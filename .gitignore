@@ -1,0 +1,28 @@
+# ---- Secrets / credentials (NEVER commit) ----
+.yahoofantasy
+private.json
+*.token
+*.tokens
+.env
+.env.*
+credentials.json
+secrets.json
+
+# ---- Python ----
+venv/
+.venv/
+env/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ipynb_checkpoints/
+
+# ---- Data files ----
+*.csv
+
+# ---- OS / editor cruft ----
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
