@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+data/raw/*
+!data/raw/.gitkeep
+# processed outputs are regenerable; keep tiers.csv + board tracked for portability
+data/processed/*.parquet
+data/processed/*.json
+.DS_Store

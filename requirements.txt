@@ -1,0 +1,8 @@
+nflreadpy>=0.1.5
+polars>=1.30
+numpy>=1.26
+requests>=2.31
+rich>=13.7
+rapidfuzz>=3.6
+PyYAML>=6.0
+pytest>=8.0

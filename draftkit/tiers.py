@@ -1,0 +1,105 @@
+"""Phase 3c — gap-based tiers with cliff flags, and the tiers.csv deliverable.
+
+Tier construction: within each position, sort by VORP and look at the drop
+between consecutive players. A drop bigger than (mean + break_z * std) of that
+position's drops starts a new tier. A drop bigger than (mean + cliff_z * std)
+additionally flags the player *above* the gap with cliff_flag=1 — "last chair
+before the music stops."
+"""
+
+from __future__ import annotations
+
+import numpy as np
+import polars as pl
+
+
+def assign_tiers(
+    values: list[float], break_z: float = 0.5, cliff_z: float = 1.0
+) -> tuple[list[int], list[bool]]:
+    """Pure function over a descending-sorted value list. Returns (tier, cliff)."""
+    n = len(values)
+    if n == 0:
+        return [], []
+    if n == 1:
+        return [1], [False]
+    gaps = np.array([values[i] - values[i + 1] for i in range(n - 1)])
+    mean, std = float(gaps.mean()), float(gaps.std())
+    # near-uniform gaps (std within float noise of zero) -> one tier
+    meaningful = std > 1e-9 * max(1.0, abs(mean))
+    break_thresh = mean + break_z * std
+    cliff_thresh = mean + cliff_z * std
+    tiers = [1]
+    cliffs = [False] * n
+    for i, g in enumerate(gaps):
+        nxt = tiers[-1] + 1 if (meaningful and g > break_thresh) else tiers[-1]
+        tiers.append(nxt)
+        if meaningful and g > cliff_thresh:
+            cliffs[i] = True  # player above the gap is the cliff edge
+    return tiers, cliffs
+
+
+def build_tiers(df: pl.DataFrame, cfg) -> pl.DataFrame:
+    tcfg = cfg["tiers"]
+    pools = cfg.pool_sizes
+    frames = []
+    for pos, pool in pools.items():
+        grp = (
+            df.filter(pl.col("pos") == pos)
+            .sort("vorp", descending=True)
+            .head(pool)
+        )
+        if grp.height == 0:
+            continue
+        tiers, cliffs = assign_tiers(
+            grp["vorp"].to_list(), float(tcfg["break_z"]), float(tcfg["cliff_z"])
+        )
+        grp = grp.with_columns(
+            pl.Series("tier", tiers, dtype=pl.Int64),
+            pl.Series("cliff_flag", cliffs, dtype=pl.Boolean),
+        )
+        frames.append(grp)
+    out = pl.concat(frames)
+    # overall value rank by VORP; adp_delta = adp - value rank
+    out = out.with_columns(
+        pl.col("vorp").rank(method="ordinal", descending=True).alias("value_rank")
+    ).with_columns((pl.col("adp") - pl.col("value_rank")).alias("adp_delta"))
+    return out.sort("value_rank")
+
+
+TIERS_COLUMNS = [
+    "player",
+    "sleeper_id",
+    "pos",
+    "team",
+    "bye",
+    "proj_pts",
+    "vorp",
+    "tier",
+    "cliff_flag",
+    "pos_rank",
+    "value_rank",
+    "ecr",
+    "adp",
+    "adp_delta",
+    "proj_source",
+    "wopr",
+    "tprr",
+    "yprr",
+    "hv_touches",
+    "routes_proxy",
+]
+
+
+def write_tiers_csv(tiers: pl.DataFrame, path) -> None:
+    out = tiers.rename({"name": "player"}).select(
+        [c for c in TIERS_COLUMNS if c in tiers.rename({"name": "player"}).columns]
+    )
+    out = out.with_columns(
+        pl.col("proj_pts").round(1),
+        pl.col("vorp").round(1),
+        pl.col("adp_delta").round(1),
+        pl.col("wopr").round(3),
+        pl.col("tprr").round(3),
+        pl.col("yprr").round(2),
+    )
+    out.write_csv(path)

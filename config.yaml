@@ -1,0 +1,66 @@
+# Omnibeta Degens draft prep — all league facts re-verified from the Sleeper API
+# by `python -m draftkit verify` (do not hand-edit league facts; edit strategy knobs).
+
+league_id: "1395566811415588864"
+draft_id: "1395566812157984768"
+season: 2026
+stats_season: 2025          # season used for the predictive dataset
+
+# Who am I? Roster 12 (draft slot 6) is currently unclaimed in this league and
+# no Sleeper account matches "gabjew90", so identity cannot be auto-detected.
+# Fill in ONE of these (username preferred). `python -m draftkit verify` will
+# resolve and print the roster/slot mapping.
+me:
+  username: null            # your Sleeper username
+  user_id: null             # or your numeric Sleeper user_id
+  draft_slot: null          # or force a slot 1-12 (overrides the above)
+
+# Replacement baselines corrected for 12-team / 2-FLEX / full-PPR
+# (flex spots skew WR in full PPR — deliberately not WR48/RB36).
+replacement_baselines:
+  QB: 12
+  RB: 40
+  WR: 60
+  TE: 12
+  K: 12
+  DEF: 12
+
+# How many players per position make the draftable pool in tiers.csv
+pool_sizes:
+  QB: 28
+  RB: 65
+  WR: 80
+  TE: 28
+  K: 16
+  DEF: 16
+
+projections:
+  # weight on the stats-based model for players with 2025 data
+  # (1 - alpha) goes to the market-implied projection from ECR;
+  # players with no 2025 data (rookies, returners) are 100% market-implied.
+  model_alpha: 0.55
+  # games-played regression: ppg is shrunk toward the positional mean with
+  # weight games/(games + k)
+  shrink_k: 5
+  # expected games for season-long totals
+  expected_games: 16.0
+
+tiers:
+  # a gap becomes a tier break when it exceeds mean + break_z * std of
+  # within-position VORP gaps; a break is also flagged as a CLIFF when it
+  # exceeds mean + cliff_z * std (per the handoff: 1 standard deviation).
+  break_z: 0.5
+  cliff_z: 1.0
+
+tracker:
+  poll_seconds: 5
+  # never recommend K/DEF before this round unless only K/DEF needs remain
+  kdef_earliest_round: 14
+  # alert when a player has fallen at least this many picks past ADP
+  # (12 = one full round in this league)
+  fall_alert_picks: 12
+
+paths:
+  raw: data/raw
+  external: data/external
+  processed: data/processed
