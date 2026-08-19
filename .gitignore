@@ -19,7 +19,9 @@ __pycache__/
 .ipynb_checkpoints/
 
 # ---- Data files ----
+# Bulk raw pulls stay local; small summary CSVs backing the retro are versioned.
 *.csv
+!reports/*.csv
 
 # ---- OS / editor cruft ----
 .DS_Store
