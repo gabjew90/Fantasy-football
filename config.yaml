@@ -6,12 +6,10 @@ draft_id: "1395566812157984768"
 season: 2026
 stats_season: 2025          # season used for the predictive dataset
 
-# Who am I? Roster 12 (draft slot 6) is currently unclaimed in this league and
-# no Sleeper account matches "gabjew90", so identity cannot be auto-detected.
-# Fill in ONE of these (username preferred). `python -m draftkit verify` will
-# resolve and print the roster/slot mapping.
+# Sleeper identity — resolved to a draft slot via the draft_order at runtime,
+# so this stays correct even if the commissioner reshuffles the order.
 me:
-  username: null            # your Sleeper username
+  username: farmerjamal     # your Sleeper username
   user_id: null             # or your numeric Sleeper user_id
   draft_slot: null          # or force a slot 1-12 (overrides the above)
 
