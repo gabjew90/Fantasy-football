@@ -78,6 +78,39 @@ def build_tiers(df: pl.DataFrame, cfg) -> pl.DataFrame:
     return out.sort("value_rank")
 
 
+def add_handcuff_info(df: pl.DataFrame) -> pl.DataFrame:
+    """UI-only handcuff columns for RBs (never an engine input).
+
+    The market blend already prices handcuff option value, so any explicit
+    contingency bump would double-count on top of an unvalidated adjustment
+    (spec §2 quarantine). These columns exist so the human can see, in the
+    bench rounds, who backs up a fragile (low exp_games) or currently-flagged
+    starter — the systematically underpriced archetype the durability
+    haircut's one-sided ledger creates.
+    """
+    name_col = "player" if "player" in df.columns else "name"
+    rbs = df.filter((pl.col("pos") == "RB") & pl.col("team").is_not_null())
+    starters = (
+        rbs.sort("vorp", descending=True)
+        .group_by("team", maintain_order=True)
+        .first()
+        .select(
+            "team",
+            pl.col(name_col).alias("backs_up"),
+            pl.col("exp_games").alias("starter_exp_games"),
+            pl.col("avail_status").alias("starter_avail"),
+        )
+    )
+    df = df.join(starters, on="team", how="left")
+    # only backup RBs carry the columns; starters themselves and non-RBs don't
+    is_backup_rb = (pl.col("pos") == "RB") & (pl.col(name_col) != pl.col("backs_up"))
+    return df.with_columns(
+        pl.when(is_backup_rb).then(pl.col("backs_up")).otherwise(None).alias("backs_up"),
+        pl.when(is_backup_rb).then(pl.col("starter_exp_games")).otherwise(None).alias("starter_exp_games"),
+        pl.when(is_backup_rb).then(pl.col("starter_avail")).otherwise(None).alias("starter_avail"),
+    )
+
+
 def build_disagreements(tiers: pl.DataFrame, adp_within: float, per_side: int = 15) -> pl.DataFrame:
     """The override-pass worklist: biggest model-vs-market rank gaps among
     players the market actually drafts (ADP inside the draft).
@@ -130,6 +163,9 @@ TIERS_COLUMNS = [
     "avail_status",
     "exp_games",
     "rookie_flag",
+    "backs_up",
+    "starter_exp_games",
+    "starter_avail",
     "wopr",
     "tprr",
     "yprr",

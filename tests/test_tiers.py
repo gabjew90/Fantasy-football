@@ -119,6 +119,31 @@ def test_disagreements_worklist():
     assert gaps == sorted(gaps)
 
 
+def test_handcuff_info_rbs_only():
+    import polars as pl
+
+    from draftkit.tiers import add_handcuff_info
+
+    df = pl.DataFrame([
+        {"player": "Star RB", "pos": "RB", "team": "SFO", "vorp": 100.0,
+         "exp_games": 12.0, "avail_status": "compromised"},
+        {"player": "Backup RB", "pos": "RB", "team": "SFO", "vorp": 10.0,
+         "exp_games": 16.0, "avail_status": None},
+        {"player": "Other WR", "pos": "WR", "team": "SFO", "vorp": 50.0,
+         "exp_games": 16.0, "avail_status": None},
+        {"player": "Solo RB", "pos": "RB", "team": "DET", "vorp": 80.0,
+         "exp_games": 16.0, "avail_status": None},
+    ])
+    out = add_handcuff_info(df)
+    back = out.filter(pl.col("player") == "Backup RB")
+    assert back["backs_up"][0] == "Star RB"
+    assert back["starter_exp_games"][0] == 12.0
+    assert back["starter_avail"][0] == "compromised"
+    assert out.filter(pl.col("player") == "Star RB")["backs_up"][0] is None
+    assert out.filter(pl.col("player") == "Other WR")["backs_up"][0] is None
+    assert out.filter(pl.col("player") == "Solo RB")["backs_up"][0] is None
+
+
 def test_no_market_rows_always_included():
     from draftkit.tiers import build_tiers
 

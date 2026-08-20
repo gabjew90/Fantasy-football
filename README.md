@@ -3,6 +3,20 @@
 Draft-prep pipeline + live draft tracker for Sleeper league **Omnibeta Degens**
 (12-team, full PPR, 2 FLEX, 15-round snake, 120s clock).
 
+> **Pre-draft cadence (settled 2026-08-19):**
+> 1. **Daily, automated:** `draftkit adpdiff` runs at 9:00 AM via Windows Task Scheduler
+>    ("draftkit ADP diff") — fresh FFC ADP snapshot, movers ≥15 picks in ≤4 days written
+>    to `reports/adp_movers.md`. The diff is the news detector; no LLM involved.
+> 2. **Night before (Saturday):** one deep research pass, fed by the movers list —
+>    overrides only on dated, sourced facts (`reports/override_research.md` has the
+>    format). Plus the full availability sweep (`data/external/availability.csv`).
+> 3. **Morning of (Sunday):** re-check ONLY the compromised subset from the sweep —
+>    preseason injury news breaks Fri/Sat and ADP is a trailing average, so
+>    final-window recency is the whole edge. Then the DRAFT DAY icon at ~2:30 PM.
+> 4. **Rounds 12–15 live:** ⛑ handcuff tags (backs up a ≤13-exp-game or
+>    availability-flagged starter) are UI-only — the market blend already prices
+>    handcuff option value, so they inform the human, never the engine.
+
 ## Quickstart
 
 ```bash

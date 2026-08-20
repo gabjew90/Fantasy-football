@@ -324,6 +324,15 @@ class Tracker:
             else:
                 why = "best value"
             why += self._bye_warning(best, needs)
+            # UI-only handcuff tag (never scored): the late-round buy signal is
+            # a backup whose starter is fragile or currently availability-flagged
+            if best.get("backs_up"):
+                seg = float(best.get("starter_exp_games") or 16.0)
+                sav = best.get("starter_avail")
+                if seg <= 13.0 or sav:
+                    tag = f" ⛑ backs up {best['backs_up']} ({seg:.0f}g"
+                    tag += f", {sav})" if sav else ")"
+                    why += tag
             score = urgency + 0.001 * (best["vorp"] or 0.0)  # stable ordering
             cands.append((score, why, best))
         cands.sort(key=lambda t: -t[0])

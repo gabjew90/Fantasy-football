@@ -115,7 +115,7 @@ def cmd_dataset(cfg: Config, args) -> None:
 
 def cmd_tiers(cfg: Config, args) -> None:
     from .projections import PROJECTION_FNS
-    from .tiers import build_disagreements, build_tiers, write_tiers_csv
+    from .tiers import add_handcuff_info, build_disagreements, build_tiers, write_tiers_csv
     from .vorp import add_vorp
     from .board import write_board_markdown
 
@@ -127,6 +127,7 @@ def cmd_tiers(cfg: Config, args) -> None:
     df = proj_fn(cfg, usage, market)
     df = add_vorp(df, cfg.baselines)
     tiers = build_tiers(df, cfg)
+    tiers = add_handcuff_info(tiers)
 
     csv_path = cfg.root / "tiers.csv"
     write_tiers_csv(tiers, csv_path)
@@ -180,6 +181,22 @@ def cmd_rivals(cfg: Config, args) -> None:
     console.print(f"rival seeds: {len(payload['users'])} users from "
                   f"{payload['history_drafts']} historical drafts -> "
                   f"{cfg.path('processed') / 'rival_seeds.json'}")
+
+
+def cmd_adpdiff(cfg: Config, args) -> None:
+    from .adpdiff import run as adp_run
+
+    result = adp_run(cfg)
+    console.print(f"ADP snapshot {result['date']}: {result['players']} players "
+                  f"(baseline: {result['baseline'] or 'none'})")
+    movers = result["movers"]
+    if movers:
+        console.print(f"[bold]{len(movers)} movers[/bold] -> reports/adp_movers.md")
+        for m in movers[:10]:
+            d = f"{'+' if m['delta'] and m['delta'] > 0 else ''}{m['delta']}" if m["delta"] is not None else m["kind"].upper()
+            console.print(f"  {m['name']} ({m['pos']}) ADP {m['adp']:.1f} [{d}]")
+    else:
+        console.print("no movers past threshold" if result["baseline"] else "first snapshot recorded")
 
 
 def cmd_log(cfg: Config, args) -> None:
@@ -252,6 +269,7 @@ def main(argv: list[str] | None = None) -> None:
     p.add_argument("--draft-id", default=None, help="override draft id (mock draft testing)")
     p.add_argument("--slot", type=int, default=None, help="override my draft slot")
     sub.add_parser("rivals")
+    sub.add_parser("adpdiff")
     p = sub.add_parser("log")
     p.add_argument("--draft-id", default=None, help="draft to review (default: real draft)")
     p = sub.add_parser("web")
@@ -272,6 +290,7 @@ def main(argv: list[str] | None = None) -> None:
         "board": cmd_board,
         "track": cmd_track,
         "rivals": cmd_rivals,
+        "adpdiff": cmd_adpdiff,
         "log": cmd_log,
         "web": cmd_web,
         "simulate": cmd_simulate,
