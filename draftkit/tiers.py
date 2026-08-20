@@ -53,7 +53,11 @@ def build_tiers(df: pl.DataFrame, cfg) -> pl.DataFrame:
         grp = grp_all.head(pool)
         if adp_within and grp_all.height > grp.height:
             cond = pl.col("adp").is_not_null() & (pl.col("adp") <= adp_within)
-            if "proj_source" in df.columns:
+            if "no_market_flag" in df.columns:
+                # flag, not proj_source: an override flips the source to
+                # "override" and must not evict an activated no_market player
+                cond = cond | pl.col("no_market_flag")
+            elif "proj_source" in df.columns:
                 cond = cond | (pl.col("proj_source") == "no_market")
             extra = grp_all.filter(
                 cond & ~pl.col("sleeper_id").is_in(grp["sleeper_id"])
@@ -90,8 +94,16 @@ def add_handcuff_info(df: pl.DataFrame) -> pl.DataFrame:
     """
     name_col = "player" if "player" in df.columns else "name"
     rbs = df.filter((pl.col("pos") == "RB") & pl.col("team").is_not_null())
+    # an "out"-zeroed starter must not be dethroned by his own backup in this
+    # heuristic — exclude zeroed rows from starter determination so the backup
+    # keeps his backs_up/starter_avail tag when the starter is flagged out
+    candidates = rbs
+    if "avail_status" in df.columns:
+        healthy = rbs.filter(pl.col("avail_status").fill_null("") != "out")
+        # keep a team's row set non-empty even if every RB is out
+        candidates = healthy if healthy.height else rbs
     starters = (
-        rbs.sort("vorp", descending=True)
+        candidates.sort("vorp", descending=True)
         .group_by("team", maintain_order=True)
         .first()
         .select(
@@ -102,8 +114,11 @@ def add_handcuff_info(df: pl.DataFrame) -> pl.DataFrame:
         )
     )
     df = df.join(starters, on="team", how="left")
-    # only backup RBs carry the columns; starters themselves and non-RBs don't
+    # only backup RBs carry the columns; starters themselves, non-RBs, and
+    # zeroed-out players (nonsense as "handcuffs") don't
     is_backup_rb = (pl.col("pos") == "RB") & (pl.col(name_col) != pl.col("backs_up"))
+    if "avail_status" in df.columns:
+        is_backup_rb = is_backup_rb & (pl.col("avail_status").fill_null("") != "out")
     return df.with_columns(
         pl.when(is_backup_rb).then(pl.col("backs_up")).otherwise(None).alias("backs_up"),
         pl.when(is_backup_rb).then(pl.col("starter_exp_games")).otherwise(None).alias("starter_exp_games"),

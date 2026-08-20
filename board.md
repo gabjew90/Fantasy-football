@@ -350,39 +350,43 @@
 
 **Tier 1**
 
-- 1. Ka'imi Fairbairn (HOU, bye 8) — 148 pts, VORP 16, ADP 141.8
-- 2. Cameron Dicker (LAC, bye 7) — 147 pts, VORP 15, ADP 143.8
-- 3. Cam Little (JAC, bye 7) — 146 pts, VORP 14, ADP 154.4
-- 4. Jason Myers (SEA, bye 11) — 144 pts, VORP 12, ADP 141.8
-- 5. Eddy Pineiro (SFO, bye 8) — 142 pts, VORP 10, ADP 164.2
-- 6. Tyler Loop (BAL, bye 13) — 141 pts, VORP 9, ADP 154.3
-- 7. Evan McPherson (CIN, bye 6) — 140 pts, VORP 8, ADP 169.8
-- 8. Cairo Santos (CHI, bye 10) — 138 pts, VORP 6, ADP 165.8
-- 9. Andy Borregales (NEP, bye 11) — 136 pts, VORP 4, ADP 165.5
-- 10. Jake Bates (DET, bye 6) — 135 pts, VORP 3, ADP 146.4
-- 11. Chase McLaughlin (TBB, bye 10) — 134 pts, VORP 2, ADP 155.4
-- 12. Harrison Mevis (LAR, bye 11) — 132 pts, VORP 0, ADP 152.4
-- 13. Harrison Butker (KCC, bye 5) — 130 pts, VORP -2, ADP 160.6
-- 14. Chris Boswell (PIT, bye 9) — 129 pts, VORP -3, ADP 157.7
-- 15. Spencer Shrader (IND, bye 13) — 128 pts, VORP -4
-- 16. Blake Grupe (IND, bye 13) — 126 pts, VORP -6, ADP 168.1
-- 17. Will Reichard (MIN, bye 6) — 124 pts, VORP -8, ADP 158.8
-- 18. Nick Folk (ATL, bye 11) — 123 pts, VORP -9, ADP 163.4
-- 19. Trey Smack (GBP, bye 11) — 122 pts, VORP -10, ADP 159.4
+- 1. Dominic Zvada (FA, bye 8) — 148 pts, VORP 16, ADP 192.4
+- 2. Ka'imi Fairbairn (HOU, bye 8) — 147 pts, VORP 15, ADP 141.8
+- 3. Cameron Dicker (LAC, bye 7) — 146 pts, VORP 14, ADP 143.8
+- 4. Cam Little (JAC, bye 7) — 144 pts, VORP 12, ADP 154.4
+- 5. Jason Myers (SEA, bye 11) — 142 pts, VORP 10, ADP 141.8
+- 6. Eddy Pineiro (SFO, bye 8) — 141 pts, VORP 9, ADP 164.2
+- 7. Tyler Loop (BAL, bye 13) — 140 pts, VORP 8, ADP 154.3
+- 8. Evan McPherson (CIN, bye 6) — 138 pts, VORP 6, ADP 169.8
+- 9. Cairo Santos (CHI, bye 10) — 136 pts, VORP 4, ADP 165.8
+- 10. Andy Borregales (NEP, bye 11) — 135 pts, VORP 3, ADP 165.5
+- 11. Jake Bates (DET, bye 6) — 134 pts, VORP 2, ADP 146.4
+- 12. Chase McLaughlin (TBB, bye 10) — 132 pts, VORP 0, ADP 155.4
+- 13. Harrison Mevis (LAR, bye 11) — 130 pts, VORP -2, ADP 152.4
+- 14. Harrison Butker (KCC, bye 5) — 129 pts, VORP -3, ADP 160.6
+- 15. Chris Boswell (PIT, bye 9) — 128 pts, VORP -4, ADP 157.7
+- 16. Spencer Shrader (IND, bye 13) — 126 pts, VORP -6
+- 17. Blake Grupe (IND, bye 13) — 124 pts, VORP -8, ADP 168.1
+- 18. Will Reichard (MIN, bye 6) — 123 pts, VORP -9, ADP 158.8
+- 19. Nick Folk (ATL, bye 11) — 122 pts, VORP -10, ADP 163.4
+- 20. Trey Smack (GBP, bye 11) — 120 pts, VORP -12, ADP 159.4
 
 **Tier 2**
 
-- 21. Wil Lutz (DEN, bye 10) — 118 pts, VORP -14, ADP 160.5
-- 22. Tyler Bass ⛰ (BUF, bye 7) — 117 pts, VORP -15, ADP 164.8
+- 22. Wil Lutz (DEN, bye 10) — 117 pts, VORP -15, ADP 160.5
+- 23. Tyler Bass (BUF, bye 7) — 116 pts, VORP -16, ADP 164.8
 
 **Tier 3**
 
 - 25. Brandon Aubrey (DAL, bye 14) — 112 pts, VORP -20, ADP 129.6
-- 27. Jake Elliott ⛰ (PHI, bye 10) — 111 pts, VORP -21, ADP 144.8
 
 **Tier 4**
 
-- 32. Joey Slye (TEN, bye 9) — 104 pts, VORP -28, ADP 148.0
+- 28. Jake Elliott ⛰ (PHI, bye 10) — 110 pts, VORP -22, ADP 144.8
+
+**Tier 5**
+
+- 33. Joey Slye (TEN, bye 9) — 102 pts, VORP -30, ADP 148.0
 
 ## DEF
 

@@ -27,8 +27,13 @@ class DraftLog:
                     e = json.loads(line)
                 except ValueError:
                     continue
+                # sequential, not max(): a reset event legitimately lowers the
+                # high-water mark and later re-made picks must be re-logged
                 if e.get("type") == "pick":
-                    self._last_pick = max(self._last_pick, int(e.get("pick_no", 0)))
+                    self._last_pick = int(e.get("pick_no", 0))
+                    self._recs_at = self._last_pick
+                elif e.get("type") == "reset":
+                    self._last_pick = int(e.get("picks", 0))
                     self._recs_at = self._last_pick
                 elif e.get("type") == "status":
                     self._last_status = e.get("status")
@@ -55,6 +60,15 @@ class DraftLog:
             self._last_status = status
 
         picks = t.state.picks
+        if len(picks) < self._last_pick:
+            # commissioner pause/reset/undo: the pick list shrank. Mark it and
+            # lower the high-water mark so re-made picks get logged fresh
+            # (entries above the new mark are superseded history).
+            self._append({"type": "reset", "picks": len(picks),
+                          "note": f"pick list shrank {self._last_pick} -> {len(picks)}; "
+                                  "entries above this point are superseded"})
+            self._last_pick = len(picks)
+            self._recs_at = len(picks)
         for i in range(self._last_pick, len(picks)):
             p = picks[i]
             pick_no = i + 1

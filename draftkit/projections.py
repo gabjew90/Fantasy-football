@@ -144,11 +144,12 @@ def _apply_availability(df: pl.DataFrame, av: pl.DataFrame) -> pl.DataFrame:
 
     status "out" zeroes the projection (player stays on the board so the draft
     room shows him as dead weight); "compromised" only carries a flag for a
-    manual look. Applied after overrides — availability is a fact, not a view.
+    manual look. Applied after overrides, deliberately: "out" is a fact, not a
+    view, so it supersedes even a manual override.
     """
     av = av.select(
         pl.col("sleeper_id").cast(pl.Utf8),
-        pl.col("status").alias("avail_status"),
+        pl.col("status").cast(pl.Utf8).str.to_lowercase().str.strip_chars().alias("avail_status"),
     ).unique(subset="sleeper_id")
     df = df.join(av, on="sleeper_id", how="left")
     return df.with_columns(
@@ -201,14 +202,17 @@ def default_projection(cfg, usage: pl.DataFrame, market: pl.DataFrame) -> pl.Dat
     # within position — a gentle linear decline, which correctly yields small
     # VORP spreads (K/DEF are near-fungible and shouldn't out-rank skill picks).
     kdef_base = {"K": (150.0, 1.5), "DEF": (135.0, 2.0)}
+    # ADP stands in for a missing ECR here too, so a K/DEF present only in
+    # the ADP feed still gets a projection instead of silently dropping
     df = df.with_columns(
-        pl.col("ecr").rank(method="ordinal").over("pos").alias("_ecr_pos_rank")
+        pl.coalesce(pl.col("ecr"), pl.col("adp"))
+        .rank(method="ordinal").over("pos").alias("_ecr_pos_rank")
     )
     df = df.with_columns(
         pl.when(
             pl.col("pos").is_in(list(kdef_base))
             & pl.col("proj_market_pts").is_null()
-            & pl.col("ecr").is_not_null()
+            & pl.coalesce(pl.col("ecr"), pl.col("adp")).is_not_null()
         )
         .then(
             pl.col("pos").replace_strict(
@@ -246,6 +250,12 @@ def default_projection(cfg, usage: pl.DataFrame, market: pl.DataFrame) -> pl.Dat
         .otherwise(pl.lit("none"))
         .alias("proj_source"),
     )
+    # no_market_flag survives overrides (which flip proj_source to "override")
+    # so the board's unconditional inclusion can't lose an ACTIVATED player
+    df = df.with_columns(
+        pl.col("sleeper_id").is_in(no_market_ids).alias("no_market_flag")
+        if no_market_ids else pl.lit(False).alias("no_market_flag")
+    )
     if no_market_ids:
         df = df.with_columns(
             pl.when(pl.col("sleeper_id").is_in(no_market_ids))
@@ -272,10 +282,12 @@ def default_projection(cfg, usage: pl.DataFrame, market: pl.DataFrame) -> pl.Dat
     if ov_path.exists():
         ov = pl.read_csv(ov_path, infer_schema_length=1000)
         if "sleeper_id" in ov.columns and "proj_pts" in ov.columns:
+            # keep="last": a hand-edited duplicate row means the later line is
+            # the revision, and a non-unique join would multiply the player
             ov = ov.select(
                 pl.col("sleeper_id").cast(pl.Utf8),
                 pl.col("proj_pts").cast(pl.Float64).alias("proj_override"),
-            )
+            ).unique(subset="sleeper_id", keep="last")
             df = df.join(ov, on="sleeper_id", how="left").with_columns(
                 pl.when(pl.col("proj_override").is_not_null())
                 .then(pl.lit("override"))

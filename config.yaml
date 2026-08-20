@@ -73,11 +73,11 @@ tiers:
 
 tracker:
   poll_seconds: 5
-  # never recommend K/DEF before this round unless only K/DEF needs remain
-  kdef_earliest_round: 14
   # alert when a player has fallen at least this many picks past ADP
   # (12 = one full round in this league)
   fall_alert_picks: 12
+  # K/DEF timing is a hard guardrail (final two picks only), not a knob —
+  # see Tracker._guardrail_ok
 
 paths:
   raw: data/raw

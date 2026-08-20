@@ -15,7 +15,9 @@ start "" http://localhost:8723
 
 :loop
 %PY% -m draftkit web --port 8723
-if errorlevel 3 exit /b 0
+rem exact match only: "if errorlevel 3" would swallow ANY crash code >= 3
+rem (e.g. 9009 missing python) as "already running" and exit silently
+if "%errorlevel%"=="3" exit /b 0
 echo.
 echo Dashboard server stopped - restarting in 2 seconds (close this window to quit)...
 timeout /t 2 /nobreak >nul

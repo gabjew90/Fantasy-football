@@ -4,6 +4,7 @@ lives in Tracker; this module serializes it to JSON and serves one page."""
 from __future__ import annotations
 
 import json
+import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
@@ -109,9 +110,10 @@ def build_state(t: Tracker) -> dict:
 class DraftWebApp:
     """Owns Tracker instances (one per draft id) and rate-limits polling.
 
-    No threads: /state polls Sleeper at most once per poll_seconds per draft,
-    driven by browser requests. Clearing the cache (reload) is always safe —
-    Tracker rebuilds full state from the picks list on the next poll.
+    ThreadingHTTPServer serves each request on its own thread, so all shared
+    state (tracker cache, poll gate, tracker/draftlog mutation) is serialized
+    behind one lock — build_state is cheap and polling is rate-limited, so
+    serializing requests costs nothing observable.
     """
 
     def __init__(self, cfg, tiers_path, default_slot):
@@ -120,34 +122,44 @@ class DraftWebApp:
         self.default_slot = default_slot
         self._trackers: dict[str, Tracker] = {}
         self._last_poll: dict[str, float] = {}
+        self._lock = threading.Lock()
 
     def _tracker(self, draft_id: str, slot: int | None) -> Tracker:
         if draft_id not in self._trackers:
             if slot is None:
-                slot = self.default_slot if draft_id == self.cfg.draft_id else 2
+                # unknown drafts start as spectator — a silent wrong-seat
+                # default is worse than prompting for the slot in the footer
+                slot = self.default_slot if draft_id == self.cfg.draft_id else None
             self._trackers[draft_id] = Tracker(
                 self.cfg, tiers_path=self.tiers_path,
                 draft_id=draft_id, my_slot=slot,
             )
-        return self._trackers[draft_id]
+        t = self._trackers[draft_id]
+        # honor a slot change on an already-cached tracker (footer "apply")
+        if slot is not None and t.my_slot != slot:
+            t.my_slot = slot
+            t._urgency_cache = None
+        return t
 
     def state_for(self, draft_id: str, slot: int | None) -> dict:
-        try:
-            t = self._tracker(draft_id, slot)
-        except Exception as e:  # bad mock id, Sleeper down at creation, etc.
-            return {"ok": False, "error": f"could not open draft {draft_id}: {e}"[:200]}
-        now = time.monotonic()
-        if now - self._last_poll.get(draft_id, 0.0) >= t.poll_seconds:
-            self._last_poll[draft_id] = now
-            t.poll()
-        state = build_state(t)
-        state["tiers_built_at"] = self.tiers_mtime()
-        return state
+        with self._lock:
+            try:
+                t = self._tracker(draft_id, slot)
+            except Exception as e:  # bad mock id, Sleeper down at creation, etc.
+                return {"ok": False, "error": f"could not open draft {draft_id}: {e}"[:200]}
+            now = time.monotonic()
+            if now - self._last_poll.get(draft_id, 0.0) >= t.poll_seconds:
+                self._last_poll[draft_id] = now
+                t.poll()
+            state = build_state(t)
+            state["tiers_built_at"] = self.tiers_mtime()
+            return state
 
     def reload(self) -> None:
         """Forget all trackers; next request re-reads tiers.csv and rebuilds."""
-        self._trackers.clear()
-        self._last_poll.clear()
+        with self._lock:
+            self._trackers.clear()
+            self._last_poll.clear()
 
     def tiers_mtime(self) -> str | None:
         try:

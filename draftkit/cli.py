@@ -160,10 +160,16 @@ def cmd_track(cfg: Config, args) -> None:
 
     slot = args.slot
     if slot is None:
-        client = SleeperClient(cfg.path("raw"))
-        slot, info = resolve_my_slot(cfg, client)
-        if slot is None and not args.draft_id:
-            console.print(f"[yellow]warning: {info.get('error')}; running in spectator mode[/yellow]")
+        if args.draft_id:
+            # a mock draft's seat has nothing to do with the real league's;
+            # inheriting it silently would track a stranger's roster
+            console.print("[yellow]mock draft: no --slot given, running as "
+                          "spectator (pass --slot N for your seat)[/yellow]")
+        else:
+            client = SleeperClient(cfg.path("raw"))
+            slot, info = resolve_my_slot(cfg, client)
+            if slot is None:
+                console.print(f"[yellow]warning: {info.get('error')}; running in spectator mode[/yellow]")
     tracker = Tracker(
         cfg,
         tiers_path=cfg.root / "tiers.csv",
@@ -239,14 +245,16 @@ def cmd_web(cfg: Config, args) -> None:
 def cmd_simulate(cfg: Config, args) -> None:
     from .simulate import run_simulation
 
-    mine = run_simulation(cfg, cfg.root / "tiers.csv", my_slot=args.slot, verbose=not args.quiet)
+    from . import snake
+
+    mine, teams = run_simulation(cfg, cfg.root / "tiers.csv", my_slot=args.slot, verbose=not args.quiet)
     console.print("\n[bold]my simulated roster:[/bold]")
     tiers = pl.read_csv(cfg.root / "tiers.csv", infer_schema_length=2000)
     by_id = {str(r["sleeper_id"]): r for r in tiers.iter_rows(named=True)}
     for p in mine:
         info = by_id[str(p["player_id"])]
         console.print(
-            f"  R{(p['pick_no'] - 1) // 12 + 1:>2} pick {p['pick_no']:>3}: "
+            f"  R{snake.pick_to_round_slot(p['pick_no'], teams)[0]:>2} pick {p['pick_no']:>3}: "
             f"{info['player']} ({info['pos']}{info['pos_rank']}, tier {info['tier']}, "
             f"proj {info['proj_pts']:.0f}, ADP {info['adp'] if info['adp'] is not None else '—'})"
         )

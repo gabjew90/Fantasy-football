@@ -26,7 +26,6 @@ def make_tracker(picks, my_slot=2):
     t.slots = dict(SLOTS)
     t.my_slot = my_slot
     t.poll_seconds = 5.0
-    t.kdef_round = 14
     t.fall_alert = 12
     t.draft_id = "logdraft"
     t.sims = 20
@@ -91,6 +90,23 @@ def test_restart_does_not_duplicate(tmp_path):
     DraftLog(log_path).sync(make_tracker([pick(1, 1)]))
     picks_logged = [e for e in _events(log_path) if e["type"] == "pick"]
     assert len(picks_logged) == 1
+
+
+def test_reset_shrink_relogs_new_picks(tmp_path):
+    # REGRESSION: a commissioner undo shrinks the pick list; the log must mark
+    # the reset and re-log replacement picks instead of skipping them forever.
+    log_path = tmp_path / "d.jsonl"
+    log = DraftLog(log_path)
+    log.sync(make_tracker([pick(1, 1), pick(2, 2)]))
+    log.sync(make_tracker([pick(1, 1)]))                 # undo pick 2
+    log.sync(make_tracker([pick(1, 1), pick(3, 2)]))     # different player re-picked
+    events = _events(log_path)
+    assert any(e["type"] == "reset" for e in events)
+    picked = [e["player"] for e in events if e["type"] == "pick"]
+    assert picked.count("Gamma TE") == 1  # the re-made pick was logged
+    # restart over the same file must not resurrect the old high-water mark
+    log2 = DraftLog(log_path)
+    assert log2._last_pick == 2
 
 
 def test_status_transition_logged(tmp_path):

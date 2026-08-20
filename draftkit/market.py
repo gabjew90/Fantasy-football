@@ -177,6 +177,11 @@ def build_market(cfg, players: dict[str, dict]) -> tuple[pl.DataFrame, dict]:
     ecr_cols = ["sleeper_id", "name", "pos", "team", "ecr", "ecr_sd"]
     if "bye" in ecr.columns:
         ecr_cols.append("bye")
+    # a user CSV's own ADP is fresher than the FFC pull — carry it through
+    # and prefer it after the join
+    if "adp" in ecr.columns:
+        ecr = ecr.rename({"adp": "adp_user"})
+        ecr_cols.append("adp_user")
     market = ecr.filter(pl.col("sleeper_id").is_not_null()).select(ecr_cols).unique(
         subset="sleeper_id", keep="first"
     )
@@ -200,10 +205,10 @@ def build_market(cfg, players: dict[str, dict]) -> tuple[pl.DataFrame, dict]:
         ),
     ).drop(["name_ffc", "pos_ffc", "bye_ffc"], strict=False)
 
-    # user CSV may carry its own adp; prefer it where present
-    if user_csv is not None and "adp" in user_csv.columns:
-        # adp already came through ecr frame if provided there
-        pass
+    if "adp_user" in market.columns:
+        market = market.with_columns(
+            pl.coalesce(pl.col("adp_user"), pl.col("adp")).alias("adp")
+        ).drop("adp_user")
 
     market = market.sort(pl.col("ecr").fill_null(999))
     return market, report

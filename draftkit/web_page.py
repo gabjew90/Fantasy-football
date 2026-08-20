@@ -89,7 +89,7 @@ PAGE = r"""<!DOCTYPE html>
 </footer>
 <script>
 const $ = id => document.getElementById(id);
-let fails = 0, lastOk = null;
+let fails = 0, lastOk = null, seq = 0;
 
 const store = {
   get draftId() { return localStorage.getItem("dk_draft_id") || ""; },
@@ -106,7 +106,15 @@ function esc(t) { const d = document.createElement("div"); d.textContent = t ?? 
 
 function render(s) {
   const b = $("banner");
-  if (!s.ok) { $("inputErr").textContent = s.error; return; }
+  if (!s.ok) {
+    $("inputErr").textContent = s.error;
+    if (!lastOk) {  // nothing good on screen yet: surface the error large
+      b.className = "banner err";
+      b.textContent = s.error;
+      document.title = "⚠ draftkit";
+    }
+    return;
+  }
   $("inputErr").textContent = "";
 
   if (s.poll_error) {
@@ -171,6 +179,7 @@ function render(s) {
 }
 
 async function tick() {
+  const my = ++seq;  // response-ordering guard: never paint a stale snapshot
   const q = new URLSearchParams();
   if (store.draftId) q.set("draft_id", store.draftId);
   if (store.slot) q.set("slot", store.slot);
@@ -178,9 +187,11 @@ async function tick() {
   try {
     const r = await fetch("/state?" + q, {cache: "no-store"});
     const s = await r.json();
+    if (my !== seq) return;  // a newer tick already resolved
     fails = 0; lastOk = Date.now();
     render(s);
   } catch (e) {
+    if (my !== seq) return;
     if (++fails >= 2) {
       $("banner").className = "banner err";
       $("banner").innerHTML = `RECONNECTING… <small>dashboard server not answering — the launcher restarts it automatically; if this persists 15s, double-click DRAFT DAY again.</small>`;

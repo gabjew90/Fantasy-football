@@ -83,4 +83,4 @@ def run_simulation(cfg, tiers_path, my_slot: int, verbose: bool = True) -> list[
         console.rule("FINAL")
         console.print(t.render())
     mine = [p for p in picks if p["draft_slot"] == my_slot]
-    return mine
+    return mine, t.teams

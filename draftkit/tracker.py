@@ -54,7 +54,6 @@ class Tracker:
         self.my_slot = my_slot
         tcfg = cfg["tracker"]
         self.poll_seconds = float(tcfg["poll_seconds"])
-        self.kdef_round = int(tcfg["kdef_earliest_round"])
         self.fall_alert = int(tcfg["fall_alert_picks"])
         ecfg = cfg["engine"] if "engine" in cfg._data else {}
         self.sims = int(ecfg.get("sims", 1000))
@@ -64,7 +63,7 @@ class Tracker:
         gcfg = cfg["guardrails"] if "guardrails" in cfg._data else {}
         self.qb2_round = int(gcfg.get("qb2_earliest_round", 10))
         self.te2_fall = int(gcfg.get("te2_fall_picks", 12))
-        self._urgency_cache: tuple[int, dict] | None = None
+        self._urgency_cache: tuple[tuple, dict] | None = None
         from .rivals import load_seeds
         self.rival_seeds = load_seeds(cfg).get("users", {})
         order = self.draft.get("draft_order") or {}
@@ -82,17 +81,23 @@ class Tracker:
     # ---------- state ----------
 
     def poll(self) -> bool:
-        """Fetch picks; returns True if new picks arrived. Retries with backoff."""
+        """Fetch picks; returns True if the pick list changed. Retries with backoff."""
         try:
             picks = get_json(f"{BASE}/draft/{self.draft_id}/picks", retries=3)
-            draft = get_json(f"{BASE}/draft/{self.draft_id}", retries=1)
-            self.state.status = draft.get("status", "unknown")
         except Exception as e:  # noqa: BLE001
             self.state.last_error = str(e)[:120]
             return False
+        changed = len(picks) != len(self.state.picks)
+        # Status only changes around pick activity; skipping the second round
+        # trip mid-draft keeps a slow meta call from stalling the /state thread.
+        if changed or self.state.status != "drafting":
+            try:
+                draft = get_json(f"{BASE}/draft/{self.draft_id}", retries=1)
+                self.state.status = draft.get("status", "unknown")
+            except Exception:  # noqa: BLE001 — picks succeeded; stale status is fine
+                pass
         self.state.last_error = None
         self.state.last_poll_ok = time.time()
-        changed = len(picks) != len(self.state.picks)
         self.state.picks = picks
         self.state.drafted_ids = {str(p["player_id"]) for p in picks}
         self.log.sync(self)
@@ -103,7 +108,7 @@ class Tracker:
         return len(self.state.picks) + 1
 
     def picks_for_slot(self, slot: int) -> list[dict]:
-        return [p for p in self.state.picks if int(p.get("draft_slot", 0)) == slot]
+        return [p for p in self.state.picks if int(p.get("draft_slot") or 0) == slot]
 
     def slot_positions(self, slot: int) -> list[str]:
         out = []
@@ -150,7 +155,9 @@ class Tracker:
                     demand[pos] = demand.get(pos, 0) + 1
         report = {}
         for pos in POS_ORDER:
-            rem = self.remaining(pos)
+            # no_market rows are engine-invisible; don't let them pad the
+            # runway count or carry cliff flags into the urgency math
+            rem = [p for p in self.remaining(pos) if p.get("proj_source") != "no_market"]
             before_cliff = None
             for i, p in enumerate(rem):
                 if p["cliff_flag"]:
@@ -174,10 +181,10 @@ class Tracker:
 
     # ---------- decision engine (final spec §5-§6) ----------
 
-    def _rival_states(self, my_next: int) -> list[dict]:
+    def _rival_states(self, start: int, my_next: int) -> list[dict]:
         """Intervening pickers in order, with their open starter slots."""
         out = []
-        for pick_no in range(self.current_pick, my_next):
+        for pick_no in range(start, my_next):
             _, slot = snake.pick_to_round_slot(pick_no, self.teams)
             if slot == self.my_slot:
                 continue
@@ -196,25 +203,41 @@ class Tracker:
         """Cached per pick-state; None when unslotted or the draft is over."""
         if not self.my_slot:
             return None
-        key = len(self.state.picks)
+        picks = self.state.picks
+        # key includes the last pick's identity so an undo+redo at equal count
+        # (commissioner reversal) invalidates the cache
+        key = (len(picks), str(picks[-1].get("player_id")) if picks else "")
         if self._urgency_cache and self._urgency_cache[0] == key:
             return self._urgency_cache[1]
+        import zlib
+
         import numpy as np
 
         from .urgency import simulate_survival
 
         cur = self.current_pick
-        my_next = snake.next_pick_for_slot(cur, self.my_slot, self.teams, self.rounds)
+        total = self.teams * self.rounds
+        rnd, slot_on_clock = snake.pick_to_round_slot(min(cur, total), self.teams)
+        # When I'M on the clock, the decision window is the rival picks between
+        # now and my FOLLOWING turn (on pick 23, rivals pick 24-25 before my
+        # 26) — next_pick_for_slot(cur) would return cur itself and zero out
+        # every urgency exactly at decision time.
+        start = cur + 1 if slot_on_clock == self.my_slot else cur
+        my_next = snake.next_pick_for_slot(start, self.my_slot, self.teams, self.rounds)
         if my_next is None:
             return None
-        rnd, _ = snake.pick_to_round_slot(min(cur, self.teams * self.rounds), self.teams)
+        # no_market rows are engine-invisible (guardrail) — keep them out of
+        # the survival pool and best-available math too
         pool = sorted(
-            self.remaining(),
+            (p for p in self.remaining() if p.get("proj_source") != "no_market"),
             key=lambda p: p["adp"] if p.get("adp") is not None else 999.0,
         )[: self.pool_size]
-        rng = np.random.default_rng(hash((self.draft_id, key)) & 0xFFFFFFFF)
+        # crc32, not hash(): string hash is per-process randomized and would
+        # let a mid-draft restart silently flip near-tie recommendations
+        seed = zlib.crc32(f"{self.draft_id}:{key[0]}:{key[1]}".encode())
+        rng = np.random.default_rng(seed)
         report = simulate_survival(
-            pool, cur, my_next, self._rival_states(my_next), self.rival_seeds,
+            pool, start, my_next, self._rival_states(start, my_next), self.rival_seeds,
             rng, sims=self.sims, sigma=self._sigma(rnd), teams=self.teams,
         )
         self._urgency_cache = (key, report)
@@ -226,7 +249,8 @@ class Tracker:
             counts[pos] = counts.get(pos, 0) + 1
         return counts
 
-    def _guardrail_ok(self, p: dict, rnd: int, needs, counts, picks_left) -> bool:
+    def _guardrail_ok(self, p: dict, rnd: int, needs, counts, picks_left,
+                      top6_te_fell: bool) -> bool:
         """Final spec §6 — hard rules, override the engine."""
         # no_market rows are board-visible only: the stats model's lone opinion
         # with no market corroboration. An overrides.csv entry (proj_source
@@ -235,21 +259,20 @@ class Tracker:
             return False
         pos = p["pos"]
         if pos in ("K", "DEF"):
-            kdef_needed = needs.get("K", 0) + needs.get("DEF", 0)
-            if picks_left > 2 and picks_left > kdef_needed:
+            # final-two-picks rule (kdef_needed <= 2 always, so this is the gate)
+            if picks_left > 2:
                 return False
             if counts.get(pos, 0) >= 1:
                 return False
-        if pos == "QB" and counts.get("QB", 0) >= 1 and rnd < self.qb2_round:
-            return False
-        if pos == "TE" and counts.get("TE", 0) >= 1:
-            top6_fell = any(
-                q["pos_rank"] <= 6
-                and q.get("adp") is not None
-                and self.current_pick - q["adp"] >= self.te2_fall
-                for q in self.remaining("TE")
-            )
-            if not top6_fell:
+        if pos == "QB":
+            if counts.get("QB", 0) >= 2:  # never a 3rd QB in a 1-QB league
+                return False
+            if counts.get("QB", 0) >= 1 and rnd < self.qb2_round:
+                return False
+        if pos == "TE":
+            if counts.get("TE", 0) >= 2:  # spec allows at most a 2nd TE
+                return False
+            if counts.get("TE", 0) >= 1 and not top6_te_fell:
                 return False
         # max one zero-role stash: proxy = negative-VORP player already rostered
         if (p["vorp"] or 0) <= 0 and not snake.needs_position(needs, pos):
@@ -269,13 +292,27 @@ class Tracker:
         return True
 
     def _bye_warning(self, p: dict, needs) -> str:
-        """Warn (never block) when a pick creates 3+ starters on one bye."""
-        starters_needed = sum(v for k, v in self.slots.items() if k != "BN")
-        picked = [
-            self.by_id.get(str(x["player_id"]))
-            for x in self.picks_for_slot(self.my_slot)
-        ]
-        byes = [q["bye"] for q in picked[:starters_needed] if q and q.get("bye") is not None]
+        """Warn (never block) when a pick creates 3+ starters on one bye.
+
+        Starters are assigned the same way snake.starter_needs fills slots
+        (dedicated -> FLEX -> bench), not by draft order — an early bench
+        stash must not count and a late-drafted real starter must.
+        """
+        remaining = {k: v for k, v in self.slots.items()}
+        byes: list = []
+        for x in self.picks_for_slot(self.my_slot):
+            q = self.by_id.get(str(x.get("player_id")))
+            if not q:
+                continue
+            pos = q["pos"]
+            if remaining.get(pos, 0) > 0:
+                remaining[pos] -= 1
+            elif pos in snake.FLEX_ELIGIBLE and remaining.get("FLEX", 0) > 0:
+                remaining["FLEX"] -= 1
+            else:
+                continue  # bench
+            if q.get("bye") is not None:
+                byes.append(q["bye"])
         if p.get("bye") is not None and byes.count(p["bye"]) >= 2:
             return f" ⚠ {byes.count(p['bye']) + 1} starters on bye {p['bye']}"
         return ""
@@ -295,19 +332,29 @@ class Tracker:
         counts = self._my_pos_counts()
         picks_left = self.rounds - len(self.picks_for_slot(self.my_slot))
         report = self.urgency_report()
+        # hoisted: the TE2 exception is a property of the board, not of each
+        # candidate — computing it per-candidate re-sorted the TE pool ~30x
+        top6_te_fell = any(
+            q["pos_rank"] <= 6
+            and q.get("adp") is not None
+            and self.current_pick - q["adp"] >= self.te2_fall
+            for q in self.remaining("TE")
+        )
 
         cands = []
-        for pos in ("RB", "WR", "TE", "QB", "K", "DEF"):
+        for pos in POS_ORDER:
             pool = [
                 p for p in self.remaining(pos)
-                if self._guardrail_ok(p, rnd, needs, counts, picks_left)
+                if self._guardrail_ok(p, rnd, needs, counts, picks_left, top6_te_fell)
             ][:3]
             if not pool:
                 continue
-            # best VORP within position; near-ties (<= 2 VORP) broken by Δ
-            best = pool[0]
+            # best VORP within position; near-ties (<= 2 VORP of the position's
+            # TOP candidate) broken by Δ — anchored so swaps can't chain
+            anchor = pool[0]
+            best = anchor
             for q in pool[1:]:
-                if abs((best["vorp"] or 0) - (q["vorp"] or 0)) <= 2.0 and (
+                if abs((anchor["vorp"] or 0) - (q["vorp"] or 0)) <= 2.0 and (
                     (q.get("adp_delta") or -999) > (best.get("adp_delta") or -999)
                 ):
                     best = q

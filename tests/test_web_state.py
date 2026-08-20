@@ -37,7 +37,6 @@ def make_tracker(picks, my_slot=2):
     t.slots = dict(SLOTS)
     t.my_slot = my_slot
     t.poll_seconds = 5.0
-    t.kdef_round = 14
     t.fall_alert = 12
     t.draft_id = "testdraft"
     t.sims = 50
@@ -154,12 +153,14 @@ class StubTracker:
 
 def test_app_rate_limits_polls(monkeypatch):
     import pathlib
+    import threading
 
     from draftkit.web import DraftWebApp
 
     app = DraftWebApp.__new__(DraftWebApp)
     app._trackers = {}
     app._last_poll = {}
+    app._lock = threading.Lock()
     app.tiers_path = pathlib.Path("nonexistent-tiers.csv")
     stub = StubTracker()
     app._trackers["d1"] = stub
@@ -171,10 +172,42 @@ def test_app_rate_limits_polls(monkeypatch):
 
 
 def test_app_reload_clears_cache():
+    import threading
+
     from draftkit.web import DraftWebApp
 
     app = DraftWebApp.__new__(DraftWebApp)
     app._trackers = {"d1": StubTracker()}
     app._last_poll = {"d1": 123.0}
+    app._lock = threading.Lock()
     app.reload()
     assert app._trackers == {} and app._last_poll == {}
+
+
+def test_on_clock_urgency_window_is_next_turn():
+    # REGRESSION: on the clock at pick 2, the engine must simulate the rival
+    # picks up to my NEXT turn (pick 23), not a zero-width window that makes
+    # every urgency 0.0 and every survival 100%.
+    t = make_tracker([pick(4, 1, "WR")], my_slot=2)  # pick 1 made -> I'm on the clock
+    s = build_state(t)
+    assert s["on_clock_me"] is True
+    rep = t.urgency_report()
+    surv = list(rep["RB"]["survival"].values())
+    assert any(v < 1.0 for v in surv), "on-clock window must simulate rivals"
+
+
+def test_slot_change_applies_to_cached_tracker():
+    import pathlib
+    import threading
+
+    from draftkit.web import DraftWebApp
+
+    app = DraftWebApp.__new__(DraftWebApp)
+    app._trackers = {}
+    app._last_poll = {"d1": 1e18}  # far future: skip polling
+    app._lock = threading.Lock()
+    app.tiers_path = pathlib.Path("nonexistent-tiers.csv")
+    t = make_tracker([], my_slot=2)
+    app._trackers["d1"] = t
+    app.state_for("d1", 7)
+    assert t.my_slot == 7
