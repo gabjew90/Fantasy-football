@@ -1,5 +1,8 @@
-# ADP movers — 2026-08-19
+# ADP movers — 2026-08-20
 
-Baseline: none (first snapshot) | threshold: 15.0 picks | pool: 266 players
+Baseline: 2026-08-19 | threshold: 15.0 picks | pool: 264 players
 
-- first snapshot recorded; diffs start tomorrow
+- **Christian Kirk** (WR) ENTERED the ADP pool (ADP 173.6)
+- **Jalen Tolbert** (WR) LEFT the ADP pool (ADP 166.6)
+- **Brandon Aiyuk** (WR) LEFT the ADP pool (ADP 166.6)
+- **Zachariah Branch** (WR) LEFT the ADP pool (ADP 172.8)
