@@ -157,6 +157,72 @@ class DraftWebApp:
         return time.strftime("%Y-%m-%d %H:%M", time.localtime(mt))
 
 
+def render_log_html(log_path, draft_id: str) -> str:
+    """Server-rendered play-by-play review page from the JSONL draft log."""
+    import html as _html
+
+    rows = []
+    if log_path.exists():
+        for line in log_path.read_text(encoding="utf-8").splitlines():
+            try:
+                e = json.loads(line)
+            except ValueError:
+                continue
+            at = _html.escape(e.get("at", ""))
+            if e["type"] == "status":
+                rows.append(f'<div class="ev status">{at} — draft status: '
+                            f'{_html.escape(str(e.get("status")))}</div>')
+            elif e["type"] == "pick":
+                name = _html.escape(str(e.get("player")))
+                pos = _html.escape(str(e.get("pos") or "?"))
+                tier = e.get("tier")
+                vorp = e.get("vorp")
+                vs = e.get("vs_adp")
+                bits = [pos]
+                if tier is not None:
+                    bits.append(f"T{tier}")
+                if vorp is not None:
+                    bits.append(f"VORP {vorp:.0f}")
+                if vs is not None:
+                    bits.append(f"{'+' if vs >= 0 else ''}{vs:.0f} vs ADP")
+                cls = "ev pick mine" if e.get("my_pick") else "ev pick"
+                tag = " <b>← MY PICK</b>" if e.get("my_pick") else ""
+                rows.append(
+                    f'<div class="{cls}">{at} — <b>P{e["pick_no"]}</b> '
+                    f'R{e["round"]} slot {e["slot"]}: <b>{name}</b> '
+                    f'({", ".join(bits)}){tag}</div>'
+                )
+            elif e["type"] == "recs":
+                recs = e.get("recommendations") or []
+                items = "".join(
+                    f'<li><b>{_html.escape(str(r["player"]))}</b> '
+                    f'({_html.escape(str(r["pos"]))}, T{r["tier"]}, VORP {r["vorp"]:.0f}) '
+                    f'— {_html.escape(str(r["why"]))}</li>'
+                    for r in recs
+                )
+                rows.append(
+                    f'<div class="ev recs">{at} — engine before pick '
+                    f'{e["current_pick"]}:<ol>{items}</ol></div>'
+                )
+    body = "\n".join(rows) or "<p>No log yet — events appear once polling starts.</p>"
+    return f"""<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><title>draftkit log</title>
+<style>
+  body {{ background: #0d1117; color: #e6edf3; font: 15px/1.5 "Segoe UI", system-ui, sans-serif;
+         max-width: 1000px; margin: 0 auto; padding: 18px; }}
+  h1 {{ font-size: 18px; color: #8b949e; }}
+  .ev {{ padding: 5px 10px; border-left: 3px solid #30363d; margin: 3px 0; }}
+  .ev.status {{ color: #d29922; border-color: #d29922; }}
+  .ev.pick.mine {{ background: #172554; border-color: #58a6ff; }}
+  .ev.recs {{ color: #8b949e; border-color: #21262d; font-size: 13.5px; }}
+  .ev.recs ol {{ margin: 2px 0 2px 22px; }}
+  .ev.recs b {{ color: #e6edf3; }}
+</style></head><body>
+<h1>Play-by-play — draft {_html.escape(draft_id)}</h1>
+{body}
+</body></html>"""
+
+
 def run_server(cfg, tiers_path, default_slot: int | None, port: int) -> int:
     """Serve the dashboard. Returns process exit code (3 = port already in use)."""
     from .web_page import PAGE
@@ -176,6 +242,12 @@ def run_server(cfg, tiers_path, default_slot: int | None, port: int) -> int:
             url = urlparse(self.path)
             if url.path == "/":
                 self._send(200, PAGE.encode("utf-8"), "text/html; charset=utf-8")
+            elif url.path == "/log":
+                q = parse_qs(url.query)
+                draft_id = (q.get("draft_id") or [cfg.draft_id])[0].strip() or cfg.draft_id
+                log_path = cfg.path("logs") / f"draft_{draft_id}.jsonl"
+                page = render_log_html(log_path, draft_id)
+                self._send(200, page.encode("utf-8"), "text/html; charset=utf-8")
             elif url.path == "/state":
                 q = parse_qs(url.query)
                 draft_id = (q.get("draft_id") or [cfg.draft_id])[0].strip() or cfg.draft_id

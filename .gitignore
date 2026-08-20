@@ -10,4 +10,6 @@ data/raw/*
 # processed outputs are regenerable; keep tiers.csv + board tracked for portability
 data/processed/*.parquet
 data/processed/*.json
+# play-by-play draft logs are a personal record, not project source
+data/logs/
 .DS_Store

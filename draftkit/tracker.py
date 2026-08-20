@@ -69,6 +69,8 @@ class Tracker:
         self.rival_seeds = load_seeds(cfg).get("users", {})
         order = self.draft.get("draft_order") or {}
         self.slot_to_user = {int(v): str(k) for k, v in order.items()}
+        from .draftlog import DraftLog
+        self.log = DraftLog(cfg.path("logs") / f"draft_{self.draft_id}.jsonl")
 
         tiers = pl.read_csv(tiers_path, infer_schema_length=2000)
         self.players = [r for r in tiers.iter_rows(named=True)]
@@ -93,6 +95,7 @@ class Tracker:
         changed = len(picks) != len(self.state.picks)
         self.state.picks = picks
         self.state.drafted_ids = {str(p["player_id"]) for p in picks}
+        self.log.sync(self)
         return changed
 
     @property

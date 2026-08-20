@@ -75,3 +75,4 @@ paths:
   raw: data/raw
   external: data/external
   processed: data/processed
+  logs: data/logs

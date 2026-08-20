@@ -175,6 +175,31 @@ def cmd_rivals(cfg: Config, args) -> None:
                   f"{cfg.path('processed') / 'rival_seeds.json'}")
 
 
+def cmd_log(cfg: Config, args) -> None:
+    draft_id = args.draft_id or cfg.draft_id
+    path = cfg.path("logs") / f"draft_{draft_id}.jsonl"
+    if not path.exists():
+        console.print(f"[yellow]no log yet for draft {draft_id}[/yellow]")
+        return
+    for line in path.read_text(encoding="utf-8").splitlines():
+        e = json.loads(line)
+        at = e.get("at", "")
+        if e["type"] == "status":
+            console.print(f"[yellow]{at}  draft status: {e['status']}[/yellow]")
+        elif e["type"] == "pick":
+            mine = " [bold cyan]<- MY PICK[/bold cyan]" if e.get("my_pick") else ""
+            vs = e.get("vs_adp")
+            vs_s = f" {'+' if vs >= 0 else ''}{vs:.0f} vs ADP" if vs is not None else ""
+            console.print(
+                f"{at}  P{e['pick_no']:>3} R{e['round']:>2} slot {e['slot']:>2}: "
+                f"[bold]{e['player']}[/bold] ({e.get('pos')}, T{e.get('tier')}{vs_s}){mine}"
+            )
+        elif e["type"] == "recs":
+            console.print(f"[dim]{at}  engine before pick {e['current_pick']}:[/dim]")
+            for i, r in enumerate(e.get("recommendations", []), 1):
+                console.print(f"[dim]        {i}. {r['player']} ({r['pos']}) — {r['why']}[/dim]")
+
+
 def cmd_web(cfg: Config, args) -> None:
     from .web import run_server
 
@@ -220,6 +245,8 @@ def main(argv: list[str] | None = None) -> None:
     p.add_argument("--draft-id", default=None, help="override draft id (mock draft testing)")
     p.add_argument("--slot", type=int, default=None, help="override my draft slot")
     sub.add_parser("rivals")
+    p = sub.add_parser("log")
+    p.add_argument("--draft-id", default=None, help="draft to review (default: real draft)")
     p = sub.add_parser("web")
     p.add_argument("--port", type=int, default=8723)
     p.add_argument("--slot", type=int, default=None, help="override my draft slot")
@@ -238,6 +265,7 @@ def main(argv: list[str] | None = None) -> None:
         "board": cmd_board,
         "track": cmd_track,
         "rivals": cmd_rivals,
+        "log": cmd_log,
         "web": cmd_web,
         "simulate": cmd_simulate,
     }[args.cmd](cfg, args)

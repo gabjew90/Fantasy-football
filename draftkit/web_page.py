@@ -82,6 +82,7 @@ PAGE = r"""<!DOCTYPE html>
   <label>slot: <input id="slot" type="number" min="1" max="12"></label>
   <button id="apply">apply</button>
   <button id="reload">reload tiers.csv</button>
+  <a id="logLink" href="/log" target="_blank" style="color:var(--cyan)">view log</a>
   <span id="tiersAt"></span>
   <span id="heartbeat"></span>
   <span id="inputErr"></span>
@@ -173,6 +174,7 @@ async function tick() {
   const q = new URLSearchParams();
   if (store.draftId) q.set("draft_id", store.draftId);
   if (store.slot) q.set("slot", store.slot);
+  $("logLink").href = "/log" + (store.draftId ? "?draft_id=" + encodeURIComponent(store.draftId) : "");
   try {
     const r = await fetch("/state?" + q, {cache: "no-store"});
     const s = await r.json();
