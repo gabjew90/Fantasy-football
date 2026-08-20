@@ -60,5 +60,5 @@ def write_board_markdown(tiers: pl.DataFrame, path) -> None:
                 f"bye {row.get('bye') or '?'}) — {row['proj_pts']:.0f} pts, "
                 f"VORP {row['vorp']:.0f}{adp}"
             )
-    with open(path, "w") as f:
+    with open(path, "w", encoding="utf-8") as f:
         f.write("\n".join(lines) + "\n")

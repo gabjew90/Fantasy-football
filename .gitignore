@@ -1,6 +1,9 @@
 __pycache__/
 *.pyc
 .venv/
+venv/
+# Yahoo OAuth tokens — never commit
+.yahoofantasy
 .pytest_cache/
 data/raw/*
 !data/raw/.gitkeep

@@ -23,7 +23,7 @@ class Config:
     @classmethod
     def load(cls, path: str | Path | None = None) -> "Config":
         p = Path(path) if path else DEFAULT_CONFIG
-        with open(p) as f:
+        with open(p, encoding="utf-8") as f:
             data = yaml.safe_load(f)
         return cls(data, p.resolve().parent)
 

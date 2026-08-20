@@ -59,11 +59,11 @@ class SleeperClient:
         if not refresh and cache.exists():
             age = time.time() - cache.stat().st_mtime
             if age < PLAYERS_TTL_SECONDS:
-                with open(cache) as f:
+                with open(cache, encoding="utf-8") as f:
                     return json.load(f)
         data = get_json(f"{BASE}/players/nfl", timeout=120)
         tmp = cache.with_suffix(".tmp")
-        with open(tmp, "w") as f:
+        with open(tmp, "w", encoding="utf-8") as f:
             json.dump(data, f)
         tmp.replace(cache)
         return data
