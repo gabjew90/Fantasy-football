@@ -228,6 +228,11 @@ class Tracker:
 
     def _guardrail_ok(self, p: dict, rnd: int, needs, counts, picks_left) -> bool:
         """Final spec §6 — hard rules, override the engine."""
+        # no_market rows are board-visible only: the stats model's lone opinion
+        # with no market corroboration. An overrides.csv entry (proj_source
+        # becomes "override") is the switch that activates them for the engine.
+        if p.get("proj_source") == "no_market":
+            return False
         pos = p["pos"]
         if pos in ("K", "DEF"):
             kdef_needed = needs.get("K", 0) + needs.get("DEF", 0)

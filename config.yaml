@@ -45,6 +45,10 @@ projections:
   # consistency is what matters, not 16 vs 17. Per-player durability is the
   # separate exp_games haircut (16 - 3yr avg games missed, floored at 12).
   expected_games: 16.0
+  # Veterans with >= this many 2025 fantasy points but no market row at all
+  # get a pure stats-model projection, flagged no_market: on the board for a
+  # manual eyeball, ignored by the live engine unless activated by an override.
+  no_market_floor: 60
 
 engine:
   sims: 1000          # Monte Carlo draft simulations per decision
@@ -62,6 +66,10 @@ tiers:
   # exceeds mean + cliff_z * std (per the handoff: 1 standard deviation).
   break_z: 0.5
   cliff_z: 1.0
+  # the board always includes every player with ADP inside the draft's pick
+  # count (12 teams x 15 rounds), regardless of model rank — the Monte Carlo
+  # rivals must be able to draft anyone the market actually drafts.
+  adp_include_within: 180
 
 tracker:
   poll_seconds: 5

@@ -121,6 +121,19 @@ def test_roster_fill_counts():
     assert s["roster"]["drafted"] == ["Alpha RB"]
 
 
+def test_no_market_player_never_recommended():
+    # no_market rows are board-visible but engine-silent until overridden
+    t = make_tracker([], my_slot=2)
+    ghost = make_player(99, "Ghost WR", "WR", 0, 1, 300.0, None)
+    ghost["proj_source"] = "no_market"
+    t.players.append(ghost)
+    t.by_id["99"] = ghost
+    s = build_state(t)
+    assert "Ghost WR" not in [r["player"] for r in s["recommendations"]]
+    board_names = [p["player"] for row in s["board"] for p in row["players"]]
+    assert "Ghost WR" in board_names  # still visible for the manual eyeball
+
+
 def test_json_serializable():
     import json
     t = make_tracker([pick(1, 1, "RB")], my_slot=2)

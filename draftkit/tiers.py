@@ -41,13 +41,25 @@ def assign_tiers(
 def build_tiers(df: pl.DataFrame, cfg) -> pl.DataFrame:
     tcfg = cfg["tiers"]
     pools = cfg.pool_sizes
+    # ADP-based inclusion: rank cutoffs are fragile against anything that
+    # reshuffles ranks (durability haircut, overrides), so the board must
+    # additionally contain every player the market actually drafts — else the
+    # Monte Carlo rivals can't take them and urgency is systematically
+    # overstated. no_market rows are always included for the manual eyeball.
+    adp_within = float(tcfg.get("adp_include_within", 0) or 0)
     frames = []
     for pos, pool in pools.items():
-        grp = (
-            df.filter(pl.col("pos") == pos)
-            .sort("vorp", descending=True)
-            .head(pool)
-        )
+        grp_all = df.filter(pl.col("pos") == pos).sort("vorp", descending=True)
+        grp = grp_all.head(pool)
+        if adp_within and grp_all.height > grp.height:
+            cond = pl.col("adp").is_not_null() & (pl.col("adp") <= adp_within)
+            if "proj_source" in df.columns:
+                cond = cond | (pl.col("proj_source") == "no_market")
+            extra = grp_all.filter(
+                cond & ~pl.col("sleeper_id").is_in(grp["sleeper_id"])
+            )
+            if extra.height:
+                grp = pl.concat([grp, extra]).sort("vorp", descending=True)
         if grp.height == 0:
             continue
         tiers, cliffs = assign_tiers(

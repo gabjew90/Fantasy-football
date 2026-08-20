@@ -82,9 +82,16 @@ def _usage_adjusted_ppg(usage: pl.DataFrame, shrink_k: float) -> pl.DataFrame:
 
 
 def _market_curve(df: pl.DataFrame) -> pl.DataFrame:
-    """Fit proj_model_pts ~ a + b*ln(ecr) per position on veterans; predict all."""
+    """Fit proj_model_pts ~ a + b*ln(ecr) per position on veterans; predict all.
+
+    ADP stands in for ECR when ECR is missing (comparable rank scales), so
+    ADP-only players still get a projection path instead of silently dropping.
+    """
     preds = np.full(df.height, np.nan)
-    ecr = df["ecr"].to_numpy().astype(float)
+    ecr_expr = (
+        pl.coalesce(pl.col("ecr"), pl.col("adp")) if "adp" in df.columns else pl.col("ecr")
+    )
+    ecr = df.select(ecr_expr.alias("_e"))["_e"].to_numpy().astype(float)
     for pos in df["pos"].unique().to_list():
         mask = (df["pos"] == pos).to_numpy()
         fitmask = (
@@ -102,12 +109,50 @@ def _market_curve(df: pl.DataFrame) -> pl.DataFrame:
     return df.with_columns(pl.Series("proj_market_pts", preds).fill_nan(None))
 
 
+def _no_market_fallback(market: pl.DataFrame, usage: pl.DataFrame, floor: float) -> pl.DataFrame:
+    """Veterans with real 2025 production but no market row at all.
+
+    The market refusing to rank a productive player is an opinion, not a fact;
+    these rows let the stats model hold its own opinion (flagged no_market so
+    they get a manual eyeball, and the live engine ignores them unless the
+    user activates them via overrides.csv).
+    """
+    have = market["sleeper_id"].drop_nulls().cast(pl.Utf8).to_list()
+    cand = usage.filter(
+        pl.col("sleeper_id").is_not_null()
+        & pl.col("pos").is_in(list(SKILL_POSITIONS))
+        & (pl.col("fpts_total") >= floor)
+        & ~pl.col("sleeper_id").cast(pl.Utf8).is_in(have)
+    )
+    if cand.height == 0:
+        return market.head(0)
+    return cand.select(
+        pl.col("sleeper_id").cast(pl.Utf8),
+        pl.col("name"),
+        pl.col("pos"),
+        pl.col("team_2025").alias("team"),
+    ).unique(subset="sleeper_id").with_columns(
+        pl.lit(None, dtype=pl.Float64).alias("ecr"),
+        pl.lit(None, dtype=pl.Float64).alias("ecr_sd"),
+        pl.lit(None, dtype=pl.Float64).alias("adp"),
+        pl.lit(None, dtype=pl.Int64).alias("bye"),
+    )
+
+
 def default_projection(cfg, usage: pl.DataFrame, market: pl.DataFrame) -> pl.DataFrame:
     """Return market frame + proj_pts, proj_source, and carried usage metrics."""
     p = cfg["projections"]
     shrink_k = float(p["shrink_k"])
     alpha = float(p["model_alpha"])
     games = float(p["expected_games"])
+
+    no_market_ids: list[str] = []
+    floor = float(p.get("no_market_floor", 0) or 0)
+    if floor:
+        fb = _no_market_fallback(market, usage, floor)
+        if fb.height:
+            no_market_ids = fb["sleeper_id"].to_list()
+            market = pl.concat([market, fb], how="diagonal_relaxed")
 
     usage = _usage_adjusted_ppg(usage, shrink_k)
     u = usage.filter(pl.col("sleeper_id").is_not_null()).select(
@@ -181,6 +226,13 @@ def default_projection(cfg, usage: pl.DataFrame, market: pl.DataFrame) -> pl.Dat
         .otherwise(pl.lit("none"))
         .alias("proj_source"),
     )
+    if no_market_ids:
+        df = df.with_columns(
+            pl.when(pl.col("sleeper_id").is_in(no_market_ids))
+            .then(pl.lit("no_market"))
+            .otherwise(pl.col("proj_source"))
+            .alias("proj_source")
+        )
 
     # Durability haircut (final spec §1): scale by expected games from the
     # 3-year availability record. No history (2026 rookies, K/DEF) -> no haircut.
@@ -205,7 +257,11 @@ def default_projection(cfg, usage: pl.DataFrame, market: pl.DataFrame) -> pl.Dat
                 pl.col("proj_pts").cast(pl.Float64).alias("proj_override"),
             )
             df = df.join(ov, on="sleeper_id", how="left").with_columns(
-                pl.coalesce(pl.col("proj_override"), pl.col("proj_pts")).alias("proj_pts")
+                pl.when(pl.col("proj_override").is_not_null())
+                .then(pl.lit("override"))
+                .otherwise(pl.col("proj_source"))
+                .alias("proj_source"),
+                pl.coalesce(pl.col("proj_override"), pl.col("proj_pts")).alias("proj_pts"),
             ).drop("proj_override")
 
     return df
