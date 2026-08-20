@@ -139,6 +139,26 @@ def _no_market_fallback(market: pl.DataFrame, usage: pl.DataFrame, floor: float)
     )
 
 
+def _apply_availability(df: pl.DataFrame, av: pl.DataFrame) -> pl.DataFrame:
+    """Availability sweep results (data/external/availability.csv).
+
+    status "out" zeroes the projection (player stays on the board so the draft
+    room shows him as dead weight); "compromised" only carries a flag for a
+    manual look. Applied after overrides — availability is a fact, not a view.
+    """
+    av = av.select(
+        pl.col("sleeper_id").cast(pl.Utf8),
+        pl.col("status").alias("avail_status"),
+    ).unique(subset="sleeper_id")
+    df = df.join(av, on="sleeper_id", how="left")
+    return df.with_columns(
+        pl.when(pl.col("avail_status") == "out")
+        .then(0.0)
+        .otherwise(pl.col("proj_pts"))
+        .alias("proj_pts")
+    )
+
+
 def default_projection(cfg, usage: pl.DataFrame, market: pl.DataFrame) -> pl.DataFrame:
     """Return market frame + proj_pts, proj_source, and carried usage metrics."""
     p = cfg["projections"]
@@ -263,6 +283,14 @@ def default_projection(cfg, usage: pl.DataFrame, market: pl.DataFrame) -> pl.Dat
                 .alias("proj_source"),
                 pl.coalesce(pl.col("proj_override"), pl.col("proj_pts")).alias("proj_pts"),
             ).drop("proj_override")
+
+    av_path = cfg.path("external") / "availability.csv"
+    if av_path.exists():
+        av = pl.read_csv(av_path, infer_schema_length=1000)
+        if "sleeper_id" in av.columns and "status" in av.columns:
+            df = _apply_availability(df, av)
+    if "avail_status" not in df.columns:
+        df = df.with_columns(pl.lit(None, dtype=pl.Utf8).alias("avail_status"))
 
     return df
 

@@ -38,6 +38,25 @@ def test_market_curve_uses_adp_when_ecr_missing():
     assert out["proj_market_pts"][-1] is not None
 
 
+def test_apply_availability():
+    from draftkit.projections import _apply_availability
+
+    df = pl.DataFrame({
+        "sleeper_id": ["1", "2", "3"],
+        "proj_pts": [200.0, 150.0, 100.0],
+    })
+    av = pl.DataFrame({
+        "sleeper_id": ["1", "2"],
+        "status": ["out", "compromised"],
+    })
+    out = _apply_availability(df, av)
+    assert out.filter(pl.col("sleeper_id") == "1")["proj_pts"][0] == 0.0
+    assert out.filter(pl.col("sleeper_id") == "1")["avail_status"][0] == "out"
+    assert out.filter(pl.col("sleeper_id") == "2")["proj_pts"][0] == 150.0
+    assert out.filter(pl.col("sleeper_id") == "2")["avail_status"][0] == "compromised"
+    assert out.filter(pl.col("sleeper_id") == "3")["avail_status"][0] is None
+
+
 def test_no_market_fallback_disabled_when_floor_zero_matches_nothing():
     market = pl.DataFrame({
         "sleeper_id": ["1"], "name": ["A"], "pos": ["WR"], "team": ["SFO"],

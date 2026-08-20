@@ -127,6 +127,7 @@ TIERS_COLUMNS = [
     "adp",
     "adp_delta",
     "proj_source",
+    "avail_status",
     "exp_games",
     "rookie_flag",
     "wopr",
