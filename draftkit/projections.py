@@ -124,6 +124,7 @@ def default_projection(cfg, usage: pl.DataFrame, market: pl.DataFrame) -> pl.Dat
         "hv_touches",
         "offense_snap_pct",
         "avg_separation",
+        "exp_games",
     ).unique(subset="sleeper_id")
 
     df = market.join(u, on="sleeper_id", how="left")
@@ -179,6 +180,19 @@ def default_projection(cfg, usage: pl.DataFrame, market: pl.DataFrame) -> pl.Dat
         .then(pl.lit("market_implied"))
         .otherwise(pl.lit("none"))
         .alias("proj_source"),
+    )
+
+    # Durability haircut (final spec §1): scale by expected games from the
+    # 3-year availability record. No history (2026 rookies, K/DEF) -> no haircut.
+    # Applied before overrides so a manual override is always the final number.
+    df = df.with_columns(
+        pl.col("exp_games").fill_null(16.0).alias("exp_games"),
+    ).with_columns(
+        (pl.col("proj_pts") * pl.col("exp_games") / 16.0).alias("proj_pts"),
+        (
+            pl.col("proj_model_pts").is_null()
+            & ~pl.col("pos").is_in(["K", "DEF"])
+        ).alias("rookie_flag"),
     )
 
     # optional overrides: data/external/overrides.csv (sleeper_id or name, proj_pts)

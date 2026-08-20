@@ -1,234 +1,234 @@
-player,sleeper_id,pos,team,bye,proj_pts,vorp,tier,cliff_flag,pos_rank,value_rank,ecr,adp,adp_delta,proj_source,wopr,tprr,yprr,hv_touches,routes_proxy
-Christian McCaffrey,4034,RB,SFO,8,341.3,200.2,1,true,1,1,9.29,6.5,5.5,blend,0.405,0.234,1.68,50,true
-Bijan Robinson,9509,RB,ATL,11,319.1,178.0,2,false,2,2,3.5,1.7,-0.3,blend,0.311,0.212,1.69,22,true
-Jahmyr Gibbs,9221,RB,DET,6,318.2,177.0,2,true,3,3,3.01,1.8,-1.2,blend,0.253,0.215,1.41,26,true
-Puka Nacua,9493,WR,LAR,11,290.7,160.6,1,false,1,4,3.21,3.1,-0.9,blend,0.675,0.386,3.99,11,true
-Ja'Marr Chase,7564,WR,CIN,6,288.4,158.3,1,false,2,5,1.67,3.9,-1.1,blend,0.737,0.285,2.17,8,true
-Jaxon Smith-Njigba,9488,WR,SEA,11,284.6,154.5,1,true,3,6,4.69,5.4,-0.6,blend,0.904,0.377,4.15,7,true
-Jonathan Taylor,6813,RB,IND,13,283.8,142.6,3,true,4,7,11.77,7.4,0.4,blend,0.157,0.104,0.72,42,true
-Amon-Ra St. Brown,7547,WR,DET,6,271.3,141.2,2,true,4,8,5.64,6.3,-1.7,blend,0.746,0.309,2.51,21,true
-De'Von Achane,9226,RB,MIA,6,258.2,117.0,4,true,5,9,20.88,10.2,1.2,blend,0.289,0.216,1.24,16,true
-Drake London,8112,WR,ATL,11,236.0,105.9,3,false,5,10,12.35,10.1,0.1,blend,0.727,0.279,2.29,9,true
-Chase Brown,9224,RB,CIN,6,247.0,105.9,5,false,6,11,17.85,13.7,2.7,blend,0.224,0.181,0.9,26,true
-Rashee Rice,10229,WR,KCC,5,231.2,101.1,4,false,6,12,22.15,14.8,2.8,blend,0.531,0.286,2.09,18,true
-James Cook III,8138,RB,BUF,7,240.3,99.1,6,true,7,13,18.3,12.3,-0.7,blend,0.127,0.112,0.82,27,true
-CeeDee Lamb,6786,WR,DAL,14,229.1,99.0,4,false,7,14,8.7,10.7,-3.3,blend,0.611,0.258,2.37,7,true
-Trey McBride,8130,TE,ARI,14,248.2,95.3,1,true,1,15,19.47,28.9,13.9,blend,0.59,0.235,1.72,12,true
-Chris Olave,8144,WR,NOS,8,223.5,93.4,5,false,8,16,20.57,21.5,5.5,blend,0.725,0.279,2.08,4,true
-Justin Jefferson,6794,WR,MIN,6,222.4,92.3,5,false,9,17,9.58,11.8,-5.2,blend,0.741,0.246,1.83,11,true
-George Pickens,8137,WR,DAL,14,221.2,91.1,5,false,10,18,19.88,19.5,1.5,blend,0.563,0.228,2.38,11,true
-A.J. Brown,5859,WR,NEP,11,218.5,88.4,5,false,11,19,14.71,17.7,-1.3,blend,0.678,0.248,2.06,5,true
-Nico Collins,7569,WR,HOU,8,218.4,88.3,5,true,12,20,16.37,21.2,1.2,blend,0.609,0.257,2.39,11,true
-Ashton Jeanty,12527,RB,LVR,13,228.0,86.8,7,false,8,21,17.07,15.3,-5.7,blend,0.181,0.149,0.7,20,true
-Saquon Barkley,4866,RB,PHI,10,225.9,84.7,7,false,9,22,25.94,20.3,-1.7,blend,0.176,0.112,0.61,29,true
-Davante Adams,2133,WR,LAR,11,210.0,79.8,6,false,13,23,50.67,41.3,18.3,blend,0.627,0.304,2.1,23,true
-Omarion Hampton,12507,RB,LAC,7,220.8,79.6,7,false,10,24,25.64,21.8,-2.2,blend,0.156,0.145,0.79,16,true
-Garrett Wilson,8146,WR,NYJ,13,209.5,79.4,6,false,14,25,30.29,26.6,1.6,blend,0.925,0.254,1.7,2,true
-Derrick Henry,3198,RB,BAL,13,220.5,79.3,7,false,11,26,37.78,17.6,-8.4,blend,0.075,0.072,0.51,40,true
-Zay Flowers,9997,WR,BAL,13,205.7,75.6,6,true,15,27,29.37,24.2,-2.8,blend,0.701,0.255,2.62,6,true
-Josh Jacobs,5850,RB,GBP,11,215.5,74.3,7,false,12,28,44.17,31.6,3.6,blend,0.124,0.142,0.91,32,true
-Kyren Williams,8150,RB,LAR,11,215.2,74.0,7,false,13,29,41.87,31.7,2.7,blend,0.136,0.11,0.62,33,true
-Brock Bowers,11604,TE,LVR,13,222.8,70.0,2,true,2,30,20.44,36.0,6.0,blend,0.526,0.223,1.76,10,true
-Javonte Williams,7588,RB,DAL,14,210.8,69.6,7,false,14,31,45.66,38.0,7.0,blend,0.119,0.107,0.29,33,true
-Malik Nabers,11632,WR,NYG,8,198.0,67.9,7,false,16,32,28.55,27.2,-4.8,blend,0.713,0.279,2.16,3,true
-Cam Skattebo,12481,RB,NYG,8,206.8,65.6,7,false,15,33,54.84,35.1,2.1,blend,0.189,0.187,1.21,14,true
-Tetairoa McMillan,12526,WR,CAR,5,195.7,65.6,7,false,17,34,33.7,33.3,-0.7,blend,0.708,0.225,1.87,6,true
-Travis Etienne Jr.,7543,RB,NOS,8,206.7,65.5,7,false,16,35,50.99,42.3,7.3,blend,0.135,0.125,0.7,32,true
-Jeremiyah Love,13287,RB,ARI,14,205.3,64.1,7,true,17,36,38.13,29.0,-7.0,market_implied,,,,,
-DeVonta Smith,7525,WR,PHI,10,191.4,61.3,7,false,18,37,23.99,28.7,-8.3,blend,0.594,0.22,1.96,4,true
-Tee Higgins,6801,WR,CIN,6,191.1,61.0,7,false,19,38,34.77,35.8,-2.2,blend,0.505,0.193,1.67,8,true
-Josh Allen,4984,QB,BUF,7,326.8,57.6,1,true,1,39,25.86,32.5,-6.5,blend,0.0,0.0,0.0,22,true
-Jaylen Waddle,7526,WR,DEN,10,187.2,57.1,7,false,20,40,38.17,45.3,5.3,blend,0.648,0.245,2.23,5,true
-D'Andre Swift,6790,RB,CHI,10,193.9,52.8,8,false,18,41,59.55,46.3,5.3,blend,0.135,0.132,0.82,24,true
-Emeka Egbuka,12514,WR,TBB,10,182.6,52.5,8,false,21,42,37.67,37.2,-4.8,blend,0.601,0.237,1.75,6,true
-Breece Hall,8155,RB,NYJ,13,190.2,49.0,8,false,19,43,40.83,29.9,-13.1,blend,0.154,0.123,0.9,13,true
-Wan'Dale Robinson,8126,WR,TEN,9,178.2,48.1,8,false,22,44,87.71,85.6,41.6,blend,0.653,0.248,1.79,6,true
-Ladd McConkey,11635,WR,LAC,7,176.8,46.7,8,false,23,45,35.74,38.0,-7.0,blend,0.499,0.201,1.49,6,true
-Rome Odunze,11620,WR,CHI,10,176.5,46.4,8,false,24,46,59.12,48.9,2.9,blend,0.602,0.209,1.53,6,true
-Terry McLaurin,5927,WR,WAS,7,176.2,46.1,8,false,25,47,44.65,46.6,-0.4,blend,0.608,0.239,2.32,3,true
-Christian Watson,8167,WR,GBP,11,176.1,46.0,8,false,26,48,56.57,58.7,10.7,blend,0.548,0.236,2.62,4,true
-Jameson Williams,8148,WR,DET,6,174.8,44.7,8,false,27,49,56.01,43.7,-5.3,blend,0.503,0.173,1.9,5,true
-DK Metcalf,5846,WR,PIT,9,173.6,43.5,8,false,28,50,78.2,64.5,14.5,blend,0.596,0.21,1.8,8,true
-Kenny Gainwell,7567,RB,TBB,10,184.2,43.0,8,false,20,51,101.59,89.5,38.5,blend,0.234,0.27,1.55,22,true
-Kenneth Walker III,8151,RB,KCC,5,183.7,42.5,8,false,21,52,29.29,22.8,-29.2,blend,0.109,0.139,1.09,11,true
-Jaylen Warren,8228,RB,PIT,9,183.5,42.3,8,false,22,53,75.93,61.9,8.9,blend,0.112,0.151,1.12,26,true
-Mike Evans,2216,WR,SFO,8,171.9,41.8,8,false,29,54,54.06,52.1,-1.9,blend,0.609,0.287,1.7,5,true
-Courtland Sutton,5045,WR,DEN,10,171.5,41.4,8,false,30,55,85.42,61.1,6.1,blend,0.557,0.203,1.66,8,true
-Rhamondre Stevenson,7611,RB,NEP,11,180.9,39.7,8,false,23,56,81.99,70.9,14.9,blend,0.181,0.115,1.07,18,true
-TreVeyon Henderson,12529,RB,NEP,11,180.4,39.2,8,false,24,57,64.21,61.0,4.0,blend,0.126,0.139,0.73,24,true
-Bucky Irving,11584,RB,TBB,10,179.3,38.1,8,false,25,58,57.86,45.9,-12.1,blend,0.146,0.137,1.09,7,true
-Quinshon Judkins,12512,RB,CLE,11,179.2,38.0,8,false,26,59,60.99,51.9,-7.1,blend,0.119,0.128,0.61,19,true
-Parker Washington,9487,WR,JAC,7,166.9,36.8,9,false,31,60,69.78,64.6,4.6,blend,0.469,0.235,2.1,7,true
-Michael Wilson,10232,WR,ARI,14,165.8,35.7,9,false,32,61,90.53,77.0,16.0,blend,0.507,0.196,1.56,5,true
-Drake Maye,11564,QB,NEP,11,304.4,35.2,2,true,2,62,39.19,50.5,-11.5,blend,0.001,0.002,0.0,15,true
-Quentin Johnston,9754,WR,LAC,7,164.5,34.3,9,false,33,63,102.53,92.2,29.2,blend,0.496,0.184,1.61,7,true
-Alec Pierce,8142,WR,IND,13,163.8,33.7,9,false,34,64,91.0,59.0,-5.0,blend,0.548,0.173,2.06,4,true
-Michael Pittman Jr.,6819,WR,PIT,9,162.9,32.8,9,false,35,65,83.42,74.4,9.4,blend,0.457,0.202,1.43,10,true
-Carnell Tate,13279,WR,TEN,9,162.1,31.9,9,false,36,66,65.44,73.5,7.5,market_implied,,,,,
-Marvin Harrison Jr.,11628,WR,ARI,14,161.2,31.1,9,false,37,67,69.8,66.0,-1.0,blend,0.502,0.185,1.54,6,true
-RJ Harvey,12489,RB,DEN,10,171.1,29.9,9,false,27,68,92.56,83.6,15.6,blend,0.146,0.192,1.18,21,true
-Tyler Warren,12518,TE,IND,13,181.2,28.4,3,false,3,69,53.48,64.2,-4.8,blend,0.425,0.208,1.52,17,true
-Rico Dowdle,7021,RB,PIT,9,169.3,28.1,9,false,28,70,88.55,76.6,6.6,blend,0.143,0.144,0.86,15,true
-Stefon Diggs,2449,WR,WAS,7,158.0,27.9,9,false,38,71,111.6,92.2,21.2,blend,0.469,0.288,2.86,7,true
-DJ Moore,4983,WR,BUF,7,157.9,27.8,9,false,39,72,52.14,49.8,-22.2,blend,0.381,0.148,1.19,7,true
-Jakobi Meyers,5947,WR,JAC,7,157.9,27.8,9,false,40,73,102.19,88.2,15.2,blend,0.541,0.21,1.59,7,true
-Brian Thomas Jr.,11631,WR,JAC,7,156.3,26.2,9,false,41,74,77.84,71.5,-2.5,blend,0.511,0.204,1.59,6,true
-David Montgomery,5892,RB,HOU,8,166.8,25.6,9,false,29,75,61.73,57.6,-17.4,blend,0.083,0.12,0.79,25,true
-Jadarian Price,13286,RB,SEA,11,166.1,24.9,9,false,30,76,75.71,82.9,6.9,market_implied,,,,,
-Colston Loveland,12517,TE,CHI,10,176.6,23.8,3,false,4,77,37.97,56.6,-20.4,blend,0.363,0.199,1.73,8,true
-Kyle Pitts Sr.,7553,TE,ATL,11,175.8,23.0,3,false,5,78,82.88,76.8,-1.2,blend,0.492,0.217,1.71,7,true
-Deebo Samuel Sr.,5872,WR,SFO,8,153.0,22.9,9,false,42,79,142.01,113.0,34.0,blend,0.475,0.239,1.76,10,true
-Houston Texans,HOU,DEF,HOU,8,135.0,22.0,1,false,1,80,153.12,95.8,15.8,market_implied,,,,,
-Jordyn Tyson,13281,WR,NOS,8,151.2,21.1,9,false,43,81,83.83,100.0,19.0,market_implied,,,,,
-Jauan Jennings,7049,WR,MIN,6,151.1,21.0,9,false,44,82,157.65,144.0,62.0,blend,0.478,0.192,1.37,11,true
-George Kittle,4217,TE,SFO,8,173.2,20.4,3,false,6,83,105.31,116.3,33.3,blend,0.451,0.211,1.92,5,true
-Denver Broncos,DEN,DEF,DEN,10,133.0,20.0,1,false,2,84,163.58,87.8,3.8,market_implied,,,,,
-Zach Charbonnet,9753,RB,SEA,11,160.6,19.4,9,false,31,85,143.64,137.0,52.0,blend,0.087,0.094,0.56,33,true
-Tyreek Hill,3321,WR,FA,,148.4,18.3,9,false,45,86,256.37,,,blend,0.688,0.331,3.02,2,true
-Romeo Doubs,8121,WR,NEP,11,148.2,18.1,9,false,46,87,129.36,111.8,24.8,blend,0.479,0.195,1.66,9,true
-Seattle Seahawks,SEA,DEF,SEA,11,131.0,18.0,1,false,3,88,167.38,82.8,-5.2,market_implied,,,,,
-Harold Fannin Jr.,12506,TE,CLE,11,170.6,17.7,3,false,7,89,76.95,78.2,-10.8,blend,0.458,0.218,1.49,5,true
-Tucker Kraft,9484,TE,GBP,11,170.3,17.5,3,false,8,90,72.87,102.9,12.9,blend,0.351,0.18,2.0,3,true
-Jordan Addison,9756,WR,MIN,6,147.5,17.4,9,false,47,91,108.59,98.8,7.8,blend,0.504,0.181,1.4,5,true
-Trevor Lawrence,7523,QB,JAC,7,286.5,17.3,3,false,3,92,79.86,93.5,1.5,blend,0.0,0.0,0.0,15,true
-Brandon Aubrey,11533,K,DAL,14,150.0,16.5,1,false,1,93,186.46,129.6,36.6,market_implied,0.0,,,0,true
-Chris Godwin Jr.,4037,WR,TBB,10,146.3,16.2,9,false,48,94,81.74,80.8,-13.2,blend,0.379,0.197,1.39,6,true
-Tony Pollard,5967,RB,TEN,9,157.3,16.1,9,false,32,95,81.52,67.1,-27.9,blend,0.114,0.096,0.48,12,true
-Los Angeles Rams,LAR,DEF,LAR,11,129.0,16.0,1,false,4,96,168.2,106.9,10.9,market_implied,,,,,
-Matthew Stafford,421,QB,LAR,11,284.5,15.3,3,false,4,97,104.67,77.9,-19.1,blend,0.0,0.0,0.0,4,true
-Ka'imi Fairbairn,3451,K,HOU,8,148.5,15.0,1,false,2,98,192.61,141.8,43.8,market_implied,,,,,
-Philadelphia Eagles,PHI,DEF,PHI,10,127.0,14.0,1,false,5,99,174.89,133.2,34.2,market_implied,,,,,
-Patrick Mahomes II,4046,QB,KCC,5,283.2,14.0,3,false,5,100,101.13,100.6,0.6,blend,0.002,0.002,-0.02,5,true
-Jalen Hurts,6904,QB,PHI,10,282.9,13.7,3,false,6,101,56.94,80.7,-20.3,blend,0.0,0.0,0.0,15,true
-Cameron Dicker,8259,K,LAC,7,147.0,13.5,1,false,3,102,196.04,143.8,41.8,market_implied,,,,,
-Makai Lemon,13294,WR,PHI,10,142.9,12.8,9,false,49,103,101.45,113.6,10.6,market_implied,,,,,
-Luther Burden III,12519,WR,CHI,10,142.2,12.1,9,false,50,104,46.29,59.4,-44.6,blend,0.271,0.254,2.76,0,true
-Cam Little,11786,K,JAC,7,145.5,12.0,1,false,4,105,199.01,154.4,49.4,market_implied,,,,,
-New England Patriots,NE,DEF,NEP,11,125.0,12.0,1,false,6,106,185.43,126.0,20.0,market_implied,,,,,
-Khalil Shakir,8134,WR,BUF,7,141.9,11.8,9,false,51,107,120.35,101.0,-6.0,blend,0.377,0.269,2.03,6,true
-Caleb Williams,11560,QB,CHI,10,279.8,10.6,3,false,7,108,68.07,88.1,-19.9,blend,0.005,0.003,0.03,8,true
-Travis Kelce,1466,TE,KCC,5,163.4,10.5,3,false,9,109,98.69,108.3,-0.7,blend,0.427,0.182,1.44,9,true
-Jason Myers,2747,K,SEA,11,144.0,10.5,1,false,5,110,200.84,141.8,31.8,market_implied,,,,,
-Josh Downs,9500,WR,IND,13,140.4,10.3,9,false,52,111,85.44,81.9,-29.1,blend,0.379,0.248,1.59,5,true
-Aaron Jones Sr.,4199,RB,MIN,6,151.4,10.2,9,false,33,112,113.67,100.1,-11.9,blend,0.203,0.184,0.89,6,true
-Troy Franklin,11627,WR,DEN,10,140.3,10.2,9,false,53,113,202.09,,,blend,0.469,0.248,1.69,11,true
-J.K. Dobbins,6806,RB,DEN,10,151.4,10.2,9,false,34,114,102.06,97.8,-16.2,blend,0.061,0.066,0.17,11,true
-Minnesota Vikings,MIN,DEF,MIN,6,123.0,10.0,1,false,7,115,186.26,112.5,-2.5,market_implied,,,,,
-Lamar Jackson,4881,QB,BAL,13,278.3,9.1,3,false,8,116,32.31,56.8,-59.2,blend,0.0,0.0,0.0,5,true
-Eddy Pineiro,5189,K,SFO,8,142.5,9.0,1,false,6,117,208.48,164.2,47.2,market_implied,,,,,
-Dallas Goedert,5022,TE,PHI,10,161.6,8.8,3,false,10,118,122.31,115.2,-2.8,blend,0.418,0.18,1.3,9,true
-Sam LaPorta,10859,TE,DET,6,161.6,8.8,3,false,11,119,82.49,87.4,-31.6,blend,0.399,0.16,1.59,3,true
-Pittsburgh Steelers,PIT,DEF,PIT,9,121.0,8.0,1,false,8,120,187.06,133.2,13.2,market_implied,,,,,
-Tyler Loop,12711,K,BAL,13,141.0,7.5,1,false,7,121,208.78,154.3,33.3,market_implied,,,,,
-Dak Prescott,3294,QB,DAL,14,275.9,6.7,3,false,9,122,80.01,65.8,-56.2,blend,0.0,0.0,0.0,10,true
-Justin Herbert,6797,QB,LAC,7,275.9,6.7,3,false,10,123,70.0,106.6,-16.4,blend,0.0,0.0,0.0,7,true
-Evan McPherson,7839,K,CIN,6,139.5,6.0,1,false,8,124,213.91,169.8,45.8,market_implied,,,,,
-Jacksonville Jaguars,JAX,DEF,JAC,7,119.0,6.0,1,false,9,125,188.66,155.2,30.2,market_implied,,,,,
-Jonathon Brooks,11583,RB,CAR,5,146.7,5.5,9,false,35,126,106.31,107.6,-18.4,market_implied,,,,,
-Brock Purdy,8183,QB,SFO,8,274.7,5.5,3,false,11,127,97.35,89.0,-38.0,blend,0.0,0.0,0.0,3,true
-Tre Tucker,10213,WR,LVR,13,135.6,5.5,10,false,54,128,172.63,133.2,5.2,blend,0.469,0.153,1.16,5,true
-Tyrone Tracy Jr.,11655,RB,NYG,8,146.2,5.0,9,false,36,129,132.07,149.3,20.3,blend,0.163,0.151,0.9,7,true
-Keenan Allen,1479,WR,LAC,7,134.9,4.8,10,false,55,130,267.75,,,blend,0.49,0.307,1.96,7,true
-Cairo Santos,2020,K,CHI,10,138.0,4.5,1,false,9,131,216.09,165.8,34.8,market_implied,,,,,
-Kyle Monangai,12534,RB,CHI,10,145.4,4.2,9,false,37,132,106.05,114.0,-18.0,blend,0.086,0.107,0.58,22,true
-Los Angeles Chargers,LAC,DEF,LAC,7,117.0,4.0,1,false,10,133,191.38,144.3,11.3,market_implied,,,,,
-Chuba Hubbard,7594,RB,CAR,5,144.9,3.7,9,false,38,134,86.83,74.9,-59.1,blend,0.108,0.154,0.88,12,true
-Travis Hunter,12530,WR,JAC,7,133.7,3.6,10,false,56,135,175.65,160.2,25.2,blend,0.387,0.231,1.53,2,true
-Andy Borregales,12713,K,NEP,11,136.5,3.0,1,false,10,136,221.27,165.5,29.5,market_implied,,,,,
-Baltimore Ravens,BAL,DEF,BAL,13,115.0,2.0,1,false,11,137,197.59,161.2,24.2,market_implied,,,,,
-Jake Bates,11539,K,DET,6,135.0,1.5,1,false,11,138,225.01,146.4,8.4,market_implied,,,,,
-KC Concepcion,13298,WR,CLE,11,131.6,1.5,10,false,57,139,131.55,123.3,-15.7,market_implied,,,,,
-Jayden Reed,10222,WR,GBP,11,131.1,1.0,10,false,58,140,109.66,92.7,-47.3,blend,0.344,0.233,2.2,0,true
-Alvin Kamara,4035,RB,NOS,8,141.8,0.6,9,false,39,141,148.76,146.1,5.1,blend,0.18,0.135,0.65,8,true
-Jalen Coker,11646,WR,CAR,5,130.7,0.6,10,false,59,142,125.3,120.6,-21.4,blend,0.371,0.167,1.53,4,true
-Joe Burrow,6770,QB,CIN,6,269.2,0.0,3,false,12,143,45.77,56.0,-87.0,blend,0.0,0.0,0.0,1,true
-Woody Marks,12474,RB,HOU,8,141.2,0.0,9,false,40,144,140.38,149.2,5.2,blend,0.115,0.105,0.61,18,true
-Jerry Jeudy,6783,WR,CLE,11,130.1,0.0,10,false,60,145,160.55,129.1,-15.9,blend,0.555,0.185,1.05,3,true
-Jake Ferguson,8110,TE,DAL,14,152.8,0.0,3,false,12,146,113.4,132.2,-13.8,blend,0.31,0.209,1.23,14,true
-Chase McLaughlin,6650,K,TBB,10,133.5,0.0,1,false,12,147,225.94,155.4,8.4,market_implied,,,,,
-Green Bay Packers,GB,DEF,GBP,11,113.0,0.0,1,false,12,148,201.68,156.7,8.7,market_implied,,,,,
-Xavier Worthy,11624,WR,KCC,5,130.1,-0.0,10,false,61,149,127.07,106.8,-42.2,blend,0.428,0.172,1.25,2,true
-Rashid Shaheed,8676,WR,SEA,11,129.2,-0.9,10,false,62,150,146.85,129.0,-21.0,blend,0.4,0.25,1.87,2,true
-Bo Nix,11563,QB,DEN,10,268.1,-1.1,3,false,13,151,101.34,115.1,-35.9,blend,0.003,0.001,0.0,6,true
-James Conner,4137,RB,ARI,14,140.0,-1.2,9,false,41,152,194.7,162.2,10.2,blend,0.135,0.139,0.59,4,true
-Harrison Mevis,12015,K,LAR,11,132.0,-1.5,1,false,13,153,231.51,152.4,-0.6,market_implied,,,,,
-Kansas City Chiefs,KC,DEF,KCC,5,111.0,-2.0,1,false,13,154,212.18,164.1,10.1,market_implied,,,,,
-Harrison Butker,4227,K,KCC,5,130.5,-3.0,1,false,14,155,240.56,160.6,5.6,market_implied,,,,,
-Dalton Kincaid,10236,TE,BUF,7,148.9,-4.0,3,false,13,156,114.64,151.6,-4.4,blend,0.369,0.291,3.4,5,true
-Cleveland Browns,CLE,DEF,CLE,11,109.0,-4.0,1,false,14,157,213.92,163.0,6.0,market_implied,,,,,
-Rachaad White,8136,RB,WAS,7,136.8,-4.4,9,false,42,158,108.98,107.5,-50.5,blend,0.105,0.13,0.63,11,true
-Chris Boswell,1945,K,PIT,9,129.0,-4.5,1,false,15,159,241.14,157.7,-1.3,market_implied,,,,,
-Keon Coleman,11637,WR,BUF,7,125.4,-4.7,10,false,63,160,244.59,94.2,-65.8,blend,0.41,0.184,1.26,9,true
-Spencer Shrader,12185,K,IND,13,127.5,-6.0,1,false,16,161,248.25,,,market_implied,,,,,
-Detroit Lions,DET,DEF,DET,6,107.0,-6.0,1,false,15,162,220.2,132.3,-29.7,market_implied,,,,,
-Jayden Higgins,12484,WR,HOU,8,123.9,-6.2,10,false,64,163,122.79,127.3,-35.7,blend,0.309,0.169,1.3,4,true
-Tyjae Spears,9508,RB,TEN,9,134.9,-6.2,9,false,43,164,145.85,134.3,-29.7,blend,0.15,0.206,1.09,8,true
-Denzel Boston,13346,WR,CLE,11,123.8,-6.3,10,false,65,165,157.29,142.4,-22.6,market_implied,,,,,
-Jared Goff,3163,QB,DET,6,262.8,-6.4,3,false,14,166,106.71,101.9,-64.1,blend,0.0,0.0,0.0,2,true
-Jayden Daniels,11566,QB,WAS,7,262.7,-6.5,3,false,15,167,49.78,72.9,-94.1,blend,0.0,0.0,0.0,3,true
-Jacory Croskey-Merritt,12533,RB,WAS,7,134.3,-6.9,9,false,44,168,119.51,118.0,-50.0,blend,0.041,0.055,0.29,21,true
-Chris Rodriguez Jr.,10219,RB,JAC,7,133.5,-7.6,9,false,45,169,143.1,157.6,-11.4,blend,0.022,0.027,0.2,22,true
-Jaxson Dart,12508,QB,NYG,8,261.3,-7.9,3,false,16,170,94.7,117.5,-52.5,blend,0.0,0.0,0.0,12,true
-Buffalo Bills,BUF,DEF,BUF,7,105.0,-8.0,1,false,16,171,228.57,158.4,-12.6,market_implied,,,,,
-Elic Ayomanor,12499,WR,TEN,9,122.0,-8.1,10,false,66,172,242.52,,,blend,0.505,0.174,1.01,6,true
-Kimani Vidal,11647,RB,LAC,7,132.1,-9.1,9,false,46,173,194.76,144.8,-28.2,blend,0.083,0.073,0.45,14,true
-Omar Cooper Jr.,13276,WR,NYJ,13,120.9,-9.2,10,false,67,174,167.8,165.6,-8.4,market_implied,,,,,
-Hunter Henry,3214,TE,NEP,11,143.3,-9.5,3,false,14,175,166.29,157.3,-17.7,blend,0.369,0.166,1.46,10,true
-Ryan Flournoy,11783,WR,DAL,14,120.5,-9.6,10,false,68,176,182.63,166.9,-9.1,blend,0.276,0.189,1.6,5,true
-Kayshon Boutte,9504,WR,NEP,11,120.2,-9.9,10,false,69,177,195.4,169.1,-7.9,blend,0.33,0.126,1.5,2,true
-Juwan Johnson,7002,TE,NOS,8,142.5,-10.3,3,false,15,178,143.94,142.7,-35.3,blend,0.374,0.19,1.66,1,true
-Bhayshul Tuten,12490,RB,JAC,7,130.3,-10.9,9,false,47,179,70.03,54.3,-124.7,blend,0.046,0.108,0.61,10,true
-De'Zhaun Stribling,13417,WR,SFO,8,119.1,-11.0,10,false,70,180,174.84,146.9,-33.1,market_implied,,,,,
-Dalton Schultz,5001,TE,HOU,8,141.3,-11.5,3,false,16,181,178.88,158.6,-22.4,blend,0.393,0.213,1.56,7,true
-Tory Horton,12497,WR,SEA,11,117.3,-12.8,10,false,71,182,254.68,,,blend,0.316,0.187,1.37,3,true
-Hollywood Brown,5848,WR,PHI,10,117.1,-13.1,10,false,72,183,283.76,,,blend,0.351,0.204,1.62,8,true
-Bam Knight,8122,RB,ARI,14,128.1,-13.1,9,false,48,184,300.36,,,blend,0.122,0.157,0.81,15,true
-Calvin Ridley,4981,WR,TEN,9,116.3,-13.8,10,false,73,185,204.36,143.2,-41.8,blend,0.423,0.222,1.87,1,true
-Mark Andrews,5012,TE,BAL,13,138.5,-14.3,3,false,17,186,127.48,128.1,-57.9,blend,0.37,0.211,1.27,12,true
-Blake Corum,11586,RB,LAR,11,126.0,-15.2,9,false,49,187,112.83,121.5,-65.5,blend,0.035,0.071,0.18,16,true
-Darius Slayton,6149,WR,NYG,8,114.8,-15.3,10,false,74,188,267.21,174.9,-13.1,blend,0.407,0.144,1.23,7,true
-Adonai Mitchell,11625,WR,NYJ,13,114.7,-15.4,10,false,75,189,171.09,160.8,-28.2,blend,0.442,0.245,1.5,2,true
-Mack Hollins,4177,WR,NEP,11,114.3,-15.8,10,false,76,190,277.26,,,blend,0.388,0.163,1.38,3,true
-Daniel Jones,5870,QB,IND,13,253.1,-16.1,4,false,17,191,159.26,158.7,-32.3,blend,0.0,0.0,0.0,10,true
-Cooper Kupp,4039,WR,SEA,11,113.7,-16.4,10,false,77,192,222.0,153.7,-38.3,blend,0.341,0.175,1.48,5,true
-Tyler Allgeier,8132,RB,ARI,14,124.5,-16.7,9,false,50,193,139.38,160.5,-32.5,blend,0.043,0.086,0.52,19,true
-Chimere Dike,12540,WR,TEN,9,113.1,-17.0,10,false,78,194,232.95,152.7,-41.3,blend,0.313,0.181,1.03,7,true
-Baker Mayfield,4892,QB,TBB,10,252.0,-17.2,4,false,18,195,117.48,129.7,-65.3,blend,0.0,0.0,0.0,1,true
-Malik Washington,11610,WR,MIA,6,112.5,-17.6,10,false,79,196,199.43,150.0,-46.0,blend,0.29,0.204,1.0,8,true
-Jordan Mason,8408,RB,MIN,6,123.2,-18.0,9,false,51,197,122.48,122.6,-74.4,blend,0.042,0.064,0.2,9,true
-Darnell Mooney,7090,WR,NYG,8,111.5,-18.6,10,false,80,198,208.67,,,blend,0.439,0.164,1.01,3,true
-Brenton Strange,9480,TE,JAC,7,133.5,-19.4,3,false,18,199,156.63,164.9,-34.1,blend,0.32,0.169,1.52,3,true
-Jacoby Brissett,3257,QB,ARI,14,249.5,-19.7,4,false,19,200,195.56,165.8,-34.2,blend,0.0,0.0,0.0,5,true
-Jonah Coleman,13345,RB,DEN,10,121.3,-19.9,9,false,52,201,165.71,160.4,-40.6,market_implied,,,,,
-Trey Benson,11589,RB,ARI,14,120.9,-20.3,9,false,53,202,261.14,,,blend,0.175,0.187,0.75,2,true
-Isiah Pacheco,8205,RB,DET,6,120.9,-20.3,9,false,54,203,151.56,156.1,-46.9,blend,0.098,0.093,0.36,9,true
-Darren Waller,2505,TE,CAR,5,132.3,-20.5,3,false,19,204,297.56,,,blend,0.421,0.259,2.16,6,true
-Jordan Love,6804,QB,GBP,11,247.2,-22.0,4,false,20,205,119.28,142.7,-62.3,blend,0.0,0.0,0.0,3,true
-Audric Estime,11579,RB,NOS,8,118.5,-22.7,9,false,55,206,304.84,,,blend,0.109,0.114,0.9,5,true
-Tyler Shough,12545,QB,NOS,8,246.0,-23.2,4,false,21,207,122.47,135.3,-71.7,blend,0.0,0.0,0.0,11,true
-Oronde Gadsden II,12493,TE,LAC,7,128.4,-24.4,3,false,20,208,178.5,137.4,-70.6,blend,0.333,0.175,1.68,5,true
-Braelon Allen,11576,RB,NYJ,13,116.2,-25.0,9,false,56,209,182.34,151.3,-57.7,blend,0.048,,,6,true
-Kareem Hunt,4098,RB,FA,,114.6,-26.6,9,false,57,210,315.02,,,blend,0.066,0.072,0.41,22,true
-Phil Mafah,12738,RB,DAL,14,113.3,-27.9,9,false,58,211,310.79,,,blend,0.087,,,1,true
-Kyler Murray,5849,QB,MIN,6,240.9,-28.3,4,false,22,212,113.28,134.2,-77.8,blend,0.0,0.0,0.0,2,true
-Zach Ertz,1339,TE,FA,,124.2,-28.7,3,false,21,213,348.75,,,blend,0.431,0.225,1.58,6,true
-Dylan Sampson,12469,RB,CLE,11,112.3,-28.9,9,false,59,214,149.56,159.6,-54.4,blend,0.115,0.258,1.75,3,true
-C.J. Stroud,9758,QB,HOU,8,239.5,-29.7,4,false,23,215,140.95,159.4,-55.6,blend,0.0,0.0,0.0,3,true
-Justice Hill,5995,RB,BAL,13,111.2,-30.0,9,false,60,216,237.68,169.5,-46.5,blend,0.162,0.234,1.47,1,true
-Emmett Johnson,13337,RB,KCC,5,111.2,-30.0,9,false,61,217,198.0,170.0,-47.0,market_implied,,,,,
-Sean Tucker,9506,RB,TBB,10,110.4,-30.8,9,false,62,218,200.06,,,blend,0.034,0.103,0.32,15,true
-Chig Okonkwo,8210,TE,WAS,7,121.1,-31.8,3,false,22,219,153.41,162.3,-56.7,blend,0.286,0.183,1.3,3,true
-AJ Barner,11603,TE,SEA,11,120.6,-32.2,3,false,23,220,208.35,158.6,-61.4,blend,0.261,0.158,1.2,8,true
-Isaiah Likely,8131,TE,NYG,8,120.5,-32.3,3,false,24,221,116.67,137.0,-84.0,blend,0.288,0.14,1.2,2,true
-Mike Washington Jr.,13305,RB,LVR,13,108.9,-32.3,9,false,63,222,206.02,153.7,-68.3,market_implied,,,,,
-Theo Johnson,11597,TE,NYG,8,120.2,-32.6,3,false,25,223,279.29,,,blend,0.375,0.146,1.04,6,true
-Michael Carter,7607,RB,TEN,9,108.2,-33.0,9,false,64,224,334.5,,,blend,0.148,0.164,0.98,7,true
-T.J. Hockenson,5844,TE,MIN,6,118.5,-34.3,3,false,26,225,191.24,169.4,-55.6,blend,0.311,0.157,1.04,3,true
-Sam Darnold,4943,QB,SEA,11,234.9,-34.3,4,false,24,226,141.92,142.0,-84.0,blend,0.0,0.0,0.0,4,true
-Jake Tonges,8698,TE,SFO,8,118.5,-34.4,3,false,27,227,282.39,,,blend,0.264,0.195,1.24,5,true
-Cade Otton,8111,TE,TBB,10,117.8,-35.0,3,false,28,228,242.56,,,blend,0.342,0.135,0.95,3,true
-Nicholas Singleton,13288,RB,TEN,9,106.0,-35.2,9,false,65,229,216.81,,,market_implied,,,,,
-Bryce Young,9228,QB,CAR,5,229.2,-40.0,4,false,25,230,165.87,172.2,-57.8,blend,0.0,0.0,0.0,5,true
-Jameis Winston,2306,QB,NYG,8,228.1,-41.1,4,false,26,231,354.46,,,blend,0.033,0.011,0.36,1,true
-Aaron Rodgers,96,QB,PIT,9,225.7,-43.5,4,false,27,232,221.65,170.8,-61.2,blend,0.001,0.002,-0.02,2,true
-Malik Willis,8161,QB,MIA,6,223.3,-46.0,4,false,28,233,130.22,161.8,-71.2,blend,0.0,0.0,0.0,3,true
+player,sleeper_id,pos,team,bye,proj_pts,vorp,tier,cliff_flag,pos_rank,value_rank,ecr,adp,adp_delta,proj_source,exp_games,rookie_flag,wopr,tprr,yprr,hv_touches,routes_proxy
+Bijan Robinson,9509,RB,ATL,11,319.1,194.7,1,true,1,1,3.5,1.7,0.7,blend,16.0,false,0.311,0.212,1.69,22,true
+Jahmyr Gibbs,9221,RB,DET,6,305.0,180.5,2,true,2,2,3.01,1.8,-0.2,blend,15.3,false,0.253,0.215,1.41,26,true
+Jaxon Smith-Njigba,9488,WR,SEA,11,284.6,170.2,1,true,1,3,4.69,5.4,2.4,blend,16.0,false,0.904,0.377,4.15,7,true
+Ja'Marr Chase,7564,WR,CIN,6,276.4,162.0,2,true,2,4,1.67,3.9,-0.1,blend,15.3,false,0.737,0.285,2.17,8,true
+Amon-Ra St. Brown,7547,WR,DET,6,265.6,151.3,3,true,3,5,5.64,6.3,1.3,blend,15.7,false,0.746,0.309,2.51,21,true
+Puka Nacua,9493,WR,LAR,11,248.3,133.9,4,true,4,6,3.21,3.1,-2.9,blend,13.7,false,0.675,0.386,3.99,11,true
+Christian McCaffrey,4034,RB,SFO,8,256.0,131.6,3,true,3,7,9.29,6.5,-0.5,blend,12.0,false,0.405,0.234,1.68,50,true
+Trey McBride,8130,TE,ARI,14,243.0,113.5,1,true,1,8,19.47,28.9,20.9,blend,15.7,false,0.59,0.235,1.72,12,true
+James Cook III,8138,RB,BUF,7,235.3,110.9,4,false,4,9,18.3,12.3,3.3,blend,15.7,false,0.127,0.112,0.82,27,true
+Ashton Jeanty,12527,RB,LVR,13,228.0,103.5,5,false,5,10,17.07,15.3,5.3,blend,16.0,false,0.181,0.149,0.7,20,true
+Jonathan Taylor,6813,RB,IND,13,224.7,100.2,5,false,6,11,11.77,7.4,-3.6,blend,12.7,false,0.157,0.104,0.72,42,true
+De'Von Achane,9226,RB,MIA,6,220.5,96.1,5,false,7,12,20.88,10.2,-1.8,blend,13.7,false,0.289,0.216,1.24,16,true
+Derrick Henry,3198,RB,BAL,13,220.5,96.0,5,true,8,13,37.78,17.6,4.6,blend,16.0,false,0.075,0.072,0.51,40,true
+George Pickens,8137,WR,DAL,14,207.4,93.0,5,false,5,14,19.88,19.5,5.5,blend,15.0,false,0.563,0.228,2.38,11,true
+Drake London,8112,WR,ATL,11,206.5,92.2,5,false,6,15,12.35,10.1,-4.9,blend,14.0,false,0.727,0.279,2.29,9,true
+Zay Flowers,9997,WR,BAL,13,201.4,87.1,6,false,7,16,29.37,24.2,8.2,blend,15.7,false,0.701,0.255,2.62,6,true
+CeeDee Lamb,6786,WR,DAL,14,200.4,86.1,6,false,8,17,8.7,10.7,-6.3,blend,14.0,false,0.611,0.258,2.37,7,true
+Chase Brown,9224,RB,CIN,6,205.9,81.4,6,false,9,18,17.85,13.7,-4.3,blend,13.3,false,0.224,0.181,0.9,26,true
+Tetairoa McMillan,12526,WR,CAR,5,195.7,81.3,6,false,9,19,33.7,33.3,14.3,blend,16.0,false,0.708,0.225,1.87,6,true
+Jeremiyah Love,13287,RB,ARI,14,205.3,80.9,6,false,10,20,38.13,29.0,9.0,market_implied,16.0,true,,,,,
+Saquon Barkley,4866,RB,PHI,10,202.3,77.9,6,false,11,21,25.94,20.3,-0.7,blend,14.3,false,0.176,0.112,0.61,29,true
+Javonte Williams,7588,RB,DAL,14,202.0,77.5,6,false,12,22,45.66,38.0,16.0,blend,15.3,false,0.119,0.107,0.29,33,true
+A.J. Brown,5859,WR,NEP,11,191.2,76.8,6,false,10,23,14.71,17.7,-5.3,blend,14.0,false,0.678,0.248,2.06,5,true
+Josh Allen,4984,QB,BUF,7,313.1,76.0,1,true,1,24,25.86,32.5,8.5,blend,15.3,false,0.0,0.0,0.0,22,true
+Justin Jefferson,6794,WR,MIN,6,190.0,75.6,6,false,11,25,9.58,11.8,-13.2,blend,13.7,false,0.741,0.246,1.83,11,true
+Travis Etienne Jr.,7543,RB,NOS,8,198.1,73.6,6,false,13,26,50.99,42.3,16.3,blend,15.3,false,0.135,0.125,0.7,32,true
+Davante Adams,2133,WR,LAR,11,183.7,69.3,7,false,12,27,50.67,41.3,14.3,blend,14.0,false,0.627,0.304,2.1,23,true
+Emeka Egbuka,12514,WR,TBB,10,182.6,68.3,7,false,13,28,37.67,37.2,9.2,blend,16.0,false,0.601,0.237,1.75,6,true
+Josh Jacobs,5850,RB,GBP,11,188.6,64.1,7,false,14,29,44.17,31.6,2.6,blend,14.0,false,0.124,0.142,0.91,32,true
+Kyren Williams,8150,RB,LAR,11,188.3,63.8,7,false,15,30,41.87,31.7,1.7,blend,14.0,false,0.136,0.11,0.62,33,true
+Nico Collins,7569,WR,HOU,8,177.4,63.1,8,false,14,31,16.37,21.2,-9.8,blend,13.0,false,0.609,0.257,2.39,11,true
+D'Andre Swift,6790,RB,CHI,10,185.9,61.4,7,false,16,32,59.55,46.3,14.3,blend,15.3,false,0.135,0.132,0.82,24,true
+Rashee Rice,10229,WR,KCC,5,173.4,59.0,8,false,15,33,22.15,14.8,-18.2,blend,12.0,false,0.531,0.286,2.09,18,true
+Brock Bowers,11604,TE,LVR,13,188.0,58.5,2,false,2,34,20.44,36.0,2.0,blend,13.5,false,0.526,0.223,1.76,10,true
+Chris Olave,8144,WR,NOS,8,172.3,57.9,8,false,16,35,20.57,21.5,-13.5,blend,12.3,false,0.725,0.279,2.08,4,true
+Breece Hall,8155,RB,NYJ,13,182.3,57.8,7,false,17,36,40.83,29.9,-6.1,blend,15.3,false,0.154,0.123,0.9,13,true
+DeVonta Smith,7525,WR,PHI,10,171.5,57.1,8,false,17,37,23.99,28.7,-8.3,blend,14.3,false,0.594,0.22,1.96,4,true
+TreVeyon Henderson,12529,RB,NEP,11,180.4,55.9,7,false,18,38,64.21,61.0,23.0,blend,16.0,false,0.126,0.139,0.73,24,true
+Wan'Dale Robinson,8126,WR,TEN,9,167.1,52.8,8,false,18,39,87.71,85.6,46.6,blend,15.0,false,0.653,0.248,1.79,6,true
+Kenny Gainwell,7567,RB,TBB,10,176.5,52.1,7,false,19,40,101.59,89.5,49.5,blend,15.3,false,0.234,0.27,1.55,22,true
+Tyler Warren,12518,TE,IND,13,181.2,51.7,2,false,3,41,53.48,64.2,23.2,blend,16.0,false,0.425,0.208,1.52,17,true
+Garrett Wilson,8146,WR,NYJ,13,165.9,51.5,8,false,19,42,30.29,26.6,-15.4,blend,12.7,false,0.925,0.254,1.7,2,true
+Ladd McConkey,11635,WR,LAC,7,165.7,51.4,8,false,20,43,35.74,38.0,-5.0,blend,15.0,false,0.499,0.201,1.49,6,true
+Courtland Sutton,5045,WR,DEN,10,164.4,50.0,8,false,21,44,85.42,61.1,17.1,blend,15.3,false,0.557,0.203,1.66,8,true
+Jaylen Waddle,7526,WR,DEN,10,163.8,49.4,8,false,22,45,38.17,45.3,0.3,blend,14.0,false,0.648,0.245,2.23,5,true
+Carnell Tate,13279,WR,TEN,9,162.1,47.7,8,false,23,46,65.44,73.5,27.5,market_implied,16.0,true,,,,,
+Jaylen Warren,8228,RB,PIT,9,172.0,47.6,7,false,20,47,75.93,61.9,14.9,blend,15.0,false,0.112,0.151,1.12,26,true
+RJ Harvey,12489,RB,DEN,10,171.1,46.6,7,false,21,48,92.56,83.6,35.6,blend,16.0,false,0.146,0.192,1.18,21,true
+Kyle Pitts Sr.,7553,TE,ATL,11,175.8,46.3,2,false,4,49,82.88,76.8,27.8,blend,16.0,false,0.492,0.217,1.71,7,true
+DJ Moore,4983,WR,BUF,7,157.9,43.6,8,false,24,50,52.14,49.8,-0.2,blend,16.0,false,0.381,0.148,1.19,7,true
+Caleb Williams,11560,QB,CHI,10,279.8,42.7,2,true,2,51,68.07,88.1,37.1,blend,16.0,false,0.005,0.003,0.03,8,true
+Michael Pittman Jr.,6819,WR,PIT,9,156.1,41.7,8,false,25,52,83.42,74.4,22.4,blend,15.3,false,0.457,0.202,1.43,10,true
+Jadarian Price,13286,RB,SEA,11,166.1,41.7,7,false,22,53,75.71,82.9,29.9,market_implied,16.0,true,,,,,
+DK Metcalf,5846,WR,PIT,9,155.5,41.1,8,false,26,54,78.2,64.5,10.5,blend,14.3,false,0.596,0.21,1.8,8,true
+Omarion Hampton,12507,RB,LAC,7,165.6,41.1,7,false,23,55,25.64,21.8,-33.2,blend,12.0,false,0.156,0.145,0.79,16,true
+Alec Pierce,8142,WR,IND,13,153.6,39.2,8,false,27,56,91.0,59.0,3.0,blend,15.0,false,0.548,0.173,2.06,4,true
+Rico Dowdle,7021,RB,PIT,9,162.2,37.7,7,false,24,57,88.55,76.6,19.6,blend,15.3,false,0.143,0.144,0.86,15,true
+Jordyn Tyson,13281,WR,NOS,8,151.2,36.9,8,false,28,58,83.83,100.0,42.0,market_implied,16.0,true,,,,,
+Terry McLaurin,5927,WR,WAS,7,150.5,36.2,8,false,29,59,44.65,46.6,-12.4,blend,13.7,false,0.608,0.239,2.32,3,true
+Colston Loveland,12517,TE,CHI,10,165.6,36.1,2,false,5,60,37.97,56.6,-3.4,blend,15.0,false,0.363,0.199,1.73,8,true
+Jameson Williams,8148,WR,DET,6,149.3,34.9,8,false,30,61,56.01,43.7,-17.3,blend,13.7,false,0.503,0.173,1.9,5,true
+Rome Odunze,11620,WR,CHI,10,148.9,34.5,8,false,31,62,59.12,48.9,-13.1,blend,13.5,false,0.602,0.209,1.53,6,true
+Michael Wilson,10232,WR,ARI,14,148.5,34.2,8,false,32,63,90.53,77.0,14.0,blend,14.3,false,0.507,0.196,1.56,5,true
+Malik Nabers,11632,WR,NYG,8,148.5,34.1,8,false,33,64,28.55,27.2,-36.8,blend,12.0,false,0.713,0.279,2.16,3,true
+Bo Nix,11563,QB,DEN,10,268.1,30.9,3,false,3,65,101.34,115.1,50.1,blend,16.0,false,0.003,0.001,0.0,6,true
+Cam Skattebo,12481,RB,NYG,8,155.1,30.7,8,false,25,66,54.84,35.1,-30.9,blend,12.0,false,0.189,0.187,1.21,14,true
+Harold Fannin Jr.,12506,TE,CLE,11,159.9,30.4,2,false,6,67,76.95,78.2,11.2,blend,15.0,false,0.458,0.218,1.49,5,true
+Jakobi Meyers,5947,WR,JAC,7,144.7,30.4,8,false,34,68,102.19,88.2,20.2,blend,14.7,false,0.541,0.21,1.59,7,true
+Tony Pollard,5967,RB,TEN,9,154.0,29.6,8,false,26,69,81.52,67.1,-1.9,blend,15.7,false,0.114,0.096,0.48,12,true
+Quentin Johnston,9754,WR,LAC,7,143.9,29.5,8,false,35,70,102.53,92.2,22.2,blend,14.0,false,0.496,0.184,1.61,7,true
+Matthew Stafford,421,QB,LAR,11,266.7,29.5,3,false,4,71,104.67,77.9,6.9,blend,15.0,false,0.0,0.0,0.0,4,true
+Zach Charbonnet,9753,RB,SEA,11,153.9,29.4,8,false,27,72,143.64,137.0,65.0,blend,15.3,false,0.087,0.094,0.56,33,true
+Tee Higgins,6801,WR,CIN,6,143.4,29.0,8,false,36,73,34.77,35.8,-37.2,blend,12.0,false,0.505,0.193,1.67,8,true
+Kenneth Walker III,8151,RB,KCC,5,153.1,28.7,8,false,28,74,29.29,22.8,-51.2,blend,13.3,false,0.109,0.139,1.09,11,true
+Makai Lemon,13294,WR,PHI,10,142.9,28.6,8,false,37,75,101.45,113.6,38.6,market_implied,16.0,true,,,,,
+Jalen Hurts,6904,QB,PHI,10,265.3,28.1,3,false,5,76,56.94,80.7,4.7,blend,15.0,false,0.0,0.0,0.0,15,true
+Brian Thomas Jr.,11631,WR,JAC,7,141.7,27.3,8,false,38,77,77.84,71.5,-5.5,blend,14.5,false,0.511,0.204,1.59,6,true
+Jared Goff,3163,QB,DET,6,262.8,25.6,3,false,6,78,106.71,101.9,23.9,blend,16.0,false,0.0,0.0,0.0,2,true
+Travis Kelce,1466,TE,KCC,5,153.2,23.6,2,false,7,79,98.69,108.3,29.3,blend,15.0,false,0.427,0.182,1.44,9,true
+Jonathon Brooks,11583,RB,CAR,5,146.7,22.3,8,false,29,80,106.31,107.6,27.6,market_implied,16.0,true,,,,,
+Houston Texans,HOU,DEF,HOU,8,135.0,22.0,1,false,1,81,153.12,95.8,14.8,market_implied,16.0,false,,,,,
+Marvin Harrison Jr.,11628,WR,ARI,14,136.0,21.7,9,false,39,82,69.8,66.0,-16.0,blend,13.5,false,0.502,0.185,1.54,6,true
+Troy Franklin,11627,WR,DEN,10,135.9,21.6,9,false,40,83,202.09,,,blend,15.5,false,0.469,0.248,1.69,11,true
+David Montgomery,5892,RB,HOU,8,145.9,21.5,8,false,30,84,61.73,57.6,-26.4,blend,14.0,false,0.083,0.12,0.79,25,true
+Quinshon Judkins,12512,RB,CLE,11,145.6,21.2,8,false,31,85,60.99,51.9,-33.1,blend,13.0,false,0.119,0.128,0.61,19,true
+Kyle Monangai,12534,RB,CHI,10,145.4,20.9,8,false,32,86,106.05,114.0,28.0,blend,16.0,false,0.086,0.107,0.58,22,true
+Denver Broncos,DEN,DEF,DEN,10,133.0,20.0,1,false,2,87,163.58,87.8,0.8,market_implied,16.0,false,,,,,
+Drake Maye,11564,QB,NEP,11,256.8,19.7,3,false,7,88,39.19,50.5,-37.5,blend,13.5,false,0.001,0.002,0.0,15,true
+Deebo Samuel Sr.,5872,WR,SFO,8,133.8,19.5,9,false,41,89,142.01,113.0,24.0,blend,14.0,false,0.475,0.239,1.76,10,true
+Rhamondre Stevenson,7611,RB,NEP,11,143.2,18.8,8,false,33,90,81.99,70.9,-19.1,blend,12.7,false,0.181,0.115,1.07,18,true
+Romeo Doubs,8121,WR,NEP,11,132.8,18.4,9,false,42,91,129.36,111.8,20.8,blend,14.3,false,0.479,0.195,1.66,9,true
+Seattle Seahawks,SEA,DEF,SEA,11,131.0,18.0,1,false,3,92,167.38,82.8,-9.2,market_implied,16.0,false,,,,,
+Jordan Addison,9756,WR,MIN,6,132.2,17.8,9,false,43,93,108.59,98.8,5.8,blend,14.3,false,0.504,0.181,1.4,5,true
+Christian Watson,8167,WR,GBP,11,132.1,17.7,9,false,44,94,56.57,58.7,-35.3,blend,12.0,false,0.548,0.236,2.62,4,true
+KC Concepcion,13298,WR,CLE,11,131.6,17.2,9,false,45,95,131.55,123.3,28.3,market_implied,16.0,true,,,,,
+Ka'imi Fairbairn,3451,K,HOU,8,148.5,16.5,1,false,1,96,192.61,141.8,45.8,market_implied,16.0,false,,,,,
+Patrick Mahomes II,4046,QB,KCC,5,253.7,16.5,3,false,8,97,101.13,100.6,3.6,blend,14.3,false,0.002,0.002,-0.02,5,true
+Los Angeles Rams,LAR,DEF,LAR,11,129.0,16.0,1,false,4,98,168.2,106.9,8.9,market_implied,16.0,false,,,,,
+Khalil Shakir,8134,WR,BUF,7,130.1,15.7,9,false,46,99,120.35,101.0,2.0,blend,14.7,false,0.377,0.269,2.03,6,true
+Bucky Irving,11584,RB,TBB,10,140.1,15.6,8,false,34,100,57.86,45.9,-54.1,blend,12.5,false,0.146,0.137,1.09,7,true
+Cameron Dicker,8259,K,LAC,7,147.0,15.0,1,false,2,101,196.04,143.8,42.8,market_implied,16.0,false,,,,,
+Baker Mayfield,4892,QB,TBB,10,252.0,14.8,3,false,9,102,117.48,129.7,27.7,blend,16.0,false,0.0,0.0,0.0,1,true
+Mike Evans,2216,WR,SFO,8,128.9,14.6,9,false,47,103,54.06,52.1,-50.9,blend,12.0,false,0.609,0.287,1.7,5,true
+Josh Downs,9500,WR,IND,13,128.7,14.4,9,false,48,104,85.44,81.9,-22.1,blend,14.7,false,0.379,0.248,1.59,5,true
+Stefon Diggs,2449,WR,WAS,7,128.4,14.0,9,false,49,105,111.6,92.2,-12.8,blend,13.0,false,0.469,0.288,2.86,7,true
+Philadelphia Eagles,PHI,DEF,PHI,10,127.0,14.0,1,false,5,106,174.89,133.2,27.2,market_implied,16.0,false,,,,,
+Jake Ferguson,8110,TE,DAL,14,143.3,13.8,2,false,8,107,113.4,132.2,25.2,blend,15.0,false,0.31,0.209,1.23,14,true
+Cam Little,11786,K,JAC,7,145.5,13.5,1,false,3,108,199.01,154.4,46.4,market_implied,16.0,false,,,,,
+Jerry Jeudy,6783,WR,CLE,11,127.4,13.0,9,false,50,109,160.55,129.1,20.1,blend,15.7,false,0.555,0.185,1.05,3,true
+Tyrone Tracy Jr.,11655,RB,NYG,8,137.1,12.6,8,false,35,110,132.07,149.3,39.3,blend,15.0,false,0.163,0.151,0.9,7,true
+Lamar Jackson,4881,QB,BAL,13,249.3,12.1,3,false,10,111,32.31,56.8,-54.2,blend,14.3,false,0.0,0.0,0.0,5,true
+Jason Myers,2747,K,SEA,11,144.0,12.0,1,false,4,112,200.84,141.8,29.8,market_implied,16.0,false,,,,,
+New England Patriots,NE,DEF,NEP,11,125.0,12.0,1,false,6,113,185.43,126.0,13.0,market_implied,16.0,false,,,,,
+George Kittle,4217,TE,SFO,8,140.8,11.2,2,false,9,114,105.31,116.3,2.3,blend,13.0,false,0.451,0.211,1.92,5,true
+Parker Washington,9487,WR,JAC,7,125.2,10.8,9,false,51,115,69.78,64.6,-50.4,blend,12.0,false,0.469,0.235,2.1,7,true
+Eddy Pineiro,5189,K,SFO,8,142.5,10.5,1,false,5,116,208.48,164.2,48.2,market_implied,16.0,false,,,,,
+Luther Burden III,12519,WR,CHI,10,124.4,10.0,9,false,52,117,46.29,59.4,-57.6,blend,14.0,false,0.271,0.254,2.76,0,true
+Minnesota Vikings,MIN,DEF,MIN,6,123.0,10.0,1,false,7,118,186.26,112.5,-5.5,market_implied,16.0,false,,,,,
+Justin Herbert,6797,QB,LAC,7,247.1,10.0,3,false,11,119,70.0,106.6,-12.4,blend,14.3,false,0.0,0.0,0.0,7,true
+Tre Tucker,10213,WR,LVR,13,124.3,9.9,9,false,53,120,172.63,133.2,13.2,blend,14.7,false,0.469,0.153,1.16,5,true
+Jacory Croskey-Merritt,12533,RB,WAS,7,134.3,9.9,8,false,36,121,119.51,118.0,-3.0,blend,16.0,false,0.041,0.055,0.29,21,true
+Jayden Higgins,12484,WR,HOU,8,123.9,9.6,9,false,54,122,122.79,127.3,5.3,blend,16.0,false,0.309,0.169,1.3,4,true
+Denzel Boston,13346,WR,CLE,11,123.8,9.4,9,false,55,123,157.29,142.4,19.4,market_implied,16.0,true,,,,,
+Tyler Loop,12711,K,BAL,13,141.0,9.0,1,false,6,124,208.78,154.3,30.3,market_implied,16.0,false,,,,,
+Jauan Jennings,7049,WR,MIN,6,122.7,8.4,9,false,56,125,157.65,144.0,19.0,blend,13.0,false,0.478,0.192,1.37,11,true
+Chuba Hubbard,7594,RB,CAR,5,132.8,8.3,8,false,37,126,86.83,74.9,-51.1,blend,14.7,false,0.108,0.154,0.88,12,true
+Pittsburgh Steelers,PIT,DEF,PIT,9,121.0,8.0,1,false,8,127,187.06,133.2,6.2,market_implied,16.0,false,,,,,
+Woody Marks,12474,RB,HOU,8,132.4,7.9,8,false,38,128,140.38,149.2,21.2,blend,15.0,false,0.115,0.105,0.61,18,true
+Evan McPherson,7839,K,CIN,6,139.5,7.5,1,false,7,129,213.91,169.8,40.8,market_implied,16.0,false,,,,,
+Rachaad White,8136,RB,WAS,7,131.1,6.6,8,false,39,130,108.98,107.5,-22.5,blend,15.3,false,0.105,0.13,0.63,11,true
+Omar Cooper Jr.,13276,WR,NYJ,13,120.9,6.6,9,false,57,131,167.8,165.6,34.6,market_implied,16.0,true,,,,,
+Cairo Santos,2020,K,CHI,10,138.0,6.0,1,false,8,132,216.09,165.8,33.8,market_implied,16.0,false,,,,,
+Jacksonville Jaguars,JAX,DEF,JAC,7,119.0,6.0,1,false,9,133,188.66,155.2,22.2,market_implied,16.0,false,,,,,
+Dalton Schultz,5001,TE,HOU,8,135.5,5.9,2,false,10,134,178.88,158.6,24.6,blend,15.3,false,0.393,0.213,1.56,7,true
+De'Zhaun Stribling,13417,WR,SFO,8,119.1,4.8,9,false,58,135,174.84,146.9,11.9,market_implied,16.0,true,,,,,
+Andy Borregales,12713,K,NEP,11,136.5,4.5,1,false,9,136,221.27,165.5,29.5,market_implied,16.0,false,,,,,
+Los Angeles Chargers,LAC,DEF,LAC,7,117.0,4.0,1,false,10,137,191.38,144.3,7.3,market_implied,16.0,false,,,,,
+Keenan Allen,1479,WR,LAC,7,118.1,3.7,9,false,59,138,267.75,,,blend,14.0,false,0.49,0.307,1.96,7,true
+Jake Bates,11539,K,DET,6,135.0,3.0,1,false,10,139,225.01,146.4,7.4,market_implied,16.0,false,,,,,
+Baltimore Ravens,BAL,DEF,BAL,13,115.0,2.0,1,false,11,140,197.59,161.2,21.2,market_implied,16.0,false,,,,,
+Sam LaPorta,10859,TE,DET,6,131.3,1.8,2,false,11,141,82.49,87.4,-53.6,blend,13.0,false,0.399,0.16,1.59,3,true
+Trevor Lawrence,7523,QB,JAC,7,238.7,1.6,4,true,12,142,79.86,93.5,-48.5,blend,13.3,false,0.0,0.0,0.0,15,true
+Chase McLaughlin,6650,K,TBB,10,133.5,1.5,1,false,11,143,225.94,155.4,12.4,market_implied,16.0,false,,,,,
+Tyler Allgeier,8132,RB,ARI,14,124.5,0.0,8,false,40,144,139.38,160.5,16.5,blend,16.0,false,0.043,0.086,0.52,19,true
+Elic Ayomanor,12499,WR,TEN,9,114.4,0.0,9,false,60,145,242.52,,,blend,15.0,false,0.505,0.174,1.01,6,true
+Harrison Mevis,12015,K,LAR,11,132.0,0.0,1,false,12,146,231.51,152.4,6.4,market_implied,16.0,false,,,,,
+Green Bay Packers,GB,DEF,GBP,11,113.0,0.0,1,false,12,147,201.68,156.7,9.7,market_implied,16.0,false,,,,,
+Xavier Worthy,11624,WR,KCC,5,113.8,-0.5,9,false,61,148,127.07,106.8,-41.2,blend,14.0,false,0.428,0.172,1.25,2,true
+Hunter Henry,3214,TE,NEP,11,128.4,-1.1,2,false,12,149,166.29,157.3,8.3,blend,14.3,false,0.369,0.166,1.46,10,true
+Chimere Dike,12540,WR,TEN,9,113.1,-1.3,9,false,62,150,232.95,152.7,2.7,blend,16.0,false,0.313,0.181,1.03,7,true
+Harrison Butker,4227,K,KCC,5,130.5,-1.5,1,false,13,151,240.56,160.6,9.6,market_implied,16.0,false,,,,,
+Tucker Kraft,9484,TE,GBP,11,127.7,-1.8,2,false,13,152,72.87,102.9,-49.1,blend,12.0,false,0.351,0.18,2.0,3,true
+Kansas City Chiefs,KC,DEF,KCC,5,111.0,-2.0,1,false,13,153,212.18,164.1,11.1,market_implied,16.0,false,,,,,
+Chris Boswell,1945,K,PIT,9,129.0,-3.0,1,false,14,154,241.14,157.7,3.7,market_implied,16.0,false,,,,,
+Tyreek Hill,3321,WR,FA,,111.3,-3.1,9,false,63,155,256.37,,,blend,12.0,false,0.688,0.331,3.02,2,true
+Jonah Coleman,13345,RB,DEN,10,121.3,-3.1,8,false,41,156,165.71,160.4,4.4,market_implied,16.0,true,,,,,
+Adonai Mitchell,11625,WR,NYJ,13,111.1,-3.2,9,false,64,157,171.09,160.8,3.8,blend,15.5,false,0.442,0.245,1.5,2,true
+Cleveland Browns,CLE,DEF,CLE,11,109.0,-4.0,1,false,14,158,213.92,163.0,5.0,market_implied,16.0,false,,,,,
+Tank Dell,9502,WR,HOU,8,110.2,-4.1,9,false,65,159,214.57,158.8,-0.2,market_implied,16.0,true,,,,,
+Spencer Shrader,12185,K,IND,13,127.5,-4.5,1,false,15,160,248.25,,,market_implied,16.0,false,,,,,
+Chris Godwin Jr.,4037,WR,TBB,10,109.7,-4.7,9,false,66,161,81.74,80.8,-80.2,blend,12.0,false,0.379,0.197,1.39,6,true
+Juwan Johnson,7002,TE,NOS,8,124.7,-4.8,2,false,14,162,143.94,142.7,-19.3,blend,14.0,false,0.374,0.19,1.66,1,true
+Antonio Williams,13301,WR,WAS,7,109.2,-5.1,9,false,67,163,219.38,170.2,7.2,market_implied,16.0,true,,,,,
+Blake Grupe,11058,K,IND,13,126.0,-6.0,1,false,16,164,249.29,168.1,4.1,market_implied,16.0,false,,,,,
+Detroit Lions,DET,DEF,DET,6,107.0,-6.0,1,false,15,165,220.2,132.3,-32.7,market_implied,16.0,false,,,,,
+Zachariah Branch,13320,WR,ATL,11,107.2,-7.1,9,false,68,166,229.71,172.8,6.8,market_implied,16.0,true,,,,,
+Aaron Jones Sr.,4199,RB,MIN,6,116.7,-7.8,8,false,42,167,113.67,100.1,-66.9,blend,12.3,false,0.203,0.184,0.89,6,true
+Buffalo Bills,BUF,DEF,BUF,7,105.0,-8.0,1,false,16,168,228.57,158.4,-9.6,market_implied,16.0,false,,,,,
+Dallas Goedert,5022,TE,PHI,10,121.2,-8.3,2,false,15,169,122.31,115.2,-53.8,blend,12.0,false,0.418,0.18,1.3,9,true
+Germie Bernard,13274,WR,PIT,9,106.1,-8.3,9,false,69,170,236.01,170.7,0.7,market_implied,16.0,true,,,,,
+Darius Slayton,6149,WR,NYG,8,105.2,-9.2,9,false,70,171,267.21,174.9,3.9,blend,14.7,false,0.407,0.144,1.23,7,true
+Brandon Aiyuk,6803,WR,SFO,8,104.3,-10.1,9,false,71,172,245.86,166.6,-5.4,market_implied,16.0,true,,,,,
+Blake Corum,11586,RB,LAR,11,114.2,-10.2,8,false,43,173,112.83,121.5,-51.5,blend,14.5,false,0.035,0.071,0.18,16,true
+Bhayshul Tuten,12490,RB,JAC,7,114.0,-10.4,8,false,44,174,70.03,54.3,-119.7,blend,14.0,false,0.046,0.108,0.61,10,true
+Jordan Love,6804,QB,GBP,11,226.6,-10.6,5,false,13,175,119.28,142.7,-32.3,blend,14.7,false,0.0,0.0,0.0,3,true
+Chris Bell,13311,WR,MIA,6,103.7,-10.7,9,false,72,176,249.16,,,market_implied,16.0,true,,,,,
+Cyrus Allen,13413,WR,KCC,5,103.7,-10.7,9,false,73,177,249.26,149.9,-27.1,market_implied,16.0,true,,,,,
+J.K. Dobbins,6806,RB,DEN,10,113.5,-10.9,8,false,45,178,102.06,97.8,-80.2,blend,12.0,false,0.061,0.066,0.17,11,true
+Chig Okonkwo,8210,TE,WAS,7,118.5,-11.0,2,false,16,179,153.41,162.3,-16.7,blend,15.7,false,0.286,0.183,1.3,3,true
+Ja'Kobi Lane,13293,WR,BAL,13,103.2,-11.1,9,false,74,180,251.76,159.8,-20.2,market_implied,16.0,true,,,,,
+Mark Andrews,5012,TE,BAL,13,118.3,-11.2,2,false,17,181,127.48,128.1,-52.9,blend,13.7,false,0.37,0.211,1.27,12,true
+Ted Hurst III,13317,WR,TBB,10,102.8,-11.6,9,false,75,182,254.24,,,market_implied,16.0,true,,,,,
+Malachi Fields,13285,WR,NYG,8,102.7,-11.7,9,false,76,183,254.83,168.8,-14.2,market_implied,16.0,true,,,,,
+Dalton Kincaid,10236,TE,BUF,7,117.8,-11.7,2,false,18,184,114.64,151.6,-32.4,blend,12.7,false,0.369,0.291,3.4,5,true
+Caleb Douglas,13296,WR,MIA,6,102.2,-12.2,9,false,77,185,257.79,178.1,-6.9,market_implied,16.0,true,,,,,
+Elijah Sarratt,13268,WR,BAL,13,102.0,-12.4,9,false,78,186,258.99,,,market_implied,16.0,true,,,,,
+Dak Prescott,3294,QB,DAL,14,224.2,-13.0,5,false,14,187,80.01,65.8,-121.2,blend,13.0,false,0.0,0.0,0.0,10,true
+Emmett Johnson,13337,RB,KCC,5,111.2,-13.3,8,false,46,188,198.0,170.0,-18.0,market_implied,16.0,true,,,,,
+Travis Hunter,12530,WR,JAC,7,100.3,-14.1,9,false,79,189,175.65,160.2,-28.8,blend,12.0,false,0.387,0.231,1.53,2,true
+Tyjae Spears,9508,RB,TEN,9,109.6,-14.8,8,false,47,190,145.85,134.3,-55.7,blend,13.0,false,0.15,0.206,1.09,8,true
+Mike Washington Jr.,13305,RB,LVR,13,108.9,-15.6,8,false,48,191,206.02,153.7,-37.3,market_implied,16.0,true,,,,,
+Chris Brazzell II,13353,WR,CAR,5,98.4,-15.9,9,false,80,192,281.0,,,market_implied,16.0,true,,,,,
+Oronde Gadsden II,12493,TE,LAC,7,112.4,-17.1,2,false,19,193,178.5,137.4,-55.6,blend,14.0,false,0.333,0.175,1.68,5,true
+Kenyon Sadiq,13330,TE,NYJ,13,111.9,-17.6,2,false,20,194,218.32,165.2,-28.8,market_implied,16.0,true,,,,,
+Alvin Kamara,4035,RB,NOS,8,106.4,-18.1,8,false,49,195,148.76,146.1,-48.9,blend,12.0,false,0.18,0.135,0.65,8,true
+Nicholas Singleton,13288,RB,TEN,9,106.0,-18.5,8,false,50,196,216.81,,,market_implied,16.0,true,,,,,
+Fernando Mendoza,13269,QB,LVR,13,218.6,-18.5,5,false,15,197,255.58,160.1,-36.9,market_implied,16.0,true,,,,,
+Aaron Rodgers,96,QB,PIT,9,218.6,-18.6,5,false,16,198,221.65,170.8,-27.2,blend,15.5,false,0.001,0.002,-0.02,2,true
+James Conner,4137,RB,ARI,14,105.0,-19.5,8,false,51,199,194.7,162.2,-36.8,blend,12.0,false,0.135,0.139,0.59,4,true
+MarShawn Lloyd,11581,RB,GBP,11,104.9,-19.5,8,false,52,200,220.8,169.0,-31.0,market_implied,16.0,true,,,,,
+AJ Barner,11603,TE,SEA,11,109.3,-20.2,2,false,21,201,208.35,158.6,-42.4,blend,14.5,false,0.261,0.158,1.2,8,true
+Kaytron Allen,13405,RB,WAS,7,103.1,-21.3,8,false,53,202,227.85,,,market_implied,16.0,true,,,,,
+C.J. Stroud,9758,QB,HOU,8,214.6,-22.6,5,false,17,203,140.95,159.4,-43.6,blend,14.3,false,0.0,0.0,0.0,3,true
+Kareem Hunt,4098,RB,FA,,100.3,-24.2,8,false,54,204,315.02,,,blend,14.0,false,0.066,0.072,0.41,22,true
+Chris Rodriguez Jr.,10219,RB,JAC,7,100.2,-24.3,8,false,55,205,143.1,157.6,-47.4,blend,12.0,false,0.022,0.027,0.2,22,true
+Deshaun Watson,4017,QB,CLE,11,212.8,-24.4,5,false,18,206,292.13,,,market_implied,16.0,true,,,,,
+Jaxson Dart,12508,QB,NYG,8,212.3,-24.9,5,false,19,207,94.7,117.5,-89.5,blend,13.0,false,0.0,0.0,0.0,12,true
+Kimani Vidal,11647,RB,LAC,7,99.1,-25.4,8,false,56,208,194.76,144.8,-63.2,blend,12.0,false,0.083,0.073,0.45,14,true
+Brock Purdy,8183,QB,SFO,8,211.8,-25.4,5,false,20,209,97.35,89.0,-120.0,blend,12.3,false,0.0,0.0,0.0,3,true
+Cam Ward,12522,QB,TEN,9,211.2,-26.0,5,false,21,210,152.29,171.8,-38.2,blend,16.0,false,0.0,0.0,0.0,8,true
+Devin Singletary,6130,RB,NYG,8,98.5,-26.0,8,false,57,211,288.53,,,blend,15.3,false,0.056,0.105,0.84,18,true
+Dylan Sampson,12469,RB,CLE,11,98.3,-26.2,8,false,58,212,149.56,159.6,-52.4,blend,14.0,false,0.115,0.258,1.75,3,true
+Cade Otton,8111,TE,TBB,10,103.1,-26.4,2,false,22,213,242.56,,,blend,14.0,false,0.342,0.135,0.95,3,true
+Demond Claiborne,13347,RB,MIN,6,96.9,-27.5,8,false,59,214,254.0,,,market_implied,16.0,true,,,,,
+Bam Knight,8122,RB,ARI,14,96.1,-28.4,8,false,60,215,300.36,,,blend,12.0,false,0.122,0.157,0.81,15,true
+Carson Beck,13272,QB,ARI,14,208.1,-29.1,5,false,22,216,325.69,,,market_implied,16.0,true,,,,,
+Brenton Strange,9480,TE,JAC,7,100.1,-29.4,2,false,23,217,156.63,164.9,-52.1,blend,12.0,false,0.32,0.169,1.52,3,true
+Eli Stowers,13349,TE,PHI,10,99.9,-29.6,2,false,24,218,273.2,,,market_implied,16.0,true,,,,,
+Jordan James,12467,RB,SFO,8,94.6,-29.9,8,false,61,219,264.7,158.6,-60.4,market_implied,16.0,true,,,,,
+Darren Waller,2505,TE,CAR,5,99.2,-30.3,2,false,25,220,297.56,,,blend,12.0,false,0.421,0.259,2.16,6,true
+Kaelon Black,13414,RB,SFO,8,93.8,-30.6,8,false,62,221,268.09,154.2,-66.8,market_implied,16.0,true,,,,,
+Cade Klubnik,13303,QB,NYJ,13,206.4,-30.8,5,false,23,222,338.4,,,market_implied,16.0,true,,,,,
+Ty Simpson,13275,QB,LAR,11,205.9,-31.3,5,false,24,223,342.19,,,market_implied,16.0,true,,,,,
+Bryce Young,9228,QB,CAR,5,205.4,-31.8,5,false,25,224,165.87,172.2,-51.8,blend,14.3,false,0.0,0.0,0.0,5,true
+Jordan Mason,8408,RB,MIN,6,92.4,-32.1,8,false,63,225,122.48,122.6,-102.4,blend,12.0,false,0.042,0.064,0.2,9,true
+Colby Parkinson,6865,TE,LAR,11,96.1,-33.5,2,false,26,226,262.81,,,blend,13.3,false,0.206,0.153,1.11,10,true
+Trey Benson,11589,RB,ARI,14,90.6,-33.8,8,false,64,227,261.14,,,blend,12.0,false,0.175,0.187,0.75,2,true
+Isiah Pacheco,8205,RB,DET,6,90.6,-33.8,8,false,65,228,151.56,156.1,-71.9,blend,12.0,false,0.098,0.093,0.36,9,true
+Oscar Delp,13319,TE,NOS,8,94.3,-35.2,2,false,27,229,303.28,,,market_implied,16.0,true,,,,,
+Joe Burrow,6770,QB,CIN,6,201.9,-35.3,5,false,26,230,45.77,56.0,-174.0,blend,12.0,false,0.0,0.0,0.0,1,true
+Gunnar Helm,12502,TE,TEN,9,93.9,-35.6,2,false,28,231,222.29,,,blend,15.0,false,0.216,0.159,1.03,3,true
+Sam Darnold,4943,QB,SEA,11,200.6,-36.5,5,false,27,232,141.92,142.0,-90.0,blend,13.7,false,0.0,0.0,0.0,4,true
+Jayden Daniels,11566,QB,WAS,7,197.0,-40.2,5,false,28,233,49.78,72.9,-160.1,blend,12.0,false,0.0,0.0,0.0,3,true

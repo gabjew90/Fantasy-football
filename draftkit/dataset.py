@@ -42,6 +42,36 @@ def fantasy_points_expr() -> pl.Expr:
     return expr.alias("fpts")
 
 
+SEASON_GAMES = 17  # NFL regular-season length; 16 is the projection convention
+
+
+def build_durability(active_weekly: pl.DataFrame, seasons: tuple[int, ...]) -> pl.DataFrame:
+    """exp_games = clamp(16 - avg games missed over played seasons, 12, 16).
+
+    Only seasons the player actually appeared in count toward the average
+    (a 2025 debut is not 'missed' 2023). 2026 rookies have no rows at all and
+    are handled downstream (exp_games null -> 16, rookie_flag).
+    """
+    per_season = (
+        active_weekly.filter(pl.col("season").is_in(list(seasons)))
+        .group_by("player_id", "season")
+        .agg(pl.len().alias("games"))
+        .with_columns(
+            (SEASON_GAMES - pl.col("games")).clip(lower_bound=0).alias("missed")
+        )
+    )
+    return (
+        per_season.group_by("player_id")
+        .agg(pl.col("missed").mean().alias("avg_missed"))
+        .with_columns(
+            (16.0 - pl.col("avg_missed")).clip(lower_bound=12.0, upper_bound=16.0)
+            .alias("exp_games")
+        )
+        .rename({"player_id": "gsis_id"})
+        .select("gsis_id", "avg_missed", "exp_games")
+    )
+
+
 def build_team_context(pbp: pl.DataFrame) -> pl.DataFrame:
     """Offensive EPA/play, neutral pass rate (Q1-Q3, WP 20-80%), plays/game."""
     plays = pbp.filter(
@@ -101,27 +131,34 @@ def build_usage(cfg) -> tuple[pl.DataFrame, pl.DataFrame]:
     import nflreadpy as nfl
 
     season = int(cfg["stats_season"])
-    weekly = nfl.load_player_stats([season]).filter(pl.col("season_type") == "REG")
+    durability_seasons = (season - 2, season - 1, season)
+    weekly_all = nfl.load_player_stats(list(durability_seasons)).filter(
+        pl.col("season_type") == "REG"
+    )
+    weekly = weekly_all.filter(pl.col("season") == season)
     pbp = nfl.load_pbp([season]).filter(pl.col("season_type") == "REG")
 
     team_ctx = build_team_context(pbp)
     hv = build_high_value_touches(pbp)
 
     carries_col = "carries" if "carries" in weekly.columns else "rushing_attempts"
-    weekly = weekly.with_columns(fantasy_points_expr())
 
-    active = weekly.filter(
-        (
+    def _active(df: pl.DataFrame) -> pl.DataFrame:
+        return df.with_columns(fantasy_points_expr()).filter(
             (
-                pl.col(carries_col).fill_null(0)
-                + pl.col("targets").fill_null(0)
-                + pl.col("passing_yards").fill_null(0).abs()
-                + pl.col("receptions").fill_null(0)
+                (
+                    pl.col(carries_col).fill_null(0)
+                    + pl.col("targets").fill_null(0)
+                    + pl.col("passing_yards").fill_null(0).abs()
+                    + pl.col("receptions").fill_null(0)
+                )
+                > 0
             )
-            > 0
+            | (pl.col("fpts") != 0)
         )
-        | (pl.col("fpts") != 0)
-    )
+
+    active = _active(weekly)
+    active_all = _active(weekly_all)
 
     player = (
         active.group_by("player_id")
@@ -205,6 +242,9 @@ def build_usage(cfg) -> tuple[pl.DataFrame, pl.DataFrame]:
             pl.lit(None, dtype=pl.Float64).alias("avg_separation"),
             pl.lit(None, dtype=pl.Float64).alias("avg_cushion"),
         )
+
+    durability = build_durability(active_all, durability_seasons)
+    player = player.join(durability, on="gsis_id", how="left")
 
     return player, team_ctx
 

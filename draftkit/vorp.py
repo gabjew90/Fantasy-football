@@ -14,21 +14,31 @@ def add_vorp(df: pl.DataFrame, baselines: dict[str, int]) -> pl.DataFrame:
         .over("pos")
         .alias("pos_rank")
     )
-    repl = (
-        df.filter(
-            pl.col("pos_rank")
-            == pl.col("pos").replace_strict(baselines, default=None, return_dtype=pl.Int64)
-        )
-        .select("pos", pl.col("proj_pts").alias("replacement_pts"))
-    )
-    # if a position pool is smaller than its baseline rank, use the last player
-    missing = [p for p in baselines if p not in repl["pos"].to_list()]
-    if missing:
-        fallback = (
-            df.filter(pl.col("pos").is_in(missing))
-            .group_by("pos")
-            .agg(pl.col("proj_pts").min().alias("replacement_pts"))
-        )
-        repl = pl.concat([repl, fallback])
+    # Final spec §2: QB/TE replacement = mean of positional ranks 10-14
+    # (smooths streaming reality and single-projection outliers);
+    # RB/WR/K/DEF use the baseline rank directly.
+    SMOOTHED = {"QB": (10, 14), "TE": (10, 14)}
+    repl_rows = []
+    for pos, baseline in baselines.items():
+        grp = df.filter(pl.col("pos") == pos)
+        if grp.height == 0:
+            continue
+        if pos in SMOOTHED:
+            lo, hi = SMOOTHED[pos]
+            window = grp.filter(pl.col("pos_rank").is_between(lo, hi))
+            if window.height == 0:
+                window = grp.filter(pl.col("pos_rank") == grp["pos_rank"].max())
+            repl_rows.append(
+                {"pos": pos, "replacement_pts": float(window["proj_pts"].mean())}
+            )
+        else:
+            at_rank = grp.filter(pl.col("pos_rank") == baseline)
+            pts = (
+                float(at_rank["proj_pts"][0])
+                if at_rank.height
+                else float(grp["proj_pts"].min())
+            )
+            repl_rows.append({"pos": pos, "replacement_pts": pts})
+    repl = pl.DataFrame(repl_rows)
     df = df.join(repl, on="pos", how="left")
     return df.with_columns((pl.col("proj_pts") - pl.col("replacement_pts")).alias("vorp"))
