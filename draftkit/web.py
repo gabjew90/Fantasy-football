@@ -196,8 +196,14 @@ def run_server(cfg, tiers_path, default_slot: int | None, port: int) -> int:
         def log_message(self, fmt, *args):  # keep the console quiet
             pass
 
+    # http.server enables SO_REUSEADDR, which on Windows lets a second bind to
+    # an in-use port silently succeed — that would defeat the double-click
+    # guard, so disable it (a restarted listener does not need it here).
+    class ExclusiveServer(ThreadingHTTPServer):
+        allow_reuse_address = False
+
     try:
-        server = ThreadingHTTPServer(("127.0.0.1", port), Handler)
+        server = ExclusiveServer(("127.0.0.1", port), Handler)
     except OSError:
         print(f"draftkit web: port {port} already in use — dashboard is already "
               f"running at http://localhost:{port}")
