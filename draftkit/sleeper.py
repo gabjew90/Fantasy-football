@@ -50,6 +50,9 @@ class SleeperClient:
     def draft_picks(self, draft_id: str) -> list[dict]:
         return get_json(f"{BASE}/draft/{draft_id}/picks")
 
+    def league_drafts(self, league_id: str) -> list[dict]:
+        return get_json(f"{BASE}/league/{league_id}/drafts")
+
     def user(self, username_or_id: str) -> dict | None:
         return get_json(f"{BASE}/user/{username_or_id}")
 

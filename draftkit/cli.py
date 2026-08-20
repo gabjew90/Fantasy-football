@@ -165,6 +165,16 @@ def cmd_track(cfg: Config, args) -> None:
     tracker.run()
 
 
+def cmd_rivals(cfg: Config, args) -> None:
+    from .rivals import build_seeds
+
+    client = SleeperClient(cfg.path("raw"))
+    payload = build_seeds(cfg, client)
+    console.print(f"rival seeds: {len(payload['users'])} users from "
+                  f"{payload['history_drafts']} historical drafts -> "
+                  f"{cfg.path('processed') / 'rival_seeds.json'}")
+
+
 def cmd_web(cfg: Config, args) -> None:
     from .web import run_server
 
@@ -209,6 +219,7 @@ def main(argv: list[str] | None = None) -> None:
     p = sub.add_parser("track")
     p.add_argument("--draft-id", default=None, help="override draft id (mock draft testing)")
     p.add_argument("--slot", type=int, default=None, help="override my draft slot")
+    sub.add_parser("rivals")
     p = sub.add_parser("web")
     p.add_argument("--port", type=int, default=8723)
     p.add_argument("--slot", type=int, default=None, help="override my draft slot")
@@ -226,6 +237,7 @@ def main(argv: list[str] | None = None) -> None:
         "tiers": cmd_tiers,
         "board": cmd_board,
         "track": cmd_track,
+        "rivals": cmd_rivals,
         "web": cmd_web,
         "simulate": cmd_simulate,
     }[args.cmd](cfg, args)
