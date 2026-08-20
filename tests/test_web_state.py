@@ -116,3 +116,43 @@ def test_json_serializable():
     import json
     t = make_tracker([pick(1, 1, "RB")], my_slot=2)
     json.dumps(build_state(t))
+
+
+class StubTracker:
+    """Counts poll() calls."""
+
+    def __init__(self):
+        self.poll_calls = 0
+        self.poll_seconds = 5.0
+
+    def poll(self):
+        self.poll_calls += 1
+        return False
+
+
+def test_app_rate_limits_polls(monkeypatch):
+    import pathlib
+
+    from draftkit.web import DraftWebApp
+
+    app = DraftWebApp.__new__(DraftWebApp)
+    app._trackers = {}
+    app._last_poll = {}
+    app.tiers_path = pathlib.Path("nonexistent-tiers.csv")
+    stub = StubTracker()
+    app._trackers["d1"] = stub
+    monkeypatch.setattr("draftkit.web.build_state", lambda t: {"ok": True})
+
+    app.state_for("d1", None)
+    app.state_for("d1", None)  # immediate second call — inside poll window
+    assert stub.poll_calls == 1
+
+
+def test_app_reload_clears_cache():
+    from draftkit.web import DraftWebApp
+
+    app = DraftWebApp.__new__(DraftWebApp)
+    app._trackers = {"d1": StubTracker()}
+    app._last_poll = {"d1": 123.0}
+    app.reload()
+    assert app._trackers == {} and app._last_poll == {}

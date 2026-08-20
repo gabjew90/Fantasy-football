@@ -104,3 +104,54 @@ def build_state(t: Tracker) -> dict:
         "poll_error": s.last_error,
         "last_poll_age_s": round(time.time() - s.last_poll_ok) if s.last_poll_ok else None,
     }
+
+
+class DraftWebApp:
+    """Owns Tracker instances (one per draft id) and rate-limits polling.
+
+    No threads: /state polls Sleeper at most once per poll_seconds per draft,
+    driven by browser requests. Clearing the cache (reload) is always safe —
+    Tracker rebuilds full state from the picks list on the next poll.
+    """
+
+    def __init__(self, cfg, tiers_path, default_slot):
+        self.cfg = cfg
+        self.tiers_path = tiers_path
+        self.default_slot = default_slot
+        self._trackers: dict[str, Tracker] = {}
+        self._last_poll: dict[str, float] = {}
+
+    def _tracker(self, draft_id: str, slot: int | None) -> Tracker:
+        if draft_id not in self._trackers:
+            if slot is None:
+                slot = self.default_slot if draft_id == self.cfg.draft_id else 2
+            self._trackers[draft_id] = Tracker(
+                self.cfg, tiers_path=self.tiers_path,
+                draft_id=draft_id, my_slot=slot,
+            )
+        return self._trackers[draft_id]
+
+    def state_for(self, draft_id: str, slot: int | None) -> dict:
+        try:
+            t = self._tracker(draft_id, slot)
+        except Exception as e:  # bad mock id, Sleeper down at creation, etc.
+            return {"ok": False, "error": f"could not open draft {draft_id}: {e}"[:200]}
+        now = time.monotonic()
+        if now - self._last_poll.get(draft_id, 0.0) >= t.poll_seconds:
+            self._last_poll[draft_id] = now
+            t.poll()
+        state = build_state(t)
+        state["tiers_built_at"] = self.tiers_mtime()
+        return state
+
+    def reload(self) -> None:
+        """Forget all trackers; next request re-reads tiers.csv and rebuilds."""
+        self._trackers.clear()
+        self._last_poll.clear()
+
+    def tiers_mtime(self) -> str | None:
+        try:
+            mt = self.tiers_path.stat().st_mtime
+        except OSError:
+            return None
+        return time.strftime("%Y-%m-%d %H:%M", time.localtime(mt))
