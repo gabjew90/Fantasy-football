@@ -69,7 +69,10 @@ PAGE = r"""<!DOCTYPE html>
 <div id="banner" class="banner">connecting…</div>
 <div class="cols">
   <div class="panel"><h2>Pick now — one per position, ranked by what waiting costs</h2><div id="recs">—</div></div>
-  <div class="panel"><h2>Board — top remaining by position</h2><div id="board">—</div></div>
+  <div class="panel"><h2>Board — top remaining by position
+    <span style="text-transform:none;letter-spacing:0;font-weight:400"> · T=tier,
+    number=points above a waiver pickup, +Nv=picks past his usual draft spot</span></h2>
+    <div id="board">—</div></div>
 </div>
 <div class="panel strip roster" id="roster" style="display:none">
   <h2>My roster</h2><div id="rosterFill"></div><div class="drafted" id="drafted"></div>
@@ -143,7 +146,7 @@ function render(s) {
 
   $("recs").innerHTML = (s.recommendations || []).map((r, i) => `
     <div class="${i === 0 ? "rec1" : "rec"}">${esc(r.player)}
-      <span class="tag">${esc(r.pos)}${esc(r.pos_rank)} · T${esc(r.tier)} · VORP ${esc(r.vorp)}</span>
+      <span class="tag">${esc(r.pos)}${esc(r.pos_rank)} · tier ${esc(r.tier)} · value ${Math.round(r.vorp)}</span>
       <div class="why">${esc(r.why)}</div>
     </div>`).join("") || "no candidates";
 
