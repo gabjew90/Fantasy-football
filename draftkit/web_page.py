@@ -68,7 +68,7 @@ PAGE = r"""<!DOCTYPE html>
 <body>
 <div id="banner" class="banner">connecting…</div>
 <div class="cols">
-  <div class="panel"><h2>Pick now — best available for you</h2><div id="recs">—</div></div>
+  <div class="panel"><h2>Pick now — one per position, ranked by what waiting costs</h2><div id="recs">—</div></div>
   <div class="panel"><h2>Board — top remaining by position</h2><div id="board">—</div></div>
 </div>
 <div class="panel strip roster" id="roster" style="display:none">

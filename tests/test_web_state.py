@@ -194,6 +194,10 @@ def test_on_clock_urgency_window_is_next_turn():
     rep = t.urgency_report()
     surv = list(rep["RB"]["survival"].values())
     assert any(v < 1.0 for v in surv), "on-clock window must simulate rivals"
+    # rationale clauses: roster-fit context must ride in the why string
+    recs = t.recommendations()
+    rb_whys = [why for _, why, p in recs if p["pos"] == "RB"]
+    assert rb_whys and "fills RB starter" in rb_whys[0]
 
 
 def test_slot_change_applies_to_cached_tracker():

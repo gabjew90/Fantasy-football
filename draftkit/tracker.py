@@ -341,10 +341,12 @@ class Tracker:
             for q in self.remaining("TE")
         )
 
+        cliff = self.cliff_report()
         cands = []
         for pos in POS_ORDER:
+            rem = [p for p in self.remaining(pos) if p.get("proj_source") != "no_market"]
             pool = [
-                p for p in self.remaining(pos)
+                p for p in rem
                 if self._guardrail_ok(p, rnd, needs, counts, picks_left, top6_te_fell)
             ][:3]
             if not pool:
@@ -360,16 +362,41 @@ class Tracker:
                     best = q
             u = report.get(pos) if report else None
             urgency = u["urgency"] if u else (best["vorp"] or 0.0)
+            # rationale: compact clauses, all from already-computed draft state
+            # (no model calls on the clock, per spec §9)
+            parts = []
             if u:
-                why = (
+                parts.append(
                     f"urgency +{urgency:.1f}: best {pos} {u['best_now']:.0f} now → "
-                    f"{u['e_best_next']:.0f} expected at your next pick"
+                    f"{u['e_best_next']:.0f} at your next turn"
                 )
                 surv = u["survival"].get(best["sleeper_id"])
                 if surv is not None:
-                    why += f" (he survives {surv:.0%})"
+                    parts.append(f"survives {surv:.0%}")
+            if needs.get(pos, 0) > 0:
+                parts.append(f"fills {pos} starter")
+            elif pos in snake.FLEX_ELIGIBLE and needs.get("FLEX", 0) > 0:
+                parts.append("fills FLEX")
             else:
-                why = "best value"
+                parts.append("bench depth")
+            same_tier = sum(1 for q in rem if q["tier"] == best["tier"])
+            next_tier = next((q["tier"] for q in rem if q["tier"] > best["tier"]), None)
+            if next_tier is not None:
+                if same_tier == 1:
+                    parts.append(f"last of T{best['tier']} (next {pos} is T{next_tier})")
+                elif same_tier <= 3:
+                    parts.append(f"{same_tier} left in T{best['tier']}")
+            demand = cliff.get(pos, {}).get("intervening_demand", 0)
+            if demand:
+                parts.append(f"{demand} rival{'s' if demand != 1 else ''} picking "
+                             f"before your turn still need {pos}")
+            if best.get("adp") is not None:
+                d = self.current_pick - best["adp"]
+                if d >= self.fall_alert:
+                    parts.append(f"fell {d:.0f} past ADP")
+                elif d >= 3:
+                    parts.append(f"{d:.0f} past ADP")
+            why = " · ".join(parts) or "best value"
             why += self._bye_warning(best, needs)
             # UI-only handcuff tag (never scored): the late-round buy signal is
             # a backup whose starter is fragile or currently availability-flagged
