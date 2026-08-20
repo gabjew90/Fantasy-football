@@ -72,7 +72,10 @@ tiers:
   adp_include_within: 180
 
 tracker:
-  poll_seconds: 5
+  # 2s puts Sleeper polling in lockstep with the dashboard's 2s tick
+  # (worst-case board staleness ~2-4s vs ~5-7s at 5). Below 2 buys nothing:
+  # the browser tick is the floor, and it risks rate-limiting mid-draft.
+  poll_seconds: 2
   # alert when a player has fallen at least this many picks past ADP
   # (12 = one full round in this league)
   fall_alert_picks: 12
