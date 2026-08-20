@@ -1,0 +1,50 @@
+# Availability Sweep — 2026-08-19
+
+Pool: every board player with ADP <= 180 except DEF units (238 players), one search each, news window Aug 5-19 2026 (unresolved older conditions included).
+
+## OUT (projection zeroed)
+
+- **Jayden Higgins** — Torn ACL in joint practice with Raiders; OUT for entire 2026 season (NFL.com/ESPN, mid-Aug)
+
+## COMPROMISED (flagged, projection unchanged)
+
+- **Jahmyr Gibbs** — Exited practice Aug 12 with minor injury amid contract hold-in (Yahoo, Aug)
+- **Puka Nacua** — Groin/psoas soreness ~Aug 12, missed practice; McVay says minor, SI says week-to-week (NBC/SI, mid-Aug)
+- **Christian McCaffrey** — No practice since Aug 10 (lower-body tightness), missed preseason opener; team calls it load management (RotoWire, Aug 15-19)
+- **De'Von Achane** — Calf issue, out at least a week; team says preventative, plan Week 1 (CBS, Aug)
+- **Justin Jefferson** — Sprained AC joint (left shoulder) mid-Aug; day-to-day, expected Week 1 (SI, Aug)
+- **Omarion Hampton** — Still working through Week 18 2025 ankle; managed workload hinted (FTN, Aug)
+- **Malik Nabers** — ACL/meniscus rehab (Oct 2025); first full-speed team drills ~Aug 17, Week 1 not confirmed (Yahoo, Aug)
+- **DeVonta Smith** — Hamstring Aug 4, out ~2 weeks, returning ~Aug 17; Eagles expect Week 1 (RotoWire/NBC, Aug 10-17)
+- **Jeremiyah Love** — High ankle sprain ~Aug 13 preseason; out rest of preseason, hoped back for opener (NFL.com, Aug)
+- **Breece Hall** — Groin Aug 17; out 2-3 weeks, expected ready Week 1 (Jets, Aug 17-18)
+- **Emeka Egbuka** — Toe sprain Aug 12; Bowles non-committal on Week 1 (Bucs Report, Aug 17)
+- **Quinshon Judkins** — Missed practice Aug 19 after hard hits Aug 18; no timeline (iHeart/Yahoo, Aug 19)
+- **Mike Evans** — Quad strain Aug 1, returned Aug 15, exited Aug 18 joint practice with quad tightness (NBC, Aug 18)
+- **Alec Pierce** — Not cleared for full practice; late-March ankle surgery, no timeline (Yahoo/SI, Aug 6-16)
+- **Luther Burden III** — Groin injury ~Aug 8-10; out rest of preseason (~month); coach expects back for Sept 13 opener (ESPN, Aug 10)
+- **Tyler Warren** — Groin injury in joint practice Aug 19; left practice, severity unknown (ESPN, Aug 19)
+- **DK Metcalf** — Unspecified injury; out since ~Aug 11, sat preseason opener, not practicing this week (RotoWire, Aug 12-16)
+- **Michael Pittman Jr.** — Right leg injury Aug 8; sidelined since, not practicing this week, more serious than first thought (NBC/FantasyPros, Aug 9-16)
+- **Chuba Hubbard** — Hamstring; week-to-week after MRI; coach confident for opener but sidelined now (NBC, Aug 13)
+- **Matthew Stafford** — Degenerative back managed through August; practicing fully last ~2 weeks, expected Week 1, condition chronic (theScore/CBS, Aug)
+- **Keon Coleman** — Foot/toe sprain in preseason opener; walking boot, not practicing Aug 18; Week 1 questioned (NBC PFT, Aug)
+- **Jordyn Tyson** — Hamstring; ~2 months per Rapoport/Garafolo Aug 17; misses early regular season (already overridden to 99)
+- **Patrick Mahomes II** — ACL/LCL tear Dec 14 2025; cleared for camp, trending Week 1 but not confirmed; held out of early preseason (CBS, Aug)
+- **Khalil Shakir** — High ankle sprain Aug 1; multi-week, McDermott expects Week 1 (SI, Aug)
+- **Tucker Kraft** — ACL Nov 2025; off PUP Jul 31, first 11-on-11 Aug 17; Week 1 expected on snap count (WTMJ, Aug)
+- **Makai Lemon** — Recurring hamstring (3rd in 17 months); no practice since Aug 4; doubt for opener (NBC Philly, mid-Aug)
+- **Alvin Kamara** — MCL sprain in joint practice; out at least a month, expected to miss Week 1 (CBS, ~Aug 15)
+- **Ty Johnson** — Knee/leg injury ~Aug 8; four missed practices, no return date, possible IR-with-return (NBC, Aug 9)
+- **Isiah Pacheco** — MCL issue per note dated Aug 19 (FantasyPros)
+- **Zach Charbonnet** — ACL surgery Feb 20; likely to start season on reserve/PUP, may not return until late season per ESPN (Aug)
+- **Jordan James** — Fractured rib early in camp; side work only mid-Aug; SF signed Khalil Herbert for depth (SI, Aug)
+- **Tank Dell** — Returning from Dec 2024 multi-ligament knee (missed all 2025); limited practice, no Week 1 timetable (WaPo/AP, Aug 7-15)
+- **James Conner** — No timeline for 11-on-11 return from 2025 ankle; Week 1 in doubt, PUP/IR start possible (NBC/PFR, Aug 16)
+- **Tyler Bass** — Missed all 2025 (hip/groin surgery); recovery on track but return not confirmed on field (FantasyPros, Aug 19)
+- **Kenyon Sadiq** — Hernia in camp; Glenn expects Week 1 but missed most of camp (Jets, Aug 18)
+- **Jaydon Blue** — Shoulder injury, missed joint practice Aug 19; no timeline (Cowboys, Aug 19)
+- **Brandon Aiyuk** — On reserve/left squad list; unresolved holdout, unpaid if it lasts through Week 1 (CBS/PFR, Jul-Aug)
+- **MarShawn Lloyd** — Hamstring in preseason game mid-Aug (recurrence); no timeline (Yahoo, Aug)
+
+All other 199 players: available (no availability-affecting news).
