@@ -115,7 +115,7 @@ def cmd_dataset(cfg: Config, args) -> None:
 
 def cmd_tiers(cfg: Config, args) -> None:
     from .projections import PROJECTION_FNS
-    from .tiers import build_tiers, write_tiers_csv
+    from .tiers import build_disagreements, build_tiers, write_tiers_csv
     from .vorp import add_vorp
     from .board import write_board_markdown
 
@@ -136,6 +136,13 @@ def cmd_tiers(cfg: Config, args) -> None:
     by_src = tiers.group_by("proj_source").len().sort("len", descending=True)
     for row in by_src.iter_rows(named=True):
         console.print(f"  {row['proj_source']}: {row['len']}")
+
+    adp_within = float(cfg["tiers"].get("adp_include_within", 180) or 180)
+    dis = build_disagreements(tiers.rename({"name": "player"}), adp_within)
+    dis_path = cfg.root / "reports" / "disagreements.csv"
+    dis_path.parent.mkdir(parents=True, exist_ok=True)
+    dis.write_csv(dis_path)
+    console.print(f"  disagreements worklist: {dis.height} -> {dis_path}")
 
 
 def cmd_board(cfg: Config, args) -> None:

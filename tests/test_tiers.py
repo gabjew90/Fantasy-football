@@ -74,6 +74,51 @@ def test_adp_outside_draft_still_cut():
     assert "Deep" not in out["name"].to_list()
 
 
+def test_disagreements_worklist():
+    import polars as pl
+
+    from draftkit.tiers import build_disagreements
+
+    rows = []
+    # model and market agree on players 0..19 (value_rank i+1, adp i+1)
+    for i in range(20):
+        rows.append({"player": f"P{i}", "pos": "WR", "team": "T", "tier": 1,
+                     "value_rank": i + 1, "adp": float(i + 1), "vorp": 100.0 - i,
+                     "proj_pts": 200.0, "exp_games": 16.0, "rookie_flag": False,
+                     "proj_source": "blend"})
+    # model fade: model rank 90, market drafts him 21st
+    rows.append({"player": "Fade", "pos": "WR", "team": "T", "tier": 9,
+                 "value_rank": 90, "adp": 21.0, "vorp": -10.0, "proj_pts": 100.0,
+                 "exp_games": 12.0, "rookie_flag": False, "proj_source": "blend"})
+    # model target: model rank 21, market waits until pick 150
+    rows.append({"player": "Target", "pos": "WR", "team": "T", "tier": 3,
+                 "value_rank": 21, "adp": 150.0, "vorp": 60.0, "proj_pts": 180.0,
+                 "exp_games": 16.0, "rookie_flag": False, "proj_source": "blend"})
+    # K and ADP-outside-180 must be excluded
+    rows.append({"player": "Kicker", "pos": "K", "team": "T", "tier": 1,
+                 "value_rank": 200, "adp": 5.0, "vorp": 10.0, "proj_pts": 140.0,
+                 "exp_games": 16.0, "rookie_flag": False, "proj_source": "market_implied"})
+    rows.append({"player": "Deep", "pos": "WR", "team": "T", "tier": 9,
+                 "value_rank": 5, "adp": 200.0, "vorp": 90.0, "proj_pts": 190.0,
+                 "exp_games": 16.0, "rookie_flag": False, "proj_source": "blend"})
+    # the real pipeline produces value_rank as UInt32 (polars rank output);
+    # subtraction must not wrap around for negative gaps
+    df = pl.DataFrame(rows).with_columns(pl.col("value_rank").cast(pl.UInt32))
+    out = build_disagreements(df, adp_within=180, per_side=15)
+    assert out["rank_gap"].min() < 0  # would be ~4294967295 on underflow
+    names = out["player"].to_list()
+    assert "Fade" in names and "Target" in names
+    assert "Kicker" not in names and "Deep" not in names
+    fade = out.filter(pl.col("player") == "Fade")
+    target = out.filter(pl.col("player") == "Target")
+    assert fade["direction"][0] == "model_fade"
+    assert target["direction"][0] == "model_target"
+    # fades sorted most-negative first within their block
+    fades = out.filter(pl.col("direction") == "model_fade")
+    gaps = fades["rank_gap"].to_list()
+    assert gaps == sorted(gaps)
+
+
 def test_no_market_rows_always_included():
     from draftkit.tiers import build_tiers
 

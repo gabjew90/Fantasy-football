@@ -78,6 +78,39 @@ def build_tiers(df: pl.DataFrame, cfg) -> pl.DataFrame:
     return out.sort("value_rank")
 
 
+def build_disagreements(tiers: pl.DataFrame, adp_within: float, per_side: int = 15) -> pl.DataFrame:
+    """The override-pass worklist: biggest model-vs-market rank gaps among
+    players the market actually drafts (ADP inside the draft).
+
+    rank_gap = adp_rank - value_rank. Negative -> model_fade (market drafts him
+    far earlier than the model would: ask "did something change for 2026 that
+    2025 data can't see?"). Positive -> model_target (the late-round sheet).
+    K/DEF excluded; no_market rows have no ADP and exclude themselves.
+    """
+    pool = tiers.filter(
+        pl.col("adp").is_not_null()
+        & (pl.col("adp") <= adp_within)
+        & ~pl.col("pos").is_in(["K", "DEF"])
+    ).with_columns(
+        pl.col("adp").rank(method="ordinal").cast(pl.Int64).alias("adp_rank"),
+        pl.col("value_rank").cast(pl.Int64),
+    )
+    pool = pool.with_columns(
+        (pl.col("adp_rank") - pl.col("value_rank")).alias("rank_gap"),
+        pl.when(pl.col("adp_rank") < pl.col("value_rank"))
+        .then(pl.lit("model_fade"))
+        .otherwise(pl.lit("model_target"))
+        .alias("direction"),
+    )
+    fades = pool.filter(pl.col("rank_gap") < 0).sort("rank_gap").head(per_side)
+    targets = pool.filter(pl.col("rank_gap") > 0).sort("rank_gap", descending=True).head(per_side)
+    name_col = "player" if "player" in tiers.columns else "name"
+    cols = [name_col, "pos", "team", "direction", "rank_gap", "value_rank",
+            "adp_rank", "adp", "tier", "vorp", "proj_pts", "exp_games",
+            "rookie_flag", "proj_source"]
+    return pl.concat([fades, targets]).select([c for c in cols if c in pool.columns])
+
+
 TIERS_COLUMNS = [
     "player",
     "sleeper_id",
