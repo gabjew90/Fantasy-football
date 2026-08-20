@@ -40,8 +40,21 @@ projections:
   # games-played regression: ppg is shrunk toward the positional mean with
   # weight games/(games + k)
   shrink_k: 5
-  # expected games for season-long totals
+  # Convention rule (final spec §1): all projections and replacement levels
+  # use the same 16-game convention. Uniform scaling never changes ranks;
+  # consistency is what matters, not 16 vs 17. Per-player durability is the
+  # separate exp_games haircut (16 - 3yr avg games missed, floored at 12).
   expected_games: 16.0
+
+engine:
+  sims: 1000          # Monte Carlo draft simulations per decision
+  pool_size: 80       # rivals sample from the top-N undrafted by ADP
+  sigma_early: 6.0    # ADP noise (picks) in round 1  (~0.5 rounds)
+  sigma_late: 27.0    # ADP noise (picks) by round 15 (~2.25 rounds)
+
+guardrails:
+  qb2_earliest_round: 10   # 2nd QB never before this round
+  te2_fall_picks: 12       # 2nd TE only if a top-6 TE fell >= this many picks past ADP
 
 tiers:
   # a gap becomes a tier break when it exceeds mean + break_z * std of

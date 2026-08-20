@@ -56,6 +56,19 @@ class Tracker:
         self.poll_seconds = float(tcfg["poll_seconds"])
         self.kdef_round = int(tcfg["kdef_earliest_round"])
         self.fall_alert = int(tcfg["fall_alert_picks"])
+        ecfg = cfg["engine"] if "engine" in cfg._data else {}
+        self.sims = int(ecfg.get("sims", 1000))
+        self.pool_size = int(ecfg.get("pool_size", 80))
+        self.sigma_early = float(ecfg.get("sigma_early", 6.0))
+        self.sigma_late = float(ecfg.get("sigma_late", 27.0))
+        gcfg = cfg["guardrails"] if "guardrails" in cfg._data else {}
+        self.qb2_round = int(gcfg.get("qb2_earliest_round", 10))
+        self.te2_fall = int(gcfg.get("te2_fall_picks", 12))
+        self._urgency_cache: tuple[int, dict] | None = None
+        from .rivals import load_seeds
+        self.rival_seeds = load_seeds(cfg).get("users", {})
+        order = self.draft.get("draft_order") or {}
+        self.slot_to_user = {int(v): str(k) for k, v in order.items()}
 
         tiers = pl.read_csv(tiers_path, infer_schema_length=2000)
         self.players = [r for r in tiers.iter_rows(named=True)]
@@ -156,79 +169,157 @@ class Tracker:
                 out.append(p)
         return sorted(out, key=lambda p: -(self.current_pick - p["adp"]))[:limit]
 
-    def kdef_allowed(self, rnd: int) -> bool:
-        if rnd >= self.kdef_round:
-            return True
+    # ---------- decision engine (final spec §5-§6) ----------
+
+    def _rival_states(self, my_next: int) -> list[dict]:
+        """Intervening pickers in order, with their open starter slots."""
+        out = []
+        for pick_no in range(self.current_pick, my_next):
+            _, slot = snake.pick_to_round_slot(pick_no, self.teams)
+            if slot == self.my_slot:
+                continue
+            needs = snake.starter_needs(self.slot_positions(slot), self.slots)
+            out.append({
+                "slot": slot, "needs": needs,
+                "user_id": self.slot_to_user.get(slot),
+            })
+        return out
+
+    def _sigma(self, rnd: int) -> float:
+        e, late = self.sigma_early, self.sigma_late
+        return e + (late - e) * (rnd - 1) / max(1, self.rounds - 1)
+
+    def urgency_report(self) -> dict | None:
+        """Cached per pick-state; None when unslotted or the draft is over."""
         if not self.my_slot:
+            return None
+        key = len(self.state.picks)
+        if self._urgency_cache and self._urgency_cache[0] == key:
+            return self._urgency_cache[1]
+        import numpy as np
+
+        from .urgency import simulate_survival
+
+        cur = self.current_pick
+        my_next = snake.next_pick_for_slot(cur, self.my_slot, self.teams, self.rounds)
+        if my_next is None:
+            return None
+        rnd, _ = snake.pick_to_round_slot(min(cur, self.teams * self.rounds), self.teams)
+        pool = sorted(
+            self.remaining(),
+            key=lambda p: p["adp"] if p.get("adp") is not None else 999.0,
+        )[: self.pool_size]
+        rng = np.random.default_rng(hash((self.draft_id, key)) & 0xFFFFFFFF)
+        report = simulate_survival(
+            pool, cur, my_next, self._rival_states(my_next), self.rival_seeds,
+            rng, sims=self.sims, sigma=self._sigma(rnd), teams=self.teams,
+        )
+        self._urgency_cache = (key, report)
+        return report
+
+    def _my_pos_counts(self) -> dict[str, int]:
+        counts: dict[str, int] = {}
+        for pos in self.slot_positions(self.my_slot):
+            counts[pos] = counts.get(pos, 0) + 1
+        return counts
+
+    def _guardrail_ok(self, p: dict, rnd: int, needs, counts, picks_left) -> bool:
+        """Final spec §6 — hard rules, override the engine."""
+        pos = p["pos"]
+        if pos in ("K", "DEF"):
+            kdef_needed = needs.get("K", 0) + needs.get("DEF", 0)
+            if picks_left > 2 and picks_left > kdef_needed:
+                return False
+            if counts.get(pos, 0) >= 1:
+                return False
+        if pos == "QB" and counts.get("QB", 0) >= 1 and rnd < self.qb2_round:
             return False
-        needs = self.my_needs()
-        picks_left = self.rounds - len(self.picks_for_slot(self.my_slot))
-        kdef_needed = needs.get("K", 0) + needs.get("DEF", 0)
-        return picks_left <= kdef_needed
+        if pos == "TE" and counts.get("TE", 0) >= 1:
+            top6_fell = any(
+                q["pos_rank"] <= 6
+                and q.get("adp") is not None
+                and self.current_pick - q["adp"] >= self.te2_fall
+                for q in self.remaining("TE")
+            )
+            if not top6_fell:
+                return False
+        # max one zero-role stash: proxy = negative-VORP player already rostered
+        if (p["vorp"] or 0) <= 0 and not snake.needs_position(needs, pos):
+            have_stash = any(
+                (self.by_id[pid].get("vorp") or 1) <= 0
+                for pid in (str(x["player_id"]) for x in self.picks_for_slot(self.my_slot))
+                if pid in self.by_id
+            )
+            if have_stash:
+                return False
+        # must-fill: remaining picks <= open starters -> starters only
+        open_starters = sum(
+            needs.get(k, 0) for k in ("QB", "RB", "WR", "TE", "FLEX", "K", "DEF")
+        )
+        if picks_left <= open_starters and not snake.needs_position(needs, pos):
+            return False
+        return True
+
+    def _bye_warning(self, p: dict, needs) -> str:
+        """Warn (never block) when a pick creates 3+ starters on one bye."""
+        starters_needed = sum(v for k, v in self.slots.items() if k != "BN")
+        picked = [
+            self.by_id.get(str(x["player_id"]))
+            for x in self.picks_for_slot(self.my_slot)
+        ]
+        byes = [q["bye"] for q in picked[:starters_needed] if q and q.get("bye") is not None]
+        if p.get("bye") is not None and byes.count(p["bye"]) >= 2:
+            return f" ⚠ {byes.count(p['bye']) + 1} starters on bye {p['bye']}"
+        return ""
 
     def recommendations(self, top_n: int = 5) -> list[tuple[float, str, dict]]:
-        """Score = VORP + escalating starter-need bonus + cliff urgency + faller bonus.
+        """Final spec §5: urgency-ranked positions, best VORP within, Δ tiebreak.
 
-        Hard constraint: once remaining picks <= open starter slots, only
-        positions that fill a starter slot are recommended (no more bench
-        luxury picks while the QB slot sits empty).
+        Guardrails (§6) hard-filter candidates first; cliffs are UI-only (§3).
         """
-        rnd, _ = snake.pick_to_round_slot(self.current_pick, self.teams)
-        needs = self.my_needs() if self.my_slot else {}
-        cliff = self.cliff_report()
-        allow_kdef = self.kdef_allowed(rnd)
+        rnd, _ = snake.pick_to_round_slot(
+            min(self.current_pick, self.teams * self.rounds), self.teams
+        )
+        if not self.my_slot:
+            pool = self.remaining()[:top_n]
+            return [(p["vorp"] or 0.0, "best value (spectator)", p) for p in pool]
+        needs = self.my_needs()
+        counts = self._my_pos_counts()
+        picks_left = self.rounds - len(self.picks_for_slot(self.my_slot))
+        report = self.urgency_report()
 
-        must_fill_only = False
-        my_pos_counts: dict[str, int] = {}
-        if self.my_slot:
-            for pos in self.slot_positions(self.my_slot):
-                my_pos_counts[pos] = my_pos_counts.get(pos, 0) + 1
-            picks_left = self.rounds - len(self.picks_for_slot(self.my_slot))
-            open_starters = sum(needs.get(k, 0) for k in ("QB", "RB", "WR", "TE", "FLEX", "K", "DEF"))
-            must_fill_only = picks_left <= open_starters
-
-        scored = []
-        for p in self.remaining()[:80]:
-            pos = p["pos"]
-            if pos in ("K", "DEF") and not allow_kdef:
+        cands = []
+        for pos in ("RB", "WR", "TE", "QB", "K", "DEF"):
+            pool = [
+                p for p in self.remaining(pos)
+                if self._guardrail_ok(p, rnd, needs, counts, picks_left)
+            ][:3]
+            if not pool:
                 continue
-            fills_starter = not self.my_slot or snake.needs_position(needs, pos)
-            if must_fill_only and not fills_starter:
-                continue
-            vorp = p["vorp"] or 0.0
-            score = float(vorp)
-            why = []
-            if self.my_slot and fills_starter:
-                if needs.get(pos, 0) > 0:
-                    # dedicated slot still open — pressure grows with the round
-                    score += 10 + 1.5 * rnd
-                    why.append(f"fills {pos} starter slot")
-                else:
-                    score += 8
-                    why.append("fills FLEX")
-            elif self.my_slot:
-                # bench depth: fine, but discourage hoarding one position
-                starters_at_pos = self.slots.get(pos, 0) + (
-                    self.slots.get("FLEX", 0) if pos in snake.FLEX_ELIGIBLE else 0
+            # best VORP within position; near-ties (<= 2 VORP) broken by Δ
+            best = pool[0]
+            for q in pool[1:]:
+                if abs((best["vorp"] or 0) - (q["vorp"] or 0)) <= 2.0 and (
+                    (q.get("adp_delta") or -999) > (best.get("adp_delta") or -999)
+                ):
+                    best = q
+            u = report.get(pos) if report else None
+            urgency = u["urgency"] if u else (best["vorp"] or 0.0)
+            if u:
+                why = (
+                    f"urgency +{urgency:.1f}: best {pos} {u['best_now']:.0f} now → "
+                    f"{u['e_best_next']:.0f} expected at your next pick"
                 )
-                excess = my_pos_counts.get(pos, 0) - starters_at_pos
-                if excess >= 0:
-                    score -= 5.0 * (excess + 1)
-            if cliff.get(pos, {}).get("urgent") and fills_starter:
-                score += 8
-                why.append(
-                    f"cliff: {cliff[pos]['before_cliff']} left, "
-                    f"{cliff[pos]['intervening_demand']} teams between picks need {pos}"
-                )
-            adp = p.get("adp")
-            if adp is not None and self.current_pick - adp > 0:
-                bonus = min(6.0, 0.25 * (self.current_pick - adp))
-                score += bonus
-                if self.current_pick - adp >= self.fall_alert:
-                    why.append(f"fell {self.current_pick - adp:.0f} past ADP")
-            scored.append((score, ", ".join(why) or "best value", p))
-        scored.sort(key=lambda t: -t[0])
-        return scored[:top_n]
+                surv = u["survival"].get(best["sleeper_id"])
+                if surv is not None:
+                    why += f" (he survives {surv:.0%})"
+            else:
+                why = "best value"
+            why += self._bye_warning(best, needs)
+            score = urgency + 0.001 * (best["vorp"] or 0.0)  # stable ordering
+            cands.append((score, why, best))
+        cands.sort(key=lambda t: -t[0])
+        return cands[:top_n]
 
     # ---------- render ----------
 
