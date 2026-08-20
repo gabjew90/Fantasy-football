@@ -165,6 +165,18 @@ def cmd_track(cfg: Config, args) -> None:
     tracker.run()
 
 
+def cmd_web(cfg: Config, args) -> None:
+    from .web import run_server
+
+    slot = args.slot
+    if slot is None:
+        client = SleeperClient(cfg.path("raw"))
+        slot, info = resolve_my_slot(cfg, client)
+        if slot is None:
+            console.print(f"[yellow]warning: {info.get('error')}; slot unresolved[/yellow]")
+    sys.exit(run_server(cfg, cfg.root / "tiers.csv", slot, args.port))
+
+
 def cmd_simulate(cfg: Config, args) -> None:
     from .simulate import run_simulation
 
@@ -197,6 +209,9 @@ def main(argv: list[str] | None = None) -> None:
     p = sub.add_parser("track")
     p.add_argument("--draft-id", default=None, help="override draft id (mock draft testing)")
     p.add_argument("--slot", type=int, default=None, help="override my draft slot")
+    p = sub.add_parser("web")
+    p.add_argument("--port", type=int, default=8723)
+    p.add_argument("--slot", type=int, default=None, help="override my draft slot")
     p = sub.add_parser("simulate")
     p.add_argument("--slot", type=int, default=6, help="my draft slot in the simulation")
     p.add_argument("--quiet", action="store_true", help="only print the final roster")
@@ -211,6 +226,7 @@ def main(argv: list[str] | None = None) -> None:
         "tiers": cmd_tiers,
         "board": cmd_board,
         "track": cmd_track,
+        "web": cmd_web,
         "simulate": cmd_simulate,
     }[args.cmd](cfg, args)
 
