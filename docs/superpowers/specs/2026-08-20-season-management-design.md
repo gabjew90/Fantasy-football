@@ -24,22 +24,50 @@ pattern as draft day).
   `keeper_appeal` note field from day one).
 - Full K/DEF detailed scoring already in config; roster QB/2RB/2WR/TE/2FLEX/K/DEF/5BN.
 
-## Design decisions (settled)
+## Design decisions (settled; revised after external review 2026-08-20)
 
-1. **Weekly projections are not built from scratch.** Baseline = Sleeper's own
-   weekly player projections (same API family we already poll). Our layer =
-   adjustments and signals: usage-trend deltas, injury designations, matchup
-   context, variance lean. Mirrors the draft board's 55/45 philosophy.
+1. **Weekly projections are not built from scratch, and the signals MODIFY the
+   number (bounded), not annotate it.** Baseline = Sleeper's own weekly player
+   projections. Adjustment layers, each capped:
+   - **Matchup multiplier (±10% max):** nflverse fantasy points allowed per
+     position per defense, shrunk hard toward league average before week 6
+     (early defensive stats are noise). DOUBLE-COUNT GUARD: weeks 1–3, regress
+     Sleeper's own weekly numbers against opponent quality; if their baseline
+     is already matchup-aware, our multiplier applies at half weight (±5%
+     tilt). This term is REQUIRED for v1 — without it the lineup engine fails
+     the "all factors" bar.
+   - **Usage-trend adjustment (±15% max, role-change cases only):** consensus
+     projections lag role changes by ~a week; the window between "usage
+     shifted" and "market repriced" is the lineup edge. Stable-role players
+     get no usage adjustment.
+   - **Availability:** hard gate (O/IR = 0), not a multiplier.
+   Honest scope note, in the brief itself: for stable-role players the lineup
+   brief is convenience; the durable edges are waivers, variance leans, and
+   the role-change window.
    RISK: the projections endpoint is undocumented; verify in week 1 preseason.
    Fallback if absent: season-long proj ÷ 16, scaled by availability — degraded
    but functional.
-2. **Two briefs, both fully automated** via Windows scheduled tasks (the ADP
-   diff pattern): waiver brief Tuesday 6 PM (nflverse weekly data lands Tuesday
-   morning; claims process Wednesday), lineup brief Sunday 9 AM (post-Saturday
-   news, pre-lock). Output: `reports/waiver_brief.md`, `reports/lineup_brief.md`,
-   plus served by the existing dashboard (`/brief` route) for phone reading.
-3. **Playoff odds + regime in v1.** Deferred to v2: rival FAAB modeling (needs
-   a few weeks of observed bids anyway), keeper-aware valuation (needs cost
+2. **Three scheduled outputs, fully automated** (the ADP diff pattern):
+   - Waiver brief, Tuesday 6 PM (nflverse data lands Tuesday AM; claims
+     process Wednesday).
+   - **Thursday check, Thursday 3 PM** — players lock at their OWN game's
+     kickoff, so TNF starters lock three days before Sunday's brief. Scoped to
+     that night's two teams only: start/sit for affected slots + inactive
+     warnings. Same lineup engine, one filter.
+   - Lineup brief, Sunday 9 AM (post-Saturday news, pre-lock; flags ordered by
+     kickoff time — London 9:30 AM ET games first).
+   Output: `reports/waiver_brief.md`, `reports/thursday_check.md`,
+   `reports/lineup_brief.md`, all served by the dashboard (`/brief`).
+3. **Playoff odds + regime in v1**, and the sim is **bye-aware**: weekly team
+   strength is computed from each team's per-week startable roster (bye
+   matrices from the schedule), never a season-constant sum — byes swing
+   weekly strength by 15+ points in weeks 5–14, exactly when regime drives
+   bid sizing.
+4. **Rival remaining FAAB budgets are v1** (Sleeper rosters expose
+   `waiver_budget_used` directly — a field read, not a model). Every claim
+   shows "teams needing this position and their remaining budgets". Only bid
+   *prediction* (sizes/habits) stays v2.
+   Deferred to v2: rival bid modeling, keeper-aware valuation (needs cost
    rules), trade radar.
 
 ## Architecture (extends draftkit in place)
@@ -82,6 +110,12 @@ Ranked claims, each with plain-English rationale (draft-style clauses):
    rivals; v2: modeled bids).
 
 FAAB bands v1 (calibration constants in config, tuned weeks 1–3):
+- **League-winning contingency tier is EXEMPT from calibration** — early-season
+  RB injuries are historically when league-winners appear, i.e. exactly when
+  bands are least calibrated. For this tier only, the aggressive number =
+  (max remaining budget among rivals who need the position) + $5, capped by
+  the asset's value to YOUR roster and by the 80%-of-remaining rule. Sealed-bid
+  logic beats an untuned band at the highest-stakes moment.
 - League-winning contingency (clear RB1 inheritance): 40–65% of remaining budget
 - Strong breakout (multi-week usage trend + open role): 15–35%
 - Speculative role change: 5–12%
@@ -94,8 +128,14 @@ Drop logic: lowest rest-of-season VORP among bench, protected classes: own-RB1
 handcuffs, IR-slot occupants, players inside 2 weeks of bye-return… plus
 "never drop to the team that needs him" note (rival rosters checked).
 
-IR housekeeping: if IR slot empty and any rostered player is OUT/DOUBTFUL,
-brief's first line says to move him and claim with the freed spot.
+IR housekeeping, BOTH directions:
+- Slot empty + any rostered player OUT/DOUBTFUL → brief's first line says to
+  move him and claim with the freed spot.
+- **Forced-exit check (the one that ruins a Sunday):** IR occupant upgraded
+  past DOUBTFUL → Sleeper invalidates the roster until someone is cut. Both
+  the Thursday check and the Sunday brief test IR eligibility of the occupant
+  against current injury_status and, if violated, lead with the required move
+  and a suggested drop.
 
 ## Lineup brief contents (Sunday)
 
