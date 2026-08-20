@@ -109,6 +109,37 @@ def test_reset_shrink_relogs_new_picks(tmp_path):
     assert log2._last_pick == 2
 
 
+def test_burst_reconstructs_recs_before_my_pick(tmp_path):
+    # REGRESSION (bot-burst): one poll swallows three picks including mine at
+    # overall pick 2 — the log must reconstruct the engine's view before my
+    # pick instead of leaving a hole in the review.
+    log_path = tmp_path / "d.jsonl"
+    log = DraftLog(log_path)
+    log.sync(make_tracker([pick(4, 1), pick(1, 2), pick(2, 3)]))
+    rec_events = [e for e in _events(log_path) if e["type"] == "recs"]
+    retro = [e for e in rec_events if e.get("reconstructed")]
+    assert len(retro) == 1
+    assert retro[0]["current_pick"] == 2  # the state just before MY pick
+    assert retro[0]["recommendations"]
+    # live snapshot for the post-burst state still logged
+    assert any(e["current_pick"] == 4 for e in rec_events)
+    # chronology: the retro snapshot appears before my pick event
+    types = [(e["type"], e.get("current_pick") or e.get("pick_no")) for e in _events(log_path)]
+    assert types.index(("recs", 2)) < types.index(("pick", 2))
+
+
+def test_no_duplicate_snapshot_on_normal_cadence(tmp_path):
+    # single-pick syncs (the real-draft cadence) must not double-log snapshots
+    log_path = tmp_path / "d.jsonl"
+    log = DraftLog(log_path)
+    log.sync(make_tracker([pick(4, 1)]))               # live snapshot cp=2
+    log.sync(make_tracker([pick(4, 1), pick(1, 2)]))   # my pick arrives alone
+    rec_events = [e for e in _events(log_path) if e["type"] == "recs"]
+    cps = [e["current_pick"] for e in rec_events]
+    assert cps.count(2) == 1
+    assert not any(e.get("reconstructed") for e in rec_events)
+
+
 def test_status_transition_logged(tmp_path):
     log_path = tmp_path / "d.jsonl"
     log = DraftLog(log_path)

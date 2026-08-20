@@ -20,7 +20,7 @@ class DraftLog:
         self.path = Path(path)
         self._last_pick = 0
         self._last_status: str | None = None
-        self._recs_at = -1  # pick count of the last recs snapshot
+        self._snapped: set[int] = set()  # current_pick values with a recs snapshot
         if self.path.exists():
             for line in self.path.read_text(encoding="utf-8").splitlines():
                 try:
@@ -31,10 +31,11 @@ class DraftLog:
                 # high-water mark and later re-made picks must be re-logged
                 if e.get("type") == "pick":
                     self._last_pick = int(e.get("pick_no", 0))
-                    self._recs_at = self._last_pick
+                elif e.get("type") == "recs":
+                    self._snapped.add(int(e.get("current_pick", 0)))
                 elif e.get("type") == "reset":
                     self._last_pick = int(e.get("picks", 0))
-                    self._recs_at = self._last_pick
+                    self._snapped = {c for c in self._snapped if c <= self._last_pick}
                 elif e.get("type") == "status":
                     self._last_status = e.get("status")
 
@@ -68,11 +69,22 @@ class DraftLog:
                           "note": f"pick list shrank {self._last_pick} -> {len(picks)}; "
                                   "entries above this point are superseded"})
             self._last_pick = len(picks)
-            self._recs_at = len(picks)
+            self._snapped = {c for c in self._snapped if c <= len(picks)}
+
         for i in range(self._last_pick, len(picks)):
             p = picks[i]
             pick_no = i + 1
             rnd, slot = snake.pick_to_round_slot(pick_no, t.teams)
+            slot_val = int(p.get("draft_slot") or slot)
+            my_pick = t.my_slot is not None and slot_val == t.my_slot
+            # bot-burst repair: several picks can arrive in one poll, skipping
+            # the live snapshot that would have preceded MY pick. State is
+            # rebuildable, so reconstruct the engine's view at that moment.
+            if my_pick and status == "drafting" and pick_no not in self._snapped:
+                recs = self._retro_recs(t, upto=i)
+                if recs is not None:
+                    self._append(self._recs_event(t, pick_no, recs, reconstructed=True))
+                    self._snapped.add(pick_no)
             info = t.by_id.get(str(p.get("player_id"))) or {}
             meta = p.get("metadata") or {}
             name = info.get("player") or (
@@ -83,8 +95,8 @@ class DraftLog:
                 "type": "pick",
                 "pick_no": pick_no,
                 "round": rnd,
-                "slot": int(p.get("draft_slot", slot)),
-                "my_pick": t.my_slot is not None and int(p.get("draft_slot", slot)) == t.my_slot,
+                "slot": slot_val,
+                "my_pick": my_pick,
                 "player": name,
                 "pos": info.get("pos") or meta.get("position"),
                 "team": info.get("team"),
@@ -95,25 +107,48 @@ class DraftLog:
             })
         self._last_pick = max(self._last_pick, len(picks))
 
-        if len(picks) > self._recs_at and status == "drafting":
-            recs = t.recommendations()
-            my_next = (
-                snake.next_pick_for_slot(t.current_pick, t.my_slot, t.teams, t.rounds)
-                if t.my_slot else None
-            )
-            self._append({
-                "type": "recs",
-                "current_pick": t.current_pick,
-                "on_clock_slot": snake.pick_to_round_slot(
-                    min(t.current_pick, t.teams * t.rounds), t.teams
-                )[1],
-                "my_next_pick": my_next,
-                "recommendations": [
-                    {
-                        "player": p["player"], "pos": p["pos"], "tier": p["tier"],
-                        "vorp": p["vorp"], "score": round(score, 1), "why": why,
-                    }
-                    for score, why, p in recs
-                ],
-            })
-            self._recs_at = len(picks)
+        cp = len(picks) + 1
+        if status == "drafting" and cp not in self._snapped:
+            self._append(self._recs_event(t, cp, t.recommendations(), reconstructed=False))
+            self._snapped.add(cp)
+
+    def _recs_event(self, t, current_pick: int, recs, reconstructed: bool) -> dict:
+        my_next = (
+            snake.next_pick_for_slot(current_pick, t.my_slot, t.teams, t.rounds)
+            if t.my_slot else None
+        )
+        e = {
+            "type": "recs",
+            "current_pick": current_pick,
+            "on_clock_slot": snake.pick_to_round_slot(
+                min(current_pick, t.teams * t.rounds), t.teams
+            )[1],
+            "my_next_pick": my_next,
+            "recommendations": [
+                {
+                    "player": p["player"], "pos": p["pos"], "tier": p["tier"],
+                    "vorp": p["vorp"], "score": round(score, 1), "why": why,
+                }
+                for score, why, p in recs
+            ],
+        }
+        if reconstructed:
+            e["reconstructed"] = True
+        return e
+
+    def _retro_recs(self, t, upto: int):
+        """Engine view with only the first `upto` picks made; restores state."""
+        saved_picks = t.state.picks
+        saved_ids = t.state.drafted_ids
+        saved_cache = t._urgency_cache
+        try:
+            t.state.picks = saved_picks[:upto]
+            t.state.drafted_ids = {str(p["player_id"]) for p in t.state.picks}
+            t._urgency_cache = None
+            return t.recommendations()
+        except Exception:  # noqa: BLE001 — a failed retro must not break logging
+            return None
+        finally:
+            t.state.picks = saved_picks
+            t.state.drafted_ids = saved_ids
+            t._urgency_cache = saved_cache

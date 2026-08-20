@@ -82,6 +82,7 @@ PAGE = r"""<!DOCTYPE html>
   <label>slot: <input id="slot" type="number" min="1" max="12"></label>
   <button id="apply">apply</button>
   <button id="reload">reload tiers.csv</button>
+  <span id="target"></span>
   <a id="logLink" href="/log" target="_blank" style="color:var(--cyan)">view log</a>
   <span id="tiersAt"></span>
   <span id="heartbeat"></span>
@@ -180,6 +181,11 @@ function render(s) {
 
 async function tick() {
   const my = ++seq;  // response-ordering guard: never paint a stale snapshot
+  // unmissable: which draft is this page actually tracking? (a mock id left
+  // in the box from Saturday would otherwise silently hijack draft day)
+  $("target").innerHTML = store.draftId
+    ? '<span class="stale">⚠ tracking MOCK …' + esc(store.draftId.slice(-6)) + '</span>'
+    : "tracking: REAL draft";
   const q = new URLSearchParams();
   if (store.draftId) q.set("draft_id", store.draftId);
   if (store.slot) q.set("slot", store.slot);
