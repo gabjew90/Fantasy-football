@@ -27,7 +27,7 @@ console = Console()
 EXPECTED = {
     "teams": 12,
     "rounds": 15,
-    "pick_timer": 120,
+    "pick_timer": 60,  # commissioner changed 120 -> 60 on 2026-08-23 (caught by verify)
     "type": "snake",
     "scoring": {"rec": 1.0, "pass_yd": 0.04, "pass_td": 4.0, "pass_int": -1.0,
                 "rush_yd": 0.1, "rec_yd": 0.1, "rush_td": 6.0, "rec_td": 6.0,
