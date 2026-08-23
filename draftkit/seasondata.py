@@ -62,6 +62,79 @@ def byes(schedule: pl.DataFrame, week: int) -> set[str]:
     return ALL_TEAMS - playing
 
 
+def nfl_state(getter=get_json) -> dict:
+    s = getter(f"{BASE}/state/nfl")
+    return {"week": int(s.get("week") or 1), "season": str(s.get("season")),
+            "season_type": s.get("season_type", "regular")}
+
+
+def score_projection(stats: dict, scoring: dict) -> float:
+    """Score a Sleeper stat-projection dict with the league's own settings."""
+    return sum(float(scoring[k]) * float(v)
+               for k, v in (stats or {}).items() if k in scoring and v is not None)
+
+
+def weekly_projections(scoring: dict, season: str, week: int,
+                       getter=get_json) -> dict[str, float] | None:
+    """sleeper_id -> projected points in league scoring, or None when Sleeper
+    is still serving ADP placeholders (pre-publish) — callers must fall back."""
+    try:
+        raw = getter(f"{BASE}/projections/nfl/regular/{season}/{week}")
+    except Exception:  # noqa: BLE001 — endpoint down = same as not published
+        return None
+    if not isinstance(raw, dict) or not raw:
+        return None
+    has_real = any(
+        isinstance(stats, dict) and any(not k.startswith("adp_") for k in stats)
+        for stats in raw.values()
+    )
+    if not has_real:
+        return None
+    return {str(pid): round(score_projection(stats, scoring), 2)
+            for pid, stats in raw.items() if isinstance(stats, dict)}
+
+
+def weekly_stats(season: str, week: int, getter=get_json) -> dict[str, dict]:
+    """Raw actuals for a completed week (scoreboard + variance inputs)."""
+    raw = getter(f"{BASE}/stats/nfl/regular/{season}/{week}")
+    return raw if isinstance(raw, dict) else {}
+
+
+def rival_budgets(rosters: list[dict], budget: int) -> dict[int, int]:
+    """roster_id -> remaining FAAB. A direct field read, per the spec review."""
+    return {int(r["roster_id"]): budget - int((r.get("settings") or {}).get("waiver_budget_used") or 0)
+            for r in rosters}
+
+
+def injury_map(players: dict) -> dict[str, str]:
+    """sleeper_id -> injury_status string ('' when healthy)."""
+    out = {}
+    for pid, p in players.items():
+        if isinstance(p, dict) and "injury_status" in p:
+            out[str(pid)] = p.get("injury_status") or ""
+    return out
+
+
+def append_transactions(cfg, txns: list[dict]) -> int:
+    """Append new league transactions (dedup by id) — v2's rival-bid history."""
+    path = Path(cfg.path("processed")) / "season" / "transactions.jsonl"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    seen = set()
+    if path.exists():
+        for line in path.read_text(encoding="utf-8").splitlines():
+            try:
+                seen.add(json.loads(line).get("transaction_id"))
+            except ValueError:
+                continue
+    added = 0
+    with open(path, "a", encoding="utf-8") as f:
+        for t in txns:
+            if t.get("transaction_id") not in seen:
+                f.write(json.dumps(t) + "\n")
+                added += 1
+    return added
+
+
 def early_games(schedule: pl.DataFrame, week: int) -> pl.DataFrame:
     """Games that kick before the weekend — players in them lock early.
 
