@@ -27,7 +27,7 @@ console = Console()
 EXPECTED = {
     "teams": 12,
     "rounds": 15,
-    "pick_timer": 120,
+    "pick_timer": 60,  # commissioner changed 120 -> 60 on 2026-08-23 (caught by verify)
     "type": "snake",
     "scoring": {"rec": 1.0, "pass_yd": 0.04, "pass_td": 4.0, "pass_int": -1.0,
                 "rush_yd": 0.1, "rec_yd": 0.1, "rush_td": 6.0, "rec_td": 6.0,
@@ -261,6 +261,13 @@ def cmd_simulate(cfg: Config, args) -> None:
 
 
 def main(argv: list[str] | None = None) -> None:
+    # Windows: force UTF-8 on stdout/stderr so board glyphs can never crash
+    # a cp1252 console or pipe mid-draft (launchers also set PYTHONIOENCODING)
+    for _stream in (sys.stdout, sys.stderr):
+        try:
+            _stream.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, ValueError):
+            pass
     parser = argparse.ArgumentParser(prog="draftkit")
     parser.add_argument("--config", default=None, help="path to config.yaml")
     sub = parser.add_subparsers(dest="cmd", required=True)
