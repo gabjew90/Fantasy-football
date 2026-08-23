@@ -261,6 +261,13 @@ def cmd_simulate(cfg: Config, args) -> None:
 
 
 def main(argv: list[str] | None = None) -> None:
+    # Windows: force UTF-8 on stdout/stderr so board glyphs can never crash
+    # a cp1252 console or pipe mid-draft (launchers also set PYTHONIOENCODING)
+    for _stream in (sys.stdout, sys.stderr):
+        try:
+            _stream.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, ValueError):
+            pass
     parser = argparse.ArgumentParser(prog="draftkit")
     parser.add_argument("--config", default=None, help="path to config.yaml")
     sub = parser.add_subparsers(dest="cmd", required=True)
