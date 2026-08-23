@@ -87,3 +87,20 @@ paths:
   external: data/external
   processed: data/processed
   logs: data/logs
+
+season:
+  matchup_cap: 0.10          # +/- cap on the opponent-defense multiplier
+  matchup_shrink_weeks: 5    # ratio weight = weeks/(weeks+this); noise guard pre-week-6
+  trend_cap: 0.15            # +/- cap on usage-trend adjustment (role changes only)
+  trend_threshold: 0.07      # min abs target-share delta to count as a role change
+  score_sigma: 28.0          # weekly team-score sd for win probability
+  sims: 1000
+  regime_safe: 0.85
+  regime_comfortable: 0.60
+  regime_bubble: 0.25
+  faab:
+    league_winner: [0.40, 0.65]
+    breakout: [0.15, 0.35]
+    speculative: [0.05, 0.12]
+    streamer: [0.01, 0.03]
+    max_week_commit: 0.80

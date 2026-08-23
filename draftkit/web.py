@@ -260,6 +260,20 @@ def run_server(cfg, tiers_path, default_slot: int | None, port: int) -> int:
                 log_path = cfg.path("logs") / f"draft_{draft_id}.jsonl"
                 page = render_log_html(log_path, draft_id)
                 self._send(200, page.encode("utf-8"), "text/html; charset=utf-8")
+            elif url.path == "/brief":
+                import html as _html
+                parts = []
+                for fname in ("waiver_brief.md", "early_check.md", "lineup_brief.md"):
+                    fp = cfg.root / "reports" / fname
+                    if fp.exists():
+                        mt = time.strftime("%a %H:%M", time.localtime(fp.stat().st_mtime))
+                        body = _html.escape(fp.read_text(encoding="utf-8"))
+                        parts.append(f"<h2 style='color:#8b949e'>{fname} <small>({mt})</small></h2>"
+                                     f"<pre style='white-space:pre-wrap;font:14px/1.5 Segoe UI'>{body}</pre>")
+                page = ("<!DOCTYPE html><html><head><meta charset='utf-8'><title>briefs</title></head>"
+                        "<body style='background:#0d1117;color:#e6edf3;max-width:900px;margin:0 auto;padding:18px'>"
+                        + ("".join(parts) or "<p>no briefs rendered yet</p>") + "</body></html>")
+                self._send(200, page.encode("utf-8"), "text/html; charset=utf-8")
             elif url.path == "/state":
                 q = parse_qs(url.query)
                 draft_id = (q.get("draft_id") or [cfg.draft_id])[0].strip() or cfg.draft_id

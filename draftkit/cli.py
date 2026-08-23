@@ -205,6 +205,42 @@ def cmd_adpdiff(cfg: Config, args) -> None:
         console.print("no movers past threshold" if result["baseline"] else "first snapshot recorded")
 
 
+
+def cmd_seasonrefresh(cfg: Config, args) -> None:
+    from .briefs import build_context, record_actuals
+
+    ctx = build_context(cfg)
+    n = record_actuals(ctx)
+    console.print(f"season state: {ctx['state']['season']} week {ctx['week']} "
+                  f"({ctx['state']['season_type']})"
+                  + (" [FALLBACK projections]" if ctx['fallback'] else ""))
+    console.print(f"rosters: {len(ctx['rosters'])} | byes this week: "
+                  f"{', '.join(sorted(ctx['byes'])) or 'none'} | actuals recorded: {n}"
+                  + (f" | stale: {ctx['stale']}" if ctx['stale'] else ""))
+
+
+def cmd_waiverbrief(cfg: Config, args) -> None:
+    from .briefs import waiver_brief
+
+    out = waiver_brief(cfg)
+    console.print(f"waiver brief -> {out}")
+    console.print(out.read_text(encoding="utf-8").split("## Claims")[0])
+
+
+def cmd_lineupbrief(cfg: Config, args) -> None:
+    from .briefs import lineup_brief
+
+    out = lineup_brief(cfg)
+    console.print(f"lineup brief -> {out}")
+
+
+def cmd_earlycheck(cfg: Config, args) -> None:
+    from .briefs import early_check
+
+    out = early_check(cfg)
+    console.print(f"early-games check -> {out}")
+
+
 def cmd_log(cfg: Config, args) -> None:
     draft_id = args.draft_id or cfg.draft_id
     path = cfg.path("logs") / f"draft_{draft_id}.jsonl"
@@ -285,6 +321,10 @@ def main(argv: list[str] | None = None) -> None:
     p.add_argument("--slot", type=int, default=None, help="override my draft slot")
     sub.add_parser("rivals")
     sub.add_parser("adpdiff")
+    sub.add_parser("seasonrefresh")
+    sub.add_parser("waiverbrief")
+    sub.add_parser("lineupbrief")
+    sub.add_parser("earlycheck")
     p = sub.add_parser("log")
     p.add_argument("--draft-id", default=None, help="draft to review (default: real draft)")
     p = sub.add_parser("web")
@@ -306,6 +346,10 @@ def main(argv: list[str] | None = None) -> None:
         "track": cmd_track,
         "rivals": cmd_rivals,
         "adpdiff": cmd_adpdiff,
+        "seasonrefresh": cmd_seasonrefresh,
+        "waiverbrief": cmd_waiverbrief,
+        "lineupbrief": cmd_lineupbrief,
+        "earlycheck": cmd_earlycheck,
         "log": cmd_log,
         "web": cmd_web,
         "simulate": cmd_simulate,

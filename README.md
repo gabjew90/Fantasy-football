@@ -3,19 +3,18 @@
 Draft-prep pipeline + live draft tracker for Sleeper league **Omnibeta Degens**
 (12-team, full PPR, 2 FLEX, 15-round snake, 120s clock).
 
-> **Pre-draft cadence (settled 2026-08-19):**
-> 1. **Daily, automated:** `draftkit adpdiff` runs at 9:00 AM via Windows Task Scheduler
->    ("draftkit ADP diff") — fresh FFC ADP snapshot, movers ≥15 picks in ≤4 days written
->    to `reports/adp_movers.md`. The diff is the news detector; no LLM involved.
-> 2. **Night before (Saturday):** one deep research pass, fed by the movers list —
->    overrides only on dated, sourced facts (`reports/override_research.md` has the
->    format). Plus the full availability sweep (`data/external/availability.csv`).
-> 3. **Morning of (Sunday):** re-check ONLY the compromised subset from the sweep —
->    preseason injury news breaks Fri/Sat and ADP is a trailing average, so
->    final-window recency is the whole edge. Then the DRAFT DAY icon at ~2:30 PM.
-> 4. **Rounds 12–15 live:** ⛑ handcuff tags (backs up a ≤13-exp-game or
->    availability-flagged starter) are UI-only — the market blend already prices
->    handcuff option value, so they inform the human, never the engine.
+> **In-season cadence (draft complete 2026-08-23 — finished #1 of 12 on the board):**
+> 1. **Tuesday 6 PM (auto):** waiver brief — ranked claims with FAAB bands, sealed-bid
+>    logic on league-winners, rival budgets, drops, IR housekeeping, regime banner,
+>    three-lens scoreboard. `reports/waiver_brief.md`; claims process Wednesday.
+> 2. **Thursday 3 PM (auto):** early-games check — start/sit + inactives for players
+>    whose games kick before the weekend (schedule-driven: week 1 has a Wednesday game).
+> 3. **Sunday 9 AM (auto):** lineup brief — optimal-vs-current diffs, variance lean,
+>    inactive flags by kickoff, bye/IR warnings. All three served at localhost:8723/brief.
+> 4. Deep research passes stay ad hoc: briefs flag names; ping Claude to verify facts.
+> 5. Weekly projections auto-detect Sleeper publish state; until live they fall back to
+>    season proj ÷ 16 with a visible banner. Matchup/trend adjustments activate from
+>    week 3 data (caps in config.yaml `season:`).
 
 ## Quickstart
 
