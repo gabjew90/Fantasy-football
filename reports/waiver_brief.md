@@ -10,13 +10,13 @@
    - bid: **$40–$65** · drop: Deebo Samuel
 2. **George Holani** (RB) — contingency-speculative
    - why: inherits role: Zach Charbonnet (PUP) on SEA
-   - bid: **$5–$12** · drop: Deebo Samuel
+   - bid: **$5–$12** · drop: Troy Franklin
 3. **Nick Westbrook-Ikhine** (WR) — contingency-speculative
    - why: inherits role: Alec Pierce (PUP) on IND
-   - bid: **$5–$12** · drop: Deebo Samuel
+   - bid: **$5–$12** · drop: Tyrone Tracy
 4. **Emanuel Wilson** (RB) — contingency-speculative
    - why: inherits role: Zach Charbonnet (PUP) on SEA
-   - bid: **$5–$12** · drop: Deebo Samuel
+   - bid: **$5–$12** · drop: RJ Harvey
 
 ## Three-lens scoreboard
 _not enough completed weeks yet_

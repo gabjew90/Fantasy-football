@@ -7,4 +7,7 @@
 ## Changes
 - current lineup is already optimal
 
+## Your starters who lock EARLY this week
+- **Davante Adams (LAR)**
+
 Early-game teams this week (lock before Sunday): LAR, NEP, SEA, SFO

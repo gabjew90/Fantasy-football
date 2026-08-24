@@ -298,8 +298,8 @@ def waiver_brief(cfg) -> Path:
                                       {p["sleeper_id"] for p in ir_occ})
     droppable = sorted((p for p in my_bench if p["sleeper_id"] not in prot),
                        key=lambda p: p["ros"])
-    for c in claims:
-        c.setdefault("drop", droppable[0]["name"] if droppable else None)
+    for i, c in enumerate(claims):
+        c.setdefault("drop", droppable[i]["name"] if i < len(droppable) else None)
 
     users_by_roster = _users_by_roster(ctx)
     rec = ctx["my_roster"].get("settings") or {}
@@ -348,11 +348,21 @@ def _lineup_model(ctx, teams_filter: set[str] | None = None) -> dict:
             "close matchup — projection decides")
     kick = {r["team"]: f"{r['gameday']} {r['gametime']}"
             for r in ctx["schedule"].filter(pl.col("week") == ctx["week"]).iter_rows(named=True)}
+    starters_set = {q["name"] for q in lineup_mod.optimal_lineup(roster, SLOTS, FLEX)}
+
+    def _backup(pos, exclude):
+        cands = [b for b in roster if b["pos"] == pos and b["name"] not in starters_set
+                 and b["name"] != exclude and b["weekly"] > 0]
+        return max(cands, key=lambda b: b["weekly"])["name"] if cands else None
+
     flags = [{"name": p["name"], "status": p["status"],
-              "kick": kick.get(p["team"], "?"), "backup": None}
+              "kick": kick.get(p["team"], "?"), "backup": _backup(p["pos"], p["name"])}
              for p in roster_view
-             if p["status"] in ("Questionable", "Doubtful", "Out") and p["name"] in
-             {q["name"] for q in lineup_mod.optimal_lineup(roster, SLOTS, FLEX)}]
+             if p["status"] in ("Questionable", "Doubtful", "Out") and p["name"] in starters_set]
+    early_mine = sorted(
+        f"{p['name']} ({p['team']})" for p in roster
+        if teams_filter is not None and p["team"] in teams_filter and p["name"] in starters_set
+    )
     warnings = []
     starters_raw = ctx["my_roster"].get("starters") or []
     if "0" in [str(s) for s in starters_raw]:
@@ -367,6 +377,7 @@ def _lineup_model(ctx, teams_filter: set[str] | None = None) -> dict:
             "opp_total": opp_total, "changes": changes, "lean": lean, "flags": flags,
             "warnings": warnings, "stale": ctx["stale"],
             "early_teams": sorted(set(ctx["early"]["team"].to_list())),
+            "early_mine": early_mine,
             "preseason_note": ("PRESEASON / projections not yet published — values are "
                                "fallback baselines" if ctx["preseason"] or ctx["fallback"] else "")}
 

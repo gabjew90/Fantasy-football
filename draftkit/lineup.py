@@ -89,6 +89,9 @@ def render_lineup_brief(model: dict) -> str:
         for f in flags:
             lines.append(f"- {f['kick']}: **{f['name']}** is {f['status']}"
                          + (f" — if inactive, start {f['backup']}" if f.get("backup") else ""))
+    if m.get("early_mine"):
+        lines += ["", "## Your starters who lock EARLY this week",
+                  *[f"- **{n}**" for n in m["early_mine"]]]
     if m.get("early_teams"):
         lines += ["", f"Early-game teams this week (lock before Sunday): {', '.join(m['early_teams'])}"]
     return "\n".join(lines) + "\n"
