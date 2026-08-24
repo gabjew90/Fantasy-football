@@ -1,6 +1,6 @@
 # Waiver Brief — week 1
 
-**Record 0-0 · playoff odds 60% · regime COMFORTABLE · $100 FAAB left**
+**Record 0-0 · playoff odds 61% · regime COMFORTABLE · $100 FAAB left**
 
 ⚠ PRESEASON / projections not yet published — values are fallback baselines (season proj ÷ 16)
 
