@@ -79,3 +79,11 @@ def test_brief_renders_regime_and_commit_cap():
     }
     md = render_waiver_brief(model)
     assert "COMFORTABLE" in md and "Guy A" in md and "$12–$28" in md and "Move X to IR" in md
+
+
+def test_urgency_multiplier_is_continuous():
+    from draftkit.waivers import urgency_mult
+    # a 4-point odds wobble across the 0.60 threshold must NOT swing bids 25%
+    assert abs(urgency_mult(0.61, "COMFORTABLE") - urgency_mult(0.57, "BUBBLE")) < 0.02
+    assert urgency_mult(0.05, "LONGSHOT") > urgency_mult(0.95, "SAFE")
+    assert urgency_mult(None, "BUBBLE") == 1.25  # label fallback

@@ -17,6 +17,19 @@ from __future__ import annotations
 REGIME_MULT = {"BUBBLE": 1.25, "LONGSHOT": 1.25, "SAFE": 0.8, "COMFORTABLE": 1.0}
 
 
+def urgency_mult(odds: float | None, regime: str) -> float:
+    """Win-now multiplier, CONTINUOUS in playoff odds.
+
+    A stepped multiplier keyed to the regime label made bids jump 25% when
+    odds wobbled across a threshold (0.61 -> 0.57 is Monte-Carlo noise, not a
+    strategy change). Linear: odds 0 -> 1.25 (desperate), 1.0 -> 0.80 (safe).
+    Falls back to the label when odds are unavailable.
+    """
+    if odds is None:
+        return REGIME_MULT.get(regime, 1.0)
+    return round(1.25 - 0.45 * max(0.0, min(1.0, odds)), 3)
+
+
 def classify_contingencies(fa_pool: list[dict], rosters: dict[int, list[dict]],
                            injury: dict[str, str]) -> list[dict]:
     """FAs who inherit a role because a rostered same-team same-pos player is Out/IR."""
@@ -38,10 +51,11 @@ def classify_contingencies(fa_pool: list[dict], rosters: dict[int, list[dict]],
 
 def bid_band(cls: str, remaining_budget: int, regime: str, faab: dict,
              rival_max_budget: int | None = None,
-             value_cap: int | None = None) -> tuple[int, int]:
+             value_cap: int | None = None,
+             odds: float | None = None) -> tuple[int, int]:
     """(fair, aggressive) dollar band for a claim class."""
     lo, hi = faab[cls]
-    mult = REGIME_MULT.get(regime, 1.0)
+    mult = urgency_mult(odds, regime)
     fair = max(1, round(lo * remaining_budget))
     aggressive = max(1, round(hi * remaining_budget * mult))
     if cls == "league_winner" and rival_max_budget is not None:
@@ -115,7 +129,8 @@ def render_waiver_brief(model: dict) -> str:
         lines += [
             f"{i}. **{c['name']}** ({c['pos']}) — {c['cls']}",
             f"   - why: {c['evidence']}",
-            f"   - bid: **${c['fair']}–${c['aggressive']}** · drop: {c.get('drop') or '(open spot)'}",
+            f"   - bid: **${c['fair']}–${c['aggressive']}** · drop: "
+            f"{c.get('drop') or c.get('drop_note') or '(open spot)'}",
         ]
         if c.get("rivals_note"):
             lines.append(f"   - competition: {c['rivals_note']}")

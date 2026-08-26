@@ -94,7 +94,7 @@ season:
   trend_cap: 0.15            # +/- cap on usage-trend adjustment (role changes only)
   trend_threshold: 0.07      # min abs target-share delta to count as a role change
   score_sigma: 28.0          # weekly team-score sd for win probability
-  sims: 1000
+  sims: 4000                 # more sims = regime label stops wobbling on noise
   regime_safe: 0.85
   regime_comfortable: 0.60
   regime_bubble: 0.25

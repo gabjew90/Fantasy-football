@@ -173,7 +173,7 @@ def playoff_odds(ctx) -> tuple[float, str]:
     odds = playoffs.simulate_season(
         strengths, matchups_by_week, _records(ctx["rosters"]),
         playoff_teams=int(league["settings"].get("playoff_teams", 6)),
-        sims=int(scfg.get("sims", 1000)), sigma=float(scfg.get("score_sigma", 28.0)),
+        sims=int(scfg.get("sims", 4000)), sigma=float(scfg.get("score_sigma", 28.0)),
         rng=rng, points_for=_points_for(ctx["rosters"]),
     )
     mine = odds.get(int(ctx["my_roster"]["roster_id"]), 0.5)
@@ -275,7 +275,7 @@ def waiver_brief(cfg) -> Path:
         fair, agg = waivers.bid_band(
             "league_winner" if cls == "league_winner" else "speculative",
             my_budget, reg, faab, rival_max_budget=rival_max if cls == "league_winner" else None,
-            value_cap=int(c["ros"] / 2) if cls == "league_winner" else None)
+            value_cap=int(c["ros"] / 2) if cls == "league_winner" else None, odds=odds)
         c["fair"], c["aggressive"] = fair, agg
         if rid_needy:
             c["rivals_note"] = (f"{len(rid_needy)} rival(s) need {c['pos']}; budgets: "
@@ -285,7 +285,7 @@ def waiver_brief(cfg) -> Path:
         best = next((p for p in fa_pool if p["pos"] == pos), None)
         mine_have = any(p["pos"] == pos for p in ctx["roster_players"][my_rid])
         if best and not mine_have:
-            fair, agg = waivers.bid_band("streamer", my_budget, reg, faab)
+            fair, agg = waivers.bid_band("streamer", my_budget, reg, faab, odds=odds)
             claims.append({**best, "cls": "streamer", "fair": fair, "aggressive": agg,
                            "evidence": f"best available {pos} this week"})
 
@@ -298,8 +298,18 @@ def waiver_brief(cfg) -> Path:
                                       {p["sleeper_id"] for p in ir_occ})
     droppable = sorted((p for p in my_bench if p["sleeper_id"] not in prot),
                        key=lambda p: p["ros"])
-    for i, c in enumerate(claims):
-        c.setdefault("drop", droppable[i]["name"] if i < len(droppable) else None)
+    # a drop must be worth LESS than the player being claimed, and each claim
+    # gets a distinct name so the list reads as a plan, not four copies
+    taken: set[str] = set()
+    for c in claims:
+        pick = next((d for d in droppable
+                     if d["name"] not in taken and d["ros"] < c.get("ros", 0)), None)
+        if pick:
+            taken.add(pick["name"])
+            c["drop"] = pick["name"]
+        else:
+            c["drop"] = None
+            c["drop_note"] = "no sensible drop — every bench player outranks him"
 
     users_by_roster = _users_by_roster(ctx)
     rec = ctx["my_roster"].get("settings") or {}
