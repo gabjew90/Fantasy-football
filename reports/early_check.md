@@ -2,7 +2,7 @@
 
 ⚠ PRESEASON / projections not yet published — values are fallback baselines
 
-**vs Lord2Pale: you 133.4 — 128.4 them** · close matchup — projection decides
+**vs Lord2Pale: you 132.6 — 129.6 them** · close matchup — projection decides
 
 ## Changes
 - current lineup is already optimal
