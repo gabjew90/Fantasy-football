@@ -1,8 +1,14 @@
-"""Discord webhook delivery: one message per brief, edits over re-spam,
-content-hash idempotency, dry-run prints instead of posting.
+"""Email delivery via Gmail SMTP (app password).
 
-Missing webhook URL degrades to stdout with a visible banner — jobs never
-crash on delivery config.
+Subject-line convention IS the interface: time-critical alerts start with
+[ACT NOW] and carry the instruction + minutes-to-lock in the subject itself,
+so the lock screen alone is decision-sufficient; weekly briefs start with
+[BRIEF]. One email per event; updates to the same event reply into the
+thread (In-Reply-To) rather than starting a new one. Content-hash
+idempotency: re-running an unchanged job sends nothing.
+
+Missing SMTP secrets degrade to stdout with a visible banner — jobs never
+crash on delivery config. --dry-run prints instead of sending.
 """
 
 from __future__ import annotations
@@ -10,81 +16,89 @@ from __future__ import annotations
 import hashlib
 import logging
 import os
+import smtplib
 import time
-
-import requests
+from email.message import EmailMessage
+from email.utils import make_msgid
+from html import escape
 
 log = logging.getLogger("manager")
 
-_EMBED_LIMIT = 4000  # Discord embed description hard cap is 4096
+SMTP_HOST, SMTP_PORT = "smtp.gmail.com", 465
 
 
 def _hash(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()[:16]
 
 
-def _embeds(title: str, body: str) -> list[dict]:
-    chunks, rest = [], body
-    while rest and len(chunks) < 10:
-        chunks.append(rest[:_EMBED_LIMIT])
-        rest = rest[_EMBED_LIMIT:]
-    out = [{"title": title if i == 0 else f"{title} (cont. {i + 1})",
-            "description": c, "color": 0x2E8B57} for i, c in enumerate(chunks)]
-    if rest:
-        out[-1]["description"] += "\n… (truncated)"
-    return out or [{"title": title, "description": "(empty)", "color": 0x2E8B57}]
+def _md_html(body: str) -> str:
+    """Tiny markdown-ish -> phone-readable HTML (headers, bold, bullets)."""
+    out = []
+    for raw in body.splitlines():
+        line = escape(raw)
+        while "**" in line:
+            line = line.replace("**", "<b>", 1).replace("**", "</b>", 1)
+        if line.startswith("# "):
+            out.append(f"<h2>{line[2:]}</h2>")
+        elif line.startswith("## "):
+            out.append(f"<h3>{line[3:]}</h3>")
+        elif line.startswith("- "):
+            out.append(f"<li>{line[2:]}</li>")
+        elif not line.strip():
+            out.append("<br>")
+        else:
+            out.append(f"<p>{line}</p>")
+    return ("<html><body style='font-family:-apple-system,Segoe UI,sans-serif;"
+            "font-size:15px;line-height:1.45'>" + "\n".join(out) + "</body></html>")
 
 
-def _request(method: str, url: str, payload: dict) -> requests.Response | None:
-    for attempt in (1, 2):
-        try:
-            resp = requests.request(method, url, json=payload, timeout=15)
-            if resp.status_code in (200, 204):
-                return resp
-            if resp.status_code == 429:
-                time.sleep(float(resp.headers.get("Retry-After", "2")))
-                continue
-            log.error("discord %s -> %s %s", method, resp.status_code, resp.text[:200])
-            return None
-        except requests.RequestException as e:  # noqa: PERF203
-            log.warning("discord attempt %d failed: %s", attempt, e)
-            time.sleep(2)
-    return None
+def deliver(store, brief_key: str, subject: str, body: str,
+            dry_run: bool = False, act_now: bool = False) -> str:
+    """Returns: printed | unchanged | sent | updated | disabled | failed."""
+    prefix = "[ACT NOW] " if act_now else "[BRIEF] "
+    full_subject = prefix + subject
 
-
-def deliver(store, brief_key: str, title: str, body: str,
-            dry_run: bool = False, webhook: str | None = None) -> str:
-    """Returns one of: printed | unchanged | posted | edited | disabled | failed."""
     if dry_run:
-        print(f"\n{'=' * 60}\n{title}\n{'=' * 60}\n{body}")
+        print(f"\n{'=' * 60}\nSUBJECT: {full_subject}\n{'=' * 60}\n{body}")
         return "printed"
 
-    h = _hash(title + body)
-    msg_id, old_hash = store.message(brief_key)
+    h = _hash(full_subject + body)
+    prev_id, old_hash = store.message(brief_key)
     if old_hash == h:
         log.info("deliver[%s]: unchanged, skipping", brief_key)
         return "unchanged"
 
-    webhook = webhook or os.environ.get("DISCORD_WEBHOOK_URL", "")
-    if not webhook:
-        print(f"\n[DELIVERY DISABLED — set DISCORD_WEBHOOK_URL in .env]\n"
-              f"{'=' * 60}\n{title}\n{'=' * 60}\n{body}")
+    user = os.environ.get("SMTP_USER", "")
+    pw = os.environ.get("SMTP_APP_PASSWORD", "")
+    to = os.environ.get("ALERT_EMAIL_TO", "")
+    if not (user and pw and to):
+        print(f"\n[DELIVERY DISABLED — set SMTP_USER / SMTP_APP_PASSWORD / "
+              f"ALERT_EMAIL_TO]\nSUBJECT: {full_subject}\n{'=' * 60}\n{body}")
         store.save_message(brief_key, None, h)
         return "disabled"
 
-    payload = {"embeds": _embeds(title, body)}
-    if msg_id:
-        resp = _request("PATCH", f"{webhook}/messages/{msg_id}", payload)
-        if resp is not None:
-            store.save_message(brief_key, msg_id, h)
-            log.info("deliver[%s]: edited message %s", brief_key, msg_id)
-            return "edited"
-        # edited message may have been deleted — fall through to a fresh post
+    msg = EmailMessage()
+    msg["Subject"] = full_subject
+    msg["From"] = user
+    msg["To"] = to
+    msg_id = make_msgid()
+    msg["Message-ID"] = msg_id
+    if prev_id:  # update the same event's thread, don't re-spam
+        msg["In-Reply-To"] = prev_id
+        msg["References"] = prev_id
+    msg.set_content(body)
+    msg.add_alternative(_md_html(body), subtype="html")
 
-    resp = _request("POST", f"{webhook}?wait=true", payload)
-    if resp is None:
-        return "failed"
-    new_id = str(resp.json().get("id", "")) if resp.text else ""
-    store.save_message(brief_key, new_id or None, h)
-    log.info("deliver[%s]: posted message %s", brief_key, new_id)
-    return "posted"
+    for attempt in (1, 2):
+        try:
+            with smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT, timeout=30) as s:
+                s.login(user, pw)
+                s.send_message(msg)
+            store.save_message(brief_key, msg_id, h)
+            state = "updated" if prev_id else "sent"
+            log.info("deliver[%s]: %s (%s)", brief_key, state, full_subject)
+            return state
+        except Exception as e:  # noqa: BLE001, PERF203
+            log.warning("smtp attempt %d failed: %s", attempt, e)
+            time.sleep(3)
+    return "failed"

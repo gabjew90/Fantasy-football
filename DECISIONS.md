@@ -8,28 +8,23 @@ document it, keep going."
   used supports it; nothing 3.11-only is needed. Rebuilding the venv mid-season
   risks the draft-era toolchain for zero functional gain. `tzdata` added for
   Windows zoneinfo.
-- **Windows host, so no systemd.** The scheduler runs via `scripts/MANAGER.bat`
-  under a Task Scheduler ONLOGON task (registration command in README). A
-  `deploy/manager.service` systemd unit ships anyway for portability, as the spec
-  asked for one in the README.
+- **Runtime is GitHub Actions (rev 2)** — the rev-1 resident scheduler
+  (APScheduler + Windows launcher + systemd unit) was built and then deleted
+  when the modified spec landed; workflows in `.github/workflows/` are the
+  only runtime now.
 - **Same repo, new `manager/` package.** The spec says single repo; draftkit
   already owns Sleeper caching, the schedule parquet, league-scored weekly
   projections with placeholder fallback, lineup math, and ROS values (tiers.csv).
   Manager reuses those as a library and owns everything decision/delivery/scheduling.
 
-## Delivery
-- **Discord wiring is ON HOLD by user instruction (2026-08-25)**: delivery will
-  ride GitHub Actions instead (details to come). `manager/deliver.py` keeps the
-  webhook code path but the operative outputs are stdout + `reports/manager/*.md`
-  — a clean handoff surface for an Actions workflow. Do not document or register
-  anything Discord-specific until the user returns with the Actions design.
-  Delivery remains post-or-edit keyed on a per-brief key in SQLite with a
-  content hash, so unchanged re-runs are no-ops (idempotency requirement)
-  regardless of backend.
-- **Briefs are also written to `reports/manager/`** so the existing GitHub-push
-  phone path keeps working alongside Discord. The old Tue/Thu/Sun scheduled
-  tasks remain until Discord delivery is verified live, then should be retired
-  (they are the fixed-cron failure mode this system replaces).
+## Delivery (rev 2 — user's modified spec, 2026-08-25)
+- **Gmail SMTP** (`smtplib` stdlib, SSL 465) with app password; multipart
+  plain+HTML via a tiny markdown converter — no email library dependency.
+  Threading: the stored Message-ID is sent as In-Reply-To on updates, so an
+  evolving event stays one thread. Content-hash idempotency is delivery-backend
+  agnostic and survived the Discord->email swap unchanged.
+- Missing SMTP secrets degrade to stdout with a banner (never crash); dry-run
+  prints. Briefs also land in `reports/manager/` (untracked working copies).
 
 ## Module 0
 - **Slate** = a distinct kickoff datetime (PT) among games involving my rostered
@@ -84,9 +79,24 @@ document it, keep going."
   needs a defense-quality model this repo doesn't have yet; faking one would be
   worse than naming the opponents.
 
-## Scheduling
-- APScheduler 3.x `BlockingScheduler` with `America/Los_Angeles` timezone; the
-  Monday 6:00 AM planner recomputes and re-registers the week's jobs with
-  deterministic ids (`wk{n}:{kind}:{iso}`, `replace_existing=True`) and drops
-  stale ones, so a crashed-and-restarted process converges to the same schedule.
-  On process start the planner runs immediately for the current week.
+## Scheduling (rev 2 — GitHub Actions)
+- **weekly.yml carries the PT-fixed events with BOTH possible UTC crons**
+  (PDT/PST); `manager cron` guards on Pacific wall-clock inside the run and
+  idempotent delivery absorbs the double fire. This avoids editing workflow
+  files from within Actions (which would need a PAT with workflow scope — a
+  fifth secret the spec doesn't list).
+- **gate.yml runs `*/15 * * * *` but the first step is a stdlib-only guard**
+  against `state/gate_hours.json` (committed by the planner: every UTC
+  (weekday, hour) containing a check window + slack). Off-window ticks exit
+  before Python/deps install, in seconds — this is the "derive the windows
+  from the committed week plan" requirement without workflow-file rewriting.
+- **A check that crashes is still marked done**: `_safe()` already emailed the
+  failure with the traceback, and retrying a crashing check every 15 minutes
+  for 45 minutes would spam five copies. At-least-once execution applies to
+  the attempt; delivery of errors is the fallback path.
+- **State is JSON files, not SQLite**: readable git diffs, painless
+  `git pull --rebase`, and the Actions concurrency group (`manager-state`,
+  no cancel) serializes writers. The old resident scheduler
+  (APScheduler/MANAGER.bat/systemd) is deleted — the spec's runtime is Actions.
+- Local Python stays 3.10 (venv); workflows pin 3.11. Both are tested by the
+  same suite; nothing 3.11-only is used.

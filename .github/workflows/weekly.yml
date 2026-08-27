@@ -1,0 +1,62 @@
+# Fixed-cron weekly jobs. GitHub cron is UTC and best-effort; PT-fixed events
+# exist at two UTC hours across DST, so each event has both crons and
+# `python -m manager cron` guards on Pacific wall-clock inside the run.
+# Delivery is content-hash idempotent, so the double fire is harmless.
+name: weekly
+on:
+  workflow_dispatch:
+    inputs:
+      job:
+        description: force one job (plan/waivers/scout/lineup/health)
+        required: false
+  schedule:
+    - cron: "0 13,14 * * 1"    # Mon planner 6:00 AM PT (PDT/PST)
+    - cron: "0 15,16 * * *"    # daily healthcheck 8:00 AM PT
+    - cron: "0 23 * * 2"       # Tue waiver brief 4:00 PM PDT
+    - cron: "0 0 * * 3"        # Tue waiver brief 4:00 PM PST (UTC Wed)
+    - cron: "0 19,20 * * 5"    # Fri scout 12:00 PM PT
+    - cron: "0 14 * * 0"       # Sun lineup backstop 7:00 AM PDT
+    - cron: "0 15 * * 0"       # Sun lineup backstop 7:00 AM PST
+
+concurrency:
+  group: manager-state
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: daily players-dump cache
+        uses: actions/cache@v4
+        with:
+          path: data/raw
+          key: sleeper-raw-${{ github.run_started_at }}
+          restore-keys: sleeper-raw-
+      - name: run windowed jobs
+        env:
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_APP_PASSWORD: ${{ secrets.SMTP_APP_PASSWORD }}
+          ALERT_EMAIL_TO: ${{ secrets.ALERT_EMAIL_TO }}
+          ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
+        run: |
+          if [ -n "${{ github.event.inputs.job }}" ]; then
+            python -m manager cron --job "${{ github.event.inputs.job }}"
+          else
+            python -m manager cron
+          fi
+      - name: commit state
+        if: always()
+        run: |
+          git config user.name "auto-manager"
+          git config user.email "actions@users.noreply.github.com"
+          git add state
+          git diff --cached --quiet || git commit -m "state: weekly $(TZ=America/Los_Angeles date '+%a %m/%d %H:%M PT')"
+          git pull --rebase --autostash origin ${{ github.ref_name }}
+          git push

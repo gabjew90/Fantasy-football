@@ -6,7 +6,7 @@ from manager.store import Store
 
 
 def _store(tmp_path):
-    return Store(tmp_path / "state.db")
+    return Store(tmp_path / "state")
 
 
 def test_faab_spent_from_transactions():
@@ -44,17 +44,33 @@ def test_alert_fires_exactly_once(tmp_path):
     assert s.first_time("inj:123:Questionable") is True  # changed fact -> alert
 
 
-def test_delivery_is_idempotent_without_webhook(tmp_path, monkeypatch, capsys):
-    monkeypatch.delenv("DISCORD_WEBHOOK_URL", raising=False)
-    s = _store(tmp_path)
-    assert deliver(s, "waivers:3", "t", "body A") == "disabled"
-    assert deliver(s, "waivers:3", "t", "body A") == "unchanged"  # no double-post
-    assert deliver(s, "waivers:3", "t", "body B") == "disabled"   # changed -> again
+def test_store_state_survives_reopen(tmp_path):
+    Store(tmp_path / "state").set("k", {"a": 1})
+    s2 = Store(tmp_path / "state")   # fresh instance = fresh Actions run
+    assert s2.get("k") == {"a": 1}
+    assert s2.first_time("x") and not Store(tmp_path / "state").first_time("x")
 
 
-def test_dry_run_prints_and_never_records(tmp_path, capsys):
+def test_delivery_is_idempotent_without_smtp(tmp_path, monkeypatch):
+    for var in ("SMTP_USER", "SMTP_APP_PASSWORD", "ALERT_EMAIL_TO"):
+        monkeypatch.delenv(var, raising=False)
     s = _store(tmp_path)
-    assert deliver(s, "k", "Title", "Body", dry_run=True) == "printed"
+    assert deliver(s, "waivers:3", "subj", "body A") == "disabled"
+    assert deliver(s, "waivers:3", "subj", "body A") == "unchanged"  # no double-send
+    assert deliver(s, "waivers:3", "subj", "body B") == "disabled"   # changed -> again
+
+
+def test_subject_prefixes(tmp_path, capsys):
+    s = _store(tmp_path)
+    deliver(s, "a", "Warren OUT — start Harvey — locks in 74 min", "x",
+            dry_run=True, act_now=True)
+    deliver(s, "b", "Waivers wk 3", "y", dry_run=True)
     out = capsys.readouterr().out
-    assert "Title" in out and "Body" in out
+    assert "[ACT NOW] Warren OUT — start Harvey — locks in 74 min" in out
+    assert "[BRIEF] Waivers wk 3" in out
+
+
+def test_dry_run_never_records(tmp_path):
+    s = _store(tmp_path)
+    assert deliver(s, "k", "T", "Body", dry_run=True) == "printed"
     assert s.message("k") == (None, None)  # dry-run leaves no delivery state

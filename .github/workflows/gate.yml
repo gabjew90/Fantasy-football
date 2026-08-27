@@ -1,0 +1,63 @@
+# The 15-minute gate: executes checks from the committed state/week_plan.json
+# whose due time has passed and aren't done. The first step is a stdlib-only
+# window guard against state/gate_hours.json (written by the Monday planner),
+# so ticks outside decision windows exit in seconds and conserve free-tier
+# minutes; Python/deps only install when there is real work.
+name: gate
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "*/15 * * * *"
+
+concurrency:
+  group: manager-state
+  cancel-in-progress: false
+
+jobs:
+  tick:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: window guard (cheap)
+        id: guard
+        run: |
+          python3 - <<'EOF' >> "$GITHUB_OUTPUT"
+          import json, datetime, pathlib, sys
+          force = "${{ github.event_name }}" == "workflow_dispatch"
+          p = pathlib.Path("state/gate_hours.json")
+          now = datetime.datetime.now(datetime.timezone.utc)
+          hot = force or (p.exists() and [now.isoweekday(), now.hour] in json.loads(p.read_text()))
+          print(f"run={'true' if hot else 'false'}")
+          EOF
+      - uses: actions/setup-python@v5
+        if: steps.guard.outputs.run == 'true'
+        with:
+          python-version: "3.11"
+          cache: pip
+      - if: steps.guard.outputs.run == 'true'
+        run: pip install -r requirements.txt
+      - name: daily players-dump cache
+        if: steps.guard.outputs.run == 'true'
+        uses: actions/cache@v4
+        with:
+          path: data/raw
+          key: sleeper-raw-${{ github.run_started_at }}
+          restore-keys: sleeper-raw-
+      - name: gate tick
+        if: steps.guard.outputs.run == 'true'
+        env:
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_APP_PASSWORD: ${{ secrets.SMTP_APP_PASSWORD }}
+          ALERT_EMAIL_TO: ${{ secrets.ALERT_EMAIL_TO }}
+          ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
+        run: python -m manager gate
+      - name: commit state
+        if: always() && steps.guard.outputs.run == 'true'
+        run: |
+          git config user.name "auto-manager"
+          git config user.email "actions@users.noreply.github.com"
+          git add state
+          git diff --cached --quiet || git commit -m "state: gate $(TZ=America/Los_Angeles date '+%a %m/%d %H:%M PT')"
+          git pull --rebase --autostash origin ${{ github.ref_name }}
+          git push

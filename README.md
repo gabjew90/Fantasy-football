@@ -133,21 +133,31 @@ committed).
 ## Auto-manager (in-season, notification-only)
 
 Watches the league so you don't watch football. Never writes to Sleeper.
+Runtime is GitHub Actions — no servers, no resident process.
 
 ```
 python -m manager --dry-run --module all   # full pipeline vs live data, stdout
-python -m manager --module waivers         # one module, delivered
-python -m manager run                      # long-lived scheduler (PT)
+python -m manager cron --job waivers       # force one weekly job
+python -m manager gate                     # one gate tick (reads state/week_plan.json)
 ```
 
-- Module 0 computes each week's checks from the real schedule (Wednesday
-  openers, 6:30 AM PT international kickoffs, December Saturdays) and posts a
-  week plan Monday 6:00 AM PT — silence means broken (healthcheck daily 8 AM).
-- Tuesday 5:00 PM PT waiver brief (bids due 7:00 PM PT), Friday noon opponent
-  scout, per-day lineup passes before the earliest inactives, per-slate
-  inactives checks at kickoff − 80 min.
-- Secrets in `.env` (see `.env.example`). Briefs land in `reports/manager/`.
-- Delivery backend: GitHub Actions integration pending (Discord webhook code
-  exists but is on hold). Windows: register `scripts/MANAGER.bat` at logon via
-  `schtasks /Create /SC ONLOGON /TN "draftkit manager" /TR "<repo>\scripts\MANAGER.BAT"`.
-  Linux: `deploy/manager.service`.
+**Setup (5 minutes):** private repo → add secrets `SMTP_USER`,
+`SMTP_APP_PASSWORD` (Gmail app password), `ALERT_EMAIL_TO`, `ODDS_API_KEY`
+(optional) → enable Actions → push. Then dispatch `weekly` with job `plan`
+from the Actions tab (or the GitHub mobile app): it emails the week plan and
+commits `state/week_plan.json`; the `gate` workflow executes the plan's
+checks every 15 minutes inside decision windows.
+
+- **weekly.yml** — Mon 6 AM PT planner, Tue 4 PM PT waiver brief (bids due
+  7 PM PT), Fri noon scout, Sun 7 AM lineup backstop, daily 8 AM healthcheck.
+  Each PT event has both possible UTC crons (DST) with a Pacific guard inside.
+- **gate.yml** — every 15 min; a stdlib window guard against
+  `state/gate_hours.json` makes off-window ticks exit in seconds. Checks are
+  due at target − 10 min and eligible ~45 min, so late/skipped crons are
+  absorbed; done flags + content-hash email idempotency prevent double sends.
+- **notify.yml** — emails `[ACT NOW]` when any workflow goes red. Silence past
+  9 AM PT with no red-run email = schedules died; debug from the Actions tab.
+- Subjects are decision-sufficient from the lock screen: `[ACT NOW] Warren
+  OUT — start Harvey — locks in 74 min`. Updates reply into the same thread.
+- **Manual run:** Actions tab → weekly → Run workflow → pick a job. Every
+  workflow has `workflow_dispatch`. State commits are the durable run log.
