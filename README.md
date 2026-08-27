@@ -129,3 +129,25 @@ Repo layout: `draftkit/` (pipeline + tracker modules), `tests/`, `config.yaml`
 (all knobs), `data/raw` (API caches, gitignored), `data/processed`
 (parquet intermediates, gitignored), `tiers.csv` + `board.md` (deliverables,
 committed).
+
+## Auto-manager (in-season, notification-only)
+
+Watches the league so you don't watch football. Never writes to Sleeper.
+
+```
+python -m manager --dry-run --module all   # full pipeline vs live data, stdout
+python -m manager --module waivers         # one module, delivered
+python -m manager run                      # long-lived scheduler (PT)
+```
+
+- Module 0 computes each week's checks from the real schedule (Wednesday
+  openers, 6:30 AM PT international kickoffs, December Saturdays) and posts a
+  week plan Monday 6:00 AM PT — silence means broken (healthcheck daily 8 AM).
+- Tuesday 5:00 PM PT waiver brief (bids due 7:00 PM PT), Friday noon opponent
+  scout, per-day lineup passes before the earliest inactives, per-slate
+  inactives checks at kickoff − 80 min.
+- Secrets in `.env` (see `.env.example`). Briefs land in `reports/manager/`.
+- Delivery backend: GitHub Actions integration pending (Discord webhook code
+  exists but is on hold). Windows: register `scripts/MANAGER.bat` at logon via
+  `schtasks /Create /SC ONLOGON /TN "draftkit manager" /TR "<repo>\scripts\MANAGER.BAT"`.
+  Linux: `deploy/manager.service`.
