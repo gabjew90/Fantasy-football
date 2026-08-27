@@ -13,3 +13,6 @@ data/processed/*.json
 # play-by-play draft logs are a personal record, not project source
 data/logs/
 .DS_Store
+.env
+data/manager/
+reports/manager/

@@ -18,11 +18,14 @@ document it, keep going."
   Manager reuses those as a library and owns everything decision/delivery/scheduling.
 
 ## Delivery
-- **No Discord webhook URL exists yet** (secret only the league owner can mint).
-  Everything runs and prints without it; posting activates the moment
-  `DISCORD_WEBHOOK_URL` lands in `.env`. Delivery is post-or-edit keyed on a
-  per-brief key stored in SQLite, with a content hash so unchanged re-runs are
-  no-ops (idempotency requirement).
+- **Discord wiring is ON HOLD by user instruction (2026-08-25)**: delivery will
+  ride GitHub Actions instead (details to come). `manager/deliver.py` keeps the
+  webhook code path but the operative outputs are stdout + `reports/manager/*.md`
+  — a clean handoff surface for an Actions workflow. Do not document or register
+  anything Discord-specific until the user returns with the Actions design.
+  Delivery remains post-or-edit keyed on a per-brief key in SQLite with a
+  content hash, so unchanged re-runs are no-ops (idempotency requirement)
+  regardless of backend.
 - **Briefs are also written to `reports/manager/`** so the existing GitHub-push
   phone path keeps working alongside Discord. The old Tue/Thu/Sun scheduled
   tasks remain until Discord delivery is verified live, then should be retired
