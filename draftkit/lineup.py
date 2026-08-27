@@ -41,12 +41,28 @@ def lineup_changes(roster: list[dict], current_ids: list[str],
     ins = [by_id[i] for i in opt_ids - cur_ids]
     outs = [by_id[i] for i in cur_ids - opt_ids]
     ins.sort(key=lambda p: -(p.get("weekly") or 0))
-    outs.sort(key=lambda p: (p.get("weekly") or 0))
-    for a, b in zip(ins, outs):
+    # pair each swap-in with a swap-out at the SAME position first — cross-position
+    # pairing produced misleading lines like "Deebo over Harvey (+-0.2)" when the
+    # real moves were Deebo->WR slot and Fannin->flex. Leftovers pair by points.
+    remaining = sorted(outs, key=lambda p: (p.get("weekly") or 0))
+    pairs = []
+    for a in ins:
+        b = next((o for o in remaining if o.get("pos") == a.get("pos")), None)
+        if b:
+            remaining.remove(b)
+            pairs.append((a, b))
+        else:
+            pairs.append((a, None))
+    for a, b in pairs:
+        if b is None and remaining:
+            b = remaining.pop(0)
+        if b is None:
+            changes.append(f"start {a['name']} (an active slot is empty: "
+                           f"+{a.get('weekly') or 0:.1f} pts)")
+            continue
         gain = (a.get("weekly") or 0) - (b.get("weekly") or 0)
-        changes.append(f"start {a['name']} over {b['name']} (+{gain:.1f} pts)")
-    for a in ins[len(outs):]:
-        changes.append(f"start {a['name']} (an active slot is empty: +{a.get('weekly') or 0:.1f} pts)")
+        note = f"+{gain:.1f} pts" if gain >= 0.05 else "coin flip — either works"
+        changes.append(f"start {a['name']} over {b['name']} ({note})")
     total = sum(p.get("weekly") or 0.0 for p in optimal)
     return changes, total
 

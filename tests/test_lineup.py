@@ -55,3 +55,19 @@ def test_brief_orders_inactive_flags_by_kickoff():
     md = render_lineup_brief(model)
     assert md.index("Early Guy") < md.index("Late Guy")  # kickoff order
     assert "FLEX slot is EMPTY" in md and "118.2" in md
+
+
+def test_swap_pairing_is_position_aware():
+    from draftkit.lineup import lineup_changes
+    slots = {"QB": 0, "RB": 1, "WR": 1, "TE": 0, "K": 0, "DEF": 0}
+    roster = [
+        {"sleeper_id": "w1", "name": "Better WR", "pos": "WR", "weekly": 12.0},
+        {"sleeper_id": "w2", "name": "Worse WR", "pos": "WR", "weekly": 8.0},
+        {"sleeper_id": "r1", "name": "Better RB", "pos": "RB", "weekly": 11.0},
+        {"sleeper_id": "r2", "name": "Worse RB", "pos": "RB", "weekly": 9.0},
+    ]
+    changes, _ = lineup_changes(roster, ["w2", "r2"], slots, flex=0)
+    text = " | ".join(changes)
+    # WR pairs with WR, RB with RB — never a cross-position negative "gain"
+    assert "Better WR over Worse WR" in text and "Better RB over Worse RB" in text
+    assert "+-" not in text
