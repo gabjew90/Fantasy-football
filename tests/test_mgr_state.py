@@ -52,7 +52,8 @@ def test_store_state_survives_reopen(tmp_path):
 
 
 def test_delivery_is_idempotent_without_smtp(tmp_path, monkeypatch):
-    for var in ("SMTP_USER", "SMTP_APP_PASSWORD", "ALERT_EMAIL_TO"):
+    for var in ("SMTP_USER", "SMTP_APP_PASSWORD", "ALERT_EMAIL_TO",
+                "GITHUB_TOKEN", "GITHUB_REPOSITORY"):
         monkeypatch.delenv(var, raising=False)
     s = _store(tmp_path)
     assert deliver(s, "waivers:3", "subj", "body A") == "disabled"
@@ -74,3 +75,37 @@ def test_dry_run_never_records(tmp_path):
     s = _store(tmp_path)
     assert deliver(s, "k", "T", "Body", dry_run=True) == "printed"
     assert s.message("k") == (None, None)  # dry-run leaves no delivery state
+
+
+def test_github_issue_delivery_and_threading(tmp_path, monkeypatch):
+    """First send opens an issue with an @mention; the update comments on it."""
+    import manager.deliver as dl
+
+    calls = []
+
+    class FakeResp:
+        status_code = 201
+        def raise_for_status(self): pass
+        def json(self): return {"number": 7}
+
+    def fake_post(url, headers=None, timeout=None, json=None):
+        calls.append((url, json))
+        return FakeResp()
+
+    monkeypatch.setenv("GITHUB_TOKEN", "t")
+    monkeypatch.setenv("GITHUB_REPOSITORY", "gabjew90/Fantasy-football")
+    monkeypatch.setattr(dl.requests, "post", fake_post)
+    s = Store(tmp_path / "state")
+
+    assert dl.deliver(s, "lineup:1", "Lineup wk 1 — 2 change(s)", "body",
+                      act_now=True) == "sent"
+    url, payload = calls[0]
+    assert url.endswith("/repos/gabjew90/Fantasy-football/issues")
+    assert payload["title"] == "[ACT NOW] Lineup wk 1 — 2 change(s)"
+    assert payload["body"].startswith("@gabjew90")  # mention -> notification
+
+    assert dl.deliver(s, "lineup:1", "Lineup wk 1 — 2 change(s)", "body",
+                      act_now=True) == "unchanged"
+    assert dl.deliver(s, "lineup:1", "Lineup wk 1 — 1 change", "new body") == "updated"
+    url2, payload2 = calls[1]
+    assert url2.endswith("/issues/7/comments")  # same event -> same thread

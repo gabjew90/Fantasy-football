@@ -18,6 +18,10 @@ on:
     - cron: "0 14 * * 0"       # Sun lineup backstop 7:00 AM PDT
     - cron: "0 15 * * 0"       # Sun lineup backstop 7:00 AM PST
 
+permissions:
+  contents: write
+  issues: write
+
 concurrency:
   group: manager-state
   cancel-in-progress: false
@@ -41,9 +45,7 @@ jobs:
           restore-keys: sleeper-raw-
       - name: run windowed jobs
         env:
-          SMTP_USER: ${{ secrets.SMTP_USER }}
-          SMTP_APP_PASSWORD: ${{ secrets.SMTP_APP_PASSWORD }}
-          ALERT_EMAIL_TO: ${{ secrets.ALERT_EMAIL_TO }}
+          GITHUB_TOKEN: ${{ github.token }}
           ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
         run: |
           if [ -n "${{ github.event.inputs.job }}" ]; then

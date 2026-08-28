@@ -9,6 +9,10 @@ on:
   schedule:
     - cron: "*/15 * * * *"
 
+permissions:
+  contents: write
+  issues: write
+
 concurrency:
   group: manager-state
   cancel-in-progress: false
@@ -47,9 +51,7 @@ jobs:
       - name: gate tick
         if: steps.guard.outputs.run == 'true'
         env:
-          SMTP_USER: ${{ secrets.SMTP_USER }}
-          SMTP_APP_PASSWORD: ${{ secrets.SMTP_APP_PASSWORD }}
-          ALERT_EMAIL_TO: ${{ secrets.ALERT_EMAIL_TO }}
+          GITHUB_TOKEN: ${{ github.token }}
           ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
         run: python -m manager gate
       - name: commit state

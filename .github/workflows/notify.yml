@@ -1,37 +1,28 @@
-# Failure notifier: emails whenever weekly or gate goes red, so silence past
-# 9:00 AM PT plus no red-run email means the schedules themselves died and the
-# Actions tab is the debug entry point. Stdlib-only — no pip install.
+# Failure notifier: opens an [ACT NOW] issue (with an @mention -> email +
+# app push) whenever weekly or gate goes red. Zero secrets, zero deps.
 name: notify
 on:
   workflow_run:
     workflows: [weekly, gate]
     types: [completed]
 
+permissions:
+  issues: write
+
 jobs:
-  email-on-failure:
+  issue-on-failure:
     if: github.event.workflow_run.conclusion == 'failure'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: send failure email
+      - name: open failure issue
         env:
-          SMTP_USER: ${{ secrets.SMTP_USER }}
-          SMTP_APP_PASSWORD: ${{ secrets.SMTP_APP_PASSWORD }}
-          ALERT_EMAIL_TO: ${{ secrets.ALERT_EMAIL_TO }}
+          GH_TOKEN: ${{ github.token }}
           WF_NAME: ${{ github.event.workflow_run.name }}
           WF_URL: ${{ github.event.workflow_run.html_url }}
         run: |
-          python3 - <<'EOF'
-          import os, smtplib
-          from email.message import EmailMessage
-          msg = EmailMessage()
-          msg["Subject"] = f"[ACT NOW] manager workflow FAILED: {os.environ['WF_NAME']}"
-          msg["From"] = os.environ["SMTP_USER"]
-          msg["To"] = os.environ["ALERT_EMAIL_TO"]
-          msg.set_content(f"Workflow {os.environ['WF_NAME']} went red.\n"
-                          f"Logs: {os.environ['WF_URL']}\n"
-                          f"The system may be missing checks until this is fixed.")
-          with smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=30) as s:
-              s.login(os.environ["SMTP_USER"], os.environ["SMTP_APP_PASSWORD"])
-              s.send_message(msg)
-          EOF
+          curl -sS -X POST \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${{ github.repository }}/issues" \
+            -d "{\"title\":\"[ACT NOW] manager workflow FAILED: $WF_NAME\",\"body\":\"@${{ github.repository_owner }}\n\nWorkflow **$WF_NAME** went red.\nLogs: $WF_URL\nThe system may be missing checks until this is fixed.\"}"

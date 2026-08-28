@@ -17,7 +17,18 @@ document it, keep going."
   projections with placeholder fallback, lineup math, and ROS values (tiers.csv).
   Manager reuses those as a library and owns everything decision/delivery/scheduling.
 
-## Delivery (rev 2 — user's modified spec, 2026-08-25)
+## Delivery (rev 3 — GitHub Issues, user's call, 2026-08-27)
+- **Primary backend is GitHub Issues, zero secrets**: github-actions[bot]
+  opens an issue per event, @mentions the owner (mentions always notify:
+  email + GitHub-app push), updates are comments on the same issue. The
+  user pointed at this pattern from a prior repo; it beats SMTP here — no
+  app password to mint/rotate, mobile push for [ACT NOW] alerts, and the
+  issue list doubles as a decision log. Trade-off: GitHub prepends
+  "[repo]" to notification subjects; the instruction still fits.
+- Issues stay open (auto-closing would fire a second notification per
+  event). Close them from the email/app if the list bothers you.
+
+## Delivery (rev 2 — SMTP, superseded but kept as fallback)
 - **Gmail SMTP** (`smtplib` stdlib, SSL 465) with app password; multipart
   plain+HTML via a tiny markdown converter — no email library dependency.
   Threading: the stored Message-ID is sent as In-Reply-To on updates, so an

@@ -1,4 +1,10 @@
-"""Email delivery via Gmail SMTP (app password).
+"""Delivery: GitHub Issues (primary, zero secrets) or Gmail SMTP (fallback).
+
+Inside Actions, github-actions[bot] opens an issue titled with the alert
+subject and @mentions the owner — GitHub's own notification system turns
+that into email + GitHub-app push, no SMTP anywhere. Updates to the same
+event are comments on the same issue (one thread). SMTP_* env vars still
+work when no GITHUB_TOKEN is present.
 
 Subject-line convention IS the interface: time-critical alerts start with
 [ACT NOW] and carry the instruction + minutes-to-lock in the subject itself,
@@ -21,6 +27,8 @@ import time
 from email.message import EmailMessage
 from email.utils import make_msgid
 from html import escape
+
+import requests
 
 log = logging.getLogger("manager")
 
@@ -68,12 +76,21 @@ def deliver(store, brief_key: str, subject: str, body: str,
         log.info("deliver[%s]: unchanged, skipping", brief_key)
         return "unchanged"
 
+    token = os.environ.get("GITHUB_TOKEN", "")
+    repo = os.environ.get("GITHUB_REPOSITORY", "")
+    if token and repo:
+        result = _github_issue(store, brief_key, full_subject, body, prev_id,
+                               token, repo)
+        if result != "failed":
+            store.save_message(brief_key, store.message(brief_key)[0], h)
+        return result
+
     user = os.environ.get("SMTP_USER", "")
     pw = os.environ.get("SMTP_APP_PASSWORD", "")
     to = os.environ.get("ALERT_EMAIL_TO", "")
     if not (user and pw and to):
-        print(f"\n[DELIVERY DISABLED — set SMTP_USER / SMTP_APP_PASSWORD / "
-              f"ALERT_EMAIL_TO]\nSUBJECT: {full_subject}\n{'=' * 60}\n{body}")
+        print(f"\n[DELIVERY DISABLED — no GITHUB_TOKEN (issue delivery) and "
+              f"no SMTP_* vars]\nSUBJECT: {full_subject}\n{'=' * 60}\n{body}")
         store.save_message(brief_key, None, h)
         return "disabled"
 
@@ -102,3 +119,32 @@ def deliver(store, brief_key: str, subject: str, body: str,
             log.warning("smtp attempt %d failed: %s", attempt, e)
             time.sleep(3)
     return "failed"
+
+
+def _github_issue(store, brief_key: str, title: str, body: str,
+                  prev_id: str | None, token: str, repo: str) -> str:
+    """Create (or comment on) the event's issue; the @mention makes GitHub
+    notify the owner — email + app push, no SMTP anywhere."""
+    mention = os.environ.get("MENTION", "@" + repo.split("/")[0])
+    headers = {"Authorization": f"Bearer {token}",
+               "Accept": "application/vnd.github+json"}
+    api = f"https://api.github.com/repos/{repo}"
+    payload = f"{mention}\n\n{body}"
+    try:
+        if prev_id:  # update = a comment on the same issue -> one thread
+            r = requests.post(f"{api}/issues/{prev_id}/comments",
+                              headers=headers, timeout=20,
+                              json={"body": f"**UPDATE — {title}**\n\n{payload}"})
+            r.raise_for_status()
+            log.info("deliver[%s]: commented on issue #%s", brief_key, prev_id)
+            return "updated"
+        r = requests.post(f"{api}/issues", headers=headers, timeout=20,
+                          json={"title": title, "body": payload})
+        r.raise_for_status()
+        num = str(r.json().get("number"))
+        store.save_message(brief_key, num, "pending")
+        log.info("deliver[%s]: opened issue #%s (%s)", brief_key, num, title)
+        return "sent"
+    except requests.RequestException as e:
+        log.error("github issue delivery failed: %s", e)
+        return "failed"
