@@ -16,7 +16,8 @@ from pathlib import Path
 
 from . import games as games_mod
 from . import gate as gate_mod
-from . import injuries, lineup_opt, scout, trade_radar, triggers, waiver_brief
+from . import (injuries, lineup_opt, scout, trade_radar, trade_watch,
+               triggers, waiver_brief)
 from .clock import PT, fmt, minutes_until, now_pt
 from .context import league_context
 from .deliver import deliver
@@ -137,9 +138,21 @@ def lineup_job(dry_run: bool = False) -> None:
     _write_report("lineup", body)
 
 
+def _trade_alerts(ctx, store, dry_run: bool) -> None:
+    for subject, body, urgent in trade_watch.scan(ctx, store):
+        key = f"trade:{_hashkey(subject)}"
+        deliver(store, key, subject, body, dry_run=dry_run, act_now=urgent)
+
+
+def _hashkey(text: str) -> str:
+    import hashlib
+    return hashlib.sha256(text.encode()).hexdigest()[:10]
+
+
 def sweep_job(dry_run: bool = False) -> None:
     ctx = league_context()
     store = get_store()
+    _trade_alerts(ctx, store, dry_run)
     alerts = injuries.sweep(ctx, store)
     if alerts:
         urgent = any(a.startswith("🔴") for a in alerts)
@@ -168,6 +181,12 @@ def slate_job(teams: list[str], kickoff_iso: str | None, dry_run: bool = False) 
 
 def healthcheck(dry_run: bool = False) -> None:
     store = get_store()
+    # daily trade sweep rides the healthcheck so Sun-Tue trades (outside the
+    # Wed-Sat injury sweeps) are still caught inside the 48h veto window
+    try:
+        _trade_alerts(league_context(), store, dry_run)
+    except Exception:  # noqa: BLE001
+        log.warning("trade watch inside healthcheck failed")
     pending = 0
     path = gate_mod.plan_path()
     if path.exists():

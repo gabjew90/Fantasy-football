@@ -109,3 +109,26 @@ def test_github_issue_delivery_and_threading(tmp_path, monkeypatch):
     assert dl.deliver(s, "lineup:1", "Lineup wk 1 — 1 change", "new body") == "updated"
     url2, payload2 = calls[1]
     assert url2.endswith("/issues/7/comments")  # same event -> same thread
+
+
+def test_trade_watch_alerts_once_per_status(tmp_path, monkeypatch):
+    from manager import trade_watch
+
+    txns = [{"type": "trade", "status": "pending", "transaction_id": "t1",
+             "adds": {"p1": 4, "p2": 9}, "roster_ids": [4, 9]}]
+    monkeypatch.setattr("draftkit.briefs.get_transactions", lambda c, l, w: txns)
+    monkeypatch.setattr(trade_watch, "values", lambda store: ({"p1": 5000, "p2": 2000}, None))
+    ctx = {"week": 1, "client": None,
+           "cfg": type("C", (), {"league_id": "x"})(),
+           "users_by_rid": {4: "bankerkyle", 9: "DihtrickCohones"},
+           "player_row": lambda pid: {"name": f"Player {pid}"}}
+    s = Store(tmp_path / "state")
+    alerts = trade_watch.scan(ctx, s)
+    assert len(alerts) == 1
+    subject, body, urgent = alerts[0]
+    assert urgent and "pending review" in subject
+    assert "LOPSIDED" in body          # 2000/5000 = 0.4 < 0.7
+    assert trade_watch.scan(ctx, s) == []   # same status -> silent
+    txns[0]["status"] = "complete"          # processed -> one more, non-urgent
+    alerts2 = trade_watch.scan(ctx, s)
+    assert len(alerts2) == 1 and not alerts2[0][2]
