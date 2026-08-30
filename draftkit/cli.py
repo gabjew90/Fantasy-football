@@ -130,6 +130,11 @@ def cmd_tiers(cfg: Config, args) -> None:
 
     proj_fn = PROJECTION_FNS[args.projection]
     df = proj_fn(cfg, usage, market)
+    from .tilts import apply_tilts, prior_top5_by_pos
+    df, n_tilted = apply_tilts(df, cfg.get("tilts"), prior_top5_by_pos(usage))
+    if n_tilted:
+        console.print(f"  standing tilts applied to {n_tilted} players "
+                      f"(league: {cfg.league_name})")
     df = add_vorp(df, cfg.baselines)
     tiers = build_tiers(df, cfg)
     tiers = add_handcuff_info(tiers)
