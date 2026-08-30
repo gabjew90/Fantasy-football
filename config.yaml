@@ -88,7 +88,10 @@ paths:
   processed: data/processed
   logs: data/logs
 
-season:
+# In-season manager knobs. NOTE: this block was originally named `season:`,
+# which silently shadowed the `season: 2026` year above (YAML last-key-wins)
+# and crashed the daily ADP diff from 08/24 on. Never reuse a scalar's key.
+inseason:
   matchup_cap: 0.10          # +/- cap on the opponent-defense multiplier
   matchup_shrink_weeks: 5    # ratio weight = weeks/(weeks+this); noise guard pre-week-6
   trend_cap: 0.15            # +/- cap on usage-trend adjustment (role changes only)
