@@ -68,3 +68,43 @@ def test_no_market_fallback_disabled_when_floor_zero_matches_nothing():
     })
     fb = _no_market_fallback(market, usage, floor=60.0)
     assert fb.height == 0
+
+
+def test_alpha_by_player_type(monkeypatch, tmp_path):
+    """Stable veterans lean stats (0.65); new-team players lean market (0.40)."""
+    import polars as pl
+    from draftkit.projections import default_projection
+
+    class FakeCfg(dict):
+        def path(self, kind):
+            return tmp_path
+
+    cfg = FakeCfg({"projections": {
+        "model_alpha": 0.55, "shrink_k": 5, "expected_games": 16.0,
+        "no_market_floor": 0,
+        "alpha_by_type": {"stable_veteran": 0.65, "volatile": 0.40}}})
+    n = 8  # the market curve needs >=6 veterans per position to fit
+    ids = ["a", "b"] + [f"x{i}" for i in range(n - 2)]
+    names = ["Stable Vet", "New Team Guy"] + [f"Filler {i}" for i in range(n - 2)]
+    teams_25 = ["ATL", "MIA"] + ["ATL"] * (n - 2)
+    usage = pl.DataFrame({
+        "sleeper_id": ids, "gsis_id": [f"g{i}" for i in ids],
+        "name": names, "pos": ["WR"] * n,
+        "games": [16.0] * n, "ppg": [12.0 - 0.5 * i for i in range(n)],
+        "fpts_total": [192.0] * n,
+        "wopr": [0.5] * n, "target_share": [0.2] * n,
+        "air_yards_share": [0.3] * n, "tprr": [0.2] * n, "yprr": [1.8] * n,
+        "routes_proxy": [500.0] * n, "hv_touches": [10.0] * n,
+        "offense_snap_pct": [0.9] * n, "avg_separation": [3.0] * n,
+        "exp_games": [16.0] * n, "team_2025": teams_25,
+    })
+    market = pl.DataFrame({
+        "sleeper_id": ids, "name": names,
+        "pos": ["WR"] * n, "team": ["ATL"] * n,
+        "ecr": [30.0 + i for i in range(n)], "ecr_sd": [3.0] * n,
+        "adp": [30.0 + i for i in range(n)], "bye": [5] * n,
+    })
+    out = default_projection(cfg, usage, market)
+    alphas = dict(zip(out["name"], out["alpha_used"]))
+    assert alphas["Stable Vet"] == 0.65
+    assert alphas["New Team Guy"] == 0.40
