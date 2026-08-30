@@ -147,6 +147,42 @@ def value_over_fa(p: dict, levels: dict[str, tuple[float, float]]) -> float:
 DOWNGRADE = {"league_winner": "breakout", "breakout": "speculative",
              "speculative": "streamer", "streamer": "streamer"}
 
+STASH_WEEKLY_FLOOR = 2.0  # under this weekly projection = no current role
+
+
+def bench_stash_count(ctx) -> int:
+    """Zero-role stashes on the BENCH PROPER. IR occupants are exempt from
+    the one-stash budget (v2 item 0.4): with 1 IR slot, one injury stash is
+    free and does not spend bench room."""
+    ir = {str(x) for x in (ctx["my_roster"].get("reserve") or [])}
+    starters = set(ctx["current_starters"])
+    n = 0
+    for p in ctx["roster_players"][ctx["my_rid"]]:
+        pid = str(p["sleeper_id"])
+        if pid in ir or pid in starters or p["pos"] in ("K", "DEF"):
+            continue
+        if (p.get("weekly") or 0.0) < STASH_WEEKLY_FLOOR:
+            n += 1
+    return n
+
+
+def stash_note(ctx, candidate: dict, contingent: bool) -> str | None:
+    """Roster-budget guidance when the claim is itself a zero-role stash."""
+    if (candidate.get("weekly") or 0.0) >= STASH_WEEKLY_FLOOR:
+        return None
+    held = bench_stash_count(ctx)
+    ir_free = not (ctx["my_roster"].get("reserve") or [])
+    ir_eligible = [p["name"] for p in ctx["roster_players"][ctx["my_rid"]]
+                   if p.get("status") in ctx["reserve_allow"]]
+    if held == 0:
+        return None  # first stash is always within budget
+    if ir_free and ir_eligible:
+        return (f"stash budget: bench already holds {held} — OK only because "
+                f"{ir_eligible[0]} can move to IR (IR stashes don't count)")
+    return (f"stash budget: bench already holds {held} zero-role stash(es) "
+            f"and the IR slot can't absorb one — this claim is over budget "
+            f"unless you value it above what you'd cut")
+
 
 def _classify(c: dict, contingent: bool) -> str:
     if contingent and (c.get("ros") or 0) >= 100:
@@ -234,6 +270,7 @@ def build(ctx, store) -> str:
             why.append(f"{trend[pid]:,} Sleeper adds/24h")
         if damp_note and not contingent:
             why.append(damp_note)
+        s_note = stash_note(ctx, p, contingent)
         if not why:
             why.append("value over my current bench")
         need_note = f"; I am short at {p['pos']} in the next 3 weeks (byes)" if needs.get(p["pos"]) else ""
@@ -246,6 +283,11 @@ def build(ctx, store) -> str:
             f"- move: {_drop_or_ir(ctx, p.get('ros') or 0, p['pos'])}",
             f"- bid **${fair}–${agg}** of my ${ctx['my_budget']} — {rival_note}",
         ]
+        if contingent:
+            lines.append(f"- insurance behind a downed starter: bid the "
+                         f"AGGRESSIVE end (${agg})")
+        if s_note:
+            lines.append(f"- {s_note}")
 
     spent = faab_mod.spent_from_transactions(store.get("txn_history", []))
     for n in faab_mod.crosscheck(spent, ctx["rosters"]):
