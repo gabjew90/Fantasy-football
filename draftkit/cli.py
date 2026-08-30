@@ -119,7 +119,8 @@ def cmd_dataset(cfg: Config, args) -> None:
 
 def cmd_tiers(cfg: Config, args) -> None:
     from .projections import PROJECTION_FNS
-    from .tiers import add_handcuff_info, build_disagreements, build_tiers, write_tiers_csv
+    from .tiers import (add_handcuff_info, add_upside_flags, build_disagreements,
+                        build_tiers, write_tiers_csv)
     from .vorp import add_vorp
     from .board import write_board_markdown
 
@@ -132,6 +133,7 @@ def cmd_tiers(cfg: Config, args) -> None:
     df = add_vorp(df, cfg.baselines)
     tiers = build_tiers(df, cfg)
     tiers = add_handcuff_info(tiers)
+    tiers = add_upside_flags(tiers)
 
     csv_path = cfg.root / "tiers.csv"
     write_tiers_csv(tiers, csv_path)

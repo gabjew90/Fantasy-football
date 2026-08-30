@@ -152,3 +152,23 @@ def test_no_market_rows_always_included():
                     "proj_source": "no_market"}])
     out = build_tiers(df, _cfg())
     assert "Ghost" in out["name"].to_list()
+
+
+def test_upside_gate_rewards_volume_paths_only():
+    import polars as pl
+    from draftkit.tiers import add_upside_flags
+    df = pl.DataFrame({
+        "player": ["Handcuff", "PassCatchRB", "CheapRookie", "DeepRookie", "BoomBust"],
+        "pos": ["RB", "RB", "WR", "WR", "WR"],
+        "backs_up": ["Star RB", None, None, None, None],
+        "tprr": [None, 0.19, None, None, 0.02],
+        "rookie_flag": [False, False, True, True, False],
+        "adp": [140.0, 90.0, 100.0, 200.0, 95.0],
+    })
+    out = add_upside_flags(df)
+    flags = dict(zip(out["player"], out["upside_flag"]))
+    assert flags == {"Handcuff": True, "PassCatchRB": True, "CheapRookie": True,
+                     "DeepRookie": False,   # no market-backed capital
+                     "BoomBust": False}     # raw variance is never rewarded
+    whys = dict(zip(out["player"], out["upside_why"]))
+    assert whys["Handcuff"] == "contingent volume"

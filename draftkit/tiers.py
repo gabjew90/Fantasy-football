@@ -159,6 +159,28 @@ def build_disagreements(tiers: pl.DataFrame, adp_within: float, per_side: int = 
     return pl.concat([fades, targets]).select([c for c in cols if c in pool.columns])
 
 
+def add_upside_flags(df: pl.DataFrame) -> pl.DataFrame:
+    """v2 item 1.5 role-quality gate: ceiling that comes from a PATH TO
+    VOLUME, never cosmetic variance. Qualifies (with the reason labeled):
+      - contingent volume: a handcuff (backs_up someone)
+      - RB receiving profile: tprr >= 0.15
+      - market-validated rookie: rookie_flag with ADP inside the top 120
+        (the free-data proxy for day-1/2 draft capital)
+    Air-yards/TD-rate gates await the opportunity rebuild (2.1) — the free
+    weekly data lacks both columns; absence is labeled, not faked."""
+    reasons = (
+        pl.when(pl.col("backs_up").is_not_null())
+        .then(pl.lit("contingent volume"))
+        .when((pl.col("pos") == "RB") & (pl.col("tprr").fill_null(0) >= 0.15))
+        .then(pl.lit("RB receiving profile"))
+        .when(pl.col("rookie_flag") & (pl.col("adp").fill_null(999) <= 120))
+        .then(pl.lit("rookie w/ market-backed capital"))
+        .otherwise(None)
+    )
+    return df.with_columns(reasons.alias("upside_why")).with_columns(
+        pl.col("upside_why").is_not_null().alias("upside_flag"))
+
+
 TIERS_COLUMNS = [
     "player",
     "sleeper_id",
@@ -186,6 +208,9 @@ TIERS_COLUMNS = [
     "yprr",
     "hv_touches",
     "routes_proxy",
+    "upside_flag",
+    "upside_why",
+    "alpha_used",
 ]
 
 
