@@ -10,13 +10,15 @@ CFG = {"enabled": True, "mid_te_fade": 0.08, "nonrush_qb_fade": 0.08,
 
 
 def _df():
+    # 4 TEs so positional ADP ranks separate: elite = top-3, Mid TE = rank 4
     return pl.DataFrame({
-        "sleeper_id": ["t1", "t2", "q1", "q2", "w1"],
-        "player": ["Mid TE", "Elite TE", "Pocket QB", "Late Rush QB", "Top5 WR"],
-        "pos": ["TE", "TE", "QB", "QB", "WR"],
-        "adp": [55.0, 8.0, 60.0, 120.0, 12.0],
-        "hv_touches": [3.0, 5.0, 4.0, 30.0, 20.0],
-        "proj_pts": [100.0, 200.0, 300.0, 250.0, 200.0],
+        "sleeper_id": ["t1", "t2", "t3", "t4", "q1", "q2", "w1"],
+        "player": ["Mid TE", "Elite TE", "TE2", "TE3",
+                   "Pocket QB", "Late Rush QB", "Top5 WR"],
+        "pos": ["TE", "TE", "TE", "TE", "QB", "QB", "WR"],
+        "adp": [55.0, 8.0, 20.0, 30.0, 60.0, 120.0, 12.0],
+        "hv_touches": [3.0, 5.0, 4.0, 4.0, 4.0, 30.0, 20.0],
+        "proj_pts": [100.0, 200.0, 150.0, 140.0, 300.0, 250.0, 200.0],
     })
 
 
@@ -28,7 +30,7 @@ def test_tilts_directions_and_cap():
     assert by["Pocket QB"] == 276.0        # -8% early non-rusher
     assert by["Late Rush QB"] == 270.0     # +8% late rusher
     assert by["Top5 WR"] == 180.0          # -10% recency regression
-    assert n == 5
+    assert n == 7  # TE2/TE3 get the elite boost (top-3 positional ADP)
     assert out["tilt"].abs().max() <= 0.10 + 1e-9
 
 
@@ -43,6 +45,6 @@ def test_prior_top5_extraction():
     usage = pl.DataFrame({
         "sleeper_id": [str(i) for i in range(8)],
         "pos": ["WR"] * 8,
-        "fpts_total": [300, 280, 260, 240, 220, 200, 180, 160.0],
+        "fpts_total": [300.0, 280.0, 260.0, 240.0, 220.0, 200.0, 180.0, 160.0],
     })
     assert prior_top5_by_pos(usage) == {"0", "1", "2", "3", "4"}
