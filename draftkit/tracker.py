@@ -451,6 +451,31 @@ class Tracker:
             score = urgency + 0.001 * (best["vorp"] or 0.0)  # stable ordering
             cands.append((score, why, best))
         cands.sort(key=lambda t: -t[0])
+        # v2 item 1.2: joint two-pick re-rank on top of the greedy order.
+        # Pure arithmetic over the cached urgency report — nothing new runs
+        # on the clock; any failure or missing report keeps the greedy list
+        # (amendment B's hard fallback).
+        try:
+            from .planner import pair_rank
+            second = {}
+            for pos in POS_ORDER:
+                vs = sorted((q["vorp"] or 0.0 for q in self.remaining(pos)
+                             if q.get("proj_source") != "no_market"), reverse=True)
+                second[pos] = float(vs[1]) if len(vs) > 1 else 0.0
+            next_rnd = min(rnd + 1, self.rounds)
+            eligible = set()
+            for pos in POS_ORDER:
+                if pos in ("K", "DEF") and picks_left - 1 > 2:
+                    continue
+                if pos == "QB" and (counts.get("QB", 0) >= 2 or
+                                    (counts.get("QB", 0) >= 1 and next_rnd < self.qb2_round)):
+                    continue
+                if pos == "TE" and counts.get("TE", 0) >= 2:
+                    continue
+                eligible.add(pos)
+            cands = pair_rank(cands, report, needs, second, eligible)
+        except Exception:  # noqa: BLE001 — planner must never block the clock
+            pass
         return cands[:top_n]
 
     # ---------- render ----------
