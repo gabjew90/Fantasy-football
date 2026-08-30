@@ -149,3 +149,16 @@ def test_live_fa_replacement_levels():
     assert value_over_fa(pool[2], lv) == 5.0
     # a non-best player is measured against the best still available
     assert value_over_fa(pool[1], lv) == -60.0
+
+
+def test_overreaction_damper_discriminates():
+    from manager.usage import overreaction
+    usage = {"spike guy": {2: {"targets": 4, "target_share": 0.12, "rec_yards": 30},
+                           3: {"targets": 5, "target_share": 0.13, "rec_yards": 140}},
+             "role guy": {2: {"targets": 3, "target_share": 0.10, "rec_yards": 25},
+                          3: {"targets": 9, "target_share": 0.24, "rec_yards": 110}}}
+    snaps = {"spike guy": {2: 0.55, 3: 0.57}, "role guy": {2: 0.40, 3: 0.78}}
+    note = overreaction("Spike Guy", usage, snaps, 3)
+    assert note and "flat usage" in note      # 30->140 yds on the same role
+    assert overreaction("Role Guy", usage, snaps, 3) is None  # genuine role change
+    assert overreaction("Spike Guy", usage, snaps, 1) is None  # needs two weeks
