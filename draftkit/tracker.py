@@ -378,6 +378,14 @@ class Tracker:
             ][:3]
             if not pool:
                 continue
+            # v2 item 1.5: benches win on 90th percentiles, not medians — from
+            # upside_from_round, gated players (role-quality, see tiers.py)
+            # score on an 85th-percentile proxy; non-qualifiers keep median
+            if rnd >= self.upside_from_round:
+                pool = sorted(
+                    pool,
+                    key=lambda q: -((q["vorp"] or 0.0)
+                                    * (self.upside_mult if q.get("upside_flag") else 1.0)))
             # best VORP within position; near-ties (<= 2 VORP of the position's
             # TOP candidate) broken by Δ — anchored so swaps can't chain
             anchor = pool[0]
@@ -437,6 +445,8 @@ class Tracker:
                     parts.append(f"bargain: still here {d:.0f} picks after he's usually drafted")
                 elif d >= 3:
                     parts.append(f"{d:.0f} picks past his usual draft spot")
+            if rnd >= self.upside_from_round and best.get("upside_flag"):
+                parts.append(f"UPSIDE play: {best.get('upside_why')}")
             why = " · ".join(parts) or "best value"
             why += self._bye_warning(best, needs)
             # UI-only handcuff tag (never scored): the late-round buy signal is
