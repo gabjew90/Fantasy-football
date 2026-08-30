@@ -126,6 +126,24 @@ def _drop_or_ir(ctx, candidate_ros: float, pos: str | None = None) -> str:
     return "no clean drop — only claim if you value him over your worst bench spot"
 
 
+def fa_replacement_levels(pool: list[dict]) -> dict[str, tuple[float, float]]:
+    """pos -> (best FA ros, second-best FA ros). The live replacement level:
+    what a claim is worth is measured against what stays freely available
+    (v2 item 0.2) — self-calibrating RB scarcity, no hand-set baselines."""
+    tops: dict[str, list[float]] = {}
+    for p in pool:
+        tops.setdefault(p["pos"], []).append(p.get("ros") or 0.0)
+    return {pos: (vals[0], vals[1] if len(vals) > 1 else 0.0)
+            for pos, vals in ((k, sorted(v, reverse=True)) for k, v in tops.items())}
+
+
+def value_over_fa(p: dict, levels: dict[str, tuple[float, float]]) -> float:
+    """ROS value above the best OTHER free agent at the position."""
+    best, second = levels.get(p["pos"], (0.0, 0.0))
+    baseline = second if (p.get("ros") or 0.0) >= best else best
+    return round((p.get("ros") or 0.0) - baseline, 1)
+
+
 def _classify(c: dict, contingent: bool) -> str:
     if contingent and (c.get("ros") or 0) >= 100:
         return "league_winner"
@@ -156,11 +174,16 @@ def build(ctx, store) -> str:
     needs = my_bye_needs(ctx)
     trend_max = max(trend.values(), default=1) or 1
 
+    levels = fa_replacement_levels(fa)
+    store.set(f"fa_replacement:{week}",
+              {pos: round(best, 1) for pos, (best, _s) in levels.items()})
+
     scored = []
     for p in fa:
         pid = str(p["sleeper_id"])
         ev = usage_mod.evidence(p["name"], usage, snaps, week - 1)
-        score = p.get("vorp") or 0.0
+        p["fa_value"] = value_over_fa(p, levels)
+        score = p["fa_value"]
         score += W_CONTINGENCY if pid in cont_ids else 0
         score += W_TREND_MAX * (trend.get(pid, 0) / trend_max)
         score += W_USAGE if ev else 0
@@ -210,6 +233,7 @@ def build(ctx, store) -> str:
         lines += [
             f"**{p['name']}** ({p['pos']}, {p.get('team') or '?'}) — {cls}",
             f"- why: {'; '.join(why)}{need_note}",
+            f"- worth over next-best FA {p['pos']}: +{p.get('fa_value', 0):.0f} ROS pts",
             f"- move: {_drop_or_ir(ctx, p.get('ros') or 0, p['pos'])}",
             f"- bid **${fair}–${agg}** of my ${ctx['my_budget']} — {rival_note}",
         ]
