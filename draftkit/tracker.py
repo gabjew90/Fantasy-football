@@ -37,6 +37,17 @@ class TrackerState:
 
 
 class Tracker:
+    # v2 engine knobs as CLASS defaults: test fixtures (and the retro-recs
+    # rewinder) construct Trackers via object.__new__, bypassing __init__
+    reach_prob = 0.15
+    reach_scale = 3.0
+    run_window = 5
+    run_min = 2
+    run_boost = 1.5
+    survival_shrink = 0.55
+    upside_from_round = 8
+    upside_mult = 1.15
+
     def __init__(
         self,
         cfg,
