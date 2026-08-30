@@ -162,3 +162,30 @@ def test_overreaction_damper_discriminates():
     assert note and "flat usage" in note      # 30->140 yds on the same role
     assert overreaction("Role Guy", usage, snaps, 3) is None  # genuine role change
     assert overreaction("Spike Guy", usage, snaps, 1) is None  # needs two weeks
+
+
+def test_ir_aware_stash_budget():
+    from manager.waiver_brief import bench_stash_count, stash_note
+    ctx = {
+        "my_rid": 2, "current_starters": ["s1"],
+        "my_roster": {"reserve": []},
+        "reserve_allow": ("Out", "Doubtful"),
+        "roster_players": {2: [
+            {"sleeper_id": "s1", "name": "Starter", "pos": "RB", "weekly": 15.0},
+            {"sleeper_id": "b1", "name": "Stash One", "pos": "RB", "weekly": 0.5},
+            {"sleeper_id": "b2", "name": "Hurt Guy", "pos": "WR", "weekly": 0.0,
+             "status": "Out"},
+        ]},
+    }
+    # Hurt Guy counts as a bench stash now (IR empty), so bench holds 2 -> but
+    # he is IR-eligible, so a new stash is OK via the IR exemption
+    assert bench_stash_count(ctx) == 2
+    note = stash_note(ctx, {"weekly": 0.0}, contingent=True)
+    assert note and "can move to IR" in note
+    # once he's ON IR: exempt from the count, and the budget is spent
+    ctx["my_roster"]["reserve"] = ["b2"]
+    assert bench_stash_count(ctx) == 1
+    note2 = stash_note(ctx, {"weekly": 0.0}, contingent=False)
+    assert note2 and "over budget" in note2
+    # a claim WITH a role is never a stash question
+    assert stash_note(ctx, {"weekly": 9.0}, contingent=False) is None
