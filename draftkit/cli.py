@@ -40,22 +40,26 @@ def cmd_verify(cfg: Config, args) -> None:
     lg = client.league(cfg.league_id)
     dr = client.draft(cfg.draft_id)
     ok = True
+    # expectations live in the LEAGUE yaml (amendment A); the module-level
+    # EXPECTED is only the fallback for pre-multi-league configs
+    expected = cfg.get("expected") or EXPECTED
 
-    console.print(f"[bold]{lg['name']}[/bold] — season {lg['season']}, status {lg['status']}")
+    console.print(f"[bold]{lg['name']}[/bold] — season {lg['season']}, status {lg['status']}"
+                  + (f"  [dim](league: {cfg.league_name})[/dim]" if cfg.league_name else ""))
     checks = [
-        ("teams", dr["settings"]["teams"], EXPECTED["teams"]),
-        ("rounds", dr["settings"]["rounds"], EXPECTED["rounds"]),
-        ("pick_timer", dr["settings"]["pick_timer"], EXPECTED["pick_timer"]),
-        ("draft type", dr["type"], EXPECTED["type"]),
+        ("teams", dr["settings"]["teams"], expected["teams"]),
+        ("rounds", dr["settings"]["rounds"], expected["rounds"]),
+        ("pick_timer", dr["settings"]["pick_timer"], expected["pick_timer"]),
+        ("draft type", dr["type"], expected["type"]),
         ("reversal_round", dr["settings"].get("reversal_round", 0), 0),
     ]
-    for name, actual, expected in checks:
-        good = actual == expected
+    for name, actual, expected_v in checks:
+        good = actual == expected_v
         ok &= good
         style = "green" if good else "bold red"
-        console.print(f"  {name}: {actual} {'✓' if good else f'✗ expected {expected}'}", style=style)
+        console.print(f"  {name}: {actual} {'✓' if good else f'✗ expected {expected_v}'}", style=style)
 
-    for key, exp in EXPECTED["scoring"].items():
+    for key, exp in expected["scoring"].items():
         actual = lg["scoring_settings"].get(key)
         good = actual == exp
         ok &= good
@@ -296,6 +300,13 @@ def cmd_simulate(cfg: Config, args) -> None:
         )
 
 
+def cmd_onboard(args) -> None:
+    from .onboard import onboard
+    out = onboard(args.league_id, args.username, args.name)
+    print(f"wrote {out}")
+    print(f"next: python -m draftkit --league {out.stem} verify")
+
+
 def main(argv: list[str] | None = None) -> None:
     # Windows: force UTF-8 on stdout/stderr so board glyphs can never crash
     # a cp1252 console or pipe mid-draft (launchers also set PYTHONIOENCODING)
@@ -306,6 +317,8 @@ def main(argv: list[str] | None = None) -> None:
             pass
     parser = argparse.ArgumentParser(prog="draftkit")
     parser.add_argument("--config", default=None, help="path to config.yaml")
+    parser.add_argument("--league", default=None,
+                        help="league name (leagues/<name>.yaml); default from config")
     sub = parser.add_subparsers(dest="cmd", required=True)
 
     sub.add_parser("verify")
@@ -333,9 +346,16 @@ def main(argv: list[str] | None = None) -> None:
     p = sub.add_parser("simulate")
     p.add_argument("--slot", type=int, default=6, help="my draft slot in the simulation")
     p.add_argument("--quiet", action="store_true", help="only print the final roster")
+    p = sub.add_parser("onboard", help="generate leagues/<name>.yaml from a Sleeper league id")
+    p.add_argument("league_id")
+    p.add_argument("--name", default=None, help="league slug (default: from league name)")
+    p.add_argument("--username", default="farmerjamal")
 
     args = parser.parse_args(argv)
-    cfg = Config.load(args.config)
+    if args.cmd == "onboard":
+        cmd_onboard(args)
+        return
+    cfg = Config.load(args.config, league=args.league)
     {
         "verify": cmd_verify,
         "players": cmd_players,
