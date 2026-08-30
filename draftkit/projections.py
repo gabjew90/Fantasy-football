@@ -191,6 +191,7 @@ def default_projection(cfg, usage: pl.DataFrame, market: pl.DataFrame) -> pl.Dat
         "offense_snap_pct",
         "avg_separation",
         "exp_games",
+        "team_2025",
     ).unique(subset="sleeper_id")
 
     df = market.join(u, on="sleeper_id", how="left")
@@ -234,9 +235,25 @@ def default_projection(cfg, usage: pl.DataFrame, market: pl.DataFrame) -> pl.Dat
         .alias("proj_model_pts")
     )
 
+    # v2 item 1.7 — alpha by player type: trust the stats model more for
+    # stable-role veterans (12+ games, same team) and the market more for
+    # players in new situations. Committee detection needs the opportunity
+    # rebuild (2.1); until then new-team + rookie carry the volatility class.
+    a_cfg = p.get("alpha_by_type") or {}
+    a_stable = float(a_cfg.get("stable_veteran", alpha))
+    a_vol = float(a_cfg.get("volatile", alpha))
+    new_team = (pl.col("team_2025").is_not_null() & pl.col("team").is_not_null()
+                & (pl.col("team_2025") != pl.col("team")))
+    alpha_col = (
+        pl.when(new_team).then(a_vol)
+        .when((pl.col("games").fill_null(0) >= 12) & ~new_team).then(a_stable)
+        .otherwise(alpha)
+    )
+    df = df.with_columns(alpha_col.alias("_alpha"))
     df = df.with_columns(
         pl.when(pl.col("proj_model_pts").is_not_null() & pl.col("proj_market_pts").is_not_null())
-        .then(alpha * pl.col("proj_model_pts") + (1 - alpha) * pl.col("proj_market_pts"))
+        .then(pl.col("_alpha") * pl.col("proj_model_pts")
+              + (1 - pl.col("_alpha")) * pl.col("proj_market_pts"))
         .when(pl.col("proj_model_pts").is_not_null())
         .then(pl.col("proj_model_pts"))
         .otherwise(pl.col("proj_market_pts"))
@@ -250,6 +267,13 @@ def default_projection(cfg, usage: pl.DataFrame, market: pl.DataFrame) -> pl.Dat
         .otherwise(pl.lit("none"))
         .alias("proj_source"),
     )
+    df = df.with_columns(
+        pl.when(pl.col("proj_source") == "blend").then(pl.col("_alpha"))
+        .when(pl.col("proj_source") == "model_only").then(1.0)
+        .otherwise(0.0)
+        .round(2)
+        .alias("alpha_used")
+    ).drop("_alpha")
     # no_market_flag survives overrides (which flip proj_source to "override")
     # so the board's unconditional inclusion can't lose an ACTIVATED player
     df = df.with_columns(
