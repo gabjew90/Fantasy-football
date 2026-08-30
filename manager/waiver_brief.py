@@ -144,6 +144,10 @@ def value_over_fa(p: dict, levels: dict[str, tuple[float, float]]) -> float:
     return round((p.get("ros") or 0.0) - baseline, 1)
 
 
+DOWNGRADE = {"league_winner": "breakout", "breakout": "speculative",
+             "speculative": "streamer", "streamer": "streamer"}
+
+
 def _classify(c: dict, contingent: bool) -> str:
     if contingent and (c.get("ros") or 0) >= 100:
         return "league_winner"
@@ -213,6 +217,9 @@ def build(ctx, store) -> str:
     for score, p, ev, pid in scored[:TOP_N]:
         contingent = pid in cont_ids
         cls = _classify(p, contingent)
+        damp_note = usage_mod.overreaction(p["name"], usage, snaps, week - 1)
+        if damp_note and not contingent:  # a real inherited role is not a mirage
+            cls = DOWNGRADE[cls]
         needy = rival_needy_budgets(ctx, p["pos"])
         fair, agg = waivers.bid_band(
             cls, ctx["my_budget"], "COMFORTABLE", faab_cfg,
@@ -225,6 +232,8 @@ def build(ctx, store) -> str:
             why.append(ev)
         if trend.get(pid):
             why.append(f"{trend[pid]:,} Sleeper adds/24h")
+        if damp_note and not contingent:
+            why.append(damp_note)
         if not why:
             why.append("value over my current bench")
         need_note = f"; I am short at {p['pos']} in the next 3 weeks (byes)" if needs.get(p["pos"]) else ""

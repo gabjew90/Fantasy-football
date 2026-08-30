@@ -85,3 +85,38 @@ def evidence(name: str, usage: dict | None, snaps: dict | None,
         sp, sc = srows.get(last_week - 1), srows[last_week]
         parts.append(f"snaps {(f'{sp:.0%} -> ' if sp is not None else '')}{sc:.0%}")
     return "; ".join(parts) if parts else None
+
+
+SPIKE_RATIO = 1.5      # production up 50%+ week-over-week...
+FLAT_SHARE_PP = 0.03   # ...while target share moved under 3 points
+FLAT_SNAP_PP = 0.05    # ...and snaps under 5 points
+
+
+def overreaction(name: str, usage: dict | None, snaps: dict | None,
+                 last_week: int) -> str | None:
+    """One spike week with flat underlying usage -> the damper clause,
+    else None. Needs both the spike week and the prior week to judge."""
+    if last_week < 2:
+        return None
+    rows = (usage or {}).get(name.lower(), {})
+    cur, prev = rows.get(last_week), rows.get(last_week - 1)
+    if not cur or not prev:
+        return None
+    spiked = (prev.get("rec_yards", 0) > 0 and
+              cur.get("rec_yards", 0) >= SPIKE_RATIO * prev["rec_yards"]) or              (prev.get("targets", 0) > 0 and
+              cur.get("targets", 0) >= SPIKE_RATIO * prev["targets"])
+    if not spiked:
+        return None
+    ts_c, ts_p = cur.get("target_share"), prev.get("target_share")
+    share_flat = (ts_c is not None and ts_p is not None
+                  and abs(ts_c - ts_p) < FLAT_SHARE_PP)
+    srows = (snaps or {}).get(name.lower(), {})
+    sn_c, sn_p = srows.get(last_week), srows.get(last_week - 1)
+    snaps_flat = (sn_c is not None and sn_p is not None
+                  and abs(sn_c - sn_p) < FLAT_SNAP_PP)
+    if share_flat and (snaps_flat or sn_c is None):
+        return (f"bid damped: one-week spike with flat usage (target share "
+                f"{ts_p:.0%}->{ts_c:.0%}"
+                + (f", snaps {sn_p:.0%}->{sn_c:.0%}" if snaps_flat else "")
+                + ") — chasing points, not a role change")
+    return None
