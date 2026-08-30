@@ -1,0 +1,68 @@
+# Omnibeta Degens — the example league (drafted 2026-08-23, in season).
+# Every league-specific fact and strategy knob lives here; config.yaml keeps
+# globals only. Selected via default_league, --league, or DRAFTKIT_LEAGUE.
+
+league_id: "1395566811415588864"
+draft_id: "1395566812157984768"
+season: 2026
+stats_season: 2025          # season used for the predictive dataset
+
+me:
+  username: farmerjamal
+  user_id: null
+  draft_slot: null           # resolved live from draft_order; force 1-12 here
+
+# 12-team / 2-FLEX / full-PPR baselines (v2 plan 1.4: derived from format at
+# onboarding for NEW leagues; these stay as drafted for the season's archive)
+replacement_baselines:
+  QB: 12
+  RB: 40
+  WR: 60
+  TE: 12
+  K: 12
+  DEF: 12
+
+pool_sizes:
+  QB: 28
+  RB: 65
+  WR: 80
+  TE: 28
+  K: 16
+  DEF: 16
+
+guardrails:
+  qb2_earliest_round: 10
+  te2_fall_picks: 12
+
+tiers:
+  break_z: 0.5
+  cliff_z: 1.0
+  adp_include_within: 180   # 12 teams x 15 rounds
+
+# Standing ADP tilts (v2 item 1.6). Off for Omnibeta: the draft is done and
+# in-season values should stay comparable to the draft-day board.
+tilts:
+  enabled: false
+  mid_te_fade: 0.08          # TE with ADP 40-90: the mid-round TE trap
+  nonrush_qb_fade: 0.08      # QB ADP < 90 without rushing profile
+  rush_qb_late_boost: 0.08   # rushing QB with ADP > 90
+  elite_te_boost: 0.05       # top-3 positional ADP TE
+  top5_regression: 0.10      # prior-season top-5 positional finisher
+  cap: 0.10                  # hard cap on any single tilt (research Q5/Q8)
+
+# What `verify` diffs the live Sleeper API against — fails loudly on mismatch
+expected:
+  teams: 12
+  rounds: 15
+  pick_timer: 60             # commissioner changed 120 -> 60 on 2026-08-23
+  type: snake
+  scoring:
+    rec: 1.0
+    pass_yd: 0.04
+    pass_td: 4.0
+    pass_int: -1.0
+    rush_yd: 0.1
+    rec_yd: 0.1
+    rush_td: 6.0
+    rec_td: 6.0
+    fum_lost: -2.0

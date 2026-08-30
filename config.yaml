@@ -1,53 +1,25 @@
-# Omnibeta Degens draft prep — all league facts re-verified from the Sleeper API
-# by `python -m draftkit verify` (do not hand-edit league facts; edit strategy knobs).
+# Global engine configuration. League-specific facts and strategy knobs live
+# in leagues/<name>.yaml (see default_league). Precedence: league file wins
+# over globals on every key, deep-merged. Select a league with
+# `--league <name>` or the DRAFTKIT_LEAGUE env var.
 
-league_id: "1395566811415588864"
-draft_id: "1395566812157984768"
-season: 2026
-stats_season: 2025          # season used for the predictive dataset
-
-# Sleeper identity — resolved to a draft slot via the draft_order at runtime,
-# so this stays correct even if the commissioner reshuffles the order.
-me:
-  username: farmerjamal     # your Sleeper username
-  user_id: null             # or your numeric Sleeper user_id
-  draft_slot: null          # or force a slot 1-12 (overrides the above)
-
-# Replacement baselines corrected for 12-team / 2-FLEX / full-PPR
-# (flex spots skew WR in full PPR — deliberately not WR48/RB36).
-replacement_baselines:
-  QB: 12
-  RB: 40
-  WR: 60
-  TE: 12
-  K: 12
-  DEF: 12
-
-# How many players per position make the draftable pool in tiers.csv
-pool_sizes:
-  QB: 28
-  RB: 65
-  WR: 80
-  TE: 28
-  K: 16
-  DEF: 16
+default_league: omnibeta
 
 projections:
-  # weight on the stats-based model for players with 2025 data
-  # (1 - alpha) goes to the market-implied projection from ECR;
-  # players with no 2025 data (rookies, returners) are 100% market-implied.
+  # weight on the stats-based model for players with 2025 data; (1 - alpha)
+  # goes to the market-implied projection. This scalar is the FALLBACK —
+  # v2 item 1.7 varies alpha by player type (see alpha_by_type).
   model_alpha: 0.55
-  # games-played regression: ppg is shrunk toward the positional mean with
-  # weight games/(games + k)
+  alpha_by_type:
+    stable_veteran: 0.65     # 12+ games last season, same team
+    volatile: 0.40           # rookies, new-team players
+  # games-played regression: ppg shrunk toward positional mean g/(g+k)
   shrink_k: 5
-  # Convention rule (final spec §1): all projections and replacement levels
-  # use the same 16-game convention. Uniform scaling never changes ranks;
-  # consistency is what matters, not 16 vs 17. Per-player durability is the
-  # separate exp_games haircut (16 - 3yr avg games missed, floored at 12).
+  # All projections and replacement levels use the same 16-game convention
+  # (uniform scaling never changes ranks). The per-player durability haircut
+  # was REMOVED 2026-08-29 (v2 plan 1.3, research Q6) — exp_games is
+  # informational only.
   expected_games: 16.0
-  # Veterans with >= this many 2025 fantasy points but no market row at all
-  # get a pure stats-model projection, flagged no_market: on the board for a
-  # manual eyeball, ignored by the live engine unless activated by an override.
   no_market_floor: 60
 
 engine:
@@ -55,32 +27,28 @@ engine:
   pool_size: 80       # rivals sample from the top-N undrafted by ADP
   sigma_early: 6.0    # ADP noise (picks) in round 1  (~0.5 rounds)
   sigma_late: 27.0    # ADP noise (picks) by round 15 (~2.25 rounds)
-
-guardrails:
-  qb2_earliest_round: 10   # 2nd QB never before this round
-  te2_fall_picks: 12       # 2nd TE only if a top-6 TE fell >= this many picks past ADP
-
-tiers:
-  # a gap becomes a tier break when it exceeds mean + break_z * std of
-  # within-position VORP gaps; a break is also flagged as a CLIFF when it
-  # exceeds mean + cliff_z * std (per the handoff: 1 standard deviation).
-  break_z: 0.5
-  cliff_z: 1.0
-  # the board always includes every player with ADP inside the draft's pick
-  # count (12 teams x 15 rounds), regardless of model rank — the Monte Carlo
-  # rivals must be able to draft anyone the market actually drafts.
-  adp_include_within: 180
+  # Survival calibration (v2 item 1.1, fitted to the Omnibeta CLV retro):
+  # calibrated = 0.5 + (raw - 0.5) * survival_shrink. Fits all three observed
+  # buckets: raw 96% -> 75%, 82% -> 68%, 45% -> 50% (n=67).
+  survival_shrink: 0.55
+  # fat-tail reach mixture: with reach_prob, a rival's ADP noise is scaled
+  # by reach_scale (one-directional reaches, CLV retro: QBs reached 33-46
+  # picks early in this room)
+  reach_prob: 0.15
+  reach_scale: 3.0
+  # positional-run escalation: 2+ same-position picks in the last 5 multiply
+  # that position's pick weight
+  run_window: 5
+  run_min: 2
+  run_boost: 1.5
+  # round-dependent objective (v2 item 1.5): from this round, gated players
+  # score on an 85th-percentile proxy instead of median
+  upside_from_round: 8
+  upside_mult: 1.15
 
 tracker:
-  # 2s puts Sleeper polling in lockstep with the dashboard's 2s tick
-  # (worst-case board staleness ~2-4s vs ~5-7s at 5). Below 2 buys nothing:
-  # the browser tick is the floor, and it risks rate-limiting mid-draft.
   poll_seconds: 2
-  # alert when a player has fallen at least this many picks past ADP
-  # (12 = one full round in this league)
   fall_alert_picks: 12
-  # K/DEF timing is a hard guardrail (final two picks only), not a knob —
-  # see Tracker._guardrail_ok
 
 paths:
   raw: data/raw
@@ -89,15 +57,15 @@ paths:
   logs: data/logs
 
 # In-season manager knobs. NOTE: this block was originally named `season:`,
-# which silently shadowed the `season: 2026` year above (YAML last-key-wins)
-# and crashed the daily ADP diff from 08/24 on. Never reuse a scalar's key.
+# which silently shadowed the `season: 2026` year (YAML last-key-wins) and
+# crashed the daily ADP diff from 08/24 on. Never reuse a scalar's key.
 inseason:
-  matchup_cap: 0.10          # +/- cap on the opponent-defense multiplier
-  matchup_shrink_weeks: 5    # ratio weight = weeks/(weeks+this); noise guard pre-week-6
-  trend_cap: 0.15            # +/- cap on usage-trend adjustment (role changes only)
-  trend_threshold: 0.07      # min abs target-share delta to count as a role change
-  score_sigma: 28.0          # weekly team-score sd for win probability
-  sims: 4000                 # more sims = regime label stops wobbling on noise
+  matchup_cap: 0.10
+  matchup_shrink_weeks: 5
+  trend_cap: 0.15
+  trend_threshold: 0.07
+  score_sigma: 28.0
+  sims: 4000
   regime_safe: 0.85
   regime_comfortable: 0.60
   regime_bubble: 0.25
