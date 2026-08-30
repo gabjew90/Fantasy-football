@@ -94,3 +94,21 @@ Where they disagreed, the disagreement is recorded, not smoothed over.
 slot-adjusted; (c) input MAE/rank-correlation vs a market baseline.
 Single-season league results and self-graded boards validate nothing.
 The three-lens scoreboard remains a public honesty device, not evidence.
+
+---
+## Status (2026-08-29, end of implementation session)
+DONE: 0.1 CLV retro · 0.2 live FA replacement · 0.3 overreaction damper ·
+0.4 IR-aware stash rule · 1.3 haircut removal (board diff APPROVED, merged)
+· amendment A multi-league structure (onboard command ready; new-league
+yaml awaits the league id) · 1.1 survival recalibration (fat tails, runs,
+calibration map) · 1.2 two-pick planner (amendment B fallback) · 1.5
+round objective + role gate · 1.6 standing tilts (off for Omnibeta) ·
+1.7 alpha by type. 132 tests.
+AWAITING USER: new league's Sleeper id (+ draft slot when known) -> item
+12 onboard + mock-draft CLV acceptance run.
+GATED (do not start): Phase 2 (2.1 opportunity rebuild w/ two-season
+backtest gate, 2.2 January baselines, 2.3 slot books).
+Flagged deviations: August-injury tilt deferred (ADP moves not yet
+attributable to injury); air-yards/TD-rate upside gates deferred to 2.1
+(columns absent in free weekly data); items 7-11 built before item 12's
+league id arrived (structure-only, no Omnibeta numbers copied anywhere).
