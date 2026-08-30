@@ -264,13 +264,14 @@ def default_projection(cfg, usage: pl.DataFrame, market: pl.DataFrame) -> pl.Dat
             .alias("proj_source")
         )
 
-    # Durability haircut (final spec §1): scale by expected games from the
-    # 3-year availability record. No history (2026 rookies, K/DEF) -> no haircut.
-    # Applied before overrides so a manual override is always the final number.
+    # Durability haircut REMOVED (v2 plan 1.3, research Q6): games-missed
+    # history is near-zero predictive year over year, and the haircut moved
+    # real draft values off folklore. exp_games stays as an informational
+    # column with ZERO projection effect. If durability ever returns it is
+    # position x workload x injury-type with heavy shrinkage — not this year.
     df = df.with_columns(
         pl.col("exp_games").fill_null(16.0).alias("exp_games"),
     ).with_columns(
-        (pl.col("proj_pts") * pl.col("exp_games") / 16.0).alias("proj_pts"),
         (
             pl.col("proj_model_pts").is_null()
             & ~pl.col("pos").is_in(["K", "DEF"])
