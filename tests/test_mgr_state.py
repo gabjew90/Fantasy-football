@@ -132,3 +132,20 @@ def test_trade_watch_alerts_once_per_status(tmp_path, monkeypatch):
     txns[0]["status"] = "complete"          # processed -> one more, non-urgent
     alerts2 = trade_watch.scan(ctx, s)
     assert len(alerts2) == 1 and not alerts2[0][2]
+
+
+def test_live_fa_replacement_levels():
+    from manager.waiver_brief import fa_replacement_levels, value_over_fa
+    pool = [
+        {"sleeper_id": "a", "pos": "RB", "ros": 120.0},
+        {"sleeper_id": "b", "pos": "RB", "ros": 60.0},
+        {"sleeper_id": "c", "pos": "WR", "ros": 110.0},
+        {"sleeper_id": "d", "pos": "WR", "ros": 105.0},
+    ]
+    lv = fa_replacement_levels(pool)
+    assert lv["RB"] == (120.0, 60.0) and lv["WR"] == (110.0, 105.0)
+    # scarce RB: best RB is worth his gap to the next one (+60); deep WR: +5
+    assert value_over_fa(pool[0], lv) == 60.0
+    assert value_over_fa(pool[2], lv) == 5.0
+    # a non-best player is measured against the best still available
+    assert value_over_fa(pool[1], lv) == -60.0
