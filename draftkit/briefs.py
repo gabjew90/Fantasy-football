@@ -25,7 +25,9 @@ POS_OK = ("QB", "RB", "WR", "TE", "K", "DEF")
 
 
 def _season_cfg(cfg) -> dict:
-    return cfg.get("season", {}) or {}
+    # "inseason" since 2026-08-29: the block's old name `season:` shadowed the
+    # season-year scalar (YAML last-key-wins) and broke every int(cfg["season"]) caller
+    return cfg.get("inseason", cfg.get("season", {})) or {}
 
 
 def build_context(cfg) -> dict:
