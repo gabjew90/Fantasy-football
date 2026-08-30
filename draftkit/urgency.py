@@ -35,8 +35,18 @@ def _tendency_mult(seed: dict | None, rnd: int, pos: str) -> float:
     return float(np.clip(share / (1.0 / 6.0), 0.5, 2.0))
 
 
+def calibrate(p: float, shrink: float) -> float:
+    """Empirical calibration map (v2 item 1.1), fitted to the Omnibeta CLV
+    retro: raw 96% -> 75%, 82% -> 68%, 45% -> 50% (n=67). A single shrink
+    toward 0.5 fits all three buckets: calibrated = 0.5 + (p - 0.5) * shrink."""
+    return 0.5 + (p - 0.5) * shrink
+
+
 def simulate_survival(pool, current_pick, next_pick, rivals, seeds, rng,
-                      sims=1000, sigma=6.0, teams=12):
+                      sims=1000, sigma=6.0, teams=12,
+                      reach_prob=0.0, reach_scale=3.0,
+                      run_window=5, run_min=2, run_boost=1.5,
+                      survival_shrink=1.0, recent_pos=None):
     """Per-position urgency + per-player survival to my next pick.
 
     pool: undrafted players (dicts with sleeper_id/pos/vorp/adp), pre-truncated.
@@ -89,18 +99,35 @@ def simulate_survival(pool, current_pick, next_pick, rivals, seeds, rng,
     # at this window size; sigma itself scales with round at the call site)
     pick_nos = np.arange(current_pick, next_pick)
     adp_like = np.exp(-0.5 * ((pick_nos[:, None] - adp[None, :]) / sigma) ** 2) + 1e-9
+    # fat-tail REACH mixture (v2 1.1, CLV retro: reaches are one-directional —
+    # players taken EARLY, never "reached for" after their ADP). With
+    # reach_prob a rival draws from a widened, forward-only likelihood.
+    ahead = adp[None, :] >= pick_nos[:, None]
+    reach_like = (np.exp(-0.5 * ((pick_nos[:, None] - adp[None, :])
+                                 / (sigma * reach_scale)) ** 2) * ahead) + 1e-9
 
     survived = np.zeros(n, dtype=np.int64)
     e_best = {pos: 0.0 for pos in POSITIONS}
+    base_recent = list(recent_pos or [])[-run_window:]
     for _ in range(sims):
         alive = np.ones(n, dtype=bool)
+        recent = list(base_recent)
         for i in range(len(rivals)):
-            w = adp_like[i] * rival_mult[i] * alive
+            like = reach_like[i] if (reach_prob and rng.random() < reach_prob)                 else adp_like[i]
+            w = like * rival_mult[i] * alive
+            # positional-run escalation: 2+ same-position picks in the recent
+            # window make the NEXT rival likelier to join the run
+            if recent:
+                window = recent[-run_window:]
+                for pos in set(window):
+                    if window.count(pos) >= run_min:
+                        w = np.where(pos_arr == pos, w * run_boost, w)
             total = w.sum()
             if total <= 0:
                 break
             choice = rng.choice(n, p=w / total)
             alive[choice] = False
+            recent.append(str(pos_arr[choice]))
         survived += alive
         for pos in POSITIONS:
             mask = (pos_arr == pos) & alive
@@ -114,7 +141,7 @@ def simulate_survival(pool, current_pick, next_pick, rivals, seeds, rng,
             "e_best_next": e,
             "urgency": best_now[pos] - e,
             "survival": {
-                pool[j]["sleeper_id"]: survived[j] / sims
+                pool[j]["sleeper_id"]: calibrate(survived[j] / sims, survival_shrink)
                 for j in range(n) if pos_arr[j] == pos
             },
         }
