@@ -57,3 +57,48 @@ def test_filled_position_rarely_taken():
                             seeds={}, rng=rng, sims=400, sigma=6.0)
     # qb1 at ADP 40 is the obvious ADP pick, but the rival's QB slot is filled
     assert rep["QB"]["survival"]["qb1"] > 0.8
+
+
+def test_survival_calibration_shrink():
+    from draftkit.urgency import calibrate
+    assert abs(calibrate(0.96, 0.55) - 0.753) < 0.01   # matches CLV retro bucket
+    assert abs(calibrate(0.82, 0.55) - 0.676) < 0.01
+    assert abs(calibrate(0.45, 0.55) - 0.4725) < 0.01
+    assert calibrate(0.5, 0.55) == 0.5
+    assert calibrate(0.96, 1.0) == 0.96                # shrink=1 is identity
+
+
+def test_reach_mixture_kills_high_adp_studs_more():
+    import numpy as np
+    from draftkit.urgency import simulate_survival
+    # a stud whose ADP is 15 picks after the window: pure gaussian says safe;
+    # one-directional reaches should reduce his survival
+    pool = ([{"sleeper_id": "stud", "pos": "WR", "vorp": 90.0, "adp": 40.0}]
+            + [{"sleeper_id": f"f{i}", "pos": "WR", "vorp": 10.0, "adp": 24.0 + i}
+               for i in range(10)])
+    rivals = [{"slot": s, "needs": {"WR": 2}, "user_id": None} for s in range(3, 9)]
+    kw = dict(sims=400, sigma=6.0, teams=12, survival_shrink=1.0)
+    base = simulate_survival(pool, 25, 31, rivals, {}, np.random.default_rng(1),
+                             reach_prob=0.0, **kw)
+    hot = simulate_survival(pool, 25, 31, rivals, {}, np.random.default_rng(1),
+                            reach_prob=0.5, reach_scale=3.0, **kw)
+    assert hot["WR"]["survival"]["stud"] < base["WR"]["survival"]["stud"]
+
+
+def test_run_escalation_targets_the_running_position():
+    import numpy as np
+    from draftkit.urgency import simulate_survival
+    pool = ([{"sleeper_id": f"rb{i}", "pos": "RB", "vorp": 50.0, "adp": 25.0 + i}
+             for i in range(6)]
+            + [{"sleeper_id": f"wr{i}", "pos": "WR", "vorp": 50.0, "adp": 25.0 + i}
+               for i in range(6)])
+    rivals = [{"slot": s, "needs": {"RB": 2, "WR": 2}, "user_id": None}
+              for s in range(3, 9)]
+    kw = dict(sims=400, sigma=6.0, teams=12, survival_shrink=1.0)
+    calm = simulate_survival(pool, 25, 31, rivals, {}, np.random.default_rng(2),
+                             recent_pos=[], **kw)
+    run = simulate_survival(pool, 25, 31, rivals, {}, np.random.default_rng(2),
+                            recent_pos=["RB", "RB", "RB"], run_boost=2.5, **kw)
+    calm_rb = sum(calm["RB"]["survival"].values())
+    run_rb = sum(run["RB"]["survival"].values())
+    assert run_rb < calm_rb  # the RB run eats RBs faster

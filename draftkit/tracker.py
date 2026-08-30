@@ -60,6 +60,16 @@ class Tracker:
         self.pool_size = int(ecfg.get("pool_size", 80))
         self.sigma_early = float(ecfg.get("sigma_early", 6.0))
         self.sigma_late = float(ecfg.get("sigma_late", 27.0))
+        # v2 item 1.1: fat-tail reaches, run escalation, empirical calibration
+        self.reach_prob = float(ecfg.get("reach_prob", 0.15))
+        self.reach_scale = float(ecfg.get("reach_scale", 3.0))
+        self.run_window = int(ecfg.get("run_window", 5))
+        self.run_min = int(ecfg.get("run_min", 2))
+        self.run_boost = float(ecfg.get("run_boost", 1.5))
+        self.survival_shrink = float(ecfg.get("survival_shrink", 0.55))
+        # v2 item 1.5: round-dependent objective
+        self.upside_from_round = int(ecfg.get("upside_from_round", 8))
+        self.upside_mult = float(ecfg.get("upside_mult", 1.15))
         gcfg = cfg["guardrails"] if "guardrails" in cfg._data else {}
         self.qb2_round = int(gcfg.get("qb2_earliest_round", 10))
         self.te2_fall = int(gcfg.get("te2_fall_picks", 12))
@@ -236,9 +246,15 @@ class Tracker:
         # let a mid-draft restart silently flip near-tie recommendations
         seed = zlib.crc32(f"{self.draft_id}:{key[0]}:{key[1]}".encode())
         rng = np.random.default_rng(seed)
+        recent_pos = [str((p.get("metadata") or {}).get("position") or "")
+                      for p in picks[-self.run_window:]]
         report = simulate_survival(
             pool, start, my_next, self._rival_states(start, my_next), self.rival_seeds,
             rng, sims=self.sims, sigma=self._sigma(rnd), teams=self.teams,
+            reach_prob=self.reach_prob, reach_scale=self.reach_scale,
+            run_window=self.run_window, run_min=self.run_min,
+            run_boost=self.run_boost, survival_shrink=self.survival_shrink,
+            recent_pos=recent_pos,
         )
         self._urgency_cache = (key, report)
         return report
