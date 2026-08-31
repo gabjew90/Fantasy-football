@@ -215,3 +215,21 @@ def test_slot_change_applies_to_cached_tracker():
     app._trackers["d1"] = t
     app.state_for("d1", 7)
     assert t.my_slot == 7
+
+
+def test_all_negative_board_never_mutes_recommendations():
+    """10-team shallow baselines push the whole late board below replacement;
+    the one-stash rule must yield rather than return zero recommendations
+    (caught by the Keefamania local-pipe replay, 2026-08-30)."""
+    t = make_tracker([], my_slot=2)
+    for p in t.players:
+        p["vorp"] = -5.0            # everyone below replacement
+    # my roster already holds a "stash" (negative-VORP pick) and starters
+    # at RB/WR are filled, so the strict stash rule blocks every candidate
+    picks = [pick(1, 2, "RB"), pick(2, 2, "RB"), pick(4, 2, "WR"),
+             pick(5, 2, "WR"), pick(6, 2, "TE")]
+    t.state.picks = picks
+    t.state.drafted_ids = {str(p["player_id"]) for p in picks}
+    recs = t.recommendations()
+    assert recs, "engine went mute on an all-negative board"
+    assert "stash budget waived" in recs[0][1] or recs[0][2]["pos"] in ("RB", "WR", "QB")
