@@ -20,7 +20,7 @@ import requests
 from .ids import SleeperIndex, load_id_map, normalize_name
 
 FPECR_URL = "https://raw.githubusercontent.com/dynastyprocess/data/master/files/db_fpecr_latest.csv"
-FFC_URL = "https://fantasyfootballcalculator.com/api/v1/adp/ppr?teams={teams}&year={year}"
+FFC_URL = "https://fantasyfootballcalculator.com/api/v1/adp/{fmt}?teams={teams}&year={year}"
 CACHE_TTL = 12 * 3600
 
 POS_NORM = {"DST": "DEF", "D/ST": "DEF", "PK": "K"}
@@ -60,11 +60,12 @@ def load_ecr(raw_dir: Path) -> pl.DataFrame:
     return out
 
 
-def load_ffc_adp(raw_dir: Path, teams: int, year: int) -> pl.DataFrame:
+def load_ffc_adp(raw_dir: Path, teams: int, year: int,
+                 fmt: str = "ppr") -> pl.DataFrame:
     cache = Path(raw_dir) / f"ffc_adp_ppr_{teams}_{year}.json"
     import json
 
-    data = json.loads(_cached_fetch(FFC_URL.format(teams=teams, year=year), cache))
+    data = json.loads(_cached_fetch(FFC_URL.format(fmt=fmt, teams=teams, year=year), cache))
     rows = data.get("players", [])
     return pl.DataFrame(
         {
@@ -170,7 +171,10 @@ def build_market(cfg, players: dict[str, dict]) -> tuple[pl.DataFrame, dict]:
         report["ecr_source"] = "dynastyprocess fpecr mirror"
     report["ecr_unmatched"] = unmatched
 
-    ffc = load_ffc_adp(raw, teams=12, year=int(cfg["season"]))
+    mcfg = cfg.get("market") or {}
+    ffc = load_ffc_adp(raw, teams=int(mcfg.get("teams", 12)),
+                       year=int(cfg["season"]),
+                       fmt=str(mcfg.get("ffc_format", "ppr")))
     ffc, ffc_unmatched = _attach_sleeper_ids(ffc, index, id_map, via_fp_id=False)
     report["ffc_unmatched"] = ffc_unmatched
 
@@ -195,6 +199,24 @@ def build_market(cfg, players: dict[str, dict]) -> tuple[pl.DataFrame, dict]:
     ).unique(subset="sleeper_id", keep="first")
 
     market = market.join(adp_part, on="sleeper_id", how="full", coalesce=True)
+
+    # Yahoo ADP override (v2 Keefamania prep): the room drafts against
+    # YAHOO's board, so a scraped data/external/yahoo_adp.csv (name,pos,adp)
+    # takes precedence over FFC where names match. League-scoped file.
+    ypath = cfg.scoped(cfg.path("external") / "yahoo_adp.csv")
+    if ypath.exists():
+        yah = pl.read_csv(ypath, infer_schema_length=500).with_columns(
+            pl.col("name").str.to_lowercase()
+            .str.replace_all(r"\s+(jr\.?|sr\.?|i{2,4}|iv|v)$", "")
+            .str.replace_all(r"[^a-z0-9]", "").alias("_norm"),
+            pl.col("adp").cast(pl.Float64).alias("adp_yahoo"),
+        ).select("_norm", "adp_yahoo").unique(subset="_norm")
+        market = market.with_columns(
+            pl.col("name").str.to_lowercase()
+            .str.replace_all(r"\s+(jr\.?|sr\.?|i{2,4}|iv|v)$", "")
+            .str.replace_all(r"[^a-z0-9]", "").alias("_norm")
+        ).join(yah, on="_norm", how="left").drop("_norm")
+        report["yahoo_adp_matched"] = int(market["adp_yahoo"].is_not_null().sum())
     market = market.with_columns(
         pl.coalesce(pl.col("name"), pl.col("name_ffc")).alias("name"),
         pl.coalesce(pl.col("pos"), pl.col("pos_ffc")).alias("pos"),
@@ -209,6 +231,11 @@ def build_market(cfg, players: dict[str, dict]) -> tuple[pl.DataFrame, dict]:
         market = market.with_columns(
             pl.coalesce(pl.col("adp_user"), pl.col("adp")).alias("adp")
         ).drop("adp_user")
+    if "adp_yahoo" in market.columns:
+        # the room's own market beats a generic feed
+        market = market.with_columns(
+            pl.coalesce(pl.col("adp_yahoo"), pl.col("adp")).alias("adp")
+        ).drop("adp_yahoo")
 
     market = market.sort(pl.col("ecr").fill_null(999))
     return market, report

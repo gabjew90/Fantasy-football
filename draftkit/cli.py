@@ -98,7 +98,7 @@ def cmd_market(cfg: Config, args) -> None:
     client = SleeperClient(cfg.path("raw"))
     players = client.players()
     market, report = build_market(cfg, players)
-    out = cfg.path("processed") / "market.parquet"
+    out = cfg.scoped(cfg.path("processed") / "market.parquet")
     market.write_parquet(out)
     console.print(f"market table: {market.height} players -> {out}")
     console.print(f"  ECR source: {report.get('ecr_source')} "
@@ -125,8 +125,8 @@ def cmd_tiers(cfg: Config, args) -> None:
     from .board import write_board_markdown
 
     processed = cfg.path("processed")
-    market = pl.read_parquet(processed / "market.parquet")
-    usage = pl.read_parquet(processed / "usage.parquet")
+    market = pl.read_parquet(cfg.scoped(processed / "market.parquet"))
+    usage = pl.read_parquet(cfg.scoped(processed / "usage.parquet"))
 
     proj_fn = PROJECTION_FNS[args.projection]
     df = proj_fn(cfg, usage, market)
@@ -140,9 +140,9 @@ def cmd_tiers(cfg: Config, args) -> None:
     tiers = add_handcuff_info(tiers)
     tiers = add_upside_flags(tiers)
 
-    csv_path = cfg.root / "tiers.csv"
+    csv_path = cfg.scoped(cfg.root / "tiers.csv")
     write_tiers_csv(tiers, csv_path)
-    board_path = cfg.root / "board.md"
+    board_path = cfg.scoped(cfg.root / "board.md")
     write_board_markdown(tiers, board_path)
     console.print(f"tiers: {tiers.height} players -> {csv_path} and {board_path}")
     by_src = tiers.group_by("proj_source").len().sort("len", descending=True)
@@ -151,7 +151,7 @@ def cmd_tiers(cfg: Config, args) -> None:
 
     adp_within = float(cfg["tiers"].get("adp_include_within", 180) or 180)
     dis = build_disagreements(tiers.rename({"name": "player"}), adp_within)
-    dis_path = cfg.root / "reports" / "disagreements.csv"
+    dis_path = cfg.scoped(cfg.root / "reports" / "disagreements.csv")
     dis_path.parent.mkdir(parents=True, exist_ok=True)
     dis.write_csv(dis_path)
     console.print(f"  disagreements worklist: {dis.height} -> {dis_path}")
@@ -160,7 +160,7 @@ def cmd_tiers(cfg: Config, args) -> None:
 def cmd_board(cfg: Config, args) -> None:
     from .board import print_board
 
-    tiers = pl.read_csv(cfg.root / "tiers.csv", infer_schema_length=2000).rename(
+    tiers = pl.read_csv(cfg.scoped(cfg.root / "tiers.csv"), infer_schema_length=2000).rename(
         {"player": "name"}
     )
     print_board(tiers, console)
@@ -183,7 +183,7 @@ def cmd_track(cfg: Config, args) -> None:
                 console.print(f"[yellow]warning: {info.get('error')}; running in spectator mode[/yellow]")
     tracker = Tracker(
         cfg,
-        tiers_path=cfg.root / "tiers.csv",
+        tiers_path=cfg.scoped(cfg.root / "tiers.csv"),
         draft_id=args.draft_id,
         my_slot=slot,
     )
