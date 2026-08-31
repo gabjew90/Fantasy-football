@@ -86,8 +86,18 @@ def build_state(t: Tracker) -> dict:
         for p in t.fallers()
     ]
 
+    local = bool(getattr(t, "local", False))
+    all_remaining = None
+    if local:
+        all_remaining = [
+            {"n": p["player"], "p": p["pos"]}
+            for p in sorted(t.remaining(), key=lambda x: x.get("adp") or 999.0)
+        ]
+
     return {
         "ok": True,
+        "local": local,
+        "all_remaining": all_remaining,
         "draft_id": t.draft_id,
         "status": s.status,
         "current_pick": cur,
@@ -154,6 +164,25 @@ class DraftWebApp:
             state = build_state(t)
             state["tiers_built_at"] = self.tiers_mtime()
             return state
+
+    def local_action(self, draft_id: str, slot, action: str,
+                     name: str = "", pos: str = "") -> dict:
+        """Manual-entry writes for LOCAL drafts only (Yahoo draft day)."""
+        with self._lock:
+            try:
+                t = self._tracker(draft_id, slot)
+            except Exception as e:  # noqa: BLE001
+                return {"ok": False, "error": str(e)[:200]}
+            if not getattr(t, "local", False):
+                return {"ok": False, "error": "not a local draft — picks come from Sleeper"}
+            if action == "pick":
+                out = t.source.add_pick(name, pos or None)
+            elif action == "undo":
+                out = t.source.undo()
+            else:
+                return {"ok": False, "error": f"unknown action {action}"}
+            self._last_poll[draft_id] = 0.0  # next /state re-polls immediately
+            return out
 
     def reload(self) -> None:
         """Forget all trackers; next request re-reads tiers.csv and rebuilds."""
@@ -285,9 +314,21 @@ def run_server(cfg, tiers_path, default_slot: int | None, port: int) -> int:
                 self._send(404, b"not found", "text/plain")
 
         def do_POST(self):  # noqa: N802
-            if urlparse(self.path).path == "/reload":
+            url = urlparse(self.path)
+            if url.path == "/reload":
                 app.reload()
                 self._send(200, b'{"ok": true}', "application/json")
+            elif url.path in ("/pick", "/undo"):
+                q = parse_qs(url.query)
+                draft_id = (q.get("draft_id") or [cfg.draft_id])[0].strip() or cfg.draft_id
+                slot_raw = (q.get("slot") or [""])[0].strip()
+                slot = int(slot_raw) if slot_raw.isdigit() else None
+                name = (q.get("name") or [""])[0]
+                pos = (q.get("pos") or [""])[0]
+                out = app.local_action(draft_id, slot,
+                                       "pick" if url.path == "/pick" else "undo",
+                                       name=name, pos=pos)
+                self._send(200, json.dumps(out).encode("utf-8"), "application/json")
             else:
                 self._send(404, b"not found", "text/plain")
 

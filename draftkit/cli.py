@@ -281,7 +281,14 @@ def cmd_web(cfg: Config, args) -> None:
     from .web import run_server
 
     slot = args.slot
-    if slot is None:
+    local = str(cfg.get("draft_id") or "").lower() in ("", "none", "null")
+    if slot is None and local:
+        raw = (cfg.get("me") or {}).get("draft_slot")
+        slot = int(raw) if raw else None
+        if slot is None:
+            console.print("[yellow]local draft: no slot yet — set me.draft_slot in the "
+                          "league yaml (or the footer) when the draft order is known[/yellow]")
+    elif slot is None:
         client = SleeperClient(cfg.path("raw"))
         slot, info = resolve_my_slot(cfg, client)
         if slot is None:
