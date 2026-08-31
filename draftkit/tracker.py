@@ -47,6 +47,7 @@ class Tracker:
     survival_shrink = 0.55
     upside_from_round = 8
     upside_mult = 1.15
+    local = False
 
     def __init__(
         self,
@@ -57,8 +58,35 @@ class Tracker:
     ):
         self.cfg = cfg
         self.client = SleeperClient(cfg.path("raw"))
-        self.draft_id = draft_id or cfg.draft_id
-        self.draft = self.client.draft(self.draft_id)
+        self.draft_id = str(draft_id or cfg.draft_id)
+        # LOCAL mode (Yahoo leagues / no pollable API): draft facts come from
+        # the league yaml's expected: block, picks from a local file fed by
+        # the dashboard's manual entry or the browser poller.
+        self.local = (self.draft_id.lower() in ("", "none", "null")
+                      or self.draft_id.startswith("local"))
+        if self.local:
+            self.draft_id = f"local_{cfg.league_name or 'draft'}"
+            exp = cfg.get("expected") or {}
+            counts: dict[str, int] = {}
+            for slotname in (str(x).upper() for x in (exp.get("roster") or [])):
+                key = "FLEX" if slotname in ("W/R/T", "W/R", "FLEX", "WRT") else slotname
+                if key != "IR":
+                    counts[key] = counts.get(key, 0) + 1
+            self.draft = {
+                "type": exp.get("type", "snake"), "status": "drafting",
+                "draft_order": {},
+                "settings": {
+                    "teams": int(exp.get("teams", 10)),
+                    "rounds": int(exp.get("rounds", 15)),
+                    "pick_timer": int(exp.get("pick_timer", 60)),
+                    "slots_qb": counts.get("QB", 0), "slots_rb": counts.get("RB", 0),
+                    "slots_wr": counts.get("WR", 0), "slots_te": counts.get("TE", 0),
+                    "slots_flex": counts.get("FLEX", 0), "slots_k": counts.get("K", 0),
+                    "slots_def": counts.get("DEF", 0), "slots_bn": counts.get("BN", 0),
+                },
+            }
+        else:
+            self.draft = self.client.draft(self.draft_id)
         self.teams = int(self.draft["settings"]["teams"])
         self.rounds = int(self.draft["settings"]["rounds"])
         self.slots = snake.roster_slots_from_draft_settings(self.draft["settings"])
@@ -97,12 +125,26 @@ class Tracker:
         for p in self.players:
             p["sleeper_id"] = str(p["sleeper_id"])
         self.by_id = {p["sleeper_id"]: p for p in self.players}
+        if self.local:
+            from .picksource import LocalDraft
+            self.source = LocalDraft(cfg.path("logs") / f"{self.draft_id}_picks.json",
+                                     self.players, self.teams, self.rounds)
         self.state = TrackerState()
 
     # ---------- state ----------
 
     def poll(self) -> bool:
         """Fetch picks; returns True if the pick list changed. Retries with backoff."""
+        if getattr(self, "local", False):
+            picks = self.source.picks()
+            changed = len(picks) != len(self.state.picks)
+            self.state.status = self.source.status()
+            self.state.last_error = None
+            self.state.last_poll_ok = time.time()
+            self.state.picks = picks
+            self.state.drafted_ids = {str(p["player_id"]) for p in picks}
+            self.log.sync(self)
+            return changed
         try:
             picks = get_json(f"{BASE}/draft/{self.draft_id}/picks", retries=3)
         except Exception as e:  # noqa: BLE001

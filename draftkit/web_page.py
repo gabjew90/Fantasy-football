@@ -63,12 +63,29 @@ PAGE = r"""<!DOCTYPE html>
                   border-radius: 6px; padding: 6px 14px; font-size: 14px; cursor: pointer; }
   .stale { color: var(--amber); font-weight: 700; }
   #inputErr { color: var(--red); }
+  #manualBar { display: none; gap: 10px; align-items: center; flex-wrap: wrap;
+               background: #161b22; border: 1px solid var(--edge); border-radius: 8px;
+               padding: 10px 14px; margin: 10px 0; }
+  #manualBar.on { display: flex; }
+  #pickName { width: 260px; background: var(--bg); color: var(--fg);
+              border: 1px solid var(--edge); border-radius: 6px; padding: 7px 10px; font-size: 15px; }
+  #pickBtn { background: #1f6feb; border: 0; color: #fff; font-weight: 700; }
+  #manualMsg { color: var(--amber); }
+  .clicky b { cursor: pointer; }
 </style>
 </head>
 <body>
 <div id="banner" class="banner">connecting…</div>
+<div id="manualBar">
+  <b>MANUAL DRAFT ENTRY</b>
+  <input id="pickName" list="poolList" placeholder="type a name (or click one below)…" autocomplete="off">
+  <datalist id="poolList"></datalist>
+  <button id="pickBtn">mark drafted</button>
+  <button id="undoBtn">undo last</button>
+  <span id="manualMsg"></span>
+</div>
 <div class="cols">
-  <div class="panel"><h2>Pick now — one per position, ranked by what waiting costs</h2><div id="recs">—</div></div>
+  <div class="panel clicky"><h2>Pick now — one per position, ranked by what waiting costs</h2><div id="recs">—</div></div>
   <div class="panel"><h2>Board — top remaining by position
     <span style="text-transform:none;letter-spacing:0;font-weight:400"> · T=tier,
     number=points above a waiver pickup, +Nv=picks past his usual draft spot</span></h2>
@@ -93,7 +110,7 @@ PAGE = r"""<!DOCTYPE html>
 </footer>
 <script>
 const $ = id => document.getElementById(id);
-let fails = 0, lastOk = null, seq = 0;
+let fails = 0, lastOk = null, seq = 0, lastLocal = false;
 
 const store = {
   get draftId() { return localStorage.getItem("dk_draft_id") || ""; },
@@ -108,6 +125,32 @@ $("reload").onclick = async () => { await fetch("/reload", {method: "POST"}); ti
 
 function esc(t) { const d = document.createElement("div"); d.textContent = t ?? ""; return d.innerHTML; }
 
+let poolCount = -1;
+async function postPick(path, name) {
+  const q = new URLSearchParams();
+  if (store.draftId) q.set("draft_id", store.draftId);
+  if (store.slot) q.set("slot", store.slot);
+  if (name) q.set("name", name);
+  const r = await fetch(path + "?" + q, {method: "POST"});
+  const out = await r.json();
+  $("manualMsg").textContent = out.ok
+    ? (out.resolved ? `#${out.pick_no}: ${out.resolved}${out.matched === false ? " (NOT ON BOARD — slot still counted)" : ""}` : `undid ${out.removed ?? ""}`)
+    : `⚠ ${out.error}`;
+  if (out.ok && path === "/pick") $("pickName").value = "";
+  tick();
+}
+$("pickBtn") && ($("pickBtn").onclick = () => { const v = $("pickName").value.trim(); if (v) postPick("/pick", v); });
+$("undoBtn") && ($("undoBtn").onclick = () => postPick("/undo"));
+document.addEventListener("keydown", e => {
+  if (e.key === "Enter" && document.activeElement === $("pickName")) $("pickBtn").click();
+});
+// click any bold player name on the page to prefill the entry box
+document.addEventListener("click", e => {
+  if (!$("manualBar").classList.contains("on")) return;
+  const b = e.target.closest(".pp b, .rec b, .rec1 b, #recs div b");
+  if (b) { $("pickName").value = b.textContent; $("pickName").focus(); }
+});
+
 function render(s) {
   const b = $("banner");
   if (!s.ok) {
@@ -120,6 +163,13 @@ function render(s) {
     return;
   }
   $("inputErr").textContent = "";
+
+  $("manualBar").classList.toggle("on", !!s.local);
+  if (s.local && s.all_remaining && s.all_remaining.length !== poolCount) {
+    poolCount = s.all_remaining.length;
+    $("poolList").innerHTML = s.all_remaining.map(p =>
+      `<option value="${esc(p.n)}">${esc(p.p)}</option>`).join("");
+  }
 
   if (s.poll_error) {
     b.className = "banner err";
@@ -188,7 +238,7 @@ async function tick() {
   // in the box from Saturday would otherwise silently hijack draft day)
   $("target").innerHTML = store.draftId
     ? '<span class="stale">⚠ tracking MOCK …' + esc(store.draftId.slice(-6)) + '</span>'
-    : "tracking: REAL draft";
+    : (lastLocal ? "tracking: LOCAL draft (manual/poller feed)" : "tracking: REAL draft");
   const q = new URLSearchParams();
   if (store.draftId) q.set("draft_id", store.draftId);
   if (store.slot) q.set("slot", store.slot);
@@ -198,6 +248,7 @@ async function tick() {
     const s = await r.json();
     if (my !== seq) return;  // a newer tick already resolved
     fails = 0; lastOk = Date.now();
+    lastLocal = !!s.local;
     render(s);
   } catch (e) {
     if (my !== seq) return;
