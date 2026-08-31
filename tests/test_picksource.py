@@ -55,3 +55,16 @@ def test_complete_status_and_cap(tmp_path):
     s.add_pick("Josh Allen")
     assert s.status() == "complete"
     assert not s.add_pick("Lamar Jackson")["ok"]
+
+
+def test_abbreviated_yahoo_feed_names_resolve(tmp_path):
+    """Validated in the 2026-08-30 live mock: the Yahoo Picks feed uses
+    'J. Gibbs'-style names, sometimes with status tags appended."""
+    s = _src(tmp_path)
+    assert s.resolve({"name": "J. Gibbs", "pos": "RB"})["sleeper_id"] == "1"
+    assert s.resolve({"name": "J. Cook III", "pos": "RB"})["sleeper_id"] == "2"
+    assert s.resolve({"name": "J. Allen", "pos": "QB"})["sleeper_id"] == "3"
+    # ALL-CAPS status tag stripped (Josh Jacobs CEL case from the mock)
+    assert s.resolve({"name": "J. Allen CEL", "pos": "QB"})["sleeper_id"] == "3"
+    # pos disambiguates same initial+similar surnames when needed
+    assert s.resolve({"name": "L. Jackson", "pos": "QB"})["sleeper_id"] == "4"

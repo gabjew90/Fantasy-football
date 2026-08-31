@@ -86,8 +86,21 @@ class LocalDraft:
 
     # -- reader ----------------------------------------------------------
     def resolve(self, entry: dict) -> dict:
-        cand = self._by_norm.get(norm(entry.get("name", ""))) or []
+        name = entry.get("name", "")
+        # strip trailing ALL-CAPS status tags Yahoo appends (Q, CEL, PUP, IR-R)
+        parts = name.strip().split()
+        while len(parts) > 1 and parts[-1].isupper() and len(parts[-1]) <= 4:
+            parts.pop()
+        name = " ".join(parts)
+        cand = self._by_norm.get(norm(name)) or []
         pos = entry.get("pos")
+        if not cand and len(parts) > 1 and len(parts[0].rstrip(".")) == 1:
+            # abbreviated Yahoo feed form ("J. Gibbs"): first initial + surname
+            initial = parts[0][0].lower()
+            last = norm(" ".join(parts[1:]))
+            cand = [c for group in self._by_norm.values() for c in group
+                    if c["player"].lower().lstrip()[0] == initial
+                    and norm(" ".join(c["player"].split()[1:])).startswith(last)]
         if pos and len(cand) > 1:
             cand = [c for c in cand if c["pos"] == pos] or cand
         if cand:

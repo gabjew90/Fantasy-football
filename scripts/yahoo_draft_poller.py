@@ -29,19 +29,27 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 # picks in a results/board pane; we scan likely containers for ordered
 # "player name + position" rows and fall back to any element list that looks
 # like one. Validated + hardened during the mock rehearsal.
+# VALIDATED in the 2026-08-30 live mock rehearsal (full 10-team room):
+# the left panel's "Picks" tab is a feed of entries shaped
+#   "<pick#> <drafter> <J. Name> [Q|CEL|PUP|IR-R ...] <POS> <Tm> Bye <n>"
+# interleaved with join/left chatter. document.title carries the on-clock
+# state ("YOUR TURN, DRAFT NOW" / "N picks until your turn" / "Draft
+# Complete"). Names are ABBREVIATED — LocalDraft.resolve handles the
+# initial+surname form and strips status tags.
 EXTRACT_JS = """
-() => {
-  const out = [];
-  const seen = new Set();
-  const rows = document.querySelectorAll(
-    '[class*="draft-result"] li, [class*="DraftResults"] li, ' +
-    '[class*="pick-list"] li, [class*="Picks"] li, table tbody tr');
-  rows.forEach(r => {
-    const t = (r.innerText || '').replace(/\\s+/g, ' ').trim();
-    const m = t.match(/([A-Z][\\w.'-]+(?: [A-Z][\\w.'-]+)+)\\s*[\\u2013-]?\\s*[A-Za-z]{2,3}\\s*-\\s*(QB|RB|WR|TE|K|DEF)/);
-    if (m && !seen.has(m[1])) { seen.add(m[1]); out.push({name: m[1], pos: m[2]}); }
+async () => {
+  const tab = [...document.querySelectorAll('button')].find(b => b.textContent.trim() === 'Picks');
+  if (tab) { tab.click(); await new Promise(r => setTimeout(r, 600)); }
+  const entries = [];
+  document.querySelectorAll('div,li').forEach(e => {
+    if (e.children.length > 8) return;
+    const t = (e.innerText || '').replace(/\s+/g, ' ').trim();
+    const m = t.match(/^(\d+) (.{1,25}?) ([A-Z]\.[\w.' -]{1,24}?) (?:Q |D |O |IR |IR-R |CEL |PUP |NA )?(QB|RB|WR|TE|K|DEF) ([A-Za-z]{2,3}) Bye (\d+)$/);
+    if (m) entries.push({n: +m[1], name: m[3], pos: m[4]});
   });
-  return out;
+  const uniq = {};
+  entries.forEach(e => uniq[e.n] = e);
+  return {title: document.title, picks: Object.values(uniq)};
 }
 """
 
@@ -87,24 +95,41 @@ def main() -> int:
                   "Chrome window this script attached to, then rerun")
             return 1
         print(f"attached to draft room: {page.url[:80]}")
+        seen: dict[int, dict] = {}
         last_n = -1
         while True:
             try:
-                picks = page.evaluate(EXTRACT_JS)
+                out = page.evaluate(EXTRACT_JS)
             except Exception as e:  # noqa: BLE001
                 print(f"extract failed ({e.__class__.__name__}) — manual entry "
                       f"on the dashboard still works; retrying")
                 time.sleep(args.interval)
                 continue
+            title = out.get("title", "")
+            for e in out.get("picks", []):
+                seen[int(e["n"])] = e
             if args.probe:
-                print(f"probe: {len(picks)} picks seen; first 5: {picks[:5]}")
+                print(f"probe: title={title!r}; {len(seen)} picks; "
+                      f"first 3: {list(seen.values())[:3]}")
                 return 0
-            if len(picks) != last_n:
-                src.set_picks([p["name"] for p in picks])
-                last_n = len(picks)
-                print(f"{time.strftime('%H:%M:%S')} picks: {last_n}"
-                      + (f" (latest: {picks[-1]['name']})" if picks else ""))
-            time.sleep(args.interval)
+            # feed may trim old entries: accumulate by pick number, placeholder
+            # any gap so later picks keep the right snake slot
+            max_n = max(seen) if seen else 0
+            names = [seen[i]["name"] if i in seen else f"Unknown Pick{i}"
+                     for i in range(1, max_n + 1)]
+            if len(names) != last_n:
+                src.set_picks(names)
+                last_n = len(names)
+                print(f"{time.strftime('%H:%M:%S')} picks: {last_n} | {title[:40]}")
+            if "Draft Complete" in title:
+                print("draft complete — poller exiting")
+                return 0
+            # adaptive cadence (mock lesson: rooms can burst 6 picks in 15s
+            # when teams autodraft) — tighten near my turn
+            m = __import__("re").search(r"(\d+) picks until", title)
+            close = ("YOUR TURN" in title or "You are next" in title
+                     or (m and int(m.group(1)) <= 3))
+            time.sleep(max(1.0, args.interval / 3) if close else args.interval)
 
 
 if __name__ == "__main__":
