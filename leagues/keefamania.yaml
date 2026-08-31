@@ -1,0 +1,77 @@
+# Keefamania (Yahoo league #49649) — team "Air Raid Gabriel".
+# Settings read from the live Yahoo settings page 2026-08-29 (API approval
+# pending, so no verify against Yahoo yet — the expected: block is the
+# transcription of record; re-check the page before draft day).
+# DRAFT: Saturday Sep 5, 2026, 10:00 PM EDT / 7:00 PM PT · snake · 60s clock.
+
+platform: yahoo
+league_id: "49649"
+draft_id: null              # Yahoo has no separate draft id; tracker uses manual/browser feed
+season: 2026
+stats_season: 2025
+
+me:
+  username: "Air Raid Gabriel"   # Yahoo team name (no Sleeper identity)
+  user_id: null
+  draft_slot: null               # unknown until Yahoo reveals draft order
+
+# 10-team · half-PPR · ONE flex (W/R/T) — derived from format via
+# draftkit.onboard math, NOT copied from Omnibeta (amendment A):
+replacement_baselines:
+  QB: 10
+  RB: 24
+  WR: 24
+  TE: 11
+  K: 10
+  DEF: 10
+
+pool_sizes:
+  QB: 26
+  RB: 49
+  WR: 44
+  TE: 27
+  K: 14
+  DEF: 14
+
+guardrails:
+  qb2_earliest_round: 10
+  te2_fall_picks: 12
+
+tiers:
+  break_z: 0.5
+  cliff_z: 1.0
+  adp_include_within: 150   # 10 teams x 15 rounds
+
+# Standing tilts ON for this draft (v2 item 1.6)
+tilts:
+  enabled: true
+  mid_te_fade: 0.08
+  nonrush_qb_fade: 0.08
+  rush_qb_late_boost: 0.08
+  elite_te_boost: 0.05
+  top5_regression: 0.10
+  cap: 0.10
+
+# Transcription of the Yahoo settings page (2026-08-29) — the closest thing
+# to a verify target until API access exists
+expected:
+  teams: 10
+  rounds: 15                # 9 starters + 6 bench (2 IR drafted separately: no)
+  pick_timer: 60
+  type: snake               # "Live Standard Draft"
+  roster: [QB, WR, WR, RB, RB, TE, "W/R/T", K, DEF, BN, BN, BN, BN, BN, BN, IR, IR]
+  scoring:
+    rec: 0.5                # HALF PPR — the big difference from Omnibeta
+    pass_yd: 0.04           # 25 yards per point
+    pass_td: 4.0
+    pass_int: -1.0
+    rush_yd: 0.1
+    rec_yd: 0.1
+    rush_td: 6.0
+    rec_td: 6.0
+    fum_lost: -2.0
+    pass_td_40p: 2.0        # league custom: +2 bonus on 40+ yard passing TDs
+  waivers: rolling_list     # NOT FAAB — priority list, 2-day claims, Tue game-time
+  trade_deadline: 2026-11-28
+  playoffs: "6 teams, weeks 15-17, reseeding on"
+  ir_slots: 2
