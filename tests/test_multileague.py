@@ -39,3 +39,24 @@ def test_superflex_raises_qb_baseline():
     assert b["QB"] == 18  # 10 * (1 + 0.8)
     demand, bench = slot_counts(positions)
     assert bench == 1
+
+
+def test_scoped_artifacts_isolate_leagues(monkeypatch):
+    from pathlib import Path
+    cfg_default = Config.load()
+    assert cfg_default.scoped(Path("tiers.csv")).name == "tiers.csv"
+    monkeypatch.setenv("DRAFTKIT_LEAGUE", "keefamania")
+    cfg_k = Config.load()
+    assert cfg_k.scoped(Path("tiers.csv")).name == "tiers.keefamania.csv"
+    assert cfg_k.scoped(Path("data/processed/usage.parquet")).name == "usage.keefamania.parquet"
+
+
+def test_scoring_from_league_yaml(monkeypatch):
+    from draftkit.dataset import scoring_from_cfg
+    cfg = Config.load()                       # omnibeta: no scoring block
+    assert scoring_from_cfg(cfg)["receptions"] == 1.0
+    monkeypatch.setenv("DRAFTKIT_LEAGUE", "keefamania")
+    k = scoring_from_cfg(Config.load())
+    assert k["receptions"] == 0.5             # half PPR
+    assert k["rushing_fumbles_lost"] == -2.0  # fum_lost fans out
+    assert k["passing_tds"] == 4.0

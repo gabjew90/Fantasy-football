@@ -69,6 +69,17 @@ class Config:
     def draft_id(self) -> str:
         return str(self._data["draft_id"])
 
+    def scoped(self, path: str | Path) -> Path:
+        """League-scoped artifact path: the DEFAULT league keeps its historic
+        filenames (tiers.csv, usage.parquet — the production manager reads
+        them), every other league gets name.<league>.ext. Hard isolation:
+        two leagues can never write the same file."""
+        path = Path(path)
+        default = self._data.get("default_league")
+        if not self.league_name or self.league_name == default:
+            return path
+        return path.with_name(f"{path.stem}.{self.league_name}{path.suffix}")
+
     def path(self, kind: str) -> Path:
         p = self.root / self._data["paths"][kind]
         os.makedirs(p, exist_ok=True)

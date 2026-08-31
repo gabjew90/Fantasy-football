@@ -35,9 +35,40 @@ SCORING = {
 }
 
 
-def fantasy_points_expr() -> pl.Expr:
+# league-yaml scoring keys (Sleeper-style) -> nflverse weekly stat columns
+_YAML_TO_NFLVERSE = {
+    "pass_yd": "passing_yards", "pass_td": "passing_tds",
+    "pass_int": "passing_interceptions", "rush_yd": "rushing_yards",
+    "rush_td": "rushing_tds", "rec": "receptions", "rec_yd": "receiving_yards",
+    "rec_td": "receiving_tds",
+    # fumbles map to all three nflverse fumble columns
+}
+
+
+def scoring_from_cfg(cfg) -> dict[str, float]:
+    """League scoring for the stats dataset. A league yaml may carry a
+    `scoring:` block (Sleeper-style keys); without one, the historic
+    full-PPR constants apply (Omnibeta's verified settings). Keys nflverse
+    has no column for (e.g. 40+ yard TD bonuses) are ignored here — that
+    is a documented approximation, not silent: see the league yaml."""
+    block = cfg.get("scoring") if cfg is not None else None
+    if not block:
+        return dict(SCORING)
+    out = dict(SCORING)
+    for k, v in block.items():
+        col = _YAML_TO_NFLVERSE.get(k)
+        if col:
+            out[col] = float(v)
+        elif k == "fum_lost":
+            for c in ("sack_fumbles_lost", "rushing_fumbles_lost",
+                      "receiving_fumbles_lost"):
+                out[c] = float(v)
+    return out
+
+
+def fantasy_points_expr(scoring: dict[str, float] | None = None) -> pl.Expr:
     expr = pl.lit(0.0)
-    for col, w in SCORING.items():
+    for col, w in (scoring or SCORING).items():
         expr = expr + pl.col(col).fill_null(0.0).cast(pl.Float64) * w
     return expr.alias("fpts")
 
@@ -143,8 +174,10 @@ def build_usage(cfg) -> tuple[pl.DataFrame, pl.DataFrame]:
 
     carries_col = "carries" if "carries" in weekly.columns else "rushing_attempts"
 
+    scoring = scoring_from_cfg(cfg)
+
     def _active(df: pl.DataFrame) -> pl.DataFrame:
-        return df.with_columns(fantasy_points_expr()).filter(
+        return df.with_columns(fantasy_points_expr(scoring)).filter(
             (
                 (
                     pl.col(carries_col).fill_null(0)
@@ -252,8 +285,8 @@ def build_usage(cfg) -> tuple[pl.DataFrame, pl.DataFrame]:
 def run(cfg) -> dict:
     processed = cfg.path("processed")
     player, team_ctx = build_usage(cfg)
-    player.write_parquet(processed / "usage.parquet")
-    team_ctx.write_parquet(processed / "team_context.parquet")
+    player.write_parquet(cfg.scoped(processed / "usage.parquet"))
+    team_ctx.write_parquet(cfg.scoped(processed / "team_context.parquet"))
     return {
         "players": player.height,
         "with_sleeper_id": player.filter(pl.col("sleeper_id").is_not_null()).height,

@@ -59,7 +59,7 @@ def build_context(cfg) -> dict:
     week_byes = seasondata.byes(schedule, week)
     early = seasondata.early_games(schedule, week)
 
-    tiers = pl.read_csv(cfg.root / "tiers.csv", infer_schema_length=2000)
+    tiers = pl.read_csv(cfg.scoped(cfg.root / "tiers.csv"), infer_schema_length=2000)
     trow = {str(r["sleeper_id"]): r for r in tiers.iter_rows(named=True)}
 
     weekly_proj = seasondata.weekly_projections(scoring, season, week)

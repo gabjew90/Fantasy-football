@@ -1,0 +1,210 @@
+name,pos,adp
+"Jahmyr Gibbs",RB,1.4
+"Bijan Robinson",RB,2.1
+"Ja'Marr Chase",WR,3.5
+"Puka Nacua",WR,5
+"Christian McCaffrey",RB,5.9
+"Jonathan Taylor",RB,6.5
+"Jaxon Smith-Njigba",WR,7.2
+"Amon-Ra St. Brown",WR,8
+"James Cook III",RB,9.6
+"CeeDee Lamb",WR,10.9
+"Saquon Barkley",RB,11.5
+"Justin Jefferson",WR,13.2
+"De'Von Achane",RB,15.4
+"Kenneth Walker III",RB,15.8
+"Chase Brown",RB,16
+"Ashton Jeanty",RB,16.9
+"Derrick Henry",RB,17.4
+"Omarion Hampton",RB,18.5
+"Drake London",WR,19.8
+"Josh Allen",QB,20.1
+"Brock Bowers",TE,21.2
+"Nico Collins",WR,22
+"George Pickens",WR,22.5
+"A.J. Brown",WR,24.2
+"Trey McBride",TE,26.7
+"Kyren Williams",RB,28.3
+"DeVonta Smith",WR,29.6
+"Jeremiyah Love",RB,30
+"Malik Nabers",WR,31
+"Chris Olave",WR,32
+"Tee Higgins",WR,33.4
+"Javonte Williams",RB,34.4
+"Breece Hall",RB,34.9
+"Rashee Rice",WR,35.4
+"Zay Flowers",WR,35.7
+"Josh Jacobs",RB,37.2
+"Lamar Jackson",QB,38.2
+"Colston Loveland",TE,39.5
+"Jaylen Waddle",WR,40.5
+"Tetairoa McMillan",WR,41.8
+"Cam Skattebo",RB,42.6
+"Travis Etienne Jr.",RB,42.6
+"Ladd McConkey",WR,44.8
+"Emeka Egbuka",WR,45.2
+"D'Andre Swift",RB,46.3
+"Tyler Warren",TE,47.3
+"Drake Maye",QB,47.2
+"Garrett Wilson",WR,49.1
+"Joe Burrow",QB,50.1
+"David Montgomery",RB,53.5
+"Quinshon Judkins",RB,54.3
+"Terry McLaurin",WR,54.1
+"Jayden Daniels",QB,54.4
+"Bucky Irving",RB,55.4
+"Davante Adams",WR,56.5
+"Jalen Hurts",QB,56.4
+"Luther Burden III",WR,58.7
+"DJ Moore",WR,60.1
+"Tucker Kraft",TE,60.5
+"Bhayshul Tuten",RB,62.6
+"Sam LaPorta",TE,63.1
+"Jadarian Price",RB,65.3
+"TreVeyon Henderson",RB,66.3
+"Jameson Williams",WR,65.9
+"Rome Odunze",WR,66.7
+"Caleb Williams",QB,67.0
+"Christian Watson",WR,68.0
+"Mike Evans",WR,69.1
+"Justin Herbert",QB,70.1
+"Harold Fannin Jr.",TE,70.9
+"Kyle Pitts Sr.",TE,72.2
+"Dak Prescott",QB,73.9
+"Jaylen Warren",RB,77.0
+"Marvin Harrison Jr.",WR,78.7
+"Rhamondre Stevenson",RB,79.0
+"Parker Washington",WR,78.8
+"Carnell Tate",WR,81.5
+"Trevor Lawrence",QB,83.8
+"Brian Thomas Jr.",WR,84.6
+"George Kittle",TE,83.6
+"Tony Pollard",RB,86.1
+"DK Metcalf",WR,86.2
+"Brandon Aubrey",K,85.7
+"Rico Dowdle",RB,87.3
+"Rams",DEF,88.3
+"Chuba Hubbard",RB,90.2
+"Jaxson Dart",QB,91.3
+"Jonathon Brooks",RB,93.1
+"Texans",DEF,93.3
+"Travis Kelce",TE,94.1
+"Alec Pierce",WR,96.2
+"J.K. Dobbins",RB,95.3
+"Chris Godwin Jr.",WR,96.7
+"Jordyn Tyson",WR,98.7
+"Dalton Kincaid",TE,97.3
+"Brock Purdy",QB,98.3
+"Bo Nix",QB,98.8
+"Blake Corum",RB,99.8
+"Matthew Stafford",QB,99.7
+"Michael Wilson",WR,101.5
+"Broncos",DEF,101.4
+"Patrick Mahomes",QB,102.5
+"Stefon Diggs",WR,104.2
+"Courtland Sutton",WR,105.2
+"Dallas Goedert",TE,105.4
+"RJ Harvey",RB,107.4
+"Kyle Monangai",RB,107.9
+"Josh Downs",WR,107.5
+"Jacory Croskey-Merritt",RB,107.6
+"Seahawks",DEF,107.8
+"De'Zhaun Stribling",WR,109.5
+"Isaiah Likely",TE,109.5
+"Quentin Johnston",WR,111.0
+"Kyler Murray",QB,112.6
+"Mark Andrews",TE,113.0
+"Jordan Mason",RB,113.5
+"Jared Goff",QB,113.8
+"Ricky Pearsall",WR,114.8
+"Makai Lemon",WR,115.8
+"Jordan Addison",WR,115.7
+"Aaron Rodgers",QB,116.1
+"Jake Ferguson",TE,116.7
+"Jayden Reed",WR,117.4
+"Ka'imi Fairbairn",K,117.4
+"Fernando Mendoza",QB,118.0
+"Kenny Gainwell",RB,119.5
+"Brian Robinson",RB,118.1
+"Cooper Kupp",WR,120.2
+"Michael Pittman Jr.",WR,120.6
+"MarShawn Lloyd",RB,120.8
+"Bryce Young",QB,121.1
+"Jason Myers",K,121.5
+"Sam Darnold",QB,122.0
+"Mike Washington Jr.",RB,123.0
+"Cameron Dicker",K,121.9
+"Rachaad White",RB,123.8
+"Jordan Love",QB,123.0
+"Eagles",DEF,123.0
+"Aaron Jones Sr.",RB,124.2
+"David Njoku",TE,123.2
+"Cam Ward",QB,124.1
+"Isaac TeSlaa",WR,124.1
+"Pat Freiermuth",TE,124.0
+"Malik Willis",QB,124.9
+"Juwan Johnson",TE,124.9
+"KC Concepcion",WR,124.8
+"C.J. Stroud",QB,124.8
+"AJ Barner",TE,124.8
+"Travis Hunter",WR,125.4
+"Keenan Allen",WR,125.5
+"Isiah Pacheco",RB,125.2
+"James Conner",RB,125.1
+"Baker Mayfield",QB,125.4
+"Alvin Kamara",RB,125.8
+"Jauan Jennings",WR,126.0
+"Ja'Kobi Lane",WR,126.2
+"Chig Okonkwo",TE,126.4
+"Oronde Gadsden",TE,126.6
+"Matthew Golden",WR,126.5
+"Dalton Schultz",TE,126.6
+"Emmett Johnson",RB,126.1
+"49ers",DEF,126.1
+"Daniel Jones",QB,126.7
+"Terrance Ferguson",TE,127.0
+"Deebo Samuel Sr.",WR,126.9
+"Bears",DEF,127.2
+"Hunter Henry",TE,127.2
+"Patriots",DEF,128.0
+"Braelon Allen",RB,128.3
+"Rashid Shaheed",WR,128.2
+"Nick Folk",K,127.8
+"Jake Elliott",K,127.7
+"T.J. Hockenson",TE,128.3
+"Giants",DEF,128.7
+"Xavier Worthy",WR,129.0
+"Brenton Strange",TE,129.2
+"Jalen Nailor",WR,128.9
+"Jonah Coleman",RB,129.0
+"Tyreek Hill",WR,129.2
+"Bills",DEF,129.6
+"Jakobi Meyers",WR,130.1
+"Tank Bigsby",RB,129.6
+"Cam Little",K,129.3
+"Tyler Allgeier",RB,130.0
+"Kenyon Sadiq",TE,130.0
+"Tyler Shough",QB,129.9
+"Trey Smack",K,129.1
+"Harrison Butker",K,129.1
+"Zach Charbonnet",RB,130.3
+"Wan'Dale Robinson",WR,130.4
+"Kaelon Black",RB,130.0
+"Falcons",DEF,129.5
+"Woody Marks",RB,130.7
+"Cowboys",DEF,130.6
+"Tyrone Tracy Jr.",RB,130.7
+"Vikings",DEF,130.6
+"Khalil Shakir",WR,130.8
+"Chris Rodriguez Jr.",RB,131.0
+"Denzel Boston",WR,131.5
+"Keaton Mitchell",RB,131.6
+"Greg Dulcich",TE,131.4
+"Romeo Doubs",WR,132.0
+"Harrison Mevis",K,132.4
+"Chiefs",DEF,132.6
+"Browns",DEF,132.7
+"Jayden Higgins",WR,132.9
+"Tyjae Spears",RB,133.0
+"Jalen Coker",WR,133.1
+"Tyler Bass",K,133.7

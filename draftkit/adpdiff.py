@@ -46,7 +46,9 @@ def run(cfg, threshold: float = DEFAULT_THRESHOLD) -> dict:
     hist_dir = Path(cfg.path("raw")) / "adp_history"
     hist_dir.mkdir(parents=True, exist_ok=True)
 
-    url = FFC_URL.format(teams=12, year=int(cfg["season"]))
+    mcfg = cfg.get("market") or {}
+    url = FFC_URL.format(fmt=str(mcfg.get("ffc_format", "ppr")),
+                         teams=int(mcfg.get("teams", 12)), year=int(cfg["season"]))
     fresh = json.loads(_cached_fetch(url, hist_dir / "_latest_pull.json", ttl=0))
     rows = [{"name": r["name"], "pos": r["position"], "adp": float(r["adp"])}
             for r in fresh.get("players", [])]

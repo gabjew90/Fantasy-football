@@ -5,10 +5,10 @@
  "fa_replacement:1": {
   "DEF": 133.1,
   "K": 141.0,
-  "QB": 256.8,
-  "RB": 112.0,
-  "TE": 135.9,
-  "WR": 126.6
+  "QB": 256.6,
+  "RB": 136.9,
+  "TE": 146.4,
+  "WR": 148.7
  },
  "fantasycalc": {
   "data": {
@@ -295,6 +295,54 @@
  },
  "txn_history": [
   [
+   {
+    "adds": {
+     "13305": 4
+    },
+    "consenter_ids": [
+     4
+    ],
+    "created": 1788040149366,
+    "creator": "603677779459895296",
+    "draft_picks": [],
+    "drops": {
+     "13337": 4
+    },
+    "leg": 1,
+    "metadata": null,
+    "roster_ids": [
+     4
+    ],
+    "settings": null,
+    "status": "complete",
+    "status_updated": 1788040149366,
+    "transaction_id": "1399545460431060992",
+    "type": "free_agent",
+    "waiver_budget": []
+   },
+   {
+    "adds": {
+     "13337": 4
+    },
+    "consenter_ids": [
+     4
+    ],
+    "created": 1788034295467,
+    "creator": "603677779459895296",
+    "draft_picks": [],
+    "drops": null,
+    "leg": 1,
+    "metadata": null,
+    "roster_ids": [
+     4
+    ],
+    "settings": null,
+    "status": "complete",
+    "status_updated": 1788034295467,
+    "transaction_id": "1399520907403210752",
+    "type": "free_agent",
+    "waiver_budget": []
+   },
    {
     "adds": {
      "11581": 8
