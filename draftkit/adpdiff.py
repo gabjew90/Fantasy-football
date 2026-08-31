@@ -43,7 +43,9 @@ def run(cfg, threshold: float = DEFAULT_THRESHOLD) -> dict:
     """Fetch fresh ADP, snapshot it, diff vs the newest prior snapshot."""
     from .market import FFC_URL, _cached_fetch
 
-    hist_dir = Path(cfg.path("raw")) / "adp_history"
+    # league-scoped: a half-PPR/10-team league's snapshots must never become
+    # the default league's diff baseline (code review 2026-08-30)
+    hist_dir = cfg.scoped(Path(cfg.path("raw")) / "adp_history")
     hist_dir.mkdir(parents=True, exist_ok=True)
 
     mcfg = cfg.get("market") or {}
@@ -80,6 +82,6 @@ def run(cfg, threshold: float = DEFAULT_THRESHOLD) -> dict:
     if not result["movers"]:
         lines.append("- no movers past threshold" if result["baseline"]
                      else "- first snapshot recorded; diffs start tomorrow")
-    (Path(cfg.root) / "reports" / "adp_movers.md").write_text(
+    (cfg.scoped(Path(cfg.root) / "reports" / "adp_movers.md")).write_text(
         "\n".join(lines) + "\n", encoding="utf-8")
     return result

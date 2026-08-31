@@ -51,7 +51,14 @@ def scoring_from_cfg(cfg) -> dict[str, float]:
     full-PPR constants apply (Omnibeta's verified settings). Keys nflverse
     has no column for (e.g. 40+ yard TD bonuses) are ignored here — that
     is a documented approximation, not silent: see the league yaml."""
-    block = cfg.get("scoring") if cfg is not None else None
+    block = None
+    if cfg is not None:
+        block = cfg.get("scoring") or (cfg.get("expected") or {}).get("scoring")
+    if cfg is not None and not block:
+        raise ValueError(
+            "league yaml carries no scoring (add scoring: or expected.scoring) — "
+            "refusing the silent full-PPR fallback (CLAUDE.md: league facts live "
+            "in leagues/<name>.yaml)")
     if not block:
         return dict(SCORING)
     out = dict(SCORING)

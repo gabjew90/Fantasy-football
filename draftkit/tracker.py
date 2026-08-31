@@ -72,15 +72,15 @@ class Tracker:
         self.sigma_early = float(ecfg.get("sigma_early", 6.0))
         self.sigma_late = float(ecfg.get("sigma_late", 27.0))
         # v2 item 1.1: fat-tail reaches, run escalation, empirical calibration
-        self.reach_prob = float(ecfg.get("reach_prob", 0.15))
-        self.reach_scale = float(ecfg.get("reach_scale", 3.0))
-        self.run_window = int(ecfg.get("run_window", 5))
-        self.run_min = int(ecfg.get("run_min", 2))
-        self.run_boost = float(ecfg.get("run_boost", 1.5))
-        self.survival_shrink = float(ecfg.get("survival_shrink", 0.55))
+        self.reach_prob = float(ecfg.get("reach_prob", Tracker.reach_prob))
+        self.reach_scale = float(ecfg.get("reach_scale", Tracker.reach_scale))
+        self.run_window = int(ecfg.get("run_window", Tracker.run_window))
+        self.run_min = int(ecfg.get("run_min", Tracker.run_min))
+        self.run_boost = float(ecfg.get("run_boost", Tracker.run_boost))
+        self.survival_shrink = float(ecfg.get("survival_shrink", Tracker.survival_shrink))
         # v2 item 1.5: round-dependent objective
-        self.upside_from_round = int(ecfg.get("upside_from_round", 8))
-        self.upside_mult = float(ecfg.get("upside_mult", 1.15))
+        self.upside_from_round = int(ecfg.get("upside_from_round", Tracker.upside_from_round))
+        self.upside_mult = float(ecfg.get("upside_mult", Tracker.upside_mult))
         gcfg = cfg["guardrails"] if "guardrails" in cfg._data else {}
         self.qb2_round = int(gcfg.get("qb2_earliest_round", 10))
         self.te2_fall = int(gcfg.get("te2_fall_picks", 12))
@@ -276,17 +276,13 @@ class Tracker:
             counts[pos] = counts.get(pos, 0) + 1
         return counts
 
-    def _guardrail_ok(self, p: dict, rnd: int, needs, counts, picks_left,
-                      top6_te_fell: bool) -> bool:
-        """Final spec §6 — hard rules, override the engine."""
-        # no_market rows are board-visible only: the stats model's lone opinion
-        # with no market corroboration. An overrides.csv entry (proj_source
-        # becomes "override") is the switch that activates them for the engine.
-        if p.get("proj_source") == "no_market":
-            return False
-        pos = p["pos"]
+    def _pos_allowed(self, pos: str, rnd: int, counts, picks_left,
+                     top6_te_fell: bool) -> bool:
+        """Position-level guardrails (spec §6) — the SINGLE source of truth,
+        used by _guardrail_ok for this pick and by the two-pick planner for
+        the next pick (code review 2026-08-30: the planner's hand copy had
+        silently diverged)."""
         if pos in ("K", "DEF"):
-            # final-two-picks rule (kdef_needed <= 2 always, so this is the gate)
             if picks_left > 2:
                 return False
             if counts.get(pos, 0) >= 1:
@@ -301,6 +297,19 @@ class Tracker:
                 return False
             if counts.get("TE", 0) >= 1 and not top6_te_fell:
                 return False
+        return True
+
+    def _guardrail_ok(self, p: dict, rnd: int, needs, counts, picks_left,
+                      top6_te_fell: bool) -> bool:
+        """Final spec §6 — hard rules, override the engine."""
+        # no_market rows are board-visible only: the stats model's lone opinion
+        # with no market corroboration. An overrides.csv entry (proj_source
+        # becomes "override") is the switch that activates them for the engine.
+        if p.get("proj_source") == "no_market":
+            return False
+        pos = p["pos"]
+        if not self._pos_allowed(pos, rnd, counts, picks_left, top6_te_fell):
+            return False
         # max one zero-role stash: proxy = negative-VORP player already rostered
         if (p["vorp"] or 0) <= 0 and not snake.needs_position(needs, pos):
             have_stash = any(
@@ -370,22 +379,27 @@ class Tracker:
 
         cliff = self.cliff_report()
         cands = []
+        second: dict[str, float] = {}  # per-position 2nd-best VORP, for the planner
         for pos in POS_ORDER:
             rem = [p for p in self.remaining(pos) if p.get("proj_source") != "no_market"]
-            pool = [
+            second[pos] = float(rem[1]["vorp"] or 0.0) if len(rem) > 1 else 0.0
+            gpool = [
                 p for p in rem
                 if self._guardrail_ok(p, rnd, needs, counts, picks_left, top6_te_fell)
-            ][:3]
-            if not pool:
-                continue
+            ]
             # v2 item 1.5: benches win on 90th percentiles, not medians — from
             # upside_from_round, gated players (role-quality, see tiers.py)
-            # score on an 85th-percentile proxy; non-qualifiers keep median
+            # score on an 85th-percentile proxy. Applied BEFORE the top-3
+            # truncation so a gated player ranked 4th+ by median can surface
+            # (code review 2026-08-30).
             if rnd >= self.upside_from_round:
-                pool = sorted(
-                    pool,
+                gpool = sorted(
+                    gpool,
                     key=lambda q: -((q["vorp"] or 0.0)
                                     * (self.upside_mult if q.get("upside_flag") else 1.0)))
+            pool = gpool[:3]
+            if not pool:
+                continue
             # best VORP within position; near-ties (<= 2 VORP of the position's
             # TOP candidate) broken by Δ — anchored so swaps can't chain
             anchor = pool[0]
@@ -467,25 +481,25 @@ class Tracker:
         # (amendment B's hard fallback).
         try:
             from .planner import pair_rank
-            second = {}
-            for pos in POS_ORDER:
-                vs = sorted((q["vorp"] or 0.0 for q in self.remaining(pos)
-                             if q.get("proj_source") != "no_market"), reverse=True)
-                second[pos] = float(vs[1]) if len(vs) > 1 else 0.0
-            next_rnd = min(rnd + 1, self.rounds)
-            eligible = set()
-            for pos in POS_ORDER:
-                if pos in ("K", "DEF") and picks_left - 1 > 2:
-                    continue
-                if pos == "QB" and (counts.get("QB", 0) >= 2 or
-                                    (counts.get("QB", 0) >= 1 and next_rnd < self.qb2_round)):
-                    continue
-                if pos == "TE" and counts.get("TE", 0) >= 2:
-                    continue
-                eligible.add(pos)
-            cands = pair_rank(cands, report, needs, second, eligible)
-        except Exception:  # noqa: BLE001 — planner must never block the clock
-            pass
+
+            def eligible_after(pos_taken: str) -> set[str]:
+                # the partner set the NEXT pick will actually allow, from the
+                # same predicate the guardrails use, with the candidate counted
+                counts_after = dict(counts)
+                counts_after[pos_taken] = counts_after.get(pos_taken, 0) + 1
+                return {
+                    pos2 for pos2 in POS_ORDER
+                    if self._pos_allowed(pos2, min(rnd + 1, self.rounds),
+                                         counts_after, picks_left - 1, top6_te_fell)
+                }
+
+            cands = pair_rank(cands, report, needs, second, eligible_after)
+        except Exception as e:  # noqa: BLE001 — planner must never block the clock
+            # fall back to greedy, but never silently: a dead planner on draft
+            # day must be visible (code review 2026-08-30)
+            import logging
+            logging.getLogger("draftkit").warning("two-pick planner fallback: %r", e)
+            self._planner_note = f"planner fallback: {e.__class__.__name__}"
         return cands[:top_n]
 
     # ---------- render ----------

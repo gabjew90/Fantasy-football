@@ -2,49 +2,67 @@
 
 Greedy per-position urgency won the pick and lost the round at #26/#47:
 it never asked what PAIR of picks maximizes value. This ranks candidates by
-    pair(c) = VORP(c now) + best expected partner at my next turn,
+    pair(c) = need-weighted VORP(c now) + best expected partner at my next turn,
 using ONLY numbers the urgency report already computed — no new simulation,
 so the on-clock path stays model-free and the greedy order is the automatic
 fallback whenever the report isn't ready (amendment B's latency budget).
 
-Same-position pairing uses min(e_best_next, second-best-now) because the
-report's expectation doesn't know the candidate himself was just taken.
+Partner rules (code review 2026-08-30): the partner-eligibility set comes
+from the SAME guardrail predicate the next pick will actually apply
+(tracker._pos_allowed, conditioned on the candidate being rostered), needs
+are consumed by the candidate before valuing the partner, and same-position
+pairing caps at second-best-now because the report's expectation doesn't
+know the candidate himself was just taken.
 """
 
 from __future__ import annotations
 
-NEED_DAMP = 0.6  # partner position that fills no starter/flex slot
+from typing import Callable
+
+from .snake import FLEX_ELIGIBLE, needs_position
+
+NEED_DAMP = 0.6  # partner/candidate position that fills no starter/flex slot
+
+
+def consume(needs: dict, pos: str) -> dict:
+    """Roster needs after taking one player at `pos` (dedicated slot first,
+    then FLEX)."""
+    out = dict(needs)
+    if out.get(pos, 0) > 0:
+        out[pos] -= 1
+    elif pos in FLEX_ELIGIBLE and out.get("FLEX", 0) > 0:
+        out["FLEX"] -= 1
+    return out
 
 
 def pair_rank(cands: list[tuple[float, str, dict]],
               report: dict | None,
               needs: dict,
               second_best_now: dict[str, float],
-              eligible_next: set[str],
-              flex_eligible: tuple[str, ...] = ("RB", "WR", "TE"),
+              eligible_after: Callable[[str], set[str]],
               ) -> list[tuple[float, str, dict]]:
     """Re-rank recommendation candidates by joint two-pick EV.
 
     cands: (greedy_score, why, player) per position, guardrail-filtered.
     report: urgency report {pos: {e_best_next, ...}} or None (-> greedy).
     second_best_now: pos -> second-best VORP currently on the board.
-    eligible_next: positions my next pick would be allowed to take.
+    eligible_after: pos_taken -> partner positions the next pick may take,
+        per the real guardrails conditioned on the candidate being rostered.
     """
     if not report or len(cands) < 2:
         return cands
 
     def partner_value(pos_taken: str) -> tuple[float, str | None]:
+        needs_after = consume(needs, pos_taken)
         best_v, best_p = 0.0, None
-        for pos2 in eligible_next:
+        for pos2 in eligible_after(pos_taken):
             u = report.get(pos2)
             if not u:
                 continue
             e = float(u.get("e_best_next") or 0.0)
             if pos2 == pos_taken:
                 e = min(e, second_best_now.get(pos2, 0.0))
-            fills = needs.get(pos2, 0) > 0 or (
-                pos2 in flex_eligible and needs.get("FLEX", 0) > 0)
-            v = e if fills else e * NEED_DAMP
+            v = e if needs_position(needs_after, pos2) else e * NEED_DAMP
             if v > best_v:
                 best_v, best_p = v, pos2
         return best_v, best_p
@@ -52,13 +70,11 @@ def pair_rank(cands: list[tuple[float, str, dict]],
     ranked = []
     for score, why, p in cands:
         pv, partner = partner_value(p["pos"])
-        pos = p["pos"]
-        fills_now = needs.get(pos, 0) > 0 or (
-            pos in flex_eligible and needs.get("FLEX", 0) > 0)
         # the CANDIDATE side is need-weighted too — without this, deep
         # positions with fat raw VORP (WR) spam the roster after their
         # starter slots are full (caught by simulate: a 10-WR roster)
-        own = float(p.get("vorp") or 0.0) * (1.0 if fills_now else NEED_DAMP)
+        own = float(p.get("vorp") or 0.0) * (
+            1.0 if needs_position(needs, p["pos"]) else NEED_DAMP)
         pair = own + pv
         if partner:
             why = (why + f" · two-pick plan: pair with the ~"

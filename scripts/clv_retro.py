@@ -54,10 +54,16 @@ def survival_calibration(picks: list[dict], recs: list[dict]) -> list[dict]:
         nxt = e.get("my_next_pick")
         if not isinstance(nxt, int):
             continue
+        # logged predictions may be post-calibration (v2 1.1): invert the
+        # recorded shrink so buckets always hold RAW model predictions and a
+        # refit can never double-shrink (code review 2026-08-30)
+        shrink = float(e.get("survival_shrink") or 1.0)
         for r in e.get("recommendations", []):
             m = SURV.search(r.get("why", ""))
             if m:
-                preds[(norm(r["player"]), nxt)] = int(m.group(1))
+                p_cal = int(m.group(1)) / 100.0
+                p_raw = p_cal if shrink >= 1.0 else 0.5 + (p_cal - 0.5) / shrink
+                preds[(norm(r["player"]), nxt)] = round(min(1.0, max(0.0, p_raw)) * 100)
     rows = []
     for (player, nxt), pct in preds.items():
         at = picked_at.get(player)

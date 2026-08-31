@@ -119,6 +119,7 @@ class DraftLog:
         )
         e = {
             "type": "recs",
+            "survival_shrink": float(getattr(t, "survival_shrink", 1.0)),
             "current_pick": current_pick,
             "on_clock_slot": snake.pick_to_round_slot(
                 min(current_pick, t.teams * t.rounds), t.teams
