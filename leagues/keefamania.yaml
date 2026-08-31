@@ -76,21 +76,10 @@ expected:
   playoffs: "6 teams, weeks 15-17, reseeding on"
   ir_slots: 2
 
-# League-driven inputs for the board build (v2 isolation: nothing shared
-# with Omnibeta — artifacts are suffixed .keefamania by Config.scoped)
-scoring:            # applied to the 2025 stats dataset (half PPR!)
-  rec: 0.5
-  pass_yd: 0.04
-  pass_td: 4.0
-  pass_int: -1.0
-  rush_yd: 0.1
-  rec_yd: 0.1
-  rush_td: 6.0
-  rec_td: 6.0
-  fum_lost: -2.0
-  # pass_td_40p +2 bonus NOT modeled (nflverse weekly lacks TD distance) —
-  # small upward bias on deep-ball QBs handled by awareness, not fake data
+# Dataset scoring reads expected.scoring above (one block, no drift —
+# code review 2026-08-30). pass_td_40p +2 is recorded there but NOT modeled:
+# nflverse weekly lacks TD distance; deep-ball QB bias handled by awareness.
 
 market:
   teams: 10
-  ffc_format: half-ppr   # FFC's half-PPR ADP feed until yahoo_adp.csv exists
+  ffc_format: half-ppr   # FFC half-PPR feed; overridden by data/external/yahoo_adp.keefamania.csv (league-scoped name!)

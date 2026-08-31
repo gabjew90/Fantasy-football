@@ -286,7 +286,7 @@ def cmd_web(cfg: Config, args) -> None:
         slot, info = resolve_my_slot(cfg, client)
         if slot is None:
             console.print(f"[yellow]warning: {info.get('error')}; slot unresolved[/yellow]")
-    sys.exit(run_server(cfg, cfg.root / "tiers.csv", slot, args.port))
+    sys.exit(run_server(cfg, cfg.scoped(cfg.root / "tiers.csv"), slot, args.port))
 
 
 def cmd_simulate(cfg: Config, args) -> None:
@@ -294,9 +294,9 @@ def cmd_simulate(cfg: Config, args) -> None:
 
     from . import snake
 
-    mine, teams = run_simulation(cfg, cfg.root / "tiers.csv", my_slot=args.slot, verbose=not args.quiet)
+    mine, teams = run_simulation(cfg, cfg.scoped(cfg.root / "tiers.csv"), my_slot=args.slot, verbose=not args.quiet)
     console.print("\n[bold]my simulated roster:[/bold]")
-    tiers = pl.read_csv(cfg.root / "tiers.csv", infer_schema_length=2000)
+    tiers = pl.read_csv(cfg.scoped(cfg.root / "tiers.csv"), infer_schema_length=2000)
     by_id = {str(r["sleeper_id"]): r for r in tiers.iter_rows(named=True)}
     for p in mine:
         info = by_id[str(p["player_id"])]

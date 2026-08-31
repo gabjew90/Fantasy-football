@@ -60,3 +60,14 @@ def test_scoring_from_league_yaml(monkeypatch):
     assert k["receptions"] == 0.5             # half PPR
     assert k["rushing_fumbles_lost"] == -2.0  # fum_lost fans out
     assert k["passing_tds"] == 4.0
+
+
+def test_scoring_without_league_block_fails_loudly():
+    import pytest as _pytest
+    from draftkit.dataset import scoring_from_cfg
+
+    class FakeCfg(dict):
+        pass
+
+    with _pytest.raises(ValueError, match="no scoring"):
+        scoring_from_cfg(FakeCfg({}))

@@ -66,6 +66,9 @@ def simulate_survival(pool, current_pick, next_pick, rivals, seeds, rng,
         pos: float(vorp[pos_arr == pos].max()) if n and (pos_arr == pos).any() else 0.0
         for pos in POSITIONS
     }
+    # No intervening rivals -> survival is EXACTLY 1.0, deliberately raw:
+    # calibration corrects the sim's model of rival behavior, and there is no
+    # rival behavior to model here (code review 2026-08-30).
     if picks_between == 0 or not rivals or n == 0:
         return {
             pos: {"best_now": best_now[pos], "e_best_next": best_now[pos],

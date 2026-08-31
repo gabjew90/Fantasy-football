@@ -60,9 +60,18 @@ def load_ecr(raw_dir: Path) -> pl.DataFrame:
     return out
 
 
+def _norm_name_expr(col):
+    """Suffix-stripping name normalization as a polars expression (single
+    definition — scripts/clv_retro.py mirrors it in Python; ids.normalize_name
+    serves the Sleeper-ID path with space-preserving semantics)."""
+    return (col.str.to_lowercase()
+            .str.replace_all(r"\s+(jr\.?|sr\.?|i{2,4}|iv|v)$", "")
+            .str.replace_all(r"[^a-z0-9]", ""))
+
+
 def load_ffc_adp(raw_dir: Path, teams: int, year: int,
                  fmt: str = "ppr") -> pl.DataFrame:
-    cache = Path(raw_dir) / f"ffc_adp_ppr_{teams}_{year}.json"
+    cache = Path(raw_dir) / f"ffc_adp_{fmt}_{teams}_{year}.json"
     import json
 
     data = json.loads(_cached_fetch(FFC_URL.format(fmt=fmt, teams=teams, year=year), cache))
@@ -200,23 +209,6 @@ def build_market(cfg, players: dict[str, dict]) -> tuple[pl.DataFrame, dict]:
 
     market = market.join(adp_part, on="sleeper_id", how="full", coalesce=True)
 
-    # Yahoo ADP override (v2 Keefamania prep): the room drafts against
-    # YAHOO's board, so a scraped data/external/yahoo_adp.csv (name,pos,adp)
-    # takes precedence over FFC where names match. League-scoped file.
-    ypath = cfg.scoped(cfg.path("external") / "yahoo_adp.csv")
-    if ypath.exists():
-        yah = pl.read_csv(ypath, infer_schema_length=500).with_columns(
-            pl.col("name").str.to_lowercase()
-            .str.replace_all(r"\s+(jr\.?|sr\.?|i{2,4}|iv|v)$", "")
-            .str.replace_all(r"[^a-z0-9]", "").alias("_norm"),
-            pl.col("adp").cast(pl.Float64).alias("adp_yahoo"),
-        ).select("_norm", "adp_yahoo").unique(subset="_norm")
-        market = market.with_columns(
-            pl.col("name").str.to_lowercase()
-            .str.replace_all(r"\s+(jr\.?|sr\.?|i{2,4}|iv|v)$", "")
-            .str.replace_all(r"[^a-z0-9]", "").alias("_norm")
-        ).join(yah, on="_norm", how="left").drop("_norm")
-        report["yahoo_adp_matched"] = int(market["adp_yahoo"].is_not_null().sum())
     market = market.with_columns(
         pl.coalesce(pl.col("name"), pl.col("name_ffc")).alias("name"),
         pl.coalesce(pl.col("pos"), pl.col("pos_ffc")).alias("pos"),
@@ -226,6 +218,29 @@ def build_market(cfg, players: dict[str, dict]) -> tuple[pl.DataFrame, dict]:
             else pl.col("bye_ffc").alias("bye")
         ),
     ).drop(["name_ffc", "pos_ffc", "bye_ffc"], strict=False)
+
+    # Yahoo ADP override (v2 Keefamania prep): the room drafts against
+    # YAHOO's board. The file is LEAGUE-SCOPED (yahoo_adp.<league>.csv for a
+    # non-default league); an unscoped file is reported loudly, not ignored.
+    ypath = cfg.scoped(cfg.path("external") / "yahoo_adp.csv")
+    unscoped = cfg.path("external") / "yahoo_adp.csv"
+    if not ypath.exists() and ypath != unscoped and unscoped.exists():
+        report["yahoo_adp_warning"] = (
+            f"found {unscoped.name} but league '{cfg.league_name}' reads "
+            f"{ypath.name} — rename it")
+    if ypath.exists():
+        yah = pl.read_csv(ypath, infer_schema_length=500).with_columns(
+            _norm_name_expr(pl.col("name")).alias("_norm"),
+            pl.col("pos").cast(pl.Utf8),
+            pl.col("adp").cast(pl.Float64).alias("adp_yahoo"),
+        ).select("_norm", "pos", "adp_yahoo").unique(subset=["_norm", "pos"])
+        # joined AFTER the name/pos coalesce so FFC-only rows (name null
+        # pre-coalesce) match too, and keyed on (name, pos) so cross-position
+        # name collisions cannot cross-assign ADP (code review 2026-08-30)
+        market = market.with_columns(
+            _norm_name_expr(pl.col("name")).alias("_norm")
+        ).join(yah, on=["_norm", "pos"], how="left").drop("_norm")
+        report["yahoo_adp_matched"] = int(market["adp_yahoo"].is_not_null().sum())
 
     if "adp_user" in market.columns:
         market = market.with_columns(

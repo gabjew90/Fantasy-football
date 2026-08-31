@@ -242,8 +242,13 @@ def default_projection(cfg, usage: pl.DataFrame, market: pl.DataFrame) -> pl.Dat
     a_cfg = p.get("alpha_by_type") or {}
     a_stable = float(a_cfg.get("stable_veteran", alpha))
     a_vol = float(a_cfg.get("volatile", alpha))
-    new_team = (pl.col("team_2025").is_not_null() & pl.col("team").is_not_null()
-                & (pl.col("team_2025") != pl.col("team")))
+    # team_2025 is an nflverse code (GB, KC, SF...); market team uses the
+    # Sleeper-style codes (GBP, KCC, SFO...). Without this mapping every
+    # player on ~10 franchises was a false "new team" (code review 2026-08-30).
+    from .seasondata import _TEAM_MAP
+    team25 = pl.col("team_2025").replace(_TEAM_MAP)
+    new_team = (team25.is_not_null() & pl.col("team").is_not_null()
+                & (team25 != pl.col("team")))
     alpha_col = (
         pl.when(new_team).then(a_vol)
         .when((pl.col("games").fill_null(0) >= 12) & ~new_team).then(a_stable)
