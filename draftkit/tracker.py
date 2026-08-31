@@ -521,6 +521,23 @@ class Tracker:
         # Pure arithmetic over the cached urgency report — nothing new runs
         # on the clock; any failure or missing report keeps the greedy list
         # (amendment B's hard fallback).
+        if not cands:
+            # Shallow-baseline boards (10-team: RB24/WR24) go negative-VORP by
+            # the late rounds, which turned the one-stash budget into a total
+            # mute — zero recommendations from R11 on (caught by the local-pipe
+            # replay, 2026-08-30). Hard rules keep holding (no_market, K/DEF
+            # timing, QB/TE caps); only the stash budget yields, loudly.
+            for pos in POS_ORDER:
+                rem = [p for p in self.remaining(pos)
+                       if p.get("proj_source") != "no_market"
+                       and self._pos_allowed(pos, rnd, counts, picks_left, top6_te_fell)]
+                if rem:
+                    best = rem[0]
+                    cands.append((best["vorp"] or 0.0,
+                                  "bench depth — best remaining value (everyone left is "
+                                  "below replacement, stash budget waived)", best))
+            cands.sort(key=lambda t: -t[0])
+
         try:
             from .planner import pair_rank
 
