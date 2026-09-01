@@ -289,13 +289,54 @@ window.DK = (function () {
       relaxed = eligible.length > 0;
     }
 
+    /* VONA -- value over NEXT AVAILABLE, not over a fixed replacement.
+     *
+     * VORP asks "how much better than a replacement-level player?". Draft day
+     * asks a different question: "how much better than whoever I could still
+     * get at this position at my NEXT turn?". On a flat position those are
+     * wildly different numbers.
+     *
+     * Measured spread of each position's top 10 (mock 8):
+     *   RB 82.3 pts (4.84/gm) · TE 67.5 (3.97) · QB 35.0 (2.06) · WR 33.6 (1.98)
+     *
+     * Every top-10 QB sits within 35 points of every other. VORP still handed
+     * Mahomes +21.1, so the engine took him at pick 42 against an ADP of 102
+     * -- a 60-pick reach to gain 0.72/game over Purdy, who was duly still
+     * available at 99. The cost landed on the bench: four WRs at or below
+     * replacement, because a mid-round pick went to a position where waiting
+     * was nearly free.
+     *
+     * Within a position VORP differences ARE projection differences (shared
+     * baseline), so VONA is simply the gap to the best player expected to
+     * survive until our next turn. A flat position self-discounts; a scarce
+     * one (RB, TE) does not. */
+    const gap = S.cfg.teams || 10;               // average wait between turns
+    const nextPickNo = (S.cfg.myNextPick || rnd * gap) + gap;
+    const survive = nextPickNo + Math.round(gap / 2);
+    const vonaBase = {};
+    for (const pos of ['QB', 'RB', 'WR', 'TE', 'K', 'DEF']) {
+      let base = null;
+      for (const p of avail) {                   // avail is VORP-descending
+        if (p.p === pos) {
+          if (base === null) base = p;           // fallback: best at position
+          if (p.a != null && p.a >= survive) { base = p; break; }
+        }
+      }
+      vonaBase[pos] = base ? base.v : 0;
+    }
+
     // need-weighted: a player filling an open starter slot outranks a
     // marginally better one who does not.
     const scored = eligible.map(p => {
       const fills = needsPosition(need, p.p);
       const urgent = picksLeft <= (['QB','RB','WR','TE','FLEX','K','DEF']
         .reduce((a, k) => a + (need[k] || 0), 0)) + 1;
-      let s = p.v;
+      /* Rank on VONA. Never below zero: a player who will still be there is
+       * not negatively valuable, just not urgent. VORP breaks ties so the
+       * genuinely better player still wins a flat comparison. */
+      const vona = Math.max(0, p.v - (vonaBase[p.p] === undefined ? 0 : vonaBase[p.p]));
+      let s = vona + p.v * 0.05;
+      p._vona = Math.round(vona * 10) / 10;
       if (fills) s += 12;
       if (fills && urgent) s += 60;
       return { p, s, fills };
@@ -305,8 +346,10 @@ window.DK = (function () {
       round: rnd, picksLeft, counts, need,
       openStarters: ['QB','RB','WR','TE','FLEX','K','DEF'].reduce((a,k)=>a+(need[k]||0),0),
       top: scored.slice(0, 20).map(x => ({
-        n: x.p.n, p: x.p.p, t: x.p.t, v: x.p.v, s: Math.round(x.s), fills: x.fills, st: x.p.s,
+        n: x.p.n, p: x.p.p, t: x.p.t, v: x.p.v, vona: x.p._vona,
+        s: Math.round(x.s), fills: x.fills, st: x.p.s,
       })),
+      vonaBase,
       blockedSample: blocked,
       availCount: avail.length,
       goneCount: S.gone.size,

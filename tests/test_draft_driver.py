@@ -460,6 +460,48 @@ def test_queue_plan_does_not_stack_one_position():
         f"queue held no runnable/receiving option: {plan}"
 
 
+def test_vona_stops_reaching_on_a_flat_position():
+    """Mock 8 took Mahomes at pick 42 against an ADP of 102 -- a 60-pick reach
+    -- and still ended up with Purdy at 99 anyway. VORP caused it: it scores
+    against a fixed replacement, so it cannot see that the whole QB field is
+    within a couple of points per game.
+
+    VONA asks the draft-day question instead: how much better is this player
+    than whoever I could still get at this position at my NEXT turn? A flat
+    position self-discounts; a scarce one does not.
+
+    Here the WR gap is huge (Adams 35.4 -> next survivor 1.8) and the QB gap
+    is small (Mahomes 21.1 -> Purdy 8.8, who lasts to ADP 98), so the WR must
+    outrank the QB even though their raw VORPs are close.
+    """
+    board = "\n".join([
+        "Davante Adams|WR|LAR|35.4|||56.5",     # available now
+        "Patrick Mahomes II|QB|KCC|21.1|||102.5",
+        "Brock Purdy|QB|SFO|8.8|||98.3",        # survives to our next turn
+        "Rome Odunze|WR|CHI|1.8|||66.7",        # the WR fallback, far worse
+    ])
+    r = run_js(
+        f"""
+        DK.loadCompact({json.dumps(board)}, {{teams: 10}});
+        document.body.innerText = {json.dumps(panel([
+            "C. McCaffrey RB SF Bye 8",
+            "J. Warren RB Pit Bye 9",
+            "T. McBride TE Ari Bye 14",
+            "B. Bowers TE LV Bye 13",
+        ]))};
+        const out = DK.rank();
+        console.log(JSON.stringify({{
+          first: out.top[0].n, firstPos: out.top[0].p,
+          vona: Object.fromEntries(out.top.map(x => [x.n, x.vona])),
+        }}));
+        """
+    )
+    assert r["firstPos"] == "WR", f"reached for the flat position: {r}"
+    assert r["first"] == "Davante Adams", r
+    # the QB's urgency is small because Purdy is still there next turn
+    assert r["vona"]["Patrick Mahomes II"] < r["vona"]["Davante Adams"], r
+
+
 def test_rank_never_returns_empty_while_picks_remain():
     """Stash-mute. Once every starter slot is filled, needsPosition() is false
     for everyone, so the "at most one zero-role stash" rule silences the whole
