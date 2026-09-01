@@ -138,3 +138,30 @@ pick instead of relying on a magic constant whose meaning was ambiguous —
 the spec's other stated goal, (b) it is verified harmless, and (c) it is
 strictly safer for smaller boards or deeper drafts where the fixed slice
 COULD bind. `pool_size` still works as the floor (`pool_min`).
+
+## Keefamania draft prep — disagreements + no_market review (2026-08-31)
+Ran the two research passes Omnibeta got and this league initially did not.
+
+**Overrides ported by DIRECTION, not by points.** Scoping overrides per
+league (correct — they are absolute points in league scoring) deleted real
+research. Ported five to half-PPR by cohort ratio and kept only those whose
+INTENT still holds against the new model number: Reed/Golden/Tuten (raise),
+Tyson/Allgeier (fade). Dropped three: Gainwell (the half-PPR port, 122,
+lands BELOW the model's own 154 — the model already credits the role, so the
+override would have silently faded a player it was written to raise),
+Charbonnet (availability 'out' supersedes overrides by design), Likely (port
+lands on the model; no information added).
+
+**Systematic finding — the QB/TE streamability discount is missing.** The
+model_target side of the disagreements worklist is 6 QBs and 3 TEs out of 10
+rows (Mahomes rank 28 vs ADP 102, Purdy 42 vs 98, Nix 46 vs 99, Goff 61 vs
+114). This is not ten separate insights, it is one structural gap: VORP over
+QB10/TE11 credits a starting QB with ~31 points of value while the market
+correctly prices the fact that you start one and can stream the position.
+research.md Q1 called for an "explicit streamability discount on QB/TE VORP"
+and it is NOT implemented (deferred to the January empirical-baseline work,
+v2 item 2.2). NOT fixing it before Saturday: it is a valuation change to the
+draft layer, it needs the same before/after discipline as any engine change,
+and the existing guardrails (QB2 not before round 10, TE cap) already stop
+the board from acting on the inflated numbers. Draft-day mitigation: treat
+QB/TE model_target rows as noise, not as buy signals.
