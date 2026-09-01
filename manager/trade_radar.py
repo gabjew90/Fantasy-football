@@ -105,8 +105,18 @@ def build(ctx, store) -> str:
     if not vals:
         return "\n".join(lines + ["radar cannot rank without values this week."])
 
+    from . import age_decay
+    acfg = (ctx.get("scfg") or {}).get("age_decay") or {}
+
     def val(p) -> int:
-        return vals.get(str(p["sleeper_id"]), 0)
+        """FantasyCalc value with the in-season age decay applied (display and
+        trade logic only — never a draft-layer number)."""
+        raw = vals.get(str(p["sleeper_id"]), 0)
+        if not raw:
+            return 0
+        f = age_decay.decay_factor(p.get("pos"), (ctx.get("age_of") or {}).get(
+            str(p["sleeper_id"])), int(ctx["week"]), acfg)
+        return int(round(raw * f))
 
     mine = ctx["roster_players"][ctx["my_rid"]]
     my_sd = surplus_deficit(mine)
@@ -193,6 +203,8 @@ def build(ctx, store) -> str:
                   f"- urgency: {o['urgency']}"]
         if o["playoff"]:
             lines.append(f"- playoff schedule (buying for wks 15-17): {o['playoff']}")
+        aged = [age_decay.note(p.get("pos"), (ctx.get("age_of") or {}).get(str(p.get("sleeper_id"))),
+                               int(ctx["week"]), acfg) for p in (mine or [])]
         if o["ratio"] is not None and (o["ratio"] < VETO_RATIO or o["ratio"] > 1 / VETO_RATIO):
             lines.append("- ⚠ value gap large enough to draw veto votes (6 of 12 kill it; "
                          "2-day review) — pad the light side")

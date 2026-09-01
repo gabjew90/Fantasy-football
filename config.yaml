@@ -75,6 +75,18 @@ inseason:
   regime_safe: 0.85
   regime_comfortable: 0.60
   regime_bubble: 0.25
+  # In-season age decay on ROS DISPLAYS and trade logic only — never touches
+  # tiers.csv, projections, or any draft-layer number (post-v2 item 4).
+  # Conventional-wisdom-shaped and UNVALIDATED; revisit with 2026 actuals.
+  age_decay:
+    enabled: true
+    cap: 0.10           # max fraction lost across a full season
+    per_year: 0.02      # per year above the position threshold, at season end
+    thresholds:
+      RB: 27
+      WR: 30
+      TE: 31
+      QB: 33
   faab:
     league_winner: [0.40, 0.65]
     breakout: [0.15, 0.35]

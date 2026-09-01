@@ -48,6 +48,11 @@ def league_context() -> dict:
 
     ctx["my_teams"] = teams_of(ctx["my_rid"])
     ctx["opp_teams"] = teams_of(ctx["opp_rid"])
+    # ages for the in-season ROS decay (display/trade only, post-v2 item 4)
+    ctx["age_of"] = {
+        str(pid): p.get("age") for pid, p in ctx["players"].items()
+        if isinstance(p, dict) and p.get("age")
+    }
     ctx["budgets"] = seasondata.rival_budgets(ctx["rosters"], ctx["budget"])
     ctx["my_budget"] = ctx["budgets"].get(ctx["my_rid"], ctx["budget"])
     ctx["current_starters"] = [str(s) for s in (ctx["my_roster"].get("starters") or [])]
