@@ -55,6 +55,12 @@ class Tracker:
     # player you would actually end up with, not against a yaml replacement
     # baseline (_fallback_points). Knob so the A/B stays runnable.
     adaptive_fallback = True
+    # Bench rounds price candidates as INSURANCE -- weeks needed x edge over
+    # the waiver wire (draftkit/bench.py) -- instead of VORP against the
+    # starter baseline. OFF until the season-level replay shows it beating
+    # raw-VORP bench selection on both leagues' boards; until then it runs
+    # alongside for comparison (correction pass, 2026-09-01).
+    bench_insurance = False
     pool_min = 40
     pool_lookback = 20
     pool_lookahead = 60
@@ -127,6 +133,14 @@ class Tracker:
         self.slot_markets = bool(ecfg.get("slot_markets", Tracker.slot_markets))
         self.adaptive_fallback = bool(
             ecfg.get("adaptive_fallback", Tracker.adaptive_fallback))
+        self.bench_insurance = bool(
+            ecfg.get("bench_insurance", Tracker.bench_insurance))
+        self.waiver_k = None
+        try:
+            from .baselines import waiver_k
+            self.waiver_k = waiver_k((cfg.get("expected") or {}).get("waivers"))
+        except Exception:  # noqa: BLE001 — default k inside bench_rows
+            pass
         gcfg = cfg["guardrails"] if "guardrails" in cfg._data else {}
         self.qb2_round = int(gcfg.get("qb2_earliest_round", 10))
         self.te2_fall = int(gcfg.get("te2_fall_picks", 12))
@@ -382,6 +396,76 @@ class Tracker:
                     and pts is not None and vf is not None):
                 out["FLEX"] = float(pts) - float(vf)
         return out
+
+    def _my_starter_names(self) -> set[str]:
+        """Names of my rostered players who would actually start (dedicated
+        slot first, then FLEX) -- the ones a handcuff on my bench insures."""
+        remaining = dict(self.slots)
+        out: set[str] = set()
+        for x in self.picks_for_slot(self.my_slot):
+            q = self.by_id.get(str(x.get("player_id")))
+            if not q:
+                continue
+            pos = q.get("pos")
+            if remaining.get(pos, 0) > 0:
+                remaining[pos] -= 1
+            elif pos in snake.FLEX_ELIGIBLE and remaining.get("FLEX", 0) > 0:
+                remaining["FLEX"] -= 1
+            else:
+                continue
+            out.add(str(q.get("player") or q.get("name") or ""))
+        return out
+
+    def _bench_candidates(self, cands: list, needs: dict, counts: dict,
+                          rnd: int, picks_left: int, top6_te_fell: bool) -> bool:
+        """Append one insurance-priced row per bench position. Returns True
+        when bench rows were produced (the caller then skips the planner).
+
+        Only active once every non-K/DEF starter is filled, and never inside
+        the must-fill window where remaining picks are owed to open starters.
+        """
+        from .bench import (BENCH_POSITIONS, insurance_value, starter_exposure,
+                            waiver_ppw)
+        open_skill = sum(needs.get(k, 0) for k in ("QB", "RB", "WR", "TE", "FLEX"))
+        open_all = open_skill + needs.get("K", 0) + needs.get("DEF", 0)
+        if open_skill > 0 or picks_left <= open_all:
+            return False
+        exposure = starter_exposure(self.slot_positions(self.my_slot), self.slots)
+        my_starters = self._my_starter_names()
+        starter_ppw = {
+            str(q.get("player") or q.get("name") or ""): float(q.get("proj_pts") or 0.0) / 17.0
+            for q in self.players
+            if str(q.get("player") or q.get("name") or "") in my_starters
+        }
+        k = getattr(self, "waiver_k", None) or 3
+        last_pick = self.teams * self.rounds
+        added = False
+        for pos in BENCH_POSITIONS:
+            rem = [p for p in self.remaining(pos)
+                   if p.get("proj_source") != "no_market"
+                   and self._pos_allowed(pos, rnd, counts, picks_left, top6_te_fell)]
+            if not rem:
+                continue
+            waiver, wname = waiver_ppw(rem, last_pick, k)
+            best, best_iv = None, None
+            for p in rem:
+                hc = starter_ppw.get(str(p.get("backs_up") or ""))
+                iv = insurance_value(p, waiver, exposure.get(pos, 0), hc)
+                if best_iv is None or iv["value"] > best_iv["value"]:
+                    best, best_iv = p, iv
+            if best is None:
+                continue
+            n = exposure.get(pos, 0)
+            why = (f"bench insurance: covers {n} {pos} starter{'s' if n != 1 else ''} "
+                   f"~{best_iv['weeks']:.1f} wks/season · +{best_iv['edge']:.1f}/wk over "
+                   f"the wire ({wname or 'nobody'}) ≈ {best_iv['value']:.0f} pts")
+            if best_iv["handcuff"]:
+                why += f" · HANDCUFF: backs up your {best.get('backs_up')}"
+            cands.append((best_iv["value"], why, best))
+            added = True
+        if added:
+            cands.sort(key=lambda t: -t[0])
+        return added
 
     @staticmethod
     def _mval(p: dict, value_key: str) -> float:
@@ -707,6 +791,16 @@ class Tracker:
         cands = [c for c in cands
                  if not (c[2]["sleeper_id"] in seen_ids
                          or seen_ids.add(c[2]["sleeper_id"]))]
+        # BENCH REALITIES (draftkit/bench.py). Once every non-K/DEF starter
+        # is filled, a candidate's value is insurance -- weeks I will need
+        # him x his edge over the waiver wire -- not VORP against the starter
+        # baseline. Bench rows are ranked greedily on that number; the
+        # two-pick planner is skipped for them because its partner term is a
+        # VORP level, a different currency, and bench picks barely interact.
+        bench_rows = False
+        if self.bench_insurance:
+            bench_rows = self._bench_candidates(
+                cands, needs, counts, rnd, picks_left, top6_te_fell)
         # v2 item 1.2: joint two-pick re-rank on top of the greedy order.
         # Pure arithmetic over the cached urgency report — nothing new runs
         # on the clock; any failure or missing report keeps the greedy list
@@ -728,6 +822,8 @@ class Tracker:
                                   "below replacement, stash budget waived)", best))
             cands.sort(key=lambda t: -t[0])
 
+        if bench_rows:
+            return cands[:top_n]
         try:
             from .planner import pair_rank
 

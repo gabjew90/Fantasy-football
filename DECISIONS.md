@@ -583,3 +583,71 @@ The document told me to record deltas "so the cut is measured, not assumed",
 then pre-stated the expected deltas. Two were wrong. CLAUDE.md now carries the
 rule in the stronger form: measure BEFORE cutting, and a predicted delta is
 not a measured one.
+
+## 2026-09-01 (7) — bench realities: insurance pricing, default OFF pending (c)
+
+Zoomed out before building. The engine's one-sentence rule -- biggest
+remaining value at positions still needed, measured against what is freely
+available later -- was applied to starters (slot markets, adaptive fallback)
+but never to the BENCH. Bench rounds priced candidates as VORP against the
+starter baseline, so a backup QB measured against QB10 read +20 when the
+thing he competes with is the waiver wire, where he is +4. That is the whole
+QB2 mechanism; no new subsystem, just clause 5 applied to clause 4.
+
+### The formula (draftkit/bench.py)
+
+    value = weeks needed x weekly edge over the wire
+    weeks needed = (my starters at pos, flex included) x (position absent rate + bye)
+    wire         = k-th best player the market leaves undrafted (ADP beyond
+                   the last pick), k from waiver format (rolling list -> 3)
+    handcuff     = backup of MY starter gets the measured uplift x1.46,
+                   capped at the starter's own rate
+
+### Two corrections taken from review before it ran
+
+* The frequency term must NOT be per-player exp_games. That column is the
+  games-missed durability haircut removed 2026-08-30 (research Q6), kept as
+  informational only; my first draft put it at the centre of every bench
+  decision and would then have validated it with injury draws from the same
+  column. Replaced with POSITION base rates, derived ex ante over six season
+  pairs (scripts/derive_bench_rates.py):
+
+      QB 2.56  RB 3.13  WR 2.69  TE 2.93   absent weeks, injury only, + 1 bye
+      (three-pair run had QB highest at 3.29 -- 35-player noise; N is now
+       70/142/144/71. Zero-game seasons excluded, so biased LOW.)
+
+* (a) waiver-level pricing and (b) frequency ship as ONE change. (a) alone
+  makes the QB2 WORSE: his edge over the wire is honestly +3.8/wk, larger
+  than a bench RB's +2.5, so without frequency the engine would take him
+  more confidently than before. Frequency is load-bearing, not a refinement.
+
+### Handcuff share: measured, and the first measurement was wrong
+
+Max-of-teammates in the starter's absent week read 1.28 of the STARTER's
+rate -- the fill-in outscoring the man he replaced. That is picking the right
+handcuff with hindsight. The ex-ante backup (best teammate in weeks the
+starter PLAYED) produces 1.06 of the starter's rate in absent weeks against
+0.73 standalone: uplift x1.46 over his own projection, which is the form the
+formula uses. n=277 starter-absent weeks.
+
+### A/B on the two real logs, 22 slots
+
+    bench_insurance   lineup pts   2+QB rosters   R10+ skill picks
+    off               1815.7       22/22          RB 41  WR 21  QB 22  TE 4
+    on                1815.6        0/22          RB 24  WR 64
+
+Lineup points cannot move -- the metric scores starters only -- so this is
+NOT validation, it is confirmation the mechanism fires. Two things it
+surfaces, deliberately left alone rather than tuned:
+
+* The bench tilted to WR. Three WR starters (two + flex) versus two RB
+  starters means a bench WR covers more absence-weeks, and that term is
+  linear in starters covered. Plausible; unproven.
+* QB2 went to zero everywhere. Also plausible for a 10-team 1-QB league;
+  also unproven, and a 12-team league with a thinner wire should not read 0.
+
+Both are exactly what the season-level replay (c) exists to grade: start
+lineups week by week with absences drawn from the empirical position
+distribution -- sharing NO input with the formula -- and compare realised
+points between insurance-priced and VORP-priced benches on both leagues'
+boards. Default stays OFF until that shows a win.
