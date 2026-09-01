@@ -211,6 +211,9 @@ TIERS_COLUMNS = [
     "upside_flag",
     "upside_why",
     "alpha_used",
+    "backs_up_pos",
+    "starter_fragility",
+    "starter_fragility_label",
 ]
 
 

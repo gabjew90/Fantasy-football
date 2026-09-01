@@ -271,6 +271,10 @@ def build(ctx, store) -> str:
         if damp_note and not contingent:
             why.append(damp_note)
         s_note = stash_note(ctx, p, contingent)
+        trow = ctx["trow"].get(pid) or {}
+        if trow.get("backs_up_pos") and trow.get("starter_fragility_label") in ("high", "moderate"):
+            why.append(f"standing handcuff: backs up {trow['backs_up_pos']} "
+                       f"({trow['starter_fragility_label']} fragility)")
         if not why:
             why.append("value over my current bench")
         need_note = f"; I am short at {p['pos']} in the next 3 weeks (byes)" if needs.get(p["pos"]) else ""

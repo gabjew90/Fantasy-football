@@ -186,3 +186,28 @@ QB/TE model_target rows as noise, not as buy signals.
   (mean weeks 15-17 opponent ratio, labelled soft/neutral/tough) alongside
   the opponent names, replacing the qualitative placeholder. Per-context
   cached so a radar run computes the dataset once.
+
+## Post-v2 item 3 — standing contingency map (2026-08-31)
+- **Informational by construction.** `draftkit/fragility.py` adds three
+  display columns (backs_up_pos, starter_fragility, starter_fragility_label)
+  and nothing else. Verified mechanically after wiring: proj_pts, vorp, tier
+  and value_rank are byte-identical to the pre-change board on BOTH leagues,
+  and a unit test asserts the function never mutates a valuation column.
+- **Signals used**: position base rate (RB 0.55 > TE 0.35 > WR 0.30 > QB
+  0.25), current-season workload, and injury TYPE when a designation exists
+  (structural +0.15, soft-tissue +0.08, unrecognised +0). Games-missed
+  history is deliberately excluded (research Q6) and the module says so in
+  a comment so it survives future edits.
+- **Calibration bug caught in verification**: the workload term saturated at
+  18 "touches per game", but `hv_touches` counts HIGH-VALUE touches for a
+  SEASON (RB p99 = 42, max 50). The term contributed ~nothing and every
+  incumbent scored 0.57-0.60. Threshold moved to 40 season high-value
+  touches; the range is now 0.26-0.85 and discriminates (CMC's backup 0.85
+  high, backup QBs 0.26 low).
+- **Depth order is inferred** from within-team, within-position board value —
+  no depth-chart feed exists in free data. Players with no identifiable
+  incumbent get empty fields rather than a guess. Spot-checked against real
+  2026 roster moves (Kamara behind Etienne in NO, Pacheco behind Gibbs in
+  DET) and the inference held.
+- **Surfaces**: draft board rounds 12+ only, and waiver-brief annotations
+  for high/moderate fragility.

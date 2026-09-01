@@ -530,6 +530,11 @@ class Tracker:
             why += self._bye_warning(best, needs)
             # UI-only handcuff tag (never scored): the late-round buy signal is
             # a backup whose starter is fragile or currently availability-flagged
+            # standing contingency (post-v2 item 3): late rounds only, display
+            # only — it never enters the score
+            if rnd >= 12 and best.get("backs_up_pos") and best.get("starter_fragility_label"):
+                why += (f" · standing handcuff: backs up {best['backs_up_pos']} "
+                        f"({best['starter_fragility_label']} fragility)")
             if best.get("backs_up"):
                 seg = float(best.get("starter_exp_games") or 16.0)
                 sav = best.get("starter_avail")
