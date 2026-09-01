@@ -66,14 +66,27 @@ def surplus_deficit(roster: list[dict]) -> dict[str, int]:
     return out
 
 
-def playoff_opponents(schedule, team: str) -> str:
-    try:
-        import polars as pl
-        rows = schedule.filter((pl.col("team") == team) & pl.col("week").is_in([15, 16, 17]))
-        opps = [f"wk{r['week']} vs {r['opp']}" for r in rows.iter_rows(named=True)]
-        return "; ".join(opps) if opps else "wk15-17: bye-heavy, check schedule"
-    except Exception:  # noqa: BLE001
-        return ""
+def playoff_schedule(ctx, team: str, pos: str) -> str:
+    """Weeks 15-17 strength as a NUMBER plus the opponent names (post-v2
+    item 2 — replaces the qualitative name-the-opponents placeholder).
+    Degrades to names-only when the defense metric is not yet meaningful."""
+    from draftkit import defense as defense_mod
+    pa = ctx.get("_pa_cache", "unset")
+    if pa == "unset":
+        try:
+            pa = defense_mod.points_allowed(
+                int(ctx["state"]["season"]), ctx["league"]["scoring_settings"],
+                through_week=max(0, int(ctx["week"]) - 1))
+        except Exception:  # noqa: BLE001
+            pa = None
+        ctx["_pa_cache"] = pa
+    shrink_k = float((ctx.get("scfg") or {}).get("matchup_shrink_weeks", 5))
+    val, label = defense_mod.schedule_strength(
+        pa, ctx["schedule"], team, pos, (15, 16, 17), shrink_k)
+    if val is None:
+        return f"{label} (DATA MISSING: defense quality not yet meaningful)" if label else ""
+    verdict = "soft" if val >= 1.05 else ("tough" if val <= 0.95 else "neutral")
+    return f"{val:.2f}x league avg ({verdict}) — {label}"
 
 
 def build(ctx, store) -> str:
@@ -149,7 +162,7 @@ def build(ctx, store) -> str:
                 "why": f"their starter {s['name']} just went {s['status']} and {give['name']} "
                        f"is the replacement-shaped asset I can spare",
                 "urgency": "48-HOUR WINDOW — text today",
-                "playoff": playoff_opponents(ctx["schedule"], give.get("team") or ""),
+                "playoff": playoff_schedule(ctx, give.get("team") or "", give.get("pos") or "RB"),
                 "ratio": None,
             })
         elif fit:
@@ -163,7 +176,7 @@ def build(ctx, store) -> str:
                         f"I'm deep at {offer['pos']}"
                         + ("; they're falling out of the race (seller window)" if seller else "")),
                 "urgency": "seller window — this discount grows weekly" if seller else "no rush",
-                "playoff": playoff_opponents(ctx["schedule"], ask.get("team") or ""),
+                "playoff": playoff_schedule(ctx, ask.get("team") or "", ask.get("pos") or "RB"),
                 "ratio": ratio,
             })
 

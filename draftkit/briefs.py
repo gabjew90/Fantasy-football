@@ -65,6 +65,22 @@ def build_context(cfg) -> dict:
     weekly_proj = seasondata.weekly_projections(scoring, season, week)
     fallback = weekly_proj is None
 
+    # defense quality (post-v2 item 2): real opponent adjustment, shrunk hard
+    # early. None -> DATA MISSING banner, never a null adjustment.
+    from . import defense as defense_mod
+    scfg_early = _season_cfg(cfg)
+    shrink_k = float(scfg_early.get("matchup_shrink_weeks", 5))
+    matchup_cap = float(scfg_early.get("matchup_cap", 0.10))
+    pa = defense_mod.points_allowed(int(season), scoring, through_week=max(0, week - 1))
+    if pa is None:
+        stale.append("defense quality (no completed weeks yet)")
+    opp_of = {}
+    try:
+        for r in schedule.filter(pl.col("week") == week).iter_rows(named=True):
+            opp_of[r["team"]] = r["opp"]
+    except Exception:  # noqa: BLE001
+        pass
+
     scfg = _season_cfg(cfg)
 
     def base_pts(pid: str) -> float:
@@ -82,13 +98,16 @@ def build_context(cfg) -> dict:
             return None
         team = p.get("team") or (trow.get(pid) or {}).get("team")
         status = injury.get(pid, "")
-        wk = weekly.compose(base_pts(pid), 1.0, 0.0, status)  # matchup/trend live from wk 3
+        ratio = defense_mod.allowed_ratio(pa, opp_of.get(team, ""), pos, shrink_k)             if pa is not None else None
+        mult = weekly.matchup_mult(ratio, week, matchup_cap, shrink_k) if ratio else 1.0
+        wk = weekly.compose(base_pts(pid), mult, 0.0, status)
         if team in week_byes:
             wk = 0.0
         name = f"{p.get('first_name','')} {p.get('last_name','')}".strip() or pid
         t = trow.get(pid) or {}
         return {"sleeper_id": pid, "name": name, "pos": pos, "team": team,
                 "weekly": round(wk, 2), "status": status,
+                "matchup_mult": round(mult, 3), "opp": opp_of.get(team),
                 "ros": round((t.get("proj_pts") or wk * 16) or 0.0, 1),
                 "backs_up": t.get("backs_up"), "stdev": 5.0}
 
@@ -387,6 +406,14 @@ def _lineup_model(ctx, teams_filter: set[str] | None = None) -> dict:
         warnings.append(a)
     return {"week": ctx["week"], "opp_name": opp_name, "my_total": my_total,
             "opp_total": opp_total, "changes": changes, "lean": lean, "flags": flags,
+            "matchups": [
+                {"name": p["name"], "opp": p.get("opp") or "?",
+                 "mult": float(p.get("matchup_mult") or 1.0),
+                 "before": (p.get("weekly") or 0.0) / float(p.get("matchup_mult") or 1.0),
+                 "after": p.get("weekly") or 0.0}
+                for p in roster if p.get("matchup_mult")
+                and abs(float(p["matchup_mult"]) - 1.0) >= 0.02
+            ],
             "warnings": warnings, "stale": ctx["stale"],
             "early_teams": sorted(set(ctx["early"]["team"].to_list())),
             "early_mine": early_mine,

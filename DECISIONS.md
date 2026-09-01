@@ -165,3 +165,24 @@ draft layer, it needs the same before/after discipline as any engine change,
 and the existing guardrails (QB2 not before round 10, TE cap) already stop
 the board from acting on the inflated numbers. Draft-day mitigation: treat
 QB/TE model_target rows as noise, not as buy signals.
+
+## Post-v2 item 2 — defense quality (2026-08-31)
+- **Metric**: fantasy points allowed per game by defense x position, scored
+  with the LEAGUE'S own weights (reuses `dataset.fantasy_points_expr`), from
+  nflverse weekly player stats attributed to `opponent_team`. Shrunk toward
+  the league mean with weight games/(games + `inseason.matchup_shrink_weeks`)
+  — the same convention `weekly.matchup_mult` already used — so week-3 data
+  barely moves anything and the metric bites around week 6.
+- **Degrade, never null-adjust**: `allowed_ratio` returns None when there is
+  no data, the defense is unknown, the position is uncovered, or fewer than
+  2 games exist; callers then print DATA MISSING and apply no multiplier.
+  Verified live: with nflverse unreachable the lineup brief still renders.
+- **Consumer 1, lineup brief**: `matchup_mult` was being fed a hard-coded
+  1.0 — the adjustment was a stated goal with no data behind it. It now
+  receives the real ratio, capped by `inseason.matchup_cap` (0.10), and the
+  brief prints every adjustment >= 2% with before/after points so a flipped
+  start/sit is explainable.
+- **Consumer 2, trade radar**: playoff-schedule arbitrage returns a NUMBER
+  (mean weeks 15-17 opponent ratio, labelled soft/neutral/tough) alongside
+  the opponent names, replacing the qualitative placeholder. Per-context
+  cached so a radar run computes the dataset once.
