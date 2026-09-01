@@ -111,3 +111,30 @@ document it, keep going."
   (APScheduler/MANAGER.bat/systemd) is deleted — the spec's runtime is Actions.
 - Local Python stays 3.10 (venv); workflows pin 3.11. Both are tested by the
   same suite; nothing 3.11-only is used.
+
+## Post-v2 item 1 — rival sampling pool (2026-08-31)
+**The hypothesized bug did not reproduce, and the change shipped anyway as
+modeling hygiene, not as a fix. Evidence:**
+
+The spec expected `pool_size: 80` to starve the sim's rival pool in the late
+rounds and thereby inflate survival. It does not, because the slice is the
+top-80 of the REMAINING players, not of the original board. Measured over a
+full 10-team Keefamania draft:
+
+    pick  undrafted  old top-80 pool  rolling window  window ADP range
+    97    138        80               119             94-151
+    124   111        80               98              116-184
+    144   91         80               78              124-187
+
+The pool held exactly 80 candidates at every pick; undrafted never fell
+below 91. Before/after mean survival at my own picks, rounds 10-14:
+0.749/0.747, 0.720/0.717, 0.744/0.743, 0.708/0.708, 0.737/0.737 — deltas of
+-0.002 to 0.000, i.e. nothing. The ADP Gaussian already assigns ~zero weight
+to candidates far from the current pick, so pool composition beyond that
+neighbourhood was never load-bearing.
+
+Kept the rolling window regardless because (a) it makes the pool track the
+pick instead of relying on a magic constant whose meaning was ambiguous —
+the spec's other stated goal, (b) it is verified harmless, and (c) it is
+strictly safer for smaller boards or deeper drafts where the fixed slice
+COULD bind. `pool_size` still works as the floor (`pool_min`).

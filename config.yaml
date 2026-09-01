@@ -24,7 +24,13 @@ projections:
 
 engine:
   sims: 1000          # Monte Carlo draft simulations per decision
-  pool_size: 80       # rivals sample from the top-N undrafted by ADP
+  # Rival sampling pool: a ROLLING ADP WINDOW around the current pick, not a
+  # fixed top-N. A fixed top-80 starved in the late rounds (board includes
+  # everyone with ADP inside 180) and inflated survival right where the
+  # round-8 upside switch decides. pool_min is the floor so it never starves.
+  pool_min: 40        # never sample from fewer than this many candidates
+  pool_lookback: 20   # include players whose ADP is up to N picks BEHIND now
+  pool_lookahead: 60  # ...and up to N picks ahead
   sigma_early: 6.0    # ADP noise (picks) in round 1  (~0.5 rounds)
   sigma_late: 27.0    # ADP noise (picks) by round 15 (~2.25 rounds)
   # Survival calibration (v2 item 1.1, fitted to the Omnibeta CLV retro):
