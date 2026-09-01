@@ -11,7 +11,7 @@
 
 **Tier 2**
 
-- 2. Jahmyr Gibbs (DET, bye 6) — 318 pts, VORP 180, ADP 1.5
+- 2. Jahmyr Gibbs (DET, bye 6) — 318 pts, VORP 181, ADP 1.5
 - 3. Bijan Robinson ⛰ (ATL, bye 11) — 313 pts, VORP 176, ADP 2.3
 
 **Tier 3**
@@ -20,12 +20,12 @@
 
 **Tier 4**
 
-- 5. De'Von Achane (MIA, bye 6) — 262 pts, VORP 124, ADP 10.4
+- 5. De'Von Achane (MIA, bye 6) — 262 pts, VORP 125, ADP 10.4
 
 **Tier 5**
 
 - 6. Chase Brown (CIN, bye 6) — 247 pts, VORP 110, ADP 13.1
-- 7. James Cook III (BUF, bye 7) — 242 pts, VORP 105, ADP 12.6
+- 7. James Cook III ⛰ (BUF, bye 7) — 242 pts, VORP 105, ADP 12.6
 
 **Tier 6**
 
@@ -33,74 +33,75 @@
 - 9. Derrick Henry (BAL, bye 13) — 223 pts, VORP 86, ADP 16.9
 - 10. Omarion Hampton (LAC, bye 7) — 221 pts, VORP 84, ADP 22.8
 - 11. Kyren Williams (LAR, bye 11) — 218 pts, VORP 81, ADP 31.7
-- 12. Josh Jacobs (GBP, bye 11) — 218 pts, VORP 80, ADP 31.2
-- 13. Ashton Jeanty (LVR, bye 13) — 215 pts, VORP 78, ADP 19.0
-- 14. Javonte Williams (DAL, bye 14) — 214 pts, VORP 77, ADP 37.1
-- 15. Cam Skattebo (NYG, bye 8) — 205 pts, VORP 68, ADP 38.9
-- 16. Travis Etienne Jr. (NOS, bye 8) — 204 pts, VORP 67, ADP 37.0
-- 17. Jeremiyah Love (ARI, bye 14) — 201 pts, VORP 63, ADP 27.1
-- 18. Kenneth Walker III (KCC, bye 5) — 198 pts, VORP 61, ADP 21.2
-- 19. D'Andre Swift (CHI, bye 10) — 198 pts, VORP 61, ADP 45.3
-- 20. Breece Hall (NYJ, bye 13) — 189 pts, VORP 51, ADP 33.7
-- 21. Jaylen Warren (PIT, bye 9) — 186 pts, VORP 49, ADP 60.8
-- 22. Rhamondre Stevenson (NEP, bye 11) — 185 pts, VORP 48, ADP 62.6
-- 23. TreVeyon Henderson (NEP, bye 11) — 179 pts, VORP 42, ADP 64.1
-- 24. Quinshon Judkins (CLE, bye 11) — 179 pts, VORP 41, ADP 50.5
-- 25. Bucky Irving (TBB, bye 10) — 179 pts, VORP 41, ADP 45.1
-- 26. RJ Harvey (DEN, bye 10) — 173 pts, VORP 35, ADP 93.4
-- 27. David Montgomery (HOU, bye 8) — 170 pts, VORP 32, ADP 57.8
-- 28. Jadarian Price (SEA, bye 11) — 167 pts, VORP 30, ADP 73.9
-- 29. Rico Dowdle (PIT, bye 9) — 165 pts, VORP 28, ADP 74.9
-- 30. Bhayshul Tuten (JAC, bye 7) — 159 pts, VORP 22, ADP 52.4
-- 31. Tony Pollard (TEN, bye 9) — 155 pts, VORP 18, ADP 69.5
-- 32. Jonathon Brooks (CAR, bye 5) — 155 pts, VORP 17, ADP 92.5
-- 33. Aaron Jones Sr. (MIN, bye 6) — 152 pts, VORP 15, ADP 104.6
-- 34. J.K. Dobbins (DEN, bye 10) — 151 pts, VORP 14, ADP 86.9
-- 35. Tyrone Tracy Jr. (NYG, bye 8) — 144 pts, VORP 6, ADP 156.3
-- 36. Woody Marks (HOU, bye 8) — 143 pts, VORP 6, ADP 139.5
-- 37. Kyle Monangai (CHI, bye 10) — 143 pts, VORP 5, ADP 110.2
-- 38. Chuba Hubbard (CAR, bye 5) — 139 pts, VORP 2, ADP 81.4
-- 39. Alvin Kamara (NOS, bye 8) — 138 pts, VORP 1, ADP 151.3
-- 40. Rachaad White (WAS, bye 7) — 137 pts, VORP 0, ADP 114.7
-- 41. James Conner (ARI, bye 14) — 137 pts, VORP -1, ADP 172.3
-- 42. Tyjae Spears (TEN, bye 9) — 136 pts, VORP -1, ADP 129.6
-- 43. Kimani Vidal (LAC, bye 7) — 134 pts, VORP -3, ADP 162.1
-- 44. Jacory Croskey-Merritt (WAS, bye 7) — 134 pts, VORP -4, ADP 114.5
-- 45. Chris Rodriguez Jr. (JAC, bye 7) — 132 pts, VORP -5, ADP 157.7
-- 46. Bam Knight (ARI, bye 14) — 128 pts, VORP -10
-- 47. Kenny Gainwell (TBB, bye 10) — 124 pts, VORP -13, ADP 91.2
-- 48. Jonah Coleman (DEN, bye 10) — 123 pts, VORP -15, ADP 149.1
-- 49. Blake Corum (LAR, bye 11) — 123 pts, VORP -15, ADP 122.5
-- 50. Jordan Mason (MIN, bye 6) — 121 pts, VORP -16, ADP 115.9
-- 51. Mike Washington Jr. (LVR, bye 13) — 120 pts, VORP -18, ADP 145.9
-- 52. Isiah Pacheco (DET, bye 6) — 119 pts, VORP -19, ADP 152.3
-- 53. Trey Benson (ARI, bye 14) — 118 pts, VORP -19
-- 54. Dean Connors (FA, bye 11) — 118 pts, VORP -20, ADP 170.4
-- 55. Audric Estime (NOS, bye 8) — 117 pts, VORP -20
-- 56. Braelon Allen (NYJ, bye 13) — 116 pts, VORP -21, ADP 156.8
-- 57. MarShawn Lloyd (GBP, bye 11) — 115 pts, VORP -22, ADP 150.4
-- 58. Emmett Johnson (KCC, bye 5) — 112 pts, VORP -26, ADP 157.7
-- 59. Phil Mafah (DAL, bye 14) — 111 pts, VORP -27
-- 60. Justice Hill (BAL, bye 13) — 110 pts, VORP -27, ADP 170.8
-- 61. Sean Tucker (TBB, bye 10) — 109 pts, VORP -28
-- 62. Dylan Sampson (CLE, bye 11) — 109 pts, VORP -28, ADP 160.4
-- 63. Keaton Mitchell (LAC, bye 7) — 106 pts, VORP -31, ADP 158.0
-- 64. Kareem Hunt (FA, bye ?) — 105 pts, VORP -33
-- 65. Raheim Sanders (CLE, bye 11) — 105 pts, VORP -33
-- 68. Tank Bigsby (PHI, bye 10) — 102 pts, VORP -35, ADP 162.5
-- 73. Kaelon Black (SFO, bye 8) — 98 pts, VORP -39, ADP 159.9
-- 75. Brian Robinson Jr. (ATL, bye 11) — 97 pts, VORP -40, ADP 159.9
-- 79. Samaje Perine (CIN, bye 6) — 95 pts, VORP -43, ADP 155.8
-- 80. Nick Chubb (HOU, bye ?) — 94 pts, VORP -44
-- 83. Ray Davis (BUF, bye 7) — 93 pts, VORP -45, ADP 166.8
-- 85. Jordan James (SFO, bye 8) — 92 pts, VORP -45, ADP 154.8
-- 86. Emari Demercado (KCC, bye 5) — 92 pts, VORP -45, ADP 141.5
-- 88. Najee Harris (NYG, bye 8) — 90 pts, VORP -47, ADP 167.0
-- 91. Jaydon Blue (DAL, bye 14) — 88 pts, VORP -49, ADP 163.3
-- 105. Tyler Allgeier ⛰ (ARI, bye 14) — 81 pts, VORP -56, ADP 155.7
+- 12. Ashton Jeanty (LVR, bye 13) — 215 pts, VORP 78, ADP 19.0
+- 13. Javonte Williams (DAL, bye 14) — 214 pts, VORP 77, ADP 37.1
+- 14. Cam Skattebo (NYG, bye 8) — 205 pts, VORP 69, ADP 38.9
+- 15. Travis Etienne Jr. (NOS, bye 8) — 204 pts, VORP 67, ADP 37.0
+- 16. Jeremiyah Love (ARI, bye 14) — 201 pts, VORP 64, ADP 27.1
+- 17. Kenneth Walker III (KCC, bye 5) — 198 pts, VORP 61, ADP 21.2
+- 18. D'Andre Swift (CHI, bye 10) — 198 pts, VORP 61, ADP 45.3
+- 19. Breece Hall (NYJ, bye 13) — 189 pts, VORP 52, ADP 33.7
+- 20. Jaylen Warren (PIT, bye 9) — 186 pts, VORP 49, ADP 60.8
+- 21. Rhamondre Stevenson (NEP, bye 11) — 185 pts, VORP 48, ADP 62.6
+- 22. TreVeyon Henderson (NEP, bye 11) — 179 pts, VORP 42, ADP 64.1
+- 23. Quinshon Judkins (CLE, bye 11) — 179 pts, VORP 42, ADP 50.5
+- 24. Bucky Irving (TBB, bye 10) — 179 pts, VORP 42, ADP 45.1
+- 25. RJ Harvey (DEN, bye 10) — 173 pts, VORP 36, ADP 93.4
+- 26. David Montgomery (HOU, bye 8) — 170 pts, VORP 33, ADP 57.8
+- 27. Jadarian Price (SEA, bye 11) — 167 pts, VORP 30, ADP 73.9
+- 28. Rico Dowdle (PIT, bye 9) — 165 pts, VORP 28, ADP 74.9
+- 29. Bhayshul Tuten (JAC, bye 7) — 159 pts, VORP 22, ADP 52.4
+- 30. Tony Pollard (TEN, bye 9) — 155 pts, VORP 18, ADP 69.5
+- 31. Jonathon Brooks (CAR, bye 5) — 155 pts, VORP 18, ADP 92.5
+- 32. Aaron Jones Sr. (MIN, bye 6) — 152 pts, VORP 15, ADP 104.6
+- 33. J.K. Dobbins (DEN, bye 10) — 151 pts, VORP 14, ADP 86.9
+- 34. Tyrone Tracy Jr. (NYG, bye 8) — 144 pts, VORP 7, ADP 156.3
+- 35. Woody Marks (HOU, bye 8) — 143 pts, VORP 6, ADP 139.5
+- 36. Kyle Monangai (CHI, bye 10) — 143 pts, VORP 6, ADP 110.2
+- 37. Chuba Hubbard (CAR, bye 5) — 139 pts, VORP 2, ADP 81.4
+- 38. Alvin Kamara (NOS, bye 8) — 138 pts, VORP 1, ADP 151.3
+- 39. Rachaad White (WAS, bye 7) — 137 pts, VORP 1, ADP 114.7
+- 40. James Conner (ARI, bye 14) — 137 pts, VORP 0, ADP 172.3
+- 41. Tyjae Spears (TEN, bye 9) — 136 pts, VORP -0, ADP 129.6
+- 42. Kimani Vidal (LAC, bye 7) — 134 pts, VORP -3, ADP 162.1
+- 43. Jacory Croskey-Merritt (WAS, bye 7) — 134 pts, VORP -3, ADP 114.5
+- 44. Chris Rodriguez Jr. (JAC, bye 7) — 132 pts, VORP -5, ADP 157.7
+- 45. Bam Knight (ARI, bye 14) — 128 pts, VORP -9
+- 46. Kenny Gainwell (TBB, bye 10) — 124 pts, VORP -13, ADP 91.2
+- 47. Jonah Coleman (DEN, bye 10) — 123 pts, VORP -14, ADP 149.1
+- 48. Blake Corum (LAR, bye 11) — 123 pts, VORP -14, ADP 122.5
+- 49. Jordan Mason (MIN, bye 6) — 121 pts, VORP -16, ADP 115.9
+- 50. Mike Washington Jr. (LVR, bye 13) — 120 pts, VORP -17, ADP 145.9
+- 51. Isiah Pacheco (DET, bye 6) — 119 pts, VORP -18, ADP 152.3
+- 52. Trey Benson (ARI, bye 14) — 118 pts, VORP -19
+- 53. Dean Connors (FA, bye 11) — 118 pts, VORP -19, ADP 170.4
+- 54. Audric Estime (NOS, bye 8) — 117 pts, VORP -20
+- 55. Braelon Allen (NYJ, bye 13) — 116 pts, VORP -21, ADP 156.8
+- 56. MarShawn Lloyd (GBP, bye 11) — 115 pts, VORP -22, ADP 150.4
+- 57. Emmett Johnson (KCC, bye 5) — 112 pts, VORP -25, ADP 157.7
+- 58. Phil Mafah (DAL, bye 14) — 111 pts, VORP -26
+- 59. Justice Hill (BAL, bye 13) — 110 pts, VORP -27, ADP 170.8
+- 60. Sean Tucker (TBB, bye 10) — 109 pts, VORP -28
+- 61. Dylan Sampson (CLE, bye 11) — 109 pts, VORP -28, ADP 160.4
+- 62. Keaton Mitchell (LAC, bye 7) — 106 pts, VORP -31, ADP 158.0
+- 63. Kareem Hunt (FA, bye ?) — 105 pts, VORP -32
+- 64. Raheim Sanders (CLE, bye 11) — 105 pts, VORP -32
+- 65. Devin Singletary (NYG, bye 8) — 104 pts, VORP -33
+- 67. Tank Bigsby (PHI, bye 10) — 102 pts, VORP -34, ADP 162.5
+- 72. Kaelon Black (SFO, bye 8) — 98 pts, VORP -39, ADP 159.9
+- 74. Brian Robinson Jr. (ATL, bye 11) — 97 pts, VORP -40, ADP 159.9
+- 78. Samaje Perine (CIN, bye 6) — 95 pts, VORP -42, ADP 155.8
+- 79. Nick Chubb (HOU, bye ?) — 94 pts, VORP -43
+- 82. Ray Davis (BUF, bye 7) — 93 pts, VORP -44, ADP 166.8
+- 84. Jordan James (SFO, bye 8) — 92 pts, VORP -45, ADP 154.8
+- 85. Emari Demercado (KCC, bye 5) — 92 pts, VORP -45, ADP 141.5
+- 87. Najee Harris (NYG, bye 8) — 90 pts, VORP -46, ADP 167.0
+- 90. Jaydon Blue (DAL, bye 14) — 88 pts, VORP -49, ADP 163.3
+- 104. Tyler Allgeier ⛰ (ARI, bye 14) — 81 pts, VORP -56, ADP 155.7
 
 **Tier 7**
 
+- 144. Josh Jacobs (GBP, bye 11) — 0 pts, VORP -137, ADP 31.2
 - 145. Zach Charbonnet (SEA, bye 11) — 0 pts, VORP -137, ADP 132.3
 
 ## WR
