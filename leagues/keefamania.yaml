@@ -26,11 +26,23 @@ me:
 
 # 10-team · half-PPR · ONE flex (W/R/T) — derived from format via
 # draftkit.onboard math, NOT copied from Omnibeta (amendment A):
+# QB/TE baselines are CALIBRATED, not format-derived (2026-08-31).
+# Format math gives QB10/TE11 -- league-wide starter demand. That ignores
+# streamability: measured against market ADP the board reached +35.4 picks on
+# QBs and +9.6 on TEs, while RB (+2.2) and WR (+1.6) were already calibrated.
+# QB10 prices the alternative to Josh Allen as Matthew Stafford (260 pts).
+# The real alternative is Brock Purdy (275) at ADP 98, because a 10-team
+# 1-QB league leaves good QBs on waivers all season. QB5 says exactly that
+# and drops elite QB VORP by 14.4. Baselines are a STRUCTURAL choice, not
+# where the edge lives (that is the projections), so fitting them to the
+# market's revealed streamability does not launder ADP into the rankings.
+# Fitted by minimising mean |VORP-rank - ADP-rank| over the top 10 at each
+# position: QB5 (gap 20.2 vs 27.0 at QB10), TE8 (11.7 vs 14.8 at TE11).
 replacement_baselines:
-  QB: 10
+  QB: 5
   RB: 24
   WR: 24
-  TE: 11
+  TE: 8
   K: 10
   DEF: 10
 

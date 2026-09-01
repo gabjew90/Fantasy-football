@@ -14,17 +14,26 @@ def add_vorp(df: pl.DataFrame, baselines: dict[str, int]) -> pl.DataFrame:
         .over("pos")
         .alias("pos_rank")
     )
-    # Final spec §2: QB/TE replacement = mean of positional ranks 10-14
-    # (smooths streaming reality and single-projection outliers);
-    # RB/WR/K/DEF use the baseline rank directly.
-    SMOOTHED = {"QB": (10, 14), "TE": (10, 14)}
+    # QB/TE replacement is SMOOTHED across a window rather than read off a
+    # single rank: one projection outlier at the exact baseline would other-
+    # wise move every VORP at the position.
+    #
+    # The window is anchored to the league's CONFIGURED baseline. It used to
+    # be hardcoded to ranks 10-14 for every league, which silently made
+    # `replacement_baselines.QB` and `.TE` dead settings -- editing them
+    # changed nothing, and the "baselines are derived per league, never
+    # copied" guarantee did not actually hold for these two positions. A
+    # 10-team league and a superflex league got the same QB replacement.
+    # Found 2026-08-31 while calibrating Keefamania's QB baseline.
+    SMOOTH_SPAN = 4          # baseline .. baseline+4 inclusive
+    SMOOTHED = ("QB", "TE")
     repl_rows = []
     for pos, baseline in baselines.items():
         grp = df.filter(pl.col("pos") == pos)
         if grp.height == 0:
             continue
         if pos in SMOOTHED:
-            lo, hi = SMOOTHED[pos]
+            lo, hi = baseline, baseline + SMOOTH_SPAN
             window = grp.filter(pl.col("pos_rank").is_between(lo, hi))
             if window.height == 0:
                 window = grp.filter(pl.col("pos_rank") == grp["pos_rank"].max())
