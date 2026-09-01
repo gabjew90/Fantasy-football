@@ -211,3 +211,19 @@ QB/TE model_target rows as noise, not as buy signals.
   DET) and the inference held.
 - **Surfaces**: draft board rounds 12+ only, and waiver-brief annotations
   for high/moderate fragility.
+
+## Post-v2 item 4 — in-season age decay (2026-08-31)
+- **Scope enforced**: applied where a ROS value is SHOWN or COMPARED (trade
+  radar values, waiver annotations), never where one is computed. Verified
+  after wiring: tiers.csv and tiers.keefamania.csv proj_pts/vorp/tier/
+  value_rank are byte-identical, on both leagues.
+- **Shape**: linear in years above a position threshold (RB 27, WR 30, TE 31,
+  QB 33), scaled by weeks elapsed so week 1 is a no-op and the full effect
+  lands at season end, hard-capped at 10% for the season. Config under
+  `inseason.age_decay` with an off switch.
+- **UNVALIDATED — conventional wisdom, not evidence.** Same standing as the
+  Module 4 positional variance assumptions. research.md Q5 found age is
+  MOSTLY PRICED IN by the market, which is precisely why this is capped at
+  10%, kept out of every valuation path, and annotated "(unvalidated)"
+  wherever it shows. Revisit once 2026 actuals accumulate; delete it if the
+  three-lens scoreboard shows it hurting.

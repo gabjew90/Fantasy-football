@@ -271,6 +271,11 @@ def build(ctx, store) -> str:
         if damp_note and not contingent:
             why.append(damp_note)
         s_note = stash_note(ctx, p, contingent)
+        from . import age_decay
+        _a = (ctx.get("scfg") or {}).get("age_decay") or {}
+        _n = age_decay.note(p["pos"], (ctx.get("age_of") or {}).get(pid), week, _a)
+        if _n:
+            why.append(_n)
         trow = ctx["trow"].get(pid) or {}
         if trow.get("backs_up_pos") and trow.get("starter_fragility_label") in ("high", "moderate"):
             why.append(f"standing handcuff: backs up {trow['backs_up_pos']} "
