@@ -82,6 +82,7 @@ def load_players(cfg: Config) -> list[dict]:
             "sleeper_id": str(i + 1), "name": r["player"], "pos": pos,
             "team": (r.get("team") or "").upper(),
             "vorp": float(r.get("vorp") or 0.0),
+            "vorp_flex": float(r.get("vorp_flex") or r.get("vorp") or 0.0),
             "proj_pts": float(r.get("proj_pts") or 0.0),
             "adp": float(r["adp"]) if r.get("adp") not in (None, "") else None,
             "adp_delta": float(r.get("adp_delta") or 0.0),

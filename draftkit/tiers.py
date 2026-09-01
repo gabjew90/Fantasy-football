@@ -189,6 +189,7 @@ TIERS_COLUMNS = [
     "bye",
     "proj_pts",
     "vorp",
+    "vorp_flex",
     "tier",
     "cliff_flag",
     "pos_rank",

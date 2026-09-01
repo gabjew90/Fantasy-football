@@ -50,4 +50,36 @@ def add_vorp(df: pl.DataFrame, baselines: dict[str, int]) -> pl.DataFrame:
             repl_rows.append({"pos": pos, "replacement_pts": pts})
     repl = pl.DataFrame(repl_rows)
     df = df.join(repl, on="pos", how="left")
-    return df.with_columns((pl.col("proj_pts") - pl.col("replacement_pts")).alias("vorp"))
+    df = df.with_columns((pl.col("proj_pts") - pl.col("replacement_pts")).alias("vorp"))
+
+    # SLOT-CONDITIONAL VALUE.
+    #
+    # VORP answers "how much better than a replacement at his position", which
+    # is the right question only for a player filling that position's dedicated
+    # slot. A player who will start in the FLEX is not competing with
+    # replacement at his own position -- he is competing with the RB or WR you
+    # would otherwise put in that slot.
+    #
+    # Getting this wrong overvalues every flex-bound tight end by the gap
+    # between the two baselines, which on the Keefamania board is 32.8 points
+    # flat: Brock Bowers scores +61.9 as a tight end but only +29.1 as a flex
+    # starter, and Colston Loveland goes from +19.4 to -13.4 -- correctly, he
+    # should not start over an RB24. That single error is what made the engine
+    # recommend two elite TEs, and a hand-written "TE2 must beat the best flex
+    # alternative" rule in the browser driver was papering over it.
+    #
+    # Added as a SEPARATE column. `vorp` keeps its meaning so the in-season
+    # manager and season artifacts are untouched; only the draft path uses it.
+    FLEX_ELIGIBLE = ("RB", "WR", "TE")
+    flex_repl = max(
+        (r["replacement_pts"] for r in repl_rows if r["pos"] in FLEX_ELIGIBLE),
+        default=None,
+    )
+    if flex_repl is None:
+        return df.with_columns(pl.col("vorp").alias("vorp_flex"))
+    return df.with_columns(
+        pl.when(pl.col("pos").is_in(list(FLEX_ELIGIBLE)))
+        .then(pl.col("proj_pts") - flex_repl)
+        .otherwise(pl.col("vorp"))
+        .alias("vorp_flex")
+    )

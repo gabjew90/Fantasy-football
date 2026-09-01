@@ -58,3 +58,51 @@ def test_qb_smoothing_with_short_pool():
     df = pl.DataFrame(_pool("QB", pts))
     out = add_vorp(df, {"QB": 12})
     assert out["replacement_pts"][0] == 200.0   # only rank 11 exists
+
+
+def test_flex_bound_players_are_valued_against_the_flex_baseline():
+    """A player who will start in the FLEX competes with the RB/WR you would
+    otherwise put there, not with replacement at his own position.
+
+    Scoring him against his positional baseline overvalues every flex-bound
+    tight end by the gap between the two. On the real Keefamania board that
+    gap is 32.8 points: Bowers reads +61.9 as a tight end but contributes
+    +29.1 as a flex starter. That error is what produced the double-elite-TE
+    build the engine kept recommending.
+    """
+    df = pl.DataFrame(
+        _pool("TE", [190.2, 189.3, 146.8, 131.4, 130.7, 129.0, 127.5, 127.4])
+        + _pool("RB", [283.0, 160.2])
+        + _pool("WR", [215.9, 147.0])
+    )
+    out = add_vorp(df, {"TE": 8, "RB": 2, "WR": 2}).sort("proj_pts", descending=True)
+    te = out.filter(pl.col("pos") == "TE").sort("proj_pts", descending=True)
+
+    # against TE8 (127.4)
+    assert round(te["vorp"][0], 1) == 62.8
+    # against the FLEX baseline, which is the better of RB24/WR24 -> 160.2
+    assert round(te["vorp_flex"][0], 1) == 30.0
+    assert round(te["vorp"][0] - te["vorp_flex"][0], 1) == 32.8
+
+    # a mid TE is NEGATIVE in the flex: he should not start over an RB24
+    assert te["vorp"][2] > 0
+    assert te["vorp_flex"][2] < 0, "TE3 must not look startable in the flex"
+
+
+def test_non_flex_positions_are_unaffected():
+    """QB/K/DEF have no flex path, so their two values must agree."""
+    df = pl.DataFrame(_pool("QB", [300.0, 280.0, 270.0])
+                      + _pool("RB", [250.0, 150.0]))
+    out = add_vorp(df, {"QB": 2, "RB": 2})
+    qb = out.filter(pl.col("pos") == "QB")
+    for a, b in zip(qb["vorp"], qb["vorp_flex"]):
+        assert a == b
+
+
+def test_vorp_column_is_unchanged_by_the_addition():
+    """`vorp` keeps its meaning: the in-season manager and season artifacts
+    read it, and this change must not reach them."""
+    df = pl.DataFrame(_pool("RB", [200.0, 180.0, 160.0, 140.0]))
+    out = add_vorp(df, {"RB": 3})
+    top = out.sort("proj_pts", descending=True)
+    assert top["vorp"][0] == 40.0        # 200 - 160, exactly as before

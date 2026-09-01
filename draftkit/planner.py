@@ -24,6 +24,29 @@ from .snake import FLEX_ELIGIBLE, needs_position
 NEED_DAMP = 0.6  # partner/candidate position that fills no starter/flex slot
 
 
+def slot_vorp(p: dict, needs: dict) -> float:
+    """Value in the slot this player would ACTUALLY occupy.
+
+    VORP is measured against replacement at the player's own position, which
+    is only the right comparison when he fills that position's dedicated slot.
+    A player headed for the FLEX competes with the RB/WR you would otherwise
+    start there, so he is worth `vorp_flex` instead.
+
+    On the Keefamania board the two differ by 32.8 points for every
+    flex-eligible player, which is what made the engine value a second elite
+    tight end at +61.9 when his real marginal contribution was +29.1 -- and
+    what produced the double-TE build.
+
+    Falls back to `vorp` when the column is absent, so older boards still load.
+    """
+    pos = p.get("pos")
+    dedicated_open = needs.get(pos, 0) > 0
+    if dedicated_open or pos not in FLEX_ELIGIBLE:
+        return float(p.get("vorp") or 0.0)
+    vf = p.get("vorp_flex")
+    return float(vf if vf is not None else (p.get("vorp") or 0.0))
+
+
 def consume(needs: dict, pos: str) -> dict:
     """Roster needs after taking one player at `pos` (dedicated slot first,
     then FLEX)."""
@@ -73,7 +96,7 @@ def pair_rank(cands: list[tuple[float, str, dict]],
         # the CANDIDATE side is need-weighted too — without this, deep
         # positions with fat raw VORP (WR) spam the roster after their
         # starter slots are full (caught by simulate: a 10-WR roster)
-        own = float(p.get("vorp") or 0.0) * (
+        own = slot_vorp(p, needs) * (
             1.0 if needs_position(needs, p["pos"]) else NEED_DAMP)
         pair = own + pv
         if partner:

@@ -458,9 +458,10 @@ class Tracker:
             # truncation so a gated player ranked 4th+ by median can surface
             # (code review 2026-08-30).
             if rnd >= self.upside_from_round:
+                from .planner import slot_vorp as _sv
                 gpool = sorted(
                     gpool,
-                    key=lambda q: -((q["vorp"] or 0.0)
+                    key=lambda q: -(_sv(q, needs)
                                     * (self.upside_mult if q.get("upside_flag") else 1.0)))
             pool = gpool[:3]
             if not pool:
@@ -542,7 +543,11 @@ class Tracker:
                     tag = f" ⛑ backs up {best['backs_up']} ({seg:.0f}g"
                     tag += f", {sav})" if sav else ")"
                     why += tag
-            score = urgency + 0.001 * (best["vorp"] or 0.0)  # stable ordering
+            # Slot-conditional: a candidate headed for the FLEX is worth
+            # vorp_flex, not vorp. Without this a second elite TE carries his
+            # full positional VORP into a slot he shares with RB/WR.
+            from .planner import slot_vorp
+            score = urgency + 0.001 * slot_vorp(best, needs)  # stable ordering
             cands.append((score, why, best))
         cands.sort(key=lambda t: -t[0])
         # v2 item 1.2: joint two-pick re-rank on top of the greedy order.

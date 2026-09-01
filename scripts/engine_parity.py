@@ -51,7 +51,8 @@ def load_board(path: str) -> list[dict]:
         out.append({
             "sleeper_id": str(i + 1), "name": r["player"], "pos": pos,
             "team": (r.get("team") or "").upper(),
-            "vorp": f("vorp"), "proj_pts": f("proj_pts"),
+            "vorp": f("vorp"), "vorp_flex": f("vorp_flex", f("vorp")),
+            "proj_pts": f("proj_pts"),
             "adp": f("adp") or None, "adp_delta": f("adp_delta"),
             "tier": int(f("tier", 9)), "pos_rank": int(f("pos_rank", 99)),
             "value_rank": int(f("value_rank", 999)),

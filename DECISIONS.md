@@ -255,3 +255,38 @@ docs/expert_review_prompt.md.
 
 Until then, `leagues/keefamania.yaml` carries a hand-tuned constant and the
 comment above it must keep saying so.
+
+## 2026-09-01 — slot-conditional VORP: correct, and inert
+
+An expert reviewer identified a real valuation error: a player who starts in
+the FLEX competes with the RB/WR you would otherwise put there, not with
+replacement at his own position. Measured on the Keefamania board the gap is
+37.1 points for every flex-eligible player — McBride 67.1 as a TE against
+30.0 in the flex, and Loveland correctly turning negative.
+
+Implemented as a separate `vorp_flex` column (so `vorp` keeps its meaning and
+the in-season manager is untouched), carried through write_tiers_csv and both
+loaders, consulted by planner.slot_vorp() and the tracker's candidate sort.
+
+**It changed nothing.** Replaying a real 10-team draft across all ten slots:
+mean −0.4 lineup VORP, four slots still taking two tight ends.
+
+The reason is structural. The engine ranks positions by urgency, which is a
+DIFFERENCE — VORP(best now) − E[VORP(best next turn)] — so a constant
+baseline shift cancels exactly. Subtracting 37.1 from every tight end leaves
+every gap between tight ends unchanged. The slot-conditional value survives
+only in a 0.001x tiebreak, worth 0.037 points of score.
+
+So the double-TE build was never a baseline error. It is TE2 -> TE3 being a
+43-point cliff, which makes the position genuinely urgent regardless of which
+slot the player fills.
+
+Kept `vorp_flex` anyway: it is correct, free, tested, and the prerequisite for
+the real fix. NOT claimed as an improvement, because it measurably is not one.
+
+The real fix is cross-positional urgency — once the TE slot is filled,
+subsequent tight ends should join the flex-eligible pool for urgency purposes
+rather than remaining their own position. That changes the meaning of every
+positional urgency number and touches the comparison every pick flows
+through, so it is offseason work, not four-days-out work. Put back to the
+expert in docs/expert_followup_prompt.md.
