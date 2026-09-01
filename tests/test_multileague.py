@@ -82,3 +82,26 @@ def test_overrides_are_league_scoped(monkeypatch):
     monkeypatch.setenv("DRAFTKIT_LEAGUE", "keefamania")
     k = Config.load()
     assert k.scoped(Path("data/external/overrides.csv")).name == "overrides.keefamania.csv"
+
+
+def test_no_omnibeta_identity_in_shared_code():
+    """League facts must not live in league-agnostic modules (item 1)."""
+    import subprocess
+    r = subprocess.run(
+        ["git", "grep", "-n", "-E",
+         "farmerjamal|omnibeta|1395566811415588864|1395566812157984768",
+         "--", "draftkit/*.py", "manager/*.py"],
+        capture_output=True, text=True)
+    assert r.stdout.strip() == "", f"Omnibeta identity leaked:\n{r.stdout}"
+
+
+def test_lenses_read_from_league_yaml_and_degrade_off(monkeypatch):
+    from draftkit.lenses import load_lenses, scoreboard_md
+    cfg = Config.load()                                  # omnibeta
+    lenses = load_lenses(cfg)
+    assert lenses.get("farmerjamal") == (1989, 1995, 10)
+    monkeypatch.setenv("DRAFTKIT_LEAGUE", "keefamania")
+    k = Config.load()
+    assert load_lenses(k) == {}                          # no block -> empty
+    md = scoreboard_md({"a": 1.0, "b": 2.0, "c": 3.0}, k)
+    assert "off for this league" in md                   # degrades, never borrows

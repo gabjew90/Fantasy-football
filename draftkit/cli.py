@@ -319,7 +319,21 @@ def cmd_simulate(cfg: Config, args) -> None:
 
 def cmd_onboard(args) -> None:
     from .onboard import onboard
-    out = onboard(args.league_id, args.username, args.name)
+    username = args.username
+    if not username:
+        # resolve from the ACTIVE league; never fall back to a hardcoded name
+        try:
+            cfg = Config.load(getattr(args, "config", None),
+                              league=getattr(args, "league", None))
+            username = (cfg.get("me") or {}).get("username")
+            src = cfg.league_name
+        except Exception:  # noqa: BLE001
+            username, src = None, None
+        if not username:
+            raise SystemExit(
+                "no username: pass --username, or set `me.username` in "
+                f"leagues/{src or '<league>'}.yaml (the active league's yaml)")
+    out = onboard(args.league_id, username, args.name)
     print(f"wrote {out}")
     print(f"next: python -m draftkit --league {out.stem} verify")
 
@@ -366,7 +380,8 @@ def main(argv: list[str] | None = None) -> None:
     p = sub.add_parser("onboard", help="generate leagues/<name>.yaml from a Sleeper league id")
     p.add_argument("league_id")
     p.add_argument("--name", default=None, help="league slug (default: from league name)")
-    p.add_argument("--username", default="farmerjamal")
+    p.add_argument("--username", default=None,
+                   help="Sleeper username; defaults to the active league's me.username")
 
     args = parser.parse_args(argv)
     if args.cmd == "onboard":

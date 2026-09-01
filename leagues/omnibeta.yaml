@@ -66,3 +66,21 @@ expected:
     rush_td: 6.0
     rec_td: 6.0
     fum_lost: -2.0
+
+# Frozen pre-season grader table for the three-lens scoreboard (league fact,
+# moved out of draftkit/lenses.py 2026-08-31). team -> [our board pts,
+# league-chat consensus pts, wizard card rank]. Sources: reports/
+# draft_review.md (Aug 23), the league chat table, the Omnibeta Draft Card.
+lenses:
+  farmerjamal:       [1989, 1995, 10]
+  bankerkyle:        [1881, 2040, 6]
+  ayatollahabdullah: [1806, 2009, 9]
+  ArcticAces:        [1805, 2015, 5]
+  Tulchh:            [1765, 1937, 7]
+  cbarone:           [1755, 1969, 2]
+  Lord2Pale:         [1680, 1923, 12]
+  vincenzo31:        [1676, 2016, 3]
+  Dizzydean6:        [1656, 1845, 11]
+  DihtrickCohones:   [1639, 2046, 4]
+  rybryethguy:       [1618, 2060, 8]
+  StinkyDillPickle:  [1611, 1998, 1]

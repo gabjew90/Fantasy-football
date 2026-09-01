@@ -343,7 +343,7 @@ def waiver_brief(cfg) -> Path:
         "preseason_note": ("PRESEASON / projections not yet published — values are "
                            "fallback baselines (season proj ÷ 16)"
                            if ctx["preseason"] or ctx["fallback"] else ""),
-        "scoreboard_md": scoreboard_md(_actual_points(cfg, users_by_roster)),
+        "scoreboard_md": scoreboard_md(_actual_points(cfg, users_by_roster), cfg),
     }
     out = cfg.root / "reports" / "waiver_brief.md"
     out.write_text(waivers.render_waiver_brief(model), encoding="utf-8")
