@@ -1,6 +1,7 @@
-"""Three-lens scoreboard (season spec Task 7)."""
+"""Three-lens scoreboard (season spec Task 7; league-scoped since 2026-08-31)."""
 
-from draftkit.lenses import LENSES, scoreboard_md, spearman
+from draftkit.config import Config
+from draftkit.lenses import load_lenses, scoreboard_md, spearman
 
 
 def test_spearman_identity_and_reversal():
@@ -9,11 +10,20 @@ def test_spearman_identity_and_reversal():
 
 
 def test_scoreboard_renders_all_teams():
-    actual = {t: 100.0 - i for i, t in enumerate(LENSES)}  # our-board order = reality
-    md = scoreboard_md(actual)
+    cfg = Config.load()                       # omnibeta carries the lenses block
+    lenses = load_lenses(cfg)
+    assert len(lenses) == 12
+    actual = {t: 100.0 - i for i, t in enumerate(lenses)}  # our-board order = reality
+    md = scoreboard_md(actual, cfg)
     assert md.count("|") > 12 * 5
     assert "our board: **+1.00**" in md
 
 
 def test_scoreboard_needs_data():
-    assert "not enough" in scoreboard_md({"farmerjamal": 100.0})
+    cfg = Config.load()
+    assert "not enough" in scoreboard_md({"farmerjamal": 100.0}, cfg)
+
+
+def test_scoreboard_without_a_league_block_is_off_not_borrowed():
+    md = scoreboard_md({"a": 1.0, "b": 2.0, "c": 3.0}, cfg=None)
+    assert "off for this league" in md
