@@ -21,3 +21,4 @@ reports/manager/
 # The private key must not be in version control; regenerate with
 # scripts/make_bridge_cert.sh
 data/draftrig/tls/*.pem
+data/draftrig/tiers_bakeoff_*.csv
