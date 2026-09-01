@@ -126,11 +126,13 @@ $("reload").onclick = async () => { await fetch("/reload", {method: "POST"}); ti
 function esc(t) { const d = document.createElement("div"); d.textContent = t ?? ""; return d.innerHTML; }
 
 let poolCount = -1;
+let poolPos = {};   // name -> pos, for collision-proof manual entry
 async function postPick(path, name) {
   const q = new URLSearchParams();
   if (store.draftId) q.set("draft_id", store.draftId);
   if (store.slot) q.set("slot", store.slot);
   if (name) q.set("name", name);
+  if (name && poolPos[name]) q.set("pos", poolPos[name]);
   const r = await fetch(path + "?" + q, {method: "POST"});
   const out = await r.json();
   $("manualMsg").textContent = out.ok
@@ -169,6 +171,8 @@ function render(s) {
     poolCount = s.all_remaining.length;
     $("poolList").innerHTML = s.all_remaining.map(p =>
       `<option value="${esc(p.n)}">${esc(p.p)}</option>`).join("");
+    poolPos = {};
+    s.all_remaining.forEach(p => { poolPos[p.n] = p.p; });
   }
 
   if (s.poll_error) {

@@ -115,7 +115,10 @@ def main() -> int:
             # feed may trim old entries: accumulate by pick number, placeholder
             # any gap so later picks keep the right snake slot
             max_n = max(seen) if seen else 0
-            names = [seen[i]["name"] if i in seen else f"Unknown Pick{i}"
+            # pos travels with the name - same-surname collisions otherwise
+            # collapse two players onto one board row (code review 2026-08-31)
+            names = [{"name": seen[i]["name"], "pos": seen[i].get("pos", "")}
+                     if i in seen else {"name": f"Unknown Pick{i}"}
                      for i in range(1, max_n + 1)]
             if len(names) != last_n:
                 src.set_picks(names)

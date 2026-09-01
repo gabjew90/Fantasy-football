@@ -68,3 +68,25 @@ def test_abbreviated_yahoo_feed_names_resolve(tmp_path):
     assert s.resolve({"name": "J. Allen CEL", "pos": "QB"})["sleeper_id"] == "3"
     # pos disambiguates same initial+similar surnames when needed
     assert s.resolve({"name": "L. Jackson", "pos": "QB"})["sleeper_id"] == "4"
+
+
+def test_set_picks_preserves_position_against_name_collisions(tmp_path):
+    """Two J. Williams must not collapse onto one board row (review 2026-08-31)."""
+    board = [
+        {"sleeper_id": "1", "player": "Javonte Williams", "pos": "RB"},
+        {"sleeper_id": "2", "player": "Jameson Williams", "pos": "WR"},
+    ]
+    s = LocalDraft(tmp_path / "p.json", board, 10, 15)
+    s.set_picks([{"name": "J. Williams", "pos": "RB"},
+                 {"name": "J. Williams", "pos": "WR"}])
+    assert [p["player_id"] for p in s.picks()] == ["1", "2"]
+
+
+def test_picks_cache_invalidates_on_rapid_rewrite(tmp_path):
+    board = [{"sleeper_id": "1", "player": "Alpha Back", "pos": "RB"},
+             {"sleeper_id": "2", "player": "Beta Back", "pos": "RB"}]
+    s = LocalDraft(tmp_path / "p.json", board, 10, 15)
+    s.set_picks([{"name": "Alpha Back"}])
+    assert len(s.picks()) == 1
+    s.set_picks([{"name": "Alpha Back"}, {"name": "Beta Back"}])
+    assert len(s.picks()) == 2   # size differs even if mtime ties

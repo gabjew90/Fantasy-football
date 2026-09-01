@@ -137,7 +137,10 @@ class Tracker:
         """Fetch picks; returns True if the pick list changed. Retries with backoff."""
         if getattr(self, "local", False):
             picks = self.source.picks()
-            changed = len(picks) != len(self.state.picks)
+            # identity, not count: undo+re-add keeps the length but changes
+            # the board (code review 2026-08-31)
+            changed = ([p["player_id"] for p in picks]
+                       != [p["player_id"] for p in self.state.picks])
             self.state.status = self.source.status()
             self.state.last_error = None
             self.state.last_poll_ok = time.time()
