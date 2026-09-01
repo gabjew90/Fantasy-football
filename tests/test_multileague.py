@@ -71,3 +71,14 @@ def test_scoring_without_league_block_fails_loudly():
 
     with _pytest.raises(ValueError, match="no scoring"):
         scoring_from_cfg(FakeCfg({}))
+
+
+def test_overrides_are_league_scoped(monkeypatch):
+    """Override projections are absolute points in league scoring, so a
+    full-PPR value must never leak onto a half-PPR board (review 8/31)."""
+    from pathlib import Path
+    cfg = Config.load()                       # omnibeta (default)
+    assert cfg.scoped(Path("data/external/overrides.csv")).name == "overrides.csv"
+    monkeypatch.setenv("DRAFTKIT_LEAGUE", "keefamania")
+    k = Config.load()
+    assert k.scoped(Path("data/external/overrides.csv")).name == "overrides.keefamania.csv"
