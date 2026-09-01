@@ -414,3 +414,37 @@ via `--show-contamination`. What is missing is an input, not logic.
 
 Offseason: pull a percent-rostered series or archive ADP each season, then run
 this over several seasons rather than one.
+
+## 2026-09-01 (4) — QB5/TE8 kept because it MEASURABLY drafts better
+
+The previous entry kept the hand-fitted baselines on "no evidence either way",
+which was a non-answer. The ownership blocker only stops the STREAMING
+derivation; it does not stop asking the operational question directly.
+
+Baselines do not change `proj_pts`. So build the board at each candidate,
+draft with each against the same fixed rivals, and score the starting lineup
+on projected points -- a number identical across all three boards, which none
+of them can move by re-pricing anything (scripts/baseline_bakeoff.py).
+
+    22 draft slots, two real drafts
+    current  QB5/TE8     mean 1768.8
+    middle   QB7/TE10    mean 1766.1     -2.7    0 better,  4 worse, 18 tied
+    format   QB10/TE11   mean 1764.8     -4.0    0 better,  6 worse, 16 tied
+
+Monotone in the same direction and never once better. Small (0.2%), but the
+question was which to ship, and the answer is not ambiguous.
+
+This does NOT vindicate the way QB5/TE8 was originally obtained -- fitting to
+|VORP rank - ADP rank| is still laundering the market's opinion, and the
+number could be right for the wrong reason. What it establishes is that
+replacing it with the format baseline would cost real points against real
+rooms, so the honest fitting critique is not a reason to change it four days
+out. Deriving it properly stays an offseason item.
+
+### Loose thread found while measuring
+
+Every single roster in all 22 slots drafts a second quarterback. In a 10-team
+1-QB league whose baseline asserts QBs are freely streamable, a rostered QB2
+is close to a wasted pick, and the two claims cannot both be right. The
+qb2_earliest_round=10 gate permits it and nothing pushes back. Worth testing a
+hard one-QB variant.
