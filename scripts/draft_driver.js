@@ -775,6 +775,38 @@ window.DK = (function () {
     rank, syncQueue, draftTop, run,
     classifyMiss, rowMatches, normTeam, autopickArmed, // exported for tests
     reconcileStarred, reconcileStarredWith,
+    /* Human-readable rationale for the pick we intend to make. Exists so the
+     * run can be narrated: a board that cannot explain itself is impossible
+     * to audit mid-draft, and every mock bug so far was caught by noticing a
+     * pick that did not make sense. */
+    why() {
+      const r = rank();
+      if (r.err) return { err: r.err };
+      const t = r.top[0];
+      if (!t) return { err: 'no eligible candidate' };
+      const runnerUp = r.top[1];
+      const openSlots = Object.entries(r.need)
+        .filter(([, n]) => n > 0).map(([k, n]) => n > 1 ? `${k}x${n}` : k);
+      const samePos = r.top.filter(x => x.p === t.p);
+      const nextBestOther = r.top.find(x => x.p !== t.p);
+      return {
+        round: r.round,
+        picksLeft: r.picksLeft,
+        roster: r.counts,
+        openStarters: openSlots,
+        pick: `${t.n} (${t.p}, VORP ${t.v})`,
+        fillsNeed: t.fills,
+        overNextAtPosition: samePos[1]
+          ? `${(t.v - samePos[1].v).toFixed(1)} over next ${t.p} (${samePos[1].n})`
+          : `only ${t.p} left on board`,
+        overNextOtherPosition: nextBestOther
+          ? `${(t.v - nextBestOther.v).toFixed(1)} over best ${nextBestOther.p} (${nextBestOther.n})`
+          : null,
+        runnerUp: runnerUp ? `${runnerUp.n} (${runnerUp.p}, ${runnerUp.v})` : null,
+        alsoConsidered: r.top.slice(1, 5).map(x => `${x.n} ${x.p} ${x.v}`),
+        blockedByGuardrails: r.blockedSample,
+      };
+    },
     /* Pure form of the queue-row parser, so the on-clock "Draft" prefix that
      * made mock 4 report an empty queue stays covered. */
     /* Pure form of the queue planner: which of the ranked candidates would
