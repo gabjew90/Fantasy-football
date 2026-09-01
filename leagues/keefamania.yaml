@@ -1,7 +1,16 @@
 # Keefamania (Yahoo league #49649) — team "Air Raid Gabriel".
-# Settings read from the live Yahoo settings page 2026-08-29 (API approval
-# pending, so no verify against Yahoo yet — the expected: block is the
-# transcription of record; re-check the page before draft day).
+# Settings read from the live Yahoo settings page 2026-08-29 and RE-VERIFIED
+# line by line 2026-08-31 (Yahoo API approval still pending, so `verify`
+# cannot run for this league; this block is the transcription of record).
+# 2026-08-31 re-read confirmed ALL of: Live Standard Draft (snake), Sat Sep 5
+# 10:00pm EDT, 10 teams, 1-minute timer, roster QB/WR/WR/RB/RB/TE/W-R-T/K/DEF
+# + 6 BN + 2 IR, rec 0.5, pass 25yd/pt, pass TD 4, INT -1, rush 10yd/pt,
+# rush+rec TD 6, fumble -2, the +2 40-yard passing TD bonus, waivers
+# "Continual rolling list" with a 2-day period, playoffs 6 teams weeks 15-17,
+# trade deadline Nov 28. ROUND COUNT: 15 non-IR slots -> 15 rounds; IR slots
+# are not filled during a Yahoo draft, so the round-gated guardrails
+# (qb2_earliest_round, upside_from_round, K/DEF timing) are correctly aligned.
+# Also noted: "injured players may be added directly to the injury slot: Yes".
 # DRAFT: Saturday Sep 5, 2026, 10:00 PM EDT / 7:00 PM PT · snake · 60s clock.
 
 platform: yahoo
