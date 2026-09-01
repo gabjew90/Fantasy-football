@@ -37,6 +37,9 @@ window.DK = (function () {
     gone: new Set(),    // board entries proven undraftable (no star button)
     starred: new Set(), // players WE queued; the star is a toggle, never re-click
     ctx: null,          // shared ranking context (te6 / bestFlexAlt / need) for te2Ok
+    plan: null,         // ranked list from the REAL engine (yahoo_bridge.py)
+    planNeeds: null,
+    planPick: null,     // pick number the plan was computed at
   };
 
   const FLEX_OK = { RB: 1, WR: 1, TE: 1 };
@@ -128,6 +131,31 @@ window.DK = (function () {
    * we never retry a name. Self-correcting, and it needs no feed parsing. */
   function markGone(entry) { S.gone.add(entry.n + '|' + entry.p); }
   function isGone(entry) { return S.gone.has(entry.n + '|' + entry.p); }
+
+  /* Every pick made so far, for the bridge to rebuild engine state.
+   *
+   * Read from the Results tab's round-by-round list, which prints
+   * "Round 3, Pick 2 (22nd Overall) Brock Bowers LV - TE". That is the one
+   * place Yahoo states the pick NUMBER, and the number is what the engine
+   * needs -- the roster panel is slot-ordered, which already caused one
+   * wrong report to the user. */
+  function draftedFeed() {
+    const t = document.body.innerText.replace(/\s+/g, ' ');
+    const out = [];
+    const re = /Round (\d+), Pick (\d+) \((\d+)\w+ Overall\)\s+([A-Za-z'\.\- ]+?)\s+([A-Za-z]{2,3})\s+-\s+(QB|RB|WR|TE|K|DEF)/g;
+    let m;
+    while ((m = re.exec(t))) {
+      out.push({ pick_no: +m[3], name: m[4].trim(), pos: m[6], team: m[5] });
+    }
+    if (out.length) return out;
+    /* Fallback while the draft is live and Results is not populated: the
+     * pick ticker, which carries name + position but no pick number. Number
+     * them in order seen -- the engine only needs the SET plus ordering. */
+    const seen = [];
+    const re2 = /([A-Z]\.\s?[A-Za-z'\-\.]+)\s+\((QB|RB|WR|TE|K|DEF)\s*[·\-]\s*([A-Za-z]{2,3})\)/g;
+    while ((m = re2.exec(t))) seen.push({ name: m[1], pos: m[2], team: m[3] });
+    return seen.map((x, i) => Object.assign({ pick_no: i + 1 }, x));
+  }
 
   /* Why a row lookup missed. Pure so it can be tested directly -- this is the
    * exact judgement that cost mock 2 thirty-six elite players by reading a
@@ -305,7 +333,45 @@ window.DK = (function () {
 
   /* ---------------- ranking ---------------- */
 
+  /* THE PLAN comes from the real engine.
+   *
+   * scripts/yahoo_bridge.py runs draftkit/tracker.py -- the same
+   * recommendations() the Sleeper draft used -- and hands the page a ranked
+   * list. The page walks it and clicks. There is no second ranking
+   * implementation to drift.
+   *
+   * Everything below rank() is still needed and still lives here: matching a
+   * board entry to a Yahoo row, the star toggle, the on-clock re-render, team
+   * defenses having no first name. That is actuation, and it genuinely cannot
+   * run anywhere but the page.
+   *
+   * The local ranking is kept ONLY as a fallback for a stale or missing plan,
+   * and says so in the output, because a silent fallback to the weaker
+   * ranking is exactly the failure this whole exercise was about. */
+  function rankFromPlan() {
+    const ros = myRoster();
+    if (!ros || !S.plan || !S.plan.length) return null;
+    const mine = new Set(ros.players.map(p => p.k + '|' + p.pos));
+    const have = ros.players.length;
+    const out = [];
+    for (const e of S.plan) {
+      const b = S.board.find(x => x.n === e.n && x.p === e.p)
+             || { n: e.n, p: e.p, t: e.t, v: e.v, a: e.a, k: idKey(e.n, e.p) };
+      if (mine.has(b.k + '|' + b.p) || isGone(b)) continue;
+      out.push({ n: b.n, p: b.p, t: b.t, v: b.v, why: e.why, fromEngine: true });
+    }
+    if (!out.length) return null;
+    return {
+      round: have + 1, picksLeft: S.cfg.rounds - have,
+      counts: ros.counts, need: S.planNeeds || {},
+      source: 'engine', planAge: S.planPick == null ? null : S.planPick,
+      top: out, availCount: out.length, goneCount: S.gone.size,
+    };
+  }
+
   function rank() {
+    const fromEngine = rankFromPlan();
+    if (fromEngine) return fromEngine;
     const ros = myRoster();
     if (!ros) return { err: 'no roster panel' };
     const counts = ros.counts;
@@ -1076,6 +1142,24 @@ window.DK = (function () {
       Object.assign(S.cfg, cfg || {});
       return 'loaded ' + S.board.length + ' players, '
              + S.collisions.size + ' name collision(s)';
+    },
+    /* Accept a plan from scripts/yahoo_bridge.py. */
+    loadPlan(obj) {
+      S.plan = (obj && obj.plan) || null;
+      S.planNeeds = (obj && obj.needs) || null;
+      S.planPick = (obj && obj.current_pick) != null ? obj.current_pick : null;
+      return S.plan ? ('plan ' + S.plan.length + ' deep @pick ' + S.planPick) : 'no plan';
+    },
+    /* Everything the bridge needs to rebuild engine state, read off the page. */
+    exportState(mySlot, teams, rounds) {
+      const ros = myRoster();
+      return {
+        my_slot: mySlot, teams: teams || S.cfg.teams, rounds: rounds || S.cfg.rounds,
+        my_roster: (ros ? ros.players : []).map(p => ({ name: p.disp, pos: p.pos })),
+        drafted: draftedFeed(),
+        on_clock: onClock(), armed: autopickArmed(),
+        roster_count: rosterCount(),
+      };
     },
     reset() {
       S.gone = new Set(); S.starred = new Set(); S.log = []; S.lastRoster = -1;
