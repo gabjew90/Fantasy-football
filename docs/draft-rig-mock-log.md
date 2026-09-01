@@ -234,3 +234,46 @@ The controlled evidence for VONA remains the 22-replay study in
 `reports/vona_validation.md`, where rivals' picks are held fixed and only our
 ranking varies. Live mocks confirm VONA *behaves* as designed; they cannot
 measure whether it drafts better.
+
+---
+
+# Architecture change (2026-09-01): the engine moved back to Python
+
+Mocks 1-9 were driven by a JavaScript reimplementation of `tracker.py`.
+Measured against the engine it was copying (`scripts/engine_bakeoff.py`) it
+agreed on **25%** of top picks and lost at **8 of 10** slots. It was not a
+port; it was a different algorithm wearing the same board.
+
+`localhost` is now solved, so there is one engine again:
+
+- The block was **mixed content**, not Private Network Access. Over http
+  Chrome never sent the request at all — an instrumented server logged curl's
+  hit and nothing from Chrome, and the promise never settled. Over TLS the
+  same request fails in 126ms with an ordinary certificate error.
+- `scripts/bridge_server.py` serves `tracker.recommendations()` on
+  `https://127.0.0.1:8443` behind a leaf-only certificate (CA:FALSE,
+  localhost SANs, 14-day expiry), accepted once in Chrome.
+- Measured from the live draft page: **/ping 10ms, a full plan including the
+  Monte Carlo 614ms**. Against a 60-second clock that is free, so the page
+  asks the engine AT the pick and staleness is zero.
+
+`draft_driver.js` keeps only what must run in the page: row matching, the
+star toggle, the on-clock re-render, defenses without first names, and
+keeping autopick from arming. Its ranking survives as a **labelled** fallback
+— every `rank()` result carries `source`, so a downgrade is visible.
+
+## Mock 10 — room 10408520, 10 teams, slot 10 — bug-finding run
+
+First run on the bridge. Two verified engine picks at the turn: McBride and
+Bowers, back to back at 10 and 11 — the two-pick planner taking BOTH elite
+TEs, which is the exact call greedy VONA got wrong at slot 9.
+
+| # | Bug | Root cause | Fix |
+|---|-----|-----------|-----|
+| 29 | Roster showed **QB:2 in round 4** against a round-10 gate | Yahoo's pick feed gives player and pick number but never whose pick it was, so every pick defaulted to slot 0, none were attributed to us, and `my_pos_counts()` came back empty. Correct ranking over wrong state | Derive slot from pick number; prefer the panel's "You" flag |
+| 30 | Bridge was told the draft was at **pick 2** while it was at pick 51 | `draftedFeed()` read the **Results** tab, which stays empty until a draft ENDS. Only caught because the fallback is labelled and reported `source: LOCAL` | Read the **Picks** panel instead |
+| 31 | Picks panel **virtualises** — mid-draft it held 8-50 and had dropped 1-7 | A single read is always partial | Accumulate into a Map across cycles; never forget a pick |
+| 32 | Slot arithmetic would have mis-attributed every pick | The room **reshuffled us from slot 3 to slot 10** seconds before starting | Trust the panel's "You" label over snake position |
+
+Bug 30 is the one worth remembering: the labelled fallback is what made it
+visible. A silent downgrade would have looked like a working draft.
