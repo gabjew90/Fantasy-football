@@ -31,7 +31,12 @@ WORKLOAD_WEIGHT = {"RB": 0.30, "WR": 0.10, "TE": 0.10, "QB": 0.10}
 
 # body parts with structural (season-threatening) vs soft-tissue (recurring)
 # risk. Anything unrecognised contributes nothing rather than a guess.
-STRUCTURAL = ("acl", "achilles", "lisfranc", "patell", "fracture", "foot", "knee")
+# Injury TYPES, never body parts. "knee" and "foot" were in this list
+# until 2026-09-01, which scored a knee bruise or a foot sprain exactly
+# like a torn ACL. An unrecognised description still contributes zero,
+# so being narrow here is the safe direction.
+STRUCTURAL = ("acl", "mcl", "pcl", "meniscus", "achilles", "lisfranc",
+              "patell", "fracture")
 SOFT_TISSUE = ("hamstring", "groin", "calf", "quad", "oblique")
 
 

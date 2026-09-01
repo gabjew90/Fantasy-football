@@ -1,6 +1,6 @@
-sleeper_id,name,proj_pts,reason,source,date_checked
-10222,Jayden Reed,117,Recovered from 2025 clavicle fractures; full camp. Half-PPR port of the 8/19 Omnibeta research (ratio-scaled).,porting 2026-08-19 research to half-PPR,2026-08-31
-12501,Matthew Golden,110,Named boundary starter for 2026. Half-PPR port of the 8/19 research.,porting 2026-08-19 research to half-PPR,2026-08-31
-12490,Bhayshul Tuten,156,Travis Etienne departed in free agency; Tuten inherits the early-down role. Half-PPR port of the 8/19 research.,porting 2026-08-19 research to half-PPR,2026-08-31
-13281,Jordyn Tyson,88,"Hamstring Aug 2026, expected out ~2 months. Half-PPR port.",porting 2026-08-19 research to half-PPR,2026-08-31
-8132,Tyler Allgeier,80,Arizona drafted Jeremiyah Love #3 overall; Allgeier loses the lead role. Half-PPR port.,porting 2026-08-19 research to half-PPR,2026-08-31
+sleeper_id,name,proj_pts,status,reason,source,date_checked
+10222,Jayden Reed,117,candidate,Recovered from 2025 clavicle fractures; full camp. Half-PPR port of the 8/19 Omnibeta research (ratio-scaled).,"2026-08-19 Omnibeta research, ratio-scaled to half-PPR on 2026-08-31 — FACT NOT RE-VERIFIED",2026-08-19
+12501,Matthew Golden,110,candidate,Named boundary starter for 2026. Half-PPR port of the 8/19 research.,"2026-08-19 Omnibeta research, ratio-scaled to half-PPR on 2026-08-31 — FACT NOT RE-VERIFIED",2026-08-19
+12490,Bhayshul Tuten,156,candidate,Travis Etienne departed in free agency; Tuten inherits the early-down role. Half-PPR port of the 8/19 research.,"2026-08-19 Omnibeta research, ratio-scaled to half-PPR on 2026-08-31 — FACT NOT RE-VERIFIED",2026-08-19
+13281,Jordyn Tyson,88,candidate,"Hamstring Aug 2026, expected out ~2 months. Half-PPR port.","2026-08-19 Omnibeta research, ratio-scaled to half-PPR on 2026-08-31 — FACT NOT RE-VERIFIED",2026-08-19
+8132,Tyler Allgeier,80,candidate,Arizona drafted Jeremiyah Love #3 overall; Allgeier loses the lead role. Half-PPR port.,"2026-08-19 Omnibeta research, ratio-scaled to half-PPR on 2026-08-31 — FACT NOT RE-VERIFIED",2026-08-19

@@ -311,10 +311,15 @@ def default_projection(cfg, usage: pl.DataFrame, market: pl.DataFrame) -> pl.Dat
     # Overrides are ABSOLUTE point values in the LEAGUE'S OWN SCORING, so they
     # must be league-scoped: a full-PPR research projection forced onto a
     # half-PPR board overstates pass-catchers by ~15-20% (code review 8/31).
+    # Only CONFIRMED rows are applied. A `candidate` row is inert and the
+    # model's number stands -- see draftkit/overrides.py for why freshness is
+    # enforced structurally rather than by remembering to check.
+    from . import overrides as _ov_mod
     ov_path = cfg.scoped(cfg.path("external") / "overrides.csv")
-    if ov_path.exists():
-        ov = pl.read_csv(ov_path, infer_schema_length=1000)
-        if "sleeper_id" in ov.columns and "proj_pts" in ov.columns:
+    ov = _ov_mod.read(ov_path)
+    if ov is not None:
+        ov, _candidates = _ov_mod.split(ov)
+        if ov.height:
             # keep="last": a hand-edited duplicate row means the later line is
             # the revision, and a non-unique join would multiply the player
             ov = ov.select(

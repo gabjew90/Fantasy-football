@@ -143,6 +143,16 @@ def cmd_tiers(cfg: Config, args) -> None:
     from .fragility import add_contingency_map
     tiers = add_contingency_map(tiers)
 
+    # Inert overrides are reported LOUDLY at every build. A candidate row is a
+    # projection you believe but have not re-verified, and the failure mode is
+    # forgetting it is switched off, not seeing that it is.
+    from .overrides import pending
+    for row in pending(cfg.scoped(cfg.path("external") / "overrides.csv")):
+        console.print(
+            f"  [yellow]PENDING OVERRIDE (inert)[/yellow] {row.get('name')} "
+            f"-> {row.get('proj_pts')} · fact dated {row.get('date_checked')} "
+            f"· re-verify to activate")
+
     csv_path = cfg.scoped(cfg.root / "tiers.csv")
     write_tiers_csv(tiers, csv_path)
     board_path = cfg.scoped(cfg.root / "board.md")

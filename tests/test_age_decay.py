@@ -40,3 +40,11 @@ def test_apply_and_note():
     assert v is not None and v < 100.0
     assert "unvalidated" in note("RB", 34, 17, CFG)
     assert note("RB", 24, 17, CFG) == ""                 # silent when immaterial
+
+
+def test_age_decay_is_opt_in():
+    """Phase 1 item 3: an unvalidated adjustment that is on by default is on
+    in leagues nobody chose it for."""
+    assert decay_factor("RB", 31.0, 17, {}) == 1.0
+    assert decay_factor("RB", 31.0, 17, None) == 1.0
+    assert decay_factor("RB", 31.0, 17, {"enabled": True}) < 1.0

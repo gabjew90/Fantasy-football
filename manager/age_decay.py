@@ -25,7 +25,11 @@ SEASON_WEEKS = 17
 def decay_factor(pos: str, age: float | None, week: int, cfg: dict | None = None) -> float:
     """Multiplier (<=1.0) on a ROS value. 1.0 when off, ageless, or young."""
     cfg = cfg or {}
-    if not cfg.get("enabled", True):
+    # OPT-IN. This adjustment is conventional-wisdom-shaped and
+    # unvalidated (see the module docstring), and an unvalidated
+    # adjustment that is on by default is on in leagues nobody chose it
+    # for. Turn it on explicitly per league, or not at all.
+    if not cfg.get("enabled", False):
         return 1.0
     if age is None or pos is None:
         return 1.0

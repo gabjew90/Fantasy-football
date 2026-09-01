@@ -24,3 +24,18 @@
 - Engine changes ship behind the validation loop in
   docs/plans/2026-08-29-draft-engine-v2-plan.md — CLV, historical sim,
   input accuracy. Self-graded boards validate nothing.
+
+## Deadline conduct
+- **When a deadline and a protocol conflict, the protocol wins and the
+  feature ships late or not at all.** A missing override is a small loss; a
+  stale one recorded as fresh is a corrupted record, and it silently poisons
+  every later judgement that trusts it.
+- `date_checked` on an override means the FACT was verified against a dated
+  source on that date. Not edited, ported, or rescaled. Rows are `candidate`
+  (inert) until re-verified fresh; nothing is promoted because time ran out.
+- The validation harness — CLV retro, replay, three-lens scoreboard,
+  byte-identical checks on informational modules, the DATA MISSING degrade
+  pattern — is never cut for simplicity. It is the reason defects get caught
+  cheaply, and twice it has been the harness itself that was wrong.
+- Measure before cutting, not after deciding to cut. A predicted delta is not
+  a measured one.

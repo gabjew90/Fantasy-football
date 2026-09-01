@@ -1,0 +1,26 @@
+# The pre-commit hook is opt-in per clone (git config core.hooksPath .githooks),
+# so it cannot be the only line of defence. This is the one that always runs.
+name: hygiene
+
+on:
+  pull_request:
+  push:
+    branches-ignore: [main]
+
+jobs:
+  commit-hygiene:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+      - name: state/ must not ride along with code changes
+        run: |
+          base="${{ github.event.pull_request.base.sha || github.event.before }}"
+          if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ]; then
+            base="$(git rev-parse HEAD~1 2>/dev/null || git rev-parse HEAD)"
+          fi
+          python scripts/check_commit_hygiene.py --range "$base...HEAD"

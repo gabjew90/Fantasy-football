@@ -61,3 +61,27 @@ def test_module_never_touches_valuation():
     out = add_contingency_map(df)
     for col in ("vorp", "proj_pts", "tier"):
         assert out[col].to_list() == df[col].to_list(), f"{col} was modified"
+
+
+# ---------- Phase 1 item 2: body parts are not injury types ----------
+
+def test_a_knee_bruise_no_longer_scores_like_a_torn_acl():
+    """"knee" and "foot" were in STRUCTURAL until 2026-09-01, so any knee or
+    foot mention took the full structural penalty."""
+    from draftkit.fragility import fragility
+    acl = fragility("RB", 300.0, "torn ACL")
+    bruise = fragility("RB", 300.0, "knee bruise")
+    assert acl > bruise
+    assert bruise == fragility("RB", 300.0, None)
+
+
+def test_ligament_tears_are_structural():
+    from draftkit.fragility import fragility
+    base = fragility("RB", 300.0, None)
+    for desc in ("MCL sprain grade 3", "PCL tear", "meniscus surgery"):
+        assert fragility("RB", 300.0, desc) > base, desc
+
+
+def test_unrecognised_descriptions_still_contribute_nothing():
+    from draftkit.fragility import fragility
+    assert fragility("RB", 300.0, "sore") == fragility("RB", 300.0, None)

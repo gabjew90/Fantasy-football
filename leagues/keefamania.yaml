@@ -66,9 +66,20 @@ tiers:
   cliff_z: 1.0
   adp_include_within: 150   # 10 teams x 15 rounds
 
-# Standing tilts ON for this draft (v2 item 1.6)
+# Standing tilts OFF for this draft (2026-09-01).
+#
+# They change EVERY pick -- 0 of 22 replayed rosters were identical with them
+# on vs off -- and they are unvalidated. A replay cannot settle whether that
+# is good, because tilts alter proj_pts and each arm then wins on its own
+# ruler: judged by the untilted model, turning them off is +1.7 points; judged
+# by the tilted model, it is -33.3. Grading a change of belief against that
+# same belief proves nothing.
+#
+# So this is a risk decision, not a measurement: an unvalidated intervention
+# that moves every pick is not something to carry blind into a real draft.
+# The theses stay in the research file for re-adoption behind a CLV backtest.
 tilts:
-  enabled: true
+  enabled: false
   mid_te_fade: 0.08
   nonrush_qb_fade: 0.08
   rush_qb_late_boost: 0.08

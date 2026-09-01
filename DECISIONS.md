@@ -512,3 +512,74 @@ Still open: the fallback uses ADP for AVAILABILITY (who survives to a pick),
 which is a structural fact rather than the market's opinion of value -- the
 distinction that matters. Replacing it with the survival simulation, which
 already models the room, is the offseason version.
+
+## 2026-09-01 (6) — correction-pass Phase 1, and what the cut list got wrong
+
+An external correction pass proposed four critical fixes, a draft-day
+de-pressuring phase, and a five-item cut list. Verified each claim before
+acting; Phase 1 was four for four, the cut list was three for five.
+
+### Phase 1 — all confirmed, all fixed
+
+1. **Stale overrides.** All five rows of overrides.keefamania.csv carried
+   `date_checked: 2026-08-31` while `source` said "porting 2026-08-19
+   research to half-PPR". Nothing was verified on the 31st; a ratio rescale
+   happened. Added a `status` column, restored the true fact date, and made
+   freshness structural: only `confirmed` rows are applied, `candidate` rows
+   are INERT and reported at every build. A file with no status column is
+   treated as entirely candidate -- an unmarked file predates the contract, so
+   nothing in it has been checked under it. Omnibeta's eight rows carry real
+   dated ESPN sources matching their date_checked and are honestly `confirmed`.
+2. **Fragility keywords.** STRUCTURAL contained "foot" and "knee" -- body
+   parts, not injury types -- so a knee bruise scored like a torn ACL. Removed
+   both, added mcl/pcl/meniscus. Unrecognised still contributes zero, so narrow
+   is the safe direction.
+3. **Age decay opt-in.** decay_factor defaulted `enabled` to True. An
+   unvalidated adjustment that is on by default is on in leagues nobody chose
+   it for. Flipped to False and disabled explicitly; OFF for both leagues until
+   2026 actuals can validate it.
+4. **State hygiene.** Six commits swept state/*.json into feature commits
+   (3720a78, 969e059, 6415db7, 4ec05e4, 4a6dfac, 2c30c0a) -- what `git add -A`
+   does silently, and I use it habitually. Added
+   scripts/check_commit_hygiene.py, a .githooks/pre-commit, and a CI job,
+   because the hook is opt-in per clone and cannot be the only defence.
+
+### Standing ADP tilts: OFF for Saturday
+
+Not because they were measured to be bad -- they cannot be measured this way.
+Tilts alter proj_pts, so a replay grades a change of belief against that same
+belief and each arm wins on its own ruler: judged by the untilted model,
+turning them off is +1.7 points; judged by the tilted model, -33.3. (A first
+run reported +49.6 for turning them off, which was pure ruler artifact.)
+
+What the replay does establish: 0 of 22 rosters were identical with tilts on
+vs off. They are a material, unvalidated intervention on every single pick.
+Carrying that blind into a real draft is a risk decision, and the answer is no.
+Theses kept in the research file for re-adoption behind a CLV backtest.
+
+### Cut list — measured, 22 slots, before deciding
+
+    item  9  delete two-pick planner        predicted <1 pt   MEASURED -6.0, 19/22 rosters change
+    item 10  delete fat-tail + run escal.   predicted ?       MEASURED  0.0,  0/22 rosters change
+    item 11  delete standing ADP tilts      predicted small   NOT MEASURABLE by replay (above)
+
+* **Item 9 rejected.** Off by 6x and the wrong sign. Its premise, "greedy
+  urgency replaces it", is now specifically wrong: after 2026-09-01 pair_rank
+  is where cross-position comparison happens, so deleting it does not simplify
+  the engine, it removes the comparison.
+* **Item 10 accepted** in principle -- zero effect on any drafted roster. Still
+  needs the CLV survival check first, since those terms move the displayed
+  "X% chance he's still there".
+* **Item 12 is factually wrong.** There is no flex-split derivation machinery
+  to delete; FLEX_SPLIT is already one hardcoded dict in onboard.py and is not
+  PPR-dependent.
+* **Item 13 partly stale.** The streamability discount was already deleted on
+  2026-09-01 by making the engine baseline-invariant.
+* **Item 14** -- DECISIONS.md has zero mentions of the nightly ADP diff, which
+  by the document's own test means cut. Left alone: absence from the log may
+  mean unlogged rather than unused, and that is the user's call.
+
+The document told me to record deltas "so the cut is measured, not assumed",
+then pre-stated the expected deltas. Two were wrong. CLAUDE.md now carries the
+rule in the stronger form: measure BEFORE cutting, and a predicted delta is
+not a measured one.

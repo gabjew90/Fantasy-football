@@ -79,7 +79,9 @@ inseason:
   # tiers.csv, projections, or any draft-layer number (post-v2 item 4).
   # Conventional-wisdom-shaped and UNVALIDATED; revisit with 2026 actuals.
   age_decay:
-    enabled: true
+    # OFF everywhere until 2026 actuals can validate it (2026-09-01).
+    # Displays and trade logic only; never touches draft numbers.
+    enabled: false
     cap: 0.10           # max fraction lost across a full season
     per_year: 0.02      # per year above the position threshold, at season end
     thresholds:
