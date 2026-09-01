@@ -1,0 +1,243 @@
+Christian McCaffrey|RB|SFO|122.8|1|comp
+Jahmyr Gibbs|RB|DET|96.9|1|
+Bijan Robinson|RB|ATL|91.8|1|
+Jonathan Taylor|RB|IND|77.8||
+Trey McBride|TE|ARI|69.3||
+Puka Nacua|WR|LAR|69.0||comp
+Brock Bowers|TE|LVR|68.5||
+Jaxon Smith-Njigba|WR|SEA|66.4||
+James Cook III|RB|BUF|63.7||
+Ja'Marr Chase|WR|CIN|61.4||comp
+Chase Brown|RB|CIN|60.5|1|
+Amon-Ra St. Brown|WR|DET|55.0||
+Derrick Henry|RB|BAL|50.4||
+De'Von Achane|RB|MIA|50.0|1|
+Drake London|WR|ATL|48.0||
+Saquon Barkley|RB|PHI|47.0||
+Rashee Rice|WR|KCC|42.3||
+Kyren Williams|RB|LAR|40.5||
+Chris Olave|WR|NOS|39.7||
+Josh Allen|QB|BUF|39.7||
+Omarion Hampton|RB|LAC|39.4||
+CeeDee Lamb|WR|DAL|37.6||
+Javonte Williams|RB|DAL|36.9||
+A.J. Brown|WR|NEP|35.9||
+Davante Adams|WR|LAR|35.4||
+Nico Collins|WR|HOU|34.3||
+Ashton Jeanty|RB|LVR|32.7||comp
+Patrick Mahomes II|QB|KCC|31.4||comp
+Justin Jefferson|WR|MIN|31.3||
+Jalen Hurts|QB|PHI|27.0||
+Travis Etienne Jr.|RB|NOS|26.3||
+Colston Loveland|TE|CHI|26.0||
+Cam Skattebo|RB|NYG|25.8|1|
+Garrett Wilson|WR|NYJ|25.8||
+Zay Flowers|WR|BAL|23.4||comp
+Jeremiyah Love|RB|ARI|21.6|1|comp
+D'Andre Swift|RB|CHI|21.0||
+Kenneth Walker III|RB|KCC|19.6||comp
+Malik Nabers|WR|NYG|19.4||comp
+George Pickens|WR|DAL|19.2||
+Drake Maye|QB|NEP|19.1||
+Brock Purdy|QB|SFO|19.0||
+Houston Texans|DEF|HOU|18.0||
+Denver Broncos|DEF|DEN|16.0||
+Tetairoa McMillan|WR|CAR|15.1||
+Bo Nix|QB|DEN|14.2||
+Seattle Seahawks|DEF|SEA|14.0||
+Brandon Aubrey|K|DAL|13.5||
+Tee Higgins|WR|CIN|12.7||
+Ka'imi Fairbairn|K|HOU|12.0||
+Los Angeles Rams|DEF|LAR|12.0||
+Tyler Warren|TE|IND|10.6||
+Cameron Dicker|K|LAC|10.5||
+Breece Hall|RB|NYJ|10.2||comp
+Philadelphia Eagles|DEF|PHI|10.0||
+George Kittle|TE|SFO|9.8||comp
+Jaylen Waddle|WR|DEN|9.4||
+Jaylen Warren|RB|PIT|9.3|1|
+Cam Little|K|JAC|9.0||
+Kyle Pitts Sr.|TE|ATL|8.2||
+Jared Goff|QB|DET|8.1||
+Minnesota Vikings|DEF|MIN|8.0||
+DeVonta Smith|WR|PHI|7.6||
+Jason Myers|K|SEA|7.5||
+Rhamondre Stevenson|RB|NEP|7.2||
+Harold Fannin Jr.|TE|CLE|6.7||
+Tucker Kraft|TE|GBP|6.6||
+Eddy Pineiro|K|SFO|6.0||
+Pittsburgh Steelers|DEF|PIT|6.0||
+Trevor Lawrence|QB|JAC|5.2||
+Jaxson Dart|QB|NYG|4.9||
+Matthew Stafford|QB|LAR|4.6||
+Tyler Loop|K|BAL|4.5||
+New England Patriots|DEF|NEP|4.0||
+Quinshon Judkins|RB|CLE|3.2||
+Evan McPherson|K|CIN|3.0||
+Emeka Egbuka|WR|TBB|2.9||comp
+TreVeyon Henderson|RB|NEP|2.9|1|comp
+Jacksonville Jaguars|DEF|JAC|2.0||
+Jake Ferguson|TE|DAL|1.9||
+Dalton Kincaid|TE|BUF|1.8||
+Rome Odunze|WR|CHI|1.8||
+Dallas Goedert|TE|PHI|1.6||
+Cairo Santos|K|CHI|1.5||
+Daniel Jones|QB|IND|0.9||
+Jameson Williams|WR|DET|0.1||
+Bucky Irving|RB|TBB|0.0||
+DK Metcalf|WR|PIT|0.0||comp
+Jake Bates|K|DET|0.0||
+Los Angeles Chargers|DEF|LAC|0.0||
+Christian Watson|WR|GBP|-0.0||
+Dak Prescott|QB|DAL|-0.6||
+Hunter Henry|TE|NEP|-1.0||
+Travis Kelce|TE|KCC|-1.1||
+Sam LaPorta|TE|DET|-1.4||comp
+Andy Borregales|K|NEP|-1.5||
+Courtland Sutton|WR|DEN|-1.7||
+Baltimore Ravens|DEF|BAL|-2.0||
+Justin Herbert|QB|LAC|-2.2||
+Terry McLaurin|WR|WAS|-2.2||
+Jacoby Brissett|QB|ARI|-2.7||
+Chase McLaughlin|K|TBB|-3.0||
+Ladd McConkey|WR|LAC|-3.1||comp
+Caleb Williams|QB|CHI|-3.6||
+Green Bay Packers|DEF|GBP|-4.0||
+Baker Mayfield|QB|TBB|-4.0||
+Bhayshul Tuten|RB|JAC|-4.2||
+Harrison Mevis|K|LAR|-4.5||
+Lamar Jackson|QB|BAL|-4.8||
+Dalton Schultz|TE|HOU|-4.9||
+David Montgomery|RB|HOU|-5.2||
+Juwan Johnson|TE|NOS|-5.4||
+RJ Harvey|RB|DEN|-5.4|1|
+Quentin Johnston|WR|LAC|-5.6||
+Parker Washington|WR|JAC|-5.9||
+Brandon McManus|K|FA|-6.0||
+Kansas City Chiefs|DEF|KCC|-6.0||
+Kenny Gainwell|RB|TBB|-6.2|1|
+Mike Evans|WR|SFO|-6.5||
+Michael Wilson|WR|ARI|-7.5||
+Wan'Dale Robinson|WR|TEN|-7.7||
+Alec Pierce|WR|IND|-8.0||comp
+Cleveland Browns|DEF|CLE|-8.0||
+Joe Burrow|QB|CIN|-8.2||
+Jadarian Price|RB|SEA|-8.9|1|
+Mark Andrews|TE|BAL|-9.1||
+Jordan Love|QB|GBP|-9.5||
+Detroit Lions|DEF|DET|-10.0||
+Tyler Shough|QB|NOS|-10.2||
+Rico Dowdle|RB|PIT|-11.0|1|
+Kyler Murray|QB|MIN|-11.3||
+Harrison Butker|K|KCC|-12.0||
+DJ Moore|WR|BUF|-12.6||
+Marvin Harrison Jr.|WR|ARI|-12.8||
+Brenton Strange|TE|JAC|-13.2||
+Carnell Tate|WR|TEN|-15.0|1|
+Jayden Daniels|QB|WAS|-15.3||
+Michael Pittman Jr.|WR|PIT|-15.4||comp
+Jakobi Meyers|WR|JAC|-17.0||
+C.J. Stroud|QB|HOU|-17.7||
+Darren Waller|TE|CAR|-17.9||
+Dallas Cowboys|DEF|DAL|-18.0||
+Brian Thomas Jr.|WR|JAC|-18.1||
+Oronde Gadsden II|TE|LAC|-18.9||
+Stefon Diggs|WR|WAS|-19.1||comp
+Tony Pollard|RB|TEN|-19.9||
+Isaiah Likely|TE|NYG|-20.0||
+Theo Johnson|TE|NYG|-20.3||
+Jonathon Brooks|RB|CAR|-20.4|1|
+J.K. Dobbins|RB|DEN|-20.6|1|
+AJ Barner|TE|SEA|-21.8||
+Sam Darnold|QB|SEA|-22.4||
+Nick Folk|K|ATL|-22.5||
+Jordan Addison|WR|MIN|-23.0||
+Chig Okonkwo|TE|WAS|-23.2||
+Trey Smack|K|GBP|-24.0||
+Colby Parkinson|TE|LAR|-24.4||
+Jake Tonges|TE|SFO|-25.4||
+Malik Willis|QB|MIA|-25.9||
+Aaron Jones Sr.|RB|MIN|-25.9|1|
+Chris Godwin Jr.|WR|TBB|-26.1||
+Ricky Pearsall|WR|SF|-26.4||
+Cade Otton|TE|TBB|-26.4||
+Deebo Samuel Sr.|WR|SFO|-26.6||
+T.J. Hockenson|TE|MIN|-26.9||
+Romeo Doubs|WR|NEP|-27.9||
+Jameis Winston|QB|NYG|-28.3||
+Tyler Bass|K|BUF|-28.5||
+Bryce Young|QB|CAR|-28.7||
+Greg Dulcich|TE|MIA|-28.8||
+Kyle Monangai|RB|CHI|-28.8|1|comp
+Jauan Jennings|WR|MIN|-29.3||
+Aaron Rodgers|QB|PIT|-30.0||
+Jayden Reed|WR|GBP|-30.0||
+Woody Marks|RB|HOU|-30.3|1|
+Pat Freiermuth|TE|PIT|-31.4||
+Khalil Shakir|WR|BUF|-31.7||comp
+Kenyon Sadiq|TE|NYJ|-31.7||comp
+Makai Lemon|WR|PHI|-32.2|1|
+Tre Tucker|WR|LVR|-32.3||
+Tyrone Tracy Jr.|RB|NYG|-33.0|1|
+Jake Elliott|K|PHI|-33.0||
+David Njoku|TE|LAC|-34.2||
+Carson Wentz|QB|MIN|-34.5||
+Josh Downs|WR|IND|-34.6||
+KC Concepcion|WR|CLE|-34.8||
+Jacory Croskey-Merritt|RB|WAS|-35.1||
+Chuba Hubbard|RB|CAR|-35.5|1|comp
+Luther Burden III|WR|CHI|-35.8||comp
+Kimani Vidal|RB|LAC|-36.9|1|
+Matthew Golden|WR|GBP|-37.0||
+James Conner|RB|ARI|-37.1|1|comp
+Chris Rodriguez Jr.|RB|JAC|-37.4|1|
+Rachaad White|RB|WAS|-37.5|1|
+Tyreek Hill|WR|FA|-37.9||
+Fernando Mendoza|QB|LVR|-38.1|1|
+Keenan Allen|WR|IND|-38.3||
+Alvin Kamara|RB|NOS|-39.1|1|comp
+De'Zhaun Stribling|WR|SFO|-39.1|1|
+Jalen Coker|WR|CAR|-39.5||
+Jerry Jeudy|WR|CLE|-40.6||
+Rashid Shaheed|WR|SEA|-41.1||
+Xavier Worthy|WR|KCC|-41.2||
+Travis Hunter|WR|JAC|-41.6||
+Terrance Ferguson|TE|LAR|-42.5||
+Tyjae Spears|RB|TEN|-42.6|1|
+Denzel Boston|WR|CLE|-43.7||
+Bam Knight|RB|ARI|-45.3|1|
+Blake Corum|RB|LAR|-46.1|1|
+Jordan Mason|RB|MIN|-48.8|1|
+Jonah Coleman|RB|DEN|-49.5|1|
+Cam Ward|QB|TEN|-50.5||
+Spencer Rattler|QB|NO|-50.7||
+Calvin Ridley|WR|TEN|-51.3||
+Mike Washington Jr.|RB|LVR|-52.5|1|
+Braelon Allen|RB|NYJ|-53.5|1|
+Isiah Pacheco|RB|DET|-53.7|1|comp
+Cooper Kupp|WR|SEA|-53.7||
+Malik Washington|WR|MIA|-54.7||
+Jalen Nailor|WR|LVR|-55.4||
+Jalen McMillan|WR|TBB|-56.4||comp
+MarShawn Lloyd|RB|GBP|-56.7||
+Cyrus Allen|WR|KCC|-57.8||
+Ja'Kobi Lane|WR|BAL|-57.8||
+Calvin Austin III|WR|PIT|-58.7||
+Jordyn Tyson|WR|NOS|-59.0|1|comp
+Emmett Johnson|RB|KCC|-59.8|1|
+Davis Mills|QB|HOU|-62.9||
+Keaton Mitchell|RB|LAC|-64.6|1|
+Tank Bigsby|RB|PHI|-65.6|1|
+Sterling Shepard|WR|TB|-65.7||
+Rashod Bateman|WR|BAL|-67.5||
+Isaac TeSlaa|WR|DET|-69.2||
+Kaelon Black|RB|SFO|-71.9|1|
+Brian Robinson Jr.|RB|ATL|-72.4|1|
+Nick Chubb|RB|HOU|-74.7|1|
+Dillon Gabriel|QB|CLE|-75.7||
+Jaydon Blue|RB|DAL|-79.6|1|
+Tyler Allgeier|RB|ARI|-80.2|1|
+Ollie Gordon II|RB|MIA|-85.1|1|
+Jayden Higgins|WR|HOU|-147.0||out
+Josh Jacobs|RB|GBP|-160.2||out
+Zach Charbonnet|RB|SEA|-160.2||out
