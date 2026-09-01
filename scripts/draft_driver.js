@@ -27,6 +27,8 @@ window.DK = (function () {
       teams: 10,
       qb2Round: 10,
       te2FallPicks: 12,
+      upsideFromRound: 8,
+      upsideMult: 1.15,
       queueDepth: 5,
     },
     log: [],
@@ -181,20 +183,40 @@ window.DK = (function () {
   /* sigma: ADP noise in picks, widening as the draft goes on (tracker._sigma) */
   function sigmaFor(rnd) { return 6.0 + 1.5 * Math.max(0, rnd - 1); }
 
-  function survivalProb(entry, nextPick, rnd) {
-    if (entry.a == null) return 0.5;              // unpriced: coin flip
-    const p = normCdf((entry.a - nextPick) / sigmaFor(rnd));
-    return Math.min(0.99, Math.max(0.01, calibrate(p)));
+  /* Survival is RANK-based, not ADP-based.
+   *
+   * The first version used the normal tail of (adp - nextPick), which gives
+   * nonsense for anyone who has already fallen. In the bake-off at slot 5,
+   * Jaxon Smith-Njigba was still on the board at pick 16 with an ADP of 7.2:
+   * absolute ADP said he was long gone, so his survival read as near zero and
+   * WR looked urgent. Python does not have this problem because it simulates
+   * rivals choosing from the CURRENT pool.
+   *
+   * Model instead: rivals take roughly the top of the remaining board with
+   * noise, so over k intervening picks a player sitting at market rank r
+   * among the available survives with P(r > k), smeared by sigma. Being a
+   * faller helps him -- a low current rank is exactly why he is still here.
+   */
+  function survivalProb(rankAmongAvail, picksBetween, rnd) {
+    const z = (picksBetween - rankAmongAvail) / sigmaFor(rnd);
+    return Math.min(0.99, Math.max(0.01, calibrate(1 - normCdf(z))));
   }
 
   /* E[VORP of the best player still available at `pos` on our next turn].
    * Walks the position in VORP order: the best survivor is the first player
    * who lasts, so weight each by the chance everyone above him is gone. */
-  function eBestNext(avail, pos, nextPick, rnd) {
+  function eBestNext(avail, pos, nextPick, rnd, curPick) {
+    /* Market rank among the available: how rivals actually order the board. */
+    const byMarket = avail.slice().sort((a, b) =>
+      ((a.a == null ? 9999 : a.a) - (b.a == null ? 9999 : b.a)));
+    const rankOf = new Map();
+    byMarket.forEach((p, i) => rankOf.set(p, i + 1));
+    const k = Math.max(0, nextPick - curPick);
+
     let carry = 1.0, exp = 0.0;
-    for (const p of avail) {
+    for (const p of avail) {                 // avail is VORP-descending
       if (p.p !== pos) continue;
-      const s = survivalProb(p, nextPick, rnd);
+      const s = survivalProb(rankOf.get(p) || 9999, k, rnd);
       exp += carry * s * p.v;
       carry *= (1 - s);
       if (carry < 0.01) break;
@@ -246,12 +268,18 @@ window.DK = (function () {
    * simulated re-check -- which calls guardrailOk directly -- did not apply
    * it, and mock 7 queued McBride AND Bowers back to back. One rule, one
    * place, consulted by every caller. */
+  /* Python's TE2 rule (tracker.recommendations): a second TE is allowed only
+   * when a top-6 TE has FALLEN te2_fall picks past his ADP -- an unexpected
+   * bargain, not a general licence.
+   *
+   * The driver had substituted an invented margin ("beat the best available
+   * RB/WR by 10 VORP"), which is stricter in some spots and looser in others.
+   * The bake-off (scripts/engine_bakeoff.py) showed the driver losing to the
+   * Python engine at 8 of 10 slots; deviations like this are why. Match the
+   * engine rather than improvise. */
   function te2Ok(p, counts) {
     if (p.p !== 'TE' || (counts.TE || 0) < 1) return true;
-    const ctx = S.ctx || {};
-    if (!(ctx.te6 || []).includes(p.n)) return false;
-    if ((ctx.need ? ctx.need.FLEX : 0) <= 0) return false;
-    return p.v >= (ctx.bestFlexAlt === undefined ? -Infinity : ctx.bestFlexAlt) + 10;
+    return !!(S.ctx && S.ctx.top6TeFell);
   }
 
   function guardrailOk(p, rnd, need, counts, picksLeft, top6TeFell, haveStash) {
@@ -311,7 +339,11 @@ window.DK = (function () {
       .map(x => x.v), -Infinity);
     /* Shared context for te2Ok, so the queue planner enforces the same rule
      * this ranking does. */
-    S.ctx = { te6, bestFlexAlt, need };
+    const curPick = S.cfg.myNextPick || rnd * (S.cfg.teams || 10);
+    const top6TeFell = S.board.some(x =>
+      x.p === 'TE' && !isGone(x) && !mine.has(x.k + '|' + x.p)
+      && te6.includes(x.n) && x.a != null && (curPick - x.a) >= S.cfg.te2FallPicks);
+    S.ctx = { te6, bestFlexAlt, need, top6TeFell };
 
     const eligible = [];
     const blocked = [];
@@ -362,7 +394,8 @@ window.DK = (function () {
      * survive until our next turn. A flat position self-discounts; a scarce
      * one (RB, TE) does not. */
     const gap = S.cfg.teams || 10;               // average wait between turns
-    const nextPickNo = (S.cfg.myNextPick || rnd * gap) + gap;
+    const curPickNo = S.cfg.myNextPick || rnd * gap;
+    const nextPickNo = curPickNo + gap;
 
     /* Expected best at each position on our next turn, and the second-best
      * on the board NOW. planner.py caps a same-position partner at
@@ -371,27 +404,64 @@ window.DK = (function () {
      * assuming it can have BOTH elite tight ends. */
     const vonaBase = {}, secondBestNow = {};
     for (const pos of ['QB', 'RB', 'WR', 'TE', 'K', 'DEF']) {
-      vonaBase[pos] = eBestNext(avail, pos, nextPickNo, rnd);
+      vonaBase[pos] = eBestNext(avail, pos, nextPickNo, rnd, curPickNo);
       const at = avail.filter(x => x.p === pos);
       secondBestNow[pos] = at.length > 1 ? at[1].v : 0;
     }
 
-    // need-weighted: a player filling an open starter slot outranks a
-    // marginally better one who does not.
-    const scored = eligible.map(p => {
-      const fills = needsPosition(need, p.p);
-      const urgent = picksLeft <= (['QB','RB','WR','TE','FLEX','K','DEF']
-        .reduce((a, k) => a + (need[k] || 0), 0)) + 1;
-      /* Urgency = VORP now minus the expected best at this position on our
-       * next turn. This is VONA done properly: probabilistic and calibrated,
-       * rather than the binary "will his ADP clear my next pick" guess. */
-      const vona = Math.max(0, p.v - (vonaBase[p.p] === undefined ? 0 : vonaBase[p.p]));
-      let s = vona + p.v * 0.05;
-      p._vona = Math.round(vona * 10) / 10;
-      if (fills) s += 12;
-      if (fills && urgent) s += 60;
-      return { p, s, fills };
-    }).sort((a, b) => b.s - a.s);
+    /* ---- FAITHFUL PORT of tracker.recommendations() ----
+     *
+     * A parity harness (scripts/engine_parity.py) replayed identical board
+     * states through both engines and found they agreed on the top pick only
+     * 25% of the time. The driver was not a port, it was a different
+     * algorithm wearing the same board. Four substantive divergences, now
+     * corrected:
+     *
+     *   1. Python builds ONE candidate per position (best of the top 3 there),
+     *      then ranks positions. The driver ranked all ~240 players directly.
+     *   2. Python scores by the POSITION's urgency, not a per-player value.
+     *   3. Python applies need weighting ONLY as the planner's 0.6 damp on a
+     *      position that fills no slot. The driver's flat +12/+60 bonuses were
+     *      an invention that distorted the order.
+     *   4. Python breaks near-ties (within 2.0 VORP of the position's top
+     *      candidate) by adp_delta, and from round 8 sorts the position by
+     *      upside-boosted VORP before truncating. The driver did neither.
+     */
+    const POS_ORDER = ['RB', 'WR', 'TE', 'QB', 'K', 'DEF'];
+    const byPos = {};
+    for (const p of eligible) (byPos[p.p] = byPos[p.p] || []).push(p);
+
+    const scored = [];
+    for (const pos of POS_ORDER) {
+      let rem = byPos[pos];
+      if (!rem || !rem.length) continue;
+      // v2 item 1.5: from upside_from_round, rank the position on an
+      // upside-boosted proxy BEFORE truncating, so a gated player ranked 4th
+      // by median can still surface.
+      if (rnd >= S.cfg.upsideFromRound) {
+        rem = rem.slice().sort((a, b) =>
+          -( (a.v || 0) * (a.u ? S.cfg.upsideMult : 1) )
+          + ( (b.v || 0) * (b.u ? S.cfg.upsideMult : 1) ));
+      }
+      const pool = rem.slice(0, 3);
+      const anchor = pool[0];
+      let best = anchor;
+      for (const q of pool.slice(1)) {
+        if (Math.abs((anchor.v || 0) - (q.v || 0)) <= 2.0
+            && (q.d === undefined ? -999 : q.d) > (best.d === undefined ? -999 : best.d)) {
+          best = q;
+        }
+      }
+      const urgency = (rem[0].v || 0) - (vonaBase[pos] || 0);  // unclipped, as Python
+      scored.push({
+        p: best,
+        s: urgency + 0.001 * (best.v || 0),   // stable ordering, as in Python
+        fills: needsPosition(need, pos),
+      });
+    }
+    scored.sort((a, b) => b.s - a.s);
+    for (const x of scored) x.p._vona = Math.round(x.s * 10) / 10;
+
 
     /* TWO-PICK JOINT PLANNER (port of planner.py).
      *
@@ -992,7 +1062,8 @@ window.DK = (function () {
         const f = ln.split('|');
         return { n: f[0], k: idKey(f[0], f[1]), p: f[1], t: f[2],
                  v: parseFloat(f[3]) || 0, u: f[4] === '1', s: f[5] || '',
-                 a: f[6] ? parseFloat(f[6]) : null };
+                 a: f[6] ? parseFloat(f[6]) : null,
+                 d: f[7] !== undefined && f[7] !== '' ? parseFloat(f[7]) : undefined };
       });
       /* Which entries are indistinguishable from another by everything the
        * Yahoo row shows except ADP. rowMatches refuses to guess on these. */

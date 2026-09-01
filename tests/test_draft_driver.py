@@ -157,27 +157,36 @@ def test_second_te_must_beat_the_best_flex_alternative():
         "TE2 offered while a far better flex option was available"
 
 
-def test_second_te_is_allowed_when_it_clearly_beats_the_flex_field():
-    """The gate is a margin, not a ban: strip the strong RB/WR out and the
-    elite TE2 becomes the right FLEX play again."""
-    thin = "\n".join([
+def test_second_te_needs_a_top6_te_to_have_actually_fallen():
+    """Python's rule (tracker.recommendations): a second TE is allowed only
+    when a top-6 TE has FALLEN te2_fall picks past his ADP -- an unexpected
+    bargain, not a general licence.
+
+    The driver had substituted an invented margin ("beat the best RB/WR by 10
+    VORP"). The bake-off showed the driver losing to the engine at 8 of 10
+    slots; improvised rules like that are why. Match the engine.
+    """
+    board = "\n".join([
         "Trey McBride|TE|ARI|69.3|||26.7",
-        "Brock Bowers|TE|LVR|68.5|||21.2",
+        "Brock Bowers|TE|LVR|66.3|||21.2",
         "Jaylen Warren|RB|PIT|9.3|1||77.0",
-        "Courtland Sutton|WR|DEN|-1.7|||105.2",
     ])
-    r = run_js(
-        f"""
-        DK.loadCompact({json.dumps(thin)});
-        document.body.innerText = {json.dumps(panel([
-            "T. McBride TE Ari Bye 14",
-            "P. Nacua WR LAR Bye 11",
-        ]))};
-        console.log(JSON.stringify(DK.rank()));
-        """
-    )
-    assert "Brock Bowers" in [c["n"] for c in r["top"]], \
-        "elite TE2 blocked even though the flex field was weak"
+    roster = panel(["T. McBride TE Ari Bye 14", "P. Nacua WR LAR Bye 11"])
+
+    def te_offered(next_pick):
+        r = run_js(
+            "DK.loadCompact(" + json.dumps(board)
+            + ", {teams: 10, myNextPick: " + str(next_pick) + "});\n"
+            "document.body.innerText = " + json.dumps(roster) + ";\n"
+            "console.log(JSON.stringify({te: DK.rank().top.some(x => x.p === 'TE')}));"
+        )
+        return r["te"]
+
+    # early: Bowers (ADP 21) has not fallen, so no TE2
+    assert te_offered(25) is False, "TE2 offered without a faller"
+    # late: now 12+ picks past his ADP, he has demonstrably fallen
+    assert te_offered(40) is True, "a genuinely fallen top-6 TE should qualify"
+
 
 
 def test_need_weighting_beats_similar_vorp():
@@ -353,7 +362,9 @@ def test_a_queued_player_who_becomes_illegal_is_no_longer_ranked():
     that autopick would take. rank() must stop offering him, which is what
     pruneQueue keys off."""
     before = rank_with(panel(["P. Nacua WR LAR Bye 11"]))
-    assert "Jalen Hurts" in [c["n"] for c in before["top"]], "QB1 should be legal"
+    # rank() returns ONE candidate per position, so the QB slot shows the best
+    # QB available rather than every legal QB.
+    assert any(c["p"] == "QB" for c in before["top"]), "QB1 should be legal"
 
     after = rank_with(panel([
         "P. Nacua WR LAR Bye 11",
@@ -502,26 +513,32 @@ def test_vona_stops_reaching_on_a_flat_position():
     assert r["vona"]["Patrick Mahomes II"] < r["vona"]["Davante Adams"], r
 
 
-def test_survival_is_probabilistic_and_calibrated():
-    """The driver originally guessed survival as a binary `adp >= nextPick+5`.
-    The Python engine simulates it and then shrinks the raw probability through
-    a map fitted to the Omnibeta CLV retro (0.5 + (p-0.5)*0.55: raw 96% -> 75%,
-    82% -> 68%, 45% -> 50%). Ported here as a closed form."""
+def test_survival_is_rank_based_not_adp_based():
+    """A player who has already FALLEN must not be scored as if he were gone.
+
+    Slot 5 of the bake-off: Jaxon Smith-Njigba was still on the board at pick
+    16 with an ADP of 7.2. Absolute-ADP survival read that as near zero, so WR
+    looked urgent and the driver spent the pick there -- losing Brock Bowers,
+    whom the Python engine took instead while still getting JSN nine picks
+    later. Rivals choose from the CURRENT pool, so survival keys on rank among
+    the available, where being a faller is exactly what keeps you available.
+    """
     r = run_js(
         """
         console.log(JSON.stringify({
-          far:   DK.survivalProb({a: 200}, 40, 4),   // way past our next turn
-          near:  DK.survivalProb({a: 41},  40, 4),   // right at it
-          gone:  DK.survivalProb({a: 5},   40, 4),   // long gone
-          unpriced: DK.survivalProb({a: null}, 40, 4),
+          // rank 40 with only 9 picks to go: very likely to last
+          deep:    DK.survivalProb(40, 9, 2),
+          // rank 1 with 9 picks to go: very likely gone
+          topOfBoard: DK.survivalProb(1, 9, 2),
+          // right at the boundary
+          atEdge:  DK.survivalProb(9, 9, 2),
         }));
         """
     )
-    # calibration pulls everything toward 0.5 -- never 0 or 1
-    assert 0.7 < r["far"] < 0.8, r          # raw ~1.0 -> shrunk
-    assert 0.45 < r["near"] < 0.55, r       # coin flip at the boundary
-    assert 0.2 < r["gone"] < 0.3, r         # raw ~0.0 -> shrunk
-    assert r["unpriced"] == 0.5
+    assert r["deep"] > r["atEdge"] > r["topOfBoard"], r
+    # calibration keeps everything off the rails
+    assert 0.01 <= r["topOfBoard"] < 0.5 < r["deep"] <= 0.99, r
+    assert abs(r["atEdge"] - 0.5) < 0.02, r
 
 
 def test_two_pick_planner_takes_both_of_an_elite_pair():
@@ -709,4 +726,8 @@ def test_availability_is_not_scraped_from_page_text():
         """
     )
     names = [c["n"] for c in r["top"]]
-    assert "Brock Bowers" in names, names
+    # rank() returns one candidate per position, so TE is represented by the
+    # best TE. The point of the regression is that the TE slot is still
+    # OFFERED at all -- the old page-scraping bug wiped the whole board.
+    assert any(c["p"] == "TE" for c in r["top"]), names
+    assert "Trey McBride" in names, names

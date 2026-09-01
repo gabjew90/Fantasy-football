@@ -67,6 +67,7 @@ def main() -> None:
             "s": (r.get("avail_status") or "")[:12],
             "u": (r.get("upside_flag") or "").lower() == "true",
             "tier": r.get("tier") or "",
+            "d": (lambda x: None if x in (None, "") else float(x))(r.get("adp_delta")),
         })
     out.sort(key=lambda x: -x["v"])
     Path(a.out).write_text(json.dumps(out, separators=(",", ":")), encoding="utf-8")
