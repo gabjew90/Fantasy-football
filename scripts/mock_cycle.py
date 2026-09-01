@@ -61,13 +61,19 @@ ordered = [{"name": seen[i]["name"], "pos": seen[i].get("pos", "")} if i in seen
 t.source.set_picks(ordered)
 t.poll()
 cur = t.current_pick
-rnd, slot = snake.pick_to_round_slot(min(cur, t.teams * t.rounds), t.teams)
+total = t.teams * t.rounds
+rnd, slot = snake.pick_to_round_slot(min(cur, total), t.teams)
 unknown = [f'{p["metadata"]["first_name"]} {p["metadata"]["last_name"]}'
            for p in t.state.picks if str(p["player_id"]).startswith("unknown")]
+my_next = snake.next_pick_for_slot(cur, my_slot, t.teams, t.rounds) if cur <= total else None
 print(f"pick={cur} R{rnd}.{(cur-1)%t.teams+1} on_clock=slot{slot} me={my_slot} "
-      f"MY_TURN={'YES' if slot==my_slot else 'no'} gaps={gaps} unknowns={len(unknown)}")
+      f"MY_TURN={'YES' if slot==my_slot else 'no'} my_next={my_next} "
+      f"gaps={gaps} unknowns={len(unknown)}")
 if unknown:
-    print("  unresolved:", ", ".join(unknown[:6]))
-if slot == my_slot and t.state.status == "drafting":
-    for i, (score, why, p) in enumerate(t.recommendations()[:3], 1):
-        print(f"  {i}. {p['player']} ({p['pos']}{p['pos_rank']}, T{p['tier']}) — {why[:150]}")
+    print("  UNRESOLVED (board degraded):", ", ".join(unknown[:6]))
+if t.state.status != "complete":
+    label = "PICK NOW" if slot == my_slot else f"QUEUE PLAN for pick {my_next}"
+    print(f"  {label}:")
+    for i, (score, why, p) in enumerate(t.recommendations()[:5], 1):
+        print(f"   {i}. {p['player']} ({p['pos']}{p['pos_rank']}, T{p['tier']}, "
+              f"vorp {p['vorp']:.0f}) — {why[:120]}")

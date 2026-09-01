@@ -39,3 +39,29 @@ pick is an engine pick, immune to all timing failures.
 Morning: re-scrape Yahoo ADP -> rebuild keefamania board -> set draft slot
 in yaml. Evening: dashboard (KEEFAMANIA DRAFT.bat) + me driving this
 protocol via browser; user welcome but not required.
+
+## Certification run 3 (2026-08-31, 10-team live room 10300777, slot 4)
+RESULT: 15/15 roster filled, zero Yahoo-default autopicks. Yahoo grades:
+A+ McCaffrey, A London, A Egbuka, A+ Vikings DEF, A- Reichard K, A- Hubbard,
+A+ Dart, B+ Likely, B- McBride, B- Harrison.
+Board integrity: 0 unresolved names, 0 gaps at every cycle after the tab
+reload (feed gap-fill recovered picks 18-23 automatically).
+
+### What made it work (vs 2/15 in run 1)
+1. IN-PAGE WAIT LOOP — the single biggest fix. Poll `document.title` inside
+   the page every 500ms for up to 20s instead of blind 10s sleeps between
+   round-trips. Catches the turn the instant it opens; 60s clock is then
+   ample (browser actions are 3-5s).
+2. Draft buttons EXIST ONLY WHILE ON THE CLOCK, and the player table is
+   VIRTUALIZED — off-screen rows are absent from the DOM. So: always
+   search-to-filter first, and never expect a Draft button between turns.
+   ("Why do you keep missing buttons" - answered.)
+3. Queue 4-deep, refilled immediately after every my-turn, each entry
+   verified by initial + POS + TEAM before starring.
+4. Full-feed transcription every cycle (no placeholders) so the engine
+   reasons on the true board.
+
+### Survived mid-draft
+The draft tab reset to about:blank around pick 5; the queue still delivered
+McCaffrey at pick 4, and re-navigating + gap-filling from the feed restored
+a clean board with zero manual repair.
