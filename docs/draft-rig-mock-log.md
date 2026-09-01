@@ -204,3 +204,33 @@ Self-corrections observed live, none needing intervention:
 
 The rig is at 192 tests. Every bug above has a regression test, so the
 failures cannot silently return.
+
+## Mock 9 — room 10313996, 10 teams, slot 4 — CLEAN (2nd consecutive), first under VONA
+
+`QB2 WR5 RB5 TE1 K1 DEF1` · 12 verified on-clock picks · **0 errors** ·
+**autopick never armed**.
+
+Picks: 4 McCaffrey · 17 McBride · 24 Kyren Williams · 37 Skattebo ·
+44 Adams · 57 Odunze · **64 Mahomes** · 77 Metcalf · 84 Sutton · 97 Purdy ·
+104 Harvey · 117 Deebo · 124 Spears · 137 Chiefs DEF · 144 Butker K.
+
+**VONA is visibly working.** Live ranking at pick 4 put James Cook III
+(VORP 63.7, VONA 23.2) *above* Puka Nacua (VORP 69.0, VONA 21.0) — the lower
+VORP player ranked higher because RB is the scarcer position. No QB appeared
+in the top 6 at all, where VORP had Josh Allen 20th overall.
+
+**Mahomes moved from pick 42 to pick 64** — 22 picks later, the exact
+behaviour VONA was built for. Still 38 picks ahead of his ADP of 102, so the
+correction is directional rather than complete.
+
+### What CANNOT be concluded from mock 8 vs mock 9
+Mock 8 was slot 2, mock 9 slot 4, against different opponents and a different
+available pool. Starting-lineup VORP fell 338.8 → 296.5, but that is
+overwhelmingly a draft-slot effect, not a ranking effect — slot 2 simply gets
+better players. Mean reach was 9.37 → 8.66 picks, a change too small to read
+through that confound either.
+
+The controlled evidence for VONA remains the 22-replay study in
+`reports/vona_validation.md`, where rivals' picks are held fixed and only our
+ranking varies. Live mocks confirm VONA *behaves* as designed; they cannot
+measure whether it drafts better.
