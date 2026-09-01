@@ -99,6 +99,14 @@ def render_lineup_brief(model: dict) -> str:
     lines += [f"- {c}" for c in m.get("changes", [])] or []
     if not m.get("changes"):
         lines.append("- current lineup is already optimal")
+    # show WHEN the opponent-defense adjustment moved a number, so a flipped
+    # start/sit is explainable (post-v2 item 2)
+    adj = [x for x in (m.get("matchups") or []) if abs(x["mult"] - 1.0) >= 0.02]
+    if adj:
+        lines += ["", "## Matchup adjustments (opponent defense)"]
+        for x in sorted(adj, key=lambda y: -abs(y["mult"] - 1.0))[:6]:
+            lines.append(f"- {x['name']} vs {x['opp']}: {(x['mult'] - 1.0) * 100:+.0f}% "
+                         f"({x['before']:.1f} → {x['after']:.1f} pts)")
     flags = sorted(m.get("flags", []), key=lambda f: f.get("kick") or "9999")
     if flags:
         lines += ["", "## Inactive risk (by kickoff — earliest locks first)"]
