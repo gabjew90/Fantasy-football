@@ -144,3 +144,24 @@ McBride fell behind Nacua, Josh Allen from 20th to 28th.
 Bug 22 is the same shape as the wrong-Robinson bug: an identity assumption
 ("every player has a first initial") that silently holds for 240 of 243 rows
 and fails completely for the rest.
+
+## Mock 7 — room 10310639, 10 teams, slot 1 — FIRST STRUCTURALLY VALID ROSTER
+
+`QB2 WR6 RB4 TE1 K1 DEF1` — 15/15 with **every mandatory slot filled,
+including a defense, and exactly one kicker**. First time. McCaffrey at 1.01,
+and autopick stayed UNARMED for nine rounds, so the live-pick path works end
+to end.
+
+Five bugs, all found and fixed mid-draft.
+
+| # | Bug | Root cause | Fix / test |
+|---|-----|-----------|------------|
+| 24 | Drafted **Brian Robinson Jr. (grade D) instead of Bijan — again** | ADP is the only thing separating them and the guard read `if (seen != null)`, so a row where Yahoo printed no ADP skipped the check *on exactly the row it existed for* | Collisions detected at board load; for a colliding entry an unreadable ADP REFUSES the row. Test |
+| 25 | Queue held McBride **and** Bowers | The TE2 margin lived in `rank()`'s filter, so `syncQueue`'s simulated re-check (which calls `guardrailOk` directly) never applied it | Moved into `te2Ok()`, consulted via `guardrailOk` by every caller |
+| 26 | **`rank()` returned nothing** at roster 9/15, so Yahoo took the pick and autopick armed | Stash-mute: with all starters filled `needsPosition()` is false for everyone, so the one-stash rule silences the whole board. The Python engine fixed this exact bug on shallow boards; the port reintroduced it | Labelled fallback relaxing the stash rule (never the positional guardrails). Test |
+| 27 | Queue stuck at **depth 1 for four rounds** with K and DEF unfilled | The ADP pre-filter skipped anyone whose ADP was earlier than our next pick — by round 12 that is every player still available, since being a faller is why they are still there | Filter applies only while the queue is healthy (depth ≥ 3); threshold 12 → 40 picks |
+| 28 | Queued defenses were **invisible**, so `reconcileStarred` marked them gone | Fixing the player table (mock 6) left the QUEUE parser still keying defenses by initial | `idKey(name, pos)` is now THE identity function, used by board load, roster parse, queue parse, prune, reconcile and the planner. Test |
+
+Bugs 22 and 28 are the same assumption in two hiding places. The lesson is
+recorded in `idKey`'s comment: a defense is called three different things by
+three different parts of the page, so identity gets exactly one function.
