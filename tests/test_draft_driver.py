@@ -541,6 +541,31 @@ def test_an_unreadable_adp_refuses_a_colliding_name():
     assert r["nonColliding"] is True
 
 
+def test_defense_identity_key_is_consistent_everywhere():
+    """A defense is called three different things: the board says "Minnesota
+    Vikings", the queue row says "Vikings", the table row says "Vikings DEF".
+
+    Any function that keys defenses differently from other players silently
+    stops matching them, which has now cost two separate bugs -- unmatchable
+    in the player table (mock 6), then invisible in the queue so
+    reconcileStarred marked them gone (mock 7). One key function, everywhere.
+    """
+    r = run_js(
+        """
+        console.log(JSON.stringify({
+          fromBoard: DK.idKey('Minnesota Vikings', 'DEF'),
+          fromQueue: DK.idKey('Vikings', 'DEF'),
+          twoWord:   DK.idKey('New England Patriots', 'DEF'),
+          fromRow:   DK.idKey('Patriots', 'DEF'),
+          player:    DK.idKey('Jahmyr Gibbs', 'RB'),
+        }));
+        """
+    )
+    assert r["fromBoard"] == r["fromQueue"] == "vikings", r
+    assert r["twoWord"] == r["fromRow"] == "patriots", r
+    assert r["player"] == "j gibbs"
+
+
 def test_team_defenses_can_be_matched_at_all():
     """Mock 6 finished with an EMPTY defense slot and two kickers.
 

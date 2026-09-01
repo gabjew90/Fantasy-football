@@ -71,6 +71,21 @@ window.DK = (function () {
     return parts[0][0] + ' ' + parts[parts.length - 1];
   }
 
+  /* THE identity key, used by every comparison in this file.
+   *
+   * A team defense has no first name: the board says "Minnesota Vikings",
+   * the queue row says "Vikings", the player table says "Vikings DEF". Any
+   * function that keys defenses differently from the others silently stops
+   * matching them -- which has now cost two separate bugs (unmatchable in the
+   * player table, then invisible in the queue). One function, everywhere. */
+  function idKey(name, pos) {
+    if (pos === 'DEF') {
+      const parts = (name || '').trim().split(/\s+/);
+      return (parts[parts.length - 1] || '').toLowerCase();
+    }
+    return keyFull(name);
+  }
+
   /* ---------------- DOM readers ---------------- */
 
   function rosterCount() {
@@ -92,7 +107,7 @@ window.DK = (function () {
     // team defenses render without an initial
     const dre = /([A-Z][A-Za-z]+(?:\s[A-Z][A-Za-z]+)?)\s+DEF\s+Bye/g;
     while ((m = dre.exec(seg))) {
-      if (!out.some(o => o.pos === 'DEF')) out.push({ disp: m[1].trim(), pos: 'DEF', team: '', k: keyAbbr(m[1]) });
+      if (!out.some(o => o.pos === 'DEF')) out.push({ disp: m[1].trim(), pos: 'DEF', team: '', k: idKey(m[1], 'DEF') });
     }
     const counts = {};
     out.forEach(p => { counts[p.pos] = (counts[p.pos] || 0) + 1; });
@@ -494,11 +509,18 @@ window.DK = (function () {
        * queue row with its own Draft button, which made the old anchored
        * regex match nothing and report an EMPTY queue while five players
        * were plainly sitting in it (mock 4 screenshot). */
-      const m = x.match(/(?:^|^Draft\s+)([A-Z]\.\s?[A-Za-z'\-\.]+)\s+(?:Q|IR|IR-R|O|D|SUSP|PUP|CEL|NA)?\s*(QB|RB|WR|TE|K|DEF)\b/);
+      /* Two shapes: "J. Gibbs RB Det ..." and, for a team defense with no
+       * first name, "Texans DEF Bye 8 ...". Missing the second shape made
+       * queued defenses INVISIBLE, so reconcileStarred concluded a rival had
+       * taken them and marked them gone -- starving the DEF slot even after
+       * defenses became matchable at all. Same identity assumption, second
+       * hiding place. */
+      const m = x.match(/(?:^|^Draft\s+)([A-Z]\.\s?[A-Za-z'\-\.]+)\s+(?:Q|IR|IR-R|O|D|SUSP|PUP|CEL|NA)?\s*(QB|RB|WR|TE|K|DEF)\b/)
+        || x.match(/(?:^|^Draft\s+)([A-Z][A-Za-z]+(?:\s[A-Z][A-Za-z]+)*)\s+(DEF)\b/);
       if (!m) continue;
       const btn = starButton(e);
       if (!btn) continue;
-      const key = keyAbbr(m[1]) + '|' + m[2];
+      const key = idKey(m[1], m[2]) + '|' + m[2];
       if (seen.has(key)) continue;
       seen.add(key);
       out.push({ el: e, btn, key, pos: m[2], text: x });
@@ -537,7 +559,7 @@ window.DK = (function () {
       removed.push(row.text.slice(0, 28));
       S.starred.forEach(id => {
         const [n, p] = id.split('|');
-        if (keyFull(n) + '|' + p === row.key) S.starred.delete(id);
+        if (idKey(n, p) + '|' + p === row.key) S.starred.delete(id);
       });
       await sleep(350);
     }
@@ -580,7 +602,7 @@ window.DK = (function () {
     const dropped = [];
     for (const id of [...S.starred]) {
       const i = id.lastIndexOf('|');
-      const key = keyFull(id.slice(0, i)) + '|' + id.slice(i + 1);
+      const key = idKey(id.slice(0, i), id.slice(i + 1)) + '|' + id.slice(i + 1);
       if (inQueue.has(key) || mine.has(key)) continue;
       S.starred.delete(id);
       const entry = S.board.find(b => b.n + '|' + b.p === id);
@@ -635,21 +657,29 @@ window.DK = (function () {
       const simRound = simHave + 1;
       const simLeft = S.cfg.rounds - simHave;
       if (!guardrailOk(entry, simRound, simNeed, simCounts, simLeft, false)) continue;
-      /* Do not queue players who will obviously be gone.
+      /* Do not queue players who will obviously be gone -- but ONLY while the
+       * queue is otherwise healthy.
        *
-       * From slot 7 the driver queued the consensus top 6 in round 1. All six
-       * went in picks 1-6, the queue was empty at pick 7, and Yahoo's
-       * fallback handed us Rashee Rice. A backup queue is only a backup if it
-       * holds players who might actually still be there, so skip anyone whose
-       * ADP is comfortably earlier than the pick we are queueing for. */
-      if (entry.a != null && S.cfg.myNextPick && entry.a < S.cfg.myNextPick - 12) continue;
+       * The filter was added because from slot 7 the driver queued the
+       * consensus top 6 in round 1, all six went in picks 1-6, and Yahoo's
+       * fallback took the pick. But applied unconditionally it starves the
+       * late rounds: by round 12 every player still on the board has an ADP
+       * earlier than the current pick -- being a faller is precisely why they
+       * are still available. Mock 7 sat at queue depth 1 for four rounds
+       * because of this, with K and DEF unfilled.
+       *
+       * markGone() already removes players who really are drafted, so this is
+       * only a preference. Drop it the moment the queue is thin. */
+      const queueThin = depth < 3;
+      if (!queueThin && entry.a != null && S.cfg.myNextPick
+          && entry.a < S.cfg.myNextPick - 40) continue;
       const id = cand.n + '|' + cand.p;
       /* The star is a TOGGLE. Re-clicking one we already queued REMOVES the
        * player. queueNames() cannot always see the whole queue (Yahoo caps
        * the visible list), so trusting it alone made the driver re-star the
        * 5th entry every cycle, flipping them in and out. Track our own
        * clicks instead. */
-      if (have.includes(keyFull(cand.n) + '|' + cand.p) || S.starred.has(id)) continue;
+      if (have.includes(idKey(cand.n, cand.p) + '|' + cand.p) || S.starred.has(id)) continue;
       const res = await starPlayer(entry);
       if (res === 'ok') {
         depth++;
@@ -828,7 +858,7 @@ window.DK = (function () {
     loadCompact(txt, cfg) {
       S.board = txt.split('\n').filter(Boolean).map(function (ln) {
         const f = ln.split('|');
-        return { n: f[0], k: keyFull(f[0]), p: f[1], t: f[2],
+        return { n: f[0], k: idKey(f[0], f[1]), p: f[1], t: f[2],
                  v: parseFloat(f[3]) || 0, u: f[4] === '1', s: f[5] || '',
                  a: f[6] ? parseFloat(f[6]) : null };
       });
@@ -849,7 +879,7 @@ window.DK = (function () {
       return 'reset';
     },
     rank, syncQueue, draftTop, run,
-    classifyMiss, rowMatches, normTeam, autopickArmed, // exported for tests
+    classifyMiss, rowMatches, normTeam, autopickArmed, idKey, // exported for tests
     reconcileStarred, reconcileStarredWith,
     /* Human-readable rationale for the pick we intend to make. Exists so the
      * run can be narrated: a board that cannot explain itself is impossible
