@@ -47,6 +47,10 @@ class Tracker:
     survival_shrink = 0.55
     upside_from_round = 8
     upside_mult = 1.15
+    # Rank by unfilled roster SLOT rather than by position (_open_markets).
+    # Kept as a knob so the ten-slot replay can A/B it; the A/B is the reason
+    # it is on. Turning it off restores per-position urgency exactly.
+    slot_markets = True
     pool_min = 40
     pool_lookback = 20
     pool_lookahead = 60
@@ -116,6 +120,7 @@ class Tracker:
         # v2 item 1.5: round-dependent objective
         self.upside_from_round = int(ecfg.get("upside_from_round", Tracker.upside_from_round))
         self.upside_mult = float(ecfg.get("upside_mult", Tracker.upside_mult))
+        self.slot_markets = bool(ecfg.get("slot_markets", Tracker.slot_markets))
         gcfg = cfg["guardrails"] if "guardrails" in cfg._data else {}
         self.qb2_round = int(gcfg.get("qb2_earliest_round", 10))
         self.te2_fall = int(gcfg.get("te2_fall_picks", 12))
@@ -272,6 +277,50 @@ class Tracker:
         e, late = self.sigma_early, self.sigma_late
         return e + (late - e) * (rnd - 1) / max(1, self.rounds - 1)
 
+    def _open_markets(self, needs: dict) -> list[tuple[str, tuple[str, ...], str]]:
+        """The markets I am still shopping in — one per UNFILLED roster slot.
+
+        Position was only ever a proxy for "market I still need to buy from".
+        Urgency asks what waiting costs, and that is a real question only in a
+        market I have not yet left. So the pools are slots, not positions:
+
+          * TE slot open  -> a TE market, priced on positional `vorp`. The
+            TE2->TE3 cliff legitimately drives taking the elite tight end here.
+          * TE slot FILLED -> there is no TE market any more. Remaining tight
+            ends appear only inside the FLEX market, where they are priced on
+            `vorp_flex` and have to beat the RB/WR competing for the same slot.
+
+        That is what finally kills the double-elite-TE build, and for the right
+        reason: the cliff is a fact about the TE market, and once your TE slot
+        is full you have left it. Slot-conditional VORP alone could not do it --
+        urgency is a DIFFERENCE, so shifting every tight end by the same 37.1
+        points left every TE-to-TE gap intact (see DECISIONS.md 2026-09-01).
+
+        Returns (market_name, member_positions, value_column). When every
+        starter slot is filled we are shopping the bench, which stays
+        per-position on `vorp` exactly as before.
+        """
+        out: list[tuple[str, tuple[str, ...], str]] = [
+            (pos, (pos,), "vorp") for pos in POS_ORDER if needs.get(pos, 0) > 0
+        ]
+        if needs.get("FLEX", 0) > 0:
+            # Membership is ALL flex-eligible positions, not just the ones whose
+            # dedicated slot is full: any of them can fill the flex, and pooling
+            # them is the whole point -- a market containing only tight ends
+            # would cancel the baseline shift all over again.
+            out.append(("FLEX", snake.FLEX_ELIGIBLE, "vorp_flex"))
+        if not out:
+            out = [(pos, (pos,), "vorp") for pos in POS_ORDER]
+        return out
+
+    @staticmethod
+    def _mval(p: dict, value_key: str) -> float:
+        """A player's value in a given market's currency."""
+        v = p.get(value_key)
+        if v is None:
+            v = p.get("vorp")
+        return float(v or 0.0)
+
     def urgency_report(self) -> dict | None:
         """Cached per pick-state; None when unslotted or the draft is over."""
         if not self.my_slot:
@@ -324,13 +373,22 @@ class Tracker:
         rng = np.random.default_rng(seed)
         recent_pos = [str((p.get("metadata") or {}).get("position") or "")
                       for p in picks[-self.run_window:]]
+        # Pooled markets alongside the per-position report. Only the FLEX
+        # market differs from a position group; dedicated slots ARE their
+        # position. Computed on the same simulation -- rival behavior does not
+        # change, only how the survivors are aggregated into "what did waiting
+        # cost me".
+        markets = None
+        if self.slot_markets and self.my_needs().get("FLEX", 0) > 0:
+            markets = {"FLEX": {"members": snake.FLEX_ELIGIBLE,
+                                "value": "vorp_flex"}}
         report = simulate_survival(
             pool, start, my_next, self._rival_states(start, my_next), self.rival_seeds,
             rng, sims=self.sims, sigma=self._sigma(rnd), teams=self.teams,
             reach_prob=self.reach_prob, reach_scale=self.reach_scale,
             run_window=self.run_window, run_min=self.run_min,
             run_boost=self.run_boost, survival_shrink=self.survival_shrink,
-            recent_pos=recent_pos,
+            recent_pos=recent_pos, markets=markets,
         )
         self._urgency_cache = (key, report)
         return report
@@ -444,10 +502,26 @@ class Tracker:
 
         cliff = self.cliff_report()
         cands = []
-        second: dict[str, float] = {}  # per-position 2nd-best VORP, for the planner
+        from .planner import slot_vorp as _sv
+        second: dict[str, float] = {}  # per-position 2nd-best, for the planner
         for pos in POS_ORDER:
-            rem = [p for p in self.remaining(pos) if p.get("proj_source") != "no_market"]
-            second[pos] = float(rem[1]["vorp"] or 0.0) if len(rem) > 1 else 0.0
+            rem_p = sorted(
+                (p for p in self.remaining(pos) if p.get("proj_source") != "no_market"),
+                key=lambda q: -_sv(q, needs))
+            second[pos] = _sv(rem_p[1], needs) if len(rem_p) > 1 else 0.0
+
+        # One row per UNFILLED ROSTER SLOT, not per position (_open_markets).
+        # A position with an open dedicated slot is its own market; every
+        # flex-eligible player also competes in the FLEX market on vorp_flex.
+        # A player can therefore win two markets -- deduped below, keeping the
+        # more urgent slot he can fill.
+        for mkt, member_pos, vkey in self._open_markets(needs):
+            def mv(q, _k=vkey):
+                return self._mval(q, _k)
+            rem = sorted(
+                (p for m in member_pos for p in self.remaining(m)
+                 if p.get("proj_source") != "no_market"),
+                key=lambda q: -mv(q))
             gpool = [
                 p for p in rem
                 if self._guardrail_ok(p, rnd, needs, counts, picks_left, top6_te_fell)
@@ -458,37 +532,40 @@ class Tracker:
             # truncation so a gated player ranked 4th+ by median can surface
             # (code review 2026-08-30).
             if rnd >= self.upside_from_round:
-                from .planner import slot_vorp as _sv
                 gpool = sorted(
                     gpool,
-                    key=lambda q: -(_sv(q, needs)
+                    key=lambda q: -(mv(q)
                                     * (self.upside_mult if q.get("upside_flag") else 1.0)))
             pool = gpool[:3]
             if not pool:
                 continue
-            # best VORP within position; near-ties (<= 2 VORP of the position's
+            # best value within the market; near-ties (<= 2 pts of the market's
             # TOP candidate) broken by Δ — anchored so swaps can't chain
             anchor = pool[0]
             best = anchor
             for q in pool[1:]:
-                if abs((anchor["vorp"] or 0) - (q["vorp"] or 0)) <= 2.0 and (
+                if abs(mv(anchor) - mv(q)) <= 2.0 and (
                     (q.get("adp_delta") or -999) > (best.get("adp_delta") or -999)
                 ):
                     best = q
-            u = report.get(pos) if report else None
-            urgency = u["urgency"] if u else (best["vorp"] or 0.0)
+            pos = best["pos"]
+            label = "your FLEX spot" if mkt == "FLEX" else mkt
+            rem_pos = [p for p in self.remaining(pos)
+                       if p.get("proj_source") != "no_market"]
+            u = report.get(mkt) if report else None
+            urgency = u["urgency"] if u else mv(best)
             # rationale: plain-English clauses, all from already-computed draft
             # state (no model calls on the clock, per spec §9)
             parts = []
             if u:
                 if urgency >= 1.0:
                     parts.append(
-                        f"waiting likely costs ~{urgency:.0f} pts "
-                        f"(best {pos} now {u['best_now']:.0f}, ~{u['e_best_next']:.0f} "
-                        f"by your next turn)"
+                        f"waiting likely costs ~{urgency:.0f} pts at {label} "
+                        f"(best option now {u['best_now']:.0f}, "
+                        f"~{u['e_best_next']:.0f} by your next turn)"
                     )
                 else:
-                    parts.append(f"safe to wait at {pos}")
+                    parts.append(f"safe to wait on {label}")
                 surv = u["survival"].get(best["sleeper_id"])
                 if surv is not None:
                     parts.append(f"{surv:.0%} chance he's still there at your next pick")
@@ -499,8 +576,9 @@ class Tracker:
             else:
                 parts.append("bench depth (starters covered)")
             c = cliff.get(pos, {})
-            same_tier = sum(1 for q in rem if q["tier"] == best["tier"])
-            next_tier = next((q["tier"] for q in rem if q["tier"] > best["tier"]), None)
+            same_tier = sum(1 for q in rem_pos if q["tier"] == best["tier"])
+            next_tier = next((q["tier"] for q in rem_pos if q["tier"] > best["tier"]),
+                             None)
             if c.get("urgent"):
                 parts.append(
                     f"TAKE-NOW ZONE: only {c['before_cliff']} left before the {pos} "
@@ -543,13 +621,18 @@ class Tracker:
                     tag = f" ⛑ backs up {best['backs_up']} ({seg:.0f}g"
                     tag += f", {sav})" if sav else ")"
                     why += tag
-            # Slot-conditional: a candidate headed for the FLEX is worth
-            # vorp_flex, not vorp. Without this a second elite TE carries his
-            # full positional VORP into a slot he shares with RB/WR.
-            from .planner import slot_vorp
-            score = urgency + 0.001 * slot_vorp(best, needs)  # stable ordering
+            # Tiebreak in the MARKET's own currency: within a pooled market
+            # every candidate carries the same urgency, so this is what
+            # actually picks the flex starter -- and it is the comparison that
+            # stops an elite TE outranking an RB he does not out-produce.
+            score = urgency + 0.001 * mv(best)  # stable ordering
             cands.append((score, why, best))
         cands.sort(key=lambda t: -t[0])
+        # a player who wins two markets appears twice; keep the more urgent
+        seen_ids: set[str] = set()
+        cands = [c for c in cands
+                 if not (c[2]["sleeper_id"] in seen_ids
+                         or seen_ids.add(c[2]["sleeper_id"]))]
         # v2 item 1.2: joint two-pick re-rank on top of the greedy order.
         # Pure arithmetic over the cached urgency report — nothing new runs
         # on the clock; any failure or missing report keeps the greedy list

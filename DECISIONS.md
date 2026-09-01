@@ -290,3 +290,65 @@ rather than remaining their own position. That changes the meaning of every
 positional urgency number and touches the comparison every pick flows
 through, so it is offseason work, not four-days-out work. Put back to the
 expert in docs/expert_followup_prompt.md.
+
+## 2026-09-01 (2) — urgency ranges over unfilled SLOTS, not positions
+
+Expert's answer to the inert result above: the fix is not to reprice the
+player, it is to change what urgency ranges over. Position was only ever a
+proxy for "market I still need to shop in". Once a dedicated slot is filled
+you have left that market, and asking what waiting costs there is a question
+about a purchase you are no longer going to make.
+
+Implemented in Tracker._open_markets: one market per UNFILLED roster slot.
+A position with an open dedicated slot is its own market on `vorp`; the FLEX
+slot is a single market pooling RB+WR+TE priced on `vorp_flex`. Filled
+positions get no row at all. When every starter slot is full we are shopping
+the bench, which stays per-position on `vorp` as before.
+
+FLEX membership is ALL flex-eligible positions, not just the ones whose
+dedicated slot is closed. A market containing only tight ends would have
+cancelled the baseline shift a second time, for exactly the reason the first
+attempt failed.
+
+### Two things the measurement corrected
+
+**The harness was grading on the ruler under test.** lineup_value() sums
+`vorp` for every starter INCLUDING the flex, which is the accounting error
+this whole thread is about. Graded that way the change looked like a 9.1-point
+regression at one slot. The headline metric is now PROJECTED POINTS of the
+starting lineup, which is baseline-free: no choice of replacement level can
+move it, so neither arm can grade itself. The sign flipped.
+
+    scripts/slot_replay.py, 22 slots across two real drafts
+    10-team log: mean +1.6 pts, 2 better, 0 worse, 8 tied
+    12-team log: mean +4.5 pts, 4 better, 0 worse, 8 tied
+    combined:    6 slots changed, ALL improvements, none worse
+
+Small (+0.2%) but one-directional, which is what you want from a correctness
+fix rather than a tuning change.
+
+**The double-TE build was never the elite-TE-pair I reported.** Every
+surviving two-TE roster takes its second tight end in R12 or R13 -- Loveland,
+Kittle, Pitts as bench stashes after all nine starter slots are full. No slot,
+under either arm, drafts two elite tight ends. The te2_fall guardrail already
+made that nearly unreachable: it only admits a TE2 who has fallen 12+ picks
+past ADP, and a player who has fallen that far has a low probability of being
+taken, hence near-zero urgency. I told the expert four slots drafted two TEs;
+that count was real but it was counting bench picks, and I have corrected it.
+
+Bench tight ends are still priced on positional `vorp` (Loveland +23.8 rather
+than his -13.4 in the flex). Left alone deliberately: a bench player earns his
+keep when a starter is out, and then he does fill his own position's slot, so
+positional VORP is the right currency for insurance.
+
+### What the unit tests could and could not show
+
+A synthetic elite-TE-pair fixture would not reproduce the bug, for the reason
+above. The behavioural test that does fire is a filled WR slot: planner.
+slot_vorp already got the two-pick LEVEL comparison right, so what the market
+change actually removes is the greedy URGENCY row -- a WR-vs-WR difference
+still arguing "take him now or lose 36 points" for a slot that no longer
+exists. Level and timing were two separate halves of the same error, and only
+one of them was fixed in the previous session.
+
+Kept behind `engine.slot_markets` (default on) so the A/B stays runnable.

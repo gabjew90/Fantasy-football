@@ -47,6 +47,18 @@ def slot_vorp(p: dict, needs: dict) -> float:
     return float(vf if vf is not None else (p.get("vorp") or 0.0))
 
 
+def market_for(pos: str, needs: dict) -> str:
+    """Which urgency market a position is shopped in, given open slots.
+
+    Mirrors Tracker._open_markets: a dedicated slot still open means the
+    position is its own market; otherwise a flex-eligible position is shopped
+    inside FLEX, where the expectation is over RB/WR/TE together.
+    """
+    if needs.get(pos, 0) > 0 or pos not in FLEX_ELIGIBLE:
+        return pos
+    return "FLEX" if needs.get("FLEX", 0) > 0 else pos
+
+
 def consume(needs: dict, pos: str) -> dict:
     """Roster needs after taking one player at `pos` (dedicated slot first,
     then FLEX)."""
@@ -79,7 +91,10 @@ def pair_rank(cands: list[tuple[float, str, dict]],
         needs_after = consume(needs, pos_taken)
         best_v, best_p = 0.0, None
         for pos2 in eligible_after(pos_taken):
-            u = report.get(pos2)
+            # value the partner in the market he'd actually be shopping in at
+            # my next turn, which depends on what THIS pick just filled
+            mkt = market_for(pos2, needs_after)
+            u = report.get(mkt) or report.get(pos2)
             if not u:
                 continue
             e = float(u.get("e_best_next") or 0.0)

@@ -42,12 +42,41 @@ def calibrate(p: float, shrink: float) -> float:
     return 0.5 + (p - 0.5) * shrink
 
 
+def _groups(pool, pos_arr, markets):
+    """The pools urgency is measured over.
+
+    Always one group per position (the historical report, on `vorp`), plus any
+    caller-supplied MARKET — a set of positions shopped together, priced on a
+    shared value column. See Tracker._open_markets for why that matters: once
+    a dedicated slot is filled you are no longer shopping that position's
+    market, and its remaining players compete inside the FLEX market instead.
+    """
+    n = len(pool)
+
+    def col(keyname: str):
+        out = np.empty(n, dtype=float)
+        for i, p in enumerate(pool):
+            v = p.get(keyname)
+            if v is None:
+                v = p.get("vorp")
+            out[i] = float(v) if v is not None else -99.0
+        return out
+
+    vals = {"vorp": col("vorp"), "vorp_flex": col("vorp_flex")}
+    groups = {pos: (pos_arr == pos, vals["vorp"]) for pos in POSITIONS}
+    for name, spec in (markets or {}).items():
+        mask = (np.isin(pos_arr, list(spec["members"])) if n
+                else np.zeros(0, dtype=bool))
+        groups[name] = (mask, vals[spec.get("value", "vorp")])
+    return groups
+
+
 def simulate_survival(pool, current_pick, next_pick, rivals, seeds, rng,
                       sims=1000, sigma=6.0, teams=12,
                       reach_prob=0.0, reach_scale=3.0,
                       run_window=5, run_min=2, run_boost=1.5,
-                      survival_shrink=1.0, recent_pos=None):
-    """Per-position urgency + per-player survival to my next pick.
+                      survival_shrink=1.0, recent_pos=None, markets=None):
+    """Per-market urgency + per-player survival to my next pick.
 
     pool: undrafted players (dicts with sleeper_id/pos/vorp/adp), pre-truncated.
     rivals: intervening pickers IN PICK ORDER — {"slot", "needs", "user_id"};
@@ -55,26 +84,37 @@ def simulate_survival(pool, current_pick, next_pick, rivals, seeds, rng,
             only when current_pick is my pick, which callers never pass).
     seeds: rival_seeds.json "users" mapping (may be empty).
     sigma: ADP noise in picks for the current round (caller scales by round).
+    markets: optional {name: {"members": (pos,...), "value": "vorp"|"vorp_flex"}}
+            extra pooled markets to report alongside the per-position ones.
+
+    The returned dict is keyed by position AND by market name; survival is
+    always per player and independent of grouping.
     """
     n = len(pool)
     picks_between = max(0, next_pick - current_pick)
     pos_arr = np.array([p["pos"] for p in pool]) if n else np.array([], dtype=str)
-    vorp = np.array([float(p["vorp"] if p["vorp"] is not None else -99.0) for p in pool])
     adp = np.array([float(p["adp"]) if p.get("adp") is not None else 200.0 for p in pool])
+    groups = _groups(pool, pos_arr, markets)
+    members = {name: set(spec["members"]) for name, spec in (markets or {}).items()}
 
     best_now = {
-        pos: float(vorp[pos_arr == pos].max()) if n and (pos_arr == pos).any() else 0.0
-        for pos in POSITIONS
+        name: float(val[mask].max()) if n and mask.any() else 0.0
+        for name, (mask, val) in groups.items()
     }
+
+    def survival_of(name, const=None, arr=None):
+        keep = members.get(name, {name})
+        return {p["sleeper_id"]: (const if const is not None else float(arr[j]))
+                for j, p in enumerate(pool) if p["pos"] in keep}
+
     # No intervening rivals -> survival is EXACTLY 1.0, deliberately raw:
     # calibration corrects the sim's model of rival behavior, and there is no
     # rival behavior to model here (code review 2026-08-30).
     if picks_between == 0 or not rivals or n == 0:
         return {
-            pos: {"best_now": best_now[pos], "e_best_next": best_now[pos],
-                  "urgency": 0.0,
-                  "survival": {p["sleeper_id"]: 1.0 for p in pool if p["pos"] == pos}}
-            for pos in POSITIONS
+            name: {"best_now": best_now[name], "e_best_next": best_now[name],
+                   "urgency": 0.0, "survival": survival_of(name, const=1.0)}
+            for name in groups
         }
 
     # static per-rival positional multiplier (needs + tendencies), per pick index
@@ -110,7 +150,7 @@ def simulate_survival(pool, current_pick, next_pick, rivals, seeds, rng,
                                  / (sigma * reach_scale)) ** 2) * ahead) + 1e-9
 
     survived = np.zeros(n, dtype=np.int64)
-    e_best = {pos: 0.0 for pos in POSITIONS}
+    e_best = {name: 0.0 for name in groups}
     base_recent = list(recent_pos or [])[-run_window:]
     for _ in range(sims):
         alive = np.ones(n, dtype=bool)
@@ -132,20 +172,19 @@ def simulate_survival(pool, current_pick, next_pick, rivals, seeds, rng,
             alive[choice] = False
             recent.append(str(pos_arr[choice]))
         survived += alive
-        for pos in POSITIONS:
-            mask = (pos_arr == pos) & alive
-            e_best[pos] += float(vorp[mask].max()) if mask.any() else 0.0
+        for name, (gmask, val) in groups.items():
+            mask = gmask & alive
+            e_best[name] += float(val[mask].max()) if mask.any() else 0.0
 
+    calibrated = np.array([calibrate(survived[j] / sims, survival_shrink)
+                           for j in range(n)])
     report = {}
-    for pos in POSITIONS:
-        e = e_best[pos] / sims
-        report[pos] = {
-            "best_now": best_now[pos],
+    for name in groups:
+        e = e_best[name] / sims
+        report[name] = {
+            "best_now": best_now[name],
             "e_best_next": e,
-            "urgency": best_now[pos] - e,
-            "survival": {
-                pool[j]["sleeper_id"]: calibrate(survived[j] / sims, survival_shrink)
-                for j in range(n) if pos_arr[j] == pos
-            },
+            "urgency": best_now[name] - e,
+            "survival": survival_of(name, arr=calibrated),
         }
     return report

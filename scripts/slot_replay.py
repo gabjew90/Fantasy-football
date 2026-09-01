@@ -1,0 +1,147 @@
+"""Acceptance test for slot-market urgency (DECISIONS.md 2026-09-01).
+
+Replays a real draft with OUR engine making our picks and rivals held fixed,
+at every draft slot, twice: once ranking by position (slot_markets off) and
+once ranking by unfilled roster slot (slot_markets on). Reports the starting
+lineup we end up with and the roster shape.
+
+The primary metric is PROJECTED POINTS of the starting lineup, not VORP.
+That matters here. VORP grades a flex starter against replacement at his own
+position -- which is the exact accounting error under test, so a VORP-graded
+harness scores the two arms on a ruler one of them is trying to fix, and the
+first run of this script duly reported a 9.1-point "regression" that was
+entirely the ruler. Projected points is baseline-free: no choice of
+replacement level can move it, so neither arm can grade itself. VORP is still
+printed for continuity with the earlier bake-offs.
+
+    python scripts/slot_replay.py --draft-id 1396184666897145856 --teams 10
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import statistics as st
+import sys
+from collections import Counter
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+import engine_parity as EP  # noqa: E402
+from engine_bakeoff import FLEX_OK, SLOTS, lineup_value  # noqa: E402
+
+
+def lineup_points(chosen: list[dict]) -> float:
+    """Projected points of the best legal starting lineup.
+
+    Baseline-free by construction, which is the whole reason it is the
+    headline number: replacement levels cancel, so an engine that changes how
+    it prices players cannot move this scoreboard except by drafting a
+    different, better-scoring team.
+    """
+    rem, flex, total = dict(SLOTS), SLOTS["FLEX"], 0.0
+    for p in sorted(chosen, key=lambda q: -q["proj_pts"]):
+        pos = p["pos"]
+        if rem.get(pos, 0) > 0:
+            rem[pos] -= 1
+            total += p["proj_pts"]
+        elif pos in FLEX_OK and flex > 0:
+            flex -= 1
+            total += p["proj_pts"]
+    return total
+
+
+def replay(board, log_picks, my_slot, teams, rounds, slot_markets):
+    by_name = {p["name"]: p for p in board}
+    taken, chosen, picks_so_far = set(), [], []
+
+    for d in log_picks:
+        if d.get("slot") != my_slot:
+            if d["player"] in by_name:
+                taken.add(d["player"])
+            picks_so_far.append({
+                "pick_no": d["pick_no"],
+                "player_id": by_name.get(d["player"], {}).get("sleeper_id", "0"),
+                "draft_slot": d["slot"], "round": d["round"],
+            })
+            continue
+
+        avail = [p for p in board if p["name"] not in taken]
+        t = EP.make_tracker(board, picks_so_far, my_slot)
+        t.teams, t.rounds = teams, rounds
+        t.slot_markets = slot_markets
+        try:
+            recs = t.recommendations(top_n=1)
+            pick = by_name[recs[0][2]["name"]] if recs else avail[0]
+        except Exception as e:  # noqa: BLE001
+            print(f"    !! slot {my_slot} pick {d['pick_no']}: {e!r}")
+            pick = avail[0]
+
+        chosen.append(pick)
+        taken.add(pick["name"])
+        picks_so_far.append({"pick_no": d["pick_no"], "player_id": pick["sleeper_id"],
+                             "draft_slot": my_slot, "round": d["round"]})
+    return chosen
+
+
+def shape(chosen) -> str:
+    c = Counter(p["pos"] for p in chosen)
+    return " ".join(f"{k}{c[k]}" for k in ("QB", "RB", "WR", "TE", "K", "DEF") if c[k])
+
+
+def main() -> None:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--draft-id", required=True)
+    ap.add_argument("--teams", type=int, required=True)
+    ap.add_argument("--board", default="tiers.keefamania.csv")
+    ap.add_argument("--slots", default="")
+    a = ap.parse_args()
+
+    board = EP.load_board(a.board)
+    log = [json.loads(line) for line in
+           open(f"data/logs/draft_{a.draft_id}.jsonl", encoding="utf-8")
+           if '"type": "pick"' in line]
+    log.sort(key=lambda d: d["pick_no"])
+    rounds = max(d["round"] for d in log)
+    slots = ([int(x) for x in a.slots.split(",")] if a.slots
+             else list(range(1, a.teams + 1)))
+
+    print(f"Slot-market acceptance replay — draft {a.draft_id}, "
+          f"{a.teams} teams, {rounds} rounds")
+    print(f"starters {SLOTS}\n")
+    print(f"{'':>4}{'lineup projected pts':>28}{'':4}{'lineup VORP':>24}")
+    print(f"{'slot':>4}{'by-pos':>10}{'by-slot':>9}{'diff':>9}{'':4}"
+          f"{'by-pos':>8}{'by-slot':>8}{'diff':>8}   {'shape (by-slot)':<24}")
+
+    rows = []
+    for s in slots:
+        off = replay(board, log, s, a.teams, rounds, False)
+        on = replay(board, log, s, a.teams, rounds, True)
+        po, pn = lineup_points(off), lineup_points(on)
+        vo, vn = lineup_value(off), lineup_value(on)
+        rows.append((s, po, pn, vo, vn, off, on))
+        print(f"{s:>4}{po:>10.1f}{pn:>9.1f}{pn - po:>+9.1f}{'':4}"
+              f"{vo:>8.1f}{vn:>8.1f}{vn - vo:>+8.1f}   {shape(on):<24}")
+
+    d = [r[2] - r[1] for r in rows]
+    dv = [r[4] - r[3] for r in rows]
+    te_off = sum(1 for r in rows if sum(1 for p in r[5] if p["pos"] == "TE") >= 2)
+    te_on = sum(1 for r in rows if sum(1 for p in r[6] if p["pos"] == "TE") >= 2)
+    print(f"\nn={len(rows)} slots        PROJECTED POINTS (baseline-free, headline)")
+    print(f"  by-slot - by-position: mean {st.mean(d):+.1f}  median {st.median(d):+.1f}  "
+          f"better {sum(1 for x in d if x > 0)}  worse {sum(1 for x in d if x < 0)}  "
+          f"tied {sum(1 for x in d if x == 0)}")
+    print(f"                         worst {min(d):+.1f}  best {max(d):+.1f}")
+    base = st.mean([r[1] for r in rows])
+    print(f"  by-position mean {base:.1f}  ->  by-slot is {100 * st.mean(d) / base:+.2f}%")
+    print(f"\n              VORP (position-baselined; overstates flex starters)")
+    print(f"  by-slot - by-position: mean {st.mean(dv):+.1f}  "
+          f"better {sum(1 for x in dv if x > 0)}  worse {sum(1 for x in dv if x < 0)}  "
+          f"tied {sum(1 for x in dv if x == 0)}")
+    print(f"\n  double-TE rosters: by-position {te_off}/{len(rows)}  "
+          f"->  by-slot {te_on}/{len(rows)}")
+
+
+if __name__ == "__main__":
+    main()
