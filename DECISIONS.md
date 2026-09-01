@@ -651,3 +651,51 @@ lineups week by week with absences drawn from the empirical position
 distribution -- sharing NO input with the formula -- and compare realised
 points between insurance-priced and VORP-priced benches on both leagues'
 boards. Default stays OFF until that shows a win.
+
+## 2026-09-01 (8) — season replay verdict: insurance pricing wins where the wire is thin
+
+scripts/season_replay.py — drafts a roster both ways, then plays 17-week
+seasons against it with absences drawn from the empirical positional
+distributions (never the formula's means), handcuff production from the
+observed share distribution, and empty slots filled by a uniform draw from
+the top 2k undrafted. Common random numbers per (sim, player). A test greps
+the harness for the formula's constant names so they cannot be wired back in.
+
+    insurance-priced bench minus VORP-priced bench, pts per season
+    keefamania  10-team, 1 flex, rolling list   +2.6  (se 0.5)  5 better  5 worse   600 seasons/roster
+    omnibeta    12-team, 2 flex, FAAB          +33.2  (se 1.6)  9 better  3 worse   200 seasons/roster
+
+Omnibeta is a clear win (+1.6%). Keefamania is +0.15% -- detectable, not
+meaningful, and split 5/5 at the slot level with per-slot swings of 10-28
+points, so the average hides two opposite effects.
+
+### What the split is
+
+Read the roster shapes. Every Keefamania slot that LOST moved to a 6th WR
+(slots 1, 4, 6, 8, 10: RB5-6 WR5-6). Every slot that WON moved to RB depth
+(2, 5, 9, 3: RB6-7). The formula's exposure term is linear in starters
+covered -- three WR starters make a bench WR look 50% more valuable than a
+bench RB behind two -- but it ignores depth ALREADY on the bench. A 6th WR
+behind three healthy starters and two backups plays only when three WRs are
+out at once, which the empirical rates make rare. The marginal bench player
+at a position covers the marginal simultaneous absence, not the first.
+
+That is a modelling error the grader found, not a parameter to tune: the
+formula should price the (n+1)th backup at P(>= n+1 starters at the position
+absent in the same week), derived from the same base rates. Pre-registered
+expectation if built: the 6th-WR picks disappear, Keefamania's losing slots
+flip or go flat, Omnibeta does not degrade (its wins came from RB depth, which
+the change should leave alone). If Omnibeta degrades, the refinement is wrong.
+
+### Decision
+
+engine.bench_insurance stays OFF by default. The bar was a win on both
+leagues; Keefamania is not one. Turning it on for Omnibeta alone on the
+strength of this replay would be choosing per league on the test set, and
+Omnibeta has already drafted. Revisit after the marginal-depth refinement.
+
+Also visible in both leagues: the insurance arm leans on the wire roughly
+twice as hard (Keefamania ~50 -> ~85 pts/season). That is the QB2's bye and
+injury weeks moving to waivers, priced at k=3 friction in the pool but at
+zero claim cost. In a rolling-list league that cost is not zero; it is the
+waiver-priority reasoning the in-season brief owes (cleanup item 4).
