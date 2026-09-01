@@ -139,6 +139,9 @@ def cmd_tiers(cfg: Config, args) -> None:
     tiers = build_tiers(df, cfg)
     tiers = add_handcuff_info(tiers)
     tiers = add_upside_flags(tiers)
+    # standing contingency map — DISPLAY ONLY, never an engine input
+    from .fragility import add_contingency_map
+    tiers = add_contingency_map(tiers)
 
     csv_path = cfg.scoped(cfg.root / "tiers.csv")
     write_tiers_csv(tiers, csv_path)
