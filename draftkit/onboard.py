@@ -14,6 +14,14 @@ from pathlib import Path
 from .sleeper import BASE, get_json
 
 FLEX_SPLIT = {"RB": 0.45, "WR": 0.45, "TE": 0.10}
+# Sleeper writes "FLEX"; Yahoo writes "W/R/T". Both are the same slot, and a
+# name this function does not recognise is silently dropped from demand --
+# which quietly cost every Yahoo league its whole flex allocation (RB20 rather
+# than RB24 on a 10-team roster). Found 2026-09-01.
+FLEX_NAMES = ("FLEX", "W/R/T", "WRT", "W/R/T/QB", "R/W/T", "W/T")
+REC_FLEX_NAMES = ("REC_FLEX", "WRRB_FLEX", "W/R", "R/W")
+# roster slots that are never filled during a draft and carry no demand
+NON_DEMAND = ("BN", "BENCH", "IR", "IR+", "NA", "TAXI")
 # pool depth beyond the replacement baseline, per position
 POOL_PAD = {"QB": 16, "RB": 25, "WR": 20, "TE": 16, "K": 4, "DEF": 4}
 
@@ -22,23 +30,34 @@ def slot_counts(roster_positions: list[str]) -> tuple[dict[str, float], int]:
     """Positional starter demand (flex spread by FLEX_SPLIT) + bench size."""
     demand: dict[str, float] = {p: 0.0 for p in ("QB", "RB", "WR", "TE", "K", "DEF")}
     bench = 0
+    unknown: list[str] = []
     for slot in roster_positions:
-        s = slot.upper()
+        s = str(slot).upper().strip()
         if s in demand:
             demand[s] += 1
-        elif s == "FLEX":
+        elif s in FLEX_NAMES:
             for pos, share in FLEX_SPLIT.items():
                 demand[pos] += share
-        elif s in ("SUPER_FLEX", "SUPERFLEX"):
+        elif s in ("SUPER_FLEX", "SUPERFLEX", "Q/W/R/T", "OP"):
             demand["QB"] += 0.8          # superflex is a QB slot in practice
             demand["RB"] += 0.1
             demand["WR"] += 0.1
-        elif s in ("REC_FLEX", "WRRB_FLEX"):
+        elif s in REC_FLEX_NAMES:
             for pos in ("WR", "RB"):
                 demand[pos] += 0.5
-        elif s == "BN":
+        elif s in ("BN", "BENCH"):
             bench += 1
-        # IDP/other slots ignored for baseline purposes
+        elif s in NON_DEMAND:
+            pass
+        else:
+            unknown.append(s)
+    if unknown:
+        # loud, not silent: an unrecognised STARTING slot understates demand
+        # and therefore the baseline, and the failure is invisible downstream
+        raise ValueError(
+            f"unrecognised roster slots {sorted(set(unknown))} — add them to "
+            "onboard.py (FLEX_NAMES / NON_DEMAND) rather than letting them "
+            "drop out of positional demand")
     return demand, bench
 
 

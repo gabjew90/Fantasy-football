@@ -51,6 +51,10 @@ class Tracker:
     # Kept as a knob so the ten-slot replay can A/B it; the A/B is the reason
     # it is on. Turning it off restores per-position urgency exactly.
     slot_markets = True
+    # Cross-position comparison in the two-pick planner measures against the
+    # player you would actually end up with, not against a yaml replacement
+    # baseline (_fallback_points). Knob so the A/B stays runnable.
+    adaptive_fallback = True
     pool_min = 40
     pool_lookback = 20
     pool_lookahead = 60
@@ -121,6 +125,8 @@ class Tracker:
         self.upside_from_round = int(ecfg.get("upside_from_round", Tracker.upside_from_round))
         self.upside_mult = float(ecfg.get("upside_mult", Tracker.upside_mult))
         self.slot_markets = bool(ecfg.get("slot_markets", Tracker.slot_markets))
+        self.adaptive_fallback = bool(
+            ecfg.get("adaptive_fallback", Tracker.adaptive_fallback))
         gcfg = cfg["guardrails"] if "guardrails" in cfg._data else {}
         self.qb2_round = int(gcfg.get("qb2_earliest_round", 10))
         self.te2_fall = int(gcfg.get("te2_fall_picks", 12))
@@ -313,6 +319,70 @@ class Tracker:
             out = [(pos, (pos,), "vorp") for pos in POS_ORDER]
         return out
 
+    def _fallback_points(self, needs: dict) -> dict[str, float]:
+        """Projected points of the player I would ACTUALLY END UP WITH at each
+        position if I skip it now.
+
+        This replaces the league yaml's replacement baseline as the reference
+        for cross-position comparison in the two-pick planner, and it is the
+        reason that baseline no longer has to be hand-fitted. A season-long
+        constant has to answer "what is the alternative to a quarterback?" with
+        one number for the whole draft. The real answer moves: in round 2 with
+        thirteen picks left the alternative is a startable QB, so an early one
+        is barely worth anything; in round 12 it is whoever is left.
+
+        Method: find the LAST pick at which I could still fill my open starter
+        slots -- if I have R picks remaining and S starters to fill, that is my
+        S-th remaining pick. Then, per position, the best projected player
+        whose ADP says he is likely to survive that long. No league constant
+        enters; it adapts to teams, roster size, my remaining picks and the
+        board.
+        """
+        remaining = [n for n in snake.slot_pick_numbers(
+            self.my_slot, self.teams, self.rounds) if n >= self.current_pick]
+        if not remaining:
+            return {}
+        open_starters = sum(needs.get(k, 0) for k in
+                            ("QB", "RB", "WR", "TE", "FLEX", "K", "DEF"))
+        # my last starter-filling pick; with no starters left to fill, the
+        # question is what the bench could still get me, so use my final pick
+        idx = min(max(open_starters, 1), len(remaining)) - 1
+        deadline = remaining[idx]
+
+        out: dict[str, float] = {}
+        for pos in POS_ORDER:
+            pool = [p for p in self.remaining(pos)
+                    if p.get("proj_source") != "no_market"]
+            if not pool:
+                continue
+            survivors = [p for p in pool
+                         if p.get("adp") is not None and p["adp"] >= deadline]
+            # nobody projected to last: the position will be picked clean, so
+            # the fallback is the worst thing still on the board
+            pick_from = survivors or pool
+            out[pos] = max(float(p.get("proj_pts") or 0.0) for p in pick_from) \
+                if survivors else min(float(p.get("proj_pts") or 0.0)
+                                      for p in pick_from)
+        return out
+
+    def _replacement_points(self) -> dict[str, float]:
+        """Per-market replacement level in POINTS, recovered from the board.
+
+        vorp = proj_pts - replacement, so replacement is proj_pts - vorp for
+        any player at the position. Needed to convert the urgency report (which
+        speaks VORP) back into points before comparing against a fallback.
+        """
+        out: dict[str, float] = {}
+        for p in self.players:
+            pos, pts, v = p.get("pos"), p.get("proj_pts"), p.get("vorp")
+            if pos and pos not in out and pts is not None and v is not None:
+                out[pos] = float(pts) - float(v)
+            vf = p.get("vorp_flex")
+            if (pos in snake.FLEX_ELIGIBLE and "FLEX" not in out
+                    and pts is not None and vf is not None):
+                out["FLEX"] = float(pts) - float(vf)
+        return out
+
     @staticmethod
     def _mval(p: dict, value_key: str) -> float:
         """A player's value in a given market's currency."""
@@ -502,13 +572,17 @@ class Tracker:
 
         cliff = self.cliff_report()
         cands = []
-        from .planner import slot_vorp as _sv
+        from .planner import own_value as _ov
+        fallback = self._fallback_points(needs) if self.adaptive_fallback else None
+        repl = self._replacement_points() if fallback else None
         second: dict[str, float] = {}  # per-position 2nd-best, for the planner
         for pos in POS_ORDER:
             rem_p = sorted(
                 (p for p in self.remaining(pos) if p.get("proj_source") != "no_market"),
-                key=lambda q: -_sv(q, needs))
-            second[pos] = _sv(rem_p[1], needs) if len(rem_p) > 1 else 0.0
+                key=lambda q: -_ov(q, needs, fallback))
+            # same currency as the planner's own/partner terms, or the cap
+            # would compare a VORP level against a fallback-measured one
+            second[pos] = _ov(rem_p[1], needs, fallback) if len(rem_p) > 1 else 0.0
 
         # One row per UNFILLED ROSTER SLOT, not per position (_open_markets).
         # A position with an open dedicated slot is its own market; every
@@ -668,7 +742,8 @@ class Tracker:
                                          counts_after, picks_left - 1, top6_te_fell)
                 }
 
-            cands = pair_rank(cands, report, needs, second, eligible_after)
+            cands = pair_rank(cands, report, needs, second, eligible_after,
+                              fallback=fallback, repl=repl)
         except Exception as e:  # noqa: BLE001 — planner must never block the clock
             # fall back to greedy, but never silently: a dead planner on draft
             # day must be visible (code review 2026-08-30)

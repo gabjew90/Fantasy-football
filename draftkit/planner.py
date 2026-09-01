@@ -47,6 +47,37 @@ def slot_vorp(p: dict, needs: dict) -> float:
     return float(vf if vf is not None else (p.get("vorp") or 0.0))
 
 
+def own_value(p: dict, needs: dict, fallback: dict[str, float] | None) -> float:
+    """What taking this player NOW is worth, for the two-pick comparison.
+
+    The default is slot_vorp -- a LEVEL, measured against a replacement
+    baseline out of the league yaml. That is where the whole engine's
+    dependence on that baseline lives (urgency is a difference, so the
+    baseline cancels there; measured 2026-09-01: with this planner disabled,
+    QB5/TE8 and QB10/TE11 draft the same team).
+
+    Levels are only commensurable across positions if the baseline is right,
+    and "right" is not a season-long constant. The alternative to drafting a
+    quarterback now is not some notional QB10 -- it is the quarterback you
+    will actually end up with when you get round to the position. In a 10-team
+    1-QB league that is a startable QB, so the true marginal value of an early
+    one is small. In the same league the alternative to a running back is
+    RB40, so his marginal value is large. A single yaml number cannot say both,
+    which is why it had to be hand-fitted to make the engine behave.
+
+    `fallback` supplies exactly that, per position, computed from the board and
+    the picks I have left (Tracker._fallback_points). With it, "own" becomes
+    projected points above the player I would otherwise end up with -- no
+    replacement baseline involved, and adaptive to the room by construction.
+    """
+    if fallback is None:
+        return slot_vorp(p, needs)
+    pos = p.get("pos")
+    if pos not in fallback:
+        return slot_vorp(p, needs)
+    return float(p.get("proj_pts") or 0.0) - fallback[pos]
+
+
 def market_for(pos: str, needs: dict) -> str:
     """Which urgency market a position is shopped in, given open slots.
 
@@ -75,6 +106,8 @@ def pair_rank(cands: list[tuple[float, str, dict]],
               needs: dict,
               second_best_now: dict[str, float],
               eligible_after: Callable[[str], set[str]],
+              fallback: dict[str, float] | None = None,
+              repl: dict[str, float] | None = None,
               ) -> list[tuple[float, str, dict]]:
     """Re-rank recommendation candidates by joint two-pick EV.
 
@@ -98,6 +131,13 @@ def pair_rank(cands: list[tuple[float, str, dict]],
             if not u:
                 continue
             e = float(u.get("e_best_next") or 0.0)
+            if fallback is not None and repl is not None and pos2 in fallback:
+                # the report speaks VORP; convert back to points through the
+                # market's own replacement level, then re-measure against the
+                # player I would otherwise end up with. Mixing a VORP partner
+                # with a fallback-measured candidate would compare two
+                # different currencies.
+                e = e + repl.get(mkt, repl.get(pos2, 0.0)) - fallback[pos2]
             if pos2 == pos_taken:
                 e = min(e, second_best_now.get(pos2, 0.0))
             v = e if needs_position(needs_after, pos2) else e * NEED_DAMP
@@ -111,7 +151,7 @@ def pair_rank(cands: list[tuple[float, str, dict]],
         # the CANDIDATE side is need-weighted too — without this, deep
         # positions with fat raw VORP (WR) spam the roster after their
         # starter slots are full (caught by simulate: a 10-WR roster)
-        own = slot_vorp(p, needs) * (
+        own = own_value(p, needs, fallback) * (
             1.0 if needs_position(needs, p["pos"]) else NEED_DAMP)
         pair = own + pv
         if partner:

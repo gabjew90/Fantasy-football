@@ -448,3 +448,67 @@ Every single roster in all 22 slots drafts a second quarterback. In a 10-team
 is close to a wasted pick, and the two claims cannot both be right. The
 qb2_earliest_round=10 gate permits it and nothing pushes back. Worth testing a
 hard one-QB variant.
+
+## 2026-09-01 (5) — the hand-fitted baseline is GONE
+
+Correcting the previous entry, which kept QB5/TE8 because it drafted better.
+It did. That was the wrong question. QB5 is a per-league magic number tuned to
+that league's ADP, and a new league onboarded tomorrow would never get one --
+so "baselines are derived per league, never hand-tuned" was not true, and
+picking the best magic number accepted the premise instead of attacking it.
+
+### Where the constant was actually doing its work
+
+Disabling the two-pick planner and re-running the bake-off:
+
+    planner ON    QB5/TE8 1768.8   QB10/TE11 1764.8   spread 4.0   6/22 differ
+    planner OFF   QB5/TE8 1759.7   QB10/TE11 1760.1   spread 0.4   2/22 differ
+
+All of it lives in pair_rank. Urgency is a DIFFERENCE, so the baseline cancels
+there exactly; pair_rank sums raw VORP LEVELS across positions, and levels are
+only commensurable if the baseline is right.
+
+So QB5 was never a measurement of replacement level. It was a fudge that
+suppressed quarterback level so the planner would stop drafting them early --
+which is why it beat the "correct" number. Right answer, wrong reason, and
+unavailable to any other league.
+
+### The fix: measure against what you actually end up with
+
+A season-long constant has to answer "what is the alternative to a QB?" with
+one number for the whole draft. The real answer moves. In round 2 with
+thirteen picks left the alternative is a startable quarterback, so an early one
+is worth little. The alternative to a running back in the same league is RB40,
+so he is worth a lot. One number cannot say both, which is why it had to be
+fitted.
+
+Tracker._fallback_points computes, per position, the best projected player
+whose ADP says he survives to my LAST starter-filling pick (my S-th remaining
+pick, S = open starter slots). planner.own_value then measures a candidate as
+proj_pts - fallback[pos], and the partner term is converted out of VORP through
+the market's recovered replacement level so both sides speak one currency.
+
+No league constant enters. It adapts to teams, roster size, remaining picks and
+the live board by construction.
+
+    22 slots, three baselines (QB5/TE8, QB7/TE10, QB10/TE11)
+    before   spread 4.0 pts   4-6 slots differ
+    after    spread 0.4 pts   0-1 slots differ
+
+Cost: 3.1 points against the fitted baseline, +1.3 against the format one. We
+gave up an advantage that only existed because of the flaw.
+
+### Consequences
+
+* leagues/keefamania.yaml is now a PURE format derivation -- QB10 RB24 WR24
+  TE11 K10 DEF10 is exactly what onboard.derive_baselines(10, roster) returns.
+  Board rebuilt.
+* onboard.slot_counts did not recognise Yahoo's "W/R/T" flex slot and silently
+  dropped it from demand, so every Yahoo league was getting RB20/WR20 instead
+  of RB24/WR24. Unknown STARTING slots now raise instead of vanishing.
+* Behind engine.adaptive_fallback (default on) so the A/B stays runnable.
+
+Still open: the fallback uses ADP for AVAILABILITY (who survives to a pick),
+which is a structural fact rather than the market's opinion of value -- the
+distinction that matters. Replacing it with the survival simulation, which
+already models the room, is the offseason version.
