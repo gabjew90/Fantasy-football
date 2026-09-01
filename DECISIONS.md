@@ -227,3 +227,31 @@ QB/TE model_target rows as noise, not as buy signals.
   10%, kept out of every valuation path, and annotated "(unvalidated)"
   wherever it shows. Revisit once 2026 actuals accumulate; delete it if the
   three-lens scoreboard shows it hurting.
+
+## 2026-09-01 — the QB5/TE8 calibration is a design regression, not a fix
+
+The engine is meant to be league-agnostic: point it at a league, derive that
+league's parameters from format. `derive_baselines()` does that —
+`round(teams × starter demand)`, flex split 45/45/10 — and it is why two
+leagues with different sizes and scoring run on one codebase.
+
+Hand-fitting QB5/TE8 for Keefamania bypassed that derivation instead of
+repairing it. The measured problem was real (the board reached 35 picks past
+ADP on QBs, against +2 for RB and WR), and the patch does fix that league.
+But a third league onboarded tomorrow inherits the same broken QB10 and the
+same 35-pick reach, and nothing in the code says so.
+
+Kept for Saturday because the draft is four days out and the fitted value is
+demonstrably better than the derived one for THIS league. Recorded here as
+debt, not as a solution.
+
+The real fix is a derivation that knows streamable positions differ: starter
+demand overstates scarcity for QB/TE/K/DEF because their waiver pool stays
+startable in a way RB's does not. A candidate worth testing is deriving
+replacement from the SHAPE of the positional projection curve — how many
+players sit within some band of the positional best — which adapts to league
+size and scoring without being fitted to that league's ADP. Put to experts in
+docs/expert_review_prompt.md.
+
+Until then, `leagues/keefamania.yaml` carries a hand-tuned constant and the
+comment above it must keep saying so.

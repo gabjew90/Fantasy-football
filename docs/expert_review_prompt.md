@@ -1,116 +1,108 @@
 # Expert review prompt — draft engine
 
 Paste everything below the line to a fantasy-football statistics expert.
-Written to be self-contained: it assumes no knowledge of this repo.
+Self-contained: assumes no knowledge of this repo.
+
+The framing matters. This engine is meant to be **league-agnostic** — you
+point it at a league and it derives that league's parameters from format.
+So the interesting question is not "are these numbers right for my league"
+but "is the derivation right for any league". Two leagues run on it today
+(12-team full-PPR Sleeper, 10-team half-PPR Yahoo) and more are expected.
 
 ---
 
-I've built an automated draft engine and I'd like you to poke holes in it.
-Please be blunt — I'm more interested in what's wrong than in reassurance.
+I've built a draft engine that is supposed to adapt to any league you point
+it at. I'd like you to attack the **derivation logic**, not tune numbers for
+me. Please be blunt.
 
-## The league
+## What is fixed vs derived
 
-10-team, **half-PPR**, snake, 15 rounds, 1-minute clock. Starters:
-QB, RB, RB, WR, WR, TE, **one** W/R/T flex, K, DEF, plus 6 bench and 2 IR
-(IR not filled during the draft). Passing TD 4pt, 25 yd/pt, plus a league
-quirk: **+2 bonus on 40+ yard passing TDs** (recorded but not modelled —
-my weekly data lacks TD distance).
+A league is described by facts only — team count, roster slots, scoring,
+rounds. Everything positional is then derived:
 
-## How it values players
+- **Replacement baseline** per position = `round(teams × starter demand)`,
+  where a flex slot contributes demand split **RB 0.45 / WR 0.45 / TE 0.10**,
+  and a superflex contributes QB 0.8 / RB 0.1 / WR 0.1.
+  - 12-team, 1 QB, 2 flex → QB12, RB40, WR60, TE12
+  - 10-team, 1 QB, 1 flex → QB10, RB24, WR24, TE11
+- **VORP** = projected points − the points of the player at that rank.
+- Projections blend a usage model with market consensus, weighted 0.65 toward
+  the model for stable veterans, 0.40 for players who changed teams.
+- Scoring (half vs full PPR, TD values, bonuses) feeds the projections.
 
-**Projections** blend a usage-based statistical model with market consensus
-(FantasyPros ECR/ADP). The blend weight varies by player type: 0.65 toward
-the model for stable veterans, 0.40 for players who changed teams, 0.55
-default. A small number of manual overrides are allowed for hard facts only
-(transactions, injuries, depth chart, coaching changes) — never hype — capped
-at 8 overrides, none moving a projection more than 40%. Players who are out
-(suspension, exempt list) are zeroed.
+## What decides the pick
 
-**VORP** = projected points − points of the "replacement" player, where
-replacement is a rank I set per position. Currently:
+Monte Carlo over every rival pick before my next turn (1000 sims). Rivals
+sample from a rolling ADP window, with ADP noise sigma growing from 6 picks
+in round 1 to 27 by round 15, damped by the roster slots they've already
+filled, tilted by their historical positional tendencies, plus a fat-tail
+mixture (15% of the time noise ×3, one-directional — rivals reach early, not
+late) and escalation when 2+ picks of one position land in a 5-pick window.
 
-| pos | baseline | replacement is | elite VORP |
-|---|---|---|---|
-| QB | QB5 | ~QB5 (274.8 pts) | best QB +20.6 |
-| TE | TE8 | ~TE8 (127.4) | best TE +62.8 |
-| RB | RB24 | RB24 (160.2) | best RB +122.8 |
-| WR | WR24 | WR24 (147.0) | best WR +68.9 |
+Raw survival probabilities are then shrunk toward 0.5:
+`calibrated = 0.5 + (raw − 0.5) × 0.55`.
 
-RB/WR are format-derived (10 teams × starters, flex demand split
-45/45/10). **QB and TE are not** — see the open questions.
+Urgency per position = VORP(best available now) − E[VORP(best available at my
+next turn)]. Final ranking is a two-pick joint plan:
+`need-weighted VORP(now) + best expected partner at my next turn`, with a
+same-position partner capped at the second-best currently on the board.
 
-**Standing tilts**, each capped at 10%: fade mid-tier TEs, fade non-rushing
-QBs, boost rushing QBs late, small boost to elite TEs, and a 10% regression
-haircut on last season's positional top 5.
+## The core problem I want your help with
 
-## How it decides on the clock
+**The format-derived baseline appears to be wrong for streamable positions,
+and I patched the symptom instead of the derivation.**
 
-1. **Survival simulation.** Monte Carlo over every rival pick between now and
-   my next turn (1000 sims). Rivals sample from a rolling ADP window around
-   the current pick, weighted by an ADP Gaussian whose sigma grows from 6
-   picks in round 1 to 27 by round 15, damped by the roster slots they've
-   already filled, and tilted by their own historical positional tendencies.
-   Includes a fat-tail mixture: 15% of the time a rival's noise is scaled 3×,
-   one-directionally (rivals reach early, they don't reach late), plus
-   positional-run escalation when 2+ picks of one position land in a 5-pick
-   window.
+In the 10-team league, `teams × demand` gives QB10. That says: if I skip
+quarterbacks, I end up with roughly the 10th-best QB. But the market behaves
+as though it's about QB5 — and empirically, in a mock, the QB my board ranked
+5th was still on the board at pick 98. My board consequently reached **35
+picks past ADP on QBs** while RB (+2) and WR (+2) were well calibrated.
 
-2. **Calibration.** Raw survival probabilities are shrunk toward 0.5:
-   `calibrated = 0.5 + (raw − 0.5) × 0.55`. Fitted to my own completed draft
-   (n=67): raw 96% → actual 75%, 82% → 68%, 45% → 50%.
+I "fixed" it by hand-fitting QB5/TE8 for that one league, minimising
+`mean |board rank − ADP rank|`. That is bad on three counts: n=10, the
+optimum is flat (QB4–QB7 all within ~2), and **it does not generalise** —
+the next league onboarded gets the same broken QB10 derivation.
 
-3. **Urgency** per position = VORP(best available now) − E[VORP(best
-   available at my next turn)].
+So, the questions:
 
-4. **Candidates**: one per position — the top 3 there after guardrails, with
-   near-ties (within 2 VORP) broken by who's fallen furthest past ADP. From
-   round 8 onward the position is first re-sorted on an upside-boosted proxy
-   (×1.15 for flagged high-variance players) before truncation, on the theory
-   that bench picks win on 90th percentiles rather than medians.
+1. **What is the right derivation for replacement level at streamable
+   positions?** Starter demand clearly overstates scarcity for QB/TE/K/DEF,
+   because the waiver pool stays startable all season in a way it doesn't for
+   RB. Should replacement be derived from the *shape of the projection curve*
+   (e.g. how many players sit within X% of the positional best) rather than
+   from team count? From expected number rostered? Something else?
 
-5. **Two-pick joint planner.** Rank by
-   `pair = need-weighted VORP(now) + best expected partner at my next turn`,
-   where a same-position partner is capped at the second-best currently on
-   the board. This exists because greedy per-position urgency "won the pick
-   and lost the round" twice in a real draft.
+2. **Should the flex split vary with scoring?** I use RB 0.45 / WR 0.45 /
+   TE 0.10 everywhere. In full PPR, pass-catching backs and slot receivers
+   gain a lot relative to half. Does flex composition actually shift enough
+   to matter, or is the split second-order?
 
-**Hard guardrails**: never a 3rd QB or TE; no QB2 before round 10; a 2nd TE
-only if a top-6 TE has fallen 12+ picks past his ADP; K/DEF only in the final
-two picks; at most one zero-role stash; and once remaining picks ≤ open
-starter slots, starters only.
+3. **Which of my constants should be league-derived rather than universal?**
+   Currently identical for every league regardless of size or scoring:
+   - "no second QB before round 10"
+   - "a second TE only if a top-6 TE has fallen 12+ picks past ADP"
+   - survival calibration shrink 0.55 (fitted to a *single* 12-team draft,
+     n=67, then applied to a 10-team league)
+   - K/DEF confined to the final two picks
 
-## Where I know I'm on thin ice — please attack these
+   Intuitively the QB2 gate should be later in a 10-team league than a
+   14-team one, and TE rules should depend on scoring. But I'd rather hear
+   which of these genuinely need to scale and which are fine as constants.
 
-1. **I fitted the QB and TE baselines to ADP.** Format math gives QB10/TE11;
-   I swept values and picked the ones minimising mean |board rank − ADP rank|
-   over each position's top 10, landing on QB5/TE8. Three problems: n=10, the
-   optimum is flat (QB4–QB7 are all within ~2), and it's fitted to market
-   rather than validated on outcomes. Is calibrating a *structural*
-   assumption to market defensible while leaving projections independent, or
-   is it circular? Is there a better way to set replacement level in a
-   10-team league?
+4. **Is the projection curve itself the real problem?** In the 10-team board,
+   TE1 projects 190 and TE2 189, then TE3 147 and TE4–TE8 within 4 points of
+   each other. Elite TEs therefore carry +62 VORP and keep surfacing in the
+   first two rounds. No choice of baseline changes that — it is the
+   projections. Is a ~43-point gap between TE2 and TE3 plausible, or does
+   that pattern indicate a modelling artifact?
 
-2. **My TE projections may be the real issue.** The board has TE1 at 190 and
-   TE2 at 189, then TE3 at 147 and TE4–TE8 within 4 points of each other. So
-   elite TEs carry +62 VORP and keep surfacing in the first two rounds. Is a
-   ~43-point gap between TE2 and TE3 plausible, or is that a modelling
-   artifact? No choice of baseline changes this — it's the projections.
+5. **Two elite TEs, both starting** — one at TE, one in the single flex. The
+   engine will do this when they are the two best available. Real strategy or
+   trap, in a 10-team half-PPR?
 
-3. **Two elite TEs, both starting** (one at TE, one in the flex). The engine
-   will do this when they're the two best players available. In a 10-team
-   half-PPR with a single flex, is that a real strategy or a trap?
+6. **What is structurally missing?** Not modelled at all: bye-week stacking
+   (warned, never scored), handcuffing (display only), playoff schedule
+   strength, and any opponent read beyond historical positional tendency.
 
-4. **QB2 not before round 10.** With a QB5 replacement level the engine
-   already wants QBs late. Is a hard round gate the right instrument, or
-   should QB2 just be allowed to compete on value?
-
-5. **Survival shrink 0.55** was fitted to 67 observations from one draft.
-   Does that magnitude of overconfidence match your experience of how often
-   "he'll last another round" is wrong?
-
-6. **What's structurally missing?** Things I do not model at all: bye-week
-   stacking (warned but never scored), handcuffing (display only), playoff
-   schedule strength, positional runs beyond the 5-pick window, and any
-   opponent-specific reads beyond historical positional tendency.
-
-What would you change first?
+What would you change first — and is there a principled way to make
+replacement level adapt to a league without fitting it to that league's ADP?
