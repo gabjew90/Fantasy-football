@@ -83,6 +83,37 @@ to the engine's top eligible pick — so whoever pulls the trigger, the pick is
 the engine's. `draftTop` is best-effort on top of that, never a dependency.
 This is the right shape given armed autopick drafts instantly.
 
+## Mock 4 — room 10305876, 10 teams, slot 7 — FAILED
+
+Actual picks (overall pick number): 7 McBride TE · 14 Bowers TE · 27 Rice WR ·
+34 J.Williams RB · 47 Adams WR · 54 Mahomes QB · **67 Nix QB** · 74 Warren RB ·
+87 Harvey RB · 94 M.Wilson WR · **107 Josh Jacobs (CEL)** · 114 Likely TE ·
+127 Golden WR · 134 Dicker K · **147 McPherson K** · **DEF: empty**.
+
+McBride at 7 was correct — the six ahead of him were gone and he was the
+board's best available. Everything after round 6 is autopick damage.
+
+| # | Bug | Root cause | Fix / test |
+|---|-----|-----------|------------|
+| 16 | **Every on-clock pick aborted** as `ui-not-ready`, in mocks 2, 3 AND 4 | Found only by *screenshotting the screen mid-turn*: Yahoo re-renders every row with a **"Draft" button** when it is your turn, and the star disappears. Keying on the star meant no row was ever recognised at the one moment that matters. The failed loop then burned the 60s clock, which is what armed autopick | `isPlayerRow()` accepts star **or** Draft button; `draftTop` clicks the row's own Draft button. Test |
+| 17 | Driver reported an **empty queue** while five players sat in it | Same re-render: queue rows gain a "Draft" prefix, and the anchored regex matched nothing | `parseQueueRow` tolerates the prefix. Test |
+| 18 | Queue held **five quarterbacks** in round 6; QB2 landed at pick 67, before the round-10 gate | `syncQueue` filled by score, which clusters by position. Only one QB was legally draftable, so the rest were pruned and the queue collapsed — starvation by a new route | The queue is a PLAN: each candidate is now checked against a roster already holding everything queued ahead of it, which diversifies for free. Test |
+| 19 | Prune churn: players cut and re-added in the same cycle | `pruneQueue` keyed off top-20 membership rather than legality, so slipping to #21 caused an un-star then re-star — wasted clicks on a TOGGLE, risking queue desync | Prune on `guardrailOk` only |
+| 20 | **Two TEs in the first three rounds, no RB** | The TE2 gate ("a board top-6 TE") was too easy | TE2 must also have FLEX open and clear the best available RB/WR by 10 VORP. Two tests |
+| 21 | **DEF slot left empty**, two kickers drafted, and Josh Jacobs (Commissioner Exempt, zeroed) taken at 107 | All three are autopick with an exhausted queue — none came from the engine, whose board ranks Jacobs last | Downstream of 16–18 |
+
+### Correction
+An earlier reading of the roster panel said pick 1 was Rashee Rice. That was
+wrong: the panel is **slot-ordered, not draft-ordered**. Rice went at 27.
+Always read the Results tab's pick column.
+
+### Direction change (user call, agreed)
+Live picking becomes **primary**, the queue drops to backup. A 60-second clock
+is enormous against a ~3s decision, and a pick computed at our turn sees the
+real board — unlike a queue built minutes earlier, which from slot 7 held six
+players who were all gone by pick 7. The queue only ever looked necessary
+because the click path was broken by bug 16.
+
 ---
 
 ## Open

@@ -219,10 +219,25 @@ window.DK = (function () {
     const avail = S.board.filter(x =>
       !mine.has(x.k + '|' + x.p) && !isGone(x));
 
+    /* A second TE can only ever start in FLEX, competing with an RB/WR who
+     * would otherwise hold that slot. Mock 4 took McBride AND Bowers in the
+     * first three rounds and went into round 4 with no running back, because
+     * "top-6 TE" alone was too easy a gate. Require a clear margin over the
+     * best flex-eligible alternative instead of a bare ranking. */
+    const bestFlexAlt = Math.max(...avail
+      .filter(x => x.p === 'RB' || x.p === 'WR')
+      .map(x => x.v), -Infinity);
+    const te2Margin = 10;
+
     const eligible = [];
     const blocked = [];
     for (const p of avail) {
-      const teOk = p.p !== 'TE' || (counts.TE || 0) < 1 || te6.includes(p.n);
+      let teOk = true;
+      if (p.p === 'TE' && (counts.TE || 0) >= 1) {
+        teOk = te6.includes(p.n)
+          && (need.FLEX || 0) > 0
+          && p.v >= bestFlexAlt + te2Margin;
+      }
       if (teOk && guardrailOk(p, rnd, need, counts, picksLeft, true, haveStash)) eligible.push(p);
       else if (blocked.length < 6) blocked.push(p.n + '(' + p.p + ')');
     }
@@ -265,14 +280,35 @@ window.DK = (function () {
     return false;
   }
 
+  /* A row's controls.
+   *
+   * THE BIG ONE (found by screenshotting mock 4 while on the clock): Yahoo
+   * re-renders every player row the moment it is your turn, replacing the
+   * star with an explicit "Draft" button. Keying only on the star meant that
+   * during our own turn -- the one moment that matters -- no row was ever
+   * recognised. tableLive() then reported a dead UI and every pick aborted.
+   * That single mistake explains the on-clock failures in mocks 2, 3 AND 4.
+   *
+   * So: a row is a player row if it carries EITHER control. */
+  function starButton(row) {
+    return [...row.querySelectorAll('button')]
+      .find(b => !b.textContent.trim() && b.querySelector('svg')) || null;
+  }
+  function draftButton(row) {
+    return [...row.querySelectorAll('button')]
+      .find(b => /^Draft$/i.test(b.textContent.replace(/\s+/g, ' ').trim())) || null;
+  }
+  function isPlayerRow(row) {
+    return !!(starButton(row) || draftButton(row));
+  }
+
   /* Is the player table actually rendering rows? Used to distinguish "this
    * player is drafted" from "the table is not up", so a UI problem can never
    * again be recorded as league-wide unavailability. */
   function tableLive() {
     return [...document.querySelectorAll('div,li,tr')].some(e => {
       const x = (e.innerText || '').replace(/\s+/g, ' ');
-      return x.length < 260 && /Bye \d+/.test(x)
-        && [...e.querySelectorAll('button')].some(b => !b.textContent.trim() && b.querySelector('svg'));
+      return x.length < 260 && /Bye \d+/.test(x) && isPlayerRow(e);
     });
   }
 
@@ -341,8 +377,7 @@ window.DK = (function () {
       const x = (e.innerText || '').replace(/\s+/g, ' ');
       if (x.length > 260) return false;
       if (!rowMatches(entry, x)) return false;
-      // star button present => it is a player-table row, not the queue panel
-      return [...e.querySelectorAll('button')].some(b => !b.textContent.trim() && b.querySelector('svg'));
+      return isPlayerRow(e);      // star OR Draft button; see isPlayerRow
     }).sort((a, b) => (a.innerText || '').length - (b.innerText || '').length);
     return rows[0] || null;
   }
@@ -387,10 +422,14 @@ window.DK = (function () {
     const seen = new Set();
     for (const e of qp.querySelectorAll('div,li')) {
       const x = (e.innerText || '').replace(/\s+/g, ' ').trim();
-      if (x.length > 120) continue;
-      const m = x.match(/^([A-Z]\.\s?[A-Za-z'\-\.]+)\s+(?:Q|IR|O|D|SUSP|PUP|CEL|NA)?\s*(QB|RB|WR|TE|K|DEF)\b/);
+      if (x.length > 140) continue;
+      /* Tolerate a leading "Draft" label: on our turn Yahoo prefixes every
+       * queue row with its own Draft button, which made the old anchored
+       * regex match nothing and report an EMPTY queue while five players
+       * were plainly sitting in it (mock 4 screenshot). */
+      const m = x.match(/(?:^|^Draft\s+)([A-Z]\.\s?[A-Za-z'\-\.]+)\s+(?:Q|IR|IR-R|O|D|SUSP|PUP|CEL|NA)?\s*(QB|RB|WR|TE|K|DEF)\b/);
       if (!m) continue;
-      const btn = [...e.querySelectorAll('button')].find(b => !b.textContent.trim() && b.querySelector('svg'));
+      const btn = starButton(e);
       if (!btn) continue;
       const key = keyAbbr(m[1]) + '|' + m[2];
       if (seen.has(key)) continue;
@@ -411,7 +450,19 @@ window.DK = (function () {
   async function pruneQueue() {
     const r = rank();
     if (r.err) return { err: r.err };
-    const legal = new Set(r.top.map(x => keyFull(x.n) + '|' + x.p));
+    /* Legality, not top-N membership.
+     *
+     * Keying off r.top (the best 20 by score) made prune churn: a player who
+     * merely slipped out of the top 20 was un-starred and then re-starred by
+     * the fill pass in the same cycle. Every one of those is a wasted click
+     * on a TOGGLE, which risks leaving the queue in the opposite state to
+     * what we think. Only remove what the guardrails actually forbid. */
+    const legal = new Set();
+    for (const p of S.board) {
+      if (guardrailOk(p, r.round, r.need, r.counts, r.picksLeft, false)) {
+        legal.add(p.k + '|' + p.p);
+      }
+    }
     const removed = [];
     for (const row of queueRows()) {
       if (legal.has(row.key)) continue;
@@ -481,6 +532,7 @@ window.DK = (function () {
   }
 
   async function syncQueue() {
+    S.cfg.myNextPick = myNextPick();       // for the queue's ADP filter
     reconcileStarred();                    // free up slots taken by others
     const pruned = await pruneQueue();     // drop what is no longer legal
     const r = rank();
@@ -488,10 +540,42 @@ window.DK = (function () {
     const have = queueNames();
     const results = [];
     let depth = have.length;
+
+    /* The queue is a PLAN for the next N picks, not a top-N list.
+     *
+     * Filling it with the highest scorers clusters by position: mock 4 queued
+     * FIVE quarterbacks in round 6. Only one was legally draftable (QB2 is
+     * gated until round 10), so the moment one landed the other four were
+     * pruned and the queue collapsed -- starvation again, by a new route.
+     *
+     * So each candidate is checked against a roster that already contains
+     * everything queued ahead of it. After one QB is planned, the simulated
+     * roster has a QB and the gate blocks the rest, which diversifies the
+     * queue for free instead of by an arbitrary per-position cap. */
+    const simCounts = Object.assign({}, r.counts);
+    let simHave = S.cfg.rounds - r.picksLeft;
+    for (const key of have) {          // already-queued players count too
+      const pos = key.slice(key.lastIndexOf('|') + 1);
+      simCounts[pos] = (simCounts[pos] || 0) + 1;
+      simHave++;
+    }
+
     for (const cand of r.top) {
       if (depth >= S.cfg.queueDepth) break;
       const entry = S.board.find(b => b.n === cand.n && b.p === cand.p);
       if (!entry) continue;
+      const simNeed = needsMap(simCounts);
+      const simRound = simHave + 1;
+      const simLeft = S.cfg.rounds - simHave;
+      if (!guardrailOk(entry, simRound, simNeed, simCounts, simLeft, false)) continue;
+      /* Do not queue players who will obviously be gone.
+       *
+       * From slot 7 the driver queued the consensus top 6 in round 1. All six
+       * went in picks 1-6, the queue was empty at pick 7, and Yahoo's
+       * fallback handed us Rashee Rice. A backup queue is only a backup if it
+       * holds players who might actually still be there, so skip anyone whose
+       * ADP is comfortably earlier than the pick we are queueing for. */
+      if (entry.a != null && S.cfg.myNextPick && entry.a < S.cfg.myNextPick - 12) continue;
       const id = cand.n + '|' + cand.p;
       /* The star is a TOGGLE. Re-clicking one we already queued REMOVES the
        * player. queueNames() cannot always see the whole queue (Yahoo caps
@@ -500,7 +584,13 @@ window.DK = (function () {
        * clicks instead. */
       if (have.includes(keyFull(cand.n) + '|' + cand.p) || S.starred.has(id)) continue;
       const res = await starPlayer(entry);
-      if (res === 'ok') { depth++; S.starred.add(id); results.push(cand.n + ':ok'); }
+      if (res === 'ok') {
+        depth++;
+        S.starred.add(id);
+        simCounts[cand.p] = (simCounts[cand.p] || 0) + 1;   // planned
+        simHave++;
+        results.push(cand.n + ':ok');
+      }
       else if (res === 'norow' || res === 'nostar') {
         markGone(entry); results.push(cand.n + ':' + res + '->gone');
       } else {
@@ -545,14 +635,21 @@ window.DK = (function () {
         markGone(entry);
         continue;
       }
-      row.click();
-      await sleep(600);
-      const btns = [...document.querySelectorAll('button')].filter(b => {
-        const x = b.textContent.replace(/\s+/g, ' ').trim();
-        return /^Draft/i.test(x) && !b.disabled && !b.closest('[role=tablist]');
-      });
-      const pick = btns.find(b => /Player/i.test(b.textContent)) || btns[btns.length - 1];
-      if (!pick) { attempted.push(cand.n + ':nobtn'); continue; }
+      /* Prefer the row's OWN Draft button. Hunting the document for a
+       * /^Draft/ button matched the nav tab named "Draft" (mock 1) and, when
+       * it did not, clicked something unrelated that silently no-opped
+       * (mock 3's phantom "drafted Bijan Robinson"). The row's button is
+       * unambiguous. */
+      let pick = draftButton(row);
+      if (!pick) {
+        row.click();
+        await sleep(600);
+        pick = draftButton(row) || [...document.querySelectorAll('button')].filter(b => {
+          const x = b.textContent.replace(/\s+/g, ' ').trim();
+          return /^Draft Player$/i.test(x) && !b.disabled && !b.closest('[role=tablist]');
+        })[0];
+      }
+      if (!pick || pick.disabled) { attempted.push(cand.n + ':nobtn'); continue; }
       pick.click();
       await sleep(1100);
       const conf = [...document.querySelectorAll('button')]
@@ -581,6 +678,18 @@ window.DK = (function () {
     return /put into autopick mode/i.test(document.body.innerText);
   }
 
+  /* Overall pick number of our next turn, read off the header ("You're up in
+   * 2 Picks • Round 4, Pick 32" / "ROUND 1, PICK 7"). Feeds the queue's
+   * ADP filter so we stop queueing players who cannot possibly last. */
+  function myNextPick() {
+    const t = document.body.innerText.replace(/\s+/g, ' ');
+    const up = t.match(/up in (\d+) Picks?/i);
+    const cur = t.match(/Round \d+,\s*Pick (\d+)/i);
+    if (cur) return parseInt(cur[1], 10) + (up ? parseInt(up[1], 10) : 0);
+    const mine = t.match(/YOUR TURN - (\d+)(?:ST|ND|RD|TH) PICK/i);
+    return mine ? parseInt(mine[1], 10) : null;
+  }
+
   /* Resident loop: this is what stops autopick from ever arming. */
   async function run(maxSeconds) {
     if (S.running) return 'already running';
@@ -595,15 +704,28 @@ window.DK = (function () {
         if (/draft results|draft complete/i.test(document.title)) { note('draft over'); break; }
 
         if (onClock()) {
-          /* The queue head IS the engine's top pick (syncQueue keeps it so),
-           * and autopick consumes it immediately. Clicking as well is pure
-           * upside when it works and pure clock-burn when it does not, so
-           * only try while Yahoo has not already taken over. */
+          /* LIVE PICK IS PRIMARY.
+           *
+           * A 60-second clock is enormous next to a ~3s decision, and a pick
+           * computed at our turn sees the real board -- unlike a queue built
+           * minutes earlier, which from slot 7 held six players who were all
+           * gone by pick 7. The queue stays as the backup that catches us if
+           * every click fails.
+           *
+           * Retry: one failed attempt used to surrender the whole clock. */
           if (autopickArmed()) {
             note('ON CLOCK (autopick armed) -> queue head takes it');
           } else {
-            const res = await draftTop();
-            note('ON CLOCK -> ' + JSON.stringify(res));
+            let res = await draftTop(4);
+            if (res.err && !onClock()) {
+              note('ON CLOCK -> turn ended: ' + JSON.stringify(res));
+            } else if (res.err) {
+              await sleep(800);
+              res = await draftTop(4);     // second bite while time remains
+              note('ON CLOCK retry -> ' + JSON.stringify(res));
+            } else {
+              note('ON CLOCK -> ' + JSON.stringify(res));
+            }
           }
           await sleep(1200);
           lastSync = 0; // force resync after our pick
@@ -653,6 +775,34 @@ window.DK = (function () {
     rank, syncQueue, draftTop, run,
     classifyMiss, rowMatches, normTeam, autopickArmed, // exported for tests
     reconcileStarred, reconcileStarredWith,
+    /* Pure form of the queue-row parser, so the on-clock "Draft" prefix that
+     * made mock 4 report an empty queue stays covered. */
+    /* Pure form of the queue planner: which of the ranked candidates would
+     * actually be queued, given each one is checked against a roster holding
+     * everything planned ahead of it. */
+    planQueue: (counts, have, depth) => {
+      const r = rank();
+      if (r.err) return [];
+      const sim = Object.assign({}, counts || r.counts);
+      let simHave = have == null ? (S.cfg.rounds - r.picksLeft) : have;
+      const out = [];
+      for (const cand of r.top) {
+        if (out.length >= (depth || S.cfg.queueDepth)) break;
+        const entry = S.board.find(b => b.n === cand.n && b.p === cand.p);
+        if (!entry) continue;
+        if (!guardrailOk(entry, simHave + 1, needsMap(sim), sim,
+                         S.cfg.rounds - simHave, false)) continue;
+        out.push(cand.n + '|' + cand.p);
+        sim[cand.p] = (sim[cand.p] || 0) + 1;
+        simHave++;
+      }
+      return out;
+    },
+    parseQueueRow: (text) => {
+      const x = (text || '').replace(/\s+/g, ' ').trim();
+      const m = x.match(/(?:^|^Draft\s+)([A-Z]\.\s?[A-Za-z'\-\.]+)\s+(?:Q|IR|IR-R|O|D|SUSP|PUP|CEL|NA)?\s*(QB|RB|WR|TE|K|DEF)\b/);
+      return m ? keyFull(m[1]) + '|' + m[2] : null;
+    },
     /* Pure form of the post-click check in draftTop. A pick counts only when
      * the roster actually grew. */
     pickLanded: (before, after) => !!(after && before && after.have > before.have),

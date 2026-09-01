@@ -14,6 +14,7 @@ from __future__ import annotations
 import json
 import shutil
 import subprocess
+import tempfile
 import textwrap
 from pathlib import Path
 
@@ -41,9 +42,14 @@ def run_js(snippet: str):
         """
     )
     code = harness + DRIVER.read_text(encoding="utf-8") + "\n" + snippet
-    out = subprocess.run(
-        [NODE, "-e", code], capture_output=True, text=True, timeout=30
-    )
+    # Via a temp file, not `node -e`: the driver outgrew Windows' command-line
+    # length limit and CreateProcess started failing with WinError 206.
+    with tempfile.TemporaryDirectory() as tmp:
+        script = Path(tmp) / "run.mjs"
+        script.write_text(code, encoding="utf-8")
+        out = subprocess.run(
+            [NODE, str(script)], capture_output=True, text=True, timeout=30
+        )
     if out.returncode != 0:
         raise AssertionError(out.stderr.strip() or out.stdout.strip())
     return json.loads(out.stdout.strip())
@@ -135,13 +141,43 @@ def test_last_pick_is_reserved_for_an_unfilled_kicker():
     assert {c["p"] for c in r["top"]} <= {"K", "DEF"}, r["top"][:4]
 
 
-def test_second_te_only_if_top_six():
-    """TE2 allowed only for a board top-6 TE. Bowers qualifies."""
+def test_second_te_must_beat_the_best_flex_alternative():
+    """A 2nd TE can only start in FLEX, competing with the RB/WR who would
+    otherwise hold that slot. Mock 4 took McBride AND Bowers in three rounds
+    and entered round 4 with no running back, because "top-6 TE" alone was
+    too easy a gate.
+
+    With McCaffrey (122.8) on the board, Bowers (68.5) must NOT be offered.
+    """
     r = rank_with(panel([
         "T. McBride TE Ari Bye 14",
         "P. Nacua WR LAR Bye 11",
     ]))
-    assert "Brock Bowers" in [c["n"] for c in r["top"]]
+    assert "Brock Bowers" not in [c["n"] for c in r["top"]], \
+        "TE2 offered while a far better flex option was available"
+
+
+def test_second_te_is_allowed_when_it_clearly_beats_the_flex_field():
+    """The gate is a margin, not a ban: strip the strong RB/WR out and the
+    elite TE2 becomes the right FLEX play again."""
+    thin = "\n".join([
+        "Trey McBride|TE|ARI|69.3|||26.7",
+        "Brock Bowers|TE|LVR|68.5|||21.2",
+        "Jaylen Warren|RB|PIT|9.3|1||77.0",
+        "Courtland Sutton|WR|DEN|-1.7|||105.2",
+    ])
+    r = run_js(
+        f"""
+        DK.loadCompact({json.dumps(thin)});
+        document.body.innerText = {json.dumps(panel([
+            "T. McBride TE Ari Bye 14",
+            "P. Nacua WR LAR Bye 11",
+        ]))};
+        console.log(JSON.stringify(DK.rank()));
+        """
+    )
+    assert "Brock Bowers" in [c["n"] for c in r["top"]], \
+        "elite TE2 blocked even though the flex field was weak"
 
 
 def test_need_weighting_beats_similar_vorp():
@@ -361,6 +397,67 @@ def test_starred_memo_releases_players_taken_by_someone_else():
     assert r["keptMcBride"] is True, "a rostered player must stay memoised"
     assert r["freedBowers"] is True, "a rival's pick must free the queue slot"
     assert r["dropped"] == ["Brock Bowers|TE"]
+
+
+def test_queue_rows_parse_with_the_on_clock_draft_prefix():
+    """Mock 4, found by screenshotting the screen while on the clock: the
+    moment it is your turn Yahoo prefixes every queue row with its own
+    "Draft" button. The anchored regex then matched nothing and the driver
+    reported an EMPTY queue while five players sat plainly in it -- so it
+    believed it had nothing to fall back on at the one moment that counts.
+    """
+    r = run_js(
+        """
+        console.log(JSON.stringify({
+          plain:  DK.parseQueueRow('T. McBride TE Ari Bye 14 ADP: 26.5'),
+          onClock:DK.parseQueueRow('Draft T. McBride TE Ari Bye 14 ADP: 26.5'),
+          status: DK.parseQueueRow('Draft W. Robinson Q WR Ten Bye 9 ADP: 130.6'),
+          junk:   DK.parseQueueRow('Autodraft will pick from queue'),
+        }));
+        """
+    )
+    assert r["plain"] == "t mcbride|TE"
+    assert r["onClock"] == "t mcbride|TE", "on-clock rows must still parse"
+    assert r["status"] == "w robinson|WR"
+    assert r["junk"] is None
+
+
+def test_queue_plan_does_not_stack_one_position():
+    """Mock 4 queued FIVE quarterbacks in round 6. Only one was legally
+    draftable (QB2 is gated until round 10), so the moment one landed the
+    other four were pruned and the queue collapsed -- starvation by a new
+    route.
+
+    The queue is a PLAN for the next N picks, so each candidate must be
+    checked against a roster already holding everything queued ahead of it.
+    """
+    qb_heavy = "\n".join([
+        "Josh Allen|QB|BUF|39.7|||20.1",
+        "Jalen Hurts|QB|PHI|27.0|||56.4",
+        "Brock Purdy|QB|SFO|19.0|||98.3",
+        "Bo Nix|QB|DEN|14.2|||98.8",
+        "Jared Goff|QB|DET|8.1|||141.6",
+        "Jaylen Warren|RB|PIT|9.3|1||77.0",
+        "Courtland Sutton|WR|DEN|-1.7|||105.2",
+    ])
+    r = run_js(
+        f"""
+        DK.loadCompact({json.dumps(qb_heavy)});
+        document.body.innerText = {json.dumps(panel([
+            "R. Rice WR KC Bye 5",
+            "D. Adams WR LAR Bye 11",
+            "J. Williams RB Dal Bye 14",
+            "T. McBride TE Ari Bye 14",
+            "B. Bowers TE LV Bye 13",
+        ]))};
+        console.log(JSON.stringify({{plan: DK.planQueue(null, null, 6)}}));
+        """
+    )
+    plan = r["plan"]
+    qbs = [p for p in plan if p.endswith("|QB")]
+    assert len(qbs) <= 1, f"queue stacked {len(qbs)} QBs: {plan}"
+    assert any(p.endswith("|RB") or p.endswith("|WR") for p in plan), \
+        f"queue held no runnable/receiving option: {plan}"
 
 
 def test_availability_is_not_scraped_from_page_text():
