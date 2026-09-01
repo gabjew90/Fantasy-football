@@ -179,6 +179,103 @@ def test_rostered_players_are_never_reoffered():
     assert "Trey McBride" not in names
 
 
+def test_a_dead_ui_is_never_read_as_players_being_drafted():
+    """Mock 2 regression. The driver searched while the right panel was on the
+    Queue tab, so no player row could ever match. It read every miss as
+    "drafted" and marked 36 elite players gone, wrecking the board.
+
+    A miss only means "gone" when the table is provably rendering players.
+    """
+    r = run_js(
+        """
+        console.log(JSON.stringify({
+          liveMiss:  DK.classifyMiss(false, true),
+          deadMiss:  DK.classifyMiss(false, false),
+          found:     DK.classifyMiss(true,  true),
+        }));
+        """
+    )
+    assert r["liveMiss"] == "gone"          # table up, player absent -> drafted
+    assert r["deadMiss"] == "uinotready"    # table down -> conclude NOTHING
+    assert r["found"] == "found"
+
+
+def test_a_queued_player_is_never_re_starred():
+    """The star is a TOGGLE: clicking it again removes the player from the
+    queue. Mock 2 re-starred the 5th entry every cycle, flipping them in and
+    out, so the queue never held more than four."""
+    r = run_js(
+        """
+        DK.reset();
+        DK._markStarred('Jonathan Taylor|RB');
+        console.log(JSON.stringify({
+          already: DK._isStarred('Jonathan Taylor|RB'),
+          other:   DK._isStarred('Bijan Robinson|RB'),
+          cleared: (DK.reset(), DK._starred().length),
+        }));
+        """
+    )
+    assert r["already"] is True
+    assert r["other"] is False
+    assert r["cleared"] == 0
+
+
+def test_row_must_match_team_not_just_name_and_position():
+    """Mock 2 queued "J. Taylor NA RB Jax" for Jonathan Taylor of INDIANAPOLIS.
+    findRow's comment claimed it checked team; the code only checked name and
+    position."""
+    r = run_js(
+        """
+        DK.loadCompact('Jonathan Taylor|RB|IND|77.8||' + '|3.0');
+        console.log(JSON.stringify({
+          right: DK.rowMatches({k:'j taylor', p:'RB', t:'IND', a:3.0},
+                               'J. Taylor RB Ind Bye 7 ADP: 3.2'),
+          wrong: DK.rowMatches({k:'j taylor', p:'RB', t:'IND', a:3.0},
+                               'J. Taylor NA RB Jax Bye 7 ADP: -'),
+        }));
+        """
+    )
+    assert r["right"] is True
+    assert r["wrong"] is False, "a Jacksonville back matched an Indianapolis one"
+
+
+def test_same_name_same_team_collision_is_split_by_adp():
+    """Bijan Robinson and Brian Robinson Jr. are both ATL RBs keyed
+    "b robinson". Only ADP separates them, and getting it wrong swaps a
+    +91.8 VORP player for a -72.4 one."""
+    r = run_js(
+        """
+        console.log(JSON.stringify({
+          bijanOnBijanRow: DK.rowMatches({k:'b robinson',p:'RB',t:'ATL',a:2.1},
+                              'B. Robinson RB Atl Bye 11 ADP: 3.0'),
+          bijanOnBrianRow: DK.rowMatches({k:'b robinson',p:'RB',t:'ATL',a:2.1},
+                              'B. Robinson RB Atl Bye 11 ADP: 119.6'),
+          brianOnBrianRow: DK.rowMatches({k:'b robinson',p:'RB',t:'ATL',a:118.1},
+                              'B. Robinson RB Atl Bye 11 ADP: 119.6'),
+        }));
+        """
+    )
+    assert r["bijanOnBijanRow"] is True
+    assert r["bijanOnBrianRow"] is False, "queued the wrong Robinson"
+    assert r["brianOnBrianRow"] is True
+
+
+def test_team_aliases_normalise_across_yahoo_and_board_spellings():
+    r = run_js(
+        """
+        console.log(JSON.stringify({
+          sfo: DK.normTeam('SFO') === DK.normTeam('SF'),
+          jac: DK.normTeam('JAC') === DK.normTeam('Jax'),
+          gbp: DK.normTeam('GBP') === DK.normTeam('GB'),
+          nep: DK.normTeam('NEP') === DK.normTeam('NE'),
+          diff: DK.normTeam('LAC') === DK.normTeam('LAR'),
+        }));
+        """
+    )
+    assert r["sfo"] and r["jac"] and r["gbp"] and r["nep"]
+    assert r["diff"] is False, "LAC and LAR must stay distinct"
+
+
 def test_availability_is_not_scraped_from_page_text():
     """Regression: an earlier driver regexed the whole page for drafted names,
     which swept in the UNDRAFTED player table and marked everyone gone.

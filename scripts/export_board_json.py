@@ -74,6 +74,25 @@ def main() -> None:
     for r in out[:5]:
         print(f"  {r['n']:22} {r['p']:3} {r['t']:4} vorp={r['v']:6.1f} key={r['k']}")
 
+    # Collisions: players the Yahoo row text cannot tell apart by
+    # initial+surname+position+team. Mock 2 queued Brian Robinson Jr. thinking
+    # it was Bijan Robinson (both "b robinson", ATL, RB). ADP separates them,
+    # so the driver needs it -- but a pair with near-identical ADP would be
+    # genuinely ambiguous and must be surfaced, not silently mis-drafted.
+    seen: dict = {}
+    for r in out:
+        seen.setdefault((r["k"], r["p"], r["t"]), []).append(r)
+    clashes = {k: v for k, v in seen.items() if len(v) > 1}
+    if clashes:
+        print(f"\n{len(clashes)} NAME COLLISION(S) -- ADP must separate these:")
+        for (k, p, t), group in clashes.items():
+            adps = [f"{g['n']} (adp {g['a']}, vorp {g['v']})" for g in group]
+            print(f"  {k} {p} {t}: " + " vs ".join(adps))
+            gap = [g["a"] for g in group if g["a"] is not None]
+            if len(gap) == len(group) and len(gap) > 1:
+                if max(gap) - min(gap) < 25:
+                    print("    !! ADP gap under 25 -- NOT separable, fix by hand")
+
 
 if __name__ == "__main__":
     main()

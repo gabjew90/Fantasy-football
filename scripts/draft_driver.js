@@ -33,6 +33,7 @@ window.DK = (function () {
     lastRoster: -1,
     running: false,
     gone: new Set(),    // board entries proven undraftable (no star button)
+    starred: new Set(), // players WE queued; the star is a toggle, never re-click
   };
 
   const FLEX_OK = { RB: 1, WR: 1, TE: 1 };
@@ -109,6 +110,15 @@ window.DK = (function () {
    * we never retry a name. Self-correcting, and it needs no feed parsing. */
   function markGone(entry) { S.gone.add(entry.n + '|' + entry.p); }
   function isGone(entry) { return S.gone.has(entry.n + '|' + entry.p); }
+
+  /* Why a row lookup missed. Pure so it can be tested directly -- this is the
+   * exact judgement that cost mock 2 thirty-six elite players by reading a
+   * dead UI as league-wide unavailability. Absence only counts when the
+   * table is demonstrably rendering other players. */
+  function classifyMiss(rowFound, isTableLive) {
+    if (rowFound) return 'found';
+    return isTableLive ? 'gone' : 'uinotready';
+  }
 
   function onClock() { return /YOUR TURN, DRAFT NOW/i.test(document.title); }
 
@@ -243,6 +253,29 @@ window.DK = (function () {
 
   /* ---------------- actuation ---------------- */
 
+  /* The right panel has Queue / Players / Board tabs. On load it can be on
+   * Queue, where a search matches no player rows at all. Mock 2 (2026-08-31)
+   * failed exactly here: every findRow returned null, the code read that as
+   * "drafted" and marked 36 elite players gone, then burned the 60s clock --
+   * which is what armed autopick. Always assert the tab before searching. */
+  function ensurePlayersTab() {
+    const tab = [...document.querySelectorAll('button')]
+      .find(b => b.textContent.trim() === 'Players');
+    if (tab) { tab.click(); return true; }
+    return false;
+  }
+
+  /* Is the player table actually rendering rows? Used to distinguish "this
+   * player is drafted" from "the table is not up", so a UI problem can never
+   * again be recorded as league-wide unavailability. */
+  function tableLive() {
+    return [...document.querySelectorAll('div,li,tr')].some(e => {
+      const x = (e.innerText || '').replace(/\s+/g, ' ');
+      return x.length < 260 && /Bye \d+/.test(x)
+        && [...e.querySelectorAll('button')].some(b => !b.textContent.trim() && b.querySelector('svg'));
+    });
+  }
+
   function searchBox() {
     return document.querySelector('input[type="search"], input[placeholder*="earch"]');
   }
@@ -256,17 +289,58 @@ window.DK = (function () {
   }
   const sleep = ms => new Promise(r => setTimeout(r, ms));
 
-  /* Find the player-table row for a board entry. Requires initial+last name,
-   * position AND team -- the triple that stopped us drafting Luke McCaffrey. */
-  function findRow(entry) {
+  /* Yahoo and the board spell teams differently (SFO/SF, JAC/Jax, GBP/GB).
+   * Both sides normalise here so the team check is meaningful. */
+  const TEAM_ALIAS = {
+    GBP: 'GB', GNB: 'GB', JAC: 'JAX', KCC: 'KC', LVR: 'LV', OAK: 'LV',
+    NEP: 'NE', NWE: 'NE', NOS: 'NO', NOR: 'NO', SFO: 'SF', TBB: 'TB',
+    TAM: 'TB', ARZ: 'ARI', BLT: 'BAL', CLV: 'CLE', HST: 'HOU', WSH: 'WAS',
+  };
+  function normTeam(t) {
+    const s = (t || '').toUpperCase().replace(/[^A-Z]/g, '');
+    return TEAM_ALIAS[s] || s;
+  }
+
+  /* Pull the ADP Yahoo prints in each row ("ADP: 46.4"), used to tell apart
+   * two players who share an initial, surname, position AND team. */
+  function rowAdp(text) {
+    const m = text.match(/ADP:\s*([\d.]+)/);
+    return m ? parseFloat(m[1]) : null;
+  }
+
+  /* Decide whether a rendered row really is this board entry.
+   *
+   * Pure, and tested. Mock 2 queued Brian Robinson Jr. (ATL RB, ADP 119.6,
+   * VORP -72) believing it was Bijan Robinson (ATL RB, ADP 3, VORP +92):
+   * identical initial, surname, position and team. The comment above the old
+   * findRow claimed it checked team; the code never did, which also let
+   * "J. Taylor" match a Jacksonville back instead of Jonathan Taylor of
+   * Indianapolis. Name+position is not an identity. */
+  function rowMatches(entry, text) {
     const initial = entry.k[0];
     const last = entry.k.slice(2);
+    if (!/Bye \d+/.test(text)) return false;
+    if (!new RegExp('\\b' + initial + '\\.\\s?[A-Za-z\'\\-]*' + last + '\\b', 'i').test(text)) return false;
+    if (!new RegExp('\\b' + entry.p + '\\b').test(text)) return false;
+    if (entry.t) {
+      const want = normTeam(entry.t);
+      const seen = (text.match(/\b([A-Za-z]{2,3})\b(?=\s+Bye)/) || [])[1];
+      if (seen && normTeam(seen) !== want) return false;
+    }
+    /* ADP guard for same-name-same-team collisions. Generous tolerance: it
+     * only has to separate players who are dozens of picks apart. */
+    if (entry.a != null) {
+      const seen = rowAdp(text);
+      if (seen != null && Math.abs(seen - entry.a) > Math.max(25, entry.a * 0.5)) return false;
+    }
+    return true;
+  }
+
+  function findRow(entry) {
     const rows = [...document.querySelectorAll('div,li,tr')].filter(e => {
       const x = (e.innerText || '').replace(/\s+/g, ' ');
       if (x.length > 260) return false;
-      if (!/Bye \d+/.test(x)) return false;
-      if (!new RegExp('\\b' + initial + '\\.\\s?[A-Za-z\'\\-]*' + last + '\\b', 'i').test(x)) return false;
-      if (!new RegExp('\\b' + entry.p + '\\b').test(x)) return false;
+      if (!rowMatches(entry, x)) return false;
       // star button present => it is a player-table row, not the queue panel
       return [...e.querySelectorAll('button')].some(b => !b.textContent.trim() && b.querySelector('svg'));
     }).sort((a, b) => (a.innerText || '').length - (b.innerText || '').length);
@@ -274,10 +348,11 @@ window.DK = (function () {
   }
 
   async function starPlayer(entry) {
+    ensurePlayersTab();
     if (!setSearch(entry.k.slice(2))) return 'nosearch';
     await sleep(700);
     const row = findRow(entry);
-    if (!row) return 'norow';
+    if (!row) return tableLive() ? 'norow' : 'uinotready';
     const star = [...row.querySelectorAll('button')].find(b => !b.textContent.trim() && b.querySelector('svg'));
     if (!star) return 'nostar';
     star.click();
@@ -316,10 +391,21 @@ window.DK = (function () {
       if (depth >= S.cfg.queueDepth) break;
       const entry = S.board.find(b => b.n === cand.n && b.p === cand.p);
       if (!entry) continue;
-      if (have.includes(keyFull(cand.n) + '|' + cand.p)) continue;
+      const id = cand.n + '|' + cand.p;
+      /* The star is a TOGGLE. Re-clicking one we already queued REMOVES the
+       * player. queueNames() cannot always see the whole queue (Yahoo caps
+       * the visible list), so trusting it alone made the driver re-star the
+       * 5th entry every cycle, flipping them in and out. Track our own
+       * clicks instead. */
+      if (have.includes(keyFull(cand.n) + '|' + cand.p) || S.starred.has(id)) continue;
       const res = await starPlayer(entry);
-      if (res === 'ok') { depth++; results.push(cand.n + ':ok'); }
-      else { markGone(entry); results.push(cand.n + ':' + res + '->gone'); }
+      if (res === 'ok') { depth++; S.starred.add(id); results.push(cand.n + ':ok'); }
+      else if (res === 'norow' || res === 'nostar') {
+        markGone(entry); results.push(cand.n + ':' + res + '->gone');
+      } else {
+        results.push(cand.n + ':' + res);   // UI not ready: never mark gone
+        break;
+      }
     }
     setSearch('');
     return { round: r.round, picksLeft: r.picksLeft, counts: r.counts,
@@ -330,13 +416,24 @@ window.DK = (function () {
   async function draftTop() {
     const r = rank();
     if (r.err || !r.top.length) return { err: r.err || 'no candidates' };
+    ensurePlayersTab();
+    await sleep(300);
+    let misses = 0;
     for (const cand of r.top) {
       const entry = S.board.find(b => b.n === cand.n && b.p === cand.p);
       if (!entry) continue;
       if (!setSearch(entry.k.slice(2))) continue;
       await sleep(700);
       const row = findRow(entry);
-      if (!row) { markGone(entry); continue; }
+      if (!row) {
+        /* Only a LIVE table proves absence. Otherwise this is a UI problem
+         * and marking players gone would poison the board -- mock 2 lost 36
+         * elite players to exactly that. */
+        if (!tableLive()) return { err: 'ui-not-ready', checked: misses };
+        markGone(entry);
+        if (++misses >= 8) return { err: 'too-many-misses' };
+        continue;
+      }
       row.click();
       await sleep(600);
       const btns = [...document.querySelectorAll('button')].filter(b => {
@@ -402,18 +499,26 @@ window.DK = (function () {
       return 'loaded ' + board.length + ' players';
     },
     /* Pipe format from scripts/export_board_json.py:
-     *   name|pos|team|vorp|upside|status   (already VORP-desc) */
+     *   name|pos|team|vorp|upside|status|adp   (already VORP-desc) */
     loadCompact(txt, cfg) {
       S.board = txt.split('\n').filter(Boolean).map(function (ln) {
         const f = ln.split('|');
         return { n: f[0], k: keyFull(f[0]), p: f[1], t: f[2],
-                 v: parseFloat(f[3]) || 0, u: f[4] === '1', s: f[5] || '' };
+                 v: parseFloat(f[3]) || 0, u: f[4] === '1', s: f[5] || '',
+                 a: f[6] ? parseFloat(f[6]) : null };
       });
       Object.assign(S.cfg, cfg || {});
       return 'loaded ' + S.board.length + ' players';
     },
-    reset() { S.gone = new Set(); S.log = []; S.lastRoster = -1; return 'reset'; },
+    reset() {
+      S.gone = new Set(); S.starred = new Set(); S.log = []; S.lastRoster = -1;
+      return 'reset';
+    },
     rank, syncQueue, draftTop, run,
+    classifyMiss, rowMatches, normTeam, // exported for tests
+    _starred: () => [...S.starred],
+    _markStarred: (id) => S.starred.add(id),
+    _isStarred: (id) => S.starred.has(id),
     state: () => ({ roster: rosterCount(), counts: (myRoster() || {}).counts,
                     queue: queueNames(), title: document.title.slice(0, 40),
                     running: S.running }),
