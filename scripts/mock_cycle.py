@@ -19,8 +19,9 @@ rounds = int(sys.argv[4]) if len(sys.argv) > 4 else None
 cfg = Config.load()
 t = Tracker(cfg, tiers_path=cfg.scoped(cfg.root / "tiers.csv"), my_slot=my_slot)
 if teams:
-    t.teams, t.rounds = teams, rounds
-    t.source.teams, t.source.rounds = teams, rounds
+    t.teams = teams
+    t.rounds = rounds or t.rounds     # rounds is optional; keep the yaml value
+    t.source.teams, t.source.rounds = t.teams, t.rounds
 
 def resolve_full(name, pos):
     m = re.match(r"^([A-Z])[.\s]+(.+)$", name.strip())
@@ -55,8 +56,8 @@ max_n = max(seen) if seen else 0
 gaps = [i for i in range(1, max_n + 1) if i not in seen]
 # a missed feed entry still occupies its pick slot — placeholder keeps every
 # later pick attributed to the right snake slot
-ordered = [seen[i]["name"] if i in seen else f"Unknown Pick{i}"
-           for i in range(1, max_n + 1)]
+ordered = [{"name": seen[i]["name"], "pos": seen[i].get("pos", "")} if i in seen
+           else {"name": f"Unknown Pick{i}"} for i in range(1, max_n + 1)]
 t.source.set_picks(ordered)
 t.poll()
 cur = t.current_pick

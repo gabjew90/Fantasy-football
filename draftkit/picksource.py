@@ -33,7 +33,7 @@ class LocalDraft:
         self._by_norm: dict[str, list[dict]] = {}
         for p in board:
             self._by_norm.setdefault(norm(p["player"]), []).append(p)
-        self._mtime: float | None = None
+        self._mtime: tuple | None = None
         self._picks_cache: list[dict] = []
 
     # -- file ------------------------------------------------------------
@@ -78,10 +78,26 @@ class LocalDraft:
         self._write(data)
         return {"ok": True, "removed": dropped.get("name")}
 
-    def set_picks(self, names: list[str]) -> None:
-        """Poller path: idempotent full replace of the pick sequence."""
+    def set_picks(self, names: list) -> None:
+        """Poller path: idempotent full replace of the pick sequence.
+
+        Accepts plain names OR {"name","pos"} dicts. POSITION MATTERS: two
+        players can share an initial+surname (J. Williams RB vs J. Williams
+        WR) and without pos both collapse onto one board row - the drafted
+        player counts twice and the other stays available to the engine
+        forever (code review 2026-08-31).
+        """
+        out = []
+        for n in names[: self.teams * self.rounds]:
+            if isinstance(n, dict):
+                e = {"name": str(n.get("name", "")).strip()}
+                if n.get("pos"):
+                    e["pos"] = str(n["pos"])
+                out.append(e)
+            else:
+                out.append({"name": str(n)})
         data = self._read()
-        data["picks"] = [{"name": n} for n in names][: self.teams * self.rounds]
+        data["picks"] = out
         self._write(data)
 
     # -- reader ----------------------------------------------------------
@@ -113,7 +129,8 @@ class LocalDraft:
     def picks(self) -> list[dict]:
         """Sleeper-shaped pick dicts (mtime-cached, cheap to poll)."""
         try:
-            mt = self.path.stat().st_mtime
+            st = self.path.stat()
+            mt = (st.st_mtime, st.st_size)  # size breaks same-tick write ties
         except OSError:
             mt = None
         if mt is not None and mt == self._mtime:

@@ -286,6 +286,12 @@ def run_server(cfg, tiers_path, default_slot: int | None, port: int) -> int:
             elif url.path == "/log":
                 q = parse_qs(url.query)
                 draft_id = (q.get("draft_id") or [cfg.draft_id])[0].strip() or cfg.draft_id
+                # a local draft tracker rewrites its id to local_<league>;
+                # the raw query value ("None" for a yaml draft_id: null) points
+                # at a file that never exists (code review 2026-08-31)
+                if (str(draft_id).lower() in ("", "none", "null")
+                        or str(draft_id).startswith("local")):
+                    draft_id = f"local_{cfg.league_name or 'draft'}"
                 log_path = cfg.path("logs") / f"draft_{draft_id}.jsonl"
                 page = render_log_html(log_path, draft_id)
                 self._send(200, page.encode("utf-8"), "text/html; charset=utf-8")
