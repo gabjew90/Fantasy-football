@@ -123,3 +123,24 @@ because the click path was broken by bug 16.
 - Autopick, once armed, could not be turned off from the DOM: the warning
   banner carries no control and the queue-panel "Autodraft" toggle does not
   clear it. Treat arming as unrecoverable and never let the clock expire.
+
+## Mock 6 — room 10307459, 10 teams, slot 2 — FAILED (best yet)
+
+`1.02 McCaffrey RB · 2.19 McBride TE · 3.22 Bowers TE · 4.39 Adams WR ·
+5.42 Skattebo RB · 6.59 Mahomes QB · 7.62 Warren RB · 8.79 Metcalf WR ·
+9.82 Johnston WR · 10.99 Nix QB · 11.102 Corum RB · 12.119 Ferguson TE ·
+13.122 Lemon WR · 14.139 Pineiro K · 15.142 Borregales K`
+
+Good: McCaffrey at 1.02 was the board's clear #1 (26 VORP over Gibbs, 54 over
+the best WR). QB2 landed at round 10, exactly on the `qb2_earliest_round`
+gate. No wrong-player errors. The calibrated board showed up immediately --
+McBride fell behind Nacua, Josh Allen from 20th to 28th.
+
+| # | Bug | Root cause | Fix / test |
+|---|-----|-----------|------------|
+| 22 | **Empty DEF slot, two kickers, a third TE** | The board calls them "Houston Texans" -> key "h texans" -> matcher looked for "H. Texans". Yahoo renders `Texans DEF Bye 8` with NO initial, so **no defense could ever match** and the driver was structurally incapable of drafting one. The unfillable slot starved the endgame and Yahoo's fallback padded it | Defenses match on nickname alone; `searchTerm()` types the nickname. Test |
+| 23 | Two TEs again (2.19, 3.22) | My own sequencing: the TE2 margin rule was written but the browser still held the mock-4 driver. Not a new engine flaw | Deployed driver v4 mid-draft |
+
+Bug 22 is the same shape as the wrong-Robinson bug: an identity assumption
+("every player has a first initial") that silently holds for 240 of 243 rows
+and fails completely for the rest.

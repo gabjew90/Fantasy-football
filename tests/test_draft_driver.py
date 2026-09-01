@@ -460,6 +460,35 @@ def test_queue_plan_does_not_stack_one_position():
         f"queue held no runnable/receiving option: {plan}"
 
 
+def test_team_defenses_can_be_matched_at_all():
+    """Mock 6 finished with an EMPTY defense slot and two kickers.
+
+    The board calls them "Houston Texans", which keys to "h texans", so the
+    matcher looked for "H. Texans". Yahoo renders the row as plain "Texans
+    DEF Bye 8" -- no initial -- so no defense could EVER match and the driver
+    was structurally incapable of drafting one. Yahoo's fallback then padded
+    the last picks with a second kicker and a third TE.
+    """
+    r = run_js(
+        """
+        console.log(JSON.stringify({
+          texans:   DK.rowMatches({k:'h texans', p:'DEF', n:'Houston Texans'},
+                                  'Texans DEF Bye 8 ADP: 93.4'),
+          rams:     DK.rowMatches({k:'l rams', p:'DEF', n:'Los Angeles Rams'},
+                                  'Rams DEF Bye 11 ADP: 111.0'),
+          wrongTeam:DK.rowMatches({k:'h texans', p:'DEF', n:'Houston Texans'},
+                                  'Broncos DEF Bye 10 ADP: 93.7'),
+          notADef:  DK.rowMatches({k:'h texans', p:'DEF', n:'Houston Texans'},
+                                  'T. Texans WR Hou Bye 8 ADP: 93.4'),
+        }));
+        """
+    )
+    assert r["texans"] is True, "a team defense still cannot be matched"
+    assert r["rams"] is True
+    assert r["wrongTeam"] is False
+    assert r["notADef"] is False
+
+
 def test_availability_is_not_scraped_from_page_text():
     """Regression: an earlier driver regexed the whole page for drafted names,
     which swept in the UNDRAFTED player table and marked everyone gone.

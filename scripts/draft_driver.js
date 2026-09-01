@@ -352,10 +352,32 @@ window.DK = (function () {
    * findRow claimed it checked team; the code never did, which also let
    * "J. Taylor" match a Jacksonville back instead of Jonathan Taylor of
    * Indianapolis. Name+position is not an identity. */
+  /* Team defenses have no first name.
+   *
+   * The board calls them "Houston Texans", which keys to "h texans", so the
+   * matcher looked for "H. Texans". Yahoo renders the row as plain
+   * "Texans DEF Bye 8" -- no initial -- so NO defense could ever match. The
+   * driver was structurally incapable of drafting one: mock 6 finished with
+   * an empty DEF slot and Yahoo's fallback padding the end with a SECOND
+   * kicker and a third TE. Match defenses on the nickname alone. */
+  function defNickname(name) {
+    const parts = (name || '').trim().split(/\s+/);
+    return parts[parts.length - 1] || '';
+  }
+
+  /* What to type into the player search for this entry. */
+  function searchTerm(entry) {
+    return entry.p === 'DEF' ? defNickname(entry.n) : entry.k.slice(2);
+  }
+
   function rowMatches(entry, text) {
+    if (!/Bye \d+/.test(text)) return false;
+    if (entry.p === 'DEF') {
+      if (!/\bDEF\b/.test(text)) return false;
+      return new RegExp('\\b' + defNickname(entry.n) + '\\b', 'i').test(text);
+    }
     const initial = entry.k[0];
     const last = entry.k.slice(2);
-    if (!/Bye \d+/.test(text)) return false;
     if (!new RegExp('\\b' + initial + '\\.\\s?[A-Za-z\'\\-]*' + last + '\\b', 'i').test(text)) return false;
     if (!new RegExp('\\b' + entry.p + '\\b').test(text)) return false;
     if (entry.t) {
@@ -397,7 +419,7 @@ window.DK = (function () {
 
   async function starPlayer(entry) {
     ensurePlayersTab();
-    if (!setSearch(entry.k.slice(2))) return 'nosearch';
+    if (!setSearch(searchTerm(entry))) return 'nosearch';
     await sleep(700);
     const row = findRow(entry);
     if (!row) return await diagnoseMiss();
@@ -625,7 +647,7 @@ window.DK = (function () {
       if (tries >= (maxTries || 3)) break;
       const entry = S.board.find(b => b.n === cand.n && b.p === cand.p);
       if (!entry) continue;
-      if (!setSearch(entry.k.slice(2))) continue;
+      if (!setSearch(searchTerm(entry))) continue;
       tries++;
       await sleep(700);
       const row = findRow(entry);
