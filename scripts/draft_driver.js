@@ -1131,11 +1131,28 @@ window.DK = (function () {
   }
 
   /* Resident loop: this is what stops autopick from ever arming. */
+  /* A HIDDEN TAB IS THROTTLED.
+   *
+   * Chrome clamps timers in a background tab to roughly one tick a minute,
+   * which stalls this loop and, worse, stalls Yahoo's own countdown: a mock
+   * waiting room read 08:21 while the server was actually at 04:15. A
+   * throttled driver silently misses picks and lets autopick arm.
+   *
+   * There is no way to opt out from inside the page, so the loop reports it
+   * loudly and keeps going -- externally driven calls (refreshPlan, draftTop)
+   * are unaffected, so a supervised draft still works. For an unsupervised
+   * one the draft tab has to stay visible. */
+  function throttleRisk() {
+    return typeof document.hidden === 'boolean' && document.hidden;
+  }
+
   async function run(maxSeconds) {
     if (S.running) return 'already running';
     S.running = true;
     const deadline = Date.now() + (maxSeconds || 3600) * 1000;
-    note('driver start');
+    note('driver start' + (throttleRisk()
+      ? ' — WARNING: tab is hidden, Chrome throttles timers; keep it visible'
+      : ''));
     let lastSync = 0;
     try {
       while (Date.now() < deadline) {
