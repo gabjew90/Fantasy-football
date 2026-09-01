@@ -159,17 +159,27 @@ def build_tracker(cfg: Config, players: list[dict], state: dict) -> Tracker:
         if not p:
             continue
         pick_no = int(d["pick_no"])
-        # DERIVE the slot from the pick number. In a snake draft the two are
-        # equivalent, and the page cannot supply it: Yahoo's pick feed names
-        # the player and the pick number but not whose pick it was. Trusting
-        # d["slot"] defaulted every pick to 0, so NONE were attributed to us,
-        # my_pos_counts() came back empty, and the engine happily recommended
-        # a second QB in round 4 against a round-10 gate. Caught in a mock.
-        rnd, slot = snake.pick_to_round_slot(pick_no, teams)
+        # Whose pick was it?
+        #
+        # Yahoo's pick feed names the player and the pick number but not the
+        # slot. Reading d["slot"] defaulted every pick to 0, so NONE were
+        # attributed to us, my_pos_counts() came back empty, and the engine
+        # recommended a second QB in round 4 against a round-10 gate.
+        #
+        # The panel does label our own picks "You", and that flag beats snake
+        # arithmetic: a mock reshuffled us from slot 3 to slot 10 seconds
+        # before it started, which would have mis-attributed every pick. Trust
+        # the flag when present, fall back to the snake position otherwise.
+        rnd, snake_slot = snake.pick_to_round_slot(pick_no, teams)
+        if d.get("mine"):
+            slot = t.my_slot
+        else:
+            slot = int(d.get("slot") or snake_slot)
+            if slot == t.my_slot:
+                slot = 0        # not ours: never let the snake claim it for us
         picks.append({
             "pick_no": pick_no, "player_id": p["sleeper_id"],
-            "draft_slot": int(d.get("slot") or slot),
-            "round": rnd,
+            "draft_slot": slot, "round": rnd,
         })
     t.state = TrackerState(picks=picks,
                            drafted_ids={x["player_id"] for x in picks},

@@ -44,6 +44,7 @@ window.DK = (function () {
     planPick: null,     // pick number the plan was computed at
     planErr: null,
     planAt: 0,
+    seenPicks: new Map(),  // accumulated; the Picks panel virtualises
   };
 
   const FLEX_OK = { RB: 1, WR: 1, TE: 1 };
@@ -143,22 +144,52 @@ window.DK = (function () {
    * place Yahoo states the pick NUMBER, and the number is what the engine
    * needs -- the roster panel is slot-ordered, which already caused one
    * wrong report to the user. */
-  function draftedFeed() {
-    const t = document.body.innerText.replace(/\s+/g, ' ');
+  /* Every pick made so far, accumulated.
+   *
+   * Yahoo's Picks panel is the only place that states pick NUMBERS during a
+   * live draft (the Results tab is empty until it ends, and the roster panel
+   * is slot-ordered -- which already caused one wrong report). Its shape is
+   * newline-separated:
+   *
+   *     50 / You / D. Adams / WR / LAR / Bye 11
+   *
+   * Two things matter. It VIRTUALISES -- mid-draft it held picks 8-50 and had
+   * dropped 1-7 -- so the feed is accumulated across cycles and never
+   * forgotten. And it labels our own picks "You", which is authoritative in a
+   * way snake arithmetic is not: this very draft reshuffled us from slot 3 to
+   * slot 10 before it began. */
+  function parsePicksPanel() {
+    const L = document.body.innerText.split(String.fromCharCode(10)).map(s => s.trim());
+    const POS = /^(QB|RB|WR|TE|K|DEF)$/;
     const out = [];
-    const re = /Round (\d+), Pick (\d+) \((\d+)\w+ Overall\)\s+([A-Za-z'\.\- ]+?)\s+([A-Za-z]{2,3})\s+-\s+(QB|RB|WR|TE|K|DEF)/g;
-    let m;
-    while ((m = re.exec(t))) {
-      out.push({ pick_no: +m[3], name: m[4].trim(), pos: m[6], team: m[5] });
+    for (let i = 0; i < L.length - 4; i++) {
+      if (!/^\d{1,3}$/.test(L[i])) continue;
+      const pick = +L[i];
+      if (pick < 1 || pick > 400) continue;
+      const mgr = L[i + 1];
+      if (!mgr || /^\d/.test(mgr)) continue;
+      let j = i + 2;
+      const name = L[j];
+      if (!name || !/^[A-Z]\.\s?[A-Za-z]/.test(name)) continue;
+      j++;
+      if (L[j] && !POS.test(L[j])) j++;            // optional Q / IR tag
+      if (!L[j] || !POS.test(L[j])) continue;
+      const pos = L[j], team = L[j + 1];
+      if (!L[j + 2] || !/^Bye/.test(L[j + 2])) continue;
+      out.push({ pick_no: pick, name, pos, team, mine: /^you$/i.test(mgr) });
     }
-    if (out.length) return out;
-    /* Fallback while the draft is live and Results is not populated: the
-     * pick ticker, which carries name + position but no pick number. Number
-     * them in order seen -- the engine only needs the SET plus ordering. */
-    const seen = [];
-    const re2 = /([A-Z]\.\s?[A-Za-z'\-\.]+)\s+\((QB|RB|WR|TE|K|DEF)\s*[·\-]\s*([A-Za-z]{2,3})\)/g;
-    while ((m = re2.exec(t))) seen.push({ name: m[1], pos: m[2], team: m[3] });
-    return seen.map((x, i) => Object.assign({ pick_no: i + 1 }, x));
+    return out;
+  }
+
+  function draftedFeed() {
+    for (const p of parsePicksPanel()) S.seenPicks.set(p.pick_no, p);
+    return [...S.seenPicks.values()].sort((a, b) => a.pick_no - b.pick_no);
+  }
+
+  /* The header states it outright: "YOUR TURN - ROUND 6, PICK 51". */
+  function currentPickNo() {
+    const m = document.body.innerText.match(/ROUND\s+(\d+),\s*PICK\s+(\d+)/i);
+    return m ? +m[2] : null;
   }
 
   /* Why a row lookup missed. Pure so it can be tested directly -- this is the
