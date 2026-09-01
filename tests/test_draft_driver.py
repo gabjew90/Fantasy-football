@@ -460,6 +460,87 @@ def test_queue_plan_does_not_stack_one_position():
         f"queue held no runnable/receiving option: {plan}"
 
 
+def test_rank_never_returns_empty_while_picks_remain():
+    """Stash-mute. Once every starter slot is filled, needsPosition() is false
+    for everyone, so the "at most one zero-role stash" rule silences the whole
+    board and rank() returns nothing. draftTop then reports "no candidates",
+    the clock expires and Yahoo takes the pick -- which is how autopick armed
+    in mock 7 at roster 9/15.
+
+    The Python engine hit this on shallow boards and fixed it with a labelled
+    fallback; this port reintroduced it. An empty recommendation is never
+    right while picks remain.
+    """
+    # Every remaining player is negative-VORP bench filler, AND we already
+    # hold one such player -- which is what switches the stash rule on.
+    thin = "\n".join([
+        "Golf Golf|WR|CIN|-20.0|||130.0",     # rostered: this is the stash
+        "Deep Sleeper|WR|FA|-30.0|||140.0",
+        "Second Sleeper|RB|FA|-35.0|||150.0",
+        "Third Sleeper|WR|FA|-40.0|||160.0",
+    ])
+    r = run_js(
+        f"""
+        DK.loadCompact({json.dumps(thin)});
+        document.body.innerText = {json.dumps(panel([
+            "A. Alpha QB Buf Bye 7",
+            "B. Bravo RB Sfo Bye 8",
+            "C. Charlie RB Det Bye 6",
+            "D. Delta WR LAR Bye 11",
+            "E. Echo WR Sea Bye 11",
+            "F. Foxtrot TE Ari Bye 14",
+            "G. Golf WR Cin Bye 5",
+        ]))};
+        const out = DK.rank();
+        console.log(JSON.stringify({{
+          n: out.top.length, relaxed: out.stashRelaxed, picksLeft: out.picksLeft
+        }}));
+        """
+    )
+    assert r["picksLeft"] == 8
+    assert r["n"] > 0, "rank() went silent with 8 picks still to make"
+    assert r["relaxed"] is True, "fallback should be labelled, not silent"
+
+
+def test_an_unreadable_adp_refuses_a_colliding_name():
+    """Mock 7 drafted Brian Robinson Jr. (grade D) instead of Bijan.
+
+    ADP is the ONLY thing separating them, and the guard was written
+    `if (seen != null)` -- so when Yahoo printed no ADP on the row, the check
+    silently skipped itself on exactly the row it existed for. For a colliding
+    entry an unreadable ADP must REFUSE the row: losing one pick to a safe
+    alternative beats handing the slot to a -72 VORP player.
+    """
+    both = "\n".join([
+        "Bijan Robinson|RB|ATL|91.8|1||2.1",
+        "Brian Robinson Jr.|RB|ATL|-72.4|1||118.1",
+        "Puka Nacua|WR|LAR|69.0|||5.0",
+    ])
+    r = run_js(
+        f"""
+        const loaded = DK.loadCompact({json.dumps(both)});
+        const bijan = {{k:'b robinson', p:'RB', t:'ATL', a:2.1, n:'Bijan Robinson'}};
+        console.log(JSON.stringify({{
+          loaded,
+          noAdp:    DK.rowMatches(bijan, 'B. Robinson RB Atl Bye 11 ADP: -'),
+          blankAdp: DK.rowMatches(bijan, 'B. Robinson RB Atl Bye 11'),
+          rightAdp: DK.rowMatches(bijan, 'B. Robinson RB Atl Bye 11 ADP: 3.0'),
+          wrongAdp: DK.rowMatches(bijan, 'B. Robinson RB Atl Bye 11 ADP: 119.6'),
+          nonColliding: DK.rowMatches(
+            {{k:'p nacua', p:'WR', t:'LAR', a:5.0, n:'Puka Nacua'}},
+            'P. Nacua Q WR LAR Bye 11'),
+        }}));
+        """
+    )
+    assert "1 name collision" in r["loaded"], r["loaded"]
+    assert r["noAdp"] is False, "guessed on a colliding name with no ADP"
+    assert r["blankAdp"] is False, "guessed on a colliding name with no ADP"
+    assert r["rightAdp"] is True
+    assert r["wrongAdp"] is False
+    # a non-colliding player must NOT be punished for a missing ADP
+    assert r["nonColliding"] is True
+
+
 def test_team_defenses_can_be_matched_at_all():
     """Mock 6 finished with an EMPTY defense slot and two kickers.
 

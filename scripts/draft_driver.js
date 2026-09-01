@@ -34,6 +34,7 @@ window.DK = (function () {
     running: false,
     gone: new Set(),    // board entries proven undraftable (no star button)
     starred: new Set(), // players WE queued; the star is a toggle, never re-click
+    ctx: null,          // shared ranking context (te6 / bestFlexAlt / need) for te2Ok
   };
 
   const FLEX_OK = { RB: 1, WR: 1, TE: 1 };
@@ -173,7 +174,22 @@ window.DK = (function () {
     return true;
   }
 
+  /* A second TE can only start in FLEX, competing with the RB/WR who would
+   * otherwise hold that slot, so it must clear the best flex alternative by a
+   * margin. This lived only inside rank()'s filter, which meant syncQueue's
+   * simulated re-check -- which calls guardrailOk directly -- did not apply
+   * it, and mock 7 queued McBride AND Bowers back to back. One rule, one
+   * place, consulted by every caller. */
+  function te2Ok(p, counts) {
+    if (p.p !== 'TE' || (counts.TE || 0) < 1) return true;
+    const ctx = S.ctx || {};
+    if (!(ctx.te6 || []).includes(p.n)) return false;
+    if ((ctx.need ? ctx.need.FLEX : 0) <= 0) return false;
+    return p.v >= (ctx.bestFlexAlt === undefined ? -Infinity : ctx.bestFlexAlt) + 10;
+  }
+
   function guardrailOk(p, rnd, need, counts, picksLeft, top6TeFell, haveStash) {
+    if (!te2Ok(p, counts)) return false;
     if (!posAllowed(p.p, rnd, counts, picksLeft, top6TeFell)) return false;
     if ((p.v || 0) <= 0 && !needsPosition(need, p.p) && haveStash) return false;
     const openStarters = ['QB', 'RB', 'WR', 'TE', 'FLEX', 'K', 'DEF']
@@ -227,19 +243,35 @@ window.DK = (function () {
     const bestFlexAlt = Math.max(...avail
       .filter(x => x.p === 'RB' || x.p === 'WR')
       .map(x => x.v), -Infinity);
-    const te2Margin = 10;
+    /* Shared context for te2Ok, so the queue planner enforces the same rule
+     * this ranking does. */
+    S.ctx = { te6, bestFlexAlt, need };
 
     const eligible = [];
     const blocked = [];
     for (const p of avail) {
-      let teOk = true;
-      if (p.p === 'TE' && (counts.TE || 0) >= 1) {
-        teOk = te6.includes(p.n)
-          && (need.FLEX || 0) > 0
-          && p.v >= bestFlexAlt + te2Margin;
-      }
-      if (teOk && guardrailOk(p, rnd, need, counts, picksLeft, true, haveStash)) eligible.push(p);
+      if (guardrailOk(p, rnd, need, counts, picksLeft, true, haveStash)) eligible.push(p);
       else if (blocked.length < 6) blocked.push(p.n + '(' + p.p + ')');
+    }
+
+    /* STASH-MUTE FALLBACK.
+     *
+     * Once every starter slot is filled, needsPosition() is false for
+     * everyone, so the "at most one zero-role stash" rule silences the entire
+     * board and rank() returns nothing. draftTop then reports "no candidates",
+     * the clock runs out, and Yahoo takes the pick -- which is how autopick
+     * armed in mock 7 at roster 9/15.
+     *
+     * The Python engine hit this exact bug on shallow boards and fixed it
+     * with a labelled fallback; this port reintroduced it. An empty
+     * recommendation is never the right answer while picks remain: relax the
+     * stash rule (never the positional guardrails) and say so. */
+    let relaxed = false;
+    if (!eligible.length) {
+      for (const p of avail) {
+        if (guardrailOk(p, rnd, need, counts, picksLeft, true, false)) eligible.push(p);
+      }
+      relaxed = eligible.length > 0;
     }
 
     // need-weighted: a player filling an open starter slot outranks a
@@ -263,6 +295,7 @@ window.DK = (function () {
       blockedSample: blocked,
       availCount: avail.length,
       goneCount: S.gone.size,
+      stashRelaxed: relaxed,
     };
   }
 
@@ -385,12 +418,24 @@ window.DK = (function () {
       const seen = (text.match(/\b([A-Za-z]{2,3})\b(?=\s+Bye)/) || [])[1];
       if (seen && normTeam(seen) !== want) return false;
     }
-    /* ADP guard for same-name-same-team collisions. Generous tolerance: it
-     * only has to separate players who are dozens of picks apart. */
-    if (entry.a != null) {
-      const seen = rowAdp(text);
-      if (seen != null && Math.abs(seen - entry.a) > Math.max(25, entry.a * 0.5)) return false;
+    /* ADP guard for same-name-same-team collisions.
+     *
+     * For a COLLIDING entry (another board row shares initial+surname+
+     * position+team) ADP is the only thing that tells them apart, so an
+     * unreadable ADP must REFUSE the row, not wave it through. Mock 7 drafted
+     * Brian Robinson Jr. (grade D) instead of Bijan because the old guard was
+     * written `if (seen != null)` and Yahoo had printed no ADP on that row --
+     * the check silently skipped itself on exactly the rows it existed for.
+     * Refusing costs one pick to a safe alternative; guessing wrong costs the
+     * whole slot. */
+    const colliding = S.collisions && S.collisions.has(entry.k + '|' + entry.p + '|' + normTeam(entry.t));
+    const seen = rowAdp(text);
+    if (colliding) {
+      if (entry.a == null || seen == null) return false;
+      return Math.abs(seen - entry.a) <= Math.max(25, entry.a * 0.5);
     }
+    if (entry.a != null && seen != null
+        && Math.abs(seen - entry.a) > Math.max(25, entry.a * 0.5)) return false;
     return true;
   }
 
@@ -787,8 +832,17 @@ window.DK = (function () {
                  v: parseFloat(f[3]) || 0, u: f[4] === '1', s: f[5] || '',
                  a: f[6] ? parseFloat(f[6]) : null };
       });
+      /* Which entries are indistinguishable from another by everything the
+       * Yahoo row shows except ADP. rowMatches refuses to guess on these. */
+      const seen = {};
+      S.collisions = new Set();
+      for (const p of S.board) {
+        const id = p.k + '|' + p.p + '|' + normTeam(p.t);
+        if (seen[id]) S.collisions.add(id); else seen[id] = 1;
+      }
       Object.assign(S.cfg, cfg || {});
-      return 'loaded ' + S.board.length + ' players';
+      return 'loaded ' + S.board.length + ' players, '
+             + S.collisions.size + ' name collision(s)';
     },
     reset() {
       S.gone = new Set(); S.starred = new Set(); S.log = []; S.lastRoster = -1;
