@@ -61,9 +61,11 @@ def prep(weekly: pl.DataFrame, fpts: pl.Expr) -> pl.DataFrame:
 
 
 def ex_ante_starters(wk: pl.DataFrame, season: int, pos: str) -> list[str]:
+    # tie-break on pid: group_by order is not stable run to run, and a tie at
+    # the cutoff rank flipped WR between 2.69 and 2.61 on identical inputs
     tot = (wk.filter((pl.col("season") == season) & (pl.col("pos") == pos))
              .group_by("pid").agg(pl.col("fpts").sum().alias("t"))
-             .sort("t", descending=True))
+             .sort(["t", "pid"], descending=[True, False]))
     return tot["pid"].to_list()[: STARTER_N[pos]]
 
 
@@ -78,7 +80,7 @@ def absent_weeks(wk: pl.DataFrame, pairs: list[tuple[int, int]]) -> dict[str, di
             vals += [MAX_GAMES - int(g) for g in games["g"].to_list() if g >= 1]
         out[pos] = {"mean": st.mean(vals), "median": st.median(vals),
                     "p_missed_any": sum(1 for v in vals if v > 0) / len(vals),
-                    "n": len(vals)}
+                    "n": len(vals), "dist": sorted(vals)}
     return out
 
 
@@ -124,13 +126,16 @@ def handcuff_share(wk: pl.DataFrame, pairs: list[tuple[int, int]]) -> dict:
     q = st.quantiles(shares, n=4)
     return {"median": st.median(shares), "mean": st.mean(shares),
             "p25": q[0], "p75": q[2], "n_weeks": len(shares),
-            "standalone_median": st.median(standalone)}
+            "standalone_median": st.median(standalone), "dist": sorted(shares)}
 
 
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--league", default="keefamania")
     ap.add_argument("--seasons", default="2019,2020,2021,2022,2023,2024,2025")
+    ap.add_argument("--export", default=None,
+                    help="write the EMPIRICAL DISTRIBUTIONS (not the means) to "
+                         "this JSON, for the season replay to draw from")
     a = ap.parse_args()
     seasons = [int(s) for s in a.seasons.split(",")]
     pairs = list(zip(seasons[:-1], seasons[1:]))
@@ -162,7 +167,22 @@ def main() -> None:
     print("\n# draftkit/bench.py constants")
     print("ABSENT_WEEKS = {" + ", ".join(
         f'"{p}": {aw[p]["mean"]:.2f}' for p in POSITIONS) + "}")
-    print(f"HANDCUFF_SHARE = {hs['median']:.2f}")
+    print(f"HANDCUFF_UPLIFT = {hs['median'] / max(hs['standalone_median'], 1e-9):.2f}")
+
+    if a.export:
+        import json
+        out = {
+            "meta": {"seasons": seasons, "pairs": pairs, "league_scoring": a.league,
+                     "starter_n": STARTER_N, "max_games": MAX_GAMES,
+                     "note": "empirical distributions for scripts/season_replay.py; "
+                             "the replay draws from these and never from the "
+                             "means frozen in draftkit/bench.py"},
+            "absent_weeks": {pos: aw[pos]["dist"] for pos in POSITIONS},
+            "handcuff_share": hs["dist"],
+        }
+        Path(a.export).parent.mkdir(parents=True, exist_ok=True)
+        Path(a.export).write_text(json.dumps(out), encoding="utf-8")
+        print(f"\nexported distributions -> {a.export}")
 
 
 if __name__ == "__main__":

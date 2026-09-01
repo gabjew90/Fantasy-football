@@ -45,7 +45,8 @@ BYE_WEEKS = 1.0
 # scoring half-PPR (the ratio is scoring-insensitive). Injury absences only in
 # fantasy weeks 1-17; zero-game seasons excluded, so biased LOW. N: QB 70,
 # RB 142, WR 144, TE 71. Medians are 1-2 weeks; means carry the season-enders.
-ABSENT_WEEKS = {"QB": 2.56, "RB": 3.13, "WR": 2.69, "TE": 2.93}
+# (WR first read 2.69: an unstable sort at the WR24 cutoff; deterministic now.)
+ABSENT_WEEKS = {"QB": 2.56, "RB": 3.13, "WR": 2.61, "TE": 2.93}
 
 # Ex-ante backup's points in his starter's absent weeks, over the same
 # backup's standalone rate: median 1.46 across 277 starter-absent weeks. The

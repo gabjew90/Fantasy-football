@@ -59,15 +59,21 @@ def load_board(path: str) -> list[dict]:
             "cliff_flag": str(r.get("cliff_flag")).lower() == "true",
             "upside_flag": str(r.get("upside_flag")).lower() == "true",
             "proj_source": r.get("proj_source") or "blend",
+            # carried for the bench-insurance path and the season replay: a
+            # handcuff is only recognised if backs_up survives the load
+            "backs_up": r.get("backs_up") or "",
+            "bye": int(float(r["bye"])) if r.get("bye") not in (None, "") else None,
         })
     out.sort(key=lambda p: -p["vorp"])
     return out
 
 
-def make_tracker(board, picks, my_slot):
+def make_tracker(board, picks, my_slot, slots=None, teams=None, rounds=None):
+    """A Tracker over a synthetic room. Defaults are the 10-team Keefamania
+    shape; pass slots/teams/rounds to replay another league's format."""
     t = object.__new__(Tracker)
-    t.teams, t.rounds = TEAMS, ROUNDS
-    t.slots = dict(SLOTS)
+    t.teams, t.rounds = teams or TEAMS, rounds or ROUNDS
+    t.slots = dict(slots or SLOTS)
     t.my_slot = my_slot
     t.poll_seconds, t.fall_alert = 5.0, 12
     t.draft_id = "parity"

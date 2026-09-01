@@ -22,3 +22,4 @@ reports/manager/
 # scripts/make_bridge_cert.sh
 data/draftrig/tls/*.pem
 data/draftrig/tiers_bakeoff_*.csv
+data/draftrig/season_*.txt

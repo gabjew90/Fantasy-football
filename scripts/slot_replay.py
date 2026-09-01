@@ -52,7 +52,7 @@ def lineup_points(chosen: list[dict]) -> float:
     return total
 
 
-def replay(board, log_picks, my_slot, teams, rounds, slot_markets):
+def replay(board, log_picks, my_slot, teams, rounds, slot_markets, slots=None):
     by_name = {p["name"]: p for p in board}
     taken, chosen, picks_so_far = set(), [], []
 
@@ -68,8 +68,8 @@ def replay(board, log_picks, my_slot, teams, rounds, slot_markets):
             continue
 
         avail = [p for p in board if p["name"] not in taken]
-        t = EP.make_tracker(board, picks_so_far, my_slot)
-        t.teams, t.rounds = teams, rounds
+        t = EP.make_tracker(board, picks_so_far, my_slot,
+                            slots=slots, teams=teams, rounds=rounds)
         t.slot_markets = slot_markets
         try:
             recs = t.recommendations(top_n=1)
