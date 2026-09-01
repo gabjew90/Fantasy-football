@@ -352,3 +352,65 @@ exists. Level and timing were two separate halves of the same error, and only
 one of them was fixed in the previous session.
 
 Kept behind `engine.slot_markets` (default on) so the A/B stays runnable.
+
+## 2026-09-01 (3) — streaming baselines: blocked on ownership, not on logic
+
+Expert item 2: replace the format baseline with an ORDER STATISTIC over the
+residual pool -- the k-th best weekly projection among players you could
+actually pick up, k=2 for FAAB and k=3 for rolling waiver priority, floored at
+the format baseline so the operator can only tighten VORP. Keefamania is
+"Continual rolling list", so k=3.
+
+This matters here because Keefamania's QB5/TE8 were hand-fitted by minimising
+|VORP rank - ADP rank|. That is fitting the baseline to the market's opinion,
+which is the thing the expert and I both flagged as the wrong way to get a
+number. Deriving it from what streaming actually returned would fix that.
+
+Built it (draftkit/baselines.py, scripts/derive_baselines.py) and it does not
+work, for a reason worth writing down.
+
+### Two input bugs found by measuring
+
+1. **"Rostered" counted wrong.** Counting board rows with ADP inside the last
+   pick put 28 quarterbacks in a 10-team 1-QB league -- 214 players carry an
+   ADP of 150 or better into a draft that makes 150 picks, because ADP is a
+   mean over drafts. Fixed to the top `teams x rounds` BY ADP.
+
+2. **K and DEF are unmeasurable.** nflverse load_player_stats has no kicking
+   or team-defense columns, so every kicker scored exactly 0.0 and the
+   operator cheerfully "derived" a K2 baseline. They are excluded now.
+
+### The blocker
+
+Identifying the WAIVER POOL needs to know who was rostered. The cheap proxy --
+top N at the position by points per game to date -- is not merely noisy, it is
+wrong in the direction that flatters streaming. Roster-ness is sticky from
+draft day, so a drafted starter having a quiet few weeks drops out of the top
+N and gets scored as a free pickup. On 2025 quarterbacks it offered:
+
+    wk5   Sam Darnold, C.J. Stroud, Bryce Young, Trevor Lawrence
+    wk8   Joe Flacco, Spencer Rattler, Tua Tagovailoa, Dillon Gabriel
+    wk14  Joe Burrow, Tyrod Taylor, Cam Ward, Geno Smith
+
+and concluded that streaming returns QB3 production. The bracket over k=1..3
+and two selectors was non-monotonic (k=1 worse than k=2), which is the
+signature of an estimator measuring nothing.
+
+Doing it properly needs prior-season ADP (data/raw/adp_history only goes back
+to 2026-08-19) or a percent-rostered time series. Neither is on disk.
+
+### Decision
+
+**Baselines unchanged for Saturday.** QB5/TE8 stay. They remain ADP-fitted and
+that is still a weakness, but replacing them with a number from a measurement
+I have just shown to be broken would be worse, and reverting to the format
+baseline (QB10/TE11) four days out would move elite QB VORP by ~14 points
+against the market's revealed pricing on the strength of no new evidence.
+
+The module ships with the ownership set as a REQUIRED argument -- it raises
+OwnershipUnavailable rather than guessing -- plus held_from_ownership() ready
+for a percent-rostered feed, 18 unit tests, and the contamination reproducible
+via `--show-contamination`. What is missing is an input, not logic.
+
+Offseason: pull a percent-rostered series or archive ADP each season, then run
+this over several seasons rather than one.
