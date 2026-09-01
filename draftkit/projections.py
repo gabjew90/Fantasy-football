@@ -308,7 +308,10 @@ def default_projection(cfg, usage: pl.DataFrame, market: pl.DataFrame) -> pl.Dat
     )
 
     # optional overrides: data/external/overrides.csv (sleeper_id or name, proj_pts)
-    ov_path = cfg.path("external") / "overrides.csv"
+    # Overrides are ABSOLUTE point values in the LEAGUE'S OWN SCORING, so they
+    # must be league-scoped: a full-PPR research projection forced onto a
+    # half-PPR board overstates pass-catchers by ~15-20% (code review 8/31).
+    ov_path = cfg.scoped(cfg.path("external") / "overrides.csv")
     if ov_path.exists():
         ov = pl.read_csv(ov_path, infer_schema_length=1000)
         if "sleeper_id" in ov.columns and "proj_pts" in ov.columns:

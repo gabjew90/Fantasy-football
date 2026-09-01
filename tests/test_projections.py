@@ -79,6 +79,9 @@ def test_alpha_by_player_type(monkeypatch, tmp_path):
         def path(self, kind):
             return tmp_path
 
+        def scoped(self, path):     # single-league fixture: identity
+            return path
+
     cfg = FakeCfg({"projections": {
         "model_alpha": 0.55, "shrink_k": 5, "expected_games": 16.0,
         "no_market_floor": 0,
