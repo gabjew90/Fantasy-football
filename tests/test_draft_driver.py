@@ -276,6 +276,58 @@ def test_team_aliases_normalise_across_yahoo_and_board_spellings():
     assert r["diff"] is False, "LAC and LAR must stay distinct"
 
 
+def test_a_pick_is_only_success_if_the_roster_actually_grew():
+    """Mock 3 logged 'drafted Bijan Robinson' twice while the roster showed
+    neither. The click path silently no-opped and the QUEUE was quietly making
+    every real pick, so the log hid the failure being hunted."""
+    r = run_js(
+        """
+        console.log(JSON.stringify({
+          grew:    DK.pickLanded({have:2,of:15}, {have:3,of:15}),
+          same:    DK.pickLanded({have:2,of:15}, {have:2,of:15}),
+          missing: DK.pickLanded({have:2,of:15}, null),
+          noBase:  DK.pickLanded(null, {have:3,of:15}),
+        }));
+        """
+    )
+    assert r["grew"] is True
+    assert r["same"] is False, "a no-op click reported as a successful pick"
+    assert r["missing"] is False and r["noBase"] is False
+
+
+def test_autopick_banner_is_detected():
+    """Once armed, Yahoo drafts the instant the turn opens. Racing it with
+    clicks only burns the clock -- and an expired clock is what arms it."""
+    r = run_js(
+        """
+        const on = 'You have been put into autopick mode due to inactivity.';
+        document.body.innerText = on;
+        const armed = DK.autopickArmed();
+        document.body.innerText = 'YOUR TEAM (3/15)';
+        console.log(JSON.stringify({armed, clear: DK.autopickArmed()}));
+        """
+    )
+    assert r["armed"] is True
+    assert r["clear"] is False
+
+
+def test_a_queued_player_who_becomes_illegal_is_no_longer_ranked():
+    """Mock 3 queued Mahomes AND Hurts in round 5. Both were legal at QB
+    count 0, but the instant the first landed the second was an illegal QB2
+    that autopick would take. rank() must stop offering him, which is what
+    pruneQueue keys off."""
+    before = rank_with(panel(["P. Nacua WR LAR Bye 11"]))
+    assert "Jalen Hurts" in [c["n"] for c in before["top"]], "QB1 should be legal"
+
+    after = rank_with(panel([
+        "P. Nacua WR LAR Bye 11",
+        "J. Allen QB Buf Bye 7",
+    ]))
+    assert after["round"] == 3
+    assert "Jalen Hurts" not in [c["n"] for c in after["top"]], \
+        "a second QB stayed rankable before qb2_earliest_round"
+
+
 def test_availability_is_not_scraped_from_page_text():
     """Regression: an earlier driver regexed the whole page for drafted names,
     which swept in the UNDRAFTED player table and marked everyone gone.

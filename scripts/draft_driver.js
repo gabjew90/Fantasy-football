@@ -347,17 +347,83 @@ window.DK = (function () {
     return rows[0] || null;
   }
 
+  /* Why did a lookup miss, given the search filter is still applied?
+   *
+   * tableLive() alone is not enough: while a query is active the table shows
+   * only matches, so a genuinely drafted player yields an empty view and
+   * looks identical to a dead UI. Mock 3 aborted a whole pick that way.
+   * Resolve it by clearing the filter and re-checking. */
+  async function diagnoseMiss() {
+    if (tableLive()) return 'norow';    // other rows visible -> player is gone
+    setSearch('');
+    await sleep(600);
+    return tableLive() ? 'norow' : 'uinotready';
+  }
+
   async function starPlayer(entry) {
     ensurePlayersTab();
     if (!setSearch(entry.k.slice(2))) return 'nosearch';
     await sleep(700);
     const row = findRow(entry);
-    if (!row) return tableLive() ? 'norow' : 'uinotready';
+    if (!row) return await diagnoseMiss();
     const star = [...row.querySelectorAll('button')].find(b => !b.textContent.trim() && b.querySelector('svg'));
     if (!star) return 'nostar';
     star.click();
     await sleep(350);
     return 'ok';
+  }
+
+  function queuePanel() {
+    return [...document.querySelectorAll('div')]
+      .filter(e => /Autodraft will pick/i.test(e.innerText || '') && (e.innerText || '').length < 2000)
+      .sort((a, b) => (b.innerText || '').length - (a.innerText || '').length)[0] || null;
+  }
+
+  /* Queue rows paired with their remove control (the same star, toggled). */
+  function queueRows() {
+    const qp = queuePanel();
+    if (!qp) return [];
+    const out = [];
+    const seen = new Set();
+    for (const e of qp.querySelectorAll('div,li')) {
+      const x = (e.innerText || '').replace(/\s+/g, ' ').trim();
+      if (x.length > 120) continue;
+      const m = x.match(/^([A-Z]\.\s?[A-Za-z'\-\.]+)\s+(?:Q|IR|O|D|SUSP|PUP|CEL|NA)?\s*(QB|RB|WR|TE|K|DEF)\b/);
+      if (!m) continue;
+      const btn = [...e.querySelectorAll('button')].find(b => !b.textContent.trim() && b.querySelector('svg'));
+      if (!btn) continue;
+      const key = keyAbbr(m[1]) + '|' + m[2];
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push({ el: e, btn, key, pos: m[2], text: x });
+    }
+    return out;
+  }
+
+  /* Remove queued players the guardrails no longer allow.
+   *
+   * syncQueue only ever ADDED, so the queue drifted out of step with the
+   * roster. Mock 3 sat with Mahomes AND Hurts queued in round 5: legal while
+   * QB count was 0, but the moment the first landed the second became an
+   * illegal QB2 that autopick would happily take -- the mock 1 mistake
+   * reappearing through a different door. Re-ranking is only honest if it can
+   * also take things off. */
+  async function pruneQueue() {
+    const r = rank();
+    if (r.err) return { err: r.err };
+    const legal = new Set(r.top.map(x => keyFull(x.n) + '|' + x.p));
+    const removed = [];
+    for (const row of queueRows()) {
+      if (legal.has(row.key)) continue;
+      row.btn.click();
+      removed.push(row.text.slice(0, 28));
+      S.starred.forEach(id => {
+        const [n, p] = id.split('|');
+        if (keyFull(n) + '|' + p === row.key) S.starred.delete(id);
+      });
+      await sleep(350);
+    }
+    return { removed };
   }
 
   function queueNames() {
@@ -382,6 +448,7 @@ window.DK = (function () {
    * Walks DOWN the ranked list, not just the top N, so unavailable players
    * are skipped rather than leaving the queue short. */
   async function syncQueue() {
+    const pruned = await pruneQueue();     // drop what is no longer legal first
     const r = rank();
     if (r.err) return r;
     const have = queueNames();
@@ -409,29 +476,39 @@ window.DK = (function () {
     }
     setSearch('');
     return { round: r.round, picksLeft: r.picksLeft, counts: r.counts,
-             need: r.need, queued: results, queueNow: queueNames(),
+             need: r.need, queued: results, pruned: (pruned.removed || []),
+             queueNow: queueNames(),
              top: r.top.slice(0, 5).map(x => x.n + '(' + x.p + ' ' + x.v + ')') };
   }
 
-  async function draftTop() {
+  /* Try to click the pick ourselves.
+   *
+   * Best-effort ONLY. The queue is the guaranteed actuator (see run()): its
+   * head is kept equal to the engine's top choice, so whoever pulls the
+   * trigger, the pick is the engine's. draftTop just gets there sooner.
+   *
+   * Bounded to a few candidates: mock 3 spent the entire 60s clock walking 20
+   * of them, which is what armed autopick in the first place. */
+  async function draftTop(maxTries) {
     const r = rank();
     if (r.err || !r.top.length) return { err: r.err || 'no candidates' };
+    const before = rosterCount();
     ensurePlayersTab();
     await sleep(300);
-    let misses = 0;
+    const attempted = [];
+    let tries = 0;
     for (const cand of r.top) {
+      if (tries >= (maxTries || 3)) break;
       const entry = S.board.find(b => b.n === cand.n && b.p === cand.p);
       if (!entry) continue;
       if (!setSearch(entry.k.slice(2))) continue;
+      tries++;
       await sleep(700);
       const row = findRow(entry);
       if (!row) {
-        /* Only a LIVE table proves absence. Otherwise this is a UI problem
-         * and marking players gone would poison the board -- mock 2 lost 36
-         * elite players to exactly that. */
-        if (!tableLive()) return { err: 'ui-not-ready', checked: misses };
+        const why = await diagnoseMiss();
+        if (why === 'uinotready') return { err: 'ui-not-ready', attempted };
         markGone(entry);
-        if (++misses >= 8) return { err: 'too-many-misses' };
         continue;
       }
       row.click();
@@ -441,16 +518,33 @@ window.DK = (function () {
         return /^Draft/i.test(x) && !b.disabled && !b.closest('[role=tablist]');
       });
       const pick = btns.find(b => /Player/i.test(b.textContent)) || btns[btns.length - 1];
-      if (!pick) continue;
+      if (!pick) { attempted.push(cand.n + ':nobtn'); continue; }
       pick.click();
       await sleep(1100);
       const conf = [...document.querySelectorAll('button')]
         .find(b => /^(Yes|Confirm|Draft Player)$/i.test(b.textContent.trim()) && !b.disabled);
       if (conf) { conf.click(); await sleep(900); }
       setSearch('');
-      return { drafted: cand.n, pos: cand.p, vorp: cand.v };
+      /* NEVER report a pick we cannot see on the roster. Mock 3 logged
+       * "drafted Bijan Robinson" twice while the roster showed neither: the
+       * click path silently no-opped and the queue was quietly making every
+       * real pick. An unverified success hides the very failure we hunt. */
+      await sleep(700);
+      const after = rosterCount();
+      if (!(after && before && after.have > before.have)) {
+        attempted.push(cand.n + ':noland');
+        continue;
+      }
+      return { drafted: cand.n, pos: cand.p, vorp: cand.v, verified: true };
     }
-    return { err: 'all candidates unclickable' };
+    return { err: 'no-verified-pick', attempted };
+  }
+
+  /* Yahoo tells us when it has taken the wheel. Once armed it drafts the
+   * instant the turn opens, so racing it with clicks only wastes the clock --
+   * and the clock expiring is what armed it. When armed, trust the queue. */
+  function autopickArmed() {
+    return /put into autopick mode/i.test(document.body.innerText);
   }
 
   /* Resident loop: this is what stops autopick from ever arming. */
@@ -467,8 +561,16 @@ window.DK = (function () {
         if (/draft results|draft complete/i.test(document.title)) { note('draft over'); break; }
 
         if (onClock()) {
-          const res = await draftTop();
-          note('ON CLOCK -> ' + JSON.stringify(res));
+          /* The queue head IS the engine's top pick (syncQueue keeps it so),
+           * and autopick consumes it immediately. Clicking as well is pure
+           * upside when it works and pure clock-burn when it does not, so
+           * only try while Yahoo has not already taken over. */
+          if (autopickArmed()) {
+            note('ON CLOCK (autopick armed) -> queue head takes it');
+          } else {
+            const res = await draftTop();
+            note('ON CLOCK -> ' + JSON.stringify(res));
+          }
           await sleep(1200);
           lastSync = 0; // force resync after our pick
         } else {
@@ -515,7 +617,10 @@ window.DK = (function () {
       return 'reset';
     },
     rank, syncQueue, draftTop, run,
-    classifyMiss, rowMatches, normTeam, // exported for tests
+    classifyMiss, rowMatches, normTeam, autopickArmed, // exported for tests
+    /* Pure form of the post-click check in draftTop. A pick counts only when
+     * the roster actually grew. */
+    pickLanded: (before, after) => !!(after && before && after.have > before.have),
     _starred: () => [...S.starred],
     _markStarred: (id) => S.starred.add(id),
     _isStarred: (id) => S.starred.has(id),
