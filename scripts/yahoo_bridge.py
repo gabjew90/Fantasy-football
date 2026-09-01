@@ -158,10 +158,18 @@ def build_tracker(cfg: Config, players: list[dict], state: dict) -> Tracker:
         p = by_key.get((key(d["name"]), d.get("pos", "")))
         if not p:
             continue
+        pick_no = int(d["pick_no"])
+        # DERIVE the slot from the pick number. In a snake draft the two are
+        # equivalent, and the page cannot supply it: Yahoo's pick feed names
+        # the player and the pick number but not whose pick it was. Trusting
+        # d["slot"] defaulted every pick to 0, so NONE were attributed to us,
+        # my_pos_counts() came back empty, and the engine happily recommended
+        # a second QB in round 4 against a round-10 gate. Caught in a mock.
+        rnd, slot = snake.pick_to_round_slot(pick_no, teams)
         picks.append({
-            "pick_no": int(d["pick_no"]), "player_id": p["sleeper_id"],
-            "draft_slot": int(d.get("slot") or 0),
-            "round": (int(d["pick_no"]) - 1) // teams + 1,
+            "pick_no": pick_no, "player_id": p["sleeper_id"],
+            "draft_slot": int(d.get("slot") or slot),
+            "round": rnd,
         })
     t.state = TrackerState(picks=picks,
                            drafted_ids={x["player_id"] for x in picks},
