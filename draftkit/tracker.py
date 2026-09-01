@@ -47,6 +47,9 @@ class Tracker:
     survival_shrink = 0.55
     upside_from_round = 8
     upside_mult = 1.15
+    pool_min = 40
+    pool_lookback = 20
+    pool_lookahead = 60
     local = False
 
     def __init__(
@@ -96,7 +99,11 @@ class Tracker:
         self.fall_alert = int(tcfg["fall_alert_picks"])
         ecfg = cfg["engine"] if "engine" in cfg._data else {}
         self.sims = int(ecfg.get("sims", 1000))
-        self.pool_size = int(ecfg.get("pool_size", 80))
+        # rolling ADP window for the rival sampling pool (post-v2 item 1);
+        # pool_size is retained as the FLOOR so old configs stay meaningful
+        self.pool_min = int(ecfg.get("pool_min", ecfg.get("pool_size", 40)))
+        self.pool_lookback = int(ecfg.get("pool_lookback", 20))
+        self.pool_lookahead = int(ecfg.get("pool_lookahead", 60))
         self.sigma_early = float(ecfg.get("sigma_early", 6.0))
         self.sigma_late = float(ecfg.get("sigma_late", 27.0))
         # v2 item 1.1: fat-tail reaches, run escalation, empirical calibration
@@ -294,10 +301,23 @@ class Tracker:
             return None
         # no_market rows are engine-invisible (guardrail) — keep them out of
         # the survival pool and best-available math too
-        pool = sorted(
+        avail = sorted(
             (p for p in self.remaining() if p.get("proj_source") != "no_market"),
             key=lambda p: p["adp"] if p.get("adp") is not None else 999.0,
-        )[: self.pool_size]
+        )
+        # ROLLING ADP WINDOW around the current pick, not a fixed top-N.
+        # A fixed top-80-by-ADP starves in the late rounds (the board carries
+        # every player with ADP inside 180, so by round 10 the top 80 are
+        # nearly all gone) — rivals then had almost nobody to "take", which
+        # understated competition and inflated survival exactly where the
+        # round-8 upside switch is deciding (post-v2 item 1).
+        lo, hi = cur - self.pool_lookback, cur + self.pool_lookahead
+        window = [p for p in avail
+                  if p.get("adp") is not None and lo <= p["adp"] <= hi]
+        if len(window) < self.pool_min:
+            # floor: never starve — extend by ADP proximity to the window
+            window = avail[: max(self.pool_min, len(window))]
+        pool = window
         # crc32, not hash(): string hash is per-process randomized and would
         # let a mid-draft restart silently flip near-tie recommendations
         seed = zlib.crc32(f"{self.draft_id}:{key[0]}:{key[1]}".encode())
