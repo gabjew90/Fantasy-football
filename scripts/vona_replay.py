@@ -96,15 +96,94 @@ def allowed(pos: str, rnd: int, counts: dict, picks_left: int, rounds: int) -> b
     return True
 
 
+import math
+
+
+def _norm_cdf(z: float) -> float:
+    return 0.5 * (1.0 + math.erf(z / math.sqrt(2.0)))
+
+
+def _sigma(rnd: int) -> float:
+    return 6.0 + 1.5 * max(0, rnd - 1)
+
+
+def survival(p: dict, next_pick: int, rnd: int) -> float:
+    """Calibrated P(still on the board at our next turn). Shrink 0.55 is the
+    map fitted to the Omnibeta CLV retro in urgency.py."""
+    if p["a"] is None:
+        return 0.5
+    raw = _norm_cdf((p["a"] - next_pick) / _sigma(rnd))
+    return min(0.99, max(0.01, 0.5 + (raw - 0.5) * 0.55))
+
+
+def e_best_next(avail: list, pos: str, next_pick: int, rnd: int) -> float:
+    carry, exp = 1.0, 0.0
+    for p in avail:
+        if p["p"] != pos:
+            continue
+        s = survival(p, next_pick, rnd)
+        exp += carry * s * p["v"]
+        carry *= (1 - s)
+        if carry < 0.01:
+            break
+    return exp
+
+
 def choose(avail: list, counts: dict, rnd: int, picks_left: int, rounds: int,
            teams: int, next_pick_no: int, mode: str):
-    """Pick one player. mode='vorp' ranks on VORP, mode='vona' on VONA."""
+    """mode='vorp' | 'vona' (binary survival) | 'pair' (ported engine)."""
     need = needs_map(counts)
     elig = [p for p in avail if allowed(p["p"], rnd, counts, picks_left, rounds)]
     if not elig:
         elig = list(avail)
     open_starters = sum(need.get(k, 0) for k in ("QB", "RB", "WR", "TE", "FLEX", "K", "DEF"))
     urgent = picks_left <= open_starters + 1
+
+    if mode in ("pair", "pairpos"):
+        NEED_DAMP = 0.6
+        ebn = {q: e_best_next(avail, q, next_pick_no, rnd)
+               for q in ("QB", "RB", "WR", "TE", "K", "DEF")}
+        second = {}
+        for q in ("QB", "RB", "WR", "TE", "K", "DEF"):
+            at = [p for p in avail if p["p"] == q]
+            second[q] = at[1]["v"] if len(at) > 1 else 0.0
+
+        def needs_after(taken):
+            out = dict(need)
+            if out.get(taken, 0) > 0:
+                out[taken] -= 1
+            elif taken in FLEX_OK and out.get("FLEX", 0) > 0:
+                out["FLEX"] -= 1
+            return out
+
+        def pair_score(p):
+            after = needs_after(p["p"])
+            c2 = dict(counts)
+            c2[p["p"]] = c2.get(p["p"], 0) + 1
+            best = 0.0
+            for q in ("QB", "RB", "WR", "TE", "K", "DEF"):
+                if not allowed(q, rnd + 1, c2, picks_left - 1, rounds):
+                    continue
+                e = ebn[q]
+                if q == p["p"]:
+                    e = min(e, second[q])
+                v = e if fills_need(after, q) else e * NEED_DAMP
+                best = max(best, v)
+            own = p["v"] * (1.0 if fills_need(need, p["p"]) else NEED_DAMP)
+            return own + best
+
+        if mode == "pair":
+            return max(elig, key=pair_score)
+        # faithful planner.py: ONE candidate per position (greedy best there),
+        # then pair-rank those ~6 -- not the whole board.
+        best_at = {}
+        for p in elig:
+            cur = best_at.get(p["p"])
+            gv = p["v"] - e_best_next(avail, p["p"], next_pick_no, rnd)
+            if cur is None or gv > cur[0]:
+                best_at[p["p"]] = (gv, p)
+        cands = [v[1] for v in best_at.values()]
+        return max(cands, key=pair_score)
 
     base = {}
     if mode == "vona":
@@ -154,7 +233,7 @@ def main() -> None:
     mine = [d["pick_no"] for d in picks if d.get("slot") == a.slot]
 
     results = {}
-    for mode in ("vorp", "vona"):
+    for mode in ("vorp", "vona", "pair", "pairpos"):
         taken = set()
         counts: dict = {}
         chosen = []
@@ -177,20 +256,13 @@ def main() -> None:
 
     print(f"Replay of draft {a.draft_id} — slot {a.slot}, {a.teams} teams\n")
     print(f"{'pick':>4}  {'VORP ranking':26} {'CLV':>6}   {'VONA ranking':26} {'CLV':>6}")
-    tot = {"vorp": [], "vona": []}
-    for i in range(len(results["vorp"])):
-        ov, pv = results["vorp"][i]
-        _, pn = results["vona"][i]
-        cv = (pv["a"] - ov) if pv["a"] else None
-        cn = (pn["a"] - ov) if pn["a"] else None
-        if cv is not None:
-            tot["vorp"].append(cv)
-        if cn is not None:
-            tot["vona"].append(cn)
-        print(f"{ov:>4}  {pv['n'][:24]:26} {('%+.1f' % cv) if cv is not None else '   n/a':>6}"
-              f"   {pn['n'][:24]:26} {('%+.1f' % cn) if cn is not None else '   n/a':>6}")
+    tot = {"vorp": [], "vona": [], "pair": [], "pairpos": []}
+    for m in ("vorp", "vona", "pair", "pairpos"):
+        for ov, pk in results[m]:
+            if pk["a"]:
+                tot[m].append(pk["a"] - ov)
 
-    for m in ("vorp", "vona"):
+    for m in ("vorp", "vona", "pair", "pairpos"):
         xs = tot[m]
         print(f"\n{m.upper():5} average CLV: {sum(xs)/len(xs):+.2f} over {len(xs)} priced picks")
     d = sum(tot["vona"]) / len(tot["vona"]) - sum(tot["vorp"]) / len(tot["vorp"])
@@ -216,10 +288,9 @@ def main() -> None:
                 total += p["v"]
         return total
 
-    sv = {m: starters_value(results[m]) for m in ("vorp", "vona")}
-    print(f"\nStarting-lineup VORP  —  VORP ranking {sv['vorp']:.1f}"
-          f"  ·  VONA ranking {sv['vona']:.1f}"
-          f"  ({sv['vona'] - sv['vorp']:+.1f})")
+    sv = {m: starters_value(results[m]) for m in ("vorp","vona","pair","pairpos")}
+    print(f"LINEUP vorp={sv['vorp']:.1f} vona={sv['vona']:.1f} "
+          f"pair={sv['pair']:.1f} pairpos={sv['pairpos']:.1f}")
 
 
 if __name__ == "__main__":

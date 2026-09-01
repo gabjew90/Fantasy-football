@@ -151,6 +151,57 @@ window.DK = (function () {
     return r ? r.have + 1 : 1;
   }
 
+  /* ---------------- survival + urgency (port of urgency.py) ----------------
+   *
+   * The Python engine estimates, by Monte Carlo over every intervening rival
+   * pick, the chance each player is still on the board at our next turn, then
+   * shrinks the raw probability through a map fitted to the Omnibeta CLV
+   * retro. This driver originally replaced all of that with a binary guess
+   * (`adp >= nextPick + 5`), which is what left it unable to see that two
+   * elite TEs would not both survive -- the failure planner.py was written to
+   * fix at picks #26/#47 of the real draft.
+   *
+   * Ported here as a closed form rather than a simulation: P(survive) is the
+   * normal tail of (adp - nextPick) / sigma, with sigma growing by round the
+   * same way tracker._sigma does. Same shape, no RNG, cheap enough to run
+   * every cycle in the page.
+   */
+  const SURVIVAL_SHRINK = 0.55;   // fitted: raw 96% -> 75%, 82% -> 68%, 45% -> 50%
+  const NEED_DAMP = 0.6;          // planner.py: position filling no starter slot
+
+  function normCdf(z) {           // Abramowitz-Stegun 7.1.26
+    const s = z < 0 ? -1 : 1, x = Math.abs(z) / Math.SQRT2;
+    const t = 1 / (1 + 0.3275911 * x);
+    const y = 1 - ((((1.061405429 * t - 1.453152027) * t + 1.421413741) * t
+              - 0.284496736) * t + 0.254829592) * t * Math.exp(-x * x);
+    return 0.5 * (1 + s * y);
+  }
+  function calibrate(p) { return 0.5 + (p - 0.5) * SURVIVAL_SHRINK; }
+
+  /* sigma: ADP noise in picks, widening as the draft goes on (tracker._sigma) */
+  function sigmaFor(rnd) { return 6.0 + 1.5 * Math.max(0, rnd - 1); }
+
+  function survivalProb(entry, nextPick, rnd) {
+    if (entry.a == null) return 0.5;              // unpriced: coin flip
+    const p = normCdf((entry.a - nextPick) / sigmaFor(rnd));
+    return Math.min(0.99, Math.max(0.01, calibrate(p)));
+  }
+
+  /* E[VORP of the best player still available at `pos` on our next turn].
+   * Walks the position in VORP order: the best survivor is the first player
+   * who lasts, so weight each by the chance everyone above him is gone. */
+  function eBestNext(avail, pos, nextPick, rnd) {
+    let carry = 1.0, exp = 0.0;
+    for (const p of avail) {
+      if (p.p !== pos) continue;
+      const s = survivalProb(p, nextPick, rnd);
+      exp += carry * s * p.v;
+      carry *= (1 - s);
+      if (carry < 0.01) break;
+    }
+    return exp;
+  }
+
   /* ---------------- guardrails (port of _pos_allowed) ---------------- */
 
   function needsMap(counts) {
@@ -312,17 +363,17 @@ window.DK = (function () {
      * one (RB, TE) does not. */
     const gap = S.cfg.teams || 10;               // average wait between turns
     const nextPickNo = (S.cfg.myNextPick || rnd * gap) + gap;
-    const survive = nextPickNo + Math.round(gap / 2);
-    const vonaBase = {};
+
+    /* Expected best at each position on our next turn, and the second-best
+     * on the board NOW. planner.py caps a same-position partner at
+     * second_best_now, because the expectation does not know the candidate
+     * himself was just taken -- that cap is exactly what stops the driver
+     * assuming it can have BOTH elite tight ends. */
+    const vonaBase = {}, secondBestNow = {};
     for (const pos of ['QB', 'RB', 'WR', 'TE', 'K', 'DEF']) {
-      let base = null;
-      for (const p of avail) {                   // avail is VORP-descending
-        if (p.p === pos) {
-          if (base === null) base = p;           // fallback: best at position
-          if (p.a != null && p.a >= survive) { base = p; break; }
-        }
-      }
-      vonaBase[pos] = base ? base.v : 0;
+      vonaBase[pos] = eBestNext(avail, pos, nextPickNo, rnd);
+      const at = avail.filter(x => x.p === pos);
+      secondBestNow[pos] = at.length > 1 ? at[1].v : 0;
     }
 
     // need-weighted: a player filling an open starter slot outranks a
@@ -331,9 +382,9 @@ window.DK = (function () {
       const fills = needsPosition(need, p.p);
       const urgent = picksLeft <= (['QB','RB','WR','TE','FLEX','K','DEF']
         .reduce((a, k) => a + (need[k] || 0), 0)) + 1;
-      /* Rank on VONA. Never below zero: a player who will still be there is
-       * not negatively valuable, just not urgent. VORP breaks ties so the
-       * genuinely better player still wins a flat comparison. */
+      /* Urgency = VORP now minus the expected best at this position on our
+       * next turn. This is VONA done properly: probabilistic and calibrated,
+       * rather than the binary "will his ADP clear my next pick" guess. */
       const vona = Math.max(0, p.v - (vonaBase[p.p] === undefined ? 0 : vonaBase[p.p]));
       let s = vona + p.v * 0.05;
       p._vona = Math.round(vona * 10) / 10;
@@ -342,14 +393,52 @@ window.DK = (function () {
       return { p, s, fills };
     }).sort((a, b) => b.s - a.s);
 
+    /* TWO-PICK JOINT PLANNER (port of planner.py).
+     *
+     * Greedy urgency "won the pick and lost the round at #26/#47" in the real
+     * Omnibeta draft, and cost this driver slot 9 of the replay sweep: it
+     * took one elite TE when taking both was worth more, because it never
+     * asked what PAIR of picks maximises value.
+     *
+     * pair(c) = need-weighted VORP(c now) + best partner expected at our next
+     * turn, where a same-position partner is capped at second-best-now. */
+    function needsAfter(taken) {
+      const out = Object.assign({}, need);
+      if ((out[taken] || 0) > 0) out[taken] -= 1;
+      else if (FLEX_OK[taken] && (out.FLEX || 0) > 0) out.FLEX -= 1;
+      return out;
+    }
+    function partnerValue(posTaken, countsAfter) {
+      const after = needsAfter(posTaken);
+      let bestV = 0, bestP = null;
+      for (const pos2 of ['QB', 'RB', 'WR', 'TE', 'K', 'DEF']) {
+        if (!posAllowed(pos2, rnd + 1, countsAfter, picksLeft - 1, true)) continue;
+        let e = vonaBase[pos2] || 0;
+        if (pos2 === posTaken) e = Math.min(e, secondBestNow[pos2] || 0);
+        const v = needsPosition(after, pos2) ? e : e * NEED_DAMP;
+        if (v > bestV) { bestV = v; bestP = pos2; }
+      }
+      return { v: bestV, pos: bestP };
+    }
+    for (const x of scored) {
+      const cAfter = Object.assign({}, counts);
+      cAfter[x.p.p] = (cAfter[x.p.p] || 0) + 1;
+      const partner = partnerValue(x.p.p, cAfter);
+      const own = x.p.v * (needsPosition(need, x.p.p) ? 1 : NEED_DAMP);
+      x.pair = own + partner.v;
+      x.partner = partner.pos;
+    }
+    scored.sort((a, b) => (b.pair - a.pair) || (b.s - a.s));
+
     return {
       round: rnd, picksLeft, counts, need,
       openStarters: ['QB','RB','WR','TE','FLEX','K','DEF'].reduce((a,k)=>a+(need[k]||0),0),
       top: scored.slice(0, 20).map(x => ({
         n: x.p.n, p: x.p.p, t: x.p.t, v: x.p.v, vona: x.p._vona,
+        pair: Math.round((x.pair || 0) * 10) / 10, partner: x.partner,
         s: Math.round(x.s), fills: x.fills, st: x.p.s,
       })),
-      vonaBase,
+      vonaBase, secondBestNow,
       blockedSample: blocked,
       availCount: avail.length,
       goneCount: S.gone.size,
@@ -923,6 +1012,7 @@ window.DK = (function () {
     },
     rank, syncQueue, draftTop, run,
     classifyMiss, rowMatches, normTeam, autopickArmed, idKey, // exported for tests
+    survivalProb, eBestNext, calibrate,
     reconcileStarred, reconcileStarredWith,
     /* Human-readable rationale for the pick we intend to make. Exists so the
      * run can be narrated: a board that cannot explain itself is impossible

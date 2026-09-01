@@ -502,6 +502,63 @@ def test_vona_stops_reaching_on_a_flat_position():
     assert r["vona"]["Patrick Mahomes II"] < r["vona"]["Davante Adams"], r
 
 
+def test_survival_is_probabilistic_and_calibrated():
+    """The driver originally guessed survival as a binary `adp >= nextPick+5`.
+    The Python engine simulates it and then shrinks the raw probability through
+    a map fitted to the Omnibeta CLV retro (0.5 + (p-0.5)*0.55: raw 96% -> 75%,
+    82% -> 68%, 45% -> 50%). Ported here as a closed form."""
+    r = run_js(
+        """
+        console.log(JSON.stringify({
+          far:   DK.survivalProb({a: 200}, 40, 4),   // way past our next turn
+          near:  DK.survivalProb({a: 41},  40, 4),   // right at it
+          gone:  DK.survivalProb({a: 5},   40, 4),   // long gone
+          unpriced: DK.survivalProb({a: null}, 40, 4),
+        }));
+        """
+    )
+    # calibration pulls everything toward 0.5 -- never 0 or 1
+    assert 0.7 < r["far"] < 0.8, r          # raw ~1.0 -> shrunk
+    assert 0.45 < r["near"] < 0.55, r       # coin flip at the boundary
+    assert 0.2 < r["gone"] < 0.3, r         # raw ~0.0 -> shrunk
+    assert r["unpriced"] == 0.5
+
+
+def test_two_pick_planner_takes_both_of_an_elite_pair():
+    """The slot-9 regression, and the same failure planner.py was written for
+    at picks #26/#47 of the real Omnibeta draft.
+
+    Two elite TEs, both startable (TE + FLEX). Greedy urgency says there is no
+    rush -- the second one survives to our next turn -- so it spends the pick
+    elsewhere and ends up with only one of them. The joint planner asks what
+    PAIR maximises value, and its same-position partner is capped at
+    second-best-now, so it sees that taking a TE now still leaves the other
+    elite TE as the partner.
+    """
+    board = "\n".join([
+        "Trey McBride|TE|ARI|67.1|||26.7",
+        "Brock Bowers|TE|LVR|66.3|||21.2",
+        "James Cook III|RB|BUF|63.7|||9.6",
+        "Chase Brown|RB|CIN|60.5|||16.0",
+        "Rome Odunze|WR|CHI|1.8|||66.7",
+    ])
+    r = run_js(
+        f"""
+        DK.loadCompact({json.dumps(board)}, {{teams: 10}});
+        document.body.innerText = {json.dumps(panel(["P. Nacua WR LAR Bye 11"]))};
+        const out = DK.rank();
+        console.log(JSON.stringify({{
+          first: out.top[0].n, firstPos: out.top[0].p,
+          partner: out.top[0].partner,
+          pair: out.top[0].pair, vona: out.top[0].vona,
+        }}));
+        """
+    )
+    # taking a TE must be recognised as pairing with the OTHER elite TE
+    assert r["firstPos"] == "TE", f"planner still split the elite pair: {r}"
+    assert r["partner"] == "TE", f"partner should be the second TE: {r}"
+
+
 def test_rank_never_returns_empty_while_picks_remain():
     """Stash-mute. Once every starter slot is filled, needsPosition() is false
     for everyone, so the "at most one zero-role stash" rule silences the whole

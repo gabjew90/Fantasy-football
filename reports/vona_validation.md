@@ -87,3 +87,46 @@ Not fixed, deliberately, four days from the draft: it costs a slot-dependent
 amount, VONA is still ahead at 8 of 10 slots (mean +12.5, median +10.4), and
 a depth-aware fallback is a bigger change than the evidence justifies right
 now. Revisit in the offseason.
+
+---
+
+# Addendum — porting the real engine (2026-09-01)
+
+The slot-9 failure was not novel. `draftkit/planner.py` exists precisely
+because of it:
+
+> *"Greedy per-position urgency won the pick and lost the round at #26/#47:
+> it never asked what PAIR of picks maximizes value."*
+
+Picks #26 and #47 of the actual Omnibeta draft. The browser driver had been
+rebuilt from scratch in JavaScript and reimplemented only the crudest form of
+that machinery, so it reintroduced a bug the codebase had already fixed:
+
+| Python engine | driver, before this port |
+|---|---|
+| Monte Carlo survival over every intervening rival pick — ADP Gaussian, round-growing sigma, rival needs, historical tendencies | binary `adp >= nextPick + 5` |
+| Calibration shrink 0.55, fitted to the Omnibeta CLV retro (n=67) | none |
+| Two-pick joint planner, same-position partner capped at second-best-now | greedy single pick |
+
+An attempt was made to avoid porting altogether by having the page call a
+local Python server, which would have made the driver a thin actuator over
+the real engine. Chrome blocks it: fetch from `https://football.fantasysports.
+yahoo.com` to `127.0.0.1` never settles (Private Network Access), confirmed
+against a threaded server with correct CORS and
+`Access-Control-Allow-Private-Network`, reachable by curl throughout. So an
+in-page engine is unavoidable and the logic has to be ported faithfully.
+
+## Result — same 22 replays
+
+| ranking | mean | median | better | worse | worst |
+|---|---:|---:|---:|---:|---:|
+| VONA (greedy, ad hoc) | **+10.3** | +11.6 | 16 | 2 | **−63.9** |
+| Ported planner | +5.5 | +1.0 | 11 | 1 | **−6.0** |
+
+The port **fixes slot 9 completely** (346.3 → 375.7, recovering the whole
+−29.4) and caps the worst case at −6.0.
+
+**Shipped the port, not the higher mean.** VONA's +10.3 comes with a −63.9
+tail, and 22 replays that share two opponent sequences are not enough to
+prefer an ad hoc heuristic over the validated design on mean alone. Whether
+VONA's extra upside is real is an offseason question with more drafts.
