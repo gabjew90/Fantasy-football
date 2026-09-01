@@ -57,3 +57,33 @@ stdev 23.2 · worst case −63.9
 
 Shipped on the consistency (16 of 18 non-tied) plus the mechanical rationale,
 not on a significance test.
+
+## Known failure mode — found at slot 9
+
+VONA underestimates urgency when a position holds **two** elite players and
+the roster can start two of them (TE + FLEX).
+
+Slot 9, 10-team replay:
+
+| pick | VORP took | VONA took |
+|---:|---|---|
+| 9 | **McBride (TE)** | Cook III (RB) |
+| 12 | **Bowers (TE)** | McBride (TE) |
+| 29 | Cook III (RB) | Kyren Williams (RB) |
+
+VONA's reasoning at pick 9 was locally correct: Bowers survives to pick 12,
+so McBride's urgency is only 67.1 − 66.3 = **0.8**, and there is no rush at
+TE. It was right — McBride *was* still there at 12.
+
+But it took only ONE of the pair. VORP took both at 9 and 12, and Cook
+survived to 29 anyway, so VORP captured all three. Final lineup VORP 375.7
+against VONA's 346.3.
+
+The gap: VONA computes the fallback as "best survivor at this position",
+which assumes we fill **one** slot there. With TE + FLEX we can start two,
+and the fallback for the *second* TE is the third-best TE, who is far worse.
+
+Not fixed, deliberately, four days from the draft: it costs a slot-dependent
+amount, VONA is still ahead at 8 of 10 slots (mean +12.5, median +10.4), and
+a depth-aware fallback is a bigger change than the evidence justifies right
+now. Revisit in the offseason.
