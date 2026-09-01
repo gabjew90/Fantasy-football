@@ -65,3 +65,35 @@ reload (feed gap-fill recovered picks 18-23 automatically).
 The draft tab reset to about:blank around pick 5; the queue still delivered
 McCaffrey at pick 4, and re-navigating + gap-filling from the feed restored
 a clean board with zero manual repair.
+
+## Draft-morning checklist (Sat 2026-09-05) — DO NOT SKIP
+Every item below is a step that was performed for the Omnibeta draft and
+initially SKIPPED when onboarding Keefamania. The board pipeline running
+clean does not mean the board is correct.
+
+1. [ ] Injury sweep refresh. Cross-check data/external/availability.csv
+       against LIVE Sleeper injury data (script pattern: compare
+       players(refresh=True) injury_status vs the file for every top-120
+       board player). Verify anything material against news before it
+       moves a projection. MISS ON 8/31: Josh Jacobs sat at board rank 22
+       with a full projection while on the Commissioner Exempt List since
+       8/30. The draft-time injury layer is MANUAL; only the in-season
+       auto-manager diffs injuries automatically.
+2. [ ] Yahoo ADP re-scrape -> data/external/yahoo_adp.keefamania.csv, then
+       rebuild market + tiers.
+3. [ ] Review reports/disagreements.keefamania.csv (board-vs-market
+       worklist, ~30 rows). NEVER REVIEWED for this league; the equivalent
+       pass for Omnibeta was a full research session.
+4. [ ] Review the 9 no_market players (engine-invisible unless activated
+       via an override).
+5. [ ] Decide whether any Keefamania-specific overrides are needed. The
+       file is now league-scoped; Keefamania currently has NONE, which is
+       correct-by-default (better no override than a wrong-scoring one).
+6. [ ] Set me.draft_slot in leagues/keefamania.yaml once Yahoo assigns it.
+
+Known accepted limitations (not fixable before Saturday):
+- No rival seeds: Yahoo gives no draft history, so the Monte Carlo uses
+  generic positional tendencies rather than per-manager ones.
+- No `verify` command: Yahoo API access is still pending, so the league
+  yaml's expected: block is a hand transcription, re-read before the draft.
+- Replacement baselines are format-derived, not backtested (v2 §7).
