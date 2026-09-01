@@ -165,3 +165,42 @@ Five bugs, all found and fixed mid-draft.
 Bugs 22 and 28 are the same assumption in two hiding places. The lesson is
 recorded in `idKey`'s comment: a defense is called three different things by
 three different parts of the page, so identity gets exactly one function.
+
+## Mock 8 — room 10311522, 10 teams, slot 2 — **CLEAN. BAR MET.**
+
+First run with every fix live from pick 1.
+
+```
+QB  P. Mahomes        WR  D. Adams          RB  C. McCaffrey
+QB  B. Purdy (R10)    WR  R. Odunze         RB  J. Warren
+                      WR  D. Metcalf        RB  R. Harvey
+TE  T. McBride        WR  C. Sutton         RB  K. Gainwell
+TE  B. Bowers         WR  W. Robinson
+K   C. Little         DEF Steelers
+```
+
+**14 verified on-clock picks. 0 on-clock errors. Autopick NEVER armed.**
+
+Against the standing bar:
+
+| Criterion | Result |
+|---|---|
+| 15/15 engine picks | yes — 14 verified `ONCLOCK`, roster full |
+| Zero Yahoo autopicks | yes — `armed: false` for the whole draft, no banner |
+| Zero wrong-player errors | yes |
+| Every mandatory slot filled | yes — exactly one K, exactly one DEF |
+| Guardrails respected | yes — QB2 at round 10, no TE3, K/DEF held to the last two picks |
+
+Self-corrections observed live, none needing intervention:
+- Drake Maye queued as QB2 in round 6, then **pruned automatically** once
+  Mahomes landed (`cut=["D. Maye QB NE"]`).
+- Seattle DEF was sniped between cycles; the queue re-ranked to Eagles DEF
+  and finally took the Steelers, unprompted.
+- `why()` at the endgame reported `open: ["K","DEF"]` with the queue holding
+  exactly those two in VORP order, every remaining TE correctly blocked.
+
+### Bug count by mock
+1 → 5 · 2 → 4 · 3 → 5 · 4 → 6 · 6 → 2 · 7 → 5 · **8 → 0**
+
+The rig is at 192 tests. Every bug above has a regression test, so the
+failures cannot silently return.
