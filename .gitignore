@@ -16,3 +16,8 @@ data/logs/
 .env
 data/manager/
 reports/manager/
+
+# Local TLS material for the engine bridge — machine-specific, never shared.
+# The private key must not be in version control; regenerate with
+# scripts/make_bridge_cert.sh
+data/draftrig/tls/*.pem
