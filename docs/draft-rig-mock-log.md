@@ -49,6 +49,40 @@ roster. Only the `D+` grade on the roster panel gave it away.
   the last picks must be reserved or the draft ends a kicker short. The Python
   `must-fill` rule is not position-aware and does not catch this.
 
+## Mock 3 — room 10304997, **10 teams**, slot 5 — FAILED (much closer)
+
+First correctly-formatted run. Mock 2's fixes all held:
+
+- **Jonathan Taylor of Indianapolis** was drafted, not the Jacksonville back.
+  The team check works.
+- The `ui-not-ready` guard kept the gone-set honest: **0 bad marks**, against
+  36 in mock 2.
+- No re-starring; the queue held a steady depth of 5 early on.
+
+Five new bugs, all downstream of one root cause.
+
+| # | Bug | Root cause | Fix / test |
+|---|-----|-----------|------------|
+| 11 | `draftTop` logged "drafted Bijan Robinson" twice; roster showed neither | Reported success straight after clicking, never checking. The click path silently no-opped and the **queue was making every real pick** — the log hid the failure being hunted | `pickLanded()`: a pick counts only when the roster grows. Test |
+| 12 | A whole pick aborted as `ui-not-ready` | `tableLive()` ran with the search filter still applied, so a genuinely drafted player's empty result set looked exactly like a dead UI | `diagnoseMiss()` clears the filter and re-checks |
+| 13 | Mahomes **and** Hurts queued together in round 5 | `syncQueue` only ever ADDED. Both legal at QB count 0, but the moment one landed the other was an illegal QB2 that autopick would take | `pruneQueue()` removes queued players the guardrails no longer allow. Re-ranking is only honest if it can also take things off |
+| 14 | `draftTop` burned the entire 60s clock | Walked all 20 candidates at ~1.3s each — and an expired clock is what **arms autopick** | Bounded to 3 tries; skipped entirely once the autopick banner is up |
+| 15 | **Queue drained 5 → 2 → 1 → 0**, then Yahoo's fallback handed us a THIRD tight end | The `S.starred` memo (which stops us toggling a player back out) never released. A player who left the queue without joining our roster was taken by a rival but stayed memoised, so refill skipped them forever | `reconcileStarred()`. Test |
+
+Bug 15 is the important one: the guardrail violation (3 TEs, then 2 QBs) was
+**not a ranking error**. The ranking was right the whole time; the queue
+starved, and Yahoo's own list filled the vacuum. Roster quality tracks queue
+depth almost exactly.
+
+Final roster showed the cost: Mahomes/Goff at QB, three TEs, and K + DEF
+still unfilled at 12/15 with an empty queue.
+
+### Architecture decision
+The **queue is the guaranteed actuator**, and `syncQueue` keeps its head equal
+to the engine's top eligible pick — so whoever pulls the trigger, the pick is
+the engine's. `draftTop` is best-effort on top of that, never a dependency.
+This is the right shape given armed autopick drafts instantly.
+
 ---
 
 ## Open

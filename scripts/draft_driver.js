@@ -447,8 +447,42 @@ window.DK = (function () {
    *
    * Walks DOWN the ranked list, not just the top N, so unavailable players
    * are skipped rather than leaving the queue short. */
+  /* Reconcile our "already starred" memo against reality.
+   *
+   * S.starred exists so we never re-click a star and toggle a player back OUT
+   * of the queue. But an entry that has left the queue without joining our
+   * roster was drafted by somebody else, and leaving it in the memo means
+   * syncQueue skips it forever and stops refilling. Mock 3 drained 5 -> 2 ->
+   * 1 that way, and once the queue ran dry Yahoo's own fallback list took
+   * over and handed us a THIRD tight end -- a guardrail violation produced
+   * entirely by starvation. */
+  function reconcileStarredWith(queueKeys, rosterKeys) {
+    const inQueue = new Set(queueKeys);
+    const mine = new Set(rosterKeys);
+    const dropped = [];
+    for (const id of [...S.starred]) {
+      const i = id.lastIndexOf('|');
+      const key = keyFull(id.slice(0, i)) + '|' + id.slice(i + 1);
+      if (inQueue.has(key) || mine.has(key)) continue;
+      S.starred.delete(id);
+      const entry = S.board.find(b => b.n + '|' + b.p === id);
+      if (entry) markGone(entry);          // someone else took them
+      dropped.push(id);
+    }
+    return dropped;
+  }
+
+  function reconcileStarred() {
+    const ros = myRoster();
+    return reconcileStarredWith(
+      queueNames(),
+      (ros ? ros.players : []).map(p => p.k + '|' + p.pos)
+    );
+  }
+
   async function syncQueue() {
-    const pruned = await pruneQueue();     // drop what is no longer legal first
+    reconcileStarred();                    // free up slots taken by others
+    const pruned = await pruneQueue();     // drop what is no longer legal
     const r = rank();
     if (r.err) return r;
     const have = queueNames();
@@ -618,6 +652,7 @@ window.DK = (function () {
     },
     rank, syncQueue, draftTop, run,
     classifyMiss, rowMatches, normTeam, autopickArmed, // exported for tests
+    reconcileStarred, reconcileStarredWith,
     /* Pure form of the post-click check in draftTop. A pick counts only when
      * the roster actually grew. */
     pickLanded: (before, after) => !!(after && before && after.have > before.have),

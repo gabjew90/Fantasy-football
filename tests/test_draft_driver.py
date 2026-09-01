@@ -328,6 +328,41 @@ def test_a_queued_player_who_becomes_illegal_is_no_longer_ranked():
         "a second QB stayed rankable before qb2_earliest_round"
 
 
+def test_starred_memo_releases_players_taken_by_someone_else():
+    """Mock 3's queue drained 5 -> 2 -> 1 and then Yahoo's own fallback list
+    took over and handed us a THIRD tight end.
+
+    Cause: the "already starred" memo (which stops us toggling a player back
+    out) never released entries. A player who left the queue without joining
+    our roster was drafted by a rival, but stayed memoised, so syncQueue
+    skipped them forever and could not refill. The guardrail violation came
+    from starvation, not from bad ranking.
+    """
+    r = run_js(
+        f"""
+        DK.loadCompact({json.dumps(BOARD)});
+        DK.reset();
+        DK._markStarred('Josh Allen|QB');       // still queued
+        DK._markStarred('Brock Bowers|TE');     // rival took him
+        DK._markStarred('Trey McBride|TE');     // we drafted him
+        const dropped = DK.reconcileStarredWith(
+          ['j allen|QB'],        // what the queue still shows
+          ['t mcbride|TE']       // what our roster holds
+        );
+        console.log(JSON.stringify({{
+          dropped,
+          keptAllen:   DK._isStarred('Josh Allen|QB'),
+          keptMcBride: DK._isStarred('Trey McBride|TE'),
+          freedBowers: !DK._isStarred('Brock Bowers|TE'),
+        }}));
+        """
+    )
+    assert r["keptAllen"] is True, "a still-queued player must stay memoised"
+    assert r["keptMcBride"] is True, "a rostered player must stay memoised"
+    assert r["freedBowers"] is True, "a rival's pick must free the queue slot"
+    assert r["dropped"] == ["Brock Bowers|TE"]
+
+
 def test_availability_is_not_scraped_from_page_text():
     """Regression: an earlier driver regexed the whole page for drafted names,
     which swept in the UNDRAFTED player table and marked everyone gone.
