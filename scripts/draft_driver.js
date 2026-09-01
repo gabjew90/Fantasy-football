@@ -30,6 +30,8 @@ window.DK = (function () {
       upsideFromRound: 8,
       upsideMult: 1.15,
       queueDepth: 5,
+      bridge: 'https://127.0.0.1:8443',
+      mySlot: null,
     },
     log: [],
     lastRoster: -1,
@@ -40,6 +42,8 @@ window.DK = (function () {
     plan: null,         // ranked list from the REAL engine (yahoo_bridge.py)
     planNeeds: null,
     planPick: null,     // pick number the plan was computed at
+    planErr: null,
+    planAt: 0,
   };
 
   const FLEX_OK = { RB: 1, WR: 1, TE: 1 };
@@ -332,6 +336,46 @@ window.DK = (function () {
   }
 
   /* ---------------- ranking ---------------- */
+
+  /* Ask the real engine, from inside the page, at the moment of the pick.
+   *
+   * This is what makes staleness zero. Chrome silently drops an HTTPS page's
+   * request to http://127.0.0.1 -- verified with an instrumented server that
+   * logged curl and nothing from Chrome -- but over TLS with an accepted
+   * certificate it is a normal cross-origin fetch. Measured round trip from
+   * the live draft page: 10ms for /ping, 614ms for a full plan including the
+   * Monte Carlo. Against a 60-second clock that is free.
+   *
+   * If the bridge is not running the driver keeps working on its own weaker
+   * ranking, and says so, because a silent downgrade is the failure this
+   * whole exercise was about. */
+  async function refreshPlan() {
+    if (!S.cfg.bridge) return 'no bridge configured';
+    const slot = S.cfg.mySlot || slotFromUrl();
+    if (!slot) return 'unknown draft slot';
+    try {
+      const body = JSON.stringify({
+        my_slot: slot, teams: S.cfg.teams, rounds: S.cfg.rounds,
+        depth: 25, drafted: draftedFeed(),
+      });
+      const r = await fetch(S.cfg.bridge + '/plan', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body,
+      });
+      const j = await r.json();
+      if (j.err) { S.planErr = j.err; return 'engine error: ' + j.err; }
+      S.plan = j.plan; S.planNeeds = j.needs; S.planPick = j.current_pick;
+      S.planErr = null; S.planAt = Date.now();
+      return 'plan ' + (j.plan || []).length + ' deep @pick ' + j.current_pick;
+    } catch (e) {
+      S.planErr = String(e).slice(0, 120);
+      return 'bridge unreachable: ' + S.planErr;
+    }
+  }
+
+  function slotFromUrl() {
+    const m = location.pathname.match(/\/draftclient\/f1\/\d+\/(\d+)/);
+    return m ? +m[1] : null;
+  }
 
   /* THE PLAN comes from the real engine.
    *
@@ -1069,6 +1113,7 @@ window.DK = (function () {
         if (/draft results|draft complete/i.test(document.title)) { note('draft over'); break; }
 
         if (onClock()) {
+          await refreshPlan();   // zero-lag: ask the engine now
           /* LIVE PICK IS PRIMARY.
            *
            * A 60-second clock is enormous next to a ~3s decision, and a pick
@@ -1099,6 +1144,7 @@ window.DK = (function () {
           if (rcNow !== S.lastRoster || Date.now() - lastSync > 12000) {
             S.lastRoster = rcNow;
             lastSync = Date.now();
+            await refreshPlan();
             const q = await syncQueue();
             note('sync r' + (q.round || '?') + ' queued=' + JSON.stringify(q.queued || []) +
                  ' depth=' + ((q.queueNow || []).length));
@@ -1144,6 +1190,9 @@ window.DK = (function () {
              + S.collisions.size + ' name collision(s)';
     },
     /* Accept a plan from scripts/yahoo_bridge.py. */
+    refreshPlan,
+    planStatus: () => ({ have: !!(S.plan && S.plan.length), err: S.planErr,
+                         atPick: S.planPick, ageMs: S.planAt ? Date.now() - S.planAt : null }),
     loadPlan(obj) {
       S.plan = (obj && obj.plan) || null;
       S.planNeeds = (obj && obj.needs) || null;

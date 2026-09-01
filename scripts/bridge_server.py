@@ -1,0 +1,141 @@
+"""Serve the real engine to the Yahoo draft page over local TLS.
+
+The page cannot reach a plain-http local server: Chrome silently drops an
+HTTPS page's cross-origin request to http://127.0.0.1 -- verified with an
+instrumented server that logged curl's hit and nothing at all from Chrome,
+and the fetch promise never settles rather than rejecting. Over TLS the same
+request fails in 126ms with a normal certificate error, which is fixable.
+
+So the page POSTs its draft state here and gets back
+draftkit/tracker.py's own recommendations, live, with no staleness and no
+second ranking implementation to drift.
+
+Setup (once):
+    python scripts/bridge_server.py --league keefamania
+    # then open https://127.0.0.1:8443/ping in the same Chrome profile and
+    # accept the certificate. It is leaf-only (CA:FALSE), valid for
+    # localhost alone, and expires in 14 days.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import ssl
+import sys
+import threading
+import traceback
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(ROOT / "scripts"))
+
+import yahoo_bridge as YB  # noqa: E402
+from draftkit.config import Config  # noqa: E402
+
+TLS_DIR = ROOT / "data" / "draftrig" / "tls"
+_LOCK = threading.Lock()
+_STATE = {"cfg": None, "players": None, "league": None, "calls": 0}
+
+
+def build_plan(state: dict, depth: int) -> dict:
+    with _LOCK:
+        cfg, players = _STATE["cfg"], _STATE["players"]
+        t = YB.build_tracker(cfg, players, state)
+        recs = t.recommendations(top_n=depth)
+        plan = [{"n": p["name"], "p": p["pos"], "t": p["team"],
+                 "v": round(float(p["vorp"] or 0.0), 1), "a": p["adp"],
+                 "why": why} for _s, why, p in recs]
+        named = {(x["n"], x["p"]) for x in plan}
+        for p in players:
+            if len(plan) >= depth:
+                break
+            if p["sleeper_id"] in t.state.drafted_ids:
+                continue
+            if (p["name"], p["pos"]) in named or p.get("proj_source") == "no_market":
+                continue
+            plan.append({"n": p["name"], "p": p["pos"], "t": p["team"],
+                         "v": round(float(p["vorp"] or 0.0), 1), "a": p["adp"],
+                         "why": "depth fallback (engine list exhausted)"})
+        _STATE["calls"] += 1
+        return {"current_pick": t.current_pick, "my_slot": t.my_slot,
+                "needs": t.my_needs(), "plan": plan, "calls": _STATE["calls"]}
+
+
+class Handler(BaseHTTPRequestHandler):
+    protocol_version = "HTTP/1.1"
+
+    def _cors(self):
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "*")
+        self.send_header("Access-Control-Allow-Private-Network", "true")
+
+    def _json(self, obj, code=200):
+        b = json.dumps(obj, separators=(",", ":")).encode()
+        self.send_response(code)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(b)))
+        self._cors()
+        self.end_headers()
+        self.wfile.write(b)
+
+    def do_OPTIONS(self):
+        self.send_response(204)
+        self._cors()
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
+    def do_GET(self):
+        if self.path.startswith("/ping"):
+            self._json({"ok": True, "engine": "draftkit.tracker",
+                        "league": _STATE["league"], "calls": _STATE["calls"]})
+        else:
+            self._json({"err": "POST draft state to /plan"}, 404)
+
+    def do_POST(self):
+        try:
+            n = int(self.headers.get("Content-Length") or 0)
+            state = json.loads(self.rfile.read(n) or b"{}")
+            depth = int(state.pop("depth", 25))
+            self._json(build_plan(state, depth))
+            top = _STATE.get("last_top")
+            print(f"  plan #{_STATE['calls']} pick {state.get('my_slot')}"
+                  f" -> served", flush=True)
+        except Exception as e:  # noqa: BLE001
+            traceback.print_exc()
+            self._json({"err": f"{type(e).__name__}: {e}"}, 500)
+
+    def log_message(self, *a):
+        pass
+
+
+def main() -> None:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--league", default=None)
+    ap.add_argument("--port", type=int, default=8443)
+    a = ap.parse_args()
+
+    cfg = Config.load(league=a.league)
+    _STATE["cfg"] = cfg
+    _STATE["players"] = YB.load_players(cfg)
+    _STATE["league"] = a.league or "default"
+
+    cert, keyf = TLS_DIR / "cert.pem", TLS_DIR / "key.pem"
+    if not cert.exists():
+        raise SystemExit(f"no certificate at {cert} — see the module docstring")
+    ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    ctx.load_cert_chain(str(cert), str(keyf))
+
+    srv = ThreadingHTTPServer(("127.0.0.1", a.port), Handler)
+    srv.socket = ctx.wrap_socket(srv.socket, server_side=True)
+    print(f"engine bridge: https://127.0.0.1:{a.port}  league={_STATE['league']}  "
+          f"{len(_STATE['players'])} players", flush=True)
+    print(f"accept the cert once at https://127.0.0.1:{a.port}/ping", flush=True)
+    srv.serve_forever()
+
+
+if __name__ == "__main__":
+    main()
