@@ -488,3 +488,25 @@ injected BEFORE the clock, and keep the draft tab in front.
 Also: preflight's `row_lookup` reported the plan head as not found because
 he had just been drafted -- cosmetic; the check should pick an undrafted
 player.
+
+## Mock 17 — room 10488007 "Coin Toss", 10 teams, slot 7 — 14 of 15 live; the waiting-room trap again
+
+Roster: Nacua (Yahoo autopick, see below), Achane, McBride, Rashee Rice,
+Jaylen Warren, Jalen Hurts, Rhamondre Stevenson, Rico Dowdle, RJ Harvey, DK
+Metcalf, Stafford (QB2, R11), Kenny Gainwell, Wan'Dale Robinson, Steelers
+DEF, Eddy Pineiro K. Legal at every guardrail.
+
+Fourteen of fifteen picks by the driver at the turn, `verified: "store"`,
+zero gate/retry/away/queue events in the log. The fixed preflight probed an
+undrafted candidate (Achane) and passed.
+
+Pick 7 was lost the same way as mock 16's pick 1, and now the mechanism is
+pinned down: a hidden waiting-room tab never redirects into the draft
+client. Its countdown crawled 35 seconds in nine minutes; the room opened
+on the server, the page changed to "Draft has Started! Enter Draft", and
+nothing moved until I reloaded the waiting-room URL and clicked that link
+(pick 13 by then). This is a Chrome background-tab effect on the waiting
+room, not the draft client: once in the room the driver drafted fine hidden
+in mocks 14-17. Saturday rule: draft tab in FRONT, in the room before the
+clock, driver injected before pick 1 -- the runbook already says so; the
+mocks have now shown twice what happens otherwise.
