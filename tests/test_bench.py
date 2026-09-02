@@ -214,6 +214,11 @@ def test_bench_pricing_yields_to_the_must_fill_window():
     assert all("bench insurance" not in w for _s, w, _p in t.recommendations(top_n=5))
 
 
-def test_default_is_off():
+def test_default_is_on_and_the_ab_knob_still_exists():
+    """Turned on 2026-09-01 after the season replay showed a win on both
+    leagues. The knob stays so the A/B can be re-run."""
     from draftkit.tracker import Tracker
-    assert Tracker.bench_insurance is False
+    assert Tracker.bench_insurance is True
+    t = make_tracker(BENCH_BOARD, MY_LINEUP, current_pick=101)
+    t.bench_insurance = False
+    assert t.recommendations(top_n=1)[0][2]["sleeper_id"] == "qb2"

@@ -699,3 +699,53 @@ twice as hard (Keefamania ~50 -> ~85 pts/season). That is the QB2's bye and
 injury weeks moving to waivers, priced at k=3 friction in the pool but at
 zero claim cost. In a rolling-list league that cost is not zero; it is the
 waiver-priority reasoning the in-season brief owes (cleanup item 4).
+
+## 2026-09-01 (9) — depth-aware insurance pricing is ON
+
+The pre-registered prediction from entry #8, and what happened:
+
+    prediction                              result
+    6th-WR picks disappear                  yes -- no Keefamania roster carries WR5+ on the insurance arm
+    Keefamania losing slots flip or flat    yes -- 5 better / 5 worse  ->  8 better / 0 worse / 2 tied
+    Omnibeta does not degrade               mostly -- 9/3/0 -> 10/1/1, but the mean fell +33.2 -> +23.9
+
+    insurance-priced bench minus VORP-priced bench, pts per season
+    keefamania   +2.6 (se 0.5)  5/5/0   ->   +12.9 (se 0.4)  8/0/2    600 seasons per roster
+    omnibeta    +33.2 (se 1.6)  9/3/0   ->   +23.9 (se 1.1)  10/1/1   200 seasons per roster
+
+The Omnibeta drop is worth being honest about rather than rounding to "held".
+The earlier +33 was carried by two RB9/WR2 rosters (slots 2 and 9, +76 and
++58) that the depth term reins in to RB6-7. What remains is a smaller, more
+even win with fewer losers, and the insurance arm now leans LESS on the wire
+in Omnibeta where before it leaned more. I read that as the refinement
+removing an over-bet rather than removing signal, but the prediction as
+written said "does not degrade" and the mean did.
+
+### Decision
+
+engine.bench_insurance defaults ON. The bar was a win on both leagues on a
+grader that shares no constant with the formula, and both clear it.
+
+### What the QB2 turned out to be
+
+The insurance arm still drafts a second quarterback in every Keefamania
+roster. The depth term ranks the FIRST QB reserve above the SECOND RB or WR
+reserve -- one starter, 3.6 expected weeks, +3.8/wk over the wire beats a
+second RB reserve who plays only when both RB starters sit -- and the season
+replay rewards that ordering. So the original symptom was never "a backup QB
+is wrong". It was "a backup QB before the first RB reserve is wrong", which
+is what the pricing now says. I had been telling the user the QB2 was close
+to a wasted pick; the measured answer is narrower than that.
+
+### Stop here
+
+This formula was revised once after seeing the grader, with the change
+pre-registered and its Omnibeta half only partly confirmed. A second revision
+against the same two draft logs would be fitting the test set. The next
+evidence that should move it is out of sample: 2026 actuals, or the grader
+run on drafts it has not seen.
+
+Grader limits carried forward: flat proj/17 weekly scoring (no variance), no
+in-season adds beyond filling an empty slot from the wire, zero claim cost in
+a rolling-list league, byes and injuries drawn independently across
+teammates.

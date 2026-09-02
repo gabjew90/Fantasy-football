@@ -56,11 +56,13 @@ class Tracker:
     # baseline (_fallback_points). Knob so the A/B stays runnable.
     adaptive_fallback = True
     # Bench rounds price candidates as INSURANCE -- weeks needed x edge over
-    # the waiver wire (draftkit/bench.py) -- instead of VORP against the
-    # starter baseline. OFF until the season-level replay shows it beating
-    # raw-VORP bench selection on both leagues' boards; until then it runs
-    # alongside for comparison (correction pass, 2026-09-01).
-    bench_insurance = False
+    # the waiver wire, depth-aware (draftkit/bench.py) -- instead of VORP
+    # against the starter baseline. ON since 2026-09-01: the season-level
+    # replay (scripts/season_replay.py, no shared constants) has it beating
+    # VORP bench selection on both leagues -- Keefamania +12.9 pts/season
+    # (8 better, 0 worse, 2 tied), Omnibeta +23.9 (10 / 1 / 1). Knob kept so
+    # the A/B stays runnable.
+    bench_insurance = True
     pool_min = 40
     pool_lookback = 20
     pool_lookahead = 60
