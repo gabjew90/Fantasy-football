@@ -510,3 +510,29 @@ room, not the draft client: once in the room the driver drafted fine hidden
 in mocks 14-17. Saturday rule: draft tab in FRONT, in the room before the
 clock, driver injected before pick 1 -- the runbook already says so; the
 mocks have now shown twice what happens otherwise.
+
+## Mock 18 — room 10488887 "Automatic First Down", 10 teams, slot 6 — clean, 15 of 15
+
+Roster: Jonathan Taylor, Achane, McBride, Javonte Williams, Tetairoa
+McMillan, Davante Adams, Trevor Lawrence, RJ Harvey, Kenny Gainwell,
+Wan'Dale Robinson, Mahomes (QB2, R11), Alec Pierce, Jakobi Meyers, Cam
+Little K, Chiefs DEF. Legal at every guardrail.
+
+Fifteen of fifteen picks by the driver at the turn, `verified: "store"`,
+zero gate / retry / away / queue events. This time the entry followed the
+new rule: wall-clock start, reload the waiting-room URL a minute before it,
+click "Enter Draft" the moment it appeared, inject during the 41-second
+pre-draft countdown -- the driver was running before pick 1.
+
+### Mocks 16-18 in one line each
+
+- 16 (slot 1): 14/15 live; pick 1 lost to a late entry (waiting-room tab).
+- 17 (slot 7): 14/15 live; pick 7 lost the same way, mechanism pinned down.
+- 18 (slot 6): 15/15 live, in the room before the clock.
+
+Across the three: 43 driver picks, 43 store-verified, no gate trips, never
+away, no autopick banner, every roster legal. The only losses were the two
+picks made before the driver was in the room, and the procedure that
+prevents that is now in the runbook and was executed in mock 18. The rig is
+done; what remains for Saturday is the projection-source decision
+(DECISIONS #21) and following the runbook to the letter.
