@@ -408,6 +408,81 @@ window.DK = (function () {
     return true;
   }
 
+  /* ---------------- the client's own state (design 2026-09-01, layer 2) ------
+   *
+   * The draft client is React + Redux. Its store holds everything the screen
+   * shows and more, as data: draftPicks.order[{id, teamId, playerId}],
+   * players.byId[pid]{fname, lname, primary_pos, team_abbr, bye, inj},
+   * draftOrder{currentPick, currentTeam}, league.managers[id]{teamId, away,
+   * loggedin}, context.managerId, countdown.seconds. Reading that instead of
+   * page text removes the feed parser, the roster parser and the header regex
+   * -- three of the four things that broke in mock 11 -- and it does not care
+   * which tab or layout is showing. Found by walking the React fiber tree for
+   * a Provider whose props carry a store (mock 12, 2026-09-01).
+   *
+   * If the store cannot be found (Yahoo restructures the app), everything
+   * below returns null and the DOM readers take over, loudly. */
+  function findStore() {
+    if (S.store && typeof S.store.getState === 'function') return S.store;
+    const queue = [];
+    for (const el of document.querySelectorAll('body, body *')) {
+      for (const k of Object.keys(el)) {
+        if (k.startsWith('__reactContainer$')) queue.push(el[k]);
+      }
+      if (el._reactRootContainer && el._reactRootContainer._internalRoot) {
+        queue.push(el._reactRootContainer._internalRoot.current);
+      }
+      if (queue.length) break;
+    }
+    const seen = new Set();
+    let n = 0;
+    while (queue.length && n < 200000) {
+      const f = queue.shift();
+      if (!f || seen.has(f)) continue;
+      seen.add(f); n++;
+      const p = f.memoizedProps || {};
+      if (p.store && typeof p.store.getState === 'function') { S.store = p.store; return p.store; }
+      if (p.value && p.value.store && typeof p.value.store.getState === 'function') { S.store = p.value.store; return p.value.store; }
+      if (f.child) queue.push(f.child);
+      if (f.sibling) queue.push(f.sibling);
+    }
+    return null;
+  }
+
+  /* One structured snapshot, or null. Positions come as Yahoo's codes; DEF is
+   * "DEF" there already. Names are "First Last" -- the bridge keys on
+   * first-initial + surname, so that matches the board. */
+  function storeState() {
+    const store = findStore();
+    if (!store) return null;
+    let s;
+    try { s = store.getState(); } catch (e) { return null; }
+    if (!s || !s.draftPicks || !s.players || !s.draftOrder) return null;
+    const byId = s.players.byId || {};
+    const managers = (s.league && s.league.managers) || {};
+    const me = s.context && managers[String(s.context.managerId)];
+    const myTeam = me ? String(me.teamId) : null;
+    const drafted = (s.draftPicks.order || []).filter(o => o && o.playerId).map(o => {
+      const p = byId[o.playerId] || {};
+      return { pick_no: +o.id, name: ((p.fname || '') + ' ' + (p.lname || '')).trim(),
+               pos: p.primary_pos || p.display_pos || '', team: p.team_abbr || '',
+               slot: null, mine: myTeam != null && String(o.teamId) === myTeam };
+    });
+    const away = Object.values(managers).filter(m => m.away).map(m => String(m.teamId));
+    return {
+      current_pick: +s.draftOrder.currentPick || null,
+      current_team: s.draftOrder.currentTeam != null ? String(s.draftOrder.currentTeam) : null,
+      my_team: myTeam,
+      on_clock: myTeam != null && String(s.draftOrder.currentTeam) === myTeam,
+      seconds: s.countdown ? s.countdown.seconds : null,
+      state: s.draft && s.draft.state,
+      drafted,
+      my_roster: drafted.filter(d => d.mine).map(d => ({ name: d.name, pos: d.pos })),
+      away_teams: away,
+      queue: (s.queue || []).map(String),
+    };
+  }
+
   /* ---------------- ranking ---------------- */
 
   /* Ask the real engine, from inside the page, at the moment of the pick.
@@ -436,13 +511,25 @@ window.DK = (function () {
        * The bridge reconciles them (yahoo_bridge.build_tracker). Mock 11
        * drafted from a plan that believed it was pick 4 with an empty roster
        * after a mid-draft reload, because only `drafted` was sent. */
+      /* Prefer the client's own store; fall back to the page readers and say
+       * so. The two must agree when both exist -- a disagreement is logged,
+       * and the store wins, because it is the data the screen was drawn from. */
+      const snap = storeState();
       const ros = myRoster();
+      const domDrafted = draftedFeed();
+      const domRoster = (ros ? ros.players : []).map(p => ({ name: p.disp, pos: p.pos }));
+      S.source = snap ? 'store' : 'dom';
+      if (snap && domDrafted.length && Math.abs(domDrafted.length - snap.drafted.length) > 3) {
+        note('store/dom disagree: store has ' + snap.drafted.length + ' picks, page text ' + domDrafted.length);
+      }
       const body = JSON.stringify({
         my_slot: slot, teams: S.cfg.teams, rounds: S.cfg.rounds,
-        depth: 25, drafted: draftedFeed(),
-        my_roster: (ros ? ros.players : []).map(p => ({ name: p.disp, pos: p.pos })),
-        current_pick: currentPickNo(),
+        depth: 25,
+        drafted: snap ? snap.drafted : domDrafted,
+        my_roster: snap ? snap.my_roster : domRoster,
+        current_pick: snap && snap.current_pick ? snap.current_pick : currentPickNo(),
         draft_key: location.pathname,   // the bridge keeps a per-draft union of the feed
+        source: S.source,
       });
       const r = await fetch(S.cfg.bridge + '/plan', {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body,
@@ -451,7 +538,7 @@ window.DK = (function () {
       if (j.err) { S.planErr = j.err; return 'engine error: ' + j.err; }
       S.plan = j.plan; S.planNeeds = j.needs; S.planPick = j.current_pick;
       S.planErr = null; S.planAt = Date.now();
-      return 'plan ' + (j.plan || []).length + ' deep @pick ' + j.current_pick;
+      return 'plan ' + (j.plan || []).length + ' deep @pick ' + j.current_pick + ' via ' + S.source;
     } catch (e) {
       S.planErr = String(e).slice(0, 120);
       return 'bridge unreachable: ' + S.planErr;
@@ -1245,18 +1332,26 @@ window.DK = (function () {
    */
   function gatesOk() {
     const why = [];
-    const hdr = currentPickNo();
-    if (!hdr) why.push('header pick unreadable');
+    const snap = storeState();
+    const hdr = (snap && snap.current_pick) || currentPickNo();
+    if (!hdr) why.push('current pick unreadable (no store, no header)');
     if (!S.plan || !S.plan.length) why.push('no plan');
     if (hdr && S.planPick != null && S.planPick !== hdr) {
       why.push('plan is for pick ' + S.planPick + ', header says ' + hdr);
     }
     if (S.planAt && Date.now() - S.planAt > 20000) why.push('plan stale (' + Math.round((Date.now() - S.planAt) / 1000) + 's)');
-    if (S.gone.size >= 25) {
-      why.push('gone set implausible (' + S.gone.size + ') -> cleared');
+    /* Per cycle, not absolute: over a whole draft the plan legitimately names
+     * many players who are then found drafted (it is padded from a header
+     * pick number, so it cannot know), and each of those is a correct "gone".
+     * What is NOT plausible is many in ONE cycle -- mock 11 marked 44 between
+     * two of our picks because no row could match. */
+    const added = S.gone.size - (S.goneAtGate || 0);
+    if (added >= 12) {
+      why.push('gone jumped by ' + added + ' since last gate -> cleared');
       S.gone = new Set();
     }
-    return { ok: why.length === 0, why, headerPick: hdr, planPick: S.planPick, gone: S.gone.size };
+    S.goneAtGate = S.gone.size;
+    return { ok: why.length === 0, why, headerPick: hdr, planPick: S.planPick, gone: S.gone.size, goneAdded: added };
   }
 
   async function run(maxSeconds) {
@@ -1396,7 +1491,7 @@ window.DK = (function () {
       S.gone = new Set(); S.starred = new Set(); S.log = []; S.lastRoster = -1;
       return 'reset';
     },
-    rank, syncQueue, draftTop, run, gatesOk,
+    rank, syncQueue, draftTop, run, gatesOk, storeState, findStore,
     classifyMiss, rowMatches, normTeam, autopickArmed, idKey, // exported for tests
     survivalProb, eBestNext, calibrate,
     reconcileStarred, reconcileStarredWith,
