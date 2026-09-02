@@ -158,7 +158,23 @@ window.DK = (function () {
    * forgotten. And it labels our own picks "You", which is authoritative in a
    * way snake arithmetic is not: this very draft reshuffled us from slot 3 to
    * slot 10 before it began. */
+  /* The LEFT panel has two tabs, Queue and Picks, and only the visible one
+   * is in the page text. The room opens on Queue. Mock 11 (2026-09-01) ran
+   * its first two picks with an EMPTY feed for exactly that reason: the
+   * bridge was told it was pick 1 with nothing drafted, and planned
+   * accordingly. Assert the tab before reading, the same way
+   * ensurePlayersTab asserts the right-hand pane before a row search. */
+  function ensureLeftTab(name) {
+    const tab = [...document.querySelectorAll('button')]
+      .find(b => b.textContent.replace(/\d+/g, '').trim() === name);
+    if (!tab) return false;
+    // aria-selected is the only reliable signal; absent counts as "not"
+    if (tab.getAttribute('aria-selected') !== 'true') tab.click();
+    return true;
+  }
+
   function parsePicksPanel() {
+    ensureLeftTab('Picks');
     const L = document.body.innerText.split(String.fromCharCode(10)).map(s => s.trim());
     const POS = /^(QB|RB|WR|TE|K|DEF)$/;
     const out = [];
@@ -181,8 +197,34 @@ window.DK = (function () {
     return out;
   }
 
+  /* The accumulated feed survives a page reload via sessionStorage (keyed
+   * by the draft URL), because the Picks panel does not: after a reload it
+   * shows only the last few picks, and mock 11 briefly planned as if it were
+   * pick 4 in round 14. The bridge keeps its own union too; this is the
+   * page-side half so a fresh driver is never blind. */
+  // guarded: the node test harness has no location or sessionStorage
+  const FEED_KEY = 'dk.seenPicks:' + (typeof location !== 'undefined' ? location.pathname : '');
+  function restoreFeed() {
+    if (S.seenPicks.size) return;
+    try {
+      const raw = sessionStorage.getItem(FEED_KEY);
+      if (!raw) return;
+      for (const p of JSON.parse(raw)) S.seenPicks.set(p.pick_no, p);
+    } catch (e) { /* storage unavailable: live reads still work */ }
+  }
+  function persistFeed() {
+    try {
+      sessionStorage.setItem(FEED_KEY, JSON.stringify([...S.seenPicks.values()]));
+    } catch (e) { /* quota or private mode: not fatal */ }
+  }
+
   function draftedFeed() {
-    for (const p of parsePicksPanel()) S.seenPicks.set(p.pick_no, p);
+    restoreFeed();
+    for (const p of parsePicksPanel()) {
+      const prev = S.seenPicks.get(p.pick_no);
+      if (!prev || (p.mine && !prev.mine)) S.seenPicks.set(p.pick_no, p);
+    }
+    persistFeed();
     return [...S.seenPicks.values()].sort((a, b) => a.pick_no - b.pick_no);
   }
 
@@ -385,9 +427,22 @@ window.DK = (function () {
     const slot = S.cfg.mySlot || slotFromUrl();
     if (!slot) return 'unknown draft slot';
     try {
+      /* Three views of the same draft, because each one fails alone:
+       *   drafted   -- the Picks panel, which VIRTUALISES (after a reload it
+       *                shows only the last few picks) and whose "You" label
+       *                is missing on autopicks;
+       *   my_roster -- the roster panel, authoritative for what WE hold;
+       *   current_pick -- the header, authoritative for WHERE we are.
+       * The bridge reconciles them (yahoo_bridge.build_tracker). Mock 11
+       * drafted from a plan that believed it was pick 4 with an empty roster
+       * after a mid-draft reload, because only `drafted` was sent. */
+      const ros = myRoster();
       const body = JSON.stringify({
         my_slot: slot, teams: S.cfg.teams, rounds: S.cfg.rounds,
         depth: 25, drafted: draftedFeed(),
+        my_roster: (ros ? ros.players : []).map(p => ({ name: p.disp, pos: p.pos })),
+        current_pick: currentPickNo(),
+        draft_key: location.pathname,   // the bridge keeps a per-draft union of the feed
       });
       const r = await fetch(S.cfg.bridge + '/plan', {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body,
@@ -797,10 +852,18 @@ window.DK = (function () {
     return true;
   }
 
+  /* The length cap exists only to skip page-sized containers; the smallest
+   * element that matches AND carries a star/Draft button is the row. It was
+   * 260, tuned to the compact layout. Mock 11 (2026-09-01) opened in Yahoo's
+   * EXPANDED stats layout, where a row's text runs to ~400 chars, so no row
+   * ever passed, every recommended player was recorded "gone" (other rows
+   * were visibly rendering), and the driver drafted four tight ends off the
+   * unfiltered tail of the plan. */
+  const ROW_TEXT_CAP = 1500;
   function findRow(entry) {
     const rows = [...document.querySelectorAll('div,li,tr')].filter(e => {
       const x = (e.innerText || '').replace(/\s+/g, ' ');
-      if (x.length > 260) return false;
+      if (x.length > ROW_TEXT_CAP) return false;
       if (!rowMatches(entry, x)) return false;
       return isPlayerRow(e);      // star OR Draft button; see isPlayerRow
     }).sort((a, b) => (a.innerText || '').length - (b.innerText || '').length);
@@ -910,6 +973,7 @@ window.DK = (function () {
   }
 
   function queueNames() {
+    ensureLeftTab('Queue');           // the other left-panel tab; see parsePicksPanel
     const qp = [...document.querySelectorAll('div')]
       .filter(e => /Autodraft will pick/i.test(e.innerText || '') && (e.innerText || '').length < 2000)
       .sort((a, b) => (b.innerText || '').length - (a.innerText || '').length)[0];
@@ -1031,8 +1095,14 @@ window.DK = (function () {
         simHave++;
         results.push(cand.n + ':ok');
       }
-      else if (res === 'norow' || res === 'nostar') {
+      else if (res === 'norow') {
         markGone(entry); results.push(cand.n + ':' + res + '->gone');
+      } else if (res === 'nostar') {
+        /* The row IS there (findRow saw a star or a Draft button) but the
+         * star specifically is not -- Yahoo swaps it for "Draft" on our turn.
+         * That is a UI state, not a drafted player; recording it as gone was
+         * one more way a present player left the plan (mock 11). */
+        results.push(cand.n + ':' + res);
       } else {
         results.push(cand.n + ':' + res);   // UI not ready: never mark gone
         break;

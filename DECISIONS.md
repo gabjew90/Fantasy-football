@@ -749,3 +749,30 @@ Grader limits carried forward: flat proj/17 weekly scoring (no variance), no
 in-season adds beyond filling an empty slot from the wire, zero claim cost in
 a rolling-list league, byes and injuries drawn independently across
 teammates.
+
+## 2026-09-01 (10) — mock 11: the driver, not the engine
+
+Ran the first live mock on the rebuilt engine and drafted four tight ends.
+Not one of them was the engine's call: every time the bridge was handed a
+correct state it answered sensibly, and the one place it could have said
+"TE3" -- the unguardrailed depth tail -- it now cannot. The failures were all
+in the page-side driver reading Yahoo's UI, and the largest was a layout
+difference (expanded stats view) that made every row lookup miss and every
+miss get recorded as "drafted". Seven defects, each with a fix and a test;
+docs/draft-rig-mock-log.md has the table.
+
+Two structural changes came out of it:
+
+* The page now sends THREE views of the draft -- the Picks feed, the roster
+  panel, and the header's pick number -- and the bridge reconciles them,
+  because each one fails alone. Both sides also remember every pick ever
+  seen (sessionStorage in the page, a per-draft union in the bridge).
+* The plan's depth tail goes through _pos_allowed like every other candidate.
+
+Standing rules added to the checklist: never reload the draft page mid-draft
+(the driver loop dies, autopick arms, and re-evaluating the driver does not
+stop the old loop); never trust a single UI reading -- the layout can differ
+room to room.
+
+The mock that finally had the engine right produced the worst roster of the
+eleven. That is the correct order to find things in.

@@ -88,3 +88,122 @@ def test_our_picks_are_attributed_to_us():
     ours = [d["pick_no"] for d in feed
             if snake.pick_to_round_slot(d["pick_no"], teams)[1] == my_slot]
     assert ours == [10, 11], ours      # slot 10 picks back-to-back at the turn
+
+
+# ---------- mock 11 (2026-09-01): reconciling the page's three views ----------
+
+class _Cfg:
+    """Minimal stand-in for draftkit.config.Config: only .get() is used."""
+    def __init__(self):
+        self._d = {
+            "expected": {"teams": 10, "rounds": 15, "roster": KEEFAMANIA_ROSTER},
+            "engine": {"sims": 50, "pool_min": 20},
+            "guardrails": {"qb2_earliest_round": 10, "te2_fall_picks": 12},
+        }
+
+    def get(self, k, default=None):
+        return self._d.get(k, default)
+
+
+def _players():
+    out, i = [], 0
+    for pos, n in (("QB", 6), ("RB", 12), ("WR", 12), ("TE", 6), ("K", 3), ("DEF", 3)):
+        for j in range(n):
+            i += 1
+            out.append({"sleeper_id": str(i), "name": f"{pos} Player{j}", "pos": pos,
+                        "team": "XX", "vorp": 100.0 - i, "vorp_flex": 90.0 - i,
+                        "proj_pts": 300.0 - i, "adp": float(i), "adp_delta": 0.0,
+                        "tier": 1, "pos_rank": j + 1, "value_rank": i,
+                        "cliff_flag": False, "upside_flag": False,
+                        "proj_source": "blend", "backs_up": "", "backs_up_pos": "",
+                        "starter_fragility_label": "", "starter_exp_games": None,
+                        "starter_avail": None})
+    return out
+
+
+def test_roster_panel_attributes_picks_the_feed_left_unlabelled():
+    """The Picks panel's "You" label is missing on autopicks and after a
+    reload the panel holds only the last few picks. The roster panel is
+    authoritative for what WE hold, so it is a second attribution source."""
+    players = _players()
+    state = {"my_slot": 8, "teams": 10, "rounds": 15,
+             # feed knows two of our picks but labels neither "You"
+             "drafted": [{"pick_no": 8, "name": "TE Player0", "pos": "TE"},
+                         {"pick_no": 13, "name": "TE Player1", "pos": "TE"}],
+             "my_roster": [{"name": "T. Player0", "pos": "TE"},
+                           {"name": "T. Player1", "pos": "TE"}]}
+    t = yb.build_tracker(_Cfg(), players, state)
+    assert t._my_pos_counts() == {"TE": 2}
+    assert t.my_needs()["TE"] == 0
+
+
+def test_roster_players_missing_from_the_feed_are_still_our_picks():
+    players = _players()
+    state = {"my_slot": 8, "teams": 10, "rounds": 15,
+             "drafted": [{"pick_no": 71, "name": "RB Player9", "pos": "RB"}],
+             "my_roster": [{"name": "T. Player0", "pos": "TE"},
+                           {"name": "Q. Player0", "pos": "QB"}]}
+    t = yb.build_tracker(_Cfg(), players, state)
+    assert t._my_pos_counts() == {"TE": 1, "QB": 1}
+
+
+def test_header_pick_number_is_authoritative_for_where_we_are():
+    """A feed of three picks after a reload must not make the engine believe
+    it is pick 4 in round 1."""
+    players = _players()
+    state = {"my_slot": 8, "teams": 10, "rounds": 15, "current_pick": 74,
+             "drafted": [{"pick_no": n, "name": f"RB Player{n - 71}", "pos": "RB"}
+                         for n in (71, 72, 73)],
+             "my_roster": []}
+    t = yb.build_tracker(_Cfg(), players, state)
+    assert t.current_pick == 74
+    # fillers remove nobody real from the board
+    assert all(p["sleeper_id"] not in t.state.drafted_ids
+               for p in players if p["name"] not in ("RB Player0", "RB Player1", "RB Player2"))
+
+
+def test_depth_tail_obeys_the_guardrails():
+    """The tail past the engine's named candidates used to be raw VORP order
+    with nothing said about position. With two tight ends rostered it offered
+    TE3 and TE4; the page took both."""
+    players = _players()
+    state = {"my_slot": 8, "teams": 10, "rounds": 15, "current_pick": 28,
+             "drafted": [],
+             "my_roster": [{"name": "T. Player0", "pos": "TE"},
+                           {"name": "T. Player1", "pos": "TE"},
+                           {"name": "Q. Player0", "pos": "QB"}]}
+    t = yb.build_tracker(_Cfg(), players, state)
+    tail = yb.depth_tail(t, [], 40)
+    positions = {x["p"] for x in tail}
+    assert "TE" not in positions, "never a third tight end"
+    assert "QB" not in positions, "no QB2 before the round gate"
+    assert "K" not in positions and "DEF" not in positions, "K/DEF wait for the end"
+    assert positions <= {"RB", "WR"}
+
+
+def test_merge_feed_keeps_the_union_across_partial_views():
+    """The Picks panel virtualises and a reload shows only the last few picks;
+    the bridge outlives both and keeps every pick it has ever been shown."""
+    mem = {}
+    yb.merge_feed(mem, [{"pick_no": 1, "name": "A", "pos": "RB"},
+                        {"pick_no": 2, "name": "B", "pos": "WR"}])
+    got = yb.merge_feed(mem, [{"pick_no": 9, "name": "C", "pos": "TE"}])
+    assert [d["pick_no"] for d in got] == [1, 2, 9]
+
+
+def test_merge_feed_never_forgets_and_learns_the_you_label():
+    mem = {}
+    yb.merge_feed(mem, [{"pick_no": 8, "name": "T. McBride", "pos": "TE"}])
+    got = yb.merge_feed(mem, [{"pick_no": 8, "name": "T. McBride", "pos": "TE", "mine": True}])
+    assert got[0]["mine"] is True
+    # a later unlabelled view does not strip the label
+    got = yb.merge_feed(mem, [{"pick_no": 8, "name": "T. McBride", "pos": "TE"}])
+    assert got[0]["mine"] is True
+
+
+def test_merge_feed_ignores_garbage_pick_numbers():
+    mem = {}
+    got = yb.merge_feed(mem, [{"pick_no": "x", "name": "A", "pos": "RB"},
+                              {"pick_no": None, "name": "B", "pos": "RB"},
+                              {"pick_no": "3", "name": "C", "pos": "RB"}])
+    assert [d["pick_no"] for d in got] == ["3"]

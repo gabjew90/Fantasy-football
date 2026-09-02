@@ -52,6 +52,20 @@ def key(n: str) -> str:
     return parts[0] if len(parts) == 1 else parts[0][0] + " " + parts[-1]
 
 
+def pkey(name: str, pos: str | None) -> str:
+    """Identity key for matching the page's text to the board.
+
+    Team defenses have no first name: the board says "Houston Texans" and the
+    roster panel says "DEF Texans", which key() turns into "h texans" and
+    "d texans" -- so in mock 11 our drafted defense was never attributed and
+    the engine kept a DEF slot open all draft. Defenses match on the nickname.
+    """
+    if str(pos or "").upper() in ("DEF", "DST"):
+        parts = norm(name).split()
+        return parts[-1] if parts else ""
+    return key(name)
+
+
 FLEX_NAMES = {"W/R/T", "WRT", "W/R", "FLEX", "W/T", "R/W/T"}
 
 
@@ -152,14 +166,26 @@ def build_tracker(cfg: Config, players: list[dict], state: dict) -> Tracker:
 
     by_key = {}
     for p in players:
-        by_key.setdefault((key(p["name"]), p["pos"]), p)
+        by_key.setdefault((pkey(p["name"], p["pos"]), p["pos"]), p)
+
+    # SECOND source of "whose pick was it": the roster panel. The page sends
+    # my_roster (name + pos read off "YOUR TEAM"), and a drafted entry whose
+    # name+pos appears there is ours whether or not the Picks panel labelled
+    # it "You". Mock 11 (2026-09-01) drafted a THIRD tight end at pick 28
+    # after a plan that saw no roster at all -- the panel's label was not
+    # readable at our turn, every pick came through unattributed, and with an
+    # empty roster the TE market was open and urgent.
+    mine_keys = {(pkey(r.get("name", ""), r.get("pos", "")), str(r.get("pos", "")).upper())
+                 for r in (state.get("my_roster") or [])}
 
     picks = []
     for d in state.get("drafted", []):
-        p = by_key.get((key(d["name"]), d.get("pos", "")))
+        p = by_key.get((pkey(d["name"], d.get("pos", "")), d.get("pos", "")))
         if not p:
             continue
         pick_no = int(d["pick_no"])
+        if (pkey(d["name"], d.get("pos", "")), str(d.get("pos", "")).upper()) in mine_keys:
+            d = dict(d, mine=True)
         # Whose pick was it?
         #
         # Yahoo's pick feed names the player and the pick number but not the
@@ -182,10 +208,102 @@ def build_tracker(cfg: Config, players: list[dict], state: dict) -> Tracker:
             "pick_no": pick_no, "player_id": p["sleeper_id"],
             "draft_slot": slot, "round": rnd,
         })
+    # RECONCILE the three views the page sends (see draft_driver.refreshPlan).
+    # 1. Roster panel players missing from the feed are still OUR picks. After
+    #    a mid-draft reload the Picks panel shows only the last few picks, so
+    #    without this the engine sees an empty roster, every slot open, and
+    #    the TE market urgent again.
+    have_ids = {x["player_id"] for x in picks}
+    mine_ids = {x["player_id"] for x in picks if x["draft_slot"] == t.my_slot}
+    next_filler = (max((x["pick_no"] for x in picks), default=0) + 1)
+    for r in state.get("my_roster") or []:
+        p = by_key.get((pkey(r.get("name", ""), r.get("pos", "")), str(r.get("pos", "")).upper()))
+        if not p or p["sleeper_id"] in have_ids:
+            continue
+        picks.append({"pick_no": next_filler, "player_id": p["sleeper_id"],
+                      "draft_slot": t.my_slot,
+                      "round": snake.pick_to_round_slot(next_filler, teams)[0]})
+        have_ids.add(p["sleeper_id"]); mine_ids.add(p["sleeper_id"])
+        next_filler += 1
+    # 2. The header's pick number is authoritative for WHERE we are. Pad with
+    #    anonymous rival picks so current_pick, the survival window and the
+    #    round-gated guardrails line up, even when the feed is partial. The
+    #    fillers remove nobody from the board, so the sim errs toward "still
+    #    available" -- which the driver's own row lookup then corrects.
+    cur = state.get("current_pick")
+    if cur:
+        cur = int(cur)
+        while len(picks) + 1 < cur:
+            n = len(picks) + 1
+            rnd, slot = snake.pick_to_round_slot(n, teams)
+            picks.append({"pick_no": n, "player_id": f"unknown{n}",
+                          "draft_slot": 0 if slot == t.my_slot else slot,
+                          "round": rnd})
+    picks.sort(key=lambda x: x["pick_no"])
     t.state = TrackerState(picks=picks,
                            drafted_ids={x["player_id"] for x in picks},
                            status="drafting")
     return t
+
+
+def merge_feed(memory: dict, drafted: list[dict]) -> list[dict]:
+    """Union the page's current view of the Picks panel into what the bridge
+    has already seen, keyed by pick number.
+
+    The panel virtualises and, after a page reload, shows only the last few
+    picks. In mock 11 a reload at pick 133 left the engine believing
+    McCaffrey was still available. The bridge is long-lived and has seen
+    every pick go by, so it keeps the union; a later view never REMOVES a
+    pick, it can only add or relabel one (a "You" flag learned later wins).
+    """
+    for d in drafted or []:
+        try:
+            n = int(d.get("pick_no"))
+        except (TypeError, ValueError):
+            continue
+        prev = memory.get(n)
+        if prev is None or (d.get("mine") and not prev.get("mine")):
+            memory[n] = dict(d)
+    return [memory[k] for k in sorted(memory)]
+
+
+def depth_tail(t: Tracker, plan: list[dict], depth: int) -> list[dict]:
+    """Pad a plan past the engine's named candidates -- under the SAME
+    guardrails the engine applies.
+
+    The tail exists so the page still has somewhere to go when everything the
+    engine named is gone by our turn. It used to be raw VORP order with only
+    drafted/no_market removed, which is how mock 11 (2026-09-01) took FOUR
+    tight ends: once the page had wrongly marked the real recommendations as
+    gone, the next entries were TE3, TE4 and a defense in round 3, and nothing
+    in the tail said no. _pos_allowed is the single source of those rules;
+    the tail goes through it like every other candidate.
+    """
+    if len(plan) >= depth:
+        return plan
+    named = {(x["n"], x["p"]) for x in plan}
+    rnd, _ = snake.pick_to_round_slot(
+        min(t.current_pick, t.teams * t.rounds), t.teams)
+    counts = t._my_pos_counts()
+    picks_left = t.rounds - len(t.picks_for_slot(t.my_slot))
+    top6_te_fell = any(
+        q["pos_rank"] <= 6 and q.get("adp") is not None
+        and t.current_pick - q["adp"] >= t.te2_fall
+        for q in t.remaining("TE"))
+    out = list(plan)
+    for p in t.players:
+        if len(out) >= depth:
+            break
+        if p["sleeper_id"] in t.state.drafted_ids:
+            continue
+        if (p["name"], p["pos"]) in named or p.get("proj_source") == "no_market":
+            continue
+        if not t._pos_allowed(p["pos"], rnd, counts, picks_left, top6_te_fell):
+            continue
+        out.append({"n": p["name"], "p": p["pos"], "t": p["team"],
+                    "v": round(float(p["vorp"] or 0.0), 1), "a": p["adp"],
+                    "why": "depth fallback (engine list exhausted)"})
+    return out
 
 
 def main() -> None:
@@ -210,18 +328,7 @@ def main() -> None:
 
     # Depth beyond the engine's per-position candidates: if everything it
     # named is gone by the time we pick, the page still needs somewhere to go.
-    named = {(x["n"], x["p"]) for x in plan}
-    drafted = t.state.drafted_ids
-    for p in players:
-        if len(plan) >= a.depth:
-            break
-        if p["sleeper_id"] in drafted or (p["name"], p["pos"]) in named:
-            continue
-        if p.get("proj_source") == "no_market":
-            continue
-        plan.append({"n": p["name"], "p": p["pos"], "t": p["team"],
-                     "v": round(float(p["vorp"] or 0.0), 1),
-                     "a": p["adp"], "why": "depth fallback (engine list exhausted)"})
+    plan = depth_tail(t, plan, a.depth)
 
     out = {
         "current_pick": t.current_pick,

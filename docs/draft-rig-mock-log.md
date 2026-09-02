@@ -277,3 +277,42 @@ TEs, which is the exact call greedy VONA got wrong at slot 9.
 
 Bug 30 is the one worth remembering: the labelled fallback is what made it
 visible. A silent downgrade would have looked like a working draft.
+
+## Mock 11 — room 10427764 "Hail Mary", 10 teams, slot 8 — the worst roster and the best run
+
+Final roster: McBride, Bowers, Warren, Pitts (FOUR tight ends), Lawrence and
+Stafford at QB, two defenses, and Yahoo put us into autopick for inactivity
+during a mid-draft reload. Every one of those outcomes traced to a defect
+that is now fixed and tested. The engine itself was never wrong: every time
+the bridge was handed a correct state it answered sensibly (Adams / Maye /
+Skattebo with TE need 0), and the depth-tail excepted, it never offered a
+third tight end.
+
+| # | Bug | Root cause | Fix |
+|---|-----|-----------|-----|
+| 33 | First two picks planned from an EMPTY feed (bridge thought it was pick 1) | The Picks panel's text only exists while the left panel's **Picks** tab is showing; the room opens on **Queue**. `parsePicksPanel` read nothing, so nothing was drafted and nobody was rostered | `ensureLeftTab('Picks')` before every feed read; `ensureLeftTab('Queue')` before reading the queue |
+| 34 | **Every recommended player marked "gone", every cycle** (44 in the set at one point) | `findRow` capped candidate elements at 260 chars, tuned to the compact layout. This room opened in Yahoo's **expanded stats** layout where a row's text is ~400 chars, so no element with a star ever passed; other rows rendered, so `classifyMiss` said *gone*. The real recommendations vanished and the driver drafted from what was left | `ROW_TEXT_CAP = 1500`; the smallest element matching AND carrying a star/Draft button is the row |
+| 35 | What was left was **tight ends and defenses** | The plan's depth-fallback tail was raw VORP order with only drafted/no_market removed -- no guardrails. With TE the shallowest position, TE3/TE4/DEF sat at the top of the tail | `yahoo_bridge.depth_tail` runs the tail through `_pos_allowed`, the same predicate as every other candidate |
+| 36 | `nostar` recorded as gone | On our turn Yahoo swaps the star for a **Draft** button; a found row with no star is a UI state, not a drafted player | only `norow` marks gone |
+| 37 | After a reload, plan believed it was **pick 4 in round 14** with an empty roster | The Picks panel shows only the last few picks after a reload; `refreshPlan` sent only `drafted` | The page now sends `my_roster` (roster panel) and `current_pick` (header) too; the bridge attributes roster players as ours and pads to the header's pick; both the page (sessionStorage) and the bridge (per-draft union, `merge_feed`) remember every pick seen |
+| 38 | Our defense never attributed; DEF slot "open" all draft | Roster panel says "DEF Texans", board says "Houston Texans"; `key()` made "d texans" vs "h texans" | `pkey()`: defenses match on the nickname |
+| 39 | Bijan/Brian collision guard silently OFF | Only `loadCompact()` built the collision set; the JSON `load()` path (bridge-served board) never did | `markCollisions()` shared by both |
+
+Two things worth remembering beyond the table.
+
+**The labelled fallback saved the diagnosis again.** `rank().source` said `engine`
+throughout, which ruled out the local ranker in one call and pointed straight
+at the gone-set. Bug 34 was found by clearing `S.gone` (`DK.reset()`),
+watching the ranking snap back to Adams / Warren / Stafford / Brown, and
+watching it re-poison within one sync cycle.
+
+**Reloading the page mid-draft was my mistake, not Yahoo's.** It killed the
+driver loop (Yahoo armed autopick for inactivity) and threw away the feed.
+The fixes in 37 make a reload survivable; the standing rule is still do not
+do it. Re-evaluating the driver in place is not a fix either -- the old loop
+keeps running in its own closure.
+
+Also seen: Yahoo enforces a per-position draft cap with a modal ("maximum
+number of TEs you can draft (4)"), which blocks the click and has to be
+dismissed. The driver does not yet handle that modal; with 35 fixed it should
+never be provoked.

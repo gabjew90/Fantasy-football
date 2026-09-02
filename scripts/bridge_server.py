@@ -43,22 +43,19 @@ _STATE = {"cfg": None, "players": None, "league": None, "calls": 0}
 def build_plan(state: dict, depth: int) -> dict:
     with _LOCK:
         cfg, players = _STATE["cfg"], _STATE["players"]
+        # The bridge outlives page reloads; the Picks panel does not. Keep the
+        # union of every view of the feed per draft (yahoo_bridge.merge_feed).
+        feed_key = str(state.get("draft_key") or f"{state.get('teams')}x{state.get('my_slot')}")
+        memory = _STATE.setdefault("feed", {}).setdefault(feed_key, {})
+        state = dict(state, drafted=YB.merge_feed(memory, state.get("drafted") or []))
         t = YB.build_tracker(cfg, players, state)
         recs = t.recommendations(top_n=depth)
         plan = [{"n": p["name"], "p": p["pos"], "t": p["team"],
                  "v": round(float(p["vorp"] or 0.0), 1), "a": p["adp"],
                  "why": why} for _s, why, p in recs]
-        named = {(x["n"], x["p"]) for x in plan}
-        for p in players:
-            if len(plan) >= depth:
-                break
-            if p["sleeper_id"] in t.state.drafted_ids:
-                continue
-            if (p["name"], p["pos"]) in named or p.get("proj_source") == "no_market":
-                continue
-            plan.append({"n": p["name"], "p": p["pos"], "t": p["team"],
-                         "v": round(float(p["vorp"] or 0.0), 1), "a": p["adp"],
-                         "why": "depth fallback (engine list exhausted)"})
+        # the tail past the engine's named candidates goes through the same
+        # guardrails as everything else (see yahoo_bridge.depth_tail)
+        plan = YB.depth_tail(t, plan, depth)
         _STATE["calls"] += 1
         return {"current_pick": t.current_pick, "my_slot": t.my_slot,
                 "needs": t.my_needs(), "plan": plan, "calls": _STATE["calls"]}
@@ -120,10 +117,19 @@ class Handler(BaseHTTPRequestHandler):
             n = int(self.headers.get("Content-Length") or 0)
             state = json.loads(self.rfile.read(n) or b"{}")
             depth = int(state.pop("depth", 25))
-            self._json(build_plan(state, depth))
-            top = _STATE.get("last_top")
-            print(f"  plan #{_STATE['calls']} pick {state.get('my_slot')}"
-                  f" -> served", flush=True)
+            plan = build_plan(state, depth)
+            self._json(plan)
+            drafted = state.get("drafted") or []
+            n_mine = sum(1 for d in drafted if d.get("mine"))
+            roster = state.get("my_roster") or []
+            head = ", ".join(f"{x['n']} ({x['p']})" for x in (plan.get("plan") or [])[:3])
+            # Log the STATE the page handed us, not just that we answered: the
+            # third-TE pick of mock 11 was invisible in a log that only said
+            # "served". If n_mine is 0 while roster is not, the panel's "You"
+            # label was unreadable and the roster fallback is doing the work.
+            print(f"  plan #{_STATE['calls']} @pick {plan.get('current_pick')} "
+                  f"drafted={len(drafted)} mine={n_mine} roster={len(roster)} "
+                  f"needs={plan.get('needs')} -> {head}", flush=True)
         except Exception as e:  # noqa: BLE001
             traceback.print_exc()
             self._json({"err": f"{type(e).__name__}: {e}"}, 500)
