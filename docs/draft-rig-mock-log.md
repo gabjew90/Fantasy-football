@@ -536,3 +536,38 @@ picks made before the driver was in the room, and the procedure that
 prevents that is now in the runbook and was executed in mock 18. The rig is
 done; what remains for Saturday is the projection-source decision
 (DECISIONS #21) and following the runbook to the letter.
+
+## Mock 19 — room 10501573 "Botched Snap", 10 teams, slot 10 — no-click picks, two injected faults, 15 of 15
+
+First mock on the client-action pick path (DECISIONS: driver commit
+a9b4ba4). Roster: McCaffrey, Achane, Rashee Rice, Garrett Wilson, Drake
+Maye, Kittle, Gainwell, RJ Harvey, Aaron Jones, Wan'Dale Robinson, Mahomes
+(QB2, R11), Sutton, Woody Marks, Rams DEF, McPherson K. Legal.
+
+Fifteen of fifteen by the driver, in the room before pick 1 (entered via
+the wall-clock reload). Fourteen picks went through Yahoo's own `makePick`
+thunk -- no search, no row, no button -- and landed in the store in 300-530
+ms; zero gate / retry / notours / queue events; never `away`.
+
+Two faults injected on purpose, both recovered:
+
+- Pick 70: the cached `makePick` replaced with a no-op right before the
+  turn. The action was called once, timed out (3 s), the driver fell back
+  to the DOM click and the store verified Gainwell as `via: click`. The
+  fault then disarmed itself and pick 71 (RJ Harvey) went back through the
+  action in 526 ms.
+- After pick 71: our own away flag forced on with Yahoo's real
+  `setAwayStatus(true)`. keepAlive saw `store=true` in the same cycle and
+  cleared it with `setAwayStatus(false)` -- no toggle click -- and a
+  one-second poll never caught the flag afterwards.
+
+Proof-of-engine, from the pick records (each carries the engine's reason
+and the best-available-by-projection alternative): the engine did NOT take
+the top projection at any of its 15 picks. Josh Allen was the top
+projection available at picks 10, 11, 30 and 31 and was passed each time
+("waiting costs ~1-10 pts at QB"); he went 32nd. McCaffrey fell to 10 and
+was taken as "last RB at this level, big drop after him"; Maye at 50 as the
+slot fill after Allen went; rounds 7-13 were priced as bench insurance
+("covers 3 RB starters ~9.6 wks, +9.1/wk over the wire ≈ 88 pts") rather
+than by raw points. Pivots when a target went: McBride and London at 30/31
+-> Rice and Wilson; Dobbins at 90 -> Aaron Jones.
