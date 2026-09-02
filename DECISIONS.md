@@ -862,3 +862,20 @@ three engine-side deliveries (namesakes, structural-only guardrail) are the
 kind of defect that would have cost real picks on Saturday. Mock 14 runs the
 fixed driver end to end; the open question is whether the store's away flag
 can diverge from the server's autopick state without the toggle storm.
+
+## 2026-09-02 (14) — mock 14: perfect on the stated bar
+
+Fifteen of fifteen picks made by the engine at the turn, store-verified, no
+autopick, no gate trip, legal roster. The three fixes from mock 13 (namesake
+resolver, structural-only guardrail, store-first autopick state) were all
+exercised live and held. The rig is not fragile in the way mocks 11-13
+were; what remains to grade is the engine's picks, which is the CLV retro's
+job once closing ADP exists.
+
+Layer 0 on the real league is now complete: the twelve names Yahoo's importer
+skipped were added by hand through the page's surname search (all deep
+bench, appended in board order), and DK Metcalf -- who had been appended to
+the bottom by a hand-star on 2026-09-01 -- was moved to his board position
+(72) with the page's Select -> "Move after..." flow. 240 of 240, saved,
+has_preranks confirmed. Both flows are ported into scripts/prerank_driver.js
+(PR.addMissing, PR.moveAfter) for the draft-morning rebuild.

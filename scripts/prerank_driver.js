@@ -171,6 +171,65 @@ window.PR = (function () {
       tab('All Players');
       return { preferred: pref.count, ordered: S.order.length, unmatched: out };
     },
+    /* Star up to n of the board players the importer skipped, in board
+     * order, through the All Players search box (surname). Each lands at the
+     * END of My Preferred, so the tail ends up in board order. Call in
+     * slices of ~3: Yahoo re-renders for a second per search and a devtools
+     * eval is cut off at 45 s. Returns what it did; 'NONE' means no row
+     * matched (name, then team, then a lone candidate) -- resolve by hand.
+     * Flow verified live on the league page 2026-09-02. */
+    async addMissing(n) {
+      const u = await this.unmatched();
+      if (u.err) return u;
+      if (tab('All Players')) await sleep(900);
+      const inp = [...document.querySelectorAll('input')].find(i => /Search players/i.test(i.placeholder || ''));
+      if (!inp) return note('no player search box');
+      const setIn = (v) => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(inp, v); inp.dispatchEvent(new Event('input', { bubbles: true })); };
+      const res = [];
+      for (const line of u.unmatched.slice(0, n || 3)) {
+        const m = line.match(/^(.*) (QB|RB|WR|TE|K|DEF) (\S+)$/);
+        if (!m) { res.push(line + ' -> unparsed'); continue; }
+        const [, name, pos, team] = m;
+        const sur = pos === 'DEF' ? name.split(' ').pop() : name.replace(/\s+(Jr\.?|Sr\.?|II|III|IV|V)$/, '').split(' ').pop();
+        setIn(sur); await sleep(1200);
+        const cands = [...document.querySelectorAll('button[aria-label]')]
+          .filter(b => vis(b) && /Add to My Preferred/i.test(b.getAttribute('aria-label') || ''))
+          .map(b => ({ b, r: parseRow(b), txt: ((b.parentElement && b.parentElement.textContent) || '').slice(0, 40) }))
+          .filter(x => x.r && x.r.pos === pos);
+        const full = cands.filter(x => norm(x.r.name, pos) === norm(name, pos));
+        const t = TEAM[team] || team;
+        const byTeam = cands.filter(x => new RegExp('·' + t + '·', 'i').test(x.txt));
+        const pick = full[0] || (byTeam.length === 1 ? byTeam[0] : null) || (cands.length === 1 ? cands[0] : null);
+        if (pick) { pick.b.click(); await sleep(400); res.push(name + ' -> ' + pick.txt + ' :: starred'); }
+        else res.push(name + ' -> NONE (' + cands.map(c => c.txt).join(' | ') + ')');
+      }
+      setIn(''); await sleep(500);
+      return { did: res, left: Math.max(0, u.unmatched.length - (n || 3)) };
+    },
+    /* Move one preferred player to sit right after another, with the page's
+     * Select -> "Move after..." flow (a hand-starred player lands at the
+     * bottom; this puts him where the board has him). Not saved. */
+    async moveAfter(name, afterName) {
+      if (!tab('My Preferred')) return { err: 'no My Preferred tab' };
+      await sleep(1300);
+      const sel = [...document.querySelectorAll('button')].find(b => b.textContent.trim() === 'Select');
+      if (!sel) return { err: 'no Select button' };
+      sel.click(); await sleep(900);
+      const rowOf = (box) => { let e = box; for (let i = 0; i < 6 && e; i++) { e = e.parentElement; const r = e && parseRowText(e.textContent || ''); if (r) return { name: r.name, el: e }; } return null; };
+      const rows = [...document.querySelectorAll('input[type=checkbox]')].map(rowOf);
+      const me = rows.find(r => r && r.name === name), tgt = rows.find(r => r && r.name === afterName);
+      if (!me || !tgt) { const c = [...document.querySelectorAll('button')].find(b => b.textContent.trim() === 'Cancel'); if (c) c.click(); return { err: (!me ? name : afterName) + ' not in My Preferred' }; }
+      me.el.querySelector('input[type=checkbox]').click(); await sleep(500);
+      const mv = [...document.querySelectorAll('button')].find(b => /^Move after/.test(b.textContent.trim()));
+      if (!mv) return { err: 'no Move after button' };
+      mv.click(); await sleep(800);
+      const target = [...tgt.el.querySelectorAll('*')].find(x => (x.textContent || '').trim() === afterName) || tgt.el;
+      target.click(); await sleep(1200);
+      const names = [...document.querySelectorAll('button[aria-label]')]
+        .filter(b => /Remove from My Preferred/i.test(b.getAttribute('aria-label') || ''))
+        .map(b => (parseRow(b) || {}).name);
+      return { at: names.indexOf(name) + 1, after: names.indexOf(afterName) + 1, ok: names.indexOf(name) === names.indexOf(afterName) + 1 };
+    },
     save() {
       const b = [...document.querySelectorAll('button')].find(x => x.textContent.trim() === 'Save');
       if (!b) return 'no Save button';

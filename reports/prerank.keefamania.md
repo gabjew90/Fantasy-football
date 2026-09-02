@@ -2,7 +2,10 @@
 
 Generated 2026-09-01 from `tiers.keefamania.csv`: board order by VORP, availability=out excluded, K/DEF last.
 This is LAYER 0 of the draft rig: if the live driver misses a pick, Yahoo's own autopick walks this list
-(with its positional balancing). Imported into Yahoo via the Edit Pre-Draft Ranks page: **228 of 240 matched**.
+(with its positional balancing). Imported into Yahoo via the Edit Pre-Draft Ranks page: 228 of 240 matched by the
+importer; the remaining 12 were added by hand on 2026-09-02 (surname search + star, board order, at the tail) and
+DK Metcalf was moved from the bottom to his board position with Select → "Move after…". **Yahoo now holds all 240
+in board order** (verified 240 of 240, `has_preranks: 1`).
 
 Live view (your account): https://football.fantasysports.yahoo.com/f1/49649/3/editprerank
 
@@ -12,12 +15,13 @@ Live view (your account): https://football.fantasysports.yahoo.com/f1/49649/3/ed
 - Josh Jacobs (RB, GBP) — out
 - Zach Charbonnet (RB, SEA) — out
 
-## Not matched by Yahoo's importer (rank them by hand if they matter)
+## Not matched by Yahoo's importer — added by hand 2026-09-02
 
-All twelve are deep bench (best VORP among them is negative). DK Metcalf and
-J.K. Dobbins were listed here on 2026-09-01 in error: Yahoo had placed both
-(rank 76 and 85 in My Preferred); my row parser read the "K" in their names
-as the kicker position. Fixed and re-checked 2026-09-02 (228 of 228 read back).
+All twelve are deep bench (best VORP among them is negative). They now sit at
+positions 229–240 of the Yahoo list, in this order. (DK Metcalf and J.K.
+Dobbins were listed here on 2026-09-01 in error: Yahoo had placed Dobbins at
+112 and Metcalf had been hand-starred to the bottom; my row parser read the
+"K" in their names as the kicker position. Parser fixed; Metcalf moved to 72.)
 
 - Theo Johnson (TE, NYG)
 - Jake Tonges (TE, SFO)

@@ -20,7 +20,11 @@ In Chrome (the profile that accepted the bridge cert):
         await PR.import();     // expect "Imported ~228 players"
         await PR.dnd();        // availability = out
         PR.save();             // "saved as your ranked order."
-        await PR.unmatched();  // expect ~12 deep-bench names only; anything with positive VORP here gets starred by hand (search the surname on the All Players tab)
+        await PR.unmatched();  // expect ~12 deep-bench names (Yahoo's importer only matches its top ~300)
+        await PR.addMissing(3); // repeat until left == 0: stars them via surname search, appended in board order
+        await PR.preferred();   // count must equal PR.status().ordered; any hand-starred player sits at the bottom --
+        // PR.moveAfter('DK Metcalf', 'Bucky Irving') puts one where the board has him (name of the player ranked just above)
+        PR.save();              // again, after the touch-ups
 
 3. Verify server-side from any Yahoo page:
 

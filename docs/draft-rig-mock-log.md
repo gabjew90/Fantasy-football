@@ -404,3 +404,36 @@ says not-away, the flag is not the truth and we need the server's word
 Also seen: with every rival away, the room ran a round in about ten seconds.
 Our own clock is unaffected, but "N picks until your turn" is minutes of
 warning in a live room and seconds in a mock.
+
+## Mock 14 — room 10433575 "Squib Kick", 10 teams, slot 9 — clean
+
+Roster: Achane, Chase Brown, Javonte Williams, Rashee Rice, Davante Adams,
+Drake Maye, George Kittle, Jaylen Warren, Courtland Sutton, Matthew Stafford
+(QB2, R10, at the gate), RJ Harvey, Wan'Dale Robinson, Woody Marks, Seahawks
+DEF, Eddy Pineiro K. One TE, K and DEF in the last two rounds, legal at every
+guardrail.
+
+Fifteen of fifteen picks made by the driver at the turn, each verified
+against the store (`verified: "store"`), none by the queue or by Yahoo. No
+gate failed, `away` never flipped on us across 45 minutes, no autopick
+banner. The bridge's state matched the room throughout (mine == roster at
+every request). This is the bar set on 2026-09-01, met.
+
+What mock 13's fixes did here, visibly:
+
+- Round 9, pick 89: Courtland Sutton at VORP -1.7 went straight through as
+  bench insurance. The rule deleted after mock 13 would have refused him and
+  the 23 candidates behind him, and the clock would have run out again.
+- The room ran with up to eight rivals away; the store said so and the
+  driver never confused their state with ours.
+- Namesakes: Amon-Ra St. Brown went at 6, A.J. Brown later; the plan never
+  offered a gone player.
+
+Nothing new broke. Two observations for the CLV retro, not the rig: the
+engine opened RB-RB-RB-WR from slot 9 (Achane, Chase Brown, Javonte Williams
+before Rashee Rice), and took Stafford as QB2 the first round the gate
+allowed it. Both are engine judgements to grade against closing ADP, not
+driver defects.
+
+Open question from mock 13 (store `away` vs the server's autopick state)
+did not arise: with no toggle storm there was nothing to desync.
