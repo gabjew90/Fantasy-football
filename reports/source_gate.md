@@ -32,80 +32,80 @@ Per cell (pair × position):
 | omnibeta | 2024->2025 | TE | 21 | 45.1 | 46.6 | 0.131 | 0.318 |
 | omnibeta | 2024->2025 | WR | 64 | 65.8 | 71.7 | 0.471 | 0.420 |
 
-## Test 2 — outcome (ADP-order rivals, engine at every slot, lineups graded on actual points)
+## Test 2 — outcome (shared ADP-order rivals, engine at every slot, lineups graded on actual points)
 
-Over 44 slot-drafts: model 1563.2, external 1539.0 (Δ -24.2, -1.55%); external better in 19, worse in 25, tied 0. Pass: NO.
+Over 44 slot-drafts: model 1558.2, external 1539.5 (Δ -18.8, -1.20%); external better in 20, worse in 24, tied 0. Pass: NO.
 
 | league | pair | model mean | external mean | Δ |
 |---|---|---|---|---|
-| keefamania | 2023->2024 | 1471.5 | 1494.4 | +22.9 |
-| keefamania | 2024->2025 | 1343.7 | 1427.0 | +83.3 |
-| omnibeta | 2023->2024 | 1780.0 | 1653.3 | -126.7 |
-| omnibeta | 2024->2025 | 1605.8 | 1555.1 | -50.7 |
+| keefamania | 2023->2024 | 1471.9 | 1484.8 | +12.9 |
+| keefamania | 2024->2025 | 1351.9 | 1449.8 | +97.9 |
+| omnibeta | 2023->2024 | 1754.4 | 1636.3 | -118.1 |
+| omnibeta | 2024->2025 | 1605.8 | 1562.8 | -43.0 |
 
-### keefamania 2023->2024 — 10 teams, 13 rounds, boards 152 / 145
+### keefamania 2023->2024 — 10 teams, 13 rounds, rival pool 158, boards 152 / 145
 
 | slot | model | external | Δ | engine errors |
 |---|---|---|---|---|
-| 1 | 1381 | 1572 | +192 | 0/0 |
+| 1 | 1381 | 1549 | +168 | 0/0 |
 | 2 | 1470 | 1549 | +79 | 0/0 |
-| 3 | 1470 | 1549 | +79 | 0/0 |
-| 4 | 1443 | 1522 | +79 | 0/0 |
-| 5 | 1485 | 1477 | -8 | 0/0 |
-| 6 | 1610 | 1573 | -37 | 0/0 |
-| 7 | 1596 | 1580 | -15 | 0/0 |
-| 8 | 1515 | 1451 | -64 | 0/0 |
-| 9 | 1359 | 1335 | -24 | 0/0 |
-| 10 | 1387 | 1335 | -51 | 0/0 |
+| 3 | 1475 | 1549 | +74 | 0/0 |
+| 4 | 1443 | 1549 | +106 | 0/0 |
+| 5 | 1485 | 1500 | +15 | 0/0 |
+| 6 | 1610 | 1502 | -108 | 0/0 |
+| 7 | 1596 | 1502 | -94 | 0/0 |
+| 8 | 1515 | 1509 | -6 | 0/0 |
+| 9 | 1359 | 1378 | +19 | 0/0 |
+| 10 | 1387 | 1262 | -125 | 0/0 |
 
-### keefamania 2024->2025 — 10 teams, 12 rounds, boards 143 / 135
+### keefamania 2024->2025 — 10 teams, 13 rounds, rival pool 144, boards 143 / 135
 
 | slot | model | external | Δ | engine errors |
 |---|---|---|---|---|
 | 1 | 1397 | 1592 | +194 | 0/0 |
 | 2 | 1361 | 1592 | +231 | 0/0 |
-| 3 | 1356 | 1377 | +21 | 0/0 |
+| 3 | 1438 | 1421 | -17 | 0/0 |
 | 4 | 1385 | 1377 | -8 | 0/0 |
-| 5 | 1385 | 1365 | -20 | 0/0 |
-| 6 | 1338 | 1365 | +26 | 0/0 |
-| 7 | 1374 | 1365 | -9 | 0/0 |
-| 8 | 1321 | 1365 | +44 | 0/0 |
+| 5 | 1385 | 1421 | +36 | 0/0 |
+| 6 | 1338 | 1421 | +82 | 0/0 |
+| 7 | 1374 | 1421 | +47 | 0/0 |
+| 8 | 1321 | 1421 | +100 | 0/0 |
 | 9 | 1321 | 1437 | +116 | 0/0 |
-| 10 | 1198 | 1437 | +239 | 0/0 |
+| 10 | 1198 | 1397 | +199 | 0/0 |
 
-### omnibeta 2023->2024 — 12 teams, 12 rounds, boards 177 / 167
+### omnibeta 2023->2024 — 12 teams, 13 rounds, rival pool 177, boards 177 / 167
 
 | slot | model | external | Δ | engine errors |
 |---|---|---|---|---|
-| 1 | 1691 | 1528 | -163 | 0/0 |
-| 2 | 1678 | 1588 | -90 | 0/0 |
-| 3 | 1646 | 1686 | +40 | 0/0 |
+| 1 | 1691 | 1545 | -146 | 0/0 |
+| 2 | 1678 | 1545 | -134 | 0/0 |
+| 3 | 1646 | 1619 | -28 | 0/0 |
 | 4 | 1557 | 1686 | +129 | 0/0 |
 | 5 | 1952 | 1621 | -330 | 0/0 |
-| 6 | 1952 | 1623 | -329 | 0/0 |
-| 7 | 1957 | 1623 | -334 | 0/0 |
-| 8 | 1950 | 1600 | -350 | 0/0 |
-| 9 | 1860 | 1726 | -134 | 0/0 |
-| 10 | 1670 | 1726 | +56 | 0/0 |
-| 11 | 1736 | 1716 | -20 | 0/0 |
-| 12 | 1711 | 1716 | +5 | 0/0 |
+| 6 | 1952 | 1699 | -252 | 0/0 |
+| 7 | 1957 | 1773 | -184 | 0/0 |
+| 8 | 1895 | 1773 | -122 | 0/0 |
+| 9 | 1680 | 1672 | -8 | 0/0 |
+| 10 | 1670 | 1554 | -116 | 0/0 |
+| 11 | 1736 | 1554 | -182 | 0/0 |
+| 12 | 1640 | 1596 | -44 | 0/0 |
 
-### omnibeta 2024->2025 — 12 teams, 13 rounds, boards 205 / 187
+### omnibeta 2024->2025 — 12 teams, 13 rounds, rival pool 205, boards 205 / 187
 
 | slot | model | external | Δ | engine errors |
 |---|---|---|---|---|
 | 1 | 1810 | 1622 | -188 | 0/0 |
-| 2 | 1589 | 1509 | -79 | 0/0 |
-| 3 | 1604 | 1509 | -94 | 0/0 |
-| 4 | 1604 | 1404 | -200 | 0/0 |
-| 5 | 1603 | 1470 | -133 | 0/0 |
-| 6 | 1429 | 1496 | +67 | 0/0 |
+| 2 | 1589 | 1405 | -184 | 0/0 |
+| 3 | 1604 | 1405 | -199 | 0/0 |
+| 4 | 1604 | 1502 | -102 | 0/0 |
+| 5 | 1603 | 1502 | -101 | 0/0 |
+| 6 | 1429 | 1528 | +99 | 0/0 |
 | 7 | 1458 | 1647 | +189 | 0/0 |
 | 8 | 1714 | 1754 | +40 | 0/0 |
 | 9 | 1714 | 1665 | -49 | 0/0 |
 | 10 | 1706 | 1528 | -178 | 0/0 |
-| 11 | 1533 | 1528 | -5 | 0/0 |
-| 12 | 1506 | 1528 | +22 | 0/0 |
+| 11 | 1533 | 1626 | +93 | 0/0 |
+| 12 | 1506 | 1570 | +64 | 0/0 |
 
-Rivals never deviate from ADP here, so runs and reaches are absent; the comparison is between the two inputs under identical rivals, which is the question. K/DEF are absent from both arms.
+Both arms face one rival list (the year's pool in ADP order), so a player one arm never projected is still taken by the rivals at his ADP; only our own picks differ. Rivals never deviate from ADP, so runs and reaches are absent. K/DEF are absent from both arms. The history rows carry no team or route data, so the handcuff and RB-receiving upside flags are inert on these boards for both arms; only the rookie upside path is live.
 

@@ -19,6 +19,7 @@
  */
 window.DK = (function () {
   const S = {
+    records: [],        // every pickRecord() this session, for trail()
     board: [],          // [{n,k,p,t,v,j,a,s,u,tier}] sorted by VORP desc
     cfg: {
       slots: { QB: 1, RB: 2, WR: 2, TE: 1, FLEX: 1, K: 1, DEF: 1 },
@@ -1235,6 +1236,10 @@ window.DK = (function () {
     // Yahoo deploy could rename one prop without the others)
     if (!force && S.actions && Object.keys(S.actions).length
         && S.actionsAt && Date.now() - S.actionsAt < 60000) return S.actions;
+    // a walk that found NOTHING is remembered too, briefly: keepAlive runs
+    // every cycle, and a room without the props (click-path fallback, or a
+    // Yahoo rename) must not pay a 200k-fiber walk once a second
+    if (!force && !S.actions && S.actionsMissAt && Date.now() - S.actionsMissAt < 10000) return null;
     const found = {};
     const queue = [];
     for (const el of document.querySelectorAll('body, body *')) {
@@ -1261,6 +1266,7 @@ window.DK = (function () {
     }
     S.actions = Object.keys(found).length ? found : null;
     S.actionsAt = Date.now();
+    S.actionsMissAt = S.actions ? null : Date.now();
     return S.actions;
   }
 
@@ -1336,22 +1342,23 @@ window.DK = (function () {
     return best ? { n: best.n, p: best.p, proj: best.j, vorp: best.v } : null;
   }
 
-  function pickRecord(cand, extra) {
+  /* The record of one pick, for the narration and the end-of-draft trail.
+   * `top` is the ranked list the pick was CHOSEN from (draftTop's rank()
+   * result), so passed_on is the decision-time list, not a re-rank of the
+   * post-pick state. Every record is retained in S.records for trail(). */
+  function pickRecord(cand, extra, top) {
     const b = S.board.find(x => x.n === cand.n && x.p === cand.p) || {};
     const alt = bestByProjection();
-    // the candidates the engine ranked just below the pick -- what was passed on
-    let passed = [];
-    try {
-      const r = rank();
-      passed = (r.top || []).filter(x => !(x.n === cand.n && x.p === cand.p)).slice(0, 3)
-        .map(x => ({ n: x.n, p: x.p, v: x.v, why: (x.why || '').slice(0, 120) }));
-    } catch (e) { /* narration only */ }
-    return Object.assign({ drafted: cand.n, pos: cand.p, vorp: cand.v, proj: b.j,
-                           why: (cand.why || '').slice(0, 220),
-                           top_proj_available: alt,
-                           took_top_projection: !!(alt && alt.n === cand.n),
-                           passed_on: passed,
-                           pick_no: S.planPick != null ? S.planPick : null }, extra);
+    const passed = (top || []).filter(x => !(x.n === cand.n && x.p === cand.p)).slice(0, 3)
+      .map(x => ({ n: x.n, p: x.p, v: x.v, why: (x.why || '').slice(0, 120) }));
+    const rec = Object.assign({ drafted: cand.n, pos: cand.p, vorp: cand.v, proj: b.j,
+                                why: (cand.why || '').slice(0, 220),
+                                top_proj_available: alt,
+                                took_top_projection: !!(alt && alt.n === cand.n),
+                                passed_on: passed,
+                                pick_no: S.planPick != null ? S.planPick : null }, extra);
+    S.records.push(rec);
+    return rec;
   }
 
   async function draftTop(maxTries) {
@@ -1390,7 +1397,7 @@ window.DK = (function () {
         tries++;
         const via = await pickViaAction(cand);
         if (via.status === 'landed') {
-          return pickRecord(cand, { verified: 'store', via: 'action', ms: via.ms });
+          return pickRecord(cand, { verified: 'store', via: 'action', ms: via.ms }, r.top);
         }
         if (via.status === 'notours') {
           attempted.push(cand.n + ':notours(' + (via.landed || '?') + ')');
@@ -1450,7 +1457,7 @@ window.DK = (function () {
         attempted.push(cand.n + ':noland');
         continue;
       }
-      return pickRecord(cand, { verified: landed === true ? 'store' : 'roster-count', via: 'click' });
+      return pickRecord(cand, { verified: landed === true ? 'store' : 'roster-count', via: 'click' }, r.top);
     }
     return { err: 'no-verified-pick', attempted };
   }
@@ -1632,13 +1639,18 @@ window.DK = (function () {
      * saw the flag. Clearing after the fact is too late by construction, so
      * send Yahoo's own "not away" (setAwayStatus(false) -> "6|league|
      * manager") every few minutes whether or not the flag is up. */
-    const hbActs = clientActions();
     const hbEvery = (S.cfg.heartbeatSec != null ? S.cfg.heartbeatSec : 240) * 1000;
     if (S.lastHeartbeat == null) S.lastHeartbeat = Date.now();   // first beat one interval after start
-    if (hbActs && typeof hbActs.setAwayStatus === 'function'
-        && Date.now() - S.lastHeartbeat >= hbEvery) {
-      try { hbActs.setAwayStatus(false); S.lastHeartbeat = Date.now(); note('heartbeat: setAwayStatus(false)'); }
-      catch (e) { note('heartbeat threw: ' + String(e).slice(0, 80)); }
+    let acts = null;                       // looked up only when a beat is due (or the flag is up)
+    if (Date.now() - S.lastHeartbeat >= hbEvery) {
+      acts = clientActions();
+      if (acts && typeof acts.setAwayStatus === 'function') {
+        // stamp BEFORE the call: a thunk that throws must wait for the next
+        // interval like one that worked, not retry every cycle and flood the log
+        S.lastHeartbeat = Date.now();
+        try { acts.setAwayStatus(false); note('heartbeat: setAwayStatus(false)'); }
+        catch (e) { note('heartbeat threw (next in ' + (hbEvery / 1000) + 's): ' + String(e).slice(0, 80)); }
+      }
     }
 
     const snap = storeState();
@@ -1652,7 +1664,7 @@ window.DK = (function () {
     // exact thunk the Autodraft toggle dispatches ("6|league|manager"),
     // with no toggle to misread. Verified against the store; the click path
     // below only runs when the action is unavailable or did not stick.
-    const acts = clientActions();
+    acts = acts || clientActions();
     if (acts && typeof acts.setAwayStatus === 'function') {
       try { acts.setAwayStatus(false); } catch (e) { note('setAwayStatus threw: ' + String(e).slice(0, 80)); }
       S.lastDisarm = Date.now();
@@ -1765,6 +1777,58 @@ window.DK = (function () {
     S.running = false;
     note('driver stop');
     return S.log.slice(-12);
+  }
+
+  /* The complete trail of a draft, composed from the store (every pick with
+   * its team id, every manager) and our retained pick records, POSTed to the
+   * bridge's /trail; scripts/mock_trail.py renders it. Requested 2026-09-02
+   * ("a complete trail of each manager's picks and roster"); until the
+   * review the same day this lived in a console snippet, not the driver.
+   * `extra` merges into the dump (e.g. { room_name }). Pure given the store
+   * and a fetch: tested through _setStore with fetch stubbed. */
+  function trailDump(extra) {
+    const store = findStore();
+    let s;
+    try { s = store && store.getState(); } catch (e) { s = null; }
+    if (!s || !s.draftPicks || !s.players) return null;
+    const byId = s.players.byId || {};
+    const managers = (s.league && s.league.managers) || {};
+    const me = s.context && managers[String(s.context.managerId)];
+    const picks = (s.draftPicks.order || []).filter(o => o && o.playerId).map(o => {
+      const p = byId[o.playerId] || {};
+      return { pick_no: +o.id, team_id: String(o.teamId),
+               name: ((p.fname || '') + ' ' + (p.lname || '')).trim(),
+               pos: p.primary_pos || p.display_pos || '', team: p.team_abbr || '' };
+    });
+    const mgrs = {};
+    for (const m of Object.values(managers)) {
+      mgrs[String(m.teamId)] = { nickname: m.nickname || '', teamId: String(m.teamId), away: !!m.away };
+    }
+    const room = (s.context && String(s.context.leagueId))
+      || ((typeof location !== 'undefined' && (location.pathname.match(/\/(\d+)\/\d+/) || [])[1]) || 'room');
+    const isHeartbeat = l => /heartbeat: setAwayStatus/.test(String(l));
+    const isIssue = l => /GATE FAILED|notours|retry|ERROR|noland|nobtn/.test(String(l));
+    return Object.assign({
+      room, room_name: (typeof document !== 'undefined' && document.title) || '',
+      teams: S.cfg.teams, my_team: me ? String(me.teamId) : null,
+      captured_at: new Date().toISOString(),
+      picks, managers: mgrs, our_records: S.records.slice(),
+      heartbeats: S.log.filter(isHeartbeat).length, issues: S.log.filter(isIssue).length,
+    }, extra || {});
+  }
+
+  async function trail(extra) {
+    const dump = trailDump(extra);
+    if (!dump) return { err: 'no store' };
+    try {
+      const r = await fetch(S.cfg.bridge + '/trail', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(dump) });
+      const j = await r.json();
+      note('trail: ' + dump.picks.length + ' picks, ' + dump.our_records.length + ' records -> ' + (j.path || JSON.stringify(j)));
+      return j;
+    } catch (e) {
+      return { err: 'bridge: ' + (e && e.message) };
+    }
   }
 
   /* Which entries are indistinguishable from another by everything the
@@ -1901,7 +1965,9 @@ window.DK = (function () {
     pickLandedStore, bannerSaysArmed,
     clientActions, playerIdFor, pickViaAction,
     /* test hook: hand the driver bound actions without a React tree */
-    _setActions(acts) { S.actions = acts || null; S.actionsAt = Date.now(); return !!acts; },
+    _setActions(acts) { S.actions = acts || null; S.actionsAt = Date.now(); S.actionsMissAt = null; return !!acts; },
+    trail, trailDump,
+    records() { return S.records.slice(); },
     _starred: () => [...S.starred],
     _markStarred: (id) => S.starred.add(id),
     _isStarred: (id) => S.starred.has(id),

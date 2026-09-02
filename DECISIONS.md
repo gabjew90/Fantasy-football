@@ -1253,3 +1253,64 @@ Threshold honesty: had the outcome threshold been 2% the outcome half
 would have passed and the decision would have been "split" -- the
 accuracy half fails either way, so no threshold in the neighbourhood
 flips the result.
+
+### Correction (same day, from the code review): the rivals were not identical
+
+The review found that Test 2's rivals drafted from each ARM'S OWN board, and
+the external board lacks every player Sleeper never lined (McCaffrey and
+Higgins in 2024; Rice, Godwin, Judkins in 2025 -- 7/8/10/18 per pair), so
+the two arms faced different rivals and the model engine could draft
+players the external arm could not. The round count was also set by the
+smaller board. Both fixed: one shared rival list per year (the pool in ADP
+order, taken whether or not a player is on our arm's board), depth from the
+shared pool (13 rounds in all four pairs). Re-run:
+
+* Accuracy: unchanged (it never depended on the replay).
+* Outcome: model 1558, external 1540 (-1.20%, threshold 1%); external
+  better in 20 of 44, worse in 24. Keefamania +13 / +98, Omnibeta -118 /
+  -43. Verdict unchanged: STAY on `model`. The correction moved the number
+  toward external by a third of a point per cent and did not cross the bar.
+
+Also stated in the report now: the history rows carry no team or route
+data, so the handcuff and RB-receiving upside flags are inert on the gate's
+boards for both arms (only the rookie path is live).
+
+## 2026-09-02 (24) — review of the day's code, and a prune
+
+Review (8 finder angles, 1-vote verification, 10 findings, all confirmed)
+of the mock-trail, heartbeat and gate commits. Fixed, with tests where the
+defect was testable:
+* the gate's rival-pool and round-count flaws above;
+* heartbeat: a throwing setAwayStatus retried every ~1 s cycle and its note
+  would evict the whole log; the timestamp is now stamped before the call;
+* keepAlive walked the React tree every cycle when no action registry
+  exists (click-path rooms); the walk now runs only when a beat is due, and
+  a miss is remembered for 10 s;
+* pickRecord re-ranked the post-pick state for `passed_on`; it now takes
+  the decision-time list from draftTop;
+* the trail producer lived in a console snippet: `DK.trail()` now composes
+  the dump from the store and the retained records and POSTs it;
+* scripts printed non-ASCII (Δ) and crashed when piped on Windows;
+* league shape (teams, rounds, starter slots) is read from the league
+  yaml's `expected:` block by one helper (engine_parity.league_shape;
+  omnibeta.yaml gained its `roster:`), replacing three hand-typed tables;
+* one board pipeline (draftkit.tiers.finish_board) for cmd_tiers, the
+  baseline bake-off and the gate -- the gate's copy had skipped the
+  contingency map;
+* one lineup grader (slot_replay.lineup_points with slots/key) instead of
+  three; one spearman import instead of four copies;
+* input_replay counted tiers by re-running the whole replay; now one pass;
+* ranks broke ties by row order, so identical rebuilds differed by a few
+  tied rows; VORP and value ranks now tie-break on sleeper_id, and two
+  consecutive rebuilds of the Keefamania board are byte-identical;
+* runbook, protocol doc, draft-day .bat, README and package.json no longer
+  describe the churn gate as pending, the poller as live, or the repo as
+  single-league.
+
+Pruned (zero readers, superseded, or one-off): the CDP poller and its .bat,
+mock_cycle.py, the pre-bridge scratch boards and plan.json under
+data/draftrig, the haircut board diff. .gitignore now covers the rig's and
+harness's scratch. Held on purpose: vona_replay.py and its validation
+report (the only controlled VONA evidence), baseline_bakeoff.py (decided a
+shipped value), the availability/override research notes (provenance for
+live data files).

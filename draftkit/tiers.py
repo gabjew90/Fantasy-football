@@ -75,7 +75,10 @@ def build_tiers(df: pl.DataFrame, cfg) -> pl.DataFrame:
         )
         frames.append(grp)
     out = pl.concat(frames)
-    # overall value rank by VORP; adp_delta = adp - value rank
+    # overall value rank by VORP; adp_delta = adp - value rank. Ties broken
+    # by sleeper_id so a rebuild from the same inputs is byte-identical.
+    tie = ["sleeper_id"] if "sleeper_id" in out.columns else []
+    out = out.sort(["vorp", *tie], descending=[True, *([False] * len(tie))])
     out = out.with_columns(
         pl.col("vorp").rank(method="ordinal", descending=True).alias("value_rank")
     ).with_columns((pl.col("adp") - pl.col("value_rank")).alias("adp_delta"))
@@ -179,6 +182,19 @@ def add_upside_flags(df: pl.DataFrame) -> pl.DataFrame:
     )
     return df.with_columns(reasons.alias("upside_why")).with_columns(
         pl.col("upside_why").is_not_null().alias("upside_flag"))
+
+
+def finish_board(df: pl.DataFrame, cfg, baselines: dict[str, int] | None = None) -> pl.DataFrame:
+    """Projection frame -> the board frame the tracker drafts from: VORP,
+    tiers, handcuff and upside flags, contingency map. ONE spelling of the
+    sequence, shared by cmd_tiers and every replay/bake-off script (review
+    2026-09-02: three hand-synchronised copies had already drifted -- the
+    projection-source gate's copy skipped the contingency map)."""
+    from .fragility import add_contingency_map
+    from .vorp import add_vorp
+
+    df = add_vorp(df, baselines if baselines is not None else cfg.baselines)
+    return add_contingency_map(add_upside_flags(add_handcuff_info(build_tiers(df, cfg))))
 
 
 TIERS_COLUMNS = [

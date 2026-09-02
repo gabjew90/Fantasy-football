@@ -966,3 +966,56 @@ def test_keep_alive_sends_a_periodic_not_away_heartbeat():
     assert r["values"] == [False], r
     assert r["n"] == 1 and r["logged"] == 1
     assert all(r[k]["away"] is False for k in ("a", "b", "c", "d"))
+
+
+def test_heartbeat_that_throws_waits_for_the_next_interval():
+    """Review 2026-09-02: the timestamp was only advanced after a successful
+    call, so a throwing thunk retried every ~1 s cycle and its note evicted
+    the whole 400-line log within minutes."""
+    r = run_js(
+        f"""
+        const s = {json.dumps(_store_with([], players=PLAYERS))};
+        DK._setStore({{ getState: () => s }});
+        DK.loadCompact("Christian McCaffrey|RB|SFO|122.8|1|", {{ heartbeatSec: 1 }});
+        let calls = 0;
+        DK._setActions({{ setAwayStatus: () => {{ calls++; throw new Error('boom'); }} }});
+        (async () => {{
+          await DK.keepAlive();                       // baseline
+          await new Promise(r => setTimeout(r, 1100));
+          await DK.keepAlive();                       // due: one throwing attempt
+          await DK.keepAlive();                       // NOT retried within the interval
+          await DK.keepAlive();
+          console.log(JSON.stringify({{ calls,
+            threw: DK.logs(20).filter(l => /heartbeat threw/.test(String(l))).length }}));
+        }})();
+        """
+    )
+    assert r["calls"] == 1 and r["threw"] == 1
+
+
+def test_trail_dump_composes_every_pick_manager_and_our_records_from_the_store():
+    """The complete trail per mock (2026-09-02) must come from the driver, not
+    a console snippet: picks carry team ids, managers carry nickname/away,
+    and our retained pick records ride along."""
+    r = run_js(
+        f"""
+        const s = {json.dumps(_store_with([(1, "1", "100"), (2, "6", "101")], players=PLAYERS))};
+        s.league.managers["1"] = {{ id: "1", teamId: "1", away: true, nickname: "raymond" }};
+        DK._setStore({{ getState: () => s }});
+        DK.loadCompact("Christian McCaffrey|RB|SFO|122.8|1|", {{ teams: 10 }});
+        // a record the way draftTop makes one, from a decision-time list
+        const top = [{{ n: 'Christian McCaffrey', p: 'RB', v: 122.8, why: 'w1' }}, {{ n: 'Bijan Robinson', p: 'RB', v: 100, why: 'w2' }}];
+        global.fetch = async (url, opts) => ({{ json: async () => ({{ ok: true, path: 'saved:' + JSON.parse(opts.body).room }}) }});
+        (async () => {{
+          const d = DK.trailDump({{ room_name: 'Test Room' }});
+          const posted = await DK.trail({{ room_name: 'Test Room' }});
+          console.log(JSON.stringify({{ picks: d.picks, managers: d.managers, my_team: d.my_team,
+            teams: d.teams, room_name: d.room_name, recs: d.our_records.length, posted }}));
+        }})();
+        """
+    )
+    assert [p["pick_no"] for p in r["picks"]] == [1, 2]
+    assert r["picks"][0]["team_id"] == "1" and r["picks"][1]["team_id"] == "6"
+    assert r["managers"]["1"]["away"] is True and "nickname" in r["managers"]["1"]
+    assert r["my_team"] == "6" and r["teams"] == 10 and r["room_name"] == "Test Room"
+    assert r["posted"]["ok"] is True and r["posted"]["path"].startswith("saved:")

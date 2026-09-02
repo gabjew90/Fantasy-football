@@ -8,6 +8,12 @@ import polars as pl
 def add_vorp(df: pl.DataFrame, baselines: dict[str, int]) -> pl.DataFrame:
     """VORP = proj_pts - proj_pts of the replacement-rank player at position."""
     df = df.filter(pl.col("proj_pts").is_not_null() & pl.col("pos").is_in(list(baselines)))
+    # Ordinal ranks break ties by row order, and row order after the joins is
+    # not stable between runs: two 0-point QBs swapped ranks 57/58 on an
+    # otherwise identical rebuild (2026-09-02), which is exactly the noise a
+    # byte-identical check must not have to explain. Sort first.
+    tie = ["sleeper_id"] if "sleeper_id" in df.columns else []
+    df = df.sort(["pos", "proj_pts", *tie], descending=[False, True, *([False] * len(tie))])
     df = df.with_columns(
         pl.col("proj_pts")
         .rank(method="ordinal", descending=True)

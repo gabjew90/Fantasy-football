@@ -1,5 +1,12 @@
 # Keefamania draft-day actuation protocol (hands-free)
 
+> **SUPERSEDED 2026-09-02.** The live procedure is docs/draft-day-runbook.md:
+> picks go through Yahoo's own `makePick` with store verification, the click
+> is the fallback, the queue is layer 0 (DECISIONS #22; mocks 19-23). The
+> loop below (queue + opportunistic clicks, `mock_cycle.py`) is the 08-31
+> design and is kept as history. The draft-morning checklist at the end is
+> still the checklist.
+
 Certified-in-progress via live mock rehearsals 2026-08-30/31. Architecture:
 the QUEUE is the actuator, clicks are opportunistic, Yahoo-default autopick
 is the failure state to prevent.

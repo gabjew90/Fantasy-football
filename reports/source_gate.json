@@ -171,36 +171,36 @@
  },
  "outcome": {
   "n": 44,
-  "model_mean": 1563.1963636363637,
-  "ext_mean": 1538.9572727272728,
-  "delta_mean": -24.239090909090883,
-  "better": 19,
-  "worse": 25,
+  "model_mean": 1558.2059090909092,
+  "ext_mean": 1539.4504545454547,
+  "delta_mean": -18.75545454545455,
+  "better": 20,
+  "worse": 24,
   "tied": 0,
   "by_pair": [
    {
     "league": "keefamania",
     "pair": "2023->2024",
-    "model_mean": 1471.454,
-    "ext_mean": 1494.368
+    "model_mean": 1471.914,
+    "ext_mean": 1484.816
    },
    {
     "league": "keefamania",
     "pair": "2024->2025",
-    "model_mean": 1343.71,
-    "ext_mean": 1426.9920000000002
+    "model_mean": 1351.9180000000001,
+    "ext_mean": 1449.7900000000002
    },
    {
     "league": "omnibeta",
     "pair": "2023->2024",
-    "model_mean": 1779.9583333333333,
-    "ext_mean": 1653.2933333333333
+    "model_mean": 1754.4366666666667,
+    "ext_mean": 1636.3183333333334
    },
    {
     "league": "omnibeta",
     "pair": "2024->2025",
     "model_mean": 1605.7916666666667,
-    "ext_mean": 1555.0833333333335
+    "ext_mean": 1562.8283333333334
    }
   ],
   "pass": false
@@ -216,6 +216,7 @@
    "pair": "2023->2024",
    "teams": 10,
    "rounds": 13,
+   "rival_pool": 158,
    "board_sizes": {
     "blend": 152,
     "lines": 145
@@ -240,15 +241,15 @@
       "Javonte Williams (RB)",
       "Mike Williams (WR)"
      ],
-     "lines": 1572.3400000000004,
+     "lines": 1549.04,
      "lines_errors": 0,
      "lines_roster": [
       "Tyreek Hill (WR)",
-      "Travis Kelce (TE)",
+      "Josh Jacobs (RB)",
       "Josh Allen (QB)",
       "Alvin Kamara (RB)",
-      "James Conner (RB)",
       "Rashee Rice (WR)",
+      "Dalton Kincaid (TE)",
       "Jerome Ford (RB)",
       "Devin Singletary (RB)",
       "Jordan Addison (WR)",
@@ -297,12 +298,12 @@
     },
     {
      "slot": 3,
-     "blend": 1469.94,
+     "blend": 1474.5400000000002,
      "blend_errors": 0,
      "blend_roster": [
       "CeeDee Lamb (WR)",
       "Josh Allen (QB)",
-      "Davante Adams (WR)",
+      "Mike Evans (WR)",
       "Mark Andrews (TE)",
       "Raheem Mostert (RB)",
       "Keenan Allen (WR)",
@@ -351,19 +352,19 @@
       "Javonte Williams (RB)",
       "Jordan Addison (WR)"
      ],
-     "lines": 1521.74,
+     "lines": 1549.04,
      "lines_errors": 0,
      "lines_roster": [
-      "Breece Hall (RB)",
+      "Tyreek Hill (WR)",
       "Josh Jacobs (RB)",
       "Josh Allen (QB)",
       "Alvin Kamara (RB)",
       "Rashee Rice (WR)",
-      "Keenan Allen (WR)",
       "Dalton Kincaid (TE)",
       "Jerome Ford (RB)",
-      "Jordan Addison (WR)",
       "Devin Singletary (RB)",
+      "Jordan Addison (WR)",
+      "Javonte Williams (RB)",
       "Caleb Williams (QB)",
       "Rome Odunze (WR)",
       "Chuba Hubbard (RB)"
@@ -388,22 +389,22 @@
       "Mike Williams (WR)",
       "Jordan Addison (WR)"
      ],
-     "lines": 1476.9,
+     "lines": 1499.62,
      "lines_errors": 0,
      "lines_roster": [
       "Amon-Ra St. Brown (WR)",
-      "Josh Jacobs (RB)",
-      "Rashee Rice (WR)",
-      "Jalen Hurts (QB)",
+      "Puka Nacua (WR)",
+      "Josh Allen (QB)",
+      "Sam LaPorta (TE)",
       "Alvin Kamara (RB)",
-      "Dalton Kincaid (TE)",
+      "Rashee Rice (WR)",
       "Jerome Ford (RB)",
       "Devin Singletary (RB)",
       "Jordan Addison (WR)",
+      "Jared Goff (QB)",
       "Javonte Williams (RB)",
-      "Caleb Williams (QB)",
       "Rome Odunze (WR)",
-      "Ezekiel Elliott (RB)"
+      "Joshua Palmer (WR)"
      ]
     },
     {
@@ -425,13 +426,13 @@
       "Mike Williams (WR)",
       "Jordan Addison (WR)"
      ],
-     "lines": 1573.02,
+     "lines": 1501.92,
      "lines_errors": 0,
      "lines_roster": [
       "Amon-Ra St. Brown (WR)",
       "Puka Nacua (WR)",
       "Josh Allen (QB)",
-      "Sam LaPorta (TE)",
+      "Travis Kelce (TE)",
       "Alvin Kamara (RB)",
       "Rashee Rice (WR)",
       "Jerome Ford (RB)",
@@ -440,7 +441,7 @@
       "Jared Goff (QB)",
       "Javonte Williams (RB)",
       "Rome Odunze (WR)",
-      "Brian Thomas Jr. (WR)"
+      "Joshua Palmer (WR)"
      ]
     },
     {
@@ -462,13 +463,13 @@
       "Tyler Lockett (WR)",
       "Chuba Hubbard (RB)"
      ],
-     "lines": 1580.32,
+     "lines": 1501.92,
      "lines_errors": 0,
      "lines_roster": [
-      "Justin Jefferson (WR)",
+      "Amon-Ra St. Brown (WR)",
       "Puka Nacua (WR)",
       "Josh Allen (QB)",
-      "Sam LaPorta (TE)",
+      "Travis Kelce (TE)",
       "Alvin Kamara (RB)",
       "Rashee Rice (WR)",
       "Jerome Ford (RB)",
@@ -477,7 +478,7 @@
       "Jared Goff (QB)",
       "Javonte Williams (RB)",
       "Rome Odunze (WR)",
-      "Brian Thomas Jr. (WR)"
+      "Joshua Palmer (WR)"
      ]
     },
     {
@@ -499,12 +500,12 @@
       "Tyler Lockett (WR)",
       "Ezekiel Elliott (RB)"
      ],
-     "lines": 1450.96,
+     "lines": 1509.22,
      "lines_errors": 0,
      "lines_roster": [
-      "A.J. Brown (WR)",
+      "Justin Jefferson (WR)",
       "Puka Nacua (WR)",
-      "Jalen Hurts (QB)",
+      "Josh Allen (QB)",
       "Travis Kelce (TE)",
       "Alvin Kamara (RB)",
       "Rashee Rice (WR)",
@@ -514,7 +515,7 @@
       "Jared Goff (QB)",
       "Javonte Williams (RB)",
       "Rome Odunze (WR)",
-      "Brian Thomas Jr. (WR)"
+      "Joshua Palmer (WR)"
      ]
     },
     {
@@ -536,22 +537,22 @@
       "Tyler Lockett (WR)",
       "Ezekiel Elliott (RB)"
      ],
-     "lines": 1335.16,
+     "lines": 1377.5600000000002,
      "lines_errors": 0,
      "lines_roster": [
       "A.J. Brown (WR)",
       "Puka Nacua (WR)",
       "Jalen Hurts (QB)",
       "Travis Kelce (TE)",
+      "Alvin Kamara (RB)",
       "Rashee Rice (WR)",
       "Jerome Ford (RB)",
       "Devin Singletary (RB)",
-      "Zack Moss (RB)",
       "Jordan Addison (WR)",
       "Jared Goff (QB)",
       "Javonte Williams (RB)",
-      "Rome Odunze (WR)",
-      "Brian Thomas Jr. (WR)"
+      "Diontae Johnson (WR)",
+      "Rome Odunze (WR)"
      ]
     },
     {
@@ -573,7 +574,7 @@
       "Diontae Johnson (WR)",
       "Ezekiel Elliott (RB)"
      ],
-     "lines": 1335.16,
+     "lines": 1261.76,
      "lines_errors": 0,
      "lines_roster": [
       "A.J. Brown (WR)",
@@ -587,8 +588,8 @@
       "Jordan Addison (WR)",
       "Jared Goff (QB)",
       "Javonte Williams (RB)",
-      "Rome Odunze (WR)",
-      "Brian Thomas Jr. (WR)"
+      "Diontae Johnson (WR)",
+      "Rome Odunze (WR)"
      ]
     }
    ]
@@ -597,7 +598,8 @@
    "league": "keefamania",
    "pair": "2024->2025",
    "teams": 10,
-   "rounds": 12,
+   "rounds": 13,
+   "rival_pool": 144,
    "board_sizes": {
     "blend": 143,
     "lines": 135
@@ -619,7 +621,8 @@
       "Jakobi Meyers (WR)",
       "Justin Herbert (QB)",
       "Rhamondre Stevenson (RB)",
-      "Jayden Higgins (WR)"
+      "Jayden Higgins (WR)",
+      "Najee Harris (RB)"
      ],
      "lines": 1591.74,
      "lines_errors": 0,
@@ -633,9 +636,10 @@
       "Jerry Jeudy (WR)",
       "Jaylen Warren (RB)",
       "Jakobi Meyers (WR)",
-      "Jordan Love (QB)",
       "Jerome Ford (RB)",
-      "Nick Chubb (RB)"
+      "Jordan Love (QB)",
+      "Nick Chubb (RB)",
+      "Xavier Legette (WR)"
      ]
     },
     {
@@ -654,7 +658,8 @@
       "Jakobi Meyers (WR)",
       "Justin Herbert (QB)",
       "Rhamondre Stevenson (RB)",
-      "Rashod Bateman (WR)"
+      "Rashod Bateman (WR)",
+      "Najee Harris (RB)"
      ],
      "lines": 1591.74,
      "lines_errors": 0,
@@ -668,44 +673,47 @@
       "Justin Fields (QB)",
       "Jaylen Warren (RB)",
       "Jakobi Meyers (WR)",
-      "Jordan Love (QB)",
       "Jerome Ford (RB)",
-      "Nick Chubb (RB)"
+      "Jordan Love (QB)",
+      "Nick Chubb (RB)",
+      "Xavier Legette (WR)"
      ]
     },
     {
      "slot": 3,
-     "blend": 1355.5800000000002,
+     "blend": 1437.6599999999999,
      "blend_errors": 0,
      "blend_roster": [
-      "Justin Jefferson (WR)",
+      "Saquon Barkley (RB)",
       "Lamar Jackson (QB)",
       "Tee Higgins (WR)",
       "Trey McBride (TE)",
+      "Courtland Sutton (WR)",
       "Aaron Jones Sr. (RB)",
-      "David Montgomery (RB)",
       "Joe Mixon (RB)",
       "J.K. Dobbins (RB)",
       "Jakobi Meyers (WR)",
       "Jared Goff (QB)",
       "Rhamondre Stevenson (RB)",
-      "Rashod Bateman (WR)"
+      "Rashod Bateman (WR)",
+      "Najee Harris (RB)"
      ],
-     "lines": 1376.6000000000001,
+     "lines": 1420.6799999999998,
      "lines_errors": 0,
      "lines_roster": [
-      "De'Von Achane (RB)",
+      "Saquon Barkley (RB)",
       "Bucky Irving (RB)",
-      "Brock Bowers (TE)",
+      "Jalen Hurts (QB)",
       "Alvin Kamara (RB)",
+      "Trey McBride (TE)",
       "Jerry Jeudy (WR)",
-      "Patrick Mahomes (QB)",
       "Jaylen Waddle (WR)",
       "Jaylen Warren (RB)",
       "Emeka Egbuka (WR)",
-      "Justin Fields (QB)",
       "Jerome Ford (RB)",
-      "Nick Chubb (RB)"
+      "Justin Fields (QB)",
+      "Nick Chubb (RB)",
+      "Xavier Legette (WR)"
      ]
     },
     {
@@ -724,7 +732,8 @@
       "Stefon Diggs (WR)",
       "Jared Goff (QB)",
       "Rhamondre Stevenson (RB)",
-      "Rashod Bateman (WR)"
+      "Rashod Bateman (WR)",
+      "Najee Harris (RB)"
      ],
      "lines": 1376.6000000000001,
      "lines_errors": 0,
@@ -738,9 +747,10 @@
       "Jaylen Waddle (WR)",
       "Jaylen Warren (RB)",
       "Emeka Egbuka (WR)",
-      "Justin Fields (QB)",
       "Jerome Ford (RB)",
-      "Nick Chubb (RB)"
+      "Justin Fields (QB)",
+      "Nick Chubb (RB)",
+      "Xavier Legette (WR)"
      ]
     },
     {
@@ -759,9 +769,10 @@
       "Stefon Diggs (WR)",
       "Jared Goff (QB)",
       "Rhamondre Stevenson (RB)",
-      "Rashod Bateman (WR)"
+      "Rashod Bateman (WR)",
+      "Najee Harris (RB)"
      ],
-     "lines": 1364.7800000000002,
+     "lines": 1420.7800000000002,
      "lines_errors": 0,
      "lines_roster": [
       "De'Von Achane (RB)",
@@ -773,9 +784,10 @@
       "Jaylen Waddle (WR)",
       "Jaylen Warren (RB)",
       "Cooper Kupp (WR)",
-      "Justin Fields (QB)",
       "Jerome Ford (RB)",
-      "Nick Chubb (RB)"
+      "Justin Fields (QB)",
+      "Javonte Williams (RB)",
+      "Xavier Legette (WR)"
      ]
     },
     {
@@ -794,9 +806,10 @@
       "Chris Godwin Jr. (WR)",
       "Jared Goff (QB)",
       "Rhamondre Stevenson (RB)",
-      "Rashod Bateman (WR)"
+      "Rashod Bateman (WR)",
+      "Najee Harris (RB)"
      ],
-     "lines": 1364.7800000000002,
+     "lines": 1420.7800000000002,
      "lines_errors": 0,
      "lines_roster": [
       "De'Von Achane (RB)",
@@ -808,9 +821,10 @@
       "Jaylen Waddle (WR)",
       "Jaylen Warren (RB)",
       "Cooper Kupp (WR)",
-      "Justin Fields (QB)",
       "Jerome Ford (RB)",
-      "Nick Chubb (RB)"
+      "Justin Fields (QB)",
+      "Javonte Williams (RB)",
+      "Xavier Legette (WR)"
      ]
     },
     {
@@ -829,23 +843,25 @@
       "Chris Godwin Jr. (WR)",
       "Jared Goff (QB)",
       "Rhamondre Stevenson (RB)",
-      "Keenan Allen (WR)"
+      "Keenan Allen (WR)",
+      "Najee Harris (RB)"
      ],
-     "lines": 1364.7800000000002,
+     "lines": 1420.7800000000002,
      "lines_errors": 0,
      "lines_roster": [
       "De'Von Achane (RB)",
       "Bucky Irving (RB)",
-      "Brock Bowers (TE)",
       "Jalen Hurts (QB)",
+      "Brock Bowers (TE)",
       "Jerry Jeudy (WR)",
       "Tony Pollard (RB)",
       "Jaylen Waddle (WR)",
       "Jaylen Warren (RB)",
       "Cooper Kupp (WR)",
-      "Justin Fields (QB)",
       "Jerome Ford (RB)",
-      "Nick Chubb (RB)"
+      "Justin Fields (QB)",
+      "Javonte Williams (RB)",
+      "Xavier Legette (WR)"
      ]
     },
     {
@@ -864,9 +880,10 @@
       "Chris Godwin Jr. (WR)",
       "Jared Goff (QB)",
       "Rhamondre Stevenson (RB)",
-      "Keenan Allen (WR)"
+      "Keenan Allen (WR)",
+      "Najee Harris (RB)"
      ],
-     "lines": 1364.7800000000002,
+     "lines": 1420.7800000000002,
      "lines_errors": 0,
      "lines_roster": [
       "De'Von Achane (RB)",
@@ -878,9 +895,10 @@
       "Jaylen Waddle (WR)",
       "Jaylen Warren (RB)",
       "Cooper Kupp (WR)",
-      "Justin Fields (QB)",
       "Jerome Ford (RB)",
-      "Nick Chubb (RB)"
+      "Justin Fields (QB)",
+      "Javonte Williams (RB)",
+      "Xavier Legette (WR)"
      ]
     },
     {
@@ -899,7 +917,8 @@
       "Chris Godwin Jr. (WR)",
       "Jared Goff (QB)",
       "Rhamondre Stevenson (RB)",
-      "Keenan Allen (WR)"
+      "Keenan Allen (WR)",
+      "Najee Harris (RB)"
      ],
      "lines": 1437.0600000000002,
      "lines_errors": 0,
@@ -913,9 +932,10 @@
       "Jaylen Warren (RB)",
       "Tyrone Tracy Jr. (RB)",
       "Cooper Kupp (WR)",
-      "Justin Fields (QB)",
       "Jerome Ford (RB)",
-      "Javonte Williams (RB)"
+      "Justin Fields (QB)",
+      "Javonte Williams (RB)",
+      "Xavier Legette (WR)"
      ]
     },
     {
@@ -934,9 +954,10 @@
       "Chris Godwin Jr. (WR)",
       "Jared Goff (QB)",
       "Rhamondre Stevenson (RB)",
-      "Keenan Allen (WR)"
+      "Keenan Allen (WR)",
+      "Najee Harris (RB)"
      ],
-     "lines": 1437.0600000000002,
+     "lines": 1396.96,
      "lines_errors": 0,
      "lines_roster": [
       "De'Von Achane (RB)",
@@ -944,13 +965,14 @@
       "Brock Bowers (TE)",
       "Jalen Hurts (QB)",
       "Jerry Jeudy (WR)",
-      "Tetairoa McMillan (WR)",
+      "Tony Pollard (RB)",
+      "Jakobi Meyers (WR)",
       "Jaylen Warren (RB)",
-      "Tyrone Tracy Jr. (RB)",
       "Cooper Kupp (WR)",
-      "Justin Fields (QB)",
       "Jerome Ford (RB)",
-      "Javonte Williams (RB)"
+      "Justin Fields (QB)",
+      "Javonte Williams (RB)",
+      "DeMario Douglas (WR)"
      ]
     }
    ]
@@ -959,7 +981,8 @@
    "league": "omnibeta",
    "pair": "2023->2024",
    "teams": 12,
-   "rounds": 12,
+   "rounds": 13,
+   "rival_pool": 177,
    "board_sizes": {
     "blend": 177,
     "lines": 167
@@ -981,9 +1004,10 @@
       "Brian Robinson (RB)",
       "Jakobi Meyers (WR)",
       "J.K. Dobbins (RB)",
+      "Baker Mayfield (QB)",
       "Adam Thielen (WR)"
      ],
-     "lines": 1528.14,
+     "lines": 1544.94,
      "lines_errors": 0,
      "lines_roster": [
       "Tyreek Hill (WR)",
@@ -992,12 +1016,13 @@
       "Dalton Kincaid (TE)",
       "Jordan Mason (RB)",
       "Jerome Ford (RB)",
+      "Chris Godwin Jr. (WR)",
       "Jordan Addison (WR)",
-      "Tyler Lockett (WR)",
       "Chuba Hubbard (RB)",
+      "Caleb Williams (QB)",
       "Joshua Palmer (WR)",
-      "Matthew Stafford (QB)",
-      "Gabe Davis (WR)"
+      "Antonio Gibson (RB)",
+      "Rashid Shaheed (WR)"
      ]
     },
     {
@@ -1016,23 +1041,25 @@
       "Diontae Johnson (WR)",
       "J.K. Dobbins (RB)",
       "Justin Fields (QB)",
-      "Adam Thielen (WR)"
+      "Adam Thielen (WR)",
+      "Xavier Legette (WR)"
      ],
-     "lines": 1588.3400000000001,
+     "lines": 1544.94,
      "lines_errors": 0,
      "lines_roster": [
       "Tyreek Hill (WR)",
       "Josh Allen (QB)",
-      "Sam LaPorta (TE)",
       "Rashee Rice (WR)",
+      "Dalton Kincaid (TE)",
       "Jordan Mason (RB)",
       "Jerome Ford (RB)",
+      "Chris Godwin Jr. (WR)",
       "Jordan Addison (WR)",
-      "Diontae Johnson (WR)",
       "Chuba Hubbard (RB)",
+      "Caleb Williams (QB)",
       "Joshua Palmer (WR)",
-      "Matthew Stafford (QB)",
-      "Gabe Davis (WR)"
+      "Antonio Gibson (RB)",
+      "Rashid Shaheed (WR)"
      ]
     },
     {
@@ -1051,23 +1078,25 @@
       "Brian Robinson (RB)",
       "Mike Williams (WR)",
       "Justin Fields (QB)",
-      "Adam Thielen (WR)"
+      "Adam Thielen (WR)",
+      "Xavier Legette (WR)"
      ],
-     "lines": 1686.3200000000002,
+     "lines": 1618.74,
      "lines_errors": 0,
      "lines_roster": [
-      "Amon-Ra St. Brown (WR)",
+      "Tyreek Hill (WR)",
       "Josh Allen (QB)",
       "Sam LaPorta (TE)",
       "Rashee Rice (WR)",
       "Jordan Mason (RB)",
       "Jerome Ford (RB)",
+      "Chris Godwin Jr. (WR)",
       "Jordan Addison (WR)",
-      "Diontae Johnson (WR)",
       "Chuba Hubbard (RB)",
+      "Caleb Williams (QB)",
       "Joshua Palmer (WR)",
-      "Matthew Stafford (QB)",
-      "Gabe Davis (WR)"
+      "Antonio Gibson (RB)",
+      "Rashid Shaheed (WR)"
      ]
     },
     {
@@ -1086,7 +1115,8 @@
       "DeAndre Hopkins (WR)",
       "J.K. Dobbins (RB)",
       "Justin Fields (QB)",
-      "Adam Thielen (WR)"
+      "Adam Thielen (WR)",
+      "Kimani Vidal (RB)"
      ],
      "lines": 1686.3200000000002,
      "lines_errors": 0,
@@ -1100,8 +1130,9 @@
       "Jordan Addison (WR)",
       "Diontae Johnson (WR)",
       "Chuba Hubbard (RB)",
+      "Caleb Williams (QB)",
       "Joshua Palmer (WR)",
-      "Matthew Stafford (QB)",
+      "Antonio Gibson (RB)",
       "Gabe Davis (WR)"
      ]
     },
@@ -1121,7 +1152,8 @@
       "Brian Robinson (RB)",
       "Courtland Sutton (WR)",
       "Justin Fields (QB)",
-      "Jordan Addison (WR)"
+      "Jordan Addison (WR)",
+      "Adam Thielen (WR)"
      ],
      "lines": 1621.4,
      "lines_errors": 0,
@@ -1135,9 +1167,10 @@
       "Jordan Addison (WR)",
       "Diontae Johnson (WR)",
       "Chuba Hubbard (RB)",
+      "Caleb Williams (QB)",
       "Joshua Palmer (WR)",
-      "Matthew Stafford (QB)",
-      "Rashid Shaheed (WR)"
+      "Antonio Gibson (RB)",
+      "Gabe Davis (WR)"
      ]
     },
     {
@@ -1156,23 +1189,25 @@
       "Brian Robinson (RB)",
       "Courtland Sutton (WR)",
       "Justin Fields (QB)",
-      "Jordan Addison (WR)"
+      "Jordan Addison (WR)",
+      "Adam Thielen (WR)"
      ],
-     "lines": 1622.7,
+     "lines": 1699.4,
      "lines_errors": 0,
      "lines_roster": [
-      "Justin Jefferson (WR)",
+      "Amon-Ra St. Brown (WR)",
       "Sam LaPorta (TE)",
       "Jalen Hurts (QB)",
       "Rashee Rice (WR)",
       "Jordan Mason (RB)",
+      "Keenan Allen (WR)",
       "Jerome Ford (RB)",
       "Jordan Addison (WR)",
-      "Diontae Johnson (WR)",
       "Chuba Hubbard (RB)",
+      "Caleb Williams (QB)",
       "Joshua Palmer (WR)",
-      "Trevor Lawrence (QB)",
-      "Rashid Shaheed (WR)"
+      "Antonio Gibson (RB)",
+      "Gabe Davis (WR)"
      ]
     },
     {
@@ -1191,9 +1226,10 @@
       "Jerome Ford (RB)",
       "Courtland Sutton (WR)",
       "Justin Fields (QB)",
-      "Jakobi Meyers (WR)"
+      "Jakobi Meyers (WR)",
+      "Adam Thielen (WR)"
      ],
-     "lines": 1622.7,
+     "lines": 1772.6000000000001,
      "lines_errors": 0,
      "lines_roster": [
       "Justin Jefferson (WR)",
@@ -1201,18 +1237,19 @@
       "Jalen Hurts (QB)",
       "Rashee Rice (WR)",
       "Jordan Mason (RB)",
+      "Keenan Allen (WR)",
       "Jerome Ford (RB)",
       "Jordan Addison (WR)",
-      "Diontae Johnson (WR)",
       "Chuba Hubbard (RB)",
+      "Caleb Williams (QB)",
       "Joshua Palmer (WR)",
-      "Trevor Lawrence (QB)",
-      "Rashid Shaheed (WR)"
+      "Zach Charbonnet (RB)",
+      "Gabe Davis (WR)"
      ]
     },
     {
      "slot": 8,
-     "blend": 1949.6799999999998,
+     "blend": 1894.78,
      "blend_errors": 0,
      "blend_roster": [
       "Kyren Williams (RB)",
@@ -1224,14 +1261,15 @@
       "T.J. Hockenson (TE)",
       "Austin Ekeler (RB)",
       "J.K. Dobbins (RB)",
-      "Courtland Sutton (WR)",
       "Justin Fields (QB)",
-      "Jakobi Meyers (WR)"
+      "Jakobi Meyers (WR)",
+      "Khalil Herbert (RB)",
+      "Adam Thielen (WR)"
      ],
-     "lines": 1600.12,
+     "lines": 1772.6000000000001,
      "lines_errors": 0,
      "lines_roster": [
-      "A.J. Brown (WR)",
+      "Justin Jefferson (WR)",
       "Sam LaPorta (TE)",
       "Jalen Hurts (QB)",
       "Rashee Rice (WR)",
@@ -1240,30 +1278,32 @@
       "Jerome Ford (RB)",
       "Jordan Addison (WR)",
       "Chuba Hubbard (RB)",
-      "Joshua Palmer (WR)",
-      "Trevor Lawrence (QB)",
-      "Rashid Shaheed (WR)"
+      "Tyler Lockett (WR)",
+      "Matthew Stafford (QB)",
+      "Zach Charbonnet (RB)",
+      "Gabe Davis (WR)"
      ]
     },
     {
      "slot": 9,
-     "blend": 1860.08,
+     "blend": 1679.72,
      "blend_errors": 0,
      "blend_roster": [
       "Kyren Williams (RB)",
       "Puka Nacua (WR)",
-      "Alvin Kamara (RB)",
-      "Lamar Jackson (QB)",
-      "Keenan Allen (WR)",
+      "Jalen Hurts (QB)",
       "Raheem Mostert (RB)",
+      "Keenan Allen (WR)",
+      "Calvin Ridley (WR)",
       "T.J. Hockenson (TE)",
       "Austin Ekeler (RB)",
       "J.K. Dobbins (RB)",
       "Tyler Lockett (WR)",
       "Justin Fields (QB)",
-      "Jakobi Meyers (WR)"
+      "Jakobi Meyers (WR)",
+      "Adam Thielen (WR)"
      ],
-     "lines": 1726.02,
+     "lines": 1672.02,
      "lines_errors": 0,
      "lines_roster": [
       "A.J. Brown (WR)",
@@ -1275,9 +1315,10 @@
       "Jerome Ford (RB)",
       "Jordan Addison (WR)",
       "Chuba Hubbard (RB)",
-      "Joshua Palmer (WR)",
-      "Jerry Jeudy (WR)",
-      "Rashid Shaheed (WR)"
+      "Tyler Lockett (WR)",
+      "Matthew Stafford (QB)",
+      "Zach Charbonnet (RB)",
+      "Gabe Davis (WR)"
      ]
     },
     {
@@ -1296,23 +1337,25 @@
       "J.K. Dobbins (RB)",
       "Tyler Lockett (WR)",
       "Justin Fields (QB)",
-      "Jakobi Meyers (WR)"
+      "Jakobi Meyers (WR)",
+      "Adam Thielen (WR)"
      ],
-     "lines": 1726.02,
+     "lines": 1553.52,
      "lines_errors": 0,
      "lines_roster": [
       "A.J. Brown (WR)",
-      "Sam LaPorta (TE)",
+      "Puka Nacua (WR)",
       "Jalen Hurts (QB)",
       "Rashee Rice (WR)",
+      "Dalton Kincaid (TE)",
       "Jordan Mason (RB)",
-      "Keenan Allen (WR)",
       "Jerome Ford (RB)",
       "Jordan Addison (WR)",
       "Chuba Hubbard (RB)",
+      "Tyler Lockett (WR)",
+      "Trevor Lawrence (QB)",
       "Joshua Palmer (WR)",
-      "Jerry Jeudy (WR)",
-      "Rashid Shaheed (WR)"
+      "Gabe Davis (WR)"
      ]
     },
     {
@@ -1329,30 +1372,32 @@
       "T.J. Hockenson (TE)",
       "Austin Ekeler (RB)",
       "J.K. Dobbins (RB)",
-      "Tyler Lockett (WR)",
       "Justin Fields (QB)",
-      "Jakobi Meyers (WR)"
+      "Jakobi Meyers (WR)",
+      "Khalil Herbert (RB)",
+      "Adam Thielen (WR)"
      ],
-     "lines": 1715.72,
+     "lines": 1553.52,
      "lines_errors": 0,
      "lines_roster": [
+      "A.J. Brown (WR)",
       "Puka Nacua (WR)",
-      "Sam LaPorta (TE)",
       "Jalen Hurts (QB)",
       "Rashee Rice (WR)",
+      "Dalton Kincaid (TE)",
       "Jordan Mason (RB)",
-      "Keenan Allen (WR)",
       "Jerome Ford (RB)",
       "Jordan Addison (WR)",
       "Chuba Hubbard (RB)",
+      "Tyler Lockett (WR)",
+      "Trevor Lawrence (QB)",
       "Joshua Palmer (WR)",
-      "Jerry Jeudy (WR)",
-      "Rashid Shaheed (WR)"
+      "Gabe Davis (WR)"
      ]
     },
     {
      "slot": 12,
-     "blend": 1710.82,
+     "blend": 1639.82,
      "blend_errors": 0,
      "blend_roster": [
       "Kyren Williams (RB)",
@@ -1366,9 +1411,10 @@
       "J.K. Dobbins (RB)",
       "DeAndre Hopkins (WR)",
       "Justin Fields (QB)",
-      "Jakobi Meyers (WR)"
+      "Khalil Herbert (RB)",
+      "Adam Thielen (WR)"
      ],
-     "lines": 1715.72,
+     "lines": 1595.82,
      "lines_errors": 0,
      "lines_roster": [
       "Puka Nacua (WR)",
@@ -1381,8 +1427,9 @@
       "Jordan Addison (WR)",
       "Chuba Hubbard (RB)",
       "Tyler Lockett (WR)",
-      "Jerry Jeudy (WR)",
-      "Rashid Shaheed (WR)"
+      "Trevor Lawrence (QB)",
+      "Joshua Palmer (WR)",
+      "Gabe Davis (WR)"
      ]
     }
    ]
@@ -1392,6 +1439,7 @@
    "pair": "2024->2025",
    "teams": 12,
    "rounds": 13,
+   "rival_pool": 205,
    "board_sizes": {
     "blend": 205,
     "lines": 187
@@ -1431,7 +1479,7 @@
       "Adam Thielen (WR)",
       "Nick Chubb (RB)",
       "Sam Darnold (QB)",
-      "Ray-Ray McCloud III (WR)"
+      "Dylan Sampson (RB)"
      ]
     },
     {
@@ -1453,7 +1501,7 @@
       "Sam Darnold (QB)",
       "Kareem Hunt (RB)"
      ],
-     "lines": 1509.42,
+     "lines": 1404.66,
      "lines_errors": 0,
      "lines_roster": [
       "Justin Jefferson (WR)",
@@ -1467,8 +1515,8 @@
       "Javonte Williams (RB)",
       "Adam Thielen (WR)",
       "Nick Chubb (RB)",
-      "Sam Darnold (QB)",
-      "Ray-Ray McCloud III (WR)"
+      "Xavier Legette (WR)",
+      "Dylan Sampson (RB)"
      ]
     },
     {
@@ -1490,7 +1538,7 @@
       "Sam Darnold (QB)",
       "Kareem Hunt (RB)"
      ],
-     "lines": 1509.42,
+     "lines": 1404.66,
      "lines_errors": 0,
      "lines_roster": [
       "Justin Jefferson (WR)",
@@ -1504,8 +1552,8 @@
       "Javonte Williams (RB)",
       "Adam Thielen (WR)",
       "Nick Chubb (RB)",
-      "Sam Darnold (QB)",
-      "Ray-Ray McCloud III (WR)"
+      "Xavier Legette (WR)",
+      "Dylan Sampson (RB)"
      ]
     },
     {
@@ -1527,7 +1575,7 @@
       "Sam Darnold (QB)",
       "Kareem Hunt (RB)"
      ],
-     "lines": 1403.66,
+     "lines": 1502.14,
      "lines_errors": 0,
      "lines_roster": [
       "Justin Jefferson (WR)",
@@ -1540,9 +1588,9 @@
       "Justin Fields (QB)",
       "Javonte Williams (RB)",
       "Adam Thielen (WR)",
-      "Nick Chubb (RB)",
-      "Ollie Gordon II (RB)",
-      "Ray-Ray McCloud III (WR)"
+      "Jordan Love (QB)",
+      "Xavier Legette (WR)",
+      "Dylan Sampson (RB)"
      ]
     },
     {
@@ -1560,11 +1608,11 @@
       "J.K. Dobbins (RB)",
       "Chris Godwin Jr. (WR)",
       "Rhamondre Stevenson (RB)",
-      "Sam Darnold (QB)",
       "Rachaad White (RB)",
+      "Sam Darnold (QB)",
       "Kareem Hunt (RB)"
      ],
-     "lines": 1470.3600000000001,
+     "lines": 1502.4,
      "lines_errors": 0,
      "lines_roster": [
       "De'Von Achane (RB)",
@@ -1578,8 +1626,8 @@
       "Jerome Ford (RB)",
       "Adam Thielen (WR)",
       "Nick Chubb (RB)",
-      "Ollie Gordon II (RB)",
-      "Ray-Ray McCloud III (WR)"
+      "Tua Tagovailoa (QB)",
+      "Dylan Sampson (RB)"
      ]
     },
     {
@@ -1601,7 +1649,7 @@
       "Rachaad White (RB)",
       "Kareem Hunt (RB)"
      ],
-     "lines": 1496.0600000000002,
+     "lines": 1528.1000000000001,
      "lines_errors": 0,
      "lines_roster": [
       "De'Von Achane (RB)",
@@ -1615,8 +1663,8 @@
       "Javonte Williams (RB)",
       "Adam Thielen (WR)",
       "Nick Chubb (RB)",
-      "Dylan Sampson (RB)",
-      "Ray-Ray McCloud III (WR)"
+      "Tua Tagovailoa (QB)",
+      "Dylan Sampson (RB)"
      ]
     },
     {
@@ -1689,7 +1737,7 @@
       "Javonte Williams (RB)",
       "Adam Thielen (WR)",
       "Tua Tagovailoa (QB)",
-      "Dylan Sampson (RB)",
+      "Nick Chubb (RB)",
       "Ray-Ray McCloud III (WR)"
      ]
     },
@@ -1761,8 +1809,8 @@
       "Emeka Egbuka (WR)",
       "Jerome Ford (RB)",
       "Javonte Williams (RB)",
-      "Justin Fields (QB)",
-      "Xavier Legette (WR)",
+      "Adam Thielen (WR)",
+      "Nick Chubb (RB)",
       "Dylan Sampson (RB)",
       "Ray-Ray McCloud III (WR)"
      ]
@@ -1786,20 +1834,20 @@
       "Rachaad White (RB)",
       "Kareem Hunt (RB)"
      ],
-     "lines": 1528.0600000000002,
+     "lines": 1625.56,
      "lines_errors": 0,
      "lines_roster": [
       "De'Von Achane (RB)",
       "Bucky Irving (RB)",
       "Jalen Hurts (QB)",
       "Terry McLaurin (WR)",
-      "Jerry Jeudy (WR)",
       "David Njoku (TE)",
+      "Jakobi Meyers (WR)",
       "Emeka Egbuka (WR)",
       "Jerome Ford (RB)",
       "Javonte Williams (RB)",
-      "Justin Fields (QB)",
-      "Xavier Legette (WR)",
+      "Rashid Shaheed (WR)",
+      "Nick Chubb (RB)",
       "Dylan Sampson (RB)",
       "Ray-Ray McCloud III (WR)"
      ]
@@ -1823,7 +1871,7 @@
       "Rachaad White (RB)",
       "Kareem Hunt (RB)"
      ],
-     "lines": 1528.0600000000002,
+     "lines": 1570.46,
      "lines_errors": 0,
      "lines_roster": [
       "De'Von Achane (RB)",
@@ -1835,8 +1883,8 @@
       "Emeka Egbuka (WR)",
       "Jerome Ford (RB)",
       "Javonte Williams (RB)",
-      "Justin Fields (QB)",
-      "Xavier Legette (WR)",
+      "Rashid Shaheed (WR)",
+      "Nick Chubb (RB)",
       "Dylan Sampson (RB)",
       "Ray-Ray McCloud III (WR)"
      ]

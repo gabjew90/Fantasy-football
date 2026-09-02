@@ -1,15 +1,17 @@
-"""Verification for "projections as an input" (DECISIONS 2026-09-02 #21).
+"""Churn DIAGNOSTIC for a projection-input change (DECISIONS #21, demoted
+from gate to diagnostic by #23).
 
-Two boards -- the old one (model blend) and the new one (external stat
-lines) -- are replayed through the SAME engine against an archived draft,
-with rivals' picks held fixed and our picks made by the engine at every
-slot. Reported per slot and in aggregate:
+Two boards -- e.g. the model blend and the external stat lines -- are
+replayed through the SAME engine against an archived draft, with rivals'
+picks held fixed and our picks made by the engine at every slot. Reported
+per slot and in aggregate:
 
-  * projected points of the starting lineup, graded on the NEW input (the
-    input of record) and on the old, so neither board grades itself alone;
-  * the picks that changed, by round, and the ten largest changes -- the
-    gate is that changes concentrate in bench rounds and QB; if starters in
-    rounds 1-6 move materially, stop and report.
+  * projected points of the starting lineup, graded on each board's own
+    ruler (each board wins on its own ruler; this is NOT an outcome test --
+    scripts/source_gate.py grades on actual points);
+  * the picks that changed, by round and by TIER of the player the old
+    board took, and the ten largest changes. Churn decides nothing; the
+    quality tests in source_gate.py do.
 
 Also prints the per-position rank correlation between the two boards'
 proj_pts, and the players that left or joined the board.
@@ -30,50 +32,22 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import engine_parity as EP  # noqa: E402
+from projection_backtest import spearman  # noqa: E402
 from slot_replay import lineup_points, replay  # noqa: E402
-
-SLOTS_BY_LEAGUE = {
-    "keefamania": {"QB": 1, "RB": 2, "WR": 2, "TE": 1, "FLEX": 1, "K": 1, "DEF": 1},
-    "omnibeta": {"QB": 1, "RB": 2, "WR": 2, "TE": 1, "FLEX": 2, "K": 1, "DEF": 1},
-}
-
-
-def spearman(a, b):
-    def ranks(x):
-        order = sorted(range(len(x)), key=lambda i: x[i])
-        r = [0.0] * len(x)
-        i = 0
-        while i < len(order):
-            j = i
-            while j + 1 < len(order) and x[order[j + 1]] == x[order[i]]:
-                j += 1
-            for k in range(i, j + 1):
-                r[order[k]] = (i + j) / 2 + 1
-            i = j + 1
-        return r
-    n = len(a)
-    if n < 3:
-        return float("nan")
-    ra, rb = ranks(a), ranks(b)
-    ma, mb = sum(ra) / n, sum(rb) / n
-    cov = sum((x - ma) * (y - mb) for x, y in zip(ra, rb))
-    va = sum((x - ma) ** 2 for x in ra) ** 0.5
-    vb = sum((y - mb) ** 2 for y in rb) ** 0.5
-    return cov / (va * vb) if va and vb else float("nan")
+from draftkit.config import Config  # noqa: E402
 
 
 def grade(chosen, ruler_by_name, slots):
     """Lineup points of a roster graded on another board's proj_pts."""
-    import slot_replay as SR
-    saved = dict(SR.SLOTS)
-    SR.SLOTS.clear(); SR.SLOTS.update(slots)
-    try:
-        return lineup_points([dict(p, proj_pts=ruler_by_name.get(p["name"], {}).get("proj_pts", 0.0)) for p in chosen])
-    finally:
-        SR.SLOTS.clear(); SR.SLOTS.update(saved)
+    return lineup_points([dict(p, proj_pts=ruler_by_name.get(p["name"], {}).get("proj_pts", 0.0)) for p in chosen],
+                         slots=slots)
 
 
 def main() -> None:
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")   # the report is printed too; cp1252 chokes on Δ
+    except (AttributeError, ValueError):
+        pass
     ap = argparse.ArgumentParser()
     ap.add_argument("--league", required=True)
     ap.add_argument("--draft-id", required=True)
@@ -85,7 +59,7 @@ def main() -> None:
 
     new_path = a.new or ("tiers.csv" if a.league == "omnibeta" else f"tiers.{a.league}.csv")
     old, new = EP.load_board(a.old), EP.load_board(new_path)
-    slots = SLOTS_BY_LEAGUE.get(a.league, EP.SLOTS)
+    _teams, _rounds, slots = EP.league_shape(Config.load(league=a.league))   # from the league yaml
     log = [json.loads(l) for l in open(f"data/logs/draft_{a.draft_id}.jsonl", encoding="utf-8")]
     log = [d for d in log if d.get("type") == "pick"]
     log.sort(key=lambda d: d["pick_no"])
@@ -111,10 +85,13 @@ def main() -> None:
           + ", ".join(zeroed[:30]) + (" …" if len(zeroed) > 30 else ""), ""]
 
     # replay
-    per_slot, changed = [], []
+    per_slot, changed, picks_by_tier = [], [], {}
     for slot in range(1, a.teams + 1):
         c_old = replay(old, log, slot, a.teams, rounds, True, slots=slots)
         c_new = replay(new, log, slot, a.teams, rounds, True, slots=slots)
+        for p in c_old:                      # denominators for the by-tier line, same rosters
+            t = int(p.get("tier") or 9)
+            picks_by_tier[t] = picks_by_tier.get(t, 0) + 1
         row = {"slot": slot,
                "old_on_new": grade(c_old, by_new, slots), "new_on_new": grade(c_new, by_new, slots),
                "old_on_old": grade(c_old, by_old, slots), "new_on_old": grade(c_new, by_old, slots)}
@@ -155,11 +132,6 @@ def main() -> None:
     by_tier = {}
     for c in changed:
         by_tier[c["tier"]] = by_tier.get(c["tier"], 0) + 1
-    picks_by_tier = {}
-    for slot in range(1, a.teams + 1):
-        for p in replay(old, log, slot, a.teams, rounds, True, slots=slots):
-            t = int(p.get("tier") or 9)
-            picks_by_tier[t] = picks_by_tier.get(t, 0) + 1
     L += ["By tier of the player the old board took (changed / picks at that tier): "
           + ", ".join(f"T{t}: {by_tier.get(t, 0)}/{picks_by_tier[t]} ({by_tier.get(t, 0) / picks_by_tier[t]:.0%})"
                       for t in sorted(picks_by_tier)) + ".", "",

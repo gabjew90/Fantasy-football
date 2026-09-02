@@ -56,6 +56,9 @@ expected:
   rounds: 15
   pick_timer: 60             # commissioner changed 120 -> 60 on 2026-08-23
   type: snake
+  # Sleeper roster_positions as read live 2026-09-02; the replay scripts take
+  # starter slots from here (scripts/engine_parity.league_shape)
+  roster: [QB, RB, RB, WR, WR, TE, FLEX, FLEX, K, DEF, BN, BN, BN, BN, BN]
   scoring:
     rec: 1.0
     pass_yd: 0.04

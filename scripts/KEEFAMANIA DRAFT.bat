@@ -10,8 +10,9 @@ venv\Scripts\python.exe -m draftkit tiers
 
 start "" http://localhost:8724
 rem Port 8724: keefamania's own port so Omnibeta's dashboard guard (8723)
-rem never collides. Manual entry works immediately; for the auto-poller,
-rem ALSO run YAHOO POLLER.bat after opening the draft room in Chrome.
+rem never collides. This dashboard is the human view only; the draft itself
+rem is made by the in-page driver per docs/draft-day-runbook.md (bridge +
+rem driver.js). The old CDP poller was retired 2026-09-02.
 venv\Scripts\python.exe -m draftkit --league keefamania web --port 8724
 if "%errorlevel%"=="3" (
   echo dashboard already running - browser tab opened.

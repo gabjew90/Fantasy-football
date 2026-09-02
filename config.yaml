@@ -17,8 +17,10 @@ projections:
   # was redefined around quality (DECISIONS #23, thresholds pre-registered)
   # and the external stand-in (Sleeper week-1 lines, the only outside lines
   # with history) FAILED both halves: pooled MAE 5% worse than the model in
-  # both leagues, and actual-points lineups 1.6% worse over 44 replayed
-  # slot-drafts (reports/source_gate.md). So the default stays `model`; the
+  # both leagues, and actual-points lineups 1.2% worse over 44 replayed
+  # slot-drafts against identical rivals (reports/source_gate.md; the
+  # first run's -1.6% had a rival-pool flaw, corrected the same day). So
+  # the default stays `model`; the
   # external path is kept as a parallel column and the 2026 sheet is judged
   # when 2026 is played.
   source: model

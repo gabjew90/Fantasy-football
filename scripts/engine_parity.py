@@ -68,6 +68,17 @@ def load_board(path: str) -> list[dict]:
     return out
 
 
+def league_shape(cfg) -> tuple[int, int, dict[str, int]]:
+    """(teams, rounds, starter slots) from the league yaml's `expected:`
+    block -- the one place league facts live (CLAUDE.md). Replaces the
+    per-league tables the replay scripts used to carry by hand."""
+    from yahoo_bridge import slots_from_yahoo_roster
+    exp = cfg["expected"]
+    slots = slots_from_yahoo_roster(exp["roster"])
+    slots.pop("BN", None)
+    return int(exp["teams"]), int(exp["rounds"]), {k: v for k, v in slots.items() if v}
+
+
 def make_tracker(board, picks, my_slot, slots=None, teams=None, rounds=None):
     """A Tracker over a synthetic room. Defaults are the 10-team Keefamania
     shape; pass slots/teams/rounds to replay another league's format."""

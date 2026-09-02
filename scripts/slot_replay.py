@@ -32,23 +32,27 @@ import engine_parity as EP  # noqa: E402
 from engine_bakeoff import FLEX_OK, SLOTS, lineup_value  # noqa: E402
 
 
-def lineup_points(chosen: list[dict]) -> float:
-    """Projected points of the best legal starting lineup.
+def lineup_points(chosen: list[dict], slots: dict | None = None, key: str = "proj_pts") -> float:
+    """Points of the best legal starting lineup, on whatever ruler `key`
+    names (projected points by default; actual season points in the
+    projection-source gate). `slots` is the league's starter shape; the
+    Keefamania default keeps the older callers unchanged.
 
     Baseline-free by construction, which is the whole reason it is the
     headline number: replacement levels cancel, so an engine that changes how
     it prices players cannot move this scoreboard except by drafting a
     different, better-scoring team.
     """
-    rem, flex, total = dict(SLOTS), SLOTS["FLEX"], 0.0
-    for p in sorted(chosen, key=lambda q: -q["proj_pts"]):
-        pos = p["pos"]
+    slots = slots or SLOTS
+    rem, flex, total = dict(slots), int(slots.get("FLEX", 0)), 0.0
+    for p in sorted(chosen, key=lambda q: -float(q.get(key) or 0.0)):
+        pos, v = p["pos"], float(p.get(key) or 0.0)
         if rem.get(pos, 0) > 0:
             rem[pos] -= 1
-            total += p["proj_pts"]
+            total += v
         elif pos in FLEX_OK and flex > 0:
             flex -= 1
-            total += p["proj_pts"]
+            total += v
     return total
 
 

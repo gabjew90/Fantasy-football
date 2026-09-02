@@ -119,9 +119,7 @@ def cmd_dataset(cfg: Config, args) -> None:
 
 def cmd_tiers(cfg: Config, args) -> None:
     from .projections import PROJECTION_FNS
-    from .tiers import (add_handcuff_info, add_upside_flags, build_disagreements,
-                        build_tiers, write_tiers_csv)
-    from .vorp import add_vorp
+    from .tiers import build_disagreements, finish_board, write_tiers_csv
     from .board import write_board_markdown
 
     processed = cfg.path("processed")
@@ -135,13 +133,8 @@ def cmd_tiers(cfg: Config, args) -> None:
     if n_tilted:
         console.print(f"  standing tilts applied to {n_tilted} players "
                       f"(league: {cfg.league_name})")
-    df = add_vorp(df, cfg.baselines)
-    tiers = build_tiers(df, cfg)
-    tiers = add_handcuff_info(tiers)
-    tiers = add_upside_flags(tiers)
-    # standing contingency map — DISPLAY ONLY, never an engine input
-    from .fragility import add_contingency_map
-    tiers = add_contingency_map(tiers)
+    # VORP -> tiers -> handcuff/upside flags -> contingency map (display only)
+    tiers = finish_board(df, cfg)
 
     # Inert overrides are reported LOUDLY at every build. A candidate row is a
     # projection you believe but have not re-verified, and the failure mode is

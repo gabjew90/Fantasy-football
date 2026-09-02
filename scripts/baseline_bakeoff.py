@@ -41,12 +41,9 @@ CANDIDATES = [
 
 def build_board(cfg: Config, overrides: dict[str, int], out: Path) -> list[dict]:
     """cmd_tiers, minus the reporting, with the baselines swapped."""
-    from draftkit.fragility import add_contingency_map
     from draftkit.projections import PROJECTION_FNS
-    from draftkit.tiers import (add_handcuff_info, add_upside_flags,
-                                build_tiers, write_tiers_csv)
+    from draftkit.tiers import finish_board, write_tiers_csv
     from draftkit.tilts import apply_tilts, prior_top5_by_pos
-    from draftkit.vorp import add_vorp
 
     processed = cfg.path("processed")
     market = pl.read_parquet(cfg.scoped(processed / "market.parquet"))
@@ -56,10 +53,7 @@ def build_board(cfg: Config, overrides: dict[str, int], out: Path) -> list[dict]
 
     baselines = dict(cfg.baselines)
     baselines.update(overrides)
-    df = add_vorp(df, baselines)
-    tiers = add_contingency_map(add_upside_flags(add_handcuff_info(
-        build_tiers(df, cfg))))
-    write_tiers_csv(tiers, out)
+    write_tiers_csv(finish_board(df, cfg, baselines), out)
     return EP.load_board(str(out))
 
 

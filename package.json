@@ -1,7 +1,7 @@
 {
   "name": "fantasy-football",
   "version": "1.0.0",
-  "description": "Draft-prep pipeline + live draft tracker for Sleeper league **Omnibeta Degens**\r (12-team, full PPR, 2 FLEX, 15-round snake, 120s clock).",
+  "description": "draftkit: multi-league draft prep, live draft engine (Sleeper tracker + Yahoo in-page driver) and in-season auto-manager. jsdom is here for the node tests of scripts/draft_driver.js.",
   "main": "index.js",
   "directories": {
     "doc": "docs",

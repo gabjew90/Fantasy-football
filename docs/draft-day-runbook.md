@@ -3,15 +3,15 @@
 Three layers, each a fallback for the one above (design: docs/superpowers/specs/2026-09-01-draft-rig-foolproof-design.md).
 Everything below is executed, not built. If a step is red, the layer below still drafts.
 
-## Projection source (decide before the T-2h rebuild)
+## Projection source (DECIDED — nothing to do on draft day)
 
-`config.yaml -> projections.source` is `model` (the 2025-usage + ECR blend the
-mocks drafted with) or `external` (FantasyPros sheet + Sleeper stat lines,
-scored in league settings, non-starters zeroed; DECISIONS #21). External is
-built and verified but the replay gate tripped (63% of round 1-6 picks
-change: QB timing and RB/WR tier order), so the flip is a human call. If you
-flip it, rebuild both boards, then `scripts/input_replay.py` once more and
-read the round 1-6 list before the draft.
+`config.yaml -> projections.source` stays `model` (the 2025-usage + ECR blend
+every mock drafted with). The alternative, `external` (FantasyPros sheet +
+Sleeper stat lines), was put through the pre-registered quality gate on
+2026-09-02 and failed both halves: its history stand-in projected 5% worse
+on error and drafted lineups 1.6% worse on actual points (DECISIONS #23,
+reports/source_gate.md). Do not flip it on draft morning. The sheet's
+numbers stay visible on the board as `proj_consensus_pts` for the eye.
 
 ## T-2h: board and layer 0 (Yahoo's own autopick walks our list)
 

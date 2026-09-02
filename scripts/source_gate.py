@@ -12,13 +12,15 @@ mean of the per-(pair, position) Spearman. external fails if pooled MAE is
 more than 2% above the model's or weighted Spearman more than 0.02 below,
 in either league.
 
-Test 2, OUTCOME -- both arms built into boards through the production code
-(add_vorp, build_tiers, handcuff and upside flags), replayed through the
-SAME engine at every draft slot against rivals drafting in that year's ADP
-order, each roster graded on the ACTUAL season points of its best legal
-lineup. K/DEF are absent from the history pools and removed from the slots
-for both arms. external fails if its mean lineup points over all slots,
-pairs and leagues are more than 1% below the model's.
+Test 2, OUTCOME -- both arms built into boards through the production board
+code (draftkit.tiers.finish_board) and replayed through the SAME engine at
+every draft slot against the SAME rivals: rivals draft the history year's
+pool in ADP order, from one shared list, whether or not a player is on our
+arm's board (an arm that never projected a player cannot draft him; the
+rivals still can). Each roster is graded on the ACTUAL season points of its
+best legal lineup. K/DEF are absent from the history pools and removed from
+the slots for both arms. external fails if its mean lineup points over all
+slots, pairs and leagues are more than 1% below the model's.
 
 Churn is not a gate; scripts/input_replay.py reports it by tier.
 
@@ -41,108 +43,73 @@ sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "scripts"))
 
 import engine_parity as EP  # noqa: E402
+from projection_backtest import ARMS, spearman  # noqa: E402
+from slot_replay import lineup_points  # noqa: E402
 from draftkit import snake  # noqa: E402
 from draftkit.config import Config  # noqa: E402
-from draftkit.tiers import add_handcuff_info, add_upside_flags, build_tiers, write_tiers_csv  # noqa: E402
-from draftkit.vorp import add_vorp  # noqa: E402
+from draftkit.tiers import finish_board, write_tiers_csv  # noqa: E402
 
-ARMS = ("usage", "curve", "blend", "lines")
 MODEL_ARM, EXTERNAL_ARM = "blend", "lines"
 LINE_GAMES = 17.0
-FLEX_OK = ("RB", "WR", "TE")
 # pre-registered thresholds (DECISIONS #23)
 MAE_TOL, RHO_TOL, OUTCOME_TOL = 0.02, 0.02, 0.01
-SLOTS_BY_LEAGUE = {
-    "keefamania": {"QB": 1, "RB": 2, "WR": 2, "TE": 1, "FLEX": 1},
-    "omnibeta": {"QB": 1, "RB": 2, "WR": 2, "TE": 1, "FLEX": 2},
-}
-TEAMS_BY_LEAGUE = {"keefamania": 10, "omnibeta": 12}
-SKILL_ROUNDS = 13          # 15 minus K and DEF
+# the history pools carry no K/DEF: those two rounds and slots are removed
+# from every league's shape, for both arms alike
+NO_KDEF = ("K", "DEF")
 
 
 # ---------------------------------------------------------------- pure parts
 
-def spearman(a: list[float], b: list[float]) -> float:
-    def ranks(x):
-        order = sorted(range(len(x)), key=lambda i: x[i])
-        r = [0.0] * len(x)
-        i = 0
-        while i < len(order):
-            j = i
-            while j + 1 < len(order) and x[order[j + 1]] == x[order[i]]:
-                j += 1
-            for k in range(i, j + 1):
-                r[order[k]] = (i + j) / 2 + 1
-            i = j + 1
-        return r
-    n = len(a)
-    if n < 3:
-        return float("nan")
-    ra, rb = ranks(a), ranks(b)
-    ma, mb = sum(ra) / n, sum(rb) / n
-    cov = sum((x - ma) * (y - mb) for x, y in zip(ra, rb))
-    va = sum((x - ma) ** 2 for x in ra) ** 0.5
-    vb = sum((y - mb) ** 2 for y in rb) ** 0.5
-    return cov / (va * vb) if va and vb else float("nan")
-
-
-def pooled_accuracy(rows: pl.DataFrame, model: str = MODEL_ARM, ext: str = EXTERNAL_ARM) -> dict:
+def pooled_accuracy(rows: pl.DataFrame) -> dict:
     """Test 1 for one league. Rows every arm projected; pooled MAE and the
     n-weighted mean of per-(pair, pos) Spearman, for both arms."""
     common = rows.filter(pl.all_horizontal([pl.col(a).is_not_null() for a in ARMS]))
     out = {"n": common.height, "by_cell": []}
-    for arm in (model, ext):
+    for arm in (MODEL_ARM, EXTERNAL_ARM):
         err = (common[arm] - common["actual"]).abs()
         out[f"{arm}_mae"] = float(err.mean()) if common.height else float("nan")
-    wsum = {model: 0.0, ext: 0.0}
+    wsum = {MODEL_ARM: 0.0, EXTERNAL_ARM: 0.0}
     for (pair, pos), cell in sorted(common.group_by(["pair", "pos"]), key=lambda kv: kv[0]):
         n = cell.height
         rec = {"pair": pair, "pos": pos, "n": n}
-        for arm in (model, ext):
+        for arm in (MODEL_ARM, EXTERNAL_ARM):
             rho = spearman(cell[arm].to_list(), cell["actual"].to_list())
             rec[f"{arm}_rho"] = rho
             rec[f"{arm}_mae"] = float((cell[arm] - cell["actual"]).abs().mean())
             if rho == rho:      # not nan
                 wsum[arm] += rho * n
         out["by_cell"].append(rec)
-    for arm in (model, ext):
+    for arm in (MODEL_ARM, EXTERNAL_ARM):
         out[f"{arm}_rho"] = wsum[arm] / common.height if common.height else float("nan")
-    out["mae_ratio"] = out[f"{ext}_mae"] / out[f"{model}_mae"] if out.get(f"{model}_mae") else float("nan")
-    out["rho_delta"] = out[f"{ext}_rho"] - out[f"{model}_rho"]
+    out["mae_ratio"] = out[f"{EXTERNAL_ARM}_mae"] / out[f"{MODEL_ARM}_mae"] if out.get(f"{MODEL_ARM}_mae") else float("nan")
+    out["rho_delta"] = out[f"{EXTERNAL_ARM}_rho"] - out[f"{MODEL_ARM}_rho"]
     out["pass"] = bool(out["mae_ratio"] <= 1 + MAE_TOL and out["rho_delta"] >= -RHO_TOL)
     return out
 
 
-def lineup_actual(chosen: list[dict], actual_by_name: dict[str, float], slots: dict) -> float:
-    """Actual season points of the best legal lineup (no K/DEF in history)."""
-    rem, flex, total = dict(slots), int(slots.get("FLEX", 0)), 0.0
-    graded = sorted(chosen, key=lambda p: -float(actual_by_name.get(p["name"], 0.0)))
-    for p in graded:
-        pts = float(actual_by_name.get(p["name"], 0.0))
-        if rem.get(p["pos"], 0) > 0:
-            rem[p["pos"]] -= 1
-            total += pts
-        elif p["pos"] in FLEX_OK and flex > 0:
-            flex -= 1
-            total += pts
-    return total
+def rival_order(rows: pl.DataFrame) -> list[str]:
+    """The shared rival draft list: every pool player with an ADP, in ADP
+    order, by name. Both arms face exactly this list."""
+    return rows.filter(pl.col("adp").is_not_null()).sort("adp")["name"].to_list()
 
 
-def adp_replay(board: list[dict], my_slot: int, teams: int, rounds: int, slots: dict) -> tuple[list[dict], int]:
-    """Rivals take the best remaining ADP; our picks are the engine's top
-    recommendation at every turn. Returns (our roster, engine errors)."""
+def adp_replay(board: list[dict], rivals: list[str], my_slot: int, teams: int, rounds: int,
+               slots: dict) -> tuple[list[dict], int]:
+    """Rivals take the best remaining name from the shared ADP list; our picks
+    are the engine's top recommendation at every turn, from our arm's board.
+    Returns (our roster, engine errors)."""
     by_name = {p["name"]: p for p in board}
-    adp_order = sorted((p for p in board if p.get("adp")), key=lambda p: float(p["adp"]))
     taken: set[str] = set()
     chosen, picks, errors = [], [], 0
     for pick_no in range(1, teams * rounds + 1):
         rnd, slot = snake.pick_to_round_slot(pick_no, teams)
         if slot != my_slot:
-            p = next((q for q in adp_order if q["name"] not in taken), None)
-            if p is None:
+            name = next((q for q in rivals if q not in taken), None)
+            if name is None:
                 break
-            taken.add(p["name"])
-            picks.append({"pick_no": pick_no, "player_id": p["sleeper_id"], "draft_slot": slot, "round": rnd})
+            taken.add(name)
+            picks.append({"pick_no": pick_no, "player_id": by_name.get(name, {}).get("sleeper_id", "0"),
+                          "draft_slot": slot, "round": rnd})
             continue
         avail = [p for p in board if p["name"] not in taken]
         if not avail:
@@ -161,6 +128,12 @@ def adp_replay(board: list[dict], my_slot: int, teams: int, rounds: int, slots: 
     return chosen, errors
 
 
+def grade_actual(chosen: list[dict], actual_by_name: dict[str, float], slots: dict) -> float:
+    """Actual season points of the best legal lineup."""
+    return lineup_points([dict(p, actual=actual_by_name.get(p["name"], 0.0)) for p in chosen],
+                         slots=slots, key="actual")
+
+
 def verdict(acc: dict[str, dict], outcome: dict) -> dict:
     acc_pass = all(v["pass"] for v in acc.values())
     out_pass = bool(outcome["pass"])
@@ -173,11 +146,26 @@ def verdict(acc: dict[str, dict], outcome: dict) -> dict:
     return {"accuracy_pass": acc_pass, "outcome_pass": out_pass, "decision": decision}
 
 
+def skill_shape(cfg: Config) -> tuple[int, int, dict[str, int]]:
+    """League shape from the yaml, minus K/DEF (absent from history pools)."""
+    teams, rounds, slots = EP.league_shape(cfg)
+    slots = {k: v for k, v in slots.items() if k not in NO_KDEF}
+    return teams, rounds - len(NO_KDEF), slots
+
+
 # ------------------------------------------------------------- data plumbing
 
 def history_board(cfg: Config, rows: pl.DataFrame, arm: str) -> list[dict]:
     """One history year's pool, projected by `arm`, through the production
-    board code, loaded the way every replay loads a board."""
+    board code, loaded the way every replay loads a board.
+
+    The history rows carry no team, depth chart or route data, so the
+    columns the board code expects are present but empty (labelled absence,
+    not invented values -- except exp_games, which the tracker requires
+    numeric and which is set to the season convention for every player
+    alike). Consequence, stated in the report: the handcuff (backs_up) and
+    RB-receiving upside paths are inert on these boards for BOTH arms; only
+    the rookie upside path can fire."""
     games = float(cfg["projections"].get("games", cfg["projections"].get("expected_games", 16.0)))
     df = (rows.filter(pl.col(arm).is_not_null())
           .select(pl.col("sleeper_id").cast(pl.Utf8), "name", "pos", "adp",
@@ -187,12 +175,11 @@ def history_board(cfg: Config, rows: pl.DataFrame, arm: str) -> list[dict]:
                         pl.lit(None, dtype=pl.Float64).alias("ecr"),
                         pl.lit(None, dtype=pl.Int64).alias("bye"),
                         pl.lit(arm).alias("proj_source"),
-                        pl.lit(16.0).alias("exp_games"),
+                        pl.lit(games).alias("exp_games"),
                         pl.lit(None, dtype=pl.Utf8).alias("avail_status"),
                         pl.lit(False).alias("no_market_flag"),
                         *[pl.lit(None, dtype=pl.Float64).alias(c) for c in ("wopr", "tprr", "yprr")]))
-    df = add_vorp(df, cfg.baselines)
-    tiers = add_upside_flags(add_handcuff_info(build_tiers(df, cfg)))
+    tiers = finish_board(df, cfg)
     with tempfile.TemporaryDirectory() as tmp:
         path = Path(tmp) / "board.csv"
         write_tiers_csv(tiers, path)
@@ -212,25 +199,27 @@ def dedupe_names(rows: pl.DataFrame) -> pl.DataFrame:
 
 def run_outcome(league: str, rows: pl.DataFrame) -> list[dict]:
     cfg = Config.load(league=league)
-    teams, slots = TEAMS_BY_LEAGUE[league], SLOTS_BY_LEAGUE[league]
+    teams, skill_rounds, slots = skill_shape(cfg)
     out = []
     for pair in sorted(rows["pair"].unique().to_list()):
         sub = rows.filter(pl.col("pair") == pair)
         actual = {r["name"]: float(r["actual"]) for r in sub.select("name", "actual").iter_rows(named=True)}
+        rivals = rival_order(sub)
         boards = {arm: history_board(cfg, sub, arm) for arm in (MODEL_ARM, EXTERNAL_ARM)}
-        rounds = min(SKILL_ROUNDS, min(len(b) for b in boards.values()) // teams - 1)
-        rec = {"league": league, "pair": pair, "teams": teams, "rounds": rounds,
+        # depth is set by the SHARED pool, never by one arm's coverage
+        rounds = min(skill_rounds, len(rivals) // teams - 1)
+        rec = {"league": league, "pair": pair, "teams": teams, "rounds": rounds, "rival_pool": len(rivals),
                "board_sizes": {a: len(b) for a, b in boards.items()}, "slots": []}
         for slot in range(1, teams + 1):
             row = {"slot": slot}
             for arm in (MODEL_ARM, EXTERNAL_ARM):
-                chosen, errs = adp_replay(boards[arm], slot, teams, rounds, slots)
-                row[arm] = lineup_actual(chosen, actual, slots)
+                chosen, errs = adp_replay(boards[arm], rivals, slot, teams, rounds, slots)
+                row[arm] = grade_actual(chosen, actual, slots)
                 row[f"{arm}_errors"] = errs
                 row[f"{arm}_roster"] = [f"{p['name']} ({p['pos']})" for p in chosen]
             rec["slots"].append(row)
             print(f"  {league} {pair} slot {slot:>2}: model {row[MODEL_ARM]:.0f}  external {row[EXTERNAL_ARM]:.0f}"
-                  f"  Δ {row[EXTERNAL_ARM] - row[MODEL_ARM]:+.0f}", flush=True)
+                  f"  delta {row[EXTERNAL_ARM] - row[MODEL_ARM]:+.0f}", flush=True)
         out.append(rec)
     return out
 
@@ -268,7 +257,7 @@ def render(acc: dict[str, dict], pairs: list[dict], outcome: dict, v: dict) -> s
         for c in a["by_cell"]:
             L.append(f"| {lg} | {c['pair']} | {c['pos']} | {c['n']} | {c[MODEL_ARM + '_mae']:.1f} | {c[EXTERNAL_ARM + '_mae']:.1f} | "
                      f"{c[MODEL_ARM + '_rho']:.3f} | {c[EXTERNAL_ARM + '_rho']:.3f} |")
-    L += ["", "## Test 2 — outcome (ADP-order rivals, engine at every slot, lineups graded on actual points)", "",
+    L += ["", "## Test 2 — outcome (shared ADP-order rivals, engine at every slot, lineups graded on actual points)", "",
           f"Over {outcome['n']} slot-drafts: model {outcome['model_mean']:.1f}, external {outcome['ext_mean']:.1f} "
           f"(Δ {outcome['delta_mean']:+.1f}, {100 * outcome['delta_mean'] / outcome['model_mean']:+.2f}%); external better in "
           f"{outcome['better']}, worse in {outcome['worse']}, tied {outcome['tied']}. Pass: {'yes' if outcome['pass'] else 'NO'}.", "",
@@ -276,18 +265,25 @@ def render(acc: dict[str, dict], pairs: list[dict], outcome: dict, v: dict) -> s
     for b in outcome["by_pair"]:
         L.append(f"| {b['league']} | {b['pair']} | {b['model_mean']:.1f} | {b['ext_mean']:.1f} | {b['ext_mean'] - b['model_mean']:+.1f} |")
     for p in pairs:
-        L += ["", f"### {p['league']} {p['pair']} — {p['teams']} teams, {p['rounds']} rounds, boards "
-              f"{p['board_sizes'][MODEL_ARM]} / {p['board_sizes'][EXTERNAL_ARM]}", "",
+        L += ["", f"### {p['league']} {p['pair']} — {p['teams']} teams, {p['rounds']} rounds, rival pool {p['rival_pool']}, "
+              f"boards {p['board_sizes'][MODEL_ARM]} / {p['board_sizes'][EXTERNAL_ARM]}", "",
               "| slot | model | external | Δ | engine errors |", "|---|---|---|---|---|"]
         for s in p["slots"]:
             L.append(f"| {s['slot']} | {s[MODEL_ARM]:.0f} | {s[EXTERNAL_ARM]:.0f} | {s[EXTERNAL_ARM] - s[MODEL_ARM]:+.0f} | "
                      f"{s[MODEL_ARM + '_errors']}/{s[EXTERNAL_ARM + '_errors']} |")
-    L += ["", "Rivals never deviate from ADP here, so runs and reaches are absent; the comparison is between "
-          "the two inputs under identical rivals, which is the question. K/DEF are absent from both arms.", ""]
+    L += ["", "Both arms face one rival list (the year's pool in ADP order), so a player one arm never "
+          "projected is still taken by the rivals at his ADP; only our own picks differ. Rivals never "
+          "deviate from ADP, so runs and reaches are absent. K/DEF are absent from both arms. The history "
+          "rows carry no team or route data, so the handcuff and RB-receiving upside flags are inert on "
+          "these boards for both arms; only the rookie upside path is live.", ""]
     return "\n".join(L) + "\n"
 
 
 def main() -> None:
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")   # Windows console/pipe default is cp1252
+    except (AttributeError, ValueError):
+        pass
     ap = argparse.ArgumentParser()
     ap.add_argument("--leagues", default="keefamania,omnibeta")
     ap.add_argument("--out", default=None)
@@ -300,8 +296,8 @@ def main() -> None:
             raise SystemExit(f"{src} missing: run scripts/projection_backtest.py --league {lg} first")
         rows = dedupe_names(pl.read_csv(src, infer_schema_length=10000))
         acc[lg] = pooled_accuracy(rows)
-        print(f"{lg} accuracy: model MAE {acc[lg][MODEL_ARM + '_mae']:.1f} ρ {acc[lg][MODEL_ARM + '_rho']:.3f} | "
-              f"external MAE {acc[lg][EXTERNAL_ARM + '_mae']:.1f} ρ {acc[lg][EXTERNAL_ARM + '_rho']:.3f} -> "
+        print(f"{lg} accuracy: model MAE {acc[lg][MODEL_ARM + '_mae']:.1f} rho {acc[lg][MODEL_ARM + '_rho']:.3f} | "
+              f"external MAE {acc[lg][EXTERNAL_ARM + '_mae']:.1f} rho {acc[lg][EXTERNAL_ARM + '_rho']:.3f} -> "
               f"{'pass' if acc[lg]['pass'] else 'FAIL'}", flush=True)
         pairs += run_outcome(lg, rows)
     outcome = summarize_outcome(pairs)

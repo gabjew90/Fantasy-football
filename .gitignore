@@ -25,3 +25,10 @@ data/draftrig/tiers_bakeoff_*.csv
 data/draftrig/season_*.txt
 data/draftrig/prerank*.json
 node_modules/
+
+# scratch the rig and the harness leave behind (review 2026-09-02)
+data/draftrig/aside/
+data/draftrig/*.log
+data/processed/backtest/
+data/processed/*.csv
+data/processed/*.txt

@@ -190,7 +190,7 @@
 
 **Tier 5**
 
-- 176. Jayden Higgins (HOU, bye ?) — 0 pts, VORP -142
+- 175. Jayden Higgins (HOU, bye ?) — 0 pts, VORP -142
 
 ## TE
 
@@ -280,8 +280,8 @@
 
 **Tier 3**
 
-- 57. Carson Wentz (MIN, bye ?) — 0 pts, VORP -274
-- 58. Dillon Gabriel (CLE, bye ?) — 0 pts, VORP -274
+- 57. Dillon Gabriel (CLE, bye ?) — 0 pts, VORP -274
+- 58. Carson Wentz (MIN, bye ?) — 0 pts, VORP -274
 
 ## K
 

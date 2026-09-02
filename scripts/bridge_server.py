@@ -120,47 +120,43 @@ class Handler(BaseHTTPRequestHandler):
         else:
             self._json({"err": "POST draft state to /plan"}, 404)
 
+    def _read_json(self) -> dict:
+        n = int(self.headers.get("Content-Length") or 0)
+        return json.loads(self.rfile.read(n) or b"{}")
+
+    def _save_named(self, body: dict, key: str, folder: Path, suffix: str, content: str, label: str) -> None:
+        """One body -> one file named by a sanitised body[key]; the two
+        page-to-disk routes below share it."""
+        name = "".join(c for c in str(body.get(key) or label) if c.isalnum() or c in "-_.")[:80]
+        out = folder / f"{name}{suffix}"
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(content, encoding="utf-8")
+        print(f"  {label} saved -> {out} ({out.stat().st_size} bytes)", flush=True)
+        self._json({"ok": True, "path": str(out), "bytes": out.stat().st_size})
+
     def do_POST(self):
-        if self.path.startswith("/trail"):
-            # End-of-mock dump from the page: every pick with team ids, the
-            # managers, and our pick records (reason, best-by-projection
-            # alternative, candidates passed on). scripts/mock_trail.py renders
-            # it. Requested 2026-09-02: a complete trail per mock.
+        if self.path.startswith("/trail") or self.path.startswith("/fixture"):
             try:
-                n = int(self.headers.get("Content-Length") or 0)
-                body = json.loads(self.rfile.read(n) or b"{}")
-                room = "".join(c for c in str(body.get("room") or "room") if c.isalnum() or c in "-_")[:40]
-                out = ROOT / "data" / "logs" / "mocks" / f"mock_{room}.json"
-                out.parent.mkdir(parents=True, exist_ok=True)
-                out.write_text(json.dumps(body, indent=1), encoding="utf-8")
-                print(f"  trail saved -> {out} ({out.stat().st_size} bytes)", flush=True)
-                self._json({"ok": True, "path": str(out)})
-            except Exception as e:  # noqa: BLE001
-                traceback.print_exc()
-                self._json({"err": f"{type(e).__name__}: {e}"}, 500)
-            return
-        if self.path.startswith("/fixture"):
-            # Save a page's HTML for the offline DOM tests (design 2026-09-01):
-            # the row lookup is the one reader still on the DOM, and it should
-            # be tested against real Yahoo markup in both layouts, on and off
-            # the clock, without joining a room.
-            try:
-                n = int(self.headers.get("Content-Length") or 0)
-                body = json.loads(self.rfile.read(n) or b"{}")
-                name = "".join(c for c in str(body.get("name") or "page")
-                               if c.isalnum() or c in "-_.")[:80]
-                out = ROOT / "tests" / "fixtures" / "yahoo" / f"{name}.html"
-                out.parent.mkdir(parents=True, exist_ok=True)
-                out.write_text(str(body.get("html") or ""), encoding="utf-8")
-                print(f"  fixture saved -> {out} ({out.stat().st_size} bytes)", flush=True)
-                self._json({"ok": True, "path": str(out), "bytes": out.stat().st_size})
+                body = self._read_json()
+                if self.path.startswith("/trail"):
+                    # End-of-mock dump from the page (DK.trail()): every pick with
+                    # team ids, the managers, and our pick records (reason,
+                    # best-by-projection alternative, candidates passed on).
+                    # scripts/mock_trail.py renders it.
+                    self._save_named(body, "room", ROOT / "data" / "logs" / "mocks", ".json",
+                                     json.dumps(body, indent=1), "mock_")
+                else:
+                    # A page's HTML for the offline DOM tests (design 2026-09-01):
+                    # the row lookup is the one reader still on the DOM, tested
+                    # against real Yahoo markup without joining a room.
+                    self._save_named(body, "name", ROOT / "tests" / "fixtures" / "yahoo", ".html",
+                                     str(body.get("html") or ""), "page")
             except Exception as e:  # noqa: BLE001
                 traceback.print_exc()
                 self._json({"err": f"{type(e).__name__}: {e}"}, 500)
             return
         try:
-            n = int(self.headers.get("Content-Length") or 0)
-            state = json.loads(self.rfile.read(n) or b"{}")
+            state = self._read_json()
             depth = int(state.pop("depth", 25))
             plan = build_plan(state, depth)
             self._json(plan)

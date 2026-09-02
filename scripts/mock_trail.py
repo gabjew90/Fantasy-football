@@ -18,15 +18,20 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from collections import defaultdict
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+
+from draftkit.snake import pick_to_round_slot  # noqa: E402
 
 
 def render(t: dict) -> str:
-    teams = int(t.get("teams") or 10)
     picks = sorted(t.get("picks") or [], key=lambda p: int(p["pick_no"]))
+    # the room size is in the dump; failing that, count the seats that picked
+    teams = int(t.get("teams") or len({str(p.get("team_id")) for p in picks}) or 10)
     managers = t.get("managers") or {}
     me = str(t.get("my_team"))
     recs = {int(r["pick_no"]): r for r in (t.get("our_records") or []) if r.get("pick_no") is not None}
@@ -40,11 +45,11 @@ def render(t: dict) -> str:
             continue
         n = int(p["pick_no"])
         r = recs.get(n)
-        rnd = (n - 1) // teams + 1
+        rnd, _slot = pick_to_round_slot(n, teams)
         L.append(f"### R{rnd} pick {n}: {p['name']} ({p['pos']})")
         if r:
             L.append(f"- via `{r.get('via', '?')}`, verified `{r.get('verified', '?')}`"
-                     + (f", {r.get('ms')} ms" if r.get('ms') else ""))
+                     + (f", {r.get('ms')} ms" if r.get('ms') is not None else ""))
             L.append(f"- engine: {r.get('why') or '—'}")
             alt = r.get("top_proj_available") or {}
             if alt:
@@ -72,15 +77,22 @@ def render(t: dict) -> str:
             counts[p["pos"]] += 1
         L.append("roster: " + " ".join(f"{k}{counts[k]}" for k in ("QB", "RB", "WR", "TE", "K", "DEF") if counts[k]))
         L.append("")
-    # grid
-    rounds = (len(picks) + teams - 1) // teams
+    # grid: cells placed by pick_no, never by list position, so a pick the
+    # store dump lacks leaves a visible hole instead of shifting the row
+    by_no = {int(p["pick_no"]): p for p in picks}
+    rounds = (max(by_no) + teams - 1) // teams if by_no else 0
     L += ["## Round by round", "", "| round | " + " | ".join(f"pick {i}" for i in range(1, teams + 1)) + " |",
           "|---|" + "---|" * teams]
     for rnd in range(1, rounds + 1):
-        row = picks[(rnd - 1) * teams: rnd * teams]
-        L.append(f"| {rnd} | " + " | ".join(
-            (("**" if str(p.get('team_id')) == me else "") + f"{p['name'].split(' ')[-1]} {p['pos']}"
-             + ("**" if str(p.get('team_id')) == me else "")) for p in row) + " |")
+        cells = []
+        for i in range(1, teams + 1):
+            p = by_no.get((rnd - 1) * teams + i)
+            if not p:
+                cells.append("—")
+                continue
+            mark = "**" if str(p.get("team_id")) == me else ""
+            cells.append(f"{mark}{p['name'].split(' ')[-1]} {p['pos']}{mark}")
+        L.append(f"| {rnd} | " + " | ".join(cells) + " |")
     return "\n".join(L) + "\n"
 
 

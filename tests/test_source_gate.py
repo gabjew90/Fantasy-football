@@ -1,6 +1,6 @@
 """The gate's arithmetic (DECISIONS #23) must be right before its verdict is
-trusted: pooled accuracy, ADP-order rivals, actual-points grading, and the
-pre-registered decision rule at its boundaries."""
+trusted: pooled accuracy, one shared rival list for both arms, actual-points
+grading, and the pre-registered decision rule at its boundaries."""
 
 from __future__ import annotations
 
@@ -42,22 +42,27 @@ def test_pooled_accuracy_pools_mae_and_weights_spearman_by_n():
 
 def test_pooled_accuracy_fails_on_either_threshold():
     rows = _rows().with_columns(pl.col("actual").alias("blend"),                 # model exactly right
-                                (pl.col("actual") * 1.5).alias("lines"))           # external 50% MAE... ratio inf
-    a = sg.pooled_accuracy(rows)
-    assert a["pass"] is False
+                                (pl.col("actual") * 1.5).alias("lines"))
+    assert sg.pooled_accuracy(rows)["pass"] is False
     # reversed ranks fail on Spearman even with tolerable MAE
     rows2 = _rows().with_columns((pl.col("actual") + 20).alias("blend"),
                                  (400 - pl.col("actual") + 20).alias("lines"))
     assert sg.pooled_accuracy(rows2)["pass"] is False
 
 
-def test_lineup_actual_fills_slots_then_flex_and_ignores_kdef():
+def test_grade_actual_fills_slots_then_flex_on_actual_points_and_ignores_kdef():
     slots = {"QB": 1, "RB": 1, "WR": 1, "FLEX": 1}
     chosen = [{"name": n, "pos": p} for n, p in
               [("q1", "QB"), ("q2", "QB"), ("r1", "RB"), ("r2", "RB"), ("w1", "WR"), ("t1", "TE"), ("k", "K")]]
     actual = {"q1": 300, "q2": 350, "r1": 100, "r2": 180, "w1": 90, "t1": 120, "k": 500}
     # QB 350, RB 180, WR 90, FLEX = best of r1 100 / t1 120 -> 120; K ignored
-    assert sg.lineup_actual(chosen, actual, slots) == 350 + 180 + 90 + 120
+    assert sg.grade_actual(chosen, actual, slots) == 350 + 180 + 90 + 120
+
+
+def test_rival_order_is_the_whole_pool_by_adp_regardless_of_arm_coverage():
+    rows = pl.DataFrame({"name": ["b", "a", "c", "d"], "adp": [2.0, 1.0, None, 3.0],
+                         "blend": [1.0, 1.0, 1.0, 1.0], "lines": [1.0, None, 1.0, 1.0]})
+    assert sg.rival_order(rows) == ["a", "b", "d"]     # 'a' is unlined but still a rival pick
 
 
 class _StubTracker:
@@ -72,14 +77,17 @@ class _StubTracker:
         return [(best["vorp"], "stub", best)]
 
 
-def test_adp_replay_rivals_take_adp_order_and_we_take_the_engine_pick(monkeypatch):
+def test_adp_replay_rivals_follow_the_shared_list_even_off_our_board(monkeypatch):
+    """Review 2026-09-02: rivals used to draft from each arm's own board, so
+    an arm that never projected McCaffrey faced rivals who never took him."""
     board = [{"sleeper_id": str(i), "name": f"p{i}", "pos": "RB", "adp": float(i), "vorp": 100.0 - i}
-             for i in range(1, 9)]
-    board[5]["vorp"] = 500.0          # p6: ADP 6 but the engine's favourite
+             for i in range(2, 9)]                   # p1 is NOT on our board
+    board[4]["vorp"] = 500.0                        # p6: ADP 6 but the engine's favourite
+    rivals = [f"p{i}" for i in range(1, 9)]         # the shared pool includes p1
     monkeypatch.setattr(sg.EP, "make_tracker", lambda board, picks, my_slot, **kw: _StubTracker(board, picks))
-    chosen, errors = sg.adp_replay(board, my_slot=2, teams=3, rounds=2, slots={"RB": 2})
-    # pick order (3 teams, snake): 1:s1 2:s2 3:s3 4:s3 5:s2 6:s1
-    # s1 takes p1; we take p6; s3 takes p2 then p3; we take p4 (best vorp left); s1 takes p5
+    chosen, errors = sg.adp_replay(board, rivals, my_slot=2, teams=3, rounds=2, slots={"RB": 2})
+    # 3 teams, snake: 1:s1 2:s2 3:s3 4:s3 5:s2 6:s1
+    # s1 takes p1 (off our board, still gone); we take p6; s3 takes p2, p3; we take p4; s1 takes p5
     assert [p["name"] for p in chosen] == ["p6", "p4"] and errors == 0
 
 
@@ -104,3 +112,12 @@ def test_dedupe_names_suffixes_only_true_collisions():
                          "name": ["Mike Williams", "Mike Williams", "Mike Williams"]})
     out = sg.dedupe_names(rows).sort("sleeper_id")["name"].to_list()
     assert out == ["Mike Williams (1)", "Mike Williams (2)", "Mike Williams"]
+
+
+def test_skill_shape_reads_the_league_yaml_and_drops_kdef():
+    from draftkit.config import Config
+    teams, rounds, slots = sg.skill_shape(Config.load(league="omnibeta"))
+    assert (teams, rounds) == (12, 13)
+    assert slots == {"QB": 1, "RB": 2, "WR": 2, "TE": 1, "FLEX": 2}
+    teams, rounds, slots = sg.skill_shape(Config.load(league="keefamania"))
+    assert (teams, rounds, slots["FLEX"]) == (10, 13, 1)

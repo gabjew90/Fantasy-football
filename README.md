@@ -1,7 +1,11 @@
-# draftkit — Omnibeta Degens draft prep
+# draftkit — draft prep, live draft engine, in-season auto-manager
 
-Draft-prep pipeline + live draft tracker for Sleeper league **Omnibeta Degens**
-(12-team, full PPR, 2 FLEX, 15-round snake, 120s clock).
+Multi-league since 2026-08-29: `config.yaml` holds globals, every league fact
+lives in `leagues/<name>.yaml` (`--league <name>` / `DRAFTKIT_LEAGUE`).
+Leagues on file: **Omnibeta Degens** (Sleeper, 12-team full PPR, 2 FLEX,
+drafted 2026-08-23) and **Keefamania** (Yahoo, 10-team half PPR, 1 FLEX,
+draft Sat 2026-09-05 — see `docs/draft-day-runbook.md`). Decisions and their
+evidence live in `DECISIONS.md`; this README is the map, not the record.
 
 > **In-season cadence (draft complete 2026-08-23 — finished #1 of 12 on the board):**
 > 1. **Tuesday 6 PM (auto):** waiver brief — ranked claims with FAAB bands, sealed-bid
@@ -33,17 +37,12 @@ python -m draftkit track               # live tracker (Phase 4)
 python -m draftkit track --draft-id <mock_draft_id> --slot 3   # vs. a Sleeper mock lobby
 ```
 
-**Before draft day** (in order):
-
-1. Set `me.username` (or `me.user_id` / `me.draft_slot`) in `config.yaml`.
-   Roster 12 / draft slot 6 is currently unclaimed and no Sleeper user
-   "gabjew90" exists, so identity can't be auto-detected — see `verify` output.
-2. Re-run `market` + `tiers` the morning of the draft (ECR/ADP move daily in
-   August; every pull is cached ≤12–24h).
-3. Optional: drop a fresh FantasyPros export at `data/external/fantasypros.csv`
-   to override the auto-pulled ECR (see `data/external/README.md`).
-4. Join a [Sleeper mock lobby](https://sleeper.com/draft) and run
-   `track --draft-id <id>` once to see the tracker against a live picks feed.
+**Before draft day** (Sleeper leagues): `me.username` lives in the league's
+yaml (`leagues/<name>.yaml -> me:`), not here; re-run `market` + `tiers` the
+morning of the draft (pulls are cached 12–24h); a Sleeper mock lobby plus
+`track --draft-id <id>` shows the tracker against a live picks feed. For the
+Yahoo league the procedure is `docs/draft-day-runbook.md` (bridge server +
+in-page driver; picks through Yahoo's own client action, store-verified).
 
 ## What the pipeline produces
 
@@ -104,8 +103,10 @@ Where I deviated, and why:
    switches to needs-only once remaining picks = open starter slots. The
    `simulate` command was added precisely because this class of bug only shows
    up over a full 15-round draft, not in unit tests.
-6. **Replacement baselines RB40/WR60/QB12/TE12** as specified (2-FLEX
-   full-PPR skews flex toward WR); configurable in `config.yaml`.
+6. **Replacement baselines are per league** (`leagues/<name>.yaml ->
+   replacement_baselines`), derived from the league's format at onboarding
+   and never copied between leagues (Omnibeta RB40/WR60/QB12/TE12;
+   Keefamania settled by bake-off, DECISIONS 2026-09-01 #4).
 
 ## Strategy notes the numbers currently support
 
@@ -125,10 +126,14 @@ python -m pytest tests/          # snake math, needs, tiering, scoring, ID match
 python -m draftkit simulate --slot 6   # full-draft dry run through the real tracker code
 ```
 
-Repo layout: `draftkit/` (pipeline + tracker modules), `tests/`, `config.yaml`
-(all knobs), `data/raw` (API caches, gitignored), `data/processed`
-(parquet intermediates, gitignored), `tiers.csv` + `board.md` (deliverables,
-committed).
+Repo layout: `draftkit/` (pipeline + tracker modules), `manager/` (in-season
+auto-manager, GitHub Actions, state in `state/*.json`), `scripts/` (the Yahoo
+draft rig — bridge server, in-page driver, pre-rank driver — and the
+validation harness: replays, backtest, gates), `leagues/*.yaml` (league
+facts), `config.yaml` (globals only), `tests/`, `data/raw` (API caches,
+gitignored), `data/processed` (intermediates, gitignored), `tiers*.csv` +
+`board*.md` (deliverables, committed), `reports/` (generated artifacts),
+`DECISIONS.md` (the record).
 
 ## Auto-manager (in-season, notification-only)
 
