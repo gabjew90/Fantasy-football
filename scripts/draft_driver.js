@@ -1339,10 +1339,19 @@ window.DK = (function () {
   function pickRecord(cand, extra) {
     const b = S.board.find(x => x.n === cand.n && x.p === cand.p) || {};
     const alt = bestByProjection();
+    // the candidates the engine ranked just below the pick -- what was passed on
+    let passed = [];
+    try {
+      const r = rank();
+      passed = (r.top || []).filter(x => !(x.n === cand.n && x.p === cand.p)).slice(0, 3)
+        .map(x => ({ n: x.n, p: x.p, v: x.v, why: (x.why || '').slice(0, 120) }));
+    } catch (e) { /* narration only */ }
     return Object.assign({ drafted: cand.n, pos: cand.p, vorp: cand.v, proj: b.j,
                            why: (cand.why || '').slice(0, 220),
                            top_proj_available: alt,
-                           took_top_projection: !!(alt && alt.n === cand.n) }, extra);
+                           took_top_projection: !!(alt && alt.n === cand.n),
+                           passed_on: passed,
+                           pick_no: S.planPick != null ? S.planPick : null }, extra);
   }
 
   async function draftTop(maxTries) {

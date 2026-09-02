@@ -121,6 +121,24 @@ class Handler(BaseHTTPRequestHandler):
             self._json({"err": "POST draft state to /plan"}, 404)
 
     def do_POST(self):
+        if self.path.startswith("/trail"):
+            # End-of-mock dump from the page: every pick with team ids, the
+            # managers, and our pick records (reason, best-by-projection
+            # alternative, candidates passed on). scripts/mock_trail.py renders
+            # it. Requested 2026-09-02: a complete trail per mock.
+            try:
+                n = int(self.headers.get("Content-Length") or 0)
+                body = json.loads(self.rfile.read(n) or b"{}")
+                room = "".join(c for c in str(body.get("room") or "room") if c.isalnum() or c in "-_")[:40]
+                out = ROOT / "data" / "logs" / "mocks" / f"mock_{room}.json"
+                out.parent.mkdir(parents=True, exist_ok=True)
+                out.write_text(json.dumps(body, indent=1), encoding="utf-8")
+                print(f"  trail saved -> {out} ({out.stat().st_size} bytes)", flush=True)
+                self._json({"ok": True, "path": str(out)})
+            except Exception as e:  # noqa: BLE001
+                traceback.print_exc()
+                self._json({"err": f"{type(e).__name__}: {e}"}, 500)
+            return
         if self.path.startswith("/fixture"):
             # Save a page's HTML for the offline DOM tests (design 2026-09-01):
             # the row lookup is the one reader still on the DOM, and it should
