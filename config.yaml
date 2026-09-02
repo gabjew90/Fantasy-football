@@ -6,6 +6,32 @@
 default_league: omnibeta
 
 projections:
+  # ---- Projections are an INPUT (DECISIONS 2026-09-02 #21) ----------------
+  # source: external  -> stat lines from outside, scored in each league's
+  #                      own settings (draftkit/external.py). The engine's
+  #                      edge is roster-aware timing, not projection modeling.
+  #         model     -> the 2025-usage + log(ECR) blend (knobs below), to be
+  #                      retired: it comes back only if scripts/projection_backtest.py
+  #                      shows it beating the external source out of sample.
+  # STATUS 2026-09-02: external is built and verified end to end
+  # (reports/input_replay.*.md) but the replay gate tripped -- 63% / 54% of
+  # round 1-6 picks change (QB timing, RB/WR tier order) -- so the flip waits
+  # for a human call (DECISIONS #21). Until then the default stays `model`.
+  source: model
+  # GAMES CONVENTION: every external line is a 17-game season total and is
+  # scaled once, by games/17, for everyone. Sleeper's gp=18 is a week count
+  # and is ignored. Baselines, bench pricing and the manager all read
+  # proj_pts on this basis (16 = 17 fantasy weeks minus the bye).
+  games: 16
+  external:
+    sources: [sheet, sleeper]     # first source wins per player; later ones fill gaps
+    sheet_path: data/external/DraftSheets_2026_Keefamania_10tm_halfPPR_1flex.xlsx
+    sheet_as_of: "2026-09-01"     # FantasyPros consensus snapshot (paid export; one-time for 2026)
+  # the one tail rule: depth-chart backups the market also does not rank as
+  # starters project 0 (contingent_of keeps the handcuff column informative)
+  non_starters_zero: true
+
+  # ---- legacy model knobs (projections.source: model only) -----------------
   # weight on the stats-based model for players with 2025 data; (1 - alpha)
   # goes to the market-implied projection. This scalar is the FALLBACK —
   # v2 item 1.7 varies alpha by player type (see alpha_by_type).

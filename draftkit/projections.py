@@ -184,7 +184,134 @@ def _apply_availability(df: pl.DataFrame, av: pl.DataFrame) -> pl.DataFrame:
 
 
 def default_projection(cfg, usage: pl.DataFrame, market: pl.DataFrame) -> pl.DataFrame:
-    """Return market frame + proj_pts, proj_source, and carried usage metrics."""
+    """Dispatch on projections.source (DECISIONS 2026-09-02 #21).
+
+    external  (config default) -- stat lines from outside, scored in league
+              settings: draftkit/external.py. The projection is an INPUT.
+    model     the retired 2025-usage + log(ECR) blend below. Off by default;
+              it has never beaten the external source out of sample and the
+              burden of proof is on it (scripts/projection_backtest.py).
+    Test fixtures that carry no `source` get the legacy path, so they test
+    what they were written to test."""
+    source = str((cfg.get("projections") or {}).get("source", "model"))
+    if source == "external":
+        return external_projection(cfg, usage, market)
+    if source != "model":
+        raise ValueError(f"projections.source must be external or model, got {source!r}")
+    return model_projection(cfg, usage, market)
+
+
+def external_projection(cfg, usage: pl.DataFrame, market: pl.DataFrame) -> pl.DataFrame:
+    """proj_pts from external stat lines; the engine does everything else."""
+    import sys
+
+    from . import external as X
+    from .ids import SleeperIndex
+    from .sleeper import SleeperClient
+
+    p = cfg["projections"]
+    games = float(p.get("games", p.get("expected_games", 16.0)))
+    players = SleeperClient(cfg.path("raw")).players()
+    lines, rep = X.load_external(cfg, SleeperIndex(players))
+    for s in rep["sources"]:
+        print(f"  projections <- {s['source']}: {s['rows']} players"
+              + (f" (as of {s['as_of']})" if s.get("as_of") else "")
+              + (f"  !! {s['error']}" if s.get("error") else ""), file=sys.stderr)
+    if rep["sheet_unmatched"]:
+        print(f"  sheet names not matched to Sleeper ({len(rep['sheet_unmatched'])}): "
+              + ", ".join(rep["sheet_unmatched"][:12]) + (" …" if len(rep["sheet_unmatched"]) > 12 else ""),
+              file=sys.stderr)
+
+    # the board is the union of the market table and the projected players:
+    # a projected player the market does not rank still exists (no ADP, so
+    # the survival sim treats him as always available)
+    ext = lines.select("sleeper_id", pl.col("name").alias("name_ext"), pl.col("pos").alias("pos_ext"),
+                       pl.col("team").alias("team_ext"), "pts17", "source", pl.col("as_of").alias("proj_as_of"))
+    df = market.join(ext, on="sleeper_id", how="full", coalesce=True).with_columns(
+        pl.coalesce(pl.col("name"), pl.col("name_ext")).alias("name"),
+        pl.coalesce(pl.col("pos"), pl.col("pos_ext")).alias("pos"),
+        pl.coalesce(pl.col("team"), pl.col("team_ext")).alias("team"),
+    ).drop("name_ext", "pos_ext", "team_ext")
+    df = df.with_columns((pl.col("pts17") * games / X.LINE_GAMES).alias("proj_pts"),
+                         pl.coalesce(pl.col("source"), pl.lit("none")).alias("proj_source")).drop("pts17", "source")
+
+    # K/DEF: no stat lines in either source; the synthetic ECR-linear
+    # projection stays (near-fungible positions, small VORP spreads)
+    kdef_base = {"K": (150.0, 1.5), "DEF": (135.0, 2.0)}
+    df = df.with_columns(pl.coalesce(pl.col("ecr"), pl.col("adp")).rank(method="ordinal").over("pos").alias("_r"))
+    df = df.with_columns(
+        pl.when(pl.col("pos").is_in(list(kdef_base)) & pl.col("proj_pts").is_null() & pl.col("_r").is_not_null())
+        .then(pl.col("pos").replace_strict({k: v[0] for k, v in kdef_base.items()}, default=None)
+              - pl.col("pos").replace_strict({k: v[1] for k, v in kdef_base.items()}, default=None) * (pl.col("_r") - 1))
+        .otherwise(pl.col("proj_pts")).alias("proj_pts"),
+        pl.when(pl.col("pos").is_in(list(kdef_base)) & (pl.col("proj_source") == "none") & pl.col("_r").is_not_null())
+        .then(pl.lit("kdef_synthetic")).otherwise(pl.col("proj_source")).alias("proj_source"),
+    ).drop("_r")
+
+    # carried usage metrics: display and handcuff columns only, never an input
+    keep = ["sleeper_id", "games", "ppg", "wopr", "target_share", "air_yards_share", "tprr", "yprr",
+            "routes_proxy", "hv_touches", "offense_snap_pct", "avg_separation", "exp_games", "team_2025"]
+    u = (usage.filter(pl.col("sleeper_id").is_not_null())
+              .select([c for c in keep if c in usage.columns]).unique(subset="sleeper_id"))
+    df = df.join(u, on="sleeper_id", how="left")
+    for c in keep[1:]:
+        if c not in df.columns:
+            df = df.with_columns(pl.lit(None, dtype=pl.Float64).alias(c))
+    df = df.with_columns(pl.col("exp_games").fill_null(16.0),
+                         (pl.col("games").is_null() & ~pl.col("pos").is_in(["K", "DEF"])).alias("rookie_flag"),
+                         pl.lit(0.0).alias("alpha_used"),
+                         pl.lit(False).alias("no_market_flag"))
+
+    # the one tail rule
+    df = df.with_columns(pl.lit(False).alias("non_starter"), pl.lit(None, dtype=pl.Utf8).alias("contingent_of"))
+    if p.get("non_starters_zero", True):
+        depth = X.depth_table(cfg.path("raw"))
+        if depth is None:
+            print("  NON-STARTER RULE SKIPPED: no players_nfl.json cache (run `players`)", file=sys.stderr)
+        else:
+            teams = int((cfg.get("expected") or {}).get("teams") or (cfg.get("market") or {}).get("teams") or 12)
+            df = X.zero_non_starters(df.drop("non_starter", "contingent_of"), depth, teams)
+            print(f"  non-starters zeroed: {int(df['non_starter'].sum())}", file=sys.stderr)
+
+    # unprojected skill players the market drafts: loud, never silent
+    adp_in = float((cfg.get("tiers") or {}).get("adp_include_within", 150) or 150)
+    missing = df.filter(pl.col("proj_pts").is_null() & pl.col("adp").is_not_null() & (pl.col("adp") <= adp_in)
+                        & ~pl.col("pos").is_in(list(kdef_base)))
+    if missing.height:
+        print(f"  UNPROJECTED but drafted (ADP <= {adp_in:g}): "
+              + ", ".join(f"{n} ({ps} {a:.0f})" for n, ps, a in missing.select("name", "pos", "adp").iter_rows()),
+              file=sys.stderr)
+    return _finish(cfg, df)
+
+
+def _finish(cfg, df: pl.DataFrame) -> pl.DataFrame:
+    """Overrides (confirmed rows only) and the availability sweep -- protocol
+    steps shared by both projection paths."""
+    from . import overrides as _ov_mod
+    ov = _ov_mod.read(cfg.scoped(cfg.path("external") / "overrides.csv"))
+    if ov is not None:
+        ov, _candidates = _ov_mod.split(ov)
+        if ov.height:
+            ov = ov.select(pl.col("sleeper_id").cast(pl.Utf8),
+                           pl.col("proj_pts").cast(pl.Float64).alias("proj_override")).unique(subset="sleeper_id", keep="last")
+            df = df.join(ov, on="sleeper_id", how="left").with_columns(
+                pl.when(pl.col("proj_override").is_not_null()).then(pl.lit("override")).otherwise(pl.col("proj_source")).alias("proj_source"),
+                pl.coalesce(pl.col("proj_override"), pl.col("proj_pts")).alias("proj_pts"),
+            ).drop("proj_override")
+    av_path = cfg.path("external") / "availability.csv"
+    if av_path.exists():
+        av = pl.read_csv(av_path, infer_schema_length=1000)
+        if "sleeper_id" in av.columns and "status" in av.columns:
+            df = _apply_availability(df, av)
+    if "avail_status" not in df.columns:
+        df = df.with_columns(pl.lit(None, dtype=pl.Utf8).alias("avail_status"))
+    return df
+
+
+def model_projection(cfg, usage: pl.DataFrame, market: pl.DataFrame) -> pl.DataFrame:
+    """RETIRED 2026-09-02 (DECISIONS #21): the 2025-usage + log(ECR) blend.
+    Kept behind projections.source: model for the backtest and for the day
+    it earns its way back. Returns market frame + proj_pts, proj_source."""
     p = cfg["projections"]
     shrink_k = float(p["shrink_k"])
     alpha = float(p["model_alpha"])

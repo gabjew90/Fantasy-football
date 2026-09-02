@@ -73,7 +73,7 @@ def test_no_market_fallback_disabled_when_floor_zero_matches_nothing():
 def test_alpha_by_player_type(monkeypatch, tmp_path):
     """Stable veterans lean stats (0.65); new-team players lean market (0.40)."""
     import polars as pl
-    from draftkit.projections import default_projection
+    from draftkit.projections import model_projection as default_projection
 
     class FakeCfg(dict):
         def path(self, kind):
@@ -120,7 +120,7 @@ def test_consensus_is_parallel_by_default_and_replaces_the_curve_only_when_asked
     the fallback where it does not."""
     import polars as pl
     from draftkit import consensus as C
-    from draftkit.projections import default_projection
+    from draftkit.projections import model_projection as default_projection
 
     class FakeCfg(dict):
         def path(self, kind):
@@ -222,7 +222,7 @@ def test_alpha_cap_by_position_sits_under_the_type_alpha(monkeypatch, tmp_path):
     """Item 2's verdict: WR usage weight capped (0.2); other positions keep
     their player-type alpha. The cap can only lower alpha, never raise it."""
     import polars as pl
-    from draftkit.projections import default_projection
+    from draftkit.projections import model_projection as default_projection
 
     class FakeCfg(dict):
         def path(self, kind):

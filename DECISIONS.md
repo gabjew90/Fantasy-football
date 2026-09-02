@@ -1096,3 +1096,59 @@ never decays) is still open and is the natural follow-up -- curve inside
 the ADP pool, lines beyond it -- to be graded the same way once a
 population that includes the tail exists (the season replay grader, not
 this MAE table).
+
+## 2026-09-02 (21) — projections become an input; the flip waits on the replay gate
+
+The engine's edge is roster-aware timing, not projection modeling.
+Projections are now an external input; the modeling code is retired pending
+a backtest it has never had. (This supersedes the "projection overhaul";
+items 3-5 of that brief are dropped, item 1's Sleeper adapter and the depth
+chart rule are folded in.)
+
+Built (draftkit/external.py, projections.source):
+* One schema for two sources -- sleeper_id · name · pos · team · pts17 ·
+  source · as_of · line. pts17 is the stat line scored in the league's own
+  settings as a 17-game total; the engine's `projections.games` (16) is
+  applied ONCE, at the end, for every source. Sleeper's gp=18 is ignored.
+* Sources in config order, first wins per player: the FantasyPros sheet
+  (data/external, read-only, as of 2026-09-01; 476 players matched to
+  Sleeper ids by the market table's own matcher, 15 unmatched -- fullbacks,
+  Bam Knight, two spacer rows) then Sleeper/Rotowire (555 players) for the
+  gaps. K/DEF keep the synthetic ECR-linear projection (no lines exist).
+* Non-starters project 0: depth-chart order past the position's starters
+  AND a market rank past teams x starters (or no rank at all). WR excluded
+  because Sleeper's receiver chart is per slot (LWR/RWR/SWR), not a depth;
+  a TE filed under the RB chart is left alone. `contingent_of` names the
+  starter ahead. 188 players zeroed in the pool, 9-13 of them on a board.
+* The usage model + log(ECR) blend is `projections.source: model`, kept for
+  the backtest and for the day it earns its way back. Overrides (confirmed
+  only) and the availability sweep apply on both paths.
+
+Verified (reports/input_replay.{keefamania.1396184666897145856,
+omnibeta.1395566812157984768}.md; 344 tests; simulate both leagues;
+manager --dry-run --module all; consumers of proj_pts read the new csv --
+the only header change is three added columns):
+* Board vs board rank correlation (proj_pts): QB 0.85 / 0.87, RB 0.93 /
+  0.95, WR 0.97 / 0.97, TE 0.89 / 0.93 (Keefamania / Omnibeta).
+* The non-starter inflation is gone (Rattler, Mills, Winston, QB3s: 0).
+* Replay, our picks by the engine at every slot against the archived
+  rivals: Keefamania lineup points +24 on the new ruler (9 slots of 10
+  better), -25 on the old ruler; Omnibeta -1 on the new ruler (6/6), -50 on
+  the old. Each board wins on its own ruler; the Omnibeta wash on the new
+  ruler says the new input does not obviously draft better even by its own
+  lights there.
+* THE GATE TRIPPED: 63% (Keefamania) and 54% (Omnibeta) of round 1-6 picks
+  change. The changes are the QB timing (Allen R3, Daniels R6 in; Maye R5
+  and Kittle R6 out) and RB/WR tier order (Henry and Gibbs over Chase Brown
+  and McCaffrey; Olave/JSN/Nabers/Wilson swaps). The brief says starters
+  moving materially in rounds 1-6 is a stop-and-report, so the default
+  stays `model` and the flip is a human call.
+
+Line counts: projections.py 432 -> 559 (the external path and the shared
+finish step were added; the model path was not deleted, per the brief),
+market.py 256 -> 256, external.py 232 new. The simplification is in the
+active path -- external mode is ~120 lines and no fitting -- not yet in the
+file, because the retired model still lives there behind the flag.
+
+To flip: projections.source: external, rebuild both boards, re-run
+scripts/input_replay.py and read the round 1-6 list again.
