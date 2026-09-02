@@ -1131,10 +1131,27 @@ window.DK = (function () {
     await sleep(300);
     const attempted = [];
     let tries = 0;
+    /* Local guardrails on every candidate, whatever list it came from. The
+     * plan's depth tail used to be unguarded (mock 11: TE3, TE4, a DEF in
+     * round 3), and a stale plan can name a position we have since filled.
+     * The engine remains the ranking; this only refuses what the roster
+     * makes illegal. Same predicate syncQueue applies. */
+    const need = r.need || {}, counts = r.counts || {};
+    const picksLeft = r.picksLeft != null ? r.picksLeft : S.cfg.rounds;
+    const rnd = r.round || 1;
+    const haveStash = (myRoster() || { players: [] }).players.some(p => {
+      const b = S.board.find(x => x.k === p.k && x.p === p.pos);
+      return b && (b.v || 0) <= 0;
+    });
+    const top6TeFell = !!(S.ctx && S.ctx.top6TeFell);
     for (const cand of r.top) {
       if (tries >= (maxTries || 3)) break;
       const entry = S.board.find(b => b.n === cand.n && b.p === cand.p);
       if (!entry) continue;
+      if (!guardrailOk(entry, rnd, need, counts, picksLeft, top6TeFell, haveStash)) {
+        attempted.push(cand.n + ':guardrail');
+        continue;
+      }
       if (!setSearch(searchTerm(entry))) continue;
       tries++;
       await sleep(700);
@@ -1216,6 +1233,32 @@ window.DK = (function () {
     return typeof document.hidden === 'boolean' && document.hidden;
   }
 
+  /* Do the driver's readings agree with each other? Pure enough to call from
+   * outside as a preflight. Each check is a way mock 11 went wrong:
+   *   header pick   -- if we cannot read where we are, we cannot judge a plan
+   *   plan @pick    -- a plan computed for another pick is a plan for another
+   *                    draft (the bridge pads from the header, so these should
+   *                    match exactly whenever the header is readable)
+   *   plan age      -- older than 20s means refreshPlan failed quietly
+   *   gone set      -- 25+ "gone" between picks is the row lookup failing,
+   *                    not 25 players vanishing; clear it and refuse this cycle
+   */
+  function gatesOk() {
+    const why = [];
+    const hdr = currentPickNo();
+    if (!hdr) why.push('header pick unreadable');
+    if (!S.plan || !S.plan.length) why.push('no plan');
+    if (hdr && S.planPick != null && S.planPick !== hdr) {
+      why.push('plan is for pick ' + S.planPick + ', header says ' + hdr);
+    }
+    if (S.planAt && Date.now() - S.planAt > 20000) why.push('plan stale (' + Math.round((Date.now() - S.planAt) / 1000) + 's)');
+    if (S.gone.size >= 25) {
+      why.push('gone set implausible (' + S.gone.size + ') -> cleared');
+      S.gone = new Set();
+    }
+    return { ok: why.length === 0, why, headerPick: hdr, planPick: S.planPick, gone: S.gone.size };
+  }
+
   async function run(maxSeconds) {
     if (S.running) return 'already running';
     S.running = true;
@@ -1232,6 +1275,17 @@ window.DK = (function () {
 
         if (onClock()) {
           await refreshPlan();   // zero-lag: ask the engine now
+          /* CONSISTENCY GATES (design 2026-09-01). A layer may act only when
+           * its readings agree; otherwise it does nothing and the queue /
+           * Yahoo's own list catches the pick. Never a confident click on a
+           * doubtful state -- mock 11's four tight ends were exactly that. */
+          const gate = gatesOk();
+          if (!gate.ok) {
+            note('GATE FAILED -> not clicking: ' + gate.why.join('; '));
+            await sleep(1200);
+            lastSync = 0;
+            continue;
+          }
           /* LIVE PICK IS PRIMARY.
            *
            * A 60-second clock is enormous next to a ~3s decision, and a pick
@@ -1342,7 +1396,7 @@ window.DK = (function () {
       S.gone = new Set(); S.starred = new Set(); S.log = []; S.lastRoster = -1;
       return 'reset';
     },
-    rank, syncQueue, draftTop, run,
+    rank, syncQueue, draftTop, run, gatesOk,
     classifyMiss, rowMatches, normTeam, autopickArmed, idKey, // exported for tests
     survivalProb, eBestNext, calibrate,
     reconcileStarred, reconcileStarredWith,
