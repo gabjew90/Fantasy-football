@@ -469,8 +469,14 @@ window.DK = (function () {
                slot: null, mine: myTeam != null && String(o.teamId) === myTeam };
     });
     const away = Object.values(managers).filter(m => m.away).map(m => String(m.teamId));
+    // draftOrder.currentPick is the count of picks MADE (null before pick 1,
+    // 5 while pick 6 is on the clock), so the pick on the clock is +1. Found
+    // in mock 13 when the on-clock gate refused to click at pick 6 because the
+    // plan said 6 and the store said 5.
+    const made = s.draftOrder.currentPick;
+    const onClockPick = Number.isFinite(+made) && made !== null ? (+made + 1) : null;
     return {
-      current_pick: +s.draftOrder.currentPick || null,
+      current_pick: onClockPick,
       current_team: s.draftOrder.currentTeam != null ? String(s.draftOrder.currentTeam) : null,
       my_team: myTeam,
       on_clock: myTeam != null && String(s.draftOrder.currentTeam) === myTeam,
