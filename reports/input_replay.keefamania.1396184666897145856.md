@@ -1,6 +1,6 @@
 # Input replay — keefamania, draft 1396184666897145856
 
-Old board `data/processed/tiers.old.keefamania.csv` vs new board `tiers.keefamania.csv`; 10 teams, 15 rounds; rivals held to the archived picks, our picks by the engine at every slot.
+Old board `data/processed/tiers.model.keefamania.csv` vs new board `data/processed/tiers.external.keefamania.csv`; 10 teams, 15 rounds; rivals held to the archived picks, our picks by the engine at every slot.
 
 ## The two boards
 
@@ -11,7 +11,7 @@ Old board `data/processed/tiers.old.keefamania.csv` vs new board `tiers.keefaman
 | WR | 73 | 0.968 | 4 | 0 |
 | TE | 27 | 0.894 | 1 | 1 |
 
-Zeroed on the new board (non-starter rule or availability), had points before (9): Terrance Ferguson, Kenyon Sadiq, David Njoku, Alvin Kamara, Jonah Coleman, James Conner, Isiah Pacheco, Ollie Gordon II, Fernando Mendoza
+Zeroed on the new board (non-starter rule or availability), had points before (9): Kenyon Sadiq, Terrance Ferguson, David Njoku, Isiah Pacheco, Jonah Coleman, Alvin Kamara, Ollie Gordon II, James Conner, Fernando Mendoza
 
 ## Lineup points by slot
 
@@ -35,6 +35,8 @@ Mean Δ on the new ruler +23.9 (slots better/worse 9/1); on the old ruler -24.8 
 99 of 150 picks changed. By round: R1: 4, R2: 7, R3: 6, R4: 3, R5: 9, R6: 9, R7: 10, R8: 8, R9: 7, R10: 10, R11: 10, R12: 7, R13: 9.
 
 Rounds 1-6: 38 changes (63% of those picks); rounds 7+: 61.
+
+By tier of the player the old board took (changed / picks at that tier): T1: 22/50 (44%), T2: 2/4 (50%), T3: 12/13 (92%), T4: 25/40 (62%), T5: 5/6 (83%), T6: 9/11 (82%), T7: 24/26 (92%).
 
 Ten largest changes (projected points, new ruler, new pick minus old pick):
 

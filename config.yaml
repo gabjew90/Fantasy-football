@@ -13,10 +13,14 @@ projections:
   #         model     -> the 2025-usage + log(ECR) blend (knobs below), to be
   #                      retired: it comes back only if scripts/projection_backtest.py
   #                      shows it beating the external source out of sample.
-  # STATUS 2026-09-02: external is built and verified end to end
-  # (reports/input_replay.*.md) but the replay gate tripped -- 63% / 54% of
-  # round 1-6 picks change (QB timing, RB/WR tier order) -- so the flip waits
-  # for a human call (DECISIONS #21). Until then the default stays `model`.
+  # STATUS 2026-09-02: external is built and verified end to end. The gate
+  # was redefined around quality (DECISIONS #23, thresholds pre-registered)
+  # and the external stand-in (Sleeper week-1 lines, the only outside lines
+  # with history) FAILED both halves: pooled MAE 5% worse than the model in
+  # both leagues, and actual-points lineups 1.6% worse over 44 replayed
+  # slot-drafts (reports/source_gate.md). So the default stays `model`; the
+  # external path is kept as a parallel column and the 2026 sheet is judged
+  # when 2026 is played.
   source: model
   # GAMES CONVENTION: every external line is a 17-game season total and is
   # scaled once, by games/17, for everyone. Sleeper's gp=18 is a week count

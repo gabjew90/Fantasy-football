@@ -1,6 +1,6 @@
 # Input replay — omnibeta, draft 1395566812157984768
 
-Old board `data/processed/tiers.old.omnibeta.csv` vs new board `tiers.csv`; 12 teams, 15 rounds; rivals held to the archived picks, our picks by the engine at every slot.
+Old board `data/processed/tiers.model.omnibeta.csv` vs new board `data/processed/tiers.external.omnibeta.csv`; 12 teams, 15 rounds; rivals held to the archived picks, our picks by the engine at every slot.
 
 ## The two boards
 
@@ -11,7 +11,7 @@ Old board `data/processed/tiers.old.omnibeta.csv` vs new board `tiers.csv`; 12 t
 | WR | 86 | 0.967 | 8 | 3 |
 | TE | 26 | 0.930 | 4 | 2 |
 
-Zeroed on the new board (non-starter rule or availability), had points before (13): Kimani Vidal, James Conner, Ray Davis, Jonah Coleman, Alvin Kamara, Jordan James, Isiah Pacheco, Najee Harris, Emari Demercado, Kenyon Sadiq, David Njoku, Terrance Ferguson, Fernando Mendoza
+Zeroed on the new board (non-starter rule or availability), had points before (13): Isiah Pacheco, Ray Davis, Jordan James, James Conner, Najee Harris, Alvin Kamara, Jonah Coleman, Kimani Vidal, Emari Demercado, Kenyon Sadiq, Terrance Ferguson, David Njoku, Fernando Mendoza
 
 ## Lineup points by slot
 
@@ -37,6 +37,8 @@ Mean Δ on the new ruler -0.8 (slots better/worse 6/6); on the old ruler -50.2 (
 117 of 180 picks changed. By round: R1: 2, R2: 4, R3: 7, R4: 8, R5: 6, R6: 12, R7: 11, R8: 11, R9: 7, R10: 12, R11: 12, R12: 11, R13: 10, R14: 2, R15: 2.
 
 Rounds 1-6: 39 changes (54% of those picks); rounds 7+: 78.
+
+By tier of the player the old board took (changed / picks at that tier): T1: 31/57 (54%), T2: 3/4 (75%), T3: 13/14 (93%), T4: 0/5 (0%), T5: 1/11 (9%), T6: 11/15 (73%), T7: 11/15 (73%), T8: 47/59 (80%).
 
 Ten largest changes (projected points, new ruler, new pick minus old pick):
 

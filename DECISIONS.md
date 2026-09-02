@@ -1175,3 +1175,81 @@ best-available-by-projection alternative and the candidates passed on; a
 full per-manager trail per mock (scripts/mock_trail.py, reports/mocks/);
 and the replay-gate redefinition (accuracy + outcome, churn by tier as a
 diagnostic) recorded for the projection-source decision.
+
+## 2026-09-02 (23) — the projection-source gate, pre-registered before it runs
+
+DECISIONS #21 left `projections.source` on `model` because 63% / 54% of
+round 1-6 picks changed under the external input. The reviewer's objection
+stands: pick churn measures difference, not quality, and keeping the source
+with no evidence because the one with some evidence changes picks is
+backwards. The gate is redefined here BEFORE the numbers are produced, so
+the result cannot move the thresholds.
+
+Arms. `model` = the retired usage + log-rank blend (the `blend` arm of the
+backtest). `external` = stat lines from outside; in history the only lines
+we have are Sleeper's week-1 lines (the backtest's `lines` arm), so they
+stand in for the 2026 sheet + Sleeper combination. The 2026 FantasyPros
+sheet itself cannot be judged until 2026 is played; this is stated in the
+report, not buried.
+
+Test 1, accuracy (scripts/projection_backtest.py rows, both leagues, pairs
+2023->2024 and 2024->2025, rows every arm projected): pooled MAE over all
+four positions and both pairs, and the n-weighted mean of the per-position
+Spearman. external FAILS if its pooled MAE is more than 2% above the
+model's, or its weighted Spearman more than 0.02 below, in either league.
+Otherwise it passes (ties pass: "not worse").
+
+Test 2, outcome (scripts/source_gate.py): for each league and history
+year, both arms are built into boards through the production code
+(add_vorp, build_tiers, handcuff and upside flags) and replayed through the
+SAME engine at every draft slot against rivals who draft in that year's
+FantasyFootballCalculator ADP order (Omnibeta is a first-year league; no
+archived 2024/2025 drafts exist, and ADP is the average of real drafts).
+K/DEF are absent from the history pools and are removed from the slots for
+both arms alike. Each drafted roster is graded on the ACTUAL season points
+of its best legal lineup -- a ruler neither board wrote. external FAILS if
+its mean lineup points over all slots, pairs and leagues are more than 1%
+below the model's. Slot wins/losses and per-pair means are reported.
+
+Diagnostic, not a gate: picks that change on the 2026 archived drafts
+(scripts/input_replay.py), now also by TIER of the player the old board
+took, and the ten largest.
+
+Decision rule: both pass -> `projections.source: external`, boards rebuilt.
+Either fails -> stays `model`, numbers recorded. One passes, one fails ->
+reported to the human with both numbers; no flip without the call.
+
+Not part of this gate: the Yahoo mock-room projections as a third source
+(a live room is needed to read them; recorded separately when captured).
+
+### Result (same day): STAY on `model`. Both tests failed, cleanly.
+
+reports/source_gate.md (+ .json), scripts/source_gate.py, tests/test_source_gate.py.
+
+* Accuracy: pooled MAE 57.8 -> 60.8 in Keefamania (+5.3%), 63.0 -> 66.0 in
+  Omnibeta (+4.7%); weighted Spearman -0.011 / -0.003. Threshold was 2% /
+  0.02. The cells agree with the earlier backtest: the lines win at RB in
+  every cell and lose at QB, WR and (mostly) TE.
+* Outcome: 44 slot-drafts, actual-points lineups. model 1563, external 1539
+  (-1.55%; threshold 1%); external better in 19, worse in 25. Split by
+  league: external AHEAD in both Keefamania years (+23, +83) and BEHIND in
+  both Omnibeta years (-127, -51). Consistent with the accuracy cells --
+  the 12-team, two-flex league leans hardest on WR depth, where the lines
+  are weakest. Zero engine errors; board sizes within 10% between arms.
+* Churn (diagnostic only, 2026 archived drafts, model vs external boards
+  built side by side today): Keefamania 99/150 picks change, Omnibeta
+  117/180. By tier of the old pick: T1 44% / 54%, and 73-93% from T3 down.
+  So the churn is not confined to the bench -- but churn decided nothing
+  here; the two quality tests did, and they went the same way.
+
+What this does and does not say. It says Sleeper's week-1 lines, as a
+season projection, are not better than the blend on two seasons of
+evidence, and drafting from them did not produce better rosters on
+average. It does NOT grade the FantasyPros sheet; that waits for 2026.
+The external path stays built and selectable; the sheet and lines remain
+parallel columns on the board (proj_consensus_pts) for the human eye.
+
+Threshold honesty: had the outcome threshold been 2% the outcome half
+would have passed and the decision would have been "split" -- the
+accuracy half fails either way, so no threshold in the neighbourhood
+flips the result.

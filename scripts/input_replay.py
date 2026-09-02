@@ -125,6 +125,9 @@ def main() -> None:
                 rnd = my_picks[i]["round"] if i < len(my_picks) else i + 1
                 changed.append({"slot": slot, "round": rnd, "old": po["name"] + f" ({po['pos']})",
                                 "new": pn["name"] + f" ({pn['pos']})",
+                                # tier of the player the OLD board took, on the old board
+                                # (DECISIONS #23: churn is reported by tier, as a diagnostic)
+                                "tier": int(po.get("tier") or 9),
                                 "delta_new_ruler": pn["proj_pts"] - by_new.get(po["name"], {}).get("proj_pts", 0.0)})
     L += ["## Lineup points by slot", "",
           "| slot | old roster, new ruler | new roster, new ruler | Δ | old roster, old ruler | new roster, old ruler | Δ |",
@@ -146,7 +149,20 @@ def main() -> None:
           + ", ".join(f"R{r}: {by_round[r]}" for r in sorted(by_round)) + ".", "",
           f"Rounds 1-6: {sum(v for r, v in by_round.items() if r <= 6)} changes "
           f"({sum(v for r, v in by_round.items() if r <= 6) / max(1, a.teams * 6):.0%} of those picks); "
-          f"rounds 7+: {sum(v for r, v in by_round.items() if r > 6)}.", "",
+          f"rounds 7+: {sum(v for r, v in by_round.items() if r > 6)}.", ""]
+    # by tier of the old pick (diagnostic, DECISIONS #23): T1-T2 are the
+    # starters the brief worried about; T5+ is bench order
+    by_tier = {}
+    for c in changed:
+        by_tier[c["tier"]] = by_tier.get(c["tier"], 0) + 1
+    picks_by_tier = {}
+    for slot in range(1, a.teams + 1):
+        for p in replay(old, log, slot, a.teams, rounds, True, slots=slots):
+            t = int(p.get("tier") or 9)
+            picks_by_tier[t] = picks_by_tier.get(t, 0) + 1
+    L += ["By tier of the player the old board took (changed / picks at that tier): "
+          + ", ".join(f"T{t}: {by_tier.get(t, 0)}/{picks_by_tier[t]} ({by_tier.get(t, 0) / picks_by_tier[t]:.0%})"
+                      for t in sorted(picks_by_tier)) + ".", "",
           "Ten largest changes (projected points, new ruler, new pick minus old pick):", "",
           "| slot | round | old pick | new pick | Δ |", "|---|---|---|---|---|"]
     for c in sorted(changed, key=lambda x: -abs(x["delta_new_ruler"]))[:10]:
