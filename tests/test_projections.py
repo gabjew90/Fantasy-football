@@ -163,3 +163,56 @@ def test_consensus_is_parallel_by_default_and_replaces_the_curve_only_when_asked
     assert used["p0"] == "stat_lines" and used[ids[-1]] == "ecr_curve"
     assert sw.filter(pl.col("sleeper_id") == "p0")["proj_market_pts"][0] == 100.0
     assert sw["proj_pts"].to_list() != base["proj_pts"].to_list()
+
+
+def test_qb_usage_regression_credits_rushing_volume():
+    """Usage-side fix 2: a QB's model term is no longer his shrunk PPG alone.
+    Two QBs with the same shrunk PPG but different rushing volume must part,
+    the runner above and the pocket passer below, and non-QB positions are
+    untouched by the change."""
+    import polars as pl
+    from draftkit.projections import _usage_adjusted_ppg
+
+    n = 20
+    carries = [20 + 100 * (i / (n - 1)) for i in range(n)]        # 20..120 per season
+    games = [16.0] * n
+    # league of QBs where ppg rises with carries per game (1.5 pts per carry/g)
+    ppg = [14.0 + 1.5 * c / g for c, g in zip(carries, games)]
+    rows = {
+        "gsis_id": [f"q{i}" for i in range(n)], "sleeper_id": [f"s{i}" for i in range(n)],
+        "name": [f"QB {i}" for i in range(n)], "pos": ["QB"] * n,
+        "games": games, "ppg": ppg, "carries": carries, "offense_snap_pct": [0.95] * n,
+        "wopr": [None] * n, "hv_touches": [0.0] * n,
+    }
+    # two probes with IDENTICAL ppg and games: one runs, one does not
+    for tag, c in (("runner", 130.0), ("pocket", 15.0)):
+        rows["gsis_id"].append(tag); rows["sleeper_id"].append(tag); rows["name"].append(tag)
+        rows["pos"].append("QB"); rows["games"].append(10.0); rows["ppg"].append(18.0)
+        rows["carries"].append(c); rows["offense_snap_pct"].append(0.95)
+        rows["wopr"].append(None); rows["hv_touches"].append(0.0)
+    usage = pl.DataFrame(rows, schema_overrides={"wopr": pl.Float64})
+    out = _usage_adjusted_ppg(usage, shrink_k=5)
+    m = dict(zip(out["gsis_id"], out["model_ppg"]))
+    assert m["runner"] > m["pocket"] + 1.0, (m["runner"], m["pocket"])
+    # the shrunk value both share sits between them
+    pos_mean = sum(ppg) / n * 0 + float(usage.filter(pl.col("games") >= 4)["ppg"].mean())
+    shrunk = 18.0 * 10 / 15 + pos_mean * 5 / 15
+    assert m["pocket"] < shrunk < m["runner"]
+
+
+def test_qb_regression_falls_back_to_shrunk_ppg_on_thin_data():
+    import polars as pl
+    from draftkit.projections import _usage_adjusted_ppg
+
+    n = 12   # >= 12 rows enters the position branch, < 15 fit rows -> no regression
+    usage = pl.DataFrame({
+        "gsis_id": [f"q{i}" for i in range(n)], "sleeper_id": [f"s{i}" for i in range(n)],
+        "name": [f"QB {i}" for i in range(n)], "pos": ["QB"] * n, "games": [16.0] * n,
+        "ppg": [15.0 + i for i in range(n)], "carries": [50.0] * n, "offense_snap_pct": [0.9] * n,
+        "wopr": [None] * n, "hv_touches": [0.0] * n}, schema_overrides={"wopr": pl.Float64})
+    out = _usage_adjusted_ppg(usage, shrink_k=5)
+    pos_mean = float(usage["ppg"].mean())
+    expected = [(15.0 + i) * 16 / 21 + pos_mean * 5 / 21 for i in range(n)]
+    got = out.sort("gsis_id")["model_ppg"].to_list()
+    exp_sorted = [e for _, e in sorted(zip([f"q{i}" for i in range(n)], expected))]
+    assert all(abs(a - b) < 1e-9 for a, b in zip(got, exp_sorted))

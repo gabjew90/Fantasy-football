@@ -42,9 +42,32 @@ def _usage_adjusted_ppg(usage: pl.DataFrame, shrink_k: float) -> pl.DataFrame:
                 + pos_mean * (shrink_k / (pl.col("games") + shrink_k))
             ).alias("shrunk_ppg")
         )
-        # usage regression: ppg ~ wopr + hv_touches_per_game (QB: skip, usage
-        # cols are receiving-centric)
+        # usage regression: ppg ~ wopr + hv_touches_per_game. WOPR and
+        # high-value touches are receiving and goal-line metrics, so until
+        # 2026-09-02 QBs skipped this step and a QB's model term was his
+        # shrunk 2025 PPG alone. The shrink pulls every high scorer toward
+        # the positional mean and nothing gave credit back for the volume
+        # that produced the points -- so rushing QBs (Daniels 8.3 carries a
+        # game, Lamar 5.2) sat below pocket veterans with more 2025 games
+        # (Stafford 1.7). QBs now get their own regression on rushing
+        # volume and snap share (projection overhaul, usage-side fix 2).
         if pos == "QB":
+            if all(c in grp.columns for c in ("carries", "offense_snap_pct")):
+                fit = grp.filter((pl.col("games") >= 6) & pl.col("offense_snap_pct").is_not_null())
+                if fit.height >= 15:
+                    X = np.column_stack([
+                        np.ones(fit.height),
+                        (fit["carries"].fill_null(0) / fit["games"]).to_numpy(),
+                        fit["offense_snap_pct"].fill_null(0).to_numpy(),
+                    ])
+                    beta, *_ = np.linalg.lstsq(X, fit["ppg"].to_numpy(), rcond=None)
+                    usage_ppg = (beta[0]
+                                 + beta[1] * (grp["carries"].fill_null(0) / grp["games"]).to_numpy()
+                                 + beta[2] * grp["offense_snap_pct"].fill_null(0).to_numpy())
+                    grp = grp.with_columns(pl.Series("usage_ppg", usage_ppg)).with_columns(
+                        (0.65 * pl.col("shrunk_ppg") + 0.35 * pl.col("usage_ppg")).alias("model_ppg"))
+                    out.append(grp)
+                    continue
             grp = grp.with_columns(pl.col("shrunk_ppg").alias("model_ppg"))
             out.append(grp)
             continue
