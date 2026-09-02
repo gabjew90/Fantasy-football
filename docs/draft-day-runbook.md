@@ -20,7 +20,7 @@ In Chrome (the profile that accepted the bridge cert):
         await PR.import();     // expect "Imported ~228 players"
         await PR.dnd();        // availability = out
         PR.save();             // "saved as your ranked order."
-        await PR.unmatched();  // star the important gaps by hand (DK Metcalf, J.K. Dobbins last time)
+        await PR.unmatched();  // expect ~12 deep-bench names only; anything with positive VORP here gets starred by hand (search the surname on the All Players tab)
 
 3. Verify server-side from any Yahoo page:
 

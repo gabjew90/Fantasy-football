@@ -51,9 +51,16 @@ window.PR = (function () {
   }
   /* A row is the button's parent; its textContent is short:
    * "James Cook IIIRB·Buf·Bye 7XRank #9·ADP 9.5". Cheap on purpose. */
-  function parseRow(btn) {
-    const m = ((btn.parentElement && btn.parentElement.textContent) || '').match(/^(.*?)(QB|RB|WR|TE|K|DEF)\b/);
+  /* The position is the token right before the first "·". A lazy match on
+   * any position token read "DK Metcalf" as name "D", position K, and "J.K.
+   * Dobbins" as "J." + K -- so both were reported unmatched after an import
+   * that had in fact placed them (2026-09-02). */
+  function parseRowText(text) {
+    const m = String(text || '').match(/^(.*?)(QB|RB|WR|TE|K|DEF)·/);
     return m ? { name: m[1].trim(), pos: m[2] } : null;
+  }
+  function parseRow(btn) {
+    return parseRowText((btn.parentElement && btn.parentElement.textContent) || '');
   }
   function index(labelRe) {
     const out = {};
@@ -171,6 +178,6 @@ window.PR = (function () {
       b.click(); return note('Save clicked');
     },
     status() { return { ordered: S.order.length, dnd: S.dnd.length, log: S.log.slice(-5) }; },
-    norm, log: () => S.log.slice(-10),
+    norm, parseRowText, log: () => S.log.slice(-10),
   };
 })();

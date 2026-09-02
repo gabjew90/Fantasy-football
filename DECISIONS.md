@@ -793,6 +793,9 @@ Done tonight, on the REAL league (49649, team 3):
 * Not matched by Yahoo's importer: DK Metcalf and J.K. Dobbins (initials --
   neither spelling tried landed) and ten players outside Yahoo's 300-list.
   Visible via PR.unmatched(); the two that matter can be starred by hand.
+  [Corrected 2026-09-02: Metcalf and Dobbins HAD landed (ranks 76 and 85).
+  PR.unmatched()'s row parser read the "K" in their names as the kicker
+  position. Fixed with a test; the twelve real misses are all deep bench.]
 * The star-by-star path works and keeps click order but slows as the list
   grows (0.9s/click at 50, 1.5s at 100); kept for touch-ups only.
 * One rival (team 9) has pre-ranks set too.

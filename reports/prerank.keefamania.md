@@ -14,8 +14,11 @@ Live view (your account): https://football.fantasysports.yahoo.com/f1/49649/3/ed
 
 ## Not matched by Yahoo's importer (rank them by hand if they matter)
 
-- DK Metcalf (WR, PIT)
-- J.K. Dobbins (RB, DEN)
+All twelve are deep bench (best VORP among them is negative). DK Metcalf and
+J.K. Dobbins were listed here on 2026-09-01 in error: Yahoo had placed both
+(rank 76 and 85 in My Preferred); my row parser read the "K" in their names
+as the kicker position. Fixed and re-checked 2026-09-02 (228 of 228 read back).
+
 - Theo Johnson (TE, NYG)
 - Jake Tonges (TE, SFO)
 - Jameis Winston (QB, NYG)
