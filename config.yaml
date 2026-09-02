@@ -30,6 +30,12 @@ projections:
   consensus:
     enabled: true            # fetch + score the parallel column at every build
     line_games: 17           # the stat lines are 17-game season totals (gp=18 is a week count)
+  # Usage-side fix 1 (2026-09-02): scale the MODEL term by a depth-chart
+  # backup's expected share of starting weeks (draftkit/role.py), only when
+  # the market rank agrees he is a backup. Starters per team by position.
+  role_gate:
+    enabled: true
+    starters: {QB: 1, RB: 2, WR: 3, TE: 1}
 
 engine:
   sims: 1000          # Monte Carlo draft simulations per decision

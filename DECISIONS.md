@@ -974,3 +974,41 @@ blend at WR (Rotowire and FantasyPros disagree at WR more than our board
 does). The lines also sit 15-25 points below the sheet at RB1-36: Rotowire
 is the conservative shop. None of this flips the default: per the brief the
 backtest (item 2) decides which market term is default and at what weight.
+
+## 2026-09-02 (18) — projection overhaul, usage-side fix 1: role gating
+
+The usage half projected 2025 per-game rates forward regardless of 2026
+role: Jameis Winston (two 2025 starts, 22 PPG) was ~227 on the board,
+Rattler ~205, Mills ~193, against ~10-30 from every projector, because a
+PPG number cannot say "he will not start". draftkit/role.py scales the
+MODEL term by a depth-chart backup's expected share of starting weeks --
+P(at least his depth beyond the starters are out in a week) at the
+position's ex-ante absence rate (bench.ABSENT_WEEKS), no bye term -- so
+QB2 0.15, RB3 0.33, RB4 0.03, TE2 0.17, QB3/TE3 0.
+
+Judgment calls:
+* Two sources must agree. The gate fires only when the market rank within
+  position is also past teams x starters, OR there is no ECR/ADP at all.
+  The second clause was added after the first build missed Rattler and
+  Mills: they reached the board through the no-market floor, and "no rank"
+  had been read as unknown when it is the market's strongest "backup".
+* WR is not gated. Sleeper's receiver chart is three sub-charts (LWR/RWR/
+  SWR) with their own orders plus unslotted receivers numbered 6-11; the
+  order is not an overall depth (Davante Adams reads RWR 2, Travis Hunter
+  SWR 4). The first build zeroed Pearsall and Calvin Austin on that. QB/RB/
+  TE charts are single ordered lists; the chart position must also match
+  the fantasy position (an H-back filed under RB is left alone).
+* Model term only, applied after the market curve is fitted, so the curve
+  is still fitted on ungated veteran points. Market-implied players (no
+  2025 stats) are untouched -- that is the market half's business (item 1).
+* Applied to everyone with one rule; the config carries the starters map
+  (QB 1, RB 2, WR 3, TE 1) under projections.role_gate.
+
+Effect (Keefamania / Omnibeta): 14 / 22 players gated, none of them a
+starter by either source; Winston, Vidal, Knight, Theo Johnson and Tonges
+fall off the Keefamania board entirely; no ungated row moved. Against the
+sheet the QB 49-60 band goes +189 -> +20 and RB 61-80 +71 -> +50; what
+remains in those bands is market-implied rows the gate cannot reach.
+Zero-share players (QB3s) project 0 from the model term; the market curve
+still gives them ~200 where it has a rank for them, which is item 1's
+case in one line.

@@ -218,6 +218,7 @@ TIERS_COLUMNS = [
     "proj_market_pts",
     "proj_consensus_pts",
     "market_source_used",
+    "role_share",
     "backs_up_pos",
     "starter_fragility",
     "starter_fragility_label",

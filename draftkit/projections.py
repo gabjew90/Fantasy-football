@@ -198,6 +198,25 @@ def default_projection(cfg, usage: pl.DataFrame, market: pl.DataFrame) -> pl.Dat
     df = df.with_columns((pl.col("model_ppg") * games).alias("proj_model_pts"))
     df = _market_curve(df)
 
+    # Role gate (projection overhaul, usage-side fix 1, 2026-09-02): a per-game
+    # rate cannot say "he will not start". Scale the MODEL term by the share
+    # of weeks a depth-chart backup can expect the role, and only when the
+    # market rank agrees he is a backup. Applied AFTER the curve fit so the
+    # market curve is still fitted on ungated veteran points. See role.py.
+    df = df.with_columns(pl.lit(1.0).alias("role_share"))
+    rg = p.get("role_gate") or {}
+    if rg.get("enabled"):
+        from . import role as _role
+        depth = _role.depth_orders(cfg.path("raw"))
+        if depth is None:
+            import sys
+            print("  ROLE GATE SKIPPED: no players_nfl.json cache (run `players`)", file=sys.stderr)
+        else:
+            teams = int((cfg.get("expected") or {}).get("teams")
+                        or (cfg.get("market") or {}).get("teams") or 12)
+            df = _role.apply_role_gate(df.drop("role_share"), depth, teams,
+                                       starters=rg.get("starters"))
+
     # K/DEF have no offensive stat lines, so neither the model nor the fitted
     # market curve covers them. Assign a synthetic projection from ECR rank
     # within position — a gentle linear decline, which correctly yields small
