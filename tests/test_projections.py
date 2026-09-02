@@ -111,3 +111,55 @@ def test_alpha_by_player_type(monkeypatch, tmp_path):
     alphas = dict(zip(out["name"], out["alpha_used"]))
     assert alphas["Stable Vet"] == 0.65
     assert alphas["New Team Guy"] == 0.40
+
+
+def test_consensus_is_parallel_by_default_and_replaces_the_curve_only_when_asked(monkeypatch, tmp_path):
+    """Projection overhaul item 1: the stat-line column rides alongside the
+    blend and changes nothing unless market_source says stat_lines; then it
+    stands in for the log-rank curve where it exists and the curve remains
+    the fallback where it does not."""
+    import polars as pl
+    from draftkit import consensus as C
+    from draftkit.projections import default_projection
+
+    class FakeCfg(dict):
+        def path(self, kind):
+            return tmp_path
+
+        def scoped(self, path):
+            return path
+
+    def mk(source, enabled=True):
+        return FakeCfg({"season": 2026, "projections": {
+            "model_alpha": 0.5, "shrink_k": 5, "expected_games": 16.0, "no_market_floor": 0,
+            "market_source": source, "consensus": {"enabled": enabled, "line_games": 17}}})
+
+    n = 8
+    ids = [f"p{i}" for i in range(n)]
+    usage = pl.DataFrame({
+        "sleeper_id": ids, "gsis_id": [f"g{i}" for i in ids], "name": ids, "pos": ["WR"] * n,
+        "games": [16.0] * n, "ppg": [12.0 - 0.5 * i for i in range(n)], "fpts_total": [192.0] * n,
+        "wopr": [0.5] * n, "target_share": [0.2] * n, "air_yards_share": [0.3] * n,
+        "tprr": [0.2] * n, "yprr": [1.8] * n, "routes_proxy": [500.0] * n, "hv_touches": [10.0] * n,
+        "offense_snap_pct": [0.9] * n, "avg_separation": [3.0] * n, "exp_games": [16.0] * n,
+        "team_2025": ["ATL"] * n})
+    market = pl.DataFrame({"sleeper_id": ids, "name": ids, "pos": ["WR"] * n, "team": ["ATL"] * n,
+                           "ecr": [30.0 + i for i in range(n)], "ecr_sd": [3.0] * n,
+                           "adp": [30.0 + i for i in range(n)], "bye": [5] * n})
+    # consensus knows all but the last player
+    cons = pl.DataFrame({"sleeper_id": ids[:-1], "proj_consensus_pts": [100.0] * (n - 1),
+                         "adp_sleeper": [40.0] * (n - 1)})
+    monkeypatch.setattr(C, "load_consensus", lambda cfg, **kw: (cons, {}))
+
+    base = default_projection(mk("ecr_curve", enabled=False), usage, market)
+    par = default_projection(mk("ecr_curve"), usage, market)
+    assert par["proj_pts"].to_list() == base["proj_pts"].to_list(), "parallel column must not move the blend"
+    assert par["proj_consensus_pts"].to_list()[:-1] == [100.0] * (n - 1)
+    assert par["proj_consensus_pts"][-1] is None
+    assert set(par["market_source_used"].to_list()) == {"ecr_curve"}
+
+    sw = default_projection(mk("stat_lines"), usage, market)
+    used = dict(zip(sw["sleeper_id"], sw["market_source_used"]))
+    assert used["p0"] == "stat_lines" and used[ids[-1]] == "ecr_curve"
+    assert sw.filter(pl.col("sleeper_id") == "p0")["proj_market_pts"][0] == 100.0
+    assert sw["proj_pts"].to_list() != base["proj_pts"].to_list()

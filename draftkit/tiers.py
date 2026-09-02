@@ -212,6 +212,12 @@ TIERS_COLUMNS = [
     "upside_flag",
     "upside_why",
     "alpha_used",
+    # projection overhaul item 1: the blend's parts and the parallel source,
+    # so a board can be graded component by component (scripts/sheet_compare.py)
+    "proj_model_pts",
+    "proj_market_pts",
+    "proj_consensus_pts",
+    "market_source_used",
     "backs_up_pos",
     "starter_fragility",
     "starter_fragility_label",

@@ -931,3 +931,46 @@ What the numbers say (both leagues agree):
   the sheet projects as non-starters.
 
 Per the brief: numbers differ materially, so stop and report before item 1.
+
+## 2026-09-02 (17) — projection overhaul, item 1: stat lines as a parallel market source
+
+draftkit/consensus.py fetches Sleeper's season stat-line projections per
+position, scores them with the league yaml's scoring key-for-key, scales the
+17-game lines onto the board's expected_games basis, and joins by Sleeper id
+(exact; no name matching). default_projection carries the result as
+`proj_consensus_pts` and, only when `projections.market_source: stat_lines`,
+substitutes it for the log-rank curve where it exists (the curve stays the
+fallback for players Rotowire does not project). Default is still
+`ecr_curve`: proj_pts is byte-identical to before on both boards (0 of 243 /
+298 rows moved); 203 of 243 Keefamania players and the equivalent in Omnibeta
+carry the column. The tiers csv now also writes proj_model_pts and
+proj_market_pts so the blend can be graded part by part.
+
+Corrections to the brief, before anyone reads the numbers:
+* This is Rotowire, not consensus. Sleeper serves one shop's lines. It is
+  strictly more informative than a rank curve, and it is one opinion where
+  ECR was many. The FantasyPros sheet is the consensus and is a one-time
+  join. Named accordingly in the code (comments) even though the column is
+  called proj_consensus_pts for continuity with the brief.
+* The endpoint is new to the repo. The existing client hits the WEEKLY
+  projections path for the in-season manager; season totals are a different
+  URL, cached under data/raw with a 12 h TTL.
+* `gp` = 18 in these rows is a week count, recorded for audit, never used to
+  scale. line_games = 17 is the convention; config projections.consensus.
+
+Acceptance (scripts/sheet_compare.py --column proj_consensus_pts, both
+leagues agree; Keefamania shown, Spearman over the sheet's top 36 / deep
+band bias board-minus-sheet):
+
+    pos   blend today   stat lines alone     tail (blend -> lines)
+    QB    0.81          0.97                 backups +217 -> +1
+    RB    0.93          0.98                 61-80: +71 -> +14
+    WR    0.93          0.88                 none either way
+    TE    0.88          0.88                 61-80: +67 -> +25
+
+So the stat lines fix exactly the two things Step 0 isolated -- the QB
+ordering and the deep floor at QB/RB/TE -- and are slightly WORSE than the
+blend at WR (Rotowire and FantasyPros disagree at WR more than our board
+does). The lines also sit 15-25 points below the sheet at RB1-36: Rotowire
+is the conservative shop. None of this flips the default: per the brief the
+backtest (item 2) decides which market term is default and at what weight.
