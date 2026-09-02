@@ -892,3 +892,42 @@ graded by the CLV retro against closing ADP, not by more mocks.
 Draft morning (2026-09-05): docs/draft-day-runbook.md, unchanged in shape —
 rebuild board, layer 0 via PR.import/dnd/save + PR.addMissing/moveAfter
 touch-ups, then the room with the driver injected from the bridge.
+
+## 2026-09-02 (16) — projection overhaul, Step 0: the comparison reproduced, and it disagrees with the brief
+
+scripts/sheet_compare.py reads the FantasyPros sheet's position tabs (AVG /
+high / low stat lines), scores them in each league's own settings, scales
+17-game lines to the board's 16-game basis, joins on the DynastyProcess
+name normalisation, and reports rank correlation, bias, largest
+disagreements and deep-rank bands per position. It is the acceptance test
+for item 1. Reports: reports/sheet_compare.{keefamania,omnibeta}.md.
+
+Judgment calls:
+* One workbook, not two. The two attachments are byte-identical (same md5),
+  both configured for Keefamania. The stat lines are format-free, so the
+  Omnibeta comparison rescored the same lines in Omnibeta's scoring; only
+  the sheet's Aggregate/FLEX/RISK tabs are league-configured and those are
+  not used by the comparison.
+* Raw AVG lines, not the Aggregate tab. The Aggregate AVG already carries the
+  sheet's missed-games adjustment (about 12–15% at the top), which is a
+  different convention from the board's flat 16/17. Comparing against it
+  flips the sign of the top-36 bias; my first quick look (chat, earlier
+  today) did exactly that and reported the board as fat everywhere. It is
+  not.
+* Games convention: sheet lines x 16/17. Stated in the report header.
+
+What the numbers say (both leagues agree):
+* QB rank correlation is 0.81–0.85 over the sheet's top 36, not 0.70. The
+  disagreement is concentrated: Daniels 3->15, Lamar 2->11, Dart 7->16,
+  Burrow 6->13 down; Stafford 15->4, Mahomes 11->5, Lawrence 8->3 up.
+* The board is BELOW the sheet across the top 36 at every position (bias
+  -9 to -22), and below it at RB 37–48 (-16/-20). The "RB 37 and beyond 30
+  to 120 above" claim holds only from RB 49 (+17/+22) and RB 61–80
+  (+64/+71). The same floor appears at TE 37+ (+42/+52) and, most extremely,
+  at QB backups (Winston/Rattler/Mills: sheet ~10, board ~200). WR shows no
+  tail floor at all (61–80: +0/+1).
+* So the tail defect is real but starts one band deeper than the brief
+  says, is absent at WR as the brief says, and its worst case is QB backups
+  the sheet projects as non-starters.
+
+Per the brief: numbers differ materially, so stop and report before item 1.
