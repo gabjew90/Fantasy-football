@@ -13,7 +13,7 @@ A uniform negative bias across a position's starters cancels in VORP and is not 
 |---|---|---|---|---|---|---|
 | QB | 34 | 0.90 | 0.88 | +2.1 | +1.0 | 41 |
 | RB | 71 | 0.91 | 0.95 | -2.4 | -15.8 | 51 |
-| WR | 90 | 0.93 | 0.93 | -6.0 | -21.6 | 88 |
+| WR | 87 | 0.96 | 0.97 | -9.7 | -22.5 | 91 |
 | TE | 33 | 0.91 | 0.90 | -5.8 | -4.7 | 83 |
 
 ## QB
@@ -110,44 +110,44 @@ Deep-rank bands (by sheet rank):
 
 | band | n | sheet | board | diff |
 |---|---|---|---|---|
-| 1-12 | 12 | 269 | 244 | -25 |
-| 13-24 | 12 | 214 | 192 | -21 |
-| 25-36 | 12 | 184 | 166 | -19 |
-| 37-48 | 12 | 163 | 150 | -13 |
-| 49-60 | 12 | 148 | 135 | -13 |
+| 1-12 | 12 | 269 | 247 | -21 |
+| 13-24 | 12 | 214 | 190 | -24 |
+| 25-36 | 12 | 184 | 162 | -22 |
+| 37-48 | 12 | 163 | 145 | -18 |
+| 49-60 | 12 | 148 | 132 | -16 |
 | 61-80 | 17 | 114 | 114 | +0 |
 
 Largest rank disagreements (sheet top 36):
 
 | player | sheet rk | board rk | sheet pts | board pts |
 |---|---|---|---|---|
-| Luther Burden III | 26 | 54 | 196 | 136 |
-| DJ Moore | 25 | 36 | 196 | 162 |
-| DK Metcalf | 32 | 23 | 184 | 177 |
-| Ladd McConkey | 21 | 28 | 205 | 175 |
-| Davante Adams | 19 | 13 | 209 | 217 |
-| Rome Odunze | 27 | 22 | 193 | 179 |
-| Marvin Harrison Jr. | 30 | 35 | 185 | 162 |
-| Brian Thomas Jr. | 36 | 41 | 171 | 156 |
-| Justin Jefferson | 7 | 11 | 255 | 218 |
-| DeVonta Smith | 16 | 20 | 223 | 189 |
+| Alec Pierce | 33 | 42 | 181 | 150 |
+| Courtland Sutton | 28 | 35 | 187 | 159 |
+| Parker Washington | 35 | 29 | 173 | 165 |
+| Jaylen Waddle | 23 | 18 | 198 | 189 |
+| Rashee Rice | 8 | 12 | 252 | 214 |
+| Emeka Egbuka | 18 | 22 | 215 | 182 |
+| Luther Burden III | 26 | 30 | 196 | 164 |
+| Mike Evans | 31 | 27 | 184 | 170 |
+| Nico Collins | 12 | 9 | 236 | 222 |
+| DJ Moore | 25 | 28 | 196 | 167 |
 
 Largest point disagreements (all matched):
 
 | player | sheet rk | board rk | sheet pts | board pts | diff |
 |---|---|---|---|---|---|
-| Mack Hollins | 114 | 73 | 53 | 117 | +64 |
-| Luther Burden III | 26 | 54 | 196 | 136 | -60 |
-| Tank Dell | 116 | 83 | 51 | 111 | +60 |
-| Cyrus Allen | 117 | 87 | 49 | 109 | +59 |
-| Keon Coleman | 102 | 64 | 70 | 129 | +59 |
-| Troy Franklin | 82 | 47 | 91 | 144 | +53 |
-| Elic Ayomanor | 100 | 66 | 75 | 124 | +50 |
-| Pat Bryant | 103 | 86 | 68 | 109 | +41 |
-| Chimere Dike | 101 | 78 | 75 | 114 | +39 |
-| Ryan Flournoy | 90 | 69 | 84 | 121 | +37 |
+| Tank Dell | 116 | 79 | 51 | 111 | +60 |
+| Cyrus Allen | 117 | 82 | 49 | 109 | +59 |
+| Pat Bryant | 103 | 74 | 68 | 114 | +45 |
+| Keon Coleman | 102 | 77 | 70 | 112 | +42 |
+| Rashee Rice | 8 | 12 | 252 | 214 | -39 |
+| Jayden Reed | 41 | 56 | 167 | 131 | -36 |
+| Ryan Flournoy | 90 | 68 | 84 | 118 | +34 |
+| Jameson Williams | 22 | 24 | 205 | 172 | -33 |
+| Matthew Golden | 47 | 61 | 157 | 124 | -33 |
+| Chimere Dike | 101 | 85 | 75 | 107 | +33 |
 
-Sheet players not on the board (88): Germie Bernard, Chris Bell, Antonio Williams, Xavier Hutchinson, Xavier Legette, Tyquan Thornton, Jahan Dotson, Bryce Lance, Jalen Tolbert, Malik Benson, Isaac TeSlaa, Andrei Iosivas, Ted Hurst III, Hollywood Brown, DeMario Douglas, Zachariah Branch, Joshua Palmer, Kevin Coleman Jr., Marvin Mims Jr., Jack Bech, Ashton Dulin, Darnell Mooney, KaVontae Turpin, Devontez Walker, Demarcus Robinson …
+Sheet players not on the board (91): Germie Bernard, Chris Bell, Antonio Williams, Xavier Hutchinson, Tory Horton, Xavier Legette, Tyquan Thornton, Jahan Dotson, Bryce Lance, Jalen Tolbert, Malik Benson, Isaac TeSlaa, Andrei Iosivas, Ted Hurst III, Hollywood Brown, DeMario Douglas, Zachariah Branch, Elic Ayomanor, Joshua Palmer, Kevin Coleman Jr., Marvin Mims Jr., Jack Bech, Ashton Dulin, Darnell Mooney, KaVontae Turpin …
 
 ## TE
 

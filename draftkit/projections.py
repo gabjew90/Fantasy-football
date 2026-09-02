@@ -329,6 +329,15 @@ def default_projection(cfg, usage: pl.DataFrame, market: pl.DataFrame) -> pl.Dat
         .when((pl.col("games").fill_null(0) >= 12) & ~new_team).then(a_stable)
         .otherwise(alpha)
     )
+    # Projection overhaul item 2 (backtest, DECISIONS #20): a per-position CAP
+    # on the usage weight. Over 2023->2024 and 2024->2025, in both leagues,
+    # every step of alpha above zero made the WR projection worse on MAE and
+    # on rank correlation; RB/QB/TE optima flipped between seasons and are
+    # left alone. The cap sits under the player-type alpha, never above it.
+    caps = {str(k).upper(): float(v) for k, v in (p.get("alpha_cap_by_position") or {}).items()}
+    if caps:
+        cap_col = pl.col("pos").replace_strict(caps, default=None, return_dtype=pl.Float64)
+        alpha_col = pl.min_horizontal(alpha_col, pl.coalesce(cap_col, pl.lit(1.0)))
     df = df.with_columns(alpha_col.alias("_alpha"))
     df = df.with_columns(
         pl.when(pl.col("proj_model_pts").is_not_null() & pl.col("proj_market_pts").is_not_null())

@@ -216,3 +216,42 @@ def test_qb_regression_falls_back_to_shrunk_ppg_on_thin_data():
     got = out.sort("gsis_id")["model_ppg"].to_list()
     exp_sorted = [e for _, e in sorted(zip([f"q{i}" for i in range(n)], expected))]
     assert all(abs(a - b) < 1e-9 for a, b in zip(got, exp_sorted))
+
+
+def test_alpha_cap_by_position_sits_under_the_type_alpha(monkeypatch, tmp_path):
+    """Item 2's verdict: WR usage weight capped (0.2); other positions keep
+    their player-type alpha. The cap can only lower alpha, never raise it."""
+    import polars as pl
+    from draftkit.projections import default_projection
+
+    class FakeCfg(dict):
+        def path(self, kind):
+            return tmp_path
+
+        def scoped(self, path):
+            return path
+
+    cfg = FakeCfg({"projections": {
+        "model_alpha": 0.55, "shrink_k": 5, "expected_games": 16.0, "no_market_floor": 0,
+        "alpha_by_type": {"stable_veteran": 0.65, "volatile": 0.40},
+        "alpha_cap_by_position": {"WR": 0.2, "QB": 0.9}}})
+    n = 8
+    def frame(pos, prefix):
+        ids = [f"{prefix}{i}" for i in range(n)]
+        usage = pl.DataFrame({
+            "sleeper_id": ids, "gsis_id": [f"g{prefix}{i}" for i in range(n)], "name": ids, "pos": [pos] * n,
+            "games": [16.0] * n, "ppg": [12.0 - 0.5 * i for i in range(n)], "fpts_total": [192.0] * n,
+            "wopr": [0.5] * n, "target_share": [0.2] * n, "air_yards_share": [0.3] * n,
+            "tprr": [0.2] * n, "yprr": [1.8] * n, "routes_proxy": [500.0] * n, "hv_touches": [10.0] * n,
+            "offense_snap_pct": [0.9] * n, "avg_separation": [3.0] * n, "exp_games": [16.0] * n,
+            "team_2025": ["ATL"] * n, "carries": [10.0] * n})
+        market = pl.DataFrame({"sleeper_id": ids, "name": ids, "pos": [pos] * n, "team": ["ATL"] * n,
+                               "ecr": [30.0 + i for i in range(n)], "ecr_sd": [3.0] * n,
+                               "adp": [30.0 + i for i in range(n)], "bye": [5] * n})
+        return usage, market
+    uw, mw = frame("WR", "w"); ur, mr = frame("RB", "r")
+    out = default_projection(cfg, pl.concat([uw, ur]), pl.concat([mw, mr]))
+    a = dict(zip(out["sleeper_id"], out["alpha_used"]))
+    assert all(a[f"w{i}"] == 0.2 for i in range(n)), "WR stable veterans capped at 0.2"
+    assert all(a[f"r{i}"] == 0.65 for i in range(n)), "RB untouched"
+    # a cap above the type alpha changes nothing (QB cap 0.9 vs 0.65) -- exercised via config parse only

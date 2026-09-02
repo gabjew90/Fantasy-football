@@ -1036,3 +1036,63 @@ pocket passer with 8 games at 17.4 PPG in 2025; his case is the market's
 expectation of a bounce-back, which is the market half's job and is what
 the stat-line source carries (item 1: Burrow 6th on that column). The
 blend weight between the two halves is item 2's decision.
+
+## 2026-09-02 (20) — projection overhaul, item 2: the backtest, and what it decided
+
+scripts/projection_backtest.py rebuilds each arm as the pipeline would have
+before the target draft and scores it against that season's actuals in
+league scoring, 17-game basis, over the T-preseason draftable pool (every
+player FantasyFootballCalculator had an ADP for; 0 actual for anyone who
+never played). Two pairs, 2023->2024 and 2024->2025, both leagues. Arms:
+usage (build_usage at stats_season S, incl. the QB regression), curve (the
+log-rank market term on the T-preseason ADP -- ECR history is not
+archived), blend (default_projection, configured alphas), lines (Sleeper
+week-1 stat lines x 17). Role gate off (no historical depth chart); no
+overrides or availability sweep. Reports: reports/projection_backtest.
+{keefamania,omnibeta}.md/.json/.rows.csv.
+
+Harness judgment calls:
+* Week-1 rows updated after the week-1 Wednesday noon UTC are dropped as
+  in-season revisions -- unless (nearly) every row shares one later stamp,
+  which is a bulk touch: Sleeper re-stamped all 835 of its 2025 week-1 rows
+  on 2025-10-06 while the lines stayed fractional projections (Allen 232.8
+  pass yd, 1.63 TD; not his 394-yard game). A midnight-Tuesday cutoff had
+  dropped every 2024 row too (stamps run to Tue 03:45 UTC).
+* Arms are also compared on the rows ALL four projected (rookies have no
+  usage arm; unlined players no lines arm) -- the apples-to-apples column.
+
+What the numbers say (both leagues, both pairs unless noted):
+* No arm dominates, and QB 2025 separates nothing (every arm's rank
+  correlation is about zero: Daniels 7 games, Burrow 8, Murray 5, Lamar 13).
+  Consensus did not "win outright", so the usage model stays.
+* The market curve is at least as good as the usage model at RB and WR,
+  and usage-only is the worst WR arm in all four league-pairs.
+* Rotowire's lines beat every arm on RB MAE in all four league-pairs, and
+  lose at QB and TE in both pairs. Not enough to make them the default
+  market term; enough to keep the parallel column.
+* The alpha grid has ONE stable reading: at WR, every step of usage weight
+  above 0 is worse on MAE and on rank correlation, in all four league-pairs
+  (Keefamania 2024: 49.6/0.50 at 0 vs 57.3/0.38 at 1; 2025: 61.3/0.56 vs
+  63.5/0.47; Omnibeta the same shape). RB flips (2024 wants 0.4-0.6, 2025
+  wants 0-0.2), TE flips (0 then 1), QB is flat. Tuning those from two
+  seasons would be fitting noise.
+
+Decided:
+* projections.alpha_cap_by_position: WR 0.20 -- a cap under the player-
+  type alpha, never above it. 0.2 rather than the grid's 0 is the hedge
+  against two seasons of evidence. Effect: only WR rows move (65 on the
+  Keefamania board; Chase 231 -> 258, Adams 182 -> 155); WR rank
+  correlation with the FantasyPros sheet 0.93 -> 0.96/0.97 in both leagues;
+  the WR blend arm re-scored in the backtest sits within a point of the
+  curve in every pair (in-sample for this choice; recorded as such).
+* market_source stays ecr_curve; alphas for RB/QB/TE unchanged; the usage
+  model is not reduced to a residual.
+
+What the backtest cannot see, on the record: its population is the
+drafted pool, so the deep-tail floor (QB backups, RB 49+, TE 37+) that
+Step 0 found and item 1's lines fix is outside its view. The role gate now
+handles the model side of that; the market side (a log-rank curve that
+never decays) is still open and is the natural follow-up -- curve inside
+the ADP pool, lines beyond it -- to be graded the same way once a
+population that includes the tail exists (the season replay grader, not
+this MAE table).
