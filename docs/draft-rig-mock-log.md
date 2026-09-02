@@ -437,3 +437,29 @@ driver defects.
 
 Open question from mock 13 (store `away` vs the server's autopick state)
 did not arise: with no toggle storm there was nothing to desync.
+
+## Mock 15 — room 10434811 "Pooch Kick", 10 teams, slot 8 — clean, nine humans
+
+Roster: Achane, Chase Brown, Javonte Williams, Rashee Rice, Davante Adams,
+Drake Maye, George Kittle, DK Metcalf, RJ Harvey, Matthew Stafford (QB2,
+R10), Kenny Gainwell, Quentin Johnston, Woody Marks, Steelers DEF, Cairo
+Santos K. Legal at every guardrail.
+
+Fifteen of fifteen picks by the driver at the turn, each `verified: "store"`;
+no gate failure, never `away`, no banner, no autopick. This room had nine
+live humans (one to four away at any time), so the pacing was the real
+league's — a round every three to four minutes, 30 seconds a pick — rather
+than mock 14's autopick sprint. Same result.
+
+Second clean run in a row under the bar set 2026-09-01. The opening eight
+picks were identical to mock 14's from a different slot (Achane, Chase
+Brown, Javonte Williams, Rashee Rice, Adams, Maye, Kittle, then the best
+WR), which says the engine is deterministic given the same board and
+similar rooms; whether those are the RIGHT picks is the CLV retro's
+question, not the rig's.
+
+Rig status after mocks 12–15: the store-fed driver, the bridge's resolver,
+the structural-only guardrail and store-first autopick state have now been
+exercised across a bot-paced room and a human-paced room without a defect.
+The only DOM dependency left is the row click, which has not missed since
+the expanded-layout fix in mock 11.

@@ -879,3 +879,16 @@ the bottom by a hand-star on 2026-09-01 -- was moved to his board position
 (72) with the page's Select -> "Move after..." flow. 240 of 240, saved,
 has_preranks confirmed. Both flows are ported into scripts/prerank_driver.js
 (PR.addMissing, PR.moveAfter) for the draft-morning rebuild.
+
+## 2026-09-02 (15) — mock 15: clean again, at human pace
+
+Second consecutive perfect mock on the stated bar (15/15 live, store-
+verified, no autopick, no gate trip, legal roster), this time in a room with
+nine humans and a 30-second clock. The rig's failure modes from mocks 11–13
+have not recurred across two full drafts. Stopping the mock series here: a
+further run tells us nothing new about the rig, and the engine's choices are
+graded by the CLV retro against closing ADP, not by more mocks.
+
+Draft morning (2026-09-05): docs/draft-day-runbook.md, unchanged in shape —
+rebuild board, layer 0 via PR.import/dnd/save + PR.addMissing/moveAfter
+touch-ups, then the room with the driver injected from the bridge.
