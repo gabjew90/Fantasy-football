@@ -42,7 +42,9 @@ In Chrome (the profile that accepted the bridge cert):
 
 ## T-15m: the room
 
-- Enter the draft room from the league page. **Keep the tab visible and the laptop awake** — Chrome throttles hidden tabs, and Yahoo's idle timer arms autopick on inactivity (the driver fakes activity, but do not test it).
+- Enter the draft room from the league page **as soon as Yahoo opens it (30-60 minutes before the clock)** and inject the driver right away. A league room has no waiting-room countdown to race; the two lost first picks in mocks 16-17 came from a hidden waiting-room tab whose redirect never fired, and cannot happen once you are in the room with the driver running.
+- **Keep the tab visible and the laptop awake** — Chrome throttles hidden tabs, and Yahoo's idle timer arms autopick on inactivity (the driver clears it through Yahoo's own setAwayStatus, but do not test it).
+- Picks go through Yahoo's own `makePick` action (mock 19 onward): no search, no row, no button. If the action is unavailable the driver falls back to the row click, and either way the store must confirm the pick before it is reported (`via: action|click`, `verified: store`).
 - Do NOT reload the page mid-draft. Re-evaluating the driver does not stop an old loop either; if the driver must be restarted, leave the room and re-enter, then inject again.
 
 In the room's DevTools console:
