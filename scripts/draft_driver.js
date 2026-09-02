@@ -1410,9 +1410,13 @@ window.DK = (function () {
     out.table_live = tableLive();
     out.plan = await refreshPlan();
     out.gates = gatesOk();
-    // can we find a row for the plan's first candidate?
+    // can we find a row for the plan's first UNDRAFTED candidate? (Mock 16:
+    // injected mid-round, the plan head had just been taken and preflight
+    // reported the row lookup broken when it was the player who was gone.)
     const r = rank();
-    const first = r && r.top && r.top[0];
+    const pfSnap = storeState();
+    const pfGone = new Set(pfSnap ? pfSnap.drafted.map(d => idKey(d.name, d.pos)) : []);
+    const first = r && r.top && (r.top.find(c => !pfGone.has(idKey(c.n, c.p))) || r.top[0]);
     if (first) {
       const entry = S.board.find(b => b.n === first.n && b.p === first.p);
       ensurePlayersTab();
