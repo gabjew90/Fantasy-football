@@ -1215,6 +1215,110 @@ window.DK = (function () {
    *
    * Bounded to a few candidates: mock 3 spent the entire 60s clock walking 20
    * of them, which is what armed autopick in the first place. */
+  /* ---------------- the client's own actions (design 2026-09-02, layer 2b) ------
+   *
+   * The Draft button calls a Redux thunk, makePick(playerId), which sends one
+   * pipe-delimited frame on the client's socket: "0|league|manager|pickNo|
+   * playerId" (react-draft-client bundle, sendMakePick). The Autodraft toggle
+   * is setAwayStatus(bool) -> "5"/"6". The top-level connected component's
+   * props carry those thunks as bound dispatchers, reachable by walking the
+   * React tree from the store's provider -- the same walk findStore does.
+   *
+   * Calling makePick ourselves runs Yahoo's own code path end to end, minus
+   * the analytics beacon: no search box, no row, no button, no confirm
+   * dialog. The click path stays as the fallback, and the store still
+   * verifies every pick (pickLandedStore) whichever path made it. */
+  function clientActions(force) {
+    const WANT = ['makePick', 'setAwayStatus', 'addToQueue', 'setCurrentPlayerId'];
+    // a registry that has anything is reused for a minute; a partial one is
+    // still a registry (the test hook hands over one action at a time, and a
+    // Yahoo deploy could rename one prop without the others)
+    if (!force && S.actions && Object.keys(S.actions).length
+        && S.actionsAt && Date.now() - S.actionsAt < 60000) return S.actions;
+    const found = {};
+    const queue = [];
+    for (const el of document.querySelectorAll('body, body *')) {
+      for (const k of Object.keys(el)) {
+        if (k.startsWith('__reactContainer$')) queue.push(el[k]);
+      }
+      if (el._reactRootContainer && el._reactRootContainer._internalRoot) {
+        queue.push(el._reactRootContainer._internalRoot.current);
+      }
+      if (queue.length) break;
+    }
+    const seen = new Set();
+    let n = 0;
+    while (queue.length && n < 200000 && WANT.some(k => !found[k])) {
+      const f = queue.shift();
+      if (!f || seen.has(f)) continue;
+      seen.add(f); n++;
+      const p = f.memoizedProps;
+      if (p && typeof p === 'object') {
+        for (const k of WANT) if (!found[k] && typeof p[k] === 'function') found[k] = p[k];
+      }
+      if (f.child) queue.push(f.child);
+      if (f.sibling) queue.push(f.sibling);
+    }
+    S.actions = Object.keys(found).length ? found : null;
+    S.actionsAt = Date.now();
+    return S.actions;
+  }
+
+  /* Yahoo's player id for a board candidate, from the store's player table
+   * (exact ids, no name matching beyond the same key the feed uses). */
+  function playerIdFor(cand) {
+    const store = findStore();
+    let s;
+    try { s = store && store.getState(); } catch (e) { return null; }
+    const byId = (s && s.players && s.players.byId) || {};
+    // full names first: the store has them, so Bijan and Brian Robinson (same
+    // initial, surname, position AND team) resolve without a tie-break;
+    // the first-initial key is the fallback for spelling variants
+    const full = (n) => String(n || '').toLowerCase().replace(/[.'’]/g, '').replace(/[-/]/g, ' ')
+      .replace(/\s+(jr|sr|ii|iii|iv|v)$/, '').replace(/\s+/g, ' ').trim();
+    const wantFull = full(cand.n);
+    const want = idKey(cand.n, cand.p);
+    const exact = [], loose = [];
+    for (const [pid, p] of Object.entries(byId)) {
+      const pos = p.primary_pos || p.display_pos || '';
+      if (pos !== cand.p) continue;
+      const name = ((p.fname || '') + ' ' + (p.lname || '')).trim();
+      const rec = { pid, team: p.team_abbr || '' };
+      if (full(name) === wantFull) exact.push(rec);
+      else if (idKey(name, pos) === want) loose.push(rec);
+    }
+    for (const hits of [exact, loose]) {
+      if (hits.length === 1) return hits[0].pid;
+      if (hits.length > 1 && cand.t) {
+        const t = hits.filter(h => normTeam(h.team) === normTeam(cand.t));
+        if (t.length === 1) return t[0].pid;
+      }
+      if (hits.length > 1) return null;   // ambiguous: the click path handles it
+    }
+    return null;
+  }
+
+  /* Make the pick through the client's own makePick and wait for the store
+   * to record it at OUR pick number. Returns {status: 'landed'|'notours'|
+   * 'timeout'|'noaction'|'noid'|'error', ...}. Never claims success without
+   * the store's word. */
+  async function pickViaAction(cand, waitMs) {
+    const acts = clientActions();
+    if (!acts || typeof acts.makePick !== 'function') return { status: 'noaction' };
+    const pid = playerIdFor(cand);
+    if (!pid) return { status: 'noid' };
+    const turn = S.planPick != null ? S.planPick : (storeState() || {}).current_pick;
+    try { acts.makePick(pid); } catch (e) { return { status: 'error', why: String(e).slice(0, 120) }; }
+    const t0 = Date.now();
+    while (Date.now() - t0 < (waitMs || 3000)) {
+      await sleep(250);
+      const landed = pickLandedStore(cand, turn);
+      if (landed === true) return { status: 'landed', pid, ms: Date.now() - t0 };
+      if (landed === false) return { status: 'notours', pid, landed: lastOwnPickName() };
+    }
+    return { status: 'timeout', pid };
+  }
+
   async function draftTop(maxTries) {
     const r = rank();
     if (r.err || !r.top.length) return { err: r.err || 'no candidates' };
@@ -1239,6 +1343,26 @@ window.DK = (function () {
       if (!guardrailOk(entry, rnd, need, counts, picksLeft, top6TeFell)) {
         attempted.push(cand.n + ':guardrail');
         continue;
+      }
+      /* First choice: the client's own makePick (no DOM). The store confirms
+       * or denies within a few hundred ms. 'notours' means someone else's
+       * pick landed at our number (autopick beat us) -- stop, do not click.
+       * 'timeout' / 'noaction' / 'noid' fall through to the click path for
+       * the same candidate; a late-landing action then shows up in the
+       * store check below as landed, and a second click is rejected by
+       * Yahoo as "not the current pick", harmlessly. */
+      if (S.cfg.useActions !== false) {
+        tries++;
+        const via = await pickViaAction(cand);
+        if (via.status === 'landed') {
+          return { drafted: cand.n, pos: cand.p, vorp: cand.v, verified: 'store', via: 'action', ms: via.ms };
+        }
+        if (via.status === 'notours') {
+          attempted.push(cand.n + ':notours(' + (via.landed || '?') + ')');
+          return { err: 'pick-made-by-other-means', attempted, landed: via.landed };
+        }
+        attempted.push(cand.n + ':action-' + via.status + (via.why ? '(' + via.why + ')' : ''));
+        tries--;   // the click attempt below is the one that counts
       }
       if (!setSearch(searchTerm(entry))) continue;
       tries++;
@@ -1429,6 +1553,12 @@ window.DK = (function () {
       }
     }
     out.autopick_armed = autopickArmed();
+    // the client's own actions (makePick / setAwayStatus): the no-DOM pick path
+    const acts = clientActions(true);
+    out.client_actions = acts ? Object.keys(acts) : [];
+    if (first && acts && typeof acts.makePick === 'function') {
+      out.player_id_lookup = { player: first.n, id: playerIdFor({ n: first.n, p: first.p, t: first.t }) };
+    }
     out.ok = !!(out.store || (out.roster_panel && out.header_pick)) && !!(out.row_lookup && out.row_lookup.found !== false) && !out.autopick_armed;
     return out;
   }
@@ -1465,7 +1595,22 @@ window.DK = (function () {
     if (!snap && S.lastDisarm && Date.now() - S.lastDisarm < 30000) {
       return { away: true, toggled: false, why: 'banner only; disarm attempted <30s ago' };
     }
-    // Disarm: the Queue panel carries an "Autodraft" toggle
+    // Disarm, first choice: the client's own setAwayStatus(false) -- the
+    // exact thunk the Autodraft toggle dispatches ("6|league|manager"),
+    // with no toggle to misread. Verified against the store; the click path
+    // below only runs when the action is unavailable or did not stick.
+    const acts = clientActions();
+    if (acts && typeof acts.setAwayStatus === 'function') {
+      try { acts.setAwayStatus(false); } catch (e) { note('setAwayStatus threw: ' + String(e).slice(0, 80)); }
+      S.lastDisarm = Date.now();
+      await sleep(800);
+      const after = storeState();
+      const stillAway = !!(after && after.my_team && after.away_teams.includes(after.my_team));
+      note('AWAY detected (store=' + awayByStore + ') -> setAwayStatus(false); away now '
+        + (after ? stillAway : 'unknown'));
+      if (after && !stillAway) return { away: true, action: true, cleared: true };
+    }
+    // Disarm, fallback: the Queue panel carries an "Autodraft" toggle
     ensureLeftTab('Queue');
     await sleep(500);
     const toggle = [...document.querySelectorAll('button,[role=switch]')]
@@ -1700,6 +1845,9 @@ window.DK = (function () {
      * the roster actually grew. */
     pickLanded: (before, after) => !!(after && before && after.have > before.have),
     pickLandedStore, bannerSaysArmed,
+    clientActions, playerIdFor, pickViaAction,
+    /* test hook: hand the driver bound actions without a React tree */
+    _setActions(acts) { S.actions = acts || null; S.actionsAt = Date.now(); return !!acts; },
     _starred: () => [...S.starred],
     _markStarred: (id) => S.starred.add(id),
     _isStarred: (id) => S.starred.has(id),

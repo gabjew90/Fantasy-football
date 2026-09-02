@@ -833,3 +833,106 @@ def test_a_pick_is_verified_against_the_store_not_the_roster_count():
     # and without a store the answer is unknown, so the roster-count check still applies
     r2 = run_js("console.log(JSON.stringify({ x: DK.pickLandedStore({ n: 'Cam Little', p: 'K' }, 6) }));")
     assert r2["x"] is None
+
+
+# ---------- client actions (2026-09-02): the no-DOM pick path ----------
+
+def _store_with(picks, my_team="6", players=None, current_pick=None):
+    """A Redux-shaped store: picks are (pick_no, teamId, playerId); players is
+    {pid: (first, last, pos, team)}."""
+    players = players or {}
+    by_id = {pid: {"fname": f, "lname": l, "primary_pos": pos, "team_abbr": t, "bye": 7}
+             for pid, (f, l, pos, t) in players.items()}
+    order = [{"id": n, "teamId": str(t), "playerId": str(pid)} for n, t, pid in picks]
+    made = len(picks)
+    return {"draftPicks": {"order": order}, "players": {"byId": by_id},
+            "draftOrder": {"currentPick": made if current_pick is None else current_pick - 1, "currentTeam": "6"},
+            "league": {"managers": {"6": {"id": "6", "teamId": my_team, "away": False, "loggedin": True}}},
+            "context": {"managerId": "6"}, "countdown": {"seconds": 30}}
+
+
+PLAYERS = {"100": ("Christian", "McCaffrey", "RB", "SF"), "101": ("Bijan", "Robinson", "RB", "ATL"),
+           "102": ("Brian", "Robinson", "RB", "ATL"), "103": ("Amon-Ra", "St. Brown", "WR", "DET"),
+           "104": ("A.J.", "Brown", "WR", "PHI")}
+
+
+def test_player_id_comes_from_the_store_and_refuses_ambiguity():
+    r = run_js(
+        f"""
+        DK._setStore({{ getState: () => ({json.dumps(_store_with([], players=PLAYERS))}) }});
+        console.log(JSON.stringify({{
+          cmc: DK.playerIdFor({{ n: 'Christian McCaffrey', p: 'RB', t: 'SFO' }}),
+          bijan: DK.playerIdFor({{ n: 'Bijan Robinson', p: 'RB', t: 'ATL' }}),
+          brian: DK.playerIdFor({{ n: 'Brian Robinson Jr.', p: 'RB', t: 'ATL' }}),
+          ajb: DK.playerIdFor({{ n: 'A.J. Brown', p: 'WR', t: 'PHI' }}),
+          wrongpos: DK.playerIdFor({{ n: 'Christian McCaffrey', p: 'WR', t: 'SFO' }}),
+          unknown: DK.playerIdFor({{ n: 'Nobody Here', p: 'RB', t: 'FA' }}),
+        }}));
+        """
+    )
+    assert r["cmc"] == "100"
+    # the two Robinsons share initial, surname, position AND team: the store
+    # keys are full names, so they resolve; the two Browns likewise
+    assert r["bijan"] == "101" and r["brian"] == "102" and r["ajb"] == "104"
+    assert r["wrongpos"] is None and r["unknown"] is None
+
+
+def test_pick_via_action_reports_landed_only_when_the_store_records_our_pick():
+    """makePick is called with the store's id; success is the store showing
+    THAT player at OUR pick number. A different player there means autopick
+    beat us ('notours'); silence means 'timeout' and the click path follows."""
+    r = run_js(
+        f"""
+        const base = {json.dumps(_store_with([(5, 1, "101")], players=PLAYERS, current_pick=6))};
+        let state = JSON.parse(JSON.stringify(base));
+        DK._setStore({{ getState: () => state }});
+        DK.loadCompact("Christian McCaffrey|RB|SFO|122.8|1|");
+        const calls = [];
+        // 1) the action lands: the store gains our pick with the same id
+        DK._setActions({{ makePick: (pid) => {{ calls.push(pid);
+          state.draftPicks.order.push({{ id: 6, teamId: "6", playerId: pid }}); state.draftOrder.currentPick = 6; }} }});
+        const cand = {{ n: 'Christian McCaffrey', p: 'RB', t: 'SFO', v: 122.8 }};
+        (async () => {{
+          const landed = await DK.pickViaAction(cand, 1500);
+          // 2) someone else's pick appears at our number
+          state = JSON.parse(JSON.stringify(base)); DK._setStore({{ getState: () => state }});
+          DK._setActions({{ makePick: (pid) => {{ state.draftPicks.order.push({{ id: 6, teamId: "6", playerId: "102" }}); state.draftOrder.currentPick = 6; }} }});
+          const notours = await DK.pickViaAction(cand, 1500);
+          // 3) nothing happens
+          state = JSON.parse(JSON.stringify(base)); DK._setStore({{ getState: () => state }});
+          DK._setActions({{ makePick: () => {{}} }});
+          const timeout = await DK.pickViaAction(cand, 600);
+          // 4) no actions at all / no id
+          DK._setActions(null);
+          const noaction = await DK.pickViaAction(cand, 300);
+          DK._setActions({{ makePick: () => {{}} }});
+          const noid = await DK.pickViaAction({{ n: 'Nobody Here', p: 'RB', t: 'FA' }}, 300);
+          console.log(JSON.stringify({{ calls, landed, notours, timeout, noaction, noid }}));
+        }})();
+        """
+    )
+    assert r["calls"] == ["100"], "makePick must be called with the store's id for the candidate"
+    assert r["landed"]["status"] == "landed" and r["landed"]["pid"] == "100"
+    assert r["notours"]["status"] == "notours" and r["notours"]["landed"] == "Brian Robinson"
+    assert r["timeout"]["status"] == "timeout"
+    assert r["noaction"]["status"] == "noaction" and r["noid"]["status"] == "noid"
+
+
+def test_keep_alive_prefers_set_away_status_and_verifies_it():
+    r = run_js(
+        f"""
+        const s = {json.dumps(_store_with([], players=PLAYERS))};
+        s.league.managers["6"].away = true;
+        DK._setStore({{ getState: () => s }});
+        DK.loadCompact("Christian McCaffrey|RB|SFO|122.8|1|");
+        const calls = [];
+        DK._setActions({{ setAwayStatus: (v) => {{ calls.push(v); s.league.managers["6"].away = v; }} }});
+        (async () => {{
+          const out = await DK.keepAlive();
+          console.log(JSON.stringify({{ calls, out, awayNow: s.league.managers["6"].away }}));
+        }})();
+        """
+    )
+    assert r["calls"] == [False]
+    assert r["out"]["action"] is True and r["out"]["cleared"] is True
+    assert r["awayNow"] is False
