@@ -1152,3 +1152,26 @@ file, because the retired model still lives there behind the flag.
 
 To flip: projections.source: external, rebuild both boards, re-run
 scripts/input_replay.py and read the round 1-6 list again.
+
+## 2026-09-02 (22) — the pick is no longer a click
+
+The Draft button dispatches Yahoo's own Redux thunk `makePick(playerId)`,
+which sends `0|league|manager|pickNo|playerId` on the client's socket; the
+Autodraft toggle is `setAwayStatus(bool)` (`5`/`6`). Both are reachable as
+bound dispatchers on the top-level connected component's props, found by
+the same React-tree walk that finds the store. The driver now picks through
+`makePick`, verifies against the store that OUR pick number holds that
+player, and keeps the DOM click strictly as the fallback. keepAlive clears
+`away` through `setAwayStatus(false)`.
+
+Found and fixed on the way (mock 20): the action path generates no user
+activity, so Yahoo's ~15-minute idle timer flagged us away and autopicked
+before the clear could run. keepAlive now heartbeats `setAwayStatus(false)`
+every 240 s and runs before every on-clock attempt. Three consecutive clean
+mocks followed (45/45 via the action, eleven heartbeats, no away flag).
+
+Also on the record now: every pick carries the engine's reason, the
+best-available-by-projection alternative and the candidates passed on; a
+full per-manager trail per mock (scripts/mock_trail.py, reports/mocks/);
+and the replay-gate redefinition (accuracy + outcome, churn by tier as a
+diagnostic) recorded for the projection-source decision.

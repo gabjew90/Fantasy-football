@@ -647,3 +647,42 @@ targets gone before 29/32 (A.J. Brown 22, Kyren 24) -> Olave and Garrett
 Wilson; Allen passed as the top projection four times and went 33rd; Hurts
 took the QB slot at 52; Rico Dowdle at 72 priced as the handcuff for our
 own Warren ("covers 3 RB starters ~9.6 wks, ≈ 96 pts over the wire").
+
+## Mock 23 — room 10505450 "Forward Progress", 10 teams, slot 8 — clean, 15 of 15 via makePick (3 of 3)
+
+Full trail: reports/mocks/mock_10505450.md.
+
+Roster: Achane, CeeDee Lamb, McBride, Javonte Williams, Davante Adams, Maye,
+TreVeyon Henderson, RJ Harvey, Gainwell, Wan'Dale Robinson, Mahomes (QB2,
+R11), Sutton, Jakobi Meyers, Eagles DEF, Pineiro K. Legal.
+
+Fifteen of fifteen through the client's `makePick` (346-1765 ms to store
+confirmation; the slow one was the final kicker in a room sprinting to
+the end), no fallback, no gate trip, never `away`. Heartbeats 16:42, 16:46,
+16:50 on schedule. Injected at pick 4 after a transient Chrome-extension
+disconnect on the waiting-room step; no pick was lost (seat 8's first turn
+was pick 8).
+
+Narration highlights: all four of McCaffrey, Nacua, St. Brown and Taylor
+went in picks 4-7 -> Achane and CeeDee Lamb at 8/13; McBride survived to 28
+(65%); Maye taken at 53 while still there ("waiting costs ~10, 43%");
+RJ Harvey at 73 as the 88-point insurance piece; K/DEF in the last two
+rounds.
+
+### The no-click series (mocks 19-23), settled
+
+- 19: 15/15, click fallback and away-clear both exercised by injected faults.
+- 20: 14/15 -- the action path's own hole: Yahoo's idle timer (nothing we
+  do counts as activity any more) flagged us away at 16 min and autopicked
+  the instant the turn opened. Fixed with a 240-s `setAwayStatus(false)`
+  heartbeat and a keepAlive before every pick attempt.
+- 21, 22, 23: 45/45 through `makePick`, eleven heartbeats on schedule,
+  zero gate/retry/notours/away events, all three drafts crossing the
+  16-minute window without the flag.
+
+What Saturday relies on, all exercised live: the client's own makePick
+with store confirmation; the DOM click as fallback (fired once, on demand,
+and landed); the away clear (fired once on demand and once for real, both
+before the flag could cost a pick after the heartbeat existed); entry
+before the clock; and a pick record per turn carrying the engine's reason,
+the best-by-projection alternative and the candidates passed on.
