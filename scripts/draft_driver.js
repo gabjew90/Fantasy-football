@@ -1319,6 +1319,32 @@ window.DK = (function () {
     return { status: 'timeout', pid };
   }
 
+  /* Proof-of-engine record for every pick: the engine's stated reason for
+   * the player it chose, and who the best AVAILABLE player by raw projection
+   * was at that moment. When the two differ, the pick log shows the engine
+   * doing something projections alone would not (slot value, urgency,
+   * survival odds, bench insurance), with its reason attached. */
+  function bestByProjection() {
+    const snap = storeState();
+    const gone = new Set(snap ? snap.drafted.map(d => idKey(d.name, d.pos)) : []);
+    let best = null;
+    for (const b of S.board) {
+      if (b.p === 'K' || b.p === 'DEF') continue;
+      if (S.gone.has(b.k + '|' + b.p) || gone.has(idKey(b.n, b.p))) continue;
+      if (!best || (b.j || 0) > (best.j || 0)) best = b;
+    }
+    return best ? { n: best.n, p: best.p, proj: best.j, vorp: best.v } : null;
+  }
+
+  function pickRecord(cand, extra) {
+    const b = S.board.find(x => x.n === cand.n && x.p === cand.p) || {};
+    const alt = bestByProjection();
+    return Object.assign({ drafted: cand.n, pos: cand.p, vorp: cand.v, proj: b.j,
+                           why: (cand.why || '').slice(0, 220),
+                           top_proj_available: alt,
+                           took_top_projection: !!(alt && alt.n === cand.n) }, extra);
+  }
+
   async function draftTop(maxTries) {
     const r = rank();
     if (r.err || !r.top.length) return { err: r.err || 'no candidates' };
@@ -1355,7 +1381,7 @@ window.DK = (function () {
         tries++;
         const via = await pickViaAction(cand);
         if (via.status === 'landed') {
-          return { drafted: cand.n, pos: cand.p, vorp: cand.v, verified: 'store', via: 'action', ms: via.ms };
+          return pickRecord(cand, { verified: 'store', via: 'action', ms: via.ms });
         }
         if (via.status === 'notours') {
           attempted.push(cand.n + ':notours(' + (via.landed || '?') + ')');
@@ -1415,7 +1441,7 @@ window.DK = (function () {
         attempted.push(cand.n + ':noland');
         continue;
       }
-      return { drafted: cand.n, pos: cand.p, vorp: cand.v, verified: landed === true ? 'store' : 'roster-count' };
+      return pickRecord(cand, { verified: landed === true ? 'store' : 'roster-count', via: 'click' });
     }
     return { err: 'no-verified-pick', attempted };
   }
