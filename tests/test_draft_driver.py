@@ -924,7 +924,8 @@ def test_keep_alive_prefers_set_away_status_and_verifies_it():
         const s = {json.dumps(_store_with([], players=PLAYERS))};
         s.league.managers["6"].away = true;
         DK._setStore({{ getState: () => s }});
-        DK.loadCompact("Christian McCaffrey|RB|SFO|122.8|1|");
+        // heartbeat parked far away so this test isolates the clear path
+        DK.loadCompact("Christian McCaffrey|RB|SFO|122.8|1|", {{ heartbeatSec: 99999 }});
         const calls = [];
         DK._setActions({{ setAwayStatus: (v) => {{ calls.push(v); s.league.managers["6"].away = v; }} }});
         (async () => {{
@@ -936,3 +937,32 @@ def test_keep_alive_prefers_set_away_status_and_verifies_it():
     assert r["calls"] == [False]
     assert r["out"]["action"] is True and r["out"]["cleared"] is True
     assert r["awayNow"] is False
+
+
+def test_keep_alive_sends_a_periodic_not_away_heartbeat():
+    """Mock 20: on the action path nothing we do counts as user activity, so
+    Yahoo's idle timer flagged us away at 16 minutes and autopicked pick 129
+    the instant the turn opened -- before keepAlive could react. Clearing
+    after the fact is too late, so keepAlive sends setAwayStatus(false) on a
+    timer whether or not the flag is up, and never more often than that."""
+    r = run_js(
+        f"""
+        const s = {json.dumps(_store_with([], players=PLAYERS))};
+        DK._setStore({{ getState: () => s }});
+        DK.loadCompact("Christian McCaffrey|RB|SFO|122.8|1|", {{ heartbeatSec: 1 }});
+        const calls = [];
+        DK._setActions({{ setAwayStatus: (v) => {{ calls.push([v, Date.now()]); }} }});
+        (async () => {{
+          const a = await DK.keepAlive();          // first call sets the baseline, no beat yet
+          const b = await DK.keepAlive();          // within the interval: nothing
+          await new Promise(r => setTimeout(r, 1100));
+          const c = await DK.keepAlive();          // interval elapsed: one beat
+          const d = await DK.keepAlive();          // and not again until the next interval
+          console.log(JSON.stringify({{ n: calls.length, values: calls.map(x => x[0]), a, b, c, d,
+            logged: DK.logs(10).filter(l => /heartbeat/.test(String(l))).length }}));
+        }})();
+        """
+    )
+    assert r["values"] == [False], r
+    assert r["n"] == 1 and r["logged"] == 1
+    assert all(r[k]["away"] is False for k in ("a", "b", "c", "d"))

@@ -1623,6 +1623,24 @@ window.DK = (function () {
      * of our picks went to Yahoo's autodraft while the flag happened to be
      * on. Without a store the banner is all we have, so then act on it at
      * most once per 30 s, and verify. */
+    /* HEARTBEAT (mock 20, 2026-09-02). Yahoo's idle timer counts user
+     * activity the client reports, not our synthetic events and not
+     * makePick. On the click path our typing and clicking happened to count,
+     * so `away` never flipped in 45-minute drafts; on the action path
+     * nothing counts, and at 16 minutes Yahoo flagged us away and autopicked
+     * pick 129 the instant the turn opened -- three seconds before keepAlive
+     * saw the flag. Clearing after the fact is too late by construction, so
+     * send Yahoo's own "not away" (setAwayStatus(false) -> "6|league|
+     * manager") every few minutes whether or not the flag is up. */
+    const hbActs = clientActions();
+    const hbEvery = (S.cfg.heartbeatSec != null ? S.cfg.heartbeatSec : 240) * 1000;
+    if (S.lastHeartbeat == null) S.lastHeartbeat = Date.now();   // first beat one interval after start
+    if (hbActs && typeof hbActs.setAwayStatus === 'function'
+        && Date.now() - S.lastHeartbeat >= hbEvery) {
+      try { hbActs.setAwayStatus(false); S.lastHeartbeat = Date.now(); note('heartbeat: setAwayStatus(false)'); }
+      catch (e) { note('heartbeat threw: ' + String(e).slice(0, 80)); }
+    }
+
     const snap = storeState();
     const awayByStore = !!(snap && snap.my_team && snap.away_teams.includes(snap.my_team));
     const armed = snap ? awayByStore : autopickArmed();
@@ -1688,6 +1706,7 @@ window.DK = (function () {
         if (/draft results|draft complete/i.test(document.title)) { note('draft over'); break; }
 
         if (onClock()) {
+          await keepAlive();     // clear a fresh away flag BEFORE the pick attempt, not after
           await refreshPlan();   // zero-lag: ask the engine now
           /* CONSISTENCY GATES (design 2026-09-01). A layer may act only when
            * its readings agree; otherwise it does nothing and the queue /
