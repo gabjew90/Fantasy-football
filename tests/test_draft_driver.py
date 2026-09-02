@@ -731,3 +731,20 @@ def test_availability_is_not_scraped_from_page_text():
     # OFFERED at all -- the old page-scraping bug wiped the whole board.
     assert any(c["p"] == "TE" for c in r["top"]), names
     assert "Trey McBride" in names, names
+
+
+def test_json_load_path_marks_name_collisions_too():
+    """The JSON load() path never built the collision set, so the Bijan/Brian
+    Robinson guard in rowMatches was silently OFF whenever the board came
+    from the bridge rather than a compact paste (found 2026-09-01)."""
+    out = run_js(
+        """
+        const r = DK.load([
+          {n: 'Bijan Robinson', p: 'RB', t: 'ATL', v: 119.8, a: 2.1},
+          {n: 'Brian Robinson Jr.', p: 'RB', t: 'ATL', v: -72.4, a: 118.1},
+          {n: 'Puka Nacua', p: 'WR', t: 'LAR', v: 93.0, a: 3.0},
+        ], {teams: 10});
+        console.log(JSON.stringify({r}));
+        """
+    )
+    assert out["r"] == "loaded 3 players, 1 name collision(s)"

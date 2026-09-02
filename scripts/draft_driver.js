@@ -1209,11 +1209,29 @@ window.DK = (function () {
     return S.log.slice(-12);
   }
 
+  /* Which entries are indistinguishable from another by everything the
+   * Yahoo row shows except ADP. rowMatches refuses to guess on these.
+   * Computed for BOTH load paths: the JSON path used to skip it, which
+   * silently switched the Bijan/Brian Robinson guard off (found 2026-09-01
+   * while loading the board from the bridge instead of a compact paste). */
+  function markCollisions() {
+    const seen = {};
+    S.collisions = new Set();
+    for (const p of S.board) {
+      const id = p.k + '|' + p.p + '|' + normTeam(p.t);
+      if (seen[id]) S.collisions.add(id); else seen[id] = 1;
+    }
+    return S.collisions.size;
+  }
+
   return {
     load(board, cfg) {
-      S.board = board;
+      S.board = board.map(function (p) {
+        return Object.assign({}, p, { k: p.k || idKey(p.n, p.p) });
+      });
       Object.assign(S.cfg, cfg || {});
-      return 'loaded ' + board.length + ' players';
+      return 'loaded ' + S.board.length + ' players, '
+             + markCollisions() + ' name collision(s)';
     },
     /* Pipe format from scripts/export_board_json.py:
      *   name|pos|team|vorp|upside|status|adp   (already VORP-desc) */
@@ -1225,17 +1243,9 @@ window.DK = (function () {
                  a: f[6] ? parseFloat(f[6]) : null,
                  d: f[7] !== undefined && f[7] !== '' ? parseFloat(f[7]) : undefined };
       });
-      /* Which entries are indistinguishable from another by everything the
-       * Yahoo row shows except ADP. rowMatches refuses to guess on these. */
-      const seen = {};
-      S.collisions = new Set();
-      for (const p of S.board) {
-        const id = p.k + '|' + p.p + '|' + normTeam(p.t);
-        if (seen[id]) S.collisions.add(id); else seen[id] = 1;
-      }
       Object.assign(S.cfg, cfg || {});
       return 'loaded ' + S.board.length + ' players, '
-             + S.collisions.size + ' name collision(s)';
+             + markCollisions() + ' name collision(s)';
     },
     /* Accept a plan from scripts/yahoo_bridge.py. */
     refreshPlan,

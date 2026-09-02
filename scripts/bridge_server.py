@@ -88,10 +88,30 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", "0")
         self.end_headers()
 
+    def _raw(self, body: bytes, ctype: str, status: int = 200) -> None:
+        self.send_response(status)
+        self._cors()
+        self.send_header("Content-Type", ctype)
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
     def do_GET(self):
         if self.path.startswith("/ping"):
             self._json({"ok": True, "engine": "draftkit.tracker",
                         "league": _STATE["league"], "calls": _STATE["calls"]})
+        elif self.path.startswith("/driver.js"):
+            # The page loads the driver from here instead of a 60KB paste
+            # through a devtools eval. Same origin as /plan, already trusted.
+            self._raw((ROOT / "scripts" / "draft_driver.js").read_bytes(),
+                      "application/javascript; charset=utf-8")
+        elif self.path.startswith("/board.json"):
+            p = ROOT / "data" / "draftrig" / f"board.{_STATE['league']}.json"
+            if p.exists():
+                self._raw(p.read_bytes(), "application/json; charset=utf-8")
+            else:
+                self._json({"err": f"export the board first: {p.name}"}, 404)
         else:
             self._json({"err": "POST draft state to /plan"}, 404)
 
