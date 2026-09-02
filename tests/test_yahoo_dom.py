@@ -152,3 +152,37 @@ def test_header_pick_number_is_readable():
     """)
     assert out["pick"] and out["pick"] > 1
     assert out["live"] is True
+
+
+SNAPSHOT = "store-snapshot-expanded.json"
+
+
+@pytest.mark.skipif(not (FIXTURES / SNAPSHOT).exists(), reason="snapshot not captured")
+def test_store_state_reads_the_clients_redux_store():
+    """The store is the primary state source now (mock 12). This runs
+    storeState() over a real snapshot: every pick with team and player ids,
+    our own picks flagged from context.managerId, the current pick, the
+    clock, and which rivals were away."""
+    out = run_in_fixture(EXPANDED, f"""
+        const snap = JSON.parse(require('fs').readFileSync({json.dumps(str(FIXTURES / SNAPSHOT))}, 'utf8'));
+        DK._setStore({{ getState: () => snap }});
+        const s = DK.storeState();
+        console.log(JSON.stringify({{
+          ok: !!s, my_team: s && s.my_team, n: s && s.drafted.length,
+          mine: s && s.drafted.filter(d => d.mine).map(d => d.pick_no + ' ' + d.name + ' ' + d.pos),
+          current_pick: s && s.current_pick, on_clock: s && s.on_clock, seconds: s && s.seconds,
+          away: s && s.away_teams.length, first: s && s.drafted[0],
+          withPos: s && s.drafted.filter(d => d.pos).length,
+        }}));
+    """)
+    assert out["ok"], out
+    assert out["my_team"] == "10"
+    assert out["n"] >= 100
+    assert out["mine"], "our picks must be flagged"
+    assert all(m.startswith(("10 ", "11 ", "30 ", "31 ", "50 ", "51 ", "70 ", "71 ", "90 ", "91 ", "110 ", "111 ")) for m in out["mine"]), out["mine"]
+    assert out["first"]["pick_no"] == 1
+    # the snapshot keeps only the first 400 players' records, so not every
+    # pick resolves to a name/position here; most must
+    assert out["withPos"] >= 0.5 * out["n"], out
+    assert out["current_pick"] >= 100
+    assert out["away"] >= 1

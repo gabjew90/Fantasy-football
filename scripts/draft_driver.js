@@ -483,6 +483,9 @@ window.DK = (function () {
     };
   }
 
+  /* test hook: hand storeState() a store without a React tree to walk */
+  function _setStore(store) { S.store = store; return !!store; }
+
   /* ---------------- ranking ---------------- */
 
   /* Ask the real engine, from inside the page, at the moment of the pick.
@@ -1354,6 +1357,43 @@ window.DK = (function () {
     return { ok: why.length === 0, why, headerPick: hdr, planPick: S.planPick, gone: S.gone.size, goneAdded: added };
   }
 
+  /* In-room preflight (design 2026-09-01, layer 2): everything the loop will
+   * rely on, checked before the clock matters, in one readable report. Any
+   * `false` means do not arm the loop on that reading alone. */
+  async function preflight() {
+    const out = {};
+    const snap = storeState();
+    out.store = !!snap;
+    out.my_team = snap ? snap.my_team : null;
+    out.store_picks = snap ? snap.drafted.length : null;
+    out.store_current_pick = snap ? snap.current_pick : null;
+    out.header_pick = currentPickNo();
+    const ros = myRoster();
+    out.roster_panel = !!ros;
+    out.roster_have = ros ? ros.players.length : null;
+    out.picks_panel = parsePicksPanel().length;
+    out.table_live = tableLive();
+    out.plan = await refreshPlan();
+    out.gates = gatesOk();
+    // can we find a row for the plan's first candidate?
+    const r = rank();
+    const first = r && r.top && r.top[0];
+    if (first) {
+      const entry = S.board.find(b => b.n === first.n && b.p === first.p);
+      ensurePlayersTab();
+      if (entry && setSearch(searchTerm(entry))) {
+        await sleep(700);
+        out.row_lookup = { player: first.n, found: !!findRow(entry) };
+        setSearch('');
+      } else {
+        out.row_lookup = { player: first.n, found: null, why: 'no search box' };
+      }
+    }
+    out.autopick_armed = autopickArmed();
+    out.ok = !!(out.store || (out.roster_panel && out.header_pick)) && !!(out.row_lookup && out.row_lookup.found !== false) && !out.autopick_armed;
+    return out;
+  }
+
   /* Yahoo marks a manager "away" after a stretch without user activity and
    * arms autopick for them -- mock 12 (2026-09-01) lost live control from
    * round 11 that way with the driver working perfectly, because programmatic
@@ -1531,7 +1571,7 @@ window.DK = (function () {
       S.gone = new Set(); S.starred = new Set(); S.log = []; S.lastRoster = -1;
       return 'reset';
     },
-    rank, syncQueue, draftTop, run, gatesOk, storeState, findStore, keepAlive,
+    rank, syncQueue, draftTop, run, gatesOk, storeState, findStore, keepAlive, preflight, _setStore,
     classifyMiss, rowMatches, normTeam, autopickArmed, idKey, // exported for tests
     findRow, parsePicksPanel, myRoster, tableLive, currentPickNo, // offline DOM tests (jsdom + fixtures)
     survivalProb, eBestNext, calibrate,
