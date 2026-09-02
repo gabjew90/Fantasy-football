@@ -15,11 +15,36 @@ from test_slot_markets import BOARD, SLOTS, make_tracker, player  # noqa: F401
 
 # ---------- weeks needed ----------
 
-def test_weeks_needed_scales_with_starters_covered():
-    one = B.weeks_needed("RB", 1)
-    two = B.weeks_needed("RB", 2)
-    assert two == pytest.approx(2 * one)
-    assert one == pytest.approx(B.ABSENT_WEEKS["RB"] + B.BYE_WEEKS)
+def test_first_backup_of_one_starter_is_the_base_rate():
+    assert B.weeks_needed("RB", 1) == pytest.approx(B.ABSENT_WEEKS["RB"] + B.BYE_WEEKS)
+
+
+def test_more_starters_means_more_weeks_but_less_than_linear():
+    """Two starters' absences overlap sometimes, so the first backup behind
+    two is worth less than twice the first backup behind one."""
+    one, two = B.weeks_needed("RB", 1), B.weeks_needed("RB", 2)
+    assert one < two < 2 * one
+
+
+def test_each_additional_reserve_is_worth_much_less_than_the_last():
+    """The season replay found every losing Keefamania slot had drafted a 6th
+    WR -- priced as if he covered the first absence when he covered the
+    third. The (n+1)th backup plays only when n+1 starters are out together."""
+    first = B.weeks_needed("WR", 3, depth_ahead=0)
+    second = B.weeks_needed("WR", 3, depth_ahead=1)
+    third = B.weeks_needed("WR", 3, depth_ahead=2)
+    assert first > second > third > 0
+    assert third < 0.15 * first
+    assert B.weeks_needed("WR", 3, depth_ahead=3) == 0.0   # nobody left to cover
+
+
+def test_depth_flows_through_insurance_value():
+    p = player("x", "WR", 0, 0, 100.0)
+    p["proj_pts"] = 170.0
+    fresh = B.insurance_value(p, waiver=6.0, exposure=3, depth_ahead=0)
+    sixth = B.insurance_value(p, waiver=6.0, exposure=3, depth_ahead=2)
+    assert sixth["value"] < 0.15 * fresh["value"]
+    assert sixth["depth_ahead"] == 2
 
 
 def test_weeks_needed_is_zero_with_nothing_to_cover():

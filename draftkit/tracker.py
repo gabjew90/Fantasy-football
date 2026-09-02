@@ -430,7 +430,12 @@ class Tracker:
         open_all = open_skill + needs.get("K", 0) + needs.get("DEF", 0)
         if open_skill > 0 or picks_left <= open_all:
             return False
-        exposure = starter_exposure(self.slot_positions(self.my_slot), self.slots)
+        my_positions = self.slot_positions(self.my_slot)
+        exposure = starter_exposure(my_positions, self.slots)
+        # backups I already hold at each position: the next one covers the
+        # NEXT simultaneous absence, not the first (bench.weeks_needed)
+        depth_ahead = {pos: max(0, my_positions.count(pos) - exposure.get(pos, 0))
+                       for pos in set(my_positions)}
         my_starters = self._my_starter_names()
         starter_ppw = {
             str(q.get("player") or q.get("name") or ""): float(q.get("proj_pts") or 0.0) / 17.0
@@ -450,14 +455,17 @@ class Tracker:
             best, best_iv = None, None
             for p in rem:
                 hc = starter_ppw.get(str(p.get("backs_up") or ""))
-                iv = insurance_value(p, waiver, exposure.get(pos, 0), hc)
+                iv = insurance_value(p, waiver, exposure.get(pos, 0), hc,
+                                     depth_ahead=depth_ahead.get(pos, 0))
                 if best_iv is None or iv["value"] > best_iv["value"]:
                     best, best_iv = p, iv
             if best is None:
                 continue
             n = exposure.get(pos, 0)
-            why = (f"bench insurance: covers {n} {pos} starter{'s' if n != 1 else ''} "
-                   f"~{best_iv['weeks']:.1f} wks/season · +{best_iv['edge']:.1f}/wk over "
+            d = depth_ahead.get(pos, 0)
+            why = (f"bench insurance: covers {n} {pos} starter{'s' if n != 1 else ''}"
+                   + (f" behind {d} reserve{'s' if d != 1 else ''} already held" if d else "")
+                   + f" ~{best_iv['weeks']:.1f} wks/season · +{best_iv['edge']:.1f}/wk over "
                    f"the wire ({wname or 'nobody'}) ≈ {best_iv['value']:.0f} pts")
             if best_iv["handcuff"]:
                 why += f" · HANDCUFF: backs up your {best.get('backs_up')}"

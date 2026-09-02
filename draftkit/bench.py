@@ -57,12 +57,33 @@ HANDCUFF_UPLIFT = 1.46
 BENCH_POSITIONS = tuple(ABSENT_WEEKS)
 
 
-def weeks_needed(pos: str, exposure: int) -> float:
-    """Expected weeks a bench player at `pos` is called on, given how many of
-    my starters he could replace."""
+def weeks_needed(pos: str, exposure: int, depth_ahead: int = 0) -> float:
+    """Expected weeks a bench player at `pos` is called on.
+
+    exposure: how many of my starters he could replace.
+    depth_ahead: how many backups at the position I ALREADY have. The first
+    backup plays whenever any starter is out; the (n+1)th plays only when
+    n+1 starters are out in the SAME week.
+
+    The first version was exposure x (rate + bye) -- linear in starters, blind
+    to depth. The season replay (DECISIONS 2026-09-01 #8) found exactly what
+    that does: every Keefamania slot that lost had drafted a 6th WR, priced as
+    if he covered the first absence when three starters and two reserves stood
+    between him and a lineup. So: treat each starter's weekly absence as an
+    independent draw with probability (rate + bye) / 17, and take
+    17 x P(at least depth_ahead + 1 of `exposure` starters are out).
+    """
     if exposure <= 0 or pos not in ABSENT_WEEKS:
         return 0.0
-    return exposure * (ABSENT_WEEKS[pos] + BYE_WEEKS)
+    q = min(1.0, (ABSENT_WEEKS[pos] + BYE_WEEKS) / FANTASY_WEEKS)
+    need = depth_ahead + 1
+    if need > exposure:
+        return 0.0
+    # P(Binomial(exposure, q) >= need), exposure is at most a handful
+    from math import comb
+    p_ge = sum(comb(exposure, j) * q ** j * (1 - q) ** (exposure - j)
+               for j in range(need, exposure + 1))
+    return FANTASY_WEEKS * p_ge
 
 
 def starter_exposure(my_positions: list[str], slots: dict[str, int]) -> dict[str, int]:
@@ -102,12 +123,14 @@ def waiver_ppw(remaining_at_pos: list[dict], last_pick: int, k: int) -> tuple[fl
 
 
 def insurance_value(p: dict, waiver: float, exposure: int,
-                    handcuff_starter_ppw: float | None = None) -> dict:
+                    handcuff_starter_ppw: float | None = None,
+                    depth_ahead: int = 0) -> dict:
     """Season points a bench player is expected to add over streaming.
 
     handcuff_starter_ppw: the weekly rate of the starter he backs up, when
-    that starter is on MY roster; None otherwise. Returns the pieces too, so
-    the rationale can show its work.
+    that starter is on MY roster; None otherwise.
+    depth_ahead: backups I already roster at his position (see weeks_needed).
+    Returns the pieces too, so the rationale can show its work.
     """
     pos = p.get("pos")
     ppw = float(p.get("proj_pts") or 0.0) / FANTASY_WEEKS
@@ -118,6 +141,7 @@ def insurance_value(p: dict, waiver: float, exposure: int,
         # above the job he is stepping into
         ppw = min(ppw * HANDCUFF_UPLIFT, max(handcuff_starter_ppw, ppw))
     edge = max(0.0, ppw - waiver)
-    weeks = weeks_needed(pos, exposure)
+    weeks = weeks_needed(pos, exposure, depth_ahead)
     return {"value": edge * weeks, "edge": edge, "weeks": weeks,
-            "ppw": ppw, "waiver_ppw": waiver, "handcuff": handcuff}
+            "ppw": ppw, "waiver_ppw": waiver, "handcuff": handcuff,
+            "depth_ahead": depth_ahead}
