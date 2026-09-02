@@ -13,6 +13,14 @@ projections:
   alpha_by_type:
     stable_veteran: 0.65     # 12+ games last season, same team
     volatile: 0.40           # rookies, new-team players
+  # Per-position CAP on the usage weight, from the out-of-sample backtest
+  # (scripts/projection_backtest.py, DECISIONS 2026-09-02 #20): at WR every
+  # step of alpha above 0 was worse in 2023->2024 and 2024->2025, in both
+  # leagues, on MAE and on rank correlation. 0.2 rather than the grid's 0 is
+  # the hedge against two seasons of evidence. RB/QB/TE flipped between
+  # seasons and are not capped.
+  alpha_cap_by_position:
+    WR: 0.20
   # games-played regression: ppg shrunk toward positional mean g/(g+k)
   shrink_k: 5
   # All projections and replacement levels use the same 16-game convention

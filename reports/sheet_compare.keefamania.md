@@ -13,7 +13,7 @@ A uniform negative bias across a position's starters cancels in VORP and is not 
 |---|---|---|---|---|---|---|
 | QB | 31 | 0.89 | 0.86 | -4.0 | -5.7 | 44 |
 | RB | 60 | 0.92 | 0.93 | -7.8 | -16.1 | 62 |
-| WR | 72 | 0.94 | 0.93 | -11.7 | -18.1 | 106 |
+| WR | 72 | 0.97 | 0.96 | -12.9 | -19.2 | 106 |
 | TE | 31 | 0.88 | 0.88 | -3.6 | -3.6 | 85 |
 
 ## QB
@@ -110,42 +110,42 @@ Deep-rank bands (by sheet rank):
 
 | band | n | sheet | board | diff |
 |---|---|---|---|---|
-| 1-12 | 12 | 221 | 201 | -20 |
-| 13-24 | 12 | 177 | 159 | -19 |
-| 25-36 | 12 | 154 | 138 | -16 |
-| 37-48 | 12 | 133 | 121 | -12 |
-| 49-60 | 12 | 120 | 111 | -9 |
-| 61-80 | 10 | 97 | 98 | +1 |
+| 1-12 | 12 | 221 | 204 | -17 |
+| 13-24 | 12 | 177 | 155 | -22 |
+| 25-36 | 12 | 154 | 135 | -18 |
+| 37-48 | 12 | 133 | 119 | -14 |
+| 49-60 | 12 | 120 | 109 | -11 |
+| 61-80 | 10 | 97 | 96 | -0 |
 
 Largest rank disagreements (sheet top 36):
 
 | player | sheet rk | board rk | sheet pts | board pts |
 |---|---|---|---|---|
-| Luther Burden III | 27 | 53 | 162 | 111 |
-| DJ Moore | 25 | 35 | 164 | 134 |
-| Davante Adams | 19 | 11 | 177 | 182 |
-| DK Metcalf | 32 | 24 | 154 | 147 |
-| Jaylen Waddle | 26 | 19 | 163 | 156 |
-| Justin Jefferson | 7 | 13 | 208 | 178 |
-| Ladd McConkey | 22 | 28 | 168 | 144 |
-| Marvin Harrison Jr. | 31 | 36 | 154 | 134 |
-| Brian Thomas Jr. | 35 | 40 | 143 | 129 |
-| CeeDee Lamb | 5 | 9 | 211 | 185 |
+| Alec Pierce | 30 | 41 | 154 | 124 |
+| Jaylen Waddle | 26 | 18 | 163 | 156 |
+| Courtland Sutton | 29 | 35 | 155 | 131 |
+| Mike Evans | 33 | 27 | 154 | 140 |
+| Parker Washington | 34 | 29 | 144 | 137 |
+| Rashee Rice | 8 | 12 | 207 | 176 |
+| Emeka Egbuka | 18 | 22 | 180 | 150 |
+| Nico Collins | 12 | 9 | 197 | 184 |
+| Zay Flowers | 13 | 16 | 189 | 164 |
+| Jameson Williams | 21 | 24 | 174 | 142 |
 
 Largest point disagreements (all matched):
 
 | player | sheet rk | board rk | sheet pts | board pts | diff |
 |---|---|---|---|---|---|
-| Luther Burden III | 27 | 53 | 162 | 111 | -50 |
-| Cyrus Allen | 118 | 70 | 40 | 89 | +49 |
-| Matthew Golden | 47 | 73 | 129 | 86 | -43 |
-| Emeka Egbuka | 18 | 21 | 180 | 150 | -30 |
-| Justin Jefferson | 7 | 13 | 208 | 178 | -30 |
-| DJ Moore | 25 | 35 | 164 | 134 | -29 |
-| Jayden Reed | 38 | 56 | 137 | 108 | -29 |
-| Rashod Bateman | 61 | 75 | 108 | 79 | -29 |
-| Ja'Marr Chase | 2 | 3 | 259 | 232 | -27 |
-| Jameson Williams | 21 | 23 | 174 | 147 | -27 |
+| Cyrus Allen | 118 | 71 | 40 | 89 | +49 |
+| Jameson Williams | 21 | 24 | 174 | 142 | -32 |
+| Rashee Rice | 8 | 12 | 207 | 176 | -30 |
+| Emeka Egbuka | 18 | 22 | 180 | 150 | -30 |
+| Alec Pierce | 30 | 41 | 154 | 124 | -30 |
+| Matthew Golden | 47 | 61 | 129 | 102 | -27 |
+| Luther Burden III | 27 | 30 | 162 | 135 | -27 |
+| DJ Moore | 25 | 28 | 164 | 138 | -26 |
+| Zay Flowers | 13 | 16 | 189 | 164 | -25 |
+| Courtland Sutton | 29 | 35 | 155 | 131 | -24 |
 
 Sheet players not on the board (106): Kayshon Boutte, Devaughn Vele, Jaylin Noel, Adonai Mitchell, Germie Bernard, Chris Bell, Antonio Williams, Caleb Douglas, Omar Cooper Jr., Dontayvion Wicks, Xavier Hutchinson, Tyquan Thornton, Tory Horton, Darius Slayton, Troy Franklin, Xavier Legette, Jahan Dotson, Bryce Lance, Tre' Harris, Ryan Flournoy, Jalen Tolbert, Malik Benson, Malachi Fields, Andrei Iosivas, Ted Hurst III …
 
