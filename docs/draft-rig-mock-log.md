@@ -463,3 +463,28 @@ the structural-only guardrail and store-first autopick state have now been
 exercised across a bot-paced room and a human-paced room without a defect.
 The only DOM dependency left is the row click, which has not missed since
 the expanded-layout fix in mock 11.
+
+## Mock 16 — room 10486951 "Red Zone", 10 teams, slot 1 — 14 of 15 live; pick 1 lost to a late entry
+
+Roster: Gibbs (Yahoo autopick, see below), McBride, Drake London, Skattebo,
+D'Andre Swift, Jameson Williams, Jalen Hurts, DK Metcalf, Wan'Dale Robinson,
+Mahomes (QB2, R10, at the gate), Courtland Sutton, RJ Harvey, Jakobi Meyers,
+Cam Little K, Jaguars DEF. Legal at every guardrail; slot 1's back-to-back
+turns (20/21, 40/41, …) handled without a gate trip.
+
+Fourteen of fifteen picks made by the driver at the turn, each `verified:
+"store"`, never `away`, no banner, no queue fallback. The driver ran from
+pick 7 with the tab HIDDEN the whole draft (the pre-rank tab was in front):
+turn picks landed 5-7 s after the clock opened, so Chrome's background
+throttling did not bite here either (mocks 14-15 were the same).
+
+The one miss was process, not the rig: I joined with ~4 minutes to go,
+Yahoo reassigned me from seat 8 to seat 1 (seat taken), and the waiting-room
+countdown in a hidden tab ran slow (it read 02:32 when the room had already
+opened). Pick 1 went to Yahoo's default list (Gibbs) before the driver was
+injected. Rule for Saturday, already in the runbook: be in the room and
+injected BEFORE the clock, and keep the draft tab in front.
+
+Also: preflight's `row_lookup` reported the plan head as not found because
+he had just been drafted -- cosmetic; the check should pick an undrafted
+player.
