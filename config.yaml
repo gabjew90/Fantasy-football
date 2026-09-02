@@ -21,6 +21,15 @@ projections:
   # informational only.
   expected_games: 16.0
   no_market_floor: 60
+  # Projection overhaul item 1 (2026-09-02). The market half of the blend is
+  # either the log-rank curve fitted to our own model points (ecr_curve) or
+  # consensus stat lines scored in league settings (stat_lines). stat_lines
+  # is built as a PARALLEL column (proj_consensus_pts) whatever this says;
+  # the default flips only when the backtest (item 2) says so.
+  market_source: ecr_curve
+  consensus:
+    enabled: true            # fetch + score the parallel column at every build
+    line_games: 17           # the stat lines are 17-game season totals (gp=18 is a week count)
 
 engine:
   sims: 1000          # Monte Carlo draft simulations per decision

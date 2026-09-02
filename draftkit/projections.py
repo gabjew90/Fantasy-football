@@ -235,6 +235,39 @@ def default_projection(cfg, usage: pl.DataFrame, market: pl.DataFrame) -> pl.Dat
         .alias("proj_model_pts")
     )
 
+    # Projection overhaul item 1 (2026-09-02): consensus stat lines scored in
+    # league settings, joined by Sleeper id as a PARALLEL column. Off unless
+    # the config enables it (test fixtures have no consensus block and stay
+    # byte-identical). With market_source == "stat_lines" the column REPLACES
+    # the log-rank curve wherever it exists; the curve remains the fallback
+    # for players Rotowire does not project. Either way the column is written
+    # so the board can be graded against the sheet component by component.
+    c_cfg = p.get("consensus") or {}
+    source = str(p.get("market_source", "ecr_curve"))
+    df = df.with_columns(pl.lit(None, dtype=pl.Float64).alias("proj_consensus_pts"),
+                         pl.lit("ecr_curve").alias("market_source_used"))
+    if c_cfg.get("enabled"):
+        from . import consensus as _cons
+        try:
+            cons, _rep = _cons.load_consensus(cfg)
+        except _cons.ConsensusUnavailable as e:
+            import sys
+            print(f"  CONSENSUS UNAVAILABLE ({e}); proj_consensus_pts empty"
+                  + (", market_source stat_lines falls back to ecr_curve" if source == "stat_lines" else ""),
+                  file=sys.stderr)
+        else:
+            df = (df.drop("proj_consensus_pts")
+                    .join(cons.select("sleeper_id", "proj_consensus_pts", "adp_sleeper"),
+                          on="sleeper_id", how="left"))
+            if source == "stat_lines":
+                df = df.with_columns(
+                    pl.when(pl.col("proj_consensus_pts").is_not_null())
+                    .then(pl.lit("stat_lines")).otherwise(pl.lit("ecr_curve"))
+                    .alias("market_source_used"),
+                    pl.coalesce(pl.col("proj_consensus_pts"), pl.col("proj_market_pts"))
+                    .alias("proj_market_pts"),
+                )
+
     # v2 item 1.7 — alpha by player type: trust the stats model more for
     # stable-role veterans (12+ games, same team) and the market more for
     # players in new situations. Committee detection needs the opportunity
