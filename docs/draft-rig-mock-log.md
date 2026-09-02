@@ -605,3 +605,25 @@ Engine narration highlights: passed on Josh Allen as the top projection at
 at 49 as the QB slot fill after Wilson and Skattebo went; rounds 7-12
 priced as bench insurance (RJ Harvey "covers 3 RB starters ~9.6 wks, ≈ 88
 pts"). Mistake count for the "three clean mocks" rule resets: 21, 22, 23.
+
+## Mock 21 — room 10503516 "First and Ten", 10 teams, slot 4 — clean, 15 of 15 via makePick (1 of 3 after the heartbeat fix)
+
+Full trail: reports/mocks/mock_10503516.md.
+
+Roster: McCaffrey, McBride, Drake London, Garrett Wilson, Skattebo, Hurts,
+Jaylen Warren, DK Metcalf, Carnell Tate, Mahomes (QB2, R10), Wan'Dale
+Robinson, Sutton, Jakobi Meyers, Cam Little K, Browns DEF. Legal.
+
+Fifteen of fifteen through the client's `makePick`, 259-739 ms to store
+confirmation; no click fallback, no gate trip, no `notours`, never `away`.
+The heartbeat fired on schedule at 15:46, 15:50, 15:54, 15:58 and 16:02,
+and the round 10/11 turn (picks 97 and 104, 16-17 minutes in -- the window
+that broke mock 20) went through without the flag appearing. In the room
+before pick 1 via the wall-clock reload.
+
+Narration highlights: pick 4 McCaffrey ("waiting costs ~44 at RB") with
+Allen passed as the top projection; Achane went at 13 so 17 became McBride
+(the 72% fallback); all three named targets vanished before 37 (Olave 30,
+Allen 34, Rice 35) -> Garrett Wilson; Maye went before 57 -> Hurts for the
+QB slot; rounds 7-13 priced as bench insurance with every pick record
+carrying the reason and the candidates passed on.
