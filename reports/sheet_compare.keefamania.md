@@ -1,6 +1,13 @@
 # Board vs FantasyPros consensus — keefamania
 
-Sheet AVG stat lines scored in the league's settings, scaled to 16 games (sheet lines are 17-game totals). Board = tiers csv proj_pts. Bias = board minus sheet.
+## Scoring basis (read this before comparing with any other sheet-vs-board number)
+
+- Sheet side: the position tabs' **AVG stat lines** (raw consensus lines, NOT the Aggregate tab, which already carries the sheet's missed-games adjustment), scored with the league yaml's scoring: rec 0.5, pass_yd 0.04, pass_td 4, pass_int -1, rush_yd 0.1, rec_yd 0.1, rush_td 6, rec_td 6, fum_lost -2, pass_td_40p 2. Stat keys the sheet has no column for (e.g. pass_td_40p) are ignored.
+- Games: sheet lines are 17-game season totals, scaled by 16/17 to the board's `expected_games` basis. No injury or missed-games adjustment is applied on either side.
+- Board side: `proj_pts` from the league's tiers csv. Bias = board minus sheet.
+- Ranks: within position, by the respective points. Spearman over matched players; 'top 36' restricts to the sheet's top 36 at the position.
+
+A uniform negative bias across a position's starters cancels in VORP and is not a defect. Differences BETWEEN positions' biases do not cancel and are worth noting.
 
 | pos | matched | Spearman (all) | Spearman (sheet top 36) | bias all | bias top 36 | unmatched |
 |---|---|---|---|---|---|---|

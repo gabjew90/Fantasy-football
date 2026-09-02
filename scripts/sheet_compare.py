@@ -117,14 +117,17 @@ def spearman(a: list[float], b: list[float]) -> float:
 
 
 def compare(sheet: dict[str, list[dict]], board: pl.DataFrame, scoring: dict,
-            games: float) -> dict:
-    """Join and measure. Returns {pos: {...}} plus 'unmatched'."""
+            games: float, column: str = "proj_pts") -> dict:
+    """Join and measure. Returns {pos: {...}} plus 'unmatched'. `column` is
+    the board column under test (proj_pts, or a parallel source such as
+    proj_consensus_pts); rows where it is null are left out of the join."""
     scale = games / SHEET_GAMES
     result: dict = {}
     for pos, players in sheet.items():
-        sub = board.filter(pl.col("pos") == pos).sort("proj_pts", descending=True)
+        sub = (board.filter((pl.col("pos") == pos) & pl.col(column).is_not_null())
+               .sort(column, descending=True))
         bmap = {}
-        for i, (name, pts) in enumerate(sub.select(["player", "proj_pts"]).iter_rows(), 1):
+        for i, (name, pts) in enumerate(sub.select(["player", column]).iter_rows(), 1):
             bmap.setdefault(normalize_name(name), (i, float(pts), name))
         rows = []
         unmatched = []
@@ -165,12 +168,27 @@ def compare(sheet: dict[str, list[dict]], board: pl.DataFrame, scoring: dict,
     return result
 
 
-def render(league: str, games: float, res: dict) -> str:
+def render(league: str, games: float, res: dict, scoring: dict | None = None,
+           column: str = "proj_pts") -> str:
+    sc = ", ".join(f"{k} {v:g}" for k, v in (scoring or {}).items())
     L = [f"# Board vs FantasyPros consensus — {league}",
          "",
-         f"Sheet AVG stat lines scored in the league's settings, scaled to {games:g} games "
-         f"(sheet lines are {SHEET_GAMES:g}-game totals). Board = tiers csv proj_pts. "
-         "Bias = board minus sheet.", ""]
+         "## Scoring basis (read this before comparing with any other sheet-vs-board number)",
+         "",
+         f"- Sheet side: the position tabs' **AVG stat lines** (raw consensus lines, NOT the "
+         f"Aggregate tab, which already carries the sheet's missed-games adjustment), scored "
+         f"with the league yaml's scoring: {sc or 'n/a'}. Stat keys the sheet has no column "
+         f"for (e.g. pass_td_40p) are ignored.",
+         f"- Games: sheet lines are {SHEET_GAMES:g}-game season totals, scaled by "
+         f"{games:g}/{SHEET_GAMES:g} to the board's `expected_games` basis. No injury or "
+         f"missed-games adjustment is applied on either side.",
+         f"- Board side: `{column}` from the league's tiers csv. Bias = board minus sheet.",
+         "- Ranks: within position, by the respective points. Spearman over matched players; "
+         "'top 36' restricts to the sheet's top 36 at the position.",
+         "",
+         "A uniform negative bias across a position's starters cancels in VORP and is not a "
+         "defect. Differences BETWEEN positions' biases do not cancel and are worth noting.",
+         ""]
     L += ["| pos | matched | Spearman (all) | Spearman (sheet top 36) | bias all | bias top 36 | unmatched |",
           "|---|---|---|---|---|---|---|"]
     for pos, r in res.items():
@@ -203,15 +221,23 @@ def main() -> None:
     ap.add_argument("--games", type=float, default=None,
                     help="games basis for the sheet (default: config projections.expected_games)")
     ap.add_argument("--out", default=None)
+    ap.add_argument("--column", default="proj_pts",
+                    help="board column under test (default proj_pts; e.g. proj_consensus_pts)")
+    ap.add_argument("--board", default=None, help="csv to grade instead of the league tiers csv")
     a = ap.parse_args()
 
     cfg = Config.load(league=a.league)
     games = a.games if a.games is not None else float((cfg.get("projections") or {}).get("expected_games", 16.0))
-    board = pl.read_csv(cfg.scoped(cfg.root / "tiers.csv"), infer_schema_length=2000)
+    board_path = Path(a.board) if a.board else cfg.scoped(cfg.root / "tiers.csv")
+    board = pl.read_csv(board_path, infer_schema_length=2000)
+    if a.column not in board.columns:
+        raise SystemExit(f"{board_path.name} has no column {a.column}")
     sheet = read_sheet(Path(a.sheet))
-    res = compare(sheet, board, scoring_from_league(cfg), games)
-    md = render(a.league, games, res)
-    out = Path(a.out) if a.out else ROOT / "reports" / f"sheet_compare.{a.league}.md"
+    scoring = scoring_from_league(cfg)
+    res = compare(sheet, board, scoring, games, column=a.column)
+    md = render(a.league, games, res, scoring, column=a.column)
+    suffix = "" if a.column == "proj_pts" else f".{a.column}"
+    out = Path(a.out) if a.out else ROOT / "reports" / f"sheet_compare.{a.league}{suffix}.md"
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(md, encoding="utf-8")
     for pos, r in res.items():
