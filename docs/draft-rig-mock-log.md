@@ -627,3 +627,23 @@ Allen passed as the top projection; Achane went at 13 so 17 became McBride
 Allen 34, Rice 35) -> Garrett Wilson; Maye went before 57 -> Hurts for the
 QB slot; rounds 7-13 priced as bench insurance with every pick record
 carrying the reason and the candidates passed on.
+
+## Mock 22 — room 10504572 "First and Ten", 10 teams, slot 9 — clean, 15 of 15 via makePick (2 of 3)
+
+Full trail: reports/mocks/mock_10504572.md.
+
+Roster: Achane, McBride, Chris Olave, Garrett Wilson, Jaylen Warren, Hurts,
+TreVeyon Henderson, Rico Dowdle, Wan'Dale Robinson, Mahomes (QB2, R11),
+Gainwell, Jakobi Meyers, Dicker K, Chiefs DEF (+ Robinson at 92). Legal.
+
+Fifteen of fifteen through the client's `makePick`, 345-721 ms to store
+confirmation; no fallback, no gate trip, never `away`. Heartbeats at
+16:16, 16:20, 16:24 on schedule; the round 9/10 turn at 16-17 minutes
+passed without the flag. In the room before pick 1.
+
+Narration highlights: McCaffrey and Chase gone in the first five, so 9/12
+became Achane and McBride ("waiting costs ~26 at TE, 44%"); both named
+targets gone before 29/32 (A.J. Brown 22, Kyren 24) -> Olave and Garrett
+Wilson; Allen passed as the top projection four times and went 33rd; Hurts
+took the QB slot at 52; Rico Dowdle at 72 priced as the handcuff for our
+own Warren ("covers 3 RB starters ~9.6 wks, ≈ 96 pts over the wire").
