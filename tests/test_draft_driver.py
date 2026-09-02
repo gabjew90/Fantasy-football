@@ -748,3 +748,15 @@ def test_json_load_path_marks_name_collisions_too():
         """
     )
     assert out["r"] == "loaded 3 players, 1 name collision(s)"
+
+
+def test_row_lookup_cap_covers_the_expanded_stats_layout():
+    """Mock 11: rows in Yahoo's expanded stats layout run ~400 chars; a
+    260-char cap on candidate elements meant no row with a control ever
+    matched and every recommended player was recorded gone."""
+    src = DRIVER.read_text(encoding="utf-8")
+    import re
+    m = re.search(r"const ROW_TEXT_CAP = (\d+);", src)
+    assert m, "ROW_TEXT_CAP must exist"
+    assert int(m.group(1)) >= 1000
+    assert "if (x.length > 260) return false;" not in src

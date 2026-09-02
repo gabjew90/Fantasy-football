@@ -1354,6 +1354,45 @@ window.DK = (function () {
     return { ok: why.length === 0, why, headerPick: hdr, planPick: S.planPick, gone: S.gone.size, goneAdded: added };
   }
 
+  /* Yahoo marks a manager "away" after a stretch without user activity and
+   * arms autopick for them -- mock 12 (2026-09-01) lost live control from
+   * round 11 that way with the driver working perfectly, because programmatic
+   * clicks are not the activity Yahoo counts. Two defences: fake the activity
+   * every cycle, and if the store says we are away anyway (or the modal is
+   * up), flip the Autodraft toggle back off and say so. */
+  async function keepAlive() {
+    try {
+      const x = 200 + Math.floor(Math.random() * 400), y = 200 + Math.floor(Math.random() * 200);
+      for (const type of ['mousemove', 'pointermove']) {
+        document.dispatchEvent(new MouseEvent(type, { bubbles: true, clientX: x, clientY: y }));
+      }
+      document.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Shift' }));
+      document.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true, key: 'Shift' }));
+      window.dispatchEvent(new Event('focus'));
+    } catch (e) { /* synthetic events are best effort */ }
+
+    const snap = storeState();
+    const awayByStore = !!(snap && snap.my_team && snap.away_teams.includes(snap.my_team));
+    const armed = autopickArmed();
+    if (!awayByStore && !armed) return { away: false };
+    // Disarm: the Queue panel carries an "Autodraft" toggle
+    ensureLeftTab('Queue');
+    await sleep(500);
+    const toggle = [...document.querySelectorAll('button,[role=switch]')]
+      .find(b => /^Autodraft$/i.test((b.textContent || '').trim()) || /autodraft/i.test(b.getAttribute('aria-label') || ''));
+    if (toggle) {
+      toggle.click();
+      await sleep(600);
+      note('AWAY/AUTOPICK detected (store=' + awayByStore + ', modal=' + armed + ') -> clicked Autodraft toggle');
+    } else {
+      note('AWAY/AUTOPICK detected but no Autodraft toggle found');
+    }
+    // a "turn off" control inside the modal, if Yahoo offers one
+    const off = [...document.querySelectorAll('button,a')].find(b => /turn off autopick/i.test(b.textContent || ''));
+    if (off) { off.click(); await sleep(400); note('clicked "turn off autopick"'); }
+    return { away: true, toggled: !!toggle, off: !!off };
+  }
+
   async function run(maxSeconds) {
     if (S.running) return 'already running';
     S.running = true;
@@ -1407,6 +1446,7 @@ window.DK = (function () {
           await sleep(1200);
           lastSync = 0; // force resync after our pick
         } else {
+          await keepAlive();     // Yahoo's inactivity timer counts human activity, not our clicks
           const rcNow = rc ? rc.have : -1;
           if (rcNow !== S.lastRoster || Date.now() - lastSync > 12000) {
             S.lastRoster = rcNow;
@@ -1491,8 +1531,9 @@ window.DK = (function () {
       S.gone = new Set(); S.starred = new Set(); S.log = []; S.lastRoster = -1;
       return 'reset';
     },
-    rank, syncQueue, draftTop, run, gatesOk, storeState, findStore,
+    rank, syncQueue, draftTop, run, gatesOk, storeState, findStore, keepAlive,
     classifyMiss, rowMatches, normTeam, autopickArmed, idKey, // exported for tests
+    findRow, parsePicksPanel, myRoster, tableLive, currentPickNo, // offline DOM tests (jsdom + fixtures)
     survivalProb, eBestNext, calibrate,
     reconcileStarred, reconcileStarredWith,
     /* Human-readable rationale for the pick we intend to make. Exists so the

@@ -24,3 +24,4 @@ data/draftrig/tls/*.pem
 data/draftrig/tiers_bakeoff_*.csv
 data/draftrig/season_*.txt
 data/draftrig/prerank*.json
+node_modules/

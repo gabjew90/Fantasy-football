@@ -1,0 +1,28 @@
+{
+  "name": "fantasy-football",
+  "version": "1.0.0",
+  "description": "Draft-prep pipeline + live draft tracker for Sleeper league **Omnibeta Degens**\r (12-team, full PPR, 2 FLEX, 15-round snake, 120s clock).",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs",
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gabjew90/Fantasy-football.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/gabjew90/Fantasy-football/issues"
+  },
+  "homepage": "https://github.com/gabjew90/Fantasy-football#readme",
+  "devDependencies": {
+    "jsdom": "^24.1.3"
+  }
+}

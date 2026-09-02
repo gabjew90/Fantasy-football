@@ -325,3 +325,44 @@ served by the bridge at /prerank.js. `scripts/net_tap.js` (served at
 /net_tap.js) hooks WebSocket/fetch/XHR passively so mock 12 can show how the
 draft client actually receives picks -- the design's layer 2 reads that
 instead of the screen.
+
+## Mock 12 — room 10430757 "Pooch Kick", 10 teams, slot 10 — clean picks, then Yahoo took the wheel
+
+Roster: Achane, McBride, Rashee Rice, Javonte Williams, Davante Adams,
+Drake Maye, Jaylen Warren, Rico Dowdle, Courtland Sutton, RJ Harvey, Kenny
+Gainwell, Wan'Dale Robinson, Malik Willis (QB2, R13), Texans DEF, Pineiro K.
+One tight end. Every pick through round 10 made by the engine at the turn,
+verified on the roster, with the bridge's state consistent throughout
+(mine == roster at every plan request).
+
+Then from about round 11 the log reads "ON CLOCK (autopick armed) -> queue
+head takes it": Yahoo had flagged us **away** for inactivity and armed
+autopick. The store confirms it (`league.managers[me].away: true`). The
+driver was clicking fine -- programmatic clicks are not the activity Yahoo
+counts. The queue (layer 1) caught those picks, which is what it is for, and
+they were still sane, but live control was lost. Fix: `keepAlive()` dispatches
+synthetic mouse/keyboard activity every cycle and, if the store says we are
+away or the modal is up, flips the Autodraft toggle back off.
+
+### What mock 12 was really for: the client's own state
+
+The draft client is React + Redux and its store is reachable by walking the
+React fiber tree. It holds the draft as data -- every pick with team and
+player ids, the whole player pool, the current pick and team, the clock, and
+per-manager `away`/`loggedin` flags. `storeState()` now feeds the bridge
+from it; the Picks panel, roster panel and header readers are the fallback
+and a disagreement is logged. The row click is the only DOM dependency left.
+
+Also confirmed live: `draftstatus` for the mock league returns the draft
+server (`...sports-aws-prod-omega.aws.oath.cloud:443`) and the client's
+message types (PICK_MADE, CURRENT_PICK_CHANGED, CLOCK, DRAFT_OVER, ...). The
+socket itself is opened before any injected hook can see it; the store makes
+that moot.
+
+Fixtures captured to tests/fixtures/yahoo/ (crumbs redacted): the live room
+in the expanded layout, the post-draft room with the Picks tab showing, and
+a store snapshot. tests/test_yahoo_dom.py runs the driver's readers against
+them under jsdom in seconds.
+
+Also seen: five of the nine rivals were `away` -- autopicking from Yahoo's
+default list. The rival-autopick idea has its signal.

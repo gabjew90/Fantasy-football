@@ -808,3 +808,23 @@ Draft-morning runbook for layer 0 (after the board rebuild):
     PR.load(board); await PR.import(); await PR.dnd(); PR.save();
     await PR.unmatched()  -> star the important gaps by hand
     confirm has_preranks == "1" via the teams endpoint.
+
+## 2026-09-01 (12) — mock 12: the engine drafted cleanly; Yahoo's idle timer took over at round 11
+
+Design step 2 done: the live channel was investigated and something better
+was found. The draft client's Redux store is reachable from the page and
+holds the entire draft as data. The driver now reads state from it and
+falls back to page text loudly; only the row click still touches the DOM.
+Offline DOM tests (jsdom + captured fixtures) cover the readers that remain.
+
+Mock 12 itself: fourteen of fifteen picks sane, one TE, no guardrail
+violations, every pick through round 10 made live by the engine. From round
+11 Yahoo had flagged us away (inactivity -- our clicks do not count) and its
+autopick drafted from our queue. The floor held, which is the design working,
+but live control must not be lost to an idle timer: keepAlive() now fakes
+activity each cycle and disarms Autodraft when the store says we are away.
+
+Bar for "perfect" (user, 2026-09-01): every one of our picks made by the
+engine at the turn, no autopick, gates never trip, roster passes every
+guardrail. Mock 12 fails only on the autopick clause. Mock 13 tests keepAlive
+and the store-fed driver together.

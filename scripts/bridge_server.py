@@ -121,6 +121,25 @@ class Handler(BaseHTTPRequestHandler):
             self._json({"err": "POST draft state to /plan"}, 404)
 
     def do_POST(self):
+        if self.path.startswith("/fixture"):
+            # Save a page's HTML for the offline DOM tests (design 2026-09-01):
+            # the row lookup is the one reader still on the DOM, and it should
+            # be tested against real Yahoo markup in both layouts, on and off
+            # the clock, without joining a room.
+            try:
+                n = int(self.headers.get("Content-Length") or 0)
+                body = json.loads(self.rfile.read(n) or b"{}")
+                name = "".join(c for c in str(body.get("name") or "page")
+                               if c.isalnum() or c in "-_.")[:80]
+                out = ROOT / "tests" / "fixtures" / "yahoo" / f"{name}.html"
+                out.parent.mkdir(parents=True, exist_ok=True)
+                out.write_text(str(body.get("html") or ""), encoding="utf-8")
+                print(f"  fixture saved -> {out} ({out.stat().st_size} bytes)", flush=True)
+                self._json({"ok": True, "path": str(out), "bytes": out.stat().st_size})
+            except Exception as e:  # noqa: BLE001
+                traceback.print_exc()
+                self._json({"err": f"{type(e).__name__}: {e}"}, 500)
+            return
         try:
             n = int(self.headers.get("Content-Length") or 0)
             state = json.loads(self.rfile.read(n) or b"{}")
