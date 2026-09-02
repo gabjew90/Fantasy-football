@@ -237,45 +237,45 @@
 
 **Tier 1**
 
-- 1. Josh Allen (BUF, bye 7) — 328 pts, VORP 58, ADP 20.1
-- 2. Drake Maye (NEP, bye 11) — 305 pts, VORP 35, ADP 47.2
-- 3. Trevor Lawrence (JAC, bye 7) — 290 pts, VORP 20, ADP 83.8
-- 4. Matthew Stafford (LAR, bye 11) — 289 pts, VORP 19, ADP 99.7
-- 5. Patrick Mahomes II (KCC, bye 5) — 287 pts, VORP 17, ADP 102.5
-- 6. Jalen Hurts (PHI, bye 10) — 283 pts, VORP 13, ADP 56.4
-- 7. Caleb Williams (CHI, bye 10) — 280 pts, VORP 10, ADP 67.0
-- 8. Dak Prescott (DAL, bye 14) — 277 pts, VORP 7, ADP 73.9
-- 9. Justin Herbert (LAC, bye 7) — 276 pts, VORP 6, ADP 70.1
-- 10. Brock Purdy (SFO, bye 8) — 275 pts, VORP 5, ADP 98.3
-- 11. Lamar Jackson (BAL, bye 13) — 273 pts, VORP 3, ADP 38.2
-- 12. Bo Nix (DEN, bye 10) — 270 pts, VORP -0, ADP 98.8
-- 13. Joe Burrow (CIN, bye 6) — 269 pts, VORP -1, ADP 50.1
-- 14. Jared Goff (DET, bye 6) — 264 pts, VORP -6, ADP 113.8
-- 15. Jayden Daniels (WAS, bye 7) — 261 pts, VORP -9, ADP 54.4
-- 16. Jaxson Dart (NYG, bye 8) — 261 pts, VORP -9, ADP 91.3
-- 17. Daniel Jones (IND, bye 13) — 257 pts, VORP -13, ADP 126.7
-- 18. Jacoby Brissett (ARI, bye 14) — 253 pts, VORP -17
-- 19. Baker Mayfield (TBB, bye 10) — 252 pts, VORP -18, ADP 125.4
-- 20. Jordan Love (GBP, bye 11) — 246 pts, VORP -24, ADP 123.0
-- 21. Tyler Shough (NOS, bye 8) — 246 pts, VORP -25, ADP 129.9
-- 22. Kyler Murray (MIN, bye 6) — 244 pts, VORP -26, ADP 112.6
-- 23. C.J. Stroud (HOU, bye 8) — 238 pts, VORP -32, ADP 124.8
-- 24. Sam Darnold (SEA, bye 11) — 233 pts, VORP -37, ADP 122.0
-- 25. Malik Willis (MIA, bye 6) — 230 pts, VORP -40, ADP 124.9
-- 26. Bryce Young (CAR, bye 5) — 227 pts, VORP -43, ADP 121.1
-- 27. Aaron Rodgers (PIT, bye 9) — 226 pts, VORP -44, ADP 116.1
-- 28. Fernando Mendoza (LVR, bye 13) — 218 pts, VORP -52, ADP 118.0
-- 35. Cam Ward ⛰ (TEN, bye 9) — 205 pts, VORP -65, ADP 124.1
+- 1. Josh Allen (BUF, bye 7) — 321 pts, VORP 47, ADP 20.1
+- 2. Drake Maye (NEP, bye 11) — 305 pts, VORP 31, ADP 47.2
+- 3. Jalen Hurts (PHI, bye 10) — 292 pts, VORP 18, ADP 56.4
+- 4. Trevor Lawrence (JAC, bye 7) — 289 pts, VORP 16, ADP 83.8
+- 5. Patrick Mahomes II (KCC, bye 5) — 286 pts, VORP 13, ADP 102.5
+- 6. Caleb Williams (CHI, bye 10) — 284 pts, VORP 11, ADP 67.0
+- 7. Justin Herbert (LAC, bye 7) — 281 pts, VORP 8, ADP 70.1
+- 8. Matthew Stafford (LAR, bye 11) — 280 pts, VORP 7, ADP 99.7
+- 9. Lamar Jackson (BAL, bye 13) — 278 pts, VORP 5, ADP 38.2
+- 10. Bo Nix (DEN, bye 10) — 278 pts, VORP 4, ADP 98.8
+- 11. Jayden Daniels (WAS, bye 7) — 276 pts, VORP 2, ADP 54.4
+- 12. Brock Purdy (SFO, bye 8) — 276 pts, VORP 2, ADP 98.3
+- 13. Dak Prescott (DAL, bye 14) — 275 pts, VORP 1, ADP 73.9
+- 14. Joe Burrow (CIN, bye 6) — 264 pts, VORP -10, ADP 50.1
+- 15. Jaxson Dart (NYG, bye 8) — 263 pts, VORP -11, ADP 91.3
+- 16. Jared Goff (DET, bye 6) — 262 pts, VORP -12, ADP 113.8
+- 17. Kyler Murray (MIN, bye 6) — 259 pts, VORP -15, ADP 112.6
+- 18. Baker Mayfield (TBB, bye 10) — 259 pts, VORP -15, ADP 125.4
+- 19. Daniel Jones (IND, bye 13) — 257 pts, VORP -16, ADP 126.7
+- 20. Jordan Love (GBP, bye 11) — 252 pts, VORP -21, ADP 123.0
+- 21. Tyler Shough (NOS, bye 8) — 248 pts, VORP -26, ADP 129.9
+- 22. Jacoby Brissett (ARI, bye 14) — 248 pts, VORP -26
+- 23. C.J. Stroud (HOU, bye 8) — 245 pts, VORP -29, ADP 124.8
+- 24. Sam Darnold (SEA, bye 11) — 242 pts, VORP -32, ADP 122.0
+- 25. Bryce Young (CAR, bye 5) — 242 pts, VORP -32, ADP 121.1
+- 26. Aaron Rodgers (PIT, bye 9) — 233 pts, VORP -41, ADP 116.1
+- 28. Fernando Mendoza (LVR, bye 13) — 227 pts, VORP -47, ADP 118.0
+- 29. Cam Ward (TEN, bye 9) — 223 pts, VORP -51, ADP 124.1
+- 32. Malik Willis ⛰ (MIA, bye 6) — 220 pts, VORP -54, ADP 124.9
 
 **Tier 2**
 
-- 55. Spencer Rattler (NO, bye ?) — 31 pts, VORP -239
-- 56. Davis Mills (HOU, bye ?) — 29 pts, VORP -241
+- 55. Spencer Rattler (NO, bye ?) — 32 pts, VORP -242
+- 56. Davis Mills (HOU, bye ?) — 28 pts, VORP -246
 
 **Tier 3**
 
-- 57. Carson Wentz (MIN, bye ?) — 0 pts, VORP -270
-- 58. Dillon Gabriel (CLE, bye ?) — 0 pts, VORP -270
+- 57. Dillon Gabriel (CLE, bye ?) — 0 pts, VORP -274
+- 58. Carson Wentz (MIN, bye ?) — 0 pts, VORP -274
 
 ## K
 

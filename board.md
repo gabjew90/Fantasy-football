@@ -288,48 +288,48 @@
 
 **Tier 1**
 
-- 1. Josh Allen (BUF, bye 7) — 328 pts, VORP 63, ADP 34.1
-- 2. Drake Maye (NEP, bye 11) — 306 pts, VORP 41, ADP 51.5
-- 3. Trevor Lawrence (JAC, bye 7) — 290 pts, VORP 25, ADP 91.2
-- 4. Matthew Stafford (LAR, bye 11) — 289 pts, VORP 24, ADP 76.4
-- 5. Patrick Mahomes II (KCC, bye 5) — 287 pts, VORP 22, ADP 102.3
-- 6. Jalen Hurts (PHI, bye 10) — 283 pts, VORP 18, ADP 77.8
-- 7. Caleb Williams (CHI, bye 10) — 281 pts, VORP 16, ADP 90.5
-- 8. Dak Prescott (DAL, bye 14) — 277 pts, VORP 12, ADP 65.8
-- 9. Justin Herbert (LAC, bye 7) — 276 pts, VORP 11, ADP 105.0
-- 10. Brock Purdy (SFO, bye 8) — 275 pts, VORP 10, ADP 86.9
-- 11. Lamar Jackson (BAL, bye 13) — 273 pts, VORP 8, ADP 56.7
-- 12. Bo Nix (DEN, bye 10) — 270 pts, VORP 5, ADP 111.7
-- 13. Joe Burrow (CIN, bye 6) — 269 pts, VORP 4, ADP 57.6
-- 14. Jared Goff (DET, bye 6) — 264 pts, VORP -1, ADP 100.5
-- 15. Jayden Daniels (WAS, bye 7) — 261 pts, VORP -4, ADP 71.4
-- 16. Jaxson Dart (NYG, bye 8) — 261 pts, VORP -4, ADP 117.6
-- 17. Daniel Jones (IND, bye 13) — 257 pts, VORP -8, ADP 159.4
-- 18. Jacoby Brissett (ARI, bye 14) — 253 pts, VORP -12, ADP 170.8
-- 19. Baker Mayfield (TBB, bye 10) — 252 pts, VORP -13, ADP 130.4
-- 20. Jordan Love (GBP, bye 11) — 246 pts, VORP -19, ADP 145.9
-- 21. Tyler Shough (NOS, bye 8) — 246 pts, VORP -19, ADP 135.6
-- 22. Kyler Murray (MIN, bye 6) — 245 pts, VORP -21, ADP 134.4
-- 23. C.J. Stroud (HOU, bye 8) — 238 pts, VORP -27, ADP 157.4
-- 24. Sam Darnold (SEA, bye 11) — 233 pts, VORP -32, ADP 145.1
-- 25. Malik Willis (MIA, bye 6) — 230 pts, VORP -35, ADP 161.3
-- 26. Bryce Young (CAR, bye 5) — 227 pts, VORP -38, ADP 162.6
-- 27. Aaron Rodgers (PIT, bye 9) — 226 pts, VORP -39, ADP 180.1
-- 28. Fernando Mendoza (LVR, bye 13) — 218 pts, VORP -47, ADP 167.1
-- 29. Geno Smith (NYJ, bye 13) — 216 pts, VORP -49, ADP 174.7
-- 30. Deshaun Watson (CLE, bye 11) — 213 pts, VORP -52, ADP 165.2
-- 31. Tua Tagovailoa (ATL, bye 11) — 210 pts, VORP -55, ADP 161.9
-- 35. Cam Ward ⛰ (TEN, bye 9) — 205 pts, VORP -60, ADP 169.2
+- 1. Josh Allen (BUF, bye 7) — 321 pts, VORP 53, ADP 34.1
+- 2. Drake Maye (NEP, bye 11) — 305 pts, VORP 37, ADP 51.5
+- 3. Jalen Hurts (PHI, bye 10) — 292 pts, VORP 24, ADP 77.8
+- 4. Trevor Lawrence (JAC, bye 7) — 289 pts, VORP 22, ADP 91.2
+- 5. Patrick Mahomes II (KCC, bye 5) — 287 pts, VORP 19, ADP 102.3
+- 6. Caleb Williams (CHI, bye 10) — 285 pts, VORP 17, ADP 90.5
+- 7. Justin Herbert (LAC, bye 7) — 281 pts, VORP 14, ADP 105.0
+- 8. Matthew Stafford (LAR, bye 11) — 280 pts, VORP 12, ADP 76.4
+- 9. Lamar Jackson (BAL, bye 13) — 279 pts, VORP 11, ADP 56.7
+- 10. Bo Nix (DEN, bye 10) — 278 pts, VORP 10, ADP 111.7
+- 11. Jayden Daniels (WAS, bye 7) — 276 pts, VORP 8, ADP 71.4
+- 12. Brock Purdy (SFO, bye 8) — 276 pts, VORP 8, ADP 86.9
+- 13. Dak Prescott (DAL, bye 14) — 275 pts, VORP 7, ADP 65.8
+- 14. Joe Burrow (CIN, bye 6) — 264 pts, VORP -4, ADP 57.6
+- 15. Jaxson Dart (NYG, bye 8) — 263 pts, VORP -5, ADP 117.6
+- 16. Jared Goff (DET, bye 6) — 262 pts, VORP -6, ADP 100.5
+- 17. Kyler Murray (MIN, bye 6) — 259 pts, VORP -9, ADP 134.4
+- 18. Baker Mayfield (TBB, bye 10) — 259 pts, VORP -9, ADP 130.4
+- 19. Daniel Jones (IND, bye 13) — 257 pts, VORP -11, ADP 159.4
+- 20. Jordan Love (GBP, bye 11) — 253 pts, VORP -15, ADP 145.9
+- 21. Tyler Shough (NOS, bye 8) — 248 pts, VORP -20, ADP 135.6
+- 22. Jacoby Brissett (ARI, bye 14) — 248 pts, VORP -20, ADP 170.8
+- 23. C.J. Stroud (HOU, bye 8) — 245 pts, VORP -23, ADP 157.4
+- 24. Sam Darnold (SEA, bye 11) — 242 pts, VORP -26, ADP 145.1
+- 25. Bryce Young (CAR, bye 5) — 242 pts, VORP -26, ADP 162.6
+- 26. Aaron Rodgers (PIT, bye 9) — 233 pts, VORP -35, ADP 180.1
+- 27. Geno Smith (NYJ, bye 13) — 230 pts, VORP -38, ADP 174.7
+- 28. Fernando Mendoza (LVR, bye 13) — 227 pts, VORP -41, ADP 167.1
+- 29. Cam Ward (TEN, bye 9) — 223 pts, VORP -45, ADP 169.2
+- 30. Deshaun Watson (CLE, bye 11) — 223 pts, VORP -45, ADP 165.2
+- 31. Tua Tagovailoa (ATL, bye 11) — 222 pts, VORP -46, ADP 161.9
+- 32. Malik Willis ⛰ (MIA, bye 6) — 220 pts, VORP -48, ADP 161.3
 
 **Tier 2**
 
-- 55. Spencer Rattler (NO, bye ?) — 31 pts, VORP -234
-- 56. Davis Mills (HOU, bye ?) — 29 pts, VORP -236
+- 55. Spencer Rattler (NO, bye ?) — 32 pts, VORP -236
+- 56. Davis Mills (HOU, bye ?) — 28 pts, VORP -240
 
 **Tier 3**
 
-- 57. Dillon Gabriel (CLE, bye ?) — 0 pts, VORP -265
-- 58. Carson Wentz (MIN, bye ?) — 0 pts, VORP -265
+- 57. Dillon Gabriel (CLE, bye ?) — 0 pts, VORP -268
+- 58. Carson Wentz (MIN, bye ?) — 0 pts, VORP -268
 
 ## K
 

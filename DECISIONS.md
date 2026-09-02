@@ -1012,3 +1012,27 @@ remains in those bands is market-implied rows the gate cannot reach.
 Zero-share players (QB3s) project 0 from the model term; the market curve
 still gives them ~200 where it has a rank for them, which is item 1's
 case in one line.
+
+## 2026-09-02 (19) — projection overhaul, usage-side fix 2: QB rushing in the usage model
+
+The usage regression (ppg ~ WOPR + high-value touches) is receiving- and
+goal-line-centric, so QBs skipped it and a QB's model term was his shrunk
+2025 PPG alone. The shrink pulls every high scorer toward the positional
+mean and nothing gave credit back for the volume that made the points, so
+rushing QBs with short or down 2025 seasons (Daniels 7 games, Lamar 13)
+sat under pocket veterans with 17 (Stafford, Prescott). QBs now get their
+own regression: ppg ~ 1 + carries per game + offense snap share, fitted on
+QBs with 6+ games (41 rows), blended 0.65 shrunk / 0.35 usage like every
+other position. Carries per game rather than rush yards: the two are
+collinear and carries is the designed-volume signal.
+
+Effect on the Keefamania QB order (rank before -> after): Hurts 6->3,
+Lamar 11->9, Daniels 15->11, Murray 22->17, Nix 12->10 up; Stafford 4->8,
+Prescott 8->13 down. Only QB rows moved. Against the sheet, QB Spearman
+0.81 -> 0.86 (top 36), 0.85 -> 0.89 (all); Omnibeta 0.85 -> 0.88.
+
+What it does not fix, on purpose: Burrow (sheet 4th, board 14th) is a
+pocket passer with 8 games at 17.4 PPG in 2025; his case is the market's
+expectation of a bounce-back, which is the market half's job and is what
+the stat-line source carries (item 1: Burrow 6th on that column). The
+blend weight between the two halves is item 2's decision.

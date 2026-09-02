@@ -11,7 +11,7 @@ A uniform negative bias across a position's starters cancels in VORP and is not 
 
 | pos | matched | Spearman (all) | Spearman (sheet top 36) | bias all | bias top 36 | unmatched |
 |---|---|---|---|---|---|---|
-| QB | 34 | 0.88 | 0.85 | -1.9 | -3.2 | 41 |
+| QB | 34 | 0.90 | 0.88 | +2.1 | +1.0 | 41 |
 | RB | 71 | 0.91 | 0.95 | -2.4 | -15.8 | 51 |
 | WR | 90 | 0.93 | 0.93 | -6.0 | -21.6 | 88 |
 | TE | 33 | 0.91 | 0.90 | -5.8 | -4.7 | 83 |
@@ -22,40 +22,40 @@ Deep-rank bands (by sheet rank):
 
 | band | n | sheet | board | diff |
 |---|---|---|---|---|
-| 1-12 | 12 | 298 | 283 | -16 |
-| 13-24 | 12 | 265 | 254 | -12 |
-| 25-36 | 8 | 193 | 221 | +28 |
+| 1-12 | 12 | 298 | 284 | -14 |
+| 13-24 | 12 | 265 | 257 | -8 |
+| 25-36 | 8 | 193 | 231 | +38 |
 | 49-60 | 2 | 10 | 30 | +20 |
 
 Largest rank disagreements (sheet top 36):
 
 | player | sheet rk | board rk | sheet pts | board pts |
 |---|---|---|---|---|
-| Jayden Daniels | 3 | 15 | 303 | 261 |
-| Matthew Stafford | 15 | 4 | 277 | 289 |
-| Jacoby Brissett | 28 | 18 | 217 | 253 |
-| Lamar Jackson | 2 | 11 | 305 | 273 |
-| Jaxson Dart | 7 | 16 | 292 | 261 |
-| Joe Burrow | 6 | 13 | 293 | 269 |
+| Malik Willis | 22 | 32 | 256 | 220 |
+| Jayden Daniels | 3 | 11 | 303 | 276 |
+| Joe Burrow | 6 | 14 | 293 | 264 |
+| Jaxson Dart | 7 | 15 | 292 | 263 |
+| Lamar Jackson | 2 | 9 | 305 | 278 |
+| Matthew Stafford | 15 | 8 | 277 | 280 |
 | Patrick Mahomes II | 11 | 5 | 285 | 287 |
-| Kyler Murray | 16 | 22 | 274 | 244 |
-| Trevor Lawrence | 8 | 3 | 288 | 290 |
-| Caleb Williams | 12 | 7 | 284 | 281 |
+| Caleb Williams | 12 | 6 | 284 | 285 |
+| Justin Herbert | 13 | 7 | 282 | 282 |
+| Jacoby Brissett | 28 | 22 | 217 | 248 |
 
 Largest point disagreements (all matched):
 
 | player | sheet rk | board rk | sheet pts | board pts | diff |
 |---|---|---|---|---|---|
-| Deshaun Watson | 32 | 30 | 127 | 213 | +86 |
-| Tua Tagovailoa | 31 | 31 | 132 | 210 | +77 |
-| Jayden Daniels | 3 | 15 | 303 | 261 | -42 |
-| Fernando Mendoza | 30 | 28 | 180 | 218 | +37 |
-| Jacoby Brissett | 28 | 18 | 217 | 253 | +36 |
-| Lamar Jackson | 2 | 11 | 305 | 273 | -33 |
-| Jaxson Dart | 7 | 16 | 292 | 261 | -31 |
-| Kyler Murray | 16 | 22 | 274 | 244 | -30 |
-| Malik Willis | 22 | 25 | 256 | 230 | -26 |
-| Joe Burrow | 6 | 13 | 293 | 269 | -24 |
+| Deshaun Watson | 32 | 30 | 127 | 223 | +95 |
+| Tua Tagovailoa | 31 | 31 | 132 | 222 | +89 |
+| Fernando Mendoza | 30 | 28 | 180 | 227 | +46 |
+| Malik Willis | 22 | 32 | 256 | 220 | -36 |
+| Jacoby Brissett | 28 | 22 | 217 | 248 | +31 |
+| Joe Burrow | 6 | 14 | 293 | 264 | -29 |
+| Jaxson Dart | 7 | 15 | 292 | 263 | -29 |
+| Josh Allen | 1 | 1 | 349 | 321 | -28 |
+| Jayden Daniels | 3 | 11 | 303 | 276 | -27 |
+| Lamar Jackson | 2 | 9 | 305 | 278 | -27 |
 
 Sheet players not on the board (41): Shedeur Sanders, Michael Penix Jr., Kirk Cousins, Carson Beck, Ty Simpson, Marcus Mariota, Quinn Ewers, Justin Fields, Riley Leonard, J.J. McCarthy, Jameis Winston, Tyrod Taylor, Jarrett Stidham, Tommy DeVito, Tyson Bagent, Joshua Dobbs, Mac Jones, Joe Flacco, Tanner McKee, Anthony Richardson Sr., Kenny Pickett, Drew Allar, Trey Lance, Tyler Huntley, Sam Howell …
 
