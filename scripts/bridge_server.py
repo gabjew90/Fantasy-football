@@ -103,6 +103,14 @@ class Handler(BaseHTTPRequestHandler):
             # through a devtools eval. Same origin as /plan, already trusted.
             self._raw((ROOT / "scripts" / "draft_driver.js").read_bytes(),
                       "application/javascript; charset=utf-8")
+        elif self.path.startswith("/net_tap.js"):
+            # instrumentation only: learn how the draft client receives picks
+            self._raw((ROOT / "scripts" / "net_tap.js").read_bytes(),
+                      "application/javascript; charset=utf-8")
+        elif self.path.startswith("/prerank.js"):
+            # layer 0: the Edit Pre-Draft Ranks driver (scripts/prerank_driver.js)
+            self._raw((ROOT / "scripts" / "prerank_driver.js").read_bytes(),
+                      "application/javascript; charset=utf-8")
         elif self.path.startswith("/board.json"):
             p = ROOT / "data" / "draftrig" / f"board.{_STATE['league']}.json"
             if p.exists():

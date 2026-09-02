@@ -776,3 +776,35 @@ room to room.
 
 The mock that finally had the engine right produced the worst roster of the
 eleven. That is the correct order to find things in.
+
+## 2026-09-01 (11) — layer 0 is live: Yahoo's own autopick now walks our board
+
+Design (docs/superpowers/specs/2026-09-01-draft-rig-foolproof-design.md):
+three layers, each a strict fallback for the one above, and a layer may act
+only when its readings pass consistency checks. The floor is Yahoo itself.
+
+Done tonight, on the REAL league (49649, team 3):
+
+* The Edit Pre-Draft Ranks page has an Import dialog that takes pasted
+  `rank,name,team,position` lines and REPLACES the list in one shot. Our 240
+  (board order, K/DEF last, availability=out excluded) imported as 228 in
+  exact order; Save persisted it; the pub-api `teams` endpoint reads
+  `has_preranks: 1` for us. Three "out" players are on Do-Not-Draft.
+* Not matched by Yahoo's importer: DK Metcalf and J.K. Dobbins (initials --
+  neither spelling tried landed) and ten players outside Yahoo's 300-list.
+  Visible via PR.unmatched(); the two that matter can be starred by hand.
+* The star-by-star path works and keeps click order but slows as the list
+  grows (0.9s/click at 50, 1.5s at 100); kept for touch-ups only.
+* One rival (team 9) has pre-ranks set too.
+
+Also found: pub-api.fantasysports.yahoo.com/fantasy/v3/{draftstatus,
+settings,teams}/nfl/<league> answers with session cookies from any Yahoo
+page -- settings carries roster_positions, position_draft_caps, draft_time,
+draft_pick_duration, waiver_rule. That is the `verify` input we were waiting
+on Yahoo's API approval for.
+
+Draft-morning runbook for layer 0 (after the board rebuild):
+    open /f1/49649/3/editprerank; eval prerank.js from the bridge;
+    PR.load(board); await PR.import(); await PR.dnd(); PR.save();
+    await PR.unmatched()  -> star the important gaps by hand
+    confirm has_preranks == "1" via the teams endpoint.

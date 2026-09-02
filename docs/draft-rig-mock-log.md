@@ -316,3 +316,12 @@ Also seen: Yahoo enforces a per-position draft cap with a modal ("maximum
 number of TEs you can draft (4)"), which blocks the click and has to be
 dismissed. The driver does not yet handle that modal; with 35 fixed it should
 never be provoked.
+
+## Between mocks 11 and 12 — layer 0 and the instrumentation tap
+
+Layer 0 (Yahoo pre-rank = our board) is set on the real league; see
+DECISIONS 2026-09-01 #11 for the runbook. `scripts/prerank_driver.js` is
+served by the bridge at /prerank.js. `scripts/net_tap.js` (served at
+/net_tap.js) hooks WebSocket/fetch/XHR passively so mock 12 can show how the
+draft client actually receives picks -- the design's layer 2 reads that
+instead of the screen.
