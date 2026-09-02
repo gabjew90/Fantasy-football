@@ -107,7 +107,7 @@ as the kicker position. Fixed and re-checked 2026-09-02 (228 of 228 read back).
 | 69 | Dalton Kincaid | TE | BUF | 0.5 | ✓ |
 | 70 | Jameson Williams | WR | DET | 0.1 | ✓ |
 | 71 | Bucky Irving | RB | TBB | 0.0 | ✓ |
-| 72 | DK Metcalf | WR | PIT | 0.0 | — |
+| 72 | DK Metcalf | WR | PIT | 0.0 | ✓ |
 | 73 | Christian Watson | WR | GBP | 0.0 | ✓ |
 | 74 | Bo Nix | QB | DEN | -0.1 | ✓ |
 | 75 | Joe Burrow | QB | CIN | -1.0 | ✓ |
@@ -147,7 +147,7 @@ as the kicker position. Fixed and re-checked 2026-09-02 (228 of 228 read back).
 | 109 | Tony Pollard | RB | TEN | -19.9 | ✓ |
 | 110 | Oronde Gadsden II | TE | LAC | -20.3 | ✓ |
 | 111 | Jonathon Brooks | RB | CAR | -20.4 | ✓ |
-| 112 | J.K. Dobbins | RB | DEN | -20.6 | — |
+| 112 | J.K. Dobbins | RB | DEN | -20.6 | ✓ |
 | 113 | Isaiah Likely | TE | NYG | -21.4 | ✓ |
 | 114 | Theo Johnson | TE | NYG | -21.7 | — |
 | 115 | Jordan Addison | WR | MIN | -23.0 | ✓ |
