@@ -828,3 +828,34 @@ Bar for "perfect" (user, 2026-09-01): every one of our picks made by the
 engine at the turn, no autopick, gates never trip, roster passes every
 guardrail. Mock 12 fails only on the autopick clause. Mock 13 tests keepAlive
 and the store-fed driver together.
+
+## 2026-09-02 (13) — mock 13: keepAlive held for eight rounds; the endgame found three more
+
+Namesakes: the bridge keyed players on first-initial + surname, which is how
+Yahoo renders a row but not an identity ("A. Brown" is two starting WRs;
+"B. Robinson" two Falcons backs). A.J. Brown, gone at pick 17, led the
+engine's plan for thirty picks. yahoo_bridge.PlayerIndex resolves full names
+first and, for abbreviated text, picks the namesake not already accounted
+for. The roster panel is attributed by player id the same way.
+
+The driver's guardrail is now structural only. Its "no VORP ≤ 0 pick once we
+hold a stash" rule refused every candidate at pick 86 — bench-insurance rows
+the engine prices above zero — and the clock ran out. Whether a bench pick
+is worth taking is bench.py's decision; the driver keeps the roster legal
+(positions, K/DEF reservation, TE2 rule) and nothing else.
+
+State comes from the store, never from a banner. Yahoo's "put into autopick
+mode" notice outlives the disarm, and treating it as state made the driver
+toggle Autodraft on and off every two seconds and stand itself down at each
+turn. autopickArmed(), keepAlive() and the pick verification all read the
+store first; page text is the fallback when there is no store.
+
+Verified means verified: a pick is ours when the store records THIS player
+at OUR pick number, not when the roster count grew.
+
+Bar for "perfect" (user, 2026-09-01) — mock 13 fails on three clauses
+(missed pick, autopick fired, live control lost from round 9). Two of the
+three engine-side deliveries (namesakes, structural-only guardrail) are the
+kind of defect that would have cost real picks on Saturday. Mock 14 runs the
+fixed driver end to end; the open question is whether the store's away flag
+can diverge from the server's autopick state without the toggle storm.

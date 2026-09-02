@@ -615,7 +615,10 @@ def test_rank_never_returns_empty_while_picks_remain():
     )
     assert r["picksLeft"] == 8
     assert r["n"] > 0, "rank() went silent with 8 picks still to make"
-    assert r["relaxed"] is True, "fallback should be labelled, not silent"
+    # Since mock 13 (2026-09-02) the stash rule itself is gone -- it emptied
+    # draftTop's candidate list at pick 86, a path the labelled fallback in
+    # rank() never covered -- so there is nothing left to relax.
+    assert not r.get("relaxed"), "the stash rule was removed; nothing should need relaxing"
 
 
 def test_an_unreadable_adp_refuses_a_colliding_name():
@@ -760,3 +763,73 @@ def test_row_lookup_cap_covers_the_expanded_stats_layout():
     assert m, "ROW_TEXT_CAP must exist"
     assert int(m.group(1)) >= 1000
     assert "if (x.length > 260) return false;" not in src
+
+
+# ---------- mock 13 (2026-09-02): the banner is not the state ----------
+
+def _fake_store(picks, my_team="6", away=False, current_pick=None):
+    """A Redux-shaped store the driver's storeState() can read. picks are
+    (pick_no, teamId, first, last, pos)."""
+    by_id = {str(100 + i): {"fname": f, "lname": l, "primary_pos": pos, "team_abbr": "XX", "bye": 7}
+             for i, (_n, _t, f, l, pos) in enumerate(picks)}
+    order = [{"id": n, "teamId": str(t), "playerId": str(100 + i)}
+             for i, (n, t, _f, _l, _p) in enumerate(picks)]
+    made = len(picks)
+    return {
+        "draftPicks": {"order": order}, "players": {"byId": by_id},
+        "draftOrder": {"currentPick": made if current_pick is None else current_pick - 1, "currentTeam": "1"},
+        "league": {"managers": {"6": {"id": "6", "teamId": my_team, "away": away, "loggedin": True},
+                                "3": {"id": "3", "teamId": "3", "away": True, "loggedin": True}}},
+        "context": {"managerId": "6"}, "countdown": {"seconds": 30},
+    }
+
+
+def test_autopick_state_comes_from_the_store_not_the_banner():
+    """Yahoo's "put into autopick mode" notice is an inert banner that stays
+    up after autodraft is switched back off. Mock 13 acted on it: the driver
+    clicked the Autodraft TOGGLE every cycle (off, on, off, on) for two
+    rounds and stood itself down on every turn. With a store, its away flag
+    is the state; the banner only matters when there is no store."""
+    picks = [(1, 1, "Jahmyr", "Gibbs", "RB"), (6, 6, "Christian", "McCaffrey", "RB")]
+    r = run_js(
+        f"""
+        const banner = 'You have been put into autopick mode due to inactivity.';
+        document.body.innerText = banner;
+        const noStore = DK.autopickArmed();
+        DK._setStore({{ getState: () => ({json.dumps(_fake_store(picks, away=False))}) }});
+        const storeOff = DK.autopickArmed();
+        DK._setStore({{ getState: () => ({json.dumps(_fake_store(picks, away=True))}) }});
+        const storeOn = DK.autopickArmed();
+        console.log(JSON.stringify({{ noStore, storeOff, storeOn, banner: DK.bannerSaysArmed() }}));
+        """
+    )
+    assert r["noStore"] is True, "without a store the banner is all we have"
+    assert r["storeOff"] is False, "store says not away: the banner must not stand the driver down"
+    assert r["storeOn"] is True
+    assert r["banner"] is True
+
+
+def test_a_pick_is_verified_against_the_store_not_the_roster_count():
+    """At pick 135 of mock 13 Yahoo's autopick took Cam Little the instant
+    the turn opened; our Seattle click was rejected, the roster count still
+    grew by one, and the log said 'Seattle, verified'. The store knows which
+    player landed at OUR pick number."""
+    picks = [(1, 1, "Jahmyr", "Gibbs", "RB"), (6, 6, "Cam", "Little", "K")]
+    r = run_js(
+        f"""
+        DK._setStore({{ getState: () => ({json.dumps(_fake_store(picks))}) }});
+        const turn = DK.storeState().drafted.find(d => d.mine).pick_no;
+        console.log(JSON.stringify({{
+          turn,
+          other:   DK.pickLandedStore({{ n: 'Seattle Seahawks', p: 'DEF' }}, turn),
+          ours:    DK.pickLandedStore({{ n: 'Cam Little', p: 'K' }}, turn),
+          pending: DK.pickLandedStore({{ n: 'Seattle Seahawks', p: 'DEF' }}, turn + 9),
+        }}));
+        """
+    )
+    assert r["other"] is False, "someone else's player at our pick must not verify our click"
+    assert r["ours"] is True
+    assert r["pending"] is None, "no pick recorded at that number yet: unknown, not false"
+    # and without a store the answer is unknown, so the roster-count check still applies
+    r2 = run_js("console.log(JSON.stringify({ x: DK.pickLandedStore({ n: 'Cam Little', p: 'K' }, 6) }));")
+    assert r2["x"] is None

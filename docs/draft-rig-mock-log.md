@@ -366,3 +366,41 @@ them under jsdom in seconds.
 
 Also seen: five of the nine rivals were `away` -- autopicking from Yahoo's
 default list. The rival-autopick idea has its signal.
+
+## Mock 13 — room 10432160 "Red Zone", 10 teams, slot 6 — keepAlive held; three new defects, all in the endgame
+
+Roster: McCaffrey, Achane, McBride, Davante Adams, Drake Maye, Jaylen Warren,
+Jameson Williams, RJ Harvey, Courtland Sutton, Quentin Johnston, Kenny
+Gainwell, Wan'Dale Robinson, Daniel Jones (QB2, R13), Cam Little K, Ravens
+DEF. Legal at every guardrail, one TE, K and DEF filled.
+
+Picks 6–75: every pick made live by the engine at the turn except pick 6
+(the on-clock gate refused a store/header disagreement and the queue took
+McCaffrey — the design working) and the store's off-by-one fixed in place.
+`away` never flipped on us through round 8: keepAlive did its job.
+
+Then pick 86 was lost, and with it live control for the rest of the draft.
+
+| # | symptom | cause | fix |
+|---|---|---|---|
+| 40 | A.J. Brown led the engine's plan from pick 42 to 46 — he had gone at 17 | the bridge keyed the board on first-initial + surname; "A. Brown" is Amon-Ra St. Brown AND A.J. Brown (and "B. Robinson" is Bijan and Brian, same team), so the dict kept one and the other could never be marked drafted | `PlayerIndex`: full name first, initial key as fallback, and among namesakes the one not already accounted for. Roster attribution resolves to player ids the same way. Tests: both Browns drafted; "A. Brown" after Amon-Ra is A.J.; our A.J. does not claim their Amon-Ra |
+| 41 | pick 86: driver refused all 24 candidates as `guardrail`, clock ran out, Yahoo armed autopick | a driver-only rule: "no VORP ≤ 0 pick once we hold a stash". By round 9 every remaining RB/WR is below replacement — including the bench-insurance rows the engine prices above zero on purpose. rank() had a labelled relaxation for this; draftTop never did | rule deleted from guardrailOk (the driver keeps the roster legal; whether a bench pick is worth it is bench.py's call). Dead relaxation branch removed; test updated |
+| 42 | from 86 on: "AWAY/AUTOPICK detected (store=true/false alternating) -> clicked Autodraft toggle" every 2 s | keepAlive treated the "put into autopick mode" notice as the state. It is an inert banner that stays up after disarm, and the control is a toggle: off, on, off, on. autopickArmed() read the same banner, so the loop also stood itself down at every turn | store first everywhere: `autopickArmed()` and keepAlive use the store's away flag when a store exists; the banner counts only without a store, once per 30 s, and a click that ARMS autodraft is undone at once. Test: banner + store-off → not armed |
+| 43 | pick 135: log said "Seattle Seahawks, verified: true"; the store says our 135 was Cam Little (K) | verification was "the roster count grew". Yahoo's autopick had taken Cam Little the instant the turn opened, our click was rejected ("not the current pick"), and the count still went up | `pickLandedStore(cand, turn)`: is the pick recorded at OUR pick number this candidate? false → reported as `pick-made-by-other-means`, never as verified; null (no store / not recorded yet) → roster-count fallback. Tested |
+
+Picks 95, 106, 135 and 146 were made by Yahoo's autodraft (queue head or
+its default list); 115 and 126 went by while I had the driver stopped to
+ship the fixes. The bridge was restarted mid-draft with the namesake fix and
+the driver re-injected at pick 131 — preflight clean, the Texans/Seahawks
+plan correct for K/DEF — which is the recovery path the runbook describes.
+
+Open question for mock 14: after the toggle storm the store said
+`away: false` while the server still autopicked for us at 135 and 146. So
+the client's flag and the server's autopick state can diverge. With the
+storm gone this should not recur; if the server autopicks while the store
+says not-away, the flag is not the truth and we need the server's word
+(draftstatus, or the pick timing itself).
+
+Also seen: with every rival away, the room ran a round in about ten seconds.
+Our own clock is unaffected, but "N picks until your turn" is minutes of
+warning in a live room and seconds in a mock.

@@ -66,6 +66,40 @@ def pkey(name: str, pos: str | None) -> str:
     return key(name)
 
 
+class PlayerIndex:
+    """Resolve a name the page hands us to ONE board player.
+
+    Yahoo renders "A. Brown" for Amon-Ra St. Brown and for A.J. Brown, and
+    "B. Robinson" for Bijan and Brian Robinson Jr. -- same position, and for
+    the Robinsons the same team. A dict keyed on first-initial + surname kept
+    whichever came first by VORP, so in mock 13 (2026-09-02) A.J. Brown went
+    at pick 17 and led the engine's plan for the next thirty picks: he could
+    never be marked drafted.
+
+    The store feed carries full names, so those match exactly. The panel's
+    abbreviated text falls back to the initial key and, among namesakes,
+    resolves to one not already accounted for (the caller passes what it has
+    seen) -- a second "A. Brown" after Amon-Ra left is A.J., never a second
+    Amon-Ra.
+    """
+
+    def __init__(self, players: list[dict]):
+        self.full: dict[tuple[str, str], list[dict]] = {}
+        self.short: dict[tuple[str, str], list[dict]] = {}
+        for p in players:
+            pos = str(p["pos"]).upper()
+            self.full.setdefault((norm(p["name"]), pos), []).append(p)
+            self.short.setdefault((pkey(p["name"], pos), pos), []).append(p)
+
+    def resolve(self, name: str, pos: str | None, exclude: set[str] = frozenset()) -> dict | None:
+        pos = str(pos or "").upper()
+        cands = self.full.get((norm(name), pos)) or self.short.get((pkey(name, pos), pos)) or []
+        fresh = [p for p in cands if p["sleeper_id"] not in exclude]
+        # every namesake already accounted for: it is a repeat view of one of
+        # them, and the highest-VORP one is the conventional reading
+        return (fresh or cands or [None])[0]
+
+
 FLEX_NAMES = {"W/R/T", "WRT", "W/R", "FLEX", "W/T", "R/W/T"}
 
 
@@ -164,9 +198,7 @@ def build_tracker(cfg: Config, players: list[dict], state: dict) -> Tracker:
     t.players = players
     t.by_id = {p["sleeper_id"]: p for p in players}
 
-    by_key = {}
-    for p in players:
-        by_key.setdefault((pkey(p["name"], p["pos"]), p["pos"]), p)
+    index = PlayerIndex(players)
 
     # SECOND source of "whose pick was it": the roster panel. The page sends
     # my_roster (name + pos read off "YOUR TEAM"), and a drafted entry whose
@@ -175,16 +207,24 @@ def build_tracker(cfg: Config, players: list[dict], state: dict) -> Tracker:
     # after a plan that saw no roster at all -- the panel's label was not
     # readable at our turn, every pick came through unattributed, and with an
     # empty roster the TE market was open and urgent.
-    mine_keys = {(pkey(r.get("name", ""), r.get("pos", "")), str(r.get("pos", "")).upper())
-                 for r in (state.get("my_roster") or [])}
+    #
+    # Resolve the roster to player ids FIRST, so a drafted entry is ours when
+    # it is the same player -- not when it merely renders the same way.
+    mine_ids: set[str] = set()
+    for r in state.get("my_roster") or []:
+        p = index.resolve(r.get("name", ""), r.get("pos", ""), exclude=mine_ids)
+        if p:
+            mine_ids.add(p["sleeper_id"])
 
     picks = []
-    for d in state.get("drafted", []):
-        p = by_key.get((pkey(d["name"], d.get("pos", "")), d.get("pos", "")))
+    seen: set[str] = set()
+    for d in sorted(state.get("drafted", []), key=lambda x: int(x.get("pick_no") or 0)):
+        p = index.resolve(d["name"], d.get("pos", ""), exclude=seen)
         if not p:
             continue
+        seen.add(p["sleeper_id"])
         pick_no = int(d["pick_no"])
-        if (pkey(d["name"], d.get("pos", "")), str(d.get("pos", "")).upper()) in mine_keys:
+        if p["sleeper_id"] in mine_ids:
             d = dict(d, mine=True)
         # Whose pick was it?
         #
@@ -214,16 +254,12 @@ def build_tracker(cfg: Config, players: list[dict], state: dict) -> Tracker:
     #    without this the engine sees an empty roster, every slot open, and
     #    the TE market urgent again.
     have_ids = {x["player_id"] for x in picks}
-    mine_ids = {x["player_id"] for x in picks if x["draft_slot"] == t.my_slot}
     next_filler = (max((x["pick_no"] for x in picks), default=0) + 1)
-    for r in state.get("my_roster") or []:
-        p = by_key.get((pkey(r.get("name", ""), r.get("pos", "")), str(r.get("pos", "")).upper()))
-        if not p or p["sleeper_id"] in have_ids:
-            continue
-        picks.append({"pick_no": next_filler, "player_id": p["sleeper_id"],
+    for pid in sorted(mine_ids - have_ids):
+        picks.append({"pick_no": next_filler, "player_id": pid,
                       "draft_slot": t.my_slot,
                       "round": snake.pick_to_round_slot(next_filler, teams)[0]})
-        have_ids.add(p["sleeper_id"]); mine_ids.add(p["sleeper_id"])
+        have_ids.add(pid)
         next_filler += 1
     # 2. The header's pick number is authoritative for WHERE we are. Pad with
     #    anonymous rival picks so current_pick, the survival window and the

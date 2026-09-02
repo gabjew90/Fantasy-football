@@ -387,10 +387,16 @@ window.DK = (function () {
     return !!(S.ctx && S.ctx.top6TeFell);
   }
 
-  function guardrailOk(p, rnd, need, counts, picksLeft, top6TeFell, haveStash) {
+  /* Structural rules only. There used to be a fourth: "no non-negative-VORP
+   * bench pick once we hold a stash". By round 9 every remaining RB/WR is
+   * below replacement, so at pick 86 of mock 13 (2026-09-02) it refused all
+   * 24 candidates the engine sent -- bench-insurance rows the engine prices
+   * ABOVE zero on purpose -- and the clock ran out. Whether a bench player is
+   * worth the pick is the engine's call (bench.py); the driver only keeps the
+   * roster legal. */
+  function guardrailOk(p, rnd, need, counts, picksLeft, top6TeFell) {
     if (!te2Ok(p, counts)) return false;
     if (!posAllowed(p.p, rnd, counts, picksLeft, top6TeFell)) return false;
-    if ((p.v || 0) <= 0 && !needsPosition(need, p.p) && haveStash) return false;
     const openStarters = ['QB', 'RB', 'WR', 'TE', 'FLEX', 'K', 'DEF']
       .reduce((a, k) => a + (need[k] || 0), 0);
     if (picksLeft <= openStarters && !needsPosition(need, p.p)) return false;
@@ -607,10 +613,6 @@ window.DK = (function () {
     const need = needsMap(counts);
     const mine = new Set(ros.players.map(p => p.k + '|' + p.pos));
 
-    const haveStash = ros.players.some(p => {
-      const b = S.board.find(x => x.k === p.k && x.p === p.pos);
-      return b && (b.v || 0) <= 0;
-    });
 
     /* TE2 gate. The Python engine asks "did a top-6 TE fall to us", which
      * needs a reliable drafted-set we deliberately do not have. Equivalent
@@ -640,7 +642,7 @@ window.DK = (function () {
     const eligible = [];
     const blocked = [];
     for (const p of avail) {
-      if (guardrailOk(p, rnd, need, counts, picksLeft, true, haveStash)) eligible.push(p);
+      if (guardrailOk(p, rnd, need, counts, picksLeft, true)) eligible.push(p);
       else if (blocked.length < 6) blocked.push(p.n + '(' + p.p + ')');
     }
 
@@ -653,16 +655,11 @@ window.DK = (function () {
      * armed in mock 7 at roster 9/15.
      *
      * The Python engine hit this exact bug on shallow boards and fixed it
-     * with a labelled fallback; this port reintroduced it. An empty
-     * recommendation is never the right answer while picks remain: relax the
-     * stash rule (never the positional guardrails) and say so. */
-    let relaxed = false;
-    if (!eligible.length) {
-      for (const p of avail) {
-        if (guardrailOk(p, rnd, need, counts, picksLeft, true, false)) eligible.push(p);
-      }
-      relaxed = eligible.length > 0;
-    }
+     * with a labelled fallback; this port reintroduced it, then relaxed the
+     * rule here when the list came back empty. draftTop had no such relief
+     * and refused all 24 candidates at pick 86 of mock 13, so the rule is
+     * gone from guardrailOk altogether: eligible is empty only when the
+     * board truly is. */
 
     /* VONA -- value over NEXT AVAILABLE, not over a fixed replacement.
      *
@@ -804,7 +801,6 @@ window.DK = (function () {
       blockedSample: blocked,
       availCount: avail.length,
       goneCount: S.gone.size,
-      stashRelaxed: relaxed,
     };
   }
 
@@ -1235,16 +1231,12 @@ window.DK = (function () {
     const need = r.need || {}, counts = r.counts || {};
     const picksLeft = r.picksLeft != null ? r.picksLeft : S.cfg.rounds;
     const rnd = r.round || 1;
-    const haveStash = (myRoster() || { players: [] }).players.some(p => {
-      const b = S.board.find(x => x.k === p.k && x.p === p.pos);
-      return b && (b.v || 0) <= 0;
-    });
     const top6TeFell = !!(S.ctx && S.ctx.top6TeFell);
     for (const cand of r.top) {
       if (tries >= (maxTries || 3)) break;
       const entry = S.board.find(b => b.n === cand.n && b.p === cand.p);
       if (!entry) continue;
-      if (!guardrailOk(entry, rnd, need, counts, picksLeft, top6TeFell, haveStash)) {
+      if (!guardrailOk(entry, rnd, need, counts, picksLeft, top6TeFell)) {
         attempted.push(cand.n + ':guardrail');
         continue;
       }
@@ -1284,21 +1276,58 @@ window.DK = (function () {
        * click path silently no-opped and the queue was quietly making every
        * real pick. An unverified success hides the very failure we hunt. */
       await sleep(700);
+      /* "The roster grew" is not "OUR click landed THIS player". At pick 135
+       * of mock 13 Yahoo's autopick had already taken Cam Little the instant
+       * the turn opened; our Seattle click was rejected ("not the current
+       * pick") and the roster count still went up by one, so the log said
+       * Seattle, verified. With the store readable, verify the pick itself. */
+      const landed = pickLandedStore(cand);
+      if (landed === false) {
+        attempted.push(cand.n + ':notours(' + (lastOwnPickName() || '?') + ')');
+        return { err: 'pick-made-by-other-means', attempted, landed: lastOwnPickName() };
+      }
       const after = rosterCount();
-      if (!(after && before && after.have > before.have)) {
+      if (landed !== true && !(after && before && after.have > before.have)) {
         attempted.push(cand.n + ':noland');
         continue;
       }
-      return { drafted: cand.n, pos: cand.p, vorp: cand.v, verified: true };
+      return { drafted: cand.n, pos: cand.p, vorp: cand.v, verified: landed === true ? 'store' : 'roster-count' };
     }
     return { err: 'no-verified-pick', attempted };
+  }
+
+  /* Did the store just record OUR pick of this candidate? true / false, or
+   * null when the store cannot say (no store, or our newest pick predates
+   * this turn). Pure given storeState(); tested through _setStore. */
+  function pickLandedStore(cand, turn) {
+    const snap = storeState();
+    if (!snap || !snap.my_team) return null;
+    const at = turn != null ? turn : S.planPick;      // the pick we were on the clock for
+    if (at == null) return null;
+    const ours = snap.drafted.find(d => d.mine && d.pick_no === at);
+    if (!ours) return null;                            // not recorded yet
+    return ours.pos === cand.p && idKey(ours.name, ours.pos) === idKey(cand.n, cand.p);
+  }
+
+  function lastOwnPickName() {
+    const snap = storeState();
+    const mine = snap ? snap.drafted.filter(d => d.mine) : [];
+    return mine.length ? mine[mine.length - 1].name : null;
   }
 
   /* Yahoo tells us when it has taken the wheel. Once armed it drafts the
    * instant the turn opens, so racing it with clicks only wastes the clock --
    * and the clock expiring is what armed it. When armed, trust the queue. */
-  function autopickArmed() {
+  function bannerSaysArmed() {
     return /put into autopick mode/i.test(document.body.innerText);
+  }
+
+  /* Store first: the banner is inert and outlives the disarm (mock 13), so
+   * on its own it would stand the driver down for the rest of the draft. */
+  function autopickArmed() {
+    const snap = storeState();
+    if (snap && snap.my_team) return snap.away_teams.includes(snap.my_team);
+    return bannerSaysArmed();
   }
 
   /* Overall pick number of our next turn, read off the header ("You're up in
@@ -1417,10 +1446,21 @@ window.DK = (function () {
       window.dispatchEvent(new Event('focus'));
     } catch (e) { /* synthetic events are best effort */ }
 
+    /* The store's away flag is the truth when we can read it. The page's
+     * "put into autopick mode" notice is NOT: it is an inert banner that
+     * stays up after autodraft is switched back off, and the Autodraft
+     * control is a toggle. Acting on the banner, mock 13 (2026-09-02) clicked
+     * that toggle every cycle -- off, on, off, on -- for two rounds, and two
+     * of our picks went to Yahoo's autodraft while the flag happened to be
+     * on. Without a store the banner is all we have, so then act on it at
+     * most once per 30 s, and verify. */
     const snap = storeState();
     const awayByStore = !!(snap && snap.my_team && snap.away_teams.includes(snap.my_team));
-    const armed = autopickArmed();
-    if (!awayByStore && !armed) return { away: false };
+    const armed = snap ? awayByStore : autopickArmed();
+    if (!armed) return { away: false };
+    if (!snap && S.lastDisarm && Date.now() - S.lastDisarm < 30000) {
+      return { away: true, toggled: false, why: 'banner only; disarm attempted <30s ago' };
+    }
     // Disarm: the Queue panel carries an "Autodraft" toggle
     ensureLeftTab('Queue');
     await sleep(500);
@@ -1428,8 +1468,18 @@ window.DK = (function () {
       .find(b => /^Autodraft$/i.test((b.textContent || '').trim()) || /autodraft/i.test(b.getAttribute('aria-label') || ''));
     if (toggle) {
       toggle.click();
+      S.lastDisarm = Date.now();
       await sleep(600);
-      note('AWAY/AUTOPICK detected (store=' + awayByStore + ', modal=' + armed + ') -> clicked Autodraft toggle');
+      const after = storeState();
+      const stillAway = !!(after && after.my_team && after.away_teams.includes(after.my_team));
+      note('AWAY/AUTOPICK detected (store=' + awayByStore + ', banner=' + bannerSaysArmed()
+        + ') -> clicked Autodraft toggle; away now ' + (after ? stillAway : 'unknown'));
+      if (after && stillAway && !awayByStore) {
+        // we just armed it: undo at once rather than wait a cycle
+        toggle.click();
+        await sleep(600);
+        note('toggle had ARMED autodraft -> clicked again');
+      }
     } else {
       note('AWAY/AUTOPICK detected but no Autodraft toggle found');
     }
@@ -1645,6 +1695,7 @@ window.DK = (function () {
     /* Pure form of the post-click check in draftTop. A pick counts only when
      * the roster actually grew. */
     pickLanded: (before, after) => !!(after && before && after.have > before.have),
+    pickLandedStore, bannerSaysArmed,
     _starred: () => [...S.starred],
     _markStarred: (id) => S.starred.add(id),
     _isStarred: (id) => S.starred.has(id),

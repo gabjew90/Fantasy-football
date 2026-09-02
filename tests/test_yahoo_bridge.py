@@ -207,3 +207,57 @@ def test_merge_feed_ignores_garbage_pick_numbers():
                               {"pick_no": None, "name": "B", "pos": "RB"},
                               {"pick_no": "3", "name": "C", "pos": "RB"}])
     assert [d["pick_no"] for d in got] == ["3"]
+
+
+# ---------- mock 13 (2026-09-02): first-initial keys collide ----------
+
+def _two_browns():
+    players = _players()
+    base = dict(players[20])
+    for i, (name, vorp) in enumerate((("Amon-Ra St. Brown", 77.4), ("A.J. Brown", 35.9))):
+        players.append(dict(base, sleeper_id=f"b{i}", name=name, pos="WR", team="XX",
+                            vorp=vorp, vorp_flex=vorp, proj_pts=200.0 + vorp, adp=5.0 + 12 * i))
+    return players
+
+
+def test_two_players_with_the_same_initial_and_surname_are_both_drafted():
+    """Yahoo prints "A. Brown" for Amon-Ra St. Brown AND A.J. Brown. Keying
+    the board on first-initial + surname kept only the higher-VORP one, so
+    A.J. Brown (pick 17 of mock 13) was never marked drafted and led the
+    engine's plan for the next thirty picks. The store hands us FULL names;
+    match on those first and fall back to the initial key only for the
+    panel's abbreviated text."""
+    players = _two_browns()
+    state = {"my_slot": 6, "teams": 10, "rounds": 15, "current_pick": 46,
+             "drafted": [{"pick_no": 5, "name": "Amon-Ra St. Brown", "pos": "WR"},
+                         {"pick_no": 17, "name": "A.J. Brown", "pos": "WR"}],
+             "my_roster": []}
+    t = yb.build_tracker(_Cfg(), players, state)
+    assert {"b0", "b1"} <= t.state.drafted_ids
+    assert not any(p["name"] == "A.J. Brown" for p in t.remaining("WR"))
+
+
+def test_abbreviated_name_resolves_to_the_undrafted_namesake():
+    """The Picks panel only ever says "A. Brown". When one namesake is already
+    gone, the abbreviated pick is the other one -- never a second copy of the
+    one we already saw leave."""
+    players = _two_browns()
+    state = {"my_slot": 6, "teams": 10, "rounds": 15, "current_pick": 20,
+             "drafted": [{"pick_no": 5, "name": "Amon-Ra St. Brown", "pos": "WR"},
+                         {"pick_no": 17, "name": "A. Brown", "pos": "WR"}],
+             "my_roster": []}
+    t = yb.build_tracker(_Cfg(), players, state)
+    assert {"b0", "b1"} <= t.state.drafted_ids
+
+
+def test_roster_attribution_does_not_bleed_across_namesakes():
+    """We hold A.J. Brown; a rival took Amon-Ra. The rival's pick must not be
+    attributed to us just because both render as "A. Brown"."""
+    players = _two_browns()
+    state = {"my_slot": 6, "teams": 10, "rounds": 15, "current_pick": 20,
+             "drafted": [{"pick_no": 5, "name": "Amon-Ra St. Brown", "pos": "WR"},
+                         {"pick_no": 15, "name": "A.J. Brown", "pos": "WR"}],
+             "my_roster": [{"name": "A.J. Brown", "pos": "WR"}]}
+    t = yb.build_tracker(_Cfg(), players, state)
+    mine = {x["player_id"] for x in t.state.picks if x["draft_slot"] == 6}
+    assert mine == {"b1"}, mine
