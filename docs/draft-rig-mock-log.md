@@ -571,3 +571,37 @@ slot fill after Allen went; rounds 7-13 were priced as bench insurance
 ("covers 3 RB starters ~9.6 wks, +9.1/wk over the wire ≈ 88 pts") rather
 than by raw points. Pivots when a target went: McBride and London at 30/31
 -> Rice and Wilson; Dobbins at 90 -> Aaron Jones.
+
+## Mock 20 — room 10502459 "Fourth and Inches", 10 teams, slot 9 — 14 of 15; the action path's own idle-timer hole
+
+Full trail: reports/mocks/mock_10502459.md (every manager's picks and
+roster, our picks with the engine's reason, the best-by-projection
+alternative and the candidates passed on).
+
+Roster: Achane, CeeDee Lamb, McBride, Javonte Williams, Maye, Davante
+Adams, Gainwell, RJ Harvey, Aaron Jones, Wan'Dale Robinson, Mahomes (QB2,
+R11), Woody Marks, Michael Pittman (Yahoo autopick, see below), Dicker K,
+Ravens DEF.
+
+Fourteen of fifteen by the driver, all fourteen through `makePick`
+(337-1018 ms to store confirmation), in the room before pick 1. The
+fifteenth is the mock's finding: at pick 129 Yahoo had flagged us `away`
+(its idle timer, ~16 minutes into the draft) and autopicked Pittman the
+instant our turn opened. The driver's record is exact -- makePick(Tracy)
+timed out, the click fallback found no Draft button (pick already made),
+the next candidate's action returned `notours(Michael Pittman Jr.)` -- and
+keepAlive cleared the flag at 15:28:06, three seconds after the pick.
+
+Why now and not in mocks 14-18: on the click path our own typing and
+clicking counted as user activity to Yahoo's client; `makePick` generates
+none, so the action path removed an accidental keep-alive. Fix (driver
+commit 26a8e97): keepAlive sends Yahoo's own `setAwayStatus(false)` every
+240 s whether or not the flag is up, and run() calls keepAlive before the
+on-clock pick attempt. Mock 19 did not hit it only because my forced
+away/clear at 14:59 reset the timer by accident.
+
+Engine narration highlights: passed on Josh Allen as the top projection at
+9, 12, 29 and 32 (he went 22nd); McBride survived to 29 (71%); Maye taken
+at 49 as the QB slot fill after Wilson and Skattebo went; rounds 7-12
+priced as bench insurance (RJ Harvey "covers 3 RB starters ~9.6 wks, ≈ 88
+pts"). Mistake count for the "three clean mocks" rule resets: 21, 22, 23.
