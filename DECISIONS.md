@@ -2196,3 +2196,18 @@ reports/g4/). Whole-pool survival vectors at every state, 15 windows.
 Extension (user, 02:15 PT): four more rooms, live knob set alternating
 (room 2 = current), each scored at both points; the G4 verdict is taken on
 all five together, criteria unchanged.
+
+### #35 G4 interim, forward room 2 of 5 (mock 29, room 10588125, drafted at CURRENT)
+
+Scored offline at both points (logs data/processed/backtest/g4_10588125_*.log),
+7 windows (seat 1's pairs), whole-pool vectors.
+- log-loss: fitted 0.2213, current 0.2366 -> fitted better by 0.015 (same
+  size as room 1).
+- 30-70% buckets (observed - predicted): fitted 30-49 -5 (n476), 50-69 -1
+  (n546); current 30-49 +8 (n504), 50-69 -1 (n766). Fitted's middle-bucket
+  miss is the smaller one on this room (6 vs 9 points summed).
+- G4 per-room reading: both criteria met for fitted. Tally after two rooms:
+  log-loss 2/2 fitted; 30-70 miss 1/2. Caveat: this room's driver lost two
+  turns to a background-tab stall (Yahoo autopicked 80-81), which changes
+  our roster history but not the survival rows, which are scored on rival
+  behaviour between our turns.
