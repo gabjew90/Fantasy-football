@@ -2315,3 +2315,40 @@ minus this pair) through plan rows to the panel and reports, so "why not
 the higher waiting-cost player" is answerable from the record (user
 request after mock 32 pick 22). Panel plan lines are now one candidate
 per line with BOTH costs: wait (position decay) and pick (pair regret).
+
+## 2026-09-03 (37) — the bridge "restarts" silently failed; true arm history of the forward rooms
+
+Mock 35's whys still named Josh Jacobs as the wire after #36 shipped,
+which exposed an operations defect: the restart command filtered
+Get-Process on .CommandLine, a property PowerShell 5.1 does not populate,
+so the kill matched nothing; and the bridge's allow_reuse_address lets a
+second Windows process bind 8443 without an error, so each new bridge
+started, logged its banner, and served NOTHING (its .log shows zero plan
+calls). Six zombie bridges were found and killed at 15:40 UTC.
+
+True serving history (from plan-call counts per process log and the call
+counter continuity in the room sidecars):
+- forward1, FITTED knobs, pre-#36 code: served mocks 28, 29, 30, 31, 32.
+- forward6, CURRENT knobs, pre-#36 code: served mocks 33, 34, 35.
+All intermediate "restarts" (forward2-5, 7, 8) never served a request.
+
+What this breaks and does not break:
+- The #35 G4 verdict STANDS: its criteria are scored OFFLINE at both knob
+  sets on each room's realised states, independent of the serving arm;
+  and the original pre-registration wanted the forward rooms drafted live
+  at the fitted point, which rooms 28-32 all were.
+- Mock-log live-arm labels for 29, 31 (said current, were fitted) and 34
+  (said fitted, was current) are corrected in this commit.
+- Mocks 33 and 35 both ran CURRENT: the "pair" is not a model comparison
+  but a same-seat same-model reproducibility check, and a strong one:
+  13 of 15 picks identical across different rooms (the two differences
+  were availability, RJ Harvey and Jakobi Meyers taken earlier in room
+  35). Pair B (seat 5, fitted, clean) is still owed: mock 36.
+- #36's wire fix and the pair-math plan fields were NOT live in any room
+  yet; mock 36 is their first live room.
+
+Restart procedure from now on (runbook + rig memory updated): kill via
+CIM Win32_Process CommandLine match, confirm "listeners: 0", start with
+-PassThru, and confirm the port's OwningProcess is a CHILD of the new
+PID before trusting the room to it; the driver preflight call# must be
+small and fresh.

@@ -903,7 +903,7 @@ reports/mocks/mock28_2026-09-03_0151pt_hitch-and-go_room10586715_seat6_*.md.
 G4 extension (user, 02:15 PT): four more rooms alternating the live knob
 set, both sets scored offline on every room.
 
-## Mock 29 — room 10588125 "Hurry-Up Offense", 10 teams, slot 1 — FORWARD TEST 2 of 5: CURRENT knobs live
+## Mock 29 — room 10588125 "Hurry-Up Offense", 10 teams, slot 1 — FORWARD TEST 2 of 5 (DECISIONS #37: actually FITTED knobs live; the restart never took)
 
 02:27-02:41 PT. 15/15 legal; 12 engine picks, all via the action path
 (~1.0 s confirm, slower than mock 28's 0.4 s -- background tab). THREE
@@ -950,7 +950,7 @@ at the fitted point: 30-50% shown 39% observed 12% (n 16); 50-70% 59% vs
 nine rivals away by round 11. Reports:
 reports/mocks/mock30_2026-09-03_0257pt_first-and-ten_room10589182_seat1_*.md.
 
-## Mock 31 — room 10590238 "Goal Line Stand", 10 teams, slot 7 — FORWARD TEST 4 of 5: CURRENT knobs live — CLEAN
+## Mock 31 — room 10590238 "Goal Line Stand", 10 teams, slot 7 — FORWARD TEST 4 of 5 (DECISIONS #37: actually FITTED knobs live) — CLEAN
 
 03:27-03:39 PT. First room on the throttle-proof driver (sleep via Blob
 Worker, heartbeat 60 s). Entry: the in-page poll for the Enter Draft
@@ -1001,7 +1001,7 @@ better, sixth room of six); 30-49 bucket miss fitted -18 (n172, CI
 [-24,-12]) vs current -13 (n155) — BOTH over-promise here in this room,
 fitted by more. Pair B is room 10598876, same seat 5, fitted knobs.
 
-## Mock 34 — room 10598876 "Unnecessary Roughness", 10 teams, slot 5 — fitted knobs — NOT pair B (entry after bell)
+## Mock 34 — room 10598876 "Unnecessary Roughness", 10 teams, slot 5 — NOT pair B (entry after bell; DECISIONS #37: actually CURRENT knobs live)
 
 07:33-07:52 PT. Joined as pair B to mock 33 but the entry was interrupted
 past the bell: pick 5 (Nacua) went to Yahoo's list, so per the user's
@@ -1013,3 +1013,19 @@ better, seventh room of seven. Survival scorecard at the fitted point:
 30-50% shown 43% observed 8% (n 13); 70-90% shown 80% observed 40%
 (n 53). Reports:
 reports/mocks/mock34_2026-09-03_0733pt_unnecessary-roughness_room10598876_seat5_*.md.
+
+## Mock 35 — room 10600461 "Hitch and Go", 10 teams, slot 5 — CLEAN — reproducibility twin of mock 33, NOT pair B (DECISIONS #37: CURRENT knobs live, old bridge)
+
+08:18-08:29 PT. 15/15 legal, 15/15 engine via the action path, zero
+autopicks. Intended as pair B (fitted) but served by the stale CURRENT
+bridge (forward6, pre-#36 code), discovered through Josh Jacobs still
+naming the wire. Result reframed per #37: same seat, same model,
+different room = 13/15 picks identical to mock 33 (both differences pure
+availability). The engine is reproducible across rooms given the model
+and seat. Chrome extension dropped ~70 s mid-room; the driver ran on
+unaffected. Offline scoring (g4_10600461_*.log): fitted 0.1287 vs
+current 0.1525, fitted better, eighth room of eight. Panel's new
+bulleted format was live (driver.js is read from disk per injection);
+the pair-math fields were not (bridge-side, stale process). Reports:
+reports/mocks/mock35_2026-09-03_0818pt_hitch-and-go_room10600461_seat5_*.md.
+Pair B moves to mock 36: seat 5, fitted on the VERIFIED forward9 bridge.
