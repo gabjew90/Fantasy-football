@@ -174,21 +174,7 @@ def build_tracker(cfg: Config, players: list[dict], state: dict) -> Tracker:
     # Engine knobs come from the SAME config the Sleeper tracker reads, so the
     # Yahoo draft is run by an identically-configured engine rather than by
     # defaults that merely look similar.
-    e = cfg.get("engine") or {}
-    t.sims = int(e.get("sims", 1000))
-    t.pool_min = int(e.get("pool_min", e.get("pool_size", 40)))
-    t.pool_lookback = int(e.get("pool_lookback", 20))
-    t.pool_lookahead = int(e.get("pool_lookahead", 60))
-    t.sigma_early = float(e.get("sigma_early", 6.0))
-    t.sigma_late = float(e.get("sigma_late", 27.0))
-    t.reach_prob = float(e.get("reach_prob", Tracker.reach_prob))
-    t.reach_scale = float(e.get("reach_scale", Tracker.reach_scale))
-    t.run_window = int(e.get("run_window", Tracker.run_window))
-    t.run_min = int(e.get("run_min", Tracker.run_min))
-    t.run_boost = float(e.get("run_boost", Tracker.run_boost))
-    t.survival_shrink = float(e.get("survival_shrink", Tracker.survival_shrink))
-    t.upside_from_round = int(e.get("upside_from_round", Tracker.upside_from_round))
-    t.upside_mult = float(e.get("upside_mult", Tracker.upside_mult))
+    t.apply_engine_cfg(cfg.get("engine") or {})   # the one knob list (Tracker.ENGINE_KNOBS)
     t.local = True
 
     g = cfg.get("guardrails") or {}

@@ -1359,3 +1359,15 @@ Built:
   assumption stated in the report), `--report-only`. clv_retro delegates to
   it.
 Tests: 8 new (urgency, draftlog x4, bridge x2, driver) + tests/test_fit_survival.py (5).
+
+### B3 (same day): knobs hoisted, one read site, nothing moved
+
+`need_damp`, `qb_filled_damp`, `qb_damp_until_round`, `kdef_early_damp`,
+`kdef_typical_round` are parameters of simulate_survival (defaults = the
+old constants), Tracker class attributes, and `engine:` keys at today's
+values; `run_ratio`, `autopick_sigma_scale`, `rival_needs_update`,
+`away_slots` are declared now and take effect in B4/B5/B6. One knob list
+(`Tracker.ENGINE_KNOBS`) read by `Tracker.apply_engine_cfg`, which the
+Sleeper constructor, the Yahoo bridge and `engine_parity.make_tracker(cfg=,
+overrides=)` all call -- the bridge's hand copy is gone. A same-seed test
+pins that the explicit defaults reproduce the implicit call exactly.

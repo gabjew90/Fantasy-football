@@ -79,9 +79,15 @@ def league_shape(cfg) -> tuple[int, int, dict[str, int]]:
     return int(exp["teams"]), int(exp["rounds"]), {k: v for k, v in slots.items() if v}
 
 
-def make_tracker(board, picks, my_slot, slots=None, teams=None, rounds=None):
+def make_tracker(board, picks, my_slot, slots=None, teams=None, rounds=None,
+                 cfg=None, overrides=None):
     """A Tracker over a synthetic room. Defaults are the 10-team Keefamania
-    shape; pass slots/teams/rounds to replay another league's format."""
+    shape; pass slots/teams/rounds to replay another league's format.
+
+    Harness knobs (sims 400, reach 0.0, pool 12/24) are NOT production; every
+    A/B in this repo runs both arms under the same harness knobs. `cfg` reads
+    the league config's engine block instead (the production point);
+    `overrides` are set last by name, for `--set knob=value` A/Bs (plan B3)."""
     t = object.__new__(Tracker)
     t.teams, t.rounds = teams or TEAMS, rounds or ROUNDS
     t.slots = dict(slots or SLOTS)
@@ -105,6 +111,12 @@ def make_tracker(board, picks, my_slot, slots=None, teams=None, rounds=None):
         drafted_ids={str(p["player_id"]) for p in picks},
         status="drafting",
     )
+    if cfg is not None:
+        t.apply_engine_cfg(cfg["engine"] if "engine" in cfg._data else {})
+    for k, v in (overrides or {}).items():
+        if not hasattr(Tracker, k) and not hasattr(t, k):
+            raise KeyError(f"unknown engine knob {k!r}")
+        setattr(t, k, v)
     return t
 
 

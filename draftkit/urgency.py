@@ -80,7 +80,11 @@ def simulate_survival(pool, current_pick, next_pick, rivals, seeds, rng,
                       sims=1000, sigma=6.0, teams=12,
                       reach_prob=0.0, reach_scale=3.0,
                       run_window=5, run_min=2, run_boost=1.5,
-                      survival_shrink=1.0, recent_pos=None, markets=None):
+                      survival_shrink=1.0, recent_pos=None, markets=None,
+                      need_damp=NEED_DAMP, qb_filled_damp=QB_FILLED_DAMP,
+                      kdef_early_damp=KDEF_EARLY_DAMP, qb_damp_until_round=10,
+                      kdef_typical_round=13, run_ratio=1.5,
+                      autopick_sigma_scale=0.5, rival_needs_update=True):
     """Per-market urgency + per-player survival to my next pick.
 
     pool: undrafted players (dicts with sleeper_id/pos/vorp/adp), pre-truncated.
@@ -91,6 +95,18 @@ def simulate_survival(pool, current_pick, next_pick, rivals, seeds, rng,
     sigma: ADP noise in picks for the current round (caller scales by round).
     markets: optional {name: {"members": (pos,...), "value": "vorp"|"vorp_flex"}}
             extra pooled markets to report alongside the per-position ones.
+
+    Rival-behaviour knobs (plan 2026-09-02 B3: hoisted from module constants
+    so they are logged with every prediction and fittable in B7):
+      need_damp            weight on a position that fills none of the rival's
+                           open starter slots (was the constant 0.15)
+      qb_filled_damp       a rival whose QB slot is filled, before
+                           qb_damp_until_round (was 0.05 / round 10)
+      kdef_early_damp      K/DEF before the rival's typical round minus one;
+                           kdef_typical_round is the fallback when no seed
+                           says otherwise (was 0.02 / 13)
+      run_ratio, autopick_sigma_scale, rival_needs_update are accepted here
+      and take effect in plan steps B4, B5 and B6 respectively.
 
     The returned dict is keyed by position AND by market name; survival is
     always per player and independent of grouping.
@@ -134,13 +150,13 @@ def simulate_survival(pool, current_pick, next_pick, rivals, seeds, rng,
             if not mask.any():
                 continue
             fills = snake.needs_position(rv["needs"], pos)
-            m = 1.0 if fills else NEED_DAMP
-            if pos == "QB" and rv["needs"].get("QB", 0) == 0 and rnd < 10:
-                m = QB_FILLED_DAMP
+            m = 1.0 if fills else need_damp
+            if pos == "QB" and rv["needs"].get("QB", 0) == 0 and rnd < qb_damp_until_round:
+                m = qb_filled_damp
             if pos in ("K", "DEF"):
-                typical = (seed or {}).get("first_round", {}).get(pos, 13)
+                typical = (seed or {}).get("first_round", {}).get(pos, kdef_typical_round)
                 if rnd < typical - 1:
-                    m = KDEF_EARLY_DAMP
+                    m = kdef_early_damp
             m *= _tendency_mult(seed, rnd, pos)
             rival_mult[i, mask] = m
 

@@ -39,12 +39,26 @@ class TrackerState:
 class Tracker:
     # v2 engine knobs as CLASS defaults: test fixtures (and the retro-recs
     # rewinder) construct Trackers via object.__new__, bypassing __init__
+    sims = 1000
+    sigma_early = 6.0
+    sigma_late = 27.0
     reach_prob = 0.15
     reach_scale = 3.0
     run_window = 5
     run_min = 2
     run_boost = 1.5
+    run_ratio = 1.5             # plan B4: run = count > run_ratio x expected; 0 = absolute count
     survival_shrink = 0.55
+    # rival need weighting (plan B3, hoisted from urgency.py constants at the
+    # values that were in force; fitted in B7)
+    need_damp = 0.15
+    qb_filled_damp = 0.05
+    qb_damp_until_round = 10
+    kdef_early_damp = 0.02
+    kdef_typical_round = 13
+    autopick_sigma_scale = 0.5  # plan B5: an autopicking rival's ADP noise, x sigma
+    rival_needs_update = True   # plan B6: a rival picking twice in my window consumes his needs
+    away_slots = frozenset()    # plan B5: draft slots on autopick (Yahoo 'away'); empty on Sleeper
     upside_from_round = 8
     upside_mult = 1.15
     # Rank by unfilled roster SLOT rather than by position (_open_markets).
@@ -113,30 +127,7 @@ class Tracker:
         tcfg = cfg["tracker"]
         self.poll_seconds = float(tcfg["poll_seconds"])
         self.fall_alert = int(tcfg["fall_alert_picks"])
-        ecfg = cfg["engine"] if "engine" in cfg._data else {}
-        self.sims = int(ecfg.get("sims", 1000))
-        # rolling ADP window for the rival sampling pool (post-v2 item 1);
-        # pool_size is retained as the FLOOR so old configs stay meaningful
-        self.pool_min = int(ecfg.get("pool_min", ecfg.get("pool_size", 40)))
-        self.pool_lookback = int(ecfg.get("pool_lookback", 20))
-        self.pool_lookahead = int(ecfg.get("pool_lookahead", 60))
-        self.sigma_early = float(ecfg.get("sigma_early", 6.0))
-        self.sigma_late = float(ecfg.get("sigma_late", 27.0))
-        # v2 item 1.1: fat-tail reaches, run escalation, empirical calibration
-        self.reach_prob = float(ecfg.get("reach_prob", Tracker.reach_prob))
-        self.reach_scale = float(ecfg.get("reach_scale", Tracker.reach_scale))
-        self.run_window = int(ecfg.get("run_window", Tracker.run_window))
-        self.run_min = int(ecfg.get("run_min", Tracker.run_min))
-        self.run_boost = float(ecfg.get("run_boost", Tracker.run_boost))
-        self.survival_shrink = float(ecfg.get("survival_shrink", Tracker.survival_shrink))
-        # v2 item 1.5: round-dependent objective
-        self.upside_from_round = int(ecfg.get("upside_from_round", Tracker.upside_from_round))
-        self.upside_mult = float(ecfg.get("upside_mult", Tracker.upside_mult))
-        self.slot_markets = bool(ecfg.get("slot_markets", Tracker.slot_markets))
-        self.adaptive_fallback = bool(
-            ecfg.get("adaptive_fallback", Tracker.adaptive_fallback))
-        self.bench_insurance = bool(
-            ecfg.get("bench_insurance", Tracker.bench_insurance))
+        self.apply_engine_cfg(cfg["engine"] if "engine" in cfg._data else {})
         self.waiver_k = None
         try:
             from .baselines import waiver_k
@@ -280,6 +271,33 @@ class Tracker:
         return sorted(out, key=lambda p: -(self.current_pick - p["adp"]))[:limit]
 
     # ---------- decision engine (final spec §5-§6) ----------
+
+    # every engine knob the config may set: (name, cast). The default is the
+    # CLASS attribute, so a knob is added in exactly two places -- here and
+    # the class default -- and every constructor (Sleeper __init__, the Yahoo
+    # bridge, the replay harness) reads the same list (plan B3).
+    ENGINE_KNOBS = (
+        ("sims", int), ("pool_lookback", int), ("pool_lookahead", int),
+        ("sigma_early", float), ("sigma_late", float),
+        ("reach_prob", float), ("reach_scale", float),
+        ("run_window", int), ("run_min", int), ("run_boost", float), ("run_ratio", float),
+        ("survival_shrink", float),
+        ("need_damp", float), ("qb_filled_damp", float), ("qb_damp_until_round", int),
+        ("kdef_early_damp", float), ("kdef_typical_round", int),
+        ("autopick_sigma_scale", float), ("rival_needs_update", bool),
+        ("upside_from_round", int), ("upside_mult", float),
+        ("slot_markets", bool), ("adaptive_fallback", bool), ("bench_insurance", bool),
+    )
+
+    def apply_engine_cfg(self, ecfg: dict | None) -> None:
+        """Read the `engine:` block onto this tracker; absent keys keep the
+        class defaults. pool_size is the legacy alias of pool_min."""
+        ecfg = ecfg or {}
+        for name, cast in self.ENGINE_KNOBS:
+            setattr(self, name, cast(ecfg.get(name, getattr(Tracker, name))))
+        # rolling ADP window for the rival sampling pool (post-v2 item 1);
+        # pool_size is retained as the FLOOR so old configs stay meaningful
+        self.pool_min = int(ecfg.get("pool_min", ecfg.get("pool_size", Tracker.pool_min)))
 
     def _rival_states(self, start: int, my_next: int) -> list[dict]:
         """Intervening pickers in order, with their open starter slots."""
@@ -553,6 +571,12 @@ class Tracker:
             run_window=self.run_window, run_min=self.run_min,
             run_boost=self.run_boost, survival_shrink=self.survival_shrink,
             recent_pos=recent_pos, markets=markets,
+            need_damp=self.need_damp, qb_filled_damp=self.qb_filled_damp,
+            kdef_early_damp=self.kdef_early_damp,
+            qb_damp_until_round=self.qb_damp_until_round,
+            kdef_typical_round=self.kdef_typical_round, run_ratio=self.run_ratio,
+            autopick_sigma_scale=self.autopick_sigma_scale,
+            rival_needs_update=self.rival_needs_update,
         )
         self._urgency_cache = (key, report)
         return report

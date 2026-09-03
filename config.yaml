@@ -106,6 +106,18 @@ engine:
   # score on an 85th-percentile proxy instead of median
   upside_from_round: 8
   upside_mult: 1.15
+  # ---- rival-behaviour knobs (plan 2026-09-02 B3) -------------------------
+  # Hoisted from constants in draftkit/urgency.py at the values that were in
+  # force, so every prediction logs the knob set it was made under and the
+  # B7 refit can move them on evidence. Nothing here is fitted yet.
+  need_damp: 0.15            # a position that fills none of the rival's open starter slots
+  qb_filled_damp: 0.05       # rival's QB slot already filled ...
+  qb_damp_until_round: 10    # ... before this round
+  kdef_early_damp: 0.02      # K/DEF before the rival's typical round minus one
+  kdef_typical_round: 13     # fallback typical round when no seed says otherwise
+  run_ratio: 1.5             # B4: a run is count > run_ratio x the model's expected count (0 = old absolute rule)
+  autopick_sigma_scale: 0.5  # B5: an autopicking rival's ADP noise as a fraction of sigma (prior)
+  rival_needs_update: true   # B6: a rival picking twice in my window consumes his needs
 
 tracker:
   poll_seconds: 2

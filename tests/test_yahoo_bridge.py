@@ -302,3 +302,21 @@ def test_log_plan_writes_one_structured_event_per_state(tmp_path):
     assert ev["current_pick"] == 8 and ev["window_start"] == 9 and ev["my_next_pick"] == 13
     assert isinstance(ev["recommendations"][0]["survival"], float)
     assert yb.room_of("mock_10505450") == "10505450" and yb.room_of(None) == "room"
+
+
+def test_engine_knobs_flow_from_the_config_through_one_list():
+    """Plan B3: the Yahoo tracker reads Tracker.ENGINE_KNOBS, not a hand copy."""
+    from draftkit.tracker import Tracker
+
+    class _KnobCfg(_Cfg):
+        def __init__(self):
+            super().__init__()
+            self._d["engine"] = {"sims": 50, "pool_min": 20, "need_damp": 0.5, "run_ratio": 2.0,
+                                 "autopick_sigma_scale": 0.25}
+
+    t = yb.build_tracker(_KnobCfg(), _players(), {"my_slot": 8, "teams": 10, "rounds": 15,
+                                                  "drafted": [], "my_roster": []})
+    assert (t.need_damp, t.run_ratio, t.autopick_sigma_scale, t.sims, t.pool_min) == (0.5, 2.0, 0.25, 50, 20)
+    assert t.qb_filled_damp == Tracker.qb_filled_damp == 0.05      # absent key: class default
+    assert Tracker.need_damp == 0.15 and Tracker.away_slots == frozenset()
+    assert {k for k, _ in Tracker.ENGINE_KNOBS} >= {"need_damp", "run_ratio", "survival_shrink", "sims"}
