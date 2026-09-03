@@ -194,3 +194,17 @@ prerank.js with `has_preranks == "1"` and 240 of 240 verified, bridge
 restart, one mock room on the result with preflight's FINGERPRINT line
 read. Write the elapsed times into docs/draft-rig-mock-log.md. Saturday
 then repeats a rehearsed sequence instead of a first attempt.
+
+### Entry is one batch, not two steps (lesson of mock 28, 2026-09-03)
+
+Mock 28 lost its first two picks to Yahoo autopick because the room was
+entered 2.5 minutes after the bell and injected a minute after that; a
+room with autopick seats runs 13 picks in that minute. The waiting-room
+countdown FREEZES when the tab is hidden, so the bell is computed from the
+wall clock at join time, never read off the page later. From 30 s before
+the computed bell, the entry runs as ONE browser batch: (1) poll the
+waiting page by fetch() until it carries the Enter Draft link, throwing if
+it does not within 30 s so the batch aborts and is re-issued; (2) navigate
+straight to the draft client; (3) wait for the store; (4) inject, load,
+preflight, panel on, run. No reading between steps. On league day the same
+batch runs the minute the commissioner's room opens.

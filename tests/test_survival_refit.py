@@ -216,3 +216,17 @@ def test_current_carries_the_autopick_knobs_at_todays_values():
     assert [g["autopick_list_prob"] for g in grids["autopick_list_prob"]] == [0.0, 0.2, 0.3, 0.4, 0.6]
     assert [g["autopick_sigma_scale"] for g in grids["autopick_sigma_scale"]] == [0.5, 0.75, 1.0, 1.5]
     assert [g["autopick_need_damp"] for g in grids["autopick_need_damp"]] == [0.02, 0.15, 0.30, 0.45]
+
+
+def test_selected_rooms_restricts_to_named_rooms_and_names_a_missing_one(monkeypatch):
+    rooms = [{"room": "10586715"}, {"room": "10531886"}, {"room": "1395566812157984768"}]
+    monkeypatch.setattr(sr, "all_rooms", lambda logs_dir: rooms)
+    assert sr.selected_rooms(SimpleNamespace(rooms=None), Path(".")) == rooms
+    assert [r["room"] for r in sr.selected_rooms(SimpleNamespace(rooms="10531886, 10586715"), Path("."))] == ["10586715", "10531886"]
+    assert sr.selected_rooms(SimpleNamespace(), Path(".")) == rooms       # older callers without the attribute
+    try:
+        sr.selected_rooms(SimpleNamespace(rooms="10586715,nope"), Path("."))
+    except SystemExit as e:
+        assert "nope" in str(e)
+    else:
+        raise AssertionError("a missing room must be a loud error, not a silent empty fit")

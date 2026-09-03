@@ -483,11 +483,25 @@ def coordinate_fit(ctxs: list[dict], stages, start: dict, a, log=None, t0: float
     return point, history, L
 
 
+def selected_rooms(a, logs_dir: Path) -> list[dict]:
+    """all_rooms, restricted to `--rooms a,b,c` when given (G4: score one
+    forward room at a time at both knob sets)."""
+    rooms = all_rooms(logs_dir)
+    want = getattr(a, "rooms", None)
+    if want:
+        keep = {s.strip() for s in str(want).split(",") if s.strip()}
+        rooms = [r for r in rooms if str(r["room"]) in keep]
+        missing = keep - {str(r["room"]) for r in rooms}
+        if missing:
+            raise SystemExit(f"--rooms: no archived room named {sorted(missing)}")
+    return rooms
+
+
 def confirm_point(a, point: dict) -> dict:
     """One knob set at confirmation sims, against both bars, three views;
     written to reports/survival_fit_point.<tag>.json."""
     logs_dir = Path(a.logs)
-    ctxs = [room_context(r, logs_dir) for r in all_rooms(logs_dir)]
+    ctxs = [room_context(r, logs_dir) for r in selected_rooms(a, logs_dir)]
     res = evaluate(ctxs, point, a.confirm_sims, a.every, a.all_slots, a.workers)
     _, bar = _bar_lines(res["rows"])
     out = {"point": point, "objective": res["objective"], "logloss": res["logloss"], "n": res["n"],
@@ -517,7 +531,7 @@ def _room_table(ctxs: list[dict]) -> list[str]:
 def run_fit(a) -> None:
     t0 = time.time()
     logs_dir = Path(a.logs)
-    ctxs = [room_context(r, logs_dir) for r in all_rooms(logs_dir)]
+    ctxs = [room_context(r, logs_dir) for r in selected_rooms(a, logs_dir)]
     stages = stages_for(getattr(a, "stage", "all"), a.smoke)
     L = ["# Survival refit (plan B7, DECISIONS #26; autopick stage DECISIONS #35)", "",
          f"Rooms: {len(ctxs)}. sims {a.sims} (confirmation {a.confirm_sims}), every {a.every} state(s), "
@@ -594,7 +608,7 @@ def run_loro(a, evaluator=None, fitter=None) -> dict:
     t0 = time.time()
     stage = getattr(a, "stage", "all")
     logs_dir = Path(a.logs)
-    ctxs = [room_context(r, logs_dir) for r in all_rooms(logs_dir)]
+    ctxs = [room_context(r, logs_dir) for r in selected_rooms(a, logs_dir)]
     stages = stages_for(stage, a.smoke)
     evaluator = evaluator or (lambda rooms, pt: evaluate(rooms, pt, a.sims, a.every, a.all_slots, a.workers))
     fitter = fitter or (lambda rooms: coordinate_fit(rooms, stages, CURRENT, a, log=lambda s: print(s, flush=True), t0=t0))

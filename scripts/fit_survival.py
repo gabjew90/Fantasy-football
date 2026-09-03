@@ -384,6 +384,9 @@ def main() -> None:
                     help="leave-one-room-out: fit on the other rooms, score the held-out room at the fitted "
                          "point and at CURRENT; writes reports/survival_loro.md")
     ap.add_argument("--loro-out", default=str(ROOT / "reports" / "survival_loro.md"))
+    ap.add_argument("--rooms", default=None,
+                    help="comma-separated room ids; restrict --fit/--confirm-point/--loro to these rooms "
+                         "(DECISIONS #35 G4: one forward room at both knob sets)")
     a = ap.parse_args()
     if a.fit or a.confirm_point or a.loro:
         sys.path.insert(0, str(ROOT / "scripts"))
