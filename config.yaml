@@ -91,7 +91,14 @@ engine:
   # Survival calibration (v2 item 1.1, fitted to the Omnibeta CLV retro):
   # calibrated = 0.5 + (raw - 0.5) * survival_shrink. Fits all three observed
   # buckets: raw 96% -> 75%, 82% -> 68%, 45% -> 50% (n=67).
-  survival_shrink: 0.55
+  # RETIRED 2026-09-02 (DECISIONS #25/#26): the 0.55 shrink was fitted to
+  # mis-scored data. Re-scored, the raw simulation is calibrated from 50% up
+  # (pooled 61/82/97 predicted vs 65/84/98 observed); 1.0 = display what the
+  # sim says. Any value other than 1.0 makes the displayed chance disagree
+  # with the decision (the joint expectation runs on the raw draw) and the
+  # engine warns once. The remaining miss is the human low end (20-50%
+  # predicted, ~35-50% observed) -- a noise-model item, not a shrink.
+  survival_shrink: 1.0
   # fat-tail reach mixture: with reach_prob, a rival's ADP noise is scaled
   # by reach_scale (one-directional reaches, CLV retro: QBs reached 33-46
   # picks early in this room)

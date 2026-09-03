@@ -1486,3 +1486,19 @@ way the 0.55 shrink is retired -- every candidate says so. B2 follows the
 call: with shrink 1.0 the calibrated vector IS the raw vector and the
 decision path is consistent by construction; the carry formula stays the
 JS approximation (measured: mean 1.2, max 8.2 points).
+
+### Decided (same day, the human's call): (A) -- shrink retired, knobs unchanged
+
+`survival_shrink: 1.0` in config.yaml, the Tracker class default, the
+replay harness and the in-page driver's constant. No pick changes (the
+decision path never read the shrink); the displayed chances now equal what
+the simulation says, which the re-scored data supports from 50% up. The
+human low end (sigma / noise shape, not a shrink) stays on the list with
+the need-damp evidence (empirical 0.31-0.49 vs 0.15 in use) for a later
+fit on more human rooms. Any non-1.0 shrink set in future prints a
+one-line warning: display and decision would disagree again.
+
+B2 closed with it: the decision is the joint expectation over the
+simulated draw; with the shrink at 1.0 the displayed vector is that draw;
+`e_best_next_carry` stays in the report as the JS mirror's approximation
+with its measured tolerance.

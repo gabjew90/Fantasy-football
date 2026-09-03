@@ -48,7 +48,7 @@ class Tracker:
     run_min = 2
     run_boost = 1.5
     run_ratio = 1.5             # plan B4: run = count > run_ratio x expected; 0 = absolute count
-    survival_shrink = 0.55
+    survival_shrink = 1.0       # retired 2026-09-02 (DECISIONS #26): the raw sim is calibrated; 0.55 was fitted to mis-scored data
     # rival need weighting (plan B3, hoisted from urgency.py constants at the
     # values that were in force; fitted in B7)
     need_damp = 0.15

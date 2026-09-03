@@ -274,7 +274,9 @@ window.DK = (function () {
    * same way tracker._sigma does. Same shape, no RNG, cheap enough to run
    * every cycle in the page.
    */
-  const SURVIVAL_SHRINK = 0.55;   // fitted: raw 96% -> 75%, 82% -> 68%, 45% -> 50%
+  // 1.0 = no shrink (DECISIONS #26, 2026-09-02): the 0.55 map was fitted to
+  // mis-scored data; re-scored, the raw simulation is calibrated from 50% up.
+  const SURVIVAL_SHRINK = 1.0;
   const NEED_DAMP = 0.6;          // planner.py: position filling no starter slot
 
   function normCdf(z) {           // Abramowitz-Stegun 7.1.26

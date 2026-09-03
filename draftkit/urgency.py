@@ -18,6 +18,7 @@ import numpy as np
 from . import snake
 
 POSITIONS = ["QB", "RB", "WR", "TE", "K", "DEF"]
+_WARNED_SHRINK: list = []     # one stderr line per process if a non-1.0 shrink is ever set again
 NEED_DAMP = 0.15          # multiplier for positions that fill no starter slot
 QB_FILLED_DAMP = 0.05     # rival with QB filled, before late rounds
 KDEF_EARLY_DAMP = 0.02    # K/DEF long before the rival's typical round
@@ -217,15 +218,24 @@ def simulate_survival(pool, current_pick, next_pick, rivals, seeds, rng,
 
     # Two survival vectors, named so they cannot be confused (plan B1/B2):
     # survival_raw is the Monte Carlo frequency; survival is the calibrated
-    # vector that is DISPLAYED. (Until plan step B2 lands, e_best_next is
-    # still the raw joint expectation from the loop above.)
+    # vector that is DISPLAYED. The DECISION (e_best_next, urgency) is the
+    # joint expectation from the loop above -- exact under sampling without
+    # replacement; the carry formula was measured against it (DECISIONS #26:
+    # top-1 flips 1/40, urgency gaps up to 8 points on thin TE markets) and
+    # stays the JS mirror's approximation, reported here as
+    # e_best_next_carry. With survival_shrink = 1.0 (the shrink is retired)
+    # display and decision are one vector; any other value makes them
+    # disagree, so the engine says so once.
     raw = survived / sims
     calibrated = np.array([calibrate(float(raw[j]), survival_shrink) for j in range(n)])
+    if survival_shrink != 1.0 and not _WARNED_SHRINK:
+        import sys
+        print(f"  SURVIVAL SHRINK {survival_shrink}: displayed survival no longer equals the decision's "
+              "(DECISIONS #26 retired the shrink; refit the noise instead)", file=sys.stderr)
+        _WARNED_SHRINK.append(True)
     report = {}
     for name, (gmask, val) in groups.items():
-        e = e_best[name] / sims                     # joint expectation, raw draw (the decision today)
-        # the carry (independence) estimator over the CALIBRATED vector, reported
-        # alongside for plan B2's measurement; not yet the decision
+        e = e_best[name] / sims                     # the decision: joint expectation over the draw
         e_carry = expected_best(val[gmask], calibrated[gmask]) if gmask.any() else 0.0
         report[name] = {
             "best_now": best_now[name],

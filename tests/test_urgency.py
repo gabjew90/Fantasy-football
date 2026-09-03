@@ -172,3 +172,27 @@ def test_expected_best_is_the_carry_formula_and_rides_alongside_the_joint():
     vals = {p["sleeper_id"]: p["vorp"] for p in POOL if p["pos"] == "RB"}
     ids = list(u["survival"])
     assert abs(u["e_best_next_carry"] - expected_best([vals[i] for i in ids], [u["survival"][i] for i in ids])) < 1e-9
+
+
+def test_shrink_is_retired_display_equals_decision_vector():
+    """DECISIONS #26: survival_shrink defaults to 1.0 everywhere, so the
+    displayed survival IS the raw vector the joint decision was drawn from;
+    a non-1.0 shrink is allowed but announces itself once."""
+    import io
+    import sys
+    import numpy as np
+    from draftkit import urgency
+    from draftkit.tracker import Tracker
+    assert Tracker.survival_shrink == 1.0
+    rep = simulate_survival(POOL, 1, 4, RIVALS, {}, np.random.default_rng(5), sims=100, sigma=3.0)
+    assert rep["RB"]["survival"] == rep["RB"]["survival_raw"]
+    assert rep["RB"]["e_best_next"] == rep["RB"]["e_best_next_joint"]
+    urgency._WARNED_SHRINK.clear()
+    err, sys.stderr = sys.stderr, io.StringIO()
+    try:
+        simulate_survival(POOL, 1, 4, RIVALS, {}, np.random.default_rng(5), sims=50, sigma=3.0, survival_shrink=0.55)
+        simulate_survival(POOL, 1, 4, RIVALS, {}, np.random.default_rng(5), sims=50, sigma=3.0, survival_shrink=0.55)
+        out = sys.stderr.getvalue()
+    finally:
+        sys.stderr = err
+    assert out.count("SURVIVAL SHRINK") == 1

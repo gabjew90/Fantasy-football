@@ -37,7 +37,7 @@ def make_tracker(players, my_picks, my_slot=1, current_pick=21, teams=10):
     t.sigma_early, t.sigma_late = 6.0, 27.0
     t.reach_prob, t.reach_scale = 0.0, 3.0
     t.run_window, t.run_min, t.run_boost = 5, 2, 1.5
-    t.survival_shrink = 0.55
+    t.survival_shrink = 1.0
     t.upside_from_round, t.upside_mult = 8, 1.15
     t.qb2_round, t.te2_fall = 10, 12
     t.slot_markets = True

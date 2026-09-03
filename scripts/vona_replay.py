@@ -113,7 +113,8 @@ def survival(p: dict, next_pick: int, rnd: int) -> float:
     if p["a"] is None:
         return 0.5
     raw = _norm_cdf((p["a"] - next_pick) / _sigma(rnd))
-    return min(0.99, max(0.01, 0.5 + (raw - 0.5) * 0.55))
+    # shrink retired 2026-09-02 (DECISIONS #26): 1.0, i.e. the raw estimate
+    return min(0.99, max(0.01, 0.5 + (raw - 0.5) * 1.0))
 
 
 def e_best_next(avail: list, pos: str, next_pick: int, rnd: int) -> float:
