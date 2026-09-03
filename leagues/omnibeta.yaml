@@ -87,3 +87,10 @@ lenses:
   DihtrickCohones:   [1639, 2046, 4]
   rybryethguy:       [1618, 2060, 8]
   StinkyDillPickle:  [1611, 1998, 1]
+
+flex_split:            # derived by scripts/derive_flex_split.py (plan A4); a league fact, re-derive, never copy
+  RB: 0.333
+  WR: 0.667
+  TE: 0.000
+  derived: 2026-09-02
+  board: tiers.csv

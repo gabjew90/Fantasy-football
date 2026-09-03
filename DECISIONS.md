@@ -1736,3 +1736,72 @@ from >= 2 sources)", as the entry predicted under combine: first. Tests:
 off keeps the multiplier ordering; on prefers the wider spread at equal
 value from round 8 only; degrades to the multiplier when sd is missing or
 comes from one source. Nothing to judge until A1's mean-combine is on.
+
+## 2026-09-02 (33) — A4: the flex split derived per league; a bench allowance; pre-registered
+
+onboard.derive_baselines spread every flex slot RB 45 / WR 45 / TE 10, a
+heuristic. Built: scripts/derive_flex_split.py walks the league's own board
+(remove teams x dedicated starters per position by projected points, fill
+teams x FLEX greedily; the mix of those flex starters is the split) and
+`--write` persists it as `flex_split:` in the league yaml. It is a league
+fact -- it depends on league size, lineup and the board -- so it is stored
+per league and re-derived, never copied. Resolution in derive_baselines:
+the yaml block, else FLEX_SPLIT_BY_FORMAT[format_key(scoring)] (frozen
+today from the two derivations, for a league straight after onboard), else
+the legacy 45/45/10 for callers that pass neither (byte-identical). `verify`
+reads only `expected:`, so it ignores the block.
+
+Derived today (model boards; the external boards as a sensitivity read):
+Keefamania 10 x 1 W/R/T -> RB 0.80 / WR 0.20 / TE 0 (external 0.60 / 0.40);
+Omnibeta 12 x 2 FLEX -> RB 0.333 / WR 0.667 / TE 0 (external 0.25 / 0.75).
+TE never reaches a flex slot on any of the four boards. The 0.2 swing
+between boards is the honest precision of the number.
+
+Bench allowance (`bench_allowance=True`): RB/WR demand x (1 + (absent weeks
++ bye) / 17) from draftkit.bench's position base rates -- the starters a
+roster expects to have out in a given week, which it insures from the
+bench. QB/TE/K/DEF untouched.
+
+Gate, fixed before the numbers: scripts/baseline_bakeoff.py per league on
+its own archived 2026 draft, every slot, the league's own starter shape
+(the old script graded Omnibeta on the Keefamania shape; fixed), candidates
+`yaml` / `flex` / `flex+bench`, scored on projected points of the starting
+lineup (baseline-free; no arm can grade itself). Rule: a candidate replaces
+`replacement_baselines` in a league only if its mean >= the yaml's AND it
+wins at least as many slots as it loses; ties keep the yaml. Expected small
+(the planner measures against what you would end up with, so the baseline
+stopped steering the draft: 0.4 pts across three candidates on 2026-09-01);
+"no change" is a valid recorded result. The split is stored regardless of
+the outcome; only the baselines wait on the gate, and they change per
+league by re-deriving.
+
+### A4 result (same day): Keefamania no change; Omnibeta passes by a hair and the archive rule holds
+
+reports/baseline_bakeoff.{keefamania,omnibeta}.md.
+
+Keefamania (10 slots): yaml QB10/RB24/WR24/TE11 mean 1831.3; flex
+QB10/RB28/WR22/TE10 mean 1831.3, 0 better / 0 worse / 10 tied -- the
+derived split drafts the identical ten rosters; flex+bench
+QB10/RB35/WR27/TE10 mean 1829.0, 0 / 1 / 9. Keeps the yaml.
+
+Omnibeta (12 slots): yaml QB12/RB40/WR60/TE12 mean 2172.4; flex
+QB12/RB32/WR40/TE12 mean 2172.8 (+0.4), 2 better / 2 worse / 8 tied;
+flex+bench QB12/RB40/WR49/TE12 mean 2167.3 (-5.1), 1 / 3 / 8. By the rule
+as written, `flex` passes for Omnibeta (mean >= yaml, wins = losses).
+
+Applied: nothing moves in either yaml. The pre-registration above missed a
+standing constraint the Omnibeta yaml has carried since the draft: its
+baselines "stay as drafted for the season's archive", because the in-season
+manager's valuations must stay comparable to the draft-day board. Two
+protocols conflict; the older, explicit one wins, and re-pricing a league
+that is mid-season on a +0.4-point, 2-2-8 result is the riskier move. The
+pass is recorded here and the derived block (`flex_split:` in the yaml)
+stays; `flex` becomes Omnibeta's baseline at its 2027 re-onboard, which
+re-derives from that season's board anyway. The bench allowance loses in
+both leagues and stays off.
+
+What the result says about the model: as predicted, the baseline stopped
+steering the draft once the planner measured against what you end up with
+(Tracker._fallback_points); across 22 slots and six candidates the spread
+is 0.4 points. The split itself is still worth storing -- it is what
+`onboard` hands a new league instead of 45/45/10 -- but it is not a lever.

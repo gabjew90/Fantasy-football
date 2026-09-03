@@ -1,0 +1,29 @@
+{
+ "league": "keefamania",
+ "teams": 10,
+ "slots": {
+  "QB": 1,
+  "RB": 2,
+  "WR": 2,
+  "TE": 1,
+  "FLEX": 1,
+  "K": 1,
+  "DEF": 1
+ },
+ "board": "tiers.keefamania.csv",
+ "derived": "2026-09-02",
+ "shares": {
+  "RB": 0.8,
+  "WR": 0.2,
+  "TE": 0.0
+ },
+ "counts": {
+  "RB": 8,
+  "WR": 2
+ },
+ "n_flex": 10,
+ "last": {
+  "RB": "Jadarian Price",
+  "WR": "Emeka Egbuka"
+ }
+}

@@ -118,3 +118,10 @@ expected:
 market:
   teams: 10
   ffc_format: half-ppr   # FFC half-PPR feed; overridden by data/external/yahoo_adp.keefamania.csv (league-scoped name!)
+
+flex_split:            # derived by scripts/derive_flex_split.py (plan A4); a league fact, re-derive, never copy
+  RB: 0.800
+  WR: 0.200
+  TE: 0.000
+  derived: 2026-09-02
+  board: tiers.keefamania.csv

@@ -1,0 +1,29 @@
+{
+ "league": "omnibeta",
+ "teams": 12,
+ "slots": {
+  "QB": 1,
+  "RB": 2,
+  "WR": 2,
+  "TE": 1,
+  "FLEX": 2,
+  "K": 1,
+  "DEF": 1
+ },
+ "board": "tiers.csv",
+ "derived": "2026-09-02",
+ "shares": {
+  "RB": 0.3333333333333333,
+  "WR": 0.6666666666666666,
+  "TE": 0.0
+ },
+ "counts": {
+  "RB": 8,
+  "WR": 16
+ },
+ "n_flex": 24,
+ "last": {
+  "RB": "Aaron Jones Sr.",
+  "WR": "Chris Godwin Jr."
+ }
+}
