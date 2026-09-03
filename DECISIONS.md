@@ -2222,3 +2222,17 @@ Logs data/processed/backtest/g4_10589182_*.log, 7 windows.
 - Tally after three rooms: log-loss 3/3 fitted, by 0.015-0.016 each time;
   30-70 miss fitted 1, current 2 (one of them a one-point tie).
 Room 4 (10590238) runs at CURRENT with the throttle-proof driver.
+
+### #35 G4 interim, forward room 4 of 5 (mock 31, room 10590238, drafted at CURRENT; clean room)
+
+Logs data/processed/backtest/g4_10590238_*.log, 15 windows (seat 7).
+- log-loss: fitted 0.1311, current 0.1554 -> fitted better by 0.024, the
+  largest margin of the four.
+- 30-70% buckets (observed - predicted): fitted 30-49 -24 (n218, CI
+  [-31,-15], 15 clusters), 50-69 -7 (n344); current 30-49 -4 (n262), 50-69
+  +9 (n489). Fitted's middle miss is the larger (31 vs 13 summed) and its
+  30-49 CI excludes zero, though under the 30-cluster bar.
+- Tally after four rooms: log-loss 4/4 fitted (0.015, 0.015, 0.016,
+  0.024); 30-70 miss fitted 1, current 3. The pattern from G2 holds out of
+  sample: the fitted point is better at the overall score and over-promises
+  survival in the 30-50 range. Room 5 (10590944, fitted) closes the set.
