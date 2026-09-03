@@ -1080,3 +1080,25 @@ bucket fitted pred 40 obs 36 (n230), current pred 40 obs 45 (n229).
 Reports:
 reports/mocks/mock37_2026-09-03_1332pt_intentional-grounding-ii_room10611562_seat3_*.md.
 Pair 2B is mock 38: seat 3, FITTED, verified forward11.
+
+## Mock 38 — room 10612448 "Squib Kick", 10 teams, slot 3 — PAIR 2B: FITTED knobs, verified bridge (forward11) — CLEAN
+
+13:57-14:12 PT. 15/15 legal, 15/15 engine, zero autopicks, preflight
+call#1. PAIR 2 vs mock 37 (same seat 3, current): 7 same picks, 3
+availability differences, 6 model choices (18 Henry over McBride, 23
+McBride shifted a round, 58 Jameson Williams before QB, 63 Hurts a slot
+later, 123 Gainwell over Marks; the same earlier-RB pattern as pair 1).
+Final lineups ONE point apart: 37 current 1643 (1st), 38 fitted 1642
+(1st). Offline scoring, pasted from g4_10612448_*.log: fitted objective
+0.1502, current 0.1669; 30-49 bucket fitted pred 39 obs 32 (n295),
+current pred 39 obs 37 (n256). Eleventh room of eleven for fitted on
+log-loss; the mid-band over-promise stays on the fitted side here.
+Reports:
+reports/mocks/mock38_2026-09-03_1357pt_squib-kick_room10612448_seat3_*.md.
+
+Two-pair summary (33 vs 36 at seat 5; 37 vs 38 at seat 3, with 35 as the
+same-model control): the models mostly want the same players, ordered
+differently; the fitted one reaches a round earlier for scarce RBs. Final
+lineup deltas: +23 fitted (pair 1), -1 fitted (pair 2). Draft outcomes are
+a wash live; the offline split (fitted better log-loss every room, worse
+30-50 honesty most rooms) is unchanged through 11 rooms.
