@@ -92,8 +92,9 @@ window.DK = (function () {
     }
   }
 
-  function narrate(kind, text) {
+  function narrate(kind, text, tag) {
     const entry = { ts: new Date().toISOString(), kind, text: String(text) };
+    if (tag) entry.tag = String(tag).slice(0, 14);   // rival picks: the manager's name is the panel tag
     S.trail.push(entry);
     if (S.trail.length > 3000) S.trail.shift();
     note('NARR ' + kind + ' ' + text);
@@ -176,7 +177,8 @@ window.DK = (function () {
     if (!S.hud || !S.hud.body) return;
     const line = document.createElement('div');
     line.style.cssText = 'padding:3px 0 3px 0;border-bottom:1px solid rgba(255,255,255,.07);white-space:pre-wrap;word-break:break-word;';
-    const k = HUD_KIND[entry.kind] || { tag: entry.kind, color: '#ddd', bg: 'rgba(221,221,221,.08)' };
+    const k0 = HUD_KIND[entry.kind] || { tag: entry.kind, color: '#ddd', bg: 'rgba(221,221,221,.08)' };
+    const k = entry.tag ? Object.assign({}, k0, { tag: entry.tag }) : k0;
     const parts = String(entry.text).split('\n');
     const first = escapeHtml(parts[0]);
     const rest = parts.slice(1).map(t => '<div style="padding-left:18px;color:' + k.color + ';opacity:.92">' + escapeHtml(t) + '</div>').join('');
@@ -778,9 +780,11 @@ window.DK = (function () {
           // the manager's name, not just the seat (user request 2026-09-03)
           const mgr = Object.values(managers).find(m => String(m.teamId) === String(o.teamId));
           const who = (mgr && mgr.nickname) ? mgr.nickname + ' (seat ' + seat + ')' : 'seat ' + seat;
-          narrate('pick', 'pick ' + no + '  ' + name + ' (' + (p.primary_pos || p.display_pos || '') + ') taken by ' + who + took
+          const tag = (mgr && mgr.nickname) ? mgr.nickname : 'seat ' + seat;
+          narrate('pick', 'pick ' + no + '  ' + name + ' (' + (p.primary_pos || p.display_pos || '') + ')'
+            + (mgr && mgr.nickname ? ' (seat ' + seat + ')' : '') + took
             + (lab === 'instant' ? ' INSTANTLY (autopick)' : '')
-            + (inPlan ? ' — a target is gone' + (inPlan.s != null ? ' (was ' + Math.round(inPlan.s * 100) + '% to survive)' : '') : ''));
+            + (inPlan ? ' — a target is gone' + (inPlan.s != null ? ' (was ' + Math.round(inPlan.s * 100) + '% to survive)' : '') : ''), tag);
         }
       }
       const seen = S.seen.get(no);
