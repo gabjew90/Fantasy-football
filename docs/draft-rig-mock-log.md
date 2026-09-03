@@ -876,3 +876,29 @@ Calibration (scorecard): 30-50% shown 43 / observed 52 (n 33); 50-70%
 60 / 33; 70-90% 80 / 37 (n 46); 90-100% 96 / 79 (n 97). Same shape as
 mocks 24-26 in a mostly human room: the overconfidence is not only the
 autopick seats.
+
+## Mock 28 — room 10586715 "Hitch and Go", 10 teams, slot 6 — FORWARD TEST 1 of 2 (DECISIONS #35 G4): fitted autopick knobs live
+
+Bridge started with `--set autopick_list_prob=0.3 --set autopick_need_damp=0.45`
+(per-process overrides; config.yaml default unchanged). Five human seats at
+the join. First room with the live trail panel and the store fingerprint
+check. Scored offline afterwards: the room's realised states at BOTH knob
+sets (survival log-loss, 30-70% bucket miss), plus the usual trail and
+scrutiny reports. Result recorded below when the room ends.
+
+Result (01:47-02:06 PT, 19 minutes, room ran at autopick pace): 15/15 legal,
+BUT picks 6 and 15 (Nacua, Jefferson) were YAHOO autopicks: I entered the
+room 2.5 minutes after the bell and injected a minute after entering; the
+room ran 17 picks in that gap. Procedural failure, not code: entry and
+injection are now one batch that fires when the Enter Draft link appears.
+Engine picks 26-146 (13 records) all via the action path, 377-519 ms
+confirm. Fingerprint matched the mock baseline. Panel on for the first
+time. Five of nine rivals flagged away by round 9; timing labels recorded
+instant vs human per pick. Survival scorecard at the fitted point: 50-70%
+shown 63% observed 63% (n 30); 70-90% shown 83% observed 53% (n 30);
+90-100% shown 96% observed 84% (n 57). The 70-90 miss is the same sign as
+the current-knob rooms. To look at in scrutiny: Aaron Jones at 115 ranked
+as RB insurance worth ~2 points over a WR cover. Reports:
+reports/mocks/mock28_2026-09-03_0151pt_hitch-and-go_room10586715_seat6_*.md.
+G4 extension (user, 02:15 PT): four more rooms alternating the live knob
+set, both sets scored offline on every room.

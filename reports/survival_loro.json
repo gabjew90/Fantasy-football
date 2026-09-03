@@ -1,0 +1,325 @@
+{
+ "stage": "autopick",
+ "current": {
+  "sigma_early": 6.0,
+  "sigma_late": 27.0,
+  "reach_prob": 0.15,
+  "need_damp": 0.15,
+  "autopick_list_prob": 0.0,
+  "autopick_sigma_scale": 0.5,
+  "autopick_need_damp": 0.02
+ },
+ "folds": [
+  {
+   "room": "10531886",
+   "type": "yahoo_autopick",
+   "n": 6521,
+   "point": {
+    "sigma_early": 6.0,
+    "sigma_late": 27.0,
+    "reach_prob": 0.15,
+    "need_damp": 0.15,
+    "autopick_list_prob": 0.3,
+    "autopick_sigma_scale": 0.5,
+    "autopick_need_damp": 0.45
+   },
+   "heldout_fitted": 0.1520294890385094,
+   "heldout_current": 0.16316534680147216,
+   "delta": -0.011135857762962748,
+   "fit_rooms": [
+    "10532940",
+    "10534350",
+    "10584427"
+   ],
+   "history": [
+    [
+     "autopick_list_prob",
+     {
+      "sigma_early": 6.0,
+      "sigma_late": 27.0,
+      "reach_prob": 0.15,
+      "need_damp": 0.15,
+      "autopick_list_prob": 0.3,
+      "autopick_sigma_scale": 0.5,
+      "autopick_need_damp": 0.02
+     },
+     0.16905580757924427
+    ],
+    [
+     "autopick_sigma_scale",
+     {
+      "sigma_early": 6.0,
+      "sigma_late": 27.0,
+      "reach_prob": 0.15,
+      "need_damp": 0.15,
+      "autopick_list_prob": 0.3,
+      "autopick_sigma_scale": 0.5,
+      "autopick_need_damp": 0.02
+     },
+     0.16905580757924427
+    ],
+    [
+     "autopick_need_damp",
+     {
+      "sigma_early": 6.0,
+      "sigma_late": 27.0,
+      "reach_prob": 0.15,
+      "need_damp": 0.15,
+      "autopick_list_prob": 0.3,
+      "autopick_sigma_scale": 0.5,
+      "autopick_need_damp": 0.45
+     },
+     0.15959113887508378
+    ]
+   ]
+  },
+  {
+   "room": "10532940",
+   "type": "yahoo_autopick",
+   "n": 6254,
+   "point": {
+    "sigma_early": 6.0,
+    "sigma_late": 27.0,
+    "reach_prob": 0.15,
+    "need_damp": 0.15,
+    "autopick_list_prob": 0.4,
+    "autopick_sigma_scale": 0.5,
+    "autopick_need_damp": 0.45
+   },
+   "heldout_fitted": 0.16877351642990335,
+   "heldout_current": 0.18890710658723092,
+   "delta": -0.020133590157327574,
+   "fit_rooms": [
+    "10531886",
+    "10534350",
+    "10584427"
+   ],
+   "history": [
+    [
+     "autopick_list_prob",
+     {
+      "sigma_early": 6.0,
+      "sigma_late": 27.0,
+      "reach_prob": 0.15,
+      "need_damp": 0.15,
+      "autopick_list_prob": 0.4,
+      "autopick_sigma_scale": 0.5,
+      "autopick_need_damp": 0.02
+     },
+     0.1594080319422656
+    ],
+    [
+     "autopick_sigma_scale",
+     {
+      "sigma_early": 6.0,
+      "sigma_late": 27.0,
+      "reach_prob": 0.15,
+      "need_damp": 0.15,
+      "autopick_list_prob": 0.4,
+      "autopick_sigma_scale": 0.5,
+      "autopick_need_damp": 0.02
+     },
+     0.1594080319422656
+    ],
+    [
+     "autopick_need_damp",
+     {
+      "sigma_early": 6.0,
+      "sigma_late": 27.0,
+      "reach_prob": 0.15,
+      "need_damp": 0.15,
+      "autopick_list_prob": 0.4,
+      "autopick_sigma_scale": 0.5,
+      "autopick_need_damp": 0.45
+     },
+     0.15450133010090739
+    ]
+   ]
+  },
+  {
+   "room": "10534350",
+   "type": "yahoo_autopick",
+   "n": 6432,
+   "point": {
+    "sigma_early": 6.0,
+    "sigma_late": 27.0,
+    "reach_prob": 0.15,
+    "need_damp": 0.15,
+    "autopick_list_prob": 0.3,
+    "autopick_sigma_scale": 0.5,
+    "autopick_need_damp": 0.45
+   },
+   "heldout_fitted": 0.14806966759700205,
+   "heldout_current": 0.15850900579944288,
+   "delta": -0.010439338202440834,
+   "fit_rooms": [
+    "10531886",
+    "10532940",
+    "10584427"
+   ],
+   "history": [
+    [
+     "autopick_list_prob",
+     {
+      "sigma_early": 6.0,
+      "sigma_late": 27.0,
+      "reach_prob": 0.15,
+      "need_damp": 0.15,
+      "autopick_list_prob": 0.3,
+      "autopick_sigma_scale": 0.5,
+      "autopick_need_damp": 0.02
+     },
+     0.16869561821757487
+    ],
+    [
+     "autopick_sigma_scale",
+     {
+      "sigma_early": 6.0,
+      "sigma_late": 27.0,
+      "reach_prob": 0.15,
+      "need_damp": 0.15,
+      "autopick_list_prob": 0.3,
+      "autopick_sigma_scale": 0.5,
+      "autopick_need_damp": 0.02
+     },
+     0.16869561821757487
+    ],
+    [
+     "autopick_need_damp",
+     {
+      "sigma_early": 6.0,
+      "sigma_late": 27.0,
+      "reach_prob": 0.15,
+      "need_damp": 0.15,
+      "autopick_list_prob": 0.3,
+      "autopick_sigma_scale": 0.5,
+      "autopick_need_damp": 0.45
+     },
+     0.1608734113270617
+    ]
+   ]
+  },
+  {
+   "room": "10584427",
+   "type": "yahoo_autopick",
+   "n": 6563,
+   "point": {
+    "sigma_early": 6.0,
+    "sigma_late": 27.0,
+    "reach_prob": 0.15,
+    "need_damp": 0.15,
+    "autopick_list_prob": 0.3,
+    "autopick_sigma_scale": 0.5,
+    "autopick_need_damp": 0.45
+   },
+   "heldout_fitted": 0.16410726195418918,
+   "heldout_current": 0.17965426064931492,
+   "delta": -0.015546998695125741,
+   "fit_rooms": [
+    "10531886",
+    "10532940",
+    "10534350"
+   ],
+   "history": [
+    [
+     "autopick_list_prob",
+     {
+      "sigma_early": 6.0,
+      "sigma_late": 27.0,
+      "reach_prob": 0.15,
+      "need_damp": 0.15,
+      "autopick_list_prob": 0.3,
+      "autopick_sigma_scale": 0.5,
+      "autopick_need_damp": 0.02
+     },
+     0.16271615358739153
+    ],
+    [
+     "autopick_sigma_scale",
+     {
+      "sigma_early": 6.0,
+      "sigma_late": 27.0,
+      "reach_prob": 0.15,
+      "need_damp": 0.15,
+      "autopick_list_prob": 0.3,
+      "autopick_sigma_scale": 0.5,
+      "autopick_need_damp": 0.02
+     },
+     0.16271615358739153
+    ],
+    [
+     "autopick_need_damp",
+     {
+      "sigma_early": 6.0,
+      "sigma_late": 27.0,
+      "reach_prob": 0.15,
+      "need_damp": 0.15,
+      "autopick_list_prob": 0.3,
+      "autopick_sigma_scale": 0.5,
+      "autopick_need_damp": 0.45
+     },
+     0.15548071900980395
+    ]
+   ]
+  }
+ ],
+ "mean_heldout_fitted": 0.15824498375490098,
+ "mean_heldout_current": 0.1725589299593652,
+ "pooled_heldout_fitted": 0.15818059495390102,
+ "pooled_heldout_current": 0.17244963558526702,
+ "bars": {
+  "fitted (held-out)": {
+   "pooled": {
+    "ci_fail": [
+     "30-49% (obs-pred -8%, CI [-14%, -1%], n 441, clusters 44)",
+     "50-69% (obs-pred -5%, CI [-8%, -2%], n 828, clusters 56)",
+     "70-89% (obs-pred +2%, CI [+0%, +4%], n 2809, clusters 59)",
+     "90-100% (obs-pred +1%, CI [+0%, +1%], n 21540, clusters 60)"
+    ],
+    "eight_point_fail": [
+     "30-49% (pred 41% obs 32%, n 441)"
+    ],
+    "n": 25770
+   },
+   "human": {
+    "ci_fail": [],
+    "eight_point_fail": [],
+    "n": 0
+   },
+   "autopick": {
+    "ci_fail": [
+     "30-49% (obs-pred -8%, CI [-14%, -1%], n 441, clusters 44)",
+     "50-69% (obs-pred -5%, CI [-8%, -2%], n 828, clusters 56)",
+     "70-89% (obs-pred +2%, CI [+0%, +4%], n 2809, clusters 59)",
+     "90-100% (obs-pred +1%, CI [+0%, +1%], n 21540, clusters 60)"
+    ],
+    "eight_point_fail": [
+     "30-49% (pred 41% obs 32%, n 441)"
+    ],
+    "n": 25770
+   }
+  },
+  "current": {
+   "pooled": {
+    "ci_fail": [],
+    "eight_point_fail": [
+     "0-29% (pred 20% obs 39%, n 95)"
+    ],
+    "n": 25770
+   },
+   "human": {
+    "ci_fail": [],
+    "eight_point_fail": [],
+    "n": 0
+   },
+   "autopick": {
+    "ci_fail": [],
+    "eight_point_fail": [
+     "0-29% (pred 20% obs 39%, n 95)"
+    ],
+    "n": 25770
+   }
+  }
+ },
+ "seconds": 704.4839084148407
+}

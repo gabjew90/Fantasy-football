@@ -34,6 +34,7 @@ sys.path.insert(0, str(ROOT / "scripts"))
 
 import yahoo_bridge as YB  # noqa: E402
 from draftkit.config import Config  # noqa: E402
+from draftkit.tracker import Tracker  # noqa: E402
 
 TLS_DIR = ROOT / "data" / "draftrig" / "tls"
 _LOCK = threading.Lock()

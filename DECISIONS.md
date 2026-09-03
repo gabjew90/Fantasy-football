@@ -2152,3 +2152,31 @@ on the same realised states) is recorded for the decision after
 2026-09-05. If the user wants the rule amended (calibration judged on the
 live forward rooms rather than the harness), that is an explicit
 amendment recorded here, not a reinterpretation.
+
+### #35 G3 result (2026-09-03 01:47 PT, replays finished during mock 28)
+
+Logs: data/processed/backtest/g3_slot_{keefamania,omnibeta}.log,
+g3_trail_{10531886,10532940,10534350,10584427}.log.
+
+- Sleeper slot_replay at the fitted point: keefamania by-slot vs by-position
+  mean -1.3 (0 better / 1 worse / 9 tied), omnibeta mean -1.9 (3/4/5) --
+  identical to the current-knob runs, as pre-registered: no away seats, the
+  autopick branch is inert. No regression, trivially.
+- Yahoo trail replay, all 10 slots, fitted minus current, mean lineup
+  projected points: room 10531886 -7.4 (0 better / 2 worse / 8 tied, worst
+  -45.1); 10532940 -1.9 (1/2/7, worst -31.6, best +25.2); 10534350 -1.6
+  (0/1/9); 10584427 -0.5 (0/2/8). Every room slightly worse; 34 of 40 slots
+  tied.
+- G3 as written ("not worse"): FAIL, by 0.03% to 0.40% of lineup points.
+  Reading: the fitted seat is more urgent (lower survival on list-walk
+  targets), so it takes a few players a turn earlier than it needed to when
+  the historical room did not actually take them; the replay holds rival
+  picks fixed, so it can only ever charge urgency, never credit it. Six
+  slots moved; the size is within one bench player's projection. Recorded
+  as a fail; the rule is the rule.
+
+Gate tally before G4: G1 PASS, G2 log-loss PASS / calibration FAIL, G3
+FAIL. The default cannot move on this study. G4 (two forward rooms at the
+fitted point, scored offline at both knob sets) still runs, because it is
+the only out-of-sample live evidence and it decides whether a second study
+is worth the user's mock time.

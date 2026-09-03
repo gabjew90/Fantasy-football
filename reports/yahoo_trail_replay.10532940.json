@@ -1,0 +1,459 @@
+{
+ "room": "10532940",
+ "league": "keefamania",
+ "teams": 10,
+ "rounds": 15,
+ "board": "tiers.keefamania.csv",
+ "sets": {
+  "autopick_list_prob": 0.3,
+  "autopick_need_damp": 0.45
+ },
+ "away_states": 150,
+ "sidecar": true,
+ "unmatched": [
+  "Rams",
+  "Texans",
+  "Broncos",
+  "Eagles",
+  "Steelers",
+  "Vikings",
+  "Patriots",
+  "Ravens",
+  "Will Reichard"
+ ],
+ "ambiguous": [],
+ "per_slot": {
+  "current": {
+   "1": {
+    "points": 1894.0,
+    "shape": "QB2 RB5 WR4 TE2 K1 DEF1",
+    "roster": [
+     "Christian McCaffrey",
+     "A.J. Brown",
+     "Chris Olave",
+     "Jahmyr Gibbs",
+     "Drake Maye",
+     "George Kittle",
+     "Ashton Jeanty",
+     "Mike Washington Jr.",
+     "Zay Flowers",
+     "Aaron Jones Sr.",
+     "Kyle Pitts Sr.",
+     "Joe Burrow",
+     "Davante Adams",
+     "Houston Texans",
+     "Brandon Aubrey"
+    ]
+   },
+   "2": {
+    "points": 1867.1,
+    "shape": "QB2 RB6 WR4 TE1 K1 DEF1",
+    "roster": [
+     "Christian McCaffrey",
+     "Bijan Robinson",
+     "Drake London",
+     "Garrett Wilson",
+     "Josh Allen",
+     "Tyler Warren",
+     "Jaylen Warren",
+     "Rico Dowdle",
+     "Tetairoa McMillan",
+     "Quinshon Judkins",
+     "Patrick Mahomes II",
+     "Mike Evans",
+     "Aaron Jones Sr.",
+     "Houston Texans",
+     "Eddy Pineiro"
+    ]
+   },
+   "3": {
+    "points": 1797.7,
+    "shape": "QB2 RB6 WR4 TE1 K1 DEF1",
+    "roster": [
+     "Christian McCaffrey",
+     "Trey McBride",
+     "Chris Olave",
+     "Rashee Rice",
+     "Cam Skattebo",
+     "Jalen Hurts",
+     "Jaylen Warren",
+     "Tyrone Tracy Jr.",
+     "RJ Harvey",
+     "Wan'Dale Robinson",
+     "Patrick Mahomes II",
+     "Kenny Gainwell",
+     "Courtland Sutton",
+     "Houston Texans",
+     "Eddy Pineiro"
+    ]
+   },
+   "4": {
+    "points": 1834.5,
+    "shape": "QB2 RB4 WR5 TE2 K1 DEF1",
+    "roster": [
+     "Ja'Marr Chase",
+     "Trey McBride",
+     "Derrick Henry",
+     "Jaxon Smith-Njigba",
+     "Travis Etienne Jr.",
+     "George Pickens",
+     "Trevor Lawrence",
+     "RJ Harvey",
+     "Parker Washington",
+     "George Kittle",
+     "Jadarian Price",
+     "Lamar Jackson",
+     "Jakobi Meyers",
+     "Houston Texans",
+     "Cam Little"
+    ]
+   },
+   "5": {
+    "points": 1794.6000000000001,
+    "shape": "QB2 RB6 WR4 TE1 K1 DEF1",
+    "roster": [
+     "Ja'Marr Chase",
+     "De'Von Achane",
+     "Nico Collins",
+     "James Cook III",
+     "Drake Maye",
+     "George Kittle",
+     "Rhamondre Stevenson",
+     "RJ Harvey",
+     "Tee Higgins",
+     "Aaron Jones Sr.",
+     "Justin Herbert",
+     "Luther Burden III",
+     "Kyle Monangai",
+     "Houston Texans",
+     "Cameron Dicker"
+    ]
+   },
+   "6": {
+    "points": 1803.8,
+    "shape": "QB2 RB6 WR4 TE1 K1 DEF1",
+    "roster": [
+     "Ja'Marr Chase",
+     "De'Von Achane",
+     "Kyren Williams",
+     "Brock Bowers",
+     "Garrett Wilson",
+     "Jalen Hurts",
+     "Omarion Hampton",
+     "Breece Hall",
+     "Blake Corum",
+     "Rome Odunze",
+     "Caleb Williams",
+     "Bucky Irving",
+     "DK Metcalf",
+     "Houston Texans",
+     "Evan McPherson"
+    ]
+   },
+   "7": {
+    "points": 1775.8999999999999,
+    "shape": "QB2 RB6 WR4 TE1 K1 DEF1",
+    "roster": [
+     "Jonathan Taylor",
+     "De'Von Achane",
+     "Rashee Rice",
+     "Chase Brown",
+     "Garrett Wilson",
+     "George Kittle",
+     "Trevor Lawrence",
+     "Rhamondre Stevenson",
+     "DeVonta Smith",
+     "J.K. Dobbins",
+     "Dak Prescott",
+     "Jaylen Waddle",
+     "Aaron Jones Sr.",
+     "Houston Texans",
+     "Ka'imi Fairbairn"
+    ]
+   },
+   "8": {
+    "points": 1776.7,
+    "shape": "QB2 RB6 WR4 TE1 K1 DEF1",
+    "roster": [
+     "Puka Nacua",
+     "De'Von Achane",
+     "Kyren Williams",
+     "CeeDee Lamb",
+     "Drake Maye",
+     "George Kittle",
+     "D'Andre Swift",
+     "Jeremiyah Love",
+     "Malik Nabers",
+     "Kyle Monangai",
+     "Trevor Lawrence",
+     "Marvin Harrison Jr.",
+     "Aaron Jones Sr.",
+     "Houston Texans",
+     "Cairo Santos"
+    ]
+   },
+   "9": {
+    "points": 1740.3,
+    "shape": "QB2 RB5 WR4 TE2 K1 DEF1",
+    "roster": [
+     "Amon-Ra St. Brown",
+     "De'Von Achane",
+     "Saquon Barkley",
+     "Kyren Williams",
+     "Drake Maye",
+     "Davante Adams",
+     "George Kittle",
+     "Blake Corum",
+     "TreVeyon Henderson",
+     "Terry McLaurin",
+     "Colston Loveland",
+     "Bo Nix",
+     "Jameson Williams",
+     "Houston Texans",
+     "Cairo Santos"
+    ]
+   },
+   "10": {
+    "points": 1726.6,
+    "shape": "QB2 RB6 WR4 TE1 K1 DEF1",
+    "roster": [
+     "De'Von Achane",
+     "CeeDee Lamb",
+     "Justin Jefferson",
+     "Javonte Williams",
+     "Drake Maye",
+     "George Kittle",
+     "Kenneth Walker III",
+     "David Montgomery",
+     "Emeka Egbuka",
+     "Emmett Johnson",
+     "Matthew Stafford",
+     "DJ Moore",
+     "Tony Pollard",
+     "Houston Texans",
+     "Evan McPherson"
+    ]
+   }
+  },
+  "fitted": {
+   "1": {
+    "points": 1862.4,
+    "shape": "QB2 RB5 WR4 TE2 K1 DEF1",
+    "roster": [
+     "Christian McCaffrey",
+     "A.J. Brown",
+     "Jahmyr Gibbs",
+     "Ashton Jeanty",
+     "Garrett Wilson",
+     "George Kittle",
+     "Trevor Lawrence",
+     "Mike Washington Jr.",
+     "Zay Flowers",
+     "Aaron Jones Sr.",
+     "Kyle Pitts Sr.",
+     "Joe Burrow",
+     "Davante Adams",
+     "Houston Texans",
+     "Brandon Aubrey"
+    ]
+   },
+   "2": {
+    "points": 1867.1,
+    "shape": "QB2 RB6 WR4 TE1 K1 DEF1",
+    "roster": [
+     "Christian McCaffrey",
+     "Bijan Robinson",
+     "Drake London",
+     "Garrett Wilson",
+     "Josh Allen",
+     "Tyler Warren",
+     "Jaylen Warren",
+     "Rico Dowdle",
+     "Tetairoa McMillan",
+     "Quinshon Judkins",
+     "Patrick Mahomes II",
+     "Mike Evans",
+     "Aaron Jones Sr.",
+     "Houston Texans",
+     "Eddy Pineiro"
+    ]
+   },
+   "3": {
+    "points": 1797.7,
+    "shape": "QB2 RB6 WR4 TE1 K1 DEF1",
+    "roster": [
+     "Christian McCaffrey",
+     "Trey McBride",
+     "Chris Olave",
+     "Rashee Rice",
+     "Cam Skattebo",
+     "Jalen Hurts",
+     "Jaylen Warren",
+     "Tyrone Tracy Jr.",
+     "RJ Harvey",
+     "Wan'Dale Robinson",
+     "Patrick Mahomes II",
+     "Kenny Gainwell",
+     "Courtland Sutton",
+     "Houston Texans",
+     "Eddy Pineiro"
+    ]
+   },
+   "4": {
+    "points": 1834.5,
+    "shape": "QB2 RB4 WR5 TE2 K1 DEF1",
+    "roster": [
+     "Ja'Marr Chase",
+     "Trey McBride",
+     "Jaxon Smith-Njigba",
+     "Derrick Henry",
+     "Travis Etienne Jr.",
+     "George Pickens",
+     "Trevor Lawrence",
+     "RJ Harvey",
+     "Parker Washington",
+     "George Kittle",
+     "Jadarian Price",
+     "Lamar Jackson",
+     "Jakobi Meyers",
+     "Houston Texans",
+     "Cam Little"
+    ]
+   },
+   "5": {
+    "points": 1794.6000000000001,
+    "shape": "QB2 RB6 WR4 TE1 K1 DEF1",
+    "roster": [
+     "Ja'Marr Chase",
+     "De'Von Achane",
+     "James Cook III",
+     "Nico Collins",
+     "Drake Maye",
+     "George Kittle",
+     "Rhamondre Stevenson",
+     "RJ Harvey",
+     "Tee Higgins",
+     "Aaron Jones Sr.",
+     "Justin Herbert",
+     "Luther Burden III",
+     "Kyle Monangai",
+     "Houston Texans",
+     "Cameron Dicker"
+    ]
+   },
+   "6": {
+    "points": 1790.6999999999998,
+    "shape": "QB2 RB6 WR4 TE1 K1 DEF1",
+    "roster": [
+     "Ja'Marr Chase",
+     "De'Von Achane",
+     "Kyren Williams",
+     "Brock Bowers",
+     "Omarion Hampton",
+     "Davante Adams",
+     "Trevor Lawrence",
+     "Breece Hall",
+     "Blake Corum",
+     "Rome Odunze",
+     "Caleb Williams",
+     "Bucky Irving",
+     "DK Metcalf",
+     "Houston Texans",
+     "Evan McPherson"
+    ]
+   },
+   "7": {
+    "points": 1801.1000000000001,
+    "shape": "QB2 RB4 WR6 TE1 K1 DEF1",
+    "roster": [
+     "Puka Nacua",
+     "Jonathan Taylor",
+     "Chase Brown",
+     "Rashee Rice",
+     "Drake Maye",
+     "George Kittle",
+     "Garrett Wilson",
+     "Rhamondre Stevenson",
+     "DeVonta Smith",
+     "J.K. Dobbins",
+     "Jaylen Waddle",
+     "Dak Prescott",
+     "Michael Pittman Jr.",
+     "Houston Texans",
+     "Ka'imi Fairbairn"
+    ]
+   },
+   "8": {
+    "points": 1776.7,
+    "shape": "QB2 RB6 WR4 TE1 K1 DEF1",
+    "roster": [
+     "Puka Nacua",
+     "De'Von Achane",
+     "Kyren Williams",
+     "CeeDee Lamb",
+     "Drake Maye",
+     "George Kittle",
+     "D'Andre Swift",
+     "Jeremiyah Love",
+     "Malik Nabers",
+     "Kyle Monangai",
+     "Trevor Lawrence",
+     "Marvin Harrison Jr.",
+     "Aaron Jones Sr.",
+     "Houston Texans",
+     "Cairo Santos"
+    ]
+   },
+   "9": {
+    "points": 1740.3,
+    "shape": "QB2 RB5 WR4 TE2 K1 DEF1",
+    "roster": [
+     "Amon-Ra St. Brown",
+     "De'Von Achane",
+     "Saquon Barkley",
+     "Kyren Williams",
+     "Drake Maye",
+     "Davante Adams",
+     "George Kittle",
+     "Blake Corum",
+     "TreVeyon Henderson",
+     "Terry McLaurin",
+     "Colston Loveland",
+     "Bo Nix",
+     "Jameson Williams",
+     "Houston Texans",
+     "Cairo Santos"
+    ]
+   },
+   "10": {
+    "points": 1726.6,
+    "shape": "QB2 RB6 WR4 TE1 K1 DEF1",
+    "roster": [
+     "De'Von Achane",
+     "CeeDee Lamb",
+     "Justin Jefferson",
+     "Javonte Williams",
+     "Drake Maye",
+     "George Kittle",
+     "Kenneth Walker III",
+     "David Montgomery",
+     "Emeka Egbuka",
+     "Emmett Johnson",
+     "Matthew Stafford",
+     "DJ Moore",
+     "Tony Pollard",
+     "Houston Texans",
+     "Evan McPherson"
+    ]
+   }
+  }
+ },
+ "errors": [],
+ "seconds": 169.02884101867676,
+ "mean_current": 1801.12,
+ "mean_fitted": 1799.17,
+ "mean_delta": -1.9499999999999773,
+ "better": 1,
+ "worse": 2,
+ "tied": 7
+}
