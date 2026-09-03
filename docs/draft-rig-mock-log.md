@@ -809,3 +809,36 @@ Auto-trail waited for the room to finish and saved under mock_<room>.json.
 Fifteen of fifteen legal; 14 driver records (11 after the reload + 3
 before), 13 via makePick, 1 via click (the masked turn); no gate failure
 outside the injected outage; heartbeats on schedule.
+
+## Mock 26 — room 10534350 "First and Ten", 10 teams, slot 6 — CLEAN confirmation run, 15 of 15 via makePick, zero events
+
+Trail and scrutiny: reports/mocks/mock26_2026-09-02_2318pt_first-and-ten_room10534350_seat6_{trail,scrutiny}.md.
+No faults injected. The first full room on the code that carries every
+fix from mocks 24 and 25 (local ranker excludes store-drafted players,
+depth tail never empty, store decides "gone", verification by our pick
+number, hyphenated-name parity).
+
+Roster: Nacua, McBride, Olave, Etienne, Maye, Jaylen Warren, Stevenson,
+Dowdle (handcuff), RJ Harvey, Wan'Dale Robinson, Mahomes (QB2, R11),
+Gainwell, Pittman, Eagles DEF, McPherson K. Legal. In the room before pick
+1 (reload after the bell, Enter Draft, injected with 6 s on the pre-draft
+clock).
+
+Fifteen of fifteen through makePick, 346-1156 ms to store confirmation
+(median ~450), ranker = engine on every pick, plan call recorded on every
+record, zero gate failures, zero local fallbacks, zero bridge warnings,
+empty bridge error log, four heartbeats on schedule through the 16-minute
+window. Pick 126 -- the spot that failed in mock 24 -- had a 25-row plan
+with a K/DEF tail behind the engine's rows and landed in 1.2 s.
+
+Narration highlights: McCaffrey went 4th and Taylor 5th, so 6 became
+Nacua (waiting ~8 at WR, 59%); McBride at 15 after his survival fell from
+97% to 58% in one turn; three RB targets (Achane, Chase Brown, Kyren)
+each went the pick before ours, so the first RB was Etienne at 35 --
+correctly, because by then the RB market was flat (best 26 vs expected
+26); Maye at 46 when Skattebo went; Dowdle at 75 as Warren's handcuff.
+
+Standing: one clean room on the final code, not three. Two more clean
+rooms are still owed by the repo's own rule before Saturday's code is
+called settled; the faults in 24 and 25 were injected, so those two do
+not count toward it.

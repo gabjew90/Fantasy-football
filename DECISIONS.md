@@ -1975,3 +1975,17 @@ Operational: the join is `window.name = 'fandraft'` then `.click()` on the
 row's Join anchor; never reload the waiting room before the bell (ec=5
 drops the seat); a devtools eval dies at 45 s. In the rig memory and the
 runbook.
+
+### Mock 26 (same night): the clean confirmation room
+
+Room 10534350, seat 6, no faults: 15 of 15 via makePick, engine ranker on
+every pick, zero gate / fallback / warning events, four heartbeats. The
+mock-24 failure point (pick 126, empty tail) now shows a 25-row plan.
+Count toward the three-clean-rooms rule: ONE. Mocks 24 and 25 do not count
+(faults were injected). Two more clean rooms owed before the code is
+called settled for 2026-09-05; if time runs out, Saturday runs on one
+clean confirmation plus two fault-tested rooms, and the record says so.
+Calibration in this room (three-plus autopick seats): 30-50% shown 46 /
+observed 0 (n 11); 50-70% 63 / 22 (n 37); 70-90% 81 / 40 (n 43); 90-100%
+96 / 81 (n 96). The overconfidence now reaches the top bucket. Three rooms
+agree; the autopick refit stage moves to first in line after 2026-09-05.
