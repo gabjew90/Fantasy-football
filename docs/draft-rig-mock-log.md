@@ -902,3 +902,25 @@ as RB insurance worth ~2 points over a WR cover. Reports:
 reports/mocks/mock28_2026-09-03_0151pt_hitch-and-go_room10586715_seat6_*.md.
 G4 extension (user, 02:15 PT): four more rooms alternating the live knob
 set, both sets scored offline on every room.
+
+## Mock 29 — room 10588125 "Hurry-Up Offense", 10 teams, slot 1 — FORWARD TEST 2 of 5: CURRENT knobs live
+
+02:27-02:41 PT. 15/15 legal; 12 engine picks, all via the action path
+(~1.0 s confirm, slower than mock 28's 0.4 s -- background tab). THREE
+Yahoo autopicks, both procedural: pick 1 (Gibbs) because the entry batch
+navigated to the bare draftclient URL, which skips the Enter Draft link's
+auth token and leaves the client on "Error connecting to draft server"
+(fixed in the runbook: click the link); picks 80-81 (RJ Harvey, Gainwell)
+because the room tab was a BACKGROUND tab (created with tabs_create while
+the finished room's tab stayed in front) and Chrome's timer throttling
+stalled the driver loop 23 s (log silent 09:37:29-09:37:52 UTC), during
+which Yahoo flagged us away and autopicked instantly. Then closing the
+finished tab dissolved the Claude tab group and the live tab became
+unreachable from pick 86 to the end; the driver finished on its own and
+posted the trail. Rule (memory + runbook): one room tab, in front, never
+close a tab while a room is live. Survival scorecard at CURRENT: 30-50%
+shown 38% observed 5% (n 21); 50-70% shown 61% observed 31% (n 13);
+70-90% 82% vs 80% (n 30); 90-100% 98% vs 86% (n 44). Six of nine rivals
+away by round 10; 23 instant autopicks labelled. Odd: bench-insurance recs
+for Tyrone Tracy carried no survival figure (s None) for several calls.
+Reports: reports/mocks/mock29_2026-09-03_0228pt_hurry-up-offense_room10588125_seat1_*.md.
