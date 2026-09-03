@@ -102,7 +102,8 @@ def simulate_survival(pool, current_pick, next_pick, rivals, seeds, rng,
                       need_damp=NEED_DAMP, qb_filled_damp=QB_FILLED_DAMP,
                       kdef_early_damp=KDEF_EARLY_DAMP, qb_damp_until_round=10,
                       kdef_typical_round=13, run_ratio=1.5,
-                      autopick_sigma_scale=0.5, rival_needs_update=True):
+                      autopick_sigma_scale=0.5, autopick_need_damp=0.02,
+                      rival_needs_update=True):
     """Per-market urgency + per-player survival to my next pick.
 
     pool: undrafted players (dicts with sleeper_id/pos/vorp/adp), pre-truncated.
@@ -123,8 +124,17 @@ def simulate_survival(pool, current_pick, next_pick, rivals, seeds, rng,
       kdef_early_damp      K/DEF before the rival's typical round minus one;
                            kdef_typical_round is the fallback when no seed
                            says otherwise (was 0.02 / 13)
-      run_ratio, autopick_sigma_scale, rival_needs_update are accepted here
-      and take effect in plan steps B4, B5 and B6 respectively.
+      autopick rivals (rv["autopick"], plan B5): Yahoo's autopick walks its
+                           default rank and fills every starter slot before
+                           any bench slot, so such a rival is MORE
+                           need-constrained than a human: while he has an
+                           open starter slot a non-filling position gets
+                           autopick_need_damp; his ADP noise is
+                           sigma x autopick_sigma_scale; he never reaches
+                           (the reach draw is still consumed so the random
+                           stream is common with the human model).
+      run_ratio and rival_needs_update are accepted here and take effect in
+      plan steps B4 and B6.
 
     The returned dict is keyed by position AND by market name; survival is
     always per player and independent of grouping.
@@ -159,15 +169,24 @@ def simulate_survival(pool, current_pick, next_pick, rivals, seeds, rng,
 
     # static per-rival positional multiplier (needs + tendencies), per pick index
     rival_mult = np.ones((len(rivals), n))
+    autopick = np.array([bool(rv.get("autopick")) for rv in rivals])
     for i, rv in enumerate(rivals):
         pick_no = current_pick + i
         rnd = (pick_no - 1) // teams + 1
         seed = (seeds or {}).get(str(rv.get("user_id"))) if rv.get("user_id") else None
+        starters_open = any(v > 0 for v in rv["needs"].values())
         for pos in POSITIONS:
             mask = pos_arr == pos
             if not mask.any():
                 continue
             fills = snake.needs_position(rv["needs"], pos)
+            if autopick[i]:
+                # starters first, then rank; K/DEF still wait for their rounds
+                m = 1.0 if (fills or not starters_open) else autopick_need_damp
+                if pos in ("K", "DEF") and rnd < kdef_typical_round - 1:
+                    m = kdef_early_damp
+                rival_mult[i, mask] = m
+                continue
             m = 1.0 if fills else need_damp
             if pos == "QB" and rv["needs"].get("QB", 0) == 0 and rnd < qb_damp_until_round:
                 m = qb_filled_damp
@@ -181,7 +200,9 @@ def simulate_survival(pool, current_pick, next_pick, rivals, seeds, rng,
     # ADP likelihood per intervening pick (same sigma across the window is fine
     # at this window size; sigma itself scales with round at the call site)
     pick_nos = np.arange(current_pick, next_pick)
-    adp_like = np.exp(-0.5 * ((pick_nos[:, None] - adp[None, :]) / sigma) ** 2) + 1e-9
+    # an autopick rival's noise is a fraction of a human's (plan B5)
+    sig = np.where(autopick, sigma * autopick_sigma_scale, sigma)[:, None]
+    adp_like = np.exp(-0.5 * ((pick_nos[:, None] - adp[None, :]) / sig) ** 2) + 1e-9
     # fat-tail REACH mixture (v2 1.1, CLV retro: reaches are one-directional —
     # players taken EARLY, never "reached for" after their ADP). With
     # reach_prob a rival draws from a widened, forward-only likelihood.
@@ -196,7 +217,11 @@ def simulate_survival(pool, current_pick, next_pick, rivals, seeds, rng,
         alive = np.ones(n, dtype=bool)
         recent = list(base_recent)
         for i in range(len(rivals)):
-            like = reach_like[i] if (reach_prob and rng.random() < reach_prob)                 else adp_like[i]
+            # the reach draw is consumed for every rival at every reach_prob so
+            # the random stream is identical across reach settings and whether
+            # or not a seat is on autopick (paired A/Bs, plan B5/B7)
+            reaching = rng.random() < reach_prob
+            like = reach_like[i] if (reaching and not autopick[i]) else adp_like[i]
             w = like * rival_mult[i] * alive
             # positional-run escalation: 2+ same-position picks in the recent
             # window make the NEXT rival likelier to join the run

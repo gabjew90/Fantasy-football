@@ -1502,3 +1502,51 @@ B2 closed with it: the decision is the joint expectation over the
 simulated draw; with the shrink at 1.0 the displayed vector is that draw;
 `e_best_next_carry` stays in the report as the JS mirror's approximation
 with its measured tolerance.
+
+### Addendum (same day): five Yahoo results emails as rooms; the early mock log is unverified
+
+Gmail holds five "Your Mock Draft Results" emails, all from 2026-08-31
+15:45-18:56 PT (seats 3 partial, 1, 2, 4, 5). scripts/yahoo_mock_email.py
+turns each into the trail shape (data/logs/mocks/mock_email<id>.json,
+picks with team ids, managers, our seat, no pick records); the fit reads
+them as room type `yahoo_email`. Their picks match none of the narrative
+log's mocks by seat or roster (best overlap 6 of 15 names), and the first
+is Yahoo's Instant Mock against bots, which the rig never used. Either
+they were drafted by hand that afternoon or the log's mocks 1-9 rosters
+record what the driver believed rather than what Yahoo did -- until mock
+13 "verified" meant only that the roster grew. Provenance is left open in
+the log; the rooms enter the fit through their RIVALS' picks only, which
+are real either way.
+
+With the five rooms added (n 65,758 rows at sims 1000): current knobs
+objective 0.2022 (yahoo_email loss 0.1745), sigma-only 0.1996 (0.1692).
+The email rooms behave like the autopick rooms: at the low end the sim
+OVER-predicts survival for them (0-29%: predicted 25%, observed 13%),
+the opposite of the human room (predicted 25%, observed 30%). So the two
+room kinds pull the low end in opposite directions and no single sigma
+fits both; the human view is the one the decision protects, and (A)
+stands. The open item is a per-room-kind noise model (B5 gives Yahoo
+autopick seats their own sigma scale; that is where this belongs).
+
+## 2026-09-02 (27) — B5: autopick rivals are modelled as what they are
+
+Yahoo's 'away' managers are drafted by Yahoo's autopick, which walks its
+default rank and fills every starter slot before any bench slot. Before
+this they were simulated as noisy humans with weak need weighting -- and
+in the Yahoo mock rooms 8-9 of 10 seats were away. Now: the driver sends
+each drafted pick's team id and the current away team ids; the bridge
+maps team ids to draft slots through the picks (DOM path: no ids, no
+mapping, every rival human -- DATA MISSING, never team id = slot);
+`Tracker.away_slots` marks them and `_rival_states` flags each rival
+`autopick`. In the sim an autopick rival gets sigma x autopick_sigma_scale
+(0.5, a prior until fitted on the Yahoo rooms), NEVER reaches, and while
+any starter slot is open a non-filling position is weighted
+autopick_need_damp (0.02) -- MORE need-constrained than a human, not less.
+K/DEF still wait for their rounds. On Keefamania the board's adp already
+IS Yahoo's rank (the league-scoped yahoo_adp override), so the likelihood
+centres on the list autopick walks. The reach draw is now consumed at
+every reach_prob, so reach A/Bs and autopick on/off share one random
+stream. Sleeper path: no signal, nothing flagged. Gate: tests (three sim
+behaviours, the id->slot mapping and its degrade) now; one live mock to
+see non-empty away_slots in the bridge log is still owed, and the
+autopick stage of the refit runs after it.

@@ -124,6 +124,7 @@ engine:
   kdef_typical_round: 13     # fallback typical round when no seed says otherwise
   run_ratio: 1.5             # B4: a run is count > run_ratio x the model's expected count (0 = old absolute rule)
   autopick_sigma_scale: 0.5  # B5: an autopicking rival's ADP noise as a fraction of sigma (prior)
+  autopick_need_damp: 0.02   # B5: autopick fills starters first; a non-filling position while a starter slot is open
   rival_needs_update: true   # B6: a rival picking twice in my window consumes his needs
 
 tracker:

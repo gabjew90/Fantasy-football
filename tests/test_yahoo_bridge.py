@@ -320,3 +320,21 @@ def test_engine_knobs_flow_from_the_config_through_one_list():
     assert t.qb_filled_damp == Tracker.qb_filled_damp == 0.05      # absent key: class default
     assert Tracker.need_damp == 0.15 and Tracker.away_slots == frozenset()
     assert {k for k, _ in Tracker.ENGINE_KNOBS} >= {"need_damp", "run_ratio", "survival_shrink", "sims"}
+
+
+def test_away_teams_become_away_slots_through_drafted_team_ids():
+    """Plan B5: the page reports away TEAM ids; drafted entries with team ids
+    map them to snake slots. Without team ids (DOM path) nothing is guessed."""
+    drafted = [{"pick_no": 1, "name": "RB Player0", "pos": "RB", "team_id": "7"},
+               {"pick_no": 2, "name": "RB Player1", "pos": "RB", "team_id": "3"},
+               {"pick_no": 19, "name": "RB Player2", "pos": "RB", "team_id": "3"}]   # slot 2 in round 2 (10 teams)
+    state = {"my_slot": 8, "teams": 10, "rounds": 15, "drafted": drafted, "my_roster": [],
+             "away_teams": ["3", "9"]}
+    assert yb.away_slots_from_state(state, 10) == frozenset({2})          # team 3 -> slot 2; team 9 unseen
+    t = yb.build_tracker(_Cfg(), _players(), state)
+    assert t.away_slots == frozenset({2})
+    rivals = t._rival_states(4, 8)
+    assert [r["autopick"] for r in rivals] == [False, False, False, False]  # slots 4-7 are human
+    assert any(r["autopick"] for r in t._rival_states(1, 4))                # slot 2 is on autopick
+    dom = dict(state, drafted=[{"pick_no": 1, "name": "RB Player0", "pos": "RB"}])
+    assert yb.away_slots_from_state(dom, 10) == frozenset()

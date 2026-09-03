@@ -266,7 +266,27 @@ def build_tracker(cfg: Config, players: list[dict], state: dict) -> Tracker:
     t.state = TrackerState(picks=picks,
                            drafted_ids={x["player_id"] for x in picks},
                            status="drafting")
+    t.away_slots = away_slots_from_state(state, teams)
     return t
+
+
+def away_slots_from_state(state: dict, teams: int) -> frozenset:
+    """Plan B5: the draft slots whose manager Yahoo has flagged `away`
+    (autopick). The page reports away TEAM ids; a team id maps to a slot
+    through any drafted entry that carries both a pick number and a team id
+    (store path). The DOM path has no team ids, so the mapping is empty and
+    the sim models every rival as human -- DATA MISSING, never a guess that
+    team id equals slot (mock 10 reshuffled us from slot 3 to 10 at the bell)."""
+    away = {str(x) for x in (state.get("away_teams") or [])}
+    if not away:
+        return frozenset()
+    team_to_slot: dict[str, int] = {}
+    for d in state.get("drafted") or []:
+        tid, no = d.get("team_id"), d.get("pick_no")
+        if tid is None or not no:
+            continue
+        team_to_slot.setdefault(str(tid), snake.pick_to_round_slot(int(no), teams)[1])
+    return frozenset(team_to_slot[t] for t in away if t in team_to_slot)
 
 
 def merge_feed(memory: dict, drafted: list[dict]) -> list[dict]:

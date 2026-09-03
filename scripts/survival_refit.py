@@ -53,7 +53,7 @@ def league_for(room: dict) -> str:
 
 
 def room_date(room: dict, logs_dir: Path) -> str | None:
-    if room["room_type"] == "yahoo_autopick":
+    if room["room_type"].startswith("yahoo"):      # Yahoo rooms: no Sleeper log, no FFC snapshot
         return None
     p = logs_dir / f"draft_{room['room']}.jsonl"
     for line in p.read_text(encoding="utf-8").splitlines():
@@ -81,7 +81,7 @@ def room_context(room: dict, logs_dir: Path) -> dict:
     board = EP.load_board(str(ROOT / ("tiers.csv" if league == "omnibeta" else "tiers.keefamania.csv")))
     adp_note = "board adp (Yahoo rank on this league's board)"
     date = room_date(room, logs_dir)
-    if date and room["room_type"] != "yahoo_autopick":
+    if date and not room["room_type"].startswith("yahoo"):
         snap = latest_snapshot_before(ROOT / "data" / "raw" / "adp_history", date)
         if snap is not None:
             adp = {norm(r["name"]): float(r["adp"]) for r in json.loads(snap.read_text(encoding="utf-8"))}

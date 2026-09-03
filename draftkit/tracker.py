@@ -57,6 +57,7 @@ class Tracker:
     kdef_early_damp = 0.02
     kdef_typical_round = 13
     autopick_sigma_scale = 0.5  # plan B5: an autopicking rival's ADP noise, x sigma
+    autopick_need_damp = 0.02   # plan B5: autopick fills every starter slot first; a non-filling position while one is open
     rival_needs_update = True   # plan B6: a rival picking twice in my window consumes his needs
     away_slots = frozenset()    # plan B5: draft slots on autopick (Yahoo 'away'); empty on Sleeper
     upside_from_round = 8
@@ -284,7 +285,7 @@ class Tracker:
         ("survival_shrink", float),
         ("need_damp", float), ("qb_filled_damp", float), ("qb_damp_until_round", int),
         ("kdef_early_damp", float), ("kdef_typical_round", int),
-        ("autopick_sigma_scale", float), ("rival_needs_update", bool),
+        ("autopick_sigma_scale", float), ("autopick_need_damp", float), ("rival_needs_update", bool),
         ("upside_from_round", int), ("upside_mult", float),
         ("slot_markets", bool), ("adaptive_fallback", bool), ("bench_insurance", bool),
     )
@@ -310,6 +311,9 @@ class Tracker:
             out.append({
                 "slot": slot, "needs": needs,
                 "user_id": self.slot_to_user.get(slot),
+                # plan B5: a Yahoo manager flagged away is drafted by Yahoo's
+                # autopick -- rank-following, starters first, no reaches
+                "autopick": slot in (getattr(self, "away_slots", None) or ()),
             })
         return out
 
@@ -576,6 +580,7 @@ class Tracker:
             qb_damp_until_round=self.qb_damp_until_round,
             kdef_typical_round=self.kdef_typical_round, run_ratio=self.run_ratio,
             autopick_sigma_scale=self.autopick_sigma_scale,
+            autopick_need_damp=self.autopick_need_damp,
             rival_needs_update=self.rival_needs_update,
         )
         self._urgency_cache = (key, report)

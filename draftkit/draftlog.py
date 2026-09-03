@@ -27,7 +27,7 @@ from . import snake
 # through getattr for trackers built without __init__)
 KNOBS = ("sims", "sigma_early", "sigma_late", "reach_prob", "reach_scale",
          "run_window", "run_min", "run_boost", "run_ratio",
-         "need_damp", "qb_filled_damp", "kdef_early_damp", "autopick_sigma_scale",
+         "need_damp", "qb_filled_damp", "kdef_early_damp", "autopick_sigma_scale", "autopick_need_damp",
          "survival_shrink", "pool_min", "pool_lookback", "pool_lookahead")
 
 

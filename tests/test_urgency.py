@@ -196,3 +196,59 @@ def test_shrink_is_retired_display_equals_decision_vector():
     finally:
         sys.stderr = err
     assert out.count("SURVIVAL SHRINK") == 1
+
+
+def _autopick_setup():
+    import numpy as np
+    pool = ([{"sleeper_id": "stud", "pos": "WR", "vorp": 90.0, "adp": 40.0}]
+            + [{"sleeper_id": f"f{i}", "pos": "WR", "vorp": 10.0, "adp": 24.0 + i} for i in range(10)])
+    return pool, np
+
+
+def test_autopick_rival_never_reaches():
+    """Plan B5: with reach_prob 0.5 a human rival reaches for the stud; an
+    autopick rival walks his list. Same seed, same random stream."""
+    pool, np = _autopick_setup()
+    kw = dict(sims=400, sigma=6.0, teams=12, survival_shrink=1.0, reach_prob=1.0, reach_scale=3.0)
+    human = [{"slot": s, "needs": {"WR": 2}, "user_id": None} for s in range(3, 9)]
+    bots = [dict(r, autopick=True) for r in human]
+    h = simulate_survival(pool, 25, 31, human, {}, np.random.default_rng(1), **kw)      # always reaching
+    b = simulate_survival(pool, 25, 31, bots, {}, np.random.default_rng(1), **kw)
+    no_reach = simulate_survival(pool, 25, 31, bots, {}, np.random.default_rng(1), **dict(kw, reach_prob=0.0))
+    assert b["WR"]["survival"]["stud"] > h["WR"]["survival"]["stud"]
+    assert b["WR"]["survival"]["stud"] == no_reach["WR"]["survival"]["stud"]     # reach is inert for autopick
+
+
+def test_autopick_rival_fills_an_open_starter_slot_before_a_better_bench_player():
+    """The inverse of the human case: Yahoo's autopick takes the RB that
+    fills his open slot over a higher-ranked WR who fills nothing."""
+    import numpy as np
+    pool = [{"sleeper_id": "wr1", "pos": "WR", "vorp": 60.0, "adp": 10.0},
+            {"sleeper_id": "rb1", "pos": "RB", "vorp": 30.0, "adp": 10.5},
+            {"sleeper_id": "rb2", "pos": "RB", "vorp": 20.0, "adp": 11.0}]
+    needs = {"QB": 0, "RB": 1, "WR": 0, "TE": 0, "FLEX": 0, "K": 1, "DEF": 1}   # RB open, WR full
+    rivals = [{"slot": 3, "needs": dict(needs), "user_id": None, "autopick": True}]
+    rep = simulate_survival(pool, 10, 11, rivals, {}, np.random.default_rng(2), sims=400, sigma=2.0,
+                            survival_shrink=1.0)
+    assert rep["WR"]["survival"]["wr1"] > 0.9         # the WR is left alone
+    assert rep["RB"]["survival"]["rb1"] < 0.6         # the slot-filling RB goes
+    # once every starter slot is full he follows rank: the WR is now in play
+    full = [{"slot": 3, "needs": {k: 0 for k in needs}, "user_id": None, "autopick": True}]
+    rep2 = simulate_survival(pool, 10, 11, full, {}, np.random.default_rng(2), sims=400, sigma=2.0,
+                             survival_shrink=1.0)
+    assert rep2["WR"]["survival"]["wr1"] < 0.7
+
+
+def test_autopick_noise_is_tighter_than_a_humans():
+    """sigma x autopick_sigma_scale: the top-of-list player is taken more
+    surely by an autopick seat."""
+    import numpy as np
+    pool = [{"sleeper_id": "top", "pos": "RB", "vorp": 50.0, "adp": 10.0}] + \
+           [{"sleeper_id": f"r{i}", "pos": "RB", "vorp": 20.0, "adp": 14.0 + i} for i in range(6)]
+    needs = {"RB": 2}
+    human = [{"slot": 3, "needs": dict(needs), "user_id": None}]
+    bot = [dict(human[0], autopick=True)]
+    h = simulate_survival(pool, 10, 11, human, {}, np.random.default_rng(3), sims=600, sigma=6.0, survival_shrink=1.0)
+    b = simulate_survival(pool, 10, 11, bot, {}, np.random.default_rng(3), sims=600, sigma=6.0, survival_shrink=1.0,
+                          autopick_sigma_scale=0.25)
+    assert b["RB"]["survival"]["top"] < h["RB"]["survival"]["top"]

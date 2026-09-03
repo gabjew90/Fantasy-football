@@ -475,6 +475,7 @@ window.DK = (function () {
       const p = byId[o.playerId] || {};
       return { pick_no: +o.id, name: ((p.fname || '') + ' ' + (p.lname || '')).trim(),
                pos: p.primary_pos || p.display_pos || '', team: p.team_abbr || '',
+               team_id: String(o.teamId),      // plan B5: lets the bridge map away managers to draft slots
                slot: null, mine: myTeam != null && String(o.teamId) === myTeam };
     });
     const away = Object.values(managers).filter(m => m.away).map(m => String(m.teamId));
@@ -548,6 +549,7 @@ window.DK = (function () {
         current_pick: snap && snap.current_pick ? snap.current_pick : currentPickNo(),
         draft_key: location.pathname,   // the bridge keeps a per-draft union of the feed
         source: S.source,
+        away_teams: snap ? snap.away_teams : [],   // plan B5: managers on autopick right now
       });
       const r = await fetch(S.cfg.bridge + '/plan', {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body,

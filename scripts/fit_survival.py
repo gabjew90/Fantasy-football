@@ -218,7 +218,10 @@ def load_yahoo_room(room: str, logs_dir: Path) -> dict | None:
     else:
         recs = trail_recs(trail)
         source = "trail prose (un-shrunk by %.2f)" % TRAIL_SHRINK
-    return {"room": room, "room_type": "yahoo_autopick", "picks": picks, "recs": recs,
+    # rooms rebuilt from Yahoo's results emails (scripts/yahoo_mock_email.py)
+    # carry no away flags and no pick records; they are their own room type
+    room_type = "yahoo_email" if trail.get("source") == "yahoo_email" else "yahoo_autopick"
+    return {"room": room, "room_type": room_type, "picks": picks, "recs": recs,
             "teams": teams, "rounds": rounds, "my_slot": my[0] if my else None, "recs_source": source,
             "away": sum(1 for m in (trail.get("managers") or {}).values() if m.get("away"))}
 
