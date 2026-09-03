@@ -982,3 +982,21 @@ Night tally (mocks 28-32): 75 legal picks, 68 by the engine, 7 to Yahoo
 autopick, every one of the 7 a procedural cause now fixed (late entry x2,
 bare client URL x1, background/hidden-tab throttling x4). Last two rooms
 clean on the final driver.
+
+## Mock 33 — room 10597994 "Intentional Grounding", 10 teams, slot 5 — pair A of paired-seat series: CURRENT knobs — CLEAN
+
+07:07-07:22 PT. First room of the SAME-SEAT PAIR protocol (user: one room
+per knob set from the same draft position). 15/15 legal, 15/15 engine via
+the action path, zero autopicks, no away flag on us; three rivals away.
+First by projected lineup at the end (1642, next 1557). The live-trail
+panel was screenshotted mid-room for the user
+(reports/mocks/hud_panel_mock33.png). Lobby scanner upgraded first: room
+size = avatar-image cells + link cells, and the join click targets the
+draft-position COLUMN, so the seat is chosen, not assigned (one click,
+seat 5, size 10 confirmed). Survival scorecard at CURRENT: 30-50% shown
+44% observed 27% (n 11); 50-70% 62% vs 47% (n 30); 70-90% 81% vs 76%
+(n 59); 90-100% 96% vs 84% (n 67). Offline scoring, both knob sets
+(g4_10597994_*.log): log-loss fitted 0.1349 vs current 0.1452 (fitted
+better, sixth room of six); 30-49 bucket miss fitted -18 (n172, CI
+[-24,-12]) vs current -13 (n155) — BOTH over-promise here in this room,
+fitted by more. Pair B is room 10598876, same seat 5, fitted knobs.
