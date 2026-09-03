@@ -52,6 +52,20 @@ from .role import GATED, STARTERS, depth_orders
 from .seasondata import score_projection
 
 LINE_GAMES = 17.0
+# Each source's own games convention, MEASURED 2026-09-02 (plan A2 pre-check):
+# the source's season line divided by 17 x Sleeper's week-1 line for five
+# healthy starters (Gibbs, Allen, Nacua, Bowers, B. Robinson). The sheet and
+# ESPN sit at ~0.98 -- full-season totals; Sleeper/Rotowire at ~0.92 -- its
+# season line already embeds about one missed game. A source that already
+# discounts games is EXCLUDED from the games table's per-row scale (it keeps
+# the uniform `games`), so nobody is discounted twice. Five players is thin;
+# re-measure when the table is re-derived.
+SOURCE_GAMES_CONVENTION = {
+    "fantasypros_sheet": {"ratio": 0.98, "already_discounted": False},
+    "espn_projections": {"ratio": 0.98, "already_discounted": False},
+    "sleeper_rotowire": {"ratio": 0.92, "already_discounted": True},
+}
+DISCOUNTED_SOURCES = tuple(k for k, v in SOURCE_GAMES_CONVENTION.items() if v["already_discounted"])
 SCHEMA = {"sleeper_id": pl.Utf8, "name": pl.Utf8, "pos": pl.Utf8, "team": pl.Utf8,
           "pts17": pl.Float64, "source": pl.Utf8, "as_of": pl.Utf8, "line": pl.Utf8}
 # what combine() emits: the schema plus the dispersion across sources (plan A1)

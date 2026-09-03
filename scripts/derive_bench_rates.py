@@ -60,13 +60,15 @@ def prep(weekly: pl.DataFrame, fpts: pl.Expr) -> pl.DataFrame:
                     pl.col("fpts")))
 
 
-def ex_ante_starters(wk: pl.DataFrame, season: int, pos: str) -> list[str]:
+def ex_ante_starters(wk: pl.DataFrame, season: int, pos: str, n: int | None = None) -> list[str]:
+    """Top n (default the position's starter count) by the PRIOR season's
+    total, in rank order -- so a slice of the list is a rank band (plan A2)."""
     # tie-break on pid: group_by order is not stable run to run, and a tie at
     # the cutoff rank flipped WR between 2.69 and 2.61 on identical inputs
     tot = (wk.filter((pl.col("season") == season) & (pl.col("pos") == pos))
              .group_by("pid").agg(pl.col("fpts").sum().alias("t"))
              .sort(["t", "pid"], descending=[True, False]))
-    return tot["pid"].to_list()[: STARTER_N[pos]]
+    return tot["pid"].to_list()[: (STARTER_N[pos] if n is None else n)]
 
 
 def absent_weeks(wk: pl.DataFrame, pairs: list[tuple[int, int]]) -> dict[str, dict]:

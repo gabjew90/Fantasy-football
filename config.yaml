@@ -43,6 +43,14 @@ projections:
   # the one tail rule: depth-chart backups the market also does not rank as
   # starters project 0 (contingent_of keeps the handcuff column informative)
   non_starters_zero: true
+  # plan A2 (DECISIONS #31): mean missed games by position x ex-ante rank band,
+  # applied as games - (missed[pos,band] - pooled_mean) so only cross-cell
+  # differences move the board; band from the provisional market rank. OFF
+  # until its pre-registered gate passes on the backtest pairs.
+  games_table:
+    enabled: false
+    mode: differential
+    path: data/processed/absence_bands.json
 
   # ---- legacy model knobs (projections.source: model only) -----------------
   # weight on the stats-based model for players with 2025 data; (1 - alpha)

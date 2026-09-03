@@ -233,21 +233,33 @@ def external_projection(cfg, usage: pl.DataFrame, market: pl.DataFrame) -> pl.Da
         pl.coalesce(pl.col("pos"), pl.col("pos_ext")).alias("pos"),
         pl.coalesce(pl.col("team"), pl.col("team_ext")).alias("team"),
     ).drop("name_ext", "pos_ext", "team_ext")
-    df = df.with_columns((pl.col("pts17") * games / X.LINE_GAMES).alias("proj_pts"),
+    # PROVISIONAL MARKET RANK, computed BEFORE any scaling: the games table
+    # (plan A2) bands on it, never on the projection being scaled; the K/DEF
+    # synthetic line below uses the same rank
+    df = df.with_columns(pl.coalesce(pl.col("ecr"), pl.col("adp")).rank(method="ordinal").over("pos").alias("_r"))
+    from . import games_table as GT
+    df = df.with_columns(GT.games_expr(games, GT.load(cfg)).alias("_games"))
+    # a source whose season line already embeds missed games keeps the
+    # uniform scale (external.SOURCE_GAMES_CONVENTION); a mean over sources
+    # counts as discounted only if every member is
+    src = pl.col("source").fill_null("none")
+    discounted = pl.any_horizontal([src == s for s in X.DISCOUNTED_SOURCES]) if X.DISCOUNTED_SOURCES else pl.lit(False)
+    df = df.with_columns(pl.when(discounted).then(pl.lit(float(games))).otherwise(pl.col("_games")).alias("_games"))
+    df = df.with_columns((pl.col("pts17") * pl.col("_games") / X.LINE_GAMES).alias("proj_pts"),
                          pl.coalesce(pl.col("source"), pl.lit("none")).alias("proj_source")).drop("pts17", "source")
     # plan A1: dispersion across sources on the same basis as proj_pts
     if disp:
         df = df.with_columns(
             pl.col("n_sources").fill_null(0).cast(pl.Int64),
-            *[(pl.col(src) * games / X.LINE_GAMES).alias(dst)
+            *[(pl.col(src) * pl.col("_games") / X.LINE_GAMES).alias(dst)
               for src, dst in (("pts17_sd", "proj_sd"), ("pts17_hi", "proj_hi"), ("pts17_lo", "proj_lo"))
               if src in df.columns],
         ).drop([c for c in ("pts17_sd", "pts17_hi", "pts17_lo") if c in df.columns])
+    df = df.drop("_games")
 
     # K/DEF: no stat lines in either source; the synthetic ECR-linear
     # projection stays (near-fungible positions, small VORP spreads)
     kdef_base = {"K": (150.0, 1.5), "DEF": (135.0, 2.0)}
-    df = df.with_columns(pl.coalesce(pl.col("ecr"), pl.col("adp")).rank(method="ordinal").over("pos").alias("_r"))
     df = df.with_columns(
         pl.when(pl.col("pos").is_in(list(kdef_base)) & pl.col("proj_pts").is_null() & pl.col("_r").is_not_null())
         .then(pl.col("pos").replace_strict({k: v[0] for k, v in kdef_base.items()}, default=None)
@@ -365,7 +377,12 @@ def model_projection(cfg, usage: pl.DataFrame, market: pl.DataFrame) -> pl.DataF
     ).unique(subset="sleeper_id")
 
     df = market.join(u, on="sleeper_id", how="left")
-    df = df.with_columns((pl.col("model_ppg") * games).alias("proj_model_pts"))
+    # plan A2: the per-row games scale (uniform unless the games table is on),
+    # banded on the provisional market rank computed before any scaling
+    from . import games_table as GT
+    df = df.with_columns(pl.coalesce(pl.col("ecr"), pl.col("adp")).rank(method="ordinal").over("pos").alias("_r"))
+    df = df.with_columns(GT.games_expr(games, GT.load(cfg)).alias("_games")).drop("_r")
+    df = df.with_columns((pl.col("model_ppg") * pl.col("_games")).alias("proj_model_pts"))
     df = _market_curve(df)
 
     # Role gate (projection overhaul, usage-side fix 1, 2026-09-02): a per-game
@@ -448,6 +465,9 @@ def model_projection(cfg, usage: pl.DataFrame, market: pl.DataFrame) -> pl.DataF
             df = (df.drop("proj_consensus_pts")
                     .join(cons.select("sleeper_id", "proj_consensus_pts", "adp_sleeper"),
                           on="sleeper_id", how="left"))
+            # consensus.score_rows leaves the column on the uniform games
+            # basis; put it on this row's games (plan A2; consensus.py untouched)
+            df = df.with_columns((pl.col("proj_consensus_pts") * pl.col("_games") / games).alias("proj_consensus_pts"))
             if source == "stat_lines":
                 df = df.with_columns(
                     pl.when(pl.col("proj_consensus_pts").is_not_null())
@@ -573,6 +593,8 @@ def model_projection(cfg, usage: pl.DataFrame, market: pl.DataFrame) -> pl.DataF
     if "avail_status" not in df.columns:
         df = df.with_columns(pl.lit(None, dtype=pl.Utf8).alias("avail_status"))
 
+    if "_games" in df.columns:
+        df = df.drop("_games")
     return _ensure_dispersion(df)      # null on the model path; same header as external (plan A1)
 
 

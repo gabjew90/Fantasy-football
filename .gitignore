@@ -35,3 +35,6 @@ data/processed/*.txt
 
 # identity-harness reference boards (scripts/board_identity.py), regenerable
 data/draftrig/ref_*.csv
+
+# the positional missed-games table (scripts/derive_absence_bands.py) is a small tracked artifact
+!data/processed/absence_bands.json

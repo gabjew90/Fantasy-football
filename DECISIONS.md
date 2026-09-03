@@ -1656,3 +1656,51 @@ the four new columns are the only additions.
   under test).
 Nothing flips: combine stays first, sources stay [sheet, sleeper], the
 gate is judged on 2026 actuals.
+
+### Reproduction check of the generalised gate (same day)
+
+scripts/source_gate.py with its defaults against reports/source_gate.md:
+Test 1 (accuracy) reproduces the #23 tables line for line. Test 2 does
+not, and should not: the replay runs the CURRENT engine, which now carries
+B4/B5/B6 (the relative-detector plumbing, autopick flags -- none in a
+Sleeper replay -- and the within-window needs update), so the outcome
+numbers move: model 1561.7, external 1536.6 (-1.61%; was -1.20%),
+external better in 20 of 44, worse in 24 (unchanged). Verdict unchanged:
+STAY. The generalisation's own arithmetic is pinned by tests
+(tests/test_source_gate.py), not by this diff.
+
+## 2026-09-02 (31) — A2: the positional missed-games table, pre-registered
+
+Pre-check, measured before the table touched anything: each source's season
+line over 17 x Sleeper's week-1 line for five healthy starters (Gibbs,
+Allen, Nacua, Bowers, B. Robinson): FantasyPros sheet 0.98, ESPN 0.98,
+Sleeper/Rotowire 0.92. The sheet and ESPN are full-season totals; Sleeper's
+season line already embeds about one missed game. Recorded as
+external.SOURCE_GAMES_CONVENTION; a Sleeper-sourced row keeps the uniform
+scale so it is never discounted twice. Five players is thin and is said so.
+
+The table (scripts/derive_absence_bands.py -> data/processed/
+absence_bands.json, tracked): mean missed games by position x ex-ante
+rank band, starters by the prior season's total, 2019-2025 pairs, zero-game
+seasons excluded (biased LOW). Pooled mean 3.15 (n 839). QB 2.49 / 2.63 /
+4.30; RB 2.81 / 3.46 / 3.44 / 4.39; WR 2.76 / 2.46 / 2.60 / 3.44; TE 2.78 /
+3.09 / 2.79. The last band is the reliably worse one at QB, RB and WR; TE
+is flat. Leak-free tables per backtest pair (through 2023: pooled 3.30;
+through 2024: 3.22) for the gate.
+
+Applied (draftkit/games_table.py, projections.games_table.enabled, OFF)
+as games - (missed[pos, band] - pooled_mean): only cross-cell differences
+move the board; the band comes from the provisional market rank computed
+before scaling, never from the projection; off-table ranks and K/DEF keep
+the uniform games; per-player durability stays forbidden. One helper feeds
+all three scale sites (external, model, the consensus column at its join).
+
+Gate, fixed before the numbers: scripts/games_table_gate.py applies the
+leak-free per-pair table to the #23 rows as `blend_gt` / `lines_gt`
+(non-null exactly where the base arm is); then source_gate.py --candidate
+blend_gt --rivals blend (and the lines twin). Test 1: pooled MAE ratio
+<= 0.99 in BOTH leagues (an improvement claim must improve) and weighted
+Spearman >= -0.02. Test 2: actual-points outcome >= 0.99x over the 44
+slot-drafts. Pass -> enabled: true, boards rebuilt, churn by tier recorded
+as a diagnostic. Any fail -> stays off, numbers recorded. Identity with the
+table off: the four reference boards must come back IDENTICAL.
