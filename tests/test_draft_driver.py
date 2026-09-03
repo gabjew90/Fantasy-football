@@ -1257,3 +1257,11 @@ def test_sleep_falls_back_to_settimeout_without_a_worker_and_reports_its_mode():
     r = run_js("const t0 = Date.now(); DK._sleep(120).then(() => console.log(JSON.stringify({ waited: Date.now() - t0, mode: DK.sleepMode() })));")
     assert r["waited"] >= 100
     assert r["mode"].startswith("timeout")
+
+
+def test_fingerprint_diff_ignores_pick_keys_before_the_first_pick():
+    r = run_js("const base = { store_keys: ['a'], pick_keys: ['id', 'playerId', 'teamId'] };"
+               "console.log(JSON.stringify({ empty: DK.fingerprintDiff({ store_keys: ['a'], pick_keys: [] }, base),"
+               " changed: DK.fingerprintDiff({ store_keys: ['a'], pick_keys: ['id'] }, base) }));")
+    assert r["empty"] == []
+    assert any(d.startswith("pick_keys: missing") for d in r["changed"])

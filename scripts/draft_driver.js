@@ -219,6 +219,9 @@ window.DK = (function () {
     const out = [];
     for (const k of Object.keys(base)) {
       if (!Array.isArray(base[k])) continue;      // labels (captured_at, room) ride along in the saved baseline
+      // pick_keys come from the first pick record; before pick 1 there is none
+      // to compare (mocks 29 and 30 raised a false "missing" at preflight)
+      if (k === 'pick_keys' && Array.isArray(now[k]) && now[k].length === 0) continue;
       const a = (base[k] || []).slice().sort().join(','), b = (now[k] || []).slice().sort().join(',');
       if (a !== b) {
         const missing = (base[k] || []).filter(x => !(now[k] || []).includes(x));
