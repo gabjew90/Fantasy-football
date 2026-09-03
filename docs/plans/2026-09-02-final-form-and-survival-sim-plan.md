@@ -1,0 +1,147 @@
+# Plan: final-form projections (4 additions) + survival-sim fixes (6 items)
+
+## Context
+
+Two pieces of agreed engine work were parked "until after Saturday's draft". The user has said to build them now. Nothing about the draft blocks the build; per CLAUDE.md every change still ships behind a flag and a pre-registered gate, and a default flips only on a passing gate. Where a gate cannot be judged yet (no history for a source), the flag ships OFF with a frozen forward snapshot and the date it becomes judgeable, stated in DECISIONS.
+
+**Track A — projection final form** (docs/… projectionpipelinesidebyside.md): (1) more free stat-line sources averaged per stat and scored once, (2) a positional missed-games table through the games convention, (3) per-player dispersion for the late-round objective only, (4) flex split derived from the curves + a bench allowance for RB/WR.
+
+**Track B — survival simulation** (expert critique): (a) urgency is built from RAW sims while only displayed survival is shrunk, (b) replace the 0.55 shrink with refit noise, (c) run detector fires on an absolute 2-in-5, (d) need damp unfitted, (e) Yahoo autopick rivals simulated as humans, (f) a rival picking twice in our window keeps fixed needs.
+
+Verified during exploration (drives the design):
+- `e_best_next` is accumulated inside the MC loop from raw `alive` (draftkit/urgency.py:174-177); `calibrate()` touches only the per-player `survival` dict (:179-190). The JS mirror (scripts/draft_driver.js:306-331) already computes e_best FROM calibrated survival with the carry formula — Python is the odd one out.
+- The n=67 the shrink was fitted on is mis-scored: draftlog logs `my_next_pick` as the on-clock pick itself, so every on-clock prediction counts as "survived" (Omnibeta: 44 pairs at 100% observed; 23/31 when rescored). Must be fixed before any refit.
+- Yahoo mock rooms have 8–9 of 10 managers `away` (autopick) — item (e) is the Yahoo default, not an edge case.
+- `line` (raw stat dict) is retained per source row (external.py:111,144), so a per-stat mean is possible; `combine()` is "first source wins" (:150-158).
+- ESPN endpoint verified live with the `X-Fantasy-Filter` header (1500-row payload, stat ids 3/4/20/24/25/42/43/53/72, carries both 2025 and 2026 season rows → filter `seasonId`). `data/raw/db_playerids.csv` carries `espn_id` for 6,233 sleeper-joinable rows (Int64; 13 dupes).
+- `data/processed/absence_bands.json` (pos × rank band mean missed games) already exists but is untracked, gitignored (`data/processed/*.json`) and unreferenced.
+- No source but Sleeper week-1 has 2023→24 / 2024→25 history, so the mean-combine and dispersion arms are unjudgeable until 2026 actuals exist; the games table and flex split ARE judgeable now.
+- `engine_parity.make_tracker` (used by every replay) runs sims 400 / reach 0.0 / pool 12,24 — not production. Both arms of every gate run under identical harness knobs.
+
+Order of execution: **B1 → B3 → B7 → B2 → B5 → B4 → B6 → A0 → A1 → A2 → A3 → A4.** The 0.55 shrink is fitted to mis-scored data (horizon bug), so the decision path is NOT wired to it (B2) until the rescored fit (B7) has produced its replacement; B7 needs B3's knobs hoisted first. B2 then ships with whatever B7 produced: a refit shrink, or 1.0.
+
+Conventions for every step: pre-register the gate in DECISIONS.md before running; Tracker knobs get CLASS defaults (object.__new__ construction in replays/tests) and are read via `ecfg.get(k, Tracker.k)`; DATA MISSING = return None, print banner, apply no adjustment; scripts print ASCII only; file I/O `encoding="utf-8"`; full suite green (`venv/Scripts/python.exe -m pytest tests -q`, 359 now) before each commit; code and `state/` never in one commit.
+
+---
+
+## Track B — survival simulation
+
+### B1. Structured logging + fit data layer (enabling; nothing flips)
+- `draftkit/urgency.py`: report gains `survival_raw` beside calibrated `survival` (zero-window branch :110-118 returns both 1.0).
+- `draftkit/draftlog.py::_recs_event` (:114-137): fix the horizon (`window_start = cp+1` when I am on the clock; `my_next_pick` from it, mirroring tracker.py:506-512); per rec add `sleeper_id, adp, survival (raw), survival_shown, market, best_now, e_best_next, urgency`; per event add `knobs` (all sim knobs incl. those hoisted in B3), `rivals` (slot, needs, autopick), `away_slots`, `window_start`. Keep the prose `why`. `_retro_recs` must return the report captured while rewound. New `DraftLog.snapshot(t, recs, report, key)`.
+- `scripts/yahoo_bridge.py`: `plan_rows(t, recs, report)` (rows gain `s` shown survival, `sr` raw, `e`, `b`; depth_tail rows None) used by both `main` and `bridge_server.build_plan` (removes the duplicate); `log_plan(...)` writes `data/logs/yahoo_<room>.jsonl` via `DraftLog.snapshot`, dedupe `(current_pick, len(drafted))`, called inside the bridge lock, failures swallowed.
+- `scripts/draft_driver.js`: `rankFromPlan` (:594) passes `s, sr, e` through; `pickRecord` keeps them on the record and each `passed_on` entry.
+- New `scripts/fit_survival.py` (data layer): loaders for Sleeper logs and Yahoo rooms (trail + yahoo_<room>.jsonl, prose fallback un-shrunk by 0.55, tagged); prediction rows with the horizon ALWAYS recomputed; both regex phrasings; drop own-take and stale rows. `--report-only` → `reports/survival_calibration.md` (buckets 0-29/30-49/50-69/70-89/90-100 by room type, plus the old three buckets rescored). `clv_retro.survival_calibration` delegates to the shared row builder.
+- Tests: test_urgency (raw vs calibrated present), test_draftlog (window_start/my_next on-clock case; rewound report), test_yahoo_bridge (plan_rows fields; log_plan one event per state), test_draft_driver (pickRecord keeps `s`), new tests/test_fit_survival.py (horizon, phrasings, un-shrink, own-take exclusion, structured preferred).
+- DECISIONS: record the horizon defect and that the shrink is retained provisionally.
+
+### B2. Decision and display read the same survival (runs AFTER B7)
+- Two estimators exist and the choice is made on measurement, not assumed:
+  - joint (today's in-loop `max(val[alive])` averaged over sims) — exact under sampling without replacement, but it cannot be reproduced from a per-player survival vector;
+  - carry (`expected_best(values, survival)`: sort by value desc, `e += carry*s*v; carry *= 1-s`) — assumes independent survivals; reproducible from the displayed vector; what the JS mirror already does.
+- Measure first: on the 40 `engine_parity` states (both leagues), compute both from the same sims and report the urgency difference per market (mean/max abs, and the top-1 pick agreement). If negligible (pre-registered: top-1 unchanged on ≥ 38/40 and max |Δurgency| < 2 pts), adopt carry as THE definition for Python and JS parity, record the measured error. If not, the joint expectation stays Python's truth, computed over the CALIBRATED draw (resample `alive` from `p_cal` marginals is not exact either — so: apply the calibration inside the sim by scaling the per-pick kill probability, and document the JS carry formula as the client-side approximation with its measured tolerance).
+- Naming, either way: report `survival_raw` (MC frequency), `survival` (calibrated, the DECISION vector, also displayed), `e_best_next` (from the decision vector), `e_best_next_joint` (raw joint, kept for the parity measurement and dropped from the report once the choice is recorded). No consumer may read `survival_raw` for a decision.
+- `urgency.py`: whichever estimator wins, `e_best_next` and `urgency` derive from `survival` (calibrated), never from raw. tracker.py:730-739 and planner.py:131-140 need no change.
+- Tests: `e_best_next` equals the chosen estimator over the reported `survival` (per position and FLEX); moves with the shrink; a test that raw and decision vectors differ when shrink ≠ 1 and coincide when 1. Investigate, never blindly re-pin, any directional test that flips (test_slot_markets:178/205, test_bench, test_fallback).
+- Gate (correctness fix, ships on green): the parity measurement above, slot_replay both leagues (commands in B7), record deltas in DECISIONS.
+
+### B3. Knobs hoisted, one read site
+- `simulate_survival(..., need_damp, qb_filled_damp, kdef_early_damp, qb_damp_until_round=10, kdef_typical_round=13, run_ratio=1.5, autopick_sigma_scale=0.5, rival_needs_update=True)`; module constants stay as defaults.
+- `tracker.py`: class defaults for all of them + `away_slots=frozenset()`; extract the knob block (:117-139) into `Tracker.apply_engine_cfg(ecfg)` called from `__init__`, `yahoo_bridge.build_tracker` (replacing the hand copy at :176-190) and `engine_parity.make_tracker(..., cfg=None, overrides=None)` (overrides applied last by setattr, for `--set key=val` A/Bs; harness defaults unchanged).
+- `config.yaml` engine block: the new keys at current values (nothing moves).
+- Tests: need_damp knob controls filled-position take rate; knobs flow from config in yahoo_bridge; explicit-defaults call byte-identical to the implicit one.
+
+### B4. Relative run detector + by_id fallback
+- `urgency.py` loop: per simulated pick compute the model's own position mass (`bincount(pos_idx, weights=w)/total`), ring buffer of `run_window`; seed from `base_recent` using the plain ADP likelihood extended backwards. Trigger: `count >= run_min and count > run_ratio * expected[pos]`; `run_ratio=0` reproduces today exactly.
+- `tracker.py`: factor `_pick_pos(p)` (metadata.position else by_id, DST→DEF) from `slot_positions` and use it for `recent_pos` (:538-539) — the detector is dead on the Yahoo path today.
+- Tests: expected-share position never triggers; relative surplus does; existing :88 holds; by_id fallback.
+- Gate: slot_replay both leagues, `--set run_ratio=0` vs 1.5; keep 1.5 if lineup points not worse on both, else set 0 and record.
+
+### B5. Autopick rivals end to end
+- driver: `storeState().drafted[]` gains `team_id`; `refreshPlan` body gains `away_teams`.
+- `yahoo_bridge.build_tracker`: team_id→slot via `snake.pick_to_round_slot` from drafted entries; `t.away_slots`; DOM path (no team ids) degrades to empty with a payload note. Sleeper path: class default empty.
+- `_rival_states` emits `autopick`; `simulate_survival`: an autopick rival is MORE need-constrained than a human, not less. Yahoo autopick fills every starter slot before any bench slot and enforces a position ratio, walking its default rank. So: (i) ranking source = Yahoo's default rank — on Keefamania the board's `adp` already IS the Yahoo ADP override (`data/external/yahoo_adp.keefamania.csv` via market.py:224-243), so the likelihood centres on the board `adp` as today; note this in the code and assert it in the bridge preflight (`market.yahoo_adp_applied`); (ii) small noise: `sigma * autopick_sigma_scale` (0.5 prior); (iii) no reach (still consume the RNG draw so the stream is common); (iv) STRONG need weighting: while that rival has any open starter slot, positions that fill none get `autopick_need_damp` (new knob, default 0.02, i.e. ~never) and K/DEF are taken only in the rounds his default list reaches them; once starters are full, the position ratio cap applies (skip positions at Yahoo's per-position max, `position_draft_caps` from the settings endpoint recorded in the league yaml `expected:`; DATA MISSING → no cap).
+- Tests: autopick rival never reaches (equals reach 0 run, same seed); with an open RB slot he takes an RB over a higher-ranked bench-only position (the inverse of the human `:51` case); once starters are full his picks follow rank; away_teams→away_slots and the degrade; `_rival_states` flags; driver body contains away_teams and drafted carries team_id.
+- Gate: no Sleeper replay can exercise it; ships on tests + one live mock where the bridge log shows non-empty `away_slots`. 0.5 is a prior until B7 fits it.
+
+### B6. Per-rival needs within the window + perf
+- `urgency.py`: split `rival_mult` into precomputed `base_mult` (tendency × K/DEF-early) and a needs 6-vector; slots appearing once keep the fast precomputed row (numerics identical to today); slots appearing 2+ times carry per-sim mutable needs, `consume` after each simulated pick and recompute only that rival's later rows; autopick rivals skip. Move `consume` to `draftkit/snake.py`, re-export from planner. `rival_needs_update=False` restores today.
+- Perf: baseline measured 0.39 s (9 rivals) / 0.94 s (22 rivals) at sims 1000, pool 100. Budget ≤ 2×; if exceeded, `engine.sims: 600` and record.
+- Tests: same slot twice with QB open → second-pick QB probability drops (vs two distinct slots); off-flag identical; planner `consume` tests pass via re-export.
+- Gate: slot_replay both leagues, off vs on; keep on if not worse.
+
+### B7. Refit and shrink retirement gate (last; ~1.5 h compute)
+- `fit_survival.py --fit`: for every pick number in every room (Omnibeta real; 3 Sleeper mocks; 4 Yahoo mocks), rebuild the state and tracker via `EP.make_tracker(..., cfg=Config.load(league), overrides=grid_point)`, ADP from the `data/raw/adp_history/adp_<date>.json` snapshot preceding the draft date (matched by `clv_retro.norm`), take `survival_raw` for the pooled players, outcome against the tracker's own window. Bernoulli NLL; coordinate search: (sigma_early × sigma_late) {4,6,8,10}×{15,21,27,35} at reach .15 → reach_prob {0,.1,.15,.25,.35} → need_damp {.15,.3,.5} → autopick_sigma_scale {.25,.5,.75,1.0} on Yahoo rooms. `--sims 200 --every 2 --workers N` for the search, 1000 to confirm. Also the empirical need-damp estimate (closed vs open take-rate solving one parameter against the model's ADP mass) by room type next to 0.15. Output `reports/survival_fit.md`.
+- `scripts/slot_replay.py` gains `--league` (slots via `EP.league_shape`) and `--set key=val`.
+- Fitting philosophy, pre-registered in the same DECISIONS entry: a four-parameter coordinate search on one human room plus bot and autopick mocks yields THE BEST POINT ON A COARSE GRID, not identified parameters; no claim of identification is made, and no parameter is reported to more precision than the grid step. Three calibration views are always reported side by side: pooled, human-room only, autopick-heavy (Yahoo) only.
+- Pre-registered acceptance (write before running): calibration within ±8 points in every bucket with n ≥ 15 on the pooled real-seat set AND the human room reported separately (a pass carried only by bot/autopick rooms while a human bucket n ≥ 15 fails = split, no flip); outcome: slot_replay lineup points, fitted vs current under identical harness knobs, mean not worse on both leagues.
+- Fallback on gate failure is declared now: the SIGMA-ONLY refit (sigma_early/late fitted, reach/need/autopick knobs at today's values, shrink 1.0) becomes the default — never 0.55, which is now known to be fitted to a bug. If even the sigma-only refit fails the calibration bar, shrink is refit on the rescored data as a stopgap and the entry says so.
+  - Keefamania: `slot_replay.py --league keefamania --draft-id 1396184666897145856 --teams 10 --board tiers.keefamania.csv --set …`
+  - Omnibeta: `slot_replay.py --league omnibeta --draft-id 1395566812157984768 --teams 12 --board tiers.csv --set …`
+- On pass: `survival_shrink: 1.0` + fitted knobs in config.yaml, Tracker class defaults, engine_parity (shrink only), draft_driver.js `SURVIVAL_SHRINK`, vona_replay note; the JS pin at tests/test_draft_driver.py:541 survives (z=0 → 0.5 for any shrink; update the comment). On fail: the sigma-only fallback above, tables recorded, missing data stated (one human room; bar = one more human room per format). B2 then wires the decision path to whatever this step produced.
+
+---
+
+## Track A — projection final form
+
+### A0. Identity harness (prerequisite)
+- New `scripts/board_identity.py`: builds a board in-process like `cli.cmd_tiers` (reuse `baseline_bakeoff.build_board` shape, `draftkit.tiers.finish_board`), `--set key.path=value` deep-merged (the `_BtCfg`/`_deep_merge` pattern in projection_backtest.py:170-181), pins `consensus.CACHE_TTL`/`ids.CACHE_TTL` in-process, `--write-ref`/`--check` comparing row count and `proj_pts, vorp, tier, value_rank` on `sleeper_id`, then the full file minus columns absent from the reference. Record four refs first: `data/draftrig/ref_{model,external}.{keefamania,omnibeta}.csv`. Every step ends with `--check` on all four with its flag off.
+
+### A1. Sources: ESPN adapter, per-stat mean, dispersion columns (ships OFF; judgeable Jan 2027)
+- `draftkit/ids.py:49-52`: cast `espn_id` to Utf8. `draftkit/market.py::_attach_sleeper_ids`: `id_col` keyword (default `fantasypros_id`); ESPN uses `id_col="espn_id"` → same name-match fallback, unmatched RETURNED.
+- New `draftkit/espn.py`: `fetch_projections(season, raw_dir, getter, ttl)` = copy of `consensus.fetch_position` (cache `data/raw/espn_proj_<season>.json`, 12 h TTL, stale-on-failure with stderr note, else `EspnUnavailable`); header `X-Fantasy-Filter` (limit 1500, split 0, source 1) + browser UA; require ≥200 players else `EspnUnavailable("filter header ignored")`; pure `parse_players(players, season)` (skill positions, the `seasonId==season & statSourceId==1 & statSplitTypeId==0` row, `STAT_IDS` map, team None).
+- `draftkit/external.py`: `from_espn(...)` → `(frame, unmatched)` in SCHEMA (score via `seasondata.score_projection`); `combine(frames, mode="first", scoring=None)`: `first` unchanged + `n_sources=1, pts17_sd=0, hi=lo=pts17`; `combine_mean`: per-`sleeper_id` per-stat mean over sources carrying the player (omitted key = 0), `pts17 = score_projection(mean_line)` (linear scoring ⇒ equals the mean of per-source pts17), `pts17_sd` population std, hi/lo, `n_sources`, `source="mean(a,b)"`, `as_of` max. `load_external`: `combine` mode from config, `espn` branch (id_map loaded inside the function), `espn_unmatched` in the report; `sheet` stays selectable, not default.
+- `draftkit/projections.py::external_projection`: carry `n_sources, pts17_sd/hi/lo`; emit `proj_sd/hi/lo` scaled like `proj_pts`; K/DEF `n_sources=0`, sd null; `_finish`: sd null for overrides / zeroed; `model_projection` emits the four as null (stable header).
+- `draftkit/tiers.py` TIERS_COLUMNS + rounding (guarded); hand allowlists: `scripts/engine_parity.load_board`, `scripts/yahoo_bridge.load_players`, `scripts/export_board_json.py` (`sd`, `ns`).
+- `config.yaml`: `external.combine: first` (→ `mean` on pass), `sources: [sheet, sleeper]` (→ `[sleeper, espn]` on pass).
+- New `scripts/forward_snapshot.py`: freeze 2026 arms now → tracked `reports/forward_2026.<league>.rows.csv` (`sleeper, espn, mean, sheet, model`, 17-game basis, `pair="2026"`); `--score` in January joins actuals via `projection_backtest.season_actuals`.
+- `scripts/source_gate.py` generalized: `--candidate X --rivals a,b,c --rows csv,csv`; pass iff the candidate is not worse than EVERY rival on both tests (existing tolerances); defaults reproduce #23 byte-for-byte (verify). Do NOT add ESPN to `projection_backtest.ARMS` (empties the common set).
+- Tests: rewrite test_external.py:79-90 (first mode + mean mode: per-stat mean, sd = |a−b|/2, order-free); new tests/test_espn.py (parse season row & stat ids; fetch header/cache/stale/degrade; from_espn id-then-name with duplicate ids; load_external continues on EspnUnavailable); test_ids cast; test_source_gate re-pin for the generalized verdict.
+- DECISIONS #25 (pre-registered): arms, population (ADP ≤ adp_include_within, rows every arm projected), Test 1 pooled MAE/weighted ρ on 2026 actuals, Test 2 source_gate outcome on the archived 2026 drafts graded on 2026 actuals; rule: mean not-worse than every rival (≤1.02× MAE, ≥−0.02 ρ, ≥0.99× outcome) in both leagues; judged when 2026 is played; until then `combine: first`. Mechanical pre-ship check: ESPN coverage ≥ 90% of Sleeper-lined ADP ≤ 180 players, unmatched listed.
+- Identity: flag off → four boards IDENTICAL (full file minus the four new columns).
+
+### A2. Missed-games table through the games convention (judgeable now)
+- New `scripts/derive_absence_bands.py` (imports `prep`, `ex_ante_starters` from derive_bench_rates.py with an optional `n`), bands QB/TE 1-6/7-12/13-24, RB/WR 1-12/13-24/25-36/37-48, ex-ante rank by prior-season total (pid tie-break), zero-game seasons excluded (stated), `--through S` for leak-free per-pair tables; JSON `{meta, bands, pooled_mean}`. `.gitignore`: `!data/processed/absence_bands.json`.
+- Empirical pre-check FIRST (recorded in DECISIONS #26 before the table is applied): establish each source's own games convention from its own fields, not by assumption, so no line is discounted twice. Sleeper: `gp` is a week count (18) and the season line is a full-season total — confirm by comparing a healthy starter's line to 17 × his weekly line from `seasondata.weekly_projections`; the sheet: FPTS is a 17-game total (its `(16 − missed)/17` scaling lives in the sheet's own downstream formula, not in the AVG line) — confirm from the workbook formulas; ESPN: season projection row, no games discount — confirm against a starter's per-game rate. Any source that already discounts games gets `already_discounted: true` in its adapter report and is EXCLUDED from the table scale (uniform games instead). Result written as a small table in the entry and as `SOURCE_GAMES_CONVENTION` next to `LINE_GAMES` in external.py.
+- New `draftkit/games_table.py`: `load(cfg)` (None + `GAMES TABLE: DATA MISSING` banner), `games_expr(cfg, table, rank_col="_r")` = `games − (missed − pooled_mean)` where the cell exists else `games`. The invariant sits in a comment beside the function: differential mode moves only cross-cell differences; the pooled mean is subtracted so the uniform part cancels (VORP is a within-position difference and briefs ÷16 stay on the 16-game basis); a source that already discounts games must never pass through it.
+- `draftkit/projections.py`: compute `_r` (rank of coalesce(ecr, adp) within pos) BEFORE scaling in both paths; external scale `pts17 * _games / 17` (and sd/hi/lo); model `model_ppg * _games`; consensus column rescaled at the join (`consensus.py` untouched). Band from `_r`, never from the projection.
+- `config.yaml`: `projections.games_table: {enabled: false, mode: differential, path: data/processed/absence_bands.json}`.
+- New `scripts/games_table_gate.py`: applies leak-free per-pair tables to the #23 rows (`blend_gt`, `lines_gt`, ADP rank within pair/pos as the provisional rank), non-null exactly where the base arm is; then `source_gate.py --candidate blend_gt --rivals blend` (and the lines twin).
+- Tests: tests/test_games_table.py (band table from synthetic weekly; differential centres on pooled mean; K/null rank/off-table uniform; DATA MISSING; band uses market rank not projection; committed table every cell n ≥ 30).
+- DECISIONS #26: Test 1 pooled MAE ratio ≤ 0.99 in BOTH leagues (an improvement claim must improve) and ρ ≥ −0.02; Test 2 outcome ≥ 0.99× over the 44 slot-drafts; pass → enabled, boards rebuilt, churn diagnostic recorded; off-table ranks use uniform games (stated).
+- Identity: `enabled: false` → four boards IDENTICAL (whole file).
+
+### A3. Dispersion in the late-round objective only (ships OFF; judgeable Jan 2027, needs A1 on)
+- `tracker.py`: class defaults `late_round_dispersion=False`, `dispersion_lambda=0.5`; at :702-706 from `upside_from_round`: key = `mv(q) + λ·proj_sd` when flag on AND `proj_sd` present AND `n_sources ≥ 2`, else the existing `upside_mult` path (the guard matters: with `combine: first` sd ≡ 0). Rationale: `sources disagree by ±sd (n, lo-hi)`. Nothing enters VORP/tiers/own_value/_fallback_points.
+- Mirrors: `engine_parity.make_tracker`, `yahoo_bridge.build_tracker` (via `apply_engine_cfg` after B3), tests/test_slot_markets fixture, `draft_driver.js` (compact board gains `sd`,`ns`; `engine_parity.js_rank` columns updated together; parity run off/on with zero diffs).
+- Tests: off matches multiplier ordering; on prefers higher spread at equal value from round 8 only; degrades when sd missing/single source; rationale reports spread; yahoo_bridge reads knobs.
+- New `scripts/dispersion_replay.py`: archived 2026 drafts, both leagues, every slot, flag off vs on (`T.Tracker` pattern, restore CLASS default), graded `lineup_points(key="actual")` when `--actuals` exist; churn by round as a diagnostic now; exits 0 with "no dispersion on this board" until A1 is on.
+- DECISIONS #27: λ = 0.5 fixed in advance (no grid on the outcome); rule: on ≥ +0.5% mean over the 22 slots and not worse in either league; judged Jan 2027.
+
+### A4. Flex split by format + bench allowance (judgeable now)
+- New `scripts/derive_flex_split.py`: per league, `league_shape(cfg)`, board via `EP.load_board`; remove top `teams×slots[pos]` per RB/WR/TE, fill `teams×FLEX` greedily by `proj_pts`; shares; `--export reports/flex_split.<league>.json`; also runnable on the external board as a sensitivity read.
+- The derived split is a LEAGUE fact (it depends on league size, lineup and bench, not scoring alone) and lives in the league yaml: `derive_flex_split.py --write` persists `flex_split: {RB: .., WR: .., TE: .., derived: 2026-09-0X, board: tiers.<league>.csv}` into `leagues/<name>.yaml`. `draftkit/onboard.py`: keep `FLEX_SPLIT` (legacy, no-scoring callers byte-identical; tests/test_multileague.py:25-41 pinned); add `FLEX_SPLIT_BY_FORMAT = {"half":…, "full":…}` (frozen from the two derivations, with date/league/last-flex names in the comment) as the FALLBACK for a league whose yaml carries no `flex_split` yet (e.g. straight after `onboard`, before a board exists); `format_key(scoring)` (`rec ≥ 1 → full`, the `consensus.adp_key` rule); resolution order in `derive_baselines(teams, roster, scoring=None, flex_split=None, bench_allowance=False)`: explicit `flex_split` (from `cfg["flex_split"]`) → by-format fallback when scoring is given → legacy constant. `slot_counts(roster, split=None, bench_allowance=False)` where the allowance multiplies RB/WR demand by `1 + (ABSENT_WEEKS[pos] + BYE_WEEKS)/FANTASY_WEEKS` imported from `draftkit/bench.py` (expected starters absent per week = insurance depth actually held; derivation in docstring); `onboard()` passes scoring and writes the fallback split into the new yaml with a comment telling the operator to run `derive_flex_split.py --write` once a board exists. `verify` ignores `flex_split` (a derived fact, not a Sleeper fact).
+- `scripts/baseline_bakeoff.py`: candidates `yaml` / `flex` / `flex+bench`; slots from `EP.league_shape` for both `replay` and `lineup_points` (today Omnibeta is graded on the Keefamania shape — fix); per-league run on its own log.
+- Tests: format_key; resolution order (yaml split → by-format → legacy); allowance raises RB/WR only by the absence factor; the walk on a synthetic 2-team board → {RB .5, WR .5, TE 0}; `--write` round-trips the yaml block without touching other keys.
+- DECISIONS #28: metric = projected points of the starting lineup, archived 2026 draft, every slot, per league; a candidate replaces the yaml baselines in a league only if mean ≥ yaml AND wins ≥ losses; ties keep the yaml; expected small (0.4-pt spread since adaptive fallback) — "no change" is a valid recorded result. The split itself is stored per league regardless of the bake-off outcome (it is a derived fact about that league); only `replacement_baselines` waits on the gate, and they change per league by re-deriving, never copied.
+- Commands: `derive_flex_split.py --league {keefamania,omnibeta} --export …`; `baseline_bakeoff.py --league keefamania --logs 1396184666897145856:10`; `… --league omnibeta --logs 1395566812157984768:12`.
+
+---
+
+## Verification (end to end)
+1. After each step: full suite green; `board_identity.py --check` on all four refs with the step's flag off; commit.
+2. B2: `engine_parity.py --states 40` before/after; slot_replay both leagues; numbers in DECISIONS.
+3. B4/B6/B7: slot_replay A/B commands above; B7 additionally `fit_survival.py --report-only` then `--fit`, `reports/survival_fit.md`.
+4. A2: `derive_absence_bands.py` (full + `--through 2023/2024`), `games_table_gate.py`, `source_gate.py --candidate blend_gt --rivals blend`.
+5. A4: `derive_flex_split.py` both leagues, `baseline_bakeoff.py` both leagues.
+6. A1/A3: `forward_snapshot.py` both leagues (frozen, tracked), `source_gate.py` defaults reproduce reports/source_gate.md; January: `forward_snapshot.py --score` + the generalized gate.
+7. Live: one Yahoo mock after B5 to confirm `away_slots` non-empty in the bridge log and `yahoo_<room>.jsonl` written; mock trail rendered.
+8. Rebuild the Keefamania board through the CLI twice and confirm byte-identical (determinism kept).
+
+## Risks
+- ESPN endpoint is undocumented; adapter degrades to stale cache → DATA MISSING; `mean` with one source present degenerates to that source.
+- RNG stream: B5/B6 keep it common for today's fixtures; test_slot_markets:133 (same-seed equality) is safe; directional pins may move with B2 — investigate, don't re-pin.
+- Perf budget for B6 stated; fallback `sims: 600`.
+- Retro data thin and skewed (one human room; bot mocks; Yahoo rooms 80–90% autopick with end-state away flags). The replay-based fit is primary; logged prose is report-only.
+- Harness ≠ production knobs (sims/reach/pool); both gate arms share them; `cfg=`/`overrides` reach the production point when wanted.
+- Off-table ranks (RB/WR 49+) use uniform games — a small step, documented not extrapolated.
