@@ -138,3 +138,18 @@ def test_gate_generalises_to_a_candidate_against_several_rivals():
     assert s["vs"]["blend"]["pass"] is True and s["vs"]["curve"]["pass"] is False and s["pass"] is False
     s2 = sg.summarize_outcome(pairs, candidate="lines", rivals=("blend", "usage"))
     assert s2["pass"] is True and s2["model_mean"] == 1000.0
+
+
+def test_an_arm_named_like_a_legacy_key_keeps_its_own_value():
+    """Regression (2026-09-02): the games-table gate judged `lines_gt` against
+    `lines`. The old #23 alias keys (blend / lines) overwrote the rival's own
+    grade with the candidate's, so the outcome summary compared the candidate
+    with itself and reported 44 ties. Every value is keyed by arm name only."""
+    rows = _rows().with_columns((pl.col("lines") * 1.10).alias("lines_gt"))
+    a = sg.pooled_accuracy(rows, candidate="lines_gt", rivals=("lines",))
+    assert a["lines_mae"] != a["lines_gt_mae"]
+    assert a["mae_ratio"] == a["lines_gt_mae"] / a["lines_mae"]
+    pairs = [{"league": "k", "pair": "x", "slots": [{"lines": 1000.0, "lines_gt": 900.0, "blend": 1200.0}]}]
+    s = sg.summarize_outcome(pairs, candidate="lines_gt", rivals=("lines",))
+    assert (s["model_mean"], s["ext_mean"], s["worse"], s["tied"]) == (1000.0, 900.0, 1, 0)
+    assert s["pass"] is False

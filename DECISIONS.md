@@ -1705,6 +1705,39 @@ slot-drafts. Pass -> enabled: true, boards rebuilt, churn by tier recorded
 as a diagnostic. Any fail -> stays off, numbers recorded. Identity with the
 table off: the four reference boards must come back IDENTICAL.
 
+### A2 result (same day): the table makes both arms LESS accurate; stays off
+
+reports/games_table_gate.md (blend_gt vs blend), reports/
+games_table_gate_lines.md (lines_gt vs lines); rows in reports/
+projection_backtest.<league>.gt.rows.csv.
+
+Test 1, pooled MAE ratio candidate / base (required <= 0.99 in both):
+blend_gt 1.023 Keefamania (59.1 vs 57.8, n 254), 1.020 Omnibeta (64.3 vs
+63.0, n 301); lines_gt 1.038 Keefamania (63.1 vs 60.8), 1.031 Omnibeta
+(68.1 vs 66.0). Weighted Spearman within +-0.004 everywhere. FAIL, all
+four cells, in the wrong direction: scaling a projection by the band's
+historical absence rate adds error rather than removing it. Per cell the
+table helps RB (MAE down 1-3 points in every RB cell) and hurts QB, WR and
+TE, which is the pattern of a signal that is real for one position and
+noise dressed as signal for the others.
+
+Test 2, actual-points outcome over the 44 slot-drafts: blend_gt 1544.1 vs
+blend 1561.7 (-1.13%, better 13 / worse 27 / tied 4) FAIL; lines_gt 1551.4
+vs lines 1536.6 (+0.96%, 23 / 17 / 4) pass. The pre-registration required
+BOTH tests; the accuracy half fails outright. Decision: games_table.enabled
+stays false; boards untouched; identity IDENTICAL x4 with the table off.
+
+Defect found while reading the first result, fixed before this was
+recorded: source_gate.py still wrote #23-style alias keys (`blend`,
+`lines`) beside the arm-named keys. For the lines_gt-vs-lines run the
+alias `lines` overwrote the rival's own grade with the candidate's, so the
+first outcome summary compared lines_gt with itself (44 ties, "+0.0%").
+The per-slot tables were right, which is how it was caught. Aliases are
+gone; every value is keyed by its arm name and render() reads the names;
+regression test added; the #23 default run reproduces the committed
+accuracy tables byte for byte, and its outcome half matches the
+reproduction check recorded under #30 (-1.61%, stay).
+
 ## 2026-09-02 (32) — A3: dispersion in the late-round objective only, pre-registered, OFF
 
 From upside_from_round the engine ranked a market's candidates on VORP x
