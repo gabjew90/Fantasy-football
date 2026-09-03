@@ -1704,3 +1704,35 @@ Spearman >= -0.02. Test 2: actual-points outcome >= 0.99x over the 44
 slot-drafts. Pass -> enabled: true, boards rebuilt, churn by tier recorded
 as a diagnostic. Any fail -> stays off, numbers recorded. Identity with the
 table off: the four reference boards must come back IDENTICAL.
+
+## 2026-09-02 (32) — A3: dispersion in the late-round objective only, pre-registered, OFF
+
+From upside_from_round the engine ranked a market's candidates on VORP x
+1.15 for role-quality "upside" players. Built: with `late_round_dispersion`
+on, a candidate whose projection carries a spread across >= 2 sources
+(proj_sd, plan A1) ranks on VORP + dispersion_lambda x spread instead; the
+boolean multiplier remains the rule for everyone without such a spread, so
+the flag is inert by construction while combine: first (every spread is 0).
+Nothing enters VORP, tiers, the planner or the fallback points. The
+rationale says "sources disagree by +-N pts (k sources, lo-hi)". Mirrored
+in the in-page driver's local fallback. Naming stays neutral: the word
+upside describes the existing role-quality gate, not this.
+
+Gate, fixed now: dispersion_lambda = 0.5, chosen in advance, no grid on the
+outcome. scripts/dispersion_replay.py: both archived 2026 drafts, every
+slot, flag off vs on on the production board, graded on 2026 ACTUAL
+lineup points (the forward snapshot scored in January); projected points
+and churn by pick are printed now as diagnostics. Rule: on must be
+>= +0.5% mean over the 22 slots AND not worse in either league.
+Prerequisite: combine: mean on the board (A1's gate); until then the
+replay exits with "no dispersion on this board". Judged January 2027; off
+for the 2026 drafts. Identity: flag off, four boards IDENTICAL.
+
+### A3 result (same day): built, inert, identical
+
+Flag off: the four reference boards IDENTICAL. dispersion_replay.py on both
+leagues exits with "no dispersion on this board (0 players with a spread
+from >= 2 sources)", as the entry predicted under combine: first. Tests:
+off keeps the multiplier ordering; on prefers the wider spread at equal
+value from round 8 only; degrades to the multiplier when sd is missing or
+comes from one source. Nothing to judge until A1's mean-combine is on.

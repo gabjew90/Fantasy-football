@@ -128,6 +128,13 @@ engine:
   # score on an 85th-percentile proxy instead of median
   upside_from_round: 8
   upside_mult: 1.15
+  # ---- late-round dispersion (plan A3, DECISIONS #32) ---------------------
+  # From upside_from_round, rank on mean + dispersion_lambda x the spread of
+  # the projection across sources (proj_sd, >= 2 sources) instead of the
+  # boolean upside multiplier. Inert while combine: first (every spread is
+  # 0). lambda fixed in advance; judged on 2026 actuals.
+  late_round_dispersion: false
+  dispersion_lambda: 0.5
   # ---- rival-behaviour knobs (plan 2026-09-02 B3) -------------------------
   # Hoisted from constants in draftkit/urgency.py at the values that were in
   # force, so every prediction logs the knob set it was made under and the

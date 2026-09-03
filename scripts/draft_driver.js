@@ -30,6 +30,8 @@ window.DK = (function () {
       te2FallPicks: 12,
       upsideFromRound: 8,
       upsideMult: 1.15,
+      lateRoundDispersion: false,   // plan A3 mirror: mean + lambda x sd from upsideFromRound (board rows carry sd/ns)
+      dispersionLambda: 0.5,
       queueDepth: 5,
       bridge: 'https://127.0.0.1:8443',
       mySlot: null,
@@ -737,9 +739,13 @@ window.DK = (function () {
       // upside-boosted proxy BEFORE truncating, so a gated player ranked 4th
       // by median can still surface.
       if (rnd >= S.cfg.upsideFromRound) {
-        rem = rem.slice().sort((a, b) =>
-          -( (a.v || 0) * (a.u ? S.cfg.upsideMult : 1) )
-          + ( (b.v || 0) * (b.u ? S.cfg.upsideMult : 1) ));
+        // plan A3 mirror of tracker._late: mean + lambda x source spread when the
+        // flag is on and the row carries a spread from >= 2 sources; else the
+        // boolean upside multiplier
+        const late = (p) => (S.cfg.lateRoundDispersion && p.sd != null && (p.ns || 0) >= 2)
+          ? (p.v || 0) + S.cfg.dispersionLambda * p.sd
+          : (p.v || 0) * (p.u ? S.cfg.upsideMult : 1);
+        rem = rem.slice().sort((a, b) => late(b) - late(a));
       }
       const pool = rem.slice(0, 3);
       const anchor = pool[0];

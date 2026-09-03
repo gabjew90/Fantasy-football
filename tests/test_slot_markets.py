@@ -255,3 +255,62 @@ def test_recent_positions_fall_back_to_the_board_when_picks_carry_no_metadata():
     assert t._recent_positions() == ["RB", "RB", "WR", "TE"]
     t.state.picks[3]["player_id"] = "unknown99"
     assert t._recent_positions()[-1] == ""
+
+
+# ---------- plan A3: late-round dispersion objective ----------
+
+def _late_board(sd_a=30.0, sd_b=5.0, n_a=2, n_b=2):
+    """Round-8 state: six picks made by me with the FLEX still open (a filled
+    roster would price the RBs as bench insurance, a different path), two
+    RBs of EQUAL value left, one with a wide source spread and one narrow,
+    plus a K and a DEF so the endgame guardrails stay quiet."""
+    mine = [player(f"m{i}", pos, 60.0 - i, 50.0 - i, 5.0 + i) for i, pos in
+            enumerate(["QB", "RB", "RB", "WR", "WR", "TE"])]
+    a = dict(player("wide", "RB", 20.0, 20.0, 80.0, rank=20), proj_sd=sd_a, n_sources=n_a, proj_hi=60.0, proj_lo=0.0)
+    b = dict(player("narrow", "RB", 20.0, 20.0, 81.0, rank=21), proj_sd=sd_b, n_sources=n_b, proj_hi=30.0, proj_lo=20.0)
+    filler = [player(f"f{i}", "WR", 1.0 - i * 0.01, 1.0, 150.0 + i) for i in range(6)]
+    kd = [player("k1", "K", 2.0, 2.0, 160.0), player("d1", "DEF", 2.0, 2.0, 161.0)]
+    return mine + [a, b] + filler + kd, [m["sleeper_id"] for m in mine]
+
+
+def _top_rb(t):
+    recs = t.recommendations(top_n=5)
+    rbs = [p["sleeper_id"] for _s, _w, p in recs if p["pos"] == "RB"]
+    return rbs[0] if rbs else None, {p["sleeper_id"]: w for _s, w, p in recs}
+
+
+def test_dispersion_off_keeps_the_upside_multiplier_ordering():
+    board, mine = _late_board()
+    t = make_tracker(board, mine, my_slot=1, current_pick=71)        # round 8
+    assert t.late_round_dispersion is False
+    top, _ = _top_rb(t)
+    # equal value, no upside flag: the board's own order (wide listed first) holds
+    assert top == "wide"
+    board2, mine2 = _late_board()
+    next(x for x in board2 if x["sleeper_id"] == "narrow")["upside_flag"] = True                                   # 'narrow' gets the role-quality flag
+    t2 = make_tracker(board2, mine2, my_slot=1, current_pick=71)
+    assert _top_rb(t2)[0] == "narrow"
+
+
+def test_dispersion_on_prefers_the_wider_spread_from_the_upside_round_only():
+    board, mine = _late_board()
+    next(x for x in board if x["sleeper_id"] == "narrow")["upside_flag"] = True                                    # narrow has the flag, wide has the spread
+    t = make_tracker(board, mine, my_slot=1, current_pick=71)
+    t.late_round_dispersion = True
+    top, whys = _top_rb(t)
+    assert top == "wide"
+    assert "sources disagree by" in whys["wide"]
+    early = make_tracker(board, mine[:2], my_slot=1, current_pick=21)  # round 3: not the late objective
+    early.late_round_dispersion = True
+    _t, whys_early = _top_rb(early)
+    assert all("sources disagree" not in w for w in whys_early.values())
+
+
+def test_dispersion_degrades_to_the_multiplier_without_a_two_source_spread():
+    for sd, n in ((None, 2), (30.0, 1), (0.0, 1)):
+        board, mine = _late_board(sd_a=sd, n_a=n, n_b=1)              # neither carries a 2-source spread
+        next(x for x in board if x["sleeper_id"] == "narrow")["upside_flag"] = True
+        t = make_tracker(board, mine, my_slot=1, current_pick=71)
+        t.late_round_dispersion = True
+        top, whys = _top_rb(t)
+        assert top == "narrow" and all("sources disagree" not in w for w in whys.values()), (sd, n)

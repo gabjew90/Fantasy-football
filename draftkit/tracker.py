@@ -62,6 +62,13 @@ class Tracker:
     away_slots = frozenset()    # plan B5: draft slots on autopick (Yahoo 'away'); empty on Sleeper
     upside_from_round = 8
     upside_mult = 1.15
+    # plan A3 (DECISIONS #32): from upside_from_round, rank a candidate on
+    # mean + dispersion_lambda x the spread of his projection across sources
+    # (proj_sd) instead of the boolean upside multiplier -- only when the flag
+    # is on AND the board carries a spread from >= 2 sources. Nothing here
+    # enters VORP, tiers or the planner. OFF until its gate passes.
+    late_round_dispersion = False
+    dispersion_lambda = 0.5
     # Rank by unfilled roster SLOT rather than by position (_open_markets).
     # Kept as a knob so the ten-slot replay can A/B it; the A/B is the reason
     # it is on. Turning it off restores per-position urgency exactly.
@@ -300,8 +307,20 @@ class Tracker:
         ("kdef_early_damp", float), ("kdef_typical_round", int),
         ("autopick_sigma_scale", float), ("autopick_need_damp", float), ("rival_needs_update", bool),
         ("upside_from_round", int), ("upside_mult", float),
+        ("late_round_dispersion", bool), ("dispersion_lambda", float),
         ("slot_markets", bool), ("adaptive_fallback", bool), ("bench_insurance", bool),
     )
+
+    def _dispersion_for(self, q: dict) -> float | None:
+        """The candidate's projection spread when the late-round dispersion
+        objective applies to him: flag on, a spread present, from >= 2 sources.
+        None otherwise (the boolean upside multiplier then applies)."""
+        if not getattr(self, "late_round_dispersion", False):
+            return None
+        sd, n = q.get("proj_sd"), q.get("n_sources") or 0
+        if sd is None or sd != sd or n < 2:
+            return None
+        return float(sd)
 
     def apply_engine_cfg(self, ecfg: dict | None) -> None:
         """Read the `engine:` block onto this tracker; absent keys keep the
@@ -741,10 +760,14 @@ class Tracker:
             # truncation so a gated player ranked 4th+ by median can surface
             # (code review 2026-08-30).
             if rnd >= self.upside_from_round:
-                gpool = sorted(
-                    gpool,
-                    key=lambda q: -(mv(q)
-                                    * (self.upside_mult if q.get("upside_flag") else 1.0)))
+                lam = float(getattr(self, "dispersion_lambda", 0.5))
+
+                def _late(q, _mv=mv, _lam=lam):
+                    sd = self._dispersion_for(q)
+                    if sd is not None:
+                        return _mv(q) + _lam * sd            # plan A3: mean + spread
+                    return _mv(q) * (self.upside_mult if q.get("upside_flag") else 1.0)
+                gpool = sorted(gpool, key=lambda q: -_late(q))
             pool = gpool[:3]
             if not pool:
                 continue
@@ -812,7 +835,11 @@ class Tracker:
                     parts.append(f"bargain: still here {d:.0f} picks after he's usually drafted")
                 elif d >= 3:
                     parts.append(f"{d:.0f} picks past his usual draft spot")
-            if rnd >= self.upside_from_round and best.get("upside_flag"):
+            if rnd >= self.upside_from_round and self._dispersion_for(best) is not None:
+                lo, hi = best.get("proj_lo"), best.get("proj_hi")
+                span = f", {lo:.0f}-{hi:.0f}" if lo is not None and hi is not None else ""
+                parts.append(f"sources disagree by ±{best['proj_sd']:.0f} pts ({best.get('n_sources')} sources{span})")
+            elif rnd >= self.upside_from_round and best.get("upside_flag"):
                 parts.append(f"UPSIDE play: {best.get('upside_why')}")
             why = " · ".join(parts) or "best value"
             why += self._bye_warning(best, needs)
