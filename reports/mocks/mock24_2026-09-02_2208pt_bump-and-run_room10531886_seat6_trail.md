@@ -1,6 +1,6 @@
-# Mock 10531886 — Live NFL Draft | Yahoo Fantasy Sports — 10 teams, our seat 6
+# Mock 24 -- Bump and Run (room 10531886) -- Wednesday 2026-09-02 22:08 PT -- 10 teams, our seat 6
 
-Captured 2026-09-03T05:27:58.388Z. Source: the draft client's store (every pick, team ids) plus the driver's pick records (engine reason, best-by-projection alternative, candidates passed on).
+Captured 2026-09-02 22:27:58 PT. Source: the draft client's store (every pick, team ids) plus the driver's pick records (engine reason, best-by-projection alternative, candidates passed on).
 
 ## Our picks and what the engine passed on
 

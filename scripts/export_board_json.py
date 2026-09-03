@@ -18,7 +18,11 @@ SUFFIX = {"jr", "sr", "ii", "iii", "iv", "v"}
 def norm(name: str) -> str:
     s = unicodedata.normalize("NFKD", name or "")
     s = "".join(c for c in s if not unicodedata.combining(c))
-    return "".join(c for c in s.lower() if c.isalnum() or c == " ").strip()
+    # a non-alphanumeric becomes a SPACE, exactly as the driver's norm() does:
+    # dropping it fused "Smith-Njigba" into "smithnjigba" (key "j smithnjigba")
+    # while the page keyed the same player "j njigba", so hyphenated surnames
+    # never matched between the board and the store (mock 25, 2026-09-02)
+    return " ".join("".join(c if c.isalnum() else " " for c in s.lower()).split())
 
 
 def key(name: str) -> str:

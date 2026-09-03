@@ -27,16 +27,21 @@ sys.path.insert(0, str(ROOT))
 
 from draftkit.snake import pick_to_round_slot  # noqa: E402
 
+sys.path.insert(0, str(ROOT / "scripts"))
+from mock_common import header_line, load_trail, report_stem, to_pt  # noqa: E402
 
-def render(t: dict) -> str:
+
+def render(t: dict, label: str | None = None, name: str | None = None) -> str:
     picks = sorted(t.get("picks") or [], key=lambda p: int(p["pick_no"]))
     # the room size is in the dump; failing that, count the seats that picked
     teams = int(t.get("teams") or len({str(p.get("team_id")) for p in picks}) or 10)
     managers = t.get("managers") or {}
     me = str(t.get("my_team"))
     recs = {int(r["pick_no"]): r for r in (t.get("our_records") or []) if r.get("pick_no") is not None}
-    L = [f"# Mock {t.get('room')} — {t.get('room_name', '')} — {teams} teams, our seat {me}",
-         "", f"Captured {t.get('captured_at', '')}. Source: the draft client's store (every pick, team ids) "
+    mine_picks = [p for p in picks if str(p.get("team_id")) == me]
+    seat = pick_to_round_slot(int(mine_picks[0]["pick_no"]), teams)[1] if mine_picks else None
+    L = [f"# {header_line(t, label, name, seat, teams)}",
+         "", f"Captured {to_pt(t.get('captured_at'))}. Source: the draft client's store (every pick, team ids) "
          "plus the driver's pick records (engine reason, best-by-projection alternative, candidates passed on).", ""]
     # ours
     L += ["## Our picks and what the engine passed on", ""]
@@ -100,12 +105,17 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--room", required=True)
     ap.add_argument("--out", default=None)
+    ap.add_argument("--label", default=None, help="e.g. 'Mock 25' -- goes into the file name and the header")
+    ap.add_argument("--name", default=None, help="the room's nickname when the trail only has the tab title")
     a = ap.parse_args()
-    src = ROOT / "data" / "logs" / "mocks" / f"mock_{a.room}.json"
-    t = json.loads(src.read_text(encoding="utf-8"))
-    out = Path(a.out) if a.out else ROOT / "reports" / "mocks" / f"mock_{a.room}.md"
+    t = load_trail(ROOT, a.room)     # pre-reload records merged in, same start time as the scrutiny report
+    picks = sorted(t.get("picks") or [], key=lambda p: int(p["pick_no"]))
+    teams = int(t.get("teams") or 10)
+    mine = [p for p in picks if str(p.get("team_id")) == str(t.get("my_team"))]
+    seat = pick_to_round_slot(int(mine[0]["pick_no"]), teams)[1] if mine else None
+    out = Path(a.out) if a.out else ROOT / "reports" / "mocks" / f"{report_stem(t, a.label, a.name, seat)}_trail.md"
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(render(t), encoding="utf-8")
+    out.write_text(render(t, a.label, a.name), encoding="utf-8")
     print(f"-> {out}")
 
 

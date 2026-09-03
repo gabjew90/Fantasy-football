@@ -1104,3 +1104,41 @@ def test_local_fallback_never_ranks_a_player_the_store_says_is_drafted():
     assert r["source"] == "local"
     assert "Christian McCaffrey" not in r["top"] and "Bijan Robinson" not in r["top"], r
     assert r["top"] and r["top"][0] in ("Amon-Ra St. Brown", "Brian Robinson Jr.")
+
+
+def test_board_key_matches_the_drivers_key_for_awkward_names():
+    """The exporter's key() and the driver's idKey() must agree, or a board row
+    never matches its store/panel rendering. Mock 25: the exporter dropped
+    hyphens ("j smithnjigba") while the driver spaced them ("j njigba"), so a
+    drafted Smith-Njigba stayed "available" to the local ranker."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("ebj", Path(__file__).resolve().parents[1] / "scripts" / "export_board_json.py")
+    ebj = importlib.util.module_from_spec(spec); spec.loader.exec_module(ebj)
+    names = ["Jaxon Smith-Njigba", "Amon-Ra St. Brown", "Ja'Marr Chase", "Brian Robinson Jr.", "Patrick Mahomes II",
+             "Wan'Dale Robinson", "Marvin Harrison Jr.", "T.J. Hockenson", "Kenneth Walker III", "De'Von Achane", "Bijan Robinson"]
+    r = run_js("console.log(JSON.stringify(" + json.dumps(names) + ".map(n => DK.idKey(n, 'RB'))));")
+    py = [ebj.key(n) for n in names]
+    assert r == py, list(zip(names, py, r))
+
+
+def test_pick_verification_uses_our_pick_number_even_without_a_team_id():
+    """Mock 25, identity masked: our makePick landed Tracy at 118, but
+    pickLandedStore needed my_team and returned null, so the click path took
+    a roster-count increase (Sutton's click, rejected by Yahoo) as proof and
+    recorded the wrong player. The entry at OUR pick number decides."""
+    r = run_js(
+        f"""
+        const s = {json.dumps(_store_with([(1, "1", "100"), (2, "6", "101")], players=PLAYERS))};
+        s.context.managerId = null;                      // the store cannot say which team we are
+        DK._setStore({{ getState: () => s }});
+        DK.loadCompact("Bijan Robinson|RB|ATL|100|1|" + String.fromCharCode(10) + "Christian McCaffrey|RB|SFO|122.8|1|", {{ teams: 10 }});
+        console.log(JSON.stringify({{
+          my_team: DK.storeState().my_team,
+          landed: DK.pickLandedStore({{ n: 'Bijan Robinson', p: 'RB' }}, 2),
+          other: DK.pickLandedStore({{ n: 'Christian McCaffrey', p: 'RB' }}, 2),
+          notyet: DK.pickLandedStore({{ n: 'Bijan Robinson', p: 'RB' }}, 3),
+        }}));
+        """
+    )
+    assert r["my_team"] is None
+    assert r["landed"] is True and r["other"] is False and r["notyet"] is None

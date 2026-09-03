@@ -900,6 +900,10 @@ window.DK = (function () {
         n: x.p.n, p: x.p.p, t: x.p.t, v: x.p.v, vona: x.p._vona,
         pair: Math.round((x.pair || 0) * 10) / 10, partner: x.partner,
         s: Math.round(x.s), fills: x.fills, st: x.p.s,
+        // a reason the record can carry: local picks used to log why ""
+        why: 'LOCAL ranker (no usable plan): VONA ' + (x.p._vona == null ? '?' : x.p._vona)
+             + ', two-pick ' + (Math.round((x.pair || 0) * 10) / 10) + (x.partner ? ' with ' + x.partner : '')
+             + (x.fills ? ', fills a slot' : ', bench'),
       })),
       vonaBase, secondBestNow,
       blockedSample: blocked,
@@ -1462,7 +1466,9 @@ window.DK = (function () {
                                 top_proj_available: alt,
                                 took_top_projection: !!(alt && alt.n === cand.n),
                                 passed_on: passed,
-                                pick_no: S.planPick != null ? S.planPick : null,
+                                // the plan's pick number, else the store's (a local-ranker
+                                // pick has no plan: mock 25 recorded pick_no null)
+                                pick_no: S.planPick != null ? S.planPick : ((storeState() || {}).current_pick || null),
                                 // scrutiny keys (2026-09-02): when, which plan, which ranker
                                 ts: new Date().toISOString(),
                                 source: cand.fromEngine ? 'engine' : 'local',
@@ -1581,12 +1587,18 @@ window.DK = (function () {
    * this turn). Pure given storeState(); tested through _setStore. */
   function pickLandedStore(cand, turn) {
     const snap = storeState();
-    if (!snap || !snap.my_team) return null;
+    if (!snap) return null;
     const at = turn != null ? turn : S.planPick;      // the pick we were on the clock for
     if (at == null) return null;
-    const ours = snap.drafted.find(d => d.mine && d.pick_no === at);
-    if (!ours) return null;                            // not recorded yet
-    return ours.pos === cand.p && idKey(ours.name, ours.pos) === idKey(cand.n, cand.p);
+    // OUR pick number is ours by definition: the entry recorded at it decides,
+    // whether or not the store can say which team we are. Requiring my_team
+    // here made verification impossible with the identity masked (mock 25,
+    // pick 118): the action landed Tracy, the check returned null, the click
+    // path took Sutton's roster-count growth as proof and recorded Sutton.
+    const entry = snap.drafted.find(d => d.pick_no === at);
+    if (!entry) return null;                           // not recorded yet
+    if (snap.my_team && !entry.mine) return false;     // a pick at "our" number that is not ours: wrong turn
+    return entry.pos === cand.p && idKey(entry.name, entry.pos) === idKey(cand.n, cand.p);
   }
 
   function lastOwnPickName() {
@@ -1968,8 +1980,11 @@ window.DK = (function () {
       || ((typeof location !== 'undefined' && (location.pathname.match(/\/(\d+)\/\d+/) || [])[1]) || 'room');
     const isHeartbeat = l => /heartbeat: setAwayStatus/.test(String(l));
     const isIssue = l => /GATE FAILED|notours|retry|ERROR|noland|nobtn/.test(String(l));
+    // the room's nickname ("Pooch Kick") when the store has it; the tab title
+    // says only "Live NFL Draft", which named two reports the same
+    const leagueName = (s.league && (s.league.name || s.league.league_name)) || '';
     return Object.assign({
-      room, room_name: (typeof document !== 'undefined' && document.title) || '',
+      room, room_name: leagueName || (typeof document !== 'undefined' && document.title) || '',
       teams: S.cfg.teams, my_team: me ? String(me.teamId) : null,
       captured_at: new Date().toISOString(),
       picks, managers: mgrs, our_records: S.records.slice(),

@@ -1925,3 +1925,53 @@ pinned by test), the FLEX-market label on plan rows when an RB wins the
 FLEX row, the laptop scheduled tasks (SEASON BRIEFS duplicates the Actions
 manager; retirement owed to the user), the JS/Python guardrail asymmetry
 (the driver's K/DEF reservation has no Python twin).
+
+### Stress mocks 24 and 25 (same night): six injected faults, five defects found, all fixed
+
+docs/draft-rig-mock-log.md carries the two entries; reports/mocks/
+scrutiny_<room>.md (scripts/mock_scrutiny.py, new) joins the trail, the
+plans sidecar, the room log and the bridge log per pick. Both rooms
+finished 15 of 15 legal on the reviewed code. Latency via makePick:
+median ~450 ms to store confirmation across 25 action picks.
+
+Faults and what they proved: makePick no-op -> click fallback landed the
+same candidate; forced away -> cleared in 2 s; bridge killed across a turn
+(twice) -> refreshes logged, gate fell back to the local ranker after
+three cycles as built; page reload mid-draft -> full state reconstruction
+from the store and the bridge's memory, preflight clean; store identity
+masked -> roster from the panel, plan kept coming, pick landed.
+
+Defects the faults exposed (fixed the same hour, each with a test):
+1. The local ranker never excluded store-drafted players (tried players
+   drafted at picks 2 and 4). Now it does.
+2. The reviewed depth_tail applied Python's one-stash rule and came back
+   EMPTY late; the page's own gone set then filtered a two-row plan to
+   nothing. Tail = position caps + must-fill; a store-backed plan row is
+   "gone" only if the store says drafted.
+3. The board exporter fused hyphenated surnames ("j smithnjigba") while
+   the driver spaced them ("j njigba"): hyphenated players never matched
+   between board and store. Normalisers made identical; parity test over
+   eleven awkward names; board re-exported.
+4. With the team id unknown the store could not verify a pick, the click
+   path took a roster-count increase as proof and RECORDED THE WRONG
+   PLAYER (Sutton for Tracy at 118) -- mock 13's error class on the one
+   path that could not use the store. Verification now reads the store
+   entry at OUR pick number, team id or not.
+5. Auto-trail fired at our roster full (147 of 150 picks) and under the
+   wrong file name; local-ranker records lacked a pick number and a
+   reason. All filled.
+
+Calibration, both rooms (scorecard in each scrutiny report): shown
+survival 30-50% observed 0% (n 22) / 57% (n 7); 50-70% observed 32% (n 28)
+and 32% (n 34); 70-90% 77% / 73%; 90-100% 93% / 94%. The low end is
+overconfident in rooms with autopick seats (5 and 7 of 10 away at the
+end). That is the input the autopick refit stage (#26, owed) was waiting
+for; nothing is changed on that evidence tonight.
+
+B5 gate closed: away_slots non-empty and moving through the whole room in
+the live bridge log, both rooms.
+
+Operational: the join is `window.name = 'fandraft'` then `.click()` on the
+row's Join anchor; never reload the waiting room before the bell (ec=5
+drops the seat); a devtools eval dies at 45 s. In the rig memory and the
+runbook.

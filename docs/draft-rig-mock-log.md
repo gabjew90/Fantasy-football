@@ -694,10 +694,13 @@ the best-by-projection alternative and the candidates passed on.
 
 ## Mock 24 — room 10531886 "Bump and Run", 10 teams, slot 6 — STRESS TEST, 15 of 15 legal, 13 by the driver, three injected faults
 
-Full trail: reports/mocks/mock_10531886.md. Scrutiny report (every pick
-joined to its plan call, markets, needs, away seats, skipped candidates;
-survival scorecard; driver log): reports/mocks/scrutiny_10531886.md, from
-scripts/mock_scrutiny.py. First room on the reviewed code (DECISIONS #34)
+Full trail: reports/mocks/mock24_2026-09-02_2208pt_bump-and-run_room10531886_seat6_trail.md.
+Scrutiny report (a plain-English reading per pick, every pick joined to its
+plan call, markets, needs, away seats, skipped candidates; survival
+scorecard; driver log, Pacific time): reports/mocks/
+mock24_2026-09-02_2208pt_bump-and-run_room10531886_seat6_scrutiny.md, from
+scripts/mock_scrutiny.py. Report names carry mock number, Pacific start
+time, room name, room id and seat. First room on the reviewed code (DECISIONS #34)
 and the first with the plans sidecar and the room log written live.
 
 Roster: McCaffrey, Achane, McBride, Garrett Wilson, Davante Adams, Maye,
@@ -761,3 +764,48 @@ then `.click()` the row's Join anchor from the lobby tab; NEVER reload the
 waiting room before the bell (ec=5 drops the seat -- lost room 10528893
 that way); reload after the bell and click Enter Draft; a devtools eval
 dies at 45 s, so poll with <= 35-s sleeps.
+
+## Mock 25 — room 10532940 "Pooch Kick", 10 teams, slot 3 — STRESS TEST 2, 15 of 15 legal, three injected faults, two defects found and fixed
+
+Full trail: reports/mocks/mock25_2026-09-02_2237pt_pooch-kick_room10532940_seat3_trail.md.
+Scrutiny: reports/mocks/mock25_2026-09-02_2237pt_pooch-kick_room10532940_seat3_scrutiny.md. Eight of ten seats human at the join;
+five away by the end.
+
+Roster: McCaffrey, McBride, Olave, Rashee Rice, Skattebo, Hurts, Jaylen
+Warren, Gainwell, RJ Harvey, Wan'Dale Robinson, Mahomes (QB2, R11), Tyrone
+Tracy, Sutton, Steelers DEF, Pineiro K. Legal. In the room before pick 1
+(reload AFTER the bell, Enter Draft clicked, injected with 46 s on the
+pre-draft clock).
+
+Injected faults:
+- Pick 25: full page reload, driver re-injected. Preflight after the
+  reload read 30 picks and our three from the store, the bridge answered
+  from its intact feed memory (plan call 28), gates clean, no warnings.
+  Records from before the reload were saved first as
+  mock_10532940_prereload.json and the scrutiny report merges them.
+- Picks 64-87: bridge killed. Refreshes logged, the gate fell back to the
+  local ranker at 78 and it PICKED this time (Gainwell via makePick, store
+  verified) and again at 83 (RJ Harvey, no bad attempts). But its first
+  attempt at 78 was Smith-Njigba, drafted at pick 4: the board exporter
+  fused hyphenated surnames ("j smithnjigba") while the driver spaced them
+  ("j njigba"), so that player never matched between board and store.
+  Fixed: the exporter's normaliser now equals the driver's; a parity test
+  over eleven awkward names; board re-exported.
+- Picks 114-124: the store's manager id masked, so the page could not say
+  which team is ours. The roster fell back to the panel (11 players,
+  matching the header), the state was logged, the bridge kept attributing
+  by name and the plan kept coming. The pick landed -- and the record was
+  WRONG: our makePick landed Tracy at 118, but verification required the
+  team id, returned "not recorded", the click path took Sutton's
+  roster-count growth as proof and recorded Sutton at 118. Sutton came at
+  123. The mock-13 class of error, back on a path that could not use the
+  store. Fixed: the store entry at OUR pick number decides, team id or
+  not (test).
+
+Also: local-ranker records carried pick_no null and an empty reason; both
+now filled (store pick number; "LOCAL ranker: VONA x, two-pick y").
+Auto-trail waited for the room to finish and saved under mock_<room>.json.
+
+Fifteen of fifteen legal; 14 driver records (11 after the reload + 3
+before), 13 via makePick, 1 via click (the masked turn); no gate failure
+outside the injected outage; heartbeats on schedule.

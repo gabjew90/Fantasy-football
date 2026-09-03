@@ -1,8 +1,42 @@
-# Scrutiny -- room 10531886 (Live NFL Draft | Yahoo Fantasy Sports)
+# Scrutiny: Mock 24 -- Bump and Run (room 10531886) -- Wednesday 2026-09-02 22:08 PT -- 10 teams, our seat 6
 
-Captured 2026-09-03T05:27:58.388Z. 10 teams, our team id 6, draft slot 6. 150 picks in the trail, 85 bridge plan calls, 72 recs events in the room log.
+Captured 2026-09-02 22:27:58 PT. Times below are Pacific. 10 teams, our team id 6, draft slot 6. 150 picks in the trail, 85 bridge plan calls, 72 recs events in the room log.
 
 Injected: mock 24: faults at 66 (makePick no-op), 71 (forced away), 78-86 (bridge killed)
+
+## How the engine thinks, in plain English
+
+1. **Projections first.** Every player has a season points projection for this league's
+   scoring. On its own that number ranks quarterbacks at the top of every list, which is why it
+   is never used on its own.
+2. **Value over what is freely available.** The engine subtracts, per position, the points of the
+   player you could get for nothing at that position (the replacement level, derived from how
+   many starters this league's format demands). That difference is the value column, VORP. A
+   player who can only start in the flex is valued against the flex replacement instead.
+3. **Markets, not positions.** It only shops in slots you have not filled. Once your tight end
+   slot is full there is no tight end market any more; remaining tight ends compete inside the
+   flex against running backs and receivers.
+4. **Survival: who will still be there at your next turn.** It simulates the picks between now
+   and your next turn a thousand times. Each rival takes players near their average draft
+   position, prefers positions they still need, and an autopick seat follows Yahoo's default
+   list more tightly than a human would. The share of simulations in which a player is still
+   on the board at your next pick is the survival percentage. It never ranks anyone by itself.
+5. **Cost of waiting is what ranks.** For each market: the best value available now, minus the
+   best value it expects to still be there at your next turn. That is the "waiting likely costs
+   about N points" line. A big player with low survival makes waiting expensive; a deep position
+   makes waiting nearly free. When every cost is near zero, the most valuable player who fills a
+   slot wins the tie.
+6. **Two picks at once.** It checks the pair: this pick plus the best partner it expects at the
+   next turn, so it does not win this pick and lose the round.
+7. **Hard rules override everything.** No second quarterback before round 10, no second tight
+   end unless a top-6 one has fallen far past his ADP, kicker and defense only in the last two
+   picks, and never leave a starting slot unfillable.
+8. **Late rounds are insurance, not points.** Once the lineup is full, a bench player is priced
+   by how many weeks you will need him (position injury rates plus the bye) times his weekly
+   edge over the waiver wire; a handcuff to your own starter is worth more.
+9. **The driver executes and verifies.** The page asks the engine at the turn, makes the pick
+   through Yahoo's own action, and confirms it in Yahoo's data before recording it. If its
+   readings disagree it does nothing and the queue it keeps catches the pick.
 
 ## The run in numbers
 
@@ -17,7 +51,8 @@ Injected: mock 24: faults at 66 (makePick no-op), 71 (forced away), 78-86 (bridg
 
 ### Pick 6 (round 1): Christian McCaffrey (RB)
 
-- Driver: via **action**, verified store, 934 ms, ranker engine, plan call 4, plan age 1271 ms, at 2026-09-03T05:09:00.506Z.
+- In plain English: Took Christian McCaffrey (RB) because waiting would likely cost about 30 points at RB, with a 56% chance he would still be there next turn. The top raw projection available was Josh Allen; the engine passed on him on purpose.
+- Driver: via **action**, verified store, 934 ms, ranker engine, plan call 4, plan age 1271 ms, at 22:09:00 PT.
 - Engine's reason: waiting likely costs ~30 pts at RB (best option now 154, ~125 by your next turn) · 56% chance he's still there at your next pick · fills your open RB slot · TAKE-NOW ZONE: only 1 left before the RB value drops, and 8 tea
 - Top projection available: Josh Allen -> took it: False.
 - Passed on: Amon-Ra St. Brown (WR, s=0.481, e=67.1); Trey McBride (TE, s=0.947, e=76.6); Josh Allen (QB, s=0.805, e=43.9).
@@ -45,7 +80,8 @@ Injected: mock 24: faults at 66 (makePick no-op), 71 (forced away), 78-86 (bridg
 
 ### Pick 15 (round 2): De'Von Achane (RB)
 
-- Driver: via **action**, verified store, 853 ms, ranker engine, plan call 8, plan age 1186 ms, at 2026-09-03T05:09:42.018Z.
+- In plain English: Took De'Von Achane (RB) because waiting would likely cost about 18 points at RB, with a 47% chance he would still be there next turn. The top raw projection available was Josh Allen; the engine passed on him on purpose.
+- Driver: via **action**, verified store, 853 ms, ranker engine, plan call 8, plan age 1186 ms, at 22:09:42 PT.
 - Engine's reason: waiting likely costs ~18 pts at RB (best option now 73, ~55 by your next turn) · 47% chance he's still there at your next pick · fills your open RB slot · last RB at this level — big drop after him · 10 teams picking bef
 - Top projection available: Josh Allen -> took it: False.
 - Passed on: Trey McBride (TE, s=0.575, e=62.5); Justin Jefferson (WR, s=0.585, e=50.4); Josh Allen (QB, s=0.474, e=38.4).
@@ -73,7 +109,8 @@ Injected: mock 24: faults at 66 (makePick no-op), 71 (forced away), 78-86 (bridg
 
 ### Pick 26 (round 3): Trey McBride (TE)
 
-- Driver: via **action**, verified store, 419 ms, ranker engine, plan call 17, plan age 731 ms, at 2026-09-03T05:11:22.150Z.
+- In plain English: Took Trey McBride (TE) because waiting would likely cost about 20 points at TE, with a 63% chance he would still be there next turn. The top raw projection available was Josh Allen; the engine passed on him on purpose.
+- Driver: via **action**, verified store, 419 ms, ranker engine, plan call 17, plan age 731 ms, at 22:11:22 PT.
 - Engine's reason: waiting likely costs ~20 pts at TE (best option now 78, ~58 by your next turn) · 63% chance he's still there at your next pick · fills your open TE slot · TAKE-NOW ZONE: only 1 left before the TE value drops, and 8 teams
 - Top projection available: Josh Allen -> took it: False.
 - Passed on: Chris Olave (WR, s=0.512, e=37.3); Josh Allen (QB, s=0.778, e=43.2); Kyren Williams (RB, s=None, e=None).
@@ -101,7 +138,8 @@ Injected: mock 24: faults at 66 (makePick no-op), 71 (forced away), 78-86 (bridg
 
 ### Pick 35 (round 4): Garrett Wilson (WR)
 
-- Driver: via **action**, verified store, 1303 ms, ranker engine, plan call 24, plan age 1633 ms, at 2026-09-03T05:12:34.218Z.
+- In plain English: Took Garrett Wilson (WR) because waiting would likely cost about 2 points at WR, with a 61% chance he would still be there next turn. The top raw projection available was Drake Maye; the engine passed on him on purpose.
+- Driver: via **action**, verified store, 1303 ms, ranker engine, plan call 24, plan age 1633 ms, at 22:12:34 PT.
 - Engine's reason: waiting likely costs ~2 pts at WR (best option now 24, ~22 by your next turn) · 61% chance he's still there at your next pick · fills your open WR slot · 10 teams picking before you still need a WR · two-pick plan: pair 
 - Top projection available: Drake Maye -> took it: False.
 - Passed on: Cam Skattebo (RB, s=0.458, e=17.2); Drake Maye (QB, s=0.613, e=25.9); Zay Flowers (WR, s=None, e=None).
@@ -129,7 +167,8 @@ Injected: mock 24: faults at 66 (makePick no-op), 71 (forced away), 78-86 (bridg
 
 ### Pick 46 (round 5): Davante Adams (WR)
 
-- Driver: via **action**, verified store, 1455 ms, ranker engine, plan call 29, plan age 4470 ms, at 2026-09-03T05:13:30.166Z.
+- In plain English: Took Davante Adams (WR) because waiting would likely cost about 4 points at WR, with a 62% chance he would still be there next turn. The top raw projection available was Drake Maye; the engine passed on him on purpose.
+- Driver: via **action**, verified store, 1455 ms, ranker engine, plan call 29, plan age 4470 ms, at 22:13:30 PT.
 - Engine's reason: waiting likely costs ~4 pts at WR (best option now 13, ~9 by your next turn) · 62% chance he's still there at your next pick · fills your open WR slot · 8 teams picking before you still need a WR · two-pick plan: pair wi
 - Top projection available: Drake Maye -> took it: False.
 - Passed on: Drake Maye (QB, s=0.685, e=26.8); Jaylen Warren (RB, s=0.952, e=9.2); Jalen Hurts (QB, s=None, e=None).
@@ -157,7 +196,8 @@ Injected: mock 24: faults at 66 (makePick no-op), 71 (forced away), 78-86 (bridg
 
 ### Pick 55 (round 6): Drake Maye (QB)
 
-- Driver: via **action**, verified store, 385 ms, ranker engine, plan call 37, plan age 701 ms, at 2026-09-03T05:15:09.910Z.
+- In plain English: Took Drake Maye (QB) because waiting would likely cost about 5 points at QB, with a 63% chance he would still be there next turn. The top raw projection available was Jalen Hurts; the engine passed on him on purpose.
+- Driver: via **action**, verified store, 385 ms, ranker engine, plan call 37, plan age 701 ms, at 22:15:09 PT.
 - Engine's reason: waiting likely costs ~5 pts at QB (best option now 31, ~26 by your next turn) · 63% chance he's still there at your next pick · fills your open QB slot · 8 teams picking before you still need a QB · 8 picks past his usua
 - Top projection available: Jalen Hurts -> took it: False.
 - Passed on: Jaylen Warren (RB, s=0.801, e=8.8); Jalen Hurts (QB, s=None, e=None); Trevor Lawrence (QB, s=None, e=None).
@@ -185,7 +225,8 @@ Injected: mock 24: faults at 66 (makePick no-op), 71 (forced away), 78-86 (bridg
 
 ### Pick 66 (round 7): Jaylen Warren (RB)
 
-- Driver: via **click**, verified store, - ms, ranker engine, plan call 45, plan age 6774 ms, at 2026-09-03T05:16:45.790Z.
+- In plain English: Took Jaylen Warren (RB) because waiting would likely cost about 3 points at your FLEX spot, with a 67% chance he would still be there next turn. The top raw projection available was Trevor Lawrence; the engine passed on him on purpose. Before this landed the driver skipped: Jaylen Warren:action-timeout.
+- Driver: via **click**, verified store, - ms, ranker engine, plan call 45, plan age 6774 ms, at 22:16:45 PT.
 - Engine's reason: waiting likely costs ~3 pts at your FLEX spot (best option now 9, ~6 by your next turn) · 67% chance he's still there at your next pick · fills a FLEX slot · 2 teams picking before you still need a RB
 - Top projection available: Trevor Lawrence -> took it: False.
 - Skipped before this landed: Jaylen Warren:action-timeout.
@@ -214,7 +255,8 @@ Injected: mock 24: faults at 66 (makePick no-op), 71 (forced away), 78-86 (bridg
 
 ### Pick 75 (round 8): Rico Dowdle (RB)
 
-- Driver: via **action**, verified store, 703 ms, ranker engine, plan call 51, plan age 1028 ms, at 2026-09-03T05:18:00.407Z.
+- In plain English: Lineup already full, so Rico Dowdle (RB) is insurance: covers 3 RB starter(s) for about 9.6 weeks a season at +10.0 points a week over the waiver wire (Josh Jacobs), worth about 96 points. He also backs up one of our own starters, which raises that value. The top raw projection available was Patrick Mahomes II; the engine passed on him on purpose.
+- Driver: via **action**, verified store, 703 ms, ranker engine, plan call 51, plan age 1028 ms, at 22:18:00 PT.
 - Engine's reason: bench insurance: covers 3 RB starters ~9.6 wks/season · +10.0/wk over the wire (Josh Jacobs) ≈ 96 pts · HANDCUFF: backs up your Jaylen Warren
 - Top projection available: Patrick Mahomes II -> took it: False.
 - Passed on: Rome Odunze (WR, s=0.756, e=-2.9); RJ Harvey (RB, s=None, e=None); Kenny Gainwell (RB, s=None, e=None).
@@ -241,12 +283,42 @@ Injected: mock 24: faults at 66 (makePick no-op), 71 (forced away), 78-86 (bridg
 
 ### Pick 86 (round 9): RJ Harvey (RB)
 
-- **No driver record**: Yahoo made this pick (queue head or autopick). See the log lines around it below.
-- No plan call recorded at this pick (bridge down?).
+- **No driver record**: Yahoo made this pick (queue head or autopick).
+- The turn in the driver log:
+    22:18:46 PT PLAN bridge unreachable: TypeError: Failed to fetch
+    22:19:03 PT PLAN bridge unreachable: TypeError: Failed to fetch
+    22:19:14 PT PLAN bridge unreachable: TypeError: Failed to fetch
+    22:19:14 PT GATE FAILED -> not clicking: plan is for pick 80, header says 86; plan stale (46s)
+    22:19:17 PT PLAN bridge unreachable: TypeError: Failed to fetch
+    22:19:17 PT GATE FAILED -> not clicking: plan is for pick 80, header says 86; plan stale (49s)
+    22:19:20 PT PLAN bridge unreachable: TypeError: Failed to fetch
+    22:19:20 PT GATE FAILED -> not clicking: plan is for pick 80, header says 86; plan stale (52s)
+    22:19:20 PT LOCAL ranking: plan gate failed 3x (plan is for pick 80, header says 86; plan stale (52s)) -> dropping the plan for this turn
+    22:19:39 PT ON CLOCK retry -> {"err":"no-verified-pick","attempted":["Bijan Robinson:action-timeout","Bijan Robinson:norow->gone","Jaxon Smith-Njigba:action-timeout","Jaxon Smith-Njigba:norow->gone"]}
+    22:19:43 PT PLAN bridge unreachable: TypeError: Failed to fetch
+    22:19:43 PT GATE FAILED -> not clicking: no plan
+- No plan call at this pick; the last plan before it was call 54 @pick 80:
+- Plan call 54 @pick 80: needs {'QB': 0, 'RB': 0, 'WR': 0, 'TE': 0, 'FLEX': 0, 'K': 1, 'DEF': 1, 'BN': 6}, away seats [4], state store with 79 drafted / 8 mine.
+- Engine's first choice was **RJ Harvey** -> taken.
+
+| plan row | pos | vorp | s | sr | e_best_next | best_now | why |
+|---|---|---|---|---|---|---|---|
+| RJ Harvey | RB | -5.4 | 0.93 | 0.93 | -5.5 | -5.4 | bench insurance: covers 3 RB starters behind 1 reserve already held ~2.5 wks/season · +9.1 |
+| DK Metcalf | WR | -9.2 | 0.74 | 0.74 | -9.5 | -9.2 | bench insurance: covers 2 WR starters ~6.5 wks/season · +2.8/wk over the wire (Rashod Bate |
+
+| market | best_now | e_best_next | urgency | pool |
+|---|---|---|---|---|
+| QB | 12.8 | 12.6 | 0.2 | 17 |
+| RB | -5.4 | -5.5 | 0.1 | 31 |
+| WR | -9.2 | -9.5 | 0.3 | 39 |
+| TE | 19.8 | 16.9 | 2.9 | 20 |
+| K | 13.5 | 13.3 | 0.2 | 11 |
+| DEF | 18.0 | 17.9 | 0.1 | 9 |
 
 ### Pick 95 (round 10): Wan'Dale Robinson (WR)
 
-- Driver: via **action**, verified store, 550 ms, ranker engine, plan call 4, plan age 879 ms, at 2026-09-03T05:20:59.839Z.
+- In plain English: Lineup already full, so Wan'Dale Robinson (WR) is insurance: covers 2 WR starter(s) for about 6.5 weeks a season at +2.7 points a week over the waiver wire (Rashod Bateman), worth about 17 points. The top raw projection available was Patrick Mahomes II; the engine passed on him on purpose.
+- Driver: via **action**, verified store, 550 ms, ranker engine, plan call 4, plan age 879 ms, at 22:20:59 PT.
 - Engine's reason: bench insurance: covers 2 WR starters ~6.5 wks/season · +2.7/wk over the wire (Rashod Bateman) ≈ 17 pts
 - Top projection available: Patrick Mahomes II -> took it: False.
 - Passed on: Patrick Mahomes II (QB, s=0.811, e=11.5); Kenny Gainwell (RB, s=0.916, e=-7.9); Matthew Stafford (QB, s=None, e=None).
@@ -274,7 +346,8 @@ Injected: mock 24: faults at 66 (makePick no-op), 71 (forced away), 78-86 (bridg
 
 ### Pick 106 (round 11): Patrick Mahomes (QB)
 
-- Driver: via **action**, verified store, 398 ms, ranker engine, plan call 9, plan age 714 ms, at 2026-09-03T05:21:57.328Z.
+- In plain English: Lineup already full, so Patrick Mahomes II (QB) is insurance: covers 1 QB starter(s) for about 3.6 weeks a season at +2.3 points a week over the waiver wire (Jacoby Brissett), worth about 8 points. The top raw projection available was Matthew Stafford; the engine passed on him on purpose.
+- Driver: via **action**, verified store, 398 ms, ranker engine, plan call 9, plan age 714 ms, at 22:21:57 PT.
 - Engine's reason: bench insurance: covers 1 QB starter ~3.6 wks/season · +2.3/wk over the wire (Jacoby Brissett) ≈ 8 pts
 - Top projection available: Matthew Stafford -> took it: False.
 - Plan rows the page dropped: Michael Pittman Jr. (gone).
@@ -303,7 +376,8 @@ Injected: mock 24: faults at 66 (makePick no-op), 71 (forced away), 78-86 (bridg
 
 ### Pick 115 (round 12): Kenny Gainwell (RB)
 
-- Driver: via **action**, verified store, 444 ms, ranker engine, plan call 14, plan age 776 ms, at 2026-09-03T05:23:01.054Z.
+- In plain English: Lineup already full, so Kenny Gainwell (RB) is insurance: covers 3 RB starter(s) for about 0.2 weeks a season at +9.1 points a week over the waiver wire (Josh Jacobs), worth about 2 points. The top raw projection available was Matthew Stafford; the engine passed on him on purpose.
+- Driver: via **action**, verified store, 444 ms, ranker engine, plan call 14, plan age 776 ms, at 22:23:01 PT.
 - Engine's reason: bench insurance: covers 3 RB starters behind 2 reserves already held ~0.2 wks/season · +9.1/wk over the wire (Josh Jacobs) ≈ 2 pts
 - Top projection available: Matthew Stafford -> took it: False.
 - Plan rows the page dropped: Michael Pittman Jr. (gone).
@@ -331,7 +405,13 @@ Injected: mock 24: faults at 66 (makePick no-op), 71 (forced away), 78-86 (bridg
 
 ### Pick 126 (round 13): Michael Pittman Jr. (WR)
 
-- **No driver record**: Yahoo made this pick (queue head or autopick). See the log lines around it below.
+- **No driver record**: Yahoo made this pick (queue head or autopick).
+- The turn in the driver log:
+    22:24:40 PT ON CLOCK retry -> {"err":"no-verified-pick","attempted":["Breece Hall:action-timeout","Breece Hall:norow->gone","Courtland Sutton:action-timeout","Courtland Sutton:norow->gone"]}
+    22:24:49 PT ON CLOCK -> turn ended: {"err":"pick-made-by-other-means","attempted":["Bucky Irving:action-timeout","Bucky Irving:norow->gone","Marvin Harrison Jr.:notours(Michael Pittman Jr.)"],"landed":"Michael Pittman Jr."}
+    22:24:52 PT AWAY detected (store=true) -> setAwayStatus(false); away now false
+    22:25:41 PT ON CLOCK -> {"drafted":"Cam Little","pos":"K","vorp":9,"proj":145.5,"why":"safe to wait on K · 71% chance he's still there at your next pick · fills your open K slot · 8 teams picking before you still need a K · 6 picks past his usual draft spot · 
+    22:26:26 PT ON CLOCK -> {"drafted":"Kansas City Chiefs","pos":"DEF","vorp":-6,"proj":111,"why":"depth fallback (engine list exhausted)","s":null,"sr":null,"e":null,"top_proj_available":{"n":"Daniel Jones","p":"QB","proj":257.1,"vorp":-16.5},"took_top_projectio
 - Plan call 21 @pick 126: needs {'QB': 0, 'RB': 0, 'WR': 0, 'TE': 0, 'FLEX': 0, 'K': 1, 'DEF': 1, 'BN': 6}, away seats [3, 4, 5, 9], state store with 125 drafted / 12 mine.
 - Engine's first choice was **Michael Pittman Jr.** -> taken.
 
@@ -351,7 +431,8 @@ Injected: mock 24: faults at 66 (makePick no-op), 71 (forced away), 78-86 (bridg
 
 ### Pick 135 (round 14): Cam Little (K)
 
-- Driver: via **action**, verified store, 452 ms, ranker engine, plan call 26, plan age 794 ms, at 2026-09-03T05:25:41.253Z.
+- In plain English: Took Cam Little (K): nothing on the board was urgent, so the engine took the most valuable player who fills an open slot (71% to survive, but nobody better was worth waiting for). The top raw projection available was Daniel Jones; the engine passed on him on purpose.
+- Driver: via **action**, verified store, 452 ms, ranker engine, plan call 26, plan age 794 ms, at 22:25:41 PT.
 - Engine's reason: safe to wait on K · 71% chance he's still there at your next pick · fills your open K slot · 8 teams picking before you still need a K · 6 picks past his usual draft spot · two-pick plan: pair with the ~32-pt RB expected
 - Top projection available: Daniel Jones -> took it: False.
 - Plan rows the page dropped: Pittsburgh Steelers (gone).
@@ -380,7 +461,8 @@ Injected: mock 24: faults at 66 (makePick no-op), 71 (forced away), 78-86 (bridg
 
 ### Pick 146 (round 15): Chiefs (DEF)
 
-- Driver: via **action**, verified store, 250 ms, ranker engine, plan call 31, plan age 570 ms, at 2026-09-03T05:26:26.991Z.
+- In plain English: Took Kansas City Chiefs (DEF) to fill a mandatory slot; nothing the engine named was left. The top raw projection available was Daniel Jones; the engine passed on him on purpose.
+- Driver: via **action**, verified store, 250 ms, ranker engine, plan call 31, plan age 570 ms, at 22:26:26 PT.
 - Engine's reason: depth fallback (engine list exhausted)
 - Top projection available: Daniel Jones -> took it: False.
 - Plan rows the page dropped: Baltimore Ravens (gone), Green Bay Packers (gone).
@@ -426,50 +508,50 @@ Injected: mock 24: faults at 66 (makePick no-op), 71 (forced away), 78-86 (bridg
     2026-09-02T22:26:20   WARNING plan #30: 1 drafted entries matched no board player: 139 Will Reichard
     2026-09-02T22:26:26   WARNING plan #31: 1 drafted entries matched no board player: 139 Will Reichard
 
-## Driver log (the lines that matter)
+## Driver log (the lines that matter, Pacific time)
 
-    2026-09-03T05:08:33.926Z preflight: ok=true pick_path=action my_team=6 plan=plan 25 deep @pick 5 via store call#1
-    2026-09-03T05:08:34.023Z driver start — WARNING: tab is hidden, Chrome throttles timers; keep it visible
-    2026-09-03T05:09:00.506Z ON CLOCK -> {"drafted":"Christian McCaffrey","pos":"RB","vorp":154.2,"proj":314.4,"why":"waiting likely costs ~30 pts at RB (best option now 154, ~125 by your next turn) · 56% chance he's still there at your next pi
-    2026-09-03T05:09:42.018Z ON CLOCK -> {"drafted":"De'Von Achane","pos":"RB","vorp":73.4,"proj":233.6,"why":"waiting likely costs ~18 pts at RB (best option now 73, ~55 by your next turn) · 47% chance he's still there at your next pick · fill
-    2026-09-03T05:11:22.150Z ON CLOCK -> {"drafted":"Trey McBride","pos":"TE","vorp":77.9,"proj":200.2,"why":"waiting likely costs ~20 pts at TE (best option now 78, ~58 by your next turn) · 63% chance he's still there at your next pick · fills
-    2026-09-03T05:12:34.219Z ON CLOCK -> {"drafted":"Garrett Wilson","pos":"WR","vorp":23.9,"proj":166,"why":"waiting likely costs ~2 pts at WR (best option now 24, ~22 by your next turn) · 61% chance he's still there at your next pick · fills 
-    2026-09-03T05:12:36.766Z heartbeat: setAwayStatus(false)
-    2026-09-03T05:13:30.167Z ON CLOCK -> {"drafted":"Davante Adams","pos":"WR","vorp":13.1,"proj":155.2,"why":"waiting likely costs ~4 pts at WR (best option now 13, ~9 by your next turn) · 62% chance he's still there at your next pick · fills 
-    2026-09-03T05:15:09.910Z ON CLOCK -> {"drafted":"Drake Maye","pos":"QB","vorp":31.1,"proj":304.7,"why":"waiting likely costs ~5 pts at QB (best option now 31, ~26 by your next turn) · 63% chance he's still there at your next pick · fills yo
-    2026-09-03T05:16:37.136Z heartbeat: setAwayStatus(false)
-    2026-09-03T05:16:45.790Z ON CLOCK -> {"drafted":"Jaylen Warren","pos":"RB","vorp":9.3,"proj":169.5,"why":"waiting likely costs ~3 pts at your FLEX spot (best option now 9, ~6 by your next turn) · 67% chance he's still there at your next pic
-    2026-09-03T05:17:22.639Z AWAY detected (store=true) -> setAwayStatus(false); away now false
-    2026-09-03T05:18:00.407Z ON CLOCK -> {"drafted":"Rico Dowdle","pos":"RB","vorp":-11,"proj":149.2,"why":"bench insurance: covers 3 RB starters ~9.6 wks/season · +10.0/wk over the wire (Josh Jacobs) ≈ 96 pts · HANDCUFF: backs up your Jaylen W
-    2026-09-03T05:18:46.304Z PLAN bridge unreachable: TypeError: Failed to fetch
-    2026-09-03T05:19:03.308Z PLAN bridge unreachable: TypeError: Failed to fetch
-    2026-09-03T05:19:14.340Z PLAN bridge unreachable: TypeError: Failed to fetch
-    2026-09-03T05:19:14.342Z GATE FAILED -> not clicking: plan is for pick 80, header says 86; plan stale (46s)
-    2026-09-03T05:19:17.596Z PLAN bridge unreachable: TypeError: Failed to fetch
-    2026-09-03T05:19:17.640Z GATE FAILED -> not clicking: plan is for pick 80, header says 86; plan stale (49s)
-    2026-09-03T05:19:20.895Z PLAN bridge unreachable: TypeError: Failed to fetch
-    2026-09-03T05:19:20.896Z GATE FAILED -> not clicking: plan is for pick 80, header says 86; plan stale (52s)
-    2026-09-03T05:19:20.896Z LOCAL ranking: plan gate failed 3x (plan is for pick 80, header says 86; plan stale (52s)) -> dropping the plan for this turn
-    2026-09-03T05:19:39.240Z ON CLOCK retry -> {"err":"no-verified-pick","attempted":["Bijan Robinson:action-timeout","Bijan Robinson:norow->gone","Jaxon Smith-Njigba:action-timeout","Jaxon Smith-Njigba:norow->gone"]}
-    2026-09-03T05:19:43.400Z PLAN bridge unreachable: TypeError: Failed to fetch
-    2026-09-03T05:19:43.401Z GATE FAILED -> not clicking: no plan
-    2026-09-03T05:19:45.411Z AWAY detected (store=true) -> setAwayStatus(false); away now false
-    2026-09-03T05:19:47.514Z PLAN bridge unreachable: TypeError: Failed to fetch
-    2026-09-03T05:19:59.692Z PLAN bridge unreachable: TypeError: Failed to fetch
-    2026-09-03T05:20:11.816Z PLAN bridge unreachable: TypeError: Failed to fetch
-    2026-09-03T05:20:37.739Z heartbeat: setAwayStatus(false)
-    2026-09-03T05:20:59.839Z ON CLOCK -> {"drafted":"Wan'Dale Robinson","pos":"WR","vorp":-10.6,"proj":131.5,"why":"bench insurance: covers 2 WR starters ~6.5 wks/season · +2.7/wk over the wire (Rashod Bateman) ≈ 17 pts","s":0.945,"sr":0.945,"e
-    2026-09-03T05:21:57.328Z ON CLOCK -> {"drafted":"Patrick Mahomes II","pos":"QB","vorp":12.8,"proj":286.4,"why":"bench insurance: covers 1 QB starter ~3.6 wks/season · +2.3/wk over the wire (Jacoby Brissett) ≈ 8 pts","s":0.927,"sr":0.927,"e"
-    2026-09-03T05:23:01.054Z ON CLOCK -> {"drafted":"Kenny Gainwell","pos":"RB","vorp":-6.2,"proj":154,"why":"bench insurance: covers 3 RB starters behind 2 reserves already held ~0.2 wks/season · +9.1/wk over the wire (Josh Jacobs) ≈ 2 pts","s
-    2026-09-03T05:24:40.011Z ON CLOCK retry -> {"err":"no-verified-pick","attempted":["Breece Hall:action-timeout","Breece Hall:norow->gone","Courtland Sutton:action-timeout","Courtland Sutton:norow->gone"]}
-    2026-09-03T05:24:42.115Z heartbeat: setAwayStatus(false)
-    2026-09-03T05:24:49.989Z ON CLOCK -> turn ended: {"err":"pick-made-by-other-means","attempted":["Bucky Irving:action-timeout","Bucky Irving:norow->gone","Marvin Harrison Jr.:notours(Michael Pittman Jr.)"],"landed":"Michael Pittman Jr."}
-    2026-09-03T05:24:52.907Z AWAY detected (store=true) -> setAwayStatus(false); away now false
-    2026-09-03T05:25:41.253Z ON CLOCK -> {"drafted":"Cam Little","pos":"K","vorp":9,"proj":145.5,"why":"safe to wait on K · 71% chance he's still there at your next pick · fills your open K slot · 8 teams picking before you still need a K · 6 p
-    2026-09-03T05:25:44.600Z BRIDGE WARNING: dropped 1 feed entries numbered >= header pick 138
-    2026-09-03T05:25:56.426Z BRIDGE WARNING: 1 drafted entries matched no board player: 139 Will Reichard
-    2026-09-03T05:26:26.991Z ON CLOCK -> {"drafted":"Kansas City Chiefs","pos":"DEF","vorp":-6,"proj":111,"why":"depth fallback (engine list exhausted)","s":null,"sr":null,"e":null,"top_proj_available":{"n":"Daniel Jones","p":"QB","proj":257.1,
-    2026-09-03T05:26:29.109Z roster full
-    2026-09-03T05:26:29.109Z driver stop
-    2026-09-03T05:26:29.122Z trail: 147 picks, 13 records -> C:\Users\gabje\Desktop\fantasy-football\data\logs\mocks\10531886.json
+    22:08:33 PT preflight: ok=true pick_path=action my_team=6 plan=plan 25 deep @pick 5 via store call#1
+    22:08:34 PT driver start — WARNING: tab is hidden, Chrome throttles timers; keep it visible
+    22:09:00 PT ON CLOCK -> {"drafted":"Christian McCaffrey","pos":"RB","vorp":154.2,"proj":314.4,"why":"waiting likely costs ~30 pts at RB (best option now 154, ~125 by your next turn) · 56% chance he's still there at your next pick · fills yo
+    22:09:42 PT ON CLOCK -> {"drafted":"De'Von Achane","pos":"RB","vorp":73.4,"proj":233.6,"why":"waiting likely costs ~18 pts at RB (best option now 73, ~55 by your next turn) · 47% chance he's still there at your next pick · fills your open R
+    22:11:22 PT ON CLOCK -> {"drafted":"Trey McBride","pos":"TE","vorp":77.9,"proj":200.2,"why":"waiting likely costs ~20 pts at TE (best option now 78, ~58 by your next turn) · 63% chance he's still there at your next pick · fills your open TE
+    22:12:34 PT ON CLOCK -> {"drafted":"Garrett Wilson","pos":"WR","vorp":23.9,"proj":166,"why":"waiting likely costs ~2 pts at WR (best option now 24, ~22 by your next turn) · 61% chance he's still there at your next pick · fills your open WR 
+    22:12:36 PT heartbeat: setAwayStatus(false)
+    22:13:30 PT ON CLOCK -> {"drafted":"Davante Adams","pos":"WR","vorp":13.1,"proj":155.2,"why":"waiting likely costs ~4 pts at WR (best option now 13, ~9 by your next turn) · 62% chance he's still there at your next pick · fills your open WR 
+    22:15:09 PT ON CLOCK -> {"drafted":"Drake Maye","pos":"QB","vorp":31.1,"proj":304.7,"why":"waiting likely costs ~5 pts at QB (best option now 31, ~26 by your next turn) · 63% chance he's still there at your next pick · fills your open QB sl
+    22:16:37 PT heartbeat: setAwayStatus(false)
+    22:16:45 PT ON CLOCK -> {"drafted":"Jaylen Warren","pos":"RB","vorp":9.3,"proj":169.5,"why":"waiting likely costs ~3 pts at your FLEX spot (best option now 9, ~6 by your next turn) · 67% chance he's still there at your next pick · fills a F
+    22:17:22 PT AWAY detected (store=true) -> setAwayStatus(false); away now false
+    22:18:00 PT ON CLOCK -> {"drafted":"Rico Dowdle","pos":"RB","vorp":-11,"proj":149.2,"why":"bench insurance: covers 3 RB starters ~9.6 wks/season · +10.0/wk over the wire (Josh Jacobs) ≈ 96 pts · HANDCUFF: backs up your Jaylen Warren","s":0.
+    22:18:46 PT PLAN bridge unreachable: TypeError: Failed to fetch
+    22:19:03 PT PLAN bridge unreachable: TypeError: Failed to fetch
+    22:19:14 PT PLAN bridge unreachable: TypeError: Failed to fetch
+    22:19:14 PT GATE FAILED -> not clicking: plan is for pick 80, header says 86; plan stale (46s)
+    22:19:17 PT PLAN bridge unreachable: TypeError: Failed to fetch
+    22:19:17 PT GATE FAILED -> not clicking: plan is for pick 80, header says 86; plan stale (49s)
+    22:19:20 PT PLAN bridge unreachable: TypeError: Failed to fetch
+    22:19:20 PT GATE FAILED -> not clicking: plan is for pick 80, header says 86; plan stale (52s)
+    22:19:20 PT LOCAL ranking: plan gate failed 3x (plan is for pick 80, header says 86; plan stale (52s)) -> dropping the plan for this turn
+    22:19:39 PT ON CLOCK retry -> {"err":"no-verified-pick","attempted":["Bijan Robinson:action-timeout","Bijan Robinson:norow->gone","Jaxon Smith-Njigba:action-timeout","Jaxon Smith-Njigba:norow->gone"]}
+    22:19:43 PT PLAN bridge unreachable: TypeError: Failed to fetch
+    22:19:43 PT GATE FAILED -> not clicking: no plan
+    22:19:45 PT AWAY detected (store=true) -> setAwayStatus(false); away now false
+    22:19:47 PT PLAN bridge unreachable: TypeError: Failed to fetch
+    22:19:59 PT PLAN bridge unreachable: TypeError: Failed to fetch
+    22:20:11 PT PLAN bridge unreachable: TypeError: Failed to fetch
+    22:20:37 PT heartbeat: setAwayStatus(false)
+    22:20:59 PT ON CLOCK -> {"drafted":"Wan'Dale Robinson","pos":"WR","vorp":-10.6,"proj":131.5,"why":"bench insurance: covers 2 WR starters ~6.5 wks/season · +2.7/wk over the wire (Rashod Bateman) ≈ 17 pts","s":0.945,"sr":0.945,"e":-10.8,"top_
+    22:21:57 PT ON CLOCK -> {"drafted":"Patrick Mahomes II","pos":"QB","vorp":12.8,"proj":286.4,"why":"bench insurance: covers 1 QB starter ~3.6 wks/season · +2.3/wk over the wire (Jacoby Brissett) ≈ 8 pts","s":0.927,"sr":0.927,"e":12.2,"top_pr
+    22:23:01 PT ON CLOCK -> {"drafted":"Kenny Gainwell","pos":"RB","vorp":-6.2,"proj":154,"why":"bench insurance: covers 3 RB starters behind 2 reserves already held ~0.2 wks/season · +9.1/wk over the wire (Josh Jacobs) ≈ 2 pts","s":0.925,"sr":
+    22:24:40 PT ON CLOCK retry -> {"err":"no-verified-pick","attempted":["Breece Hall:action-timeout","Breece Hall:norow->gone","Courtland Sutton:action-timeout","Courtland Sutton:norow->gone"]}
+    22:24:42 PT heartbeat: setAwayStatus(false)
+    22:24:49 PT ON CLOCK -> turn ended: {"err":"pick-made-by-other-means","attempted":["Bucky Irving:action-timeout","Bucky Irving:norow->gone","Marvin Harrison Jr.:notours(Michael Pittman Jr.)"],"landed":"Michael Pittman Jr."}
+    22:24:52 PT AWAY detected (store=true) -> setAwayStatus(false); away now false
+    22:25:41 PT ON CLOCK -> {"drafted":"Cam Little","pos":"K","vorp":9,"proj":145.5,"why":"safe to wait on K · 71% chance he's still there at your next pick · fills your open K slot · 8 teams picking before you still need a K · 6 picks past his
+    22:25:44 PT BRIDGE WARNING: dropped 1 feed entries numbered >= header pick 138
+    22:25:56 PT BRIDGE WARNING: 1 drafted entries matched no board player: 139 Will Reichard
+    22:26:26 PT ON CLOCK -> {"drafted":"Kansas City Chiefs","pos":"DEF","vorp":-6,"proj":111,"why":"depth fallback (engine list exhausted)","s":null,"sr":null,"e":null,"top_proj_available":{"n":"Daniel Jones","p":"QB","proj":257.1,"vorp":-16.5}
+    22:26:29 PT roster full
+    22:26:29 PT driver stop
+    22:26:29 PT trail: 147 picks, 13 records -> C:\Users\gabje\Desktop\fantasy-football\data\logs\mocks\10531886.json
 

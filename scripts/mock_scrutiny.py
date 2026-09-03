@@ -39,11 +39,14 @@ sys.path.insert(0, str(ROOT))
 
 from draftkit.snake import pick_to_round_slot  # noqa: E402
 
+sys.path.insert(0, str(ROOT / "scripts"))
+from mock_common import HOW_THE_ENGINE_THINKS, header_line, load_trail, pt_lines, report_stem, to_pt  # noqa: E402
+
 ISSUE = re.compile(r"ON CLOCK|GATE|LOCAL|AWAY|heartbeat|PLAN |WARNING|ERROR|preflight|trail:|driver st|roster full|draft over|retry|notours")
 
 
 def load(room: str, bridge_log: str | None):
-    trail = json.loads((ROOT / "data" / "logs" / "mocks" / f"mock_{room}.json").read_text(encoding="utf-8"))
+    trail = load_trail(ROOT, room)   # pre-reload records and log merged in
     plans_p = ROOT / "data" / "logs" / f"yahoo_{room}.plans.jsonl"
     plans = [json.loads(x) for x in plans_p.read_text(encoding="utf-8").splitlines()] if plans_p.exists() else []
     room_p = ROOT / "data" / "logs" / f"yahoo_{room}.jsonl"
@@ -67,7 +70,47 @@ def fmt_row(p: dict) -> str:
     return f"| {p.get('n')} | {p.get('p')} | {f(p.get('v'))} | {f(p.get('s'), 2)} | {f(p.get('sr'), 2)} | {f(p.get('e'))} | {f(p.get('b'))} | {(p.get('why') or '')[:90]} |"
 
 
-def render(room: str, trail: dict, plans: list[dict], events: list[dict], blog: list[str]) -> str:
+def plain_english(r: dict) -> str:
+    """One sentence a non-technical reader can check against the numbers."""
+    why = r.get("why") or ""
+    name, pos = r.get("drafted"), r.get("pos")
+    alt = (r.get("top_proj_available") or {}).get("n")
+    s = r.get("s")
+    pct = f"{round(float(s) * 100)}%" if isinstance(s, (int, float)) and s else None
+    parts = []
+    m = re.search(r"waiting likely costs ~(\d+) pts at ([^(]+?)\s*\(", why)
+    if m:
+        parts.append(f"Took {name} ({pos}) because waiting would likely cost about {m.group(1)} points at {m.group(2).strip()}"
+                     + (f", with a {pct} chance he would still be there next turn" if pct else "") + ".")
+    elif why.startswith("safe to wait"):
+        parts.append(f"Took {name} ({pos}): nothing on the board was urgent, so the engine took the most valuable player who fills an open slot"
+                     + (f" ({pct} to survive, but nobody better was worth waiting for)" if pct else "") + ".")
+    elif why.startswith("bench insurance"):
+        m2 = re.search(r"covers (\d+) (\w+) starters?[^~]*~([\d.]+) wks[^+]*\+([\d.]+)/wk[^(]*(?:\(([^)]+)\))?[^0-9]*(\d+) pts", why)
+        if m2:
+            parts.append(f"Lineup already full, so {name} ({pos}) is insurance: covers {m2.group(1)} {m2.group(2)} starter(s) for about {m2.group(3)} weeks a season at +{m2.group(4)} points a week over the waiver wire"
+                         + (f" ({m2.group(5)})" if m2.group(5) else "") + f", worth about {m2.group(6)} points.")
+        else:
+            parts.append(f"Lineup already full, so {name} ({pos}) was priced as bench insurance, not by raw points.")
+        if "HANDCUFF" in why:
+            parts.append("He also backs up one of our own starters, which raises that value.")
+    elif why.startswith("LOCAL ranker"):
+        parts.append(f"The engine was unreachable, so the page's own simpler ranking took {name} ({pos}): {why}.")
+    elif why.startswith("depth fallback") or why.startswith("fills your open"):
+        parts.append(f"Took {name} ({pos}) to fill a mandatory slot; nothing the engine named was left.")
+    else:
+        parts.append(f"Took {name} ({pos}). Engine: {why[:120]}")
+    if alt and alt != name:
+        parts.append(f"The top raw projection available was {alt}; the engine passed on him on purpose.")
+    if r.get("attempted"):
+        parts.append("Before this landed the driver skipped: " + ", ".join(r["attempted"]) + ".")
+    if r.get("source") == "local":
+        parts.append("(Local ranker, not the engine.)")
+    return " ".join(parts)
+
+
+def render(room: str, trail: dict, plans: list[dict], events: list[dict], blog: list[str],
+           label: str | None = None, name: str | None = None) -> str:
     teams = int(trail.get("teams") or 10)
     my_team = str(trail.get("my_team"))
     picks = sorted(trail.get("picks") or [], key=lambda x: x["pick_no"])
@@ -96,11 +139,14 @@ def render(room: str, trail: dict, plans: list[dict], events: list[dict], blog: 
         s = tuple(d.get("away_slots") or [])
         if not away_sets or away_sets[-1] != s:
             away_sets.append(s)
-    L = [f"# Scrutiny -- room {room} ({trail.get('room_name', '')})", "",
-         f"Captured {trail.get('captured_at', '?')}. {teams} teams, our team id {my_team}, draft slot {my_slot}. "
+    L = [f"# Scrutiny: {header_line(trail, label, name, my_slot, teams)}", "",
+         f"Captured {to_pt(trail.get('captured_at'))}. Times below are Pacific. {teams} teams, our team id {my_team}, draft slot {my_slot}. "
          f"{len(picks)} picks in the trail, {len(plans)} bridge plan calls, {sum(1 for e in events if e.get('type') == 'recs')} recs events in the room log.", ""]
+    if trail.get("reloaded"):
+        L += [f"The page was reloaded mid-draft at {to_pt(trail['reloaded'])}; records from before it are merged in.", ""]
     if trail.get("stress"):
         L += [f"Injected: {trail['stress']}", ""]
+    L += [HOW_THE_ENGINE_THINKS]
     L += ["## The run in numbers", "",
           f"- Our picks: {len(mine)}; by the driver {len(recs)} (action {via.get('action', 0)}, click {via.get('click', 0)}), "
           f"by Yahoo from the queue / autopick {len(yahoo_made)}" + (": " + ", ".join(f"{p['pick_no']} {p['name']}" for p in yahoo_made) if yahoo_made else "") + ".",
@@ -118,7 +164,8 @@ def render(room: str, trail: dict, plans: list[dict], events: list[dict], blog: 
         r = rec_by_pick.get(no)
         L += [f"### Pick {no} (round {rnd}): {p['name']} ({p['pos']})", ""]
         if r:
-            L += [f"- Driver: via **{r.get('via')}**, verified {r.get('verified')}, {r.get('ms', '-')} ms, ranker {r.get('source', '?')}, plan call {r.get('plan_call')}, plan age {r.get('plan_age_ms')} ms, at {r.get('ts', '?')}.",
+            L += [f"- In plain English: {plain_english(r)}",
+                  f"- Driver: via **{r.get('via')}**, verified {r.get('verified')}, {r.get('ms', '-')} ms, ranker {r.get('source', '?')}, plan call {r.get('plan_call')}, plan age {r.get('plan_age_ms')} ms, at {to_pt(r.get('ts'), '%H:%M:%S PT') or '?'}.",
                   f"- Engine's reason: {r.get('why', '')}",
                   f"- Top projection available: {(r.get('top_proj_available') or {}).get('n')} -> took it: {r.get('took_top_projection')}."]
             if r.get("attempted"):
@@ -128,14 +175,36 @@ def render(room: str, trail: dict, plans: list[dict], events: list[dict], blog: 
             if r.get("passed_on"):
                 L.append("- Passed on: " + "; ".join(f"{x['n']} ({x['p']}, s={x.get('s')}, e={x.get('e')})" for x in r["passed_on"]) + ".")
         else:
-            L.append("- **No driver record**: Yahoo made this pick (queue head or autopick). See the log lines around it below.")
-        # the plan at that call (or the last plan computed at this pick number)
+            L.append("- **No driver record**: Yahoo made this pick (queue head or autopick).")
+            # the turn's own log lines: from the previous own pick to this one
+            prev_no = max([q["pick_no"] for q in mine if q["pick_no"] < no], default=0)
+            prev_rec = rec_by_pick.get(prev_no)
+            t_from = (prev_rec or {}).get("ts") or ""
+            turn_lines = []
+            for l in log:
+                ts = l[:24]
+                if t_from and ts <= t_from:
+                    continue
+                if re.search(r"ON CLOCK|GATE|LOCAL|PLAN |AWAY|notours|retry", l):
+                    turn_lines.append(l)
+                if f'"pick_no":{no + 1}' in l or f'"pick_no":{no + 2}' in l:
+                    break
+            if turn_lines:
+                L.append("- The turn in the driver log:")
+                L += [f"    {l[:260]}" for l in pt_lines(turn_lines[:12])]
+        # the plan at that call, else the last plan computed at this pick
+        # number, else the LAST plan before it (a bridge outage leaves none)
         d = None
         if r and r.get("plan_call") is not None:
             d = next((x for x in plans if x.get("call") == r["plan_call"]), None)
         if d is None:
             cands = [x for x in plans if x.get("current_pick") == no]
             d = cands[-1] if cands else None
+        if d is None:
+            before = [x for x in plans if (x.get("current_pick") or 0) < no]
+            if before:
+                d = before[-1]
+                L.append(f"- No plan call at this pick; the last plan before it was call {d.get('call')} @pick {d.get('current_pick')}:")
         if d:
             first = (d.get("plan") or [{}])[0]
             landed_first = bool(first) and key(first.get("n", "")) == key(p["name"]) and first.get("p") == p["pos"]
@@ -189,8 +258,8 @@ def render(room: str, trail: dict, plans: list[dict], events: list[dict], blog: 
         L += ["## Bridge log: warnings and errors", ""] + [f"    {x[:200]}" for x in blog[:40]] + [""]
 
     # ---- driver log
-    L += ["## Driver log (the lines that matter)", ""]
-    L += [f"    {l[:240]}" for l in log if ISSUE.search(l)]
+    L += ["## Driver log (the lines that matter, Pacific time)", ""]
+    L += [f"    {l[:240]}" for l in pt_lines([l for l in log if ISSUE.search(l)])]
     L.append("")
     return "\n".join(L) + "\n"
 
@@ -200,10 +269,15 @@ def main() -> int:
     ap.add_argument("--room", required=True)
     ap.add_argument("--bridge-log", default=None)
     ap.add_argument("--out", default=None)
+    ap.add_argument("--label", default=None, help="e.g. 'Mock 25' -- goes into the file name and the header")
+    ap.add_argument("--name", default=None, help="the room's nickname when the trail only has the tab title")
     a = ap.parse_args()
     trail, plans, events, blog = load(a.room, a.bridge_log)
-    md = render(a.room, trail, plans, events, blog)
-    out = Path(a.out) if a.out else ROOT / "reports" / "mocks" / f"scrutiny_{a.room}.md"
+    md = render(a.room, trail, plans, events, blog, a.label, a.name)
+    teams = int(trail.get("teams") or 10)
+    mine = [p for p in sorted(trail.get("picks") or [], key=lambda x: x["pick_no"]) if str(p["team_id"]) == str(trail.get("my_team"))]
+    seat = pick_to_round_slot(mine[0]["pick_no"], teams)[1] if mine else None
+    out = Path(a.out) if a.out else ROOT / "reports" / "mocks" / f"{report_stem(trail, a.label, a.name, seat)}_scrutiny.md"
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(md, encoding="utf-8")
     print(f"-> {out} ({len(md.splitlines())} lines)")
