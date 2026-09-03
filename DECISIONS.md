@@ -2236,3 +2236,55 @@ Logs data/processed/backtest/g4_10590238_*.log, 15 windows (seat 7).
   0.024); 30-70 miss fitted 1, current 3. The pattern from G2 holds out of
   sample: the fitted point is better at the overall score and over-promises
   survival in the 30-50 range. Room 5 (10590944, fitted) closes the set.
+
+### #35 G4 result and the decision (2026-09-03 04:10 PT, five forward rooms)
+
+Rooms 10586715 (fitted live), 10588125 (current), 10589182 (fitted),
+10590238 (current), 10590944 (fitted); every room scored offline at BOTH
+points, whole-pool survival vectors, 400 sims, every state
+(data/processed/backtest/g4_<room>_{fitted,current}.log).
+
+| room | fitted LL | current LL | delta | fitted 30-49 / 50-69 | current 30-49 / 50-69 |
+|---|---|---|---|---|---|
+| 10586715 | 0.1452 | 0.1601 | -0.0149 | -5 / -6 | +4 / +1 |
+| 10588125 | 0.2213 | 0.2366 | -0.0153 | -5 / -1 | +8 / -1 |
+| 10589182 | 0.1973 | 0.2130 | -0.0157 | -1 / +1 | +0 / +1 |
+| 10590238 | 0.1311 | 0.1554 | -0.0243 | -24 / -7 | -4 / +9 |
+| 10590944 | 0.1809 | 0.1977 | -0.0168 | -7 / -3 | +5 / +6 |
+
+Pooled, n-weighted (observed - predicted): fitted 30-49 -7.1, 50-69 -2.7
+(abs sum 9.8); current 30-49 +3.3, 50-69 +2.8 (abs sum 6.1).
+
+Against the pre-registered G4 criteria:
+- fitted pooled log-loss lower: PASS, and in every single room, by 0.015
+  to 0.024. This is out-of-sample and unambiguous: the fitted rival model
+  predicts what these rooms do better than the current one.
+- 30-70% bucket miss smaller pooled: FAIL. Fitted over-promises survival
+  in the 30-50 range by 7 points pooled (five of five rooms negative);
+  current under-promises by 3.
+- no single room worse by > 0.01: PASS (none worse at all).
+
+G4: FAIL as written (two of three). Gate tally: G1 PASS, G2 log-loss PASS
+/ calibration FAIL, G3 FAIL (small), G4 log-loss PASS / calibration FAIL.
+
+DECISION: the default does NOT move. config.yaml and the Tracker keep
+autopick_list_prob 0.0, autopick_need_damp 0.02, autopick_sigma_scale
+0.5 for the 2026-09-05 draft. The yahoo_rank column stays on the board
+(data). The engine change stays in the code behind its knob.
+
+What the study established, for the record and for January: the
+list-walk mixture is the better description of autopick seats (G1, G2,
+G4 all say so on log-loss, in and out of sample), AND at the fitted point
+it is over-confident in exactly the 30-50% range where the engine's
+"wait or take" decisions live, while the current model is slightly
+under-confident there. The two knob sets bracket the truth. A middle point
+(autopick_list_prob 0.2, or the fitted point with a survival shrink on the
+30-70 band) is the obvious next candidate, and it is a NEW pre-registered
+study, not a tweak before Saturday. Reading of G3's small regression in
+that light: a model that is over-confident about losing players takes
+them a turn early; the fix belongs in calibration, not in abandoning the
+list-walk.
+
+Rig outcome of the same night: the last two rooms (mocks 31 and 32) were
+clean, 15/15 engine picks each, on the final driver (worker sleep,
+60 s heartbeat, fingerprint fix). The clean-room rule for Saturday is met.
