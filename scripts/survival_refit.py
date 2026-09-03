@@ -508,6 +508,7 @@ def confirm_point(a, point: dict) -> dict:
            "calibration": {name: bootstrap_ci(rows) for name, rows in views(res["rows"])}, "bar": bar}
     tag = "_".join(f"{k}{v}" for k, v in sorted(point.items()))
     path = Path(a.fit_out).parent / f"survival_fit_point.{tag}.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(out, indent=1), encoding="utf-8")
     print(f"point {point}: objective {res['objective']:.4f} " + " ".join(f"{k} {v:.4f}" for k, v in sorted(res["logloss"].items())))
     for name, rows in views(res["rows"]):

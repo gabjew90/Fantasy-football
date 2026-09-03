@@ -2180,3 +2180,19 @@ FAIL. The default cannot move on this study. G4 (two forward rooms at the
 fitted point, scored offline at both knob sets) still runs, because it is
 the only out-of-sample live evidence and it decides whether a second study
 is worth the user's mock time.
+
+### #35 G4 interim, forward room 1 of 5 (mock 28, room 10586715, drafted at the fitted point)
+
+Scored offline with `fit_survival.py --confirm-point ... --rooms 10586715
+--confirm-sims 400 --every 1` at both knob sets (logs
+data/processed/backtest/g4_10586715_{fitted,current}.log; JSON under
+reports/g4/). Whole-pool survival vectors at every state, 15 windows.
+- log-loss: fitted 0.1452, current 0.1601 -> fitted better by 0.015.
+- 30-70% buckets (observed - predicted): fitted 30-49 -5 (n154), 50-69 -6
+  (n421); current 30-49 +4 (n167), 50-69 +1 (n470). The fitted point
+  over-promises survival in the middle buckets on this room; current is
+  nearer zero. CI bar: both PASS (under 30 clusters, so the bar cannot flag).
+- G4 per-room reading: log-loss criterion met, 30-70 miss criterion NOT met.
+Extension (user, 02:15 PT): four more rooms, live knob set alternating
+(room 2 = current), each scored at both points; the G4 verdict is taken on
+all five together, criteria unchanged.
