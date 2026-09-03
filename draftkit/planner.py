@@ -110,6 +110,8 @@ def pair_rank(cands: list[tuple[float, str, dict]],
         per the real guardrails conditioned on the candidate being rostered.
     """
     if not report or len(cands) < 2:
+        for _s, _w, p in cands:
+            p.pop("_pair", None)     # never leave a previous call's math on a player
         return cands
 
     def partner_value(pos_taken: str) -> tuple[float, str | None]:
@@ -149,7 +151,16 @@ def pair_rank(cands: list[tuple[float, str, dict]],
         if partner:
             why = (why + f" · two-pick plan: pair with the ~"
                    f"{pv:.0f}-pt {partner} expected at your next turn")
+        # the arithmetic that decides the ranking, kept structured so the
+        # panel and the reports can SHOW the decision, not just assert it
+        # (user request 2026-09-03: cost of waiting AND cost of picking)
+        p["_pair"] = {"own": round(own, 1), "partner_pos": partner,
+                      "partner_pts": round(pv, 1), "pair": round(pair, 1)}
         ranked.append((pair, score, why, p))
     ranked.sort(key=lambda t: (-t[0], -t[1]))
+    best_pair = ranked[0][0]
+    for pair, _s, _w, p in ranked:
+        # cost of PICKING him now = the best pair minus his pair (0 for the winner)
+        p["_pair"]["pick_cost"] = round(best_pair - pair, 1)
     # keep the original tuple shape; joint value becomes the score the UI sorts by
     return [(pair, why, p) for pair, _s, why, p in ranked]

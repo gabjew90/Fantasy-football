@@ -1000,3 +1000,16 @@ seat 5, size 10 confirmed). Survival scorecard at CURRENT: 30-50% shown
 better, sixth room of six); 30-49 bucket miss fitted -18 (n172, CI
 [-24,-12]) vs current -13 (n155) — BOTH over-promise here in this room,
 fitted by more. Pair B is room 10598876, same seat 5, fitted knobs.
+
+## Mock 34 — room 10598876 "Unnecessary Roughness", 10 teams, slot 5 — fitted knobs — NOT pair B (entry after bell)
+
+07:33-07:52 PT. Joined as pair B to mock 33 but the entry was interrupted
+past the bell: pick 5 (Nacua) went to Yahoo's list, so per the user's
+rule this room does NOT count as the pair; mock 35 (same seat 5, fitted,
+must be 15/15 engine) replaces it. 14/15 engine picks via the action
+path, no other misses. Offline scoring at both knob sets
+(g4_10598876_*.log): fitted 0.1520 vs current 0.1642 on log-loss, fitted
+better, seventh room of seven. Survival scorecard at the fitted point:
+30-50% shown 43% observed 8% (n 13); 70-90% shown 80% observed 40%
+(n 53). Reports:
+reports/mocks/mock34_2026-09-03_0733pt_unnecessary-roughness_room10598876_seat5_*.md.

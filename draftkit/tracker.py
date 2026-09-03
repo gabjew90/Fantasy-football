@@ -951,6 +951,8 @@ class Tracker:
             cands.sort(key=lambda t: -t[0])
 
         if bench_rows:
+            for _sc, _w, p in cands:
+                p.pop("_pair", None)   # bench mode skips the pair stage; drop stale math
             return cands[:top_n]
         try:
             from .planner import pair_rank
@@ -974,6 +976,8 @@ class Tracker:
             import logging
             logging.getLogger("draftkit").warning("two-pick planner fallback: %r", e)
             self._planner_note = f"planner fallback: {e.__class__.__name__}"
+            for _sc, _w, p in cands:
+                p.pop("_pair", None)   # a half-run pair stage must not leave numbers behind
         return cands[:top_n]
 
     # ---------- render ----------

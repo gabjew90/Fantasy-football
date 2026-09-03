@@ -222,3 +222,23 @@ def test_default_is_on_and_the_ab_knob_still_exists():
     t = make_tracker(BENCH_BOARD, MY_LINEUP, current_pick=101)
     t.bench_insurance = False
     assert t.recommendations(top_n=1)[0][2]["sleeper_id"] == "qb2"
+
+
+def test_wire_never_names_a_zeroed_or_out_player():
+    """The 2026-09-03 Josh Jacobs defect: an availability-'out' player with a
+    zeroed projection was the wire floor, so RB insurance was measured
+    against a ghost."""
+    from draftkit.bench import waiver_ppw
+    healthy_deep = {"player": "Deep Back", "proj_pts": 119.0, "adp": 160.0}
+    ghost = {"player": "Josh Jacobs", "proj_pts": 0.0, "adp": 37.2, "avail_status": "out"}
+    ppw, name = waiver_ppw([healthy_deep, ghost], last_pick=150, k=1)
+    assert name == "Deep Back" and ppw == 119.0 / 17.0
+
+    # no viable undrafted player on the board: the worst VIABLE remaining
+    # player is the floor, never the ghost
+    drafted_range = {"player": "Early Back", "proj_pts": 200.0, "adp": 40.0}
+    ppw, name = waiver_ppw([drafted_range, ghost], last_pick=150, k=3)
+    assert name == "Early Back" and ppw == 200.0 / 17.0
+
+    # nothing viable at all
+    assert waiver_ppw([ghost], last_pick=150, k=3) == (0.0, "")

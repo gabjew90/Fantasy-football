@@ -2288,3 +2288,30 @@ list-walk.
 Rig outcome of the same night: the last two rooms (mocks 31 and 32) were
 clean, 15/15 engine picks each, on the final driver (worker sleep,
 60 s heartbeat, fingerprint fix). The clean-room rule for Saturday is met.
+
+## 2026-09-03 (36) — bench-insurance wire measured a ghost; minimal fix, measured
+
+User question during mock review ("isn't Josh Jacobs injured?") exposed it:
+waiver_ppw's fallback took the WORST REMAINING player as the wire floor
+when no undrafted-by-ADP player existed at the position. On this board
+that was always a player availability-zeroed to 0.0 points (Jacobs,
+Commissioner Exempt; Charbonnet likewise flagged), so every RB insurance
+edge in mocks 28-34 was measured against a ghost: Tracy's "+10.9/wk over
+the wire" was his raw output, ~105 pts instead of an honest ~79.
+
+Fix (draftkit/bench.py): the wire can never be a player who projects 0 or
+is availability-'out'. Free list and fallback both filter to viable
+players; nothing else changes. A replacement-level floor was considered
+and REJECTED: measured on the night's 194 recorded bench decisions it
+flipped 77 (replacement is a starter baseline, not a wire), while the
+minimal fix flips 20 of 223 — all late coin-flips (RB depth vs a WR worth
+±2 pts of insurance). The RB wire moves 0.0 -> 2.7/wk (Ollie Gordon II)
+across all seven rooms; big calls unchanged. Test:
+test_wire_never_names_a_zeroed_or_out_player. Full suite 478 green.
+
+Also shipped, display-only: the pair stage records its arithmetic per
+candidate (own-now, expected partner, pair total, pick_cost = best pair
+minus this pair) through plan rows to the panel and reports, so "why not
+the higher waiting-cost player" is answerable from the record (user
+request after mock 32 pick 22). Panel plan lines are now one candidate
+per line with BOTH costs: wait (position decay) and pick (pair regret).

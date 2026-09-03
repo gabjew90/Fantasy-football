@@ -451,12 +451,21 @@ def plan_rows(t: Tracker, recs, report=None) -> list[dict]:
                 s = (u.get("survival") or {}).get(sid)
                 sr = (u.get("survival_raw") or {}).get(sid)
                 e, b = u.get("e_best_next"), u.get("best_now")
-        rows.append({"n": p["name"], "p": p["pos"], "t": p["team"],
-                     "v": round(float(p["vorp"] or 0.0), 1), "a": p["adp"], "why": why,
-                     "s": None if s is None else round(float(s), 3),
-                     "sr": None if sr is None else round(float(sr), 3),
-                     "e": None if e is None else round(float(e), 1),
-                     "b": None if b is None else round(float(b), 1)})
+        row = {"n": p["name"], "p": p["pos"], "t": p["team"],
+               "v": round(float(p["vorp"] or 0.0), 1), "a": p["adp"], "why": why,
+               "s": None if s is None else round(float(s), 3),
+               "sr": None if sr is None else round(float(sr), 3),
+               "e": None if e is None else round(float(e), 1),
+               "b": None if b is None else round(float(b), 1)}
+        pm = p.get("_pair")
+        if pm:
+            # the pair stage's own arithmetic: value banked now, expected
+            # partner at my next turn, the pair total, and what picking this
+            # candidate costs against the best pair (0 = the winner)
+            row["pair"] = {"own": pm.get("own"), "partner": pm.get("partner_pos"),
+                           "partner_pts": pm.get("partner_pts"),
+                           "total": pm.get("pair"), "pick_cost": pm.get("pick_cost")}
+        rows.append(row)
     return rows
 
 

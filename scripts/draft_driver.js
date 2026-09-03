@@ -101,6 +101,29 @@ window.DK = (function () {
     return entry;
   }
 
+  /* One plan candidate as one short line: name, both costs, survival.
+   * "wait" is the position's decay to our next turn. "pick" is what taking
+   * him now costs against the best pair (0 = the pick the plan wants). */
+  function planLine(e) {
+    const parts = [e.n + ' ' + e.p];
+    const why = String(e.why || '');
+    const m = why.match(/waiting likely costs ~(\d+) pts/);
+    if (m) parts.push('wait costs ' + m[1]);
+    else if (/^safe to wait/.test(why)) parts.push('safe to wait');
+    else if (/^bench insurance/.test(why)) {
+      const b = why.match(/≈ (\d+) pts/);
+      parts.push('insurance' + (b ? ' worth ~' + b[1] : ''));
+    } else if (/^depth fallback/.test(why)) parts.push('depth fallback, engine list done');
+    const pm = e.pair;
+    if (pm && pm.pick_cost != null) {
+      parts.push(pm.pick_cost === 0
+        ? 'pick costs 0, best pair ' + pm.total + ' (' + pm.own + ' now + ~' + pm.partner_pts + ' ' + (pm.partner || '') + ' next)'
+        : 'pick costs ' + pm.pick_cost);
+    }
+    if (e.s != null) parts.push(Math.round(e.s * 100) + '% survives to our turn');
+    return parts.join(' · ');
+  }
+
   /* The plain-English reading of a pick record -- the same wording
    * scripts/mock_scrutiny.py prints, so live and afterwards agree. */
   function plainEnglishPick(rec) {
@@ -122,14 +145,16 @@ window.DK = (function () {
     } else if (/^LOCAL ranker/.test(why)) {
       parts.push('engine unreachable, the page’s own ranking chose ' + rec.drafted + ' (' + rec.pos + ')');
     } else if (/^depth fallback|^fills your open/.test(why)) {
-      parts.push('chose ' + rec.drafted + ' (' + rec.pos + ') to fill a mandatory slot; nothing the engine named was left');
+      parts.push('chose ' + rec.drafted + ' (' + rec.pos + ') to fill a mandatory slot. Nothing the engine named was left');
     } else {
       parts.push('chose ' + rec.drafted + ' (' + rec.pos + ')' + (why ? ': ' + why.slice(0, 100) : ''));
     }
+    const pm = rec.pair;
+    if (pm && pm.total != null) parts.push('pair math: ' + pm.own + ' now + ~' + pm.partner_pts + ' ' + (pm.partner || '') + ' next = ' + pm.total);
     const alt = rec.top_proj_available;
     if (alt && alt.n !== rec.drafted) parts.push('top projection left was ' + alt.n + ', passed on purpose');
     if (rec.attempted && rec.attempted.length) parts.push('skipped first: ' + rec.attempted.join(', '));
-    return parts.join('; ');
+    return parts.join('\n  • ');
   }
 
   function hudAppend(entry) {
@@ -863,14 +888,16 @@ window.DK = (function () {
       S.plan = j.plan; S.planNeeds = j.needs; S.planPick = j.current_pick;
       S.planCall = j.calls == null ? null : j.calls;   // joins this plan to the bridge's log lines
       S.planErr = null; S.planAt = Date.now();
-      // narrate a plan when its top three or its pick changed (not every 12 s)
+      // narrate a plan when its top three or its pick changed (not every 12 s).
+      // One candidate per line (user 2026-09-03: bullets, plain language,
+      // and BOTH costs: waiting = the position's decay, picking = best pair
+      // total minus this candidate's pair total).
       const top3 = (j.plan || []).slice(0, 3);
       const sig = j.current_pick + '|' + top3.map(e => e.n).join('|');
       if (sig !== S.lastPlanSig) {
         S.lastPlanSig = sig;
-        narrate('plan', 'plan #' + S.planCall + ' for pick ' + j.current_pick + ': '
-          + top3.map(e => e.n + ' ' + e.p + (e.s != null ? ' ' + Math.round(e.s * 100) + '%' : '')
-            + (e.why ? ' “' + String(e.why).split(' · ')[0].slice(0, 44) + '”' : '')).join(' · '));
+        narrate('plan', 'plan #' + S.planCall + ' for pick ' + j.current_pick + '\n'
+          + top3.map(e => '  • ' + planLine(e)).join('\n'));
       }
       // the bridge says aloud what it had to guess or drop; once per distinct message
       for (const w of (j.warnings || [])) {

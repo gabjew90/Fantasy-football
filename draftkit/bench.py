@@ -108,13 +108,22 @@ def waiver_ppw(remaining_at_pos: list[dict], last_pick: int, k: int) -> tuple[fl
     undrafted. Candidates are the remaining players whose ADP falls beyond
     the draft's last pick (or who have no ADP at all); if the wire is thinner
     than k, take its worst; if nothing is projected undrafted, the worst
-    remaining player is the honest floor."""
+    VIABLE remaining player is the honest floor.
+
+    Viable means projects above 0 and is not availability-'out': streaming
+    means picking up someone who can play. The old fallback took the worst
+    remaining player outright, and in every 2026-09-03 mock that was Josh
+    Jacobs at 0.0 (zeroed for the Commissioner Exempt List), which measured
+    all RB insurance against a ghost."""
+    viable = [p for p in remaining_at_pos
+              if float(p.get("proj_pts") or 0.0) > 0.0
+              and str(p.get("avail_status") or "") != "out"]
     free = sorted(
-        (p for p in remaining_at_pos
+        (p for p in viable
          if p.get("adp") is None or float(p["adp"]) > last_pick),
         key=lambda p: -float(p.get("proj_pts") or 0.0))
     if not free:
-        free = sorted(remaining_at_pos, key=lambda p: float(p.get("proj_pts") or 0.0))[:1]
+        free = sorted(viable, key=lambda p: float(p.get("proj_pts") or 0.0))[:1]
     if not free:
         return 0.0, ""
     pick = free[min(k, len(free)) - 1]
