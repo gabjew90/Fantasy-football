@@ -949,3 +949,18 @@ at the fitted point: 30-50% shown 39% observed 12% (n 16); 50-70% 59% vs
 11% (n 18); 70-90% 81% vs 78% (n 40); 90-100% 97% vs 83% (n 54). Six of
 nine rivals away by round 11. Reports:
 reports/mocks/mock30_2026-09-03_0257pt_first-and-ten_room10589182_seat1_*.md.
+
+## Mock 31 — room 10590238 "Goal Line Stand", 10 teams, slot 7 — FORWARD TEST 4 of 5: CURRENT knobs live — CLEAN
+
+03:27-03:39 PT. First room on the throttle-proof driver (sleep via Blob
+Worker, heartbeat 60 s). Entry: the in-page poll for the Enter Draft
+anchor ran past the 45 s eval budget before the bell; the post-bell reload
+plus click landed the driver at 10:28:01 UTC with zero picks made.
+15/15 legal, 15/15 ENGINE picks via the action path, zero Yahoo
+autopicks, no gate trips, no away flag on us all room (five rivals away
+by round 8). Fingerprint matched. Standings by projected lineup: first
+from pick 34 on. Survival scorecard at CURRENT: 30-50% shown 43% observed
+38% (n 8); 50-70% 61% vs 23% (n 22); 70-90% 82% vs 63% (n 30); 90-100%
+96% vs 82% (n 60). Counts as clean room 1 of 2 on the final code
+(driver d967a6c+46ec997). Reports:
+reports/mocks/mock31_2026-09-03_0328pt_goal-line-stand_room10590238_seat7_*.md.
