@@ -2352,3 +2352,28 @@ CIM Win32_Process CommandLine match, confirm "listeners: 0", start with
 -PassThru, and confirm the port's OwningProcess is a CHILD of the new
 PID before trusting the room to it; the driver preflight call# must be
 small and fresh.
+
+## 2026-09-03 (38) — the wire is who goes undrafted, not the board's ADP tail (user find #2)
+
+The #36 fix stopped ghosts from being the wire floor but kept the
+selection: players with ADP beyond pick 150. On this board that set is
+essentially empty at RB (the projected tail carries ADPs inside 150), so
+the fallback landed on the worst healthy projection, Ollie Gordon II at
+45 pts (2.7/wk), and every RB insurance edge from round 5 on was inflated
+by ~4/wk. The user caught it from the mock reports ("Ollie Gordon at 2.8
+a week is not the RB waiver wire in a 10-team league").
+
+Fix (bench.predicted_undrafted + waiver_ppw wire_names): the market
+spends its remaining (150 - current_pick) picks in ADP order on the
+remaining players it ranks highest; everyone left after that IS the wire;
+the baseline is the k-th best projection inside that set per position.
+Test: test_wire_is_kth_best_projection_among_predicted_undrafted.
+
+Measured re-read of mocks 37 and 38 (exact per-state wire): honest RB
+wire ~118-123 pts (~7/wk), WR ~114, QB 248 (Brissett). Insurance values
+compress hard (Tracy 80 -> 36; Metcalf 18 -> 7; round 11+ becomes 0-1 pt
+coin flips, the true depth of a 10-team wire). Composition: Tracy still
+wins his slot in both rooms; ONE real flip per room, pick 98, where
+honest wires put Mahomes-as-QB2 (8) over RJ Harvey (6) — an order swap
+with pick 103. Live from mock 39's bench rounds (bridge forward12,
+verified port owner, restarted mid-room during round 3).
