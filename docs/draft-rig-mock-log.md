@@ -1134,3 +1134,19 @@ before our turn in one room and not the other) and ONE was a model choice
 +52 is room luck, not the model; both rooms first or near it. Running pair
 tally: +23, -1, -52 for fitted; pure model-choice picks across all three
 pairs: RB-earlier every time, outcome-neutral in aggregate.
+
+## Mock 41 — room 10618261 "Pump Fake II", 10 teams, slot 9 — PAIR 4A: FITTED knobs, full #39 engine — CLEAN
+
+16:42-16:57 PT. First room with everything from the day live together:
+#38 wire, #39 near-tie rule and market-floored fallback, manager-named
+rival lines, Board-tab rest, translucent tagged panel. 15/15 legal, 15/15
+engine, zero autopicks, preflight call#1 (forward14). Visible effects:
+McCaffrey's own value at pick 1 rose to 174.6 (was 159.6) as the RB
+fallback deflated; Dowdle's insurance printed 26 pts (was 96 under the
+ghost wire); Board tab confirmed selected between actions; user dragged
+the panel to the left edge mid-room. First by projected lineup at the
+end (1580, next 1574). Offline scoring, pasted from g4_10618261_*.log:
+fitted objective 0.1726, current 0.1878; 30-49 bucket fitted pred 40
+obs 25 (n344), current pred 40 obs 39 (n401). Reports:
+reports/mocks/mock41_2026-09-03_1642pt_pump-fake-ii_room10618261_seat9_*.md.
+Pair 4B is room 10619316, seat 9, CURRENT (forward15, verified).
