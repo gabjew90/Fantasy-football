@@ -56,7 +56,8 @@ def lineup_points(chosen: list[dict], slots: dict | None = None, key: str = "pro
     return total
 
 
-def replay(board, log_picks, my_slot, teams, rounds, slot_markets, slots=None):
+def replay(board, log_picks, my_slot, teams, rounds, slot_markets, slots=None, overrides=None):
+    """overrides: engine knobs set on every tracker (plan B3/B7 A/Bs)."""
     by_name = {p["name"]: p for p in board}
     taken, chosen, picks_so_far = set(), [], []
 
@@ -73,7 +74,7 @@ def replay(board, log_picks, my_slot, teams, rounds, slot_markets, slots=None):
 
         avail = [p for p in board if p["name"] not in taken]
         t = EP.make_tracker(board, picks_so_far, my_slot,
-                            slots=slots, teams=teams, rounds=rounds)
+                            slots=slots, teams=teams, rounds=rounds, overrides=overrides)
         t.slot_markets = slot_markets
         try:
             recs = t.recommendations(top_n=1)
@@ -100,7 +101,20 @@ def main() -> None:
     ap.add_argument("--teams", type=int, required=True)
     ap.add_argument("--board", default="tiers.keefamania.csv")
     ap.add_argument("--slots", default="")
+    ap.add_argument("--league", default=None, help="starter shape from the league yaml (engine_parity.league_shape)")
+    ap.add_argument("--set", action="append", default=[], metavar="KNOB=VALUE",
+                    help="engine knob override for BOTH arms (e.g. --set sigma_early=8 --set survival_shrink=1.0)")
     a = ap.parse_args()
+
+    overrides = {}
+    for kv in a.set:
+        k, v = kv.split("=", 1)
+        overrides[k] = float(v) if v.replace(".", "", 1).replace("-", "", 1).isdigit() else v
+    league_slots = None
+    if a.league:
+        from draftkit.config import Config
+        _teams, _rounds, league_slots = EP.league_shape(Config.load(league=a.league))
+        SLOTS.clear(); SLOTS.update(league_slots)     # lineup_points' default shape for this run
 
     board = EP.load_board(a.board)
     log = [json.loads(line) for line in
@@ -111,7 +125,7 @@ def main() -> None:
     slots = ([int(x) for x in a.slots.split(",")] if a.slots
              else list(range(1, a.teams + 1)))
 
-    print(f"Slot-market acceptance replay — draft {a.draft_id}, "
+    print(f"Slot-market acceptance replay -- draft {a.draft_id}, {'knobs ' + str(overrides) if overrides else ''}"
           f"{a.teams} teams, {rounds} rounds")
     print(f"starters {SLOTS}\n")
     print(f"{'':>4}{'lineup projected pts':>28}{'':4}{'lineup VORP':>24}")
@@ -120,8 +134,8 @@ def main() -> None:
 
     rows = []
     for s in slots:
-        off = replay(board, log, s, a.teams, rounds, False)
-        on = replay(board, log, s, a.teams, rounds, True)
+        off = replay(board, log, s, a.teams, rounds, False, slots=league_slots, overrides=overrides)
+        on = replay(board, log, s, a.teams, rounds, True, slots=league_slots, overrides=overrides)
         po, pn = lineup_points(off), lineup_points(on)
         vo, vn = lineup_value(off), lineup_value(on)
         rows.append((s, po, pn, vo, vn, off, on))

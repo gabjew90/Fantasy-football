@@ -294,16 +294,32 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--logs", default=str(ROOT / "data" / "logs"))
     ap.add_argument("--report-only", action="store_true")
+    ap.add_argument("--fit", action="store_true", help="plan B7: the replay-based refit (scripts/survival_refit.py)")
+    ap.add_argument("--smoke", action="store_true", help="two-point grid, for a quick end-to-end check")
+    ap.add_argument("--sims", type=int, default=200)
+    ap.add_argument("--confirm-sims", type=int, default=1000)
+    ap.add_argument("--every", type=int, default=2, help="evaluate every Nth state")
+    ap.add_argument("--all-slots", action="store_true", help="every seat's window, not just the real seat")
+    ap.add_argument("--workers", type=int, default=max(1, (__import__('os').cpu_count() or 2) - 1))
     ap.add_argument("--out", default=str(ROOT / "reports" / "survival_calibration.md"))
+    ap.add_argument("--fit-out", default=str(ROOT / "reports" / "survival_fit.md"))
+    ap.add_argument("--confirm-point", default=None, metavar="JSON",
+                    help='confirm one knob set at --confirm-sims against the bar, e.g. \'{"sigma_early": 4}\'')
     a = ap.parse_args()
+    if a.fit or a.confirm_point:
+        sys.path.insert(0, str(ROOT / "scripts"))
+        from survival_refit import CURRENT, confirm_point, run_fit
+        if a.confirm_point:
+            confirm_point(a, {**CURRENT, **json.loads(a.confirm_point)})
+        else:
+            run_fit(a)
+        return
     rooms = all_rooms(Path(a.logs))
     md = render_report(rooms)
     Path(a.out).parent.mkdir(parents=True, exist_ok=True)
     Path(a.out).write_text(md, encoding="utf-8")
     print(md)
     print(f"-> {a.out}")
-    if not a.report_only:
-        print("--fit is plan step B7 and is not implemented yet; report written.")
 
 
 if __name__ == "__main__":

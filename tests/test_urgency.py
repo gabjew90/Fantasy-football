@@ -154,3 +154,21 @@ def test_explicit_default_knobs_reproduce_the_implicit_call_exactly():
                           qb_damp_until_round=10, kdef_typical_round=13, run_ratio=1.5,
                           autopick_sigma_scale=0.5, rival_needs_update=True)
     assert a == b
+
+
+def test_expected_best_is_the_carry_formula_and_rides_alongside_the_joint():
+    """Plan B2 scaffolding: expected_best walks candidates by value, each the
+    best alive with P(nobody better survived) x P(he survived); the report
+    carries it next to the joint estimator without changing the decision."""
+    import numpy as np
+    from draftkit.urgency import expected_best
+    assert expected_best([50.0, 30.0], [1.0, 1.0]) == 50.0
+    assert expected_best([50.0, 30.0], [0.0, 1.0]) == 30.0
+    assert abs(expected_best([50.0, 30.0], [0.5, 0.5]) - (0.5 * 50 + 0.5 * 0.5 * 30)) < 1e-12
+    assert expected_best([30.0, 50.0], [0.5, 0.5]) == expected_best([50.0, 30.0], [0.5, 0.5])   # order-free
+    rep = simulate_survival(POOL, 1, 4, RIVALS, {}, np.random.default_rng(4), sims=200, sigma=3.0)
+    u = rep["RB"]
+    assert u["e_best_next"] == u["e_best_next_joint"]                 # the decision is still the joint
+    vals = {p["sleeper_id"]: p["vorp"] for p in POOL if p["pos"] == "RB"}
+    ids = list(u["survival"])
+    assert abs(u["e_best_next_carry"] - expected_best([vals[i] for i in ids], [u["survival"][i] for i in ids])) < 1e-9

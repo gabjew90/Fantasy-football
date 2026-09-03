@@ -1371,3 +1371,118 @@ values; `run_ratio`, `autopick_sigma_scale`, `rival_needs_update`,
 Sleeper constructor, the Yahoo bridge and `engine_parity.make_tracker(cfg=,
 overrides=)` all call -- the bridge's hand copy is gone. A same-seed test
 pins that the explicit defaults reproduce the implicit call exactly.
+
+## 2026-09-02 (26) — B7: the survival refit, pre-registered before it runs
+
+What is fitted. sigma_early, sigma_late, reach_prob, need_damp, by
+coordinate search on a coarse grid: sigma (4,6,8,10) x (15,21,27,35) at
+reach 0.15, then reach_prob (0, .10, .15, .25, .35), then need_damp (.15,
+.30, .50). autopick_sigma_scale is fitted only once step B5 exists (it has
+no effect before). Stated plainly: this yields THE BEST POINT ON THE GRID,
+not identified parameters, on one human room plus bot and autopick mocks;
+no value is reported finer than its grid step.
+
+How. scripts/fit_survival.py --fit re-runs the simulation on every archived
+state (every second pick, the room's real seat) with the production board
+for that league, draft-day ADP from the FFC snapshot preceding the draft
+(Yahoo rooms keep the board's Yahoo rank), survival_shrink 1.0, sims 200
+for the search and 1000 for the confirmation; scores the RAW survival
+vector of every pooled player against the room's actual picks. Objective:
+mean over room types of the per-type log loss (equal weight per type, so
+four autopick rooms cannot outvote the one human room). Three calibration
+views are always reported: pooled, human room, autopick rooms.
+
+Acceptance, fixed now:
+* Calibration: raw predicted vs observed within 8 points in every bucket
+  with n >= 15, on the pooled real-seat rows AND on the human room alone. A
+  pass carried by bot/autopick rooms while a human bucket with n >= 15
+  fails is SPLIT: recorded, no flip without the human's call.
+* Outcome: scripts/slot_replay.py, fitted knobs vs current, identical
+  harness knobs otherwise, both leagues, every slot: mean projected lineup
+  points not worse (ties pass); per-slot wins/losses reported.
+  keefamania: slot_replay.py --league keefamania --draft-id 1396184666897145856 --teams 10 --board tiers.keefamania.csv --set ...
+  omnibeta:   slot_replay.py --league omnibeta  --draft-id 1395566812157984768 --teams 12 --board tiers.csv --set ...
+* On pass: survival_shrink 1.0 and the fitted knobs into config.yaml,
+  Tracker class defaults, engine_parity (shrink only), draft_driver.js
+  SURVIVAL_SHRINK; then B2 wires the decision path to the calibrated vector.
+* On fail: the SIGMA-ONLY refit (sigma fitted, everything else at today's
+  values, shrink 1.0) becomes the default -- never 0.55, which #25 showed
+  was fitted to mis-scored data. If even sigma-only fails the bar, the
+  shrink is refit on the rescored rows as a stopgap and this entry says so.
+Also reported, not a gate: the empirical need damp implied by rivals'
+closed-slot picks against the ADP mass, by room type, next to the 0.15 in
+use.
+
+### B2 measurement (same day): joint vs carry expected-best
+
+scripts/ebest_parity.py, 40 random mid-draft states per league, sims 1000,
+production knobs. Urgency from the Monte Carlo JOINT expectation vs the
+carry (independence) formula over the calibrated survival vector
+(reports/ebest_parity.md):
+
+| league | top-1 unchanged | mean abs delta urgency | max abs delta |
+|---|---|---|---|
+| keefamania | 39/40 | 1.2 pts | 6.8 pts |
+| omnibeta | 39/40 | 1.2 pts | 8.2 pts |
+
+The pre-registered bar was top-1 unchanged on >= 38/40 AND max delta < 2
+points. The second half fails, on tight-end markets above all (a thin
+market where one survivor dominates, so independence overstates the
+expected best by 6-8 points). Decision, as pre-registered: the joint
+expectation stays Python's definition of e_best_next; the carry formula is
+the JS mirror's client-side approximation, documented with this tolerance
+(mean 1.2, max 8.2 points; 1 top-1 flip in 40 per league), and the report
+carries both numbers (`e_best_next_joint`, `e_best_next_carry`) so the gap
+stays measurable. The decision path is wired to the calibrated vector after
+B7 (below).
+
+### B7 result (same day): the raw simulation is calibrated where the shrink said it was not; the low end splits
+
+reports/survival_fit.md (+ .json), reports/survival_fit_point.*.json,
+reports/ebest_parity.md. 8 rooms, 40,414 prediction rows per knob set at
+the confirmation (sims 1000, every second state, real seats). Wall time
+726 s for the search.
+
+The first finding is about the shrink itself. With NO shrink, the raw
+simulation at today's knobs is calibrated from 50% up in every view:
+pooled predicted 61 / 82 / 97 vs observed 65 / 84 / 98; the human room
+61 / 81 / 97 vs 68 / 84 / 97. The live 0.55 map would display that 97% as
+76% against an observed 98%. #25 found the n=67 behind the shrink was
+mis-scored; this confirms the direction of the error: the sim was not
+overconfident at the top. Where it is off is the LOW end in the human
+room: players the sim gives 20-50% survive more often than that.
+
+Three knob sets, shrink 1.0 throughout:
+
+| knob set | objective | human loss | calibration bar | outcome vs today (by-slot lineup pts) |
+|---|---|---|---|---|
+| current (6/27, reach .15, need .15) | 0.2114 | 0.2345 | human PASS (max miss 7); pooled FAIL one bucket by 1 pt (30-49: pred 41 obs 32) | identical by construction |
+| sigma-only (4/27, reach .15, need .15) | 0.2097 | 0.2359 | pooled PASS; human FAIL 0-29 (22 vs 36), 30-49 (41 vs 50) | Keefamania tied 10/10; Omnibeta +9.0/slot, 3 better 0 worse 9 tied |
+| fitted (4/27, reach .10, need .30) | 0.2060 | 0.2336 | pooled PASS; human FAIL 0-29 (21 vs 34), 30-49 (40 vs 52) | Keefamania -0.7/slot (0 better 1 worse 9 tied); Omnibeta +9.0/slot (3/0/9) |
+
+Empirical need damp (closed-slot take rate against the ADP mass): human
+0.44, Sleeper bots 0.31, Yahoo autopick 0.49 -- all well above the 0.15
+in use; the grid's best was 0.30 (its top value was 0.50 and lost).
+
+Applying the pre-registered rule: the fitted point is a SPLIT (pooled
+passes, human buckets with n 122 and 218 fail) and also fails the outcome
+half on Keefamania by 0.7 points per slot. The declared fallback, the
+sigma-only refit, passes the outcome half in both leagues but shows the
+same human-room split. No candidate passes both halves outright, so
+nothing flips on the fitter's authority; the choice is recorded here for
+the human's call:
+
+  (A) today's knobs, shrink 1.0 -- the human room passes every bucket,
+      no pick changes, the shrink is retired;
+  (B) sigma-only, shrink 1.0 -- better objective and +9/slot in the
+      Omnibeta replay, at the cost of the human low end;
+  (C) fitted -- best objective, fails the Keefamania outcome bar.
+
+Recommendation on the record: (A). The real rooms that matter are human
+(Omnibeta) or unknown (Keefamania on Saturday; the mocks were 80-90%
+autopick, the league will not be); the human-room calibration is the one
+to protect, and (A) is the only set that holds it in every bucket. Either
+way the 0.55 shrink is retired -- every candidate says so. B2 follows the
+call: with shrink 1.0 the calibrated vector IS the raw vector and the
+decision path is consistent by construction; the carry formula stays the
+JS approximation (measured: mean 1.2, max 8.2 points).

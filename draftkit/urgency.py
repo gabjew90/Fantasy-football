@@ -47,6 +47,23 @@ def calibrate(p: float, shrink: float) -> float:
     return 0.5 + (p - 0.5) * shrink
 
 
+def expected_best(values, survival) -> float:
+    """E[best value still alive] under INDEPENDENT survivals: walk the
+    candidates in value-descending order; each is the best alive with
+    probability (nobody better survived) x (he survived). This is the JS
+    mirror's eBestNext (draft_driver.js) and is reproducible from a
+    displayed survival vector. It is an approximation of the joint
+    expectation the Monte Carlo loop computes (sampling without replacement
+    correlates survivals); plan B2 measures the gap before choosing."""
+    order = sorted(range(len(values)), key=lambda i: -float(values[i]))
+    carry, e = 1.0, 0.0
+    for i in order:
+        s = float(survival[i])
+        e += carry * s * float(values[i])
+        carry *= (1.0 - s)
+    return e
+
+
 def _groups(pool, pos_arr, markets):
     """The pools urgency is measured over.
 
@@ -205,11 +222,16 @@ def simulate_survival(pool, current_pick, next_pick, rivals, seeds, rng,
     raw = survived / sims
     calibrated = np.array([calibrate(float(raw[j]), survival_shrink) for j in range(n)])
     report = {}
-    for name in groups:
-        e = e_best[name] / sims
+    for name, (gmask, val) in groups.items():
+        e = e_best[name] / sims                     # joint expectation, raw draw (the decision today)
+        # the carry (independence) estimator over the CALIBRATED vector, reported
+        # alongside for plan B2's measurement; not yet the decision
+        e_carry = expected_best(val[gmask], calibrated[gmask]) if gmask.any() else 0.0
         report[name] = {
             "best_now": best_now[name],
             "e_best_next": e,
+            "e_best_next_joint": e,
+            "e_best_next_carry": e_carry,
             "urgency": best_now[name] - e,
             "survival": survival_of(name, arr=calibrated),
             "survival_raw": survival_of(name, arr=raw),
