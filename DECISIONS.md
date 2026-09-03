@@ -2211,3 +2211,14 @@ Scored offline at both points (logs data/processed/backtest/g4_10588125_*.log),
   turns to a background-tab stall (Yahoo autopicked 80-81), which changes
   our roster history but not the survival rows, which are scored on rival
   behaviour between our turns.
+
+### #35 G4 interim, forward room 3 of 5 (mock 30, room 10589182, drafted at the fitted point)
+
+Logs data/processed/backtest/g4_10589182_*.log, 7 windows.
+- log-loss: fitted 0.1973, current 0.2130 -> fitted better by 0.016.
+- 30-70% buckets (observed - predicted): fitted 30-49 -1 (n392), 50-69 +1
+  (n544); current 30-49 0 (n399), 50-69 +1 (n739). Tied within a point;
+  current nominally smaller (1 vs 2 summed).
+- Tally after three rooms: log-loss 3/3 fitted, by 0.015-0.016 each time;
+  30-70 miss fitted 1, current 2 (one of them a one-point tie).
+Room 4 (10590238) runs at CURRENT with the throttle-proof driver.
