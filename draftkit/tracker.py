@@ -452,9 +452,23 @@ class Tracker:
             # nobody projected to last: the position will be picked clean, so
             # the fallback is the worst thing still on the board
             pick_from = survivors or pool
-            out[pos] = max(float(p.get("proj_pts") or 0.0) for p in pick_from) \
-                if survivors else min(float(p.get("proj_pts") or 0.0)
-                                      for p in pick_from)
+            # The fallback is priced at the LOWER of our blend and the market's
+            # own projection. Taking the max of our projections over the ADP
+            # survivors selects for the model's largest tail over-projections
+            # (RJ Harvey: blend 155, market 136, consensus 118 -- user find,
+            # 2026-09-03), which shrank every RB candidate's own value and
+            # tilted pair coin-flips to WR. The market's number is the one
+            # consistent with the ADP that made him a survivor.
+            def _fb(p: dict) -> float:
+                b = float(p.get("proj_pts") or 0.0)
+                m = p.get("proj_market_pts")
+                try:
+                    m = float(m) if m not in (None, "") else None
+                except (TypeError, ValueError):
+                    m = None
+                return min(b, m) if m is not None and m > 0 else b
+            out[pos] = max(_fb(p) for p in pick_from) \
+                if survivors else min(_fb(p) for p in pick_from)
         return out
 
     def _replacement_points(self) -> dict[str, float]:

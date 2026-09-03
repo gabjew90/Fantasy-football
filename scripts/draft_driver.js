@@ -157,12 +157,32 @@ window.DK = (function () {
     return parts.join('\n  • ');
   }
 
+  /* One trail line: dim time stamp, a coloured tag for the kind, then the
+   * text with the first line emphasised and continuation lines (the plan
+   * bullets) indented. Readability pass, user request 2026-09-03. */
+  const HUD_KIND = {
+    picked:    { tag: 'PICK',   color: '#7fe3ff', bg: 'rgba(127,227,255,.14)' },
+    turn:      { tag: 'TURN',   color: '#ffd76a', bg: 'rgba(255,215,106,.14)' },
+    plan:      { tag: 'plan',   color: '#c8c8c8', bg: 'rgba(200,200,200,.08)' },
+    pick:      { tag: 'rival',  color: '#e6e6e6', bg: 'rgba(230,230,230,.06)' },
+    gate:      { tag: 'GATE',   color: '#ff8a8a', bg: 'rgba(255,138,138,.16)' },
+    away:      { tag: 'AWAY',   color: '#ff8a8a', bg: 'rgba(255,138,138,.16)' },
+    bridge:    { tag: 'bridge', color: '#ffb36a', bg: 'rgba(255,179,106,.14)' },
+    fault:     { tag: 'FAULT',  color: '#f79cff', bg: 'rgba(247,156,255,.16)' },
+    heartbeat: { tag: 'beat',   color: '#7fbf7f', bg: 'rgba(127,191,127,.10)' },
+    info:      { tag: 'info',   color: '#a9b4c2', bg: 'rgba(169,180,194,.10)' },
+  };
   function hudAppend(entry) {
     if (!S.hud || !S.hud.body) return;
     const line = document.createElement('div');
-    line.style.cssText = 'padding:1px 0;border-bottom:1px solid rgba(255,255,255,.06);white-space:pre-wrap;word-break:break-word;';
-    const color = { picked: '#8ef', turn: '#fd6', gate: '#f88', away: '#f88', bridge: '#f88', fault: '#f8f', plan: '#bbb', pick: '#ddd', heartbeat: '#7a7', info: '#aaa' }[entry.kind] || '#ddd';
-    line.innerHTML = '<span style="color:#888">' + ptTime(new Date(entry.ts)) + '</span>  <span style="color:' + color + '">' + escapeHtml(entry.text) + '</span>';
+    line.style.cssText = 'padding:3px 0 3px 0;border-bottom:1px solid rgba(255,255,255,.07);white-space:pre-wrap;word-break:break-word;';
+    const k = HUD_KIND[entry.kind] || { tag: entry.kind, color: '#ddd', bg: 'rgba(221,221,221,.08)' };
+    const parts = String(entry.text).split('\n');
+    const first = escapeHtml(parts[0]);
+    const rest = parts.slice(1).map(t => '<div style="padding-left:18px;color:' + k.color + ';opacity:.92">' + escapeHtml(t) + '</div>').join('');
+    line.innerHTML = '<span style="color:#7d8590">' + ptTime(new Date(entry.ts)) + '</span>'
+      + ' <span style="display:inline-block;min-width:38px;text-align:center;padding:0 5px;border-radius:3px;font-size:10px;letter-spacing:.3px;background:' + k.bg + ';color:' + k.color + '">' + k.tag + '</span> '
+      + '<span style="color:' + k.color + (entry.kind === 'picked' || entry.kind === 'turn' ? ';font-weight:600' : '') + '">' + first + '</span>' + rest;
     const body = S.hud.body;
     const atBottom = body.scrollHeight - body.scrollTop - body.clientHeight < 24;
     body.appendChild(line);
@@ -193,12 +213,12 @@ window.DK = (function () {
     root.id = 'dk-hud';
     const pos = { 'bottom-right': 'bottom:8px;right:8px;', 'bottom-left': 'bottom:8px;left:8px;', 'top-right': 'top:8px;right:8px;', 'top-left': 'top:8px;left:8px;' }[o.corner] || 'bottom:8px;right:8px;';
     root.style.cssText = 'position:fixed;' + pos + 'width:' + o.width + 'px;height:' + o.height + 'px;z-index:2147483000;'
-      + 'background:rgba(12,14,18,.88);color:#ddd;font:12px/1.35 Consolas,Menlo,monospace;border:1px solid #333;border-radius:6px;'
+      + 'background:rgba(10,12,16,.66);backdrop-filter:blur(2px);color:#ddd;font:12.5px/1.4 Consolas,Menlo,monospace;border:1px solid rgba(255,255,255,.14);border-radius:6px;'
       + 'display:flex;flex-direction:column;box-shadow:0 2px 12px rgba(0,0,0,.5);'
       // native resize from the bottom-right corner (user request 2026-09-03)
       + 'resize:both;overflow:hidden;min-width:260px;min-height:120px;';
     const head = document.createElement('div');
-    head.style.cssText = 'padding:4px 8px;background:#1b2027;color:#fd6;border-bottom:1px solid #333;flex:0 0 auto;cursor:move;user-select:none;';
+    head.style.cssText = 'padding:4px 8px;background:rgba(27,32,39,.72);color:#ffd76a;border-bottom:1px solid rgba(255,255,255,.14);flex:0 0 auto;cursor:move;user-select:none;font-weight:600;';
     head.textContent = 'draft engine — waiting for the room';
     head.title = 'drag to move · resize from the bottom-right corner';
     // drag by the header: on first grab the panel pins to left/top so the
@@ -391,6 +411,22 @@ window.DK = (function () {
     // aria-selected is the only reliable signal; absent counts as "not"
     if (tab.getAttribute('aria-selected') !== 'true') tab.click();
     return true;
+  }
+
+  /* The centre pane's tabs (Players / Board / Results / Standings) are
+   * role=tab buttons. The driver's own work happens through the store and
+   * the makePick action, so the human-facing view can rest on the Board
+   * between actions (user request 2026-09-03). Only clicks when needed. */
+  function ensureCenterTab(name) {
+    const tab = [...document.querySelectorAll('button[role=tab]')]
+      .find(b => (b.textContent || '').trim() === name);
+    if (!tab) return false;
+    if (tab.getAttribute('aria-selected') !== 'true') tab.click();
+    return true;
+  }
+  function settleView() {
+    if (S.cfg.restView === false) return;
+    try { ensureCenterTab(S.cfg.restView || 'Board'); } catch (e) { /* view is cosmetic */ }
   }
 
   function parsePicksPanel() {
@@ -739,7 +775,10 @@ window.DK = (function () {
           const lab = timingLabel(sincePrev, gap);
           const took = sincePrev != null ? ' in ' + Math.round(sincePrev / 1000) + ' s' : '';
           const inPlan = (S.plan || []).slice(0, 8).find(e => e.n === name);
-          narrate('pick', 'pick ' + no + '  ' + name + ' (' + (p.primary_pos || p.display_pos || '') + ') taken by seat ' + seat + took
+          // the manager's name, not just the seat (user request 2026-09-03)
+          const mgr = Object.values(managers).find(m => String(m.teamId) === String(o.teamId));
+          const who = (mgr && mgr.nickname) ? mgr.nickname + ' (seat ' + seat + ')' : 'seat ' + seat;
+          narrate('pick', 'pick ' + no + '  ' + name + ' (' + (p.primary_pos || p.display_pos || '') + ') taken by ' + who + took
             + (lab === 'instant' ? ' INSTANTLY (autopick)' : '')
             + (inPlan ? ' — a target is gone' + (inPlan.s != null ? ' (was ' + Math.round(inPlan.s * 100) + '% to survive)' : '') : ''));
         }
@@ -2328,6 +2367,8 @@ window.DK = (function () {
                  ' depth=' + ((q.queueNow || []).length) + ' pruned=' + JSON.stringify(q.pruned || []));
           }
         }
+        // rest the human view on the Board between actions
+        settleView();
         // short poll keeps the client active
         await sleep(900);
       }

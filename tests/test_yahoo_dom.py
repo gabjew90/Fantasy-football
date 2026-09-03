@@ -201,7 +201,7 @@ def test_hud_is_created_once_and_removed_and_never_rewrites_lines():
         const lines = [...body.children].map(d => d.textContent);
         const off = DK.hud(false);
         console.log(JSON.stringify({ a, b, count: document.querySelectorAll('#dk-hud').length === 0 ? 'removed' : 'still there',
-          lines: lines.map(t => t.replace(/^\\d\\d:\\d\\d:\\d\\d\\s+/, '')), off }));
+          lines: lines.map(t => t.replace(/^\\d\\d:\\d\\d:\\d\\d\\s+\\S+\\s+/, '')), off }));   // time stamp, then the kind tag
         """
     )
     assert r["a"] == "hud on" and r["b"] == "hud on" and r["off"] == "hud off"

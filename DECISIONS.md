@@ -2377,3 +2377,35 @@ wins his slot in both rooms; ONE real flip per room, pick 98, where
 honest wires put Mahomes-as-QB2 (8) over RJ Harvey (6) — an order swap
 with pick 103. Live from mock 39's bench rounds (bridge forward12,
 verified port owner, restarted mid-room during round 3).
+
+## 2026-09-03 (39) — two planner corrections from the user's read of the pair reports
+
+1. NEAR-TIE RULE (planner.pair_rank, NEAR_TIE = 1.0). When two candidates'
+   pair values are within a point, the pair is worth the same either way
+   but only completes if the second player is there next turn, so the one
+   LESS likely to survive goes first. Measured on the 163 recorded
+   starter-phase plans of rooms 37-39: 7 flip their top pick (4%), among
+   them the user's example verbatim (room 38 pick 38: Garrett Wilson 85% ->
+   Cam Skattebo 75%, pairs 64.3 vs 63.5). The why gains "near tie (x pts):
+   scarcer player first"; a runner-up's pick_cost is clamped at 0.
+   Test: test_near_tie_goes_to_the_scarcer_player.
+
+2. FALLBACK PRICED AT MIN(BLEND, MARKET) (tracker._fallback_points). The
+   fallback ("the player you would end up with") was the MAX of our blend
+   projection over the ADP survivors, which selects the model's largest tail
+   over-projections by construction (winner's curse): RJ Harvey blend 155,
+   market 136, consensus 118; Gainwell 154/135/121; Tracy 127/109/95. Across
+   all ADP-90-150 RBs the model actually sits 18 pts UNDER the market on
+   average, so this is selection, not a uniform floor bias. An inflated RB
+   fallback shrank every RB candidate's own value and tilted the pair coin
+   flips toward WR. The fallback now prices each survivor at the lower of
+   blend and market-implied projection (proj_market_pts, newly carried into
+   the engine pool by yahoo_bridge.load_players and engine_parity.load_board;
+   it was never in the pool before). Test:
+   test_fallback_is_floored_by_the_market_projection. Effect on recorded
+   rooms not re-measured state-by-state (the fallback is not in the sidecar);
+   the first live room will show it in the pair math.
+
+Both ship with the driver update of the same commit: rival pick lines
+carry the manager's name, the panel rests the client on the Board tab
+between actions, and the panel is translucent with tagged, coloured lines.

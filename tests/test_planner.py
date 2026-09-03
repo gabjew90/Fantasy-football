@@ -66,3 +66,24 @@ def test_consume_prefers_dedicated_slot_then_flex():
     assert after_rb == {"RB": 0, "WR": 0, "FLEX": 1}
     after_wr = consume(needs, "WR")           # no WR slot -> eats FLEX
     assert after_wr == {"RB": 1, "WR": 0, "FLEX": 0}
+
+
+def test_near_tie_goes_to_the_scarcer_player():
+    """User rule (2026-09-03): pairs within NEAR_TIE points are a coin flip,
+    so the player LESS likely to survive to the next turn goes first; outside
+    the window the pair order holds."""
+    from draftkit.planner import NEAR_TIE, pair_rank
+    needs = {"RB": 1, "WR": 1, "FLEX": 1}
+    a = {"sleeper_id": "a", "pos": "WR", "proj_pts": 160.0, "vorp": 40.0, "vorp_flex": 40.0}
+    b = {"sleeper_id": "b", "pos": "RB", "proj_pts": 160.0, "vorp": 39.5, "vorp_flex": 39.5}
+    report = {"WR": {"e_best_next": 30.0, "survival": {"a": 0.85}},
+              "RB": {"e_best_next": 30.0, "survival": {"b": 0.75}}}
+    cands = [(40.0, "wr why", a), (39.5, "rb why", b)]
+    ranked = pair_rank(cands, report, needs, {"WR": 30.0, "RB": 30.0}, lambda pos: {"RB", "WR"})
+    assert [p["sleeper_id"] for _, _, p in ranked] == ["b", "a"], "scarcer RB first within the tie window"
+    assert "near tie" in ranked[0][1] and b["_pair"]["pick_cost"] == 0.0
+    # outside the window the higher pair keeps the top spot
+    a2 = dict(a, vorp=40.0 + NEAR_TIE + 1.0, vorp_flex=40.0 + NEAR_TIE + 1.0)
+    ranked2 = pair_rank([(42.0, "wr why", a2), (39.5, "rb why", dict(b))], report, needs,
+                        {"WR": 30.0, "RB": 30.0}, lambda pos: {"RB", "WR"})
+    assert ranked2[0][2]["sleeper_id"] == "a"

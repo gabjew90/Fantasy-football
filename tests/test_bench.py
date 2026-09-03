@@ -262,3 +262,25 @@ def test_wire_is_kth_best_projection_among_predicted_undrafted():
     assert wire == {"WireBack1", "WireBack2", "WireBack3", "TailBack"}
     ppw, name = waiver_ppw(rem_all, last_pick=150, k=3, wire_names=wire)
     assert name == "WireBack3" and abs(ppw - 100.0 / 17.0) < 1e-9
+
+
+def test_fallback_is_floored_by_the_market_projection():
+    """Winner's-curse guard (user find 2026-09-03): the fallback player is the
+    max projection among ADP survivors, which selects the model's biggest
+    tail over-projection; price him at min(blend, market)."""
+    from draftkit.tracker import Tracker
+    t = Tracker.__new__(Tracker)
+    t.my_slot, t.teams, t.rounds = 5, 10, 15
+    # current_pick is len(state.picks) + 1: 59 picks made puts us at pick 60
+    t.state = type("S", (), {"drafted_ids": set(), "picks": [{} for _ in range(59)]})()
+    t.players = [
+        {"sleeper_id": "1", "pos": "RB", "player": "Tail Back", "proj_pts": 155.0, "proj_market_pts": 136.0, "adp": 107.0, "vorp": 20.0},
+        {"sleeper_id": "2", "pos": "RB", "player": "Honest Back", "proj_pts": 140.0, "proj_market_pts": 141.0, "adp": 110.0, "vorp": 10.0},
+        {"sleeper_id": "3", "pos": "WR", "player": "Some Wide", "proj_pts": 150.0, "proj_market_pts": "", "adp": 120.0, "vorp": 15.0},
+    ]
+    fb = t._fallback_points({"RB": 1, "WR": 1})
+    # Tail Back's blend 155 would have been the RB fallback; floored to 136 he
+    # loses to Honest Back at min(140, 141) = 140
+    assert fb["RB"] == 140.0
+    # no market number: the blend stands
+    assert fb["WR"] == 150.0

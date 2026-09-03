@@ -22,6 +22,7 @@ from typing import Callable
 from .snake import FLEX_ELIGIBLE, needs_position
 
 NEED_DAMP = 0.6  # partner/candidate position that fills no starter/flex slot
+NEAR_TIE = 1.0   # pair values this close are a coin flip: survival breaks it
 
 
 def slot_vorp(p: dict, needs: dict) -> float:
@@ -158,9 +159,32 @@ def pair_rank(cands: list[tuple[float, str, dict]],
                       "partner_pts": round(pv, 1), "pair": round(pair, 1)}
         ranked.append((pair, score, why, p))
     ranked.sort(key=lambda t: (-t[0], -t[1]))
+
+    # NEAR-TIE RULE (user, 2026-09-03): when two candidates' pairs are within
+    # NEAR_TIE points, take the one LESS likely to be there next turn. The
+    # pair is worth the same either way, but it only completes if the second
+    # player survives, so the scarcer one goes first. One bubble pass over
+    # adjacent near-ties; survival comes from the same report the pair used.
+    def _surv(p: dict) -> float:
+        mkt = market_for(p["pos"], needs)
+        u = report.get(mkt) or report.get(p["pos"]) or {}
+        s = (u.get("survival") or {}).get(str(p.get("sleeper_id")))
+        return float(s) if s is not None else 1.0
+    i = 0
+    while i < len(ranked) - 1:
+        a, b = ranked[i], ranked[i + 1]
+        if abs(a[0] - b[0]) <= NEAR_TIE and _surv(b[3]) < _surv(a[3]) - 1e-9:
+            ranked[i], ranked[i + 1] = b, a
+            ranked[i] = (ranked[i][0], ranked[i][1],
+                         ranked[i][2] + f" · near tie ({abs(a[0] - b[0]):.1f} pts): scarcer player first",
+                         ranked[i][3])
+            i = max(0, i - 1)
+        else:
+            i += 1
     best_pair = ranked[0][0]
     for pair, _s, _w, p in ranked:
-        # cost of PICKING him now = the best pair minus his pair (0 for the winner)
-        p["_pair"]["pick_cost"] = round(best_pair - pair, 1)
+        # cost of PICKING him now = the best pair minus his pair (0 for the
+        # winner; a near-tie runner-up can sit a hair above the winner, so clamp)
+        p["_pair"]["pick_cost"] = round(max(0.0, best_pair - pair), 1)
     # keep the original tuple shape; joint value becomes the score the UI sorts by
     return [(pair, why, p) for pair, _s, why, p in ranked]

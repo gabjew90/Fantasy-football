@@ -1117,3 +1117,20 @@ pre-#38 bridge, bench rounds on the fixed one; 3B runs fixed throughout
 (the fix only touches bench pricing, so rounds 1-7 stay comparable).
 Reports:
 reports/mocks/mock39_2026-09-03_1542pt_wishbone_room10616150_seat7_*.md.
+
+## Mock 40 — room 10617211 "Third and Long", 10 teams, slot 7 — PAIR 3B: CURRENT knobs, #38 wire throughout — CLEAN
+
+16:12-16:27 PT. 15/15 legal, 15/15 engine, zero autopicks, preflight
+call#1 (forward13). Offline scoring, pasted from g4_10617211_*.log:
+fitted objective 0.1428, current 0.1569; 30-49 bucket fitted pred 41 obs
+35 (n153), current pred 41 obs 41 (n164). Reports:
+reports/mocks/mock40_2026-09-03_1612pt_third-and-long_room10617211_seat7_*.md.
+
+PAIR 3 (seat 7): 39 fitted 1579 pts vs 40 current 1631 pts, current +52.
+Attribution by availability check: of 10 differing picks, 9 were
+availability (Taylor gone at 6 in room 39; McBride, Maye, Hurts each gone
+before our turn in one room and not the other) and ONE was a model choice
+(round 4: fitted Etienne RB 186 over Rice WR 176, the usual RB lean). The
++52 is room luck, not the model; both rooms first or near it. Running pair
+tally: +23, -1, -52 for fitted; pure model-choice picks across all three
+pairs: RB-earlier every time, outcome-neutral in aggregate.

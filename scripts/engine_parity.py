@@ -64,6 +64,8 @@ def load_board(path: str) -> list[dict]:
             "backs_up": r.get("backs_up") or "",
             "bye": int(float(r["bye"])) if r.get("bye") not in (None, "") else None,
             # plan A1/A3: dispersion across projection sources (None when absent)
+            # market-implied projection: floors the planner fallback (DECISIONS #39)
+            "proj_market_pts": f("proj_market_pts") if r.get("proj_market_pts") not in (None, "") else None,
             "proj_sd": f("proj_sd") if r.get("proj_sd") not in (None, "") else None,
             "proj_hi": f("proj_hi") if r.get("proj_hi") not in (None, "") else None,
             "proj_lo": f("proj_lo") if r.get("proj_lo") not in (None, "") else None,
