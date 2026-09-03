@@ -242,3 +242,23 @@ def test_wire_never_names_a_zeroed_or_out_player():
 
     # nothing viable at all
     assert waiver_ppw([ghost], last_pick=150, k=3) == (0.0, "")
+
+
+def test_wire_is_kth_best_projection_among_predicted_undrafted():
+    """User find (2026-09-03 evening): the ADP>last_pick filter left the RB
+    wire empty on this board and the floor fell to a 45-pt player. The wire
+    must be who is actually left after the market spends its remaining
+    picks in ADP order."""
+    from draftkit.bench import predicted_undrafted, waiver_ppw
+    rem_all = ([{"player": f"Early{i}", "pos": "RB", "proj_pts": 200.0 - i, "adp": 10.0 + i} for i in range(4)]
+               + [{"player": "WireBack1", "pos": "RB", "proj_pts": 120.0, "adp": 60.0},
+                  {"player": "WireBack2", "pos": "RB", "proj_pts": 110.0, "adp": 70.0},
+                  {"player": "WireBack3", "pos": "RB", "proj_pts": 100.0, "adp": None},
+                  {"player": "TailBack", "pos": "RB", "proj_pts": 45.0, "adp": 52.0}])
+    # 4 picks left (147..150): the market takes the four Early backs; the
+    # TailBack's low ADP does NOT save him from the wire set, and the wire
+    # is ranked by projection, so k=3 lands on WireBack3 at 100.
+    wire = predicted_undrafted(rem_all, current_pick=147, last_pick=150)
+    assert wire == {"WireBack1", "WireBack2", "WireBack3", "TailBack"}
+    ppw, name = waiver_ppw(rem_all, last_pick=150, k=3, wire_names=wire)
+    assert name == "WireBack3" and abs(ppw - 100.0 / 17.0) < 1e-9

@@ -522,6 +522,9 @@ class Tracker:
         }
         k = getattr(self, "waiver_k", None) or 3
         last_pick = self.teams * self.rounds
+        from .bench import predicted_undrafted
+        rem_all = [p for p in self.remaining() if p.get("proj_source") != "no_market"]
+        wire_names = predicted_undrafted(rem_all, self.current_pick, last_pick)
         added = False
         for pos in BENCH_POSITIONS:
             rem = [p for p in self.remaining(pos)
@@ -529,7 +532,7 @@ class Tracker:
                    and self._pos_allowed(pos, rnd, counts, picks_left, top6_te_fell)]
             if not rem:
                 continue
-            waiver, wname = waiver_ppw(rem, last_pick, k)
+            waiver, wname = waiver_ppw(rem, last_pick, k, wire_names=wire_names)
             best, best_iv = None, None
             for p in rem:
                 hc = starter_ppw.get(str(p.get("backs_up") or ""))

@@ -103,32 +103,58 @@ def starter_exposure(my_positions: list[str], slots: dict[str, int]) -> dict[str
     return out
 
 
-def waiver_ppw(remaining_at_pos: list[dict], last_pick: int, k: int) -> tuple[float, str]:
+def _pname(p: dict) -> str:
+    return str(p.get("player") or p.get("name") or "")
+
+
+def predicted_undrafted(remaining_all: list[dict], current_pick: int, last_pick: int) -> set[str]:
+    """Names of the remaining players the market will NOT roster.
+
+    The rooms have (last_pick - current_pick) picks left; the market spends
+    them, in ADP order, on the remaining players it ranks highest. Everyone
+    after that IS the waiver wire. Players with no ADP sort as undrafted.
+    (User find, 2026-09-03 evening: the old ADP>last_pick filter left the
+    RB wire empty on this board, so the floor fell to the worst healthy
+    projection, Ollie Gordon at 2.7/wk, when the real end-of-room wire held
+    ~118-pt RBs at ~7/wk. Every wire must be a player who will actually go
+    undrafted, not a board-tail artifact.)"""
+    n_left = max(0, int(last_pick) - int(current_pick) + 1)
+    ranked = sorted(remaining_all,
+                    key=lambda p: float(p["adp"]) if p.get("adp") is not None else 9999.0)
+    return {_pname(p) for p in ranked[n_left:]}
+
+
+def waiver_ppw(remaining_at_pos: list[dict], last_pick: int, k: int,
+               wire_names: set | None = None) -> tuple[float, str]:
     """(points per week, name) of the k-th best player the market leaves
-    undrafted. Candidates are the remaining players whose ADP falls beyond
-    the draft's last pick (or who have no ADP at all); if the wire is thinner
-    than k, take its worst; if nothing is projected undrafted, the worst
-    VIABLE remaining player is the honest floor.
+    undrafted at this position.
+
+    `wire_names` is the predicted-undrafted set from predicted_undrafted();
+    when given, the wire is the k-th best projection inside it. Without it
+    (older callers, tests) the legacy ADP>last_pick filter applies. If the
+    wire is thinner than k, take its worst; if it is empty, the worst
+    VIABLE remaining player is the floor.
 
     Viable means projects above 0 and is not availability-'out': streaming
-    means picking up someone who can play. The old fallback took the worst
-    remaining player outright, and in every 2026-09-03 mock that was Josh
-    Jacobs at 0.0 (zeroed for the Commissioner Exempt List), which measured
-    all RB insurance against a ghost."""
+    means picking up someone who can play (the 2026-09-03 Josh Jacobs
+    defect, DECISIONS #36)."""
     viable = [p for p in remaining_at_pos
               if float(p.get("proj_pts") or 0.0) > 0.0
               and str(p.get("avail_status") or "") != "out"]
-    free = sorted(
-        (p for p in viable
-         if p.get("adp") is None or float(p["adp"]) > last_pick),
-        key=lambda p: -float(p.get("proj_pts") or 0.0))
+    if wire_names is not None:
+        free = sorted((p for p in viable if _pname(p) in wire_names),
+                      key=lambda p: -float(p.get("proj_pts") or 0.0))
+    else:
+        free = sorted(
+            (p for p in viable
+             if p.get("adp") is None or float(p["adp"]) > last_pick),
+            key=lambda p: -float(p.get("proj_pts") or 0.0))
     if not free:
         free = sorted(viable, key=lambda p: float(p.get("proj_pts") or 0.0))[:1]
     if not free:
         return 0.0, ""
     pick = free[min(k, len(free)) - 1]
-    return float(pick.get("proj_pts") or 0.0) / FANTASY_WEEKS, str(
-        pick.get("player") or pick.get("name") or "")
+    return float(pick.get("proj_pts") or 0.0) / FANTASY_WEEKS, _pname(pick)
 
 
 def insurance_value(p: dict, waiver: float, exposure: int,
