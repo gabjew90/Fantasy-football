@@ -211,3 +211,20 @@ auth token; navigating to the bare draftclient URL leaves the client on
 pick 1 to Yahoo autopick (2026-09-03); (3) wait ~7 s for the store;
 (4) inject, load, preflight, panel on, run. No reading between steps. On league day the same
 batch runs the minute the commissioner's room opens.
+
+### Room-size and tab rules from the forward-test night (2026-09-03)
+
+- Only the waiting room tells the truth about a room's size: the seat
+  header under the room name numbers 1..N. The lobby row's Join/Move link
+  count is the number of OPEN seats, not the size. Read the header after
+  every join; leave (Move to another room from the lobby) if it is not 10.
+- One room tab, in the front of its window, and never a second tab created
+  after it. Never close any tab while a room is live: closing one dissolves
+  the Claude tab group and the live tab becomes unreachable.
+- The driver's loop now sleeps on a Worker timer and heartbeats every 60 s,
+  so a hidden window no longer stalls it; the start line says "sleep via
+  worker". If it says "timeout", the page refused the worker and the tab
+  MUST stay visible.
+- Entry: at the bell, reload the waiting room, click Enter Draft, wait ~6 s,
+  inject; a pre-bell in-page poll for the link is fine but must stay under
+  the 45 s eval budget (28 s).
