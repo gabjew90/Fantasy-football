@@ -408,10 +408,18 @@ def depth_tail(t: Tracker, plan: list[dict], depth: int) -> list[dict]:
             continue
         if (p["name"], p["pos"]) in named or p.get("proj_source") == "no_market":
             continue
-        # the FULL guardrail (position caps + must-fill + stash), not only the
-        # position caps: with 3 picks left and K/DEF/FLEX open the tail used
-        # to offer a QB2 ahead of the kicker (review 2026-09-02)
-        if not t._guardrail_ok(p, rnd, needs, counts, picks_left, top6_te_fell):
+        # Position caps AND must-fill, but NOT Python's one-stash rule: with 3
+        # picks left, K/DEF open and every remaining RB/WR below replacement,
+        # the full _guardrail_ok refused everyone and the tail came back EMPTY
+        # (stress mock 2026-09-02, pick 126: two engine rows, nothing behind
+        # them, the page's local ranker took over). The must-fill rule is
+        # what stopped the QB2-before-the-kicker case; the stash rule is the
+        # engine's ranking opinion, and the tail exists for when the engine's
+        # named rows are gone.
+        if not t._pos_allowed(p["pos"], rnd, counts, picks_left, top6_te_fell):
+            continue
+        open_starters = sum(v for k, v in needs.items() if k not in ("BN", "BENCH", "IR"))
+        if picks_left <= open_starters and not snake.needs_position(needs, p["pos"]):
             continue
         out.append({"n": p["name"], "p": p["pos"], "t": p["team"],
                     "v": round(float(p["vorp"] or 0.0), 1), "a": p["adp"],

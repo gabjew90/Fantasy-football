@@ -1083,3 +1083,24 @@ def test_roster_view_prefers_the_store_and_the_header_count():
     assert r["source"] == "store" and r["have"] == 3
     assert r["counts"] == {"WR": 2}
     assert r["keys"] == ["a brown", "a brown"]      # the board key is initial + LAST token; the collision guard handles the rest
+
+
+def test_local_fallback_never_ranks_a_player_the_store_says_is_drafted():
+    """Stress mock 2026-09-02 (bridge killed at pick 78): the local ranker at
+    pick 86 tried two players drafted at picks 2 and 4, because its
+    availability set only knew S.gone (row lookups) and our own roster. The
+    store's drafted list is authoritative and must be excluded."""
+    r = run_js(
+        f"""
+        const s = {json.dumps(_store_with([(1, "1", "100"), (2, "2", "101")], players=PLAYERS))};
+        DK._setStore({{ getState: () => s }});
+        document.body.innerText = 'ROUND 1, PICK 3 YOUR TEAM (0/15) ';
+        DK.loadCompact(["Christian McCaffrey|RB|SFO|122.8|1||1", "Bijan Robinson|RB|ATL|100|1||2",
+                        "Brian Robinson Jr.|RB|WAS|20|||80", "Amon-Ra St. Brown|WR|DET|60|||5"].join(String.fromCharCode(10)), {{ teams: 10 }});
+        const r = DK.rank();
+        console.log(JSON.stringify({{ source: r.source, top: r.top.map(x => x.n) }}));
+        """
+    )
+    assert r["source"] == "local"
+    assert "Christian McCaffrey" not in r["top"] and "Bijan Robinson" not in r["top"], r
+    assert r["top"] and r["top"][0] in ("Amon-Ra St. Brown", "Brian Robinson Jr.")

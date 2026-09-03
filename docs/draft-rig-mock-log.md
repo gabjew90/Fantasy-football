@@ -691,3 +691,73 @@ and landed); the away clear (fired once on demand and once for real, both
 before the flag could cost a pick after the heartbeat existed); entry
 before the clock; and a pick record per turn carrying the engine's reason,
 the best-by-projection alternative and the candidates passed on.
+
+## Mock 24 — room 10531886 "Bump and Run", 10 teams, slot 6 — STRESS TEST, 15 of 15 legal, 13 by the driver, three injected faults
+
+Full trail: reports/mocks/mock_10531886.md. Scrutiny report (every pick
+joined to its plan call, markets, needs, away seats, skipped candidates;
+survival scorecard; driver log): reports/mocks/scrutiny_10531886.md, from
+scripts/mock_scrutiny.py. First room on the reviewed code (DECISIONS #34)
+and the first with the plans sidecar and the room log written live.
+
+Roster: McCaffrey, Achane, McBride, Garrett Wilson, Davante Adams, Maye,
+Jaylen Warren, Rico Dowdle (handcuff), RJ Harvey, Wan'Dale Robinson,
+Mahomes (QB2, R11), Gainwell, Pittman, Cam Little K, Chiefs DEF. Legal.
+
+The room: all ten seats open when joined, 30-second clock, seven of ten
+managers away by the end -- the autopick-heavy case. Away seats mapped
+live through thirteen changes ({5} -> {7} -> {} -> {4} -> ... ->
+{3,4,5,7,9}); the B5 gate (non-empty away_slots in a live bridge log) is
+closed.
+
+Driver: 12 picks via makePick (median 501 ms to store confirmation, 250 to
+1455), 1 via the click fallback (injected), 2 by Yahoo from our queue (see
+below). Four heartbeats on schedule; three away flags detected and cleared
+(one injected, two real: Yahoo flags you away when it makes your pick).
+
+Injected faults:
+- Pick 66: makePick replaced by a self-disarming no-op. The action timed
+  out after 3 s, the record says `Jaylen Warren:action-timeout`, the same
+  candidate landed by the click fallback, store-verified; the real action
+  was back for pick 75.
+- After 66: our away flag forced on with Yahoo's real setAwayStatus(true).
+  keepAlive saw store=true two seconds later and cleared it with
+  setAwayStatus(false); the flag never survived to a turn.
+- Picks 78-86: the bridge killed. Every refresh logged `PLAN bridge
+  unreachable`; at the turn the gate failed three cycles on plan-only
+  reasons and the NEW local fallback fired as designed -- and then found
+  the defect it was built to expose: the local ranker's availability set
+  knew only S.gone and our roster, not the store's drafted list, so it
+  tried Bijan Robinson and Smith-Njigba (picks 2 and 4). Both failed, the
+  clock ran, and Yahoo made pick 86 from our queue: RJ Harvey, the engine's
+  own queued choice. Fixed in the same hour (rank() excludes store-drafted
+  players; test). Bridge restarted at pick 88; the page re-fed the new
+  process from the store, plan call 4 of the new process made pick 95.
+
+Found without injection:
+- Pick 126: the plan had two rows and NO depth tail, because the reviewed
+  depth_tail ran Python's full guardrail including the one-stash rule,
+  which refuses every below-replacement bench player once you hold
+  stashes. The page's own gone set (polluted by the fault-3 row misses)
+  held both rows, the plan filtered to empty, the local ranker (still the
+  old one in that page) tried drafted players again, and the queue made
+  the pick: Pittman. Two fixes: the tail applies position caps + must-fill
+  but not the stash rule, and with a store the store's drafted list decides
+  "gone", never the page's memory.
+- The first automatic trail posted at OUR roster full, three picks before
+  the room ended, and under `<room>.json` instead of `mock_<room>.json`.
+  Both fixed (wait for the room, up to two minutes; prefix).
+- Bridge warning "dropped 1 feed entry numbered >= header pick 138": the
+  store's drafted list ran one ahead of its currentPick for one call; the
+  reconcile-down rule dropped a real pick for that call and the next call
+  was whole. Harmless, recorded.
+- The 50-70% survival bucket read 60% shown / 32% observed (n 34) in this
+  room; 70-90% 80/73, 90-100% 95/94. Autopick seats take the top of
+  Yahoo's list faster than a sigma-scaled human; input for the autopick
+  refit stage.
+
+Operational lessons (in the rig memory): join = `window.name='fandraft'`
+then `.click()` the row's Join anchor from the lobby tab; NEVER reload the
+waiting room before the bell (ec=5 drops the seat -- lost room 10528893
+that way); reload after the bell and click Enter Draft; a devtools eval
+dies at 45 s, so poll with <= 35-s sleeps.

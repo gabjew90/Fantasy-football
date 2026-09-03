@@ -136,11 +136,16 @@ class Handler(BaseHTTPRequestHandler):
         n = int(self.headers.get("Content-Length") or 0)
         return json.loads(self.rfile.read(n) or b"{}")
 
-    def _save_named(self, body: dict, key: str, folder: Path, suffix: str, content: str, label: str) -> None:
-        """One body -> one file named by a sanitised body[key]; the two
-        page-to-disk routes below share it."""
+    def _save_named(self, body: dict, key: str, folder: Path, suffix: str, content: str, label: str,
+                    prefix: str = "") -> None:
+        """One body -> one file named by prefix + a sanitised body[key]; the
+        two page-to-disk routes below share it. (The trail used to land as
+        <room>.json while scripts/mock_trail.py reads mock_<room>.json --
+        found when the first automatic trail posted, 2026-09-02.)"""
         name = "".join(c for c in str(body.get(key) or label) if c.isalnum() or c in "-_.")[:80]
-        out = folder / f"{name}{suffix}"
+        if prefix and name.startswith(prefix):
+            prefix = ""
+        out = folder / f"{prefix}{name}{suffix}"
         out.parent.mkdir(parents=True, exist_ok=True)
         out.write_text(content, encoding="utf-8")
         print(f"  {label} saved -> {out} ({out.stat().st_size} bytes)", flush=True)
@@ -156,7 +161,7 @@ class Handler(BaseHTTPRequestHandler):
                     # best-by-projection alternative, candidates passed on).
                     # scripts/mock_trail.py renders it.
                     self._save_named(body, "room", ROOT / "data" / "logs" / "mocks", ".json",
-                                     json.dumps(body, indent=1), "mock_")
+                                     json.dumps(body, indent=1), "mock_", prefix="mock_")
                 else:
                     # A page's HTML for the offline DOM tests (design 2026-09-01):
                     # the row lookup is the one reader still on the DOM, tested

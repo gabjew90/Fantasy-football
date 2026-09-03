@@ -666,6 +666,14 @@ window.DK = (function () {
     if (!S.plan || !S.plan.length) return null;
     const mine = new Set(view.players.map(p => p.k + '|' + p.pos));
     const have = view.have;
+    // With a store, "gone" means the STORE says drafted. S.gone is the page's
+    // own memory of row-lookup misses and it pollutes: at pick 126 of the
+    // stress mock (2026-09-02) it held both of the engine's rows, the plan
+    // filtered to nothing and the local ranker took the turn. The engine
+    // never names a drafted player, so a store-backed plan row is live.
+    const snapPlan = storeState();
+    const storeGone = snapPlan ? new Set(snapPlan.drafted.map(d => idKey(d.name, d.pos) + '|' + d.pos)) : null;
+    const goneNow = (b) => storeGone ? storeGone.has(b.k + '|' + b.p) : isGone(b);
     const out = [], dropped = [];
     for (const e of S.plan) {
       const b = S.board.find(x => x.n === e.n && x.p === e.p)
@@ -673,7 +681,7 @@ window.DK = (function () {
       // every plan row the page refuses is recorded, so the trail can show a
       // live player wrongly marked gone (the mock-11 failure class)
       if (mine.has(b.k + '|' + b.p)) { dropped.push({ n: b.n, p: b.p, why: 'mine' }); continue; }
-      if (isGone(b)) { dropped.push({ n: b.n, p: b.p, why: 'gone' }); continue; }
+      if (goneNow(b)) { dropped.push({ n: b.n, p: b.p, why: storeGone ? 'drafted' : 'gone' }); continue; }
       // s / sr / e: the engine's shown survival, raw survival and expected
       // best-at-next-turn for this candidate's market, kept structured so the
       // trail never has to parse them back out of the why string
@@ -709,8 +717,14 @@ window.DK = (function () {
      * board's six best TEs -- same intent, no scraping. */
     const te6 = S.board.filter(x => x.p === 'TE').slice(0, 6).map(x => x.n);
 
+    // Drafted players come from the STORE, not only from S.gone (which only
+    // row lookups fill). Stress mock 2026-09-02, bridge killed at pick 78:
+    // the local fallback at pick 86 tried Bijan Robinson and Smith-Njigba,
+    // drafted at picks 2 and 4, and the queue had to make the pick.
+    const snapLocal = storeState();
+    const draftedKeys = new Set(snapLocal ? snapLocal.drafted.map(d => idKey(d.name, d.pos) + '|' + d.pos) : []);
     const avail = S.board.filter(x =>
-      !mine.has(x.k + '|' + x.p) && !isGone(x));
+      !mine.has(x.k + '|' + x.p) && !isGone(x) && !draftedKeys.has(x.k + '|' + x.p));
 
     /* A second TE can only ever start in FLEX, competing with an RB/WR who
      * would otherwise hold that slot. Mock 4 took McBride AND Bowers in the
@@ -1910,7 +1924,16 @@ window.DK = (function () {
     note('driver stop');
     if (ended) {
       // the trail is the record; it must not depend on someone remembering
-      // the console call after the last pick
+      // the console call after the last pick. Our roster fills before the
+      // room does (first auto trail: 147 of 150 picks), so wait for the
+      // room to finish, up to two minutes, then post.
+      const total = (S.cfg.teams || 10) * (S.cfg.rounds || 15);
+      const t0 = Date.now();
+      while (Date.now() - t0 < (S.cfg.trailWaitMs || 120000)) {
+        const snap = storeState();
+        if (!snap || snap.drafted.length >= total || /draft results|draft complete/i.test(document.title)) break;
+        await sleep(2000);
+      }
       try { await trail({ auto: true }); } catch (e) { note('auto trail failed: ' + (e && e.message)); }
     }
     return S.log.slice(-12);
