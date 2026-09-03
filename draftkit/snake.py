@@ -55,6 +55,18 @@ def starter_needs(picked_positions: list[str], slots: dict[str, int]) -> dict[st
     return remaining
 
 
+def consume(needs: dict[str, int], pos: str) -> dict[str, int]:
+    """Roster needs after taking one player at `pos` (dedicated slot first,
+    then FLEX). Lives here so the planner and the survival simulation share
+    one definition (plan B6)."""
+    out = dict(needs)
+    if out.get(pos, 0) > 0:
+        out[pos] -= 1
+    elif pos in FLEX_ELIGIBLE and out.get("FLEX", 0) > 0:
+        out["FLEX"] -= 1
+    return out
+
+
 def needs_position(needs: dict[str, int], pos: str) -> bool:
     """Does a roster with these open slots still need a player at pos as a starter?"""
     if needs.get(pos, 0) > 0:

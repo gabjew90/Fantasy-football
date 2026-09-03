@@ -90,15 +90,7 @@ def market_for(pos: str, needs: dict) -> str:
     return "FLEX" if needs.get("FLEX", 0) > 0 else pos
 
 
-def consume(needs: dict, pos: str) -> dict:
-    """Roster needs after taking one player at `pos` (dedicated slot first,
-    then FLEX)."""
-    out = dict(needs)
-    if out.get(pos, 0) > 0:
-        out[pos] -= 1
-    elif pos in FLEX_ELIGIBLE and out.get("FLEX", 0) > 0:
-        out["FLEX"] -= 1
-    return out
+from .snake import consume  # noqa: E402,F401  (one definition, shared with the survival sim; plan B6)
 
 
 def pair_rank(cands: list[tuple[float, str, dict]],

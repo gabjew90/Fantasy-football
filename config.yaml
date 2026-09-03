@@ -122,7 +122,13 @@ engine:
   qb_damp_until_round: 10    # ... before this round
   kdef_early_damp: 0.02      # K/DEF before the rival's typical round minus one
   kdef_typical_round: 13     # fallback typical round when no seed says otherwise
-  run_ratio: 1.5             # B4: a run is count > run_ratio x the model's expected count (0 = old absolute rule)
+  # B4: a run is count > run_ratio x the model's own expected count for the
+  # position; 0 = the old absolute rule (2-in-5 of anything). Measured
+  # 2026-09-02 (DECISIONS #29): the relative rule drafted the identical team
+  # on 21 of 22 slots and one Keefamania slot ~1 point lower, which fails the
+  # pre-registered "not worse on both leagues" by a hair, so the old rule
+  # stays the default and the relative rule waits for more rooms.
+  run_ratio: 0
   autopick_sigma_scale: 0.5  # B5: an autopicking rival's ADP noise as a fraction of sigma (prior)
   autopick_need_damp: 0.02   # B5: autopick fills starters first; a non-filling position while a starter slot is open
   rival_needs_update: true   # B6: a rival picking twice in my window consumes his needs

@@ -240,3 +240,18 @@ def test_market_for_matches_the_tracker():
     assert market_for("TE", {"TE": 0, "FLEX": 1}) == "FLEX"
     assert market_for("TE", {"TE": 0, "FLEX": 0}) == "TE"   # bench
     assert market_for("QB", {"QB": 0, "FLEX": 1}) == "QB"   # never flex-eligible
+
+
+def test_recent_positions_fall_back_to_the_board_when_picks_carry_no_metadata():
+    """Plan B4: bridge and replay picks have no metadata; the run detector's
+    history must come from the board, not read as blanks."""
+    players = [player("a", "RB", 50, 50, 1.0), player("b", "RB", 40, 40, 2.0),
+               player("c", "WR", 45, 45, 3.0), player("d", "TE", 30, 10, 4.0)]
+    t = make_tracker(players, [], my_slot=5, current_pick=5)
+    for p in t.state.picks:
+        p.pop("metadata", None)
+    t.state.picks[0]["player_id"] = "a"; t.state.picks[1]["player_id"] = "b"
+    t.state.picks[2]["player_id"] = "c"; t.state.picks[3]["player_id"] = "d"
+    assert t._recent_positions() == ["RB", "RB", "WR", "TE"]
+    t.state.picks[3]["player_id"] = "unknown99"
+    assert t._recent_positions()[-1] == ""

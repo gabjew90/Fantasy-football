@@ -1550,3 +1550,48 @@ stream. Sleeper path: no signal, nothing flagged. Gate: tests (three sim
 behaviours, the id->slot mapping and its degrade) now; one live mock to
 see non-empty away_slots in the bridge log is still owed, and the
 autopick stage of the refit runs after it.
+
+## 2026-09-02 (28) — B6: a rival who picks twice in my window consumes his needs
+
+At a snake turn every team between me and the wall picks twice inside my
+window, and the sim handed each of them the same needs for both picks, so
+it could give one rival two quarterbacks. Now each rival carries a
+per-position multiplier VECTOR; slots that appear more than once keep a
+per-sim needs copy, `snake.consume` (moved from planner, re-exported)
+shrinks it by what the sim just handed them, and only that rival's LATER
+picks are re-weighted. Autopick rivals are updated too -- starters-first is
+a needs rule, so it matters more for them, not less. Slots that pick once
+keep the precomputed vector: numerics identical to before (tested, same
+seed). `rival_needs_update: false` restores the old behaviour.
+
+Test: same slot twice with QB the only open slot -> the second QB survives
++30 points more often than against two different QB-needy rivals; with the
+flag off the two cases agree within 0.1.
+
+Perf (sims 1000, pool 100, FLEX market): before this plan 0.39 s at 9
+rivals / 0.94 s at 22; after B4's relative run detector 0.55 / 1.59; after
+B6, with the detector rewritten as running counts (one boolean mask per
+pick instead of a Python window scan), 0.56 / 1.58 -- inside the
+pre-registered <= 2x budget (0.80 / 1.88). sims stays 1000.
+
+## 2026-09-02 (29) — B4: the run detector measured relative to expectation; the old rule keeps the default
+
+The old detector fired on an absolute count -- two of a position in five
+picks -- which in an RB/WR-heavy draft is the normal state, so the 1.5
+boost was a near-constant multiplier on the two most common positions.
+Built: a run is now count >= run_min AND count > run_ratio x the model's
+own expected count for that position over the window (its share of the
+pick mass at each pick, history picks scored on the plain ADP likelihood);
+run_ratio = 0 reproduces the absolute rule exactly. Also fixed: on the
+Yahoo path and in every replay the picks carry no metadata, so the
+detector read "" for every real pick and never fired on history; the
+position now comes from the board (Tracker._pick_pos).
+
+Gate, pre-registered (slot_replay, both leagues, every slot, production
+reach, relative vs absolute): Omnibeta identical on 12 of 12 slots;
+Keefamania identical on 9 of 10 and one slot 1 point lower (mean
+-0.1/slot). "Not worse on both leagues, ties pass" is not met, by a hair,
+so `run_ratio` ships at 0 -- the absolute rule -- and the relative rule
+stays selectable for a re-test once more rooms exist. Tests pin both
+behaviours (expected-share positions never trigger at 1.5; a relative
+surplus does; 0 restores the old firing).

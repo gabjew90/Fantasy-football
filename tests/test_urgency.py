@@ -252,3 +252,74 @@ def test_autopick_noise_is_tighter_than_a_humans():
     b = simulate_survival(pool, 10, 11, bot, {}, np.random.default_rng(3), sims=600, sigma=6.0, survival_shrink=1.0,
                           autopick_sigma_scale=0.25)
     assert b["RB"]["survival"]["top"] < h["RB"]["survival"]["top"]
+
+
+def test_run_detector_ignores_a_positions_expected_share():
+    """Plan B4: two WRs in a row in a pool that is 90% WR by ADP mass is not
+    a run; the boost must not fire, so the report is identical to a calm
+    window (same seed)."""
+    import numpy as np
+    pool = ([{"sleeper_id": f"wr{i}", "pos": "WR", "vorp": 40.0, "adp": 25.0 + i} for i in range(9)]
+            + [{"sleeper_id": "rb0", "pos": "RB", "vorp": 40.0, "adp": 34.0}])
+    rivals = [{"slot": s, "needs": {"RB": 2, "WR": 3, "FLEX": 1}, "user_id": None} for s in range(3, 9)]
+    kw = dict(sims=300, sigma=6.0, teams=12, survival_shrink=1.0)
+    calm = simulate_survival(pool, 25, 31, rivals, {}, np.random.default_rng(4), recent_pos=[], **kw)
+    wrs = simulate_survival(pool, 25, 31, rivals, {}, np.random.default_rng(4), recent_pos=["WR", "WR"], **kw)
+    assert wrs["WR"]["survival"] == calm["WR"]["survival"]
+    assert wrs["RB"]["survival"] == calm["RB"]["survival"]
+
+
+def test_run_detector_fires_on_a_relative_surplus():
+    """Two TEs in a row where the model expected almost none IS a run."""
+    import numpy as np
+    pool = ([{"sleeper_id": f"rb{i}", "pos": "RB", "vorp": 50.0, "adp": 25.0 + i} for i in range(5)]
+            + [{"sleeper_id": f"wr{i}", "pos": "WR", "vorp": 50.0, "adp": 25.0 + i} for i in range(5)]
+            + [{"sleeper_id": f"te{i}", "pos": "TE", "vorp": 30.0, "adp": 45.0 + i} for i in range(2)])
+    rivals = [{"slot": s, "needs": {"RB": 2, "WR": 2, "TE": 1}, "user_id": None} for s in range(3, 9)]
+    kw = dict(sims=400, sigma=6.0, teams=12, survival_shrink=1.0, run_boost=3.0)
+    calm = simulate_survival(pool, 25, 31, rivals, {}, np.random.default_rng(5), recent_pos=[], **kw)
+    run = simulate_survival(pool, 25, 31, rivals, {}, np.random.default_rng(5), recent_pos=["TE", "TE"], **kw)
+    assert sum(run["TE"]["survival"].values()) < sum(calm["TE"]["survival"].values())
+    # run_ratio 0 is the old absolute rule: the 90%-WR case then DOES boost
+    pool2 = ([{"sleeper_id": f"wr{i}", "pos": "WR", "vorp": 40.0, "adp": 25.0 + i} for i in range(9)]
+             + [{"sleeper_id": "rb0", "pos": "RB", "vorp": 40.0, "adp": 34.0}])
+    riv2 = [{"slot": s, "needs": {"RB": 2, "WR": 3, "FLEX": 1}, "user_id": None} for s in range(3, 9)]
+    a = simulate_survival(pool2, 25, 31, riv2, {}, np.random.default_rng(6), recent_pos=["WR", "WR"],
+                          sims=300, sigma=6.0, teams=12, survival_shrink=1.0, run_ratio=0.0)
+    b = simulate_survival(pool2, 25, 31, riv2, {}, np.random.default_rng(6), recent_pos=[],
+                          sims=300, sigma=6.0, teams=12, survival_shrink=1.0, run_ratio=0.0)
+    assert a["WR"]["survival"] != b["WR"]["survival"]
+
+
+def test_same_slot_twice_in_the_window_consumes_its_needs():
+    """Plan B6: at a snake turn a rival picks twice inside my window. With
+    QB the only open slot he takes one QB, not two: after a simulated QB his
+    second pick no longer wants a QB, so the second QB survives far more
+    often than when two DIFFERENT QB-needy rivals pick."""
+    import numpy as np
+    pool = [{"sleeper_id": "qb1", "pos": "QB", "vorp": 60.0, "adp": 10.0},
+            {"sleeper_id": "qb2", "pos": "QB", "vorp": 55.0, "adp": 11.0},
+            {"sleeper_id": "rb1", "pos": "RB", "vorp": 30.0, "adp": 12.0},
+            {"sleeper_id": "wr1", "pos": "WR", "vorp": 30.0, "adp": 12.5}]
+    needs = {"QB": 1, "RB": 0, "WR": 0, "TE": 0, "FLEX": 0, "K": 1, "DEF": 1}
+    same = [{"slot": 10, "needs": dict(needs), "user_id": None},
+            {"slot": 10, "needs": dict(needs), "user_id": None}]        # picks 10 and 11: the turn
+    different = [{"slot": 10, "needs": dict(needs), "user_id": None},
+                 {"slot": 8, "needs": dict(needs), "user_id": None}]
+    kw = dict(sims=500, sigma=2.0, teams=10, survival_shrink=1.0)
+    a = simulate_survival(pool, 10, 12, same, {}, np.random.default_rng(7), **kw)
+    b = simulate_survival(pool, 10, 12, different, {}, np.random.default_rng(7), **kw)
+    assert a["QB"]["survival"]["qb2"] > b["QB"]["survival"]["qb2"] + 0.3
+    # with the update off the same-slot case behaves like two strangers
+    c = simulate_survival(pool, 10, 12, same, {}, np.random.default_rng(7), rival_needs_update=False, **kw)
+    assert abs(c["QB"]["survival"]["qb2"] - b["QB"]["survival"]["qb2"]) < 0.1
+
+
+def test_needs_update_is_a_no_op_when_every_slot_picks_once():
+    """Rivals that appear once keep the precomputed vector: numerics identical
+    with the flag on or off (same seed)."""
+    import numpy as np
+    a = simulate_survival(POOL, 10, 13, RIVALS, {}, np.random.default_rng(8), sims=200, sigma=6.0)
+    b = simulate_survival(POOL, 10, 13, RIVALS, {}, np.random.default_rng(8), sims=200, sigma=6.0,
+                          rival_needs_update=False)
+    assert a == b

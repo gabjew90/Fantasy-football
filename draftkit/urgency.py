@@ -167,35 +167,49 @@ def simulate_survival(pool, current_pick, next_pick, rivals, seeds, rng,
             for name in groups
         }
 
-    # static per-rival positional multiplier (needs + tendencies), per pick index
-    rival_mult = np.ones((len(rivals), n))
+    # Per-rival positional multiplier (needs + tendencies) as a vector over
+    # POSITIONS (+1 for unknown), indexed by each player's position. Kept as
+    # a vector rather than a per-player row so it can be recomputed cheaply
+    # when a rival's needs change inside the window (plan B6).
+    pos_index = {p: k for k, p in enumerate(POSITIONS)}
+    n_pos = len(POSITIONS) + 1
+    pos_idx = np.array([pos_index.get(p, len(POSITIONS)) for p in pos_arr], dtype=np.int64)
     autopick = np.array([bool(rv.get("autopick")) for rv in rivals])
-    for i, rv in enumerate(rivals):
-        pick_no = current_pick + i
-        rnd = (pick_no - 1) // teams + 1
-        seed = (seeds or {}).get(str(rv.get("user_id"))) if rv.get("user_id") else None
-        starters_open = any(v > 0 for v in rv["needs"].values())
+    rounds_of = [(current_pick + i - 1) // teams + 1 for i in range(len(rivals))]
+    seeds_of = [((seeds or {}).get(str(rv.get("user_id"))) if rv.get("user_id") else None) for rv in rivals]
+
+    def pos_mult(needs: dict, rnd: int, seed, is_autopick: bool) -> np.ndarray:
+        v = np.ones(n_pos)
+        starters_open = any(x > 0 for x in needs.values())
         for pos in POSITIONS:
-            mask = pos_arr == pos
-            if not mask.any():
-                continue
-            fills = snake.needs_position(rv["needs"], pos)
-            if autopick[i]:
+            k = pos_index[pos]
+            fills = snake.needs_position(needs, pos)
+            if is_autopick:
                 # starters first, then rank; K/DEF still wait for their rounds
                 m = 1.0 if (fills or not starters_open) else autopick_need_damp
                 if pos in ("K", "DEF") and rnd < kdef_typical_round - 1:
                     m = kdef_early_damp
-                rival_mult[i, mask] = m
+                v[k] = m
                 continue
             m = 1.0 if fills else need_damp
-            if pos == "QB" and rv["needs"].get("QB", 0) == 0 and rnd < qb_damp_until_round:
+            if pos == "QB" and needs.get("QB", 0) == 0 and rnd < qb_damp_until_round:
                 m = qb_filled_damp
             if pos in ("K", "DEF"):
                 typical = (seed or {}).get("first_round", {}).get(pos, kdef_typical_round)
                 if rnd < typical - 1:
                     m = kdef_early_damp
-            m *= _tendency_mult(seed, rnd, pos)
-            rival_mult[i, mask] = m
+            v[k] = m * _tendency_mult(seed, rnd, pos)
+        return v
+
+    base_mult = [pos_mult(rv["needs"], rounds_of[i], seeds_of[i], bool(autopick[i])) for i, rv in enumerate(rivals)]
+    # slots that pick more than once inside the window: at a snake turn every
+    # team between me and the wall does. Their needs are consumed as the sim
+    # hands them players, so the same rival cannot "need" a QB twice.
+    later_of: dict = {}
+    for i, rv in enumerate(rivals):
+        later_of.setdefault(rv["slot"], []).append(i)
+    multi = {s: idx for s, idx in later_of.items() if rival_needs_update and len(idx) > 1}
+    slot_of = [rv["slot"] for rv in rivals]
 
     # ADP likelihood per intervening pick (same sigma across the window is fine
     # at this window size; sigma itself scales with round at the call site)
@@ -212,30 +226,73 @@ def simulate_survival(pool, current_pick, next_pick, rivals, seeds, rng,
 
     survived = np.zeros(n, dtype=np.int64)
     e_best = {name: 0.0 for name in groups}
-    base_recent = list(recent_pos or [])[-run_window:]
+    # RUN DETECTOR (plan B4). The old rule fired on an absolute count -- two
+    # of a position in five picks -- which in an RB/WR-heavy draft is the
+    # normal state, so the 1.5 boost was a near-constant multiplier on the
+    # two most common positions. A run is now a SURPLUS over what the model
+    # itself expected: count(pos in window) >= run_min AND count >
+    # run_ratio x sum of the position's share of the pick mass at each pick
+    # in the window. run_ratio = 0 restores the absolute rule exactly.
+    base_recent = [p for p in (recent_pos or []) if p][-run_window:]
+    # the real history picks' expected shares: the plain ADP likelihood at
+    # those pick numbers over the current pool (the players still here are
+    # what those picks were choosing among, less the ones they took)
+    hist_items = []                       # (position index, expected-mass vector)
+    if base_recent:
+        hp = np.arange(current_pick - len(base_recent), current_pick)
+        hist_like = np.exp(-0.5 * ((hp[:, None] - adp[None, :]) / sigma) ** 2) + 1e-9
+        for pos, row in zip(base_recent, hist_like):
+            hist_items.append((pos_index.get(pos, len(POSITIONS)), np.bincount(pos_idx, weights=row, minlength=n_pos) / row.sum()))
+    onehot = np.eye(n_pos)
     for _ in range(sims):
         alive = np.ones(n, dtype=bool)
-        recent = list(base_recent)
+        # run-detector window as running sums: counts per position and the
+        # model's expected count per position over the last run_window picks
+        window = list(hist_items)
+        count = np.zeros(n_pos)
+        expected = np.zeros(n_pos)
+        for k, m in window:
+            count += onehot[k]
+            expected += m
+        mult = list(base_mult)            # per-sim copy of the multiplier vectors
+        needs_now = {s: dict(rivals[idx[0]]["needs"]) for s, idx in multi.items()}
         for i in range(len(rivals)):
             # the reach draw is consumed for every rival at every reach_prob so
             # the random stream is identical across reach settings and whether
             # or not a seat is on autopick (paired A/Bs, plan B5/B7)
             reaching = rng.random() < reach_prob
             like = reach_like[i] if (reaching and not autopick[i]) else adp_like[i]
-            w = like * rival_mult[i] * alive
-            # positional-run escalation: 2+ same-position picks in the recent
-            # window make the NEXT rival likelier to join the run
-            if recent:
-                window = recent[-run_window:]
-                for pos in set(window):
-                    if window.count(pos) >= run_min:
-                        w = np.where(pos_arr == pos, w * run_boost, w)
+            w = like * mult[i][pos_idx] * alive
+            total0 = w.sum()
+            if total0 <= 0:
+                break
+            mass = np.bincount(pos_idx, weights=w, minlength=n_pos) / total0
+            if window:
+                boost = (count >= run_min) & (count > run_ratio * expected)
+                if boost.any():
+                    w = w * np.where(boost[pos_idx], run_boost, 1.0)
             total = w.sum()
             if total <= 0:
                 break
             choice = rng.choice(n, p=w / total)
             alive[choice] = False
-            recent.append(str(pos_arr[choice]))
+            k = int(pos_idx[choice])
+            window.append((k, mass))
+            count += onehot[k]
+            expected += mass
+            if len(window) > run_window:
+                k0, m0 = window.pop(0)
+                count -= onehot[k0]
+                expected -= m0
+            s = slot_of[i]
+            if s in multi:
+                # this rival's needs shrink by what he just took; his LATER
+                # picks in the window are re-weighted (autopick rivals too:
+                # starters-first is a needs rule)
+                needs_now[s] = snake.consume(needs_now[s], str(pos_arr[choice]))
+                for j in multi[s]:
+                    if j > i:
+                        mult[j] = pos_mult(needs_now[s], rounds_of[j], seeds_of[j], bool(autopick[j]))
         survived += alive
         for name, (gmask, val) in groups.items():
             mask = gmask & alive

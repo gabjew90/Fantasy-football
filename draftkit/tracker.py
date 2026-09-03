@@ -47,7 +47,7 @@ class Tracker:
     run_window = 5
     run_min = 2
     run_boost = 1.5
-    run_ratio = 1.5             # plan B4: run = count > run_ratio x expected; 0 = absolute count
+    run_ratio = 0.0             # plan B4: run = count > run_ratio x expected; 0 = the absolute count rule (kept: DECISIONS #29)
     survival_shrink = 1.0       # retired 2026-09-02 (DECISIONS #26): the raw sim is calibrated; 0.55 was fitted to mis-scored data
     # rival need weighting (plan B3, hoisted from urgency.py constants at the
     # values that were in force; fitted in B7)
@@ -202,14 +202,27 @@ class Tracker:
     def picks_for_slot(self, slot: int) -> list[dict]:
         return [p for p in self.state.picks if int(p.get("draft_slot") or 0) == slot]
 
+    def _pick_pos(self, p: dict) -> str:
+        """A pick's position: Sleeper's metadata when present, else the board
+        (the Yahoo bridge and the replay harness send picks with no
+        metadata -- the run detector read "" for every one of them until
+        plan B4, so it never fired on real history there)."""
+        pos = (p.get("metadata") or {}).get("position")
+        if not pos:
+            info = self.by_id.get(str(p.get("player_id")))
+            pos = info["pos"] if info else "?"
+        return {"DST": "DEF"}.get(pos, pos)
+
     def slot_positions(self, slot: int) -> list[str]:
+        return [self._pick_pos(p) for p in self.picks_for_slot(slot)]
+
+    def _recent_positions(self) -> list[str]:
+        """Positions of the last run_window real picks, for the run detector
+        (unknown players -> '' and are ignored there)."""
         out = []
-        for p in self.picks_for_slot(slot):
-            pos = (p.get("metadata") or {}).get("position")
-            if not pos:
-                info = self.by_id.get(str(p["player_id"]))
-                pos = info["pos"] if info else "?"
-            out.append({"DST": "DEF"}.get(pos, pos))
+        for p in self.state.picks[-self.run_window:]:
+            pos = self._pick_pos(p)
+            out.append(pos if pos != "?" else "")
         return out
 
     def remaining(self, pos: str | None = None) -> list[dict]:
@@ -557,8 +570,7 @@ class Tracker:
         # let a mid-draft restart silently flip near-tie recommendations
         seed = zlib.crc32(f"{self.draft_id}:{key[0]}:{key[1]}".encode())
         rng = np.random.default_rng(seed)
-        recent_pos = [str((p.get("metadata") or {}).get("position") or "")
-                      for p in picks[-self.run_window:]]
+        recent_pos = self._recent_positions()
         # Pooled markets alongside the per-position report. Only the FLEX
         # market differs from a position group; dedicated slots ARE their
         # position. Computed on the same simulation -- rival behavior does not

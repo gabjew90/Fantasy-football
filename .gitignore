@@ -32,3 +32,6 @@ data/draftrig/*.log
 data/processed/backtest/
 data/processed/*.csv
 data/processed/*.txt
+
+# identity-harness reference boards (scripts/board_identity.py), regenerable
+data/draftrig/ref_*.csv
