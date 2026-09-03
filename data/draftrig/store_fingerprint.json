@@ -1,0 +1,76 @@
+{
+ "captured_from_room": "10584427",
+ "captured_at": "2026-09-03T08:30:41.771Z",
+ "kind": "store_fingerprint",
+ "store_keys": [
+  "auction",
+  "chat",
+  "context",
+  "countdown",
+  "currentPlayerId",
+  "currentTeamId",
+  "darkMode",
+  "draft",
+  "draftAssistant",
+  "draftOrder",
+  "draftPicks",
+  "draftStatus",
+  "error",
+  "league",
+  "leagueStandings",
+  "modal",
+  "muted",
+  "navigation",
+  "pickGrades",
+  "playerFilters",
+  "playerNotes",
+  "players",
+  "queue",
+  "settings",
+  "statMode",
+  "teamGrades"
+ ],
+ "draftOrder_keys": [
+  "currentPick",
+  "currentTeam",
+  "order"
+ ],
+ "countdown_keys": [
+  "seconds",
+  "timeout"
+ ],
+ "pick_keys": [
+  "cost",
+  "id",
+  "playerId",
+  "teamId"
+ ],
+ "player_keys_present": [
+  "id",
+  "fname",
+  "lname",
+  "primary_pos",
+  "display_pos",
+  "team_abbr",
+  "o_rank",
+  "average-pick",
+  "psr_rank",
+  "bye"
+ ],
+ "manager_keys": [
+  "away",
+  "guid",
+  "id",
+  "is_comanager",
+  "is_commissioner",
+  "loggedin",
+  "nickname",
+  "teamId"
+ ],
+ "action_names": [
+  "addToQueue",
+  "makePick",
+  "setAwayStatus",
+  "setCurrentPlayerId"
+ ]
+}

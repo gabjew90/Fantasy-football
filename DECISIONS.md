@@ -2120,3 +2120,35 @@ its rivals score no real points, so these rooms can show pipeline
 soundness, churn and eye-test sanity, never accuracy. The default stays on
 #23's verdict; the January scoring of the frozen forward snapshot (#30)
 decides 2027. Saturday drafts on the validated board regardless.
+
+### #35 G2 result (2026-09-03 01:40 PT): log-loss half PASS, calibration half FAIL as written
+
+scripts/fit_survival.py --fit --stage autopick --loro --sims 200 --every 2
+(reports/survival_loro.md). Four sidecar rooms (24-27), leave-one-out,
+coordinate fit from CURRENT on the other three.
+- Every fold lands on the same point: autopick_list_prob 0.3 (one fold
+  0.4), autopick_need_damp 0.45, autopick_sigma_scale 0.5 (the stage kept
+  the current scale; the pick-level fit preferred 0.75 -- within its CI).
+- Held-out Bernoulli log-loss, fitted vs current: 0.1520/0.1632,
+  0.1688/0.1889, 0.1481/0.1585, 0.1641/0.1797; pooled 0.1582 vs 0.1726.
+  Better in all four folds. The log-loss half of G2 PASSES.
+- Calibration at the fitted point (cluster-bootstrap 90% CI of obs-pred,
+  >= 30 clusters): 30-49% -8 [-14,-1], 50-69% -5 [-8,-2], 70-89% +2
+  [0,+4] -- three buckets exclude 0. At CURRENT in the same harness the
+  same buckets read 0 [-9,+9], +3 [-3,+8], +2 [0,+4]. The calibration half
+  FAILS as pre-registered.
+- Caveat that must ride with the result: this harness scores states
+  rebuilt with the league config but 200 sims and the harness pool, and in
+  it CURRENT looks calibrated -- while the four LIVE rooms (production
+  knobs, 1000 sims) scored CURRENT at 90-100% shown -> 79-94% observed and
+  70-90% -> 37-77%. The harness and the live scorecards disagree about the
+  current model, so the harness is not a clean judge of either point. The
+  live scorecards of the forward rooms (G4) are the production measurement.
+
+Call, by the rule as written: G2 fails -> the default does NOT move on
+this evidence. The forward rooms still run at the fitted point, as
+pre-registered, and their live calibration (both knob sets scored offline
+on the same realised states) is recorded for the decision after
+2026-09-05. If the user wants the rule amended (calibration judged on the
+live forward rooms rather than the harness), that is an explicit
+amendment recorded here, not a reinterpretation.

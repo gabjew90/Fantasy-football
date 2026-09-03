@@ -257,6 +257,12 @@ def render(room: str, trail: dict, plans: list[dict], events: list[dict], blog: 
     if blog:
         L += ["## Bridge log: warnings and errors", ""] + [f"    {x[:200]}" for x in blog[:40]] + [""]
 
+    # ---- the narration, exactly as the panel showed it
+    narr = trail.get("narration") or []
+    if narr:
+        L += ["## Narration (what the panel showed live, Pacific time)", ""]
+        L += [f"    {to_pt(e.get('ts'), '%H:%M:%S')}  {e.get('text', '')[:230]}" for e in narr]
+        L.append("")
     # ---- driver log
     L += ["## Driver log (the lines that matter, Pacific time)", ""]
     L += [f"    {l[:240]}" for l in pt_lines([l for l in log if ISSUE.search(l)])]

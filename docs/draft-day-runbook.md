@@ -184,3 +184,13 @@ name. Mitigation, in order, all before pick 1:
 5. **No code changes after Friday evening.** The board rebuild and the
    pre-rank load are the only Saturday steps; the driver served from the
    bridge is the one that ran the last clean mock.
+
+## Friday dress rehearsal (owed before 2026-09-05)
+
+Run the WHOLE Saturday sequence once on Friday and time it: ADP refresh
+(hand scrape, plus the room-snapshot ADP as the cross-check), `market`,
+`tiers`, board identity check, `export_board_json`, pre-rank import via
+prerank.js with `has_preranks == "1"` and 240 of 240 verified, bridge
+restart, one mock room on the result with preflight's FINGERPRINT line
+read. Write the elapsed times into docs/draft-rig-mock-log.md. Saturday
+then repeats a rehearsed sequence instead of a first attempt.

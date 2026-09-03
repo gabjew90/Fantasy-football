@@ -50,6 +50,10 @@ def build_plan(state: dict, depth: int) -> dict:
         page_drafted = len(state.get("drafted") or [])
         state = dict(state, drafted=YB.merge_feed(memory, state.get("drafted") or []))
         t = YB.build_tracker(cfg, players, state)
+        # --set knob=value overrides (forward-test rooms, DECISIONS #35 G4):
+        # applied after the config so the default never moves before the gate
+        for k, v in (_STATE.get("overrides") or {}).items():
+            setattr(t, k, v)
         recs = t.recommendations(top_n=depth)
         report = t.urgency_report()
         plan = YB.plan_rows(t, recs, report)
@@ -123,6 +127,14 @@ class Handler(BaseHTTPRequestHandler):
             # layer 0: the Edit Pre-Draft Ranks driver (scripts/prerank_driver.js)
             self._raw((ROOT / "scripts" / "prerank_driver.js").read_bytes(),
                       "application/javascript; charset=utf-8")
+        elif self.path.startswith("/fingerprint.json"):
+            # the store structure captured in the mock rooms; preflight diffs
+            # the league room against it (draft-day data-shape check)
+            p = ROOT / "data" / "draftrig" / "store_fingerprint.json"
+            if p.exists():
+                self._raw(p.read_bytes(), "application/json; charset=utf-8")
+            else:
+                self._json({"err": "no fingerprint captured yet: POST /fingerprint from a mock room"}, 404)
         elif self.path.startswith("/board.json"):
             p = ROOT / "data" / "draftrig" / f"board.{_STATE['league']}.json"
             if p.exists():
@@ -153,10 +165,15 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         if (self.path.startswith("/trail") or self.path.startswith("/fixture")
-                or self.path.startswith("/players")):
+                or self.path.startswith("/players") or self.path.startswith("/fingerprint")):
             try:
                 body = self._read_json()
-                if self.path.startswith("/players"):
+                if self.path.startswith("/fingerprint"):
+                    # the store structure of a room the driver ran in (DK.fingerprint()),
+                    # kept under ONE fixed name as the baseline preflight diffs against
+                    self._save_named(dict(body, name="store_fingerprint"), "name", ROOT / "data" / "draftrig", ".json",
+                                     json.dumps(body, indent=1), "store_fingerprint")
+                elif self.path.startswith("/players"):
                     # The room's whole player store (DK.players(): o_rank,
                     # psr_rank, avg_pick per player). scripts/
                     # yahoo_rank_from_snapshot.py turns it into the
@@ -212,10 +229,21 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--league", default=None)
     ap.add_argument("--port", type=int, default=8443)
+    ap.add_argument("--set", action="append", default=[], metavar="KNOB=VALUE",
+                    help="engine knob override for this bridge process only (e.g. autopick_list_prob=0.3); logged on every plan")
     a = ap.parse_args()
 
     cfg = Config.load(league=a.league)
     _STATE["cfg"] = cfg
+    overrides = {}
+    for item in a.set:
+        k, _, v = item.partition("=")
+        if not hasattr(Tracker, k):
+            raise SystemExit(f"unknown engine knob {k!r}")
+        overrides[k] = type(getattr(Tracker, k))(v) if not isinstance(getattr(Tracker, k), bool) else v.lower() in ("1", "true", "yes")
+    _STATE["overrides"] = overrides
+    if overrides:
+        print(f"engine overrides for this process: {overrides}", flush=True)
     _STATE["players"] = YB.load_players(cfg)
     _STATE["league"] = a.league or "default"
 

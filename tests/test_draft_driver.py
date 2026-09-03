@@ -959,7 +959,7 @@ def test_keep_alive_sends_a_periodic_not_away_heartbeat():
           const c = await DK.keepAlive();          // interval elapsed: one beat
           const d = await DK.keepAlive();          // and not again until the next interval
           console.log(JSON.stringify({{ n: calls.length, values: calls.map(x => x[0]), a, b, c, d,
-            logged: DK.logs(10).filter(l => /heartbeat/.test(String(l))).length }}));
+            logged: DK.logs(10).filter(l => /^\S+ heartbeat: setAwayStatus/.test(String(l))).length }}));
         }})();
         """
     )
@@ -1211,3 +1211,39 @@ def test_players_snapshot_posts_yahoo_ranks_once_per_room():
     assert r["first"]["o_rank"] == 1 and r["first"]["avg_pick"] == 2 and r["first"]["pos"] == "RB" and r["first"]["name"] == "Christian McCaffrey"
     assert r["posted"] == 1 and r["url"] == "/players" and r["again"] is True
     assert r["ref"] == "players_777.json"
+
+
+# ---------- the live trail panel (docs/plans/2026-09-03-live-trail-hud-plan.md) ----------
+
+def test_narrate_appends_time_stamped_lines_and_mirrors_into_the_log():
+    r = run_js("DK.narrate('info', 'one'); DK.narrate('picked', 'two'); const t = DK.narration();"
+               "console.log(JSON.stringify({ n: t.length, kinds: t.map(x => x.kind), texts: t.map(x => x.text), ts: t[0].ts,"
+               " logged: DK.logs(10).filter(l => /NARR (info|picked) (one|two)/.test(String(l))).length }));")
+    assert r["n"] == 2 and r["kinds"] == ["info", "picked"] and r["texts"] == ["one", "two"]
+    assert r["ts"].endswith("Z") and "T" in r["ts"]
+    assert r["logged"] == 2
+
+
+def test_plain_english_pick_reads_like_the_scrutiny_report():
+    r = run_js("console.log(JSON.stringify(["
+               "DK.plainEnglishPick({ drafted: 'Trey McBride', pos: 'TE', s: 0.79, why: 'waiting likely costs ~6 pts at TE (best option now 78, ~72 by your next turn) · 79% chance', top_proj_available: { n: 'Josh Allen' } }),"
+               "DK.plainEnglishPick({ drafted: 'Drake Maye', pos: 'QB', s: 0.88, why: 'safe to wait on QB · 88% chance', top_proj_available: { n: 'Drake Maye' } }),"
+               "DK.plainEnglishPick({ drafted: 'Rico Dowdle', pos: 'RB', why: 'bench insurance: covers 3 RB starters ~9.6 wks/season · +10.0/wk over the wire (Josh Jacobs) ≈ 96 pts · HANDCUFF: backs up your Jaylen Warren', attempted: ['X:action-timeout'] }),"
+               "]));")
+    assert r[0].startswith("chose Trey McBride (TE): waiting would likely cost about 6 points at TE, 79% to still be there next turn")
+    assert "top projection left was Josh Allen, passed on purpose" in r[0]
+    assert r[1].startswith("chose Drake Maye (QB): nothing urgent") and "passed on purpose" not in r[1]
+    assert r[2].startswith("lineup full, so Rico Dowdle (RB) is insurance: covers 3 RB starter(s) about 9.6 weeks")
+    assert "backs up one of our starters" in r[2] and "skipped first: X:action-timeout" in r[2]
+
+
+def test_fingerprint_diff_names_missing_and_new_parts():
+    r = run_js("const base = { store_keys: ['a', 'b', 'players'], pick_keys: ['id', 'playerId', 'teamId'], action_names: ['makePick', 'setAwayStatus'] };"
+               "const now = { store_keys: ['a', 'players', 'zzz'], pick_keys: ['id', 'playerId', 'teamId'], action_names: ['makePick'] };"
+               "console.log(JSON.stringify({ same: DK.fingerprintDiff(base, base), diff: DK.fingerprintDiff(now, base), none: DK.fingerprintDiff(null, base) }));")
+    assert r["same"] == []
+    assert any(d.startswith("store_keys: missing b; new zzz") for d in r["diff"])
+    assert any(d.startswith("action_names: missing setAwayStatus") for d in r["diff"])
+    assert r["none"] == ["no baseline to compare"]
+
+

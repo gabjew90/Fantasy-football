@@ -55,6 +55,12 @@ window.DK = (function () {
     lastStoreAt: 0,
     clockMax: 30,          // the largest countdown seen; Yahoo mocks run 30 s, leagues 60
     snapshotPosted: null,  // room id once the players snapshot has been POSTed
+    // the live trail (docs/plans/2026-09-03-live-trail-hud-plan.md): plain
+    // sentences, time-stamped, append-only; rendered in the heads-up panel
+    trail: [],
+    hud: null,
+    lastPlanSig: null,
+    fingerprint: null,
   };
 
   const FLEX_OK = { RB: 1, WR: 1, TE: 1 };
@@ -69,6 +75,158 @@ window.DK = (function () {
     // the trail dump retains the log, so the ring must not have wrapped
     if (S.log.length > (S.cfg.logCap || 5000)) S.log.shift();
     return line;
+  }
+
+  /* ---------------- the live trail and its panel ----------------
+   *
+   * narrate() writes one plain-English, time-stamped line per thing the
+   * engine or the driver saw or did. Lines are appended, never rewritten:
+   * the reader scrolls the panel like a chat. Every line also goes into
+   * S.log (prefixed NARR) so the end-of-draft dump and the scrutiny report
+   * carry exactly what was shown live. */
+  function ptTime(d) {
+    try {
+      return (d || new Date()).toLocaleTimeString('en-US', { hour12: false, timeZone: 'America/Los_Angeles' });
+    } catch (e) {
+      return (d || new Date()).toISOString().slice(11, 19);
+    }
+  }
+
+  function narrate(kind, text) {
+    const entry = { ts: new Date().toISOString(), kind, text: String(text) };
+    S.trail.push(entry);
+    if (S.trail.length > 3000) S.trail.shift();
+    note('NARR ' + kind + ' ' + text);
+    hudAppend(entry);
+    return entry;
+  }
+
+  /* The plain-English reading of a pick record -- the same wording
+   * scripts/mock_scrutiny.py prints, so live and afterwards agree. */
+  function plainEnglishPick(rec) {
+    const why = rec.why || '';
+    const pct = (rec.s != null && rec.s > 0) ? Math.round(rec.s * 100) + '%' : null;
+    const parts = [];
+    let m = why.match(/waiting likely costs ~(\d+) pts at ([^(]+?)\s*\(/);
+    if (m) {
+      parts.push('chose ' + rec.drafted + ' (' + rec.pos + '): waiting would likely cost about ' + m[1] + ' points at ' + m[2].trim()
+        + (pct ? ', ' + pct + ' to still be there next turn' : ''));
+    } else if (/^safe to wait/.test(why)) {
+      parts.push('chose ' + rec.drafted + ' (' + rec.pos + '): nothing urgent, the most valuable player who fills a slot'
+        + (pct ? ' (' + pct + ' to survive, nobody better worth waiting for)' : ''));
+    } else if (/^bench insurance/.test(why)) {
+      const m2 = why.match(/covers (\d+) (\w+) starters?[^~]*~([\d.]+) wks[^+]*\+([\d.]+)\/wk[^0-9]*?(?:\(([^)]+)\))?[^0-9]*(\d+) pts/);
+      parts.push('lineup full, so ' + rec.drafted + ' (' + rec.pos + ') is insurance'
+        + (m2 ? ': covers ' + m2[1] + ' ' + m2[2] + ' starter(s) about ' + m2[3] + ' weeks a season at +' + m2[4] + ' a week over the wire, about ' + m2[6] + ' points' : ''));
+      if (/HANDCUFF/.test(why)) parts.push('he also backs up one of our starters');
+    } else if (/^LOCAL ranker/.test(why)) {
+      parts.push('engine unreachable, the page’s own ranking chose ' + rec.drafted + ' (' + rec.pos + ')');
+    } else if (/^depth fallback|^fills your open/.test(why)) {
+      parts.push('chose ' + rec.drafted + ' (' + rec.pos + ') to fill a mandatory slot; nothing the engine named was left');
+    } else {
+      parts.push('chose ' + rec.drafted + ' (' + rec.pos + ')' + (why ? ': ' + why.slice(0, 100) : ''));
+    }
+    const alt = rec.top_proj_available;
+    if (alt && alt.n !== rec.drafted) parts.push('top projection left was ' + alt.n + ', passed on purpose');
+    if (rec.attempted && rec.attempted.length) parts.push('skipped first: ' + rec.attempted.join(', '));
+    return parts.join('; ');
+  }
+
+  function hudAppend(entry) {
+    if (!S.hud || !S.hud.body) return;
+    const line = document.createElement('div');
+    line.style.cssText = 'padding:1px 0;border-bottom:1px solid rgba(255,255,255,.06);white-space:pre-wrap;word-break:break-word;';
+    const color = { picked: '#8ef', turn: '#fd6', gate: '#f88', away: '#f88', bridge: '#f88', fault: '#f8f', plan: '#bbb', pick: '#ddd', heartbeat: '#7a7', info: '#aaa' }[entry.kind] || '#ddd';
+    line.innerHTML = '<span style="color:#888">' + ptTime(new Date(entry.ts)) + '</span>  <span style="color:' + color + '">' + escapeHtml(entry.text) + '</span>';
+    const body = S.hud.body;
+    const atBottom = body.scrollHeight - body.scrollTop - body.clientHeight < 24;
+    body.appendChild(line);
+    if (atBottom || !S.hud.userScrolled) body.scrollTop = body.scrollHeight;
+    else S.hud.marker.style.display = 'block';
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+  }
+
+  function hudHeader(text) {
+    if (S.hud && S.hud.head) S.hud.head.textContent = text;
+  }
+
+  /* hud(true|false|{corner, width, height}) -- a fixed, read-only panel
+   * outside React's root; the body is the trail, appended only. */
+  function hud(opts) {
+    if (typeof document === 'undefined' || !document.createElement || !document.body) return null;
+    if (opts === false) {
+      if (S.hud && S.hud.root && S.hud.root.parentNode) S.hud.root.parentNode.removeChild(S.hud.root);
+      S.hud = null;
+      return 'hud off';
+    }
+    const o = Object.assign({ corner: 'bottom-right', width: 440, height: 280 }, (opts && typeof opts === 'object') ? opts : {});
+    if (S.hud && S.hud.root && document.body.contains(S.hud.root)) return 'hud on';
+    const root = document.createElement('div');
+    root.id = 'dk-hud';
+    const pos = { 'bottom-right': 'bottom:8px;right:8px;', 'bottom-left': 'bottom:8px;left:8px;', 'top-right': 'top:8px;right:8px;', 'top-left': 'top:8px;left:8px;' }[o.corner] || 'bottom:8px;right:8px;';
+    root.style.cssText = 'position:fixed;' + pos + 'width:' + o.width + 'px;height:' + o.height + 'px;z-index:2147483000;'
+      + 'background:rgba(12,14,18,.88);color:#ddd;font:12px/1.35 Consolas,Menlo,monospace;border:1px solid #333;border-radius:6px;'
+      + 'display:flex;flex-direction:column;box-shadow:0 2px 12px rgba(0,0,0,.5);';
+    const head = document.createElement('div');
+    head.style.cssText = 'padding:4px 8px;background:#1b2027;color:#fd6;border-bottom:1px solid #333;flex:0 0 auto;';
+    head.textContent = 'draft engine — waiting for the room';
+    const body = document.createElement('div');
+    body.style.cssText = 'flex:1 1 auto;overflow-y:auto;padding:4px 8px;';
+    const marker = document.createElement('div');
+    marker.style.cssText = 'display:none;padding:2px 8px;background:#fd6;color:#000;text-align:center;cursor:default;flex:0 0 auto;';
+    marker.textContent = 'new lines below ↓';
+    body.addEventListener('scroll', () => {
+      const atBottom = body.scrollHeight - body.scrollTop - body.clientHeight < 24;
+      S.hud.userScrolled = !atBottom;
+      if (atBottom) marker.style.display = 'none';
+    });
+    root.appendChild(head); root.appendChild(body); root.appendChild(marker);
+    document.body.appendChild(root);
+    S.hud = { root, head, body, marker, userScrolled: false };
+    for (const e of S.trail.slice(-200)) hudAppend(e);
+    return 'hud on';
+  }
+
+  /* The structure the driver depends on, as a comparable fingerprint (draft-day
+   * data-shape risk, docs/draft-day-runbook.md): store keys, a pick's keys, a
+   * player's keys of interest, a manager's keys, the action props found. */
+  function fingerprint() {
+    const store = findStore();
+    let s;
+    try { s = store && store.getState(); } catch (e) { s = null; }
+    if (!s) return null;
+    const pick = ((s.draftPicks || {}).order || []).find(o => o && o.playerId) || null;
+    const player = Object.values((s.players || {}).byId || {})[0] || null;
+    const manager = Object.values((s.league || {}).managers || {})[0] || null;
+    const acts = clientActions();
+    const want = ['id', 'fname', 'lname', 'primary_pos', 'display_pos', 'team_abbr', 'o_rank', 'average-pick', 'psr_rank', 'bye'];
+    return {
+      store_keys: Object.keys(s).sort(),
+      draftOrder_keys: Object.keys(s.draftOrder || {}).sort(),
+      countdown_keys: Object.keys(s.countdown || {}).sort(),
+      pick_keys: pick ? Object.keys(pick).sort() : [],
+      player_keys_present: player ? want.filter(k => k in player) : [],
+      manager_keys: manager ? Object.keys(manager).sort() : [],
+      action_names: acts ? Object.keys(acts).sort() : [],
+    };
+  }
+
+  function fingerprintDiff(now, base) {
+    if (!now || !base) return ['no baseline to compare'];
+    const out = [];
+    for (const k of Object.keys(base)) {
+      if (!Array.isArray(base[k])) continue;      // labels (captured_at, room) ride along in the saved baseline
+      const a = (base[k] || []).slice().sort().join(','), b = (now[k] || []).slice().sort().join(',');
+      if (a !== b) {
+        const missing = (base[k] || []).filter(x => !(now[k] || []).includes(x));
+        const extra = (now[k] || []).filter(x => !(base[k] || []).includes(x));
+        out.push(k + ': ' + (missing.length ? 'missing ' + missing.join('/') : '') + (missing.length && extra.length ? '; ' : '') + (extra.length ? 'new ' + extra.join('/') : ''));
+      }
+    }
+    return out;
   }
 
   /* ---- name keying: must match scripts/export_board_json.py::key() ---- */
@@ -523,6 +681,20 @@ window.DK = (function () {
         const sincePrev = prev && prev.seen_ms ? now - prev.seen_ms : null;
         S.seen.set(no, { seen_at: new Date(now).toISOString(), seen_ms: now, clock_left: Number.isFinite(+secs) ? +secs : null,
                          poll_gap_ms: gap, since_prev_ms: sincePrev, away_teams_at: away.slice(), clock_max: S.clockMax });
+        // the trail line for a rival's pick (ours is narrated by pickRecord)
+        const isMine = myTeam != null && String(o.teamId) === myTeam;
+        if (!isMine && S.running) {
+          const teams = S.cfg.teams || 10;
+          const rnd0 = Math.floor((no - 1) / teams), idx = (no - 1) % teams;
+          const seat = rnd0 % 2 === 0 ? idx + 1 : teams - idx;
+          const name = ((p.fname || '') + ' ' + (p.lname || '')).trim();
+          const lab = timingLabel(sincePrev, gap);
+          const took = sincePrev != null ? ' in ' + Math.round(sincePrev / 1000) + ' s' : '';
+          const inPlan = (S.plan || []).slice(0, 8).find(e => e.n === name);
+          narrate('pick', 'pick ' + no + '  ' + name + ' (' + (p.primary_pos || p.display_pos || '') + ') taken by seat ' + seat + took
+            + (lab === 'instant' ? ' INSTANTLY (autopick)' : '')
+            + (inPlan ? ' — a target is gone' + (inPlan.s != null ? ' (was ' + Math.round(inPlan.s * 100) + '% to survive)' : '') : ''));
+        }
       }
       const seen = S.seen.get(no);
       return { pick_no: no, name: ((p.fname || '') + ' ' + (p.lname || '')).trim(),
@@ -688,13 +860,23 @@ window.DK = (function () {
       S.plan = j.plan; S.planNeeds = j.needs; S.planPick = j.current_pick;
       S.planCall = j.calls == null ? null : j.calls;   // joins this plan to the bridge's log lines
       S.planErr = null; S.planAt = Date.now();
+      // narrate a plan when its top three or its pick changed (not every 12 s)
+      const top3 = (j.plan || []).slice(0, 3);
+      const sig = j.current_pick + '|' + top3.map(e => e.n).join('|');
+      if (sig !== S.lastPlanSig) {
+        S.lastPlanSig = sig;
+        narrate('plan', 'plan #' + S.planCall + ' for pick ' + j.current_pick + ': '
+          + top3.map(e => e.n + ' ' + e.p + (e.s != null ? ' ' + Math.round(e.s * 100) + '%' : '')
+            + (e.why ? ' “' + String(e.why).split(' · ')[0].slice(0, 44) + '”' : '')).join(' · '));
+      }
       // the bridge says aloud what it had to guess or drop; once per distinct message
       for (const w of (j.warnings || [])) {
-        if (S.lastWarning !== w) { S.lastWarning = w; note('BRIDGE WARNING: ' + w); }
+        if (S.lastWarning !== w) { S.lastWarning = w; note('BRIDGE WARNING: ' + w); narrate('bridge', 'bridge warning: ' + w); }
       }
       return 'plan ' + (j.plan || []).length + ' deep @pick ' + j.current_pick + ' via ' + S.source + ' call#' + S.planCall;
     } catch (e) {
       S.planErr = String(e).slice(0, 120);
+      if (S.running) narrate('bridge', 'engine bridge unreachable (' + S.planErr.slice(0, 60) + ') — using the last plan; the queue is the safety net');
       return 'bridge unreachable: ' + S.planErr;
     }
   }
@@ -1566,6 +1748,8 @@ window.DK = (function () {
                                 plan_call: S.planCall == null ? null : S.planCall,
                                 plan_age_ms: S.planAt ? Date.now() - S.planAt : null }, extra);
     S.records.push(rec);
+    narrate('picked', 'PICKED ' + rec.drafted + ' (' + rec.pos + ') via ' + (rec.via || '?') + (rec.ms != null ? ', confirmed in ' + rec.ms + ' ms' : '')
+      + ' — ' + plainEnglishPick(rec));
     return rec;
   }
 
@@ -1819,6 +2003,17 @@ window.DK = (function () {
     out.autopick_armed = autopickArmed();
     // the refit study's snapshot of Yahoo's player table, once per room
     out.players_snapshot = await postPlayersSnapshot();
+    // draft-day data-shape check: the store's structure against the mock rooms'
+    out.fingerprint = fingerprint();
+    S.fingerprint = out.fingerprint;
+    try {
+      const base = await (await fetch(S.cfg.bridge + '/fingerprint.json')).json();
+      out.fingerprint_diff = base && !base.err ? fingerprintDiff(out.fingerprint, base) : ['no baseline on the bridge'];
+    } catch (e) {
+      out.fingerprint_diff = ['baseline unreadable: ' + String(e).slice(0, 60)];
+    }
+    if (out.fingerprint_diff.length) note('FINGERPRINT differs from the mock rooms: ' + out.fingerprint_diff.join(' | '));
+    else note('FINGERPRINT matches the mock rooms');
     // the client's own actions (makePick / setAwayStatus): the no-DOM pick path
     const acts = clientActions(true);
     out.client_actions = acts ? Object.keys(acts) : [];
@@ -1877,7 +2072,7 @@ window.DK = (function () {
         // stamp BEFORE the call: a thunk that throws must wait for the next
         // interval like one that worked, not retry every cycle and flood the log
         S.lastHeartbeat = Date.now();
-        try { acts.setAwayStatus(false); note('heartbeat: setAwayStatus(false)'); }
+        try { acts.setAwayStatus(false); note('heartbeat: setAwayStatus(false)'); narrate('heartbeat', 'heartbeat sent (Yahoo told we are not idle)'); }
         catch (e) { note('heartbeat threw (next in ' + (hbEvery / 1000) + 's): ' + String(e).slice(0, 80)); }
       }
     }
@@ -1902,6 +2097,7 @@ window.DK = (function () {
       const stillAway = !!(after && after.my_team && after.away_teams.includes(after.my_team));
       note('AWAY detected (store=' + awayByStore + ') -> setAwayStatus(false); away now '
         + (after ? stillAway : 'unknown'));
+      narrate('away', 'Yahoo flagged us AWAY — cleared through setAwayStatus' + (after && !stillAway ? ' (confirmed)' : ' (not yet confirmed)'));
       if (after && !stillAway) return { away: true, action: true, cleared: true };
     }
     // Disarm, fallback: the Queue panel carries an "Autodraft" toggle
@@ -1943,14 +2139,25 @@ window.DK = (function () {
     note('driver start' + (throttleRisk()
       ? ' — WARNING: tab is hidden, Chrome throttles timers; keep it visible'
       : ''));
+    if (S.cfg.hud !== false) hud(true);
+    narrate('info', 'driver started — seat ' + (S.cfg.mySlot || slotFromUrl() || '?') + ', ' + (S.cfg.teams || 10) + ' teams, '
+      + (S.cfg.rounds || 15) + ' rounds' + (throttleRisk() ? ' — WARNING: tab hidden, keep it visible' : ''));
     let lastSync = 0;
     let planGateFails = 0;
     let ended = false;
     try {
       while (Date.now() < deadline && S.running) {
         const rc = rosterCount();
-        if (rc && rc.have >= S.cfg.rounds) { note('roster full'); ended = true; break; }
-        if (/draft results|draft complete/i.test(document.title)) { note('draft over'); ended = true; break; }
+        if (rc && rc.have >= S.cfg.rounds) { note('roster full'); narrate('info', 'roster full — driver done; posting the trail when the room finishes'); ended = true; break; }
+        if (/draft results|draft complete/i.test(document.title)) { note('draft over'); narrate('info', 'draft over'); ended = true; break; }
+        {
+          const sh = storeState();
+          const cp = (sh && sh.current_pick) || currentPickNo();
+          const nxt = cp && S.cfg.myNextPick ? S.cfg.myNextPick : null;
+          hudHeader('pick ' + (cp || '?') + (sh && sh.on_clock ? ' · ON THE CLOCK' : (nxt ? ' · our turn at ' + nxt : ''))
+            + ' · plan #' + (S.planCall == null ? '?' : S.planCall) + (S.planAt ? ' (' + Math.round((Date.now() - S.planAt) / 1000) + ' s)' : '')
+            + (sh && sh.away_teams && sh.away_teams.length ? ' · away seats ' + sh.away_teams.length : ''));
+        }
 
         if (onClock()) {
           await keepAlive();     // clear a fresh away flag BEFORE the pick attempt, not after
@@ -1963,6 +2170,7 @@ window.DK = (function () {
           const gate = gatesOk();
           if (!gate.ok) {
             note('GATE FAILED -> not clicking: ' + gate.why.join('; '));
+            narrate('gate', 'GATE: not picking yet — ' + gate.why.join('; '));
             /* When the ONLY thing wrong is the plan (bridge down, or its pick
              * number stuck ahead of the header), three cycles of that (~7 s)
              * hands the turn to the labelled local ranker rather than to the
@@ -1971,6 +2179,7 @@ window.DK = (function () {
             planGateFails = planOnly ? planGateFails + 1 : 0;
             if (planOnly && planGateFails >= 3) {
               note('LOCAL ranking: plan gate failed ' + planGateFails + 'x (' + gate.why.join('; ') + ') -> dropping the plan for this turn');
+              narrate('gate', 'LOCAL ranking for this turn: the engine plan failed the gate ' + planGateFails + ' times');
               S.plan = null; S.planPick = null; S.planAt = 0;
               planGateFails = 0;
             } else {
@@ -1992,14 +2201,22 @@ window.DK = (function () {
            * Retry: one failed attempt used to surrender the whole clock. */
           if (autopickArmed()) {
             note('ON CLOCK (autopick armed) -> queue head takes it');
+            narrate('turn', 'ON THE CLOCK but Yahoo autopick is armed — the queue head takes it');
           } else {
+            const snapT = storeState();
+            const needsT = Object.entries(S.planNeeds || {}).filter(([k, v]) => v > 0 && k !== 'BN').map(([k, v]) => v > 1 ? k + 'x' + v : k).join(' ');
+            narrate('turn', 'ON THE CLOCK, pick ' + ((snapT && snapT.current_pick) || currentPickNo() || '?') + ' · plan #' + S.planCall
+              + ' (' + (S.planAt ? ((Date.now() - S.planAt) / 1000).toFixed(1) : '?') + ' s old) · lineup needs ' + (needsT || 'nothing; bench'));
             let res = await draftTop(4);
             if (res.err && !onClock()) {
               note('ON CLOCK -> turn ended: ' + JSON.stringify(res));
+              narrate('gate', 'turn ended before a pick landed (' + res.err + (res.landed ? '; Yahoo took ' + res.landed : '') + ')');
             } else if (res.err) {
               await sleep(800);
+              narrate('gate', 'first attempt failed (' + res.err + (res.attempted ? ': ' + res.attempted.join(', ') : '') + ') — retrying');
               res = await draftTop(4);     // second bite while time remains
               note('ON CLOCK retry -> ' + JSON.stringify(res));
+              if (res.err) narrate('gate', 'retry failed (' + res.err + ') — the queue / Yahoo list catches this pick');
             } else {
               note('ON CLOCK -> ' + JSON.stringify(res));
             }
@@ -2093,6 +2310,8 @@ window.DK = (function () {
       picks, managers: mgrs, our_records: S.records.slice(),
       heartbeats: S.log.filter(isHeartbeat).length, issues: S.log.filter(isIssue).length,
       log: S.log.slice(),   // the complete action log, for scrutiny after the mock
+      narration: S.trail.slice(),   // exactly what the panel showed, time-stamped
+      fingerprint: S.fingerprint,
       clock_max: S.clockMax,
       players_snapshot_ref: S.snapshotPosted ? ('players_' + S.snapshotPosted + '.json') : null,
     }, extra || {});
@@ -2168,6 +2387,8 @@ window.DK = (function () {
     },
     rank, syncQueue, draftTop, run, gatesOk, storeState, findStore, keepAlive, preflight, _setStore, rosterView, top6TeFell,
     timingLabel, playersSnapshot, postPlayersSnapshot,
+    narrate, hud, plainEnglishPick, fingerprint, fingerprintDiff,
+    narration: () => S.trail.slice(),
     classifyMiss, rowMatches, normTeam, autopickArmed, idKey, // exported for tests
     findRow, parsePicksPanel, myRoster, tableLive, currentPickNo, // offline DOM tests (jsdom + fixtures)
     survivalProb, eBestNext, calibrate,

@@ -186,3 +186,23 @@ def test_store_state_reads_the_clients_redux_store():
     assert out["withPos"] >= 0.5 * out["n"], out
     assert out["current_pick"] >= 100
     assert out["away"] >= 1
+
+
+def test_hud_is_created_once_and_removed_and_never_rewrites_lines():
+    """jsdom: the panel is one fixed element outside React's root; lines are
+    appended in order; hud(false) removes it; a second hud(true) is a no-op."""
+    r = run_in_fixture(EXPANDED, 
+        """
+        DK.loadCompact("Christian McCaffrey|RB|SFO|122.8|1|", { teams: 10 });
+        const a = DK.hud(true), b = DK.hud(true);
+        DK.narrate('plan', 'first'); DK.narrate('picked', 'second');
+        const el = document.getElementById('dk-hud');
+        const body = el.children[1];   // header, body, marker
+        const lines = [...body.children].map(d => d.textContent);
+        const off = DK.hud(false);
+        console.log(JSON.stringify({ a, b, count: document.querySelectorAll('#dk-hud').length === 0 ? 'removed' : 'still there',
+          lines: lines.map(t => t.replace(/^\\d\\d:\\d\\d:\\d\\d\\s+/, '')), off }));
+        """
+    )
+    assert r["a"] == "hud on" and r["b"] == "hud on" and r["off"] == "hud off"
+    assert r["lines"] == ["first", "second"] and r["count"] == "removed"
