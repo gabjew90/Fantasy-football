@@ -205,6 +205,9 @@ wall clock at join time, never read off the page later. From 30 s before
 the computed bell, the entry runs as ONE browser batch: (1) poll the
 waiting page by fetch() until it carries the Enter Draft link, throwing if
 it does not within 30 s so the batch aborts and is re-issued; (2) navigate
-straight to the draft client; (3) wait for the store; (4) inject, load,
-preflight, panel on, run. No reading between steps. On league day the same
+to the waiting room and CLICK the Enter Draft link -- its href carries an
+auth token; navigating to the bare draftclient URL leaves the client on
+"Error connecting to draft server" in predraft, which is how mock 29 lost
+pick 1 to Yahoo autopick (2026-09-03); (3) wait ~7 s for the store;
+(4) inject, load, preflight, panel on, run. No reading between steps. On league day the same
 batch runs the minute the commissioner's room opens.
