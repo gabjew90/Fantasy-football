@@ -194,10 +194,30 @@ window.DK = (function () {
     const pos = { 'bottom-right': 'bottom:8px;right:8px;', 'bottom-left': 'bottom:8px;left:8px;', 'top-right': 'top:8px;right:8px;', 'top-left': 'top:8px;left:8px;' }[o.corner] || 'bottom:8px;right:8px;';
     root.style.cssText = 'position:fixed;' + pos + 'width:' + o.width + 'px;height:' + o.height + 'px;z-index:2147483000;'
       + 'background:rgba(12,14,18,.88);color:#ddd;font:12px/1.35 Consolas,Menlo,monospace;border:1px solid #333;border-radius:6px;'
-      + 'display:flex;flex-direction:column;box-shadow:0 2px 12px rgba(0,0,0,.5);';
+      + 'display:flex;flex-direction:column;box-shadow:0 2px 12px rgba(0,0,0,.5);'
+      // native resize from the bottom-right corner (user request 2026-09-03)
+      + 'resize:both;overflow:hidden;min-width:260px;min-height:120px;';
     const head = document.createElement('div');
-    head.style.cssText = 'padding:4px 8px;background:#1b2027;color:#fd6;border-bottom:1px solid #333;flex:0 0 auto;';
+    head.style.cssText = 'padding:4px 8px;background:#1b2027;color:#fd6;border-bottom:1px solid #333;flex:0 0 auto;cursor:move;user-select:none;';
     head.textContent = 'draft engine — waiting for the room';
+    head.title = 'drag to move · resize from the bottom-right corner';
+    // drag by the header: on first grab the panel pins to left/top so the
+    // corner anchor stops fighting the drag
+    head.addEventListener('mousedown', ev => {
+      if (ev.button !== 0) return;
+      const r = root.getBoundingClientRect();
+      root.style.left = r.left + 'px'; root.style.top = r.top + 'px';
+      root.style.right = 'auto'; root.style.bottom = 'auto';
+      const dx = ev.clientX - r.left, dy = ev.clientY - r.top;
+      const move = e => {
+        root.style.left = Math.max(0, Math.min(window.innerWidth - 60, e.clientX - dx)) + 'px';
+        root.style.top = Math.max(0, Math.min(window.innerHeight - 30, e.clientY - dy)) + 'px';
+      };
+      const up = () => { document.removeEventListener('mousemove', move); document.removeEventListener('mouseup', up); };
+      document.addEventListener('mousemove', move);
+      document.addEventListener('mouseup', up);
+      ev.preventDefault();
+    });
     const body = document.createElement('div');
     body.style.cssText = 'flex:1 1 auto;overflow-y:auto;padding:4px 8px;';
     const marker = document.createElement('div');
