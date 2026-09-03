@@ -964,3 +964,21 @@ from pick 34 on. Survival scorecard at CURRENT: 30-50% shown 43% observed
 96% vs 82% (n 60). Counts as clean room 1 of 2 on the final code
 (driver d967a6c+46ec997). Reports:
 reports/mocks/mock31_2026-09-03_0328pt_goal-line-stand_room10590238_seat7_*.md.
+
+## Mock 32 — room 10590944 "Pump Fake", 10 teams, slot 2 — FORWARD TEST 5 of 5: fitted knobs live — CLEAN
+
+03:47-04:06 PT. Post-bell reload + Enter Draft click, driver in at
+10:47:42 UTC with zero picks. 15/15 legal, 15/15 ENGINE picks via the
+action path (415-621 ms confirm), zero Yahoo autopicks, no away flag on
+us; four rivals away by round 9. Fingerprint matched; sleep via worker.
+Clean room 2 of 2 on the final code. Same seat-2 opening the engine
+produced elsewhere tonight (McCaffrey, McBride, London). Survival
+scorecard at the fitted point: 30-50% shown 39% observed 0% (n 29);
+50-70% 59% vs 41% (n 32); 70-90% 83% vs 82% (n 50); 90-100% 96% vs 92%
+(n 74). Reports:
+reports/mocks/mock32_2026-09-03_0347pt_pump-fake_room10590944_seat2_*.md.
+
+Night tally (mocks 28-32): 75 legal picks, 68 by the engine, 7 to Yahoo
+autopick, every one of the 7 a procedural cause now fixed (late entry x2,
+bare client URL x1, background/hidden-tab throttling x4). Last two rooms
+clean on the final driver.
