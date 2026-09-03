@@ -152,6 +152,9 @@ def load_players(cfg: Config) -> list[dict]:
             "proj_hi": float(r["proj_hi"]) if r.get("proj_hi") not in (None, "") else None,
             "proj_lo": float(r["proj_lo"]) if r.get("proj_lo") not in (None, "") else None,
             "n_sources": int(r.get("n_sources") or 0),
+            # DECISIONS #35: Yahoo default rank (o_rank); the tracker reads it
+            # as `yrank` for the list-walking autopick component. None when absent.
+            "yahoo_rank": float(r["yahoo_rank"]) if r.get("yahoo_rank") not in (None, "") else None,
         })
     out.sort(key=lambda p: -p["vorp"])
     return out

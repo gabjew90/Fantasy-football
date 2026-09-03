@@ -250,6 +250,10 @@ TIERS_COLUMNS = [
     "backs_up_pos",
     "starter_fragility",
     "starter_fragility_label",
+    # DECISIONS #35: Yahoo's default overall rank (o_rank), the list an
+    # autopick seat walks. Informational -- read by the tracker as `yrank`
+    # for the list-walking autopick component, never by VORP or tiers.
+    "yahoo_rank",
 ]
 
 
@@ -266,5 +270,6 @@ def write_tiers_csv(tiers: pl.DataFrame, path) -> None:
         pl.col("tprr").round(3),
         pl.col("yprr").round(2),
         *[pl.col(c).round(1) for c in ("proj_sd", "proj_hi", "proj_lo") if c in out.columns],
+        *[pl.col(c).round(0) for c in ("yahoo_rank",) if c in out.columns],
     )
     out.write_csv(path)

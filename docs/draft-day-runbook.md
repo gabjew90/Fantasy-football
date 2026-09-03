@@ -146,3 +146,41 @@ Operator console API (read-only unless noted):
 ## After
 
 `docs/draft-rig-mock-log.md` gets the entry; `data/logs/` has the picks; run the CLV retro when closing ADP is available.
+
+## Draft-day surprise: the league room's data shape may differ from the mock rooms
+
+Every mock ran in Yahoo's mock draft client. The league room is the same
+application as far as anything observed, but nothing has proven it, and
+the driver reads the page's Redux store and calls its React props by
+name. Mitigation, in order, all before pick 1:
+
+1. **Structure fingerprint at preflight.** `DK.preflight()` records the
+   store's top-level keys, a pick record's keys, a player record's keys
+   (o_rank, average-pick, primary_pos, fname/lname), the managers' keys
+   (teamId, away) and the action prop names it found (makePick,
+   setAwayStatus). It compares them to `data/draftrig/store_fingerprint.json`
+   captured from the mock rooms and prints every difference as a
+   `FINGERPRINT` line. A difference is not necessarily fatal, but every one
+   must be read before the loop is armed.
+2. **Enter the league room the minute Yahoo opens it** (30-60 minutes before
+   the clock), inject, run preflight, read the fingerprint and the
+   heads-up panel with the room idle. That hour is the rehearsal; nothing
+   can be lost in it.
+3. **Three layers, each independently valid on Saturday morning:**
+   the driver's action path (needs the store + makePick); the driver's click
+   path (needs the players table and a Draft button; `row_lookup.found` in
+   preflight); the queue the driver maintains (needs only addToQueue or the
+   star button); Yahoo's own autopick from OUR pre-rank list (needs nothing
+   from the page -- loaded Saturday morning from the final board, verified
+   `has_preranks` == "1", 240 of 240). If the fingerprint says the store or
+   the actions are gone, the draft still runs on layers 3 and 4, and the
+   operator narrates from the bridge's plan (the engine still works from
+   the Picks panel text, the DOM path).
+4. **Keepers / pre-made picks.** If the league has keepers or the store
+   shows picks before the draft opens, tell the bridge nothing: it pads to
+   the header pick number and attributes by name. Untested live -- if the
+   league has keepers, run the offline shape test (tests/test_yahoo_bridge
+   `header pick number is authoritative`) with the real keeper count first.
+5. **No code changes after Friday evening.** The board rebuild and the
+   pre-rank load are the only Saturday steps; the driver served from the
+   bridge is the one that ran the last clean mock.

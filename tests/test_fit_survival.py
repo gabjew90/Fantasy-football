@@ -78,3 +78,16 @@ def test_bucketize_reports_n_predicted_and_observed():
     b = {x["bucket"]: x for x in fs.bucketize(rows)}
     assert b["90-100"]["n"] == 2 and abs(b["90-100"]["obs"] - 0.5) < 1e-9 and abs(b["90-100"]["pred"] - 0.935) < 1e-9
     assert b["0-29"]["n"] == 1 and b["50-69"]["n"] == 0 and b["50-69"]["pred"] is None
+
+
+def test_sidecar_loader_orders_calls_by_pick_and_room_stems_skip_copies(tmp_path):
+    logs = tmp_path
+    (logs / "yahoo_77.plans.jsonl").write_text(
+        '{"call": 3, "current_pick": 9, "state_in": {"away_teams": ["1"]}}\n'
+        '{"call": 1, "current_pick": 2, "state_in": {"away_teams": []}}\n'
+        'not json\n'
+        '{"call": 2, "current_pick": 2, "state_in": {"away_teams": ["4"]}}\n', encoding="utf-8")
+    calls = fs.load_sidecar("77", logs)
+    assert [(c["current_pick"], c["call"]) for c in calls] == [(2, 1), (2, 2), (9, 3)]
+    assert fs.load_sidecar("78", logs) == []
+    assert fs.is_room_stem("10534350") and not fs.is_room_stem("10532940_prereload") and not fs.is_room_stem("players_10534350")

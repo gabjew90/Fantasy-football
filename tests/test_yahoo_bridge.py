@@ -439,3 +439,23 @@ def test_depth_tail_applies_must_fill_not_only_the_position_caps():
     t = yb.build_tracker(_Cfg(), players, state)
     tail = yb.depth_tail(t, [], 40)
     assert tail and {x["p"] for x in tail} <= {"K", "DEF"}, [x["p"] for x in tail]
+
+
+def test_load_players_carries_yahoo_rank_and_tolerates_its_absence(tmp_path):
+    """DECISIONS #35: the board column `yahoo_rank` reaches the pool as-is
+    (the tracker maps it to `yrank`); a board built before the column
+    existed still loads, with None."""
+    from draftkit.config import Config
+
+    head = "player,pos,team,vorp,proj_pts,adp,tier,pos_rank,value_rank"
+    rows = ["A Back,RB,ATL,50.0,250.0,3.0,1,1,1", "B Wide,WR,CIN,40.0,240.0,,1,1,2"]
+    cfg = Config({"default_league": None}, tmp_path)
+
+    (tmp_path / "tiers.csv").write_text(
+        head + ",yahoo_rank\n" + rows[0] + ",2.0\n" + rows[1] + ",\n", encoding="utf-8")
+    got = {p["name"]: p["yahoo_rank"] for p in yb.load_players(cfg)}
+    assert got == {"A Back": 2.0, "B Wide": None}
+
+    (tmp_path / "tiers.csv").write_text(head + "\n" + "\n".join(rows) + "\n", encoding="utf-8")
+    got = {p["name"]: p["yahoo_rank"] for p in yb.load_players(cfg)}
+    assert got == {"A Back": None, "B Wide": None}

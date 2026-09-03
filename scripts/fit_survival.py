@@ -196,6 +196,59 @@ def trail_recs(trail: dict) -> list[dict]:
     return out
 
 
+def load_sidecar(room: str, logs_dir: Path) -> list[dict]:
+    """The bridge's per-call plan records (data/logs/yahoo_<room>.plans.jsonl),
+    ordered by (current_pick, call). Empty when the room has none."""
+    p = logs_dir / f"yahoo_{room}.plans.jsonl"
+    if not p.exists():
+        return []
+    rows = []
+    for line in p.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        try:
+            rows.append(json.loads(line))
+        except ValueError:
+            continue
+    rows = [r for r in rows if isinstance(r.get("current_pick"), int)]
+    return sorted(rows, key=lambda r: (int(r["current_pick"]), int(r.get("call") or 0)))
+
+
+def team_slots(picks_raw: list[dict], teams: int) -> dict[str, int]:
+    """Yahoo team id -> draft slot, from ANY pick that team made in the trail
+    (the snake fixes the slot from the pick number), so a seat that has not
+    yet picked at a given state still resolves -- the bridge's own away_slots
+    field is built from the slot map, which is empty for such a seat."""
+    out: dict[str, int] = {}
+    for p in picks_raw:
+        tid = str(p.get("team_id"))
+        if tid and tid != "None" and tid not in out:
+            out[tid] = snake.pick_to_round_slot(int(p["pick_no"]), teams)[1]
+    return out
+
+
+def away_at_from_sidecar(calls: list[dict], team_slot: dict[str, int], n_picks: int) -> dict[int, frozenset]:
+    """{pick_no: frozenset(draft slots on autopick)} for pick_no 1..n_picks:
+    the slots whose team id was in state_in.away_teams at the LATEST call
+    with current_pick <= pick_no (a call made while pick_no was on the clock
+    counts). The flag flickers with connection status, so this is the nearest
+    preceding reading, not a smoothed one. Picks before the first call: empty.
+    Team ids with no pick anywhere in the trail cannot be placed and are
+    dropped (they never pick, so they never enter a window as a rival)."""
+    cps = [int(c["current_pick"]) for c in calls]
+    sets = []
+    for c in calls:
+        ids = ((c.get("state_in") or {}).get("away_teams")) or []
+        sets.append(frozenset(team_slot[str(t)] for t in ids if str(t) in team_slot))
+    out: dict[int, frozenset] = {}
+    j = -1
+    for p in range(1, n_picks + 1):
+        while j + 1 < len(cps) and cps[j + 1] <= p:
+            j += 1
+        out[p] = sets[j] if j >= 0 else frozenset()
+    return out
+
+
 def load_yahoo_room(room: str, logs_dir: Path) -> dict | None:
     trail_path = logs_dir / "mocks" / f"mock_{room}.json"
     if not trail_path.exists():
@@ -221,9 +274,22 @@ def load_yahoo_room(room: str, logs_dir: Path) -> dict | None:
     # rooms rebuilt from Yahoo's results emails (scripts/yahoo_mock_email.py)
     # carry no away flags and no pick records; they are their own room type
     room_type = "yahoo_email" if trail.get("source") == "yahoo_email" else "yahoo_autopick"
+    # DECISIONS #35: the per-pick away set from the sidecar (team ids -> slots
+    # via the snake). Rooms without a sidecar get an empty set at every pick,
+    # so the engine's autopick branch is not exercised for them.
+    calls = load_sidecar(room, logs_dir)
+    n_picks = max((p["pick_no"] for p in picks), default=0)
+    away_at = away_at_from_sidecar(calls, team_slots(picks_raw, teams), n_picks) if calls else {}
     return {"room": room, "room_type": room_type, "picks": picks, "recs": recs,
             "teams": teams, "rounds": rounds, "my_slot": my[0] if my else None, "recs_source": source,
-            "away": sum(1 for m in (trail.get("managers") or {}).values() if m.get("away"))}
+            "away": sum(1 for m in (trail.get("managers") or {}).values() if m.get("away")),
+            "has_sidecar": bool(calls), "away_at": away_at}
+
+
+def is_room_stem(stem: str) -> bool:
+    """mock_<room>.json only: not the pre-reload copy of a trail (its picks
+    would double-count the room) and not a players snapshot."""
+    return not (stem.endswith("_prereload") or stem.startswith("players_"))
 
 
 def all_rooms(logs_dir: Path) -> list[dict]:
@@ -235,7 +301,10 @@ def all_rooms(logs_dir: Path) -> list[dict]:
         if r["picks"] and r["my_slot"]:
             rooms.append(r)
     for p in sorted((logs_dir / "mocks").glob("mock_*.json")) if (logs_dir / "mocks").exists() else []:
-        r = load_yahoo_room(p.stem.replace("mock_", ""), logs_dir)
+        stem = p.stem.replace("mock_", "", 1)
+        if not is_room_stem(stem):
+            continue
+        r = load_yahoo_room(stem, logs_dir)
         if r and r["picks"] and r["my_slot"]:
             rooms.append(r)
     return rooms
@@ -308,12 +377,21 @@ def main() -> None:
     ap.add_argument("--fit-out", default=str(ROOT / "reports" / "survival_fit.md"))
     ap.add_argument("--confirm-point", default=None, metavar="JSON",
                     help='confirm one knob set at --confirm-sims against the bar, e.g. \'{"sigma_early": 4}\'')
+    ap.add_argument("--stage", default="all", choices=["all", "sigma", "reach", "need", "autopick"],
+                    help="which coordinate stage(s) to run; autopick = the three DECISIONS #35 sub-stages "
+                         "on the rooms whose sidecar gives a non-empty away set")
+    ap.add_argument("--loro", action="store_true",
+                    help="leave-one-room-out: fit on the other rooms, score the held-out room at the fitted "
+                         "point and at CURRENT; writes reports/survival_loro.md")
+    ap.add_argument("--loro-out", default=str(ROOT / "reports" / "survival_loro.md"))
     a = ap.parse_args()
-    if a.fit or a.confirm_point:
+    if a.fit or a.confirm_point or a.loro:
         sys.path.insert(0, str(ROOT / "scripts"))
-        from survival_refit import CURRENT, confirm_point, run_fit
+        from survival_refit import CURRENT, confirm_point, run_fit, run_loro
         if a.confirm_point:
             confirm_point(a, {**CURRENT, **json.loads(a.confirm_point)})
+        elif a.loro:
+            run_loro(a)
         else:
             run_fit(a)
         return

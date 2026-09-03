@@ -68,6 +68,8 @@ def load_board(path: str) -> list[dict]:
             "proj_hi": f("proj_hi") if r.get("proj_hi") not in (None, "") else None,
             "proj_lo": f("proj_lo") if r.get("proj_lo") not in (None, "") else None,
             "n_sources": int(f("n_sources", 0)),
+            # DECISIONS #35: Yahoo default rank (o_rank); None when absent
+            "yahoo_rank": f("yahoo_rank") if r.get("yahoo_rank") not in (None, "") else None,
         })
     out.sort(key=lambda p: -p["vorp"])
     return out

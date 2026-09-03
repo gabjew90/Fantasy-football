@@ -152,10 +152,18 @@ class Handler(BaseHTTPRequestHandler):
         self._json({"ok": True, "path": str(out), "bytes": out.stat().st_size})
 
     def do_POST(self):
-        if self.path.startswith("/trail") or self.path.startswith("/fixture"):
+        if (self.path.startswith("/trail") or self.path.startswith("/fixture")
+                or self.path.startswith("/players")):
             try:
                 body = self._read_json()
-                if self.path.startswith("/trail"):
+                if self.path.startswith("/players"):
+                    # The room's whole player store (DK.players(): o_rank,
+                    # psr_rank, avg_pick per player). scripts/
+                    # yahoo_rank_from_snapshot.py turns it into the
+                    # league-scoped yahoo_rank input (DECISIONS #35).
+                    self._save_named(body, "source_room", ROOT / "data" / "logs" / "mocks", ".json",
+                                     json.dumps(body, indent=1), "players_", prefix="players_")
+                elif self.path.startswith("/trail"):
                     # End-of-mock dump from the page (DK.trail()): every pick with
                     # team ids, the managers, and our pick records (reason,
                     # best-by-projection alternative, candidates passed on).

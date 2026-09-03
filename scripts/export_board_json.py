@@ -75,6 +75,8 @@ def main() -> None:
             # plan A1/A3: source dispersion and count, for the driver's late-round mirror
             "sd": (lambda x: None if x in (None, "") else float(x))(r.get("proj_sd")),
             "ns": int(r.get("n_sources") or 0),
+            # DECISIONS #35: Yahoo default rank (o_rank), null when unmatched
+            "yr": (lambda x: None if x in (None, "") else float(x))(r.get("yahoo_rank")),
         })
     out.sort(key=lambda x: -x["v"])
     Path(a.out).write_text(json.dumps(out, separators=(",", ":")), encoding="utf-8")

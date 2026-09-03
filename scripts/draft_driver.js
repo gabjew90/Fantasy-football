@@ -515,8 +515,14 @@ window.DK = (function () {
       // first seen with the clock still full (and a recent previous poll,
       // Chrome throttles the hidden tab) is Yahoo's, not a person's
       if (!S.seen.has(no)) {
-        S.seen.set(no, { seen_at: new Date(now).toISOString(), clock_left: Number.isFinite(+secs) ? +secs : null,
-                         poll_gap_ms: gap, away_teams_at: away.slice(), clock_max: S.clockMax });
+        // how long the picker took = this pick's first sight minus the
+        // previous pick's first sight (the countdown at first sight belongs
+        // to the NEXT turn, which has just opened, so it says nothing about
+        // the picker -- mock 27, 2026-09-03, every pick read clock 30)
+        const prev = S.seen.get(no - 1);
+        const sincePrev = prev && prev.seen_ms ? now - prev.seen_ms : null;
+        S.seen.set(no, { seen_at: new Date(now).toISOString(), seen_ms: now, clock_left: Number.isFinite(+secs) ? +secs : null,
+                         poll_gap_ms: gap, since_prev_ms: sincePrev, away_teams_at: away.slice(), clock_max: S.clockMax });
       }
       const seen = S.seen.get(no);
       return { pick_no: no, name: ((p.fname || '') + ' ' + (p.lname || '')).trim(),
@@ -527,7 +533,8 @@ window.DK = (function () {
                // ADP as Yahoo shows it, preseason rank
                o_rank: num(p.o_rank), avg_pick: num(p['average-pick']), psr_rank: num(p.psr_rank),
                seen_at: seen.seen_at, clock_left: seen.clock_left, poll_gap_ms: seen.poll_gap_ms,
-               label: timingLabel(seen.clock_left, seen.poll_gap_ms, seen.clock_max) };
+               since_prev_ms: seen.since_prev_ms,
+               label: timingLabel(seen.since_prev_ms, seen.poll_gap_ms) };
     });
     // draftOrder.currentPick is the count of picks MADE (null before pick 1,
     // 5 while pick 6 is on the clock), so the pick on the clock is +1. Found
@@ -549,16 +556,16 @@ window.DK = (function () {
     };
   }
 
-  /* The pre-registered timing label (DECISIONS #35): 'instant' when the pick
-   * was first seen with at most 3 s off a full clock AND the previous poll
-   * was no more than 2 s earlier (otherwise a throttled tab could make a slow
-   * human look instant); 'human' when at least 10 s had run; else 'unknown'.
-   * Pure; the thresholds scale with the room's clock (30 s mocks, 60 s league). */
-  function timingLabel(clockLeft, pollGapMs, clockMax) {
-    const max = clockMax || 30;
-    if (clockLeft == null) return 'unknown';
-    if (clockLeft >= max - 3) return (pollGapMs != null && pollGapMs <= 2000) ? 'instant' : 'unknown';
-    if (clockLeft <= max - 10) return 'human';
+  /* The timing label (DECISIONS #35, corrected 2026-09-03 mock 27): how long
+   * the picker took = this pick's first sight minus the previous pick's, in
+   * ms. 'instant' when that is at most 2.5 s AND the previous poll was no more
+   * than 2 s earlier (a throttled tab must not make a slow human look
+   * instant); 'human' when the picker took at least 8 s; else 'unknown'. The
+   * first pick of the room has no predecessor -> 'unknown'. Pure. */
+  function timingLabel(sincePrevMs, pollGapMs) {
+    if (sincePrevMs == null) return 'unknown';
+    if (sincePrevMs <= 2500) return (pollGapMs != null && pollGapMs <= 2000) ? 'instant' : 'unknown';
+    if (sincePrevMs >= 8000) return 'human';
     return 'unknown';
   }
 
@@ -1534,7 +1541,12 @@ window.DK = (function () {
    * post-pick state. Every record is retained in S.records for trail(). */
   function pickRecord(cand, extra, top) {
     const b = S.board.find(x => x.n === cand.n && x.p === cand.p) || {};
-    const alt = bestByProjection();
+    // bestByProjection() runs after OUR pick landed, so it excludes the pick
+    // itself; when the pick projects at least as high as anyone left, the
+    // pick WAS the top projection (mock 27: Maye 305 read as "passed on
+    // Hurts 292")
+    let alt = bestByProjection();
+    if (alt && (b.j || 0) >= (alt.proj || 0)) alt = { n: cand.n, p: cand.p, proj: b.j, vorp: b.v };
     const passed = (top || []).filter(x => !(x.n === cand.n && x.p === cand.p)).slice(0, 3)
       .map(x => ({ n: x.n, p: x.p, v: x.v, why: (x.why || '').slice(0, 120),
                    s: x.s == null ? null : x.s, e: x.e == null ? null : x.e }));

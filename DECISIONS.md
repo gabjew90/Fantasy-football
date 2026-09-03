@@ -2095,3 +2095,28 @@ What pi_away means: the deployable list-walk probability GIVEN the live
 signal is Yahoo's away flag (impure). The timing label (new rooms) should
 separate true autopicks (pi_instant expected >= 0.8) from flagged humans;
 until it exists, 0.3 is the honest value for the flag we have.
+
+### Draft-day data-shape risk (2026-09-03, user's question)
+
+The league room has never been observed by the driver; every mock ran in
+the mock client. Mitigation recorded in docs/draft-day-runbook.md: a store
+structure fingerprint at preflight compared against the mock rooms'
+(`data/draftrig/store_fingerprint.json`, to be captured from mock 27's
+room), entry the minute the league room opens with a full idle preflight,
+the four independent layers restated, keepers flagged as untested, and a
+code freeze from Friday evening. The fingerprint code is a small addition
+to preflight and ships with the trail panel.
+
+### Queued (2026-09-03, user's call): multi-source board tried in mock rooms, exploratory
+
+After the trail panel, the fingerprint check, the board rebuild and the
+refit's forward rooms: build the multi-source board (projections.external
+combine: mean, sources sleeper + espn, late_round_dispersion on) side by
+side with the shipped board, publish the diff (movers by more than a
+round; replay churn by tier on the archived drafts), then draft one or two
+mock rooms on it with the same narration. Stated limits, so nobody reads
+the result as evidence: a mock grades a board by its own projections and
+its rivals score no real points, so these rooms can show pipeline
+soundness, churn and eye-test sanity, never accuracy. The default stays on
+#23's verdict; the January scoring of the frozen forward snapshot (#30)
+decides 2027. Saturday drafts on the validated board regardless.

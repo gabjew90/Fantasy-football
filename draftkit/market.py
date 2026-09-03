@@ -69,6 +69,35 @@ def _norm_name_expr(col):
             .str.replace_all(r"[^a-z0-9]", ""))
 
 
+def _yahoo_key_expr(name, pos):
+    """Join key for Yahoo-sourced files. Players: the suffix-stripped name.
+    Defenses: the nickname only -- Yahoo's room names a DEF "Texans" while
+    the market/board names it "Houston Texans", so the last whitespace token
+    ("texans") is the one part both sides agree on."""
+    nick = name.str.strip_chars().str.extract(r"(\S+)\s*$", 1)
+    return (pl.when(pos == "DEF")
+            .then(_norm_name_expr(nick))
+            .otherwise(_norm_name_expr(name)))
+
+
+def attach_yahoo_rank(market: pl.DataFrame, path: Path) -> tuple[pl.DataFrame, int]:
+    """Left-join Yahoo's default overall rank (o_rank) onto the market frame
+    as `yahoo_rank` (Float64, null when unmatched). Keyed on (yahoo key, pos)
+    like the Yahoo ADP join; returns (frame, matched count). Adds exactly one
+    column -- every existing column keeps its value and its row order."""
+    yah = pl.read_csv(path, infer_schema_length=500).with_columns(
+        pl.col("pos").cast(pl.Utf8).str.to_uppercase(),
+    )
+    yah = yah.with_columns(
+        _yahoo_key_expr(pl.col("name"), pl.col("pos")).alias("_ykey"),
+        pl.col("yahoo_rank").cast(pl.Float64),
+    ).select("_ykey", "pos", "yahoo_rank").unique(subset=["_ykey", "pos"], keep="first")
+    out = market.with_columns(
+        _yahoo_key_expr(pl.col("name"), pl.col("pos")).alias("_ykey")
+    ).join(yah, on=["_ykey", "pos"], how="left", maintain_order="left").drop("_ykey")
+    return out, int(out["yahoo_rank"].is_not_null().sum())
+
+
 def load_ffc_adp(raw_dir: Path, teams: int, year: int,
                  fmt: str = "ppr") -> pl.DataFrame:
     cache = Path(raw_dir) / f"ffc_adp_{fmt}_{teams}_{year}.json"
@@ -245,6 +274,19 @@ def build_market(cfg, players: dict[str, dict]) -> tuple[pl.DataFrame, dict]:
             _norm_name_expr(pl.col("name")).alias("_norm")
         ).join(yah, on=["_norm", "pos"], how="left").drop("_norm")
         report["yahoo_adp_matched"] = int(market["adp_yahoo"].is_not_null().sum())
+
+    # Yahoo default rank (o_rank -- the list an autopick seat walks, DECISIONS
+    # #35). Same league-scoping and the same loud-not-silent rule for an
+    # unscoped file. Informational column: nothing downstream of VORP reads it.
+    rpath = cfg.scoped(cfg.path("external") / "yahoo_rank.csv")
+    runscoped = cfg.path("external") / "yahoo_rank.csv"
+    if not rpath.exists() and rpath != runscoped and runscoped.exists():
+        report["yahoo_rank_warning"] = (
+            f"found {runscoped.name} but league '{cfg.league_name}' reads "
+            f"{rpath.name} — rename it")
+    if rpath.exists():
+        market, matched = attach_yahoo_rank(market, rpath)
+        report["yahoo_rank_matched"] = matched
 
     if "adp_user" in market.columns:
         market = market.with_columns(

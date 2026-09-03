@@ -842,3 +842,37 @@ Standing: one clean room on the final code, not three. Two more clean
 rooms are still owed by the repo's own rule before Saturday's code is
 called settled; the faults in 24 and 25 were injected, so those two do
 not count toward it.
+
+## Mock 27 — room 10584427 "Hang Time", 10 teams, slot 8 — CLEAN (2 of 3), 15 of 15 via makePick; first room with the refit instrumentation
+
+Trail and scrutiny: reports/mocks/mock27_2026-09-03_0043pt_hang-time_room10584427_seat8_{trail,scrutiny}.md.
+Six human seats at the join; one away (seat 5) most of the room.
+
+Roster: Smith-Njigba, Achane, McBride, Garrett Wilson, Maye, Jaylen
+Warren, Stevenson, Gainwell, Aaron Jones, Wan'Dale Robinson, Mahomes
+(QB2, R11), Pittman, Woody Marks, Eagles DEF, Pineiro K. Legal. Led the
+room on projected starting lineup from round 8 on (1473 vs 1447 at pick
+78). In the room before pick 1 (reload after the bell, Enter Draft, 7 s on
+the pre-draft clock).
+
+Fifteen of fifteen through makePick (374-603 ms), five heartbeats, zero
+gate / local / away events; two named bridge warnings (Kaleb Johnson and
+Will Reichard are not on the 238-player board -- DATA MISSING, said aloud,
+no effect). Second clean room on the final code (mock 26 was the first);
+one more owed.
+
+New this room (DECISIONS #35 instrumentation): the driver posted a
+players snapshot (1195 players with Yahoo o_rank/avg_pick) through the new
+/players route at preflight, stamped every rival pick's first sight, and
+the label rule was found wrong on the spot -- the countdown at first sight
+belongs to the NEXT turn, so every pick read "clock 30". Corrected the
+same hour to time-since-previous-pick (instant <= 2.5 s with a poll gap
+<= 2 s; human >= 8 s); the stamps in this room's trail allow the relabel
+offline. Our own pick 13 landed 17 s after the previous pick -- the queue
+sync holding the loop when the turn opens (review 2026-09-02 finding);
+fine on a 60-s clock, thin on 30. Queued for iteration.
+
+Calibration (scorecard): 30-50% shown 43 / observed 52 (n 33); 50-70%
+60 / 33; 70-90% 80 / 37 (n 46); 90-100% 96 / 79 (n 97). Same shape as
+mocks 24-26 in a mostly human room: the overconfidence is not only the
+autopick seats.

@@ -1146,21 +1146,21 @@ def test_pick_verification_uses_our_pick_number_even_without_a_team_id():
 
 # ---------- refit study instrumentation (DECISIONS #35) ----------
 
-def test_timing_label_is_the_pre_registered_rule():
-    """instant = first seen with <= 3 s off a full clock AND a previous poll
-    no more than 2 s earlier; human = >= 10 s run; else unknown. Scales
-    with the room clock (30 s mocks, 60 s league)."""
+def test_timing_label_is_the_corrected_rule():
+    """instant = the picker took <= 2.5 s (this pick's first sight minus the
+    previous pick's) AND the previous poll was <= 2 s earlier; human = took
+    >= 8 s; else unknown. The first pick of a room has no predecessor."""
     r = run_js("console.log(JSON.stringify(["
-               "DK.timingLabel(30, 900, 30), DK.timingLabel(27, 1800, 30), DK.timingLabel(27, 2600, 30),"
-               "DK.timingLabel(24, 900, 30), DK.timingLabel(20, 900, 30), DK.timingLabel(5, 900, 30),"
-               "DK.timingLabel(58, 900, 60), DK.timingLabel(45, 900, 60), DK.timingLabel(null, 900, 30), DK.timingLabel(29, null, 30)]));")
-    assert r == ["instant", "instant", "unknown", "unknown", "human", "human", "instant", "human", "unknown", "unknown"]
+               "DK.timingLabel(1000, 900), DK.timingLabel(2500, 1800), DK.timingLabel(2500, 2600),"
+               "DK.timingLabel(5000, 900), DK.timingLabel(8000, 900), DK.timingLabel(20000, 900),"
+               "DK.timingLabel(null, 900), DK.timingLabel(1000, null)]));")
+    assert r == ["instant", "instant", "unknown", "unknown", "human", "human", "unknown", "unknown"]
 
 
 def test_store_state_stamps_first_sight_and_carries_yahoo_ranks():
-    """Each drafted entry carries Yahoo's o_rank / avg_pick / psr_rank and the
-    first-sight stamp (clock left, poll gap, away set) taken the FIRST time
-    the pick was seen -- later reads do not move it."""
+    """Each drafted entry carries Yahoo's o_rank / avg_pick / psr_rank and a
+    first-sight stamp (time since the previous pick, poll gap, away set)
+    taken the FIRST time the pick was seen -- later reads do not move it."""
     r = run_js(
         f"""
         const s = {json.dumps(_store_with([(1, "1", "100")], players=PLAYERS))};
@@ -1169,22 +1169,23 @@ def test_store_state_stamps_first_sight_and_carries_yahoo_ranks():
         s.countdown.seconds = 29; s.league.managers["9"] = {{ id: "9", teamId: "9", away: true }};
         DK._setStore({{ getState: () => s }});
         const a = DK.storeState();
-        // second pick appears with the clock at 12 (a human took 18 s); first pick's stamp must not move
+        // the second pick appears on the very next poll: the picker took ~0 s -> instant
         s.draftPicks.order.push({{ id: 2, teamId: "2", playerId: "101" }});
         s.countdown.seconds = 12; s.draftOrder.currentPick = 2;
         const b = DK.storeState();
+        const c = DK.storeState();
         console.log(JSON.stringify({{
-          first: {{ o_rank: a.drafted[0].o_rank, avg_pick: a.drafted[0].avg_pick, psr: a.drafted[0].psr_rank, clock: a.drafted[0].clock_left, label: a.drafted[0].label, away: a.drafted[0].seen_at ? true : false }},
-          again: {{ clock: b.drafted[0].clock_left, label: b.drafted[0].label }},
-          second: {{ clock: b.drafted[1].clock_left, label: b.drafted[1].label, gapKnown: b.drafted[1].poll_gap_ms != null, o_rank: b.drafted[1].o_rank }},
+          first: {{ o_rank: a.drafted[0].o_rank, avg_pick: a.drafted[0].avg_pick, psr: a.drafted[0].psr_rank, clock: a.drafted[0].clock_left, label: a.drafted[0].label, since: a.drafted[0].since_prev_ms }},
+          again: {{ clock: c.drafted[0].clock_left, label: c.drafted[0].label }},
+          second: {{ clock: b.drafted[1].clock_left, label: b.drafted[1].label, since: b.drafted[1].since_prev_ms, gapKnown: b.drafted[1].poll_gap_ms != null, o_rank: b.drafted[1].o_rank }},
           awayAt: DK.trailDump().picks[0].away_teams_at,
         }}));
         """
     )
     assert r["first"]["o_rank"] == 6 and r["first"]["avg_pick"] == 5.8 and r["first"]["psr"] == 15
-    assert r["first"]["clock"] == 29 and r["first"]["label"] == "unknown"   # first ever poll: no gap known -> not 'instant'
-    assert r["again"]["clock"] == 29, "the stamp is taken once"
-    assert r["second"]["clock"] == 12 and r["second"]["label"] == "human" and r["second"]["gapKnown"] and r["second"]["o_rank"] == 2
+    assert r["first"]["clock"] == 29 and r["first"]["label"] == "unknown" and r["first"]["since"] is None   # no predecessor
+    assert r["again"]["clock"] == 29 and r["again"]["label"] == "unknown", "the stamp is taken once"
+    assert r["second"]["clock"] == 12 and r["second"]["label"] == "instant" and r["second"]["since"] <= 2500 and r["second"]["gapKnown"] and r["second"]["o_rank"] == 2
     assert r["awayAt"] == ["9"]
 
 
