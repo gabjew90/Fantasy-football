@@ -1247,3 +1247,13 @@ def test_fingerprint_diff_names_missing_and_new_parts():
     assert r["none"] == ["no baseline to compare"]
 
 
+
+
+def test_sleep_falls_back_to_settimeout_without_a_worker_and_reports_its_mode():
+    """node has no Worker: the throttle-proof sleep must degrade to
+    setTimeout, still wait, and say so in sleepMode. (In Chrome the Blob
+    worker path is live; mock 30's tab confirmed a 500 ms sleep in 508 ms
+    while hidden.)"""
+    r = run_js("const t0 = Date.now(); DK._sleep(120).then(() => console.log(JSON.stringify({ waited: Date.now() - t0, mode: DK.sleepMode() })));")
+    assert r["waited"] >= 100
+    assert r["mode"].startswith("timeout")

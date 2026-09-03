@@ -1237,7 +1237,45 @@ window.DK = (function () {
     el.dispatchEvent(new Event('input', { bubbles: true }));
     return true;
   }
-  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  /* THROTTLE-PROOF SLEEP (mocks 29 and 30, 2026-09-03). Chrome's intensive
+   * wake-up throttling applies to a page hidden for more than five minutes:
+   * chained setTimeouts get roughly one wake-up a minute. Both rooms lost a
+   * pair of picks to it -- the loop went silent for 20-23 s exactly when our
+   * turn opened, Yahoo (whose own client timers were throttled too) had
+   * flagged us away, and its autopick fired the instant the turn opened.
+   * Timers inside a dedicated Worker are exempt, so the wait is scheduled in
+   * a Blob worker and resolved by its message; a guard setTimeout at ms+5 s
+   * means the worst case is the old throttled behaviour, never a hang. Falls
+   * back to setTimeout where Worker/Blob are missing (node tests) or the page
+   * refuses blob: workers; S.sleepMode says which path is live and the start
+   * line reports it. */
+  let sleepWorker = null, sleepSeq = 0;
+  const sleepWaiters = new Map();
+  function sleepViaWorker() {
+    if (sleepWorker !== null) return sleepWorker;
+    try {
+      if (typeof Worker === 'undefined' || typeof Blob === 'undefined' || typeof URL === 'undefined' || !URL.createObjectURL) throw new Error('no Worker');
+      const src = 'onmessage=function(e){setTimeout(function(){postMessage(e.data.id)},e.data.ms)}';
+      const w = new Worker(URL.createObjectURL(new Blob([src], { type: 'application/javascript' })));
+      w.onmessage = e => { const r = sleepWaiters.get(e.data); if (r) { sleepWaiters.delete(e.data); r(); } };
+      w.onerror = () => {
+        sleepWorker = false; S.sleepMode = 'timeout (worker error)';
+        for (const [id, r] of [...sleepWaiters]) { sleepWaiters.delete(id); r(); }
+      };
+      sleepWorker = w; S.sleepMode = 'worker';
+    } catch (e) { sleepWorker = false; S.sleepMode = 'timeout (' + String(e && e.message).slice(0, 40) + ')'; }
+    return sleepWorker;
+  }
+  const sleep = ms => new Promise(resolve => {
+    const w = sleepViaWorker();
+    if (!w) return setTimeout(resolve, ms);
+    const id = ++sleepSeq;
+    let guard = null;
+    const done = () => { if (guard) clearTimeout(guard); resolve(); };
+    sleepWaiters.set(id, done);
+    guard = setTimeout(() => { if (sleepWaiters.delete(id)) resolve(); }, ms + 5000);
+    try { w.postMessage({ id, ms }); } catch (e) { sleepWaiters.delete(id); clearTimeout(guard); setTimeout(resolve, ms); }
+  });
 
   /* Yahoo and the board spell teams differently (SFO/SF, JAC/Jax, GBP/GB).
    * Both sides normalise here so the team check is meaningful. */
@@ -2063,7 +2101,10 @@ window.DK = (function () {
      * saw the flag. Clearing after the fact is too late by construction, so
      * send Yahoo's own "not away" (setAwayStatus(false) -> "6|league|
      * manager") every few minutes whether or not the flag is up. */
-    const hbEvery = (S.cfg.heartbeatSec != null ? S.cfg.heartbeatSec : 240) * 1000;
+    /* 240 s was too slow: mock 30 (2026-09-03) was flagged away within four
+     * minutes of a beat while the tab was throttled. 60 s, from the
+     * throttle-proof loop. */
+    const hbEvery = (S.cfg.heartbeatSec != null ? S.cfg.heartbeatSec : 60) * 1000;
     if (S.lastHeartbeat == null) S.lastHeartbeat = Date.now();   // first beat one interval after start
     let acts = null;                       // looked up only when a beat is due (or the flag is up)
     if (Date.now() - S.lastHeartbeat >= hbEvery) {
@@ -2136,7 +2177,8 @@ window.DK = (function () {
     // 3600-s default expired mid-draft. The loop ends on roster full / draft
     // over / DK.stop().
     const deadline = maxSeconds ? Date.now() + maxSeconds * 1000 : Infinity;
-    note('driver start' + (throttleRisk()
+    sleepViaWorker();
+    note('driver start — sleep via ' + S.sleepMode + (throttleRisk()
       ? ' — WARNING: tab is hidden, Chrome throttles timers; keep it visible'
       : ''));
     if (S.cfg.hud !== false) hud(true);
@@ -2388,6 +2430,7 @@ window.DK = (function () {
     rank, syncQueue, draftTop, run, gatesOk, storeState, findStore, keepAlive, preflight, _setStore, rosterView, top6TeFell,
     timingLabel, playersSnapshot, postPlayersSnapshot,
     narrate, hud, plainEnglishPick, fingerprint, fingerprintDiff,
+    sleepMode: () => S.sleepMode, _sleep: sleep,
     narration: () => S.trail.slice(),
     classifyMiss, rowMatches, normTeam, autopickArmed, idKey, // exported for tests
     findRow, parsePicksPanel, myRoster, tableLive, currentPickNo, // offline DOM tests (jsdom + fixtures)

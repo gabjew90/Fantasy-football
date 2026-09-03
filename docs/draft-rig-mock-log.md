@@ -924,3 +924,28 @@ shown 38% observed 5% (n 21); 50-70% shown 61% observed 31% (n 13);
 away by round 10; 23 instant autopicks labelled. Odd: bench-insurance recs
 for Tyrone Tracy carried no survival figure (s None) for several calls.
 Reports: reports/mocks/mock29_2026-09-03_0228pt_hurry-up-offense_room10588125_seat1_*.md.
+
+## Mock 30 — room 10589182 "First and Ten", 10 teams, slot 1 — FORWARD TEST 3 of 5: fitted knobs live
+
+02:57-03:15 PT. Entry as one batch: the fetch poll matched my own league's
+draft link (regex too loose), but the reload at the bell kept the seat, the
+Enter Draft link was clicked at 09:57:08 UTC and the driver was in with
+zero picks made. 15/15 legal; 13 engine picks via the action path (~0.95 s
+confirm), pick 1 McCaffrey included. TWO Yahoo autopicks (120 Sutton, 121
+Goedert): the driver loop went silent 20 s (poll gap 19995 ms, 10:13:09 to
+10:13:29 UTC) with the tab IN FRONT -- the whole Chrome window is hidden
+while the rig runs unattended, and Chrome's intensive wake-up throttling
+(page hidden > 5 min) limits chained setTimeouts to ~1 wake-up a minute.
+Yahoo flagged us away inside 4 minutes of a heartbeat and autopicked the
+instant the turn opened. Fix shipped after the room: the driver's sleep
+runs on a Blob Worker timer (exempt from the throttling; confirmed live on
+Yahoo's page, 500 ms -> 508 ms while hidden) with a +5 s guard and a
+setTimeout fallback; heartbeat 240 s -> 60 s. On league day the tab is
+visible and focused, which is exempt anyway; the fix removes the
+dependence. Seat 1 produced the SAME first six engine picks as mock 29
+from the same seat (McBride, London, then Swift/Skattebo, G. Wilson, Hurts,
+Warren): the engine is deterministic given the board. Survival scorecard
+at the fitted point: 30-50% shown 39% observed 12% (n 16); 50-70% 59% vs
+11% (n 18); 70-90% 81% vs 78% (n 40); 90-100% 97% vs 83% (n 54). Six of
+nine rivals away by round 11. Reports:
+reports/mocks/mock30_2026-09-03_0257pt_first-and-ten_room10589182_seat1_*.md.
