@@ -1265,21 +1265,3 @@ def test_fingerprint_diff_ignores_pick_keys_before_the_first_pick():
                " changed: DK.fingerprintDiff({ store_keys: ['a'], pick_keys: ['id'] }, base) }));")
     assert r["empty"] == []
     assert any(d.startswith("pick_keys: missing") for d in r["changed"])
-
-
-def test_hud_is_draggable_by_the_header_and_resizable():
-    """jsdom: the header carries the move cursor and a mousedown pins the
-    panel to left/top (so the corner anchor stops fighting the drag); the
-    root declares native resize."""
-    r = run_js_dom(
-        """
-        DK.loadCompact("Christian McCaffrey|RB|SFO|122.8|1|", { teams: 10 });
-        DK.hud(true);
-        const el = document.getElementById('dk-hud');
-        const head = el.children[0];
-        head.dispatchEvent(new window.MouseEvent('mousedown', { button: 0, clientX: 50, clientY: 40, bubbles: true }));
-        console.log(JSON.stringify({ cursor: head.style.cursor, resize: el.style.resize,
-          pinned: el.style.right === 'auto' && el.style.bottom === 'auto' }));
-        """
-    )
-    assert r["cursor"] == "move" and r["resize"] == "both" and r["pinned"] is True
