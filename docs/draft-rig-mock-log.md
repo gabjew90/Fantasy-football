@@ -1029,3 +1029,35 @@ bulleted format was live (driver.js is read from disk per injection);
 the pair-math fields were not (bridge-side, stale process). Reports:
 reports/mocks/mock35_2026-09-03_0818pt_hitch-and-go_room10600461_seat5_*.md.
 Pair B moves to mock 36: seat 5, fitted on the VERIFIED forward9 bridge.
+
+## Mock 36 — room 10601343 "Crackback Block", 10 teams, slot 5 — PAIR B: FITTED knobs + #36 wire fix, verified bridge (forward9) — CLEAN
+
+08:42-09:00 PT. First room on a VERIFIED bridge (preflight call#1; port
+owner a child of the launched PID). 15/15 legal, 15/15 engine, zero
+autopicks. First live room for the #36 wire fix and the pair-math panel
+lines, both confirmed on screen:
+- plan lines carried both costs, e.g. pick 1: "McCaffrey · wait costs 11
+  · pick costs 0, best pair 290.5 (159.6 now + ~130.9 RB next)".
+- Tracy's insurance printed ~80 (was ~105 against the ghost wire), and
+  the honest wire flipped two bench picks to WR/QB insurance exactly as
+  the #36 measurement predicted (85 W. Robinson over Gainwell).
+Two Chrome-extension drops mid-room; the driver ran through both.
+
+PAIR B vs mock 33 (same seat 5, CURRENT knobs), with mock 35 as the
+same-model control (13/15 identical to 33):
+- 36 matched 33 on 5 of 15 picks; of the 10 differences, 3 were pure
+  availability, 7 were the model/wire (16 Achane over McBride, 25 McBride
+  over K. Williams, 45 Skattebo over Adams, 65 Hurts a round early over
+  Warren, 76 Tracy over Dowdle, 85 WR insurance over RB, 125 A. Jones
+  over Meyers).
+- Final lineups: 33 = 1642 pts (1st), 35 = 1642 (1st), 36 = 1665 (1st).
+  The fitted+fix room came out 23 pts better, one room, not evidence by
+  itself.
+- Offline scoring (g4_10601343_*.log): fitted 0.1354 vs current 0.1633,
+  fitted better, ninth room of nine.
+Survival scorecard at the fitted point: 30-50% shown 44% observed 12%
+(n 17); 50-70% 62% vs 39% (n 38). Reports:
+reports/mocks/mock36_2026-09-03_0842pt_crackback-block_room10601343_seat5_*.md.
+Note: the plans sidecar's rec rows still lack the pair fields (its
+serializer is separate from plan_rows); the panel narration in the trail
+preserves them. Follow-up: carry pair into plan_detail recs.
