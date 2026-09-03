@@ -1065,3 +1065,18 @@ reports/mocks/mock36_2026-09-03_0842pt_crackback-block_room10601343_seat5_*.md.
 Note: the plans sidecar's rec rows still lack the pair fields (its
 serializer is separate from plan_rows); the panel narration in the trail
 preserves them. Follow-up: carry pair into plan_detail recs.
+
+## Mock 37 — room 10611562 "Intentional Grounding II", 10 teams, slot 3 — PAIR 2A: CURRENT knobs, verified bridge (forward10) — CLEAN
+
+13:32-13:47 PT. 15/15 legal, 15/15 engine, zero autopicks; preflight
+call#1 confirmed the fresh process. First room where the plans sidecar
+carries the pair math (155 rec rows with wait cost, own-now, partner,
+pick cost). The #36 wire fix showed up in a current-knob room too: 83
+DK Metcalf (WR insurance 18) over RJ Harvey (RB 16), the coin-flip the
+measurement predicted. Four rivals away most of the room. First by
+projected lineup at the end (1643, next 1569). Offline scoring, pasted
+from g4_10611562_*.log: fitted objective 0.1524, current 0.1718; 30-49
+bucket fitted pred 40 obs 36 (n230), current pred 40 obs 45 (n229).
+Reports:
+reports/mocks/mock37_2026-09-03_1332pt_intentional-grounding-ii_room10611562_seat3_*.md.
+Pair 2B is mock 38: seat 3, FITTED, verified forward11.
