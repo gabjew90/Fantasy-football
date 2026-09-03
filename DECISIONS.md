@@ -1770,6 +1770,15 @@ off keeps the multiplier ordering; on prefers the wider spread at equal
 value from round 8 only; degrades to the multiplier when sd is missing or
 comes from one source. Nothing to judge until A1's mean-combine is on.
 
+Driver parity (engine_parity.py, 40 states, seed 7, Keefamania board):
+17/40 identical top pick, 20/40 same position, 24/40 in the engine's
+top 5 -- and exactly the same three numbers with the driver as it was
+before A3 and before B5. So this step changed nothing on the in-page
+path, and 17/40 is the STANDING gap between the in-page fallback
+(`rank().source == "local"`, a compact board with no markets) and the
+engine the bridge serves. It is a labelled fallback, not the live path;
+the gap is recorded here so nobody reads it as a regression later.
+
 ## 2026-09-02 (33) — A4: the flex split derived per league; a bench allowance; pre-registered
 
 onboard.derive_baselines spread every flex slot RB 45 / WR 45 / TE 10, a
