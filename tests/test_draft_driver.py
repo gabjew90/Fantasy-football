@@ -1142,3 +1142,71 @@ def test_pick_verification_uses_our_pick_number_even_without_a_team_id():
     )
     assert r["my_team"] is None
     assert r["landed"] is True and r["other"] is False and r["notyet"] is None
+
+
+# ---------- refit study instrumentation (DECISIONS #35) ----------
+
+def test_timing_label_is_the_pre_registered_rule():
+    """instant = first seen with <= 3 s off a full clock AND a previous poll
+    no more than 2 s earlier; human = >= 10 s run; else unknown. Scales
+    with the room clock (30 s mocks, 60 s league)."""
+    r = run_js("console.log(JSON.stringify(["
+               "DK.timingLabel(30, 900, 30), DK.timingLabel(27, 1800, 30), DK.timingLabel(27, 2600, 30),"
+               "DK.timingLabel(24, 900, 30), DK.timingLabel(20, 900, 30), DK.timingLabel(5, 900, 30),"
+               "DK.timingLabel(58, 900, 60), DK.timingLabel(45, 900, 60), DK.timingLabel(null, 900, 30), DK.timingLabel(29, null, 30)]));")
+    assert r == ["instant", "instant", "unknown", "unknown", "human", "human", "instant", "human", "unknown", "unknown"]
+
+
+def test_store_state_stamps_first_sight_and_carries_yahoo_ranks():
+    """Each drafted entry carries Yahoo's o_rank / avg_pick / psr_rank and the
+    first-sight stamp (clock left, poll gap, away set) taken the FIRST time
+    the pick was seen -- later reads do not move it."""
+    r = run_js(
+        f"""
+        const s = {json.dumps(_store_with([(1, "1", "100")], players=PLAYERS))};
+        s.players.byId["100"].o_rank = 6; s.players.byId["100"]["average-pick"] = "5.8"; s.players.byId["100"].psr_rank = 15;
+        s.players.byId["101"].o_rank = 2; s.players.byId["101"]["average-pick"] = "2.0";
+        s.countdown.seconds = 29; s.league.managers["9"] = {{ id: "9", teamId: "9", away: true }};
+        DK._setStore({{ getState: () => s }});
+        const a = DK.storeState();
+        // second pick appears with the clock at 12 (a human took 18 s); first pick's stamp must not move
+        s.draftPicks.order.push({{ id: 2, teamId: "2", playerId: "101" }});
+        s.countdown.seconds = 12; s.draftOrder.currentPick = 2;
+        const b = DK.storeState();
+        console.log(JSON.stringify({{
+          first: {{ o_rank: a.drafted[0].o_rank, avg_pick: a.drafted[0].avg_pick, psr: a.drafted[0].psr_rank, clock: a.drafted[0].clock_left, label: a.drafted[0].label, away: a.drafted[0].seen_at ? true : false }},
+          again: {{ clock: b.drafted[0].clock_left, label: b.drafted[0].label }},
+          second: {{ clock: b.drafted[1].clock_left, label: b.drafted[1].label, gapKnown: b.drafted[1].poll_gap_ms != null, o_rank: b.drafted[1].o_rank }},
+          awayAt: DK.trailDump().picks[0].away_teams_at,
+        }}));
+        """
+    )
+    assert r["first"]["o_rank"] == 6 and r["first"]["avg_pick"] == 5.8 and r["first"]["psr"] == 15
+    assert r["first"]["clock"] == 29 and r["first"]["label"] == "unknown"   # first ever poll: no gap known -> not 'instant'
+    assert r["again"]["clock"] == 29, "the stamp is taken once"
+    assert r["second"]["clock"] == 12 and r["second"]["label"] == "human" and r["second"]["gapKnown"] and r["second"]["o_rank"] == 2
+    assert r["awayAt"] == ["9"]
+
+
+def test_players_snapshot_posts_yahoo_ranks_once_per_room():
+    r = run_js(
+        f"""
+        const s = {json.dumps(_store_with([], players=PLAYERS))};
+        for (const [id, p] of Object.entries(s.players.byId)) {{ p.o_rank = +id - 99; p["average-pick"] = String(+id - 98); p.psr_rank = 3; }}
+        s.context.leagueId = "777";
+        DK._setStore({{ getState: () => s }});
+        const posts = [];
+        global.fetch = async (url, opts) => {{ posts.push({{ url, body: JSON.parse(opts.body) }}); return {{ json: async () => ({{ ok: true, path: "saved" }}) }}; }};
+        (async () => {{
+          const snap = DK.playersSnapshot();
+          const a = await DK.postPlayersSnapshot();
+          const b = await DK.postPlayersSnapshot();
+          console.log(JSON.stringify({{ n: snap.n, kind: snap.kind, room: snap.room, first: snap.players.find(p => p.id === "100"),
+            posted: posts.length, url: posts[0].url.slice(-8), again: b.already === true, ref: DK.trailDump().players_snapshot_ref }}));
+        }})();
+        """
+    )
+    assert r["n"] == len(PLAYERS) and r["kind"] == "players_snapshot" and r["room"] == "777"
+    assert r["first"]["o_rank"] == 1 and r["first"]["avg_pick"] == 2 and r["first"]["pos"] == "RB" and r["first"]["name"] == "Christian McCaffrey"
+    assert r["posted"] == 1 and r["url"] == "/players" and r["again"] is True
+    assert r["ref"] == "players_777.json"

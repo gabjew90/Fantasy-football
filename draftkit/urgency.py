@@ -103,6 +103,7 @@ def simulate_survival(pool, current_pick, next_pick, rivals, seeds, rng,
                       kdef_early_damp=KDEF_EARLY_DAMP, qb_damp_until_round=10,
                       kdef_typical_round=13, run_ratio=0.0,
                       autopick_sigma_scale=0.5, autopick_need_damp=0.02,
+                      autopick_list_prob=0.0,
                       history_end=None,
                       rival_needs_update=True):
     """Per-market urgency + per-player survival to my next pick.
@@ -134,6 +135,17 @@ def simulate_survival(pool, current_pick, next_pick, rivals, seeds, rng,
                            sigma x autopick_sigma_scale; he never reaches
                            (the reach draw is still consumed so the random
                            stream is common with the human model).
+      autopick_list_prob   (plan 2026-09-03 s4, DECISIONS #35) with this
+                           probability an autopick seat WALKS Yahoo's default
+                           list instead of drawing from the ADP Gaussian: he
+                           takes the alive player with the lowest `yrank`
+                           (pool key; Yahoo default rank, lower = better;
+                           falls back to adp) among those fitting an open
+                           starter slot, else the lowest-yrank alive player.
+                           The reach uniform decides both reaching and
+                           walking, and rng.choice still runs against the
+                           one-hot, so the draw count per rival per sim is
+                           unchanged. 0.0 is today's behaviour exactly.
       run_ratio and rival_needs_update are accepted here and take effect in
       plan steps B4 and B6.
 
@@ -144,6 +156,11 @@ def simulate_survival(pool, current_pick, next_pick, rivals, seeds, rng,
     picks_between = max(0, next_pick - current_pick)
     pos_arr = np.array([p["pos"] for p in pool]) if n else np.array([], dtype=str)
     adp = np.array([float(p["adp"]) if p.get("adp") is not None else 200.0 for p in pool])
+    # Yahoo default rank for the list-walking autopick component; mirrors the
+    # adp fallback (missing yrank -> adp -> 200.0)
+    yrank = np.array([float(p["yrank"]) if p.get("yrank") is not None
+                      else (float(p["adp"]) if p.get("adp") is not None else 200.0)
+                      for p in pool])
     groups = _groups(pool, pos_arr, markets)
     members = {name: set(spec["members"]) for name, spec in (markets or {}).items()}
 
@@ -268,9 +285,24 @@ def simulate_survival(pool, current_pick, next_pick, rivals, seeds, rng,
             # the reach draw is consumed for every rival at every reach_prob so
             # the random stream is identical across reach settings and whether
             # or not a seat is on autopick (paired A/Bs, plan B5/B7)
-            reaching = rng.random() < reach_prob
-            like = reach_like[i] if (reaching and not autopick[i]) else adp_like[i]
-            w = like * mult[i][pos_idx] * alive
+            u = rng.random()
+            reaching = u < reach_prob
+            # the SAME uniform decides whether an autopick seat walks Yahoo's
+            # list this pick (DECISIONS #35); at list_prob 0 it never does
+            walking = bool(autopick[i]) and (u < autopick_list_prob)
+            w = None
+            if walking:
+                # one-hot on the lowest-yrank alive player that fits an open
+                # starter slot (multiplier exactly 1.0); else lowest-yrank
+                # alive; an empty pool falls through to the normal path
+                elig = alive & (mult[i][pos_idx] == 1.0)
+                cand = elig if elig.any() else alive
+                if cand.any():
+                    w = np.zeros(n)
+                    w[int(np.argmin(np.where(cand, yrank, np.inf)))] = 1.0
+            if w is None:
+                like = reach_like[i] if (reaching and not autopick[i]) else adp_like[i]
+                w = like * mult[i][pos_idx] * alive
             total0 = w.sum()
             if total0 <= 0:
                 break

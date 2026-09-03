@@ -152,7 +152,8 @@ def test_explicit_default_knobs_reproduce_the_implicit_call_exactly():
     b = simulate_survival(POOL, 1, 4, RIVALS, {}, np.random.default_rng(9), sims=150, sigma=3.0,
                           need_damp=0.15, qb_filled_damp=0.05, kdef_early_damp=0.02,
                           qb_damp_until_round=10, kdef_typical_round=13, run_ratio=0.0,
-                          autopick_sigma_scale=0.5, rival_needs_update=True)
+                          autopick_sigma_scale=0.5, autopick_need_damp=0.02,
+                          autopick_list_prob=0.0, rival_needs_update=True)
     assert a == b
 
 
@@ -323,3 +324,116 @@ def test_needs_update_is_a_no_op_when_every_slot_picks_once():
     b = simulate_survival(POOL, 10, 13, RIVALS, {}, np.random.default_rng(8), sims=200, sigma=6.0,
                           rival_needs_update=False)
     assert a == b
+
+
+# ---------- DECISIONS #35: an autopick seat walks Yahoo's default list ----------
+
+def _list_walk_pool():
+    """One-pick window fixtures for the list walker. The top-ADP RB carries
+    the WORSE Yahoo rank, and the best-yrank player of all is a WR the rival
+    has no open slot for -- so the walker must obey yrank (not adp) AND the
+    starters-first need filter to land on rb_b."""
+    pool = [{"sleeper_id": "wr1", "pos": "WR", "vorp": 60.0, "adp": 10.0, "yrank": 1.0},
+            {"sleeper_id": "rb_a", "pos": "RB", "vorp": 50.0, "adp": 10.5, "yrank": 8.0},
+            {"sleeper_id": "rb_b", "pos": "RB", "vorp": 40.0, "adp": 12.0, "yrank": 3.0},
+            {"sleeper_id": "rb_c", "pos": "RB", "vorp": 30.0, "adp": 13.0, "yrank": 9.0}]
+    needs = {"QB": 0, "RB": 1, "WR": 0, "TE": 0, "FLEX": 0, "K": 1, "DEF": 1}   # RB open, WR full
+    bot = [{"slot": 3, "needs": dict(needs), "user_id": None, "autopick": True}]
+    return pool, bot
+
+
+def test_autopick_list_prob_zero_is_the_no_arg_call_exactly():
+    """The knob is OFF by default: spelling out 0.0 changes nothing, in a
+    room with autopick seats and in one without (same seed, dict equality)."""
+    import numpy as np
+    pool, np = _autopick_setup()
+    bots = [{"slot": s, "needs": {"WR": 2}, "user_id": None, "autopick": True} for s in range(3, 9)]
+    kw = dict(sims=200, sigma=6.0, teams=12, reach_prob=0.5)
+    a = simulate_survival(pool, 25, 31, bots, {}, np.random.default_rng(11), **kw)
+    b = simulate_survival(pool, 25, 31, bots, {}, np.random.default_rng(11), autopick_list_prob=0.0, **kw)
+    assert a == b
+    c = simulate_survival(POOL, 1, 4, RIVALS, {}, np.random.default_rng(12), sims=150, sigma=3.0)
+    d = simulate_survival(POOL, 1, 4, RIVALS, {}, np.random.default_rng(12), sims=150, sigma=3.0,
+                          autopick_list_prob=0.0)
+    assert c == d
+
+
+def test_autopick_list_walker_takes_the_lowest_yrank_need_fitting_player():
+    """list_prob 1, one autopick rival, one pick: the lowest-yrank player who
+    fills an open starter slot is gone in every sim (survival 0.0), everyone
+    else survives (1.0). rb_a is the top-ADP RB but ranks worse on Yahoo's
+    list; wr1 is Yahoo's #1 but the WR slot is full."""
+    import numpy as np
+    pool, bot = _list_walk_pool()
+    rep = simulate_survival(pool, 10, 11, bot, {}, np.random.default_rng(2), sims=100, sigma=6.0,
+                            survival_shrink=1.0, autopick_list_prob=1.0)
+    assert rep["RB"]["survival"]["rb_b"] == 0.0
+    assert rep["RB"]["survival"]["rb_a"] == 1.0
+    assert rep["RB"]["survival"]["rb_c"] == 1.0
+    assert rep["WR"]["survival"]["wr1"] == 1.0
+    # once every starter slot is full the need filter is vacuous: the walker
+    # follows the raw list and Yahoo's #1 (the WR) goes
+    full = [dict(bot[0], needs={k: 0 for k in bot[0]["needs"]})]
+    rep2 = simulate_survival(pool, 10, 11, full, {}, np.random.default_rng(2), sims=100, sigma=6.0,
+                             survival_shrink=1.0, autopick_list_prob=1.0)
+    assert rep2["WR"]["survival"]["wr1"] == 0.0
+    assert all(v == 1.0 for v in rep2["RB"]["survival"].values())
+
+
+def test_autopick_list_prob_is_inert_for_human_seats():
+    """A window of only human rivals: identical report at list_prob 0 and 1
+    under one seed (the walk is gated on the autopick flag)."""
+    import numpy as np
+    pool = [dict(p, yrank=100.0 - p["adp"]) for p in POOL]      # a yrank that disagrees with adp
+    kw = dict(sims=200, sigma=6.0, reach_prob=0.3)
+    a = simulate_survival(pool, 10, 13, RIVALS, {}, np.random.default_rng(13), autopick_list_prob=0.0, **kw)
+    b = simulate_survival(pool, 10, 13, RIVALS, {}, np.random.default_rng(13), autopick_list_prob=1.0, **kw)
+    assert a == b
+
+
+def test_autopick_list_walker_yrank_falls_back_to_adp():
+    """Without a yrank key the walker orders by adp: the same call with
+    yrank spelled out as adp is identical, and the lowest-ADP need-fitting
+    player is the one taken."""
+    import numpy as np
+    pool, bot = _list_walk_pool()
+    bare = [{k: v for k, v in p.items() if k != "yrank"} for p in pool]
+    spelled = [dict(p, yrank=p["adp"]) for p in bare]
+    kw = dict(sims=100, sigma=6.0, survival_shrink=1.0, autopick_list_prob=1.0)
+    a = simulate_survival(bare, 10, 11, bot, {}, np.random.default_rng(3), **kw)
+    b = simulate_survival(spelled, 10, 11, bot, {}, np.random.default_rng(3), **kw)
+    assert a == b
+    assert a["RB"]["survival"]["rb_a"] == 0.0          # adp 10.5: the best RB by adp
+    assert a["RB"]["survival"]["rb_b"] == 1.0
+    assert a["WR"]["survival"]["wr1"] == 1.0
+    # a None yrank is treated as absent, not as rank 0
+    none_rank = [dict(p, yrank=None) for p in bare]
+    c = simulate_survival(none_rank, 10, 11, bot, {}, np.random.default_rng(3), **kw)
+    assert c == a
+
+
+def test_autopick_list_walk_reuses_the_reach_uniform_so_a_human_upstream_is_unchanged():
+    """The walk decision must not add a draw: with a HUMAN picking first and
+    an autopick seat second, the human's picks are the same stream at
+    list_prob 0 and 1. The human only ever takes WRs (need_damp 0) and the
+    bot only ever takes RBs (autopick_need_damp 0), so the WR survivals are
+    the human's fingerprint: identical across the two runs, while the RB
+    survivals show the bot did change (list_prob 1 -> rb_b always)."""
+    import numpy as np
+    pool = [{"sleeper_id": f"wr{i}", "pos": "WR", "vorp": 40.0, "adp": 10.0 + i, "yrank": 50.0 + i}
+            for i in range(4)] + \
+           [{"sleeper_id": "rb_a", "pos": "RB", "vorp": 50.0, "adp": 10.5, "yrank": 8.0},
+            {"sleeper_id": "rb_b", "pos": "RB", "vorp": 40.0, "adp": 12.0, "yrank": 3.0},
+            {"sleeper_id": "rb_c", "pos": "RB", "vorp": 30.0, "adp": 13.0, "yrank": 9.0}]
+    human = {"slot": 3, "needs": {"QB": 0, "RB": 0, "WR": 2, "TE": 0, "FLEX": 0}, "user_id": None}
+    bot = {"slot": 4, "needs": {"QB": 0, "RB": 1, "WR": 0, "TE": 0, "FLEX": 0}, "user_id": None,
+           "autopick": True}
+    kw = dict(sims=300, sigma=6.0, survival_shrink=1.0, reach_prob=0.4, reach_scale=3.0,
+              need_damp=0.0, qb_filled_damp=0.0, autopick_need_damp=0.0)
+    a = simulate_survival(pool, 10, 12, [human, bot], {}, np.random.default_rng(21), autopick_list_prob=0.0, **kw)
+    b = simulate_survival(pool, 10, 12, [human, bot], {}, np.random.default_rng(21), autopick_list_prob=1.0, **kw)
+    assert a["WR"]["survival"] == b["WR"]["survival"]            # the human is untouched
+    assert 0.0 < min(a["WR"]["survival"].values()) < 1.0         # ...and he was actually drawing
+    assert b["RB"]["survival"]["rb_b"] == 0.0                     # the bot walked the list
+    assert b["RB"]["survival"]["rb_a"] == 1.0 and b["RB"]["survival"]["rb_c"] == 1.0
+    assert a["RB"]["survival"] != b["RB"]["survival"]             # at list_prob 0 he drew from the Gaussian

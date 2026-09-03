@@ -43,6 +43,14 @@ def pt_lines(lines: list[str]) -> list[str]:
     return out
 
 
+def key(name: str) -> str:
+    """first initial + last token, lower, suffixes dropped -- the board key,
+    for joining names across the trail, the snapshot and the board."""
+    parts = re.sub(r"[^a-z0-9 ]", " ", (name or "").lower()).split()
+    parts = [p for p in parts if p not in ("jr", "sr", "ii", "iii", "iv", "v")] or parts
+    return (parts[0][0] + " " + parts[-1]) if parts else ""
+
+
 def slug(name: str) -> str:
     s = re.sub(r"[^a-z0-9]+", "-", (name or "").lower()).strip("-")
     return s[:32] or "room"

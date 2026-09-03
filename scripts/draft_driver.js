@@ -48,6 +48,13 @@ window.DK = (function () {
     planErr: null,
     planAt: 0,
     seenPicks: new Map(),  // accumulated; the Picks panel virtualises
+    // first sight of each store pick (refit study, DECISIONS #35): when it
+    // appeared, how much clock was left, how long since the previous poll,
+    // and which managers were flagged away at that instant
+    seen: new Map(),
+    lastStoreAt: 0,
+    clockMax: 30,          // the largest countdown seen; Yahoo mocks run 30 s, leagues 60
+    snapshotPosted: null,  // room id once the players snapshot has been POSTed
   };
 
   const FLEX_OK = { RB: 1, WR: 1, TE: 1 };
@@ -494,14 +501,34 @@ window.DK = (function () {
     const managers = (s.league && s.league.managers) || {};
     const me = s.context && managers[String(s.context.managerId)];
     const myTeam = me ? String(me.teamId) : null;
+    const away = Object.values(managers).filter(m => m.away).map(m => String(m.teamId));
+    const secs = s.countdown ? s.countdown.seconds : null;
+    if (Number.isFinite(+secs) && +secs > S.clockMax) S.clockMax = +secs;
+    const now = Date.now();
+    const gap = S.lastStoreAt ? now - S.lastStoreAt : null;
+    S.lastStoreAt = now;
+    const num = (v) => { const x = parseFloat(v); return Number.isFinite(x) ? x : null; };
     const drafted = (s.draftPicks.order || []).filter(o => o && o.playerId).map(o => {
       const p = byId[o.playerId] || {};
-      return { pick_no: +o.id, name: ((p.fname || '') + ' ' + (p.lname || '')).trim(),
+      const no = +o.id;
+      // first sight: an autopick fires the instant the turn opens, so a pick
+      // first seen with the clock still full (and a recent previous poll,
+      // Chrome throttles the hidden tab) is Yahoo's, not a person's
+      if (!S.seen.has(no)) {
+        S.seen.set(no, { seen_at: new Date(now).toISOString(), clock_left: Number.isFinite(+secs) ? +secs : null,
+                         poll_gap_ms: gap, away_teams_at: away.slice(), clock_max: S.clockMax });
+      }
+      const seen = S.seen.get(no);
+      return { pick_no: no, name: ((p.fname || '') + ' ' + (p.lname || '')).trim(),
                pos: p.primary_pos || p.display_pos || '', team: p.team_abbr || '',
                team_id: String(o.teamId),      // plan B5: lets the bridge map away managers to draft slots
-               slot: null, mine: myTeam != null && String(o.teamId) === myTeam };
+               slot: null, mine: myTeam != null && String(o.teamId) === myTeam,
+               // Yahoo's own ordering columns (refit study): default overall rank,
+               // ADP as Yahoo shows it, preseason rank
+               o_rank: num(p.o_rank), avg_pick: num(p['average-pick']), psr_rank: num(p.psr_rank),
+               seen_at: seen.seen_at, clock_left: seen.clock_left, poll_gap_ms: seen.poll_gap_ms,
+               label: timingLabel(seen.clock_left, seen.poll_gap_ms, seen.clock_max) };
     });
-    const away = Object.values(managers).filter(m => m.away).map(m => String(m.teamId));
     // draftOrder.currentPick is the count of picks MADE (null before pick 1,
     // 5 while pick 6 is on the clock), so the pick on the clock is +1. Found
     // in mock 13 when the on-clock gate refused to click at pick 6 because the
@@ -520,6 +547,58 @@ window.DK = (function () {
       away_teams: away,
       queue: (s.queue || []).map(String),
     };
+  }
+
+  /* The pre-registered timing label (DECISIONS #35): 'instant' when the pick
+   * was first seen with at most 3 s off a full clock AND the previous poll
+   * was no more than 2 s earlier (otherwise a throttled tab could make a slow
+   * human look instant); 'human' when at least 10 s had run; else 'unknown'.
+   * Pure; the thresholds scale with the room's clock (30 s mocks, 60 s league). */
+  function timingLabel(clockLeft, pollGapMs, clockMax) {
+    const max = clockMax || 30;
+    if (clockLeft == null) return 'unknown';
+    if (clockLeft >= max - 3) return (pollGapMs != null && pollGapMs <= 2000) ? 'instant' : 'unknown';
+    if (clockLeft <= max - 10) return 'human';
+    return 'unknown';
+  }
+
+  /* One snapshot per room of Yahoo's player table: id, name, position, team,
+   * Yahoo's default overall rank (what an autopick seat walks), Yahoo ADP and
+   * preseason rank. POSTed to the bridge's /players; the refit study joins it
+   * to the trail and the board (data/external/yahoo_rank.<league>.csv). */
+  function playersSnapshot() {
+    const store = findStore();
+    let s;
+    try { s = store && store.getState(); } catch (e) { s = null; }
+    if (!s || !s.players) return null;
+    const num = (v) => { const x = parseFloat(v); return Number.isFinite(x) ? x : null; };
+    const players = Object.entries(s.players.byId || {}).map(([pid, p]) => ({
+      id: String(p.id != null ? p.id : pid), name: ((p.fname || '') + ' ' + (p.lname || '')).trim(),
+      pos: p.primary_pos || p.display_pos || '', team: p.team_abbr || '',
+      o_rank: num(p.o_rank), psr_rank: num(p.psr_rank), avg_pick: num(p['average-pick']),
+      pct_drafted: num(p['percent-drafted']), bye: num(p.bye),
+    }));
+    const room = (s.context && String(s.context.leagueId))
+      || ((typeof location !== 'undefined' && (location.pathname.match(/\/(\d+)\/\d+/) || [])[1]) || 'room');
+    return { room, source_room: room, kind: 'players_snapshot', captured_at: new Date().toISOString(),
+             clock_max: S.clockMax, n: players.length, players };
+  }
+
+  async function postPlayersSnapshot() {
+    const snap = playersSnapshot();
+    if (!snap) return { err: 'no store' };
+    if (S.snapshotPosted === snap.room) return { ok: true, already: true };
+    try {
+      const r = await fetch(S.cfg.bridge + '/players', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(snap) });
+      const j = await r.json();
+      if (j && j.ok) S.snapshotPosted = snap.room;
+      note('players snapshot: ' + snap.n + ' players -> ' + (j.path || JSON.stringify(j)));
+      return j;
+    } catch (e) {
+      note('players snapshot failed: ' + String(e).slice(0, 80));
+      return { err: String(e).slice(0, 80) };
+    }
   }
 
   /* test hook: hand storeState() a store without a React tree to walk */
@@ -1726,6 +1805,8 @@ window.DK = (function () {
       }
     }
     out.autopick_armed = autopickArmed();
+    // the refit study's snapshot of Yahoo's player table, once per room
+    out.players_snapshot = await postPlayersSnapshot();
     // the client's own actions (makePick / setAwayStatus): the no-DOM pick path
     const acts = clientActions(true);
     out.client_actions = acts ? Object.keys(acts) : [];
@@ -1966,11 +2047,21 @@ window.DK = (function () {
     const byId = s.players.byId || {};
     const managers = (s.league && s.league.managers) || {};
     const me = s.context && managers[String(s.context.managerId)];
+    const numv = (v) => { const x = parseFloat(v); return Number.isFinite(x) ? x : null; };
     const picks = (s.draftPicks.order || []).filter(o => o && o.playerId).map(o => {
       const p = byId[o.playerId] || {};
-      return { pick_no: +o.id, team_id: String(o.teamId),
+      const no = +o.id;
+      const seen = S.seen.get(no) || {};
+      return { pick_no: no, team_id: String(o.teamId),
                name: ((p.fname || '') + ' ' + (p.lname || '')).trim(),
-               pos: p.primary_pos || p.display_pos || '', team: p.team_abbr || '' };
+               pos: p.primary_pos || p.display_pos || '', team: p.team_abbr || '',
+               // refit study (DECISIONS #35): Yahoo's ordering columns and the
+               // first-sight stamps that label an autopick by its timing
+               o_rank: numv(p.o_rank), avg_pick: numv(p['average-pick']), psr_rank: numv(p.psr_rank),
+               seen_at: seen.seen_at || null, clock_left: seen.clock_left == null ? null : seen.clock_left,
+               poll_gap_ms: seen.poll_gap_ms == null ? null : seen.poll_gap_ms,
+               away_teams_at: seen.away_teams_at || null,
+               label: seen.seen_at ? timingLabel(seen.clock_left, seen.poll_gap_ms, seen.clock_max) : 'unseen' };
     });
     const mgrs = {};
     for (const m of Object.values(managers)) {
@@ -1990,6 +2081,8 @@ window.DK = (function () {
       picks, managers: mgrs, our_records: S.records.slice(),
       heartbeats: S.log.filter(isHeartbeat).length, issues: S.log.filter(isIssue).length,
       log: S.log.slice(),   // the complete action log, for scrutiny after the mock
+      clock_max: S.clockMax,
+      players_snapshot_ref: S.snapshotPosted ? ('players_' + S.snapshotPosted + '.json') : null,
     }, extra || {});
   }
 
@@ -2062,6 +2155,7 @@ window.DK = (function () {
       return 'reset';
     },
     rank, syncQueue, draftTop, run, gatesOk, storeState, findStore, keepAlive, preflight, _setStore, rosterView, top6TeFell,
+    timingLabel, playersSnapshot, postPlayersSnapshot,
     classifyMiss, rowMatches, normTeam, autopickArmed, idKey, // exported for tests
     findRow, parsePicksPanel, myRoster, tableLive, currentPickNo, // offline DOM tests (jsdom + fixtures)
     survivalProb, eBestNext, calibrate,

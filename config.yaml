@@ -153,6 +153,7 @@ engine:
   run_ratio: 0
   autopick_sigma_scale: 0.5  # B5: an autopicking rival's ADP noise as a fraction of sigma (prior)
   autopick_need_damp: 0.02   # B5: autopick fills starters first; a non-filling position while a starter slot is open
+  autopick_list_prob: 0.0    # DECISIONS #35: P(autopick seat walks Yahoo's default list, lowest yrank fitting a starter slot); fitted by #35; 0 = today's behaviour
   rival_needs_update: true   # B6: a rival picking twice in my window consumes his needs
 
 tracker:

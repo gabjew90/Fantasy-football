@@ -1989,3 +1989,109 @@ Calibration in this room (three-plus autopick seats): 30-50% shown 46 /
 observed 0 (n 11); 50-70% 63 / 22 (n 37); 70-90% 81 / 40 (n 43); 90-100%
 96 / 81 (n 96). The overconfidence now reaches the top bucket. Three rooms
 agree; the autopick refit stage moves to first in line after 2026-09-05.
+
+## 2026-09-03 (35) — Autopick-seat refit as a measured study: pre-registration
+
+Plan: docs/plans/2026-09-03-autopick-refit-plan.md (approved 2026-09-03).
+Written BEFORE any fit runs. Evidence that prompted it: three sidecar
+rooms (10531886, 10532940, 10534350) show survival overconfident with
+autopick seats (30-50% shown -> 0-57% observed; 50-70% -> 22-32%; 70-90%
+-> 40-77%; 90-100% -> 81-94%); away-at-pick seats take the top player by
+board ADP only 5% of the time (median rank 9, n 108) against humans' 13%
+(median 6, n 269); by Yahoo's own default rank (`o_rank`, read from the
+draft-room store) away picks are top-1 32% -- a third walk Yahoo's list,
+the rest look human. The `away` flag flickers (connection status), so it
+is an impure label; Yahoo's pick records carry no auto flag.
+
+Labels (fixed now): `instant` = first seen with clock_left >= 27 of 30 AND
+poll gap <= 2000 ms (new rooms only); `human` = clock_left <= 20; `away` =
+the seat's team id was in away_teams at the nearest preceding plan call
+(built from team ids, never from the slot map, which is empty for a seat
+until it has picked); `bot` = Sleeper mocks; `human` = the Omnibeta real
+draft; `end_away` / `unknown` = the four older trails and the five email
+rooms; `ours` = our own seat, excluded from every fit.
+
+Forms compared per seat class, likelihood = multinomial over the pool
+available at each pick: (i) Gaussian in ADP with sigma(round) as today;
+(ii) Gaussian in o_rank; (iii) label-conditional mixture, P(list | label)
+= pi_label, list component = one-hot on the lowest-o_rank alive player
+that fits an open starter slot, human component = today's Gaussian with
+today's need multipliers. Pre-declared branch: if the top-1-by-o_rank
+share of instant/away picks does NOT rise under the starters-first
+filter, the list being walked is not o_rank and the list component becomes
+a tight Gaussian in o_rank (sigma 1-2) instead of a one-hot.
+
+Grid (values reported at grid precision only): pi in 0.1 steps;
+sigma_early {4,6,8,10}; sigma_late {15,21,27,35}; autopick_sigma_scale
+{0.75,1.0,1.5,2.0}; autopick_need_damp {0.02,0.15,0.30}; need_damp
+{.15,.30,.45}. 1-D Wilks 90% profiles for every pi and sigma. Selection by
+leave-one-room-out pick-level log-likelihood per pick, not AIC.
+
+Gates:
+- G1 (primary): LORO pick-level log-lik per pick for the away/instant
+  class improves over form (i) at today's knobs; the 90% CI of pi_away
+  excludes 0.
+- G2 (deployment): survival Bernoulli log-loss at the fitted point <=
+  current, LORO, pooled AND autopick views; calibration: no bucket with
+  effective n >= 30 whose cluster-bootstrap (room, window) 90% CI of
+  (observed - predicted) excludes 0, pooled or autopick view. Human view
+  reported; human knobs flip ONLY if the human view's log-loss improves
+  and its buckets pass.
+- G3 (no regression): slot_replay both Sleeper leagues, fitted vs current,
+  mean lineup points not worse (autopick knobs inert there); the new
+  yahoo_trail_replay on the sidecar rooms, all 10 slots, not worse.
+- G4 (forward): after the freeze, TWO new mock rooms drafted live with the
+  fitted knobs, fresh Yahoo ADP and o_rank captured that day; offline both
+  knob sets scored on those rooms: fitted pooled survival log-loss lower,
+  the 30-70% bucket miss smaller pooled, no single room worse by > 0.01.
+- Decision: G1 and G2 and G3 and G4 -> autopick_list_prob,
+  autopick_sigma_scale, autopick_need_damp flip in config.yaml and the
+  Tracker defaults; the yahoo_rank board column ships. Any fail -> knobs
+  stay; the study is recorded; yahoo_rank still ships (data, not a
+  decision). If pi_away's CI from three rooms spans more than +-0.15, the
+  user is asked whether to run two more fit rooms first; the mock count
+  is never widened silently.
+
+Honesty clauses: three rooms establish the SIGN of the miss, not its size;
+a bucket of n 15 cannot fail an 8-point bar (binomial SE 7.7 at p 0.9),
+hence the CI bar and effective n; survival rows are clustered by (room,
+window) and are the deployment check, not the fitting objective; fit and
+forward rooms share the board but not the ADP date -- drift measured per
+room, players moving > 10 ADP picks between scrapes are unscoreable, not
+misses; nothing is identified beyond its profile CI. Engine change ships
+with autopick_list_prob = 0 (byte-identical) until the decision.
+
+### #35 G1 result (2026-09-03, before any survival replay ran)
+
+Dataset: scripts/pick_dataset.py -> 938 rival picks over 7 Yahoo rooms
+(reports/rival_picks.md). Need-rule check: among away-labelled picks whose
+taken player fits an open starter slot, 80% are EXACTLY the lowest Yahoo
+rank that fits (vs 8% by board ADP); the pre-declared one-hot list
+component stands. Only ~47% of away picks fit an open starter at all --
+the other half behave like humans (the away flag is impure, as expected),
+so over ALL away picks the exact-hit share is 38%.
+
+Fit: scripts/rival_fit.py (reports/rival_fit.md), multinomial over the
+pool at each pick, coarse grid, LORO by room.
+- away (n 102, 3 rooms): mixture pi 0.3 [90% 0.3-0.4], sigma_early 4
+  [4-6], sigma_late 27 [21-27], need_damp 0.45 [0.45], scale 0.75
+  [0.75-1.0]. LORO log-lik per pick: mixture -3.005, gauss_adp -3.908,
+  gauss_yrank -4.172, CURRENT -4.865. G1 PASS (better held-out, pi CI
+  excludes 0).
+- human (present-at-pick, n 300): mixture pi 0.2, need_damp 0.45, sigma 4
+  -> 27; LORO -3.404 vs current -3.940. Humans also lean on Yahoo's
+  default-sorted list. Recorded for the human sub-gate; no human knob
+  moves on this alone.
+- unknown (4 older trails, n 536): mixture pi 0.3; LORO -3.348 vs -4.024.
+
+Deviation from the pre-registration, stated: the fit used ONE need_damp
+grid {.15,.30,.45} for every class, so the away class's 0.45 lies outside
+the pre-registered autopick_need_damp grid {0.02,0.15,0.30}. The survival
+stage (G2) will evaluate autopick_need_damp over {0.15,0.30,0.45} and this
+note is the record of the change. autopick_sigma_scale 0.75 is on the
+pre-registered grid; autopick_list_prob 0.3 is on the pi grid.
+
+What pi_away means: the deployable list-walk probability GIVEN the live
+signal is Yahoo's away flag (impure). The timing label (new rooms) should
+separate true autopicks (pi_instant expected >= 0.8) from flagged humans;
+until it exists, 0.3 is the honest value for the flag we have.

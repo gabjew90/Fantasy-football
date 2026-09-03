@@ -58,6 +58,7 @@ class Tracker:
     kdef_typical_round = 13
     autopick_sigma_scale = 0.5  # plan B5: an autopicking rival's ADP noise, x sigma
     autopick_need_damp = 0.02   # plan B5: autopick fills every starter slot first; a non-filling position while one is open
+    autopick_list_prob = 0.0    # DECISIONS #35: P(an autopick seat walks Yahoo's default list this pick); 0 = today's behaviour
     rival_needs_update = True   # plan B6: a rival picking twice in my window consumes his needs
     away_slots = frozenset()    # plan B5: draft slots on autopick (Yahoo 'away'); empty on Sleeper
     upside_from_round = 8
@@ -315,7 +316,8 @@ class Tracker:
         ("survival_shrink", float),
         ("need_damp", float), ("qb_filled_damp", float), ("qb_damp_until_round", int),
         ("kdef_early_damp", float), ("kdef_typical_round", int),
-        ("autopick_sigma_scale", float), ("autopick_need_damp", float), ("rival_needs_update", bool),
+        ("autopick_sigma_scale", float), ("autopick_need_damp", float), ("autopick_list_prob", float),
+        ("rival_needs_update", bool),
         ("upside_from_round", int), ("upside_mult", float),
         ("late_round_dispersion", bool), ("dispersion_lambda", float),
         ("slot_markets", bool), ("adaptive_fallback", bool), ("bench_insurance", bool),
@@ -611,7 +613,11 @@ class Tracker:
         if len(window) < self.pool_min:
             # floor: never starve — extend by ADP proximity to the window
             window = avail[: max(self.pool_min, len(window))]
-        pool = window
+        # DECISIONS #35: the list-walking autopick component reads `yrank`
+        # (Yahoo default rank). Rows without a yahoo_rank are passed through
+        # untouched so the engine's fallback to adp applies.
+        pool = [dict(p, yrank=p["yahoo_rank"]) if p.get("yahoo_rank") is not None else p
+                for p in window]
         # crc32, not hash(): string hash is per-process randomized and would
         # let a mid-draft restart silently flip near-tie recommendations
         seed = zlib.crc32(f"{self.draft_id}:{key[0]}:{key[1]}".encode())
@@ -640,6 +646,7 @@ class Tracker:
             kdef_typical_round=self.kdef_typical_round, run_ratio=self.run_ratio,
             autopick_sigma_scale=self.autopick_sigma_scale,
             autopick_need_damp=self.autopick_need_damp,
+            autopick_list_prob=self.autopick_list_prob,
             rival_needs_update=self.rival_needs_update,
         )
         self._urgency_cache = (key, report)

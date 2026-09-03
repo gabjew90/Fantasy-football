@@ -1,0 +1,708 @@
+{
+ "away": {
+  "gauss_adp": {
+   "point": {
+    "sigma_early": 4.0,
+    "sigma_late": 35.0,
+    "need_damp": 0.15,
+    "scale": 0.75
+   },
+   "ll_per_pick": -3.9075484267920766,
+   "profiles": {
+    "sigma_early": {
+     "ci90": [
+      4.0,
+      4.0
+     ]
+    },
+    "sigma_late": {
+     "ci90": [
+      35.0,
+      35.0
+     ]
+    },
+    "need_damp": {
+     "ci90": [
+      0.15,
+      0.15
+     ]
+    },
+    "scale": {
+     "ci90": [
+      0.75,
+      0.75
+     ]
+    }
+   }
+  },
+  "gauss_yrank": {
+   "point": {
+    "sigma_early": 4.0,
+    "sigma_late": 35.0,
+    "need_damp": 0.15,
+    "scale": 1.0
+   },
+   "ll_per_pick": -4.140351729464673,
+   "profiles": {
+    "sigma_early": {
+     "ci90": [
+      4.0,
+      4.0
+     ]
+    },
+    "sigma_late": {
+     "ci90": [
+      21.0,
+      35.0
+     ]
+    },
+    "need_damp": {
+     "ci90": [
+      0.15,
+      0.15
+     ]
+    },
+    "scale": {
+     "ci90": [
+      1.0,
+      1.5
+     ]
+    }
+   }
+  },
+  "mixture": {
+   "point": {
+    "sigma_early": 4.0,
+    "sigma_late": 27.0,
+    "need_damp": 0.45,
+    "pi": 0.3,
+    "scale": 0.75
+   },
+   "ll_per_pick": -2.9780410534199597,
+   "profiles": {
+    "sigma_early": {
+     "ci90": [
+      4.0,
+      6.0
+     ]
+    },
+    "sigma_late": {
+     "ci90": [
+      21.0,
+      27.0
+     ]
+    },
+    "need_damp": {
+     "ci90": [
+      0.45,
+      0.45
+     ]
+    },
+    "pi": {
+     "ci90": [
+      0.3,
+      0.4
+     ]
+    },
+    "scale": {
+     "ci90": [
+      0.75,
+      1.0
+     ]
+    }
+   }
+  },
+  "loro": {
+   "rows": {
+    "mixture": [
+     {
+      "room": "10531886",
+      "n_test": 14,
+      "fitted": {
+       "sigma_early": 4.0,
+       "sigma_late": 27.0,
+       "need_damp": 0.45,
+       "pi": 0.3,
+       "scale": 0.75
+      },
+      "ll_fitted_per_pick": -2.552032213058662,
+      "ll_current_per_pick": -4.08967407617067
+     },
+     {
+      "room": "10532940",
+      "n_test": 54,
+      "fitted": {
+       "sigma_early": 4.0,
+       "sigma_late": 27.0,
+       "need_damp": 0.45,
+       "pi": 0.4,
+       "scale": 0.75
+      },
+      "ll_fitted_per_pick": -3.057355461436838,
+      "ll_current_per_pick": -4.929579028539767
+     },
+     {
+      "room": "10534350",
+      "n_test": 34,
+      "fitted": {
+       "sigma_early": 6.0,
+       "sigma_late": 15.0,
+       "need_damp": 0.45,
+       "pi": 0.3,
+       "scale": 1.0
+      },
+      "ll_fitted_per_pick": -3.1070894665923614,
+      "ll_current_per_pick": -5.081664116478339
+     }
+    ],
+    "gauss_yrank": [
+     {
+      "room": "10531886",
+      "n_test": 14,
+      "fitted": {
+       "sigma_early": 4.0,
+       "sigma_late": 35.0,
+       "need_damp": 0.15,
+       "scale": 1.0
+      },
+      "ll_fitted_per_pick": -6.154483428103326,
+      "ll_current_per_pick": -4.08967407617067
+     },
+     {
+      "room": "10532940",
+      "n_test": 54,
+      "fitted": {
+       "sigma_early": 4.0,
+       "sigma_late": 35.0,
+       "need_damp": 0.15,
+       "scale": 0.75
+      },
+      "ll_fitted_per_pick": -4.212027619046077,
+      "ll_current_per_pick": -4.929579028539767
+     },
+     {
+      "room": "10534350",
+      "n_test": 34,
+      "fitted": {
+       "sigma_early": 4.0,
+       "sigma_late": 35.0,
+       "need_damp": 0.15,
+       "scale": 1.0
+      },
+      "ll_fitted_per_pick": -3.293504110001805,
+      "ll_current_per_pick": -5.081664116478339
+     }
+    ],
+    "gauss_adp": [
+     {
+      "room": "10531886",
+      "n_test": 14,
+      "fitted": {
+       "sigma_early": 4.0,
+       "sigma_late": 35.0,
+       "need_damp": 0.15,
+       "scale": 0.75
+      },
+      "ll_fitted_per_pick": -3.405670136144194,
+      "ll_current_per_pick": -4.08967407617067
+     },
+     {
+      "room": "10532940",
+      "n_test": 54,
+      "fitted": {
+       "sigma_early": 4.0,
+       "sigma_late": 35.0,
+       "need_damp": 0.15,
+       "scale": 0.75
+      },
+      "ll_fitted_per_pick": -3.917779136876543,
+      "ll_current_per_pick": -4.929579028539767
+     },
+     {
+      "room": "10534350",
+      "n_test": 34,
+      "fitted": {
+       "sigma_early": 4.0,
+       "sigma_late": 35.0,
+       "need_damp": 0.15,
+       "scale": 0.75
+      },
+      "ll_fitted_per_pick": -4.097955418689408,
+      "ll_current_per_pick": -5.081664116478339
+     }
+    ]
+   },
+   "pooled": {
+    "mixture": -3.004575370240694,
+    "gauss_yrank": -4.172464697666628,
+    "gauss_adp": -3.9075484267920775
+   },
+   "current_pooled": -4.864992985958827
+  }
+ },
+ "human": {
+  "gauss_adp": {
+   "point": {
+    "sigma_early": 4.0,
+    "sigma_late": 27.0,
+    "need_damp": 0.3
+   },
+   "ll_per_pick": -3.905705694804713,
+   "profiles": {
+    "sigma_early": {
+     "ci90": [
+      4.0,
+      4.0
+     ]
+    },
+    "sigma_late": {
+     "ci90": [
+      27.0,
+      27.0
+     ]
+    },
+    "need_damp": {
+     "ci90": [
+      0.3,
+      0.3
+     ]
+    }
+   }
+  },
+  "gauss_yrank": {
+   "point": {
+    "sigma_early": 4.0,
+    "sigma_late": 35.0,
+    "need_damp": 0.15
+   },
+   "ll_per_pick": -3.9021703052780095,
+   "profiles": {
+    "sigma_early": {
+     "ci90": [
+      4.0,
+      4.0
+     ]
+    },
+    "sigma_late": {
+     "ci90": [
+      35.0,
+      35.0
+     ]
+    },
+    "need_damp": {
+     "ci90": [
+      0.15,
+      0.15
+     ]
+    }
+   }
+  },
+  "mixture": {
+   "point": {
+    "sigma_early": 4.0,
+    "sigma_late": 27.0,
+    "need_damp": 0.45,
+    "pi": 0.2
+   },
+   "ll_per_pick": -3.308535720250662,
+   "profiles": {
+    "sigma_early": {
+     "ci90": [
+      4.0,
+      4.0
+     ]
+    },
+    "sigma_late": {
+     "ci90": [
+      27.0,
+      27.0
+     ]
+    },
+    "need_damp": {
+     "ci90": [
+      0.45,
+      0.45
+     ]
+    },
+    "pi": {
+     "ci90": [
+      0.2,
+      0.2
+     ]
+    }
+   }
+  },
+  "loro": {
+   "rows": {
+    "mixture": [
+     {
+      "room": "10531886",
+      "n_test": 120,
+      "fitted": {
+       "sigma_early": 4.0,
+       "sigma_late": 21.0,
+       "need_damp": 0.45,
+       "pi": 0.2
+      },
+      "ll_fitted_per_pick": -3.832902603902275,
+      "ll_current_per_pick": -4.339943295795026
+     },
+     {
+      "room": "10532940",
+      "n_test": 80,
+      "fitted": {
+       "sigma_early": 4.0,
+       "sigma_late": 27.0,
+       "need_damp": 0.45,
+       "pi": 0.2
+      },
+      "ll_fitted_per_pick": -2.8985400965093957,
+      "ll_current_per_pick": -3.688149632099176
+     },
+     {
+      "room": "10534350",
+      "n_test": 100,
+      "fitted": {
+       "sigma_early": 4.0,
+       "sigma_late": 35.0,
+       "need_damp": 0.45,
+       "pi": 0.3
+      },
+      "ll_fitted_per_pick": -3.293630185375189,
+      "ll_current_per_pick": -3.662528793454045
+     }
+    ],
+    "gauss_yrank": [
+     {
+      "room": "10531886",
+      "n_test": 120,
+      "fitted": {
+       "sigma_early": 4.0,
+       "sigma_late": 27.0,
+       "need_damp": 0.15
+      },
+      "ll_fitted_per_pick": -4.091673931687933,
+      "ll_current_per_pick": -4.339943295795026
+     },
+     {
+      "room": "10532940",
+      "n_test": 80,
+      "fitted": {
+       "sigma_early": 4.0,
+       "sigma_late": 35.0,
+       "need_damp": 0.15
+      },
+      "ll_fitted_per_pick": -3.677781174914441,
+      "ll_current_per_pick": -3.688149632099176
+     },
+     {
+      "room": "10534350",
+      "n_test": 100,
+      "fitted": {
+       "sigma_early": 4.0,
+       "sigma_late": 35.0,
+       "need_damp": 0.15
+      },
+      "ll_fitted_per_pick": -4.008223171637762,
+      "ll_current_per_pick": -3.662528793454045
+     }
+    ],
+    "gauss_adp": [
+     {
+      "room": "10531886",
+      "n_test": 120,
+      "fitted": {
+       "sigma_early": 4.0,
+       "sigma_late": 27.0,
+       "need_damp": 0.3
+      },
+      "ll_fitted_per_pick": -4.373781185914987,
+      "ll_current_per_pick": -4.339943295795026
+     },
+     {
+      "room": "10532940",
+      "n_test": 80,
+      "fitted": {
+       "sigma_early": 4.0,
+       "sigma_late": 27.0,
+       "need_damp": 0.3
+      },
+      "ll_fitted_per_pick": -3.6337431151037203,
+      "ll_current_per_pick": -3.688149632099176
+     },
+     {
+      "room": "10534350",
+      "n_test": 100,
+      "fitted": {
+       "sigma_early": 4.0,
+       "sigma_late": 35.0,
+       "need_damp": 0.15
+      },
+      "ll_fitted_per_pick": -3.6999831116912616,
+      "ll_current_per_pick": -3.662528793454045
+     }
+    ]
+   },
+   "pooled": {
+    "mixture": -3.4039817957551453,
+    "gauss_yrank": -3.953485609864945,
+    "gauss_adp": -3.9518383422907406
+   },
+   "current_pooled": -3.940326818029139
+  }
+ },
+ "unknown": {
+  "gauss_adp": {
+   "point": {
+    "sigma_early": 4.0,
+    "sigma_late": 27.0,
+    "need_damp": 0.3
+   },
+   "ll_per_pick": -4.007723243384106,
+   "profiles": {
+    "sigma_early": {
+     "ci90": [
+      4.0,
+      4.0
+     ]
+    },
+    "sigma_late": {
+     "ci90": [
+      27.0,
+      27.0
+     ]
+    },
+    "need_damp": {
+     "ci90": [
+      0.15,
+      0.3
+     ]
+    }
+   }
+  },
+  "gauss_yrank": {
+   "point": {
+    "sigma_early": 4.0,
+    "sigma_late": 35.0,
+    "need_damp": 0.15
+   },
+   "ll_per_pick": -3.944923595938464,
+   "profiles": {
+    "sigma_early": {
+     "ci90": [
+      4.0,
+      4.0
+     ]
+    },
+    "sigma_late": {
+     "ci90": [
+      35.0,
+      35.0
+     ]
+    },
+    "need_damp": {
+     "ci90": [
+      0.15,
+      0.15
+     ]
+    }
+   }
+  },
+  "mixture": {
+   "point": {
+    "sigma_early": 4.0,
+    "sigma_late": 27.0,
+    "need_damp": 0.45,
+    "pi": 0.3
+   },
+   "ll_per_pick": -3.309443040669707,
+   "profiles": {
+    "sigma_early": {
+     "ci90": [
+      4.0,
+      4.0
+     ]
+    },
+    "sigma_late": {
+     "ci90": [
+      27.0,
+      27.0
+     ]
+    },
+    "need_damp": {
+     "ci90": [
+      0.45,
+      0.45
+     ]
+    },
+    "pi": {
+     "ci90": [
+      0.3,
+      0.3
+     ]
+    }
+   }
+  },
+  "loro": {
+   "rows": {
+    "mixture": [
+     {
+      "room": "10502459",
+      "n_test": 134,
+      "fitted": {
+       "sigma_early": 4.0,
+       "sigma_late": 27.0,
+       "need_damp": 0.45,
+       "pi": 0.3
+      },
+      "ll_fitted_per_pick": -3.1969297538680577,
+      "ll_current_per_pick": -4.046297482287506
+     },
+     {
+      "room": "10503516",
+      "n_test": 134,
+      "fitted": {
+       "sigma_early": 4.0,
+       "sigma_late": 21.0,
+       "need_damp": 0.45,
+       "pi": 0.3
+      },
+      "ll_fitted_per_pick": -3.8367505951157446,
+      "ll_current_per_pick": -4.199927853464603
+     },
+     {
+      "room": "10504572",
+      "n_test": 134,
+      "fitted": {
+       "sigma_early": 4.0,
+       "sigma_late": 27.0,
+       "need_damp": 0.45,
+       "pi": 0.3
+      },
+      "ll_fitted_per_pick": -3.232044198138482,
+      "ll_current_per_pick": -3.9513525336883055
+     },
+     {
+      "room": "10505450",
+      "n_test": 134,
+      "fitted": {
+       "sigma_early": 4.0,
+       "sigma_late": 27.0,
+       "need_damp": 0.45,
+       "pi": 0.3
+      },
+      "ll_fitted_per_pick": -3.1254685176621315,
+      "ll_current_per_pick": -3.899522196892784
+     }
+    ],
+    "gauss_yrank": [
+     {
+      "room": "10502459",
+      "n_test": 134,
+      "fitted": {
+       "sigma_early": 4.0,
+       "sigma_late": 35.0,
+       "need_damp": 0.15
+      },
+      "ll_fitted_per_pick": -3.9458503381649566,
+      "ll_current_per_pick": -4.046297482287506
+     },
+     {
+      "room": "10503516",
+      "n_test": 134,
+      "fitted": {
+       "sigma_early": 4.0,
+       "sigma_late": 35.0,
+       "need_damp": 0.15
+      },
+      "ll_fitted_per_pick": -4.1552223563832476,
+      "ll_current_per_pick": -4.199927853464603
+     },
+     {
+      "room": "10504572",
+      "n_test": 134,
+      "fitted": {
+       "sigma_early": 4.0,
+       "sigma_late": 35.0,
+       "need_damp": 0.15
+      },
+      "ll_fitted_per_pick": -3.9114170845055694,
+      "ll_current_per_pick": -3.9513525336883055
+     },
+     {
+      "room": "10505450",
+      "n_test": 134,
+      "fitted": {
+       "sigma_early": 4.0,
+       "sigma_late": 35.0,
+       "need_damp": 0.15
+      },
+      "ll_fitted_per_pick": -3.767204604700074,
+      "ll_current_per_pick": -3.899522196892784
+     }
+    ],
+    "gauss_adp": [
+     {
+      "room": "10502459",
+      "n_test": 134,
+      "fitted": {
+       "sigma_early": 4.0,
+       "sigma_late": 27.0,
+       "need_damp": 0.15
+      },
+      "ll_fitted_per_pick": -4.029579971184154,
+      "ll_current_per_pick": -4.046297482287506
+     },
+     {
+      "room": "10503516",
+      "n_test": 134,
+      "fitted": {
+       "sigma_early": 4.0,
+       "sigma_late": 27.0,
+       "need_damp": 0.3
+      },
+      "ll_fitted_per_pick": -4.204197999220904,
+      "ll_current_per_pick": -4.199927853464603
+     },
+     {
+      "room": "10504572",
+      "n_test": 134,
+      "fitted": {
+       "sigma_early": 4.0,
+       "sigma_late": 27.0,
+       "need_damp": 0.3
+      },
+      "ll_fitted_per_pick": -3.9428875764847016,
+      "ll_current_per_pick": -3.9513525336883055
+     },
+     {
+      "room": "10505450",
+      "n_test": 134,
+      "fitted": {
+       "sigma_early": 4.0,
+       "sigma_late": 27.0,
+       "need_damp": 0.15
+      },
+      "ll_fitted_per_pick": -3.8764727068739218,
+      "ll_current_per_pick": -3.899522196892784
+     }
+    ]
+   },
+   "pooled": {
+    "mixture": -3.347798266196104,
+    "gauss_yrank": -3.9449235959384623,
+    "gauss_adp": -4.01328456344092
+   },
+   "current_pooled": -4.0242750165832994
+  }
+ },
+ "G1": {
+  "pass": true,
+  "loro_mixture": -3.004575370240694,
+  "loro_current": -4.864992985958827,
+  "pi_ci90": [
+   0.3,
+   0.4
+  ]
+ }
+}
