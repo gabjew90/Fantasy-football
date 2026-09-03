@@ -214,10 +214,13 @@ batch runs the minute the commissioner's room opens.
 
 ### Room-size and tab rules from the forward-test night (2026-09-03)
 
-- Only the waiting room tells the truth about a room's size: the seat
-  header under the room name numbers 1..N. The lobby row's Join/Move link
-  count is the number of OPEN seats, not the size. Read the header after
-  every join; leave (Move to another room from the lobby) if it is not 10.
+- The lobby row DOES show the room size, but not in its text: filled seats
+  are avatar IMAGES (no innerText), open seats are Join/Move links. Size =
+  cells with an avatar img + cells with a link; columns past the size are
+  empty. Counting only the links (the 09-03 04:00 scanner) sees open seats
+  and cannot tell a 10-team empty room from a 14-team half-full one — that
+  cost three wasted joins. The waiting-room seat header (1..N) remains the
+  post-join confirmation.
 - One room tab, in the front of its window, and never a second tab created
   after it. Never close any tab while a room is live: closing one dissolves
   the Claude tab group and the live tab becomes unreachable.
