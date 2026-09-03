@@ -238,6 +238,13 @@ TIERS_COLUMNS = [
     # projections as an input (DECISIONS #21): where the number came from and
     # the one tail rule's outputs
     "proj_as_of",
+    # plan A1: how many sources carried the player and how far they disagree
+    # (points, same basis as proj_pts); dispersion is read only by the
+    # late-round objective (plan A3), never by VORP or tiers
+    "n_sources",
+    "proj_sd",
+    "proj_hi",
+    "proj_lo",
     "non_starter",
     "contingent_of",
     "backs_up_pos",
@@ -258,5 +265,6 @@ def write_tiers_csv(tiers: pl.DataFrame, path) -> None:
         pl.col("wopr").round(3),
         pl.col("tprr").round(3),
         pl.col("yprr").round(2),
+        *[pl.col(c).round(1) for c in ("proj_sd", "proj_hi", "proj_lo") if c in out.columns],
     )
     out.write_csv(path)

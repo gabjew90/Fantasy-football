@@ -126,14 +126,18 @@ def load_user_csv(external_dir: Path) -> pl.DataFrame | None:
 
 
 def _attach_sleeper_ids(
-    df: pl.DataFrame, index: SleeperIndex, id_map: pl.DataFrame, via_fp_id: bool
+    df: pl.DataFrame, index: SleeperIndex, id_map: pl.DataFrame, via_fp_id: bool,
+    id_col: str = "fantasypros_id",
 ) -> tuple[pl.DataFrame, list[str]]:
-    """Add a sleeper_id column; return (df, unmatched names)."""
-    if via_fp_id and "fantasypros_id" in df.columns:
-        fp2sl = id_map.filter(
-            pl.col("fantasypros_id").is_not_null() & pl.col("sleeper_id").is_not_null()
-        ).select("fantasypros_id", "sleeper_id").unique(subset="fantasypros_id")
-        df = df.join(fp2sl, on="fantasypros_id", how="left")
+    """Add a sleeper_id column; return (df, unmatched names). `id_col` is the
+    external id joined through the id map first (fantasypros_id for the
+    market table, espn_id for the ESPN feed -- plan A1); the name matcher
+    fills whatever the id join missed and unmatched names are RETURNED."""
+    if via_fp_id and id_col in df.columns and id_col in id_map.columns:
+        x2sl = id_map.filter(
+            pl.col(id_col).is_not_null() & pl.col("sleeper_id").is_not_null()
+        ).select(pl.col(id_col).cast(pl.Utf8), "sleeper_id").unique(subset=id_col)
+        df = df.with_columns(pl.col(id_col).cast(pl.Utf8)).join(x2sl, on=id_col, how="left")
     else:
         df = df.with_columns(pl.lit(None, dtype=pl.Utf8).alias("sleeper_id"))
 

@@ -68,6 +68,9 @@ def main() -> None:
             "u": (r.get("upside_flag") or "").lower() == "true",
             "tier": r.get("tier") or "",
             "d": (lambda x: None if x in (None, "") else float(x))(r.get("adp_delta")),
+            # plan A1/A3: source dispersion and count, for the driver's late-round mirror
+            "sd": (lambda x: None if x in (None, "") else float(x))(r.get("proj_sd")),
+            "ns": int(r.get("n_sources") or 0),
         })
     out.sort(key=lambda x: -x["v"])
     Path(a.out).write_text(json.dumps(out, separators=(",", ":")), encoding="utf-8")

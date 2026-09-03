@@ -1595,3 +1595,64 @@ so `run_ratio` ships at 0 -- the absolute rule -- and the relative rule
 stays selectable for a re-test once more rooms exist. Tests pin both
 behaviours (expected-share positions never trigger at 1.5; a relative
 surplus does; 0 restores the old firing).
+
+## 2026-09-02 (30) — A1: sources averaged per stat, dispersion columns, ESPN — pre-registered, ships OFF
+
+Built. draftkit/espn.py (public kona_player_info endpoint with the
+X-Fantasy-Filter header, cache-first, stale-on-failure, a thin payload =
+"filter ignored" = unavailable), external.from_espn (espn_id through the id
+map first, the market's name matcher second, unmatched RETURNED),
+external.combine(mode='first'|'mean'): 'mean' is the equal-weight per-stat
+mean of every source carrying the player, scored ONCE (a stat one source
+omits counts as 0 for it); because scoring is linear that equals the mean
+of the per-source scores, so n_sources / pts17_sd / hi / lo are the spread
+of those scores. Carried as n_sources / proj_sd / proj_hi / proj_lo on the
+board (both paths; null for overrides and zeroed players), through the
+parity loader, the bridge loader and the browser export. Config:
+projections.external.combine: first (the 2026 default), sources
+[sheet, sleeper]; espn is a selectable third source.
+
+Frozen today: reports/forward_2026.<league>.rows.csv -- the 2026 arms
+sleeper / espn / mean / sheet / model on the 17-game basis, one row per
+board player, EACH with its own source date (sleeper_as_of, espn_as_of,
+sheet_as_of, model_built). scripts/forward_snapshot.py --score (January)
+joins 2026 actuals and REFUSES any row whose latest source date is after
+kickoff 2026-09-10.
+
+Gate (judged when 2026 is played; nothing flips before). Candidate `mean`
+vs rivals sleeper, espn, sheet, model. Population: board players with a
+2026 ADP inside the draft, rows every arm projected. Test 1: pooled MAE and
+n-weighted Spearman on 2026 actuals, both leagues; Test 2: scripts/
+source_gate.py --rows <forward csvs> --candidate mean --rivals
+sleeper,espn,sheet,model on the archived 2026 drafts with one shared rival
+list, lineups graded on 2026 actual points. Rule: mean not worse than EVERY
+rival (MAE <= 1.02x, Spearman >= -0.02, outcome >= 0.99x) in both leagues.
+Pass -> combine: mean and sources [sleeper, espn] (and #23's source
+question reopens with these numbers). Stated plainly: ESPN has no
+2023-2025 history in this repo, so the mean arm cannot be scored on the
+backtest pairs; the Sleeper-only history verdict (#23) stands until then.
+Mechanical pre-ship check recorded below: ESPN coverage of Sleeper-lined
+players with ADP <= 180, and unmatched names.
+
+Identity: with combine: first the four reference boards (model/external x
+Keefamania/Omnibeta) must come back IDENTICAL on every existing column;
+the four new columns are the only additions.
+
+### A1 result (same day): built, frozen, identical with the flag off
+
+* ESPN fetched live through the filter header: 193 of the 199 Sleeper-lined
+  Keefamania board players (97%) and 224 of 237 on Omnibeta (95%) -- above
+  the 90% pre-ship bar. Unmatched names are in the build report.
+* Forward snapshots frozen: reports/forward_2026.keefamania.rows.csv (238
+  rows) and .omnibeta (294), arms sleeper / espn / mean / sheet / model with
+  per-source dates; the January scorer refuses any row dated after
+  2026-09-10.
+* Identity with combine: first, all four reference boards IDENTICAL on
+  every pre-existing column; the only additions are n_sources / proj_sd /
+  proj_hi / proj_lo.
+* scripts/source_gate.py generalised to --candidate / --rivals / --rows
+  (pass = not worse than EVERY rival); the defaults reproduce the #23 run
+  (population = rows every backtest arm present projected, plus the arms
+  under test).
+Nothing flips: combine stays first, sources stay [sheet, sleeper], the
+gate is judged on 2026 actuals.

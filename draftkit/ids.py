@@ -46,10 +46,11 @@ def load_id_map(cache_dir: Path) -> pl.DataFrame:
         resp.raise_for_status()
         cache.write_bytes(resp.content)
     df = pl.read_csv(cache, infer_schema_length=10000, null_values=["NA"])
-    return df.with_columns(
-        pl.col("sleeper_id").cast(pl.Utf8, strict=False),
-        pl.col("fantasypros_id").cast(pl.Utf8, strict=False),
-    )
+    casts = [pl.col("sleeper_id").cast(pl.Utf8, strict=False),
+             pl.col("fantasypros_id").cast(pl.Utf8, strict=False)]
+    if "espn_id" in df.columns:          # plan A1: the ESPN feed joins on this, no name matching
+        casts.append(pl.col("espn_id").cast(pl.Utf8, strict=False))
+    return df.with_columns(casts)
 
 
 class SleeperIndex:

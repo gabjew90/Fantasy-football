@@ -121,3 +121,20 @@ def test_skill_shape_reads_the_league_yaml_and_drops_kdef():
     assert slots == {"QB": 1, "RB": 2, "WR": 2, "TE": 1, "FLEX": 2}
     teams, rounds, slots = sg.skill_shape(Config.load(league="keefamania"))
     assert (teams, rounds, slots["FLEX"]) == (10, 13, 1)
+
+
+def test_gate_generalises_to_a_candidate_against_several_rivals():
+    """Plan A1: pass only when the candidate is not worse than EVERY rival;
+    the #23 defaults (lines vs blend) read exactly as before."""
+    rows = _rows().with_columns(pl.col("actual").alias("curve"))          # a perfect third arm
+    a = sg.pooled_accuracy(rows, candidate="lines", rivals=("blend", "curve"))
+    assert a["vs"]["blend"]["pass"] is True and a["vs"]["curve"]["pass"] is False and a["pass"] is False
+    assert a["mae_ratio"] == a["vs"]["blend"]["mae_ratio"]                # first rival keeps the #23 keys
+    d = sg.pooled_accuracy(_rows())
+    assert d["candidate"] == "lines" and d["rivals"] == ["blend"] and d["pass"] is True
+    pairs = [{"league": "k", "pair": "x", "slots": [{"blend": 1000.0, "lines": 995.0, "curve": 1010.0,
+                                                      "usage": 900.0}]}]
+    s = sg.summarize_outcome(pairs, candidate="lines", rivals=("blend", "curve"))
+    assert s["vs"]["blend"]["pass"] is True and s["vs"]["curve"]["pass"] is False and s["pass"] is False
+    s2 = sg.summarize_outcome(pairs, candidate="lines", rivals=("blend", "usage"))
+    assert s2["pass"] is True and s2["model_mean"] == 1000.0

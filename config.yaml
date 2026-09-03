@@ -30,7 +30,14 @@ projections:
   # proj_pts on this basis (16 = 17 fantasy weeks minus the bye).
   games: 16
   external:
-    sources: [sheet, sleeper]     # first source wins per player; later ones fill gaps
+    sources: [sheet, sleeper]     # order matters under combine: first; espn is a third source (plan A1)
+    # combine: first -> first source wins per player, later ones fill gaps
+    #          mean  -> equal-weight per-stat mean of every source carrying the
+    #                   player, scored once; dispersion columns (proj_sd/hi/lo,
+    #                   n_sources) come from the spread of per-source scores.
+    # 'first' until the pre-registered gate (DECISIONS #30) passes on 2026
+    # actuals -- ESPN has no history, so the mean arm is unjudgeable before then.
+    combine: first
     sheet_path: data/external/DraftSheets_2026_Keefamania_10tm_halfPPR_1flex.xlsx
     sheet_as_of: "2026-09-01"     # FantasyPros consensus snapshot (paid export; one-time for 2026)
   # the one tail rule: depth-chart backups the market also does not rank as

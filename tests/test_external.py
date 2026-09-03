@@ -76,18 +76,57 @@ def test_from_sleeper_uses_the_common_schema_and_skips_placeholders(tmp_path):
     assert "gp" not in json.loads(r["line"]) and "adp_half_ppr" not in json.loads(r["line"])
 
 
-def test_combine_lets_the_first_source_win_and_later_ones_fill_gaps():
+def _two_frames():
     a = pl.DataFrame({"sleeper_id": ["1", "2"], "name": ["A", "B"], "pos": ["RB", "RB"], "team": ["X", "X"],
-                      "pts17": [200.0, 150.0], "source": ["sheet", "sheet"], "as_of": ["d", "d"], "line": ["{}", "{}"]},
+                      "pts17": [200.0, 150.0], "source": ["sheet", "sheet"], "as_of": ["d", "d"],
+                      "line": [json.dumps({"rush_yd": 1000.0, "rec": 50.0}), json.dumps({"rush_yd": 900.0})]},
                      schema=X.SCHEMA)
-    b = pl.DataFrame({"sleeper_id": ["2", "3"], "name": ["B", "C"], "pos": ["RB", "RB"], "team": ["X", "X"],
-                      "pts17": [999.0, 100.0], "source": ["sleeper", "sleeper"], "as_of": ["e", "e"], "line": ["{}", "{}"]},
+    b = pl.DataFrame({"sleeper_id": ["2", "3"], "name": ["B", "C"], "pos": ["RB", "RB"], "team": [None, "Y"],
+                      "pts17": [999.0, 100.0], "source": ["sleeper", "sleeper"], "as_of": ["e", "e"],
+                      "line": [json.dumps({"rush_yd": 700.0}), json.dumps({"rush_yd": 500.0})]},
                      schema=X.SCHEMA)
+    return a, b
+
+
+def test_combine_first_mode_is_unchanged_and_reports_one_source():
+    a, b = _two_frames()
     out = X.combine([a, b])
     got = {r["sleeper_id"]: r for r in out.iter_rows(named=True)}
     assert got["2"]["pts17"] == 150.0 and got["2"]["source"] == "sheet"
     assert got["3"]["source"] == "sleeper" and out.height == 3
+    assert all(r["n_sources"] == 1 and r["pts17_sd"] == 0.0 and r["pts17_hi"] == r["pts17"] for r in got.values())
     assert X.combine([X.empty(), b]).height == 2
+    assert list(out.columns) == list(X.SCHEMA_COMBINED)
+
+
+def test_combine_mean_averages_per_stat_with_equal_weight_and_reports_dispersion():
+    """Plan A1: player 2 has rush_yd 900 in one source and 700 in the other;
+    the mean LINE is 800 yards, scored once. A stat only one source carries
+    counts as 0 for the other."""
+    a, b = _two_frames()
+    out = X.combine([a, b], mode="mean", scoring=HALF)
+    got = {r["sleeper_id"]: r for r in out.iter_rows(named=True)}
+    two = got["2"]
+    assert json.loads(two["line"]) == {"rush_yd": 800.0}
+    assert abs(two["pts17"] - X.score_projection({"rush_yd": 800.0}, HALF)) < 1e-9
+    s1, s2 = X.score_projection({"rush_yd": 900.0}, HALF), X.score_projection({"rush_yd": 700.0}, HALF)
+    assert abs(two["pts17"] - (s1 + s2) / 2) < 1e-9                      # linear scoring: mean of scores
+    assert abs(two["pts17_sd"] - abs(s1 - s2) / 2) < 1e-9
+    assert two["pts17_hi"] == max(s1, s2) and two["pts17_lo"] == min(s1, s2) and two["n_sources"] == 2
+    assert two["source"] == "mean(sheet,sleeper)" and two["as_of"] == "e" and two["team"] == "X"
+    one = got["1"]
+    assert one["n_sources"] == 1 and one["pts17_sd"] == 0.0
+    assert json.loads(one["line"]) == {"rush_yd": 1000.0, "rec": 50.0}
+    rev = {r["sleeper_id"]: r["pts17"] for r in X.combine([b, a], mode="mean", scoring=HALF).iter_rows(named=True)}
+    assert all(abs(rev[k] - got[k]["pts17"]) < 1e-9 for k in got)       # order-free
+    c = pl.DataFrame({"sleeper_id": ["9"], "name": ["Z"], "pos": ["WR"], "team": ["Q"], "pts17": [0.0],
+                      "source": ["espn"], "as_of": ["f"], "line": [json.dumps({"rec": 40.0, "rec_yd": 400.0})]},
+                     schema=X.SCHEMA)
+    d = pl.DataFrame({"sleeper_id": ["9"], "name": ["Z"], "pos": ["WR"], "team": ["Q"], "pts17": [0.0],
+                      "source": ["sleeper"], "as_of": ["f"], "line": [json.dumps({"rec_yd": 600.0})]},
+                     schema=X.SCHEMA)
+    z = X.combine([c, d], mode="mean", scoring=HALF).row(0, named=True)
+    assert json.loads(z["line"]) == {"rec": 20.0, "rec_yd": 500.0}     # a stat one source lacks counts as 0
 
 
 def test_non_starters_go_to_zero_only_when_depth_chart_and_market_agree():
