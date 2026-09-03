@@ -1102,3 +1102,18 @@ differently; the fitted one reaches a round earlier for scarce RBs. Final
 lineup deltas: +23 fitted (pair 1), -1 fitted (pair 2). Draft outcomes are
 a wash live; the offline split (fitted better log-loss every room, worse
 30-50 honesty most rooms) is unchanged through 11 rooms.
+
+## Mock 39 — room 10616150 "Wishbone", 10 teams, slot 7 — PAIR 3A: FITTED knobs — CLEAN — first bench rounds on the #38 wire
+
+15:42-16:02 PT. 15/15 legal, 15/15 engine, zero autopicks. The #38
+predicted-undrafted wire went live mid-room (bridge forward12 restarted
+during round 3, verified port owner; one plan fetch blipped, the cached
+plan covered it). Bench prices came out honest for the first time: RJ
+Harvey ~18, Adams ~16, Gainwell ~5, and Mahomes-as-QB2 arrived at pick 94,
+one round earlier than rooms 37/38 took him, exactly the flip the #38
+re-read predicted. Offline scoring, pasted from g4_10616150_*.log: fitted
+objective 0.1369, current 0.1508. Caveat for pair 3: rounds 1-6 ran on the
+pre-#38 bridge, bench rounds on the fixed one; 3B runs fixed throughout
+(the fix only touches bench pricing, so rounds 1-7 stay comparable).
+Reports:
+reports/mocks/mock39_2026-09-03_1542pt_wishbone_room10616150_seat7_*.md.
