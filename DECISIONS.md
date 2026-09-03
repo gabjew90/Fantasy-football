@@ -1847,3 +1847,81 @@ steering the draft once the planner measured against what you end up with
 (Tracker._fallback_points); across 22 slots and six candidates the spread
 is 0.4 points. The split itself is still worth storing -- it is what
 `onboard` hands a new league instead of 45/45/10 -- but it is not a lever.
+
+## 2026-09-02 (34) — End-to-end review before the stress mocks: live-path defects fixed, stale context shed
+
+Trigger: I forgot, mid-session, how a mock room is joined (the settled
+method: `window.name = 'fandraft'` in the lobby tab, then `.click()` on the
+row's Join anchor; a click from an unnamed tab opens a popup outside the
+controlled tab group). The user's call: review end to end and shed stale
+context so that class of mistake stops recurring. Six review angles ran in
+parallel (stale prose, driver pick path, bridge-to-engine trace, dead code,
+engine logic on the live path, logging); 80-odd findings; the ones below
+are fixed, with a test each where a test could hold it.
+
+Driver (scripts/draft_driver.js), the ones that lose picks:
+- TE2 rule read `S.ctx`, set only by the local fallback ranker, so on the
+  engine path every engine-recommended second TE was refused. Now
+  `top6TeFell()` computes Python's rule from the board and the current pick.
+- round / picksLeft / counts came from the roster-panel regex (cannot parse
+  "A. St. Brown", IR-R tags), which drives K/DEF timing and must-fill.
+  `rosterView()` prefers the store's roster and the header count.
+- A store that cannot identify our team sent an empty roster (mock 11's
+  failure reopened): the roster now falls back to the panel, the state is
+  logged, and the gate refuses to click when neither source can say.
+- Try budget: the action attempt was un-counted, so a timing-out makePick
+  with no search box walked all 25 plan rows at 3 s each.
+- Bridge down / plan stuck at the turn: three plan-only gate failures hand
+  the turn to the labelled local ranker instead of the clock; the plan fetch
+  has an 8-s abort; every failed refresh is logged.
+- `run()` had a 3600-s default that expired mid-draft when injected early;
+  now no deadline. The trail POST is automatic at draft end. Preflight
+  reports the pick path (action vs click) and whether our team is known.
+- Scrutiny: full ISO timestamps, plan call number, ranker source, plan age,
+  skipped candidates and dropped plan rows on every pick record; the action
+  log rides in the trail; the log ring holds 5000 lines; reset keeps it.
+
+Bridge (scripts/yahoo_bridge.py, bridge_server.py):
+- Pads only UP: a spurious entry left current_pick one ahead of the header
+  for the rest of a room and the gate refused every click. Entries numbered
+  at or past the header pick are dropped (ours never), over-count is a
+  named warning.
+- merge_feed was first-view-wins; the store's entry (carries team_id) now
+  corrects a panel misread, mine flags survive.
+- The URL seat is cross-checked against our own flagged picks; one
+  consistent disagreeing snake slot wins (the reshuffle case).
+- depth_tail ran only the position caps; now the full guardrail (must-fill,
+  stash), so 2 picks left with K/DEF open offers K/DEF only.
+- Unresolved drafted names and "past my first turn with no roster" are
+  named warnings, returned to the page (logged as BRIDGE WARNING), printed
+  with a timestamp and the call number, and written to the plans sidecar.
+- log_plan's dedupe key was a tautology; it now names the state.
+
+Engine (draftkit/tracker.py, urgency.py, draftlog.py):
+- The rolling pool had a LOWER bound (cur - 20): a faller 20+ picks past
+  ADP -- the bargain the engine exists for -- was outside the simulation,
+  so his market's numbers ignored him and his survival clause vanished.
+  No lower bound now; pool_lookback stays in the knob list, unused.
+- upside_mult on a negative market value pushed the flagged player DOWN;
+  now additive in |value|.
+- `adp_delta or -999` read 0.0 as missing in the near-tie.
+- intervening_slots() was empty exactly when I was on the clock.
+- slot_markets=False now really is per-position urgency (the off arm used
+  to build the FLEX row anyway). Bench rows are deduped after the merge.
+- Autopick rivals: BN rode in needs so "starters full" never triggered;
+  sigma floor against a zero scale; run-history seeded one pick late on the
+  clock; simulate_survival's own run_ratio default matches the shipped 0.
+- Yahoo pick rows in the room log now carry the name; fillers are skipped.
+
+Shed: exportState and the poller-era set_picks, variance_pick, trend_adj +
+two config keys, the disagreements worklist csv, stale runbook steps (run
+budget, trail, preflight fields, away-clear, net_tap), the protocol doc's
+checklist moved into the runbook, superseded banners on six historical
+docs and the architecture report, the join method written into the
+runbook and the rig memory.
+
+Not changed, recorded: _fallback_points' S-th-pick deadline (heuristic,
+pinned by test), the FLEX-market label on plan rows when an RB wins the
+FLEX row, the laptop scheduled tasks (SEASON BRIEFS duplicates the Actions
+manager; retirement owed to the user), the JS/Python guardrail asymmetry
+(the driver's K/DEF reservation has no Python twin).

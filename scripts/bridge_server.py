@@ -47,6 +47,7 @@ def build_plan(state: dict, depth: int) -> dict:
         # union of every view of the feed per draft (yahoo_bridge.merge_feed).
         feed_key = str(state.get("draft_key") or f"{state.get('teams')}x{state.get('my_slot')}")
         memory = _STATE.setdefault("feed", {}).setdefault(feed_key, {})
+        page_drafted = len(state.get("drafted") or [])
         state = dict(state, drafted=YB.merge_feed(memory, state.get("drafted") or []))
         t = YB.build_tracker(cfg, players, state)
         recs = t.recommendations(top_n=depth)
@@ -55,15 +56,21 @@ def build_plan(state: dict, depth: int) -> dict:
         # the tail past the engine's named candidates goes through the same
         # guardrails as everything else (see yahoo_bridge.depth_tail)
         plan = YB.depth_tail(t, plan, depth)
+        _STATE["calls"] += 1
+        call = _STATE["calls"]
         # the structured calibration record for this room (plan B1); logging
         # never breaks a plan
         try:
             YB.log_plan(t, recs, report, feed_key, ROOT / "data" / "logs")
+            # the scrutiny sidecar: every call, the state received, the full
+            # plan and every market's numbers (stress mocks 2026-09-02)
+            YB.log_plan_detail(t, recs, report, plan, state, feed_key, ROOT / "data" / "logs",
+                               call=call, page_drafted=page_drafted)
         except Exception:  # noqa: BLE001
             traceback.print_exc()
-        _STATE["calls"] += 1
         return {"current_pick": t.current_pick, "my_slot": t.my_slot,
-                "needs": t.my_needs(), "plan": plan, "calls": _STATE["calls"]}
+                "needs": t.my_needs(), "plan": plan, "calls": call,
+                "warnings": list(getattr(t, "warnings", []) or [])}
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -173,9 +180,13 @@ class Handler(BaseHTTPRequestHandler):
             # third-TE pick of mock 11 was invisible in a log that only said
             # "served". If n_mine is 0 while roster is not, the panel's "You"
             # label was unreadable and the roster fallback is doing the work.
-            print(f"  plan #{_STATE['calls']} @pick {plan.get('current_pick')} "
+            import time
+            stamp = time.strftime("%Y-%m-%dT%H:%M:%S")
+            print(f"{stamp} plan #{plan.get('calls')} @pick {plan.get('current_pick')} "
                   f"drafted={len(drafted)} mine={n_mine} roster={len(roster)} "
                   f"needs={plan.get('needs')} -> {head}", flush=True)
+            for w in plan.get("warnings") or []:
+                print(f"{stamp}   WARNING plan #{plan.get('calls')}: {w}", flush=True)
         except Exception as e:  # noqa: BLE001
             traceback.print_exc()
             self._json({"err": f"{type(e).__name__}: {e}"}, 500)

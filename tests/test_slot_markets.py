@@ -314,3 +314,33 @@ def test_dispersion_degrades_to_the_multiplier_without_a_two_source_spread():
         t.late_round_dispersion = True
         top, whys = _top_rb(t)
         assert top == "narrow" and all("sources disagree" not in w for w in whys.values()), (sd, n)
+
+
+# ---------- review 2026-09-02: engine fixes on the live path ----------
+
+def test_a_faller_far_past_his_adp_is_in_the_simulated_pool():
+    """A WR with ADP 5 still there at pick 41 used to be outside the rolling
+    pool (cur - 20), so his market's numbers ignored the one bargain the
+    engine exists to catch."""
+    board = [player("faller", "WR", 60.0, 50.0, 5.0, rank=1)] +             [player(f"w{i}", "WR", 30.0 - i, 20.0 - i, 38.0 + i, rank=2 + i) for i in range(30)] +             [player(f"r{i}", "RB", 30.0 - i, 30.0 - i, 39.0 + i, rank=1 + i) for i in range(30)]
+    t = make_tracker(board, [], my_slot=1, current_pick=41)
+    rep = t.urgency_report()
+    assert "faller" in rep["WR"]["survival"]
+    assert rep["WR"]["best_now"] == 60.0
+
+
+def test_intervening_slots_is_not_empty_when_i_am_on_the_clock():
+    t = make_tracker([player("x", "RB", 10.0, 10.0, 30.0)], [], my_slot=1, current_pick=21)   # pick 21 = slot 1, round 3
+    # picks 22-39: slots 2..10 finish round 3, then 10..2 open round 4 before my pick 40
+    assert t.intervening_slots() == list(range(2, 11)) + list(range(10, 1, -1)), t.intervening_slots()
+
+
+def test_zero_adp_delta_is_a_real_delta_in_the_near_tie():
+    """`or -999` read 0.0 as missing, so a player with delta -3 beat one with 0.0."""
+    a = dict(player("a", "RB", 20.0, 20.0, 50.0), adp_delta=-3.0)
+    b = dict(player("b", "RB", 19.0, 19.0, 51.0), adp_delta=0.0)
+    filler = [player(f"f{i}", "WR", 1.0, 1.0, 150.0 + i) for i in range(4)]
+    t = make_tracker([a, b] + filler, [], my_slot=1, current_pick=21)
+    recs = t.recommendations(top_n=5)
+    rbs = [p["sleeper_id"] for _s, _w, p in recs if p["pos"] == "RB"]
+    assert rbs[0] == "b"

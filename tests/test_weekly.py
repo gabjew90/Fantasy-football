@@ -2,7 +2,7 @@
 
 import pytest
 
-from draftkit.weekly import compose, matchup_mult, shrunk_ratio, trend_adj
+from draftkit.weekly import compose, matchup_mult, shrunk_ratio
 
 
 def test_shrinkage_early_season():
@@ -16,13 +16,6 @@ def test_matchup_capped_both_ways():
     assert matchup_mult(None, weeks=10, cap=0.10, shrink_weeks=5) == 1.0
 
 
-def test_trend_threshold_and_cap():
-    assert trend_adj(0.05, cap=0.15, threshold=0.07) == 0.0     # under threshold: no adj
-    assert trend_adj(0.12, cap=0.15, threshold=0.07) == pytest.approx(0.15)  # 0.24 capped
-    assert trend_adj(-0.10, cap=0.15, threshold=0.07) == pytest.approx(-0.15)
-    assert trend_adj(None, cap=0.15, threshold=0.07) == 0.0
-
-
 def test_availability_gate_is_absolute():
     assert compose(20.0, 1.10, 0.15, "Out") == 0.0
     assert compose(20.0, 1.10, 0.15, "IR") == 0.0
@@ -30,5 +23,5 @@ def test_availability_gate_is_absolute():
 
 
 def test_compose_bounded_stack():
-    # 10 pts * 1.10 matchup * 1.15 trend = 12.65 — worst-case combined swing
+    # 10 pts * 1.10 matchup * 1.15 adj = 12.65 — worst-case combined swing
     assert compose(10.0, 1.10, 0.15, "") == pytest.approx(12.65)

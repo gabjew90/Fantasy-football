@@ -1,5 +1,13 @@
 # How the Yahoo draft is actually driven (2026-09-01)
 
+> **SUPERSEDED 2026-09-01 (same day).** The constraint below was worked
+> around: a TLS bridge (`scripts/bridge_server.py`, self-signed cert
+> accepted in Chrome) lets the page call the real Python engine at the pick
+> itself — measured 614 ms, zero staleness — so the stale-plan trade-off
+> this note weighs no longer applies. The live procedure is
+> docs/draft-day-runbook.md; the design is in scripts/bridge_server.py's
+> docstring. Kept as the record of the measurement.
+
 ## The constraint, verified three ways
 
 The page cannot reach a local Python server. Tested against a threaded server

@@ -171,8 +171,6 @@ paths:
 inseason:
   matchup_cap: 0.10
   matchup_shrink_weeks: 5
-  trend_cap: 0.15
-  trend_threshold: 0.07
   score_sigma: 28.0
   sims: 4000
   regime_safe: 0.85

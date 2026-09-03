@@ -245,14 +245,24 @@ class Tracker:
         return snake.starter_needs(self.slot_positions(self.my_slot), self.slots)
 
     def intervening_slots(self) -> list[int]:
+        """Rival slots picking between now and my NEXT turn. When I am on the
+        clock the window starts at the pick after mine (the same off-by-one
+        urgency_report fixes); before this the cliff report said "0 teams
+        picking before you" exactly at decision time."""
         if not self.my_slot:
             return []
-        nxt = snake.next_pick_for_slot(self.current_pick, self.my_slot, self.teams, self.rounds)
+        cur = self.current_pick
+        total = self.teams * self.rounds
+        on_clock = cur <= total and snake.pick_to_round_slot(cur, self.teams)[1] == self.my_slot
+        start = cur + 1 if on_clock else cur
+        if start > total:
+            return []
+        nxt = snake.next_pick_for_slot(start, self.my_slot, self.teams, self.rounds)
         if nxt is None:
             return []
         return [
             s
-            for s in snake.slots_picking_between(self.current_pick, nxt, self.teams)
+            for s in snake.slots_picking_between(start, nxt, self.teams)
             if s != self.my_slot
         ]
 
@@ -379,6 +389,16 @@ class Tracker:
         out: list[tuple[str, tuple[str, ...], str]] = [
             (pos, (pos,), "vorp") for pos in POS_ORDER if needs.get(pos, 0) > 0
         ]
+        if not getattr(self, "slot_markets", True):
+            # the A/B control arm is PER-POSITION urgency: a FLEX-eligible
+            # position with only the flex open still gets its own positional
+            # row (review 2026-09-02: the off arm used to build the FLEX row
+            # anyway and price it on a raw level, so it was not a control)
+            if needs.get("FLEX", 0) > 0:
+                have = {m for m, _members, _v in out}
+                out += [(pos, (pos,), "vorp") for pos in POS_ORDER
+                        if pos in snake.FLEX_ELIGIBLE and pos not in have]
+            return out or [(pos, (pos,), "vorp") for pos in POS_ORDER]
         if needs.get("FLEX", 0) > 0:
             # Membership is ALL flex-eligible positions, not just the ones whose
             # dedicated slot is full: any of them can fill the flex, and pooling
@@ -578,9 +598,16 @@ class Tracker:
         # nearly all gone) — rivals then had almost nobody to "take", which
         # understated competition and inflated survival exactly where the
         # round-8 upside switch is deciding (post-v2 item 1).
-        lo, hi = cur - self.pool_lookback, cur + self.pool_lookahead
+        # No LOWER bound (review 2026-09-02): a player 20+ picks past his ADP
+        # is exactly the faller the engine exists to catch, and the old
+        # `cur - pool_lookback` floor dropped him from the simulation -- so
+        # his market's best_now/e_best/urgency were computed without him and
+        # his "% chance he's still there" clause vanished. Fallers are few;
+        # the pool grows by a handful. pool_lookback is kept in the knob list
+        # for config compatibility and no longer bounds anything.
+        hi = cur + self.pool_lookahead
         window = [p for p in avail
-                  if p.get("adp") is not None and lo <= p["adp"] <= hi]
+                  if p.get("adp") is not None and p["adp"] <= hi]
         if len(window) < self.pool_min:
             # floor: never starve — extend by ADP proximity to the window
             window = avail[: max(self.pool_min, len(window))]
@@ -602,6 +629,7 @@ class Tracker:
         report = simulate_survival(
             pool, start, my_next, self._rival_states(start, my_next), self.rival_seeds,
             rng, sims=self.sims, sigma=self._sigma(rnd), teams=self.teams,
+            history_end=cur,   # the real history ends at the pick on the clock, not at `start`
             reach_prob=self.reach_prob, reach_scale=self.reach_scale,
             run_window=self.run_window, run_min=self.run_min,
             run_boost=self.run_boost, survival_shrink=self.survival_shrink,
@@ -766,7 +794,11 @@ class Tracker:
                     sd = self._dispersion_for(q)
                     if sd is not None:
                         return _mv(q) + _lam * sd            # plan A3: mean + spread
-                    return _mv(q) * (self.upside_mult if q.get("upside_flag") else 1.0)
+                    # additive in |value|: a multiplier on a NEGATIVE market
+                    # value (late rounds on a shallow board) pushed the flagged
+                    # player DOWN, the opposite of the intent (review 2026-09-02)
+                    boost = (self.upside_mult - 1.0) * abs(_mv(q)) if q.get("upside_flag") else 0.0
+                    return _mv(q) + boost
                 gpool = sorted(gpool, key=lambda q: -_late(q))
             pool = gpool[:3]
             if not pool:
@@ -775,10 +807,13 @@ class Tracker:
             # TOP candidate) broken by Δ — anchored so swaps can't chain
             anchor = pool[0]
             best = anchor
+
+            def _delta(q):
+                # 0.0 is a real delta, not a missing one (`or -999` read it as missing)
+                d = q.get("adp_delta")
+                return -999.0 if d is None else float(d)
             for q in pool[1:]:
-                if abs(mv(anchor) - mv(q)) <= 2.0 and (
-                    (q.get("adp_delta") or -999) > (best.get("adp_delta") or -999)
-                ):
+                if abs(mv(anchor) - mv(q)) <= 2.0 and _delta(q) > _delta(best):
                     best = q
             pos = best["pos"]
             label = "your FLEX spot" if mkt == "FLEX" else mkt
@@ -879,6 +914,14 @@ class Tracker:
         if self.bench_insurance:
             bench_rows = self._bench_candidates(
                 cands, needs, counts, rnd, picks_left, top6_te_fell)
+            if bench_rows:
+                # the bench rows are appended to the market rows and the whole
+                # list re-sorted; a player can now be in twice (review
+                # 2026-09-02). Keep the higher-scored row.
+                seen_ids = set()
+                cands = [c for c in cands
+                         if not (c[2]["sleeper_id"] in seen_ids
+                                 or seen_ids.add(c[2]["sleeper_id"]))]
         # v2 item 1.2: joint two-pick re-rank on top of the greedy order.
         # Pure arithmetic over the cached urgency report — nothing new runs
         # on the clock; any failure or missing report keeps the greedy list

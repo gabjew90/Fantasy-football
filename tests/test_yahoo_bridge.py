@@ -338,3 +338,104 @@ def test_away_teams_become_away_slots_through_drafted_team_ids():
     assert any(r["autopick"] for r in t._rival_states(1, 4))                # slot 2 is on autopick
     dom = dict(state, drafted=[{"pick_no": 1, "name": "RB Player0", "pos": "RB"}])
     assert yb.away_slots_from_state(dom, 10) == frozenset()
+
+
+def test_plan_detail_records_state_needs_every_market_and_the_full_plan(tmp_path):
+    """The scrutiny sidecar (stress mocks 2026-09-02): one record per bridge
+    call carrying what the page sent, the engine needs, every market's
+    numbers with named top survivals, the recs and the whole plan."""
+    players = _players()
+    state = {"my_slot": 8, "teams": 10, "rounds": 15, "current_pick": 28, "on_clock": False,
+             "drafted": [{"pick_no": 1, "name": "RB Player0", "pos": "RB", "team_id": "1"}],
+             "my_roster": [{"name": "T. Player0", "pos": "TE"}], "away_teams": ["3"]}
+    t = yb.build_tracker(_Cfg(), players, state)
+    recs = t.recommendations(top_n=5)
+    report = t.urgency_report()
+    plan = yb.plan_rows(t, recs, report)
+    d = yb.plan_detail(t, recs, report, plan, state)
+    assert d["type"] == "plan_detail" and d["current_pick"] == 28 and d["my_slot"] == 8
+    assert d["state_in"]["drafted"] == 1 and d["state_in"]["my_roster"] == ["T. Player0 (TE)"]
+    assert d["state_in"]["away_teams"] == ["3"]
+    assert d["needs"]["TE"] == 0 and len(d["plan"]) == len(plan) and len(d["recs"]) == len(recs)
+    assert d["markets"], "every market the report priced"
+    for mkt, m in d["markets"].items():
+        assert {"best_now", "e_best_next", "urgency", "top_survival", "pool"} <= set(m)
+        for row in m["top_survival"]:
+            assert row["name"] and 0.0 <= row["s"] <= 1.0
+    path = yb.log_plan_detail(t, recs, report, plan, state, "/draftclient/f1/424242/8", tmp_path)
+    yb.log_plan_detail(t, recs, report, plan, state, "/draftclient/f1/424242/8", tmp_path)
+    assert path.name == "yahoo_424242.plans.jsonl"
+    assert len(path.read_text(encoding="utf-8").splitlines()) == 2, "no dedupe: every call is an event"
+
+
+# ---------- review 2026-09-02: the bridge reconciles DOWN, the store beats the panel, the seat is checked ----------
+
+def test_feed_entries_at_or_past_the_header_pick_are_dropped_and_said():
+    """One spurious panel line used to leave current_pick one ahead of the
+    header for the rest of the room; the page's gate then refused every click."""
+    players = _players()
+    drafted = [{"pick_no": n, "name": f"RB Player{n - 1}", "pos": "RB"} for n in range(1, 8)]
+    drafted.append({"pick_no": 8, "name": "WR Player0", "pos": "WR"})        # numbered AT the pick on the clock
+    state = {"my_slot": 8, "teams": 10, "rounds": 15, "current_pick": 8, "drafted": drafted, "my_roster": []}
+    t = yb.build_tracker(_Cfg(), players, state)
+    assert t.current_pick == 8
+    assert any("dropped 1 feed entries" in w for w in t.warnings), t.warnings
+
+
+def test_my_own_pick_numbered_past_the_header_is_kept():
+    players = _players()
+    drafted = [{"pick_no": n, "name": f"RB Player{n - 1}", "pos": "RB"} for n in range(1, 8)]
+    drafted.append({"pick_no": 8, "name": "WR Player0", "pos": "WR", "mine": True})
+    state = {"my_slot": 8, "teams": 10, "rounds": 15, "current_pick": 8, "drafted": drafted, "my_roster": []}
+    t = yb.build_tracker(_Cfg(), players, state)
+    assert t._my_pos_counts() == {"WR": 1}
+    assert any("over-count" in w for w in t.warnings)
+
+
+def test_merge_feed_lets_the_store_correct_a_panel_misread():
+    mem = {}
+    yb.merge_feed(mem, [{"pick_no": 9, "name": "A. Brown", "pos": "WR", "mine": True}])        # panel view
+    got = yb.merge_feed(mem, [{"pick_no": 9, "name": "Amon-Ra St. Brown", "pos": "WR", "team_id": "4"}])
+    assert got[0]["name"] == "Amon-Ra St. Brown" and got[0]["team_id"] == "4"
+    assert got[0]["mine"] is True, "a mine flag learned earlier survives the correction"
+    # a second panel view never undoes the store's entry
+    got = yb.merge_feed(mem, [{"pick_no": 9, "name": "A. Brown", "pos": "WR"}])
+    assert got[0]["name"] == "Amon-Ra St. Brown"
+
+
+def test_seat_is_taken_from_my_own_picks_when_the_url_slot_disagrees():
+    """A room reshuffled us from slot 3 to slot 10 at the bell; our flagged
+    picks fall on the real seat and the survival window must use it."""
+    players = _players()
+    drafted = [{"pick_no": n, "name": f"RB Player{n - 1}", "pos": "RB"} for n in range(1, 21)]
+    for n in (10, 11):                                   # slot 10 picks 10 and 11 in a 10-team snake
+        drafted[n - 1] = dict(drafted[n - 1], mine=True, team_id="7")
+    state = {"my_slot": 3, "teams": 10, "rounds": 15, "current_pick": 21, "drafted": drafted, "my_roster": []}
+    t = yb.build_tracker(_Cfg(), players, state)
+    assert t.my_slot == 10
+    assert t._my_pos_counts() == {"RB": 2}
+    assert any("my_slot 3 disagrees" in w for w in t.warnings), t.warnings
+
+
+def test_roster_unknown_past_my_first_turn_is_a_named_warning():
+    players = _players()
+    drafted = [{"pick_no": n, "name": f"RB Player{n - 1}", "pos": "RB"} for n in range(1, 12)]
+    state = {"my_slot": 8, "teams": 10, "rounds": 15, "current_pick": 12, "drafted": drafted, "my_roster": []}
+    t = yb.build_tracker(_Cfg(), players, state)
+    assert any("MY ROSTER UNKNOWN" in w for w in t.warnings), t.warnings
+    # an unresolved drafted name is reported, never dropped in silence
+    state2 = dict(state, drafted=drafted + [{"pick_no": 12, "name": "Nobody Real", "pos": "WR"}], current_pick=13)
+    t2 = yb.build_tracker(_Cfg(), players, state2)
+    assert t2.unresolved and any("matched no board player" in w for w in t2.warnings)
+
+
+def test_depth_tail_applies_must_fill_not_only_the_position_caps():
+    """Two picks left, K and DEF open: the tail must be K/DEF only."""
+    players = _players()
+    mine = ([{"name": "QB Player0", "pos": "QB"}] + [{"name": f"RB Player{i}", "pos": "RB"} for i in range(6)]
+            + [{"name": f"WR Player{i}", "pos": "WR"} for i in range(5)] + [{"name": "TE Player0", "pos": "TE"}])
+    assert len(mine) == 13
+    state = {"my_slot": 8, "teams": 10, "rounds": 15, "current_pick": 133, "drafted": [], "my_roster": mine}
+    t = yb.build_tracker(_Cfg(), players, state)
+    tail = yb.depth_tail(t, [], 40)
+    assert tail and {x["p"] for x in tail} <= {"K", "DEF"}, [x["p"] for x in tail]

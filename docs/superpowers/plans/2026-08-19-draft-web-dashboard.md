@@ -1,3 +1,5 @@
+> Historical (superseded); see docs/draft-day-runbook.md and docs/plans/2026-09-02-final-form-and-survival-sim-plan.md
+
 # Draft-Day Web Dashboard Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

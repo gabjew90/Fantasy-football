@@ -54,9 +54,13 @@ window.DK = (function () {
   const SUFFIX = { jr: 1, sr: 1, ii: 1, iii: 1, iv: 1, v: 1 };
 
   function note(msg) {
-    const line = new Date().toISOString().slice(11, 19) + ' ' + msg;
+    // full ISO (UTC, with the date): the bridge logs and the trail are joined
+    // on time afterwards, and a mock that straddles 00:00 UTC must not wrap
+    const line = new Date().toISOString() + ' ' + msg;
     S.log.push(line);
-    if (S.log.length > 400) S.log.shift();
+    // 5000 lines holds a whole 15-round mock (a poll loop writes ~1500);
+    // the trail dump retains the log, so the ring must not have wrapped
+    if (S.log.length > (S.cfg.logCap || 5000)) S.log.shift();
     return line;
   }
 
@@ -389,7 +393,24 @@ window.DK = (function () {
    * engine rather than improvise. */
   function te2Ok(p, counts) {
     if (p.p !== 'TE' || (counts.TE || 0) < 1) return true;
-    return !!(S.ctx && S.ctx.top6TeFell);
+    return top6TeFell();
+  }
+
+  /* Python's rule, computed from what the page knows RIGHT NOW: a top-6 TE
+   * (board order) who is still undrafted and sits te2FallPicks or more past
+   * his ADP at the current pick. Until 2026-09-02 this read S.ctx, which only
+   * the local fallback ranker sets -- so on the engine path (the normal one)
+   * every engine-recommended second TE was refused by the driver's own
+   * re-check. Now one function, consulted by every caller. */
+  function top6TeFell() {
+    const view = rosterView();
+    const mine = new Set(view.players.map(p => p.k + '|' + p.pos));
+    const snap = storeState();
+    const drafted = new Set(snap ? snap.drafted.map(d => idKey(d.name, d.pos) + '|' + d.pos) : []);
+    const cur = (snap && snap.current_pick) || currentPickNo() || S.cfg.myNextPick || (view.have + 1) * (S.cfg.teams || 10);
+    const te6 = S.board.filter(x => x.p === 'TE').slice(0, 6);
+    return te6.some(x => !isGone(x) && !mine.has(x.k + '|' + x.p) && !drafted.has(x.k + '|' + x.p)
+      && x.a != null && (cur - x.a) >= S.cfg.te2FallPicks);
   }
 
   /* Structural rules only. There used to be a fourth: "no non-negative-VORP
@@ -543,24 +564,49 @@ window.DK = (function () {
       if (snap && domDrafted.length && Math.abs(domDrafted.length - snap.drafted.length) > 3) {
         note('store/dom disagree: store has ' + snap.drafted.length + ' picks, page text ' + domDrafted.length);
       }
+      // A store that cannot identify OUR team has every pick mine:false and an
+      // empty my_roster; sending that told the bridge we owned nothing (the
+      // QB/TE gates reopen). The picks are still right; the roster falls back
+      // to the panel, and the condition is logged once per state.
+      const teamKnown = !!(snap && snap.my_team);
+      if (snap && !teamKnown && S.teamUnknownAt !== snap.drafted.length) {
+        S.teamUnknownAt = snap.drafted.length;
+        note('store found but my team is UNKNOWN -> roster from the panel (' + domRoster.length + ' players)');
+      }
       const body = JSON.stringify({
         my_slot: slot, teams: S.cfg.teams, rounds: S.cfg.rounds,
         depth: 25,
         drafted: snap ? snap.drafted : domDrafted,
-        my_roster: snap ? snap.my_roster : domRoster,
+        my_roster: teamKnown ? snap.my_roster : domRoster,
         current_pick: snap && snap.current_pick ? snap.current_pick : currentPickNo(),
         draft_key: location.pathname,   // the bridge keeps a per-draft union of the feed
-        source: S.source,
+        source: S.source + (snap && !teamKnown ? '+dom-roster' : ''),
         away_teams: snap ? snap.away_teams : [],   // plan B5: managers on autopick right now
+        roster_count: rosterCount() ? rosterCount().have : null,
+        on_clock: snap ? snap.on_clock : onClock(),
       });
-      const r = await fetch(S.cfg.bridge + '/plan', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body,
-      });
+      // a hung bridge must not hold the on-clock path for the whole clock
+      const ctl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+      const timer = ctl ? setTimeout(() => ctl.abort(), (S.cfg.planTimeoutMs || 8000)) : null;
+      let r;
+      try {
+        r = await fetch(S.cfg.bridge + '/plan', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body,
+          signal: ctl ? ctl.signal : undefined,
+        });
+      } finally {
+        if (timer) clearTimeout(timer);
+      }
       const j = await r.json();
       if (j.err) { S.planErr = j.err; return 'engine error: ' + j.err; }
       S.plan = j.plan; S.planNeeds = j.needs; S.planPick = j.current_pick;
+      S.planCall = j.calls == null ? null : j.calls;   // joins this plan to the bridge's log lines
       S.planErr = null; S.planAt = Date.now();
-      return 'plan ' + (j.plan || []).length + ' deep @pick ' + j.current_pick + ' via ' + S.source;
+      // the bridge says aloud what it had to guess or drop; once per distinct message
+      for (const w of (j.warnings || [])) {
+        if (S.lastWarning !== w) { S.lastWarning = w; note('BRIDGE WARNING: ' + w); }
+      }
+      return 'plan ' + (j.plan || []).length + ' deep @pick ' + j.current_pick + ' via ' + S.source + ' call#' + S.planCall;
     } catch (e) {
       S.planErr = String(e).slice(0, 120);
       return 'bridge unreachable: ' + S.planErr;
@@ -587,16 +633,47 @@ window.DK = (function () {
    * The local ranking is kept ONLY as a fallback for a stale or missing plan,
    * and says so in the output, because a silent fallback to the weaker
    * ranking is exactly the failure this whole exercise was about. */
-  function rankFromPlan() {
+  /* What WE hold, from the best reader available: the store's own roster
+   * (full names, exact positions) when it can identify our team, else the
+   * roster panel's text. `have` is the LARGER of the roster length and the
+   * header's (n/15) count, because a name the panel regex cannot parse
+   * ("A. St. Brown", an IR-R tag) used to make picksLeft one too large and
+   * that number drives the K/DEF timing and the must-fill rule. */
+  function rosterView() {
+    const snap = storeState();
     const ros = myRoster();
-    if (!ros || !S.plan || !S.plan.length) return null;
-    const mine = new Set(ros.players.map(p => p.k + '|' + p.pos));
-    const have = ros.players.length;
-    const out = [];
+    const rc = rosterCount();
+    let players, source;
+    if (snap && snap.my_team) {
+      players = snap.my_roster.map(p => ({ k: idKey(p.name, p.pos), pos: p.pos, disp: p.name }));
+      source = 'store';
+    } else if (ros) {
+      players = ros.players;
+      source = 'dom';
+    } else {
+      players = [];
+      source = 'none';
+    }
+    const counts = {};
+    for (const p of players) counts[p.pos] = (counts[p.pos] || 0) + 1;
+    const have = Math.max(players.length, rc && rc.have ? rc.have : 0);
+    return { players, counts, have, source, headerHave: rc ? rc.have : null };
+  }
+
+  function rankFromPlan() {
+    const view = rosterView();
+    if (view.source === 'none' && view.headerHave == null) return null;
+    if (!S.plan || !S.plan.length) return null;
+    const mine = new Set(view.players.map(p => p.k + '|' + p.pos));
+    const have = view.have;
+    const out = [], dropped = [];
     for (const e of S.plan) {
       const b = S.board.find(x => x.n === e.n && x.p === e.p)
              || { n: e.n, p: e.p, t: e.t, v: e.v, a: e.a, k: idKey(e.n, e.p) };
-      if (mine.has(b.k + '|' + b.p) || isGone(b)) continue;
+      // every plan row the page refuses is recorded, so the trail can show a
+      // live player wrongly marked gone (the mock-11 failure class)
+      if (mine.has(b.k + '|' + b.p)) { dropped.push({ n: b.n, p: b.p, why: 'mine' }); continue; }
+      if (isGone(b)) { dropped.push({ n: b.n, p: b.p, why: 'gone' }); continue; }
       // s / sr / e: the engine's shown survival, raw survival and expected
       // best-at-next-turn for this candidate's market, kept structured so the
       // trail never has to parse them back out of the why string
@@ -606,19 +683,20 @@ window.DK = (function () {
     if (!out.length) return null;
     return {
       round: have + 1, picksLeft: S.cfg.rounds - have,
-      counts: ros.counts, need: S.planNeeds || {},
-      source: 'engine', planAge: S.planPick == null ? null : S.planPick,
-      top: out, availCount: out.length, goneCount: S.gone.size,
+      counts: view.counts, need: S.planNeeds || {}, rosterSource: view.source,
+      source: 'engine', planAge: S.planPick == null ? null : S.planPick, planCall: S.planCall == null ? null : S.planCall,
+      top: out, dropped, availCount: out.length, goneCount: S.gone.size,
     };
   }
 
   function rank() {
     const fromEngine = rankFromPlan();
     if (fromEngine) return fromEngine;
-    const ros = myRoster();
-    if (!ros) return { err: 'no roster panel' };
+    const view = rosterView();
+    if (view.source === 'none' && view.headerHave == null) return { err: 'no roster panel, no header' };
+    const ros = { players: view.players, counts: view.counts };
     const counts = ros.counts;
-    const have = ros.players.length;
+    const have = view.have;
     const picksLeft = S.cfg.rounds - have;
     const rnd = have + 1;
     const need = needsMap(counts);
@@ -644,11 +722,7 @@ window.DK = (function () {
       .map(x => x.v), -Infinity);
     /* Shared context for te2Ok, so the queue planner enforces the same rule
      * this ranking does. */
-    const curPick = S.cfg.myNextPick || rnd * (S.cfg.teams || 10);
-    const top6TeFell = S.board.some(x =>
-      x.p === 'TE' && !isGone(x) && !mine.has(x.k + '|' + x.p)
-      && te6.includes(x.n) && x.a != null && (curPick - x.a) >= S.cfg.te2FallPicks);
-    S.ctx = { te6, bestFlexAlt, need, top6TeFell };
+    S.ctx = { te6, bestFlexAlt, need, top6TeFell: top6TeFell() };
 
     const eligible = [];
     const blocked = [];
@@ -806,6 +880,7 @@ window.DK = (function () {
 
     return {
       round: rnd, picksLeft, counts, need,
+      source: 'local', rosterSource: view.source,   // the labelled fallback: no plan, or every plan row filtered
       openStarters: ['QB','RB','WR','TE','FLEX','K','DEF'].reduce((a,k)=>a+(need[k]||0),0),
       top: scored.slice(0, 20).map(x => ({
         n: x.p.n, p: x.p.p, t: x.p.t, v: x.p.v, vona: x.p._vona,
@@ -1373,7 +1448,12 @@ window.DK = (function () {
                                 top_proj_available: alt,
                                 took_top_projection: !!(alt && alt.n === cand.n),
                                 passed_on: passed,
-                                pick_no: S.planPick != null ? S.planPick : null }, extra);
+                                pick_no: S.planPick != null ? S.planPick : null,
+                                // scrutiny keys (2026-09-02): when, which plan, which ranker
+                                ts: new Date().toISOString(),
+                                source: cand.fromEngine ? 'engine' : 'local',
+                                plan_call: S.planCall == null ? null : S.planCall,
+                                plan_age_ms: S.planAt ? Date.now() - S.planAt : null }, extra);
     S.records.push(rec);
     return rec;
   }
@@ -1394,15 +1474,20 @@ window.DK = (function () {
     const need = r.need || {}, counts = r.counts || {};
     const picksLeft = r.picksLeft != null ? r.picksLeft : S.cfg.rounds;
     const rnd = r.round || 1;
-    const top6TeFell = !!(S.ctx && S.ctx.top6TeFell);
+    const teFell = top6TeFell();
+    const dropped = r.dropped || [];
     for (const cand of r.top) {
+      // ONE candidate counts as one try whichever path it takes: the action
+      // attempt used to be un-counted, so a room where makePick timed out and
+      // the search box was missing walked all 25 plan rows at 3 s each
       if (tries >= (maxTries || 3)) break;
       const entry = S.board.find(b => b.n === cand.n && b.p === cand.p);
       if (!entry) continue;
-      if (!guardrailOk(entry, rnd, need, counts, picksLeft, top6TeFell)) {
+      if (!guardrailOk(entry, rnd, need, counts, picksLeft, teFell)) {
         attempted.push(cand.n + ':guardrail');
         continue;
       }
+      tries++;
       /* First choice: the client's own makePick (no DOM). The store confirms
        * or denies within a few hundred ms. 'notours' means someone else's
        * pick landed at our number (autopick beat us) -- stop, do not click.
@@ -1411,25 +1496,23 @@ window.DK = (function () {
        * store check below as landed, and a second click is rejected by
        * Yahoo as "not the current pick", harmlessly. */
       if (S.cfg.useActions !== false) {
-        tries++;
         const via = await pickViaAction(cand);
         if (via.status === 'landed') {
-          return pickRecord(cand, { verified: 'store', via: 'action', ms: via.ms }, r.top);
+          return pickRecord(cand, { verified: 'store', via: 'action', ms: via.ms, attempted, dropped }, r.top);
         }
         if (via.status === 'notours') {
           attempted.push(cand.n + ':notours(' + (via.landed || '?') + ')');
           return { err: 'pick-made-by-other-means', attempted, landed: via.landed };
         }
         attempted.push(cand.n + ':action-' + via.status + (via.why ? '(' + via.why + ')' : ''));
-        tries--;   // the click attempt below is the one that counts
       }
-      if (!setSearch(searchTerm(entry))) continue;
-      tries++;
+      if (!setSearch(searchTerm(entry))) { attempted.push(cand.n + ':nosearch'); continue; }
       await sleep(700);
       const row = findRow(entry);
       if (!row) {
         const why = await diagnoseMiss();
         if (why === 'uinotready') return { err: 'ui-not-ready', attempted };
+        attempted.push(cand.n + ':norow->gone');
         markGone(entry);
         continue;
       }
@@ -1474,7 +1557,7 @@ window.DK = (function () {
         attempted.push(cand.n + ':noland');
         continue;
       }
-      return pickRecord(cand, { verified: landed === true ? 'store' : 'roster-count', via: 'click' }, r.top);
+      return pickRecord(cand, { verified: landed === true ? 'store' : 'roster-count', via: 'click', attempted, dropped }, r.top);
     }
     return { err: 'no-verified-pick', attempted };
   }
@@ -1561,6 +1644,11 @@ window.DK = (function () {
       why.push('plan is for pick ' + S.planPick + ', header says ' + hdr);
     }
     if (S.planAt && Date.now() - S.planAt > 20000) why.push('plan stale (' + Math.round((Date.now() - S.planAt) / 1000) + 's)');
+    // a store that cannot say which team is ours, with no roster panel to
+    // fall back on while the header says we hold players: the engine would be
+    // told we own nothing (mock 11). Do not click on that state.
+    const rc = rosterCount();
+    if (snap && !snap.my_team && !myRoster() && rc && rc.have > 0) why.push('my team unknown (store has no manager id, no roster panel)');
     /* Per cycle, not absolute: over a whole draft the plan legitimately names
      * many players who are then found drafted (it is padded from a header
      * pick number, so it cannot know), and each of those is a correct "gone".
@@ -1618,7 +1706,12 @@ window.DK = (function () {
     if (first && acts && typeof acts.makePick === 'function') {
       out.player_id_lookup = { player: first.n, id: playerIdFor({ n: first.n, p: first.p, t: first.t }) };
     }
+    // which pick path this room will run: the action needs makePick AND an
+    // id for the candidate; anything else is the click fallback, said aloud
+    out.pick_path = (acts && typeof acts.makePick === 'function' && out.player_id_lookup && out.player_id_lookup.id) ? 'action' : 'click';
+    out.my_team_known = !snap || !!snap.my_team;
     out.ok = !!(out.store || (out.roster_panel && out.header_pick)) && !!(out.row_lookup && out.row_lookup.found !== false) && !out.autopick_armed;
+    note('preflight: ok=' + out.ok + ' pick_path=' + out.pick_path + ' my_team=' + out.my_team + ' plan=' + out.plan);
     return out;
   }
 
@@ -1723,20 +1816,27 @@ window.DK = (function () {
   async function run(maxSeconds) {
     if (S.running) return 'already running';
     S.running = true;
-    const deadline = Date.now() + (maxSeconds || 3600) * 1000;
+    // No deadline unless one is asked for: the runbook injects 30-60 minutes
+    // before the clock and a 150-pick draft can run 150 minutes, so the old
+    // 3600-s default expired mid-draft. The loop ends on roster full / draft
+    // over / DK.stop().
+    const deadline = maxSeconds ? Date.now() + maxSeconds * 1000 : Infinity;
     note('driver start' + (throttleRisk()
       ? ' — WARNING: tab is hidden, Chrome throttles timers; keep it visible'
       : ''));
     let lastSync = 0;
+    let planGateFails = 0;
+    let ended = false;
     try {
-      while (Date.now() < deadline) {
+      while (Date.now() < deadline && S.running) {
         const rc = rosterCount();
-        if (rc && rc.have >= S.cfg.rounds) { note('roster full'); break; }
-        if (/draft results|draft complete/i.test(document.title)) { note('draft over'); break; }
+        if (rc && rc.have >= S.cfg.rounds) { note('roster full'); ended = true; break; }
+        if (/draft results|draft complete/i.test(document.title)) { note('draft over'); ended = true; break; }
 
         if (onClock()) {
           await keepAlive();     // clear a fresh away flag BEFORE the pick attempt, not after
-          await refreshPlan();   // zero-lag: ask the engine now
+          const pr = await refreshPlan();   // zero-lag: ask the engine now
+          if (!/^plan /.test(pr)) note('PLAN ' + pr);
           /* CONSISTENCY GATES (design 2026-09-01). A layer may act only when
            * its readings agree; otherwise it does nothing and the queue /
            * Yahoo's own list catches the pick. Never a confident click on a
@@ -1744,9 +1844,23 @@ window.DK = (function () {
           const gate = gatesOk();
           if (!gate.ok) {
             note('GATE FAILED -> not clicking: ' + gate.why.join('; '));
-            await sleep(1200);
-            lastSync = 0;
-            continue;
+            /* When the ONLY thing wrong is the plan (bridge down, or its pick
+             * number stuck ahead of the header), three cycles of that (~7 s)
+             * hands the turn to the labelled local ranker rather than to the
+             * clock. Any other gate reason still means do nothing. */
+            const planOnly = gate.why.length && gate.why.every(w => /^(no plan|plan stale|plan is for pick)/.test(w));
+            planGateFails = planOnly ? planGateFails + 1 : 0;
+            if (planOnly && planGateFails >= 3) {
+              note('LOCAL ranking: plan gate failed ' + planGateFails + 'x (' + gate.why.join('; ') + ') -> dropping the plan for this turn');
+              S.plan = null; S.planPick = null; S.planAt = 0;
+              planGateFails = 0;
+            } else {
+              await sleep(1200);
+              lastSync = 0;
+              continue;
+            }
+          } else {
+            planGateFails = 0;
           }
           /* LIVE PICK IS PRIMARY.
            *
@@ -1779,10 +1893,11 @@ window.DK = (function () {
           if (rcNow !== S.lastRoster || Date.now() - lastSync > 12000) {
             S.lastRoster = rcNow;
             lastSync = Date.now();
-            await refreshPlan();
+            const pr = await refreshPlan();
+            if (!/^plan /.test(pr)) note('PLAN ' + pr);
             const q = await syncQueue();
             note('sync r' + (q.round || '?') + ' queued=' + JSON.stringify(q.queued || []) +
-                 ' depth=' + ((q.queueNow || []).length));
+                 ' depth=' + ((q.queueNow || []).length) + ' pruned=' + JSON.stringify(q.pruned || []));
           }
         }
         // short poll keeps the client active
@@ -1793,6 +1908,11 @@ window.DK = (function () {
     }
     S.running = false;
     note('driver stop');
+    if (ended) {
+      // the trail is the record; it must not depend on someone remembering
+      // the console call after the last pick
+      try { await trail({ auto: true }); } catch (e) { note('auto trail failed: ' + (e && e.message)); }
+    }
     return S.log.slice(-12);
   }
 
@@ -1831,6 +1951,7 @@ window.DK = (function () {
       captured_at: new Date().toISOString(),
       picks, managers: mgrs, our_records: S.records.slice(),
       heartbeats: S.log.filter(isHeartbeat).length, issues: S.log.filter(isIssue).length,
+      log: S.log.slice(),   // the complete action log, for scrutiny after the mock
     }, extra || {});
   }
 
@@ -1896,22 +2017,13 @@ window.DK = (function () {
       S.planPick = (obj && obj.current_pick) != null ? obj.current_pick : null;
       return S.plan ? ('plan ' + S.plan.length + ' deep @pick ' + S.planPick) : 'no plan';
     },
-    /* Everything the bridge needs to rebuild engine state, read off the page. */
-    exportState(mySlot, teams, rounds) {
-      const ros = myRoster();
-      return {
-        my_slot: mySlot, teams: teams || S.cfg.teams, rounds: rounds || S.cfg.rounds,
-        my_roster: (ros ? ros.players : []).map(p => ({ name: p.disp, pos: p.pos })),
-        drafted: draftedFeed(),
-        on_clock: onClock(), armed: autopickArmed(),
-        roster_count: rosterCount(),
-      };
-    },
     reset() {
-      S.gone = new Set(); S.starred = new Set(); S.log = []; S.lastRoster = -1;
+      // the log is kept: preflight-era lines are part of the record
+      S.gone = new Set(); S.starred = new Set(); S.lastRoster = -1;
+      note('reset (gone/starred cleared; log kept)');
       return 'reset';
     },
-    rank, syncQueue, draftTop, run, gatesOk, storeState, findStore, keepAlive, preflight, _setStore,
+    rank, syncQueue, draftTop, run, gatesOk, storeState, findStore, keepAlive, preflight, _setStore, rosterView, top6TeFell,
     classifyMiss, rowMatches, normTeam, autopickArmed, idKey, // exported for tests
     findRow, parsePicksPanel, myRoster, tableLive, currentPickNo, // offline DOM tests (jsdom + fixtures)
     survivalProb, eBestNext, calibrate,

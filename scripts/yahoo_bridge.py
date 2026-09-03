@@ -210,10 +210,17 @@ def build_tracker(cfg: Config, players: list[dict], state: dict) -> Tracker:
 
     picks = []
     seen: set[str] = set()
+    unresolved: list[dict] = []          # drafted entries no board player matched (logged, not dropped silently)
+    mine_snake_slots: set[int] = set()   # where OUR flagged picks actually fell
+    flagged_ids: set[str] = set()        # the players those flags named
     for d in sorted(state.get("drafted", []), key=lambda x: int(x.get("pick_no") or 0)):
         p = index.resolve(d["name"], d.get("pos", ""), exclude=seen)
         if not p:
+            unresolved.append({"pick_no": d.get("pick_no"), "name": d.get("name"), "pos": d.get("pos")})
             continue
+        if d.get("mine") and d.get("pick_no"):
+            mine_snake_slots.add(snake.pick_to_round_slot(int(d["pick_no"]), teams)[1])
+            flagged_ids.add(p["sleeper_id"])
         seen.add(p["sleeper_id"])
         pick_no = int(d["pick_no"])
         if p["sleeper_id"] in mine_ids:
@@ -258,6 +265,26 @@ def build_tracker(cfg: Config, players: list[dict], state: dict) -> Tracker:
     #    round-gated guardrails line up, even when the feed is partial. The
     #    fillers remove nobody from the board, so the sim errs toward "still
     #    available" -- which the driver's own row lookup then corrects.
+    warnings: list[str] = []
+    # Seat check (review 2026-09-02): the URL/config slot is what the room
+    # said before the bell; a reshuffle moves us. Our own flagged picks say
+    # where we really sit. One consistent snake slot that disagrees wins.
+    if len(mine_snake_slots) == 1 and next(iter(mine_snake_slots)) != t.my_slot:
+        real = next(iter(mine_snake_slots))
+        warnings.append(f"my_slot {t.my_slot} disagrees with my picks (snake slot {real}); using {real}")
+        t.my_slot = real
+        # one rule for every pick, re-applied: ours (flagged or on the roster
+        # panel) sit on the real seat; anyone else sits on his snake slot,
+        # except that the real seat's unflagged picks are "not ours" (0)
+        mine_all = mine_ids | flagged_ids
+        for x in picks:
+            if x["player_id"] in mine_all:
+                x["draft_slot"] = real
+            else:
+                s = snake.pick_to_round_slot(x["pick_no"], teams)[1]
+                x["draft_slot"] = 0 if s == real else s
+    elif len(mine_snake_slots) > 1:
+        warnings.append(f"my flagged picks fall on several snake slots {sorted(mine_snake_slots)}; keeping my_slot {t.my_slot}")
     cur = state.get("current_pick")
     if cur:
         cur = int(cur)
@@ -267,11 +294,33 @@ def build_tracker(cfg: Config, players: list[dict], state: dict) -> Tracker:
             picks.append({"pick_no": n, "player_id": f"unknown{n}",
                           "draft_slot": 0 if slot == t.my_slot else slot,
                           "round": rnd})
+        # RECONCILE DOWN too (review 2026-09-02). The header is authoritative
+        # for where we are; an entry numbered AT or past the pick on the clock
+        # cannot have happened (a spurious panel line, a namesake resolved
+        # twice). It used to stay, current_pick ran one ahead of the header
+        # for the rest of the room, and the page's gate refused every click.
+        # Our own flagged picks are never dropped.
+        before = len(picks)
+        picks = [x for x in picks if x["pick_no"] < cur or x["draft_slot"] == t.my_slot]
+        if len(picks) != before:
+            warnings.append(f"dropped {before - len(picks)} feed entries numbered >= header pick {cur}")
+        if len(picks) + 1 > cur:
+            warnings.append(f"feed over-count: {len(picks)} picks but header says pick {cur} is on the clock")
     picks.sort(key=lambda x: x["pick_no"])
     t.state = TrackerState(picks=picks,
                            drafted_ids={x["player_id"] for x in picks},
                            status="drafting")
     t.away_slots = away_slots_from_state(state, teams)
+    # DATA MISSING, said aloud: we are past our first turn and the engine sees
+    # no roster of ours -- every slot open, QB/TE gates off (mock 11)
+    first_turn = snake.slot_pick_numbers(t.my_slot, teams, rounds)[0] if t.my_slot else None
+    if first_turn and cur and cur > first_turn and not t.picks_for_slot(t.my_slot):
+        warnings.append("MY ROSTER UNKNOWN: past my first turn with no pick attributed to me (no mine flags, no roster panel)")
+    if unresolved:
+        warnings.append(f"{len(unresolved)} drafted entries matched no board player: "
+                        + ", ".join(f"{u['pick_no']} {u['name']}" for u in unresolved[:5]))
+    t.unresolved = unresolved
+    t.warnings = warnings
     return t
 
 
@@ -310,8 +359,20 @@ def merge_feed(memory: dict, drafted: list[dict]) -> list[dict]:
         except (TypeError, ValueError):
             continue
         prev = memory.get(n)
-        if prev is None or (d.get("mine") and not prev.get("mine")):
+        if prev is None:
             memory[n] = dict(d)
+            continue
+        # the store's view (carries team_id) beats a panel-parsed one at the
+        # same number (review 2026-09-02: first-view-wins let a DOM misread
+        # shadow the real pick for the rest of the room); a `mine` flag
+        # learned later is kept either way
+        replace = (d.get("team_id") is not None and prev.get("team_id") is None) \
+            or (d.get("mine") and not prev.get("mine"))
+        if replace:
+            merged = dict(d)
+            if prev.get("mine") and not merged.get("mine"):
+                merged["mine"] = True
+            memory[n] = merged
     return [memory[k] for k in sorted(memory)]
 
 
@@ -333,6 +394,7 @@ def depth_tail(t: Tracker, plan: list[dict], depth: int) -> list[dict]:
     rnd, _ = snake.pick_to_round_slot(
         min(t.current_pick, t.teams * t.rounds), t.teams)
     counts = t._my_pos_counts()
+    needs = t.my_needs()
     picks_left = t.rounds - len(t.picks_for_slot(t.my_slot))
     top6_te_fell = any(
         q["pos_rank"] <= 6 and q.get("adp") is not None
@@ -346,7 +408,10 @@ def depth_tail(t: Tracker, plan: list[dict], depth: int) -> list[dict]:
             continue
         if (p["name"], p["pos"]) in named or p.get("proj_source") == "no_market":
             continue
-        if not t._pos_allowed(p["pos"], rnd, counts, picks_left, top6_te_fell):
+        # the FULL guardrail (position caps + must-fill + stash), not only the
+        # position caps: with 3 picks left and K/DEF/FLEX open the tail used
+        # to offer a QB2 ahead of the kicker (review 2026-09-02)
+        if not t._guardrail_ok(p, rnd, needs, counts, picks_left, top6_te_fell):
             continue
         out.append({"n": p["name"], "p": p["pos"], "t": p["team"],
                     "v": round(float(p["vorp"] or 0.0), 1), "a": p["adp"],
@@ -395,7 +460,73 @@ def log_plan(t: Tracker, recs, report, draft_key, log_dir) -> Path:
     shape as the Sleeper draft log, so scripts/fit_survival.py reads both."""
     from draftkit.draftlog import DraftLog
     path = Path(log_dir) / f"yahoo_{room_of(draft_key)}.jsonl"
-    DraftLog(path).snapshot(t, recs, report, key=(t.current_pick, len(t.state.picks)))
+    # the key names the STATE, not just the count: a `mine` label learned at
+    # the same pick count changes needs and recs and must produce an event
+    # (the old (current_pick, len(picks)) pair was a tautology)
+    needs_key = "needs:" + ",".join(f"{k}{v}" for k, v in sorted(t.my_needs().items()))   # flat: the key round-trips through JSON
+    DraftLog(path).snapshot(t, recs, report, key=(t.current_pick, len(t.picks_for_slot(t.my_slot)), needs_key))
+    return path
+
+
+def plan_detail(t: Tracker, recs, report, plan, state: dict, top_survival: int = 12,
+                call: int | None = None, page_drafted: int | None = None) -> dict:
+    """The scrutiny record for one plan (stress mocks, 2026-09-02): what the
+    page handed the bridge, what the engine saw, and every market's numbers
+    -- not just the candidates' rows. Pure; log_plan_detail appends it.
+    `call` is the bridge's call counter (the page keeps it as plan_call, the
+    bridge prints it), `page_drafted` the page's OWN drafted count before the
+    bridge merged its memory in."""
+    import datetime as dt
+    import time
+    drafted = state.get("drafted") or []
+    markets = {}
+    for mkt, u in (report or {}).items():
+        if not isinstance(u, dict):
+            continue
+        surv = u.get("survival") or {}
+        raw = u.get("survival_raw") or {}
+        top = sorted(surv.items(), key=lambda kv: -float(kv[1] or 0.0))[:top_survival]
+        names = {}
+        for sid, _p in top:
+            p = t.by_id.get(str(sid)) or {}
+            names[str(sid)] = p.get("name") or p.get("player")
+        markets[mkt] = {
+            "best_now": u.get("best_now"), "e_best_next": u.get("e_best_next"),
+            "e_best_next_carry": u.get("e_best_next_carry"), "urgency": u.get("urgency"),
+            "pool": len(surv),
+            "top_survival": [{"sleeper_id": str(sid), "name": names.get(str(sid)),
+                              "s": round(float(surv[sid]), 3), "sr": round(float(raw.get(sid, surv[sid])), 3)}
+                             for sid, _p in top],
+        }
+    return {
+        "type": "plan_detail", "ts": dt.datetime.now().isoformat(timespec="seconds"),
+        "ts_epoch": round(time.time(), 3), "call": call,
+        "warnings": list(getattr(t, "warnings", []) or []),
+        "unresolved": list(getattr(t, "unresolved", []) or []),
+        "current_pick": t.current_pick, "my_slot": t.my_slot, "teams": t.teams, "rounds": t.rounds,
+        "state_in": {"drafted": len(drafted), "page_drafted": page_drafted,
+                     "mine": sum(1 for d in drafted if d.get("mine")),
+                     "my_roster": [f"{x.get('name')} ({x.get('pos')})" for x in (state.get("my_roster") or [])],
+                     "on_clock": state.get("on_clock"), "armed": state.get("armed"),
+                     "roster_count": state.get("roster_count"), "current_pick": state.get("current_pick"),
+                     "away_teams": state.get("away_teams"), "source": state.get("source")},
+        "away_slots": sorted(int(s) for s in (getattr(t, "away_slots", None) or ())),
+        "needs": t.my_needs(),
+        "recs": [{"name": p.get("name"), "pos": p["pos"], "score": round(float(s), 2), "why": why}
+                 for s, why, p in recs],
+        "plan": plan,
+        "markets": markets,
+    }
+
+
+def log_plan_detail(t: Tracker, recs, report, plan, state: dict, draft_key, log_dir,
+                    call: int | None = None, page_drafted: int | None = None) -> Path:
+    """Append plan_detail to data/logs/yahoo_<room>.plans.jsonl (one line per
+    bridge call, no dedupe: a re-request at the same state IS an event)."""
+    path = Path(log_dir) / f"yahoo_{room_of(draft_key)}.plans.jsonl"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a", encoding="utf-8") as fh:
+        fh.write(json.dumps(plan_detail(t, recs, report, plan, state, call=call, page_drafted=page_drafted)) + "\n")
     return path
 
 

@@ -1,4 +1,6 @@
-"""Derive replacement baselines from what streaming actually returned.
+"""NOT draftkit.onboard.derive_baselines (the format-derived onboarding function): this script is the record of the ownership-data blocker.
+
+Derive replacement baselines from what streaming actually returned.
 
 Intended to replace the hand-fitted QB5/TE8 in leagues/keefamania.yaml, which
 were tuned to minimise the gap between VORP rank and ADP rank -- i.e. fitted

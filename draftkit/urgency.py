@@ -101,8 +101,9 @@ def simulate_survival(pool, current_pick, next_pick, rivals, seeds, rng,
                       survival_shrink=1.0, recent_pos=None, markets=None,
                       need_damp=NEED_DAMP, qb_filled_damp=QB_FILLED_DAMP,
                       kdef_early_damp=KDEF_EARLY_DAMP, qb_damp_until_round=10,
-                      kdef_typical_round=13, run_ratio=1.5,
+                      kdef_typical_round=13, run_ratio=0.0,
                       autopick_sigma_scale=0.5, autopick_need_damp=0.02,
+                      history_end=None,
                       rival_needs_update=True):
     """Per-market urgency + per-player survival to my next pick.
 
@@ -180,7 +181,9 @@ def simulate_survival(pool, current_pick, next_pick, rivals, seeds, rng,
 
     def pos_mult(needs: dict, rnd: int, seed, is_autopick: bool) -> np.ndarray:
         v = np.ones(n_pos)
-        starters_open = any(x > 0 for x in needs.values())
+        # BN rides along in the needs dict and is never consumed; without
+        # excluding it an autopick seat never reached "starters full" mode
+        starters_open = any(v > 0 for k, v in needs.items() if k not in ("BN", "BENCH", "IR"))
         for pos in POSITIONS:
             k = pos_index[pos]
             fills = snake.needs_position(needs, pos)
@@ -215,7 +218,8 @@ def simulate_survival(pool, current_pick, next_pick, rivals, seeds, rng,
     # at this window size; sigma itself scales with round at the call site)
     pick_nos = np.arange(current_pick, next_pick)
     # an autopick rival's noise is a fraction of a human's (plan B5)
-    sig = np.where(autopick, sigma * autopick_sigma_scale, sigma)[:, None]
+    # floor: a zero scale (or sigma) would divide by zero in the likelihood
+    sig = np.maximum(np.where(autopick, sigma * autopick_sigma_scale, sigma), 1e-6)[:, None]
     adp_like = np.exp(-0.5 * ((pick_nos[:, None] - adp[None, :]) / sig) ** 2) + 1e-9
     # fat-tail REACH mixture (v2 1.1, CLV retro: reaches are one-directional —
     # players taken EARLY, never "reached for" after their ADP). With
@@ -239,7 +243,11 @@ def simulate_survival(pool, current_pick, next_pick, rivals, seeds, rng,
     # what those picks were choosing among, less the ones they took)
     hist_items = []                       # (position index, expected-mass vector)
     if base_recent:
-        hp = np.arange(current_pick - len(base_recent), current_pick)
+        # the history's last pick is the one BEFORE the pick on the clock;
+        # when I am on the clock current_pick is already cur+1 (the window
+        # start), so the caller passes history_end=cur
+        h_end = int(history_end) if history_end is not None else current_pick
+        hp = np.arange(h_end - len(base_recent), h_end)
         hist_like = np.exp(-0.5 * ((hp[:, None] - adp[None, :]) / sigma) ** 2) + 1e-9
         for pos, row in zip(base_recent, hist_like):
             hist_items.append((pos_index.get(pos, len(POSITIONS)), np.bincount(pos_idx, weights=row, minlength=n_pos) / row.sum()))

@@ -152,7 +152,11 @@ class DraftLog:
                     self._snapped.add(pick_no)
             info = t.by_id.get(str(p.get("player_id"))) or {}
             meta = p.get("metadata") or {}
-            name = info.get("player") or (
+            # Sleeper boards key the name "player", the Yahoo bridge's "name";
+            # the bridge's fillers (unknown{n}) are not players and are skipped
+            if str(p.get("player_id", "")).startswith("unknown"):
+                continue
+            name = info.get("player") or info.get("name") or (
                 f"{meta.get('first_name', '?')} {meta.get('last_name', '')}".strip()
             )
             adp = info.get("adp")

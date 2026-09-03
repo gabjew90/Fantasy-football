@@ -1,4 +1,6 @@
-"""Bake-off: does the browser driver draft as WELL as the Sleeper engine?
+"""Superseded by the bridge; kept only because scripts/slot_replay.py imports FLEX_OK, SLOTS, lineup_value.
+
+Bake-off: does the browser driver draft as WELL as the Sleeper engine?
 
 Parity (scripts/engine_parity.py) asks whether the two make the same pick.
 They often do not -- 25% identical top pick -- but identical was never the

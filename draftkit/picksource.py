@@ -1,10 +1,11 @@
 """Local pick source for drafts without a pollable API (Yahoo leagues).
 
-One JSON file is the single source of truth for the pick sequence. Writers:
-the dashboard's manual-entry mode (clicks/POSTs) and/or the browser poller
-script (idempotent full replace). Reader: the Tracker. Snake order turns a
-bare ordered list of "who just got drafted" into full pick records — no
-other input is ever needed.
+One JSON file is the single source of truth for the pick sequence. Writer:
+the dashboard's manual-entry mode (clicks/POSTs via add_pick/undo). The
+browser poller path (set_picks) was pruned 2026-09-02; the Yahoo draft is
+driven in-page by scripts/draft_driver.js instead. Reader: the Tracker.
+Snake order turns a bare ordered list of "who just got drafted" into full
+pick records — no other input is ever needed.
 
 Unresolved names still occupy their pick slot (the draft advances even when
 a name misses our board); they resolve as unknown:<norm> with the raw name
@@ -77,28 +78,6 @@ class LocalDraft:
         dropped = data["picks"].pop()
         self._write(data)
         return {"ok": True, "removed": dropped.get("name")}
-
-    def set_picks(self, names: list) -> None:
-        """Poller path: idempotent full replace of the pick sequence.
-
-        Accepts plain names OR {"name","pos"} dicts. POSITION MATTERS: two
-        players can share an initial+surname (J. Williams RB vs J. Williams
-        WR) and without pos both collapse onto one board row - the drafted
-        player counts twice and the other stays available to the engine
-        forever (code review 2026-08-31).
-        """
-        out = []
-        for n in names[: self.teams * self.rounds]:
-            if isinstance(n, dict):
-                e = {"name": str(n.get("name", "")).strip()}
-                if n.get("pos"):
-                    e["pos"] = str(n["pos"])
-                out.append(e)
-            else:
-                out.append({"name": str(n)})
-        data = self._read()
-        data["picks"] = out
-        self._write(data)
 
     # -- reader ----------------------------------------------------------
     def resolve(self, entry: dict) -> dict:

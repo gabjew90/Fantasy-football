@@ -1,10 +1,10 @@
 """Lineup + early-games briefs (season spec Task 6).
 
 Start/sit against the actual weekly opponent: optimal lineup diffs only,
-variance lean that ONLY breaks close calls (never overrides a clear
-projection edge), inactive-risk flags ordered by kickoff (week 1 of 2026
-has a Wednesday game — lock order comes from the schedule, not the
-calendar), and red structural warnings first.
+inactive-risk flags ordered by kickoff (week 1 of 2026 has a Wednesday
+game — lock order comes from the schedule, not the calendar), and red
+structural warnings first. The variance lean that breaks close calls lives
+in manager/lineup_opt.py (its own inline rule).
 """
 
 from __future__ import annotations
@@ -65,19 +65,6 @@ def lineup_changes(roster: list[dict], current_ids: list[str],
         changes.append(f"start {a['name']} over {b['name']} ({note})")
     total = sum(p.get("weekly") or 0.0 for p in optimal)
     return changes, total
-
-
-def variance_pick(a: dict, b: dict, margin: float, close_gap: float) -> dict:
-    """Between two candidates: projection wins unless it's a close call, then
-    the matchup margin decides — underdogs take ceiling, favorites take floor."""
-    hi, lo = (a, b) if (a.get("weekly") or 0) >= (b.get("weekly") or 0) else (b, a)
-    if (hi.get("weekly") or 0) - (lo.get("weekly") or 0) >= close_gap:
-        return hi
-    if margin < -8:   # projected underdog: chase ceiling
-        return a if (a.get("stdev") or 0) >= (b.get("stdev") or 0) else b
-    if margin > 8:    # projected favorite: protect floor
-        return a if (a.get("stdev") or 0) <= (b.get("stdev") or 0) else b
-    return hi
 
 
 def render_lineup_brief(model: dict) -> str:

@@ -1,3 +1,5 @@
+> Historical (superseded); see docs/draft-day-runbook.md and docs/plans/2026-09-02-final-form-and-survival-sim-plan.md
+
 # Draft-day web dashboard — design
 
 Date: 2026-08-19

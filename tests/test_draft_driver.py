@@ -1040,3 +1040,46 @@ def test_plan_survival_fields_ride_through_the_ranked_list():
     assert r["src"] == "engine"
     assert r["top"][0] == {"n": "Christian McCaffrey", "s": 0.7, "sr": 0.86, "e": 80.5}
     assert r["top"][1] == {"n": "Bijan Robinson", "s": None, "sr": None, "e": None}
+
+
+# ---------- review 2026-09-02: the engine path's own guardrail context ----------
+
+def test_te2_rule_is_computed_without_the_local_ranker():
+    """te2Ok used to read S.ctx, which only the local fallback rank() sets, so
+    on the engine path (a plan loaded, rank() never reaching the local branch)
+    every engine-recommended second TE was refused. The rule now reads the
+    board and the current pick directly."""
+    board = chr(10).join(["Trey McBride|TE|ARI|60|1||10", "Brock Bowers|TE|LV|58|1||12",
+                          "Sam LaPorta|TE|DET|40|||30", "George Kittle|TE|SF|38|||34",
+                          "Mark Andrews|TE|BAL|30|||50", "TJ Hockenson|TE|MIN|28|||55",
+                          "Jake Ferguson|TE|DAL|10|||90"])
+    js = [
+        "document.body.innerText = 'ROUND 5, PICK 41 YOUR TEAM (4/15) ';",
+        "DK.loadCompact(" + json.dumps(board) + ", {teams: 10, te2FallPicks: 12});",
+        "const a = DK.top6TeFell();                       // McBride 31 picks past ADP 10 at pick 41",
+        "DK.loadCompact(" + json.dumps(board) + ", {teams: 10, te2FallPicks: 40});",
+        "const b = DK.top6TeFell();                       // nobody has fallen 40",
+        "console.log(JSON.stringify({a, b}));",
+    ]
+    r = run_js(chr(10).join(js))
+    assert r["a"] is True and r["b"] is False
+
+
+def test_roster_view_prefers_the_store_and_the_header_count():
+    """The round / picksLeft that drive K/DEF timing came from the roster
+    panel regex, which cannot parse "A. St. Brown"; the store's roster and
+    the header count are both available and now win."""
+    r = run_js(
+        f"""
+        const s = {json.dumps(_store_with([(1, "1", "100"), (2, "6", "103"), (3, "6", "104")], players=PLAYERS))};
+        DK._setStore({{ getState: () => s }});
+        document.body.innerText = 'YOUR TEAM (3/15) A. St. Brown WR Det Bye 8 A. Brown WR Phi Bye 5';
+        DK.loadCompact("Christian McCaffrey|RB|SFO|122.8|1|", {{ teams: 10 }});
+        const v = DK.rosterView();
+        console.log(JSON.stringify({{ have: v.have, source: v.source, counts: v.counts, header: v.headerHave,
+                                      keys: v.players.map(p => p.k) }}));
+        """
+    )
+    assert r["source"] == "store" and r["have"] == 3
+    assert r["counts"] == {"WR": 2}
+    assert r["keys"] == ["a brown", "a brown"]      # the board key is initial + LAST token; the collision guard handles the rest

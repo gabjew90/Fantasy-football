@@ -1,3 +1,5 @@
+> Historical (superseded); see docs/draft-day-runbook.md and docs/plans/2026-09-02-final-form-and-survival-sim-plan.md
+
 # Sleeper Auto-Manager ("must-win" edition) — build plan
 
 Spec: uploads/0cd9a710-fantasymanagerbuildprompt.md (one-pass, no clarifying questions,

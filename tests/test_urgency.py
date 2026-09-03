@@ -151,7 +151,7 @@ def test_explicit_default_knobs_reproduce_the_implicit_call_exactly():
     a = simulate_survival(POOL, 1, 4, RIVALS, {}, np.random.default_rng(9), sims=150, sigma=3.0)
     b = simulate_survival(POOL, 1, 4, RIVALS, {}, np.random.default_rng(9), sims=150, sigma=3.0,
                           need_damp=0.15, qb_filled_damp=0.05, kdef_early_damp=0.02,
-                          qb_damp_until_round=10, kdef_typical_round=13, run_ratio=1.5,
+                          qb_damp_until_round=10, kdef_typical_round=13, run_ratio=0.0,
                           autopick_sigma_scale=0.5, rival_needs_update=True)
     assert a == b
 
@@ -262,7 +262,7 @@ def test_run_detector_ignores_a_positions_expected_share():
     pool = ([{"sleeper_id": f"wr{i}", "pos": "WR", "vorp": 40.0, "adp": 25.0 + i} for i in range(9)]
             + [{"sleeper_id": "rb0", "pos": "RB", "vorp": 40.0, "adp": 34.0}])
     rivals = [{"slot": s, "needs": {"RB": 2, "WR": 3, "FLEX": 1}, "user_id": None} for s in range(3, 9)]
-    kw = dict(sims=300, sigma=6.0, teams=12, survival_shrink=1.0)
+    kw = dict(sims=300, sigma=6.0, teams=12, survival_shrink=1.0, run_ratio=1.5)   # the RELATIVE rule under test
     calm = simulate_survival(pool, 25, 31, rivals, {}, np.random.default_rng(4), recent_pos=[], **kw)
     wrs = simulate_survival(pool, 25, 31, rivals, {}, np.random.default_rng(4), recent_pos=["WR", "WR"], **kw)
     assert wrs["WR"]["survival"] == calm["WR"]["survival"]
@@ -276,7 +276,7 @@ def test_run_detector_fires_on_a_relative_surplus():
             + [{"sleeper_id": f"wr{i}", "pos": "WR", "vorp": 50.0, "adp": 25.0 + i} for i in range(5)]
             + [{"sleeper_id": f"te{i}", "pos": "TE", "vorp": 30.0, "adp": 45.0 + i} for i in range(2)])
     rivals = [{"slot": s, "needs": {"RB": 2, "WR": 2, "TE": 1}, "user_id": None} for s in range(3, 9)]
-    kw = dict(sims=400, sigma=6.0, teams=12, survival_shrink=1.0, run_boost=3.0)
+    kw = dict(sims=400, sigma=6.0, teams=12, survival_shrink=1.0, run_boost=3.0, run_ratio=1.5)
     calm = simulate_survival(pool, 25, 31, rivals, {}, np.random.default_rng(5), recent_pos=[], **kw)
     run = simulate_survival(pool, 25, 31, rivals, {}, np.random.default_rng(5), recent_pos=["TE", "TE"], **kw)
     assert sum(run["TE"]["survival"].values()) < sum(calm["TE"]["survival"].values())

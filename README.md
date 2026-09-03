@@ -17,8 +17,8 @@ evidence live in `DECISIONS.md`; this README is the map, not the record.
 >    inactive flags by kickoff, bye/IR warnings. All three served at localhost:8723/brief.
 > 4. Deep research passes stay ad hoc: briefs flag names; ping Claude to verify facts.
 > 5. Weekly projections auto-detect Sleeper publish state; until live they fall back to
->    season proj ÷ 16 with a visible banner. Matchup/trend adjustments activate from
->    week 3 data (caps in config.yaml `season:`).
+>    season proj ÷ 16 with a visible banner. The matchup adjustment activates from
+>    week 3 data (cap in config.yaml `inseason:`).
 
 ## Quickstart
 
@@ -125,6 +125,12 @@ Where I deviated, and why:
 python -m pytest tests/          # snake math, needs, tiering, scoring, ID matching
 python -m draftkit simulate --slot 6   # full-draft dry run through the real tracker code
 ```
+
+## Operating notes
+
+- Sleeper leagues launch draft day with `scripts/DRAFT DAY.bat`; Yahoo leagues follow `docs/draft-day-runbook.md` (bridge server + in-page driver).
+- `git config core.hooksPath .githooks` is required once per clone: the pre-commit hook is the guard that keeps `state/*.json` commits and code commits apart.
+- `scripts/SEASON BRIEFS.bat` and `scripts/ADP DIFF.bat` are run by Windows scheduled tasks on the laptop, not by the repo. SEASON BRIEFS duplicates what the GitHub Actions manager already delivers and is a candidate for retirement — that decision is owed to the user; neither task has been touched.
 
 Repo layout: `draftkit/` (pipeline + tracker modules), `manager/` (in-season
 auto-manager, GitHub Actions, state in `state/*.json`), `scripts/` (the Yahoo

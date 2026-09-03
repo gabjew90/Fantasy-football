@@ -2,7 +2,7 @@
 
 import pytest
 
-from draftkit.lineup import lineup_changes, variance_pick, render_lineup_brief
+from draftkit.lineup import lineup_changes, render_lineup_brief
 
 SLOTS = {"QB": 1, "RB": 2, "WR": 2, "TE": 1, "K": 1, "DEF": 1}
 
@@ -28,18 +28,6 @@ def test_lineup_changes_only_diffs():
     worse = ["q1", "r1", "r2", "w1", "w2", "t1", "w3", "w3", "k1", "d1"]
     changes2, total2 = lineup_changes(ROSTER, worse, SLOTS, flex=2)
     assert any("RB C" in c for c in changes2)
-
-
-def test_variance_lean_breaks_only_close_calls():
-    steady = _p("a", "Steady", "WR", 12.0, stdev=2.0)
-    boom = _p("b", "Boom", "WR", 11.0, stdev=8.0)
-    # underdog by 12: prefer ceiling in close calls
-    assert variance_pick(steady, boom, margin=-12.0, close_gap=2.5)["name"] == "Boom"
-    # favorite by 12: prefer floor
-    assert variance_pick(steady, boom, margin=12.0, close_gap=2.5)["name"] == "Steady"
-    # not a close call (gap 5 > 2.5): projection wins regardless of margin
-    far = _p("c", "Far", "WR", 17.0, stdev=9.0)
-    assert variance_pick(far, steady, margin=12.0, close_gap=2.5)["name"] == "Far"
 
 
 def test_brief_orders_inactive_flags_by_kickoff():

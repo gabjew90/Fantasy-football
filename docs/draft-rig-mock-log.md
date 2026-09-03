@@ -1,14 +1,19 @@
 # Draft rig — mock log
 
 Standing order: run mocks until a full draft completes with **15/15 engine
-picks, zero Yahoo autopicks, and zero wrong-player errors**. Every mock ends
-with the bug list it produced and the regression test that now covers it.
+picks, zero Yahoo autopicks, and zero wrong-player errors**. **MET** — mocks
+21, 22 and 23 each finished 15/15 under the final rig. Every mock ends with
+the bug list it produced and the regression test that now covers it.
 
 Target league: **Keefamania**, Yahoo 49649, 10 teams, half-PPR, 15 rounds,
 1-minute timer, snake. Draft Sat Sep 5 2026 10:00pm EDT.
 
-Rig: `scripts/draft_driver.js` (in-page), board from
-`scripts/export_board_json.py`, tests in `tests/test_draft_driver.py` (node).
+Rig: `scripts/bridge_server.py` (TLS bridge serving the engine, board and
+driver), `scripts/yahoo_bridge.py` (the engine behind it),
+`scripts/draft_driver.js` (in-page hands), `scripts/prerank_driver.js`
+(layer 0 loader), board from `scripts/export_board_json.py`. Tests:
+`tests/test_draft_driver.py`, `tests/test_prerank_driver.py` (node),
+`tests/test_yahoo_bridge.py`, `tests/test_yahoo_dom.py`.
 
 ---
 
