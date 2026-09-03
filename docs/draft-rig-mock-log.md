@@ -1008,7 +1008,7 @@ past the bell: pick 5 (Nacua) went to Yahoo's list, so per the user's
 rule this room does NOT count as the pair; mock 35 (same seat 5, fitted,
 must be 15/15 engine) replaces it. 14/15 engine picks via the action
 path, no other misses. Offline scoring at both knob sets
-(g4_10598876_*.log): fitted 0.1520 vs current 0.1642 on log-loss, fitted
+(g4_10598876_*.log): fitted 0.1492 vs current 0.1594 on log-loss, fitted
 better, seventh room of seven. Survival scorecard at the fitted point:
 30-50% shown 43% observed 8% (n 13); 70-90% shown 80% observed 40%
 (n 53). Reports:
