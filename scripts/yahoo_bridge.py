@@ -532,7 +532,8 @@ def plan_detail(t: Tracker, recs, report, plan, state: dict, top_survival: int =
                      "away_teams": state.get("away_teams"), "source": state.get("source")},
         "away_slots": sorted(int(s) for s in (getattr(t, "away_slots", None) or ())),
         "needs": t.my_needs(),
-        "recs": [{"name": p.get("name"), "pos": p["pos"], "score": round(float(s), 2), "why": why}
+        "recs": [{"name": p.get("name"), "pos": p["pos"], "score": round(float(s), 2), "why": why,
+                  **({"pair": p["_pair"]} if p.get("_pair") else {})}
                  for s, why, p in recs],
         "plan": plan,
         "markets": markets,
