@@ -1053,8 +1053,12 @@ same-model control (13/15 identical to 33):
 - Final lineups: 33 = 1642 pts (1st), 35 = 1642 (1st), 36 = 1665 (1st).
   The fitted+fix room came out 23 pts better, one room, not evidence by
   itself.
-- Offline scoring (g4_10601343_*.log): fitted 0.1354 vs current 0.1633,
-  fitted better, ninth room of nine.
+- Offline scoring (g4_10601343_*.log): fitted 0.1396 vs current 0.1488,
+  fitted better, ninth room of nine. 30-49 bucket (observed - predicted):
+  fitted -21 (n130), current -9 (n145); the fitted point still
+  over-promises mid-range survival.
+  (This line was corrected once: the first commit carried figures typed
+  from memory. Rule: numbers enter this log only pasted from the source.)
 Survival scorecard at the fitted point: 30-50% shown 44% observed 12%
 (n 17); 50-70% 62% vs 39% (n 38). Reports:
 reports/mocks/mock36_2026-09-03_0842pt_crackback-block_room10601343_seat5_*.md.
