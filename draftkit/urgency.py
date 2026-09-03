@@ -38,7 +38,12 @@ def _tendency_mult(seed: dict | None, rnd: int, pos: str) -> float:
 def calibrate(p: float, shrink: float) -> float:
     """Empirical calibration map (v2 item 1.1), fitted to the Omnibeta CLV
     retro: raw 96% -> 75%, 82% -> 68%, 45% -> 50% (n=67). A single shrink
-    toward 0.5 fits all three buckets: calibrated = 0.5 + (p - 0.5) * shrink."""
+    toward 0.5 fits all three buckets: calibrated = 0.5 + (p - 0.5) * shrink.
+    (Plan B1 note: that n=67 was scored against the wrong horizon; the map
+    is retained provisionally until the B7 refit.) shrink == 1.0 returns p
+    exactly, so raw and calibrated are identical, not identical-to-1e-17."""
+    if shrink == 1.0:
+        return float(p)
     return 0.5 + (p - 0.5) * shrink
 
 
@@ -113,7 +118,8 @@ def simulate_survival(pool, current_pick, next_pick, rivals, seeds, rng,
     if picks_between == 0 or not rivals or n == 0:
         return {
             name: {"best_now": best_now[name], "e_best_next": best_now[name],
-                   "urgency": 0.0, "survival": survival_of(name, const=1.0)}
+                   "urgency": 0.0, "survival": survival_of(name, const=1.0),
+                   "survival_raw": survival_of(name, const=1.0)}
             for name in groups
         }
 
@@ -176,8 +182,12 @@ def simulate_survival(pool, current_pick, next_pick, rivals, seeds, rng,
             mask = gmask & alive
             e_best[name] += float(val[mask].max()) if mask.any() else 0.0
 
-    calibrated = np.array([calibrate(survived[j] / sims, survival_shrink)
-                           for j in range(n)])
+    # Two survival vectors, named so they cannot be confused (plan B1/B2):
+    # survival_raw is the Monte Carlo frequency; survival is the calibrated
+    # vector that is DISPLAYED. (Until plan step B2 lands, e_best_next is
+    # still the raw joint expectation from the loop above.)
+    raw = survived / sims
+    calibrated = np.array([calibrate(float(raw[j]), survival_shrink) for j in range(n)])
     report = {}
     for name in groups:
         e = e_best[name] / sims
@@ -186,5 +196,6 @@ def simulate_survival(pool, current_pick, next_pick, rivals, seeds, rng,
             "e_best_next": e,
             "urgency": best_now[name] - e,
             "survival": survival_of(name, arr=calibrated),
+            "survival_raw": survival_of(name, arr=raw),
         }
     return report

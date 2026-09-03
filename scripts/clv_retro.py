@@ -20,16 +20,12 @@ from collections import defaultdict
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from draftkit.config import Config  # noqa: E402
+from fit_survival import norm, prediction_rows  # noqa: E402  (one row builder for every calibration)
 
 SUFFIXES = re.compile(r"\s+(jr\.?|sr\.?|i{2,4}|iv|v)$", re.IGNORECASE)
-SURV = re.compile(r"(\d+)% chance he'?s still there")
-
-
-def norm(name: str) -> str:
-    n = SUFFIXES.sub("", name.strip().lower())
-    return re.sub(r"[^a-z0-9]", "", n)
 
 
 def latest_snapshot_before(hist_dir: Path, date: str) -> Path | None:
@@ -46,30 +42,25 @@ def load_log(path: Path) -> tuple[list[dict], list[dict]]:
     return picks, recs
 
 
-def survival_calibration(picks: list[dict], recs: list[dict]) -> list[dict]:
-    """(player, my_next_pick) -> last predicted survival %, vs outcome."""
-    picked_at = {norm(p["player"]): p["pick_no"] for p in picks}
-    preds: dict[tuple[str, int], int] = {}
-    for e in recs:
-        nxt = e.get("my_next_pick")
-        if not isinstance(nxt, int):
-            continue
-        # logged predictions may be post-calibration (v2 1.1): invert the
-        # recorded shrink so buckets always hold RAW model predictions and a
-        # refit can never double-shrink (code review 2026-08-30)
-        shrink = float(e.get("survival_shrink") or 1.0)
-        for r in e.get("recommendations", []):
-            m = SURV.search(r.get("why", ""))
-            if m:
-                p_cal = int(m.group(1)) / 100.0
-                p_raw = p_cal if shrink >= 1.0 else 0.5 + (p_cal - 0.5) / shrink
-                preds[(norm(r["player"]), nxt)] = round(min(1.0, max(0.0, p_raw)) * 100)
-    rows = []
-    for (player, nxt), pct in preds.items():
-        at = picked_at.get(player)
-        survived = at is None or at >= nxt
-        rows.append({"player": player, "next": nxt, "pred": pct, "survived": survived})
-    return rows
+def survival_calibration(picks: list[dict], recs: list[dict],
+                         teams: int | None = None, rounds: int | None = None,
+                         my_slot: int | None = None) -> list[dict]:
+    """(player, my_next_pick) -> last predicted RAW survival %, vs outcome.
+
+    Delegates to scripts/fit_survival.prediction_rows (plan B1): the horizon
+    is recomputed from the state rather than read from the logged
+    my_next_pick, which was the on-clock pick itself when I was on the
+    clock and graded every on-clock prediction as survived."""
+    teams = teams or max((int(p.get("slot") or 0) for p in picks), default=0)
+    rounds = rounds or max((int(p.get("round") or 0) for p in picks), default=0)
+    if my_slot is None:
+        mine = sorted({int(p["slot"]) for p in picks if p.get("my_pick")})
+        my_slot = mine[0] if mine else None
+    if not (teams and rounds and my_slot):
+        return []
+    return [{"player": r["player"], "next": r["my_next"], "pred": round(r["pred"] * 100),
+             "survived": r["survived"]}
+            for r in prediction_rows(picks, recs, teams, rounds, my_slot)]
 
 
 def main() -> int:

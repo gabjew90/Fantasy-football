@@ -1314,3 +1314,48 @@ harness's scratch. Held on purpose: vona_replay.py and its validation
 report (the only controlled VONA evidence), baseline_bakeoff.py (decided a
 shipped value), the availability/override research notes (provenance for
 live data files).
+
+## 2026-09-02 (25) — B1: the survival calibration record, and a defect in the old one
+
+Plan: docs/plans/2026-09-02-final-form-and-survival-sim-plan.md (approved
+today). Step B1 is the enabling layer for the refit; nothing flips.
+
+The defect. draftlog logged `my_next_pick = next_pick_for_slot(cp)`, which
+is cp ITSELF when I am on the clock, while the sim's window at that moment
+runs to my FOLLOWING turn (tracker.urgency_report). clv_retro then scored
+`survived = picked_at >= my_next_pick`, so every on-clock prediction graded
+as survived. The n=67 behind `survival_shrink: 0.55` was scored that way.
+Rescored against the real horizon (reports/survival_calibration.md), the
+human room's three legacy buckets read:
+
+| bucket | old n / observed | corrected n / observed |
+|---|---|---|
+| 50-69% | 9 / 44% | 5 / 0% |
+| 70-89% | 19 / 68% | 10 / 30% |
+| 90-100% | 28 / 75% | 40 / 82% |
+
+Pooled over every room (n=147: one human Sleeper room, three Sleeper bot
+mocks, four Yahoo autopick mocks read from the trails' prose), predicted
+70-89% observed 42%, predicted 90-100% observed 86%. The sim is more
+overconfident in the middle and LESS overconfident at the top than the
+0.55 map assumed. The shrink is retained provisionally until step B7's
+refit; B2 does not wire the decision path to it before then.
+
+Built:
+* urgency report carries `survival_raw` (Monte Carlo frequency) beside
+  `survival` (calibrated, displayed); calibrate(p, 1.0) returns p exactly.
+* recs events: `window_start` and `my_next_pick` from the sim's window;
+  per recommendation `sleeper_id, adp, market, survival (raw),
+  survival_shown, best_now, e_best_next, urgency`; per event the knob set,
+  the rivals' needs and the away slots. The reconstructed (bot-burst) event
+  captures the report while rewound. `DraftLog.snapshot()` is the bridge's
+  per-state hook.
+* the bridge: one `plan_rows` for the CLI and the server (rows carry
+  s/sr/e/b), `log_plan` -> data/logs/yahoo_<room>.jsonl; the driver passes
+  s/sr/e through rankFromPlan and keeps them on pick records and passed_on.
+* scripts/fit_survival.py: the row builder (horizon always recomputed;
+  structured field first, then shown field, then either prose phrasing
+  un-shrunk by the logged shrink; trails un-shrunk by 0.55 -- an
+  assumption stated in the report), `--report-only`. clv_retro delegates to
+  it.
+Tests: 8 new (urgency, draftlog x4, bridge x2, driver) + tests/test_fit_survival.py (5).

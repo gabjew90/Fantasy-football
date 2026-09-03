@@ -591,7 +591,11 @@ window.DK = (function () {
       const b = S.board.find(x => x.n === e.n && x.p === e.p)
              || { n: e.n, p: e.p, t: e.t, v: e.v, a: e.a, k: idKey(e.n, e.p) };
       if (mine.has(b.k + '|' + b.p) || isGone(b)) continue;
-      out.push({ n: b.n, p: b.p, t: b.t, v: b.v, why: e.why, fromEngine: true });
+      // s / sr / e: the engine's shown survival, raw survival and expected
+      // best-at-next-turn for this candidate's market, kept structured so the
+      // trail never has to parse them back out of the why string
+      out.push({ n: b.n, p: b.p, t: b.t, v: b.v, why: e.why, fromEngine: true,
+                 s: e.s == null ? null : e.s, sr: e.sr == null ? null : e.sr, e: e.e == null ? null : e.e });
     }
     if (!out.length) return null;
     return {
@@ -1350,9 +1354,12 @@ window.DK = (function () {
     const b = S.board.find(x => x.n === cand.n && x.p === cand.p) || {};
     const alt = bestByProjection();
     const passed = (top || []).filter(x => !(x.n === cand.n && x.p === cand.p)).slice(0, 3)
-      .map(x => ({ n: x.n, p: x.p, v: x.v, why: (x.why || '').slice(0, 120) }));
+      .map(x => ({ n: x.n, p: x.p, v: x.v, why: (x.why || '').slice(0, 120),
+                   s: x.s == null ? null : x.s, e: x.e == null ? null : x.e }));
     const rec = Object.assign({ drafted: cand.n, pos: cand.p, vorp: cand.v, proj: b.j,
                                 why: (cand.why || '').slice(0, 220),
+                                s: cand.s == null ? null : cand.s, sr: cand.sr == null ? null : cand.sr,
+                                e: cand.e == null ? null : cand.e,
                                 top_proj_available: alt,
                                 took_top_projection: !!(alt && alt.n === cand.n),
                                 passed_on: passed,

@@ -102,3 +102,23 @@ def test_run_escalation_targets_the_running_position():
     calm_rb = sum(calm["RB"]["survival"].values())
     run_rb = sum(run["RB"]["survival"].values())
     assert run_rb < calm_rb  # the RB run eats RBs faster
+
+
+def test_report_carries_raw_and_calibrated_survival_side_by_side():
+    """Plan B1: two named vectors -- survival_raw (Monte Carlo frequency) and
+    survival (calibrated, displayed) -- so the calibration record and the
+    decision path can never confuse them."""
+    import numpy as np
+    from draftkit.urgency import calibrate
+    rng = np.random.default_rng(3)
+    a = simulate_survival(POOL, 1, 4, RIVALS, {}, rng, sims=200, sigma=3.0, survival_shrink=1.0)
+    rng = np.random.default_rng(3)
+    b = simulate_survival(POOL, 1, 4, RIVALS, {}, rng, sims=200, sigma=3.0, survival_shrink=0.55)
+    for pos in ("RB", "QB"):
+        for sid, raw in a[pos]["survival_raw"].items():
+            assert a[pos]["survival"][sid] == raw                      # shrink 1.0: identical
+            assert abs(b[pos]["survival"][sid] - calibrate(b[pos]["survival_raw"][sid], 0.55)) < 1e-12
+        assert b[pos]["survival_raw"] == a[pos]["survival_raw"]        # same seed: same raw draw
+    z = simulate_survival(POOL, 5, 5, [], {}, np.random.default_rng(0), survival_shrink=0.55)
+    assert all(v == 1.0 for v in z["RB"]["survival"].values())
+    assert all(v == 1.0 for v in z["RB"]["survival_raw"].values())

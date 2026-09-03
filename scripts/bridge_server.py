@@ -50,12 +50,17 @@ def build_plan(state: dict, depth: int) -> dict:
         state = dict(state, drafted=YB.merge_feed(memory, state.get("drafted") or []))
         t = YB.build_tracker(cfg, players, state)
         recs = t.recommendations(top_n=depth)
-        plan = [{"n": p["name"], "p": p["pos"], "t": p["team"],
-                 "v": round(float(p["vorp"] or 0.0), 1), "a": p["adp"],
-                 "why": why} for _s, why, p in recs]
+        report = t.urgency_report()
+        plan = YB.plan_rows(t, recs, report)
         # the tail past the engine's named candidates goes through the same
         # guardrails as everything else (see yahoo_bridge.depth_tail)
         plan = YB.depth_tail(t, plan, depth)
+        # the structured calibration record for this room (plan B1); logging
+        # never breaks a plan
+        try:
+            YB.log_plan(t, recs, report, feed_key, ROOT / "data" / "logs")
+        except Exception:  # noqa: BLE001
+            traceback.print_exc()
         _STATE["calls"] += 1
         return {"current_pick": t.current_pick, "my_slot": t.my_slot,
                 "needs": t.my_needs(), "plan": plan, "calls": _STATE["calls"]}

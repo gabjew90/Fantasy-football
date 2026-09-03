@@ -150,3 +150,50 @@ def test_status_transition_logged(tmp_path):
     log.sync(t)
     statuses = [e["status"] for e in _events(log_path) if e["type"] == "status"]
     assert statuses == ["pre_draft", "drafting"]
+
+
+def test_recs_event_logs_the_sims_window_and_structured_survival(tmp_path):
+    """Plan B1. On the clock (12 teams, slot 2, pick 1 made -> cp = 2 is
+    mine) the survival sim spans picks 3..22 and my next turn is 23; the
+    old event logged my_next_pick = 2 and graded every on-clock prediction
+    as survived. Each recommendation now carries the raw survival, the
+    event the knob set and the rivals' needs."""
+    log = DraftLog(tmp_path / "d.jsonl")
+    log.sync(make_tracker([pick(1, 1)]))
+    ev = [e for e in _events(tmp_path / "d.jsonl") if e["type"] == "recs"][0]
+    assert ev["current_pick"] == 2 and ev["on_clock_slot"] == 2
+    assert ev["window_start"] == 3 and ev["my_next_pick"] == 23
+    assert len(ev["rivals"]) == 20 and all("needs" in r and "autopick" in r for r in ev["rivals"])
+    assert "survival_shrink" in ev["knobs"] and ev["knobs"]["sims"] == 20
+    rec = ev["recommendations"][0]
+    assert isinstance(rec["survival"], float) and 0.0 <= rec["survival"] <= 1.0
+    assert isinstance(rec["survival_shown"], float) and rec["market"] in ("RB", "WR", "TE", "FLEX")
+    assert rec["sleeper_id"] and "e_best_next" in rec and "best_now" in rec
+
+
+def test_recs_event_off_the_clock_windows_from_the_current_pick(tmp_path):
+    log = DraftLog(tmp_path / "d.jsonl")
+    log.sync(make_tracker([]))            # cp = 1, slot 1 on the clock, I am slot 2
+    ev = [e for e in _events(tmp_path / "d.jsonl") if e["type"] == "recs"][0]
+    assert (ev["window_start"], ev["my_next_pick"]) == (1, 2)
+
+
+def test_reconstructed_event_uses_the_rewound_report(tmp_path):
+    log = DraftLog(tmp_path / "d.jsonl")
+    log.sync(make_tracker([pick(4, 1), pick(1, 2), pick(2, 3)]))
+    retro = [e for e in _events(tmp_path / "d.jsonl") if e.get("reconstructed")][0]
+    assert retro["current_pick"] == 2 and retro["window_start"] == 3 and retro["my_next_pick"] == 23
+    assert all(isinstance(r.get("survival"), float) for r in retro["recommendations"])
+
+
+def test_snapshot_writes_one_event_per_key_and_logs_picks(tmp_path):
+    log = DraftLog(tmp_path / "y.jsonl")
+    t = make_tracker([pick(1, 1)])
+    recs = t.recommendations()
+    assert log.snapshot(t, recs, t.urgency_report(), key=(2, 1)) is True
+    assert log.snapshot(t, recs, t.urgency_report(), key=(2, 1)) is False
+    ev = _events(tmp_path / "y.jsonl")
+    assert [e["type"] for e in ev].count("recs") == 1 and [e["type"] for e in ev].count("pick") == 1
+    assert ev[-1]["snapshot_key"] == [2, 1]
+    # a restart over the same file remembers the key
+    assert DraftLog(tmp_path / "y.jsonl").snapshot(t, recs, None, key=(2, 1)) is False

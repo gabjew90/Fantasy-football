@@ -1019,3 +1019,24 @@ def test_trail_dump_composes_every_pick_manager_and_our_records_from_the_store()
     assert r["managers"]["1"]["away"] is True and "nickname" in r["managers"]["1"]
     assert r["my_team"] == "6" and r["teams"] == 10 and r["room_name"] == "Test Room"
     assert r["posted"]["ok"] is True and r["posted"]["path"].startswith("saved:")
+
+
+def test_plan_survival_fields_ride_through_the_ranked_list():
+    """Plan B1: the bridge's s / sr / e per candidate must survive
+    rankFromPlan so pick records keep them structured."""
+    board = "Christian McCaffrey|RB|SFO|122.8|1|" + chr(10) + "Bijan Robinson|RB|ATL|100|1|"
+    plan = {"plan": [{"n": "Christian McCaffrey", "p": "RB", "t": "SFO", "v": 122.8, "a": 1, "why": "w",
+                      "s": 0.7, "sr": 0.86, "e": 80.5},
+                     {"n": "Bijan Robinson", "p": "RB", "t": "ATL", "v": 100, "a": 4, "why": "w2"}],
+            "needs": {"RB": 2}, "current_pick": 3}
+    js = [
+        "document.body.innerText = 'YOUR TEAM (0/15) ';",
+        "DK.loadCompact(" + json.dumps(board) + ", {teams: 10});",
+        "DK.loadPlan(" + json.dumps(plan) + ");",
+        "const out = DK.rank();",
+        "console.log(JSON.stringify({src: out.source, top: out.top.map(x => ({n: x.n, s: x.s, sr: x.sr, e: x.e}))}));",
+    ]
+    r = run_js(chr(10).join(js))
+    assert r["src"] == "engine"
+    assert r["top"][0] == {"n": "Christian McCaffrey", "s": 0.7, "sr": 0.86, "e": 80.5}
+    assert r["top"][1] == {"n": "Bijan Robinson", "s": None, "sr": None, "e": None}

@@ -261,3 +261,44 @@ def test_roster_attribution_does_not_bleed_across_namesakes():
     t = yb.build_tracker(_Cfg(), players, state)
     mine = {x["player_id"] for x in t.state.picks if x["draft_slot"] == 6}
     assert mine == {"b1"}, mine
+
+
+# ---------- plan B1 (2026-09-02): the plan carries the engine's numbers ----------
+
+def test_plan_rows_carry_survival_fields_and_depth_tail_leaves_them_empty():
+    players = _players()
+    state = {"my_slot": 8, "teams": 10, "rounds": 15,
+             "drafted": [{"pick_no": n, "name": f"RB Player{n - 1}", "pos": "RB"} for n in range(1, 8)],
+             "my_roster": []}
+    t = yb.build_tracker(_Cfg(), players, state)
+    recs = t.recommendations(top_n=5)
+    rows = yb.plan_rows(t, recs, t.urgency_report())
+    assert rows and all(set(r) >= {"n", "p", "t", "v", "a", "why", "s", "sr", "e", "b"} for r in rows)
+    assert any(isinstance(r["s"], float) and 0.0 <= r["s"] <= 1.0 for r in rows)
+    assert any(isinstance(r["sr"], float) for r in rows) and any(isinstance(r["e"], float) for r in rows)
+    # without a report the rows still have the keys, empty
+    bare = yb.plan_rows(t, recs, None)
+    assert all(r["s"] is None and r["e"] is None for r in bare)
+    tail = yb.depth_tail(t, rows, 25)
+    assert all(r["s"] is None for r in tail[len(rows):])
+
+
+def test_log_plan_writes_one_structured_event_per_state(tmp_path):
+    players = _players()
+    state = {"my_slot": 8, "teams": 10, "rounds": 15,
+             "drafted": [{"pick_no": n, "name": f"RB Player{n - 1}", "pos": "RB"} for n in range(1, 8)],
+             "my_roster": []}
+    t = yb.build_tracker(_Cfg(), players, state)
+    recs = t.recommendations(top_n=5)
+    report = t.urgency_report()
+    path = yb.log_plan(t, recs, report, "/draftclient/f1/10505450/8", tmp_path)
+    assert path.name == "yahoo_10505450.jsonl"
+    yb.log_plan(t, recs, report, "/draftclient/f1/10505450/8", tmp_path)   # same state: no second event
+    import json
+    events = [json.loads(x) for x in path.read_text(encoding="utf-8").splitlines()]
+    rec_events = [e for e in events if e["type"] == "recs"]
+    assert len(rec_events) == 1
+    ev = rec_events[0]
+    assert ev["current_pick"] == 8 and ev["window_start"] == 9 and ev["my_next_pick"] == 13
+    assert isinstance(ev["recommendations"][0]["survival"], float)
+    assert yb.room_of("mock_10505450") == "10505450" and yb.room_of(None) == "room"

@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 import unicodedata
 from pathlib import Path
@@ -338,8 +339,53 @@ def depth_tail(t: Tracker, plan: list[dict], depth: int) -> list[dict]:
             continue
         out.append({"n": p["name"], "p": p["pos"], "t": p["team"],
                     "v": round(float(p["vorp"] or 0.0), 1), "a": p["adp"],
-                    "why": "depth fallback (engine list exhausted)"})
+                    "why": "depth fallback (engine list exhausted)",
+                    "s": None, "sr": None, "e": None, "b": None})
     return out
+
+
+def plan_rows(t: Tracker, recs, report=None) -> list[dict]:
+    """The plan rows the page consumes -- ONE spelling for the CLI and the
+    bridge server. Besides name/pos/team/vorp/adp/why, each row carries the
+    engine's numbers for the candidate's market so the trail keeps them
+    structured (plan 2026-09-02 B1): s = shown (calibrated) survival to my
+    next pick, sr = raw survival, e = expected best at my next turn, b = best
+    now."""
+    from draftkit.planner import market_for
+    needs = t.my_needs()
+    rows = []
+    for _score, why, p in recs:
+        s = sr = e = b = None
+        if report:
+            mkt = market_for(p["pos"], needs)
+            u = report.get(mkt) or report.get(p["pos"])
+            if u:
+                sid = str(p.get("sleeper_id"))
+                s = (u.get("survival") or {}).get(sid)
+                sr = (u.get("survival_raw") or {}).get(sid)
+                e, b = u.get("e_best_next"), u.get("best_now")
+        rows.append({"n": p["name"], "p": p["pos"], "t": p["team"],
+                     "v": round(float(p["vorp"] or 0.0), 1), "a": p["adp"], "why": why,
+                     "s": None if s is None else round(float(s), 3),
+                     "sr": None if sr is None else round(float(sr), 3),
+                     "e": None if e is None else round(float(e), 1),
+                     "b": None if b is None else round(float(b), 1)})
+    return rows
+
+
+def room_of(draft_key) -> str:
+    """The Yahoo room id inside the page's draft key (its pathname)."""
+    m = re.search(r"(\d{5,})", str(draft_key or ""))
+    return m.group(1) if m else "room"
+
+
+def log_plan(t: Tracker, recs, report, draft_key, log_dir) -> Path:
+    """One recs event per state into data/logs/yahoo_<room>.jsonl, the same
+    shape as the Sleeper draft log, so scripts/fit_survival.py reads both."""
+    from draftkit.draftlog import DraftLog
+    path = Path(log_dir) / f"yahoo_{room_of(draft_key)}.jsonl"
+    DraftLog(path).snapshot(t, recs, report, key=(t.current_pick, len(t.state.picks)))
+    return path
 
 
 def main() -> None:
@@ -356,11 +402,7 @@ def main() -> None:
     t = build_tracker(cfg, players, state)
 
     recs = t.recommendations(top_n=a.depth)
-    plan = [{
-        "n": p["name"], "p": p["pos"], "t": p["team"],
-        "v": round(float(p["vorp"] or 0.0), 1),
-        "a": p["adp"], "why": why,
-    } for _score, why, p in recs]
+    plan = plan_rows(t, recs, t.urgency_report())
 
     # Depth beyond the engine's per-position candidates: if everything it
     # named is gone by the time we pick, the page still needs somewhere to go.
