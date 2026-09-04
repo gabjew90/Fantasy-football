@@ -83,3 +83,38 @@ def test_the_sweep_actually_covers_the_live_draft_path():
     assert "bridge_server" in names
     assert "yahoo_bridge" in names
     assert len(names) >= 30
+
+
+# ---------- label prefixes that other files match on (2026-09-04) -----------
+# Fourth instance of one defect class today: proj_band dropped by a
+# hand-written column list, three copies of the bench-insurance prefix, `pair`
+# dropped by the driver's field list, and now this. A `why` prefix is a
+# CONTRACT between the Python that writes it and the JS/report code that
+# matches it, and nothing enforced that contract.
+
+def test_depth_fallback_prefix_is_stable():
+    """scripts/draft_driver.js and scripts/mock_scrutiny.py both match on the
+    literal "depth fallback" at the START of the why string. Reword the rest
+    freely; move the prefix and the HUD silently renders padding rows as if
+    they were real recommendations."""
+    root = Path(__file__).resolve().parents[1]
+    bridge = (root / "scripts" / "yahoo_bridge.py").read_text(encoding="utf-8")
+    assert '"why": "depth fallback (' in bridge, "the emitted prefix moved"
+
+    driver = (root / "scripts" / "draft_driver.js").read_text(encoding="utf-8")
+    assert driver.count("/^depth fallback") == 2, "driver matcher count changed"
+
+    scrutiny = (root / "scripts" / "mock_scrutiny.py").read_text(encoding="utf-8")
+    assert 'startswith("depth fallback")' in scrutiny
+
+
+def test_depth_fallback_no_longer_claims_the_engine_ran_out_of_players():
+    """The old wording, "engine list exhausted", read as a failure. The engine
+    names one candidate per OPEN MARKET, so a short list means few open slots,
+    not an empty board."""
+    root = Path(__file__).resolve().parents[1]
+    bridge = (root / "scripts" / "yahoo_bridge.py").read_text(encoding="utf-8")
+    assert '"depth fallback (engine list exhausted)"' not in bridge
+
+    driver = (root / "scripts" / "draft_driver.js").read_text(encoding="utf-8")
+    assert "engine list done" not in driver

@@ -114,7 +114,7 @@ window.DK = (function () {
     else if (/^bench insurance/.test(why)) {
       const b = why.match(/≈ (\d+) pts/);
       parts.push('insurance' + (b ? ' worth ~' + b[1] : ''));
-    } else if (/^depth fallback/.test(why)) parts.push('depth fallback, engine list done');
+    } else if (/^depth fallback/.test(why)) parts.push('padding: no engine opinion this deep, board order');
     const pm = e.pair;
     if (pm && pm.pick_cost != null) {
       parts.push(pm.pick_cost === 0

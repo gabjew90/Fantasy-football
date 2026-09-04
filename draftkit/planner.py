@@ -168,9 +168,15 @@ def pair_rank(cands: list[tuple[float, str, dict]],
         # This is a DISPLAY fix. The ordering is untouched; the clause is
         # appended, so every downstream `why` matcher (draft_driver.js,
         # mock_scrutiny.py) still anchors on the same prefixes.
-        why = (why + f" · RANKED ON {pair:.0f} = {own:.0f} his own edge over the "
+        # ONE DECIMAL, not zero. NEAR_TIE is 1.0, so integers cannot settle
+        # whether two rows were inside the tie window: a printed "140 vs 139"
+        # spans true gaps from 0.0 to 2.0, and half that range fires the rule
+        # while half does not. A reader checking the near-tie rule against the
+        # report could not do it, and reasonably read the absence of an
+        # annotation as the rule being broken (user, room 10705481 round 2).
+        why = (why + f" · RANKED ON {pair:.1f} = {own:.1f} his own edge over the "
                f"{p.get('pos')} you'd otherwise end up with"
-               + (f" + {pv:.0f} the {partner} this frees up next turn" if partner
+               + (f" + {pv:.1f} the {partner} this frees up next turn" if partner
                   else " (no partner: nothing else fills a slot next turn)"))
         # the arithmetic that decides the ranking, kept structured so the
         # panel and the reports can SHOW the decision, not just assert it

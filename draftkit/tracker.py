@@ -1209,8 +1209,11 @@ class Tracker:
                 if rem:
                     best = rem[0]
                     cands.append((best["vorp"] or 0.0,
-                                  "bench depth — best remaining value (everyone left is "
-                                  "below replacement, stash budget waived)", best))
+                                  "bench depth — best remaining value. Every "
+                                  "candidate was refused by the one-stash rule "
+                                  "(all below replacement, no slot to fill), so "
+                                  "that rule alone was waived to avoid "
+                                  "recommending nothing at all", best))
             cands.sort(key=lambda t: -t[0])
 
         if bench_rows:

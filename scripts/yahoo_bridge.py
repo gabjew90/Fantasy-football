@@ -417,7 +417,17 @@ def depth_tail(t: Tracker, plan: list[dict], depth: int) -> list[dict]:
             continue
         out.append({"n": p["name"], "p": p["pos"], "t": p["team"],
                     "v": round(float(p["vorp"] or 0.0), 1), "a": p["adp"],
-                    "why": "depth fallback (engine list exhausted)",
+                    # "exhausted" was wrong and it misled a reader into thinking
+                    # the engine had run out of PLAYERS. It never does. It
+                    # produces one candidate per OPEN MARKET, so with two slots
+                    # left it has two opinions while 150 players remain on the
+                    # board. Everything past that is this padding: board order,
+                    # guardrails applied, sitting below every real row, and it
+                    # has never supplied a pick. The prefix stays "depth
+                    # fallback" because draft_driver.js and mock_scrutiny.py
+                    # both match on it (see test_depth_fallback_prefix_is_stable).
+                    "why": "depth fallback (no engine opinion this deep; "
+                           "board order, guardrails applied)",
                     "s": None, "sr": None, "e": None, "b": None})
     return out
 
