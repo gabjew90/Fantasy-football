@@ -128,6 +128,39 @@ expected:
 # code review 2026-08-30). pass_td_40p +2 is recorded there but NOT modeled:
 # nflverse weekly lacks TD distance; deep-ball QB bias handled by awareness.
 
+# Projection source for THIS league (user decision 2026-09-04): the FantasyPros
+# consensus sheet alone. Placed here rather than in config.yaml on purpose:
+# config.yaml is global, and Omnibeta is mid-season on the model path, so a
+# global switch would silently re-price the in-season manager's waiver and
+# lineup values for a league that is already playing.
+#
+# What this is and is not. The external path is built and verified end to end
+# (2026-09-02). It has NOT been gated on history: the sheet has none in the
+# repo, and the only outside source that does (Sleeper week-1 lines) lost to
+# the model by 5% MAE and 1.2% lineup points (DECISIONS #23). This is a
+# philosophy decision, recorded as one: projections are an input, the edge is
+# roster-aware timing (keep-engine-simple). Judged when 2026 is played.
+#
+# Consequences accepted: a player the sheet does not carry has no projection
+# and is invisible to the engine (the rebuild reports the count); one source
+# means every proj_sd is zero, so late_round_dispersion stays inert.
+projections:
+  source: external
+  external:
+    sources: [sheet]
+    combine: first
+  # OFF on the sheet path. The rule zeroes any depth-chart backup the market
+  # does not rank as a starter. That was a crutch for the usage MODEL, whose
+  # per-game rate cannot say "he will not start". A consensus sheet already
+  # prices role: on the 2026-09-04 build the rule erased seven real sheet
+  # lines on drafted players (Mendoza 191.6, Pacheco 103.6, Ferguson 103.0,
+  # Kamara 101.1, Sadiq 100.5, Coleman 98.4, Njoku 86.4) and set them to 0,
+  # i.e. it declared the expert panel wrong by 100% on the strength of a
+  # depth-chart order. Under "solely the sheet" the sheet's number stands.
+  # The separate availability rule still zeroes `out` players (Jacobs,
+  # Charbonnet), because out is a fact and not a view.
+  non_starters_zero: false
+
 market:
   teams: 10
   ffc_format: half-ppr   # FFC half-PPR feed; overridden by data/external/yahoo_adp.keefamania.csv (league-scoped name!)
