@@ -153,3 +153,110 @@ def test_an_arm_named_like_a_legacy_key_keeps_its_own_value():
     s = sg.summarize_outcome(pairs, candidate="lines_gt", rivals=("lines",))
     assert (s["model_mean"], s["ext_mean"], s["worse"], s["tied"]) == (1000.0, 900.0, 1, 0)
     assert s["pass"] is False
+
+
+# --------------------------------------------------------------------------
+# What the harness says about its own limits (harness review, 2026-09-03).
+# Three of these guard contamination the gate used to report as a footnote;
+# the rest guard the error bar.
+# --------------------------------------------------------------------------
+
+def _pairs(delta_by_seed, errors=(0, 0), picks_differing=3, seeds=(None,)):
+    """Synthetic outcome records: one league, one pair, per seed."""
+    out = []
+    for sd in seeds:
+        d = delta_by_seed[sd]
+        slots = []
+        for i in range(1, 11):
+            slots.append({"slot": i, "blend": 1000.0, "lines": 1000.0 + d,
+                          "blend_errors": errors[0], "lines_errors": errors[1],
+                          "blend_roster": [f"p{i}{k}" for k in range(5)],
+                          "lines_roster": [f"p{i}{k}" for k in range(5)],
+                          "picks_differing": picks_differing, "picks_total": 5})
+        out.append({"league": "keefamania", "pair": "2024->2025", "seed": sd,
+                    "teams": 10, "rounds": 13, "skill_rounds": 13,
+                    "rounds_capped_by_pool": False, "rival_pool": 150,
+                    "candidate": "lines", "rivals": ["blend"],
+                    "board_sizes": {"blend": 150, "lines": 150}, "slots": slots})
+    return out
+
+
+def test_rival_order_is_deterministic_without_a_seed_and_redrawn_with_one():
+    """The exact-consensus order must be byte-identical to the pre-seed
+    behaviour, or every number recorded before seeds existed stops being
+    comparable to a re-run."""
+    rows = _rows().with_columns(pl.Series("adp", [3.0, 1.0, 2.0, 6.0, 4.0, 5.0, 7.0]))
+    exact = sg.rival_order(rows)
+    assert exact == sg.rival_order(rows, seed=None)
+    assert exact == ["b", "c", "a", "e", "f", "d", "z"]
+    # a seed reorders, reproducibly, and keeps the same population
+    s1, s1b, s2 = (sg.rival_order(rows, 1), sg.rival_order(rows, 1), sg.rival_order(rows, 2))
+    assert s1 == s1b, "a seed must be reproducible or the error bar is not either"
+    assert sorted(s1) == sorted(exact) and s1 != s2
+
+
+def test_zero_jitter_ignores_the_seed():
+    rows = _rows()
+    assert sg.rival_order(rows, seed=7, jitter=0.0) == sg.rival_order(rows)
+
+
+def test_engine_errors_invalidate_the_run_rather_than_footnoting_it():
+    """An exception falls back to the best available player -- a different,
+    dumber drafting policy. One arm throwing more than another means the two
+    were not graded on the same engine."""
+    o = sg.summarize_outcome(_pairs({None: 0.0}, errors=(0, 4)))
+    assert o["errors"] == {"lines": 40, "blend": 0} and o["errors_clean"] is False
+    v = sg.verdict({"kf": {"pass": True}}, o)
+    assert v["decision"] == "invalid" and any("engine errors" in x for x in v["invalid"])
+    # and a clean run is not invalidated
+    clean = sg.summarize_outcome(_pairs({None: 0.0}))
+    assert clean["errors_clean"] is True
+    assert sg.verdict({"kf": {"pass": True}}, clean)["invalid"] == []
+
+
+def test_an_inert_candidate_cannot_pass_the_outcome_half():
+    """A candidate that drafts what its rival drafts was not tested. Its
+    'pass' would be a null result wearing a passing grade."""
+    o = sg.summarize_outcome(_pairs({None: 0.0}, picks_differing=0))
+    assert o["inert"] is True and o["pass"] is True      # it does clear the threshold
+    v = sg.verdict({"kf": {"pass": True}}, o)
+    assert v["decision"] == "invalid", "an untested arm must not be reported as a flip"
+
+
+def test_the_seed_spread_is_reported_and_never_moves_the_threshold():
+    """A delta smaller than the seed-to-seed spread is unresolved. The
+    pre-registered 1% bar is unchanged either way -- that is the point."""
+    # +0.5% observed, but the seeds range over 4 points of percentage
+    o = sg.summarize_outcome(_pairs({None: 5.0, 1: -15.0, 2: 25.0},
+                                    seeds=(None, 1, 2)))
+    assert [b["seed"] for b in o["by_seed"]] == [None, 1, 2]
+    assert abs(o["delta_pct"] - 0.5) < 1e-6
+    assert abs(o["delta_spread"] - 4.0) < 1e-6
+    assert o["resolvable"] is False
+    v = sg.verdict({"kf": {"pass": True}}, o)
+    # unresolvable is NOT a failure and NOT an invalidation: the bar stays put
+    assert v["decision"] == "flip" and v["invalid"] == [] and v["resolvable"] is False
+
+
+def test_a_delta_larger_than_the_spread_is_resolvable():
+    o = sg.summarize_outcome(_pairs({None: 100.0, 1: 99.0, 2: 101.0}, seeds=(None, 1, 2)))
+    assert o["resolvable"] is True and o["delta_spread"] < abs(o["delta_pct"])
+
+
+def test_one_seed_reports_no_spread_rather_than_a_fake_zero():
+    o = sg.summarize_outcome(_pairs({None: 5.0}))
+    assert o["delta_spread"] is None and o["resolvable"] is None
+
+
+def test_the_games_basis_is_one_constant_shared_with_the_backtest():
+    """A local copy would rescale one arm against another the day the
+    backtest's basis changed."""
+    from projection_backtest import SEASON_GAMES
+    assert sg.LINE_GAMES is SEASON_GAMES
+
+
+def test_a_pool_capped_replay_is_named_in_the_report():
+    pairs = _pairs({None: 0.0})
+    pairs[0].update(rounds=8, skill_rounds=13, rounds_capped_by_pool=True, rival_pool=90)
+    o = sg.summarize_outcome(pairs)
+    assert o["capped_pairs"] and "8 of 13 rounds" in o["capped_pairs"][0]

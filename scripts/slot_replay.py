@@ -114,7 +114,12 @@ def main() -> None:
     if a.league:
         from draftkit.config import Config
         _teams, _rounds, league_slots = EP.league_shape(Config.load(league=a.league))
-        SLOTS.clear(); SLOTS.update(league_slots)     # lineup_points' default shape for this run
+    # the shape this run grades on, passed explicitly. It used to be installed
+    # by SLOTS.clear(); SLOTS.update(...), which rewrote engine_bakeoff's
+    # module-level default for every other importer in the process -- fine
+    # while this stayed a one-shot script, a silent cross-contamination the
+    # moment a gate imports two replays.
+    grading_slots = league_slots or SLOTS
 
     board = EP.load_board(a.board)
     log = [json.loads(line) for line in
@@ -127,7 +132,7 @@ def main() -> None:
 
     print(f"Slot-market acceptance replay -- draft {a.draft_id}, {'knobs ' + str(overrides) if overrides else ''}"
           f"{a.teams} teams, {rounds} rounds")
-    print(f"starters {SLOTS}\n")
+    print(f"starters {grading_slots}\n")
     print(f"{'':>4}{'lineup projected pts':>28}{'':4}{'lineup VORP':>24}")
     print(f"{'slot':>4}{'by-pos':>10}{'by-slot':>9}{'diff':>9}{'':4}"
           f"{'by-pos':>8}{'by-slot':>8}{'diff':>8}   {'shape (by-slot)':<24}")
@@ -136,7 +141,7 @@ def main() -> None:
     for s in slots:
         off = replay(board, log, s, a.teams, rounds, False, slots=league_slots, overrides=overrides)
         on = replay(board, log, s, a.teams, rounds, True, slots=league_slots, overrides=overrides)
-        po, pn = lineup_points(off), lineup_points(on)
+        po, pn = lineup_points(off, grading_slots), lineup_points(on, grading_slots)
         vo, vn = lineup_value(off), lineup_value(on)
         rows.append((s, po, pn, vo, vn, off, on))
         print(f"{s:>4}{po:>10.1f}{pn:>9.1f}{pn - po:>+9.1f}{'':4}"
