@@ -189,6 +189,16 @@ inseason:
   regime_safe: 0.85
   regime_comfortable: 0.60
   regime_bubble: 0.25
+  # Rest-of-season values shrink as the calendar does. `ros` held a SEASON
+  # total at every week, so in week 14 a free agent was valued for eleven
+  # games he could no longer play.
+  #
+  # This is the repo's one knob that does NOT default to today's behaviour,
+  # and the reason is that today's behaviour is no decay at all, which no
+  # value of a correctly-specified knob reproduces. `enabled: false` restores
+  # the old numbers exactly, so rollback is this one line.
+  ros_prorate:
+    enabled: true
   # In-season age decay on ROS DISPLAYS and trade logic only — never touches
   # tiers.csv, projections, or any draft-layer number (post-v2 item 4).
   # Conventional-wisdom-shaped and UNVALIDATED; revisit with 2026 actuals.

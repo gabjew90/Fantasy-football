@@ -98,6 +98,15 @@ def build_context(cfg, week: int | None = None) -> dict:
 
     scfg = _season_cfg(cfg)
 
+    # Rest-of-season values shrink with the calendar (knob inseason.ros_prorate).
+    # last_week is the CHAMPIONSHIP week, not week 18: points scored after the
+    # league has crowned a winner buy nothing, so a week-10 claim is priced for
+    # the title run and not for the calendar year.
+    playoff_start = int((league.get("settings") or {}).get("playoff_week_start", 15))
+    last_week = playoff_start + _playoff_rounds(league) - 1
+    prorate_ros = bool((scfg.get("ros_prorate") or {}).get("enabled", True))
+    weeks_left = weekly.weeks_remaining(week, last_week)
+
     def base_pts(pid: str) -> float:
         if weekly_proj and pid in weekly_proj:
             return weekly_proj[pid]
@@ -120,10 +129,16 @@ def build_context(cfg, week: int | None = None) -> dict:
             wk = 0.0
         name = f"{p.get('first_name','')} {p.get('last_name','')}".strip() or pid
         t = trow.get(pid) or {}
+        season_ros = float((t.get("proj_pts") or wk * 16) or 0.0)
         return {"sleeper_id": pid, "name": name, "pos": pos, "team": team,
                 "weekly": round(wk, 2), "status": status,
                 "matchup_mult": round(mult, 3), "opp": opp_of.get(team),
-                "ros": round((t.get("proj_pts") or wk * 16) or 0.0, 1),
+                # ros is what is STILL AHEAD; ros_season is the untouched
+                # season total, kept by name for the one consumer that is
+                # honestly on a season scale (the FAAB value cap).
+                "ros": round(weekly.ros_prorate(season_ros, week, last_week)
+                             if prorate_ros else season_ros, 1),
+                "ros_season": round(season_ros, 1),
                 "backs_up": t.get("backs_up"), "stdev": 5.0}
 
     roster_players: dict[int, list[dict]] = {}
@@ -148,6 +163,7 @@ def build_context(cfg, week: int | None = None) -> dict:
         "league": league, "budget": budget, "reserve_allow": reserve_allow,
         "rosters": rosters, "roster_players": roster_players, "users": users,
         "my_roster": my_roster, "identity": identity, "players": players, "injury": injury,
+        "last_week": last_week, "weeks_left": weeks_left, "ros_prorated": prorate_ros,
         "shape": shape, "slots": shape.slots,
         "flex_slots": shape.flex_slots, "flex": shape.flex,
         "schedule": schedule, "byes": week_byes, "early": early,
@@ -174,6 +190,17 @@ def _records(rosters) -> dict[int, tuple[int, int]]:
 def _points_for(rosters) -> dict[int, float]:
     return {int(r["roster_id"]): float((r.get("settings") or {}).get("fpts", 0) or 0)
             for r in rosters}
+
+
+def _playoff_rounds(league: dict) -> int:
+    """Bracket rounds from the playoff field, so the championship week can be
+    derived rather than assumed. A 6-team field is three rounds (two byes), a
+    4-team field two. Falls back to three, the Sleeper default shape."""
+    n = int((league.get("settings") or {}).get("playoff_teams", 6) or 6)
+    rounds = 0
+    while (1 << rounds) < max(2, n):
+        rounds += 1
+    return max(1, rounds)
 
 
 def playoff_odds(ctx) -> tuple[float, str]:
@@ -290,7 +317,9 @@ def waiver_brief(cfg) -> Path:
         if str(pid) in rostered or not isinstance(p, dict) or not p.get("active"):
             continue
         row = ctx["player_row"](str(pid))
-        if row and (row["weekly"] > 0 or row["ros"] > 60):
+        # rate, not remaining: prorating a pool FILTER would empty the pool
+        # in week 16, when nobody has 60 points left to give.
+        if row and (row["weekly"] > 0 or row["ros_season"] > 60):
             fa_pool.append(row)
     fa_pool.sort(key=lambda p: -p["ros"])
     fa_pool = fa_pool[:200]
@@ -308,12 +337,19 @@ def waiver_brief(cfg) -> Path:
     for c in claims:
         rid_needy = [rid for rid, n in needs.items() if rid != my_rid and n.get(c["pos"], 0) > 0]
         rival_max = max((budgets[r] for r in rid_needy), default=None)
+        # remaining, not rate: in week 14 a 120-point-season player has
+        # about 28 points left and is not a league winner at any price.
         cls = "league_winner" if c["ros"] >= 120 else "speculative"
         c["cls"] = cls if cls == "league_winner" else "contingency-speculative"
         fair, agg = waivers.bid_band(
             "league_winner" if cls == "league_winner" else "speculative",
             my_budget, reg, faab, rival_max_budget=rival_max if cls == "league_winner" else None,
-            value_cap=int(c["ros"] / 2) if cls == "league_winner" else None, odds=odds)
+            # ros_season BY NAME, not the prorated ros. Dollars-equals-
+            # points-over-two was always dimensionally odd; prorating it
+            # would silently shrink every late-season ceiling on top of a
+            # bid model that is unmodelled rather than season-scaled. It
+            # ships as a KNOWN inconsistency with a name.
+            value_cap=int(c["ros_season"] / 2) if cls == "league_winner" else None, odds=odds)
         c["fair"], c["aggressive"] = fair, agg
         if rid_needy:
             c["rivals_note"] = (f"{len(rid_needy)} rival(s) need {c['pos']}; budgets: "

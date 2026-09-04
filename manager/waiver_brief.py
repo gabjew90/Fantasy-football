@@ -23,11 +23,21 @@ FLEX_POS = ("RB", "WR", "TE")
 TREND_TTL = 3600
 TOP_N = 5
 
-# add-ranking weights (documented in DECISIONS.md)
-W_CONTINGENCY = 40.0
-W_TREND_MAX = 25.0
-W_USAGE = 10.0
-W_NEED = 15.0
+# Add-ranking weights, PER WEEK REMAINING (documented in DECISIONS.md).
+#
+# These are added to fa_value, which is a rest-of-season number. Once `ros`
+# started shrinking with the calendar, a fixed +40 for a contingency stopped
+# being a thumb on the scale and became the whole scale: in week 16, with two
+# weeks left, every real add is worth single digits and the bonuses decide the
+# ranking outright. So the bonuses shrink with it. The season-scale values
+# below are the historical ones divided by a 17-week season, and are
+# multiplied by weeks remaining at the call site -- which reproduces the old
+# numbers exactly in week 1 and nowhere else, by design.
+SEASON_WEEKS = 17.0
+W_CONTINGENCY = 40.0 / SEASON_WEEKS
+W_TREND_MAX = 25.0 / SEASON_WEEKS
+W_USAGE = 10.0 / SEASON_WEEKS
+W_NEED = 15.0 / SEASON_WEEKS
 
 
 def trending(store, kind: str = "add") -> dict[str, int]:
@@ -187,6 +197,9 @@ def stash_note(ctx, candidate: dict, contingent: bool) -> str | None:
 
 
 def _classify(c: dict, contingent: bool) -> str:
+    # `ros` is REMAINING points, so these bars tighten as the season runs out.
+    # That is the intent: a player worth 100 points from week 2 is a league
+    # winner, and the same weekly rate from week 14 is a streamer.
     if contingent and (c.get("ros") or 0) >= 100:
         return "league_winner"
     if contingent:
@@ -226,10 +239,12 @@ def build(ctx, store) -> str:
         ev = usage_mod.evidence(p["name"], usage, snaps, week - 1)
         p["fa_value"] = value_over_fa(p, levels)
         score = p["fa_value"]
-        score += W_CONTINGENCY if pid in cont_ids else 0
-        score += W_TREND_MAX * (trend.get(pid, 0) / trend_max)
-        score += W_USAGE if ev else 0
-        score += W_NEED if needs.get(p["pos"], 0) > 0 else 0
+        # every bonus on the same horizon as the value it is added to
+        wl = ctx.get("weeks_left") or 1
+        score += W_CONTINGENCY * wl if pid in cont_ids else 0
+        score += W_TREND_MAX * wl * (trend.get(pid, 0) / trend_max)
+        score += W_USAGE * wl if ev else 0
+        score += W_NEED * wl if needs.get(p["pos"], 0) > 0 else 0
         scored.append((score, p, ev, pid))
     scored.sort(key=lambda t: -t[0])
 
@@ -262,7 +277,10 @@ def build(ctx, store) -> str:
         fair, agg = waivers.bid_band(
             cls, ctx["my_budget"], "COMFORTABLE", faab_cfg,
             rival_max_budget=(needy[0] if cls == "league_winner" and needy else None),
-            value_cap=int((p.get("ros") or 0) / 2) if cls == "league_winner" else None)
+            # ros_season BY NAME -- see draftkit/briefs.py:waiver_brief for
+            # why the bid cap stays on the season scale while everything else
+            # around it moved to remaining points.
+            value_cap=int((p.get("ros_season") or 0) / 2) if cls == "league_winner" else None)
         why = []
         if contingent:
             why.append(cont_ids[pid])
