@@ -2409,3 +2409,98 @@ verified port owner, restarted mid-room during round 3).
 Both ship with the driver update of the same commit: rival pick lines
 carry the manager's name, the panel rests the client on the Board tab
 between actions, and the panel is translucent with tagged, coloured lines.
+
+## 2026-09-04 (40) — the market curve that never decayed: measured, and it does NOT ship
+
+Pre-registered before the numbers existed; thresholds below were fixed in
+advance and none moved after they were seen.
+
+**The defect.** Pooled over both leagues and both backtest pairs, banded by
+within-position ADP rank, the market term loses 60 points across RB ranks 1-13
+and 7 points across ranks 37-60, while the actuals in those bands fall 118 -> 88
+and are still falling. Two mechanisms compound: ln() flattens, and a
+per-position curve fitted on OVERALL market rank inherits the published ADP
+feed's own tail compression (RB ranks 49-72 all sit between overall ADP 148 and
+174, so twelve players cost 0.12 in ln(adp) against 1.51 at the top). Third, the
+fitted dependent variable is itself floored: usage at the RB tail is 127.6 and
+pos_mean x 16 is 128. This was left open at #20: "a log-rank curve that never
+decays is still the natural follow-up."
+
+**Corrections recorded because they were tested and rejected before building.**
+(1) Restricting the prediction to the fitted rank band moves 7 of 684 backtest
+rows: the FFC feed stops near overall ADP 180 and `games >= 8` veterans reach the
+end of the pool. It is kept as a production clause and labelled ungradeable here
+rather than allowed to look like a pass. (2) Shrinking toward a replacement-level
+anchor moves the tail UP: the mean over `games >= 4` spans 57-176 players
+including every scrub and already sits below replacement level in all sixteen
+cells (RB 7.20 vs 11.14 at rank 24). The anchor was left alone.
+
+**Arms, separated on the user's instruction so a verdict names its cause.** In
+`_market_curve` only, behind `projections.market_curve_tail.mode`, default off:
+`blend_rank` = within-position ordinal rank as the regressor; `blend_rank_lin` =
++ `y ~ a + b*ln(r) + c*r` fitted by the same OLS on the same `games >= 8`
+population; `blend_tail` = + tangent continuation past the fit, clamped at zero.
+The linear term applies to RB and WR ONLY, fixed in advance on the evidence that
+fitted c is stable and negative there in all four league-pairs and swings sign at
+QB and TE. Choosing the list up front avoids selecting the shape on the same data
+that grades the arm.
+
+**Results.**
+
+Deep bands (RB rank 37+, WR rank 49+), reports/tail_curve_bands.md:
+
+| arm | keefamania deep ratio | omnibeta deep ratio | head MAE ratio | max top-12 move | deep rows moved |
+|---|---|---|---|---|---|
+| blend_rank | 1.017 | 0.997 | 0.998 / 0.997 | 10.8 / 15.5 | 64% / 72% |
+| blend_rank_lin | 0.934 | 0.942 | 1.012 / 1.011 | 26.9 / 31.4 | 98% / 87% |
+| blend_tail | 0.933 | 0.942 | 1.011 / 1.010 | 26.9 / 31.4 | 98% / 87% |
+
+All four (league, pair) cells improve for blend_rank_lin: 0.944, 0.924, 0.954,
+0.933.
+
+Pooled accuracy, reports/tail_curve_gate.md: keefamania MAE ratio 0.996 with
+Spearman -0.002, omnibeta 0.998 with +0.003. Both inside the #23 tolerances.
+
+Outcome, the same 44 slot-drafts graded on actual lineup points: blend 1554.5,
+blend_rank_lin 1530.8, delta -23.7 or **-1.53%**. Better in 25 slots, worse in
+18, tied 1.
+
+**Verdict against the pre-registered bars.**
+- deep-band MAE at most 0.97 in both leagues: PASS (0.934, 0.942)
+- deep-band at most 1.00 in 3 of 4 cells: PASS (4 of 4)
+- anti-inertness, at least 25% of deep rows moving more than 1 pt: PASS
+- head unchanged, MAE ratio at most 1.01 and no top-12 projection moving more
+  than 2.0 points: **FAIL** (1.012 / 1.011, and moves of 26.9 / 31.4)
+- outcome, mean lineup points at least 0.99x blend: **FAIL** (-1.53%)
+
+**DECISION: the knob stays `mode: "off"`. Nothing ships.** config.yaml and the
+Tracker are unchanged; both reference boards come back IDENTICAL under
+`board_identity.py --check`.
+
+**What was learned, which is the point of running it.**
+
+1. The correction works on the band it targets and still drafts worse. Deep-band
+   accuracy improved 6-7% and the drafted teams lost 1.53% of actual points. The
+   arm wins more slots than it loses (25 to 18) and loses bigger, so it is a
+   higher-variance board, not a better one.
+2. This is the SECOND attempt to fix the tail by moving the projection level, and
+   both failed the same half by a similar margin: the external source at -1.20%
+   (#23) and this at -1.53%. Two independent routes to "lower the tail" both cost
+   actual points. That is now a pattern and the next attempt should explain it
+   before spending on a third.
+3. The regressor swap alone is worthless: 1.017 and 0.997 deep, no material
+   improvement. Had the three edits been graded as one unit, a pass would have
+   been credited to it. Splitting them was the user's call and it is the only
+   reason this is known.
+4. **The head criterion was mis-specified and that is my error, not the arm's.**
+   Any change to the regressor refits the whole curve, so "no top-12 projection
+   moves more than 2.0 points" was unreachable by construction for every arm
+   here, including the one that does nothing useful. It should have been stated
+   as a bound on the head's ACCURACY (which passed at 1.012 against a 1.01 bar,
+   a near miss) and not on projection movement. The bar is not moved
+   retroactively; the outcome half fails independently and decides on its own.
+
+**Still open, unchanged by this.** The usage-side floor (`pos_mean x 16`) is
+untouched and remains the deeper cause. Any future attempt is a new
+pre-registration and must first answer point 2: why lowering the tail keeps
+costing lineup points even when it improves tail accuracy.
