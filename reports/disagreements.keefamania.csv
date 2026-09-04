@@ -1,31 +1,31 @@
 player,pos,team,direction,rank_gap,value_rank,adp_rank,adp,tier,vorp,proj_pts,exp_games,rookie_flag,proj_source
-Josh Jacobs,RB,GBP,model_fade,-189,225,36,37.2,10,-172.17882352941177,0.0,14.0,false,fantasypros_sheet
-Ollie Gordon II,RB,MIA,model_fade,-174,224,50,52.0,9,-149.9670588235294,22.211764705882356,15.0,false,fantasypros_sheet
-Fernando Mendoza,QB,LVR,model_fade,-102,221,119,118.0,4,-103.40705882352935,180.3143529411765,16.0,true,fantasypros_sheet
-Jordyn Tyson,WR,NOS,model_fade,-97,191,94,98.7,8,-49.359811764705896,114.51783529411763,16.0,true,fantasypros_sheet
-Brian Robinson Jr.,RB,ATL,model_fade,-97,217,120,118.1,7,-94.43764705882354,77.74117647058823,14.0,false,fantasypros_sheet
-Blake Corum,RB,LAR,model_fade,-90,187,97,99.8,5,-45.62823529411767,126.5505882352941,14.5,false,fantasypros_sheet
-Aaron Rodgers,QB,PIT,model_fade,-89,205,116,116.1,3,-72.5195294117647,211.20188235294117,15.5,false,fantasypros_sheet
-Isaac TeSlaa,WR,DET,model_fade,-85,218,133,124.1,10,-95.79294117647059,68.08470588235294,13.0,false,fantasypros_sheet
-Cooper Kupp,WR,SEA,model_fade,-82,204,122,120.2,8,-68.60235294117648,95.27529411764705,12.333333333333334,false,fantasypros_sheet
-James Conner,RB,ARI,model_fade,-82,223,141,125.1,8,-134.06117647058824,38.11764705882353,12.0,false,fantasypros_sheet
-Josh Downs,WR,IND,model_fade,-79,183,104,107.5,8,-42.48470588235293,121.3929411764706,14.666666666666666,false,fantasypros_sheet
-RJ Harvey,RB,DEN,model_fade,-77,180,103,107.4,5,-40.865882352941185,131.3129411764706,16.0,false,fantasypros_sheet
-Stefon Diggs,WR,WAS,model_fade,-74,174,100,104.2,8,-36.88470588235296,126.99294117647057,13.0,false,fantasypros_sheet
-Jacory Croskey-Merritt,RB,WAS,model_fade,-74,179,105,107.6,5,-39.501176470588206,132.67764705882357,16.0,false,fantasypros_sheet
-Cam Ward,QB,TEN,model_fade,-71,203,132,124.1,3,-66.54305882352938,217.17835294117648,16.0,false,fantasypros_sheet
-Hunter Henry,TE,NEP,model_target,42,115,157,127.2,3,-9.703529411764706,117.69411764705883,14.333333333333334,false,fantasypros_sheet
-Dallas Goedert,TE,PHI,model_target,39,63,102,105.4,3,10.917647058823519,138.31529411764706,12.0,false,fantasypros_sheet
-Tyler Shough,QB,NOS,model_target,39,128,167,129.9,2,-15.16799999999995,268.5534117647059,12.0,false,fantasypros_sheet
-Brenton Strange,TE,JAC,model_target,37,127,164,129.2,3,-13.016470588235322,114.38117647058822,12.0,false,fantasypros_sheet
-Denzel Boston,WR,CLE,model_target,32,147,179,131.5,8,-27.268517647058786,136.60912941176474,16.0,true,fantasypros_sheet
-Harold Fannin Jr.,TE,CLE,model_target,31,40,71,70.9,3,20.67764705882354,148.07529411764708,15.0,false,fantasypros_sheet
-Greg Dulcich,TE,MIA,model_target,30,148,178,131.4,3,-27.29411764705884,100.1035294117647,12.0,false,fantasypros_sheet
-George Kittle,TE,SFO,model_target,27,52,79,83.6,3,15.171764705882339,142.56941176470588,13.0,false,fantasypros_sheet
-Mark Andrews,TE,BAL,model_target,27,84,111,113.0,3,1.7505882352941171,129.14823529411765,13.666666666666666,false,fantasypros_sheet
-Jakobi Meyers,WR,JAC,model_target,21,150,171,130.1,8,-27.642352941176483,136.23529411764704,14.666666666666666,false,fantasypros_sheet
-Travis Kelce,TE,KCC,model_target,19,69,88,94.1,3,8.254117647058848,135.65176470588239,15.0,false,fantasypros_sheet
-Dalton Schultz,TE,HOU,model_target,18,134,152,126.6,3,-18.362352941176482,109.03529411764706,15.333333333333334,false,fantasypros_sheet
-T.J. Hockenson,TE,MIN,model_target,18,141,159,128.3,3,-24.8658823529412,102.53176470588234,12.333333333333334,false,fantasypros_sheet
-Kyle Pitts Sr.,TE,ATL,model_target,17,55,72,72.2,3,13.13882352941178,140.53647058823532,16.0,false,fantasypros_sheet
-Juwan Johnson,TE,NOS,model_target,15,124,139,124.9,3,-11.529411764705884,115.86823529411765,14.0,false,fantasypros_sheet
+Josh Jacobs,RB,GBP,model_fade,-178,226,48,49.5,10,-172.17882352941177,0.0,14.0,false,fantasypros_sheet
+Fernando Mendoza,QB,LVR,model_fade,-103,222,119,118.6,4,-103.40705882352935,180.3143529411765,16.0,true,fantasypros_sheet
+Brian Robinson Jr.,RB,ATL,model_fade,-98,218,120,119.0,7,-94.43764705882354,77.74117647058823,14.0,false,fantasypros_sheet
+Ray Davis,RB,BUF,model_fade,-96,225,129,123.5,9,-148.25411764705882,23.924705882352942,14.0,false,fantasypros_sheet
+Jordyn Tyson,WR,NOS,model_fade,-94,192,98,100.9,8,-49.359811764705896,114.51783529411763,16.0,true,fantasypros_sheet
+Blake Corum,RB,LAR,model_fade,-93,188,95,99.5,5,-45.62823529411767,126.5505882352941,14.5,false,fantasypros_sheet
+Aaron Rodgers,QB,PIT,model_fade,-92,207,115,115.9,3,-72.5195294117647,211.20188235294117,15.5,false,fantasypros_sheet
+Cooper Kupp,WR,SEA,model_fade,-84,206,122,120.2,8,-68.60235294117648,95.27529411764705,12.333333333333334,false,fantasypros_sheet
+Isaac TeSlaa,WR,DET,model_fade,-82,219,137,124.2,10,-95.79294117647059,68.08470588235294,13.0,false,fantasypros_sheet
+Josh Downs,WR,IND,model_fade,-81,184,103,106.4,8,-42.48470588235293,121.3929411764706,14.666666666666666,false,fantasypros_sheet
+James Conner,RB,ARI,model_fade,-81,224,143,125.6,8,-134.06117647058824,38.11764705882353,12.0,false,fantasypros_sheet
+MarShawn Lloyd,RB,GBP,model_fade,-78,169,91,96.9,5,-34.38117647058826,137.79764705882351,16.0,true,fantasypros_sheet
+Jacory Croskey-Merritt,RB,WAS,model_fade,-76,180,104,106.7,5,-39.501176470588206,132.67764705882357,16.0,false,fantasypros_sheet
+RJ Harvey,RB,DEN,model_fade,-76,181,105,108.9,5,-40.865882352941185,131.3129411764706,16.0,false,fantasypros_sheet
+Stefon Diggs,WR,WAS,model_fade,-75,175,100,104.3,8,-36.88470588235296,126.99294117647057,13.0,false,fantasypros_sheet
+Hunter Henry,TE,NEP,model_target,41,117,158,127.6,3,-9.703529411764706,117.69411764705883,14.333333333333334,false,fantasypros_sheet
+Dallas Goedert,TE,PHI,model_target,38,63,101,105.3,3,10.917647058823519,138.31529411764706,12.0,false,fantasypros_sheet
+Brenton Strange,TE,JAC,model_target,38,128,166,129.4,3,-13.016470588235322,114.38117647058822,12.0,false,fantasypros_sheet
+Tyler Shough,QB,NOS,model_target,37,131,168,130.0,2,-15.16799999999995,268.5534117647059,12.0,false,fantasypros_sheet
+Denzel Boston,WR,CLE,model_target,31,149,180,131.5,8,-27.268517647058786,136.60912941176474,16.0,true,fantasypros_sheet
+Harold Fannin Jr.,TE,CLE,model_target,30,40,70,70.8,3,20.67764705882354,148.07529411764708,15.0,false,fantasypros_sheet
+Greg Dulcich,TE,MIA,model_target,29,150,179,131.4,3,-27.29411764705884,100.1035294117647,12.0,false,fantasypros_sheet
+Mark Andrews,TE,BAL,model_target,28,84,112,113.2,3,1.7505882352941171,129.14823529411765,13.666666666666666,false,fantasypros_sheet
+George Kittle,TE,SFO,model_target,26,52,78,82.9,3,15.171764705882339,142.56941176470588,13.0,false,fantasypros_sheet
+Jakobi Meyers,WR,JAC,model_target,20,152,172,130.3,8,-27.642352941176483,136.23529411764704,14.666666666666666,false,fantasypros_sheet
+Travis Kelce,TE,KCC,model_target,19,69,88,94.8,3,8.254117647058848,135.65176470588239,15.0,false,fantasypros_sheet
+T.J. Hockenson,TE,MIN,model_target,18,143,161,128.4,3,-24.8658823529412,102.53176470588234,12.333333333333334,false,fantasypros_sheet
+Kyle Pitts Sr.,TE,ATL,model_target,16,55,71,72.2,3,13.13882352941178,140.53647058823532,16.0,false,fantasypros_sheet
+Jaxson Dart,QB,NYG,model_target,14,72,86,92.3,2,7.838117647058823,291.5595294117647,13.0,false,fantasypros_sheet
+Wan'Dale Robinson,WR,TEN,model_target,14,163,177,130.8,8,-32.668235294117636,131.2094117647059,15.0,false,fantasypros_sheet
