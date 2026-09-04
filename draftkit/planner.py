@@ -194,9 +194,20 @@ def pair_rank(cands: list[tuple[float, str, dict]],
     while i < len(ranked) - 1:
         a, b = ranked[i], ranked[i + 1]
         if abs(a[0] - b[0]) <= NEAR_TIE and _surv(b[3]) < _surv(a[3]) - 1e-9:
+            # NAME THE COUNTERPARTY. "near tie (0.7 pts): scarcer player
+            # first" states a gap against nobody, so a reader assumes the swap
+            # was against the player finally picked -- which it usually is not,
+            # because this pass runs over ADJACENT pairs anywhere in the list.
+            # Room 10703362 pick 24 annotated Olave, who was promoted over
+            # Josh Allen while McBride sat above both and was never in the
+            # comparison; read without the name it looked like the rule had
+            # fired backwards. A label that cannot be checked is the same
+            # defect as a reason that is not the reason.
+            over = a[3].get("player") or a[3].get("name") or a[3].get("pos")
             ranked[i], ranked[i + 1] = b, a
             ranked[i] = (ranked[i][0], ranked[i][1],
-                         ranked[i][2] + f" · near tie ({abs(a[0] - b[0]):.1f} pts): scarcer player first",
+                         ranked[i][2] + f" · near tie ({abs(a[0] - b[0]):.1f} pts) with {over}"
+                         f": scarcer player first ({_surv(b[3]):.0%} vs {_surv(a[3]):.0%})",
                          ranked[i][3])
             i = max(0, i - 1)
         else:

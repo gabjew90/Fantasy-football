@@ -1265,3 +1265,32 @@ def test_fingerprint_diff_ignores_pick_keys_before_the_first_pick():
                " changed: DK.fingerprintDiff({ store_keys: ['a'], pick_keys: ['id'] }, base) }));")
     assert r["empty"] == []
     assert any(d.startswith("pick_keys: missing") for d in r["changed"])
+
+
+def test_pair_arithmetic_rides_through_the_ranked_list():
+    """The field that decides the pick must reach the page, not just the why
+    string. `pair` was absent from the plan->candidate mapping, so every mock
+    ever recorded carried pair:null on every pick -- directly under a comment
+    promising the numbers were kept structured. Sibling of the survival test
+    above, and of the proj_band drop in yahoo_bridge.load_players: a
+    hand-maintained field list that silently forgets an upstream addition."""
+    board = "Christian McCaffrey|RB|SFO|122.8|1|" + chr(10) + "Bijan Robinson|RB|ATL|100|1|"
+    pair = {"own": 58.6, "partner": "WR", "partner_pts": 70.7,
+            "total": 129.3, "pick_cost": 0.0}
+    plan = {"plan": [{"n": "Christian McCaffrey", "p": "RB", "t": "SFO", "v": 122.8, "a": 1,
+                      "why": "w", "s": 0.7, "sr": 0.86, "e": 80.5, "b": 122.8, "pair": pair},
+                     {"n": "Bijan Robinson", "p": "RB", "t": "ATL", "v": 100, "a": 4, "why": "w2"}],
+            "needs": {"RB": 2}, "current_pick": 3}
+    js = [
+        "document.body.innerText = 'YOUR TEAM (0/15) ';",
+        "DK.loadCompact(" + json.dumps(board) + ", {teams: 10});",
+        "DK.loadPlan(" + json.dumps(plan) + ");",
+        "const out = DK.rank();",
+        "console.log(JSON.stringify({top: out.top.map(x => ({n: x.n, pair: x.pair, b: x.b}))}));",
+    ]
+    r = run_js(chr(10).join(js))
+    assert r["top"][0]["pair"] == pair, r["top"][0]
+    assert r["top"][0]["b"] == 122.8
+    # a row the planner never scored says so with null rather than inventing one
+    assert r["top"][1]["pair"] is None
+    assert r["top"][1]["b"] is None

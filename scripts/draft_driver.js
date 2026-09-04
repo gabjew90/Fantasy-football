@@ -1046,8 +1046,22 @@ window.DK = (function () {
       // s / sr / e: the engine's shown survival, raw survival and expected
       // best-at-next-turn for this candidate's market, kept structured so the
       // trail never has to parse them back out of the why string
+      // `pair` is the own/partner/total arithmetic that ACTUALLY RANKS the
+      // pick, and it was missing from this list, so every mock ever recorded
+      // has pair:null on every pick -- directly under a comment promising the
+      // numbers are kept structured so the trail need not parse them out of
+      // the why string. `b` (best-now) was lost the same way.
+      //
+      // Forwarding the whole row with a spread was tried first and broke
+      // test_plan_survival_fields_ride_through_the_ranked_list (a candidate
+      // came back with no `n`); the cause was not chased, because an explicit
+      // list that passes is worth more than a clever one that needs a
+      // debugging session. The cost is that the next field added upstream
+      // must be added here too -- which is exactly the defect this fixes, so
+      // the tests below pin BOTH the fields and the fact that they arrive.
       out.push({ n: b.n, p: b.p, t: b.t, v: b.v, why: e.why, fromEngine: true,
-                 s: e.s == null ? null : e.s, sr: e.sr == null ? null : e.sr, e: e.e == null ? null : e.e });
+                 s: e.s == null ? null : e.s, sr: e.sr == null ? null : e.sr, e: e.e == null ? null : e.e,
+                 b: e.b == null ? null : e.b, pair: e.pair || null });
     }
     if (!out.length) return null;
     return {
