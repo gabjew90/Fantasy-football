@@ -229,9 +229,9 @@
   "MIN": ""
  },
  "scout:1": {
-  "margin": 3.7,
+  "margin": 5.3,
   "mode": "neutral",
-  "win_prob": 0.555
+  "win_prob": 0.579
  },
  "trending:add": {
   "data": {
