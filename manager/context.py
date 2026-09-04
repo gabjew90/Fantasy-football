@@ -17,10 +17,30 @@ log = logging.getLogger("manager")
 
 POS_SLOTS = SLOTS  # starting requirements: QB1 RB2 WR2 TE1 K1 DEF1 + 2 FLEX
 
+# Set once from the CLI before any job runs. Module state rather than a
+# parameter threaded through seven job signatures: every job already calls
+# league_context() with no arguments, and a partial thread-through is how a
+# job ends up silently reading a different league than its siblings.
+_LEAGUE: str | None = None
+_WEEK: int | None = None
+
+
+def configure(league: str | None = None, week: int | None = None) -> None:
+    global _LEAGUE, _WEEK
+    _LEAGUE, _WEEK = league, week
+
 
 def league_context() -> dict:
-    cfg = Config.load()
-    ctx = build_context(cfg)
+    cfg = Config.load(league=_LEAGUE)
+    # The manager speaks Sleeper. A yahoo league would otherwise send its
+    # league_id to the Sleeper API and fail somewhere less legible.
+    platform = str(cfg.get("platform") or "sleeper").lower()
+    if platform != "sleeper":
+        raise RuntimeError(
+            f"the in-season manager cannot run league {cfg.league_name!r}: "
+            f"platform is {platform!r}, and only sleeper is supported. "
+            f"Yahoo's fantasy API is approval-gated, so there is no data path.")
+    ctx = build_context(cfg, week=_WEEK)
     ctx["my_rid"] = int(ctx["my_roster"]["roster_id"])
 
     users_by_rid = {}

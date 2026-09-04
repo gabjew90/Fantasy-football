@@ -17,7 +17,7 @@ import polars as pl
 from . import lineup as lineup_mod
 from . import playoffs, seasondata, waivers, weekly
 from .lenses import scoreboard_md
-from .sleeper import SleeperClient
+from .sleeper import SleeperClient, resolve_my_roster
 
 SLOTS = {"QB": 1, "RB": 2, "WR": 2, "TE": 1, "K": 1, "DEF": 1}
 FLEX = 2
@@ -30,15 +30,25 @@ def _season_cfg(cfg) -> dict:
     return cfg.get("inseason", cfg.get("season", {})) or {}
 
 
-def build_context(cfg) -> dict:
-    """One fetch pass; every downstream brief reads from this dict."""
+def build_context(cfg, week: int | None = None) -> dict:
+    """One fetch pass; every downstream brief reads from this dict.
+
+    `week` overrides the live NFL week. It exists so a week-dependent change
+    (the rest-of-season prorate, the matchup layer) can be rendered and read
+    today instead of waiting for the calendar to reach the interesting part of
+    the season. Callers that pass it must be interactive: pinning the live
+    manager to a stale week would be worse than the bug it is testing.
+    """
     stale: list[str] = []
     client = SleeperClient(cfg.path("raw"))
     state = seasondata.nfl_state()
-    season, week = state["season"], state["week"]
+    season, week_live = state["season"], state["week"]
     preseason = state["season_type"] != "regular"
     if preseason:
-        week = 1
+        week_live = 1
+    week = week_live if week is None else int(week)
+    if week != week_live:
+        stale.append(f"week PINNED to {week} (live week is {week_live})")
 
     league = client.league(cfg.league_id)
     scoring = league["scoring_settings"]
@@ -49,9 +59,10 @@ def build_context(cfg) -> dict:
     ) or ("Out",)
     rosters = client.league_rosters(cfg.league_id)
     users = {str(u["user_id"]): u.get("display_name", "?") for u in client.league_users(cfg.league_id)}
-    me_user = next((uid for uid, name in users.items()
-                    if name.lower() == str(cfg["me"]["username"]).lower()), None)
-    my_roster = next((r for r in rosters if str(r.get("owner_id")) == me_user), rosters[0])
+    # Identity is asserted, never guessed. The old rule fell back to rosters[0]
+    # on a display-name miss and every module downstream then said "your
+    # lineup" about a stranger's team (draftkit/sleeper.py resolve_my_roster).
+    my_roster, identity = resolve_my_roster(cfg, users, rosters, client)
 
     players = client.players()
     injury = seasondata.injury_map(players)
@@ -132,7 +143,7 @@ def build_context(cfg) -> dict:
         "preseason": preseason, "fallback": fallback, "stale": stale,
         "league": league, "budget": budget, "reserve_allow": reserve_allow,
         "rosters": rosters, "roster_players": roster_players, "users": users,
-        "my_roster": my_roster, "players": players, "injury": injury,
+        "my_roster": my_roster, "identity": identity, "players": players, "injury": injury,
         "schedule": schedule, "byes": week_byes, "early": early,
         "matchups": matchups, "player_row": player_row, "trow": trow,
     }

@@ -103,10 +103,24 @@ def run_job(job: dict, dry_run: bool = False) -> None:
         _safe(slate_job, job.get("teams", []), job.get("kickoff"), dry_run)
 
 
+def _identity_line(ctx) -> str:
+    """Who this brief is about. Carries the ROSTER ID, not just the display
+    name: a name collision is exactly the failure identity resolution exists to
+    catch, so a body that only named the name could still look right while
+    being about the wrong team."""
+    i = ctx.get("identity") or {}
+    week = ctx.get("week")
+    lg = getattr(ctx.get("cfg"), "league_name", "?")
+    return (f"_managing {i.get('display', '?')} · roster {i.get('roster_id', '?')} · "
+            f"league {lg} · week {week} · identity via {i.get('source', '?')}_
+
+")
+
+
 def waiver_job(dry_run: bool = False) -> None:
     ctx = league_context()
     store = get_store()
-    body = waiver_brief.build(ctx, store)
+    body = _identity_line(ctx) + waiver_brief.build(ctx, store)
     body += "\n\n" + trade_radar.build(ctx, store)
     top = re.search(r"\*\*(.+?)\*\*", body.split("## Top adds", 1)[-1])
     subject = (f"Waivers wk {ctx['week']} — top add: {top.group(1)}" if top
@@ -118,7 +132,7 @@ def waiver_job(dry_run: bool = False) -> None:
 def scout_job(dry_run: bool = False) -> None:
     ctx = league_context()
     store = get_store()
-    body = scout.build(ctx, store)
+    body = _identity_line(ctx) + scout.build(ctx, store)
     s = store.get(f"scout:{ctx['week']}", {})
     subject = (f"Scout wk {ctx['week']}: {ctx['opp_name']} — margin "
                f"{s.get('margin', 0):+.0f}, win {s.get('win_prob', 0.5):.0%}")
@@ -129,7 +143,7 @@ def scout_job(dry_run: bool = False) -> None:
 def lineup_job(dry_run: bool = False) -> None:
     ctx = league_context()
     store = get_store()
-    body = lineup_opt.build(ctx, store)
+    body = _identity_line(ctx) + lineup_opt.build(ctx, store)
     n = body.count("\n- **") if "## Changes" in body else 0
     subject = (f"Lineup wk {ctx['week']} — {n} change(s) needed" if n
                else f"Lineup wk {ctx['week']} — no changes needed")

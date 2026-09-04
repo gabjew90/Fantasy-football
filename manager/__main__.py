@@ -43,9 +43,19 @@ def main() -> int:
                     default=None, help="cron: force one job regardless of window")
     ap.add_argument("--dry-run", action="store_true",
                     help="full pipeline against live data; print instead of email")
+    ap.add_argument("--league", default=None,
+                    help="league name; overrides DRAFTKIT_LEAGUE / default_league")
+    ap.add_argument("--week", type=int, default=None,
+                    help="render as if it were this NFL week (module runs only)")
     args = ap.parse_args()
 
+    if args.week is not None and args.command != "module":
+        ap.error("--week is for 'module' runs only: pinning gate/cron to a stale "
+                 "week would make the live manager act on the wrong week")
+
     from . import jobs
+    from .context import configure
+    configure(league=args.league, week=args.week)
 
     if args.command == "gate":
         from .gate import run_gate

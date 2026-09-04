@@ -163,7 +163,10 @@ def main() -> None:
         src = ROOT / "reports" / f"projection_backtest.{lg}.rows.csv"
         if not src.exists():
             raise SystemExit(f"{src} missing: run projection_backtest.py --league {lg} first")
-        rows = pl.read_csv(src, infer_schema_length=10000)
+        # the csv round-trip infers sleeper_id as i64; the rebuilt frames carry
+        # it as the string it is everywhere else, so pin the join key
+        rows = pl.read_csv(src, infer_schema_length=10000).with_columns(
+            pl.col("sleeper_id").cast(pl.Utf8))
         cfg = Config.load(league=lg)
         players = SleeperClient(cfg.path("raw")).players()
         cache_dir = cfg.path("processed") / "backtest"
