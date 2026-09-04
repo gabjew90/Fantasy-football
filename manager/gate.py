@@ -57,9 +57,15 @@ def check_status(check: dict, now_utc: datetime) -> str:
     return "expired"
 
 
-def write_plan(week: int, jobs: list[dict], root: str | Path = ".") -> Path:
+def build_plan(week: int, jobs: list[dict], root: str | Path = ".") -> dict:
+    """The week plan as a dict, reading any committed plan for its done flags.
+
+    Split out of write_plan so a dry run can render the plan without the file
+    existing: state/ is committed and shipped to the live manager, and a
+    rehearsal that writes the week plan hands the real gate a plan it never
+    scheduled.
+    """
     path = plan_path(root)
-    path.parent.mkdir(parents=True, exist_ok=True)
     existing = {}
     if path.exists():
         try:
@@ -71,11 +77,15 @@ def write_plan(week: int, jobs: list[dict], root: str | Path = ".") -> Path:
     checks = [to_plan_check(j) for j in jobs]
     for c in checks:
         c["done"] = existing.get(c["id"], False)
-    path.write_text(json.dumps({
-        "week": week,
-        "generated_pt": datetime.now(tz=PT).isoformat(),
-        "checks": checks,
-    }, indent=1), encoding="utf-8")
+    return {"week": week,
+            "generated_pt": datetime.now(tz=PT).isoformat(),
+            "checks": checks}
+
+
+def write_plan(week: int, jobs: list[dict], root: str | Path = ".") -> Path:
+    path = plan_path(root)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(build_plan(week, jobs, root), indent=1), encoding="utf-8")
     return path
 
 
@@ -115,8 +125,13 @@ def run_gate(dry_run: bool = False, root: str | Path = ".") -> dict:
         jobs_mod.run_job(job, dry_run=dry_run)
         check["done"] = True   # even a failed run counts — _safe() emailed the
         ran += 1               # error; retrying a crashing check every 15 min spams
-    if ran:
+    if ran and not dry_run:
         path.write_text(json.dumps(plan, indent=1), encoding="utf-8")
+    elif ran:
+        # A dry run used to mark checks done in the COMMITTED week plan, so a
+        # rehearsal silently consumed the real run's work. `--dry-run` renders;
+        # it does not spend state.
+        log.info("gate: dry run, not marking %d check(s) done in %s", ran, path)
     pending = sum(1 for s in statuses.values() if s == "pending")
     log.info("gate: ran %d, %d pending", ran, pending)
     return {"ran": ran, "pending": pending, "statuses": statuses}

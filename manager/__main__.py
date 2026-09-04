@@ -56,6 +56,9 @@ def main() -> int:
     from . import jobs
     from .context import configure
     configure(league=args.league, week=args.week)
+    # state/ is committed and shipped to the live manager, so a rehearsal must
+    # not leave anything behind for the real run to read.
+    jobs.configure(dry_run=args.dry_run)
 
     if args.command == "gate":
         from .gate import run_gate

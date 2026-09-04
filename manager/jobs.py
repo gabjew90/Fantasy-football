@@ -28,8 +28,19 @@ log = logging.getLogger("manager")
 REPORT_DIR = Path("reports/manager")
 
 
+# Set once from the CLI, same rationale as context._LEAGUE: get_store() is
+# called from nine places including _safe()'s error path, and a partial
+# thread-through is how one of them ends up writing state during a rehearsal.
+_DRY_RUN = False
+
+
+def configure(dry_run: bool = False) -> None:
+    global _DRY_RUN
+    _DRY_RUN = bool(dry_run)
+
+
 def get_store() -> Store:
-    return Store(Path("state"))
+    return Store(Path("state"), read_only=_DRY_RUN)
 
 
 def _write_report(name: str, body: str) -> None:
@@ -64,10 +75,15 @@ def plan_week(dry_run: bool = False) -> dict:
                               time(6, 0), tzinfo=PT)
     jobs = triggers.compute_week_plan(week, monday, wk_games,
                                       ctx["my_teams"], ctx["opp_teams"])
-    gate_mod.write_plan(week, jobs)
-    plan = json.loads(gate_mod.plan_path().read_text(encoding="utf-8"))
+    plan = gate_mod.build_plan(week, jobs)
     hours = gate_mod.gate_hours_utc(plan["checks"])
-    (Path("state") / "gate_hours.json").write_text(json.dumps(hours), encoding="utf-8")
+    if dry_run:
+        # state/ is committed and read by the live gate. A rehearsal that
+        # writes the week plan hands the real run a schedule it never made.
+        log.info("dry run: not writing state/week_plan.json or state/gate_hours.json")
+    else:
+        gate_mod.write_plan(week, jobs)
+        (Path("state") / "gate_hours.json").write_text(json.dumps(hours), encoding="utf-8")
 
     # accrue transaction history for FAAB accounting
     hist = store.get("txn_history", [])

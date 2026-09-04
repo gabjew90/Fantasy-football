@@ -9,14 +9,32 @@ used — kv, first-time alert gate, delivery bookkeeping, bid history.
 from __future__ import annotations
 
 import json
+import logging
 import time
 from pathlib import Path
 
+log = logging.getLogger("manager")
+
 
 class Store:
-    def __init__(self, state_dir: str | Path):
+    """`read_only` makes a dry run genuinely dry.
+
+    It was not. `python -m manager --module waivers --dry-run --week 13`
+    rewrote 60 lines of state/kv.json with week-13 replacement levels, and
+    state/ is committed and shipped to the live manager: a rehearsal against a
+    pinned week left real state behind for the real run to read. The writers
+    are spread across jobs, the gate and the briefs and each would have to
+    learn about dry_run separately, so the flag lives at the one place they
+    all go through. Writes become no-ops and are logged, rather than raising,
+    because a dry run's job is to render the brief all the way to the end.
+    """
+
+    def __init__(self, state_dir: str | Path, read_only: bool = False):
         self.dir = Path(state_dir)
-        self.dir.mkdir(parents=True, exist_ok=True)
+        self.read_only = bool(read_only)
+        self.suppressed: list[str] = []
+        if not self.read_only:
+            self.dir.mkdir(parents=True, exist_ok=True)
 
     def _load(self, name: str) -> dict:
         f = self.dir / f"{name}.json"
@@ -28,6 +46,10 @@ class Store:
             return {}
 
     def _save(self, name: str, data: dict) -> None:
+        if self.read_only:
+            self.suppressed.append(name)
+            log.info("dry run: not writing state/%s.json", name)
+            return
         (self.dir / f"{name}.json").write_text(
             json.dumps(data, indent=1, sort_keys=True), encoding="utf-8")
 
