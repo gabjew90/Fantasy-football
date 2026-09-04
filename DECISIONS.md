@@ -2812,3 +2812,75 @@ evidence. Config knob unchanged: `projections.games_table.enabled: false`.
 
 Artifacts: `reports/games_table_gate_rb.md` and `.json` (five-seed run),
 `reports/projection_backtest.*.gt.rows.csv` with the `blend_gt_rb` column.
+
+## 2026-09-04 (44) — Keefamania drafts on the FantasyPros sheet alone; Yahoo ADP refreshed; what the replays can and cannot say
+
+**Decision (user).** For the real draft, Keefamania's projections come solely
+from the FantasyPros consensus sheet (as of 2026-09-01). `projections.source:
+external`, `sources: [sheet]`, `combine: first`, set in
+`leagues/keefamania.yaml` and deliberately NOT in `config.yaml`: config is
+global and Omnibeta is mid-season on the model path, so a global switch would
+have silently re-priced the in-season manager. Omnibeta's board is
+byte-identical to its reference after the change.
+
+**This is a philosophy decision, recorded as one.** The external path is
+built and verified end to end (2026-09-02). It has not been gated on history:
+the sheet has none in the repo, and the only outside source that does
+(Sleeper week-1 lines) lost to the model by 5% MAE and 1.2% lineup points
+(#23). That stand-in is weak evidence about an expert panel and was never
+claimed to be strong. The basis is the repo's own stated position: projections
+are an input, the edge is roster-aware timing. Judged when 2026 is played.
+The first follow-up is to find FantasyPros preseason projection history for
+2023 and 2024, which would turn this into a measurement.
+
+**`non_starters_zero` is off for this league.** On the first sheet build the
+rule erased seven real sheet lines on drafted players and set them to zero
+(Mendoza 191.6, Pacheco 103.6, Ferguson 103.0, Kamara 101.1, Sadiq 100.5,
+Coleman 98.4, Njoku 86.4), declaring the panel wrong by 100% on a depth-chart
+order. It was a crutch for a per-game usage rate that cannot say "he will not
+start"; a consensus sheet already prices role. The separate availability rule
+still zeroes `out` players (Jacobs, Charbonnet).
+
+**The board.** 227 players against the model's 238 (191 sheet, 36 K/DEF
+synthetic). The sheet omits Tyreek Hill (ADP 129), the one drafted player now
+invisible to the engine; Jaydon Blue, Chubb and Pearsall are omitted but sit
+outside the draft. Hollywood Brown fails the Sleeper name match and was absent
+from the model board too. Shared skill players re-price at a median 1.07x
+(WR 1.11x, RB 1.07x, QB 1.02x, TE 1.02x). McCaffrey #1 → #3, Allen #18 → #12,
+Henry #17 → #9, Love and Jeanty enter the top 20; 108 of 224 shared players
+move ten or more value ranks.
+
+**Yahoo ADP refreshed from today's room snapshot.** The live file was the
+08-31 hand scrape. Promoted the 12:07 room snapshot (players_10705481.json):
+208 shared players, median move 0.3 picks, top 30 unchanged, Lloyd 120.8 →
+96.9 and Jacobs 37.2 → 49.5 the only moves of ten or more, plus 19 K/DEF rows
+the old file lacked. Of 221 players on both the pre- and post-refresh sheet
+boards, proj_pts changed for 8, all K/DEF (their synthetic line keys on
+market rank), and for zero skill positions.
+
+**What the replays say, and what they cannot.** All three 2026-09-04 mock
+rooms replayed on both boards, each roster then graded on BOTH sets of
+projections:
+
+| room | sheet-drafted minus model-drafted, on the MODEL ruler | on the SHEET ruler |
+|---|---|---|
+| 10703362 | −49.0 | +10.4 |
+| 10704422 | −36.7 | +32.1 |
+| 10705481 | −34.5 | +25.3 |
+
+Each arm wins on its own projections and loses on the other's. This is the
+"grading a change of belief against that same belief" trap already recorded
+for tilts, and it means these replays are a behavioural smoke test, not
+evidence for or against the switch. Only actual points can adjudicate it.
+
+What the replays DO establish: the engine drafts a coherent roster on the
+sheet board, and the shape changes. Sheet board, 30 of 30 seats across three
+rooms: `QB2 RB6 WR4 TE1 K1 DEF1`. The model drafted a second TE in 10 of 30.
+QB2 is 30 of 30 on both, so the source does not touch that pattern.
+
+**First live picks on the sheet board** (room 10712781, seat 9, driver
+injected with the room already at pick 9): pick 9 Derrick Henry, four seconds
+after the driver started, RANKED ON 181.2 = 93.2 + 88.0; pick 12 Josh Allen,
+whom the model board had passed for four rounds in room 10703362.
+
+Commits: 9be946d (switch), afeb60d (page board), 2a2eb53 (ADP refresh).
