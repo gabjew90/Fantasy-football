@@ -179,17 +179,40 @@ def test_the_two_quantities_are_never_summed():
     assert got == 3.0 and got != 5.0 and got != 7.0
 
 
-def test_the_board_loader_carries_the_band():
-    """The column has to survive tiers.csv -> load_board or the knob sees
-    nothing. It was silently selected away once already."""
+def test_every_board_loader_carries_the_same_engine_fields():
+    """The band has to survive tiers.csv -> the engine, by BOTH routes.
+
+    The offline replays go through engine_parity.load_board and the live Yahoo
+    rig through yahoo_bridge.load_players. They were two hand-written copies of
+    one list and had already drifted: the live rig never carried proj_band, so
+    an offline replay would have shown the analyst spread working while a real
+    room silently ignored it. An offline test alone cannot catch that, which is
+    why this asserts the shared definition rather than either loader's source.
+    """
+    from draftkit.boardrow import ENGINE_FIELDS, engine_fields
+
+    for required in ("proj_band", "proj_sd", "proj_market_pts", "n_sources", "adp"):
+        assert required in ENGINE_FIELDS
+
+    row = {"player": "X", "pos": "RB", "vorp": "1.0", "proj_pts": "100.0",
+           "proj_band": "12.5", "proj_sd": "", "n_sources": "1", "adp": "45"}
+    got = engine_fields(row)
+    assert got["proj_band"] == 12.5
+    assert got["proj_sd"] is None, "an empty cell is absence, not zero"
+    assert got["adp"] == 45.0 and got["vorp_flex"] == 1.0
+
+    # and neither loader may reintroduce a private copy of the list
+    import inspect
     import importlib.util
     from pathlib import Path
     root = Path(__file__).resolve().parents[1]
-    spec = importlib.util.spec_from_file_location("ep", root / "scripts" / "engine_parity.py")
-    ep = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(ep)
-    import inspect
-    assert '"proj_band"' in inspect.getsource(ep.load_board)
+    for name, fn in (("engine_parity", "load_board"), ("yahoo_bridge", "load_players")):
+        spec = importlib.util.spec_from_file_location(name, root / "scripts" / f"{name}.py")
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        src = inspect.getsource(getattr(mod, fn))
+        assert "engine_fields(r)" in src, f"{name}.{fn} stopped using the shared fields"
+        assert '"proj_sd"' not in src, f"{name}.{fn} grew its own copy again"
 
 
 def test_external_projection_selects_every_dispersion_column():

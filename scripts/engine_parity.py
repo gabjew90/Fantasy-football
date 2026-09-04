@@ -28,6 +28,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from draftkit import snake  # noqa: E402
+from draftkit.boardrow import engine_fields
 from draftkit.tracker import Tracker, TrackerState  # noqa: E402
 
 DRIVER = Path(__file__).resolve().parents[1] / "scripts" / "draft_driver.js"
@@ -38,44 +39,21 @@ TEAMS, ROUNDS = 10, 15
 
 
 def load_board(path: str) -> list[dict]:
+    """A board csv as engine-facing dicts. The numeric fields come from
+    draftkit.boardrow so this loader and the live Yahoo one cannot drift; the
+    identity fields below are this harness's own (synthetic sleeper_id, bye)."""
     out = []
     for i, r in enumerate(csv.DictReader(open(path, encoding="utf-8"))):
-        def f(k, d=0.0):
-            try:
-                return float(r.get(k) or d)
-            except (TypeError, ValueError):
-                return d
         pos = (r.get("pos") or "").upper()
         if pos not in ("QB", "RB", "WR", "TE", "K", "DEF"):
             continue
-        out.append({
+        row = {
             "sleeper_id": str(i + 1), "name": r["player"], "pos": pos,
             "team": (r.get("team") or "").upper(),
-            "vorp": f("vorp"), "vorp_flex": f("vorp_flex", f("vorp")),
-            "proj_pts": f("proj_pts"),
-            "adp": f("adp") or None, "adp_delta": f("adp_delta"),
-            "tier": int(f("tier", 9)), "pos_rank": int(f("pos_rank", 99)),
-            "value_rank": int(f("value_rank", 999)),
-            "cliff_flag": str(r.get("cliff_flag")).lower() == "true",
-            "upside_flag": str(r.get("upside_flag")).lower() == "true",
-            "proj_source": r.get("proj_source") or "blend",
-            # carried for the bench-insurance path and the season replay: a
-            # handcuff is only recognised if backs_up survives the load
-            "backs_up": r.get("backs_up") or "",
             "bye": int(float(r["bye"])) if r.get("bye") not in (None, "") else None,
-            # plan A1/A3: dispersion across projection sources (None when absent)
-            # market-implied projection: floors the planner fallback (DECISIONS #39)
-            "proj_market_pts": f("proj_market_pts") if r.get("proj_market_pts") not in (None, "") else None,
-            "proj_sd": f("proj_sd") if r.get("proj_sd") not in (None, "") else None,
-            "proj_hi": f("proj_hi") if r.get("proj_hi") not in (None, "") else None,
-            "proj_lo": f("proj_lo") if r.get("proj_lo") not in (None, "") else None,
-            # the SOURCE's own published range, distinct from proj_sd's
-            # disagreement between sources (draftkit/external.py DISPERSION)
-            "proj_band": f("proj_band") if r.get("proj_band") not in (None, "") else None,
-            "n_sources": int(f("n_sources", 0)),
-            # DECISIONS #35: Yahoo default rank (o_rank); None when absent
-            "yahoo_rank": f("yahoo_rank") if r.get("yahoo_rank") not in (None, "") else None,
-        })
+        }
+        row.update(engine_fields(r))
+        out.append(row)
     out.sort(key=lambda p: -p["vorp"])
     return out
 

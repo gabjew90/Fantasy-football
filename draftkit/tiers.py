@@ -1,10 +1,33 @@
 """Phase 3c — gap-based tiers with cliff flags, and the tiers.csv deliverable.
 
-Tier construction: within each position, sort by VORP and look at the drop
-between consecutive players. A drop bigger than (mean + break_z * std) of that
-position's drops starts a new tier. A drop bigger than (mean + cliff_z * std)
-additionally flags the player *above* the gap with cliff_flag=1 — "last chair
-before the music stops."
+Two methods, selected by `tiers.method`.
+
+`gap_sd` (the original, still the default): within each position, sort by VORP
+and look at the drop between CONSECUTIVE players. A drop bigger than
+(mean + break_z * std) of that position's drops starts a new tier; bigger than
+(mean + cliff_z * std) also flags the player above it as a cliff.
+
+`anchor_frac` is the SPREADSHEET'S OWN RULE, adopted rather than reinvented: a
+new tier starts when the drop from the TIER'S TOP PLAYER exceeds a fixed
+fraction of the position's best value (the sheet uses 0.2 of the best VBD).
+
+It exists because gap_sd has two failure modes that compound at any position
+with one dominant player, measured on the 2026 boards:
+
+  * ONE HUGE GAP POISONS THE BAR. Josh Allen sits 211 points clear at QB. That
+    single gap drags the gap std to 39.2, putting the break bar at 32.0, and
+    no gap between two ACTUAL quarterbacks can clear it. Result: 27 of 29 QBs
+    in one tier. TE does the same (25 of 31), and Omnibeta's model board puts
+    76 of 94 receivers in one tier.
+  * STAIRCASE DRIFT. Comparing against the PREVIOUS player lets many small
+    steps accumulate with no bound on a tier's own spread. That QB tier ran
+    from VORP 21.7 down to -27.4.
+
+Measured, widest within-tier spread, gap_sd -> anchor_frac: QB 94 -> 13,
+TE 77 -> 12, WR 52 -> 20, RB 67 -> 29 on the Keefamania sheet board.
+
+CLIFFS ARE UNCHANGED AND SHARED. Only the grouping was defective, and
+mean + cliff_z * std is outlier-inflated in exactly the way a cliff wants.
 """
 
 from __future__ import annotations
@@ -12,29 +35,83 @@ from __future__ import annotations
 import numpy as np
 import polars as pl
 
+TIER_METHODS = ("gap_sd", "anchor_frac")
+
 
 def assign_tiers(
-    values: list[float], break_z: float = 0.5, cliff_z: float = 1.0
+    values: list[float], break_z: float = 0.5, cliff_z: float = 1.0,
+    method: str = "gap_sd", break_frac: float = 0.20,
 ) -> tuple[list[int], list[bool]]:
-    """Pure function over a descending-sorted value list. Returns (tier, cliff)."""
+    """Pure function over a descending-sorted value list. Returns (tier, cliff).
+
+    CLIFFS ARE IDENTICAL IN BOTH METHODS. Only the tier grouping differs, and
+    only the grouping was defective.
+
+    `break_z`/`cliff_z` are z-scores on the gap distribution (gap_sd).
+    `break_frac` is a FRACTION OF THE POSITION'S BEST VALUE (anchor_frac).
+    Separate names because the units differ: reusing break_z would make 0.5
+    mean "half a standard deviation" in one method and "half the best player
+    on the board" in the other.
+    """
+    if method not in TIER_METHODS:
+        raise ValueError(f"tiers.method {method!r} not in {TIER_METHODS}")
     n = len(values)
     if n == 0:
         return [], []
     if n == 1:
         return [1], [False]
     gaps = np.array([values[i] - values[i + 1] for i in range(n - 1)])
+
+    # ---- cliffs: unchanged, shared, and deliberately outlier-sensitive -----
+    # A cliff is one enormous step, so mean + cliff_z * std is inflated in
+    # exactly the way that suits it: when a single gap dwarfs the rest, only
+    # that gap should flag. It reads 1 cliff at QB, which is correct -- Allen
+    # is the only real cliff there.
     mean, std = float(gaps.mean()), float(gaps.std())
-    # near-uniform gaps (std within float noise of zero) -> one tier
     meaningful = std > 1e-9 * max(1.0, abs(mean))
-    break_thresh = mean + break_z * std
     cliff_thresh = mean + cliff_z * std
-    tiers = [1]
-    cliffs = [False] * n
-    for i, g in enumerate(gaps):
-        nxt = tiers[-1] + 1 if (meaningful and g > break_thresh) else tiers[-1]
-        tiers.append(nxt)
-        if meaningful and g > cliff_thresh:
-            cliffs[i] = True  # player above the gap is the cliff edge
+    cliffs = [meaningful and float(g) > cliff_thresh for g in gaps] + [False]
+
+    # ---- tiers -------------------------------------------------------------
+    if method == "gap_sd":
+        break_thresh = mean + break_z * std
+        tiers = [1]
+        for g in gaps:
+            tiers.append(tiers[-1] + 1 if (meaningful and g > break_thresh) else tiers[-1])
+        return tiers, cliffs
+
+    # anchor_frac: the spreadsheet's rule. A new tier starts when the drop from
+    # the TIER'S OWN TOP PLAYER exceeds a fixed fraction of the position's best
+    # value. (The sheet uses 0.2 of the best VBD; same shape, same default.)
+    #
+    # It replaces gap_sd because gap_sd has two failure modes that compound at
+    # any position with one dominant player, measured on the 2026 boards:
+    #
+    #   ONE HUGE GAP POISONS THE BAR. Josh Allen sits 211 points clear at QB.
+    #   That single gap drags the gap std to 39.2, putting the break bar at
+    #   32.0, and no gap between two ACTUAL quarterbacks can clear it. Result:
+    #   27 of 29 QBs in one tier. TE does the same (25 of 31).
+    #
+    #   STAIRCASE DRIFT. Comparing against the PREVIOUS player lets many small
+    #   steps accumulate with no bound on a tier's own spread. That QB tier ran
+    #   from VORP 21.7 down to -27.4.
+    #
+    # Anchoring fixes both: a tier's internal spread is bounded by
+    # construction, and the position's top value is stable against one outlier
+    # in a way the gap std is not.
+    top = float(values[0])
+    if not np.isfinite(top) or top <= 1e-9:
+        # the best player at this position is worth nothing over replacement,
+        # so there is no tier structure to describe
+        return [1] * n, cliffs
+    break_thresh = max(break_frac, 1e-9) * top
+    tiers, anchor = [1], top
+    for v in values[1:]:
+        if anchor - v > break_thresh:
+            tiers.append(tiers[-1] + 1)
+            anchor = v
+        else:
+            tiers.append(tiers[-1])
     return tiers, cliffs
 
 
@@ -67,7 +144,9 @@ def build_tiers(df: pl.DataFrame, cfg) -> pl.DataFrame:
         if grp.height == 0:
             continue
         tiers, cliffs = assign_tiers(
-            grp["vorp"].to_list(), float(tcfg["break_z"]), float(tcfg["cliff_z"])
+            grp["vorp"].to_list(), float(tcfg["break_z"]), float(tcfg["cliff_z"]),
+            str(tcfg.get("method", "gap_sd")),
+            float(tcfg.get("break_frac", 0.20)),
         )
         grp = grp.with_columns(
             pl.Series("tier", tiers, dtype=pl.Int64),

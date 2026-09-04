@@ -1861,10 +1861,18 @@ window.DK = (function () {
     let alt = bestByProjection();
     if (alt && (b.j || 0) >= (alt.proj || 0)) alt = { n: cand.n, p: cand.p, proj: b.j, vorp: b.v };
     const passed = (top || []).filter(x => !(x.n === cand.n && x.p === cand.p)).slice(0, 3)
-      .map(x => ({ n: x.n, p: x.p, v: x.v, why: (x.why || '').slice(0, 120),
+      .map(x => ({ n: x.n, p: x.p, v: x.v, why: x.why || '',
+                   pair: x.pair == null ? null : x.pair,
                    s: x.s == null ? null : x.s, e: x.e == null ? null : x.e }));
+    // The reason is stored WHOLE. It used to be cut at 220 characters, and the
+    // two-pick planner appends its clause LAST (planner.py: "two-pick plan:
+    // pair with the ~N-pt POS expected at your next turn"), so the cost of
+    // PICKING was the one thing systematically truncated out of every recorded
+    // mock while the cost of WAITING always survived. The structured `pair`
+    // math went with it: plan_rows sends it and nothing here kept it.
     const rec = Object.assign({ drafted: cand.n, pos: cand.p, vorp: cand.v, proj: b.j,
-                                why: (cand.why || '').slice(0, 220),
+                                why: cand.why || '',
+                                pair: cand.pair == null ? null : cand.pair,
                                 s: cand.s == null ? null : cand.s, sr: cand.sr == null ? null : cand.sr,
                                 e: cand.e == null ? null : cand.e,
                                 top_proj_available: alt,

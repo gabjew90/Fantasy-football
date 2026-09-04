@@ -37,6 +37,16 @@ guardrails:
 tiers:
   break_z: 0.5
   cliff_z: 1.0
+  # gap_sd is the original: a new tier when the drop from the PREVIOUS
+  # player beats mean + break_z x std of that position's drops. It puts
+  # 27 of 29 QBs in one tier because Allen's 211-point gap sets a bar no
+  # gap between two real quarterbacks can clear (DECISIONS: tier method).
+  # anchor_frac is the spreadsheet's rule: a new tier when the drop from
+  # the TIER'S TOP PLAYER beats break_frac x the position's best value.
+  # Default stays gap_sd until the change is gated. Cliffs are identical
+  # under both.
+  method: gap_sd
+  break_frac: 0.20
   adp_include_within: 180   # 12 teams x 15 rounds
 
 # Standing ADP tilts (v2 item 1.6). Off for Omnibeta: the draft is done and

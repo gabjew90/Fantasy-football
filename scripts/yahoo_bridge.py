@@ -36,6 +36,7 @@ import polars as pl  # noqa: E402
 from draftkit import snake  # noqa: E402
 from draftkit.config import Config  # noqa: E402
 from draftkit.tracker import Tracker, TrackerState  # noqa: E402
+from draftkit.boardrow import engine_fields
 
 
 def norm(n: str) -> str:
@@ -121,43 +122,31 @@ def slots_from_yahoo_roster(roster: list[str]) -> dict[str, int]:
 
 
 def load_players(cfg: Config) -> list[dict]:
+    """The scoped board as engine-facing dicts, for the LIVE Yahoo rig.
+
+    The numeric fields come from draftkit.boardrow. They used to be a second
+    hand-written copy of engine_parity's list and had already fallen behind by
+    one column (proj_band), so the analyst spread that an offline replay acted
+    on was silently dropped in a live room. Presentation fields below are this
+    rig's own -- the HUD renders them and no replay needs them.
+    """
     df = pl.read_csv(cfg.scoped(cfg.root / "tiers.csv"), infer_schema_length=2000)
     out = []
     for i, r in enumerate(df.iter_rows(named=True)):
         pos = (r.get("pos") or "").upper()
         if pos not in ("QB", "RB", "WR", "TE", "K", "DEF"):
             continue
-        out.append({
+        row = {
             "sleeper_id": str(i + 1), "name": r["player"], "pos": pos,
             "team": (r.get("team") or "").upper(),
-            "vorp": float(r.get("vorp") or 0.0),
-            "vorp_flex": float(r.get("vorp_flex") or r.get("vorp") or 0.0),
-            "proj_pts": float(r.get("proj_pts") or 0.0),
-            "adp": float(r["adp"]) if r.get("adp") not in (None, "") else None,
-            "adp_delta": float(r.get("adp_delta") or 0.0),
-            "tier": int(r.get("tier") or 9),
-            "pos_rank": int(r.get("pos_rank") or 99),
-            "value_rank": int(r.get("value_rank") or 999),
-            "cliff_flag": bool(r.get("cliff_flag")),
-            "upside_flag": bool(r.get("upside_flag")),
             "upside_why": r.get("upside_why") or "",
-            "proj_source": r.get("proj_source") or "blend",
-            "backs_up": r.get("backs_up") or "",
             "backs_up_pos": r.get("backs_up_pos") or "",
             "starter_fragility_label": r.get("starter_fragility_label") or "",
             "starter_exp_games": r.get("starter_exp_games"),
             "starter_avail": r.get("starter_avail"),
-            # plan A1/A3: dispersion across projection sources (None when absent)
-            # market-implied projection: floors the planner fallback (DECISIONS #39)
-            "proj_market_pts": float(r["proj_market_pts"]) if r.get("proj_market_pts") not in (None, "") else None,
-            "proj_sd": float(r["proj_sd"]) if r.get("proj_sd") not in (None, "") else None,
-            "proj_hi": float(r["proj_hi"]) if r.get("proj_hi") not in (None, "") else None,
-            "proj_lo": float(r["proj_lo"]) if r.get("proj_lo") not in (None, "") else None,
-            "n_sources": int(r.get("n_sources") or 0),
-            # DECISIONS #35: Yahoo default rank (o_rank); the tracker reads it
-            # as `yrank` for the list-walking autopick component. None when absent.
-            "yahoo_rank": float(r["yahoo_rank"]) if r.get("yahoo_rank") not in (None, "") else None,
-        })
+        }
+        row.update(engine_fields(r))
+        out.append(row)
     out.sort(key=lambda p: -p["vorp"])
     return out
 

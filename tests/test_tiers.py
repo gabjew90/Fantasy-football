@@ -172,3 +172,81 @@ def test_upside_gate_rewards_volume_paths_only():
                      "BoomBust": False}     # raw variance is never rewarded
     whys = dict(zip(out["player"], out["upside_why"]))
     assert whys["Handcuff"] == "contingent volume"
+
+
+# --- tier method: anchor_frac (the spreadsheet's rule) ----------------------
+# gap_sd groups by the drop from the PREVIOUS player, with a bar set from the
+# gap distribution. One dominant player inflates that bar until nothing else
+# can clear it, and nothing bounds a tier's own spread. anchor_frac measures
+# from the TIER'S TOP PLAYER against a fraction of the position's best value.
+
+def _one_star(n=30):
+    """One dominant player, then a long smooth run whose total spread is
+    several times the tier allowance. The shape that breaks gap_sd, and the
+    shape QB actually has on the 2026 board."""
+    return [200.0] + [40.0 - 4.0 * i for i in range(n - 1)]
+
+
+def test_gap_sd_collapses_when_one_player_dominates():
+    """The defect, pinned. Not a hypothetical: this is QB on the 2026 board."""
+    tiers, _ = assign_tiers(_one_star(), method="gap_sd")
+    from collections import Counter
+    sizes = Counter(tiers)
+    assert max(sizes.values()) >= len(tiers) - 2, (
+        "gap_sd is expected to dump nearly everyone into one tier here")
+
+
+def test_anchor_frac_keeps_resolution_under_one_dominant_player():
+    vals = _one_star()
+    tiers, _ = assign_tiers(vals, method="anchor_frac", break_frac=0.20)
+    assert tiers[0] == 1 and tiers[1] == 2, "the dominant player is his own tier"
+    assert max(tiers) >= 3, "the run below him must still be split"
+
+
+def test_anchor_frac_bounds_a_tiers_own_spread():
+    """The property gap_sd cannot offer: a tier cannot drift arbitrarily far
+    from its own best player."""
+    vals = [100.0 - 2.0 * i for i in range(40)]      # a pure staircase
+    frac = 0.15
+    tiers, _ = assign_tiers(vals, method="anchor_frac", break_frac=frac)
+    allowance = frac * vals[0]
+    for t in set(tiers):
+        members = [vals[i] for i, x in enumerate(tiers) if x == t]
+        assert max(members) - min(members) <= allowance + 1e-9
+
+
+def test_cliffs_are_identical_under_both_methods():
+    """Only the grouping was defective. A cliff is one enormous step and the
+    outlier-sensitive bar is right for that, so it is deliberately shared."""
+    for vals in (_one_star(), [100.0 - 2.0 * i for i in range(30)],
+                 [50.0, 49.0, 48.0, 10.0, 9.0, 8.0]):
+        _t1, c1 = assign_tiers(vals, method="gap_sd")
+        _t2, c2 = assign_tiers(vals, method="anchor_frac")
+        assert c1 == c2
+
+
+def test_the_default_is_todays_behaviour_exactly():
+    """Repo rule: a new knob defaults to what the engine already did."""
+    for vals in (_one_star(), [9.0, 8.0, 4.0, 3.9, 1.0], [5.0, 5.0, 5.0]):
+        assert assign_tiers(vals) == assign_tiers(vals, method="gap_sd")
+
+
+def test_an_unknown_method_raises_rather_than_silently_picking_one():
+    import pytest
+    with pytest.raises(ValueError, match="tiers.method"):
+        assign_tiers([3.0, 2.0, 1.0], method="whatever")
+
+
+def test_anchor_frac_degrades_when_the_best_player_is_worthless():
+    """A position whose top player is at or below replacement has no tier
+    structure to describe, and a fraction of a non-positive number is not a
+    threshold."""
+    tiers, _ = assign_tiers([0.0, -5.0, -20.0], method="anchor_frac")
+    assert tiers == [1, 1, 1]
+    tiers, _ = assign_tiers([-1.0, -5.0], method="anchor_frac")
+    assert tiers == [1, 1]
+
+
+def test_anchor_frac_edges():
+    assert assign_tiers([], method="anchor_frac") == ([], [])
+    assert assign_tiers([5.0], method="anchor_frac") == ([1], [False])
