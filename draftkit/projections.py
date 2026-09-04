@@ -296,7 +296,10 @@ def external_projection(cfg, usage: pl.DataFrame, market: pl.DataFrame) -> pl.Da
     # the board is the union of the market table and the projected players:
     # a projected player the market does not rank still exists (no ADP, so
     # the survival sim treats him as always available)
-    disp = [c for c in ("n_sources", "pts17_sd", "pts17_hi", "pts17_lo") if c in lines.columns]
+    # keyed off external.DISPERSION rather than a second hardcoded list: the
+    # two drifted the moment pts17_band was added and the column was silently
+    # selected away three functions after it was computed.
+    disp = [c for c in X.DISPERSION if c in lines.columns]
     ext = lines.select("sleeper_id", pl.col("name").alias("name_ext"), pl.col("pos").alias("pos_ext"),
                        pl.col("team").alias("team_ext"), "pts17", "source", pl.col("as_of").alias("proj_as_of"), *disp)
     df = market.join(ext, on="sleeper_id", how="full", coalesce=True).with_columns(
@@ -323,9 +326,11 @@ def external_projection(cfg, usage: pl.DataFrame, market: pl.DataFrame) -> pl.Da
         df = df.with_columns(
             pl.col("n_sources").fill_null(0).cast(pl.Int64),
             *[(pl.col(src) * pl.col("_games") / X.LINE_GAMES).alias(dst)
-              for src, dst in (("pts17_sd", "proj_sd"), ("pts17_hi", "proj_hi"), ("pts17_lo", "proj_lo"))
+              for src, dst in (("pts17_sd", "proj_sd"), ("pts17_hi", "proj_hi"),
+                               ("pts17_lo", "proj_lo"), ("pts17_band", "proj_band"))
               if src in df.columns],
-        ).drop([c for c in ("pts17_sd", "pts17_hi", "pts17_lo") if c in df.columns])
+        ).drop([c for c in ("pts17_sd", "pts17_hi", "pts17_lo", "pts17_band")
+                if c in df.columns])
     df = df.drop("_games")
 
     # K/DEF: no stat lines in either source; the synthetic ECR-linear
@@ -403,12 +408,13 @@ def _finish(cfg, df: pl.DataFrame) -> pl.DataFrame:
 def _ensure_dispersion(df: pl.DataFrame) -> pl.DataFrame:
     """Plan A1: the dispersion columns exist on BOTH paths (stable csv
     header); a confirmed override or a zeroed player has no source spread."""
-    for c, dt_ in (("n_sources", pl.Int64), ("proj_sd", pl.Float64), ("proj_hi", pl.Float64), ("proj_lo", pl.Float64)):
+    for c, dt_ in (("n_sources", pl.Int64), ("proj_sd", pl.Float64), ("proj_hi", pl.Float64),
+                   ("proj_lo", pl.Float64), ("proj_band", pl.Float64)):
         if c not in df.columns:
             df = df.with_columns(pl.lit(None, dtype=dt_).alias(c))
     blank = (pl.col("proj_source") == "override") | (pl.col("proj_pts").fill_null(0.0) == 0.0)
     return df.with_columns(*[pl.when(blank).then(None).otherwise(pl.col(c)).alias(c)
-                             for c in ("proj_sd", "proj_hi", "proj_lo")])
+                             for c in ("proj_sd", "proj_hi", "proj_lo", "proj_band")])
 
 
 def model_projection(cfg, usage: pl.DataFrame, market: pl.DataFrame) -> pl.DataFrame:

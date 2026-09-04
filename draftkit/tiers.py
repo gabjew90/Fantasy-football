@@ -245,6 +245,9 @@ TIERS_COLUMNS = [
     "proj_sd",
     "proj_hi",
     "proj_lo",
+    # the SOURCE's own stated range (external.DISPERSION), distinct from
+    # proj_sd's disagreement BETWEEN sources
+    "proj_band",
     "non_starter",
     "contingent_of",
     "backs_up_pos",
@@ -269,7 +272,8 @@ def write_tiers_csv(tiers: pl.DataFrame, path) -> None:
         pl.col("wopr").round(3),
         pl.col("tprr").round(3),
         pl.col("yprr").round(2),
-        *[pl.col(c).round(1) for c in ("proj_sd", "proj_hi", "proj_lo") if c in out.columns],
+        *[pl.col(c).round(1) for c in ("proj_sd", "proj_hi", "proj_lo", "proj_band")
+          if c in out.columns],
         *[pl.col(c).round(0) for c in ("yahoo_rank",) if c in out.columns],
     )
     out.write_csv(path)

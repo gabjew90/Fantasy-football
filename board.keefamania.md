@@ -80,17 +80,17 @@
 - 60. Kaelon Black (SFO, bye 8) — 88 pts, VORP -72, ADP 130.0
 - 62. Brian Robinson Jr. (ATL, bye 11) — 88 pts, VORP -72, ADP 118.1
 - 65. Nick Chubb (HOU, bye ?) — 85 pts, VORP -75
-- 71. Jaydon Blue ⛰ (DAL, bye 14) — 81 pts, VORP -80, ADP 148.7
+- 72. Jaydon Blue ⛰ (DAL, bye 14) — 81 pts, VORP -80, ADP 148.7
 
 **Tier 8**
 
-- 93. Isiah Pacheco ⛰ (DET, bye 6) — 66 pts, VORP -94, ADP 125.2
+- 95. Isiah Pacheco ⛰ (DET, bye 6) — 66 pts, VORP -94, ADP 125.2
 
 **Tier 9**
 
-- 111. Alvin Kamara (NOS, bye 8) — 51 pts, VORP -109, ADP 125.8
-- 116. James Conner (ARI, bye 14) — 45 pts, VORP -115, ADP 125.1
-- 117. Ollie Gordon II ⛰ (MIA, bye 6) — 45 pts, VORP -115, ADP 52.0
+- 113. Alvin Kamara (NOS, bye 8) — 51 pts, VORP -109, ADP 125.8
+- 118. James Conner (ARI, bye 14) — 45 pts, VORP -115, ADP 125.1
+- 119. Ollie Gordon II ⛰ (MIA, bye 6) — 45 pts, VORP -115, ADP 52.0
 
 **Tier 10**
 

@@ -69,6 +69,9 @@ def load_board(path: str) -> list[dict]:
             "proj_sd": f("proj_sd") if r.get("proj_sd") not in (None, "") else None,
             "proj_hi": f("proj_hi") if r.get("proj_hi") not in (None, "") else None,
             "proj_lo": f("proj_lo") if r.get("proj_lo") not in (None, "") else None,
+            # the SOURCE's own published range, distinct from proj_sd's
+            # disagreement between sources (draftkit/external.py DISPERSION)
+            "proj_band": f("proj_band") if r.get("proj_band") not in (None, "") else None,
             "n_sources": int(f("n_sources", 0)),
             # DECISIONS #35: Yahoo default rank (o_rank); None when absent
             "yahoo_rank": f("yahoo_rank") if r.get("yahoo_rank") not in (None, "") else None,

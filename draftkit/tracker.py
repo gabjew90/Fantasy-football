@@ -330,14 +330,34 @@ class Tracker:
 
     def _dispersion_for(self, q: dict) -> float | None:
         """The candidate's projection spread when the late-round dispersion
-        objective applies to him: flag on, a spread present, from >= 2 sources.
-        None otherwise (the boolean upside multiplier then applies)."""
+        objective applies to him. None otherwise (the boolean upside
+        multiplier then applies).
+
+        TWO different quantities can supply it, in this order:
+
+          proj_sd    disagreement BETWEEN sources, valid only at n >= 2. One
+                     source has an sd of zero by construction, which is an
+                     absence of evidence and not a narrow forecast, so the
+                     n >= 2 guard stays exactly as it was.
+          proj_band  ONE source's own published range (its high and low lines
+                     either side of its base). A real uncertainty statement
+                     from the forecaster rather than an artifact of how many
+                     feeds happened to be pulled.
+
+        They are not the same thing and are deliberately not summed. Combining
+        them (in quadrature, say) is a modelling claim nobody here has
+        measured, and preferring cross-source disagreement when it exists
+        keeps the arm identical to the one plan A3 was written for.
+        """
         if not getattr(self, "late_round_dispersion", False):
             return None
         sd, n = q.get("proj_sd"), q.get("n_sources") or 0
-        if sd is None or sd != sd or n < 2:
-            return None
-        return float(sd)
+        if sd is not None and sd == sd and n >= 2:
+            return float(sd)
+        band = q.get("proj_band")
+        if band is not None and band == band and float(band) > 0.0:
+            return float(band)
+        return None
 
     def apply_engine_cfg(self, ecfg: dict | None) -> None:
         """Read the `engine:` block onto this tracker; absent keys keep the
@@ -899,10 +919,17 @@ class Tracker:
                     parts.append(f"bargain: still here {d:.0f} picks after he's usually drafted")
                 elif d >= 3:
                     parts.append(f"{d:.0f} picks past his usual draft spot")
-            if rnd >= self.upside_from_round and self._dispersion_for(best) is not None:
-                lo, hi = best.get("proj_lo"), best.get("proj_hi")
-                span = f", {lo:.0f}-{hi:.0f}" if lo is not None and hi is not None else ""
-                parts.append(f"sources disagree by ±{best['proj_sd']:.0f} pts ({best.get('n_sources')} sources{span})")
+            if rnd >= self.upside_from_round and (_d := self._dispersion_for(best)) is not None:
+                n = best.get("n_sources") or 0
+                sd = best.get("proj_sd")
+                if sd is not None and sd == sd and n >= 2:
+                    lo, hi = best.get("proj_lo"), best.get("proj_hi")
+                    span = f", {lo:.0f}-{hi:.0f}" if lo is not None and hi is not None else ""
+                    parts.append(f"sources disagree by ±{sd:.0f} pts ({n} sources{span})")
+                else:
+                    # naming the quantity matters: this is the forecaster's own
+                    # stated range, not two feeds disagreeing
+                    parts.append(f"wide forecast: the source's own range is ±{_d:.0f} pts")
             elif rnd >= self.upside_from_round and best.get("upside_flag"):
                 parts.append(f"UPSIDE play: {best.get('upside_why')}")
             why = " · ".join(parts) or "best value"

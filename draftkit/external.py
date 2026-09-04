@@ -42,6 +42,8 @@ from __future__ import annotations
 
 import datetime as dt
 import json
+import logging
+import re
 from pathlib import Path
 
 import polars as pl
@@ -50,6 +52,8 @@ from .consensus import POSITIONS as SLEEPER_POSITIONS
 from .consensus import ConsensusUnavailable, fetch_position
 from .role import GATED, STARTERS, depth_orders
 from .seasondata import score_projection
+
+log = logging.getLogger("draftkit")
 
 LINE_GAMES = 17.0
 # Each source's own games convention, MEASURED 2026-09-02 (plan A2 pre-check):
@@ -69,7 +73,14 @@ DISCOUNTED_SOURCES = tuple(k for k, v in SOURCE_GAMES_CONVENTION.items() if v["a
 SCHEMA = {"sleeper_id": pl.Utf8, "name": pl.Utf8, "pos": pl.Utf8, "team": pl.Utf8,
           "pts17": pl.Float64, "source": pl.Utf8, "as_of": pl.Utf8, "line": pl.Utf8}
 # what combine() emits: the schema plus the dispersion across sources (plan A1)
-DISPERSION = {"n_sources": pl.Int64, "pts17_sd": pl.Float64, "pts17_hi": pl.Float64, "pts17_lo": pl.Float64}
+# `pts17_sd` is DISAGREEMENT BETWEEN SOURCES and `n_sources` counts them.
+# `pts17_band` is a different quantity: ONE source's own stated uncertainty,
+# from a high/low line it publishes alongside its base line. Conflating the
+# two would make pts17_sd mean two things and would quietly defeat the
+# n_sources >= 2 guard, so the band gets its own column and is null for a
+# source that publishes no range.
+DISPERSION = {"n_sources": pl.Int64, "pts17_sd": pl.Float64, "pts17_hi": pl.Float64,
+              "pts17_lo": pl.Float64, "pts17_band": pl.Float64}
 SCHEMA_COMBINED = {**SCHEMA, **DISPERSION}
 
 # Column layout of each sheet position tab (0-based, after Player, Team).
@@ -87,26 +98,67 @@ def empty() -> pl.DataFrame:
     return pl.DataFrame(schema=SCHEMA)
 
 
-def _frame(rows: list[dict]) -> pl.DataFrame:
-    return pl.DataFrame(rows, schema=SCHEMA) if rows else empty()
+def _frame(rows: list[dict], schema: dict | None = None) -> pl.DataFrame:
+    schema = schema or SCHEMA
+    return pl.DataFrame(rows, schema=schema) if rows else pl.DataFrame(schema=schema)
 
 
 # ------------------------------------------------------------------ sheet
 
-def parse_sheet_tab(rows: list[tuple], pos: str) -> list[dict]:
-    """A player row carries the name; 'high'/'low' rows that follow are the
-    expert extremes and are skipped. Returns [{name, team, line}]."""
+def sheet_bump_column(ws_formulas) -> int | None:
+    """0-based index of the tab's ROOKIE BUMP column, located by formula shape.
+
+    The sheet adds a per-position rookie adjustment to every projection:
+
+        ppg   = raw scored line / 17
+        bump  = IF(rookie, MAX(0, k * (cap - ppg)), 0)     per game
+        total = raw scored line + bump * 17
+
+    with k/cap of 0.258/14.9 at RB and 0.28/12.0 at WR, and no bump at QB or
+    TE. Reading Excel's own cached product (the `= <T> * 17` column) rather
+    than re-deriving it from those constants means a re-published sheet with
+    different coefficients is followed automatically, and there is no second
+    copy of somebody else's numbers to go stale in this repo.
+    """
+    for col in range(1, (ws_formulas.max_column or 0) + 1):
+        v = ws_formulas.cell(row=3, column=col).value
+        if isinstance(v, str) and re.fullmatch(r"=[A-Z]+\d+\*17", v.strip()):
+            return col - 1
+    return None
+
+
+def parse_sheet_tab(rows: list[tuple], pos: str, bump_col: int | None = None) -> list[dict]:
+    """A player row carries the name; the 'high' and 'low' rows that follow
+    are the same expert's own range for him and are ATTACHED to him.
+
+    They used to be skipped. The sheet's own Aggregate tab averages low, base
+    and high, so throwing two of the three away meant the loader never
+    reproduced the number the spreadsheet itself reports.
+
+    Returns [{name, team, line, line_hi, line_lo, bump}]: the extremes are
+    None when absent, and `bump` is the tab's rookie adjustment in season
+    points (0.0 for a veteran, None when the column was not located).
+    """
     cols = SHEET_COLS[pos]
     out: list[dict] = []
     for r in rows[1:]:
         name = r[0] if len(r) > 0 else None
-        # the tabs carry a spacer row whose "name" is a non-breaking space
-        # (read back as "\xa0" or the mojibake "Â\xa0"); it is not a player
-        if not (isinstance(name, str) and name.replace("\xa0", "").replace("Â", "").strip()):
-            continue
+        named = isinstance(name, str) and name.replace("\xa0", "").replace("Â", "").strip()
+        marker = str(r[1]).strip().lower() if len(r) > 1 and isinstance(r[1], str) else ""
         line = {k: float(r[2 + i]) for i, k in enumerate(cols)
                 if len(r) > 2 + i and isinstance(r[2 + i], (int, float))}
-        out.append({"name": name.strip(), "team": r[1] if len(r) > 1 else None, "line": line})
+        if not named:
+            # an unnamed row marked high/low belongs to the player above it;
+            # anything else is the spacer row (a non-breaking space)
+            if marker in ("high", "low") and out and line:
+                out[-1][f"line_{marker[:2]}"] = line
+            continue
+        bump = None
+        if bump_col is not None and len(r) > bump_col:
+            b = r[bump_col]
+            bump = float(b) if isinstance(b, (int, float)) else 0.0
+        out.append({"name": name.strip(), "team": r[1] if len(r) > 1 else None,
+                    "line": line, "line_hi": None, "line_lo": None, "bump": bump})
     return out
 
 
@@ -115,18 +167,47 @@ def from_sheet(path: Path, scoring: dict, index, as_of: str) -> tuple[pl.DataFra
     SleeperIndex (name, pos, team -> sleeper_id). Returns (frame, unmatched)."""
     import openpyxl
     wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
-    rows, unmatched = [], []
+    # a second pass for FORMULAS, only to locate the rookie-bump column: the
+    # values pass cannot see formulas and the column sits at no fixed letter
+    wf = openpyxl.load_workbook(path, read_only=True, data_only=False)
+    rows, unmatched, bumped = [], [], 0
     for pos in SHEET_COLS:
-        for p in parse_sheet_tab(list(wb[pos].iter_rows(values_only=True)), pos):
+        bump_col = sheet_bump_column(wf[pos])
+        for p in parse_sheet_tab(list(wb[pos].iter_rows(values_only=True)), pos, bump_col):
             sid = index.match(p["name"], pos, p["team"])
             if not sid:
                 unmatched.append(f"{p['name']} ({pos})")
                 continue
+            # the sheet's own number is the scored line PLUS its rookie bump;
+            # reading only the line under-projects every rookie by up to 65
+            # points against the spreadsheet this source exists to carry
+            bump = float(p.get("bump") or 0.0)
+            if bump:
+                bumped += 1
+            base = float(score_projection(p["line"], scoring)) + bump
+            # the source's own range, as a one-sigma-equivalent. Population sd
+            # of {low, base, high} -- the SAME estimator combine(mode="mean")
+            # uses across sources, so the two dispersion numbers are at least
+            # on one scale even though they measure different things.
+            # the sheet adds the same bump to low, base and high, so it
+            # shifts the trio without widening it: the band is unchanged
+            trio = [base]
+            for k in ("line_lo", "line_hi"):
+                if p.get(k):
+                    trio.append(float(score_projection(p[k], scoring)) + bump)
+            band = None
+            if len(trio) == 3:
+                mu = sum(trio) / 3.0
+                band = (sum((x - mu) ** 2 for x in trio) / 3.0) ** 0.5
             rows.append({"sleeper_id": str(sid), "name": p["name"], "pos": pos, "team": p["team"],
-                         "pts17": float(score_projection(p["line"], scoring)),
+                         "pts17": base,
                          "source": "fantasypros_sheet", "as_of": as_of,
-                         "line": json.dumps(p["line"], sort_keys=True)})
-    return _frame(rows).unique(subset="sleeper_id", keep="first"), unmatched
+                         "line": json.dumps(p["line"], sort_keys=True),
+                         "pts17_band": band})
+    if bumped:
+        log.info("sheet: rookie bump applied to %d players", bumped)
+    return (_frame(rows, {**SCHEMA, "pts17_band": pl.Float64})
+            .unique(subset="sleeper_id", keep="first"), unmatched)
 
 
 # ---------------------------------------------------------------- sleeper
@@ -199,8 +280,16 @@ def from_espn(season: int, scoring: dict, raw_dir: Path, id_map: pl.DataFrame, i
 # ------------------------------------------------------------------ union
 
 def _with_dispersion_single(f: pl.DataFrame) -> pl.DataFrame:
-    return f.with_columns(pl.lit(1, dtype=pl.Int64).alias("n_sources"), pl.lit(0.0).alias("pts17_sd"),
-                          pl.col("pts17").alias("pts17_hi"), pl.col("pts17").alias("pts17_lo"))
+    """One source: no cross-source disagreement by construction. Its own band
+    is carried through untouched when it published one."""
+    if "pts17_band" not in f.columns:
+        f = f.with_columns(pl.lit(None, dtype=pl.Float64).alias("pts17_band"))
+    f = f.with_columns(pl.lit(1, dtype=pl.Int64).alias("n_sources"), pl.lit(0.0).alias("pts17_sd"),
+                       pl.col("pts17").alias("pts17_hi"), pl.col("pts17").alias("pts17_lo"))
+    # a source that already carries pts17_band leaves it mid-frame, so the
+    # canonical order is restored explicitly rather than depending on which
+    # columns each source happened to supply
+    return f.select(list(SCHEMA_COMBINED))
 
 
 def combine(frames: list[pl.DataFrame], mode: str = "first", scoring: dict | None = None) -> pl.DataFrame:
@@ -246,7 +335,14 @@ def combine(frames: list[pl.DataFrame], mode: str = "first", scoring: dict | Non
                     "source": "mean(" + ",".join(sorted(set(g["source"].to_list()))) + ")",
                     "as_of": max((x for x in g["as_of"].to_list() if x), default=""),
                     "line": json.dumps(mean_line, sort_keys=True),
-                    "n_sources": n, "pts17_sd": sd, "pts17_hi": max(scores), "pts17_lo": min(scores)})
+                    "n_sources": n, "pts17_sd": sd, "pts17_hi": max(scores), "pts17_lo": min(scores),
+                    # the mean of the sources that published a range. Combining
+                    # a within-source band with cross-source disagreement (in
+                    # quadrature, say) is a modelling choice and is NOT made
+                    # here: the two stay separate columns.
+                    "pts17_band": (lambda b: sum(b) / len(b) if b else None)(
+                        [float(x) for x in g["pts17_band"].to_list() if x is not None]
+                        if "pts17_band" in g.columns else [])})
     return pl.DataFrame(out, schema=SCHEMA_COMBINED)
 
 
