@@ -271,7 +271,14 @@ def test_replacement_mode_gives_every_live_position_a_key():
 
 
 def test_the_default_reproduces_todays_behaviour():
+    """A GOLDEN check, not `f(x) == f(x)`. The previous body compared two
+    calls of a pure function and could not fail; it was named as a guard on
+    the fallback-floor no-op and guarded nothing. These are the board_min
+    values on the shared BOARD fixture with an empty roster, pinned so that
+    any change to the default arm fails here by name."""
     assert Tracker.fallback_floor == "board_min"
     t = make_tracker(BOARD, [])
     assert not hasattr(t, "_fallback_floor_override")
-    assert t._fallback_points(t.my_needs()) == t._fallback_points(t.my_needs())
+    got = {k: round(v, 3) for k, v in t._fallback_points(t.my_needs()).items()}
+    assert got == {"DEF": 104.0, "K": 105.0, "QB": 118.0,
+                   "RB": 102.1, "TE": 102.2, "WR": 102.3}, got

@@ -90,22 +90,35 @@ def replay(board, log_picks, my_slot, teams, rounds, slot_markets, slots=None, o
     return chosen
 
 
-def parse_knob(v: str):
-    """One `--set knob=value` value.
+def parse_knob(k: str, v: str):
+    """One `--set knob=value` pair, cast the way the engine will read it.
 
-    The bool branch is not decoration. Every boolean knob is read through
-    `bool(getattr(...))`, and `bool("false")` is True -- so before this,
-    `--set per_position_deadline=false` turned the knob ON and the A/B
-    recorded in DECISIONS was the opposite arm from the one intended.
-    scripts/bridge_server.py has always parsed bools; this is the harness
-    catching up, and scripts/knob_churn.py imports it so there is one parser.
+    The cast comes from `Tracker.ENGINE_KNOBS`, the same (name, cast) table
+    `apply_engine_cfg` uses, so a knob typed here has the type it has when
+    it arrives from config.yaml. Two failures this replaces, both found the
+    same day:
 
-    Numerics stay `float` exactly as before, so every `--set` already cited in
-    DECISIONS keeps the value it had.
+      * every boolean knob is read through `bool(...)`, and `bool("false")`
+        is True -- so `--set per_position_deadline=false` turned the knob ON
+        and the A/B recorded in DECISIONS was the opposite arm;
+      * the first fix cast every numeric to float, so `--set sims=200` handed
+        `range(200.0)` to the survival sim, which raised on every one of our
+        picks; replay() caught it and substituted the naive top-VORP fallback,
+        and the scoreboard printed numbers for an arm that never ran.
+
+    scripts/bridge_server.py casts through the Tracker class attribute and
+    has always been right; knob_churn.py imports this so there is one parser.
+    A name outside the table (the `pool_size` alias, a harness-only attribute)
+    falls back to bool / float / str.
     """
+    from draftkit.tracker import Tracker
+
     low = v.strip().lower()
-    if low in ("true", "false"):
-        return low == "true"
+    cast = dict(Tracker.ENGINE_KNOBS).get(k)
+    if cast is bool or (cast is None and low in ("true", "false", "yes", "no")):
+        return low in ("1", "true", "yes")
+    if cast is not None:
+        return cast(v)
     return float(v) if v.replace(".", "", 1).replace("-", "", 1).isdigit() else v
 
 
@@ -138,7 +151,7 @@ def main() -> None:
     overrides = {}
     for kv in a.set:
         k, v = kv.split("=", 1)
-        overrides[k] = parse_knob(v)
+        overrides[k] = parse_knob(k, v)
     league_slots = None
     if a.league:
         from draftkit.config import Config

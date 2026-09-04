@@ -9,7 +9,7 @@ Everything below is executed, not built. If a step is red, the layer below still
 every mock drafted with). The alternative, `external` (FantasyPros sheet +
 Sleeper stat lines), was put through the pre-registered quality gate on
 2026-09-02 and failed both halves: its history stand-in projected 5% worse
-on error and drafted lineups 1.6% worse on actual points (DECISIONS #23,
+on error and drafted lineups 1.2% worse on actual points (DECISIONS #23,
 reports/source_gate.md). Do not flip it on draft morning. The sheet's
 numbers stay visible on the board as `proj_consensus_pts` for the eye.
 

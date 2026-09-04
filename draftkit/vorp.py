@@ -67,10 +67,12 @@ def add_vorp(df: pl.DataFrame, baselines: dict[str, int]) -> pl.DataFrame:
     # would otherwise put in that slot.
     #
     # Getting this wrong overvalues every flex-bound tight end by the gap
-    # between the two baselines, which on the Keefamania board is 32.8 points
-    # flat: Brock Bowers scores +61.9 as a tight end but only +29.1 as a flex
-    # starter, and Colston Loveland goes from +19.4 to -13.4 -- correctly, he
-    # should not start over an RB24. That single error is what made the engine
+    # between the two baselines. That gap is flex_repl minus the position's
+    # own replacement, so it is PER POSITION and zero for whichever position
+    # sets the flex baseline: on the 2026-09-04 Keefamania board TE 38.0,
+    # WR 18.1, RB 0.0. Brock Bowers scores +61.9 as a tight end but only
+    # +29.1 as a flex starter, and Colston Loveland goes from +19.4 to -13.4
+    # -- correctly, he should not start over an RB24. That single error is what made the engine
     # recommend two elite TEs, and a hand-written "TE2 must beat the best flex
     # alternative" rule in the browser driver was papering over it.
     #

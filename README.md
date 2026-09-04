@@ -58,7 +58,7 @@ in-page driver; picks through Yahoo's own client action, store-verified).
 
 ## Verified league facts (2026-08-19, re-checkable via `verify`)
 
-- Snake, 15 rounds, 120s timer, 12 teams, no third-round reversal, CPU
+- Snake, 15 rounds, 60s timer, 12 teams, no third-round reversal, CPU
   autopick on timeout.
 - Scoring: 1.0/rec, 0.04/pass yd, 4 pass TD, −1 INT, 0.1 rush/rec yd,
   6 rush/rec TD, −2 fumble lost. No TE premium.
@@ -84,10 +84,16 @@ Where I deviated, and why:
    unmatched count across 505 ECR rows: 2 (both irrelevant depth players).
 3. **Projection = blend, with the model share configurable.** Pure
    2025-production projections can't see rookies, team changes, or injuries;
-   pure market projections have no edge. Default: 55% model (2025 league-scored
-   PPG, shrunk by games played, adjusted by a within-position regression on
-   WOPR + high-value touches) + 45% market-implied (per-position log-curve fit
-   of projection vs. ECR). Players with no 2025 data are 100% market-implied
+   pure market projections have no edge. The model share (alpha) is set by
+   player type, not one number: 0.65 for stable veterans (12+ games, same
+   team), 0.40 for new-team players and rookies, 0.55 otherwise, and WR is
+   capped at 0.20 because two seasons of backtest made every step above zero
+   worse there. The model half is 2025 league-scored PPG, shrunk by games
+   played, adjusted by a within-position regression on WOPR + high-value
+   touches, then role-gated (a depth-chart backup the market also ranks as a
+   backup is scaled to his expected share of starting weeks). The market half
+   is a per-position log-curve fit of projection vs. ECR. Players with no
+   2025 data are 100% market-implied
    and labeled `proj_source=market_implied` in tiers.csv — treat those tiers
    as market consensus, not model insight. K/DEF are always market-implied by
    ECR rank with a deliberately flat spread (they're near-fungible; the small
@@ -115,7 +121,7 @@ Where I deviated, and why:
 - TE and QB cliffs are steep this year: after the top-2 TEs the position falls
   off hard (tier 3 is a 40+ point drop), while QB tier 3 is deep — the model
   consistently waits on QB into rounds 7–9 and it costs almost nothing.
-- The 120s clock + CPU autopick means the tracker's precomputed
+- The 60s clock + CPU autopick means the tracker's precomputed
   recommendations matter: everything renders instantly from tiers.csv; there
   are no network or model calls in the on-clock path.
 

@@ -52,7 +52,7 @@ def main() -> None:
     overrides = {}
     for kv in a.set:
         k, v = kv.split("=", 1)
-        overrides[k] = parse_knob(v)
+        overrides[k] = parse_knob(k, v)
     if not overrides:
         ap.error("--set is required: with no override both arms are identical")
 

@@ -65,9 +65,10 @@ def test_flex_bound_players_are_valued_against_the_flex_baseline():
     otherwise put there, not with replacement at his own position.
 
     Scoring him against his positional baseline overvalues every flex-bound
-    tight end by the gap between the two. On the real Keefamania board that
-    gap is 32.8 points: Bowers reads +61.9 as a tight end but contributes
-    +29.1 as a flex starter. That error is what produced the double-elite-TE
+    tight end by the gap between the two. That gap is per position (zero for
+    whichever position sets the flex baseline); on the 2026-09-04 Keefamania
+    board it is TE 38.0, WR 18.1, RB 0.0. Bowers reads +61.9 as a tight end
+    but contributes +29.1 as a flex starter. That error is what produced the double-elite-TE
     build the engine kept recommending.
     """
     df = pl.DataFrame(

@@ -33,10 +33,13 @@ def slot_vorp(p: dict, needs: dict) -> float:
     A player headed for the FLEX competes with the RB/WR you would otherwise
     start there, so he is worth `vorp_flex` instead.
 
-    On the Keefamania board the two differ by 32.8 points for every
-    flex-eligible player, which is what made the engine value a second elite
-    tight end at +61.9 when his real marginal contribution was +29.1 -- and
-    what produced the double-TE build.
+    The gap between the two is PER POSITION, not one constant: vorp_flex
+    measures against the highest flex-eligible replacement, so the gap is
+    zero for whichever position sets that baseline and largest for the
+    shallowest. On the 2026-09-04 Keefamania board it is TE 38.0, WR 18.1,
+    RB 0.0. That TE gap is what made the engine value a second elite tight
+    end at +61.9 when his real marginal contribution was +29.1 -- and what
+    produced the double-TE build.
 
     Falls back to `vorp` when the column is absent, so older boards still load.
     """

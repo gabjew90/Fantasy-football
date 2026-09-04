@@ -40,9 +40,13 @@ def calibrate(p: float, shrink: float) -> float:
     """Empirical calibration map (v2 item 1.1), fitted to the Omnibeta CLV
     retro: raw 96% -> 75%, 82% -> 68%, 45% -> 50% (n=67). A single shrink
     toward 0.5 fits all three buckets: calibrated = 0.5 + (p - 0.5) * shrink.
-    (Plan B1 note: that n=67 was scored against the wrong horizon; the map
-    is retained provisionally until the B7 refit.) shrink == 1.0 returns p
-    exactly, so raw and calibrated are identical, not identical-to-1e-17."""
+    RETIRED (DECISIONS #25/#26): that n=67 was scored against the wrong
+    horizon, and the B7 refit found the raw simulation calibrated from 50%
+    up. survival_shrink is pinned at 1.0 in config.yaml and on the Tracker
+    class, and simulate_survival warns once for any other value. The function
+    stays so that old logs and the knob table still load. shrink == 1.0
+    returns p exactly, so raw and calibrated are identical, not
+    identical-to-1e-17."""
     if shrink == 1.0:
         return float(p)
     return 0.5 + (p - 0.5) * shrink

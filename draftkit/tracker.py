@@ -242,7 +242,7 @@ class Tracker:
 
     def poll(self) -> bool:
         """Fetch picks; returns True if the pick list changed. Retries with backoff."""
-        if getattr(self, "local", False):
+        if self.local:
             picks = self.source.picks()
             # identity, not count: undo+re-add keeps the length but changes
             # the board (code review 2026-08-31)
@@ -420,7 +420,7 @@ class Tracker:
         measured, and preferring cross-source disagreement when it exists
         keeps the arm identical to the one plan A3 was written for.
         """
-        if not getattr(self, "late_round_dispersion", False):
+        if not self.late_round_dispersion:
             return None
         sd, n = q.get("proj_sd"), q.get("n_sources") or 0
         if sd is not None and sd == sd and n >= 2:
@@ -453,7 +453,7 @@ class Tracker:
                 "user_id": self.slot_to_user.get(slot),
                 # plan B5: a Yahoo manager flagged away is drafted by Yahoo's
                 # autopick -- rank-following, starters first, no reaches
-                "autopick": slot in (getattr(self, "away_slots", None) or ()),
+                "autopick": slot in (self.away_slots or ()),
             })
         return out
 
@@ -487,7 +487,7 @@ class Tracker:
         out: list[tuple[str, tuple[str, ...], str]] = [
             (pos, (pos,), "vorp") for pos in POS_ORDER if needs.get(pos, 0) > 0
         ]
-        if not getattr(self, "slot_markets", True):
+        if not self.slot_markets:
             # the A/B control arm is PER-POSITION urgency: a FLEX-eligible
             # position with only the flex open still gets its own positional
             # row (review 2026-09-02: the off arm used to build the FLEX row
@@ -555,7 +555,7 @@ class Tracker:
         # available can settle it -- churn is not a verdict, and lineup points
         # cannot resolve below ~3% (DECISIONS #41). So it ships OFF and stays
         # off. See DECISIONS for what would unblock it.
-        per_pos = bool(getattr(self, "per_position_deadline", False))
+        per_pos = bool(self.per_position_deadline)
         shared_deadline = _deadline(sum(needs.get(k, 0) for k in
                                         ("QB", "RB", "WR", "TE", "FLEX", "K", "DEF")))
 
@@ -604,7 +604,7 @@ class Tracker:
         # silently. (bench.waiver_ppw was rejected for this fix precisely
         # because it speaks points-per-week over FANTASY_WEEKS=17 while
         # projections.games is 16.)
-        floor_mode = str(getattr(self, "fallback_floor", "board_min"))
+        floor_mode = str(self.fallback_floor)
         repl_pts = self._replacement_points() if floor_mode == "replacement" else {}
 
         out: dict[str, float] = {}
@@ -712,7 +712,7 @@ class Tracker:
 
         # draft-time k: hedges which undrafted player is really best, not
         # whether a claim would be won (draftkit/baselines.py draft_k)
-        k = int(getattr(self, "draft_k", None) or 3)
+        k = int(self.draft_k or 3)
         last_pick = self.teams * self.rounds
         from .bench import predicted_undrafted
         rem_all = [p for p in self.remaining() if p.get("proj_source") != "no_market"]
@@ -996,8 +996,8 @@ class Tracker:
             # truncation so a gated player ranked 4th+ by median can surface
             # (code review 2026-08-30).
             if rnd >= self.upside_from_round:
-                lam = float(getattr(self, "dispersion_lambda", 0.5))
-                relative = bool(getattr(self, "upside_boost_relative", False))
+                lam = float(self.dispersion_lambda)
+                relative = bool(self.upside_boost_relative)
                 # The market's own floor, taken ONCE before the sort so the key
                 # is stable. A boost measured FROM it is a difference, so a
                 # baseline shift cancels -- the same reason urgency is immune.
@@ -1012,9 +1012,9 @@ class Tracker:
                     # A multiplier on a NEGATIVE market value pushed the flagged
                     # player DOWN, the opposite of the intent (review
                     # 2026-09-02). abs() fixed the sign but is NON-LINEAR, so a
-                    # shift in the market's baseline (vorp vs vorp_flex, which
-                    # differ by a constant 30.3 pts here) reorders the
-                    # shortlist. Measuring the span from the market floor is a
+                    # shift in the market's baseline (vorp vs vorp_flex, whose
+                    # gap is per position: TE 38.0, WR 18.1, RB 0.0 on the
+                    # 2026-09-04 Keefamania board) reorders the shortlist. Measuring the span from the market floor is a
                     # difference and cancels instead. Knob so the A/B runs.
                     span = (_mv(q) - _floor) if _rel else abs(_mv(q))
                     return _mv(q) + (self.upside_mult - 1.0) * span
@@ -1164,7 +1164,7 @@ class Tracker:
                 # whenever insurance out-scores urgency, which for a big-VORP
                 # backup QB is most of the time (caught by the regression test
                 # below, which is why it exists).
-                prefer_bench = bool(getattr(self, "bench_row_wins_dedupe", False))
+                prefer_bench = bool(self.bench_row_wins_dedupe)
                 by_id: dict[str, list] = {}
                 for c in cands:
                     by_id.setdefault(c[2]["sleeper_id"], []).append(c)
