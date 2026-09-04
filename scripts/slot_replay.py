@@ -90,6 +90,25 @@ def replay(board, log_picks, my_slot, teams, rounds, slot_markets, slots=None, o
     return chosen
 
 
+def parse_knob(v: str):
+    """One `--set knob=value` value.
+
+    The bool branch is not decoration. Every boolean knob is read through
+    `bool(getattr(...))`, and `bool("false")` is True -- so before this,
+    `--set per_position_deadline=false` turned the knob ON and the A/B
+    recorded in DECISIONS was the opposite arm from the one intended.
+    scripts/bridge_server.py has always parsed bools; this is the harness
+    catching up, and scripts/knob_churn.py imports it so there is one parser.
+
+    Numerics stay `float` exactly as before, so every `--set` already cited in
+    DECISIONS keeps the value it had.
+    """
+    low = v.strip().lower()
+    if low in ("true", "false"):
+        return low == "true"
+    return float(v) if v.replace(".", "", 1).replace("-", "", 1).isdigit() else v
+
+
 def load_log(draft_id: str) -> list[dict]:
     """The pick log for a draft, in pick order. Shared with knob_churn.py so
     the two replays cannot drift on how a log is read."""
@@ -119,7 +138,7 @@ def main() -> None:
     overrides = {}
     for kv in a.set:
         k, v = kv.split("=", 1)
-        overrides[k] = float(v) if v.replace(".", "", 1).replace("-", "", 1).isdigit() else v
+        overrides[k] = parse_knob(v)
     league_slots = None
     if a.league:
         from draftkit.config import Config

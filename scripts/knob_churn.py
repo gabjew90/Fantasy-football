@@ -35,19 +35,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import engine_parity as EP  # noqa: E402
-from slot_replay import load_log, replay  # noqa: E402
-
-
-def parse_value(v: str):
-    """Knob values arrive as strings. Booleans and the string-valued
-    fallback_floor both matter here, so this is not float() with a fallback."""
-    low = v.strip().lower()
-    if low in ("true", "false"):
-        return low == "true"
-    try:
-        return int(v) if v.strip().lstrip("-").isdigit() else float(v)
-    except ValueError:
-        return v
+from slot_replay import load_log, parse_knob, replay  # noqa: E402
 
 
 def main() -> None:
@@ -64,7 +52,7 @@ def main() -> None:
     overrides = {}
     for kv in a.set:
         k, v = kv.split("=", 1)
-        overrides[k] = parse_value(v)
+        overrides[k] = parse_knob(v)
     if not overrides:
         ap.error("--set is required: with no override both arms are identical")
 

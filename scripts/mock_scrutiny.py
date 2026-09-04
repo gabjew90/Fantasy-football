@@ -38,6 +38,11 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from draftkit.snake import pick_to_round_slot  # noqa: E402
+# The prefix the engine actually writes, not a copy of it. A hardcoded
+# "bench insurance" here would keep matching until the day the prefix changed,
+# and then this report would silently re-classify every insurance row as a
+# market row while the Python tests stayed green.
+from draftkit.tracker import BENCH_WHY_PREFIX  # noqa: E402
 
 sys.path.insert(0, str(ROOT / "scripts"))
 from mock_common import HOW_THE_ENGINE_THINKS, header_line, load_trail, pt_lines, report_stem, to_pt  # noqa: E402
@@ -85,7 +90,7 @@ def plain_english(r: dict) -> str:
     elif why.startswith("safe to wait"):
         parts.append(f"Took {name} ({pos}): nothing on the board was urgent, so the engine took the most valuable player who fills an open slot"
                      + (f" ({pct} to survive, but nobody better was worth waiting for)" if pct else "") + ".")
-    elif why.startswith("bench insurance"):
+    elif why.startswith(BENCH_WHY_PREFIX.rstrip(":")):
         m2 = re.search(r"covers (\d+) (\w+) starters?[^~]*~([\d.]+) wks[^+]*\+([\d.]+)/wk[^(]*(?:\(([^)]+)\))?[^0-9]*(\d+) pts", why)
         if m2:
             parts.append(f"Lineup already full, so {name} ({pos}) is insurance: covers {m2.group(1)} {m2.group(2)} starter(s) for about {m2.group(3)} weeks a season at +{m2.group(4)} points a week over the waiver wire"

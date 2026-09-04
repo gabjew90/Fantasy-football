@@ -4,10 +4,7 @@
  "teams": 10,
  "rounds": 15,
  "board": "tiers.keefamania.csv",
- "sets": {
-  "autopick_list_prob": 0.3,
-  "autopick_need_damp": 0.45
- },
+ "sets": {},
  "away_states": 139,
  "sidecar": true,
  "unmatched": [
@@ -23,437 +20,72 @@
  ],
  "ambiguous": [],
  "per_slot": {
-  "current": {
-   "1": {
-    "points": 1886.0,
-    "shape": "QB2 RB6 WR4 TE1 K1 DEF1",
-    "roster": [
-     "Christian McCaffrey",
-     "Jahmyr Gibbs",
-     "Drake London",
-     "Ashton Jeanty",
-     "A.J. Brown",
-     "Jalen Hurts",
-     "George Kittle",
-     "Mike Washington Jr.",
-     "Tetairoa McMillan",
-     "Kenny Gainwell",
-     "Patrick Mahomes II",
-     "Ladd McConkey",
-     "Jadarian Price",
-     "Houston Texans",
-     "Cam Little"
-    ]
-   },
-   "2": {
-    "points": 1921.6999999999998,
-    "shape": "QB2 RB6 WR4 TE1 K1 DEF1",
-    "roster": [
-     "Christian McCaffrey",
-     "Drake London",
-     "Chris Olave",
-     "Bijan Robinson",
-     "Brock Bowers",
-     "Jalen Hurts",
-     "Omarion Hampton",
-     "Cam Skattebo",
-     "Garrett Wilson",
-     "Kenny Gainwell",
-     "Patrick Mahomes II",
-     "Emeka Egbuka",
-     "Tony Pollard",
-     "Houston Texans",
-     "Cam Little"
-    ]
-   },
-   "3": {
-    "points": 1862.8999999999999,
-    "shape": "QB2 RB6 WR4 TE1 K1 DEF1",
-    "roster": [
-     "Christian McCaffrey",
-     "Ja'Marr Chase",
-     "Derrick Henry",
-     "Kyren Williams",
-     "Zay Flowers",
-     "Jalen Hurts",
-     "George Kittle",
-     "Blake Corum",
-     "David Montgomery",
-     "DJ Moore",
-     "Patrick Mahomes II",
-     "Courtland Sutton",
-     "Aaron Jones Sr.",
-     "Houston Texans",
-     "Cameron Dicker"
-    ]
-   },
-   "4": {
-    "points": 1805.6,
-    "shape": "QB2 RB5 WR4 TE2 K1 DEF1",
-    "roster": [
-     "Christian McCaffrey",
-     "Derrick Henry",
-     "Drake London",
-     "Nico Collins",
-     "Drake Maye",
-     "George Kittle",
-     "Kenneth Walker III",
-     "RJ Harvey",
-     "Jaylen Waddle",
-     "Kenny Gainwell",
-     "Colston Loveland",
-     "Jayden Daniels",
-     "Terry McLaurin",
-     "Houston Texans",
-     "Eddy Pineiro"
-    ]
-   },
-   "5": {
-    "points": 1746.2000000000003,
-    "shape": "QB2 RB6 WR4 TE1 K1 DEF1",
-    "roster": [
-     "Jonathan Taylor",
-     "Chase Brown",
-     "Drake London",
-     "Rashee Rice",
-     "Drake Maye",
-     "George Kittle",
-     "Rhamondre Stevenson",
-     "TreVeyon Henderson",
-     "RJ Harvey",
-     "Courtland Sutton",
-     "Patrick Mahomes II",
-     "Jonathon Brooks",
-     "Michael Pittman Jr.",
-     "Houston Texans",
-     "Eddy Pineiro"
-    ]
-   },
-   "6": {
-    "points": 1727.0000000000002,
-    "shape": "QB2 RB6 WR4 TE1 K1 DEF1",
-    "roster": [
-     "Puka Nacua",
-     "Trey McBride",
-     "Chris Olave",
-     "Travis Etienne Jr.",
-     "Drake Maye",
-     "Jaylen Warren",
-     "Rhamondre Stevenson",
-     "Rico Dowdle",
-     "RJ Harvey",
-     "Wan'Dale Robinson",
-     "Patrick Mahomes II",
-     "Kenny Gainwell",
-     "Michael Pittman Jr.",
-     "Houston Texans",
-     "Evan McPherson"
-    ]
-   },
-   "7": {
-    "points": 1725.4,
-    "shape": "QB2 RB6 WR4 TE1 K1 DEF1",
-    "roster": [
-     "Jaxon Smith-Njigba",
-     "De'Von Achane",
-     "George Pickens",
-     "Travis Etienne Jr.",
-     "Tyler Warren",
-     "Jalen Hurts",
-     "Jeremiyah Love",
-     "Tyler Allgeier",
-     "Malik Nabers",
-     "Kenny Gainwell",
-     "Caleb Williams",
-     "Mike Evans",
-     "Woody Marks",
-     "Houston Texans",
-     "Tyler Loop"
-    ]
-   },
-   "8": {
-    "points": 1742.1000000000001,
-    "shape": "QB2 RB6 WR4 TE1 K1 DEF1",
-    "roster": [
-     "Amon-Ra St. Brown",
-     "De'Von Achane",
-     "George Pickens",
-     "Saquon Barkley",
-     "Josh Allen",
-     "George Kittle",
-     "Quinshon Judkins",
-     "RJ Harvey",
-     "Tee Higgins",
-     "Kenny Gainwell",
-     "Jared Goff",
-     "Jameson Williams",
-     "J.K. Dobbins",
-     "Houston Texans",
-     "Cairo Santos"
-    ]
-   },
-   "9": {
-    "points": 1793.1,
-    "shape": "QB2 RB6 WR4 TE1 K1 DEF1",
-    "roster": [
-     "Amon-Ra St. Brown",
-     "De'Von Achane",
-     "Justin Jefferson",
-     "James Cook III",
-     "George Kittle",
-     "Jalen Hurts",
-     "Javonte Williams",
-     "Bucky Irving",
-     "DeVonta Smith",
-     "Kenny Gainwell",
-     "Dak Prescott",
-     "Davante Adams",
-     "Kyle Monangai",
-     "Houston Texans",
-     "Brandon Aubrey"
-    ]
-   },
-   "10": {
-    "points": 1742.5,
-    "shape": "QB2 RB6 WR3 TE2 K1 DEF1",
-    "roster": [
-     "De'Von Achane",
-     "Amon-Ra St. Brown",
-     "CeeDee Lamb",
-     "Travis Etienne Jr.",
-     "George Kittle",
-     "Jalen Hurts",
-     "D'Andre Swift",
-     "Kyle Monangai",
-     "Breece Hall",
-     "Luther Burden III",
-     "Kyle Pitts Sr.",
-     "Trevor Lawrence",
-     "Woody Marks",
-     "Houston Texans",
-     "Ka'imi Fairbairn"
-    ]
-   }
-  },
   "fitted": {
    "1": {
-    "points": 1886.0,
+    "points": 1871.3,
     "shape": "QB2 RB6 WR4 TE1 K1 DEF1",
     "roster": [
      "Christian McCaffrey",
      "Jahmyr Gibbs",
-     "Drake London",
-     "Ashton Jeanty",
+     "Kyren Williams",
      "A.J. Brown",
-     "Jalen Hurts",
-     "George Kittle",
-     "Mike Washington Jr.",
+     "Drake Maye",
      "Tetairoa McMillan",
-     "Kenny Gainwell",
-     "Patrick Mahomes II",
+     "George Kittle",
+     "Ashton Jeanty",
      "Ladd McConkey",
+     "Patrick Mahomes II",
+     "Kenny Gainwell",
+     "Christian Watson",
      "Jadarian Price",
      "Houston Texans",
      "Cam Little"
     ]
    },
-   "2": {
-    "points": 1905.4999999999998,
-    "shape": "QB2 RB6 WR4 TE1 K1 DEF1",
-    "roster": [
-     "Christian McCaffrey",
-     "Drake London",
-     "Bijan Robinson",
-     "Brock Bowers",
-     "Omarion Hampton",
-     "Garrett Wilson",
-     "Jalen Hurts",
-     "Cam Skattebo",
-     "Emeka Egbuka",
-     "Kenny Gainwell",
-     "Patrick Mahomes II",
-     "Rome Odunze",
-     "Tony Pollard",
-     "Houston Texans",
-     "Cam Little"
-    ]
-   },
-   "3": {
-    "points": 1862.8999999999999,
-    "shape": "QB2 RB6 WR4 TE1 K1 DEF1",
-    "roster": [
-     "Christian McCaffrey",
-     "Ja'Marr Chase",
-     "Derrick Henry",
-     "Kyren Williams",
-     "Zay Flowers",
-     "Jalen Hurts",
-     "George Kittle",
-     "Blake Corum",
-     "David Montgomery",
-     "DJ Moore",
-     "Patrick Mahomes II",
-     "Courtland Sutton",
-     "Aaron Jones Sr.",
-     "Houston Texans",
-     "Cameron Dicker"
-    ]
-   },
    "4": {
-    "points": 1805.6,
+    "points": 1811.8,
     "shape": "QB2 RB5 WR4 TE2 K1 DEF1",
     "roster": [
      "Christian McCaffrey",
      "Derrick Henry",
      "Drake London",
-     "Nico Collins",
+     "Cam Skattebo",
      "Drake Maye",
+     "Nico Collins",
      "George Kittle",
-     "Kenneth Walker III",
-     "RJ Harvey",
+     "Tyrone Tracy Jr.",
      "Jaylen Waddle",
-     "Kenny Gainwell",
+     "Kenneth Walker III",
+     "Patrick Mahomes II",
      "Colston Loveland",
-     "Jayden Daniels",
      "Terry McLaurin",
      "Houston Texans",
      "Eddy Pineiro"
     ]
    },
-   "5": {
-    "points": 1746.2000000000003,
-    "shape": "QB2 RB6 WR4 TE1 K1 DEF1",
-    "roster": [
-     "Jonathan Taylor",
-     "Chase Brown",
-     "Drake London",
-     "Rashee Rice",
-     "Drake Maye",
-     "George Kittle",
-     "Rhamondre Stevenson",
-     "TreVeyon Henderson",
-     "RJ Harvey",
-     "Courtland Sutton",
-     "Patrick Mahomes II",
-     "Jonathon Brooks",
-     "Michael Pittman Jr.",
-     "Houston Texans",
-     "Eddy Pineiro"
-    ]
-   },
-   "6": {
-    "points": 1727.0000000000002,
-    "shape": "QB2 RB6 WR4 TE1 K1 DEF1",
-    "roster": [
-     "Puka Nacua",
-     "Trey McBride",
-     "Chris Olave",
-     "Travis Etienne Jr.",
-     "Drake Maye",
-     "Jaylen Warren",
-     "Rhamondre Stevenson",
-     "Rico Dowdle",
-     "RJ Harvey",
-     "Wan'Dale Robinson",
-     "Patrick Mahomes II",
-     "Kenny Gainwell",
-     "Michael Pittman Jr.",
-     "Houston Texans",
-     "Evan McPherson"
-    ]
-   },
    "7": {
-    "points": 1725.4,
+    "points": 1733.9,
     "shape": "QB2 RB6 WR4 TE1 K1 DEF1",
     "roster": [
      "Jaxon Smith-Njigba",
      "De'Von Achane",
-     "George Pickens",
-     "Travis Etienne Jr.",
-     "Tyler Warren",
+     "Javonte Williams",
+     "Rashee Rice",
      "Jalen Hurts",
+     "Tyler Warren",
      "Jeremiyah Love",
      "Tyler Allgeier",
      "Malik Nabers",
+     "Patrick Mahomes II",
      "Kenny Gainwell",
-     "Caleb Williams",
      "Mike Evans",
      "Woody Marks",
      "Houston Texans",
      "Tyler Loop"
-    ]
-   },
-   "8": {
-    "points": 1742.1000000000001,
-    "shape": "QB2 RB6 WR4 TE1 K1 DEF1",
-    "roster": [
-     "Amon-Ra St. Brown",
-     "De'Von Achane",
-     "George Pickens",
-     "Saquon Barkley",
-     "Josh Allen",
-     "George Kittle",
-     "Quinshon Judkins",
-     "RJ Harvey",
-     "Tee Higgins",
-     "Kenny Gainwell",
-     "Jared Goff",
-     "Jameson Williams",
-     "J.K. Dobbins",
-     "Houston Texans",
-     "Cairo Santos"
-    ]
-   },
-   "9": {
-    "points": 1793.1,
-    "shape": "QB2 RB6 WR4 TE1 K1 DEF1",
-    "roster": [
-     "Amon-Ra St. Brown",
-     "De'Von Achane",
-     "Justin Jefferson",
-     "James Cook III",
-     "George Kittle",
-     "Jalen Hurts",
-     "Javonte Williams",
-     "Bucky Irving",
-     "DeVonta Smith",
-     "Kenny Gainwell",
-     "Dak Prescott",
-     "Davante Adams",
-     "Kyle Monangai",
-     "Houston Texans",
-     "Brandon Aubrey"
-    ]
-   },
-   "10": {
-    "points": 1742.5,
-    "shape": "QB2 RB6 WR3 TE2 K1 DEF1",
-    "roster": [
-     "De'Von Achane",
-     "Amon-Ra St. Brown",
-     "CeeDee Lamb",
-     "Travis Etienne Jr.",
-     "George Kittle",
-     "Jalen Hurts",
-     "D'Andre Swift",
-     "Kyle Monangai",
-     "Breece Hall",
-     "Luther Burden III",
-     "Kyle Pitts Sr.",
-     "Trevor Lawrence",
-     "Woody Marks",
-     "Houston Texans",
-     "Ka'imi Fairbairn"
     ]
    }
   }
  },
  "errors": [],
- "seconds": 168.3525676727295,
- "mean_current": 1795.25,
- "mean_fitted": 1793.63,
- "mean_delta": -1.6200000000000045,
- "better": 0,
- "worse": 1,
- "tied": 9
+ "seconds": 22.962905883789062
 }
