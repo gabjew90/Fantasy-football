@@ -87,3 +87,68 @@ def test_near_tie_goes_to_the_scarcer_player():
     ranked2 = pair_rank([(42.0, "wr why", a2), (39.5, "rb why", dict(b))], report, needs,
                         {"WR": 30.0, "RB": 30.0}, lambda pos: {"RB", "WR"})
     assert ranked2[0][2]["sleeper_id"] == "a"
+
+
+# ---------- the reason must be the reason (2026-09-04, room 10704422) --------
+# pair_rank sorts on `pair`. The urgency sentence a `why` OPENS with -- "waiting
+# likely costs ~N pts" -- is the greedy score, which only breaks ties. Printing
+# one number as the reason while sorting on another made the trails
+# unauditable: at pick 11 the report showed McBride's waiting cost as 31 and
+# Chase Brown's as 13, took Chase Brown, and nothing anywhere said why. The
+# deciding term was own-value, which appeared in no human-readable output.
+
+def _printed_total(why: str) -> float:
+    """The number the reason claims decided the pick."""
+    return float(why.split("RANKED ON ")[1].split(" =")[0])
+
+
+def test_the_printed_number_is_the_one_the_sort_returned():
+    """The invariant. pair_rank returns (pair, why, player) and sorts on pair,
+    so the number printed in the reason must BE that pair, for every row --
+    near-tie swaps included, since a swap moves the row and its number
+    together."""
+    ranked = pair_rank(_cands(), REPORT, NEEDS, SECOND, ALL)
+    assert ranked
+    for pair, why, p in ranked:
+        assert "RANKED ON" in why, why
+        assert abs(_printed_total(why) - pair) < 0.51, (why, pair)
+        assert abs(_printed_total(why) - p["_pair"]["pair"]) < 0.51
+
+
+def test_the_printed_parts_add_up_to_the_printed_total():
+    """A reason showing a sum nobody can check is no better than no reason."""
+    for _pair, _why, p in pair_rank(_cands(), REPORT, NEEDS, SECOND, ALL):
+        d = p["_pair"]
+        assert abs(d["own"] + d["partner_pts"] - d["pair"]) < 0.11, d
+
+
+def test_a_candidate_with_no_partner_says_so_rather_than_going_silent():
+    cands = [(5.0, "qb why", {"pos": "QB", "vorp": 30.0, "sleeper_id": "q1"}),
+             (4.0, "rb why", {"pos": "RB", "vorp": 20.0, "sleeper_id": "r1"})]
+    report = {"QB": {"e_best_next": 10.0}, "RB": {"e_best_next": 8.0}}
+    ranked = pair_rank(cands, report, {"QB": 1, "RB": 1}, {"QB": 5.0, "RB": 5.0},
+                       lambda pos_taken: set())
+    for _pair, why, _p in ranked:
+        assert "RANKED ON" in why
+        assert "no partner" in why
+
+
+def test_the_urgency_sentence_is_not_mistaken_for_the_ranking():
+    """The actual defect, reproduced in miniature: the row with the WORSE
+    greedy score can win, and when it does the reason must still explain the
+    win. Before this, such a row printed only its urgency number and the
+    reader was left with a reason that argued for the other player."""
+    ranked = pair_rank(_cands(), REPORT, NEEDS, SECOND, ALL)
+    winner_why = ranked[0][1]
+    # 'flowers' wins on the pair despite the RB carrying the higher greedy score
+    assert ranked[0][2]["sleeper_id"] == "flowers"
+    assert "RANKED ON" in winner_why
+    assert _printed_total(winner_why) >= _printed_total(ranked[1][1]) - 2.0
+
+
+def test_greedy_fallback_adds_no_ranked_on_clause():
+    """With no report the order is greedy and `pair` never runs, so claiming a
+    pair total would be a lie."""
+    cands = _cands()
+    out = pair_rank(cands, None, NEEDS, SECOND, ALL)
+    assert all("RANKED ON" not in w for _s, w, _p in out)

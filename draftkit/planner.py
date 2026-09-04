@@ -152,6 +152,26 @@ def pair_rank(cands: list[tuple[float, str, dict]],
         if partner:
             why = (why + f" · two-pick plan: pair with the ~"
                    f"{pv:.0f}-pt {partner} expected at your next turn")
+        # THE NUMBER THAT ACTUALLY DECIDES THE ORDER, said out loud.
+        #
+        # `ranked.sort` below is keyed on `pair`, and the urgency sentence this
+        # `why` opens with -- "waiting likely costs ~N pts" -- is the GREEDY
+        # score, which only ever breaks a tie. Printing the urgency number as
+        # the reason while sorting on a different one made the reports
+        # unauditable: room 10704422 pick 11 showed McBride's waiting cost as
+        # 31 and Chase Brown's as 13, took Chase Brown, and nothing on the page
+        # or in the trail said why. The answer was own-value -- fallback[RB]
+        # was low because the RB pool empties, so Chase Brown's points above
+        # the back he'd otherwise end up with were large -- and that term
+        # appeared nowhere a human could read it.
+        #
+        # This is a DISPLAY fix. The ordering is untouched; the clause is
+        # appended, so every downstream `why` matcher (draft_driver.js,
+        # mock_scrutiny.py) still anchors on the same prefixes.
+        why = (why + f" · RANKED ON {pair:.0f} = {own:.0f} his own edge over the "
+               f"{p.get('pos')} you'd otherwise end up with"
+               + (f" + {pv:.0f} the {partner} this frees up next turn" if partner
+                  else " (no partner: nothing else fills a slot next turn)"))
         # the arithmetic that decides the ranking, kept structured so the
         # panel and the reports can SHOW the decision, not just assert it
         # (user request 2026-09-03: cost of waiting AND cost of picking)
