@@ -2772,3 +2772,43 @@ roster" without re-deriving any of it.
 - The stale `data/draftrig/ref_model.*.csv` references were re-cut. They
   predated the sheet-source rebuild and the `proj_band` column, so the
   documented check had been reporting drift that no uncommitted change caused.
+
+## 2026-09-04 (43) — RB-only games table: accuracy passes, outcome unresolvable, NOT shipped
+
+**Pre-registered before running.** DECISIONS #31 failed the games-table gate
+pooled across positions, while its own per-cell table showed RB MAE improving
+in all four (league, pair) cells and QB/WR/TE mostly worsening. The obvious
+sub-experiment: apply the absence table to running backs alone and leave every
+other position on the base arm. Arm `blend_gt_rb`, written by
+`scripts/games_table_gate.py` as a sibling of `blend_gt`, judged by
+`scripts/source_gate.py` unchanged with `--candidate blend_gt_rb --rivals blend`.
+Same two halves, same thresholds, no gate code touched.
+
+**Accuracy half: PASS in both leagues.** Keefamania MAE 57.8 → 57.1
+(ratio 0.988), Spearman 0.476 → 0.481. Omnibeta 63.0 → 62.5 (0.992),
+0.467 → 0.465. Every non-RB cell is byte-identical by construction, so the
+entire pooled gain is the four RB cells: 56.0 → 54.7, 68.2 → 65.2,
+59.3 → 57.8, 70.6 → 68.7.
+
+**Outcome half: unresolvable, exactly as #41 predicts.** One seed said
++0.44% (24 better, 20 worse). Five seeds said **−0.48%**, 99 better, 110
+worse, 11 tied, with a **spread across seeds of 6.87 points of percentage**.
+The sign flipped between one seed and five. `resolvable: False`. The
+mechanical decision string reads "flip" because both halves pass their
+pre-registered thresholds; the outcome pass is a pass of a test that cannot
+see a half-percent effect, and this entry does not cite it as evidence.
+
+**What the evidence supports.** The accuracy half alone: the games table
+improves RB projections and does nothing to any other position. That is a
+clean, isolated, out-of-sample result on two season pairs and two leagues.
+
+**Not shipped, and why.** The same day this ran, the user moved Keefamania to
+the FantasyPros sheet alone (#44). The games table applies on the external
+path too (`external_projection` scales by `games_table.games_expr`), so
+turning it on for RB would rescale the sheet's running-back lines by the
+absence bands. That is a defensible projection improvement and it is not
+"solely the sheet". The decision belongs to the user, with this entry as the
+evidence. Config knob unchanged: `projections.games_table.enabled: false`.
+
+Artifacts: `reports/games_table_gate_rb.md` and `.json` (five-seed run),
+`reports/projection_backtest.*.gt.rows.csv` with the `blend_gt_rb` column.
