@@ -2134,6 +2134,23 @@ window.DK = (function () {
   /* In-room preflight (design 2026-09-01, layer 2): everything the loop will
    * rely on, checked before the clock matters, in one readable report. Any
    * `false` means do not arm the loop on that reading alone. */
+  /* The room's team count from the store, against what DK.load was told.
+   * draftOrder.order is the FULL pick order (210 entries in a 14-team,
+   * 15-round room), so length / rounds is the team count and needs no
+   * guessing. Pure and exported so it is testable with a fake store. */
+  function roomSizeCheck() {
+    const out = { order_len: null, teams_implied: null, teams_mismatch: false };
+    try {
+      const st = findStore(); const raw = st && st.getState();
+      const order = raw && raw.draftOrder && raw.draftOrder.order;
+      out.order_len = Array.isArray(order) ? order.length : null;
+      const implied = out.order_len && S.cfg.rounds ? out.order_len / S.cfg.rounds : null;
+      out.teams_implied = implied;
+      out.teams_mismatch = Number.isInteger(implied) && implied !== S.cfg.teams;
+    } catch (e) { /* no store: nothing to compare, the other preflight checks carry it */ }
+    return out;
+  }
+
   async function preflight() {
     const out = {};
     const snap = storeState();
@@ -2191,7 +2208,18 @@ window.DK = (function () {
     // id for the candidate; anything else is the click fallback, said aloud
     out.pick_path = (acts && typeof acts.makePick === 'function' && out.player_id_lookup && out.player_id_lookup.id) ? 'action' : 'click';
     out.my_team_known = !snap || !!snap.my_team;
-    out.ok = !!(out.store || (out.roster_panel && out.header_pick)) && !!(out.row_lookup && out.row_lookup.found !== false) && !out.autopick_armed;
+    // ROOM SIZE against what the operator told DK.load. Room 10712781
+    // (2026-09-04) was a 14-team room injected with teams: 10; nothing
+    // refused it, so my picks fell on 9, 20, 37 while the engine computed
+    // horizons, rival counts and round numbers for a 10-team snake, and every
+    // ADP-keyed quantity (survival, deadline, wire) ran 10-team ADP against a
+    // 210-pick draft. The only warning was the bridge's "flagged picks fall on
+    // several snake slots", which fired after the second pick. The store's
+    // draftOrder.order is the full pick order, so its length over rounds IS
+    // the team count, and a disagreement is a hard refusal here.
+    Object.assign(out, roomSizeCheck());
+    if (out.teams_mismatch) note('ROOM SIZE MISMATCH: draftOrder implies ' + out.teams_implied + ' teams, DK.load said ' + S.cfg.teams + ' -> preflight refused; reload with the right teams');
+    out.ok = !!(out.store || (out.roster_panel && out.header_pick)) && !!(out.row_lookup && out.row_lookup.found !== false) && !out.autopick_armed && !out.teams_mismatch;
     note('preflight: ok=' + out.ok + ' pick_path=' + out.pick_path + ' my_team=' + out.my_team + ' plan=' + out.plan);
     return out;
   }
@@ -2560,7 +2588,7 @@ window.DK = (function () {
     },
     rank, syncQueue, draftTop, run, gatesOk, storeState, findStore, keepAlive, preflight, _setStore, rosterView, top6TeFell,
     timingLabel, playersSnapshot, postPlayersSnapshot,
-    narrate, hud, plainEnglishPick, fingerprint, fingerprintDiff,
+    narrate, hud, plainEnglishPick, fingerprint, fingerprintDiff, roomSizeCheck,
     sleepMode: () => S.sleepMode, _sleep: sleep,
     narration: () => S.trail.slice(),
     classifyMiss, rowMatches, normTeam, autopickArmed, idKey, // exported for tests

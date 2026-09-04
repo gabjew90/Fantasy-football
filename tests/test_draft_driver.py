@@ -1294,3 +1294,30 @@ def test_pair_arithmetic_rides_through_the_ranked_list():
     # a row the planner never scored says so with null rather than inventing one
     assert r["top"][1]["pair"] is None
     assert r["top"][1]["b"] is None
+
+
+def test_preflight_refuses_a_room_whose_size_disagrees_with_dk_load():
+    """Room 10712781 (2026-09-04) was a 14-team room injected with teams: 10.
+    Nothing refused it: my picks fell on 9, 20, 37 while the engine computed a
+    10-team snake, and every ADP-keyed quantity ran 10-team ADP against a
+    210-pick draft. The store's draftOrder.order is the full pick order, so its
+    length over rounds is the team count with no guessing."""
+    board = "Christian McCaffrey|RB|SFO|122.8|1|" + chr(10) + "Bijan Robinson|RB|ATL|100|1|"
+    picks = [(1, 1, "Jahmyr", "Gibbs", "RB"), (6, 6, "Christian", "McCaffrey", "RB")]
+    base = _fake_store(picks)
+    js = [
+        "DK.loadCompact(" + json.dumps(board) + ", {teams: 10, rounds: 15});",
+        "const base = " + json.dumps(base) + ";",
+        "const withOrder = (n) => { const s = JSON.parse(JSON.stringify(base));"
+        "  s.draftOrder.order = Array.from({length: n}, (_, i) => ({id: i + 1, teamId: String((i % 14) + 1)})); return s; };",
+        "DK._setStore({ getState: () => withOrder(210) }); const fourteen = DK.roomSizeCheck();",
+        "DK._setStore({ getState: () => withOrder(150) }); const ten = DK.roomSizeCheck();",
+        "DK._setStore({ getState: () => base }); const noOrder = DK.roomSizeCheck();",
+        "console.log(JSON.stringify({ fourteen, ten, noOrder }));",
+    ]
+    r = run_js(chr(10).join(js))
+    assert r["fourteen"] == {"order_len": 210, "teams_implied": 14, "teams_mismatch": True}, r["fourteen"]
+    assert r["ten"] == {"order_len": 150, "teams_implied": 10, "teams_mismatch": False}, r["ten"]
+    # a store that carries no pick order is not evidence of a mismatch; the
+    # other preflight checks carry the verdict
+    assert r["noOrder"]["teams_mismatch"] is False and r["noOrder"]["order_len"] is None, r["noOrder"]
