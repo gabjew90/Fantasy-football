@@ -124,7 +124,7 @@ def _drop_or_ir(ctx, candidate_ros: float, pos: str | None = None) -> str:
         return f"move {ir_ready[0]['name']} to IR (opens the slot free)"
     from draftkit.lineup import optimal_lineup
     mine = ctx["roster_players"][ctx["my_rid"]]
-    opt_ids = {str(p["sleeper_id"]) for p in optimal_lineup(mine, ctx["slots"], ctx["flex_slots"])}
+    opt_ids = {str(p["sleeper_id"]) for p in optimal_lineup(mine, ctx["slots"], flex_slots=ctx["flex_slots"])}
     keep = opt_ids | set(ctx["current_starters"])
     starters = {p["name"] for p in mine if str(p["sleeper_id"]) in keep}
     bench = [p for p in mine if str(p["sleeper_id"]) not in keep]
@@ -308,7 +308,9 @@ def build(ctx, store) -> str:
         lines += [
             f"**{p['name']}** ({p['pos']}, {p.get('team') or '?'}) — {cls}",
             f"- why: {'; '.join(why)}{need_note}",
-            f"- worth over next-best FA {p['pos']}: +{p.get('fa_value', 0):.0f} ROS pts",
+            # value_over_fa is negative for anyone who is not the best free
+            # agent at his position, so the sign comes from the number
+            f"- worth over next-best FA {p['pos']}: {p.get('fa_value', 0):+.0f} ROS pts",
             f"- move: {_drop_or_ir(ctx, p.get('ros') or 0, p['pos'])}",
             f"- bid **${fair}–${agg}** of my ${ctx['my_budget']} — {rival_note}",
         ]

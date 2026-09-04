@@ -2504,3 +2504,84 @@ Tracker are unchanged; both reference boards come back IDENTICAL under
 untouched and remains the deeper cause. Any future attempt is a new
 pre-registration and must first answer point 2: why lowering the tail keeps
 costing lineup points even when it improves tail accuracy.
+
+
+---
+
+## #41 â€” 2026-09-03 â€” The outcome half cannot resolve the threshold it judges
+
+**Answering point 2 of #40, and it is not the answer that was expected.**
+
+#40 asked why two independent routes to a lower tail both lost the outcome half
+by a similar margin (external source -1.20%, tail arm -1.53%) and said the next
+attempt must explain it before spending on a third. The explanation is that
+neither number was ever a measurement.
+
+**What was wrong with the harness.** Rivals were pinned to exact consensus ADP,
+so every replay of a pair made identical rival picks. The 44 slot-drafts behind
+a verdict were therefore TWO draft universes sampled at 22 seats each, and
+neighbouring seats see nearly the same board. Only our own seat varied. Reported
+as "44 slot-drafts", a 1% delta claimed far more evidence than it had. Found in
+a review of the harness, not of a result.
+
+**The measurement.** `scripts/source_gate.py --seeds 5` redraws the rival room
+with Gaussian ADP noise of 6 picks, the same draw handed to every arm so a
+per-slot delta stays paired. The tail arm (`blend_rank_lin` vs `blend`), same
+rows CSVs as #40, both leagues, both pairs:
+
+| seed | Î” lineup points | Î” % |
+|---|---|---|
+| exact ADP (the #40 run) | -23.7 | **-1.53%** |
+| 1 | -35.2 | -2.14% |
+| 2 | -72.2 | -4.43% |
+| 3 | +16.1 | **+1.09%** |
+| 4 | +26.2 | **+1.69%** |
+
+Pooled over 220 slot-drafts: blend 1572.0, blend_rank_lin 1554.2, Î” -1.13%.
+Errors 0/0. Picks changed 1317 of 2860, so the arm is not inert. Better in 121
+seats, worse in 94: it wins MORE often and loses bigger, consistent with #40's
+higher-variance reading.
+
+**Spread across seeds: 6.12 percentage points, against a 1% threshold.** Two of
+five seeds say the tail arm is better. The per-seed standard deviation is 2.50
+points of percentage, so the standard error of the mean at five seeds is 1.12% â€”
+larger than the effect being judged.
+
+**What this does and does not change.**
+
+- It does NOT flip #40 or #23. Both applied their pre-registered rule correctly
+  to the number in front of them, and the rule is not rewritten after the fact.
+  Nothing ships on this entry. `market_curve_tail.mode` stays `off` and
+  `projections.source` stays `model`.
+- It DOES retire the "two independent routes both cost points, that is a
+  pattern" reading in #40 point 2. There is no pattern. There are two draws from
+  a distribution whose spread is six times the threshold, and both happened to
+  land on the same side of zero. Chance does that about a quarter of the time.
+- Any future entry citing the outcome half at the 1-2% scale is citing noise
+  unless it reports a seed spread.
+
+**What the outcome half is actually good for.** With five seeds it resolves
+effects above roughly 3%. Below that it is a screen for gross regressions, not
+an instrument. Getting the standard error to 0.25%, which would make a 1% effect
+a four-sigma result, needs about 100 seeds â€” roughly eight hours at the current
+cost. That is affordable overnight and is the price of any future 1% claim; it
+is not worth paying for a screening run.
+
+**Harness changes shipped with this entry** (commit `c3ce493`), each of which
+would have caught something:
+
+1. `--seeds N` and the per-seed spread table, with the report stating outright
+   when the observed delta is inside the spread. It never moves the threshold.
+2. Engine exceptions and an inert candidate now set `decision = invalid` and
+   exit nonzero. An exception falls back to the best available player, a
+   different and dumber drafting policy, so an arm that throws more often than
+   another was not graded on the same engine. All four recorded runs were in
+   fact 0/0 â€” luck, not a guarantee.
+3. `slot_replay.py` no longer installs the league shape by mutating
+   `engine_bakeoff.SLOTS` for every importer in the process.
+4. `LINE_GAMES` is imported from `projection_backtest.SEASON_GAMES` instead of
+   retyped, so the two cannot drift and rescale one arm against another.
+5. Pool-capped replay depth is named in the report, and the limitations section
+   states that `ecr` is null on the history boards, so an arm differing only
+   through ECR would surface as inert rather than as a pass.
+

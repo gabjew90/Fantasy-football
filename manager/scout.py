@@ -31,8 +31,8 @@ def build(ctx, store) -> str:
     totals, v_note = implied_totals(store)
     mine = vegas_adjust(ctx["roster_players"][ctx["my_rid"]], totals)
     theirs = vegas_adjust(ctx["roster_players"][ctx["opp_rid"]], totals)
-    my_opt = optimal_lineup(mine, ctx["slots"], ctx["flex_slots"])
-    their_opt = optimal_lineup(theirs, ctx["slots"], ctx["flex_slots"])
+    my_opt = optimal_lineup(mine, ctx["slots"], flex_slots=ctx["flex_slots"])
+    their_opt = optimal_lineup(theirs, ctx["slots"], flex_slots=ctx["flex_slots"])
     my_total = sum(p.get("weekly") or 0 for p in my_opt)
     their_total = sum(p.get("weekly") or 0 for p in their_opt)
     margin = my_total - their_total

@@ -152,22 +152,41 @@ def test_a_rec_flex_is_filled_before_the_open_flex():
     assert {"w3", "r2"} <= got
 
 
-def test_the_flex_vocabulary_is_eligibility_not_a_name():
-    """onboard puts W/T (a WR/TE slot) in FLEX_NAMES and W/R (a WR/RB slot) in
-    REC_FLEX_NAMES. Reusing those buckets for a lineup would let a RB start in
-    a receiver flex, so shape keeps its own exact table."""
-    from draftkit.shape import FLEX_ELIGIBILITY
-    assert FLEX_ELIGIBILITY["W/T"] == frozenset(("WR", "TE"))
-    assert FLEX_ELIGIBILITY["W/R"] == frozenset(("RB", "WR"))
-    assert FLEX_ELIGIBILITY["W/R/T"] == frozenset(("RB", "WR", "TE"))
+def test_every_production_call_site_passes_flex_slots_by_name():
+    """The lineup tests above call optimal_lineup with flex_slots= as a
+    keyword and passed while production was broken: a mechanical edit across a
+    dozen call sites had left the eligibility sets in the `flex` POSITIONAL,
+    where they reached int() and raised three frames down on the first live
+    run. Two guards, because the convention is the thing that has to hold.
+    """
+    import inspect
+
+    from draftkit import briefs, lineup, playoffs
+    from manager import lineup_opt, scout, trade_radar, waiver_brief
+
+    for mod in (briefs, playoffs, lineup, lineup_opt, scout, trade_radar, waiver_brief):
+        src = inspect.getsource(mod)
+        assert 'ctx["slots"], ctx["flex_slots"]' not in src, (
+            f"{mod.__name__}: flex_slots is sitting in the `flex` positional")
+        assert ", flex, flex_slots)" not in src, (
+            f"{mod.__name__}: forward flex_slots by name")
+
+    # and the mistake is now named rather than surfacing as a TypeError about
+    # tuples from inside int()
+    with pytest.raises(TypeError, match="Eligibility sets go to `flex_slots`"):
+        lineup.optimal_lineup(_roster(), starting_slots(OMNIBETA).slots,
+                              starting_slots(OMNIBETA).flex_slots)
 
 
-def test_an_unknown_flex_kind_needs_no_new_field():
-    """The generalisation this refactor bought: a WR/RB flex is a slot with an
-    eligibility set, not a fourth counter, and n_starters counts it."""
-    sh = starting_slots(["QB", "RB", "WR", "TE", "W/R", "K", "DEF", "BN"])
-    assert sh.flex == 0 and sh.rec_flex == 0 and sh.superflex == 0
-    assert len(sh.flex_slots) == 1 and sh.n_starters == 7
+def test_a_ctx_shaped_call_drives_the_manager_lineup_path():
+    """The call as production makes it, through the ctx keys the manager
+    actually reads. No test covered this seam, which is how the positional
+    bug reached a live run instead of a red suite."""
+    from draftkit.lineup import optimal_lineup
+    shape = starting_slots(OMNIBETA)
+    ctx = {"slots": shape.slots, "flex": shape.flex, "flex_slots": shape.flex_slots}
+    got = optimal_lineup(_roster(), ctx["slots"], flex_slots=ctx["flex_slots"])
+    assert len(got) == shape.n_starters == 10
 
 
 def test_the_flex_vocabulary_is_eligibility_not_a_name():

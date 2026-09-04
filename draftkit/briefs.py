@@ -216,7 +216,7 @@ def playoff_odds(ctx) -> tuple[float, str]:
         strengths[rid] = {}
         for w in weeks:
             wb = seasondata.byes(schedule, w)
-            strengths[rid][w] = playoffs.team_week_strength(roster, wb, ctx["slots"], ctx["flex_slots"])
+            strengths[rid][w] = playoffs.team_week_strength(roster, wb, ctx["slots"], flex_slots=ctx["flex_slots"])
     matchups_by_week = {}
     for w in weeks:
         try:
@@ -364,7 +364,7 @@ def waiver_brief(cfg) -> Path:
                            "evidence": f"best available {pos} this week"})
 
     bench_starters = {p["name"] for p in lineup_mod.optimal_lineup(
-        ctx["roster_players"][my_rid], ctx["slots"], ctx["flex_slots"])}
+        ctx["roster_players"][my_rid], ctx["slots"], flex_slots=ctx["flex_slots"])}
     my_bench = [p for p in ctx["roster_players"][my_rid] if p["name"] not in bench_starters]
     ir_occ = [ctx["player_row"](str(pid)) for pid in (ctx["my_roster"].get("reserve") or [])]
     ir_occ = [x for x in ir_occ if x]
@@ -411,7 +411,7 @@ def _lineup_model(ctx, teams_filter: set[str] | None = None) -> dict:
     else:
         roster_view = roster
     current = [str(x) for x in (ctx["my_roster"].get("starters") or []) if str(x) != "0"]
-    changes, my_total = lineup_mod.lineup_changes(roster, current, ctx["slots"], ctx["flex_slots"])
+    changes, my_total = lineup_mod.lineup_changes(roster, current, ctx["slots"], flex_slots=ctx["flex_slots"])
     if teams_filter is not None:
         changes = [c for c in changes if any(p["name"] in c for p in roster_view)]
     # opponent
@@ -425,14 +425,14 @@ def _lineup_model(ctx, teams_filter: set[str] | None = None) -> dict:
             orid = int(opp["roster_id"])
             opp_name = _users_by_roster(ctx).get(orid, "?")
             opp_total = sum(p["weekly"] for p in lineup_mod.optimal_lineup(
-                ctx["roster_players"][orid], ctx["slots"], ctx["flex_slots"]))
+                ctx["roster_players"][orid], ctx["slots"], flex_slots=ctx["flex_slots"]))
     margin = my_total - opp_total
     lean = ("favorite — prefer floor in close calls" if margin > 8 else
             "underdog — prefer ceiling in close calls" if margin < -8 else
             "close matchup — projection decides")
     kick = {r["team"]: f"{r['gameday']} {r['gametime']}"
             for r in ctx["schedule"].filter(pl.col("week") == ctx["week"]).iter_rows(named=True)}
-    starters_set = {q["name"] for q in lineup_mod.optimal_lineup(roster, ctx["slots"], ctx["flex_slots"])}
+    starters_set = {q["name"] for q in lineup_mod.optimal_lineup(roster, ctx["slots"], flex_slots=ctx["flex_slots"])}
 
     def _backup(pos, exclude):
         cands = [b for b in roster if b["pos"] == pos and b["name"] not in starters_set
@@ -451,7 +451,7 @@ def _lineup_model(ctx, teams_filter: set[str] | None = None) -> dict:
     starters_raw = ctx["my_roster"].get("starters") or []
     if "0" in [str(s) for s in starters_raw]:
         warnings.append("You have an EMPTY starting slot in Sleeper")
-    for p in lineup_mod.optimal_lineup(roster, ctx["slots"], ctx["flex_slots"]):
+    for p in lineup_mod.optimal_lineup(roster, ctx["slots"], flex_slots=ctx["flex_slots"]):
         if p["team"] in ctx["byes"]:
             warnings.append(f"{p['name']} is on BYE this week and projects 0")
     ir_occ = [ctx["player_row"](str(pid)) for pid in (ctx["my_roster"].get("reserve") or [])]

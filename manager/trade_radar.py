@@ -147,7 +147,7 @@ def build(ctx, store) -> str:
 
         # desperation: their optimal starter freshly Out/IR where I hold the shape
         desperation = None
-        starters = optimal_lineup(roster, ctx["slots"], ctx["flex_slots"])
+        starters = optimal_lineup(roster, ctx["slots"], flex_slots=ctx["flex_slots"])
         for s in starters:
             if (s.get("status") or "") in ("Out", "IR") and store.first_time(
                     f"desp:{rid}:{s['sleeper_id']}:{s.get('status')}"):

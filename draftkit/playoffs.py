@@ -27,7 +27,7 @@ def team_week_strength(roster: list[dict], byes: set[str],
                             else float(p.get("weekly") or 0.0)))
             for p in roster]
     return sum(float(p["weekly"])
-               for p in optimal_lineup(pool, slots, flex, flex_slots))
+               for p in optimal_lineup(pool, slots, flex, flex_slots=flex_slots))
 
 
 def simulate_season(strengths: dict[int, dict[int, float]],

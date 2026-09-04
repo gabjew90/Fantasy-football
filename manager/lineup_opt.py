@@ -101,7 +101,7 @@ def build(ctx, store) -> str:
     week = ctx["week"]
     totals, v_note = implied_totals(store)
     roster = vegas_adjust(ctx["roster_players"].get(ctx["my_rid"], []), totals)
-    optimal = optimal_lineup(roster, ctx["slots"], ctx["flex_slots"])
+    optimal = optimal_lineup(roster, ctx["slots"], flex_slots=ctx["flex_slots"])
 
     scout = store.get(f"scout:{week}", {})
     margin = scout.get("margin")
@@ -114,7 +114,7 @@ def build(ctx, store) -> str:
     else:
         mode, mode_why = "neutral", f"margin {margin:+.0f} is close — projection decides"
 
-    swaps, _total = lineup_changes(roster, ctx["current_starters"], ctx["slots"], ctx["flex_slots"])
+    swaps, _total = lineup_changes(roster, ctx["current_starters"], ctx["slots"], flex_slots=ctx["flex_slots"])
 
     table = contingency_table(roster, optimal)
     store.set(f"contingency:{week}", table)

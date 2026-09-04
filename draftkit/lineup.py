@@ -21,6 +21,15 @@ def _flex_sets(flex: int, flex_slots) -> tuple[frozenset[str], ...]:
     """
     if flex_slots is not None:
         return tuple(sorted((frozenset(e) for e in flex_slots), key=len))
+    if flex and not isinstance(flex, int):
+        # A shape's flex_slots handed to the `flex` positional. int() would
+        # raise something about tuples from three frames down; this names the
+        # actual mistake, which a mechanical edit across a dozen call sites
+        # made once already.
+        raise TypeError(
+            f"optimal_lineup got {type(flex).__name__} for `flex`, which counts "
+            "plain RB/WR/TE slots. Eligibility sets go to `flex_slots`: call it "
+            "as optimal_lineup(roster, slots, flex_slots=shape.flex_slots).")
     return (frozenset(FLEX_ELIGIBLE),) * int(flex or 0)
 
 
@@ -57,7 +66,7 @@ def lineup_changes(roster: list[dict], current_ids: list[str],
                    flex_slots=None) -> tuple[list[str], float]:
     """Suggested swaps (only differences) + optimal projected total."""
     by_id = {str(p["sleeper_id"]): p for p in roster}
-    optimal = optimal_lineup(roster, slots, flex, flex_slots)
+    optimal = optimal_lineup(roster, slots, flex, flex_slots=flex_slots)
     opt_ids = {p["sleeper_id"] for p in optimal}
     cur_ids = {i for i in (str(x) for x in current_ids) if i in by_id}
     changes = []

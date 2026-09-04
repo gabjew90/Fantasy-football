@@ -112,9 +112,7 @@ def _identity_line(ctx) -> str:
     week = ctx.get("week")
     lg = getattr(ctx.get("cfg"), "league_name", "?")
     return (f"_managing {i.get('display', '?')} · roster {i.get('roster_id', '?')} · "
-            f"league {lg} · week {week} · identity via {i.get('source', '?')}_
-
-")
+            f"league {lg} · week {week} · identity via {i.get('source', '?')}_\n\n")
 
 
 def waiver_job(dry_run: bool = False) -> None:
