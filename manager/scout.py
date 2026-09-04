@@ -12,8 +12,7 @@ import math
 
 from draftkit.lineup import optimal_lineup
 
-from .context import POS_SLOTS
-from .lineup_opt import FLEX, STDEV, vegas_adjust
+from .lineup_opt import STDEV, vegas_adjust
 from .vegas import implied_totals
 
 log = logging.getLogger("manager")
@@ -32,8 +31,8 @@ def build(ctx, store) -> str:
     totals, v_note = implied_totals(store)
     mine = vegas_adjust(ctx["roster_players"][ctx["my_rid"]], totals)
     theirs = vegas_adjust(ctx["roster_players"][ctx["opp_rid"]], totals)
-    my_opt = optimal_lineup(mine, POS_SLOTS, FLEX)
-    their_opt = optimal_lineup(theirs, POS_SLOTS, FLEX)
+    my_opt = optimal_lineup(mine, ctx["slots"], ctx["flex_slots"])
+    their_opt = optimal_lineup(theirs, ctx["slots"], ctx["flex_slots"])
     my_total = sum(p.get("weekly") or 0 for p in my_opt)
     their_total = sum(p.get("weekly") or 0 for p in their_opt)
     margin = my_total - their_total
@@ -48,7 +47,7 @@ def build(ctx, store) -> str:
             holes.append(f"{p['name']} ({p['pos']}) is {p['status']} and they lack a clean pivot")
         if (p.get("weekly") or 0) == 0:
             holes.append(f"{p['name']} ({p['pos']}) projects ZERO (bye/inactive) — forced start")
-    n_starters = sum(POS_SLOTS.values()) + FLEX
+    n_starters = ctx["shape"].n_starters
     if len(their_opt) < n_starters:
         holes.append(f"they can only fill {len(their_opt)}/{n_starters} slots")
 

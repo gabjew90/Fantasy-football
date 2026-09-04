@@ -10,12 +10,10 @@ from __future__ import annotations
 import logging
 
 from draftkit import seasondata
-from draftkit.briefs import SLOTS, FLEX, build_context
+from draftkit.briefs import build_context
 from draftkit.config import Config
 
 log = logging.getLogger("manager")
-
-POS_SLOTS = SLOTS  # starting requirements: QB1 RB2 WR2 TE1 K1 DEF1 + 2 FLEX
 
 # Set once from the CLI before any job runs. Module state rather than a
 # parameter threaded through seven job signatures: every job already calls

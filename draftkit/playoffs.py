@@ -11,29 +11,23 @@ from __future__ import annotations
 
 import numpy as np
 
-FLEX_ELIGIBLE = ("RB", "WR", "TE")
-
+from .lineup import optimal_lineup
 
 def team_week_strength(roster: list[dict], byes: set[str],
-                       slots: dict[str, int], flex: int) -> float:
-    """Best legal lineup for one week; bye-week players score 0."""
-    def wk(p):
-        return 0.0 if p.get("team") in byes else float(p.get("weekly") or 0.0)
+                       slots: dict[str, int], flex: int = 0,
+                       flex_slots=None) -> float:
+    """Best legal lineup for one week; bye-week players score 0.
 
-    pool = sorted(roster, key=wk, reverse=True)
-    counts = {k: 0 for k in slots}
-    used, total, flex_used = set(), 0.0, 0
-    for p in pool:
-        pos = p.get("pos")
-        if pos in slots and counts[pos] < slots[pos]:
-            counts[pos] += 1
-            total += wk(p)
-            used.add(p["sleeper_id"])
-    for p in pool:
-        if p["sleeper_id"] not in used and p.get("pos") in FLEX_ELIGIBLE and flex_used < flex:
-            flex_used += 1
-            total += wk(p)
-    return total
+    Delegates to lineup.optimal_lineup on a bye-zeroed copy rather than
+    re-implementing the fill. The second copy of that loop lived here and
+    silently kept its own flex vocabulary, so a league with a rec_flex or a
+    superflex got a different lineup in the playoff sim than in the brief.
+    """
+    pool = [dict(p, weekly=(0.0 if p.get("team") in byes
+                            else float(p.get("weekly") or 0.0)))
+            for p in roster]
+    return sum(float(p["weekly"])
+               for p in optimal_lineup(pool, slots, flex, flex_slots))
 
 
 def simulate_season(strengths: dict[int, dict[int, float]],

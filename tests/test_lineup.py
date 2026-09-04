@@ -4,7 +4,9 @@ import pytest
 
 from draftkit.lineup import lineup_changes, render_lineup_brief
 
-SLOTS = {"QB": 1, "RB": 2, "WR": 2, "TE": 1, "K": 1, "DEF": 1}
+# Omnibeta's dedicated slots, named as the fixture they are. Production
+# resolves this from the league (draftkit/shape.py); a test may pin it.
+OMNIBETA_SLOTS ={"QB": 1, "RB": 2, "WR": 2, "TE": 1, "K": 1, "DEF": 1}
 
 
 def _p(pid, name, pos, weekly, stdev=4.0, team="SFO"):
@@ -22,11 +24,11 @@ ROSTER = [
 
 def test_lineup_changes_only_diffs():
     current = ["q1", "r1", "r2", "w1", "w2", "t1", "r3", "w3", "k1", "d1"]  # already optimal
-    changes, total = lineup_changes(ROSTER, current, SLOTS, flex=2)
+    changes, total = lineup_changes(ROSTER, current, OMNIBETA_SLOTS, flex=2)
     assert changes == []
     # bench the better RB C for WR C in flex -> one suggested swap
     worse = ["q1", "r1", "r2", "w1", "w2", "t1", "w3", "w3", "k1", "d1"]
-    changes2, total2 = lineup_changes(ROSTER, worse, SLOTS, flex=2)
+    changes2, total2 = lineup_changes(ROSTER, worse, OMNIBETA_SLOTS, flex=2)
     assert any("RB C" in c for c in changes2)
 
 
@@ -59,3 +61,29 @@ def test_swap_pairing_is_position_aware():
     # WR pairs with WR, RB with RB — never a cross-position negative "gain"
     assert "Better WR over Worse WR" in text and "Better RB over Worse RB" in text
     assert "+-" not in text
+
+
+def test_one_flex_league_starts_one_fewer_than_two_flex():
+    """Keefamania is nine starters, Omnibeta is ten. The same roster and the
+    same code must produce different lineups, or the shape is being ignored."""
+    from draftkit.lineup import optimal_lineup
+    one = optimal_lineup(ROSTER, OMNIBETA_SLOTS, flex=1)
+    two = optimal_lineup(ROSTER, OMNIBETA_SLOTS, flex=2)
+    assert len(one) == 9 and len(two) == 10
+    assert {p["sleeper_id"] for p in one} < {p["sleeper_id"] for p in two}
+    # the tenth body is the best flex-eligible player left over, not a repeat
+    extra = ({p["sleeper_id"] for p in two} - {p["sleeper_id"] for p in one}).pop()
+    assert extra == "w3"
+
+
+def test_one_flex_league_starts_one_fewer_than_two_flex():
+    """Keefamania is nine starters, Omnibeta is ten. The same roster and the
+    same code must produce different lineups, or the shape is being ignored."""
+    from draftkit.lineup import optimal_lineup
+    one = optimal_lineup(ROSTER, OMNIBETA_SLOTS, flex=1)
+    two = optimal_lineup(ROSTER, OMNIBETA_SLOTS, flex=2)
+    assert len(one) == 9 and len(two) == 10
+    assert {p["sleeper_id"] for p in one} < {p["sleeper_id"] for p in two}
+    # the tenth body is the best flex-eligible player left over, not a repeat
+    extra = ({p["sleeper_id"] for p in two} - {p["sleeper_id"] for p in one}).pop()
+    assert extra == "w3"

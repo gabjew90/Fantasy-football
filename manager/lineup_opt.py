@@ -13,12 +13,10 @@ import logging
 
 from draftkit.lineup import lineup_changes, optimal_lineup
 
-from .context import POS_SLOTS
 from .vegas import implied_totals
 
 log = logging.getLogger("manager")
 
-FLEX = 2
 FLEX_POS = ("RB", "WR", "TE")
 COINFLIP = 1.5
 VEGAS_UP, VEGAS_DOWN, VEGAS_MULT = 24.0, 18.0, 0.05
@@ -60,20 +58,25 @@ def contingency_table(roster: list[dict], starters: list[dict]) -> dict[str, str
     return table
 
 
-def flex_analysis(roster: list[dict], optimal: list[dict], mode: str) -> list[str]:
-    """The decisions worth words: FLEX occupants vs alternatives within 1.5 pts."""
+def flex_analysis(roster: list[dict], optimal: list[dict], mode: str,
+                  slots: dict[str, int], flex: int) -> list[str]:
+    """The decisions worth words: FLEX occupants vs alternatives within 1.5 pts.
+
+    `slots` and `flex` are the league's own shape (draftkit/shape.py). They
+    were module literals holding Omnibeta's two flex spots, so a one-flex
+    league got a second flex decision it does not have."""
     opt_ids = {str(p["sleeper_id"]) for p in optimal}
-    dedicated: dict[str, int] = {k: 0 for k in POS_SLOTS}
+    dedicated: dict[str, int] = {k: 0 for k in slots}
     flex_occ = []
     for p in sorted(optimal, key=lambda x: -(x.get("weekly") or 0)):
-        if dedicated.get(p["pos"], 99) < POS_SLOTS.get(p["pos"], 0):
+        if dedicated.get(p["pos"], 99) < slots.get(p["pos"], 0):
             dedicated[p["pos"]] += 1
         elif p["pos"] in FLEX_POS:
             flex_occ.append(p)
     bench = [p for p in roster if str(p["sleeper_id"]) not in opt_ids
              and p["pos"] in FLEX_POS and (p.get("weekly") or 0) > 0]
     lines = []
-    for f in flex_occ[-FLEX:] if flex_occ else []:
+    for f in flex_occ[-flex:] if (flex_occ and flex) else []:
         rivals = [b for b in bench
                   if abs((b.get("weekly") or 0) - (f.get("weekly") or 0)) <= COINFLIP]
         if not rivals:
@@ -98,7 +101,7 @@ def build(ctx, store) -> str:
     week = ctx["week"]
     totals, v_note = implied_totals(store)
     roster = vegas_adjust(ctx["roster_players"].get(ctx["my_rid"], []), totals)
-    optimal = optimal_lineup(roster, POS_SLOTS, FLEX)
+    optimal = optimal_lineup(roster, ctx["slots"], ctx["flex_slots"])
 
     scout = store.get(f"scout:{week}", {})
     margin = scout.get("margin")
@@ -111,7 +114,7 @@ def build(ctx, store) -> str:
     else:
         mode, mode_why = "neutral", f"margin {margin:+.0f} is close — projection decides"
 
-    swaps, _total = lineup_changes(roster, ctx["current_starters"], POS_SLOTS, FLEX)
+    swaps, _total = lineup_changes(roster, ctx["current_starters"], ctx["slots"], ctx["flex_slots"])
 
     table = contingency_table(roster, optimal)
     store.set(f"contingency:{week}", table)
@@ -133,7 +136,7 @@ def build(ctx, store) -> str:
     else:
         lines += ["", "current Sleeper lineup already matches — no taps needed"]
     lines += ["", "## The decisions that matter"]
-    lines += [f"- {l}" for l in flex_analysis(roster, optimal, mode)] or ["- none this week"]
+    lines += [f"- {l}" for l in flex_analysis(roster, optimal, mode, ctx["slots"], ctx["flex"])] or ["- none this week"]
     if table:
         lines += ["", "## If inactive → start"]
         lines += [f"- {k} → {v}" for k, v in table.items()]

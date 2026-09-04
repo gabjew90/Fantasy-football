@@ -15,7 +15,7 @@ from draftkit.sleeper import BASE, get_json
 
 from . import faab as faab_mod
 from . import usage as usage_mod
-from .context import POS_SLOTS, rostered_ids
+from .context import rostered_ids
 
 log = logging.getLogger("manager")
 
@@ -47,6 +47,7 @@ def trending(store, kind: str = "add") -> dict[str, int]:
 
 
 def my_bye_needs(ctx) -> dict[str, int]:
+    slots, flex = ctx["slots"], ctx["flex"]
     """pos -> deficit count across my starting slots over the next 3 weeks."""
     needs: dict[str, int] = {}
     week = ctx["week"]
@@ -57,17 +58,18 @@ def my_bye_needs(ctx) -> dict[str, int]:
             if p.get("team") in wb or p.get("status") in ("Out", "IR", "PUP", "Suspended"):
                 continue
             avail[p["pos"]] = avail.get(p["pos"], 0) + 1
-        flex_pool = sum(max(0, avail.get(pos, 0) - POS_SLOTS.get(pos, 0)) for pos in FLEX_POS)
-        for pos, req in POS_SLOTS.items():
+        flex_pool = sum(max(0, avail.get(pos, 0) - slots.get(pos, 0)) for pos in FLEX_POS)
+        for pos, req in slots.items():
             if avail.get(pos, 0) < req:
                 needs[pos] = needs.get(pos, 0) + (req - avail.get(pos, 0))
-        if flex_pool < 2:
+        if flex_pool < flex:
             for pos in FLEX_POS:
                 needs[pos] = needs.get(pos, 0)  # mark position as at least relevant
     return needs
 
 
 def rival_needy_budgets(ctx, pos: str) -> list[int]:
+    slots = ctx["slots"]
     """Remaining budgets of rivals who cannot fill `pos` from healthy players."""
     out = []
     for rid, roster in ctx["roster_players"].items():
@@ -75,7 +77,7 @@ def rival_needy_budgets(ctx, pos: str) -> list[int]:
             continue
         healthy = [p for p in roster
                    if p["pos"] == pos and p.get("status") not in ("Out", "IR", "PUP")]
-        if len(healthy) <= POS_SLOTS.get(pos, 1):
+        if len(healthy) <= slots.get(pos, 1):
             out.append(ctx["budgets"].get(rid, 0))
     return sorted(out, reverse=True)
 
@@ -112,7 +114,7 @@ def _drop_or_ir(ctx, candidate_ros: float, pos: str | None = None) -> str:
         return f"move {ir_ready[0]['name']} to IR (opens the slot free)"
     from draftkit.lineup import optimal_lineup
     mine = ctx["roster_players"][ctx["my_rid"]]
-    opt_ids = {str(p["sleeper_id"]) for p in optimal_lineup(mine, POS_SLOTS, 2)}
+    opt_ids = {str(p["sleeper_id"]) for p in optimal_lineup(mine, ctx["slots"], ctx["flex_slots"])}
     keep = opt_ids | set(ctx["current_starters"])
     starters = {p["name"] for p in mine if str(p["sleeper_id"]) in keep}
     bench = [p for p in mine if str(p["sleeper_id"]) not in keep]

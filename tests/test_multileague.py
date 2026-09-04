@@ -95,6 +95,52 @@ def test_no_omnibeta_identity_in_shared_code():
     assert r.stdout.strip() == "", f"Omnibeta identity leaked:\n{r.stdout}"
 
 
+def test_no_roster_shape_literals_in_shared_code():
+    """A league's LINEUP SHAPE is a league fact too (plan B2).
+
+    The name/id guard above passed for months while
+    `SLOTS = {QB 1, RB 2, WR 2, TE 1, K 1, DEF 1}` and `FLEX = 2` sat in
+    draftkit/briefs.py, so every non-Omnibeta league had a ten-starter lineup
+    optimised for a nine-starter roster. draftkit/shape.py is the one place
+    allowed to turn roster positions into slot counts.
+    """
+    import subprocess
+    pat = (r"^(SLOTS|POS_SLOTS|FLEX|N_STARTERS|ROSTER_SLOTS)\s*=|"
+           r"flex\s*(<|>|==|<=|>=)\s*[0-9]|"
+           r"\bflex\s*=\s*[1-9]")
+    r = subprocess.run(
+        ["git", "grep", "-n", "-E", pat, "--",
+         "draftkit/*.py", "manager/*.py", ":!draftkit/shape.py"],
+        capture_output=True, text=True)
+    assert r.stdout.strip() == "", (
+        "roster shape hardcoded outside draftkit/shape.py -- resolve it with "
+        f"shape_for(cfg, league) instead:\n{r.stdout}")
+
+
+
+def test_no_roster_shape_literals_in_shared_code():
+    """A league's LINEUP SHAPE is a league fact too (plan B2).
+
+    The name/id guard above passed for months while
+    `SLOTS = {QB 1, RB 2, WR 2, TE 1, K 1, DEF 1}` and `FLEX = 2` sat in
+    draftkit/briefs.py, so every non-Omnibeta league had a ten-starter lineup
+    optimised for a nine-starter roster. draftkit/shape.py is the one place
+    allowed to turn roster positions into slot counts.
+    """
+    import subprocess
+    pat = (r"^(SLOTS|POS_SLOTS|FLEX|N_STARTERS|ROSTER_SLOTS)\s*=|"
+           r"flex\s*(<|>|==|<=|>=)\s*[0-9]|"
+           r"\bflex\s*=\s*[1-9]")
+    r = subprocess.run(
+        ["git", "grep", "-n", "-E", pat, "--",
+         "draftkit/*.py", "manager/*.py", ":!draftkit/shape.py"],
+        capture_output=True, text=True)
+    assert r.stdout.strip() == "", (
+        "roster shape hardcoded outside draftkit/shape.py -- resolve it with "
+        f"shape_for(cfg, league) instead:\n{r.stdout}")
+
+
+
 def test_lenses_read_from_league_yaml_and_degrade_off(monkeypatch):
     from draftkit.lenses import load_lenses, scoreboard_md
     cfg = Config.load()                                  # omnibeta

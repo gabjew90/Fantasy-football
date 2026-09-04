@@ -15,14 +15,12 @@ import requests
 
 from draftkit.lineup import optimal_lineup
 
-from .context import POS_SLOTS
 
 log = logging.getLogger("manager")
 
 URL = ("https://api.fantasycalc.com/values/current"
        "?isDynasty=false&numQbs=1&numTeams=12&ppr=1")
 TTL = 24 * 3600
-FLEX = 2
 MAX_OPPS = 3
 VETO_RATIO = 0.7          # offer/ask value below this may draw veto votes
 TRADE_WEEKS = (3, 10)     # active window; recommend initiating by week 10
@@ -51,17 +49,28 @@ def values(store) -> tuple[dict[str, int], str | None]:
         return {}, f"DATA MISSING: FantasyCalc values ({e.__class__.__name__})"
 
 
-def surplus_deficit(roster: list[dict]) -> dict[str, int]:
-    """pos -> healthy startable count minus starting requirement (FLEX spread
-    across RB/WR/TE demand)."""
+def _flex_split(ctx) -> dict[str, float]:
+    """The league's own flex split (scripts/derive_flex_split.py writes it into
+    the league yaml; onboard.resolve_flex_split falls back to the format's)."""
+    from draftkit.onboard import resolve_flex_split
+    cfg = ctx["cfg"]
+    return resolve_flex_split(cfg.get("scoring") or (cfg.get("expected") or {}).get("scoring"),
+                              cfg.get("flex_split"))
+
+
+def surplus_deficit(roster: list[dict], slots: dict[str, int], flex: int,
+                    split: dict[str, float]) -> dict[str, int]:
+    """pos -> healthy startable count minus starting requirement (flex spread
+    across RB/WR/TE by the league's own derived split)."""
     healthy: dict[str, int] = {}
     for p in roster:
         if (p.get("status") or "") in ("Out", "IR", "PUP", "Suspended"):
             continue
         healthy[p["pos"]] = healthy.get(p["pos"], 0) + 1
     out = {}
-    for pos, req in POS_SLOTS.items():
-        need = req + (1 if pos in ("RB", "WR") else 0)  # FLEX demand approximation
+    for pos, req in slots.items():
+        # the league's own derived flex split, not a hardcoded "one RB one WR"
+        need = req + round(flex * float(split.get(pos, 0.0)))
         out[pos] = healthy.get(pos, 0) - need
     return out
 
@@ -119,7 +128,8 @@ def build(ctx, store) -> str:
         return int(round(raw * f))
 
     mine = ctx["roster_players"][ctx["my_rid"]]
-    my_sd = surplus_deficit(mine)
+    shape_args = (ctx["slots"], ctx["flex"], _flex_split(ctx))
+    my_sd = surplus_deficit(mine, *shape_args)
     records = {int(r["roster_id"]): (int((r.get("settings") or {}).get("wins", 0)),
                                      int((r.get("settings") or {}).get("losses", 0)))
                for r in ctx["rosters"]}
@@ -131,13 +141,13 @@ def build(ctx, store) -> str:
         if rid == ctx["my_rid"] or not roster:
             continue
         mgr = ctx["users_by_rid"].get(rid, f"roster {rid}")
-        their_sd = surplus_deficit(roster)
+        their_sd = surplus_deficit(roster, *shape_args)
         w, l = records.get(rid, (0, 0))
         seller = week > 5 and w < l and (sixth_seed_wins - w) >= 2
 
         # desperation: their optimal starter freshly Out/IR where I hold the shape
         desperation = None
-        starters = optimal_lineup(roster, POS_SLOTS, FLEX)
+        starters = optimal_lineup(roster, ctx["slots"], ctx["flex_slots"])
         for s in starters:
             if (s.get("status") or "") in ("Out", "IR") and store.first_time(
                     f"desp:{rid}:{s['sleeper_id']}:{s.get('status')}"):

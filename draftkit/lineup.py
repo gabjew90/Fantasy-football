@@ -9,32 +9,55 @@ in manager/lineup_opt.py (its own inline rule).
 
 from __future__ import annotations
 
-FLEX_ELIGIBLE = ("RB", "WR", "TE")
+FLEX_ELIGIBLE = ("RB", "WR", "TE")          # a plain FLEX slot
 
 
-def optimal_lineup(roster: list[dict], slots: dict[str, int], flex: int) -> list[dict]:
+def _flex_sets(flex: int, flex_slots) -> tuple[frozenset[str], ...]:
+    """Eligibility sets for the flex slots, most restrictive first.
+
+    `flex_slots` from draftkit.shape is authoritative when given. The int
+    `flex` is the shorthand every caller and test used before rec/super flex
+    existed and still means exactly what it meant: that many RB/WR/TE slots.
+    """
+    if flex_slots is not None:
+        return tuple(sorted((frozenset(e) for e in flex_slots), key=len))
+    return (frozenset(FLEX_ELIGIBLE),) * int(flex or 0)
+
+
+def optimal_lineup(roster: list[dict], slots: dict[str, int], flex: int = 0,
+                   flex_slots=None) -> list[dict]:
+    """Highest-scoring legal lineup.
+
+    Flex eligibility classes nest (WR/TE inside RB/WR/TE inside QB/RB/WR/TE),
+    so filling the most restrictive first is optimal rather than merely a
+    heuristic: any player a tighter slot can take a looser one can too, so
+    spending the loose slot first can strand the tight one empty while the
+    reverse never can. `_flex_sets` sorts by size to guarantee that order.
+    """
     pool = sorted(roster, key=lambda p: -(p.get("weekly") or 0.0))
     counts = {k: 0 for k in slots}
-    chosen, flex_used = [], 0
+    chosen = []
     for p in pool:
         pos = p.get("pos")
         if pos in slots and counts[pos] < slots[pos]:
             counts[pos] += 1
             chosen.append(p)
     ids = {p["sleeper_id"] for p in chosen}
-    for p in pool:
-        if p["sleeper_id"] not in ids and p.get("pos") in FLEX_ELIGIBLE and flex_used < flex:
-            flex_used += 1
-            chosen.append(p)
-            ids.add(p["sleeper_id"])
+    for eligible in _flex_sets(flex, flex_slots):
+        for p in pool:
+            if p["sleeper_id"] not in ids and p.get("pos") in eligible:
+                chosen.append(p)
+                ids.add(p["sleeper_id"])
+                break
     return chosen
 
 
 def lineup_changes(roster: list[dict], current_ids: list[str],
-                   slots: dict[str, int], flex: int) -> tuple[list[str], float]:
+                   slots: dict[str, int], flex: int = 0,
+                   flex_slots=None) -> tuple[list[str], float]:
     """Suggested swaps (only differences) + optimal projected total."""
     by_id = {str(p["sleeper_id"]): p for p in roster}
-    optimal = optimal_lineup(roster, slots, flex)
+    optimal = optimal_lineup(roster, slots, flex, flex_slots)
     opt_ids = {p["sleeper_id"] for p in optimal}
     cur_ids = {i for i in (str(x) for x in current_ids) if i in by_id}
     changes = []

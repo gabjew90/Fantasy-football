@@ -22,6 +22,7 @@ from rich.table import Table
 from rich.text import Text
 
 from . import snake
+from .shape import starting_slots
 from .sleeper import SleeperClient, get_json, BASE
 
 POS_ORDER = ["RB", "WR", "TE", "QB", "K", "DEF"]
@@ -109,11 +110,15 @@ class Tracker:
         if self.local:
             self.draft_id = f"local_{cfg.league_name or 'draft'}"
             exp = cfg.get("expected") or {}
-            counts: dict[str, int] = {}
-            for slotname in (str(x).upper() for x in (exp.get("roster") or [])):
-                key = "FLEX" if slotname in ("W/R/T", "W/R", "FLEX", "WRT") else slotname
-                if key != "IR":
-                    counts[key] = counts.get(key, 0) + 1
+            # one definition of "roster-position list -> starting slots", shared
+            # with the in-season manager. The inline parse that used to live here
+            # had its own flex vocabulary and silently kept anything it did not
+            # recognise as a position of its own.
+            sh = starting_slots(exp.get("roster") or [],
+                                f"leagues/{cfg.league_name}.yaml expected.roster")
+            counts = dict(sh.slots)
+            counts["FLEX"] = len(sh.flex_slots)
+            counts["BN"] = sh.bench
             self.draft = {
                 "type": exp.get("type", "snake"), "status": "drafting",
                 "draft_order": {},
