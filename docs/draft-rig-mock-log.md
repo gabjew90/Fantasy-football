@@ -1150,3 +1150,29 @@ fitted objective 0.1726, current 0.1878; 30-49 bucket fitted pred 40
 obs 25 (n344), current pred 40 obs 39 (n401). Reports:
 reports/mocks/mock41_2026-09-03_1642pt_pump-fake-ii_room10618261_seat9_*.md.
 Pair 4B is room 10619316, seat 9, CURRENT (forward15, verified).
+
+## Mock 42 — room 10619316 "Crackback Block II", 10 teams, slot 9 — PAIR 4B: CURRENT knobs, full #39 engine — CLEAN
+
+17:12-17:29 PT. 15/15 legal, 15/15 engine, zero autopicks, preflight
+call#1 (forward15). Manager-named panel tags confirmed live ("Logan pick
+6 Amon-Ra St. Brown"). Offline scoring, pasted from g4_10619316_*.log:
+fitted objective 0.1807, current 0.1903; 30-49 bucket fitted pred 40 obs
+21 (n317), current pred 42 obs 34 (n362). Reports:
+reports/mocks/mock42_2026-09-03_1712pt_crackback-block-ii_room10619316_seat9_*.md.
+
+PAIR 4 (seat 9): 41 fitted 1580 vs 42 current 1623, current +43. Seven
+identical picks; every difference was availability (McBride and Maye gone
+before our turn in room 41), including the one nominal model choice at 52
+(Kittle, because room 41 had no TE). At every turn where both rooms held
+the same players, the two models made the same pick.
+
+FOUR-PAIR SUMMARY (seats 5, 3, 7, 9; eight clean rooms plus one control):
+lineup delta for fitted +23, -1, -52, -43; the last two entirely room
+availability. Genuine model-choice picks across all pairs: five or six,
+all the same shape (fitted reaches a round earlier for a scarce RB, gets
+its TE/QB a round later anyway), outcome-neutral. Offline, fitted better
+log-loss in 13 of 13 rooms scored today and over-promising the 30-50
+band in most. Conclusion unchanged: better forecaster, not a better
+drafter, worse calibrated at the decision point; the default stays for
+2026-09-05. Rig: 14 consecutive clean rooms (15/15 engine) on the final
+engine and driver.
