@@ -40,6 +40,16 @@ def apply_table(rows: pl.DataFrame, tables: dict[str, dict], arms=("blend", "lin
         sub = sub.with_columns(pl.col("adp").rank(method="ordinal").over("pos").alias("_r"))
         sub = sub.with_columns(GT.games_expr(GAMES, table).alias("_games"))
         sub = sub.with_columns(*[(pl.col(a) * pl.col("_games") / GAMES).alias(f"{a}_gt") for a in arms if a in sub.columns])
+        # RB-ONLY ARM (pre-registered 2026-09-04). The pooled gate FAILED
+        # (DECISIONS #31) while the games table improved RB MAE in all four
+        # (league, pair) cells and worsened QB/WR/TE. `<arm>_gt_rb` applies the
+        # table to running backs alone and leaves every other position on the
+        # base arm, so source_gate can judge exactly that hypothesis with the
+        # same two halves and no change to its verdict code:
+        #   source_gate.py --rows <gt rows> --candidate blend_gt_rb --rivals blend
+        sub = sub.with_columns(*[
+            pl.when(pl.col("pos") == "RB").then(pl.col(f"{a}_gt")).otherwise(pl.col(a)).alias(f"{a}_gt_rb")
+            for a in arms if a in sub.columns])
         parts.append(sub.drop("_r", "_games"))
     return pl.concat(parts, how="vertical_relaxed")
 

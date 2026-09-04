@@ -65,16 +65,33 @@ from slot_replay import replay  # noqa: E402
 from draftkit.snake import FLEX_ELIGIBLE  # noqa: E402
 
 WEEKS = 17
-LEAGUES = {
-    "keefamania": dict(board="tiers.keefamania.csv", log="1396184666897145856",
-                       teams=10, rounds=15, k=3,     # rolling waiver list
-                       slots={"QB": 1, "RB": 2, "WR": 2, "TE": 1, "FLEX": 1,
-                              "K": 1, "DEF": 1}),
-    "omnibeta": dict(board="tiers.csv", log="1395566812157984768",
-                     teams=12, rounds=15, k=2,       # FAAB
-                     slots={"QB": 1, "RB": 2, "WR": 2, "TE": 1, "FLEX": 2,
-                            "K": 1, "DEF": 1}),
-}
+LEAGUE_NAMES = ("keefamania", "omnibeta")
+# The Keefamania "draft log" is a Sleeper MOCK room used as a stand-in (Yahoo
+# publishes no draft log to replay), so it is not a league fact and does not
+# belong in the yaml. Omnibeta replays its real draft, whose id the yaml holds.
+STANDIN_LOGS = {"keefamania": "1396184666897145856"}
+
+
+def league_entry(name: str) -> dict:
+    """Everything this replay needs about a league, read from
+    leagues/<name>.yaml instead of retyped here (CLAUDE.md: league facts
+    live in the yaml). Team count, roster shape, board name and waiver k
+    all follow the yaml, so a corrected league file corrects this replay
+    with it. Until 2026-09-04 this was a private dict that could disagree
+    with the verified record and nothing would say so."""
+    from draftkit.baselines import waiver_k
+    from draftkit.config import Config
+    cfg = Config.load(league=name)
+    teams, rounds, slots = EP.league_shape(cfg)
+    return dict(
+        board=str(cfg.scoped(cfg.root / "tiers.csv")),
+        log=str(cfg.get("draft_id") or STANDIN_LOGS[name]),
+        teams=teams, rounds=rounds,
+        k=waiver_k((cfg.get("expected") or {}).get("waivers")),
+        slots=slots,
+    )
+
+
 STARTER_ORDER = ("QB", "RB", "WR", "TE", "K", "DEF")
 
 
@@ -213,13 +230,13 @@ def shape(roster) -> str:
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--league", required=True, choices=list(LEAGUES))
+    ap.add_argument("--league", required=True, choices=list(LEAGUE_NAMES))
     ap.add_argument("--sims", type=int, default=200)
     ap.add_argument("--rates", default="data/processed/bench_rates.json")
     ap.add_argument("--slots", default="", help="comma list of draft slots")
     a = ap.parse_args()
 
-    L = LEAGUES[a.league]
+    L = league_entry(a.league)
     if not Path(a.rates).exists():
         # data/processed is not tracked; the distributions are regenerable
         raise SystemExit(

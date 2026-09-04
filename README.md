@@ -8,14 +8,11 @@ draft Sat 2026-09-05 — see `docs/draft-day-runbook.md`). Decisions and their
 evidence live in `DECISIONS.md`; this README is the map, not the record.
 
 > **In-season cadence (draft complete 2026-08-23 — finished #1 of 12 on the board):**
-> 1. **Tuesday 6 PM (auto):** waiver brief — ranked claims with FAAB bands, sealed-bid
->    logic on league-winners, rival budgets, drops, IR housekeeping, regime banner,
->    three-lens scoreboard. `reports/waiver_brief.md`; claims process Wednesday.
-> 2. **Thursday 3 PM (auto):** early-games check — start/sit + inactives for players
->    whose games kick before the weekend (schedule-driven: week 1 has a Wednesday game).
-> 3. **Sunday 9 AM (auto):** lineup brief — optimal-vs-current diffs, variance lean,
->    inactive flags by kickoff, bye/IR warnings. All three served at localhost:8723/brief.
-> 4. Deep research passes stay ad hoc: briefs flag names; ping Claude to verify facts.
+> The auto-manager runs on GitHub Actions (`.github/workflows/weekly.yml`) and
+> delivers as GitHub Issues. Pacific time: **Monday 6 AM** planner, **Tuesday 4 PM**
+> waiver brief (claims process Wednesday), **Friday noon** scout, **Sunday 7 AM**
+> lineup backstop, plus a daily 8 AM healthcheck. There is no Thursday job.
+> Deep research passes stay ad hoc: briefs flag names; ping Claude to verify facts.
 > 5. Weekly projections auto-detect Sleeper publish state; until live they fall back to
 >    season proj ÷ 16 with a visible banner. The matchup adjustment activates from
 >    week 3 data (cap in config.yaml `inseason:`).

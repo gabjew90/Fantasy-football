@@ -119,7 +119,16 @@ def main() -> int:
         default_league = cfg._data.get("default_league")
         if out_dir is None:
             out_dir = cfg.path("external")
-    except Exception as e:  # noqa: BLE001 -- the script is useful without a league yaml
+    except FileNotFoundError:
+        # CLAUDE.md: a missing league file is a loud error, never a silent
+        # fallback. Before this, `--league omnibetta` (a typo) printed one
+        # line and wrote yahoo_rank.omnibetta.csv, and a temporarily unreadable
+        # real yaml wrote the scoped filename the default league never reads.
+        raise
+    except Exception as e:  # noqa: BLE001
+        if a.league:
+            raise
+        # no --league asked for: the script still works on a bare snapshot
         print(f"  (config not loaded: {type(e).__name__}: {e}; using data/external)")
         if out_dir is None:
             out_dir = ROOT / "data" / "external"

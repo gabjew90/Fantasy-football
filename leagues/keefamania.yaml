@@ -117,9 +117,12 @@ expected:
     fum_lost: -2.0
     pass_td_40p: 2.0        # league custom: +2 bonus on 40+ yard passing TDs
   waivers: rolling_list     # NOT FAAB — priority list, 2-day claims, Tue game-time
-  trade_deadline: 2026-11-28
-  playoffs: "6 teams, weeks 15-17, reseeding on"
-  ir_slots: 2
+  # Recorded facts that `verify` does not diff and no code reads (review
+  # 2026-09-04). Kept as comments so this block holds only what verify
+  # actually checks; promote one back to a key the day a consumer exists.
+  #   trade_deadline: 2026-11-28
+  #   playoffs: "6 teams, weeks 15-17, reseeding on"
+  #   ir_slots: 2
 
 # Dataset scoring reads expected.scoring above (one block, no drift —
 # code review 2026-08-30). pass_td_40p +2 is recorded there but NOT modeled:

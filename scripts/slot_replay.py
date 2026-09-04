@@ -29,7 +29,10 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import engine_parity as EP  # noqa: E402
-from engine_bakeoff import FLEX_OK, SLOTS, lineup_value  # noqa: E402
+# engine_bakeoff.py was kept alive for three names; they live here now.
+# SLOTS is the Keefamania default shape and --league overrides it below.
+from engine_parity import SLOTS  # noqa: E402
+from draftkit.snake import FLEX_ELIGIBLE as FLEX_OK  # noqa: E402
 
 
 def lineup_points(chosen: list[dict], slots: dict | None = None, key: str = "proj_pts") -> float:
@@ -181,7 +184,11 @@ def main() -> None:
         off = replay(board, log, s, a.teams, rounds, False, slots=league_slots, overrides=overrides)
         on = replay(board, log, s, a.teams, rounds, True, slots=league_slots, overrides=overrides)
         po, pn = lineup_points(off, grading_slots), lineup_points(on, grading_slots)
-        vo, vn = lineup_value(off), lineup_value(on)
+        # graded on the SAME shape as the points columns. lineup_value was
+        # hard-wired to the Keefamania 1-FLEX roster, so on Omnibeta this
+        # column scored a lineup the league cannot set next to one it can.
+        vo, vn = (lineup_points(off, grading_slots, key="vorp"),
+                  lineup_points(on, grading_slots, key="vorp"))
         rows.append((s, po, pn, vo, vn, off, on))
         print(f"{s:>4}{po:>10.1f}{pn:>9.1f}{pn - po:>+9.1f}{'':4}"
               f"{vo:>8.1f}{vn:>8.1f}{vn - vo:>+8.1f}   {shape(on):<24}")

@@ -936,7 +936,12 @@ window.DK = (function () {
       });
       // a hung bridge must not hold the on-clock path for the whole clock
       const ctl = typeof AbortController !== 'undefined' ? new AbortController() : null;
-      const timer = ctl ? setTimeout(() => ctl.abort(), (S.cfg.planTimeoutMs || 8000)) : null;
+      // 3 s, not 8. A HUNG bridge (a QuickEdit text selection in its console
+      // window, a held lock) costs this whole timeout per gate cycle, and the
+      // local-ranker handoff needs three failed cycles plus a 1.2 s sleep
+      // each, so 8 s meant ~28 s of a 60 s clock gone before the driver even
+      // began picking. Measured plan latency is ~175 ms median, ~1.3 s worst.
+      const timer = ctl ? setTimeout(() => ctl.abort(), (S.cfg.planTimeoutMs || 3000)) : null;
       let r;
       try {
         r = await fetch(S.cfg.bridge + '/plan', {
@@ -1930,7 +1935,16 @@ window.DK = (function () {
       // the search box was missing walked all 25 plan rows at 3 s each
       if (tries >= (maxTries || 3)) break;
       const entry = S.board.find(b => b.n === cand.n && b.p === cand.p);
-      if (!entry) continue;
+      if (!entry) {
+        // A plan row the page cannot find on its own board must not vanish
+        // in silence. The bridge reads tiers.csv live while board.json was
+        // exported earlier, so a respelled or newly overridden name lands
+        // here, and before this the engine's #1 candidate was skipped with
+        // no trace in the trail. Recorded, NOT counted as a try: a board
+        // mismatch is not a pick attempt and must not burn the budget.
+        attempted.push(cand.n + ':not-on-board');
+        continue;
+      }
       if (!guardrailOk(entry, rnd, need, counts, picksLeft, teFell)) {
         attempted.push(cand.n + ':guardrail');
         continue;
