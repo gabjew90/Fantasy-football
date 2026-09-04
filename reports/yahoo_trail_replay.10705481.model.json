@@ -1,0 +1,237 @@
+{
+ "room": "10705481",
+ "league": "keefamania",
+ "teams": 10,
+ "rounds": 15,
+ "board": "C:\\Users\\gabje\\AppData\\Local\\Temp\\claude\\C--Users-gabje-Desktop-fantasy-football\\85c73b68-a261-49f7-a5f2-550595b18f46\\scratchpad\\tiers.keefamania.MODEL.csv",
+ "sets": {},
+ "away_states": 150,
+ "sidecar": true,
+ "unmatched": [
+  "Rams",
+  "Broncos",
+  "Texans",
+  "Will Reichard",
+  "Eagles",
+  "Steelers",
+  "Ravens",
+  "Vikings"
+ ],
+ "ambiguous": [],
+ "per_slot": {
+  "fitted": {
+   "1": {
+    "points": 1892.9,
+    "shape": "QB2 RB6 WR4 TE1 K1 DEF1",
+    "roster": [
+     "Christian McCaffrey",
+     "Jahmyr Gibbs",
+     "Drake London",
+     "Josh Allen",
+     "D'Andre Swift",
+     "George Pickens",
+     "George Kittle",
+     "Kyle Monangai",
+     "Jaylen Waddle",
+     "Caleb Williams",
+     "RJ Harvey",
+     "Rome Odunze",
+     "Jadarian Price",
+     "Houston Texans",
+     "Eddy Pineiro"
+    ]
+   },
+   "2": {
+    "points": 1786.8,
+    "shape": "QB2 RB6 WR4 TE1 K1 DEF1",
+    "roster": [
+     "Christian McCaffrey",
+     "Drake London",
+     "Trey McBride",
+     "Cam Skattebo",
+     "D'Andre Swift",
+     "Terry McLaurin",
+     "Trevor Lawrence",
+     "Tyrone Tracy Jr.",
+     "Kyle Monangai",
+     "Patrick Mahomes II",
+     "Wan'Dale Robinson",
+     "Michael Pittman Jr.",
+     "Aaron Jones Sr.",
+     "Houston Texans",
+     "Eddy Pineiro"
+    ]
+   },
+   "3": {
+    "points": 1784.0,
+    "shape": "QB2 RB5 WR4 TE2 K1 DEF1",
+    "roster": [
+     "Bijan Robinson",
+     "Trey McBride",
+     "A.J. Brown",
+     "Nico Collins",
+     "Ashton Jeanty",
+     "Jalen Hurts",
+     "Jaylen Warren",
+     "Rico Dowdle",
+     "Tetairoa McMillan",
+     "Tyler Warren",
+     "Matthew Stafford",
+     "Mike Washington Jr.",
+     "DK Metcalf",
+     "Houston Texans",
+     "Cam Little"
+    ]
+   },
+   "4": {
+    "points": 1778.3,
+    "shape": "QB2 RB5 WR4 TE2 K1 DEF1",
+    "roster": [
+     "Ja'Marr Chase",
+     "Trey McBride",
+     "Derrick Henry",
+     "Cam Skattebo",
+     "Drake Maye",
+     "Garrett Wilson",
+     "Brock Bowers",
+     "Tyrone Tracy Jr.",
+     "Marvin Harrison Jr.",
+     "Patrick Mahomes II",
+     "Breece Hall",
+     "Michael Pittman Jr.",
+     "Quinshon Judkins",
+     "Houston Texans",
+     "Cairo Santos"
+    ]
+   },
+   "5": {
+    "points": 1857.8,
+    "shape": "QB2 RB5 WR4 TE2 K1 DEF1",
+    "roster": [
+     "Jonathan Taylor",
+     "Trey McBride",
+     "Kyren Williams",
+     "Puka Nacua",
+     "Drake Maye",
+     "Zay Flowers",
+     "Omarion Hampton",
+     "Javonte Williams",
+     "Jameson Williams",
+     "Patrick Mahomes II",
+     "Rhamondre Stevenson",
+     "Colston Loveland",
+     "Courtland Sutton",
+     "Houston Texans",
+     "Cameron Dicker"
+    ]
+   },
+   "6": {
+    "points": 1815.5,
+    "shape": "QB2 RB6 WR4 TE1 K1 DEF1",
+    "roster": [
+     "Jonathan Taylor",
+     "De'Von Achane",
+     "Amon-Ra St. Brown",
+     "A.J. Brown",
+     "Drake Maye",
+     "George Kittle",
+     "Travis Etienne Jr.",
+     "Jaylen Warren",
+     "Ladd McConkey",
+     "Patrick Mahomes II",
+     "David Montgomery",
+     "Parker Washington",
+     "Woody Marks",
+     "Houston Texans",
+     "Evan McPherson"
+    ]
+   },
+   "7": {
+    "points": 1797.4,
+    "shape": "QB2 RB4 WR5 TE2 K1 DEF1",
+    "roster": [
+     "Jaxon Smith-Njigba",
+     "Jonathan Taylor",
+     "Kyren Williams",
+     "Justin Jefferson",
+     "Drake Maye",
+     "Chris Olave",
+     "George Kittle",
+     "Jeremiyah Love",
+     "Mike Evans",
+     "Patrick Mahomes II",
+     "Kyle Pitts Sr.",
+     "Luther Burden III",
+     "Kenny Gainwell",
+     "Houston Texans",
+     "Evan McPherson"
+    ]
+   },
+   "8": {
+    "points": 1766.2999999999997,
+    "shape": "QB2 RB6 WR4 TE1 K1 DEF1",
+    "roster": [
+     "Jaxon Smith-Njigba",
+     "De'Von Achane",
+     "James Cook III",
+     "Travis Etienne Jr.",
+     "Drake Maye",
+     "DeVonta Smith",
+     "George Kittle",
+     "Kenneth Walker III",
+     "Emeka Egbuka",
+     "Patrick Mahomes II",
+     "TreVeyon Henderson",
+     "Courtland Sutton",
+     "Woody Marks",
+     "Houston Texans",
+     "Jason Myers"
+    ]
+   },
+   "9": {
+    "points": 1761.8,
+    "shape": "QB2 RB6 WR4 TE1 K1 DEF1",
+    "roster": [
+     "Jaxon Smith-Njigba",
+     "De'Von Achane",
+     "Chase Brown",
+     "Rashee Rice",
+     "Drake Maye",
+     "George Kittle",
+     "Jaylen Warren",
+     "Rico Dowdle",
+     "Malik Nabers",
+     "Patrick Mahomes II",
+     "Bucky Irving",
+     "Davante Adams",
+     "RJ Harvey",
+     "Houston Texans",
+     "Ka'imi Fairbairn"
+    ]
+   },
+   "10": {
+    "points": 1748.0000000000002,
+    "shape": "QB2 RB6 WR4 TE1 K1 DEF1",
+    "roster": [
+     "De'Von Achane",
+     "Chase Brown",
+     "Saquon Barkley",
+     "CeeDee Lamb",
+     "Drake Maye",
+     "Davante Adams",
+     "George Kittle",
+     "Kyren Williams",
+     "Tee Higgins",
+     "Patrick Mahomes II",
+     "Kenny Gainwell",
+     "DJ Moore",
+     "Tony Pollard",
+     "Houston Texans",
+     "Brandon Aubrey"
+    ]
+   }
+  }
+ },
+ "errors": [],
+ "seconds": 133.24615502357483
+}
