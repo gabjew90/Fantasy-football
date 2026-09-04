@@ -104,31 +104,102 @@ def _usage_adjusted_ppg(usage: pl.DataFrame, shrink_k: float) -> pl.DataFrame:
     return usage.join(pl.concat(aligned), on="gsis_id", how="left")
 
 
-def _market_curve(df: pl.DataFrame) -> pl.DataFrame:
-    """Fit proj_model_pts ~ a + b*ln(ecr) per position on veterans; predict all.
+# DECISIONS #40: the linear-in-rank term applies to these positions and no
+# others, fixed BEFORE the gate ran. Measured fitted c is stable and negative
+# for RB (-2.11, -2.11, -2.04, -1.74) and WR (-0.69, -0.92, -1.01, -0.92) across
+# all four league-pairs, and swings sign for QB and TE (-3.55 to +1.60) on fit
+# populations of 13-25. Choosing the list up front rather than discarding a
+# positive c per cell keeps the shape from being selected on the same data the
+# arm is graded on.
+TAIL_LINEAR_POSITIONS = ("RB", "WR")
+TAIL_MODES = ("off", "rank", "rank_lin", "full")
+
+
+def _market_curve(df: pl.DataFrame, tail: dict | None = None) -> pl.DataFrame:
+    """Fit proj_model_pts ~ a + b*ln(rank) per position on veterans; predict all.
 
     ADP stands in for ECR when ECR is missing (comparable rank scales), so
     ADP-only players still get a projection path instead of silently dropping.
+
+    `tail` selects the arm (DECISIONS #40). None, or mode "off", is the
+    historical behaviour byte for byte:
+
+      off       fit and predict on ln(raw ECR/ADP), as shipped since #20
+      rank      the regressor becomes the WITHIN-POSITION ordinal rank. A
+                per-position fit should not carry other positions' density on
+                its x-axis, and the rank does not saturate the way the published
+                ADP feed does at its own tail (RB ranks 49-72 all sit between
+                overall ADP 148 and 174, so twelve players cost 0.12 in ln(adp)
+                against 1.51 at the top).
+      rank_lin  + a linear-in-rank term for TAIL_LINEAR_POSITIONS, so the curve
+                can keep decaying where ln() has gone flat. This is the arm the
+                gate is really judging.
+      full      + tangent continuation past the fit population's last rank.
+                Production-only: it moves ~7 of 684 backtest rows because the
+                ADP feed stops near pick 180 while veterans reach the end of it.
+
+    Every mode other than "off" floors predictions at zero. A negative market
+    projection is meaningless, and the linear term can reach one at deep ranks.
     """
+    raw = (tail or {}).get("mode", "off")
+    # bare `off` in yaml is a 1.1 boolean; treat False as the historical arm
+    # rather than crashing on a config that reads correctly to a human
+    mode = "off" if raw in (None, False) else str(raw).lower()
+    if mode not in TAIL_MODES:
+        raise ValueError(f"projections.market_curve_tail.mode {mode!r} not in {TAIL_MODES}")
+    min_fit = int((tail or {}).get("min_fit", 30))
+
     preds = np.full(df.height, np.nan)
     ecr_expr = (
         pl.coalesce(pl.col("ecr"), pl.col("adp")) if "adp" in df.columns else pl.col("ecr")
     )
     ecr = df.select(ecr_expr.alias("_e"))["_e"].to_numpy().astype(float)
+    if mode == "off":
+        xs = ecr
+    else:
+        # same idiom as the games-table band at model_projection; masked back to
+        # ecr's own finite set so COVERAGE IS IDENTICAL across modes -- the arms
+        # are only comparable if proj_market_pts is non-null on the same rows
+        xs = df.select(ecr_expr.rank(method="ordinal").over("pos").alias("_r"))["_r"] \
+               .to_numpy().astype(float)
+        xs = np.where(np.isfinite(ecr), xs, np.nan)
+
     for pos in df["pos"].unique().to_list():
         mask = (df["pos"] == pos).to_numpy()
         fitmask = (
             mask
-            & np.isfinite(ecr)
+            & np.isfinite(xs)
             & df["proj_model_pts"].is_not_null().to_numpy()
             & (df["games"].fill_null(0) >= 8).to_numpy()
         )
-        if fitmask.sum() >= 6:
-            x = np.log(ecr[fitmask])
-            y = df["proj_model_pts"].to_numpy()[fitmask].astype(float)
-            b, a = np.polyfit(x, y, 1)
-            predmask = mask & np.isfinite(ecr)
-            preds[predmask] = a + b * np.log(ecr[predmask])
+        if fitmask.sum() < 6:
+            continue
+        x = xs[fitmask]
+        y = df["proj_model_pts"].to_numpy()[fitmask].astype(float)
+        predmask = mask & np.isfinite(xs)
+        r = xs[predmask]
+        # min_fit is a safety net against a future board with a thin RB/WR cell,
+        # not the selector -- the position list above is the selector
+        linear = (
+            mode in ("rank_lin", "full")
+            and pos in TAIL_LINEAR_POSITIONS
+            and fitmask.sum() >= min_fit
+        )
+        if linear:
+            beta, *_ = np.linalg.lstsq(
+                np.column_stack([np.ones(x.size), np.log(x), x]), y, rcond=None)
+            a, b, c = float(beta[0]), float(beta[1]), float(beta[2])
+        else:
+            b, a = np.polyfit(np.log(x), y, 1)
+            a, b, c = float(a), float(b), 0.0
+        if mode == "full":
+            rstar = float(x.max())
+            rc = np.minimum(r, rstar)
+            v = (a + b * np.log(rc) + c * rc
+                 + np.where(r > rstar, (b / rstar + c) * (r - rstar), 0.0))
+        else:
+            v = a + b * np.log(r) + c * r
+        preds[predmask] = v if mode == "off" else np.maximum(v, 0.0)
     return df.with_columns(pl.Series("proj_market_pts", preds).fill_nan(None))
 
 
@@ -383,7 +454,7 @@ def model_projection(cfg, usage: pl.DataFrame, market: pl.DataFrame) -> pl.DataF
     df = df.with_columns(pl.coalesce(pl.col("ecr"), pl.col("adp")).rank(method="ordinal").over("pos").alias("_r"))
     df = df.with_columns(GT.games_expr(games, GT.load(cfg)).alias("_games")).drop("_r")
     df = df.with_columns((pl.col("model_ppg") * pl.col("_games")).alias("proj_model_pts"))
-    df = _market_curve(df)
+    df = _market_curve(df, p.get("market_curve_tail"))
 
     # Role gate (projection overhaul, usage-side fix 1, 2026-09-02): a per-game
     # rate cannot say "he will not start". Scale the MODEL term by the share

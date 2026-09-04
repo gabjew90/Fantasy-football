@@ -255,3 +255,139 @@ def test_alpha_cap_by_position_sits_under_the_type_alpha(monkeypatch, tmp_path):
     assert all(a[f"w{i}"] == 0.2 for i in range(n)), "WR stable veterans capped at 0.2"
     assert all(a[f"r{i}"] == 0.65 for i in range(n)), "RB untouched"
     # a cap above the type alpha changes nothing (QB cap 0.9 vs 0.65) -- exercised via config parse only
+
+
+# ---- DECISIONS #40: the market curve that stopped decaying inside its fit ----
+
+def _curve_rows(pos="RB", n=100, fitted=60, b0=-45.0, c0=-0.6, base=340.0):
+    """n players at one position, values shaped like the real board: a log decay
+    plus a mild linear one. The first `fitted` are veterans (games 16) and are
+    the curve's fit population; the rest are tail rows with no stats. `adp` is
+    2x the rank so the log-only fit is a pure reparameterisation of rank, which
+    lets one test isolate the regressor swap from the shape change."""
+    import math
+    rows = []
+    for i in range(n):
+        vet = i < fitted
+        v = base + b0 * math.log(i + 1) + c0 * i
+        rows.append({
+            "pos": pos, "ecr": float(i + 1) * 2.0, "adp": float(i + 1) * 2.0,
+            "proj_model_pts": v if vet else None,
+            "games": 16 if vet else None,
+        })
+    return pl.DataFrame(rows)
+
+
+def test_market_curve_tail_off_is_byte_identical():
+    """The historical arm must survive untouched: no tail dict, an explicit
+    off, and a yaml-1.1 bare `off` (which parses to False) all agree."""
+    from draftkit.projections import _market_curve
+
+    df = _curve_rows()
+    base = _market_curve(df)["proj_market_pts"].to_list()
+    for tail in ({"mode": "off"}, {"mode": False}, {}, None):
+        assert _market_curve(df, tail)["proj_market_pts"].to_list() == base
+
+
+def test_regressor_swap_is_a_reparameterisation_when_adp_tracks_rank():
+    """Isolates edit 1. With adp = 2 x rank, ln(2r) = ln 2 + ln(r), so the
+    log-only fit absorbs the swap into its intercept and predictions are
+    unchanged. On the real board adp does NOT track rank at the tail -- that
+    saturation is the defect -- so any difference there is the point."""
+    from draftkit.projections import _market_curve
+
+    df = _curve_rows()
+    off = _market_curve(df, {"mode": "off"})["proj_market_pts"].to_list()
+    rank = _market_curve(df, {"mode": "rank"})["proj_market_pts"].to_list()
+    assert max(abs(a - b) for a, b in zip(off, rank)) < 1e-6
+
+
+def test_market_curve_tail_covers_exactly_the_same_rows():
+    """The arms are only comparable if proj_market_pts is non-null on the same
+    rows. Includes an adp-only row and a row with neither rank."""
+    from draftkit.projections import _market_curve
+
+    df = pl.concat([
+        _curve_rows(),
+        pl.DataFrame([{"pos": "RB", "ecr": None, "adp": 190.0,
+                       "proj_model_pts": None, "games": None},
+                      {"pos": "RB", "ecr": None, "adp": None,
+                       "proj_model_pts": None, "games": None}]),
+    ])
+    masks = {
+        mode: [v is None for v in _market_curve(df, {"mode": mode})["proj_market_pts"]]
+        for mode in ("off", "rank", "rank_lin", "full")
+    }
+    assert masks["off"] == masks["rank"] == masks["rank_lin"] == masks["full"]
+    assert masks["off"][-2] is False and masks["off"][-1] is True
+
+
+def test_market_curve_tail_keeps_decaying_where_log_has_gone_flat():
+    """The defect in one assertion: across the deep band the log-only curve
+    barely moves, and the linear term must drop materially further.
+
+    Deliberately NOT asserting that the head is unchanged. The linear term
+    reshapes the whole fitted curve, so on any synthetic population the head
+    moves too. Whether it moves on the REAL board is a pass criterion of the
+    gate (top-24 MAE ratio <= 1.01, no top-12 projection moving > 2.0 pts),
+    measured there rather than asserted here on data that cannot represent it.
+    """
+    from draftkit.projections import _market_curve
+
+    df = _curve_rows()
+    off = _market_curve(df, {"mode": "off"})["proj_market_pts"].to_list()
+    lin = _market_curve(df, {"mode": "rank_lin"})["proj_market_pts"].to_list()
+    assert (lin[36] - lin[59]) > (off[36] - off[59]), "deep band must fall further"
+    assert lin[59] < off[59], "the deep band must come DOWN, not up"
+    assert all(a >= b - 1e-9 for a, b in zip(lin, lin[1:])), "still a decaying curve"
+
+
+def test_market_curve_linear_term_is_position_not_data_selected():
+    """The position list is the selector (DECISIONS #40). A TE cell with a
+    strongly decaying fit still gets log-only, however good the linear fit is."""
+    from draftkit.projections import _market_curve, TAIL_LINEAR_POSITIONS
+
+    assert TAIL_LINEAR_POSITIONS == ("RB", "WR")
+    df = _curve_rows(pos="TE")
+    rank = _market_curve(df, {"mode": "rank"})["proj_market_pts"].to_list()
+    lin = _market_curve(df, {"mode": "rank_lin"})["proj_market_pts"].to_list()
+    assert lin == rank
+
+
+def test_market_curve_tail_needs_a_deep_enough_fit_population():
+    """min_fit is the thin-cell safety net: 20 veterans falls back to log-only."""
+    from draftkit.projections import _market_curve
+
+    df = _curve_rows(n=40, fitted=20)
+    rank = _market_curve(df, {"mode": "rank"})["proj_market_pts"].to_list()
+    lin = _market_curve(df, {"mode": "rank_lin", "min_fit": 30})["proj_market_pts"].to_list()
+    assert lin == rank
+
+
+def test_market_curve_tail_is_floored_at_zero():
+    from draftkit.projections import _market_curve
+
+    df = _curve_rows(n=400, fitted=60, b0=-80.0, c0=-2.0)
+    for mode in ("rank", "rank_lin", "full"):
+        vals = [v for v in _market_curve(df, {"mode": mode})["proj_market_pts"] if v is not None]
+        assert min(vals) >= 0.0
+
+
+def test_market_curve_full_continues_on_the_tangent_past_the_fit():
+    """Past the last fitted rank the curve may not go FLATTER than it was at
+    the last point the data supported."""
+    from draftkit.projections import _market_curve
+
+    df = _curve_rows()
+    lin = _market_curve(df, {"mode": "rank_lin"})["proj_market_pts"].to_list()
+    full = _market_curve(df, {"mode": "full"})["proj_market_pts"].to_list()
+    assert lin[:60] == full[:60], "inside the fit population the arms agree"
+    assert full[99] < lin[99] - 1.0, "and it keeps falling faster outside it"
+
+
+def test_market_curve_tail_rejects_an_unknown_mode():
+    from draftkit.projections import _market_curve
+    import pytest
+
+    with pytest.raises(ValueError, match="market_curve_tail.mode"):
+        _market_curve(_curve_rows(), {"mode": "steeper"})
