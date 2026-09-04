@@ -1127,11 +1127,21 @@ fitted objective 0.1428, current 0.1569; 30-49 bucket fitted pred 41 obs
 reports/mocks/mock40_2026-09-03_1612pt_third-and-long_room10617211_seat7_*.md.
 
 PAIR 3 (seat 7): 39 fitted 1579 pts vs 40 current 1631 pts, current +52.
-Attribution by availability check: of 10 differing picks, 9 were
-availability (Taylor gone at 6 in room 39; McBride, Maye, Hurts each gone
-before our turn in one room and not the other) and ONE was a model choice
-(round 4: fitted Etienne RB 186 over Rice WR 176, the usual RB lean). The
-+52 is room luck, not the model; both rooms first or near it. Running pair
+Attribution by availability check: ALL TEN differing picks were
+availability. Round 4 was logged here as a model choice (fitted Etienne
+over current Rice); re-reading both sidecars on 2026-09-04 shows Rice was
+already gone in room 39 -- he sits on that plan's "depth fallback, engine
+list exhausted" line -- so it was availability too. Correction recorded
+because the wrong version was committed first.
+
+What round 4 DOES show, and it is worth more than the mislabel: the two
+models' partner terms differed sharply. Old expected a 34.5-pt WR at our
+next turn (pick 47) and got exactly Garrett Wilson at 34.5. Fitted
+expected 52.2; Wilson went at 46, one pick early, and the best left was
+Maye at 18.3. The fitted point's optimism about what survives was
+contradicted inside 13 picks -- the calibration miss visible in one live
+decision. It did not change the pick (the partner term was identical
+across all three of its candidates and cancels). Running pair
 tally: +23, -1, -52 for fitted; pure model-choice picks across all three
 pairs: RB-earlier every time, outcome-neutral in aggregate.
 
@@ -1168,9 +1178,12 @@ the same players, the two models made the same pick.
 
 FOUR-PAIR SUMMARY (seats 5, 3, 7, 9; eight clean rooms plus one control):
 lineup delta for fitted +23, -1, -52, -43; the last two entirely room
-availability. Genuine model-choice picks across all pairs: five or six,
-all the same shape (fitted reaches a round earlier for a scarce RB, gets
-its TE/QB a round later anyway), outcome-neutral. Offline, fitted better
+availability. Genuine model-choice picks across all pairs: four or
+five (pair 3 contributes none after the 2026-09-04 correction above), all
+the same shape (fitted reaches a round earlier for a scarce RB, gets its
+TE/QB a round later anyway), outcome-neutral. The live-outcome evidence
+for the fitted point is therefore thinner than first written, in both
+directions. Offline, fitted better
 log-loss in 13 of 13 rooms scored today and over-promising the 30-50
 band in most. Conclusion unchanged: better forecaster, not a better
 drafter, worse calibrated at the decision point; the default stays for
