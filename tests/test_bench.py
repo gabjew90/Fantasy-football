@@ -284,3 +284,126 @@ def test_fallback_is_floored_by_the_market_projection():
     assert fb["RB"] == 140.0
     # no market number: the blend stands
     assert fb["WR"] == 150.0
+
+
+# ---------- the market/bench seam (2026-09-04, plan item B) ------------------
+# `_open_markets` never returns empty: once every slot is filled it revives all
+# six positional markets on `vorp`, which is EXACTLY when bench mode is also
+# active. So a player lands in the list twice -- once as a market row carrying
+# `urgency + 0.001*mv`, once insurance-priced in raw season points. Keeping the
+# larger number is not a comparison between two candidates, it is a coin flip
+# between two rulers.
+#
+# The rule: prefer the BENCH row, except for an upgrade whose own projection
+# beats the starter he would displace. Insurance prices a man who plays only
+# when someone is out; an upgrade plays every week.
+#
+# The fixture is fussy for two reasons, and both were mistakes made first:
+#
+#  * The seam needs K AND DEF filled as well. With either still open,
+#    `_open_markets` returns only that market, so no positional row exists to
+#    collide with and every test below passes vacuously.
+#  * A collision needs ONE player to be both his market's best by vorp and his
+#    position's best by insurance -- `_bench_candidates` emits a single row per
+#    position. In the original board the only such player is qb2, who is an
+#    upgrade, so the knob changed nothing and the tests proved nothing.
+#    `wr_depth` is the case that actually moves: market winner at WR, insurance
+#    winner at WR, and projected below the weakest WR I start.
+
+SEAM_LINEUP = MY_LINEUP + ["k_a", "def_a"]
+_wr_depth = player("wr_depth", "WR", 18.0, 18.0, 100.0, rank=9)
+_wr_depth["proj_pts"] = 130.0          # my weakest starting WR projects 140
+_wr_depth["backs_up"] = ""
+SEAM_BOARD = [dict(q) for q in BENCH_BOARD] + [_wr_depth]
+
+
+def _seam_tracker(prefer_bench: bool):
+    t = make_tracker(SEAM_BOARD, SEAM_LINEUP, current_pick=101)
+    t.bench_insurance = True
+    t.bench_row_wins_dedupe = prefer_bench
+    return t
+
+
+def _rows(prefer_bench: bool):
+    return _seam_tracker(prefer_bench).recommendations(top_n=12)
+
+
+def _row(prefer_bench: bool, sid: str):
+    return next(r for r in _rows(prefer_bench) if r[2]["sleeper_id"] == sid)
+
+
+def _is_bench(row) -> bool:
+    from draftkit.tracker import BENCH_WHY_PREFIX
+    return str(row[1]).startswith(BENCH_WHY_PREFIX)
+
+
+def test_the_seam_fixture_really_revives_the_positional_markets():
+    t = _seam_tracker(True)
+    markets = [m for m, _members, _v in t._open_markets(t.my_needs())]
+    assert set(markets) >= {"QB", "RB", "WR", "TE"}, markets
+
+
+def test_the_seam_fixture_really_prices_one_player_two_ways():
+    """Without a genuine collision the knob is untested. wr_depth must be both
+    the WR market's pick and the WR insurance pick."""
+    t = _seam_tracker(False)
+    needs, counts = t.my_needs(), t._my_pos_counts()
+    cands: list = []
+    added, _upgrades = t._bench_candidates(cands, needs, counts, 11, 6, False)
+    assert added
+    assert any(c[2]["sleeper_id"] == "wr_depth" for c in cands), \
+        "wr_depth is not the WR insurance row -- the collision is gone"
+    assert _row(False, "wr_depth") is not None
+
+
+def test_no_player_carries_two_currencies_at_once():
+    for prefer_bench in (False, True):
+        ids = [r[2]["sleeper_id"] for r in _rows(prefer_bench)]
+        assert len(ids) == len(set(ids)), f"duplicate row, prefer_bench={prefer_bench}"
+
+
+def test_the_knob_actually_changes_which_ruler_a_backup_is_measured_on():
+    """Today the market row wins purely because 24.3 > 20.9 -- two numbers in
+    different units. With the knob on, insurance wins because insurance is the
+    right question for a bench player."""
+    assert not _is_bench(_row(False, "wr_depth")), "fixture no longer reproduces it"
+    assert _is_bench(_row(True, "wr_depth"))
+
+
+def test_the_upgrade_is_identified_by_beating_the_starter_he_displaces():
+    """qb2 projects 280 against my starting QB's 130, so he is not a backup at
+    all. wr_depth projects 130 against my weakest WR starter's 140, so he is."""
+    t = _seam_tracker(True)
+    added, upgrade_ids = t._bench_candidates(
+        [], t.my_needs(), t._my_pos_counts(), 11, 6, False)
+    assert added
+    assert "qb2" in upgrade_ids
+    assert "wr_depth" not in upgrade_ids
+
+
+def test_an_upgrade_keeps_his_market_row_rather_than_being_priced_as_a_backup():
+    """The failure this exception exists to prevent: pricing a man who starts
+    every week as one who plays ~3 weeks a season."""
+    assert not _is_bench(_row(True, "qb2"))
+
+
+def test_the_preference_is_symmetric_not_a_bolted_on_exception():
+    """First cut only blocked market->bench for an upgrade, so an upgrade whose
+    BENCH row happened to sort first kept it anyway. Whichever way the scores
+    fall, the ruler is chosen by what the player is."""
+    for prefer_bench in (False, True):
+        rows = _rows(prefer_bench)
+        assert rows == sorted(rows, key=lambda r: -r[0]), "greedy order broken"
+
+
+def test_the_default_is_todays_behaviour():
+    """B ships off, and off means the old rule verbatim: first row wins per
+    player, which after the score sort is the larger number regardless of
+    which currency it is denominated in."""
+    from draftkit.tracker import Tracker
+    assert Tracker.bench_row_wins_dedupe is False
+    t = _seam_tracker(False)
+    assert t.bench_row_wins_dedupe is False
+    for sid in ("wr_depth", "qb2", "rb_depth"):
+        assert not _is_bench(_row(False, sid)), sid
+    assert _is_bench(_row(False, "rb_cuff"))   # his bench row simply scores higher

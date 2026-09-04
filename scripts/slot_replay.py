@@ -90,6 +90,16 @@ def replay(board, log_picks, my_slot, teams, rounds, slot_markets, slots=None, o
     return chosen
 
 
+def load_log(draft_id: str) -> list[dict]:
+    """The pick log for a draft, in pick order. Shared with knob_churn.py so
+    the two replays cannot drift on how a log is read."""
+    log = [json.loads(line) for line in
+           open(f"data/logs/draft_{draft_id}.jsonl", encoding="utf-8")
+           if '"type": "pick"' in line]
+    log.sort(key=lambda d: d["pick_no"])
+    return log
+
+
 def shape(chosen) -> str:
     c = Counter(p["pos"] for p in chosen)
     return " ".join(f"{k}{c[k]}" for k in ("QB", "RB", "WR", "TE", "K", "DEF") if c[k])
@@ -122,10 +132,7 @@ def main() -> None:
     grading_slots = league_slots or SLOTS
 
     board = EP.load_board(a.board)
-    log = [json.loads(line) for line in
-           open(f"data/logs/draft_{a.draft_id}.jsonl", encoding="utf-8")
-           if '"type": "pick"' in line]
-    log.sort(key=lambda d: d["pick_no"])
+    log = load_log(a.draft_id)
     rounds = max(d["round"] for d in log)
     slots = ([int(x) for x in a.slots.split(",")] if a.slots
              else list(range(1, a.teams + 1)))

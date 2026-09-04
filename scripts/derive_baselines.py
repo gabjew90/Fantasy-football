@@ -82,6 +82,9 @@ def main() -> None:
     teams = int(exp.get("teams") or 10)
     rounds = int(exp.get("rounds") or 15)
     waiver = exp.get("waivers")
+    # waiver_k is right HERE and nowhere else on the draft path: this
+    # script replays the season week by week and takes the k-th best
+    # unrostered player, so the friction it models IS claim friction.
     k = a.k or B.waiver_k(waiver)
 
     season = int(cfg.get("stats_season") or 2025)

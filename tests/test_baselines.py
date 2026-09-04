@@ -202,3 +202,55 @@ def test_held_from_ownership_skips_unparseable_rows():
             {"player": "c", "week": "3", "pct_rostered": "99"}]
     got = B.held_from_ownership(rows, {"a": "QB", "b": "QB", "c": "QB"})
     assert got == {"QB": {3: {"c"}}}
+
+
+# ---------- the k split (2026-09-04, plan item F) ----------------------------
+# One function used to answer two different questions. `waiver_k` returns 2 for
+# FAAB and 3 for rolling, justified as "streaming friction as an order
+# statistic" -- a claim about whether SOMEONE ELSE beats you to a player. At
+# draft time nobody is contesting anything; what the engine is unsure about is
+# its own ranking of players nobody has taken yet. Same operator, different
+# quantity, so they are now two numbers that get defended separately.
+
+def test_waiver_k_still_answers_claim_friction_and_is_still_format_keyed():
+    assert B.waiver_k("faab") == 2
+    assert B.waiver_k("rolling") == 3
+    assert B.waiver_k(None) == 3, "unknown format must take the pessimistic side"
+
+
+def test_draft_k_is_not_keyed_on_waiver_format():
+    """The whole point of the split. draft_k takes no waiver argument at all,
+    so a league switching from rolling to FAAB cannot silently move it."""
+    import inspect
+    assert "waiver" not in inspect.signature(B.draft_k).parameters
+    assert B.draft_k() == B.DRAFT_K_DEFAULT == 3
+
+
+def test_draft_k_ignores_a_zero_or_unparseable_configuration():
+    assert B.draft_k(0) == 3, "0 would mean 'the best undrafted player, certainly'"
+    assert B.draft_k(None) == 3
+    assert B.draft_k("x") == 3
+    assert B.draft_k(5) == 5
+
+
+def test_the_draft_path_no_longer_reaches_waiver_k():
+    """A grep, deliberately. The defect was not a wrong value, it was a live
+    wire between the draft code and a waiver-format table; a value test would
+    pass while the wire was still there, because both answered 3 for this
+    league. Comments are allowed to mention it -- calls are not."""
+    import pathlib
+    src = (pathlib.Path(B.__file__).parent / "tracker.py").read_text(encoding="utf-8")
+    code = "\n".join(ln for ln in src.splitlines() if not ln.lstrip().startswith("#"))
+    assert "waiver_k" not in code, "tracker.py calls waiver_k on the draft path"
+    assert "draft_k" in code
+
+
+def test_the_shipped_draft_k_matches_the_value_it_replaced():
+    """F ships as a true no-op: the global engine block carries 3, which is
+    what waiver_k returned for both leagues before the split."""
+    import pathlib
+
+    import yaml
+    root = pathlib.Path(B.__file__).parents[1]
+    cfg = yaml.safe_load((root / "config.yaml").read_text(encoding="utf-8"))
+    assert cfg["engine"]["draft_k"] == 3

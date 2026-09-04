@@ -26,6 +26,50 @@ from .shape import starting_slots
 from .sleeper import SleeperClient, get_json, BASE
 
 POS_ORDER = ["RB", "WR", "TE", "QB", "K", "DEF"]
+# Bench rows are priced in a DIFFERENT currency from market rows, and the
+# dedup has to tell them apart. One constant, written once and matched once.
+BENCH_WHY_PREFIX = "bench insurance:"
+
+FALLBACK_FLOORS = ("board_min", "replacement")
+
+
+def fallback_value(survivor_vals: list[float], pool_vals: list[float],
+                   repl: float | None, mode: str = "board_min") -> float | None:
+    """One position's fallback: the best player still gettable by the deadline.
+
+    Pure, and module-level, so the CONTINUITY PROPERTY can be tested against
+    the real decision instead of a copy of it.
+
+    `board_min` is the original. When nobody survives the deadline it flips the
+    operator from max to min over the whole pool, and since ADP order and
+    projection order differ, the pool minimum sits well below the last
+    survivor. The fallback enters own_value with a MINUS sign, so that step is
+    an instant board-wide UPWARD spike in apparent value -- at the scarce
+    position, sized by whichever junk player is lowest-projected.
+
+    `replacement` treats streaming as a FLOOR UNDER EVERY ANSWER, not just as
+    the answer when the position empties. Substituting it only in the empty
+    case still jumps -- the first attempt at this fix did exactly that and the
+    property test caught an 80-point step. The floor is also the more correct
+    statement: you can always stream, so what you would end up with at a
+    position is never worse than replacement, whether or not a draftable
+    survivor exists.
+
+    That makes the curve max(falling survivor line, flat floor) -- monotonically
+    non-increasing, and it flattens at replacement instead of falling off
+    anything. Replacement level is what replacement_baselines means
+    (draftkit/baselines.py derives it from a streaming backtest).
+
+    UNITS: every argument is SEASON POINTS on the projections.games
+    convention. bench.waiver_ppw is the same idea but speaks points-per-week
+    over FANTASY_WEEKS=17, which is why it is not used here.
+    """
+    best = max(survivor_vals) if survivor_vals else None
+    if mode == "replacement" and repl is not None:
+        return float(repl) if best is None else max(best, float(repl))
+    if best is not None:
+        return best
+    return min(pool_vals) if pool_vals else None
 
 
 @dataclass
@@ -87,6 +131,30 @@ class Tracker:
     # (8 better, 0 worse, 2 tied), Omnibeta +23.9 (10 / 1 / 1). Knob kept so
     # the A/B stays runnable.
     bench_insurance = True
+    # --- the 2026-09-04 correctness set. EVERY DEFAULT IS TODAY'S BEHAVIOUR. ---
+    # E: the upside boost measured from the market floor (a difference, so a
+    #    baseline shift cancels) instead of abs() of the level (non-linear, so
+    #    it does not).
+    upside_boost_relative = False
+    # A/C: when a position is picked clean before the deadline, price the
+    #    fallback at replacement level -- what you can actually stream -- rather
+    #    than at the worst player left on the board, which flips the operator
+    #    from max to min and drops a cliff.
+    fallback_floor = "board_min"        # "board_min" | "replacement"
+    # B: at the market/bench seam, prefer the insurance row over the market row
+    #    (except for a genuine upgrade). See the dedup in recommendations().
+    bench_row_wins_dedupe = False
+    # D: a per-position deadline instead of one shared across positions that
+    #    empty at different rates. IMPLEMENTED, MEASURED, AND DELIBERATELY LEFT
+    #    OFF: churn is not a verdict and DECISIONS #41 shows lineup points
+    #    cannot resolve it. Turning it on needs more season pairs first.
+    per_position_deadline = False
+    # F: draft-time k hedges PREDICTION ERROR (which undrafted player is really
+    #    best) and has nothing to do with waiver format; baselines.waiver_k
+    #    hedges CLAIM FRICTION and belongs to the in-season path. Split so each
+    #    is defended separately. 3 = today; the derivation from backtest error
+    #    is what should move it.
+    draft_k = 3
     pool_min = 40
     pool_lookback = 20
     pool_lookahead = 60
@@ -142,12 +210,12 @@ class Tracker:
         self.poll_seconds = float(tcfg["poll_seconds"])
         self.fall_alert = int(tcfg["fall_alert_picks"])
         self.apply_engine_cfg(cfg["engine"] if "engine" in cfg._data else {})
-        self.waiver_k = None
-        try:
-            from .baselines import waiver_k
-            self.waiver_k = waiver_k((cfg.get("expected") or {}).get("waivers"))
-        except Exception:  # noqa: BLE001 — default k inside bench_rows
-            pass
+        # The draft path uses draft_k ONLY. waiver_k is keyed on FAAB-vs-rolling
+        # because it models CLAIM FRICTION, which is an in-season fact; the
+        # bench wire at draft time is hedging PREDICTION ERROR instead, and
+        # deciding it by waiver format was defending a number with a reason
+        # that is false here (2026-09-04). apply_engine_cfg has already set
+        # draft_k from the engine block by this point.
         gcfg = cfg["guardrails"] if "guardrails" in cfg._data else {}
         self.qb2_round = int(gcfg.get("qb2_earliest_round", 10))
         self.te2_fall = int(gcfg.get("te2_fall_picks", 12))
@@ -326,6 +394,9 @@ class Tracker:
         ("upside_from_round", int), ("upside_mult", float),
         ("late_round_dispersion", bool), ("dispersion_lambda", float),
         ("slot_markets", bool), ("adaptive_fallback", bool), ("bench_insurance", bool),
+        ("upside_boost_relative", bool), ("fallback_floor", str),
+        ("bench_row_wins_dedupe", bool), ("per_position_deadline", bool),
+        ("draft_k", int),
     )
 
     def _dispersion_for(self, q: dict) -> float | None:
@@ -459,41 +530,99 @@ class Tracker:
             self.my_slot, self.teams, self.rounds) if n >= self.current_pick]
         if not remaining:
             return {}
-        open_starters = sum(needs.get(k, 0) for k in
-                            ("QB", "RB", "WR", "TE", "FLEX", "K", "DEF"))
-        # my last starter-filling pick; with no starters left to fill, the
-        # question is what the bench could still get me, so use my final pick
-        idx = min(max(open_starters, 1), len(remaining)) - 1
-        deadline = remaining[idx]
+        def _deadline(open_slots: int) -> int:
+            """My last starter-filling pick, given that many slots to fill.
+            With no starters left, the question is what the BENCH could still
+            get me, so the answer is my final pick."""
+            return remaining[min(max(open_slots, 1), len(remaining)) - 1]
+
+        # D (2026-09-04): ONE deadline for every position, or one per position?
+        #
+        # Shared (today) counts every open starter slot, FLEX included, so a
+        # held-open flex pushes the deadline later for QB too. Per-position
+        # counts only the slots the position is ELIGIBLE for, so QB's horizon
+        # ignores the flex entirely.
+        #
+        # Neither is obviously right, and the comment says so rather than
+        # picking a winner. Shared is correct if picks are a SHARED BUDGET:
+        # spending one on a flex really does push the quarterback later,
+        # whether or not a quarterback could have filled that slot.
+        # Per-position is correct if each position has its own QUEUE: the
+        # positions empty at very different rates, and "who survives to my
+        # pick 90" is a fair question for TE and a meaningless one for RB.
+        #
+        # This is a modelling disagreement, not a defect, and nothing
+        # available can settle it -- churn is not a verdict, and lineup points
+        # cannot resolve below ~3% (DECISIONS #41). So it ships OFF and stays
+        # off. See DECISIONS for what would unblock it.
+        per_pos = bool(getattr(self, "per_position_deadline", False))
+        shared_deadline = _deadline(sum(needs.get(k, 0) for k in
+                                        ("QB", "RB", "WR", "TE", "FLEX", "K", "DEF")))
+
+        def _deadline_for(pos: str) -> int:
+            if not per_pos:
+                return shared_deadline
+            slots = needs.get(pos, 0)
+            if pos in snake.FLEX_ELIGIBLE:
+                slots += needs.get("FLEX", 0)
+            return _deadline(slots)
+
+        # The fallback is priced at the LOWER of our blend and the market's
+        # own projection. Taking the max of our projections over the ADP
+        # survivors selects for the model's largest tail over-projections
+        # (RJ Harvey: blend 155, market 136, consensus 118 -- user find,
+        # 2026-09-03), which shrank every RB candidate's own value and
+        # tilted pair coin-flips to WR. The market's number is the one
+        # consistent with the ADP that made him a survivor.
+        def _fb(p: dict) -> float:
+            b = float(p.get("proj_pts") or 0.0)
+            m = p.get("proj_market_pts")
+            try:
+                m = float(m) if m not in (None, "") else None
+            except (TypeError, ValueError):
+                m = None
+            return min(b, m) if m is not None and m > 0 else b
+
+        # WHEN A POSITION IS PICKED CLEAN before the deadline, what is the
+        # honest alternative? `board_min` (today) takes the worst player left,
+        # which makes the operator flip from max to min and drops a cliff:
+        # ADP order and projection order differ, so the pool minimum sits well
+        # below the last survivor, and because the fallback enters own_value
+        # with a MINUS sign that is an instant board-wide UPWARD spike in
+        # apparent value -- at the scarce position, driven by whichever junk
+        # player happens to be lowest-projected.
+        #
+        # `replacement` answers it with what you can actually stream, which is
+        # exactly what replacement_baselines means (draftkit/baselines.py
+        # derives them from a streaming backtest). Continuous, and it reuses a
+        # number the engine already trusts for this question.
+        #
+        # UNITS: both branches are SEASON TOTALS on the projections.games
+        # convention -- _fb() reads proj_pts, and _replacement_points()
+        # recovers proj_pts - vorp. They agree today, and this assert is here
+        # because a later change to projections.games would otherwise break it
+        # silently. (bench.waiver_ppw was rejected for this fix precisely
+        # because it speaks points-per-week over FANTASY_WEEKS=17 while
+        # projections.games is 16.)
+        floor_mode = str(getattr(self, "fallback_floor", "board_min"))
+        repl_pts = self._replacement_points() if floor_mode == "replacement" else {}
 
         out: dict[str, float] = {}
         for pos in POS_ORDER:
             pool = [p for p in self.remaining(pos)
                     if p.get("proj_source") != "no_market"]
-            if not pool:
-                continue
+            deadline = _deadline_for(pos)
             survivors = [p for p in pool
                          if p.get("adp") is not None and p["adp"] >= deadline]
-            # nobody projected to last: the position will be picked clean, so
-            # the fallback is the worst thing still on the board
-            pick_from = survivors or pool
-            # The fallback is priced at the LOWER of our blend and the market's
-            # own projection. Taking the max of our projections over the ADP
-            # survivors selects for the model's largest tail over-projections
-            # (RJ Harvey: blend 155, market 136, consensus 118 -- user find,
-            # 2026-09-03), which shrank every RB candidate's own value and
-            # tilted pair coin-flips to WR. The market's number is the one
-            # consistent with the ADP that made him a survivor.
-            def _fb(p: dict) -> float:
-                b = float(p.get("proj_pts") or 0.0)
-                m = p.get("proj_market_pts")
-                try:
-                    m = float(m) if m not in (None, "") else None
-                except (TypeError, ValueError):
-                    m = None
-                return min(b, m) if m is not None and m > 0 else b
-            out[pos] = max(_fb(p) for p in pick_from) \
-                if survivors else min(_fb(p) for p in pick_from)
+            # C: an EMPTY pool used to `continue`, dropping the position from
+            # the dict -- planner.own_value then silently returned slot_vorp, a
+            # VORP LEVEL compared against points-above-fallback numbers in the
+            # same sort. In `replacement` mode the key always exists, so the
+            # currency cannot switch mid-sort.
+            v = fallback_value([_fb(p) for p in survivors], [_fb(p) for p in pool],
+                               repl_pts.get(pos), floor_mode)
+            if v is not None:
+                out[pos] = v
         return out
 
     def _replacement_points(self) -> dict[str, float]:
@@ -534,9 +663,17 @@ class Tracker:
         return out
 
     def _bench_candidates(self, cands: list, needs: dict, counts: dict,
-                          rnd: int, picks_left: int, top6_te_fell: bool) -> bool:
-        """Append one insurance-priced row per bench position. Returns True
-        when bench rows were produced (the caller then skips the planner).
+                          rnd: int, picks_left: int, top6_te_fell: bool
+                          ) -> tuple[bool, set]:
+        """Append one insurance-priced row per bench position.
+
+        Returns (added, upgrade_ids). `added` True when bench rows were
+        produced (the caller then skips the planner). `upgrade_ids` are the
+        bench candidates whose OWN PROJECTION BEATS THE WEAKEST STARTER THEY
+        WOULD DISPLACE -- for those, insurance is the wrong ruler. Insurance
+        prices a man who only plays when someone is out; a late upgrade plays
+        every week, and pricing him as a backup understates him badly. The
+        dedup uses this to keep the market row for exactly those players.
 
         Only active once every non-K/DEF starter is filled, and never inside
         the must-fill window where remaining picks are owed to open starters.
@@ -546,7 +683,7 @@ class Tracker:
         open_skill = sum(needs.get(k, 0) for k in ("QB", "RB", "WR", "TE", "FLEX"))
         open_all = open_skill + needs.get("K", 0) + needs.get("DEF", 0)
         if open_skill > 0 or picks_left <= open_all:
-            return False
+            return False, set()
         my_positions = self.slot_positions(self.my_slot)
         exposure = starter_exposure(my_positions, self.slots)
         # backups I already hold at each position: the next one covers the
@@ -559,12 +696,28 @@ class Tracker:
             for q in self.players
             if str(q.get("player") or q.get("name") or "") in my_starters
         }
-        k = getattr(self, "waiver_k", None) or 3
+        # the weakest starter I hold at each position: the man a bench
+        # candidate would actually displace if he is an upgrade rather than
+        # insurance. Season points on both sides (starter_ppw above is the
+        # per-week form the handcuff uplift needs; this is not that).
+        weakest_starter: dict[str, float] = {}
+        for q in self.players:
+            nm = str(q.get("player") or q.get("name") or "")
+            if nm not in my_starters:
+                continue
+            qp = q.get("pos")
+            pts = float(q.get("proj_pts") or 0.0)
+            if qp and (qp not in weakest_starter or pts < weakest_starter[qp]):
+                weakest_starter[qp] = pts
+
+        # draft-time k: hedges which undrafted player is really best, not
+        # whether a claim would be won (draftkit/baselines.py draft_k)
+        k = int(getattr(self, "draft_k", None) or 3)
         last_pick = self.teams * self.rounds
         from .bench import predicted_undrafted
         rem_all = [p for p in self.remaining() if p.get("proj_source") != "no_market"]
         wire_names = predicted_undrafted(rem_all, self.current_pick, last_pick)
-        added = False
+        added, upgrade_ids = False, set()
         for pos in BENCH_POSITIONS:
             rem = [p for p in self.remaining(pos)
                    if p.get("proj_source") != "no_market"
@@ -591,9 +744,15 @@ class Tracker:
                 why += f" · HANDCUFF: backs up your {best.get('backs_up')}"
             cands.append((best_iv["value"], why, best))
             added = True
+            # is he an upgrade rather than insurance? Compared at his own
+            # position: displacing across the flex is a second-order case the
+            # market row already prices correctly through vorp_flex.
+            floor = weakest_starter.get(pos)
+            if floor is not None and float(best.get("proj_pts") or 0.0) > floor:
+                upgrade_ids.add(str(best.get("sleeper_id")))
         if added:
             cands.sort(key=lambda t: -t[0])
-        return added
+        return added, upgrade_ids
 
     @staticmethod
     def _mval(p: dict, value_key: str) -> float:
@@ -838,16 +997,27 @@ class Tracker:
             # (code review 2026-08-30).
             if rnd >= self.upside_from_round:
                 lam = float(getattr(self, "dispersion_lambda", 0.5))
+                relative = bool(getattr(self, "upside_boost_relative", False))
+                # The market's own floor, taken ONCE before the sort so the key
+                # is stable. A boost measured FROM it is a difference, so a
+                # baseline shift cancels -- the same reason urgency is immune.
+                floor_v = min((mv(q) for q in gpool), default=0.0) if relative else 0.0
 
-                def _late(q, _mv=mv, _lam=lam):
+                def _late(q, _mv=mv, _lam=lam, _rel=relative, _floor=floor_v):
                     sd = self._dispersion_for(q)
                     if sd is not None:
                         return _mv(q) + _lam * sd            # plan A3: mean + spread
-                    # additive in |value|: a multiplier on a NEGATIVE market
-                    # value (late rounds on a shallow board) pushed the flagged
-                    # player DOWN, the opposite of the intent (review 2026-09-02)
-                    boost = (self.upside_mult - 1.0) * abs(_mv(q)) if q.get("upside_flag") else 0.0
-                    return _mv(q) + boost
+                    if not q.get("upside_flag"):
+                        return _mv(q)
+                    # A multiplier on a NEGATIVE market value pushed the flagged
+                    # player DOWN, the opposite of the intent (review
+                    # 2026-09-02). abs() fixed the sign but is NON-LINEAR, so a
+                    # shift in the market's baseline (vorp vs vorp_flex, which
+                    # differ by a constant 30.3 pts here) reorders the
+                    # shortlist. Measuring the span from the market floor is a
+                    # difference and cancels instead. Knob so the A/B runs.
+                    span = (_mv(q) - _floor) if _rel else abs(_mv(q))
+                    return _mv(q) + (self.upside_mult - 1.0) * span
                 gpool = sorted(gpool, key=lambda q: -_late(q))
             pool = gpool[:3]
             if not pool:
@@ -968,16 +1138,60 @@ class Tracker:
         # VORP level, a different currency, and bench picks barely interact.
         bench_rows = False
         if self.bench_insurance:
-            bench_rows = self._bench_candidates(
+            bench_rows, upgrade_ids = self._bench_candidates(
                 cands, needs, counts, rnd, picks_left, top6_te_fell)
             if bench_rows:
-                # the bench rows are appended to the market rows and the whole
-                # list re-sorted; a player can now be in twice (review
-                # 2026-09-02). Keep the higher-scored row.
-                seen_ids = set()
-                cands = [c for c in cands
-                         if not (c[2]["sleeper_id"] in seen_ids
-                                 or seen_ids.add(c[2]["sleeper_id"]))]
+                # A player can now be in the list twice (review 2026-09-02):
+                # once from a market row and once insurance-priced. The two
+                # scores are in INCOMMENSURABLE CURRENCIES -- market rows carry
+                # urgency + 0.001*mv, bench rows carry raw season insurance
+                # points -- so "keep the higher number" is not a comparison,
+                # it is a coin flip between rulers. It matters because
+                # _open_markets never returns empty (it revives all six
+                # positional markets once every slot is full), which is exactly
+                # when bench mode is also active.
+                #
+                # Prefer the BENCH row, because insurance is the right ruler
+                # for a bench player -- EXCEPT for an upgrade, whose own
+                # projection beats the starter he would displace. Insurance
+                # prices a man who plays only when someone is out; an upgrade
+                # plays every week, so pricing him as a backup would swap one
+                # bug for a systematic undervaluation of late upgrades.
+                # The choice is SYMMETRIC. Picking the bench row for a backup
+                # but leaving an upgrade on whichever row happened to sort
+                # first is not a rule, it is the same coin flip with an
+                # exception bolted on -- and the sort puts the bench row first
+                # whenever insurance out-scores urgency, which for a big-VORP
+                # backup QB is most of the time (caught by the regression test
+                # below, which is why it exists).
+                prefer_bench = bool(getattr(self, "bench_row_wins_dedupe", False))
+                by_id: dict[str, list] = {}
+                for c in cands:
+                    by_id.setdefault(c[2]["sleeper_id"], []).append(c)
+
+                def _is_bench(row) -> bool:
+                    return str(row[1]).startswith(BENCH_WHY_PREFIX)
+
+                seen_ids: set[str] = set()
+                kept: list = []
+                for c in cands:
+                    sid = c[2]["sleeper_id"]
+                    if sid in seen_ids:
+                        continue
+                    seen_ids.add(sid)
+                    if prefer_bench:
+                        rows = by_id[sid]
+                        want_bench = sid not in upgrade_ids
+                        pick = next((d for d in rows if _is_bench(d) == want_bench), None)
+                        if pick is not None:
+                            c = pick
+                    kept.append(c)
+                if prefer_bench:
+                    # a swap changes the score, so the greedy order has to be
+                    # re-established; without this a row keeps the rank its
+                    # discarded twin earned.
+                    kept.sort(key=lambda t: -t[0])
+                cands = kept
         # v2 item 1.2: joint two-pick re-rank on top of the greedy order.
         # Pure arithmetic over the cached urgency report — nothing new runs
         # on the clock; any failure or missing report keeps the greedy list

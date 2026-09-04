@@ -167,6 +167,23 @@ engine:
   autopick_need_damp: 0.02   # B5: autopick fills starters first; a non-filling position while a starter slot is open
   autopick_list_prob: 0.0    # DECISIONS #35: P(autopick seat walks Yahoo's default list, lowest yrank fitting a starter slot); fitted by #35; 0 = today's behaviour
   rival_needs_update: true   # B6: a rival picking twice in my window consumes his needs
+  # ---- correctness set (2026-09-04) --------------------------------------
+  # Engine BEHAVIOUR, so it lives here in globals and not in a league file:
+  # none of these five is a fact about a league. Every value below is TODAY'S
+  # behaviour, so the whole set is a no-op at ship time; the knobs exist so
+  # each fix can be turned on and judged on its own.
+  upside_boost_relative: false   # boost off the market floor, not abs(level)
+  fallback_floor: board_min      # board_min (today) | replacement
+  bench_row_wins_dedupe: false   # who wins the market/bench seam
+  per_position_deadline: false   # STAYS OFF: no measurement can decide it
+  # Draft-time order statistic for the bench wire. Hedges PREDICTION ERROR --
+  # which undrafted player is really the best one -- and NOT claim friction,
+  # which is baselines.waiver_k and belongs to the in-season path. 3 is
+  # today's value, carried over unchanged. 2 was considered and rejected:
+  # deep-band MAE is 65-70 pts (DECISIONS #40), and at that error the best
+  # undrafted RB is a coin flip among several, which argues for hedging
+  # HARDER than 3, not softer. A derivation from that error moves this number.
+  draft_k: 3
 
 tracker:
   poll_seconds: 2

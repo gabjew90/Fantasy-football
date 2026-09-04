@@ -152,3 +152,126 @@ def test_partner_term_is_converted_into_the_fallback_currency():
     ranked = pair_rank(cands, report, needs, {"WR": 10.0, "RB": 10.0},
                        lambda _t: {"WR", "RB"}, fallback=fb, repl=repl)
     assert ranked[0][2]["sleeper_id"] == "r"
+
+
+# --- the continuity fix (2026-09-04): A + C ---------------------------------
+# `board_min` (today) answers "this position is picked clean" with the WORST
+# player left. That flips the operator from max to min, and because the
+# fallback enters own_value with a MINUS sign the result is an instant
+# board-wide UPWARD spike in apparent value -- at the scarce position, sized by
+# whichever junk player is lowest-projected. `replacement` answers it with what
+# you can actually stream instead.
+
+from draftkit.tracker import fallback_value  # noqa: E402
+
+
+REPL = 100.0          # what streaming this position returns all season
+
+
+def _sweep(mode, repl=REPL):
+    """The real decision function, swept across the whole deadline range.
+
+    ADP and projection are correlated the way they really are: the best player
+    goes earliest, so a rising deadline keeps only progressively worse players
+    and eventually nobody. The deep tail projects BELOW replacement, which is
+    ordinary -- most of a position's tail is worse than what you can stream.
+    """
+    n = 24
+    players = [{"proj": 200.0 - 7.0 * i, "adp": float(10 + 8 * i)} for i in range(n)]
+    curve = []
+    for deadline in range(0, 220, 2):
+        surv = [q["proj"] for q in players if q["adp"] >= deadline]
+        pool = [q["proj"] for q in players]
+        v = fallback_value(surv, pool, repl, mode)
+        if v is not None:
+            curve.append(v)
+    return curve
+
+
+def test_board_min_claims_your_fallback_is_worse_than_the_waiver_wire():
+    """The defect, stated precisely. It is not merely "a big step": board_min
+    returns a number BELOW replacement level, i.e. it asserts that skipping the
+    position leaves you worse off than streaming it. That is never true --
+    streaming is always available -- and because the fallback enters own_value
+    with a MINUS sign, understating it inflates every candidate at that
+    position."""
+    curve = _sweep("board_min")
+    assert min(curve) < REPL, "expected board_min to dip below the wire"
+
+
+def test_replacement_never_goes_below_what_you_could_stream():
+    """A's acceptance criterion."""
+    curve = _sweep("replacement")
+    assert min(curve) >= REPL - 1e-9, f"dipped to {min(curve):.1f} under {REPL}"
+
+
+def test_replacement_is_monotone_and_flattens_at_the_floor():
+    curve = _sweep("replacement")
+    assert curve == sorted(curve, reverse=True), "the fallback must never rise"
+    assert curve[-1] == REPL
+    steps = [curve[i] - curve[i + 1] for i in range(len(curve) - 1)]
+    assert max(steps) <= 7.0 + 1e-9, f"step of {max(steps):.1f} between players"
+
+
+def test_replacement_is_a_floor_under_every_answer_not_just_the_empty_case():
+    """Substituting replacement ONLY when the position empties still jumps --
+    the first cut of this fix did that and the sweep caught an 80-point step.
+    You can always stream, so the answer is never worse than replacement."""
+    assert fallback_value([40.0], [40.0, 5.0], 120.0, "replacement") == 120.0
+    assert fallback_value([180.0], [180.0, 5.0], 120.0, "replacement") == 180.0
+    # board_min ignores the floor entirely, exactly as today
+    assert fallback_value([40.0], [40.0, 5.0], 120.0, "board_min") == 40.0
+
+
+def test_replacement_falls_back_to_board_min_when_there_is_no_replacement():
+    """A board with no recoverable replacement level must still answer."""
+    assert fallback_value([], [50.0, 10.0], None, "replacement") == 10.0
+    assert fallback_value([], [], None, "replacement") is None
+
+
+def test_survivors_win_over_a_lower_floor_in_both_modes():
+    for mode in ("board_min", "replacement"):
+        assert fallback_value([90.0, 70.0], [90.0, 70.0, 5.0], 60.0, mode) == 90.0
+
+
+def test_both_branches_are_season_points_on_one_games_convention():
+    """The units assertion. `max()` over survivors reads proj_pts and the
+    replacement branch recovers proj_pts - vorp, so both are season points on
+    projections.games. This fails loudly if that stops being true. It is also
+    why bench.waiver_ppw was rejected for this fix: it speaks per-week over
+    FANTASY_WEEKS=17 while projections.games is 16."""
+    import inspect
+
+    from draftkit import tracker as T
+    src = inspect.getsource(T.Tracker._fallback_points)
+    assert "_replacement_points()" in src
+    assert "waiver_ppw(" not in src, "the per-week source must stay out of here"
+
+    t = make_tracker(BOARD, [])
+    repl = t._replacement_points()
+    for pos, r in repl.items():
+        if pos == "FLEX":
+            continue
+        same = [q for q in t.players if q.get("pos") == pos]
+        if same:
+            q = same[0]
+            assert abs((q["proj_pts"] - q["vorp"]) - r) < 1e-6, pos
+
+
+def test_replacement_mode_gives_every_live_position_a_key():
+    """C: an empty pool used to drop the position, and own_value then silently
+    returned slot_vorp -- a VORP LEVEL compared against points-above-fallback
+    numbers in the same sort."""
+    t = make_tracker(BOARD, [])
+    t.fallback_floor = "replacement"
+    fb = t._fallback_points(t.my_needs())
+    for pos in ("QB", "RB", "WR", "TE"):
+        if t.remaining(pos):
+            assert pos in fb, f"{pos} dropped out of the fallback"
+
+
+def test_the_default_reproduces_todays_behaviour():
+    assert Tracker.fallback_floor == "board_min"
+    t = make_tracker(BOARD, [])
+    assert not hasattr(t, "_fallback_floor_override")
+    assert t._fallback_points(t.my_needs()) == t._fallback_points(t.my_needs())

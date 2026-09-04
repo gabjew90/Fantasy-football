@@ -82,10 +82,45 @@ STREAMABLE = ("QB", "RB", "WR", "TE")
 
 
 def waiver_k(waiver_type: str | None, default: int = 3) -> int:
-    """Streaming friction as an order statistic. Unknown waiver type -> the
-    PESSIMISTIC (higher-k) value, because assuming you can always land your
-    first choice is the failure mode that inflates VORP."""
+    """IN-SEASON claim friction as an order statistic.
+
+    You do not land your first choice every week: someone else may win the
+    claim. How often depends on the waiver FORMAT, which is why this one is
+    keyed on it. Unknown type -> the PESSIMISTIC (higher-k) value, because
+    assuming you always get your man is the failure mode that inflates VORP.
+
+    NOT for draft time. See draft_k below: at the draft you are forecasting a
+    pool that does not exist yet, and the uncertainty is your own projection,
+    not a contested claim.
+    """
     return WAIVER_K.get(str(waiver_type or "").lower().strip(), default)
+
+
+# Draft-time k. A DIFFERENT QUANTITY that happens to share the operator.
+#
+# When the engine asks "what will the wire hold?" during a draft, the thing it
+# is unsure about is WHICH undrafted player is really best -- its own ranking.
+# Deep-band MAE is 65-70 points (DECISIONS #40); at that error the best
+# undrafted RB is a coin flip among several, so the k-th best is a hedge
+# against prediction error. Waiver format has nothing to do with it, and
+# keying this on FAAB-vs-rolling (as waiver_k did for both callers until
+# 2026-09-04) was defending it with a reason that is false here.
+#
+# 3 is today's value, carried over unchanged so the split ships as a no-op.
+# 2 was considered and REJECTED: it is defensible under claim friction (nobody
+# contests a claim at draft time) but claim friction is precisely what this
+# split moves to the in-season side, and the prediction-error argument runs the
+# other way -- 65-point error bars argue for hedging HARDER than 3, not softer.
+# The derivation from backtest error is what should move this number.
+DRAFT_K_DEFAULT = 3
+
+
+def draft_k(configured: int | None = None) -> int:
+    """Draft-time order statistic, hedging PREDICTION ERROR. Not waiver-typed."""
+    try:
+        return int(configured) if configured else DRAFT_K_DEFAULT
+    except (TypeError, ValueError):
+        return DRAFT_K_DEFAULT
 
 
 def weekly_points(weekly: pl.DataFrame, fpts: pl.Expr) -> pl.DataFrame:

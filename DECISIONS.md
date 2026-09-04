@@ -2585,3 +2585,190 @@ would have caught something:
    states that `ecr` is null on the history boards, so an arm differing only
    through ECR would surface as inert rather than as a pass.
 
+
+## 2026-09-04 (42) — six defects around "the alternative"; five ship as no-ops, one is deliberately unshipped
+
+A user-supplied critique named three flaws in how the engine prices the
+alternative to taking a player now. All three point at real areas. All three
+get the mechanism wrong, and underneath two of them sit worse defects than the
+ones alleged. Six items in total, every one behind a knob whose default is
+today's behaviour, verified byte-identical on both league boards.
+
+### The critique, corrected
+
+**1. "The shared deadline undervalues taking a RB now." The direction is
+backwards.** `fallback[pos]` enters `own_value` with a MINUS sign
+(`planner.py:79`, `proj_pts - fallback[pos]`), so a LOWER fallback makes a
+position look MORE valuable, not less. A later shared deadline leaves a scarce
+position FEWER survivors, `max()` over that small bad set is LOW, and RB-now is
+therefore PROMOTED. The code history agrees: the `min(blend, market)` floor was
+added on 2026-09-03 precisely because the RB fallback ran too HIGH and tilted
+pair coin-flips to WR.
+
+Anyone reasoning about this function must carry the sign. It is the single
+easiest thing to get backwards here, and getting it backwards inverts the
+recommendation.
+
+**2. "`vorp_flex` goes stale." True, and nearly harmless — but the cancellation
+is MARKET-LOCAL, not global.** `flex_repl` is one constant applied to every
+member of a market whose membership is exactly the flex-eligible set, so it
+cancels in shortlist ordering, in the 2-point near-tie window, in urgency, and
+in the `_replacement_points` round-trip (identity by construction — a "fresher"
+value would BREAK the conversion at `planner.py:135`).
+
+It does NOT cancel in two places, and both are fixed below: the `abs()` upside
+boost (E) and the market/bench seam (B). **Do not cite "it cancels" as a general
+property.** It cancels within one market's ordering and nowhere else.
+
+**3. "The market -> bench handoff is where the QB2 bug lived." That case works.**
+QB filled, FLEX filled, K/DEF open, round 11: `_open_markets` emits no QB row,
+`_bench_candidates` fires, the backup QB is priced against the wire. Correct.
+The structural instinct was right and the real seam is next door — when K and
+DEF are ALSO filled, which is when `_open_markets` revives all six positional
+markets while bench mode is running.
+
+### What ships
+
+| | defect | knob | default |
+|---|---|---|---|
+| A | max/min cliff in `_fallback_points` | `fallback_floor` | `board_min` |
+| B | market/bench currency mixing | `bench_row_wins_dedupe` | `false` |
+| C | `own_value` reverts to `slot_vorp` on an empty pool | (with A) | — |
+| D | one deadline shared across positions | `per_position_deadline` | `false`, **stays off** |
+| E | `abs()` upside boost is not baseline-invariant | `upside_boost_relative` | `false` |
+| F | `k` keyed on waiver format at draft time | `draft_k` | `3` |
+
+All five knobs live in `config.yaml`'s `engine:` block, not in a league file.
+None of them is a fact about a league; they are engine behaviour, and the repo
+rule puts behaviour in globals. A league can still override any of them through
+the normal deep-merge.
+
+**A — the cliff.** While ADP survivors exist the fallback steps DOWN as the
+deadline passes each one. The instant the last survivor is crossed the operator
+flips from `max` to `min` over the whole pool, ADP-None players included. ADP
+order and projection order differ, so the pool minimum sits far below the last
+survivor, and with the minus sign that is an instant board-wide UPWARD spike in
+apparent value — firing at the scarce position, sized by whichever junk player
+happens to be lowest-projected.
+
+`replacement` treats streaming as a FLOOR UNDER EVERY ANSWER, not as the answer
+when the position empties. **The first cut substituted it only in the empty
+case, and the property test caught an 80-point step** — that variant merely
+moved the cliff. The floor is also the truer statement: you can always stream,
+so what you end up with is never worse than replacement whether or not a
+draftable survivor exists.
+
+Rejected: `bench.waiver_ppw`, which is the same idea but speaks per-week over
+`FANTASY_WEEKS = 17` while `projections.games` is 16. A units assertion and a
+test now pin both branches of `_fallback_points` to the season-total
+convention, because that seam would otherwise break silently.
+
+**C.** An empty pool used to `continue`, dropping the position from the dict;
+`planner.own_value` then returned `slot_vorp` — a VORP LEVEL sorted against
+points-above-fallback numbers in the same list. In `replacement` mode the key
+always exists, so the currency cannot switch mid-sort.
+
+**B — the seam.** Prefer the bench row, EXCEPT for an upgrade whose own
+projection beats the starter he would displace: insurance prices a man who plays
+only when someone is out, and pricing a genuine upgrade that way would trade an
+incommensurable-currency bug for a systematic undervaluation of late upgrades.
+
+**The preference has to be symmetric, and the first cut was not.** It blocked
+market -> bench for an upgrade but never swapped an upgrade's bench row back to
+his market row, so an upgrade whose bench row happened to sort first kept it.
+That is the same coin flip with an exception bolted on. The regression test
+that catches it exists because the first fixture did not: the seam needs K and
+DEF filled too, and a collision needs one player to be both his market's best by
+VORP and his position's best by insurance. In the original board the only such
+player is the upgrade, so the knob changed nothing and the tests passed
+vacuously.
+
+**E.** `boost = (upside_mult - 1) * abs(mv(q))`. The `abs()` fixed a real sign
+bug (a multiplier on a negative market value pushed the flagged player DOWN) but
+it is non-linear, so a baseline shift reorders the shortlist — and `vorp` and
+`vorp_flex` differ by a constant 30.3 points here. Measuring the span from the
+market floor makes the boost a DIFFERENCE, which cancels the baseline the same
+way urgency already does. Ordered first, before A, so the first board rebuild
+did not run through the reordering hazard E removes.
+
+**F — the k split, a true no-op.** `waiver_k` returned 2 for FAAB and 3 for
+rolling, justified as "streaming friction as an order statistic". Both
+production consumers were DRAFT-TIME. Two different quantities were sharing one
+function because they share an operator:
+
+| | what k hedges | justified by | waiver-typed? |
+|---|---|---|---|
+| draft-time | which undrafted player is really best | prediction error | **no** |
+| in-season | someone else may win the claim | claim friction | **yes** |
+
+`draft_k` ships at **3, today's value**. An earlier draft of this plan set 2 and
+recorded in the same paragraph that it contradicted its own justification.
+Shipping a number the plan argues is backwards is worse than shipping the status
+quo. Deep-band MAE is 65-70 points (#40); at that error the best undrafted RB is
+a coin flip among several, which argues for hedging HARDER than 3, not softer.
+A derivation from that error is the thing that should move this number.
+`waiver_k` keeps the format table and stays on the in-season path, where
+`scripts/derive_baselines.py` replays weekly claims and claim friction is
+exactly what it models. A grep test now fails if the draft path reaches
+`waiver_k` again — a value test would not have, because both answered 3.
+
+### D is implemented, measured, and deliberately NOT shipped
+
+One deadline is summed over every open starter slot including FLEX, so a
+held-open flex pushes the horizon later for QB too. With A fixed this is no
+longer a correctness issue; it is a modelling disagreement, and the code comment
+says so instead of picking a winner:
+
+- **Shared is right if picks are a shared budget.** Spending one on a flex
+  really does push the quarterback later, whether or not a quarterback could
+  have filled that slot.
+- **Per-position is right if each position has its own queue.** Positions empty
+  at very different rates, and "who survives to my pick 90" is a fair question
+  for TE and a meaningless one for RB.
+
+**Nothing available can settle it.** Churn is not a verdict ("gates measure
+quality, not churn"). Lineup points cannot resolve below ~3% (#41: 6.12pp
+between-room spread against a 1% threshold, and with only 2 seasons x 2 leagues
+more seeds do not shrink it). So this is not a knob awaiting a coin flip; it is
+a documented, measured, unshipped option.
+
+**What would unblock it:** more season pairs in the backtest (2022->2023,
+2021->2022), which is its own piece of work.
+
+### Churn, reported as a diagnostic and nothing more
+
+`scripts/knob_churn.py`, 10-seat and 12-seat offline replays, rivals held fixed.
+
+| arm | keefamania | omnibeta |
+|---|---|---|
+| A+B+E on (the shipped set, D off) | 50 / 150 (33.3%) | 20 / 180 (11.1%) |
+| D alone | 49 / 150 (32.7%) | **107 / 180 (59.4%)** |
+
+The shipped set reorders within positions rather than changing roster shape:
+keefamania's churn is concentrated in rounds 2-7 and the last two rounds, and
+the position mix barely moves (RB 14 out and 14 in, K and DEF 6 and 6).
+Omnibeta is a third of that.
+
+**D is a different animal, and this is the strongest argument for leaving it
+off.** On omnibeta it changes 59.4% of picks and it moves ROSTER SHAPE, not just
+ordering: 39 RB picks leave and 29 arrive, while 22 WR picks leave and 32
+arrive — a net ten-pick swing from running back to receiver, spread across every
+round. A change that large in the direction the whole engine exists to get right
+is exactly the change you must not ship on a scoreboard that cannot resolve it.
+
+**None of this is evidence either way.** It is here so a later reviewer can tell
+"inert" from "reaches the early rounds" and "reorders" from "restructures the
+roster" without re-deriving any of it.
+
+### Verification
+
+- 663 tests pass.
+- `scripts/board_identity.py` IDENTICAL on both leagues with every knob at its
+  default, F included.
+- The A continuity property test sweeps the whole deadline range against the
+  real decision function and asserts the curve never rises and never steps
+  further than the gap between two adjacent players. Today's `board_min` fails
+  it, which is the point: without that first test the second proves nothing.
+- The stale `data/draftrig/ref_model.*.csv` references were re-cut. They
+  predated the sheet-source rebuild and the `proj_band` column, so the
+  documented check had been reporting drift that no uncommitted change caused.
