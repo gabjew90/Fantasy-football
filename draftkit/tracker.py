@@ -116,6 +116,13 @@ class Tracker:
     # ANOTHER roster goes down (bench.insurance_value, contingency term).
     bench_survival_discount = False
     bench_contingency = False
+    # TURN SEATS (2026-09-04): at the turn my next pick is one pick away with
+    # nobody in between, so every survival is exactly 1.0 and every urgency 0,
+    # and the two picks are ranked on value alone with no view of the 18-pick
+    # gap that follows. With the knob on, an empty window looks through to
+    # the FOLLOWING turn for survival and urgency, and the pair planner prices
+    # the partner at best_now (he is certain) instead of e_best_next.
+    turn_look_through = False
     rival_needs_update = True   # plan B6: a rival picking twice in my window consumes his needs
     away_slots = frozenset()    # plan B5: draft slots on autopick (Yahoo 'away'); empty on Sleeper
     upside_from_round = 8
@@ -411,6 +418,7 @@ class Tracker:
         ("bench_row_wins_dedupe", bool), ("per_position_deadline", bool),
         ("draft_k", int),
         ("bench_survival_discount", bool), ("bench_contingency", bool),
+        ("turn_look_through", bool),
     )
 
     def _dispersion_for(self, q: dict) -> float | None:
@@ -619,7 +627,23 @@ class Tracker:
         # because it speaks points-per-week over FANTASY_WEEKS=17 while
         # projections.games is 16.)
         floor_mode = str(self.fallback_floor)
-        repl_pts = self._replacement_points() if floor_mode == "replacement" else {}
+        # `wire` (2026-09-04): the floor is what the WIRE will hold, not the
+        # season replacement level. Measured on the headline board,
+        # `replacement` still churned 28% of picks with the currency
+        # mismatch gone, because replacement_baselines (QB10/RB24/WR24/TE11)
+        # are DRAFTED players by the mid rounds -- the 24th RB is gone by pick
+        # 60 -- so as a floor it overstated what is freely available and bound
+        # in rounds 5-7 where nothing is empty. The k-th best player the market
+        # leaves undrafted (bench.waiver_ppw, the same operator the bench
+        # insurance uses) is below every survivor while survivors exist and
+        # is the honest answer when the position is picked clean.
+        if floor_mode == "replacement":
+            repl_pts = self._replacement_points()
+        elif floor_mode == "wire":
+            repl_pts = self._wire_points()
+        else:
+            repl_pts = {}
+        floor_arg = "replacement" if floor_mode in ("replacement", "wire") else floor_mode
 
         out: dict[str, float] = {}
         for pos in POS_ORDER:
@@ -634,9 +658,29 @@ class Tracker:
             # same sort. In `replacement` mode the key always exists, so the
             # currency cannot switch mid-sort.
             v = fallback_value([_fb(p) for p in survivors], [_fb(p) for p in pool],
-                               repl_pts.get(pos), floor_mode)
+                               repl_pts.get(pos), floor_arg)
             if v is not None:
                 out[pos] = v
+        return out
+
+    def _wire_points(self) -> dict[str, float]:
+        """Season points of the wire at each position: the draft_k-th best
+        player the market leaves undrafted (ADP past the last pick), the
+        bench module's operator, times its 17 weeks. Empty when nothing is
+        predicted undrafted at a position (fallback_value then falls back)."""
+        from .bench import FANTASY_WEEKS, predicted_undrafted, waiver_ppw
+        k = int(self.draft_k or 3)
+        last_pick = self.teams * self.rounds
+        rem_all = [p for p in self.remaining() if p.get("proj_source") != "no_market"]
+        wire_names = predicted_undrafted(rem_all, self.current_pick, last_pick)
+        out: dict[str, float] = {}
+        for pos in POS_ORDER:
+            rem = [p for p in rem_all if p.get("pos") == pos]
+            if not rem:
+                continue
+            ppw, _who = waiver_ppw(rem, last_pick, k, wire_names=wire_names)
+            if ppw is not None:
+                out[pos] = float(ppw) * FANTASY_WEEKS
         return out
 
     def _replacement_points(self) -> dict[str, float]:
@@ -864,6 +908,15 @@ class Tracker:
         my_next = snake.next_pick_for_slot(start, self.my_slot, self.teams, self.rounds)
         if my_next is None:
             return None
+        self._look_through = False
+        if self.turn_look_through and my_next == start:
+            # the turn: no rival between this pick and my next. Price the
+            # window to the turn after, the one the second pick has to survive.
+            later = snake.next_pick_for_slot(start + 1, self.my_slot, self.teams, self.rounds)
+            if later is not None and later > start + 1:
+                # the window opens after my consecutive pick (which is mine,
+                # not a rival's) and runs to the turn after
+                start, my_next, self._look_through = start + 1, later, True
         # no_market rows are engine-invisible (guardrail) — keep them out of
         # the survival pool and best-available math too
         avail = sorted(
@@ -1312,7 +1365,8 @@ class Tracker:
                 }
 
             cands = pair_rank(cands, report, needs, second, eligible_after,
-                              fallback=fallback, repl=repl)
+                              fallback=fallback, repl=repl,
+                              partner_certain=bool(getattr(self, "_look_through", False)))
         except Exception as e:  # noqa: BLE001 — planner must never block the clock
             # fall back to greedy, but never silently: a dead planner on draft
             # day must be visible (code review 2026-08-30)

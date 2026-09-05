@@ -104,6 +104,7 @@ def pair_rank(cands: list[tuple[float, str, dict]],
               eligible_after: Callable[[str], set[str]],
               fallback: dict[str, float] | None = None,
               repl: dict[str, float] | None = None,
+              partner_certain: bool = False,
               ) -> list[tuple[float, str, dict]]:
     """Re-rank recommendation candidates by joint two-pick EV.
 
@@ -112,6 +113,9 @@ def pair_rank(cands: list[tuple[float, str, dict]],
     second_best_now: pos -> second-best VORP currently on the board.
     eligible_after: pos_taken -> partner positions the next pick may take,
         per the real guardrails conditioned on the candidate being rostered.
+    partner_certain: the partner pick is the very next pick with no rival in
+        between (a turn seat under Tracker.turn_look_through), so the partner
+        is priced at the market's best_now rather than its expected best.
     """
     if not report or len(cands) < 2:
         for _s, _w, p in cands:
@@ -128,7 +132,7 @@ def pair_rank(cands: list[tuple[float, str, dict]],
             u = report.get(mkt) or report.get(pos2)
             if not u:
                 continue
-            e = float(u.get("e_best_next") or 0.0)
+            e = float((u.get("best_now") if partner_certain else u.get("e_best_next")) or 0.0)
             if fallback is not None and repl is not None and pos2 in fallback:
                 # the report speaks VORP; convert back to points through the
                 # market's own replacement level, then re-measure against the

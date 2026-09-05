@@ -522,7 +522,11 @@ def plan_detail(t: Tracker, recs, report, plan, state: dict, top_survival: int =
     return {
         "type": "plan_detail", "ts": dt.datetime.now().isoformat(timespec="seconds"),
         "ts_epoch": round(time.time(), 3), "call": call,
-        "warnings": list(getattr(t, "warnings", []) or []),
+        # the two-pick planner falls back to greedy on any exception and
+        # leaves a note on the tracker (review 2026-08-30); the note used to
+        # stop there, invisible on the page (review 2026-09-04)
+        "warnings": list(getattr(t, "warnings", []) or [])
+                    + ([str(t._planner_note)] if getattr(t, "_planner_note", None) else []),
         "unresolved": list(getattr(t, "unresolved", []) or []),
         "current_pick": t.current_pick, "my_slot": t.my_slot, "teams": t.teams, "rounds": t.rounds,
         "state_in": {"drafted": len(drafted), "page_drafted": page_drafted,

@@ -182,6 +182,10 @@ engine:
   # late_round_dispersion. All default off = today's behaviour.
   bench_survival_discount: false
   bench_contingency: false
+  # turn seats: with no rival between consecutive picks, look through to
+  # the following turn for survival and urgency, partner priced at best_now
+  # (DECISIONS #50). Off = today's behaviour.
+  turn_look_through: false
   rival_needs_update: true   # B6: a rival picking twice in my window consumes his needs
   # ---- correctness set (2026-09-04) --------------------------------------
   # Engine BEHAVIOUR, so it lives here in globals and not in a league file:
@@ -190,6 +194,9 @@ engine:
   # each fix can be turned on and judged on its own.
   upside_boost_relative: false   # boost off the market floor, not abs(level)
   fallback_floor: board_min      # board_min (today) | replacement
+  # values: board_min (today) | replacement (season baselines; churned 28% on the
+  # headline board because those baselines are drafted players by round 5) |
+  # wire (the draft_k-th predicted-undrafted player, bench.waiver_ppw; DECISIONS #50)
   bench_row_wins_dedupe: false   # who wins the market/bench seam
   per_position_deadline: false   # STAYS OFF: no measurement can decide it
   # Draft-time order statistic for the bench wire. Hedges PREDICTION ERROR --

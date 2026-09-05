@@ -198,11 +198,16 @@ class Handler(BaseHTTPRequestHandler):
                 traceback.print_exc()
                 self._json({"err": f"{type(e).__name__}: {e}"}, 500)
             return
+        sent = False
         try:
             state = self._read_json()
             depth = int(state.pop("depth", 25))
             plan = build_plan(state, depth)
+            sent = True
             self._json(plan)
+            # From here on the response is on the wire: a failure below (or a
+            # client that hung up mid-write, the SSL EOF/BAD_LENGTH tracebacks
+            # of 2026-09-04) must be logged, never answered a second time.
             drafted = state.get("drafted") or []
             n_mine = sum(1 for d in drafted if d.get("mine"))
             roster = state.get("my_roster") or []
@@ -220,7 +225,8 @@ class Handler(BaseHTTPRequestHandler):
                 print(f"{stamp}   WARNING plan #{plan.get('calls')}: {w}", flush=True)
         except Exception as e:  # noqa: BLE001
             traceback.print_exc()
-            self._json({"err": f"{type(e).__name__}: {e}"}, 500)
+            if not sent:
+                self._json({"err": f"{type(e).__name__}: {e}"}, 500)
 
     def log_message(self, *a):
         pass

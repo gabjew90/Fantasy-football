@@ -3125,3 +3125,85 @@ re-runs it.
 Board after this: 226 players, 190 headline, 36 K/DEF synthetic, 5 zeroed
 on the board (Jacobs, Tyson, Pacheco, Conner, Charbonnet; Kirk, Dell,
 Aiyuk, Higgins are outside the pool). Suite 729 passed.
+
+## 2026-09-04 (49) — the sheet's source has history after all: FantasyPros preseason consensus from the Wayback Machine gates as a flip
+
+#44 and #45 recorded the sheet switch as a philosophy decision because the
+repo held no history for it. FantasyPros' draft projections pages
+(nfl/projections/<pos>.php?week=draft) are archived, and the draft page is
+STATIC once the season starts: the November 2024 RB capture still shows
+McCaffrey at 280.6, the December 2024 WR capture Nacua at 94.7 catches and
+1,299 yards (he missed six games that year), Kelce within 3 points of his
+May line. So a post-kickoff capture of the draft page is the preseason
+table.
+
+scripts/fantasypros_history.py: CDX lookup per position and season,
+preference to captures in [Aug 1, kickoff], else the earliest after; the
+wrapped capture parsed (Wayback rewrites URLs, never table text; the raw
+id_ route sometimes returns gzip bytes); stat columns in the sheet's own
+tab layout (external.SHEET_COLS), scored in league scoring so the page's
+FPTS column and its scoring never enter. Captures used: 2024 QB Sep 5
+(preseason), RB Nov 7, WR Dec 16, TE Dec 3 (static); 2025 QB Sep 2, RB Aug
+26, WR Aug 20, TE Aug 22 (all preseason). data/external/fantasypros_history/
+(8 files, 1,224 players). `--attach <league>` adds an `fpros` column to the
+backtest rows (season T of each pair).
+
+Gate (scripts/source_gate.py, candidate fpros, rivals blend and lines,
+reports/fpros_gate.md): DECISION flip.
+* accuracy: keefamania MAE 57.6 vs 57.8 (ratio 0.997), rho equal; omnibeta
+  61.8 vs 63.0 (0.981), rho +0.021. By cell: RB on 2024->2025 is the big
+  one (57.4 vs 68.2 keefamania, 58.8 vs 70.6 omnibeta), QB is worse in
+  three of four cells (the model's QB regression is the better QB arm), WR
+  and TE a wash.
+* outcome: 44 slot-drafts, blend 1554.5 -> fpros 1700.5, +146.0 (+9.4%),
+  better in 34, worse in 10; by pair +140.9, +228.8, +19.2, +208.0. The
+  candidate changes 505 of 572 of our picks. One seed, rivals pinned to
+  ADP, so the slot-drafts of a pair are one universe sampled at each seat.
+  Prior source gates moved lineup points by about 1%; this is nine.
+
+Reading. The gain is where the model's known weakness sat: #23 found the
+board fat from RB 49 on, and the outcome half is exactly the draft that
+punishes fat deep RB numbers. The consensus is not much more accurate on
+MAE; it is much less wrong at the tail the engine drafts from. What the
+history validates is the consensus LINE (the sheet's position tabs). The
+headline transform (#45: rank-based durability haircut plus the ECR-tab
+line, averaged) is not what was archived, so it stays a definition. And
+the QB cells say the model's QB arm is better than the consensus; a
+combine that keeps the model at QB is a candidate for 2027, not for this
+draft.
+
+Follow-up worth doing when time allows: 2023 captures exist for all four
+positions (Sep 6, 2023); adding the 2022->2023 pair to the backtest would
+give the gate a third season.
+
+## 2026-09-04 (50) — housekeeping: wire floor, turn look-through, bridge double response, planner note
+
+* `fallback_floor: wire` (new mode). #42's `replacement` floor churned 28%
+  of picks on the headline board with the currency mismatch gone (the
+  board carries no proj_market_pts, so _fb is the blend everywhere): the
+  season baselines are drafted players by round 5, so as a floor they
+  overstated what is freely available and bound in rounds 5-7 where
+  nothing was empty. The wire (bench.waiver_ppw, draft_k-th
+  predicted-undrafted player, x17) sits below every survivor while
+  survivors exist and is the honest answer when a position is picked
+  clean. Churn 8 of 150 picks, all K/DEF order in rounds 14-15. ON for
+  Keefamania.
+* `turn_look_through` (new knob). At the turn the survival window had zero
+  rivals, every survival read 1.0 and both picks ranked on value alone.
+  Now an empty window looks through to the following turn (opening after
+  my consecutive pick) and pair_rank prices the partner at best_now
+  (`partner_certain`). Churn 5 of 150, seats 1 and 10 only, rounds 4-6.
+  ON for Keefamania. Harness note: draftlog.sim_window does not mirror the
+  look-through, so the calibration record grades a turn-seat prediction
+  against the short window; fix when the knob's picks are studied.
+* bridge_server /plan: once the plan is on the wire, a failure in the
+  post-response logging (or a client that hung up mid-write, the SSL
+  EOF/BAD_LENGTH tracebacks of the day) is logged and never answered a
+  second time.
+* the two-pick planner's fallback note (`_planner_note`) now reaches the
+  page in the plan's warnings; it used to stop on the tracker.
+* not done, still open: survival_shrink rip-out, the JS local ranker, the
+  two-pick bench form (#47's follow-up), merge_feed empty names,
+  _pos_allowed must-fill, roster parser second copy.
+
+Tests: tests/test_turn_and_wire.py (6). Suite 736 passed.

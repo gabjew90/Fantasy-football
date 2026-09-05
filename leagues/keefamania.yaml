@@ -135,11 +135,14 @@ expected:
 # lineup values for a league that is already playing.
 #
 # What this is and is not. The external path is built and verified end to end
-# (2026-09-02). It has NOT been gated on history: the sheet has none in the
-# repo, and the only outside source that does (Sleeper week-1 lines) lost to
-# the model by 5% MAE and 1.2% lineup points (DECISIONS #23). This is a
-# philosophy decision, recorded as one: projections are an input, the edge is
-# roster-aware timing (keep-engine-simple). Judged when 2026 is played.
+# (2026-09-02). Taken first as a philosophy decision (projections are an
+# input, the edge is roster-aware timing), then GATED on history the same
+# evening (DECISIONS #49): FantasyPros' own preseason consensus for 2024 and
+# 2025, recovered from the Wayback Machine (scripts/fantasypros_history.py),
+# passes the source gate against the model on accuracy and wins the outcome
+# replay by +9.4% lineup points over 44 slot-drafts, every pair positive.
+# That validates the consensus LINE the sheet's tabs carry; the headline
+# transform on top (#45) remains a definition, not a measured claim.
 #
 # Consequences accepted: a player the sheet does not carry has no projection
 # and is invisible to the engine (the rebuild reports the count); one source
@@ -193,3 +196,13 @@ flex_split:            # derived by scripts/derive_flex_split.py (plan A4); a le
 # Omnibeta has no band (model path) and is in season.
 engine:
   late_round_dispersion: true
+  # Housekeeping 2026-09-04 (DECISIONS #50), both measured on the headline
+  # board before switching on. fallback_floor: wire floors the fallback at
+  # the draft_k-th predicted-undrafted player instead of the board minimum
+  # (the cliff of #42) or the season baseline (drafted players by round 5,
+  # 28% churn); churn 8 of 150 picks, all K/DEF order in rounds 14-15.
+  # turn_look_through: at the turn, survival and urgency look through to the
+  # following turn and the partner is priced as certain; churn 5 of 150,
+  # seats 1 and 10 only, rounds 4-6.
+  fallback_floor: wire
+  turn_look_through: true
