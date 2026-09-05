@@ -488,6 +488,17 @@ class Tracker:
         # rolling ADP window for the rival sampling pool (post-v2 item 1);
         # pool_size is retained as the FLOOR so old configs stay meaningful
         self.pool_min = int(ecfg.get("pool_min", ecfg.get("pool_size", Tracker.pool_min)))
+        # engine.prefer: the user's named calls, [[preferred, over], ...] in
+        # board names. When a market's best is the second name and the first
+        # is in that market's shortlist, the first is the row (user,
+        # 2026-09-05: Chase over Nacua at pick 3, a 1.6-point sheet gap).
+        prefer = ecfg.get("prefer") or []
+        pairs: list[tuple[str, str]] = []
+        for item in prefer:
+            if not isinstance(item, (list, tuple)) or len(item) != 2:
+                raise ValueError(f"engine.prefer entries are [preferred, over] pairs, got {item!r}")
+            pairs.append((str(item[0]), str(item[1])))
+        self.prefer = pairs
 
     def _rival_states(self, start: int, my_next: int) -> list[dict]:
         """Intervening pickers in order, with their open starter slots."""
@@ -1278,6 +1289,15 @@ class Tracker:
             for q in pool[1:]:
                 if abs(mv(anchor) - mv(q)) <= 2.0 and _delta(q) > _delta(best):
                     best = q
+            # the user's named preference inside this market (engine.prefer)
+            pref_note = None
+            for want, over in (getattr(self, "prefer", None) or []):
+                if str(best.get("name") or best.get("player")) == over:
+                    hit = next((q for q in pool if str(q.get("name") or q.get("player")) == want), None)
+                    if hit is not None:
+                        best = hit
+                        pref_note = f"USER PREFERENCE: {want} over {over} (league yaml engine.prefer)"
+                        break
             self._market_alternates[mkt] = {"best": mv(best), "alts": [(q, mv(q)) for q in pool if q is not best]}
             pos = best["pos"]
             label = "your FLEX spot" if mkt == "FLEX" else mkt
@@ -1288,6 +1308,8 @@ class Tracker:
             # rationale: plain-English clauses, all from already-computed draft
             # state (no model calls on the clock, per spec §9)
             parts = []
+            if pref_note:
+                parts.append(pref_note)
             if u:
                 if urgency >= 1.0:
                     parts.append(
