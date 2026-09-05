@@ -3771,3 +3771,40 @@ one-representative rule (the flex-bound guard now asserts the flex-fallback
 pricing directly; the Δ rule is asserted on the market head; the
 dispersion tests follow the round's variance rule). The plan's top three
 now often come from one live market; the page shows 25 deep.
+
+## 2026-09-05 (63) -- the band, the flat floor, the fitted survival point, the shown-row calibration, and the expectation that follows it
+
+Rooms 10801633 (seat 2) and 10802514 (seat 7) showed the cost of a strict
+1.5-point urgency band: TE 21.6 vs WR 15.4 left London (value 62.5)
+uncompared with McBride (43.2); QB 27.6 vs RB 24.4 left Henry dead; WR 21.3
+vs RB 16.2 left Javonte and Hall dead. And in a two-pick window QB 6.5 over
+WR 0.4 decided a position while London out-valued Allen by ten. The user:
+"implement your recommendation and mock". Shipped, no knob:
+
+1. A market is live within URGENCY_BAND (1.5) OR within URGENCY_REL (30%) of
+   the top urgency.
+2. Under URGENCY_FLOOR (8.0) nothing is urgent: the pair leads and stages 2-4
+   settle the winning band, as at the turn (label "STAGED (flat: ...)").
+3. Survival on the study's fitted point (reports/survival_fit_study_2026-09-05.md,
+   eleven rooms, shown objective, baseline corrected to the live engine block
+   after the first run ranked draws against a stale literal): rival_draw
+   floored, sigma 6/27, autopick_list_prob 0.4; shown log loss 0.525 against
+   0.585 for the order/10-45 point #46 chose over four rooms.
+4. engine.survival_calibration: a piecewise-linear map through the fitted
+   point's shown-row bucket means at 1000 sims (0.16->0.14, 0.40->0.21,
+   0.60->0.43, 0.81->0.73, 0.96->0.88), applied to survival (the stages,
+   the bench multiplier, the page); survival_raw stays the sim's number.
+   The display shrink #26 retired was fitted on a broken horizon; this one
+   is fitted on the corrected horizon over 5.5k shown rows. Not LORO-checked:
+   the study does not persist row-level predictions at the fitted point, and
+   the user's rule for today is that the mocks are the check.
+5. Each market's e_best_next and urgency are recomputed from the calibrated
+   survivals with urgency.expected_best (the page's independent walk);
+   the sim's numbers stay as e_best_next_raw / urgency_raw. Without this the
+   stages read a 23% Javonte while urgency still promised a 180-point back at
+   47 (room 10802514 pick 34; Judkins was the back at 47).
+
+Replayed through the new engine, room 10802514 pick 14 still takes Allen
+(QB drop 20 vs RB drop 13, the pair agrees), pick 27 becomes a flat state
+and the pair takes Jeremiyah Love over McBride, pick 34 still takes Rice
+over Javonte on the (old) expectation; item 5 is aimed at that.
