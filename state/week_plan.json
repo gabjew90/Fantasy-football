@@ -90,7 +90,7 @@
    "due_utc": "2026-09-05T14:50:00+00:00",
    "due_pt": "2026-09-05T07:50:00-07:00",
    "window_min": 45,
-   "done": false
+   "done": true
   },
   {
    "id": "wk1:injury_sweep:0905T1600",
