@@ -239,10 +239,8 @@ engine:
   # the engine, measured and off, like the bench knobs.
   tie_break: scarcity
   tie_window: 1.0
-  # The user's named calls, board names, [preferred, over]. Applied when the
-  # market's best is the second name and the first is in its shortlist; the
-  # row says USER PREFERENCE so the trail shows whose call it was.
-  # 2026-09-05: Chase over Nacua at pick 3 (sheet 246.8 vs 248.4, Nacua the
-  # tighter range, Chase the higher ceiling 257 vs 252).
-  prefer:
-    - ["Ja'Marr Chase", "Puka Nacua"]
+  # The user's named calls, board names, [preferred, over]: a final reorder
+  # after the stages, the row says USER PREFERENCE (DECISIONS #61). Chase
+  # over Nacua was set and reverted the same afternoon (user, 2026-09-05);
+  # the engine's own read stands (Nacua on the floor, 1.6 sheet points).
+  prefer: []
