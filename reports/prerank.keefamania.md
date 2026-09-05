@@ -1,19 +1,29 @@
 # Keefamania pre-draft ranks (Yahoo autopick list)
 
-Generated 2026-09-01 from `tiers.keefamania.csv`: board order by VORP, availability=out excluded, K/DEF last.
-This is LAYER 0 of the draft rig: if the live driver misses a pick, Yahoo's own autopick walks this list
-(with its positional balancing). Imported into Yahoo via the Edit Pre-Draft Ranks page: 228 of 240 matched by the
-importer; the remaining 12 were added by hand on 2026-09-02 (surname search + star, board order, at the tail) and
-DK Metcalf was moved from the bottom to his board position with Select → "Move after…". **Yahoo now holds all 240
-in board order** (verified 240 of 240, `has_preranks: 1`).
+Re-imported 2026-09-05 16:30 PT from the draft-day board (`data/draftrig/board.keefamania.json`,
+rebuilt 15:52 on the refreshed Yahoo ADP and ranks, commit 333c8cc): board order by VORP,
+availability=out excluded, K/DEF last. This is LAYER 0 of the draft rig: if the live driver misses a
+pick, Yahoo's own autopick walks this list (with its positional balancing).
+
+**Yahoo now holds 221 of 221 in board order** (read back after a reload: zero inversions, zero stale
+names, `has_preranks: 1`). The importer matched 220; AJ Dillon (RB, CAR, board #174) was starred by
+hand and sits at position 221, the tail, because the page re-renders too slowly for the Select ->
+"Move after..." flow (three attempts timed out at 45 s). He is deep bench; leaving him last costs
+nothing a 150-pick draft can reach. The 26 stale names from the 09-02 list (Brissett, Waller,
+Pearsall, Tyreek Hill, the twelve hand-added deep-bench names, ...) dropped off on save.
+
+Earlier import (2026-09-01/02, 240 of 240) is superseded; its notes are kept below for the record.
 
 Live view (your account): https://football.fantasysports.yahoo.com/f1/49649/3/editprerank
 
-## Do Not Draft (availability = out)
+## Do Not Draft (availability = out), as of 2026-09-05
 
-- Jayden Higgins (WR, HOU) — out
-- Josh Jacobs (RB, GBP) — out
-- Zach Charbonnet (RB, SEA) — out
+- Jordyn Tyson (WR) — marked 09-05
+- James Conner (RB) — marked 09-05
+- Isiah Pacheco (RB) — marked 09-05
+- Josh Jacobs (RB, GBP) — already held
+- Zach Charbonnet (RB, SEA) — already held
+- Jayden Higgins (WR, HOU) — held from 09-01 (no longer on the board)
 
 ## Not matched by Yahoo's importer — added by hand 2026-09-02
 
