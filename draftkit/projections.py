@@ -290,6 +290,15 @@ def external_projection(cfg, usage: pl.DataFrame, market: pl.DataFrame) -> pl.Da
         print(f"  projections <- {s['source']}: {s['rows']} players"
               + (f" (as of {s['as_of']})" if s.get("as_of") else "")
               + (f"  !! {s['error']}" if s.get("error") else ""), file=sys.stderr)
+    sh = rep.get("sheet") or {}
+    if sh.get("headline_spec"):
+        hp = sh.get("headline_parity") or {}
+        print(f"  sheet: updated {sh.get('sheet_as_of')}, headline games basis {sh['headline_spec']['games']:g}, "
+              f"{sh['headline_spec']['avg_form']}; reproduced vs the page: {hp.get('compared')} players, "
+              f"max diff {hp.get('max_abs_diff')}", file=sys.stderr)
+    if sh.get("sheet_scoring_diffs"):
+        print(f"  !! sheet Scoring tab differs from the league yaml on {sorted(sh['sheet_scoring_diffs'])}: "
+              f"lines are scored with the LEAGUE settings", file=sys.stderr)
     if rep["sheet_unmatched"]:
         print(f"  sheet names not matched to Sleeper ({len(rep['sheet_unmatched'])}): "
               + ", ".join(rep["sheet_unmatched"][:12]) + (" …" if len(rep["sheet_unmatched"]) > 12 else ""),
@@ -328,9 +337,11 @@ def external_projection(cfg, usage: pl.DataFrame, market: pl.DataFrame) -> pl.Da
     df = df.with_columns(pl.when(discounted).then(pl.lit(float(games))).otherwise(pl.col("_games")).alias("_games"))
     # the line's own season basis per source (17 for a full-season line; the
     # DraftSheet headline is stated on 16 less a haircut): external.source_basis_expr
+    if "pts_basis" not in df.columns:
+        df = df.with_columns(pl.lit(None, dtype=pl.Float64).alias("pts_basis"))
     df = df.with_columns(X.source_basis_expr().alias("_basis"))
     df = df.with_columns((pl.col("pts17") * pl.col("_games") / pl.col("_basis")).alias("proj_pts"),
-                         pl.coalesce(pl.col("source"), pl.lit("none")).alias("proj_source")).drop("pts17", "source")
+                         pl.coalesce(pl.col("source"), pl.lit("none")).alias("proj_source")).drop("pts17", "source", "pts_basis")
     # plan A1: dispersion across sources on the same basis as proj_pts
     if disp:
         df = df.with_columns(

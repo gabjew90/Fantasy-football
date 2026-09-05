@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 
 import polars as pl
+import pytest
 
 from draftkit import external as X
 
@@ -159,10 +160,12 @@ def test_non_starters_go_to_zero_only_when_depth_chart_and_market_agree():
     assert "_mkt_rank" not in out.columns
 
 
-def test_from_sheet_headline_reads_the_draftsheet_pts_on_a_16_game_basis(tmp_path):
-    """line="headline": the DraftSheet PTS becomes the line, the source names
-    the basis, and a tab player the DraftSheet does not list is brought onto
-    that basis at his position's median headline/tab ratio."""
+def _headline_workbook(tmp_path, games: int, three_way: bool):
+    """A two-back workbook with the tabs the headline is built from. Gibbs is
+    RB1 with a low/high pair; Bijan is on the tab but NOT in the ECR list, so
+    he is off the page and estimated. The Aggregate tab carries only the
+    FORMULA STRINGS the loader reads (games basis, average form, rank
+    window); values are not needed because the loader recomputes them."""
     import openpyxl
     wb = openpyxl.Workbook()
     wb.remove(wb.active)
@@ -173,32 +176,111 @@ def test_from_sheet_headline_reads_the_draftsheet_pts_on_a_16_game_basis(tmp_pat
     wb["RB"].append([None, "high", 283.5, 1422, 15, 74, 625, 5, 1])
     wb["RB"].append([None, "low", 263, 1353, 12, 67.9, 546.4, 3.4, 1.3])
     wb["RB"].append(["Bijan Robinson", "ATL", 285.8, 1391.1, 8.8, 76.9, 705.6, 3.5, 1.8])
-    ds = wb.create_sheet("DraftSheet")
-    ds.append(["RUNNING BACK", None, None, None, None, None, None, None, "WIDE RECEIVER"])
-    ds.append(["TIER", "NAME", "TM/BYE", "PTS", "VALUE", "PS", "ECR", None, "TIER", "NAME", "TM/BYE", "PTS"])
-    ds.append([1, "Jahmyr Gibbs", "DET/6", 266.86, 133.8, 0.9, "RB1", None, 1, "Puka Nacua", "LAR/11", 232.5])
-    ds.append([None, None, None, None, None, None, None, None, 1, "Ja'Marr Chase", "CIN/6", 230.1])
-    p = tmp_path / "sheet.xlsx"
+    ecr = wb.create_sheet("ECR")
+    ecr.append(["RK", "TIERS", "PLAYER NAME", "TEAM", "POS"])
+    ecr.append([1, 1, "Jahmyr Gibbs", "DET", "RB1"])
+    risk = wb.create_sheet("RISK")
+    risk.append(["Position", "Projected Games Adjustment"])
+    risk.append(["RB1", 2.5514])
+    ag = wb.create_sheet("Aggregate")
+    hdr = [None] * 100
+    for off in (0, 14, 28, 42):
+        hdr[off + 5], hdr[off + 6], hdr[off + 7], hdr[off + 8] = "LOW", "AVG", "HIGH", "Zscore Projection"
+    hdr[59 - 1], hdr[64 - 1], hdr[69 - 1], hdr[74 - 1] = "QBPts", "RBPts", "WRPts", "TEPts"
+    ag.append([None] * 100)
+    ag.append(hdr)
+    row = [None] * 100
+    for pos, off in (("QB", 0), ("RB", 14), ("WR", 28), ("TE", 42)):
+        row[off] = f"{pos}1"
+        row[off + 5] = f"=IFERROR(VLOOKUP(X,{pos}!A:Q,15,FALSE())/17*({games}-Y),0)"
+        row[off + 8] = ("=AVERAGE(AVERAGE(L,H),A,VLOOKUP(X,ECR!L:N,3,FALSE))" if three_way
+                        else "=AVERAGE(L,A,H,VLOOKUP(X,ECR!L:N,3,FALSE()))")
+    row[59 - 1] = "=IFERROR(LARGE($G$3:$G$52,BF3),\"\")"
+    row[64 - 1] = "=IFERROR(LARGE($U$3:$U$102,BK3),\"\")"
+    row[69 - 1] = "=IFERROR(LARGE($AI$3:$AI$102,BP3),\"\")"
+    row[74 - 1] = "=IFERROR(LARGE($AW$3:$AW$52,BU3),\"\")"
+    ag.append(row)
+    sc = wb.create_sheet("Scoring")
+    sc.append(["Updated:", "2026-09-04"])
+    p = tmp_path / f"sheet_{games}_{int(three_way)}.xlsx"
     wb.save(p)
+    return p
+
+
+@pytest.mark.parametrize("games,three_way", [(16, False), (17, True)])
+def test_from_sheet_headline_is_reproduced_from_the_workbooks_inputs(tmp_path, games, three_way):
+    """line="headline" (DECISIONS #54): the DraftSheet PTS rebuilt from the
+    tab lines, the ECR slot, the RISK haircut and the workbook's own
+    formulas, in LEAGUE scoring; the row carries the workbook's games basis;
+    a tab player off the page is estimated at the position's median ratio."""
+    from draftkit.seasondata import score_projection
+    p = _headline_workbook(tmp_path, games, three_way)
     idx = FakeIndex({("Jahmyr Gibbs", "RB"): "4866", ("Bijan Robinson", "RB"): "9509"})
-    df, unmatched = X.from_sheet(p, HALF, idx, as_of="2026-09-01", line="headline")
+    rep = {}
+    df, unmatched = X.from_sheet(p, HALF, idx, as_of="cfg", line="headline", report=rep)
     assert unmatched == []
+    assert rep["sheet_as_of"] == "2026-09-04" and rep["headline_spec"]["games"] == games
+    assert rep["headline_spec"]["avg_form"] == ("mid_avg_ecr" if three_way else "low_avg_high_ecr")
+    assert rep["headline_spec"]["off_basis_positions"] == []
     rows = {r["name"]: r for r in df.iter_rows(named=True)}
     g = rows["Jahmyr Gibbs"]
-    assert g["source"] == "fantasypros_sheet_headline" and abs(g["pts17"] - 266.86) < 1e-9
+    # by hand, the way the workbook does it (no bump column in this fixture)
+    base = score_projection({"rush_att": 275.2, "rush_yd": 1383.7, "rush_td": 13.8, "rec": 71.3, "rec_yd": 581.1, "rec_td": 4.1, "fum_lost": 1.1}, HALF)
+    hi = score_projection({"rush_att": 283.5, "rush_yd": 1422, "rush_td": 15, "rec": 74, "rec_yd": 625, "rec_td": 5, "fum_lost": 1}, HALF)
+    lo = score_projection({"rush_att": 263, "rush_yd": 1353, "rush_td": 12, "rec": 67.9, "rec_yd": 546.4, "rec_td": 3.4, "fum_lost": 1.3}, HALF)
+    f = (games - 2.5514) / 17.0
+    ecr_pts = base * f                      # RB1 is the largest AVG in a one-man block
+    want = (((lo + hi) / 2 * f + base * f + ecr_pts) / 3) if three_way else ((lo * f + base * f + hi * f + ecr_pts) / 4)
+    assert g["source"] == "fantasypros_sheet_headline" and abs(g["pts17"] - want) < 1e-6
+    assert g["pts_basis"] == float(games)
     # the band rides along in the headline's units: same relative spread
     tab = X.from_sheet(p, HALF, idx, as_of="x", line="tab")[0].filter(pl.col("name") == "Jahmyr Gibbs").row(0, named=True)
     assert abs(g["pts17_band"] / g["pts17"] - tab["pts17_band"] / tab["pts17"]) < 1e-9
-    # not on the DraftSheet: the tab line brought onto the headline basis by
-    # the position's median headline/tab ratio (here Gibbs alone sets it)
+    assert tab["pts_basis"] is None
+    # not on the page (no ECR slot): the tab line brought onto the headline
+    # basis by the position's median headline/tab ratio (Gibbs alone sets it)
     b = rows["Bijan Robinson"]
-    assert b["source"] == "fantasypros_sheet_headline"
-    assert abs(b["pts17"] - 318.32 * 266.86 / 337.33) < 0.1
-    assert X.parse_draftsheet(list(openpyxl.load_workbook(p, data_only=True)["DraftSheet"].iter_rows(values_only=True))) \
-        == {"Jahmyr Gibbs": 266.86, "Puka Nacua": 232.5, "Ja'Marr Chase": 230.1}
+    assert b["source"] == "fantasypros_sheet_headline" and b["pts_basis"] == float(games)
+    assert abs(b["pts17"] - 318.32 * want / base) < 0.1
 
 
-def test_source_basis_expr_puts_the_headline_on_16_games_and_everything_else_on_17():
-    df = pl.DataFrame({"source": ["fantasypros_sheet", "fantasypros_sheet_headline", "sleeper_rotowire", None]})
-    assert df.select(X.source_basis_expr().alias("b"))["b"].to_list() == [17.0, 16.0, 17.0, 17.0]
+def test_the_workbooks_own_scoring_is_reported_not_used(tmp_path):
+    """A default-settings copy scored at full PPR: the lines are still scored
+    with the LEAGUE settings and the difference is reported, never applied."""
+    import openpyxl
+    p = _headline_workbook(tmp_path, 17, True)
+    wb = openpyxl.load_workbook(p)
+    sc = wb["Scoring"]
+    for label, v in (("PassYDS", 25), ("PassTDs", 4), ("INTS", -1), ("RushYDS", 10), ("RushTDS", 6),
+                     ("RB PPR", 1.0), ("WR PPR", 1.0), ("TE PPR", 1.0), ("RecYDS", 10), ("RecTDS", 6), ("FL", -2)):
+        sc.append([label, v])
+    wb.save(p)
+    idx = FakeIndex({("Jahmyr Gibbs", "RB"): "4866", ("Bijan Robinson", "RB"): "9509"})
+    rep = {}
+    df, _ = X.from_sheet(p, HALF, idx, as_of="cfg", line="tab", report=rep)
+    assert rep["sheet_scoring_diffs"] == {"rec": (1.0, HALF["rec"])}
+    g = df.filter(pl.col("name") == "Jahmyr Gibbs").row(0, named=True)
+    from draftkit.seasondata import score_projection
+    assert abs(g["pts17"] - score_projection({"rush_att": 275.2, "rush_yd": 1383.7, "rush_td": 13.8, "rec": 71.3, "rec_yd": 581.1, "rec_td": 4.1, "fum_lost": 1.1}, HALF)) < 1e-9
+
+
+def test_a_block_left_on_the_old_basis_is_named_and_not_followed(tmp_path):
+    """The 09-04 copy: TE rows 4-52 still say 16 while everything else says
+    17. The loader takes the majority for every position and names the block."""
+    import openpyxl
+    p = _headline_workbook(tmp_path, 17, True)
+    wb = openpyxl.load_workbook(p)
+    ag = wb["Aggregate"]
+    for r in range(4, 54):
+        ag.cell(row=r, column=42 + 6, value="=IFERROR(VLOOKUP(X,TE!A:K,9,FALSE())/17*(16-Y),0)")
+    wb.save(p)
+    import openpyxl as _o
+    spec = X.sheet_headline_spec(_o.load_workbook(p, read_only=True, data_only=False))
+    assert spec["games"] == 17.0 and spec["games_by_pos"]["TE"] == 16.0 and spec["off_basis_positions"] == ["TE"]
+
+
+def test_source_basis_expr_takes_the_rows_own_basis_and_falls_back_to_17():
+    df = pl.DataFrame({"source": ["fantasypros_sheet", "fantasypros_sheet_headline", "fantasypros_sheet_headline", "sleeper_rotowire", None],
+                       "pts_basis": [None, 16.0, 17.0, None, None]})
+    assert df.select(X.source_basis_expr().alias("b"))["b"].to_list() == [17.0, 16.0, 17.0, 17.0, 17.0]
     assert "fantasypros_sheet_headline" in X.DISCOUNTED_SOURCES

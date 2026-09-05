@@ -74,7 +74,9 @@ SOURCE_GAMES_CONVENTION = {
     # (16 - RISK-tab missed games by ECR rank), so the number is ALREADY a
     # 16-game total less a durability haircut. Basis 16 and discounted, so
     # proj_pts equals the page's number and no games scale touches it twice.
-    "fantasypros_sheet_headline": {"ratio": None, "already_discounted": True, "basis_games": 16.0},
+    # basis_games is NOT fixed here: from_sheet reads it off the workbook's
+    # Aggregate formula and carries it per row in `pts_basis` (DECISIONS #54)
+    "fantasypros_sheet_headline": {"ratio": None, "already_discounted": True},
 }
 DISCOUNTED_SOURCES = tuple(k for k, v in SOURCE_GAMES_CONVENTION.items() if v["already_discounted"])
 
@@ -88,7 +90,8 @@ def source_basis_expr() -> pl.Expr:
     for name, conv in SOURCE_GAMES_CONVENTION.items():
         if conv.get("basis_games") is not None:
             expr = pl.when(pl.col("source") == name).then(pl.lit(float(conv["basis_games"]))).otherwise(expr)
-    return expr
+    # a row that states its own basis (pts_basis) wins over the table
+    return pl.coalesce(pl.col("pts_basis"), expr)
 
 
 SCHEMA = {"sleeper_id": pl.Utf8, "name": pl.Utf8, "pos": pl.Utf8, "team": pl.Utf8,
@@ -101,7 +104,14 @@ SCHEMA = {"sleeper_id": pl.Utf8, "name": pl.Utf8, "pos": pl.Utf8, "team": pl.Utf
 # n_sources >= 2 guard, so the band gets its own column and is null for a
 # source that publishes no range.
 DISPERSION = {"n_sources": pl.Int64, "pts17_sd": pl.Float64, "pts17_hi": pl.Float64,
-              "pts17_lo": pl.Float64, "pts17_band": pl.Float64}
+              "pts17_lo": pl.Float64, "pts17_band": pl.Float64,
+              # not a dispersion: the season length THIS row's pts17 is stated
+              # on when the source decides it per workbook (the DraftSheet
+              # headline, read off the Aggregate formula: 16 in the 09-02
+              # copy, 17 in the 09-04 copy). Null means the source table /
+              # LINE_GAMES. Carried here because this is the set of optional
+              # per-row columns every path must preserve (DECISIONS #54).
+              "pts_basis": pl.Float64}
 SCHEMA_COMBINED = {**SCHEMA, **DISPERSION}
 
 # Column layout of each sheet position tab (0-based, after Player, Team).
@@ -121,7 +131,11 @@ def empty() -> pl.DataFrame:
 
 def _frame(rows: list[dict], schema: dict | None = None) -> pl.DataFrame:
     schema = schema or SCHEMA
-    return pl.DataFrame(rows, schema=schema) if rows else pl.DataFrame(schema=schema)
+    if not rows:
+        return pl.DataFrame(schema=schema)
+    keys = set().union(*(r.keys() for r in rows))
+    rows = [{k: r.get(k) for k in schema} for r in rows] if keys != set(schema) else rows
+    return pl.DataFrame(rows, schema=schema)
 
 
 # ------------------------------------------------------------------ sheet
@@ -210,31 +224,261 @@ def parse_draftsheet(rows: list[tuple]) -> dict[str, float]:
     return out
 
 
-def from_sheet(path: Path, scoring: dict, index, as_of: str, line: str = "tab") -> tuple[pl.DataFrame, list[str]]:
-    """The sheet's consensus lines in the common schema. `index` is a
-    SleeperIndex (name, pos, team -> sleeper_id). Returns (frame, unmatched).
+# ---- the workbook's own inputs (DECISIONS #54) --------------------------
+# Everything the DraftSheet headline is built from, read from the workbook so
+# the number can be REPRODUCED under the league's rules rather than copied off
+# a page that was rendered under whatever the Scoring tab happened to say.
 
-    line="tab": the position tab's line scored in league settings plus the
+# Scoring-tab row label -> draftkit scoring key. Yards rows state yards PER
+# POINT (inverted below); the three PPR rows must agree (one `rec` key).
+_SHEET_SCORING = {"PassYDS": ("pass_yd", True), "RushYDS": ("rush_yd", True), "RecYDS": ("rec_yd", True),
+                  "PassTDs": ("pass_td", False), "RushTDS": ("rush_td", False), "RecTDS": ("rec_td", False),
+                  "INTS": ("pass_int", False), "FL": ("fum_lost", False), "RB PPR": ("rec", False)}
+
+
+def sheet_scoring(wb) -> dict:
+    """The Scoring tab as a draftkit scoring dict. Informational: the loader
+    scores lines with the LEAGUE yaml; this is what the workbook was set to,
+    so a difference can be reported instead of silently shipped."""
+    if "Scoring" not in wb.sheetnames:
+        return {}
+    raw: dict[str, float] = {}
+    for r in wb["Scoring"].iter_rows(min_row=1, max_row=40, values_only=True):
+        if r and isinstance(r[0], str) and len(r) > 1 and isinstance(r[1], (int, float)):
+            raw[r[0].strip()] = float(r[1])
+    out: dict[str, float] = {}
+    for label, (key, invert) in _SHEET_SCORING.items():
+        if label in raw:
+            out[key] = (1.0 / raw[label] if raw[label] else 0.0) if invert else raw[label]
+    for label in ("WR PPR", "TE PPR"):
+        if label in raw and "rec" in out and abs(raw[label] - out["rec"]) > 1e-9:
+            out[f"rec_{label.split()[0].lower()}"] = raw[label]   # per-position PPR the loader cannot score
+    return out
+
+
+def sheet_updated(wb) -> str | None:
+    """The Scoring tab's 'Updated:' date (ISO), the workbook's own as-of."""
+    if "Scoring" not in wb.sheetnames:
+        return None
+    for r in wb["Scoring"].iter_rows(min_row=1, max_row=3, max_col=3, values_only=True):
+        if r and isinstance(r[0], str) and r[0].strip().lower().startswith("updated") and len(r) > 1:
+            v = r[1]
+            if isinstance(v, dt.datetime):
+                return v.date().isoformat()
+            if isinstance(v, dt.date):
+                return v.isoformat()
+            if isinstance(v, str) and v.strip():
+                return v.strip()[:10]
+    return None
+
+
+def sheet_headline_spec(wf) -> dict:
+    """How THIS workbook builds the DraftSheet headline, read off the
+    Aggregate tab's formulas (a formulas-mode workbook):
+
+      games       the season length its LOW/AVG/HIGH lines are scaled to,
+                  `line / 17 * (games - missed)`: 16 in the 09-02 copy,
+                  17 in the 09-04 default copy. Read on EVERY row of every
+                  position block and taken by majority, because the 09-04
+                  copy has 17 in QB/RB/WR and in one TE row with the other
+                  49 TE rows still on 16 (a half-applied template edit);
+                  `games_by_pos` says what each block mostly says and
+                  `off_basis_positions` names the blocks that disagree with
+                  the workbook majority. The loader reproduces every
+                  position on the ONE majority basis, so the page's stale
+                  block does not become a position tilt on the board;
+      avg_form    how the headline averages: `low_avg_high_ecr` (four-way)
+                  or `mid_avg_ecr` (mean of low/high, then AVG, then the
+                  ECR-slot points, three-way), by majority the same way;
+      rank_window per position, how many ECR slots the block ranks for the
+                  ECR-slot points (`LARGE($G$3:$G$52, k)` -> 50).
+
+    Raises when the shapes are not recognised: a copy this loader cannot
+    read is a loud error, never a silent fallback to the page."""
+    from collections import Counter
+    ws = wf["Aggregate"]
+    rows = list(ws.iter_rows(min_row=1, max_row=160))
+
+    def val(r, c):
+        cells = rows[r - 1] if r - 1 < len(rows) else ()
+        return getattr(cells[c - 1], "value", None) if c - 1 < len(cells) else None
+
+    width = max((len(r) for r in rows), default=0)
+    # each block: its LOW column (row-2 header) and its position (row-3 slot cell, five to the left)
+    blocks: list[tuple[str, int]] = []
+    pts_cols: dict[int, str] = {}
+    for c in range(1, width + 1):
+        h = val(2, c)
+        if h == "LOW":
+            slot = val(3, c - 5)
+            pos = "".join(ch for ch in str(slot or "") if ch.isalpha())
+            if pos in SHEET_COLS:
+                blocks.append((pos, c))
+        if isinstance(h, str) and h.endswith("Pts") and h[:-3] in SHEET_COLS:
+            pts_cols[c] = h[:-3]
+    if not blocks:
+        raise ValueError("Aggregate tab: no position blocks with a LOW column found; cannot reproduce the headline")
+    games_by_pos: dict[str, float] = {}
+    forms: Counter = Counter()
+    all_games: Counter = Counter()
+    for pos, c in blocks:
+        g: Counter = Counter()
+        for r in range(3, len(rows) + 1):
+            v = val(r, c)
+            if isinstance(v, str) and v.startswith("="):
+                m = re.search(r"/17\*\((\d+(?:\.\d+)?)-", v)
+                if m:
+                    g[float(m.group(1))] += 1
+            z = val(r, c + 3)          # LOW, AVG, HIGH, then the headline
+            if isinstance(z, str) and z.startswith("=") and "AVERAGE(" in z and "ECR!" in z:
+                forms["mid_avg_ecr" if z.replace(" ", "").startswith("=AVERAGE(AVERAGE(") else "low_avg_high_ecr"] += 1
+        if g:
+            games_by_pos[pos] = g.most_common(1)[0][0]
+            all_games.update(g)
+    if not all_games or not forms:
+        raise ValueError("Aggregate tab formulas not recognised (games basis / headline average): "
+                         "cannot reproduce the DraftSheet headline from this workbook")
+    # one vote per block (three blocks on 17 outvote one on 16 whatever their
+    # row counts); a tie between block majorities falls back to row counts
+    votes = Counter(games_by_pos.values())
+    top = votes.most_common()
+    if len(top) > 1 and top[0][1] == top[1][1]:
+        games = all_games.most_common(1)[0][0]
+    else:
+        games = top[0][0]
+    windows: dict[str, int] = {}
+    for c, pos in pts_cols.items():
+        v = val(3, c)
+        m = re.search(r"LARGE\(\$[A-Z]+\$(\d+):\$[A-Z]+\$(\d+)", str(v or ""))
+        if m:
+            windows[pos] = int(m.group(2)) - int(m.group(1)) + 1
+    return {"games": games, "avg_form": forms.most_common(1)[0][0],
+            "games_by_pos": games_by_pos,
+            "off_basis_positions": sorted(p for p, g in games_by_pos.items() if g != games),
+            "rank_window": {p: int(windows.get(p, 50 if p in ("QB", "TE") else 100)) for p in SHEET_COLS}}
+
+
+def sheet_risk(wb) -> dict[str, float]:
+    """RISK tab: ECR position slot ('WR14') -> projected missed games."""
+    out: dict[str, float] = {}
+    for r in wb["RISK"].iter_rows(min_row=1, max_row=1000, max_col=2, values_only=True):
+        if r and isinstance(r[0], str) and len(r) > 1 and isinstance(r[1], (int, float)):
+            out[r[0].strip()] = float(r[1])
+    return out
+
+
+def sheet_ecr_slots(wb) -> dict[str, str]:
+    """ECR tab: player name key -> position slot ('WR14')."""
+    out: dict[str, str] = {}
+    for r in wb["ECR"].iter_rows(min_row=2, max_row=2000, max_col=5, values_only=True):
+        if r and isinstance(r[2], str) and isinstance(r[4], str) and r[2].strip():
+            out.setdefault(_sheet_name_key(r[2]), r[4].strip())
+    return out
+
+
+def _slot_number(slot: str | None, pos: str) -> int | None:
+    if not slot or not slot.startswith(pos):
+        return None
+    try:
+        return int(slot[len(pos):])
+    except ValueError:
+        return None
+
+
+def reproduce_headline(rows: list[dict], slots: dict[str, str], risk: dict[str, float], spec: dict) -> dict[str, float]:
+    """The DraftSheet PTS per sleeper_id, rebuilt from the tab lines the way
+    the workbook builds it (Aggregate tab, verified cell for cell against
+    both 2026 copies in tests/test_sheet_parity.py):
+
+        f        = (games - missed[slot]) / 17
+        LOW/AVG/HIGH = scored low / base / high line x f
+        ECRpts   = the k-th largest AVG in the position's block, k = the
+                   player's own ECR slot, block = slots 1..rank_window (a
+                   slot whose player has no tab line counts as 0)
+        headline = AVERAGE(LOW, AVG, HIGH, ECRpts)               four-way
+                or AVERAGE(AVERAGE(LOW, HIGH), AVG, ECRpts)      three-way
+
+    `rows` are from_sheet's scored tab rows (_base/_lo/_hi in league
+    scoring). A player with no ECR slot at his tab position, no RISK entry
+    for it, or a slot beyond the block is not on the DraftSheet and gets no
+    headline here (from_sheet estimates him at the position's median ratio).
+    The workbook's team count, roster and auction settings do not enter:
+    they move VBD and PS on the page, never PTS."""
+    games, form, windows = float(spec["games"]), spec["avg_form"], spec["rank_window"]
+    out: dict[str, float] = {}
+    for pos in SHEET_COLS:
+        win = int(windows.get(pos, 50))
+        by_slot: dict[int, dict] = {}
+        for r in rows:
+            if r["pos"] != pos:
+                continue
+            slot = slots.get(_sheet_name_key(r["name"]))
+            k = _slot_number(slot, pos)
+            if k is None or slot not in risk:
+                continue
+            by_slot.setdefault(k, {**r, "_k": k, "_missed": float(risk[slot])})
+        block = [(by_slot[k]["_base"] / LINE_GAMES * (games - by_slot[k]["_missed"])) if k in by_slot else 0.0
+                 for k in range(1, win + 1)]
+        ranked = sorted(block, reverse=True)
+        for k, r in by_slot.items():
+            if k > win:
+                continue
+            f = (games - r["_missed"]) / LINE_GAMES
+            low = (r["_lo"] if r["_lo"] is not None else r["_base"]) * f
+            avg = r["_base"] * f
+            high = (r["_hi"] if r["_hi"] is not None else r["_base"]) * f
+            ecr_pts = ranked[k - 1]
+            if form == "mid_avg_ecr":
+                out[r["sleeper_id"]] = ((low + high) / 2.0 + avg + ecr_pts) / 3.0
+            else:
+                out[r["sleeper_id"]] = (low + avg + high + ecr_pts) / 4.0
+    return out
+
+
+def from_sheet(path: Path, scoring: dict, index, as_of: str, line: str = "tab",
+               report: dict | None = None) -> tuple[pl.DataFrame, list[str]]:
+    """The sheet's consensus lines in the common schema. `index` is a
+    SleeperIndex (name, pos, team -> sleeper_id). Returns (frame, unmatched);
+    `report`, when given, is filled with what the workbook said about itself.
+
+    line="tab": the position tab's line scored in LEAGUE settings plus the
     rookie bump (the tab's own AVG cell), a 17-game total, source
     `fantasypros_sheet`. line="headline": the DraftSheet tab's PTS, the
-    number the sheet's reader sees (source `fantasypros_sheet_headline`,
-    basis 16, see SOURCE_GAMES_CONVENTION). A tab player the DraftSheet does
-    not list is brought onto that basis at his position's median
-    headline/tab ratio; the count is logged.
+    number the sheet's reader sees, REPRODUCED from the tab lines, the ECR
+    slots, the RISK haircuts and the workbook's own Aggregate formulas
+    (reproduce_headline / sheet_headline_spec), never copied off the page.
+    That is what makes a default-settings copy of the workbook usable for a
+    league whose settings differ (DECISIONS #54): the league yaml's scoring
+    is applied to the lines, and the workbook's team count, roster and
+    auction cells do not enter. Source `fantasypros_sheet_headline`, basis
+    = the workbook's games (pts_basis). A tab player the DraftSheet does not
+    list is brought onto that basis at his position's median headline/tab
+    ratio; the count is logged. The as-of is the workbook's 'Updated:' cell
+    when it has one.
     """
     if line not in ("tab", "headline"):
         raise ValueError(f"sheet_line must be tab or headline, got {line!r}")
     import openpyxl
     wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
-    # a second pass for FORMULAS, only to locate the rookie-bump column: the
-    # values pass cannot see formulas and the column sits at no fixed letter
+    # a second pass for FORMULAS: the rookie-bump column sits at no fixed
+    # letter, and the headline's games basis / average form live in formulas
     wf = openpyxl.load_workbook(path, read_only=True, data_only=False)
-    headline: dict[str, float] = {}
+    rep = report if report is not None else {}
+    upd = sheet_updated(wb)
+    if upd:
+        as_of = upd
+    rep["sheet_as_of"] = as_of
+    ss = sheet_scoring(wb)
+    rep["sheet_scoring_diffs"] = {k: (v, float(scoring.get(k, 0.0))) for k, v in ss.items()
+                                  if abs(v - float(scoring.get(k, 0.0))) > 1e-9}
+    spec = risk = slots = None
     if line == "headline":
-        if "DraftSheet" not in wb.sheetnames:
-            raise ValueError(f"{path.name} has no DraftSheet tab; sheet_line: headline needs it")
-        headline = parse_draftsheet(list(wb["DraftSheet"].iter_rows(values_only=True)))
-    rows, unmatched, bumped, no_headline = [], [], 0, 0
+        for tab in ("ECR", "RISK", "Aggregate"):
+            if tab not in wb.sheetnames:
+                raise ValueError(f"{path.name} has no {tab} tab; sheet_line: headline is reproduced from it")
+        spec, risk, slots = sheet_headline_spec(wf), sheet_risk(wb), sheet_ecr_slots(wb)
+        rep["headline_spec"] = spec
+    rows, unmatched, bumped = [], [], 0
     for pos in SHEET_COLS:
         bump_col = sheet_bump_column(wf[pos])
         for p in parse_sheet_tab(list(wb[pos].iter_rows(values_only=True)), pos, bump_col):
@@ -255,55 +499,75 @@ def from_sheet(path: Path, scoring: dict, index, as_of: str, line: str = "tab") 
             # on one scale even though they measure different things.
             # the sheet adds the same bump to low, base and high, so it
             # shifts the trio without widening it: the band is unchanged
-            trio = [base]
-            for k in ("line_lo", "line_hi"):
-                if p.get(k):
-                    trio.append(float(score_projection(p[k], scoring)) + bump)
+            lo = float(score_projection(p["line_lo"], scoring)) + bump if p.get("line_lo") else None
+            hi = float(score_projection(p["line_hi"], scoring)) + bump if p.get("line_hi") else None
+            trio = [x for x in (lo, base, hi) if x is not None]
             band = None
             if len(trio) == 3:
                 mu = sum(trio) / 3.0
                 band = (sum((x - mu) ** 2 for x in trio) / 3.0) ** 0.5
-            pts, source = base, "fantasypros_sheet"
-            if line == "headline":
-                h = headline.get(_sheet_name_key(p["name"]))
-                if h is None:
-                    no_headline += 1
-                    pts, source = None, "fantasypros_sheet_headline"   # estimated below
-                else:
-                    pts, source = h, "fantasypros_sheet_headline"
-                    # the sheet's range, carried in the headline's own units:
-                    # the same relative spread around the number it reports
-                    if band is not None and base > 0:
-                        band = band * h / base
             rows.append({"sleeper_id": str(sid), "name": p["name"], "pos": pos, "team": p["team"],
-                         "pts17": pts, "_base": base,
-                         "source": source, "as_of": as_of,
+                         "pts17": base, "_base": base, "_lo": lo, "_hi": hi,
+                         "source": "fantasypros_sheet", "as_of": as_of,
                          "line": json.dumps(p["line"], sort_keys=True),
-                         "pts17_band": band})
+                         "pts17_band": band, "pts_basis": None})
     if bumped:
         log.info("sheet: rookie bump applied to %d players", bumped)
     if line == "headline":
-        # A tab player the DraftSheet does not list (it VLOOKUPs the ECR tab,
-        # so these are players outside the sheet's ECR) gets the tab line
-        # brought onto the headline's basis by his position's median
-        # headline/tab ratio. Leaving him on the 17-game tab basis promoted
-        # Ja'Kobi Lane 64 value ranks on the 2026-09-04 build for no reason
-        # but the basis.
+        games = float(spec["games"])
+        hl = reproduce_headline(rows, slots, risk, spec)
+        no_headline = 0
+        for r in rows:
+            r["source"], r["pts_basis"] = "fantasypros_sheet_headline", games
+            h = hl.get(r["sleeper_id"])
+            if h is None:
+                no_headline += 1
+                r["pts17"] = None            # estimated below
+            else:
+                r["pts17"] = h
+                # the sheet's range, carried in the headline's own units:
+                # the same relative spread around the number it reports
+                if r["pts17_band"] is not None and r["_base"] > 0:
+                    r["pts17_band"] = r["pts17_band"] * h / r["_base"]
+        # A tab player the DraftSheet does not list (no ECR slot at his tab
+        # position, or one beyond the block) gets the tab line brought onto
+        # the headline's basis by his position's median headline/tab ratio.
+        # Leaving him on the 17-game tab basis promoted Ja'Kobi Lane 64 value
+        # ranks on the 2026-09-04 build for no reason but the basis.
         ratio: dict[str, float] = {}
         for pos in SHEET_COLS:
             rs = sorted(r["pts17"] / r["_base"] for r in rows
                         if r["pos"] == pos and r["pts17"] is not None and r["_base"] > 0)
-            ratio[pos] = rs[len(rs) // 2] if rs else 16.0 / LINE_GAMES
+            ratio[pos] = rs[len(rs) // 2] if rs else games / LINE_GAMES
         for r in rows:
             if r["pts17"] is None:
                 r["pts17"] = r["_base"] * ratio[r["pos"]]
                 if r["pts17_band"] is not None:
                     r["pts17_band"] = r["pts17_band"] * ratio[r["pos"]]
-        log.info("sheet: DraftSheet headline used for %d players, %d estimated from the tab line "
-                 "at the position's median ratio", len(rows) - no_headline, no_headline)
+        # self-check against the page the workbook rendered: exact when the
+        # Scoring tab matches the league, off by the rescoring when it does
+        # not (which is the point); the parity tests hold the exact case
+        off = set(spec.get("off_basis_positions") or [])
+        if off:
+            log.warning("sheet: the %s block(s) of the Aggregate tab still carry a %s-game formula while the "
+                        "workbook majority is %g; reproduced on %g for every position, so the page's %s numbers "
+                        "will read lower than the board's", ",".join(sorted(off)),
+                        "/".join(f"{spec['games_by_pos'][p]:g}" for p in sorted(off)), games, games, ",".join(sorted(off)))
+        if "DraftSheet" in wb.sheetnames:
+            page = parse_draftsheet(list(wb["DraftSheet"].iter_rows(values_only=True)))
+            diffs = [abs(hl[r["sleeper_id"]] - page[_sheet_name_key(r["name"])]) for r in rows
+                     if r["sleeper_id"] in hl and _sheet_name_key(r["name"]) in page and r["pos"] not in off]
+            rep["headline_parity"] = {"compared": len(diffs),
+                                      "max_abs_diff": round(max(diffs), 4) if diffs else None,
+                                      "over_0_05": sum(1 for d in diffs if d > 0.05),
+                                      "skipped_positions": sorted(off)}
+        log.info("sheet: DraftSheet headline reproduced for %d players (games %s, %s), %d estimated from "
+                 "the tab line at the position's median ratio", len(rows) - no_headline, games,
+                 spec["avg_form"], no_headline)
     for r in rows:
-        r.pop("_base", None)
-    return (_frame(rows, {**SCHEMA, "pts17_band": pl.Float64})
+        for k in ("_base", "_lo", "_hi"):
+            r.pop(k, None)
+    return (_frame(rows, {**SCHEMA, "pts17_band": pl.Float64, "pts_basis": pl.Float64})
             .unique(subset="sleeper_id", keep="first"), unmatched)
 
 
@@ -379,8 +643,9 @@ def from_espn(season: int, scoring: dict, raw_dir: Path, id_map: pl.DataFrame, i
 def _with_dispersion_single(f: pl.DataFrame) -> pl.DataFrame:
     """One source: no cross-source disagreement by construction. Its own band
     is carried through untouched when it published one."""
-    if "pts17_band" not in f.columns:
-        f = f.with_columns(pl.lit(None, dtype=pl.Float64).alias("pts17_band"))
+    for c in ("pts17_band", "pts_basis"):
+        if c not in f.columns:
+            f = f.with_columns(pl.lit(None, dtype=pl.Float64).alias(c))
     f = f.with_columns(pl.lit(1, dtype=pl.Int64).alias("n_sources"), pl.lit(0.0).alias("pts17_sd"),
                        pl.col("pts17").alias("pts17_hi"), pl.col("pts17").alias("pts17_lo"))
     # a source that already carries pts17_band leaves it mid-frame, so the
@@ -432,6 +697,9 @@ def combine(frames: list[pl.DataFrame], mode: str = "first", scoring: dict | Non
                     "source": "mean(" + ",".join(sorted(set(g["source"].to_list()))) + ")",
                     "as_of": max((x for x in g["as_of"].to_list() if x), default=""),
                     "line": json.dumps(mean_line, sort_keys=True),
+                    "pts_basis": None,
+                    "pts_basis": None,
+                    "pts_basis": None,
                     "n_sources": n, "pts17_sd": sd, "pts17_hi": max(scores), "pts17_lo": min(scores),
                     # the mean of the sources that published a range. Combining
                     # a within-source band with cross-source disagreement (in
@@ -459,9 +727,14 @@ def load_external(cfg, index, getter=None) -> tuple[pl.DataFrame, dict]:
             if not path.exists():
                 report["sources"].append({"source": "sheet", "rows": 0, "error": f"missing {path.name}"})
                 continue
+            report["sheet"] = {}
             f, unmatched = from_sheet(path, scoring, index, as_of=str(ext.get("sheet_as_of", "")),
-                                      line=str(ext.get("sheet_line", "tab")))
+                                      line=str(ext.get("sheet_line", "tab")), report=report["sheet"])
             report["sheet_unmatched"] = unmatched
+            if report["sheet"].get("sheet_scoring_diffs"):
+                log.warning("sheet: the workbook's Scoring tab differs from the league yaml on %s; "
+                            "lines are scored with the league's settings",
+                            sorted(report["sheet"]["sheet_scoring_diffs"]))
         elif name == "sleeper":
             try:
                 f = from_sleeper(int(cfg["season"]), scoring, cfg.path("raw"), getter=getter)

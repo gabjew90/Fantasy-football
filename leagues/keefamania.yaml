@@ -158,12 +158,19 @@ projections:
     # total, scaled 16/17 by the board). `headline` is the DraftSheet tab's
     # PTS, the number the sheet's reader sees: the sheet's Zscore
     # Projection, an average of its Aggregate LOW/AVG/HIGH (tab line / 17 x
-    # (16 - RISK-tab missed games by ECR rank)) and the ECR tab's own Pts.
-    # Median 0.82 of the tab number, rank order within position 0.975-0.996
-    # the same; what moves is the gaps, and the engine runs on gaps. Chosen
-    # so the engine and the page agree on every number, not on a measurement
-    # of the rank-based durability haircut it carries (the games-table
-    # analogue was a wash at QB/WR/TE, DECISIONS #31).
+    # (games - RISK-tab missed games by ECR rank slot)) and the ECR-slot
+    # points (the k-th largest AVG at the position, k = the ECR slot).
+    # Since DECISIONS #54 the loader REPRODUCES that number from the
+    # workbook's raw inputs with THIS league's scoring and reads the games
+    # basis, the averaging form and the rank windows off the workbook's own
+    # formulas, so the workbook can be the default-settings copy (its team
+    # count, roster and auction cells never enter PTS) and a formula change
+    # between downloads is followed, not assumed. Median 0.82 of the tab
+    # number, rank order within position 0.975-0.996 the same; what moves is
+    # the gaps, and the engine runs on gaps. Chosen so the engine and the
+    # page agree on every number, not on a measurement of the rank-based
+    # durability haircut it carries (the games-table analogue was a wash at
+    # QB/WR/TE, DECISIONS #31).
     sheet_line: headline
   # OFF on the sheet path. The rule zeroes any depth-chart backup the market
   # does not rank as a starter. That was a crutch for the usage MODEL, whose
@@ -206,11 +213,9 @@ engine:
   # seats 1 and 10 only, rounds 4-6.
   fallback_floor: wire
   turn_look_through: true
-  # User decision 2026-09-05 (DECISIONS #53): near-ties between skill players
-  # go to the one with more projected touchdowns, inside a 5-point window on
-  # the ranked number (Rice vs Javonte at pick 27 of room 10727517 was 4.7).
-  # Measured first and shipped against the measurement: on 2024-25
-  # FantasyPros projections the higher-TD player of a near-tie scored less
-  # 58% of the time at RB and 57% at WR. The user weighed that and chose it.
-  tie_break: touchdowns
-  tie_window: 5.0
+  # DECISIONS #53: the touchdown tiebreak (tie_break: touchdowns, window 5.0)
+  # ran for one room (10790713, fired once, Rice over Etienne at 36) and the
+  # user reverted it the same morning. Today's rule again; the knob stays in
+  # the engine, measured and off, like the bench knobs.
+  tie_break: scarcity
+  tie_window: 1.0

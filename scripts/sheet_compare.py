@@ -39,7 +39,7 @@ from draftkit.config import Config  # noqa: E402
 from draftkit.ids import normalize_name  # noqa: E402
 from draftkit.seasondata import score_projection  # noqa: E402
 
-SHEET = ROOT / "data" / "external" / "DraftSheets_2026_Keefamania_10tm_halfPPR_1flex.xlsx"
+SHEET = ROOT / "data" / "external" / "DraftSheets_2026_default_2026-09-04.xlsx"
 SHEET_GAMES = 17.0
 
 # Column layout of each position tab (0-based, after Player, Team). The

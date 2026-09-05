@@ -3362,3 +3362,83 @@ else. The season replay is bench-neutral and cannot see a starter tiebreak
 worth 4 picks in 42, so the -5 is noise-sized and not the verdict; the
 instrument that can judge it is the 2026 actuals against the rooms drafted
 under it.
+
+### #53 addendum (2026-09-05 09:50 PT): reverted
+
+The touchdown tiebreak ran for one room (10790713, seat 5). It fired once,
+at pick 36: the engine's arithmetic had Etienne 0.8 ahead of Rice, the
+scarcity rule would have kept Etienne (39% to survive against 59%), the
+touchdown rule promoted Rice (10.5 against 8.4) and the page said so. In
+hindsight Rice plus Skattebo at 45 was worth 52 of edge against 41 for the
+Etienne path. One firing is an anecdote. The user reverted it the same
+morning: leagues/keefamania.yaml is back on tie_break scarcity, window
+1.0, today's rule byte for byte. The knob, the proj_td column and the seven
+tests stay, measured and off, like the bench knobs.
+
+## 2026-09-05 (54) — the DraftSheet headline is reproduced from the workbook's inputs under the league's rules
+
+The user handed over the 09-04 copy of the FantasyPros workbook and said it
+is the DEFAULT-settings copy: the loader has to apply Keefamania's rules and
+land on the right number whatever the Scoring tab says. What the copy said:
+
+* Scoring tab #TEAMS 12 (Keefamania is 10); roster and scoring identical to
+  the league. Team count moves only VBD and PS on the page, never PTS.
+* Every headline 7-9% higher than the 09-02 copy with the raw lines nearly
+  unchanged (139 of 475 tab lines moved, almost all rounding; Gibbs +6
+  carries, Sadiq and Mason Taylor at TE, Daniel Jones). The Aggregate
+  formulas changed: LOW/AVG/HIGH scale by (17 - missed) instead of
+  (16 - missed), and the headline is AVERAGE(AVERAGE(LOW,HIGH), AVG,
+  ECRpts) (three-way) instead of AVERAGE(LOW, AVG, HIGH, ECRpts).
+* The TE block is half-edited: row 3 says 17, rows 4-52 still say 16, and
+  the cached page values follow the formulas, so on the page every tight
+  end sits about 7% below where the other three positions sit. McBride
+  reads 164.8 on the page and 175.7 on a consistent 17 basis.
+
+What shipped (draftkit/external.py, projections.py, config.yaml, tests):
+
+* `from_sheet(line="headline")` no longer copies DraftSheet PTS. It rebuilds
+  it: tab low/base/high scored with the LEAGUE yaml plus the rookie bump,
+  times (games - RISK missed games for the player's ECR slot) / 17; the
+  ECR-slot points as the k-th largest AVG of the position's ranked block
+  (k = the player's slot, window read off the LARGE range); the average in
+  the workbook's form. `sheet_headline_spec` reads games, form and windows
+  off the Aggregate formulas on every row of every block, takes the
+  majority, and names blocks that disagree (`off_basis_positions`). The
+  reproduction runs every position on the majority basis, so the stale TE
+  block does not become a position tilt on the board; the CLI warns.
+* The row carries its basis (`pts_basis`, new schema column; the basis
+  table's fixed 16 for the headline source is gone) and
+  `source_basis_expr` reads it first. The board scales 16/17 on the 09-04
+  copy; the shift against the 09-02 board is (m/17)(1/17) of the line,
+  under a point.
+* `sheet_scoring` reads the Scoring tab into draftkit keys and the loader
+  reports every difference from the league yaml (none on either copy);
+  `sheet_updated` reads the 'Updated:' cell, which is now the as-of.
+* Parity (tests/test_sheet_parity.py) runs over BOTH copies: tab lines
+  exact on both; the reproduced headline against the page exact to the
+  cent on QB/RB/WR of the 09-04 copy and on all four positions of the 09-02
+  copy, one deep-tail row (Ty Simpson, QB40) 0.05 off on both from a
+  VLOOKUP miss inside the workbook's own block; TE on the 09-04 copy
+  flagged and confirmed stale (page/board ratio 0.85-0.96). Synthetic
+  tests cover both formula forms, the reported-not-applied scoring, and a
+  half-edited block.
+
+Board rebuilt on the 09-04 copy; the diff against the 09-02 board and the
+bridge restart are on the line under this entry.
+
+DECISION: the workbook the league runs on is whatever the user downloads,
+settings and all; draftkit owns the rules. If FantasyPros ships a shape the
+detector does not recognise, the loader raises; it never falls back to the
+page.
+
+Board on the 09-04 copy against the 09-02 board (226 players both): mean
++1.4 points (the three-way average lifts the middle of the range; the
+17-game basis cancels against the 16/17 scale within a point); 147 players
+move more than 1 point, 19 more than 3, 4 more than 5 (Gibbs +7.6 on his
+own line refresh); by position QB +2.3, RB +1.8, WR +1.5, TE +0.9. Value
+rank moves of 5 or more inside the top 120: Garrett Wilson 55 to 46, Jaylen
+Waddle 86 to 73, Bucky Irving 49 to 58, Jayden Daniels 42 to 47, ten others
+by 5 to 8. AJ Dillon enters the ECR window, Adam Randall leaves it. Rice
+169.9 to 170.2, Javonte 175.5 to 177.8, McBride 164.1 to 165.3 (on the
+consistent basis; the page's stale TE block reads 164.8 against 175.7).
+Bridge restarted on the new board and verified.
