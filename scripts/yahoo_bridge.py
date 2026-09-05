@@ -356,12 +356,17 @@ def merge_feed(memory: dict, drafted: list[dict]) -> list[dict]:
         if prev is None:
             memory[n] = dict(d)
             continue
+        # a NAME learned later repairs an entry first seen without one: after a
+        # reload the panel can hand over a pick with an empty name, and
+        # first-seen-wins kept it nameless, so that drafted player matched no
+        # board row and stayed "available" in every later plan (review 2026-09-04).
         # the store's view (carries team_id) beats a panel-parsed one at the
         # same number (review 2026-09-02: first-view-wins let a DOM misread
         # shadow the real pick for the rest of the room); a `mine` flag
         # learned later is kept either way
-        replace = (d.get("team_id") is not None and prev.get("team_id") is None) \
-            or (d.get("mine") and not prev.get("mine"))
+        replace = ((d.get("team_id") is not None and prev.get("team_id") is None)
+                   or (d.get("mine") and not prev.get("mine"))
+                   or (bool(str(d.get("name") or "").strip()) and not str(prev.get("name") or "").strip()))
         if replace:
             merged = dict(d)
             if prev.get("mine") and not merged.get("mine"):

@@ -59,6 +59,7 @@ Known accepted limitations (not fixable before Saturday):
 
 In Chrome (the profile that accepted the bridge cert):
 
+0. **The bridge console window: disable QuickEdit before starting the bridge, and never click in it during the draft.** A click in a QuickEdit-enabled console selects text and PAUSES the process until a key is pressed; the page then sees a bridge that answers nothing (the hung-bridge incident, 2026-09-03). Right-click the title bar > Properties > Options > untick QuickEdit Mode, or start the bridge hidden (`Start-Process -WindowStyle Hidden`, the way the mock rig does) and read its log from the file.
 1. Open https://127.0.0.1:8443/ping — must show `"ok":true`.
 2. Open https://football.fantasysports.yahoo.com/f1/49649/3/editprerank and in DevTools console:
 

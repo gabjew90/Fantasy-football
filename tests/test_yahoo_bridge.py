@@ -459,3 +459,21 @@ def test_load_players_carries_yahoo_rank_and_tolerates_its_absence(tmp_path):
     (tmp_path / "tiers.csv").write_text(head + "\n" + "\n".join(rows) + "\n", encoding="utf-8")
     got = {p["name"]: p["yahoo_rank"] for p in yb.load_players(cfg)}
     assert got == {"A Back": None, "B Wide": None}
+
+
+def test_merge_feed_repairs_an_entry_first_seen_with_an_empty_name():
+    """Review 2026-09-04: after a reload the panel can hand over a pick with
+    no name; first-seen-wins kept it nameless for the rest of the room, so the
+    drafted player matched no board row and stayed "available" in every plan.
+    A later view that carries the name replaces the nameless entry; a later
+    view that carries nothing does not erase a name."""
+    mem = {}
+    yb.merge_feed(mem, [{"pick_no": 12, "name": "", "pos": "RB"}])
+    got = yb.merge_feed(mem, [{"pick_no": 12, "name": "Bijan Robinson", "pos": "RB"}])
+    assert got == [{"pick_no": 12, "name": "Bijan Robinson", "pos": "RB"}]
+    got = yb.merge_feed(mem, [{"pick_no": 12, "name": "", "pos": "RB"}])
+    assert got[0]["name"] == "Bijan Robinson"
+    mem2 = {}
+    yb.merge_feed(mem2, [{"pick_no": 3, "name": "", "pos": "WR", "mine": True}])
+    got = yb.merge_feed(mem2, [{"pick_no": 3, "name": "Puka Nacua", "pos": "WR"}])
+    assert got[0]["name"] == "Puka Nacua" and got[0]["mine"] is True
