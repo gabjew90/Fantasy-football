@@ -99,8 +99,10 @@ def plain_english(r: dict) -> str:
             parts.append(f"Lineup already full, so {name} ({pos}) was priced as bench insurance, not by raw points.")
         if "HANDCUFF" in why:
             parts.append("He also backs up one of our own starters, which raises that value.")
+    elif why.startswith("STALE PLAN"):
+        parts.append(f"The bridge stopped answering, so the driver took {name} ({pos}) from the last plan the engine sent: {why}.")
     elif why.startswith("LOCAL ranker"):
-        parts.append(f"The engine was unreachable, so the page's own simpler ranking took {name} ({pos}): {why}.")
+        parts.append(f"The engine was unreachable, so the page's own simpler ranking (removed 2026-09-04) took {name} ({pos}): {why}.")
     elif why.startswith("depth fallback") or why.startswith("fills your open"):
         parts.append(f"Took {name} ({pos}) to fill a mandatory slot; nothing the engine named was left.")
     else:
@@ -136,7 +138,7 @@ def render(room: str, trail: dict, plans: list[dict], events: list[dict], blog: 
     n_hb = sum(1 for l in log if "heartbeat: setAwayStatus" in l)
     n_away = sum(1 for l in log if "AWAY detected" in l)
     n_gate = sum(1 for l in log if "GATE FAILED" in l)
-    n_local = sum(1 for l in log if "LOCAL ranking" in l)
+    n_local = sum(1 for l in log if ("LOCAL ranking" in l or "STALE PLAN:" in l))
     n_planfail = sum(1 for l in log if re.search(r"PLAN (bridge|engine)", l))
     warnings = sorted({w for d in plans for w in (d.get("warnings") or [])})
     away_sets = []

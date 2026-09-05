@@ -119,7 +119,7 @@ which writes reports/mocks/mock_<room>.md (every pick, our reasons, the alternat
 - Bridge console: one line per plan request, `mine == roster`, `needs` shrinking, plan heads sensible.
 - `DK.gatesOk()` → `ok: true` on the clock. `GATE FAILED -> not clicking` in the log is the design working: the queue (layer 1) takes that pick, then Yahoo's list (layer 0).
 - `DK.storeState().on_clock` flips true at our turn; `DK.storeState().away_teams` should not contain `my_team` — if it does, the driver calls Yahoo's own `setAwayStatus(false)`, verifies against the store, and logs it; the Autodraft toggle click is the fallback.
-- `DK.rank().source` must read `engine`. `LOCAL` means the bridge is unreachable — check the bridge window.
+- `DK.rank().source` must read `engine`. `stale-plan` means the bridge stopped answering and the driver is picking from the last plan it received (minus anyone drafted since) — check the bridge window. `none` means no plan was ever received: the driver will not pick, the queue and Yahoo's list take the turn. The page has no ranker of its own (removed 2026-09-04).
 
 Operator console API (read-only unless noted):
 
