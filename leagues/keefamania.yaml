@@ -152,6 +152,14 @@ projections:
   external:
     sources: [sheet]
     combine: first
+    # The FantasyPros DraftSheet workbook this league drafts on: the user's
+    # league-settings copy of the 09-04 download (Scoring tab 10 teams). The
+    # loader scores the lines with THIS yaml and reproduces the headline from
+    # the workbook's own formulas (DECISIONS #54), so the default-settings
+    # copy gives the identical board. Replace the file, rebuild tiers,
+    # re-export board.json, restart the bridge.
+    sheet_path: data/external/DraftSheets_2026_Keefamania_10tm_halfPPR_1flex_v2.xlsx
+    sheet_as_of: "2026-09-04"     # fallback only: the workbook's own 'Updated:' cell wins when present
     # Which of the sheet's numbers IS the projection (user decision
     # 2026-09-04, DECISIONS #45). `tab` is the position tab's line scored in
     # league settings plus the rookie bump (the tab's AVG cell, a 17-game

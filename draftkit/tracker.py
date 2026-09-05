@@ -22,6 +22,7 @@ from rich.table import Table
 from rich.text import Text
 
 from . import snake
+from .boardrow import published_range
 from .shape import starting_slots
 from .sleeper import SleeperClient, get_json, BASE
 
@@ -128,12 +129,13 @@ class Tracker:
     # the FOLLOWING turn for survival and urgency, and the pair planner prices
     # the partner at best_now (he is certain) instead of e_best_next.
     turn_look_through = False
-    # DECISIONS #53 (user decision 2026-09-05): how a near-tie between two
-    # skill players is broken. scarcity = the less-likely-to-survive player
-    # first inside planner.NEAR_TIE (today). touchdowns = the player with more
-    # projected touchdowns first inside tie_window; QB/K/DEF pairs keep
-    # scarcity. The 2024-25 backtest says the higher-TD player of a near-tie
-    # scored LESS 57% of the time at RB/WR; the user weighed that and chose it.
+    # DECISIONS #53: how a near-tie between two skill players is broken.
+    # scarcity = the less-likely-to-survive player first inside
+    # planner.NEAR_TIE, then the higher floor (#55). touchdowns = the player
+    # with more projected touchdowns first inside tie_window; QB/K/DEF pairs
+    # keep scarcity. Tried for one room on 2026-09-05 and reverted the same
+    # morning (the 2024-25 backtest has the higher-TD player of a near-tie
+    # scoring LESS 57% of the time at RB/WR); kept, off, like the bench knobs.
     tie_break = "scarcity"
     tie_window = 1.0
     rival_needs_update = True   # plan B6: a rival picking twice in my window consumes his needs
@@ -471,6 +473,11 @@ class Tracker:
         ecfg = ecfg or {}
         for name, cast in self.ENGINE_KNOBS:
             setattr(self, name, cast(ecfg.get(name, getattr(Tracker, name))))
+        from .planner import TIE_BREAKS
+        if self.tie_break not in TIE_BREAKS:
+            # a free string that silently ran scarcity (review 2026-09-05):
+            # an A/B typed 'touchdown' would compare two identical arms
+            raise ValueError(f"engine.tie_break must be one of {TIE_BREAKS}, got {self.tie_break!r}")
         # rolling ADP window for the rival sampling pool (post-v2 item 1);
         # pool_size is retained as the FLOOR so old configs stay meaningful
         self.pool_min = int(ecfg.get("pool_min", ecfg.get("pool_size", Tracker.pool_min)))
@@ -811,15 +818,9 @@ class Tracker:
         by_name = {str(q.get("player") or q.get("name") or ""): q for q in self.players}
 
         def _ceiling(q: dict) -> float | None:
-            """The best published case: the high line, else the point plus
-            half the band; None when the board carries neither."""
-            hi = q.get("proj_hi")
-            if hi is not None and hi == hi:
-                return float(hi)
-            band, pts = q.get("proj_band"), q.get("proj_pts")
-            if band is not None and band == band and pts is not None:
-                return float(pts) + float(band) / 2.0
-            return None
+            """The best published case (boardrow.published_range): the high
+            line, else the point plus half the band; None without either."""
+            return published_range(q)[1]
 
         added, upgrade_ids = False, set()
         per_pos: list[tuple] = []          # (pos, best, best_iv, why, e_next, s_best)
@@ -852,6 +853,8 @@ class Tracker:
             for p, iv in scored:
                 if p is best or anchor - iv["value_raw"] > BENCH_TIE:
                     continue
+                if iv["value_raw"] < 0.0 <= anchor:
+                    continue      # a man below the wire never wins a tie against one above it
                 cb, cp = _ceiling(best), _ceiling(p)
                 if cb is not None and cp is not None and cp > cb + 1e-9:
                     best, best_iv = p, iv
@@ -866,10 +869,10 @@ class Tracker:
             if best_iv.get("contingency"):
                 why += (f" · +{best_iv['contingency']:.0f} of that is the role shift if "
                         f"{best.get('backs_up')} goes down (he would start over your weakest {pos})")
-            e_next, s_best = best_iv["value"], None
+            e_next, s_best = best_iv["value_raw"], None
             if surv_by_pos:
                 s_map = surv_by_pos.get(pos, {})
-                vals = [iv["value"] for _p, iv in scored]
+                vals = [iv["value_raw"] for _p, iv in scored]
                 survs = [float(s_map.get(str(_p.get("sleeper_id")), 1.0)) for _p, _iv in scored]
                 e_next = expected_best(vals, survs)
                 s_best = float(s_map.get(str(best.get("sleeper_id")), 1.0))
@@ -891,14 +894,14 @@ class Tracker:
                     for q, _b, _iv, _w, e2, _s in per_pos:
                         if q != pos and e2 > partner_v:
                             partner_v, partner_q = e2, q
-                score = best_iv["value"] + partner_v
-                why += (f" · two-pick: {best_iv['value']:.0f} now"
+                score = best_iv["value_raw"] + partner_v
+                why += (f" · two-pick: {best_iv['value_raw']:.0f} now"
                         + (f" + ~{partner_v:.0f} the {partner_q} expected at your next turn" if partner_q
                            else " (last bench pick: value alone)")
                         + f" = {score:.0f}"
                         + (f" · {s_best:.0%} he is still there next turn" if s_best is not None else ""))
             elif self.bench_survival_discount:
-                cost = max(0.0, best_iv["value"] - e_next)
+                cost = max(0.0, best_iv["value_raw"] - e_next)
                 why += (f" · waiting likely costs ~{cost:.0f} ({s_best:.0%} he is still there next turn, "
                         f"expected best {pos} then {e_next:.0f})")
                 score = cost
@@ -914,7 +917,7 @@ class Tracker:
             for i in range(len(cands) - 1):
                 a, b = cands[i], cands[i + 1]
                 if (str(a[1]).startswith(BENCH_WHY_PREFIX) and str(b[1]).startswith(BENCH_WHY_PREFIX)
-                        and abs(a[0] - b[0]) <= BENCH_TIE):
+                        and abs(a[0] - b[0]) <= BENCH_TIE and not (b[0] < 0.0 <= a[0])):
                     ca, cb = _ceiling(a[2]), _ceiling(b[2])
                     if ca is not None and cb is not None and cb > ca + 1e-9:
                         cands[i], cands[i + 1] = b, a

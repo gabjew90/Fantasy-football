@@ -288,3 +288,48 @@ def test_source_basis_expr_takes_the_rows_own_basis_and_falls_back_to_17():
                        "pts_basis": [None, 16.0, 17.0, None, None]})
     assert df.select(X.source_basis_expr().alias("b"))["b"].to_list() == [17.0, 16.0, 17.0, 17.0, 17.0]
     assert "fantasypros_sheet_headline" in X.DISCOUNTED_SOURCES
+
+
+def test_the_headline_block_holds_tab_players_the_index_cannot_match(tmp_path):
+    """Review 2026-09-05: the workbook's LARGE() block ranks every tab player
+    at the position; a name Sleeper cannot resolve must still occupy his slot
+    or everyone ranked below him shifts. Bijan is RB1 in ECR but unknown to
+    the index; Gibbs at RB2 must see Bijan's AVG as the largest in the block."""
+    import openpyxl
+    from draftkit.seasondata import score_projection
+    p = _headline_workbook(tmp_path, 17, True)
+    wb = openpyxl.load_workbook(p)
+    ecr = wb["ECR"]
+    ecr.delete_rows(2)
+    ecr.append([1, 1, "Bijan Robinson", "ATL", "RB1"])
+    ecr.append([2, 1, "Jahmyr Gibbs", "DET", "RB2"])
+    wb["RISK"].append(["RB2", 2.5514])
+    wb.save(p)
+    idx = FakeIndex({("Jahmyr Gibbs", "RB"): "4866"})          # Bijan unmatched
+    df, unmatched = X.from_sheet(p, HALF, idx, as_of="cfg", line="headline")
+    assert unmatched == ["Bijan Robinson (RB)"]
+    g = df.filter(pl.col("name") == "Jahmyr Gibbs").row(0, named=True)
+    f = (17 - 2.5514) / 17.0
+    base_g = score_projection({"rush_att": 275.2, "rush_yd": 1383.7, "rush_td": 13.8, "rec": 71.3, "rec_yd": 581.1, "rec_td": 4.1, "fum_lost": 1.1}, HALF)
+    base_b = score_projection({"rush_att": 285.8, "rush_yd": 1391.1, "rush_td": 8.8, "rec": 76.9, "rec_yd": 705.6, "rec_td": 3.5, "fum_lost": 1.8}, HALF)
+    hi = score_projection({"rush_att": 283.5, "rush_yd": 1422, "rush_td": 15, "rec": 74, "rec_yd": 625, "rec_td": 5, "fum_lost": 1}, HALF)
+    lo = score_projection({"rush_att": 263, "rush_yd": 1353, "rush_td": 12, "rec": 67.9, "rec_yd": 546.4, "rec_td": 3.4, "fum_lost": 1.3}, HALF)
+    ecr_pts_rb2 = sorted([base_g * f, base_b * f], reverse=True)[1]     # the 2nd largest, Bijan counted
+    want = ((lo + hi) / 2 * f + base_g * f + ecr_pts_rb2) / 3
+    assert abs(g["pts17"] - want) < 1e-6
+
+
+def test_an_unrecognised_rank_window_raises(tmp_path):
+    import openpyxl
+    import pytest
+    p = _headline_workbook(tmp_path, 17, True)
+    wb = openpyxl.load_workbook(p)
+    wb["Aggregate"].cell(row=3, column=64, value="=IFERROR(LARGE(RBAVG,BK3),\"\")")   # a named range the reader does not know
+    wb.save(p)
+    with pytest.raises(ValueError, match="RB"):
+        X.sheet_headline_spec(openpyxl.load_workbook(p, read_only=True, data_only=False))
+
+
+def test_slot_parsing_tolerates_stray_spaces():
+    assert X._split_slot(" WR 14 ") == ("WR", 14) and X._slot_key("rb1") == "RB1"
+    assert X._split_slot("FLEX") is None and X._slot_number("WR14", "RB") is None

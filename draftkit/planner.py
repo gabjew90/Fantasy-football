@@ -19,6 +19,7 @@ from __future__ import annotations
 
 from typing import Callable
 
+from .boardrow import published_range
 from .snake import FLEX_ELIGIBLE, needs_position
 
 NEED_DAMP = 0.6  # partner/candidate position that fills no starter/flex slot
@@ -28,11 +29,13 @@ NEAR_TIE = 1.0   # pair values this close are a coin flip: survival breaks it
 # published low line, else the point minus half the band (DECISIONS #55)
 FLOOR_SURV_TOL = 0.05
 FLOOR_GAP = 3.0
-# tie_break: touchdowns (user decision 2026-09-05, DECISIONS #53) compares
-# projected touchdowns between two SKILL players whose pairs are within
-# tie_window; a quarterback's thirty scores would win every tie against any
-# back or receiver, so QB pairs (and K/DEF) keep the scarcity rule.
+# tie_break: touchdowns (DECISIONS #53, tried for one room and reverted the
+# same morning; the knob stays, off) compares projected touchdowns between
+# two SKILL players whose pairs are within tie_window; a quarterback's thirty
+# scores would win every tie against any back or receiver, so QB pairs (and
+# K/DEF) keep the scarcity rule.
 TD_TIE_POSITIONS = frozenset({"RB", "WR", "TE"})
+TIE_BREAKS = ("scarcity", "touchdowns")
 
 
 def slot_vorp(p: dict, needs: dict) -> float:
@@ -223,66 +226,52 @@ def pair_rank(cands: list[tuple[float, str, dict]],
         return (tie_break == "touchdowns" and x.get("pos") in TD_TIE_POSITIONS
                 and y.get("pos") in TD_TIE_POSITIONS and _td(x) is not None and _td(y) is not None)
 
-    i = 0
-    while i < len(ranked) - 1:
-        a, b = ranked[i], ranked[i + 1]
-        # TOUCHDOWN RULE (DECISIONS #53): for a skill-vs-skill pair inside
-        # tie_window this rule alone decides, in either direction, so the
-        # reversed pair can never swap back on scarcity and the pass ends.
-        if _td_pair(a[3], b[3]) and abs(a[0] - b[0]) <= tie_window and _td(a[3]) != _td(b[3]):
-            if _td(b[3]) > _td(a[3]):
-                over = a[3].get("player") or a[3].get("name") or a[3].get("pos")
-                ranked[i], ranked[i + 1] = b, a
-                ranked[i] = (ranked[i][0], ranked[i][1],
-                             ranked[i][2] + f" · near tie ({abs(a[0] - b[0]):.1f} pts) with {over}"
-                             f": more projected touchdowns ({_td(b[3]):.1f} vs {_td(a[3]):.1f})",
-                             ranked[i][3])
-                i = max(0, i - 1)
-            else:
-                i += 1
-        elif abs(a[0] - b[0]) <= NEAR_TIE and _surv(b[3]) < _surv(a[3]) - 1e-9:
-            # NAME THE COUNTERPARTY. "near tie (0.7 pts): scarcer player
-            # first" states a gap against nobody, so a reader assumes the swap
-            # was against the player finally picked -- which it usually is not,
-            # because this pass runs over ADJACENT pairs anywhere in the list.
-            # Room 10703362 pick 24 annotated Olave, who was promoted over
-            # Josh Allen while McBride sat above both and was never in the
-            # comparison; read without the name it looked like the rule had
-            # fired backwards. A label that cannot be checked is the same
-            # defect as a reason that is not the reason.
-            over = a[3].get("player") or a[3].get("name") or a[3].get("pos")
-            ranked[i], ranked[i + 1] = b, a
-            ranked[i] = (ranked[i][0], ranked[i][1],
-                         ranked[i][2] + f" · near tie ({abs(a[0] - b[0]):.1f} pts) with {over}"
-                         f": scarcer player first ({_surv(b[3]):.0%} vs {_surv(a[3]):.0%})",
-                         ranked[i][3])
-            i = max(0, i - 1)
-        else:
-            i += 1
-    # FLOOR RULE (user, 2026-09-05, DECISIONS #55). After the survival pass:
-    # adjacent rows within NEAR_TIE whose survivals are within FLOOR_SURV_TOL
-    # go to the higher floor when the floors differ by FLOOR_GAP or more. The
-    # counterparty is named, as the survival swap names his.
     def _floor(p: dict) -> float | None:
-        lo = p.get("proj_lo")
-        if lo is not None and lo == lo:
-            return float(lo)
-        band, pts = p.get("proj_band"), p.get("proj_pts")
-        if band is not None and band == band and pts is not None:
-            return float(pts) - float(band) / 2.0
-        return None
-    i, guard = 0, 0
-    while i < len(ranked) - 1 and guard < 4 * len(ranked):
-        guard += 1
+        return published_range(p)[0]
+
+    def _prefer_b(a, b) -> str | None:
+        """ONE comparator for an adjacent pair (review 2026-09-05: the three
+        rules used to run as separate passes and a later pass could demote a
+        row while leaving the earlier pass's label on it). Returns the reason
+        b should go above a, or None to leave the order alone:
+          1. touchdown rule (knob), inside tie_window, decides either way;
+          2. inside NEAR_TIE: survivals more than FLOOR_SURV_TOL apart -> the
+             scarcer player first;
+          3. else floors FLOOR_GAP or more apart -> the higher floor first;
+          4. else any survival difference -> the scarcer player first."""
+        gap = abs(a[0] - b[0])
+        pa, pb = a[3], b[3]
+        if _td_pair(pa, pb) and gap <= tie_window and _td(pa) != _td(pb):
+            return (f"more projected touchdowns ({_td(pb):.1f} vs {_td(pa):.1f})"
+                    if _td(pb) > _td(pa) else None)
+        if gap > NEAR_TIE:
+            return None
+        sa, sb = _surv(pa), _surv(pb)
+        if abs(sa - sb) > FLOOR_SURV_TOL:
+            return f"scarcer player first ({sb:.0%} vs {sa:.0%})" if sb < sa else None
+        fa, fb = _floor(pa), _floor(pb)
+        if fa is not None and fb is not None and abs(fb - fa) >= FLOOR_GAP:
+            return f"higher floor ({fb:.0f} vs {fa:.0f})" if fb > fa else None
+        return f"scarcer player first ({sb:.0%} vs {sa:.0%})" if sb < sa - 1e-9 else None
+
+    # One bubble pass over adjacent pairs; a swap steps back one slot so the
+    # promoted row is compared with the row now above it. NAME THE
+    # COUNTERPARTY: "near tie (0.7 pts): scarcer player first" states a gap
+    # against nobody, so a reader assumes the swap was against the player
+    # finally picked -- which it usually is not (room 10703362 pick 24
+    # annotated Olave, promoted over Josh Allen while McBride sat above both).
+    # The windows make the preference non-transitive in principle, so a
+    # cycle stop bounds the pass; in practice it never engages.
+    i, steps = 0, 0
+    while i < len(ranked) - 1 and steps < 4 * (len(ranked) + 1):
+        steps += 1
         a, b = ranked[i], ranked[i + 1]
-        fa, fb = _floor(a[3]), _floor(b[3])
-        if (abs(a[0] - b[0]) <= NEAR_TIE and abs(_surv(a[3]) - _surv(b[3])) <= FLOOR_SURV_TOL
-                and fa is not None and fb is not None and fb - fa >= FLOOR_GAP):
+        reason = _prefer_b(a, b)
+        if reason:
             over = a[3].get("player") or a[3].get("name") or a[3].get("pos")
             ranked[i], ranked[i + 1] = b, a
             ranked[i] = (ranked[i][0], ranked[i][1],
-                         ranked[i][2] + f" · near tie ({abs(a[0] - b[0]):.1f} pts) with {over}"
-                         f": higher floor ({fb:.0f} vs {fa:.0f})",
+                         ranked[i][2] + f" · near tie ({abs(a[0] - b[0]):.1f} pts) with {over}: {reason}",
                          ranked[i][3])
             i = max(0, i - 1)
         else:

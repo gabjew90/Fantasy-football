@@ -63,8 +63,8 @@ def build(league: str) -> pl.DataFrame:
     except Exception as e:  # noqa: BLE001
         print(f"  espn unavailable: {e}", file=sys.stderr)
         frames["espn"] = X.empty()
-    sheet_path = Path(cfg.root) / str(ext.get("sheet_path", ""))
-    if sheet_path.exists():
+    sheet_path = Path(cfg.root) / str(ext.get("sheet_path") or "")
+    if ext.get("sheet_path") and sheet_path.is_file():
         frames["sheet"], _ = X.from_sheet(sheet_path, scoring, index, as_of=str(ext.get("sheet_as_of", "")))
     else:
         frames["sheet"] = X.empty()

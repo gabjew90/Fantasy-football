@@ -259,3 +259,35 @@ def test_the_floor_rule_needs_three_points_and_falls_back_to_the_band():
     # neither floor nor band on one side: left alone
     order, _ = _floor_case(surv_a=0.57, surv_b=0.59, lo_a=None, lo_b=161.1, band_a=None, band_b=None)
     assert order == ["rice", "javonte"]
+
+
+def test_one_comparator_leaves_no_stale_label_on_the_demoted_row():
+    """Review 2026-09-05: with the input order reversed (Javonte ahead, Rice
+    2 points scarcer) the old survival pass promoted Rice and labelled him,
+    then the floor pass demoted him again and left the label. One comparator:
+    Javonte stays first, nobody carries a near-tie label."""
+    from draftkit.planner import pair_rank
+    needs = {"RB": 1, "WR": 1, "FLEX": 1}
+    j = {"sleeper_id": "javonte", "player": "Javonte Williams", "pos": "RB", "proj_pts": 176.0,
+         "vorp": 40.5, "vorp_flex": 40.5, "proj_lo": 161.1, "proj_hi": 188.6, "proj_band": 11.3}
+    r = {"sleeper_id": "rice", "player": "Rashee Rice", "pos": "WR", "proj_pts": 170.0,
+         "vorp": 40.0, "vorp_flex": 40.0, "proj_lo": 150.0, "proj_hi": 199.8, "proj_band": 20.1}
+    report = {"WR": {"e_best_next": 30.0, "survival": {"rice": 0.57}},
+              "RB": {"e_best_next": 30.0, "survival": {"javonte": 0.59}}}
+    ranked = pair_rank([(40.5, "j", j), (40.0, "r", r)], report, needs, {"WR": 30.0, "RB": 30.0}, lambda pos: {"RB", "WR"})
+    assert [p["sleeper_id"] for _, _, p in ranked] == ["javonte", "rice"]
+    assert all("near tie" not in why for _, why, _ in ranked)
+
+
+def test_a_lineless_single_source_has_no_floor_to_compare():
+    """proj_lo == proj_hi == proj_pts is a point, not a range: the floor rule
+    falls back to the band, and with no band it leaves the pair alone."""
+    from draftkit.planner import pair_rank
+    needs = {"RB": 1, "WR": 1, "FLEX": 1}
+    a = {"sleeper_id": "a", "pos": "WR", "proj_pts": 170.0, "vorp": 40.5, "vorp_flex": 40.5,
+         "proj_lo": 170.0, "proj_hi": 170.0, "proj_band": None}
+    b = {"sleeper_id": "b", "pos": "RB", "proj_pts": 176.0, "vorp": 40.0, "vorp_flex": 40.0,
+         "proj_lo": 176.0, "proj_hi": 176.0, "proj_band": None}
+    report = {"WR": {"e_best_next": 30.0, "survival": {"a": 0.57}}, "RB": {"e_best_next": 30.0, "survival": {"b": 0.59}}}
+    ranked = pair_rank([(40.5, "a", a), (40.0, "b", b)], report, needs, {"WR": 30.0, "RB": 30.0}, lambda pos: {"RB", "WR"})
+    assert ranked[0][2]["sleeper_id"] == "a" and "higher floor" not in ranked[0][1]

@@ -236,3 +236,43 @@ def test_two_pick_reduces_to_value_order_when_everyone_is_certain():
     off.urgency_report = _fake_report(surv)
     on.urgency_report = _fake_report(surv)
     assert [r[2]["sleeper_id"] for r in off.recommendations(3)] == [r[2]["sleeper_id"] for r in on.recommendations(3)]
+
+
+def test_a_man_below_the_wire_never_wins_a_ceiling_tie():
+    """Review 2026-09-05: raw +1.1 against raw -0.6 is inside BENCH_TIE, and
+    the sub-wire man has the wider range; he still may not take the row."""
+    board = _twins_board(a={"proj_pts": 83.0, "proj_hi": 86.0, "proj_band": 3.0},
+                         b={"proj_pts": 79.0, "proj_hi": 140.0, "proj_band": 40.0})
+    # pin the wire. The market spends its 50 remaining picks in ADP order, so
+    # give it 60 receivers to spend them on: the twins (ADP 120) get drafted,
+    # the three no-ADP backs (82/81/80) are the RB wire and its k=3 is 80.
+    # The fixture's other backs go, so the twins are the RB shortlist.
+    board = [q for q in board if not (q["pos"] == "RB" and (q["sleeper_id"] == "rb_wire" or q["sleeper_id"].startswith("pad")))]
+    for q in board:
+        if q["sleeper_id"].startswith("rb_wire"):
+            q["adp"] = None
+    for i in range(60):
+        f = player(f"wrf{i}", "WR", -40.0, -40.0, 100.0 + i, rank=40 + i)   # not 'filler': the synthetic tracker names rival picks filler<n>
+        f["proj_pts"], f["backs_up"] = 60.0, ""
+        board.append(f)
+    t = _pool(board)
+    rb = next(r for r in t.recommendations(8) if str(r[1]).startswith("bench insurance") and r[2]["pos"] == "RB")
+    assert rb[2]["sleeper_id"] == "twin_a" and rb[0] > 0, (rb[2]["sleeper_id"], rb[1][:120])
+
+
+def test_tie_break_knob_rejects_a_misspelt_value():
+    import pytest
+    from draftkit.tracker import Tracker
+    t = object.__new__(Tracker)
+    with pytest.raises(ValueError):
+        t.apply_engine_cfg({"tie_break": "touchdown"})
+    t.apply_engine_cfg({"tie_break": "touchdowns"})
+    assert t.tie_break == "touchdowns"
+
+
+def test_published_range_reads_lines_then_band_then_nothing():
+    from draftkit.boardrow import published_range
+    assert published_range({"proj_pts": 170.0, "proj_lo": 150.0, "proj_hi": 199.8, "proj_band": 20.1}) == (150.0, 199.8)
+    assert published_range({"proj_pts": 170.0, "proj_lo": 170.0, "proj_hi": 170.0, "proj_band": 10.0}) == (165.0, 175.0)
+    assert published_range({"proj_pts": 170.0, "proj_lo": 170.0, "proj_hi": 170.0, "proj_band": None}) == (None, None)
+    assert published_range({"proj_pts": 170.0, "proj_lo": None, "proj_hi": 180.0, "proj_band": None}) == (None, 180.0)

@@ -19,11 +19,14 @@ Two sources, one schema:
     number can be audited back to its inputs.
 
 Sources:
-  sheet   the FantasyPros draft sheet's position tabs (data/external/
-          DraftSheets_2026_*.xlsx, committed read-only). The consensus AVG
-          line per player; the high/low expert lines are ignored here. Names
-          are resolved to Sleeper ids through the same matcher the market
-          table uses.
+  sheet   the FantasyPros draft sheet workbook (data/external/
+          DraftSheets_2026_*.xlsx, committed read-only). The position tabs'
+          consensus line per player plus the panel's high and low lines
+          (pts17_band, pts17_line_lo/hi), and with sheet_line: headline the
+          DraftSheet PTS reproduced from the workbook's own inputs under the
+          league's scoring (from_sheet, reproduce_headline; DECISIONS #54).
+          Names are resolved to Sleeper ids through the same matcher the
+          market table uses.
   sleeper https://api.sleeper.app/projections/nfl/<season>?season_type=
           regular&position[]=POS -- Rotowire's lines, refreshed regularly.
           The source for every draft after this one.
@@ -70,12 +73,12 @@ SOURCE_GAMES_CONVENTION = {
     "sleeper_rotowire": {"ratio": 0.92, "already_discounted": True},
     # The DraftSheet tab's own PTS (user decision 2026-09-04, DECISIONS #45):
     # the sheet's Zscore Projection, an average of its Aggregate LOW/AVG/HIGH
-    # and the ECR tab's Pts. The Aggregate lines are the tab line / 17 x
-    # (16 - RISK-tab missed games by ECR rank), so the number is ALREADY a
-    # 16-game total less a durability haircut. Basis 16 and discounted, so
-    # proj_pts equals the page's number and no games scale touches it twice.
-    # basis_games is NOT fixed here: from_sheet reads it off the workbook's
-    # Aggregate formula and carries it per row in `pts_basis` (DECISIONS #54)
+    # (the tab line / 17 x (games - RISK-tab missed games for the ECR slot))
+    # and the ECR-slot points. Already a season total less a durability
+    # haircut, on whatever basis the workbook's formula states (16 in the
+    # 09-02 copy, 17 in the 09-04 copy): from_sheet reads it and carries it
+    # per row in `pts_basis`, and projections takes the row at face value,
+    # so proj_pts equals the page's number and no games scale touches it.
     "fantasypros_sheet_headline": {"ratio": None, "already_discounted": True},
 }
 DISCOUNTED_SOURCES = tuple(k for k, v in SOURCE_GAMES_CONVENTION.items() if v["already_discounted"])
@@ -90,7 +93,8 @@ def source_basis_expr() -> pl.Expr:
     for name, conv in SOURCE_GAMES_CONVENTION.items():
         if conv.get("basis_games") is not None:
             expr = pl.when(pl.col("source") == name).then(pl.lit(float(conv["basis_games"]))).otherwise(expr)
-    # a row that states its own basis (pts_basis) wins over the table
+    # a row that states its own basis (pts_basis) wins over the table; the
+    # frame must carry the column (null where the table decides)
     return pl.coalesce(pl.col("pts_basis"), expr)
 
 
@@ -309,11 +313,10 @@ def sheet_headline_spec(wf) -> dict:
     pts_cols: dict[int, str] = {}
     for c in range(1, width + 1):
         h = val(2, c)
-        if h == "LOW":
-            slot = val(3, c - 5)
-            pos = "".join(ch for ch in str(slot or "") if ch.isalpha())
-            if pos in SHEET_COLS:
-                blocks.append((pos, c))
+        if h == "LOW" and c - 5 >= 1:
+            p = _split_slot(val(3, c - 5))
+            if p and p[0] in SHEET_COLS:
+                blocks.append((p[0], c))
         if isinstance(h, str) and h.endswith("Pts") and h[:-3] in SHEET_COLS:
             pts_cols[c] = h[:-3]
     if not blocks:
@@ -352,10 +355,16 @@ def sheet_headline_spec(wf) -> dict:
         m = re.search(r"LARGE\(\$[A-Z]+\$(\d+):\$[A-Z]+\$(\d+)", str(v or ""))
         if m:
             windows[pos] = int(m.group(2)) - int(m.group(1)) + 1
+    missing = [p for p in SHEET_COLS if p not in windows]
+    if missing:
+        # no silent 50/100 default (review 2026-09-05): a moved or widened
+        # block would compute every ECR-slot point over the wrong window
+        raise ValueError(f"Aggregate tab: no '<POS>Pts' LARGE(...) window found for {missing}; "
+                         "cannot reproduce the DraftSheet headline from this workbook")
     return {"games": games, "avg_form": forms.most_common(1)[0][0],
             "games_by_pos": games_by_pos,
             "off_basis_positions": sorted(p for p, g in games_by_pos.items() if g != games),
-            "rank_window": {p: int(windows.get(p, 50 if p in ("QB", "TE") else 100)) for p in SHEET_COLS}}
+            "rank_window": {p: int(windows[p]) for p in SHEET_COLS}}
 
 
 def sheet_risk(wb) -> dict[str, float]:
@@ -363,7 +372,9 @@ def sheet_risk(wb) -> dict[str, float]:
     out: dict[str, float] = {}
     for r in wb["RISK"].iter_rows(min_row=1, max_row=1000, max_col=2, values_only=True):
         if r and isinstance(r[0], str) and len(r) > 1 and isinstance(r[1], (int, float)):
-            out[r[0].strip()] = float(r[1])
+            k = _slot_key(r[0])
+            if k:
+                out[k] = float(r[1])
     return out
 
 
@@ -372,17 +383,29 @@ def sheet_ecr_slots(wb) -> dict[str, str]:
     out: dict[str, str] = {}
     for r in wb["ECR"].iter_rows(min_row=2, max_row=2000, max_col=5, values_only=True):
         if r and isinstance(r[2], str) and isinstance(r[4], str) and r[2].strip():
-            out.setdefault(_sheet_name_key(r[2]), r[4].strip())
+            k = _slot_key(r[4])
+            if k:
+                out.setdefault(_sheet_name_key(r[2]), k)
     return out
 
 
+def _split_slot(slot) -> tuple[str, int] | None:
+    """'WR14' / 'WR 14' / ' RB1 ' -> ('WR', 14) / ('RB', 1); None otherwise.
+    The one parser for ECR position slots (review 2026-09-05: three ad-hoc
+    readings of the same token could disagree on a stray space and silently
+    estimate a whole position at the median ratio)."""
+    m = re.fullmatch(r"\s*([A-Za-z]+)\s*(\d+)\s*", str(slot or ""))
+    return (m.group(1).upper(), int(m.group(2))) if m else None
+
+
+def _slot_key(slot) -> str | None:
+    p = _split_slot(slot)
+    return f"{p[0]}{p[1]}" if p else None
+
+
 def _slot_number(slot: str | None, pos: str) -> int | None:
-    if not slot or not slot.startswith(pos):
-        return None
-    try:
-        return int(slot[len(pos):])
-    except ValueError:
-        return None
+    p = _split_slot(slot)
+    return p[1] if p and p[0] == pos else None
 
 
 def reproduce_headline(rows: list[dict], slots: dict[str, str], risk: dict[str, float], spec: dict) -> dict[str, float]:
@@ -398,14 +421,19 @@ def reproduce_headline(rows: list[dict], slots: dict[str, str], risk: dict[str, 
         headline = AVERAGE(LOW, AVG, HIGH, ECRpts)               four-way
                 or AVERAGE(AVERAGE(LOW, HIGH), AVG, ECRpts)      three-way
 
-    `rows` are from_sheet's scored tab rows (_base/_lo/_hi in league
-    scoring). A player with no ECR slot at his tab position, no RISK entry
-    for it, or a slot beyond the block is not on the DraftSheet and gets no
-    headline here (from_sheet estimates him at the position's median ratio).
-    The workbook's team count, roster and auction settings do not enter:
-    they move VBD and PS on the page, never PTS."""
+    `rows` are EVERY parsed tab row (name, pos, _base/_lo/_hi in league
+    scoring), matched to Sleeper or not: the workbook's LARGE() block holds
+    every tab player at the position, so a name the SleeperIndex cannot
+    resolve must still occupy his slot here or every player ranked below him
+    shifts (review 2026-09-05, measured: Guerendo 7.66 -> 5.76 with four
+    unmatched deep names). Returns {(pos, name key): headline}. A player with
+    no ECR slot at his tab position, no RISK entry for it, or a slot beyond
+    the block is not on the DraftSheet and gets no headline here (from_sheet
+    estimates him at the position's median ratio). The workbook's team
+    count, roster and auction settings do not enter: they move VBD and PS on
+    the page, never PTS."""
     games, form, windows = float(spec["games"]), spec["avg_form"], spec["rank_window"]
-    out: dict[str, float] = {}
+    out: dict[tuple[str, str], float] = {}
     for pos in SHEET_COLS:
         win = int(windows.get(pos, 50))
         by_slot: dict[int, dict] = {}
@@ -428,10 +456,11 @@ def reproduce_headline(rows: list[dict], slots: dict[str, str], risk: dict[str, 
             avg = r["_base"] * f
             high = (r["_hi"] if r["_hi"] is not None else r["_base"]) * f
             ecr_pts = ranked[k - 1]
+            key = (pos, _sheet_name_key(r["name"]))
             if form == "mid_avg_ecr":
-                out[r["sleeper_id"]] = ((low + high) / 2.0 + avg + ecr_pts) / 3.0
+                out[key] = ((low + high) / 2.0 + avg + ecr_pts) / 3.0
             else:
-                out[r["sleeper_id"]] = (low + avg + high + ecr_pts) / 4.0
+                out[key] = (low + avg + high + ecr_pts) / 4.0
     return out
 
 
@@ -479,13 +508,13 @@ def from_sheet(path: Path, scoring: dict, index, as_of: str, line: str = "tab",
         spec, risk, slots = sheet_headline_spec(wf), sheet_risk(wb), sheet_ecr_slots(wb)
         rep["headline_spec"] = spec
     rows, unmatched, bumped = [], [], 0
+    parsed: list[dict] = []            # every tab row, matched or not (the headline block needs all)
     for pos in SHEET_COLS:
         bump_col = sheet_bump_column(wf[pos])
         for p in parse_sheet_tab(list(wb[pos].iter_rows(values_only=True)), pos, bump_col):
             sid = index.match(p["name"], pos, p["team"])
             if not sid:
                 unmatched.append(f"{p['name']} ({pos})")
-                continue
             # the sheet's own number is the scored line PLUS its rookie bump;
             # reading only the line under-projects every rookie by up to 65
             # points against the spreadsheet this source exists to carry
@@ -506,24 +535,27 @@ def from_sheet(path: Path, scoring: dict, index, as_of: str, line: str = "tab",
             if len(trio) == 3:
                 mu = sum(trio) / 3.0
                 band = (sum((x - mu) ** 2 for x in trio) / 3.0) ** 0.5
-            rows.append({"sleeper_id": str(sid), "name": p["name"], "pos": pos, "team": p["team"],
-                         "pts17": base, "_base": base, "_lo": lo, "_hi": hi,
-                         "source": "fantasypros_sheet", "as_of": as_of,
-                         "line": json.dumps(p["line"], sort_keys=True),
-                         # the panel's own low and high lines, carried so the
-                         # board's proj_lo/proj_hi ARE the floor and ceiling
-                         # (DECISIONS #55); combine() folds them into pts17_lo/hi
-                         "pts17_line_lo": lo, "pts17_line_hi": hi,
-                         "pts17_band": band, "pts_basis": None})
+            row = {"sleeper_id": str(sid) if sid else None, "name": p["name"], "pos": pos, "team": p["team"],
+                   "pts17": base, "_base": base, "_lo": lo, "_hi": hi,
+                   "source": "fantasypros_sheet", "as_of": as_of,
+                   "line": json.dumps(p["line"], sort_keys=True),
+                   # the panel's own low and high lines, carried so the
+                   # board's proj_lo/proj_hi ARE the floor and ceiling
+                   # (DECISIONS #55); combine() folds them into pts17_lo/hi
+                   "pts17_line_lo": lo, "pts17_line_hi": hi,
+                   "pts17_band": band, "pts_basis": None}
+            parsed.append(row)
+            if sid:
+                rows.append(row)
     if bumped:
         log.info("sheet: rookie bump applied to %d players", bumped)
     if line == "headline":
         games = float(spec["games"])
-        hl = reproduce_headline(rows, slots, risk, spec)
+        hl = reproduce_headline(parsed, slots, risk, spec)
         no_headline = 0
         for r in rows:
             r["source"], r["pts_basis"] = "fantasypros_sheet_headline", games
-            h = hl.get(r["sleeper_id"])
+            h = hl.get((r["pos"], _sheet_name_key(r["name"])))
             if h is None:
                 no_headline += 1
                 r["pts17"] = None            # estimated below
@@ -563,12 +595,26 @@ def from_sheet(path: Path, scoring: dict, index, as_of: str, line: str = "tab",
                         "/".join(f"{spec['games_by_pos'][p]:g}" for p in sorted(off)), games, games, ",".join(sorted(off)))
         if "DraftSheet" in wb.sheetnames:
             page = parse_draftsheet(list(wb["DraftSheet"].iter_rows(values_only=True)))
-            diffs = [abs(hl[r["sleeper_id"]] - page[_sheet_name_key(r["name"])]) for r in rows
-                     if r["sleeper_id"] in hl and _sheet_name_key(r["name"]) in page and r["pos"] not in off]
+            pairs = [(hl[(r["pos"], _sheet_name_key(r["name"]))], page[_sheet_name_key(r["name"])])
+                     for r in parsed
+                     if (r["pos"], _sheet_name_key(r["name"])) in hl and _sheet_name_key(r["name"]) in page
+                     and r["pos"] not in off]
+            diffs = [abs(a - b) for a, b in pairs]
+            # the page is the oracle when its Scoring tab matches the league:
+            # every page row at 20+ points must land within 0.05 (the deep
+            # tail wobbles by a few tenths on one VLOOKUP miss inside the
+            # workbook's own block). More than two misses means the formula
+            # shapes this loader read are not the ones the page was built
+            # with, and the board must not ship on a guess (review 2026-09-05).
+            bad = [(a, b) for a, b in pairs if b >= 20.0 and abs(a - b) > 0.05]
             rep["headline_parity"] = {"compared": len(diffs),
                                       "max_abs_diff": round(max(diffs), 4) if diffs else None,
                                       "over_0_05": sum(1 for d in diffs if d > 0.05),
                                       "skipped_positions": sorted(off)}
+            if not rep["sheet_scoring_diffs"] and len(bad) > 2:
+                raise ValueError(f"DraftSheet headline reproduction disagrees with the page on {len(bad)} "
+                                 f"players at 20+ points (worst {max(bad, key=lambda t: abs(t[0]-t[1]))}); "
+                                 "the workbook's formula shapes were not read correctly")
         log.info("sheet: DraftSheet headline reproduced for %d players (games %s, %s), %d estimated from "
                  "the tab line at the position's median ratio", len(rows) - no_headline, games,
                  spec["avg_form"], no_headline)
@@ -710,8 +756,6 @@ def combine(frames: list[pl.DataFrame], mode: str = "first", scoring: dict | Non
                     "as_of": max((x for x in g["as_of"].to_list() if x), default=""),
                     "line": json.dumps(mean_line, sort_keys=True),
                     "pts_basis": None,
-                    "pts_basis": None,
-                    "pts_basis": None,
                     "n_sources": n, "pts17_sd": sd, "pts17_hi": max(scores), "pts17_lo": min(scores),
                     # the mean of the sources that published a range. Combining
                     # a within-source band with cross-source disagreement (in
@@ -735,8 +779,8 @@ def load_external(cfg, index, getter=None) -> tuple[pl.DataFrame, dict]:
     frames, report = [], {"sources": [], "sheet_unmatched": [], "espn_unmatched": [], "combine": mode}
     for name in ext.get("sources") or ["sleeper"]:
         if name == "sheet":
-            path = Path(cfg.root) / str(ext.get("sheet_path", ""))
-            if not path.exists():
+            path = Path(cfg.root) / str(ext.get("sheet_path") or "")
+            if not ext.get("sheet_path") or not path.is_file():
                 report["sources"].append({"source": "sheet", "rows": 0, "error": f"missing {path.name}"})
                 continue
             report["sheet"] = {}

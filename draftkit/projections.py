@@ -335,11 +335,17 @@ def external_projection(cfg, usage: pl.DataFrame, market: pl.DataFrame) -> pl.Da
     src = pl.col("source").fill_null("none")
     discounted = pl.any_horizontal([src == s for s in X.DISCOUNTED_SOURCES]) if X.DISCOUNTED_SOURCES else pl.lit(False)
     df = df.with_columns(pl.when(discounted).then(pl.lit(float(games))).otherwise(pl.col("_games")).alias("_games"))
-    # the line's own season basis per source (17 for a full-season line; the
-    # DraftSheet headline is stated on 16 less a haircut): external.source_basis_expr
+    # the line's own season basis: 17 for a full-season line, or whatever the
+    # row states (pts_basis; the DraftSheet headline reads it off the
+    # workbook, 16 in the 09-02 copy, 17 in the 09-04 copy). A row that
+    # STATES its basis is taken at face value: its number IS the projection
+    # the reader sees (DECISIONS #45, #54; review 2026-09-05 found the 09-04
+    # board sitting at page x 16/17), so its games scale is its own basis.
     if "pts_basis" not in df.columns:
         df = df.with_columns(pl.lit(None, dtype=pl.Float64).alias("pts_basis"))
     df = df.with_columns(X.source_basis_expr().alias("_basis"))
+    df = df.with_columns(pl.when(pl.col("pts_basis").is_not_null()).then(pl.col("_basis"))
+                         .otherwise(pl.col("_games")).alias("_games"))
     df = df.with_columns((pl.col("pts17") * pl.col("_games") / pl.col("_basis")).alias("proj_pts"),
                          pl.coalesce(pl.col("source"), pl.lit("none")).alias("proj_source")).drop("pts17", "source", "pts_basis")
     # plan A1: dispersion across sources on the same basis as proj_pts
@@ -424,36 +430,6 @@ def _finish(cfg, df: pl.DataFrame) -> pl.DataFrame:
     if "avail_status" not in df.columns:
         df = df.with_columns(pl.lit(None, dtype=pl.Utf8).alias("avail_status"))
     return _ensure_dispersion(df)
-
-
-def _line_touchdowns(line) -> float | None:
-    """Projected touchdowns in a source stat line (rush + rec + pass), None
-    when the line carries no touchdown key at all. The tie_break: touchdowns
-    knob compares this between skill players (DECISIONS #53)."""
-    if line is None:
-        return None
-    try:
-        d = json.loads(line) if isinstance(line, str) else dict(line)
-    except (TypeError, ValueError):
-        return None
-    vals = [d.get(k) for k in ("rush_td", "rec_td", "pass_td")]
-    vals = [float(v) for v in vals if v is not None]
-    return sum(vals) if vals else None
-
-
-def _line_touchdowns(line) -> float | None:
-    """Projected touchdowns in a source stat line (rush + rec + pass), None
-    when the line carries no touchdown key at all. The tie_break: touchdowns
-    knob compares this between skill players (DECISIONS #53)."""
-    if line is None:
-        return None
-    try:
-        d = json.loads(line) if isinstance(line, str) else dict(line)
-    except (TypeError, ValueError):
-        return None
-    vals = [d.get(k) for k in ("rush_td", "rec_td", "pass_td")]
-    vals = [float(v) for v in vals if v is not None]
-    return sum(vals) if vals else None
 
 
 def _line_touchdowns(line) -> float | None:

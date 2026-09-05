@@ -3530,3 +3530,73 @@ league's rules to whatever copy it is handed. The v2 copy becomes the
 configured sheet_path because its page (VALUE, PS, tiers) is the one that
 matches the league when the user reads it; a test now holds the two copies
 to one board.
+
+## 2026-09-05 (56) — review of the morning's changes (e4065c8..HEAD): ten findings, all fixed
+
+Eight review angles over #53-#55 plus the sheet swap, verified against the
+code and the live board. What was wrong and what changed:
+
+1. **The board sat at page x 16/17.** projections scaled every row by
+   games/basis; the 09-04 headline is stated on 17, so Gibbs read 274.2 on
+   the board and 291.4 on the sheet, against #45's "engine and page agree on
+   every number" (true on the 09-02 copy only because its basis was 16). A
+   row that STATES its own basis (pts_basis) is now taken at face value:
+   proj_pts = pts17. Board now equals the page on QB/RB/WR to 0.1 (the TE
+   block is on the consistent basis, #54). K/DEF synthetic lines keep the
+   16 scale, so K/DEF slide a few value ranks; every skill number rises 17/16.
+2. **The headline block only held Sleeper-matched rows.** The workbook's
+   LARGE() block ranks every tab player; four unmatched deep names (Bam
+   Knight, Connor Heyward, Riley Nowakowski, Hollywood Brown) became zeros
+   and shifted the ECR-slot points of everyone below them (Guerendo 7.66 vs
+   5.76). reproduce_headline now runs over every parsed tab row, matched or
+   not, keyed by (pos, name). Test with an unmatched RB1.
+3. **The ceiling tiebreak could promote a man below the wire** (raw -0.6
+   inside 2.0 of raw +1.1). Below-wire never wins a tie against above-wire,
+   per position and across positions. Test.
+4. **A lineless single source read its point as a floor and a ceiling.**
+   pts17_lo/hi coalesce to the point when a source publishes no lines, so
+   on a Sleeper-only board the floor rule would have been "higher projection
+   wins". One helper, boardrow.published_range: lines when they are a range
+   (both ends on the point is not one), else the point +/- band/2, else
+   None; used by the planner floor and the bench ceiling. Tests.
+5. **The floor pass left a stale "scarcer player first" label** on a row it
+   demoted. The touchdown, survival and floor rules are now one comparator
+   in one bubble pass, one label per swap: TD (knob) inside tie_window;
+   inside NEAR_TIE survivals more than 5 points apart -> scarcer first, else
+   floors 3+ apart -> higher floor, else any survival difference -> scarcer.
+   Same outcomes as the passes; no stale labels. Test with the order reversed.
+6. **rank_window defaulted silently** to 50/100 when the LARGE() range was
+   not recognised. It raises now, like the games basis and average form.
+   And the page is the oracle: when the Scoring tab matches the league,
+   more than two page rows at 20+ points off by >0.05 raises instead of
+   shipping a board built on a misread formula.
+7. **The two-pick and survival-discount arms still scored on the floored
+   value.** Both now use the raw value (knobs stay off).
+8. **tie_break was a free string**; a misspelling silently ran scarcity
+   under the wrong log stamp. apply_engine_cfg rejects anything but
+   scarcity / touchdowns. Test.
+9. **Triple _line_touchdowns definition, triple pts_basis key** (a patch
+   applied three times). One of each.
+10. **Stale prose**: the TD rule described as live (config.yaml, tracker,
+    planner), "basis 16" in external/projections, the module docstring
+    saying the high/low lines are ignored, the band tiebreak said to ride
+    late_round_dispersion. Rewritten. sheet_path / sheet_as_of moved from
+    config.yaml to leagues/keefamania.yaml (a league fact; a league without
+    one has no sheet source, reported, and a blank path can no longer open
+    the repo root as a workbook).
+
+Also from the review, recorded and not changed: the ECR-slot parser is now
+one whitespace-tolerant function (_split_slot) used by the spec, RISK and
+ECR readers; the bench churn artifact's 19th "change" was Mahomes vs
+Mahomes II in a name compare (the entry's 18 stands); the parity module is
+~40 s of the suite and could share workbook fixtures; combine(mean) carries
+no basis (mean mode is off and unjudgeable before 2026 actuals, #30); the
+majority-vote basis stands over a per-row basis because the page's stale TE
+block would otherwise become a position tilt on the board. Suite 769.
+
+Board after the fix (v2 workbook): every QB/RB/WR headline row equals the
+page within 0.1 except the five availability-`out` players the board zeroes
+(Tyson, Jacobs, Charbonnet, Pacheco, Conner); Gibbs 291.4, Rice 180.8,
+Javonte 188.9, McBride 175.7 (consistent basis). K/DEF move at most 4 value
+ranks (Texans 39 -> 40, Fannin 40 -> 39 the only top-40 change). Bridge
+restarted on it and verified.

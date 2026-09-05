@@ -38,13 +38,9 @@ projections:
     # 'first' until the pre-registered gate (DECISIONS #30) passes on 2026
     # actuals -- ESPN has no history, so the mean arm is unjudgeable before then.
     combine: first
-    # The FantasyPros DraftSheet workbook. Since DECISIONS #54 this is the
-    # DEFAULT-settings copy the user downloads: the loader scores the lines
-    # with the league yaml and reproduces the headline from the workbook's
-    # own formulas, so its Scoring-tab team count / roster / auction cells do
-    # not matter. Replace the file, rebuild tiers, re-export, restart bridge.
-    sheet_path: data/external/DraftSheets_2026_Keefamania_10tm_halfPPR_1flex_v2.xlsx   # the user's league-settings copy of the 09-04 download; byte-identical board to the default copy (DECISIONS #54 note)
-    sheet_as_of: "2026-09-04"     # fallback only: the workbook's own 'Updated:' cell wins when present
+    # sheet_path / sheet_as_of are LEAGUE facts (which workbook a league drafts
+    # on) and live in leagues/<name>.yaml under projections.external; a league
+    # without one simply has no sheet source (reported, not an error).
   # the one tail rule: depth-chart backups the market also does not rank as
   # starters project 0 (contingent_of keeps the handcuff column informative)
   non_starters_zero: true
@@ -145,8 +141,9 @@ engine:
   # scarcity: inside planner.NEAR_TIE (1.0) the player less likely to survive
   # to the next turn goes first. touchdowns: inside tie_window, a skill-vs-
   # skill near-tie goes to the player with more projected touchdowns (QB/K/DEF
-  # pairs keep scarcity). Global default is today's rule; keefamania sets
-  # touchdowns at a 5-point window by user decision.
+  # pairs keep scarcity). touchdowns was tried for one room on 2026-09-05 and
+  # reverted the same morning; both leagues run scarcity (+ the floor rule of
+  # DECISIONS #55, which has no knob).
   tie_break: scarcity
   tie_window: 1.0
   # ---- rival-behaviour knobs (plan 2026-09-02 B3) -------------------------
@@ -180,8 +177,9 @@ engine:
   # candidates and their simulated survivals) instead of raw insurance points.
   # bench_contingency: a backup whose starter is on ANOTHER roster is also
   # priced for the role shift if that starter goes down (absence table x
-  # uplift over my weakest starter). The band tiebreak on bench rows rides
-  # late_round_dispersion. All default off = today's behaviour.
+  # uplift over my weakest starter). Bench near-ties break on the higher
+  # ceiling in every round with no knob (DECISIONS #55). All default off =
+  # today's behaviour.
   bench_survival_discount: false
   bench_contingency: false
   # bench_two_pick: value now plus the expected best insurance still

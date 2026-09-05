@@ -54,6 +54,26 @@ ENGINE_FIELDS: dict[str, tuple[str, object]] = {
 }
 
 
+def published_range(q: dict) -> tuple[float | None, float | None]:
+    """(floor, ceiling) of one board row: the source's own published low and
+    high lines when it published a range, else the point minus/plus half the
+    band, else (None, None). A single source with no lines carries
+    proj_lo == proj_hi == proj_pts (external._with_dispersion_single), which
+    is NOT a range and must not be read as one (review 2026-09-05): the
+    planner's floor rule and the bench ceiling tiebreak both call this."""
+    pts = q.get("proj_pts")
+    lo, hi = q.get("proj_lo"), q.get("proj_hi")
+    ok = lambda v: v is not None and v == v   # noqa: E731 - NaN guard
+    band = q.get("proj_band")
+    half = float(band) / 2.0 if ok(band) and pts is not None and float(band) > 0 else None
+    # both ends sitting on the point is "no range published", not a range
+    if ok(lo) and ok(hi) and pts is not None and float(lo) == float(pts) == float(hi):
+        lo = hi = None
+    floor = float(lo) if ok(lo) else (float(pts) - half if half is not None else None)
+    ceiling = float(hi) if ok(hi) else (float(pts) + half if half is not None else None)
+    return floor, ceiling
+
+
 def engine_fields(r: dict) -> dict:
     """The engine-facing numbers from one board row (a csv DictReader row or a
     polars row dict). `vorp_flex` falls back to `vorp` for older boards."""
