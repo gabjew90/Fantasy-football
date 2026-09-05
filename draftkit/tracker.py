@@ -104,6 +104,7 @@ class Tracker:
     autopick_sigma_scale = 0.5  # plan B5: an autopicking rival's ADP noise, x sigma
     autopick_need_damp = 0.02   # plan B5: autopick fills every starter slot first; a non-filling position while one is open
     autopick_list_prob = 0.0    # DECISIONS #35: P(an autopick seat walks Yahoo's default list this pick); 0 = today's behaviour
+    rival_draw = "lottery"      # survival study 2026-09-04: lottery (today) | floored | order (urgency.simulate_survival)
     rival_needs_update = True   # plan B6: a rival picking twice in my window consumes his needs
     away_slots = frozenset()    # plan B5: draft slots on autopick (Yahoo 'away'); empty on Sleeper
     upside_from_round = 8
@@ -390,6 +391,7 @@ class Tracker:
         ("need_damp", float), ("qb_filled_damp", float), ("qb_damp_until_round", int),
         ("kdef_early_damp", float), ("kdef_typical_round", int),
         ("autopick_sigma_scale", float), ("autopick_need_damp", float), ("autopick_list_prob", float),
+        ("rival_draw", str),
         ("rival_needs_update", bool),
         ("upside_from_round", int), ("upside_mult", float),
         ("late_round_dispersion", bool), ("dispersion_lambda", float),
@@ -848,6 +850,7 @@ class Tracker:
             autopick_sigma_scale=self.autopick_sigma_scale,
             autopick_need_damp=self.autopick_need_damp,
             autopick_list_prob=self.autopick_list_prob,
+            rival_draw=self.rival_draw,
             rival_needs_update=self.rival_needs_update,
         )
         self._urgency_cache = (key, report)

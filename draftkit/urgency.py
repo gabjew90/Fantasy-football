@@ -108,6 +108,7 @@ def simulate_survival(pool, current_pick, next_pick, rivals, seeds, rng,
                       kdef_typical_round=13, run_ratio=0.0,
                       autopick_sigma_scale=0.5, autopick_need_damp=0.02,
                       autopick_list_prob=0.0,
+                      rival_draw="lottery",
                       history_end=None,
                       rival_needs_update=True):
     """Per-market urgency + per-player survival to my next pick.
@@ -150,6 +151,27 @@ def simulate_survival(pool, current_pick, next_pick, rivals, seeds, rng,
                            walking, and rng.choice still runs against the
                            one-hot, so the draw count per rival per sim is
                            unchanged. 0.0 is today's behaviour exactly.
+      rival_draw           (survival study 2026-09-04, DECISIONS #46) HOW a
+                           rival chooses among the alive pool:
+                             lottery  today: a draw proportional to the
+                                      Gaussian likelihood in (pick - ADP)
+                                      times the multipliers, over the whole
+                                      pool. A player PAST his ADP loses
+                                      weight as he falls, and every player
+                                      is diluted by pool size.
+                             floored  the same lottery with the distance
+                                      floored at zero for players past their
+                                      ADP (a faller weighs as much as an
+                                      on-ADP player).
+                             order    the rival takes the alive player with
+                                      the lowest ADP + N(0, sigma), the
+                                      multipliers folded in as an additive
+                                      pick penalty of -sigma x ln(m). A faller
+                                      is then the LIKELIEST pick. The list-walk
+                                      branch is unchanged; the random stream
+                                      differs from the lottery (n normals per
+                                      rival pick), so paired A/Bs against it
+                                      are not common-random-number.
       run_ratio and rival_needs_update are accepted here and take effect in
       plan steps B4 and B6.
 
@@ -242,6 +264,12 @@ def simulate_survival(pool, current_pick, next_pick, rivals, seeds, rng,
     # floor: a zero scale (or sigma) would divide by zero in the likelihood
     sig = np.maximum(np.where(autopick, sigma * autopick_sigma_scale, sigma), 1e-6)[:, None]
     adp_like = np.exp(-0.5 * ((pick_nos[:, None] - adp[None, :]) / sig) ** 2) + 1e-9
+    if rival_draw == "floored":
+        # a player past his ADP is at least as likely to be taken as one at it
+        dist = np.maximum(adp[None, :] - pick_nos[:, None], 0.0)
+        adp_like = np.exp(-0.5 * (dist / sig) ** 2) + 1e-9
+    elif rival_draw not in ("lottery", "order"):
+        raise ValueError(f"rival_draw must be lottery, floored or order, got {rival_draw!r}")
     # fat-tail REACH mixture (v2 1.1, CLV retro: reaches are one-directional —
     # players taken EARLY, never "reached for" after their ADP). With
     # reach_prob a rival draws from a widened, forward-only likelihood.
@@ -318,7 +346,20 @@ def simulate_survival(pool, current_pick, next_pick, rivals, seeds, rng,
             total = w.sum()
             if total <= 0:
                 break
-            choice = rng.choice(n, p=w / total)
+            if rival_draw == "order" and not walking:
+                # noisy-order draw: lowest ADP + noise wins, multipliers (and
+                # the run boost) as additive pick penalties
+                s_i = float(sig[i, 0]) * (reach_scale if (reaching and not autopick[i]) else 1.0)
+                mvec = mult[i][pos_idx]
+                if window:
+                    b = (count >= run_min) & (count > run_ratio * expected)
+                    if b.any():
+                        mvec = mvec * np.where(b[pos_idx], run_boost, 1.0)
+                pen = -s_i * np.log(np.maximum(mvec, 1e-9))
+                score = np.where(alive, adp + rng.standard_normal(n) * s_i + pen, np.inf)
+                choice = int(np.argmin(score))
+            else:
+                choice = rng.choice(n, p=w / total)
             alive[choice] = False
             k = int(pos_idx[choice])
             window.append((k, mass))

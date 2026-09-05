@@ -62,14 +62,31 @@ HUMAN_STAGES = (
     ("reach", [{"reach_prob": r} for r in (0.0, 0.10, 0.15, 0.25, 0.35)]),
     ("need", [{"need_damp": d} for d in (0.15, 0.30, 0.50)]),
 )
-STAGES = HUMAN_STAGES + AUTOPICK_STAGES
+# The rival-draw form (survival study 2026-09-04, DECISIONS #46): how a rival
+# chooses, not how noisy he is. Fits on every room. Run with --objective shown.
+RIVAL_STAGES = (("rival", [{"rival_draw": v} for v in ("lottery", "floored", "order")]),)
+# The pre-registered study grid (DECISIONS #46): draw form x noise JOINTLY,
+# because a noisy-order rival needs a wider sigma than a lottery rival to
+# reproduce the same dispersion (order at sigma 6 overshoots: shown-at-9%
+# survived 26% on four rooms), then the list-walk probability for the
+# top-bucket losses no draw form touches (shown 97-98% survived 82% under
+# all three). sigma_late scales with sigma_early (27/6 today).
+RIVAL_STUDY_STAGES = (
+    ("rival_x_sigma", [{"rival_draw": v, "sigma_early": e, "sigma_late": round(27.0 * e / 6.0, 1)}
+                       for v in ("lottery", "floored", "order") for e in (6.0, 10.0, 15.0, 20.0)]),
+    ("autopick_list_prob", [{"autopick_list_prob": p} for p in (0.0, 0.2, 0.4)]),
+)
+STAGES = HUMAN_STAGES + AUTOPICK_STAGES + RIVAL_STAGES
 SMOKE_STAGES = (("sigma", [{"sigma_early": 6.0, "sigma_late": 27.0}, {"sigma_early": 8.0, "sigma_late": 27.0}]),)
 CURRENT = {"sigma_early": 6.0, "sigma_late": 27.0, "reach_prob": 0.15, "need_damp": 0.15,
-           "autopick_list_prob": 0.0, "autopick_sigma_scale": 0.5, "autopick_need_damp": 0.02}
+           "autopick_list_prob": 0.0, "autopick_sigma_scale": 0.5, "autopick_need_damp": 0.02,
+           "rival_draw": "lottery"}
 CURRENT_AUTOPICK = {k: CURRENT[k] for k in ("autopick_list_prob", "autopick_sigma_scale", "autopick_need_damp")}
 HUMAN_TYPE = "sleeper_human"          # the Omnibeta real draft
 N_BOOT, CI_ALPHA, MIN_CLUSTERS = 500, 0.10, 30
+SHOWN_TOP_N = 8                  # rows flagged "shown": the engine top-8 recommendations at the state
 _ROOMS: list[dict] = []          # per-worker room contexts (set by _init_worker)
+OBJECTIVE = "pool"               # "pool" (every pooled player, DECISIONS #26/#35) | "shown" (the engine top rows)
 
 
 def stages_for(name: str, smoke: bool = False):
@@ -79,6 +96,10 @@ def stages_for(name: str, smoke: bool = False):
         return STAGES
     if name == "autopick":
         return AUTOPICK_STAGES
+    if name == "rival":
+        return RIVAL_STAGES
+    if name == "rival_study":
+        return RIVAL_STUDY_STAGES
     return tuple(s for s in STAGES if s[0] == name)
 
 
@@ -226,6 +247,14 @@ def state_rows(ctx: dict, cp: int, seat: int, point: dict, sims: int) -> list[tu
     rep = t.urgency_report()
     if not rep:
         return []
+    # the SHOWN set: the players the engine would put in front of the user at
+    # this state (its top recommendations). The whole-pool vector is mostly
+    # deep players who trivially survive; the decision rides on these rows
+    # (reports/survival_shown_diagnostic.md: 81% shown / 49% survived).
+    try:
+        shown = {str(q.get("sleeper_id")) for _v, _w, q in t.recommendations(top_n=SHOWN_TOP_N)}
+    except Exception:  # noqa: BLE001
+        shown = set()
     cluster = f"{ctx['room']}:{seat}:{nxt}"
     out = []
     for pos in POSITIONS:
@@ -238,7 +267,7 @@ def state_rows(ctx: dict, cp: int, seat: int, point: dict, sims: int) -> list[tu
                 continue
             if at is not None and at < nxt and snake.pick_to_round_slot(at, teams)[1] == seat:
                 continue                            # my own take inside the window: unobservable
-            out.append((float(p), at is None or at >= nxt, pos, cluster))
+            out.append((float(p), at is None or at >= nxt, pos, cluster, str(pid) in shown))
     return out
 
 
@@ -295,10 +324,21 @@ def evaluate(ctxs: list[dict], point: dict, sims: int, every: int, all_slots: bo
         for a in tasks:
             absorb(*_task(a))
     ll = {k: logloss(v) for k, v in rows_by_type.items()}
+    ll_shown = {k: logloss(shown_rows(v)) for k, v in rows_by_type.items()}
+    pool_obj = sum(ll.values()) / len(ll) if ll else float("nan")
+    shown_vals = [v for v in ll_shown.values() if v == v]
+    shown_obj = sum(shown_vals) / len(shown_vals) if shown_vals else float("nan")
     return {"point": point, "rows": dict(rows_by_type), "rows_by_room": dict(rows_by_room), "logloss": ll,
+            "logloss_shown": ll_shown, "objective_pool": pool_obj, "objective_shown": shown_obj,
             "logloss_by_room": {k: logloss(v) for k, v in rows_by_room.items()},
-            "objective": sum(ll.values()) / len(ll) if ll else float("nan"), "errors": errors,
-            "n": sum(len(v) for v in rows_by_type.values())}
+            "objective": shown_obj if OBJECTIVE == "shown" else pool_obj, "errors": errors,
+            "n": sum(len(v) for v in rows_by_type.values()),
+            "n_shown": sum(len(shown_rows(v)) for v in rows_by_type.values())}
+
+
+def shown_rows(rows):
+    """Rows flagged shown (5th field); older 4-field rows count as not shown."""
+    return [r for r in rows if len(r) > 4 and r[4]]
 
 
 def views(rows_by_type: dict) -> list[tuple[str, list]]:
@@ -467,14 +507,15 @@ def coordinate_fit(ctxs: list[dict], stages, start: dict, a, log=None, t0: float
             continue
         types = sorted({c["room_type"] for c in rooms})
         L += ["", f"## Stage: {stage} ({len(rooms)} room(s): {', '.join(c['room'] for c in rooms)})", "",
-              "| point | objective | " + " | ".join(types) + " |", "|---|---|" + "---|" * len(types)]
+              "| point | objective | " + " | ".join(types) + " | pool / shown |", "|---|---|" + "---|" * (len(types) + 1)]
         best = None
         for g in grid:
             cand = {**point, **g}
             res = evaluate(rooms, cand, a.sims, a.every, a.all_slots, a.workers)
-            L.append(f"| {g} | {res['objective']:.4f} | " + " | ".join(f"{res['logloss'].get(k, float('nan')):.4f}" for k in types) + " |")
+            L.append(f"| {g} | {res['objective']:.4f} | " + " | ".join(f"{res['logloss'].get(k, float('nan')):.4f}" for k in types)
+                     + f" | pool {res['objective_pool']:.4f} shown {res['objective_shown']:.4f} (n {res['n_shown']}) |")
             if log:
-                log(f"  {stage} {g}: {res['objective']:.4f} ({time.time() - t0:.0f}s)")
+                log(f"  {stage} {g}: objective {res['objective']:.4f}  pool {res['objective_pool']:.4f}  shown {res['objective_shown']:.4f} ({time.time() - t0:.0f}s)")
             if best is None or res["objective"] < best[1]:
                 best = (cand, res["objective"])
         point = best[0]
@@ -530,11 +571,14 @@ def _room_table(ctxs: list[dict]) -> list[str]:
 
 
 def run_fit(a) -> None:
+    global OBJECTIVE
+    OBJECTIVE = getattr(a, "objective", "pool") or "pool"
     t0 = time.time()
     logs_dir = Path(a.logs)
     ctxs = [room_context(r, logs_dir) for r in selected_rooms(a, logs_dir)]
     stages = stages_for(getattr(a, "stage", "all"), a.smoke)
-    L = ["# Survival refit (plan B7, DECISIONS #26; autopick stage DECISIONS #35)", "",
+    L = ["# Survival refit (plan B7, DECISIONS #26; autopick stage DECISIONS #35; rival stage DECISIONS #46)", "",
+         f"Objective population: {OBJECTIVE} ({'the engine top-%d rows at each state' % SHOWN_TOP_N if OBJECTIVE == 'shown' else 'every pooled player'}).", "",
          f"Rooms: {len(ctxs)}. sims {a.sims} (confirmation {a.confirm_sims}), every {a.every} state(s), "
          f"{'all seats' if a.all_slots else 'real seat'}, workers {a.workers}, stage {getattr(a, 'stage', 'all')}. "
          "Objective = mean over room types of the per-type log loss (equal weight per type; the one human room "
@@ -561,6 +605,7 @@ def run_fit(a) -> None:
               + " ".join(f"{k} {v:.4f}" for k, v in sorted(res["logloss"].items()))]
         for name, rows in views(res["rows"]) + sorted(res["rows"].items()):
             L += _calib_lines(name, rows)
+            L += _calib_lines(name + " SHOWN (engine top-%d)" % SHOWN_TOP_N, shown_rows(rows))
         bl, bars[label] = _bar_lines(res["rows"])
         L += bl
     fitted_bar = bars["fitted"]
@@ -606,6 +651,8 @@ def run_loro(a, evaluator=None, fitter=None) -> dict:
     per-room held-out log-loss for both and the pooled mean; writes
     reports/survival_loro.md (+ .json). `evaluator`/`fitter` are injection
     points for tests."""
+    global OBJECTIVE
+    OBJECTIVE = getattr(a, "objective", "pool") or "pool"
     t0 = time.time()
     stage = getattr(a, "stage", "all")
     logs_dir = Path(a.logs)

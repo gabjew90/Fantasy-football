@@ -2972,3 +2972,61 @@ study (Gaussian lottery | floored | noisy order), fitted through
 survival_refit leave-one-room-out, is the next pre-registration; a display
 calibration map would not reach the decision (e_best_next is the raw
 simulation's joint expectation). Not run yet.
+
+## 2026-09-04 (46) — survival: the rival draw form, pre-registered before the fit runs
+
+Finding (reports/survival_shown_diagnostic.md, #45 tail): on the rows the
+engine SHOWS, survival is over-promised in every bucket, and the split is
+distance past ADP (players still ahead of their ADP calibrated 98/97;
+players 5+ picks past it 93-96 shown, 41-46 survived). The whole-pool
+vector #35 scored is mostly deep players who trivially survive, which is
+why #35 read the current model as slightly under-confident: two
+populations, and the decision rides on the shown one.
+
+Mechanism (draftkit/urgency.py): the per-rival draw is a lottery over the
+whole pool with weight = Gaussian in (pick - ADP). A faller LOSES weight
+as he falls; every player is diluted by pool size.
+
+Built, all behind `engine.rival_draw` (default `lottery` = today, byte for
+byte): `floored` (distance floored at zero for players past ADP) and
+`order` (lowest ADP + N(0, sigma) wins, multipliers as additive pick
+penalties -sigma ln m). Harness: survival_refit gains a `shown` flag on
+every row (the engine's top-8 recommendations at the state), a `--objective
+shown|pool` switch, and a `rival_study` stage.
+
+Pilot, four recent rooms, 200 sims, every third state (scratch
+arm_tables.py, 449 shown rows): lottery shown log loss 0.696, floored
+0.635, order 0.778; pool 0.180 / 0.175 / 0.242. Floored repairs the middle
+(shown 60 -> survived 53 against 41) and leaves the top bucket where it
+was (97 -> 82 under all three arms); order at sigma 6 overshoots (shown 9
+-> survived 26). Read: the draw form and the noise must be fitted
+JOINTLY, and the top-bucket miss is not a draw-form miss (list-walk
+autopick seats, kickers especially).
+
+PRE-REGISTRATION (before the run):
+
+* Grid: rival_x_sigma = {lottery, floored, order} x sigma_early {6, 10,
+  15, 20} (sigma_late scaled 27/6), then autopick_list_prob {0, 0.2, 0.4}
+  on sidecar rooms. Coordinate search, best point on the grid.
+* Objective: SHOWN log loss, mean over room types (equal weight; the one
+  human room cannot be outvoted). Pool log loss reported alongside as a
+  guard: a winner whose pool log loss is worse than current by more than
+  0.010 does not ship.
+* Confirmation at higher sims on current vs fitted, three views, shown
+  and pool tables, cluster-bootstrap CI bars on the shown rows.
+* Human room (sleeper_human, n small) reported separately; a point that
+  wins pooled and is worse on the human room's shown log loss does not
+  flip the live knob. Keefamania is a human league.
+* Ship rule: LORO on the fitted point vs current, shown log loss, must win
+  in a majority of held-out rooms and pooled. Then the knob moves in
+  config.yaml (global: the rival model is not league-specific).
+* Stated in advance: a corrected model will say "take him now" far more
+  often on fallen players. That is what the record says it should do; the
+  human split decides whether it holds outside autopick rooms.
+* What the study cannot do: a display calibration map. e_best_next is the
+  raw simulation's joint expectation; only a rival-model change reaches
+  the decision.
+
+Command: venv\Scripts\python.exe scripts\fit_survival.py --fit --stage
+rival_study --objective shown --sims 100 --every 4 --confirm-sims 400
+--workers 6 --fit-out reports/survival_fit_rival.md
