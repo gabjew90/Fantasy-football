@@ -1193,6 +1193,8 @@ class Tracker:
         repl = self._replacement_points() if fallback else None
         second: dict[str, float] = {}  # per-position 2nd-best, for the planner
         urgency_of: dict[str, float] = {}   # market -> urgency, for stage 1
+        for q in self.players:
+            q.pop("_mkts", None)            # per-call: which markets he won this call
         for pos in POS_ORDER:
             rem_p = sorted(
                 (p for p in self.remaining(pos) if p.get("proj_source") != "no_market"),
@@ -1353,7 +1355,11 @@ class Tracker:
             score = urgency + 0.001 * mv(best)  # stable ordering
             # the market this row was built in and its urgency, for stage 1
             # of the staged ranker (draftkit/staged.py)
-            best["_mkt"] = mkt
+            # a player can win two markets (WR and FLEX); the dedup below keeps
+            # the more urgent row, so stage 1 must read THAT market, not the
+            # last one written (room 10799518 pick 7: JSN read as FLEX 21.9
+            # when his WR row at 43.5 was the one kept)
+            best.setdefault("_mkts", {})[mkt] = float(urgency)
             urgency_of[mkt] = float(urgency)
             if u and fallback is not None and repl is not None:
                 # The sim scores a market with NO survivor at replacement
@@ -1498,7 +1504,10 @@ class Tracker:
             # STAGED RANKING (user design 2026-09-05): urgency picks the
             # position, value the player, then banded scarcity, variance by
             # round, and the pair last. At the turn the pair leads.
-            market_of = {str(p.get("sleeper_id")): str(p.get("_mkt") or p.get("pos")) for _s, _w, p in cands}
+            market_of = {}
+            for _s, _w, p in cands:
+                won = p.get("_mkts") or {}
+                market_of[str(p.get("sleeper_id"))] = (max(won, key=won.get) if won else str(p.get("pos")))
             cands = staged_rank(cands, report, needs, rnd, urgency_of, market_of, second, eligible_after,
                                 fallback=fallback, repl=repl,
                                 partner_certain=bool(getattr(self, "_look_through", False)),

@@ -63,12 +63,15 @@ guardrails:
   # Yahoo's per-position roster cap. Mock rooms 10797402 and 10798461
   # (2026-09-05) refused our SEVENTH running back (Gainwell at 126, White at
   # 130): the thunk timed out, the click did not land, the driver fell to the
-  # next name on the clock. Six backs is the measured limit in the standard
-  # mock room; the receiver cap is assumed the same. VERIFY against the real
-  # league's roster settings in the room before pick 1 (store.league).
+  # next name on the clock. Read off the room store (settings.settings.
+  # position_draft_caps) in room 10799518: RB 6, WR 8, TE 4, QB 4, K 4,
+  # DEF 4. The engine already holds QB and TE at 2 and K/DEF at 1. VERIFY
+  # the real league's caps in the room before pick 1 (same store path).
   position_max:
     RB: 6
-    WR: 6
+    WR: 8
+    TE: 4
+    QB: 4
 
 tiers:
   break_z: 0.5
