@@ -68,8 +68,29 @@ SOURCE_GAMES_CONVENTION = {
     "fantasypros_sheet": {"ratio": 0.98, "already_discounted": False},
     "espn_projections": {"ratio": 0.98, "already_discounted": False},
     "sleeper_rotowire": {"ratio": 0.92, "already_discounted": True},
+    # The DraftSheet tab's own PTS (user decision 2026-09-04, DECISIONS #45):
+    # the sheet's Zscore Projection, an average of its Aggregate LOW/AVG/HIGH
+    # and the ECR tab's Pts. The Aggregate lines are the tab line / 17 x
+    # (16 - RISK-tab missed games by ECR rank), so the number is ALREADY a
+    # 16-game total less a durability haircut. Basis 16 and discounted, so
+    # proj_pts equals the page's number and no games scale touches it twice.
+    "fantasypros_sheet_headline": {"ratio": None, "already_discounted": True, "basis_games": 16.0},
 }
 DISCOUNTED_SOURCES = tuple(k for k, v in SOURCE_GAMES_CONVENTION.items() if v["already_discounted"])
+
+
+def source_basis_expr() -> pl.Expr:
+    """Per-row games basis of the `source` column: the season length its
+    line is stated on (LINE_GAMES unless the convention table says
+    otherwise). projections.external_projection divides by THIS, not by the
+    constant, so a source stated on 16 games is not rescaled as if it were 17."""
+    expr = pl.lit(LINE_GAMES)
+    for name, conv in SOURCE_GAMES_CONVENTION.items():
+        if conv.get("basis_games") is not None:
+            expr = pl.when(pl.col("source") == name).then(pl.lit(float(conv["basis_games"]))).otherwise(expr)
+    return expr
+
+
 SCHEMA = {"sleeper_id": pl.Utf8, "name": pl.Utf8, "pos": pl.Utf8, "team": pl.Utf8,
           "pts17": pl.Float64, "source": pl.Utf8, "as_of": pl.Utf8, "line": pl.Utf8}
 # what combine() emits: the schema plus the dispersion across sources (plan A1)
@@ -162,15 +183,58 @@ def parse_sheet_tab(rows: list[tuple], pos: str, bump_col: int | None = None) ->
     return out
 
 
-def from_sheet(path: Path, scoring: dict, index, as_of: str) -> tuple[pl.DataFrame, list[str]]:
+def _sheet_name_key(name) -> str:
+    return str(name).replace("\xa0", " ").replace("Â", "").strip()
+
+
+def parse_draftsheet(rows: list[tuple]) -> dict[str, float]:
+    """The DraftSheet tab's PTS per player name: the number the sheet's
+    reader sees. The tab lays out several position blocks side by side, each
+    headed by a NAME ... PTS row; a block ends at its first blank NAME cell."""
+    out: dict[str, float] = {}
+    for i, r in enumerate(rows):
+        hdr = [str(c).strip() if c is not None else "" for c in r]
+        if "NAME" not in hdr:
+            continue
+        for j, h in enumerate(hdr):
+            if h != "NAME" or "PTS" not in hdr[j:]:
+                continue
+            pts = hdr.index("PTS", j)
+            for rr in rows[i + 1:]:
+                name = rr[j] if j < len(rr) else None
+                if not (isinstance(name, str) and _sheet_name_key(name)):
+                    break
+                v = rr[pts] if pts < len(rr) else None
+                if isinstance(v, (int, float)):
+                    out.setdefault(_sheet_name_key(name), float(v))
+    return out
+
+
+def from_sheet(path: Path, scoring: dict, index, as_of: str, line: str = "tab") -> tuple[pl.DataFrame, list[str]]:
     """The sheet's consensus lines in the common schema. `index` is a
-    SleeperIndex (name, pos, team -> sleeper_id). Returns (frame, unmatched)."""
+    SleeperIndex (name, pos, team -> sleeper_id). Returns (frame, unmatched).
+
+    line="tab": the position tab's line scored in league settings plus the
+    rookie bump (the tab's own AVG cell), a 17-game total, source
+    `fantasypros_sheet`. line="headline": the DraftSheet tab's PTS, the
+    number the sheet's reader sees (source `fantasypros_sheet_headline`,
+    basis 16, see SOURCE_GAMES_CONVENTION). A tab player the DraftSheet does
+    not list is brought onto that basis at his position's median
+    headline/tab ratio; the count is logged.
+    """
+    if line not in ("tab", "headline"):
+        raise ValueError(f"sheet_line must be tab or headline, got {line!r}")
     import openpyxl
     wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
     # a second pass for FORMULAS, only to locate the rookie-bump column: the
     # values pass cannot see formulas and the column sits at no fixed letter
     wf = openpyxl.load_workbook(path, read_only=True, data_only=False)
-    rows, unmatched, bumped = [], [], 0
+    headline: dict[str, float] = {}
+    if line == "headline":
+        if "DraftSheet" not in wb.sheetnames:
+            raise ValueError(f"{path.name} has no DraftSheet tab; sheet_line: headline needs it")
+        headline = parse_draftsheet(list(wb["DraftSheet"].iter_rows(values_only=True)))
+    rows, unmatched, bumped, no_headline = [], [], 0, 0
     for pos in SHEET_COLS:
         bump_col = sheet_bump_column(wf[pos])
         for p in parse_sheet_tab(list(wb[pos].iter_rows(values_only=True)), pos, bump_col):
@@ -199,13 +263,46 @@ def from_sheet(path: Path, scoring: dict, index, as_of: str) -> tuple[pl.DataFra
             if len(trio) == 3:
                 mu = sum(trio) / 3.0
                 band = (sum((x - mu) ** 2 for x in trio) / 3.0) ** 0.5
+            pts, source = base, "fantasypros_sheet"
+            if line == "headline":
+                h = headline.get(_sheet_name_key(p["name"]))
+                if h is None:
+                    no_headline += 1
+                    pts, source = None, "fantasypros_sheet_headline"   # estimated below
+                else:
+                    pts, source = h, "fantasypros_sheet_headline"
+                    # the sheet's range, carried in the headline's own units:
+                    # the same relative spread around the number it reports
+                    if band is not None and base > 0:
+                        band = band * h / base
             rows.append({"sleeper_id": str(sid), "name": p["name"], "pos": pos, "team": p["team"],
-                         "pts17": base,
-                         "source": "fantasypros_sheet", "as_of": as_of,
+                         "pts17": pts, "_base": base,
+                         "source": source, "as_of": as_of,
                          "line": json.dumps(p["line"], sort_keys=True),
                          "pts17_band": band})
     if bumped:
         log.info("sheet: rookie bump applied to %d players", bumped)
+    if line == "headline":
+        # A tab player the DraftSheet does not list (it VLOOKUPs the ECR tab,
+        # so these are players outside the sheet's ECR) gets the tab line
+        # brought onto the headline's basis by his position's median
+        # headline/tab ratio. Leaving him on the 17-game tab basis promoted
+        # Ja'Kobi Lane 64 value ranks on the 2026-09-04 build for no reason
+        # but the basis.
+        ratio: dict[str, float] = {}
+        for pos in SHEET_COLS:
+            rs = sorted(r["pts17"] / r["_base"] for r in rows
+                        if r["pos"] == pos and r["pts17"] is not None and r["_base"] > 0)
+            ratio[pos] = rs[len(rs) // 2] if rs else 16.0 / LINE_GAMES
+        for r in rows:
+            if r["pts17"] is None:
+                r["pts17"] = r["_base"] * ratio[r["pos"]]
+                if r["pts17_band"] is not None:
+                    r["pts17_band"] = r["pts17_band"] * ratio[r["pos"]]
+        log.info("sheet: DraftSheet headline used for %d players, %d estimated from the tab line "
+                 "at the position's median ratio", len(rows) - no_headline, no_headline)
+    for r in rows:
+        r.pop("_base", None)
     return (_frame(rows, {**SCHEMA, "pts17_band": pl.Float64})
             .unique(subset="sleeper_id", keep="first"), unmatched)
 
@@ -362,7 +459,8 @@ def load_external(cfg, index, getter=None) -> tuple[pl.DataFrame, dict]:
             if not path.exists():
                 report["sources"].append({"source": "sheet", "rows": 0, "error": f"missing {path.name}"})
                 continue
-            f, unmatched = from_sheet(path, scoring, index, as_of=str(ext.get("sheet_as_of", "")))
+            f, unmatched = from_sheet(path, scoring, index, as_of=str(ext.get("sheet_as_of", "")),
+                                      line=str(ext.get("sheet_line", "tab")))
             report["sheet_unmatched"] = unmatched
         elif name == "sleeper":
             try:

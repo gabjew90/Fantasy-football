@@ -149,6 +149,19 @@ projections:
   external:
     sources: [sheet]
     combine: first
+    # Which of the sheet's numbers IS the projection (user decision
+    # 2026-09-04, DECISIONS #45). `tab` is the position tab's line scored in
+    # league settings plus the rookie bump (the tab's AVG cell, a 17-game
+    # total, scaled 16/17 by the board). `headline` is the DraftSheet tab's
+    # PTS, the number the sheet's reader sees: the sheet's Zscore
+    # Projection, an average of its Aggregate LOW/AVG/HIGH (tab line / 17 x
+    # (16 - RISK-tab missed games by ECR rank)) and the ECR tab's own Pts.
+    # Median 0.82 of the tab number, rank order within position 0.975-0.996
+    # the same; what moves is the gaps, and the engine runs on gaps. Chosen
+    # so the engine and the page agree on every number, not on a measurement
+    # of the rank-based durability haircut it carries (the games-table
+    # analogue was a wash at QB/WR/TE, DECISIONS #31).
+    sheet_line: headline
   # OFF on the sheet path. The rule zeroes any depth-chart backup the market
   # does not rank as a starter. That was a crutch for the usage MODEL, whose
   # per-game rate cannot say "he will not start". A consensus sheet already
@@ -171,3 +184,12 @@ flex_split:            # derived by scripts/derive_flex_split.py (plan A4); a le
   TE: 0.000
   derived: 2026-09-02
   board: tiers.keefamania.csv
+
+# Late-round dispersion ON for this league (user, 2026-09-04): from
+# upside_from_round the shortlist ranks on mean + dispersion_lambda x the
+# player's own published range (proj_band, the sheet's high/low rows) in
+# place of the flat 1.15 upside multiplier. proj_sd is zero on one source, so
+# the band is the only dispersion the tracker can see. League-scoped because
+# Omnibeta has no band (model path) and is in season.
+engine:
+  late_round_dispersion: true

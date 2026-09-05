@@ -2884,3 +2884,91 @@ after the driver started, RANKED ON 181.2 = 93.2 + 88.0; pick 12 Josh Allen,
 whom the model board had passed for four rounds in room 10703362.
 
 Commits: 9be946d (switch), afeb60d (page board), 2a2eb53 (ADP refresh).
+
+## 2026-09-04 (45) — "the sheet" means the DraftSheet headline, not the position tab
+
+User, reviewing room 10714820 pick 49 (Davante Adams): the page shows Adams
+at 140, the board said 176.7. The board was reproducing the position tab's
+AVG cell (x 16/17), which #44 recorded as "the sheet". The sheet carries
+three numbers per player, from its own formulas:
+
+* position tab AVG: the stat line scored in the Scoring tab plus the rookie
+  bump, a 17-game total (Adams 187.8);
+* Aggregate AVG = tab AVG / 17 x (16 - Missed Games), Missed Games from the
+  RISK tab keyed by the player's ECR rank slot (QB1 2.12, WR23 3.16), a
+  durability curve by rank and not player knowledge (Adams 141.9);
+* DraftSheet PTS = AVERAGE(Aggregate LOW, AVG, HIGH, ECR!Pts), the sheet's
+  "Zscore Projection" and the number the reader sees (Adams 140.3). ECR!Pts
+  is a second line; for Allen and JSN it equals the Aggregate AVG, for Adams,
+  Rice and Love it is lower.
+
+Measured (scratch, 190 board players): headline / tab-basis median 0.82,
+range 0.68-1.23; rank correlation within position 0.994 QB, 0.996 RB, 0.995
+WR, 0.975 TE; five players move 5+ places. The order is the same. The gaps
+are not, and the engine runs on gaps.
+
+DECISION (user: "b"): `projections.external.sheet_line: headline` in
+leagues/keefamania.yaml. Under "solely the sheet", the number the user
+checks the engine against is the page's number, and matching it removes a
+permanent source of confusion at no cost in order. It is NOT a measurement
+of the rank-based durability haircut the headline carries: the games-table
+analogue was a wash at QB/WR/TE and an improvement at RB (#31), and the
+ECR!Pts term is ungated. Recorded as a definition of the input, not a
+projection claim.
+
+Implementation. `external.from_sheet(line=...)`: `tab` (unchanged default)
+or `headline`, which reads `parse_draftsheet` (NAME/PTS blocks) and emits
+source `fantasypros_sheet_headline`. `SOURCE_GAMES_CONVENTION` gains
+`basis_games: 16.0` for it, `already_discounted: True`, and
+`external_projection` divides by `source_basis_expr()` per row instead of
+the 17 constant, so proj_pts equals the page and no games scale touches it
+twice. A tab player the DraftSheet does not list (it VLOOKUPs the ECR tab)
+is brought onto the basis at his position's median headline/tab ratio: left
+on the 17-game tab line, Ja'Kobi Lane rose 64 value ranks on the first
+rebuild for no reason but the basis. The band is carried at the same
+relative spread. Tests: loader fixture with a DraftSheet tab, the basis
+expression, and a parity test that every page player's proj_pts equals the
+DraftSheet PTS on the real workbook (188 of 188; the two "misses" are
+Jacobs and Charbonnet, zeroed by the `out` rule as intended). Omnibeta
+byte-identical (board_identity). Suite 711 passed.
+
+Board consequences: 225 players (189 headline incl. Lane estimated, 36 K/DEF
+synthetic). Value-rank movers 10+: 34 of 225. QB compresses (Herbert up 13,
+Jones down 41, Darnold down 21), TE up (Kraft, Okonkwo, Johnson), McCaffrey
+falls behind Nacua/JSN/Brown at picks 3-7. The K/DEF synthetic lines
+(150/135, 1.5/2.0 per rank) did NOT shrink, so K and DEF climb the value
+ranks (Folk 129 -> 118); their DRAFT timing did not move (below).
+
+Churn, tab board vs headline board, same engine, ten seats of the Omnibeta
+log (scratch board_churn.py): 66 of 150 picks (44%), R1:4 R3:7 R4:7 R5:6
+R6:8 R7:4 R8:7 R9:3 R10:5 R11:4 R12:6 R13:5; positions left QB10 RB33 TE3
+WR20, taken QB10 RB30 TE5 WR21. K taken round 14.2 on both, DEF 14.8 on both.
+Shapes: QB2 RB6 WR4 TE1 in 9 of 10 seats before, 7 of 10 after (two TE2
+rosters appear). Churn is a diagnostic (gates measure quality, not churn);
+the replays cannot adjudicate a projection source (#44), so no outcome
+claim is made.
+
+Point-denominated thresholds left as they were and noted: planner NEAR_TIE
+1.0, the 2.0-point near-tie window and the "waiting costs" 1.0 floor in
+tracker, bench insurance edges. On a scale 18% smaller they bind slightly
+more often. Not retuned.
+
+Same session, same league file: `engine.late_round_dispersion: true`
+(league-scoped; Omnibeta stays false). Offline churn 0 of 150 picks vs off,
+and room 10714820 (seat 9, dispersion on) showed no visible effect: the knob
+picks the representative inside a market from round 8, and by then the open
+markets are K and DEF. The bench path never reads the band. Recorded so
+nobody credits or blames it for a pick.
+
+Also this session (reports/survival_shown_diagnostic.md, commit 31994c7):
+on the players the engine actually shows, survival is over-promised in
+every bucket (81% shown / 49% survived, n=1474), and the split is distance
+past ADP, not the Yahoo ranking source. Players still ahead of their ADP
+are calibrated (98/97); players 5+ picks past it survive 41-46% against
+93-96% shown; windows of 5+ rivals 75/22. Mechanism: the per-rival draw is a
+Gaussian lottery in (pick - ADP) over the whole pool, so a faller loses
+weight as he falls and every player is diluted by pool size. A `rival_draw`
+study (Gaussian lottery | floored | noisy order), fitted through
+survival_refit leave-one-room-out, is the next pre-registration; a display
+calibration map would not reach the decision (e_best_next is the raw
+simulation's joint expectation). Not run yet.

@@ -17,6 +17,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import polars as pl
 import pytest
 
 from draftkit import external as X
@@ -165,3 +166,30 @@ def test_the_band_is_carried_and_zero_means_the_panel_agreed(loaded):
 def test_nothing_is_dropped_when_every_name_resolves(loaded):
     _f, unmatched, _s = loaded
     assert unmatched == []
+
+
+def test_the_headline_line_reproduces_the_draftsheet_page(cached):
+    """sheet_line: headline. proj_pts must be the number the sheet's reader
+    sees: DraftSheet PTS, on the board with no further games scaling."""
+    import openpyxl
+    cfg = Config.load(league="keefamania")
+    scoring = cfg.get("scoring") or (cfg.get("expected") or {}).get("scoring") or {}
+    frame, _ = X.from_sheet(SHEET, scoring, _PassThrough(), as_of="test", line="headline")
+    page = X.parse_draftsheet(list(openpyxl.load_workbook(SHEET, data_only=True)["DraftSheet"].iter_rows(values_only=True)))
+    assert len(page) >= 200
+    hl = frame.filter(pl.col("source") == "fantasypros_sheet_headline")
+    on_page = [r for r in hl.iter_rows(named=True) if r["name"].strip() in page]
+    assert len(on_page) >= 180, f"only {len(on_page)} tab players found on the DraftSheet"
+    # the rest are estimated at the position's median ratio: exactly the tab
+    # players the DraftSheet does not list (it VLOOKUPs the ECR tab), and on
+    # the production board (Sleeper index + market join) that is a handful
+    # of deep players, never a drafted name
+    assert hl.height - len(on_page) == sum(1 for r in hl.iter_rows(named=True) if r["name"].strip() not in page)
+    est = hl.filter(~pl.col("name").str.strip_chars().is_in(list(page)))
+    assert est["pts17"].null_count() == 0
+    bad = [(r["name"], r["pts17"], page[r["name"].strip()]) for r in on_page
+           if abs(r["pts17"] - page[r["name"].strip()]) >= 0.01]
+    assert not bad, bad[:10]
+    # the basis: the page number is 16 games less a haircut, never rescaled
+    scaled = frame.with_columns(X.source_basis_expr().alias("b"))
+    assert set(scaled.filter(pl.col("source") == "fantasypros_sheet_headline")["b"].to_list()) == {16.0}

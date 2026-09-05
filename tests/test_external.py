@@ -157,3 +157,48 @@ def test_non_starters_go_to_zero_only_when_depth_chart_and_market_agree():
     assert g["rb3"]["proj_pts"] == 0.0 and g["rb3"]["contingent_of"] is None, "no order-1 RB known on team E"
     assert g["hback"]["proj_pts"] == 60.0, "a TE filed under the RB chart is left alone"
     assert "_mkt_rank" not in out.columns
+
+
+def test_from_sheet_headline_reads_the_draftsheet_pts_on_a_16_game_basis(tmp_path):
+    """line="headline": the DraftSheet PTS becomes the line, the source names
+    the basis, and a tab player the DraftSheet does not list is brought onto
+    that basis at his position's median headline/tab ratio."""
+    import openpyxl
+    wb = openpyxl.Workbook()
+    wb.remove(wb.active)
+    for pos, hdr in (("QB", ["Player", "Team"] + ["x"] * 9), ("RB", ["Player", "Team"] + ["x"] * 7),
+                     ("WR", ["Player", "Team"] + ["x"] * 7), ("TE", ["Player", "Team"] + ["x"] * 4)):
+        wb.create_sheet(pos).append(hdr)
+    wb["RB"].append(["Jahmyr Gibbs", "DET", 275.2, 1383.7, 13.8, 71.3, 581.1, 4.1, 1.1])
+    wb["RB"].append([None, "high", 283.5, 1422, 15, 74, 625, 5, 1])
+    wb["RB"].append([None, "low", 263, 1353, 12, 67.9, 546.4, 3.4, 1.3])
+    wb["RB"].append(["Bijan Robinson", "ATL", 285.8, 1391.1, 8.8, 76.9, 705.6, 3.5, 1.8])
+    ds = wb.create_sheet("DraftSheet")
+    ds.append(["RUNNING BACK", None, None, None, None, None, None, None, "WIDE RECEIVER"])
+    ds.append(["TIER", "NAME", "TM/BYE", "PTS", "VALUE", "PS", "ECR", None, "TIER", "NAME", "TM/BYE", "PTS"])
+    ds.append([1, "Jahmyr Gibbs", "DET/6", 266.86, 133.8, 0.9, "RB1", None, 1, "Puka Nacua", "LAR/11", 232.5])
+    ds.append([None, None, None, None, None, None, None, None, 1, "Ja'Marr Chase", "CIN/6", 230.1])
+    p = tmp_path / "sheet.xlsx"
+    wb.save(p)
+    idx = FakeIndex({("Jahmyr Gibbs", "RB"): "4866", ("Bijan Robinson", "RB"): "9509"})
+    df, unmatched = X.from_sheet(p, HALF, idx, as_of="2026-09-01", line="headline")
+    assert unmatched == []
+    rows = {r["name"]: r for r in df.iter_rows(named=True)}
+    g = rows["Jahmyr Gibbs"]
+    assert g["source"] == "fantasypros_sheet_headline" and abs(g["pts17"] - 266.86) < 1e-9
+    # the band rides along in the headline's units: same relative spread
+    tab = X.from_sheet(p, HALF, idx, as_of="x", line="tab")[0].filter(pl.col("name") == "Jahmyr Gibbs").row(0, named=True)
+    assert abs(g["pts17_band"] / g["pts17"] - tab["pts17_band"] / tab["pts17"]) < 1e-9
+    # not on the DraftSheet: the tab line brought onto the headline basis by
+    # the position's median headline/tab ratio (here Gibbs alone sets it)
+    b = rows["Bijan Robinson"]
+    assert b["source"] == "fantasypros_sheet_headline"
+    assert abs(b["pts17"] - 318.32 * 266.86 / 337.33) < 0.1
+    assert X.parse_draftsheet(list(openpyxl.load_workbook(p, data_only=True)["DraftSheet"].iter_rows(values_only=True))) \
+        == {"Jahmyr Gibbs": 266.86, "Puka Nacua": 232.5, "Ja'Marr Chase": 230.1}
+
+
+def test_source_basis_expr_puts_the_headline_on_16_games_and_everything_else_on_17():
+    df = pl.DataFrame({"source": ["fantasypros_sheet", "fantasypros_sheet_headline", "sleeper_rotowire", None]})
+    assert df.select(X.source_basis_expr().alias("b"))["b"].to_list() == [17.0, 16.0, 17.0, 17.0]
+    assert "fantasypros_sheet_headline" in X.DISCOUNTED_SOURCES

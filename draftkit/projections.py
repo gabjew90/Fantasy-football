@@ -319,19 +319,22 @@ def external_projection(cfg, usage: pl.DataFrame, market: pl.DataFrame) -> pl.Da
     src = pl.col("source").fill_null("none")
     discounted = pl.any_horizontal([src == s for s in X.DISCOUNTED_SOURCES]) if X.DISCOUNTED_SOURCES else pl.lit(False)
     df = df.with_columns(pl.when(discounted).then(pl.lit(float(games))).otherwise(pl.col("_games")).alias("_games"))
-    df = df.with_columns((pl.col("pts17") * pl.col("_games") / X.LINE_GAMES).alias("proj_pts"),
+    # the line's own season basis per source (17 for a full-season line; the
+    # DraftSheet headline is stated on 16 less a haircut): external.source_basis_expr
+    df = df.with_columns(X.source_basis_expr().alias("_basis"))
+    df = df.with_columns((pl.col("pts17") * pl.col("_games") / pl.col("_basis")).alias("proj_pts"),
                          pl.coalesce(pl.col("source"), pl.lit("none")).alias("proj_source")).drop("pts17", "source")
     # plan A1: dispersion across sources on the same basis as proj_pts
     if disp:
         df = df.with_columns(
             pl.col("n_sources").fill_null(0).cast(pl.Int64),
-            *[(pl.col(src) * pl.col("_games") / X.LINE_GAMES).alias(dst)
+            *[(pl.col(src) * pl.col("_games") / pl.col("_basis")).alias(dst)
               for src, dst in (("pts17_sd", "proj_sd"), ("pts17_hi", "proj_hi"),
                                ("pts17_lo", "proj_lo"), ("pts17_band", "proj_band"))
               if src in df.columns],
         ).drop([c for c in ("pts17_sd", "pts17_hi", "pts17_lo", "pts17_band")
                 if c in df.columns])
-    df = df.drop("_games")
+    df = df.drop("_games", "_basis")
 
     # K/DEF: no stat lines in either source; the synthetic ECR-linear
     # projection stays (near-fungible positions, small VORP spreads)
