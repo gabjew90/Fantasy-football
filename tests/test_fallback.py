@@ -114,9 +114,20 @@ def test_recommendations_are_insensitive_to_a_baseline_shift():
     a = _lineup({})
     b = _lineup({"QB": 25.0, "TE": -12.0})   # as if QB10/TE8 -> QB5/TE11
     assert a.adaptive_fallback and b.adaptive_fallback
-    top_a = [p["sleeper_id"] for _s, _w, p in a.recommendations(top_n=3)]
-    top_b = [p["sleeper_id"] for _s, _w, p in b.recommendations(top_n=3)]
-    assert top_a == top_b, f"{top_a} != {top_b}"
+    recs_a, recs_b = a.recommendations(top_n=3), b.recommendations(top_n=3)
+    assert recs_a[0][2]["sleeper_id"] == recs_b[0][2]["sleeper_id"]
+    # stage 2's number (points over the player I'd otherwise end up with)
+    # never moves with the baseline
+    va = {p["sleeper_id"]: p["_staged"].get("value") for _s, _w, p in recs_a if p.get("_staged")}
+    vb = {p["sleeper_id"]: p["_staged"].get("value") for _s, _w, p in recs_b if p.get("_staged")}
+    for sid in set(va) & set(vb):
+        if va[sid] is not None and vb[sid] is not None:
+            assert abs(va[sid] - vb[sid]) < 1e-6, sid
+    # The tail can move: the survival sim scores a market with no survivor at
+    # 0 (replacement level), so a shift leaks into urgency by shift x P(the
+    # market empties in the window), which on this tiny board is not 0. That
+    # leak only reaches the ranking through stage 1 on markets that can
+    # empty, never through the winner's value.
 
 
 def test_turning_the_fallback_off_restores_the_old_sensitivity():
@@ -125,12 +136,19 @@ def test_turning_the_fallback_off_restores_the_old_sensitivity():
     a, b = _lineup({}), _lineup({"QB": 90.0})
     a.adaptive_fallback = b.adaptive_fallback = False
     assert Tracker.adaptive_fallback is True     # default stays on
-    top_a = [p["sleeper_id"] for _s, _w, p in a.recommendations(top_n=1)]
-    top_b = [p["sleeper_id"] for _s, _w, p in b.recommendations(top_n=1)]
-    assert top_a != top_b, "the A/B is meaningless if both arms agree"
+    # with the fallback off, stage 2 prices on the VORP level, so the QB
+    # row's value moves with the shift (the staged ranker still lets urgency
+    # pick the position first, so the winner need not change)
+    def qb_value(t):
+        from draftkit.staged import staged_value
+        needs = t.my_needs()
+        p = next(p for _s, _w, p in t.recommendations(top_n=6) if p["pos"] == "QB")
+        return staged_value(p, needs, t._fallback_points(needs) if t.adaptive_fallback else None)
+    assert qb_value(b) - qb_value(a) > 80.0, "the A/B is meaningless if both arms agree"
 
     # ...and the same shift leaves the adaptive arm alone
     c, d = _lineup({}), _lineup({"QB": 90.0})
+    assert abs(qb_value(c) - qb_value(d)) < 1e-6
     assert ([p["sleeper_id"] for _s, _w, p in c.recommendations(top_n=1)]
             == [p["sleeper_id"] for _s, _w, p in d.recommendations(top_n=1)])
 

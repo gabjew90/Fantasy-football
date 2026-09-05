@@ -61,56 +61,52 @@ def test_contingency_never_stacks_on_my_own_handcuff():
     assert r["handcuff"] and r["contingency"] == 0.0
 
 
-def test_tracker_contingency_knob_raises_a_rivals_backup_and_says_why():
-    # without my own handcuff on the board, the rival's backup is the RB row
-    board = [copy.deepcopy(p) for p in BENCH_BOARD if p["sleeper_id"] not in ("rb_cuff", "rb_depth")]
-    rival = player("rival_rb", "RB", 70, 70, 3.0)
-    rival["proj_pts"] = 250.0
-    cuff2 = player("rb_cuff2", "RB", 2.5, 2.5, 121.0, rank=35)
-    cuff2["proj_pts"] = 110.0
-    cuff2["backs_up"] = "rival_rb"
-    board += [rival, cuff2]
-    off = _bench_tracker(board, bench_contingency=False)
-    on = _bench_tracker(board, bench_contingency=True)
-    for t in (off, on):
+def test_a_rivals_backup_is_always_priced_for_the_role_shift():
+    """Staged bench (2026-09-05): the offensive term is part of insurance, no
+    knob. The same back priced with and without a rival starter to inherit."""
+    def board_with(backs_up):
+        board = [copy.deepcopy(p) for p in BENCH_BOARD if p["sleeper_id"] not in ("rb_cuff", "rb_depth")]
+        rival = player("rival_rb", "RB", 70, 70, 3.0)
+        rival["proj_pts"] = 250.0
+        cuff2 = player("rb_cuff2", "RB", 2.5, 2.5, 121.0, rank=35)
+        cuff2["proj_pts"] = 110.0
+        cuff2["backs_up"] = backs_up
+        return board + [rival, cuff2]
+    plain = _bench_tracker(board_with(""))
+    cuff = _bench_tracker(board_with("rival_rb"))
+    for t in (plain, cuff):
         t.state.drafted_ids.add("rival_rb")        # on a rival's roster, not on the wire
-    row_off = next(r for r in off.recommendations(10) if r[2]["sleeper_id"] == "rb_cuff2")
-    row_on = next(r for r in on.recommendations(10) if r[2]["sleeper_id"] == "rb_cuff2")
-    assert row_on[0] > row_off[0]
-    assert "role shift if rival_rb goes down" in row_on[1]
-    assert "role shift" not in row_off[1]
+    row_plain = next(r for r in plain.recommendations(10) if r[2]["sleeper_id"] == "rb_cuff2")
+    row_cuff = next(r for r in cuff.recommendations(10) if r[2]["sleeper_id"] == "rb_cuff2")
+    assert row_cuff[2]["_staged"]["insurance"] > row_plain[2]["_staged"]["insurance"]
+    assert "role shift if rival_rb goes down" in row_cuff[1]
+    assert "role shift" not in row_plain[1]
 
 
 # --------------------------------------------------------- survival drop-off
 
-def test_survival_discount_ranks_bench_rows_on_cost_of_waiting():
-    # rb_cuff (my handcuff) is the bigger insurance number but certain to be
-    # there next turn; qb2 is smaller and 20% to survive. Raw insurance takes
-    # rb_cuff (the shipped behaviour); the drop-off takes qb2 now, rb_cuff later.
+def test_timing_multiplier_takes_the_scarce_item_first():
+    """Staged bench: score = insurance x (1 - survival). rb_cuff (my handcuff)
+    is the bigger insurance number but certain to be there next turn, so he
+    scores 0 and waits; qb2 is smaller and 20% to survive, so he goes now."""
     surv = {"RB": {"rb_depth": 1.0, "rb_cuff": 1.0}, "QB": {"qb2": 0.2}}
-    off = _bench_tracker(bench_survival_discount=False)
-    off.urgency_report = _fake_report(surv)
-    on = _bench_tracker(bench_survival_discount=True)
-    on.urgency_report = _fake_report(surv)
-    assert off.recommendations(5)[0][2]["sleeper_id"] == "rb_cuff"
-    top = on.recommendations(5)[0]
-    assert top[2]["sleeper_id"] == "qb2"
-    assert "waiting likely costs" in top[1] and "20% he is still there" in top[1]
+    t = _bench_tracker()
+    t.urgency_report = _fake_report(surv)
+    rows = t.recommendations(5)
+    top = rows[0]
+    assert top[2]["sleeper_id"] == "qb2", [(r[2]["sleeper_id"], round(r[0], 2)) for r in rows]
+    assert "timing: 20% he is still there" in top[1] and "BENCH STAGED" in top[1]
+    cuff = next(r for r in rows if r[2]["sleeper_id"] == "rb_cuff")
+    assert cuff[0] == 0.0 and cuff[2]["_staged"]["insurance"] > top[2]["_staged"]["insurance"]
 
 
-def test_survival_discount_is_the_expected_best_operator_not_one_minus_s():
-    # rb_cuff at 50% with rb_depth (a close second) certain to be there:
-    # waiting costs P(first gone) x the GAP to the second, not (1 - s) x his
-    # whole value.
+def test_bench_score_is_insurance_times_one_minus_survival():
     surv = {"RB": {"rb_cuff": 0.5, "rb_depth": 1.0}, "QB": {"qb2": 1.0}}
-    off = _bench_tracker(bench_survival_discount=False)
-    off.urgency_report = _fake_report(surv)
-    on = _bench_tracker(bench_survival_discount=True)
-    on.urgency_report = _fake_report(surv)
-    value = {r[2]["sleeper_id"]: r[0] for r in off.recommendations(10)}["rb_cuff"]
-    cost = {r[2]["sleeper_id"]: r[0] for r in on.recommendations(10)}["rb_cuff"]
-    assert value > 0
-    assert 0.0 <= cost < 0.25 * value          # (1 - s) x value would be 0.5 x value
+    t = _bench_tracker()
+    t.urgency_report = _fake_report(surv)
+    row = next(r for r in t.recommendations(10) if r[2]["sleeper_id"] == "rb_cuff")
+    ins = row[2]["_staged"]["insurance"]
+    assert ins > 0 and abs(row[0] - 0.5 * ins) < 0.06
 
 
 def test_missing_survival_counts_as_certain():
@@ -164,10 +160,20 @@ def test_a_back_below_the_wire_sorts_below_a_receiver_above_it():
     and the receiver above his wire heads the bench list."""
     t = _pool(_rod_sutton_board())
     bench = [r for r in t.recommendations(10) if str(r[1]).startswith("bench insurance")]
-    assert bench and bench[0][2]["sleeper_id"] == "sutton", [(r[2]["sleeper_id"], round(r[0], 2)) for r in bench]
-    assert all(r[2]["sleeper_id"] != "rodriguez" for r in bench)
-    rb = next(r for r in bench if r[2]["pos"] == "RB")
-    assert rb[2]["sleeper_id"].startswith("rb_wire") and rb[0] < bench[0][0]
+    ids = [r[2]["sleeper_id"] for r in bench]
+    assert bench and ids[0] == "sutton", [(r[2]["sleeper_id"], round(r[0], 2)) for r in bench]
+    # the staged bench pools every position: Rodriguez (negative insurance)
+    # never sits above anyone at or above his wire
+    if "rodriguez" in ids:
+        rod = next(r for r in bench if r[2]["sleeper_id"] == "rodriguez")
+        assert rod[2]["_staged"]["insurance"] < 0
+        assert all(r[2]["_staged"]["insurance"] >= 0 for r in bench[:ids.index("rodriguez")]), ids
+    # and priced directly, the wire's own back is worth about nothing, Rodriguez less
+    t2 = _pool(_rod_sutton_board())
+    cands: list = []
+    t2._bench_candidates(cands, t2.my_needs(), t2._my_pos_counts(), 11, 8, False)
+    by = {c[2]["sleeper_id"]: c[2]["_staged"]["insurance"] for c in cands}
+    assert by["sutton"] > 0
 
 
 def _twins_board(**edits):
@@ -190,9 +196,10 @@ def test_bench_ties_break_on_the_ceiling_never_the_width():
     # no high line: projection plus half the band stands in
     t = _pool(_twins_board(a={"proj_hi": None, "proj_band": 10.0}, b={"proj_hi": None, "proj_band": 30.0}))
     assert t.recommendations(5)[0][2]["sleeper_id"] == "twin_b"
-    # neither on one side: the order is left alone (twin_a is first on the board)
+    # no range on one side: a published ceiling beats none (staged bench,
+    # 2026-09-05: a lottery ticket with a known upside over one with no range)
     t = _pool(_twins_board(a={"proj_hi": None, "proj_band": None}, b={"proj_hi": 140.0, "proj_band": 5.0}))
-    assert t.recommendations(5)[0][2]["sleeper_id"] == "twin_a"
+    assert t.recommendations(5)[0][2]["sleeper_id"] == "twin_b"
 
 
 def test_knobs_are_registered_and_default_off():
@@ -204,38 +211,38 @@ def test_knobs_are_registered_and_default_off():
 
 # ---------------------------------------------------------- two-pick form
 
-def test_two_pick_takes_the_scarce_item_first_and_the_safe_one_when_picks_run_out():
-    """rb_cuff is the bigger insurance number (about 28) and certain to be
-    there next turn; qb2 is smaller (about 10) and 20% to survive. Two-pick:
-    qb2-now + rb_cuff-next (10 + 28) beats rb_cuff-now + qb2-next (28 + 2),
-    so the scarce small item goes first and the safe big one waits. At the
-    LAST bench pick the partner term is zero and rb_cuff wins on value."""
+def test_the_last_bench_pick_ranks_on_insurance_alone():
+    """With no bench pick after this one there is nothing to wait for: the
+    timing multiplier is dropped and rb_cuff (the bigger insurance number,
+    certain to survive) is the row, not the 20% qb2."""
     surv = {"RB": {"rb_cuff": 1.0, "rb_depth": 1.0}, "QB": {"qb2": 0.2}}
-    t = _bench_tracker(bench_two_pick=True)
-    t.urgency_report = _fake_report(surv)
-    top = t.recommendations(5)[0]
-    assert top[2]["sleeper_id"] == "qb2", top[1]
-    assert "two-pick" in top[1] and "the RB expected at your next turn" in top[1]
-    # last bench pick: 7 starters + 5 bench rostered, K and DEF still owed, so
-    # picks_left is 3 and no bench pick follows this one
-    # the five bench bodies are WR/TE pads, so rb_cuff keeps his RB insurance
-    # (an RB pad on the bench would sit ahead of him and flatten it)
+    # 7 starters + 5 bench rostered, K and DEF still owed, so picks_left is 3
+    # and no bench pick follows this one; the five bench bodies are WR/TE pads
     last = make_tracker(BENCH_BOARD, MY_LINEUP + ["pad1", "pad2", "pad4", "pad5", "pad7"], current_pick=131)
     last.bench_insurance = True
-    last.bench_two_pick = True
     last.urgency_report = _fake_report(surv)
     rows = last.recommendations(5)
     assert rows and rows[0][2]["sleeper_id"] == "rb_cuff", [r[2]["sleeper_id"] for r in rows]
-    assert "last bench pick: value alone" in rows[0][1]
+    assert "insurance alone (last bench pick)" in rows[0][1] and "timing:" not in rows[0][1]
 
 
-def test_two_pick_reduces_to_value_order_when_everyone_is_certain():
-    surv = {"RB": {"rb_cuff": 1.0, "rb_depth": 1.0}, "QB": {"qb2": 1.0}}
-    off = _bench_tracker(bench_two_pick=False)
-    on = _bench_tracker(bench_two_pick=True)
-    off.urgency_report = _fake_report(surv)
-    on.urgency_report = _fake_report(surv)
-    assert [r[2]["sleeper_id"] for r in off.recommendations(3)] == [r[2]["sleeper_id"] for r in on.recommendations(3)]
+def test_zero_insurance_falls_through_to_the_ceiling_over_the_wire():
+    """When every candidate's insurance rounds to zero the ceiling alone
+    ranks, over the position's wire so positions compare, never board order."""
+    board = _twins_board(a={"proj_pts": 80.0, "proj_hi": 84.0, "proj_band": 4.0},
+                         b={"proj_pts": 80.0, "proj_hi": 130.0, "proj_band": 50.0})
+    # only the twins and the wire stay as bench candidates; the wire is three
+    # 80-point backs the market leaves, so k=3 is 80 and everyone's edge is 0
+    keep = set(MY_LINEUP) | {"twin_a", "twin_b"}
+    board = [q for q in board if q["sleeper_id"] in keep or q["sleeper_id"].startswith("rb_wire")]
+    for q in board:
+        if q["sleeper_id"].startswith("rb_wire"):
+            q["proj_pts"], q["adp"] = 80.0, None
+    t = _pool(board)
+    rows = [r for r in t.recommendations(6) if str(r[1]).startswith("bench insurance")]
+    assert rows, "no bench rows"
+    assert all(r[2]["_staged"]["insurance"] <= 1e-9 for r in rows), [(r[2]["sleeper_id"], r[2]["_staged"]) for r in rows]
+    assert rows[0][2]["sleeper_id"] == "twin_b" and "zero insurance everywhere: ceiling over the wire" in rows[0][1]
 
 
 def test_a_man_below_the_wire_never_wins_a_ceiling_tie():
@@ -247,7 +254,8 @@ def test_a_man_below_the_wire_never_wins_a_ceiling_tie():
     # give it 60 receivers to spend them on: the twins (ADP 120) get drafted,
     # the three no-ADP backs (82/81/80) are the RB wire and its k=3 is 80.
     # The fixture's other backs go, so the twins are the RB shortlist.
-    board = [q for q in board if not (q["pos"] == "RB" and (q["sleeper_id"] == "rb_wire" or q["sleeper_id"].startswith("pad")))]
+    keep = set(MY_LINEUP) | {"twin_a", "twin_b"}
+    board = [q for q in board if q["sleeper_id"] in keep or q["sleeper_id"].startswith("rb_wire")]
     for q in board:
         if q["sleeper_id"].startswith("rb_wire"):
             q["adp"] = None
@@ -257,7 +265,7 @@ def test_a_man_below_the_wire_never_wins_a_ceiling_tie():
         board.append(f)
     t = _pool(board)
     rb = next(r for r in t.recommendations(8) if str(r[1]).startswith("bench insurance") and r[2]["pos"] == "RB")
-    assert rb[2]["sleeper_id"] == "twin_a" and rb[0] > 0, (rb[2]["sleeper_id"], rb[1][:120])
+    assert rb[2]["sleeper_id"] == "twin_a" and rb[2]["_staged"]["insurance"] > 0, (rb[2]["sleeper_id"], rb[1][:160])
 
 
 def test_tie_break_knob_rejects_a_misspelt_value():

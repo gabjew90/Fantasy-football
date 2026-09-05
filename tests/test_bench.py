@@ -362,11 +362,10 @@ def test_no_player_carries_two_currencies_at_once():
         assert len(ids) == len(set(ids)), f"duplicate row, prefer_bench={prefer_bench}"
 
 
-def test_the_knob_actually_changes_which_ruler_a_backup_is_measured_on():
-    """Today the market row wins purely because 24.3 > 20.9 -- two numbers in
-    different units. With the knob on, insurance wins because insurance is the
-    right question for a bench player."""
-    assert not _is_bench(_row(False, "wr_depth")), "fixture no longer reproduces it"
+def test_a_backup_is_measured_on_insurance_whatever_the_knob_says():
+    """Staged bench (2026-09-05): the bench row is always the ruler for a
+    backup; bench_row_wins_dedupe stays registered and switches nothing."""
+    assert _is_bench(_row(False, "wr_depth"))
     assert _is_bench(_row(True, "wr_depth"))
 
 
@@ -391,19 +390,26 @@ def test_the_preference_is_symmetric_not_a_bolted_on_exception():
     """First cut only blocked market->bench for an upgrade, so an upgrade whose
     BENCH row happened to sort first kept it anyway. Whichever way the scores
     fall, the ruler is chosen by what the player is."""
-    for prefer_bench in (False, True):
-        rows = _rows(prefer_bench)
-        assert rows == sorted(rows, key=lambda r: -r[0]), "greedy order broken"
+    def kinds(rows):
+        return [("up" if (not _is_bench(r) and r[2]["sleeper_id"] == "qb2") else "bench" if _is_bench(r) else "mkt")
+                for r in rows]
+    off, on = _rows(False), _rows(True)
+    assert [r[2]["sleeper_id"] for r in off] == [r[2]["sleeper_id"] for r in on], "the knob switches nothing now"
+    k = kinds(off)
+    # upgrades, then bench rows, then the revived market rows; never interleaved
+    order = [k[0]] + [x for i, x in enumerate(k[1:], 1) if x != k[i - 1]]
+    assert order == [x for x in ("up", "bench", "mkt") if x in k], k
 
 
-def test_the_default_is_todays_behaviour():
-    """B ships off, and off means the old rule verbatim: first row wins per
-    player, which after the score sort is the larger number regardless of
-    which currency it is denominated in."""
-    from draftkit.tracker import Tracker
-    assert Tracker.bench_row_wins_dedupe is False
-    t = _seam_tracker(False)
-    assert t.bench_row_wins_dedupe is False
-    for sid in ("wr_depth", "qb2", "rb_depth"):
-        assert not _is_bench(_row(False, sid)), sid
-    assert _is_bench(_row(False, "rb_cuff"))   # his bench row simply scores higher
+def test_upgrades_lead_on_their_market_row_then_bench_rows_then_the_rest():
+    """The seam order is fixed, never a re-sort across currencies: the
+    upgrade (qb2 out-projects my starting QB) on his market row first, the
+    backups on bench rows, the revived market rows last."""
+    rows = _rows(False)
+    kinds = [("up" if (not _is_bench(r) and r[2]["sleeper_id"] == "qb2") else "bench" if _is_bench(r) else "mkt") for r in rows]
+    assert kinds[0] == "up", kinds
+    assert not _is_bench(_row(False, "qb2"))
+    first_mkt = kinds.index("mkt") if "mkt" in kinds else len(kinds)
+    assert all(k != "bench" for k in kinds[first_mkt:]), kinds
+    for sid in ("wr_depth", "rb_depth", "rb_cuff"):
+        assert _is_bench(_row(False, sid)), sid

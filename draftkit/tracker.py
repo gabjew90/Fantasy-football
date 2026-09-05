@@ -800,26 +800,35 @@ class Tracker:
         from .bench import predicted_undrafted
         rem_all = [p for p in self.remaining() if p.get("proj_source") != "no_market"]
         wire_names = predicted_undrafted(rem_all, self.current_pick, last_pick)
-        from .bench import ABSENT_WEEKS
-        from .urgency import expected_best
-        # survival to my next turn per player, for the bench drop-off: the
-        # same simulation the market path uses; a player outside its ADP
-        # window has no entry and counts as certain to survive
-        surv_by_pos: dict[str, dict] = {}
-        two_pick = bool(self.bench_two_pick)
-        if self.bench_survival_discount or two_pick:
-            rep = self.urgency_report() or {}
-            surv_by_pos = {pos: (rep.get(pos) or {}).get("survival") or {} for pos in BENCH_POSITIONS}
+        from .bench import ABSENT_WEEKS, FANTASY_WEEKS
+        from .staged import SURV_GAP, VARIANCE_BAND
+        # BENCH STAGES (user design 2026-09-05 afternoon):
+        #   1. insurance value picks the player, across every bench position at
+        #      once: the defensive term (weeks needed x edge over the wire) plus
+        #      the offensive term when it lands (his starter on another roster
+        #      goes down, he inherits, displaces my weakest starter);
+        #   2. timing as a multiplier: score = insurance x (1 - survival), so a
+        #      handcuff who will still be there next turn waits;
+        #   3. scarcity, banded, same thresholds as the starters;
+        #   4. ceiling, always: bench spots are lottery tickets;
+        #   5. no pair, bench mode stays greedy.
+        # When every candidate's insurance is zero: ceiling alone (over the
+        # position's wire so positions compare), then role-shift flags, never
+        # raw board order.
+        # Survival to my next turn per player, the same simulation the market
+        # path uses; a player outside the simulated window has no entry and
+        # counts as certain to survive.
+        rep = self.urgency_report() or {}
+        surv_by_pos = {pos: (rep.get(pos) or {}).get("survival") or {} for pos in BENCH_POSITIONS}
         # the starter a role shift would displace, per position: at a
         # flex-eligible position the weakest flex-eligible starter (the new
         # starter pushes him out through the FLEX)
         displace_ppw: dict[str, float] = {}
-        if self.bench_contingency:
-            for pos in BENCH_POSITIONS:
-                group = set(snake.FLEX_ELIGIBLE) if pos in snake.FLEX_ELIGIBLE else {pos}
-                vals = [weakest_starter[g] for g in group if g in weakest_starter]
-                if vals:
-                    displace_ppw[pos] = min(vals) / 17.0
+        for pos in BENCH_POSITIONS:
+            group = set(snake.FLEX_ELIGIBLE) if pos in snake.FLEX_ELIGIBLE else {pos}
+            vals = [weakest_starter[g] for g in group if g in weakest_starter]
+            if vals:
+                displace_ppw[pos] = min(vals) / 17.0
         by_name = {str(q.get("player") or q.get("name") or ""): q for q in self.players}
 
         def _ceiling(q: dict) -> float | None:
@@ -827,8 +836,15 @@ class Tracker:
             line, else the point plus half the band; None without either."""
             return published_range(q)[1]
 
-        added, upgrade_ids = False, set()
-        per_pos: list[tuple] = []          # (pos, best, best_iv, why, e_next, s_best)
+        def _role_flag(q: dict) -> bool:
+            return bool((q.get("backs_up_pos") and q.get("starter_fragility_label")) or q.get("upside_flag"))
+
+        # bench picks I still hold AFTER this one (K and DEF are owed their
+        # own picks): with none left there is nothing to wait for, so the
+        # timing multiplier is dropped and insurance alone ranks
+        last_bench = (picks_left - 1 - needs.get("K", 0) - needs.get("DEF", 0)) < 1
+        scored: list[dict] = []
+        upgrade_ids: set = set()
         for pos in BENCH_POSITIONS:
             rem = [p for p in self.remaining(pos)
                    if p.get("proj_source") != "no_market"
@@ -836,11 +852,12 @@ class Tracker:
             if not rem:
                 continue
             waiver, wname = waiver_ppw(rem, last_pick, k, wire_names=wire_names)
-            scored: list[tuple[dict, dict]] = []
+            s_map = surv_by_pos.get(pos, {})
+            floor = weakest_starter.get(pos)
             for p in rem:
                 hc = starter_ppw.get(str(p.get("backs_up") or ""))
                 kw: dict = {}
-                if self.bench_contingency and hc is None and p.get("backs_up") and pos in displace_ppw:
+                if hc is None and p.get("backs_up") and pos in displace_ppw:
                     st = by_name.get(str(p.get("backs_up")))
                     kw = {"contingency_weeks": ABSENT_WEEKS[pos],
                           "contingency_starter_ppw": (float(st.get("proj_pts") or 0.0) / 17.0) if st else None,
@@ -848,86 +865,95 @@ class Tracker:
                 iv = insurance_value(p, waiver, exposure.get(pos, 0), hc,
                                      depth_ahead=depth_ahead.get(pos, 0),
                                      split_handcuff=bool(self.handcuff_split), **kw)
-                scored.append((p, iv))
-            # ranked on the RAW value (edge before the floor x weeks): a player
-            # below the wire is worth less than the wire and sorts that way
-            best, best_iv = max(scored, key=lambda t: t[1]["value_raw"])
-            # within BENCH_TIE of the best, the higher CEILING wins; anchored
-            # on the original best, no chaining; a row without a ceiling on
-            # either side leaves the order alone
-            anchor = best_iv["value_raw"]
-            for p, iv in scored:
-                if p is best or anchor - iv["value_raw"] > BENCH_TIE:
-                    continue
-                if iv["value_raw"] < 0.0 <= anchor:
-                    continue      # a man below the wire never wins a tie against one above it
-                cb, cp = _ceiling(best), _ceiling(p)
-                if cb is not None and cp is not None and cp > cb + 1e-9:
-                    best, best_iv = p, iv
+                s = float(s_map.get(str(p.get("sleeper_id")), 1.0))
+                ins = float(iv["value_raw"])
+                ceil = _ceiling(p)
+                scored.append({"p": p, "iv": iv, "pos": pos, "wname": wname, "s": s, "ins": ins,
+                               "score": ins if last_bench else ins * (1.0 - s),
+                               "ceil": ceil,
+                               "ceil_wire": None if ceil is None else ceil - waiver * FANTASY_WEEKS})
+                # an upgrade rather than insurance: his own projection beats the
+                # weakest starter he would displace at his position
+                if floor is not None and float(p.get("proj_pts") or 0.0) > floor:
+                    upgrade_ids.add(str(p.get("sleeper_id")))
+        if not scored:
+            return False, set()
+
+        zero = all(r["ins"] <= 1e-9 for r in scored)
+        if zero:
+            def _cw(r):
+                return r["ceil_wire"] if r["ceil_wire"] is not None else -1e9
+            ordered = sorted(scored, key=lambda r: -_cw(r))
+            # role-shift flags break ceilings inside VARIANCE_BAND, one pass
+            for i in range(len(ordered) - 1):
+                a, b = ordered[i], ordered[i + 1]
+                if (a["ceil_wire"] is not None and b["ceil_wire"] is not None
+                        and a["ceil_wire"] - b["ceil_wire"] <= VARIANCE_BAND
+                        and _role_flag(b["p"]) and not _role_flag(a["p"])):
+                    ordered[i], ordered[i + 1] = b, a
+            top = ordered[0]
+            mode = (f"zero insurance everywhere: ceiling over the wire "
+                    f"({top['ceil_wire']:.0f}" if top["ceil_wire"] is not None else "zero insurance everywhere: ceiling over the wire (none published")
+            mode += ", role flag)" if _role_flag(top["p"]) else ")"
+        else:
+            ordered = sorted(scored, key=lambda r: (-r["score"], -r["ins"]))
+            top_score = ordered[0]["score"]
+            tied = [r for r in ordered if top_score - r["score"] <= BENCH_TIE]
+            rest = ordered[len(tied):]
+            # a man below the wire never wins a tie against one above it
+            # (DECISIONS #55/#56: the widest band used to take the row)
+            if any(r["ins"] >= 0.0 for r in tied):
+                below = [r for r in tied if r["ins"] < 0.0]
+                tied = [r for r in tied if r["ins"] >= 0.0]
+                rest = below + rest
+            if len(tied) == 1:
+                mode = ("insurance alone (last bench pick)" if last_bench
+                        else f"insurance x timing ({tied[0]['ins']:.0f} x {1.0 - tied[0]['s']:.0%})")
+            else:
+                by_s = sorted(tied, key=lambda r: r["s"])
+                if by_s[1]["s"] - by_s[0]["s"] >= SURV_GAP - 1e-9:
+                    tied = by_s
+                    mode = (f"{len(by_s)} within {BENCH_TIE:g}: scarcer first "
+                            f"({by_s[0]['s']:.0%} vs {by_s[1]['s']:.0%} for {by_s[1]['p'].get('player') or by_s[1]['p'].get('name')})")
+                else:
+                    def _ck(r):
+                        # a published ceiling beats none: a lottery ticket with a
+                        # known upside over one with no range at all
+                        return r["ceil"] if r["ceil"] is not None else -1e9
+                    tied = sorted(tied, key=lambda r: -_ck(r))
+                    c0 = tied[0]["ceil"]
+                    mode = (f"{len(tied)} within {BENCH_TIE:g}, survival within {SURV_GAP:g}: "
+                            + (f"higher ceiling ({c0:.0f})" if c0 is not None else "no ceiling published, insurance order"))
+            ordered = tied + rest
+
+        rows: list[tuple] = []
+        for i, r in enumerate(ordered[:8]):
+            p, iv, pos = r["p"], r["iv"], r["pos"]
             n = exposure.get(pos, 0)
             d = depth_ahead.get(pos, 0)
             why = (f"bench insurance: covers {n} {pos} starter{'s' if n != 1 else ''}"
                    + (f" behind {d} reserve{'s' if d != 1 else ''} already held" if d else "")
-                   + f" ~{best_iv['weeks']:.1f} wks/season · +{best_iv['edge']:.1f}/wk over "
-                   f"the wire ({wname or 'nobody'}) ≈ {best_iv['value']:.0f} pts")
-            if best_iv["handcuff"]:
-                why += f" · HANDCUFF: backs up your {best.get('backs_up')}"
-            if best_iv.get("contingency"):
-                why += (f" · +{best_iv['contingency']:.0f} of that is the role shift if "
-                        f"{best.get('backs_up')} goes down (he would start over your weakest {pos})")
-            e_next, s_best = best_iv["value_raw"], None
-            if surv_by_pos:
-                s_map = surv_by_pos.get(pos, {})
-                vals = [iv["value_raw"] for _p, iv in scored]
-                survs = [float(s_map.get(str(_p.get("sleeper_id")), 1.0)) for _p, _iv in scored]
-                e_next = expected_best(vals, survs)
-                s_best = float(s_map.get(str(best.get("sleeper_id")), 1.0))
-            per_pos.append((pos, best, best_iv, why, e_next, s_best))
-            # is he an upgrade rather than insurance? Compared at his own
-            # position: displacing across the flex is a second-order case the
-            # market row already prices correctly through vorp_flex.
-            floor = weakest_starter.get(pos)
-            if floor is not None and float(best.get("proj_pts") or 0.0) > floor:
-                upgrade_ids.add(str(best.get("sleeper_id")))
-        # bench picks I still hold AFTER this one (K and DEF are owed their
-        # own picks): the two-pick partner exists only if one remains
-        bench_left_after = picks_left - 1 - needs.get("K", 0) - needs.get("DEF", 0)
-        for pos, best, best_iv, why, e_next, s_best in per_pos:
-            score = best_iv["value_raw"]
-            if two_pick:
-                partner_v, partner_q = 0.0, None
-                if bench_left_after >= 1:
-                    for q, _b, _iv, _w, e2, _s in per_pos:
-                        if q != pos and e2 > partner_v:
-                            partner_v, partner_q = e2, q
-                score = best_iv["value_raw"] + partner_v
-                why += (f" · two-pick: {best_iv['value_raw']:.0f} now"
-                        + (f" + ~{partner_v:.0f} the {partner_q} expected at your next turn" if partner_q
-                           else " (last bench pick: value alone)")
-                        + f" = {score:.0f}"
-                        + (f" · {s_best:.0%} he is still there next turn" if s_best is not None else ""))
-            elif self.bench_survival_discount:
-                cost = max(0.0, best_iv["value_raw"] - e_next)
-                why += (f" · waiting likely costs ~{cost:.0f} ({s_best:.0%} he is still there next turn, "
-                        f"expected best {pos} then {e_next:.0f})")
-                score = cost
-            best["_bench_value"] = best_iv["value_raw"]
-            cands.append((score, why, best))
-            added = True
-        if added:
-            # cost of waiting first (or raw insurance with the knob off), the
-            # bigger raw insurance value breaking exact ties
-            cands.sort(key=lambda t: (-t[0], -float(t[2].get("_bench_value") or 0.0)))
-            # across positions, the same near-tie rule: within BENCH_TIE the
-            # higher ceiling first, one pass over adjacent bench rows
-            for i in range(len(cands) - 1):
-                a, b = cands[i], cands[i + 1]
-                if (str(a[1]).startswith(BENCH_WHY_PREFIX) and str(b[1]).startswith(BENCH_WHY_PREFIX)
-                        and abs(a[0] - b[0]) <= BENCH_TIE and not (b[0] < 0.0 <= a[0])):
-                    ca, cb = _ceiling(a[2]), _ceiling(b[2])
-                    if ca is not None and cb is not None and cb > ca + 1e-9:
-                        cands[i], cands[i + 1] = b, a
-        return added, upgrade_ids
+                   + f" ~{iv['weeks']:.1f} wks/season · +{iv['edge']:.1f}/wk over "
+                   f"the wire ({r['wname'] or 'nobody'}) ≈ {iv['value']:.0f} pts")
+            if iv["handcuff"]:
+                why += f" · HANDCUFF: backs up your {p.get('backs_up')}"
+            if iv.get("contingency"):
+                why += (f" · +{iv['contingency']:.0f} of that is the role shift if "
+                        f"{p.get('backs_up')} goes down (he would start over your weakest {pos})")
+            if not last_bench:
+                why += f" · timing: {r['s']:.0%} he is still there next turn -> score {r['score']:.1f}"
+            if r["ceil"] is not None:
+                why += f" · ceiling {r['ceil']:.0f}"
+            if i == 0:
+                why += f" · BENCH STAGED: {mode}"
+            p["_bench_value"] = r["ins"]
+            p["_staged"] = {"mode": "bench", "insurance": round(r["ins"], 1), "surv": round(r["s"], 3),
+                            "score": round(r["score"], 1), "ceiling": r["ceil"]}
+            rows.append((r["score"], why, p))
+        # bench rows lead; the revived market rows follow as information and
+        # lose the dedup to the bench row of the same player
+        cands[:0] = rows
+        return True, upgrade_ids
 
     @staticmethod
     def _mval(p: dict, value_key: str) -> float:
@@ -1156,6 +1182,7 @@ class Tracker:
         fallback = self._fallback_points(needs) if self.adaptive_fallback else None
         repl = self._replacement_points() if fallback else None
         second: dict[str, float] = {}  # per-position 2nd-best, for the planner
+        urgency_of: dict[str, float] = {}   # market -> urgency, for stage 1
         for pos in POS_ORDER:
             rem_p = sorted(
                 (p for p in self.remaining(pos) if p.get("proj_source") != "no_market"),
@@ -1314,6 +1341,34 @@ class Tracker:
             # actually picks the flex starter -- and it is the comparison that
             # stops an elite TE outranking an RB he does not out-produce.
             score = urgency + 0.001 * mv(best)  # stable ordering
+            # the market this row was built in and its urgency, for stage 1
+            # of the staged ranker (draftkit/staged.py)
+            best["_mkt"] = mkt
+            urgency_of[mkt] = float(urgency)
+            if u and fallback is not None and repl is not None:
+                # The sim scores a market with NO survivor at replacement
+                # (VORP 0), so a market that can empty inside the window
+                # carries a LEVEL in its urgency, not a difference, and a
+                # baseline shift leaks in by shift x P(empties). The honest
+                # alternative when the market empties is the fallback player:
+                # add P(empties) x his VORP back. A member outside the
+                # simulated window has no survival entry and is certain to
+                # survive, so then P(empties) is 0 and nothing changes.
+                surv_m = u.get("survival") or {}
+                ids = {str(q.get("sleeper_id")) for q in rem}
+                ss = [float(s) for sid_, s in surv_m.items() if sid_ in ids]
+                if ss and len(ss) == len(ids):
+                    p_none = 1.0
+                    for s in ss:
+                        p_none *= (1.0 - s)
+                    if mkt == "FLEX":
+                        fbs = [fallback[q] for q in snake.FLEX_ELIGIBLE if q in fallback]
+                        fb_pts = max(fbs) if fbs else None
+                    else:
+                        fb_pts = fallback.get(pos)
+                    if fb_pts is not None and p_none > 0.0:
+                        fb_vorp = fb_pts - repl.get(mkt, repl.get(pos, 0.0))
+                        urgency_of[mkt] = float(urgency) - p_none * fb_vorp
             cands.append((score, why, best))
         cands.sort(key=lambda t: -t[0])
         # a player who wins two markets appears twice; keep the more urgent
@@ -1355,7 +1410,10 @@ class Tracker:
                 # whenever insurance out-scores urgency, which for a big-VORP
                 # backup QB is most of the time (caught by the regression test
                 # below, which is why it exists).
-                prefer_bench = bool(self.bench_row_wins_dedupe)
+                # Since the staged bench (2026-09-05) the bench row is ALWAYS
+                # the ruler for a backup and the market row for an upgrade;
+                # bench_row_wins_dedupe stays registered for config
+                # compatibility and no longer switches anything.
                 by_id: dict[str, list] = {}
                 for c in cands:
                     by_id.setdefault(c[2]["sleeper_id"], []).append(c)
@@ -1370,19 +1428,20 @@ class Tracker:
                     if sid in seen_ids:
                         continue
                     seen_ids.add(sid)
-                    if prefer_bench:
-                        rows = by_id[sid]
-                        want_bench = sid not in upgrade_ids
-                        pick = next((d for d in rows if _is_bench(d) == want_bench), None)
-                        if pick is not None:
-                            c = pick
-                    kept.append(c)
-                if prefer_bench:
-                    # a swap changes the score, so the greedy order has to be
-                    # re-established; without this a row keeps the rank its
-                    # discarded twin earned.
-                    kept.sort(key=lambda t: -t[0])
-                cands = kept
+                    rows = by_id[sid]
+                    want_bench = sid not in upgrade_ids
+                    pick = next((d for d in rows if _is_bench(d) == want_bench), None)
+                    kept.append(pick if pick is not None else c)
+                # ORDER, never a re-sort across the two currencies: upgrades on
+                # their market row first (a man who out-projects the starter
+                # he would displace is a starter question), then the bench
+                # rows in staged order, then the revived market rows as
+                # information.
+                ups = sorted((c for c in kept if not _is_bench(c) and c[2]["sleeper_id"] in upgrade_ids),
+                             key=lambda t: -t[0])
+                bench = [c for c in kept if _is_bench(c)]
+                others = [c for c in kept if not _is_bench(c) and c[2]["sleeper_id"] not in upgrade_ids]
+                cands = ups + bench + others
         # v2 item 1.2: joint two-pick re-rank on top of the greedy order.
         # Pure arithmetic over the cached urgency report — nothing new runs
         # on the clock; any failure or missing report keeps the greedy list
@@ -1413,7 +1472,7 @@ class Tracker:
                 p.pop("_bench_value", None)
             return cands[:top_n]
         try:
-            from .planner import pair_rank
+            from .staged import staged_rank
 
             def eligible_after(pos_taken: str) -> set[str]:
                 # the partner set the NEXT pick will actually allow, from the
@@ -1426,10 +1485,14 @@ class Tracker:
                                          counts_after, picks_left - 1, top6_te_fell)
                 }
 
-            cands = pair_rank(cands, report, needs, second, eligible_after,
-                              fallback=fallback, repl=repl,
-                              partner_certain=bool(getattr(self, "_look_through", False)),
-                              tie_break=str(self.tie_break), tie_window=float(self.tie_window))
+            # STAGED RANKING (user design 2026-09-05): urgency picks the
+            # position, value the player, then banded scarcity, variance by
+            # round, and the pair last. At the turn the pair leads.
+            market_of = {str(p.get("sleeper_id")): str(p.get("_mkt") or p.get("pos")) for _s, _w, p in cands}
+            cands = staged_rank(cands, report, needs, rnd, urgency_of, market_of, second, eligible_after,
+                                fallback=fallback, repl=repl,
+                                partner_certain=bool(getattr(self, "_look_through", False)),
+                                tie_break=str(self.tie_break), tie_window=float(self.tie_window))
         except Exception as e:  # noqa: BLE001 — planner must never block the clock
             # fall back to greedy, but never silently: a dead planner on draft
             # day must be visible (code review 2026-08-30)
