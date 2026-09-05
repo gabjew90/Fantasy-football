@@ -3689,3 +3689,37 @@ rows all score under 1 (everyone 90%+ to survive) and the 2.0 band makes
 the late bench effectively ceiling order until the last pick. Recorded, not
 judged. Knobs bench_survival_discount, bench_two_pick, bench_contingency,
 bench_row_wins_dedupe stay registered and switch nothing. Suite 782.
+
+## 2026-09-05 (60) -- what the first staged rooms found: the host's position cap, a 0-point bench pick, a stage-1 market slip
+
+Three rooms, three fixes, all shipped the same hour.
+
+1. **Yahoo refused our seventh running back**, twice (room 10797402 pick 126
+   Gainwell, room 10798461 pick 130 White): the thunk timed out, the click did
+   not land, the driver logged action-timeout then noland and fell to the next
+   name with 7-8 s of the clock gone. The room store carries the rule
+   (settings.settings.position_draft_caps: RB 6, WR 8, TE 4, QB 4, K 4, DEF 4).
+   guardrails.position_max in the league yaml, enforced in _pos_allowed; the
+   driver sends the room's own caps as position_caps and the bridge writes
+   them over the yaml (merge_position_caps). The engine already held QB and TE
+   at 2 and K/DEF at 1, so only RB and WR were ever exposed.
+2. **A 0.0-point Josh Jacobs at pick 116** (room 10799518). Two RB starters
+   and two reserves held: a third back covers 0.0 weeks, every back's
+   insurance is exactly 0, a receiver at 0.01 kept the zero-insurance
+   fallthrough from firing, and the scarcity stage took the "scarcest" of 26
+   worthless rows, Jacobs at 57% survival off a stale ADP of 49. Bench
+   candidates must now be viable (projection above 0, not out, the wire's own
+   test), and the fallthrough fires when everyone is under BENCH_ZERO (0.5
+   points) rather than at exact zeros.
+3. **Stage 1 read the last market written, not the one kept.** A player who
+   wins WR and FLEX had his _mkt overwritten by the FLEX loop, so the ranker
+   read 21.9 as the top urgency when the kept WR row said 43.5 (room 10799518
+   pick 7). Each player now records every market he won and the ranker reads
+   the most urgent.
+
+Also observed and left: in the first staged room six of seven starter picks
+were settled by urgency alone (the 1.5 band was entered once, at 56, where
+the floor decided Adams over Tuten); the bench timing multiplier behaved as
+designed at 76/85 (Harrison at 18% survival first, Pollard at 24 insurance
+still there at 85); the survival scorecard over-promised above 50% again,
+and the multiplier leans on those numbers, so the refit is next.
