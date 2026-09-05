@@ -76,6 +76,13 @@ RIVAL_STUDY_STAGES = (
                        for v in ("lottery", "floored", "order") for e in (6.0, 10.0, 15.0, 20.0)]),
     ("autopick_list_prob", [{"autopick_list_prob": p} for p in (0.0, 0.2, 0.4)]),
 )
+# Coarse grid for the leave-one-room-out refit (a genuine refit per fold on
+# the study's two axes; the full 15-point grid per fold would run ~23 h).
+RIVAL_LORO_STAGES = (
+    ("rival_x_sigma", [{"rival_draw": v, "sigma_early": e, "sigma_late": round(27.0 * e / 6.0, 1)}
+                       for v in ("lottery", "order") for e in (6.0, 10.0)]),
+    ("autopick_list_prob", [{"autopick_list_prob": p} for p in (0.0, 0.2)]),
+)
 STAGES = HUMAN_STAGES + AUTOPICK_STAGES + RIVAL_STAGES
 SMOKE_STAGES = (("sigma", [{"sigma_early": 6.0, "sigma_late": 27.0}, {"sigma_early": 8.0, "sigma_late": 27.0}]),)
 CURRENT = {"sigma_early": 6.0, "sigma_late": 27.0, "reach_prob": 0.15, "need_damp": 0.15,
@@ -100,6 +107,8 @@ def stages_for(name: str, smoke: bool = False):
         return RIVAL_STAGES
     if name == "rival_study":
         return RIVAL_STUDY_STAGES
+    if name == "rival_loro":
+        return RIVAL_LORO_STAGES
     return tuple(s for s in STAGES if s[0] == name)
 
 

@@ -66,13 +66,14 @@ def test_read_rejects_a_file_missing_the_required_columns(tmp_path):
     assert OV.read(p) is None
 
 
-def test_the_shipped_keefamania_overrides_are_all_inert():
-    """The five rows that started this. They stay inert until the draft-morning
-    pass re-verifies them; none may be promoted for lack of time."""
+def test_the_keefamania_projection_overrides_are_retired():
+    """Retired 2026-09-04 (DECISIONS #48): Keefamania projects solely from the
+    DraftSheet headline, dated 2026-09-01, which post-dates every fact the five
+    Aug-19 rows carried. A projection override against the sheet would
+    contradict that decision, so the file is a header and nothing else.
+    Availability (out / compromised) is the channel that remains."""
     ov = OV.read(__import__("pathlib").Path(
         "data/external/overrides.keefamania.csv"))
     assert ov is not None
     ok, cand = OV.split(ov)
-    assert ok.height == 0, "no Keefamania override is verified yet"
-    assert cand.height == 5
-    assert set(cand["date_checked"].to_list()) == {"2026-08-19"}
+    assert ok.height == 0 and cand.height == 0

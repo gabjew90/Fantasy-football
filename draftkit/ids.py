@@ -70,17 +70,28 @@ class SleeperIndex:
                     if token:
                         self.dst_by_token.setdefault(token, pid)
                 continue
-            if pos not in ("QB", "RB", "WR", "TE", "K"):
+            # a two-way player carries his fantasy side in fantasy_positions
+            # (Travis Hunter: position DB, fantasy_positions [DB, WR], 2026-09-04);
+            # index him under every fantasy position so a WR source line lands
+            fpos = [x for x in (p.get("fantasy_positions") or []) if x in ("QB", "RB", "WR", "TE", "K")]
+            slots = [x for x in dict.fromkeys(([pos] if pos in ("QB", "RB", "WR", "TE", "K") else []) + fpos)]
+            if not slots:
                 continue
             name = p.get("full_name") or f"{p.get('first_name','')} {p.get('last_name','')}"
             key = normalize_name(name)
-            bucket = self.by_pos.setdefault(pos, {})
-            # prefer active players on a name collision
-            if key in bucket:
-                existing = self.players[bucket[key]]
-                if existing.get("active") or not p.get("active"):
-                    continue
-            bucket[key] = pid
+            for slot in slots:
+                bucket = self.by_pos.setdefault(slot, {})
+                # prefer active players on a name collision, and the primary
+                # position's holder over a secondary-position claimant
+                if key in bucket:
+                    existing = self.players[bucket[key]]
+                    primary_now, primary_before = pos == slot, existing.get("position") == slot
+                    if primary_before and not primary_now:
+                        continue                      # a secondary claimant never displaces the primary
+                    if not (primary_now and not primary_before):
+                        if existing.get("active") or not p.get("active"):
+                            continue
+                bucket[key] = pid
 
     def match_dst(self, name: str) -> str | None:
         n = normalize_name(name)

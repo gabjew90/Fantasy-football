@@ -377,7 +377,7 @@ def main() -> None:
     ap.add_argument("--fit-out", default=str(ROOT / "reports" / "survival_fit.md"))
     ap.add_argument("--confirm-point", default=None, metavar="JSON",
                     help='confirm one knob set at --confirm-sims against the bar, e.g. \'{"sigma_early": 4}\'')
-    ap.add_argument("--stage", default="all", choices=["all", "sigma", "reach", "need", "autopick", "rival", "rival_study"],
+    ap.add_argument("--stage", default="all", choices=["all", "sigma", "reach", "need", "autopick", "rival", "rival_study", "rival_loro"],
                     help="which coordinate stage(s) to run; autopick = the three DECISIONS #35 sub-stages "
                          "on the rooms whose sidecar gives a non-empty away set")
     ap.add_argument("--objective", default="pool", choices=["pool", "shown"],

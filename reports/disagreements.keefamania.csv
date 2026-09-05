@@ -1,19 +1,19 @@
 player,pos,team,direction,rank_gap,value_rank,adp_rank,adp,tier,vorp,proj_pts,exp_games,rookie_flag,proj_source
 Josh Jacobs,RB,GBP,model_fade,-176,224,48,49.5,9,-146.011094176471,0.0,14.0,false,fantasypros_sheet_headline
-Fernando Mendoza,QB,LVR,model_fade,-102,221,119,118.6,6,-104.8366823741172,144.293647058824,16.0,true,fantasypros_sheet_headline
-Aaron Rodgers,QB,PIT,model_fade,-99,214,115,115.9,5,-81.2884470800002,167.841882352941,15.5,false,fantasypros_sheet_headline
-Brian Robinson Jr.,RB,ATL,model_fade,-98,218,120,119.0,7,-86.96344791176512,59.0476462647059,14.0,false,fantasypros_sheet_headline
-Ray Davis,RB,BUF,model_fade,-94,223,129,123.5,8,-116.61638829411811,29.3947058823529,14.0,false,fantasypros_sheet_headline
-Jordyn Tyson,WR,NOS,model_fade,-90,188,98,100.9,10,-47.450567557893095,88.1755353685779,16.0,true,fantasypros_sheet_headline
+Jordyn Tyson,WR,NOS,model_fade,-124,222,98,100.9,6,-135.626102926471,0.0,16.0,true,fantasypros_sheet_headline
+Fernando Mendoza,QB,LVR,model_fade,-101,220,119,118.6,6,-104.8366823741172,144.293647058824,16.0,true,fantasypros_sheet_headline
+Aaron Rodgers,QB,PIT,model_fade,-98,213,115,115.9,5,-81.2884470800002,167.841882352941,15.5,false,fantasypros_sheet_headline
+Brian Robinson Jr.,RB,ATL,model_fade,-97,217,120,119.0,7,-86.96344791176512,59.0476462647059,14.0,false,fantasypros_sheet_headline
+Ray Davis,RB,BUF,model_fade,-92,221,129,123.5,8,-116.61638829411811,29.3947058823529,14.0,false,fantasypros_sheet_headline
+Isiah Pacheco,RB,DET,model_fade,-84,225,141,125.5,9,-146.011094176471,0.0,12.0,false,fantasypros_sheet_headline
 Blake Corum,RB,LAR,model_fade,-83,178,95,99.5,6,-41.384618647059,104.626475529412,14.5,false,fantasypros_sheet_headline
-Cooper Kupp,WR,SEA,model_fade,-81,203,122,120.2,10,-63.09356383488499,72.532539091586,12.333333333333334,false,fantasypros_sheet_headline
-James Conner,RB,ARI,model_fade,-79,222,143,125.6,8,-112.4022706470592,33.6088235294118,12.0,false,fantasypros_sheet_headline
-Bryce Young,QB,CAR,model_fade,-76,200,124,121.4,3,-59.7140470800002,189.416282352941,14.333333333333334,false,fantasypros_sheet_headline
-Isaac TeSlaa,WR,DET,model_fade,-76,213,137,124.2,12,-78.75164276265859,56.8744601638124,13.0,false,fantasypros_sheet_headline
-Josh Downs,WR,IND,model_fade,-73,176,103,106.4,10,-40.03354894285219,95.5925539836188,14.666666666666666,false,fantasypros_sheet_headline
-Cam Ward,QB,TEN,model_fade,-73,207,134,124.1,4,-71.2310353152942,177.899294117647,16.0,false,fantasypros_sheet_headline
+Cooper Kupp,WR,SEA,model_fade,-80,202,122,120.2,5,-63.09356383488499,72.532539091586,12.333333333333334,false,fantasypros_sheet_headline
+James Conner,RB,ARI,model_fade,-80,223,143,125.6,9,-146.011094176471,0.0,12.0,false,fantasypros_sheet_headline
+Bryce Young,QB,CAR,model_fade,-75,199,124,121.4,3,-59.7140470800002,189.416282352941,14.333333333333334,false,fantasypros_sheet_headline
+Isaac TeSlaa,WR,DET,model_fade,-75,212,137,124.2,5,-78.75164276265859,56.8744601638124,13.0,false,fantasypros_sheet_headline
+Josh Downs,WR,IND,model_fade,-73,176,103,106.4,5,-40.03354894285219,95.5925539836188,14.666666666666666,false,fantasypros_sheet_headline
+Cam Ward,QB,TEN,model_fade,-72,206,134,124.1,4,-71.2310353152942,177.899294117647,16.0,false,fantasypros_sheet_headline
 Jacory Croskey-Merritt,RB,WAS,model_fade,-71,175,104,106.7,6,-39.611000294118,106.400093882353,16.0,false,fantasypros_sheet_headline
-Jordan Mason,RB,MIN,model_fade,-71,181,110,112.4,6,-42.506237970589,103.504856205882,12.0,false,fantasypros_sheet_headline
 Hunter Henry,TE,NEP,model_target,43,115,158,127.6,5,-11.832617829412015,100.747340867647,14.333333333333334,false,fantasypros_sheet_headline
 Brenton Strange,TE,JAC,model_target,41,125,166,129.4,5,-16.439363241176608,96.1405954558824,12.0,false,fantasypros_sheet_headline
 Dallas Goedert,TE,PHI,model_target,33,68,101,105.3,4,6.560833744116991,119.140792441176,12.0,false,fantasypros_sheet_headline
@@ -23,9 +23,9 @@ George Kittle,TE,SFO,model_target,22,56,78,82.9,4,11.326896685293988,123.9068553
 Travis Kelce,TE,KCC,model_target,22,66,88,94.8,4,7.870107479411985,120.450066176471,15.0,false,fantasypros_sheet_headline
 Isaiah Likely,TE,NYG,model_target,20,88,108,109.5,4,0.6596234499999838,113.239582147059,12.0,false,fantasypros_sheet_headline
 Mark Andrews,TE,BAL,model_target,18,94,112,113.2,4,-1.4939122705880123,111.086046426471,13.666666666666666,false,fantasypros_sheet_headline
-Jakobi Meyers,WR,JAC,model_target,18,154,172,130.3,10,-32.43682519005999,103.189277736411,14.666666666666666,false,fantasypros_sheet_headline
-Denzel Boston,WR,CLE,model_target,18,162,180,131.5,10,-35.25113345513799,100.374969471333,16.0,true,fantasypros_sheet_headline
+Jakobi Meyers,WR,JAC,model_target,18,154,172,130.3,5,-32.43682519005999,103.189277736411,14.666666666666666,false,fantasypros_sheet_headline
+Denzel Boston,WR,CLE,model_target,18,162,180,131.5,5,-35.25113345513799,100.374969471333,16.0,true,fantasypros_sheet_headline
 Kyle Pitts Sr.,TE,ATL,model_target,17,54,71,72.2,4,11.683669317646988,124.263628014706,16.0,false,fantasypros_sheet_headline
 T.J. Hockenson,TE,MIN,model_target,17,144,161,128.4,6,-29.268233697059017,83.311725,12.333333333333334,false,fantasypros_sheet_headline
-Wan'Dale Robinson,WR,TEN,model_target,17,160,177,130.8,10,-34.79393613570399,100.832166790767,15.0,false,fantasypros_sheet_headline
+Wan'Dale Robinson,WR,TEN,model_target,17,160,177,130.8,5,-34.79393613570399,100.832166790767,15.0,false,fantasypros_sheet_headline
 Jake Ferguson,TE,DAL,model_target,16,102,118,117.3,4,-5.004250020588017,107.575708676471,15.0,false,fantasypros_sheet_headline

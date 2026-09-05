@@ -3075,3 +3075,53 @@ stays available for a board where bench near-ties are common.
 
 Resolution note: the season replay resolves 0.4-1.2 points a season; a
 -1.7 is small but real, not noise.
+
+## 2026-09-04 (48) — availability re-verified against dated sources; Keefamania projection overrides retired; two-way players indexed
+
+Availability (data/external/availability.csv), 33 rows re-verified today
+by web search against dated reports (ESPN, NFL.com, CBS, NBC, team sites,
+beat writers), notes rewritten with the source and date; the four
+Sleeper-Q "flag only" rows from 8/31 with no news (Dicker, Metcalf, Evans,
+Flowers) keep their date. Changes:
+
+* to `out` (zeroed): Christian Kirk (IR, calf, 4+ games), James Conner
+  (IR, foot, 4+ games), Tank Dell (must miss 4, "nowhere near ready"),
+  Jordyn Tyson (IR, hamstring, 4+ games), Isiah Pacheco (IR, back, return
+  "the hope"). Same rule as Charbonnet: a season-opening IR/PUP stint is a
+  fact, and the `out` status has no partial-season form. Jacobs (exempt
+  list, season opens on it), Charbonnet (reserve/PUP), Aiyuk
+  (reserve/left squad), Higgins (IR, season) re-confirmed.
+* rows removed: McCaffrey (healthy, full practice), Pittman (minor
+  hamstring, no concern; a Steeler now).
+* everyone else stays `compromised` with today's fact: Kamara (likely
+  misses Week 1), Kittle (real chance at Week 1), Love (50-50), Egbuka and
+  McMillan (not locks), Nabers (not committing), Monangai (week-to-week),
+  Ty Johnson (up in the air), the rest trending to play.
+
+Keefamania projection overrides (overrides.keefamania.csv): the five
+Aug-19 candidate rows (Reed, Golden, Tuten, Tyson, Allgeier) are RETIRED,
+the file is a header. Under #45 the projection is the DraftSheet headline
+dated 2026-09-01, which post-dates every fact those rows carried; a
+projection override against the sheet would contradict "solely the
+sheet". Availability is the channel that remains. tests/test_overrides
+updated to assert the retirement.
+
+Two-way players: Sleeper's refreshed universe lists Travis Hunter as
+position DB with fantasy_positions [DB, WR]; SleeperIndex bucketed by
+`position` only, so the sheet's WR line for him did not match and the
+board reported him UNPROJECTED at ADP 125. SleeperIndex now indexes every
+fantasy position, primary holder winning a name collision. Hunter lands at
+63.4 (headline basis, estimated: he is off the DraftSheet page). Sheet
+names unmatched fell from 10 to 4 (three fullbacks, Hollywood Brown).
+
+Also measured: the RB-only games table against the external proxy arm
+(`lines_gt_rb` vs `lines`, reports/games_table_gate_lines_rb.md) passes
+both halves (RB MAE 66.5 -> 64.1 on 2024->2025 keefamania, outcome +0.35%,
+one seed). Moot on the headline basis: the sheet already carries a
+rank-based durability haircut and `external_projection` excludes
+discounted sources from the table. Nothing to ship; recorded so nobody
+re-runs it.
+
+Board after this: 226 players, 190 headline, 36 K/DEF synthetic, 5 zeroed
+on the board (Jacobs, Tyson, Pacheco, Conner, Charbonnet; Kirk, Dell,
+Aiyuk, Higgins are outside the pool). Suite 729 passed.
