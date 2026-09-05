@@ -257,6 +257,7 @@ class Tracker:
         gcfg = cfg["guardrails"] if "guardrails" in cfg._data else {}
         self.qb2_round = int(gcfg.get("qb2_earliest_round", 10))
         self.te2_fall = int(gcfg.get("te2_fall_picks", 12))
+        self.position_max = {str(k): int(v) for k, v in (gcfg.get("position_max") or {}).items()}
         self._urgency_cache: tuple[tuple, dict] | None = None
         from .rivals import load_seeds
         self.rival_seeds = load_seeds(cfg).get("users", {})
@@ -1076,6 +1077,15 @@ class Tracker:
         used by _guardrail_ok for this pick and by the two-pick planner for
         the next pick (code review 2026-08-30: the planner's hand copy had
         silently diverged)."""
+        # The host's roster cap per position (guardrails.position_max). Rooms
+        # 10797402 and 10798461 (2026-09-05): the engine named a SEVENTH back
+        # (Gainwell at 126, White at 130), Yahoo refused the thunk and the
+        # click, the driver logged action-timeout then noland and fell to the
+        # next name with the clock running. The cap is a room fact the engine
+        # must never test.
+        mx = (getattr(self, "position_max", None) or {}).get(pos)
+        if mx is not None and counts.get(pos, 0) >= int(mx):
+            return False
         if pos in ("K", "DEF"):
             if picks_left > 2:
                 return False

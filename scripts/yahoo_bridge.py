@@ -179,6 +179,7 @@ def build_tracker(cfg: Config, players: list[dict], state: dict) -> Tracker:
     g = cfg.get("guardrails") or {}
     t.qb2_round = int(g.get("qb2_earliest_round", 10))
     t.te2_fall = int(g.get("te2_fall_picks", 12))
+    t.position_max = {str(k): int(v) for k, v in (g.get("position_max") or {}).items()}
     t._urgency_cache = None
     t.rival_seeds, t.slot_to_user = {}, {}
     t.players = players
