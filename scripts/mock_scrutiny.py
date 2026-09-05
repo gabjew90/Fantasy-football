@@ -99,6 +99,8 @@ def plain_english(r: dict) -> str:
             parts.append(f"Lineup already full, so {name} ({pos}) was priced as bench insurance, not by raw points.")
         if "HANDCUFF" in why:
             parts.append("He also backs up one of our own starters, which raises that value.")
+    elif why.startswith("runner-up at"):
+        parts.append(f"The engine's first choice was gone, so its runner-up took the slot: {name} ({pos}): {why}.")
     elif why.startswith("STALE PLAN"):
         parts.append(f"The bridge stopped answering, so the driver took {name} ({pos}) from the last plan the engine sent: {why}.")
     elif why.startswith("LOCAL ranker"):

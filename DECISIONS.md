@@ -3292,3 +3292,20 @@ Churn of the fitted point vs the old defaults, headline board, ten seats: 32
 of 150 picks (21%), rounds 1-13, position-neutral (QB 5, RB 15, WR 10, TE 2
 left and taken alike). The sim now takes fallers off the board sooner; the
 roster shapes do not move.
+
+## 2026-09-04 (52) — two follow-ups from the room 10726459 review
+
+* Bench band tiebreak needs a margin. At pick 85 Pierce went over Tate on a
+  band of 13.2 against 13.1 with Tate 3 projection points better; at 76
+  Dowdle over Pollard and at 96 Mahomes over Dart went the same way on
+  wider gaps. The tiebreak now fires only when the range is at least
+  BENCH_BAND_MARGIN (20%) wider. Value still decides outside the 2-point
+  tie. Test added.
+* Runner-ups instead of padding. The engine always held each open market's
+  #2 and #3 (the shortlist behind its representative) and threw them away,
+  so with one slot open the plan was one real row and two 'padding' lines.
+  Tracker keeps them (_market_alternates), yahoo_bridge.runner_up_rows
+  appends them after the named rows with their own survival and gap to the
+  first choice ('runner-up at TE: the engine's #2 choice there, 6 pts behind
+  its first · 92% chance ...'), the driver and the scrutiny report label
+  them, board-order padding remains only below that. Test added. Suite 730.

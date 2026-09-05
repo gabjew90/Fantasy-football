@@ -30,6 +30,8 @@ POS_ORDER = ["RB", "WR", "TE", "QB", "K", "DEF"]
 # dedup has to tell them apart. One constant, written once and matched once.
 BENCH_WHY_PREFIX = "bench insurance:"
 BENCH_TIE = 2.0   # bench rows this close are a coin flip: the wider published range breaks it (late_round_dispersion)
+BENCH_BAND_MARGIN = 0.2   # ...only when the range is at least this much wider: a 0.1-point band edge flipped
+                          # Pierce over Tate at pick 85 of room 10726459 (review 2026-09-04)
 
 FALLBACK_FLOORS = ("board_min", "replacement")
 
@@ -831,7 +833,8 @@ class Tracker:
                 # within BENCH_TIE of the best, the wider published range is
                 # the better lottery ticket; anchored on the best, no chaining
                 for p, iv in scored:
-                    if p is not best and best_iv["value"] - iv["value"] <= BENCH_TIE and _band(p) > _band(best):
+                    if (p is not best and best_iv["value"] - iv["value"] <= BENCH_TIE
+                            and _band(p) >= (1.0 + BENCH_BAND_MARGIN) * _band(best)):
                         best, best_iv = p, iv
             n = exposure.get(pos, 0)
             d = depth_ahead.get(pos, 0)
@@ -893,7 +896,7 @@ class Tracker:
                 for i in range(len(cands) - 1):
                     a, b = cands[i], cands[i + 1]
                     if (str(a[1]).startswith(BENCH_WHY_PREFIX) and str(b[1]).startswith(BENCH_WHY_PREFIX)
-                            and abs(a[0] - b[0]) <= BENCH_TIE and _band(b[2]) > _band(a[2])):
+                            and abs(a[0] - b[0]) <= BENCH_TIE and _band(b[2]) >= (1.0 + BENCH_BAND_MARGIN) * _band(a[2])):
                         cands[i], cands[i + 1] = b, a
         return added, upgrade_ids
 
@@ -1115,6 +1118,11 @@ class Tracker:
 
         cliff = self.cliff_report()
         cands = []
+        # each open market's shortlist beyond its representative, for the
+        # plan's runner-up rows (review 2026-09-04): the engine always had
+        # these numbers and used to throw them away, leaving the page to pad
+        # the list with board order
+        self._market_alternates: dict[str, dict] = {}
         from .planner import own_value as _ov
         fallback = self._fallback_points(needs) if self.adaptive_fallback else None
         repl = self._replacement_points() if fallback else None
@@ -1187,6 +1195,7 @@ class Tracker:
             for q in pool[1:]:
                 if abs(mv(anchor) - mv(q)) <= 2.0 and _delta(q) > _delta(best):
                     best = q
+            self._market_alternates[mkt] = {"best": mv(best), "alts": [(q, mv(q)) for q in pool if q is not best]}
             pos = best["pos"]
             label = "your FLEX spot" if mkt == "FLEX" else mkt
             rem_pos = [p for p in self.remaining(pos)

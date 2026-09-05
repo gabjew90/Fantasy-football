@@ -477,3 +477,23 @@ def test_merge_feed_repairs_an_entry_first_seen_with_an_empty_name():
     yb.merge_feed(mem2, [{"pick_no": 3, "name": "", "pos": "WR", "mine": True}])
     got = yb.merge_feed(mem2, [{"pick_no": 3, "name": "Puka Nacua", "pos": "WR"}])
     assert got[0]["name"] == "Puka Nacua" and got[0]["mine"] is True
+
+
+def test_plan_carries_each_markets_runner_ups_with_their_own_survival():
+    """Review 2026-09-04: the engine keeps its #2 and #3 at every open
+    market; the plan shows them, with survival, ahead of the board-order
+    padding, and never duplicates a named row."""
+    from test_slot_markets import BOARD, make_tracker
+    # the live board rows carry `name`; the slot-market fixture uses `player`
+    t = make_tracker([dict(p, name=p["player"]) for p in BOARD], [], my_slot=1, current_pick=21)
+    recs = t.recommendations(5)
+    report = t.urgency_report()
+    plan = yb.plan_rows(t, recs, report)
+    with_alts = yb.runner_up_rows(t, plan, report)
+    assert len(with_alts) > len(plan)
+    alts = [r for r in with_alts if str(r["why"]).startswith("runner-up at")]
+    assert alts, with_alts
+    names = [(r["n"], r["p"]) for r in with_alts]
+    assert len(names) == len(set(names))
+    assert any(r["s"] is not None for r in alts)
+    assert all("choice there" in r["why"] for r in alts)

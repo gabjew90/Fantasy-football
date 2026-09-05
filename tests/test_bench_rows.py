@@ -189,3 +189,22 @@ def test_two_pick_reduces_to_value_order_when_everyone_is_certain():
     off.urgency_report = _fake_report(surv)
     on.urgency_report = _fake_report(surv)
     assert [r[2]["sleeper_id"] for r in off.recommendations(3)] == [r[2]["sleeper_id"] for r in on.recommendations(3)]
+
+
+def test_band_tiebreak_needs_a_real_margin():
+    """A 0.1-point wider band flipped Pierce over Tate at pick 85 of room
+    10726459. The range has to be BENCH_BAND_MARGIN wider to override value."""
+    from draftkit.tracker import BENCH_BAND_MARGIN
+    board = copy.deepcopy(BENCH_BOARD)
+    twin = copy.deepcopy(next(p for p in board if p["sleeper_id"] == "rb_cuff"))
+    twin.update(sleeper_id="rb_cuff_wide", player="rb_cuff_wide", adp=121.0, proj_band=10.0 * (1 + BENCH_BAND_MARGIN) - 0.5)
+    for p in board:
+        p.setdefault("proj_band", 10.0)
+    board.append(twin)
+    on = _bench_tracker(board, late_round_dispersion=True)
+    on.upside_from_round = 8
+    assert on.recommendations(5)[0][2]["sleeper_id"] == "rb_cuff"        # not wide enough to flip
+    twin["proj_band"] = 10.0 * (1 + BENCH_BAND_MARGIN) + 0.5
+    on2 = _bench_tracker(board, late_round_dispersion=True)
+    on2.upside_from_round = 8
+    assert on2.recommendations(5)[0][2]["sleeper_id"] == "rb_cuff_wide"  # wide enough

@@ -375,6 +375,39 @@ def merge_feed(memory: dict, drafted: list[dict]) -> list[dict]:
     return [memory[k] for k in sorted(memory)]
 
 
+def runner_up_rows(t: Tracker, plan: list[dict], report) -> list[dict]:
+    """The engine's second and third choices at each open market, appended
+    after its named rows with their own survival, so the page shows real
+    alternatives instead of board-order padding (review 2026-09-04: with one
+    slot open the plan was one real row and two 'padding' lines while the
+    engine held the next-best TEs and their numbers). Prefix `runner-up` is
+    matched by draft_driver.planLine and mock_scrutiny."""
+    named = {(r["n"], r["p"]) for r in plan}
+    out = list(plan)
+    for mkt, spec in (getattr(t, "_market_alternates", None) or {}).items():
+        label = "your FLEX spot" if mkt == "FLEX" else mkt
+        u = (report or {}).get(mkt) or {}
+        for rank, (q, v) in enumerate(spec.get("alts") or [], start=2):
+            qn = q.get("name") or q.get("player")
+            key = (qn, q["pos"])
+            if key in named:
+                continue
+            named.add(key)
+            sid = str(q.get("sleeper_id"))
+            s_ = (u.get("survival") or {}).get(sid)
+            sr = (u.get("survival_raw") or {}).get(sid)
+            gap = float(spec.get("best") or 0.0) - float(v or 0.0)
+            why = (f"runner-up at {label}: the engine's #{rank} choice there, {gap:.0f} pts behind its first"
+                   + (f" · {float(s_):.0%} chance he's still there at your next pick" if s_ is not None else ""))
+            out.append({"n": qn, "p": q["pos"], "t": q.get("team"),
+                        "v": round(float(q.get("vorp") or 0.0), 1), "a": q.get("adp"), "why": why,
+                        "s": None if s_ is None else round(float(s_), 3),
+                        "sr": None if sr is None else round(float(sr), 3),
+                        "e": None if u.get("e_best_next") is None else round(float(u["e_best_next"]), 1),
+                        "b": None if u.get("best_now") is None else round(float(u["best_now"]), 1)})
+    return out
+
+
 def depth_tail(t: Tracker, plan: list[dict], depth: int) -> list[dict]:
     """Pad a plan past the engine's named candidates -- under the SAME
     guardrails the engine applies.
@@ -579,7 +612,7 @@ def main() -> None:
 
     # Depth beyond the engine's per-position candidates: if everything it
     # named is gone by the time we pick, the page still needs somewhere to go.
-    plan = depth_tail(t, plan, a.depth)
+    plan = depth_tail(t, runner_up_rows(t, plan, t.urgency_report()), a.depth)
 
     out = {
         "current_pick": t.current_pick,

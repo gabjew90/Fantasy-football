@@ -115,6 +115,11 @@ window.DK = (function () {
     else if (/^bench insurance/.test(why)) {
       const b = why.match(/≈ (\d+) pts/);
       parts.push('insurance' + (b ? ' worth ~' + b[1] : ''));
+    } else if (/^runner-up at/.test(why)) {
+      const r = why.match(/#(\d) choice there, (\d+) pts behind[^0-9]*(\d+)?%?/);
+      parts.push('runner-up' + (r ? ' #' + r[1] + ', ' + r[2] + ' behind' : ''));
+      const sv = why.match(/(\d+)% chance/);
+      if (sv) parts.push(sv[1] + '% survives to our turn');
     } else if (/^depth fallback/.test(why)) parts.push('padding: no engine opinion this deep, board order');
     const pm = e.pair;
     if (pm && pm.pick_cost != null) {
