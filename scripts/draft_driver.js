@@ -60,6 +60,7 @@ window.DK = (function () {
     trail: [],
     hud: null,
     lastPlanSig: null,
+    stalePlan: null,    // the last engine plan the gate dropped this turn: {rows, pick, call, at}
     fingerprint: null,
   };
 
@@ -143,8 +144,10 @@ window.DK = (function () {
       parts.push('lineup full, so ' + rec.drafted + ' (' + rec.pos + ') is insurance'
         + (m2 ? ': covers ' + m2[1] + ' ' + m2[2] + ' starter(s) about ' + m2[3] + ' weeks a season at +' + m2[4] + ' a week over the wire, about ' + m2[6] + ' points' : ''));
       if (/HANDCUFF/.test(why)) parts.push('he also backs up one of our starters');
-    } else if (/^LOCAL ranker/.test(why)) {
-      parts.push('engine unreachable, the page’s own ranking chose ' + rec.drafted + ' (' + rec.pos + ')');
+    } else if (/^STALE PLAN/.test(why)) {
+      const sm = why.match(/from pick (\d+)(?:, (\d+) s old)?/);
+      parts.push('bridge unreachable, so the last engine plan' + (sm ? ' (pick ' + sm[1] + (sm[2] ? ', ' + sm[2] + ' s old' : '') + ')' : '')
+        + ' chose ' + rec.drafted + ' (' + rec.pos + ')');
     } else if (/^depth fallback|^fills your open/.test(why)) {
       parts.push('chose ' + rec.drafted + ' (' + rec.pos + ') to fill a mandatory slot. Nothing the engine named was left');
     } else {
@@ -330,6 +333,12 @@ window.DK = (function () {
    * function that keys defenses differently from the others silently stops
    * matching them -- which has now cost two separate bugs (unmatchable in the
    * player table, then invisible in the queue). One function, everywhere. */
+  /* Whole-name key for the collision cases idKey cannot separate. */
+  function fullKey(name) {
+    return String(name || '').toLowerCase().replace(/[^a-z ]/g, ' ').replace(/\b(jr|sr|ii|iii|iv|v)\b/g, ' ')
+      .replace(/\s+/g, ' ').trim();
+  }
+
   function idKey(name, pos) {
     if (pos === 'DEF') {
       const parts = (name || '').trim().split(/\s+/);
@@ -954,6 +963,7 @@ window.DK = (function () {
       const j = await r.json();
       if (j.err) { S.planErr = j.err; return 'engine error: ' + j.err; }
       S.plan = j.plan; S.planNeeds = j.needs; S.planPick = j.current_pick;
+      S.stalePlan = null;
       S.planCall = j.calls == null ? null : j.calls;   // joins this plan to the bridge's log lines
       S.planErr = null; S.planAt = Date.now();
       // narrate a plan when its top three or its pick changed (not every 12 s).
@@ -1026,10 +1036,10 @@ window.DK = (function () {
     return { players, counts, have, source, headerHave: rc ? rc.have : null };
   }
 
-  function rankFromPlan() {
+  function rankFromRows(rows, meta) {
     const view = rosterView();
     if (view.source === 'none' && view.headerHave == null) return null;
-    if (!S.plan || !S.plan.length) return null;
+    if (!rows || !rows.length) return null;
     const mine = new Set(view.players.map(p => p.k + '|' + p.pos));
     const have = view.have;
     // With a store, "gone" means the STORE says drafted. S.gone is the page's
@@ -1039,9 +1049,21 @@ window.DK = (function () {
     // never names a drafted player, so a store-backed plan row is live.
     const snapPlan = storeState();
     const storeGone = snapPlan ? new Set(snapPlan.drafted.map(d => idKey(d.name, d.pos) + '|' + d.pos)) : null;
-    const goneNow = (b) => storeGone ? storeGone.has(b.k + '|' + b.p) : isGone(b);
+    // idKey folds "Bijan Robinson" and "Brian Robinson Jr." onto one key
+    // (marked in S.collisions at load). For those rows the drafted check has
+    // to use the full name, or Bijan going at pick 2 marks Brian drafted for
+    // the rest of the room (found 2026-09-04 by the stale-plan test).
+    const storeGoneFull = snapPlan ? new Set(snapPlan.drafted.map(d => fullKey(d.name) + '|' + d.pos)) : null;
+    // two board rows on one idKey at the same position (Bijan / Brian
+    // Robinson), whatever their teams: only the whole name may decide
+    const kpCollides = (b) => S.board.filter(x => x.k === b.k && x.p === b.p).length > 1;
+    const goneNow = (b) => {
+      if (!storeGone) return isGone(b);
+      if (storeGoneFull.has(fullKey(b.n) + '|' + b.p)) return true;
+      return storeGone.has(b.k + '|' + b.p) && !kpCollides(b);
+    };
     const out = [], dropped = [];
-    for (const e of S.plan) {
+    for (const e of rows) {
       const b = S.board.find(x => x.n === e.n && x.p === e.p)
              || { n: e.n, p: e.p, t: e.t, v: e.v, a: e.a, k: idKey(e.n, e.p) };
       // every plan row the page refuses is recorded, so the trail can show a
@@ -1064,7 +1086,7 @@ window.DK = (function () {
       // debugging session. The cost is that the next field added upstream
       // must be added here too -- which is exactly the defect this fixes, so
       // the tests below pin BOTH the fields and the fact that they arrive.
-      out.push({ n: b.n, p: b.p, t: b.t, v: b.v, why: e.why, fromEngine: true,
+      out.push({ n: b.n, p: b.p, t: b.t, v: b.v, why: (meta.prefix || '') + e.why, fromEngine: meta.source === 'engine',
                  s: e.s == null ? null : e.s, sr: e.sr == null ? null : e.sr, e: e.e == null ? null : e.e,
                  b: e.b == null ? null : e.b, pair: e.pair || null });
     }
@@ -1072,223 +1094,53 @@ window.DK = (function () {
     return {
       round: have + 1, picksLeft: S.cfg.rounds - have,
       counts: view.counts, need: S.planNeeds || {}, rosterSource: view.source,
-      source: 'engine', planAge: S.planPick == null ? null : S.planPick, planCall: S.planCall == null ? null : S.planCall,
+      source: meta.source, planAge: meta.planPick == null ? null : meta.planPick, planCall: meta.planCall == null ? null : meta.planCall,
+      stale: meta.stale || null,
       top: out, dropped, availCount: out.length, goneCount: S.gone.size,
     };
+  }
+
+  function rankFromPlan() {
+    return rankFromRows(S.plan, { source: 'engine', planPick: S.planPick == null ? null : S.planPick,
+                                  planCall: S.planCall == null ? null : S.planCall });
+  }
+
+  /* The last engine plan the gate dropped this turn, minus everyone drafted
+   * since. When the bridge is unreachable this is the engine's own opinion
+   * from a few seconds ago, which beats a second, divergent ranking written
+   * in JavaScript (review 2026-09-04: the local VONA ranker is deleted; it
+   * had its own guardrail copies, its own two-pick math and its own bugs).
+   * With no plan ever received the pick falls to the queue and then to
+   * Yahoo's list, labelled as such. */
+  function rankFromStalePlan() {
+    const sp = S.stalePlan;
+    if (!sp || !sp.rows || !sp.rows.length) return null;
+    const age = sp.at ? Math.round((Date.now() - sp.at) / 1000) : null;
+    return rankFromRows(sp.rows, {
+      source: 'stale-plan', planPick: sp.pick, planCall: sp.call, stale: { pick: sp.pick, ageS: age },
+      prefix: 'STALE PLAN (engine plan from pick ' + sp.pick + (age == null ? '' : ', ' + age + ' s old')
+              + '; bridge unreachable): ',
+    });
+  }
+
+  function stashPlanAsStale() {
+    if (S.plan && S.plan.length) {
+      S.stalePlan = { rows: S.plan, pick: S.planPick, call: S.planCall, at: S.planAt || Date.now() };
+    }
+    S.plan = null; S.planPick = null; S.planAt = 0;
   }
 
   function rank() {
     const fromEngine = rankFromPlan();
     if (fromEngine) return fromEngine;
+    const stale = rankFromStalePlan();
+    if (stale) return stale;
     const view = rosterView();
     if (view.source === 'none' && view.headerHave == null) return { err: 'no roster panel, no header' };
-    const ros = { players: view.players, counts: view.counts };
-    const counts = ros.counts;
-    const have = view.have;
-    const picksLeft = S.cfg.rounds - have;
-    const rnd = have + 1;
-    const need = needsMap(counts);
-    const mine = new Set(ros.players.map(p => p.k + '|' + p.pos));
-
-
-    /* TE2 gate. The Python engine asks "did a top-6 TE fall to us", which
-     * needs a reliable drafted-set we deliberately do not have. Equivalent
-     * local rule: a 2nd TE is only allowed if the candidate IS one of the
-     * board's six best TEs -- same intent, no scraping. */
-    const te6 = S.board.filter(x => x.p === 'TE').slice(0, 6).map(x => x.n);
-
-    // Drafted players come from the STORE, not only from S.gone (which only
-    // row lookups fill). Stress mock 2026-09-02, bridge killed at pick 78:
-    // the local fallback at pick 86 tried Bijan Robinson and Smith-Njigba,
-    // drafted at picks 2 and 4, and the queue had to make the pick.
-    const snapLocal = storeState();
-    const draftedKeys = new Set(snapLocal ? snapLocal.drafted.map(d => idKey(d.name, d.pos) + '|' + d.pos) : []);
-    const avail = S.board.filter(x =>
-      !mine.has(x.k + '|' + x.p) && !isGone(x) && !draftedKeys.has(x.k + '|' + x.p));
-
-    /* A second TE can only ever start in FLEX, competing with an RB/WR who
-     * would otherwise hold that slot. Mock 4 took McBride AND Bowers in the
-     * first three rounds and went into round 4 with no running back, because
-     * "top-6 TE" alone was too easy a gate. Require a clear margin over the
-     * best flex-eligible alternative instead of a bare ranking. */
-    const bestFlexAlt = Math.max(...avail
-      .filter(x => x.p === 'RB' || x.p === 'WR')
-      .map(x => x.v), -Infinity);
-    /* Shared context for te2Ok, so the queue planner enforces the same rule
-     * this ranking does. */
-    S.ctx = { te6, bestFlexAlt, need, top6TeFell: top6TeFell() };
-
-    const eligible = [];
-    const blocked = [];
-    for (const p of avail) {
-      if (guardrailOk(p, rnd, need, counts, picksLeft, true)) eligible.push(p);
-      else if (blocked.length < 6) blocked.push(p.n + '(' + p.p + ')');
-    }
-
-    /* STASH-MUTE FALLBACK.
-     *
-     * Once every starter slot is filled, needsPosition() is false for
-     * everyone, so the "at most one zero-role stash" rule silences the entire
-     * board and rank() returns nothing. draftTop then reports "no candidates",
-     * the clock runs out, and Yahoo takes the pick -- which is how autopick
-     * armed in mock 7 at roster 9/15.
-     *
-     * The Python engine hit this exact bug on shallow boards and fixed it
-     * with a labelled fallback; this port reintroduced it, then relaxed the
-     * rule here when the list came back empty. draftTop had no such relief
-     * and refused all 24 candidates at pick 86 of mock 13, so the rule is
-     * gone from guardrailOk altogether: eligible is empty only when the
-     * board truly is. */
-
-    /* VONA -- value over NEXT AVAILABLE, not over a fixed replacement.
-     *
-     * VORP asks "how much better than a replacement-level player?". Draft day
-     * asks a different question: "how much better than whoever I could still
-     * get at this position at my NEXT turn?". On a flat position those are
-     * wildly different numbers.
-     *
-     * Measured spread of each position's top 10 (mock 8):
-     *   RB 82.3 pts (4.84/gm) · TE 67.5 (3.97) · QB 35.0 (2.06) · WR 33.6 (1.98)
-     *
-     * Every top-10 QB sits within 35 points of every other. VORP still handed
-     * Mahomes +21.1, so the engine took him at pick 42 against an ADP of 102
-     * -- a 60-pick reach to gain 0.72/game over Purdy, who was duly still
-     * available at 99. The cost landed on the bench: four WRs at or below
-     * replacement, because a mid-round pick went to a position where waiting
-     * was nearly free.
-     *
-     * Within a position VORP differences ARE projection differences (shared
-     * baseline), so VONA is simply the gap to the best player expected to
-     * survive until our next turn. A flat position self-discounts; a scarce
-     * one (RB, TE) does not. */
-    const gap = S.cfg.teams || 10;               // average wait between turns
-    const curPickNo = S.cfg.myNextPick || rnd * gap;
-    const nextPickNo = curPickNo + gap;
-
-    /* Expected best at each position on our next turn, and the second-best
-     * on the board NOW. planner.py caps a same-position partner at
-     * second_best_now, because the expectation does not know the candidate
-     * himself was just taken -- that cap is exactly what stops the driver
-     * assuming it can have BOTH elite tight ends. */
-    const vonaBase = {}, secondBestNow = {};
-    for (const pos of ['QB', 'RB', 'WR', 'TE', 'K', 'DEF']) {
-      vonaBase[pos] = eBestNext(avail, pos, nextPickNo, rnd, curPickNo);
-      const at = avail.filter(x => x.p === pos);
-      secondBestNow[pos] = at.length > 1 ? at[1].v : 0;
-    }
-
-    /* ---- FAITHFUL PORT of tracker.recommendations() ----
-     *
-     * A parity harness (scripts/engine_parity.py) replayed identical board
-     * states through both engines and found they agreed on the top pick only
-     * 25% of the time. The driver was not a port, it was a different
-     * algorithm wearing the same board. Four substantive divergences, now
-     * corrected:
-     *
-     *   1. Python builds ONE candidate per position (best of the top 3 there),
-     *      then ranks positions. The driver ranked all ~240 players directly.
-     *   2. Python scores by the POSITION's urgency, not a per-player value.
-     *   3. Python applies need weighting ONLY as the planner's 0.6 damp on a
-     *      position that fills no slot. The driver's flat +12/+60 bonuses were
-     *      an invention that distorted the order.
-     *   4. Python breaks near-ties (within 2.0 VORP of the position's top
-     *      candidate) by adp_delta, and from round 8 sorts the position by
-     *      upside-boosted VORP before truncating. The driver did neither.
-     */
-    const POS_ORDER = ['RB', 'WR', 'TE', 'QB', 'K', 'DEF'];
-    const byPos = {};
-    for (const p of eligible) (byPos[p.p] = byPos[p.p] || []).push(p);
-
-    const scored = [];
-    for (const pos of POS_ORDER) {
-      let rem = byPos[pos];
-      if (!rem || !rem.length) continue;
-      // v2 item 1.5: from upside_from_round, rank the position on an
-      // upside-boosted proxy BEFORE truncating, so a gated player ranked 4th
-      // by median can still surface.
-      if (rnd >= S.cfg.upsideFromRound) {
-        // plan A3 mirror of tracker._late: mean + lambda x source spread when the
-        // flag is on and the row carries a spread from >= 2 sources; else the
-        // boolean upside multiplier
-        const late = (p) => (S.cfg.lateRoundDispersion && p.sd != null && (p.ns || 0) >= 2)
-          ? (p.v || 0) + S.cfg.dispersionLambda * p.sd
-          : (p.v || 0) * (p.u ? S.cfg.upsideMult : 1);
-        rem = rem.slice().sort((a, b) => late(b) - late(a));
-      }
-      const pool = rem.slice(0, 3);
-      const anchor = pool[0];
-      let best = anchor;
-      for (const q of pool.slice(1)) {
-        if (Math.abs((anchor.v || 0) - (q.v || 0)) <= 2.0
-            && (q.d === undefined ? -999 : q.d) > (best.d === undefined ? -999 : best.d)) {
-          best = q;
-        }
-      }
-      const urgency = (rem[0].v || 0) - (vonaBase[pos] || 0);  // unclipped, as Python
-      scored.push({
-        p: best,
-        s: urgency + 0.001 * (best.v || 0),   // stable ordering, as in Python
-        fills: needsPosition(need, pos),
-      });
-    }
-    scored.sort((a, b) => b.s - a.s);
-    for (const x of scored) x.p._vona = Math.round(x.s * 10) / 10;
-
-
-    /* TWO-PICK JOINT PLANNER (port of planner.py).
-     *
-     * Greedy urgency "won the pick and lost the round at #26/#47" in the real
-     * Omnibeta draft, and cost this driver slot 9 of the replay sweep: it
-     * took one elite TE when taking both was worth more, because it never
-     * asked what PAIR of picks maximises value.
-     *
-     * pair(c) = need-weighted VORP(c now) + best partner expected at our next
-     * turn, where a same-position partner is capped at second-best-now. */
-    function needsAfter(taken) {
-      const out = Object.assign({}, need);
-      if ((out[taken] || 0) > 0) out[taken] -= 1;
-      else if (FLEX_OK[taken] && (out.FLEX || 0) > 0) out.FLEX -= 1;
-      return out;
-    }
-    function partnerValue(posTaken, countsAfter) {
-      const after = needsAfter(posTaken);
-      let bestV = 0, bestP = null;
-      for (const pos2 of ['QB', 'RB', 'WR', 'TE', 'K', 'DEF']) {
-        if (!posAllowed(pos2, rnd + 1, countsAfter, picksLeft - 1, true)) continue;
-        let e = vonaBase[pos2] || 0;
-        if (pos2 === posTaken) e = Math.min(e, secondBestNow[pos2] || 0);
-        const v = needsPosition(after, pos2) ? e : e * NEED_DAMP;
-        if (v > bestV) { bestV = v; bestP = pos2; }
-      }
-      return { v: bestV, pos: bestP };
-    }
-    for (const x of scored) {
-      const cAfter = Object.assign({}, counts);
-      cAfter[x.p.p] = (cAfter[x.p.p] || 0) + 1;
-      const partner = partnerValue(x.p.p, cAfter);
-      const own = x.p.v * (needsPosition(need, x.p.p) ? 1 : NEED_DAMP);
-      x.pair = own + partner.v;
-      x.partner = partner.pos;
-    }
-    scored.sort((a, b) => (b.pair - a.pair) || (b.s - a.s));
-
     return {
-      round: rnd, picksLeft, counts, need,
-      source: 'local', rosterSource: view.source,   // the labelled fallback: no plan, or every plan row filtered
-      openStarters: ['QB','RB','WR','TE','FLEX','K','DEF'].reduce((a,k)=>a+(need[k]||0),0),
-      top: scored.slice(0, 20).map(x => ({
-        n: x.p.n, p: x.p.p, t: x.p.t, v: x.p.v, vona: x.p._vona,
-        pair: Math.round((x.pair || 0) * 10) / 10, partner: x.partner,
-        s: Math.round(x.s), fills: x.fills, st: x.p.s,
-        // a reason the record can carry: local picks used to log why ""
-        why: 'LOCAL ranker (no usable plan): VONA ' + (x.p._vona == null ? '?' : x.p._vona)
-             + ', two-pick ' + (Math.round((x.pair || 0) * 10) / 10) + (x.partner ? ' with ' + x.partner : '')
-             + (x.fills ? ', fills a slot' : ', bench'),
-      })),
-      vonaBase, secondBestNow,
-      blockedSample: blocked,
-      availCount: avail.length,
-      goneCount: S.gone.size,
+      round: view.have + 1, picksLeft: S.cfg.rounds - view.have, counts: view.counts, need: S.planNeeds || {},
+      rosterSource: view.source, source: 'none', top: [], availCount: 0, goneCount: S.gone.size,
+      err: 'no engine plan (none received, or every row of the last one is drafted): the queue and the Yahoo list take this pick',
     };
   }
 
@@ -2377,9 +2229,9 @@ window.DK = (function () {
             const planOnly = gate.why.length && gate.why.every(w => /^(no plan|plan stale|plan is for pick)/.test(w));
             planGateFails = planOnly ? planGateFails + 1 : 0;
             if (planOnly && planGateFails >= 3) {
-              note('LOCAL ranking: plan gate failed ' + planGateFails + 'x (' + gate.why.join('; ') + ') -> dropping the plan for this turn');
-              narrate('gate', 'LOCAL ranking for this turn: the engine plan failed the gate ' + planGateFails + ' times');
-              S.plan = null; S.planPick = null; S.planAt = 0;
+              note('STALE PLAN: plan gate failed ' + planGateFails + 'x (' + gate.why.join('; ') + ') -> picking from the last engine plan this turn');
+              narrate('gate', 'the engine plan failed the gate ' + planGateFails + ' times; picking from the last plan the engine sent (minus anyone drafted since)');
+              stashPlanAsStale();
               planGateFails = 0;
             } else {
               await sleep(1200);
@@ -2574,6 +2426,7 @@ window.DK = (function () {
     refreshPlan,
     planStatus: () => ({ have: !!(S.plan && S.plan.length), err: S.planErr,
                          atPick: S.planPick, ageMs: S.planAt ? Date.now() - S.planAt : null }),
+    _stashPlan: stashPlanAsStale,   // tests: what the gate does when it drops the plan
     loadPlan(obj) {
       S.plan = (obj && obj.plan) || null;
       S.planNeeds = (obj && obj.needs) || null;

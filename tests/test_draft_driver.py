@@ -71,11 +71,25 @@ BOARD = "\n".join(
 )
 
 
-def rank_with(roster_text: str):
-    """Rank against a stubbed YOUR TEAM panel."""
+def plan_rows(board: str) -> list[dict]:
+    """A compact board pasted back as an engine plan (the local ranker is
+    gone; rank() only ever filters a plan)."""
+    out = []
+    for line in board.splitlines():
+        f = line.split("|")
+        if len(f) < 4 or not f[0]:
+            continue
+        out.append({"n": f[0], "p": f[1], "t": f[2], "v": float(f[3] or 0), "why": "w"})
+    return out
+
+
+def rank_with(roster_text: str, board: str = None):
+    """Rank the board-as-plan against a stubbed YOUR TEAM panel."""
+    board = board or BOARD
     return run_js(
         f"""
-        DK.loadCompact({json.dumps(BOARD)});
+        DK.loadCompact({json.dumps(board)});
+        DK.loadPlan({json.dumps({"plan": plan_rows(board), "needs": {}, "current_pick": 1})});
         document.body.innerText = {json.dumps(roster_text)};
         console.log(JSON.stringify(DK.rank()));
         """
@@ -86,132 +100,6 @@ def panel(players: list[str], of: int = 15) -> str:
     """Build a YOUR TEAM panel like Yahoo renders it."""
     body = " ".join(players)
     return f"YOUR TEAM ({len(players)}/{of}) {body}"
-
-
-def test_never_a_third_qb():
-    """The exact mistake from the 2026-08-31 mock: two QBs rostered, a third
-    still queued because ranking ignored the guardrail."""
-    r = rank_with(panel([
-        "J. Hurts QB Phi Bye 10",
-        "T. Lawrence QB Jax Bye 7",
-        "P. Nacua WR LAR Bye 11",
-    ]))
-    names = [c["n"] for c in r["top"]]
-    assert "Brock Purdy" not in names, f"3rd QB offered: {names}"
-
-
-def test_no_qb2_before_round_gate():
-    """qb2_earliest_round is 10 for keefamania; a 2nd QB in round 4 is out."""
-    r = rank_with(panel([
-        "J. Hurts QB Phi Bye 10",
-        "P. Nacua WR LAR Bye 11",
-        "C. McCaffrey RB SF Bye 8",
-    ]))
-    assert r["round"] == 4
-    assert "Josh Allen" not in [c["n"] for c in r["top"]]
-
-
-def test_k_and_def_locked_until_last_two_picks():
-    r = rank_with(panel(["P. Nacua WR LAR Bye 11"]))
-    names = [c["n"] for c in r["top"]]
-    assert "Brandon Aubrey" not in names
-    assert "Houston Texans" not in names
-
-
-def test_k_and_def_open_in_last_two_picks():
-    """13 rostered -> 2 picks left -> K/DEF become legal and, being the only
-    unfilled starters, must rank first."""
-    letters = "ABCDEFGHIJKLM"
-    roster = [f"{c}. Filler{c} WR LAR Bye 11" for c in letters]
-    r = rank_with(panel(roster))
-    assert r["picksLeft"] == 2, r["counts"]
-    names = [c["n"] for c in r["top"][:2]]
-    assert "Brandon Aubrey" in names and "Houston Texans" in names, names
-
-
-def test_last_pick_is_reserved_for_an_unfilled_kicker():
-    """One pick left, K still open: nothing but a kicker may be offered, even
-    though McCaffrey's VORP dwarfs Aubrey's. Otherwise the draft ends with an
-    empty mandatory slot."""
-    letters = "ABCDEFGHIJKLMN"
-    roster = [f"{c}. Filler{c} WR LAR Bye 11" for c in letters]
-    roster.append("H. Texans DEF Hou Bye 8")
-    r = rank_with(panel(roster[:14]))
-    assert r["picksLeft"] == 1
-    assert {c["p"] for c in r["top"]} <= {"K", "DEF"}, r["top"][:4]
-
-
-def test_second_te_must_beat_the_best_flex_alternative():
-    """A 2nd TE can only start in FLEX, competing with the RB/WR who would
-    otherwise hold that slot. Mock 4 took McBride AND Bowers in three rounds
-    and entered round 4 with no running back, because "top-6 TE" alone was
-    too easy a gate.
-
-    With McCaffrey (122.8) on the board, Bowers (68.5) must NOT be offered.
-    """
-    r = rank_with(panel([
-        "T. McBride TE Ari Bye 14",
-        "P. Nacua WR LAR Bye 11",
-    ]))
-    assert "Brock Bowers" not in [c["n"] for c in r["top"]], \
-        "TE2 offered while a far better flex option was available"
-
-
-def test_second_te_needs_a_top6_te_to_have_actually_fallen():
-    """Python's rule (tracker.recommendations): a second TE is allowed only
-    when a top-6 TE has FALLEN te2_fall picks past his ADP -- an unexpected
-    bargain, not a general licence.
-
-    The driver had substituted an invented margin ("beat the best RB/WR by 10
-    VORP"). The bake-off showed the driver losing to the engine at 8 of 10
-    slots; improvised rules like that are why. Match the engine.
-    """
-    board = "\n".join([
-        "Trey McBride|TE|ARI|69.3|||26.7",
-        "Brock Bowers|TE|LVR|66.3|||21.2",
-        "Jaylen Warren|RB|PIT|9.3|1||77.0",
-    ])
-    roster = panel(["T. McBride TE Ari Bye 14", "P. Nacua WR LAR Bye 11"])
-
-    def te_offered(next_pick):
-        r = run_js(
-            "DK.loadCompact(" + json.dumps(board)
-            + ", {teams: 10, myNextPick: " + str(next_pick) + "});\n"
-            "document.body.innerText = " + json.dumps(roster) + ";\n"
-            "console.log(JSON.stringify({te: DK.rank().top.some(x => x.p === 'TE')}));"
-        )
-        return r["te"]
-
-    # early: Bowers (ADP 21) has not fallen, so no TE2
-    assert te_offered(25) is False, "TE2 offered without a faller"
-    # late: now 12+ picks past his ADP, he has demonstrably fallen
-    assert te_offered(40) is True, "a genuinely fallen top-6 TE should qualify"
-
-
-
-def test_need_weighting_beats_similar_vorp():
-    """A player filling an open starter slot outranks a comparable one who
-    fills nothing.
-
-    Deliberately NOT asserted: that an open slot beats a far better player.
-    With 9 picks left and deep QB supply, taking elite TE Bowers (68.5) over
-    QB Allen (39.7) is correct, and qb2_earliest_round=10 says QB is not
-    urgent. Need-weighting is a tiebreak, not an override -- the override
-    case is must-fill, covered by the K/DEF test.
-    """
-    roster = [
-        "C. McCaffrey RB SF Bye 8",
-        "J. Warren RB Pit Bye 9",
-        "P. Nacua WR LAR Bye 11",
-        "A. Brown WR NE Bye 11",
-        "T. McBride TE Ari Bye 14",
-        "B. Bowers TE LV Bye 8",
-        "J. Waddle WR Den Bye 10",
-    ]
-    r = rank_with(panel(roster))
-    assert r["need"]["QB"] == 1
-    # both TEs rostered -> QB is the only open starter among live candidates
-    assert r["top"][0]["p"] == "QB", r["top"][:3]
 
 
 def test_rostered_players_are_never_reoffered():
@@ -356,25 +244,6 @@ def test_autopick_banner_is_detected():
     assert r["clear"] is False
 
 
-def test_a_queued_player_who_becomes_illegal_is_no_longer_ranked():
-    """Mock 3 queued Mahomes AND Hurts in round 5. Both were legal at QB
-    count 0, but the instant the first landed the second was an illegal QB2
-    that autopick would take. rank() must stop offering him, which is what
-    pruneQueue keys off."""
-    before = rank_with(panel(["P. Nacua WR LAR Bye 11"]))
-    # rank() returns ONE candidate per position, so the QB slot shows the best
-    # QB available rather than every legal QB.
-    assert any(c["p"] == "QB" for c in before["top"]), "QB1 should be legal"
-
-    after = rank_with(panel([
-        "P. Nacua WR LAR Bye 11",
-        "J. Allen QB Buf Bye 7",
-    ]))
-    assert after["round"] == 3
-    assert "Jalen Hurts" not in [c["n"] for c in after["top"]], \
-        "a second QB stayed rankable before qb2_earliest_round"
-
-
 def test_starred_memo_releases_players_taken_by_someone_else():
     """Mock 3's queue drained 5 -> 2 -> 1 and then Yahoo's own fallback list
     took over and handed us a THIRD tight end.
@@ -454,6 +323,7 @@ def test_queue_plan_does_not_stack_one_position():
     r = run_js(
         f"""
         DK.loadCompact({json.dumps(qb_heavy)});
+        DK.loadPlan({json.dumps({"plan": plan_rows(qb_heavy), "needs": {}, "current_pick": 51})});
         document.body.innerText = {json.dumps(panel([
             "R. Rice WR KC Bye 5",
             "D. Adams WR LAR Bye 11",
@@ -469,48 +339,6 @@ def test_queue_plan_does_not_stack_one_position():
     assert len(qbs) <= 1, f"queue stacked {len(qbs)} QBs: {plan}"
     assert any(p.endswith("|RB") or p.endswith("|WR") for p in plan), \
         f"queue held no runnable/receiving option: {plan}"
-
-
-def test_vona_stops_reaching_on_a_flat_position():
-    """Mock 8 took Mahomes at pick 42 against an ADP of 102 -- a 60-pick reach
-    -- and still ended up with Purdy at 99 anyway. VORP caused it: it scores
-    against a fixed replacement, so it cannot see that the whole QB field is
-    within a couple of points per game.
-
-    VONA asks the draft-day question instead: how much better is this player
-    than whoever I could still get at this position at my NEXT turn? A flat
-    position self-discounts; a scarce one does not.
-
-    Here the WR gap is huge (Adams 35.4 -> next survivor 1.8) and the QB gap
-    is small (Mahomes 21.1 -> Purdy 8.8, who lasts to ADP 98), so the WR must
-    outrank the QB even though their raw VORPs are close.
-    """
-    board = "\n".join([
-        "Davante Adams|WR|LAR|35.4|||56.5",     # available now
-        "Patrick Mahomes II|QB|KCC|21.1|||102.5",
-        "Brock Purdy|QB|SFO|8.8|||98.3",        # survives to our next turn
-        "Rome Odunze|WR|CHI|1.8|||66.7",        # the WR fallback, far worse
-    ])
-    r = run_js(
-        f"""
-        DK.loadCompact({json.dumps(board)}, {{teams: 10}});
-        document.body.innerText = {json.dumps(panel([
-            "C. McCaffrey RB SF Bye 8",
-            "J. Warren RB Pit Bye 9",
-            "T. McBride TE Ari Bye 14",
-            "B. Bowers TE LV Bye 13",
-        ]))};
-        const out = DK.rank();
-        console.log(JSON.stringify({{
-          first: out.top[0].n, firstPos: out.top[0].p,
-          vona: Object.fromEntries(out.top.map(x => [x.n, x.vona])),
-        }}));
-        """
-    )
-    assert r["firstPos"] == "WR", f"reached for the flat position: {r}"
-    assert r["first"] == "Davante Adams", r
-    # the QB's urgency is small because Purdy is still there next turn
-    assert r["vona"]["Patrick Mahomes II"] < r["vona"]["Davante Adams"], r
 
 
 def test_survival_is_rank_based_not_adp_based():
@@ -539,86 +367,6 @@ def test_survival_is_rank_based_not_adp_based():
     # calibration keeps everything off the rails
     assert 0.01 <= r["topOfBoard"] < 0.5 < r["deep"] <= 0.99, r
     assert abs(r["atEdge"] - 0.5) < 0.02, r
-
-
-def test_two_pick_planner_takes_both_of_an_elite_pair():
-    """The slot-9 regression, and the same failure planner.py was written for
-    at picks #26/#47 of the real Omnibeta draft.
-
-    Two elite TEs, both startable (TE + FLEX). Greedy urgency says there is no
-    rush -- the second one survives to our next turn -- so it spends the pick
-    elsewhere and ends up with only one of them. The joint planner asks what
-    PAIR maximises value, and its same-position partner is capped at
-    second-best-now, so it sees that taking a TE now still leaves the other
-    elite TE as the partner.
-    """
-    board = "\n".join([
-        "Trey McBride|TE|ARI|67.1|||26.7",
-        "Brock Bowers|TE|LVR|66.3|||21.2",
-        "James Cook III|RB|BUF|63.7|||9.6",
-        "Chase Brown|RB|CIN|60.5|||16.0",
-        "Rome Odunze|WR|CHI|1.8|||66.7",
-    ])
-    r = run_js(
-        f"""
-        DK.loadCompact({json.dumps(board)}, {{teams: 10}});
-        document.body.innerText = {json.dumps(panel(["P. Nacua WR LAR Bye 11"]))};
-        const out = DK.rank();
-        console.log(JSON.stringify({{
-          first: out.top[0].n, firstPos: out.top[0].p,
-          partner: out.top[0].partner,
-          pair: out.top[0].pair, vona: out.top[0].vona,
-        }}));
-        """
-    )
-    # taking a TE must be recognised as pairing with the OTHER elite TE
-    assert r["firstPos"] == "TE", f"planner still split the elite pair: {r}"
-    assert r["partner"] == "TE", f"partner should be the second TE: {r}"
-
-
-def test_rank_never_returns_empty_while_picks_remain():
-    """Stash-mute. Once every starter slot is filled, needsPosition() is false
-    for everyone, so the "at most one zero-role stash" rule silences the whole
-    board and rank() returns nothing. draftTop then reports "no candidates",
-    the clock expires and Yahoo takes the pick -- which is how autopick armed
-    in mock 7 at roster 9/15.
-
-    The Python engine hit this on shallow boards and fixed it with a labelled
-    fallback; this port reintroduced it. An empty recommendation is never
-    right while picks remain.
-    """
-    # Every remaining player is negative-VORP bench filler, AND we already
-    # hold one such player -- which is what switches the stash rule on.
-    thin = "\n".join([
-        "Golf Golf|WR|CIN|-20.0|||130.0",     # rostered: this is the stash
-        "Deep Sleeper|WR|FA|-30.0|||140.0",
-        "Second Sleeper|RB|FA|-35.0|||150.0",
-        "Third Sleeper|WR|FA|-40.0|||160.0",
-    ])
-    r = run_js(
-        f"""
-        DK.loadCompact({json.dumps(thin)});
-        document.body.innerText = {json.dumps(panel([
-            "A. Alpha QB Buf Bye 7",
-            "B. Bravo RB Sfo Bye 8",
-            "C. Charlie RB Det Bye 6",
-            "D. Delta WR LAR Bye 11",
-            "E. Echo WR Sea Bye 11",
-            "F. Foxtrot TE Ari Bye 14",
-            "G. Golf WR Cin Bye 5",
-        ]))};
-        const out = DK.rank();
-        console.log(JSON.stringify({{
-          n: out.top.length, relaxed: out.stashRelaxed, picksLeft: out.picksLeft
-        }}));
-        """
-    )
-    assert r["picksLeft"] == 8
-    assert r["n"] > 0, "rank() went silent with 8 picks still to make"
-    # Since mock 13 (2026-09-02) the stash rule itself is gone -- it emptied
-    # draftTop's candidate list at pick 86, a path the labelled fallback in
-    # rank() never covered -- so there is nothing left to relax.
-    assert not r.get("relaxed"), "the stash rule was removed; nothing should need relaxing"
 
 
 def test_an_unreadable_adp_refuses_a_colliding_name():
@@ -721,6 +469,7 @@ def test_availability_is_not_scraped_from_page_text():
     r = run_js(
         f"""
         DK.loadCompact({json.dumps(BOARD)});
+        DK.loadPlan({json.dumps({"plan": plan_rows(BOARD), "needs": {}, "current_pick": 1})});
         document.body.innerText = {json.dumps(
             panel(["P. Nacua WR LAR Bye 11"])
             + " Brock Bowers TE LVR Bye 8 Josh Allen QB Buf Bye 7"
@@ -1085,11 +834,10 @@ def test_roster_view_prefers_the_store_and_the_header_count():
     assert r["keys"] == ["a brown", "a brown"]      # the board key is initial + LAST token; the collision guard handles the rest
 
 
-def test_local_fallback_never_ranks_a_player_the_store_says_is_drafted():
-    """Stress mock 2026-09-02 (bridge killed at pick 78): the local ranker at
-    pick 86 tried two players drafted at picks 2 and 4, because its
-    availability set only knew S.gone (row lookups) and our own roster. The
-    store's drafted list is authoritative and must be excluded."""
+def test_no_plan_ever_means_no_page_ranking_only_the_queue_and_yahoo():
+    """The local VONA ranker is gone (review 2026-09-04). With no engine plan
+    ever received, rank() reports source none and an empty top, labelled, so
+    draftTop declines and the queue / Yahoo list take the pick."""
     r = run_js(
         f"""
         const s = {json.dumps(_store_with([(1, "1", "100"), (2, "2", "101")], players=PLAYERS))};
@@ -1098,12 +846,39 @@ def test_local_fallback_never_ranks_a_player_the_store_says_is_drafted():
         DK.loadCompact(["Christian McCaffrey|RB|SFO|122.8|1||1", "Bijan Robinson|RB|ATL|100|1||2",
                         "Brian Robinson Jr.|RB|WAS|20|||80", "Amon-Ra St. Brown|WR|DET|60|||5"].join(String.fromCharCode(10)), {{ teams: 10 }});
         const r = DK.rank();
-        console.log(JSON.stringify({{ source: r.source, top: r.top.map(x => x.n) }}));
+        console.log(JSON.stringify({{ source: r.source, top: r.top, err: r.err }}));
         """
     )
-    assert r["source"] == "local"
-    assert "Christian McCaffrey" not in r["top"] and "Bijan Robinson" not in r["top"], r
-    assert r["top"] and r["top"][0] in ("Amon-Ra St. Brown", "Brian Robinson Jr.")
+    assert r["source"] == "none" and r["top"] == []
+    assert "no engine plan" in r["err"]
+
+
+def test_a_dropped_plan_is_ranked_stale_minus_players_the_store_says_are_drafted():
+    """When the gate drops the plan (bridge unreachable), the last engine plan
+    is kept as stale and ranked minus everyone drafted since -- the engine's
+    own opinion from seconds ago, not a page-side ranking. Stress mock
+    2026-09-02 (bridge killed at pick 78) is the case: the store's drafted
+    list is authoritative and must be excluded."""
+    r = run_js(
+        f"""
+        const s = {json.dumps(_store_with([(1, "1", "100"), (2, "2", "101")], players=PLAYERS))};
+        DK._setStore({{ getState: () => s }});
+        document.body.innerText = 'ROUND 1, PICK 3 YOUR TEAM (0/15) ';
+        DK.loadCompact(["Christian McCaffrey|RB|SFO|122.8|1||1", "Bijan Robinson|RB|ATL|100|1||2",
+                        "Brian Robinson Jr.|RB|WAS|20|||80", "Amon-Ra St. Brown|WR|DET|60|||5"].join(String.fromCharCode(10)), {{ teams: 10 }});
+        DK.loadPlan({{ current_pick: 3, calls: 7, needs: {{}}, plan: [
+          {{ n: 'Christian McCaffrey', p: 'RB', why: 'top' }}, {{ n: 'Bijan Robinson', p: 'RB', why: 'second' }},
+          {{ n: 'Amon-Ra St. Brown', p: 'WR', why: 'third' }}, {{ n: 'Brian Robinson Jr.', p: 'RB', why: 'fourth' }} ] }});
+        DK._stashPlan();
+        const r = DK.rank();
+        console.log(JSON.stringify({{ source: r.source, top: r.top.map(x => x.n), whys: r.top.map(x => x.why), stale: r.stale, planStatus: DK.planStatus() }}));
+        """
+    )
+    assert r["source"] == "stale-plan"
+    assert r["top"] == ["Amon-Ra St. Brown", "Brian Robinson Jr."], r
+    assert all(w.startswith("STALE PLAN (engine plan from pick 3") for w in r["whys"]), r["whys"]
+    assert r["stale"]["pick"] == 3
+    assert r["planStatus"]["have"] is False      # the live plan slot is empty until the bridge answers again
 
 
 def test_board_key_matches_the_drivers_key_for_awkward_names():
@@ -1321,3 +1096,59 @@ def test_preflight_refuses_a_room_whose_size_disagrees_with_dk_load():
     # a store that carries no pick order is not evidence of a mismatch; the
     # other preflight checks carry the verdict
     assert r["noOrder"]["teams_mismatch"] is False and r["noOrder"]["order_len"] is None, r["noOrder"]
+
+
+# ---------- review 2026-09-04: the page ranks nothing itself; the queue still guards ----------
+
+def test_queue_plan_applies_the_guardrails_to_the_engines_plan():
+    """The local ranker is gone, so the page never ranks. The QUEUE planner
+    still checks each engine row against the roster it would hold by then
+    (guardrailOk): no third QB, no second QB before the gate, no K or DEF
+    until the last two picks. A plan that lists them anyway (a stale plan,
+    say) must not put them in the queue."""
+    board = "\n".join([
+        "Josh Allen|QB|BUF|39.7|||20.1",
+        "Jalen Hurts|QB|PHI|27.0|||56.4",
+        "Brandon Aubrey|K|DAL|9.0|||140.0",
+        "Ravens|DEF|BAL|8.0|||141.0",
+        "Jaylen Warren|RB|PIT|9.3|1||77.0",
+        "Courtland Sutton|WR|DEN|-1.7|||105.2",
+        "Kenneth Gainwell|RB|TB|4.0|||120.0",
+    ])
+    r = run_js(
+        f"""
+        DK.loadCompact({json.dumps(board)});
+        DK.loadPlan({json.dumps({"plan": plan_rows(board), "needs": {}, "current_pick": 44})});
+        document.body.innerText = {json.dumps(panel([
+            "P. Mahomes QB KC Bye 6", "R. Rice WR KC Bye 5", "D. Adams WR LAR Bye 11",
+            "J. Williams RB Dal Bye 14", "T. McBride TE Ari Bye 14",
+        ]))};
+        console.log(JSON.stringify({{ plan: DK.planQueue(null, null, 8), rank: DK.rank().top.map(x => x.n) }}));
+        """
+    )
+    queued = r["plan"]
+    assert not any(q.endswith("|QB") for q in queued), f"a second QB before the gate was queued: {queued}"
+    assert not any(q.endswith("|K") or q.endswith("|DEF") for q in queued), f"K/DEF queued with 10 picks left: {queued}"
+    assert any(q.endswith("|RB") or q.endswith("|WR") for q in queued), queued
+    # rank() itself hands the plan through untouched (minus mine/drafted): the
+    # engine owns the guardrails on the pick, the queue owns them on the queue
+    assert "Jalen Hurts" in r["rank"]
+
+
+def test_stale_plan_still_feeds_the_queue_planner():
+    """With the bridge gone, the queue is planned from the stale plan, so
+    Yahoo's autopick draws from the engine's last opinion, not its default
+    list."""
+    board = "\n".join(["Jaylen Warren|RB|PIT|9.3|1||77.0", "Courtland Sutton|WR|DEN|-1.7|||105.2",
+                        "Kenneth Gainwell|RB|TB|4.0|||120.0"])
+    r = run_js(
+        f"""
+        DK.loadCompact({json.dumps(board)});
+        DK.loadPlan({json.dumps({"plan": plan_rows(board), "needs": {}, "current_pick": 88})});
+        document.body.innerText = {json.dumps(panel(["P. Mahomes QB KC Bye 6", "R. Rice WR KC Bye 5"]))};
+        DK._stashPlan();
+        console.log(JSON.stringify({{ plan: DK.planQueue(null, null, 5), status: DK.planStatus().have }}));
+        """
+    )
+    assert r["status"] is False
+    assert r["plan"] == ["Jaylen Warren|RB", "Courtland Sutton|WR", "Kenneth Gainwell|RB"]
