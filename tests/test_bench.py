@@ -390,9 +390,11 @@ def test_the_preference_is_symmetric_not_a_bolted_on_exception():
     """First cut only blocked market->bench for an upgrade, so an upgrade whose
     BENCH row happened to sort first kept it anyway. Whichever way the scores
     fall, the ruler is chosen by what the player is."""
+    t0 = _seam_tracker(False)
+    _added, ups = t0._bench_candidates([], t0.my_needs(), t0._my_pos_counts(), 11, 6, False)
+
     def kinds(rows):
-        return [("up" if (not _is_bench(r) and r[2]["sleeper_id"] == "qb2") else "bench" if _is_bench(r) else "mkt")
-                for r in rows]
+        return [("bench" if _is_bench(r) else "up" if r[2]["sleeper_id"] in ups else "mkt") for r in rows]
     off, on = _rows(False), _rows(True)
     assert [r[2]["sleeper_id"] for r in off] == [r[2]["sleeper_id"] for r in on], "the knob switches nothing now"
     k = kinds(off)
@@ -405,9 +407,11 @@ def test_upgrades_lead_on_their_market_row_then_bench_rows_then_the_rest():
     """The seam order is fixed, never a re-sort across currencies: the
     upgrade (qb2 out-projects my starting QB) on his market row first, the
     backups on bench rows, the revived market rows last."""
-    rows = _rows(False)
-    kinds = [("up" if (not _is_bench(r) and r[2]["sleeper_id"] == "qb2") else "bench" if _is_bench(r) else "mkt") for r in rows]
-    assert kinds[0] == "up", kinds
+    t = _seam_tracker(False)
+    _added, ups = t._bench_candidates([], t.my_needs(), t._my_pos_counts(), 11, 6, False)
+    rows = t.recommendations(top_n=12)
+    kinds = [("bench" if _is_bench(r) else "up" if r[2]["sleeper_id"] in ups else "mkt") for r in rows]
+    assert kinds[0] == "up" and rows[0][2]["sleeper_id"] == "qb2", kinds
     assert not _is_bench(_row(False, "qb2"))
     first_mkt = kinds.index("mkt") if "mkt" in kinds else len(kinds)
     assert all(k != "bench" for k in kinds[first_mkt:]), kinds

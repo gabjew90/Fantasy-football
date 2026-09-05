@@ -148,6 +148,24 @@ def _steps_2_to_4(rows: list[Row], report: dict, needs: dict, rnd: int,
         return tied + rest, f"pair order stands ({why_skip})"
     ranked = pair(tied)
     note = f"pair decided ({why_skip})"
+    # A dead-heat pair (same position, same partner: the pair cannot separate
+    # them, and its own near-tie rule would read the floor in any round) falls
+    # back to the ROUND's variance rule: floor through FLOOR_THROUGH_ROUND,
+    # ceiling after.
+    top = ranked[0][0]
+    heat = [r for r in ranked if top - r[0] <= VARIANCE_BAND]
+    if len(heat) > 1:
+        keys = {_sid(p): variance_key(p, rnd, fallback) for _s, _w, p in heat}
+        if all(k is not None for k in keys.values()):
+            what = "floor" if rnd <= FLOOR_THROUGH_ROUND else "ceiling"
+            by_k = sorted(heat, key=lambda r: -keys[_sid(r[2])])
+            k0, k1 = keys[_sid(by_k[0][2])], keys[_sid(by_k[1][2])]
+            if k0 - k1 > VARIANCE_BAND:
+                for _s, _w, p in heat:
+                    p["_staged"][what] = round(keys[_sid(p)], 1)
+                ranked = by_k + ranked[len(heat):]
+                note = (f"pair tied within {VARIANCE_BAND:g} ({why_skip}); higher {what} over replacement "
+                        f"({k0:.0f} vs {k1:.0f} for {_name(by_k[1][2])})")
     others = [_tag(r, "staged: lower pair") for r in ranked[1:]]
     return [ranked[0]] + others + rest, note
 

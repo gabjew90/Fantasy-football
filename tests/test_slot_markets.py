@@ -186,9 +186,18 @@ def test_flex_bound_candidate_ranks_on_flex_value_not_positional_value():
     recs = t.recommendations(top_n=6)
     order = [p["sleeper_id"] for _s, _w, p in recs]
     assert "rb_a" in order
-    assert order[0] != "wr_top"
-    if "wr_top" in order:
-        assert order.index("rb_a") < order.index("wr_top")
+    # Since the staged ranker (2026-09-05) every market row goes through the
+    # stages, and stage 2 prices a FLEX entrant against the best FLEX
+    # fallback, never against his own position's replacement or his
+    # positional VORP. wr_top's stage-2 value must be his points over the
+    # flex fallback (the back he would otherwise start there), and the plan
+    # must still carry the back.
+    from draftkit.staged import staged_value
+    needs, fb = t.my_needs(), t._fallback_points(t.my_needs())
+    wr = next(p for _s, _w, p in recs if p["sleeper_id"] == "wr_top")
+    flex_fb = max(fb[q] for q in ("RB", "WR", "TE") if q in fb)
+    assert abs(staged_value(wr, needs, fb) - (wr["proj_pts"] - flex_fb)) < 1e-9
+    assert staged_value(wr, needs, fb) < wr["proj_pts"] - fb["WR"], "priced against his own position's fallback"
 
 
 def test_a_filled_position_no_longer_gets_its_own_urgency_row():
@@ -283,12 +292,15 @@ def test_dispersion_off_keeps_the_upside_multiplier_ordering():
     t = make_tracker(board, mine, my_slot=1, current_pick=71)        # round 8
     assert t.late_round_dispersion is False
     top, _ = _top_rb(t)
-    # equal value, no upside flag: the board's own order (wide listed first) holds
+    # equal value, both gone regardless, the pair a dead heat: round 8, so
+    # the ceiling decides (staged stage 4), wide 60 over narrow 30
     assert top == "wide"
     board2, mine2 = _late_board()
     next(x for x in board2 if x["sleeper_id"] == "narrow")["upside_flag"] = True                                   # 'narrow' gets the role-quality flag
     t2 = make_tracker(board2, mine2, my_slot=1, current_pick=71)
-    assert _top_rb(t2)[0] == "narrow"
+    top2, whys2 = _top_rb(t2)
+    # the flag still marks his row; the round's variance rule still orders (user design 2026-09-05)
+    assert "UPSIDE play" in whys2["narrow"] and top2 == "wide"
 
 
 def test_dispersion_on_prefers_the_wider_spread_from_the_upside_round_only():
@@ -312,7 +324,22 @@ def test_dispersion_degrades_to_the_multiplier_without_a_two_source_spread():
         t = make_tracker(board, mine, my_slot=1, current_pick=71)
         t.late_round_dispersion = True
         top, whys = _top_rb(t)
-        assert top == "narrow" and all("sources disagree" not in w for w in whys.values()), (sd, n)
+        # no two-source disagreement to report...
+        assert all("sources disagree" not in w for w in whys.values()), (sd, n)
+        # ...but the source's own published high line IS a range (staged stage
+        # 4, 2026-09-05: the one-sheet Keefamania board has lines and one
+        # source), so round 8 orders on the ceiling: wide 60 over narrow 30
+        assert top == "wide", (sd, n)
+    # with no range published at all, stage 4 is skipped and the flagged
+    # head of the market (the multiplier's order) stands
+    board, mine = _late_board(sd_a=None, n_a=1, n_b=1)
+    for x in board:
+        if x["sleeper_id"] in ("wide", "narrow"):
+            x["proj_hi"] = x["proj_lo"] = None
+    next(x for x in board if x["sleeper_id"] == "narrow")["upside_flag"] = True
+    t = make_tracker(board, mine, my_slot=1, current_pick=71)
+    t.late_round_dispersion = True
+    assert _top_rb(t)[0] == "narrow"
 
 
 # ---------- review 2026-09-02: engine fixes on the live path ----------
@@ -340,6 +367,7 @@ def test_zero_adp_delta_is_a_real_delta_in_the_near_tie():
     b = dict(player("b", "RB", 19.0, 19.0, 51.0), adp_delta=0.0)
     filler = [player(f"f{i}", "WR", 1.0, 1.0, 150.0 + i) for i in range(4)]
     t = make_tracker([a, b] + filler, [], my_slot=1, current_pick=21)
-    recs = t.recommendations(top_n=5)
-    rbs = [p["sleeper_id"] for _s, _w, p in recs if p["pos"] == "RB"]
-    assert rbs[0] == "b"
+    t.recommendations(top_n=5)
+    # the Δ rule picks the market's HEAD (the shortlist's lead row and the
+    # plan's alternates anchor); the final order is the stages' (2026-09-05)
+    assert t._market_alternates["RB"]["best"] == 19.0, t._market_alternates["RB"]

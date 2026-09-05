@@ -982,6 +982,28 @@ class Tracker:
         cands[:0] = rows
         return True, upgrade_ids
 
+    def _apply_prefer(self, cands: list) -> list:
+        """engine.prefer as a final reorder: for each [preferred, over] pair
+        with both men in the list and the preferred one below, move him to
+        just above the other and say so in his reason (user, 2026-09-05:
+        Chase over Nacua at pick 3). Inert otherwise."""
+        pairs = getattr(self, "prefer", None) or []
+        if not pairs or len(cands) < 2:
+            return cands
+        out = list(cands)
+
+        def _nm(row):
+            return str(row[2].get("name") or row[2].get("player") or "")
+        for want, over in pairs:
+            iw = next((i for i, r in enumerate(out) if _nm(r) == want), None)
+            io = next((i for i, r in enumerate(out) if _nm(r) == over), None)
+            if iw is None or io is None or iw < io:
+                continue
+            row = out.pop(iw)
+            row = (row[0], row[1] + f" · USER PREFERENCE: {want} over {over} (league yaml engine.prefer)", row[2])
+            out.insert(io, row)
+        return out
+
     @staticmethod
     def _mval(p: dict, value_key: str) -> float:
         """A player's value in a given market's currency."""
@@ -1277,152 +1299,148 @@ class Tracker:
             pool = gpool[:3]
             if not pool:
                 continue
-            # best value within the market; near-ties (<= 2 pts of the market's
-            # TOP candidate) broken by Δ — anchored so swaps can't chain
+            # The market's head: best value, near-ties (<= 2 pts of the TOP
+            # candidate) broken by Δ, anchored so swaps can't chain. EVERY
+            # member of the shortlist becomes a row (user, 2026-09-05): the
+            # stages (value band, banded scarcity, floor/ceiling, pair) run
+            # over same-position candidates too, where one representative per
+            # market used to settle Chase vs Nacua on 1.6 VORP before any
+            # stage ran.
             anchor = pool[0]
-            best = anchor
+            head = anchor
 
             def _delta(q):
                 # 0.0 is a real delta, not a missing one (`or -999` read it as missing)
                 d = q.get("adp_delta")
                 return -999.0 if d is None else float(d)
             for q in pool[1:]:
-                if abs(mv(anchor) - mv(q)) <= 2.0 and _delta(q) > _delta(best):
-                    best = q
-            # the user's named preference inside this market (engine.prefer)
-            pref_note = None
-            for want, over in (getattr(self, "prefer", None) or []):
-                if str(best.get("name") or best.get("player")) == over:
-                    hit = next((q for q in pool if str(q.get("name") or q.get("player")) == want), None)
-                    if hit is not None:
-                        best = hit
-                        pref_note = f"USER PREFERENCE: {want} over {over} (league yaml engine.prefer)"
-                        break
-            self._market_alternates[mkt] = {"best": mv(best), "alts": [(q, mv(q)) for q in pool if q is not best]}
-            pos = best["pos"]
-            label = "your FLEX spot" if mkt == "FLEX" else mkt
-            rem_pos = [p for p in self.remaining(pos)
-                       if p.get("proj_source") != "no_market"]
-            u = report.get(mkt) if report else None
-            urgency = u["urgency"] if u else mv(best)
-            # rationale: plain-English clauses, all from already-computed draft
-            # state (no model calls on the clock, per spec §9)
-            parts = []
-            if pref_note:
-                parts.append(pref_note)
-            if u:
-                if urgency >= 1.0:
-                    parts.append(
-                        f"waiting likely costs ~{urgency:.0f} pts at {label} "
-                        f"(best option now {u['best_now']:.0f}, "
-                        f"~{u['e_best_next']:.0f} by your next turn)"
-                    )
-                else:
-                    parts.append(f"safe to wait on {label}")
-                surv = u["survival"].get(best["sleeper_id"])
-                if surv is not None:
-                    parts.append(f"{surv:.0%} chance he's still there at your next pick")
-            if needs.get(pos, 0) > 0:
-                parts.append(f"fills your open {pos} slot")
-            elif pos in snake.FLEX_ELIGIBLE and needs.get("FLEX", 0) > 0:
-                parts.append("fills a FLEX slot")
-            else:
-                parts.append("bench depth (starters covered)")
-            c = cliff.get(pos, {})
-            same_tier = sum(1 for q in rem_pos if q["tier"] == best["tier"])
-            next_tier = next((q["tier"] for q in rem_pos if q["tier"] > best["tier"]),
-                             None)
-            if c.get("urgent"):
-                parts.append(
-                    f"TAKE-NOW ZONE: only {c['before_cliff']} left before the {pos} "
-                    f"value drops, and {c['intervening_demand']} team"
-                    f"{'s' if c['intervening_demand'] != 1 else ''} picking before "
-                    f"you still need one"
-                )
-            else:
-                if next_tier is not None and same_tier == 1:
-                    parts.append(f"last {pos} at this level — big drop after him")
-                elif next_tier is not None and same_tier <= 3:
-                    parts.append(f"only {same_tier} {pos}s left at this level")
-                elif c.get("before_cliff") is not None and c["before_cliff"] <= 3:
-                    parts.append(f"{c['before_cliff']} left before the {pos} value drops")
-                demand = c.get("intervening_demand", 0)
-                if demand:
-                    parts.append(f"{demand} team{'s' if demand != 1 else ''} picking "
-                                 f"before you still need a {pos}")
-            if best.get("adp") is not None:
-                d = self.current_pick - best["adp"]
-                if d >= self.fall_alert:
-                    parts.append(f"bargain: still here {d:.0f} picks after he's usually drafted")
-                elif d >= 3:
-                    parts.append(f"{d:.0f} picks past his usual draft spot")
-            if rnd >= self.upside_from_round and (_d := self._dispersion_for(best)) is not None:
-                n = best.get("n_sources") or 0
-                sd = best.get("proj_sd")
-                if sd is not None and sd == sd and n >= 2:
-                    lo, hi = best.get("proj_lo"), best.get("proj_hi")
-                    span = f", {lo:.0f}-{hi:.0f}" if lo is not None and hi is not None else ""
-                    parts.append(f"sources disagree by ±{sd:.0f} pts ({n} sources{span})")
-                else:
-                    # naming the quantity matters: this is the forecaster's own
-                    # stated range, not two feeds disagreeing
-                    parts.append(f"wide forecast: the source's own range is ±{_d:.0f} pts")
-            elif rnd >= self.upside_from_round and best.get("upside_flag"):
-                parts.append(f"UPSIDE play: {best.get('upside_why')}")
-            why = " · ".join(parts) or "best value"
-            why += self._bye_warning(best, needs)
-            # UI-only handcuff tag (never scored): the late-round buy signal is
-            # a backup whose starter is fragile or currently availability-flagged
-            # standing contingency (post-v2 item 3): late rounds only, display
-            # only — it never enters the score
-            if rnd >= 12 and best.get("backs_up_pos") and best.get("starter_fragility_label"):
-                why += (f" · standing handcuff: backs up {best['backs_up_pos']} "
-                        f"({best['starter_fragility_label']} fragility)")
-            if best.get("backs_up"):
-                seg = float(best.get("starter_exp_games") or 16.0)
-                sav = best.get("starter_avail")
-                if seg <= 13.0 or sav:
-                    tag = f" ⛑ backs up {best['backs_up']} ({seg:.0f}g"
-                    tag += f", {sav})" if sav else ")"
-                    why += tag
-            # Tiebreak in the MARKET's own currency: within a pooled market
-            # every candidate carries the same urgency, so this is what
-            # actually picks the flex starter -- and it is the comparison that
-            # stops an elite TE outranking an RB he does not out-produce.
-            score = urgency + 0.001 * mv(best)  # stable ordering
-            # the market this row was built in and its urgency, for stage 1
-            # of the staged ranker (draftkit/staged.py)
-            # a player can win two markets (WR and FLEX); the dedup below keeps
-            # the more urgent row, so stage 1 must read THAT market, not the
-            # last one written (room 10799518 pick 7: JSN read as FLEX 21.9
-            # when his WR row at 43.5 was the one kept)
-            best.setdefault("_mkts", {})[mkt] = float(urgency)
-            urgency_of[mkt] = float(urgency)
-            if u and fallback is not None and repl is not None:
-                # The sim scores a market with NO survivor at replacement
-                # (VORP 0), so a market that can empty inside the window
-                # carries a LEVEL in its urgency, not a difference, and a
-                # baseline shift leaks in by shift x P(empties). The honest
-                # alternative when the market empties is the fallback player:
-                # add P(empties) x his VORP back. A member outside the
-                # simulated window has no survival entry and is certain to
-                # survive, so then P(empties) is 0 and nothing changes.
-                surv_m = u.get("survival") or {}
-                ids = {str(q.get("sleeper_id")) for q in rem}
-                ss = [float(s) for sid_, s in surv_m.items() if sid_ in ids]
-                if ss and len(ss) == len(ids):
-                    p_none = 1.0
-                    for s in ss:
-                        p_none *= (1.0 - s)
-                    if mkt == "FLEX":
-                        fbs = [fallback[q] for q in snake.FLEX_ELIGIBLE if q in fallback]
-                        fb_pts = max(fbs) if fbs else None
-                    else:
-                        fb_pts = fallback.get(pos)
-                    if fb_pts is not None and p_none > 0.0:
-                        fb_vorp = fb_pts - repl.get(mkt, repl.get(pos, 0.0))
-                        urgency_of[mkt] = float(urgency) - p_none * fb_vorp
-            cands.append((score, why, best))
+                if abs(mv(anchor) - mv(q)) <= 2.0 and _delta(q) > _delta(head):
+                    head = q
+            ordered = [head] + [q for q in pool if q is not head]
+            self._market_alternates[mkt] = {"best": mv(head), "alts": [(q, mv(q)) for q in pool if q is not head]}
+            for best in ordered:
+              pos = best["pos"]
+              label = "your FLEX spot" if mkt == "FLEX" else mkt
+              rem_pos = [p for p in self.remaining(pos)
+                         if p.get("proj_source") != "no_market"]
+              u = report.get(mkt) if report else None
+              urgency = u["urgency"] if u else mv(best)
+              # rationale: plain-English clauses, all from already-computed draft
+              # state (no model calls on the clock, per spec §9)
+              parts = []
+              if u:
+                  if urgency >= 1.0:
+                      parts.append(
+                          f"waiting likely costs ~{urgency:.0f} pts at {label} "
+                          f"(best option now {u['best_now']:.0f}, "
+                          f"~{u['e_best_next']:.0f} by your next turn)"
+                      )
+                  else:
+                      parts.append(f"safe to wait on {label}")
+                  surv = u["survival"].get(best["sleeper_id"])
+                  if surv is not None:
+                      parts.append(f"{surv:.0%} chance he's still there at your next pick")
+              if needs.get(pos, 0) > 0:
+                  parts.append(f"fills your open {pos} slot")
+              elif pos in snake.FLEX_ELIGIBLE and needs.get("FLEX", 0) > 0:
+                  parts.append("fills a FLEX slot")
+              else:
+                  parts.append("bench depth (starters covered)")
+              c = cliff.get(pos, {})
+              same_tier = sum(1 for q in rem_pos if q["tier"] == best["tier"])
+              next_tier = next((q["tier"] for q in rem_pos if q["tier"] > best["tier"]),
+                               None)
+              if c.get("urgent"):
+                  parts.append(
+                      f"TAKE-NOW ZONE: only {c['before_cliff']} left before the {pos} "
+                      f"value drops, and {c['intervening_demand']} team"
+                      f"{'s' if c['intervening_demand'] != 1 else ''} picking before "
+                      f"you still need one"
+                  )
+              else:
+                  if next_tier is not None and same_tier == 1:
+                      parts.append(f"last {pos} at this level — big drop after him")
+                  elif next_tier is not None and same_tier <= 3:
+                      parts.append(f"only {same_tier} {pos}s left at this level")
+                  elif c.get("before_cliff") is not None and c["before_cliff"] <= 3:
+                      parts.append(f"{c['before_cliff']} left before the {pos} value drops")
+                  demand = c.get("intervening_demand", 0)
+                  if demand:
+                      parts.append(f"{demand} team{'s' if demand != 1 else ''} picking "
+                                   f"before you still need a {pos}")
+              if best.get("adp") is not None:
+                  d = self.current_pick - best["adp"]
+                  if d >= self.fall_alert:
+                      parts.append(f"bargain: still here {d:.0f} picks after he's usually drafted")
+                  elif d >= 3:
+                      parts.append(f"{d:.0f} picks past his usual draft spot")
+              if rnd >= self.upside_from_round and (_d := self._dispersion_for(best)) is not None:
+                  n = best.get("n_sources") or 0
+                  sd = best.get("proj_sd")
+                  if sd is not None and sd == sd and n >= 2:
+                      lo, hi = best.get("proj_lo"), best.get("proj_hi")
+                      span = f", {lo:.0f}-{hi:.0f}" if lo is not None and hi is not None else ""
+                      parts.append(f"sources disagree by ±{sd:.0f} pts ({n} sources{span})")
+                  else:
+                      # naming the quantity matters: this is the forecaster's own
+                      # stated range, not two feeds disagreeing
+                      parts.append(f"wide forecast: the source's own range is ±{_d:.0f} pts")
+              elif rnd >= self.upside_from_round and best.get("upside_flag"):
+                  parts.append(f"UPSIDE play: {best.get('upside_why')}")
+              why = " · ".join(parts) or "best value"
+              why += self._bye_warning(best, needs)
+              # UI-only handcuff tag (never scored): the late-round buy signal is
+              # a backup whose starter is fragile or currently availability-flagged
+              # standing contingency (post-v2 item 3): late rounds only, display
+              # only — it never enters the score
+              if rnd >= 12 and best.get("backs_up_pos") and best.get("starter_fragility_label"):
+                  why += (f" · standing handcuff: backs up {best['backs_up_pos']} "
+                          f"({best['starter_fragility_label']} fragility)")
+              if best.get("backs_up"):
+                  seg = float(best.get("starter_exp_games") or 16.0)
+                  sav = best.get("starter_avail")
+                  if seg <= 13.0 or sav:
+                      tag = f" ⛑ backs up {best['backs_up']} ({seg:.0f}g"
+                      tag += f", {sav})" if sav else ")"
+                      why += tag
+              # Tiebreak in the MARKET's own currency: within a pooled market
+              # every candidate carries the same urgency, so this is what
+              # actually picks the flex starter -- and it is the comparison that
+              # stops an elite TE outranking an RB he does not out-produce.
+              score = urgency + 0.001 * mv(best)  # stable ordering
+              # the market this row was built in and its urgency, for stage 1
+              # of the staged ranker (draftkit/staged.py)
+              # a player can win two markets (WR and FLEX); the dedup below keeps
+              # the more urgent row, so stage 1 must read THAT market, not the
+              # last one written (room 10799518 pick 7: JSN read as FLEX 21.9
+              # when his WR row at 43.5 was the one kept)
+              best.setdefault("_mkts", {})[mkt] = float(urgency)
+              urgency_of[mkt] = float(urgency)
+              if u and fallback is not None and repl is not None:
+                  # The sim scores a market with NO survivor at replacement
+                  # (VORP 0), so a market that can empty inside the window
+                  # carries a LEVEL in its urgency, not a difference, and a
+                  # baseline shift leaks in by shift x P(empties). The honest
+                  # alternative when the market empties is the fallback player:
+                  # add P(empties) x his VORP back. A member outside the
+                  # simulated window has no survival entry and is certain to
+                  # survive, so then P(empties) is 0 and nothing changes.
+                  surv_m = u.get("survival") or {}
+                  ids = {str(q.get("sleeper_id")) for q in rem}
+                  ss = [float(s) for sid_, s in surv_m.items() if sid_ in ids]
+                  if ss and len(ss) == len(ids):
+                      p_none = 1.0
+                      for s in ss:
+                          p_none *= (1.0 - s)
+                      if mkt == "FLEX":
+                          fbs = [fallback[q] for q in snake.FLEX_ELIGIBLE if q in fallback]
+                          fb_pts = max(fbs) if fbs else None
+                      else:
+                          fb_pts = fallback.get(pos)
+                      if fb_pts is not None and p_none > 0.0:
+                          fb_vorp = fb_pts - repl.get(mkt, repl.get(pos, 0.0))
+                          urgency_of[mkt] = float(urgency) - p_none * fb_vorp
+              cands.append((score, why, best))
         cands.sort(key=lambda t: -t[0])
         # a player who wins two markets appears twice; keep the more urgent
         seen_ids: set[str] = set()
@@ -1549,6 +1567,7 @@ class Tracker:
                                 fallback=fallback, repl=repl,
                                 partner_certain=bool(getattr(self, "_look_through", False)),
                                 tie_break=str(self.tie_break), tie_window=float(self.tie_window))
+            cands = self._apply_prefer(cands)
         except Exception as e:  # noqa: BLE001 — planner must never block the clock
             # fall back to greedy, but never silently: a dead planner on draft
             # day must be visible (code review 2026-08-30)

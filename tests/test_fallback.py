@@ -142,7 +142,7 @@ def test_turning_the_fallback_off_restores_the_old_sensitivity():
     def qb_value(t):
         from draftkit.staged import staged_value
         needs = t.my_needs()
-        p = next(p for _s, _w, p in t.recommendations(top_n=6) if p["pos"] == "QB")
+        p = next(p for _s, _w, p in t.recommendations(top_n=15) if p["pos"] == "QB")
         return staged_value(p, needs, t._fallback_points(needs) if t.adaptive_fallback else None)
     assert qb_value(b) - qb_value(a) > 80.0, "the A/B is meaningless if both arms agree"
 
