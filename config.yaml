@@ -1,4 +1,4 @@
-# Global engine configuration. League-specific facts and strategy knobs live
+﻿# Global engine configuration. League-specific facts and strategy knobs live
 # in leagues/<name>.yaml (see default_league). Precedence: league file wins
 # over globals on every key, deep-merged. Select a league with
 # `--league <name>` or the DRAFTKIT_LEAGUE env var.
@@ -55,7 +55,7 @@ projections:
 
   # ---- legacy model knobs (projections.source: model only) -----------------
   # weight on the stats-based model for players with 2025 data; (1 - alpha)
-  # goes to the market-implied projection. This scalar is the FALLBACK —
+  # goes to the market-implied projection. This scalar is the FALLBACK â€”
   # v2 item 1.7 varies alpha by player type (see alpha_by_type).
   model_alpha: 0.55
   alpha_by_type:
@@ -73,7 +73,7 @@ projections:
   shrink_k: 5
   # All projections and replacement levels use the same 16-game convention
   # (uniform scaling never changes ranks). The per-player durability haircut
-  # was REMOVED 2026-08-29 (v2 plan 1.3, research Q6) — exp_games is
+  # was REMOVED 2026-08-29 (v2 plan 1.3, research Q6) â€” exp_games is
   # informational only.
   expected_games: 16.0
   no_market_floor: 60
@@ -114,8 +114,8 @@ engine:
   pool_min: 40        # never sample from fewer than this many candidates
   pool_lookback: 20   # include players whose ADP is up to N picks BEHIND now
   pool_lookahead: 60  # ...and up to N picks ahead
-  sigma_early: 10.0    # #46: fitted with rival_draw order (was 6.0)
-  sigma_late: 45.0    # #46: 27/6 scaled with sigma_early (was 27.0)
+  sigma_early: 6.0     # 2026-09-05 study (11 rooms, shown objective): floored draw at 6/27 (was 10.0 under order, #46)
+  sigma_late: 27.0    # 27/6 scaled with sigma_early (was 45.0)
   # fat-tail reach mixture: with reach_prob, a rival's ADP noise is scaled
   # by reach_scale (one-directional reaches, CLV retro: QBs reached 33-46
   # picks early in this room)
@@ -168,13 +168,21 @@ engine:
   run_ratio: 0
   autopick_sigma_scale: 0.5  # B5: an autopicking rival's ADP noise as a fraction of sigma (prior)
   autopick_need_damp: 0.02   # B5: autopick fills starters first; a non-filling position while a starter slot is open
-  autopick_list_prob: 0.2    # #46: fitted with the order draw (was 0.0; #35 kept 0.0 under the lottery)
+  autopick_list_prob: 0.4    # 2026-09-05 study: 0.4 at the floored/6-27 point (was 0.2 under order, #46)
   # HOW a rival chooses among the alive pool (survival study 2026-09-04,
   # DECISIONS #46): lottery = today (Gaussian-in-(pick - ADP) draw over the
   # whole pool; a faller LOSES weight as he falls), floored (a faller weighs
   # as much as an on-ADP player), order (lowest ADP + noise wins; a faller
   # is the likeliest pick). Shown-candidate calibration is the measurement.
-  rival_draw: order    # DECISIONS #46 result: fitted and LORO-confirmed 2026-09-04 (was lottery)
+  rival_draw: floored  # 2026-09-05 study over 11 rooms, shown log loss 0.525 vs order/10-45 at 0.585 (was order, #46)
+  # Shown-row calibration (2026-09-05): the rows the engine shows are the rows
+  # other drafters want; over eleven rooms at the fitted point the SHOWN
+  # survival ran 40% -> 21% observed, 60% -> 43%, 81% -> 73%, 96% -> 88%
+  # (reports/survival_fit_study_2026-09-05.md, confirmation at 1000 sims).
+  # Piecewise-linear knots [predicted, observed], endpoints 0 and 1 implied;
+  # applied to the survival the stages, the bench multiplier and the page
+  # read, never to survival_raw. Empty list = identity.
+  survival_calibration: [[0.16, 0.14], [0.40, 0.21], [0.60, 0.43], [0.81, 0.73], [0.96, 0.88]]
   # ---- bench rows (2026-09-04, user-approved design; DECISIONS #47) --------
   # bench_survival_discount: rank a bench row on its COST OF WAITING (insurance
   # now minus the expected best insurance at my next turn, over the position's
@@ -247,7 +255,7 @@ inseason:
   # the old numbers exactly, so rollback is this one line.
   ros_prorate:
     enabled: true
-  # In-season age decay on ROS DISPLAYS and trade logic only — never touches
+  # In-season age decay on ROS DISPLAYS and trade logic only â€” never touches
   # tiers.csv, projections, or any draft-layer number (post-v2 item 4).
   # Conventional-wisdom-shaped and UNVALIDATED; revisit with 2026 actuals.
   age_decay:

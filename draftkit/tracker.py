@@ -31,6 +31,26 @@ POS_ORDER = ["RB", "WR", "TE", "QB", "K", "DEF"]
 # dedup has to tell them apart. One constant, written once and matched once.
 BENCH_WHY_PREFIX = "bench insurance:"
 BENCH_ZERO = 0.5  # season insurance under this is nothing: the zero-insurance fallthrough (ceiling over the wire)
+
+
+def calibrate_survival(s: float, knots: list[tuple[float, float]]) -> float:
+    """Piecewise-linear map from the sim's survival to what the SHOWN rows
+    actually did (engine.survival_calibration, [[predicted, observed], ...]).
+    Endpoints (0, 0) and (1, 1) are implied. The rows the engine shows are the
+    rows other drafters want too: over eleven rooms the fitted rival model
+    still showed 40% where 21% survived and 60% where 43% did (reports/
+    survival_fit_study_2026-09-05.md), a gap no draw form in the grid closes.
+    Applied to `survival` only; `survival_raw` stays the sim's number."""
+    if not knots:
+        return s
+    pts = sorted([(0.0, 0.0)] + [(float(a), float(b)) for a, b in knots] + [(1.0, 1.0)])
+    s = min(1.0, max(0.0, float(s)))
+    for (x0, y0), (x1, y1) in zip(pts, pts[1:]):
+        if s <= x1:
+            if x1 == x0:
+                return y1
+            return y0 + (y1 - y0) * (s - x0) / (x1 - x0)
+    return pts[-1][1]
 BENCH_TIE = 2.0   # bench rows this close on the RAW insurance value are a coin flip: the higher
                   # CEILING breaks it (proj_hi, else proj_pts + band/2; never the width, DECISIONS #55)
 
@@ -499,6 +519,18 @@ class Tracker:
                 raise ValueError(f"engine.prefer entries are [preferred, over] pairs, got {item!r}")
             pairs.append((str(item[0]), str(item[1])))
         self.prefer = pairs
+        # engine.survival_calibration: [[predicted, observed], ...] knots for
+        # calibrate_survival; empty means the sim's number is shown as is
+        knots = ecfg.get("survival_calibration") or []
+        cal: list[tuple[float, float]] = []
+        for item in knots:
+            if not isinstance(item, (list, tuple)) or len(item) != 2:
+                raise ValueError(f"engine.survival_calibration entries are [predicted, observed] pairs, got {item!r}")
+            a, b = float(item[0]), float(item[1])
+            if not (0.0 <= a <= 1.0 and 0.0 <= b <= 1.0):
+                raise ValueError(f"engine.survival_calibration knots are probabilities, got {item!r}")
+            cal.append((a, b))
+        self.survival_calibration = cal
 
     def _rival_states(self, start: int, my_next: int) -> list[dict]:
         """Intervening pickers in order, with their open starter slots."""
@@ -1110,6 +1142,13 @@ class Tracker:
             rival_draw=self.rival_draw,
             rival_needs_update=self.rival_needs_update,
         )
+        # the shown survival is the calibrated one (calibrate_survival); the
+        # sim's own number stays in survival_raw for the harness
+        knots = getattr(self, "survival_calibration", None) or []
+        if knots and report:
+            for _mkt, u in report.items():
+                if isinstance(u, dict) and isinstance(u.get("survival"), dict):
+                    u["survival"] = {k: calibrate_survival(v, knots) for k, v in u["survival"].items()}
         self._urgency_cache = (key, report)
         return report
 

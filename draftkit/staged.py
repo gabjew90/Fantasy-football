@@ -36,6 +36,16 @@ from .planner import market_for, own_value, pair_rank
 from .snake import FLEX_ELIGIBLE
 
 URGENCY_BAND = 1.5
+# A market also stays live within URGENCY_REL of the top urgency (user,
+# 2026-09-05 afternoon, rooms 10801633 and 10802514): TE 21.6 vs WR 15.4 left
+# London (value 62.5) uncompared with McBride (43.2); QB 27.6 vs RB 24.4 left
+# Henry dead; WR 21.3 vs RB 16.2 left Javonte and Hall dead. A few urgency
+# points must not lock out fifteen value points.
+URGENCY_REL = 0.30
+# Below this top urgency nothing is really urgent (a 2-pick window, or a flat
+# board): the pair leads, as at the turn (room 10801633 pick 19: QB 6.5 over
+# WR 0.4 decided the position while London out-valued Allen by 10).
+URGENCY_FLOOR = 8.0
 VALUE_BAND = 2.0
 SURV_GAP = 0.15
 BOTH_GONE = 0.20
@@ -191,34 +201,42 @@ def staged_rank(cands: list[Row], report: dict | None, needs: dict, rnd: int,
     if not report or len(cands) < 2:
         return pair(cands)
 
-    if partner_certain:
-        # the turn: no rival between this pick and my next, urgency is empty,
-        # the pair leads and stages 2 to 4 settle the winning band
-        ranked = pair(cands)
-        top = ranked[0][0]
-        tied = [r for r in ranked if top - r[0] <= VALUE_BAND]
-        rest = [_tag(r, f"staged: pair {r[0]:.1f}, {top - r[0]:.1f} under the best") for r in ranked if top - r[0] > VALUE_BAND]
-        for _s, _w, p in cands:
-            p.setdefault("_staged", {})["mode"] = "turn"
-        if len(tied) == 1:
-            out = [_tag(tied[0], f"STAGED (turn): pair picked him ({top:.1f})")] + rest
-            return out
-        ordered, note = _steps_2_to_4(tied, report, needs, rnd, fallback, pair=None)
-        head = _tag(ordered[0], f"STAGED (turn): pair band of {len(tied)}, then {note}")
-        return [head] + ordered[1:] + rest
-
-    # stage 1: urgency picks the position
     urg = {_sid(p): float(urgency_of.get(market_of.get(_sid(p), p.get("pos")), 0.0) or 0.0)
            for _s, _w, p in cands}
     top_u = max(urg.values())
     for _s, _w, p in cands:
         p.setdefault("_staged", {})["urgency"] = round(urg[_sid(p)], 1)
         p["_staged"]["market"] = market_of.get(_sid(p), p.get("pos"))
-    live = [c for c in cands if top_u - urg[_sid(c[2])] <= URGENCY_BAND]
-    dead = sorted((c for c in cands if top_u - urg[_sid(c[2])] > URGENCY_BAND),
+
+    flat = top_u < URGENCY_FLOOR
+    if partner_certain or flat:
+        # the turn (no rival between this pick and my next) or a flat board
+        # (nothing loses more than URGENCY_FLOOR by waiting): urgency is empty,
+        # the pair leads and stages 2 to 4 settle the winning band
+        mode = "turn" if partner_certain else "flat"
+        ranked = pair(cands)
+        top = ranked[0][0]
+        tied = [r for r in ranked if top - r[0] <= VALUE_BAND]
+        rest = [_tag(r, f"staged: pair {r[0]:.1f}, {top - r[0]:.1f} under the best") for r in ranked if top - r[0] > VALUE_BAND]
+        for _s, _w, p in cands:
+            p["_staged"]["mode"] = mode
+        label = "STAGED (turn)" if partner_certain else f"STAGED (flat: top urgency {top_u:.1f} under {URGENCY_FLOOR:g})"
+        if len(tied) == 1:
+            out = [_tag(tied[0], f"{label}: pair picked him ({top:.1f})")] + rest
+            return out
+        ordered, note = _steps_2_to_4(tied, report, needs, rnd, fallback, pair=None)
+        head = _tag(ordered[0], f"{label}: pair band of {len(tied)}, then {note}")
+        return [head] + ordered[1:] + rest
+
+    # stage 1: urgency picks the position. Live = within URGENCY_BAND of the
+    # top, or within URGENCY_REL of it.
+    def _live(u: float) -> bool:
+        return (top_u - u <= URGENCY_BAND) or (u >= top_u * (1.0 - URGENCY_REL))
+    live = [c for c in cands if _live(urg[_sid(c[2])])]
+    dead = sorted((c for c in cands if not _live(urg[_sid(c[2])])),
                   key=lambda c: -urg[_sid(c[2])])
     dead = [_tag(c, f"staged: not live, {market_of.get(_sid(c[2]), c[2].get('pos'))} urgency "
-                    f"{urg[_sid(c[2])]:.1f} vs {top_u:.1f} at the top") for c in dead]
+                    f"{urg[_sid(c[2])]:.1f} vs {top_u:.1f} at the top (band {URGENCY_BAND:g} or {URGENCY_REL:.0%})") for c in dead]
     live_mkts = sorted({market_of.get(_sid(c[2]), c[2].get("pos")) for c in live})
     lead = (f"urgency picked {'/'.join(live_mkts)} ({top_u:.1f}"
             + (f", next {max(urg[_sid(d[2])] for d in dead):.1f}" if dead else "")
