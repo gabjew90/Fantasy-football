@@ -29,6 +29,7 @@ POS_ORDER = ["RB", "WR", "TE", "QB", "K", "DEF"]
 # Bench rows are priced in a DIFFERENT currency from market rows, and the
 # dedup has to tell them apart. One constant, written once and matched once.
 BENCH_WHY_PREFIX = "bench insurance:"
+BENCH_TIE = 2.0   # bench rows this close are a coin flip: the wider published range breaks it (late_round_dispersion)
 
 FALLBACK_FLOORS = ("board_min", "replacement")
 
@@ -105,6 +106,16 @@ class Tracker:
     autopick_need_damp = 0.02   # plan B5: autopick fills every starter slot first; a non-filling position while one is open
     autopick_list_prob = 0.0    # DECISIONS #35: P(an autopick seat walks Yahoo's default list this pick); 0 = today's behaviour
     rival_draw = "lottery"      # survival study 2026-09-04: lottery (today) | floored | order (urgency.simulate_survival)
+    # BENCH ROWS (2026-09-04, user-approved design). bench_survival_discount:
+    # rank a bench row on its cost of waiting -- insurance value now minus
+    # the expected best insurance value at my next turn (urgency.expected_best
+    # over the position's candidates and their simulated survivals) -- the
+    # same operator the market path uses, instead of raw insurance points,
+    # which took Tracy at 79 while he was 95% to be there at 89.
+    # bench_contingency: price the role shift when a backup's starter on
+    # ANOTHER roster goes down (bench.insurance_value, contingency term).
+    bench_survival_discount = False
+    bench_contingency = False
     rival_needs_update = True   # plan B6: a rival picking twice in my window consumes his needs
     away_slots = frozenset()    # plan B5: draft slots on autopick (Yahoo 'away'); empty on Sleeper
     upside_from_round = 8
@@ -399,6 +410,7 @@ class Tracker:
         ("upside_boost_relative", bool), ("fallback_floor", str),
         ("bench_row_wins_dedupe", bool), ("per_position_deadline", bool),
         ("draft_k", int),
+        ("bench_survival_discount", bool), ("bench_contingency", bool),
     )
 
     def _dispersion_for(self, q: dict) -> float | None:
@@ -719,6 +731,32 @@ class Tracker:
         from .bench import predicted_undrafted
         rem_all = [p for p in self.remaining() if p.get("proj_source") != "no_market"]
         wire_names = predicted_undrafted(rem_all, self.current_pick, last_pick)
+        from .bench import ABSENT_WEEKS
+        from .urgency import expected_best
+        # survival to my next turn per player, for the bench drop-off: the
+        # same simulation the market path uses; a player outside its ADP
+        # window has no entry and counts as certain to survive
+        surv_by_pos: dict[str, dict] = {}
+        if self.bench_survival_discount:
+            rep = self.urgency_report() or {}
+            surv_by_pos = {pos: (rep.get(pos) or {}).get("survival") or {} for pos in BENCH_POSITIONS}
+        # the starter a role shift would displace, per position: at a
+        # flex-eligible position the weakest flex-eligible starter (the new
+        # starter pushes him out through the FLEX)
+        displace_ppw: dict[str, float] = {}
+        if self.bench_contingency:
+            for pos in BENCH_POSITIONS:
+                group = set(snake.FLEX_ELIGIBLE) if pos in snake.FLEX_ELIGIBLE else {pos}
+                vals = [weakest_starter[g] for g in group if g in weakest_starter]
+                if vals:
+                    displace_ppw[pos] = min(vals) / 17.0
+        by_name = {str(q.get("player") or q.get("name") or ""): q for q in self.players}
+        late = rnd >= self.upside_from_round and bool(self.late_round_dispersion)
+
+        def _band(q: dict) -> float:
+            b = q.get("proj_band")
+            return float(b) if b is not None and b == b else 0.0
+
         added, upgrade_ids = False, set()
         for pos in BENCH_POSITIONS:
             rem = [p for p in self.remaining(pos)
@@ -727,15 +765,25 @@ class Tracker:
             if not rem:
                 continue
             waiver, wname = waiver_ppw(rem, last_pick, k, wire_names=wire_names)
-            best, best_iv = None, None
+            scored: list[tuple[dict, dict]] = []
             for p in rem:
                 hc = starter_ppw.get(str(p.get("backs_up") or ""))
+                kw: dict = {}
+                if self.bench_contingency and hc is None and p.get("backs_up") and pos in displace_ppw:
+                    st = by_name.get(str(p.get("backs_up")))
+                    kw = {"contingency_weeks": ABSENT_WEEKS[pos],
+                          "contingency_starter_ppw": (float(st.get("proj_pts") or 0.0) / 17.0) if st else None,
+                          "my_weakest_ppw": displace_ppw[pos]}
                 iv = insurance_value(p, waiver, exposure.get(pos, 0), hc,
-                                     depth_ahead=depth_ahead.get(pos, 0))
-                if best_iv is None or iv["value"] > best_iv["value"]:
-                    best, best_iv = p, iv
-            if best is None:
-                continue
+                                     depth_ahead=depth_ahead.get(pos, 0), **kw)
+                scored.append((p, iv))
+            best, best_iv = max(scored, key=lambda t: t[1]["value"])
+            if late:
+                # within BENCH_TIE of the best, the wider published range is
+                # the better lottery ticket; anchored on the best, no chaining
+                for p, iv in scored:
+                    if p is not best and best_iv["value"] - iv["value"] <= BENCH_TIE and _band(p) > _band(best):
+                        best, best_iv = p, iv
             n = exposure.get(pos, 0)
             d = depth_ahead.get(pos, 0)
             why = (f"bench insurance: covers {n} {pos} starter{'s' if n != 1 else ''}"
@@ -744,7 +792,22 @@ class Tracker:
                    f"the wire ({wname or 'nobody'}) ≈ {best_iv['value']:.0f} pts")
             if best_iv["handcuff"]:
                 why += f" · HANDCUFF: backs up your {best.get('backs_up')}"
-            cands.append((best_iv["value"], why, best))
+            if best_iv.get("contingency"):
+                why += (f" · +{best_iv['contingency']:.0f} of that is the role shift if "
+                        f"{best.get('backs_up')} goes down (he would start over your weakest {pos})")
+            score = best_iv["value"]
+            if self.bench_survival_discount:
+                s_map = surv_by_pos.get(pos, {})
+                vals = [iv["value"] for _p, iv in scored]
+                survs = [float(s_map.get(str(_p.get("sleeper_id")), 1.0)) for _p, _iv in scored]
+                e_next = expected_best(vals, survs)
+                cost = max(0.0, best_iv["value"] - e_next)
+                s_best = float(s_map.get(str(best.get("sleeper_id")), 1.0))
+                why += (f" · waiting likely costs ~{cost:.0f} ({s_best:.0%} he is still there next turn, "
+                        f"expected best {pos} then {e_next:.0f})")
+                score = cost
+            best["_bench_value"] = best_iv["value"]
+            cands.append((score, why, best))
             added = True
             # is he an upgrade rather than insurance? Compared at his own
             # position: displacing across the flex is a second-order case the
@@ -753,7 +816,17 @@ class Tracker:
             if floor is not None and float(best.get("proj_pts") or 0.0) > floor:
                 upgrade_ids.add(str(best.get("sleeper_id")))
         if added:
-            cands.sort(key=lambda t: -t[0])
+            # cost of waiting first (or raw insurance with the knob off), the
+            # bigger insurance value breaking exact ties
+            cands.sort(key=lambda t: (-t[0], -float(t[2].get("_bench_value") or 0.0)))
+            if late:
+                # across positions, the same near-tie rule, one anchored pass
+                # over adjacent bench rows
+                for i in range(len(cands) - 1):
+                    a, b = cands[i], cands[i + 1]
+                    if (str(a[1]).startswith(BENCH_WHY_PREFIX) and str(b[1]).startswith(BENCH_WHY_PREFIX)
+                            and abs(a[0] - b[0]) <= BENCH_TIE and _band(b[2]) > _band(a[2])):
+                        cands[i], cands[i + 1] = b, a
         return added, upgrade_ids
 
     @staticmethod
@@ -1222,6 +1295,7 @@ class Tracker:
         if bench_rows:
             for _sc, _w, p in cands:
                 p.pop("_pair", None)   # bench mode skips the pair stage; drop stale math
+                p.pop("_bench_value", None)
             return cands[:top_n]
         try:
             from .planner import pair_rank

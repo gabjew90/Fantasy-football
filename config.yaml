@@ -172,6 +172,16 @@ engine:
   # as much as an on-ADP player), order (lowest ADP + noise wins; a faller
   # is the likeliest pick). Shown-candidate calibration is the measurement.
   rival_draw: lottery
+  # ---- bench rows (2026-09-04, user-approved design; DECISIONS #47) --------
+  # bench_survival_discount: rank a bench row on its COST OF WAITING (insurance
+  # now minus the expected best insurance at my next turn, over the position's
+  # candidates and their simulated survivals) instead of raw insurance points.
+  # bench_contingency: a backup whose starter is on ANOTHER roster is also
+  # priced for the role shift if that starter goes down (absence table x
+  # uplift over my weakest starter). The band tiebreak on bench rows rides
+  # late_round_dispersion. All default off = today's behaviour.
+  bench_survival_discount: false
+  bench_contingency: false
   rival_needs_update: true   # B6: a rival picking twice in my window consumes his needs
   # ---- correctness set (2026-09-04) --------------------------------------
   # Engine BEHAVIOUR, so it lives here in globals and not in a league file:

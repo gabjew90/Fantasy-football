@@ -159,16 +159,31 @@ def waiver_ppw(remaining_at_pos: list[dict], last_pick: int, k: int,
 
 def insurance_value(p: dict, waiver: float, exposure: int,
                     handcuff_starter_ppw: float | None = None,
-                    depth_ahead: int = 0) -> dict:
+                    depth_ahead: int = 0,
+                    contingency_weeks: float | None = None,
+                    contingency_starter_ppw: float | None = None,
+                    my_weakest_ppw: float | None = None) -> dict:
     """Season points a bench player is expected to add over streaming.
 
     handcuff_starter_ppw: the weekly rate of the starter he backs up, when
     that starter is on MY roster; None otherwise.
     depth_ahead: backups I already roster at his position (see weeks_needed).
+
+    The CONTINGENCY term (engine.bench_contingency, 2026-09-04): a backup
+    whose starter is on SOMEONE ELSE'S roster has a second source of value the
+    insurance line never sees -- if that starter goes down, the backup
+    inherits the role and starts for ME, displacing my weakest starter at his
+    position (or the weakest flex-eligible starter, through the FLEX). Priced
+    with the same absence table and the same uplift as the own-handcuff case,
+    applied to the event that actually generates his upside:
+        contingency_weeks x max(0, uplifted rate - my weakest starter's rate)
+    Skipped for my own handcuff (that event is the insurance line already;
+    adding both would double count). None of the three inputs -> 0.
     Returns the pieces too, so the rationale can show its work.
     """
     pos = p.get("pos")
-    ppw = float(p.get("proj_pts") or 0.0) / FANTASY_WEEKS
+    own = float(p.get("proj_pts") or 0.0) / FANTASY_WEEKS
+    ppw = own
     handcuff = handcuff_starter_ppw is not None
     if handcuff:
         # inherits the role in exactly the weeks the insurance pays; the cap
@@ -177,6 +192,10 @@ def insurance_value(p: dict, waiver: float, exposure: int,
         ppw = min(ppw * HANDCUFF_UPLIFT, max(handcuff_starter_ppw, ppw))
     edge = max(0.0, ppw - waiver)
     weeks = weeks_needed(pos, exposure, depth_ahead)
-    return {"value": edge * weeks, "edge": edge, "weeks": weeks,
+    contingency = 0.0
+    if (not handcuff and contingency_weeks and my_weakest_ppw is not None):
+        up = min(own * HANDCUFF_UPLIFT, max(float(contingency_starter_ppw or 0.0), own))
+        contingency = max(0.0, up - float(my_weakest_ppw)) * float(contingency_weeks)
+    return {"value": edge * weeks + contingency, "edge": edge, "weeks": weeks,
             "ppw": ppw, "waiver_ppw": waiver, "handcuff": handcuff,
-            "depth_ahead": depth_ahead}
+            "depth_ahead": depth_ahead, "contingency": contingency}

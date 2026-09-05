@@ -234,6 +234,8 @@ def main() -> None:
     ap.add_argument("--sims", type=int, default=200)
     ap.add_argument("--rates", default="data/processed/bench_rates.json")
     ap.add_argument("--slots", default="", help="comma list of draft slots")
+    ap.add_argument("--set", action="append", default=[], metavar="KNOB=VALUE",
+                    help="B arm knobs (A arm = insurance as today); e.g. --set bench_survival_discount=true")
     a = ap.parse_args()
 
     L = league_entry(a.league)
@@ -255,6 +257,14 @@ def main() -> None:
     slots = ([int(x) for x in a.slots.split(",")] if a.slots
              else list(range(1, L["teams"] + 1)))
 
+    from slot_replay import parse_knob
+    overrides = {}
+    for kv in a.set:
+        k_, v_ = kv.split("=", 1)
+        overrides[k_] = parse_knob(k_, v_)
+    defaults = {k_: getattr(T.Tracker, k_) for k_ in overrides}
+    if overrides:
+        print(f"B arm overrides: {overrides} (A arm: insurance on, defaults)")
     print(f"Season replay — {a.league}: {L['teams']} teams, k={L['k']}, "
           f"{a.sims} seasons per roster, absences from empirical position "
           f"distributions\n")
@@ -264,9 +274,16 @@ def main() -> None:
     for s in slots:
         rosters = {}
         for flag in (False, True):
-            T.Tracker.bench_insurance = flag
+            # default arms: VORP bench (off) vs insurance (on). With --set,
+            # BOTH arms price insurance and the on arm carries the overrides,
+            # so a bench knob is graded against today's insurance, not VORP.
+            T.Tracker.bench_insurance = flag or bool(overrides)
+            for k_, v_ in (overrides.items() if flag else ()):
+                setattr(T.Tracker, k_, v_)
             rosters[flag] = replay(board, log, s, L["teams"], rounds, True,
                                    slots=L["slots"])
+            for k_ in overrides:
+                setattr(T.Tracker, k_, defaults[k_])
         T.Tracker.bench_insurance = False
         off = season(rosters[False], L["slots"], wire, rates, byes, a.sims,
                      f"{a.league}:{s}")
