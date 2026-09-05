@@ -830,6 +830,20 @@ window.DK = (function () {
       my_roster: drafted.filter(d => d.mine).map(d => ({ name: d.name, pos: d.pos })),
       away_teams: away,
       queue: (s.queue || []).map(String),
+      // the room's per-position draft caps (settings.settings.position_draft_caps,
+      // e.g. {RB:"6",WR:"8",TE:"4",QB:"4",K:"4",DEF:"4"}): the bridge applies
+      // them over the league yaml so the engine never names a player Yahoo
+      // will refuse (rooms 10797402 / 10798461: a 7th RB, thunk and click both
+      // rejected, the clock spent finding out)
+      position_caps: (function () {
+        try {
+          const caps = s.settings && s.settings.settings && s.settings.settings.position_draft_caps;
+          if (!caps || typeof caps !== 'object') return null;
+          const out = {};
+          for (const k of Object.keys(caps)) { const v = parseInt(caps[k], 10); if (!isNaN(v)) out[k] = v; }
+          return Object.keys(out).length ? out : null;
+        } catch (e) { return null; }
+      })(),
     };
   }
 
@@ -947,6 +961,7 @@ window.DK = (function () {
         away_teams: snap ? snap.away_teams : [],   // plan B5: managers on autopick right now
         roster_count: rosterCount() ? rosterCount().have : null,
         on_clock: snap ? snap.on_clock : onClock(),
+        position_caps: snap ? (snap.position_caps || null) : null,   // the room's draft caps, room truth over the yaml
       });
       // a hung bridge must not hold the on-clock path for the whole clock
       const ctl = typeof AbortController !== 'undefined' ? new AbortController() : null;

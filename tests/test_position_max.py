@@ -32,3 +32,13 @@ def test_the_league_file_carries_the_measured_back_cap():
     from draftkit.config import Config
     g = Config.load(league="keefamania").get("guardrails") or {}
     assert int((g.get("position_max") or {}).get("RB", 0)) == 6
+
+
+def test_the_room_caps_write_over_the_yaml_caps():
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+    from yahoo_bridge import merge_position_caps
+    assert merge_position_caps({"RB": 6, "WR": 6}, {"RB": "6", "WR": "8", "TE": "4", "OFF": "4"}) == {"RB": 6, "WR": 8, "TE": 4, "OFF": 4}
+    assert merge_position_caps({"RB": 6}, None) == {"RB": 6}
+    assert merge_position_caps(None, {"RB": "x", "WR": "8"}) == {"WR": 8}

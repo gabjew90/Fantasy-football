@@ -151,6 +151,21 @@ def load_players(cfg: Config) -> list[dict]:
     return out
 
 
+def merge_position_caps(yaml_caps: dict | None, room_caps: dict | None) -> dict[str, int]:
+    """The engine's per-position roster cap: the league yaml's numbers with
+    the ROOM's own draft caps (draft_driver sends settings.position_draft_caps
+    as `position_caps`) written over them. The room is the truth; the yaml is
+    what we knew before the door opened. Unparseable entries are skipped."""
+    out: dict[str, int] = {}
+    for src in (yaml_caps or {}), (room_caps or {}):
+        for k, v in src.items():
+            try:
+                out[str(k).upper()] = int(v)
+            except (TypeError, ValueError):
+                continue
+    return out
+
+
 def build_tracker(cfg: Config, players: list[dict], state: dict) -> Tracker:
     """A Tracker over Yahoo state. No Sleeper API is involved."""
     exp = cfg.get("expected") or {}
@@ -179,7 +194,7 @@ def build_tracker(cfg: Config, players: list[dict], state: dict) -> Tracker:
     g = cfg.get("guardrails") or {}
     t.qb2_round = int(g.get("qb2_earliest_round", 10))
     t.te2_fall = int(g.get("te2_fall_picks", 12))
-    t.position_max = {str(k): int(v) for k, v in (g.get("position_max") or {}).items()}
+    t.position_max = merge_position_caps(g.get("position_max"), state.get("position_caps"))
     t._urgency_cache = None
     t.rival_seeds, t.slot_to_user = {}, {}
     t.players = players
