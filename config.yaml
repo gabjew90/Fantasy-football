@@ -113,8 +113,8 @@ engine:
   pool_min: 40        # never sample from fewer than this many candidates
   pool_lookback: 20   # include players whose ADP is up to N picks BEHIND now
   pool_lookahead: 60  # ...and up to N picks ahead
-  sigma_early: 6.0    # ADP noise (picks) in round 1  (~0.5 rounds)
-  sigma_late: 27.0    # ADP noise (picks) by round 15 (~2.25 rounds)
+  sigma_early: 10.0    # #46: fitted with rival_draw order (was 6.0)
+  sigma_late: 45.0    # #46: 27/6 scaled with sigma_early (was 27.0)
   # fat-tail reach mixture: with reach_prob, a rival's ADP noise is scaled
   # by reach_scale (one-directional reaches, CLV retro: QBs reached 33-46
   # picks early in this room)
@@ -154,13 +154,13 @@ engine:
   run_ratio: 0
   autopick_sigma_scale: 0.5  # B5: an autopicking rival's ADP noise as a fraction of sigma (prior)
   autopick_need_damp: 0.02   # B5: autopick fills starters first; a non-filling position while a starter slot is open
-  autopick_list_prob: 0.0    # DECISIONS #35: P(autopick seat walks Yahoo's default list, lowest yrank fitting a starter slot); fitted by #35; 0 = today's behaviour
+  autopick_list_prob: 0.2    # #46: fitted with the order draw (was 0.0; #35 kept 0.0 under the lottery)
   # HOW a rival chooses among the alive pool (survival study 2026-09-04,
   # DECISIONS #46): lottery = today (Gaussian-in-(pick - ADP) draw over the
   # whole pool; a faller LOSES weight as he falls), floored (a faller weighs
   # as much as an on-ADP player), order (lowest ADP + noise wins; a faller
   # is the likeliest pick). Shown-candidate calibration is the measurement.
-  rival_draw: lottery
+  rival_draw: order    # DECISIONS #46 result: fitted and LORO-confirmed 2026-09-04 (was lottery)
   # ---- bench rows (2026-09-04, user-approved design; DECISIONS #47) --------
   # bench_survival_discount: rank a bench row on its COST OF WAITING (insurance
   # now minus the expected best insurance at my next turn, over the position's

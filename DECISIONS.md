@@ -3207,3 +3207,88 @@ give the gate a third season.
   _pos_allowed must-fill, roster parser second copy.
 
 Tests: tests/test_turn_and_wire.py (6). Suite 736 passed.
+
+## 2026-09-04 (51) — the page no longer ranks; survival_shrink removed; the two-pick bench form measured and not shipped
+
+The JS local ranker is gone (scripts/draft_driver.js, 165 lines). rank()
+is now: the engine plan; else the last plan the gate dropped this turn,
+kept as `stalePlan` and ranked minus everyone drafted since (source
+`stale-plan`, the why prefixed "STALE PLAN (engine plan from pick N, M s
+old; bridge unreachable)"); else nothing, labelled `none`, so draftTop
+declines and the queue and Yahoo's list take the pick. The queue planner
+still applies guardrailOk to the engine's rows, which is where the
+guardrail coverage now lives in the driver tests (a stale plan listing a
+QB2 before the gate or a K with ten picks left never reaches the queue).
+Twelve tests that exercised the deleted ranker are gone, four are added.
+Found on the way: the store-drafted check keyed on idKey folded Bijan and
+Brian Robinson onto one key, so Bijan going at pick 2 marked Brian drafted
+for the rest of the room; rows whose key collides on the board now match
+on the whole name. The runbook and the scrutiny report know the label.
+
+survival_shrink is removed outright: the knob, urgency.calibrate(), the
+one-time warning, the logged field, the config block, the harness
+override and the tests around them. `survival` and `survival_raw` remain
+two keys over one vector (the page reads one, the calibration harness the
+other). DECISIONS #26 retired it; nothing had read a value other than 1.0
+since.
+
+bench_two_pick (the follow-up #47 named): a bench position scores as its
+insurance now plus the expected best insurance still gettable at the
+OTHER bench positions next turn, value alone at the last bench pick.
+Built behind a knob and measured on the season replay against insurance
+as shipped:
+
+| league | two-pick vs insurance | seats better / worse / tied |
+|---|---|---|
+| keefamania (10) | -0.0 / season, se 0.3 | 4 / 2 / 4 |
+| omnibeta (12) | -8.2 / season, se 0.8 | 2 / 5 / 5 |
+
+It fixes the QB2 starvation the drop-off caused (every roster keeps its
+QB2) and buys nothing for it. DECISION: does not ship; default off. The
+bench pricing as shipped stands, and with it the round-10 QB2 the user
+asked about: the season grader has now said three times that it is the
+right pick.
+
+Bench work for a future season, if any: the bench formula's inputs are
+position base rates and a wire; the only bench change the grader has
+liked was the wire correction (#36). The next candidate is the grader
+itself (two seasons of actuals, not a simulated season).
+
+### #46 result (2026-09-04 21:50 PT): fit and leave-one-room-out both pass; the knob moves
+
+Fit (scripts/fit_survival.py --fit --stage rival_study --objective shown,
+41 rooms, sims 100, every 4th state, confirmation at 400;
+reports/survival_fit_rival.md). Grid winner: rival_draw `order`,
+sigma_early 10 / sigma_late 45, autopick_list_prob 0.2. Shown-row log
+loss 0.596 against today's 0.742; pool 0.192 against 0.209 (guard
+passes). Shown calibration, pooled, fitted vs current: 81% shown survives
+70% (was 58%), 60% survives 45% (was 34%), 40% survives 31% (was 20%), the
+top bucket 97% survives 90% (was 89%). Cost: the whole pool's bottom
+bucket over-corrects (13% shown, 34% survive) and the human room's pool
+under-promises its low and middle buckets by 13 to 15 points; on that
+room's shown rows it is a wash at n=117.
+
+Leave-one-room-out (--loro --stage rival_loro, a genuine refit per fold on
+the coarse grid {lottery, order} x sigma {6, 10} then list-walk {0, 0.2};
+reports/survival_loro_rival.md). The fitted point is the SAME in all 41
+folds. Held-out shown log loss: fitted wins 35 of 41 rooms, pooled mean
+0.528 against 0.613 (delta -0.085). The one human room (the Omnibeta
+draft): 0.752 against 0.842, a win. Row-pooled whole-pool log loss:
+0.1916 against 0.1832, worse by 0.0084, inside the 0.010 guard. The six
+losses include two of today's three sheet-board rooms (10713941 +0.23,
+10714820 +0.03), which is worth a look when more sheet-board rooms exist.
+
+Against the pre-registration: objective PASS, pool guard PASS (fit and
+LORO), human room PASS, LORO majority PASS, LORO pooled PASS.
+
+DECISION: config.yaml (global; the rival model is not league-specific)
+moves to rival_draw order, sigma_early 10, sigma_late 45,
+autopick_list_prob 0.2. Pick churn of the point on the headline board,
+ten seats of the Omnibeta log: see the line under this entry. Stated in
+advance and now true: the engine will say "take him now" more often on
+players past their ADP. The bridge was restarted on the new point.
+
+Churn of the fitted point vs the old defaults, headline board, ten seats: 32
+of 150 picks (21%), rounds 1-13, position-neutral (QB 5, RB 15, WR 10, TE 2
+left and taken alike). The sim now takes fallers off the board sooner; the
+roster shapes do not move.
