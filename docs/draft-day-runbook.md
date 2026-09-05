@@ -74,6 +74,16 @@ In Chrome (the profile that accepted the bridge cert):
         // PR.moveAfter('DK Metcalf', 'Bucky Irving') puts one where the board has him (name of the player ranked just above)
         PR.save();              // again, after the touch-ups
 
+   Re-import on 2026-09-05 (221-player board over the 240-player list of 09-02):
+   the first PR.import() right after navigation reported "import dialog did not
+   open" (page not settled); the retry imported 220. Yahoo's import + Save
+   REPLACES the saved list: the 26 stale names from the old board dropped off
+   on save, and a player hand-starred BEFORE that save was lost with them, so
+   star the unmatched AFTER the first save, then save again. The page re-renders
+   slowly with 240 rows: one "Remove from My Preferred" click per ~40 s and
+   PR.moveAfter timed out three times at the 45 s eval budget; a deep-bench
+   hand-starred name can stay at the tail. Read the list back after a reload
+   (PR.preferred() against PR.csv()) before recording it.
    The last successful load is recorded in reports/prerank.keefamania.md
    (what the list looked like, what was unmatched, what was hand-starred).
 
