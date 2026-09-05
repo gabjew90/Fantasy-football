@@ -3030,3 +3030,48 @@ PRE-REGISTRATION (before the run):
 Command: venv\Scripts\python.exe scripts\fit_survival.py --fit --stage
 rival_study --objective shown --sims 100 --every 4 --confirm-sims 400
 --workers 6 --fit-out reports/survival_fit_rival.md
+
+## 2026-09-04 (47) — bench set (survival drop-off, contingency, band tiebreak): built, measured, NOT shipped
+
+User-approved design (three items from the bench critique): rank bench
+rows on cost of waiting (insurance now minus expected_best over the
+position's candidates and their simulated survivals), add a contingency
+term for a backup whose starter is on another roster (absence table x
+uplift over my weakest starter, never stacked on my own handcuff), and
+break bench near-ties (2.0 pts) on the published band from the upside
+round. Knobs: engine.bench_survival_discount, engine.bench_contingency;
+the tiebreak rides late_round_dispersion. Ten tests. Defaults off.
+
+Measured on the season replay (the one grader that sees the bench:
+empirical absences, wire streaming; scripts/season_replay.py --set, A arm
+= insurance as shipped). reports/season_bench_knobs.md.
+
+| arm | keefamania (10 seats) | omnibeta (12 seats) |
+|---|---|---|
+| all three | -17.9/season, se 1.0, 1 better 8 worse | -24.4, se 1.2, 2 better 10 worse |
+| survival drop-off alone | -1.7, se 0.4, 4 better 2 worse | not run |
+| contingency alone | -4.4, se 0.6, 1 better 5 worse | not run |
+| band tiebreak alone | 0.0, ten identical rosters | not run |
+
+Mechanism of the bundle's loss, visible in the roster shapes: seats end
+QB1 RB7 (keefamania 8 and 9: -87 and -47; omnibeta 1, 2, 3, 11). The
+contingency term inflates rival-backup RBs, the drop-off ranks them as
+urgent because they do not survive, and the QB2, who always survives,
+costs nothing to wait on at every turn and is never taken. Pure cost of
+waiting has no notion that picks run out; the market path has the
+must-fill window for that, the bench has no slot obligation. The season
+grader, which streams a wire QB through the QB1's bye and absences,
+punishes the missing QB2 hard, and in doing so says the round-10 QB2
+the insurance formula produces is right.
+
+DECISION: none of the three ships. All default off. What would change
+it: a two-pick form for the bench (value now plus the expected best still
+available at the OTHER positions next turn, so a safe large item is taken
+as soon as nothing scarcer is worth more, and at the last bench pick
+value is all that counts), measured the same way. Not built: the user
+approved the drop-off form, and the measurement, not a redesign on the
+spot, is what should reopen it. The band tiebreak is a true null here and
+stays available for a board where bench near-ties are common.
+
+Resolution note: the season replay resolves 0.4-1.2 points a season; a
+-1.7 is small but real, not noise.
