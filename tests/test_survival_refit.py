@@ -193,7 +193,8 @@ def test_run_loro_fits_on_the_other_rooms_and_scores_the_held_out_one(tmp_path, 
 
     def evaluator(rooms, point):
         room = rooms[0]["room"]
-        ll = 0.20 if point["autopick_list_prob"] > 0 else 0.25
+        # the fitted point is 0.3; CURRENT reads the live engine block (any value), so key on the fitted value
+        ll = 0.20 if abs(point["autopick_list_prob"] - 0.3) < 1e-9 else 0.25
         rows = [(0.8, True, "RB", f"{room}:1:{i}") for i in range(4)]
         return {"objective": ll, "n": len(rows), "rows": {rooms[0]["room_type"]: rows}}
 
@@ -210,7 +211,12 @@ def test_run_loro_fits_on_the_other_rooms_and_scores_the_held_out_one(tmp_path, 
 
 
 def test_current_carries_the_autopick_knobs_at_todays_values():
-    assert sr.CURRENT["autopick_list_prob"] == 0.0
+    """CURRENT is the LIVE engine block (2026-09-05: the literal had gone stale
+    a day after #46 shipped), so it must equal what config.yaml says today."""
+    from draftkit.config import Config
+    e = Config.load().get("engine") or {}
+    for k in ("autopick_list_prob", "autopick_sigma_scale", "autopick_need_damp", "rival_draw", "sigma_early", "sigma_late"):
+        assert sr.CURRENT[k] == e[k], k
     assert sr.CURRENT["autopick_sigma_scale"] == 0.5 and sr.CURRENT["autopick_need_damp"] == 0.02
     grids = dict(sr.AUTOPICK_STAGES)
     assert [g["autopick_list_prob"] for g in grids["autopick_list_prob"]] == [0.0, 0.2, 0.3, 0.4, 0.6]
