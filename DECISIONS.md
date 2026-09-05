@@ -3738,3 +3738,36 @@ reason opens with USER PREFERENCE so the trail shows whose call it was.
 Inert when the preferred man is gone; malformed entries raise. Tests in
 tests/test_prefer.py. Seat 3 with Bijan and Gibbs gone now reads Chase,
 Taylor, Nacua.
+
+## 2026-09-05 (62) -- every market row goes through the stages (same-position candidates included)
+
+The user asked whether a market's one representative was properly compared
+with the next man at his own position. It was not: each market sent one row
+(its top VORP, an ADP tiebreak inside 2 points) and the stages ran only
+across markets, so Chase lost to Nacua on 1.6 VORP before any stage ran,
+and the same for Taylor against McCaffrey or Allen against Lamar. Under
+the design "candidates within 2 points go to step 3" says nothing about
+position, and a same-position pair is where the floor and ceiling rules do
+the most work because the pair term is identical for both.
+
+Now each market orders its top three (VORP, the ADP tiebreak for the head,
+the head still anchors the plan's alternates) and every one becomes a row
+carrying the market's urgency. Stage 1 keeps whole markets live or dead;
+stages 2 to 5 run over all live rows. A dead-heat pair (within 1.0, the
+same-position case: same partner, the pair cannot separate them, and its
+own near-tie rule read the floor in any round) falls back to the round's
+variance rule, floor through round 7 and ceiling from round 8. A published
+range counts as a range whatever the source count (the one-sheet
+Keefamania board has LOW and HIGH lines and one source; requiring two
+sources would switch stage 4 off for the draft). engine.prefer became a
+final reorder (preferred above the named man wherever both appear) instead
+of a swap at market selection.
+
+Seat 3 with Bijan and Gibbs gone, preference off: Nacua, Chase, JSN as
+three WR rows (value 120.5 vs 118.9, both under 20% to survive, the pair
+decided on that 1.6), then Taylor, McCaffrey, Cook. Preference on: Chase
+first with the USER PREFERENCE tag. Tests rewritten where they encoded the
+one-representative rule (the flex-bound guard now asserts the flex-fallback
+pricing directly; the Δ rule is asserted on the market head; the
+dispersion tests follow the round's variance rule). The plan's top three
+now often come from one live market; the page shows 25 deep.
