@@ -190,12 +190,17 @@ def insurance_value(p: dict, waiver: float, exposure: int,
         # is a sanity bound, not a tuned number -- a backup does not project
         # above the job he is stepping into
         ppw = min(ppw * HANDCUFF_UPLIFT, max(handcuff_starter_ppw, ppw))
-    edge = max(0.0, ppw - waiver)
+    # the floor is DISPLAY only (DECISIONS #55): the raw edge ranks, so a
+    # man below the wire sorts below the wire instead of tying at zero with
+    # everyone the wire beats
+    edge_raw = ppw - waiver
+    edge = max(0.0, edge_raw)
     weeks = weeks_needed(pos, exposure, depth_ahead)
     contingency = 0.0
     if (not handcuff and contingency_weeks and my_weakest_ppw is not None):
         up = min(own * HANDCUFF_UPLIFT, max(float(contingency_starter_ppw or 0.0), own))
         contingency = max(0.0, up - float(my_weakest_ppw)) * float(contingency_weeks)
     return {"value": edge * weeks + contingency, "edge": edge, "weeks": weeks,
+            "value_raw": edge_raw * weeks + contingency, "edge_raw": edge_raw,
             "ppw": ppw, "waiver_ppw": waiver, "handcuff": handcuff,
             "depth_ahead": depth_ahead, "contingency": contingency}

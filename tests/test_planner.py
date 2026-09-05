@@ -214,3 +214,48 @@ def test_equal_touchdowns_fall_back_to_scarcity_inside_near_tie():
     ranked = pair_rank([(40.5, "a", a), (40.0, "b", b)], report, needs, {"WR": 30.0, "RB": 30.0}, lambda pos: {"RB", "WR"},
                        tie_break="touchdowns", tie_window=5.0)
     assert ranked[0][2]["sleeper_id"] == "b" and "scarcer player first" in ranked[0][1]
+
+
+# ---------- floor rule (user, 2026-09-05, DECISIONS #55) -----------------------
+
+def _floor_case(surv_a, surv_b, lo_a, lo_b, gap=0.5, band_a=None, band_b=None):
+    from draftkit.planner import pair_rank
+    needs = {"RB": 1, "WR": 1, "FLEX": 1}
+    a = {"sleeper_id": "rice", "player": "Rashee Rice", "pos": "WR", "proj_pts": 170.0,
+         "vorp": 40.0 + gap, "vorp_flex": 40.0 + gap, "proj_lo": lo_a, "proj_hi": 199.8, "proj_band": band_a}
+    b = {"sleeper_id": "javonte", "player": "Javonte Williams", "pos": "RB", "proj_pts": 176.0,
+         "vorp": 40.0, "vorp_flex": 40.0, "proj_lo": lo_b, "proj_hi": 188.6, "proj_band": band_b}
+    report = {"WR": {"e_best_next": 30.0, "survival": {"rice": surv_a}},
+              "RB": {"e_best_next": 30.0, "survival": {"javonte": surv_b}}}
+    ranked = pair_rank([(40.0 + gap, "rice why", a), (40.0, "javonte why", b)], report, needs,
+                       {"WR": 30.0, "RB": 30.0}, lambda pos: {"RB", "WR"})
+    return [p["sleeper_id"] for _, _, p in ranked], ranked[0][1]
+
+
+def test_javonte_beats_rice_on_the_floor_when_survival_cannot_separate_them():
+    """Rice 0.5 ahead on the pair and 2 points scarcer (57% against 59%),
+    so the survival rule keeps him first on noise. The survivals are within
+    5 points, the floors from the sheet's low lines are 150 and 161: the
+    higher floor goes first, and the reason names the man he went over."""
+    order, why = _floor_case(surv_a=0.57, surv_b=0.59, lo_a=150.0, lo_b=161.1)
+    assert order == ["javonte", "rice"]
+    assert "near tie (0.5 pts) with Rashee Rice: higher floor (161 vs 150)" in why
+
+
+def test_the_floor_rule_stays_out_when_survival_settled_it():
+    """Survivals 80% against 60%: the survival rule already decided (the
+    scarcer man first) and a 20-point gap is not a tie the floor may reopen."""
+    order, why = _floor_case(surv_a=0.60, surv_b=0.80, lo_a=150.0, lo_b=161.1)
+    assert order == ["rice", "javonte"] and "higher floor" not in why
+
+
+def test_the_floor_rule_needs_three_points_and_falls_back_to_the_band():
+    # floors 158 and 160: too close to call, the survival order (Rice scarcer) holds
+    order, _ = _floor_case(surv_a=0.57, surv_b=0.59, lo_a=158.0, lo_b=160.0)
+    assert order == ["rice", "javonte"]
+    # no low lines: projection minus half the band stands in (170-10 vs 176-5.6)
+    order, why = _floor_case(surv_a=0.57, surv_b=0.59, lo_a=None, lo_b=None, band_a=20.1, band_b=11.2)
+    assert order == ["javonte", "rice"] and "higher floor (170 vs 160)" in why
+    # neither floor nor band on one side: left alone
+    order, _ = _floor_case(surv_a=0.57, surv_b=0.59, lo_a=None, lo_b=161.1, band_a=None, band_b=None)
+    assert order == ["rice", "javonte"]

@@ -1,0 +1,26 @@
+10726459 pick  76: drafted Rico Dowdle            now Rico Dowdle              bench insurance: covers 2 RB starters ~7.3 wks/season · +2.9/wk over the wire (Chris Rodriguez Jr.) ≈ 21 pts
+10726459 pick  85: drafted Alec Pierce            now Carnell Tate           CHANGE  bench insurance: covers 3 WR starters ~8.7 wks/season · +1.1/wk over the wire (Denzel Boston) ≈ 10 pts
+10726459 pick  96: drafted Patrick Mahomes        now Jaxson Dart            CHANGE  bench insurance: covers 1 QB starter ~3.6 wks/season · +2.8/wk over the wire (Daniel Jones) ≈ 10 pts
+10726459 pick 105: drafted Adam Randall           now RJ Harvey              CHANGE  bench insurance: covers 2 RB starters behind 1 reserve already held ~1.0 wks/season · +1.7/wk over the wire (C
+10726459 pick 116: drafted Chris Rodriguez Jr.    now RJ Harvey              CHANGE  bench insurance: covers 2 RB starters behind 1 reserve already held ~1.0 wks/season · +1.4/wk over the wire (T
+10726459 pick 125: drafted Tyrone Tracy Jr.       now Aaron Jones Sr.        CHANGE  bench insurance: covers 2 RB starters behind 2 reserves already held ~0.0 wks/season · +1.2/wk over the wire (
+10727517 pick  74: drafted Rico Dowdle            now TreVeyon Henderson     CHANGE  bench insurance: covers 2 RB starters ~7.3 wks/season · +3.3/wk over the wire (Chris Rodriguez Jr.) ≈ 24 pts
+10727517 pick  87: drafted Alec Pierce            now Carnell Tate           CHANGE  bench insurance: covers 3 WR starters ~8.7 wks/season · +1.1/wk over the wire (Denzel Boston) ≈ 10 pts
+10727517 pick  94: drafted Patrick Mahomes        now Jaxson Dart            CHANGE  bench insurance: covers 1 QB starter ~3.6 wks/season · +2.8/wk over the wire (Daniel Jones) ≈ 10 pts
+10727517 pick 107: drafted Adam Randall           now Rachaad White          CHANGE  bench insurance: covers 2 RB starters behind 1 reserve already held ~1.0 wks/season · +1.6/wk over the wire (C
+10727517 pick 114: drafted Chris Rodriguez Jr.    now Rachaad White          CHANGE  bench insurance: covers 2 RB starters behind 1 reserve already held ~1.0 wks/season · +1.6/wk over the wire (C
+10727517 pick 127: drafted Tyrone Tracy Jr.       now Rachaad White          CHANGE  bench insurance: covers 2 RB starters behind 2 reserves already held ~0.0 wks/season · +1.2/wk over the wire (
+10728751 pick  75: drafted Rico Dowdle            now TreVeyon Henderson     CHANGE  bench insurance: covers 2 RB starters ~7.3 wks/season · +3.3/wk over the wire (Chris Rodriguez Jr.) ≈ 24 pts
+10728751 pick  86: drafted Carnell Tate           now Carnell Tate             bench insurance: covers 3 WR starters ~8.7 wks/season · +1.1/wk over the wire (Denzel Boston) ≈ 10 pts
+10728751 pick  95: drafted Jaxson Dart            now Jaxson Dart              bench insurance: covers 1 QB starter ~3.6 wks/season · +2.8/wk over the wire (Daniel Jones) ≈ 10 pts
+10728751 pick 106: drafted Chris Rodriguez Jr.    now RJ Harvey              CHANGE  bench insurance: covers 2 RB starters behind 1 reserve already held ~1.0 wks/season · +1.7/wk over the wire (C
+10728751 pick 115: drafted Adam Randall           now RJ Harvey              CHANGE  bench insurance: covers 2 RB starters behind 2 reserves already held ~0.0 wks/season · +1.7/wk over the wire (
+10728751 pick 126: drafted Tyrone Tracy Jr.       now Rachaad White          CHANGE  bench insurance: covers 2 RB starters behind 2 reserves already held ~0.0 wks/season · +1.6/wk over the wire (
+10790713 pick  76: drafted Rico Dowdle            now Rico Dowdle              bench insurance: covers 2 RB starters ~7.3 wks/season · +2.9/wk over the wire (Chris Rodriguez Jr.) ≈ 21 pts
+10790713 pick  85: drafted Alec Pierce            now Alec Pierce              bench insurance: covers 3 WR starters ~8.7 wks/season · +0.9/wk over the wire (Denzel Boston) ≈ 8 pts
+10790713 pick  96: drafted Patrick Mahomes        now Patrick Mahomes II     CHANGE  bench insurance: covers 1 QB starter ~3.6 wks/season · +2.5/wk over the wire (Daniel Jones) ≈ 9 pts
+10790713 pick 105: drafted Chris Rodriguez Jr.    now RJ Harvey              CHANGE  bench insurance: covers 2 RB starters behind 1 reserve already held ~1.0 wks/season · +1.7/wk over the wire (C
+10790713 pick 116: drafted Adam Randall           now Rachaad White          CHANGE  bench insurance: covers 2 RB starters behind 2 reserves already held ~0.0 wks/season · +1.6/wk over the wire (
+10790713 pick 125: drafted Tyrone Tracy Jr.       now Rachaad White          CHANGE  bench insurance: covers 2 RB starters behind 2 reserves already held ~0.0 wks/season · +1.2/wk over the wire (
+
+bench picks: 5 unchanged, 19 changed of 24

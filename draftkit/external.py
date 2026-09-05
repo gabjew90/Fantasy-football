@@ -510,6 +510,10 @@ def from_sheet(path: Path, scoring: dict, index, as_of: str, line: str = "tab",
                          "pts17": base, "_base": base, "_lo": lo, "_hi": hi,
                          "source": "fantasypros_sheet", "as_of": as_of,
                          "line": json.dumps(p["line"], sort_keys=True),
+                         # the panel's own low and high lines, carried so the
+                         # board's proj_lo/proj_hi ARE the floor and ceiling
+                         # (DECISIONS #55); combine() folds them into pts17_lo/hi
+                         "pts17_line_lo": lo, "pts17_line_hi": hi,
                          "pts17_band": band, "pts_basis": None})
     if bumped:
         log.info("sheet: rookie bump applied to %d players", bumped)
@@ -525,10 +529,13 @@ def from_sheet(path: Path, scoring: dict, index, as_of: str, line: str = "tab",
                 r["pts17"] = None            # estimated below
             else:
                 r["pts17"] = h
-                # the sheet's range, carried in the headline's own units:
-                # the same relative spread around the number it reports
-                if r["pts17_band"] is not None and r["_base"] > 0:
-                    r["pts17_band"] = r["pts17_band"] * h / r["_base"]
+                # the sheet's range and its low/high lines, carried in the
+                # headline's own units: the same relative spread around the
+                # number it reports
+                if r["_base"] > 0:
+                    for k in ("pts17_band", "pts17_line_lo", "pts17_line_hi"):
+                        if r[k] is not None:
+                            r[k] = r[k] * h / r["_base"]
         # A tab player the DraftSheet does not list (no ECR slot at his tab
         # position, or one beyond the block) gets the tab line brought onto
         # the headline's basis by his position's median headline/tab ratio.
@@ -542,8 +549,9 @@ def from_sheet(path: Path, scoring: dict, index, as_of: str, line: str = "tab",
         for r in rows:
             if r["pts17"] is None:
                 r["pts17"] = r["_base"] * ratio[r["pos"]]
-                if r["pts17_band"] is not None:
-                    r["pts17_band"] = r["pts17_band"] * ratio[r["pos"]]
+                for k in ("pts17_band", "pts17_line_lo", "pts17_line_hi"):
+                    if r[k] is not None:
+                        r[k] = r[k] * ratio[r["pos"]]
         # self-check against the page the workbook rendered: exact when the
         # Scoring tab matches the league, off by the rescoring when it does
         # not (which is the point); the parity tests hold the exact case
@@ -567,7 +575,8 @@ def from_sheet(path: Path, scoring: dict, index, as_of: str, line: str = "tab",
     for r in rows:
         for k in ("_base", "_lo", "_hi"):
             r.pop(k, None)
-    return (_frame(rows, {**SCHEMA, "pts17_band": pl.Float64, "pts_basis": pl.Float64})
+    return (_frame(rows, {**SCHEMA, "pts17_band": pl.Float64, "pts_basis": pl.Float64,
+                          "pts17_line_lo": pl.Float64, "pts17_line_hi": pl.Float64})
             .unique(subset="sleeper_id", keep="first"), unmatched)
 
 
@@ -641,13 +650,16 @@ def from_espn(season: int, scoring: dict, raw_dir: Path, id_map: pl.DataFrame, i
 # ------------------------------------------------------------------ union
 
 def _with_dispersion_single(f: pl.DataFrame) -> pl.DataFrame:
-    """One source: no cross-source disagreement by construction. Its own band
-    is carried through untouched when it published one."""
-    for c in ("pts17_band", "pts_basis"):
+    """One source: no cross-source disagreement by construction (pts17_sd 0).
+    Its own band is carried through untouched when it published one, and
+    pts17_hi / pts17_lo are its own published high and low lines when it has
+    them (the best and worst published case, DECISIONS #55), else the point."""
+    for c in ("pts17_band", "pts_basis", "pts17_line_lo", "pts17_line_hi"):
         if c not in f.columns:
             f = f.with_columns(pl.lit(None, dtype=pl.Float64).alias(c))
     f = f.with_columns(pl.lit(1, dtype=pl.Int64).alias("n_sources"), pl.lit(0.0).alias("pts17_sd"),
-                       pl.col("pts17").alias("pts17_hi"), pl.col("pts17").alias("pts17_lo"))
+                       pl.coalesce(pl.col("pts17_line_hi"), pl.col("pts17")).alias("pts17_hi"),
+                       pl.coalesce(pl.col("pts17_line_lo"), pl.col("pts17")).alias("pts17_lo"))
     # a source that already carries pts17_band leaves it mid-frame, so the
     # canonical order is restored explicitly rather than depending on which
     # columns each source happened to supply

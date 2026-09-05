@@ -122,30 +122,77 @@ def test_missing_survival_counts_as_certain():
     assert "100% he is still there" in rows["rb_cuff"][1]
 
 
-# --------------------------------------------------------------- band tiebreak
+# ------------------------------------------- raw value, ceiling tiebreak (#55)
 
-def test_band_breaks_a_bench_near_tie_from_the_upside_round():
-    board = copy.deepcopy(BENCH_BOARD)
-    twin = copy.deepcopy(next(p for p in board if p["sleeper_id"] == "rb_cuff"))
-    twin.update(sleeper_id="rb_cuff_wide", player="rb_cuff_wide", adp=121.0, proj_band=30.0)
-    for p in board:
-        p.setdefault("proj_band", 5.0)
-    board.append(twin)
-    off = _bench_tracker(board, late_round_dispersion=False)
-    on = _bench_tracker(board, late_round_dispersion=True)
-    off.upside_from_round = on.upside_from_round = 8            # pick 101 is round 11
-    assert off.recommendations(5)[0][2]["sleeper_id"] == "rb_cuff"
-    assert on.recommendations(5)[0][2]["sleeper_id"] == "rb_cuff_wide"
+def _pool(board, my_extra=()):
+    """A tracker in bench mode at pick 101 over `board` plus my full lineup."""
+    t = make_tracker(board, MY_LINEUP + list(my_extra), current_pick=101)
+    t.bench_insurance = True
+    return t
 
 
-def test_band_tiebreak_stays_out_before_the_upside_round():
-    board = copy.deepcopy(BENCH_BOARD)
-    twin = copy.deepcopy(next(p for p in board if p["sleeper_id"] == "rb_cuff"))
-    twin.update(sleeper_id="rb_cuff_wide", player="rb_cuff_wide", adp=121.0, proj_band=30.0)
-    board.append(twin)
-    on = _bench_tracker(board, late_round_dispersion=True)
-    on.upside_from_round = 14
-    assert on.recommendations(5)[0][2]["sleeper_id"] == "rb_cuff"
+def test_insurance_value_returns_the_raw_edge_alongside_the_floored_one():
+    below = B.insurance_value({"pos": "RB", "proj_pts": 77.0}, waiver=82.0 / 17.0, exposure=2)
+    above = B.insurance_value({"pos": "WR", "proj_pts": 117.0}, waiver=100.0 / 17.0, exposure=3)
+    assert below["edge"] == 0.0 and below["value"] == 0.0
+    assert below["edge_raw"] < 0 and below["value_raw"] < 0
+    assert above["value_raw"] == above["value"] > 0
+
+
+def _rod_sutton_board():
+    """Room 10790713 pick 105: Rodriguez (RB, 77 pts, below an 82-pt wire,
+    band 22) against Sutton (WR, 117 pts, above a 100-pt wire, band 4)."""
+    board = [copy.deepcopy(p) for p in BENCH_BOARD if p["sleeper_id"] not in ("rb_depth", "rb_cuff", "qb2", "wr_depth")]
+    def mk(pid, pos, pts, adp, band, rank):
+        q = player(pid, pos, pts - 100.0, pts - 100.0, adp, rank=rank)
+        q["proj_pts"], q["proj_band"], q["backs_up"] = pts, band, ""
+        return q
+    board += [mk("rodriguez", "RB", 77.0, 130.7, 22.3, 40), mk("sutton", "WR", 116.6, 105.9, 4.2, 45)]
+    # the wire: three RBs and three WRs the market leaves undrafted
+    for i, pts in enumerate((82.0, 81.0, 80.0)):
+        board.append(mk(f"rb_wire{i}", "RB", pts, 140.0 + i, 5.0, 50 + i))
+    for i, pts in enumerate((100.0, 99.0, 98.0)):
+        board.append(mk(f"wr_wire{i}", "WR", pts, 140.0 + i, 5.0, 60 + i))
+    return board
+
+
+def test_a_back_below_the_wire_sorts_below_a_receiver_above_it():
+    """The defect of the 09-04 review: Rodriguez, Randall and Tracy went
+    over Sutton and Pittman because everyone priced at 0-2 points was a tie
+    and the widest band won. Ranked on the raw value, a man below the wire
+    is negative: he is not the RB row at all (the wire's own best back is),
+    and the receiver above his wire heads the bench list."""
+    t = _pool(_rod_sutton_board())
+    bench = [r for r in t.recommendations(10) if str(r[1]).startswith("bench insurance")]
+    assert bench and bench[0][2]["sleeper_id"] == "sutton", [(r[2]["sleeper_id"], round(r[0], 2)) for r in bench]
+    assert all(r[2]["sleeper_id"] != "rodriguez" for r in bench)
+    rb = next(r for r in bench if r[2]["pos"] == "RB")
+    assert rb[2]["sleeper_id"].startswith("rb_wire") and rb[0] < bench[0][0]
+
+
+def _twins_board(**edits):
+    board = [copy.deepcopy(p) for p in BENCH_BOARD if p["sleeper_id"] not in ("rb_depth", "rb_cuff", "qb2", "wr_depth")]
+    def mk(pid, **kw):
+        q = player(pid, "RB", 10.0, 10.0, 120.0, rank=30)
+        q["proj_pts"], q["backs_up"] = 110.0, ""
+        q.update(kw)
+        return q
+    board += [mk("twin_a", **edits.get("a", {})), mk("twin_b", **edits.get("b", {}))]
+    for i, pts in enumerate((82.0, 81.0, 80.0)):
+        board.append(mk(f"rb_wire{i}", proj_pts=pts, adp=140.0 + i, sleeper_id=f"rb_wire{i}", player=f"rb_wire{i}"))
+    return board
+
+
+def test_bench_ties_break_on_the_ceiling_never_the_width():
+    # same raw value; the higher published high line wins
+    t = _pool(_twins_board(a={"proj_hi": 120.0, "proj_band": 30.0}, b={"proj_hi": 135.0, "proj_band": 5.0}))
+    assert t.recommendations(5)[0][2]["sleeper_id"] == "twin_b", "ceiling, not width"
+    # no high line: projection plus half the band stands in
+    t = _pool(_twins_board(a={"proj_hi": None, "proj_band": 10.0}, b={"proj_hi": None, "proj_band": 30.0}))
+    assert t.recommendations(5)[0][2]["sleeper_id"] == "twin_b"
+    # neither on one side: the order is left alone (twin_a is first on the board)
+    t = _pool(_twins_board(a={"proj_hi": None, "proj_band": None}, b={"proj_hi": 140.0, "proj_band": 5.0}))
+    assert t.recommendations(5)[0][2]["sleeper_id"] == "twin_a"
 
 
 def test_knobs_are_registered_and_default_off():
@@ -189,22 +236,3 @@ def test_two_pick_reduces_to_value_order_when_everyone_is_certain():
     off.urgency_report = _fake_report(surv)
     on.urgency_report = _fake_report(surv)
     assert [r[2]["sleeper_id"] for r in off.recommendations(3)] == [r[2]["sleeper_id"] for r in on.recommendations(3)]
-
-
-def test_band_tiebreak_needs_a_real_margin():
-    """A 0.1-point wider band flipped Pierce over Tate at pick 85 of room
-    10726459. The range has to be BENCH_BAND_MARGIN wider to override value."""
-    from draftkit.tracker import BENCH_BAND_MARGIN
-    board = copy.deepcopy(BENCH_BOARD)
-    twin = copy.deepcopy(next(p for p in board if p["sleeper_id"] == "rb_cuff"))
-    twin.update(sleeper_id="rb_cuff_wide", player="rb_cuff_wide", adp=121.0, proj_band=10.0 * (1 + BENCH_BAND_MARGIN) - 0.5)
-    for p in board:
-        p.setdefault("proj_band", 10.0)
-    board.append(twin)
-    on = _bench_tracker(board, late_round_dispersion=True)
-    on.upside_from_round = 8
-    assert on.recommendations(5)[0][2]["sleeper_id"] == "rb_cuff"        # not wide enough to flip
-    twin["proj_band"] = 10.0 * (1 + BENCH_BAND_MARGIN) + 0.5
-    on2 = _bench_tracker(board, late_round_dispersion=True)
-    on2.upside_from_round = 8
-    assert on2.recommendations(5)[0][2]["sleeper_id"] == "rb_cuff_wide"  # wide enough

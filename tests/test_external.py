@@ -237,6 +237,10 @@ def test_from_sheet_headline_is_reproduced_from_the_workbooks_inputs(tmp_path, g
     tab = X.from_sheet(p, HALF, idx, as_of="x", line="tab")[0].filter(pl.col("name") == "Jahmyr Gibbs").row(0, named=True)
     assert abs(g["pts17_band"] / g["pts17"] - tab["pts17_band"] / tab["pts17"]) < 1e-9
     assert tab["pts_basis"] is None
+    # the panel's own high and low lines ride to the board as the ceiling and
+    # the floor (DECISIONS #55): combine() folds them into pts17_hi / pts17_lo
+    one = X.combine([df]).filter(pl.col("name") == "Jahmyr Gibbs").row(0, named=True)
+    assert abs(one["pts17_hi"] - hi * want / base) < 1e-6 and abs(one["pts17_lo"] - lo * want / base) < 1e-6
     # not on the page (no ECR slot): the tab line brought onto the headline
     # basis by the position's median headline/tab ratio (Gibbs alone sets it)
     b = rows["Bijan Robinson"]

@@ -29,9 +29,8 @@ POS_ORDER = ["RB", "WR", "TE", "QB", "K", "DEF"]
 # Bench rows are priced in a DIFFERENT currency from market rows, and the
 # dedup has to tell them apart. One constant, written once and matched once.
 BENCH_WHY_PREFIX = "bench insurance:"
-BENCH_TIE = 2.0   # bench rows this close are a coin flip: the wider published range breaks it (late_round_dispersion)
-BENCH_BAND_MARGIN = 0.2   # ...only when the range is at least this much wider: a 0.1-point band edge flipped
-                          # Pierce over Tate at pick 85 of room 10726459 (review 2026-09-04)
+BENCH_TIE = 2.0   # bench rows this close on the RAW insurance value are a coin flip: the higher
+                  # CEILING breaks it (proj_hi, else proj_pts + band/2; never the width, DECISIONS #55)
 
 FALLBACK_FLOORS = ("board_min", "replacement")
 
@@ -810,11 +809,17 @@ class Tracker:
                 if vals:
                     displace_ppw[pos] = min(vals) / 17.0
         by_name = {str(q.get("player") or q.get("name") or ""): q for q in self.players}
-        late = rnd >= self.upside_from_round and bool(self.late_round_dispersion)
 
-        def _band(q: dict) -> float:
-            b = q.get("proj_band")
-            return float(b) if b is not None and b == b else 0.0
+        def _ceiling(q: dict) -> float | None:
+            """The best published case: the high line, else the point plus
+            half the band; None when the board carries neither."""
+            hi = q.get("proj_hi")
+            if hi is not None and hi == hi:
+                return float(hi)
+            band, pts = q.get("proj_band"), q.get("proj_pts")
+            if band is not None and band == band and pts is not None:
+                return float(pts) + float(band) / 2.0
+            return None
 
         added, upgrade_ids = False, set()
         per_pos: list[tuple] = []          # (pos, best, best_iv, why, e_next, s_best)
@@ -837,14 +842,19 @@ class Tracker:
                 iv = insurance_value(p, waiver, exposure.get(pos, 0), hc,
                                      depth_ahead=depth_ahead.get(pos, 0), **kw)
                 scored.append((p, iv))
-            best, best_iv = max(scored, key=lambda t: t[1]["value"])
-            if late:
-                # within BENCH_TIE of the best, the wider published range is
-                # the better lottery ticket; anchored on the best, no chaining
-                for p, iv in scored:
-                    if (p is not best and best_iv["value"] - iv["value"] <= BENCH_TIE
-                            and _band(p) >= (1.0 + BENCH_BAND_MARGIN) * _band(best)):
-                        best, best_iv = p, iv
+            # ranked on the RAW value (edge before the floor x weeks): a player
+            # below the wire is worth less than the wire and sorts that way
+            best, best_iv = max(scored, key=lambda t: t[1]["value_raw"])
+            # within BENCH_TIE of the best, the higher CEILING wins; anchored
+            # on the original best, no chaining; a row without a ceiling on
+            # either side leaves the order alone
+            anchor = best_iv["value_raw"]
+            for p, iv in scored:
+                if p is best or anchor - iv["value_raw"] > BENCH_TIE:
+                    continue
+                cb, cp = _ceiling(best), _ceiling(p)
+                if cb is not None and cp is not None and cp > cb + 1e-9:
+                    best, best_iv = p, iv
             n = exposure.get(pos, 0)
             d = depth_ahead.get(pos, 0)
             why = (f"bench insurance: covers {n} {pos} starter{'s' if n != 1 else ''}"
@@ -874,7 +884,7 @@ class Tracker:
         # own picks): the two-pick partner exists only if one remains
         bench_left_after = picks_left - 1 - needs.get("K", 0) - needs.get("DEF", 0)
         for pos, best, best_iv, why, e_next, s_best in per_pos:
-            score = best_iv["value"]
+            score = best_iv["value_raw"]
             if two_pick:
                 partner_v, partner_q = 0.0, None
                 if bench_left_after >= 1:
@@ -892,20 +902,21 @@ class Tracker:
                 why += (f" · waiting likely costs ~{cost:.0f} ({s_best:.0%} he is still there next turn, "
                         f"expected best {pos} then {e_next:.0f})")
                 score = cost
-            best["_bench_value"] = best_iv["value"]
+            best["_bench_value"] = best_iv["value_raw"]
             cands.append((score, why, best))
             added = True
         if added:
             # cost of waiting first (or raw insurance with the knob off), the
-            # bigger insurance value breaking exact ties
+            # bigger raw insurance value breaking exact ties
             cands.sort(key=lambda t: (-t[0], -float(t[2].get("_bench_value") or 0.0)))
-            if late:
-                # across positions, the same near-tie rule, one anchored pass
-                # over adjacent bench rows
-                for i in range(len(cands) - 1):
-                    a, b = cands[i], cands[i + 1]
-                    if (str(a[1]).startswith(BENCH_WHY_PREFIX) and str(b[1]).startswith(BENCH_WHY_PREFIX)
-                            and abs(a[0] - b[0]) <= BENCH_TIE and _band(b[2]) >= (1.0 + BENCH_BAND_MARGIN) * _band(a[2])):
+            # across positions, the same near-tie rule: within BENCH_TIE the
+            # higher ceiling first, one pass over adjacent bench rows
+            for i in range(len(cands) - 1):
+                a, b = cands[i], cands[i + 1]
+                if (str(a[1]).startswith(BENCH_WHY_PREFIX) and str(b[1]).startswith(BENCH_WHY_PREFIX)
+                        and abs(a[0] - b[0]) <= BENCH_TIE):
+                    ca, cb = _ceiling(a[2]), _ceiling(b[2])
+                    if ca is not None and cb is not None and cb > ca + 1e-9:
                         cands[i], cands[i + 1] = b, a
         return added, upgrade_ids
 

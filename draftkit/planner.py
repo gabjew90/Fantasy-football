@@ -23,6 +23,11 @@ from .snake import FLEX_ELIGIBLE, needs_position
 
 NEED_DAMP = 0.6  # partner/candidate position that fills no starter/flex slot
 NEAR_TIE = 1.0   # pair values this close are a coin flip: survival breaks it
+# ...and when survival cannot (the two survivals within FLOOR_SURV_TOL), the
+# higher FLOOR does, if the floors differ by at least FLOOR_GAP points: the
+# published low line, else the point minus half the band (DECISIONS #55)
+FLOOR_SURV_TOL = 0.05
+FLOOR_GAP = 3.0
 # tie_break: touchdowns (user decision 2026-09-05, DECISIONS #53) compares
 # projected touchdowns between two SKILL players whose pairs are within
 # tie_window; a quarterback's thirty scores would win every tie against any
@@ -250,6 +255,34 @@ def pair_rank(cands: list[tuple[float, str, dict]],
             ranked[i] = (ranked[i][0], ranked[i][1],
                          ranked[i][2] + f" · near tie ({abs(a[0] - b[0]):.1f} pts) with {over}"
                          f": scarcer player first ({_surv(b[3]):.0%} vs {_surv(a[3]):.0%})",
+                         ranked[i][3])
+            i = max(0, i - 1)
+        else:
+            i += 1
+    # FLOOR RULE (user, 2026-09-05, DECISIONS #55). After the survival pass:
+    # adjacent rows within NEAR_TIE whose survivals are within FLOOR_SURV_TOL
+    # go to the higher floor when the floors differ by FLOOR_GAP or more. The
+    # counterparty is named, as the survival swap names his.
+    def _floor(p: dict) -> float | None:
+        lo = p.get("proj_lo")
+        if lo is not None and lo == lo:
+            return float(lo)
+        band, pts = p.get("proj_band"), p.get("proj_pts")
+        if band is not None and band == band and pts is not None:
+            return float(pts) - float(band) / 2.0
+        return None
+    i, guard = 0, 0
+    while i < len(ranked) - 1 and guard < 4 * len(ranked):
+        guard += 1
+        a, b = ranked[i], ranked[i + 1]
+        fa, fb = _floor(a[3]), _floor(b[3])
+        if (abs(a[0] - b[0]) <= NEAR_TIE and abs(_surv(a[3]) - _surv(b[3])) <= FLOOR_SURV_TOL
+                and fa is not None and fb is not None and fb - fa >= FLOOR_GAP):
+            over = a[3].get("player") or a[3].get("name") or a[3].get("pos")
+            ranked[i], ranked[i + 1] = b, a
+            ranked[i] = (ranked[i][0], ranked[i][1],
+                         ranked[i][2] + f" · near tie ({abs(a[0] - b[0]):.1f} pts) with {over}"
+                         f": higher floor ({fb:.0f} vs {fa:.0f})",
                          ranked[i][3])
             i = max(0, i - 1)
         else:

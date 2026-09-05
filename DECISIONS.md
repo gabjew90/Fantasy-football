@@ -3442,3 +3442,74 @@ by 5 to 8. AJ Dillon enters the ECR window, Adam Randall leaves it. Rice
 169.9 to 170.2, Javonte 175.5 to 177.8, McBride 164.1 to 165.3 (on the
 consistent basis; the page's stale TE block reads 164.8 against 175.7).
 Bridge restarted on the new board and verified.
+
+## 2026-09-05 (55) — bench ranks on the raw edge, ties break on the ceiling; starter near-ties break on the floor (user design)
+
+Three rooms in a row (10727517, 10728751, 10790713) spent picks 105-125 on
+running backs projected BELOW the waiver-wire back over receivers projected
+above theirs. Mechanism, watched live at pick 105 of 10790713: once a
+reserve is held, every further reserve at the position is worth 0-2 points
+of insurance, the insurance formula floored a negative edge to zero so a
+sub-wire back TIED a receiver worth 2, and inside that 2-point window the
+late-round tiebreak preferred the wider published range. Rodriguez's range
+was 22 wide on a 77-point projection; Sutton's 4 wide on 117. Every version
+of Sutton outscored every version of Rodriguez and the engine still took
+Rodriguez. The user specified the fix.
+
+Shipped, no knob (the old behaviour was the defect):
+
+* `bench.insurance_value` returns `value_raw` / `edge_raw` (edge before the
+  floor x weeks) beside the floored `value` / `edge`. `_bench_candidates`
+  picks each position's row and sorts across positions on the RAW value;
+  the reason string still shows the floored number. A man below the wire is
+  negative and cannot tie a man above it, and he is no longer the
+  position's row at all: the wire's own best back (raw ~0) is.
+* Bench near-ties (within BENCH_TIE 2.0 on the raw value, per position and
+  across positions) go to the higher CEILING: `proj_hi`, else `proj_pts +
+  proj_band / 2`, else the order is left alone. Width is gone
+  (BENCH_BAND_MARGIN and the band tiebreak removed, DECISIONS #47 item 2
+  and #52 item 1 superseded).
+* Starter near-ties (planner.pair_rank): after the survival pass, adjacent
+  rows within NEAR_TIE whose survivals are within FLOOR_SURV_TOL (5 points)
+  go to the higher FLOOR when the floors differ by FLOOR_GAP (3 points) or
+  more: `proj_lo`, else `proj_pts - proj_band / 2`, else left alone. The
+  reason names the counterparty: "near tie (0.5 pts) with Rashee Rice:
+  higher floor (161 vs 150)". A 2-point survival difference no longer
+  decides a coin flip on its own.
+* So that `proj_hi` / `proj_lo` ARE a ceiling and a floor: a single
+  source's own published high and low lines (the sheet's high/low rows,
+  scored in league settings, on the headline basis) now become
+  `pts17_hi` / `pts17_lo` in combine(); with two or more sources the
+  cross-source max/min stand as before. On the Keefamania board 190 skill
+  rows carry hi >= pts >= lo; projections and VORP are unchanged.
+
+Tests (tests/test_bench_rows.py, test_planner.py, test_external.py): the
+raw value beside the floored one; Rodriguez against Sutton (Sutton heads the
+bench list, Rodriguez is not the RB row, the wire back is); twins that tie
+on the raw value break on proj_hi, then on the band fallback, and are left
+alone without either, never on width; Javonte against Rice (Rice 0.5 ahead
+and 2 points scarcer: the survival rule keeps him, the floor rule moves
+Javonte up and says why), the rule stays out at a 20-point survival gap,
+needs 3 points of floor, falls back to the band, and leaves a floorless pair
+alone; the sheet's high/low become pts17_hi/lo. Three band-width tests
+removed. Suite 752.
+
+Measurements are on the lines under this entry (season replay against the
+insurance arm of the 09-05 morning run; bench churn against the last four
+rooms' actual picks).
+
+Measured after building. Season replay, keefamania, 10 seats x 200 seasons,
+insurance (new rules) against a VORP bench on the 09-04 board: +5.1 points
+a season, paired se 0.6, 6 seats better, 3 worse, 1 tied. (The morning's
+run had the old insurance rules at 1551.4 mean on the 09-02 board; the new
+rules land at 1554.2 on the 09-04 board, whose VORP-bench arm is 1549.1, so
+the rule and the board refresh are confounded there and only the paired
++5.1 is clean.) Bench churn against the four rooms' actual picks (24 bench
+picks after pick 70, K/DEF excluded): 18 change. In room 10790713, the one
+room drafted on today's board, exactly the three sub-wire backs change,
+Rodriguez -> RJ Harvey (108 pts), Randall -> Rachaad White (106), Tracy ->
+White, and the other three bench picks stand. In the three rooms drafted on
+the 09-02 board the WR row moves Pierce -> Tate, the QB2 Mahomes -> Dart and
+the first RB reserve Dowdle -> Henderson; those ride on the board refresh
+(Henderson 134.9 -> 136.9 against Dowdle 128.2 -> 129.5) as much as on the
+rule and are not separable here.
