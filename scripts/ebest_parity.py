@@ -68,7 +68,7 @@ def main() -> None:
     L = ["# Expected-best estimators: joint vs carry (plan B2 measurement)", "",
          f"{a.states} random mid-draft states per league (engine_parity's generator, seed {a.seed}), "
          f"sims {a.sims}, production knobs from each league's config. Per market: urgency from the joint "
-         "(Monte Carlo) expectation vs the carry (independence) formula over the calibrated survival vector.", ""]
+         "(Monte Carlo) expectation vs the carry (independence) formula over the survival vector.", ""]
     summary = {}
     for league, board_file in BOARDS.items():
         cfg = Config.load(league=league)

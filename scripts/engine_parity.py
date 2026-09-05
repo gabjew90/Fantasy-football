@@ -91,7 +91,6 @@ def make_tracker(board, picks, my_slot, slots=None, teams=None, rounds=None,
     t.pool_lookback, t.pool_lookahead, t.pool_min = 12, 24, 40
     t.reach_prob, t.reach_scale = 0.0, 3.0
     t.run_window, t.run_min, t.run_boost = 5, 2, 1.5
-    t.survival_shrink = 1.0     # retired shrink (DECISIONS #26)
     t.late_round_dispersion, t.dispersion_lambda = False, 0.5   # plan A3 knob, off
     t._urgency_cache = None
     t.rival_seeds, t.slot_to_user = {}, {}

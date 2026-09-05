@@ -28,7 +28,7 @@ from . import snake
 KNOBS = ("sims", "sigma_early", "sigma_late", "reach_prob", "reach_scale",
          "run_window", "run_min", "run_boost", "run_ratio",
          "need_damp", "qb_filled_damp", "kdef_early_damp", "autopick_sigma_scale", "autopick_need_damp",
-         "survival_shrink", "pool_min", "pool_lookback", "pool_lookahead")
+         "pool_min", "pool_lookback", "pool_lookahead")
 
 
 def sim_window(current_pick: int, my_slot: int | None, teams: int, rounds: int) -> tuple[int | None, int | None]:
@@ -220,7 +220,6 @@ class DraftLog:
                 rivals = []
         e = {
             "type": "recs",
-            "survival_shrink": float(getattr(t, "survival_shrink", 1.0)),
             "current_pick": current_pick,
             "on_clock_slot": on_clock_slot,
             "window_start": window_start,

@@ -148,7 +148,7 @@ def main() -> None:
     ap.add_argument("--slots", default="")
     ap.add_argument("--league", default=None, help="starter shape from the league yaml (engine_parity.league_shape)")
     ap.add_argument("--set", action="append", default=[], metavar="KNOB=VALUE",
-                    help="engine knob override for BOTH arms (e.g. --set sigma_early=8 --set survival_shrink=1.0)")
+                    help="engine knob override for BOTH arms (e.g. --set sigma_early=8 --set need_damp=0.3)")
     a = ap.parse_args()
 
     overrides = {}

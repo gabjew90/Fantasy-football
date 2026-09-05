@@ -164,7 +164,7 @@ def test_recs_event_logs_the_sims_window_and_structured_survival(tmp_path):
     assert ev["current_pick"] == 2 and ev["on_clock_slot"] == 2
     assert ev["window_start"] == 3 and ev["my_next_pick"] == 23
     assert len(ev["rivals"]) == 20 and all("needs" in r and "autopick" in r for r in ev["rivals"])
-    assert "survival_shrink" in ev["knobs"] and ev["knobs"]["sims"] == 20
+    assert "sigma_early" in ev["knobs"] and ev["knobs"]["sims"] == 20
     rec = ev["recommendations"][0]
     assert isinstance(rec["survival"], float) and 0.0 <= rec["survival"] <= 1.0
     assert isinstance(rec["survival_shown"], float) and rec["market"] in ("RB", "WR", "TE", "FLEX")

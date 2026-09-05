@@ -153,3 +153,39 @@ def test_knobs_are_registered_and_default_off():
     names = {n for n, _ in Tracker.ENGINE_KNOBS}
     assert {"bench_survival_discount", "bench_contingency"} <= names
     assert Tracker.bench_survival_discount is False and Tracker.bench_contingency is False
+
+
+# ---------------------------------------------------------- two-pick form
+
+def test_two_pick_takes_the_scarce_item_first_and_the_safe_one_when_picks_run_out():
+    """rb_cuff is the bigger insurance number (about 28) and certain to be
+    there next turn; qb2 is smaller (about 10) and 20% to survive. Two-pick:
+    qb2-now + rb_cuff-next (10 + 28) beats rb_cuff-now + qb2-next (28 + 2),
+    so the scarce small item goes first and the safe big one waits. At the
+    LAST bench pick the partner term is zero and rb_cuff wins on value."""
+    surv = {"RB": {"rb_cuff": 1.0, "rb_depth": 1.0}, "QB": {"qb2": 0.2}}
+    t = _bench_tracker(bench_two_pick=True)
+    t.urgency_report = _fake_report(surv)
+    top = t.recommendations(5)[0]
+    assert top[2]["sleeper_id"] == "qb2", top[1]
+    assert "two-pick" in top[1] and "the RB expected at your next turn" in top[1]
+    # last bench pick: 7 starters + 5 bench rostered, K and DEF still owed, so
+    # picks_left is 3 and no bench pick follows this one
+    # the five bench bodies are WR/TE pads, so rb_cuff keeps his RB insurance
+    # (an RB pad on the bench would sit ahead of him and flatten it)
+    last = make_tracker(BENCH_BOARD, MY_LINEUP + ["pad1", "pad2", "pad4", "pad5", "pad7"], current_pick=131)
+    last.bench_insurance = True
+    last.bench_two_pick = True
+    last.urgency_report = _fake_report(surv)
+    rows = last.recommendations(5)
+    assert rows and rows[0][2]["sleeper_id"] == "rb_cuff", [r[2]["sleeper_id"] for r in rows]
+    assert "last bench pick: value alone" in rows[0][1]
+
+
+def test_two_pick_reduces_to_value_order_when_everyone_is_certain():
+    surv = {"RB": {"rb_cuff": 1.0, "rb_depth": 1.0}, "QB": {"qb2": 1.0}}
+    off = _bench_tracker(bench_two_pick=False)
+    on = _bench_tracker(bench_two_pick=True)
+    off.urgency_report = _fake_report(surv)
+    on.urgency_report = _fake_report(surv)
+    assert [r[2]["sleeper_id"] for r in off.recommendations(3)] == [r[2]["sleeper_id"] for r in on.recommendations(3)]

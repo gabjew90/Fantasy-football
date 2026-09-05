@@ -18,7 +18,6 @@ import numpy as np
 from . import snake
 
 POSITIONS = ["QB", "RB", "WR", "TE", "K", "DEF"]
-_WARNED_SHRINK: list = []     # one stderr line per process if a non-1.0 shrink is ever set again
 NEED_DAMP = 0.15          # multiplier for positions that fill no starter slot
 QB_FILLED_DAMP = 0.05     # rival with QB filled, before late rounds
 KDEF_EARLY_DAMP = 0.02    # K/DEF long before the rival's typical round
@@ -34,22 +33,6 @@ def _tendency_mult(seed: dict | None, rnd: int, pos: str) -> float:
     if share is None:
         return 1.0
     return float(np.clip(share / (1.0 / 6.0), 0.5, 2.0))
-
-
-def calibrate(p: float, shrink: float) -> float:
-    """Empirical calibration map (v2 item 1.1), fitted to the Omnibeta CLV
-    retro: raw 96% -> 75%, 82% -> 68%, 45% -> 50% (n=67). A single shrink
-    toward 0.5 fits all three buckets: calibrated = 0.5 + (p - 0.5) * shrink.
-    RETIRED (DECISIONS #25/#26): that n=67 was scored against the wrong
-    horizon, and the B7 refit found the raw simulation calibrated from 50%
-    up. survival_shrink is pinned at 1.0 in config.yaml and on the Tracker
-    class, and simulate_survival warns once for any other value. The function
-    stays so that old logs and the knob table still load. shrink == 1.0
-    returns p exactly, so raw and calibrated are identical, not
-    identical-to-1e-17."""
-    if shrink == 1.0:
-        return float(p)
-    return 0.5 + (p - 0.5) * shrink
 
 
 def expected_best(values, survival) -> float:
@@ -102,7 +85,7 @@ def simulate_survival(pool, current_pick, next_pick, rivals, seeds, rng,
                       sims=1000, sigma=6.0, teams=12,
                       reach_prob=0.0, reach_scale=3.0,
                       run_window=5, run_min=2, run_boost=1.5,
-                      survival_shrink=1.0, recent_pos=None, markets=None,
+                      recent_pos=None, markets=None,
                       need_damp=NEED_DAMP, qb_filled_damp=QB_FILLED_DAMP,
                       kdef_early_damp=KDEF_EARLY_DAMP, qb_damp_until_round=10,
                       kdef_typical_round=13, run_ratio=0.0,
@@ -383,34 +366,26 @@ def simulate_survival(pool, current_pick, next_pick, rivals, seeds, rng,
             mask = gmask & alive
             e_best[name] += float(val[mask].max()) if mask.any() else 0.0
 
-    # Two survival vectors, named so they cannot be confused (plan B1/B2):
-    # survival_raw is the Monte Carlo frequency; survival is the calibrated
-    # vector that is DISPLAYED. The DECISION (e_best_next, urgency) is the
-    # joint expectation from the loop above -- exact under sampling without
-    # replacement; the carry formula was measured against it (DECISIONS #26:
-    # top-1 flips 1/40, urgency gaps up to 8 points on thin TE markets) and
-    # stays the JS mirror's approximation, reported here as
-    # e_best_next_carry. With survival_shrink = 1.0 (the shrink is retired)
-    # display and decision are one vector; any other value makes them
-    # disagree, so the engine says so once.
+    # One survival vector, reported under two keys: `survival` is what the
+    # page shows and `survival_raw` is what the calibration harness scores.
+    # They were two vectors while a display shrink existed (plan B1/B2); the
+    # shrink was retired by DECISIONS #26 and removed on 2026-09-04, so they
+    # are the same array and the decision (e_best_next, urgency: the joint
+    # expectation from the loop above, exact under sampling without
+    # replacement) is drawn from the vector the user sees. The carry formula
+    # stays as the JS mirror's approximation (e_best_next_carry).
     raw = survived / sims
-    calibrated = np.array([calibrate(float(raw[j]), survival_shrink) for j in range(n)])
-    if survival_shrink != 1.0 and not _WARNED_SHRINK:
-        import sys
-        print(f"  SURVIVAL SHRINK {survival_shrink}: displayed survival no longer equals the decision's "
-              "(DECISIONS #26 retired the shrink; refit the noise instead)", file=sys.stderr)
-        _WARNED_SHRINK.append(True)
     report = {}
     for name, (gmask, val) in groups.items():
         e = e_best[name] / sims                     # the decision: joint expectation over the draw
-        e_carry = expected_best(val[gmask], calibrated[gmask]) if gmask.any() else 0.0
+        e_carry = expected_best(val[gmask], raw[gmask]) if gmask.any() else 0.0
         report[name] = {
             "best_now": best_now[name],
             "e_best_next": e,
             "e_best_next_joint": e,
             "e_best_next_carry": e_carry,
             "urgency": best_now[name] - e,
-            "survival": survival_of(name, arr=calibrated),
+            "survival": survival_of(name, arr=raw),
             "survival_raw": survival_of(name, arr=raw),
         }
     return report

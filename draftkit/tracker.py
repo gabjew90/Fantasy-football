@@ -94,7 +94,6 @@ class Tracker:
     run_min = 2
     run_boost = 1.5
     run_ratio = 0.0             # plan B4: run = count > run_ratio x expected; 0 = the absolute count rule (kept: DECISIONS #29)
-    survival_shrink = 1.0       # retired 2026-09-02 (DECISIONS #26): the raw sim is calibrated; 0.55 was fitted to mis-scored data
     # rival need weighting (plan B3, hoisted from urgency.py constants at the
     # values that were in force; fitted in B7)
     need_damp = 0.15
@@ -116,6 +115,11 @@ class Tracker:
     # ANOTHER roster goes down (bench.insurance_value, contingency term).
     bench_survival_discount = False
     bench_contingency = False
+    # bench_two_pick (2026-09-04, #47 follow-up): a bench position scores as
+    # its value now plus the expected best insurance still gettable at the
+    # OTHER bench positions next turn (the market path's two-pick shape); at
+    # the last bench pick value alone counts. Supersedes the drop-off when on.
+    bench_two_pick = False
     # TURN SEATS (2026-09-04): at the turn my next pick is one pick away with
     # nobody in between, so every survival is exactly 1.0 and every urgency 0,
     # and the two picks are ranked on value alone with no view of the 18-pick
@@ -405,7 +409,6 @@ class Tracker:
         ("sigma_early", float), ("sigma_late", float),
         ("reach_prob", float), ("reach_scale", float),
         ("run_window", int), ("run_min", int), ("run_boost", float), ("run_ratio", float),
-        ("survival_shrink", float),
         ("need_damp", float), ("qb_filled_damp", float), ("qb_damp_until_round", int),
         ("kdef_early_damp", float), ("kdef_typical_round", int),
         ("autopick_sigma_scale", float), ("autopick_need_damp", float), ("autopick_list_prob", float),
@@ -417,7 +420,7 @@ class Tracker:
         ("upside_boost_relative", bool), ("fallback_floor", str),
         ("bench_row_wins_dedupe", bool), ("per_position_deadline", bool),
         ("draft_k", int),
-        ("bench_survival_discount", bool), ("bench_contingency", bool),
+        ("bench_survival_discount", bool), ("bench_contingency", bool), ("bench_two_pick", bool),
         ("turn_look_through", bool),
     )
 
@@ -781,7 +784,8 @@ class Tracker:
         # same simulation the market path uses; a player outside its ADP
         # window has no entry and counts as certain to survive
         surv_by_pos: dict[str, dict] = {}
-        if self.bench_survival_discount:
+        two_pick = bool(self.bench_two_pick)
+        if self.bench_survival_discount or two_pick:
             rep = self.urgency_report() or {}
             surv_by_pos = {pos: (rep.get(pos) or {}).get("survival") or {} for pos in BENCH_POSITIONS}
         # the starter a role shift would displace, per position: at a
@@ -802,6 +806,7 @@ class Tracker:
             return float(b) if b is not None and b == b else 0.0
 
         added, upgrade_ids = False, set()
+        per_pos: list[tuple] = []          # (pos, best, best_iv, why, e_next, s_best)
         for pos in BENCH_POSITIONS:
             rem = [p for p in self.remaining(pos)
                    if p.get("proj_source") != "no_market"
@@ -839,26 +844,45 @@ class Tracker:
             if best_iv.get("contingency"):
                 why += (f" · +{best_iv['contingency']:.0f} of that is the role shift if "
                         f"{best.get('backs_up')} goes down (he would start over your weakest {pos})")
-            score = best_iv["value"]
-            if self.bench_survival_discount:
+            e_next, s_best = best_iv["value"], None
+            if surv_by_pos:
                 s_map = surv_by_pos.get(pos, {})
                 vals = [iv["value"] for _p, iv in scored]
                 survs = [float(s_map.get(str(_p.get("sleeper_id")), 1.0)) for _p, _iv in scored]
                 e_next = expected_best(vals, survs)
-                cost = max(0.0, best_iv["value"] - e_next)
                 s_best = float(s_map.get(str(best.get("sleeper_id")), 1.0))
-                why += (f" · waiting likely costs ~{cost:.0f} ({s_best:.0%} he is still there next turn, "
-                        f"expected best {pos} then {e_next:.0f})")
-                score = cost
-            best["_bench_value"] = best_iv["value"]
-            cands.append((score, why, best))
-            added = True
+            per_pos.append((pos, best, best_iv, why, e_next, s_best))
             # is he an upgrade rather than insurance? Compared at his own
             # position: displacing across the flex is a second-order case the
             # market row already prices correctly through vorp_flex.
             floor = weakest_starter.get(pos)
             if floor is not None and float(best.get("proj_pts") or 0.0) > floor:
                 upgrade_ids.add(str(best.get("sleeper_id")))
+        # bench picks I still hold AFTER this one (K and DEF are owed their
+        # own picks): the two-pick partner exists only if one remains
+        bench_left_after = picks_left - 1 - needs.get("K", 0) - needs.get("DEF", 0)
+        for pos, best, best_iv, why, e_next, s_best in per_pos:
+            score = best_iv["value"]
+            if two_pick:
+                partner_v, partner_q = 0.0, None
+                if bench_left_after >= 1:
+                    for q, _b, _iv, _w, e2, _s in per_pos:
+                        if q != pos and e2 > partner_v:
+                            partner_v, partner_q = e2, q
+                score = best_iv["value"] + partner_v
+                why += (f" · two-pick: {best_iv['value']:.0f} now"
+                        + (f" + ~{partner_v:.0f} the {partner_q} expected at your next turn" if partner_q
+                           else " (last bench pick: value alone)")
+                        + f" = {score:.0f}"
+                        + (f" · {s_best:.0%} he is still there next turn" if s_best is not None else ""))
+            elif self.bench_survival_discount:
+                cost = max(0.0, best_iv["value"] - e_next)
+                why += (f" · waiting likely costs ~{cost:.0f} ({s_best:.0%} he is still there next turn, "
+                        f"expected best {pos} then {e_next:.0f})")
+                score = cost
+            best["_bench_value"] = best_iv["value"]
+            cands.append((score, why, best))
+            added = True
         if added:
             # cost of waiting first (or raw insurance with the knob off), the
             # bigger insurance value breaking exact ties
@@ -967,7 +991,7 @@ class Tracker:
             history_end=cur,   # the real history ends at the pick on the clock, not at `start`
             reach_prob=self.reach_prob, reach_scale=self.reach_scale,
             run_window=self.run_window, run_min=self.run_min,
-            run_boost=self.run_boost, survival_shrink=self.survival_shrink,
+            run_boost=self.run_boost,
             recent_pos=recent_pos, markets=markets,
             need_damp=self.need_damp, qb_filled_damp=self.qb_filled_damp,
             kdef_early_damp=self.kdef_early_damp,

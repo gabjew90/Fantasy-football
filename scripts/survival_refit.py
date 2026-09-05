@@ -3,7 +3,7 @@ autopick stage and LORO per DECISIONS #35 / plan 2026-09-03 s5).
 
 The logged prose is report-only. The fit re-runs the simulation on every
 archived state (picks made so far, seen from that room's real seat) with the
-production board for the league, draft-day ADP, survival_shrink 1.0 and a
+production board for the league, draft-day ADP and a
 candidate knob set, and scores the RAW survival vector of every pooled
 player against what the room actually did.
 
@@ -252,7 +252,7 @@ def state_rows(ctx: dict, cp: int, seat: int, point: dict, sims: int) -> list[tu
     away = (ctx.get("away_at") or {}).get(cp, frozenset())
     t = EP.make_tracker(ctx["board"], ctx["picks"][:cp - 1], seat, slots=ctx["slots"], teams=teams,
                         rounds=rounds, cfg=ctx["cfg"],
-                        overrides={**point, "sims": sims, "survival_shrink": 1.0, "away_slots": frozenset(away)})
+                        overrides={**point, "sims": sims, "away_slots": frozenset(away)})
     rep = t.urgency_report()
     if not rep:
         return []

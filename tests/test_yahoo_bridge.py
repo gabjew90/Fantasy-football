@@ -319,7 +319,7 @@ def test_engine_knobs_flow_from_the_config_through_one_list():
     assert (t.need_damp, t.run_ratio, t.autopick_sigma_scale, t.sims, t.pool_min) == (0.5, 2.0, 0.25, 50, 20)
     assert t.qb_filled_damp == Tracker.qb_filled_damp == 0.05      # absent key: class default
     assert Tracker.need_damp == 0.15 and Tracker.away_slots == frozenset()
-    assert {k for k, _ in Tracker.ENGINE_KNOBS} >= {"need_damp", "run_ratio", "survival_shrink", "sims"}
+    assert {k for k, _ in Tracker.ENGINE_KNOBS} >= {"need_damp", "run_ratio", "sims"}
 
 
 def test_away_teams_become_away_slots_through_drafted_team_ids():
