@@ -33,12 +33,15 @@ from draftkit.config import Config
 
 ROOT = Path(__file__).resolve().parents[1]
 SHEETS = [ROOT / "data/external/DraftSheets_2026_Keefamania_10tm_halfPPR_1flex.xlsx",
-          ROOT / "data/external/DraftSheets_2026_default_2026-09-04.xlsx"]
+          ROOT / "data/external/DraftSheets_2026_default_2026-09-04.xlsx",
+          ROOT / "data/external/DraftSheets_2026_Keefamania_10tm_halfPPR_1flex_v2.xlsx"]
 # what each copy's formulas say, asserted so a silent re-shape fails loudly
-EXPECTED_SPEC = {SHEETS[0].name: (16.0, "low_avg_high_ecr"), SHEETS[1].name: (17.0, "mid_avg_ecr")}
-# the 09-04 copy's TE block: 49 of 50 rows still on the 16-game formula (a
-# half-applied template edit); the loader names it and reproduces TE on 17
-OFF_BASIS = {SHEETS[0].name: [], SHEETS[1].name: ["TE"]}
+EXPECTED_SPEC = {SHEETS[0].name: (16.0, "low_avg_high_ecr"), SHEETS[1].name: (17.0, "mid_avg_ecr"),
+                 SHEETS[2].name: (17.0, "mid_avg_ecr")}
+# the 09-04 download's TE block: 49 of 50 rows still on the 16-game formula
+# (a half-applied template edit, present in the default copy AND the user's
+# league-settings copy); the loader names it and reproduces TE on 17
+OFF_BASIS = {SHEETS[0].name: [], SHEETS[1].name: ["TE"], SHEETS[2].name: ["TE"]}
 
 # the sheet's own AVG cell per tab (1-based column): the base line scored with
 # the Scoring tab, plus the tab's rookie bump
@@ -242,3 +245,19 @@ def test_the_headline_line_reproduces_the_draftsheet_page(sheet, cached):
     assert set(hl["pts_basis"].to_list()) == {games}
     scaled = frame.with_columns(X.source_basis_expr().alias("b"))
     assert set(scaled["b"].to_list()) == {games}
+
+
+def test_the_league_settings_copy_and_the_default_copy_give_one_board():
+    """The user's ask (2026-09-05): the loader applies the league's rules to
+    whatever copy it is handed. The default download (Scoring tab at 12
+    teams) and the same download with Keefamania's settings entered must
+    yield the same headline for every player, to the cent."""
+    a, _ = X.from_sheet(SHEETS[1], _scoring(), _PassThrough(), as_of="x", line="headline")
+    b, _ = X.from_sheet(SHEETS[2], _scoring(), _PassThrough(), as_of="x", line="headline")
+    ma = {r["sleeper_id"]: r for r in a.iter_rows(named=True)}
+    mb = {r["sleeper_id"]: r for r in b.iter_rows(named=True)}
+    assert set(ma) == set(mb) and len(ma) >= 480
+    for k in ma:
+        for col in ("pts17", "pts17_band", "pts17_line_lo", "pts17_line_hi", "pts_basis"):
+            va, vb = ma[k][col], mb[k][col]
+            assert (va is None and vb is None) or abs(va - vb) < 1e-9, (k, col, va, vb)

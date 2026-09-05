@@ -43,7 +43,7 @@ projections:
     # with the league yaml and reproduces the headline from the workbook's
     # own formulas, so its Scoring-tab team count / roster / auction cells do
     # not matter. Replace the file, rebuild tiers, re-export, restart bridge.
-    sheet_path: data/external/DraftSheets_2026_default_2026-09-04.xlsx
+    sheet_path: data/external/DraftSheets_2026_Keefamania_10tm_halfPPR_1flex_v2.xlsx   # the user's league-settings copy of the 09-04 download; byte-identical board to the default copy (DECISIONS #54 note)
     sheet_as_of: "2026-09-04"     # fallback only: the workbook's own 'Updated:' cell wins when present
   # the one tail rule: depth-chart backups the market also does not rank as
   # starters project 0 (contingent_of keeps the handcuff column informative)

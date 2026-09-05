@@ -3513,3 +3513,20 @@ the 09-02 board the WR row moves Pierce -> Tate, the QB2 Mahomes -> Dart and
 the first RB reserve Dowdle -> Henderson; those ride on the board refresh
 (Henderson 134.9 -> 136.9 against Dowdle 128.2 -> 129.5) as much as on the
 rule and are not separable here.
+
+
+### #54 note (2026-09-05 11:30 PT): the league-settings copy
+
+The user entered Keefamania's settings into the same 09-04 download
+(`DraftSheets_2026_Keefamania_10tm_halfPPR_1flex_v2.xlsx`: Scoring tab 10
+teams, 1/2/2/1/1 + 6 bench, scoring identical to the league yaml, Updated
+2026-09-04). Checked against the default copy: 0 of 485 tab lines differ,
+0 of 237 page PTS differ, the TE block is half-edited in this copy too (so
+it is FantasyPros' template, not the download's settings), and
+`from_sheet` yields the same headline, band, low/high lines and basis for
+every one of 492 players to the cent. tiers.keefamania.csv rebuilt on it is
+byte-identical. That is the direct proof of the ask: the loader applies the
+league's rules to whatever copy it is handed. The v2 copy becomes the
+configured sheet_path because its page (VALUE, PS, tiers) is the one that
+matches the league when the user reads it; a test now holds the two copies
+to one board.
