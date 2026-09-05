@@ -306,3 +306,32 @@ def test_a_handcuff_is_uplifted_only_in_his_own_starters_weeks():
     # the knob is registered and off by default
     from draftkit.tracker import Tracker
     assert ("handcuff_split", bool) in Tracker.ENGINE_KNOBS and Tracker.handcuff_split is False
+
+
+def test_a_bench_tie_breaks_on_the_ceiling_over_the_wire_not_raw_points():
+    """Room 10804278 pick 114: 33 rows inside BENCH_TIE, survival within
+    the gap, and the raw ceiling took Mahomes (290) over every back and
+    receiver (120-160). Over the position's wire the back's 70 beats the
+    quarterback's 34, the currency the zero-insurance path already uses."""
+    board = _twins_board(a={"proj_pts": 92.0, "proj_hi": 150.0, "proj_band": 4.0})
+    board = [q for q in board if q["sleeper_id"] != "twin_b"]
+    qb = player("qb_two", "QB", 25.0, 25.0, 118.0, rank=8)
+    qb["proj_pts"], qb["proj_hi"], qb["proj_band"], qb["backs_up"] = 258.0, 290.0, 4.0, ""
+    board.append(qb)
+    for i, pts in enumerate((258.0, 257.0, 256.0)):
+        w = player(f"qb_wire{i}", "QB", 8.0, 8.0, None, rank=20 + i)
+        w["proj_pts"], w["backs_up"] = pts, ""
+        board.append(w)
+    keep = set(MY_LINEUP) | {"twin_a", "qb_two"}
+    board = [q for q in board if q["sleeper_id"] in keep or q["sleeper_id"].startswith(("rb_wire", "qb_wire"))]
+    for q in board:
+        if q["sleeper_id"].startswith("rb_wire"):
+            q["adp"] = None
+    t = _pool(board)
+    rows = [r for r in t.recommendations(6) if str(r[1]).startswith("bench insurance")]
+    by = {r[2]["sleeper_id"]: r for r in rows}
+    assert "twin_a" in by and "qb_two" in by, [(r[2]["sleeper_id"], r[2]["_staged"]) for r in rows]
+    ins_a, ins_q = by["twin_a"][2]["_staged"]["insurance"], by["qb_two"][2]["_staged"]["insurance"]
+    assert abs(by["twin_a"][2]["_staged"]["score"] - by["qb_two"][2]["_staged"]["score"]) <= 2.0, (ins_a, ins_q)
+    assert rows[0][2]["sleeper_id"] == "twin_a", [(r[2]["sleeper_id"], r[2]["_staged"], r[1][-120:]) for r in rows]
+    assert "higher ceiling over the wire" in rows[0][1]

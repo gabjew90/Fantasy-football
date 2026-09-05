@@ -3849,3 +3849,11 @@ the room took Allen; pick 34 Rice (WR 55.1 vs RB 53.0) where it took
 McBride; 47 onward unchanged (flat boards, then bench). Suite 800 passing.
 A QB or TE is now taken when his value over the deadline fallback beats the
 best back or receiver's, which is what the plan meant by value all along.
+
+Addendum (same room, pick 114): the bench tie broke on the RAW ceiling, so
+Mahomes (290) won a 33-row tie against backs and receivers whose ceilings
+read 120-160, by position alone. The tie now breaks on the ceiling over the
+position's wire (ceil minus 17 weeks of the k=3 wire), the currency the
+zero-insurance fallthrough already used; the label reads "higher ceiling
+over the wire". A QB2 still wins when he is the best ticket over his wire.
+tests/test_bench_rows.py::test_a_bench_tie_breaks_on_the_ceiling_over_the_wire_not_raw_points.

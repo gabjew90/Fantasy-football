@@ -976,13 +976,16 @@ class Tracker:
                             f"({by_s[0]['s']:.0%} vs {by_s[1]['s']:.0%} for {by_s[1]['p'].get('player') or by_s[1]['p'].get('name')})")
                 else:
                     def _ck(r):
-                        # a published ceiling beats none: a lottery ticket with a
-                        # known upside over one with no range at all
-                        return r["ceil"] if r["ceil"] is not None else -1e9
+                        # ceiling OVER THE POSITION'S WIRE, the currency the
+                        # zero-insurance path uses: raw season points let a QB2
+                        # (290) win every late tie against backs and receivers
+                        # (120-160) by default (room 10804278 pick 114, DECISIONS
+                        # #64). A published ceiling still beats none.
+                        return r["ceil_wire"] if r["ceil_wire"] is not None else -1e9
                     tied = sorted(tied, key=lambda r: -_ck(r))
-                    c0 = tied[0]["ceil"]
+                    c0 = tied[0]["ceil_wire"]
                     mode = (f"{len(tied)} within {BENCH_TIE:g}, survival within {SURV_GAP:g}: "
-                            + (f"higher ceiling ({c0:.0f})" if c0 is not None else "no ceiling published, insurance order"))
+                            + (f"higher ceiling over the wire ({c0:.0f})" if c0 is not None else "no ceiling published, insurance order"))
             ordered = tied + rest
 
         rows: list[tuple] = []
