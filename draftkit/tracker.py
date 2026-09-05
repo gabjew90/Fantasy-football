@@ -1146,9 +1146,28 @@ class Tracker:
         # sim's own number stays in survival_raw for the harness
         knots = getattr(self, "survival_calibration", None) or []
         if knots and report:
-            for _mkt, u in report.items():
-                if isinstance(u, dict) and isinstance(u.get("survival"), dict):
-                    u["survival"] = {k: calibrate_survival(v, knots) for k, v in u["survival"].items()}
+            from .urgency import expected_best
+            for mkt, u in report.items():
+                if not (isinstance(u, dict) and isinstance(u.get("survival"), dict)):
+                    continue
+                u["survival"] = {k: calibrate_survival(v, knots) for k, v in u["survival"].items()}
+                # The expectation and the urgency must come from the SAME
+                # probabilities the stages read. Room 10802514 pick 34: the
+                # calibrated survival said Javonte 23%, the raw expectation
+                # still promised a 180-point back at 47, and the RB market
+                # read as safe; Judkins was the back at 47. Recompute the
+                # expected best with the independent walk the page uses
+                # (urgency.expected_best) over the calibrated survivals; the
+                # sim's own numbers stay as *_raw.
+                vkey = "vorp_flex" if mkt == "FLEX" else "vorp"
+                sids = [sid for sid in u["survival"] if sid in self.by_id]
+                if sids:
+                    vals = [self._mval(self.by_id[sid], vkey) for sid in sids]
+                    e_cal = expected_best(vals, [u["survival"][sid] for sid in sids])
+                    u["e_best_next_raw"] = u.get("e_best_next")
+                    u["urgency_raw"] = u.get("urgency")
+                    u["e_best_next"] = e_cal
+                    u["urgency"] = float(u.get("best_now", 0.0) or 0.0) - e_cal
         self._urgency_cache = (key, report)
         return report
 

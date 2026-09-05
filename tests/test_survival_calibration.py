@@ -87,3 +87,23 @@ def test_a_flat_board_lets_the_pair_lead():
     out = _rank([(6.5, "q", qb), (0.4, "w", wr)], {"QB": 6.5, "WR": 0.4}, {"QB": {"qb": 0.83}, "WR": {"wr": 0.81}})
     assert f"STAGED (flat: top urgency 6.5 under {URGENCY_FLOOR:g})" in out[0][1]
     assert all(p["_staged"]["mode"] == "flat" for _s, _w, p in out)
+
+
+def test_the_expectation_and_urgency_follow_the_calibrated_survival():
+    from draftkit.urgency import expected_best
+    from test_slot_markets import BOARD, make_tracker
+    t = make_tracker(BOARD, [], current_pick=21)
+    t.apply_engine_cfg({"survival_calibration": [list(k) for k in KNOTS]})
+    rep = t.urgency_report()
+    checked = 0
+    for mkt, u in rep.items():
+        if not (isinstance(u, dict) and isinstance(u.get("survival"), dict)) or not u["survival"]:
+            continue
+        vkey = "vorp_flex" if mkt == "FLEX" else "vorp"
+        sids = [s for s in u["survival"] if s in t.by_id]
+        e = expected_best([t._mval(t.by_id[s], vkey) for s in sids], [u["survival"][s] for s in sids])
+        assert u["e_best_next"] == pytest.approx(e)
+        assert u["urgency"] == pytest.approx(u["best_now"] - e)
+        assert "e_best_next_raw" in u and "urgency_raw" in u
+        checked += 1
+    assert checked > 0
