@@ -1,0 +1,18 @@
+B arm overrides: {'handcuff_split': True} (A arm: insurance on, defaults)
+Season replay — keefamania: 10 teams, k=3, 200 seasons per roster, absences from empirical position distributions
+
+slot  VORP bench  insurance    diff  wire off  wire on   shape off -> on
+   1      1693.9     1693.9    +0.0      26.1     26.1   QB2 RB5 WR5 TE1 K1 DEF1 -> QB2 RB5 WR5 TE1 K1 DEF1
+   2      1627.3     1627.3    +0.0      27.2     27.2   QB2 RB7 WR3 TE1 K1 DEF1 -> QB2 RB7 WR3 TE1 K1 DEF1
+   3      1701.7     1701.7    +0.0      12.6     12.6   QB2 RB5 WR4 TE2 K1 DEF1 -> QB2 RB5 WR4 TE2 K1 DEF1
+   4      1617.3     1617.3    +0.0      31.3     31.3   QB2 RB4 WR6 TE1 K1 DEF1 -> QB2 RB4 WR6 TE1 K1 DEF1
+   5      1647.1     1647.1    +0.0      13.3     13.3   QB2 RB6 WR3 TE2 K1 DEF1 -> QB2 RB6 WR3 TE2 K1 DEF1
+   6      1629.8     1629.8    +0.0      27.1     27.1   QB2 RB6 WR4 TE1 K1 DEF1 -> QB2 RB6 WR4 TE1 K1 DEF1
+   7      1605.0     1605.0    +0.0      29.0     29.0   QB2 RB5 WR5 TE1 K1 DEF1 -> QB2 RB5 WR5 TE1 K1 DEF1
+   8      1623.0     1623.0    +0.0      27.4     27.4   QB2 RB5 WR5 TE1 K1 DEF1 -> QB2 RB5 WR5 TE1 K1 DEF1
+   9      1611.9     1603.6    -8.3      27.9     27.6   QB2 RB6 WR4 TE1 K1 DEF1 -> QB2 RB7 WR3 TE1 K1 DEF1
+  10      1593.9     1593.9    +0.0      25.8     25.8   QB2 RB6 WR4 TE1 K1 DEF1 -> QB2 RB6 WR4 TE1 K1 DEF1
+
+n=10 slots x 200 seasons
+insurance - VORP: mean -0.8 pts/season  (paired se 0.1)  slots better 0  worse 1  tied 9
+VORP-bench mean season 1635.1  ->  insurance is -0.05%

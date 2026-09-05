@@ -162,7 +162,8 @@ def insurance_value(p: dict, waiver: float, exposure: int,
                     depth_ahead: int = 0,
                     contingency_weeks: float | None = None,
                     contingency_starter_ppw: float | None = None,
-                    my_weakest_ppw: float | None = None) -> dict:
+                    my_weakest_ppw: float | None = None,
+                    split_handcuff: bool = False) -> dict:
     """Season points a bench player is expected to add over streaming.
 
     handcuff_starter_ppw: the weekly rate of the starter he backs up, when
@@ -190,17 +191,35 @@ def insurance_value(p: dict, waiver: float, exposure: int,
         # is a sanity bound, not a tuned number -- a backup does not project
         # above the job he is stepping into
         ppw = min(ppw * HANDCUFF_UPLIFT, max(handcuff_starter_ppw, ppw))
+    weeks = weeks_needed(pos, exposure, depth_ahead)
+    # A handcuff inherits the role only in the weeks HIS starter is out. The
+    # cover weeks span every starter at the position, so the uplifted rate
+    # applies to his starter's absences and his own rate to the rest
+    # (DECISIONS #58: Monangai, backing up a flex Swift, was priced at the
+    # uplifted rate across all 9.6 RB cover weeks and beat Pollard 47 to 35;
+    # split, he is 33). The starter's own absences: one starter, first call.
+    # Behind engine.handcuff_split (the #8 worked example priced the uplift
+    # across every cover week); measured on the season replay before a
+    # league turns it on.
+    if handcuff and split_handcuff and weeks > 0:
+        w_star = min(weeks, weeks_needed(pos, 1, 0))
+        w_rest = weeks - w_star
+        value_raw = (ppw - waiver) * w_star + (own - waiver) * w_rest
+    else:
+        w_star, w_rest = (weeks, 0.0) if handcuff else (0.0, weeks)
+        value_raw = (ppw - waiver) * weeks
+    # the per-week edge the reason string shows is the blended one
+    edge_raw = value_raw / weeks if weeks > 0 else (ppw - waiver)
     # the floor is DISPLAY only (DECISIONS #55): the raw edge ranks, so a
     # man below the wire sorts below the wire instead of tying at zero with
     # everyone the wire beats
-    edge_raw = ppw - waiver
     edge = max(0.0, edge_raw)
-    weeks = weeks_needed(pos, exposure, depth_ahead)
     contingency = 0.0
     if (not handcuff and contingency_weeks and my_weakest_ppw is not None):
         up = min(own * HANDCUFF_UPLIFT, max(float(contingency_starter_ppw or 0.0), own))
         contingency = max(0.0, up - float(my_weakest_ppw)) * float(contingency_weeks)
-    return {"value": edge * weeks + contingency, "edge": edge, "weeks": weeks,
-            "value_raw": edge_raw * weeks + contingency, "edge_raw": edge_raw,
+    return {"value": max(0.0, value_raw) + contingency, "edge": edge, "weeks": weeks,
+            "value_raw": value_raw + contingency, "edge_raw": edge_raw,
+            "handcuff_weeks": w_star,
             "ppw": ppw, "waiver_ppw": waiver, "handcuff": handcuff,
             "depth_ahead": depth_ahead, "contingency": contingency}

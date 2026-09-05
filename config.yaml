@@ -146,6 +146,10 @@ engine:
   # DECISIONS #55, which has no knob).
   tie_break: scarcity
   tie_window: 1.0
+  # handcuff_split (DECISIONS #58): a handcuff's uplifted rate counts only in
+  # his own starter's absence weeks, his own rate in the rest of the cover.
+  # Off = the DECISIONS #8 pricing. Measured per league before switching on.
+  handcuff_split: false
   # ---- rival-behaviour knobs (plan 2026-09-02 B3) -------------------------
   # Hoisted from constants in draftkit/urgency.py at the values that were in
   # force, so every prediction logs the knob set it was made under and the

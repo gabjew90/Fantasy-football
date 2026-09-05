@@ -138,6 +138,10 @@ class Tracker:
     # scoring LESS 57% of the time at RB/WR); kept, off, like the bench knobs.
     tie_break = "scarcity"
     tie_window = 1.0
+    # DECISIONS #58: a handcuff's uplifted rate applies only in HIS starter's
+    # absence weeks; the rest of the cover is at his own rate. Off = the #8
+    # pricing (uplift across every cover week).
+    handcuff_split = False
     rival_needs_update = True   # plan B6: a rival picking twice in my window consumes his needs
     away_slots = frozenset()    # plan B5: draft slots on autopick (Yahoo 'away'); empty on Sleeper
     upside_from_round = 8
@@ -434,6 +438,7 @@ class Tracker:
         ("bench_survival_discount", bool), ("bench_contingency", bool), ("bench_two_pick", bool),
         ("turn_look_through", bool),
         ("tie_break", str), ("tie_window", float),
+        ("handcuff_split", bool),
     )
 
     def _dispersion_for(self, q: dict) -> float | None:
@@ -841,7 +846,8 @@ class Tracker:
                           "contingency_starter_ppw": (float(st.get("proj_pts") or 0.0) / 17.0) if st else None,
                           "my_weakest_ppw": displace_ppw[pos]}
                 iv = insurance_value(p, waiver, exposure.get(pos, 0), hc,
-                                     depth_ahead=depth_ahead.get(pos, 0), **kw)
+                                     depth_ahead=depth_ahead.get(pos, 0),
+                                     split_handcuff=bool(self.handcuff_split), **kw)
                 scored.append((p, iv))
             # ranked on the RAW value (edge before the floor x weeks): a player
             # below the wire is worth less than the wire and sorts that way

@@ -3623,3 +3623,30 @@ reverse case with the label, and the inside-the-gap case. Suite 770.
 The bench ceiling rule compares raw ceilings across positions with the
 same weakness in principle; bench rows are already priced against each
 position's wire, so it is left as is and noted.
+
+## 2026-09-05 (58) — a handcuff's uplift counts only in his starter's weeks (knob, measured, off)
+
+Room 10796348 pick 73: Monangai (115 pts, backs up our flex D'Andre Swift)
+was the RB insurance row at 47 points over Pollard (142) at 35 and Warren
+(144) at 36. The whole margin is the handcuff uplift: his 6.8 a week is
+lifted to 9.9 (x1.46, capped at Swift's rate) and that rate is multiplied
+by all 9.6 cover weeks, which are the expected absences of all three
+starting backs. He inherits Swift's role only when Swift is out (about 4
+weeks); when Achane or Love is out he plays at his own 6.8. Split that
+way he is about 33 and Pollard is the row.
+
+Shipped as engine.handcuff_split (default off = the DECISIONS #8 pricing,
+which the worked-example tests encode). bench.insurance_value(...,
+split_handcuff=True) prices the starter's own absence weeks
+(weeks_needed(pos, 1, 0), capped at the cover) at the uplifted rate and the
+rest at the backup's own rate; the reason string's per-week edge is the
+blend; `handcuff_weeks` is returned. Test on the Monangai numbers, both
+settings.
+
+Measured, keefamania season replay, 10 seats x 200 seasons, split against
+today: -0.8 points a season, paired se 0.1, 0 seats better, 1 worse, 9
+tied. The grader is nearly blind to it (a handcuff row rarely changes who
+starts in the replay) and where it saw anything it went the wrong way by a
+hair. DECISION: off. The pricing argument is recorded; the knob is one line
+away if the user wants it on. It cost nothing in the room: Pollard lasted
+to 88 and we took him there.

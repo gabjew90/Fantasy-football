@@ -276,3 +276,25 @@ def test_published_range_reads_lines_then_band_then_nothing():
     assert published_range({"proj_pts": 170.0, "proj_lo": 170.0, "proj_hi": 170.0, "proj_band": 10.0}) == (165.0, 175.0)
     assert published_range({"proj_pts": 170.0, "proj_lo": 170.0, "proj_hi": 170.0, "proj_band": None}) == (None, None)
     assert published_range({"proj_pts": 170.0, "proj_lo": None, "proj_hi": 180.0, "proj_band": None}) == (None, 180.0)
+
+
+def test_a_handcuff_is_uplifted_only_in_his_own_starters_weeks():
+    """Room 10796348 pick 73 (DECISIONS #58): Monangai (115 pts) backing up
+    our flex Swift was priced at the uplifted rate across all 9.6 RB cover
+    weeks and beat Pollard (142) 47 to 35. Split, the uplift covers Swift's
+    ~4 absences and his own rate the other ~5.5: about 33, and Pollard's
+    35 is the row."""
+    wire = 80.4 / 17.0
+    mon = B.insurance_value({"pos": "RB", "proj_pts": 115.2}, waiver=wire, exposure=3, handcuff_starter_ppw=174.4 / 17.0,
+                            split_handcuff=True)
+    pol = B.insurance_value({"pos": "RB", "proj_pts": 141.9}, waiver=wire, exposure=3, split_handcuff=True)
+    old = B.insurance_value({"pos": "RB", "proj_pts": 115.2}, waiver=wire, exposure=3, handcuff_starter_ppw=174.4 / 17.0)
+    assert old["value_raw"] > pol["value_raw"], "the #8 pricing (knob off) still has Monangai over Pollard"
+    assert mon["handcuff"] and 0 < mon["handcuff_weeks"] < mon["weeks"]
+    assert 30 < mon["value_raw"] < 36 and pol["value_raw"] > mon["value_raw"], (mon["value_raw"], pol["value_raw"])
+    # a handcuff still beats a same-rate non-handcuff: the uplift is real in his starter's weeks
+    twin = B.insurance_value({"pos": "RB", "proj_pts": 115.2}, waiver=wire, exposure=3, split_handcuff=True)
+    assert mon["value_raw"] > twin["value_raw"]
+    # the knob is registered and off by default
+    from draftkit.tracker import Tracker
+    assert ("handcuff_split", bool) in Tracker.ENGINE_KNOBS and Tracker.handcuff_split is False
