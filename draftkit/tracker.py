@@ -30,6 +30,7 @@ POS_ORDER = ["RB", "WR", "TE", "QB", "K", "DEF"]
 # Bench rows are priced in a DIFFERENT currency from market rows, and the
 # dedup has to tell them apart. One constant, written once and matched once.
 BENCH_WHY_PREFIX = "bench insurance:"
+BENCH_ZERO = 0.5  # season insurance under this is nothing: the zero-insurance fallthrough (ceiling over the wire)
 BENCH_TIE = 2.0   # bench rows this close on the RAW insurance value are a coin flip: the higher
                   # CEILING breaks it (proj_hi, else proj_pts + band/2; never the width, DECISIONS #55)
 
@@ -853,6 +854,16 @@ class Tracker:
             if not rem:
                 continue
             waiver, wname = waiver_ppw(rem, last_pick, k, wire_names=wire_names)
+            # a bench candidate must be VIABLE, the same test the wire applies
+            # (bench.waiver_ppw): projects above 0 and is not out. Room
+            # 10799518 pick 116: Josh Jacobs at 0.0 projected points and a
+            # stale ADP of 49 was "scarcest" among 26 zero-insurance rows and
+            # the engine named him.
+            rem = [p for p in rem
+                   if float(p.get("proj_pts") or 0.0) > 0.0
+                   and str(p.get("avail_status") or "") != "out"]
+            if not rem:
+                continue
             s_map = surv_by_pos.get(pos, {})
             floor = weakest_starter.get(pos)
             for p in rem:
@@ -880,7 +891,11 @@ class Tracker:
         if not scored:
             return False, set()
 
-        zero = all(r["ins"] <= 1e-9 for r in scored)
+        # "every candidate scores zero on insurance" is a materiality test, not
+        # an exact one: with two reserves already held a third back covers
+        # 0.0 weeks, so every back is exactly 0 while a receiver at 0.01 kept
+        # 25 worthless rows inside the scarcity band (room 10799518 pick 116)
+        zero = all(r["ins"] < BENCH_ZERO for r in scored)
         if zero:
             def _cw(r):
                 return r["ceil_wire"] if r["ceil_wire"] is not None else -1e9
