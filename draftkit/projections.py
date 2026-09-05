@@ -19,6 +19,8 @@ lives (usage vs. draft cost).
 
 from __future__ import annotations
 
+import json
+
 import numpy as np
 import polars as pl
 
@@ -300,6 +302,11 @@ def external_projection(cfg, usage: pl.DataFrame, market: pl.DataFrame) -> pl.Da
     # two drifted the moment pts17_band was added and the column was silently
     # selected away three functions after it was computed.
     disp = [c for c in X.DISPERSION if c in lines.columns]
+    # projected touchdowns from the same stat line the points came from; a
+    # count, not points, so it needs no games or basis scaling (DECISIONS #53)
+    if "line" in lines.columns:
+        lines = lines.with_columns(pl.col("line").map_elements(_line_touchdowns, return_dtype=pl.Float64).alias("proj_td"))
+        disp = [*disp, "proj_td"]
     ext = lines.select("sleeper_id", pl.col("name").alias("name_ext"), pl.col("pos").alias("pos_ext"),
                        pl.col("team").alias("team_ext"), "pts17", "source", pl.col("as_of").alias("proj_as_of"), *disp)
     df = market.join(ext, on="sleeper_id", how="full", coalesce=True).with_columns(
@@ -408,11 +415,56 @@ def _finish(cfg, df: pl.DataFrame) -> pl.DataFrame:
     return _ensure_dispersion(df)
 
 
+def _line_touchdowns(line) -> float | None:
+    """Projected touchdowns in a source stat line (rush + rec + pass), None
+    when the line carries no touchdown key at all. The tie_break: touchdowns
+    knob compares this between skill players (DECISIONS #53)."""
+    if line is None:
+        return None
+    try:
+        d = json.loads(line) if isinstance(line, str) else dict(line)
+    except (TypeError, ValueError):
+        return None
+    vals = [d.get(k) for k in ("rush_td", "rec_td", "pass_td")]
+    vals = [float(v) for v in vals if v is not None]
+    return sum(vals) if vals else None
+
+
+def _line_touchdowns(line) -> float | None:
+    """Projected touchdowns in a source stat line (rush + rec + pass), None
+    when the line carries no touchdown key at all. The tie_break: touchdowns
+    knob compares this between skill players (DECISIONS #53)."""
+    if line is None:
+        return None
+    try:
+        d = json.loads(line) if isinstance(line, str) else dict(line)
+    except (TypeError, ValueError):
+        return None
+    vals = [d.get(k) for k in ("rush_td", "rec_td", "pass_td")]
+    vals = [float(v) for v in vals if v is not None]
+    return sum(vals) if vals else None
+
+
+def _line_touchdowns(line) -> float | None:
+    """Projected touchdowns in a source stat line (rush + rec + pass), None
+    when the line carries no touchdown key at all. The tie_break: touchdowns
+    knob compares this between skill players (DECISIONS #53)."""
+    if line is None:
+        return None
+    try:
+        d = json.loads(line) if isinstance(line, str) else dict(line)
+    except (TypeError, ValueError):
+        return None
+    vals = [d.get(k) for k in ("rush_td", "rec_td", "pass_td")]
+    vals = [float(v) for v in vals if v is not None]
+    return sum(vals) if vals else None
+
+
 def _ensure_dispersion(df: pl.DataFrame) -> pl.DataFrame:
     """Plan A1: the dispersion columns exist on BOTH paths (stable csv
     header); a confirmed override or a zeroed player has no source spread."""
     for c, dt_ in (("n_sources", pl.Int64), ("proj_sd", pl.Float64), ("proj_hi", pl.Float64),
-                   ("proj_lo", pl.Float64), ("proj_band", pl.Float64)):
+                   ("proj_lo", pl.Float64), ("proj_band", pl.Float64), ("proj_td", pl.Float64)):
         if c not in df.columns:
             df = df.with_columns(pl.lit(None, dtype=dt_).alias(c))
     blank = (pl.col("proj_source") == "override") | (pl.col("proj_pts").fill_null(0.0) == 0.0)

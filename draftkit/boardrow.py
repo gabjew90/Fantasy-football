@@ -49,6 +49,8 @@ ENGINE_FIELDS: dict[str, tuple[str, object]] = {
     "n_sources": ("i", 0),
     # DECISIONS #35: Yahoo default rank (o_rank), for the list-walking autopick
     "yahoo_rank": ("fn", None),
+    # DECISIONS #53: projected touchdowns, the tie_break: touchdowns input
+    "proj_td": ("fn", None),
 }
 
 

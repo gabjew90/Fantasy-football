@@ -336,6 +336,9 @@ TIERS_COLUMNS = [
     # autopick seat walks. Informational -- read by the tracker as `yrank`
     # for the list-walking autopick component, never by VORP or tiers.
     "yahoo_rank",
+    # DECISIONS #53: projected touchdowns (rush + rec + pass) from the source
+    # stat line; the tie_break: touchdowns knob reads it, nothing else does
+    "proj_td",
 ]
 
 
@@ -351,7 +354,7 @@ def write_tiers_csv(tiers: pl.DataFrame, path) -> None:
         pl.col("wopr").round(3),
         pl.col("tprr").round(3),
         pl.col("yprr").round(2),
-        *[pl.col(c).round(1) for c in ("proj_sd", "proj_hi", "proj_lo", "proj_band")
+        *[pl.col(c).round(1) for c in ("proj_sd", "proj_hi", "proj_lo", "proj_band", "proj_td")
           if c in out.columns],
         *[pl.col(c).round(0) for c in ("yahoo_rank",) if c in out.columns],
     )

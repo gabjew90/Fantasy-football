@@ -152,3 +152,65 @@ def test_greedy_fallback_adds_no_ranked_on_clause():
     cands = _cands()
     out = pair_rank(cands, None, NEEDS, SECOND, ALL)
     assert all("RANKED ON" not in w for _s, w, _p in out)
+
+
+# ---------- touchdown tiebreak (user decision 2026-09-05, DECISIONS #53) ------
+
+def _td_case(td_a, td_b, pos_a="WR", pos_b="RB", gap=4.0):
+    from draftkit.planner import pair_rank
+    needs = {"RB": 1, "WR": 1, "QB": 1, "FLEX": 1}
+    a = {"sleeper_id": "a", "pos": pos_a, "proj_pts": 170.0, "vorp": 40.0 + gap, "vorp_flex": 40.0 + gap, "proj_td": td_a}
+    b = {"sleeper_id": "b", "pos": pos_b, "proj_pts": 176.0, "vorp": 40.0, "vorp_flex": 40.0, "proj_td": td_b}
+    report = {pos_a: {"e_best_next": 30.0, "survival": {"a": 0.69}},
+              pos_b: {"e_best_next": 30.0, "survival": {"b": 0.57}}}
+    cands = [(40.0 + gap, "a why", a), (40.0, "b why", b)]
+    return pair_rank(cands, report, needs, {pos_a: 30.0, pos_b: 30.0}, lambda pos: {"RB", "WR", "QB"},
+                     tie_break="touchdowns", tie_window=5.0), a, b
+
+
+def test_touchdown_tiebreak_takes_the_higher_td_skill_player_inside_the_window():
+    """Rice (10.5 TD) vs Javonte (11.9 TD), 4.7 apart on the ranked number:
+    with tie_break touchdowns and a 5-point window Javonte goes first, and
+    the label names the counterparty and both counts."""
+    ranked, a, b = _td_case(10.5, 11.9, gap=4.7)
+    assert [p["sleeper_id"] for _, _, p in ranked] == ["b", "a"]
+    assert "more projected touchdowns (11.9 vs 10.5)" in ranked[0][1]
+    assert b["_pair"]["pick_cost"] == 0.0
+
+
+def test_touchdown_tiebreak_holds_the_order_when_the_top_player_has_more():
+    ranked, _a, _b = _td_case(11.9, 10.5, gap=4.7)
+    assert ranked[0][2]["sleeper_id"] == "a" and "near tie" not in ranked[0][1]
+
+
+def test_touchdown_tiebreak_respects_the_window():
+    ranked, _a, _b = _td_case(10.5, 11.9, gap=5.5)
+    assert ranked[0][2]["sleeper_id"] == "a"
+
+
+def test_touchdown_tiebreak_never_compares_a_quarterback():
+    """A QB has thirty scores; a QB-vs-skill near-tie keeps the scarcity rule
+    (inside NEAR_TIE only), so a 4-point gap is not touched at all."""
+    ranked, _a, _b = _td_case(10.5, 32.0, pos_a="WR", pos_b="QB", gap=4.0)
+    assert ranked[0][2]["sleeper_id"] == "a" and "touchdowns" not in ranked[0][1]
+
+
+def test_touchdown_tiebreak_is_off_by_default():
+    from draftkit.planner import pair_rank
+    needs = {"RB": 1, "WR": 1, "FLEX": 1}
+    a = {"sleeper_id": "a", "pos": "WR", "proj_pts": 170.0, "vorp": 44.0, "vorp_flex": 44.0, "proj_td": 10.5}
+    b = {"sleeper_id": "b", "pos": "RB", "proj_pts": 176.0, "vorp": 40.0, "vorp_flex": 40.0, "proj_td": 11.9}
+    report = {"WR": {"e_best_next": 30.0, "survival": {"a": 0.69}}, "RB": {"e_best_next": 30.0, "survival": {"b": 0.57}}}
+    ranked = pair_rank([(44.0, "a", a), (40.0, "b", b)], report, needs, {"WR": 30.0, "RB": 30.0}, lambda pos: {"RB", "WR"})
+    assert ranked[0][2]["sleeper_id"] == "a"
+
+
+def test_equal_touchdowns_fall_back_to_scarcity_inside_near_tie():
+    from draftkit.planner import pair_rank
+    needs = {"RB": 1, "WR": 1, "FLEX": 1}
+    a = {"sleeper_id": "a", "pos": "WR", "proj_pts": 170.0, "vorp": 40.5, "vorp_flex": 40.5, "proj_td": 10.0}
+    b = {"sleeper_id": "b", "pos": "RB", "proj_pts": 176.0, "vorp": 40.0, "vorp_flex": 40.0, "proj_td": 10.0}
+    report = {"WR": {"e_best_next": 30.0, "survival": {"a": 0.85}}, "RB": {"e_best_next": 30.0, "survival": {"b": 0.75}}}
+    ranked = pair_rank([(40.5, "a", a), (40.0, "b", b)], report, needs, {"WR": 30.0, "RB": 30.0}, lambda pos: {"RB", "WR"},
+                       tie_break="touchdowns", tie_window=5.0)
+    assert ranked[0][2]["sleeper_id"] == "b" and "scarcer player first" in ranked[0][1]

@@ -391,3 +391,13 @@ def test_market_curve_tail_rejects_an_unknown_mode():
 
     with pytest.raises(ValueError, match="market_curve_tail.mode"):
         _market_curve(_curve_rows(), {"mode": "steeper"})
+
+
+def test_line_touchdowns_sums_the_three_td_keys_and_is_none_without_one():
+    import json as _json
+    from draftkit.projections import _line_touchdowns
+    assert abs(_line_touchdowns(_json.dumps({"rush_td": 10.7, "rec_td": 1.2, "rush_yd": 1195.7})) - 11.9) < 1e-9
+    assert abs(_line_touchdowns(_json.dumps({"pass_td": 30.1, "rush_td": 4.0, "pass_yd": 4300})) - 34.1) < 1e-9
+    assert _line_touchdowns(_json.dumps({"rush_yd": 500})) is None
+    assert _line_touchdowns(None) is None
+    assert _line_touchdowns("not json") is None

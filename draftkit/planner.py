@@ -23,6 +23,11 @@ from .snake import FLEX_ELIGIBLE, needs_position
 
 NEED_DAMP = 0.6  # partner/candidate position that fills no starter/flex slot
 NEAR_TIE = 1.0   # pair values this close are a coin flip: survival breaks it
+# tie_break: touchdowns (user decision 2026-09-05, DECISIONS #53) compares
+# projected touchdowns between two SKILL players whose pairs are within
+# tie_window; a quarterback's thirty scores would win every tie against any
+# back or receiver, so QB pairs (and K/DEF) keep the scarcity rule.
+TD_TIE_POSITIONS = frozenset({"RB", "WR", "TE"})
 
 
 def slot_vorp(p: dict, needs: dict) -> float:
@@ -105,6 +110,8 @@ def pair_rank(cands: list[tuple[float, str, dict]],
               fallback: dict[str, float] | None = None,
               repl: dict[str, float] | None = None,
               partner_certain: bool = False,
+              tie_break: str = "scarcity",
+              tie_window: float = NEAR_TIE,
               ) -> list[tuple[float, str, dict]]:
     """Re-rank recommendation candidates by joint two-pick EV.
 
@@ -203,10 +210,32 @@ def pair_rank(cands: list[tuple[float, str, dict]],
         u = report.get(mkt) or report.get(p["pos"]) or {}
         s = (u.get("survival") or {}).get(str(p.get("sleeper_id")))
         return float(s) if s is not None else 1.0
+    def _td(p: dict) -> float | None:
+        v = p.get("proj_td")
+        return float(v) if v is not None else None
+
+    def _td_pair(x: dict, y: dict) -> bool:
+        return (tie_break == "touchdowns" and x.get("pos") in TD_TIE_POSITIONS
+                and y.get("pos") in TD_TIE_POSITIONS and _td(x) is not None and _td(y) is not None)
+
     i = 0
     while i < len(ranked) - 1:
         a, b = ranked[i], ranked[i + 1]
-        if abs(a[0] - b[0]) <= NEAR_TIE and _surv(b[3]) < _surv(a[3]) - 1e-9:
+        # TOUCHDOWN RULE (DECISIONS #53): for a skill-vs-skill pair inside
+        # tie_window this rule alone decides, in either direction, so the
+        # reversed pair can never swap back on scarcity and the pass ends.
+        if _td_pair(a[3], b[3]) and abs(a[0] - b[0]) <= tie_window and _td(a[3]) != _td(b[3]):
+            if _td(b[3]) > _td(a[3]):
+                over = a[3].get("player") or a[3].get("name") or a[3].get("pos")
+                ranked[i], ranked[i + 1] = b, a
+                ranked[i] = (ranked[i][0], ranked[i][1],
+                             ranked[i][2] + f" · near tie ({abs(a[0] - b[0]):.1f} pts) with {over}"
+                             f": more projected touchdowns ({_td(b[3]):.1f} vs {_td(a[3]):.1f})",
+                             ranked[i][3])
+                i = max(0, i - 1)
+            else:
+                i += 1
+        elif abs(a[0] - b[0]) <= NEAR_TIE and _surv(b[3]) < _surv(a[3]) - 1e-9:
             # NAME THE COUNTERPARTY. "near tie (0.7 pts): scarcer player
             # first" states a gap against nobody, so a reader assumes the swap
             # was against the player finally picked -- which it usually is not,

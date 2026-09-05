@@ -206,3 +206,11 @@ engine:
   # seats 1 and 10 only, rounds 4-6.
   fallback_floor: wire
   turn_look_through: true
+  # User decision 2026-09-05 (DECISIONS #53): near-ties between skill players
+  # go to the one with more projected touchdowns, inside a 5-point window on
+  # the ranked number (Rice vs Javonte at pick 27 of room 10727517 was 4.7).
+  # Measured first and shipped against the measurement: on 2024-25
+  # FantasyPros projections the higher-TD player of a near-tie scored less
+  # 58% of the time at RB and 57% at WR. The user weighed that and chose it.
+  tie_break: touchdowns
+  tie_window: 5.0

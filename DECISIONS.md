@@ -3309,3 +3309,56 @@ roster shapes do not move.
   first choice ('runner-up at TE: the engine's #2 choice there, 6 pts behind
   its first · 92% chance ...'), the driver and the scrutiny report label
   them, board-order padding remains only below that. Test added. Suite 730.
+
+## 2026-09-05 (53) — near-ties between skill players break on projected touchdowns (user decision)
+
+The user questioned Rice over Javonte Williams at pick 27 of room 10727517
+(4.7 apart on the ranked number, 2.8 of it own-edge, both markets flat) and,
+after the ECR and range comparisons, asked for projected touchdowns as the
+tiebreak. Measured before building:
+
+* 2024 and 2025 FantasyPros draft projections against actuals, same-position
+  pairs projected within 6 points: the player with MORE projected touchdowns
+  scored less 58% of the time at RB (273 pairs) and 57% at WR (623 pairs),
+  in each season separately; QB 45% (98), TE 54% (54). Earlier ADP as the
+  same tiebreak: 51-53%. Across positions, RB-vs-WR pairs within 6 points
+  pick the RB 80% of the time and he scored more 49%. Touchdowns are the
+  least repeatable part of a stat line, so the rule prefers the projection
+  most likely to regress.
+* The user weighed that against role ("javonte is gonna get the yards too,
+  he's the workhorse") and reaffirmed. It ships as asked, with the evidence
+  here.
+
+What shipped. `proj_td` (rush + rec + pass touchdowns from the source stat
+line; a count, no games or basis scaling) on the tiers csv and in
+boardrow.ENGINE_FIELDS. Engine knobs `tie_break` (scarcity | touchdowns) and
+`tie_window`, global defaults scarcity / 1.0 = today's rule byte for byte.
+planner.pair_rank: for two RB/WR/TE candidates whose pairs are within
+tie_window and whose touchdown counts differ, the higher count goes first
+and the label reads "near tie (N pts) with X: more projected touchdowns (a
+vs b)"; the rule decides that pair in either direction, so the reversed pair
+cannot swap back on scarcity. A pair with a QB, K or DEF, or equal counts,
+keeps the scarcity rule inside NEAR_TIE. leagues/keefamania.yaml: touchdowns,
+window 5.0 (wide enough for the 4.7 that prompted it). Seven tests. Suite 737.
+
+Measured after building, keefamania:
+
+| instrument | result |
+|---|---|
+| season replay, 10 slots x 200 seasons, touchdowns vs today | -5.0 pts/season, se 0.4; 0 slots better, 4 worse, 6 tied (-0.3%) |
+| churn, our first-seven-round picks in the six sheet-board rooms | 4 of 42 change |
+
+All four changes go from a WR or TE to an RB: JSN -> McCaffrey at 7 (13.3 vs
+9.6 TD), Rice -> Javonte at 27 (11.9 vs 10.5), Fannin -> Tuten at 54 (10.7
+vs 5.7) and Fannin -> Judkins at 55 (8.7 vs 5.7). Two of the four take a
+running back over the last TE at his tier, because tight ends score fewer
+touchdowns than backs at the same value; that is a position tilt built into
+the rule, not a read on those players. Restricting the comparison to RB vs
+WR is one line (planner.TD_TIE_POSITIONS) if the user wants the TE timing
+left alone.
+
+DECISION: shipped for keefamania on the user's call, default off everywhere
+else. The season replay is bench-neutral and cannot see a starter tiebreak
+worth 4 picks in 42, so the -5 is noise-sized and not the verdict; the
+instrument that can judge it is the 2026 actuals against the rooms drafted
+under it.

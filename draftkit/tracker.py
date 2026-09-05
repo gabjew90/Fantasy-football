@@ -129,6 +129,14 @@ class Tracker:
     # the FOLLOWING turn for survival and urgency, and the pair planner prices
     # the partner at best_now (he is certain) instead of e_best_next.
     turn_look_through = False
+    # DECISIONS #53 (user decision 2026-09-05): how a near-tie between two
+    # skill players is broken. scarcity = the less-likely-to-survive player
+    # first inside planner.NEAR_TIE (today). touchdowns = the player with more
+    # projected touchdowns first inside tie_window; QB/K/DEF pairs keep
+    # scarcity. The 2024-25 backtest says the higher-TD player of a near-tie
+    # scored LESS 57% of the time at RB/WR; the user weighed that and chose it.
+    tie_break = "scarcity"
+    tie_window = 1.0
     rival_needs_update = True   # plan B6: a rival picking twice in my window consumes his needs
     away_slots = frozenset()    # plan B5: draft slots on autopick (Yahoo 'away'); empty on Sleeper
     upside_from_round = 8
@@ -424,6 +432,7 @@ class Tracker:
         ("draft_k", int),
         ("bench_survival_discount", bool), ("bench_contingency", bool), ("bench_two_pick", bool),
         ("turn_look_through", bool),
+        ("tie_break", str), ("tie_window", float),
     )
 
     def _dispersion_for(self, q: dict) -> float | None:
@@ -1399,7 +1408,8 @@ class Tracker:
 
             cands = pair_rank(cands, report, needs, second, eligible_after,
                               fallback=fallback, repl=repl,
-                              partner_certain=bool(getattr(self, "_look_through", False)))
+                              partner_certain=bool(getattr(self, "_look_through", False)),
+                              tie_break=str(self.tie_break), tie_window=float(self.tie_window))
         except Exception as e:  # noqa: BLE001 — planner must never block the clock
             # fall back to greedy, but never silently: a dead planner on draft
             # day must be visible (code review 2026-08-30)

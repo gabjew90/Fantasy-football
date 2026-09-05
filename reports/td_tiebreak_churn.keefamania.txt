@@ -1,0 +1,48 @@
+10713941 pick   8: today Jaxon Smith-Njigba     touchdowns Jaxon Smith-Njigba    
+10713941 pick  13: today De'Von Achane          touchdowns De'Von Achane         
+10713941 pick  28: today Drake London           touchdowns Drake London          
+10713941 pick  33: today Josh Allen             touchdowns Josh Allen            
+10713941 pick  48: today Cam Skattebo           touchdowns Cam Skattebo          
+10713941 pick  53: today Jayden Daniels         touchdowns Jayden Daniels        
+10713941 pick  68: today Jaxson Dart            touchdowns Jaxson Dart           
+10714820 pick   9: today Derrick Henry          touchdowns Derrick Henry         
+10714820 pick  12: today De'Von Achane          touchdowns De'Von Achane         
+10714820 pick  29: today Rashee Rice            touchdowns Rashee Rice           
+10714820 pick  32: today Rashee Rice            touchdowns Rashee Rice           
+10714820 pick  49: today Davante Adams          touchdowns Davante Adams         
+10714820 pick  52: today Jayden Daniels         touchdowns Jayden Daniels        
+10714820 pick  69: today George Kittle          touchdowns George Kittle         
+10719939 pick   4: today Ja'Marr Chase          touchdowns Ja'Marr Chase         
+10719939 pick  17: today De'Von Achane          touchdowns De'Von Achane         
+10719939 pick  24: today Rashee Rice            touchdowns Rashee Rice           
+10719939 pick  37: today Travis Etienne Jr.     touchdowns Travis Etienne Jr.    
+10719939 pick  44: today Jayden Daniels         touchdowns Jayden Daniels        
+10719939 pick  57: today Harold Fannin Jr.      touchdowns Harold Fannin Jr.     
+10719939 pick  64: today Harold Fannin Jr.      touchdowns Harold Fannin Jr.     
+10726459 pick   5: today Ja'Marr Chase          touchdowns Ja'Marr Chase         
+10726459 pick  16: today Derrick Henry          touchdowns Derrick Henry         
+10726459 pick  25: today Drake London           touchdowns Drake London          
+10726459 pick  36: today Rashee Rice            touchdowns Rashee Rice           
+10726459 pick  45: today Cam Skattebo           touchdowns Cam Skattebo          
+10726459 pick  56: today Jayden Daniels         touchdowns Jayden Daniels        
+10726459 pick  65: today Harold Fannin Jr.      touchdowns Harold Fannin Jr.     
+10727517 pick   7: today Jaxon Smith-Njigba     touchdowns Christian McCaffrey     FLIP
+10727517 pick  14: today Derrick Henry          touchdowns Derrick Henry         
+10727517 pick  27: today Rashee Rice            touchdowns Javonte Williams        FLIP
+10727517 pick  34: today Travis Etienne Jr.     touchdowns Travis Etienne Jr.    
+10727517 pick  47: today Lamar Jackson          touchdowns Lamar Jackson         
+10727517 pick  54: today Harold Fannin Jr.      touchdowns Bhayshul Tuten          FLIP
+10727517 pick  67: today Jameson Williams       touchdowns Jameson Williams      
+10728751 pick   6: today Jaxon Smith-Njigba     touchdowns Jaxon Smith-Njigba    
+10728751 pick  15: today Derrick Henry          touchdowns Derrick Henry         
+10728751 pick  26: today Rashee Rice            touchdowns Rashee Rice           
+10728751 pick  35: today Travis Etienne Jr.     touchdowns Travis Etienne Jr.    
+10728751 pick  46: today Lamar Jackson          touchdowns Lamar Jackson         
+10728751 pick  55: today Harold Fannin Jr.      touchdowns Quinshon Judkins        FLIP
+10728751 pick  66: today Jameson Williams       touchdowns Jameson Williams      
+
+churn: 4 of 42 first-seven-round picks change
+10727517 pick   7: Jaxon Smith-Njigba (WR) -> Christian McCaffrey (RB)  near tie (1.7 pts) with Jaxon Smith-Njigba: more projected touchdowns (13.3 vs 9.6)
+10727517 pick  27: Rashee Rice (WR) -> Javonte Williams (RB)  near tie (3.9 pts) with Rashee Rice: more projected touchdowns (11.9 vs 10.5)
+10727517 pick  54: Harold Fannin Jr. (TE) -> Bhayshul Tuten (RB)  near tie (2.5 pts) with Harold Fannin Jr.: more projected touchdowns (10.7 vs 5.7)
+10728751 pick  55: Harold Fannin Jr. (TE) -> Quinshon Judkins (RB)  near tie (1.6 pts) with Harold Fannin Jr.: more projected touchdowns (8.7 vs 5.7)

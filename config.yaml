@@ -136,6 +136,14 @@ engine:
   # 0). lambda fixed in advance; judged on 2026 actuals.
   late_round_dispersion: false
   dispersion_lambda: 0.5
+  # ---- near-tie rule (DECISIONS #53) ---------------------------------------
+  # scarcity: inside planner.NEAR_TIE (1.0) the player less likely to survive
+  # to the next turn goes first. touchdowns: inside tie_window, a skill-vs-
+  # skill near-tie goes to the player with more projected touchdowns (QB/K/DEF
+  # pairs keep scarcity). Global default is today's rule; keefamania sets
+  # touchdowns at a 5-point window by user decision.
+  tie_break: scarcity
+  tie_window: 1.0
   # ---- rival-behaviour knobs (plan 2026-09-02 B3) -------------------------
   # Hoisted from constants in draftkit/urgency.py at the values that were in
   # force, so every prediction logs the knob set it was made under and the
