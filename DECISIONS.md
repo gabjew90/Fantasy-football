@@ -3723,3 +3723,18 @@ the floor decided Adams over Tuten); the bench timing multiplier behaved as
 designed at 76/85 (Harrison at 18% survival first, Pollard at 24 insurance
 still there at 85); the survival scorecard over-promised above 50% again,
 and the multiplier leans on those numbers, so the refit is next.
+
+## 2026-09-05 (61) -- engine.prefer: the user's named calls inside a market
+
+The user wants Chase over Nacua at pick 3. The sheet has them 1.6 apart
+(248.4 vs 246.8) and the engine's tiebreak for a first-round coin flip is the
+floor, which Nacua wins by 9.5 (range 247-252 vs 237-257); Chase's case is
+the ceiling (+4) and the market (ADP 3.5 vs 5.0). A taste call, not a fact,
+so it does not go through overrides.csv (that is for dated facts, per the
+deadline conduct rule). engine.prefer in the league yaml holds [preferred,
+over] pairs in board names; when a market's best is the second name and the
+first is in that market's shortlist, the first becomes the row and the
+reason opens with USER PREFERENCE so the trail shows whose call it was.
+Inert when the preferred man is gone; malformed entries raise. Tests in
+tests/test_prefer.py. Seat 3 with Bijan and Gibbs gone now reads Chase,
+Taylor, Nacua.
