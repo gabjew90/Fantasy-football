@@ -26,7 +26,9 @@ NEED_DAMP = 0.6  # partner/candidate position that fills no starter/flex slot
 NEAR_TIE = 1.0   # pair values this close are a coin flip: survival breaks it
 # ...and when survival cannot (the two survivals within FLOOR_SURV_TOL), the
 # higher FLOOR does, if the floors differ by at least FLOOR_GAP points: the
-# published low line, else the point minus half the band (DECISIONS #55)
+# published low line, else the point minus half the band, MINUS the
+# position's fallback so a TE floor and an RB floor are compared in the
+# pair's own currency (DECISIONS #55, #57)
 FLOOR_SURV_TOL = 0.05
 FLOOR_GAP = 3.0
 # tie_break: touchdowns (DECISIONS #53, tried for one room and reverted the
@@ -227,7 +229,19 @@ def pair_rank(cands: list[tuple[float, str, dict]],
                 and y.get("pos") in TD_TIE_POSITIONS and _td(x) is not None and _td(y) is not None)
 
     def _floor(p: dict) -> float | None:
-        return published_range(p)[0]
+        """The floor in the PAIR's currency: the published low line (else the
+        point minus half the band) MINUS the position's fallback, the same
+        replacement the pair number prices him against. Raw floors compared
+        a tight end's 161 with a back's 166 and moved Hall over McBride at
+        pick 31 of room 10795644, where McBride's floor stood 51 above the
+        TE he would otherwise start and Hall's 16 above his back (user,
+        2026-09-05). Without a fallback table (greedy path, tests) the raw
+        floor stands."""
+        f = published_range(p)[0]
+        if f is None:
+            return None
+        fb = (fallback or {}).get(p.get("pos"))
+        return f - float(fb) if fb is not None else f
 
     def _prefer_b(a, b) -> str | None:
         """ONE comparator for an adjacent pair (review 2026-09-05: the three
@@ -251,7 +265,8 @@ def pair_rank(cands: list[tuple[float, str, dict]],
             return f"scarcer player first ({sb:.0%} vs {sa:.0%})" if sb < sa else None
         fa, fb = _floor(pa), _floor(pb)
         if fa is not None and fb is not None and abs(fb - fa) >= FLOOR_GAP:
-            return f"higher floor ({fb:.0f} vs {fa:.0f})" if fb > fa else None
+            what = "higher floor over replacement" if fallback else "higher floor"
+            return f"{what} ({fb:.0f} vs {fa:.0f})" if fb > fa else None
         return f"scarcer player first ({sb:.0%} vs {sa:.0%})" if sb < sa - 1e-9 else None
 
     # One bubble pass over adjacent pairs; a swap steps back one slot so the

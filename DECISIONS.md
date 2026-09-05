@@ -3600,3 +3600,26 @@ page within 0.1 except the five availability-`out` players the board zeroes
 Javonte 188.9, McBride 175.7 (consistent basis). K/DEF move at most 4 value
 ranks (Texans 39 -> 40, Fannin 40 -> 39 the only top-40 change). Bridge
 restarted on it and verified.
+
+## 2026-09-05 (57) — the floor rule compares floors over each position's replacement
+
+First live firing of the #55 floor rule, room 10795644 pick 31 (seat 10,
+the turn, survivals to pick 50 both ~0): the pair had McBride 0.9 ahead of
+Hall; raw floors 161 (TE) against 166 (RB) moved Hall up. McBride went at
+33, the TE slot fell to Fannin at 70 (19 edge against McBride's 56), Hall
+in the flex was worth 29 against a near-zero flex market at 70: about 8
+edge points against the rule. The defect is the currency: the pair number
+prices every player against his position's fallback, and the floor rule
+compared raw points across positions, so a tight end's 161 (51 above the
+TE he would otherwise start) lost to a back's 166 (16 above his back).
+
+Shipped (user, 2026-09-05): planner._floor returns the published floor
+MINUS fallback[pos] when the pair carries a fallback table (always, on the
+live path); the label reads "higher floor over replacement (16 vs 10)".
+Without a fallback (greedy path, tests) raw floors stand as before.
+FLOOR_GAP 3 is now three points of floor edge. Test: an exact pair tie
+where raw floors say Hall and the pair's currency says McBride, the
+reverse case with the label, and the inside-the-gap case. Suite 770.
+The bench ceiling rule compares raw ceilings across positions with the
+same weakness in principle; bench rows are already priced against each
+position's wire, so it is left as is and noted.

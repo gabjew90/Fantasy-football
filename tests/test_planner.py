@@ -291,3 +291,37 @@ def test_a_lineless_single_source_has_no_floor_to_compare():
     report = {"WR": {"e_best_next": 30.0, "survival": {"a": 0.57}}, "RB": {"e_best_next": 30.0, "survival": {"b": 0.59}}}
     ranked = pair_rank([(40.5, "a", a), (40.0, "b", b)], report, needs, {"WR": 30.0, "RB": 30.0}, lambda pos: {"RB", "WR"})
     assert ranked[0][2]["sleeper_id"] == "a" and "higher floor" not in ranked[0][1]
+
+
+def test_floors_are_compared_over_each_positions_replacement():
+    """Room 10795644 pick 31 (DECISIONS #57): raw floors put a back's 166
+    over a tight end's 161 and moved Hall over McBride, though McBride's
+    floor stood 51 above the TE he would otherwise start and Hall's 16 above
+    his back. Floors are compared over each position's fallback, the pair's
+    own currency. Built as an exact pair tie so only the floor rule speaks."""
+    from draftkit.planner import pair_rank
+    needs = {"TE": 1, "FLEX": 1, "RB": 0, "WR": 0}
+    fallback = {"TE": 110.0, "RB": 150.0, "WR": 135.0, "QB": 250.0}
+    second = {"TE": 15.0, "FLEX": 15.0, "RB": 15.0}
+    report = {"TE": {"e_best_next": 15.0, "survival": {"mcb": 0.001}},
+              "FLEX": {"e_best_next": 15.0, "survival": {"hall": 0.004}},
+              "RB": {"e_best_next": 15.0, "survival": {"hall": 0.004}}}
+    def run(mcb_lo, hall_lo):
+        # own edges equal (147-110 = 187-150 = 37) and partners equal: pair tie
+        mcb = {"sleeper_id": "mcb", "player": "Trey McBride", "pos": "TE", "proj_pts": 147.0,
+               "vorp": 37.0, "vorp_flex": 37.0, "proj_lo": mcb_lo, "proj_hi": 160.0, "proj_band": 10.0}
+        hall = {"sleeper_id": "hall", "player": "Breece Hall", "pos": "RB", "proj_pts": 187.0,
+                "vorp": 29.0, "vorp_flex": 29.0, "proj_lo": hall_lo, "proj_hi": 205.0, "proj_band": 15.0}
+        r = pair_rank([(37.0, "te", mcb), (36.9, "flex", hall)], report, needs, second,
+                      lambda pos: {"RB", "WR", "TE"}, fallback=fallback)
+        return [p["sleeper_id"] for _, _, p in r], r[0][1]
+    # McBride floor 140 -> 30 over his TE; Hall 166 -> 16 over his back: raw
+    # floors say Hall (166 > 140), the pair's currency says McBride
+    order, why = run(140.0, 166.0)
+    assert order == ["mcb", "hall"] and "higher floor" not in why
+    # McBride floor 120 -> 10; Hall stays 16: Hall, and the label says the currency
+    order, why = run(120.0, 166.0)
+    assert order == ["hall", "mcb"] and "higher floor over replacement (16 vs 10)" in why
+    # inside the 3-point gap nothing moves
+    order, why = run(125.0, 166.0)          # 15 vs 16
+    assert order == ["mcb", "hall"] and "higher floor" not in why
