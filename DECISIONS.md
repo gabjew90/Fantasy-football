@@ -3650,3 +3650,42 @@ starts in the replay) and where it saw anything it went the wrong way by a
 hair. DECISION: off. The pricing argument is recorded; the knob is one line
 away if the user wants it on. It cost nothing in the room: Pollard lasted
 to 88 and we took him there.
+
+## 2026-09-05 (59) -- staged ranking replaces pair-first (user design, no knob, mocks are the check)
+
+The user's design, shipped as written on the afternoon of the draft.
+Starter rounds (draftkit/staged.py): 1. urgency picks the position,
+markets within 1.5 of the top stay live; 2. value (points over the player
+you would otherwise end up with, a FLEX entrant against the best flex
+fallback) picks the player, within 2.0 goes on; 3. scarcity banded on
+survival to my next pick, a 0.15 gap takes the lower, all under 0.20 or all
+over 0.85 goes to the pair; 4. variance by round, the higher floor through
+round 7 and the higher ceiling after, both over the fallback (#57), skipped
+without a published range on every side, within 1.0 to the pair; 5. the
+pair decides what is left. At the turn the pair leads and stages 2 to 4
+break its ties. Bench rounds (tracker._bench_candidates): every position
+pooled on insurance with the role-shift term always priced, score =
+insurance x (1 - survival) so a handcuff who will still be there waits,
+insurance alone at the last bench pick, ties within BENCH_TIE to banded
+scarcity then the ceiling (a man below the wire never wins a tie against one
+above it, #55), no pair; all-zero insurance falls through to the ceiling
+over the position's wire, then role-shift flags, never board order.
+Upgrades keep their market row and lead; bench rows follow in staged order;
+the revived market rows trail; no cross-currency re-sort at the seam.
+
+Found on the way: the survival sim scores a market with no survivor at
+replacement (VORP 0), so a market that can empty in the window carried a
+LEVEL in its urgency and a baseline shift moved it by shift x P(empties).
+Under pair-first that only touched the greedy tiebreak; with urgency first
+it decides the position. The tracker adds P(empties) x the fallback
+player's VORP back, so stage 1 is baseline-invariant with the adaptive
+fallback on (test_fallback records the leak and the fix).
+
+The user set aside the deadline rule and the knob for this one: no
+measurement gate, the mock rooms are the check. Replay of room 10797402
+(the last pair-first room) through the staged engine: the seven starter
+picks unchanged; bench order changes only inside the tie band, where late
+rows all score under 1 (everyone 90%+ to survive) and the 2.0 band makes
+the late bench effectively ceiling order until the last pick. Recorded, not
+judged. Knobs bench_survival_discount, bench_two_pick, bench_contingency,
+bench_row_wins_dedupe stay registered and switch nothing. Suite 782.
