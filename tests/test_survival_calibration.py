@@ -3,7 +3,7 @@ softenings: the relative urgency band and the flat-board exception."""
 
 import pytest
 
-from draftkit.staged import URGENCY_FLOOR, URGENCY_REL, staged_rank
+from draftkit.staged import URGENCY_FLOOR, VALUE_BAND, staged_rank
 from draftkit.tracker import Tracker, calibrate_survival
 from test_staged import FALLBACK, NEEDS, REPL, _p, _report
 
@@ -61,22 +61,21 @@ def _rank(cands, urg, surv, rnd=3):
                        fallback=FALLBACK, repl=REPL)
 
 
-def test_a_market_within_the_relative_band_is_live():
-    """Room 10801633 pick 22: TE 21.6 vs WR 15.4 (within 30%), London 62.5 vs
-    McBride 43.2 on value. The receiver must be compared, and wins."""
-    te = _p("te", "TE", 175.7, lo=161.0, hi=190.0)     # value 75.7 over the TE fallback
+def test_the_position_is_picked_on_deadline_value_not_one_turn_urgency():
+    """Room 10801633 pick 22: TE 21.6 vs WR 15.4 on one-turn urgency, London
+    62.5 vs McBride 43.2 on value. Stage 1 reads value: the receiver."""
+    te = _p("te", "TE", 143.2, lo=130.0, hi=160.0)     # value 43.2 over the TE fallback
     wr = _p("wr", "WR", 190.4, lo=180.0, hi=200.0)     # value 60.4
-    te["proj_pts"] = 143.2                             # value 43.2, as in the room
     out = _rank([(21.6, "t", te), (15.4, "w", wr)], {"TE": 21.6, "WR": 15.4}, {"TE": {"te": 0.2}, "WR": {"wr": 0.01}})
     assert out[0][2]["sleeper_id"] == "wr"
-    assert "urgency picked TE/WR" in out[0][1] and "value picked him (60.4 vs 43.2" in out[0][1]
+    assert "value picked WR (60.4, next TE 43.2" in out[0][1]
 
 
-def test_a_market_outside_both_bands_stays_dead():
+def test_a_market_outside_the_value_band_stays_dead_whatever_its_urgency():
     te = _p("te", "TE", 143.2)
     wr = _p("wr", "WR", 190.4)
     out = _rank([(30.0, "t", te), (15.0, "w", wr)], {"TE": 30.0, "WR": 15.0}, {})
-    assert out[0][2]["sleeper_id"] == "te" and f"or {URGENCY_REL:.0%}" in out[1][1]
+    assert out[0][2]["sleeper_id"] == "wr" and f"(band {VALUE_BAND:g}); one-turn urgency 30.0" in out[1][1]
 
 
 def test_a_flat_board_lets_the_pair_lead():

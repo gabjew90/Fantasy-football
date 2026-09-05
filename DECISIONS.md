@@ -3808,3 +3808,44 @@ Replayed through the new engine, room 10802514 pick 14 still takes Allen
 (QB drop 20 vs RB drop 13, the pair agrees), pick 27 becomes a flat state
 and the pair takes Jeremiyah Love over McBride, pick 34 still takes Rice
 over Javonte on the (old) expectation; item 5 is aimed at that.
+
+## 2026-09-05 (64) -- stage 1 picks the position on the deadline horizon, not the one-turn drop
+
+Room 10804278 (seat 7, the complete #63 set) took Josh Allen at 14 and Trey
+McBride at 27. The user: "allen and McBride as early picks is really fucking
+us". The stage trail:
+
+| pick | one-turn urgency | value on the deadline horizon |
+|---|---|---|
+| 14 | QB 27.7, RB 17.3 (62% of the top, dead) | Achane 83.9, Allen 55.1 |
+| 27 | TE 14.6, WR 6.4 (dead) | Rice 55.1, McBride 47.0 |
+
+Stage 1 measured each position by one-turn urgency: the best now minus the
+expected best at my NEXT pick. That is the right two-pick lookahead only when
+both positions get filled within the next two picks (RB and WR early). For a
+position the plan defers to its deadline, QB and TE, nobody refills next
+turn, so the cliff past the three outliers is not a cost anyone pays; the
+value stage already prices the deferral correctly against the deadline
+fallback, and it was overruled by 29 and 8 points. Room 10803391 dodged the
+same trap only because RB urgency landed inside the 30% line. #63's band and
+line were widenings of the wrong number.
+
+Change (draftkit/staged.py, no knob, user: "do the rewrite u recommend
+before next room"):
+
+1. Stage 1 picks the position by the best deadline-horizon value in each
+   market (staged_value of its best row); markets within VALUE_BAND (2.0) of
+   the top stay live. Position and player are now chosen in one currency.
+   URGENCY_REL is gone; the band tags carry the one-turn urgency for the record.
+2. One-turn urgency moves to a tiebreak: inside a value tie across markets,
+   a gap of URGENCY_BAND (1.5) or more takes the more urgent market's rows
+   on alone; same-market ties skip it. Then scarcity, variance, pair as before.
+3. The turn and flat exceptions (URGENCY_FLOOR 8.0) stand: with nothing
+   urgent the pair still leads.
+
+Replay of room 10803391 through the new stage 1: pick 14 Achane (RB 83.9
+vs WR 69.3, as before); pick 27 Jeremiyah Love (RB 57.4 vs QB 55.1) where
+the room took Allen; pick 34 Rice (WR 55.1 vs RB 53.0) where it took
+McBride; 47 onward unchanged (flat boards, then bench). Suite 800 passing.
+A QB or TE is now taken when his value over the deadline fallback beats the
+best back or receiver's, which is what the plan meant by value all along.

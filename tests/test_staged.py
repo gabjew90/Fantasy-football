@@ -1,6 +1,7 @@
-"""The staged starter ranking (user design, 2026-09-05): urgency picks the
-position, value the player, banded scarcity, variance by round, pair last;
-the pair leads at the turn."""
+"""The staged starter ranking (user design, 2026-09-05): value on the deadline
+horizon picks the position and the player, one-turn urgency then banded
+scarcity then variance by round break ties, pair last; the pair leads at the
+turn and on a flat board."""
 
 from draftkit.staged import (BOTH_GONE, SURV_GAP, URGENCY_BAND, VALUE_BAND, VARIANCE_BAND,
                              staged_rank, staged_value)
@@ -31,22 +32,46 @@ def _rank(cands, urg, surv, rnd=3, partner_certain=False, e_next=None, best_now=
                        fallback=FALLBACK, repl=REPL, partner_certain=partner_certain)
 
 
-def test_stage_1_urgency_picks_the_position_over_a_bigger_value():
-    wr = _p("wr", "WR", 190.0)      # value 60
-    rb = _p("rb", "RB", 200.0)      # value 80, but the RB market is not urgent
-    out = _rank([(30.0, "w", wr), (20.0, "r", rb)], {"WR": 30.0, "RB": 20.0}, {})
-    assert out[0][2]["sleeper_id"] == "wr"
-    assert "STAGED: urgency picked WR (30.0, next 20.0), one market live" in out[0][1]
-    assert "not live, RB urgency 20.0 vs 30.0" in out[1][1]
-
-
-def test_stage_2_value_picks_inside_the_urgency_band():
-    wr = _p("wr", "WR", 190.0)      # value 60
-    rb = _p("rb", "RB", 200.0)      # value 80, market within URGENCY_BAND
-    out = _rank([(30.0, "w", wr), (29.0, "r", rb)], {"WR": 30.0, "RB": 30.0 - URGENCY_BAND}, {})
+def test_stage_1_value_picks_the_position_even_when_another_market_is_more_urgent():
+    # room 10804278 pick 14: QB one-turn urgency 27.7 vs RB 17.3 took Allen while
+    # value had Achane 29 ahead. Stage 1 now reads the deadline horizon.
+    qb = _p("qb", "QB", 315.0)      # value 55
+    rb = _p("rb", "RB", 204.0)      # value 84
+    out = _rank([(27.7, "q", qb), (17.3, "r", rb)], {"QB": 27.7, "RB": 17.3}, {})
     assert out[0][2]["sleeper_id"] == "rb"
-    assert "value picked him (80.0 vs 60.0 for wr)" in out[0][1]
-    assert out[1][2]["_staged"]["value"] == 60.0
+    assert "STAGED: value picked RB (84.0, next QB 55.0; one-turn urgency 17.3, top 27.7), one row live" in out[0][1]
+    assert "not live, QB best value 55.0 vs 84.0 at the top (band 2); one-turn urgency 27.7" in out[1][1]
+    assert out[1][2]["_staged"]["market_best"] == 55.0
+
+
+def test_stage_1_a_market_is_live_on_its_best_row_and_stage_2_ranks_the_players():
+    wr1 = _p("wr1", "WR", 190.0)    # value 60
+    wr2 = _p("wr2", "WR", 185.0)    # value 55, same market
+    rb = _p("rb", "RB", 179.0)      # value 59, market within VALUE_BAND of WR
+    out = _rank([(30.0, "w", wr1), (30.0, "w", wr2), (20.0, "r", rb)], {"WR": 30.0, "RB": 30.0 - URGENCY_BAND}, {})
+    assert [c[2]["sleeper_id"] for c in out][:1] == ["wr1"]
+    assert "value picked RB/WR (60.0" in out[0][1]
+    assert out[-1][2]["sleeper_id"] == "wr2"
+    assert "staged: value 55.0, 5.0 under the best" in out[-1][1]
+
+
+def test_stage_3_one_turn_urgency_breaks_a_value_tie_across_markets():
+    wr = _p("wr", "WR", 190.0)      # value 60
+    rb = _p("rb", "RB", 181.0)      # value 61, inside VALUE_BAND
+    surv = {"WR": {"wr": 0.20}, "RB": {"rb": 0.20 + SURV_GAP}}   # scarcity would take the WR
+    out = _rank([(30.0, "w", wr), (28.0, "r", rb)], {"WR": 30.0 - URGENCY_BAND, "RB": 30.0}, surv)
+    assert out[0][2]["sleeper_id"] == "rb"
+    assert "value within 2, RB more urgent (30.0 vs 28.5 for WR); one row left" in out[0][1]
+    assert "less urgent market (WR 28.5 vs RB 30.0)" in out[1][1]
+
+
+def test_stage_3_skips_when_the_urgency_gap_is_inside_the_band():
+    wr = _p("wr", "WR", 190.0)
+    rb = _p("rb", "RB", 181.0)
+    surv = {"WR": {"wr": 0.20}, "RB": {"rb": 0.20 + SURV_GAP}}
+    out = _rank([(30.0, "w", wr), (29.0, "r", rb)], {"WR": 29.0, "RB": 30.0}, surv)
+    assert out[0][2]["sleeper_id"] == "wr"
+    assert "scarcer first (20% vs 35% for rb" in out[0][1]
 
 
 def test_stage_3_a_survival_gap_takes_the_scarcer_player():
