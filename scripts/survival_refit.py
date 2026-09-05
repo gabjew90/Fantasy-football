@@ -85,9 +85,29 @@ RIVAL_LORO_STAGES = (
 )
 STAGES = HUMAN_STAGES + AUTOPICK_STAGES + RIVAL_STAGES
 SMOKE_STAGES = (("sigma", [{"sigma_early": 6.0, "sigma_late": 27.0}, {"sigma_early": 8.0, "sigma_late": 27.0}]),)
-CURRENT = {"sigma_early": 6.0, "sigma_late": 27.0, "reach_prob": 0.15, "need_damp": 0.15,
-           "autopick_list_prob": 0.0, "autopick_sigma_scale": 0.5, "autopick_need_damp": 0.02,
-           "rival_draw": "lottery"}
+_CURRENT_FALLBACK = {"sigma_early": 6.0, "sigma_late": 27.0, "reach_prob": 0.15, "need_damp": 0.15,
+                     "autopick_list_prob": 0.0, "autopick_sigma_scale": 0.5, "autopick_need_damp": 0.02,
+                     "rival_draw": "lottery"}
+
+
+def _live_engine_knobs() -> dict:
+    """The baseline is what the bridge RUNS, read from the engine block, not a
+    literal. 2026-09-05: the literal still said lottery / 6-27 / list-walk 0.0
+    a day after DECISIONS #46 shipped order / 10-45 / 0.2, so a rival-stage
+    refit ranked draws against a point nobody was drafting with."""
+    try:
+        from draftkit.config import Config
+        e = Config.load().get("engine") or {}
+    except Exception:  # noqa: BLE001 - a missing config means the fallback, loudly below
+        e = {}
+    out = {k: e.get(k, v) for k, v in _CURRENT_FALLBACK.items()}
+    missing = [k for k in _CURRENT_FALLBACK if k not in e]
+    if missing:
+        print(f"survival_refit: engine block lacks {missing}; fallback values used for those")
+    return out
+
+
+CURRENT = _live_engine_knobs()
 CURRENT_AUTOPICK = {k: CURRENT[k] for k in ("autopick_list_prob", "autopick_sigma_scale", "autopick_need_damp")}
 HUMAN_TYPE = "sleeper_human"          # the Omnibeta real draft
 N_BOOT, CI_ALPHA, MIN_CLUSTERS = 500, 0.10, 30
