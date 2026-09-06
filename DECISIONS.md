@@ -3857,3 +3857,17 @@ position's wire (ceil minus 17 weeks of the k=3 wire), the currency the
 zero-insurance fallthrough already used; the label reads "higher ceiling
 over the wire". A QB2 still wins when he is the best ticket over his wire.
 tests/test_bench_rows.py::test_a_bench_tie_breaks_on_the_ceiling_over_the_wire_not_raw_points.
+
+## 2026-09-05 (65) -- no backup quarterback in the Keefamania draft
+
+The user, after mock rooms 10806035 (Lawrence at 92 behind Allen) and
+10806744 (Dart at 102 behind Daniels): in a 10-team one-QB league the
+bench slot belongs to a high-upside back who can be moved to an IR slot if
+hurt, letting a free agent in without a waiver claim; a QB2 cannot be
+stashed and sits as dead weight. `guardrails.qb2_earliest_round: 99` in
+leagues/keefamania.yaml (was 10; 15 rounds, so a second QB is never
+allowed). The yaml position cap could not do it: the room's own draft caps
+(QB 4) overwrite the yaml's in merge_position_caps. Verified offline on
+room 10806744's states at 99/102/119: the bench rows are all backs and
+receivers. Bridge32 restarted on the new league file 17:40 PT; the engine
+code is unchanged (commit 93836dc, DECISIONS #64 and the engine lock).

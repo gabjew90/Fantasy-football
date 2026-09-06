@@ -58,7 +58,13 @@ pool_sizes:
   DEF: 14
 
 guardrails:
-  qb2_earliest_round: 10
+  # No backup quarterback in this draft (user, 2026-09-05 17:38 PT, after
+  # Lawrence at 92 and Dart at 102 in the last two mocks): in a 10-team
+  # 1-QB league the slot goes to a high-upside back who can be moved to IR
+  # if hurt; a QB2 cannot. The gate is past the last round (15), so the
+  # engine never names a second QB; the yaml position cap would not do it
+  # because the room's own caps (QB 4) overwrite the yaml's.
+  qb2_earliest_round: 99
   te2_fall_picks: 12
   # Yahoo's per-position roster cap. Mock rooms 10797402 and 10798461
   # (2026-09-05) refused our SEVENTH running back (Gainwell at 126, White at
