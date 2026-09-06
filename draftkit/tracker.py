@@ -279,6 +279,7 @@ class Tracker:
         self.qb2_round = int(gcfg.get("qb2_earliest_round", 10))
         self.te2_fall = int(gcfg.get("te2_fall_picks", 12))
         self.position_max = {str(k): int(v) for k, v in (gcfg.get("position_max") or {}).items()}
+        self.position_earliest_round = {str(k): int(v) for k, v in (gcfg.get("earliest_round") or {}).items()}
         self._urgency_cache: tuple[tuple, dict] | None = None
         from .rivals import load_seeds
         self.rival_seeds = load_seeds(cfg).get("users", {})
@@ -1194,6 +1195,12 @@ class Tracker:
         # must never test.
         mx = (getattr(self, "position_max", None) or {}).get(pos)
         if mx is not None and counts.get(pos, 0) >= int(mx):
+            return False
+        # guardrails.earliest_round: the user's round floor per position
+        # (Keefamania 2026-09-05: QB from round 4, TE from round 3, DECISIONS
+        # #67). Before it the position has no market row at all.
+        er = (getattr(self, "position_earliest_round", None) or {}).get(pos)
+        if er is not None and rnd < int(er):
             return False
         if pos in ("K", "DEF"):
             if picks_left > 2:

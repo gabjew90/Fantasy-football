@@ -42,3 +42,15 @@ def test_the_room_caps_write_over_the_yaml_caps():
     assert merge_position_caps({"RB": 6, "WR": 6}, {"RB": "6", "WR": "8", "TE": "4", "OFF": "4"}) == {"RB": 6, "WR": 8, "TE": 4, "OFF": 4}
     assert merge_position_caps({"RB": 6}, None) == {"RB": 6}
     assert merge_position_caps(None, {"RB": "x", "WR": "8"}) == {"WR": 8}
+
+
+def test_earliest_round_keeps_a_position_out_until_its_round():
+    """guardrails.earliest_round (DECISIONS #67): QB from round 4, TE from
+    round 3; nothing else changes."""
+    t = _t({})
+    t.position_earliest_round = {"QB": 4, "TE": 3}
+    assert not t._pos_allowed("QB", 3, {}, 12, False)
+    assert t._pos_allowed("QB", 4, {}, 11, False)
+    assert not t._pos_allowed("TE", 2, {}, 13, False)
+    assert t._pos_allowed("TE", 3, {}, 12, False)
+    assert t._pos_allowed("RB", 1, {}, 14, False)

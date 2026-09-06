@@ -65,6 +65,13 @@ guardrails:
   # engine never names a second QB; the yaml position cap would not do it
   # because the room's own caps (QB 4) overwrite the yaml's.
   qb2_earliest_round: 99
+  # Round floor per position (user, 2026-09-05 17:52 PT, DECISIONS #67): no
+  # quarterback row before round 4, no tight end row before round 3. The
+  # value stage had them competing for round-2/3 picks (Allen at 14,
+  # McBride at 27 in room 10804278; Allen at 23 in 10807800 on a value tie).
+  earliest_round:
+    QB: 4
+    TE: 3
   te2_fall_picks: 12
   # Yahoo's per-position roster cap. Mock rooms 10797402 and 10798461
   # (2026-09-05) refused our SEVENTH running back (Gainwell at 126, White at

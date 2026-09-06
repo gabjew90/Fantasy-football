@@ -3893,3 +3893,19 @@ reorder, USER PREFERENCE rows, DECISIONS #61). Verified on the engine:
 subset green (staged, prefer, calibration). Bridge34 restarted 17:49 PT on
 commit of this entry; draftkit/staged.py carries only a comment change
 against 93836dc.
+
+## 2026-09-05 (67) -- round floors: no QB before round 4, no TE before round 3
+
+User (17:52 PT), after the #66 finding that any widening of the value band
+hands round-2/3 ties to the QB market through the urgency tiebreak: ban the
+positions outright early instead. `guardrails.earliest_round: {QB: 4, TE: 3}`
+in leagues/keefamania.yaml; Tracker.position_earliest_round is enforced in
+_pos_allowed (the single guardrail gate, so markets, the bench and the
+two-pick planner all honour it) and set by yahoo_bridge.build_tracker like
+the caps. VALUE_BAND stays 2.0; the two engine.prefer lines stand.
+
+Replayed: room 10804278 pick 14 -> Achane (no QB row; the room took Allen),
+pick 27 -> Rice (TE row present in round 3, loses on value; the room took
+McBride), pick 34 -> Rice; room 10806035 pick 12 -> Achane. Test in
+tests/test_position_max.py. Bridge35 restarts on this commit once room
+10807800 closes; this is the engine for the league draft.
