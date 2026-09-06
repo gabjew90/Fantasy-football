@@ -40,7 +40,7 @@ def test_stage_1_value_picks_the_position_even_when_another_market_is_more_urgen
     out = _rank([(27.7, "q", qb), (17.3, "r", rb)], {"QB": 27.7, "RB": 17.3}, {})
     assert out[0][2]["sleeper_id"] == "rb"
     assert "STAGED: value picked RB (84.0, next QB 55.0; one-turn urgency 17.3, top 27.7), one row live" in out[0][1]
-    assert "not live, QB best value 55.0 vs 84.0 at the top (band 2); one-turn urgency 27.7" in out[1][1]
+    assert f"not live, QB best value 55.0 vs 84.0 at the top (band {VALUE_BAND:g}); one-turn urgency 27.7" in out[1][1]
     assert out[1][2]["_staged"]["market_best"] == 55.0
 
 
@@ -61,7 +61,7 @@ def test_stage_3_one_turn_urgency_breaks_a_value_tie_across_markets():
     surv = {"WR": {"wr": 0.20}, "RB": {"rb": 0.20 + SURV_GAP}}   # scarcity would take the WR
     out = _rank([(30.0, "w", wr), (28.0, "r", rb)], {"WR": 30.0 - URGENCY_BAND, "RB": 30.0}, surv)
     assert out[0][2]["sleeper_id"] == "rb"
-    assert "value within 2, RB more urgent (30.0 vs 28.5 for WR); one row left" in out[0][1]
+    assert f"value within {VALUE_BAND:g}, RB more urgent (30.0 vs 28.5 for WR); one row left" in out[0][1]
     assert "less urgent market (WR 28.5 vs RB 30.0)" in out[1][1]
 
 

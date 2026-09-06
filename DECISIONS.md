@@ -3871,3 +3871,25 @@ allowed). The yaml position cap could not do it: the room's own draft caps
 room 10806744's states at 99/102/119: the bench rows are all backs and
 receivers. Bridge32 restarted on the new league file 17:40 PT; the engine
 code is unchanged (commit 93836dc, DECISIONS #64 and the engine lock).
+
+## 2026-09-05 (66) -- the user's two calls: Chase over Nacua, Javonte over Love (preferences, not a wider band)
+
+Asked which thresholds would flip them: Javonte over Love needed VALUE_BAND
+2.0 -> 3.0 (the 2.7 gap then reaches the round-3 floor rule, 172.7 vs
+171.2); Chase over Nacua is not reachable by any threshold (tied inside the
+band, both 18% to survive, the pair takes Nacua's 1.6; Nacua also wins the
+floor 246.8 vs 237.3, Chase only the ceiling). The user asked for the band
+move plus the Chase preference.
+
+Tried: VALUE_BAND 3.0 replayed on room 10803391 pick 27 pulled Allen (55.1)
+into the tie with Love (57.4) and the cross-market urgency tiebreak (QB
+17.9 vs RB 2.0) took the QB in round 3, the #64 outcome the user had just
+ruled out; Javonte was never compared. Reverted to 2.0 the same minute.
+
+Shipped instead: leagues/keefamania.yaml engine.prefer =
+[[Ja'Marr Chase, Puka Nacua], [Javonte Williams, Jeremiyah Love]] (final
+reorder, USER PREFERENCE rows, DECISIONS #61). Verified on the engine:
+10803391@27 -> Javonte, pick-3 state with Gibbs/Bijan gone -> Chase. Suite
+subset green (staged, prefer, calibration). Bridge34 restarted 17:49 PT on
+commit of this entry; draftkit/staged.py carries only a comment change
+against 93836dc.

@@ -55,6 +55,10 @@ URGENCY_BAND = 1.5
 # or a flat board): the pair leads, as at the turn (room 10801633 pick 19).
 URGENCY_FLOOR = 8.0
 # Stage 1 (positions) and stage 2 (players) both tie inside this band.
+# Tried at 3.0 on 2026-09-05 17:45 PT to let Javonte (54.7) reach the floor
+# rule against Love (57.4): the wider band also pulled Allen (55.1) into
+# the tie and the cross-market urgency tiebreak took the QB in round 3
+# (DECISIONS #66). Stays 2.0; the user's calls go through engine.prefer.
 VALUE_BAND = 2.0
 SURV_GAP = 0.15
 BOTH_GONE = 0.20

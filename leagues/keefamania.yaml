@@ -249,4 +249,11 @@ engine:
   # after the stages, the row says USER PREFERENCE (DECISIONS #61). Chase
   # over Nacua was set and reverted the same afternoon (user, 2026-09-05);
   # the engine's own read stands (Nacua on the floor, 1.6 sheet points).
-  prefer: []
+  # 2026-09-05 17:45 PT: set again for the league draft. Room 10807800 pick
+  # 3 tied them inside the band (120.5 / 118.9), both 18% to survive, and
+  # the pair took Nacua's 1.6; the user wants Chase there.
+  # Javonte over Love (user, same time): a 2.7-point sheet gap; widening
+  # the value band to reach the floor rule also let Allen back into round 3.
+  prefer:
+    - ["Ja'Marr Chase", "Puka Nacua"]
+    - ["Javonte Williams", "Jeremiyah Love"]
