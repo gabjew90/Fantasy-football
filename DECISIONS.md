@@ -3909,3 +3909,42 @@ pick 27 -> Rice (TE row present in round 3, loses on value; the room took
 McBride), pick 34 -> Rice; room 10806035 pick 12 -> Achane. Test in
 tests/test_position_max.py. Bridge35 restarts on this commit once room
 10807800 closes; this is the engine for the league draft.
+
+## 2026-09-05 (68) -- the Keefamania draft (league 49649, seat 2 of 10, 7:00 PM PT)
+
+Engine: commit bc1bb02 on bridge35 (deadline-horizon stage 1 #64, bench
+ties on ceiling over the wire, no QB2 #65, prefer Chase>Nacua and
+Javonte>Love #66, QB from round 4 and TE from round 3 #67). Entered the
+room at 18:41 through the Draft Central "Launch Draft Application" anchor
+(target window enternewdraft_49649_3; a first click from a tab named
+fandraft opened an invisible popup, renaming the tab to the target fixed
+it). Fingerprint identical to the mock rooms; five of ten managers away.
+
+Picks: 2 Gibbs (RB 149.5 vs WR 120.5; team 7 passed on both backs at 1),
+19 London (flat turn, floor 54 vs 48 over Brown), 22 A.J. Brown (WR 60.6
+vs RB 54.1), 39 Etienne (Allen led on value 52.9 vs 47.0 from pick 31 and
+went at 34), 42 Skattebo (FLEX 33.1 vs QB 14.7), 59 Daniels (Hurts at 58),
+62 LaPorta, 79 Dowdle, 82 Warren, 99 Dobbins, 102 Michael Wilson, 119
+Pittman, 122 Golden, 139 Steelers, 142 Loop. 15 of 15 by the driver,
+action path, latency median 380 ms after the re-inject.
+
+Incidents:
+1. The room page reloaded on its own at about 19:35 (between picks 85 and
+   86), taking the injected driver with it. The user noticed first ("what
+   happened resume the engine"); re-injected at 19:36:15, no pick was due
+   in the gap (ours were 82 and 99). A stall watchdog on the plan stream
+   (40 s) was added for the rest of the draft. The driver's pick records
+   for picks 2-82 were lost with the page, so mock_scrutiny attributes
+   those nine to Yahoo autopick; the plan stream at each on-clock moment
+   shows the driver took the plan leader every time. Fix owed: persist the
+   records (localStorage) and have the trail mark store-only picks as
+   "driver, records lost" when the plan log agrees.
+2. Pick 102, Michael Wilson: ten bench rows inside the 2-point band, all
+   worth 0-2 points of insurance, and the scarcity tiebreak (50% vs 75%)
+   ran before the ceiling. On a band that flat scarcity is noise; the
+   ceiling over the wire should decide first when every row in the band is
+   under a few points. Owed as a bench-rule change after the season starts.
+
+Survival scorecard (shown vs observed): 0-30% 17->2, 30-50% 39->41,
+50-70% 61->70, 70-90% 81->89, 90-100% 95->96. A five-autopick room is
+more predictable than the sim assumes in the middle.
