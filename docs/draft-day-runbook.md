@@ -91,6 +91,20 @@ In Chrome (the profile that accepted the bridge cert):
 
         (await (await fetch('https://pub-api.fantasysports.yahoo.com/fantasy/v3/teams/nfl/49649?format=rawjson',{credentials:'include'})).json()).service.team_list.find(t=>t.id==3).has_preranks   // "1"
 
+## Verified on the league pages, 2026-09-05 17:22 PT (not from memory)
+
+- Scoring & Settings: Live Standard Draft, Sat Sep 5 10:00pm EDT, **Live
+  Draft Pick Time 1 minute 15 seconds** (the yaml comment says 60 s; the
+  driver does not depend on the clock, median action 0.5 s), Max Teams 10,
+  no draft-pick trades.
+- Draft Central (/f1/49649/draft) carries the "Draft Countdown" panel
+  (01:37:33 at 17:22:32, so the clock is 19:00:05 PT) and only the system
+  test link so far; the room link appears there when Yahoo opens the room.
+  Enter through that link (it carries the auth token), never the bare
+  /draftclient/f1/49649/<slot> URL.
+- Team 3 has_preranks == "1" via the pub-api teams call from the page.
+- The draft order was not published on any league page at 17:22.
+
 ## T-15m: the room
 
 - Enter the draft room from the league page **as soon as Yahoo opens it (30-60 minutes before the clock)** and inject the driver right away. A league room has no waiting-room countdown to race; the two lost first picks in mocks 16-17 came from a hidden waiting-room tab whose redirect never fired, and cannot happen once you are in the room with the driver running.
