@@ -13,10 +13,12 @@ here, and the cache key carries the window so a wider pull is never reused.
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 import time as _time
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 import requests
 
@@ -66,16 +68,60 @@ def _in_window(commence: str, lo: datetime, hi: datetime) -> bool:
     return lo <= t <= hi
 
 
-def implied_totals(store, window=None) -> tuple[dict[str, float], str | None]:
+def snapshot_path(season, week) -> Path:
+    return Path("state") / "vegas" / f"{season}-wk{int(week):02d}.json"
+
+
+def read_snapshot(season, week) -> tuple[dict[str, float], str | None]:
+    """Committed lines for a week, written by `manager vegas-refresh`.
+
+    The API key is a local secret and stays local. Rather than putting it in
+    CI, the week's lines are pulled here and committed, so the scheduled job
+    reads numbers it cannot fetch itself. Stale beats absent, and the note
+    always says how old they are.
+    """
+    p = snapshot_path(season, week)
+    if not p.exists():
+        return {}, None
+    try:
+        blob = json.loads(p.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as e:
+        return {}, f"DATA MISSING: Vegas snapshot unreadable ({e.__class__.__name__})"
+    data = {str(k): float(v) for k, v in (blob.get("data") or {}).items()}
+    if not data:
+        return {}, None
+    age_h = (_time.time() - float(blob.get("ts") or 0)) / 3600.0
+    return data, (f"Vegas lines from the committed snapshot, "
+                  f"{age_h:.0f}h old (refreshed {blob.get('refreshed_at', '?')})")
+
+
+def write_snapshot(season, week, totals: dict[str, float]) -> Path:
+    """Persist a week's lines into committed state."""
+    p = snapshot_path(season, week)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(json.dumps({
+        "season": str(season), "week": int(week), "ts": _time.time(),
+        "refreshed_at": datetime.now(tz=timezone.utc).strftime(ISO),
+        "data": {k: round(float(v), 1) for k, v in sorted(totals.items())},
+    }, indent=2) + "\n", encoding="utf-8")
+    return p
+
+
+def implied_totals(store, window=None, season=None, week=None
+                   ) -> tuple[dict[str, float], str | None]:
     """team code -> implied points for `window` (default: the whole feed).
 
     `window` is a (from, to) pair of aware datetimes, normally week_window(ctx).
-    ({}, note) when unavailable. Passing no window keeps every posted game and
-    is only correct when the feed itself is already one week wide.
+    With no API key, falls back to the committed snapshot for season/week when
+    one was passed. ({}, note) when neither is available.
     """
     key = os.environ.get("ODDS_API_KEY", "")
     if not key:
-        return {}, "DATA MISSING: Vegas lines (no ODDS_API_KEY)"
+        if season is not None and week is not None:
+            data, note = read_snapshot(season, week)
+            if data:
+                return data, note
+        return {}, "DATA MISSING: Vegas lines (no ODDS_API_KEY, no snapshot)"
     lo = hi = None
     url = URL.format(key=key)
     ckey = "vegas"

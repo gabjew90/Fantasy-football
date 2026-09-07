@@ -118,3 +118,43 @@ def test_no_key_is_a_data_missing_line_not_a_crash(monkeypatch):
 def test_week_window_without_a_schedule_degrades_to_a_seven_day_span():
     lo, hi = vegas.week_window({"week": 1})
     assert timedelta(days=6) < (hi - lo) <= timedelta(days=8)
+
+
+def test_no_key_falls_back_to_a_committed_snapshot(monkeypatch, tmp_path):
+    """The API key stays local; CI reads lines it could never fetch itself."""
+    monkeypatch.delenv("ODDS_API_KEY", raising=False)
+    monkeypatch.chdir(tmp_path)
+    vegas.write_snapshot("2026", 3, {"BUF": 27.0, "HOU": 21.0})
+    out, note = vegas.implied_totals(FakeStore(), season="2026", week=3)
+    assert out == {"BUF": 27.0, "HOU": 21.0}
+    assert "snapshot" in note and "DATA MISSING" not in note
+
+
+def test_the_snapshot_note_always_states_its_age(monkeypatch, tmp_path):
+    monkeypatch.delenv("ODDS_API_KEY", raising=False)
+    monkeypatch.chdir(tmp_path)
+    p = vegas.write_snapshot("2026", 3, {"BUF": 27.0})
+    import json as _j
+    blob = _j.loads(p.read_text(encoding="utf-8"))
+    blob["ts"] = blob["ts"] - 3600 * 30          # 30 hours ago
+    p.write_text(_j.dumps(blob), encoding="utf-8")
+    _, note = vegas.implied_totals(FakeStore(), season="2026", week=3)
+    assert "30h old" in note, note
+
+
+def test_no_key_and_no_snapshot_is_still_data_missing(monkeypatch, tmp_path):
+    monkeypatch.delenv("ODDS_API_KEY", raising=False)
+    monkeypatch.chdir(tmp_path)
+    out, note = vegas.implied_totals(FakeStore(), season="2026", week=9)
+    assert out == {} and "DATA MISSING" in note
+
+
+def test_a_live_key_ignores_the_snapshot(monkeypatch, tmp_path):
+    """A stale committed file must never shadow a fetch that can succeed."""
+    monkeypatch.chdir(tmp_path)
+    vegas.write_snapshot("2026", 1, {"BUF": 1.0})
+    seen = []
+    _patch_feed(monkeypatch, seen)
+    lo, hi = WEEK1 - timedelta(hours=1), WEEK1 + timedelta(hours=6)
+    out, _ = vegas.implied_totals(FakeStore(), window=(lo, hi), season="2026", week=1)
+    assert out["BUF"] == 27.0, "snapshot shadowed a live fetch"

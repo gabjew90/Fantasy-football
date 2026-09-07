@@ -28,7 +28,9 @@ def build(ctx, store) -> str:
     week = ctx["week"]
     if ctx["opp_rid"] is None:
         return f"# Opponent scout — week {week}\n\nno matchup this week."
-    totals, v_note = implied_totals(store, window=week_window(ctx))
+    totals, v_note = implied_totals(store, window=week_window(ctx),
+                                    season=(ctx.get("state") or {}).get("season"),
+                                    week=ctx["week"])
     mine = vegas_adjust(ctx["roster_players"][ctx["my_rid"]], totals)
     theirs = vegas_adjust(ctx["roster_players"][ctx["opp_rid"]], totals)
     my_opt = optimal_lineup(mine, ctx["slots"], flex_slots=ctx["flex_slots"])
