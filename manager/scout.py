@@ -13,7 +13,7 @@ import math
 from draftkit.lineup import optimal_lineup
 
 from .lineup_opt import STDEV, vegas_adjust
-from .vegas import implied_totals
+from .vegas import implied_totals, week_window
 
 log = logging.getLogger("manager")
 
@@ -28,7 +28,7 @@ def build(ctx, store) -> str:
     week = ctx["week"]
     if ctx["opp_rid"] is None:
         return f"# Opponent scout — week {week}\n\nno matchup this week."
-    totals, v_note = implied_totals(store)
+    totals, v_note = implied_totals(store, window=week_window(ctx))
     mine = vegas_adjust(ctx["roster_players"][ctx["my_rid"]], totals)
     theirs = vegas_adjust(ctx["roster_players"][ctx["opp_rid"]], totals)
     my_opt = optimal_lineup(mine, ctx["slots"], flex_slots=ctx["flex_slots"])
