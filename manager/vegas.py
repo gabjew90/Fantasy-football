@@ -1,6 +1,14 @@
 """Vegas lines via The Odds API: implied team totals for projection tilts.
 
 No ODDS_API_KEY -> a DATA MISSING line and no adjustment; never a crash.
+
+WEEK WINDOW (fixed 2026-09-07). The endpoint returns EVERY posted game, which
+in September is all 272 of the season sorted ascending by kickoff. The old
+loop assigned `out[team]` per event with no date filter, so each team ended up
+holding its LAST game of the season -- every tilt all year would have run on
+January lines, silently and without an error. Callers pass the current week's
+window; the request is bounded server-side by commenceTime and filtered again
+here, and the cache key carries the window so a wider pull is never reused.
 """
 
 from __future__ import annotations
@@ -8,6 +16,7 @@ from __future__ import annotations
 import logging
 import os
 import time as _time
+from datetime import datetime, timedelta, timezone
 
 import requests
 
@@ -16,6 +25,7 @@ log = logging.getLogger("manager")
 URL = ("https://api.the-odds-api.com/v4/sports/americanfootball_nfl/odds"
        "?regions=us&markets=spreads,totals&oddsFormat=american&apiKey={key}")
 TTL = 6 * 3600
+ISO = "%Y-%m-%dT%H:%M:%SZ"
 
 # Odds API full names -> draftkit team codes
 NAMES = {
@@ -33,16 +43,51 @@ NAMES = {
 }
 
 
-def implied_totals(store) -> tuple[dict[str, float], str | None]:
-    """team code -> implied points this week. ({}, note) when unavailable."""
+def week_window(ctx) -> tuple[datetime, datetime]:
+    """UTC (from, to) bounding the current week's kickoffs, with an hour of
+    slack each side. Falls back to now .. now+7d when the schedule is absent."""
+    from .games import week_games
+    try:
+        games = week_games(ctx["schedule"], int(ctx["week"]))
+    except Exception:  # noqa: BLE001 — a missing schedule is not a crash
+        games = []
+    if not games:
+        now = datetime.now(tz=timezone.utc)
+        return now - timedelta(hours=1), now + timedelta(days=7)
+    kicks = [g["kickoff"].astimezone(timezone.utc) for g in games]
+    return min(kicks) - timedelta(hours=1), max(kicks) + timedelta(hours=6)
+
+
+def _in_window(commence: str, lo: datetime, hi: datetime) -> bool:
+    try:
+        t = datetime.strptime(commence, ISO).replace(tzinfo=timezone.utc)
+    except (TypeError, ValueError):
+        return False
+    return lo <= t <= hi
+
+
+def implied_totals(store, window=None) -> tuple[dict[str, float], str | None]:
+    """team code -> implied points for `window` (default: the whole feed).
+
+    `window` is a (from, to) pair of aware datetimes, normally week_window(ctx).
+    ({}, note) when unavailable. Passing no window keeps every posted game and
+    is only correct when the feed itself is already one week wide.
+    """
     key = os.environ.get("ODDS_API_KEY", "")
     if not key:
         return {}, "DATA MISSING: Vegas lines (no ODDS_API_KEY)"
-    cached = store.get("vegas")
+    lo = hi = None
+    url = URL.format(key=key)
+    ckey = "vegas"
+    if window:
+        lo, hi = (d.astimezone(timezone.utc) for d in window)
+        url += f"&commenceTimeFrom={lo.strftime(ISO)}&commenceTimeTo={hi.strftime(ISO)}"
+        ckey = f"vegas:{lo.strftime(ISO)}:{hi.strftime(ISO)}"
+    cached = store.get(ckey)
     if cached and _time.time() - cached.get("ts", 0) < TTL:
         return cached["data"], None
     try:
-        resp = requests.get(URL.format(key=key), timeout=20)
+        resp = requests.get(url, timeout=20)
         resp.raise_for_status()
         events = resp.json()
     except Exception as e:  # noqa: BLE001
@@ -52,6 +97,9 @@ def implied_totals(store) -> tuple[dict[str, float], str | None]:
 
     out: dict[str, float] = {}
     for ev in events:
+        # belt and braces: the server bound can be ignored, the local one cannot
+        if lo is not None and not _in_window(ev.get("commence_time", ""), lo, hi):
+            continue
         home, away = NAMES.get(ev.get("home_team", "")), NAMES.get(ev.get("away_team", ""))
         if not home or not away:
             continue
@@ -67,5 +115,5 @@ def implied_totals(store) -> tuple[dict[str, float], str | None]:
         if total and spread_home is not None:
             out[home] = round(total / 2 - spread_home / 2, 1)
             out[away] = round(total / 2 + spread_home / 2, 1)
-    store.set("vegas", {"ts": _time.time(), "data": out})
+    store.set(ckey, {"ts": _time.time(), "data": out})
     return out, None

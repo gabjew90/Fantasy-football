@@ -13,7 +13,7 @@ import logging
 
 from draftkit.lineup import lineup_changes, optimal_lineup
 
-from .vegas import implied_totals
+from .vegas import implied_totals, week_window
 
 log = logging.getLogger("manager")
 
@@ -99,7 +99,7 @@ def flex_analysis(roster: list[dict], optimal: list[dict], mode: str,
 
 def build(ctx, store) -> str:
     week = ctx["week"]
-    totals, v_note = implied_totals(store)
+    totals, v_note = implied_totals(store, window=week_window(ctx))
     roster = vegas_adjust(ctx["roster_players"].get(ctx["my_rid"], []), totals)
     optimal = optimal_lineup(roster, ctx["slots"], flex_slots=ctx["flex_slots"])
 

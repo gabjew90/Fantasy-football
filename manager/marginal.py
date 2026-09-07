@@ -1,0 +1,143 @@
+"""Marginal roster value: what a move actually costs and gains.
+
+A player's projection is what he scores. It is NOT what he is worth to you,
+because when he leaves somebody replaces him. The two numbers diverge wildly:
+on the 2026-09-06 Keefamania roster Michael Wilson projected 134.6 and cost 0
+to lose (he never starts and the next man up is as good), while Sam LaPorta
+projected 146.2 and cost the full 146.2 (only tight end, nothing behind him).
+Nearly identical on a projection sheet, opposite in reality.
+
+Everything here is a DIFFERENCE of two optimal lineups, so the projection
+baseline cancels and only the shape of the roster matters.
+
+Players are the roster dicts the manager already passes around: `sleeper_id`,
+`pos`, and a value key (default `weekly`, the same key `optimal_lineup` sorts
+on). Pass `key="ros"` to price a rest-of-season trade instead of one week.
+"""
+
+from __future__ import annotations
+
+import logging
+from dataclasses import dataclass, field
+
+from draftkit.lineup import optimal_lineup
+
+log = logging.getLogger("manager")
+
+
+def _pid(p: dict) -> str:
+    return str(p["sleeper_id"])
+
+
+def lineup_points(roster: list[dict], shape: dict, key: str = "weekly") -> float:
+    """Points of the best legal lineup this roster can field."""
+    if key != "weekly":
+        roster = [dict(p, weekly=(p.get(key) or 0.0)) for p in roster]
+    best = optimal_lineup(roster, shape["slots"], shape.get("flex", 0),
+                          flex_slots=shape.get("flex_slots"))
+    return round(sum((p.get("weekly") or 0.0) for p in best), 1)
+
+
+def cost_to_lose(roster: list[dict], player, shape: dict, key: str = "weekly") -> float:
+    """Lineup points lost if `player` leaves, AFTER the slot is refilled.
+
+    Zero means the roster does not miss him at all. That is the single most
+    useful fact in a trade negotiation and no projection sheet shows it.
+    """
+    pid = player if isinstance(player, str) else _pid(player)
+    before = lineup_points(roster, shape, key)
+    after = lineup_points([p for p in roster if _pid(p) != pid], shape, key)
+    return round(before - after, 1)
+
+
+def gain_to_add(roster: list[dict], player: dict, shape: dict,
+                key: str = "weekly") -> float:
+    """Lineup points gained if `player` joins. Zero means he never starts."""
+    before = lineup_points(roster, shape, key)
+    after = lineup_points(roster + [player], shape, key)
+    return round(after - before, 1)
+
+
+@dataclass
+class Deal:
+    """Both sides of a package, in lineup points rather than projections."""
+    mine_before: float
+    mine_after: float
+    theirs_before: float
+    theirs_after: float
+    give: list[str] = field(default_factory=list)
+    get: list[str] = field(default_factory=list)
+
+    @property
+    def my_delta(self) -> float:
+        return round(self.mine_after - self.mine_before, 1)
+
+    @property
+    def their_delta(self) -> float:
+        return round(self.theirs_after - self.theirs_before, 1)
+
+    @property
+    def mutual(self) -> bool:
+        """Both lineups improve. Rare, and the only kind that gets accepted
+        without someone having to be talked into it."""
+        return self.my_delta > 0 and self.their_delta > 0
+
+    def __str__(self) -> str:
+        return (f"give {', '.join(self.give) or '-'} / get {', '.join(self.get) or '-'}: "
+                f"me {self.my_delta:+.1f}, them {self.their_delta:+.1f}")
+
+
+def price(my_roster: list[dict], their_roster: list[dict],
+          give: list[dict], get: list[dict], shape: dict,
+          their_shape: dict | None = None, key: str = "weekly") -> Deal:
+    """Price a package from both sides at once.
+
+    `shape` is {slots, flex, flex_slots}. `their_shape` defaults to the same,
+    which is right within one league and wrong across two.
+    """
+    their_shape = their_shape or shape
+    give_ids, get_ids = {_pid(p) for p in give}, {_pid(p) for p in get}
+    mine_after = [p for p in my_roster if _pid(p) not in give_ids] + list(get)
+    theirs_after = [p for p in their_roster if _pid(p) not in get_ids] + list(give)
+    return Deal(
+        mine_before=lineup_points(my_roster, shape, key),
+        mine_after=lineup_points(mine_after, shape, key),
+        theirs_before=lineup_points(their_roster, their_shape, key),
+        theirs_after=lineup_points(theirs_after, their_shape, key),
+        give=[p.get("name", _pid(p)) for p in give],
+        get=[p.get("name", _pid(p)) for p in get],
+    )
+
+
+def dead_weight(roster: list[dict], shape: dict, key: str = "weekly") -> list[dict]:
+    """Players who cost nothing to lose, worst first.
+
+    These are not cheap trade chips. Nobody else's lineup improves from them
+    either, which is why offering them as a sweetener buys precisely nothing.
+    """
+    out = [{"player": p, "cost": cost_to_lose(roster, p, shape, key),
+            "proj": round(p.get(key) or 0.0, 1)}
+           for p in roster]
+    return sorted((r for r in out if r["cost"] <= 0.0), key=lambda r: -r["proj"])
+
+
+def tradeable(roster: list[dict], others: dict, shape: dict,
+              key: str = "weekly") -> list[dict]:
+    """Rank my roster by demand against cost.
+
+    `others` is {owner -> roster}. `buyers` counts how many rival lineups
+    actually improve; a player nobody's lineup wants has no market whatever
+    his projection says.
+    """
+    rows = []
+    for p in roster:
+        cost = cost_to_lose(roster, p, shape, key)
+        gains = [(gain_to_add(r, p, shape, key), who) for who, r in others.items()]
+        best = max(gains) if gains else (0.0, None)
+        rows.append({
+            "player": p, "proj": round(p.get(key) or 0.0, 1), "cost": cost,
+            "buyers": sum(1 for g, _ in gains if g > 0),
+            "best_gain": best[0], "best_buyer": best[1],
+            "ratio": round(best[0] / cost, 2) if cost > 0 else None,
+        })
+    return sorted(rows, key=lambda r: (-(r["ratio"] or 0), -r["best_gain"]))

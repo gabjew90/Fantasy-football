@@ -40,6 +40,23 @@ W_USAGE = 10.0 / SEASON_WEEKS
 W_NEED = 15.0 / SEASON_WEEKS
 
 
+def _regime(ctx) -> tuple[str, str | None]:
+    """This roster's FAAB regime from its live playoff odds.
+
+    Degrades to COMFORTABLE with a visible note rather than crashing the
+    brief: the simulation needs a season's matchups and cannot run in week 1
+    of a fresh league, and a missing regime must never cost you the brief.
+    """
+    try:
+        from draftkit.briefs import playoff_odds
+        odds, reg = playoff_odds(ctx)
+        ctx["_playoff_odds"] = odds
+        return reg, None
+    except Exception as e:  # noqa: BLE001
+        return "COMFORTABLE", (f"DATA MISSING: playoff odds ({e.__class__.__name__}) "
+                               f"— bids priced at COMFORTABLE")
+
+
 def trending(store, kind: str = "add") -> dict[str, int]:
     """sleeper_id -> count over 24h; cached one hour."""
     key = f"trending:{kind}"
@@ -264,6 +281,21 @@ def build(ctx, store) -> str:
     if ir_lines:
         lines += ["## IR moves"] + [f"- {a}" for a in ir_lines] + [""]
 
+    # REGIME IS COMPUTED, NOT ASSUMED (fixed 2026-09-07). This was the literal
+    # "COMFORTABLE" for every league in every week, so every per-dollar number
+    # below was regime-blind: a LONGSHOT roster that should be bidding
+    # aggressively and a SAFE one that should be hoarding got the same band.
+    regime, reg_note = _regime(ctx)
+    if reg_note:
+        lines.append(f"⚠ {reg_note}")
+    else:
+        # SHOW THE REGIME. It sets every bid band below, so a brief that
+        # prices bids without naming the regime cannot be audited.
+        odds = ctx.get("_playoff_odds")
+        lines.append(f"_bids priced at **{regime}**"
+                     + (f" (playoff odds {odds:.0%})_" if odds is not None else "_"))
+    lines.append("")
+
     lines.append("## Top adds")
     if not scored:
         lines.append("- free agent pool is empty of ranked players")
@@ -275,7 +307,7 @@ def build(ctx, store) -> str:
             cls = DOWNGRADE[cls]
         needy = rival_needy_budgets(ctx, p["pos"])
         fair, agg = waivers.bid_band(
-            cls, ctx["my_budget"], "COMFORTABLE", faab_cfg,
+            cls, ctx["my_budget"], regime, faab_cfg,
             rival_max_budget=(needy[0] if cls == "league_winner" and needy else None),
             # ros_season BY NAME -- see draftkit/briefs.py:waiver_brief for
             # why the bid cap stays on the season scale while everything else
