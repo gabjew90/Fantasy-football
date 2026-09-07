@@ -13,6 +13,7 @@ import logging
 
 from draftkit.lineup import lineup_changes, optimal_lineup
 
+from . import consensus, provenance
 from .vegas import implied_totals, week_window
 
 log = logging.getLogger("manager")
@@ -127,6 +128,8 @@ def build(ctx, store) -> str:
     if v_note:
         lines.append(f"⚠ {v_note}")
     lines.append("")
+    con, con_notes = consensus.build(ctx, store)
+
     lines.append("## Start (optimal)")
     for p in sorted(optimal, key=lambda x: -(x.get("weekly") or 0)):
         v = f" · {p['vegas']}" if p.get("vegas") else ""
@@ -139,7 +142,44 @@ def build(ctx, store) -> str:
         lines += ["", "current Sleeper lineup already matches — no taps needed"]
     lines += ["", "## The decisions that matter"]
     lines += [f"- {l}" for l in flex_analysis(roster, optimal, mode, ctx["slots"], ctx["flex"])] or ["- none this week"]
+
+    # HOW FIRM IS THE GROUND. A swap worth less than the sources' own
+    # disagreement about the two players is noise wearing a decimal point,
+    # and the brief used to present it with the same confidence as a real
+    # edge. Flagged, never suppressed: the call is still yours.
+    if swaps:
+        shaky = []
+        by_name = {p["name"]: p for p in roster}
+        for c in swaps:
+            gain = 0.0
+            if "(+" in c:
+                try:
+                    gain = float(c.split("(+", 1)[1].split(" ", 1)[0])
+                except (IndexError, ValueError):
+                    gain = 0.0
+            named = [n for n in by_name if n in c]
+            rows = [con.get(str(by_name[n]["sleeper_id"])) for n in named]
+            worst = max((r.get("spread", 0.0) for r in rows if r), default=0.0)
+            if rows and any(rows) and not consensus.confident(
+                    {"n": 2, "spread": worst}, gain):
+                shaky.append(f"{c} — sources disagree by {worst:.0f} on these two, "
+                             f"which is more than the {gain:.1f} the swap gains")
+        if shaky:
+            lines += ["", "## Close enough to be a coin flip"]
+            lines += [f"- {t}" for t in shaky]
     if table:
         lines += ["", "## If inactive → start"]
         lines += [f"- {k} → {v}" for k, v in table.items()]
+
+    srcs = {}
+    for n in con_notes:
+        if n.startswith("consensus"):
+            srcs["consensus"] = n.split("consensus ", 1)[-1]
+        elif ":" in n:
+            k, v = n.split(":", 1)
+            v = v.strip()
+            srcs[k.strip()] = v[len(k) + 1:].strip() if v.startswith(k.strip()) else v
+    if v_note:
+        srcs["vegas"] = v_note
+    lines += ["", provenance.render(provenance.stamp(ctx, srcs))]
     return "\n".join(lines)

@@ -13,6 +13,7 @@ import time as _time
 from draftkit import seasondata, waivers
 from draftkit.sleeper import BASE, get_json
 
+from . import consensus, provenance
 from . import faab as faab_mod
 from . import usage as usage_mod
 from .context import rostered_ids
@@ -285,6 +286,12 @@ def build(ctx, store) -> str:
     # "COMFORTABLE" for every league in every week, so every per-dollar number
     # below was regime-blind: a LONGSHOT roster that should be bidding
     # aggressively and a SAFE one that should be hoarding got the same band.
+    # TRANSPARENCY (2026-09-07). Three things a reader could not previously do:
+    # see how firmly the sources agree on a number, see what was ranked and
+    # then rejected, and trace the brief back to the code and inputs that made
+    # it. None of these change a recommendation; they make one auditable.
+    con, con_notes = consensus.build(ctx, store)
+
     regime, reg_note = _regime(ctx)
     if reg_note:
         lines.append(f"⚠ {reg_note}")
@@ -342,7 +349,8 @@ def build(ctx, store) -> str:
             f"- why: {'; '.join(why)}{need_note}",
             # value_over_fa is negative for anyone who is not the best free
             # agent at his position, so the sign comes from the number
-            f"- worth over next-best FA {p['pos']}: {p.get('fa_value', 0):+.0f} ROS pts",
+            f"- worth over next-best FA {p['pos']}: {p.get('fa_value', 0):+.0f} ROS pts"
+            + consensus.annotate(con.get(pid)),
             f"- move: {_drop_or_ir(ctx, p.get('ros') or 0, p['pos'])}",
             f"- bid **${fair}–${agg}** of my ${ctx['my_budget']} — {rival_note}",
         ]
@@ -364,5 +372,30 @@ def build(ctx, store) -> str:
         if hot_drops:
             names = [ctx["player_row"](p)["name"] for p in hot_drops if ctx["player_row"](p)]
             lines.append(f"⚠ league-wide drop trend includes my players: {', '.join(names)} — check news before assuming they're fine.")
+    # RANKS BEYOND THE CUT. These were computed and then silently dropped, so
+    # the brief could not be second-guessed: you saw five names with no way to
+    # know what came sixth, or by how much it missed.
+    rest = scored[TOP_N:TOP_N + 5]
+    if rest and len(scored) > TOP_N:
+        lines += ["", "## Also ranked (not recommended)"]
+        for score, p, _ev, pid in rest:
+            gap = scored[TOP_N - 1][0] - score
+            lines.append(
+                f"- {p['name']} ({p['pos']}, {p.get('team') or '?'}) — "
+                f"{p.get('fa_value', 0):+.0f} ROS pts over next-best FA, "
+                f"{gap:.0f} behind the last recommendation"
+                + consensus.annotate(con.get(pid)))
+        lines.append("")
+
     lines.append("**Bids in by 7:00 PM PT tonight.**")
+
+    srcs = {}
+    for n in con_notes:
+        if n.startswith("consensus"):
+            srcs["consensus"] = n.split("consensus ", 1)[-1]
+        elif ":" in n:
+            k, v = n.split(":", 1)
+            v = v.strip()
+            srcs[k.strip()] = v[len(k) + 1:].strip() if v.startswith(k.strip()) else v
+    lines += ["", provenance.render(provenance.stamp(ctx, srcs))]
     return "\n".join(lines)

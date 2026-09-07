@@ -50,10 +50,17 @@ def file_hash(path) -> str | None:
     return hashlib.sha256(p.read_bytes()).hexdigest()[:12]
 
 
+def league_name(ctx) -> str | None:
+    """The Cfg is an OBJECT, not a dict: the league name is an attribute and
+    cfg.get("...") silently returns None for it."""
+    cfg = ctx.get("cfg")
+    return getattr(cfg, "league_name", None) or ctx.get("league_name")
+
+
 def config_hash(ctx) -> str | None:
     """Hash of the league file actually in force, so a settings edit is
     visible in the brief that first ran under it."""
-    name = (ctx.get("cfg") or {}).get("_league_name") or ctx.get("league_name")
+    name = league_name(ctx)
     if not name:
         return None
     return file_hash(Path("leagues") / f"{name}.yaml")
@@ -66,7 +73,7 @@ def stamp(ctx, sources: dict | None = None) -> dict:
         "commit": sha,
         "dirty": dirty,
         "config_hash": config_hash(ctx),
-        "league": (ctx.get("cfg") or {}).get("_league_name") or ctx.get("league_name"),
+        "league": league_name(ctx),
         "week": ctx.get("week"),
         "generated_at": datetime.now(tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "sources": dict(sources or {}),
