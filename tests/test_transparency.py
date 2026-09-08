@@ -247,3 +247,86 @@ def test_an_already_correct_number_is_not_touched():
     con = {"1": {"mean": 200.0, "n": 3, "spread": 4.0, "per_source": {}}}
     n, _ = consensus.apply(_ctx(rows), con)
     assert n == 0 and rows[0]["weekly"] == 12.0
+
+
+# -------------------------------------------------------------- source ageing
+
+def test_live_sources_never_decay():
+    for w in (1, 5, 12, 18):
+        assert consensus.source_weight("sleeper", w) == 1.0
+        assert consensus.source_weight("espn", w) == 1.0
+
+
+def test_the_preseason_sheet_decays_to_zero():
+    """It is a draft workbook. Nothing regenerates it once the season starts,
+    so equal weight in November means arguing for August."""
+    assert consensus.source_weight("sheet", 1) == 1.0
+    assert consensus.source_weight("sheet", 5) == 0.5
+    assert consensus.source_weight("sheet", 9) == 0.0
+    assert consensus.source_weight("sheet", 15) == 0.0
+
+
+def test_the_mean_is_weighted_and_the_static_source_fades(monkeypatch):
+    """Player 30 is where the sheet actually disagrees. Everyone else matches,
+    so the medians line up and no rescale hides the difference -- a UNIFORM
+    offset would be a scale difference and would be removed by design."""
+    live = {str(i): 100.0 for i in range(60)}
+    stale = dict(live, **{"30": 200.0})
+    monkeypatch.setattr(consensus, "_sleeper", lambda s, y: (live, None))
+    monkeypatch.setattr(consensus, "_espn", lambda s, y, r, i: (live, None))
+    monkeypatch.setattr(consensus, "_sheet", lambda c: (stale, None))
+
+    def at(week):
+        ctx = {"cfg": Cfg(league_name="x"), "state": {"season": "2026"},
+               "players": {}, "week": week}
+        return consensus.build(ctx)[0]["30"]["mean"]
+
+    wk1, wk5, wk9 = at(1), at(5), at(9)
+    assert wk1 > wk5 > wk9, (wk1, wk5, wk9)
+    assert wk9 == 100.0, "an aged-out source still moved the mean"
+
+
+def test_ageing_out_is_announced(monkeypatch):
+    live = {str(i): 100.0 for i in range(60)}
+    monkeypatch.setattr(consensus, "_sleeper", lambda s, y: (live, None))
+    monkeypatch.setattr(consensus, "_espn", lambda s, y, r, i: ({}, None))
+    monkeypatch.setattr(consensus, "_sheet", lambda c: ({str(i): 200.0 for i in range(60)}, None))
+    ctx = {"cfg": Cfg(league_name="x"), "state": {"season": "2026"},
+           "players": {}, "week": 12}
+    _, notes = consensus.build(ctx)
+    assert any("aged out" in n and n.startswith("\u26a0") for n in notes)
+
+
+def test_a_down_weighted_source_is_announced(monkeypatch):
+    live = {str(i): 100.0 for i in range(60)}
+    monkeypatch.setattr(consensus, "_sleeper", lambda s, y: (live, None))
+    monkeypatch.setattr(consensus, "_espn", lambda s, y, r, i: ({}, None))
+    monkeypatch.setattr(consensus, "_sheet", lambda c: ({str(i): 200.0 for i in range(60)}, None))
+    ctx = {"cfg": Cfg(league_name="x"), "state": {"season": "2026"},
+           "players": {}, "week": 4}
+    _, notes = consensus.build(ctx)
+    assert any("down-weighted" in n for n in notes)
+
+
+def test_a_uniform_offset_is_a_scale_difference_and_is_removed(monkeypatch):
+    """ESPN 30% high on EVERY player is a different season model, not an
+    argument about anyone. Rescaling must flatten it to zero spread."""
+    monkeypatch.setattr(consensus, "_sleeper", lambda s, y: ({str(i): 100.0 for i in range(60)}, None))
+    monkeypatch.setattr(consensus, "_espn", lambda s, y, r, i: ({str(i): 130.0 for i in range(60)}, None))
+    monkeypatch.setattr(consensus, "_sheet", lambda c: ({}, None))
+    ctx = {"cfg": Cfg(league_name="x"), "state": {"season": "2026"},
+           "players": {}, "week": 3}
+    assert consensus.build(ctx)[0]["30"]["spread"] == 0.0
+
+
+def test_a_real_player_level_disagreement_survives_rescaling(monkeypatch):
+    """One player the sources genuinely argue about, everyone else agreed."""
+    base = {str(i): 100.0 for i in range(60)}
+    monkeypatch.setattr(consensus, "_sleeper", lambda s, y: (base, None))
+    monkeypatch.setattr(consensus, "_espn", lambda s, y, r, i: (dict(base, **{"30": 160.0}), None))
+    monkeypatch.setattr(consensus, "_sheet", lambda c: ({}, None))
+    ctx = {"cfg": Cfg(league_name="x"), "state": {"season": "2026"},
+           "players": {}, "week": 3}
+    data = consensus.build(ctx)[0]
+    assert data["30"]["spread"] == 60.0, "a real disagreement was flattened"
+    assert data["31"]["spread"] == 0.0, "agreement was turned into noise"

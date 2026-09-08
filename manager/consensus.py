@@ -34,6 +34,29 @@ TTL = 12 * 3600
 MIN_COMMON = 40          # below this the rescale is noise, so report unscaled
 FLOOR = 40.0             # players too small to inform the median
 
+# NOT EVERY SOURCE AGES THE SAME WAY.
+#
+# Sleeper and ESPN republish their season projections through the year, so
+# they carry this week's information. The FantasyPros workbook is a PRESEASON
+# DRAFT SHEET: nothing regenerates it once the season starts, and this module
+# is its only consumer. Left at equal weight it would still be arguing for
+# August by November, on a player whose role changed in September.
+#
+# So a static source decays: full weight in week 1, zero by DECAY_WEEKS. The
+# preseason view is genuinely worth something early, when it encodes an
+# offseason of work and there are no games to argue with it, and worth
+# progressively less as real ones accumulate. Weights are printed, never
+# implicit.
+LIVE_SOURCES = ("sleeper", "espn")
+DECAY_WEEKS = 8
+
+
+def source_weight(label: str, week: int, decay_weeks: int = DECAY_WEEKS) -> float:
+    if label in LIVE_SOURCES:
+        return 1.0
+    played = max(0, int(week or 1) - 1)
+    return round(max(0.0, 1.0 - played / float(decay_weeks or 1)), 3)
+
 
 def _scoring(cfg) -> dict:
     return dict(cfg.get("scoring") or (cfg.get("expected") or {}).get("scoring") or {})
@@ -153,18 +176,38 @@ def build(ctx, store=None) -> tuple[dict[str, dict], list[str]]:
     elif len(src) > 1:
         notes.append(f"sources not rescaled: only {len(common)} players in common")
 
+    decay_weeks = int((ctx.get("scfg") or {}).get("consensus_decay_weeks", DECAY_WEEKS))
+    week = int(ctx.get("week") or 1)
+    weight = {k: source_weight(k, week, decay_weeks) for k in src}
+    live = {k: w for k, w in weight.items() if w > 0}
+    if not live:
+        return {}, notes + ["DATA MISSING: every projection source has aged out"]
+
     out: dict[str, dict] = {}
     for pid in set().union(*(s.keys() for s in src.values())):
         per = {k: round(s[pid] * scale[k], 1) for k, s in src.items()
-               if pid in s and s[pid] > 0}
+               if pid in s and s[pid] > 0 and weight[k] > 0}
         if not per:
             continue
+        wsum = sum(weight[k] for k in per)
+        mean = sum(v * weight[k] for k, v in per.items()) / wsum
         vals = list(per.values())
-        out[pid] = {"mean": round(sum(vals) / len(vals), 1), "n": len(vals),
-                    "spread": round(max(vals) - min(vals), 1), "per_source": per}
+        out[pid] = {"mean": round(mean, 1), "n": len(vals),
+                    "spread": round(max(vals) - min(vals), 1), "per_source": per,
+                    "weights": {k: weight[k] for k in per}}
 
-    notes.append(f"consensus over {len(src)} sources ({', '.join(sorted(src))}), "
+    wtxt = ", ".join(f"{k} x{weight[k]:g}" for k in sorted(src))
+    notes.append(f"consensus over {len(live)} live sources ({wtxt}), "
                  f"{len(out)} players, rescaled on {len(common)} in common")
+    aged = [k for k, w in weight.items() if 0 < w < 1.0]
+    if aged:
+        notes.append(f"⚠ preseason source(s) {', '.join(aged)} down-weighted to "
+                     f"{', '.join(f'{weight[k]:g}' for k in aged)} — static file, "
+                     f"reaches zero at week {decay_weeks + 1}")
+    dead = [k for k, w in weight.items() if w == 0]
+    if dead:
+        notes.append(f"⚠ {', '.join(dead)} aged out of the consensus (preseason "
+                     f"file, week {week})")
     if store is not None:
         store.set(ckey, {"ts": _time.time(), "data": out, "notes": notes})
     return out, notes
