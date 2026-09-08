@@ -330,3 +330,44 @@ def test_a_real_player_level_disagreement_survives_rescaling(monkeypatch):
     data = consensus.build(ctx)[0]
     assert data["30"]["spread"] == 60.0, "a real disagreement was flattened"
     assert data["31"]["spread"] == 0.0, "agreement was turned into noise"
+
+
+# ------------------------------------------- shelved players at stale prices
+
+def test_a_shelved_player_with_no_live_source_is_dropped_from_the_pool():
+    """Ricky Pearsall, PCL surgery, out for 2026, still carried his August
+    148.7 on the board and ranked as the best free agent WR in Omnibeta.
+    Every live source had caught it -- Sleeper 0.0, ESPN and the sheet absent
+    -- but consensus cannot correct a player it has no row for."""
+    from manager import waiver_brief as wb
+    pl = {"active": True, "injury_status": "IR", "full_name": "Shelved Star"}
+    assert wb._stale_reserve(pl, {}, "1") is True
+    assert wb._stale_reserve(pl, {"1": {"n": 2}}, "1") is False, \
+        "a source still carries him, so trust it"
+
+
+def test_a_healthy_player_is_never_dropped_for_this_reason():
+    from manager import waiver_brief as wb
+    for status in ("", None, "Questionable", "Doubtful"):
+        assert wb._stale_reserve({"injury_status": status}, {}, "1") is False
+
+
+def test_every_reserve_designation_is_covered():
+    from manager import waiver_brief as wb
+    for st in ("IR", "IR-R", "PUP", "PUP-R", "NFI", "NFI-R", "DNR", "Sus", "Inactive"):
+        assert wb._stale_reserve({"injury_status": st}, {}, "1") is True, st
+
+
+def test_the_pool_excludes_him_and_records_why():
+    from manager import waiver_brief as wb
+    rows = {"1": {"name": "Shelved Star", "pos": "WR", "weekly": 0.0, "ros": 148.7,
+                  "ros_season": 148.7, "sleeper_id": "1"},
+            "2": {"name": "Healthy Guy", "pos": "WR", "weekly": 9.0, "ros": 120.0,
+                  "ros_season": 120.0, "sleeper_id": "2"}}
+    ctx = {"players": {"1": {"active": True, "injury_status": "IR"},
+                       "2": {"active": True, "injury_status": None}},
+           "rosters": [], "player_row": rows.get, "trow": {}}
+    pool = wb._fa_pool(ctx, con={})
+    names = {p["name"] for p in pool}
+    assert names == {"Healthy Guy"}, names
+    assert "Shelved Star (IR)" in ctx["_stale_reserve_dropped"]

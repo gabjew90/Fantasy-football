@@ -110,14 +110,38 @@ def rival_needy_budgets(ctx, pos: str) -> list[int]:
     return sorted(out, reverse=True)
 
 
-def _fa_pool(ctx) -> list[dict]:
+# A player on season-ending IR still carries his PRESEASON number on the board,
+# because the board was built in August and nothing rebuilds it. Ricky Pearsall
+# (PCL surgery, out for 2026) sat at 148.7 and ranked as the best free agent
+# receiver in Omnibeta on 2026-09-08. Every LIVE source had already caught it --
+# Sleeper projected him 0.0, ESPN and the sheet dropped him entirely -- but the
+# consensus could not correct a player it has no row for, so the stale number
+# sailed through. A shelved player at his August price is the most dangerous
+# kind of wrong: it looks like the best add on the board.
+RESERVE_STATUS = ("IR", "IR-R", "PUP", "PUP-R", "NFI", "NFI-R", "DNR", "Sus", "Inactive")
+
+
+def _stale_reserve(pl: dict, con: dict, pid: str) -> bool:
+    """On a reserve list AND no live source still carries him."""
+    if (pl.get("injury_status") or "") not in RESERVE_STATUS:
+        return False
+    return (con.get(pid) or {}).get("n", 0) < 1
+
+
+def _fa_pool(ctx, con: dict | None = None) -> list[dict]:
     """Full Sleeper dump, not just the draft board — deep contingency stashes
     (a PUP starter's backup) are exactly the players tiers.csv never ranked."""
     taken = rostered_ids(ctx)
-    pool = []
+    con = con or {}
+    pool, dropped = [], []
     for pid, pl in ctx["players"].items():
         pid = str(pid)
         if pid in taken or not isinstance(pl, dict) or not pl.get("active"):
+            continue
+        if _stale_reserve(pl, con, pid):
+            row = ctx["player_row"](pid)
+            if row and (row.get("ros") or 0) > 60:
+                dropped.append(f"{row['name']} ({pl.get('injury_status')})")
             continue
         row = ctx["player_row"](pid)
         if row and (row.get("weekly", 0) > 0 or (row.get("ros") or 0) > 60):
@@ -126,6 +150,10 @@ def _fa_pool(ctx) -> list[dict]:
             t = ctx["trow"].get(pid) or {}
             row["vorp"] = float(t.get("vorp") or 0.0)
             pool.append(row)
+    if dropped:
+        log.info("fa pool: excluded %d shelved players carrying stale board "
+                 "values: %s", len(dropped), ", ".join(sorted(dropped)[:6]))
+        ctx["_stale_reserve_dropped"] = sorted(dropped)
     pool.sort(key=lambda p: -(p.get("ros") or 0.0))
     return pool[:300]
 
@@ -230,7 +258,18 @@ def _classify(c: dict, contingent: bool) -> str:
 def build(ctx, store) -> str:
     week = ctx["week"]
     notes: list[str] = list(ctx.get("stale") or [])
-    fa = _fa_pool(ctx)
+
+    # CONSENSUS FIRST. It re-bases every projection AND tells _fa_pool which
+    # shelved players are carrying a stale August number, so it has to run
+    # before the pool is built rather than after it is ranked.
+    con, con_notes = consensus.build(ctx, store)
+    if con and (ctx.get("scfg") or {}).get("consensus_projections", True):
+        _n, _notes = consensus.apply(ctx, con)
+        con_notes += _notes
+    # A warning filed into a collapsed footer is a warning that is gone.
+    con_warnings = [n for n in con_notes if n.startswith("⚠")]
+
+    fa = _fa_pool(ctx, con)
     trend = trending(store, "add")
     drops_trend = trending(store, "drop")
 
@@ -288,17 +327,6 @@ def build(ctx, store) -> str:
     # "COMFORTABLE" for every league in every week, so every per-dollar number
     # below was regime-blind: a LONGSHOT roster that should be bidding
     # aggressively and a SAFE one that should be hoarding got the same band.
-    # TRANSPARENCY (2026-09-07). Three things a reader could not previously do:
-    # see how firmly the sources agree on a number, see what was ranked and
-    # then rejected, and trace the brief back to the code and inputs that made
-    # it. None of these change a recommendation; they make one auditable.
-    con, con_notes = consensus.build(ctx, store)
-    if con and (ctx.get("scfg") or {}).get("consensus_projections", True):
-        _n, _notes = consensus.apply(ctx, con)
-        con_notes += _notes
-    # A warning filed into a collapsed footer is a warning that is gone.
-    con_warnings = [n for n in con_notes if n.startswith("⚠")]
-
     regime, reg_note = _regime(ctx)
     if reg_note:
         lines.append(f"⚠ {reg_note}")
