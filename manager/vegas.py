@@ -29,6 +29,19 @@ URL = ("https://api.the-odds-api.com/v4/sports/americanfootball_nfl/odds"
 TTL = 6 * 3600
 ISO = "%Y-%m-%dT%H:%M:%SZ"
 
+# TWO CODE STYLES, ONE LOOKUP (fixed 2026-09-08).
+#
+# NAMES below emits DRAFTKIT codes (GBP, NOS, SFO...). Roster rows carry
+# SLEEPER codes (GB, NO, SF...). Consumers do totals.get(player["team"]), so
+# for these eight teams the lookup silently missed and a quarter of the league
+# never received a Vegas tilt -- no error, no note, just no adjustment. Deebo
+# Samuel sat on a 26.5 implied total and got nothing.
+#
+# The returned dict carries BOTH spellings for the same number, so a caller
+# cannot be wrong about which convention it holds.
+ALIASES = {"GBP": "GB", "JAC": "JAX", "KCC": "KC", "LVR": "LV",
+           "NEP": "NE", "NOS": "NO", "SFO": "SF", "TBB": "TB"}
+
 # Odds API full names -> draftkit team codes
 NAMES = {
     "Arizona Cardinals": "ARI", "Atlanta Falcons": "ATL", "Baltimore Ravens": "BAL",
@@ -68,6 +81,17 @@ def _in_window(commence: str, lo: datetime, hi: datetime) -> bool:
     return lo <= t <= hi
 
 
+def with_aliases(totals: dict[str, float]) -> dict[str, float]:
+    """Same numbers under both code styles, so no consumer can miss."""
+    out = dict(totals)
+    for canon, alias in ALIASES.items():
+        if canon in totals:
+            out[alias] = totals[canon]
+        elif alias in totals:
+            out[canon] = totals[alias]
+    return out
+
+
 def snapshot_path(season, week) -> Path:
     return Path("state") / "vegas" / f"{season}-wk{int(week):02d}.json"
 
@@ -91,8 +115,9 @@ def read_snapshot(season, week) -> tuple[dict[str, float], str | None]:
     if not data:
         return {}, None
     age_h = (_time.time() - float(blob.get("ts") or 0)) / 3600.0
-    return data, (f"Vegas lines from the committed snapshot, "
-                  f"{age_h:.0f}h old (refreshed {blob.get('refreshed_at', '?')})")
+    return with_aliases(data), (
+        f"Vegas lines from the committed snapshot, "
+        f"{age_h:.0f}h old (refreshed {blob.get('refreshed_at', '?')})")
 
 
 def write_snapshot(season, week, totals: dict[str, float]) -> Path:
@@ -131,14 +156,15 @@ def implied_totals(store, window=None, season=None, week=None
         ckey = f"vegas:{lo.strftime(ISO)}:{hi.strftime(ISO)}"
     cached = store.get(ckey)
     if cached and _time.time() - cached.get("ts", 0) < TTL:
-        return cached["data"], None
+        return with_aliases(cached["data"]), None
     try:
         resp = requests.get(url, timeout=20)
         resp.raise_for_status()
         events = resp.json()
     except Exception as e:  # noqa: BLE001
         if cached:
-            return cached["data"], "DATA MISSING: Vegas refresh failed — using cached lines"
+            return (with_aliases(cached["data"]),
+                    "DATA MISSING: Vegas refresh failed — using cached lines")
         return {}, f"DATA MISSING: Vegas lines ({e.__class__.__name__})"
 
     out: dict[str, float] = {}
@@ -162,4 +188,4 @@ def implied_totals(store, window=None, season=None, week=None
             out[home] = round(total / 2 - spread_home / 2, 1)
             out[away] = round(total / 2 + spread_home / 2, 1)
     store.set(ckey, {"ts": _time.time(), "data": out})
-    return out, None
+    return with_aliases(out), None

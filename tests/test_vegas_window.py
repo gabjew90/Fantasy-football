@@ -158,3 +158,30 @@ def test_a_live_key_ignores_the_snapshot(monkeypatch, tmp_path):
     lo, hi = WEEK1 - timedelta(hours=1), WEEK1 + timedelta(hours=6)
     out, _ = vegas.implied_totals(FakeStore(), window=(lo, hi), season="2026", week=1)
     assert out["BUF"] == 27.0, "snapshot shadowed a live fetch"
+
+
+def test_both_team_code_styles_resolve(monkeypatch, tmp_path):
+    """Roster rows carry Sleeper codes (SF, NO, GB); NAMES emits draftkit
+    codes (SFO, NOS, GBP). For eight teams the lookup silently missed and a
+    quarter of the league never got a Vegas tilt."""
+    monkeypatch.delenv("ODDS_API_KEY", raising=False)
+    monkeypatch.chdir(tmp_path)
+    vegas.write_snapshot("2026", 1, {"SFO": 26.5, "NOS": 21.2, "PIT": 23.0})
+    out, _ = vegas.implied_totals(FakeStore(), season="2026", week=1)
+    for canon, alias in (("SFO", "SF"), ("NOS", "NO")):
+        assert out[canon] == out[alias], f"{alias} cannot find {canon}"
+    assert out["PIT"] == 23.0, "an unaliased team was disturbed"
+
+
+def test_every_mismatched_team_is_covered():
+    sleeper_only = {"GB", "JAX", "KC", "LV", "NE", "NO", "SF", "TB"}
+    assert set(vegas.ALIASES.values()) == sleeper_only
+    assert set(vegas.ALIASES) <= set(vegas.NAMES.values())
+
+
+def test_aliasing_a_live_fetch_too(monkeypatch):
+    seen = []
+    _patch_feed(monkeypatch, seen)
+    lo, hi = WEEK1 - timedelta(hours=1), WEEK1 + timedelta(hours=6)
+    out, _ = vegas.implied_totals(FakeStore(), window=(lo, hi))
+    assert out["BUF"] == 27.0 and out["HOU"] == 21.0
