@@ -13,7 +13,7 @@ import time as _time
 from draftkit import seasondata, waivers
 from draftkit.sleeper import BASE, get_json
 
-from . import consensus, provenance
+from . import consensus, ecr as ecr_mod, provenance
 from . import faab as faab_mod
 from . import usage as usage_mod
 from .context import rostered_ids
@@ -269,6 +269,7 @@ def build(ctx, store) -> str:
     # A warning filed into a collapsed footer is a warning that is gone.
     con_warnings = [n for n in con_notes if n.startswith("⚠")]
 
+    panel, panel_note = ecr_mod.by_sleeper_id(ctx, store)
     fa = _fa_pool(ctx, con)
     trend = trending(store, "add")
     drops_trend = trending(store, "drop")
@@ -389,6 +390,12 @@ def build(ctx, store) -> str:
             f"- move: {_drop_or_ir(ctx, p.get('ros') or 0, p['pos'])}",
             f"- bid **${fair}–${agg}** of my ${ctx['my_budget']} — {rival_note}",
         ]
+        # CEILING, NOT JUST THE MEAN. A bench player only ever enters the
+        # lineup when he breaks out, so his median barely matters and the
+        # panel's most optimistic rank is the whole question.
+        pan = ecr_mod.annotate(panel.get(pid))
+        if pan:
+            lines.append("- ceiling:" + pan[2:])
         if contingent:
             lines.append(f"- insurance behind a downed starter: bid the "
                          f"AGGRESSIVE end (${agg})")
@@ -419,7 +426,54 @@ def build(ctx, store) -> str:
                 f"- {p['name']} ({p['pos']}, {p.get('team') or '?'}) — "
                 f"{p.get('fa_value', 0):+.0f} ROS pts over next-best FA, "
                 f"{gap:.0f} behind the last recommendation"
-                + consensus.annotate(con.get(pid)))
+                + consensus.annotate(con.get(pid))
+                + ecr_mod.annotate(panel.get(pid)))
+        lines.append("")
+
+    # THE UPSIDE BOARD. Everything above ranks on rest-of-season mean, which
+    # is right for a player who will start and wrong for one who will sit. A
+    # bench player only enters the lineup when he breaks out, so his median
+    # barely matters and the panel's most optimistic rank is the question.
+    #
+    # RANKS ONLY COMPARE WITHIN A POSITION. The first cut sorted every free
+    # agent by raw best-rank and produced a board of five kickers, because K3
+    # is a smaller number than WR46. Grouped by position, and each candidate
+    # is measured against the weakest player I would actually drop at that
+    # same position -- which is the comparison that decides a roster spot.
+    STASH_POS = ("RB", "WR", "TE")
+    bench_ids = {str(q["sleeper_id"]) for q in ctx["roster_players"][ctx["my_rid"]]}         - set(ctx["current_starters"])
+    worst_at = {}
+    for q in ctx["roster_players"][ctx["my_rid"]]:
+        qid = str(q["sleeper_id"])
+        rec = panel.get(qid)
+        if qid not in bench_ids or q["pos"] not in STASH_POS or not rec:
+            continue
+        cur = worst_at.get(q["pos"])
+        if cur is None or rec["best"] > cur[0]["best"]:      # ranks: higher = worse
+            worst_at[q["pos"]] = (rec, q["name"])
+    board = []
+    for pos in STASH_POS:
+        cands = [(panel[str(q["sleeper_id"])], q) for q in fa[:120]
+                 if q["pos"] == pos and str(q["sleeper_id"]) in panel]
+        if not cands:
+            continue
+        held = worst_at.get(pos)
+        for rec, q in sorted(cands, key=lambda t: t[0]["best"])[:3]:
+            board.append((pos, rec, q, held, ecr_mod.ceiling_beats(rec, held[0] if held else None)))
+    if board:
+        lines += ["", "## Upside board (ranked by ceiling, not by mean)"]
+        for pos in STASH_POS:
+            rows_p = [b for b in board if b[0] == pos]
+            if not rows_p:
+                continue
+            held = rows_p[0][3]
+            hdr = (f"weakest {pos} you would drop is {held[1]}, best case "
+                   f"{pos}{held[0]['best']:.0f}") if held else                   f"no benched {pos} with a panel rank to compare against"
+            lines.append(f"_{hdr}_")
+            for _pos, rec, q, _h, beats in rows_p:
+                mark = " ← **higher ceiling than what you hold**" if beats else ""
+                lines.append(f"- {q['name']} ({pos}) best case {pos}{rec['best']:.0f}, "
+                             f"median {pos}{rec['ecr']:.0f}{mark}")
         lines.append("")
 
     lines.append("**Bids in by 7:00 PM PT tonight.**")
@@ -432,5 +486,7 @@ def build(ctx, store) -> str:
             k, v = n.split(":", 1)
             v = v.strip()
             srcs[k.strip()] = v[len(k) + 1:].strip() if v.startswith(k.strip()) else v
+    if panel_note:
+        srcs["experts"] = panel_note
     lines += ["", provenance.render(provenance.stamp(ctx, srcs))]
     return "\n".join(lines)
