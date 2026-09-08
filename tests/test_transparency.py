@@ -168,3 +168,82 @@ def test_file_hash_is_none_for_an_absent_file(tmp_path):
     p = tmp_path / "yes.yaml"
     p.write_text("a: 1", encoding="utf-8")
     assert len(provenance.file_hash(p)) == 12
+
+
+# --------------------------------------------------------------------- apply
+
+def _row(pid, season, weekly, name="p"):
+    return {"sleeper_id": pid, "name": name, "pos": "RB",
+            "ros_season": season, "ros": season, "weekly": weekly}
+
+
+def _ctx(rows, player_row=None):
+    return {"cfg": Cfg(league_name="x"), "state": {"season": "2026"},
+            "players": {}, "roster_players": {1: rows},
+            "player_row": player_row or (lambda pid: None)}
+
+
+def test_apply_rescales_level_and_keeps_weekly_shape():
+    """The sources give SEASON totals; the weekly number carries the opponent
+    and the bye. Consensus sets the level, the existing weekly keeps shape."""
+    rows = [_row("1", 200.0, 12.0)]
+    con = {"1": {"mean": 240.0, "n": 3, "spread": 10.0, "per_source": {}}}
+    n, _ = consensus.apply(_ctx(rows), con)
+    assert n == 1
+    assert rows[0]["ros_season"] == 240.0
+    assert rows[0]["weekly"] == 14.4          # 12 * 1.2, shape preserved
+
+
+def test_a_single_source_is_not_a_consensus_and_is_left_alone():
+    rows = [_row("1", 200.0, 12.0)]
+    con = {"1": {"mean": 400.0, "n": 1, "spread": 0.0, "per_source": {}}}
+    n, _ = consensus.apply(_ctx(rows), con)
+    assert n == 0 and rows[0]["ros_season"] == 200.0
+
+
+def test_a_wild_ratio_is_clamped_and_counted(capsys):
+    rows = [_row("1", 50.0, 3.0)]
+    con = {"1": {"mean": 500.0, "n": 3, "spread": 5.0, "per_source": {}}}
+    n, notes = consensus.apply(_ctx(rows), con)
+    assert rows[0]["ros_season"] == 80.0       # 50 * 1.60, not 500
+    assert any(x.startswith("\u26a0") and "clamped" in x for x in notes)
+
+
+def test_a_missing_board_number_has_no_ratio_and_is_skipped():
+    rows = [_row("1", 0.0, 0.0)]
+    con = {"1": {"mean": 240.0, "n": 3, "spread": 1.0, "per_source": {}}}
+    n, _ = consensus.apply(_ctx(rows), con)
+    assert n == 0
+
+
+def test_the_free_agent_pool_is_rebased_on_the_same_basis():
+    """A consensus roster judged against a single-source wire is worse than
+    using neither, so player_row is wrapped too."""
+    fa = _row("9", 100.0, 6.0, name="fa")
+    ctx = _ctx([], player_row=lambda pid: fa if pid == "9" else None)
+    con = {"9": {"mean": 150.0, "n": 3, "spread": 2.0, "per_source": {}}}
+    consensus.apply(ctx, con)
+    got = ctx["player_row"]("9")
+    assert got["ros_season"] == 150.0 and got["weekly"] == 9.0
+
+
+def test_wrapping_player_row_is_idempotent():
+    calls = []
+
+    def orig(pid):
+        calls.append(pid)
+        return _row(pid, 100.0, 6.0)
+
+    ctx = _ctx([], player_row=orig)
+    con = {"9": {"mean": 150.0, "n": 3, "spread": 2.0, "per_source": {}}}
+    consensus.apply(ctx, con)
+    consensus.apply(ctx, con)          # a second module calling it must not double-wrap
+    ctx["player_row"]("9")
+    assert len(calls) == 1, "player_row wrapped twice — projections applied twice"
+
+
+def test_an_already_correct_number_is_not_touched():
+    rows = [_row("1", 200.0, 12.0)]
+    con = {"1": {"mean": 200.0, "n": 3, "spread": 4.0, "per_source": {}}}
+    n, _ = consensus.apply(_ctx(rows), con)
+    assert n == 0 and rows[0]["weekly"] == 12.0

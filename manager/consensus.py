@@ -170,6 +170,72 @@ def build(ctx, store=None) -> tuple[dict[str, dict], list[str]]:
     return out, notes
 
 
+DEFAULT_CLAMP = (0.60, 1.60)
+
+
+def apply(ctx, con: dict, *, min_sources: int = 2, clamp=DEFAULT_CLAMP
+          ) -> tuple[int, list[str]]:
+    """Re-base every projection on the consensus. Returns (n_changed, notes).
+
+    RATIO, NOT REPLACEMENT. The sources give SEASON totals; the manager also
+    needs a weekly number, and only Sleeper publishes one per week. That
+    weekly figure carries the opponent, the bye and the matchup multiplier,
+    which a season total cannot reconstruct. So the consensus sets the LEVEL
+    and the existing weekly keeps the SHAPE: every projection key is scaled by
+    consensus_mean / board_season.
+
+    Guards, because a bad name match must not silently move a lineup:
+      * a single source is not a consensus, so `min_sources` rows are skipped
+      * a zero or missing board number has no ratio and is skipped
+      * the ratio is clamped, and anything clamped is counted and reported
+
+    Applied to the rosters AND wrapped around ctx["player_row"], so the free
+    agent pool the waiver brief builds later is re-based on the same basis.
+    Comparing a consensus roster against a single-source wire would be worse
+    than using neither.
+    """
+    lo, hi = clamp
+    changed = clamped = 0
+
+    def _rescale(row: dict) -> dict:
+        nonlocal changed, clamped
+        if not isinstance(row, dict):
+            return row
+        r = con.get(str(row.get("sleeper_id") or ""))
+        base = row.get("ros_season") or 0.0
+        if not r or r.get("n", 0) < min_sources or not base:
+            return row
+        ratio = float(r["mean"]) / float(base)
+        if not lo <= ratio <= hi:
+            clamped += 1
+            ratio = min(hi, max(lo, ratio))
+        if abs(ratio - 1.0) < 1e-9:
+            return row
+        for k in ("weekly", "ros", "ros_season"):
+            if row.get(k):
+                row[k] = round(float(row[k]) * ratio, 2)
+        row["consensus"] = r
+        changed += 1
+        return row
+
+    for roster in (ctx.get("roster_players") or {}).values():
+        for row in roster:
+            _rescale(row)
+
+    original = ctx.get("player_row")
+    if callable(original) and not getattr(original, "_consensus_wrapped", False):
+        def wrapped(pid, _orig=original):
+            return _rescale(_orig(pid))
+        wrapped._consensus_wrapped = True          # idempotent across modules
+        ctx["player_row"] = wrapped
+
+    notes = [f"projections re-based on the consensus: {changed} players adjusted"]
+    if clamped:
+        notes.append(f"⚠ {clamped} consensus ratios clamped to "
+                     f"[{lo:.2f}, {hi:.2f}] — check for a bad name match")
+    return changed, notes
+
+
 def annotate(row: dict | None) -> str:
     """The inline suffix a brief shows next to a number.
 

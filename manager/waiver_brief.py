@@ -272,6 +272,8 @@ def build(ctx, store) -> str:
         lines.append("⚠ projections not yet published — values are season-baseline fallbacks")
     for n in notes:
         lines.append(f"⚠ {n}")
+    for n in con_warnings:
+        lines.append(n)
     lines.append("")
 
     # IR flags FIRST — a free roster spot changes every drop decision below
@@ -291,6 +293,11 @@ def build(ctx, store) -> str:
     # then rejected, and trace the brief back to the code and inputs that made
     # it. None of these change a recommendation; they make one auditable.
     con, con_notes = consensus.build(ctx, store)
+    if con and (ctx.get("scfg") or {}).get("consensus_projections", True):
+        _n, _notes = consensus.apply(ctx, con)
+        con_notes += _notes
+    # A warning filed into a collapsed footer is a warning that is gone.
+    con_warnings = [n for n in con_notes if n.startswith("⚠")]
 
     regime, reg_note = _regime(ctx)
     if reg_note:

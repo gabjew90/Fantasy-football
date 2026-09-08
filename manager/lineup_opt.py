@@ -100,6 +100,15 @@ def flex_analysis(roster: list[dict], optimal: list[dict], mode: str,
 
 def build(ctx, store) -> str:
     week = ctx["week"]
+    # Consensus BEFORE the optimiser: re-basing projections after the lineup
+    # is chosen would show numbers that did not pick it.
+    con, con_notes = consensus.build(ctx, store)
+    if con and (ctx.get("scfg") or {}).get("consensus_projections", True):
+        _n, _notes = consensus.apply(ctx, con)
+        con_notes += _notes
+    # A warning filed into a collapsed footer is a warning that is gone.
+    con_warnings = [n for n in con_notes if n.startswith("⚠")]
+
     totals, v_note = implied_totals(store, window=week_window(ctx),
                                     season=(ctx.get("state") or {}).get("season"),
                                     week=ctx["week"])
@@ -127,9 +136,9 @@ def build(ctx, store) -> str:
         lines.append("⚠ projections not yet published — season-baseline fallback values")
     if v_note:
         lines.append(f"⚠ {v_note}")
+    for n in con_warnings:
+        lines.append(n)
     lines.append("")
-    con, con_notes = consensus.build(ctx, store)
-
     lines.append("## Start (optimal)")
     for p in sorted(optimal, key=lambda x: -(x.get("weekly") or 0)):
         v = f" · {p['vegas']}" if p.get("vegas") else ""
