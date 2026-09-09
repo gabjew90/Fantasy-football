@@ -121,12 +121,16 @@ def _sheet(cfg) -> tuple[dict[str, float], str | None]:
         with p.open(encoding="utf-8") as fh:
             for row in csv.DictReader(fh):
                 sid = (row.get("sleeper_id") or "").strip()
+                # A BLANK CELL IS NOT A ZERO. Blank means the sheet never
+                # priced him; "0" means it priced him at nothing, which is
+                # real information about a player whose season ended.
+                raw = (row.get("proj_pts") or "").strip()
+                if not sid or not raw:
+                    continue
                 try:
-                    v = float(row.get("proj_pts") or 0.0)
+                    out[sid] = float(raw)
                 except ValueError:
                     continue
-                if sid and v:
-                    out[sid] = v
     except OSError as e:
         return {}, f"sheet unreadable ({e.__class__.__name__})"
     return out, f"sheet {_time.strftime('%Y-%m-%d', _time.localtime(p.stat().st_mtime))}"
@@ -184,11 +188,22 @@ def build(ctx, store=None) -> tuple[dict[str, dict], list[str]]:
         return {}, notes + ["DATA MISSING: every projection source has aged out"]
 
     out: dict[str, dict] = {}
+    contributed = {k: 0 for k in src}
     for pid in set().union(*(s.keys() for s in src.values())):
+        # A SOURCE THAT SAYS ZERO IS A SOURCE THAT SAID SOMETHING.
+        #
+        # This filter used to read `s[pid] > 0`, which threw away exactly the
+        # rows that matter most: when a season ends, every live shop zeroes
+        # the player, all three zeroes were discarded as "no coverage", `n`
+        # never reached min_sources, and the board kept its August number.
+        # That is the whole Pearsall defect, and _stale_reserve was a patch
+        # over this line.
         per = {k: round(s[pid] * scale[k], 1) for k, s in src.items()
-               if pid in s and s[pid] > 0 and weight[k] > 0}
+               if pid in s and weight[k] > 0}
         if not per:
             continue
+        for k in per:
+            contributed[k] += 1
         wsum = sum(weight[k] for k in per)
         mean = sum(v * weight[k] for k, v in per.items()) / wsum
         vals = list(per.values())
@@ -196,9 +211,22 @@ def build(ctx, store=None) -> tuple[dict[str, dict], list[str]]:
                     "spread": round(max(vals) - min(vals), 1), "per_source": per,
                     "weights": {k: weight[k] for k in per}}
 
+    # COUNT SOURCES THAT CONTRIBUTED, NOT SOURCES THAT ANSWERED THE PHONE. A
+    # stat-key rename upstream makes _score return 0.0 for every player; the
+    # source still lands in `src`, and the footer used to report it as live.
+    silent = [k for k, c in contributed.items() if c == 0 and weight[k] > 0]
+    if silent:
+        notes.append(f"⚠ {', '.join(silent)} returned rows but matched no player "
+                     f"— check its stat keys against the league scoring block")
+    real = [k for k in live if contributed[k]]
     wtxt = ", ".join(f"{k} x{weight[k]:g}" for k in sorted(src))
-    notes.append(f"consensus over {len(live)} live sources ({wtxt}), "
+    notes.append(f"consensus over {len(real)} live sources ({wtxt}), "
                  f"{len(out)} players, rescaled on {len(common)} in common")
+    if common and any(abs(v - 1.0) > 0.10 for v in scale.values()):
+        pts = sorted(statistics.median(s[p] for s in src.values()) for p in common)
+        notes.append(f"⚠ rescale fitted on {len(common)} players spanning "
+                     f"{pts[0]:.0f}–{pts[-1]:.0f} pts and extrapolated to the "
+                     f"whole pool — wire-level players sit below that range")
     aged = [k for k, w in weight.items() if 0 < w < 1.0]
     if aged:
         notes.append(f"⚠ preseason source(s) {', '.join(aged)} down-weighted to "
@@ -214,6 +242,12 @@ def build(ctx, store=None) -> tuple[dict[str, dict], list[str]]:
 
 
 DEFAULT_CLAMP = (0.60, 1.60)
+DEAD_EPS = 1.0           # a consensus this low is "he does not play again"
+
+# Positions the projection sources are actually asked about. Anything outside
+# this set has n=0 for reasons that say nothing about the player, so absence
+# from the consensus is not evidence about him.
+COVERED_POS = ("QB", "RB", "WR", "TE")
 
 
 def apply(ctx, con: dict, *, min_sources: int = 2, clamp=DEFAULT_CLAMP
@@ -238,15 +272,42 @@ def apply(ctx, con: dict, *, min_sources: int = 2, clamp=DEFAULT_CLAMP
     than using neither.
     """
     lo, hi = clamp
-    changed = clamped = 0
+    changed = clamped = zeroed = 0
 
     def _rescale(row: dict) -> dict:
-        nonlocal changed, clamped
+        nonlocal changed, clamped, zeroed
         if not isinstance(row, dict):
+            return row
+        # EXACTLY ONCE PER ROW.
+        #
+        # These rows are the shared ctx["roster_players"] dicts and this
+        # function mutates them in place, so a second apply() on the same ctx
+        # re-derives the ratio from the ALREADY-REBASED base. For an
+        # unclamped row that is self-cancelling (the new base equals the mean,
+        # so the ratio is 1). For a CLAMPED row it is not: base 100 against a
+        # consensus of 300 walked 160 -> 256 -> 300 over three calls and the
+        # clamp warning vanished on the third, because by then the ratio
+        # really was 1.0. waiver_brief and lineup_opt both call apply() on one
+        # ctx, so that third call is a normal run, not a pathological one.
+        if row.get("_consensus_applied"):
             return row
         r = con.get(str(row.get("sleeper_id") or ""))
         base = row.get("ros_season") or 0.0
-        if not r or r.get("n", 0) < min_sources or not base:
+        if not r or r.get("n", 0) < min_sources:
+            return row
+        # The sources agree he scores nothing. That is a fact about the
+        # player, not a missing number, and it must not be clamped up to 60%
+        # of a stale August projection.
+        if float(r["mean"]) <= DEAD_EPS:
+            if any(row.get(k) for k in ("weekly", "ros", "ros_season")):
+                for k in ("weekly", "ros", "ros_season"):
+                    row[k] = 0.0
+                row["consensus"] = r
+                row["_consensus_applied"] = True
+                changed += 1
+                zeroed += 1
+            return row
+        if not base:
             return row
         ratio = float(r["mean"]) / float(base)
         if not lo <= ratio <= hi:
@@ -258,6 +319,7 @@ def apply(ctx, con: dict, *, min_sources: int = 2, clamp=DEFAULT_CLAMP
             if row.get(k):
                 row[k] = round(float(row[k]) * ratio, 2)
         row["consensus"] = r
+        row["_consensus_applied"] = True
         changed += 1
         return row
 
@@ -273,6 +335,9 @@ def apply(ctx, con: dict, *, min_sources: int = 2, clamp=DEFAULT_CLAMP
         ctx["player_row"] = wrapped
 
     notes = [f"projections re-based on the consensus: {changed} players adjusted"]
+    if zeroed:
+        notes.append(f"{zeroed} players zeroed — every source has them at nothing "
+                     f"(season over, released or retired)")
     if clamped:
         notes.append(f"⚠ {clamped} consensus ratios clamped to "
                      f"[{lo:.2f}, {hi:.2f}] — check for a bad name match")

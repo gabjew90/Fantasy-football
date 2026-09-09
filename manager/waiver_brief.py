@@ -122,8 +122,17 @@ RESERVE_STATUS = ("IR", "IR-R", "PUP", "PUP-R", "NFI", "NFI-R", "DNR", "Sus", "I
 
 
 def _stale_reserve(pl: dict, con: dict, pid: str) -> bool:
-    """On a reserve list AND no live source still carries him."""
+    """On a reserve list AND no live source still carries him.
+
+    Only meaningful for positions the sources are asked about. Kickers and
+    defenses are absent from the consensus unconditionally -- the Sleeper
+    projections request names QB/RB/WR/TE and nothing else -- so reading
+    their n=0 as staleness deleted every reserve-status K and DEF from the
+    pool on evidence that was never collected.
+    """
     if (pl.get("injury_status") or "") not in RESERVE_STATUS:
+        return False
+    if (pl.get("position") or "") not in consensus.COVERED_POS:
         return False
     return (con.get(pid) or {}).get("n", 0) < 1
 
@@ -184,21 +193,33 @@ def _drop_or_ir(ctx, candidate_ros: float, pos: str | None = None) -> str:
     return "no clean drop — only claim if you value him over your worst bench spot"
 
 
-def fa_replacement_levels(pool: list[dict]) -> dict[str, tuple[float, float]]:
-    """pos -> (best FA ros, second-best FA ros). The live replacement level:
-    what a claim is worth is measured against what stays freely available
-    (v2 item 0.2) — self-calibrating RB scarcity, no hand-set baselines."""
-    tops: dict[str, list[float]] = {}
+def fa_replacement_levels(pool: list[dict]) -> dict[str, tuple[float, float, str]]:
+    """pos -> (best FA ros, second-best FA ros, id of the best). The live
+    replacement level: what a claim is worth is measured against what stays
+    freely available (v2 item 0.2) — self-calibrating RB scarcity, no
+    hand-set baselines.
+
+    The id is carried because the leader has to be identified BY IDENTITY.
+    Comparing on value alone meant an exact tie at the top counted both
+    players as the leader, and both then priced themselves against
+    second-best -- two names in the adds list each claiming a marginal value
+    that only exists once, when only one of them can be claimed into it.
+    """
+    tops: dict[str, list[tuple[float, str]]] = {}
     for p in pool:
-        tops.setdefault(p["pos"], []).append(p.get("ros") or 0.0)
-    return {pos: (vals[0], vals[1] if len(vals) > 1 else 0.0)
-            for pos, vals in ((k, sorted(v, reverse=True)) for k, v in tops.items())}
+        tops.setdefault(p["pos"], []).append(
+            (p.get("ros") or 0.0, str(p.get("sleeper_id") or "")))
+    out = {}
+    for pos, vals in tops.items():
+        vals.sort(key=lambda t: -t[0])
+        out[pos] = (vals[0][0], vals[1][0] if len(vals) > 1 else 0.0, vals[0][1])
+    return out
 
 
-def value_over_fa(p: dict, levels: dict[str, tuple[float, float]]) -> float:
+def value_over_fa(p: dict, levels: dict[str, tuple[float, float, str]]) -> float:
     """ROS value above the best OTHER free agent at the position."""
-    best, second = levels.get(p["pos"], (0.0, 0.0))
-    baseline = second if (p.get("ros") or 0.0) >= best else best
+    best, second, best_pid = levels.get(p["pos"], (0.0, 0.0, ""))
+    baseline = second if str(p.get("sleeper_id") or "") == best_pid else best
     return round((p.get("ros") or 0.0) - baseline, 1)
 
 
@@ -289,7 +310,7 @@ def build(ctx, store) -> str:
 
     levels = fa_replacement_levels(fa)
     store.set(f"fa_replacement:{week}",
-              {pos: round(best, 1) for pos, (best, _s) in levels.items()})
+              {pos: round(best, 1) for pos, (best, _s, _pid) in levels.items()})
 
     scored = []
     for p in fa:

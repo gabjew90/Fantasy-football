@@ -138,6 +138,21 @@ def tradeable(roster: list[dict], others: dict, shape: dict,
             "player": p, "proj": round(p.get(key) or 0.0, 1), "cost": cost,
             "buyers": sum(1 for g, _ in gains if g > 0),
             "best_gain": best[0], "best_buyer": best[1],
+            # None reads as "free": no denominator, not a missing number
             "ratio": round(best[0] / cost, 2) if cost > 0 else None,
         })
-    return sorted(rows, key=lambda r: (-(r["ratio"] or 0), -r["best_gain"]))
+
+    # FREE AND WANTED IS THE TOP OF THIS LIST, NOT THE BOTTOM.
+    #
+    # `ratio` is None when the player costs nothing to lose, and the old key
+    # coerced that None to 0, which sorted every free asset BELOW anything
+    # with a positive ratio: cost 0 / gain 20 scored (0, -20) and lost to
+    # cost 5 / gain 10 at (-2.0, -10). A player your lineup does not miss who
+    # improves a rival's by 20 is the best chip on the board -- an infinite
+    # ratio, not a zero one -- and this function is the one that answers
+    # "who are my most tradeable assets".
+    def rank(r):
+        free_and_wanted = r["cost"] <= 0 and r["best_gain"] > 0
+        return (0 if free_and_wanted else 1, -(r["ratio"] or 0), -r["best_gain"])
+
+    return sorted(rows, key=rank)

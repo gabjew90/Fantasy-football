@@ -340,10 +340,23 @@ def test_a_shelved_player_with_no_live_source_is_dropped_from_the_pool():
     Every live source had caught it -- Sleeper 0.0, ESPN and the sheet absent
     -- but consensus cannot correct a player it has no row for."""
     from manager import waiver_brief as wb
-    pl = {"active": True, "injury_status": "IR", "full_name": "Shelved Star"}
+    pl = {"active": True, "injury_status": "IR", "full_name": "Shelved Star",
+          "position": "WR"}
     assert wb._stale_reserve(pl, {}, "1") is True
     assert wb._stale_reserve(pl, {"1": {"n": 2}}, "1") is False, \
         "a source still carries him, so trust it"
+
+
+def test_absence_is_only_evidence_for_positions_the_sources_cover():
+    """The projections request names QB/RB/WR/TE. A kicker's n=0 is a fact
+    about the request, not about the kicker, and reading it as staleness
+    deleted every reserve-status K and DEF from the pool."""
+    from manager import waiver_brief as wb
+    for pos in ("K", "DEF"):
+        pl = {"active": True, "injury_status": "IR", "position": pos}
+        assert wb._stale_reserve(pl, {}, "1") is False, pos
+    # and an unknown position is never grounds to delete a player either
+    assert wb._stale_reserve({"active": True, "injury_status": "IR"}, {}, "1") is False
 
 
 def test_a_healthy_player_is_never_dropped_for_this_reason():
@@ -355,7 +368,8 @@ def test_a_healthy_player_is_never_dropped_for_this_reason():
 def test_every_reserve_designation_is_covered():
     from manager import waiver_brief as wb
     for st in ("IR", "IR-R", "PUP", "PUP-R", "NFI", "NFI-R", "DNR", "Sus", "Inactive"):
-        assert wb._stale_reserve({"injury_status": st}, {}, "1") is True, st
+        assert wb._stale_reserve(
+            {"injury_status": st, "position": "RB"}, {}, "1") is True, st
 
 
 def test_the_pool_excludes_him_and_records_why():
@@ -364,8 +378,8 @@ def test_the_pool_excludes_him_and_records_why():
                   "ros_season": 148.7, "sleeper_id": "1"},
             "2": {"name": "Healthy Guy", "pos": "WR", "weekly": 9.0, "ros": 120.0,
                   "ros_season": 120.0, "sleeper_id": "2"}}
-    ctx = {"players": {"1": {"active": True, "injury_status": "IR"},
-                       "2": {"active": True, "injury_status": None}},
+    ctx = {"players": {"1": {"active": True, "injury_status": "IR", "position": "WR"},
+                       "2": {"active": True, "injury_status": None, "position": "WR"}},
            "rosters": [], "player_row": rows.get, "trow": {}}
     pool = wb._fa_pool(ctx, con={})
     names = {p["name"] for p in pool}

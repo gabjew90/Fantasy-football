@@ -129,7 +129,17 @@ def build_context(cfg, week: int | None = None) -> dict:
             wk = 0.0
         name = f"{p.get('first_name','')} {p.get('last_name','')}".strip() or pid
         t = trow.get(pid) or {}
-        season_ros = float((t.get("proj_pts") or wk * 16) or 0.0)
+        # THE FALLBACK BASE MUST BE UNADJUSTED.
+        #
+        # This read `wk * 16`, and `wk` already carries the matchup
+        # multiplier, the injury discount and the bye zeroing. consensus.apply
+        # then divides the consensus mean by that base and multiplies `weekly`
+        # back by the result, so the algebra collapses to
+        #     weekly = wk * (mean / (wk * 16)) = mean / 16
+        # and the opponent adjustment is cancelled exactly. Off-board players
+        # are the whole deep wire, so every streamer arrived matchup-blind and
+        # was then ranked beside rostered players whose adjustment survived.
+        season_ros = float((t.get("proj_pts") or base_pts(pid) * 16) or 0.0)
         return {"sleeper_id": pid, "name": name, "pos": pos, "team": team,
                 "weekly": round(wk, 2), "status": status,
                 "matchup_mult": round(mult, 3), "opp": opp_of.get(team),

@@ -33,15 +33,38 @@ def _flex_sets(flex: int, flex_slots) -> tuple[frozenset[str], ...]:
     return (frozenset(FLEX_ELIGIBLE),) * int(flex or 0)
 
 
+def _nested(sets: tuple[frozenset[str], ...]) -> bool:
+    """Does every eligibility set contain the one before it?
+
+    `_flex_sets` sorts by SIZE, which orders a nested chain correctly and
+    says nothing at all about sets that merely happen to be the same size.
+    """
+    return all(a <= b for a, b in zip(sets, sets[1:]))
+
+
+def _permutations(sets):
+    from itertools import permutations
+    return list(permutations(sets))
+
+
 def optimal_lineup(roster: list[dict], slots: dict[str, int], flex: int = 0,
                    flex_slots=None) -> list[dict]:
     """Highest-scoring legal lineup.
 
-    Flex eligibility classes nest (WR/TE inside RB/WR/TE inside QB/RB/WR/TE),
-    so filling the most restrictive first is optimal rather than merely a
-    heuristic: any player a tighter slot can take a looser one can too, so
-    spending the loose slot first can strand the tight one empty while the
-    reverse never can. `_flex_sets` sorts by size to guarantee that order.
+    When flex eligibility classes nest (WR/TE inside RB/WR/TE inside
+    QB/RB/WR/TE), filling the most restrictive first is optimal rather than
+    merely a heuristic: any player a tighter slot can take a looser one can
+    too, so spending the loose slot first can strand the tight one empty
+    while the reverse never can.
+
+    THAT ARGUMENT NEEDS THE SETS TO ACTUALLY NEST, and size ordering does not
+    establish it. Given one {RB,WR} slot and one {WR,TE} slot -- same size,
+    neither inside the other -- with WR 20, RB 5, TE 3 left, filling {RB,WR}
+    first scores 23 and filling {WR,TE} first scores 25, so the answer would
+    depend on the order the shape happened to list them in. Both current
+    leagues use plain nested W/R/T and take the greedy path unchanged; a
+    non-nested shape searches the orderings instead, which is cheap because
+    a lineup never has more than a few flex slots.
     """
     pool = sorted(roster, key=lambda p: -(p.get("weekly") or 0.0))
     counts = {k: 0 for k in slots}
@@ -51,14 +74,24 @@ def optimal_lineup(roster: list[dict], slots: dict[str, int], flex: int = 0,
         if pos in slots and counts[pos] < slots[pos]:
             counts[pos] += 1
             chosen.append(p)
-    ids = {p["sleeper_id"] for p in chosen}
-    for eligible in _flex_sets(flex, flex_slots):
-        for p in pool:
-            if p["sleeper_id"] not in ids and p.get("pos") in eligible:
-                chosen.append(p)
-                ids.add(p["sleeper_id"])
-                break
-    return chosen
+    base_ids = {p["sleeper_id"] for p in chosen}
+
+    sets = _flex_sets(flex, flex_slots)
+    orders = [sets] if _nested(sets) else _permutations(sets)
+
+    def fill(order):
+        ids, picked = set(base_ids), []
+        for eligible in order:
+            for p in pool:
+                if p["sleeper_id"] not in ids and p.get("pos") in eligible:
+                    picked.append(p)
+                    ids.add(p["sleeper_id"])
+                    break
+        return picked
+
+    best = max((fill(o) for o in orders),
+               key=lambda ps: sum((p.get("weekly") or 0.0) for p in ps))
+    return chosen + best
 
 
 def lineup_changes(roster: list[dict], current_ids: list[str],

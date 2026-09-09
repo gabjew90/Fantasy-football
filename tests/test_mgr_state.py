@@ -143,7 +143,9 @@ def test_live_fa_replacement_levels():
         {"sleeper_id": "d", "pos": "WR", "ros": 105.0},
     ]
     lv = fa_replacement_levels(pool)
-    assert lv["RB"] == (120.0, 60.0) and lv["WR"] == (110.0, 105.0)
+    # the leader is carried BY ID: an exact tie at the top must not let two
+    # players both price themselves against second-best
+    assert lv["RB"] == (120.0, 60.0, "a") and lv["WR"] == (110.0, 105.0, "c")
     # scarce RB: best RB is worth his gap to the next one (+60); deep WR: +5
     assert value_over_fa(pool[0], lv) == 60.0
     assert value_over_fa(pool[2], lv) == 5.0
