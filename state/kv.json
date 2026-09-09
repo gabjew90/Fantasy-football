@@ -1,4 +1,6086 @@
 {
+ "consensus:omnibeta:2026": {
+  "data": {
+   "10210": {
+    "mean": 4.0,
+    "n": 1,
+    "per_source": {
+     "sleeper": 4.0
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "10212": {
+    "mean": 13.8,
+    "n": 1,
+    "per_source": {
+     "sleeper": 13.8
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "10213": {
+    "mean": 125.9,
+    "n": 1,
+    "per_source": {
+     "sleeper": 125.9
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "10214": {
+    "mean": 5.9,
+    "n": 1,
+    "per_source": {
+     "sleeper": 5.9
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "10216": {
+    "mean": 5.2,
+    "n": 1,
+    "per_source": {
+     "sleeper": 5.2
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "10217": {
+    "mean": 12.4,
+    "n": 1,
+    "per_source": {
+     "sleeper": 12.4
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "10218": {
+    "mean": 36.7,
+    "n": 1,
+    "per_source": {
+     "sleeper": 36.7
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "10219": {
+    "mean": 132.5,
+    "n": 1,
+    "per_source": {
+     "sleeper": 132.5
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "10222": {
+    "mean": 197.6,
+    "n": 1,
+    "per_source": {
+     "sleeper": 197.6
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "10226": {
+    "mean": 91.3,
+    "n": 1,
+    "per_source": {
+     "sleeper": 91.3
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "10227": {
+    "mean": 8.1,
+    "n": 1,
+    "per_source": {
+     "sleeper": 8.1
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "10229": {
+    "mean": 227.3,
+    "n": 1,
+    "per_source": {
+     "sleeper": 227.3
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "10231": {
+    "mean": 41.9,
+    "n": 1,
+    "per_source": {
+     "sleeper": 41.9
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "10232": {
+    "mean": 166.0,
+    "n": 1,
+    "per_source": {
+     "sleeper": 166.0
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "10235": {
+    "mean": 7.6,
+    "n": 1,
+    "per_source": {
+     "sleeper": 7.6
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "10236": {
+    "mean": 163.6,
+    "n": 1,
+    "per_source": {
+     "sleeper": 163.6
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "10444": {
+    "mean": 6.6,
+    "n": 1,
+    "per_source": {
+     "sleeper": 6.6
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "10859": {
+    "mean": 196.5,
+    "n": 1,
+    "per_source": {
+     "sleeper": 196.5
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "10867": {
+    "mean": 4.2,
+    "n": 1,
+    "per_source": {
+     "sleeper": 4.2
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "10871": {
+    "mean": 31.4,
+    "n": 1,
+    "per_source": {
+     "sleeper": 31.4
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "11034": {
+    "mean": 6.5,
+    "n": 1,
+    "per_source": {
+     "sleeper": 6.5
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "11168": {
+    "mean": 24.1,
+    "n": 1,
+    "per_source": {
+     "sleeper": 24.1
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "11199": {
+    "mean": 36.3,
+    "n": 1,
+    "per_source": {
+     "sleeper": 36.3
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "11201": {
+    "mean": 4.4,
+    "n": 1,
+    "per_source": {
+     "sleeper": 4.4
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "11237": {
+    "mean": 25.5,
+    "n": 1,
+    "per_source": {
+     "sleeper": 25.5
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "11256": {
+    "mean": 12.5,
+    "n": 1,
+    "per_source": {
+     "sleeper": 12.5
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "11292": {
+    "mean": 12.4,
+    "n": 1,
+    "per_source": {
+     "sleeper": 12.4
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "11299": {
+    "mean": 5.6,
+    "n": 1,
+    "per_source": {
+     "sleeper": 5.6
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "11320": {
+    "mean": 0.6,
+    "n": 1,
+    "per_source": {
+     "sleeper": 0.6
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "11370": {
+    "mean": 56.3,
+    "n": 1,
+    "per_source": {
+     "sleeper": 56.3
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "11371": {
+    "mean": 5.6,
+    "n": 1,
+    "per_source": {
+     "sleeper": 5.6
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "11377": {
+    "mean": 4.0,
+    "n": 1,
+    "per_source": {
+     "sleeper": 4.0
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "11433": {
+    "mean": 5.7,
+    "n": 1,
+    "per_source": {
+     "sleeper": 5.7
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "11435": {
+    "mean": 56.5,
+    "n": 1,
+    "per_source": {
+     "sleeper": 56.5
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "11439": {
+    "mean": 7.5,
+    "n": 1,
+    "per_source": {
+     "sleeper": 7.5
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "11510": {
+    "mean": 9.0,
+    "n": 1,
+    "per_source": {
+     "sleeper": 9.0
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "11557": {
+    "mean": 12.4,
+    "n": 1,
+    "per_source": {
+     "sleeper": 12.4
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "11559": {
+    "mean": 141.2,
+    "n": 1,
+    "per_source": {
+     "sleeper": 141.2
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "11560": {
+    "mean": 297.3,
+    "n": 1,
+    "per_source": {
+     "sleeper": 297.3
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "11562": {
+    "mean": 12.7,
+    "n": 1,
+    "per_source": {
+     "sleeper": 12.7
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "11563": {
+    "mean": 293.7,
+    "n": 1,
+    "per_source": {
+     "sleeper": 293.7
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "11564": {
+    "mean": 318.8,
+    "n": 1,
+    "per_source": {
+     "sleeper": 318.8
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "11565": {
+    "mean": 13.6,
+    "n": 1,
+    "per_source": {
+     "sleeper": 13.6
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "11566": {
+    "mean": 306.7,
+    "n": 1,
+    "per_source": {
+     "sleeper": 306.7
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "11569": {
+    "mean": 9.6,
+    "n": 1,
+    "per_source": {
+     "sleeper": 9.6
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "11570": {
+    "mean": 38.7,
+    "n": 1,
+    "per_source": {
+     "sleeper": 38.7
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "11571": {
+    "mean": 60.5,
+    "n": 1,
+    "per_source": {
+     "sleeper": 60.5
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "11574": {
+    "mean": 11.9,
+    "n": 1,
+    "per_source": {
+     "sleeper": 11.9
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "11575": {
+    "mean": 65.1,
+    "n": 1,
+    "per_source": {
+     "sleeper": 65.1
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "11576": {
+    "mean": 52.2,
+    "n": 1,
+    "per_source": {
+     "sleeper": 52.2
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "11577": {
+    "mean": 33.8,
+    "n": 1,
+    "per_source": {
+     "sleeper": 33.8
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "11579": {
+    "mean": 22.6,
+    "n": 1,
+    "per_source": {
+     "sleeper": 22.6
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "11581": {
+    "mean": 149.0,
+    "n": 1,
+    "per_source": {
+     "sleeper": 149.0
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "11583": {
+    "mean": 154.9,
+    "n": 1,
+    "per_source": {
+     "sleeper": 154.9
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "11584": {
+    "mean": 197.3,
+    "n": 1,
+    "per_source": {
+     "sleeper": 197.3
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "11586": {
+    "mean": 135.3,
+    "n": 1,
+    "per_source": {
+     "sleeper": 135.3
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "11588": {
+    "mean": 27.0,
+    "n": 1,
+    "per_source": {
+     "sleeper": 27.0
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "11593": {
+    "mean": 29.4,
+    "n": 1,
+    "per_source": {
+     "sleeper": 29.4
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "11596": {
+    "mean": 27.5,
+    "n": 1,
+    "per_source": {
+     "sleeper": 27.5
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "11597": {
+    "mean": 77.0,
+    "n": 1,
+    "per_source": {
+     "sleeper": 77.0
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "11599": {
+    "mean": 33.2,
+    "n": 1,
+    "per_source": {
+     "sleeper": 33.2
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "11600": {
+    "mean": 24.9,
+    "n": 1,
+    "per_source": {
+     "sleeper": 24.9
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "11603": {
+    "mean": 142.4,
+    "n": 1,
+    "per_source": {
+     "sleeper": 142.4
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "11604": {
+    "mean": 251.5,
+    "n": 1,
+    "per_source": {
+     "sleeper": 251.5
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "11606": {
+    "mean": 7.5,
+    "n": 1,
+    "per_source": {
+     "sleeper": 7.5
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "11608": {
+    "mean": 31.3,
+    "n": 1,
+    "per_source": {
+     "sleeper": 31.3
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "11610": {
+    "mean": 131.3,
+    "n": 1,
+    "per_source": {
+     "sleeper": 131.3
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "11616": {
+    "mean": 1.7,
+    "n": 1,
+    "per_source": {
+     "sleeper": 1.7
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "11617": {
+    "mean": 6.8,
+    "n": 1,
+    "per_source": {
+     "sleeper": 6.8
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "11618": {
+    "mean": 127.4,
+    "n": 1,
+    "per_source": {
+     "sleeper": 127.4
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "11620": {
+    "mean": 207.9,
+    "n": 1,
+    "per_source": {
+     "sleeper": 207.9
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "11623": {
+    "mean": 23.3,
+    "n": 1,
+    "per_source": {
+     "sleeper": 23.3
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "11624": {
+    "mean": 161.5,
+    "n": 1,
+    "per_source": {
+     "sleeper": 161.5
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "11625": {
+    "mean": 98.3,
+    "n": 1,
+    "per_source": {
+     "sleeper": 98.3
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "11626": {
+    "mean": 66.0,
+    "n": 1,
+    "per_source": {
+     "sleeper": 66.0
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "11627": {
+    "mean": 66.1,
+    "n": 1,
+    "per_source": {
+     "sleeper": 66.1
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "11628": {
+    "mean": 186.2,
+    "n": 1,
+    "per_source": {
+     "sleeper": 186.2
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "11629": {
+    "mean": 29.9,
+    "n": 1,
+    "per_source": {
+     "sleeper": 29.9
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "11630": {
+    "mean": 26.8,
+    "n": 1,
+    "per_source": {
+     "sleeper": 26.8
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "11631": {
+    "mean": 195.4,
+    "n": 1,
+    "per_source": {
+     "sleeper": 195.4
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "11632": {
+    "mean": 234.7,
+    "n": 1,
+    "per_source": {
+     "sleeper": 234.7
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "11635": {
+    "mean": 228.2,
+    "n": 1,
+    "per_source": {
+     "sleeper": 228.2
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "11637": {
+    "mean": 85.8,
+    "n": 1,
+    "per_source": {
+     "sleeper": 85.8
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "11640": {
+    "mean": 26.0,
+    "n": 1,
+    "per_source": {
+     "sleeper": 26.0
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "11643": {
+    "mean": 44.1,
+    "n": 1,
+    "per_source": {
+     "sleeper": 44.1
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "11646": {
+    "mean": 165.9,
+    "n": 1,
+    "per_source": {
+     "sleeper": 165.9
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "11647": {
+    "mean": 60.0,
+    "n": 1,
+    "per_source": {
+     "sleeper": 60.0
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "11650": {
+    "mean": 9.3,
+    "n": 1,
+    "per_source": {
+     "sleeper": 9.3
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "11651": {
+    "mean": 6.2,
+    "n": 1,
+    "per_source": {
+     "sleeper": 6.2
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "11655": {
+    "mean": 111.3,
+    "n": 1,
+    "per_source": {
+     "sleeper": 111.3
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "1166": {
+    "mean": 39.2,
+    "n": 1,
+    "per_source": {
+     "sleeper": 39.2
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "11716": {
+    "mean": 15.4,
+    "n": 1,
+    "per_source": {
+     "sleeper": 15.4
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "11729": {
+    "mean": 4.0,
+    "n": 1,
+    "per_source": {
+     "sleeper": 4.0
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "11762": {
+    "mean": 3.2,
+    "n": 1,
+    "per_source": {
+     "sleeper": 3.2
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "11783": {
+    "mean": 121.2,
+    "n": 1,
+    "per_source": {
+     "sleeper": 121.2
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "11820": {
+    "mean": 7.3,
+    "n": 1,
+    "per_source": {
+     "sleeper": 7.3
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "11834": {
+    "mean": 110.6,
+    "n": 1,
+    "per_source": {
+     "sleeper": 110.6
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "11921": {
+    "mean": 7.1,
+    "n": 1,
+    "per_source": {
+     "sleeper": 7.1
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "11994": {
+    "mean": 4.8,
+    "n": 1,
+    "per_source": {
+     "sleeper": 4.8
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "12048": {
+    "mean": 25.2,
+    "n": 1,
+    "per_source": {
+     "sleeper": 25.2
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "12455": {
+    "mean": 26.3,
+    "n": 1,
+    "per_source": {
+     "sleeper": 26.3
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "12457": {
+    "mean": 56.6,
+    "n": 1,
+    "per_source": {
+     "sleeper": 56.6
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "12467": {
+    "mean": 59.7,
+    "n": 1,
+    "per_source": {
+     "sleeper": 59.7
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "12469": {
+    "mean": 88.7,
+    "n": 1,
+    "per_source": {
+     "sleeper": 88.7
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "12470": {
+    "mean": 12.4,
+    "n": 1,
+    "per_source": {
+     "sleeper": 12.4
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "12471": {
+    "mean": 30.0,
+    "n": 1,
+    "per_source": {
+     "sleeper": 30.0
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "12472": {
+    "mean": 4.7,
+    "n": 1,
+    "per_source": {
+     "sleeper": 4.7
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "12473": {
+    "mean": 15.7,
+    "n": 1,
+    "per_source": {
+     "sleeper": 15.7
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "12474": {
+    "mean": 83.8,
+    "n": 1,
+    "per_source": {
+     "sleeper": 83.8
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "12475": {
+    "mean": 4.2,
+    "n": 1,
+    "per_source": {
+     "sleeper": 4.2
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "12476": {
+    "mean": 31.9,
+    "n": 1,
+    "per_source": {
+     "sleeper": 31.9
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "12481": {
+    "mean": 201.2,
+    "n": 1,
+    "per_source": {
+     "sleeper": 201.2
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "12482": {
+    "mean": 32.0,
+    "n": 1,
+    "per_source": {
+     "sleeper": 32.0
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "12483": {
+    "mean": 77.9,
+    "n": 1,
+    "per_source": {
+     "sleeper": 77.9
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "12485": {
+    "mean": 38.4,
+    "n": 1,
+    "per_source": {
+     "sleeper": 38.4
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "12486": {
+    "mean": 11.9,
+    "n": 1,
+    "per_source": {
+     "sleeper": 11.9
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "12487": {
+    "mean": 100.3,
+    "n": 1,
+    "per_source": {
+     "sleeper": 100.3
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "12489": {
+    "mean": 144.1,
+    "n": 1,
+    "per_source": {
+     "sleeper": 144.1
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "12490": {
+    "mean": 174.8,
+    "n": 1,
+    "per_source": {
+     "sleeper": 174.8
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "12492": {
+    "mean": 96.4,
+    "n": 1,
+    "per_source": {
+     "sleeper": 96.4
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "12493": {
+    "mean": 141.8,
+    "n": 1,
+    "per_source": {
+     "sleeper": 141.8
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "12495": {
+    "mean": 23.2,
+    "n": 1,
+    "per_source": {
+     "sleeper": 23.2
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "12496": {
+    "mean": 29.2,
+    "n": 1,
+    "per_source": {
+     "sleeper": 29.2
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "12497": {
+    "mean": 92.0,
+    "n": 1,
+    "per_source": {
+     "sleeper": 92.0
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "12498": {
+    "mean": 96.4,
+    "n": 1,
+    "per_source": {
+     "sleeper": 96.4
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "12499": {
+    "mean": 56.7,
+    "n": 1,
+    "per_source": {
+     "sleeper": 56.7
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "12500": {
+    "mean": 12.4,
+    "n": 1,
+    "per_source": {
+     "sleeper": 12.4
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "12501": {
+    "mean": 170.0,
+    "n": 1,
+    "per_source": {
+     "sleeper": 170.0
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "12502": {
+    "mean": 130.3,
+    "n": 1,
+    "per_source": {
+     "sleeper": 130.3
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "12503": {
+    "mean": 62.8,
+    "n": 1,
+    "per_source": {
+     "sleeper": 62.8
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "12504": {
+    "mean": 32.0,
+    "n": 1,
+    "per_source": {
+     "sleeper": 32.0
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "12505": {
+    "mean": 33.9,
+    "n": 1,
+    "per_source": {
+     "sleeper": 33.9
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "12506": {
+    "mean": 180.4,
+    "n": 1,
+    "per_source": {
+     "sleeper": 180.4
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "12507": {
+    "mean": 242.9,
+    "n": 1,
+    "per_source": {
+     "sleeper": 242.9
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "12508": {
+    "mean": 294.5,
+    "n": 1,
+    "per_source": {
+     "sleeper": 294.5
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "12509": {
+    "mean": 112.9,
+    "n": 1,
+    "per_source": {
+     "sleeper": 112.9
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "12510": {
+    "mean": 13.9,
+    "n": 1,
+    "per_source": {
+     "sleeper": 13.9
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "12511": {
+    "mean": 22.5,
+    "n": 1,
+    "per_source": {
+     "sleeper": 22.5
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "12512": {
+    "mean": 196.0,
+    "n": 1,
+    "per_source": {
+     "sleeper": 196.0
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "12514": {
+    "mean": 224.0,
+    "n": 1,
+    "per_source": {
+     "sleeper": 224.0
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "12515": {
+    "mean": 2.1,
+    "n": 1,
+    "per_source": {
+     "sleeper": 2.1
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "12516": {
+    "mean": 5.6,
+    "n": 1,
+    "per_source": {
+     "sleeper": 5.6
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "12517": {
+    "mean": 215.4,
+    "n": 1,
+    "per_source": {
+     "sleeper": 215.4
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "12518": {
+    "mean": 201.1,
+    "n": 1,
+    "per_source": {
+     "sleeper": 201.1
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "12519": {
+    "mean": 209.0,
+    "n": 1,
+    "per_source": {
+     "sleeper": 209.0
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "12520": {
+    "mean": 4.8,
+    "n": 1,
+    "per_source": {
+     "sleeper": 4.8
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "12521": {
+    "mean": 72.2,
+    "n": 1,
+    "per_source": {
+     "sleeper": 72.2
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "12522": {
+    "mean": 225.8,
+    "n": 1,
+    "per_source": {
+     "sleeper": 225.8
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "12523": {
+    "mean": 30.2,
+    "n": 1,
+    "per_source": {
+     "sleeper": 30.2
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "12524": {
+    "mean": 97.1,
+    "n": 1,
+    "per_source": {
+     "sleeper": 97.1
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "12526": {
+    "mean": 221.0,
+    "n": 1,
+    "per_source": {
+     "sleeper": 221.0
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "12527": {
+    "mean": 233.9,
+    "n": 1,
+    "per_source": {
+     "sleeper": 233.9
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "12529": {
+    "mean": 171.0,
+    "n": 1,
+    "per_source": {
+     "sleeper": 171.0
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "12530": {
+    "mean": 96.6,
+    "n": 1,
+    "per_source": {
+     "sleeper": 96.6
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "12531": {
+    "mean": 36.2,
+    "n": 1,
+    "per_source": {
+     "sleeper": 36.2
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "12533": {
+    "mean": 127.9,
+    "n": 1,
+    "per_source": {
+     "sleeper": 127.9
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "12534": {
+    "mean": 154.6,
+    "n": 1,
+    "per_source": {
+     "sleeper": 154.6
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "12535": {
+    "mean": 87.1,
+    "n": 1,
+    "per_source": {
+     "sleeper": 87.1
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "12536": {
+    "mean": 85.2,
+    "n": 1,
+    "per_source": {
+     "sleeper": 85.2
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "12539": {
+    "mean": 7.1,
+    "n": 1,
+    "per_source": {
+     "sleeper": 7.1
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "12540": {
+    "mean": 89.4,
+    "n": 1,
+    "per_source": {
+     "sleeper": 89.4
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "12541": {
+    "mean": 4.7,
+    "n": 1,
+    "per_source": {
+     "sleeper": 4.7
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "12542": {
+    "mean": 4.6,
+    "n": 1,
+    "per_source": {
+     "sleeper": 4.6
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "12543": {
+    "mean": 24.4,
+    "n": 1,
+    "per_source": {
+     "sleeper": 24.4
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "12544": {
+    "mean": 56.2,
+    "n": 1,
+    "per_source": {
+     "sleeper": 56.2
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "12545": {
+    "mean": 268.9,
+    "n": 1,
+    "per_source": {
+     "sleeper": 268.9
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "12547": {
+    "mean": 31.2,
+    "n": 1,
+    "per_source": {
+     "sleeper": 31.2
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "12634": {
+    "mean": 2.4,
+    "n": 1,
+    "per_source": {
+     "sleeper": 2.4
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "12641": {
+    "mean": 37.7,
+    "n": 1,
+    "per_source": {
+     "sleeper": 37.7
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "12658": {
+    "mean": 31.9,
+    "n": 1,
+    "per_source": {
+     "sleeper": 31.9
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "12670": {
+    "mean": 35.5,
+    "n": 1,
+    "per_source": {
+     "sleeper": 35.5
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "12699": {
+    "mean": 1.0,
+    "n": 1,
+    "per_source": {
+     "sleeper": 1.0
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "12718": {
+    "mean": 41.7,
+    "n": 1,
+    "per_source": {
+     "sleeper": 41.7
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "12738": {
+    "mean": 6.7,
+    "n": 1,
+    "per_source": {
+     "sleeper": 6.7
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "12860": {
+    "mean": 8.9,
+    "n": 1,
+    "per_source": {
+     "sleeper": 8.9
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "13047": {
+    "mean": 4.3,
+    "n": 1,
+    "per_source": {
+     "sleeper": 4.3
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "13079": {
+    "mean": 25.9,
+    "n": 1,
+    "per_source": {
+     "sleeper": 25.9
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "13101": {
+    "mean": 1.9,
+    "n": 1,
+    "per_source": {
+     "sleeper": 1.9
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "13121": {
+    "mean": 4.0,
+    "n": 1,
+    "per_source": {
+     "sleeper": 4.0
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "13150": {
+    "mean": 6.7,
+    "n": 1,
+    "per_source": {
+     "sleeper": 6.7
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "13268": {
+    "mean": 61.4,
+    "n": 1,
+    "per_source": {
+     "sleeper": 61.4
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "13269": {
+    "mean": 210.2,
+    "n": 1,
+    "per_source": {
+     "sleeper": 210.2
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "13270": {
+    "mean": 39.3,
+    "n": 1,
+    "per_source": {
+     "sleeper": 39.3
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "13272": {
+    "mean": 54.9,
+    "n": 1,
+    "per_source": {
+     "sleeper": 54.9
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "13273": {
+    "mean": 27.8,
+    "n": 1,
+    "per_source": {
+     "sleeper": 27.8
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "13274": {
+    "mean": 98.9,
+    "n": 1,
+    "per_source": {
+     "sleeper": 98.9
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "13275": {
+    "mean": 13.6,
+    "n": 1,
+    "per_source": {
+     "sleeper": 13.6
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "13276": {
+    "mean": 127.1,
+    "n": 1,
+    "per_source": {
+     "sleeper": 127.1
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "13278": {
+    "mean": 56.1,
+    "n": 1,
+    "per_source": {
+     "sleeper": 56.1
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "13279": {
+    "mean": 177.3,
+    "n": 1,
+    "per_source": {
+     "sleeper": 177.3
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "13281": {
+    "mean": 111.0,
+    "n": 1,
+    "per_source": {
+     "sleeper": 111.0
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "13282": {
+    "mean": 53.3,
+    "n": 1,
+    "per_source": {
+     "sleeper": 53.3
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "13285": {
+    "mean": 105.2,
+    "n": 1,
+    "per_source": {
+     "sleeper": 105.2
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "13286": {
+    "mean": 170.0,
+    "n": 1,
+    "per_source": {
+     "sleeper": 170.0
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "13287": {
+    "mean": 211.8,
+    "n": 1,
+    "per_source": {
+     "sleeper": 211.8
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "13288": {
+    "mean": 63.7,
+    "n": 1,
+    "per_source": {
+     "sleeper": 63.7
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "13289": {
+    "mean": 22.0,
+    "n": 1,
+    "per_source": {
+     "sleeper": 22.0
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "13293": {
+    "mean": 104.9,
+    "n": 1,
+    "per_source": {
+     "sleeper": 104.9
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "13294": {
+    "mean": 168.5,
+    "n": 1,
+    "per_source": {
+     "sleeper": 168.5
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "13296": {
+    "mean": 94.8,
+    "n": 1,
+    "per_source": {
+     "sleeper": 94.8
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "13297": {
+    "mean": 26.1,
+    "n": 1,
+    "per_source": {
+     "sleeper": 26.1
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "13298": {
+    "mean": 156.4,
+    "n": 1,
+    "per_source": {
+     "sleeper": 156.4
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "13299": {
+    "mean": 27.4,
+    "n": 1,
+    "per_source": {
+     "sleeper": 27.4
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "13301": {
+    "mean": 75.2,
+    "n": 1,
+    "per_source": {
+     "sleeper": 75.2
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "13302": {
+    "mean": 30.1,
+    "n": 1,
+    "per_source": {
+     "sleeper": 30.1
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "13303": {
+    "mean": 24.0,
+    "n": 1,
+    "per_source": {
+     "sleeper": 24.0
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "13305": {
+    "mean": 97.5,
+    "n": 1,
+    "per_source": {
+     "sleeper": 97.5
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "13306": {
+    "mean": 30.3,
+    "n": 1,
+    "per_source": {
+     "sleeper": 30.3
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "13307": {
+    "mean": 29.5,
+    "n": 1,
+    "per_source": {
+     "sleeper": 29.5
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "13309": {
+    "mean": 30.2,
+    "n": 1,
+    "per_source": {
+     "sleeper": 30.2
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "13311": {
+    "mean": 67.2,
+    "n": 1,
+    "per_source": {
+     "sleeper": 67.2
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "13315": {
+    "mean": 8.4,
+    "n": 1,
+    "per_source": {
+     "sleeper": 8.4
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "13316": {
+    "mean": 29.4,
+    "n": 1,
+    "per_source": {
+     "sleeper": 29.4
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "13317": {
+    "mean": 97.9,
+    "n": 1,
+    "per_source": {
+     "sleeper": 97.9
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "13318": {
+    "mean": 6.6,
+    "n": 1,
+    "per_source": {
+     "sleeper": 6.6
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "13319": {
+    "mean": 39.4,
+    "n": 1,
+    "per_source": {
+     "sleeper": 39.4
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "13320": {
+    "mean": 78.5,
+    "n": 1,
+    "per_source": {
+     "sleeper": 78.5
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "13322": {
+    "mean": 33.5,
+    "n": 1,
+    "per_source": {
+     "sleeper": 33.5
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "13324": {
+    "mean": 31.8,
+    "n": 1,
+    "per_source": {
+     "sleeper": 31.8
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "13327": {
+    "mean": 25.3,
+    "n": 1,
+    "per_source": {
+     "sleeper": 25.3
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "13329": {
+    "mean": 60.6,
+    "n": 1,
+    "per_source": {
+     "sleeper": 60.6
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "13330": {
+    "mean": 100.2,
+    "n": 1,
+    "per_source": {
+     "sleeper": 100.2
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "13333": {
+    "mean": 23.3,
+    "n": 1,
+    "per_source": {
+     "sleeper": 23.3
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "13336": {
+    "mean": 6.6,
+    "n": 1,
+    "per_source": {
+     "sleeper": 6.6
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "13337": {
+    "mean": 65.2,
+    "n": 1,
+    "per_source": {
+     "sleeper": 65.2
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "13338": {
+    "mean": 32.4,
+    "n": 1,
+    "per_source": {
+     "sleeper": 32.4
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "13342": {
+    "mean": 28.4,
+    "n": 1,
+    "per_source": {
+     "sleeper": 28.4
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "13345": {
+    "mean": 63.9,
+    "n": 1,
+    "per_source": {
+     "sleeper": 63.9
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "13346": {
+    "mean": 134.7,
+    "n": 1,
+    "per_source": {
+     "sleeper": 134.7
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "13347": {
+    "mean": 24.8,
+    "n": 1,
+    "per_source": {
+     "sleeper": 24.8
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "13348": {
+    "mean": 30.7,
+    "n": 1,
+    "per_source": {
+     "sleeper": 30.7
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "13349": {
+    "mean": 81.4,
+    "n": 1,
+    "per_source": {
+     "sleeper": 81.4
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "13354": {
+    "mean": 30.1,
+    "n": 1,
+    "per_source": {
+     "sleeper": 30.1
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "13356": {
+    "mean": 6.6,
+    "n": 1,
+    "per_source": {
+     "sleeper": 6.6
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "13357": {
+    "mean": 31.6,
+    "n": 1,
+    "per_source": {
+     "sleeper": 31.6
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "13380": {
+    "mean": 39.0,
+    "n": 1,
+    "per_source": {
+     "sleeper": 39.0
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "1339": {
+    "mean": 36.7,
+    "n": 1,
+    "per_source": {
+     "sleeper": 36.7
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "13394": {
+    "mean": 59.6,
+    "n": 1,
+    "per_source": {
+     "sleeper": 59.6
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "13400": {
+    "mean": 58.0,
+    "n": 1,
+    "per_source": {
+     "sleeper": 58.0
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "13401": {
+    "mean": 33.8,
+    "n": 1,
+    "per_source": {
+     "sleeper": 33.8
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "13402": {
+    "mean": 63.6,
+    "n": 1,
+    "per_source": {
+     "sleeper": 63.6
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "13403": {
+    "mean": 20.4,
+    "n": 1,
+    "per_source": {
+     "sleeper": 20.4
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "13405": {
+    "mean": 45.9,
+    "n": 1,
+    "per_source": {
+     "sleeper": 45.9
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "13408": {
+    "mean": 32.8,
+    "n": 1,
+    "per_source": {
+     "sleeper": 32.8
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "13410": {
+    "mean": 6.6,
+    "n": 1,
+    "per_source": {
+     "sleeper": 6.6
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "13411": {
+    "mean": 57.2,
+    "n": 1,
+    "per_source": {
+     "sleeper": 57.2
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "13413": {
+    "mean": 94.5,
+    "n": 1,
+    "per_source": {
+     "sleeper": 94.5
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "13414": {
+    "mean": 42.3,
+    "n": 1,
+    "per_source": {
+     "sleeper": 42.3
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "13417": {
+    "mean": 128.4,
+    "n": 1,
+    "per_source": {
+     "sleeper": 128.4
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "13419": {
+    "mean": 11.2,
+    "n": 1,
+    "per_source": {
+     "sleeper": 11.2
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "13420": {
+    "mean": 38.7,
+    "n": 1,
+    "per_source": {
+     "sleeper": 38.7
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "13421": {
+    "mean": 33.0,
+    "n": 1,
+    "per_source": {
+     "sleeper": 33.0
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "13422": {
+    "mean": 31.6,
+    "n": 1,
+    "per_source": {
+     "sleeper": 31.6
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "13424": {
+    "mean": 36.3,
+    "n": 1,
+    "per_source": {
+     "sleeper": 36.3
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "13427": {
+    "mean": 12.5,
+    "n": 1,
+    "per_source": {
+     "sleeper": 12.5
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "13429": {
+    "mean": 8.0,
+    "n": 1,
+    "per_source": {
+     "sleeper": 8.0
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "13431": {
+    "mean": 31.6,
+    "n": 1,
+    "per_source": {
+     "sleeper": 31.6
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "13433": {
+    "mean": 9.6,
+    "n": 1,
+    "per_source": {
+     "sleeper": 9.6
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "13434": {
+    "mean": 61.6,
+    "n": 1,
+    "per_source": {
+     "sleeper": 61.6
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "13435": {
+    "mean": 57.8,
+    "n": 1,
+    "per_source": {
+     "sleeper": 57.8
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "13477": {
+    "mean": 31.0,
+    "n": 1,
+    "per_source": {
+     "sleeper": 31.0
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "13491": {
+    "mean": 4.2,
+    "n": 1,
+    "per_source": {
+     "sleeper": 4.2
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "13516": {
+    "mean": 3.8,
+    "n": 1,
+    "per_source": {
+     "sleeper": 3.8
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "13533": {
+    "mean": 63.0,
+    "n": 1,
+    "per_source": {
+     "sleeper": 63.0
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "1373": {
+    "mean": 222.5,
+    "n": 1,
+    "per_source": {
+     "sleeper": 222.5
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "1379": {
+    "mean": 19.9,
+    "n": 1,
+    "per_source": {
+     "sleeper": 19.9
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "13846": {
+    "mean": 7.3,
+    "n": 1,
+    "per_source": {
+     "sleeper": 7.3
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "13946": {
+    "mean": 4.0,
+    "n": 1,
+    "per_source": {
+     "sleeper": 4.0
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "1426": {
+    "mean": 2.5,
+    "n": 1,
+    "per_source": {
+     "sleeper": 2.5
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "1466": {
+    "mean": 171.4,
+    "n": 1,
+    "per_source": {
+     "sleeper": 171.4
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "1479": {
+    "mean": 106.8,
+    "n": 1,
+    "per_source": {
+     "sleeper": 106.8
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "1837": {
+    "mean": 12.3,
+    "n": 1,
+    "per_source": {
+     "sleeper": 12.3
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "19": {
+    "mean": 28.7,
+    "n": 1,
+    "per_source": {
+     "sleeper": 28.7
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "2028": {
+    "mean": 27.2,
+    "n": 1,
+    "per_source": {
+     "sleeper": 27.2
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "2078": {
+    "mean": 28.0,
+    "n": 1,
+    "per_source": {
+     "sleeper": 28.0
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "2133": {
+    "mean": 190.5,
+    "n": 1,
+    "per_source": {
+     "sleeper": 190.5
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "2152": {
+    "mean": 11.6,
+    "n": 1,
+    "per_source": {
+     "sleeper": 11.6
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "2197": {
+    "mean": 28.8,
+    "n": 1,
+    "per_source": {
+     "sleeper": 28.8
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "2216": {
+    "mean": 220.2,
+    "n": 1,
+    "per_source": {
+     "sleeper": 220.2
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "2306": {
+    "mean": 12.9,
+    "n": 1,
+    "per_source": {
+     "sleeper": 12.9
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "2307": {
+    "mean": 13.1,
+    "n": 1,
+    "per_source": {
+     "sleeper": 13.1
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "2359": {
+    "mean": 4.8,
+    "n": 1,
+    "per_source": {
+     "sleeper": 4.8
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "2374": {
+    "mean": 28.3,
+    "n": 1,
+    "per_source": {
+     "sleeper": 28.3
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "2449": {
+    "mean": 157.3,
+    "n": 1,
+    "per_source": {
+     "sleeper": 157.3
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "2505": {
+    "mean": 122.6,
+    "n": 1,
+    "per_source": {
+     "sleeper": 122.6
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "260": {
+    "mean": 11.3,
+    "n": 1,
+    "per_source": {
+     "sleeper": 11.3
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "2749": {
+    "mean": 12.5,
+    "n": 1,
+    "per_source": {
+     "sleeper": 12.5
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "2750": {
+    "mean": 1.8,
+    "n": 1,
+    "per_source": {
+     "sleeper": 1.8
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "3048": {
+    "mean": 2.3,
+    "n": 1,
+    "per_source": {
+     "sleeper": 2.3
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "3161": {
+    "mean": 12.4,
+    "n": 1,
+    "per_source": {
+     "sleeper": 12.4
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "3163": {
+    "mean": 279.5,
+    "n": 1,
+    "per_source": {
+     "sleeper": 279.5
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "3198": {
+    "mean": 244.9,
+    "n": 1,
+    "per_source": {
+     "sleeper": 244.9
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "3200": {
+    "mean": 0.6,
+    "n": 1,
+    "per_source": {
+     "sleeper": 0.6
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "3202": {
+    "mean": 33.2,
+    "n": 1,
+    "per_source": {
+     "sleeper": 33.2
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "3214": {
+    "mean": 153.5,
+    "n": 1,
+    "per_source": {
+     "sleeper": 153.5
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "3257": {
+    "mean": 160.0,
+    "n": 1,
+    "per_source": {
+     "sleeper": 160.0
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "3269": {
+    "mean": 4.1,
+    "n": 1,
+    "per_source": {
+     "sleeper": 4.1
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "3271": {
+    "mean": 32.9,
+    "n": 1,
+    "per_source": {
+     "sleeper": 32.9
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "3286": {
+    "mean": 38.1,
+    "n": 1,
+    "per_source": {
+     "sleeper": 38.1
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "3294": {
+    "mean": 299.9,
+    "n": 1,
+    "per_source": {
+     "sleeper": 299.9
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "3321": {
+    "mean": 93.7,
+    "n": 1,
+    "per_source": {
+     "sleeper": 93.7
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "3634": {
+    "mean": 27.7,
+    "n": 1,
+    "per_source": {
+     "sleeper": 27.7
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "3976": {
+    "mean": 11.9,
+    "n": 1,
+    "per_source": {
+     "sleeper": 11.9
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "4017": {
+    "mean": 102.1,
+    "n": 1,
+    "per_source": {
+     "sleeper": 102.1
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "4033": {
+    "mean": 58.0,
+    "n": 1,
+    "per_source": {
+     "sleeper": 58.0
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "4034": {
+    "mean": 291.0,
+    "n": 1,
+    "per_source": {
+     "sleeper": 291.0
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "4035": {
+    "mean": 63.0,
+    "n": 1,
+    "per_source": {
+     "sleeper": 63.0
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "4037": {
+    "mean": 173.6,
+    "n": 1,
+    "per_source": {
+     "sleeper": 173.6
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "4039": {
+    "mean": 86.4,
+    "n": 1,
+    "per_source": {
+     "sleeper": 86.4
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "4040": {
+    "mean": 4.1,
+    "n": 1,
+    "per_source": {
+     "sleeper": 4.1
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "4046": {
+    "mean": 284.7,
+    "n": 1,
+    "per_source": {
+     "sleeper": 284.7
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "4054": {
+    "mean": 15.4,
+    "n": 1,
+    "per_source": {
+     "sleeper": 15.4
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "4066": {
+    "mean": 70.7,
+    "n": 1,
+    "per_source": {
+     "sleeper": 70.7
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "4082": {
+    "mean": 5.3,
+    "n": 1,
+    "per_source": {
+     "sleeper": 5.3
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "4098": {
+    "mean": 24.2,
+    "n": 1,
+    "per_source": {
+     "sleeper": 24.2
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "4137": {
+    "mean": 57.2,
+    "n": 1,
+    "per_source": {
+     "sleeper": 57.2
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "4144": {
+    "mean": 35.9,
+    "n": 1,
+    "per_source": {
+     "sleeper": 35.9
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "4147": {
+    "mean": 69.8,
+    "n": 1,
+    "per_source": {
+     "sleeper": 69.8
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "4171": {
+    "mean": 6.5,
+    "n": 1,
+    "per_source": {
+     "sleeper": 6.5
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "4177": {
+    "mean": 57.6,
+    "n": 1,
+    "per_source": {
+     "sleeper": 57.6
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "4179": {
+    "mean": 12.4,
+    "n": 1,
+    "per_source": {
+     "sleeper": 12.4
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "4189": {
+    "mean": 5.7,
+    "n": 1,
+    "per_source": {
+     "sleeper": 5.7
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "4199": {
+    "mean": 137.1,
+    "n": 1,
+    "per_source": {
+     "sleeper": 137.1
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "421": {
+    "mean": 276.2,
+    "n": 1,
+    "per_source": {
+     "sleeper": 276.2
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "4217": {
+    "mean": 169.3,
+    "n": 1,
+    "per_source": {
+     "sleeper": 169.3
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "4219": {
+    "mean": 9.4,
+    "n": 1,
+    "per_source": {
+     "sleeper": 9.4
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "4234": {
+    "mean": 9.3,
+    "n": 1,
+    "per_source": {
+     "sleeper": 9.3
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "4274": {
+    "mean": 4.3,
+    "n": 1,
+    "per_source": {
+     "sleeper": 4.3
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "4351": {
+    "mean": 13.7,
+    "n": 1,
+    "per_source": {
+     "sleeper": 13.7
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "4381": {
+    "mean": 9.5,
+    "n": 1,
+    "per_source": {
+     "sleeper": 9.5
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "4454": {
+    "mean": 77.4,
+    "n": 1,
+    "per_source": {
+     "sleeper": 77.4
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "4464": {
+    "mean": 12.0,
+    "n": 1,
+    "per_source": {
+     "sleeper": 12.0
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "4602": {
+    "mean": 1.9,
+    "n": 1,
+    "per_source": {
+     "sleeper": 1.9
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "4663": {
+    "mean": 9.3,
+    "n": 1,
+    "per_source": {
+     "sleeper": 9.3
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "4718": {
+    "mean": 9.2,
+    "n": 1,
+    "per_source": {
+     "sleeper": 9.2
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "4866": {
+    "mean": 244.7,
+    "n": 1,
+    "per_source": {
+     "sleeper": 244.7
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "4881": {
+    "mean": 324.0,
+    "n": 1,
+    "per_source": {
+     "sleeper": 324.0
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "4892": {
+    "mean": 272.9,
+    "n": 1,
+    "per_source": {
+     "sleeper": 272.9
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "4943": {
+    "mean": 260.7,
+    "n": 1,
+    "per_source": {
+     "sleeper": 260.7
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "4950": {
+    "mean": 46.4,
+    "n": 1,
+    "per_source": {
+     "sleeper": 46.4
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "4972": {
+    "mean": 11.7,
+    "n": 1,
+    "per_source": {
+     "sleeper": 11.7
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "4981": {
+    "mean": 77.3,
+    "n": 1,
+    "per_source": {
+     "sleeper": 77.3
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "4983": {
+    "mean": 179.0,
+    "n": 1,
+    "per_source": {
+     "sleeper": 179.0
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "4984": {
+    "mean": 357.5,
+    "n": 1,
+    "per_source": {
+     "sleeper": 357.5
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "4992": {
+    "mean": 7.3,
+    "n": 1,
+    "per_source": {
+     "sleeper": 7.3
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "4993": {
+    "mean": 104.9,
+    "n": 1,
+    "per_source": {
+     "sleeper": 104.9
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "4995": {
+    "mean": 4.0,
+    "n": 1,
+    "per_source": {
+     "sleeper": 4.0
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "5001": {
+    "mean": 150.9,
+    "n": 1,
+    "per_source": {
+     "sleeper": 150.9
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "5008": {
+    "mean": 9.9,
+    "n": 1,
+    "per_source": {
+     "sleeper": 9.9
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "5010": {
+    "mean": 27.0,
+    "n": 1,
+    "per_source": {
+     "sleeper": 27.0
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "5012": {
+    "mean": 162.5,
+    "n": 1,
+    "per_source": {
+     "sleeper": 162.5
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "5022": {
+    "mean": 136.0,
+    "n": 1,
+    "per_source": {
+     "sleeper": 136.0
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "5045": {
+    "mean": 174.3,
+    "n": 1,
+    "per_source": {
+     "sleeper": 174.3
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "5086": {
+    "mean": 26.9,
+    "n": 1,
+    "per_source": {
+     "sleeper": 26.9
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "5127": {
+    "mean": 12.0,
+    "n": 1,
+    "per_source": {
+     "sleeper": 12.0
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "5133": {
+    "mean": 1.7,
+    "n": 1,
+    "per_source": {
+     "sleeper": 1.7
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "5154": {
+    "mean": 3.9,
+    "n": 1,
+    "per_source": {
+     "sleeper": 3.9
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "5185": {
+    "mean": 6.4,
+    "n": 1,
+    "per_source": {
+     "sleeper": 6.4
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "5409": {
+    "mean": 5.8,
+    "n": 1,
+    "per_source": {
+     "sleeper": 5.8
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "5844": {
+    "mean": 155.0,
+    "n": 1,
+    "per_source": {
+     "sleeper": 155.0
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "5846": {
+    "mean": 183.3,
+    "n": 1,
+    "per_source": {
+     "sleeper": 183.3
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "5848": {
+    "mean": 67.5,
+    "n": 1,
+    "per_source": {
+     "sleeper": 67.5
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "5849": {
+    "mean": 281.1,
+    "n": 1,
+    "per_source": {
+     "sleeper": 281.1
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "5850": {
+    "mean": 85.2,
+    "n": 1,
+    "per_source": {
+     "sleeper": 85.2
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "5857": {
+    "mean": 36.6,
+    "n": 1,
+    "per_source": {
+     "sleeper": 36.6
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "5859": {
+    "mean": 245.2,
+    "n": 1,
+    "per_source": {
+     "sleeper": 245.2
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "5870": {
+    "mean": 221.5,
+    "n": 1,
+    "per_source": {
+     "sleeper": 221.5
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "5872": {
+    "mean": 155.7,
+    "n": 1,
+    "per_source": {
+     "sleeper": 155.7
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "5892": {
+    "mean": 206.1,
+    "n": 1,
+    "per_source": {
+     "sleeper": 206.1
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "5906": {
+    "mean": 76.4,
+    "n": 1,
+    "per_source": {
+     "sleeper": 76.4
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "5927": {
+    "mean": 213.8,
+    "n": 1,
+    "per_source": {
+     "sleeper": 213.8
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "5938": {
+    "mean": 24.0,
+    "n": 1,
+    "per_source": {
+     "sleeper": 24.0
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "5947": {
+    "mean": 169.3,
+    "n": 1,
+    "per_source": {
+     "sleeper": 169.3
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "5967": {
+    "mean": 160.1,
+    "n": 1,
+    "per_source": {
+     "sleeper": 160.1
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "5970": {
+    "mean": 48.1,
+    "n": 1,
+    "per_source": {
+     "sleeper": 48.1
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "5973": {
+    "mean": 31.4,
+    "n": 1,
+    "per_source": {
+     "sleeper": 31.4
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "5985": {
+    "mean": 9.8,
+    "n": 1,
+    "per_source": {
+     "sleeper": 9.8
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "5995": {
+    "mean": 67.7,
+    "n": 1,
+    "per_source": {
+     "sleeper": 67.7
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "6001": {
+    "mean": 31.6,
+    "n": 1,
+    "per_source": {
+     "sleeper": 31.6
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "6011": {
+    "mean": 28.0,
+    "n": 1,
+    "per_source": {
+     "sleeper": 28.0
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "6039": {
+    "mean": 55.8,
+    "n": 1,
+    "per_source": {
+     "sleeper": 55.8
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "6130": {
+    "mean": 30.6,
+    "n": 1,
+    "per_source": {
+     "sleeper": 30.6
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "6136": {
+    "mean": 12.2,
+    "n": 1,
+    "per_source": {
+     "sleeper": 12.2
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "6149": {
+    "mean": 76.3,
+    "n": 1,
+    "per_source": {
+     "sleeper": 76.3
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "6154": {
+    "mean": 26.9,
+    "n": 1,
+    "per_source": {
+     "sleeper": 26.9
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "6271": {
+    "mean": 75.8,
+    "n": 1,
+    "per_source": {
+     "sleeper": 75.8
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "6427": {
+    "mean": 3.0,
+    "n": 1,
+    "per_source": {
+     "sleeper": 3.0
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "6659": {
+    "mean": 4.4,
+    "n": 1,
+    "per_source": {
+     "sleeper": 4.4
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "6768": {
+    "mean": 87.0,
+    "n": 1,
+    "per_source": {
+     "sleeper": 87.0
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "6770": {
+    "mean": 302.1,
+    "n": 1,
+    "per_source": {
+     "sleeper": 302.1
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "6783": {
+    "mean": 119.6,
+    "n": 1,
+    "per_source": {
+     "sleeper": 119.6
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "6786": {
+    "mean": 268.5,
+    "n": 1,
+    "per_source": {
+     "sleeper": 268.5
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "6790": {
+    "mean": 208.0,
+    "n": 1,
+    "per_source": {
+     "sleeper": 208.0
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "6794": {
+    "mean": 250.4,
+    "n": 1,
+    "per_source": {
+     "sleeper": 250.4
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "6797": {
+    "mean": 293.5,
+    "n": 1,
+    "per_source": {
+     "sleeper": 293.5
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "6801": {
+    "mean": 222.4,
+    "n": 1,
+    "per_source": {
+     "sleeper": 222.4
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "6803": {
+    "mean": 49.6,
+    "n": 1,
+    "per_source": {
+     "sleeper": 49.6
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "6804": {
+    "mean": 276.5,
+    "n": 1,
+    "per_source": {
+     "sleeper": 276.5
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "6806": {
+    "mean": 160.2,
+    "n": 1,
+    "per_source": {
+     "sleeper": 160.2
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "6813": {
+    "mean": 270.3,
+    "n": 1,
+    "per_source": {
+     "sleeper": 270.3
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "6819": {
+    "mean": 170.9,
+    "n": 1,
+    "per_source": {
+     "sleeper": 170.9
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "6820": {
+    "mean": 0.8,
+    "n": 1,
+    "per_source": {
+     "sleeper": 0.8
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "6826": {
+    "mean": 79.7,
+    "n": 1,
+    "per_source": {
+     "sleeper": 79.7
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "6850": {
+    "mean": 4.0,
+    "n": 1,
+    "per_source": {
+     "sleeper": 4.0
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "6853": {
+    "mean": 6.8,
+    "n": 1,
+    "per_source": {
+     "sleeper": 6.8
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "6865": {
+    "mean": 76.3,
+    "n": 1,
+    "per_source": {
+     "sleeper": 76.3
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "6869": {
+    "mean": 27.8,
+    "n": 1,
+    "per_source": {
+     "sleeper": 27.8
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "6904": {
+    "mean": 308.5,
+    "n": 1,
+    "per_source": {
+     "sleeper": 308.5
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "6920": {
+    "mean": 9.2,
+    "n": 1,
+    "per_source": {
+     "sleeper": 9.2
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "6938": {
+    "mean": 5.1,
+    "n": 1,
+    "per_source": {
+     "sleeper": 5.1
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "6945": {
+    "mean": 3.9,
+    "n": 1,
+    "per_source": {
+     "sleeper": 3.9
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "6957": {
+    "mean": 0.6,
+    "n": 1,
+    "per_source": {
+     "sleeper": 0.6
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "6960": {
+    "mean": 6.5,
+    "n": 1,
+    "per_source": {
+     "sleeper": 6.5
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "7002": {
+    "mean": 140.9,
+    "n": 1,
+    "per_source": {
+     "sleeper": 140.9
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "7021": {
+    "mean": 161.1,
+    "n": 1,
+    "per_source": {
+     "sleeper": 161.1
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "7039": {
+    "mean": 8.5,
+    "n": 1,
+    "per_source": {
+     "sleeper": 8.5
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "7049": {
+    "mean": 105.7,
+    "n": 1,
+    "per_source": {
+     "sleeper": 105.7
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "7075": {
+    "mean": 8.0,
+    "n": 1,
+    "per_source": {
+     "sleeper": 8.0
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "7083": {
+    "mean": 12.7,
+    "n": 1,
+    "per_source": {
+     "sleeper": 12.7
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "7090": {
+    "mean": 73.4,
+    "n": 1,
+    "per_source": {
+     "sleeper": 73.4
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "7496": {
+    "mean": 29.5,
+    "n": 1,
+    "per_source": {
+     "sleeper": 29.5
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "7523": {
+    "mean": 301.4,
+    "n": 1,
+    "per_source": {
+     "sleeper": 301.4
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "7525": {
+    "mean": 229.2,
+    "n": 1,
+    "per_source": {
+     "sleeper": 229.2
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "7526": {
+    "mean": 221.0,
+    "n": 1,
+    "per_source": {
+     "sleeper": 221.0
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "7527": {
+    "mean": 26.7,
+    "n": 1,
+    "per_source": {
+     "sleeper": 26.7
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "7528": {
+    "mean": 26.3,
+    "n": 1,
+    "per_source": {
+     "sleeper": 26.3
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "7531": {
+    "mean": 1.9,
+    "n": 1,
+    "per_source": {
+     "sleeper": 1.9
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "7536": {
+    "mean": 8.0,
+    "n": 1,
+    "per_source": {
+     "sleeper": 8.0
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "7543": {
+    "mean": 205.7,
+    "n": 1,
+    "per_source": {
+     "sleeper": 205.7
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "7547": {
+    "mean": 278.5,
+    "n": 1,
+    "per_source": {
+     "sleeper": 278.5
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "7553": {
+    "mean": 171.6,
+    "n": 1,
+    "per_source": {
+     "sleeper": 171.6
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "7561": {
+    "mean": 9.3,
+    "n": 1,
+    "per_source": {
+     "sleeper": 9.3
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "7562": {
+    "mean": 10.7,
+    "n": 1,
+    "per_source": {
+     "sleeper": 10.7
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "7564": {
+    "mean": 309.1,
+    "n": 1,
+    "per_source": {
+     "sleeper": 309.1
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "7567": {
+    "mean": 152.3,
+    "n": 1,
+    "per_source": {
+     "sleeper": 152.3
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "7568": {
+    "mean": 6.1,
+    "n": 1,
+    "per_source": {
+     "sleeper": 6.1
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "7569": {
+    "mean": 260.0,
+    "n": 1,
+    "per_source": {
+     "sleeper": 260.0
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "7571": {
+    "mean": 102.3,
+    "n": 1,
+    "per_source": {
+     "sleeper": 102.3
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "7585": {
+    "mean": 12.0,
+    "n": 1,
+    "per_source": {
+     "sleeper": 12.0
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "7587": {
+    "mean": 4.9,
+    "n": 1,
+    "per_source": {
+     "sleeper": 4.9
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "7588": {
+    "mean": 212.0,
+    "n": 1,
+    "per_source": {
+     "sleeper": 212.0
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "7591": {
+    "mean": 34.7,
+    "n": 1,
+    "per_source": {
+     "sleeper": 34.7
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "7594": {
+    "mean": 147.9,
+    "n": 1,
+    "per_source": {
+     "sleeper": 147.9
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "7595": {
+    "mean": 4.2,
+    "n": 1,
+    "per_source": {
+     "sleeper": 4.2
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "7600": {
+    "mean": 128.4,
+    "n": 1,
+    "per_source": {
+     "sleeper": 128.4
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "7602": {
+    "mean": 4.0,
+    "n": 1,
+    "per_source": {
+     "sleeper": 4.0
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "7607": {
+    "mean": 8.1,
+    "n": 1,
+    "per_source": {
+     "sleeper": 8.1
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "7610": {
+    "mean": 14.6,
+    "n": 1,
+    "per_source": {
+     "sleeper": 14.6
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "7611": {
+    "mean": 169.0,
+    "n": 1,
+    "per_source": {
+     "sleeper": 169.0
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "7612": {
+    "mean": 4.9,
+    "n": 1,
+    "per_source": {
+     "sleeper": 4.9
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "7670": {
+    "mean": 32.6,
+    "n": 1,
+    "per_source": {
+     "sleeper": 32.6
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "7694": {
+    "mean": 31.8,
+    "n": 1,
+    "per_source": {
+     "sleeper": 31.8
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "7716": {
+    "mean": 31.8,
+    "n": 1,
+    "per_source": {
+     "sleeper": 31.8
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "7757": {
+    "mean": 0.6,
+    "n": 1,
+    "per_source": {
+     "sleeper": 0.6
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "7828": {
+    "mean": 59.1,
+    "n": 1,
+    "per_source": {
+     "sleeper": 59.1
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "7842": {
+    "mean": 10.1,
+    "n": 1,
+    "per_source": {
+     "sleeper": 10.1
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "7891": {
+    "mean": 27.3,
+    "n": 1,
+    "per_source": {
+     "sleeper": 27.3
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "7946": {
+    "mean": 7.5,
+    "n": 1,
+    "per_source": {
+     "sleeper": 7.5
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "8041": {
+    "mean": 2.3,
+    "n": 1,
+    "per_source": {
+     "sleeper": 2.3
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "8110": {
+    "mean": 159.8,
+    "n": 1,
+    "per_source": {
+     "sleeper": 159.8
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "8111": {
+    "mean": 122.3,
+    "n": 1,
+    "per_source": {
+     "sleeper": 122.3
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "8112": {
+    "mean": 248.2,
+    "n": 1,
+    "per_source": {
+     "sleeper": 248.2
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "8116": {
+    "mean": 7.5,
+    "n": 1,
+    "per_source": {
+     "sleeper": 7.5
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "8117": {
+    "mean": 34.2,
+    "n": 1,
+    "per_source": {
+     "sleeper": 34.2
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "8119": {
+    "mean": 71.2,
+    "n": 1,
+    "per_source": {
+     "sleeper": 71.2
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "8121": {
+    "mean": 161.2,
+    "n": 1,
+    "per_source": {
+     "sleeper": 161.2
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "8126": {
+    "mean": 170.7,
+    "n": 1,
+    "per_source": {
+     "sleeper": 170.7
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "8127": {
+    "mean": 38.4,
+    "n": 1,
+    "per_source": {
+     "sleeper": 38.4
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "8129": {
+    "mean": 4.3,
+    "n": 1,
+    "per_source": {
+     "sleeper": 4.3
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "8130": {
+    "mean": 232.9,
+    "n": 1,
+    "per_source": {
+     "sleeper": 232.9
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "8131": {
+    "mean": 157.3,
+    "n": 1,
+    "per_source": {
+     "sleeper": 157.3
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "8132": {
+    "mean": 77.2,
+    "n": 1,
+    "per_source": {
+     "sleeper": 77.2
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "8134": {
+    "mean": 170.7,
+    "n": 1,
+    "per_source": {
+     "sleeper": 170.7
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "8135": {
+    "mean": 34.8,
+    "n": 1,
+    "per_source": {
+     "sleeper": 34.8
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "8136": {
+    "mean": 128.1,
+    "n": 1,
+    "per_source": {
+     "sleeper": 128.1
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "8137": {
+    "mean": 243.7,
+    "n": 1,
+    "per_source": {
+     "sleeper": 243.7
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "8138": {
+    "mean": 258.8,
+    "n": 1,
+    "per_source": {
+     "sleeper": 258.8
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "8139": {
+    "mean": 5.1,
+    "n": 1,
+    "per_source": {
+     "sleeper": 5.1
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "8142": {
+    "mean": 177.9,
+    "n": 1,
+    "per_source": {
+     "sleeper": 177.9
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "8144": {
+    "mean": 233.9,
+    "n": 1,
+    "per_source": {
+     "sleeper": 233.9
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "8145": {
+    "mean": 9.3,
+    "n": 1,
+    "per_source": {
+     "sleeper": 9.3
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "8146": {
+    "mean": 224.9,
+    "n": 1,
+    "per_source": {
+     "sleeper": 224.9
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "8147": {
+    "mean": 48.8,
+    "n": 1,
+    "per_source": {
+     "sleeper": 48.8
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "8148": {
+    "mean": 206.2,
+    "n": 1,
+    "per_source": {
+     "sleeper": 206.2
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "8150": {
+    "mean": 208.0,
+    "n": 1,
+    "per_source": {
+     "sleeper": 208.0
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "8151": {
+    "mean": 244.0,
+    "n": 1,
+    "per_source": {
+     "sleeper": 244.0
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "8154": {
+    "mean": 69.9,
+    "n": 1,
+    "per_source": {
+     "sleeper": 69.9
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "8155": {
+    "mean": 211.0,
+    "n": 1,
+    "per_source": {
+     "sleeper": 211.0
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "8161": {
+    "mean": 270.1,
+    "n": 1,
+    "per_source": {
+     "sleeper": 270.1
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "8167": {
+    "mean": 207.6,
+    "n": 1,
+    "per_source": {
+     "sleeper": 207.6
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "8168": {
+    "mean": 3.0,
+    "n": 1,
+    "per_source": {
+     "sleeper": 3.0
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "8172": {
+    "mean": 110.9,
+    "n": 1,
+    "per_source": {
+     "sleeper": 110.9
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "8177": {
+    "mean": 25.6,
+    "n": 1,
+    "per_source": {
+     "sleeper": 25.6
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "8180": {
+    "mean": 130.6,
+    "n": 1,
+    "per_source": {
+     "sleeper": 130.6
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "8181": {
+    "mean": 14.7,
+    "n": 1,
+    "per_source": {
+     "sleeper": 14.7
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "8183": {
+    "mean": 299.2,
+    "n": 1,
+    "per_source": {
+     "sleeper": 299.2
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "8188": {
+    "mean": 62.6,
+    "n": 1,
+    "per_source": {
+     "sleeper": 62.6
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "8195": {
+    "mean": 7.1,
+    "n": 1,
+    "per_source": {
+     "sleeper": 7.1
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "8200": {
+    "mean": 6.5,
+    "n": 1,
+    "per_source": {
+     "sleeper": 6.5
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "8204": {
+    "mean": 9.8,
+    "n": 1,
+    "per_source": {
+     "sleeper": 9.8
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "8205": {
+    "mean": 53.6,
+    "n": 1,
+    "per_source": {
+     "sleeper": 53.6
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "8207": {
+    "mean": 4.8,
+    "n": 1,
+    "per_source": {
+     "sleeper": 4.8
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "8208": {
+    "mean": 8.4,
+    "n": 1,
+    "per_source": {
+     "sleeper": 8.4
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "8210": {
+    "mean": 144.1,
+    "n": 1,
+    "per_source": {
+     "sleeper": 144.1
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "8225": {
+    "mean": 40.1,
+    "n": 1,
+    "per_source": {
+     "sleeper": 40.1
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "8228": {
+    "mean": 170.6,
+    "n": 1,
+    "per_source": {
+     "sleeper": 170.6
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "8249": {
+    "mean": 8.1,
+    "n": 1,
+    "per_source": {
+     "sleeper": 8.1
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "8254": {
+    "mean": 5.6,
+    "n": 1,
+    "per_source": {
+     "sleeper": 5.6
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "827": {
+    "mean": 12.9,
+    "n": 1,
+    "per_source": {
+     "sleeper": 12.9
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "829": {
+    "mean": 11.8,
+    "n": 1,
+    "per_source": {
+     "sleeper": 11.8
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "8408": {
+    "mean": 153.7,
+    "n": 1,
+    "per_source": {
+     "sleeper": 153.7
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "8484": {
+    "mean": 2.3,
+    "n": 1,
+    "per_source": {
+     "sleeper": 2.3
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "8489": {
+    "mean": 5.4,
+    "n": 1,
+    "per_source": {
+     "sleeper": 5.4
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "8527": {
+    "mean": 4.6,
+    "n": 1,
+    "per_source": {
+     "sleeper": 4.6
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "8583": {
+    "mean": 5.7,
+    "n": 1,
+    "per_source": {
+     "sleeper": 5.7
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "8676": {
+    "mean": 138.1,
+    "n": 1,
+    "per_source": {
+     "sleeper": 138.1
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "8698": {
+    "mean": 70.8,
+    "n": 1,
+    "per_source": {
+     "sleeper": 70.8
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "8800": {
+    "mean": 68.9,
+    "n": 1,
+    "per_source": {
+     "sleeper": 68.9
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "8885": {
+    "mean": 7.5,
+    "n": 1,
+    "per_source": {
+     "sleeper": 7.5
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "8917": {
+    "mean": 71.5,
+    "n": 1,
+    "per_source": {
+     "sleeper": 71.5
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "9221": {
+    "mean": 329.4,
+    "n": 1,
+    "per_source": {
+     "sleeper": 329.4
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "9224": {
+    "mean": 255.2,
+    "n": 1,
+    "per_source": {
+     "sleeper": 255.2
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "9225": {
+    "mean": 65.2,
+    "n": 1,
+    "per_source": {
+     "sleeper": 65.2
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "9226": {
+    "mean": 257.4,
+    "n": 1,
+    "per_source": {
+     "sleeper": 257.4
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "9228": {
+    "mean": 233.6,
+    "n": 1,
+    "per_source": {
+     "sleeper": 233.6
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "9229": {
+    "mean": 21.3,
+    "n": 1,
+    "per_source": {
+     "sleeper": 21.3
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "9230": {
+    "mean": 12.4,
+    "n": 1,
+    "per_source": {
+     "sleeper": 12.4
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "9479": {
+    "mean": 85.1,
+    "n": 1,
+    "per_source": {
+     "sleeper": 85.1
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "9480": {
+    "mean": 161.0,
+    "n": 1,
+    "per_source": {
+     "sleeper": 161.0
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "9482": {
+    "mean": 80.8,
+    "n": 1,
+    "per_source": {
+     "sleeper": 80.8
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "9484": {
+    "mean": 174.4,
+    "n": 1,
+    "per_source": {
+     "sleeper": 174.4
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "9486": {
+    "mean": 70.4,
+    "n": 1,
+    "per_source": {
+     "sleeper": 70.4
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "9487": {
+    "mean": 210.4,
+    "n": 1,
+    "per_source": {
+     "sleeper": 210.4
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "9488": {
+    "mean": 282.6,
+    "n": 1,
+    "per_source": {
+     "sleeper": 282.6
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "9493": {
+    "mean": 310.5,
+    "n": 1,
+    "per_source": {
+     "sleeper": 310.5
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "9494": {
+    "mean": 69.9,
+    "n": 1,
+    "per_source": {
+     "sleeper": 69.9
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "9500": {
+    "mean": 172.3,
+    "n": 1,
+    "per_source": {
+     "sleeper": 172.3
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "9501": {
+    "mean": 80.4,
+    "n": 1,
+    "per_source": {
+     "sleeper": 80.4
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "9502": {
+    "mean": 51.9,
+    "n": 1,
+    "per_source": {
+     "sleeper": 51.9
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "9504": {
+    "mean": 125.2,
+    "n": 1,
+    "per_source": {
+     "sleeper": 125.2
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "9506": {
+    "mean": 52.5,
+    "n": 1,
+    "per_source": {
+     "sleeper": 52.5
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "9508": {
+    "mean": 114.6,
+    "n": 1,
+    "per_source": {
+     "sleeper": 114.6
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "9509": {
+    "mean": 322.9,
+    "n": 1,
+    "per_source": {
+     "sleeper": 322.9
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "9511": {
+    "mean": 96.9,
+    "n": 1,
+    "per_source": {
+     "sleeper": 96.9
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "96": {
+    "mean": 175.0,
+    "n": 1,
+    "per_source": {
+     "sleeper": 175.0
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "9753": {
+    "mean": 67.2,
+    "n": 1,
+    "per_source": {
+     "sleeper": 67.2
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "9754": {
+    "mean": 163.9,
+    "n": 1,
+    "per_source": {
+     "sleeper": 163.9
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "9756": {
+    "mean": 171.7,
+    "n": 1,
+    "per_source": {
+     "sleeper": 171.7
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "9757": {
+    "mean": 5.6,
+    "n": 1,
+    "per_source": {
+     "sleeper": 5.6
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "9758": {
+    "mean": 245.8,
+    "n": 1,
+    "per_source": {
+     "sleeper": 245.8
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "9997": {
+    "mean": 228.2,
+    "n": 1,
+    "per_source": {
+     "sleeper": 228.2
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   },
+   "9999": {
+    "mean": 12.7,
+    "n": 1,
+    "per_source": {
+     "sleeper": 12.7
+    },
+    "spread": 0.0,
+    "weights": {
+     "sleeper": 1.0
+    }
+   }
+  },
+  "notes": [
+   "espn: espn unavailable (ModuleNotFoundError)",
+   "sheet: sheet absent (tiers.external.omnibeta.csv)",
+   "consensus over 1 live sources (sleeper x1), 552 players, rescaled on 0 in common"
+  ],
+  "ts": 1788915789.6867182
+ },
  "contingency:1": {
   "Tyler Warren": "RJ Harvey (RB, 10.3 pts)"
  },
