@@ -121,16 +121,16 @@ def _sheet(cfg) -> tuple[dict[str, float], str | None]:
         with p.open(encoding="utf-8") as fh:
             for row in csv.DictReader(fh):
                 sid = (row.get("sleeper_id") or "").strip()
-                # A BLANK CELL IS NOT A ZERO. Blank means the sheet never
-                # priced him; "0" means it priced him at nothing, which is
-                # real information about a player whose season ended.
-                raw = (row.get("proj_pts") or "").strip()
-                if not sid or not raw:
-                    continue
+                # Both a blank cell and a literal 0 mean UNPRICED here: this
+                # is a draft board, and 11 of its 232 rows carry proj_pts 0
+                # while holding a real ADP (Josh Jacobs, 0 points, ADP 37.2).
+                # Neither is a claim that the player scores nothing.
                 try:
-                    out[sid] = float(raw)
+                    v = float((row.get("proj_pts") or "").strip() or 0.0)
                 except ValueError:
                     continue
+                if sid and v:
+                    out[sid] = v
     except OSError as e:
         return {}, f"sheet unreadable ({e.__class__.__name__})"
     return out, f"sheet {_time.strftime('%Y-%m-%d', _time.localtime(p.stat().st_mtime))}"
@@ -190,16 +190,25 @@ def build(ctx, store=None) -> tuple[dict[str, dict], list[str]]:
     out: dict[str, dict] = {}
     contributed = {k: 0 for k in src}
     for pid in set().union(*(s.keys() for s in src.values())):
-        # A SOURCE THAT SAYS ZERO IS A SOURCE THAT SAID SOMETHING.
+        # A ZERO IS NOT A PROJECTION OF ZERO, IT IS AN UNPRICED ROW.
         #
-        # This filter used to read `s[pid] > 0`, which threw away exactly the
-        # rows that matter most: when a season ends, every live shop zeroes
-        # the player, all three zeroes were discarded as "no coverage", `n`
-        # never reached min_sources, and the board kept its August number.
-        # That is the whole Pearsall defect, and _stale_reserve was a patch
-        # over this line.
+        # The 2026-09-08 audit called this filter the root of the Pearsall
+        # defect -- every live source had zeroed a season-ending-IR receiver
+        # and each zero was discarded as no-coverage, so `n` never reached
+        # min_sources and the board kept his August number. Counting zeroes
+        # as opinions was tried and is WORSE, because these sources do not
+        # encode zero that way: the FantasyPros sheet writes proj_pts 0 for
+        # any player on the board it has not priced, and Josh Jacobs sits
+        # there at 0 with an ADP of 37.2. Blending that dropped him from
+        # 110.3 to 73.5, and Kamara, Conner, Pacheco, Njoku and Charbonnet
+        # with him -- corrupting six starters to correct one shelved player.
+        #
+        # So absence stays the signal, and the guard against acting on it
+        # lives where the extra evidence is: waiver_brief._stale_reserve,
+        # which requires a reserve designation as well, and only for the
+        # positions these sources are actually asked about (COVERED_POS).
         per = {k: round(s[pid] * scale[k], 1) for k, s in src.items()
-               if pid in s and weight[k] > 0}
+               if pid in s and s[pid] > 0 and weight[k] > 0}
         if not per:
             continue
         for k in per:

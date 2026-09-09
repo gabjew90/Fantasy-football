@@ -52,13 +52,16 @@ def test_an_unclamped_row_is_still_applied_exactly_once():
     assert (r["ros_season"], r["weekly"]) == (120.0, 12.0)
 
 
-# ----------------------------------------- 4. a source saying zero says something
+# -------------------------- 4. zero vs absent (fix attempted, then REVERTED:
+#                               these sources encode 'unpriced' as 0, so a zero
+#                               is not an opinion. See consensus.build.)
 
-def test_all_sources_at_zero_zeroes_the_row_rather_than_clamping_it_up():
-    """Pearsall: season-ending surgery, every live source at 0, and the board
-    kept his August 148.7 because each zero was discarded as no-coverage.
-    Clamping 0/148.7 to the 0.60 floor would have been just as wrong."""
-    con = {"x": {"mean": 0.0, "n": 3, "spread": 0.0, "per_source": {}}}
+def test_a_consensus_at_nothing_zeroes_the_row_rather_than_clamping_it_up():
+    """When the sources do price a player at nothing, that is a fact about
+    him and must not be clamped up to 60% of a stale August number. Reachable
+    only when every source carries a real near-zero price -- an unpriced row
+    is excluded from the blend, see the comment in consensus.build."""
+    con = {"x": {"mean": 0.4, "n": 3, "spread": 0.2, "per_source": {}}}
     ctx = {"roster_players": {1: [_row("x", 148.7, 9.0)]}}
     _, notes = consensus.apply(ctx, con)
     r = ctx["roster_players"][1][0]
@@ -73,7 +76,11 @@ def test_one_source_at_zero_is_not_enough_to_zero_a_player():
     assert ctx["roster_players"][1][0]["ros_season"] == 148.7
 
 
-def test_build_counts_a_zero_as_coverage(monkeypatch):
+def test_an_unpriced_zero_does_not_drag_the_mean(monkeypatch):
+    """Counting zeroes as opinions was tried on 2026-09-08 and reverted. The
+    FantasyPros sheet writes proj_pts 0 for board players it has not priced:
+    Josh Jacobs sits at 0 with an ADP of 37.2, and blending it took him from
+    110.3 to 73.5 along with Kamara, Conner, Pacheco, Njoku and Charbonnet."""
     hi = {str(i): 100.0 + i for i in range(60)}
     zero = dict.fromkeys(hi, 0.0)
     monkeypatch.setattr(consensus, "_sleeper", lambda s, y: (hi, None))
@@ -81,7 +88,8 @@ def test_build_counts_a_zero_as_coverage(monkeypatch):
     monkeypatch.setattr(consensus, "_sheet", lambda c: ({}, None))
     ctx = {"cfg": _Cfg(), "state": {"season": "2026"}, "players": {}}
     data, _ = consensus.build(ctx)
-    assert data["30"]["n"] == 2, "a source that said zero was dropped as absent"
+    assert data["30"]["n"] == 1
+    assert data["30"]["mean"] == 130.0, "an unpriced row was blended in"
 
 
 class _Cfg(dict):
