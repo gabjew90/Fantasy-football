@@ -144,3 +144,34 @@ def test_a_context_with_no_player_index_degrades_to_an_empty_pool():
     ctx = _ctx()
     assert trade_radar._waiver_pool(ctx) == []
     assert trade_radar._priced(ctx, _opp(), {}), "still prices without a wire"
+
+
+def test_radar_hands_verdict_the_consensus_row_for_the_biggest_piece():
+    """`confident` was None on every package the radar had ever priced.
+
+    verdict() has taken a `con` row since the gate shipped, and the only
+    production caller never passed one, so the noise test was dead code in
+    the field while its unit tests passed. Assert the wiring, not just the
+    helper: a big edge on a player the sources argue about must come back
+    with the warning attached.
+    """
+    from manager import marginal, trade_radar as tr
+
+    noisy = {"n": 2, "mean": 255.8, "spread": 60.0}
+    give = [{"sleeper_id": "1", "pos": "RB", "name": "Big", "ros": 255.8,
+             "consensus": noisy},
+            {"sleeper_id": "2", "pos": "TE", "name": "Small", "ros": 180.9,
+             "consensus": {"n": 2, "mean": 180.9, "spread": 1.0}}]
+    get = [{"sleeper_id": "3", "pos": "WR", "name": "In", "ros": 229.4,
+            "consensus": {"n": 2, "mean": 229.4, "spread": 0.5}}]
+
+    assert tr._biggest_row(give, get) is noisy
+    assert tr._biggest_row([], []) is None
+    # a row that apply() never rescaled carries no consensus key
+    assert tr._biggest_row([{"sleeper_id": "9", "ros": 400.0}], []) is None
+
+    deal = marginal.Deal(100.0, 116.5, 100.0, 102.7,
+                         give=["Big"], get=["In"])
+    v = marginal.verdict(deal, 17, con=tr._biggest_row(give, get))
+    assert v["confident"] is False
+    assert any("disagreement" in w for w in v["warnings"])

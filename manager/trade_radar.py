@@ -91,6 +91,23 @@ def _waiver_pool(ctx, con=None) -> list[dict]:
     return pool
 
 
+def _biggest_row(give, get) -> dict | None:
+    """The consensus row for the largest piece in the package.
+
+    verdict() cannot tell a 16-point edge between players every source agrees
+    about from the same edge on one they argue about by twenty-two -- unless
+    it is handed the row to test against. It always could; nothing passed it,
+    so `confident` came back None on every package the radar has ever priced.
+    The biggest piece is the right one because the package's disagreement is
+    dominated by its largest projection, and consensus.confident halves the
+    spread before comparing, which already builds in slack for the rest.
+    """
+    rows = [p for p in list(give) + list(get) if isinstance(p, dict)]
+    if not rows:
+        return None
+    return max(rows, key=lambda p: p.get("ros") or 0.0).get("consensus")
+
+
 def _priced(ctx, opp, vals) -> list[str]:
     """What the package does to both starting lineups, seats named, and
     whether it clears the gates.
@@ -113,7 +130,8 @@ def _priced(ctx, opp, vals) -> list[str]:
                            market_values=vals, waivers=wv)
         thin = marginal.newly_thin(mine, shape, arriving=get, departing=give,
                                    waivers=wv, key="ros")
-        v = marginal.verdict(d, ctx.get("weeks_left") or 1, thin=thin)
+        v = marginal.verdict(d, ctx.get("weeks_left") or 1, thin=thin,
+                             con=_biggest_row(give, get))
     except Exception as e:  # noqa: BLE001
         log.warning("trade radar: could not price %s (%s)", opp.get("mgr"), e)
         return []
