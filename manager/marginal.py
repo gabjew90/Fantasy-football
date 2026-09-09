@@ -349,6 +349,25 @@ MARKET_CEILING = 1.15
 # whether an IR slot is free, how much the lineup gain is worth against a
 # tail risk. That is a manager's call, not a constant's. Flip to True and
 # every gate-3 failure becomes a hard no again.
+# THE CEILING REPORTS; IT DOES NOT BLOCK. User decision, 2026-09-09.
+#
+# Gate 2 folds two jobs into one band. The FLOOR asks "will they say yes" --
+# a deal they refuse is worth nothing, so it blocks. The CEILING asks "am I
+# handing over market value" -- and market value does not score points. Its
+# only use is future trade capital, and with the whole-league misallocation
+# ceiling measured at +7.2 there is almost nothing to buy with it.
+#
+# Worse, for a deal that gets ACCEPTED the ceiling is counterproductive. The
+# counterparty judges on names and value, not on my lineup math. The one
+# package on the 2026-09-09 board that both sides won -- Javonte + Deebo for
+# Garrett Wilson, me +5.2 lineup points, them +2.0 -- ran 149% on the market,
+# because that is precisely what made it a yes: they win in the currency
+# they see, I win in the one that scores. The 1.15 ceiling rejected it.
+#
+# So overpaying is still measured and still said out loud, in `warnings`.
+# Flip this to block again when preserving asset value matters more than
+# acquiring points -- a keeper league, or a season already lost.
+MARKET_CEILING_BLOCKS = False
 DEPTH_BLOCKS = False
 # And below this the lineup edge is inside projection error, so you are
 # paying transaction risk for nothing.
@@ -408,6 +427,7 @@ def newly_thin(roster: list[dict], shape: dict, *, arriving=(), departing=(),
 def verdict(deal: Deal, weeks_left: int, *, floor_ppg: float = EDGE_PPG,
             market_floor: float = MARKET_FLOOR,
             market_ceiling: float = MARKET_CEILING,
+            market_ceiling_blocks: bool = MARKET_CEILING_BLOCKS,
             thin: list[str] | None = None, depth_blocks: bool = DEPTH_BLOCKS,
             con: dict | None = None) -> dict:
     """The two gates, kept separate on purpose.
@@ -443,7 +463,12 @@ def verdict(deal: Deal, weeks_left: int, *, floor_ppg: float = EDGE_PPG,
     share = None
     if deal.market and deal.market.get("in"):
         share = deal.market["out"] / deal.market["in"]
-    gate2 = share is None or market_floor <= share <= market_ceiling
+    # The floor always binds. The ceiling binds only when asked to -- the
+    # same shape as gate 3, and for the same reason: it is information, not
+    # a veto, unless the caller says otherwise.
+    under = share is not None and share < market_floor
+    over = share is not None and share > market_ceiling
+    gate2 = not under and not (over and market_ceiling_blocks)
     confident = None
     if con is not None:
         from . import consensus as consensus_mod
@@ -456,12 +481,13 @@ def verdict(deal: Deal, weeks_left: int, *, floor_ppg: float = EDGE_PPG,
     if not gate1:
         reasons.append(f"lineup: me {mine_ppg:+.2f} ppg (need {floor_ppg:+.2f}), "
                        f"them {theirs_ppg:+.2f}")
-    if not gate2 and share < market_floor:
+    if under:
         reasons.append(f"market: they receive {100 * share:.0f}% of what they give "
                        f"(need {100 * market_floor:.0f}%) — expect a rejection")
-    elif not gate2:
-        reasons.append(f"market: I send {100 * share:.0f}% of what I get back "
-                       f"(ceiling {100 * market_ceiling:.0f}%) — overpaying")
+    if over:
+        (reasons if market_ceiling_blocks else warnings).append(
+            f"market: I send {100 * share:.0f}% of what I get back "
+            f"(ceiling {100 * market_ceiling:.0f}%) — overpaying")
     if not gate3:
         msg = (f"depth: one injury empties a required slot at "
                f"{', '.join(thin)} — no cover on the roster")
@@ -471,6 +497,7 @@ def verdict(deal: Deal, weeks_left: int, *, floor_ppg: float = EDGE_PPG,
     return {"gate1": gate1, "gate2": gate2, "gate3": gate3,
             "send": bool(gate1 and gate2 and (gate3 or not depth_blocks)),
             "depth_blocks": depth_blocks, "thin": list(thin or []),
+            "market_ceiling_blocks": market_ceiling_blocks,
             "my_ppg": round(mine_ppg, 2), "their_ppg": round(theirs_ppg, 2),
             "market_share": round(share, 3) if share is not None else None,
             "confident": confident, "why": reasons, "warnings": warnings}

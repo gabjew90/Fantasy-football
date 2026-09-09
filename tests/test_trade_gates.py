@@ -224,21 +224,42 @@ def test_the_movement_lists_stay_disjoint_with_a_backfill():
 
 # ---------------------------------------------- gate 2 ceiling, gate 3 depth
 
-def test_gate_two_rejects_overpaying_as_well_as_underpaying():
-    """The source framework only had a floor, which protects against THEM
-    saying no. Nothing stopped a package that gained 2.6 season points while
-    handing over 559% of the market value it got back."""
+def test_overpaying_is_reported_and_blocks_only_when_asked():
+    """The ceiling was a veto until 2026-09-09. It is now a warning by
+    default: market value does not score points, and the one package that
+    session where both sides won ran 149% -- the ceiling rejected exactly the
+    deal that got a yes. The 559% fleecing case must still be SAID, and the
+    knob must still block when a caller turns it on."""
     fleeced = _deal(17.0, 5.0, out=5590, inn=1000)
     v = marginal.verdict(fleeced, weeks_left=17)
+    assert v["gate2"] is True and v["send"] is True
+    assert any("overpaying" in w for w in v["warnings"]), v
+    assert not any("overpaying" in w for w in v["why"])
+
+    blocked = marginal.verdict(fleeced, weeks_left=17, market_ceiling_blocks=True)
+    assert blocked["gate2"] is False and blocked["send"] is False
+    assert any("overpaying" in w for w in blocked["why"]), blocked
+
+
+def test_lifting_the_ceiling_did_not_lift_the_floor():
+    """A deal they refuse is worth nothing whatever it does to my lineup.
+    That job still blocks."""
+    low = _deal(17.0, 5.0, out=5000, inn=10000)
+    v = marginal.verdict(low, weeks_left=17)
     assert v["gate2"] is False and v["send"] is False
-    assert any("overpaying" in w for w in v["why"])
+    assert any("expect a rejection" in w for w in v["why"])
+
+
+def test_the_ceiling_ships_as_advisory():
+    assert marginal.MARKET_CEILING_BLOCKS is False
+    assert marginal.verdict(_deal(1.0, 1.0), weeks_left=17)["market_ceiling_blocks"] is False
 
 
 def test_the_floor_and_the_ceiling_report_different_reasons():
     low = marginal.verdict(_deal(17.0, 5.0, out=5000, inn=10000), weeks_left=17)
     high = marginal.verdict(_deal(17.0, 5.0, out=10000, inn=5000), weeks_left=17)
     assert any("expect a rejection" in w for w in low["why"])
-    assert any("overpaying" in w for w in high["why"])
+    assert any("overpaying" in w for w in high["warnings"])
 
 
 def test_an_even_market_still_passes():
