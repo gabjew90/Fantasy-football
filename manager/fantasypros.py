@@ -4,11 +4,11 @@ WHY A THIRD SOURCE, AND WHAT IT IS AND IS NOT WORTH.
 
 Adding a source shrinks the disagreement BETWEEN sources. That was never the
 big term. Measured against this repo's own out-of-sample backtest
-(reports/projection_backtest.omnibeta.md, the `lines` arm scored on actuals),
-the top-36 MAE on a season total is 59-69 points at RB and 65-85 at WR, while
-ESPN and Sleeper sit 16-21 points apart. The shops agree with each other
-several times more closely than any of them agrees with the season that
-actually happens.
+(reports/projection_backtest.<league>.md, the `lines` arm scored on actuals),
+the top-36 MAE on a season total runs 59-69 points at RB and 65-85 at WR in a
+full-PPR league, while ESPN and Sleeper sit 16-21 points apart. The shops
+agree with each other several times more closely than any of them agrees with
+the season that actually happens.
 
 So this is NOT here to sharpen a point estimate. It is here because:
 
@@ -178,6 +178,11 @@ def fetch(scoring: dict, season, index, kind: str = ROS, week: int | None = None
                 unmatched += 1
                 continue
             out[pid] = {
+                # The FantasyPros id, which the keyed injuries endpoint needs
+                # to filter on. Carried here because THIS feed is uncapped and
+                # that one is not: the crosswalk is free, the bulk pull is not.
+                "fp_id": row.get("player_id"),
+                "yahoo_id": row.get("player_yahoo_id"),
                 "pts": _num(row.get("r2p_pts")),
                 "ecr": _num(row.get("rank_ecr")),
                 "best": _num(row.get("rank_min")),
@@ -215,3 +220,153 @@ def points(scoring: dict, season, index, store=None
     if not rows:
         return {}, note
     return ({pid: r["pts"] for pid, r in rows.items() if r.get("pts")}, note)
+
+
+# ---------------------------------------------------------------- injuries
+#
+# WHAT THIS ADDS THAT WE DID NOT ALREADY HAVE.
+#
+# Sleeper's player index carries `injury_status` for 776 players and
+# `injury_body_part` for 698, so the LABEL was never missing. What is missing
+# is everything behind it: `practice_participation` and `practice_description`
+# are null on all 776 rows, and there has never been a number anywhere.
+#
+# The label on its own is close to uninformative, and measurably so. On the
+# week-1 report Rome Odunze is flagged Questionable at a 0.31 chance of
+# playing while George Kittle carries NO status at 0.76 -- the flag and the
+# probability disagree in both directions. Meanwhile "Questionable" does
+# nothing at all in this engine today: it prints next to a name, and no
+# projection, lineup or depth calculation reads it.
+#
+# THIS MODULE ONLY SUPPLIES THE NUMBER. Multiplying projections by it would
+# move every lineup in both leagues, and that is a modelling decision nothing
+# has measured yet, so it is deliberately not made here.
+#
+# TWO SEPARATE LIMITS, AND THEY PULL IN OPPOSITE DIRECTIONS.
+#
+#   1. TEN ROWS PER RESPONSE. There are 219 injuries and no paging: `limit`,
+#      `offset` and `page` are all ignored. `player_ids` filters server-side,
+#      so a batch returns only the injured players among the ids asked about.
+#      This argues for SMALL batches.
+#   2. ABOUT TWELVE CALLS BEFORE A 429. Measured, not documented: the
+#      thirteenth identical request returns "Too Many Requests" with no
+#      Retry-After header. Asking about 182 rostered players eight at a time
+#      is 23 calls and dies two thirds of the way through. This argues for
+#      LARGE batches.
+#
+# Large wins, because truncation is DETECTABLE and rate limiting is not. The
+# response carries `count` as the true number of matches -- the unfiltered
+# call reports count 219 while returning ten rows -- so a truncated batch
+# announces itself and can be split and retried, paying an extra call only
+# where one is actually needed. A 429 just loses the rest of the run.
+
+API = "https://api.fantasypros.com/public/v2/json"
+BATCH = 40               # 182 rostered players in 5 calls, not 23
+MAX_CALLS = 10           # stay under the measured ~12 before a 429
+INJURY_TTL = 3 * 3600
+
+
+def _api_key():
+    import os
+    return os.environ.get("FANTASYPROS_API_KEY") or None
+
+
+def _injury_page(fp_ids, season, week, key):
+    """Returns (rows, truncated). `truncated` when the cap hid matches."""
+    r = requests.get(f"{API}/nfl/injuries", timeout=TIMEOUT,
+                     headers={"x-api-key": key},
+                     params={"year": season, "week": int(week or 1),
+                             "include_probabilities": "true",
+                             "player_ids": ":".join(str(i) for i in fp_ids)})
+    r.raise_for_status()
+    body = r.json() or {}
+    rows = body.get("injuries") or []
+    try:
+        total = int(body.get("count"))
+    except (TypeError, ValueError):
+        total = len(rows)
+    return rows, total > len(rows)
+
+
+def _row(x) -> dict:
+    practice = [x.get("practice_1"), x.get("practice_2"), x.get("practice_3")]
+    return {
+        "status": (x.get("status") or "").strip() or None,
+        # NONE IS NOT ZERO. A player with no published probability is usually
+        # one nobody asked about; defaulting him to zero benches a healthy
+        # starter, which is a far worse error than saying "unknown".
+        "play_prob": _num(x.get("probability_of_playing")),
+        "practice": [p for p in practice if p],
+        "ir_weeks": list(x.get("ir_weeks") or []),
+        "injury": (x.get("injury_type") or "").strip() or None,
+    }
+
+
+def injuries(rows: dict, season, week, store=None
+             ) -> tuple[dict[str, dict], str | None]:
+    """sleeper_id -> {status, play_prob, practice, ir_weeks, injury}.
+
+    `rows` is the output of fetch(), which is where the FantasyPros ids come
+    from -- that feed is uncapped and unkeyed, so the crosswalk is free while
+    this call is not. Pass only the players you actually care about.
+
+    Degrades to a PARTIAL result with a note rather than raising: half the
+    injury reports is better than none, and silently returning half is worse
+    than either.
+    """
+    key = _api_key()
+    if not key:
+        return {}, ("DATA MISSING: no FANTASYPROS_API_KEY, so injury "
+                    "probabilities are unavailable — Sleeper still supplies "
+                    "the status label")
+
+    by_fp: dict[str, str] = {}
+    for pid, r in (rows or {}).items():
+        if r.get("fp_id") is not None:
+            by_fp.setdefault(str(r["fp_id"]), pid)
+    if not by_fp:
+        return {}, "DATA MISSING: fantasypros injuries (no id crosswalk)"
+
+    ids = sorted(by_fp)
+    ckey = f"fantasypros:injuries:{season}:{week}:{len(ids)}"
+    if store is not None:
+        cached = store.get(ckey)
+        if cached and _time.time() - cached.get("ts", 0) < INJURY_TTL:
+            return cached["data"], cached.get("note")
+
+    out: dict[str, dict] = {}
+    queue = [ids[i:i + BATCH] for i in range(0, len(ids), BATCH)]
+    calls, asked, split, note = 0, 0, 0, None
+    while queue:
+        batch = queue.pop(0)
+        if calls >= MAX_CALLS:
+            note = (f"⚠ fantasypros injuries: stopped at {MAX_CALLS} calls with "
+                    f"{sum(len(b) for b in queue) + len(batch)} of {len(ids)} "
+                    f"players unasked — the free tier 429s at about twelve")
+            break
+        try:
+            page, truncated = _injury_page(batch, season, week, key)
+            calls += 1
+        except Exception as e:  # noqa: BLE001
+            note = (f"⚠ fantasypros injuries: stopped after {asked} of "
+                    f"{len(ids)} players ({e.__class__.__name__})")
+            break
+        if truncated and len(batch) > 1:
+            # More matches than the cap returned. Halve it and re-ask, so a
+            # busy batch costs an extra call instead of losing players.
+            mid = len(batch) // 2
+            queue[:0] = [batch[:mid], batch[mid:]]
+            split += 1
+            continue
+        asked += len(batch)
+        for x in page:
+            pid = by_fp.get(str(x.get("player_id")))
+            if pid:
+                out[pid] = _row(x)
+
+    if note is None:
+        note = (f"fantasypros injuries: {len(out)} reports over {asked} players "
+                f"in {calls} calls" + (f", {split} batch(es) split" if split else ""))
+    if store is not None:
+        store.set(ckey, {"ts": _time.time(), "data": out, "note": note})
+    return out, note

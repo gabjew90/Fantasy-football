@@ -193,3 +193,111 @@ def test_fantasypros_holds_full_weight_because_it_republishes():
     """The decay is for STATIC sources. This one is a live rest-of-season
     feed, so a week-12 brief must not be quietly discounting it."""
     assert consensus.source_weight("fantasypros", week=12) == 1.0
+
+
+# ------------------------------------------------------------------ injuries
+
+def _rows_with_ids(n):
+    return {f"s{i}": {"fp_id": 1000 + i, "pos": "RB"} for i in range(n)}
+
+
+def _fp_inj(pid, **kw):
+    base = {"player_id": pid, "status": "Questionable", "injury_type": "Knee",
+            "probability_of_playing": "0.5", "practice_1": None,
+            "practice_2": None, "practice_3": None, "ir_weeks": []}
+    base.update(kw)
+    return base
+
+
+def test_no_key_is_data_missing_and_says_the_label_still_works(monkeypatch):
+    """Losing the probability must not read as losing injury data entirely --
+    Sleeper still supplies the status for 776 players."""
+    monkeypatch.delenv("FANTASYPROS_API_KEY", raising=False)
+    out, note = fp.injuries(_rows_with_ids(5), 2026, 1)
+    assert out == {} and "DATA MISSING" in note
+    assert "Sleeper" in note
+
+
+def test_a_probability_of_zero_survives_and_absent_stays_none(monkeypatch):
+    """NONE IS NOT ZERO. A player nobody has reported on must not be read as
+    certain to miss, which is what a 0.0 default would do."""
+    monkeypatch.setenv("FANTASYPROS_API_KEY", "k")
+    monkeypatch.setattr(fp, "_injury_page", lambda ids, s, w, k: ([
+        _fp_inj(1000, probability_of_playing="0"),
+        _fp_inj(1001, probability_of_playing=None)], False))
+    out, _ = fp.injuries(_rows_with_ids(2), 2026, 1)
+    assert out["s0"]["play_prob"] == 0.0
+    assert out["s1"]["play_prob"] is None
+
+
+def test_a_truncated_batch_is_split_and_retried_not_silently_dropped(monkeypatch):
+    """The response caps at ten rows but reports the TRUE match count, so a
+    batch that hid players announces itself. Splitting costs one extra call;
+    ignoring it loses injuries with no sign that anything went missing."""
+    monkeypatch.setenv("FANTASYPROS_API_KEY", "k")
+    seen = []
+
+    def page(ids, season, week, key):
+        seen.append(list(ids))
+        if len(ids) > 2:                       # pretend the cap bit
+            return [_fp_inj(1000)], True
+        return [_fp_inj(int(i)) for i in ids], False
+    monkeypatch.setattr(fp, "_injury_page", page)
+
+    out, note = fp.injuries(_rows_with_ids(4), 2026, 1)
+    assert len(seen) > 1, "a truncated batch was never split"
+    assert set(out) == {"s0", "s1", "s2", "s3"}, out
+    assert "split" in note
+
+
+def test_a_single_id_that_still_truncates_does_not_loop_forever(monkeypatch):
+    monkeypatch.setenv("FANTASYPROS_API_KEY", "k")
+    monkeypatch.setattr(fp, "_injury_page",
+                        lambda ids, s, w, k: ([_fp_inj(1000)], True))
+    out, note = fp.injuries(_rows_with_ids(1), 2026, 1)
+    assert out and isinstance(note, str)
+
+
+def test_the_call_budget_stops_short_of_the_rate_limit(monkeypatch):
+    """Measured, not documented: the thirteenth call 429s with no Retry-After.
+    Running past that loses the rest of the run, so stop early and say so."""
+    monkeypatch.setenv("FANTASYPROS_API_KEY", "k")
+    calls = []
+
+    def page(ids, season, week, key):
+        calls.append(1)
+        return [], True                        # always truncated -> always splits
+    monkeypatch.setattr(fp, "_injury_page", page)
+    out, note = fp.injuries(_rows_with_ids(fp.BATCH * 4), 2026, 1)
+    assert len(calls) <= fp.MAX_CALLS, f"{len(calls)} calls, budget {fp.MAX_CALLS}"
+    assert "unasked" in note and "429" in note
+
+
+def test_a_mid_run_failure_keeps_what_it_already_has(monkeypatch):
+    monkeypatch.setenv("FANTASYPROS_API_KEY", "k")
+    n = [0]
+
+    def page(ids, season, week, key):
+        n[0] += 1
+        if n[0] == 1:
+            return [_fp_inj(1000)], False
+        raise TimeoutError("slow")
+    monkeypatch.setattr(fp, "_injury_page", page)
+    out, note = fp.injuries(_rows_with_ids(fp.BATCH * 2), 2026, 1)
+    assert "s0" in out, "a partial result was thrown away"
+    assert "stopped after" in note and "TimeoutError" in note
+
+
+def test_the_crosswalk_comes_from_the_uncapped_feed(monkeypatch):
+    """fetch() carries fp_id precisely so injuries() never has to pay a keyed,
+    capped call to learn which id belongs to whom."""
+    _feed(monkeypatch, {"RB": [{"player_name": "Bijan Robinson", "player_id": 17240,
+                                "player_yahoo_id": "40059", "r2p_pts": "378.0"}]})
+    rows, _ = fp.fetch({}, 2026, INDEX)
+    assert rows["1"]["fp_id"] == 17240 and rows["1"]["yahoo_id"] == "40059"
+
+
+def test_a_player_with_no_fantasypros_id_is_not_asked_about(monkeypatch):
+    monkeypatch.setenv("FANTASYPROS_API_KEY", "k")
+    out, note = fp.injuries({"s0": {"pos": "RB"}}, 2026, 1)
+    assert out == {} and "no id crosswalk" in note
