@@ -73,7 +73,7 @@ def lineup_points(roster: list[dict], shape: dict, key: str = "weekly") -> float
 
 
 def slot_moves(roster: list[dict], shape: dict, *, arriving=(), departing=(),
-               key: str = "weekly") -> dict:
+               filled=(), key: str = "weekly") -> dict:
     """Re-solve the lineup around a trade and say which seats actually moved.
 
     THE POINT IS THE PROMOTIONS. A package's effect is not "these two left
@@ -88,7 +88,12 @@ def slot_moves(roster: list[dict], shape: dict, *, arriving=(), departing=(),
       departed  started, and left in the trade
       benched   started, still rostered, no longer starts (squeezed out)
       arrived   came in the trade and starts
+      backfilled  a waiver pickup for a spot the trade opened, and starts
       promoted  already rostered and on the bench, now starts
+
+    `filled` is kept apart from `arriving` because a waiver body reported as
+    "in (from the trade)" is a lie the reader cannot check -- it was not in
+    the package and the other manager never saw it.
     """
     # MATERIALISE BEFORE ITERATING TWICE. `arriving` was read once to build
     # the id set and again to build the post-trade roster; a generator is
@@ -97,15 +102,17 @@ def slot_moves(roster: list[dict], shape: dict, *, arriving=(), departing=(),
     # same package a generator caller got 0 for.
     arriving = list(arriving)
     departing = list(departing)
+    filled = list(filled)
     dep = {_pid(p) for p in departing}
     arr = {_pid(p) for p in arriving}
+    bf = {_pid(p) for p in filled}
     # A player on both sides is not a trade, and counting him as departed AND
     # arrived would break the disjointness the four lists promise.
     both = dep & arr
     if both:
         raise ValueError(
             f"the same player is both arriving and departing: {sorted(both)}")
-    after_roster = [p for p in roster if _pid(p) not in dep] + arriving
+    after_roster = [p for p in roster if _pid(p) not in dep] + arriving + filled
     before = starters(roster, shape, key)
     after = starters(after_roster, shape, key)
     b_ids = {_pid(p) for p in before}
@@ -118,7 +125,9 @@ def slot_moves(roster: list[dict], shape: dict, *, arriving=(), departing=(),
         "departed": [p for p in before if _pid(p) in dep],
         "benched": [p for p in before if _pid(p) not in a_ids and _pid(p) not in dep],
         "arrived": [p for p in after if _pid(p) in arr],
-        "promoted": [p for p in after if _pid(p) not in b_ids and _pid(p) not in arr],
+        "backfilled": [p for p in after if _pid(p) in bf],
+        "promoted": [p for p in after if _pid(p) not in b_ids
+                     and _pid(p) not in arr and _pid(p) not in bf],
     }
 
 
@@ -255,10 +264,10 @@ def price(my_roster: list[dict], their_roster: list[dict],
     # Both sides re-solve. slot_moves carries the totals, so the deltas and
     # the seat-by-seat story cannot drift apart the way they would if the
     # points were computed here and the movements somewhere else.
-    mine = slot_moves(my_roster, shape, arriving=list(get) + my_fill,
-                      departing=give, key=key)
-    theirs = slot_moves(their_roster, their_shape,
-                        arriving=list(give) + their_fill, departing=get, key=key)
+    mine = slot_moves(my_roster, shape, arriving=get, departing=give,
+                      filled=my_fill, key=key)
+    theirs = slot_moves(their_roster, their_shape, arriving=give,
+                        departing=get, filled=their_fill, key=key)
     return Deal(
         mine_before=mine["total_before"], mine_after=mine["total_after"],
         theirs_before=theirs["total_before"], theirs_after=theirs["total_after"],
@@ -288,15 +297,19 @@ def depth_risk(roster: list[dict], shape: dict, pos: str, *, arriving=(),
         list(arriving) + fill
 
     def drop(pool):
+        # NO WAIVER TOP-UP HERE. An injury does not open a roster spot, so
+        # the replacement is whoever is already on the roster. The waiver
+        # body belongs in `after_roster` only, where the TRADE opened the
+        # spot -- and it is already there. Adding one inside this function
+        # topped up the BEFORE pool too, which has lost nothing and needs
+        # nothing, and that erased the difference the replay exists to
+        # measure: a 2-for-1 that plainly sold depth reported extra 0.0.
         at_pos = [p for p in pool if p.get("pos") == pos]
         if not at_pos:
             return 0.0, None
         star = max(at_pos, key=lambda p: (p.get(key) or 0.0))
         healthy = lineup_points(pool, shape, key)
         hurt_pool = [p for p in pool if _pid(p) != _pid(star)]
-        if waivers:
-            hurt_pool = hurt_pool + backfill(
-                1, waivers, key, exclude=list(pool) + fill)
         return round(healthy - lineup_points(hurt_pool, shape, key), 1), star
 
     before_drop, before_star = drop(roster)
@@ -388,6 +401,7 @@ def explain(deal: Deal, me: str = "you", them: str = "them") -> str:
         for tag, rows in (("out (traded)", mv["departed"]),
                           ("out (squeezed to bench)", mv["benched"]),
                           ("in  (from the trade)", mv["arrived"]),
+                          ("in  (waiver fill, opened spot)", mv.get("backfilled") or []),
                           ("in  (PROMOTED off the bench)", mv["promoted"])):
             for p in rows:
                 out.append(f"    {tag:30s} {p.get('pos', '?'):3s} "

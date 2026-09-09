@@ -73,15 +73,40 @@ def test_the_side_receiving_more_bodies_gets_no_backfill():
 
 def test_depth_risk_measures_what_a_trade_costs_you_when_a_starter_goes_down():
     """A package can look even on the starting lineup and quietly sell the
-    depth behind it."""
-    mine = [p("RB", 15.0, "star"), p("RB", 13.0), p("RB", 11.0),
-            p("WR", 16.0), p("WR", 13.0), p("WR", 12.0), p("WR", 10.0)]
+    depth behind it.
+
+    The roster needs REAL bench depth for this to mean anything. An earlier
+    version of this test used six players for six slots, so both pools lost
+    the same 15.0 and it passed on a fixture that could not have failed."""
+    mine = [p("RB", 15.0, "star"), p("RB", 13.0, "benchRB"), p("RB", 11.0),
+            p("WR", 16.0), p("WR", 14.0), p("WR", 13.0, "sentWR"),
+            p("WR", 12.0), p("WR", 10.0)]
     theirs = [p("WR", 17.5, "their star")]
-    r = marginal.depth_risk(mine, TWO_FLEX, "RB",
-                            arriving=[theirs[0]], departing=[mine[1], mine[4]],
-                            waivers=[p("RB", 8.0)])
+    give = [mine[1], mine[5]]
+    r = marginal.depth_risk(mine, TWO_FLEX, "RB", arriving=[theirs[0]],
+                            departing=give, waivers=[p("RB", 8.0, "wv")])
     assert r["before_star"] == "star" and r["pos"] == "RB"
-    assert r["extra"] > 0, "trading two bodies for one must widen the hole"
+    assert r["extra"] > 0, (
+        f"trading the bench RB away must widen the hole: {r}")
+
+
+def test_the_before_pool_is_never_topped_up_from_waivers():
+    """An injury does not open a roster spot. Topping the BEFORE pool up
+    erased the very difference the replay measures -- with a three-deep
+    waiver pool a 2-for-1 that plainly sold depth reported extra 0.0."""
+    mine = [p("RB", 15.0, "star"), p("RB", 13.0, "benchRB"), p("RB", 11.0),
+            p("WR", 16.0), p("WR", 14.0), p("WR", 13.0, "sentWR"),
+            p("WR", 12.0), p("WR", 10.0)]
+    theirs = [p("WR", 17.5, "their star")]
+    give = [mine[1], mine[5]]
+    deep = [p("RB", 9.0), p("RB", 8.5), p("RB", 8.0)]
+    rich = marginal.depth_risk(mine, TWO_FLEX, "RB", arriving=[theirs[0]],
+                               departing=give, waivers=deep)
+    lean = marginal.depth_risk(mine, TWO_FLEX, "RB", arriving=[theirs[0]],
+                               departing=give, waivers=deep[:1])
+    assert rich["before_drop"] == lean["before_drop"], (
+        "the size of the waiver pool must not change the pre-trade roster")
+    assert rich["extra"] > 0 and lean["extra"] > 0
 
 
 def test_depth_risk_is_zero_when_the_trade_touches_nothing_at_that_position():
@@ -166,3 +191,32 @@ def test_a_disputed_consensus_row_is_reported_alongside_the_gates():
 
 def test_weeks_left_of_zero_does_not_divide_by_zero():
     assert marginal.verdict(_deal(10.0, 1.0), weeks_left=0)["my_ppg"] == 10.0
+
+
+def test_a_waiver_pickup_is_not_reported_as_part_of_the_trade():
+    """explain() showed "in (from the trade) RB WAIVER PICKUP" for a body the
+    other manager never saw. The reader cannot check that, so it is a lie."""
+    mine = [p("RB", 15.0), p("RB", 13.0, "sent"), p("WR", 16.0, "sent2"),
+            p("WR", 12.0), p("WR", 10.0)]
+    theirs = [p("WR", 17.5, "star")]
+    d = marginal.price(mine, theirs, [mine[1], mine[2]], [theirs[0]], TWO_FLEX,
+                       waivers=[p("RB", 14.0, "WAIVER PICKUP")])
+    arrived = [x["name"] for x in d.my_moves["arrived"]]
+    filled = [x["name"] for x in d.my_moves["backfilled"]]
+    assert arrived == ["star"], arrived
+    assert filled == ["WAIVER PICKUP"], filled
+    body = marginal.explain(d)
+    assert "waiver fill, opened spot" in body
+    assert "from the trade)           RB  WAIVER PICKUP" not in body
+
+
+def test_the_movement_lists_stay_disjoint_with_a_backfill():
+    mine = [p("RB", 15.0), p("RB", 13.0), p("WR", 16.0), p("WR", 12.0),
+            p("WR", 11.0)]
+    theirs = [p("WR", 17.5)]
+    d = marginal.price(mine, theirs, [mine[1], mine[4]], [theirs[0]], TWO_FLEX,
+                       waivers=[p("RB", 14.0)])
+    mv = d.my_moves
+    ids = [x["sleeper_id"] for g in ("departed", "benched", "arrived",
+                                     "backfilled", "promoted") for x in mv[g]]
+    assert len(ids) == len(set(ids))
