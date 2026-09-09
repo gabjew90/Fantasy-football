@@ -325,6 +325,13 @@ def depth_risk(roster: list[dict], shape: dict, pos: str, *, arriving=(),
 # package can be good for them and still be refused. Below this share of the
 # value they are giving up, expect a no whatever the points say.
 MARKET_FLOOR = 0.90
+# ...and a ceiling, which the source framework did not have. Its floor only
+# protects against THEM saying no. Nothing stopped a package that improved my
+# lineup by 2.6 season points while handing over 559% of the market value I
+# got back -- 250 of 460 "passing" Omnibeta packages had me overpaying by
+# more than 15%, and 119 by more than 50%. Lineup points are this week;
+# market value is every trade after it.
+MARKET_CEILING = 1.15
 # And below this the lineup edge is inside projection error, so you are
 # paying transaction risk for nothing.
 #
@@ -339,8 +346,35 @@ MARKET_FLOOR = 0.90
 EDGE_PPG = 0.0
 
 
+def thin_after(roster: list[dict], shape: dict, *, arriving=(), departing=(),
+               waivers=None, key: str = "weekly") -> list[str]:
+    """Positions where, after this trade, ONE injury empties a required slot.
+
+    Not a judgement call and not a threshold -- a structural fact. A wide
+    receiver cannot legally occupy a tight end slot, so a roster holding
+    exactly as many tight ends as it must start has no cover at all. That is
+    what the cbarone package does: it takes the second tight end and leaves
+    Warren alone, so losing him costs the whole 201.4 rather than the 52.0 it
+    costs today, when Fannin slides up from the flex and Deebo backfills it.
+
+    Waivers count, because the spot a 2-for-1 opens gets filled by Tuesday --
+    but only against positions the wire actually covers.
+    """
+    dep = {_pid(p) for p in departing}
+    fill = backfill(len(list(departing)) - len(list(arriving)), waivers, key,
+                    exclude=list(arriving) + list(departing))
+    after = [p for p in roster if _pid(p) not in dep] + list(arriving) + fill
+    held: dict[str, int] = {}
+    for p in after:
+        held[p.get("pos")] = held.get(p.get("pos"), 0) + 1
+    return sorted(pos for pos, need in (shape.get("slots") or {}).items()
+                  if need and held.get(pos, 0) <= need)
+
+
 def verdict(deal: Deal, weeks_left: int, *, floor_ppg: float = EDGE_PPG,
-            market_floor: float = MARKET_FLOOR, con: dict | None = None) -> dict:
+            market_floor: float = MARKET_FLOOR,
+            market_ceiling: float = MARKET_CEILING,
+            thin: list[str] | None = None, con: dict | None = None) -> dict:
     """The two gates, kept separate on purpose.
 
     GATE 1 asks whether the trade is actually good -- my lineup up by more
@@ -371,21 +405,31 @@ def verdict(deal: Deal, weeks_left: int, *, floor_ppg: float = EDGE_PPG,
     share = None
     if deal.market and deal.market.get("in"):
         share = deal.market["out"] / deal.market["in"]
-    gate2 = share is None or share >= market_floor
+    gate2 = share is None or market_floor <= share <= market_ceiling
     confident = None
     if con is not None:
         from . import consensus as consensus_mod
         confident = consensus_mod.confident(con, abs(deal.my_delta))
+    # GATE 3: a required slot with no cover behind it. Structural, so it is
+    # not a threshold and does not care how big the trade is.
+    gate3 = not thin
     reasons = []
     if not gate1:
         reasons.append(f"lineup: me {mine_ppg:+.2f} ppg (need {floor_ppg:+.2f}), "
                        f"them {theirs_ppg:+.2f}")
-    if not gate2:
+    if not gate2 and share < market_floor:
         reasons.append(f"market: they receive {100 * share:.0f}% of what they give "
                        f"(need {100 * market_floor:.0f}%) — expect a rejection")
+    elif not gate2:
+        reasons.append(f"market: I send {100 * share:.0f}% of what I get back "
+                       f"(ceiling {100 * market_ceiling:.0f}%) — overpaying")
+    if not gate3:
+        reasons.append(f"depth: one injury empties a required slot at "
+                       f"{', '.join(thin)} — no cover on the roster")
     if confident is False:
         reasons.append("edge is smaller than the sources' own disagreement")
-    return {"gate1": gate1, "gate2": gate2, "send": bool(gate1 and gate2),
+    return {"gate1": gate1, "gate2": gate2, "gate3": gate3,
+            "send": bool(gate1 and gate2 and gate3), "thin": list(thin or []),
             "my_ppg": round(mine_ppg, 2), "their_ppg": round(theirs_ppg, 2),
             "market_share": round(share, 3) if share is not None else None,
             "confident": confident, "why": reasons}

@@ -220,3 +220,69 @@ def test_the_movement_lists_stay_disjoint_with_a_backfill():
     ids = [x["sleeper_id"] for g in ("departed", "benched", "arrived",
                                      "backfilled", "promoted") for x in mv[g]]
     assert len(ids) == len(set(ids))
+
+
+# ---------------------------------------------- gate 2 ceiling, gate 3 depth
+
+def test_gate_two_rejects_overpaying_as_well_as_underpaying():
+    """The source framework only had a floor, which protects against THEM
+    saying no. Nothing stopped a package that gained 2.6 season points while
+    handing over 559% of the market value it got back."""
+    fleeced = _deal(17.0, 5.0, out=5590, inn=1000)
+    v = marginal.verdict(fleeced, weeks_left=17)
+    assert v["gate2"] is False and v["send"] is False
+    assert any("overpaying" in w for w in v["why"])
+
+
+def test_the_floor_and_the_ceiling_report_different_reasons():
+    low = marginal.verdict(_deal(17.0, 5.0, out=5000, inn=10000), weeks_left=17)
+    high = marginal.verdict(_deal(17.0, 5.0, out=10000, inn=5000), weeks_left=17)
+    assert any("expect a rejection" in w for w in low["why"])
+    assert any("overpaying" in w for w in high["why"])
+
+
+def test_an_even_market_still_passes():
+    v = marginal.verdict(_deal(17.0, 5.0, out=10700, inn=10000), weeks_left=17)
+    assert v["gate2"] is True, "107% is the cbarone package and it is fine"
+
+
+def test_thin_after_names_a_slot_with_no_cover():
+    """A wide receiver cannot legally occupy a tight end slot, so a roster
+    holding exactly as many tight ends as it must start has no cover."""
+    shape = {"slots": {"RB": 2, "WR": 2, "TE": 1}, "flex": 2}
+    roster = [p("TE", 20.0, "te1"), p("TE", 18.0, "te2"),
+              p("RB", 15.0), p("RB", 14.0), p("RB", 13.0),
+              p("WR", 16.0), p("WR", 15.0), p("WR", 12.0)]
+    assert marginal.thin_after(roster, shape) == []
+    thin = marginal.thin_after(roster, shape, departing=[roster[1]],
+                               arriving=[p("WR", 19.0)])
+    assert thin == ["TE"]
+
+
+def test_a_waiver_body_can_cover_a_spot_a_two_for_one_opens():
+    # three backs, so only the TE room is left without cover -- an earlier
+    # fixture held exactly two RBs for two RB slots and was thin at both,
+    # which is what the function correctly said
+    shape = {"slots": {"RB": 2, "TE": 1}, "flex": 1}
+    roster = [p("TE", 20.0, "te1"), p("TE", 18.0, "te2"),
+              p("RB", 15.0), p("RB", 14.0), p("RB", 13.0)]
+    give = [roster[1], roster[3]]
+    assert marginal.thin_after(roster, shape, departing=give,
+                               arriving=[p("RB", 19.0)]) == ["TE"]
+    covered = marginal.thin_after(roster, shape, departing=give,
+                                  arriving=[p("RB", 19.0)],
+                                  waivers=[p("TE", 9.0, "wire TE")])
+    assert covered == [], "the opened spot is filled by Tuesday"
+
+
+def test_gate_three_blocks_a_package_that_empties_a_slot():
+    v = marginal.verdict(_deal(17.0, 5.0, out=10000, inn=10000),
+                         weeks_left=17, thin=["TE"])
+    assert v["gate3"] is False and v["send"] is False
+    assert any("empties a required slot" in w for w in v["why"])
+    assert v["thin"] == ["TE"]
+
+
+def test_gate_three_is_silent_when_nothing_is_thin():
+    v = marginal.verdict(_deal(17.0, 5.0, out=10000, inn=10000), weeks_left=17)
+    assert v["gate3"] is True and v["send"] is True and v["thin"] == []
