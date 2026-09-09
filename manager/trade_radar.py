@@ -9,78 +9,22 @@ suppressed via state unless the opportunity's conditions changed.
 from __future__ import annotations
 
 import logging
-import time as _time
-
-import requests
 
 from draftkit.lineup import optimal_lineup
 
 
 log = logging.getLogger("manager")
 
-# FORMAT IS A LEAGUE FACT (fixed 2026-09-07). This was hardcoded to
-# numTeams=12&ppr=1 -- Omnibeta's shape. Keefamania is 10-team half-PPR and
-# would have been priced on another league's market with no error anywhere.
-URL = ("https://api.fantasycalc.com/values/current"
-       "?isDynasty=false&numQbs={qbs}&numTeams={teams}&ppr={ppr}")
-TTL = 24 * 3600
+# The FantasyCalc client lives in manager.market now, so the trade pricing in
+# manager.marginal can use the same values on the same league format instead
+# of this module owning them behind a weeks 3-10 gate. Re-exported because
+# manager.trade_watch imports `values` from here.
+from .market import fetch as market, league_format, values   # noqa: E402,F401
+
 MAX_OPPS = 3
 VETO_RATIO = 0.7          # offer/ask value below this may draw veto votes
 TRADE_WEEKS = (3, 10)     # active window; recommend initiating by week 10
 DEADLINE_WEEK = 11
-
-
-def league_format(ctx) -> tuple[int, float, int]:
-    """(teams, ppr, qbs) for the FantasyCalc query, from the league itself."""
-    teams = len(ctx.get("rosters") or []) or 12
-    cfg = ctx.get("cfg") or {}
-    scoring = (cfg.get("scoring") or (cfg.get("expected") or {}).get("scoring") or {})
-    ppr = float(scoring.get("rec", 1.0))
-    qbs = 2 if int((ctx.get("slots") or {}).get("SUPER_FLEX", 0)) else 1
-    return teams, ppr, qbs
-
-
-def market(store, ctx) -> tuple[dict[str, dict], str | None]:
-    """sleeper_id -> the FantasyCalc row we keep.
-
-    `value` is what a trade costs in market terms; `trend30` and `rostered`
-    are what make buy-low and sell-high detectable at all. The old version
-    kept `value` and threw the rest away.
-    """
-    teams, ppr, qbs = league_format(ctx)
-    ckey = f"fantasycalc:{teams}:{ppr}:{qbs}"
-    cached = store.get(ckey)
-    if cached and _time.time() - cached.get("ts", 0) < TTL:
-        return cached["data"], None
-    try:
-        resp = requests.get(URL.format(qbs=qbs, teams=teams, ppr=ppr), timeout=20)
-        resp.raise_for_status()
-        data = {}
-        for row in resp.json():
-            sid = (row.get("player") or {}).get("sleeperId")
-            if not sid:
-                continue
-            data[str(sid)] = {
-                "value": int(row.get("value") or 0),
-                "overall": row.get("overallRank"),
-                "pos_rank": row.get("positionRank"),
-                "trend30": row.get("trend30Day"),
-                "rostered": row.get("maybeRosterPercent"),
-                "trade_freq": row.get("maybeTradeFrequency"),
-            }
-        store.set(ckey, {"ts": _time.time(), "data": data})
-        return data, None
-    except Exception as e:  # noqa: BLE001
-        if cached:
-            return (cached["data"],
-                    "DATA MISSING: FantasyCalc refresh failed — using cached values")
-        return {}, f"DATA MISSING: FantasyCalc values ({e.__class__.__name__})"
-
-
-def values(store, ctx) -> tuple[dict[str, int], str | None]:
-    """sleeper_id -> FantasyCalc value, the shape the radar body consumes."""
-    rows, note = market(store, ctx)
-    return {k: int(v.get("value") or 0) for k, v in rows.items()}, note
 
 
 def _flex_split(ctx) -> dict[str, float]:

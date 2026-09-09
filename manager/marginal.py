@@ -60,13 +60,20 @@ def gain_to_add(roster: list[dict], player: dict, shape: dict,
 
 @dataclass
 class Deal:
-    """Both sides of a package, in lineup points rather than projections."""
+    """Both sides of a package, in lineup points rather than projections.
+
+    `market` is the optional FantasyCalc second opinion (manager.market.price).
+    It is carried, never blended: the two measure different things, and the
+    interesting deals are exactly the ones where they disagree. Averaging them
+    would hide the signal.
+    """
     mine_before: float
     mine_after: float
     theirs_before: float
     theirs_after: float
     give: list[str] = field(default_factory=list)
     get: list[str] = field(default_factory=list)
+    market: dict | None = None
 
     @property
     def my_delta(self) -> float:
@@ -82,23 +89,58 @@ class Deal:
         without someone having to be talked into it."""
         return self.my_delta > 0 and self.their_delta > 0
 
+    @property
+    def market_delta(self) -> int | None:
+        return None if not self.market else int(self.market["delta"])
+
+    @property
+    def disputed(self) -> bool:
+        """Lineup points and the market point opposite ways.
+
+        Worth surfacing rather than resolving. When this fired on the
+        2026-09-08 Barkley package the lineup model said -10.0 and the market
+        said +1263, and the market was reading an age gap and a tight-end
+        ranking the projections did not carry.
+        """
+        m = self.market_delta
+        return m is not None and self.my_delta != 0 and (m > 0) != (self.my_delta > 0)
+
     def __str__(self) -> str:
-        return (f"give {', '.join(self.give) or '-'} / get {', '.join(self.get) or '-'}: "
-                f"me {self.my_delta:+.1f}, them {self.their_delta:+.1f}")
+        s = (f"give {', '.join(self.give) or '-'} / get {', '.join(self.get) or '-'}: "
+             f"me {self.my_delta:+.1f}, them {self.their_delta:+.1f}")
+        if self.market:
+            s += f", {_market_mod().annotate(self.market)}"
+            if self.disputed:
+                s += "  ⚠ lineup points and market disagree"
+        return s
+
+
+def _market_mod():
+    from . import market
+    return market
 
 
 def price(my_roster: list[dict], their_roster: list[dict],
           give: list[dict], get: list[dict], shape: dict,
-          their_shape: dict | None = None, key: str = "weekly") -> Deal:
+          their_shape: dict | None = None, key: str = "weekly",
+          market_values: dict[str, int] | None = None) -> Deal:
     """Price a package from both sides at once.
 
     `shape` is {slots, flex, flex_slots}. `their_shape` defaults to the same,
     which is right within one league and wrong across two.
+
+    `market_values` is an optional {sleeper_id: value} map from
+    manager.market.values(). Pure lookup -- this module does no I/O, so the
+    caller owns the fetch and the cache.
     """
     their_shape = their_shape or shape
     give_ids, get_ids = {_pid(p) for p in give}, {_pid(p) for p in get}
     mine_after = [p for p in my_roster if _pid(p) not in give_ids] + list(get)
     theirs_after = [p for p in their_roster if _pid(p) not in get_ids] + list(give)
+    mkt = None
+    if market_values:
+        from . import market as market_mod
+        mkt = market_mod.price(market_values, give, get)
     return Deal(
         mine_before=lineup_points(my_roster, shape, key),
         mine_after=lineup_points(mine_after, shape, key),
@@ -106,6 +148,7 @@ def price(my_roster: list[dict], their_roster: list[dict],
         theirs_after=lineup_points(theirs_after, their_shape, key),
         give=[p.get("name", _pid(p)) for p in give],
         get=[p.get("name", _pid(p)) for p in get],
+        market=mkt,
     )
 
 

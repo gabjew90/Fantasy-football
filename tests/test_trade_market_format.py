@@ -7,7 +7,7 @@ it. Wrong values that look right are worse than missing ones.
 
 import pytest
 
-from manager import trade_radar
+from manager import market, trade_radar
 
 
 class FakeStore:
@@ -40,13 +40,18 @@ def _patch(monkeypatch, seen):
         def json():
             return ROW
 
-    monkeypatch.setattr(trade_radar.requests, "get",
-                        lambda url, timeout=20: (seen.append(url), R())[1])
+    # the client moved to manager.market on 2026-09-08 so manager.marginal
+    # can price trades on the same values; trade_radar re-exports it
+    monkeypatch.setattr(market.requests, "get",
+                        lambda url, params=None, timeout=20:
+                        (seen.append(dict(params or {})), R())[1])
 
 
 def test_league_format_reads_teams_and_ppr_from_the_league():
-    assert trade_radar.league_format(OMNIBETA) == (12, 1.0, 1)
-    assert trade_radar.league_format(KEEFAMANIA) == (10, 0.5, 1)
+    # the 4th field is isDynasty, added when the client moved to
+    # manager.market (redraft returns 199 players, dynasty 423)
+    assert trade_radar.league_format(OMNIBETA) == (12, 1.0, 1, False)
+    assert trade_radar.league_format(KEEFAMANIA) == (10, 0.5, 1, False)
 
 
 def test_superflex_asks_for_two_quarterbacks():
@@ -54,14 +59,24 @@ def test_superflex_asks_for_two_quarterbacks():
     assert trade_radar.league_format(sf)[2] == 2
 
 
-def test_the_two_leagues_produce_different_urls(monkeypatch):
+def test_the_two_leagues_produce_different_queries(monkeypatch):
     seen = []
     _patch(monkeypatch, seen)
     trade_radar.market(FakeStore(), OMNIBETA)
     trade_radar.market(FakeStore(), KEEFAMANIA)
-    assert "numTeams=12" in seen[0] and "ppr=1.0" in seen[0]
-    assert "numTeams=10" in seen[1] and "ppr=0.5" in seen[1]
+    assert seen[0]["numTeams"] == 12 and seen[0]["ppr"] == 1.0
+    assert seen[1]["numTeams"] == 10 and seen[1]["ppr"] == 0.5
     assert seen[0] != seen[1]
+
+
+def test_only_parameters_the_api_honours_are_sent(monkeypatch):
+    """Measured 2026-09-08: the endpoint SILENTLY IGNORES unknown keys --
+    teMultiplier and numStarters return byte-identical values to a bogus
+    parameter. Sending one would advertise support that does not exist."""
+    seen = []
+    _patch(monkeypatch, seen)
+    trade_radar.market(FakeStore(), OMNIBETA)
+    assert set(seen[0]) == {"isDynasty", "numQbs", "numTeams", "ppr"}
 
 
 def test_cache_is_keyed_by_format_so_leagues_cannot_share_values(monkeypatch):
@@ -94,9 +109,9 @@ def test_values_still_returns_the_flat_shape_the_body_consumes(monkeypatch):
 
 
 def test_an_outage_is_a_data_missing_line_not_a_crash(monkeypatch):
-    def boom(url, timeout=20):
+    def boom(url, params=None, timeout=20):
         raise ConnectionError("down")
 
-    monkeypatch.setattr(trade_radar.requests, "get", boom)
+    monkeypatch.setattr(market.requests, "get", boom)
     vals, note = trade_radar.values(FakeStore(), OMNIBETA)
     assert vals == {} and "DATA MISSING" in note
