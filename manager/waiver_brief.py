@@ -135,7 +135,11 @@ def _stale_reserve(pl: dict, con: dict, pid: str) -> bool:
         return False
     if (pl.get("position") or "") not in consensus.COVERED_POS:
         return False
-    return (con.get(pid) or {}).get("n", 0) < 1
+    # NOT `n < 1`. n counts every source, and FantasyPros arrived on
+    # 2026-09-09 as a ranking feed whose list simply ends somewhere -- a
+    # shelved receiver it still lists reaches n=1 and walks back into the
+    # pool. Ask only the sources that price the whole position.
+    return not consensus.carried_by_enumerating_source(con.get(pid))
 
 
 def _fa_pool(ctx, con: dict | None = None) -> list[dict]:

@@ -36,6 +36,20 @@ log = logging.getLogger("manager")
 TTL = 12 * 3600
 MIN_COMMON = 40          # below this the rescale is noise, so report unscaled
 MIN_POS_COMMON = 12      # ...and below this for ONE position, so borrow the overall
+SEASON_WEEKS = 17        # the fantasy season these season totals span
+
+# SOURCES THAT SPEAK REST-OF-SEASON, NOT SEASON TOTAL.
+#
+# Sleeper's projections endpoint returns a full-season number (its rows carry
+# gp: 18.0) and so does ESPN. FantasyPros publishes REST of season: remaining
+# games only, shrinking every week. apply() divides the blended mean by
+# `ros_season`, "the untouched season total", so mixing the two bases feeds a
+# half-season number into a full-season ratio.
+#
+# It is invisible in week 1 -- with nothing played the two coincide exactly,
+# which is why the measured "FantasyPros runs 9-13% hot" looked like a clean
+# constant -- and it grows every week after.
+ROS_BASIS_SOURCES = ("fantasypros",)
 FLOOR = 40.0             # players too small to inform the median
 
 # NOT EVERY SOURCE AGES THE SAME WAY.
@@ -208,6 +222,33 @@ def build(ctx, store=None) -> tuple[dict[str, dict], list[str]]:
     if not src:
         return {}, notes + ["DATA MISSING: no projection source reachable"]
 
+    # PUT EVERY SOURCE ON THE SAME BASIS BEFORE ANYTHING COMPARES THEM.
+    #
+    # The median rescale below would absorb the LEVEL difference on its own,
+    # but not the shape: a rest-of-season number is proportional to a
+    # player's REMAINING production while the others are proportional to his
+    # FULL-SEASON production, and those differ per player. Undone here rather
+    # than in the reader, because `week` lives in this function.
+    #
+    # WHAT THIS DOES NOT FIX, and it is the population that matters most: the
+    # conversion is exact only for a player who has played every game so far.
+    # Someone returning from four weeks on IR has his whole season's output
+    # still ahead of him, so his rest-of-season number is much larger a share
+    # of his season total than the median player's, and this scaling leaves
+    # him inflated. Fixing that needs a per-player games-played feed the free
+    # tier does not give us. Until then the guard is `spread`, which goes
+    # loud on exactly those rows.
+    weeks_left = int(ctx.get("weeks_left") or SEASON_WEEKS)
+    if 0 < weeks_left < SEASON_WEEKS:
+        factor = SEASON_WEEKS / float(weeks_left)
+        for label in ROS_BASIS_SOURCES:
+            if label in src:
+                src[label] = {p: v * factor for p, v in src[label].items()}
+                notes.append(
+                    f"{label} is rest-of-season; scaled x{factor:.2f} onto a "
+                    f"season basis ({weeks_left} of {SEASON_WEEKS} weeks left) "
+                    f"— exact only for players who have missed no games")
+
     # EACH SOURCE IS FITTED AGAINST THE REFERENCE OVER ITS OWN OVERLAP, NOT
     # OVER A GLOBAL INTERSECTION.
     #
@@ -377,6 +418,28 @@ DEAD_EPS = 1.0           # a consensus this low is "he does not play again"
 # 32 rows) but a defence never carries a reserve designation, so nothing
 # turns on it.
 COVERED_POS = ("QB", "RB", "WR", "TE")
+
+# Sources whose SILENCE about a player is evidence he is shelved.
+#
+# _stale_reserve fires when nothing carries a reserve-status player. That is
+# a claim about coverage, and it only holds for a source that prices the
+# whole position. Sleeper and ESPN do. FantasyPros publishes RANKINGS with
+# their own inclusion rules -- 32 kickers against 154 active ones -- so its
+# listing a shelved receiver at some residual value is not an opinion that he
+# will play, it is an artefact of where its list ends.
+#
+# Adding it as a third source silently raised the bar for that guard from
+# "both sources dropped him" to "all three did", which would have quietly
+# put shelved players back in the waiver pool at their August board numbers:
+# the Pearsall defect, restored by a source addition rather than a code
+# change. Counted separately so it cannot.
+ENUMERATING_SOURCES = ("sleeper", "espn")
+
+
+def carried_by_enumerating_source(row: dict | None) -> bool:
+    """Does a source that prices the WHOLE position still carry this player?"""
+    per = (row or {}).get("per_source") or {}
+    return any(k in per for k in ENUMERATING_SOURCES)
 
 
 def apply(ctx, con: dict, *, min_sources: int = 2, clamp=DEFAULT_CLAMP

@@ -344,8 +344,21 @@ def test_a_shelved_player_with_no_live_source_is_dropped_from_the_pool():
     pl = {"active": True, "injury_status": "IR", "full_name": "Shelved Star",
           "position": "WR"}
     assert wb._stale_reserve(pl, {}, "1") is True
-    assert wb._stale_reserve(pl, {"1": {"n": 2}}, "1") is False, \
-        "a source still carries him, so trust it"
+    carried = {"1": {"n": 2, "per_source": {"sleeper": 90.0, "espn": 88.0}}}
+    assert wb._stale_reserve(pl, carried, "1") is False, \
+        "a source that prices the whole position still carries him, so trust it"
+
+    # THE THIRD SOURCE MUST NOT RESCUE HIM ON ITS OWN. FantasyPros publishes
+    # rankings whose list ends somewhere -- 32 kickers against 154 active --
+    # so its carrying a shelved receiver is an artefact of where the list
+    # stops, not an opinion that he plays. Counting it would have raised this
+    # guard from "both sources dropped him" to "all three did" and put
+    # Pearsall back in the pool at his August number.
+    fp_only = {"1": {"n": 1, "per_source": {"fantasypros": 40.0}}}
+    assert wb._stale_reserve(pl, fp_only, "1") is True, \
+        "a ranking feed's inclusion was read as coverage"
+    mixed = {"1": {"n": 2, "per_source": {"espn": 88.0, "fantasypros": 40.0}}}
+    assert wb._stale_reserve(pl, mixed, "1") is False
 
 
 def test_absence_is_only_evidence_for_positions_the_sources_cover():
@@ -441,3 +454,39 @@ def test_each_position_is_scaled_on_its_own_ratio(monkeypatch):
     for pid in ("10", "60"):
         assert data[pid]["spread"] < 1.0, (
             f"{idx[pid]['position']} still carries a scale residual: {data[pid]}")
+
+
+def test_a_rest_of_season_source_is_put_on_a_season_basis_first(monkeypatch):
+    """Sleeper and ESPN return full-season totals (Sleeper's rows carry
+    gp: 18.0); FantasyPros returns REST of season. apply() divides the blend
+    by ros_season, "the untouched season total", so mixing the bases feeds a
+    part-season number into a full-season ratio.
+
+    Invisible in week 1 -- nothing played, so the two coincide exactly, which
+    is why the source measured as a clean constant when it was wired in.
+    """
+    season = {str(i): 200.0 for i in range(60)}
+    half = {str(i): 100.0 for i in range(60)}          # same players, 8 weeks left
+    monkeypatch.setattr(consensus, "_sleeper", lambda s, y: (season, None))
+    monkeypatch.setattr(consensus, "_espn", lambda s, y, r, i: (season, None))
+    monkeypatch.setattr(consensus, "_fantasypros", lambda s, y, i: (half, None))
+    ctx = {"cfg": Cfg(league_name="x"), "state": {"season": "2026"},
+           "players": {"1": {}}, "weeks_left": 8}
+    data, notes = consensus.build(ctx)
+    assert any("rest-of-season" in n and "x2.12" in n for n in notes), notes
+    # 100 * (17/8) = 212.5, then the median rescale lands it on 200
+    assert data["30"]["spread"] < 1.0, data["30"]
+
+
+def test_week_one_does_not_rescale_a_rest_of_season_source(monkeypatch):
+    """With nothing played the two bases are identical, and multiplying by
+    17/17 is a no-op that should not appear in the notes as if work happened."""
+    season = {str(i): 200.0 for i in range(60)}
+    monkeypatch.setattr(consensus, "_sleeper", lambda s, y: (season, None))
+    monkeypatch.setattr(consensus, "_espn", lambda s, y, r, i: ({}, "down"))
+    monkeypatch.setattr(consensus, "_fantasypros", lambda s, y, i: (season, None))
+    ctx = {"cfg": Cfg(league_name="x"), "state": {"season": "2026"},
+           "players": {"1": {}}, "weeks_left": 17}
+    data, notes = consensus.build(ctx)
+    assert not any("rest-of-season" in n for n in notes), notes
+    assert data["30"]["mean"] == 200.0

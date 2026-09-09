@@ -197,6 +197,9 @@ def fetch(scoring: dict, season, index, kind: str = ROS, week: int | None = None
                 # that one is not: the crosswalk is free, the bulk pull is not.
                 "fp_id": row.get("player_id"),
                 "yahoo_id": row.get("player_yahoo_id"),
+                # The FEED's spelling, not the index's -- crosswalk() keys on
+                # it, and a name identical to ours is of no use there.
+                "name": row.get("player_name"),
                 "pts": _num(row.get("r2p_pts")),
                 "ecr": _num(row.get("rank_ecr")),
                 "best": _num(row.get("rank_min")),
@@ -390,10 +393,17 @@ def injuries(rows: dict, season, week, store=None
             if pid:
                 out[pid] = _row(x)
 
-    if note is None:
+    partial = note is not None
+    if not partial:
         note = (f"fantasypros injuries: {len(out)} reports over {asked} players "
                 f"in {calls} calls" + (f", {split} batch(es) split" if split else ""))
-    if store is not None:
+    # NEVER CACHE A RUN THAT DID NOT FINISH. fetch() already refuses to, and
+    # this call is the one far more likely to fail -- it is keyed and
+    # rate-limited, and MAX_CALLS exists precisely because a 429 is expected.
+    # Freezing a 429 for the full TTL means every brief for three hours
+    # reports no injuries, long after the API has recovered; a run cut short
+    # at batch 2 of 5 freezes three fifths of the roster as healthy.
+    if store is not None and not partial:
         store.set(ckey, {"ts": _time.time(), "data": out, "note": note})
     return out, note
 
@@ -444,8 +454,13 @@ def crosswalk(scoring: dict, season, index, store=None
         yid = r.get("yahoo_id")
         if yid:
             by_yahoo.setdefault(str(yid), pid)
+        # KEYED ON THE FANTASYPROS SPELLING, WHICH IS THE WHOLE POINT.
+        # Keying it on the Sleeper index's own full_name made the table a
+        # strict subset of the by_norm that yahoo.load already builds from
+        # those same fields -- so it could never hold a rendering the index
+        # lacked, and the "second spelling" fallback could not fire at all.
         d = (index.get(pid) or {}) if hasattr(index, "get") else {}
-        nm = d.get("full_name") or d.get("last_name")
+        nm = r.get("name") or d.get("full_name") or d.get("last_name")
         if nm:
             by_name.setdefault(normalize_name(nm), []).append(
                 (pid, r.get("pos") or d.get("position") or "",
