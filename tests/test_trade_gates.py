@@ -1,0 +1,168 @@
+"""Waiver backfill, the depth replay, and the two acceptance gates.
+
+Three additions from the 2026-09-09 framework review. The lineup recompute
+was already right -- it reproduced both of that framework's worked examples
+to the decimal -- so these are the parts it had that we did not.
+"""
+
+from __future__ import annotations
+
+import pytest
+
+from manager import marginal
+
+TWO_FLEX = {"slots": {"RB": 2, "WR": 2}, "flex": 2}
+_n = [0]
+
+
+def p(pos, v, name=None):
+    _n[0] += 1
+    return {"sleeper_id": f"p{_n[0]}", "pos": pos, "weekly": v,
+            "name": name or f"{pos}{v}"}
+
+
+# --------------------------------------------------------------- backfill
+
+def test_backfill_only_fills_spots_a_package_actually_opens():
+    """NOT a replacement baseline. Bench players are already in the pool the
+    optimiser solves over, so a departing starter is covered automatically.
+    This is only for the spot a 2-for-1 leaves empty."""
+    wv = [p("RB", 8.0), p("WR", 7.0)]
+    assert marginal.backfill(0, wv) == []
+    assert marginal.backfill(-1, wv) == []
+    assert [x["weekly"] for x in marginal.backfill(1, wv)] == [8.0]
+    assert [x["weekly"] for x in marginal.backfill(2, wv)] == [8.0, 7.0]
+
+
+def test_backfill_never_hands_back_a_player_already_in_the_deal():
+    wv = [p("RB", 9.0, "in the deal"), p("RB", 8.0)]
+    got = marginal.backfill(1, wv, exclude=[wv[0]])
+    assert [x["name"] for x in got] == [wv[1]["name"]]
+
+
+def test_backfill_is_empty_without_a_pool():
+    assert marginal.backfill(2, None) == []
+    assert marginal.backfill(2, []) == []
+
+
+def test_a_two_for_one_prices_the_opened_spot_instead_of_leaving_it_empty():
+    """The spot is filled by Tuesday. Pricing it at zero understates every
+    consolidation."""
+    mine = [p("RB", 15.0), p("RB", 13.0), p("RB", 6.0),
+            p("WR", 16.0), p("WR", 13.0), p("WR", 12.0), p("WR", 10.0)]
+    theirs = [p("WR", 17.5, "star"), p("RB", 4.0), p("WR", 4.0)]
+    give, get = [mine[1], mine[4]], [theirs[0]]
+    wv = [p("RB", 14.0, "big waiver")]
+    without = marginal.price(mine, theirs, give, get, TWO_FLEX)
+    with_wv = marginal.price(mine, theirs, give, get, TWO_FLEX, waivers=wv)
+    assert with_wv.my_delta > without.my_delta
+    assert with_wv.my_backfill == ["big waiver"]
+    assert without.my_backfill == []
+
+
+def test_the_side_receiving_more_bodies_gets_no_backfill():
+    mine = [p("RB", 15.0), p("WR", 16.0), p("WR", 12.0)]
+    theirs = [p("RB", 14.0), p("RB", 13.0), p("WR", 11.0)]
+    d = marginal.price(mine, theirs, [mine[0]], [theirs[0], theirs[1]],
+                       TWO_FLEX, waivers=[p("WR", 9.0)])
+    assert d.my_backfill == [], "I received a body, I did not open a spot"
+    assert d.their_backfill, "they sent two and received one"
+
+
+# ------------------------------------------------------------- depth_risk
+
+def test_depth_risk_measures_what_a_trade_costs_you_when_a_starter_goes_down():
+    """A package can look even on the starting lineup and quietly sell the
+    depth behind it."""
+    mine = [p("RB", 15.0, "star"), p("RB", 13.0), p("RB", 11.0),
+            p("WR", 16.0), p("WR", 13.0), p("WR", 12.0), p("WR", 10.0)]
+    theirs = [p("WR", 17.5, "their star")]
+    r = marginal.depth_risk(mine, TWO_FLEX, "RB",
+                            arriving=[theirs[0]], departing=[mine[1], mine[4]],
+                            waivers=[p("RB", 8.0)])
+    assert r["before_star"] == "star" and r["pos"] == "RB"
+    assert r["extra"] > 0, "trading two bodies for one must widen the hole"
+
+
+def test_depth_risk_is_zero_when_the_trade_touches_nothing_at_that_position():
+    mine = [p("RB", 15.0), p("RB", 13.0), p("WR", 16.0), p("WR", 12.0)]
+    r = marginal.depth_risk(mine, TWO_FLEX, "RB")
+    assert r["extra"] == 0.0
+
+
+def test_depth_risk_survives_a_position_nobody_holds():
+    mine = [p("RB", 15.0), p("WR", 12.0)]
+    r = marginal.depth_risk(mine, TWO_FLEX, "TE")
+    assert r["before_drop"] == 0.0 and r["after_drop"] == 0.0
+
+
+# ---------------------------------------------------------------- verdict
+
+def _deal(mine_delta, theirs_delta, out=None, inn=None):
+    mkt = None if out is None else {"out": out, "in": inn, "delta": inn - out,
+                                    "pct": None, "unpriced": []}
+    return marginal.Deal(100.0, 100.0 + mine_delta, 100.0,
+                         100.0 + theirs_delta, market=mkt)
+
+
+def test_the_threshold_ships_at_zero_because_nothing_has_measured_it():
+    assert marginal.EDGE_PPG == 0.0
+
+
+def test_a_zero_delta_package_is_never_send_even_at_a_zero_threshold():
+    """Pure churn carries transaction risk and buys nothing."""
+    v = marginal.verdict(_deal(0.0, 5.0), weeks_left=17)
+    assert v["gate1"] is False and v["send"] is False
+
+
+def test_gate_one_needs_my_side_up_and_theirs_not_down():
+    assert marginal.verdict(_deal(17.0, 1.0), weeks_left=17)["gate1"] is True
+    assert marginal.verdict(_deal(17.0, -1.0), weeks_left=17)["gate1"] is False
+    assert marginal.verdict(_deal(-1.0, 5.0), weeks_left=17)["gate1"] is False
+
+
+def test_season_totals_are_converted_to_per_week():
+    v = marginal.verdict(_deal(17.0, 0.0), weeks_left=17)
+    assert v["my_ppg"] == 1.0
+    v2 = marginal.verdict(_deal(13.0, 0.0), weeks_left=17)
+    assert v2["my_ppg"] == 0.76
+
+
+def test_raising_the_floor_rejects_the_marginal_package():
+    """+13.0 over a 17-week season is +0.76 ppg -- under the 1.0 the source
+    framework suggests, over the zero we ship."""
+    d = _deal(13.0, 5.0)
+    assert marginal.verdict(d, weeks_left=17)["gate1"] is True
+    assert marginal.verdict(d, weeks_left=17, floor_ppg=1.0)["gate1"] is False
+
+
+def test_gate_two_is_about_acceptance_not_truth():
+    """A package can be good for them and still be refused, because managers
+    price by name recognition rather than by their own optimal lineup."""
+    good_for_them = _deal(17.0, 17.0, out=5000, inn=10000)   # they get 50%
+    v = marginal.verdict(good_for_them, weeks_left=17)
+    assert v["gate1"] is True and v["gate2"] is False and v["send"] is False
+    assert any("expect a rejection" in w for w in v["why"])
+
+
+def test_gate_two_passes_when_the_market_reads_even():
+    v = marginal.verdict(_deal(17.0, 5.0, out=9800, inn=10000), weeks_left=17)
+    assert v["gate2"] is True and v["market_share"] == 0.98 and v["send"] is True
+
+
+def test_no_market_data_does_not_block_a_deal():
+    v = marginal.verdict(_deal(17.0, 5.0), weeks_left=17)
+    assert v["market_share"] is None and v["gate2"] is True
+
+
+def test_a_disputed_consensus_row_is_reported_alongside_the_gates():
+    """A fixed floor cannot tell a real edge from one smaller than the
+    sources' own disagreement; consensus.confident can."""
+    noisy = {"n": 3, "spread": 60.0, "per_source": {}, "mean": 0.0}
+    v = marginal.verdict(_deal(5.0, 1.0), weeks_left=17, con=noisy)
+    assert v["confident"] is False
+    assert any("disagreement" in w for w in v["why"])
+
+
+def test_weeks_left_of_zero_does_not_divide_by_zero():
+    assert marginal.verdict(_deal(10.0, 1.0), weeks_left=0)["my_ppg"] == 10.0

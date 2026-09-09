@@ -160,6 +160,8 @@ class Deal:
     market: dict | None = None
     my_moves: dict | None = None
     their_moves: dict | None = None
+    my_backfill: list[str] = field(default_factory=list)
+    their_backfill: list[str] = field(default_factory=list)
 
     @property
     def my_delta(self) -> float:
@@ -206,10 +208,27 @@ def _market_mod():
     return market
 
 
+def backfill(n: int, waivers, key: str = "weekly", exclude=()) -> list[dict]:
+    """The best `n` free agents, for roster spots a package leaves open.
+
+    NOT a replacement baseline. Bench players are already in the pool the
+    optimiser solves over, so a departing starter is covered by the bench
+    automatically. This is narrower: a 2-for-1 sends more bodies than it
+    receives and opens a SPOT, and that spot is filled by Tuesday. Pricing
+    it at zero understates every consolidation.
+    """
+    if n <= 0 or not waivers:
+        return []
+    skip = {_pid(p) for p in exclude}
+    pool = [p for p in waivers if _pid(p) not in skip]
+    return sorted(pool, key=lambda p: -(p.get(key) or 0.0))[:n]
+
+
 def price(my_roster: list[dict], their_roster: list[dict],
           give: list[dict], get: list[dict], shape: dict,
           their_shape: dict | None = None, key: str = "weekly",
-          market_values: dict[str, int] | None = None) -> Deal:
+          market_values: dict[str, int] | None = None,
+          waivers: list[dict] | None = None) -> Deal:
     """Price a package from both sides at once.
 
     `shape` is {slots, flex, flex_slots}. `their_shape` defaults to the same,
@@ -218,25 +237,145 @@ def price(my_roster: list[dict], their_roster: list[dict],
     `market_values` is an optional {sleeper_id: value} map from
     manager.market.values(). Pure lookup -- this module does no I/O, so the
     caller owns the fetch and the cache.
+
+    `waivers` is the free-agent pool. Whichever side sends more bodies than
+    it receives gets its opened spots filled from it, because that side will
+    have filled them by Tuesday and a spot priced at zero makes every
+    consolidation look worse than it is.
     """
     their_shape = their_shape or shape
     mkt = None
     if market_values:
         from . import market as market_mod
         mkt = market_mod.price(market_values, give, get)
+    taken = list(give) + list(get)
+    my_fill = backfill(len(give) - len(get), waivers, key, exclude=taken)
+    their_fill = backfill(len(get) - len(give), waivers, key,
+                          exclude=taken + my_fill)
     # Both sides re-solve. slot_moves carries the totals, so the deltas and
     # the seat-by-seat story cannot drift apart the way they would if the
     # points were computed here and the movements somewhere else.
-    mine = slot_moves(my_roster, shape, arriving=get, departing=give, key=key)
-    theirs = slot_moves(their_roster, their_shape, arriving=give,
-                        departing=get, key=key)
+    mine = slot_moves(my_roster, shape, arriving=list(get) + my_fill,
+                      departing=give, key=key)
+    theirs = slot_moves(their_roster, their_shape,
+                        arriving=list(give) + their_fill, departing=get, key=key)
     return Deal(
         mine_before=mine["total_before"], mine_after=mine["total_after"],
         theirs_before=theirs["total_before"], theirs_after=theirs["total_after"],
         give=[p.get("name", _pid(p)) for p in give],
         get=[p.get("name", _pid(p)) for p in get],
         market=mkt, my_moves=mine, their_moves=theirs,
+        my_backfill=[p.get("name", _pid(p)) for p in my_fill],
+        their_backfill=[p.get("name", _pid(p)) for p in their_fill],
     )
+
+
+def depth_risk(roster: list[dict], shape: dict, pos: str, *, arriving=(),
+               departing=(), waivers=None, key: str = "weekly") -> dict:
+    """How much worse an injury at `pos` gets because of this trade.
+
+    Remove the best player at that position from BOTH the before and after
+    pools and compare the drops. The point is that a package which looks
+    even on the starting lineup can quietly sell the depth behind it, and
+    the replacement for a week-12 injury is not the bench body you traded
+    away -- it is whoever is on waivers that week. So the injured pool is
+    topped up from waivers, not from a bench that no longer exists.
+    """
+    dep = {_pid(p) for p in departing}
+    fill = backfill(len(list(departing)) - len(list(arriving)), waivers, key,
+                    exclude=list(arriving) + list(departing))
+    after_roster = [p for p in roster if _pid(p) not in dep] + \
+        list(arriving) + fill
+
+    def drop(pool):
+        at_pos = [p for p in pool if p.get("pos") == pos]
+        if not at_pos:
+            return 0.0, None
+        star = max(at_pos, key=lambda p: (p.get(key) or 0.0))
+        healthy = lineup_points(pool, shape, key)
+        hurt_pool = [p for p in pool if _pid(p) != _pid(star)]
+        if waivers:
+            hurt_pool = hurt_pool + backfill(
+                1, waivers, key, exclude=list(pool) + fill)
+        return round(healthy - lineup_points(hurt_pool, shape, key), 1), star
+
+    before_drop, before_star = drop(roster)
+    after_drop, after_star = drop(after_roster)
+    return {"pos": pos, "before_drop": before_drop, "after_drop": after_drop,
+            "extra": round(after_drop - before_drop, 1),
+            "before_star": (before_star or {}).get("name"),
+            "after_star": (after_star or {}).get("name")}
+
+
+# GATE 2 IS ABOUT ACCEPTANCE, NOT TRUTH. Most managers evaluate a trade by
+# name recognition and draft cost, not by their own optimal lineup, so a
+# package can be good for them and still be refused. Below this share of the
+# value they are giving up, expect a no whatever the points say.
+MARKET_FLOOR = 0.90
+# And below this the lineup edge is inside projection error, so you are
+# paying transaction risk for nothing.
+#
+# ZERO WHILE WE HAVE NO EVIDENCE FOR A NUMBER. The framework this came from
+# suggests 1.0 PPG, which is plausible and would currently reject the
+# Javonte + Fannin package (+13.0 season = +0.76 ppg). But a threshold is a
+# claim about projection error, and nothing here has measured it -- shipping
+# 1.0 would be a guess wearing a decimal point, and DECISIONS says a
+# predicted delta is not a measured one. So the gate starts at zero, every
+# deal reports its own ppg, and the number gets raised when a backtest says
+# what it should be.
+EDGE_PPG = 0.0
+
+
+def verdict(deal: Deal, weeks_left: int, *, floor_ppg: float = EDGE_PPG,
+            market_floor: float = MARKET_FLOOR, con: dict | None = None) -> dict:
+    """The two gates, kept separate on purpose.
+
+    GATE 1 asks whether the trade is actually good -- my lineup up by more
+    than projection error, theirs not down. GATE 2 asks whether they will
+    say yes. They answer different questions and a deal needs both.
+
+    The interesting region is the gap between them: passing gate 1 for both
+    sides while sitting near even on gate 2 is the target. Passing 1 and
+    failing 2 is a good idea you cannot sell -- adjust the package until the
+    market reads even, then re-run gate 1 to check you did not break it.
+
+    `weeks_left` converts season totals to PPG, because the threshold is a
+    per-week quantity and the lineup deltas here are not. Pass 1 if the
+    values are already per-week.
+
+    `con` is the consensus row for the biggest piece, if you have it. A
+    fixed floor cannot tell a 1.0 edge on a player every source agrees about
+    from the same edge on one they argue about by thirty points; when a row
+    is supplied, consensus.confident applies that test as well.
+    """
+    wl = max(1, int(weeks_left or 1))
+    mine_ppg = deal.my_delta / wl
+    theirs_ppg = deal.their_delta / wl
+    # `> 0` as well as the floor, so a zero-delta package is never "send it"
+    # even with the threshold at zero -- pure churn carries transaction risk
+    # and buys nothing.
+    gate1 = deal.my_delta > 0 and mine_ppg >= floor_ppg and deal.their_delta >= 0
+    share = None
+    if deal.market and deal.market.get("in"):
+        share = deal.market["out"] / deal.market["in"]
+    gate2 = share is None or share >= market_floor
+    confident = None
+    if con is not None:
+        from . import consensus as consensus_mod
+        confident = consensus_mod.confident(con, abs(deal.my_delta))
+    reasons = []
+    if not gate1:
+        reasons.append(f"lineup: me {mine_ppg:+.2f} ppg (need {floor_ppg:+.2f}), "
+                       f"them {theirs_ppg:+.2f}")
+    if not gate2:
+        reasons.append(f"market: they receive {100 * share:.0f}% of what they give "
+                       f"(need {100 * market_floor:.0f}%) — expect a rejection")
+    if confident is False:
+        reasons.append("edge is smaller than the sources' own disagreement")
+    return {"gate1": gate1, "gate2": gate2, "send": bool(gate1 and gate2),
+            "my_ppg": round(mine_ppg, 2), "their_ppg": round(theirs_ppg, 2),
+            "market_share": round(share, 3) if share is not None else None,
+            "confident": confident, "why": reasons}
 
 
 def explain(deal: Deal, me: str = "you", them: str = "them") -> str:
