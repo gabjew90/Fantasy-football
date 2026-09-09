@@ -519,11 +519,33 @@ def dead_weight(roster: list[dict], shape: dict, key: str = "weekly") -> list[di
 
 def tradeable(roster: list[dict], others: dict, shape: dict,
               key: str = "weekly") -> list[dict]:
-    """Rank my roster by demand against cost.
+    """Rank my roster by SURPLUS: where is a player worth more than here?
+
+    THIS IS THE FIRST LOOK, NOT THE PRICE. For each of my players it asks
+    one question in isolation -- what does my lineup lose without him, and
+    what does the best rival lineup gain with him -- and ranks on the gap:
+
+        surplus = best_gain - cost
+
+    Positive means he is misallocated: he scores more sitting over there.
+    That is where a trade CAN create value, and it is the only place one can.
+    It is not what a package is worth, because arrivals and departures
+    interact through the flex and the single-player numbers do not add. On
+    2026-09-09 Deebo Samuel scored surplus 0.0 against every roster -- worth
+    nothing to anyone in isolation -- and carried the entire +7.2 of the
+    best package on the board, because the WR leaving the other side opened
+    a flex seat that did not exist when this function asked. Find the seam
+    here; price the package with price().
+
+    Ranked on surplus rather than the old gain/cost ratio because ratio
+    answers a different question. It favoured any cheap player with a buyer
+    over the biggest absolute misallocation: cost 10 / gain 20 (ratio 2.0,
+    surplus +10) outranked cost 100 / gain 150 (ratio 1.5, surplus +50).
+    `ratio` is still carried for callers that want it.
 
     `others` is {owner -> roster}. `buyers` counts how many rival lineups
     actually improve; a player nobody's lineup wants has no market whatever
-    his projection says.
+    his projection says, and sorts last whatever his surplus.
     """
     rows = []
     for p in roster:
@@ -534,6 +556,7 @@ def tradeable(roster: list[dict], others: dict, shape: dict,
             "player": p, "proj": round(p.get(key) or 0.0, 1), "cost": cost,
             "buyers": sum(1 for g, _ in gains if g > 0),
             "best_gain": best[0], "best_buyer": best[1],
+            "surplus": round(best[0] - cost, 1),
             # None reads as "free": no denominator, not a missing number
             "ratio": round(best[0] / cost, 2) if cost > 0 else None,
         })
@@ -549,6 +572,10 @@ def tradeable(roster: list[dict], others: dict, shape: dict,
     # "who are my most tradeable assets".
     def rank(r):
         free_and_wanted = r["cost"] <= 0 and r["best_gain"] > 0
-        return (0 if free_and_wanted else 1, -(r["ratio"] or 0), -r["best_gain"])
+        # Three tiers, then surplus within each. A player nobody wants stays
+        # at the bottom even at surplus 0 -- otherwise a bench body with no
+        # buyer outranks a correctly-allocated starter at surplus -14.
+        tier = 0 if free_and_wanted else (1 if r["buyers"] > 0 else 2)
+        return (tier, -r["surplus"], -r["best_gain"])
 
     return sorted(rows, key=rank)

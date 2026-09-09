@@ -256,3 +256,35 @@ def test_the_pid_error_handler_does_not_itself_throw():
     for bad in (None, "abc", 7, [1, 2], {"pos": "RB"}, {"pos": "RB", "x": {1, 2}}):
         with pytest.raises(KeyError, match="sleeper_id"):
             marginal._pid(bad)
+
+
+# ------------------------------------------ 2026-09-09: tradeable ranks on surplus
+
+def test_tradeable_ranks_the_biggest_misallocation_first_not_the_best_ratio():
+    """cost 10 / gain 20 is ratio 2.0 but surplus +10; cost 100 / gain 150 is
+    ratio 1.5 but surplus +50. The first look is asking where a trade can
+    CREATE the most value, and that is the +50, not the 2.0."""
+    shape = {"slots": {"RB": 1, "WR": 1}, "flex": 0}
+    mine = [{"sleeper_id": "cheap", "pos": "RB", "weekly": 30.0, "name": "cheap"},
+            {"sleeper_id": "rb_bk", "pos": "RB", "weekly": 20.0, "name": "rb_bk"},
+            {"sleeper_id": "big", "pos": "WR", "weekly": 200.0, "name": "big"},
+            {"sleeper_id": "wr_bk", "pos": "WR", "weekly": 100.0, "name": "wr_bk"}]
+    # rival needs both: an RB at 10 (cheap gains him 20) and a WR at 50 (big gains 150)
+    others = {"rival": [{"sleeper_id": "r_rb", "pos": "RB", "weekly": 10.0, "name": "r_rb"},
+                        {"sleeper_id": "r_wr", "pos": "WR", "weekly": 50.0, "name": "r_wr"}]}
+    ranked = marginal.tradeable(mine, others, shape)
+    by_id = {r["player"]["sleeper_id"]: r for r in ranked}
+    assert by_id["cheap"]["surplus"] == 10.0 and by_id["cheap"]["ratio"] == 2.0
+    assert by_id["big"]["surplus"] == 50.0 and by_id["big"]["ratio"] == 1.5
+    order = [r["player"]["sleeper_id"] for r in ranked if r["buyers"] > 0]
+    assert order.index("big") < order.index("cheap"), \
+        [(r["player"]["name"], r["surplus"], r["ratio"]) for r in ranked]
+
+
+def test_surplus_is_gain_minus_cost_and_carried_on_every_row():
+    shape = {"slots": {"RB": 1}, "flex": 0}
+    mine = [{"sleeper_id": "star", "pos": "RB", "weekly": 20.0, "name": "star"},
+            {"sleeper_id": "spare", "pos": "RB", "weekly": 12.0, "name": "spare"}]
+    others = {"rival": [{"sleeper_id": "r1", "pos": "RB", "weekly": 1.0, "name": "r1"}]}
+    for r in marginal.tradeable(mine, others, shape):
+        assert r["surplus"] == round(r["best_gain"] - r["cost"], 1), r
