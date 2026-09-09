@@ -76,6 +76,41 @@ def playoff_schedule(ctx, team: str, pos: str) -> str:
     return f"{val:.2f}x league avg ({verdict}) — {label}"
 
 
+def _priced(ctx, opp, vals) -> list[str]:
+    """What the package does to both starting lineups, seats named.
+
+    Degrades to nothing rather than breaking the brief: a desperation row has
+    no concrete ask, and an opportunity whose roster went missing is not
+    worth a traceback in an email.
+    """
+    from . import marginal
+    give, get = opp.get("give_p") or [], opp.get("get_p") or []
+    theirs = (ctx.get("roster_players") or {}).get(opp.get("rid")) or []
+    if not theirs or not (give or get):
+        return []
+    shape = {"slots": ctx["slots"], "flex": ctx.get("flex", 0),
+             "flex_slots": ctx.get("flex_slots")}
+    try:
+        d = marginal.price(ctx["roster_players"][ctx["my_rid"]], theirs,
+                           give, get, shape, key="ros", market_values=vals)
+    except Exception as e:  # noqa: BLE001
+        log.warning("trade radar: could not price %s (%s)", opp.get("mgr"), e)
+        return []
+    out = [f"- lineup effect: **me {d.my_delta:+.1f}**, them {d.their_delta:+.1f}"
+           f" (rest-of-season points)"]
+    for label, mv in (("me", d.my_moves), ("them", d.their_moves)):
+        for tag, rows in (("loses the spot", mv["benched"]),
+                          ("comes off the bench", mv["promoted"])):
+            for p in rows:
+                out.append(f"  - {label}: {p['name']} ({p['pos']}) {tag}")
+    if d.market:
+        from . import market as market_mod
+        out.append(f"  - {market_mod.annotate(d.market)}")
+        if d.disputed:
+            out.append("  - ⚠ lineup points and the market disagree on this one")
+    return out
+
+
 def build(ctx, store) -> str:
     week = ctx["week"]
     header = f"## Trade radar — week {week}"
@@ -162,6 +197,7 @@ def build(ctx, store) -> str:
                 "urgency": "48-HOUR WINDOW — text today",
                 "playoff": playoff_schedule(ctx, give.get("team") or "", give.get("pos") or "RB"),
                 "ratio": None,
+                "rid": rid, "give_p": [give], "get_p": [],
             })
         elif fit:
             ask, offer = fit
@@ -176,6 +212,7 @@ def build(ctx, store) -> str:
                 "urgency": "seller window — this discount grows weekly" if seller else "no rush",
                 "playoff": playoff_schedule(ctx, ask.get("team") or "", ask.get("pos") or "RB"),
                 "ratio": ratio,
+                "rid": rid, "give_p": [offer], "get_p": [ask],
             })
 
     opps.sort(key=lambda o: -o["score"])
@@ -191,6 +228,12 @@ def build(ctx, store) -> str:
                   f"- urgency: {o['urgency']}"]
         if o["playoff"]:
             lines.append(f"- playoff schedule (buying for wks 15-17): {o['playoff']}")
+        # PRICE IT, do not just name it. The radar has always said who to
+        # text and about what; until now it never said what the package
+        # actually does to either lineup, which is the only thing that
+        # decides whether to send it. Both sides re-solve, bench promotions
+        # included -- see manager.marginal.slot_moves.
+        lines += _priced(ctx, o, vals)
         aged = [age_decay.note(p.get("pos"), (ctx.get("age_of") or {}).get(str(p.get("sleeper_id"))),
                                int(ctx["week"]), acfg) for p in (mine or [])]
         if o["ratio"] is not None and (o["ratio"] < VETO_RATIO or o["ratio"] > 1 / VETO_RATIO):

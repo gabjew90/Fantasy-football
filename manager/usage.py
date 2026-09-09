@@ -16,17 +16,28 @@ MISSING_NOTE = ("DATA MISSING: inside-10 carries and route participation/YPRR "
 
 
 def load_usage(season: int) -> tuple[dict | None, str | None]:
-    """name(lower) -> {week -> row}. None + note when the season isn't published."""
+    """name(lower) -> {week -> row}. None + note when the season isn't published.
+
+    READS nflreadpy, NOT nfl_data_py. The old library's weekly endpoint 404s
+    for EVERY season, not just an unpublished one -- nflverse moved its
+    release assets and nfl_data_py is no longer maintained against them. So
+    this function had been returning DATA MISSING on every run since it was
+    written, which silently disabled the usage-evidence bonus in the waiver
+    brief and the overreaction damper that is supposed to stop a one-week
+    spike from ranking an add. draftkit.defense already reads nflreadpy;
+    this now matches it. nfl_data_py's SNAP endpoint still works, so
+    load_snaps below is left alone.
+    """
     try:
-        import nfl_data_py as nfl
-        df = nfl.import_weekly_data([season])
+        import nflreadpy as nfl
+        df = nfl.load_player_stats([int(season)])
     except Exception as e:  # noqa: BLE001 — any failure degrades the section
         return None, f"DATA MISSING: nflverse weekly usage ({e.__class__.__name__})"
-    if df is None or len(df) == 0:
+    if df is None or df.height == 0:
         return None, f"DATA MISSING: nflverse weekly usage ({season} not yet published)"
     out: dict[str, dict[int, dict]] = {}
-    cols = df.columns
-    for _, r in df.iterrows():
+    cols = set(df.columns)
+    for r in df.iter_rows(named=True):          # polars, not pandas
         name = str(r.get("player_display_name") or "").lower()
         if not name:
             continue
