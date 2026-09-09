@@ -29,13 +29,60 @@ def _pid(p: dict) -> str:
     return str(p["sleeper_id"])
 
 
-def lineup_points(roster: list[dict], shape: dict, key: str = "weekly") -> float:
-    """Points of the best legal lineup this roster can field."""
+def starters(roster: list[dict], shape: dict, key: str = "weekly") -> list[dict]:
+    """The best legal lineup, as rows scored on `key`.
+
+    Rows come back carrying `weekly` set to the `key` value, because that is
+    what the optimiser sorted on and a caller printing a different number
+    beside a lineup it did not choose is how a brief lies quietly.
+    """
     if key != "weekly":
         roster = [dict(p, weekly=(p.get(key) or 0.0)) for p in roster]
-    best = optimal_lineup(roster, shape["slots"], shape.get("flex", 0),
+    return optimal_lineup(roster, shape["slots"], shape.get("flex", 0),
                           flex_slots=shape.get("flex_slots"))
-    return round(sum((p.get("weekly") or 0.0) for p in best), 1)
+
+
+def lineup_points(roster: list[dict], shape: dict, key: str = "weekly") -> float:
+    """Points of the best legal lineup this roster can field."""
+    return round(sum((p.get("weekly") or 0.0)
+                     for p in starters(roster, shape, key)), 1)
+
+
+def slot_moves(roster: list[dict], shape: dict, *, arriving=(), departing=(),
+               key: str = "weekly") -> dict:
+    """Re-solve the lineup around a trade and say which seats actually moved.
+
+    THE POINT IS THE PROMOTIONS. A package's effect is not "these two left
+    and these two arrived" -- the lineup re-solves globally, so losing two
+    receivers can pull a running back up off the bench into a flex, and that
+    promotion is a real part of the price. In the 2026-09-08 vincenzo31
+    package three players left their lineup and three entered, one of whom
+    (Rico Dowdle) was not in the trade at all. A summary that omits him
+    cannot explain where their +13.6 came from.
+
+    Returns the before/after lineups plus four disjoint movement lists:
+      departed  started, and left in the trade
+      benched   started, still rostered, no longer starts (squeezed out)
+      arrived   came in the trade and starts
+      promoted  already rostered and on the bench, now starts
+    """
+    dep = {_pid(p) for p in departing}
+    arr = {_pid(p) for p in arriving}
+    after_roster = [p for p in roster if _pid(p) not in dep] + list(arriving)
+    before = starters(roster, shape, key)
+    after = starters(after_roster, shape, key)
+    b_ids = {_pid(p) for p in before}
+    a_ids = {_pid(p) for p in after}
+    tb = round(sum((p.get("weekly") or 0.0) for p in before), 1)
+    ta = round(sum((p.get("weekly") or 0.0) for p in after), 1)
+    return {
+        "before": before, "after": after,
+        "total_before": tb, "total_after": ta, "delta": round(ta - tb, 1),
+        "departed": [p for p in before if _pid(p) in dep],
+        "benched": [p for p in before if _pid(p) not in a_ids and _pid(p) not in dep],
+        "arrived": [p for p in after if _pid(p) in arr],
+        "promoted": [p for p in after if _pid(p) not in b_ids and _pid(p) not in arr],
+    }
 
 
 def cost_to_lose(roster: list[dict], player, shape: dict, key: str = "weekly") -> float:
@@ -74,6 +121,8 @@ class Deal:
     give: list[str] = field(default_factory=list)
     get: list[str] = field(default_factory=list)
     market: dict | None = None
+    my_moves: dict | None = None
+    their_moves: dict | None = None
 
     @property
     def my_delta(self) -> float:
@@ -134,22 +183,51 @@ def price(my_roster: list[dict], their_roster: list[dict],
     caller owns the fetch and the cache.
     """
     their_shape = their_shape or shape
-    give_ids, get_ids = {_pid(p) for p in give}, {_pid(p) for p in get}
-    mine_after = [p for p in my_roster if _pid(p) not in give_ids] + list(get)
-    theirs_after = [p for p in their_roster if _pid(p) not in get_ids] + list(give)
     mkt = None
     if market_values:
         from . import market as market_mod
         mkt = market_mod.price(market_values, give, get)
+    # Both sides re-solve. slot_moves carries the totals, so the deltas and
+    # the seat-by-seat story cannot drift apart the way they would if the
+    # points were computed here and the movements somewhere else.
+    mine = slot_moves(my_roster, shape, arriving=get, departing=give, key=key)
+    theirs = slot_moves(their_roster, their_shape, arriving=give,
+                        departing=get, key=key)
     return Deal(
-        mine_before=lineup_points(my_roster, shape, key),
-        mine_after=lineup_points(mine_after, shape, key),
-        theirs_before=lineup_points(their_roster, their_shape, key),
-        theirs_after=lineup_points(theirs_after, their_shape, key),
+        mine_before=mine["total_before"], mine_after=mine["total_after"],
+        theirs_before=theirs["total_before"], theirs_after=theirs["total_after"],
         give=[p.get("name", _pid(p)) for p in give],
         get=[p.get("name", _pid(p)) for p in get],
-        market=mkt,
+        market=mkt, my_moves=mine, their_moves=theirs,
     )
+
+
+def explain(deal: Deal, me: str = "you", them: str = "them") -> str:
+    """The seat-by-seat walkthrough, both sides, as a brief would print it."""
+    def side(label, mv, delta):
+        if not mv:
+            return []
+        out = [f"{label}: {mv['total_before']:.1f} -> {mv['total_after']:.1f} "
+               f"({delta:+.1f})"]
+        for tag, rows in (("out (traded)", mv["departed"]),
+                          ("out (squeezed to bench)", mv["benched"]),
+                          ("in  (from the trade)", mv["arrived"]),
+                          ("in  (PROMOTED off the bench)", mv["promoted"])):
+            for p in rows:
+                out.append(f"    {tag:30s} {p.get('pos', '?'):3s} "
+                           f"{p.get('name', '?')} {p.get('weekly') or 0:.1f}")
+        return out
+
+    lines = [f"give {', '.join(deal.give) or '-'}  /  get {', '.join(deal.get) or '-'}", ""]
+    lines += side(me, deal.my_moves, deal.my_delta)
+    lines.append("")
+    lines += side(them, deal.their_moves, deal.their_delta)
+    if deal.market:
+        from . import market as market_mod
+        lines += ["", market_mod.annotate(deal.market)]
+        if deal.disputed:
+            lines.append("⚠ lineup points and the market disagree")
+    return "\n".join(lines)
 
 
 def dead_weight(roster: list[dict], shape: dict, key: str = "weekly") -> list[dict]:
