@@ -35,6 +35,15 @@ def starters(roster: list[dict], shape: dict, key: str = "weekly") -> list[dict]
     Rows come back carrying `weekly` set to the `key` value, because that is
     what the optimiser sorted on and a caller printing a different number
     beside a lineup it did not choose is how a brief lies quietly.
+
+    TREAT THE RESULT AS READ-ONLY. On the default key these ARE the caller's
+    own roster dicts; on any other key they are copies whose `weekly` has
+    been overwritten with the key's value. So mutating a returned row edits
+    the roster in one mode and silently does nothing in the other, and
+    reading `weekly` off one gives a different quantity depending on how the
+    call was made. Copying unconditionally would be tidier and costs a few
+    million dict builds across a frontier search, so the contract is
+    documented instead of paid for.
     """
     if key != "weekly":
         roster = [dict(p, weekly=(p.get(key) or 0.0)) for p in roster]
@@ -66,9 +75,22 @@ def slot_moves(roster: list[dict], shape: dict, *, arriving=(), departing=(),
       arrived   came in the trade and starts
       promoted  already rostered and on the bench, now starts
     """
+    # MATERIALISE BEFORE ITERATING TWICE. `arriving` was read once to build
+    # the id set and again to build the post-trade roster; a generator is
+    # exhausted by the first pass, so the incoming players silently vanished
+    # and the deal priced at 0 with no error. A list caller got +500 for the
+    # same package a generator caller got 0 for.
+    arriving = list(arriving)
+    departing = list(departing)
     dep = {_pid(p) for p in departing}
     arr = {_pid(p) for p in arriving}
-    after_roster = [p for p in roster if _pid(p) not in dep] + list(arriving)
+    # A player on both sides is not a trade, and counting him as departed AND
+    # arrived would break the disjointness the four lists promise.
+    both = dep & arr
+    if both:
+        raise ValueError(
+            f"the same player is both arriving and departing: {sorted(both)}")
+    after_roster = [p for p in roster if _pid(p) not in dep] + arriving
     before = starters(roster, shape, key)
     after = starters(after_roster, shape, key)
     b_ids = {_pid(p) for p in before}

@@ -48,13 +48,49 @@ def test_the_four_movement_lists_are_disjoint_and_explain_the_delta():
     ids = [x["sleeper_id"] for grp in ("departed", "benched", "arrived", "promoted")
            for x in mv[grp]]
     assert len(ids) == len(set(ids)), "a player appears in two movement lists"
-    # every seat change is accounted for: out-of-lineup and into-lineup balance
-    left = len(mv["departed"]) + len(mv["benched"])
-    came = len(mv["arrived"]) + len(mv["promoted"])
-    assert left == came, (mv["departed"], mv["benched"], mv["arrived"], mv["promoted"])
     gone = sum(x["weekly"] for x in mv["departed"] + mv["benched"])
     added = sum(x["weekly"] for x in mv["arrived"] + mv["promoted"])
     assert mv["delta"] == pytest.approx(added - gone, abs=0.05)
+
+
+def test_seats_need_not_balance_when_the_roster_shrinks():
+    """An earlier version of the test above asserted len(out) == len(in), which
+    is only true while the roster can still fill every slot. Trade a player
+    away with nothing back on a thin roster and a seat simply goes empty."""
+    thin = [p("a", "RB", 300), p("b", "RB", 200)]
+    mv = marginal.slot_moves(thin, {"slots": {"RB": 2}, "flex": 0},
+                             departing=[p("a", "RB", 300)])
+    assert len(mv["departed"]) == 1
+    assert not mv["arrived"] and not mv["promoted"]
+    assert mv["delta"] == -300.0
+
+
+def test_a_generator_of_arrivals_is_not_silently_consumed():
+    """`arriving` is read twice -- once for the id set, once for the
+    post-trade roster. A generator was exhausted by the first pass, so the
+    incoming players vanished and the package priced at 0 with no error."""
+    star = p("star", "RB", 500)
+    from_list = marginal.slot_moves(THEM, SHAPE, arriving=[star])
+    from_gen = marginal.slot_moves(THEM, SHAPE, arriving=(x for x in [star]))
+    assert from_gen["delta"] == from_list["delta"] != 0
+    assert [x["sleeper_id"] for x in from_gen["arrived"]] == ["star"]
+
+
+def test_the_same_player_cannot_arrive_and_depart():
+    with pytest.raises(ValueError, match="both arriving and departing"):
+        marginal.slot_moves(THEM, SHAPE, arriving=[p("wr1", "WR", 239)],
+                            departing=[p("wr1", "WR", 239)])
+
+
+def test_a_duplicate_row_cannot_fill_two_fixed_slots():
+    """RB 300 + RB 100 with two RB slots is 400. Handing slot_moves an
+    arriving player who is already rostered used to return 600, because the
+    fixed-slot loop had no seen-id check while the flex loop did."""
+    r = [p("x", "RB", 300), p("y", "RB", 100)]
+    mv = marginal.slot_moves(r, {"slots": {"RB": 2}, "flex": 0},
+                             arriving=[p("x", "RB", 300)])
+    assert mv["total_after"] == 400.0
+    assert [q["sleeper_id"] for q in mv["after"]] == ["x", "y"]
 
 
 def test_a_squeezed_starter_is_not_confused_with_a_traded_one():

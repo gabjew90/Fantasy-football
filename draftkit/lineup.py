@@ -69,12 +69,22 @@ def optimal_lineup(roster: list[dict], slots: dict[str, int], flex: int = 0,
     pool = sorted(roster, key=lambda p: -(p.get("weekly") or 0.0))
     counts = {k: 0 for k in slots}
     chosen = []
+    base_ids: set = set()
     for p in pool:
+        # ONE SEAT PER PLAYER. The flex loop below has always checked this;
+        # the fixed-slot loop did not, so a roster carrying the same
+        # sleeper_id twice started him twice and the total was silently
+        # inflated -- RB 300 + RB 100 with two RB slots and a duplicate of
+        # the 300 returned 600 instead of 400. Reachable whenever a caller
+        # builds a post-trade roster by concatenation (marginal.slot_moves)
+        # and the arriving player is already rostered.
+        if p["sleeper_id"] in base_ids:
+            continue
         pos = p.get("pos")
         if pos in slots and counts[pos] < slots[pos]:
             counts[pos] += 1
             chosen.append(p)
-    base_ids = {p["sleeper_id"] for p in chosen}
+            base_ids.add(p["sleeper_id"])
 
     sets = _flex_sets(flex, flex_slots)
     orders = [sets] if _nested(sets) else _permutations(sets)
