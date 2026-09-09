@@ -308,3 +308,27 @@ def test_gate_three_is_silent_when_nothing_is_thin():
     v = marginal.verdict(_deal(17.0, 5.0, out=10000, inn=10000), weeks_left=17)
     assert v["gate3"] is True and v["send"] is True and v["thin"] == []
     assert v["warnings"] == []
+
+
+def test_gate_three_reports_only_what_the_trade_broke():
+    """thin_after is a state query and answers honestly: a one-QB league
+    rosters one quarterback and streams a kicker, so all of them read
+    "uncovered" every week. The live brief said "empties a required slot at
+    DEF, K, QB, TE" when only the TE room was this package's doing."""
+    shape = {"slots": {"QB": 1, "RB": 2, "TE": 1, "K": 1}, "flex": 1}
+    roster = [p("QB", 300.0), p("K", 120.0),
+              p("RB", 30.0), p("RB", 29.0), p("RB", 28.0),
+              p("TE", 24.0, "te1"), p("TE", 23.0, "te2")]
+    # QB and K have no cover before the trade and none after -- not news
+    assert set(marginal.thin_after(roster, shape)) == {"QB", "K"}
+    got = marginal.newly_thin(roster, shape, departing=[roster[6]],
+                              arriving=[p("RB", 31.0)])
+    assert got == ["TE"], got
+
+
+def test_newly_thin_is_empty_when_a_trade_breaks_nothing():
+    shape = {"slots": {"QB": 1, "RB": 2, "TE": 1}, "flex": 1}
+    roster = [p("QB", 300.0), p("RB", 30.0), p("RB", 29.0), p("RB", 28.0),
+              p("TE", 24.0), p("TE", 23.0)]
+    assert marginal.newly_thin(roster, shape, departing=[roster[3]],
+                               arriving=[p("RB", 31.0)]) == []

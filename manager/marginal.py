@@ -233,6 +233,18 @@ def backfill(n: int, waivers, key: str = "weekly", exclude=()) -> list[dict]:
     return sorted(pool, key=lambda p: -(p.get(key) or 0.0))[:n]
 
 
+def _fill_for(arriving, departing, waivers, key: str = "weekly") -> list[dict]:
+    """The backfill one side of a package earns. ONE definition.
+
+    price(), depth_risk() and thin_after() each derived this independently
+    and happened to agree; a change to the exclude semantics would have had
+    to land in three places, only one of which the price() tests cover.
+    """
+    arriving, departing = list(arriving), list(departing)
+    return backfill(len(departing) - len(arriving), waivers, key,
+                    exclude=arriving + departing)
+
+
 def price(my_roster: list[dict], their_roster: list[dict],
           give: list[dict], get: list[dict], shape: dict,
           their_shape: dict | None = None, key: str = "weekly",
@@ -257,10 +269,8 @@ def price(my_roster: list[dict], their_roster: list[dict],
     if market_values:
         from . import market as market_mod
         mkt = market_mod.price(market_values, give, get)
-    taken = list(give) + list(get)
-    my_fill = backfill(len(give) - len(get), waivers, key, exclude=taken)
-    their_fill = backfill(len(get) - len(give), waivers, key,
-                          exclude=taken + my_fill)
+    my_fill = _fill_for(get, give, waivers, key)
+    their_fill = _fill_for(give, get, waivers, key)
     # Both sides re-solve. slot_moves carries the totals, so the deltas and
     # the seat-by-seat story cannot drift apart the way they would if the
     # points were computed here and the movements somewhere else.
@@ -369,14 +379,30 @@ def thin_after(roster: list[dict], shape: dict, *, arriving=(), departing=(),
     but only against positions the wire actually covers.
     """
     dep = {_pid(p) for p in departing}
-    fill = backfill(len(list(departing)) - len(list(arriving)), waivers, key,
-                    exclude=list(arriving) + list(departing))
+    fill = _fill_for(arriving, departing, waivers, key)
     after = [p for p in roster if _pid(p) not in dep] + list(arriving) + fill
     held: dict[str, int] = {}
     for p in after:
         held[p.get("pos")] = held.get(p.get("pos"), 0) + 1
     return sorted(pos for pos, need in (shape.get("slots") or {}).items()
                   if need and held.get(pos, 0) <= need)
+
+
+def newly_thin(roster: list[dict], shape: dict, *, arriving=(), departing=(),
+               waivers=None, key: str = "weekly") -> list[str]:
+    """Positions THIS TRADE leaves without cover, ignoring ones already bare.
+
+    thin_after is a state query and answers honestly: a one-QB league rosters
+    one quarterback, a kicker and a defense are streamed one-deep, and all
+    three are "uncovered" every week of the season. Reporting them buries the
+    single position a package actually broke -- the live cbarone brief read
+    "empties a required slot at DEF, K, QB, TE" when only the TE room was the
+    trade's doing. So gate 3 asks what CHANGED, not what is true.
+    """
+    before = set(thin_after(roster, shape, key=key))
+    after = set(thin_after(roster, shape, arriving=arriving,
+                           departing=departing, waivers=waivers, key=key))
+    return sorted(after - before)
 
 
 def verdict(deal: Deal, weeks_left: int, *, floor_ppg: float = EDGE_PPG,
@@ -407,10 +433,13 @@ def verdict(deal: Deal, weeks_left: int, *, floor_ppg: float = EDGE_PPG,
     wl = max(1, int(weeks_left or 1))
     mine_ppg = deal.my_delta / wl
     theirs_ppg = deal.their_delta / wl
-    # `> 0` as well as the floor, so a zero-delta package is never "send it"
-    # even with the threshold at zero -- pure churn carries transaction risk
-    # and buys nothing.
-    gate1 = deal.my_delta > 0 and mine_ppg >= floor_ppg and deal.their_delta >= 0
+    # Two separate requirements, and which one binds depends on floor_ppg.
+    # At the shipped 0.0 only `gains` does any work -- but it has to be
+    # there, or a zero-delta package would read as "send it" and pure churn
+    # carries transaction risk while buying nothing.
+    gains = deal.my_delta > 0
+    clears = mine_ppg >= floor_ppg
+    gate1 = gains and clears and deal.their_delta >= 0
     share = None
     if deal.market and deal.market.get("in"):
         share = deal.market["out"] / deal.market["in"]

@@ -193,6 +193,13 @@ def _drop_or_ir(ctx, candidate_ros: float, pos: str | None = None) -> str:
     return "no clean drop — only claim if you value him over your worst bench spot"
 
 
+def free_agent_pool(ctx, con: dict | None = None) -> list[dict]:
+    """The wire, as player rows. Public because the trade framework needs the
+    same pool the waiver brief ranks -- including its stale-reserve filter,
+    so a package is never backfilled with a player whose season is over."""
+    return _fa_pool(ctx, con)
+
+
 def fa_replacement_levels(pool: list[dict]) -> dict[str, tuple[float, float, str]]:
     """pos -> (best FA ros, second-best FA ros, id of the best). The live
     replacement level: what a claim is worth is measured against what stays

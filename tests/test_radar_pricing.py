@@ -29,7 +29,8 @@ THEIRS = [p("tqb", "QB", 291), p("trb1", "RB", 287), p("trb2", "RB", 249),
 def _ctx():
     return {"my_rid": 1, "roster_players": {1: MINE, 2: THEIRS},
             "slots": {"QB": 1, "RB": 2, "WR": 2, "TE": 1}, "flex": 2,
-            "flex_slots": None, "users_by_rid": {1: "me", 2: "them"}}
+            "flex_slots": None, "users_by_rid": {1: "me", 2: "them"},
+            "weeks_left": 17}
 
 
 def _opp(**kw):
@@ -104,3 +105,42 @@ def test_an_unidentified_row_does_not_break_the_lineup_solve():
     roster = [{"pos": "RB", "weekly": 100, "sleeper_id": "a"},
               {"pos": "RB", "weekly": 1}]
     assert [x.get("sleeper_id") for x in optimal_lineup(roster, {"RB": 1}, 0)] == ["a"]
+
+
+# ------------------------------------------- the gates reach the brief itself
+
+def test_the_brief_states_a_verdict_not_just_a_number():
+    """The gate stack existed for a day with no production caller: _priced
+    passed no waivers and never called verdict(), so a brief could recommend
+    a package that overpaid 559% on market with nothing to say so."""
+    out = "\n".join(trade_radar._priced(_ctx(), _opp(), {}))
+    assert "SEND" in out or "hold" in out
+    assert "/wk)" in out, "the per-week figure is what a threshold is set against"
+
+
+def test_a_blocking_reason_is_marked_and_a_warning_is_not():
+    ctx = _ctx()
+    # market far below the floor -> gate 2 blocks
+    vals = {"mrb2": 100, "mte2": 100, "twr1": 9000, "twr4": 9000}
+    blocked = "\n".join(trade_radar._priced(ctx, _opp(), vals))
+    assert "hold" in blocked and "⚠" in blocked
+    assert "expect a rejection" in blocked
+
+
+def test_the_waiver_pool_is_built_once_and_cached_on_the_context():
+    ctx = _ctx()
+    assert "_wv_pool" not in ctx
+    trade_radar._priced(ctx, _opp(), {})
+    assert "_wv_pool" in ctx, "300 rows rebuilt per opportunity is waste"
+    ctx["_wv_pool"] = [{"sleeper_id": "sentinel", "pos": "RB", "ros": 1.0,
+                        "weekly": 0.0, "name": "sentinel"}]
+    trade_radar._priced(ctx, _opp(), {})
+    assert ctx["_wv_pool"][0]["sleeper_id"] == "sentinel", "cache was rebuilt"
+
+
+def test_a_context_with_no_player_index_degrades_to_an_empty_pool():
+    """The test ctx has no `players`/`trow`, which is what a half-built
+    context looks like. It must not take the brief down."""
+    ctx = _ctx()
+    assert trade_radar._waiver_pool(ctx) == []
+    assert trade_radar._priced(ctx, _opp(), {}), "still prices without a wire"

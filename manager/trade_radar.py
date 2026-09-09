@@ -76,8 +76,24 @@ def playoff_schedule(ctx, team: str, pos: str) -> str:
     return f"{val:.2f}x league avg ({verdict}) — {label}"
 
 
+def _waiver_pool(ctx, con=None) -> list[dict]:
+    """The wire, for spots a package opens. Cached on ctx: the radar prices
+    every opportunity and rebuilding a 300-row pool each time is waste."""
+    pool = ctx.get("_wv_pool")
+    if pool is None:
+        try:
+            from .waiver_brief import free_agent_pool
+            pool = free_agent_pool(ctx, con)
+        except Exception as e:  # noqa: BLE001
+            log.warning("trade radar: no waiver pool (%s)", e.__class__.__name__)
+            pool = []
+        ctx["_wv_pool"] = pool
+    return pool
+
+
 def _priced(ctx, opp, vals) -> list[str]:
-    """What the package does to both starting lineups, seats named.
+    """What the package does to both starting lineups, seats named, and
+    whether it clears the gates.
 
     Degrades to nothing rather than breaking the brief: a desperation row has
     no concrete ask, and an opportunity whose roster went missing is not
@@ -90,17 +106,30 @@ def _priced(ctx, opp, vals) -> list[str]:
         return []
     shape = {"slots": ctx["slots"], "flex": ctx.get("flex", 0),
              "flex_slots": ctx.get("flex_slots")}
+    mine = ctx["roster_players"][ctx["my_rid"]]
+    wv = _waiver_pool(ctx)
     try:
-        d = marginal.price(ctx["roster_players"][ctx["my_rid"]], theirs,
-                           give, get, shape, key="ros", market_values=vals)
+        d = marginal.price(mine, theirs, give, get, shape, key="ros",
+                           market_values=vals, waivers=wv)
+        thin = marginal.newly_thin(mine, shape, arriving=get, departing=give,
+                                   waivers=wv, key="ros")
+        v = marginal.verdict(d, ctx.get("weeks_left") or 1, thin=thin)
     except Exception as e:  # noqa: BLE001
         log.warning("trade radar: could not price %s (%s)", opp.get("mgr"), e)
         return []
-    out = [f"- lineup effect (rest-of-season POINTS, not the market values "
-           f"quoted above): **me {d.my_delta:+.1f}**, them {d.their_delta:+.1f}"]
+    verdict_word = "SEND" if v["send"] else "hold"
+    out = [f"- **{verdict_word}** — lineup effect (rest-of-season POINTS, not the "
+           f"market values quoted above): **me {d.my_delta:+.1f}** "
+           f"({v['my_ppg']:+.2f}/wk), them {d.their_delta:+.1f}"]
+    for r in v["why"]:
+        out.append(f"  - ⚠ {r}")
+    for r in v["warnings"]:
+        out.append(f"  - {r}")
     for label, mv in (("me", d.my_moves), ("them", d.their_moves)):
         for tag, rows in (("loses the spot", mv["benched"]),
-                          ("comes off the bench", mv["promoted"])):
+                          ("comes off the bench", mv["promoted"]),
+                          ("fills the opened spot off waivers",
+                           mv.get("backfilled") or [])):
             for p in rows:
                 out.append(f"  - {label}: {p['name']} ({p['pos']}) {tag}")
     if d.market:
