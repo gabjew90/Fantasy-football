@@ -371,11 +371,26 @@ def build(ctx, store=None) -> tuple[dict[str, dict], list[str]]:
     notes.append(f"consensus over {len(real)} live sources ({wtxt}), {len(out)} "
                  f"players, rescaled against {ref} ({otxt}), {len(common)} "
                  f"priced by all")
-    if common and any(abs(v - 1.0) > 0.10 for v in scale.values()):
+    # WATCH EVERY FACTOR THAT IS ACTUALLY APPLIED, NOT JUST THE GLOBAL ONE.
+    #
+    # This guard predates the per-position fit and only ever read `scale`.
+    # Those stay mild -- espn 0.963, fantasypros 0.906, both inside the 10%
+    # bar -- while the per-position factors that REPLACE them reach 0.821 at
+    # WR. So the more extreme a multiplier got, the less likely the warning
+    # was to mention it. Both sets are checked now.
+    applied = list(scale.values()) + [v for f in pos_scale.values()
+                                      for v in f.values()]
+    extreme = [v for v in applied if abs(v - 1.0) > 0.10]
+    if common and extreme:
         pts = sorted(statistics.median(s[p] for s in src.values()) for p in common)
+        worst = ", ".join(
+            f"{k}/{pos} {v:.3f}" for k, f in sorted(pos_scale.items())
+            for pos, v in sorted(f.items()) if abs(v - 1.0) > 0.10) or             ", ".join(f"{k} {v:.3f}" for k, v in sorted(scale.items())
+                      if abs(v - 1.0) > 0.10)
         notes.append(f"⚠ rescale fitted on {len(common)} players spanning "
                      f"{pts[0]:.0f}–{pts[-1]:.0f} pts and extrapolated to the "
-                     f"whole pool — wire-level players sit below that range")
+                     f"whole pool — wire-level players sit below that range; "
+                     f"widest factors {worst}")
     aged = [k for k, w in weight.items() if 0 < w < 1.0]
     if aged:
         notes.append(f"⚠ preseason source(s) {', '.join(aged)} down-weighted to "

@@ -490,3 +490,25 @@ def test_week_one_does_not_rescale_a_rest_of_season_source(monkeypatch):
     data, notes = consensus.build(ctx)
     assert not any("rest-of-season" in n for n in notes), notes
     assert data["30"]["mean"] == 200.0
+
+
+def test_the_extrapolation_warning_watches_the_factors_actually_applied(
+        monkeypatch):
+    """The guard predates the per-position fit and only read `scale`. Those
+    stay mild -- espn 0.963, fantasypros 0.906, both inside the 10% bar --
+    while the per-position factors that REPLACE them reach 0.821 at WR. The
+    more extreme a multiplier got, the less likely it was to be mentioned."""
+    idx = {str(i): {"position": "RB" if i < 40 else "WR", "full_name": f"p{i}"}
+           for i in range(80)}
+    sleeper = {str(i): 150.0 + i for i in range(80)}
+    # Chosen so the GLOBAL ratio lands inside 10% while WR sits far outside:
+    # RB is 18% cold, WR is 18% hot, and the medians nearly cancel.
+    other = {str(i): (150.0 + i) * (1.22 if i < 40 else 0.82) for i in range(80)}
+    monkeypatch.setattr(consensus, "_sleeper", lambda s, y: (sleeper, None))
+    monkeypatch.setattr(consensus, "_espn", lambda s, y, r, i: (other, None))
+    monkeypatch.setattr(consensus, "_fantasypros", lambda s, y, i: ({}, "down"))
+    ctx = {"cfg": Cfg(league_name="x"), "state": {"season": "2026"}, "players": idx}
+    _, notes = consensus.build(ctx)
+    warned = [n for n in notes if "extrapolated to the whole pool" in n]
+    assert warned, f"no extrapolation warning at all: {notes}"
+    assert "espn/WR" in warned[0] or "espn/RB" in warned[0], warned[0]
