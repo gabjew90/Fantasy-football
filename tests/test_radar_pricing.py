@@ -81,10 +81,23 @@ def test_a_missing_roster_degrades_to_silence_not_a_traceback():
 
 
 def test_a_pricing_failure_is_logged_and_swallowed(monkeypatch, caplog):
+    import logging
     from manager import marginal
 
     def boom(*a, **kw):
         raise RuntimeError("solver exploded")
 
     monkeypatch.setattr(marginal, "price", boom)
-    assert trade_radar._priced(_ctx(), _opp(), {}) == []
+    with caplog.at_level(logging.WARNING, logger="manager"):
+        assert trade_radar._priced(_ctx(), _opp(), {}) == []
+    assert "could not price" in caplog.text, "swallowed silently, not logged"
+
+
+def test_an_unidentified_row_does_not_break_the_lineup_solve():
+    """optimal_lineup's new duplicate guard must not read sleeper_id off rows
+    the old code never touched -- one without an id that never starts was
+    fine at flex=0 and has to stay fine."""
+    from draftkit.lineup import optimal_lineup
+    roster = [{"pos": "RB", "weekly": 100, "sleeper_id": "a"},
+              {"pos": "RB", "weekly": 1}]
+    assert [x.get("sleeper_id") for x in optimal_lineup(roster, {"RB": 1}, 0)] == ["a"]

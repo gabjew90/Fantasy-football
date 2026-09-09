@@ -78,13 +78,20 @@ def optimal_lineup(roster: list[dict], slots: dict[str, int], flex: int = 0,
         # the 300 returned 600 instead of 400. Reachable whenever a caller
         # builds a post-trade roster by concatenation (marginal.slot_moves)
         # and the arriving player is already rostered.
-        if p["sleeper_id"] in base_ids:
+        # .get, not [] — the old loop read sleeper_id only off CHOSEN rows, so
+        # a roster carrying an unidentified row that never starts used to be
+        # fine at flex=0. Subscripting here would have turned that into a
+        # KeyError, narrowing a public helper for no gain. An idless row just
+        # opts out of the duplicate check.
+        pid = p.get("sleeper_id")
+        if pid is not None and pid in base_ids:
             continue
         pos = p.get("pos")
         if pos in slots and counts[pos] < slots[pos]:
             counts[pos] += 1
             chosen.append(p)
-            base_ids.add(p["sleeper_id"])
+            if pid is not None:
+                base_ids.add(pid)
 
     sets = _flex_sets(flex, flex_slots)
     orders = [sets] if _nested(sets) else _permutations(sets)
