@@ -299,6 +299,13 @@ def apply(ctx, con: dict, *, min_sources: int = 2, clamp=DEFAULT_CLAMP
         # really was 1.0. waiver_brief and lineup_opt both call apply() on one
         # ctx, so that third call is a normal run, not a pathological one.
         if row.get("_consensus_applied"):
+            # THE WARNING DESCRIBES THE DATA, NOT THE ACT. Skipping a row
+            # silently would mean the second caller's notes -- lineup_opt
+            # renders them, and it runs after waiver_brief -- reported no
+            # clamped rows while clamped rows sat in the lineup it was about
+            # to print. Count the state, not the mutation.
+            if row.get("_consensus_clamped"):
+                clamped += 1
             return row
         r = con.get(str(row.get("sleeper_id") or ""))
         base = row.get("ros_season") or 0.0
@@ -322,6 +329,7 @@ def apply(ctx, con: dict, *, min_sources: int = 2, clamp=DEFAULT_CLAMP
         if not lo <= ratio <= hi:
             clamped += 1
             ratio = min(hi, max(lo, ratio))
+            row["_consensus_clamped"] = True
         if abs(ratio - 1.0) < 1e-9:
             return row
         for k in ("weekly", "ros", "ros_season"):

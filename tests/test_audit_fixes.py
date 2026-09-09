@@ -37,10 +37,23 @@ def test_repeated_apply_cannot_walk_a_clamped_ratio_to_its_full_value():
 
 
 def test_the_clamp_warning_does_not_evaporate_on_a_second_pass():
+    """lineup_opt calls apply() after waiver_brief has already run it, and it
+    RENDERS the notes it gets back. A per-row guard that skipped silently
+    would hand it a clean bill of health for a lineup holding clamped rows,
+    so the warning has to describe the data rather than the mutation."""
     con = {"x": {"mean": 300.0, "n": 3, "spread": 5.0, "per_source": {}}}
     ctx = {"roster_players": {1: [_row("x", 100.0, 10.0)]}}
-    first = consensus.apply(ctx, con)[1]
-    assert any("clamped" in n for n in first)
+    for pass_no in (1, 2, 3):
+        notes = consensus.apply(ctx, con)[1]
+        assert any("clamped" in n for n in notes), f"pass {pass_no}: {notes}"
+        assert any(n.startswith("⚠") for n in notes), f"pass {pass_no} not visible"
+
+
+def test_a_clean_roster_never_reports_a_clamp():
+    con = {"x": {"mean": 120.0, "n": 3, "spread": 5.0, "per_source": {}}}
+    ctx = {"roster_players": {1: [_row("x", 100.0, 10.0)]}}
+    for _ in range(3):
+        assert not any("clamped" in n for n in consensus.apply(ctx, con)[1])
 
 
 def test_an_unclamped_row_is_still_applied_exactly_once():
