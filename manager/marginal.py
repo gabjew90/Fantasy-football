@@ -332,6 +332,14 @@ MARKET_FLOOR = 0.90
 # more than 15%, and 119 by more than 50%. Lineup points are this week;
 # market value is every trade after it.
 MARKET_CEILING = 1.15
+# Gate 3 REPORTS BUT DOES NOT BLOCK (turned off 2026-09-09 on the user's
+# call). Leaving a required slot without cover is a real cost and the
+# warning still names the position, but whether it is disqualifying depends
+# on things the model does not hold -- how thin the wire is that week,
+# whether an IR slot is free, how much the lineup gain is worth against a
+# tail risk. That is a manager's call, not a constant's. Flip to True and
+# every gate-3 failure becomes a hard no again.
+DEPTH_BLOCKS = False
 # And below this the lineup edge is inside projection error, so you are
 # paying transaction risk for nothing.
 #
@@ -374,7 +382,8 @@ def thin_after(roster: list[dict], shape: dict, *, arriving=(), departing=(),
 def verdict(deal: Deal, weeks_left: int, *, floor_ppg: float = EDGE_PPG,
             market_floor: float = MARKET_FLOOR,
             market_ceiling: float = MARKET_CEILING,
-            thin: list[str] | None = None, con: dict | None = None) -> dict:
+            thin: list[str] | None = None, depth_blocks: bool = DEPTH_BLOCKS,
+            con: dict | None = None) -> dict:
     """The two gates, kept separate on purpose.
 
     GATE 1 asks whether the trade is actually good -- my lineup up by more
@@ -411,9 +420,10 @@ def verdict(deal: Deal, weeks_left: int, *, floor_ppg: float = EDGE_PPG,
         from . import consensus as consensus_mod
         confident = consensus_mod.confident(con, abs(deal.my_delta))
     # GATE 3: a required slot with no cover behind it. Structural, so it is
-    # not a threshold and does not care how big the trade is.
+    # not a threshold and does not care how big the trade is. Advisory
+    # unless `depth_blocks`, so it lands in `warnings` rather than `why`.
     gate3 = not thin
-    reasons = []
+    reasons, warnings = [], []
     if not gate1:
         reasons.append(f"lineup: me {mine_ppg:+.2f} ppg (need {floor_ppg:+.2f}), "
                        f"them {theirs_ppg:+.2f}")
@@ -424,15 +434,17 @@ def verdict(deal: Deal, weeks_left: int, *, floor_ppg: float = EDGE_PPG,
         reasons.append(f"market: I send {100 * share:.0f}% of what I get back "
                        f"(ceiling {100 * market_ceiling:.0f}%) — overpaying")
     if not gate3:
-        reasons.append(f"depth: one injury empties a required slot at "
-                       f"{', '.join(thin)} — no cover on the roster")
+        msg = (f"depth: one injury empties a required slot at "
+               f"{', '.join(thin)} — no cover on the roster")
+        (reasons if depth_blocks else warnings).append(msg)
     if confident is False:
-        reasons.append("edge is smaller than the sources' own disagreement")
+        warnings.append("edge is smaller than the sources' own disagreement")
     return {"gate1": gate1, "gate2": gate2, "gate3": gate3,
-            "send": bool(gate1 and gate2 and gate3), "thin": list(thin or []),
+            "send": bool(gate1 and gate2 and (gate3 or not depth_blocks)),
+            "depth_blocks": depth_blocks, "thin": list(thin or []),
             "my_ppg": round(mine_ppg, 2), "their_ppg": round(theirs_ppg, 2),
             "market_share": round(share, 3) if share is not None else None,
-            "confident": confident, "why": reasons}
+            "confident": confident, "why": reasons, "warnings": warnings}
 
 
 def explain(deal: Deal, me: str = "you", them: str = "them") -> str:

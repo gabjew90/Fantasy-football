@@ -186,7 +186,7 @@ def test_a_disputed_consensus_row_is_reported_alongside_the_gates():
     noisy = {"n": 3, "spread": 60.0, "per_source": {}, "mean": 0.0}
     v = marginal.verdict(_deal(5.0, 1.0), weeks_left=17, con=noisy)
     assert v["confident"] is False
-    assert any("disagreement" in w for w in v["why"])
+    assert any("disagreement" in w for w in v["warnings"])
 
 
 def test_weeks_left_of_zero_does_not_divide_by_zero():
@@ -275,14 +275,36 @@ def test_a_waiver_body_can_cover_a_spot_a_two_for_one_opens():
     assert covered == [], "the opened spot is filled by Tuesday"
 
 
-def test_gate_three_blocks_a_package_that_empties_a_slot():
+def test_gate_three_warns_but_does_not_block_by_default():
+    """Turned off 2026-09-09. Whether an empty slot is disqualifying depends
+    on the wire that week, a free IR slot, and how the lineup gain trades
+    against a tail risk -- none of which the model holds."""
     v = marginal.verdict(_deal(17.0, 5.0, out=10000, inn=10000),
                          weeks_left=17, thin=["TE"])
-    assert v["gate3"] is False and v["send"] is False
-    assert any("empties a required slot" in w for w in v["why"])
+    assert marginal.DEPTH_BLOCKS is False
+    assert v["gate3"] is False, "the condition is still detected"
+    assert v["send"] is True, "...but it no longer vetoes"
+    assert any("empties a required slot" in w for w in v["warnings"])
+    assert not any("empties" in w for w in v["why"])
     assert v["thin"] == ["TE"]
+
+
+def test_gate_three_can_be_switched_back_on():
+    v = marginal.verdict(_deal(17.0, 5.0, out=10000, inn=10000),
+                         weeks_left=17, thin=["TE"], depth_blocks=True)
+    assert v["send"] is False
+    assert any("empties a required slot" in w for w in v["why"])
+
+
+def test_a_disagreement_note_is_a_warning_not_a_veto():
+    noisy = {"n": 3, "spread": 60.0, "per_source": {}, "mean": 0.0}
+    v = marginal.verdict(_deal(5.0, 1.0, out=10000, inn=10000),
+                         weeks_left=17, con=noisy)
+    assert v["send"] is True
+    assert any("disagreement" in w for w in v["warnings"])
 
 
 def test_gate_three_is_silent_when_nothing_is_thin():
     v = marginal.verdict(_deal(17.0, 5.0, out=10000, inn=10000), weeks_left=17)
     assert v["gate3"] is True and v["send"] is True and v["thin"] == []
+    assert v["warnings"] == []
