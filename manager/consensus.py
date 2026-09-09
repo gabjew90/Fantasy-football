@@ -35,6 +35,7 @@ log = logging.getLogger("manager")
 
 TTL = 12 * 3600
 MIN_COMMON = 40          # below this the rescale is noise, so report unscaled
+MIN_POS_COMMON = 12      # ...and below this for ONE position, so borrow the overall
 FLOOR = 40.0             # players too small to inform the median
 
 # NOT EVERY SOURCE AGES THE SAME WAY.
@@ -51,6 +52,10 @@ FLOOR = 40.0             # players too small to inform the median
 # mechanism the next static source needs, and because deleting a tested
 # decay only to rebuild it later is worse than a comment saying it is idle.
 LIVE_SOURCES = ("sleeper", "espn", "fantasypros")
+# Rescale anchor, most preferred first. Every other source is scaled ONTO
+# this one, so it decides the level of the whole board and must not change
+# with which sources happen to answer.
+REF_ORDER = ("sleeper", "espn", "fantasypros")
 DECAY_WEEKS = 8
 
 
@@ -59,6 +64,20 @@ def source_weight(label: str, week: int, decay_weeks: int = DECAY_WEEKS) -> floa
         return 1.0
     played = max(0, int(week or 1) - 1)
     return round(max(0.0, 1.0 - played / float(decay_weeks or 1)), 3)
+
+
+def _positions(index) -> dict[str, str]:
+    """sleeper_id -> position, for the per-position rescale.
+
+    Empty when there is no index, which collapses the fit back to one global
+    ratio -- the previous behaviour, and the right degrade: a scale factor
+    keyed on a position we cannot read is worse than no keying at all.
+    """
+    out = {}
+    for pid, d in (index or {}).items():
+        if isinstance(d, dict) and d.get("position"):
+            out[str(pid)] = d["position"]
+    return out
 
 
 def _scoring(cfg) -> dict:
@@ -159,6 +178,7 @@ def build(ctx, store=None) -> tuple[dict[str, dict], list[str]]:
             return cached["data"], list(cached.get("notes") or [])
 
     scoring = _scoring(cfg)
+    index = ctx.get("players")
     notes: list[str] = []
     src: dict[str, dict[str, float]] = {}
     # THE DRAFT SHEET IS NOT AN IN-SEASON SOURCE (dropped 2026-09-09, on the
@@ -179,7 +199,7 @@ def build(ctx, store=None) -> tuple[dict[str, dict], list[str]]:
     # shift by 5 or more, largest 18 (Matthew Golden 157.2 -> 175.2). What is
     # lost outright is kicker coverage, which the consensus never used --
     # the Sleeper request names QB/RB/WR/TE only.
-    for label, (vals, note) in _sources(cfg, scoring, season, ctx.get("players")):
+    for label, (vals, note) in _sources(cfg, scoring, season, index):
         if note:
             notes.append(f"{label}: {note}")
         if vals:
@@ -199,10 +219,25 @@ def build(ctx, store=None) -> tuple[dict[str, dict], list[str]]:
     # Sleeper is never asked for, so the intersection would collapse to the
     # positions every source happens to share. Fitted pairwise, a partial
     # source is scaled on what it shares and costs the others nothing.
-    ref = "sleeper" if "sleeper" in src else max(src, key=lambda k: len(src[k]))
+    # THE REFERENCE SETS THE LEVEL FOR THE WHOLE BOARD, so it is chosen by a
+    # FIXED PREFERENCE, not by size. Picking the largest source handed the
+    # anchor to FantasyPros (471 rows against ESPN's 414) whenever Sleeper
+    # was down -- and FantasyPros is the one source measured to run 9-13%
+    # hot, so an outage would have inflated every projection in every league
+    # by about ten percent and pushed borderline ratios into apply()'s clamp.
+    ref = next((k for k in REF_ORDER if k in src),
+               max(src, key=lambda k: len(src[k])))
     big = {p for p, v in src[ref].items() if v > FLOOR}
     scale = {k: 1.0 for k in src}
+    pos_scale: dict[str, dict[str, float]] = {}
     overlap = {ref: len(big)}
+    # PER POSITION, because one global ratio is measurably the wrong shape.
+    # FantasyPros runs 1.096 hot at WR and 1.116 at RB over the top 36, and
+    # 1.406 at TE further down; a single median splits the difference and
+    # leaves a residual that biases every CROSS-POSITION trade -- which is
+    # what a trade usually is. Falls back to the global ratio for a position
+    # with too little overlap to fit, and says which ones those were.
+    pos_of = _positions(index)
     for k, s_k in src.items():
         if k == ref:
             continue
@@ -213,7 +248,28 @@ def build(ctx, store=None) -> tuple[dict[str, dict], list[str]]:
                          f"common with {ref}")
             continue
         med = statistics.median(s_k[p] for p in shared)
-        scale[k] = (statistics.median(src[ref][p] for p in shared) / med) if med else 1.0
+        gross = (statistics.median(src[ref][p] for p in shared) / med) if med else 1.0
+        scale[k] = gross
+        buckets: dict[str, list[str]] = {}
+        for p in shared:
+            buckets.setdefault(pos_of.get(p) or "?", []).append(p)
+        fitted, fell_back = {}, []
+        for pos in sorted(set(pos_of.get(p) or "?" for p in s_k)):
+            grp = buckets.get(pos) or []
+            m = statistics.median(s_k[p] for p in grp) if len(grp) >= MIN_POS_COMMON else 0.0
+            if m:
+                fitted[pos] = statistics.median(src[ref][p] for p in grp) / m
+            elif pos != "?":
+                fell_back.append(pos)
+        if fitted:
+            pos_scale[k] = fitted
+        if fell_back:
+            # K and DEF land here by construction: Sleeper is never asked for
+            # them, so they can never appear in `shared` and their factor is
+            # borrowed from positions they are not members of.
+            notes.append(f"{k}: {', '.join(fell_back)} could not be fitted "
+                         f"against {ref} (no shared players) — scaled on the "
+                         f"overall {gross:.3f} instead")
     # `common` still means "priced by every source", but it is now a REPORTED
     # diagnostic rather than the thing the fit depends on.
     common = set.intersection(*({p for p, v in s.items() if v > FLOOR}
@@ -246,7 +302,9 @@ def build(ctx, store=None) -> tuple[dict[str, dict], list[str]]:
         # lives where the extra evidence is: waiver_brief._stale_reserve,
         # which requires a reserve designation as well, and only for the
         # positions these sources are actually asked about (COVERED_POS).
-        per = {k: round(s[pid] * scale[k], 1) for k, s in src.items()
+        ppos = pos_of.get(pid)
+        per = {k: round(s[pid] * (pos_scale.get(k, {}).get(ppos) or scale[k]), 1)
+               for k, s in src.items()
                if pid in s and s[pid] > 0 and weight[k] > 0}
         if not per:
             continue
@@ -297,6 +355,27 @@ DEAD_EPS = 1.0           # a consensus this low is "he does not play again"
 # Positions the projection sources are actually asked about. Anything outside
 # this set has n=0 for reasons that say nothing about the player, so absence
 # from the consensus is not evidence about him.
+#
+# K AND DEF STAY OUT, EVEN THOUGH A SOURCE NOW CARRIES THEM.
+#
+# FantasyPros arrived on 2026-09-09 and covers all six positions, which makes
+# the old wording here ("absent from the consensus unconditionally") wrong.
+# Widening the set on that basis was tried and REVERTED the same day, because
+# the premise that matters is not "is anyone asked" but "is the answer
+# complete enough that silence means something".
+#
+# It is not. The FantasyPros rest-of-season kicker page lists 32 -- one per
+# team, the starters -- against 154 active kickers in the Sleeper index. A
+# kicker on IR is precisely the kicker who will not be in that 32, so his
+# n=0 is guaranteed by the shape of the feed and says nothing about him.
+# Reading it as staleness would delete every reserve-status kicker from the
+# waiver pool: the original defect, restored by a change that looked like a
+# fix. tests/test_audit_fixes.py caught it.
+#
+# What would justify moving K here is a source that enumerates the position
+# rather than ranking the top of it. DEF is nearly there already (32 teams,
+# 32 rows) but a defence never carries a reserve designation, so nothing
+# turns on it.
 COVERED_POS = ("QB", "RB", "WR", "TE")
 
 

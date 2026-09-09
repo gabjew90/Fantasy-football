@@ -58,7 +58,8 @@ def _shape_from_cfg(cfg) -> dict:
 
 
 def load(cfg, players: dict, con: dict | None = None,
-         key: str = "mean") -> tuple[dict[str, list[dict]], dict, list[str]]:
+         key: str = "mean", crosswalk: dict | None = None
+         ) -> tuple[dict[str, list[dict]], dict, list[str]]:
     """(owner -> rows, shape, notes).
 
     Rows are the shape manager.marginal expects: sleeper_id, pos, name, and
@@ -66,6 +67,14 @@ def load(cfg, players: dict, con: dict | None = None,
     Unmatched names are REPORTED, never dropped silently -- a roster missing
     two players prices every trade for that team wrong, and the caller has
     to be able to see it.
+
+    `crosswalk` is manager.fantasypros.crosswalk(), optional. Yahoo and
+    FantasyPros are both fantasy-industry feeds and often agree on a
+    rendering Sleeper writes differently, so a name the Sleeper index misses
+    can still land. It is a SECOND SPELLING, not a second identity: the
+    crosswalk resolves its own names through the same Sleeper index, so it
+    widens coverage without making any single match more certain. The exact
+    join needs the scrape to carry Yahoo's player id, which it does not yet.
     """
     from draftkit.ids import normalize_name
 
@@ -93,8 +102,10 @@ def load(cfg, players: dict, con: dict | None = None,
             by_norm.setdefault(normalize_name(nm), []).append(str(pid))
 
     con = con or {}
+    cw_name = ((crosswalk or {}).get("by_name")) or {}
     out: dict[str, list[dict]] = {}
     unmatched: list[str] = []
+    ambiguous: list[str] = []
     for line in path.read_text(encoding="utf-8").strip().splitlines():
         parts = line.split("|")
         if len(parts) != 3:
@@ -105,8 +116,21 @@ def load(cfg, players: dict, con: dict | None = None,
             continue
         cand = [x for x in by_norm.get(normalize_name(name), [])
                 if (players.get(x) or {}).get("position") == pos]
+        if not cand and cw_name:
+            # Second spelling. "Harold Fannin Jr." on the Yahoo page against
+            # "Harold Fannin" in the Sleeper index is the common shape.
+            cand = [pid for pid, cw_pos, _ in cw_name.get(normalize_name(name), [])
+                    if cw_pos == pos]
         if not cand:
             unmatched.append(f"{name} ({pos})")
+            continue
+        if len(cand) > 1:
+            # AMBIGUITY WAS A SILENT WRONG ANSWER. cand[0] picked whichever
+            # Mike Williams the index happened to list first and priced that
+            # team around him. A duplicate name is a roster the caller must
+            # resolve by hand, so it is reported like any other miss --
+            # short by one is visible, wrong by one is not.
+            ambiguous.append(f"{name} ({pos}, {len(cand)} matches)")
             continue
         pid = cand[0]
         out.setdefault(owner, []).append({
@@ -117,5 +141,9 @@ def load(cfg, players: dict, con: dict | None = None,
     if unmatched:
         notes.append(f"⚠ {len(unmatched)} roster names did not resolve to a player id, "
                      f"so their teams are priced short: {', '.join(unmatched[:6])}")
+    if ambiguous:
+        notes.append(f"⚠ {len(ambiguous)} roster names match more than one player and "
+                     f"were NOT guessed, so their teams are priced short: "
+                     f"{', '.join(ambiguous[:6])}")
     notes.append(f"{len(out)} teams, {sum(len(v) for v in out.values())} skill players")
     return out, _shape_from_cfg(cfg), notes

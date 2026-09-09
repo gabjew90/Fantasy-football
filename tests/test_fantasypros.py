@@ -301,3 +301,86 @@ def test_a_player_with_no_fantasypros_id_is_not_asked_about(monkeypatch):
     monkeypatch.setenv("FANTASYPROS_API_KEY", "k")
     out, note = fp.injuries({"s0": {"pos": "RB"}}, 2026, 1)
     assert out == {} and "no id crosswalk" in note
+
+
+# ------------------------------------------- fixes from the 2026-09-09 review
+
+def test_the_injury_cache_names_who_was_asked_about_not_how_many(monkeypatch):
+    """Keyed on len(ids), two leagues rostering the same NUMBER of players
+    shared an entry; within one league a 1-for-1 trade kept the count
+    identical, so the acquired player showed no injury and the departed one
+    still did."""
+    monkeypatch.setenv("FANTASYPROS_API_KEY", "k")
+
+    class Store(dict):
+        def get(self, k, d=None):
+            return dict.get(self, k, d)
+
+        def set(self, k, v):
+            self[k] = v
+
+    store = Store()
+    monkeypatch.setattr(fp, "_injury_page",
+                        lambda ids, s, w, k: ([_fp_inj(int(ids[0]))], False))
+    a = {"sA": {"fp_id": 1000}, "sB": {"fp_id": 1001}}
+    b = {"sC": {"fp_id": 2000}, "sD": {"fp_id": 2001}}   # same SIZE, other people
+    fp.injuries(a, 2026, 1, store=store)
+    out_b, _ = fp.injuries(b, 2026, 1, store=store)
+    assert "sA" not in out_b, "cache collided across two equal-sized rosters"
+    assert len(store) == 2, f"both runs shared one key: {list(store)}"
+
+
+def test_one_dead_position_does_not_discard_the_five_already_fetched(monkeypatch):
+    def _rows(pos, slug, season, kind, week=None):
+        if pos == "DST":
+            raise TimeoutError("slow")
+        if pos == "RB":
+            return [{"player_name": "Bijan Robinson", "r2p_pts": "378.0"}], {}
+        return [], {}
+    monkeypatch.setattr(fp, "_rows", _rows)
+    out, note = fp.fetch({}, 2026, INDEX)
+    assert out.get("1", {}).get("pts") == 378.0, "kept nothing after a late failure"
+    assert note.startswith("⚠") and "NO DATA for DST" in note
+
+
+def test_an_empty_result_is_never_cached(monkeypatch):
+    """A momentarily malformed player index fails every name join. Caching
+    that for the 6h TTL keeps the consensus on two sources long after the
+    index recovers."""
+    class Store(dict):
+        def get(self, k, d=None):
+            return dict.get(self, k, d)
+
+        def set(self, k, v):
+            self[k] = v
+
+    store = Store()
+    monkeypatch.setattr(fp, "_rows", lambda *a, **k: ([], {}))
+    out, note = fp.fetch({}, 2026, INDEX, store=store)
+    assert out == {} and "DATA MISSING" in note
+    assert store == {}, "an empty match result was cached"
+
+
+def test_an_int_keyed_index_misses_cleanly_instead_of_raising(monkeypatch):
+    """_index_by_name stringifies ids; subscripting the caller's dict with a
+    key we coerced turned an int-keyed index into a KeyError."""
+    idx = {1: {"full_name": "Bijan Robinson", "position": "RB", "team": "ATL"}}
+    monkeypatch.setattr(fp, "_rows", lambda p, s, y, k, w=None: (
+        [{"player_name": "Bijan Robinson", "r2p_pts": "378.0"}], {}))
+    out, note = fp.fetch({}, 2026, idx)          # must not raise
+    assert out == {} and "DATA MISSING" in note
+
+
+def test_the_crosswalk_reports_yahoo_ids_and_a_second_name_index(monkeypatch):
+    _feed(monkeypatch, {"RB": [{"player_name": "Bijan Robinson", "player_id": 17240,
+                                "player_yahoo_id": "40059", "r2p_pts": "378.0"}]})
+    cw, note = fp.crosswalk({}, 2026, INDEX)
+    assert cw["by_yahoo"] == {"40059": "1"}
+    assert cw["by_name"]["bijan robinson"] == [("1", "RB", "ATL")]
+    assert "crosswalk 1 yahoo ids" in note
+
+
+def test_the_crosswalk_degrades_to_empty_tables_not_none(monkeypatch):
+    monkeypatch.setattr(fp, "_rows", lambda *a, **k: ([], {}))
+    cw, note = fp.crosswalk({}, 2026, INDEX)
+    assert cw == {"by_yahoo": {}, "by_name": {}} and "DATA MISSING" in note

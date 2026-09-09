@@ -124,11 +124,12 @@ RESERVE_STATUS = ("IR", "IR-R", "PUP", "PUP-R", "NFI", "NFI-R", "DNR", "Sus", "I
 def _stale_reserve(pl: dict, con: dict, pid: str) -> bool:
     """On a reserve list AND no live source still carries him.
 
-    Only meaningful for positions the sources are asked about. Kickers and
-    defenses are absent from the consensus unconditionally -- the Sleeper
-    projections request names QB/RB/WR/TE and nothing else -- so reading
-    their n=0 as staleness deleted every reserve-status K and DEF from the
-    pool on evidence that was never collected.
+    Only meaningful for positions the sources COVER COMPLETELY, which is what
+    consensus.COVERED_POS tracks. Kickers and defenses sit outside it: the
+    Sleeper request names QB/RB/WR/TE, and while FantasyPros does carry all
+    six it publishes the top 32 kickers against 154 active ones, so an IR
+    kicker's n=0 is a fact about the feed's shape and not about him. Reading
+    it as staleness deleted every reserve-status K and DEF from the pool.
     """
     if (pl.get("injury_status") or "") not in RESERVE_STATUS:
         return False

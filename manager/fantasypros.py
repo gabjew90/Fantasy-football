@@ -16,10 +16,14 @@ So this is NOT here to sharpen a point estimate. It is here because:
     12-16 points from our two-source consensus at the top of the board --
     about as far as ESPN and Sleeper sit from each other. It is not a scaled
     copy, so it earns its place in the mean.
-  * IT RESTORES K AND DST. The Sleeper request names QB/RB/WR/TE only and the
-    draft sheet left with the draft, so kickers and defences have had NO
-    consensus at all -- Eddy Pineiro and the Vikings defence carry n=0 and
-    whatever the board said in August. This source covers all six.
+  * IT COVERS K AND DST, WHICH NOTHING ELSE DOES. The Sleeper request names
+    QB/RB/WR/TE only and the draft sheet left with the draft, so kickers and
+    defences had NO consensus at all. Note what this does and does not buy:
+    they arrive at n=1, and consensus.apply needs min_sources=2, so the
+    projections are still NOT re-based -- Eddy Pineiro stays on his August
+    board number with a FantasyPros opinion recorded beside it. What it buys
+    today is evidence where there was none (waiver_brief._stale_reserve can
+    finally see a shelved kicker); re-basing needs a second K/DEF source.
   * IT CARRIES THE PANEL, NOT JUST A NUMBER. `type=draft` is ~149 experts
     with per-player best/worst/sd and FantasyPros' own tier numbers. Ranks
     are the half of the instrument that has measured skill (top-36 Spearman
@@ -152,11 +156,17 @@ def fetch(scoring: dict, season, index, kind: str = ROS, week: int | None = None
     by_norm, by_team = _index_by_name(index)
     out: dict[str, dict] = {}
     stamps, ambiguous, unmatched = [], 0, 0
+    failed: list[str] = []
     for fp_pos, our_pos in POSITIONS.items():
         try:
             rows, body = _rows(fp_pos, slug, season, kind, week)
         except Exception as e:  # noqa: BLE001
-            return {}, f"DATA MISSING: fantasypros {fp_pos} ({e.__class__.__name__})"
+            # KEEP WHAT WE HAVE. A timeout on DST -- the last of six -- used
+            # to discard 446 skill rows already parsed and drop the consensus
+            # to two sources for that build. injuries() in this same module
+            # degrades partially; these two must not disagree.
+            failed.append(f"{fp_pos} ({e.__class__.__name__})")
+            continue
         if body.get("last_updated"):
             stamps.append(str(body["last_updated"]))
         for row in rows:
@@ -164,9 +174,13 @@ def fetch(scoring: dict, season, index, kind: str = ROS, week: int | None = None
                 tm = (row.get("player_team_id") or "").upper()
                 pid = by_team.get(TEAM_ALIAS.get(tm, tm))
             else:
+                # index.get, NOT index[x]. _index_by_name stringifies ids
+                # into by_norm; subscripting the caller's dict with a key we
+                # coerced turns an int-keyed index into a KeyError instead of
+                # a clean miss. _espn avoids this by not stringifying at all.
                 cand = [x for x in by_norm.get(
                     normalize_name(row.get("player_name") or ""), [])
-                    if (index[x].get("position") == our_pos)]
+                    if (index.get(x) or {}).get("position") == our_pos]
                 if len(cand) > 1:
                     # AMBIGUOUS NAMES ARE DROPPED, NOT GUESSED -- the same
                     # rule _espn follows. A wrong match does not show up as a
@@ -199,11 +213,17 @@ def fetch(scoring: dict, season, index, kind: str = ROS, week: int | None = None
     # its own sends you looking at the network when the answer is that every
     # row hit an ambiguous name, which is a player-index problem instead.
     why = (f", {ambiguous} ambiguous names dropped" if ambiguous else "") +           (f", {unmatched} unmatched" if unmatched else "")
+    if failed:
+        why += f", NO DATA for {', '.join(failed)}"
     if not out:
-        note = f"DATA MISSING: fantasypros matched no players{why}"
-    else:
-        note = (f"fantasypros {kind} {slug}: {len(out)} players" + why
-                + (f", updated {sorted(stamps)[-1]}" if stamps else ""))
+        # DO NOT CACHE AN EMPTY RESULT. A momentarily malformed player index
+        # fails every name join, and caching that for the 6h TTL keeps the
+        # consensus on two sources long after the index recovers.
+        return out, f"DATA MISSING: fantasypros matched no players{why}"
+    note = (f"fantasypros {kind} {slug}: {len(out)} players" + why
+            + (f", updated {sorted(stamps)[-1]}" if stamps else ""))
+    if failed:
+        note = "⚠ " + note
     if store is not None:
         store.set(ckey, {"ts": _time.time(), "data": out, "note": note})
     return out, note
@@ -328,7 +348,13 @@ def injuries(rows: dict, season, week, store=None
         return {}, "DATA MISSING: fantasypros injuries (no id crosswalk)"
 
     ids = sorted(by_fp)
-    ckey = f"fantasypros:injuries:{season}:{week}:{len(ids)}"
+    # KEYED ON WHO WAS ASKED ABOUT, NOT HOW MANY. Two leagues rostering the
+    # same NUMBER of players shared an entry and got each other's reports;
+    # within one league a 1-for-1 trade left the count identical, so the
+    # acquired player showed no injury and the departed one still did.
+    import hashlib
+    fingerprint = hashlib.sha1(":".join(ids).encode()).hexdigest()[:16]
+    ckey = f"fantasypros:injuries:{season}:{week}:{len(ids)}:{fingerprint}"
     if store is not None:
         cached = store.get(ckey)
         if cached and _time.time() - cached.get("ts", 0) < INJURY_TTL:
@@ -370,3 +396,59 @@ def injuries(rows: dict, season, week, store=None
     if store is not None:
         store.set(ckey, {"ts": _time.time(), "data": out, "note": note})
     return out, note
+
+
+# --------------------------------------------------------------- crosswalk
+
+def crosswalk(scoring: dict, season, index, store=None
+              ) -> tuple[dict, str | None]:
+    """Identity for a league whose rosters arrive as bare names.
+
+    Returns {"by_yahoo": {yahoo_id: sleeper_id},
+             "by_name":  {normalised name: [(sleeper_id, pos, team)]}}
+
+    BE HONEST ABOUT WHAT THIS IS WORTH. fetch() resolves a FantasyPros row to
+    a sleeper_id BY NAME, so `by_yahoo` is a name-mediated link, not an
+    independent one. It does not make the Sleeper side exact.
+
+    What it does buy, which is real:
+
+      * A SECOND NAME SPELLING, WHICH MEASURED ZERO AND IS KEPT ANYWAY.
+        draftkit.ids.normalize_name already strips punctuation and
+        generational suffixes, so "Harold Fannin Jr." against "Harold Fannin"
+        ALREADY matches -- suffixes were the obvious guess and they are not
+        the gap. What is left is genuinely different renderings of one person
+        ("Marquise Brown" against "Hollywood Brown"). On the Keefamania
+        scrape of 2026-09-09 that population is EMPTY: 131 players resolved
+        with the crosswalk and 131 without it. So this buys nothing today. It
+        is kept because it costs one dict on a fetch the consensus already
+        makes, and it is the path a renaming would otherwise take down
+        silently -- but do not cite it as a benefit until it rescues someone.
+      * TEAM, SO AMBIGUITY IS RESOLVABLE. yahoo.load currently takes cand[0]
+        on a duplicate name, which silently prices the wrong Mike Williams.
+        A team code turns that guess into a decision.
+      * A PLACE FOR THE EXACT JOIN TO LAND. The scrape is `POS|Name|Owner`
+        today. If it is ever widened to carry Yahoo's own player id, this
+        table is already the other half and the name matching drops out
+        entirely. That is the upgrade worth making; this is not a substitute
+        for it.
+    """
+    rows, note = fetch(scoring, season, index, kind=ROS, store=store)
+    if not rows:
+        return {"by_yahoo": {}, "by_name": {}}, note
+
+    from draftkit.ids import normalize_name
+    by_yahoo: dict[str, str] = {}
+    by_name: dict[str, list[tuple[str, str, str]]] = {}
+    for pid, r in rows.items():
+        yid = r.get("yahoo_id")
+        if yid:
+            by_yahoo.setdefault(str(yid), pid)
+        d = (index.get(pid) or {}) if hasattr(index, "get") else {}
+        nm = d.get("full_name") or d.get("last_name")
+        if nm:
+            by_name.setdefault(normalize_name(nm), []).append(
+                (pid, r.get("pos") or d.get("position") or "",
+                 (d.get("team") or "").upper()))
+    return ({"by_yahoo": by_yahoo, "by_name": by_name},
+            f"{note}; crosswalk {len(by_yahoo)} yahoo ids")

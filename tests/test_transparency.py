@@ -386,3 +386,58 @@ def test_the_pool_excludes_him_and_records_why():
     names = {p["name"] for p in pool}
     assert names == {"Healthy Guy"}, names
     assert "Shelved Star (IR)" in ctx["_stale_reserve_dropped"]
+
+
+def test_the_rescale_anchor_does_not_move_with_which_sources_answer(monkeypatch):
+    """Picking the largest source handed the anchor to FantasyPros (471 rows
+    against ESPN's 414) on a Sleeper outage -- and FantasyPros is the one
+    source measured to run 9-13% hot, so an outage would have inflated every
+    projection in every league by about ten percent."""
+    espn = {str(i): 100.0 + i for i in range(60)}
+    fpros = {str(i): (100.0 + i) * 1.10 for i in range(90)}     # bigger AND hot
+    monkeypatch.setattr(consensus, "_sleeper", lambda s, y: ({}, "down"))
+    monkeypatch.setattr(consensus, "_espn", lambda s, y, r, i: (espn, None))
+    monkeypatch.setattr(consensus, "_fantasypros", lambda s, y, i: (fpros, None))
+    ctx = {"cfg": Cfg(league_name="x"), "state": {"season": "2026"},
+           "players": {"1": {}}}
+    data, notes = consensus.build(ctx)
+    assert any("rescaled against espn" in n for n in notes), notes
+    # ESPN's level survives; FantasyPros is pulled DOWN onto it, not the reverse
+    assert abs(data["30"]["mean"] - 130.0) < 1.0, data["30"]
+
+
+def test_a_position_with_no_shared_players_is_named_not_silently_borrowed(
+        monkeypatch):
+    """Sleeper is never asked for K or DEF, so those rows can never appear in
+    the overlap a scale factor is fitted on. Applying a skill-position ratio
+    to them anyway is defensible; doing it silently is not."""
+    idx = {str(i): {"position": "RB" if i < 60 else "K", "full_name": f"p{i}"}
+           for i in range(80)}
+    sleeper = {str(i): 100.0 + i for i in range(60)}                 # RB only
+    fpros = {str(i): (100.0 + i) * 1.10 for i in range(80)}          # RB + K
+    monkeypatch.setattr(consensus, "_sleeper", lambda s, y: (sleeper, None))
+    monkeypatch.setattr(consensus, "_espn", lambda s, y, r, i: ({}, "down"))
+    monkeypatch.setattr(consensus, "_fantasypros", lambda s, y, i: (fpros, None))
+    ctx = {"cfg": Cfg(league_name="x"), "state": {"season": "2026"}, "players": idx}
+    data, notes = consensus.build(ctx)
+    assert any("K could not be fitted" in n for n in notes), notes
+    assert data["70"]["n"] == 1, data["70"]
+
+
+def test_each_position_is_scaled_on_its_own_ratio(monkeypatch):
+    """One global median splits the difference between positions that differ,
+    leaving a residual that biases exactly the cross-position trades the
+    engine exists to price."""
+    idx = {str(i): {"position": "RB" if i < 40 else "WR", "full_name": f"p{i}"}
+           for i in range(80)}
+    sleeper = {str(i): 100.0 + i for i in range(80)}
+    # 20% hot at RB, 5% hot at WR -- a single ratio can be right for neither
+    other = {str(i): (100.0 + i) * (1.20 if i < 40 else 1.05) for i in range(80)}
+    monkeypatch.setattr(consensus, "_sleeper", lambda s, y: (sleeper, None))
+    monkeypatch.setattr(consensus, "_espn", lambda s, y, r, i: (other, None))
+    monkeypatch.setattr(consensus, "_fantasypros", lambda s, y, i: ({}, "down"))
+    ctx = {"cfg": Cfg(league_name="x"), "state": {"season": "2026"}, "players": idx}
+    data, _ = consensus.build(ctx)
+    for pid in ("10", "60"):
+        assert data[pid]["spread"] < 1.0, (
+            f"{idx[pid]['position']} still carries a scale residual: {data[pid]}")
