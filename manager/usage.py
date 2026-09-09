@@ -1,4 +1,4 @@
-"""Weekend usage from nflverse (nfl_data_py): snap %, target share, targets,
+"""Weekend usage from nflverse (nflreadpy): snap %, target share, targets,
 carries, receiving yards — week-over-week deltas as role-change evidence.
 
 Inside-10 carries and route/YPRR data are not in the free weekly dataset;
@@ -25,8 +25,8 @@ def load_usage(season: int) -> tuple[dict | None, str | None]:
     written, which silently disabled the usage-evidence bonus in the waiver
     brief and the overreaction damper that is supposed to stop a one-week
     spike from ranking an add. draftkit.defense already reads nflreadpy;
-    this now matches it. nfl_data_py's SNAP endpoint still works, so
-    load_snaps below is left alone.
+    this now matches it, and load_snaps moved with it so the module speaks
+    one library and returns one dataframe type.
     """
     try:
         import nflreadpy as nfl
@@ -53,14 +53,14 @@ def load_usage(season: int) -> tuple[dict | None, str | None]:
 def load_snaps(season: int) -> dict | None:
     """name(lower) -> {week -> offense snap pct}."""
     try:
-        import nfl_data_py as nfl
-        df = nfl.import_snap_counts([season])
+        import nflreadpy as nfl
+        df = nfl.load_snap_counts([int(season)])
     except Exception:  # noqa: BLE001
         return None
-    if df is None or len(df) == 0:
+    if df is None or df.height == 0:
         return None
     out: dict[str, dict[int, float]] = {}
-    for _, r in df.iterrows():
+    for r in df.iter_rows(named=True):          # polars, same as load_usage
         name = str(r.get("player") or "").lower()
         if name:
             out.setdefault(name, {})[int(r["week"])] = float(r.get("offense_pct") or 0)

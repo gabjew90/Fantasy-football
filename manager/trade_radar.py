@@ -96,8 +96,8 @@ def _priced(ctx, opp, vals) -> list[str]:
     except Exception as e:  # noqa: BLE001
         log.warning("trade radar: could not price %s (%s)", opp.get("mgr"), e)
         return []
-    out = [f"- lineup effect: **me {d.my_delta:+.1f}**, them {d.their_delta:+.1f}"
-           f" (rest-of-season points)"]
+    out = [f"- lineup effect (rest-of-season POINTS, not the market values "
+           f"quoted above): **me {d.my_delta:+.1f}**, them {d.their_delta:+.1f}"]
     for label, mv in (("me", d.my_moves), ("them", d.their_moves)):
         for tag, rows in (("loses the spot", mv["benched"]),
                           ("comes off the bench", mv["promoted"])):

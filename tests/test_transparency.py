@@ -80,7 +80,6 @@ def test_build_rescales_sources_onto_a_common_basis(monkeypatch):
     lo = {k: v * 0.90 for k, v in hi.items()}
     monkeypatch.setattr(consensus, "_sleeper", lambda s, y: (hi, None))
     monkeypatch.setattr(consensus, "_espn", lambda s, y, r, i: (lo, None))
-    monkeypatch.setattr(consensus, "_sheet", lambda c: ({}, None))
     ctx = {"cfg": Cfg(league_name="x"), "state": {"season": "2026"}, "players": {}}
     data, notes = consensus.build(ctx)
     row = data["30"]
@@ -92,7 +91,6 @@ def test_build_rescales_sources_onto_a_common_basis(monkeypatch):
 def test_a_dead_source_is_a_note_not_a_crash(monkeypatch):
     monkeypatch.setattr(consensus, "_sleeper", lambda s, y: ({}, "sleeper unavailable (X)"))
     monkeypatch.setattr(consensus, "_espn", lambda s, y, r, i: ({"1": 50.0}, None))
-    monkeypatch.setattr(consensus, "_sheet", lambda c: ({}, None))
     ctx = {"cfg": Cfg(league_name="x"), "state": {"season": "2026"}, "players": {}}
     data, notes = consensus.build(ctx)
     assert data["1"]["n"] == 1
@@ -101,8 +99,7 @@ def test_a_dead_source_is_a_note_not_a_crash(monkeypatch):
 
 def test_every_source_down_is_reported_and_empty(monkeypatch):
     for fn, sig in (("_sleeper", lambda s, y: ({}, "down")),
-                    ("_espn", lambda s, y, r, i: ({}, "down")),
-                    ("_sheet", lambda c: ({}, "down"))):
+                    ("_espn", lambda s, y, r, i: ({}, "down"))):
         monkeypatch.setattr(consensus, fn, sig)
     ctx = {"cfg": Cfg(league_name="x"), "state": {"season": "2026"}, "players": {}}
     data, notes = consensus.build(ctx)
@@ -113,7 +110,6 @@ def test_every_source_down_is_reported_and_empty(monkeypatch):
 def test_too_few_common_players_reports_rather_than_rescaling_on_noise(monkeypatch):
     monkeypatch.setattr(consensus, "_sleeper", lambda s, y: ({"1": 100.0, "2": 90.0}, None))
     monkeypatch.setattr(consensus, "_espn", lambda s, y, r, i: ({"1": 50.0, "2": 45.0}, None))
-    monkeypatch.setattr(consensus, "_sheet", lambda c: ({}, None))
     ctx = {"cfg": Cfg(league_name="x"), "state": {"season": "2026"}, "players": {}}
     _, notes = consensus.build(ctx)
     assert any("not rescaled" in n for n in notes)
@@ -128,7 +124,6 @@ def test_the_store_caches_so_a_brief_does_not_refetch(monkeypatch):
 
     monkeypatch.setattr(consensus, "_sleeper", sleeper)
     monkeypatch.setattr(consensus, "_espn", lambda s, y, r, i: ({}, None))
-    monkeypatch.setattr(consensus, "_sheet", lambda c: ({}, None))
     ctx = {"cfg": Cfg(league_name="x"), "state": {"season": "2026"}, "players": {}}
     store = FakeStore()
     consensus.build(ctx, store)
@@ -274,7 +269,8 @@ def test_the_mean_is_weighted_and_the_static_source_fades(monkeypatch):
     stale = dict(live, **{"30": 200.0})
     monkeypatch.setattr(consensus, "_sleeper", lambda s, y: (live, None))
     monkeypatch.setattr(consensus, "_espn", lambda s, y, r, i: (live, None))
-    monkeypatch.setattr(consensus, "_sheet", lambda c: (stale, None))
+    monkeypatch.setattr(consensus, "_sources", lambda c, sc, se, ix: (
+        ("sleeper", (live, None)), ("espn", (live, None)), ("sheet", (stale, None))))
 
     def at(week):
         ctx = {"cfg": Cfg(league_name="x"), "state": {"season": "2026"},
@@ -290,7 +286,9 @@ def test_ageing_out_is_announced(monkeypatch):
     live = {str(i): 100.0 for i in range(60)}
     monkeypatch.setattr(consensus, "_sleeper", lambda s, y: (live, None))
     monkeypatch.setattr(consensus, "_espn", lambda s, y, r, i: ({}, None))
-    monkeypatch.setattr(consensus, "_sheet", lambda c: ({str(i): 200.0 for i in range(60)}, None))
+    monkeypatch.setattr(consensus, "_sources", lambda c, sc, se, ix: (
+        ("sleeper", (live, None)),
+        ("sheet", ({str(i): 200.0 for i in range(60)}, None))))
     ctx = {"cfg": Cfg(league_name="x"), "state": {"season": "2026"},
            "players": {}, "week": 12}
     _, notes = consensus.build(ctx)
@@ -301,7 +299,9 @@ def test_a_down_weighted_source_is_announced(monkeypatch):
     live = {str(i): 100.0 for i in range(60)}
     monkeypatch.setattr(consensus, "_sleeper", lambda s, y: (live, None))
     monkeypatch.setattr(consensus, "_espn", lambda s, y, r, i: ({}, None))
-    monkeypatch.setattr(consensus, "_sheet", lambda c: ({str(i): 200.0 for i in range(60)}, None))
+    monkeypatch.setattr(consensus, "_sources", lambda c, sc, se, ix: (
+        ("sleeper", (live, None)),
+        ("sheet", ({str(i): 200.0 for i in range(60)}, None))))
     ctx = {"cfg": Cfg(league_name="x"), "state": {"season": "2026"},
            "players": {}, "week": 4}
     _, notes = consensus.build(ctx)
@@ -313,7 +313,6 @@ def test_a_uniform_offset_is_a_scale_difference_and_is_removed(monkeypatch):
     argument about anyone. Rescaling must flatten it to zero spread."""
     monkeypatch.setattr(consensus, "_sleeper", lambda s, y: ({str(i): 100.0 for i in range(60)}, None))
     monkeypatch.setattr(consensus, "_espn", lambda s, y, r, i: ({str(i): 130.0 for i in range(60)}, None))
-    monkeypatch.setattr(consensus, "_sheet", lambda c: ({}, None))
     ctx = {"cfg": Cfg(league_name="x"), "state": {"season": "2026"},
            "players": {}, "week": 3}
     assert consensus.build(ctx)[0]["30"]["spread"] == 0.0
@@ -324,7 +323,6 @@ def test_a_real_player_level_disagreement_survives_rescaling(monkeypatch):
     base = {str(i): 100.0 for i in range(60)}
     monkeypatch.setattr(consensus, "_sleeper", lambda s, y: (base, None))
     monkeypatch.setattr(consensus, "_espn", lambda s, y, r, i: (dict(base, **{"30": 160.0}), None))
-    monkeypatch.setattr(consensus, "_sheet", lambda c: ({}, None))
     ctx = {"cfg": Cfg(league_name="x"), "state": {"season": "2026"},
            "players": {}, "week": 3}
     data = consensus.build(ctx)[0]

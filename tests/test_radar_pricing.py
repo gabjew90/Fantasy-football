@@ -66,7 +66,10 @@ def test_the_market_line_appears_only_with_values():
     vals = {"mrb2": 4890, "mte2": 1598, "twr1": 4746, "twr4": 1569}
     with_market = "\n".join(trade_radar._priced(_ctx(), _opp(), vals))
     without = "\n".join(trade_radar._priced(_ctx(), _opp(), {}))
-    assert "market" in with_market and "market" not in without
+    # match the annotation itself, not the word: the points line now carries a
+    # "not the market values quoted above" disclaimer that mentions it too
+    assert "out /" in with_market and "in (" in with_market
+    assert "out /" not in without
 
 
 def test_a_desperation_row_with_no_concrete_ask_still_prices_the_offer():

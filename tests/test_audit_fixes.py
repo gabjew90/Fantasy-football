@@ -98,7 +98,6 @@ def test_an_unpriced_zero_does_not_drag_the_mean(monkeypatch):
     zero = dict.fromkeys(hi, 0.0)
     monkeypatch.setattr(consensus, "_sleeper", lambda s, y: (hi, None))
     monkeypatch.setattr(consensus, "_espn", lambda s, y, r, i: (zero, None))
-    monkeypatch.setattr(consensus, "_sheet", lambda c: ({}, None))
     ctx = {"cfg": _Cfg(), "state": {"season": "2026"}, "players": {}}
     data, _ = consensus.build(ctx)
     assert data["30"]["n"] == 1
@@ -118,7 +117,6 @@ def test_a_source_that_matches_nobody_is_flagged_not_counted(monkeypatch):
     hi = {str(i): 100.0 + i for i in range(60)}
     monkeypatch.setattr(consensus, "_sleeper", lambda s, y: (hi, None))
     monkeypatch.setattr(consensus, "_espn", lambda s, y, r, i: ({}, None))
-    monkeypatch.setattr(consensus, "_sheet", lambda c: ({}, None))
     ctx = {"cfg": _Cfg(), "state": {"season": "2026"}, "players": {}}
     _, notes = consensus.build(ctx)
     assert any("consensus over 1 live sources" in n for n in notes), notes

@@ -13,6 +13,10 @@ a better input than the current single source is an empirical question that
 needs a season of actuals to answer, and until then substituting it would be
 trading a known quantity for an untested one.
 
+The FantasyPros draft sheet was the third source until 2026-09-09; it was
+a preseason workbook and left with the draft, so the blend is Sleeper and
+ESPN.
+
 Scales differ between shops -- ESPN runs about 6% below Sleeper across the
 board, not because it disagrees about players but because it models a
 slightly different season. So each source is scored in the league's own
@@ -22,7 +26,6 @@ carry, then averaged. `spread` is max minus min after rescaling.
 
 from __future__ import annotations
 
-import csv
 import logging
 import statistics
 import time as _time
@@ -37,16 +40,16 @@ FLOOR = 40.0             # players too small to inform the median
 # NOT EVERY SOURCE AGES THE SAME WAY.
 #
 # Sleeper and ESPN republish their season projections through the year, so
-# they carry this week's information. The FantasyPros workbook is a PRESEASON
-# DRAFT SHEET: nothing regenerates it once the season starts, and this module
-# is its only consumer. Left at equal weight it would still be arguing for
-# August by November, on a player whose role changed in September.
+# they carry this week's information and hold full weight. A STATIC source --
+# one nothing regenerates once the season starts -- decays instead: full
+# weight in week 1, zero by DECAY_WEEKS, because a preseason view is worth
+# something while there are no games to argue with it and progressively less
+# as real ones accumulate.
 #
-# So a static source decays: full weight in week 1, zero by DECAY_WEEKS. The
-# preseason view is genuinely worth something early, when it encodes an
-# offseason of work and there are no games to argue with it, and worth
-# progressively less as real ones accumulate. Weights are printed, never
-# implicit.
+# NO SOURCE USES THIS PATH TODAY. The FantasyPros draft sheet was the only
+# static one and left with the draft on 2026-09-09. Kept because it is the
+# mechanism the next static source needs, and because deleting a tested
+# decay only to rebuild it later is worse than a comment saying it is idle.
 LIVE_SOURCES = ("sleeper", "espn")
 DECAY_WEEKS = 8
 
@@ -109,31 +112,20 @@ def _espn(scoring: dict, season, raw_dir, index) -> tuple[dict[str, float], str 
     return out, None
 
 
-def _sheet(cfg) -> tuple[dict[str, float], str | None]:
-    name = getattr(cfg, "league_name", None)
-    if not name:
-        return {}, None
-    p = Path("data/processed") / f"tiers.external.{name}.csv"
-    if not p.exists():
-        return {}, f"sheet absent ({p.name})"
-    out = {}
-    try:
-        with p.open(encoding="utf-8") as fh:
-            for row in csv.DictReader(fh):
-                sid = (row.get("sleeper_id") or "").strip()
-                # Both a blank cell and a literal 0 mean UNPRICED here: this
-                # is a draft board, and 11 of its 232 rows carry proj_pts 0
-                # while holding a real ADP (Josh Jacobs, 0 points, ADP 37.2).
-                # Neither is a claim that the player scores nothing.
-                try:
-                    v = float((row.get("proj_pts") or "").strip() or 0.0)
-                except ValueError:
-                    continue
-                if sid and v:
-                    out[sid] = v
-    except OSError as e:
-        return {}, f"sheet unreadable ({e.__class__.__name__})"
-    return out, f"sheet {_time.strftime('%Y-%m-%d', _time.localtime(p.stat().st_mtime))}"
+def _sources(cfg, scoring, season, index):
+    """The readers to blend, in order. THE SEAM FOR A NEW SOURCE.
+
+    A static source appends here and the decay in `source_weight` picks it up
+    automatically -- that is the whole reason the decay survives the draft
+    sheet's removal. Kept as a function rather than a literal inside build()
+    so the weighting and the ageing notices stay testable without a real
+    static source to hand.
+    """
+    raw_dir = cfg.path("raw") if hasattr(cfg, "path") else "data/raw"
+    return (
+        ("sleeper", _sleeper(scoring, season)),
+        ("espn", _espn(scoring, season, raw_dir, index)),
+    )
 
 
 def build(ctx, store=None) -> tuple[dict[str, dict], list[str]]:
@@ -153,13 +145,25 @@ def build(ctx, store=None) -> tuple[dict[str, dict], list[str]]:
     scoring = _scoring(cfg)
     notes: list[str] = []
     src: dict[str, dict[str, float]] = {}
-    for label, (vals, note) in (
-        ("sleeper", _sleeper(scoring, season)),
-        ("espn", _espn(scoring, season,
-                       cfg.path("raw") if hasattr(cfg, "path") else "data/raw",
-                       ctx.get("players"))),
-        ("sheet", _sheet(cfg)),
-    ):
+    # THE DRAFT SHEET IS NOT AN IN-SEASON SOURCE (dropped 2026-09-09, on the
+    # user's word that it existed for the draft and nothing else).
+    #
+    # It was the only static source, so the decay machinery below now has no
+    # subscriber -- kept because it is the mechanism any future static source
+    # needs, not because anything uses it today.
+    #
+    # Two defects leave with it. It was the source that wrote proj_pts 0 for
+    # a board player it had not priced, which is why zeroes cannot be read as
+    # opinions in build() below. And being the smallest source it bounded
+    # `common`, so the ESPN rescale was fitted on 232 draft-relevant starters
+    # and extrapolated to the wire; the population is now bounded by ESPN's
+    # 414 instead.
+    #
+    # Measured before removing: median move 0.3 points, 50 of 572 players
+    # shift by 5 or more, largest 18 (Matthew Golden 157.2 -> 175.2). What is
+    # lost outright is kicker coverage, which the consensus never used --
+    # the Sleeper request names QB/RB/WR/TE only.
+    for label, (vals, note) in _sources(cfg, scoring, season, ctx.get("players")):
         if note:
             notes.append(f"{label}: {note}")
         if vals:
