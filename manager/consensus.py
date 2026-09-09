@@ -50,7 +50,7 @@ FLOOR = 40.0             # players too small to inform the median
 # static one and left with the draft on 2026-09-09. Kept because it is the
 # mechanism the next static source needs, and because deleting a tested
 # decay only to rebuild it later is worse than a comment saying it is idle.
-LIVE_SOURCES = ("sleeper", "espn")
+LIVE_SOURCES = ("sleeper", "espn", "fantasypros")
 DECAY_WEEKS = 8
 
 
@@ -112,6 +112,21 @@ def _espn(scoring: dict, season, raw_dir, index) -> tuple[dict[str, float], str 
     return out, None
 
 
+def _fantasypros(scoring, season, index, store=None
+                 ) -> tuple[dict[str, float], str | None]:
+    """Rest-of-season points from the FantasyPros partner feed.
+
+    The only source here that covers K and DEF. Returns empty without a
+    network call when there is no player index, which is what keeps the
+    build() tests offline.
+    """
+    try:
+        from . import fantasypros as fp_mod
+        return fp_mod.points(scoring, season, index, store=store)
+    except Exception as e:  # noqa: BLE001
+        return {}, f"fantasypros unavailable ({e.__class__.__name__})"
+
+
 def _sources(cfg, scoring, season, index):
     """The readers to blend, in order. THE SEAM FOR A NEW SOURCE.
 
@@ -125,6 +140,7 @@ def _sources(cfg, scoring, season, index):
     return (
         ("sleeper", _sleeper(scoring, season)),
         ("espn", _espn(scoring, season, raw_dir, index)),
+        ("fantasypros", _fantasypros(scoring, season, index)),
     )
 
 
@@ -172,17 +188,36 @@ def build(ctx, store=None) -> tuple[dict[str, dict], list[str]]:
     if not src:
         return {}, notes + ["DATA MISSING: no projection source reachable"]
 
-    common = set.intersection(*({p for p, v in s.items() if v > FLOOR} for s in src.values())) \
-        if len(src) > 1 else set()
+    # EACH SOURCE IS FITTED AGAINST THE REFERENCE OVER ITS OWN OVERLAP, NOT
+    # OVER A GLOBAL INTERSECTION.
+    #
+    # The intersection this used to take let the SMALLEST source set the
+    # population every other source was fitted on. That already bit once: the
+    # draft sheet bounded `common` at 232 draft-relevant starters, so ESPN's
+    # ratio was fitted on startable players and extrapolated to the wire.
+    # FantasyPros would do it again and worse -- it carries K and DEF that
+    # Sleeper is never asked for, so the intersection would collapse to the
+    # positions every source happens to share. Fitted pairwise, a partial
+    # source is scaled on what it shares and costs the others nothing.
+    ref = "sleeper" if "sleeper" in src else max(src, key=lambda k: len(src[k]))
+    big = {p for p, v in src[ref].items() if v > FLOOR}
     scale = {k: 1.0 for k in src}
-    if len(common) >= MIN_COMMON:
-        base = statistics.median(src["sleeper"][p] for p in common) if "sleeper" in src \
-            else statistics.median(next(iter(src.values()))[p] for p in common)
-        for k, s in src.items():
-            med = statistics.median(s[p] for p in common)
-            scale[k] = (base / med) if med else 1.0
-    elif len(src) > 1:
-        notes.append(f"sources not rescaled: only {len(common)} players in common")
+    overlap = {ref: len(big)}
+    for k, s_k in src.items():
+        if k == ref:
+            continue
+        shared = [p for p, v in s_k.items() if v > FLOOR and p in big]
+        overlap[k] = len(shared)
+        if len(shared) < MIN_COMMON:
+            notes.append(f"{k} not rescaled: only {len(shared)} players in "
+                         f"common with {ref}")
+            continue
+        med = statistics.median(s_k[p] for p in shared)
+        scale[k] = (statistics.median(src[ref][p] for p in shared) / med) if med else 1.0
+    # `common` still means "priced by every source", but it is now a REPORTED
+    # diagnostic rather than the thing the fit depends on.
+    common = set.intersection(*({p for p, v in s.items() if v > FLOOR}
+                                for s in src.values())) if len(src) > 1 else set()
 
     decay_weeks = int((ctx.get("scfg") or {}).get("consensus_decay_weeks", DECAY_WEEKS))
     week = int(ctx.get("week") or 1)
@@ -233,8 +268,10 @@ def build(ctx, store=None) -> tuple[dict[str, dict], list[str]]:
                      f"— check its stat keys against the league scoring block")
     real = [k for k in live if contributed[k]]
     wtxt = ", ".join(f"{k} x{weight[k]:g}" for k in sorted(src))
-    notes.append(f"consensus over {len(real)} live sources ({wtxt}), "
-                 f"{len(out)} players, rescaled on {len(common)} in common")
+    otxt = ", ".join(f"{k} on {overlap[k]}" for k in sorted(src) if k != ref)
+    notes.append(f"consensus over {len(real)} live sources ({wtxt}), {len(out)} "
+                 f"players, rescaled against {ref} ({otxt}), {len(common)} "
+                 f"priced by all")
     if common and any(abs(v - 1.0) > 0.10 for v in scale.values()):
         pts = sorted(statistics.median(s[p] for s in src.values()) for p in common)
         notes.append(f"⚠ rescale fitted on {len(common)} players spanning "

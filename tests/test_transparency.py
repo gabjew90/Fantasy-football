@@ -85,7 +85,10 @@ def test_build_rescales_sources_onto_a_common_basis(monkeypatch):
     row = data["30"]
     assert row["n"] == 2
     assert row["spread"] < 1.0, f"scale not removed: {row}"
-    assert any("rescaled on 60" in n for n in notes)
+    # The note names the REFERENCE and the size of each source's own overlap
+    # with it, because the fit is pairwise: a global "60 in common" hid which
+    # population any given source was actually scaled on.
+    assert any("rescaled against sleeper (espn on 60)" in n for n in notes)
 
 
 def test_a_dead_source_is_a_note_not_a_crash(monkeypatch):
