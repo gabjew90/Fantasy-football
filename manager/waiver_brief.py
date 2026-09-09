@@ -288,7 +288,12 @@ def build(ctx, store) -> str:
         _n, _notes = consensus.apply(ctx, con)
         con_notes += _notes
     # A warning filed into a collapsed footer is a warning that is gone.
-    con_warnings = [n for n in con_notes if n.startswith("⚠")]
+    # BOTH MARKERS. Filtering on the warning glyph alone dropped every
+    # "DATA MISSING:" line, so a total projection outage rendered a brief
+    # with no warning at all -- the same way the clamp warning went
+    # missing on 2026-09-08 for want of a colon.
+    con_warnings = [n for n in con_notes
+                    if n.startswith("⚠") or n.startswith("DATA MISSING")]
 
     panel, panel_note = ecr_mod.by_sleeper_id(ctx, store)
     fa = _fa_pool(ctx, con)

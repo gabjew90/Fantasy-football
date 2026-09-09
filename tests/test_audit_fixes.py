@@ -230,3 +230,29 @@ def test_a_reserve_kicker_is_not_deleted_by_a_qb_rb_wr_te_consensus():
     for pos in ("K", "DEF"):
         assert wb._stale_reserve(
             {"active": True, "injury_status": "IR", "position": pos}, {}, "1") is False
+
+
+# ------------------------------- 2026-09-09 review: the degrade paths themselves
+
+def test_a_total_projection_outage_is_visible_in_the_brief(monkeypatch):
+    """consensus emits "DATA MISSING: no projection source reachable", which
+    does not start with the warning glyph. waiver_brief and lineup_opt both
+    filtered con_notes on that glyph alone, so a complete outage rendered a
+    brief with no warning while it ran on nothing."""
+    monkeypatch.setattr(consensus, "_sources", lambda c, sc, se, ix: (
+        ("sleeper", ({}, "down")), ("espn", ({}, "down"))))
+    ctx = {"cfg": _Cfg(), "state": {"season": "2026"}, "players": {}}
+    data, notes = consensus.build(ctx)
+    assert data == {}
+    surfaced = [n for n in notes
+                if n.startswith("⚠") or n.startswith("DATA MISSING")]
+    assert surfaced, f"nothing would reach the reader: {notes}"
+
+
+def test_the_pid_error_handler_does_not_itself_throw():
+    """Building the message with p.items() raised AttributeError for a str,
+    int or list -- an error about the error, replacing the one that named the
+    actual bad row."""
+    for bad in (None, "abc", 7, [1, 2], {"pos": "RB"}, {"pos": "RB", "x": {1, 2}}):
+        with pytest.raises(KeyError, match="sleeper_id"):
+            marginal._pid(bad)

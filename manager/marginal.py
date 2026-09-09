@@ -32,10 +32,18 @@ def _pid(p: dict) -> str:
     KeyError from three frames down."""
     try:
         return str(p["sleeper_id"])
-    except (KeyError, TypeError):
+    except (KeyError, TypeError, IndexError):
+        # The handler must not throw. Building the message with p.items()
+        # raised AttributeError for a str, int or list -- an error ABOUT the
+        # bad row, replaced by an unrelated error about the error, which is
+        # strictly worse than the bare KeyError it was meant to improve on.
+        try:
+            shown = repr(dict(list(p.items())[:4]))
+        except AttributeError:
+            shown = f"{type(p).__name__} {p!r}"
         raise KeyError(
-            f"roster row has no sleeper_id, so it cannot be tracked through a "
-            f"lineup change: {dict(list((p or {}).items())[:4])!r}") from None
+            f"roster row has no usable sleeper_id, so it cannot be tracked "
+            f"through a lineup change: {shown}") from None
 
 
 def starters(roster: list[dict], shape: dict, key: str = "weekly") -> list[dict]:
