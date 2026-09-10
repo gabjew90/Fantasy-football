@@ -283,6 +283,13 @@ Until then, regression fences for the cases that motivated this:
 
 ## Order
 
+Status 2026-09-10: steps 1-7 landed -- D1 a043fd2, classify adba7b7, rank
+plumbing e339933 (with the superflex-board fix), accepts 3a8adbe, verdict
+modes 9f743c2, chips 39f4639 (with the K/DEF fix), radar bffc1d5. Step 8 is
+the review. Three live checks caught what fixtures could not: a wire DEF
+credited to a trade as backfill (D3), the superflex overall board read as
+the one-QB board, and a DEF and a K at the top of the chip list.
+
 1. D1 -- position-aware `backfill()`, with fence 5.
 2. `classify()` -- the slot classification per side, from `slot_moves` plus
    the wire. Fences 1-3 on fixtures.

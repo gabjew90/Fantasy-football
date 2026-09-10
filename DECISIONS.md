@@ -3997,4 +3997,18 @@ case the same body (Deebo, 151.7) fills the vacated flex and the same starter
 gain - cost. And it is one-shot: after the first RB moves, the next scores
 -5.5.
 
-Plan: docs/plans/2026-09-09-slot-based-trades-plan.md. Not built yet.
+Plan: docs/plans/2026-09-09-slot-based-trades-plan.md.
+
+Built 2026-09-09/10, steps 1-7: position-aware backfill a043fd2;
+classify() adba7b7; rank_panel() e339933; accepts() 3a8adbe;
+verdict(mode=) and Deal.acceptance 9f743c2; tradeable() chips 39f4639;
+the radar bffc1d5, which flipped MODE to slots. 1,089 tests. Three live
+checks caught what fixtures could not: a wire DEF credited to a 2-for-1
+as backfill (D3; K/DEF now excluded from backfill); the FantasyPros
+`position=OP` board read as the one-QB overall list when it is the
+SUPERFLEX board (Caleb Williams at overall 8 -- the board is now chosen
+from the league shape and every row says which); and a DEF and a K at the
+top of the chip list (tradeable() skips them). The Henry + Fannin package
+now prints as an OFFER at mean +1.07/wk, range -1.20 to +2.94, his side
+accepting on two UPGRADEs with the rankings-reader flag at -42; the
+decision is the user's, as specified. Step 8, the review, follows.
