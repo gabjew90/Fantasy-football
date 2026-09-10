@@ -687,11 +687,12 @@ DEPTH_BLOCKS = False
 #               season to him, which nobody accepts.
 #   "slots"  -- accepts(): a positional rank upgrade from me AND his starters'
 #               market not reduced, in HIS currencies. The plan's design.
-# SHIPS AS "points" UNTIL STEP 7. The radar does not pass a rank panel to
-# price() yet, so a slots default today would reject every package with
-# "no acceptance computed". The flip is one token, and it lands with the
-# radar change that supplies the panel. docs/plans/2026-09-09-slot-based-trades-plan.md
-MODE = "points"
+# DEFAULT "slots" SINCE STEP 7 (2026-09-10): the radar supplies the rank
+# panel through price(ranks=). A caller with no panel gets "acceptance: not
+# computed" and a hold -- never a silent fall back to the points gate. The
+# points gate is one keyword away for a caller that means it, and its tests
+# say so. docs/plans/2026-09-09-slot-based-trades-plan.md
+MODE = "slots"
 # And below this the lineup edge is inside projection error, so you are
 # paying transaction risk for nothing.
 #
@@ -945,6 +946,14 @@ def tradeable(roster: list[dict], others: dict, shape: dict,
     base = lineup_points(roster, shape, key)
     rows = []
     for p in roster:
+        # NEVER A KICKER OR A DEFENCE. They are streamed, not traded -- the
+        # same policy that keeps them out of backfill -- and left in they
+        # topped the live chip list on 2026-09-10: the Vikings DEF at a cost
+        # of -11.0, because departing him let a better wire DEF backfill, with
+        # four rank buyers whose defences the panel ranks lower. A chip list
+        # led by a DEF and a K is a list nobody reads past.
+        if (p.get("pos") or "") in BACKFILL_SKIP:
+            continue
         pid = _pid(p)
         cost = cost_to_lose(roster, p, shape, key)
         rest = [q for q in roster if _pid(q) != pid]

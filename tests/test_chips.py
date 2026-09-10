@@ -101,3 +101,21 @@ def test_without_a_rank_panel_the_surplus_ranking_is_unchanged():
     assert rows[0]["player"]["name"] == "spare"
     assert all(r["rank_buyers"] is None for r in rows)
     assert all(r["true_cost"] == r["cost"] for r in rows)
+
+
+def test_a_kicker_or_defence_is_never_a_chip():
+    """Live on 2026-09-10 the chip list opened with the Vikings DEF at a cost
+    of -11.0 -- departing him admitted a better wire DEF to the backfill --
+    and the kicker second. Streamed positions are not chips, whatever the
+    wire says about them."""
+    dst = _r("DEF", 100.0, "my def", 120)
+    k = _r("K", 130.0, "my k", 110)
+    mine = [dst, k] + _fillers("m")
+    shape = dict(SHAPE, slots=dict(SHAPE["slots"], DEF=1, K=1))
+    wire = [_r("DEF", 130.0, "better def", 90), _r("K", 140.0, "better k", 80)]
+    rival = [_r("DEF", 50.0, "r_def", 200), _r("K", 60.0, "r_k", 200)] + _fillers("r")
+    ranks = _ranks(mine, rival, wire)
+    rows = marginal.tradeable(mine, {"R": rival}, shape, waivers=wire, ranks=ranks)
+    names = [r["player"]["name"] for r in rows]
+    assert "my def" not in names and "my k" not in names, names
+    assert all(r["player"]["pos"] not in ("K", "DEF") for r in rows)

@@ -91,6 +91,63 @@ def _waiver_pool(ctx, con=None) -> list[dict]:
     return pool
 
 
+def _rank_panel(ctx):
+    """The rank panel accepts() reads, cached on ctx like the waiver pool.
+
+    None when unavailable -- never {}. price() leaves acceptance None on
+    None, and verdict(mode="slots") then says "not computed" instead of
+    judging every package on a board that ranks nobody. Tests inject
+    ctx["_rank_panel"] the way they inject ctx["_wv_pool"].
+    """
+    if "_rank_panel" not in ctx:
+        try:
+            from . import ecr
+            panel, notes = ecr.rank_panel(ctx)
+            for n in notes or ():
+                if n.startswith("⚠") or n.startswith("DATA MISSING"):
+                    log.warning("trade radar: %s", n)
+            ctx["_rank_panel"] = panel or None
+        except Exception as e:  # noqa: BLE001
+            log.warning("trade radar: no rank panel (%s)", e.__class__.__name__)
+            ctx["_rank_panel"] = None
+    return ctx["_rank_panel"]
+
+
+def _range_ppg(mine, theirs, give, get, shape, wv, wl):
+    """(lo, hi) of my delta per week: the package priced on each source alone.
+
+    The blend is the best estimate; this is how far the shops disagree about
+    it, and the user decides on it -- it is reported, never gated. Rows carry
+    `consensus.per_source` after consensus.apply(); a roster with none (a
+    test fixture, a league on one source) gives None and the brief says so.
+    The wire is priced on the blend: the backfill body's own spread is
+    second-order next to the package's.
+    """
+    from . import marginal
+    srcs: set[str] = set()
+    for p in list(mine) + list(theirs):
+        srcs |= set(((p.get("consensus") or {}).get("per_source") or {}).keys())
+    if not srcs:
+        return None
+
+    def on(rows, src):
+        out = []
+        for p in rows:
+            v = ((p.get("consensus") or {}).get("per_source") or {}).get(src)
+            out.append(dict(p, ros=float(v if v is not None else (p.get("ros") or 0.0))))
+        return out
+
+    ids_g = {str(p["sleeper_id"]) for p in give}
+    ids_t = {str(p["sleeper_id"]) for p in get}
+    deltas = []
+    for src in sorted(srcs):
+        m, t = on(mine, src), on(theirs, src)
+        g = [p for p in m if str(p["sleeper_id"]) in ids_g]
+        h = [p for p in t if str(p["sleeper_id"]) in ids_t]
+        deltas.append(marginal.price(m, t, g, h, shape, key="ros", waivers=wv).my_delta / wl)
+    return (min(deltas), max(deltas))
+
+
 def _biggest_row(give, get) -> dict | None:
     """The consensus row for the largest piece in the package.
 
@@ -125,20 +182,41 @@ def _priced(ctx, opp, vals) -> list[str]:
              "flex_slots": ctx.get("flex_slots")}
     mine = ctx["roster_players"][ctx["my_rid"]]
     wv = _waiver_pool(ctx)
+    ranks = _rank_panel(ctx)
+    wl = ctx.get("weeks_left") or 1
     try:
         d = marginal.price(mine, theirs, give, get, shape, key="ros",
-                           market_values=vals, waivers=wv)
+                           market_values=vals, waivers=wv, ranks=ranks)
         thin = marginal.newly_thin(mine, shape, arriving=get, departing=give,
                                    waivers=wv, key="ros")
-        v = marginal.verdict(d, ctx.get("weeks_left") or 1, thin=thin,
-                             con=_biggest_row(give, get))
+        v = marginal.verdict(d, wl, thin=thin, con=_biggest_row(give, get))
+        rng = _range_ppg(mine, theirs, give, get, shape, wv, wl)
     except Exception as e:  # noqa: BLE001
         log.warning("trade radar: could not price %s (%s)", opp.get("mgr"), e)
         return []
-    verdict_word = "SEND" if v["send"] else "hold"
+    # OFFER, not SEND. His side is a prediction that a position-by-position
+    # manager plausibly says yes; my side is a mean with a range the user
+    # decides on. Neither is a command.
+    verdict_word = "OFFER" if v["send"] else "hold"
+    rng_txt = (f"range {rng[0]:+.2f} to {rng[1]:+.2f}/wk across sources" if rng
+               else "range n/a — one source")
     out = [f"- **{verdict_word}** — lineup effect (rest-of-season POINTS, not the "
            f"market values quoted above): **me {d.my_delta:+.1f}** "
-           f"({v['my_ppg']:+.2f}/wk), them {d.their_delta:+.1f}"]
+           f"({rng_txt}; mean {v['my_ppg']:+.2f}/wk), them {d.their_delta:+.1f} "
+           f"(my model of his lineup — shown, not gated)"]
+    acc = d.acceptance
+    if acc is None:
+        out.append("  - his side: not judged — no rank panel this run")
+    else:
+        names = {str(p["sleeper_id"]): p.get("name", str(p["sleeper_id"])) for p in give}
+        tags = ", ".join(f"{names.get(pid, pid)} {t}" for pid, t in acc["tags"].items())
+        mb, ma = acc["starters_market_before"], acc["starters_market_after"]
+        out.append(f"  - his side: {'accepts' if acc['accept'] else 'refuses'} — {tags}; "
+                   f"his starters' market {mb} -> {ma} ({ma - mb:+d})"
+                   + (f"; panel {acc['panel']}" if acc.get("panel") else ""))
+        if acc["net_rank"] < 0:
+            out.append(f"  - ⚑ a rankings-reader sees his lineup worse by "
+                       f"{-acc['net_rank']:.0f} rank-points")
     for r in v["why"]:
         out.append(f"  - ⚠ {r}")
     for r in v["warnings"]:
@@ -158,6 +236,42 @@ def _priced(ctx, opp, vals) -> list[str]:
     return out
 
 
+def _chips_lines(ctx) -> list[str]:
+    """Step 1 of the slot-based plan, at the top of the radar: what I can sell
+    without my lineup noticing, and who would START him as an upgrade -- a
+    buyer found in the buyer's currency, overall rank, not in my points."""
+    from . import marginal
+    ranks = _rank_panel(ctx)
+    if not ranks:
+        return ["- chips: not ranked — no rank panel this run"]
+    mine = ctx["roster_players"][ctx["my_rid"]]
+    others = {ctx["users_by_rid"].get(rid, f"roster {rid}"): r
+              for rid, r in ctx["roster_players"].items()
+              if rid != ctx["my_rid"] and r}
+    shape = {"slots": ctx["slots"], "flex": ctx.get("flex", 0),
+             "flex_slots": ctx.get("flex_slots")}
+    try:
+        rows = marginal.tradeable(mine, others, shape, key="ros",
+                                  waivers=_waiver_pool(ctx), ranks=ranks)
+    except Exception as e:  # noqa: BLE001
+        log.warning("trade radar: chips failed (%s)", e)
+        return []
+    out = ["- chips (cheap for me to sell, and someone would start him as an upgrade):"]
+    shown = 0
+    for r in rows:
+        if not r["rank_buyers"]:
+            break
+        pl = r["player"]
+        out.append(f"  - {pl['name']} ({pl['pos']}) costs my lineup {r['true_cost']:.1f} "
+                   f"— buyers: {', '.join(r['rank_buyers'][:4])}")
+        shown += 1
+        if shown >= 3:
+            break
+    if shown == 0:
+        out.append("  - none: nothing I hold is both cheap for me and an upgrade for anyone")
+    return out
+
+
 def build(ctx, store) -> str:
     week = ctx["week"]
     header = f"## Trade radar — week {week}"
@@ -173,6 +287,9 @@ def build(ctx, store) -> str:
         lines.append(f"⚠ {note}")
     if not vals:
         return "\n".join(lines + ["radar cannot rank without values this week."])
+
+    lines += _chips_lines(ctx)
+    lines.append("")
 
     from . import age_decay
     acfg = (ctx.get("scfg") or {}).get("age_decay") or {}

@@ -130,26 +130,34 @@ def _deal(mine_delta, theirs_delta, out=None, inn=None):
                          100.0 + theirs_delta, market=mkt)
 
 
+# THESE ARE THE POINTS-MODE GATE TESTS. verdict() defaults to mode="slots"
+# since step 7 of the slot-based plan (2026-09-10). The mechanics below --
+# his lineup delta as gate 1, the market floor blocking, gate 3, confident --
+# are the original gate, and are tested as that gate, explicitly.
+import functools
+_verdict = functools.partial(marginal.verdict, mode="points")
+
+
 def test_the_threshold_ships_at_zero_because_nothing_has_measured_it():
     assert marginal.EDGE_PPG == 0.0
 
 
 def test_a_zero_delta_package_is_never_send_even_at_a_zero_threshold():
     """Pure churn carries transaction risk and buys nothing."""
-    v = marginal.verdict(_deal(0.0, 5.0), weeks_left=17)
+    v = _verdict(_deal(0.0, 5.0), weeks_left=17)
     assert v["gate1"] is False and v["send"] is False
 
 
 def test_gate_one_needs_my_side_up_and_theirs_not_down():
-    assert marginal.verdict(_deal(17.0, 1.0), weeks_left=17)["gate1"] is True
-    assert marginal.verdict(_deal(17.0, -1.0), weeks_left=17)["gate1"] is False
-    assert marginal.verdict(_deal(-1.0, 5.0), weeks_left=17)["gate1"] is False
+    assert _verdict(_deal(17.0, 1.0), weeks_left=17)["gate1"] is True
+    assert _verdict(_deal(17.0, -1.0), weeks_left=17)["gate1"] is False
+    assert _verdict(_deal(-1.0, 5.0), weeks_left=17)["gate1"] is False
 
 
 def test_season_totals_are_converted_to_per_week():
-    v = marginal.verdict(_deal(17.0, 0.0), weeks_left=17)
+    v = _verdict(_deal(17.0, 0.0), weeks_left=17)
     assert v["my_ppg"] == 1.0
-    v2 = marginal.verdict(_deal(13.0, 0.0), weeks_left=17)
+    v2 = _verdict(_deal(13.0, 0.0), weeks_left=17)
     assert v2["my_ppg"] == 0.76
 
 
@@ -157,26 +165,26 @@ def test_raising_the_floor_rejects_the_marginal_package():
     """+13.0 over a 17-week season is +0.76 ppg -- under the 1.0 the source
     framework suggests, over the zero we ship."""
     d = _deal(13.0, 5.0)
-    assert marginal.verdict(d, weeks_left=17)["gate1"] is True
-    assert marginal.verdict(d, weeks_left=17, floor_ppg=1.0)["gate1"] is False
+    assert _verdict(d, weeks_left=17)["gate1"] is True
+    assert _verdict(d, weeks_left=17, floor_ppg=1.0)["gate1"] is False
 
 
 def test_gate_two_is_about_acceptance_not_truth():
     """A package can be good for them and still be refused, because managers
     price by name recognition rather than by their own optimal lineup."""
     good_for_them = _deal(17.0, 17.0, out=5000, inn=10000)   # they get 50%
-    v = marginal.verdict(good_for_them, weeks_left=17)
+    v = _verdict(good_for_them, weeks_left=17)
     assert v["gate1"] is True and v["gate2"] is False and v["send"] is False
     assert any("expect a rejection" in w for w in v["why"])
 
 
 def test_gate_two_passes_when_the_market_reads_even():
-    v = marginal.verdict(_deal(17.0, 5.0, out=9800, inn=10000), weeks_left=17)
+    v = _verdict(_deal(17.0, 5.0, out=9800, inn=10000), weeks_left=17)
     assert v["gate2"] is True and v["market_share"] == 0.98 and v["send"] is True
 
 
 def test_no_market_data_does_not_block_a_deal():
-    v = marginal.verdict(_deal(17.0, 5.0), weeks_left=17)
+    v = _verdict(_deal(17.0, 5.0), weeks_left=17)
     assert v["market_share"] is None and v["gate2"] is True
 
 
@@ -184,13 +192,13 @@ def test_a_disputed_consensus_row_is_reported_alongside_the_gates():
     """A fixed floor cannot tell a real edge from one smaller than the
     sources' own disagreement; consensus.confident can."""
     noisy = {"n": 3, "spread": 60.0, "per_source": {}, "mean": 0.0}
-    v = marginal.verdict(_deal(5.0, 1.0), weeks_left=17, con=noisy)
+    v = _verdict(_deal(5.0, 1.0), weeks_left=17, con=noisy)
     assert v["confident"] is False
     assert any("disagreement" in w for w in v["warnings"])
 
 
 def test_weeks_left_of_zero_does_not_divide_by_zero():
-    assert marginal.verdict(_deal(10.0, 1.0), weeks_left=0)["my_ppg"] == 10.0
+    assert _verdict(_deal(10.0, 1.0), weeks_left=0)["my_ppg"] == 10.0
 
 
 def test_a_waiver_pickup_is_not_reported_as_part_of_the_trade():
@@ -231,12 +239,12 @@ def test_overpaying_is_reported_and_blocks_only_when_asked():
     deal that got a yes. The 559% fleecing case must still be SAID, and the
     knob must still block when a caller turns it on."""
     fleeced = _deal(17.0, 5.0, out=5590, inn=1000)
-    v = marginal.verdict(fleeced, weeks_left=17)
+    v = _verdict(fleeced, weeks_left=17)
     assert v["gate2"] is True and v["send"] is True
     assert any("overpaying" in w for w in v["warnings"]), v
     assert not any("overpaying" in w for w in v["why"])
 
-    blocked = marginal.verdict(fleeced, weeks_left=17, market_ceiling_blocks=True)
+    blocked = _verdict(fleeced, weeks_left=17, market_ceiling_blocks=True)
     assert blocked["gate2"] is False and blocked["send"] is False
     assert any("overpaying" in w for w in blocked["why"]), blocked
 
@@ -245,25 +253,25 @@ def test_lifting_the_ceiling_did_not_lift_the_floor():
     """A deal they refuse is worth nothing whatever it does to my lineup.
     That job still blocks."""
     low = _deal(17.0, 5.0, out=5000, inn=10000)
-    v = marginal.verdict(low, weeks_left=17)
+    v = _verdict(low, weeks_left=17)
     assert v["gate2"] is False and v["send"] is False
     assert any("expect a rejection" in w for w in v["why"])
 
 
 def test_the_ceiling_ships_as_advisory():
     assert marginal.MARKET_CEILING_BLOCKS is False
-    assert marginal.verdict(_deal(1.0, 1.0), weeks_left=17)["market_ceiling_blocks"] is False
+    assert _verdict(_deal(1.0, 1.0), weeks_left=17)["market_ceiling_blocks"] is False
 
 
 def test_the_floor_and_the_ceiling_report_different_reasons():
-    low = marginal.verdict(_deal(17.0, 5.0, out=5000, inn=10000), weeks_left=17)
-    high = marginal.verdict(_deal(17.0, 5.0, out=10000, inn=5000), weeks_left=17)
+    low = _verdict(_deal(17.0, 5.0, out=5000, inn=10000), weeks_left=17)
+    high = _verdict(_deal(17.0, 5.0, out=10000, inn=5000), weeks_left=17)
     assert any("expect a rejection" in w for w in low["why"])
     assert any("overpaying" in w for w in high["warnings"])
 
 
 def test_an_even_market_still_passes():
-    v = marginal.verdict(_deal(17.0, 5.0, out=10700, inn=10000), weeks_left=17)
+    v = _verdict(_deal(17.0, 5.0, out=10700, inn=10000), weeks_left=17)
     assert v["gate2"] is True, "107% is the cbarone package and it is fine"
 
 
@@ -300,7 +308,7 @@ def test_gate_three_warns_but_does_not_block_by_default():
     """Turned off 2026-09-09. Whether an empty slot is disqualifying depends
     on the wire that week, a free IR slot, and how the lineup gain trades
     against a tail risk -- none of which the model holds."""
-    v = marginal.verdict(_deal(17.0, 5.0, out=10000, inn=10000),
+    v = _verdict(_deal(17.0, 5.0, out=10000, inn=10000),
                          weeks_left=17, thin=["TE"])
     assert marginal.DEPTH_BLOCKS is False
     assert v["gate3"] is False, "the condition is still detected"
@@ -311,7 +319,7 @@ def test_gate_three_warns_but_does_not_block_by_default():
 
 
 def test_gate_three_can_be_switched_back_on():
-    v = marginal.verdict(_deal(17.0, 5.0, out=10000, inn=10000),
+    v = _verdict(_deal(17.0, 5.0, out=10000, inn=10000),
                          weeks_left=17, thin=["TE"], depth_blocks=True)
     assert v["send"] is False
     assert any("empties a required slot" in w for w in v["why"])
@@ -319,14 +327,14 @@ def test_gate_three_can_be_switched_back_on():
 
 def test_a_disagreement_note_is_a_warning_not_a_veto():
     noisy = {"n": 3, "spread": 60.0, "per_source": {}, "mean": 0.0}
-    v = marginal.verdict(_deal(5.0, 1.0, out=10000, inn=10000),
+    v = _verdict(_deal(5.0, 1.0, out=10000, inn=10000),
                          weeks_left=17, con=noisy)
     assert v["send"] is True
     assert any("disagreement" in w for w in v["warnings"])
 
 
 def test_gate_three_is_silent_when_nothing_is_thin():
-    v = marginal.verdict(_deal(17.0, 5.0, out=10000, inn=10000), weeks_left=17)
+    v = _verdict(_deal(17.0, 5.0, out=10000, inn=10000), weeks_left=17)
     assert v["gate3"] is True and v["send"] is True and v["thin"] == []
     assert v["warnings"] == []
 

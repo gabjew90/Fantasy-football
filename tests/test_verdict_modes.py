@@ -2,9 +2,8 @@
 
 Two questions verdict() can ask about HIS side. "points": his lineup delta
 in MY projections must be >= 0 -- the original gate. "slots": accepts(),
-in HIS currencies. The mechanism lands here with "points" still the
-default, because the radar does not pass a rank panel yet; the flip is
-step 7.
+in HIS currencies. The mechanism landed with "points" still the default
+until the radar supplied a rank panel; step 7 flipped it to "slots".
 """
 
 from __future__ import annotations
@@ -28,11 +27,13 @@ NO_UPGRADE = {"accept": False, "test1": False, "test2": True, "why": ["he sits"]
 MARKET_DOWN = {"accept": False, "test1": True, "test2": False, "why": ["down 1,717"]}
 
 
-def test_mode_ships_as_points_until_the_radar_supplies_a_panel():
-    """A slots default today would reject every production package with
-    "not computed" -- the radar passes no rank panel to price() yet."""
-    assert marginal.MODE == "points"
-    assert marginal.verdict(_deal(17.0, 5.0), weeks_left=17)["mode"] == "points"
+def test_mode_is_slots_now_the_radar_supplies_a_panel():
+    """Step 7 flipped it. A caller with no panel gets a hold that says
+    "not computed" -- never a silent fall back to the points gate."""
+    assert marginal.MODE == "slots"
+    v = marginal.verdict(_deal(17.0, 5.0), weeks_left=17)
+    assert v["mode"] == "slots" and v["gate1"] is False
+    assert any("not computed" in w for w in v["why"]), v["why"]
 
 
 def test_slots_mode_reads_acceptance_and_never_his_lineup_delta():

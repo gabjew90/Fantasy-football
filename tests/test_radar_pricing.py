@@ -175,3 +175,71 @@ def test_radar_hands_verdict_the_consensus_row_for_the_biggest_piece():
     v = marginal.verdict(deal, 17, con=tr._biggest_row(give, get))
     assert v["confident"] is False
     assert any("disagreement" in w for w in v["warnings"])
+
+
+
+# ---------------------------- step 7 (2026-09-10): slots mode in the brief
+
+def _panel():
+    """Overall ranks for the fixture. mrb2 (RB, 30) beats their worst
+    starting RB (trb2, 40); mte2 (TE, 80) beats tte1 (120). Both UPGRADE."""
+    ov = {"mqb": 50, "mrb1": 5, "mrb2": 30, "mwr1": 33, "mte1": 45, "mte2": 80, "mwr2": 70,
+          "tqb": 50, "trb1": 20, "trb2": 40, "twr1": 10, "twr2": 35, "twr3": 36, "twr4": 60,
+          "tte1": 120, "tbench": 150}
+    return {k: {"overall": v, "positional": None, "pos": None, "panel": 181,
+                "source": "t", "list": "ALL"} for k, v in ov.items()}
+
+
+def test_with_a_rank_panel_the_brief_judges_his_side_and_says_offer():
+    """OFFER, not SEND: his side is a prediction that a position-by-position
+    manager plausibly says yes, and my side is a mean with a range."""
+    ctx = _ctx()
+    ctx["_rank_panel"] = _panel()
+    out = "\n".join(trade_radar._priced(ctx, _opp(), {}))
+    assert "OFFER" in out and "SEND" not in out
+    assert "his side: accepts" in out
+    assert "UPGRADE" in out
+
+
+def test_without_a_rank_panel_the_brief_holds_and_says_why():
+    """Never a silent fall back to the points gate."""
+    out = "\n".join(trade_radar._priced(_ctx(), _opp(), {}))
+    assert "hold" in out
+    assert "not computed" in out
+    assert "his side: not judged" in out
+
+
+def test_the_range_across_sources_is_printed_beside_the_mean():
+    ctx = _ctx()
+    ctx["_rank_panel"] = _panel()
+    give0 = dict(MINE[2], consensus={"per_source": {"a": 228.0, "b": 200.0}})
+    ctx["roster_players"][1] = [give0 if x is MINE[2] else x for x in MINE]
+    out = "\n".join(trade_radar._priced(ctx, _opp(give_p=[give0, MINE[5]]), {}))
+    assert "range " in out and " to " in out and "/wk" in out
+    assert "n/a" not in out
+    plain = "\n".join(trade_radar._priced(_ctx(), _opp(), {}))
+    assert "range n/a" in plain
+
+
+def test_the_rank_panel_is_fetched_once_and_cached_on_the_context():
+    ctx = _ctx()
+    assert "_rank_panel" not in ctx
+    trade_radar._priced(ctx, _opp(), {})
+    assert "_rank_panel" in ctx, "the panel is fetched per opportunity"
+    sentinel = _panel()
+    ctx["_rank_panel"] = sentinel
+    trade_radar._priced(ctx, _opp(), {})
+    assert ctx["_rank_panel"] is sentinel, "cache was rebuilt"
+
+
+def test_chips_name_who_would_start_him_as_an_upgrade():
+    ctx = _ctx()
+    ctx["_rank_panel"] = _panel()
+    out = "\n".join(trade_radar._chips_lines(ctx))
+    assert "chips" in out
+    assert "buyers: them" in out
+
+
+def test_chips_degrade_without_a_panel():
+    out = "\n".join(trade_radar._chips_lines(_ctx()))
+    assert "no rank panel" in out
