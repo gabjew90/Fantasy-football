@@ -368,6 +368,9 @@ class Deal:
     their_moves: dict | None = None
     my_backfill: list[str] = field(default_factory=list)
     their_backfill: list[str] = field(default_factory=list)
+    # accepts() on HIS side, when price() was given a rank panel. None means
+    # "not computed", which verdict(mode="slots") reports rather than hides.
+    acceptance: dict | None = None
 
     @property
     def my_delta(self) -> float:
@@ -538,7 +541,8 @@ def price(my_roster: list[dict], their_roster: list[dict],
           give: list[dict], get: list[dict], shape: dict,
           their_shape: dict | None = None, key: str = "weekly",
           market_values: dict[str, int] | None = None,
-          waivers: list[dict] | None = None) -> Deal:
+          waivers: list[dict] | None = None,
+          ranks: dict | None = None) -> Deal:
     """Price a package from both sides at once.
 
     `shape` is {slots, flex, flex_slots}. `their_shape` defaults to the same,
@@ -552,6 +556,11 @@ def price(my_roster: list[dict], their_roster: list[dict],
     it receives gets its opened spots filled from it, because that side will
     have filled them by Tuesday and a spot priced at zero makes every
     consolidation look worse than it is.
+
+    `ranks` is ecr.rank_panel(). When given, accepts() runs on HIS side and
+    lands on the Deal as `acceptance`, which is what verdict(mode="slots")
+    reads in place of his lineup delta. Left None, the Deal says so and
+    slots mode refuses to guess.
     """
     their_shape = their_shape or shape
     mkt = None
@@ -572,6 +581,13 @@ def price(my_roster: list[dict], their_roster: list[dict],
                       filled=my_fill, key=key)
     theirs = slot_moves(their_roster, their_shape, arriving=give,
                         departing=get, filled=their_fill, key=key)
+    # His side, in his currencies. accepts() re-solves his lineup through
+    # classify(); that repeats work done two lines up (~0.5 ms) and is kept
+    # simple until the radar shows the cost matters.
+    acceptance = None
+    if ranks is not None:
+        acceptance = accepts(their_roster, their_shape, arriving=give, departing=get,
+                             waivers=waivers, key=key, ranks=ranks, market=market_values)
     return Deal(
         mine_before=mine["total_before"], mine_after=mine["total_after"],
         theirs_before=theirs["total_before"], theirs_after=theirs["total_after"],
@@ -580,6 +596,7 @@ def price(my_roster: list[dict], their_roster: list[dict],
         market=mkt, my_moves=mine, their_moves=theirs,
         my_backfill=[p.get("name", _pid(p)) for p in my_fill],
         their_backfill=[p.get("name", _pid(p)) for p in their_fill],
+        acceptance=acceptance,
     )
 
 
@@ -664,6 +681,17 @@ MARKET_CEILING = 1.15
 # acquiring points -- a keeper league, or a season already lost.
 MARKET_CEILING_BLOCKS = False
 DEPTH_BLOCKS = False
+# WHICH QUESTION verdict() ASKS ABOUT HIS SIDE.
+#   "points" -- his lineup delta in MY projections must be >= 0. The original
+#               gate; measured this session to surface packages worth +0.6 a
+#               season to him, which nobody accepts.
+#   "slots"  -- accepts(): a positional rank upgrade from me AND his starters'
+#               market not reduced, in HIS currencies. The plan's design.
+# SHIPS AS "points" UNTIL STEP 7. The radar does not pass a rank panel to
+# price() yet, so a slots default today would reject every package with
+# "no acceptance computed". The flip is one token, and it lands with the
+# radar change that supplies the panel. docs/plans/2026-09-09-slot-based-trades-plan.md
+MODE = "points"
 # And below this the lineup edge is inside projection error, so you are
 # paying transaction risk for nothing.
 #
@@ -726,7 +754,7 @@ def verdict(deal: Deal, weeks_left: int, *, floor_ppg: float = EDGE_PPG,
             market_ceiling: float = MARKET_CEILING,
             market_ceiling_blocks: bool = MARKET_CEILING_BLOCKS,
             thin: list[str] | None = None, depth_blocks: bool = DEPTH_BLOCKS,
-            con: dict | None = None) -> dict:
+            con: dict | None = None, mode: str = MODE) -> dict:
     """The two gates, kept separate on purpose.
 
     GATE 1 asks whether the trade is actually good -- my lineup up by more
@@ -756,7 +784,15 @@ def verdict(deal: Deal, weeks_left: int, *, floor_ppg: float = EDGE_PPG,
     # carries transaction risk while buying nothing.
     gains = deal.my_delta > 0
     clears = mine_ppg >= floor_ppg
-    gate1 = gains and clears and deal.their_delta >= 0
+    # HIS SIDE, in the currency the mode names. Slots mode never reads his
+    # lineup delta -- that is my model of his team, and he does not use it.
+    if mode == "slots":
+        his_yes = bool(deal.acceptance and deal.acceptance.get("accept"))
+    elif mode == "points":
+        his_yes = deal.their_delta >= 0
+    else:
+        raise ValueError(f"verdict mode {mode!r} is not 'slots' or 'points'")
+    gate1 = gains and clears and his_yes
     share = None
     if deal.market and deal.market.get("in"):
         share = deal.market["out"] / deal.market["in"]
@@ -765,7 +801,11 @@ def verdict(deal: Deal, weeks_left: int, *, floor_ppg: float = EDGE_PPG,
     # a veto, unless the caller says otherwise.
     under = share is not None and share < market_floor
     over = share is not None and share > market_ceiling
-    gate2 = not under and not (over and market_ceiling_blocks)
+    # In slots mode the floor's job -- "will he refuse" -- is answered by
+    # accepts() Test 2 (his starters' market must not drop), so the band is
+    # information only. In points mode the floor still blocks.
+    floor_blocks = mode == "points"
+    gate2 = not (under and floor_blocks) and not (over and market_ceiling_blocks)
     confident = None
     if con is not None:
         from . import consensus as consensus_mod
@@ -775,12 +815,23 @@ def verdict(deal: Deal, weeks_left: int, *, floor_ppg: float = EDGE_PPG,
     # unless `depth_blocks`, so it lands in `warnings` rather than `why`.
     gate3 = not thin
     reasons, warnings = [], []
-    if not gate1:
-        reasons.append(f"lineup: me {mine_ppg:+.2f} ppg (need {floor_ppg:+.2f}), "
-                       f"them {theirs_ppg:+.2f}")
+    if not (gains and clears):
+        reasons.append(f"lineup: me {mine_ppg:+.2f} ppg (need {floor_ppg:+.2f})")
+    if not his_yes:
+        if mode == "points":
+            reasons.append(f"lineup: them {theirs_ppg:+.2f} ppg")
+        elif deal.acceptance is None:
+            reasons.append("acceptance: not computed — price() was given no rank "
+                           "panel, and slots mode will not guess his side")
+        else:
+            acc = deal.acceptance
+            reasons.append("acceptance: " + ("no positional upgrade from me"
+                           if not acc.get("test1") else "his starters' market drops")
+                           + f" — {'; '.join(acc.get('why') or [])}")
     if under:
-        reasons.append(f"market: they receive {100 * share:.0f}% of what they give "
-                       f"(need {100 * market_floor:.0f}%) — expect a rejection")
+        (reasons if floor_blocks else warnings).append(
+            f"market: they receive {100 * share:.0f}% of what they give "
+            f"(need {100 * market_floor:.0f}%) — expect a rejection")
     if over:
         (reasons if market_ceiling_blocks else warnings).append(
             f"market: I send {100 * share:.0f}% of what I get back "
@@ -795,6 +846,7 @@ def verdict(deal: Deal, weeks_left: int, *, floor_ppg: float = EDGE_PPG,
             "send": bool(gate1 and gate2 and (gate3 or not depth_blocks)),
             "depth_blocks": depth_blocks, "thin": list(thin or []),
             "market_ceiling_blocks": market_ceiling_blocks,
+            "mode": mode, "acceptance": deal.acceptance,
             "my_ppg": round(mine_ppg, 2), "their_ppg": round(theirs_ppg, 2),
             "market_share": round(share, 3) if share is not None else None,
             "confident": confident, "why": reasons, "warnings": warnings}
