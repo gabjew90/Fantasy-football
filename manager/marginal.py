@@ -222,6 +222,112 @@ def classify(roster: list[dict], shape: dict, *, arriving=(), departing=(),
     return {"received": received, "given": given, "moves": mv, "fill": list(fill)}
 
 
+# ------------------------------------------------------------- acceptance
+#
+# DOES IT LOOK LIKE A WIN TO HIM. Two tests, both must pass; the Acceptance
+# section of docs/plans/2026-09-09-slot-based-trades-plan.md is the spec. He
+# is modelled on PERCEPTION -- the rank panel and the trade market -- over
+# the players that land in a slot he uses. Points never enter it: they are
+# my currency, not his.
+UPGRADE, FILLER, SITS = "UPGRADE", "FILLER", "SITS"
+UNRANKED = 300.0          # a player the panel does not rank: deep bench
+SKILL = ("QB", "RB", "WR", "TE")
+
+
+def _rank_of(ranks, p) -> float:
+    """Overall rank, lower is better; UNRANKED for a player the panel skips."""
+    r = (ranks or {}).get(_pid(p)) or {}
+    v = r.get("overall")
+    return float(v) if v is not None else UNRANKED
+
+
+def accepts(their_roster: list[dict], shape: dict, *, arriving, departing,
+            waivers=None, key: str = "weekly", ranks=None, market=None) -> dict:
+    """Does the trade look like a win to HIM. Two tests; both must pass.
+
+    Run on HIS roster: `arriving` are my players, `departing` are his.
+    `ranks` is ecr.rank_panel() ({pid: {overall, positional, panel, ...}})
+    and `market` is FantasyCalc ({pid: value}). Neither test reads points.
+
+    TEST 1 -- a positional rank upgrade from me. A sent player who STARTS
+    is an UPGRADE if he beats the WORST INCUMBENT STARTER AT HIS OWN
+    POSITION on overall rank, flex-starters at that position included.
+    Positional and label-free: "their RB got better" is a fact about the
+    player; which slot is labelled RB2 is an artefact of fill order and is
+    never compared across the trade. A sent player who starts and does not
+    beat him is FILLER -- in the lineup only because someone left; Deebo
+    Samuel is the measured case. One who does not start SITS. At least one
+    UPGRADE is required.
+
+    TEST 2 -- the market value of his STARTERS must not drop, backfill
+    included. A roster-state test: what his starting lineup is worth as a
+    set of assets, before and after. Dead weight never enters it, nor does
+    the body he must drop in a 2-for-1.
+
+    REPORTED, never gated: net overall rank of his starters -- the
+    rankings-reader's view -- which disagrees with Test 1 exactly where the
+    expert board and the trade market disagree (Javonte -> Wilson: an RB
+    upgrade, net -13, market +1,086). The ledger decides which kind of
+    manager he is; until it has, the flag is printed on every row.
+
+    Returns {accept, test1, test2, tags, starters_market_before,
+             starters_market_after, net_rank, panel, classes, why}.
+    """
+    arriving, departing = list(arriving), list(departing)
+    cls = classify(their_roster, shape, arriving=arriving, departing=departing,
+                   waivers=waivers, key=key)
+    before, after = cls["moves"]["before"], cls["moves"]["after"]
+    after_ids = {_pid(p) for p in after}
+
+    def mk(p) -> int:
+        return int((market or {}).get(_pid(p)) or 0)
+
+    def nm(p) -> str:
+        return p.get("name") or _pid(p)
+
+    tags: dict[str, str] = {}
+    why: list[str] = []
+    for p in arriving:
+        pid, pos = _pid(p), p.get("pos")
+        if pid not in after_ids:
+            tags[pid] = SITS
+            why.append(f"{nm(p)} does not start for him")
+            continue
+        incumbents = [_rank_of(ranks, q) for q in before if q.get("pos") == pos]
+        floor = max(incumbents) if incumbents else UNRANKED
+        mine = _rank_of(ranks, p)
+        if mine < floor:
+            tags[pid] = UPGRADE
+            why.append(f"{nm(p)} ({pos}, overall {mine:.0f}) upgrades his worst "
+                       f"starting {pos} (overall {floor:.0f})")
+        else:
+            tags[pid] = FILLER
+            why.append(f"{nm(p)} starts but is not an upgrade at {pos} "
+                       f"(overall {mine:.0f} against his worst starter at {floor:.0f})")
+    test1 = any(t == UPGRADE for t in tags.values())
+
+    mkt_before = sum(mk(p) for p in before)
+    mkt_after = sum(mk(p) for p in after)
+    test2 = mkt_after >= mkt_before
+    why.append(f"his starters' market {mkt_before} -> {mkt_after} "
+               f"({mkt_after - mkt_before:+d})" + ("" if test2 else " -- DOWN"))
+
+    # Skill positions only: K/DEF ranks are noise and never move in a trade.
+    rank_before = sum(_rank_of(ranks, p) for p in before if p.get("pos") in SKILL)
+    rank_after = sum(_rank_of(ranks, p) for p in after if p.get("pos") in SKILL)
+    net_rank = round(rank_before - rank_after, 1)
+    if net_rank < 0:
+        why.append(f"a rankings-reader sees his lineup worse by {-net_rank:.0f} "
+                   f"rank-points")
+
+    panels = [((ranks or {}).get(_pid(p)) or {}).get("panel") for p in arriving + departing]
+    panels = [x for x in panels if x]
+    return {"accept": bool(test1 and test2), "test1": test1, "test2": test2,
+            "tags": tags, "starters_market_before": mkt_before,
+            "starters_market_after": mkt_after, "net_rank": net_rank,
+            "panel": min(panels) if panels else None, "classes": cls, "why": why}
+
+
 def cost_to_lose(roster: list[dict], player, shape: dict, key: str = "weekly") -> float:
     """Lineup points lost if `player` leaves, AFTER the slot is refilled.
 
