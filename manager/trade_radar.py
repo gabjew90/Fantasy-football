@@ -134,6 +134,9 @@ def _injury_adjusted(ctx):
     reserve = {str(p["sleeper_id"]) for rows in list(rosters.values()) + [wire] for p in rows
                if (injury.get(str(p.get("sleeper_id"))) or "") in ("IR", "PUP")}
     weeks_out = _weeks_out(ctx, reserve)
+    # The user's own read of an injury outranks the feeds: Sleeper's Out has
+    # no duration and a multi-week ankle would otherwise cost one week.
+    weeks_out.update({str(k): int(v) for k, v in (ctx.get("weeks_out") or {}).items()})
     adj = {rid: marginal.injury_discount(rows, injury, wl, weeks_out=weeks_out, key="ros")
            for rid, rows in rosters.items()}
     adj_wire = marginal.injury_discount(wire, injury, wl, weeks_out=weeks_out, key="ros")

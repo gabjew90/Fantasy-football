@@ -130,6 +130,18 @@ def test_an_ir_piece_asks_fantasypros_for_weeks_and_a_dead_feed_uses_the_default
     assert "mrb2 (RB) is Out" in out and "1 wk out" in out
 
 
+def test_the_users_own_weeks_out_override_the_feeds(monkeypatch):
+    """Sleeper's Out has no duration. ctx["weeks_out"] is the user's read
+    (scripts/keefamania_trades.py --out "A.J. Brown=6") and wins."""
+    monkeypatch.setattr(trade_radar, "_weeks_out", lambda ctx, pids: {})
+    ctx = _ctx()
+    twr1 = ctx["roster_players"][2][3]
+    ctx["injury"] = {twr1["sleeper_id"]: "Out"}
+    ctx["weeks_out"] = {twr1["sleeper_id"]: 6}
+    out = "\n".join(trade_radar._priced(ctx, _opp(), {}))
+    assert "twr1 (WR) is Out" in out and "6 wks out" in out
+
+
 def test_the_adjustment_is_built_once_per_context():
     ctx = _ctx()
     ctx["injury"] = {}
