@@ -222,6 +222,13 @@ def _market_mod():
 # (~0.25 ms); the naive version over the whole wire is ~4 ms per package and
 # too slow for a frontier search.
 BACKFILL_TOP_K = 3
+# Never a kicker or a defence, in either path. A trade never opens a K or DEF
+# seat -- they are streamed, not traded -- and their projections are the least
+# reliable on the board (one source, uncalibrated against the others). Left in,
+# the lineup solve picked a wire DEF that beat mine as the "backfill" for a
+# 2-for-1 that touched no DEF seat, crediting the trade +11 for a pickup
+# available any Tuesday by dropping the worst bench body. Measured 2026-09-09.
+BACKFILL_SKIP = ("K", "DEF")
 
 def backfill(n: int, waivers, key: str = "weekly", exclude=(), *,
              roster=None, shape=None, top_k: int = BACKFILL_TOP_K) -> list[dict]:
@@ -251,7 +258,8 @@ def backfill(n: int, waivers, key: str = "weekly", exclude=(), *,
     if n <= 0 or not waivers:
         return []
     skip = {_pid(p) for p in exclude}
-    pool = [p for p in waivers if _pid(p) not in skip]
+    pool = [p for p in waivers if _pid(p) not in skip
+            and (p.get("pos") or "") not in BACKFILL_SKIP]
     if roster is None or shape is None:
         return sorted(pool, key=lambda p: -(p.get(key) or 0.0))[:n]
 

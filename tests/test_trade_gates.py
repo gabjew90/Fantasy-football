@@ -454,3 +454,23 @@ def test_depth_risk_and_thin_after_use_the_position_aware_fill():
     r = marginal.depth_risk(mine, D1_SHAPE, "RB", arriving=theirs, departing=[rb2, flex_wr],
                             waivers=wire)
     assert r["after_star"] is not None
+
+
+def test_a_defence_that_beats_mine_is_never_a_trade_backfill():
+    """Measured live: the position-aware fill picked a wire DEF that beat my
+    DEF as the backfill for a 2-for-1 touching no DEF seat, moving that deal
+    from +2.4 to +13.4. A trade never opens a K or DEF seat; those are
+    streamed. Excluded in both paths, so neither can credit a trade with a
+    pickup the roster could make any Tuesday."""
+    mine = _thin_roster() + [_q("DEF", 100.0, "my def")]
+    shape = dict(D1_SHAPE, slots=dict(D1_SHAPE["slots"], DEF=1))
+    rb2, flex_wr = mine[2], mine[6]
+    theirs = [_q("WR", 16.0, "star")]
+    wire = [_q("DEF", 130.0, "better def"), _q("RB", 12.0, "waiver RB")]
+    after_moves = [p for p in mine if p not in (rb2, flex_wr)] + theirs
+    aware = marginal.backfill(1, wire, roster=after_moves, shape=shape)
+    assert [x["name"] for x in aware] == ["waiver RB"], aware
+    legacy = marginal.backfill(1, wire)
+    assert [x["name"] for x in legacy] == ["waiver RB"], legacy
+    d = marginal.price(mine, theirs, [rb2, flex_wr], theirs, shape, waivers=wire)
+    assert d.my_backfill == ["waiver RB"], d.my_backfill

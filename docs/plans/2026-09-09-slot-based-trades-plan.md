@@ -204,6 +204,18 @@ behind Hurts".
   receiving side. Cheap once `classify()` exists -- the drop is whichever of
   his rows is FREE and lowest -- but it is a separate change and this plan
   does not claim it.
+- **D3 (known gap, NOT fixed by this plan): a backfill can be credited for an
+  upgrade the trade did not create.** The position-aware fill takes the wire
+  body that raises the lineup most. When nothing on the wire fills the seat
+  the trade emptied, that body can be an unrelated upgrade elsewhere -- one
+  the roster could make any Tuesday by dropping its worst bench body. Caught
+  live on 2026-09-09: a wire DEF that beat mine was picked as the backfill
+  for a 2-for-1 touching no DEF seat, moving the package from +2.4 to +13.4.
+  K and DEF are now excluded outright (streamed, never traded, single-source
+  projections). The general case -- a wire WR who beats a current starter --
+  is still credited to the trade. The honest cap is "what this spot is worth
+  over dropping the worst bench body for the same add", and it is a separate
+  change.
 
 ## What is retired
 
@@ -238,8 +250,10 @@ outcome, and grade the model on what came back.
 Until then, regression fences for the cases that motivated this:
 
 1. Caleb + Henry -> St. Brown (cbarone): his side REJECTS. Henry passes
-   Test 1 (over Warren, 74); Test 2 fails, starters-market -1,717. Caleb is
-   DEAD_WEIGHT behind Hurts and never enters either test.
+   Test 1 (over Warren, 74); Test 2 fails, starters-market -1,717. Caleb does
+   not start behind Hurts -- by the wire rule he classifies USABLE_DEPTH, a
+   QB2 nineteen points over Jordan Love, not DEAD_WEIGHT -- and either way he
+   never enters either test: not a positional upgrade, not a starter.
 2. Javonte -> Garrett Wilson (ayatollahabdullah), straight: his side ACCEPTS.
    Test 1: Javonte (RB, 43) over Monangai (120). Test 2: +1,086. Net-rank
    flag -13. Appears with no sweetener attached.
