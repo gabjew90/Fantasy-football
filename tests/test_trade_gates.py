@@ -546,3 +546,93 @@ def test_a_body_the_shape_cannot_start_is_never_picked():
             _q("RB", 5.0, "waiver RB")]
     d = marginal.price(mine, theirs, [bench_rb, bench_wr], theirs, D1_SHAPE, waivers=wire)
     assert d.my_backfill == ["waiver RB"], d.my_backfill
+
+
+
+# ------------------------------------ classify() (2026-09-09): slot classes
+
+def _c_roster():
+    """Under D1_SHAPE (QB1 RB2 WR2 TE1 + 1 flex): qb1, rb1, rb2, wr1, wr2, te1
+    start, wr3 (11) takes the flex over rb3 (10). Bench: qb2, rb3, wr4."""
+    return [_q("QB", 20.0, "qb1"), _q("QB", 18.0, "qb2"),
+            _q("RB", 15.0, "rb1"), _q("RB", 13.0, "rb2"), _q("RB", 10.0, "rb3"),
+            _q("WR", 14.0, "wr1"), _q("WR", 12.0, "wr2"), _q("WR", 11.0, "wr3"),
+            _q("WR", 9.0, "wr4"), _q("TE", 9.0, "te1")]
+
+
+def test_a_received_player_who_starts_is_STARTS():
+    r = _c_roster()
+    star = _q("WR", 16.0, "star")
+    out = marginal.classify(r, D1_SHAPE, arriving=[star])
+    assert out["received"][star["sleeper_id"]] == marginal.STARTS
+
+
+def test_the_caleb_case_is_USABLE_DEPTH_not_dead_weight():
+    """QB1 31.5 starts, QB2 28.2 on the bench, arriving QB 29.4, wire QB 27.5.
+    He does not start; he IS the best backup; he beats the wire. By the wire
+    rule that is usable depth -- a QB2 nineteen points over Love -- and it
+    enters neither acceptance test. Fence 1, as corrected."""
+    r = _c_roster()
+    r[0]["weekly"], r[1]["weekly"] = 31.5, 28.2
+    caleb = _q("QB", 29.4, "caleb")
+    out = marginal.classify(r, D1_SHAPE, arriving=[caleb], waivers=[_q("QB", 27.5, "love")])
+    assert out["received"][caleb["sleeper_id"]] == marginal.USABLE_DEPTH
+
+
+def test_a_backup_the_wire_beats_is_DEAD_WEIGHT():
+    """Same roster, same arriving QB, but a 30.0 sits on the wire: a backup
+    the roster could claim tomorrow is not depth."""
+    r = _c_roster()
+    r[0]["weekly"], r[1]["weekly"] = 31.5, 28.2
+    caleb = _q("QB", 29.4, "caleb")
+    out = marginal.classify(r, D1_SHAPE, arriving=[caleb],
+                            waivers=[_q("QB", 30.0, "better on the wire")])
+    assert out["received"][caleb["sleeper_id"]] == marginal.DEAD_WEIGHT
+
+
+def test_a_backup_behind_a_better_bench_body_is_DEAD_WEIGHT_even_with_no_wire():
+    r = _c_roster()                              # rb3 (10) is already the best RB backup
+    rb = _q("RB", 9.5, "worse than rb3")
+    out = marginal.classify(r, D1_SHAPE, arriving=[rb], waivers=None)
+    assert out["received"][rb["sleeper_id"]] == marginal.DEAD_WEIGHT
+
+
+def test_given_players_classify_STARTED_DEPTH_LOST_and_FREE():
+    """rb1 starts: STARTED. rb3 (10) is the best RB backup and beats a wire
+    RB at 8: DEPTH_LOST. wr4 (9) sits behind wr5 (9.5) on the bench: FREE."""
+    r = _c_roster() + [_q("WR", 9.5, "wr5")]
+    rb1, rb3, wr4 = r[2], r[4], r[8]
+    out = marginal.classify(r, D1_SHAPE, departing=[rb1, rb3, wr4],
+                            arriving=[_q("TE", 20.0, "big te")],
+                            waivers=[_q("RB", 8.0, "wire rb")])
+    g = out["given"]
+    assert g[rb1["sleeper_id"]] == marginal.STARTED
+    assert g[rb3["sleeper_id"]] == marginal.DEPTH_LOST
+    assert g[wr4["sleeper_id"]] == marginal.FREE
+
+
+def test_deebo_STARTS_when_a_receiver_leaves_and_classify_says_only_that():
+    """wr2 (12) leaves; Deebo (10.5) arrives and is worse than every WR they
+    started (14, 12, 11). He still fills the emptied flex over rb3 (10), so
+    he STARTS. Whether that is an UPGRADE is accepts() Test 1, which tags
+    him FILLER. classify() says starts, and nothing more."""
+    r = _c_roster()
+    wr2 = r[6]
+    deebo = _q("WR", 10.5, "deebo")
+    out = marginal.classify(r, D1_SHAPE, arriving=[deebo], departing=[wr2])
+    assert out["received"][deebo["sleeper_id"]] == marginal.STARTS
+
+
+def test_classify_uses_the_same_backfill_and_lineup_as_price():
+    """Who starts after must be the answer price() gives, or the class and
+    the delta describe two different trades."""
+    mine = _thin_roster()
+    rb2, flex_wr = mine[2], mine[6]
+    theirs = [_q("WR", 16.0, "star")]
+    wire = [_q("QB", 30.0, "big waiver QB"), _q("RB", 12.0, "waiver RB")]
+    out = marginal.classify(mine, D1_SHAPE, arriving=theirs, departing=[rb2, flex_wr],
+                            waivers=wire)
+    d = marginal.price(mine, theirs, [rb2, flex_wr], theirs, D1_SHAPE, waivers=wire)
+    assert [x["name"] for x in out["fill"]] == d.my_backfill == ["waiver RB"]
+    assert ({x["sleeper_id"] for x in out["moves"]["after"]}
+            == {x["sleeper_id"] for x in d.my_moves["after"]})

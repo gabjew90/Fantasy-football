@@ -131,6 +131,97 @@ def slot_moves(roster: list[dict], shape: dict, *, arriving=(), departing=(),
     }
 
 
+# ---------------------------------------------------------------- slots
+#
+# A slot class is a FACT about one player on one roster after the joint
+# re-solve. It is not a verdict on the trade -- the verdict is accepts(),
+# which applies two tests to the whole starting set. And STARTS is not
+# UPGRADE: Deebo Samuel STARTS for a team that just lost a WR, filling the
+# emptied flex, and is a downgrade against every receiver they had.
+# Plan: docs/plans/2026-09-09-slot-based-trades-plan.md
+STARTS, USABLE_DEPTH, DEAD_WEIGHT = "STARTS", "USABLE_DEPTH", "DEAD_WEIGHT"
+STARTED, DEPTH_LOST, FREE = "STARTED", "DEPTH_LOST", "FREE"
+
+
+def _wire_best(waivers, pos, key, exclude_ids) -> float:
+    """Best wire body at `pos`, or 0.0 when the wire has nobody there.
+
+    A depth add is only depth if he beats this. A backup the roster could
+    claim tomorrow is not depth -- which is what makes a 294-point QB2
+    nearly worthless on a wire holding six QBs at 253-275.
+    """
+    best = 0.0
+    for q in waivers or ():
+        if q.get("pos") == pos and _pid(q) not in exclude_ids:
+            best = max(best, float(q.get(key) or 0.0))
+    return best
+
+
+def _best_backup(pool, starter_ids, pos, key):
+    """The best non-starter at `pos` in `pool`, or None."""
+    cands = [q for q in pool if q.get("pos") == pos and _pid(q) not in starter_ids]
+    return max(cands, key=lambda q: float(q.get(key) or 0.0)) if cands else None
+
+
+def classify(roster: list[dict], shape: dict, *, arriving=(), departing=(),
+             waivers=None, key: str = "weekly") -> dict:
+    """Slot class for every player a package touches, on ONE roster.
+
+    Returns {"received": {pid: class}, "given": {pid: class},
+             "moves": slot_moves(...), "fill": [...]}
+
+      received  STARTS        in the starting lineup after (post-backfill)
+                USABLE_DEPTH  not starting; best non-starter at his position;
+                              better than the best wire body there
+                DEAD_WEIGHT   neither
+      given     STARTED       was starting before
+                DEPTH_LOST    was the best backup at his position and better
+                              than the wire
+                FREE          neither
+
+    Run it on BOTH rosters for a trade: on his with my players arriving and
+    his departing, on mine the other way round. The backfill is the same
+    position-aware one price() uses, so "who starts after" here is the same
+    answer price() gives -- if the two ever disagreed, the class and the
+    delta would be describing two different trades.
+    """
+    arriving, departing = list(arriving), list(departing)
+    dep_ids = {_pid(p) for p in departing}
+    arr_ids = {_pid(p) for p in arriving}
+    post = [p for p in roster if _pid(p) not in dep_ids] + arriving
+    fill = _fill_for(arriving, departing, waivers, key, roster=post, shape=shape)
+    mv = slot_moves(roster, shape, arriving=arriving, departing=departing,
+                    filled=fill, key=key)
+    before_ids = {_pid(p) for p in mv["before"]}
+    after_ids = {_pid(p) for p in mv["after"]}
+    after_roster = post + list(fill)
+    excl = dep_ids | arr_ids | {_pid(p) for p in fill}
+
+    received: dict[str, str] = {}
+    for p in arriving:
+        pid = _pid(p)
+        if pid in after_ids:
+            received[pid] = STARTS
+            continue
+        bb = _best_backup(after_roster, after_ids, p.get("pos"), key)
+        beats = float(p.get(key) or 0.0) > _wire_best(waivers, p.get("pos"), key, excl)
+        received[pid] = (USABLE_DEPTH if (bb is not None and _pid(bb) == pid and beats)
+                         else DEAD_WEIGHT)
+
+    given: dict[str, str] = {}
+    for p in departing:
+        pid = _pid(p)
+        if pid in before_ids:
+            given[pid] = STARTED
+            continue
+        bb = _best_backup(list(roster), before_ids, p.get("pos"), key)
+        beats = float(p.get(key) or 0.0) > _wire_best(waivers, p.get("pos"), key, excl)
+        given[pid] = (DEPTH_LOST if (bb is not None and _pid(bb) == pid and beats)
+                      else FREE)
+
+    return {"received": received, "given": given, "moves": mv, "fill": list(fill)}
+
+
 def cost_to_lose(roster: list[dict], player, shape: dict, key: str = "weekly") -> float:
     """Lineup points lost if `player` leaves, AFTER the slot is refilled.
 
