@@ -3948,3 +3948,53 @@ Incidents:
 Survival scorecard (shown vs observed): 0-30% 17->2, 30-50% 39->41,
 50-70% 61->70, 70-90% 81->89, 90-100% 95->96. A five-autopick room is
 more predictable than the sim assumes in the middle.
+
+
+## 2026-09-09 (69) -- a trade is read in slots, one currency per side
+
+The gate-1 counterparty test (`their_delta >= 0`, in my point projections)
+is retired. Measured today: it surfaces packages worth +0.6 a season to the
+other manager, which nobody accepts, and the only thing that passed it was a
+dead-weight sweetener. The market-mode replacement tried in its place (he
+says yes at >= 110% FantasyCalc gain) is roster-blind: it recommended Caleb
+Williams + Derrick Henry for Amon-Ra St. Brown to a manager who has Jalen
+Hurts and would never start Caleb -- 113% as counted, 80% on the players he
+could actually use. Caleb starts for one team in the league, by 4.4 points.
+
+The user's model, adopted: a manager reads an offer in slots. Each received
+player is a starter upgrade, usable depth (best backup at his position AND
+better than the wire), or dead weight -- nothing, whatever the market says.
+The counterparty is modelled on perception, in two tests that must BOTH
+pass. Test 1: a player I send is a POSITIONAL rank upgrade -- he beats the
+worst incumbent starter at his own position on overall ECR, flex-starters at
+that position included. Positional and label-free: a slot name (RB2, FLEX)
+is an artefact of fill order and is never compared across the trade, but
+"their RB got better" is a fact about the player and survives Monangai
+sliding to the flex label. Test 2: the FantasyCalc value of his starters
+after the trade, backfill included, is not below before -- a roster-state
+test, so dead weight and the body he must drop never enter it. Net rank over
+all his starters is printed as a flag, never gated: it is the
+rankings-reader's view, and it disagrees with Test 1 exactly where the
+expert board and the trade market disagree (Javonte -> Wilson: positional
+upgrade, net -13, market +1,086). The ledger decides which view this
+league's managers hold. Three earlier drafts of Test 1 -- slot-label,
+whole-set, net -- each failed on a case the user named; the whole-set
+version rejected Javonte -> Wilson by treating an RB and a WR as
+interchangeable seats. My side stays on points:
+the joint re-solve and depth_risk. The per-source range is REPORTED -- mean
+and range in pts/wk on every row -- and is NOT a gate. User's words: "that
+last gate is my discretionary decision to reject or approve, you just tell
+me the mean and the range I'm getting on points/wk." The earlier -5 veto
+hid Henry + Fannin -> McMillan + Smith, a row his side accepts and the blend
+prices at +1.07/wk with range -1.2 to +2.9; that row now appears with those
+numbers on it. The market ceiling stays advisory.
+
+Also recorded, because it will be forgotten otherwise: the surplus from
+moving ONE player is a property of the two players around him, not of him.
+Bijan, Henry and Javonte to ayatollahabdullah all score +7.2, because in every
+case the same body (Deebo, 151.7) fills the vacated flex and the same starter
+(Monangai, 144.5) loses his seat; the traded player cancels out of
+gain - cost. And it is one-shot: after the first RB moves, the next scores
+-5.5.
+
+Plan: docs/plans/2026-09-09-slot-based-trades-plan.md. Not built yet.
