@@ -217,7 +217,14 @@ def _market_mod():
     return market
 
 
-def backfill(n: int, waivers, key: str = "weekly", exclude=()) -> list[dict]:
+# How many wire bodies per position the position-aware backfill considers.
+# 3 per position over six positions is about 18 lineup solves per opened spot
+# (~0.25 ms); the naive version over the whole wire is ~4 ms per package and
+# too slow for a frontier search.
+BACKFILL_TOP_K = 3
+
+def backfill(n: int, waivers, key: str = "weekly", exclude=(), *,
+             roster=None, shape=None, top_k: int = BACKFILL_TOP_K) -> list[dict]:
     """The best `n` free agents, for roster spots a package leaves open.
 
     NOT a replacement baseline. Bench players are already in the pool the
@@ -225,24 +232,69 @@ def backfill(n: int, waivers, key: str = "weekly", exclude=()) -> list[dict]:
     automatically. This is narrower: a 2-for-1 sends more bodies than it
     receives and opens a SPOT, and that spot is filled by Tuesday. Pricing
     it at zero understates every consolidation.
+
+    POSITION-AWARE WHEN IT CAN BE. Given `roster` (the roster AFTER the
+    departures and arrivals, i.e. with the spot actually open) and `shape`,
+    each pick is the wire body that raises that roster's optimal lineup the
+    most, chosen from the top `top_k` per position. Without them it falls
+    back to the top `n` by raw points, which is what every caller got until
+    2026-09-09 and what the older tests pin.
+
+    Why the raw-points version was wrong: it handed over the best body on
+    the wire regardless of position. On a board where the wire's best body
+    is a QB (Omnibeta: Jordan Love, 275), a roster giving an RB in a 2-for-1
+    received a QB who could not play flex, and the seat was priced as empty.
+    Harmless on a roster with a flex-eligible bench body to cover; a real
+    mispricing on one without. It happened to be RIGHT for the one case it
+    was measured on (giving a QB, receiving Love), which is how it survived.
     """
     if n <= 0 or not waivers:
         return []
     skip = {_pid(p) for p in exclude}
     pool = [p for p in waivers if _pid(p) not in skip]
-    return sorted(pool, key=lambda p: -(p.get(key) or 0.0))[:n]
+    if roster is None or shape is None:
+        return sorted(pool, key=lambda p: -(p.get(key) or 0.0))[:n]
+
+    # Candidates: top_k per position. The lineup solve decides among them.
+    by_pos: dict[str, list[dict]] = {}
+    for q in sorted(pool, key=lambda p: -(p.get(key) or 0.0)):
+        bucket = by_pos.setdefault(q.get("pos") or "?", [])
+        if len(bucket) < top_k:
+            bucket.append(q)
+    cands = [q for bucket in by_pos.values() for q in bucket]
+    have = list(roster)
+    picked: list[dict] = []
+    for _ in range(n):
+        if not cands:
+            break
+        base = lineup_points(have, shape, key)
+        # Best lineup gain; raw points break the tie so a body that cannot
+        # start still comes in by quality rather than by dict order.
+        best = max(cands, key=lambda q: (round(lineup_points(have + [q], shape, key)
+                                               - base, 6), q.get(key) or 0.0))
+        picked.append(best)
+        have.append(best)
+        cands.remove(best)
+    return picked
 
 
-def _fill_for(arriving, departing, waivers, key: str = "weekly") -> list[dict]:
+def _fill_for(arriving, departing, waivers, key: str = "weekly", *,
+              roster=None, shape=None) -> list[dict]:
     """The backfill one side of a package earns. ONE definition.
 
     price(), depth_risk() and thin_after() each derived this independently
     and happened to agree; a change to the exclude semantics would have had
     to land in three places, only one of which the price() tests cover.
+
+    `roster` is that side's roster WITH the departures removed and the
+    arrivals added -- the state in which the spot is actually open -- so the
+    position-aware pick sees the hole it is filling. All three callers build
+    it the same way and pass it; the legacy raw-points path is only for a
+    caller that has no roster to offer.
     """
     arriving, departing = list(arriving), list(departing)
     return backfill(len(departing) - len(arriving), waivers, key,
-                    exclude=arriving + departing)
+                    exclude=arriving + departing, roster=roster, shape=shape)
 
 
 def price(my_roster: list[dict], their_roster: list[dict],
@@ -269,8 +321,13 @@ def price(my_roster: list[dict], their_roster: list[dict],
     if market_values:
         from . import market as market_mod
         mkt = market_mod.price(market_values, give, get)
-    my_fill = _fill_for(get, give, waivers, key)
-    their_fill = _fill_for(give, get, waivers, key)
+    give_ids, get_ids = {_pid(p) for p in give}, {_pid(p) for p in get}
+    my_fill = _fill_for(get, give, waivers, key,
+                        roster=[p for p in my_roster if _pid(p) not in give_ids] + list(get),
+                        shape=shape)
+    their_fill = _fill_for(give, get, waivers, key,
+                           roster=[p for p in their_roster if _pid(p) not in get_ids] + list(give),
+                           shape=their_shape or shape)
     # Both sides re-solve. slot_moves carries the totals, so the deltas and
     # the seat-by-seat story cannot drift apart the way they would if the
     # points were computed here and the movements somewhere else.
@@ -301,8 +358,9 @@ def depth_risk(roster: list[dict], shape: dict, pos: str, *, arriving=(),
     topped up from waivers, not from a bench that no longer exists.
     """
     dep = {_pid(p) for p in departing}
-    fill = backfill(len(list(departing)) - len(list(arriving)), waivers, key,
-                    exclude=list(arriving) + list(departing))
+    fill = _fill_for(arriving, departing, waivers, key,
+                     roster=[p for p in roster if _pid(p) not in dep] + list(arriving),
+                     shape=shape)
     after_roster = [p for p in roster if _pid(p) not in dep] + \
         list(arriving) + fill
 
@@ -398,7 +456,9 @@ def thin_after(roster: list[dict], shape: dict, *, arriving=(), departing=(),
     but only against positions the wire actually covers.
     """
     dep = {_pid(p) for p in departing}
-    fill = _fill_for(arriving, departing, waivers, key)
+    fill = _fill_for(arriving, departing, waivers, key,
+                     roster=[p for p in roster if _pid(p) not in dep] + list(arriving),
+                     shape=shape)
     after = [p for p in roster if _pid(p) not in dep] + list(arriving) + fill
     held: dict[str, int] = {}
     for p in after:

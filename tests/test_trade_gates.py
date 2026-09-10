@@ -353,3 +353,104 @@ def test_newly_thin_is_empty_when_a_trade_breaks_nothing():
               p("TE", 24.0), p("TE", 23.0)]
     assert marginal.newly_thin(roster, shape, departing=[roster[3]],
                                arriving=[p("RB", 31.0)]) == []
+
+
+
+# ------------------------------------------ D1 (2026-09-09): position-aware backfill
+
+_d1 = [0]
+
+
+def _q(pos, v, name=None):
+    _d1[0] += 1
+    return {"sleeper_id": f"d1_{_d1[0]}", "pos": pos, "weekly": v,
+            "name": name or f"{pos}{v}"}
+
+
+D1_SHAPE = {"slots": {"QB": 1, "RB": 2, "WR": 2, "TE": 1}, "flex": 1}
+
+
+def _thin_roster():
+    """Every starter and no bench at all: nothing can cover an opened seat."""
+    return [_q("QB", 20.0, "my qb"), _q("RB", 15.0, "rb1"), _q("RB", 13.0, "rb2"),
+            _q("WR", 14.0, "wr1"), _q("WR", 12.0, "wr2"), _q("TE", 9.0, "te"),
+            _q("WR", 11.0, "flex wr")]
+
+
+def test_fence5_a_thin_roster_giving_an_rb_gets_an_rb_back_not_the_wires_best_qb():
+    """The wire's best body by raw points is a QB. A roster that just gave an
+    RB in a 2-for-1 has an RB seat open and no bench body to slide in. The
+    raw-points backfill handed over the QB, who cannot play RB or flex, and
+    priced the seat as empty. The position-aware pick sees the hole."""
+    mine = _thin_roster()
+    rb2, flex_wr = mine[2], mine[6]
+    theirs = [_q("WR", 16.0, "star")]
+    wire = [_q("QB", 30.0, "big waiver QB"), _q("RB", 12.0, "waiver RB")]
+
+    legacy = marginal.backfill(1, wire)
+    assert [x["name"] for x in legacy] == ["big waiver QB"], "legacy path changed"
+
+    after_moves = [p for p in mine if p not in (rb2, flex_wr)] + theirs
+    aware = marginal.backfill(1, wire, roster=after_moves, shape=D1_SHAPE)
+    assert [x["name"] for x in aware] == ["waiver RB"], aware
+
+    d = marginal.price(mine, theirs, [rb2, flex_wr], theirs, D1_SHAPE, waivers=wire)
+    assert d.my_backfill == ["waiver RB"], d.my_backfill
+
+
+def test_position_aware_agrees_with_legacy_when_the_wires_best_body_fits():
+    """The one case the old behaviour was measured on: give the QB, the
+    wire's best body is a QB. Both paths must pick him, or the change moved
+    a number it had no business moving."""
+    mine = _thin_roster()
+    qb, flex_wr = mine[0], mine[6]
+    theirs = [_q("WR", 16.0, "star")]
+    wire = [_q("QB", 27.5, "waiver QB"), _q("RB", 10.0, "waiver RB")]
+    after_moves = [p for p in mine if p not in (qb, flex_wr)] + theirs
+    legacy = marginal.backfill(1, wire)
+    aware = marginal.backfill(1, wire, roster=after_moves, shape=D1_SHAPE)
+    assert [x["name"] for x in legacy] == [x["name"] for x in aware] == ["waiver QB"]
+
+
+def test_backfill_without_a_roster_is_exactly_the_old_top_n_by_points():
+    wire = [_q("QB", 30.0), _q("RB", 12.0), _q("WR", 25.0), _q("TE", 8.0)]
+    got = [x["weekly"] for x in marginal.backfill(2, wire)]
+    assert got == [30.0, 25.0], "legacy ordering must survive the new keyword args"
+
+
+def test_position_aware_fills_two_opened_seats_greedily_by_lineup_gain():
+    """A 3-for-1 opens two seats. Each pick is the body that raises the
+    lineup most GIVEN the previous pick, so the second RB is not chosen
+    while the RB seat is already refilled and a WR seat still gapes."""
+    mine = _thin_roster()
+    rb2, wr2, flex_wr = mine[2], mine[4], mine[6]
+    theirs = [_q("TE", 16.0, "star te")]
+    wire = [_q("RB", 12.0, "waiver RB a"), _q("RB", 11.5, "waiver RB b"),
+            _q("WR", 11.0, "waiver WR"), _q("QB", 18.0, "QB below mine")]
+    after_moves = [p for p in mine if p not in (rb2, wr2, flex_wr)] + theirs
+    picks = [x["name"] for x in marginal.backfill(2, wire, roster=after_moves, shape=D1_SHAPE)]
+    assert set(picks) == {"waiver RB a", "waiver WR"}, picks
+
+
+def test_depth_risk_and_thin_after_use_the_position_aware_fill():
+    """All three callers share _fill_for. If depth_risk still handed a thin
+    roster the wire's QB after it gave an RB, its 'extra' would report an
+    RB hole that the trade actually refills."""
+    mine = _thin_roster()
+    rb2, flex_wr = mine[2], mine[6]
+    theirs = [_q("WR", 16.0, "star")]
+    wire = [_q("QB", 30.0, "big waiver QB"), _q("RB", 12.0, "waiver RB")]
+    thin = marginal.thin_after(mine, D1_SHAPE, arriving=theirs, departing=[rb2, flex_wr],
+                               waivers=wire)
+    # thin_after counts bodies against slots: two RBs for two RB slots is still
+    # thin by its own rule, so RB cannot discriminate. QB can. The legacy fill
+    # would have taken the wire QB (30 > 20) and QB would NOT be thin. It is,
+    # which proves the fill went to the open RB seat instead.
+    assert "QB" in thin, f"the fill took the wire QB instead of the RB: {thin}"
+    fill = marginal._fill_for(theirs, [rb2, flex_wr], wire,
+                              roster=[p for p in mine if p not in (rb2, flex_wr)] + theirs,
+                              shape=D1_SHAPE)
+    assert [x["name"] for x in fill] == ["waiver RB"], fill
+    r = marginal.depth_risk(mine, D1_SHAPE, "RB", arriving=theirs, departing=[rb2, flex_wr],
+                            waivers=wire)
+    assert r["after_star"] is not None
