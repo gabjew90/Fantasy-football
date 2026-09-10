@@ -121,3 +121,72 @@ def ceiling_beats(add: dict | None, drop: dict | None) -> bool:
     if add.get("pos") != drop.get("pos"):
         return False
     return add["best"] < drop["best"]          # ranks: lower is better
+
+
+# -------------------------------------------------------------- rank panel
+
+def rank_panel(ctx, store=None) -> tuple[dict[str, dict], list[str]]:
+    """sleeper_id -> {overall, positional, pos, panel, source}. Plus notes.
+
+    The rank view the slot-based acceptance test reads (plan:
+    docs/plans/2026-09-09-slot-based-trades-plan.md). OVERALL rank is the
+    test's scale -- a WR4 against an RB13 is undecidable on positional rank
+    and plain on the overall board -- and positional is carried for display,
+    because "RB13 over RB27" is how a person reads a seat.
+
+    Source order: the FantasyPros draft panel (~149 experts) while it is
+    fresh, else the DynastyProcess mirror of the same consensus (a few days
+    behind, no panel size published). ONE SCALE PER RUN: if FantasyPros
+    carries anyone, the mirror is not consulted for the rest, because a
+    WR4 on one panel against an RB13 on another is not a comparison. Every
+    row says which source and carries the panel size, so a three-expert ROS
+    rank can never be read as agreement.
+    """
+    from . import consensus as C, fantasypros as fp
+
+    notes: list[str] = []
+    cfg = ctx["cfg"]
+    scoring = C._scoring(cfg)
+    season = (ctx.get("state") or {}).get("season") or ctx.get("season")
+    index = ctx.get("players")
+
+    # WHICH OVERALL BOARD. "OP" is the superflex list, quarterbacks on top;
+    # "ALL" is the one-QB list. A one-QB league reading OP would carry every
+    # QB at a rank inflated by 50 or more into the acceptance test.
+    slots = ctx.get("slots") or {}
+    flex_sets = ctx.get("flex_slots") or ()
+    superflex = int(slots.get("QB", 0) or 0) >= 2 or any("QB" in set(fs) for fs in flex_sets)
+    board = fp.OVERALL_SUPERFLEX if superflex else fp.OVERALL_ONE_QB
+    ov, n1 = fp.overall(scoring, season, index, kind=fp.DRAFT, store=store,
+                        position=board)
+    pos_rows, n2 = fp.fetch(scoring, season, index, kind=fp.DRAFT, store=store)
+    for n in (n1, n2):
+        if n:
+            notes.append(n)
+
+    out: dict[str, dict] = {}
+    if ov:
+        for pid, r in ov.items():
+            pr = pos_rows.get(pid) or {}
+            out[pid] = {"overall": r["overall"], "positional": pr.get("ecr"),
+                        "pos": r["pos"], "panel": r.get("panel"),
+                        "source": "fantasypros draft", "list": r.get("list")}
+        return out, notes
+
+    mirror, note = by_sleeper_id(ctx)
+    if note:
+        notes.append(note)
+    for pid, r in (mirror or {}).items():
+        if r.get("overall") is None:
+            continue
+        out[pid] = {"overall": r["overall"], "positional": r.get("ecr"),
+                    "pos": r.get("pos"), "panel": None,
+                    "source": f"dynastyprocess mirror {r.get('as_of') or ''}".strip(),
+                    "list": "ro"}
+    if out:
+        notes.append("⚠ rank panel from the DynastyProcess mirror: the FantasyPros "
+                     "draft feed was unavailable, and the mirror publishes no "
+                     "panel size")
+    else:
+        notes.append("DATA MISSING: no rank panel reachable")
+    return out, notes

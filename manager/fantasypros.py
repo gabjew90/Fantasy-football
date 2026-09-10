@@ -467,3 +467,72 @@ def crosswalk(scoring: dict, season, index, store=None
                  (d.get("team") or "").upper()))
     return ({"by_yahoo": by_yahoo, "by_name": by_name},
             f"{note}; crosswalk {len(by_yahoo)} yahoo ids")
+
+
+# ----------------------------------------------------------------- overall
+
+# The two overall lists FantasyPros publishes. They are NOT interchangeable.
+# "ALL" is the standard one-QB board: Bijan 4, Caleb Williams 63. "OP" --
+# offensive player -- is the SUPERFLEX board, with quarterbacks stacked on
+# top: Allen 1, Hurts 5, Caleb 8, and every non-QB pushed down 8-17 ranks
+# to make room. Measured live 2026-09-10 against the DynastyProcess mirror
+# of the same panel; the first cut of this function used OP for a one-QB
+# league and would have inflated every QB in the acceptance test.
+OVERALL_ONE_QB, OVERALL_SUPERFLEX = "ALL", "OP"
+
+
+def overall(scoring: dict, season, index, kind: str = DRAFT, store=None,
+            position: str = OVERALL_ONE_QB) -> tuple[dict[str, dict], str | None]:
+    """sleeper_id -> {overall, pos, panel, list}. The OVERALL consensus rank.
+
+    The per-position fetch() carries positional rank (RB13). This carries
+    the one list that puts a WR4 and an RB13 on the same scale, which is
+    what a cross-position trade needs. `position` picks WHICH overall list:
+    OVERALL_ONE_QB for a one-QB league, OVERALL_SUPERFLEX when two QBs can
+    start -- rank_panel() decides from the league shape. `panel` is the
+    expert count on that list, carried so a three-expert rank can never be
+    read as agreement, and `list` says which board the number came from.
+    """
+    from draftkit.ids import normalize_name
+
+    slug = scoring_slug(scoring)
+    ckey = f"fantasypros:overall:{position}:{kind}:{slug}:{season}"
+    if store is not None:
+        cached = store.get(ckey)
+        if cached and _time.time() - cached.get("ts", 0) < TTL:
+            return cached["data"], cached.get("note")
+    if not index:
+        return {}, "DATA MISSING: fantasypros overall (no player index)"
+
+    by_norm, by_team = _index_by_name(index)
+    try:
+        rows, body = _rows(position, slug, season, kind)
+    except Exception as e:  # noqa: BLE001
+        return {}, f"DATA MISSING: fantasypros overall {position} ({e.__class__.__name__})"
+
+    out: dict[str, dict] = {}
+    for row in rows:
+        our_pos = POSITIONS.get(row.get("player_position_id"))
+        if not our_pos:
+            continue
+        if our_pos == "DEF":
+            tm = (row.get("player_team_id") or "").upper()
+            pid = by_team.get(TEAM_ALIAS.get(tm, tm))
+        else:
+            cand = [x for x in by_norm.get(
+                normalize_name(row.get("player_name") or ""), [])
+                if (index.get(x) or {}).get("position") == our_pos]
+            pid = cand[0] if len(cand) == 1 else None    # ambiguous: dropped
+        rank = _num(row.get("rank_ecr"))
+        if not pid or rank is None:
+            continue
+        out[pid] = {"overall": rank, "pos": our_pos,
+                    "panel": body.get("total_experts"), "list": position}
+
+    if not out:
+        return out, f"DATA MISSING: fantasypros overall {position} matched no players"
+    note = (f"fantasypros overall {position} {kind} {slug}: {len(out)} players, "
+            f"panel {body.get('total_experts')}, updated {body.get('last_updated')}")
+    if store is not None:
+        store.set(ckey, {"ts": _time.time(), "data": out, "note": note})
+    return out, note
