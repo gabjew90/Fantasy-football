@@ -894,7 +894,7 @@ def dead_weight(roster: list[dict], shape: dict, key: str = "weekly") -> list[di
 
 
 def tradeable(roster: list[dict], others: dict, shape: dict,
-              key: str = "weekly") -> list[dict]:
+              key: str = "weekly", *, waivers=None, ranks=None) -> list[dict]:
     """Rank my roster by SURPLUS: where is a player worth more than here?
 
     THIS IS THE FIRST LOOK, NOT THE PRICE. For each of my players it asks
@@ -922,15 +922,47 @@ def tradeable(roster: list[dict], others: dict, shape: dict,
     `others` is {owner -> roster}. `buyers` counts how many rival lineups
     actually improve; a player nobody's lineup wants has no market whatever
     his projection says, and sorts last whatever his surplus.
+
+    CHIPS (step 6 of the slot-based trade plan). A chip is a player who is
+    CHEAP FOR ME TO SELL AND HAS A BUYER -- both, not either:
+
+      * `true_cost` is the lineup drop with the position-aware backfill a
+        2-for-1 actually earns, given `waivers`. Caleb Williams costs 293.7
+        on cost_to_lose (an empty QB seat) and 18.7 with Jordan Love
+        backfilled off the wire. Without `waivers` it equals `cost`.
+      * `rank_buyers` are the teams for whom he is a positional upgrade IN
+        THEIR CURRENCY: he starts for them AND beats their worst incumbent
+        at his position on overall rank -- accepts() Test 1 applied to one
+        player. A buyer has to be found in the currency the buyer uses: on
+        points, `buyers` counts anyone whose lineup ticks up, which can name
+        a team that would never see him as an upgrade on the board, and
+        miss one that would.
+
+    When `ranks` is given the list ranks CHIPS: has a rank buyer first, then
+    `true_cost` ascending; unbought players last whatever the cost. Without
+    `ranks` the surplus ranking below is unchanged and `rank_buyers` is None.
     """
+    base = lineup_points(roster, shape, key)
     rows = []
     for p in roster:
+        pid = _pid(p)
         cost = cost_to_lose(roster, p, shape, key)
+        rest = [q for q in roster if _pid(q) != pid]
+        fill = (_fill_for([], [p], waivers, key, roster=rest, shape=shape)
+                if waivers else [])
+        true_cost = round(base - lineup_points(rest + list(fill), shape, key), 1)
         gains = [(gain_to_add(r, p, shape, key), who) for who, r in others.items()]
         best = max(gains) if gains else (0.0, None)
+        rank_buyers = None
+        if ranks is not None:
+            rank_buyers = [who for who, r in others.items()
+                           if accepts(r, shape, arriving=[p], departing=[],
+                                      key=key, ranks=ranks)["tags"].get(pid) == UPGRADE]
         rows.append({
             "player": p, "proj": round(p.get(key) or 0.0, 1), "cost": cost,
+            "true_cost": true_cost,
             "buyers": sum(1 for g, _ in gains if g > 0),
+            "rank_buyers": rank_buyers,
             "best_gain": best[0], "best_buyer": best[1],
             "surplus": round(best[0] - cost, 1),
             # None reads as "free": no denominator, not a missing number
@@ -947,6 +979,10 @@ def tradeable(roster: list[dict], others: dict, shape: dict,
     # ratio, not a zero one -- and this function is the one that answers
     # "who are my most tradeable assets".
     def rank(r):
+        if ranks is not None:
+            # Chips: a buyer in his currency first, cheapest for me first
+            # within that; nobody wants him -> last, however cheap.
+            return (0 if r["rank_buyers"] else 1, r["true_cost"], -r["surplus"])
         free_and_wanted = r["cost"] <= 0 and r["best_gain"] > 0
         # Three tiers, then surplus within each. A player nobody wants stays
         # at the bottom even at surplus 0 -- otherwise a bench body with no

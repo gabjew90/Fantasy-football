@@ -123,6 +123,15 @@ Measured on the known cases, Test 1 + Test 2:
 | RJ Harvey -> Bo Nix (rybryethguy) | Harvey does not start | 0 | 0 | reject |
 | Henry + Fannin -> McMillan + Smith | Henry over Warren, Fannin over Goedert | +288 | -44 | accept |
 
+The net ranks in that table were measured on the DynastyProcess mirror
+(`ro` board, 2026-09-04). The live FantasyPros ALL board (2026-09-10, panel
+181) reproduces every verdict and every tag, with net ranks of -27, -12,
+-31, 0 and -42 respectively. The first live cut read `position=OP` -- the
+SUPERFLEX board, quarterbacks stacked on top, Caleb Williams at overall 8 --
+and was caught because positional rank tracked the mirror exactly while
+overall did not. `rank_panel()` now chooses the board from the league shape
+and every row says which list it came from.
+
 The last row is the deal this whole design was built on rejecting, and his
 side now ACCEPTS it. That is correct: "accept" is a prediction that a
 position-by-position manager plausibly clicks yes -- RB up, TE up, value
@@ -282,7 +291,11 @@ Until then, regression fences for the cases that motivated this:
 4. `accepts()` -- Test 1 (positional upgrade, worst incumbent at his
    position), Test 2 (starters-market, backfill in), per-player tags
    (UPGRADE / FILLER / does not start), and the net-rank flag.
-5. `verdict(mode="slots")` -- wired; old path behind `mode="points"`.
+5. `verdict(mode="slots")` -- wired, reading `Deal.acceptance` that
+   `price(ranks=)` attaches. SHIPPED WITH `MODE = "points"` STILL THE
+   DEFAULT: the radar passes no rank panel to `price()` until step 7, and a
+   slots default before that would reject every production package with
+   "acceptance: not computed". The flip is one token and lands in step 7.
 6. `tradeable()` -- chips with buyers.
 7. `trade_radar` -- the Step 2 search and the per-row classification print.
 8. DECISIONS cross-reference; code review.
