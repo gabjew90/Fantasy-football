@@ -4032,3 +4032,27 @@ roster could have replaced any Tuesday read as depth lost. The given side
 now uses the pre-fill wire. Also: the rankings-reader flag needs a
 half-point (mirror ranks are fractional; -0.3 printed "worse by 0"), and
 a rejection on both tests names both. 1,097 tests.
+
+UAT 2026-09-10 (Omnibeta, live). The engine searched 58,240 packages
+where I receive a WR (34 s); 788 passed his two tests and my lineup; the
+top rows by my mean were Henry + Harvey -> Wilson + Flowers
+(ayatollahabdullah, +2.82/wk, range +1.52 to +4.75, flag -67) and
+Henry -> Evans + London (DihtrickCohones, +2.22/wk, +1.17 to +3.11,
+flag -31). Walked five packages check by check; every number traced to a
+player and no test passed for a reason other than its own. Findings:
+Test 2 moved under 2% on all five (a floor, not a discriminator); the
+rankings-reader flag is what separates a plausible yes from a laugh; the
+depth advisory is count-only (Kaelon Black at 59 ROS counts as RB cover).
+Two design questions closed: D2 (the 2-for-1 receiver must drop someone)
+moves no number we compute -- every his-side test reads his starters --
+and is retired; D3 (backfill credited for an available-today upgrade) was
+measured at 0 of 2,514 positive 2-for-1s on the live wire and stays a
+named artefact. One defect: the radar recommended Henry + Warren for
+Egbuka + A.J. Brown with Brown Out -- the trade path never read
+injury_status and the player file was a day old. Fixed as fence 7 in the
+plan: three-hour player file in season, `marginal.injury_discount()` on
+every roster and the wire before pricing, and an INJURED line per piece.
+The same package re-prices at +0.31/wk and his side refuses on market.
+Also found and fixed on the way: `defense.points_allowed()` handed
+Sleeper scoring keys to polars as column names and took `build_context`
+down the first week real stats landed (110a75a).

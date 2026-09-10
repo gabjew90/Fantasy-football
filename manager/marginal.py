@@ -768,12 +768,74 @@ def newly_thin(roster: list[dict], shape: dict, *, arriving=(), departing=(),
     return sorted(after - before)
 
 
+# ---------------------------------------------------------------- injuries
+#
+# THE TRADE PATH NEVER LOOKED AT INJURY STATUS. On 2026-09-10 it priced
+# Henry + Warren for Egbuka + A.J. Brown as +1.16/wk with Brown Out (ankle)
+# on Sleeper and every source still carrying his full season. Two fixes,
+# both here so price(), the radar and the chips share them: the ROS of a
+# player who is not playing is scaled by the weeks he misses, and every
+# such piece is named out loud. Advisory, never a gate -- the user decides.
+INJURED = ("Out", "IR", "PUP", "Sus", "Suspended", "NA", "COV", "DNR", "Doubtful")
+# Weeks missed when nobody has said: Out/Doubtful is this week; a reserve
+# designation is the four-game minimum. FantasyPros `ir_weeks` overrides.
+DEFAULT_WEEKS_OUT = {"Out": 1, "Doubtful": 1, "Sus": 1, "Suspended": 1, "NA": 1,
+                     "COV": 1, "IR": 4, "PUP": 4, "DNR": 99}
+
+
+def injury_discount(rows, injury: dict | None, weeks_left: int, *,
+                    weeks_out: dict | None = None, key: str = "ros") -> list[dict]:
+    """Copies of `rows` with `key` scaled by the share of the season the
+    player is expected to play. Healthy and Questionable rows come back
+    untouched (same object). A discounted row carries `_injury` =
+    {status, weeks, healthy} so the brief can say what it did.
+
+    `ros_season` is left alone on purpose: the per-source range scales each
+    shop's season total by ros / ros_season, so the discount reaches every
+    source-world for free.
+    """
+    if not injury:
+        return list(rows)
+    wl = max(1, int(weeks_left or 1))
+    out = []
+    for p in rows:
+        status = (injury.get(_pid(p)) or "").strip()
+        if status not in INJURED:
+            out.append(p)
+            continue
+        weeks = (weeks_out or {}).get(_pid(p))
+        if weeks is None:
+            weeks = DEFAULT_WEEKS_OUT.get(status, 1)
+        weeks = min(wl, max(0, int(weeks)))
+        share = (wl - weeks) / wl
+        healthy = float(p.get(key) or 0.0)
+        q = dict(p)
+        q[key] = round(healthy * share, 2)
+        q["_injury"] = {"status": status, "weeks": weeks, "healthy": healthy}
+        out.append(q)
+    return out
+
+
+def injury_flags(pieces) -> list[str]:
+    """One line per package piece that injury_discount() touched."""
+    out = []
+    for p in pieces:
+        inj = p.get("_injury")
+        if not inj:
+            continue
+        out.append(f"INJURED: {p.get('name') or _pid(p)} ({p.get('pos')}) is {inj['status']} "
+                   f"— priced at {p.get('ros') or 0:.0f} ROS, {inj['healthy']:.0f} healthy "
+                   f"({inj['weeks']} wk{'s' if inj['weeks'] != 1 else ''} out)")
+    return out
+
+
 def verdict(deal: Deal, weeks_left: int, *, floor_ppg: float = EDGE_PPG,
             market_floor: float = MARKET_FLOOR,
             market_ceiling: float = MARKET_CEILING,
             market_ceiling_blocks: bool = MARKET_CEILING_BLOCKS,
             thin: list[str] | None = None, depth_blocks: bool = DEPTH_BLOCKS,
-            con: dict | None = None, mode: str = MODE) -> dict:
+            con: dict | None = None, mode: str = MODE,
+            injured: list[str] | None = None) -> dict:
     """The two gates, kept separate on purpose.
 
     GATE 1 asks whether the trade is actually good -- my lineup up by more
@@ -834,6 +896,10 @@ def verdict(deal: Deal, weeks_left: int, *, floor_ppg: float = EDGE_PPG,
     # unless `depth_blocks`, so it lands in `warnings` rather than `why`.
     gate3 = not thin
     reasons, warnings = [], []
+    # Injured pieces lead the warnings: the numbers above were priced on the
+    # discounted ROS, and the reader should know that before the mean.
+    for w in (injured or []):
+        warnings.append(f"⚠ {w}")
     if not (gains and clears):
         reasons.append(f"lineup: me {mine_ppg:+.2f} ppg (need {floor_ppg:+.2f})")
     if not his_yes:

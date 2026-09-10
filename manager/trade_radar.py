@@ -91,6 +91,56 @@ def _waiver_pool(ctx, con=None) -> list[dict]:
     return pool
 
 
+def _weeks_out(ctx, pids: set[str]) -> dict[str, int]:
+    """FantasyPros `ir_weeks` for the reserve-designated players in `pids`,
+    as weeks still to miss from the current week. Empty on any failure: the
+    default table in marginal.DEFAULT_WEEKS_OUT then applies."""
+    if not pids:
+        return {}
+    try:
+        from . import fantasypros as fp_mod
+        rows, _ = fp_mod.fetch(ctx["league"]["scoring_settings"], ctx["state"]["season"],
+                               ctx.get("players") or {})
+        sub = {pid: rows[pid] for pid in pids if pid in rows}
+        if not sub:
+            return {}
+        inj, _ = fp_mod.injuries(sub, ctx["state"]["season"], int(ctx["week"]))
+        week = int(ctx["week"])
+        out = {}
+        for pid, r in inj.items():
+            weeks = [int(w) for w in (r.get("ir_weeks") or []) if str(w).lstrip("-").isdigit()]
+            ahead = [w for w in weeks if w >= week]
+            if ahead:
+                out[pid] = len(ahead)
+        return out
+    except Exception as e:  # noqa: BLE001
+        log.warning("trade radar: no ir_weeks (%s)", e.__class__.__name__)
+        return {}
+
+
+def _injury_adjusted(ctx):
+    """Every roster and the wire with injured players' ROS discounted by the
+    weeks they miss (marginal.injury_discount). Cached on ctx: the radar
+    prices hundreds of packages and the adjustment is the same for all.
+    Returns ({rid: rows}, wire_rows)."""
+    cached = ctx.get("_inj_adj")
+    if cached is not None:
+        return cached
+    from . import marginal
+    injury = ctx.get("injury") or {}
+    wl = ctx.get("weeks_left") or 1
+    rosters = ctx.get("roster_players") or {}
+    wire = _waiver_pool(ctx)
+    reserve = {str(p["sleeper_id"]) for rows in list(rosters.values()) + [wire] for p in rows
+               if (injury.get(str(p.get("sleeper_id"))) or "") in ("IR", "PUP")}
+    weeks_out = _weeks_out(ctx, reserve)
+    adj = {rid: marginal.injury_discount(rows, injury, wl, weeks_out=weeks_out, key="ros")
+           for rid, rows in rosters.items()}
+    adj_wire = marginal.injury_discount(wire, injury, wl, weeks_out=weeks_out, key="ros")
+    ctx["_inj_adj"] = (adj, adj_wire)
+    return ctx["_inj_adj"]
+
+
 def _rank_panel(ctx):
     """The rank panel accepts() reads, cached on ctx like the waiver pool.
 
@@ -198,8 +248,15 @@ def _priced(ctx, opp, vals) -> list[str]:
         return []
     shape = {"slots": ctx["slots"], "flex": ctx.get("flex", 0),
              "flex_slots": ctx.get("flex_slots")}
-    mine = ctx["roster_players"][ctx["my_rid"]]
-    wv = _waiver_pool(ctx)
+    # Price on the injury-adjusted rows, and price the SAME rows the lineups
+    # are built from -- a give/get row from the raw roster would carry the
+    # healthy ROS into a discounted lineup.
+    adj, wv = _injury_adjusted(ctx)
+    mine = adj.get(ctx["my_rid"]) or ctx["roster_players"][ctx["my_rid"]]
+    theirs = adj.get(opp.get("rid")) or theirs
+    by_pid = {str(p["sleeper_id"]): p for p in list(mine) + list(theirs)}
+    give = [by_pid.get(str(p["sleeper_id"]), p) for p in give]
+    get = [by_pid.get(str(p["sleeper_id"]), p) for p in get]
     ranks = _rank_panel(ctx)
     wl = ctx.get("weeks_left") or 1
     try:
@@ -207,7 +264,8 @@ def _priced(ctx, opp, vals) -> list[str]:
                            market_values=vals, waivers=wv, ranks=ranks)
         thin = marginal.newly_thin(mine, shape, arriving=get, departing=give,
                                    waivers=wv, key="ros")
-        v = marginal.verdict(d, wl, thin=thin, con=_biggest_row(give, get))
+        v = marginal.verdict(d, wl, thin=thin, con=_biggest_row(give, get),
+                             injured=marginal.injury_flags(list(give) + list(get)))
         rng = _range_ppg(mine, theirs, give, get, shape, wv, wl)
     except Exception as e:  # noqa: BLE001
         log.warning("trade radar: could not price %s (%s)", opp.get("mgr"), e)
@@ -262,15 +320,16 @@ def _chips_lines(ctx) -> list[str]:
     ranks = _rank_panel(ctx)
     if not ranks:
         return ["- chips: not ranked — no rank panel this run"]
-    mine = ctx["roster_players"][ctx["my_rid"]]
-    others = {ctx["users_by_rid"].get(rid, f"roster {rid}"): r
+    adj, wv = _injury_adjusted(ctx)
+    mine = adj.get(ctx["my_rid"]) or ctx["roster_players"][ctx["my_rid"]]
+    others = {ctx["users_by_rid"].get(rid, f"roster {rid}"): adj.get(rid) or r
               for rid, r in ctx["roster_players"].items()
               if rid != ctx["my_rid"] and r}
     shape = {"slots": ctx["slots"], "flex": ctx.get("flex", 0),
              "flex_slots": ctx.get("flex_slots")}
     try:
         rows = marginal.tradeable(mine, others, shape, key="ros",
-                                  waivers=_waiver_pool(ctx), ranks=ranks)
+                                  waivers=wv, ranks=ranks)
     except Exception as e:  # noqa: BLE001
         log.warning("trade radar: chips failed (%s)", e)
         return []
@@ -280,8 +339,10 @@ def _chips_lines(ctx) -> list[str]:
         if not r["rank_buyers"]:
             break
         pl = r["player"]
+        inj = pl.get("_injury")
         out.append(f"  - {pl['name']} ({pl['pos']}) costs my lineup {r['true_cost']:.1f} "
-                   f"— buyers: {', '.join(r['rank_buyers'][:4])}")
+                   f"— buyers: {', '.join(r['rank_buyers'][:4])}"
+                   + (f" — ⚠ {inj['status']}, {inj['weeks']} wk out" if inj else ""))
         shown += 1
         if shown >= 3:
             break

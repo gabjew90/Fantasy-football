@@ -56,12 +56,19 @@ class SleeperClient:
     def user(self, username_or_id: str) -> dict | None:
         return get_json(f"{BASE}/user/{username_or_id}")
 
-    def players(self, refresh: bool = False) -> dict[str, dict]:
-        """Full NFL player universe, cached locally with a daily TTL."""
+    def players(self, refresh: bool = False, max_age: float | None = None) -> dict[str, dict]:
+        """Full NFL player universe, cached locally with a daily TTL.
+
+        `max_age` overrides the TTL for one call. In season the file is where
+        `injury_status` comes from, and a day-old copy priced A.J. Brown as a
+        healthy WR11 on 2026-09-10 while Sleeper had him Out -- the trade
+        radar passes a few hours instead.
+        """
         cache = self.cache_dir / "players_nfl.json"
+        ttl = PLAYERS_TTL_SECONDS if max_age is None else float(max_age)
         if not refresh and cache.exists():
             age = time.time() - cache.stat().st_mtime
-            if age < PLAYERS_TTL_SECONDS:
+            if age < ttl:
                 with open(cache, encoding="utf-8") as f:
                     return json.load(f)
         data = get_json(f"{BASE}/players/nfl", timeout=120)

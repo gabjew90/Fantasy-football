@@ -29,6 +29,11 @@ def _season_cfg(cfg) -> dict:
     return cfg.get("inseason", cfg.get("season", {})) or {}
 
 
+# How old the Sleeper player file may be in season before it is refetched.
+# It carries injury_status; the trade radar and the waiver brief both read it.
+INSEASON_PLAYERS_MAX_AGE = 3 * 3600
+
+
 def build_context(cfg, week: int | None = None) -> dict:
     """One fetch pass; every downstream brief reads from this dict.
 
@@ -68,7 +73,10 @@ def build_context(cfg, week: int | None = None) -> dict:
     # lineup" about a stranger's team (draftkit/sleeper.py resolve_my_roster).
     my_roster, identity = resolve_my_roster(cfg, users, rosters, client)
 
-    players = client.players()
+    # In season the player file is the injury feed. A day-old copy is a
+    # day-old injury report: on 2026-09-10 it priced A.J. Brown as healthy
+    # while Sleeper had him Out. Preseason keeps the daily TTL.
+    players = client.players(max_age=None if preseason else INSEASON_PLAYERS_MAX_AGE)
     injury = seasondata.injury_map(players)
     schedule = seasondata.load_schedule(cfg, int(season))
     week_byes = seasondata.byes(schedule, week)

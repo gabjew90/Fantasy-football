@@ -280,6 +280,18 @@ Until then, regression fences for the cases that motivated this:
    flag -44, my side +1.07/wk with range -1.2 to +2.9. The earlier range
    veto removed this row; it must now appear with those three numbers on it,
    because the decision it represents is the user's.
+7. Henry + Warren -> Egbuka + A.J. Brown (Tulchh), UAT 2026-09-10: Brown was
+   Out (ankle) on Sleeper and the radar priced him as a healthy WR11 at
+   +1.16/wk from a day-old player file, because the trade path never read
+   injury_status. Now: the player file is refetched after three hours in
+   season; every roster and the wire go through `injury_discount()` before
+   pricing (Out/Doubtful one week, IR/PUP four or FantasyPros `ir_weeks`,
+   ros_season untouched so the range inherits the discount); and every
+   injured piece prints `⚠ INJURED: name (pos) is Out -- priced at X ROS, Y
+   healthy (n wk out)` ahead of the other warnings. Advisory, never a gate.
+   Measured: the same package re-prices at +0.31/wk with Brown at 232/247.
+   Sleeper's Out carries no duration, so a multi-week Out is under-discounted
+   until it becomes IR; the line says the assumption out loud.
 
 ## Order
 
