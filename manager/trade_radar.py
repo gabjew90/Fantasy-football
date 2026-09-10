@@ -122,19 +122,37 @@ def _range_ppg(mine, theirs, give, get, shape, wv, wl):
     test fixture, a league on one source) gives None and the brief says so.
     The wire is priced on the blend: the backfill body's own spread is
     second-order next to the package's.
+
+    SCALE. `per_source` values are SEASON totals (consensus rescales each shop
+    onto the reference's season basis); a row's `ros` is what is still ahead,
+    prorated by the calendar. Each per-source value is put on the row's own
+    basis through `ros / ros_season`, so a source-world roster and the blended
+    wire are in one currency. A source is used only when EVERY player in the
+    package carries it -- a source one player has and the other lacks would
+    give the blend plus one player's disagreement and call it a range. Roster
+    rows outside the package that lack the source keep the blend.
     """
     from . import marginal
-    srcs: set[str] = set()
-    for p in list(mine) + list(theirs):
-        srcs |= set(((p.get("consensus") or {}).get("per_source") or {}).keys())
+
+    def per(p):
+        return ((p.get("consensus") or {}).get("per_source") or {})
+
+    pkg = list(give) + list(get)
+    if not pkg or any(float(p.get("ros_season") or 0.0) <= 0 for p in pkg):
+        return None
+    srcs = set.intersection(*(set(per(p).keys()) for p in pkg))
     if not srcs:
         return None
 
     def on(rows, src):
         out = []
         for p in rows:
-            v = ((p.get("consensus") or {}).get("per_source") or {}).get(src)
-            out.append(dict(p, ros=float(v if v is not None else (p.get("ros") or 0.0))))
+            v = per(p).get(src)
+            ros, season = float(p.get("ros") or 0.0), float(p.get("ros_season") or 0.0)
+            if v is None or season <= 0:
+                out.append(dict(p, ros=ros))
+            else:
+                out.append(dict(p, ros=float(v) * ros / season))
         return out
 
     ids_g = {str(p["sleeper_id"]) for p in give}
@@ -214,7 +232,7 @@ def _priced(ctx, opp, vals) -> list[str]:
         out.append(f"  - his side: {'accepts' if acc['accept'] else 'refuses'} — {tags}; "
                    f"his starters' market {mb} -> {ma} ({ma - mb:+d})"
                    + (f"; panel {acc['panel']}" if acc.get("panel") else ""))
-        if acc["net_rank"] < 0:
+        if acc["net_rank"] <= -0.5:
             out.append(f"  - ⚑ a rankings-reader sees his lineup worse by "
                        f"{-acc['net_rank']:.0f} rank-points")
     for r in v["why"]:

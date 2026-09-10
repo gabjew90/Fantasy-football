@@ -178,3 +178,61 @@ def test_accept_is_both_tests_and_classes_are_carried():
     assert out["accept"] == (out["test1"] and out["test2"])
     assert out["classes"]["received"][javonte["sleeper_id"]] == marginal.STARTS
     assert out["classes"]["given"][_find(his, "wilson")["sleeper_id"]] == marginal.STARTED
+
+
+# ------------------------------------------- the floor when the panel is silent
+
+def test_an_unranked_incumbent_is_left_out_of_the_floor_not_counted_as_300():
+    """Review 2026-09-10: on the mirror fallback a name collision can drop a
+    starter from the panel. UNRANKED is 300, and max() over the incumbents
+    would have made any ranked body I send an upgrade over a WR1. Monangai
+    unranked: Javonte is still judged against Hubbard (100) and is an
+    UPGRADE. Both RBs unranked: the seat cannot be judged, FILLER, said so."""
+    his = _ayat()
+    _find(his, "monangai")["_ov"] = None
+    javonte = _a("RB", 22, "javonte", 43, 4860)
+    ranks, market = _tables(his, [javonte])
+    out = marginal.accepts(his, TWO_FLEX, arriving=[javonte],
+                           departing=[_find(his, "wilson")], ranks=ranks, market=market)
+    assert out["tags"][javonte["sleeper_id"]] == marginal.UPGRADE
+    assert any("overall 100" in w for w in out["why"]), out["why"]
+
+    his = _ayat()
+    _find(his, "monangai")["_ov"] = None
+    _find(his, "hubbard")["_ov"] = None
+    ranks, market = _tables(his, [javonte])
+    out = marginal.accepts(his, TWO_FLEX, arriving=[javonte],
+                           departing=[_find(his, "wilson")], ranks=ranks, market=market)
+    assert out["tags"][javonte["sleeper_id"]] == marginal.FILLER
+    assert out["test1"] is False and out["accept"] is False
+    assert any("not on the panel" in w for w in out["why"]), out["why"]
+
+
+def test_filling_an_empty_seat_is_still_an_upgrade():
+    """No TE on his roster at all: a ranked TE I send fills the seat, and
+    that IS an upgrade -- there is no incumbent to be unranked."""
+    his = [p for p in _cbarone() if p["pos"] != "TE"]
+    te = _a("TE", 12, "kmet", 150, 600)
+    ranks, market = _tables(his, [te])
+    out = marginal.accepts(his, ONE_FLEX, arriving=[te],
+                           departing=[_find(his, "meyers")], ranks=ranks, market=market)
+    assert out["tags"][te["sleeper_id"]] == marginal.UPGRADE
+
+
+def test_a_fractional_net_rank_under_half_a_point_is_not_flagged():
+    """Mirror ranks are fractional. -0.3 printed as "worse by 0 rank-points"."""
+    his = _ayat()
+    _find(his, "wilson")["_ov"] = 30.3
+    javonte = _a("RB", 22, "javonte", 43, 4860)
+    ranks, market = _tables(his, [javonte])
+    out = marginal.accepts(his, TWO_FLEX, arriving=[javonte],
+                           departing=[_find(his, "wilson")], ranks=ranks, market=market)
+    assert out["net_rank"] == -12.7
+    assert any("rankings-reader" in w for w in out["why"])
+    his = _ayat()
+    _find(his, "wilson")["_ov"] = 42.7          # javonte 43 in for 42.7: net -0.3
+    ranks, market = _tables(his, [javonte])
+    out = marginal.accepts(his, TWO_FLEX, arriving=[javonte],
+                           departing=[_find(his, "wilson")], ranks=ranks, market=market)
+    assert out["net_rank"] == -0.3
+    assert not any("rankings-reader" in w for w in out["why"]), out["why"]

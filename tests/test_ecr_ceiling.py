@@ -24,6 +24,10 @@ CSV = (
     "rp,Michael Wilson,WR,39.5,5.52,28,52,2026-09-04\n"
     "rp,Josh Allen,LB,12.0,2.0,8,20,2026-09-04\n"
     "dp,Kayshon Boutte,WR,40.0,5.0,20,60,2026-09-04\n"
+    "rp,Justin Jefferson,WR,1.0,0.5,1,3,2026-09-04\n"
+    "ro,Justin Jefferson,WR,2.0,0.8,1,4,2026-09-04\n"
+    "rp,Justin Jefferson,LB,30.0,4.0,20,45,2026-09-04\n"
+    "ro,Justin Jefferson,LB,90.0,9.0,70,120,2026-09-04\n"
 )
 
 
@@ -86,7 +90,21 @@ def test_position_must_agree_or_a_linebacker_inherits_the_quarterback(monkeypatc
                        "2": {"full_name": "Josh Allen", "position": "LB"}}}
     out, _ = ecr.by_sleeper_id(ctx)
     assert "1" not in out, "the QB was matched to the linebacker's panel row"
-    assert out["2"]["pos"] == "LB"
+    assert "2" not in out, "IDP rows are not ranked at all"
+
+
+def test_an_idp_namesake_does_not_overwrite_the_receivers_ranks(monkeypatch):
+    """Review 2026-09-10: the file carries IDP rows and the table is keyed by
+    name. Justin Jefferson the linebacker came after the receiver and
+    overwrote his ecr and overall; by_sleeper_id then dropped the WR on the
+    position check, and accepts() saw an UNRANKED starter."""
+    _patch(monkeypatch)
+    t, _ = ecr.fetch()
+    jj = t["justin jefferson"]
+    assert jj["pos"] == "WR" and jj["ecr"] == 1.0 and jj["overall"] == 2.0
+    ctx = {"players": {"7": {"full_name": "Justin Jefferson", "position": "WR"}}}
+    out, _ = ecr.by_sleeper_id(ctx)
+    assert out["7"]["overall"] == 2.0
 
 
 def test_annotate_reports_the_range_and_is_silent_without_one():

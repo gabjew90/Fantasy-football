@@ -4012,3 +4012,23 @@ top of the chip list (tradeable() skips them). The Henry + Fannin package
 now prints as an OFFER at mean +1.07/wk, range -1.20 to +2.94, his side
 accepting on two UPGRADEs with the rankings-reader flag at -42; the
 decision is the user's, as specified. Step 8, the review, follows.
+
+Step 8 review (2026-09-10), three defects fixed. (1) The range was on the
+wrong scale: `per_source` is a SEASON total and `ros` is prorated, so
+every per-source world carried the package at `last_week/weeks_left` times
+its size inside a prorated roster -- invisible at week 1 (factor 1.0),
+2.1x by week 10. Per-source values are now put on the row's own basis by
+`ros / ros_season`, and a source counts only when every player in the
+package carries it. Measured at week 6: range -0.42 to +2.93 around a
++1.33 mean, where the unfixed code bracketed a different quantity than
+the mean beside it. (2) An UNRANKED incumbent (300) made the Test 1 floor
+300, so any ranked body I send was an "upgrade" over him -- and it was
+live on the mirror fallback, where the file is keyed by name alone and
+Justin Jefferson the linebacker overwrote the receiver. Unranked
+incumbents now stay out of the floor; a seat with none ranked is FILLER
+and says so; `ecr.fetch` skips IDP rows. (3) DEPTH_LOST was judged against
+the wire AFTER the fill had claimed its best body; a departing backup the
+roster could have replaced any Tuesday read as depth lost. The given side
+now uses the pre-fill wire. Also: the rankings-reader flag needs a
+half-point (mirror ranks are fractional; -0.3 printed "worse by 0"), and
+a rejection on both tests names both. 1,097 tests.

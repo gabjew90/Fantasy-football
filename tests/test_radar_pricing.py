@@ -209,16 +209,67 @@ def test_without_a_rank_panel_the_brief_holds_and_says_why():
     assert "his side: not judged" in out
 
 
+def _range_and_mean(out: str):
+    import re
+    m = re.search(r"range ([+-]\d+\.\d+) to ([+-]\d+\.\d+)/wk across sources; mean ([+-]\d+\.\d+)/wk", out)
+    assert m, out
+    return float(m.group(1)), float(m.group(2)), float(m.group(3))
+
+
+def _sourced(ctx, *, weeks_frac=1.0, give_b=0.8, get_b=1.2, drop_b_on=()):
+    """The package players carry per_source on a SEASON basis: source a is
+    exactly the blend, source b is give_b/get_b of it. `weeks_frac` is the
+    share of the season still ahead -- ros = ros_season * weeks_frac."""
+    def src(p, b):
+        season = p["ros"] / weeks_frac
+        per = {"a": season, "b": season * b}
+        for k in drop_b_on:
+            if p["sleeper_id"] == k:
+                per.pop("b")
+        return dict(p, ros_season=season, consensus={"per_source": per})
+    give = [src(MINE[2], give_b), src(MINE[5], give_b)]
+    get = [src(THEIRS[3], get_b), src(THEIRS[6], get_b)]
+    ctx["roster_players"][1] = [next((g for g in give if g["sleeper_id"] == x["sleeper_id"]), x)
+                                for x in MINE]
+    ctx["roster_players"][2] = [next((g for g in get if g["sleeper_id"] == x["sleeper_id"]), x)
+                                for x in THEIRS]
+    return _opp(give_p=give, get_p=get)
+
+
 def test_the_range_across_sources_is_printed_beside_the_mean():
+    """Source a IS the blend, so one end of the range equals the mean; source
+    b marks the package down on my side and up on theirs, so the other end
+    is strictly above it. A range, not the word."""
     ctx = _ctx()
     ctx["_rank_panel"] = _panel()
-    give0 = dict(MINE[2], consensus={"per_source": {"a": 228.0, "b": 200.0}})
-    ctx["roster_players"][1] = [give0 if x is MINE[2] else x for x in MINE]
-    out = "\n".join(trade_radar._priced(ctx, _opp(give_p=[give0, MINE[5]]), {}))
-    assert "range " in out and " to " in out and "/wk" in out
-    assert "n/a" not in out
+    out = "\n".join(trade_radar._priced(ctx, _sourced(ctx), {}))
+    lo, hi, mean = _range_and_mean(out)
+    assert lo == mean and hi > mean, (lo, hi, mean)
     plain = "\n".join(trade_radar._priced(_ctx(), _opp(), {}))
     assert "range n/a" in plain
+
+
+def test_per_source_values_are_put_on_the_rows_rest_of_season_basis():
+    """Review 2026-09-10: per_source is a SEASON total, ros is what is still
+    ahead. Half the season left: a source-a world built from raw per_source
+    would double the package inside a prorated roster and the "range" would
+    bracket the wrong quantity. Scaled, source a is still the blend."""
+    ctx = _ctx()
+    ctx["_rank_panel"] = _panel()
+    out = "\n".join(trade_radar._priced(ctx, _sourced(ctx, weeks_frac=0.5), {}))
+    lo, hi, mean = _range_and_mean(out)
+    assert lo == mean and hi > mean, (lo, hi, mean)
+
+
+def test_a_source_one_package_player_lacks_is_not_a_source():
+    """b missing on one of the four: the range would be the blend plus one
+    player's disagreement. Only a remains, and a is the blend."""
+    ctx = _ctx()
+    ctx["_rank_panel"] = _panel()
+    opp = _sourced(ctx, drop_b_on=(THEIRS[6]["sleeper_id"],))
+    out = "\n".join(trade_radar._priced(ctx, opp, {}))
+    lo, hi, mean = _range_and_mean(out)
+    assert lo == hi == mean, (lo, hi, mean)
 
 
 def test_the_rank_panel_is_fetched_once_and_cached_on_the_context():

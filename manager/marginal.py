@@ -195,7 +195,12 @@ def classify(roster: list[dict], shape: dict, *, arriving=(), departing=(),
     before_ids = {_pid(p) for p in mv["before"]}
     after_ids = {_pid(p) for p in mv["after"]}
     after_roster = post + list(fill)
-    excl = dep_ids | arr_ids | {_pid(p) for p in fill}
+    # Two wires. AFTER the trade the fill body has been claimed, so he is no
+    # longer on it; BEFORE the trade he was, and a departing player judged
+    # against a wire that has already lost its best body would be called
+    # DEPTH_LOST when the roster could have claimed that body any Tuesday.
+    excl_after = dep_ids | arr_ids | {_pid(p) for p in fill}
+    excl_before = dep_ids | arr_ids
 
     received: dict[str, str] = {}
     for p in arriving:
@@ -204,7 +209,7 @@ def classify(roster: list[dict], shape: dict, *, arriving=(), departing=(),
             received[pid] = STARTS
             continue
         bb = _best_backup(after_roster, after_ids, p.get("pos"), key)
-        beats = float(p.get(key) or 0.0) > _wire_best(waivers, p.get("pos"), key, excl)
+        beats = float(p.get(key) or 0.0) > _wire_best(waivers, p.get("pos"), key, excl_after)
         received[pid] = (USABLE_DEPTH if (bb is not None and _pid(bb) == pid and beats)
                          else DEAD_WEIGHT)
 
@@ -215,7 +220,7 @@ def classify(roster: list[dict], shape: dict, *, arriving=(), departing=(),
             given[pid] = STARTED
             continue
         bb = _best_backup(list(roster), before_ids, p.get("pos"), key)
-        beats = float(p.get(key) or 0.0) > _wire_best(waivers, p.get("pos"), key, excl)
+        beats = float(p.get(key) or 0.0) > _wire_best(waivers, p.get("pos"), key, excl_before)
         given[pid] = (DEPTH_LOST if (bb is not None and _pid(bb) == pid and beats)
                       else FREE)
 
@@ -294,7 +299,19 @@ def accepts(their_roster: list[dict], shape: dict, *, arriving, departing,
             why.append(f"{nm(p)} does not start for him")
             continue
         incumbents = [_rank_of(ranks, q) for q in before if q.get("pos") == pos]
-        floor = max(incumbents) if incumbents else UNRANKED
+        ranked = [r for r in incumbents if r < UNRANKED]
+        # An incumbent the panel skips is NOT a 300: on the mirror fallback a
+        # name collision can drop a WR1 from the panel, and a floor of 300
+        # would make any ranked body I send an "upgrade" over him. Judge
+        # against the ranked incumbents only; if none is ranked the seat
+        # cannot be judged and the sent player is FILLER, said out loud. An
+        # EMPTY seat (no incumbent at all) is still an upgrade to fill.
+        if incumbents and not ranked:
+            tags[pid] = FILLER
+            why.append(f"{nm(p)} starts at {pos} but his incumbent {pos}s are not "
+                       f"on the panel -- cannot call it an upgrade")
+            continue
+        floor = max(ranked) if ranked else UNRANKED
         mine = _rank_of(ranks, p)
         if mine < floor:
             tags[pid] = UPGRADE
@@ -316,7 +333,8 @@ def accepts(their_roster: list[dict], shape: dict, *, arriving, departing,
     rank_before = sum(_rank_of(ranks, p) for p in before if p.get("pos") in SKILL)
     rank_after = sum(_rank_of(ranks, p) for p in after if p.get("pos") in SKILL)
     net_rank = round(rank_before - rank_after, 1)
-    if net_rank < 0:
+    # Mirror ranks are fractional; a -0.3 must not print "worse by 0".
+    if net_rank <= -0.5:
         why.append(f"a rankings-reader sees his lineup worse by {-net_rank:.0f} "
                    f"rank-points")
 
@@ -826,8 +844,9 @@ def verdict(deal: Deal, weeks_left: int, *, floor_ppg: float = EDGE_PPG,
                            "panel, and slots mode will not guess his side")
         else:
             acc = deal.acceptance
-            reasons.append("acceptance: " + ("no positional upgrade from me"
-                           if not acc.get("test1") else "his starters' market drops")
+            failed = ([] if acc.get("test1") else ["no positional upgrade from me"]) + \
+                     ([] if acc.get("test2") else ["his starters' market drops"])
+            reasons.append("acceptance: " + " and ".join(failed)
                            + f" — {'; '.join(acc.get('why') or [])}")
     if under:
         (reasons if floor_blocks else warnings).append(

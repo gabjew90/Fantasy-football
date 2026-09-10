@@ -619,6 +619,21 @@ def test_given_players_classify_STARTED_DEPTH_LOST_and_FREE():
     assert g[wr4["sleeper_id"]] == marginal.FREE
 
 
+def test_DEPTH_LOST_is_judged_against_the_wire_BEFORE_the_fill_claimed_it():
+    """Review 2026-09-10. rb3 (10) is the best RB backup. The wire holds RBs
+    at 12 and 8. He gives rb3 + wr2 for one WR; the 2-for-1 fill claims the
+    12. Judged against the post-fill wire (best left: 8) rb3 looked like
+    DEPTH_LOST; the roster could have claimed the 12 any Tuesday, so by the
+    plan's before-state rule he is FREE."""
+    r = _c_roster()
+    rb3, wr2 = r[4], r[6]
+    wire = [_q("RB", 12.0, "wire 12"), _q("RB", 8.0, "wire 8")]
+    out = marginal.classify(r, D1_SHAPE, arriving=[_q("WR", 16.0, "star")],
+                            departing=[rb3, wr2], waivers=wire)
+    assert [x["name"] for x in out["fill"]] == ["wire 12"], out["fill"]
+    assert out["given"][rb3["sleeper_id"]] == marginal.FREE
+
+
 def test_deebo_STARTS_when_a_receiver_leaves_and_classify_says_only_that():
     """wr2 (12) leaves; Deebo (10.5) arrives and is worse than every WR they
     started (14, 12, 11). He still fills the emptied flex over rb3 (10), so

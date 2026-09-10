@@ -59,6 +59,13 @@ def test_slots_mode_rejection_names_the_test_that_failed():
     assert any("market drops" in w for w in b["why"]), b["why"]
 
 
+def test_a_rejection_on_both_tests_names_both():
+    both = {"accept": False, "test1": False, "test2": False, "why": ["he sits", "down 900"]}
+    v = marginal.verdict(_deal(17.0, 5.0, acceptance=both), weeks_left=17, mode="slots")
+    r = next(w for w in v["why"] if w.startswith("acceptance:"))
+    assert "no positional upgrade" in r and "market drops" in r, r
+
+
 def test_points_mode_is_the_gate_that_shipped():
     assert marginal.verdict(_deal(17.0, 5.0), weeks_left=17, mode="points")["gate1"] is True
     v = marginal.verdict(_deal(17.0, -1.0), weeks_left=17, mode="points")

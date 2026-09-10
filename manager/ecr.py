@@ -37,6 +37,8 @@ TTL = 12 * 3600
 # 'rp' = redraft positional (WR37), 'ro' = redraft overall (WR37 -> 81st).
 # Positional is what a start/sit or stash decision actually turns on.
 POSITIONAL, OVERALL = "rp", "ro"
+# Only these can be matched to a Sleeper roster; the file also ranks IDP.
+OFFENSE = ("QB", "RB", "WR", "TE", "K", "DST", "DEF")
 
 
 def _num(v):
@@ -67,6 +69,11 @@ def fetch(store=None) -> tuple[dict[str, dict], str | None]:
             continue
         nm = normalize_name(r.get("player") or "")
         if not nm:
+            continue
+        # The file carries IDP rows and the table is keyed by name alone, so
+        # "Justin Jefferson" the linebacker would overwrite the receiver's
+        # ranks and by_sleeper_id would then drop him on the position check.
+        if (r.get("pos") or "").upper() not in OFFENSE:
             continue
         rec = out.setdefault(nm, {"pos": (r.get("pos") or "").upper(),
                                   "as_of": r.get("scrape_date")})
