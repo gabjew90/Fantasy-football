@@ -218,9 +218,11 @@ def _market_mod():
 
 
 # How many wire bodies per position the position-aware backfill considers.
-# 3 per position over six positions is about 18 lineup solves per opened spot
-# (~0.25 ms); the naive version over the whole wire is ~4 ms per package and
-# too slow for a frontier search.
+# 3 per position over the four startable skill positions (K/DEF are skipped
+# below) is about 12 lineup solves per opened spot. Measured 2026-09-09:
+# price() runs 0.51 ms per package with this against 0.23 ms on the legacy
+# pick -- immaterial for the radar, roughly double for an offline frontier
+# sweep. The naive version over the whole wire is ~4 ms and too slow for one.
 BACKFILL_TOP_K = 3
 # Never a kicker or a defence, in either path. A trade never opens a K or DEF
 # seat -- they are streamed, not traded -- and their projections are the least
@@ -231,7 +233,8 @@ BACKFILL_TOP_K = 3
 BACKFILL_SKIP = ("K", "DEF")
 
 def backfill(n: int, waivers, key: str = "weekly", exclude=(), *,
-             roster=None, shape=None, top_k: int = BACKFILL_TOP_K) -> list[dict]:
+             roster=None, shape=None, top_k: int = BACKFILL_TOP_K,
+             departed_pos=()) -> list[dict]:
     """The best `n` free agents, for roster spots a package leaves open.
 
     NOT a replacement baseline. Bench players are already in the pool the
@@ -255,18 +258,42 @@ def backfill(n: int, waivers, key: str = "weekly", exclude=(), *,
     mispricing on one without. It happened to be RIGHT for the one case it
     was measured on (giving a QB, receiving Love), which is how it survived.
     """
+    # HALF-SPECIFIED IS A BUG, NOT A FALLBACK. Falling back to the legacy pick
+    # when only one of roster/shape arrives would reintroduce the position-
+    # blind fill with nothing in the output to say so. No caller legitimately
+    # passes one without the other.
+    if (roster is None) != (shape is None):
+        raise ValueError("backfill needs both roster and shape for the "
+                         "position-aware pick, or neither for the legacy one")
     if n <= 0 or not waivers:
         return []
     skip = {_pid(p) for p in exclude}
+    # K/DEF are skipped UNLESS THE TRADE ITSELF DEPARTED ONE. The blanket skip
+    # charged a package that gave my kicker the whole seat: wire K at 7.5, RB
+    # handed over instead, my_delta -8.0 where -0.5 was true. Reachable --
+    # the radar's desperation path offers any of my players at the position
+    # of THEIR injured starter, and kickers go on IR.
+    departed_pos = set(departed_pos or ())
     pool = [p for p in waivers if _pid(p) not in skip
-            and (p.get("pos") or "") not in BACKFILL_SKIP]
-    if roster is None or shape is None:
+            and ((p.get("pos") or "") not in BACKFILL_SKIP
+                 or (p.get("pos") or "") in departed_pos)]
+    if roster is None:
         return sorted(pool, key=lambda p: -(p.get(key) or 0.0))[:n]
+
+    # ONLY POSITIONS THE SHAPE CAN START. A body the lineup cannot seat gains
+    # exactly 0, and the old code could still pick it when nothing else
+    # gained, dropping a positionless row into after_roster for thin_after to
+    # count under None. Skipping it also removes those solves.
+    from draftkit.lineup import _flex_sets
+    startable = set(shape.get("slots") or {})
+    for eligible in _flex_sets(shape.get("flex", 0), shape.get("flex_slots")):
+        startable |= set(eligible)
+    pool = [p for p in pool if (p.get("pos") or "") in startable]
 
     # Candidates: top_k per position. The lineup solve decides among them.
     by_pos: dict[str, list[dict]] = {}
     for q in sorted(pool, key=lambda p: -(p.get(key) or 0.0)):
-        bucket = by_pos.setdefault(q.get("pos") or "?", [])
+        bucket = by_pos.setdefault(q["pos"], [])
         if len(bucket) < top_k:
             bucket.append(q)
     cands = [q for bucket in by_pos.values() for q in bucket]
@@ -276,10 +303,14 @@ def backfill(n: int, waivers, key: str = "weekly", exclude=(), *,
         if not cands:
             break
         base = lineup_points(have, shape, key)
-        # Best lineup gain; raw points break the tie so a body that cannot
-        # start still comes in by quality rather than by dict order.
-        best = max(cands, key=lambda q: (round(lineup_points(have + [q], shape, key)
-                                               - base, 6), q.get(key) or 0.0))
+        # Best lineup gain first. On a TIE, prefer a body at a position the
+        # trade emptied: that is the seat this fill exists for, and an
+        # unrelated upgrade elsewhere is D3 territory (see the plan). Raw
+        # points last, so quality rather than dict order decides the rest.
+        best = max(cands, key=lambda q: (
+            round(lineup_points(have + [q], shape, key) - base, 6),
+            q["pos"] in departed_pos,
+            q.get(key) or 0.0))
         picked.append(best)
         have.append(best)
         cands.remove(best)
@@ -302,7 +333,8 @@ def _fill_for(arriving, departing, waivers, key: str = "weekly", *,
     """
     arriving, departing = list(arriving), list(departing)
     return backfill(len(departing) - len(arriving), waivers, key,
-                    exclude=arriving + departing, roster=roster, shape=shape)
+                    exclude=arriving + departing, roster=roster, shape=shape,
+                    departed_pos={p.get("pos") for p in departing})
 
 
 def price(my_roster: list[dict], their_roster: list[dict],

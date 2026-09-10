@@ -451,9 +451,14 @@ def test_depth_risk_and_thin_after_use_the_position_aware_fill():
                               roster=[p for p in mine if p not in (rb2, flex_wr)] + theirs,
                               shape=D1_SHAPE)
     assert [x["name"] for x in fill] == ["waiver RB"], fill
-    r = marginal.depth_risk(mine, D1_SHAPE, "RB", arriving=theirs, departing=[rb2, flex_wr],
+    # The depth half has to DISCRIMINATE. The review monkeypatched the legacy
+    # fill back in and the old assertion here could not tell the difference.
+    # Under the legacy fill the wire QB30 sits in front of QB20, so losing the
+    # best QB after the trade costs 10 where before it cost 20: extra -10.
+    # Position-aware leaves the QB alone and losing him costs 20 either way.
+    r = marginal.depth_risk(mine, D1_SHAPE, "QB", arriving=theirs, departing=[rb2, flex_wr],
                             waivers=wire)
-    assert r["after_star"] is not None
+    assert r["extra"] == 0.0, r
 
 
 def test_a_defence_that_beats_mine_is_never_a_trade_backfill():
@@ -473,4 +478,71 @@ def test_a_defence_that_beats_mine_is_never_a_trade_backfill():
     legacy = marginal.backfill(1, wire)
     assert [x["name"] for x in legacy] == ["waiver RB"], legacy
     d = marginal.price(mine, theirs, [rb2, flex_wr], theirs, shape, waivers=wire)
+    assert d.my_backfill == ["waiver RB"], d.my_backfill
+
+
+
+# ------------------------------------- D1 review (2026-09-09): the four fixes
+
+import pytest
+
+
+def test_a_trade_that_departs_a_kicker_refills_the_kicker_seat():
+    """BACKFILL_SKIP filtered K/DEF unconditionally, so a package that itself
+    opened a K or DEF seat could not refill it and was charged the whole
+    seat: give my K, wire K at 7.5 and RB at 5.0, my_delta came back -8.0
+    with the RB as the fill. Reachable -- the radar's desperation path offers
+    any of my players at the position of THEIR injured starter, and kickers
+    go on IR. Skip K/DEF only when the trade did not depart one."""
+    mine = _thin_roster() + [_q("K", 8.0, "my k")]
+    shape = dict(D1_SHAPE, slots=dict(D1_SHAPE["slots"], K=1))
+    k = mine[-1]
+    theirs = [_q("WR", 1.0, "nobody")]
+    wire = [_q("K", 7.5, "wire k"), _q("RB", 5.0, "wire rb")]
+    d = marginal.price(mine, theirs, [k], [], shape, waivers=wire)
+    assert d.my_backfill == ["wire k"], d.my_backfill
+    assert d.my_delta == -0.5, d.my_delta
+    # The legacy direct call still refuses a kicker nobody departed...
+    assert [x["name"] for x in marginal.backfill(1, wire)] == ["wire rb"]
+    # ...and admits one when told the trade departed that position.
+    assert [x["name"] for x in marginal.backfill(1, wire, departed_pos={"K"})] == ["wire k"]
+
+
+def test_roster_without_shape_is_an_error_not_a_silent_fallback():
+    """Falling back to the legacy pick when only one of roster/shape is given
+    reintroduces the position-blind fill with nothing in the output to say
+    so. No caller legitimately passes one without the other."""
+    wire = [_q("RB", 12.0)]
+    with pytest.raises(ValueError, match="roster and shape"):
+        marginal.backfill(1, wire, roster=_thin_roster())
+    with pytest.raises(ValueError, match="roster and shape"):
+        marginal.backfill(1, wire, shape=D1_SHAPE)
+
+
+def test_a_tie_breaks_toward_the_seat_the_trade_emptied():
+    """Fence 5 passed on a 2-point margin. A wire QB at 32.0 against my QB at
+    20 gains exactly 12 -- the same as the RB filling the opened RB seat --
+    and raw points then handed the QB the tie. A body that occupies the seat
+    the trade emptied wins a tie over an unrelated upgrade. The OUTRIGHT
+    case (QB 32.1 beats the RB by 0.1) is D3 in the plan and stays open."""
+    mine = _thin_roster()
+    rb2, flex_wr = mine[2], mine[6]
+    theirs = [_q("WR", 16.0, "star")]
+    wire = [_q("QB", 32.0, "tying QB"), _q("RB", 12.0, "waiver RB")]
+    d = marginal.price(mine, theirs, [rb2, flex_wr], theirs, D1_SHAPE, waivers=wire)
+    assert d.my_backfill == ["waiver RB"], d.my_backfill
+
+
+def test_a_body_the_shape_cannot_start_is_never_picked():
+    """A positionless row, or one at a position with no slot and no flex
+    eligibility, can only ever gain 0. The old code still picked it when
+    nothing else gained -- here, a 2-for-1 of two bench bodies that empties
+    no seat -- and dropped it into after_roster for thin_after to count
+    under None. Startable positions come from the shape and _flex_sets."""
+    mine = _thin_roster() + [_q("RB", 6.0, "bench rb"), _q("WR", 5.0, "bench wr")]
+    bench_rb, bench_wr = mine[-2], mine[-1]
+    theirs = [_q("WR", 1.0, "nobody")]
+    wire = [{"sleeper_id": "d1_nopos", "weekly": 99.0, "name": "no position"},
+            _q("RB", 5.0, "waiver RB")]
+    d = marginal.price(mine, theirs, [bench_rb, bench_wr], theirs, D1_SHAPE, waivers=wire)
     assert d.my_backfill == ["waiver RB"], d.my_backfill
