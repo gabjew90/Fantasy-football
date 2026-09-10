@@ -16,6 +16,48 @@ PA = _pa([(f"T{i}", "RB", 20.0, 6) for i in range(8)]
          + [("SOFT", "RB", 30.0, 6), ("TOUGH", "RB", 10.0, 6)])
 
 
+def test_points_allowed_scores_sleeper_keys_through_the_nflverse_map(monkeypatch):
+    """2026-09-10, week 2: build_context died on ColumnNotFoundError("sack").
+    points_allowed() is fed Sleeper's scoring_settings and handed the Sleeper
+    keys to pl.col. Preseason the frame was empty and it never scored a row.
+    Sleeper keys must go through the map; a half-PPR league must score its
+    receptions at 0.5; a key nflverse has no column for is dropped."""
+    import draftkit.defense as dmod
+
+    wk = pl.DataFrame({
+        "season_type": ["REG", "REG", "REG", "REG"],
+        "week": [1, 1, 2, 2],
+        "position": ["WR", "WR", "WR", "WR"],
+        "opponent_team": ["DAL", "DAL", "DAL", "DAL"],
+        "receptions": [10.0, 0.0, 10.0, 0.0],
+        "receiving_yards": [0.0, 0.0, 0.0, 0.0],
+        "receiving_tds": [0.0, 0.0, 0.0, 0.0],
+        "passing_yards": [0.0] * 4, "passing_tds": [0.0] * 4,
+        "passing_interceptions": [0.0] * 4, "rushing_yards": [0.0] * 4,
+        "rushing_tds": [0.0] * 4, "passing_2pt_conversions": [0.0] * 4,
+        "rushing_2pt_conversions": [0.0] * 4, "receiving_2pt_conversions": [0.0] * 4,
+        "sack_fumbles_lost": [0.0] * 4, "rushing_fumbles_lost": [0.0] * 4,
+        "receiving_fumbles_lost": [0.0] * 4, "special_teams_tds": [0.0] * 4,
+    })
+
+    class FakeNfl:
+        @staticmethod
+        def load_player_stats(seasons):
+            return wk
+
+    monkeypatch.setitem(__import__("sys").modules, "nflreadpy", FakeNfl)
+    sleeper = {"rec": 0.5, "pass_yd": 0.04, "sack": 1.0, "def_td": 6.0, "bonus_rec_te": 1.0}
+    pa = dmod.points_allowed(2026, sleeper)
+    assert pa is not None
+    row = pa.filter((pl.col("defense") == "DAL") & (pl.col("pos") == "WR")).row(0, named=True)
+    assert row["allowed_pg"] == 5.0 and row["games"] == 2   # 10 rec x 0.5 per week
+
+    # a column the frame lacks is DATA MISSING, not a crash
+    monkeypatch.setitem(__import__("sys").modules, "nflreadpy",
+                        type("N", (), {"load_player_stats": staticmethod(lambda s: wk.drop("receptions"))}))
+    assert dmod.points_allowed(2026, sleeper) is None
+
+
 def test_ratio_is_relative_to_league_average_and_shrunk():
     soft = allowed_ratio(PA, "SOFT", "RB", shrink_k=5)
     tough = allowed_ratio(PA, "TOUGH", "RB", shrink_k=5)

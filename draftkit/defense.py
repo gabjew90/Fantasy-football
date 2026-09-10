@@ -44,19 +44,29 @@ def points_allowed(season: int, scoring: dict[str, float],
     if len(wk) == 0:
         return None
 
-    from .dataset import fantasy_points_expr
+    from .dataset import SCORING, fantasy_points_expr, nflverse_weights
     from .seasondata import _norm_team
 
+    # `scoring` is Sleeper's scoring_settings (pass_yd, sack, def_td, ...),
+    # not nflverse columns. Shipped preseason on an empty frame, this scored
+    # the Sleeper keys directly and raised ColumnNotFoundError the first
+    # week real stats landed, taking build_context down with it. Convert,
+    # and treat a missing column as DATA MISSING, never a crash.
+    weights = nflverse_weights(scoring, base=SCORING)
     have = set(wk.columns)
-    need = {"opponent_team", "position", "week"}
+    need = {"opponent_team", "position", "week"} | set(weights)
     if not need.issubset(have):
-        log.warning("defense: weekly frame missing %s", need - have)
+        log.warning("defense: weekly frame missing %s", sorted(need - have))
         return None
 
-    wk = wk.with_columns(fantasy_points_expr(scoring)).filter(
-        pl.col("position").is_in(list(POSITIONS))
-        & pl.col("opponent_team").is_not_null()
-    )
+    try:
+        wk = wk.with_columns(fantasy_points_expr(weights)).filter(
+            pl.col("position").is_in(list(POSITIONS))
+            & pl.col("opponent_team").is_not_null()
+        )
+    except Exception as e:  # noqa: BLE001
+        log.warning("defense: could not score the weekly frame (%s)", e.__class__.__name__)
+        return None
     if len(wk) == 0:
         return None
     per_game = (

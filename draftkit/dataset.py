@@ -41,6 +41,8 @@ _YAML_TO_NFLVERSE = {
     "pass_int": "passing_interceptions", "rush_yd": "rushing_yards",
     "rush_td": "rushing_tds", "rec": "receptions", "rec_yd": "receiving_yards",
     "rec_td": "receiving_tds",
+    "pass_2pt": "passing_2pt_conversions", "rush_2pt": "rushing_2pt_conversions",
+    "rec_2pt": "receiving_2pt_conversions", "st_td": "special_teams_tds",
     # fumbles map to all three nflverse fumble columns
 }
 
@@ -61,8 +63,21 @@ def scoring_from_cfg(cfg) -> dict[str, float]:
             "in leagues/<name>.yaml)")
     if not block:
         return dict(SCORING)
-    out = dict(SCORING)
-    for k, v in block.items():
+    return nflverse_weights(block, base=SCORING)
+
+
+def nflverse_weights(block: dict, base: dict[str, float] | None = None) -> dict[str, float]:
+    """Sleeper-style scoring keys -> nflverse weekly stat columns.
+
+    The keys Sleeper uses (`pass_yd`, `sack`, `def_td`, `bonus_rec_te`, ...)
+    are NOT nflverse column names, and handing them to `fantasy_points_expr`
+    raises ColumnNotFoundError the first time the weekly frame is non-empty
+    -- which for a function shipped in the preseason was week 1. Keys
+    nflverse has no column for (kicking, team defense, bonuses) are dropped;
+    that is the documented approximation, not silent.
+    """
+    out = dict(base or {})
+    for k, v in (block or {}).items():
         col = _YAML_TO_NFLVERSE.get(k)
         if col:
             out[col] = float(v)
