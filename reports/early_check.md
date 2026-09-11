@@ -1,8 +1,6 @@
 # Early-Games Check (players in these games lock early) — week 1
 
-⚠ STALE DATA: defense quality (no completed weeks yet)
-
-**vs Lord2Pale: you 133.4 — 129.4 them** · close matchup — projection decides
+**vs Lord2Pale: you 132.9 — 130.6 them** · close matchup — projection decides
 
 ## Changes
 - current lineup is already optimal
