@@ -134,7 +134,7 @@
    "due_utc": "2026-09-13T14:20:00+00:00",
    "due_pt": "2026-09-13T07:20:00-07:00",
    "window_min": 45,
-   "done": false
+   "done": true
   },
   {
    "id": "wk1:slate_check:0913T0840",
