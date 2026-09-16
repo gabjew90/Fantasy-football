@@ -113,11 +113,31 @@ def api_entries(league_id, get=None) -> list[dict]:
             out.append({
                 "pos": positions[0] if positions else "", "positions": positions,
                 "name": (f.get("name") or {}).get("full") or "",
-                "owner": owner, "yahoo_id": str(f.get("player_id") or ""),
+                "owner": owner, "owner_key": _flat(t["team"][0]).get("team_key"),
+                "team_id": _flat(t["team"][0]).get("team_id"),
+                "yahoo_id": str(f.get("player_id") or ""),
+                "team": str(f.get("editorial_team_abbr") or "").upper(),
                 "slot": sel.get("position"), "yahoo_status": f.get("status"),
                 "injury_note": f.get("injury_note"),
             })
     return out
+
+
+def yahoo_id_map(cfg) -> dict[str, str]:
+    """{yahoo_id: sleeper_id} from the DynastyProcess id map; empty on any
+    failure, and the callers then match on names as they always did."""
+    try:
+        import polars as pl
+        from draftkit.ids import load_id_map
+        df = load_id_map(cfg.path("raw"))
+        if "yahoo_id" not in df.columns:
+            return {}
+        df = df.select(pl.col("yahoo_id").cast(pl.Int64, strict=False).cast(pl.Utf8),
+                       pl.col("sleeper_id")).drop_nulls()
+        return dict(df.iter_rows())
+    except Exception as e:  # noqa: BLE001
+        log.warning("yahoo: no id map (%s) -- matching on names", e.__class__.__name__)
+        return {}
 
 
 def _scrape_entries(path: Path) -> list[dict]:

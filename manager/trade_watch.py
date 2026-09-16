@@ -23,11 +23,16 @@ def scan(ctx, store) -> list[tuple[str, str, bool]]:
     from draftkit.briefs import get_transactions
 
     week = max(1, ctx["week"])
-    try:
-        txns = get_transactions(ctx["client"], ctx["cfg"].league_id, week)
-    except Exception:  # noqa: BLE001
-        log.warning("trade watch: transactions fetch failed")
-        return []
+    # build_context already fetched this week's transactions from whichever
+    # platform hosts the league (Sleeper-shaped either way); the direct
+    # Sleeper call is only the fallback for a context built without them.
+    txns = ctx.get("transactions")
+    if txns is None:
+        try:
+            txns = get_transactions(ctx["client"], ctx["cfg"].league_id, week)
+        except Exception:  # noqa: BLE001
+            log.warning("trade watch: transactions fetch failed")
+            return []
     trades = [t for t in txns if t.get("type") == "trade"]
     if not trades:
         return []

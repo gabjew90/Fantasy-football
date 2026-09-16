@@ -34,7 +34,74 @@ def _season_cfg(cfg) -> dict:
 INSEASON_PLAYERS_MAX_AGE = 3 * 3600
 
 
-def build_context(cfg, week: int | None = None) -> dict:
+# Sleeper's IR slot always takes these designations; Out and Doubtful join
+# only when the league's reserve_allow_* flags say so.
+RESERVE_BASE = ("IR", "PUP", "COV", "NA")
+
+
+def reserve_statuses(settings: dict) -> tuple[str, ...]:
+    """Injury statuses a player may hold in an IR slot, in Sleeper's vocabulary.
+
+    The old rule was the two flags OR ("Out",): it left "IR" itself out, so
+    a genuinely IR-designated player sitting in the IR slot was reported as
+    an invalid roster ("you MUST move him off IR"). Omnibeta never showed it
+    because its reserve slot was empty; Keefamania's first dry run flagged
+    both of its IR stashes. A platform may hand over the list directly
+    (`settings["reserve_allow"]`, which Yahoo does).
+    """
+    explicit = settings.get("reserve_allow")
+    if explicit:
+        return tuple(str(s) for s in explicit)
+    allow = list(RESERVE_BASE)
+    for status, flag in (("Out", "reserve_allow_out"), ("Doubtful", "reserve_allow_doubtful")):
+        if settings.get(flag):
+            allow.append(status)
+    return tuple(allow)
+
+
+class SleeperSource:
+    """The league-side reads build_context needs, from Sleeper.
+
+    THE PLATFORM SEAM. Everything else in build_context -- the player
+    universe, weekly projections, schedule, byes, defense quality, the
+    prorate -- is NFL-wide and platform-free; only these seven reads know
+    which site hosts the league. manager/yahoo_context.YahooSource answers
+    the same seven from Yahoo's API in Sleeper's shapes, so every module
+    downstream (waivers, lineup, injuries, scout, trade watch) runs
+    unchanged for either league.
+    """
+    platform = "sleeper"
+
+    def __init__(self, cfg, client: SleeperClient | None = None):
+        self.cfg = cfg
+        self.client = client or SleeperClient(cfg.path("raw"))
+
+    def league(self) -> dict:
+        return self.client.league(self.cfg.league_id)
+
+    def rosters(self) -> list[dict]:
+        return self.client.league_rosters(self.cfg.league_id)
+
+    def users(self) -> dict[str, str]:
+        return {str(u["user_id"]): u.get("display_name", "?")
+                for u in self.client.league_users(self.cfg.league_id)}
+
+    def resolve_me(self, users: dict, rosters: list[dict]) -> tuple[dict, dict]:
+        return resolve_my_roster(self.cfg, users, rosters, self.client)
+
+    def injury_overlay(self) -> dict[str, str]:
+        """Platform injury designations that outrank the NFL-wide feed. Sleeper
+        IS the NFL-wide feed, so nothing to add."""
+        return {}
+
+    def matchups(self, week: int) -> list[dict]:
+        return client_matchups(self.client, self.cfg.league_id, week)
+
+    def transactions(self, week: int) -> list[dict]:
+        return get_transactions(self.client, self.cfg.league_id, week)
+
+
+def build_context(cfg, week: int | None = None, source=None) -> dict:
     """One fetch pass; every downstream brief reads from this dict.
 
     `week` overrides the live NFL week. It exists so a week-dependent change
@@ -42,9 +109,14 @@ def build_context(cfg, week: int | None = None) -> dict:
     today instead of waiting for the calendar to reach the interesting part of
     the season. Callers that pass it must be interactive: pinning the live
     manager to a stale week would be worse than the bug it is testing.
+
+    `source` answers the league-side reads (SleeperSource by default; see the
+    class for the seam). The Sleeper client is still needed for the NFL-wide
+    player universe whichever platform hosts the league.
     """
     stale: list[str] = []
-    client = SleeperClient(cfg.path("raw"))
+    source = source or SleeperSource(cfg)
+    client = getattr(source, "client", None) or SleeperClient(cfg.path("raw"))
     state = seasondata.nfl_state()
     season, week_live = state["season"], state["week"]
     preseason = state["season_type"] != "regular"
@@ -54,30 +126,30 @@ def build_context(cfg, week: int | None = None) -> dict:
     if week != week_live:
         stale.append(f"week PINNED to {week} (live week is {week_live})")
 
-    league = client.league(cfg.league_id)
+    league = source.league()
     scoring = league["scoring_settings"]
     budget = int(league["settings"].get("waiver_budget", 100))
-    reserve_allow = tuple(
-        s for s, ok in (("Out", league["settings"].get("reserve_allow_out", 0)),
-                        ("Doubtful", league["settings"].get("reserve_allow_doubtful", 0))) if ok
-    ) or ("Out",)
+    reserve_allow = reserve_statuses(league["settings"])
     # Starting lineup shape from data. The literals this replaces were
     # Omnibeta facts, so any other league had its lineup optimised into the
     # wrong number of starters (draftkit/shape.py).
     shape, shape_warnings = shape_for(cfg, league)
     stale += shape_warnings
-    rosters = client.league_rosters(cfg.league_id)
-    users = {str(u["user_id"]): u.get("display_name", "?") for u in client.league_users(cfg.league_id)}
+    rosters = source.rosters()
+    users = source.users()
     # Identity is asserted, never guessed. The old rule fell back to rosters[0]
     # on a display-name miss and every module downstream then said "your
     # lineup" about a stranger's team (draftkit/sleeper.py resolve_my_roster).
-    my_roster, identity = resolve_my_roster(cfg, users, rosters, client)
+    my_roster, identity = source.resolve_me(users, rosters)
 
     # In season the player file is the injury feed. A day-old copy is a
     # day-old injury report: on 2026-09-10 it priced A.J. Brown as healthy
     # while Sleeper had him Out. Preseason keeps the daily TTL.
     players = client.players(max_age=None if preseason else INSEASON_PLAYERS_MAX_AGE)
     injury = seasondata.injury_map(players)
+    # The hosting platform's own designation decides its IR slots; where it
+    # speaks it outranks the NFL-wide feed (Yahoo IR/IR-R/PUP-R on Keefamania).
+    injury.update(source.injury_overlay())
     schedule = seasondata.load_schedule(cfg, int(season))
     week_byes = seasondata.byes(schedule, week)
     early = seasondata.early_games(schedule, week)
@@ -165,18 +237,25 @@ def build_context(cfg, week: int | None = None) -> dict:
         roster_players[int(r["roster_id"])] = [x for x in rows if x]
 
     try:
-        matchups = client_matchups(client, cfg.league_id, week)
+        matchups = source.matchups(week)
     except Exception:  # noqa: BLE001
         matchups, _ = [], stale.append(f"week-{week} matchups")
 
+    txns: list[dict] | None = None
     try:
-        txns = get_transactions(client, cfg.league_id, week)
+        txns = source.transactions(week)
         seasondata.append_transactions(cfg, txns)
     except Exception:  # noqa: BLE001
         stale.append("transactions")
+    # A source's own warnings (a scoring block that disagrees with the yaml,
+    # a roster name that did not resolve) ride the stale banner: they are
+    # facts about the inputs the reader must see before the numbers.
+    stale += list(getattr(source, "notes", []) or [])
 
     return {
         "cfg": cfg, "scfg": scfg, "client": client, "state": state, "week": week,
+        "source": source, "platform": getattr(source, "platform", "sleeper"),
+        "transactions": txns, "faab": budget > 0,
         "preseason": preseason, "fallback": fallback, "stale": stale,
         "league": league, "budget": budget, "reserve_allow": reserve_allow,
         "rosters": rosters, "roster_players": roster_players, "users": users,

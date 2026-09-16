@@ -89,7 +89,7 @@ def ir_actions(ir_occupants: list[dict], roster: list[dict],
         status = injury.get(str(p.get("sleeper_id")), "")
         if status not in reserve_allow:
             acts.append(
-                f"🔴 {p.get('name')} is now '{status or 'healthy'}' — Sleeper will "
+                f"🔴 {p.get('name')} is now '{status or 'healthy'}' — the league site will "
                 f"invalidate your roster: you MUST move him off IR and cut someone "
                 f"before lineups lock."
             )

@@ -8,10 +8,13 @@ draft Sat 2026-09-05 — see `docs/draft-day-runbook.md`). Decisions and their
 evidence live in `DECISIONS.md`; this README is the map, not the record.
 
 > **In-season cadence (draft complete 2026-08-23 — finished #1 of 12 on the board):**
-> The auto-manager runs on GitHub Actions (`.github/workflows/weekly.yml`) and
-> delivers as GitHub Issues. Pacific time: **Monday 6 AM** planner, **Tuesday 4 PM**
-> waiver brief (claims process Wednesday), **Friday noon** scout, **Sunday 7 AM**
-> lineup backstop, plus a daily 8 AM healthcheck. There is no Thursday job.
+> The auto-manager runs on GitHub Actions (`.github/workflows/weekly.yml`, hourly
+> since 2026-09-16 — GitHub's cron lag made fixed windows miss, DECISIONS #70) and
+> delivers as GitHub Issues. Pacific time, first tick after: **Monday 5:30 AM**
+> planner, **Tuesday 3:30 PM** waiver brief (deadline 6:45), **Friday 11:30 AM**
+> scout, **Sunday 6 AM** lineup backstop (deadline 9:45), daily 7:30 AM healthcheck.
+> Both leagues: Sleeper directly, Yahoo through its API since 2026-09-16
+> (`manager/yahoo_context.py`; `python -m manager --league keefamania --dry-run --module all`).
 > Deep research passes stay ad hoc: briefs flag names; ping Claude to verify facts.
 > 5. Weekly projections auto-detect Sleeper publish state; until live they fall back to
 >    season proj ÷ 16 with a visible banner. The matchup adjustment activates from

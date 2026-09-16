@@ -96,6 +96,10 @@ def my_bye_needs(ctx) -> dict[str, int]:
     return needs
 
 
+def _waiver_priority(ctx) -> int:
+    return int((ctx["my_roster"].get("settings") or {}).get("waiver_position") or 0)
+
+
 def rival_needy_budgets(ctx, pos: str) -> list[int]:
     slots = ctx["slots"]
     """Remaining budgets of rivals who cannot fill `pos` from healthy players."""
@@ -373,7 +377,8 @@ def build(ctx, store) -> str:
         # SHOW THE REGIME. It sets every bid band below, so a brief that
         # prices bids without naming the regime cannot be audited.
         odds = ctx.get("_playoff_odds")
-        lines.append(f"_bids priced at **{regime}**"
+        what = "bids priced at" if ctx.get("faab", True) else "claims ranked for a"
+        lines.append(f"_{what} **{regime}**" + (" regime" if not ctx.get("faab", True) else "")
                      + (f" (playoff odds {odds:.0%})_" if odds is not None else "_"))
     lines.append("")
 
@@ -426,7 +431,10 @@ def build(ctx, store) -> str:
             f"- worth over next-best FA {p['pos']}: {p.get('fa_value', 0):+.0f} ROS pts"
             + consensus.annotate(con.get(pid)),
             f"- move: {_drop_or_ir(ctx, p.get('ros') or 0, p['pos'])}",
-            f"- bid **${fair}–${agg}** of my ${ctx['my_budget']} — {rival_note}",
+            (f"- bid **${fair}–${agg}** of my ${ctx['my_budget']} — {rival_note}"
+             if ctx.get("faab", True) else
+             f"- claim: rolling-list waivers, no bid — my priority is "
+             f"#{_waiver_priority(ctx)} of {len(ctx['rosters'])}"),
         ]
         # CEILING, NOT JUST THE MEAN. A bench player only ever enters the
         # lineup when he breaks out, so his median barely matters and the
@@ -435,18 +443,26 @@ def build(ctx, store) -> str:
         if pan:
             lines.append("- ceiling:" + pan[2:])
         if contingent:
-            lines.append(f"- insurance behind a downed starter: bid the "
-                         f"AGGRESSIVE end (${agg})")
+            lines.append(f"- insurance behind a downed starter: bid the AGGRESSIVE end (${agg})"
+                         if ctx.get("faab", True) else
+                         "- insurance behind a downed starter: put this claim first")
         if s_note:
             lines.append(f"- {s_note}")
 
-    spent = faab_mod.spent_from_transactions(store.get("txn_history", []))
-    for n in faab_mod.crosscheck(spent, ctx["rosters"]):
-        lines.append(f"- {n}")
-    budgets = sorted(((ctx['users_by_rid'][rid], b) for rid, b in ctx["budgets"].items()),
-                     key=lambda t: -t[1])
-    lines += ["", "## League FAAB remaining",
-              " · ".join(f"{n} ${b}" for n, b in budgets), ""]
+    if ctx.get("faab", True):
+        spent = faab_mod.spent_from_transactions(store.get("txn_history", []))
+        for n in faab_mod.crosscheck(spent, ctx["rosters"]):
+            lines.append(f"- {n}")
+        budgets = sorted(((ctx['users_by_rid'][rid], b) for rid, b in ctx["budgets"].items()),
+                         key=lambda t: -t[1])
+        lines += ["", "## League FAAB remaining",
+                  " · ".join(f"{n} ${b}" for n, b in budgets), ""]
+    else:
+        # A rolling list has no budget to spend; the order is the currency.
+        order = sorted(ctx["rosters"], key=lambda r: int((r.get("settings") or {}).get("waiver_position") or 99))
+        lines += ["", "## Waiver priority (rolling list)",
+                  " · ".join(f"{int((r.get('settings') or {}).get('waiver_position') or 0)}. "
+                             f"{ctx['users_by_rid'].get(int(r['roster_id']), '?')}" for r in order), ""]
     if drops_trend:
         hot_drops = [pid for pid in drops_trend if pid in {str(p['sleeper_id']) for p in ctx['roster_players'][ctx['my_rid']]}]
         if hot_drops:

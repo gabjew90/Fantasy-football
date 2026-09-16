@@ -4097,3 +4097,34 @@ cached once and never refreshed (December flex moves kickoffs); the Vegas
 snapshot is a manual weekly chore; the committed kv.json carries 160 KB
 of source caches; the ledger (season-manager v2 layer 4) is unbuilt, and
 it is the only thing that will ever grade any of this.
+
+## 2026-09-16 (71) -- Keefamania gets the whole manager: one seam, seven reads
+
+`draftkit.briefs.build_context` now takes a `source` for the seven reads
+that know which site hosts the league (league, rosters, users, identity,
+the platform's injury designations, matchups, transactions); everything
+else it does is NFL-wide and unchanged. `SleeperSource` wraps the old
+calls, `manager/yahoo_context.YahooSource` answers the same seven from
+the Yahoo API in Sleeper's shapes, and `manager.context` dispatches on
+`platform`. No module downstream branches. Players resolve to Sleeper
+ids the way manager.yahoo does (id map, then name within position; a
+DEF by team code, which is its Sleeper id).
+
+Two defects the first Keefamania dry run exposed, both fixed before
+anything shipped. K and DEF projected 0.0 because the yaml scoring block
+is offense-only -- the league's scoring now comes from Yahoo's own
+`stat_modifiers` mapped onto Sleeper keys, the yaml fills gaps, and a
+disagreement is reported (none today). And both IR stashes were reported
+as an invalid roster: the IR-eligible statuses were derived as the two
+Sleeper flags OR ("Out",), which never contained IR itself -- latent on
+Omnibeta, whose reserve slot has been empty. `reserve_statuses()` starts
+from IR/PUP/COV/NA and a platform may pass its own list. Rolling-list
+leagues no longer read FAAB bids: claim priority and the waiver order
+take their place (`ctx["faab"]`).
+
+Not yet done, and needed before Keefamania is actually scheduled: the
+manager's state (store, week plan, gate hours, delivery bookkeeping) is
+one directory shared by every league, so a second league would collide
+with the first on every key; and the Yahoo refresh token lives only on
+the local machine, so Actions cannot yet call the API. Both are the next
+commit.

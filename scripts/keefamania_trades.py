@@ -46,20 +46,7 @@ def _surname(name: str) -> str:
 
 
 def _yahoo_id_map(cfg) -> dict[str, str]:
-    """{yahoo_id: sleeper_id} from the DynastyProcess id map; empty on any
-    failure, and yahoo.load then matches on names as it always did."""
-    try:
-        import polars as pl
-        from draftkit.ids import load_id_map
-        df = load_id_map(cfg.path("raw"))
-        if "yahoo_id" not in df.columns:
-            return {}
-        df = df.select(pl.col("yahoo_id").cast(pl.Int64, strict=False).cast(pl.Utf8),
-                       pl.col("sleeper_id")).drop_nulls()
-        return dict(df.iter_rows())
-    except Exception as e:  # noqa: BLE001
-        print(f"  yahoo: no id map ({e.__class__.__name__}) — matching on names")
-        return {}
+    return yahoo.yahoo_id_map(cfg)
 
 
 def build_ctx(league: str) -> dict:
