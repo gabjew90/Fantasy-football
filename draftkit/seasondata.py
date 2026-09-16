@@ -34,14 +34,37 @@ def _norm_team(code: str) -> str:
     return _TEAM_MAP.get(code, code)
 
 
-def load_schedule(cfg, season: int) -> pl.DataFrame:
-    """Long-format REG schedule: one row per team-game. Cached to parquet."""
+SCHEDULE_TTL = 24 * 3600
+
+
+def load_schedule(cfg, season: int, max_age: float | None = SCHEDULE_TTL,
+                  loader=None) -> pl.DataFrame:
+    """Long-format REG schedule: one row per team-game. Cached to parquet.
+
+    The cache used to be permanent: the file written on 2026-08-23 would
+    have served the whole season, and the NFL flexes December kickoffs
+    (Sunday afternoon -> Sunday night, Saturday slates), which moves the
+    lock times every gate check is computed from. In season the file is
+    refreshed once a day; a failed refresh keeps the last good copy and
+    logs it, because a day-old schedule beats no schedule.
+    """
     cache = Path(cfg.path("processed")) / f"schedule_{season}.parquet"
     if cache.exists():
-        return pl.read_parquet(cache)
-    import nflreadpy as nfl
-
-    s = nfl.load_schedules([season]).filter(pl.col("game_type") == "REG")
+        age = time.time() - cache.stat().st_mtime
+        if max_age is None or age < max_age:
+            return pl.read_parquet(cache)
+    try:
+        if loader is None:
+            import nflreadpy as nfl
+            loader = nfl.load_schedules
+        s = loader([season]).filter(pl.col("game_type") == "REG")
+    except Exception as e:  # noqa: BLE001
+        if cache.exists():
+            import logging
+            logging.getLogger("draftkit").warning(
+                "schedule refresh failed (%s) -- using the cached copy", e.__class__.__name__)
+            return pl.read_parquet(cache)
+        raise
     rows = []
     for r in s.select("week", "away_team", "home_team", "gameday",
                       "weekday", "gametime").iter_rows(named=True):
