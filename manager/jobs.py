@@ -89,7 +89,9 @@ def plan_week(dry_run: bool = False) -> dict:
     hist = store.get("txn_history", [])
     from draftkit.briefs import get_transactions
     try:
-        wk_txns = get_transactions(ctx["client"], ctx["cfg"].league_id, week)
+        wk_txns = ctx.get("transactions")
+        if wk_txns is None:
+            wk_txns = get_transactions(ctx["client"], ctx["cfg"].league_id, week)
         if len(hist) < week:
             hist += [[] for _ in range(week - len(hist))]
         hist[week - 1] = wk_txns
@@ -229,31 +231,69 @@ def healthcheck(dry_run: bool = False) -> None:
 
 
 # -- weekly.yml dispatcher ------------------------------------------------
-# GitHub cron is UTC; PT-fixed events live at two possible UTC hours across
-# DST. The workflow fires at both; this guard runs the job only inside its
-# PT window, and delivery idempotency absorbs the double fire.
+# GitHub cron is best-effort. Measured on this repo 2026-09-16 over 38
+# scheduled runs: median lag 128 minutes, worst 357. The first design gated
+# each job on a two-hour Pacific wall-clock WINDOW, so of those 38 runs only
+# the three Tuesday fires landed inside one: the planner, the healthcheck,
+# the Friday scout and the Sunday lineup backstop never ran on schedule
+# (memory: actions-cron-lag-breaks-windows). A green run outside its window
+# was a no-op, and nothing could tell.
+#
+# So the rule is now "not yet run this PERIOD, and past its start": the
+# workflow fires hourly, each job runs on the first tick after its start
+# time on its day, and a run is recorded per period so the next tick skips
+# it. A deadline exists only where a late run would be worse than none --
+# waiver bids close at 19:00, the Sunday slate kicks off at 10:00.
+SCHEDULE = {
+    # kind: (iso_weekdays it may run on, not_before_pt, deadline_pt or None)
+    "plan":    ((1, 2), time(5, 30), None),          # Monday; Tuesday is the catch-up
+    "health":  (None, time(7, 30), None),            # daily
+    "waivers": ((2,), time(15, 30), time(18, 45)),   # bids by 19:00 PT
+    "scout":   ((5,), time(11, 30), None),
+    "lineup":  ((7,), time(6, 0), time(9, 45)),      # before the 10:00 PT slate; gate leads
+}
+# The old two-hour windows, kept for the tests that pin the design change.
 WINDOWS = {
-    # kind: (iso_weekday or None=daily, start_pt, end_pt)
     "plan":   (1, time(5, 30), time(7, 30)),
     "health": (None, time(7, 30), time(9, 30)),
     "waivers": (2, time(15, 30), time(18, 30)),
     "scout":  (5, time(11, 30), time(14, 0)),
-    "lineup": (7, time(6, 0), time(8, 30)),   # Sunday backstop; gate leads
+    "lineup": (7, time(6, 0), time(8, 30)),
 }
+
+
+def period_key(kind: str, now: datetime) -> str:
+    """One run per period: a date for a daily job, an ISO week for the rest."""
+    if SCHEDULE[kind][0] is None:
+        return now.strftime("%Y-%m-%d")
+    y, w, _ = now.isocalendar()
+    return f"{y}-W{w:02d}"
+
+
+def due_now(kind: str, now: datetime, store) -> bool:
+    days, start, deadline = SCHEDULE[kind]
+    if days is not None and now.isoweekday() not in days:
+        return False
+    if now.time() < start:
+        return False
+    if deadline is not None and now.time() > deadline:
+        return False
+    return not store.get(f"ran:{kind}:{period_key(kind, now)}")
 
 
 def cron_tick(dry_run: bool = False, force: str | None = None) -> list[str]:
     now = now_pt()
+    store = get_store()
     ran = []
-    for kind, (dow, start, end) in WINDOWS.items():
+    for kind in SCHEDULE:
         if force and kind != force:
             continue
-        if not force:
-            if dow is not None and now.isoweekday() != dow:
-                continue
-            if not (start <= now.time() <= end):
-                continue
+        if not force and not due_now(kind, now, store):
+            continue
         ran.append(kind)
+        # Recorded BEFORE the job runs: a job that crashes is emailed by
+        # _safe(), and re-running a crashing job every hour would spam.
+        store.set(f"ran:{kind}:{period_key(kind, now)}", fmt(now))
         if kind == "plan":
             _safe(plan_week, dry_run)
         elif kind == "health":

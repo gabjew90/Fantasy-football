@@ -87,8 +87,19 @@ def main() -> int:
 
     if args.command == "gate":
         from .gate import run_gate
-        result = run_gate(dry_run=args.dry_run)
-        print(f"[gate] ran {result.get('ran', 0)}, pending {result.get('pending', 0)}")
+        # The live week lets the gate notice a plan the planner never wrote
+        # for this week and replan; unreachable Sleeper means no heal, not
+        # a crash -- the checks still tick.
+        live_week = None
+        try:
+            from draftkit.seasondata import nfl_state
+            st = nfl_state()
+            live_week = int(st["week"]) if st.get("season_type") == "regular" else 1
+        except Exception as e:  # noqa: BLE001
+            logging.getLogger("manager").warning("gate: live week unknown (%s)", e.__class__.__name__)
+        result = run_gate(dry_run=args.dry_run, live_week=live_week)
+        print(f"[gate] ran {result.get('ran', 0)}, pending {result.get('pending', 0)}"
+              + (", replanned" if result.get("healed") else ""))
         return 0
 
     if args.command == "cron":

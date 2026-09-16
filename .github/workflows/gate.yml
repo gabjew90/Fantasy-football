@@ -23,17 +23,11 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
-      - name: window guard (cheap)
+      - name: window guard (cheap, stdlib only)
         id: guard
         run: |
-          python3 - <<'EOF' >> "$GITHUB_OUTPUT"
-          import json, datetime, pathlib, sys
-          force = "${{ github.event_name }}" == "workflow_dispatch"
-          p = pathlib.Path("state/gate_hours.json")
-          now = datetime.datetime.now(datetime.timezone.utc)
-          hot = force or (p.exists() and [now.isoweekday(), now.hour] in json.loads(p.read_text()))
-          print(f"run={'true' if hot else 'false'}")
-          EOF
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then FORCED=--forced; else FORCED=; fi
+          python3 scripts/gate_guard.py $FORCED >> "$GITHUB_OUTPUT"
       - uses: actions/setup-python@v5
         if: steps.guard.outputs.run == 'true'
         with:

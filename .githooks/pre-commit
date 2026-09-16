@@ -1,3 +1,15 @@
 #!/bin/sh
 # Enabled with:  git config core.hooksPath .githooks
-exec python scripts/check_commit_hygiene.py
+#
+# Git Bash on the Windows host has no `python` on PATH (only the venv), so a
+# bare `exec python` aborted every commit made by the scheduled brief jobs
+# from 2026-09-01 on -- silently, because the .bat swallowed the output.
+# Prefer the repo venv, then fall back to whatever interpreter exists.
+root="$(git rev-parse --show-toplevel)"
+for py in "$root/venv/Scripts/python.exe" "$root/venv/bin/python" python3 python py; do
+  if command -v "$py" >/dev/null 2>&1 || [ -x "$py" ]; then
+    exec "$py" "$root/scripts/check_commit_hygiene.py"
+  fi
+done
+echo "pre-commit: no python interpreter found; skipping commit hygiene" >&2
+exit 0

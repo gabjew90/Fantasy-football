@@ -4056,3 +4056,44 @@ The same package re-prices at +0.31/wk and his side refuses on market.
 Also found and fixed on the way: `defense.points_allowed()` handed
 Sleeper scoring keys to polars as column names and took `build_context`
 down the first week real stats landed (110a75a).
+
+## 2026-09-16 (70) -- the scheduler never ran four of its five jobs; end-to-end review
+
+An end-to-end review of ingestion, analysis and automation (asked for the
+day the Yahoo API went live) found the automation running at about a
+fifth of its design. GitHub fires this repo's crons late: over all 38
+scheduled `weekly` runs since 08-28 the lag from the cron slot was median
+128 minutes, worst 357 (public API, `actions/workflows/weekly.yml/runs`).
+The dispatcher gated each job on a two-hour Pacific wall-clock window, so
+of 38 green runs exactly three did anything -- the Tuesday waiver briefs,
+whose 23:00-UTC cron happened to land 49-66 minutes late inside a
+three-hour window. The Monday planner (0 of 6 Mondays), the daily
+healthcheck (0 of 20 days), the Friday scout and the Sunday backstop
+never ran on schedule. Consequences: state/week_plan.json stayed on week
+1 from 08-31, gate_hours.json on 09-02, the 15-minute gate ticked against
+week-1 kickoffs through all of week 2, and the whole delivery record is
+seven issues. The `notify` workflow could not see it: nothing failed.
+
+Decision: the rule is "not yet run this period, and past its start", not
+"inside a window". weekly.yml fires hourly; `jobs.SCHEDULE` runs each job
+on the first tick after its start time on its day and records the run
+per period (date for the healthcheck, ISO week otherwise) before the job
+runs, so a crashing job is not retried hourly. A deadline exists only
+where a late run is worse than none: waivers 18:45 (bids close 19:00),
+Sunday backstop 09:45 (the early slate). Tuesday is the planner's
+catch-up day. `gate.run_gate(live_week=)` replans when the committed plan
+is for another week, and the cheap guard (`scripts/gate_guard.py`) also
+ticks on a missing or six-day-old plan, so a dead planner can no longer
+keep the gate asleep. Also: `.githooks/pre-commit` called `python`, which
+Git Bash on this host does not have, so every `brief:` commit from the
+local scheduled jobs aborted silently from 09-01; the hook now prefers
+the venv.
+
+The rest of the review, in the order it will be built: Keefamania has no
+in-season coverage at all (context.py refuses non-Sleeper; the API now
+carries everything build_context needs) -- next; `injuries.py`, the code
+behind every [ACT NOW] alert, has no tests; the nflverse schedule is
+cached once and never refreshed (December flex moves kickoffs); the Vegas
+snapshot is a manual weekly chore; the committed kv.json carries 160 KB
+of source caches; the ledger (season-manager v2 layer 4) is unbuilt, and
+it is the only thing that will ever grade any of this.

@@ -103,15 +103,42 @@ def gate_hours_utc(checks: list[dict]) -> list[list[int]]:
     return sorted([d, h] for d, h in hours)
 
 
-def run_gate(dry_run: bool = False, root: str | Path = ".") -> dict:
-    """One tick: execute every due-and-not-done check; mark done; save."""
+def plan_is_stale(plan: dict | None, live_week: int | None) -> bool:
+    """A plan for another week, or none at all, when the live week is known.
+
+    The Monday planner is the only writer of the plan, and it never ran on
+    schedule for two weeks (the cron-lag defect): the gate kept ticking
+    against week-1 kickoffs while week 2 was played. The gate now heals
+    itself -- when the committed plan is not for the live week it replans
+    before evaluating anything.
+    """
+    if live_week is None:
+        return False
+    return not plan or int(plan.get("week") or 0) != int(live_week)
+
+
+def run_gate(dry_run: bool = False, root: str | Path = ".",
+             live_week: int | None = None) -> dict:
+    """One tick: execute every due-and-not-done check; mark done; save.
+
+    `live_week` is the NFL week the caller read from Sleeper; when the
+    committed plan is for a different week the planner is run first. None
+    (the tests, and a caller that could not reach Sleeper) skips the heal.
+    """
     from . import jobs as jobs_mod  # late import: gate math stays test-light
 
     path = plan_path(root)
-    if not path.exists():
+    plan = json.loads(path.read_text(encoding="utf-8")) if path.exists() else None
+    healed = False
+    if plan_is_stale(plan, live_week):
+        log.warning("gate: plan is for week %s, live week is %s -- replanning",
+                    (plan or {}).get("week"), live_week)
+        if jobs_mod._safe(jobs_mod.plan_week, dry_run) is not None:
+            healed = True
+            plan = json.loads(path.read_text(encoding="utf-8")) if path.exists() else plan
+    if not plan:
         log.warning("gate: no week plan committed yet")
-        return {"ran": 0, "note": "no plan"}
-    plan = json.loads(path.read_text(encoding="utf-8"))
+        return {"ran": 0, "note": "no plan", "healed": healed}
     now = datetime.now(tz=timezone.utc)
     ran, statuses = 0, {}
     for check in plan.get("checks", []):
@@ -134,4 +161,4 @@ def run_gate(dry_run: bool = False, root: str | Path = ".") -> dict:
         log.info("gate: dry run, not marking %d check(s) done in %s", ran, path)
     pending = sum(1 for s in statuses.values() if s == "pending")
     log.info("gate: ran %d, %d pending", ran, pending)
-    return {"ran": ran, "pending": pending, "statuses": statuses}
+    return {"ran": ran, "pending": pending, "statuses": statuses, "healed": healed}
