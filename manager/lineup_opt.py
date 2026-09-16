@@ -136,6 +136,19 @@ def build(ctx, store) -> str:
     table = contingency_table(roster, optimal)
     store.set(f"contingency:{week}", table)
 
+    # THE LEDGER ROW: the lineup as recommended, with every projection that
+    # chose it and the whole pool it was chosen from, so hindsight can price
+    # what the bench left behind.
+    from . import ledger
+    ledger.emit(store, ctx, "lineup", [{
+        "subject": f"lineup:{week}", "mode": mode,
+        "starters": [str(p["sleeper_id"]) for p in optimal],
+        "pool": [str(p["sleeper_id"]) for p in roster],
+        "pos": {str(p["sleeper_id"]): p.get("pos") for p in roster},
+        "projected": {str(p["sleeper_id"]): round(float(p.get("weekly") or 0.0), 2) for p in optimal},
+        "swaps": list(swaps),
+    }])
+
     lines = [f"# Lineup — week {week} ({mode.upper()} mode: {mode_why})", ""]
     if ctx.get("fallback"):
         lines.append("⚠ projections not yet published — season-baseline fallback values")

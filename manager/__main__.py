@@ -16,7 +16,7 @@ from datetime import datetime
 
 from dotenv import load_dotenv
 
-MODULES = ("plan", "waivers", "injuries", "lineup", "scout", "trade", "health", "all")
+MODULES = ("plan", "waivers", "injuries", "lineup", "scout", "trade", "health", "ledger", "all")
 
 
 def _setup_logging() -> None:
@@ -104,7 +104,7 @@ def main() -> int:
 
     if args.command == "cron":
         force = {"plan": "plan", "waivers": "waivers", "scout": "scout",
-                 "lineup": "lineup", "health": "health"}.get(args.job or "", None)
+                 "lineup": "lineup", "health": "health", "ledger": "ledger"}.get(args.job or "", None)
         ran = jobs.cron_tick(dry_run=args.dry_run, force=force)
         print(f"[cron] ran: {ran or 'nothing (outside all windows)'}")
         return 0
@@ -130,6 +130,8 @@ def main() -> int:
             print(build(league_context(), jobs.get_store()))
         elif name == "health":
             jobs.healthcheck(dry_run=args.dry_run)
+        elif name == "ledger":
+            jobs.ledger_job(dry_run=args.dry_run, week=args.week)
 
     if args.module == "all":
         # scout before lineup so ceiling/floor mode is fresh; plan first (spec order)

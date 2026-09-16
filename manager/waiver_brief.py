@@ -176,6 +176,30 @@ def _fa_pool(ctx, con: dict | None = None) -> list[dict]:
     return pool[:300]
 
 
+def _drop_pid(ctx, candidate_ros: float, pos: str | None = None) -> str | None:
+    """The sleeper_id of the player _drop_or_ir would name, for the ledger;
+    None when the move is an IR shuffle, a streamer swap or no clean drop."""
+    if pos in ("K", "DEF"):
+        cur = [p for p in ctx["roster_players"][ctx["my_rid"]] if p["pos"] == pos]
+        return str(cur[0]["sleeper_id"]) if cur else None
+    ir_ready = [p for p in ctx["roster_players"].get(ctx["my_rid"], [])
+                if p.get("status") in ctx["reserve_allow"]]
+    if ir_ready and not (ctx["my_roster"].get("reserve") or []):
+        return None
+    from draftkit.lineup import optimal_lineup
+    mine = ctx["roster_players"][ctx["my_rid"]]
+    opt_ids = {str(p["sleeper_id"]) for p in optimal_lineup(mine, ctx["slots"], flex_slots=ctx["flex_slots"])}
+    keep = opt_ids | set(ctx["current_starters"])
+    starters = {p["name"] for p in mine if str(p["sleeper_id"]) in keep}
+    bench = [p for p in mine if str(p["sleeper_id"]) not in keep]
+    prot = waivers.protected_drop_ids(
+        bench, starters, set(str(x) for x in (ctx["my_roster"].get("reserve") or [])))
+    for d in sorted((p for p in bench if str(p["sleeper_id"]) not in prot), key=lambda p: p.get("ros") or 0):
+        if (d.get("ros") or 0) < candidate_ros:
+            return str(d["sleeper_id"])
+    return None
+
+
 def _drop_or_ir(ctx, candidate_ros: float, pos: str | None = None) -> str:
     """Concrete roster move that makes space, respecting protections."""
     if pos in ("K", "DEF"):
@@ -347,6 +371,18 @@ def build(ctx, store) -> str:
         score += W_NEED * wl if needs.get(p["pos"], 0) > 0 else 0
         scored.append((score, p, ev, pid))
     scored.sort(key=lambda t: -t[0])
+
+    # THE LEDGER ROWS: the adds as recommended, with the class, the rank and
+    # the drop each one was paired with, before any rendering.
+    from . import ledger
+    ledger.emit(store, ctx, "waiver_add", [{
+        "subject": f"add:{pid}", "pid": pid, "name": p["name"], "pos": p["pos"],
+        "team": p.get("team"), "rank": i + 1, "score": round(float(score), 3),
+        "cls": _classify(p, pid in cont_ids), "contingent": pid in cont_ids,
+        "fa_value": round(float(p.get("fa_value") or 0.0), 2),
+        "ros": p.get("ros"), "weekly": p.get("weekly"),
+        "drop_pid": _drop_pid(ctx, p.get("ros") or 0, p["pos"]),
+    } for i, (score, p, ev, pid) in enumerate(scored[:TOP_N])])
 
     faab_cfg = ctx["scfg"].get("faab", {})
     lines = [f"# Waiver brief — week {week}", ""]

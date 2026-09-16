@@ -144,6 +144,14 @@ silently into the projection.
 
 ## Layer 4 — ledger, absorbed
 
+> Status 2026-09-16: BUILT as `manager/ledger.py` (DECISIONS #72) with a
+> narrower first cut than the bullets below -- four kinds (lineup, scout,
+> waiver_add, trade_offer), one ruler each, actuals from Sleeper's weekly
+> stats scored in league settings, graded by the Tuesday `ledger` job. The
+> nflreadpy cross-check, the naive baselines and the `ledger_source` ruler
+> are not in it yet; the rows carry enough (projections, pool, sources) to
+> add them without re-emitting.
+
 Per the ledger v3 plan with the corrections from the 2026-09-07 review:
 
 - naive baselines use the historical base rate, not p = 1

@@ -56,6 +56,12 @@ def build(ctx, store) -> str:
     mode = "ceiling" if margin <= -10 else ("floor" if margin >= 10 else "neutral")
     store.set(f"scout:{week}", {"margin": round(margin, 1), "win_prob": round(wp, 3),
                                 "mode": mode})
+    from . import ledger
+    ledger.emit(store, ctx, "scout", [{
+        "subject": f"scout:{week}", "opp_rid": ctx["opp_rid"], "opp": ctx.get("opp_name"),
+        "my_total": round(my_total, 2), "their_total": round(their_total, 2),
+        "margin": round(margin, 2), "win_prob": round(wp, 4), "mode": mode,
+    }])
 
     lines = [
         f"# Opponent scout — week {week}: {ctx['opp_name']}",

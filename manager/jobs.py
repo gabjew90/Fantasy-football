@@ -211,6 +211,27 @@ def slate_job(teams: list[str], kickoff_iso: str | None, dry_run: bool = False) 
         print(f"[slate {teams}] all starters active")
 
 
+def ledger_job(dry_run: bool = False, week: int | None = None) -> None:
+    """Tuesday: grade last week's ledger rows against actuals and deliver the
+    season scoreboard. `week` defaults to the week just completed."""
+    from . import ledger
+    ctx = league_context()
+    store = get_store()
+    target = int(week) if week is not None else max(1, int(ctx["week"]) - 1)
+    mine, theirs = ledger.matchup_actuals(ctx, target)
+    grades = ledger.grade_week(ctx, store, target, my_actual=mine, their_actual=theirs)
+    league = getattr(ctx.get("cfg"), "league_name", "?")
+    body = _identity_line(ctx) + ledger.report(store, league)
+    body += (f"\n\n_week {target}: {grades.get('graded', 0)} row(s) graded"
+             + (f" — {grades['note']}" if grades.get("note") else "") + "_")
+    lu = grades.get("lineup") or {}
+    subject = (f"Ledger wk {target} — lineup {lu['efficiency']:.0%} of best, "
+               f"{lu['left_on_bench']:.1f} left on the bench" if lu.get("efficiency") is not None
+               else f"Ledger wk {target} — {grades.get('graded', 0)} graded")
+    deliver(store, f"ledger:{target}", subject, body, dry_run=dry_run)
+    _write_report("ledger", body)
+
+
 def healthcheck(dry_run: bool = False) -> None:
     store = get_store()
     # daily trade sweep rides the healthcheck so Sun-Tue trades (outside the
@@ -253,6 +274,7 @@ SCHEDULE = {
     "waivers": ((2,), time(15, 30), time(18, 45)),   # bids by 19:00 PT
     "scout":   ((5,), time(11, 30), None),
     "lineup":  ((7,), time(6, 0), time(9, 45)),      # before the 10:00 PT slate; gate leads
+    "ledger":  ((2,), time(9, 0), None),             # Tuesday: grade last week against actuals
 }
 # The old two-hour windows, kept for the tests that pin the design change.
 WINDOWS = {
@@ -306,5 +328,7 @@ def cron_tick(dry_run: bool = False, force: str | None = None) -> list[str]:
             _safe(scout_job, dry_run)
         elif kind == "lineup":
             _safe(lineup_job, dry_run)
+        elif kind == "ledger":
+            _safe(ledger_job, dry_run)
     log.info("cron tick ran: %s", ran or "nothing (outside all windows)")
     return ran

@@ -236,7 +236,7 @@ def _biggest_row(give, get) -> dict | None:
     return max(rows, key=lambda p: p.get("ros") or 0.0).get("consensus")
 
 
-def _priced(ctx, opp, vals) -> list[str]:
+def _priced(ctx, opp, vals, store=None) -> list[str]:
     """What the package does to both starting lineups, seats named, and
     whether it clears the gates.
 
@@ -273,6 +273,24 @@ def _priced(ctx, opp, vals) -> list[str]:
     except Exception as e:  # noqa: BLE001
         log.warning("trade radar: could not price %s (%s)", opp.get("mgr"), e)
         return []
+    if store is not None:
+        # THE LEDGER ROW: the package as priced, whatever the verdict. The
+        # slot model is judged on every offer it emitted, not on the ones
+        # that were sent (season-manager v2, layer 4).
+        from . import ledger
+        acc = d.acceptance or {}
+        ledger.emit(store, ctx, "trade_offer", [{
+            "subject": f"trade:{opp.get('rid')}:{'+'.join(str(p['sleeper_id']) for p in give)}"
+                       f"->{'+'.join(str(p['sleeper_id']) for p in get)}",
+            "mgr": opp.get("mgr"), "rid": opp.get("rid"),
+            "give": [str(p["sleeper_id"]) for p in give], "get": [str(p["sleeper_id"]) for p in get],
+            "give_names": [p.get("name") for p in give], "get_names": [p.get("name") for p in get],
+            "my_delta": round(float(d.my_delta), 2), "my_ppg": round(float(d.my_delta) / wl, 3),
+            "range_ppg": [round(x, 3) for x in rng] if rng else None,
+            "their_delta": round(float(d.their_delta), 2),
+            "accepts": bool(acc.get("accept")), "test1": acc.get("test1"), "test2": acc.get("test2"),
+            "net_rank": acc.get("net_rank"), "send": bool(v.get("send")), "mode": v.get("mode"),
+        }])
     # OFFER, not SEND. His side is a prediction that a position-by-position
     # manager plausibly says yes; my side is a mean with a range the user
     # decides on. Neither is a command.
@@ -479,7 +497,7 @@ def build(ctx, store) -> str:
         # actually does to either lineup, which is the only thing that
         # decides whether to send it. Both sides re-solve, bench promotions
         # included -- see manager.marginal.slot_moves.
-        lines += _priced(ctx, o, vals)
+        lines += _priced(ctx, o, vals, store=store)
         aged = [age_decay.note(p.get("pos"), (ctx.get("age_of") or {}).get(str(p.get("sleeper_id"))),
                                int(ctx["week"]), acfg) for p in (mine or [])]
         if o["ratio"] is not None and (o["ratio"] < VETO_RATIO or o["ratio"] > 1 / VETO_RATIO):

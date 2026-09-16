@@ -4136,3 +4136,37 @@ refresh token rides as a repository secret (`YAHOO_REFRESH_TOKEN`) and
 The secrets themselves are the user's to add (`scripts/yahoo_auth.py
 secrets` prints them locally); until they are, Keefamania's Actions runs
 degrade to "DATA MISSING: Yahoo API rosters" and the snapshot fallback.
+
+## 2026-09-16 (72) -- the ledger: every recommendation written down, then graded
+
+Season-manager v2, layer 4, built last because everything above it had to
+exist first and needed most because nothing above it had ever been
+graded. `manager/ledger.py`. Emission is one call inside each brief and
+records what the brief already computed: the lineup as recommended with
+its projections and the whole pool it was chosen from; the scout's
+totals, margin and win probability; the top waiver adds with class, rank
+and the drop each was paired with; every trade package the radar priced,
+sent or not, with the mean, the range and the acceptance verdict. Rows
+are JSON lines under the league's state directory, one file per week,
+each carrying the provenance stamp. A dry run emits nothing.
+
+One pre-registered ruler per kind, and the season scoreboard is the only
+place they are summed: lineup = chosen points over the best lineup the
+roster could have fielded in hindsight (and the bench points left
+behind); scout = margin error and the Brier score of the win probability;
+waiver add = the add's points that week beside the suggested drop's;
+trade offer = the pieces' realised points each week, given against
+received, a series the slot model is judged on at season's end.
+Actuals are Sleeper's weekly stat lines scored in the league's own
+settings (the Yahoo league's from its stat_modifiers), so both leagues
+grade on one basis. The Tuesday `ledger` job grades the week just
+completed and delivers the scoreboard; `python -m manager --module
+ledger --week N` grades any week by hand.
+
+What it will settle, in order of how soon: whether the lineup optimiser
+beats the lineup the user would have set (weeks); whether the scout's
+win probabilities are calibrated (a couple of months); whether the
+waiver ranks pick players who outscore the drops (a couple of months);
+and the DECISIONS #23 source gate and the slot-based trade model
+(#69), which need the season. Nothing in it is tuned to look good: the
+rulers were fixed before the first row was written.
