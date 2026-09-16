@@ -4131,11 +4131,19 @@ same day: `manager.context.state_dir()` keeps the default league at
 `state/` (no migration) and gives every other league `state/<league>/`
 (store, week plan, gate hours, delivery bookkeeping); the guard reads
 every league directory; both workflows run every league per tick; the
-refresh token rides as a repository secret (`YAHOO_REFRESH_TOKEN`) and
-`yahoo_api._load` bootstraps the token file from it on a fresh checkout.
-The secrets themselves are the user's to add (`scripts/yahoo_auth.py
-secrets` prints them locally); until they are, Keefamania's Actions runs
-degrade to "DATA MISSING: Yahoo API rosters" and the snapshot fallback.
+refresh token CAN ride as a repository secret (`YAHOO_REFRESH_TOKEN`,
+bootstrapped into the token file by `yahoo_api._load`) -- but the user
+declined to paste secrets into GitHub, and the assistant does not enter
+credentials anywhere, so that path is optional and unused. The path in
+force instead: the machine that signed in does the reading.
+`python -m manager --league keefamania yahoo-sync` (hourly at :50 from
+Task Scheduler, `scripts/YAHOO SYNC.bat`) fetches the seven resources
+YahooSource reads and commits each payload to `state/keefamania/yahoo/`;
+on Actions `yahoo_api.get` finds no credentials and answers from those
+files, and YahooSource notes their age in every brief (a warning past
+six hours). Same pattern as the committed Vegas snapshot, for the same
+reason: no key ever leaves this machine. Verified: with the credentials
+removed from the environment the scout renders from the synced files.
 
 ## 2026-09-16 (72) -- the ledger: every recommendation written down, then graded
 

@@ -38,7 +38,7 @@ def main() -> int:
     _setup_logging()
     ap = argparse.ArgumentParser(prog="manager")
     ap.add_argument("command", nargs="?", default="module",
-                    choices=("gate", "cron", "module", "vegas-refresh"))
+                    choices=("gate", "cron", "module", "vegas-refresh", "yahoo-sync"))
     ap.add_argument("--module", choices=MODULES, default=None)
     ap.add_argument("--job", choices=tuple(k for k in MODULES if k != "all"),
                     default=None, help="cron: force one job regardless of window")
@@ -52,7 +52,7 @@ def main() -> int:
 
     # vegas-refresh writes a WEEK-KEYED file, so an explicit week is meaningful
     # there; pinning gate/cron to a stale week is what the guard is for.
-    if args.week is not None and args.command not in ("module", "vegas-refresh"):
+    if args.week is not None and args.command not in ("module", "vegas-refresh", "yahoo-sync"):
         ap.error("--week is for 'module' and 'vegas-refresh' runs only: pinning "
                  "gate/cron to a stale week would make the live manager act on "
                  "the wrong week")
@@ -84,6 +84,24 @@ def main() -> int:
         print("        " + " · ".join(f"{t} {v:.1f}" for t, v in top))
         print("        commit state/vegas/ so the scheduled job can read it")
         return 0
+
+    if args.command == "yahoo-sync":
+        # The Yahoo credentials are LOCAL, like the Odds key: this pulls every
+        # resource the manager reads into state/<league>/yahoo/ and the .bat
+        # commits it, so Actions reads Yahoo without holding a secret.
+        from draftkit.config import Config
+        from draftkit.seasondata import nfl_state
+        from . import yahoo_sync
+        cfg = Config.load(league=args.league)
+        if str(cfg.get("platform") or "sleeper").lower() != "yahoo":
+            print(f"[yahoo-sync] {cfg.league_name} is not a Yahoo league")
+            return 1
+        st = nfl_state()
+        week = args.week or (int(st["week"]) if st.get("season_type") == "regular" else 1)
+        result = yahoo_sync.sync(cfg, week)
+        for path, status in result.items():
+            print(f"[yahoo-sync] {status:<8} {path}")
+        return 0 if all(v == "ok" for v in result.values()) else 1
 
     if args.command == "gate":
         from .gate import run_gate

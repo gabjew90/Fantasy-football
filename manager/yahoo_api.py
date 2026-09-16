@@ -119,10 +119,67 @@ def access_token(path: Path = TOKEN_PATH) -> str:
     return tok["access_token"]
 
 
+def cache_slug(path: str) -> str:
+    """A filename for one resource path: league/nfl.l.49649/teams/roster ->
+    league_nfl.l.49649_teams_roster."""
+    return "".join(c if c.isalnum() or c in ".-=" else "_" for c in path.strip("/"))
+
+
+def cache_dir() -> Path:
+    from .context import state_dir
+    return state_dir() / "yahoo"
+
+
+def read_cached(path: str, directory: Path | None = None) -> tuple[dict | None, float | None]:
+    """(payload, fetched_at) for a resource the local sync committed, or
+    (None, None)."""
+    d = directory or cache_dir()
+    f = d / f"{cache_slug(path)}.json"
+    if not f.exists():
+        return None, None
+    try:
+        blob = json.loads(f.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None, None
+    return blob.get("payload"), blob.get("fetched_at")
+
+
+def write_cached(path: str, payload: dict, directory: Path | None = None) -> Path:
+    d = directory or cache_dir()
+    d.mkdir(parents=True, exist_ok=True)
+    f = d / f"{cache_slug(path)}.json"
+    f.write_text(json.dumps({"path": path, "fetched_at": time.time(), "payload": payload},
+                            indent=1, sort_keys=True), encoding="utf-8")
+    return f
+
+
+def has_credentials(token_path: Path = TOKEN_PATH) -> bool:
+    return bool(os.environ.get("YAHOO_CLIENT_ID") and os.environ.get("YAHOO_CLIENT_SECRET")
+                and _load(token_path))
+
+
 def get(path: str, params: dict | None = None, token_path: Path = TOKEN_PATH) -> dict:
-    """GET a fantasy resource as JSON. Raises YahooScopeError when the app
-    is not approved for Fantasy Sports, YahooAuthError on any other 4xx."""
+    """GET a fantasy resource as JSON.
+
+    With credentials (client id + secret + a token file or YAHOO_REFRESH_TOKEN)
+    this is the live API. Without them -- GitHub Actions, where no Yahoo
+    secret is stored -- it reads the payload the LOCAL SYNC committed
+    (`python -m manager --league <name> yahoo-sync`, scheduled hourly on the
+    machine that holds the credentials, into state/<league>/yahoo/). The
+    scheduled jobs never need a Yahoo secret; they read what the sync wrote,
+    the same way they read the committed Vegas snapshot.
+
+    Raises YahooScopeError when the app is not approved for Fantasy Sports,
+    YahooAuthError on any other 4xx or when neither path can answer.
+    """
     q = dict(params or {})
+    if not has_credentials(token_path):
+        payload, fetched = read_cached(path)
+        if payload is not None:
+            return payload
+        raise YahooAuthError(
+            f"no Yahoo credentials and no synced copy of {path} -- run the yahoo-sync "
+            f"job on the machine that holds them")
     q.setdefault("format", "json")
     url = f"{API}/{path.lstrip('/')}"
     r = requests.get(url, params=q, timeout=TIMEOUT,

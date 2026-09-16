@@ -32,12 +32,14 @@ are reported in `notes`, never dropped silently.
 from __future__ import annotations
 
 import logging
+import time
 from datetime import datetime
 
 from draftkit.ids import normalize_name
 from draftkit.sleeper import IdentityError, SleeperClient
 
 from . import yahoo as yahoo_mod
+from .yahoo_api import get as yahoo_api_get
 
 log = logging.getLogger("manager")
 
@@ -97,9 +99,7 @@ class YahooSource:
         self.cfg = cfg
         self.league_id = str(getattr(cfg, "league_id", None) or cfg.get("league_id"))
         self.key = f"league/nfl.l.{self.league_id}"
-        if get is None:
-            from .yahoo_api import get
-        self._get = get
+        self._get = get or yahoo_api_get
         self.client = SleeperClient(cfg.path("raw"))
         self._players = players
         self._id_map = id_map
@@ -148,8 +148,23 @@ class YahooSource:
         return cands[0] if len(cands) == 1 else None
 
     # ------------------------------------------------------------- league
+    def _freshness_note(self) -> None:
+        """Say where the Yahoo data came from and how old it is. Live reads
+        need no note; a synced copy names its age, and a stale one warns."""
+        from .yahoo_api import has_credentials, read_cached
+        if self._get is not yahoo_api_get or has_credentials():
+            return
+        _, fetched = read_cached(f"{self.key}/teams/roster")
+        if fetched is None:
+            return
+        age_h = (time.time() - float(fetched)) / 3600.0
+        mark = "⚠ " if age_h > 6 else ""
+        self.notes.append(f"{mark}Yahoo data from the local sync, {age_h:.1f}h old"
+                          + (" — is the sync job running?" if age_h > 6 else ""))
+
     def _settings_body(self) -> dict:
         if self._settings is None:
+            self._freshness_note()
             body = self._get(f"{self.key}/settings")
             lg = body["fantasy_content"]["league"]
             meta = lg[0] if isinstance(lg[0], dict) else {}
