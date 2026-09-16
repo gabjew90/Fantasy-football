@@ -31,6 +31,17 @@ def main(argv: list[str]) -> int:
         print(f"token saved to {yahoo_api.TOKEN_PATH}; expires_in {tok.get('expires_in')}s; "
               f"refresh token {'present' if tok.get('refresh_token') else 'MISSING'}")
         return 0
+    if cmd == "secrets":
+        # For the user's own terminal only: the three values GitHub Actions
+        # needs as repository secrets. Never run this from an assistant.
+        tok = json.loads(Path(yahoo_api.TOKEN_PATH).read_text(encoding="utf-8"))
+        import os
+        print("Add these as repository secrets (Settings > Secrets and variables > Actions):")
+        print(f"YAHOO_CLIENT_ID={os.environ.get('YAHOO_CLIENT_ID', '')}")
+        print(f"YAHOO_CLIENT_SECRET={os.environ.get('YAHOO_CLIENT_SECRET', '')}")
+        print(f"YAHOO_REFRESH_TOKEN={tok.get('refresh_token', '')}")
+        print(f"FANTASYPROS_API_KEY={os.environ.get('FANTASYPROS_API_KEY', '')}")
+        return 0
     if cmd == "test":
         try:
             g = yahoo_api.get("game/nfl")

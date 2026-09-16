@@ -40,7 +40,8 @@ def configure(dry_run: bool = False) -> None:
 
 
 def get_store() -> Store:
-    return Store(Path("state"), read_only=_DRY_RUN)
+    from .context import state_dir
+    return Store(state_dir(), read_only=_DRY_RUN)
 
 
 def _write_report(name: str, body: str) -> None:
@@ -83,7 +84,7 @@ def plan_week(dry_run: bool = False) -> dict:
         log.info("dry run: not writing state/week_plan.json or state/gate_hours.json")
     else:
         gate_mod.write_plan(week, jobs)
-        (Path("state") / "gate_hours.json").write_text(json.dumps(hours), encoding="utf-8")
+        (gate_mod.plan_path().parent / "gate_hours.json").write_text(json.dumps(hours), encoding="utf-8")
 
     # accrue transaction history for FAAB accounting
     hist = store.get("txn_history", [])
@@ -140,7 +141,8 @@ def waiver_job(dry_run: bool = False) -> None:
     body += "\n\n" + trade_radar.build(ctx, store)
     top = re.search(r"\*\*(.+?)\*\*", body.split("## Top adds", 1)[-1])
     subject = (f"Waivers wk {ctx['week']} — top add: {top.group(1)}" if top
-               else f"Waivers wk {ctx['week']}") + " — bids by 7:00 PM PT"
+               else f"Waivers wk {ctx['week']}") + (" — bids by 7:00 PM PT" if ctx.get("faab", True)
+                                                    else " — claims in before waivers run")
     deliver(store, f"waivers:{ctx['week']}", subject, body, dry_run=dry_run)
     _write_report("waivers", body)
 

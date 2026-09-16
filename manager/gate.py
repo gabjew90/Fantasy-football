@@ -25,8 +25,13 @@ EARLY_MIN = 10       # due = target - 10 min (late-cron buffer)
 WINDOW_MIN = 45      # eligible for this long after due
 
 
-def plan_path(root: str | Path = ".") -> Path:
-    return Path(root) / "state" / "week_plan.json"
+def plan_path(root: str | Path | None = None) -> Path:
+    """The configured league's plan file. `root` is the test seam: an
+    explicit root keeps the old `<root>/state/week_plan.json` layout."""
+    if root is not None:
+        return Path(root) / "state" / "week_plan.json"
+    from .context import state_dir
+    return state_dir() / "week_plan.json"
 
 
 def to_plan_check(job: dict) -> dict:
@@ -57,7 +62,7 @@ def check_status(check: dict, now_utc: datetime) -> str:
     return "expired"
 
 
-def build_plan(week: int, jobs: list[dict], root: str | Path = ".") -> dict:
+def build_plan(week: int, jobs: list[dict], root: str | Path | None = None) -> dict:
     """The week plan as a dict, reading any committed plan for its done flags.
 
     Split out of write_plan so a dry run can render the plan without the file
@@ -82,7 +87,7 @@ def build_plan(week: int, jobs: list[dict], root: str | Path = ".") -> dict:
             "checks": checks}
 
 
-def write_plan(week: int, jobs: list[dict], root: str | Path = ".") -> Path:
+def write_plan(week: int, jobs: list[dict], root: str | Path | None = None) -> Path:
     path = plan_path(root)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(build_plan(week, jobs, root), indent=1), encoding="utf-8")
@@ -117,7 +122,7 @@ def plan_is_stale(plan: dict | None, live_week: int | None) -> bool:
     return not plan or int(plan.get("week") or 0) != int(live_week)
 
 
-def run_gate(dry_run: bool = False, root: str | Path = ".",
+def run_gate(dry_run: bool = False, root: str | Path | None = None,
              live_week: int | None = None) -> dict:
     """One tick: execute every due-and-not-done check; mark done; save.
 

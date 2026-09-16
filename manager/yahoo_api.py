@@ -68,12 +68,20 @@ def _save(tok: dict, path: Path = TOKEN_PATH) -> dict:
 
 
 def _load(path: Path = TOKEN_PATH) -> dict | None:
-    if not path.exists():
-        return None
-    try:
-        return json.loads(path.read_text(encoding="utf-8"))
-    except json.JSONDecodeError:
-        return None
+    if path.exists():
+        try:
+            return json.loads(path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            return None
+    # No file: a fresh checkout (GitHub Actions). The refresh token is the
+    # durable credential -- Yahoo's OAuth needs the sign-in once, on the
+    # machine that ran it -- so the scheduled jobs carry it as a secret and
+    # bootstrap the file from it. An expired access token is what makes
+    # access_token() refresh on the first use.
+    seed = os.environ.get("YAHOO_REFRESH_TOKEN")
+    if seed:
+        return {"refresh_token": seed, "access_token": "", "expires_in": 0, "obtained_at": 0}
+    return None
 
 
 def _token_call(data: dict) -> dict:

@@ -4126,5 +4126,13 @@ Not yet done, and needed before Keefamania is actually scheduled: the
 manager's state (store, week plan, gate hours, delivery bookkeeping) is
 one directory shared by every league, so a second league would collide
 with the first on every key; and the Yahoo refresh token lives only on
-the local machine, so Actions cannot yet call the API. Both are the next
-commit.
+the local machine, so Actions cannot yet call the API. Both done the
+same day: `manager.context.state_dir()` keeps the default league at
+`state/` (no migration) and gives every other league `state/<league>/`
+(store, week plan, gate hours, delivery bookkeeping); the guard reads
+every league directory; both workflows run every league per tick; the
+refresh token rides as a repository secret (`YAHOO_REFRESH_TOKEN`) and
+`yahoo_api._load` bootstraps the token file from it on a fresh checkout.
+The secrets themselves are the user's to add (`scripts/yahoo_auth.py
+secrets` prints them locally); until they are, Keefamania's Actions runs
+degrade to "DATA MISSING: Yahoo API rosters" and the snapshot fallback.

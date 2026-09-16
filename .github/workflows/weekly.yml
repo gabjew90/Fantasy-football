@@ -41,16 +41,25 @@ jobs:
           path: data/raw
           key: sleeper-raw-${{ github.run_started_at }}
           restore-keys: sleeper-raw-
-      - name: run windowed jobs
+      - name: run due jobs (every league)
         env:
           GITHUB_TOKEN: ${{ github.token }}
           ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
+          FANTASYPROS_API_KEY: ${{ secrets.FANTASYPROS_API_KEY }}
+          # Yahoo: the refresh token is the durable credential; the sign-in
+          # happened once, locally (scripts/yahoo_auth.py). Each league's
+          # state lives in its own directory (manager.context.state_dir).
+          YAHOO_CLIENT_ID: ${{ secrets.YAHOO_CLIENT_ID }}
+          YAHOO_CLIENT_SECRET: ${{ secrets.YAHOO_CLIENT_SECRET }}
+          YAHOO_REFRESH_TOKEN: ${{ secrets.YAHOO_REFRESH_TOKEN }}
         run: |
-          if [ -n "${{ github.event.inputs.job }}" ]; then
-            python -m manager cron --job "${{ github.event.inputs.job }}"
-          else
-            python -m manager cron
-          fi
+          for league in omnibeta keefamania; do
+            if [ -n "${{ github.event.inputs.job }}" ]; then
+              python -m manager --league "$league" cron --job "${{ github.event.inputs.job }}"
+            else
+              python -m manager --league "$league" cron
+            fi
+          done
       - name: commit state
         if: always()
         run: |

@@ -2,11 +2,12 @@
 
 Prints `run=true` when this tick should install Python and run the gate:
   * the tick was dispatched by hand; or
-  * the current UTC (iso_weekday, hour) is in state/gate_hours.json, the
-    hours the planner committed for this week's checks; or
-  * the committed week plan is missing or older than PLAN_MAX_AGE_DAYS --
-    the planner did not run, so the gate must tick to heal it (gate.run_gate
-    replans when the plan's week is not the live week).
+  * the current UTC (iso_weekday, hour) is in ANY league's gate_hours.json
+    (state/gate_hours.json for the default league, state/<league>/ for the
+    others), the hours the planner committed for this week's checks; or
+  * any league's committed week plan is missing or older than
+    PLAN_MAX_AGE_DAYS -- the planner did not run, so the gate must tick to
+    heal it (gate.run_gate replans when the plan's week is not the live week).
 
 The third rule is what was missing when the planner silently stopped on
 2026-08-31: gate_hours.json kept week-1 hours and the guard faithfully
@@ -24,6 +25,7 @@ PLAN_MAX_AGE_DAYS = 6
 
 def decide(now_utc: dt.datetime, hours_text: str | None, plan_text: str | None,
            forced: bool = False) -> tuple[bool, str]:
+    """One league's verdict."""
     if forced:
         return True, "dispatched"
     try:
@@ -45,15 +47,35 @@ def decide(now_utc: dt.datetime, hours_text: str | None, plan_text: str | None,
     return False, "outside gate hours"
 
 
+def league_dirs(state: pathlib.Path) -> list[pathlib.Path]:
+    """state/ itself (the default league) plus every state/<league>/ that
+    holds a plan or gate hours -- but not state/vegas, which holds snapshots."""
+    out = [state]
+    if state.exists():
+        for d in sorted(p for p in state.iterdir() if p.is_dir()):
+            if (d / "week_plan.json").exists() or (d / "gate_hours.json").exists():
+                out.append(d)
+    return out
+
+
+def decide_all(now_utc: dt.datetime, state: pathlib.Path, forced: bool = False) -> tuple[bool, str]:
+    reasons = []
+    for d in league_dirs(state):
+        hours, plan = d / "gate_hours.json", d / "week_plan.json"
+        run, why = decide(now_utc,
+                          hours.read_text(encoding="utf-8") if hours.exists() else None,
+                          plan.read_text(encoding="utf-8") if plan.exists() else None,
+                          forced)
+        label = d.name if d != state else "default"
+        if run:
+            return True, f"{label}: {why}"
+        reasons.append(f"{label}: {why}")
+    return False, "; ".join(reasons)
+
+
 def main(argv: list[str]) -> int:
     forced = "--forced" in argv
-    root = pathlib.Path(".")
-    hours = root / "state" / "gate_hours.json"
-    plan = root / "state" / "week_plan.json"
-    run, why = decide(dt.datetime.now(dt.timezone.utc),
-                      hours.read_text(encoding="utf-8") if hours.exists() else None,
-                      plan.read_text(encoding="utf-8") if plan.exists() else None,
-                      forced)
+    run, why = decide_all(dt.datetime.now(dt.timezone.utc), pathlib.Path("state"), forced)
     print(f"run={'true' if run else 'false'}")
     print(f"guard: {why}", file=sys.stderr)
     return 0

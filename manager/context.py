@@ -8,6 +8,7 @@ my/opponent team sets, current-week matchup pairing, remaining FAAB.
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 
 from draftkit import seasondata
 from draftkit.briefs import build_context
@@ -28,17 +29,43 @@ def configure(league: str | None = None, week: int | None = None) -> None:
     _LEAGUE, _WEEK = league, week
 
 
+def state_dir() -> Path:
+    """Where this league's committed state lives.
+
+    One directory served every league until 2026-09-16, which was fine while
+    only Omnibeta ran. The store keys (`ran:plan:2026-W38`, `waivers:2`, the
+    consensus cache), the week plan and the gate hours are all per league,
+    so a second league would have consumed the first league's runs and
+    overwritten its plan. The default league keeps `state/` unchanged (no
+    migration, the Actions history stays readable); every other league gets
+    `state/<league>/`. Same convention as Config.scoped for tiers.csv.
+    """
+    cfg = Config.load(league=_LEAGUE)
+    default = cfg.get("default_league")
+    name = cfg.league_name
+    if not name or name == default:
+        return Path("state")
+    return Path("state") / str(name)
+
+
 def league_context() -> dict:
     cfg = Config.load(league=_LEAGUE)
-    # The manager speaks Sleeper. A yahoo league would otherwise send its
-    # league_id to the Sleeper API and fail somewhere less legible.
+    # The league-side reads come from whichever platform hosts the league
+    # (draftkit.briefs.SleeperSource is the seam). Yahoo was refused here
+    # until 2026-09-16, when its API access was provisioned; an unknown
+    # platform is still a loud error rather than a Sleeper call with a
+    # foreign league id.
     platform = str(cfg.get("platform") or "sleeper").lower()
-    if platform != "sleeper":
+    if platform == "sleeper":
+        source = None
+    elif platform == "yahoo":
+        from .yahoo_context import YahooSource
+        source = YahooSource(cfg)
+    else:
         raise RuntimeError(
             f"the in-season manager cannot run league {cfg.league_name!r}: "
-            f"platform is {platform!r}, and only sleeper is supported. "
-            f"Yahoo's fantasy API is approval-gated, so there is no data path.")
-    ctx = build_context(cfg, week=_WEEK)
+            f"platform is {platform!r}; sleeper and yahoo are supported.")
+    ctx = build_context(cfg, week=_WEEK, source=source)
     ctx["my_rid"] = int(ctx["my_roster"]["roster_id"])
 
     users_by_rid = {}
