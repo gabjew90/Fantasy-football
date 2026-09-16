@@ -1,5 +1,5 @@
 {
- "fetched_at": 1789599609.320464,
+ "fetched_at": 1789602606.0728788,
  "path": "league/nfl.l.49649/teams",
  "payload": {
   "fantasy_content": {
@@ -854,7 +854,7 @@
     }
    ],
    "refresh_rate": "30",
-   "time": "75.522184371948ms",
+   "time": "81.258058547974ms",
    "xml:lang": "en-US",
    "yahoo:uri": "/fantasy/v2/league/nfl.l.49649/teams"
   }

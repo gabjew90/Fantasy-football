@@ -1,5 +1,5 @@
 {
- "fetched_at": 1789599610.0919032,
+ "fetched_at": 1789602606.6954482,
  "path": "league/nfl.l.49649/standings",
  "payload": {
   "fantasy_content": {
@@ -1108,7 +1108,7 @@
     }
    ],
    "refresh_rate": "30",
-   "time": "73.227882385254ms",
+   "time": "81.290006637573ms",
    "xml:lang": "en-US",
    "yahoo:uri": "/fantasy/v2/league/nfl.l.49649/standings"
   }

@@ -1,5 +1,5 @@
 {
- "fetched_at": 1789599610.983707,
+ "fetched_at": 1789602607.3243983,
  "path": "league/nfl.l.49649/scoreboard;week=2",
  "payload": {
   "fantasy_content": {
@@ -546,7 +546,7 @@
                },
                "team_projected_points": {
                 "coverage_type": "week",
-                "total": "108.78",
+                "total": "108.77",
                 "week": "2"
                },
                "win_probability": 0.43999999999999995
@@ -843,7 +843,7 @@
                },
                "team_projected_points": {
                 "coverage_type": "week",
-                "total": "109.63",
+                "total": "109.61",
                 "week": "2"
                },
                "win_probability": 0.5
@@ -1074,7 +1074,7 @@
     }
    ],
    "refresh_rate": "30",
-   "time": "110.64600944519ms",
+   "time": "93.849897384644ms",
    "xml:lang": "en-US",
    "yahoo:uri": "/fantasy/v2/league/nfl.l.49649/scoreboard;week=2"
   }
