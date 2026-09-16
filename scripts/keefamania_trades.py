@@ -39,6 +39,29 @@ SEASON_WEEKS = 17
 WIRE_PER_POS = 40
 
 
+def _surname(name: str) -> str:
+    """Yahoo writes suffixes ("Travis Etienne Jr."); the tag wants "Etienne"."""
+    parts = [w for w in name.split() if w.rstrip(".").lower() not in ("jr", "sr", "ii", "iii", "iv", "v")]
+    return parts[-1] if parts else name
+
+
+def _yahoo_id_map(cfg) -> dict[str, str]:
+    """{yahoo_id: sleeper_id} from the DynastyProcess id map; empty on any
+    failure, and yahoo.load then matches on names as it always did."""
+    try:
+        import polars as pl
+        from draftkit.ids import load_id_map
+        df = load_id_map(cfg.path("raw"))
+        if "yahoo_id" not in df.columns:
+            return {}
+        df = df.select(pl.col("yahoo_id").cast(pl.Int64, strict=False).cast(pl.Utf8),
+                       pl.col("sleeper_id")).drop_nulls()
+        return dict(df.iter_rows())
+    except Exception as e:  # noqa: BLE001
+        print(f"  yahoo: no id map ({e.__class__.__name__}) — matching on names")
+        return {}
+
+
 def build_ctx(league: str) -> dict:
     cfg = Config.load(league=league)
     client = SleeperClient(cfg.path("raw"))
@@ -59,11 +82,20 @@ def build_ctx(league: str) -> dict:
     con, notes = consensus.build(ctx)
     for n in notes:
         print(f"  consensus: {n}")
-    rosters, shape, ynotes = yahoo.load(cfg, players, con)
+    rosters, shape, ynotes = yahoo.load(cfg, players, con, source="auto", id_map=_yahoo_id_map(cfg))
     for n in ynotes:
         print(f"  yahoo: {n}")
     if not rosters:
         sys.exit("no rosters")
+    # Yahoo's designation is the one that decides IR-slot eligibility in this
+    # league, and it can lead Sleeper's feed by a day; it wins where it speaks.
+    overlay = yahoo.injury_overlay(rosters)
+    changed = {pid: (injury.get(pid) or "", st) for pid, st in overlay.items() if (injury.get(pid) or "") != st}
+    injury.update(overlay)
+    if changed:
+        print(f"  yahoo: injury designations that differ from Sleeper's: "
+              + ", ".join(f"{(players.get(pid) or {}).get('full_name', pid)} {a or 'healthy'}->{b}"
+                          for pid, (a, b) in changed.items()))
 
     def row(r, pid):
         c = con.get(pid) or {}
@@ -199,7 +231,7 @@ def main() -> None:
         theirs = adj[rid]
         rng = trade_radar._range_ppg(mine, theirs, give, get, shape, wv, wl)
         thin = marginal.newly_thin(mine, shape, arriving=get, departing=give, waivers=wv, key="ros")
-        tags = ", ".join(f"{p['name'].split()[-1][:7]} {acc['tags'][str(p['sleeper_id'])][0]}" for p in give)
+        tags = ", ".join(f"{_surname(p['name'])[:7]} {acc['tags'][str(p['sleeper_id'])][0]}" for p in give)
         r = f"{rng[0]:+.2f}..{rng[1]:+.2f}" if rng else "n/a"
         print(f"{ppg:>+6.2f} {r:>15} {acc['starters_market_after'] - acc['starters_market_before']:>+6d} "
               f"{acc['net_rank']:>+5.0f} {','.join(thin) or '-':>6}  "
