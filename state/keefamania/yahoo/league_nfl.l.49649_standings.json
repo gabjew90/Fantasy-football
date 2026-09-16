@@ -1,0 +1,1116 @@
+{
+ "fetched_at": 1789599610.0919032,
+ "path": "league/nfl.l.49649/standings",
+ "payload": {
+  "fantasy_content": {
+   "copyright": "Certain Data by Sportradar, Stats Perform and Rotowire",
+   "league": [
+    {
+     "allow_add_to_dl_extra_pos": 1,
+     "current_week": 2,
+     "draft_status": "postdraft",
+     "edit_key": "2",
+     "end_date": "2027-01-04",
+     "end_week": "17",
+     "felo_tier": "silver",
+     "game_code": "nfl",
+     "iris_group_chat_id": "",
+     "is_cash_league": "0",
+     "is_guillotine": "0",
+     "is_highscore": false,
+     "is_plus_league": "0",
+     "is_pro_league": "0",
+     "league_id": "49649",
+     "league_key": "470.l.49649",
+     "league_type": "private",
+     "league_update_timestamp": "1789541009",
+     "logo_url": "https://s.yimg.com/ep/cx/blendr/v2/image-avatar-football-trophy-buf-png_1721783391232.png",
+     "matchup_week": 2,
+     "max_teams": "10",
+     "name": "Keefamania",
+     "num_teams": 10,
+     "recordbook_url": "https://football.fantasysports.yahoo.com/f1/49649/recordbook?layout=webview&device=smartphone",
+     "renew": "",
+     "renewed": "",
+     "roster_type": "week",
+     "scoring_label": "H2H",
+     "scoring_type": "head",
+     "season": "2026",
+     "short_invitation_url": "https://football.fantasysports.yahoo.com/f1/49649/invitation?key=dcdd6d9e2f90266d&ikey=319457eceebc6ff6",
+     "start_date": "2026-09-09",
+     "start_week": "1",
+     "url": "https://football.fantasysports.yahoo.com/f1/49649",
+     "weekly_deadline": ""
+    },
+    {
+     "standings": [
+      {
+       "teams": {
+        "0": {
+         "team": [
+          [
+           {
+            "team_key": "470.l.49649.t.2"
+           },
+           {
+            "team_id": "2"
+           },
+           {
+            "name": "Ed Lasso\u2019s AFC Richmond"
+           },
+           [],
+           {
+            "url": "https://football.fantasysports.yahoo.com/f1/49649/2"
+           },
+           {
+            "team_logos": [
+             {
+              "team_logo": {
+               "size": "large",
+               "url": "https://s.yimg.com/ep/cx/blendr/v2/image-bunny-png_1721952315910.png"
+              }
+             }
+            ]
+           },
+           [],
+           [],
+           {
+            "waiver_priority": 3
+           },
+           [],
+           {
+            "number_of_moves": 1
+           },
+           {
+            "number_of_trades": 0
+           },
+           {
+            "roster_adds": {
+             "coverage_type": "week",
+             "coverage_value": 2,
+             "value": "0"
+            }
+           },
+           [],
+           {
+            "league_scoring_type": "head"
+           },
+           [],
+           {
+            "draft_position": 6
+           },
+           {
+            "draft_grade": "D",
+            "draft_recap_url": "https://football.fantasysports.yahoo.com/f1/49649/2/draftrecap",
+            "has_draft_grade": 1
+           },
+           [],
+           [],
+           [],
+           [],
+           [],
+           {
+            "managers": [
+             {
+              "manager": {
+               "felo_score": "683",
+               "felo_tier": "silver",
+               "guid": "--hidden--",
+               "image_url": "https://s.yimg.com/ag/images/default_user_profile_pic_64sq.jpg",
+               "manager_id": "2",
+               "nickname": "Edward"
+              }
+             }
+            ]
+           }
+          ],
+          {
+           "team_points": {
+            "coverage_type": "season",
+            "season": "2026",
+            "total": "153.76"
+           }
+          },
+          {
+           "team_standings": {
+            "outcome_totals": {
+             "losses": 0,
+             "percentage": "1.000",
+             "ties": 0,
+             "wins": "1"
+            },
+            "playoff_seed": "1",
+            "points_against": 113.06,
+            "points_for": "153.76",
+            "rank": "1",
+            "streak": {
+             "type": "win",
+             "value": "1"
+            }
+           }
+          }
+         ]
+        },
+        "1": {
+         "team": [
+          [
+           {
+            "team_key": "470.l.49649.t.7"
+           },
+           {
+            "team_id": "7"
+           },
+           {
+            "name": "WHISTLE/KEIBLER (STAN)"
+           },
+           [],
+           {
+            "url": "https://football.fantasysports.yahoo.com/f1/49649/7"
+           },
+           {
+            "team_logos": [
+             {
+              "team_logo": {
+               "size": "large",
+               "url": "https://s.yimg.com/ba/images/0b1f460050e00e1e111684e9d5376c881ac2dbc7c1e17370b1e39984e5e89f51.png"
+              }
+             }
+            ]
+           },
+           [],
+           [],
+           {
+            "waiver_priority": 10
+           },
+           [],
+           {
+            "number_of_moves": 8
+           },
+           {
+            "number_of_trades": 0
+           },
+           {
+            "roster_adds": {
+             "coverage_type": "week",
+             "coverage_value": 2,
+             "value": "3"
+            }
+           },
+           [],
+           {
+            "league_scoring_type": "head"
+           },
+           [],
+           {
+            "draft_position": 1
+           },
+           {
+            "draft_grade": "F",
+            "draft_recap_url": "https://football.fantasysports.yahoo.com/f1/49649/7/draftrecap",
+            "has_draft_grade": 1
+           },
+           [],
+           [],
+           [],
+           [],
+           [],
+           {
+            "managers": [
+             {
+              "manager": {
+               "felo_score": "577",
+               "felo_tier": "bronze",
+               "guid": "--hidden--",
+               "image_url": "https://s.yimg.com/ag/images/default_user_profile_pic_64sq.jpg",
+               "is_commissioner": "1",
+               "manager_id": "7",
+               "nickname": "Stanley"
+              }
+             }
+            ]
+           }
+          ],
+          {
+           "team_points": {
+            "coverage_type": "season",
+            "season": "2026",
+            "total": "130.80"
+           }
+          },
+          {
+           "team_standings": {
+            "outcome_totals": {
+             "losses": 0,
+             "percentage": "1.000",
+             "ties": 0,
+             "wins": "1"
+            },
+            "playoff_seed": "2",
+            "points_against": 120.22,
+            "points_for": "130.80",
+            "rank": "2",
+            "streak": {
+             "type": "win",
+             "value": "1"
+            }
+           }
+          }
+         ]
+        },
+        "2": {
+         "team": [
+          [
+           {
+            "team_key": "470.l.49649.t.3"
+           },
+           {
+            "team_id": "3"
+           },
+           {
+            "name": "Air Raid Gabriel"
+           },
+           {
+            "is_owned_by_current_login": 1
+           },
+           {
+            "url": "https://football.fantasysports.yahoo.com/f1/49649/3"
+           },
+           {
+            "team_logos": [
+             {
+              "team_logo": {
+               "size": "large",
+               "url": "https://s.yimg.com/ep/cx/blendr/v2/image-touchdown-signal-png_1721175309366.png"
+              }
+             }
+            ]
+           },
+           [],
+           [],
+           {
+            "waiver_priority": 9
+           },
+           [],
+           {
+            "number_of_moves": 13
+           },
+           {
+            "number_of_trades": 0
+           },
+           {
+            "roster_adds": {
+             "coverage_type": "week",
+             "coverage_value": 2,
+             "value": "4"
+            }
+           },
+           [],
+           {
+            "league_scoring_type": "head"
+           },
+           [],
+           {
+            "draft_position": 2
+           },
+           {
+            "draft_grade": "B",
+            "draft_recap_url": "https://football.fantasysports.yahoo.com/f1/49649/3/draftrecap",
+            "has_draft_grade": 1
+           },
+           [],
+           [],
+           [],
+           [],
+           [],
+           {
+            "managers": [
+             {
+              "manager": {
+               "felo_score": "640",
+               "felo_tier": "silver",
+               "guid": "--hidden--",
+               "image_url": "https://s.yimg.com/ag/images/default_user_profile_pic_64sq.jpg",
+               "is_current_login": "1",
+               "manager_id": "3",
+               "nickname": "Gabriel"
+              }
+             }
+            ]
+           }
+          ],
+          {
+           "team_points": {
+            "coverage_type": "season",
+            "season": "2026",
+            "total": "122.06"
+           }
+          },
+          {
+           "team_standings": {
+            "outcome_totals": {
+             "losses": 0,
+             "percentage": "1.000",
+             "ties": 0,
+             "wins": "1"
+            },
+            "playoff_seed": "3",
+            "points_against": 88.7,
+            "points_for": "122.06",
+            "rank": "3",
+            "streak": {
+             "type": "win",
+             "value": "1"
+            }
+           }
+          }
+         ]
+        },
+        "3": {
+         "team": [
+          [
+           {
+            "team_key": "470.l.49649.t.4"
+           },
+           {
+            "team_id": "4"
+           },
+           {
+            "name": "Angle Lockers"
+           },
+           [],
+           {
+            "url": "https://football.fantasysports.yahoo.com/f1/49649/4"
+           },
+           {
+            "team_logos": [
+             {
+              "team_logo": {
+               "size": "large",
+               "url": "https://s.yimg.com/ep/cx/blendr/v2/image-dracula-png_1721173923779.png"
+              }
+             }
+            ]
+           },
+           [],
+           [],
+           {
+            "waiver_priority": 2
+           },
+           [],
+           {
+            "number_of_moves": 1
+           },
+           {
+            "number_of_trades": 0
+           },
+           {
+            "roster_adds": {
+             "coverage_type": "week",
+             "coverage_value": 2,
+             "value": "0"
+            }
+           },
+           [],
+           {
+            "league_scoring_type": "head"
+           },
+           [],
+           {
+            "draft_position": 9
+           },
+           {
+            "draft_grade": "C-",
+            "draft_recap_url": "https://football.fantasysports.yahoo.com/f1/49649/4/draftrecap",
+            "has_draft_grade": 1
+           },
+           [],
+           [],
+           [],
+           [],
+           [],
+           {
+            "managers": [
+             {
+              "manager": {
+               "felo_score": "597",
+               "felo_tier": "bronze",
+               "guid": "--hidden--",
+               "image_url": "https://s.yimg.com/ag/images/4461/38167518674_db17e8_64sq.jpg",
+               "manager_id": "4",
+               "nickname": "x3shift"
+              }
+             }
+            ]
+           }
+          ],
+          {
+           "team_points": {
+            "coverage_type": "season",
+            "season": "2026",
+            "total": "117.46"
+           }
+          },
+          {
+           "team_standings": {
+            "outcome_totals": {
+             "losses": 0,
+             "percentage": "1.000",
+             "ties": 0,
+             "wins": "1"
+            },
+            "playoff_seed": "4",
+            "points_against": 95.2,
+            "points_for": "117.46",
+            "rank": "4",
+            "streak": {
+             "type": "win",
+             "value": "1"
+            }
+           }
+          }
+         ]
+        },
+        "4": {
+         "team": [
+          [
+           {
+            "team_key": "470.l.49649.t.8"
+           },
+           {
+            "team_id": "8"
+           },
+           {
+            "name": "Kelvin's Frontline Precision"
+           },
+           [],
+           {
+            "url": "https://football.fantasysports.yahoo.com/f1/49649/8"
+           },
+           {
+            "team_logos": [
+             {
+              "team_logo": {
+               "size": "large",
+               "url": "https://s.yimg.com/ba/images/72872f4869515b3d98f29efb9b46b3a0d9df0511e7744a8881d0a0b77a81a73c.png"
+              }
+             }
+            ]
+           },
+           [],
+           [],
+           {
+            "waiver_priority": 4
+           },
+           [],
+           {
+            "number_of_moves": 7
+           },
+           {
+            "number_of_trades": 0
+           },
+           {
+            "roster_adds": {
+             "coverage_type": "week",
+             "coverage_value": 2,
+             "value": "2"
+            }
+           },
+           [],
+           {
+            "league_scoring_type": "head"
+           },
+           [],
+           {
+            "draft_position": 8
+           },
+           {
+            "draft_grade": "D",
+            "draft_recap_url": "https://football.fantasysports.yahoo.com/f1/49649/8/draftrecap",
+            "has_draft_grade": 1
+           },
+           [],
+           [],
+           [],
+           [],
+           [],
+           {
+            "managers": [
+             {
+              "manager": {
+               "felo_score": "596",
+               "felo_tier": "bronze",
+               "guid": "--hidden--",
+               "image_url": "https://s.yimg.com/ag/images/default_user_profile_pic_64sq.jpg",
+               "manager_id": "8",
+               "nickname": "Kelvin"
+              }
+             }
+            ]
+           }
+          ],
+          {
+           "team_points": {
+            "coverage_type": "season",
+            "season": "2026",
+            "total": "104.72"
+           }
+          },
+          {
+           "team_standings": {
+            "outcome_totals": {
+             "losses": 0,
+             "percentage": "1.000",
+             "ties": 0,
+             "wins": "1"
+            },
+            "playoff_seed": "5",
+            "points_against": 90.56,
+            "points_for": "104.72",
+            "rank": "5",
+            "streak": {
+             "type": "win",
+             "value": "1"
+            }
+           }
+          }
+         ]
+        },
+        "5": {
+         "team": [
+          [
+           {
+            "team_key": "470.l.49649.t.9"
+           },
+           {
+            "team_id": "9"
+           },
+           {
+            "name": "Endzone Zack"
+           },
+           [],
+           {
+            "url": "https://football.fantasysports.yahoo.com/f1/49649/9"
+           },
+           {
+            "team_logos": [
+             {
+              "team_logo": {
+               "size": "large",
+               "url": "https://s.yimg.com/ep/cx/blendr/v2/image-football-trophy-png_1721174536245.png"
+              }
+             }
+            ]
+           },
+           [],
+           [],
+           {
+            "waiver_priority": 8
+           },
+           [],
+           {
+            "number_of_moves": 2
+           },
+           {
+            "number_of_trades": 0
+           },
+           {
+            "roster_adds": {
+             "coverage_type": "week",
+             "coverage_value": 2,
+             "value": "1"
+            }
+           },
+           [],
+           {
+            "league_scoring_type": "head"
+           },
+           [],
+           {
+            "draft_position": 3
+           },
+           {
+            "draft_grade": "A-",
+            "draft_recap_url": "https://football.fantasysports.yahoo.com/f1/49649/9/draftrecap",
+            "has_draft_grade": 1
+           },
+           [],
+           [],
+           [],
+           [],
+           [],
+           {
+            "managers": [
+             {
+              "manager": {
+               "felo_score": "590",
+               "felo_tier": "bronze",
+               "guid": "--hidden--",
+               "image_url": "https://s.yimg.com/ag/images/default_user_profile_pic_64sq.jpg",
+               "manager_id": "9",
+               "nickname": "Zack"
+              }
+             }
+            ]
+           }
+          ],
+          {
+           "team_points": {
+            "coverage_type": "season",
+            "season": "2026",
+            "total": "120.22"
+           }
+          },
+          {
+           "team_standings": {
+            "outcome_totals": {
+             "losses": "1",
+             "percentage": ".000",
+             "ties": 0,
+             "wins": 0
+            },
+            "playoff_seed": "6",
+            "points_against": 130.8,
+            "points_for": "120.22",
+            "rank": "6",
+            "streak": {
+             "type": "loss",
+             "value": "1"
+            }
+           }
+          }
+         ]
+        },
+        "6": {
+         "team": [
+          [
+           {
+            "team_key": "470.l.49649.t.1"
+           },
+           {
+            "team_id": "1"
+           },
+           {
+            "name": "QuAck Attack (Simon)"
+           },
+           [],
+           {
+            "url": "https://football.fantasysports.yahoo.com/f1/49649/1"
+           },
+           {
+            "team_logos": [
+             {
+              "team_logo": {
+               "size": "large",
+               "url": "https://yahoofantasysports-res.cloudinary.com/image/upload/t_s192sq/fantasy-logos/326cd1ed85970402f9292e8af60d06180b34c713f5a02343843a83213f180987.jpg"
+              }
+             }
+            ]
+           },
+           [],
+           [],
+           {
+            "waiver_priority": 6
+           },
+           [],
+           {
+            "number_of_moves": 1
+           },
+           {
+            "number_of_trades": 0
+           },
+           {
+            "roster_adds": {
+             "coverage_type": "week",
+             "coverage_value": 2,
+             "value": "0"
+            }
+           },
+           [],
+           {
+            "league_scoring_type": "head"
+           },
+           [],
+           {
+            "draft_position": 7
+           },
+           {
+            "draft_grade": "F",
+            "draft_recap_url": "https://football.fantasysports.yahoo.com/f1/49649/1/draftrecap",
+            "has_draft_grade": 1
+           },
+           [],
+           [],
+           [],
+           [],
+           [],
+           {
+            "managers": [
+             {
+              "manager": {
+               "felo_score": "589",
+               "felo_tier": "bronze",
+               "guid": "--hidden--",
+               "image_url": "https://s.yimg.com/ag/images/default_user_profile_pic_64sq.jpg",
+               "is_commissioner": "1",
+               "manager_id": "1",
+               "nickname": "Simon"
+              }
+             }
+            ]
+           }
+          ],
+          {
+           "team_points": {
+            "coverage_type": "season",
+            "season": "2026",
+            "total": "113.06"
+           }
+          },
+          {
+           "team_standings": {
+            "outcome_totals": {
+             "losses": "1",
+             "percentage": ".000",
+             "ties": 0,
+             "wins": 0
+            },
+            "playoff_seed": "7",
+            "points_against": 153.76,
+            "points_for": "113.06",
+            "rank": "7",
+            "streak": {
+             "type": "loss",
+             "value": "1"
+            }
+           }
+          }
+         ]
+        },
+        "7": {
+         "team": [
+          [
+           {
+            "team_key": "470.l.49649.t.10"
+           },
+           {
+            "team_id": "10"
+           },
+           {
+            "name": "Beastmode"
+           },
+           [],
+           {
+            "url": "https://football.fantasysports.yahoo.com/f1/49649/10"
+           },
+           {
+            "team_logos": [
+             {
+              "team_logo": {
+               "size": "large",
+               "url": "https://s.yimg.com/ep/cx/blendr/v2/image-skulland-bones-png_1721174079578.png"
+              }
+             }
+            ]
+           },
+           [],
+           [],
+           {
+            "waiver_priority": 5
+           },
+           [],
+           {
+            "number_of_moves": 1
+           },
+           {
+            "number_of_trades": 0
+           },
+           {
+            "roster_adds": {
+             "coverage_type": "week",
+             "coverage_value": 2,
+             "value": "0"
+            }
+           },
+           [],
+           {
+            "league_scoring_type": "head"
+           },
+           [],
+           {
+            "draft_position": 5
+           },
+           {
+            "draft_grade": "D",
+            "draft_recap_url": "https://football.fantasysports.yahoo.com/f1/49649/10/draftrecap",
+            "has_draft_grade": 1
+           },
+           [],
+           [],
+           [],
+           [],
+           [],
+           {
+            "managers": [
+             {
+              "manager": {
+               "felo_score": "589",
+               "felo_tier": "bronze",
+               "guid": "--hidden--",
+               "image_url": "https://s.yimg.com/ag/images/default_user_profile_pic_64sq.jpg",
+               "manager_id": "10",
+               "nickname": "Chris"
+              }
+             }
+            ]
+           }
+          ],
+          {
+           "team_points": {
+            "coverage_type": "season",
+            "season": "2026",
+            "total": "95.20"
+           }
+          },
+          {
+           "team_standings": {
+            "outcome_totals": {
+             "losses": "1",
+             "percentage": ".000",
+             "ties": 0,
+             "wins": 0
+            },
+            "playoff_seed": "8",
+            "points_against": 117.46,
+            "points_for": "95.20",
+            "rank": "8",
+            "streak": {
+             "type": "loss",
+             "value": "1"
+            }
+           }
+          }
+         ]
+        },
+        "8": {
+         "team": [
+          [
+           {
+            "team_key": "470.l.49649.t.6"
+           },
+           {
+            "team_id": "6"
+           },
+           {
+            "name": "Big PP"
+           },
+           [],
+           {
+            "url": "https://football.fantasysports.yahoo.com/f1/49649/6"
+           },
+           {
+            "team_logos": [
+             {
+              "team_logo": {
+               "size": "large",
+               "url": "https://s.yimg.com/ep/cx/blendr/v2/image-dracula-png_1721173923779.png"
+              }
+             }
+            ]
+           },
+           [],
+           [],
+           {
+            "waiver_priority": 7
+           },
+           [],
+           {
+            "number_of_moves": 1
+           },
+           {
+            "number_of_trades": 0
+           },
+           {
+            "roster_adds": {
+             "coverage_type": "week",
+             "coverage_value": 2,
+             "value": "1"
+            }
+           },
+           [],
+           {
+            "league_scoring_type": "head"
+           },
+           [],
+           {
+            "draft_position": 4
+           },
+           {
+            "draft_grade": "C+",
+            "draft_recap_url": "https://football.fantasysports.yahoo.com/f1/49649/6/draftrecap",
+            "has_draft_grade": 1
+           },
+           [],
+           [],
+           [],
+           [],
+           [],
+           {
+            "managers": [
+             {
+              "manager": {
+               "felo_score": "589",
+               "felo_tier": "bronze",
+               "guid": "--hidden--",
+               "image_url": "https://s.yimg.com/ag/images/default_user_profile_pic_64sq.jpg",
+               "manager_id": "6",
+               "nickname": "pmo"
+              }
+             }
+            ]
+           }
+          ],
+          {
+           "team_points": {
+            "coverage_type": "season",
+            "season": "2026",
+            "total": "90.56"
+           }
+          },
+          {
+           "team_standings": {
+            "outcome_totals": {
+             "losses": "1",
+             "percentage": ".000",
+             "ties": 0,
+             "wins": 0
+            },
+            "playoff_seed": "9",
+            "points_against": 104.72,
+            "points_for": "90.56",
+            "rank": "9",
+            "streak": {
+             "type": "loss",
+             "value": "1"
+            }
+           }
+          }
+         ]
+        },
+        "9": {
+         "team": [
+          [
+           {
+            "team_key": "470.l.49649.t.5"
+           },
+           {
+            "team_id": "5"
+           },
+           {
+            "name": "Off in Chapel"
+           },
+           [],
+           {
+            "url": "https://football.fantasysports.yahoo.com/f1/49649/5"
+           },
+           {
+            "team_logos": [
+             {
+              "team_logo": {
+               "size": "large",
+               "url": "https://s.yimg.com/ep/cx/blendr/v2/image-luchador-png_1721174314847.png"
+              }
+             }
+            ]
+           },
+           [],
+           [],
+           {
+            "waiver_priority": 1
+           },
+           [],
+           {
+            "number_of_moves": 0
+           },
+           {
+            "number_of_trades": 0
+           },
+           {
+            "roster_adds": {
+             "coverage_type": "week",
+             "coverage_value": 2,
+             "value": "0"
+            }
+           },
+           [],
+           {
+            "league_scoring_type": "head"
+           },
+           [],
+           {
+            "draft_position": 10
+           },
+           {
+            "draft_grade": "D",
+            "draft_recap_url": "https://football.fantasysports.yahoo.com/f1/49649/5/draftrecap",
+            "has_draft_grade": 1
+           },
+           [],
+           [],
+           [],
+           [],
+           [],
+           {
+            "managers": [
+             {
+              "manager": {
+               "felo_score": "588",
+               "felo_tier": "bronze",
+               "guid": "--hidden--",
+               "image_url": "https://s.yimg.com/ag/images/default_user_profile_pic_64sq.jpg",
+               "manager_id": "5",
+               "nickname": "Kevin"
+              }
+             }
+            ]
+           }
+          ],
+          {
+           "team_points": {
+            "coverage_type": "season",
+            "season": "2026",
+            "total": "88.70"
+           }
+          },
+          {
+           "team_standings": {
+            "outcome_totals": {
+             "losses": "1",
+             "percentage": ".000",
+             "ties": 0,
+             "wins": 0
+            },
+            "playoff_seed": "10",
+            "points_against": 122.06,
+            "points_for": "88.70",
+            "rank": "10",
+            "streak": {
+             "type": "loss",
+             "value": "1"
+            }
+           }
+          }
+         ]
+        },
+        "count": 10
+       }
+      }
+     ]
+    }
+   ],
+   "refresh_rate": "30",
+   "time": "73.227882385254ms",
+   "xml:lang": "en-US",
+   "yahoo:uri": "/fantasy/v2/league/nfl.l.49649/standings"
+  }
+ }
+}

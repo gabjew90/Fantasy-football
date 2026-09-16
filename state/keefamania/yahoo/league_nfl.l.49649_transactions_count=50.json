@@ -1,0 +1,3446 @@
+{
+ "fetched_at": 1789599611.6156504,
+ "path": "league/nfl.l.49649/transactions;count=50",
+ "payload": {
+  "fantasy_content": {
+   "copyright": "Certain Data by Sportradar, Stats Perform and Rotowire",
+   "league": [
+    {
+     "allow_add_to_dl_extra_pos": 1,
+     "current_week": 2,
+     "draft_status": "postdraft",
+     "edit_key": "2",
+     "end_date": "2027-01-04",
+     "end_week": "17",
+     "felo_tier": "silver",
+     "game_code": "nfl",
+     "iris_group_chat_id": "",
+     "is_cash_league": "0",
+     "is_guillotine": "0",
+     "is_highscore": false,
+     "is_plus_league": "0",
+     "is_pro_league": "0",
+     "league_id": "49649",
+     "league_key": "470.l.49649",
+     "league_type": "private",
+     "league_update_timestamp": "1789541009",
+     "logo_url": "https://s.yimg.com/ep/cx/blendr/v2/image-avatar-football-trophy-buf-png_1721783391232.png",
+     "matchup_week": 2,
+     "max_teams": "10",
+     "name": "Keefamania",
+     "num_teams": 10,
+     "recordbook_url": "https://football.fantasysports.yahoo.com/f1/49649/recordbook?layout=webview&device=smartphone",
+     "renew": "",
+     "renewed": "",
+     "roster_type": "week",
+     "scoring_label": "H2H",
+     "scoring_type": "head",
+     "season": "2026",
+     "short_invitation_url": "https://football.fantasysports.yahoo.com/f1/49649/invitation?key=dcdd6d9e2f90266d&ikey=319457eceebc6ff6",
+     "start_date": "2026-09-09",
+     "start_week": "1",
+     "url": "https://football.fantasysports.yahoo.com/f1/49649",
+     "weekly_deadline": ""
+    },
+    {
+     "transactions": {
+      "0": {
+       "transaction": [
+        {
+         "status": "successful",
+         "timestamp": "1789594318",
+         "transaction_id": "60",
+         "transaction_key": "470.l.49649.tr.60",
+         "type": "add/drop"
+        },
+        {
+         "players": {
+          "0": {
+           "player": [
+            [
+             {
+              "player_key": "470.p.40915"
+             },
+             {
+              "player_id": "40915"
+             },
+             {
+              "name": {
+               "ascii_first": "Adonai",
+               "ascii_last": "Mitchell",
+               "first": "Adonai",
+               "full": "Adonai Mitchell",
+               "last": "Mitchell"
+              }
+             },
+             {
+              "editorial_team_abbr": "NYJ"
+             },
+             {
+              "display_position": "WR"
+             },
+             {
+              "position_type": "O"
+             }
+            ],
+            {
+             "transaction_data": [
+              {
+               "destination_team_key": "470.l.49649.t.7",
+               "destination_team_name": "WHISTLE/KEIBLER (STAN)",
+               "destination_type": "team",
+               "source_type": "freeagents",
+               "type": "add"
+              }
+             ]
+            }
+           ]
+          },
+          "1": {
+           "player": [
+            [
+             {
+              "player_key": "470.p.42655"
+             },
+             {
+              "player_id": "42655"
+             },
+             {
+              "name": {
+               "ascii_first": "De'Zhaun",
+               "ascii_last": "Stribling",
+               "first": "De'Zhaun",
+               "full": "De'Zhaun Stribling",
+               "last": "Stribling"
+              }
+             },
+             {
+              "editorial_team_abbr": "SF"
+             },
+             {
+              "display_position": "WR"
+             },
+             {
+              "position_type": "O"
+             }
+            ],
+            {
+             "transaction_data": {
+              "destination_type": "waivers",
+              "source_team_key": "470.l.49649.t.7",
+              "source_team_name": "WHISTLE/KEIBLER (STAN)",
+              "source_type": "team",
+              "type": "drop"
+             }
+            }
+           ]
+          },
+          "count": 2
+         }
+        }
+       ]
+      },
+      "1": {
+       "transaction": [
+        {
+         "status": "successful",
+         "timestamp": "1789577746",
+         "transaction_id": "59",
+         "transaction_key": "470.l.49649.tr.59",
+         "type": "add/drop"
+        },
+        {
+         "players": {
+          "0": {
+           "player": [
+            [
+             {
+              "player_key": "470.p.29235"
+             },
+             {
+              "player_id": "29235"
+             },
+             {
+              "name": {
+               "ascii_first": "Jared",
+               "ascii_last": "Goff",
+               "first": "Jared",
+               "full": "Jared Goff",
+               "last": "Goff"
+              }
+             },
+             {
+              "editorial_team_abbr": "Det"
+             },
+             {
+              "display_position": "QB"
+             },
+             {
+              "position_type": "O"
+             }
+            ],
+            {
+             "transaction_data": [
+              {
+               "destination_team_key": "470.l.49649.t.8",
+               "destination_team_name": "Kelvin's Frontline Precision",
+               "destination_type": "team",
+               "source_type": "freeagents",
+               "type": "add"
+              }
+             ]
+            }
+           ]
+          },
+          "1": {
+           "player": [
+            [
+             {
+              "player_key": "470.p.40201"
+             },
+             {
+              "player_id": "40201"
+             },
+             {
+              "name": {
+               "ascii_first": "Dontayvion",
+               "ascii_last": "Wicks",
+               "first": "Dontayvion",
+               "full": "Dontayvion Wicks",
+               "last": "Wicks"
+              }
+             },
+             {
+              "editorial_team_abbr": "Phi"
+             },
+             {
+              "display_position": "WR"
+             },
+             {
+              "position_type": "O"
+             }
+            ],
+            {
+             "transaction_data": {
+              "destination_type": "freeagents",
+              "source_team_key": "470.l.49649.t.8",
+              "source_team_name": "Kelvin's Frontline Precision",
+              "source_type": "team",
+              "type": "drop"
+             }
+            }
+           ]
+          },
+          "count": 2
+         }
+        }
+       ]
+      },
+      "10": {
+       "transaction": [
+        {
+         "status": "successful",
+         "timestamp": "1789542423",
+         "transaction_id": "47",
+         "transaction_key": "470.l.49649.tr.47",
+         "type": "add"
+        },
+        {
+         "players": {
+          "0": {
+           "player": [
+            [
+             {
+              "player_key": "470.p.40201"
+             },
+             {
+              "player_id": "40201"
+             },
+             {
+              "name": {
+               "ascii_first": "Dontayvion",
+               "ascii_last": "Wicks",
+               "first": "Dontayvion",
+               "full": "Dontayvion Wicks",
+               "last": "Wicks"
+              }
+             },
+             {
+              "editorial_team_abbr": "Phi"
+             },
+             {
+              "display_position": "WR"
+             },
+             {
+              "position_type": "O"
+             }
+            ],
+            {
+             "transaction_data": [
+              {
+               "destination_team_key": "470.l.49649.t.8",
+               "destination_team_name": "Kelvin's Frontline Precision",
+               "destination_type": "team",
+               "source_type": "freeagents",
+               "type": "add"
+              }
+             ]
+            }
+           ]
+          },
+          "count": 1
+         }
+        }
+       ]
+      },
+      "11": {
+       "transaction": [
+        {
+         "status": "successful",
+         "timestamp": "1789480291",
+         "transaction_id": "46",
+         "transaction_key": "470.l.49649.tr.46",
+         "type": "drop"
+        },
+        {
+         "players": {
+          "0": {
+           "player": [
+            [
+             {
+              "player_key": "470.p.31833"
+             },
+             {
+              "player_id": "31833"
+             },
+             {
+              "name": {
+               "ascii_first": "Kyler",
+               "ascii_last": "Murray",
+               "first": "Kyler",
+               "full": "Kyler Murray",
+               "last": "Murray"
+              }
+             },
+             {
+              "editorial_team_abbr": "Min"
+             },
+             {
+              "display_position": "QB"
+             },
+             {
+              "position_type": "O"
+             }
+            ],
+            {
+             "transaction_data": {
+              "destination_type": "waivers",
+              "source_team_key": "470.l.49649.t.8",
+              "source_team_name": "Kelvin's Frontline Precision",
+              "source_type": "team",
+              "type": "drop"
+             }
+            }
+           ]
+          },
+          "count": 1
+         }
+        }
+       ]
+      },
+      "12": {
+       "transaction": [
+        {
+         "status": "successful",
+         "timestamp": "1789479413",
+         "transaction_id": "45",
+         "transaction_key": "470.l.49649.tr.45",
+         "type": "drop"
+        },
+        {
+         "players": {
+          "0": {
+           "player": [
+            [
+             {
+              "player_key": "470.p.41902"
+             },
+             {
+              "player_id": "41902"
+             },
+             {
+              "name": {
+               "ascii_first": "Woody",
+               "ascii_last": "Marks",
+               "first": "Woody",
+               "full": "Woody Marks",
+               "last": "Marks"
+              }
+             },
+             {
+              "editorial_team_abbr": "Hou"
+             },
+             {
+              "display_position": "RB"
+             },
+             {
+              "position_type": "O"
+             }
+            ],
+            {
+             "transaction_data": {
+              "destination_type": "waivers",
+              "source_team_key": "470.l.49649.t.8",
+              "source_team_name": "Kelvin's Frontline Precision",
+              "source_type": "team",
+              "type": "drop"
+             }
+            }
+           ]
+          },
+          "count": 1
+         }
+        }
+       ]
+      },
+      "13": {
+       "transaction": [
+        {
+         "status": "successful",
+         "timestamp": "1789283400",
+         "transaction_id": "44",
+         "transaction_key": "470.l.49649.tr.44",
+         "type": "add"
+        },
+        {
+         "players": {
+          "0": {
+           "player": [
+            [
+             {
+              "player_key": "470.p.42696"
+             },
+             {
+              "player_id": "42696"
+             },
+             {
+              "name": {
+               "ascii_first": "Malachi",
+               "ascii_last": "Fields",
+               "first": "Malachi",
+               "full": "Malachi Fields",
+               "last": "Fields"
+              }
+             },
+             {
+              "editorial_team_abbr": "NYG"
+             },
+             {
+              "display_position": "WR"
+             },
+             {
+              "position_type": "O"
+             }
+            ],
+            {
+             "transaction_data": [
+              {
+               "destination_team_key": "470.l.49649.t.4",
+               "destination_team_name": "Angle Lockers",
+               "destination_type": "team",
+               "source_type": "freeagents",
+               "type": "add"
+              }
+             ]
+            }
+           ]
+          },
+          "count": 1
+         }
+        }
+       ]
+      },
+      "14": {
+       "transaction": [
+        {
+         "status": "successful",
+         "timestamp": "1789283344",
+         "transaction_id": "43",
+         "transaction_key": "470.l.49649.tr.43",
+         "type": "drop"
+        },
+        {
+         "players": {
+          "0": {
+           "player": [
+            [
+             {
+              "player_key": "470.p.42646"
+             },
+             {
+              "player_id": "42646"
+             },
+             {
+              "name": {
+               "ascii_first": "KC",
+               "ascii_last": "Concepcion Jr.",
+               "first": "KC",
+               "full": "KC Concepcion Jr.",
+               "last": "Concepcion Jr."
+              }
+             },
+             {
+              "editorial_team_abbr": "Cle"
+             },
+             {
+              "display_position": "WR"
+             },
+             {
+              "position_type": "O"
+             }
+            ],
+            {
+             "transaction_data": {
+              "destination_type": "waivers",
+              "source_team_key": "470.l.49649.t.4",
+              "source_team_name": "Angle Lockers",
+              "source_type": "team",
+              "type": "drop"
+             }
+            }
+           ]
+          },
+          "count": 1
+         }
+        }
+       ]
+      },
+      "15": {
+       "transaction": [
+        {
+         "status": "successful",
+         "timestamp": "1789259168",
+         "transaction_id": "42",
+         "transaction_key": "470.l.49649.tr.42",
+         "type": "add"
+        },
+        {
+         "players": {
+          "0": {
+           "player": [
+            [
+             {
+              "player_key": "470.p.40097"
+             },
+             {
+              "player_id": "40097"
+             },
+             {
+              "name": {
+               "ascii_first": "Tank",
+               "ascii_last": "Dell",
+               "first": "Tank",
+               "full": "Tank Dell",
+               "last": "Dell"
+              }
+             },
+             {
+              "editorial_team_abbr": "Hou"
+             },
+             {
+              "display_position": "WR"
+             },
+             {
+              "position_type": "O"
+             }
+            ],
+            {
+             "transaction_data": [
+              {
+               "destination_team_key": "470.l.49649.t.3",
+               "destination_team_name": "Air Raid Gabriel",
+               "destination_type": "team",
+               "source_type": "freeagents",
+               "type": "add"
+              }
+             ]
+            }
+           ]
+          },
+          "count": 1
+         }
+        }
+       ]
+      },
+      "16": {
+       "transaction": [
+        {
+         "status": "successful",
+         "timestamp": "1789230979",
+         "transaction_id": "41",
+         "transaction_key": "470.l.49649.tr.41",
+         "type": "add/drop"
+        },
+        {
+         "players": {
+          "0": {
+           "player": [
+            [
+             {
+              "player_key": "470.p.40065"
+             },
+             {
+              "player_id": "40065"
+             },
+             {
+              "name": {
+               "ascii_first": "Michael",
+               "ascii_last": "Mayer",
+               "first": "Michael",
+               "full": "Michael Mayer",
+               "last": "Mayer"
+              }
+             },
+             {
+              "editorial_team_abbr": "LV"
+             },
+             {
+              "display_position": "TE"
+             },
+             {
+              "position_type": "O"
+             }
+            ],
+            {
+             "transaction_data": [
+              {
+               "destination_team_key": "470.l.49649.t.7",
+               "destination_team_name": "WHISTLE/KEIBLER (STAN)",
+               "destination_type": "team",
+               "source_type": "freeagents",
+               "type": "add"
+              }
+             ]
+            }
+           ]
+          },
+          "1": {
+           "player": [
+            [
+             {
+              "player_key": "470.p.41825"
+             },
+             {
+              "player_id": "41825"
+             },
+             {
+              "name": {
+               "ascii_first": "Tyler",
+               "ascii_last": "Shough",
+               "first": "Tyler",
+               "full": "Tyler Shough",
+               "last": "Shough"
+              }
+             },
+             {
+              "editorial_team_abbr": "NO"
+             },
+             {
+              "display_position": "QB"
+             },
+             {
+              "position_type": "O"
+             }
+            ],
+            {
+             "transaction_data": {
+              "destination_type": "waivers",
+              "source_team_key": "470.l.49649.t.7",
+              "source_team_name": "WHISTLE/KEIBLER (STAN)",
+              "source_type": "team",
+              "type": "drop"
+             }
+            }
+           ]
+          },
+          "count": 2
+         }
+        }
+       ]
+      },
+      "17": {
+       "transaction": [
+        {
+         "status": "successful",
+         "timestamp": "1789198697",
+         "transaction_id": "40",
+         "transaction_key": "470.l.49649.tr.40",
+         "type": "add/drop"
+        },
+        {
+         "players": {
+          "0": {
+           "player": [
+            [
+             {
+              "player_key": "470.p.41902"
+             },
+             {
+              "player_id": "41902"
+             },
+             {
+              "name": {
+               "ascii_first": "Woody",
+               "ascii_last": "Marks",
+               "first": "Woody",
+               "full": "Woody Marks",
+               "last": "Marks"
+              }
+             },
+             {
+              "editorial_team_abbr": "Hou"
+             },
+             {
+              "display_position": "RB"
+             },
+             {
+              "position_type": "O"
+             }
+            ],
+            {
+             "transaction_data": [
+              {
+               "destination_team_key": "470.l.49649.t.8",
+               "destination_team_name": "Kelvin's Frontline Precision",
+               "destination_type": "team",
+               "source_type": "freeagents",
+               "type": "add"
+              }
+             ]
+            }
+           ]
+          },
+          "1": {
+           "player": [
+            [
+             {
+              "player_key": "470.p.34085"
+             },
+             {
+              "player_id": "34085"
+             },
+             {
+              "name": {
+               "ascii_first": "Jake",
+               "ascii_last": "Ferguson",
+               "first": "Jake",
+               "full": "Jake Ferguson",
+               "last": "Ferguson"
+              }
+             },
+             {
+              "editorial_team_abbr": "Dal"
+             },
+             {
+              "display_position": "TE"
+             },
+             {
+              "position_type": "O"
+             }
+            ],
+            {
+             "transaction_data": {
+              "destination_type": "waivers",
+              "source_team_key": "470.l.49649.t.8",
+              "source_team_name": "Kelvin's Frontline Precision",
+              "source_type": "team",
+              "type": "drop"
+             }
+            }
+           ]
+          },
+          "count": 2
+         }
+        }
+       ]
+      },
+      "18": {
+       "transaction": [
+        {
+         "status": "successful",
+         "timestamp": "1789198246",
+         "transaction_id": "38",
+         "transaction_key": "470.l.49649.tr.38",
+         "type": "add/drop"
+        },
+        {
+         "players": {
+          "0": {
+           "player": [
+            [
+             {
+              "player_key": "470.p.32676"
+             },
+             {
+              "player_id": "32676"
+             },
+             {
+              "name": {
+               "ascii_first": "Justin",
+               "ascii_last": "Herbert",
+               "first": "Justin",
+               "full": "Justin Herbert",
+               "last": "Herbert"
+              }
+             },
+             {
+              "editorial_team_abbr": "LAC"
+             },
+             {
+              "display_position": "QB"
+             },
+             {
+              "position_type": "O"
+             }
+            ],
+            {
+             "transaction_data": [
+              {
+               "destination_team_key": "470.l.49649.t.1",
+               "destination_team_name": "QuAck Attack (Simon)",
+               "destination_type": "team",
+               "source_type": "waivers",
+               "type": "add"
+              }
+             ]
+            }
+           ]
+          },
+          "1": {
+           "player": [
+            [
+             {
+              "player_key": "470.p.29235"
+             },
+             {
+              "player_id": "29235"
+             },
+             {
+              "name": {
+               "ascii_first": "Jared",
+               "ascii_last": "Goff",
+               "first": "Jared",
+               "full": "Jared Goff",
+               "last": "Goff"
+              }
+             },
+             {
+              "editorial_team_abbr": "Det"
+             },
+             {
+              "display_position": "QB"
+             },
+             {
+              "position_type": "O"
+             }
+            ],
+            {
+             "transaction_data": {
+              "destination_type": "waivers",
+              "source_team_key": "470.l.49649.t.1",
+              "source_team_name": "QuAck Attack (Simon)",
+              "source_type": "team",
+              "type": "drop"
+             }
+            }
+           ]
+          },
+          "count": 2
+         }
+        }
+       ]
+      },
+      "19": {
+       "transaction": [
+        {
+         "status": "successful",
+         "timestamp": "1789112406",
+         "transaction_id": "37",
+         "transaction_key": "470.l.49649.tr.37",
+         "type": "add/drop"
+        },
+        {
+         "players": {
+          "0": {
+           "player": [
+            [
+             {
+              "player_key": "470.p.41808"
+             },
+             {
+              "player_id": "41808"
+             },
+             {
+              "name": {
+               "ascii_first": "Matthew",
+               "ascii_last": "Golden",
+               "first": "Matthew",
+               "full": "Matthew Golden",
+               "last": "Golden"
+              }
+             },
+             {
+              "editorial_team_abbr": "GB"
+             },
+             {
+              "display_position": "WR"
+             },
+             {
+              "position_type": "O"
+             }
+            ],
+            {
+             "transaction_data": [
+              {
+               "destination_team_key": "470.l.49649.t.3",
+               "destination_team_name": "Air Raid Gabriel",
+               "destination_type": "team",
+               "source_type": "freeagents",
+               "type": "add"
+              }
+             ]
+            }
+           ]
+          },
+          "1": {
+           "player": [
+            [
+             {
+              "player_key": "470.p.34104"
+             },
+             {
+              "player_id": "34104"
+             },
+             {
+              "name": {
+               "ascii_first": "Khalil",
+               "ascii_last": "Shakir",
+               "first": "Khalil",
+               "full": "Khalil Shakir",
+               "last": "Shakir"
+              }
+             },
+             {
+              "editorial_team_abbr": "Buf"
+             },
+             {
+              "display_position": "WR"
+             },
+             {
+              "position_type": "O"
+             }
+            ],
+            {
+             "transaction_data": {
+              "destination_type": "waivers",
+              "source_team_key": "470.l.49649.t.3",
+              "source_team_name": "Air Raid Gabriel",
+              "source_type": "team",
+              "type": "drop"
+             }
+            }
+           ]
+          },
+          "count": 2
+         }
+        }
+       ]
+      },
+      "2": {
+       "transaction": [
+        {
+         "status": "successful",
+         "timestamp": "1789550039",
+         "transaction_id": "55",
+         "transaction_key": "470.l.49649.tr.55",
+         "type": "add/drop"
+        },
+        {
+         "players": {
+          "0": {
+           "player": [
+            [
+             {
+              "player_key": "470.p.40835"
+             },
+             {
+              "player_id": "40835"
+             },
+             {
+              "name": {
+               "ascii_first": "Jake",
+               "ascii_last": "Bates",
+               "first": "Jake",
+               "full": "Jake Bates",
+               "last": "Bates"
+              }
+             },
+             {
+              "editorial_team_abbr": "Det"
+             },
+             {
+              "display_position": "K"
+             },
+             {
+              "position_type": "K"
+             }
+            ],
+            {
+             "transaction_data": [
+              {
+               "destination_team_key": "470.l.49649.t.7",
+               "destination_team_name": "WHISTLE/KEIBLER (STAN)",
+               "destination_type": "team",
+               "source_type": "waivers",
+               "type": "add"
+              }
+             ]
+            }
+           ]
+          },
+          "1": {
+           "player": [
+            [
+             {
+              "player_key": "470.p.41062"
+             },
+             {
+              "player_id": "41062"
+             },
+             {
+              "name": {
+               "ascii_first": "Cam",
+               "ascii_last": "Little",
+               "first": "Cam",
+               "full": "Cam Little",
+               "last": "Little"
+              }
+             },
+             {
+              "editorial_team_abbr": "Jax"
+             },
+             {
+              "display_position": "K"
+             },
+             {
+              "position_type": "K"
+             }
+            ],
+            {
+             "transaction_data": {
+              "destination_type": "waivers",
+              "source_team_key": "470.l.49649.t.7",
+              "source_team_name": "WHISTLE/KEIBLER (STAN)",
+              "source_type": "team",
+              "type": "drop"
+             }
+            }
+           ]
+          },
+          "count": 2
+         }
+        }
+       ]
+      },
+      "20": {
+       "transaction": [
+        {
+         "status": "successful",
+         "timestamp": "1789112392",
+         "transaction_id": "36",
+         "transaction_key": "470.l.49649.tr.36",
+         "type": "add/drop"
+        },
+        {
+         "players": {
+          "0": {
+           "player": [
+            [
+             {
+              "player_key": "470.p.40121"
+             },
+             {
+              "player_id": "40121"
+             },
+             {
+              "name": {
+               "ascii_first": "Michael",
+               "ascii_last": "Wilson",
+               "first": "Michael",
+               "full": "Michael Wilson",
+               "last": "Wilson"
+              }
+             },
+             {
+              "editorial_team_abbr": "Ari"
+             },
+             {
+              "display_position": "WR"
+             },
+             {
+              "position_type": "O"
+             }
+            ],
+            {
+             "transaction_data": [
+              {
+               "destination_team_key": "470.l.49649.t.3",
+               "destination_team_name": "Air Raid Gabriel",
+               "destination_type": "team",
+               "source_type": "freeagents",
+               "type": "add"
+              }
+             ]
+            }
+           ]
+          },
+          "1": {
+           "player": [
+            [
+             {
+              "player_key": "470.p.40877"
+             },
+             {
+              "player_id": "40877"
+             },
+             {
+              "name": {
+               "ascii_first": "Xavier",
+               "ascii_last": "Worthy",
+               "first": "Xavier",
+               "full": "Xavier Worthy",
+               "last": "Worthy"
+              }
+             },
+             {
+              "editorial_team_abbr": "KC"
+             },
+             {
+              "display_position": "WR"
+             },
+             {
+              "position_type": "O"
+             }
+            ],
+            {
+             "transaction_data": {
+              "destination_type": "waivers",
+              "source_team_key": "470.l.49649.t.3",
+              "source_team_name": "Air Raid Gabriel",
+              "source_type": "team",
+              "type": "drop"
+             }
+            }
+           ]
+          },
+          "count": 2
+         }
+        }
+       ]
+      },
+      "21": {
+       "transaction": [
+        {
+         "status": "successful",
+         "timestamp": "1789112162",
+         "transaction_id": "34",
+         "transaction_key": "470.l.49649.tr.34",
+         "type": "add"
+        },
+        {
+         "players": {
+          "0": {
+           "player": [
+            [
+             {
+              "player_key": "470.p.32725"
+             },
+             {
+              "player_id": "32725"
+             },
+             {
+              "name": {
+               "ascii_first": "J.K.",
+               "ascii_last": "Dobbins",
+               "first": "J.K.",
+               "full": "J.K. Dobbins",
+               "last": "Dobbins"
+              }
+             },
+             {
+              "editorial_team_abbr": "Den"
+             },
+             {
+              "display_position": "RB"
+             },
+             {
+              "position_type": "O"
+             }
+            ],
+            {
+             "transaction_data": [
+              {
+               "destination_team_key": "470.l.49649.t.10",
+               "destination_team_name": "Beastmode",
+               "destination_type": "team",
+               "source_type": "waivers",
+               "type": "add"
+              }
+             ]
+            }
+           ]
+          },
+          "count": 1
+         }
+        }
+       ]
+      },
+      "22": {
+       "transaction": [
+        {
+         "status": "successful",
+         "timestamp": "1789059564",
+         "transaction_id": "33",
+         "transaction_key": "470.l.49649.tr.33",
+         "type": "add/drop"
+        },
+        {
+         "players": {
+          "0": {
+           "player": [
+            [
+             {
+              "player_key": "470.p.41825"
+             },
+             {
+              "player_id": "41825"
+             },
+             {
+              "name": {
+               "ascii_first": "Tyler",
+               "ascii_last": "Shough",
+               "first": "Tyler",
+               "full": "Tyler Shough",
+               "last": "Shough"
+              }
+             },
+             {
+              "editorial_team_abbr": "NO"
+             },
+             {
+              "display_position": "QB"
+             },
+             {
+              "position_type": "O"
+             }
+            ],
+            {
+             "transaction_data": [
+              {
+               "destination_team_key": "470.l.49649.t.7",
+               "destination_team_name": "WHISTLE/KEIBLER (STAN)",
+               "destination_type": "team",
+               "source_type": "freeagents",
+               "type": "add"
+              }
+             ]
+            }
+           ]
+          },
+          "1": {
+           "player": [
+            [
+             {
+              "player_key": "470.p.29399"
+             },
+             {
+              "player_id": "29399"
+             },
+             {
+              "name": {
+               "ascii_first": "Tyreek",
+               "ascii_last": "Hill",
+               "first": "Tyreek",
+               "full": "Tyreek Hill",
+               "last": "Hill"
+              }
+             },
+             {
+              "editorial_team_abbr": "Mia"
+             },
+             {
+              "display_position": "WR"
+             },
+             {
+              "position_type": "O"
+             }
+            ],
+            {
+             "transaction_data": {
+              "destination_type": "waivers",
+              "source_team_key": "470.l.49649.t.7",
+              "source_team_name": "WHISTLE/KEIBLER (STAN)",
+              "source_type": "team",
+              "type": "drop"
+             }
+            }
+           ]
+          },
+          "count": 2
+         }
+        }
+       ]
+      },
+      "23": {
+       "transaction": [
+        {
+         "status": "successful",
+         "timestamp": "1789058542",
+         "transaction_id": "32",
+         "transaction_key": "470.l.49649.tr.32",
+         "type": "add"
+        },
+        {
+         "players": {
+          "0": {
+           "player": [
+            [
+             {
+              "player_key": "470.p.41058"
+             },
+             {
+              "player_id": "41058"
+             },
+             {
+              "name": {
+               "ascii_first": "Malik",
+               "ascii_last": "Washington",
+               "first": "Malik",
+               "full": "Malik Washington",
+               "last": "Washington"
+              }
+             },
+             {
+              "editorial_team_abbr": "Mia"
+             },
+             {
+              "display_position": "WR"
+             },
+             {
+              "position_type": "O"
+             }
+            ],
+            {
+             "transaction_data": [
+              {
+               "destination_team_key": "470.l.49649.t.7",
+               "destination_team_name": "WHISTLE/KEIBLER (STAN)",
+               "destination_type": "team",
+               "source_type": "freeagents",
+               "type": "add"
+              }
+             ]
+            }
+           ]
+          },
+          "count": 1
+         }
+        }
+       ]
+      },
+      "24": {
+       "transaction": [
+        {
+         "status": "successful",
+         "timestamp": "1789058537",
+         "transaction_id": "31",
+         "transaction_key": "470.l.49649.tr.31",
+         "type": "drop"
+        },
+        {
+         "players": {
+          "0": {
+           "player": [
+            [
+             {
+              "player_key": "470.p.34042"
+             },
+             {
+              "player_id": "34042"
+             },
+             {
+              "name": {
+               "ascii_first": "Malik",
+               "ascii_last": "Willis",
+               "first": "Malik",
+               "full": "Malik Willis",
+               "last": "Willis"
+              }
+             },
+             {
+              "editorial_team_abbr": "Mia"
+             },
+             {
+              "display_position": "QB"
+             },
+             {
+              "position_type": "O"
+             }
+            ],
+            {
+             "transaction_data": {
+              "destination_type": "freeagents",
+              "source_team_key": "470.l.49649.t.7",
+              "source_team_name": "WHISTLE/KEIBLER (STAN)",
+              "source_type": "team",
+              "type": "drop"
+             }
+            }
+           ]
+          },
+          "count": 1
+         }
+        }
+       ]
+      },
+      "25": {
+       "transaction": [
+        {
+         "status": "successful",
+         "timestamp": "1789058523",
+         "transaction_id": "30",
+         "transaction_key": "470.l.49649.tr.30",
+         "type": "add/drop"
+        },
+        {
+         "players": {
+          "0": {
+           "player": [
+            [
+             {
+              "player_key": "470.p.34042"
+             },
+             {
+              "player_id": "34042"
+             },
+             {
+              "name": {
+               "ascii_first": "Malik",
+               "ascii_last": "Willis",
+               "first": "Malik",
+               "full": "Malik Willis",
+               "last": "Willis"
+              }
+             },
+             {
+              "editorial_team_abbr": "Mia"
+             },
+             {
+              "display_position": "QB"
+             },
+             {
+              "position_type": "O"
+             }
+            ],
+            {
+             "transaction_data": [
+              {
+               "destination_team_key": "470.l.49649.t.7",
+               "destination_team_name": "WHISTLE/KEIBLER (STAN)",
+               "destination_type": "team",
+               "source_type": "freeagents",
+               "type": "add"
+              }
+             ]
+            }
+           ]
+          },
+          "1": {
+           "player": [
+            [
+             {
+              "player_key": "470.p.42642"
+             },
+             {
+              "player_id": "42642"
+             },
+             {
+              "name": {
+               "ascii_first": "Makai",
+               "ascii_last": "Lemon",
+               "first": "Makai",
+               "full": "Makai Lemon",
+               "last": "Lemon"
+              }
+             },
+             {
+              "editorial_team_abbr": "Phi"
+             },
+             {
+              "display_position": "WR"
+             },
+             {
+              "position_type": "O"
+             }
+            ],
+            {
+             "transaction_data": {
+              "destination_type": "waivers",
+              "source_team_key": "470.l.49649.t.7",
+              "source_team_name": "WHISTLE/KEIBLER (STAN)",
+              "source_type": "team",
+              "type": "drop"
+             }
+            }
+           ]
+          },
+          "count": 2
+         }
+        }
+       ]
+      },
+      "26": {
+       "transaction": [
+        {
+         "status": "successful",
+         "timestamp": "1789051732",
+         "transaction_id": "29",
+         "transaction_key": "470.l.49649.tr.29",
+         "type": "add/drop"
+        },
+        {
+         "players": {
+          "0": {
+           "player": [
+            [
+             {
+              "player_key": "470.p.40114"
+             },
+             {
+              "player_id": "40114"
+             },
+             {
+              "name": {
+               "ascii_first": "Tre",
+               "ascii_last": "Tucker",
+               "first": "Tre",
+               "full": "Tre Tucker",
+               "last": "Tucker"
+              }
+             },
+             {
+              "editorial_team_abbr": "LV"
+             },
+             {
+              "display_position": "WR"
+             },
+             {
+              "position_type": "O"
+             }
+            ],
+            {
+             "transaction_data": [
+              {
+               "destination_team_key": "470.l.49649.t.3",
+               "destination_team_name": "Air Raid Gabriel",
+               "destination_type": "team",
+               "source_type": "freeagents",
+               "type": "add"
+              }
+             ]
+            }
+           ]
+          },
+          "1": {
+           "player": [
+            [
+             {
+              "player_key": "470.p.40065"
+             },
+             {
+              "player_id": "40065"
+             },
+             {
+              "name": {
+               "ascii_first": "Michael",
+               "ascii_last": "Mayer",
+               "first": "Michael",
+               "full": "Michael Mayer",
+               "last": "Mayer"
+              }
+             },
+             {
+              "editorial_team_abbr": "LV"
+             },
+             {
+              "display_position": "TE"
+             },
+             {
+              "position_type": "O"
+             }
+            ],
+            {
+             "transaction_data": {
+              "destination_type": "freeagents",
+              "source_team_key": "470.l.49649.t.3",
+              "source_team_name": "Air Raid Gabriel",
+              "source_type": "team",
+              "type": "drop"
+             }
+            }
+           ]
+          },
+          "count": 2
+         }
+        }
+       ]
+      },
+      "27": {
+       "transaction": [
+        {
+         "status": "successful",
+         "timestamp": "1789030258",
+         "transaction_id": "28",
+         "transaction_key": "470.l.49649.tr.28",
+         "type": "add/drop"
+        },
+        {
+         "players": {
+          "0": {
+           "player": [
+            [
+             {
+              "player_key": "470.p.40065"
+             },
+             {
+              "player_id": "40065"
+             },
+             {
+              "name": {
+               "ascii_first": "Michael",
+               "ascii_last": "Mayer",
+               "first": "Michael",
+               "full": "Michael Mayer",
+               "last": "Mayer"
+              }
+             },
+             {
+              "editorial_team_abbr": "LV"
+             },
+             {
+              "display_position": "TE"
+             },
+             {
+              "position_type": "O"
+             }
+            ],
+            {
+             "transaction_data": [
+              {
+               "destination_team_key": "470.l.49649.t.3",
+               "destination_team_name": "Air Raid Gabriel",
+               "destination_type": "team",
+               "source_type": "freeagents",
+               "type": "add"
+              }
+             ]
+            }
+           ]
+          },
+          "1": {
+           "player": [
+            [
+             {
+              "player_key": "470.p.42712"
+             },
+             {
+              "player_id": "42712"
+             },
+             {
+              "name": {
+               "ascii_first": "Kaelon",
+               "ascii_last": "Black",
+               "first": "Kaelon",
+               "full": "Kaelon Black",
+               "last": "Black"
+              }
+             },
+             {
+              "editorial_team_abbr": "SF"
+             },
+             {
+              "display_position": "RB"
+             },
+             {
+              "position_type": "O"
+             }
+            ],
+            {
+             "transaction_data": {
+              "destination_type": "waivers",
+              "source_team_key": "470.l.49649.t.3",
+              "source_team_name": "Air Raid Gabriel",
+              "source_type": "team",
+              "type": "drop"
+             }
+            }
+           ]
+          },
+          "count": 2
+         }
+        }
+       ]
+      },
+      "28": {
+       "transaction": [
+        {
+         "status": "successful",
+         "timestamp": "1789021017",
+         "transaction_id": "27",
+         "transaction_key": "470.l.49649.tr.27",
+         "type": "add/drop"
+        },
+        {
+         "players": {
+          "0": {
+           "player": [
+            [
+             {
+              "player_key": "470.p.29399"
+             },
+             {
+              "player_id": "29399"
+             },
+             {
+              "name": {
+               "ascii_first": "Tyreek",
+               "ascii_last": "Hill",
+               "first": "Tyreek",
+               "full": "Tyreek Hill",
+               "last": "Hill"
+              }
+             },
+             {
+              "editorial_team_abbr": "Mia"
+             },
+             {
+              "display_position": "WR"
+             },
+             {
+              "position_type": "O"
+             }
+            ],
+            {
+             "transaction_data": [
+              {
+               "destination_team_key": "470.l.49649.t.7",
+               "destination_team_name": "WHISTLE/KEIBLER (STAN)",
+               "destination_type": "team",
+               "source_type": "freeagents",
+               "type": "add"
+              }
+             ]
+            }
+           ]
+          },
+          "1": {
+           "player": [
+            [
+             {
+              "player_key": "470.p.41902"
+             },
+             {
+              "player_id": "41902"
+             },
+             {
+              "name": {
+               "ascii_first": "Woody",
+               "ascii_last": "Marks",
+               "first": "Woody",
+               "full": "Woody Marks",
+               "last": "Marks"
+              }
+             },
+             {
+              "editorial_team_abbr": "Hou"
+             },
+             {
+              "display_position": "RB"
+             },
+             {
+              "position_type": "O"
+             }
+            ],
+            {
+             "transaction_data": {
+              "destination_type": "waivers",
+              "source_team_key": "470.l.49649.t.7",
+              "source_team_name": "WHISTLE/KEIBLER (STAN)",
+              "source_type": "team",
+              "type": "drop"
+             }
+            }
+           ]
+          },
+          "count": 2
+         }
+        }
+       ]
+      },
+      "29": {
+       "transaction": [
+        {
+         "status": "successful",
+         "timestamp": "1788978432",
+         "transaction_id": "26",
+         "transaction_key": "470.l.49649.tr.26",
+         "type": "add/drop"
+        },
+        {
+         "players": {
+          "0": {
+           "player": [
+            [
+             {
+              "player_key": "470.p.42744"
+             },
+             {
+              "player_id": "42744"
+             },
+             {
+              "name": {
+               "ascii_first": "Mike",
+               "ascii_last": "Washington Jr.",
+               "first": "Mike",
+               "full": "Mike Washington Jr.",
+               "last": "Washington Jr."
+              }
+             },
+             {
+              "editorial_team_abbr": "LV"
+             },
+             {
+              "display_position": "RB"
+             },
+             {
+              "position_type": "O"
+             }
+            ],
+            {
+             "transaction_data": [
+              {
+               "destination_team_key": "470.l.49649.t.2",
+               "destination_team_name": "Ed Lasso\u2019s AFC Richmond",
+               "destination_type": "team",
+               "source_type": "freeagents",
+               "type": "add"
+              }
+             ]
+            }
+           ]
+          },
+          "1": {
+           "player": [
+            [
+             {
+              "player_key": "470.p.32676"
+             },
+             {
+              "player_id": "32676"
+             },
+             {
+              "name": {
+               "ascii_first": "Justin",
+               "ascii_last": "Herbert",
+               "first": "Justin",
+               "full": "Justin Herbert",
+               "last": "Herbert"
+              }
+             },
+             {
+              "editorial_team_abbr": "LAC"
+             },
+             {
+              "display_position": "QB"
+             },
+             {
+              "position_type": "O"
+             }
+            ],
+            {
+             "transaction_data": {
+              "destination_type": "waivers",
+              "source_team_key": "470.l.49649.t.2",
+              "source_team_name": "Ed Lasso\u2019s AFC Richmond",
+              "source_type": "team",
+              "type": "drop"
+             }
+            }
+           ]
+          },
+          "count": 2
+         }
+        }
+       ]
+      },
+      "3": {
+       "transaction": [
+        {
+         "status": "successful",
+         "timestamp": "1789550039",
+         "transaction_id": "54",
+         "transaction_key": "470.l.49649.tr.54",
+         "type": "add/drop"
+        },
+        {
+         "players": {
+          "0": {
+           "player": [
+            [
+             {
+              "player_key": "470.p.40877"
+             },
+             {
+              "player_id": "40877"
+             },
+             {
+              "name": {
+               "ascii_first": "Xavier",
+               "ascii_last": "Worthy",
+               "first": "Xavier",
+               "full": "Xavier Worthy",
+               "last": "Worthy"
+              }
+             },
+             {
+              "editorial_team_abbr": "KC"
+             },
+             {
+              "display_position": "WR"
+             },
+             {
+              "position_type": "O"
+             }
+            ],
+            {
+             "transaction_data": [
+              {
+               "destination_team_key": "470.l.49649.t.3",
+               "destination_team_name": "Air Raid Gabriel",
+               "destination_type": "team",
+               "source_type": "waivers",
+               "type": "add"
+              }
+             ]
+            }
+           ]
+          },
+          "1": {
+           "player": [
+            [
+             {
+              "player_key": "470.p.32704"
+             },
+             {
+              "player_id": "32704"
+             },
+             {
+              "name": {
+               "ascii_first": "Michael",
+               "ascii_last": "Pittman Jr.",
+               "first": "Michael",
+               "full": "Michael Pittman Jr.",
+               "last": "Pittman Jr."
+              }
+             },
+             {
+              "editorial_team_abbr": "Pit"
+             },
+             {
+              "display_position": "WR"
+             },
+             {
+              "position_type": "O"
+             }
+            ],
+            {
+             "transaction_data": {
+              "destination_type": "waivers",
+              "source_team_key": "470.l.49649.t.3",
+              "source_team_name": "Air Raid Gabriel",
+              "source_type": "team",
+              "type": "drop"
+             }
+            }
+           ]
+          },
+          "count": 2
+         }
+        }
+       ]
+      },
+      "30": {
+       "transaction": [
+        {
+         "status": "successful",
+         "timestamp": "1788919045",
+         "transaction_id": "25",
+         "transaction_key": "470.l.49649.tr.25",
+         "type": "add/drop"
+        },
+        {
+         "players": {
+          "0": {
+           "player": [
+            [
+             {
+              "player_key": "470.p.34104"
+             },
+             {
+              "player_id": "34104"
+             },
+             {
+              "name": {
+               "ascii_first": "Khalil",
+               "ascii_last": "Shakir",
+               "first": "Khalil",
+               "full": "Khalil Shakir",
+               "last": "Shakir"
+              }
+             },
+             {
+              "editorial_team_abbr": "Buf"
+             },
+             {
+              "display_position": "WR"
+             },
+             {
+              "position_type": "O"
+             }
+            ],
+            {
+             "transaction_data": [
+              {
+               "destination_team_key": "470.l.49649.t.3",
+               "destination_team_name": "Air Raid Gabriel",
+               "destination_type": "team",
+               "source_type": "freeagents",
+               "type": "add"
+              }
+             ]
+            }
+           ]
+          },
+          "1": {
+           "player": [
+            [
+             {
+              "player_key": "470.p.40095"
+             },
+             {
+              "player_id": "40095"
+             },
+             {
+              "name": {
+               "ascii_first": "Tank",
+               "ascii_last": "Bigsby",
+               "first": "Tank",
+               "full": "Tank Bigsby",
+               "last": "Bigsby"
+              }
+             },
+             {
+              "editorial_team_abbr": "Phi"
+             },
+             {
+              "display_position": "RB"
+             },
+             {
+              "position_type": "O"
+             }
+            ],
+            {
+             "transaction_data": {
+              "destination_type": "freeagents",
+              "source_team_key": "470.l.49649.t.3",
+              "source_team_name": "Air Raid Gabriel",
+              "source_type": "team",
+              "type": "drop"
+             }
+            }
+           ]
+          },
+          "count": 2
+         }
+        }
+       ]
+      },
+      "31": {
+       "transaction": [
+        {
+         "status": "successful",
+         "timestamp": "1788916816",
+         "transaction_id": "24",
+         "transaction_key": "470.l.49649.tr.24",
+         "type": "add"
+        },
+        {
+         "players": {
+          "0": {
+           "player": [
+            [
+             {
+              "player_key": "470.p.33113"
+             },
+             {
+              "player_id": "33113"
+             },
+             {
+              "name": {
+               "ascii_first": "Juwan",
+               "ascii_last": "Johnson",
+               "first": "Juwan",
+               "full": "Juwan Johnson",
+               "last": "Johnson"
+              }
+             },
+             {
+              "editorial_team_abbr": "NO"
+             },
+             {
+              "display_position": "TE"
+             },
+             {
+              "position_type": "O"
+             }
+            ],
+            {
+             "transaction_data": [
+              {
+               "destination_team_key": "470.l.49649.t.8",
+               "destination_team_name": "Kelvin's Frontline Precision",
+               "destination_type": "team",
+               "source_type": "freeagents",
+               "type": "add"
+              }
+             ]
+            }
+           ]
+          },
+          "count": 1
+         }
+        }
+       ]
+      },
+      "32": {
+       "transaction": [
+        {
+         "status": "successful",
+         "timestamp": "1788913916",
+         "transaction_id": "23",
+         "transaction_key": "470.l.49649.tr.23",
+         "type": "add/drop"
+        },
+        {
+         "players": {
+          "0": {
+           "player": [
+            [
+             {
+              "player_key": "470.p.42712"
+             },
+             {
+              "player_id": "42712"
+             },
+             {
+              "name": {
+               "ascii_first": "Kaelon",
+               "ascii_last": "Black",
+               "first": "Kaelon",
+               "full": "Kaelon Black",
+               "last": "Black"
+              }
+             },
+             {
+              "editorial_team_abbr": "SF"
+             },
+             {
+              "display_position": "RB"
+             },
+             {
+              "position_type": "O"
+             }
+            ],
+            {
+             "transaction_data": [
+              {
+               "destination_team_key": "470.l.49649.t.3",
+               "destination_team_name": "Air Raid Gabriel",
+               "destination_type": "team",
+               "source_type": "freeagents",
+               "type": "add"
+              }
+             ]
+            }
+           ]
+          },
+          "1": {
+           "player": [
+            [
+             {
+              "player_key": "470.p.40121"
+             },
+             {
+              "player_id": "40121"
+             },
+             {
+              "name": {
+               "ascii_first": "Michael",
+               "ascii_last": "Wilson",
+               "first": "Michael",
+               "full": "Michael Wilson",
+               "last": "Wilson"
+              }
+             },
+             {
+              "editorial_team_abbr": "Ari"
+             },
+             {
+              "display_position": "WR"
+             },
+             {
+              "position_type": "O"
+             }
+            ],
+            {
+             "transaction_data": {
+              "destination_type": "waivers",
+              "source_team_key": "470.l.49649.t.3",
+              "source_team_name": "Air Raid Gabriel",
+              "source_type": "team",
+              "type": "drop"
+             }
+            }
+           ]
+          },
+          "count": 2
+         }
+        }
+       ]
+      },
+      "33": {
+       "transaction": [
+        {
+         "status": "successful",
+         "timestamp": "1788910619",
+         "transaction_id": "22",
+         "transaction_key": "470.l.49649.tr.22",
+         "type": "add"
+        },
+        {
+         "players": {
+          "0": {
+           "player": [
+            [
+             {
+              "player_key": "470.p.31833"
+             },
+             {
+              "player_id": "31833"
+             },
+             {
+              "name": {
+               "ascii_first": "Kyler",
+               "ascii_last": "Murray",
+               "first": "Kyler",
+               "full": "Kyler Murray",
+               "last": "Murray"
+              }
+             },
+             {
+              "editorial_team_abbr": "Min"
+             },
+             {
+              "display_position": "QB"
+             },
+             {
+              "position_type": "O"
+             }
+            ],
+            {
+             "transaction_data": [
+              {
+               "destination_team_key": "470.l.49649.t.8",
+               "destination_team_name": "Kelvin's Frontline Precision",
+               "destination_type": "team",
+               "source_type": "freeagents",
+               "type": "add"
+              }
+             ]
+            }
+           ]
+          },
+          "count": 1
+         }
+        }
+       ]
+      },
+      "34": {
+       "transaction": [
+        {
+         "status": "successful",
+         "timestamp": "1788910556",
+         "transaction_id": "21",
+         "transaction_key": "470.l.49649.tr.21",
+         "type": "add/drop"
+        },
+        {
+         "players": {
+          "0": {
+           "player": [
+            [
+             {
+              "player_key": "470.p.40075"
+             },
+             {
+              "player_id": "40075"
+             },
+             {
+              "name": {
+               "ascii_first": "Zach",
+               "ascii_last": "Charbonnet",
+               "first": "Zach",
+               "full": "Zach Charbonnet",
+               "last": "Charbonnet"
+              }
+             },
+             {
+              "editorial_team_abbr": "Sea"
+             },
+             {
+              "display_position": "RB"
+             },
+             {
+              "position_type": "O"
+             }
+            ],
+            {
+             "transaction_data": [
+              {
+               "destination_team_key": "470.l.49649.t.8",
+               "destination_team_name": "Kelvin's Frontline Precision",
+               "destination_type": "team",
+               "source_type": "freeagents",
+               "type": "add"
+              }
+             ]
+            }
+           ]
+          },
+          "1": {
+           "player": [
+            [
+             {
+              "player_key": "470.p.34107"
+             },
+             {
+              "player_id": "34107"
+             },
+             {
+              "name": {
+               "ascii_first": "Tyler",
+               "ascii_last": "Allgeier",
+               "first": "Tyler",
+               "full": "Tyler Allgeier",
+               "last": "Allgeier"
+              }
+             },
+             {
+              "editorial_team_abbr": "Ari"
+             },
+             {
+              "display_position": "RB"
+             },
+             {
+              "position_type": "O"
+             }
+            ],
+            {
+             "transaction_data": {
+              "destination_type": "waivers",
+              "source_team_key": "470.l.49649.t.8",
+              "source_team_name": "Kelvin's Frontline Precision",
+              "source_type": "team",
+              "type": "drop"
+             }
+            }
+           ]
+          },
+          "count": 2
+         }
+        }
+       ]
+      },
+      "35": {
+       "transaction": [
+        {
+         "status": "successful",
+         "timestamp": "1788903748",
+         "transaction_id": "20",
+         "transaction_key": "470.l.49649.tr.20",
+         "type": "commish"
+        }
+       ]
+      },
+      "36": {
+       "transaction": [
+        {
+         "status": "successful",
+         "timestamp": "1788890046",
+         "transaction_id": "19",
+         "transaction_key": "470.l.49649.tr.19",
+         "type": "add/drop"
+        },
+        {
+         "players": {
+          "0": {
+           "player": [
+            [
+             {
+              "player_key": "470.p.40877"
+             },
+             {
+              "player_id": "40877"
+             },
+             {
+              "name": {
+               "ascii_first": "Xavier",
+               "ascii_last": "Worthy",
+               "first": "Xavier",
+               "full": "Xavier Worthy",
+               "last": "Worthy"
+              }
+             },
+             {
+              "editorial_team_abbr": "KC"
+             },
+             {
+              "display_position": "WR"
+             },
+             {
+              "position_type": "O"
+             }
+            ],
+            {
+             "transaction_data": [
+              {
+               "destination_team_key": "470.l.49649.t.3",
+               "destination_team_name": "Air Raid Gabriel",
+               "destination_type": "team",
+               "source_type": "freeagents",
+               "type": "add"
+              }
+             ]
+            }
+           ]
+          },
+          "1": {
+           "player": [
+            [
+             {
+              "player_key": "470.p.41808"
+             },
+             {
+              "player_id": "41808"
+             },
+             {
+              "name": {
+               "ascii_first": "Matthew",
+               "ascii_last": "Golden",
+               "first": "Matthew",
+               "full": "Matthew Golden",
+               "last": "Golden"
+              }
+             },
+             {
+              "editorial_team_abbr": "GB"
+             },
+             {
+              "display_position": "WR"
+             },
+             {
+              "position_type": "O"
+             }
+            ],
+            {
+             "transaction_data": {
+              "destination_type": "waivers",
+              "source_team_key": "470.l.49649.t.3",
+              "source_team_name": "Air Raid Gabriel",
+              "source_type": "team",
+              "type": "drop"
+             }
+            }
+           ]
+          },
+          "count": 2
+         }
+        }
+       ]
+      },
+      "37": {
+       "transaction": [
+        {
+         "status": "successful",
+         "timestamp": "1788856342",
+         "transaction_id": "18",
+         "transaction_key": "470.l.49649.tr.18",
+         "type": "add/drop"
+        },
+        {
+         "players": {
+          "0": {
+           "player": [
+            [
+             {
+              "player_key": "470.p.40095"
+             },
+             {
+              "player_id": "40095"
+             },
+             {
+              "name": {
+               "ascii_first": "Tank",
+               "ascii_last": "Bigsby",
+               "first": "Tank",
+               "full": "Tank Bigsby",
+               "last": "Bigsby"
+              }
+             },
+             {
+              "editorial_team_abbr": "Phi"
+             },
+             {
+              "display_position": "RB"
+             },
+             {
+              "position_type": "O"
+             }
+            ],
+            {
+             "transaction_data": [
+              {
+               "destination_team_key": "470.l.49649.t.3",
+               "destination_team_name": "Air Raid Gabriel",
+               "destination_type": "team",
+               "source_type": "freeagents",
+               "type": "add"
+              }
+             ]
+            }
+           ]
+          },
+          "1": {
+           "player": [
+            [
+             {
+              "player_key": "470.p.32725"
+             },
+             {
+              "player_id": "32725"
+             },
+             {
+              "name": {
+               "ascii_first": "J.K.",
+               "ascii_last": "Dobbins",
+               "first": "J.K.",
+               "full": "J.K. Dobbins",
+               "last": "Dobbins"
+              }
+             },
+             {
+              "editorial_team_abbr": "Den"
+             },
+             {
+              "display_position": "RB"
+             },
+             {
+              "position_type": "O"
+             }
+            ],
+            {
+             "transaction_data": {
+              "destination_type": "waivers",
+              "source_team_key": "470.l.49649.t.3",
+              "source_team_name": "Air Raid Gabriel",
+              "source_type": "team",
+              "type": "drop"
+             }
+            }
+           ]
+          },
+          "count": 2
+         }
+        }
+       ]
+      },
+      "38": {
+       "transaction": [
+        {
+         "status": "successful",
+         "timestamp": "1788852398",
+         "transaction_id": "17",
+         "transaction_key": "470.l.49649.tr.17",
+         "type": "add/drop"
+        },
+        {
+         "players": {
+          "0": {
+           "player": [
+            [
+             {
+              "player_key": "470.p.100024"
+             },
+             {
+              "player_id": "100024"
+             },
+             {
+              "name": {
+               "ascii_first": "Chargers",
+               "ascii_last": "",
+               "first": "Chargers",
+               "full": "Chargers",
+               "last": ""
+              }
+             },
+             {
+              "editorial_team_abbr": "LAC"
+             },
+             {
+              "display_position": "DEF"
+             },
+             {
+              "position_type": "DT"
+             }
+            ],
+            {
+             "transaction_data": [
+              {
+               "destination_team_key": "470.l.49649.t.9",
+               "destination_team_name": "Endzone Zack",
+               "destination_type": "team",
+               "source_type": "waivers",
+               "type": "add"
+              }
+             ]
+            }
+           ]
+          },
+          "1": {
+           "player": [
+            [
+             {
+              "player_key": "470.p.34047"
+             },
+             {
+              "player_id": "34047"
+             },
+             {
+              "name": {
+               "ascii_first": "Rachaad",
+               "ascii_last": "White",
+               "first": "Rachaad",
+               "full": "Rachaad White",
+               "last": "White"
+              }
+             },
+             {
+              "editorial_team_abbr": "Was"
+             },
+             {
+              "display_position": "RB"
+             },
+             {
+              "position_type": "O"
+             }
+            ],
+            {
+             "transaction_data": {
+              "destination_type": "waivers",
+              "source_team_key": "470.l.49649.t.9",
+              "source_team_name": "Endzone Zack",
+              "source_type": "team",
+              "type": "drop"
+             }
+            }
+           ]
+          },
+          "count": 2
+         }
+        }
+       ]
+      },
+      "39": {
+       "transaction": [
+        {
+         "status": "successful",
+         "timestamp": "1788852398",
+         "transaction_id": "16",
+         "transaction_key": "470.l.49649.tr.16",
+         "type": "add/drop"
+        },
+        {
+         "players": {
+          "0": {
+           "player": [
+            [
+             {
+              "player_key": "470.p.34107"
+             },
+             {
+              "player_id": "34107"
+             },
+             {
+              "name": {
+               "ascii_first": "Tyler",
+               "ascii_last": "Allgeier",
+               "first": "Tyler",
+               "full": "Tyler Allgeier",
+               "last": "Allgeier"
+              }
+             },
+             {
+              "editorial_team_abbr": "Ari"
+             },
+             {
+              "display_position": "RB"
+             },
+             {
+              "position_type": "O"
+             }
+            ],
+            {
+             "transaction_data": [
+              {
+               "destination_team_key": "470.l.49649.t.8",
+               "destination_team_name": "Kelvin's Frontline Precision",
+               "destination_type": "team",
+               "source_type": "waivers",
+               "type": "add"
+              }
+             ]
+            }
+           ]
+          },
+          "1": {
+           "player": [
+            [
+             {
+              "player_key": "470.p.30973"
+             },
+             {
+              "player_id": "30973"
+             },
+             {
+              "name": {
+               "ascii_first": "Sam",
+               "ascii_last": "Darnold",
+               "first": "Sam",
+               "full": "Sam Darnold",
+               "last": "Darnold"
+              }
+             },
+             {
+              "editorial_team_abbr": "Sea"
+             },
+             {
+              "display_position": "QB"
+             },
+             {
+              "position_type": "O"
+             }
+            ],
+            {
+             "transaction_data": {
+              "destination_type": "waivers",
+              "source_team_key": "470.l.49649.t.8",
+              "source_team_name": "Kelvin's Frontline Precision",
+              "source_type": "team",
+              "type": "drop"
+             }
+            }
+           ]
+          },
+          "count": 2
+         }
+        }
+       ]
+      },
+      "4": {
+       "transaction": [
+        {
+         "status": "successful",
+         "timestamp": "1789550039",
+         "transaction_id": "53",
+         "transaction_key": "470.l.49649.tr.53",
+         "type": "add/drop"
+        },
+        {
+         "players": {
+          "0": {
+           "player": [
+            [
+             {
+              "player_key": "470.p.100025"
+             },
+             {
+              "player_id": "100025"
+             },
+             {
+              "name": {
+               "ascii_first": "49ers",
+               "ascii_last": "",
+               "first": "49ers",
+               "full": "49ers",
+               "last": ""
+              }
+             },
+             {
+              "editorial_team_abbr": "SF"
+             },
+             {
+              "display_position": "DEF"
+             },
+             {
+              "position_type": "DT"
+             }
+            ],
+            {
+             "transaction_data": [
+              {
+               "destination_team_key": "470.l.49649.t.9",
+               "destination_team_name": "Endzone Zack",
+               "destination_type": "team",
+               "source_type": "waivers",
+               "type": "add"
+              }
+             ]
+            }
+           ]
+          },
+          "1": {
+           "player": [
+            [
+             {
+              "player_key": "470.p.100024"
+             },
+             {
+              "player_id": "100024"
+             },
+             {
+              "name": {
+               "ascii_first": "Chargers",
+               "ascii_last": "",
+               "first": "Chargers",
+               "full": "Chargers",
+               "last": ""
+              }
+             },
+             {
+              "editorial_team_abbr": "LAC"
+             },
+             {
+              "display_position": "DEF"
+             },
+             {
+              "position_type": "DT"
+             }
+            ],
+            {
+             "transaction_data": {
+              "destination_type": "waivers",
+              "source_team_key": "470.l.49649.t.9",
+              "source_team_name": "Endzone Zack",
+              "source_type": "team",
+              "type": "drop"
+             }
+            }
+           ]
+          },
+          "count": 2
+         }
+        }
+       ]
+      },
+      "40": {
+       "transaction": [
+        {
+         "status": "successful",
+         "timestamp": "1788496497",
+         "transaction_id": "15",
+         "transaction_key": "470.l.49649.tr.15",
+         "type": "commish"
+        }
+       ]
+      },
+      "41": {
+       "transaction": [
+        {
+         "status": "successful",
+         "timestamp": "1788496497",
+         "transaction_id": "14",
+         "transaction_key": "470.l.49649.tr.14",
+         "type": "commish"
+        }
+       ]
+      },
+      "42": {
+       "transaction": [
+        {
+         "status": "successful",
+         "timestamp": "1788496497",
+         "transaction_id": "13",
+         "transaction_key": "470.l.49649.tr.13",
+         "type": "commish"
+        }
+       ]
+      },
+      "43": {
+       "transaction": [
+        {
+         "status": "successful",
+         "timestamp": "1788495747",
+         "transaction_id": "12",
+         "transaction_key": "470.l.49649.tr.12",
+         "type": "commish"
+        }
+       ]
+      },
+      "44": {
+       "transaction": [
+        {
+         "status": "successful",
+         "timestamp": "1788495747",
+         "transaction_id": "11",
+         "transaction_key": "470.l.49649.tr.11",
+         "type": "commish"
+        }
+       ]
+      },
+      "45": {
+       "transaction": [
+        {
+         "status": "successful",
+         "timestamp": "1788491861",
+         "transaction_id": "10",
+         "transaction_key": "470.l.49649.tr.10",
+         "type": "commish"
+        }
+       ]
+      },
+      "46": {
+       "transaction": [
+        {
+         "status": "successful",
+         "timestamp": "1788479211",
+         "transaction_id": "9",
+         "transaction_key": "470.l.49649.tr.9",
+         "type": "commish"
+        }
+       ]
+      },
+      "47": {
+       "transaction": [
+        {
+         "status": "successful",
+         "timestamp": "1788414038",
+         "transaction_id": "8",
+         "transaction_key": "470.l.49649.tr.8",
+         "type": "commish"
+        }
+       ]
+      },
+      "48": {
+       "transaction": [
+        {
+         "status": "successful",
+         "timestamp": "1788209028",
+         "transaction_id": "7",
+         "transaction_key": "470.l.49649.tr.7",
+         "type": "commish"
+        }
+       ]
+      },
+      "49": {
+       "transaction": [
+        {
+         "status": "successful",
+         "timestamp": "1781296859",
+         "transaction_id": "4",
+         "transaction_key": "470.l.49649.tr.4",
+         "type": "commish"
+        }
+       ]
+      },
+      "5": {
+       "transaction": [
+        {
+         "status": "successful",
+         "timestamp": "1789550039",
+         "transaction_id": "52",
+         "transaction_key": "470.l.49649.tr.52",
+         "type": "add/drop"
+        },
+        {
+         "players": {
+          "0": {
+           "player": [
+            [
+             {
+              "player_key": "470.p.42697"
+             },
+             {
+              "player_id": "42697"
+             },
+             {
+              "name": {
+               "ascii_first": "Caleb",
+               "ascii_last": "Douglas",
+               "first": "Caleb",
+               "full": "Caleb Douglas",
+               "last": "Douglas"
+              }
+             },
+             {
+              "editorial_team_abbr": "Mia"
+             },
+             {
+              "display_position": "WR"
+             },
+             {
+              "position_type": "O"
+             }
+            ],
+            {
+             "transaction_data": [
+              {
+               "destination_team_key": "470.l.49649.t.7",
+               "destination_team_name": "WHISTLE/KEIBLER (STAN)",
+               "destination_type": "team",
+               "source_type": "waivers",
+               "type": "add"
+              }
+             ]
+            }
+           ]
+          },
+          "1": {
+           "player": [
+            [
+             {
+              "player_key": "470.p.29269"
+             },
+             {
+              "player_id": "29269"
+             },
+             {
+              "name": {
+               "ascii_first": "Hunter",
+               "ascii_last": "Henry",
+               "first": "Hunter",
+               "full": "Hunter Henry",
+               "last": "Henry"
+              }
+             },
+             {
+              "editorial_team_abbr": "NE"
+             },
+             {
+              "display_position": "TE"
+             },
+             {
+              "position_type": "O"
+             }
+            ],
+            {
+             "transaction_data": {
+              "destination_type": "waivers",
+              "source_team_key": "470.l.49649.t.7",
+              "source_team_name": "WHISTLE/KEIBLER (STAN)",
+              "source_type": "team",
+              "type": "drop"
+             }
+            }
+           ]
+          },
+          "count": 2
+         }
+        }
+       ]
+      },
+      "6": {
+       "transaction": [
+        {
+         "status": "successful",
+         "timestamp": "1789550039",
+         "transaction_id": "51",
+         "transaction_key": "470.l.49649.tr.51",
+         "type": "add/drop"
+        },
+        {
+         "players": {
+          "0": {
+           "player": [
+            [
+             {
+              "player_key": "470.p.31868"
+             },
+             {
+              "player_id": "31868"
+             },
+             {
+              "name": {
+               "ascii_first": "Deebo",
+               "ascii_last": "Samuel Sr.",
+               "first": "Deebo",
+               "full": "Deebo Samuel Sr.",
+               "last": "Samuel Sr."
+              }
+             },
+             {
+              "editorial_team_abbr": "SF"
+             },
+             {
+              "display_position": "WR"
+             },
+             {
+              "position_type": "O"
+             }
+            ],
+            {
+             "transaction_data": [
+              {
+               "destination_team_key": "470.l.49649.t.3",
+               "destination_team_name": "Air Raid Gabriel",
+               "destination_type": "team",
+               "source_type": "waivers",
+               "type": "add"
+              }
+             ]
+            }
+           ]
+          },
+          "1": {
+           "player": [
+            [
+             {
+              "player_key": "470.p.40114"
+             },
+             {
+              "player_id": "40114"
+             },
+             {
+              "name": {
+               "ascii_first": "Tre",
+               "ascii_last": "Tucker",
+               "first": "Tre",
+               "full": "Tre Tucker",
+               "last": "Tucker"
+              }
+             },
+             {
+              "editorial_team_abbr": "LV"
+             },
+             {
+              "display_position": "WR"
+             },
+             {
+              "position_type": "O"
+             }
+            ],
+            {
+             "transaction_data": {
+              "destination_type": "waivers",
+              "source_team_key": "470.l.49649.t.3",
+              "source_team_name": "Air Raid Gabriel",
+              "source_type": "team",
+              "type": "drop"
+             }
+            }
+           ]
+          },
+          "count": 2
+         }
+        }
+       ]
+      },
+      "7": {
+       "transaction": [
+        {
+         "status": "successful",
+         "timestamp": "1789550039",
+         "transaction_id": "50",
+         "transaction_key": "470.l.49649.tr.50",
+         "type": "add/drop"
+        },
+        {
+         "players": {
+          "0": {
+           "player": [
+            [
+             {
+              "player_key": "470.p.42712"
+             },
+             {
+              "player_id": "42712"
+             },
+             {
+              "name": {
+               "ascii_first": "Kaelon",
+               "ascii_last": "Black",
+               "first": "Kaelon",
+               "full": "Kaelon Black",
+               "last": "Black"
+              }
+             },
+             {
+              "editorial_team_abbr": "SF"
+             },
+             {
+              "display_position": "RB"
+             },
+             {
+              "position_type": "O"
+             }
+            ],
+            {
+             "transaction_data": [
+              {
+               "destination_team_key": "470.l.49649.t.6",
+               "destination_team_name": "Big PP",
+               "destination_type": "team",
+               "source_type": "waivers",
+               "type": "add"
+              }
+             ]
+            }
+           ]
+          },
+          "1": {
+           "player": [
+            [
+             {
+              "player_key": "470.p.40875"
+             },
+             {
+              "player_id": "40875"
+             },
+             {
+              "name": {
+               "ascii_first": "Bo",
+               "ascii_last": "Nix",
+               "first": "Bo",
+               "full": "Bo Nix",
+               "last": "Nix"
+              }
+             },
+             {
+              "editorial_team_abbr": "Den"
+             },
+             {
+              "display_position": "QB"
+             },
+             {
+              "position_type": "O"
+             }
+            ],
+            {
+             "transaction_data": {
+              "destination_type": "waivers",
+              "source_team_key": "470.l.49649.t.6",
+              "source_team_name": "Big PP",
+              "source_type": "team",
+              "type": "drop"
+             }
+            }
+           ]
+          },
+          "count": 2
+         }
+        }
+       ]
+      },
+      "8": {
+       "transaction": [
+        {
+         "status": "successful",
+         "timestamp": "1789543651",
+         "transaction_id": "49",
+         "transaction_key": "470.l.49649.tr.49",
+         "type": "add"
+        },
+        {
+         "players": {
+          "0": {
+           "player": [
+            [
+             {
+              "player_key": "470.p.41097"
+             },
+             {
+              "player_id": "41097"
+             },
+             {
+              "name": {
+               "ascii_first": "Devaughn",
+               "ascii_last": "Vele",
+               "first": "Devaughn",
+               "full": "Devaughn Vele",
+               "last": "Vele"
+              }
+             },
+             {
+              "editorial_team_abbr": "NO"
+             },
+             {
+              "display_position": "WR"
+             },
+             {
+              "position_type": "O"
+             }
+            ],
+            {
+             "transaction_data": [
+              {
+               "destination_team_key": "470.l.49649.t.3",
+               "destination_team_name": "Air Raid Gabriel",
+               "destination_type": "team",
+               "source_type": "freeagents",
+               "type": "add"
+              }
+             ]
+            }
+           ]
+          },
+          "count": 1
+         }
+        }
+       ]
+      },
+      "9": {
+       "transaction": [
+        {
+         "status": "successful",
+         "timestamp": "1789543300",
+         "transaction_id": "48",
+         "transaction_key": "470.l.49649.tr.48",
+         "type": "add/drop"
+        },
+        {
+         "players": {
+          "0": {
+           "player": [
+            [
+             {
+              "player_key": "470.p.100027"
+             },
+             {
+              "player_id": "100027"
+             },
+             {
+              "name": {
+               "ascii_first": "Buccaneers",
+               "ascii_last": "",
+               "first": "Buccaneers",
+               "full": "Buccaneers",
+               "last": ""
+              }
+             },
+             {
+              "editorial_team_abbr": "TB"
+             },
+             {
+              "display_position": "DEF"
+             },
+             {
+              "position_type": "DT"
+             }
+            ],
+            {
+             "transaction_data": [
+              {
+               "destination_team_key": "470.l.49649.t.3",
+               "destination_team_name": "Air Raid Gabriel",
+               "destination_type": "team",
+               "source_type": "freeagents",
+               "type": "add"
+              }
+             ]
+            }
+           ]
+          },
+          "1": {
+           "player": [
+            [
+             {
+              "player_key": "470.p.100023"
+             },
+             {
+              "player_id": "100023"
+             },
+             {
+              "name": {
+               "ascii_first": "Steelers",
+               "ascii_last": "",
+               "first": "Steelers",
+               "full": "Steelers",
+               "last": ""
+              }
+             },
+             {
+              "editorial_team_abbr": "Pit"
+             },
+             {
+              "display_position": "DEF"
+             },
+             {
+              "position_type": "DT"
+             }
+            ],
+            {
+             "transaction_data": {
+              "destination_type": "waivers",
+              "source_team_key": "470.l.49649.t.3",
+              "source_team_name": "Air Raid Gabriel",
+              "source_type": "team",
+              "type": "drop"
+             }
+            }
+           ]
+          },
+          "count": 2
+         }
+        }
+       ]
+      },
+      "count": 50
+     }
+    }
+   ],
+   "refresh_rate": "30",
+   "time": "49.930095672607ms",
+   "xml:lang": "en-US",
+   "yahoo:uri": "/fantasy/v2/league/nfl.l.49649/transactions;count=50"
+  }
+ }
+}

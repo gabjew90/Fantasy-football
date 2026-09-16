@@ -1,0 +1,1172 @@
+{
+ "fetched_at": 1789599612.4867544,
+ "path": "league/nfl.l.49649/scoreboard;week=1",
+ "payload": {
+  "fantasy_content": {
+   "copyright": "Certain Data by Sportradar, Stats Perform and Rotowire",
+   "league": [
+    {
+     "allow_add_to_dl_extra_pos": 1,
+     "current_week": 2,
+     "draft_status": "postdraft",
+     "edit_key": "2",
+     "end_date": "2027-01-04",
+     "end_week": "17",
+     "felo_tier": "silver",
+     "game_code": "nfl",
+     "iris_group_chat_id": "",
+     "is_cash_league": "0",
+     "is_guillotine": "0",
+     "is_highscore": false,
+     "is_plus_league": "0",
+     "is_pro_league": "0",
+     "league_id": "49649",
+     "league_key": "470.l.49649",
+     "league_type": "private",
+     "league_update_timestamp": "1789541009",
+     "logo_url": "https://s.yimg.com/ep/cx/blendr/v2/image-avatar-football-trophy-buf-png_1721783391232.png",
+     "matchup_week": 2,
+     "max_teams": "10",
+     "name": "Keefamania",
+     "num_teams": 10,
+     "recordbook_url": "https://football.fantasysports.yahoo.com/f1/49649/recordbook?layout=webview&device=smartphone",
+     "renew": "",
+     "renewed": "",
+     "roster_type": "week",
+     "scoring_label": "H2H",
+     "scoring_type": "head",
+     "season": "2026",
+     "short_invitation_url": "https://football.fantasysports.yahoo.com/f1/49649/invitation?key=dcdd6d9e2f90266d&ikey=319457eceebc6ff6",
+     "start_date": "2026-09-09",
+     "start_week": "1",
+     "url": "https://football.fantasysports.yahoo.com/f1/49649",
+     "weekly_deadline": ""
+    },
+    {
+     "scoreboard": {
+      "0": {
+       "matchups": {
+        "0": {
+         "matchup": {
+          "0": {
+           "teams": {
+            "0": {
+             "team": [
+              [
+               {
+                "team_key": "470.l.49649.t.1"
+               },
+               {
+                "team_id": "1"
+               },
+               {
+                "name": "QuAck Attack (Simon)"
+               },
+               [],
+               {
+                "url": "https://football.fantasysports.yahoo.com/f1/49649/1"
+               },
+               {
+                "team_logos": [
+                 {
+                  "team_logo": {
+                   "size": "large",
+                   "url": "https://yahoofantasysports-res.cloudinary.com/image/upload/t_s192sq/fantasy-logos/326cd1ed85970402f9292e8af60d06180b34c713f5a02343843a83213f180987.jpg"
+                  }
+                 }
+                ]
+               },
+               [],
+               [],
+               {
+                "waiver_priority": 6
+               },
+               [],
+               {
+                "number_of_moves": 1
+               },
+               {
+                "number_of_trades": 0
+               },
+               {
+                "roster_adds": {
+                 "coverage_type": "week",
+                 "coverage_value": 2,
+                 "value": "0"
+                }
+               },
+               [],
+               {
+                "league_scoring_type": "head"
+               },
+               [],
+               {
+                "draft_position": 7
+               },
+               {
+                "draft_grade": "F",
+                "draft_recap_url": "https://football.fantasysports.yahoo.com/f1/49649/1/draftrecap",
+                "has_draft_grade": 1
+               },
+               [],
+               [],
+               [],
+               [],
+               [],
+               {
+                "managers": [
+                 {
+                  "manager": {
+                   "felo_score": "589",
+                   "felo_tier": "bronze",
+                   "guid": "--hidden--",
+                   "image_url": "https://s.yimg.com/ag/images/default_user_profile_pic_64sq.jpg",
+                   "is_commissioner": "1",
+                   "manager_id": "1",
+                   "nickname": "Simon"
+                  }
+                 }
+                ]
+               }
+              ],
+              {
+               "team_points": {
+                "coverage_type": "week",
+                "total": "113.06",
+                "week": "1"
+               },
+               "team_projected_points": {
+                "coverage_type": "week",
+                "total": "110.78",
+                "week": "1"
+               },
+               "win_probability": 0
+              }
+             ]
+            },
+            "1": {
+             "team": [
+              [
+               {
+                "team_key": "470.l.49649.t.2"
+               },
+               {
+                "team_id": "2"
+               },
+               {
+                "name": "Ed Lasso\u2019s AFC Richmond"
+               },
+               [],
+               {
+                "url": "https://football.fantasysports.yahoo.com/f1/49649/2"
+               },
+               {
+                "team_logos": [
+                 {
+                  "team_logo": {
+                   "size": "large",
+                   "url": "https://s.yimg.com/ep/cx/blendr/v2/image-bunny-png_1721952315910.png"
+                  }
+                 }
+                ]
+               },
+               [],
+               [],
+               {
+                "waiver_priority": 3
+               },
+               [],
+               {
+                "number_of_moves": 1
+               },
+               {
+                "number_of_trades": 0
+               },
+               {
+                "roster_adds": {
+                 "coverage_type": "week",
+                 "coverage_value": 2,
+                 "value": "0"
+                }
+               },
+               [],
+               {
+                "league_scoring_type": "head"
+               },
+               [],
+               {
+                "draft_position": 6
+               },
+               {
+                "draft_grade": "D",
+                "draft_recap_url": "https://football.fantasysports.yahoo.com/f1/49649/2/draftrecap",
+                "has_draft_grade": 1
+               },
+               [],
+               [],
+               [],
+               [],
+               [],
+               {
+                "managers": [
+                 {
+                  "manager": {
+                   "felo_score": "683",
+                   "felo_tier": "silver",
+                   "guid": "--hidden--",
+                   "image_url": "https://s.yimg.com/ag/images/default_user_profile_pic_64sq.jpg",
+                   "manager_id": "2",
+                   "nickname": "Edward"
+                  }
+                 }
+                ]
+               }
+              ],
+              {
+               "team_points": {
+                "coverage_type": "week",
+                "total": "153.76",
+                "week": "1"
+               },
+               "team_projected_points": {
+                "coverage_type": "week",
+                "total": "110.95",
+                "week": "1"
+               },
+               "win_probability": 1
+              }
+             ]
+            },
+            "count": 2
+           }
+          },
+          "is_consolation": "0",
+          "is_matchup_of_the_week": "1",
+          "is_matchup_recap_available": 1,
+          "is_playoffs": "0",
+          "is_tied": 0,
+          "matchup_grades": [
+           {
+            "matchup_grade": {
+             "grade": "D+",
+             "team_key": "470.l.49649.t.1"
+            }
+           },
+           {
+            "matchup_grade": {
+             "grade": "A+",
+             "team_key": "470.l.49649.t.2"
+            }
+           }
+          ],
+          "matchup_recap_title": "Chase wins all season long with Toyota Gameday Giveaways.",
+          "matchup_recap_url": "https://football.fantasysports.yahoo.com/f1/49649/recap?week=1&mid1=1&mid2=2",
+          "status": "postevent",
+          "week": "1",
+          "week_end": "2026-09-14",
+          "week_start": "2026-09-09",
+          "winner_team_key": "470.l.49649.t.2"
+         }
+        },
+        "1": {
+         "matchup": {
+          "0": {
+           "teams": {
+            "0": {
+             "team": [
+              [
+               {
+                "team_key": "470.l.49649.t.3"
+               },
+               {
+                "team_id": "3"
+               },
+               {
+                "name": "Air Raid Gabriel"
+               },
+               {
+                "is_owned_by_current_login": 1
+               },
+               {
+                "url": "https://football.fantasysports.yahoo.com/f1/49649/3"
+               },
+               {
+                "team_logos": [
+                 {
+                  "team_logo": {
+                   "size": "large",
+                   "url": "https://s.yimg.com/ep/cx/blendr/v2/image-touchdown-signal-png_1721175309366.png"
+                  }
+                 }
+                ]
+               },
+               [],
+               [],
+               {
+                "waiver_priority": 9
+               },
+               [],
+               {
+                "number_of_moves": 13
+               },
+               {
+                "number_of_trades": 0
+               },
+               {
+                "roster_adds": {
+                 "coverage_type": "week",
+                 "coverage_value": 2,
+                 "value": "4"
+                }
+               },
+               [],
+               {
+                "league_scoring_type": "head"
+               },
+               [],
+               {
+                "draft_position": 2
+               },
+               {
+                "draft_grade": "B",
+                "draft_recap_url": "https://football.fantasysports.yahoo.com/f1/49649/3/draftrecap",
+                "has_draft_grade": 1
+               },
+               [],
+               [],
+               [],
+               [],
+               [],
+               {
+                "managers": [
+                 {
+                  "manager": {
+                   "felo_score": "640",
+                   "felo_tier": "silver",
+                   "guid": "--hidden--",
+                   "image_url": "https://s.yimg.com/ag/images/default_user_profile_pic_64sq.jpg",
+                   "is_current_login": "1",
+                   "manager_id": "3",
+                   "nickname": "Gabriel"
+                  }
+                 }
+                ]
+               }
+              ],
+              {
+               "team_points": {
+                "coverage_type": "week",
+                "total": "122.06",
+                "week": "1"
+               },
+               "team_projected_points": {
+                "coverage_type": "week",
+                "total": "103.47",
+                "week": "1"
+               },
+               "win_probability": 1
+              }
+             ]
+            },
+            "1": {
+             "team": [
+              [
+               {
+                "team_key": "470.l.49649.t.5"
+               },
+               {
+                "team_id": "5"
+               },
+               {
+                "name": "Off in Chapel"
+               },
+               [],
+               {
+                "url": "https://football.fantasysports.yahoo.com/f1/49649/5"
+               },
+               {
+                "team_logos": [
+                 {
+                  "team_logo": {
+                   "size": "large",
+                   "url": "https://s.yimg.com/ep/cx/blendr/v2/image-luchador-png_1721174314847.png"
+                  }
+                 }
+                ]
+               },
+               [],
+               [],
+               {
+                "waiver_priority": 1
+               },
+               [],
+               {
+                "number_of_moves": 0
+               },
+               {
+                "number_of_trades": 0
+               },
+               {
+                "roster_adds": {
+                 "coverage_type": "week",
+                 "coverage_value": 2,
+                 "value": "0"
+                }
+               },
+               [],
+               {
+                "league_scoring_type": "head"
+               },
+               [],
+               {
+                "draft_position": 10
+               },
+               {
+                "draft_grade": "D",
+                "draft_recap_url": "https://football.fantasysports.yahoo.com/f1/49649/5/draftrecap",
+                "has_draft_grade": 1
+               },
+               [],
+               [],
+               [],
+               [],
+               [],
+               {
+                "managers": [
+                 {
+                  "manager": {
+                   "felo_score": "588",
+                   "felo_tier": "bronze",
+                   "guid": "--hidden--",
+                   "image_url": "https://s.yimg.com/ag/images/default_user_profile_pic_64sq.jpg",
+                   "manager_id": "5",
+                   "nickname": "Kevin"
+                  }
+                 }
+                ]
+               }
+              ],
+              {
+               "team_points": {
+                "coverage_type": "week",
+                "total": "88.70",
+                "week": "1"
+               },
+               "team_projected_points": {
+                "coverage_type": "week",
+                "total": "105.82",
+                "week": "1"
+               },
+               "win_probability": 0
+              }
+             ]
+            },
+            "count": 2
+           }
+          },
+          "is_consolation": "0",
+          "is_matchup_of_the_week": "0",
+          "is_matchup_recap_available": 1,
+          "is_playoffs": "0",
+          "is_tied": 0,
+          "matchup_grades": [
+           {
+            "matchup_grade": {
+             "grade": "A+",
+             "team_key": "470.l.49649.t.3"
+            }
+           },
+           {
+            "matchup_grade": {
+             "grade": "D",
+             "team_key": "470.l.49649.t.5"
+            }
+           }
+          ],
+          "matchup_recap_title": "Chase wins all season long with Toyota Gameday Giveaways.",
+          "matchup_recap_url": "https://football.fantasysports.yahoo.com/f1/49649/recap?week=1&mid1=3&mid2=5",
+          "status": "postevent",
+          "week": "1",
+          "week_end": "2026-09-14",
+          "week_start": "2026-09-09",
+          "winner_team_key": "470.l.49649.t.3"
+         }
+        },
+        "2": {
+         "matchup": {
+          "0": {
+           "teams": {
+            "0": {
+             "team": [
+              [
+               {
+                "team_key": "470.l.49649.t.4"
+               },
+               {
+                "team_id": "4"
+               },
+               {
+                "name": "Angle Lockers"
+               },
+               [],
+               {
+                "url": "https://football.fantasysports.yahoo.com/f1/49649/4"
+               },
+               {
+                "team_logos": [
+                 {
+                  "team_logo": {
+                   "size": "large",
+                   "url": "https://s.yimg.com/ep/cx/blendr/v2/image-dracula-png_1721173923779.png"
+                  }
+                 }
+                ]
+               },
+               [],
+               [],
+               {
+                "waiver_priority": 2
+               },
+               [],
+               {
+                "number_of_moves": 1
+               },
+               {
+                "number_of_trades": 0
+               },
+               {
+                "roster_adds": {
+                 "coverage_type": "week",
+                 "coverage_value": 2,
+                 "value": "0"
+                }
+               },
+               [],
+               {
+                "league_scoring_type": "head"
+               },
+               [],
+               {
+                "draft_position": 9
+               },
+               {
+                "draft_grade": "C-",
+                "draft_recap_url": "https://football.fantasysports.yahoo.com/f1/49649/4/draftrecap",
+                "has_draft_grade": 1
+               },
+               [],
+               [],
+               [],
+               [],
+               [],
+               {
+                "managers": [
+                 {
+                  "manager": {
+                   "felo_score": "597",
+                   "felo_tier": "bronze",
+                   "guid": "--hidden--",
+                   "image_url": "https://s.yimg.com/ag/images/4461/38167518674_db17e8_64sq.jpg",
+                   "manager_id": "4",
+                   "nickname": "x3shift"
+                  }
+                 }
+                ]
+               }
+              ],
+              {
+               "team_points": {
+                "coverage_type": "week",
+                "total": "117.46",
+                "week": "1"
+               },
+               "team_projected_points": {
+                "coverage_type": "week",
+                "total": "104.99",
+                "week": "1"
+               },
+               "win_probability": 1
+              }
+             ]
+            },
+            "1": {
+             "team": [
+              [
+               {
+                "team_key": "470.l.49649.t.10"
+               },
+               {
+                "team_id": "10"
+               },
+               {
+                "name": "Beastmode"
+               },
+               [],
+               {
+                "url": "https://football.fantasysports.yahoo.com/f1/49649/10"
+               },
+               {
+                "team_logos": [
+                 {
+                  "team_logo": {
+                   "size": "large",
+                   "url": "https://s.yimg.com/ep/cx/blendr/v2/image-skulland-bones-png_1721174079578.png"
+                  }
+                 }
+                ]
+               },
+               [],
+               [],
+               {
+                "waiver_priority": 5
+               },
+               [],
+               {
+                "number_of_moves": 1
+               },
+               {
+                "number_of_trades": 0
+               },
+               {
+                "roster_adds": {
+                 "coverage_type": "week",
+                 "coverage_value": 2,
+                 "value": "0"
+                }
+               },
+               [],
+               {
+                "league_scoring_type": "head"
+               },
+               [],
+               {
+                "draft_position": 5
+               },
+               {
+                "draft_grade": "D",
+                "draft_recap_url": "https://football.fantasysports.yahoo.com/f1/49649/10/draftrecap",
+                "has_draft_grade": 1
+               },
+               [],
+               [],
+               [],
+               [],
+               [],
+               {
+                "managers": [
+                 {
+                  "manager": {
+                   "felo_score": "589",
+                   "felo_tier": "bronze",
+                   "guid": "--hidden--",
+                   "image_url": "https://s.yimg.com/ag/images/default_user_profile_pic_64sq.jpg",
+                   "manager_id": "10",
+                   "nickname": "Chris"
+                  }
+                 }
+                ]
+               }
+              ],
+              {
+               "team_points": {
+                "coverage_type": "week",
+                "total": "95.20",
+                "week": "1"
+               },
+               "team_projected_points": {
+                "coverage_type": "week",
+                "total": "106.02",
+                "week": "1"
+               },
+               "win_probability": 0
+              }
+             ]
+            },
+            "count": 2
+           }
+          },
+          "is_consolation": "0",
+          "is_matchup_of_the_week": "0",
+          "is_matchup_recap_available": 1,
+          "is_playoffs": "0",
+          "is_tied": 0,
+          "matchup_grades": [
+           {
+            "matchup_grade": {
+             "grade": "A",
+             "team_key": "470.l.49649.t.4"
+            }
+           },
+           {
+            "matchup_grade": {
+             "grade": "D+",
+             "team_key": "470.l.49649.t.10"
+            }
+           }
+          ],
+          "matchup_recap_title": "Chase wins all season long with Toyota Gameday Giveaways.",
+          "matchup_recap_url": "https://football.fantasysports.yahoo.com/f1/49649/recap?week=1&mid1=4&mid2=10",
+          "status": "postevent",
+          "week": "1",
+          "week_end": "2026-09-14",
+          "week_start": "2026-09-09",
+          "winner_team_key": "470.l.49649.t.4"
+         }
+        },
+        "3": {
+         "matchup": {
+          "0": {
+           "teams": {
+            "0": {
+             "team": [
+              [
+               {
+                "team_key": "470.l.49649.t.6"
+               },
+               {
+                "team_id": "6"
+               },
+               {
+                "name": "Big PP"
+               },
+               [],
+               {
+                "url": "https://football.fantasysports.yahoo.com/f1/49649/6"
+               },
+               {
+                "team_logos": [
+                 {
+                  "team_logo": {
+                   "size": "large",
+                   "url": "https://s.yimg.com/ep/cx/blendr/v2/image-dracula-png_1721173923779.png"
+                  }
+                 }
+                ]
+               },
+               [],
+               [],
+               {
+                "waiver_priority": 7
+               },
+               [],
+               {
+                "number_of_moves": 1
+               },
+               {
+                "number_of_trades": 0
+               },
+               {
+                "roster_adds": {
+                 "coverage_type": "week",
+                 "coverage_value": 2,
+                 "value": "1"
+                }
+               },
+               [],
+               {
+                "league_scoring_type": "head"
+               },
+               [],
+               {
+                "draft_position": 4
+               },
+               {
+                "draft_grade": "C+",
+                "draft_recap_url": "https://football.fantasysports.yahoo.com/f1/49649/6/draftrecap",
+                "has_draft_grade": 1
+               },
+               [],
+               [],
+               [],
+               [],
+               [],
+               {
+                "managers": [
+                 {
+                  "manager": {
+                   "felo_score": "589",
+                   "felo_tier": "bronze",
+                   "guid": "--hidden--",
+                   "image_url": "https://s.yimg.com/ag/images/default_user_profile_pic_64sq.jpg",
+                   "manager_id": "6",
+                   "nickname": "pmo"
+                  }
+                 }
+                ]
+               }
+              ],
+              {
+               "team_points": {
+                "coverage_type": "week",
+                "total": "90.56",
+                "week": "1"
+               },
+               "team_projected_points": {
+                "coverage_type": "week",
+                "total": "108.74",
+                "week": "1"
+               },
+               "win_probability": 0
+              }
+             ]
+            },
+            "1": {
+             "team": [
+              [
+               {
+                "team_key": "470.l.49649.t.8"
+               },
+               {
+                "team_id": "8"
+               },
+               {
+                "name": "Kelvin's Frontline Precision"
+               },
+               [],
+               {
+                "url": "https://football.fantasysports.yahoo.com/f1/49649/8"
+               },
+               {
+                "team_logos": [
+                 {
+                  "team_logo": {
+                   "size": "large",
+                   "url": "https://s.yimg.com/ba/images/72872f4869515b3d98f29efb9b46b3a0d9df0511e7744a8881d0a0b77a81a73c.png"
+                  }
+                 }
+                ]
+               },
+               [],
+               [],
+               {
+                "waiver_priority": 4
+               },
+               [],
+               {
+                "number_of_moves": 7
+               },
+               {
+                "number_of_trades": 0
+               },
+               {
+                "roster_adds": {
+                 "coverage_type": "week",
+                 "coverage_value": 2,
+                 "value": "2"
+                }
+               },
+               [],
+               {
+                "league_scoring_type": "head"
+               },
+               [],
+               {
+                "draft_position": 8
+               },
+               {
+                "draft_grade": "D",
+                "draft_recap_url": "https://football.fantasysports.yahoo.com/f1/49649/8/draftrecap",
+                "has_draft_grade": 1
+               },
+               [],
+               [],
+               [],
+               [],
+               [],
+               {
+                "managers": [
+                 {
+                  "manager": {
+                   "felo_score": "596",
+                   "felo_tier": "bronze",
+                   "guid": "--hidden--",
+                   "image_url": "https://s.yimg.com/ag/images/default_user_profile_pic_64sq.jpg",
+                   "manager_id": "8",
+                   "nickname": "Kelvin"
+                  }
+                 }
+                ]
+               }
+              ],
+              {
+               "team_points": {
+                "coverage_type": "week",
+                "total": "104.72",
+                "week": "1"
+               },
+               "team_projected_points": {
+                "coverage_type": "week",
+                "total": "105.16",
+                "week": "1"
+               },
+               "win_probability": 1
+              }
+             ]
+            },
+            "count": 2
+           }
+          },
+          "is_consolation": "0",
+          "is_matchup_of_the_week": "0",
+          "is_matchup_recap_available": 1,
+          "is_playoffs": "0",
+          "is_tied": 0,
+          "matchup_grades": [
+           {
+            "matchup_grade": {
+             "grade": "D+",
+             "team_key": "470.l.49649.t.6"
+            }
+           },
+           {
+            "matchup_grade": {
+             "grade": "B+",
+             "team_key": "470.l.49649.t.8"
+            }
+           }
+          ],
+          "matchup_recap_title": "Chase wins all season long with Toyota Gameday Giveaways.",
+          "matchup_recap_url": "https://football.fantasysports.yahoo.com/f1/49649/recap?week=1&mid1=6&mid2=8",
+          "status": "postevent",
+          "week": "1",
+          "week_end": "2026-09-14",
+          "week_start": "2026-09-09",
+          "winner_team_key": "470.l.49649.t.8"
+         }
+        },
+        "4": {
+         "matchup": {
+          "0": {
+           "teams": {
+            "0": {
+             "team": [
+              [
+               {
+                "team_key": "470.l.49649.t.7"
+               },
+               {
+                "team_id": "7"
+               },
+               {
+                "name": "WHISTLE/KEIBLER (STAN)"
+               },
+               [],
+               {
+                "url": "https://football.fantasysports.yahoo.com/f1/49649/7"
+               },
+               {
+                "team_logos": [
+                 {
+                  "team_logo": {
+                   "size": "large",
+                   "url": "https://s.yimg.com/ba/images/0b1f460050e00e1e111684e9d5376c881ac2dbc7c1e17370b1e39984e5e89f51.png"
+                  }
+                 }
+                ]
+               },
+               [],
+               [],
+               {
+                "waiver_priority": 10
+               },
+               [],
+               {
+                "number_of_moves": 8
+               },
+               {
+                "number_of_trades": 0
+               },
+               {
+                "roster_adds": {
+                 "coverage_type": "week",
+                 "coverage_value": 2,
+                 "value": "3"
+                }
+               },
+               [],
+               {
+                "league_scoring_type": "head"
+               },
+               [],
+               {
+                "draft_position": 1
+               },
+               {
+                "draft_grade": "F",
+                "draft_recap_url": "https://football.fantasysports.yahoo.com/f1/49649/7/draftrecap",
+                "has_draft_grade": 1
+               },
+               [],
+               [],
+               [],
+               [],
+               [],
+               {
+                "managers": [
+                 {
+                  "manager": {
+                   "felo_score": "577",
+                   "felo_tier": "bronze",
+                   "guid": "--hidden--",
+                   "image_url": "https://s.yimg.com/ag/images/default_user_profile_pic_64sq.jpg",
+                   "is_commissioner": "1",
+                   "manager_id": "7",
+                   "nickname": "Stanley"
+                  }
+                 }
+                ]
+               }
+              ],
+              {
+               "team_points": {
+                "coverage_type": "week",
+                "total": "130.80",
+                "week": "1"
+               },
+               "team_projected_points": {
+                "coverage_type": "week",
+                "total": "103.97",
+                "week": "1"
+               },
+               "win_probability": 1
+              }
+             ]
+            },
+            "1": {
+             "team": [
+              [
+               {
+                "team_key": "470.l.49649.t.9"
+               },
+               {
+                "team_id": "9"
+               },
+               {
+                "name": "Endzone Zack"
+               },
+               [],
+               {
+                "url": "https://football.fantasysports.yahoo.com/f1/49649/9"
+               },
+               {
+                "team_logos": [
+                 {
+                  "team_logo": {
+                   "size": "large",
+                   "url": "https://s.yimg.com/ep/cx/blendr/v2/image-football-trophy-png_1721174536245.png"
+                  }
+                 }
+                ]
+               },
+               [],
+               [],
+               {
+                "waiver_priority": 8
+               },
+               [],
+               {
+                "number_of_moves": 2
+               },
+               {
+                "number_of_trades": 0
+               },
+               {
+                "roster_adds": {
+                 "coverage_type": "week",
+                 "coverage_value": 2,
+                 "value": "1"
+                }
+               },
+               [],
+               {
+                "league_scoring_type": "head"
+               },
+               [],
+               {
+                "draft_position": 3
+               },
+               {
+                "draft_grade": "A-",
+                "draft_recap_url": "https://football.fantasysports.yahoo.com/f1/49649/9/draftrecap",
+                "has_draft_grade": 1
+               },
+               [],
+               [],
+               [],
+               [],
+               [],
+               {
+                "managers": [
+                 {
+                  "manager": {
+                   "felo_score": "590",
+                   "felo_tier": "bronze",
+                   "guid": "--hidden--",
+                   "image_url": "https://s.yimg.com/ag/images/default_user_profile_pic_64sq.jpg",
+                   "manager_id": "9",
+                   "nickname": "Zack"
+                  }
+                 }
+                ]
+               }
+              ],
+              {
+               "team_points": {
+                "coverage_type": "week",
+                "total": "120.22",
+                "week": "1"
+               },
+               "team_projected_points": {
+                "coverage_type": "week",
+                "total": "116.60",
+                "week": "1"
+               },
+               "win_probability": 0
+              }
+             ]
+            },
+            "count": 2
+           }
+          },
+          "is_consolation": "0",
+          "is_matchup_of_the_week": "0",
+          "is_matchup_recap_available": 1,
+          "is_playoffs": "0",
+          "is_tied": 0,
+          "matchup_grades": [
+           {
+            "matchup_grade": {
+             "grade": "A",
+             "team_key": "470.l.49649.t.7"
+            }
+           },
+           {
+            "matchup_grade": {
+             "grade": "C-",
+             "team_key": "470.l.49649.t.9"
+            }
+           }
+          ],
+          "matchup_recap_title": "Chase wins all season long with Toyota Gameday Giveaways.",
+          "matchup_recap_url": "https://football.fantasysports.yahoo.com/f1/49649/recap?week=1&mid1=7&mid2=9",
+          "status": "postevent",
+          "week": "1",
+          "week_end": "2026-09-14",
+          "week_start": "2026-09-09",
+          "winner_team_key": "470.l.49649.t.7"
+         }
+        },
+        "count": 5
+       }
+      },
+      "week": "1"
+     }
+    }
+   ],
+   "refresh_rate": "30",
+   "time": "114.85719680786ms",
+   "xml:lang": "en-US",
+   "yahoo:uri": "/fantasy/v2/league/nfl.l.49649/scoreboard;week=1"
+  }
+ }
+}
