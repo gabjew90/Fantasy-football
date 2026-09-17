@@ -75,6 +75,95 @@ def _plain_move(move: str) -> str:
     return re.sub(r"\s*\(.*\)$", "", move).replace(" — ", ", ").replace("—", ",")
 
 
+def _last(name: str) -> str:
+    """Surname for a second mention. Suffixes stay with the surname."""
+    parts = (name or "").split()
+    if len(parts) >= 2 and parts[-1].rstrip(".") in ("Jr", "Sr", "II", "III", "IV"):
+        return " ".join(parts[-2:])
+    return parts[-1] if parts else name
+
+
+def _num(x: float) -> str:
+    return f"{x:.1f}".rstrip("0").rstrip(".")
+
+
+CLASS_WORDS = {"league_winner": "he could start for you every week",
+               "breakout": "starter upside",
+               "speculative": "a stash, not a starter yet",
+               "streamer": "a one week play"}
+
+
+def swap_why(f: dict, mode: str = "neutral") -> str:
+    """One sentence on why the swap: the two projections, then the single
+    fact that separates them (a status, a game total, or how far the
+    sources disagree)."""
+    if not f:
+        return ""
+    a, b = _last(f["in"]), _last(f["out"]) if f.get("out") else None
+    parts = []
+    if b:
+        parts.append(f"{a} projects {_num(f['in_pts'])}, {b} {_num(f['out_pts'] or 0)}")
+    else:
+        parts.append(f"{a} projects {_num(f['in_pts'])} and the slot was empty")
+    if f.get("out_status"):
+        parts.append(f"{b} is {f['out_status']}")
+    elif f.get("in_status"):
+        parts.append(f"{a} is {f['in_status']} but still the better play")
+    # The Vegas note carries its own sign: "implied 28 (+5%)" is a high
+    # total, "implied 16 (-5%)" a low one. One phrase at most.
+    vin = re.search(r"implied (\d+) \(([+-])", f.get("in_vegas") or "")
+    vout = re.search(r"implied (\d+) \(([+-])", f.get("out_vegas") or "")
+    if vin and vin.group(2) == "+":
+        parts.append(f"{a}'s team is in a high scoring game, {vin.group(1)} points implied")
+    elif vin:
+        parts.append(f"{a}'s game is a low scoring one, {vin.group(1)} points implied, and he still projects higher")
+    elif vout and b and vout.group(2) == "+":
+        parts.append(f"{b}'s team is in the higher scoring game, {vout.group(1)} points implied, but {a} still projects higher")
+    elif vout and b:
+        parts.append(f"{b}'s game is a low scoring one, {vout.group(1)} points implied")
+    gap = abs(f["in_pts"] - (f["out_pts"] or 0))
+    if b and f.get("spread", 0) > max(gap, 1.0) * 3:
+        parts.append(f"the sources disagree by {f['spread']:.0f} on these two, so this is close to a coin flip"
+                     + (" and the higher ceiling wins it" if mode == "ceiling" else
+                        " and the safer floor wins it" if mode == "floor" else ""))
+    return ". ".join(p[:1].upper() + p[1:] for p in parts)
+
+
+def add_why(a: dict, faab: bool) -> list[str]:
+    """Up to two lines under a claim: what he is and what he is worth,
+    then the bid logic."""
+    out = []
+    parts = []
+    w = plain_why(a.get("why") or "", a.get("pos"))
+    if w:
+        parts.append(w)
+    ros, drop_ros = a.get("ros"), a.get("drop_ros")
+    if ros and a.get("drop") and drop_ros is not None:
+        parts.append(f"{_last(a['name'])} projects {ros:.0f} points the rest of the way, "
+                     f"{_last(a['drop'])} {drop_ros:.0f}")
+    elif ros:
+        parts.append(f"projects {ros:.0f} points the rest of the way")
+    e = a.get("ecr")
+    if e and e.get("ecr") is not None:
+        parts.append(f"experts have him {e['pos']}{e['ecr']:.0f}, best case {e['pos']}{e['best']:.0f}")
+    cls = CLASS_WORDS.get(a.get("cls") or "")
+    if cls:
+        parts.append(cls)
+    if parts:
+        out.append("Why: " + ". ".join(p[:1].upper() + p[1:] for p in parts) + ".")
+    if faab and a.get("fair") is not None:
+        if a.get("contingent"):
+            out.append("Bid: he backs up a downed starter, so pay the high end.")
+        elif a.get("rivals"):
+            budgets = " and ".join(f"${b}" for b in a["rivals"][:2])
+            out.append(f"Bid: rivals with a need at {a['pos']} hold {budgets}, so lean to the high end.")
+        else:
+            out.append("Bid: no rival is forced to bid here, so the low end should land him.")
+    elif not faab and a.get("contingent"):
+        out.append("He backs up a downed starter, so he is worth more than his spot in this list suggests.")
+    return out
+
+
 def _name(p) -> str:
     return (p.get("name") or str(p.get("sleeper_id")))
 
@@ -103,12 +192,17 @@ def lineup(ctx, summary: dict) -> tuple[str | None, str, bool]:
     lock = summary.get("first_lock")
     if not swaps:
         return None, "", False
-    swaps = [x[:1].upper() + x[1:] for x in swaps]
-    first = swaps[0].split(" (")[0]
-    subject = first if len(swaps) == 1 else f"{first}, and {len(swaps) - 1} more"
+    facts = summary.get("facts") or {}
+    shown = [x[:1].upper() + x[1:] for x in swaps]
+    first = shown[0].split(" (")[0]
+    subject = first if len(shown) == 1 else f"{first}, and {len(shown) - 1} more"
     lines = ["Set your lineup:"]
-    for i, s in enumerate(swaps, 1):
+    for i, (raw, s) in enumerate(zip(swaps, shown), 1):
         lines.append(f"{i}. {s}")
+        why = swap_why(facts.get(raw) or {}, mode)
+        if why:
+            lines.append(f"   Why: {why}.")
+    swaps = shown
     if mode != "neutral":
         lines.append("")
         lines.append("You are the " + ("underdog this week: take the higher ceiling on coin flips."
@@ -150,9 +244,7 @@ def waivers(ctx, summary: dict) -> tuple[str | None, str, bool]:
                 used[drop] = i
             price = f" Bid ${a['fair']} to ${a['agg']}." if faab and a.get("fair") is not None else ""
             lines.append(f"{i}. Claim {a['name']} ({a['pos']}, {a.get('team') or '?'}). {move}.{price}")
-            why = plain_why(a.get("why") or "", a.get("pos"))
-            if why:
-                lines.append(f"   {why}.")
+            lines += [f"   {w}" for w in add_why(a, faab)]
         lines.append("")
     lines.append(WAIVER_DEADLINE_TEXT["faab" if faab else "rolling"])
     if faab and summary.get("budget") is not None:
@@ -217,15 +309,22 @@ def injury_changes(changes: list[dict], contingency: dict, starters: set[str]) -
         return None, "", False
     lines = []
     heads = []
+    hot = []
     urgent = False
     for c in changes:
         status = c["new"] or "healthy"
         note = f" ({c['note']})" if c.get("note") else ""
         line = f"{c['name']} ({c['pos']}): {status}{note}"
         heads.append(line)
+        hot.append(c["pid"] in starters and c["new"] in BAD)
         if c["pid"] in starters and c["new"] in BAD:
             repl = contingency.get(c["name"])
-            line += ". Start " + (repl.split(" (")[0] if repl else "your best bench option") + " instead."
+            if repl:
+                m = re.match(r"(.+?) \((\w+), ([\d.]+) pts\)", repl)
+                line += (f". Start {m.group(1)} instead, your best bench {m.group(2)} at {_num(float(m.group(3)))} projected."
+                         if m else f". Start {repl.split(' (')[0]} instead.")
+            else:
+                line += ". Start your best bench option instead."
             urgent = True
         elif c["pid"] in starters and c["new"] == "Questionable":
             repl = contingency.get(c["name"])
@@ -233,7 +332,7 @@ def injury_changes(changes: list[dict], contingency: dict, starters: set[str]) -
                 line += f". If he sits, start {repl.split(' (')[0]}."
         lines.append(line)
     # The urgent one leads the subject when there are several.
-    order = sorted(range(len(lines)), key=lambda i: 0 if lines[i].endswith("instead.") else 1)
+    order = sorted(range(len(lines)), key=lambda i: 0 if hot[i] else 1)
     head = heads[order[0]]
     subject = head if len(lines) == 1 else f"{head}, and {len(lines) - 1} more"
     return subject, "\n".join(lines), urgent

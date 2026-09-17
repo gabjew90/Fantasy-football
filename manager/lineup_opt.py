@@ -10,6 +10,7 @@ Module 2 consumes.
 from __future__ import annotations
 
 import logging
+import re
 
 from draftkit.lineup import lineup_changes, optimal_lineup
 
@@ -98,6 +99,31 @@ def flex_analysis(roster: list[dict], optimal: list[dict], mode: str,
     return lines
 
 
+def swap_facts(swaps: list[str], roster: list[dict], con: dict) -> dict[str, dict]:
+    """swap line -> the facts behind it, for the phone rationale: both
+    projections, each side's Vegas note and status, and how far the
+    sources disagree on the pair."""
+    by_name = {p["name"]: p for p in roster}
+    out = {}
+    for s in swaps:
+        m = re.match(r"start (.+?) over (.+?) \(", s) or re.match(r"start (.+?) \(", s)
+        if not m:
+            continue
+        a = by_name.get(m.group(1))
+        b = by_name.get(m.group(2)) if m.lastindex and m.lastindex >= 2 else None
+        if not a:
+            continue
+        rows = [con.get(str(x["sleeper_id"])) for x in (a, b) if x]
+        out[s] = {
+            "in": a["name"], "in_pts": float(a.get("weekly") or 0), "in_vegas": a.get("vegas"),
+            "in_status": a.get("status") or "",
+            "out": b["name"] if b else None, "out_pts": float(b.get("weekly") or 0) if b else None,
+            "out_vegas": b.get("vegas") if b else None, "out_status": (b.get("status") or "") if b else "",
+            "spread": max((float(r.get("spread") or 0) for r in rows if r), default=0.0),
+        }
+    return out
+
+
 def _first_lock(ctx, starters: list[dict]) -> str | None:
     """'Thu 5:15 PM (DET)': the earliest kickoff among my starters' teams."""
     try:
@@ -167,6 +193,7 @@ def build(ctx, store) -> str:
     ctx.setdefault("_summary", {})["lineup_phone"] = {
         "swaps": list(swaps), "mode": mode, "contingency": dict(table),
         "first_lock": _first_lock(ctx, optimal),
+        "facts": swap_facts(list(swaps), roster, con or {}),
     }
 
     lines = [f"# Lineup — week {week} ({mode.upper()} mode: {mode_why})", ""]

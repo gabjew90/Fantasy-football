@@ -62,7 +62,7 @@ def test_waivers_faab_claim_drop_bid_and_deadline():
         {"faab": True}, {"adds": _adds(), "budget": 88, "priority": 4, "teams": 12})
     assert subject == "Claim Tyler Allgeier, drop Cam Akers"
     assert "1. Claim Tyler Allgeier (RB, ATL). Drop Cam Akers. Bid $7 to $12." in body
-    assert "   Robinson is questionable, Allgeier gets the work." in body
+    assert "   Why: Robinson is questionable, Allgeier gets the work." in body
     assert "2. Claim Jalen Coker (WR, CAR). Drop Elijah Moore. Bid $3 to $5." in body
     assert "Bids lock 7:00 PM PT tonight." in body
     assert "FAAB left: $88." in body
@@ -133,7 +133,7 @@ def test_injury_change_for_a_starter_going_out_is_act_now_with_replacement():
         changes, {"A.J. Brown": "Jalen Coker (WR, 9.1 pts)"}, {"1"})
     assert urgent is True
     assert subject == "A.J. Brown (WR): Out (Hamstring)"
-    assert body == "A.J. Brown (WR): Out (Hamstring). Start Jalen Coker instead."
+    assert body == "A.J. Brown (WR): Out (Hamstring). Start Jalen Coker instead, your best bench WR at 9.1 projected."
     _clean(body)
 
 
@@ -212,3 +212,51 @@ def test_waivers_same_drop_twice_becomes_a_fallback_and_no_dashes():
     assert "2. Claim Jalen Coker (WR, CAR). Drop Devaughn Vele if claim 1 misses." in body
     assert "3. Claim DeeJay Dallas (WR, CAR). No obvious drop, only claim him if he beats your worst bench player." in body
     _clean(body)
+
+
+# --------------------------------------------------------------- rationale
+
+def test_lineup_swap_carries_a_why_line():
+    facts = {"start Harold Fannin over Devaughn Vele (+0.6 pts)": {
+        "in": "Harold Fannin", "in_pts": 10.2, "in_vegas": None, "in_status": "",
+        "out": "Devaughn Vele", "out_pts": 9.6, "out_vegas": "implied 29 (+5%)", "out_status": "",
+        "spread": 44.0}}
+    _s, body, _u = phone.lineup({}, {"swaps": list(facts), "facts": facts, "mode": "neutral"})
+    assert body.splitlines()[1] == "1. Start Harold Fannin over Devaughn Vele (+0.6 pts)"
+    assert body.splitlines()[2] == ("   Why: Fannin projects 10.2, Vele 9.6. Vele's team is in the higher scoring game, "
+                                    "29 points implied, but Fannin still projects higher. The sources disagree by 44 on "
+                                    "these two, so this is close to a coin flip.")
+    _clean(body)
+
+
+def test_swap_why_names_the_deciding_fact():
+    base = {"in": "Kyren Williams", "in_pts": 14.0, "out": "Chase Brown", "out_pts": 12.1,
+            "in_vegas": None, "out_vegas": None, "in_status": "", "out_status": "", "spread": 3.0}
+    assert phone.swap_why(base) == "Williams projects 14, Brown 12.1"
+    assert phone.swap_why(dict(base, out_status="Questionable")) == "Williams projects 14, Brown 12.1. Brown is Questionable"
+    assert phone.swap_why(dict(base, in_vegas="implied 28 (+5%)")).endswith("Williams's team is in a high scoring game, 28 points implied")
+    assert phone.swap_why(dict(base, in_vegas="implied 16 (-5%)")).endswith("Williams's game is a low scoring one, 16 points implied, and he still projects higher")
+    assert phone.swap_why(dict(base, out_vegas="implied 16 (-5%)")).endswith("Brown's game is a low scoring one, 16 points implied")
+    assert phone.swap_why(dict(base, spread=30.0), "ceiling").endswith("close to a coin flip and the higher ceiling wins it")
+    assert phone.swap_why({"in": "Bo Nix", "in_pts": 18.0, "out": None, "out_pts": None}) == "Nix projects 18 and the slot was empty"
+
+
+def test_add_why_gives_worth_and_bid_logic():
+    a = {"name": "Wan'Dale Robinson", "pos": "WR", "cls": "breakout", "drop": "Kaelon Black",
+         "why": "target share 21%; targets 6; carries 0; rec yds 38; snaps 82%",
+         "ros": 128.4, "drop_ros": 40.2, "ecr": {"pos": "WR", "ecr": 62, "best": 60},
+         "fair": 14, "agg": 32, "rivals": [], "contingent": False}
+    assert phone.add_why(a, faab=True) == [
+        "Why: Last week: 21% of targets and 82% of snaps. Robinson projects 128 points the rest of the way, Black 40. "
+        "Experts have him WR62, best case WR60. Starter upside.",
+        "Bid: no rival is forced to bid here, so the low end should land him."]
+    assert phone.add_why(dict(a, rivals=[80, 55]), faab=True)[1] ==         "Bid: rivals with a need at WR hold $80 and $55, so lean to the high end."
+    assert phone.add_why(dict(a, contingent=True, cls="league_winner"), faab=True)[1] ==         "Bid: he backs up a downed starter, so pay the high end."
+    rolling = phone.add_why(dict(a, contingent=True), faab=False)
+    assert len(rolling) == 2 and rolling[1].startswith("He backs up a downed starter")
+    assert len(phone.add_why(dict(a, ecr=None, why="", ros=None), faab=False)) == 1
+
+
+def test_surname_keeps_suffix():
+    assert phone._last("Marvin Harrison Jr.") == "Harrison Jr."
+    assert phone._last("Bijan Robinson") == "Robinson"

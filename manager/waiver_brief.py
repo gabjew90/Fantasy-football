@@ -468,10 +468,19 @@ def build(ctx, store) -> str:
         # The phone rendering: one reason, the move, the price.
         _reason = next((w for w in why if not w.startswith("value over")), why[0]) if why else ""
         _move = _drop_or_ir(ctx, p.get('ros') or 0, p['pos'])
+        _drop = _move[5:] if _move.startswith("drop ") else None
+        _drop_row = next((r for r in ctx["roster_players"][ctx["my_rid"]] if r["name"] == _drop), None)
+        _pan = panel.get(pid) or {}
         ctx.setdefault("_summary", {}).setdefault("waiver_adds", []).append({
             "name": p["name"], "pos": p["pos"], "team": p.get("team"), "cls": cls,
-            "move": _move[0].upper() + _move[1:], "drop": _move[5:] if _move.startswith("drop ") else None,
+            "move": _move[0].upper() + _move[1:], "drop": _drop,
             "why": _reason.replace("—", "-"), "fair": fair, "agg": agg,
+            # the rationale: what he is worth, against whom, and who else wants him
+            "ros": p.get("ros"), "drop_ros": (_drop_row or {}).get("ros"),
+            "fa_value": p.get("fa_value"), "contingent": bool(contingent),
+            "ecr": ({"pos": _pan.get("pos"), "ecr": _pan.get("ecr"), "best": _pan.get("best")}
+                    if _pan.get("best") is not None else None),
+            "rivals": list(needy[:3]),
         })
         lines += [
             f"**{p['name']}** ({p['pos']}, {p.get('team') or '?'}) — {cls}",
