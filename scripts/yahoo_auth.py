@@ -31,6 +31,11 @@ def main(argv: list[str]) -> int:
         print(f"token saved to {yahoo_api.TOKEN_PATH}; expires_in {tok.get('expires_in')}s; "
               f"refresh token {'present' if tok.get('refresh_token') else 'MISSING'}")
         return 0
+    if cmd == "refresh-token":
+        # Bare value on stdout, for piping into `gh secret set`. Nothing else.
+        tok = json.loads(Path(yahoo_api.TOKEN_PATH).read_text(encoding="utf-8"))
+        sys.stdout.write(tok.get("refresh_token", ""))
+        return 0
     if cmd == "secrets":
         # For the user's own terminal only: the three values GitHub Actions
         # needs as repository secrets. Never run this from an assistant.
