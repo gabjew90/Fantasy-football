@@ -4145,6 +4145,19 @@ six hours). Same pattern as the committed Vegas snapshot, for the same
 reason: no key ever leaves this machine. Verified: with the credentials
 removed from the environment the scout renders from the synced files.
 
+Superseded the same evening: the user prefers every schedule on GitHub.
+The GitHub CLI was installed and `scripts/GITHUB SECRETS.bat` set the
+five repository secrets from the local .env and token file through
+`gh secret set` (values never displayed; the owner did the `gh auth
+login -w`). A dispatched gate run replanned both leagues (issues #8, #9)
+and a dispatched healthcheck built Keefamania's context on Actions
+without a Yahoo failure (issues #10, #11). All six local Task Scheduler
+jobs are DISABLED, not deleted: the two syncs (now redundant), the ADP
+diff (a draft-time tool) and the three legacy season briefs (the Issues
+carry everything they produced). The synced-file path stays in the code
+as the no-credentials fallback and is what a fresh clone without
+secrets would use.
+
 ## 2026-09-16 (72) -- the ledger: every recommendation written down, then graded
 
 Season-manager v2, layer 4, built last because everything above it had to

@@ -152,7 +152,12 @@ class YahooSource:
         """Say where the Yahoo data came from and how old it is. Live reads
         need no note; a synced copy names its age, and a stale one warns."""
         from .yahoo_api import has_credentials, read_cached
-        if self._get is not yahoo_api_get or has_credentials():
+        if self._get is not yahoo_api_get:
+            return
+        if has_credentials():
+            # Logged so an Actions run shows which path it took: with the
+            # secrets present this is the live API, and no note is needed.
+            log.info("yahoo: reading league %s live from the API", self.league_id)
             return
         _, fetched = read_cached(f"{self.key}/teams/roster")
         if fetched is None:
