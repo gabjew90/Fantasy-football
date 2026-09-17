@@ -75,6 +75,15 @@ def _plain_move(move: str) -> str:
     return re.sub(r"\s*\(.*\)$", "", move).replace(" — ", ", ").replace("—", ",")
 
 
+def warnings_block(ctx) -> list[str]:
+    """Anything that can make the advice below wrong, in plain words.
+
+    Only ctx["data_warnings"] -- the report's `stale` banner is a list of
+    provenance notes and does not belong on a phone.
+    """
+    return [str(w) for w in (ctx.get("data_warnings") or [])]
+
+
 def _last(name: str) -> str:
     """Surname for a second mention. Suffixes stay with the surname."""
     parts = (name or "").split()
@@ -196,7 +205,11 @@ def lineup(ctx, summary: dict) -> tuple[str | None, str, bool]:
     shown = [x[:1].upper() + x[1:] for x in swaps]
     first = shown[0].split(" (")[0]
     subject = first if len(shown) == 1 else f"{first}, and {len(shown) - 1} more"
-    lines = ["Set your lineup:"]
+    lines = []
+    warn = warnings_block(ctx)
+    if warn:
+        lines += warn + [""]
+    lines.append("Set your lineup:")
     for i, (raw, s) in enumerate(zip(swaps, shown), 1):
         lines.append(f"{i}. {s}")
         why = swap_why(facts.get(raw) or {}, mode)
@@ -226,6 +239,9 @@ def waivers(ctx, summary: dict) -> tuple[str | None, str, bool]:
     if not adds and not ir:
         return None, "", False
     lines = []
+    warn = warnings_block(ctx)
+    if warn:
+        lines += warn + [""]
     if ir:
         lines.append("Roster first:")
         lines += [f"- {x}" for x in ir]

@@ -17,6 +17,8 @@ import logging
 
 import polars as pl
 
+from . import seasondata
+
 log = logging.getLogger("draftkit")
 
 POSITIONS = ("QB", "RB", "WR", "TE")
@@ -114,13 +116,18 @@ def schedule_strength(pa: pl.DataFrame | None, schedule, team: str, pos: str,
     the names are kept alongside the number.
     """
     try:
+        # `team` arrives from a ROSTER row (SF, NO, GB...); the schedule holds
+        # draftkit codes (SFO, NOS, GBP...). Unconverted, those eight
+        # franchises matched no rows and every player on them reported
+        # "bye-heavy or unscheduled" instead of a playoff schedule.
         rows = schedule.filter(
-            (pl.col("team") == team) & pl.col("week").is_in(list(weeks))
+            (pl.col("team") == seasondata.to_draftkit(team))
+            & pl.col("week").is_in(list(weeks))
         ).sort("week")
     except Exception:  # noqa: BLE001
         return None, ""
     opps = [(int(r["week"]), r["opp"]) for r in rows.iter_rows(named=True)]
-    label = "; ".join(f"wk{w} vs {o}" for w, o in opps)
+    label = "; ".join(f"wk{w} vs {seasondata.to_sleeper(o)}" for w, o in opps)
     if not opps:
         return None, "bye-heavy or unscheduled"
     ratios = [r for r in (allowed_ratio(pa, o, pos, shrink_k) for _w, o in opps)

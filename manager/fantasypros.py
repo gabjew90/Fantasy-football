@@ -110,23 +110,10 @@ def _num(v):
 
 
 def _index_by_name(index):
-    """normalised name -> [sleeper_id], and team -> sleeper_id for defences."""
-    from draftkit.ids import normalize_name
-    by_norm: dict[str, list[str]] = {}
-    by_team: dict[str, str] = {}
-    for pid, d in (index or {}).items():
-        if not isinstance(d, dict):
-            continue
-        pos = d.get("position")
-        if pos == "DEF":
-            tm = (d.get("team") or "").upper()
-            if tm:
-                by_team[tm] = str(pid)
-            continue
-        nm = d.get("full_name") or d.get("last_name")
-        if nm and pos:
-            by_norm.setdefault(normalize_name(nm), []).append(str(pid))
-    return by_norm, by_team
+    """The shared resolver (draftkit.ids.NameIndex): fantasy eligibility, not
+    the depth-chart slot, and live players preferred over retired namesakes."""
+    from draftkit.ids import NameIndex
+    return NameIndex(index)
 
 
 def fetch(scoring: dict, season, index, kind: str = ROS, week: int | None = None,
@@ -153,7 +140,7 @@ def fetch(scoring: dict, season, index, kind: str = ROS, week: int | None = None
     if not index:
         return {}, "DATA MISSING: fantasypros unmatched (no player index)"
 
-    by_norm, by_team = _index_by_name(index)
+    names = _index_by_name(index)
     out: dict[str, dict] = {}
     stamps, ambiguous, unmatched = [], 0, 0
     failed: list[str] = []
@@ -171,23 +158,18 @@ def fetch(scoring: dict, season, index, kind: str = ROS, week: int | None = None
             stamps.append(str(body["last_updated"]))
         for row in rows:
             if our_pos == "DEF":
-                tm = (row.get("player_team_id") or "").upper()
-                pid = by_team.get(TEAM_ALIAS.get(tm, tm))
+                pid = names.defense(row.get("player_team_id") or "", TEAM_ALIAS)
             else:
-                # index.get, NOT index[x]. _index_by_name stringifies ids
-                # into by_norm; subscripting the caller's dict with a key we
-                # coerced turns an int-keyed index into a KeyError instead of
-                # a clean miss. _espn avoids this by not stringifying at all.
-                cand = [x for x in by_norm.get(
-                    normalize_name(row.get("player_name") or ""), [])
-                    if (index.get(x) or {}).get("position") == our_pos]
-                if len(cand) > 1:
-                    # AMBIGUOUS NAMES ARE DROPPED, NOT GUESSED -- the same
-                    # rule _espn follows. A wrong match does not show up as a
-                    # missing player, it shows up as a lineup change.
+                # AMBIGUOUS NAMES ARE DROPPED, NOT GUESSED (NameIndex): a
+                # wrong match does not show up as a missing player, it shows
+                # up as a lineup change. Ambiguity is now judged among LIVE
+                # players only, so a retired namesake no longer hides one.
+                nm = row.get("player_name") or ""
+                pid = names.resolve(nm, our_pos,
+                                    (row.get("player_team_id") or "").upper())
+                if pid is None and len(names.by_name.get(normalize_name(nm), [])) > 1:
                     ambiguous += 1
                     continue
-                pid = cand[0] if cand else None
             if not pid:
                 unmatched += 1
                 continue
@@ -504,7 +486,7 @@ def overall(scoring: dict, season, index, kind: str = DRAFT, store=None,
     if not index:
         return {}, "DATA MISSING: fantasypros overall (no player index)"
 
-    by_norm, by_team = _index_by_name(index)
+    names = _index_by_name(index)
     try:
         rows, body = _rows(position, slug, season, kind)
     except Exception as e:  # noqa: BLE001
@@ -516,13 +498,10 @@ def overall(scoring: dict, season, index, kind: str = DRAFT, store=None,
         if not our_pos:
             continue
         if our_pos == "DEF":
-            tm = (row.get("player_team_id") or "").upper()
-            pid = by_team.get(TEAM_ALIAS.get(tm, tm))
-        else:
-            cand = [x for x in by_norm.get(
-                normalize_name(row.get("player_name") or ""), [])
-                if (index.get(x) or {}).get("position") == our_pos]
-            pid = cand[0] if len(cand) == 1 else None    # ambiguous: dropped
+            pid = names.defense(row.get("player_team_id") or "", TEAM_ALIAS)
+        else:                                            # ambiguous: dropped
+            pid = names.resolve(row.get("player_name") or "", our_pos,
+                                (row.get("player_team_id") or "").upper())
         rank = _num(row.get("rank_ecr"))
         if not pid or rank is None:
             continue

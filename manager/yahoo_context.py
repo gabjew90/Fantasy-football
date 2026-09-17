@@ -35,7 +35,7 @@ import logging
 import time
 from datetime import datetime
 
-from draftkit.ids import normalize_name
+from draftkit.ids import NameIndex
 from draftkit.sleeper import IdentityError, SleeperClient
 
 from . import yahoo as yahoo_mod
@@ -91,6 +91,9 @@ def _flat(parts) -> dict:
     return yahoo_mod._flat(parts)
 
 
+STALE_HOURS = 6.0   # beyond this the synced copy can be missing a roster move
+
+
 class YahooSource:
     platform = "yahoo"
 
@@ -108,6 +111,8 @@ class YahooSource:
         self._rosters: list[dict] | None = None
         self._standings: dict | None = None
         self.notes: list[str] = []
+        # notes go to the report footer; warnings go into the delivered text
+        self.warnings: list[str] = []
 
     # ------------------------------------------------------------ helpers
     @property
@@ -123,15 +128,11 @@ class YahooSource:
             self._id_map = yahoo_mod.yahoo_id_map(self.cfg)
         return self._id_map
 
-    def _by_name(self) -> dict[str, list[str]]:
-        out: dict[str, list[str]] = {}
-        for pid, d in self.players.items():
-            if not isinstance(d, dict):
-                continue
-            nm = d.get("full_name") or d.get("last_name")
-            if nm and d.get("position"):
-                out.setdefault(normalize_name(nm), []).append(str(pid))
-        return out
+    def _by_name(self) -> NameIndex:
+        """The shared resolver, so a Yahoo roster row joins the same way an
+        ESPN or FantasyPros row does: on fantasy eligibility, preferring the
+        player who is actually active."""
+        return NameIndex(self.players)
 
     def resolve(self, yahoo_id: str, name: str, pos: str, team: str = "") -> str | None:
         """Sleeper id for one Yahoo player, or None."""
@@ -143,9 +144,7 @@ class YahooSource:
             d = self.players.get(str(mapped)) or {}
             if d.get("position") == pos or pos in (d.get("fantasy_positions") or []):
                 return str(mapped)
-        cands = [x for x in self._names.get(normalize_name(name), [])
-                 if (self.players.get(x) or {}).get("position") == pos]
-        return cands[0] if len(cands) == 1 else None
+        return self._names.resolve(name, pos, team)
 
     # ------------------------------------------------------------- league
     def _freshness_note(self) -> None:
@@ -163,9 +162,19 @@ class YahooSource:
         if fetched is None:
             return
         age_h = (time.time() - float(fetched)) / 3600.0
-        mark = "⚠ " if age_h > 6 else ""
+        mark = "⚠ " if age_h > STALE_HOURS else ""
         self.notes.append(f"{mark}Yahoo data from the local sync, {age_h:.1f}h old"
-                          + (" — is the sync job running?" if age_h > 6 else ""))
+                          + (" — is the sync job running?" if age_h > STALE_HOURS else ""))
+        if age_h > STALE_HOURS:
+            # A WARNING THE USER ACTUALLY SEES. This was a log line and a
+            # footer note, so on 2026-09-17 a day-old roster was read
+            # without either of us noticing: it was missing a player the
+            # user had just added, and the lineup advice was built on it.
+            # Anything that can make the advice wrong belongs in the
+            # delivered text.
+            self.warnings.append(
+                f"Careful: this roster is a copy from {age_h:.0f} hours ago, so a move "
+                f"you made since then is missing. Nothing here has refreshed it.")
 
     def _settings_body(self) -> dict:
         if self._settings is None:

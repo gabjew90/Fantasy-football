@@ -22,6 +22,8 @@ from pathlib import Path
 
 import requests
 
+from draftkit import seasondata
+
 log = logging.getLogger("manager")
 
 URL = ("https://api.the-odds-api.com/v4/sports/americanfootball_nfl/odds"
@@ -39,8 +41,10 @@ ISO = "%Y-%m-%dT%H:%M:%SZ"
 #
 # The returned dict carries BOTH spellings for the same number, so a caller
 # cannot be wrong about which convention it holds.
-ALIASES = {"GBP": "GB", "JAC": "JAX", "KCC": "KC", "LVR": "LV",
-           "NEP": "NE", "NOS": "NO", "SFO": "SF", "TBB": "TB"}
+#
+# The map itself now lives in draftkit.seasondata, next to the codes it
+# inverts, because manager.games needed the same one (2026-09-17).
+ALIASES = seasondata.SLEEPER_CODE
 
 # Odds API full names -> draftkit team codes
 NAMES = {

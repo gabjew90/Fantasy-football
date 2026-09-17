@@ -4191,3 +4191,85 @@ waiver ranks pick players who outscore the drops (a couple of months);
 and the DECISIONS #23 source gate and the slot-based trade model
 (#69), which need the season. Nothing in it is tuned to look good: the
 rulers were fixed before the first row was written.
+
+## 2026-09-17 (73) -- two conventions, four silent joins, and a warning nobody saw
+
+THE BRIEFS ARE REWRITTEN FOR A PHONE (see the commits of 09-16/17). The
+user's verdict on the first production samples was that they were
+unreadable and not actionable: "if i can see the same basic information in
+the league app, i dont need it, i need things that re actioanble ... mainly
+sit/start, bench drop/waivers, and injuries notification/changes needed,
+and league deadlines, and getting this info as quick as its available."
+
+So `manager/phone.py` renders everything delivered, from a structured
+summary each builder stashes on `ctx["_summary"]`; the long form still goes
+to `reports/manager/*.md`. Nothing to do means nothing sent. The scout is
+computed and graded but never delivered, the daily healthcheck speaks only
+when the week's plan is missing, and the injury sweep moved from twice a day
+to every hourly tick because a designation change is the one thing that
+cannot wait. Each action carries a rationale: both projections and the one
+fact that separates them for a swap; last week's usage, the rest-of-season
+points against the drop's, the experts' rank and the bid logic for a claim.
+
+THEN THE USER ASKED WHO TO START, AND THE ANSWER WAS BUILT ON A DAY-OLD
+ROSTER. Four defects, all of the same shape -- two data conventions that
+never met, and nobody told:
+
+1. TEAM CODES. The schedule carries draftkit codes (SFO, NOS, GBP, KCC,
+   TBB, NEP, LVR, JAC); roster rows carry Sleeper codes (SF, NO, GB, KC,
+   TB, NE, LV, JAX). `manager.games.week_games` emitted the former and
+   every caller intersected it with the latter, so for eight franchises the
+   intersection was EMPTY: no inactives check was ever scheduled for them
+   and they never appeared in a lock time. Measured on the live week-2
+   plans: three San Francisco players in Omnibeta (including the kicker and
+   the defence) and five players in Keefamania had no slate check at all.
+   `manager.vegas` hit this exact bug on 09-08 and fixed it locally, which
+   is why the map existed; it now lives in `draftkit.seasondata`
+   (`SLEEPER_CODE`, `to_sleeper`, `to_draftkit`) and the conversion happens
+   at the seam the schedule enters through. `defense.schedule_strength` had
+   the same bug in the other direction -- it filtered the schedule with a
+   roster code, so the trade radar reported "bye-heavy or unscheduled" for
+   a quarter of the league.
+
+2. PLAYER NAMES. Sleeper's `position` is the DEPTH-CHART slot;
+   `fantasy_positions` is what the player is eligible at. Three separate
+   inline joins (consensus/espn, fantasypros, yahoo_context) matched on
+   `position`, so a source calling Travis Hunter a WR (he is `DB` /
+   fantasy `WR`) matched nothing -- he was the largest unmatched row in the
+   ESPN feed -- and every fullback went with him. The same joins dropped
+   any name held by more than one player, so three Kyle Williamses (two
+   retired, no team) hid the live New England receiver. One shared
+   `draftkit.ids.NameIndex` now does it: eligibility first, then the team
+   the feed names, then live players over retired namesakes, and a genuine
+   tie between two live players is still DROPPED, not guessed -- a wrong
+   match does not surface as a missing player, it surfaces as a lineup
+   change nobody ordered. ESPN unmatched rows 9 -> 2, ambiguous 1 -> 0,
+   consensus population 646 -> 650.
+   LEFT UNFIXED AND MEASURED: Riley Nowakowski (Sleeper TE, ESPN RB) and
+   Matthew Hibner (absent from Sleeper entirely). Accepting a unique
+   name+team across disagreeing positions would catch the first, and the
+   two players it would buy are worth less than the guard it would spend.
+
+3. THE STALE WARNING WAS INVISIBLE. Without Yahoo credentials loaded,
+   `yahoo_api.get` silently serves whatever the last local sync committed.
+   That is the right degrade for Actions, but the age warning was a log
+   line and a report footer, and the report footer is exactly what the
+   phone rendering drops. A 22-hour-old roster was therefore read as
+   current, missing a player the user had added, and the lineup advice was
+   built on it. `notes` (provenance, report) and `warnings` (this can make
+   the ADVICE wrong) are now separate: a source's warnings ride
+   `ctx["data_warnings"]` and `phone` prints them ABOVE the actions.
+
+4. THE CLAMP NOTE BLAMED THE WRONG THING. "N consensus ratios clamped --
+   check for a bad name match" sent the reader hunting a join bug. Measured
+   across both leagues: all six clamped rows were honest disagreements (an
+   injured Tank Dell against a preseason base; wire players on stale season
+   numbers), none was a mismatch, and none was on a roster the user owns.
+   The note now names the players and says what it actually is.
+
+THE LESSON, AND IT IS THE SAME ONE AS #70: every one of these failed by
+returning nothing rather than by raising. An empty set intersection, a
+dropped name, a footer nobody reads. The guard against that class is not
+more care at the call site, it is a measurement of the join itself -- how
+many rows matched, how many did not, and who they were -- which is why the
+new tests assert the counts and not just the happy path.

@@ -27,6 +27,35 @@ ALL_TEAMS = {
 _TEAM_MAP = {"LA": "LAR", "LV": "LVR", "NO": "NOS", "NE": "NEP", "GB": "GBP",
              "KC": "KCC", "SF": "SFO", "TB": "TBB", "WSH": "WAS", "JAX": "JAC"}
 
+# THE INVERSE, AND THE ONE PLACE IT IS WRITTEN DOWN.
+#
+# draftkit's own codes (which this module's ALL_TEAMS defines) are not the
+# codes a Sleeper or Yahoo ROSTER row carries, for these eight franchises.
+# Anything that matches a schedule row against a roster row has to convert,
+# and until 2026-09-17 two places did not: manager.games.week_games, and so
+# every consumer of it. The cost was silent -- eight teams' worth of players
+# got no inactives check and never appeared in a lock time, because
+# frozenset({"SFO", ...}) & {"SF", ...} is empty. manager.vegas hit exactly
+# this in September and fixed it locally; this is that fix, shared.
+#
+# LA/WSH/JAX are absent on purpose: they are spellings the loader normalises
+# ON THE WAY IN, not distinct draftkit codes, and inverting them would turn
+# LAR into LA.
+SLEEPER_CODE = {"GBP": "GB", "JAC": "JAX", "KCC": "KC", "LVR": "LV",
+                "NEP": "NE", "NOS": "NO", "SFO": "SF", "TBB": "TB"}
+
+
+def to_sleeper(code: str) -> str:
+    """A draftkit team code in the convention roster rows use."""
+    c = (code or "").upper()
+    return SLEEPER_CODE.get(c, c)
+
+
+def to_draftkit(code: str) -> str:
+    """A roster team code in the convention the schedule and stats use."""
+    c = (code or "").upper()
+    return _TEAM_MAP.get(c, c)
+
 EARLY_DAYS_EXCLUDED = ("Saturday", "Sunday", "Monday")
 
 

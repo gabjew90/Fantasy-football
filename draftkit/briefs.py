@@ -251,11 +251,16 @@ def build_context(cfg, week: int | None = None, source=None) -> dict:
     # a roster name that did not resolve) ride the stale banner: they are
     # facts about the inputs the reader must see before the numbers.
     stale += list(getattr(source, "notes", []) or [])
+    # WARNINGS ARE NOT NOTES. `stale` is the report's banner, which the
+    # delivered text deliberately drops; a warning is a fact that can make
+    # the ADVICE wrong (a roster copy old enough to be missing a move), so
+    # it travels separately and manager.phone puts it in the message.
+    warnings = list(getattr(source, "warnings", []) or [])
 
     return {
         "cfg": cfg, "scfg": scfg, "client": client, "state": state, "week": week,
         "source": source, "platform": getattr(source, "platform", "sleeper"),
-        "transactions": txns, "faab": budget > 0,
+        "transactions": txns, "faab": budget > 0, "data_warnings": warnings,
         "preseason": preseason, "fallback": fallback, "stale": stale,
         "league": league, "budget": budget, "reserve_allow": reserve_allow,
         "rosters": rosters, "roster_players": roster_players, "users": users,

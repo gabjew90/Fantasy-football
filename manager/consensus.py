@@ -124,24 +124,21 @@ def _sleeper(scoring: dict, season) -> tuple[dict[str, float], str | None]:
 def _espn(scoring: dict, season, raw_dir, index) -> tuple[dict[str, float], str | None]:
     try:
         from draftkit import espn as espn_mod
-        from draftkit.ids import normalize_name
+        from draftkit import ids as ids_mod
         raw = espn_mod.fetch_projections(season, Path(raw_dir))
         rows = espn_mod.parse_players(raw, season)
     except Exception as e:  # noqa: BLE001
         return {}, f"espn unavailable ({e.__class__.__name__})"
     if not index:
         return {}, "espn unmatched (no player index)"
-    by_norm: dict[str, list[str]] = {}
-    for pid, d in (index or {}).items():
-        nm = d.get("full_name") or d.get("last_name")
-        if nm and d.get("position"):
-            by_norm.setdefault(normalize_name(nm), []).append(pid)
+    names = ids_mod.NameIndex(index)
     out = {}
     for r in rows:
-        c = [x for x in by_norm.get(normalize_name(r["name"]), [])
-             if (index[x].get("position") == r["pos"])]
-        if len(c) == 1:                       # ambiguous names are dropped, not guessed
-            out[c[0]] = _score(r["line"], scoring)
+        # NameIndex matches on fantasy eligibility and prefers live players;
+        # ambiguity between two live players is still dropped, not guessed.
+        pid = names.resolve(r["name"], r["pos"], r.get("team") or "")
+        if pid is not None:
+            out[pid] = _score(r["line"], scoring)
     return out, None
 
 
@@ -480,6 +477,7 @@ def apply(ctx, con: dict, *, min_sources: int = 2, clamp=DEFAULT_CLAMP
     """
     lo, hi = clamp
     changed = clamped = zeroed = 0
+    clamped_names: list[str] = []
 
     def _rescale(row: dict) -> dict:
         nonlocal changed, clamped, zeroed
@@ -504,6 +502,8 @@ def apply(ctx, con: dict, *, min_sources: int = 2, clamp=DEFAULT_CLAMP
             # to print. Count the state, not the mutation.
             if row.get("_consensus_clamped"):
                 clamped += 1
+                if row.get("name") and row["name"] not in clamped_names:
+                    clamped_names.append(row["name"])
             return row
         r = con.get(str(row.get("sleeper_id") or ""))
         base = row.get("ros_season") or 0.0
@@ -526,6 +526,8 @@ def apply(ctx, con: dict, *, min_sources: int = 2, clamp=DEFAULT_CLAMP
         ratio = float(r["mean"]) / float(base)
         if not lo <= ratio <= hi:
             clamped += 1
+            if row.get("name") and row["name"] not in clamped_names:
+                clamped_names.append(row["name"])
             ratio = min(hi, max(lo, ratio))
             row["_consensus_clamped"] = True
         if abs(ratio - 1.0) < 1e-9:
@@ -554,8 +556,18 @@ def apply(ctx, con: dict, *, min_sources: int = 2, clamp=DEFAULT_CLAMP
         notes.append(f"{zeroed} players zeroed — every source has them at nothing "
                      f"(season over, released or retired)")
     if clamped:
-        notes.append(f"⚠ {clamped} consensus ratios clamped to "
-                     f"[{lo:.2f}, {hi:.2f}] — check for a bad name match")
+        # NAME THE ROWS, AND STOP GUESSING AT THE CAUSE. This used to read
+        # "check for a bad name match", which sent the reader looking for a
+        # join bug: measured on 2026-09-17, all six clamped rows across both
+        # leagues were honest disagreements (an injured Tank Dell against a
+        # preseason base, wire players on stale season numbers) and none was
+        # a mismatch. It also counted every roster in the league, so it fired
+        # on players nobody involved could act on.
+        who = ", ".join(clamped_names[:4]) + (" and others" if len(clamped_names) > 4 else "")
+        notes.append(f"⚠ {clamped} consensus ratios clamped to [{lo:.2f}, {hi:.2f}]"
+                     + (f" ({who})" if who else "")
+                     + " — the sources disagree with the season base by more than the "
+                       "clamp allows, usually an injury the base predates")
     return changed, notes
 
 

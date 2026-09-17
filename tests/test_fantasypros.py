@@ -73,11 +73,23 @@ def test_a_franchise_the_two_feeds_spell_differently_still_joins(monkeypatch):
     assert "JAX" in rows, "JAC/JAX alias not applied"
 
 
-def test_an_ambiguous_name_is_dropped_rather_than_guessed(monkeypatch):
-    """Two Mike Williamses at WR. A wrong match does not surface as a missing
-    player, it surfaces as a lineup change nobody ordered."""
+def test_a_namesake_is_resolved_by_team_when_the_feed_gives_one(monkeypatch):
+    """Two Mike Williamses at WR, and the feed says NYJ. Dropping a player
+    the feed identifies unambiguously threw away a real match (the shared
+    resolver, 2026-09-17); guessing between them is what must not happen."""
     _feed(monkeypatch, {"WR": [{"player_name": "Mike Williams",
                                 "player_team_id": "NYJ", "r2p_pts": "150.0"}]})
+    rows, note = fp.fetch({}, 2026, INDEX)
+    assert "9a" in rows and "9b" not in rows
+    assert "ambiguous" not in note
+
+
+def test_an_ambiguous_name_is_dropped_rather_than_guessed(monkeypatch):
+    """Same two, and nothing to tell them apart. A wrong match does not
+    surface as a missing player, it surfaces as a lineup change nobody
+    ordered -- so neither is taken."""
+    _feed(monkeypatch, {"WR": [{"player_name": "Mike Williams",
+                                "player_team_id": "LAC", "r2p_pts": "150.0"}]})
     rows, note = fp.fetch({}, 2026, INDEX)
     assert "9a" not in rows and "9b" not in rows
     assert "1 ambiguous" in note
@@ -361,14 +373,15 @@ def test_an_empty_result_is_never_cached(monkeypatch):
     assert store == {}, "an empty match result was cached"
 
 
-def test_an_int_keyed_index_misses_cleanly_instead_of_raising(monkeypatch):
-    """_index_by_name stringifies ids; subscripting the caller's dict with a
-    key we coerced turned an int-keyed index into a KeyError."""
+def test_an_int_keyed_index_matches_and_returns_string_ids(monkeypatch):
+    """An int-keyed index used to raise a KeyError, then (once guarded) to
+    miss every player silently. The shared resolver holds its own rows, so
+    it matches and hands back the ids stringified."""
     idx = {1: {"full_name": "Bijan Robinson", "position": "RB", "team": "ATL"}}
     monkeypatch.setattr(fp, "_rows", lambda p, s, y, k, w=None: (
         [{"player_name": "Bijan Robinson", "r2p_pts": "378.0"}], {}))
     out, note = fp.fetch({}, 2026, idx)          # must not raise
-    assert out == {} and "DATA MISSING" in note
+    assert out["1"]["pts"] == 378.0 and "DATA MISSING" not in (note or "")
 
 
 def test_the_crosswalk_reports_yahoo_ids_and_a_second_name_index(monkeypatch):

@@ -260,3 +260,33 @@ def test_add_why_gives_worth_and_bid_logic():
 def test_surname_keeps_suffix():
     assert phone._last("Marvin Harrison Jr.") == "Harrison Jr."
     assert phone._last("Bijan Robinson") == "Robinson"
+
+
+# ------------------------------------------------------- stale data warnings
+
+def test_a_stale_roster_warning_leads_the_lineup_message():
+    """2026-09-17: a day-old Yahoo copy was missing a player the user had
+    just added, and the advice was built on it. The warning existed only as
+    a log line and a report footer, so neither of us saw it."""
+    ctx = {"data_warnings": ["Careful: this roster is a copy from 22 hours ago, so a move "
+                             "you made since then is missing. Nothing here has refreshed it."]}
+    subject, body, _u = phone.lineup(ctx, {"swaps": ["Start A over B (+2.0 pts)"]})
+    assert subject == "Start A over B", "the action still leads the subject"
+    assert body.splitlines()[0].startswith("Careful: this roster is a copy")
+    assert body.splitlines()[1] == ""
+    assert "Set your lineup:" in body
+
+
+def test_a_stale_roster_warning_leads_the_waiver_message():
+    ctx = {"faab": True, "data_warnings": ["Careful: this roster is a copy from 9 hours ago."]}
+    _s, body, _u = phone.waivers(ctx, {"adds": _adds()[:1]})
+    assert body.startswith("Careful: this roster is a copy from 9 hours ago.\n\n")
+    assert "Claims, in order:" in body
+
+
+def test_no_warning_means_no_extra_line():
+    _s, body, _u = phone.lineup({}, {"swaps": ["Start A over B (+2.0 pts)"]})
+    assert body.splitlines()[0] == "Set your lineup:"
+    assert phone.warnings_block({}) == []
+    assert phone.warnings_block({"stale": ["transactions"]}) == [], \
+        "the report banner is provenance, not a warning about the advice"

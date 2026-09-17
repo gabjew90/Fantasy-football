@@ -39,6 +39,77 @@ def normalize_name(name: str) -> str:
     return " ".join(parts)
 
 
+class NameIndex:
+    """Normalised name -> Sleeper ids, with the two joins every source needs.
+
+    It replaced three near-identical inline indexes (manager.consensus._espn,
+    manager.fantasypros._index_by_name, manager.yahoo_context._by_name), each
+    of which matched on `position` and dropped any name held by more than one
+    player. Both rules were wrong, and measured on 2026-09-17:
+
+    * `position` is the DEPTH-CHART slot, `fantasy_positions` is what the
+      player is eligible at. Travis Hunter is position DB / fantasy WR, and
+      every fullback is position FB / fantasy RB, so a source calling Hunter
+      a WR matched nothing -- he was the largest unmatched row in the ESPN
+      feed, and seven fullbacks went with him.
+    * Retired namesakes made live players ambiguous. Three Kyle Williamses
+      carry the name, two of them inactive with no team, so the live New
+      England WR was dropped as "ambiguous" rather than matched.
+
+    So: eligibility first, then prefer the candidates who are actually
+    playing. Genuine ambiguity between two live players is still dropped
+    rather than guessed -- a wrong match does not surface as a missing
+    player, it surfaces as a lineup change.
+    """
+
+    def __init__(self, players: dict | None):
+        self.by_name: dict[str, list[str]] = {}
+        self.by_team: dict[str, str] = {}
+        self.rows: dict[str, dict] = {}
+        for pid, d in (players or {}).items():
+            if not isinstance(d, dict):
+                continue
+            pid = str(pid)
+            pos = d.get("position") or ""
+            fantasy = [p for p in (d.get("fantasy_positions") or []) if p]
+            if pos == "DEF" or "DEF" in fantasy:
+                tm = (d.get("team") or "").upper()
+                if tm:
+                    self.by_team[tm] = pid
+                continue
+            name = d.get("full_name") or d.get("last_name")
+            if not name or not (pos or fantasy):
+                continue
+            self.rows[pid] = {"pos": pos, "fantasy": set(fantasy) or {pos},
+                              "team": (d.get("team") or "").upper(),
+                              "active": bool(d.get("active"))}
+            self.by_name.setdefault(normalize_name(name), []).append(pid)
+
+    def resolve(self, name: str, pos: str | None = None, team: str = "") -> str | None:
+        """One Sleeper id, or None when nothing matches or a live tie remains."""
+        cands = list(self.by_name.get(normalize_name(name), []))
+        if pos:
+            eligible = [p for p in cands
+                        if pos in self.rows[p]["fantasy"] or self.rows[p]["pos"] == pos]
+            cands = eligible or []
+        if len(cands) > 1 and team:
+            narrowed = [p for p in cands if self.rows[p]["team"] == team.upper()]
+            if narrowed:
+                cands = narrowed
+        if len(cands) > 1:
+            # A namesake who is retired or unsigned cannot be the player a
+            # live feed is reporting on.
+            live = [p for p in cands if self.rows[p]["active"] and self.rows[p]["team"]]
+            if live:
+                cands = live
+        return cands[0] if len(cands) == 1 else None
+
+    def defense(self, team: str, alias: dict | None = None) -> str | None:
+        tm = (team or "").upper()
+        tm = (alias or {}).get(tm, tm)
+        return self.by_team.get(tm)
+
+
 def load_id_map(cache_dir: Path) -> pl.DataFrame:
     cache = Path(cache_dir) / "db_playerids.csv"
     if not cache.exists() or time.time() - cache.stat().st_mtime > CACHE_TTL:
