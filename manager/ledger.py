@@ -62,6 +62,9 @@ def emit(store, ctx, kind: str, rows: list[dict], sources: dict | None = None) -
     dry run, which must leave state untouched)."""
     if kind not in KINDS:
         raise ValueError(f"ledger kind {kind!r} is not one of {KINDS}")
+    # The structured result also feeds the delivered (phone) rendering, dry
+    # run or not: manager.phone reads ctx["_summary"][kind].
+    ctx.setdefault("_summary", {})[kind] = list(rows)
     if not rows:
         return 0
     if getattr(store, "read_only", False):

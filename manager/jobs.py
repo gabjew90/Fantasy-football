@@ -16,7 +16,7 @@ from pathlib import Path
 
 from . import games as games_mod
 from . import gate as gate_mod
-from . import (injuries, lineup_opt, scout, trade_radar, trade_watch,
+from . import (injuries, lineup_opt, phone, scout, trade_radar, trade_watch,
                triggers, waiver_brief)
 from .clock import PT, fmt, minutes_until, now_pt
 from .context import league_context
@@ -101,9 +101,11 @@ def plan_week(dry_run: bool = False) -> dict:
         log.warning("transaction history fetch failed")
 
     body = triggers.render_week_plan(week, jobs)
-    deliver(store, f"plan:{week}", f"Week {week} plan — {len(jobs)} checks scheduled",
-            body, dry_run=dry_run)
     _write_report("week_plan", body)
+    # Delivered: the deadlines only. The check schedule is the system's
+    # business, not the user's (2026-09-16 review).
+    subject, short = phone.plan(week, jobs, ctx, faab=bool(ctx.get("faab", True)))
+    deliver(store, f"plan:{week}", subject, short, dry_run=dry_run)
     return {"week": week, "jobs": jobs}
 
 
@@ -137,37 +139,44 @@ def _identity_line(ctx) -> str:
 def waiver_job(dry_run: bool = False) -> None:
     ctx = league_context()
     store = get_store()
-    body = _identity_line(ctx) + waiver_brief.build(ctx, store)
-    body += "\n\n" + trade_radar.build(ctx, store)
-    top = re.search(r"\*\*(.+?)\*\*", body.split("## Top adds", 1)[-1])
-    subject = (f"Waivers wk {ctx['week']} — top add: {top.group(1)}" if top
-               else f"Waivers wk {ctx['week']}") + (" — bids by 7:00 PM PT" if ctx.get("faab", True)
-                                                    else " — claims in before waivers run")
+    full = _identity_line(ctx) + waiver_brief.build(ctx, store)
+    radar = trade_radar.build(ctx, store)
+    _write_report("waivers", full + "\n\n" + radar)
+    summ = ctx.get("_summary") or {}
+    meta = summ.get("waivers_meta") or {}
+    subject, body, _ = phone.waivers(ctx, {"adds": summ.get("waiver_adds") or [], **meta})
+    if subject is None:
+        log.info("waivers: nothing worth a claim this week, nothing sent")
+        return
+    # An OFFER from the radar is an action too; the rest of the radar stays
+    # in the report.
+    offers = [ln for ln in radar.splitlines() if ln.startswith("- **OFFER**")]
+    if offers:
+        body += "\n\nTrade worth sending (details in reports/manager/waivers.md):\n" + "\n".join(offers[:2])
     deliver(store, f"waivers:{ctx['week']}", subject, body, dry_run=dry_run)
-    _write_report("waivers", body)
 
 
 def scout_job(dry_run: bool = False) -> None:
+    """Computes the matchup (the lineup brief reads its mode; the ledger
+    grades its call) and writes the report. Not delivered: a projected margin
+    is not an action (2026-09-16 review)."""
     ctx = league_context()
     store = get_store()
     body = _identity_line(ctx) + scout.build(ctx, store)
-    s = store.get(f"scout:{ctx['week']}", {})
-    subject = (f"Scout wk {ctx['week']}: {ctx['opp_name']} — margin "
-               f"{s.get('margin', 0):+.0f}, win {s.get('win_prob', 0.5):.0%}")
-    deliver(store, f"scout:{ctx['week']}", subject, body, dry_run=dry_run)
     _write_report("scout", body)
+    log.info("scout: computed for week %s, report written, nothing sent", ctx["week"])
 
 
 def lineup_job(dry_run: bool = False) -> None:
     ctx = league_context()
     store = get_store()
-    body = _identity_line(ctx) + lineup_opt.build(ctx, store)
-    n = body.count("\n- **") if "## Changes" in body else 0
-    subject = (f"Lineup wk {ctx['week']} — {n} change(s) needed" if n
-               else f"Lineup wk {ctx['week']} — no changes needed")
-    deliver(store, f"lineup:{ctx['week']}", subject, body,
-            dry_run=dry_run, act_now=bool(n))
-    _write_report("lineup", body)
+    full = _identity_line(ctx) + lineup_opt.build(ctx, store)
+    _write_report("lineup", full)
+    subject, body, urgent = phone.lineup(ctx, (ctx.get("_summary") or {}).get("lineup_phone") or {})
+    if subject is None:
+        log.info("lineup: already optimal for week %s, nothing sent", ctx["week"])
+        return
+    deliver(store, f"lineup:{ctx['week']}", subject, body, dry_run=dry_run, act_now=urgent)
 
 
 def _trade_alerts(ctx, store, dry_run: bool) -> None:
@@ -185,15 +194,16 @@ def sweep_job(dry_run: bool = False) -> None:
     ctx = league_context()
     store = get_store()
     _trade_alerts(ctx, store, dry_run)
-    alerts = injuries.sweep(ctx, store)
-    if alerts:
-        urgent = any(a.startswith("🔴") for a in alerts)
-        first = re.sub(r"[*🔴🟡🟢 ]+", " ", alerts[0]).strip()
-        key = f"sweep:{ctx['week']}:{now_pt().strftime('%m%d%H')}"
-        deliver(store, key, f"Injury change: {first}", "\n".join(alerts),
-                dry_run=dry_run, act_now=urgent)
-    elif dry_run:
-        print("[sweep] no designation changes since last sweep")
+    changes = injuries.sweep_changes(ctx, store)
+    if not changes:
+        if dry_run:
+            print("[sweep] no designation changes since last sweep")
+        return
+    contingency = store.get(f"contingency:{ctx['week']}", {})
+    starters = set(str(x) for x in ctx.get("current_starters") or [])
+    subject, body, urgent = phone.injury_changes(changes, contingency, starters)
+    key = f"sweep:{ctx['week']}:{now_pt().strftime('%m%d%H%M')}"
+    deliver(store, key, subject, body, dry_run=dry_run, act_now=urgent)
 
 
 def slate_job(teams: list[str], kickoff_iso: str | None, dry_run: bool = False) -> None:
@@ -221,36 +231,48 @@ def ledger_job(dry_run: bool = False, week: int | None = None) -> None:
     mine, theirs = ledger.matchup_actuals(ctx, target)
     grades = ledger.grade_week(ctx, store, target, my_actual=mine, their_actual=theirs)
     league = getattr(ctx.get("cfg"), "league_name", "?")
-    body = _identity_line(ctx) + ledger.report(store, league)
-    body += (f"\n\n_week {target}: {grades.get('graded', 0)} row(s) graded"
-             + (f" — {grades['note']}" if grades.get("note") else "") + "_")
-    lu = grades.get("lineup") or {}
-    subject = (f"Ledger wk {target} — lineup {lu['efficiency']:.0%} of best, "
-               f"{lu['left_on_bench']:.1f} left on the bench" if lu.get("efficiency") is not None
-               else f"Ledger wk {target} — {grades.get('graded', 0)} graded")
+    _write_report("ledger", _identity_line(ctx) + ledger.report(store, league))
+    subject, body = phone.ledger(target, grades)
+    if subject is None:
+        log.info("ledger: nothing graded for week %s, nothing sent", target)
+        return
     deliver(store, f"ledger:{target}", subject, body, dry_run=dry_run)
-    _write_report("ledger", body)
 
 
 def healthcheck(dry_run: bool = False) -> None:
     store = get_store()
     # daily trade sweep rides the healthcheck so Sun-Tue trades (outside the
     # Wed-Sat injury sweeps) are still caught inside the 48h veto window
+    live_week = None
     try:
-        _trade_alerts(league_context(), store, dry_run)
+        ctx = league_context()
+        live_week = ctx.get("week")
+        _trade_alerts(ctx, store, dry_run)
     except Exception:  # noqa: BLE001
         log.warning("trade watch inside healthcheck failed")
     pending = 0
+    plan = None
     path = gate_mod.plan_path()
     if path.exists():
         plan = json.loads(path.read_text(encoding="utf-8"))
         now = datetime.now(tz=timezone.utc)
         pending = sum(1 for c in plan.get("checks", [])
                       if gate_mod.check_status(c, now) == "pending")
-    key = f"health:{now_pt().strftime('%Y%m%d')}"
-    deliver(store, key, f"alive — {pending} checks pending this week",
-            f"manager alive — {pending} checks pending — {fmt(now_pt())}",
-            dry_run=dry_run)
+    # Delivered only when something is wrong. A daily "alive" was noise
+    # (2026-09-16 review); the healthcheck's job is to shout when the plan
+    # is missing or for another week, which is the failure that went unseen
+    # for two weeks. A healthy day is a log line.
+    if plan is None or gate_mod.plan_is_stale(plan, live_week):
+        deliver(store, f"health:{now_pt().strftime('%Y%m%d')}",
+                f"Week {live_week or '?'} checks are not scheduled",
+                f"There is no plan for week {live_week or '?'} (found: "
+                f"{'week ' + str(plan.get('week')) if plan else 'nothing'}). The gate replans on "
+                f"its next hourly tick. This repeats daily until it does.",
+                dry_run=dry_run, act_now=True)
+    else:
+        log.info("health: plan current, %d checks pending", pending)
+        if dry_run:
+            print(f"[health] alive, {pending} checks pending, nothing sent")
 
 
 # -- weekly.yml dispatcher ------------------------------------------------
@@ -334,5 +356,11 @@ def cron_tick(dry_run: bool = False, force: str | None = None) -> list[str]:
             _safe(lineup_job, dry_run)
         elif kind == "ledger":
             _safe(ledger_job, dry_run)
-    log.info("cron tick ran: %s", ran or "nothing (outside all windows)")
+    # THE INJURY WATCH runs on every tick, not on a period: the user wants a
+    # designation change within the hour, not at the next twice-daily sweep.
+    # Change-only plus the seen-gate means a quiet hour sends nothing.
+    if not force:
+        _safe(sweep_job, dry_run)
+    log.info("cron tick ran: %s (plus the injury watch)" if not force else "cron tick ran: %s",
+             ran or "nothing (outside all windows)")
     return ran

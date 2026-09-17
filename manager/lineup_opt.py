@@ -98,6 +98,21 @@ def flex_analysis(roster: list[dict], optimal: list[dict], mode: str,
     return lines
 
 
+def _first_lock(ctx, starters: list[dict]) -> str | None:
+    """'Thu 5:15 PM (DET)': the earliest kickoff among my starters' teams."""
+    try:
+        from .games import week_games
+        from .phone import _when
+        teams = {p.get("team") for p in starters if p.get("team")}
+        games = [g for g in week_games(ctx["schedule"], int(ctx["week"])) if g["teams"] & teams]
+        if not games:
+            return None
+        g = min(games, key=lambda g: g["kickoff"])
+        return f"{_when(g['kickoff'])} ({', '.join(sorted(g['teams'] & teams))})"
+    except Exception:  # noqa: BLE001
+        return None
+
+
 def build(ctx, store) -> str:
     week = ctx["week"]
     # Consensus BEFORE the optimiser: re-basing projections after the lineup
@@ -148,6 +163,11 @@ def build(ctx, store) -> str:
         "projected": {str(p["sleeper_id"]): round(float(p.get("weekly") or 0.0), 2) for p in optimal},
         "swaps": list(swaps),
     }])
+    # What the phone rendering needs beyond the ledger row.
+    ctx.setdefault("_summary", {})["lineup_phone"] = {
+        "swaps": list(swaps), "mode": mode, "contingency": dict(table),
+        "first_lock": _first_lock(ctx, optimal),
+    }
 
     lines = [f"# Lineup — week {week} ({mode.upper()} mode: {mode_why})", ""]
     if ctx.get("fallback"):

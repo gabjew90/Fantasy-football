@@ -394,11 +394,17 @@ def build(ctx, store) -> str:
         lines.append(n)
     lines.append("")
 
+    ctx.setdefault("_summary", {})["waivers_meta"] = {
+        "priority": _waiver_priority(ctx), "teams": len(ctx["rosters"]),
+        "budget": ctx.get("my_budget"),
+    }
     # IR flags FIRST — a free roster spot changes every drop decision below
     ir_lines = waivers.ir_actions(
         [p for p in ctx["roster_players"][ctx["my_rid"]]
          if str(p["sleeper_id"]) in set(str(x) for x in (ctx["my_roster"].get("reserve") or []))],
         ctx["roster_players"][ctx["my_rid"]], ctx["injury"], ctx["reserve_allow"])
+    ctx["_summary"]["waivers_meta"]["ir"] = [
+        a.replace("🔴 ", "").replace(" — ", ". ").replace("—", "-") for a in ir_lines]
     if ir_lines:
         lines += ["## IR moves"] + [f"- {a}" for a in ir_lines] + [""]
 
@@ -459,6 +465,14 @@ def build(ctx, store) -> str:
         need_note = f"; I am short at {p['pos']} in the next 3 weeks (byes)" if needs.get(p["pos"]) else ""
         rival_note = (f"rival budgets at need: {', '.join(f'${b}' for b in needy[:3])}"
                       if needy else "no rival is forced to bid here")
+        # The phone rendering: one reason, the move, the price.
+        _reason = next((w for w in why if not w.startswith("value over")), why[0]) if why else ""
+        _move = _drop_or_ir(ctx, p.get('ros') or 0, p['pos'])
+        ctx.setdefault("_summary", {}).setdefault("waiver_adds", []).append({
+            "name": p["name"], "pos": p["pos"], "team": p.get("team"), "cls": cls,
+            "move": _move[0].upper() + _move[1:], "drop": _move[5:] if _move.startswith("drop ") else None,
+            "why": _reason.replace("—", "-"), "fair": fair, "agg": agg,
+        })
         lines += [
             f"**{p['name']}** ({p['pos']}, {p.get('team') or '?'}) — {cls}",
             f"- why: {'; '.join(why)}{need_note}",

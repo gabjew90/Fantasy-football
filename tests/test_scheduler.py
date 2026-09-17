@@ -36,10 +36,23 @@ def _tick(monkeypatch, store, when, dry_run=False, force=None):
     monkeypatch.setattr(jobs, "now_pt", lambda: when)
     monkeypatch.setattr(jobs, "get_store", lambda: store)
     fired = []
-    for name in ("plan_week", "healthcheck", "waiver_job", "scout_job", "lineup_job"):
+    for name in ("plan_week", "healthcheck", "waiver_job", "scout_job", "lineup_job",
+                 "ledger_job", "sweep_job"):
         monkeypatch.setattr(jobs, name, lambda dry_run=False, _n=name: fired.append(_n))
     ran = jobs.cron_tick(dry_run=dry_run, force=force)
     return ran, fired
+
+
+def test_the_injury_watch_runs_on_every_unforced_tick(monkeypatch, store):
+    """A designation change should reach the phone within the hour, so the
+    sweep rides every tick and is not a period job: it never appears in
+    `ran` and a forced sample run does not fire it."""
+    ran, fired = _tick(monkeypatch, store, _pt(2026, 9, 14, 4, 0))
+    assert ran == [] and fired == ["sweep_job"]
+    ran, fired = _tick(monkeypatch, store, _pt(2026, 9, 14, 5, 0))
+    assert fired == ["sweep_job"]
+    _ran, fired = _tick(monkeypatch, store, _pt(2026, 9, 16, 3, 0), force="waivers")
+    assert "sweep_job" not in fired
 
 
 # --------------------------------------------------------------- the design
@@ -58,7 +71,7 @@ def test_a_late_monday_tick_runs_the_planner_once_and_the_next_tick_skips_it(mon
     assert "plan" in ran and "plan_week" in fired
     assert "health" in ran, "the daily healthcheck is also past its start and unrun"
     ran2, fired2 = _tick(monkeypatch, store, _pt(2026, 9, 14, 12, 41))
-    assert ran2 == [] and fired2 == []
+    assert ran2 == [] and fired2 == ["sweep_job"]
 
 
 def test_a_period_is_a_week_for_weekly_jobs_and_a_day_for_daily_ones():
@@ -113,6 +126,7 @@ def test_the_run_is_recorded_before_the_job_so_a_crashing_job_is_not_retried_hou
         raise RuntimeError("scout exploded")
     monkeypatch.setattr(jobs, "scout_job", boom)
     monkeypatch.setattr(jobs, "healthcheck", lambda dry_run=False: None)
+    monkeypatch.setattr(jobs, "sweep_job", lambda dry_run=False: None)
     monkeypatch.setattr(jobs, "deliver", lambda *a, **k: "printed")
     jobs.cron_tick()
     assert store.get("ran:scout:2026-W38")

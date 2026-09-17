@@ -18,23 +18,37 @@ log = logging.getLogger("manager")
 BAD = ("Out", "IR", "Doubtful", "Suspended", "Inactive", "PUP")
 
 
-def sweep(ctx, store) -> list[str]:
-    """Designation CHANGES for my rostered players since the last sweep."""
+def sweep_changes(ctx, store) -> list[dict]:
+    """Designation CHANGES for my rostered players since the last sweep, as
+    structured rows: {pid, name, pos, old, new, note}. Each change alerts
+    once (seen-gate on pid + status); the snapshot advances every call."""
     mine = ctx["roster_players"].get(ctx["my_rid"], [])
+    players = ctx.get("players") or {}
     current = {str(p["sleeper_id"]): (p.get("status") or "") for p in mine}
     prev = store.get("inj_snapshot", {})
-    alerts = []
+    out = []
     for pid, status in current.items():
         old = prev.get(pid, "")
         if status == old:
             continue
         p = next(x for x in mine if str(x["sleeper_id"]) == pid)
-        aid = f"inj:{pid}:{status}"
-        if store.first_time(aid):
-            arrow = f"{old or 'healthy'} -> {status or 'healthy'}"
-            mark = "🔴" if status in BAD else ("🟢" if not status else "🟡")
-            alerts.append(f"{mark} **{p['name']}** ({p['pos']}): {arrow}")
+        if store.first_time(f"inj:{pid}:{status}"):
+            d = players.get(pid) if isinstance(players.get(pid), dict) else {}
+            note = d.get("injury_body_part") or p.get("injury_note") or ""
+            out.append({"pid": pid, "name": p["name"], "pos": p["pos"],
+                        "old": old, "new": status, "note": note})
     store.set("inj_snapshot", current)
+    return out
+
+
+def sweep(ctx, store) -> list[str]:
+    """Designation CHANGES for my rostered players since the last sweep."""
+    alerts = []
+    for c in sweep_changes(ctx, store):
+        status, old = c["new"], c["old"]
+        arrow = f"{old or 'healthy'} -> {status or 'healthy'}"
+        mark = "🔴" if status in BAD else ("🟢" if not status else "🟡")
+        alerts.append(f"{mark} **{c['name']}** ({c['pos']}): {arrow}")
     return alerts
 
 
