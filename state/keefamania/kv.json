@@ -12979,6 +12979,26 @@
   [
    {
     "adds": {
+     "6083": 4
+    },
+    "created": 0,
+    "draft_picks": [],
+    "drops": {
+     "8259": 4
+    },
+    "metadata": {
+     "yahoo_type": ""
+    },
+    "roster_ids": [
+     4
+    ],
+    "settings": {},
+    "status": "pending",
+    "transaction_id": "None",
+    "type": "free_agent"
+   },
+   {
+    "adds": {
      "11625": 7
     },
     "created": 0,
@@ -13011,6 +13031,164 @@
     },
     "roster_ids": [
      8
+    ],
+    "settings": {},
+    "status": "pending",
+    "transaction_id": "None",
+    "type": "free_agent"
+   },
+   {
+    "adds": {
+     "11539": 7
+    },
+    "created": 0,
+    "draft_picks": [],
+    "drops": {
+     "11786": 7
+    },
+    "metadata": {
+     "yahoo_type": ""
+    },
+    "roster_ids": [
+     7
+    ],
+    "settings": {},
+    "status": "pending",
+    "transaction_id": "None",
+    "type": "waiver"
+   },
+   {
+    "adds": {
+     "11624": 3
+    },
+    "created": 0,
+    "draft_picks": [],
+    "drops": {
+     "6819": 3
+    },
+    "metadata": {
+     "yahoo_type": ""
+    },
+    "roster_ids": [
+     3
+    ],
+    "settings": {},
+    "status": "pending",
+    "transaction_id": "None",
+    "type": "waiver"
+   },
+   {
+    "adds": {
+     "SF": 9
+    },
+    "created": 0,
+    "draft_picks": [],
+    "drops": {
+     "LAC": 9
+    },
+    "metadata": {
+     "yahoo_type": ""
+    },
+    "roster_ids": [
+     9
+    ],
+    "settings": {},
+    "status": "pending",
+    "transaction_id": "None",
+    "type": "waiver"
+   },
+   {
+    "adds": {
+     "13296": 7
+    },
+    "created": 0,
+    "draft_picks": [],
+    "drops": {
+     "3214": 7
+    },
+    "metadata": {
+     "yahoo_type": ""
+    },
+    "roster_ids": [
+     7
+    ],
+    "settings": {},
+    "status": "pending",
+    "transaction_id": "None",
+    "type": "waiver"
+   },
+   {
+    "adds": {
+     "5872": 3
+    },
+    "created": 0,
+    "draft_picks": [],
+    "drops": {
+     "10213": 3
+    },
+    "metadata": {
+     "yahoo_type": ""
+    },
+    "roster_ids": [
+     3
+    ],
+    "settings": {},
+    "status": "pending",
+    "transaction_id": "None",
+    "type": "waiver"
+   },
+   {
+    "adds": {
+     "13414": 6
+    },
+    "created": 0,
+    "draft_picks": [],
+    "drops": {
+     "11563": 6
+    },
+    "metadata": {
+     "yahoo_type": ""
+    },
+    "roster_ids": [
+     6
+    ],
+    "settings": {},
+    "status": "pending",
+    "transaction_id": "None",
+    "type": "waiver"
+   },
+   {
+    "adds": {
+     "11834": 3
+    },
+    "created": 0,
+    "draft_picks": [],
+    "drops": null,
+    "metadata": {
+     "yahoo_type": ""
+    },
+    "roster_ids": [
+     3
+    ],
+    "settings": {},
+    "status": "pending",
+    "transaction_id": "None",
+    "type": "free_agent"
+   },
+   {
+    "adds": {
+     "TB": 3
+    },
+    "created": 0,
+    "draft_picks": [],
+    "drops": {
+     "PIT": 3
+    },
+    "metadata": {
+     "yahoo_type": ""
+    },
+    "roster_ids": [
+     3
     ],
     "settings": {},
     "status": "pending",
@@ -13204,26 +13382,6 @@
     "status": "pending",
     "transaction_id": "None",
     "type": "free_agent"
-   },
-   {
-    "adds": {
-     "11539": 7
-    },
-    "created": 0,
-    "draft_picks": [],
-    "drops": {
-     "11786": 7
-    },
-    "metadata": {
-     "yahoo_type": ""
-    },
-    "roster_ids": [
-     7
-    ],
-    "settings": {},
-    "status": "pending",
-    "transaction_id": "None",
-    "type": "waiver"
    },
    {
     "adds": {
@@ -13421,26 +13579,6 @@
    },
    {
     "adds": {
-     "11624": 3
-    },
-    "created": 0,
-    "draft_picks": [],
-    "drops": {
-     "6819": 3
-    },
-    "metadata": {
-     "yahoo_type": ""
-    },
-    "roster_ids": [
-     3
-    ],
-    "settings": {},
-    "status": "pending",
-    "transaction_id": "None",
-    "type": "waiver"
-   },
-   {
-    "adds": {
      "8134": 3
     },
     "created": 0,
@@ -13630,26 +13768,6 @@
     "type": "waiver"
    },
    {
-    "adds": {
-     "SF": 9
-    },
-    "created": 0,
-    "draft_picks": [],
-    "drops": {
-     "LAC": 9
-    },
-    "metadata": {
-     "yahoo_type": ""
-    },
-    "roster_ids": [
-     9
-    ],
-    "settings": {},
-    "status": "pending",
-    "transaction_id": "None",
-    "type": "waiver"
-   },
-   {
     "adds": null,
     "created": 0,
     "draft_picks": [],
@@ -13770,118 +13888,6 @@
      "yahoo_type": ""
     },
     "roster_ids": [],
-    "settings": {},
-    "status": "pending",
-    "transaction_id": "None",
-    "type": "free_agent"
-   },
-   {
-    "adds": null,
-    "created": 0,
-    "draft_picks": [],
-    "drops": null,
-    "metadata": {
-     "yahoo_type": ""
-    },
-    "roster_ids": [],
-    "settings": {},
-    "status": "pending",
-    "transaction_id": "None",
-    "type": "free_agent"
-   },
-   {
-    "adds": {
-     "13296": 7
-    },
-    "created": 0,
-    "draft_picks": [],
-    "drops": {
-     "3214": 7
-    },
-    "metadata": {
-     "yahoo_type": ""
-    },
-    "roster_ids": [
-     7
-    ],
-    "settings": {},
-    "status": "pending",
-    "transaction_id": "None",
-    "type": "waiver"
-   },
-   {
-    "adds": {
-     "5872": 3
-    },
-    "created": 0,
-    "draft_picks": [],
-    "drops": {
-     "10213": 3
-    },
-    "metadata": {
-     "yahoo_type": ""
-    },
-    "roster_ids": [
-     3
-    ],
-    "settings": {},
-    "status": "pending",
-    "transaction_id": "None",
-    "type": "waiver"
-   },
-   {
-    "adds": {
-     "13414": 6
-    },
-    "created": 0,
-    "draft_picks": [],
-    "drops": {
-     "11563": 6
-    },
-    "metadata": {
-     "yahoo_type": ""
-    },
-    "roster_ids": [
-     6
-    ],
-    "settings": {},
-    "status": "pending",
-    "transaction_id": "None",
-    "type": "waiver"
-   },
-   {
-    "adds": {
-     "11834": 3
-    },
-    "created": 0,
-    "draft_picks": [],
-    "drops": null,
-    "metadata": {
-     "yahoo_type": ""
-    },
-    "roster_ids": [
-     3
-    ],
-    "settings": {},
-    "status": "pending",
-    "transaction_id": "None",
-    "type": "free_agent"
-   },
-   {
-    "adds": {
-     "TB": 3
-    },
-    "created": 0,
-    "draft_picks": [],
-    "drops": {
-     "PIT": 3
-    },
-    "metadata": {
-     "yahoo_type": ""
-    },
-    "roster_ids": [
-     3
-    ],
     "settings": {},
     "status": "pending",
     "transaction_id": "None",
