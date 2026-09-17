@@ -316,8 +316,12 @@ def cron_tick(dry_run: bool = False, force: str | None = None) -> list[str]:
             continue
         ran.append(kind)
         # Recorded BEFORE the job runs: a job that crashes is emailed by
-        # _safe(), and re-running a crashing job every hour would spam.
-        store.set(f"ran:{kind}:{period_key(kind, now)}", fmt(now))
+        # _safe(), and re-running a crashing job every hour would spam. A
+        # FORCED run (workflow_dispatch --job) is a rehearsal or a sample and
+        # must not spend the period, or Friday's scout would be skipped
+        # because someone dispatched one on Wednesday.
+        if not force:
+            store.set(f"ran:{kind}:{period_key(kind, now)}", fmt(now))
         if kind == "plan":
             _safe(plan_week, dry_run)
         elif kind == "health":

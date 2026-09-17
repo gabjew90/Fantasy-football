@@ -120,9 +120,12 @@ def test_the_run_is_recorded_before_the_job_so_a_crashing_job_is_not_retried_hou
     assert "scout" not in ran
 
 
-def test_force_ignores_day_time_and_period(monkeypatch, store):
+def test_force_ignores_day_time_and_period_and_does_not_spend_it(monkeypatch, store):
     ran, fired = _tick(monkeypatch, store, _pt(2026, 9, 16, 3, 0), force="waivers")
     assert ran == ["waivers"] and fired == ["waiver_job"]
+    assert store.get("ran:waivers:2026-W38") is None, "a dispatched sample is not the week's run"
+    ran, _ = _tick(monkeypatch, store, _pt(2026, 9, 15, 16, 0))
+    assert "waivers" in ran, "the scheduled Tuesday run still happens"
 
 
 def test_a_dry_run_does_not_spend_the_period(monkeypatch, tmp_path):
