@@ -30,6 +30,10 @@ on:
         description: run the backtest smoke even if the model did not change
         required: false
         default: "false"
+      backtest_args:
+        description: 'extra args for backtest.py, e.g. "--no-historical-blend" to ablate'
+        required: false
+        default: ""
 
 permissions:
   contents: read
@@ -129,8 +133,12 @@ jobs:
           NFL_BACKTEST_CACHE: ${{ runner.temp }}/nflbt
         run: |
           set -euo pipefail
+          # ${{ }} is expanded by Actions before bash sees it, so an ablation
+          # flag arrives as literal argv. Unquoted on purpose: it is a list of
+          # flags, not a single argument.
           python props/engine/scripts/backtest.py \
-            --season 2025 --out "$RUNNER_TEMP/bt" --tag ci 2>&1 | tee "$RUNNER_TEMP/bt.log"
+            --season 2025 --out "$RUNNER_TEMP/bt" --tag ci \
+            ${{ github.event.inputs.backtest_args }} 2>&1 | tee "$RUNNER_TEMP/bt.log"
 
       - name: report CRPS on the job summary
         if: always()
