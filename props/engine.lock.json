@@ -1,14 +1,14 @@
 {
   "algorithm": "props-engine-sha256-lf-1",
-  "engine_sha256": "37b8ec713240221a2c90b36a2cf6b6f6f5cb57f40215e9896ffb110caa32484a",
-  "file_count": 29,
+  "engine_sha256": "e02ac8b22db8b56f41dc2fa186aafa7bc24809313ab51d0e08797e6de895c62d",
+  "file_count": 30,
   "files": {
-    "SKILL.md": "b0e126a0cedd697ac60c882157575a942abcfd2354538bb1665e6547e97d07c9",
+    "SKILL.md": "7ab5ae183fb30a15a9aebd9564ffe382e232dd68aa87abb52be4361db676b166",
     "resources/calibration_2025.csv": "47e3922c7af818307831d70a3d2be4333200f3aee1d94dc6bbf6e0e9ccee4ac8",
     "resources/data_source_matrix.md": "2088a5ebe6164a75c11331367fda734d4b10ea217704320321a3f2aec6bb9c2b",
     "resources/execution_protocol.md": "5f54fb23a77d60ecc947d44b6f18ecf67c4357d6b49c70bc937726c1c14016c1",
     "resources/line_archive.md": "baf1b6b97ec439bdf26b73dc4c3ae23d0c4ee9f502db4be7baae70390cdb5c45",
-    "resources/methodology.md": "fedd9259c589cf78d6bb4021589b47d420f3ffb1bb77c2c114fa08f889298ea4",
+    "resources/methodology.md": "774d97a5d86cd0a5594d68139c37e00d9bdaf0a336569b98f4c5bf4c251a71e3",
     "resources/model_registry.md": "52997de75ce087df1d1e50a0a5fc2f7d495cdad53fbc139ed3dba9b662c985a3",
     "resources/modeling_framework.md": "51568adb4e4f69442a98190b3909c0e3c0c4042f5348289bb8799dab541ed2e7",
     "resources/priors_2024_opponent.csv": "aa37b5af3e6b758ce08c7d71179083e3af5df0c9bb3492fe848eb9e2a7d1f9e4",
@@ -28,10 +28,11 @@
     "resources/stadium_coords.csv": "cf9ce9133fa57249347a2ee14c90b2ddc011602aed5398b1ebf3f7fd0ea71aa1",
     "scripts/backtest.py": "3961f65fa2f961efd1d612caf5f075ebcdc2f29b6e64feaf5cd5710b250bfc92",
     "scripts/build_priors.py": "51ff241ac3585feb63984c72f51e1b4c29946491942dea09e5357e5feaee8057",
+    "scripts/eligibility.py": "2299a7f7fa24285d9a1177fe2a5f5b60da597757519ffb60577cd1e8c53745c4",
     "scripts/model.py": "6d1ab321bb501ecfede8c5e57f202927e3cfb165681bf460adcea8c35cc651bb",
-    "scripts/odds_client.py": "7dcac28ea3aff276129ae01a200f1b90dd09b375d3f57cc295f0cc92cfe0bdbb",
-    "scripts/score_game.py": "92354814721b8ee3b2b4645060f0b60654044a6965fae0919b971d9f2196b74f",
-    "scripts/score_week.py": "14f224b7be15f8bf44bad161308eca14d851414770d36bce1b2ba06757b07240"
+    "scripts/odds_client.py": "434186273bd0412a5545247228298951c5d0504a19c8a47c4c782bf3bb75aaa1",
+    "scripts/score_game.py": "fdc9f997151cefc4c6fbf37eb6e04fcc2f5c8da4aff356743443e78a51f480c6",
+    "scripts/score_week.py": "1c91499ab89bc30c30b63e7f79e5d4472905e7e64e6d0b6a42b3796a13de06c4"
   },
-  "tag": "props-v1.1"
+  "tag": "props-v1.2"
 }
