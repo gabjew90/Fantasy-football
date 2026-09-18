@@ -39,3 +39,6 @@ data/draftrig/ref_*.csv
 
 # the positional missed-games table (scripts/derive_absence_bands.py) is a small tracked artifact
 !data/processed/absence_bands.json
+
+# build output: the .skill carries the API key, so it must never be committed
+dist/

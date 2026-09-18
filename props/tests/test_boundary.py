@@ -47,3 +47,28 @@ def test_no_credential_file_vendored():
 def test_record_tree_present():
     for sub in ("predictions", "lines", "settled"):
         assert (PROPS / "record" / sub).is_dir(), f"record/{sub} missing"
+
+
+def test_no_credential_file_anywhere_in_the_tree():
+    """The narrow check above guards one path; this guards the repository.
+
+    The engine's credential lives only in the installed skill and in a built
+    .skill, never here. A key committed to a public repo is not recoverable
+    by deleting it.
+    """
+    offenders = [p.relative_to(PROPS).as_posix() for p in PROPS.rglob("*")
+                 if p.is_file() and p.name.endswith(".env")]
+    assert not offenders, f"credential-shaped files in props/: {offenders}"
+
+
+def test_the_loader_ships_no_engine_of_its_own():
+    """props/skill/ is the loader. If an engine appeared inside it there
+    would be two engines again, which is the problem all of this solves.
+    The vendored fallback is assembled at build time from a git tag."""
+    skill = PROPS / "skill"
+    if not skill.is_dir():
+        return
+    stray = [p.relative_to(skill).as_posix() for p in skill.rglob("*")
+             if p.is_file() and p.name in ("score_game.py", "score_week.py",
+                                           "model.py", "odds_client.py")]
+    assert not stray, f"engine code vendored into the loader: {stray}"
