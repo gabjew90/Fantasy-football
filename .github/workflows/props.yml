@@ -89,17 +89,31 @@ jobs:
         if: steps.guard.outputs.run == 'true' && steps.guard.outputs.mode == 'capture'
         env:
           ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
-          PROPS_WORKDIR: props/.cache
+          # NFL_OUT is the scorer's real output knob (score_game.py:54). The
+          # step used to set PROPS_WORKDIR, which nothing reads, so OUT fell
+          # back to its hard-coded /mnt/user-data/outputs and EVERY capture
+          # died on a runner: PermissionError on /mnt/user-data from
+          # score_game, then OSError "non-existent directory" from score_week
+          # writing slate_runs. Both artifacts and the nflverse downloads now
+          # live under props/.cache, which is the path the cache step keeps --
+          # the scorer's --workdir default is ~/nfl_wd, so without the flag
+          # below that cache was saving an empty directory every run.
+          NFL_OUT: props/.cache/outputs
         run: |
+          mkdir -p props/.cache/outputs
           python props/engine/scripts/score_week.py \
             --season ${{ steps.guard.outputs.season }} \
             --week ${{ steps.guard.outputs.week }} \
+            --workdir props/.cache \
             ${{ github.event.inputs.games && format('--games {0}', github.event.inputs.games) || '' }} \
             --skip-started
+          # One invocation, no `|| --dir .` fallback: record_run exits non-zero
+          # for a missing directory AND for "no artifacts found" AND for a bug
+          # inside persist, so the fallback masked every one of those as the
+          # same duplicate error instead of failing loudly.
           python props/record_run.py \
-            --dir /mnt/user-data/outputs \
-            --snapshot-type ${{ steps.guard.outputs.snapshot_type }} \
-            || python props/record_run.py --dir . --snapshot-type ${{ steps.guard.outputs.snapshot_type }}
+            --dir props/.cache/outputs \
+            --snapshot-type ${{ steps.guard.outputs.snapshot_type }}
 
       - name: settle
         if: steps.guard.outputs.run == 'true' && steps.guard.outputs.mode == 'settle'
