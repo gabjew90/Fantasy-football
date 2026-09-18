@@ -86,7 +86,8 @@ league reference, now fixed; see `model_registry.md` round-7 correction. Positio
 level remains too thin to use. Shares are shrunk in opportunity units with per-rate constants.
 Players on a team are simulated jointly (one team-volume draw, multinomial split), so
 teammate outcomes are correlated; same-game-parlay numbers built from that are
-unvalidated. See `model_registry.md`, `receiving_hier_v2`.
+unvalidated and parlay pricing is therefore gated off in the scorer. See
+`model_registry.md`, `receiving_hier_v2`.
 
 ## Early-season prior extension
 Before roughly week 5, current-season evidence is too thin to establish a role on its own.
@@ -285,17 +286,22 @@ need not be surfaced. Write the reply as a premium prop guide with this structur
    independent product. State that same-player props are one bet, not two.
    For anytime-TD calls, state each team's TD total and whether it is market-anchored;
    if the history blend disagreed with the market by more than 20%, say so.
-   Calibration: quote the 2025 backtest reliability once (`resources/calibration_2025.csv`,
-   built by `backtest.py`): realized hit rate per model-probability bucket for receptions
-   and receiving yards. Rushing and TD models have no backtest; say so.
+   Calibration: say plainly that NO market is validated against sportsbook lines.
+   `resources/calibration_2025.csv` is a distributional self-check, not a track record:
+   it places lines at fixed offsets from the model's own median, over every player-week
+   rather than the ones worth betting, and reuses each player-week 8-10 times so its `n`
+   column overstates the evidence by about an order of magnitude. Quote it only with that
+   description attached. Rushing and TD have no backtest at all; say so.
    Ladder: `ladder_*.csv` holds P(stat <= k) per player for pricing alternate lines;
    surface it for the top two or three plays when the book's line sits inside the ladder.
-6. **Recommended parlays** — from parlays_*.csv: 2- and 3-leg combinations of STRONG
-   legs across different players, priced from the JOINT simulation. For each: the legs,
-   joint probability, the independent-product probability and the correlation factor,
-   the fair price, and the "take at +X or longer" threshold. TD legs are excluded; books
-   price SGPs with their own correlation model, so the fair price is a guide, not a
-   guarantee. At most three parlays, say which one to prioritise.
+6. **Parlays — DISABLED, do not price them.** `parlays_*.csv` is no longer written.
+   The simulation does induce real within-team correlation, which is exactly why a
+   parlay number built from it reads as authoritative, but the joint distribution has
+   never been checked against realised joint outcomes: the backtest scores each market
+   marginally and never looks at pairs. A correlation factor wrong in the second decimal
+   turns a +450 fair price into a losing bet, and marginal CRPS cannot detect that. If
+   asked for a parlay, say it is gated pending a joint-outcome holdout and give the
+   single legs instead.
 7. **Board summary** — plays count and Under/Over split, and the one-line note that the
    Under lean is unresolved until logged results settle it. Engineering notes (scorer
    changes, repackaging questions) never go in the report or the card; raise them in a

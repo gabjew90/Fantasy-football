@@ -4491,3 +4491,97 @@ Not done, and still listed: narrowing the engine hash scope, per-row
 released engine or on evidence that the current scope is costing something.
 Nothing here changes a probability, a tier or a decision; it changes only what
 is written down beside them.
+
+## 2026-09-18 (77) -- one eligibility test, and what the calibration table is not
+
+Three of six directives from the user's props review. The other three (one
+simulation pipeline for live and backtest, the frozen weeks 2-4 holdout, and
+by-market calibration in the scorecard) are separate work; this is the part
+that changes what the scorer CLAIMS, and it wanted to land on its own so a
+later bisect over the holdout has something legible to land on.
+
+**Eligibility was three functions that disagreed.** `score_game.py` answered
+"is this a play" three ways: `clears_edge_rule_if_validated` (gap and ER from
+the posted price), `is_play` on the betting card, and the ladder's ER-max
+pick. The card's version -- the one the report showed the reader, as "N of M
+posted props are at a line we'd play" -- derived its threshold from
+`P_NEEDED = (1 + min_er) / (1 + 100/110)`, which **assumes every prop is
+priced at -110**. Props routinely are not. At -140 the break-even win
+probability is about 4.5 points higher, so the card counted lines as playable
+that the edge rule in the same run rejected, and the real price was sitting
+unused in the same DataFrame. All three now call `scripts/eligibility.py`.
+
+**Measured, not predicted**, on a live MIA@SF week-2 board (Sleeper prices,
+24 yardage/reception lines): the old price-blind rule called **17 of 24**
+playable; the price-aware rule calls **2**. Five of the fifteen it now
+rejects have NEGATIVE expected return at the posted price — Caleb Douglas
+Over 2.5 receptions at -192 is ER -0.094, Deebo Samuel Under 3.5 at -172 is
+-0.089 — and the old card presented every one of them as "a line we'd play".
+The rest are rejected by the wide-gap rule, which was already the tier
+policy but had never been enforced where the edge was computed.
+
+`model_state` was the same class of problem one level down. It was assigned by
+matching market-name strings (which is how it once said `receiving_hier_v1`
+for a v2 model) and it **gated nothing**: every row was `decision = "PASS"`
+and the card went on calling the prop a play beside the MODEL_UNVALIDATED
+label. A status that changes no outcome is a comment. It is now one of the
+reasons a prop can be refused, which -- since `VALIDATED_MARKETS` is empty --
+means nothing is currently eligible. That is the honest reading of the
+evidence and it matches what the report's own preamble already said.
+
+The verdict carries `eligible` (enforced) and `priced` (the edge rule with the
+status gate suspended), because the record's long-standing
+`clears_edge_rule_if_validated` column has to keep meaning what it says, and
+because a prospective record of "what we would have bet if we trusted it" is
+the thing that eventually decides whether to trust it.
+
+`_missing()` fails closed on NaN. Every comparison against NaN is False, so a
+NaN expected return would have passed `er < min_er` and been reported as
+clearing the rule -- silently, and in the direction of placing a bet. A NaN
+`er` is the one recoverable case: it is an optimisation the caller passes so
+the two arithmetic paths cannot drift, so it is recomputed from price and
+p_win, which are themselves checked first.
+
+**The 2025 calibration table is not calibration against a sportsbook.** It is
+built by placing lines at fixed offsets from the model's OWN median (+/- 0.5
+to 3.5 receptions, +/- 5 to 30 yards) over every player-week. Two consequences
+the engine was not stating:
+
+  - Each of the 1,895 player-weeks is reused at 8-10 offsets, so a bucket
+    reading `n=1823` does not rest on 1,823 independent games. The `n` column
+    overstates the evidence by roughly an order of magnitude.
+  - A real call only happens where the model and the book DISAGREE. The table
+    covers every player-week symmetrically, so the selection -- which is the
+    entire mechanism by which betting either works or does not -- is absent.
+
+The table is kept: distributional self-consistency is worth knowing, and the
+backtest comment shows the author had already avoided the narrower
+circularity of using model quantiles. What is removed is the claim built on
+it. `score_game.py` said "Validated: receptions and receiving yards"; the bet
+card carried a column headed **Backtest**, described as "realized hit rate in
+the 2025 walk-forward test for calls in this probability bucket", sitting
+beside the Kelly stake. That column is now **Self-check** and says what it is.
+`methodology.md`, `score_week.py` and `SKILL.md` carried the same claim and
+now carry the same correction. Validated against posted lines: nothing.
+
+**Parlay pricing is gated off.** `ENABLE_PARLAYS = False`. The simulation does
+induce real within-team correlation -- one team-volume draw, multinomial split
+-- which is exactly why a parlay number built from it reads as authoritative.
+Nothing has ever compared the simulated joint distribution against realised
+joint outcomes; the backtest scores each market marginally and never looks at
+pairs. A correlation factor wrong in the second decimal turns a +450 fair
+price into a losing bet, and the marginal CRPS that HAS been measured cannot
+detect it. Singles keep being recorded prospectively. Joint pricing waits on
+its own holdout, per the user's instruction to validate joint outcomes
+separately first.
+
+Found while gating it: the confidence-tier log lived INSIDE `if not
+PARLAY.empty:`, so a slate with no parlay candidates printed no tiers either.
+Turning parlays off would have made that permanent. They are independent
+outputs and are now logged independently.
+
+Not in this entry, and still owed: the shared simulation pipeline (the
+backtest builds its own independent per-player draws via `draw_block` and
+never calls `simulate_team_game`, so the CRPS in CI does not measure the
+pipeline that makes the calls), the frozen holdout over weeks 2-4, and
+by-market calibration and returns in the scorecard.
