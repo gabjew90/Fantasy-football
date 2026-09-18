@@ -530,27 +530,29 @@ def main():
             # carries for ypc), matching how K0 was tuned in build_priors.py
             ncol = PRIOR_N_COL.get(slot_col)
             n_pri_opp = float(pri[ncol]) if (pri is not None and ncol in pri and pd.notna(pri[ncol])) else n25 * 30.0
-            if new_team:
-                n_pri_opp = min(n_pri_opp, rate_k0)   # cap an other-team prior at half weight
-            ind = blend(own_pri, n_pri_opp, sp, rate_k0)
-            scaled = False
-            if isinstance(ind, float) and not np.isnan(ind) and slot_col in ("target_share", "rush_share"):
-                ind *= role_scale; scaled = role_scale != 1.0
-            cur_rate = (cur_num / cur_den) if (cur_den is not None and cur_den > 0) else np.nan
-            n_cur_opp = float(cur_den) if pd.notna(cur_rate) else 0.0
-            final = ind if pd.isna(cur_rate) else blend(cur_rate, n_cur_opp, ind, rate_k0)
-            if opp_metric is not None and len(opp_table) and pd.notna(final):
-                # team-level, fixed shrinkage k0=150 plays: after the YPT-reference bug was
-                # fixed, this was the best of four variants on 2025 (reception yards +0.061
-                # CRPS, CI excludes zero; receptions unchanged). The earlier "harmful" verdict
-                # was entirely that bug. Between-defense YPT spread is ~8% SD.
-                final = float(final) * MODEL.opponent_multiplier(opp_table, opp_team, "ALL", opp_metric, k0_opp=150.0, mode="fixed")
-                if slot_col == "catch_rate":
-                    final = float(np.clip(final, 0.05, 1.0))
-            w_cur = (n_cur_opp / (n_cur_opp + rate_k0)) if pd.notna(cur_rate) else 0.0
-            ev_chain[pri_col] = dict(own_prior=own_pri, n_prior=n25, slot_prior=sp, indiv_prior=ind,
-                                     scaled=scaled, cur_rate=cur_rate, cur_num=cur_num, cur_den=cur_den,
-                                     n_cur=n_cur, w_cur=w_cur, final=final, k0_used=rate_k0)
+            # THE BLEND ITSELF LIVES IN model.py so the backtest runs the same
+            # one. Everything above this line is gathering inputs; everything
+            # the blend does is now shared.
+            #
+            # opponent multiplier: team-level, fixed shrinkage k0=150 plays.
+            # After the YPT-reference bug was fixed this was the best of four
+            # variants on 2025 (reception yards +0.061 CRPS, CI excludes zero;
+            # receptions unchanged). The earlier "harmful" verdict was entirely
+            # that bug. Between-defense YPT spread is ~8% SD.
+            opp_mult = 1.0
+            if opp_metric is not None and len(opp_table):
+                opp_mult = MODEL.opponent_multiplier(opp_table, opp_team, "ALL", opp_metric,
+                                                     k0_opp=150.0, mode="fixed")
+            final, chain = MODEL.blended_rate(
+                own_pri, n_pri_opp, sp, rate_k0,
+                cur_num=cur_num, cur_den=cur_den,
+                role_scale=role_scale,
+                scale_role=slot_col in ("target_share", "rush_share"),
+                new_team=new_team, opp_mult=opp_mult,
+                clip=(0.05, 1.0) if slot_col == "catch_rate" else None)
+            chain["n_prior"] = n25
+            chain["n_cur"] = n_cur
+            ev_chain[pri_col] = chain
             return final
 
         ts = rate(cw.targets if cw is not None else None, tt_cur if cw is not None else None,
