@@ -1,6 +1,6 @@
 {
  "week": 2,
- "generated_pt": "2026-09-16T18:43:38.486569-07:00",
+ "generated_pt": "2026-09-17T22:06:33.204809-07:00",
  "checks": [
   {
    "id": "wk2:waiver_brief:0915T1700",
@@ -55,13 +55,14 @@
   {
    "id": "wk2:slate_check:0917T1555",
    "kind": "slate_check",
-   "info": "inactives check \u2014 DET lock Thu 09/17 05:15 PM PT",
+   "info": "inactives check \u2014 BUF, DET lock Thu 09/17 05:15 PM PT",
    "target_pt": "2026-09-17T15:55:00-07:00",
    "due_utc": "2026-09-17T22:45:00+00:00",
    "due_pt": "2026-09-17T15:45:00-07:00",
    "window_min": 45,
    "done": false,
    "teams": [
+    "BUF",
     "DET"
    ],
    "kickoff": "2026-09-17T17:15:00-07:00"
@@ -139,7 +140,7 @@
   {
    "id": "wk2:slate_check:0920T0840",
    "kind": "slate_check",
-   "info": "inactives check \u2014 ATL, BAL, CAR, HOU, MIN, PHI, PIT lock Sun 09/20 10:00 AM PT",
+   "info": "inactives check \u2014 ATL, BAL, CAR, GB, HOU, MIN, NE, NO, PHI, PIT, TB lock Sun 09/20 10:00 AM PT",
    "target_pt": "2026-09-20T08:40:00-07:00",
    "due_utc": "2026-09-20T15:30:00+00:00",
    "due_pt": "2026-09-20T08:30:00-07:00",
@@ -149,39 +150,44 @@
     "ATL",
     "BAL",
     "CAR",
+    "GB",
     "HOU",
     "MIN",
+    "NE",
+    "NO",
     "PHI",
-    "PIT"
+    "PIT",
+    "TB"
    ],
    "kickoff": "2026-09-20T10:00:00-07:00"
   },
   {
    "id": "wk2:slate_check:0920T1145",
    "kind": "slate_check",
-   "info": "inactives check \u2014 DEN lock Sun 09/20 01:05 PM PT",
+   "info": "inactives check \u2014 JAX lock Sun 09/20 01:05 PM PT",
    "target_pt": "2026-09-20T11:45:00-07:00",
    "due_utc": "2026-09-20T18:35:00+00:00",
    "due_pt": "2026-09-20T11:35:00-07:00",
    "window_min": 45,
    "done": false,
    "teams": [
-    "DEN"
+    "JAX"
    ],
    "kickoff": "2026-09-20T13:05:00-07:00"
   },
   {
    "id": "wk2:slate_check:0920T1205",
    "kind": "slate_check",
-   "info": "inactives check \u2014 ARI, DAL, WAS lock Sun 09/20 01:25 PM PT",
+   "info": "inactives check \u2014 DAL, MIA, SF, WAS lock Sun 09/20 01:25 PM PT",
    "target_pt": "2026-09-20T12:05:00-07:00",
    "due_utc": "2026-09-20T18:55:00+00:00",
    "due_pt": "2026-09-20T11:55:00-07:00",
    "window_min": 45,
    "done": false,
    "teams": [
-    "ARI",
     "DAL",
+    "MIA",
+    "SF",
     "WAS"
    ],
    "kickoff": "2026-09-20T13:25:00-07:00"
@@ -189,14 +195,15 @@
   {
    "id": "wk2:slate_check:0920T1600",
    "kind": "slate_check",
-   "info": "inactives check \u2014 IND lock Sun 09/20 05:20 PM PT",
+   "info": "inactives check \u2014 IND, KC lock Sun 09/20 05:20 PM PT",
    "target_pt": "2026-09-20T16:00:00-07:00",
    "due_utc": "2026-09-20T22:50:00+00:00",
    "due_pt": "2026-09-20T15:50:00-07:00",
    "window_min": 45,
    "done": false,
    "teams": [
-    "IND"
+    "IND",
+    "KC"
    ],
    "kickoff": "2026-09-20T17:20:00-07:00"
   },

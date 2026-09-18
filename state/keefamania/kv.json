@@ -12999,6 +12999,73 @@
   [
    {
     "adds": {
+     "7839": 2
+    },
+    "created": 0,
+    "draft_picks": [],
+    "drops": {
+     "5189": 2
+    },
+    "metadata": {
+     "yahoo_type": ""
+    },
+    "roster_ids": [
+     2
+    ],
+    "settings": {},
+    "status": "pending",
+    "transaction_id": "None",
+    "type": "free_agent"
+   },
+   {
+    "adds": {
+     "10232": 7,
+     "13296": 3,
+     "8148": 3,
+     "8228": 7
+    },
+    "created": 0,
+    "draft_picks": [],
+    "drops": {
+     "10232": 3,
+     "13296": 7,
+     "8148": 7,
+     "8228": 3
+    },
+    "metadata": {
+     "yahoo_type": ""
+    },
+    "roster_ids": [
+     3,
+     7
+    ],
+    "settings": {},
+    "status": "pending",
+    "transaction_id": "None",
+    "type": "free_agent"
+   },
+   {
+    "adds": {
+     "8134": 9
+    },
+    "created": 0,
+    "draft_picks": [],
+    "drops": {
+     "12489": 9
+    },
+    "metadata": {
+     "yahoo_type": ""
+    },
+    "roster_ids": [
+     9
+    ],
+    "settings": {},
+    "status": "pending",
+    "transaction_id": "None",
+    "type": "free_agent"
+   },
+   {
+    "adds": {
      "6083": 4
     },
     "created": 0,
@@ -13786,48 +13853,6 @@
     "status": "pending",
     "transaction_id": "None",
     "type": "waiver"
-   },
-   {
-    "adds": null,
-    "created": 0,
-    "draft_picks": [],
-    "drops": null,
-    "metadata": {
-     "yahoo_type": ""
-    },
-    "roster_ids": [],
-    "settings": {},
-    "status": "pending",
-    "transaction_id": "None",
-    "type": "free_agent"
-   },
-   {
-    "adds": null,
-    "created": 0,
-    "draft_picks": [],
-    "drops": null,
-    "metadata": {
-     "yahoo_type": ""
-    },
-    "roster_ids": [],
-    "settings": {},
-    "status": "pending",
-    "transaction_id": "None",
-    "type": "free_agent"
-   },
-   {
-    "adds": null,
-    "created": 0,
-    "draft_picks": [],
-    "drops": null,
-    "metadata": {
-     "yahoo_type": ""
-    },
-    "roster_ids": [],
-    "settings": {},
-    "status": "pending",
-    "transaction_id": "None",
-    "type": "free_agent"
    },
    {
     "adds": null,
