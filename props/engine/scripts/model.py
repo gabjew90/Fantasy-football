@@ -1,0 +1,469 @@
+"""Shared model core for nfl-prop-research.
+
+Pure model logic, no network I/O and no odds fetching. `score_game.py` (live, one
+game) and `backtest.py` (walk-forward validation across many games) both call this
+module so the model that gets validated is exactly the model that gets used.
+
+Everything here operates on already-loaded pandas frames built from nflverse CSVs.
+"""
+import numpy as np
+import pandas as pd
+import re
+
+# ---------------------------------------------------------------- name matching
+def norm_name(s):
+    """Normalise a player name for joining across sources that disagree on
+    punctuation and suffixes: 'D.J. Moore' == 'DJ Moore', 'Luther Burden III' ==
+    'Luther Burden'. Used for snap counts AND the odds-API join -- the odds join
+    previously used exact string match with no normalisation, so 'D.J. Moore' from
+    a book would drop the prop silently."""
+    if not isinstance(s, str):
+        return s
+    s = s.lower().replace(".", "").replace("'", "").replace("-", " ")
+    s = re.sub(r"\b(jr|sr|ii|iii|iv|v)\b", "", s)
+    return " ".join(s.split())
+
+
+def name_key_loose(s):
+    """Fallback join key: first initial + surname. Catches nickname/full-name splits
+    that norm_name cannot ("Joshua Palmer" on a sportsbook vs "Josh Palmer" on the
+    roster -- a real ACT receiver whose props were being silently dropped). Looser than
+    norm_name, so it is only consulted after an exact normalised match fails."""
+    n = norm_name(s)
+    if not isinstance(n, str):
+        return n
+    parts = n.split()
+    return f"{parts[0][0]} {parts[-1]}" if len(parts) >= 2 else n
+
+
+def is_team_entry(s):
+    """Sportsbooks post team defense/special-teams entries in the same player field.
+    They are not players and must not be reported as name-join failures."""
+    t = str(s).lower()
+    return any(k in t for k in ("d/st", " dst", "defense", "special teams"))
+
+
+# ---------------------------------------------------------------- shrinkage
+def blend(own, n, prior, k0):
+    """Shrink `own` (estimated from `n` opportunity units) toward `prior` by k0."""
+    if pd.isna(prior):
+        return own
+    if pd.isna(own) or n <= 0:
+        return prior
+    w = n / (n + k0)
+    return w * own + (1 - w) * prior
+
+
+# Per-rate shrinkage constants, in OPPORTUNITY units (targets/carries/goal-line
+# touches), not games. A rate estimated from few opportunities should be trusted
+# less than one estimated from many, regardless of how many games produced them.
+# Values below are fit by build_priors.py's tune_k0s() on a held-out 2025 fold
+# (weeks 5-6 fit / 7-8 score) and stored in priors_{season}_params.json; these are
+# fallback defaults only, used if a params file lacks the key (e.g. an older
+# bundle).
+DEFAULT_K0 = {
+    "target_share": 16.0,   # opportunity units = team targets over the games counted
+    "catch_rate":    8.0,   # opportunity units = the player's own targets
+    "ypt":          12.0,
+    "rush_share":   10.0,   # opportunity units = team carries over the games counted
+    "ypc":          20.0,
+    "i10_target_share": 6.0,
+    "i10_carry_share":  6.0,
+}
+
+
+def normalize_depth_charts(dc, kick_lookup=None):
+    """Return team/week/gsis_id/slot from either nflverse depth-chart schema.
+
+    Modern (2025+): timestamped snapshots with `dt`, `team`, `pos_abb`, `pos_rank`.
+    The pre-game snapshot is the latest one strictly before kickoff, which is why
+    kick_lookup {(team, week): kickoff_utc} is needed.
+    Legacy (<=2024): already one row per team-week, with `club_code`, `depth_team`
+    (the rank) and `position`. No timestamp, so no kickoff filter is possible; these
+    are published weekly and treated as pre-game.
+
+    Without this, any backtest on a season before 2025 dies on a missing `dt` column,
+    which is what blocked the second-season validation.
+    """
+    cols = set(dc.columns)
+    out = []
+    if "dt" in cols:
+        d = dc.copy()
+        d["dt"] = pd.to_datetime(d["dt"], errors="coerce", utc=True)
+        d = d.dropna(subset=["dt"])
+        d = d[d.pos_abb.isin(["QB", "RB", "WR", "TE"])]
+        for (team, wk), kt in (kick_lookup or {}).items():
+            sub = d[(d.team == team) & (d.dt < kt)]
+            if sub.empty:
+                continue
+            sub = sub[sub.dt == sub.dt.max()]
+            for pos, mx in [("QB", 1), ("RB", 2), ("WR", 3), ("TE", 1)]:
+                for _, x in sub[(sub.pos_abb == pos) & (sub.pos_rank <= mx)].iterrows():
+                    out.append({"team": team, "week": wk, "gsis_id": x.gsis_id,
+                                "slot": f"{pos}{int(x.pos_rank)}"})
+    else:
+        d = dc.copy()
+        team_col = "club_code" if "club_code" in cols else "team"
+        rank_col = "depth_team" if "depth_team" in cols else "pos_rank"
+        d = d[d["position"].isin(["QB", "RB", "WR", "TE"])]
+        # The legacy schema lists the SAME position across offense AND special teams:
+        # a WR row with depth_team=1 may be the starting split end or the punt returner
+        # (depth_position PR/KR/KOR under position WR; 921 PR rows in 2024 alone). Keep
+        # only offensive rows whose depth_position equals the position, otherwise "WR1"
+        # is a coin flip between a starter and a return man. This, not the K0 or the
+        # priors, was the source of the 5% receptions under-prediction on 2024.
+        if "formation" in d.columns:
+            d = d[d["formation"].astype(str).str.strip() == "Offense"]
+        if "depth_position" in d.columns:
+            d = d[d["depth_position"].astype(str).str.strip() == d["position"].astype(str).str.strip()]
+        d[rank_col] = pd.to_numeric(d[rank_col], errors="coerce")
+        d["week"] = pd.to_numeric(d["week"], errors="coerce")
+        d = d.dropna(subset=[rank_col, "gsis_id", "week"])
+        # kind="mergesort" is STABLE; pandas' default quicksort is not, so ties on
+        # depth_team could otherwise assign WR1 nondeterministically across runs.
+        d = d.sort_values([team_col, "week", "position", rank_col], kind="mergesort")
+        d = d.drop_duplicates([team_col, "week", "position", "gsis_id"])
+        d["_ord"] = d.groupby([team_col, "week", "position"]).cumcount() + 1
+        for pos, mx in [("QB", 1), ("RB", 2), ("WR", 3), ("TE", 1)]:
+            sub = d[(d["position"] == pos) & (d["_ord"] <= mx)]
+            for _, x in sub.iterrows():
+                out.append({"team": x[team_col], "week": int(x["week"]), "gsis_id": x.gsis_id,
+                            "slot": f"{pos}{int(x['_ord'])}"})
+        return pd.DataFrame(out).drop_duplicates(["team", "week", "gsis_id"])
+    return pd.DataFrame(out).drop_duplicates(["team", "week", "gsis_id"])
+
+
+DRIFT_CLIP = (0.85, 1.15)   # never bound on 2024 or 2025; guards a thin early sample only
+
+
+def league_drift_ratio(team_week_volume, target_week, recent_games=3, min_prior_weeks=4):
+    """League-wide recent-to-expanding volume ratio, for correcting within-season drift.
+
+    A per-team expanding mean is the low-variance way to estimate a team's volume, but it
+    LAGS league-wide drift: total targets/game rose 3.4% inside 2024 and fell 4.2% inside
+    2025, so an expanding mean read ~4% low in one season and ~2% high in the other. A
+    trailing per-team window fixes the bias but adds real noise (per-team 4-game means are
+    volatile), which cost CRPS when tested.
+
+    This separates the two problems: keep the expanding mean per team for the LEVEL, and
+    scale it by a single league-wide ratio for the DRIFT. The ratio is estimated across
+    all 32 teams at once, so it is nearly noise-free compared with a per-team window.
+
+    team_week_volume: DataFrame with columns week, team_targets, team_carries (all teams).
+    Returns {"targets": ratio, "carries": ratio}, clipped to [0.85, 1.15] so a thin early
+    sample cannot produce a wild correction. Returns 1.0 before min_prior_weeks.
+    """
+    prior = team_week_volume[team_week_volume.week < target_week]
+    weeks_avail = sorted(prior.week.unique())
+    if len(weeks_avail) < min_prior_weeks:
+        return {"targets": 1.0, "carries": 1.0}
+    recent_weeks = weeks_avail[-recent_games:]
+    out = {}
+    for col, key in [("team_targets", "targets"), ("team_carries", "carries")]:
+        exp_mean = prior[col].mean()
+        rec_mean = prior[prior.week.isin(recent_weeks)][col].mean()
+        r = (rec_mean / exp_mean) if exp_mean > 0 else 1.0
+        out[key] = float(np.clip(r, *DRIFT_CLIP))
+    return out
+
+
+# ---------------------------------------------------------------- team environment
+def market_environment_fitted(team_spread, total, mkt_fit, team_pace_blend, team_pr_blend,
+                               pace_weight=0.5):
+    """Team plays and pass rate from FITTED market coefficients (build_priors.py) rather
+    than a hand-set shift, blended with the team's own pace/pass-rate history.
+
+    team_spread: this team's own spread (negative = favored).
+    team_pace_blend / team_pr_blend: the team's history-blended plays and pass rate.
+    pace_weight: how much of the market's fitted prediction to take vs the team's own
+    history. The fit's R^2 on 2025 is ~0.02 for plays and ~0.04 for pass rate: the market
+    explains almost none of the between-game variance in team volume, so an aggressive
+    weight is not justified by the data.
+    """
+    if not mkt_fit:
+        return {"plays": team_pace_blend, "pass_rate": team_pr_blend,
+                "implied_points": None, "source": "history (no market fit available)"}
+    fp, fr = mkt_fit["plays"], mkt_fit["pass_rate"]
+    mkt_plays = fp["intercept"] + fp["per_spread_pt"] * team_spread + fp["per_total_pt"] * total
+    mkt_pr = fr["intercept"] + fr["per_spread_pt"] * team_spread + fr["per_total_pt"] * total
+    w = float(np.clip(pace_weight, 0.0, 1.0))
+    return {"plays": (1 - w) * team_pace_blend + w * mkt_plays,
+            "pass_rate": float(np.clip((1 - w) * team_pr_blend + w * mkt_pr, 0.35, 0.75)),
+            "implied_points": (total - team_spread) / 2, "source": "market-fitted"}
+
+
+def market_implied_environment(spread_home, total, home_pass_rate, away_pass_rate,
+                                league_plays_per_game, pass_rate_slope=None,
+                                plays_slope=None, league_total=None):
+    """Convert a same-book spread/total into implied per-team scoring, then plays
+    and pass rate. `spread_home` is the home team's spread (negative = favored),
+    matching both nflverse `spread_line` and Odds API `point` sign convention.
+
+    Returns {team_side: {'implied_points':..., 'plays':..., 'pass_rate':...}} for
+    'home' and 'away'. Plays are apportioned using the classic pace-and-script
+    heuristic: a bigger favorite runs more, faces the same total plays roughly
+    evenly, so we hold plays close to league average and shift pass rate by score
+    differential rather than inventing a plays model we cannot validate.
+    """
+    implied_home = (total - spread_home) / 2
+    implied_away = (total + spread_home) / 2
+    # home_pass_rate / away_pass_rate MUST be the teams' own (history-blended) rates,
+    # not the league rate. Round-5 first version passed the league rate for both,
+    # which erased team identity (a pass-heavy offense projected the same as a
+    # run-heavy one) and is one reason "market" showed no CRPS gain over a constant.
+    # pass_rate_slope: change in a team's pass rate per point of ITS OWN spread
+    # (positive spread = underdog = passes more). Fit by build_priors/backtest from
+    # prior-season data; the hand-set 0.015-per-7-points default is used only if
+    # no fit is supplied. plays_slope: change in a team's plays per point of game
+    # total above league average.
+    slope = pass_rate_slope if pass_rate_slope is not None else 0.015 / 7.0
+    shift_home = np.clip(spread_home, -14, 14) * slope
+    plays_h = plays_a = league_plays_per_game
+    if plays_slope is not None and league_total is not None:
+        plays_h = plays_a = league_plays_per_game + plays_slope * (total - league_total)
+    return {
+        "home": {"implied_points": implied_home, "plays": plays_h,
+                 "pass_rate": np.clip(home_pass_rate + shift_home, 0.35, 0.75)},
+        "away": {"implied_points": implied_away, "plays": plays_a,
+                 "pass_rate": np.clip(away_pass_rate - shift_home, 0.35, 0.75)},
+    }
+
+
+def team_environment(team, cur_team_row, cur_n, pri_team_row, k0_volume,
+                      market=None, league_pass_rate=0.58, league_plays=64.0):
+    """Blend prior-season and current-season team volume, optionally re-centring
+    on a market-implied total when one is supplied.
+
+    market, if given: {'implied_points':..., 'plays':..., 'pass_rate':...} for
+    THIS team, from market_implied_environment(). When supplied, targets/carries
+    are built from plays x pass_rate instead of the pure history blend, and the
+    history blend is used only for the pass/rush split's stability check.
+    Disclosure required wherever this is used: the environment then comes from
+    the same book's own price, so it cannot itself be cited as an edge on the
+    total or spread -- only player-level allocation within that total can be.
+    """
+    out = {}
+    for c in ["targets", "carries", "i10_targets", "i10_carries", "pass_td", "rush_td"]:
+        own = cur_team_row.get(c, np.nan) if cur_team_row is not None else np.nan
+        pri = pri_team_row.get(c, np.nan) if pri_team_row is not None else np.nan
+        out[c] = blend(own, cur_n, pri, k0_volume)
+    out["source"] = "history"
+    if market is not None:
+        plays = market["plays"]
+        pass_rate = market["pass_rate"]
+        out["targets"] = plays * pass_rate
+        out["carries"] = plays * (1 - pass_rate)
+        # touchdowns scale with implied points at the league rate; goal-line shares
+        # of targets/carries carry over unchanged from the history blend since the
+        # market doesn't speak to WHERE on the field a team's plays happen
+        td_per_pt = out.get("_league_td_per_point", 0.1055)
+        total_td = market["implied_points"] * td_per_pt
+        # keep the history blend's pass/rush TD split ratio, apply to the new total
+        hist_total_td = out["pass_td"] + out["rush_td"]
+        if hist_total_td > 0:
+            out["pass_td"] = total_td * out["pass_td"] / hist_total_td
+            out["rush_td"] = total_td * out["rush_td"] / hist_total_td
+        out["source"] = "market"
+    return out
+
+
+# ---------------------------------------------------------------- opponent adjustment
+def build_opponent_table(pbp, roles):
+    """Per-team, per-position-group defensive efficiency allowed, relative to
+    league average, from a season of play-by-play. Position group, not full
+    position, to keep the sample size usable (a full season is still only ~17
+    games per defense).
+    """
+    passes = pbp[(pbp.play_type == "pass") & pbp.receiver_player_id.notna()].copy()
+    rushes = pbp[(pbp.play_type == "run") & (pbp.qb_kneel != 1) & pbp.rusher_player_id.notna()].copy()
+    role_pos = roles.set_index("gsis_id")["slot"].str.extract(r"([A-Z]+)")[0].to_dict()
+    passes["posgrp"] = passes.receiver_player_id.map(role_pos).fillna("OTHER")
+    rushes["posgrp"] = rushes.rusher_player_id.map(role_pos).fillna("OTHER")
+
+    def agg(df, ycol):
+        df = df.assign(**{ycol: df[ycol].fillna(0.0)})   # per-target, incompletions count as 0
+        g = df.groupby(["defteam", "posgrp"]).agg(
+            plays=("play_id", "size"), yards=(ycol, "sum"), var_play=(ycol, "var"),
+            completions=("complete_pass", "sum") if ycol == "receiving_yards" else ("play_id", "size"))
+        return g
+
+    passes_all = passes.copy(); passes_all["posgrp"] = "ALL"
+    rushes_all = rushes.copy(); rushes_all["posgrp"] = "ALL"
+    passes = pd.concat([passes, passes_all]); rushes = pd.concat([rushes, rushes_all])
+    pass_def = agg(passes, "receiving_yards")
+    rush_def = agg(rushes, "rushing_yards")
+    # receiving_yards is NaN on incompletions in nflverse PBP, so .mean() silently
+    # returns yards per COMPLETION. The per-team value is yards per TARGET. Mixing them
+    # gave every defense a ratio near 0.67 and cut every receiving-yards projection
+    # 12-18% regardless of opponent (caught by a reviewer from the report's Under lean).
+    # Fill NaN with 0 so numerator and denominator are both per target.
+    _p = passes.assign(_ry=passes.receiving_yards.fillna(0.0))
+    league_ypt = _p.groupby("posgrp")._ry.sum() / _p.groupby("posgrp").size()
+    league_cr = passes.groupby("posgrp").complete_pass.mean()
+    league_ypc = rushes.assign(_ry=rushes.rushing_yards.fillna(0.0)).groupby("posgrp")._ry.mean()
+
+    rows = []
+    for (team, pg), r in pass_def.iterrows():
+        if r.plays < 20 or pg not in league_ypt.index:
+            continue
+        rows.append({"team": team, "posgrp": pg, "metric": "ypt",
+                     "n": int(r.plays), "value": r.yards / r.plays,
+                     "league": float(league_ypt[pg]), "var_play": float(r.var_play)})
+        rows.append({"team": team, "posgrp": pg, "metric": "catch_rate",
+                     "n": int(r.plays), "value": r.completions / r.plays,
+                     "league": float(league_cr[pg])})
+    for (team, pg), r in rush_def.iterrows():
+        if r.plays < 20 or pg not in league_ypc.index:
+            continue
+        rows.append({"team": team, "posgrp": pg, "metric": "ypc",
+                     "n": int(r.plays), "value": r.yards / r.plays,
+                     "league": float(league_ypc[pg]), "var_play": float(r.var_play)})
+    df = pd.DataFrame(rows)
+    if df.empty:
+        return df
+    # Empirical-Bayes shrinkage constant per (posgrp, metric): k_eb = within / between.
+    # within = mean per-play variance of the metric (binomial for catch rate, sample
+    # variance of yards for ypt/ypc); between = variance of team ratios minus the
+    # sampling noise. If between <= 0 there is no detectable team signal and k_eb is
+    # set very large (adjustment becomes a no-op), which is the honest outcome.
+    ks = []
+    for (pg, met), g in df.groupby(["posgrp", "metric"]):
+        ratio = g.value / g.league
+        if met == "catch_rate":
+            within = float((g.league * (1 - g.league)).mean()) / float(g.league.mean() ** 2)
+        else:
+            within = float(g["var_play"].mean()) / float(g.league.mean() ** 2) if "var_play" in g else 1.0
+        samp_noise = float((within / g.n).mean())
+        between = float(ratio.var(ddof=1)) - samp_noise if len(g) > 2 else 0.0
+        k_eb = within / between if between > 1e-6 else 1e9
+        ks.append({"posgrp": pg, "metric": met, "k_eb": k_eb, "between_var": max(between, 0.0)})
+    return df.merge(pd.DataFrame(ks), on=["posgrp", "metric"], how="left")
+
+
+def opponent_multiplier(opp_table, defteam, posgrp, metric, k0_opp=150.0, mode="fixed"):
+    """Multiplicative opponent-efficiency adjustment, shrunk toward 1.0 (league average)
+    by plays faced.
+
+    History worth keeping: earlier rounds concluded this adjustment was useless or
+    actively harmful (fixed shrinkage measured -0.34 CRPS on reception yards). That
+    conclusion was an artifact of a bug in build_opponent_table: the league YPT
+    reference was computed with .mean() on a column that is NaN for incompletions,
+    which silently returned yards per COMPLETION (10.9) against a per-TARGET team
+    value (7.3). Every defense therefore got a ratio near 0.67, and every
+    receiving-yards projection was cut 12-18% regardless of opponent. With that
+    fixed (2025, team level, k0=150): reception yards +0.056 CRPS, 95% CI
+    (+0.006, +0.108), excludes zero. The adjustment helps.
+
+    Defaults: team level, fixed k0=150 plays. Position-group level was retested after
+    the fix and remains indistinguishable from no adjustment -- the per-position
+    samples are genuinely too thin. mode="eb" uses the empirical-Bayes constant from
+    build_opponent_table instead; it also helps (+0.052) but fixed k0=150 is simpler
+    and marginally better, so it is the default.
+    """
+    row = opp_table[(opp_table.team == defteam) & (opp_table.posgrp == posgrp)
+                    & (opp_table.metric == metric)]
+    if row.empty or row.iloc[0].league <= 0:
+        return 1.0
+    r = row.iloc[0]
+    raw_ratio = r.value / r.league
+    k = float(r.k_eb) if (mode == "eb" and "k_eb" in row and pd.notna(r.k_eb)) else k0_opp
+    w = r.n / (r.n + k)
+    return 1.0 * (1 - w) + raw_ratio * w
+
+
+# ---------------------------------------------------------------- TD allocation
+def td_lambda(env_team, i10_target_share, i10_carry_share, target_share, rush_share,
+              f_pass_in10, f_rush_in10):
+    """Expected TDs for a player. Goal-line TDs (plays starting inside the 10) are
+    allocated by inside-the-10 share; the rest -- roughly half of passing TDs and
+    a quarter of rushing TDs league-wide -- by overall target/carry share, since
+    that is what a long touchdown actually depends on. Allocating everything by
+    goal-line share under-rates explosive/high-volume players and over-rates
+    goal-line specialists (verified on 2025: Gibbs 9/18 and J.Williams 8/20 TDs
+    came from outside the 10)."""
+    return (env_team["pass_td"] * (f_pass_in10 * i10_target_share + (1 - f_pass_in10) * target_share)
+            + env_team["rush_td"] * (f_rush_in10 * i10_carry_share + (1 - f_rush_in10) * rush_share))
+
+
+# ---------------------------------------------------------------- questionable regime
+QUESTIONABLE_WEIGHTS = {"normal": 0.55, "limited": 0.30, "out": 0.15}
+QUESTIONABLE_SCALE = {"normal": 1.0, "limited": 0.6, "out": 0.0}
+# Base rates: of players tagged Questionable in 2025, what fraction played a normal
+# snap share, a limited one, or sat out. Stored here as the documented default;
+# build_priors.py can refresh QUESTIONABLE_WEIGHTS from data if desired.
+
+
+def questionable_regimes(mu_base):
+    """Return {regime: (probability, adjusted_mu)} for a Questionable player.
+    Per modeling_framework.md: run normal/limited/out regimes with stated weights;
+    if the regimes disagree enough to change the betting decision, the market_read
+    layer should mark the line for the PASS-because-flip rule rather than pricing
+    an average of the three."""
+    return {reg: (w, mu_base * QUESTIONABLE_SCALE[reg]) for reg, w in QUESTIONABLE_WEIGHTS.items()}
+
+
+def questionable_flip_check(samples_by_regime, line):
+    """True if the Over/Under recommendation would flip depending which
+    Questionable regime is realised -- the case where PASS is mandatory regardless
+    of the blended number."""
+    sides = set()
+    for regime, s in samples_by_regime.items():
+        p_over = float(np.mean(s > line))
+        sides.add(p_over >= 0.5)
+    return len(sides) > 1
+
+
+# ---------------------------------------------------------------- joint simulation
+def simulate_team_game(rng, n_sim, team_volume_mean, team_volume_r, player_shares,
+                        player_catch_rates, player_ypt, per_catch_shape, other_bucket=True):
+    """Draw one team's targets jointly with all eligible receivers in one pass.
+
+    1. Team targets ~ NegBinomial(team_volume_mean, team_volume_r) -- one draw per
+       simulation, shared by every player on the team this simulation.
+    2. Those targets are split across players (plus an 'other' bucket absorbing
+       the share the eligible set doesn't cover) via Multinomial(shares).
+    3. Each player's catches | his own targets ~ Binomial(his catch rate).
+    4. Yards | catches ~ sum of per-catch Gamma draws.
+
+    This makes teammates' receptions NEGATIVELY correlated within a simulation
+    (more targets to A means fewer available for B, for a fixed team total) and
+    makes every player's outcome share the team's own play-count variance --
+    both true of real football and both absent from independent per-player draws.
+    Returns {player_index: (receptions_array, yards_array)}, plus team_targets_array.
+    """
+    names = list(player_shares.keys())
+    shares = np.array([player_shares[n] for n in names], dtype=float)
+    shares = np.clip(shares, 0, None)
+    if other_bucket:
+        rest = max(1.0 - shares.sum(), 0.0)
+        shares = np.append(shares, rest)
+    else:
+        s = shares.sum()
+        shares = shares / s if s > 0 else shares
+
+    p = team_volume_r / (team_volume_r + max(team_volume_mean, 1e-6))
+    team_targets = rng.negative_binomial(team_volume_r, p, size=n_sim)
+
+    # vectorized multinomial: sequential conditional binomials, no Python loop
+    p_norm = shares / shares.sum()
+    alloc = np.zeros((n_sim, len(p_norm)), dtype=int)
+    remaining = team_targets.copy()
+    remaining_p = 1.0
+    for j in range(len(p_norm) - 1):
+        pj = np.clip(p_norm[j] / remaining_p, 0.0, 1.0) if remaining_p > 0 else 0.0
+        alloc[:, j] = rng.binomial(remaining, pj)
+        remaining = remaining - alloc[:, j]
+        remaining_p -= p_norm[j]
+    alloc[:, -1] = remaining
+
+    out = {}
+    for j, name in enumerate(names):
+        tg = alloc[:, j].astype(float)
+        cr = max(player_catch_rates.get(name, 0.3), 0.05)
+        rec = rng.binomial(alloc[:, j], cr).astype(float)
+        ypt = max(player_ypt.get(name, 7.0), 0.5)
+        ypc = ypt / cr
+        shape_total = np.clip(rec, 0, 25) * per_catch_shape
+        yds = np.where(rec > 0, rng.gamma(np.maximum(shape_total, 1e-6), ypc / per_catch_shape), 0.0)
+        out[name] = (rec, yds)
+    return out, team_targets

@@ -1,0 +1,278 @@
+"""Grade recorded prop calls against actual outcomes.
+
+Joins `record/predictions/<season>/wk<NN>.jsonl` to nflverse weekly player
+stats and writes one settled row per call to
+`record/settled/<season>/settled_<season>.csv`.
+
+Settlement rules, matching how books settle these markets:
+  receptions        stat > line -> Over wins; stat < line -> Under wins
+  reception_yds     same, on receiving_yards
+  rush_yds          same, on rushing_yards
+  anytime_td        rushing_tds + receiving_tds >= 1 -> Yes wins
+A half-point line cannot push. A whole-number line that lands exactly on the
+stat is recorded as `push` and excluded from hit-rate denominators.
+
+A call is only settled when the player appears in that week's stat file. A
+player who did not play settles as `dnp` rather than as a loss, because a
+book would have voided the prop; folding a void into the record as a loss
+would bias every hit rate downward.
+
+Name joining: nflverse `player_id` is not present on Sleeper rows, so the join
+is on a normalized name within (season, week, team), with a first-initial +
+surname fallback. Unjoined rows are written with status `unjoined` and counted
+in the run summary rather than dropped, since a silent drop is the failure mode
+that would quietly shrink the record.
+
+Usage:
+    python props/settle.py --season 2026 [--week 2] [--through-week 5]
+"""
+
+from __future__ import annotations
+
+import argparse
+import csv
+import json
+import re
+import sys
+import unicodedata
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import persist  # noqa: E402
+
+try:
+    import pandas as pd
+except ImportError:  # pragma: no cover
+    print("pandas is required: pip install -r props/requirements.txt", file=sys.stderr)
+    raise
+
+NFLVERSE = "https://github.com/nflverse/nflverse-data/releases/download"
+STATS_URL = NFLVERSE + "/stats_player/stats_player_week_{season}.csv"
+
+SUFFIX = re.compile(r"\s+(jr|sr|ii|iii|iv|v)\.?$", re.IGNORECASE)
+
+MARKET_STAT = {
+    "player_receptions": "receptions",
+    "player_reception_yds": "receiving_yards",
+    "player_rush_yds": "rushing_yards",
+    "player_anytime_td": "_anytime_td",
+    "receptions": "receptions",
+    "reception_yds": "receiving_yards",
+    "rush_yds": "rushing_yards",
+    "anytime_td": "_anytime_td",
+}
+
+SETTLED_FIELDS = [
+    "season", "week", "game", "event_id", "book", "market", "player", "team",
+    "slot", "side", "line", "price", "p_model", "p_novig", "gap", "tier",
+    "decision", "new_team", "questionable", "model_state", "snapshot_type",
+    "logged_at_utc", "actual", "result", "status", "won", "pnl_per_100",
+    "join_method",
+]
+
+
+def norm_name(s: str) -> str:
+    s = unicodedata.normalize("NFKD", str(s))
+    s = "".join(c for c in s if not unicodedata.combining(c))
+    s = s.lower().replace(".", "").replace("'", "").replace("-", " ")
+    s = SUFFIX.sub("", s.strip())
+    return re.sub(r"\s+", " ", s).strip()
+
+
+def loose_key(s: str) -> str:
+    """First initial + surname.
+
+    nflverse `player_name` is abbreviated (`C.McCaffrey`) while the record
+    stores the book's full name (`Christian McCaffrey`). Normalising the dot to
+    a space first makes both collapse to `c mccaffrey`, which is what lets the
+    two sides join at all. This is deliberately lossy: two players on one team
+    sharing an initial and surname would collide, so it is only ever a fallback
+    after the full-name match.
+    """
+    n = norm_name(str(s).replace(".", ". ")).strip()
+    parts = n.split()
+    return f"{parts[0][0]} {parts[-1]}" if len(parts) >= 2 else n
+
+
+def american_pnl(price: float, won: bool) -> float:
+    """Profit per $100 staked."""
+    if won is None:
+        return 0.0
+    if not won:
+        return -100.0
+    return price if price > 0 else 10000.0 / abs(price)
+
+
+def load_stats(season: int, cache: Path) -> pd.DataFrame:
+    cache.parent.mkdir(parents=True, exist_ok=True)
+    if not cache.exists():
+        import urllib.request
+        urllib.request.urlretrieve(STATS_URL.format(season=season), cache)
+    df = pd.read_csv(cache, low_memory=False)
+    df = df[df["season_type"] == "REG"].copy()
+    for col in ("receptions", "receiving_yards", "rushing_yards",
+                "receiving_tds", "rushing_tds"):
+        if col not in df.columns:
+            df[col] = 0
+        df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
+    df["_anytime_td"] = (df["rushing_tds"] + df["receiving_tds"] >= 1).astype(int)
+    # `player_display_name` carries the full name and is what the book's name
+    # can match exactly; `player_name` is abbreviated and only ever usable
+    # through the loose key.
+    full = df["player_display_name"] if "player_display_name" in df.columns \
+        else df["player_name"]
+    df["_name"] = full.map(norm_name)
+    df["_loose"] = df["player_name"].map(loose_key)
+    return df
+
+
+def settle_row(row: dict, actual: float) -> tuple[str, bool | None]:
+    """Return (result, won) for a call given the actual stat."""
+    market = MARKET_STAT.get(str(row.get("market", "")).strip())
+    side = str(row.get("side", "")).strip().lower()
+    if market == "_anytime_td":
+        scored = actual >= 1
+        won = scored if side in ("yes", "over") else not scored
+        return ("yes" if scored else "no"), won
+    line = row.get("line")
+    if line is None:
+        return "no_line", None
+    if actual == line:
+        return "push", None
+    over = actual > line
+    won = over if side == "over" else not over
+    return ("over" if over else "under"), won
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--season", type=int, required=True)
+    ap.add_argument("--week", type=int, help="settle only this week")
+    ap.add_argument("--through-week", type=int,
+                    help="settle every week up to and including this one")
+    ap.add_argument("--snapshot-type", default="decision",
+                    help="which snapshot to grade (default: decision)")
+    args = ap.parse_args()
+
+    pred_dir = persist.RECORD_ROOT / "predictions" / str(args.season)
+    if not pred_dir.is_dir():
+        print(f"no predictions recorded for {args.season}", file=sys.stderr)
+        return 2
+
+    weeks = []
+    for f in sorted(pred_dir.glob("wk*.jsonl")):
+        w = int(f.stem[2:])
+        if args.week and w != args.week:
+            continue
+        if args.through_week and w > args.through_week:
+            continue
+        weeks.append((w, f))
+    if not weeks:
+        print("no matching weeks", file=sys.stderr)
+        return 2
+
+    stats = load_stats(args.season,
+                       Path("/tmp") / f"stats_player_week_{args.season}.csv")
+
+    out_rows, counts = [], {"settled": 0, "push": 0, "dnp": 0,
+                            "unjoined": 0, "unplayed_week": 0}
+
+    for week, path in weeks:
+        wk_stats = stats[stats["week"] == week]
+        if wk_stats.empty:
+            with path.open(encoding="utf-8") as fh:
+                counts["unplayed_week"] += sum(1 for line in fh if line.strip())
+            print(f"week {week}: no results published yet, skipped")
+            continue
+        exact = {(r["team"], r["_name"]): r for _, r in wk_stats.iterrows()}
+        loose = {(r["team"], r["_loose"]): r for _, r in wk_stats.iterrows()}
+        name_only = {r["_name"]: r for _, r in wk_stats.iterrows()}
+
+        with path.open(encoding="utf-8") as fh:
+            for line in fh:
+                line = line.strip()
+                if not line:
+                    continue
+                row = json.loads(line)
+                if row.get("snapshot_type") != args.snapshot_type:
+                    continue
+                team = row.get("team")
+                nm = norm_name(row.get("player", ""))
+                stat_row, how = None, None
+                for key, table, method in (((team, nm), exact, "team+name"),
+                                           ((team, loose_key(row.get("player", ""))),
+                                            loose, "team+initial"),
+                                           (nm, name_only, "name-only")):
+                    if key in table:
+                        stat_row, how = table[key], method
+                        break
+
+                out = {f: row.get(f) for f in SETTLED_FIELDS if f in row}
+                out["season"], out["week"] = args.season, week
+                out["join_method"] = how or ""
+
+                if stat_row is None:
+                    out.update(actual="", result="", status="dnp", won="",
+                               pnl_per_100="")
+                    # A player on the week's roster who recorded no stat line is
+                    # a DNP/void; one absent from the file entirely is an
+                    # unresolved join and is flagged separately.
+                    out["status"] = "dnp" if nm in name_only else "unjoined"
+                    counts[out["status"]] += 1
+                    out_rows.append(out)
+                    continue
+
+                stat_col = MARKET_STAT.get(str(row.get("market", "")).strip())
+                if stat_col is None:
+                    out.update(actual="", result="unknown_market", status="skipped",
+                               won="", pnl_per_100="")
+                    out_rows.append(out)
+                    continue
+
+                actual = float(stat_row[stat_col])
+                result, won = settle_row(row, actual)
+                out["actual"] = actual
+                out["result"] = result
+                if won is None:
+                    out.update(status="push", won="", pnl_per_100=0.0)
+                    counts["push"] += 1
+                else:
+                    price = row.get("price")
+                    out.update(status="settled", won=int(won),
+                               pnl_per_100=round(american_pnl(float(price), won), 2)
+                               if price is not None else "")
+                    counts["settled"] += 1
+                out_rows.append(out)
+
+    if not out_rows:
+        print("nothing to settle")
+        return 0
+
+    dest = persist.settled_path(args.season)
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    existing = {}
+    if dest.exists():
+        with dest.open(encoding="utf-8") as fh:
+            for r in csv.DictReader(fh):
+                existing[(r["season"], r["week"], r["event_id"], r["book"],
+                          r["market"], r["player"], r["side"], r["line"])] = r
+    for r in out_rows:
+        existing[(str(r.get("season")), str(r.get("week")), str(r.get("event_id")),
+                  str(r.get("book")), str(r.get("market")), str(r.get("player")),
+                  str(r.get("side")), str(r.get("line")))] = r
+    with dest.open("w", encoding="utf-8", newline="") as fh:
+        w = csv.DictWriter(fh, fieldnames=SETTLED_FIELDS, extrasaction="ignore")
+        w.writeheader()
+        for r in existing.values():
+            w.writerow(r)
+
+    print(f"[{persist.mode()}] {dest}: {len(existing)} settled rows")
+    print("  " + ", ".join(f"{k}={v}" for k, v in counts.items() if v))
+    if counts["unjoined"]:
+        print("  unjoined rows are kept, not dropped; check the name join "
+              "before trusting hit rates for that week.")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

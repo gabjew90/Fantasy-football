@@ -1,0 +1,120 @@
+# Props historical record. Independent of the fantasy workflows: its own
+# concurrency group (they use `manager-state`) and its own paths, so a props
+# tick and a manager tick can never fight over the same commit.
+#
+# Three jobs, all driven off one cheap stdlib-only guard so ticks outside a
+# kickoff window exit in seconds and cost almost no free-tier minutes:
+#   capture  score every game that kicks off soon; inside 60 minutes of kickoff
+#            the snapshot is `close`, earlier it is `decision`. The closing
+#            snapshot is the one CLV depends on and the one a chat session
+#            cannot reliably produce by hand.
+#   settle   Tuesday, after nflverse publishes weekly stats; grades every
+#            recorded call against what actually happened.
+#   scorecard rebuilds record/scorecard.md from the settled rows.
+#
+# The engine reads prices from Sleeper (no key, no quota) by default.
+# ODDS_API_KEY is passed only so a DK/FD closing capture is possible when the
+# quota allows; it is never committed to the tree.
+name: props
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: capture | settle | scorecard
+        required: false
+        default: capture
+      season:
+        description: season (default current)
+        required: false
+      week:
+        description: week (default current)
+        required: false
+      games:
+        description: "optional game list, e.g. MIA@SF,DET@BUF"
+        required: false
+  schedule:
+    # every 15 minutes; the guard decides whether there is real work
+    - cron: "*/15 * * * *"
+    # Tuesday 15:00 UTC (08:00 PT), after weekly stats publish
+    - cron: "0 15 * * 2"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: props-record
+  cancel-in-progress: false
+
+jobs:
+  tick:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: window guard (stdlib only, no deps installed yet)
+        id: guard
+        run: python3 props/guard.py >> "$GITHUB_OUTPUT"
+        env:
+          PROPS_MODE: ${{ github.event.inputs.mode }}
+          PROPS_SEASON: ${{ github.event.inputs.season }}
+          PROPS_WEEK: ${{ github.event.inputs.week }}
+          FORCED: ${{ github.event_name == 'workflow_dispatch' && '1' || '' }}
+
+      - uses: actions/setup-python@v5
+        if: steps.guard.outputs.run == 'true'
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - if: steps.guard.outputs.run == 'true'
+        run: pip install -r props/requirements.txt
+
+      - name: nflverse cache
+        if: steps.guard.outputs.run == 'true'
+        uses: actions/cache@v4
+        with:
+          path: props/.cache
+          key: props-nflverse-${{ github.run_started_at }}
+          restore-keys: props-nflverse-
+
+      - name: boundary tests
+        if: steps.guard.outputs.run == 'true'
+        run: |
+          pip install pytest
+          python -m pytest props/tests -q
+
+      - name: capture
+        if: steps.guard.outputs.run == 'true' && steps.guard.outputs.mode == 'capture'
+        env:
+          ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
+          PROPS_WORKDIR: props/.cache
+        run: |
+          python props/engine/scripts/score_week.py \
+            --season ${{ steps.guard.outputs.season }} \
+            --week ${{ steps.guard.outputs.week }} \
+            ${{ github.event.inputs.games && format('--games {0}', github.event.inputs.games) || '' }} \
+            --skip-started
+          python props/record_run.py \
+            --dir /mnt/user-data/outputs \
+            --snapshot-type ${{ steps.guard.outputs.snapshot_type }} \
+            || python props/record_run.py --dir . --snapshot-type ${{ steps.guard.outputs.snapshot_type }}
+
+      - name: settle
+        if: steps.guard.outputs.run == 'true' && steps.guard.outputs.mode == 'settle'
+        run: python props/settle.py --season ${{ steps.guard.outputs.season }}
+
+      - name: scorecard
+        if: steps.guard.outputs.run == 'true' && steps.guard.outputs.mode != 'capture'
+        run: python props/scorecard.py --season ${{ steps.guard.outputs.season }}
+
+      - name: commit record
+        if: always() && steps.guard.outputs.run == 'true'
+        run: |
+          git config user.name "props-record"
+          git config user.email "actions@users.noreply.github.com"
+          git add props/record
+          git diff --cached --quiet || git commit -m "props: ${{ steps.guard.outputs.mode }} $(TZ=America/Los_Angeles date '+%a %m/%d %H:%M PT')"
+          git pull --rebase --autostash origin ${{ github.ref_name }}
+          git push

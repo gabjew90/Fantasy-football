@@ -1,0 +1,6 @@
+# Pinned to match the repo root requirements.txt so one Actions runner can
+# install both without resolver conflicts. Verified against pandas 1.5.3 /
+# numpy 1.26.4, which the fantasy workflows already pin.
+pandas==1.5.3
+numpy==1.26.4
+requests==2.34.2
