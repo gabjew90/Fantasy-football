@@ -54,6 +54,63 @@ def blend(own, n, prior, k0):
     return w * own + (1 - w) * prior
 
 
+def blended_rate(own_prior, n_prior, slot_prior, k0, *,
+                 cur_num=None, cur_den=None, cur_rate=None,
+                 role_scale=1.0, scale_role=False,
+                 new_team=False, opp_mult=1.0, clip=None):
+    """The two-stage shrinkage every player rate goes through.
+
+      stage 1  the player's PRIOR-SEASON rate is shrunk toward his slot's
+               league prior, giving an individual prior;
+      stage 2  the partial CURRENT season is shrunk toward that individual
+               prior, weighted by the opportunities behind it.
+
+    WHY THIS LIVES IN model.py. Only the live scorer implemented both stages.
+    backtest.py blended the current season straight to the slot prior and never
+    touched the prior-season individual rate at all -- so the component
+    methodology.md flags as unvalidated ("the pre-week-5 prior blend") was
+    precisely the one the backtest could not see. Two implementations of the
+    same idea, one of them measured and the other one shipped. Now there is
+    one, and the backtest exercises the blend that actually prices props.
+
+    `n_prior` and `cur_den` are in OPPORTUNITY units (team targets for shares,
+    own targets for catch rate and ypt, carries for ypc), matching how k0 was
+    tuned. Returns (final, chain); the chain is the evidence trail the report
+    renders and the ledger stores.
+    """
+    if new_team:
+        # A rate carried over from another team is a weak prior about the role
+        # here, so it is capped at half weight rather than trusted in full.
+        n_prior = min(n_prior, k0)
+    ind = blend(own_prior, n_prior, slot_prior, k0)
+    scaled = False
+    if scale_role and isinstance(ind, float) and not pd.isna(ind) and role_scale != 1.0:
+        ind *= role_scale
+        scaled = True
+    # Callers hold the current season either as a numerator/denominator pair
+    # (the scorer, counting this week's targets) or as an already-divided rate
+    # with its opportunity count (the backtest, aggregating prior weeks).
+    # Reconstructing a numerator just to divide it again loses precision and
+    # breaks when the rate is NaN but the denominator is not.
+    if cur_rate is None:
+        cur_rate = (cur_num / cur_den) if (cur_den is not None and cur_den > 0) \
+            else float("nan")
+    if pd.isna(cur_rate):
+        cur_rate = float("nan")
+    n_cur = float(cur_den) if (cur_den is not None and pd.notna(cur_rate)) else 0.0
+    final = ind if pd.isna(cur_rate) else blend(cur_rate, n_cur, ind, k0)
+    if opp_mult != 1.0 and pd.notna(final):
+        final = float(final) * opp_mult
+        if clip is not None:
+            final = float(np.clip(final, *clip))
+    chain = dict(own_prior=own_prior, slot_prior=slot_prior, indiv_prior=ind,
+                 scaled=scaled, cur_rate=cur_rate, cur_num=cur_num,
+                 cur_den=cur_den, n_cur=n_cur,
+                 w_cur=(n_cur / (n_cur + k0)) if pd.notna(cur_rate) else 0.0,
+                 final=final, k0_used=k0)
+    return final, chain
+
+
 # Per-rate shrinkage constants, in OPPORTUNITY units (targets/carries/goal-line
 # touches), not games. A rate estimated from few opportunities should be trusted
 # less than one estimated from many, regardless of how many games produced them.
