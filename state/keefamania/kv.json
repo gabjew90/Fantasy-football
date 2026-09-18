@@ -12930,10 +12930,11 @@
  "ran:health:2026-09-16": "Wed 09/16 05:25 PM PT",
  "ran:health:2026-09-17": "Thu 09/17 10:27 AM PT",
  "ran:health:2026-09-18": "Fri 09/18 09:53 AM PT",
+ "ran:scout:2026-W38": "Fri 09/18 12:22 PM PT",
  "scout:2": {
-  "margin": -6.4,
+  "margin": -3.8,
   "mode": "neutral",
-  "win_prob": 0.401
+  "win_prob": 0.44
  },
  "trending:add": {
   "data": {
