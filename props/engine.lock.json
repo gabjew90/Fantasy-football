@@ -1,6 +1,6 @@
 {
   "algorithm": "props-engine-sha256-lf-1",
-  "engine_sha256": "2119c38c5e737a15dded81ca482a1352b0f632ecf80215b456639be8b9b85724",
+  "engine_sha256": "553aeb009ecd2b42b21f3b46eadccc96e098560ee3af50be4bdbfeacc301ee13",
   "file_count": 30,
   "files": {
     "SKILL.md": "7ab5ae183fb30a15a9aebd9564ffe382e232dd68aa87abb52be4361db676b166",
@@ -8,7 +8,7 @@
     "resources/data_source_matrix.md": "2088a5ebe6164a75c11331367fda734d4b10ea217704320321a3f2aec6bb9c2b",
     "resources/execution_protocol.md": "5f54fb23a77d60ecc947d44b6f18ecf67c4357d6b49c70bc937726c1c14016c1",
     "resources/line_archive.md": "baf1b6b97ec439bdf26b73dc4c3ae23d0c4ee9f502db4be7baae70390cdb5c45",
-    "resources/methodology.md": "774d97a5d86cd0a5594d68139c37e00d9bdaf0a336569b98f4c5bf4c251a71e3",
+    "resources/methodology.md": "8e395466e1ee32f8cd1936fd4636ba241b5be93b9e1f0ce4dc6d42ad112faf30",
     "resources/model_registry.md": "52997de75ce087df1d1e50a0a5fc2f7d495cdad53fbc139ed3dba9b662c985a3",
     "resources/modeling_framework.md": "51568adb4e4f69442a98190b3909c0e3c0c4042f5348289bb8799dab541ed2e7",
     "resources/priors_2024_opponent.csv": "aa37b5af3e6b758ce08c7d71179083e3af5df0c9bb3492fe848eb9e2a7d1f9e4",

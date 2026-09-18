@@ -54,12 +54,30 @@ Floors: 6 points for count and yardage props; 25% relative edge for TD props.
 The team TD total comes from the market's implied points. A TD gap therefore lives only in the allocation (goal-line share, overall share), not in the team's scoring expectation. Treat a TD gap as a share disagreement, not a game disagreement, and never as equivalent to a receptions gap.
 
 ## 10. Validation status
-Walk-forward 2025 backtest of receptions and receiving yards (train weeks 5-8, test 9-18, N = 1,895 player-weeks):
-- CRPS model 1.009 vs naive baseline 1.050 (receptions), 13.27 vs 13.94 (yards).
+Walk-forward 2025 backtest of receptions and receiving yards (train weeks 5-8, test 9-18, N = 1,895 player-weeks).
+
+**These numbers were re-measured on 2026-09-18 after the backtest was made to run the live pipeline.** The previous figures (1.0082 / 13.2764) described a harness that differed from the scorer in three ways: it drew each player from his own negative binomial instead of calling `simulate_team_game`; it blended the current season straight onto the slot prior, never reading a prior-season individual rate; and it loaded `priors_{S}`, which `build_priors.py --season S` builds from season S -- the season under test -- so the K0 constants, league rates and `market_env_fit` were fitted on data including the test weeks.
+
+Current, with the joint sampler and `priors_{S-1}`:
+- CRPS model 1.0081 vs naive baseline 1.0510 (receptions), 13.1415 vs 13.9172 (yards).
 - Bias: PIT mean 0.498 / 0.503, actual/model mean 0.995 / 1.011.
 - Distributional self-check (NOT calibration against a sportsbook): with lines placed at fixed offsets from the model's own median and bucketed by predicted probability, realized frequency lands within 2.6 points of stated in every 50-90% bucket for both markets and both sides. Worst bucket: 90%+ Under yards, realized 90.1% vs stated 94.4%. Table in `calibration_2025.csv`.
   - **The `n` column in that table is not a count of independent observations.** Each of the 1,895 player-weeks is reused at 8-10 offsets (4 for receptions, 5 for yards, each on both sides), so a bucket showing n=1,823 rests on far fewer than 1,823 independent games. It overstates the evidence by roughly an order of magnitude.
   - **It cannot speak to betting performance.** The lines are not book lines, and it covers every player-week symmetrically, whereas a call only occurs where the model and the book disagree. Selection is the whole mechanism, and this test removes it.
+
+### Component ablations (2026-09-18)
+Measured, each isolated, all other settings held:
+
+| component | receptions | rec yards |
+| --- | --- | --- |
+| historical blend (two-stage vs one-stage) | -0.0044 | -0.0741 |
+| joint sampler vs independent per-player draws | +0.0041 | -0.0157 |
+
+Two readings matter more than the signs.
+
+**The blend numbers are point estimates, not a verdict.** -0.0044 on a base of 1.01 is 0.44%; -0.0741 on 13.2 is 0.56%. Neither has a confidence interval. `backtest.py --compare-to` runs a paired game-block bootstrap built for exactly this, and until it does, "the pre-week-5 prior blend helps" remains unvalidated -- which is what this document has said all along and what the ablation switch (`--no-historical-blend`) now makes settleable.
+
+**Marginal CRPS is nearly blind to the sampler.** Independent per-player draws and the live joint draw -- generative models with completely different correlation structure, one where teammates compete for a fixed team volume and one where they do not -- differ by 0.4% on receptions and 0.1% on yards. This is the empirical reason joint/parlay pricing is gated off: the metric that has been measured cannot distinguish the two samplers, so it cannot possibly validate a correlation factor.
 
 **Validated against posted sportsbook lines: nothing.** Not the pre-week-5 prior blend (this form was not in the backtest), not rushing yards, not anytime TD, not the edge rule against closing lines, not the prior-season team-volume blend in the live scorer, and not joint/parlay outcomes, which have never been compared against realised joint results at all. Every market is therefore ineligible under `scripts/eligibility.py`, and the record in `props/record` is being accumulated prospectively to answer the question. Second-season (2024) confirmation pending a residual 2.6% bias.
 
