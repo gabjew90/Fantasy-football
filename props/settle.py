@@ -39,6 +39,7 @@ import unicodedata
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import calls as calls_mod  # noqa: E402
 import persist  # noqa: E402
 
 try:
@@ -71,7 +72,7 @@ SETTLED_FIELDS = [
     # DictWriter's extrasaction="ignore" below drops them silently, and the
     # scorecard could not separate two versions.
     "engine_hash", "engine_tag",
-    "snapshot_type",
+    "snapshot_type", "is_call",
     "logged_at_utc", "actual", "result", "status", "won", "pnl_per_100",
     "join_method",
 ]
@@ -206,7 +207,8 @@ def main(argv: list[str] | None = None) -> int:
                        / f"stats_player_week_{args.season}.csv")
 
     out_rows, counts = [], {"settled": 0, "push": 0, "dnp": 0,
-                            "unjoined": 0, "unplayed_week": 0}
+                            "unjoined": 0, "unplayed_week": 0,
+                            "calls": 0, "superseded": 0, "ties": 0}
 
     for week, path in weeks:
         wk_stats = stats[stats["week"] == week]
@@ -219,61 +221,71 @@ def main(argv: list[str] | None = None) -> int:
         loose = {(r["team"], r["_loose"]): r for _, r in wk_stats.iterrows()}
         name_only = {r["_name"]: r for _, r in wk_stats.iterrows()}
 
+        # EVERY ROW IS GRADED; ONE PER MARKET IS A CALL. The whole week has
+        # to be in hand before `is_call` can be decided, because the call is
+        # the LAST decision for a market and a later tick supersedes an
+        # earlier one. History is still graded -- a superseded line beside the
+        # one that replaced it is what makes the CSV self-explaining -- but
+        # the scorecard counts only calls.
         with path.open(encoding="utf-8") as fh:
-            for line in fh:
-                line = line.strip()
-                if not line:
-                    continue
-                row = json.loads(line)
-                if row.get("snapshot_type") != args.snapshot_type:
-                    continue
-                team = row.get("team")
-                nm = norm_name(row.get("player", ""))
-                stat_row, how = None, None
-                for key, table, method in (((team, nm), exact, "team+name"),
-                                           ((team, loose_key(row.get("player", ""))),
-                                            loose, "team+initial"),
-                                           (nm, name_only, "name-only")):
-                    if key in table:
-                        stat_row, how = table[key], method
-                        break
+            week_rows = [json.loads(line) for line in fh if line.strip()]
+        n_calls, n_ties = calls_mod.mark_calls(week_rows, args.snapshot_type)
+        counts["calls"] += n_calls
+        counts["ties"] += n_ties
 
-                out = {f: row.get(f) for f in SETTLED_FIELDS if f in row}
-                out["season"], out["week"] = args.season, week
-                out["join_method"] = how or ""
+        for row in week_rows:
+            if row.get("snapshot_type") != args.snapshot_type:
+                continue
+            if not row.get("is_call"):
+                counts["superseded"] += 1
+            team = row.get("team")
+            nm = norm_name(row.get("player", ""))
+            stat_row, how = None, None
+            for key, table, method in (((team, nm), exact, "team+name"),
+                                       ((team, loose_key(row.get("player", ""))),
+                                        loose, "team+initial"),
+                                       (nm, name_only, "name-only")):
+                if key in table:
+                    stat_row, how = table[key], method
+                    break
 
-                if stat_row is None:
-                    out.update(actual="", result="", status="dnp", won="",
-                               pnl_per_100="")
-                    # A player on the week's roster who recorded no stat line is
-                    # a DNP/void; one absent from the file entirely is an
-                    # unresolved join and is flagged separately.
-                    out["status"] = "dnp" if nm in name_only else "unjoined"
-                    counts[out["status"]] += 1
-                    out_rows.append(out)
-                    continue
+            out = {f: row.get(f) for f in SETTLED_FIELDS if f in row}
+            out["season"], out["week"] = args.season, week
+            out["join_method"] = how or ""
+            out["is_call"] = int(bool(row.get("is_call")))
 
-                stat_col = MARKET_STAT.get(str(row.get("market", "")).strip())
-                if stat_col is None:
-                    out.update(actual="", result="unknown_market", status="skipped",
-                               won="", pnl_per_100="")
-                    out_rows.append(out)
-                    continue
-
-                actual = float(stat_row[stat_col])
-                result, won = settle_row(row, actual)
-                out["actual"] = actual
-                out["result"] = result
-                if won is None:
-                    out.update(status="push", won="", pnl_per_100=0.0)
-                    counts["push"] += 1
-                else:
-                    price = row.get("price")
-                    out.update(status="settled", won=int(won),
-                               pnl_per_100=round(american_pnl(float(price), won), 2)
-                               if price is not None else "")
-                    counts["settled"] += 1
+            if stat_row is None:
+                out.update(actual="", result="", status="dnp", won="",
+                           pnl_per_100="")
+                # A player on the week's roster who recorded no stat line is
+                # a DNP/void; one absent from the file entirely is an
+                # unresolved join and is flagged separately.
+                out["status"] = "dnp" if nm in name_only else "unjoined"
+                counts[out["status"]] += 1
                 out_rows.append(out)
+                continue
+
+            stat_col = MARKET_STAT.get(str(row.get("market", "")).strip())
+            if stat_col is None:
+                out.update(actual="", result="unknown_market", status="skipped",
+                           won="", pnl_per_100="")
+                out_rows.append(out)
+                continue
+
+            actual = float(stat_row[stat_col])
+            result, won = settle_row(row, actual)
+            out["actual"] = actual
+            out["result"] = result
+            if won is None:
+                out.update(status="push", won="", pnl_per_100=0.0)
+                counts["push"] += 1
+            else:
+                price = row.get("price")
+                out.update(status="settled", won=int(won),
+                           pnl_per_100=round(american_pnl(float(price), won), 2)
+                           if price is not None else "")
+                counts["settled"] += 1
+            out_rows.append(out)
 
     if not out_rows:
         print("nothing to settle")
