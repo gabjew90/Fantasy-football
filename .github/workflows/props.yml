@@ -94,13 +94,21 @@ jobs:
           # back to its hard-coded /mnt/user-data/outputs and EVERY capture
           # died on a runner: PermissionError on /mnt/user-data from
           # score_game, then OSError "non-existent directory" from score_week
-          # writing slate_runs. Both artifacts and the nflverse downloads now
-          # live under props/.cache, which is the path the cache step keeps --
-          # the scorer's --workdir default is ~/nfl_wd, so without the flag
-          # below that cache was saving an empty directory every run.
-          NFL_OUT: props/.cache/outputs
+          # writing slate_runs.
+          #
+          # INPUTS ARE CACHED, OUTPUTS ARE NOT. --workdir points into
+          # props/.cache so the nflverse downloads survive between ticks (the
+          # scorer's default is ~/nfl_wd, which the cache step never saw, so
+          # it had been storing an empty directory). NFL_OUT must NOT live
+          # there: score_game APPENDS to line_archive_nfl_<season>.jsonl
+          # (score_game.py:824), so a cached output directory handed the next
+          # run its own previous archive and re-appended to it -- measured on
+          # run 35310231919, which fed record_run 136 rows against a 68-row
+          # record and would have doubled again every tick. RUNNER_TEMP is
+          # fresh per run, which is what an append-only artifact needs.
+          NFL_OUT: ${{ runner.temp }}/props-out
         run: |
-          mkdir -p props/.cache/outputs
+          mkdir -p "$NFL_OUT"
           python props/engine/scripts/score_week.py \
             --season ${{ steps.guard.outputs.season }} \
             --week ${{ steps.guard.outputs.week }} \
@@ -112,7 +120,7 @@ jobs:
           # inside persist, so the fallback masked every one of those as the
           # same duplicate error instead of failing loudly.
           python props/record_run.py \
-            --dir props/.cache/outputs \
+            --dir "$NFL_OUT" \
             --snapshot-type ${{ steps.guard.outputs.snapshot_type }}
 
       - name: settle
