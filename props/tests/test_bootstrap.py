@@ -297,6 +297,9 @@ def test_the_vendored_archive_unpacks_to_the_locked_engine(tmp_path):
         blob = z.read("nfl-prop-research/vendor/engine.tar.gz")
         stamp = json.loads(z.read("nfl-prop-research/vendor/ENGINE_STAMP.json"))
     dest = tmp_path / "unpacked"
-    assert bootstrap.extract_engine(blob, dest) == 29
+    # From the lock, not a literal: the count changes whenever the engine
+    # gains a file, and a hardcoded number turns that into a failure in the
+    # bootstrap tests, which are about extraction, not about engine size.
+    assert bootstrap.extract_engine(blob, dest) == ev.load_lock()["file_count"]
     assert ev.tree_hash(dest) == stamp["engine_hash"]
     assert ev.tree_hash(dest) == ev.load_lock()["engine_sha256"]

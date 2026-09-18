@@ -57,8 +57,11 @@ The team TD total comes from the market's implied points. A TD gap therefore liv
 Walk-forward 2025 backtest of receptions and receiving yards (train weeks 5-8, test 9-18, N = 1,895 player-weeks):
 - CRPS model 1.009 vs naive baseline 1.050 (receptions), 13.27 vs 13.94 (yards).
 - Bias: PIT mean 0.498 / 0.503, actual/model mean 0.995 / 1.011.
-- Tail reliability (lines at fixed offsets from the median, bucketed by predicted probability): realized within 2.6 points of stated in every 50-90% bucket for both markets and both sides, n 900 to 3,000 per bucket. Worst bucket: 90%+ Under yards, realized 90.1% vs stated 94.4%. Table in `calibration_2025.csv`.
-Not validated: the pre-week-5 prior blend (this form was not in the backtest), rushing yards, anytime TD, the edge rule against closing lines, the prior-season team-volume blend in the live scorer. Second-season (2024) confirmation pending a residual 2.6% bias.
+- Distributional self-check (NOT calibration against a sportsbook): with lines placed at fixed offsets from the model's own median and bucketed by predicted probability, realized frequency lands within 2.6 points of stated in every 50-90% bucket for both markets and both sides. Worst bucket: 90%+ Under yards, realized 90.1% vs stated 94.4%. Table in `calibration_2025.csv`.
+  - **The `n` column in that table is not a count of independent observations.** Each of the 1,895 player-weeks is reused at 8-10 offsets (4 for receptions, 5 for yards, each on both sides), so a bucket showing n=1,823 rests on far fewer than 1,823 independent games. It overstates the evidence by roughly an order of magnitude.
+  - **It cannot speak to betting performance.** The lines are not book lines, and it covers every player-week symmetrically, whereas a call only occurs where the model and the book disagree. Selection is the whole mechanism, and this test removes it.
+
+**Validated against posted sportsbook lines: nothing.** Not the pre-week-5 prior blend (this form was not in the backtest), not rushing yards, not anytime TD, not the edge rule against closing lines, not the prior-season team-volume blend in the live scorer, and not joint/parlay outcomes, which have never been compared against realised joint results at all. Every market is therefore ineligible under `scripts/eligibility.py`, and the record in `props/record` is being accumulated prospectively to answer the question. Second-season (2024) confirmation pending a residual 2.6% bias.
 
 ## 11. Parameter table (v1.0)
 | Parameter | Value | Where |

@@ -20,7 +20,14 @@ jobs:
       - name: state/ must not ride along with code changes
         run: |
           base="${{ github.event.pull_request.base.sha || github.event.before }}"
+          # NOT HEAD. On a pull_request event the checkout is a MERGE commit of
+          # this branch into main's CURRENT head, so anything main gained while
+          # the PR was open is inside HEAD. The manager commits state/ hourly on
+          # a schedule, so `base...HEAD` reported main's own state commit as
+          # riding along with this branch's code -- a false positive that would
+          # hit essentially every PR left open for an hour.
+          head="${{ github.event.pull_request.head.sha || github.sha }}"
           if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ]; then
-            base="$(git rev-parse HEAD~1 2>/dev/null || git rev-parse HEAD)"
+            base="$(git rev-parse "$head~1" 2>/dev/null || echo "$head")"
           fi
-          python scripts/check_commit_hygiene.py --range "$base...HEAD"
+          python scripts/check_commit_hygiene.py --range "$base...$head"

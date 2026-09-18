@@ -38,6 +38,16 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 from score_game import GAMES_URL, OUT, eastern_to_utc, fetch  # noqa: E402
 
+# The report contains "≥" and other non-cp1252 characters. The Linux
+# runner writes UTF-8 by default so this was invisible in CI, while every
+# local run died on the final print. Same reconfigure the draftkit CLI does.
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding="utf-8")
+    except (AttributeError, ValueError):  # pragma: no cover - non-tty streams
+        pass
+
+
 CAL_MARKETS = {"player_receptions", "player_reception_yds"}
 MK_LABEL = {"player_receptions": "catches", "player_reception_yds": "rec yds",
             "player_rush_yds": "rush yds", "player_anytime_td": "anytime TD"}
@@ -128,10 +138,13 @@ def main():
             cmd += a.extra.split()
         t0 = time.time()
         log_path = wd / "logs" / f"{A}_{H}.log"
-        with open(log_path, "w") as fh:
+        with open(log_path, "w", encoding="utf-8") as fh:
             rc = subprocess.run(cmd, stdout=fh, stderr=subprocess.STDOUT).returncode
         secs = round(time.time() - t0, 1)
-        txt = open(log_path).read()
+        # errors="replace": this log is parsed for the spread/total, and a
+        # slate must not die because one game's report held a character the
+        # host codepage cannot represent.
+        txt = Path(log_path).read_text(encoding="utf-8", errors="replace")
         spread = total = None
         m_ = _re.search(r"spread/total from .*?: (\w+ [+-]?[\d.]+), total ([\d.]+)", txt) \
             or _re.search(r"Market spread/total \(DK\).*?\| ok \| (\w+ [+-]?[\d.]+), total ([\d.]+)", txt)
@@ -282,13 +295,15 @@ def main():
               "A high WEAK count means role turnover or a large model-book gap is doing the work; where the book disagrees "
               "on our side, 'the book knows something the model doesn't' is a live explanation and those rows grade as "
               "their own bucket at the week-8 review. Sleeper depth-rank gaps are logged, never acted on.*",
-              "", "*Calibration: receptions and receiving yards are the only markets with a backtest behind them "
-              "(2025, resources/calibration_2025.csv: realized hit rate within 2.6 points of stated in every 50-90% bucket; "
-              "the 90%+ tail runs about 4 points optimistic). Rushing yards and anytime TD have no backtest. Team TD totals "
-              "are anchored to the same-book spread and total.*"]
+              "", "*Calibration: no market has been validated against sportsbook lines. Receptions and receiving yards have a "
+              "2025 walk-forward behind them (resources/calibration_2025.csv), but it places lines at fixed offsets from the "
+              "model\u2019s own median across every player-week, so it measures distributional self-consistency, not whether the "
+              "model beats a book on the calls it would actually make. Rushing yards and anytime TD have no backtest at all. "
+              "Team TD totals are anchored to the same-book spread and total.*"]
     L += ["", "Per-game guides, cards, ladders, parlays and shadow logs are in the outputs folder under each game's name."]
     md = "\n".join(L)
-    (OUT / f"slate_summary_{a.season}_wk{a.week:02d}.md").write_text(md)
+    (OUT / f"slate_summary_{a.season}_wk{a.week:02d}.md").write_text(
+        md, encoding="utf-8")
     print("\n" + md)
 
 

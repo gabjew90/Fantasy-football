@@ -27,8 +27,19 @@ import numpy as np
 import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import eligibility
 import model as MODEL
 from model import norm_name, name_key_loose, is_team_entry, blend
+
+# The report contains "≥" and other non-cp1252 characters. The Linux
+# runner writes UTF-8 by default so this was invisible in CI, while every
+# local run died on the final print. Same reconfigure the draftkit CLI does.
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding="utf-8")
+    except (AttributeError, ValueError):  # pragma: no cover - non-tty streams
+        pass
+
 
 HERE = Path(__file__).resolve().parent
 RES = HERE.parent / "resources"
@@ -111,6 +122,11 @@ def run_odds(stage, args_list):
         raise RuntimeError(f"odds_client {stage} failed: {r.stderr[:400]}")
     return json.loads(r.stdout)
 
+
+# Joint (parlay) pricing is gated off until a joint-outcome holdout exists.
+# The research escape hatch is --enable-parlays, which stamps the output as
+# unvalidated; it exists so the validation itself can be built.
+ENABLE_PARLAYS = False
 
 # ---------------------------------------------------------------- shrinkage
 # blend() comes from model.py (imported above) so score_game.py and backtest.py
@@ -1106,13 +1122,21 @@ def main():
         R["flag"] = np.where(R.new_team, "NEW TEAM - model role prior weak",
                     np.where(R.questionable, "QUESTIONABLE - regime unresolved",
                     np.where(R.gap.abs() > 0.10, "large gap - market likely holds info model lacks", "")))
-        R["model_state"] = np.where(R.market.isin(["player_receptions", "player_reception_yds"]),
-            "receiving_hier_v2, MODEL_UNVALIDATED (PROTOTYPE)",
-            np.where(R.market == "player_rush_yds",
-                     "rush_yds_v0, MODEL_UNVALIDATED (no backtest)",
-                     "anytime_td_v0, MODEL_UNVALIDATED (no backtest)"))
+        # ONE ELIGIBILITY TEST, here and on the betting card and the ladder.
+        # `model_state` used to be assigned by matching market-name strings,
+        # which is how it once claimed v1 for a v2 model; it now comes from
+        # the same table that decides whether the market is validated at all.
+        verdicts = [eligibility.evaluate(
+            rr.market, p_win=float(rr.p_model), price=float(rr.price),
+            gap=float(rr.gap), p_push=float(getattr(rr, "p_push", 0.0) or 0.0),
+            new_team=bool(rr.new_team), questionable=bool(rr.questionable),
+            min_gap=a.min_gap, min_er=a.min_er, er=float(rr.ER))
+            for rr in R.itertuples()]
+        R["model_state"] = [v.status for v in verdicts]
         R["decision"] = "PASS"
-        R["clears_edge_rule_if_validated"] = (R.gap >= a.min_gap) & (R.ER >= a.min_er)
+        R["eligible"] = [v.eligible for v in verdicts]
+        R["ineligible_because"] = [v.why for v in verdicts]
+        R["clears_edge_rule_if_validated"] = [v.priced for v in verdicts]
         R = R.sort_values("gap", ascending=False)
         R.insert(0, "logged_at_utc", now()); R.insert(1, "season", SEASON); R.insert(2, "week", WEEK)
         R.insert(3, "event_id", quote_meta.get("event_id"))
@@ -1139,7 +1163,7 @@ def main():
                      r["outcome"], r.get("point"), r["last_update"])
                 if k not in seen:
                     seen.add(k); merged.append(line)
-        arch.write_text("\n".join(merged) + "\n")
+        arch.write_text("\n".join(merged) + "\n", encoding="utf-8")
 
 
 
@@ -1288,10 +1312,15 @@ def main():
                 over_thr = float(Lx); break
         return under_thr, over_thr
 
+    # The whole priced row is carried, not just the number. The card used to
+    # keep only (book, line) and then decide playability from the sample
+    # distribution against an ASSUMED -110, while the real price sat unused in
+    # R. That is the defect `eligibility` exists to remove.
     book_lines = {}
     if not R.empty:
-        for _, rr in R[R.market.isin([m for m, _, _, _ in CARD_MARKETS])].iterrows():
-            book_lines.setdefault((rr.player, rr.market), []).append((rr.book, rr.line))
+        for rr in R[R.market.isin([m for m, _, _, _ in CARD_MARKETS])].itertuples():
+            book_lines.setdefault((rr.player, rr.market), []).append(
+                (rr.book, rr.line, rr))
 
     card_rows = []
     for _, m in M.iterrows():
@@ -1303,33 +1332,38 @@ def main():
                 continue
             u_thr, o_thr = thresholds(samp, step)
             lines = book_lines.get((m["name"], mkey), [])
-            bl = None; bk = ""
+            bl = None; bk = ""; brow = None
             if lines:
-                bk, bl = sorted(lines, key=lambda x: x[0] != "draftkings")[0]
-            call, why = "no line posted", ""
-            if bl is not None:
-                if u_thr is not None and bl >= u_thr:
-                    call = f"UNDER {bl}"
-                elif o_thr is not None and bl <= o_thr:
-                    call = f"OVER {bl}"
-                else:
-                    call = "no play"
-            if m.new_team:
-                why = "distrust: new team, 1 game"
-            elif m.questionable:
-                why = "distrust: Questionable"
-            else:
-                gap_rows = R[(R.player == m["name"]) & (R.market == mkey)] if not R.empty else pd.DataFrame()
-                if len(gap_rows) and gap_rows.gap.abs().max() > 0.10:
-                    why = "distrust: book far from us, likely knows something"
+                bk, bl, brow = sorted(lines, key=lambda x: x[0] != "draftkings")[0]
+            call, why, eligible, priced = "no line posted", "", False, False
+            if brow is not None:
+                # The side comes from the priced row, which chose it by
+                # p_model against the no-vig probability. Deriving it here
+                # from the distribution thresholds instead could name the
+                # opposite side to the one the record logged.
+                v = eligibility.evaluate(
+                    mkey, p_win=float(brow.p_model), price=float(brow.price),
+                    gap=float(brow.gap),
+                    p_push=float(getattr(brow, "p_push", 0.0) or 0.0),
+                    new_team=bool(m.new_team), questionable=bool(m.questionable),
+                    min_gap=a.min_gap, min_er=a.min_er, er=float(brow.ER))
+                eligible, priced, why = v.eligible, v.priced, v.why
+                call = f"{str(brow.side).upper()} {bl}" if priced else "no play"
             card_rows.append(dict(player=m["name"], team=m.team, prop=label, book=bk, book_line=bl,
                                   our_median=float(np.median(samp)),
                                   under_at=u_thr, over_at=o_thr, call=call, why=why,
+                                  price=float(brow.price) if brow is not None else None,
+                                  er=float(brow.ER) if brow is not None else None,
+                                  eligible=eligible, would_play_if_validated=priced,
                                   strength=abs((samp < bl).mean() - 0.5) if bl is not None else 0))
     CARD = pd.DataFrame(card_rows)
     if not CARD.empty:
-        CARD["is_play"] = CARD.call.str.startswith(("UNDER", "OVER"))
-        CARD = CARD.sort_values(["is_play", "strength"], ascending=[False, False])
+        # `is_play` was a string-prefix test on rendered display text. It is
+        # now the enforced verdict, and the price-aware "would play if the
+        # model were validated" is kept beside it.
+        CARD["is_play"] = CARD.eligible
+        CARD = CARD.sort_values(["would_play_if_validated", "strength"],
+                                ascending=[False, False])
         CARD.to_csv(OUT / f"betting_card_{slug}.csv", index=False)
 
     L = []
@@ -1474,7 +1508,17 @@ def main():
         sv = sims[row["player"]][col]
         return (sv > row["line"]) if row["side"] == "Over" else (sv < row["line"])
     parlay_rows = []
-    if not CONF.empty:
+    # JOINT OUTCOMES ARE NOT VALIDATED, SO THEY ARE NOT PRICED.
+    # The simulation does induce real within-team correlation (one team-volume
+    # draw, multinomial split), and that is exactly why a parlay number built
+    # from it looks authoritative. Nothing has ever checked whether the
+    # simulated joint distribution matches realised joint outcomes -- the
+    # backtest scores each market marginally and never looks at pairs. A
+    # correlation factor that is wrong in the second decimal place turns a
+    # +450 fair price into a losing bet, and the marginal CRPS that has been
+    # measured cannot detect it. Singles are recorded prospectively; joint
+    # pricing waits on its own holdout. See DECISIONS #77.
+    if ENABLE_PARLAYS and not CONF.empty:
         legs = CONF[CONF.tier == "STRONG"].head(5)
         legs = legs[legs.market != "player_anytime_td"]
         from itertools import combinations
@@ -1496,21 +1540,34 @@ def main():
                                         correlation_effect=joint / indep if indep > 0 else np.nan,
                                         fair_price=int(round(fair_amer)), take_at_or_longer=int(round(need_amer / 5) * 5)))
     PARLAY = pd.DataFrame(parlay_rows).sort_values("p_joint", ascending=False) if parlay_rows else pd.DataFrame()
-    if not PARLAY.empty:
-        PARLAY.to_csv(OUT / f"parlays_{slug}.csv", index=False)
+    # The confidence tiers used to be logged INSIDE the parlay block, so a
+    # slate with no parlay candidates printed no tiers either. Gating parlays
+    # off would have made that permanent; they are independent outputs and
+    # are logged independently.
+    if not CONF.empty:
         log("\n=== Confidence tiers ===")
         for _, c in CONF.iterrows():
             log(f"  {c.tier:36s} {c.player} {c.side} {c.line if pd.notna(c.line) else ''} {c.market.replace('player_','')}  us {c.p_model:.0%} book {c.p_novig:.0%} gap {c.gap:+.0%}")
+    if not PARLAY.empty:
+        PARLAY.to_csv(OUT / f"parlays_{slug}.csv", index=False)
         log("\n=== Parlay candidates (STRONG legs only, joint sim) ===")
         for _, pr in PARLAY.head(8).iterrows():
             log(f"  {pr.legs}: joint {pr.p_joint:.1%} (indep {pr.p_if_independent:.1%}, corr x{pr.correlation_effect:.2f}) fair {pr.fair_price:+d}, take at {pr.take_at_or_longer:+d} or longer")
+    elif not ENABLE_PARLAYS:
+        log("\n=== Parlay candidates: DISABLED ===")
+        log("  joint outcomes have never been checked against realised joint")
+        log("  outcomes; marginal CRPS cannot detect a wrong correlation factor.")
 
     shown = CARD[CARD.call != "no line posted"]
     if not shown.empty:
-        n_play = int(shown.is_play.sum()); n_under = int(shown.call.str.startswith("UNDER").sum())
-        L.append(f"*{n_play} of {len(shown)} posted yardage/reception props are at a line we'd play, {n_under} of them Unders. "
+        n_play = int(shown.would_play_if_validated.sum())
+        n_under = int(shown.call.str.startswith("UNDER").sum())
+        n_elig = int(shown.is_play.sum())
+        L.append(f"*{n_play} of {len(shown)} posted yardage/reception props clear the edge rule at the price actually "
+                 f"posted, {n_under} of them Unders. **{n_elig} are eligible to bet**, because no market's model has "
+                 f"passed a holdout against real sportsbook lines yet — that gate is enforced, not advisory. "
                  f"The card leans Under overall; whether that is the model running low or the books shading toward the Over "
-                 f"is what the logged results will settle. Where a call is marked \"book far from us\", the book is usually right.*\n")
+                 f"is what the logged results will settle.*\n")
     L.append("<details><summary>Everything else: how the numbers were built, sources, per-line arithmetic</summary>\n")
 
     # ---- plain-English summary box ----
@@ -1543,8 +1600,25 @@ def main():
     except Exception:
         pass
     def cal_lookup(market, side, p):
-        """Realized hit rate in the 2025 walk-forward backtest for this probability
-        bucket. Only receptions / receiving yards were backtested."""
+        """Distributional self-check, NOT a betting track record.
+
+        The 2025 table behind this was built by placing lines at FIXED OFFSETS
+        FROM THE MODEL'S OWN MEDIAN and asking whether the model's stated
+        probability matched the realised frequency. That measures whether the
+        distribution is self-consistent near its own centre. It does not
+        measure anything about beating a sportsbook, for two reasons:
+
+          - the lines are not book lines, so no book's opinion is in it; and
+          - it covers every player-week symmetrically, whereas a real call
+            only happens where model and book DISAGREE. That is a different
+            population, and the selection is the whole point of betting.
+
+        It also reuses each of the 1,895 player-weeks at 8-10 offsets, so the
+        per-bucket `n` is not 1,895 independent observations -- it overstates
+        the evidence by roughly an order of magnitude.
+
+        Kept because self-consistency is worth knowing and it is honest about
+        what it is. Never presented as a realised hit rate on calls."""
         if CAL is None: return np.nan
         mk = {"player_receptions": "receptions", "player_reception_yds": "rec_yards"}.get(market)
         if mk is None or pd.isna(p) or p < 0.5: return np.nan
@@ -1627,7 +1701,19 @@ def main():
                     if mk == "player_receptions" else
                     (f"<{L_}.5:{np.mean(sims[pl][col_] < L_ + 0.5):.0%}" for L_ in range(max(5, int(min(np.median(sims[pl][col_]), best.line) // 5 * 5) - 10), int(max(np.median(sims[pl][col_]), best.line) // 5 * 5) + 11, 5))))(SIM_COL.get(mk)),
                 best_line=best_line_txt, correlated_with=corr_txt,
-                backtest_hit_rate=cal_lookup(mk, sd, best.p_model), tier=tier,
+                dist_selfcheck=cal_lookup(mk, sd, best.p_model), tier=tier,
+                # THE SAME VERDICT AS EVERYWHERE ELSE. This is the table that
+                # carries a Kelly stake, so it is the last place that may keep
+                # its own private notion of what is bettable.
+                **(lambda v: dict(eligible=v.eligible,
+                                  would_play_if_validated=v.priced,
+                                  ineligible_because=v.why))(
+                    eligibility.evaluate(
+                        mk, p_win=float(best.p_model), price=float(best.price),
+                        gap=float(best.gap), p_push=float(best.p_push or 0.0),
+                        new_team=bool(best.new_team),
+                        questionable=bool(best.questionable),
+                        min_gap=a.min_gap, min_er=a.min_er, er=float(best.ER))),
                 note="; ".join([x for x in [("new team" if best.new_team else "questionable" if best.questionable else ""),
                                             ("prior-vs-market gap" if prior_driven else ""),
                                             ("rush model unvalidated" if mk == "player_rush_yds" else "TD model unvalidated" if mk == "player_anytime_td" else "")] if x]),
@@ -1703,7 +1789,7 @@ def main():
               "<details><summary>Method in six lines</summary>\n",
               f"1. Data: nflverse play-by-play/rosters/injuries/snaps through week {WEEK-1}, 2025 priors bundled, prices from {books_used_str}, NWS weather.",
               "2. Model: receiving_hier_v2 (receptions, rec yds), rush_yds_v0, anytime_td_v0; methodology v1.0 in resources/methodology.md.",
-              "3. Validated: receptions and receiving yards, 2025 walk-forward, tail reliability within 2.6 pts per bucket (calibration_2025.csv). Not validated: rushing, TD, the pre-week-5 prior blend, the edge rule against closing lines.",
+              "3. Validated against sportsbook lines: NOTHING. The 2025 walk-forward shows the model beats a naive baseline on CRPS and that its distribution is internally consistent (calibration_2025.csv places lines at fixed offsets from the model\u2019s own median, not at book numbers, across all player-weeks rather than the ones worth betting). No market has been tested against posted lines, so every prop is ineligible and the record is being built prospectively.",
               "4. Team TD totals are market-anchored, so a TD gap is a share disagreement only.",
               "5. Thresholds, not bets: 'take at X' is where the edge rule clears at -110; no call is a validated betting edge until logged closing lines say so.",
               "6. Tiers: STRONG = stable role, edge at/above floor, not prior-driven. LEAN = under floor. WEAK = role change or gap > 15 pts.",
@@ -1713,16 +1799,24 @@ def main():
             if len(expo_top):
                 e = expo_top.iloc[0]
                 T.append(f"**Game-script thesis.** {e.legs_total} of the card's legs ride on '{e.thesis}' ({e.players}); the {e.legs_bettable} bettable ones have P(all hit) {e.p_all_bettable_hit:.0%} vs {e.p_if_independent:.0%} if independent. Size them as one bet.\n")
+        n_elig_bet = int(BET.eligible.sum())
         T += ["## Bet card\n",
+             (f"> **{n_elig_bet} of {len(BET)} rows are eligible to bet.** Eligibility is enforced by one shared test "
+              f"(`scripts/eligibility.py`) covering model status, expected return at the price actually posted, and role. "
+              f"No market has passed a holdout against real sportsbook lines, so none is eligible. **The Kelly and stake "
+              f"columns below are what the arithmetic would say if it were — not a recommendation to stake anything.**\n"
+              if n_elig_bet < len(BET) else ""),
              f"*Best price per line across books, snapshot {now()}. Edge in probability points; EV per $100 at the listed price; "
              "Kelly is the full-Kelly fraction of bankroll. STRONG = stable role and edge at or above the floor (6 pts, or 25% relative on TD). "
              "LEAN = below the floor, no bet. WEAK = role changed or gap over 15 pts, treat as the book knowing something. "
-             "Backtest column: realized hit rate in the 2025 walk-forward test for calls in this probability bucket (receptions and receiving yards only).*\n",
-             "| Tier | Player | Prop | Line | Book | Odds | Model | No-vig | Edge | EV/$100 | Kelly | 1/4-Kelly per $1k | Backtest | Ladder | Correlated with | Note |",
+             "Self-check column: the 2025 distributional self-check for this probability bucket -- lines placed at fixed offsets from "
+             "the model\u2019s OWN median, not book lines, over every player-week rather than the ones worth betting. It says the "
+             "distribution is internally consistent. It is not a track record against a sportsbook, and no market has one yet.*\n",
+             "| Tier | Player | Prop | Line | Book | Odds | Model | No-vig | Edge | EV/$100 | Kelly | 1/4-Kelly per $1k | Self-check | Ladder | Correlated with | Note |",
              "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
         for _, b in BET.iterrows():
             ln = "" if pd.isna(b.line) else f"{b.line:g}"
-            cal = "" if pd.isna(b.backtest_hit_rate) else f"{b.backtest_hit_rate:.0%}"
+            cal = "" if pd.isna(b.dist_selfcheck) else f"{b.dist_selfcheck:.0%}"
             T.append(f"| {b.tier.split(' ')[0]} | {b.player} ({b.team}) | {b.side} {b.prop} | {ln} | {b.book} | {b.price:+d} | {b.model_p:.0%} | {b.novig_p:.0%} | {b.edge_pts:+.0f} | {b.ev_per_100:+.0f} | {b.kelly_frac:.2f} | ${b.stake_qkelly_per_1000:.0f} | {cal} | {b.ladder} | {b.correlated_with} | {b.note} |")
         if not EXPO.empty:
             T.append("\n**Exposure.** " + " ".join(
@@ -1734,7 +1828,7 @@ def main():
         log("\n=== BET CARD (best price per line; sorted tier then EV) ===")
         for _, b in BET.iterrows():
             ln = "" if pd.isna(b.line) else f"{b.line:g} "
-            cal = "" if pd.isna(b.backtest_hit_rate) else f" bt {b.backtest_hit_rate:.0%}"
+            cal = "" if pd.isna(b.dist_selfcheck) else f" sc {b.dist_selfcheck:.0%}"
             log(f"  {b.tier.split(' ')[0]:8s} {b.player:20s} {b.side:5s} {ln}{b.prop:10s} {b.book:10s} {b.price:+5d} "
                 f"us {b.model_p:.0%} book {b.novig_p:.0%} edge {b.edge_pts:+.0f} EV {b.ev_per_100:+.0f}/100 kelly {b.kelly_frac:.2f}{cal}  {b.correlated_with}")
     if not EXPO.empty:
@@ -1893,7 +1987,10 @@ def main():
 
     if not CARD.empty:
         L.append("\n</details>")
-    (OUT / f"report_{slug}.md").write_text("\n".join(L))
+    # encoding is explicit: the report contains "≥" and Windows defaults to
+    # cp1252, which cannot encode it. The Linux runner never saw this because
+    # it defaults to UTF-8, so the bug was invisible in CI and fatal locally.
+    (OUT / f"report_{slug}.md").write_text("\n".join(L), encoding="utf-8")
     M.drop(columns=["evidence"]).to_csv(OUT / f"player_params_{slug}.csv", index=False)
     log(f"\nwrote {OUT}/report_{slug}.md")
     print("\n".join(L))

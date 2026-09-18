@@ -121,7 +121,7 @@ def quota(headers):
 
 def cache_write(name, payload):
     CACHE.mkdir(exist_ok=True)
-    (CACHE / name).write_text(json.dumps(payload, indent=1))
+    (CACHE / name).write_text(json.dumps(payload, indent=1), encoding="utf-8")
 
 
 def run_stage(cred, stage, event_id=None, params=None, cache_name=None):
