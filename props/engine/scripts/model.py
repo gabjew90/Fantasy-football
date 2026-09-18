@@ -55,7 +55,8 @@ def blend(own, n, prior, k0):
 
 
 def blended_rate(own_prior, n_prior, slot_prior, k0, *,
-                 cur_num=None, cur_den=None, role_scale=1.0, scale_role=False,
+                 cur_num=None, cur_den=None, cur_rate=None,
+                 role_scale=1.0, scale_role=False,
                  new_team=False, opp_mult=1.0, clip=None):
     """The two-stage shrinkage every player rate goes through.
 
@@ -86,8 +87,17 @@ def blended_rate(own_prior, n_prior, slot_prior, k0, *,
     if scale_role and isinstance(ind, float) and not pd.isna(ind) and role_scale != 1.0:
         ind *= role_scale
         scaled = True
-    cur_rate = (cur_num / cur_den) if (cur_den is not None and cur_den > 0) else float("nan")
-    n_cur = float(cur_den) if pd.notna(cur_rate) else 0.0
+    # Callers hold the current season either as a numerator/denominator pair
+    # (the scorer, counting this week's targets) or as an already-divided rate
+    # with its opportunity count (the backtest, aggregating prior weeks).
+    # Reconstructing a numerator just to divide it again loses precision and
+    # breaks when the rate is NaN but the denominator is not.
+    if cur_rate is None:
+        cur_rate = (cur_num / cur_den) if (cur_den is not None and cur_den > 0) \
+            else float("nan")
+    if pd.isna(cur_rate):
+        cur_rate = float("nan")
+    n_cur = float(cur_den) if (cur_den is not None and pd.notna(cur_rate)) else 0.0
     final = ind if pd.isna(cur_rate) else blend(cur_rate, n_cur, ind, k0)
     if opp_mult != 1.0 and pd.notna(final):
         final = float(final) * opp_mult

@@ -151,7 +151,29 @@ def main():
     if "spread_line" not in games.columns:
         sys.exit("games.csv has no spread_line/total_line -- cannot backtest --env market")
 
-    P0 = json.load(open(RES / f"priors_{S}_params.json"))
+    # THE PRIOR SEASON, NOT THIS ONE.
+    #
+    # This used to read priors_{S}, and build_priors.py --season S builds that
+    # file FROM season S -- the season under test. So the shrinkage constants
+    # K0R, the league rates, and market_env_fit (which turns spread/total into
+    # the team volume behind every mu) were all fitted on data that includes
+    # the test weeks. The walk-forward was clean in player evidence and leaky
+    # in hyperparameters, and the leak flattered exactly the environment model
+    # the harness exists to judge.
+    #
+    # The live scorer uses PRIOR = SEASON - 1. Matching it fixes the leak and,
+    # because priors_{PRIOR}_players.csv carries per-player prior-season rates,
+    # is also what makes the two-stage historical blend possible here at all.
+    PRIOR = S - 1
+    prior_params = RES / f"priors_{PRIOR}_params.json"
+    if not prior_params.exists():
+        sys.exit(f"priors_{PRIOR}_params.json is missing: a walk-forward test of "
+                 f"{S} needs the priors the live scorer would have had, which are "
+                 f"built from {PRIOR}. Run build_priors.py --season {PRIOR}.")
+    P0 = json.load(open(prior_params))
+    pri_players = pd.read_csv(RES / f"priors_{PRIOR}_players.csv").set_index("gsis_id")
+    print(f"priors: {PRIOR} (the season before the one under test), "
+          f"{len(pri_players)} players", file=sys.stderr)
     K0R = P0.get("k0_per_rate", M.DEFAULT_K0)
     league_pass_rate = P0.get("league_pass_rate", 0.55)
     MKT_FIT = P0.get("market_env_fit", {})
@@ -316,12 +338,39 @@ def main():
             sp = slot_p[W]
             def gv(d, k, default=np.nan):
                 return float(d.get(k, default)) if k in d.index else default
-            # n in OPPORTUNITY units, matching how K0 was tuned
-            ts = M.blend(r.own_ts, r.n_tt, gv(sp["ts"], slot), K0R.get("target_share", 80))
-            cr = M.blend(r.own_cr, r.n_tg, gv(sp["cr"], slot, 0.6), K0R.get("catch_rate", 40))
-            ypt = M.blend(r.own_ypt, r.n_tg, gv(sp["ypt"], slot, 7.0), K0R.get("ypt", 160))
-            rs_ = M.blend(r.own_rs, r.n_cc, gv(sp["rs"], slot, 0.03), K0R.get("rush_share", 20))
-            ypc = M.blend(r.own_ypc, r.n_ca, gv(sp["ypc"], slot, 4.2), K0R.get("ypc", 80))
+            # THE SAME TWO-STAGE BLEND THE SCORER RUNS (model.blended_rate):
+            # prior-season own rate -> slot prior -> this season's partial
+            # evidence. This used to be a single M.blend of the current season
+            # straight onto the slot prior, with the prior-season individual
+            # rate never read at all -- so "the pre-week-5 prior blend", the
+            # component methodology.md flags as unvalidated, was the one thing
+            # the backtest structurally could not measure.
+            #
+            # n is in OPPORTUNITY units on both sides, matching how K0 was
+            # tuned: team targets for shares, own targets for catch rate and
+            # ypt, carries for ypc.
+            pri = pri_players.loc[r.gsis_id] if r.gsis_id in pri_players.index else None
+
+            def two_stage(pri_col, n_col, slot_key, default, k0_key, k0_default,
+                          cur, cur_n, scale_role=False):
+                own_pri = float(pri[pri_col]) if (pri is not None and pd.notna(pri[pri_col])) else np.nan
+                n_pri = float(pri[n_col]) if (pri is not None and pd.notna(pri[n_col])) else 0.0
+                val, _chain = M.blended_rate(
+                    own_pri, n_pri, gv(sp[slot_key], slot, default),
+                    K0R.get(k0_key, k0_default),
+                    cur_rate=cur, cur_den=cur_n, scale_role=scale_role)
+                return val
+
+            ts = two_stage("target_share", "team_targets_n", "ts", np.nan,
+                           "target_share", 80, r.own_ts, r.n_tt)
+            cr = two_stage("catch_rate", "targets_n", "cr", 0.6,
+                           "catch_rate", 40, r.own_cr, r.n_tg)
+            ypt = two_stage("ypt", "targets_n", "ypt", 7.0,
+                            "ypt", 160, r.own_ypt, r.n_tg)
+            rs_ = two_stage("rush_share", "team_carries_n", "rs", 0.03,
+                            "rush_share", 20, r.own_rs, r.n_cc)
+            ypc = two_stage("ypc", "carries_n", "ypc", 4.2,
+                            "ypc", 80, r.own_ypc, r.n_ca)
 
             opp_team = opp_team_of.get((r.team, W))
             if args.opponent and opp_team:
