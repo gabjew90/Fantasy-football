@@ -137,16 +137,80 @@ for when you have decided the versions are comparable.
 `persist.py` declares its mode on every write. `local` means the rows are on
 disk but not committed; only `github` (inside the workflow) persists them.
 
+## Releases, and how a model change reaches production
+
+Three rules:
+
+1. **The repo is the only engine.** `props/engine/` at a tagged release is the
+   model. A chat session fetches it every session through the loader; the
+   workflow exports it from the tag on every capture. Nothing runs an engine
+   that is not in this repo.
+2. **Chat is read-only; the workflow is the only writer.** Opening sweep
+   Thursday, decision captures inside six hours of a kickoff, closing capture
+   inside one hour, settle Tuesday, scorecard after. No chat run is logged,
+   and none needs to be.
+3. **Merging to `main` changes nothing that runs.** The engine switches when
+   a tag is cut and `engine.lock.json` is bumped, which is a separate,
+   one-line pull request.
+
+`props-v1.1` is the worked example. Two engine defects: `backtest.py` used
+the pandas 2.2 `include_groups` keyword, which is a `TypeError` on the 1.5.3
+this repo pins, so the paired bootstrap crashed; and `score_game.py` stamped
+`receiving_hier_v1` onto every row for a model the registry and the report
+both call v2, so the record was mislabelled at the one field meant to scope a
+later fix.
+
+```bash
+git switch -c props/v1.1 origin/main
+# edit props/engine/... and the model_registry.md entry, citing the tag
+venv\Scripts\python.exe -m pytest props/tests -q
+python props/engine_version.py print          # the hash moved; the tag is now withheld
+python props/engine_version.py write-lock --tag props-v1.1
+python props/engine_version.py verify         # IDENTICAL (props-v1.1)
+gh pr create                                  # props-ci runs the tests and the CRPS smoke
+# merge, then cut the tag on the merge commit -- never on a branch commit a
+# squash would orphan, and never move an existing tag:
+git fetch origin && git tag -a props-v1.1 -m "..." origin/main && git push origin props-v1.1
+```
+
+Until that tag exists, `record_run.py` stamps the computed hash and leaves
+`engine_tag` empty, and the capture workflow falls back to `main`'s engine
+with `engine_source=main-fallback` on every row. Both are loud and neither
+loses a capture.
+
+Rebuild and reinstall the `.skill` only when `bootstrap.py` or the loader's
+`SKILL.md` changed, or to refresh the vendored fallback:
+
+```bash
+python props/build_skill.py --credential "<path outside this repo>/credential.env" \
+    --out dist/nfl-prop-research.skill
+```
+
+That file carries the API key. Treat it as a secret; `dist/` is gitignored
+and a test fails the build if a credential is ever tracked here.
+
 ## The workflow
 
 `.github/workflows/props.yml` runs on its own concurrency group
 (`props-record`) and touches only `props/`, so it cannot collide with the
 fantasy workflows on `manager-state`. A 15-minute tick hits `guard.py` first,
-which installs nothing and exits in under a second unless a kickoff is within
-six hours. Inside 60 minutes of kickoff the capture is recorded as `close` —
-that snapshot is what closing-line value is computed from, and it is the one
-thing a chat session cannot reliably produce, since the container cannot
-schedule itself.
+which installs nothing and exits in under a second unless there is work.
+
+| Window | When | Snapshot |
+|---|---|---|
+| open | Thursday 22:00–24:00 UTC, once per ISO week | `open` |
+| capture | a kickoff within six hours | `decision` |
+| capture | a kickoff within 60 minutes | `close` |
+| settle | Tuesday 14:00–16:00 UTC, once per ISO week | grades the week |
+
+The windows are hours wide because GitHub fires these crons a median 128
+minutes late (DECISIONS #70); a marker in the Actions cache is what stops the
+other seven ticks inside a window from running again. The `close` snapshot is
+what closing-line value is computed from, and it is the one thing a chat
+session cannot reliably produce, since the container cannot schedule itself.
+The `open` sweep is the other end of that measurement: by the time the
+six-hour capture window opens, the board has already absorbed most of the
+week's news.
 
 ## What the record is for
 

@@ -18,8 +18,13 @@ import argparse
 import subprocess
 import sys
 
-STATE_PREFIX = "state/"
-CODE_PREFIXES = ("draftkit/", "manager/", "scripts/", "tests/")
+# Machine-written data. `props/record/` joined `state/` on 2026-09-18: it is
+# the betting record, committed by the props workflow every fifteen minutes a
+# game is near, and the same hazard applies -- `record_run.py` in `local` mode
+# writes into the checkout, so a hand-run while editing code sweeps rows into
+# a code commit and makes the diff unreviewable.
+STATE_PREFIXES = ("state/", "props/record/")
+CODE_PREFIXES = ("draftkit/", "manager/", "scripts/", "tests/", "props/")
 
 
 def offending(paths: list[str]) -> tuple[list[str], list[str]]:
@@ -28,10 +33,15 @@ def offending(paths: list[str]) -> tuple[list[str], list[str]]:
     Separators are normalised here rather than only at the git boundary: this
     runs on a Windows host, and a check that silently passes because it was
     handed backslashes is worse than no check.
+
+    `props/` is both a code prefix and (under `record/`) a state prefix, so
+    state wins: the workflow's own `git add props/record` commits must keep
+    passing, while a commit that mixes the record with props code does not.
     """
     norm = [p.replace("\\", "/") for p in paths]
-    state = sorted(p for p in norm if p.startswith(STATE_PREFIX))
-    code = sorted(p for p in norm if p.startswith(CODE_PREFIXES))
+    state = sorted(p for p in norm if p.startswith(STATE_PREFIXES))
+    code = sorted(p for p in norm
+                  if p.startswith(CODE_PREFIXES) and not p.startswith(STATE_PREFIXES))
     return (state, code) if state and code else ([], [])
 
 

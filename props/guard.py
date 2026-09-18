@@ -9,6 +9,9 @@ keeps the free-tier minute cost near zero and leaves the fantasy workflows'
 budget untouched.
 
 Windows:
+  open      Thursday 22:00-24:00 UTC, once per ISO week: where the week's
+            numbers started, so a Sunday decision can be read against an open
+            as well as a close.
   capture   a game kicks off within CAPTURE_LEAD_MIN (default 6 hours). Inside
             CLOSE_WINDOW_MIN (default 60) of any kickoff the snapshot becomes
             `close`, which is the row closing-line value is computed from.
@@ -45,6 +48,10 @@ except Exception:  # noqa: BLE001 — no tzdata on the host (rare; Windows witho
 GAMES_URL = "https://raw.githubusercontent.com/nflverse/nfldata/master/data/games.csv"
 CACHE = Path(__file__).resolve().parent / ".cache"
 CAPTURE_LEAD_MIN = int(os.environ.get("PROPS_CAPTURE_LEAD_MIN", "360"))
+# The Thursday opening sweep: 22:00-24:00 UTC, i.e. Thursday evening
+# US Eastern, before the week's first kickoff.
+OPEN_FROM_HOUR = int(os.environ.get("PROPS_OPEN_FROM_HOUR", "22"))
+OPEN_TO_HOUR = int(os.environ.get("PROPS_OPEN_TO_HOUR", "24"))
 CLOSE_WINDOW_MIN = int(os.environ.get("PROPS_CLOSE_WINDOW_MIN", "60"))
 
 
@@ -95,6 +102,29 @@ def week_from_calendar(now: dt.datetime, season: int) -> int:
     kickoff_thursday = labor_day + dt.timedelta(days=3)
     week = (now.date() - kickoff_thursday).days // 7 + 1
     return max(1, min(18, week))
+
+
+def _soonest_week(games: list[dict], now: dt.datetime) -> int | None:
+    """The week of the next game that has not kicked off.
+
+    The opening sweep runs on Thursday evening, before that week's first
+    kickoff, so "the next game" is this week's Thursday nighter or, once it
+    has started, the Sunday slate -- either way the week the sweep is for.
+    """
+    best: tuple[float, int] | None = None
+    for g in games:
+        k = kickoff_utc(g)
+        if k is None:
+            continue
+        lead = (k - now).total_seconds()
+        if lead < -3 * 3600:          # already well under way
+            continue
+        if best is None or lead < best[0]:
+            try:
+                best = (lead, int(g["week"]))
+            except (KeyError, ValueError):
+                continue
+    return best[1] if best else None
 
 
 def _period_marker(kind: str, key: str) -> Path:
@@ -197,6 +227,24 @@ def main() -> int:
         emit(run="true", mode="capture", season=season, week=week,
              snapshot_type="decision")
         return 0
+
+    # THE OPENING PRICE, ONCE A WEEK. Closing-line value needs two ends, and
+    # the capture window only opens six hours before a kickoff -- by then the
+    # board has already absorbed most of the week's news. A Thursday-evening
+    # sweep records where the week's numbers started, so a decision made on
+    # Sunday can be read against an open as well as a close. Once per ISO
+    # week, on the same marker the settle window uses: the window is two
+    # hours wide because GitHub fires these crons late, and the marker is
+    # what stops the other seven ticks inside it.
+    if now.weekday() == 3 and OPEN_FROM_HOUR <= now.hour < OPEN_TO_HOUR:
+        iso = now.isocalendar()
+        key = f"{iso[0]}-W{iso[1]:02d}"
+        if not period_done("open", key):
+            week = _soonest_week(games, now) or week_from_calendar(now, season)
+            mark_period("open", key)
+            emit(run="true", mode="capture", season=season, week=week,
+                 snapshot_type="open")
+            return 0
 
     soonest, soonest_week = None, None
     for g in games:

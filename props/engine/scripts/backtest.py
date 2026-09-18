@@ -542,7 +542,12 @@ def main():
           for mk in ["rec", "yds"]:
             d = dd
             diff = d[f"crps_{mk}_model_ref"] - d[f"crps_{mk}_model"]
-            g = d.groupby("game_id"); sums = g.apply(lambda x: (x[f"crps_{mk}_model_ref"] - x[f"crps_{mk}_model"]).sum(), include_groups=False); cnt = g.size()
+            # `include_groups` is pandas 2.2+; this repo pins 1.5.3, where it is a TypeError.
+            # Selecting the two columns before apply() is equivalent and works on both.
+            cols = [f"crps_{mk}_model_ref", f"crps_{mk}_model"]
+            g = d.groupby("game_id")
+            sums = g[cols].apply(lambda x: (x[cols[0]] - x[cols[1]]).sum())
+            cnt = g.size()
             idx = brng.integers(0, len(sums), size=(2000, len(sums)))
             boot = sums.values[idx].sum(1) / cnt.values[idx].sum(1)
             lo, hi = np.percentile(boot, [2.5, 97.5])
