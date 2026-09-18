@@ -290,3 +290,55 @@ def test_no_warning_means_no_extra_line():
     assert phone.warnings_block({}) == []
     assert phone.warnings_block({"stale": ["transactions"]}) == [], \
         "the report banner is provenance, not a warning about the advice"
+
+
+def test_the_healthcheck_speaks_when_the_data_is_stale_and_nothing_else_would(monkeypatch, tmp_path):
+    """The hole the warning fell through: lineup/waivers print the warning
+    ABOVE their actions, but send nothing at all when there is no action, so
+    a stale roster silenced its own warning. The daily healthcheck now
+    carries it."""
+    from manager import gate as gate_mod
+    from manager import jobs
+    from manager.store import Store
+
+    sent = []
+    store = Store(tmp_path / "state")
+    warn = ("Careful: this roster is a copy from 22 hours ago, so a move you made "
+            "since then is missing. Nothing here has refreshed it.")
+    plan = tmp_path / "week_plan.json"
+    plan.write_text('{"week": 2, "generated_pt": "2026-09-17T06:00:00-07:00", "checks": []}',
+                    encoding="utf-8")
+    monkeypatch.setattr(jobs, "get_store", lambda: store)
+    monkeypatch.setattr(jobs, "league_context",
+                        lambda: {"week": 2, "data_warnings": [warn], "cfg": None})
+    monkeypatch.setattr(jobs, "_trade_alerts", lambda *a, **k: None)
+    monkeypatch.setattr(gate_mod, "plan_path", lambda *a, **k: plan)
+    monkeypatch.setattr(jobs, "deliver",
+                        lambda store, key, subject, body, **kw: sent.append((key, subject, body)))
+    jobs.healthcheck()
+
+    assert len(sent) == 1, "a current plan plus a stale roster should send exactly the warning"
+    key, subject, body = sent[0]
+    assert key.startswith("stale:")
+    assert subject == "This roster is a copy from 22 hours ago"
+    assert warn in body
+    assert "may be missing a move you made" in body
+    _clean(body)
+
+
+def test_the_healthcheck_stays_quiet_when_the_data_is_fresh(monkeypatch, tmp_path):
+    from manager import gate as gate_mod
+    from manager import jobs
+    from manager.store import Store
+
+    sent = []
+    plan = tmp_path / "week_plan.json"
+    plan.write_text('{"week": 2, "generated_pt": "2026-09-17T06:00:00-07:00", "checks": []}',
+                    encoding="utf-8")
+    monkeypatch.setattr(jobs, "get_store", lambda: Store(tmp_path / "state"))
+    monkeypatch.setattr(jobs, "league_context", lambda: {"week": 2, "data_warnings": [], "cfg": None})
+    monkeypatch.setattr(jobs, "_trade_alerts", lambda *a, **k: None)
+    monkeypatch.setattr(gate_mod, "plan_path", lambda *a, **k: plan)
+    monkeypatch.setattr(jobs, "deliver", lambda *a, **kw: sent.append(a))
+    jobs.healthcheck()
+    assert sent == []

@@ -85,13 +85,23 @@ class NameIndex:
                               "active": bool(d.get("active"))}
             self.by_name.setdefault(normalize_name(name), []).append(pid)
 
+    def candidates(self, name: str, pos: str | None = None) -> list[str]:
+        """Every id this name could mean at this position, before tie-breaking.
+
+        A caller that counts "ambiguous" needs this rather than the raw name
+        bucket: a name held by two receivers is NOT ambiguous for a tight end,
+        it is unmatched, and counting it as ambiguous hid position misses in
+        the one diagnostic that would reveal a join regression.
+        """
+        cands = list(self.by_name.get(normalize_name(name), []))
+        if not pos:
+            return cands
+        return [p for p in cands
+                if pos in self.rows[p]["fantasy"] or self.rows[p]["pos"] == pos]
+
     def resolve(self, name: str, pos: str | None = None, team: str = "") -> str | None:
         """One Sleeper id, or None when nothing matches or a live tie remains."""
-        cands = list(self.by_name.get(normalize_name(name), []))
-        if pos:
-            eligible = [p for p in cands
-                        if pos in self.rows[p]["fantasy"] or self.rows[p]["pos"] == pos]
-            cands = eligible or []
+        cands = self.candidates(name, pos)
         if len(cands) > 1 and team:
             narrowed = [p for p in cands if self.rows[p]["team"] == team.upper()]
             if narrowed:

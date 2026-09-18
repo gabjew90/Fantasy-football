@@ -244,12 +244,29 @@ def healthcheck(dry_run: bool = False) -> None:
     # daily trade sweep rides the healthcheck so Sun-Tue trades (outside the
     # Wed-Sat injury sweeps) are still caught inside the 48h veto window
     live_week = None
+    warnings: list[str] = []
     try:
         ctx = league_context()
         live_week = ctx.get("week")
+        warnings = list(ctx.get("data_warnings") or [])
         _trade_alerts(ctx, store, dry_run)
     except Exception:  # noqa: BLE001
         log.warning("trade watch inside healthcheck failed")
+
+    # A WARNING MUST NOT RIDE AN ACTION. phone.lineup/waivers print
+    # ctx["data_warnings"] above their actions, but both send NOTHING when
+    # there is nothing to do -- so on 2026-09-17 a 22-hour-old roster copy,
+    # missing a player the user had just added, produced "already optimal"
+    # and the staleness went with it. The healthcheck already exists to speak
+    # only when something is wrong and runs once a day, which is the right
+    # cadence for "the data under your briefs is old".
+    if warnings:
+        head = re.split(r"[,.]", warnings[0])[0].replace("Careful: ", "").strip()
+        deliver(store, f"stale:{now_pt().strftime('%Y%m%d')}",
+                head[:1].upper() + head[1:],
+                "\n".join(warnings) + "\n\nUntil it refreshes, anything I say about "
+                "your roster may be missing a move you made.",
+                dry_run=dry_run)
     pending = 0
     plan = None
     path = gate_mod.plan_path()

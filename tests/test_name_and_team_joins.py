@@ -169,3 +169,58 @@ def test_playoff_schedule_strength_finds_a_sleeper_coded_team():
     assert ratio is None, "no points-allowed frame, so no number"
     assert label == "wk15 vs SEA; wk16 vs NO; wk17 vs ARI"
     assert "unscheduled" not in label
+
+
+# ------------------------------------------------- the ambiguity diagnostic
+
+def test_candidates_are_position_eligible_so_a_miss_is_not_ambiguity(idx):
+    """The counter fix: two receivers named Mike Williams make that name
+    ambiguous for a WR, but for a TE there is no candidate at all -- that is
+    unmatched, and calling it ambiguous hid position misses in the only
+    diagnostic that reveals a join regression."""
+    assert sorted(idx.candidates("Mike Williams", "WR")) == ["9a", "9b"]
+    assert idx.candidates("Mike Williams", "TE") == []
+    assert sorted(idx.candidates("Mike Williams")) == ["9a", "9b"]
+    # eligibility, not the depth chart: Hunter is position DB
+    assert idx.candidates("Travis Hunter", "WR") == ["12530"]
+
+
+def test_fantasypros_counts_a_position_miss_as_unmatched(monkeypatch):
+    """A name two WRs share, offered as a TE, must land in `unmatched`."""
+    from manager import fantasypros as fp
+    index = {
+        "9a": {"full_name": "Mike Williams", "position": "WR",
+               "fantasy_positions": ["WR"], "team": "NYJ", "active": True},
+        "9b": {"full_name": "Mike Williams", "position": "WR",
+               "fantasy_positions": ["WR"], "team": "PIT", "active": True},
+    }
+
+    def _rows(pos, slug, season, kind, week=None):
+        if pos == "TE":
+            return [{"player_name": "Mike Williams", "player_team_id": "LAC",
+                     "r2p_pts": "90.0"}], {}
+        return [], {}
+    monkeypatch.setattr(fp, "_rows", _rows)
+    out, note = fp.fetch({}, 2026, index)
+    assert out == {}
+    assert "1 unmatched" in note
+    assert "ambiguous" not in note, "a position miss is not ambiguity"
+
+
+def test_fantasypros_still_counts_a_real_live_tie_as_ambiguous(monkeypatch):
+    from manager import fantasypros as fp
+    index = {
+        "9a": {"full_name": "Mike Williams", "position": "WR",
+               "fantasy_positions": ["WR"], "team": "NYJ", "active": True},
+        "9b": {"full_name": "Mike Williams", "position": "WR",
+               "fantasy_positions": ["WR"], "team": "PIT", "active": True},
+    }
+
+    def _rows(pos, slug, season, kind, week=None):
+        if pos == "WR":
+            return [{"player_name": "Mike Williams", "player_team_id": "LAC",
+                     "r2p_pts": "90.0"}], {}
+        return [], {}
+    monkeypatch.setattr(fp, "_rows", _rows)
+    out, note = fp.fetch({}, 2026, index)
+    assert out == {} and "1 ambiguous" in note

@@ -167,7 +167,10 @@ def fetch(scoring: dict, season, index, kind: str = ROS, week: int | None = None
                 nm = row.get("player_name") or ""
                 pid = names.resolve(nm, our_pos,
                                     (row.get("player_team_id") or "").upper())
-                if pid is None and len(names.by_name.get(normalize_name(nm), [])) > 1:
+                # Ambiguous means two candidates AT THIS POSITION, which is
+                # what NameIndex.candidates answers. Counting the raw name
+                # bucket instead reported a position miss as ambiguity.
+                if pid is None and len(names.candidates(nm, our_pos)) > 1:
                     ambiguous += 1
                     continue
             if not pid:
