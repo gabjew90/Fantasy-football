@@ -80,6 +80,10 @@ def main():
     ap.add_argument("--opp-mode", choices=["fixed", "eb"], default="fixed")
     ap.add_argument("--opp-k0", type=float, default=1000.0)
     ap.add_argument("--opp-metrics", default="catch_rate,ypt,ypc")
+    ap.add_argument("--historical-blend", action="store_true", default=True,
+                    help="two-stage: prior-season own rate -> slot prior -> this season (what the live scorer does)")
+    ap.add_argument("--no-historical-blend", dest="historical_blend", action="store_false",
+                    help="ABLATION: one stage, this season -> slot prior, ignoring the prior-season individual rate")
     ap.add_argument("--tag", default=None, help="label for output files")
     ap.add_argument("--compare-to", default=None, help="results.pkl of a reference run; paired game-block bootstrap on the MODEL's own CRPS")
     args = ap.parse_args()
@@ -89,7 +93,8 @@ def main():
     rng = np.random.default_rng(20260917)
     N = 1000
 
-    print(f"env={args.env} opponent={args.opponent}", file=sys.stderr)
+    print(f"env={args.env} opponent={args.opponent} "
+          f"historical_blend={args.historical_blend}", file=sys.stderr)
 
     # ---- self-contained data build (round 7): derive every frame from nflverse for
     # ANY season, instead of depending on the round-4 pickles that only existed for
@@ -353,8 +358,15 @@ def main():
 
             def two_stage(pri_col, n_col, slot_key, default, k0_key, k0_default,
                           cur, cur_n, scale_role=False):
-                own_pri = float(pri[pri_col]) if (pri is not None and pd.notna(pri[pri_col])) else np.nan
-                n_pri = float(pri[n_col]) if (pri is not None and pd.notna(pri[n_col])) else 0.0
+                # The ablation drops stage one by giving it nothing to shrink
+                # from, which leaves blend() returning the slot prior -- exactly
+                # the one-stage behaviour, through the same code path, so the
+                # comparison cannot be confounded by a second implementation.
+                if args.historical_blend:
+                    own_pri = float(pri[pri_col]) if (pri is not None and pd.notna(pri[pri_col])) else np.nan
+                    n_pri = float(pri[n_col]) if (pri is not None and pd.notna(pri[n_col])) else 0.0
+                else:
+                    own_pri, n_pri = np.nan, 0.0
                 val, _chain = M.blended_rate(
                     own_pri, n_pri, gv(sp[slot_key], slot, default),
                     K0R.get(k0_key, k0_default),
