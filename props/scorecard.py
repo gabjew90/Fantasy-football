@@ -27,6 +27,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import calls as calls_mod  # noqa: E402
 import persist  # noqa: E402
 
 try:
@@ -61,7 +62,30 @@ def load_settled(season: int) -> pd.DataFrame:
     df["p_novig"] = pd.to_numeric(df["p_novig"], errors="coerce")
     df["pnl_per_100"] = pd.to_numeric(df["pnl_per_100"], errors="coerce")
     df["tier_base"] = df["tier"].map(tier_base)
+    # ONE CALL PER MARKET. Every priced line is graded, but a line that moved
+    # between two capture ticks is history, not a second decision (see
+    # props/calls.py). A settled file written before is_call existed is read
+    # as all-calls rather than crashing the Tuesday job.
+    if "is_call" not in df.columns:
+        print("settled file predates is_call; counting every graded row. "
+              "Re-run props/settle.py to separate calls from line history.",
+              file=sys.stderr)
+        df["is_call"] = 1
+    df["is_call"] = pd.to_numeric(df["is_call"], errors="coerce").fillna(0).astype(int)
+    if "engine_hash" not in df.columns:
+        df["engine_hash"] = ""
+    if "engine_tag" not in df.columns:
+        df["engine_tag"] = None
     return df
+
+
+def engine_label(df: pd.DataFrame) -> str:
+    """How an engine is named in a heading: its tag, else a short hash."""
+    tag = next((t for t in df.get("engine_tag", []) if isinstance(t, str) and t), None)
+    if tag:
+        return tag
+    h = next((x for x in df.get("engine_hash", []) if isinstance(x, str) and x), "")
+    return h[:12] if h else "unidentified engine"
 
 
 def clv_table(season: int) -> pd.DataFrame:
@@ -76,50 +100,65 @@ def clv_table(season: int) -> pd.DataFrame:
                     rows.append(json.loads(line))
     if not rows:
         return pd.DataFrame()
-    df = pd.DataFrame(rows)
-    keys = ["season", "week", "event_id", "book", "market", "player", "side"]
-    dec = df[df["snapshot_type"] == "decision"]
-    close = df[df["snapshot_type"] == "close"]
-    if dec.empty or close.empty:
+
+    # ONE ROW PER SIDE OF THE JOIN, so a moved line cannot fan out. The old
+    # join was on seven fields that excluded `line`, so McCaffrey's two
+    # decision rows (58.5, then 59.5) would each have paired with every close
+    # row for that market and one call would have become several CLV rows
+    # with an ambiguous opening number.
+    decisions, _ties = calls_mod.select_calls(rows, "decision")
+    # The closing price is a market fact, so the close side ignores the
+    # engine: if the engine changed between the decision and the close, the
+    # deciding engine still gets its CLV. It must be the LAST close -- see
+    # calls.last_per on why the first would misreport an early-window run.
+    market_key = tuple(f for f in calls_mod.CALL_KEY if f != "engine_hash")
+    closes = calls_mod.last_per(rows, "close", market_key)
+    if not decisions or not closes:
         return pd.DataFrame()
-    m = dec.merge(close, on=keys, suffixes=("_dec", "_close"))
-    if m.empty:
-        return m
-    # A line moving toward an Under call means the number came down.
-    m["line_move"] = m["line_close"] - m["line_dec"]
-    m["moved_our_way"] = (
-        ((m["side"].str.lower() == "under") & (m["line_move"] < 0)) |
-        ((m["side"].str.lower() == "over") & (m["line_move"] > 0))
-    )
-    return m[keys + ["line_dec", "line_close", "line_move", "moved_our_way",
-                     "tier_dec", "p_model_dec"]]
+
+    paired = []
+    for key, dec in decisions.items():
+        close = closes.get(tuple(key[:-1]))    # drop engine_hash
+        if close is None:
+            continue
+        # Both sides come from the predictions file, so both carry `line`.
+        # An anytime-TD row has none, and a market without a number has
+        # no line movement to measure.
+        if dec.get("line") is None or close.get("line") is None:
+            continue
+        close_line = close["line"]
+        if close_line is None:
+            continue
+        move = float(close_line) - float(dec["line"])
+        side = str(dec.get("side") or "").lower()
+        paired.append({
+            "season": dec.get("season"), "week": dec.get("week"),
+            "event_id": dec.get("event_id"), "book": dec.get("book"),
+            "market": dec.get("market"), "player": dec.get("player"),
+            "side": dec.get("side"), "engine_hash": dec.get("engine_hash"),
+            "engine_tag": dec.get("engine_tag"),
+            "line_dec": float(dec["line"]), "line_close": float(close_line),
+            "line_move": move,
+            # A line moving toward an Under call means the number came down.
+            "moved_our_way": (move < 0 if side == "under"
+                              else move > 0 if side == "over" else False),
+            "tier_dec": dec.get("tier"), "p_model_dec": dec.get("p_model"),
+        })
+    return pd.DataFrame(paired)
 
 
-def main() -> int:
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--season", type=int, required=True)
-    args = ap.parse_args()
-
-    df = load_settled(args.season)
-    out = [f"# Props scorecard — {args.season}", ""]
-
-    if df.empty:
-        out += ["No settled calls yet. Run `props/settle.py` after results "
-                "publish (nflverse weekly stats land Tuesday morning ET).", ""]
-        (persist.RECORD_ROOT / "scorecard.md").write_text("\n".join(out),
-                                                          encoding="utf-8")
-        print("no settled rows yet")
-        return 0
-
+def render_sections(df: pd.DataFrame) -> tuple[list[str], list[dict]]:
+    """The four rollups for one engine's calls. (markdown lines, csv rows)."""
+    out: list[str] = []
+    rows: list[dict] = []
     n = len(df)
     hits = int(df["won"].sum())
     out += [f"{n} settled calls, {hits} winners ({hits / n:.1%}), "
             f"net {df['pnl_per_100'].sum():+.0f} per $100 flat-staked.", ""]
 
-    out += ["## Calibration: does the model's probability mean anything?", "",
+    out += ["### Calibration: does the model's probability mean anything?", "",
             "| Model prob | Calls | Hit rate | Stated | Diff | Net/$100 |",
             "|---|---|---|---|---|---|"]
-    rows = []
     for lo, hi in BUCKETS:
         b = df[(df["p_model"] >= lo) & (df["p_model"] < hi)]
         if b.empty:
@@ -127,13 +166,14 @@ def main() -> int:
         hr, stated = b["won"].mean(), b["p_model"].mean()
         rows.append({"bucket": f"{lo:.0%}-{hi:.0%}", "n": len(b),
                      "hit_rate": hr, "stated": stated, "diff": hr - stated,
-                     "net": b["pnl_per_100"].sum()})
+                     "net": b["pnl_per_100"].sum(),
+                     "engine_hash": df["engine_hash"].iloc[0] if n else ""})
         out.append(f"| {lo:.0%}-{hi:.0%} | {len(b)} | {hr:.1%} | {stated:.1%} "
                    f"| {hr - stated:+.1%} | {b['pnl_per_100'].sum():+.0f} |")
     out += ["", "A bucket needs roughly 50 calls before its hit rate says "
             "anything; below that the difference is noise.", ""]
 
-    out += ["## Tier validity: is a big gap the book knowing something?", "",
+    out += ["### Tier validity: is a big gap the book knowing something?", "",
             "| Tier | Calls | Hit rate | Model said | Book said | Net/$100 |",
             "|---|---|---|---|---|---|"]
     for tier in ("STRONG", "MODERATE", "LEAN", "WEAK", "UNTIERED"):
@@ -148,7 +188,7 @@ def main() -> int:
             "book column, that assumption is costing money and the tier rule "
             "should change.", ""]
 
-    out += ["## By market", "",
+    out += ["### By market", "",
             "| Market | Calls | Hit rate | Model said | Net/$100 |",
             "|---|---|---|---|---|"]
     for mkt, b in df.groupby("market"):
@@ -158,32 +198,104 @@ def main() -> int:
             "markets; rushing and anytime TD have no backtest at all, so their "
             "rows here are the first evidence either way.", ""]
 
-    out += ["## By week", "", "| Week | Calls | Hit rate | Net/$100 |",
+    out += ["### By week", "", "| Week | Calls | Hit rate | Net/$100 |",
             "|---|---|---|---|"]
     for wk, b in df.groupby("week"):
         out.append(f"| {wk} | {len(b)} | {b['won'].mean():.1%} | "
                    f"{b['pnl_per_100'].sum():+.0f} |")
     out.append("")
+    return out, rows
 
-    clv = clv_table(args.season)
-    out += ["## Closing line value", ""]
+
+def render_clv(clv: pd.DataFrame, engine_hash: str | None = None) -> list[str]:
+    """The CLV paragraph, for one engine or (engine_hash=None) for all."""
+    if engine_hash is not None and not clv.empty and "engine_hash" in clv:
+        clv = clv[clv["engine_hash"] == engine_hash]
+    out = ["### Closing line value", ""]
     if clv.empty:
         out += ["No paired decision/close snapshots yet. CLV needs a closing "
                 "capture inside 60 minutes of kickoff; without it, closing-line "
                 "value is unavailable and must not be estimated.", ""]
-    else:
-        share = clv["moved_our_way"].mean()
-        out += [f"{len(clv)} calls have both snapshots. The line moved toward "
-                f"the call {share:.1%} of the time (mean move "
-                f"{clv['line_move'].mean():+.2f}).", "",
-                "Beating the close consistently is the signal that survives "
-                "small samples. Winning without it is variance.", ""]
+        return out
+    share = clv["moved_our_way"].mean()
+    out += [f"{len(clv)} calls have both snapshots. The line moved toward "
+            f"the call {share:.1%} of the time (mean move "
+            f"{clv['line_move'].mean():+.2f}).", "",
+            "Beating the close consistently is the signal that survives "
+            "small samples. Winning without it is variance.", ""]
+    return out
+
+
+def main(argv: list[str] | None = None) -> int:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--season", type=int, required=True)
+    ap.add_argument("--pool", action="store_true",
+                    help="also print one set of rollups over every engine "
+                         "version, which is only meaningful once you have "
+                         "decided the versions are comparable")
+    args = ap.parse_args(argv)
+
+    settled = load_settled(args.season)
+    out = [f"# Props scorecard — {args.season}", ""]
+
+    if settled.empty:
+        out += ["No settled calls yet. Run `props/settle.py` after results "
+                "publish (nflverse weekly stats land Tuesday morning ET).", ""]
+        (persist.RECORD_ROOT / "scorecard.md").write_text("\n".join(out),
+                                                          encoding="utf-8")
+        print("no settled rows yet")
+        return 0
+
+    graded = len(settled)
+    df = settled[settled["is_call"] == 1]
+    if df.empty:
+        out += [f"{graded} rows graded, none of them a call. A call is the "
+                f"last decision for a market; if every row is a superseded "
+                f"line, re-run props/settle.py.", ""]
+        (persist.RECORD_ROOT / "scorecard.md").write_text("\n".join(out),
+                                                          encoding="utf-8")
+        print("no calls among the settled rows")
+        return 0
+
+    clv = clv_table(args.season)
+    engines = list(df.groupby("engine_hash", dropna=False))
+
+    out += [f"{len(df)} calls ({graded} priced lines graded, so "
+            f"{graded - len(df)} superseded by a later line).", ""]
+
+    # TWO ENGINES ARE NOT ONE SAMPLE. Pooling calls from different model
+    # versions produces one number that describes neither, so the default is
+    # per-engine sections and NO grand total. --pool is the explicit
+    # override, because whether two versions are comparable is the user's
+    # judgement to make, not this script's.
+    if len(engines) > 1:
+        labels = ", ".join(engine_label(g) for _h, g in engines)
+        out += [f"**{len(engines)} engine versions in the record ({labels}); "
+                f"they are not pooled.** Pass `--pool` to pool them "
+                f"explicitly.", ""]
+
+    csv_rows: list[dict] = []
+    for engine_hash, group in engines:
+        out += [f"## Engine {engine_label(group)}", ""]
+        sections, rows = render_sections(group)
+        out += sections
+        csv_rows += rows
+        out += render_clv(clv, engine_hash)
+
+    if args.pool and len(engines) > 1:
+        out += ["## All engines (pooled by request)", "",
+                "These calls come from different model versions; the pooled "
+                "numbers describe no single one of them.", ""]
+        sections, _rows = render_sections(df)
+        out += sections
+        out += render_clv(clv)
 
     (persist.RECORD_ROOT / "scorecard.md").write_text("\n".join(out), encoding="utf-8")
-    if rows:
-        pd.DataFrame(rows).to_csv(persist.RECORD_ROOT / "scorecard.csv", index=False)
+    if csv_rows:
+        pd.DataFrame(csv_rows).to_csv(persist.RECORD_ROOT / "scorecard.csv", index=False)
     print(f"[{persist.mode()}] wrote {persist.RECORD_ROOT / 'scorecard.md'} "
-          f"({n} settled calls)")
+          f"({len(df)} calls of {graded} graded rows, "
+          f"{len(engines)} engine version(s))")
     return 0
 
 

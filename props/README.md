@@ -90,8 +90,27 @@ python props/engine_version.py verify                    # IDENTICAL or DRIFT (n
 python props/engine_version.py write-lock --tag props-v1.1
 ```
 
-Settled rows add `actual`, `result`, `status`, `won`, `pnl_per_100` and
-`join_method`. A player who did not play settles as `dnp`, not a loss, because
+### What counts as one call
+
+The record keeps every priced line at every moment, which is right: a line
+that moves is history worth having. A scorecard counts decisions, and those
+are not the same thing. Week 2 holds 33 rows for a 32-line board because one
+rush-yards Under was captured at 58.5 and then at 59.5 thirteen minutes
+later.
+
+So a **call** is the `decision` row with the latest `logged_at_utc` for one
+(season, week, event, book, market, player, engine). `side` and `line` are
+attributes of the call, not part of its identity. `open` and `close` rows are
+never calls, so a game captured only inside the closing window has no call --
+a price-only snapshot is not a decision. `props/calls.py` is the only place
+that rule lives; `settle.py` and `scorecard.py` both import it.
+
+`settle.py` grades every priced line and flags which one was the call
+(`is_call`), because a superseded line beside the one that replaced it is what
+makes the settled CSV self-explaining. `scorecard.py` counts only calls.
+
+Settled rows add `actual`, `result`, `status`, `won`, `pnl_per_100`,
+`is_call` and `join_method`. A player who did not play settles as `dnp`, not a loss, because
 a book would have voided the prop; folding voids in as losses would bias every
 hit rate downward. Rows whose name could not be joined are kept with status
 `unjoined` and reported, never silently dropped.
@@ -109,6 +128,11 @@ python props/settle.py --season 2026 --week 2
 # rebuild the rollups
 python props/scorecard.py --season 2026
 ```
+
+The scorecard groups by engine. With more than one version in the record it
+prints a section each and **no** combined total: pooling two models' calls
+produces one number that describes neither. `--pool` is the explicit override
+for when you have decided the versions are comparable.
 
 `persist.py` declares its mode on every write. `local` means the rows are on
 disk but not committed; only `github` (inside the workflow) persists them.
