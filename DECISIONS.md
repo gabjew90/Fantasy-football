@@ -4393,7 +4393,18 @@ It does NOT gate on those numbers. No reference JSON, no tolerance, no
 seed-noise study, no `resolve_engine.py`. A tolerance is a claim about how
 much CRPS moves between two runs of the SAME model, and answering that needs
 a seed sweep and a second engine version to sit against; there is exactly one
-released engine. Typing a threshold now would be a number invented rather
+released engine.
+
+WHAT THE FIRST CI RUN MEASURED, which removes one of the two obstacles. The
+smoke on this very pull request took 38 seconds for the walk-forward and 57
+for the whole job, cold cache included -- so runtime was never the reason to
+defer, and the CI timeout drops from a guessed 45 minutes to 20. It also
+reproduced `methodology.md`'s recorded validation exactly: crps_rec_model
+1.0082 against baseline 1.0502, crps_yds_model 13.2764 against 13.9523,
+N=1895, versus the documented 1.009/1.050 and 13.27/13.94. The vendored
+engine behaves as its own documentation says, which is the first independent
+confirmation of that. What remains genuinely unmeasured is the seed-to-seed
+spread, and that is the number a tolerance has to be built from. Typing a threshold now would be a number invented rather
 than measured, which is the thing CLAUDE.md's "measure before cutting"
 forbids, and a gate calibrated by guess either blocks good changes or waves
 bad ones through. The smoke prints CRPS so a reviewer sees it move; the gate

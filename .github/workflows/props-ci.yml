@@ -99,9 +99,10 @@ jobs:
     needs: tests
     if: needs.tests.outputs.model_changed == 'true' || github.event.inputs.backtest == 'true'
     runs-on: ubuntu-latest
-    # Generous, because nobody has timed the full walk-forward yet. Measuring
-    # it is what turns this into a real gate (DECISIONS #75).
-    timeout-minutes: 45
+    # Measured 2026-09-18 on ubuntu-latest: 38s for the walk-forward itself,
+    # 57s for the whole job including pip and the nflverse download. The
+    # ceiling is for a cold cache and a slower runner, not an expectation.
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
