@@ -1,0 +1,163 @@
+# The gate on props/ changes. Three checks, and deliberately no more.
+#
+# WHY THIS EXISTS SEPARATELY FROM props.yml. props.yml runs
+# `pytest props/tests` before every capture, so anything asserted there can
+# cost an NFL slate: a closing line missed is unrecoverable. The check that
+# the vendored engine matches props/engine.lock.json therefore lives HERE,
+# on pull requests, where a human is waiting and the cost of a red run is a
+# few minutes.
+#
+# The backtest smoke PRINTS CRPS rather than gating on it. A tolerance is
+# only meaningful against a second engine version to compare with, and there
+# is exactly one (props-v1.0). Typing a threshold now would be a number
+# invented rather than measured, which is what CLAUDE.md forbids; the gate
+# arrives with v1.2, when v1.1 exists as a baseline. See DECISIONS #75.
+name: props-ci
+
+on:
+  pull_request:
+    paths:
+      - props/**
+      - .github/workflows/props*.yml
+  push:
+    branches-ignore: [main]
+    paths:
+      - props/**
+      - .github/workflows/props*.yml
+  workflow_dispatch:
+    inputs:
+      backtest:
+        description: run the backtest smoke even if the model did not change
+        required: false
+        default: "false"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: props-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      model_changed: ${{ steps.changed.outputs.model }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - run: pip install -r props/requirements.txt pytest
+
+      - name: props tests
+        run: python -m pytest props/tests -q
+
+      - name: the engine matches its lock
+        # The check kept out of the capture path. It also catches a lock that
+        # names a tag which does not exist, or whose engine is not the one the
+        # lock describes -- a typo in a release bump.
+        run: |
+          set -euo pipefail
+          python props/engine_version.py verify
+          TAG=$(python3 -c "import json;print(json.load(open('props/engine.lock.json'))['tag'])")
+          if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
+            mkdir -p "$RUNNER_TEMP/tagged"
+            git archive --format=tar "refs/tags/$TAG" props/engine | tar -x -C "$RUNNER_TEMP/tagged"
+            python props/engine_version.py verify \
+              --engine-dir "$RUNNER_TEMP/tagged/props/engine"
+            echo "the engine at $TAG matches the lock"
+          else
+            echo "::notice title=tag not cut yet::the lock names $TAG, which does not exist yet; it is cut on the merge commit"
+          fi
+
+      - name: did the model change?
+        id: changed
+        run: |
+          set -euo pipefail
+          BASE="${{ github.event.pull_request.base.sha || github.event.before }}"
+          if [ -z "$BASE" ] || ! git cat-file -e "$BASE" 2>/dev/null; then
+            BASE=$(git rev-parse HEAD~1)
+          fi
+          if git diff --name-only "$BASE...HEAD" \
+             | grep -qE '^props/engine/(scripts/(model|backtest|build_priors)\.py|resources/(priors_|calibration_))'; then
+            echo "model=true" >> "$GITHUB_OUTPUT"
+            echo "the model changed; the backtest smoke will run"
+          else
+            echo "model=false" >> "$GITHUB_OUTPUT"
+            echo "no model change; skipping the backtest smoke"
+          fi
+
+  backtest-smoke:
+    needs: tests
+    if: needs.tests.outputs.model_changed == 'true' || github.event.inputs.backtest == 'true'
+    runs-on: ubuntu-latest
+    # Generous, because nobody has timed the full walk-forward yet. Measuring
+    # it is what turns this into a real gate (DECISIONS #75).
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      # scipy is only needed here, so the capture runner stays lean; the rest
+      # of the pins match production so the smoke validates what actually runs.
+      - run: pip install -r props/requirements.txt -r props/requirements-dev.txt
+
+      - name: nflverse 2025 cache
+        uses: actions/cache@v4
+        with:
+          # ONLY the raw downloads. The backtest also writes derived frames
+          # into --out, built with model.normalize_depth_charts; caching those
+          # would mask the very change under test.
+          path: ${{ runner.temp }}/nflbt
+          key: props-nflbt-2025-v1
+
+      - name: walk-forward CRPS
+        env:
+          NFL_BACKTEST_CACHE: ${{ runner.temp }}/nflbt
+        run: |
+          set -euo pipefail
+          python props/engine/scripts/backtest.py \
+            --season 2025 --out "$RUNNER_TEMP/bt" --tag ci 2>&1 | tee "$RUNNER_TEMP/bt.log"
+
+      - name: report CRPS on the job summary
+        if: always()
+        run: |
+          {
+            echo "## Backtest smoke (2025 walk-forward)"
+            echo
+            echo "Lower CRPS is better. \`baseA\` is each player's own un-shrunk"
+            echo "rates, so the model has to beat it to be worth its complexity."
+            echo
+            if [ -f "$RUNNER_TEMP/bt/backtest_ci_summary.json" ]; then
+              echo '```json'
+              cat "$RUNNER_TEMP/bt/backtest_ci_summary.json"
+              echo '```'
+            else
+              echo "No summary written; see the log artifact."
+            fi
+            echo
+            echo "_No pass/fail threshold yet: there is one released engine, so"
+            echo "there is nothing to compare against. Read the numbers._"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: backtest-smoke
+          path: |
+            ${{ runner.temp }}/bt/*.json
+            ${{ runner.temp }}/bt/*.csv
+            ${{ runner.temp }}/bt.log
+          if-no-files-found: warn

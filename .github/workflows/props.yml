@@ -85,6 +85,41 @@ jobs:
           pip install pytest
           python -m pytest props/tests -q
 
+      - name: resolve the pinned engine
+        # THE ENGINE COMES FROM THE TAG, THE GLUE FROM MAIN. props/engine.lock.json
+        # on main names the release; the engine is exported from that tag into
+        # RUNNER_TEMP, never into the working tree -- `git checkout <tag> -- props/engine`
+        # would stage it, and the commit step below would then push the pinned
+        # engine over whatever main has.
+        #
+        # A FETCH FAILURE DOES NOT SKIP THE CAPTURE. A missed closing line cannot
+        # be recaptured; a run on main's engine can be identified after the fact,
+        # because every row it writes carries engine_source=main-fallback and the
+        # hash of what actually ran. The job is failed at the very end, after the
+        # record is committed, so notify.yml still opens an issue.
+        if: steps.guard.outputs.run == 'true' && steps.guard.outputs.mode == 'capture'
+        id: engine
+        run: |
+          set -uo pipefail
+          TAG=$(python3 -c "import json;print(json.load(open('props/engine.lock.json'))['tag'])")
+          HASH=$(python3 -c "import json;print(json.load(open('props/engine.lock.json'))['engine_sha256'])")
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          DEST="$RUNNER_TEMP/engine"
+          mkdir -p "$DEST"
+          if git fetch --no-tags --depth=1 origin "+refs/tags/$TAG:refs/tags/$TAG" \
+             && git archive --format=tar "refs/tags/$TAG" props/engine | tar -x -C "$DEST" \
+             && python3 props/engine_version.py verify \
+                  --engine-dir "$DEST/props/engine" --expect-hash "$HASH"; then
+            echo "ENGINE_DIR=$DEST/props/engine" >> "$GITHUB_ENV"
+            echo "ENGINE_SOURCE=tag" >> "$GITHUB_ENV"
+            echo "source=tag" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning title=pinned engine unavailable::$TAG could not be fetched or did not verify; running main's engine and marking every row main-fallback"
+            echo "ENGINE_DIR=props/engine" >> "$GITHUB_ENV"
+            echo "ENGINE_SOURCE=main-fallback" >> "$GITHUB_ENV"
+            echo "source=main-fallback" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: capture
         if: steps.guard.outputs.run == 'true' && steps.guard.outputs.mode == 'capture'
         env:
@@ -109,7 +144,7 @@ jobs:
           NFL_OUT: ${{ runner.temp }}/props-out
         run: |
           mkdir -p "$NFL_OUT"
-          python props/engine/scripts/score_week.py \
+          python "$ENGINE_DIR/scripts/score_week.py" \
             --season ${{ steps.guard.outputs.season }} \
             --week ${{ steps.guard.outputs.week }} \
             --workdir props/.cache \
@@ -119,9 +154,13 @@ jobs:
           # for a missing directory AND for "no artifacts found" AND for a bug
           # inside persist, so the fallback masked every one of those as the
           # same duplicate error instead of failing loudly.
+          # ONE VARIABLE FEEDS BOTH, so the stamp cannot describe a different
+          # tree than the one that scored.
           python props/record_run.py \
             --dir "$NFL_OUT" \
-            --snapshot-type ${{ steps.guard.outputs.snapshot_type }}
+            --snapshot-type ${{ steps.guard.outputs.snapshot_type }} \
+            --engine-dir "$ENGINE_DIR" \
+            --engine-source "$ENGINE_SOURCE"
 
       - name: settle
         if: steps.guard.outputs.run == 'true' && steps.guard.outputs.mode == 'settle'
@@ -140,3 +179,12 @@ jobs:
           git diff --cached --quiet || git commit -m "props: ${{ steps.guard.outputs.mode }} $(TZ=America/Los_Angeles date '+%a %m/%d %H:%M PT')"
           git pull --rebase --autostash origin ${{ github.ref_name }}
           git push
+
+      - name: fail if the capture ran an unpinned engine
+        # Deliberately last: the record is already written and pushed. This
+        # exists only so notify.yml opens an [ACT NOW] issue -- the rows say
+        # main-fallback either way, but a red run is what gets noticed.
+        if: always() && steps.engine.outputs.source == 'main-fallback'
+        run: |
+          echo "::error title=unpinned engine::the capture ran main's engine, not ${{ steps.engine.outputs.tag }}; rows are stamped main-fallback"
+          exit 1

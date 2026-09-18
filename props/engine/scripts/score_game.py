@@ -14,7 +14,7 @@ pulls a decision-time quote from Sleeper Picks (The Odds API as fallback), and w
   line_archive_nfl_{season}.jsonl decision snapshot rows (merged with --prior-archive)
   shadow_log_{season}_wk{W}_{AWAY}_{HOME}.csv  one row per posted line, all PASS
 
-EVERY probability here is EXPLORATORY. receiving_hier_v1 is PROTOTYPE; rush_yds_v0 and
+EVERY probability here is EXPLORATORY. receiving_hier_v2 is PROTOTYPE; rush_yds_v0 and
 anytime_td_v0 have no backtest at all. Nothing is a fair price or an entry threshold.
 Recommendation is PASS on every line, per the model registry.
 """
@@ -1107,7 +1107,7 @@ def main():
                     np.where(R.questionable, "QUESTIONABLE - regime unresolved",
                     np.where(R.gap.abs() > 0.10, "large gap - market likely holds info model lacks", "")))
         R["model_state"] = np.where(R.market.isin(["player_receptions", "player_reception_yds"]),
-            "receiving_hier_v1, MODEL_UNVALIDATED (PROTOTYPE)",
+            "receiving_hier_v2, MODEL_UNVALIDATED (PROTOTYPE)",
             np.where(R.market == "player_rush_yds",
                      "rush_yds_v0, MODEL_UNVALIDATED (no backtest)",
                      "anytime_td_v0, MODEL_UNVALIDATED (no backtest)"))
@@ -1884,7 +1884,7 @@ def main():
             L.append(f"| {r.book} | {r.market.replace('player_','')} | {r.player} | {'' if pd.isna(r.line) else r.line} | "
                      f"{'' if pd.isna(r.model_mean) else round(r.model_mean,1)} | {r.side} | {r.p_model:.3f} | {r.p_novig:.3f} | "
                      f"{r.gap:+.3f} | {r.price} | {r.ER:+.3f} |")
-    L.append(f"\nModel states: receptions/receiving yards `receiving_hier_v1` PROTOTYPE; rushing yards `rush_yds_v0` no backtest; "
+    L.append(f"\nModel states: receptions/receiving yards `receiving_hier_v2` PROTOTYPE; rushing yards `rush_yds_v0` no backtest; "
              f"anytime TD `anytime_td_v0` no backtest. All MODEL_UNVALIDATED. Dispersion: receptions log r = "
              f"{P['receptions_dispersion']['a']:.3f} + {P['receptions_dispersion']['b']:.3f}·log μ; carries "
              f"{P['carries_dispersion']['a']:.3f} + {P['carries_dispersion']['b']:.3f}·log μ; per-catch Gamma shape {SH:.3f}; "

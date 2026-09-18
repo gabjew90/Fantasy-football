@@ -4352,3 +4352,81 @@ Still to come, in order: one call per player/market per event (the record holds
 `line` is in the key -- correct as history, wrong as a call count); the chat
 bootstrap that makes the installed skill a thin loader fetching this repo at a
 tag; then the workflow pin, `props-ci.yml` and the release runbook.
+
+## 2026-09-18 (75) -- the engine is pinned, and the gate it does not have yet
+
+Entry 74 gave every record row an engine hash. This pins which engine runs,
+adds the other end of the closing-line measurement, and gates props changes on
+pull requests -- with one deliberate omission, recorded here so it is a choice
+rather than an oversight.
+
+THE PIN. `props/engine.lock.json` on main names a tag and the content hash of
+the engine at it. The capture workflow exports the engine from that tag into
+RUNNER_TEMP -- not `git checkout <tag> -- props/engine`, which stages it, so
+the existing `git add props/record` commit step would have pushed the pinned
+engine over whatever main has -- and verifies the hash before scoring. The
+glue (guard, record_run, persist, settle, scorecard) stays on main, because
+the schedule trigger runs main's workflow file regardless and glue cannot
+alter a probability or a tier.
+
+A FETCH FAILURE DOES NOT SKIP A CAPTURE. If the tag cannot be fetched or does
+not verify, the run uses main's engine and stamps `engine_source=main-fallback`
+onto every row, and a final step fails the job AFTER the record is committed
+so notify.yml opens an issue. The two requirements are in tension inside one
+step -- a failed step stops the ones after it -- so they are separate steps.
+The reasoning is the same as the lock-match check's: a closing line missed is
+unrecoverable, and a run that can be identified after the fact is not.
+
+THE OPENING SWEEP. Closing-line value needs two ends. The capture window opens
+six hours before a kickoff, by which time the board has absorbed most of the
+week's news, so Thursday 22:00-24:00 UTC now records where the week's numbers
+started, once per ISO week on the same marker mechanism the Tuesday settle
+uses. A test pins the case that matters: the sweep must not swallow the tick
+that would otherwise have made the Thursday nighter's decision capture.
+
+THE GATE, AND WHAT IT DELIBERATELY IS NOT. `props-ci.yml` runs on pull
+requests touching `props/**`: the props tests, the lock-match check, and --
+only when `model.py`, the priors or the calibration change -- a walk-forward
+CRPS backtest whose four numbers are printed to the job summary.
+
+It does NOT gate on those numbers. No reference JSON, no tolerance, no
+seed-noise study, no `resolve_engine.py`. A tolerance is a claim about how
+much CRPS moves between two runs of the SAME model, and answering that needs
+a seed sweep and a second engine version to sit against; there is exactly one
+released engine. Typing a threshold now would be a number invented rather
+than measured, which is the thing CLAUDE.md's "measure before cutting"
+forbids, and a gate calibrated by guess either blocks good changes or waves
+bad ones through. The smoke prints CRPS so a reviewer sees it move; the gate
+arrives with v1.2, when v1.1 is a baseline to compare against.
+
+THE LOCK-MATCH CHECK LIVES IN CI, NOT IN `props/tests/`. props.yml runs that
+directory before every capture, so an assertion there that the engine matches
+the lock would turn an unreleased engine edit into a skipped NFL slate. It
+belongs where a human is waiting.
+
+HYGIENE. `props/record/` joins `state/` as machine-written data and `props/`
+joins the code prefixes, with state winning the overlap so the workflow's own
+`git add props/record` still passes. The hazard is concrete: `record_run.py`
+in `local` mode writes into the checkout, so a hand-run while editing code
+sweeps rows into a code commit.
+
+props-v1.1 IS THE WORKED EXAMPLE, and it fixes two real defects rather than
+being a ceremonial bump. `backtest.py` used the pandas 2.2 `include_groups`
+keyword, which is a TypeError on the 1.5.3 this repo pins -- so the paired
+bootstrap, the one tool that compares two engines, crashed under production
+dependencies (demonstrated both ways on 1.5.3 before and after the fix). And
+`score_game.py` stamped `receiving_hier_v1` onto every row for a model the
+registry and the report both call v2: the record was mislabelled at precisely
+the field whose stated purpose is "so a later fix can be scoped".
+
+Those two edits moved the engine hash from 911a3de4 to 37b8ec71, which is the
+release mechanism demonstrating itself: the tag was withheld the moment the
+tree changed, and returned only after the lock was rewritten.
+
+Follow-ups, unchanged from entry 74 and still deliberate: narrowing the hash
+scope so a docs-only edit does not split the bucket; per-row `snapshot_type`
+(guard marks a whole run `close` when the soonest kickoff is inside the hour,
+so an early-afternoon run also stamps the late games -- `calls.last_per` is
+written to tolerate exactly that); stamping `commence_time` onto prediction
+rows; the root `tests/` suite in CI; and a GitHub ruleset protecting
+`props-v*` against a forced tag move.

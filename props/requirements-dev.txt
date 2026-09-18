@@ -1,0 +1,7 @@
+# Only the backtest needs these, and only in CI or a validation run. The
+# capture workflow installs props/requirements.txt alone, so the 15-minute
+# tick stays cheap.
+#
+# scipy is pinned to a build compatible with the numpy 1.26.4 / Python 3.11
+# the rest of the repo uses, so the smoke exercises the production stack.
+scipy==1.13.1

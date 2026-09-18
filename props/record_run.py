@@ -126,6 +126,8 @@ def main() -> int:
                     choices=["decision", "open", "close"])
     ap.add_argument("--engine-dir", type=Path, default=engine_version.ENGINE_DIR,
                     help="the engine tree that produced these artifacts")
+    ap.add_argument("--engine-source", default=None,
+                    help="how that tree was obtained: tag | main-fallback | local")
     args = ap.parse_args()
 
     src = Path(args.dir)
@@ -143,6 +145,12 @@ def main() -> int:
     # the capture path, where a lost slate is unrecoverable and a mislabelled
     # tag is a one-line fix: stamp the computed hash, withhold the tag, warn.
     stamp = engine_version.stamp(args.engine_dir)
+    if args.engine_source:
+        # WHERE THE ENGINE CAME FROM, not just what it was. A capture that
+        # fell back to main's engine because the pinned tag was unreachable
+        # is still a valid capture, but it is not the release, and the record
+        # has to say which.
+        stamp["engine_source"] = args.engine_source
     if stamp["engine_tag"] is None:
         print(f"engine {stamp['engine_hash'][:12]} does not match "
               f"{engine_version.LOCK_PATH.name}; rows carry the computed hash "

@@ -71,7 +71,7 @@ SETTLED_FIELDS = [
     # The engine that made the call. These must be listed here or the
     # DictWriter's extrasaction="ignore" below drops them silently, and the
     # scorecard could not separate two versions.
-    "engine_hash", "engine_tag",
+    "engine_hash", "engine_tag", "engine_source",
     "snapshot_type", "is_call",
     "logged_at_utc", "actual", "result", "status", "won", "pnl_per_100",
     "join_method",

@@ -307,3 +307,117 @@ def test_record_run_refuses_to_file_rows_it_cannot_stamp(tmp_path, monkeypatch):
         "--engine-dir", str(tmp_path / "no-engine")])
     assert record_run.main() == 2
     assert not (tmp_path / "record").exists(), "nothing may be written"
+
+
+# ------------------------------------------------- the Thursday opening sweep
+
+def _thursday_games():
+    """A week-3 Thursday nighter and its Sunday slate."""
+    return [{"week": "3", "gameday": "2026-09-24", "gametime": "20:15"},
+            {"week": "3", "gameday": "2026-09-27", "gametime": "13:00"}]
+
+
+def test_the_open_sweep_fires_once_a_week_on_thursday_evening(monkeypatch, tmp_path):
+    """Closing-line value needs two ends. The capture window only opens six
+    hours before a kickoff, by which time the board has absorbed the week's
+    news, so the opening price needs its own sweep."""
+    monkeypatch.setattr(guard, "CACHE", tmp_path)
+    monkeypatch.setattr(guard, "_period_marker",
+                        lambda kind, key: tmp_path / f"ran_{kind}_{key}")
+    monkeypatch.setattr(guard, "load_games", lambda season: _thursday_games())
+
+    thursday = dt.datetime(2026, 9, 24, 22, 5, tzinfo=dt.timezone.utc)
+    assert thursday.weekday() == 3
+    modes = []
+    for minutes in range(0, 120, 15):
+        monkeypatch.setattr(guard.dt, "datetime",
+                            _FrozenDatetime(thursday + dt.timedelta(minutes=minutes)))
+        modes.append(_run_guard(guard))
+    first = modes[0]
+    assert first["run"] == "true" and first["snapshot_type"] == "open"
+    assert int(first["week"]) == 3, "the week the sweep is for"
+    assert all(m["snapshot_type"] != "open" for m in modes[1:]), \
+        "the other seven ticks in the window must not re-open"
+
+
+def test_the_open_sweep_returns_the_next_week(monkeypatch, tmp_path):
+    monkeypatch.setattr(guard, "CACHE", tmp_path)
+    monkeypatch.setattr(guard, "_period_marker",
+                        lambda kind, key: tmp_path / f"r_{kind}_{key}")
+    monkeypatch.setattr(guard, "load_games", lambda season: _thursday_games())
+    for when, expect in ((dt.datetime(2026, 9, 24, 22, 5, tzinfo=dt.timezone.utc), "open"),
+                         (dt.datetime(2026, 10, 1, 22, 5, tzinfo=dt.timezone.utc), "open")):
+        monkeypatch.setattr(guard.dt, "datetime", _FrozenDatetime(when))
+        out = _run_guard(guard)
+        assert out["snapshot_type"] == expect, f"{when} should sweep again"
+
+
+def test_no_open_sweep_on_other_days_or_outside_the_window(monkeypatch, tmp_path):
+    monkeypatch.setattr(guard, "CACHE", tmp_path)
+    monkeypatch.setattr(guard, "_period_marker",
+                        lambda kind, key: tmp_path / f"r_{kind}_{key}")
+    monkeypatch.setattr(guard, "load_games", lambda season: _thursday_games())
+    for when in (dt.datetime(2026, 9, 23, 22, 5, tzinfo=dt.timezone.utc),   # Wednesday
+                 dt.datetime(2026, 9, 25, 22, 5, tzinfo=dt.timezone.utc),   # Friday
+                 dt.datetime(2026, 9, 24, 21, 5, tzinfo=dt.timezone.utc)):  # too early
+        monkeypatch.setattr(guard.dt, "datetime", _FrozenDatetime(when))
+        assert _run_guard(guard)["snapshot_type"] != "open", when
+
+
+def test_the_open_sweep_never_shadows_a_kickoff_that_is_already_close(monkeypatch, tmp_path):
+    """A Thursday 20:15 ET kickoff is 00:15Z Friday, so at 22:05Z Thursday
+    the game is two hours out -- inside the capture window but not inside the
+    close window. The sweep must not swallow the tick that would have made
+    the decision capture."""
+    monkeypatch.setattr(guard, "CACHE", tmp_path)
+    monkeypatch.setattr(guard, "_period_marker",
+                        lambda kind, key: tmp_path / f"r_{kind}_{key}")
+    monkeypatch.setattr(guard, "load_games", lambda season: _thursday_games())
+    monkeypatch.setattr(guard.dt, "datetime",
+                        _FrozenDatetime(dt.datetime(2026, 9, 24, 22, 5, tzinfo=dt.timezone.utc)))
+    first = _run_guard(guard)
+    assert first["snapshot_type"] == "open"
+    # the very next tick still captures the approaching kickoff
+    monkeypatch.setattr(guard.dt, "datetime",
+                        _FrozenDatetime(dt.datetime(2026, 9, 24, 22, 20, tzinfo=dt.timezone.utc)))
+    second = _run_guard(guard)
+    assert second["run"] == "true" and second["snapshot_type"] == "decision"
+
+
+def test_the_engine_source_is_stamped_when_the_workflow_passes_it(tmp_path, monkeypatch):
+    """A capture that fell back to main's engine is still a valid capture,
+    but it is not the release, and the record has to say which."""
+    import record_run
+    engine = tmp_path / "engine"
+    (engine / "scripts").mkdir(parents=True)
+    (engine / "SKILL.md").write_bytes(b"---\nname: x\n---\n")
+    (engine / "scripts/model.py").write_bytes(b"x = 1\n")
+    monkeypatch.setattr(persist, "RECORD_ROOT", tmp_path / "record")
+    monkeypatch.setattr(sys, "argv", [
+        "record_run.py", "--dir", str(_scorer_dir(tmp_path)),
+        "--engine-dir", str(engine), "--engine-source", "main-fallback"])
+    assert record_run.main() == 0
+
+    rows = [json.loads(x) for x in
+            (tmp_path / "record" / "predictions/2026/wk02.jsonl").open(encoding="utf-8")
+            if x.strip()]
+    assert rows and all(r["engine_source"] == "main-fallback" for r in rows)
+
+
+def test_no_engine_source_flag_leaves_the_field_off(tmp_path, monkeypatch):
+    """Chat and laptop runs pass nothing; the absence is not 'unknown', it
+    is simply not a workflow capture."""
+    import record_run
+    engine = tmp_path / "engine"
+    (engine / "scripts").mkdir(parents=True)
+    (engine / "SKILL.md").write_bytes(b"---\nname: x\n---\n")
+    (engine / "scripts/model.py").write_bytes(b"x = 1\n")
+    monkeypatch.setattr(persist, "RECORD_ROOT", tmp_path / "record")
+    monkeypatch.setattr(sys, "argv", [
+        "record_run.py", "--dir", str(_scorer_dir(tmp_path)),
+        "--engine-dir", str(engine)])
+    assert record_run.main() == 0
+    rows = [json.loads(x) for x in
+            (tmp_path / "record" / "predictions/2026/wk02.jsonl").open(encoding="utf-8")
+            if x.strip()]
+    assert all("engine_source" not in r for r in rows)
