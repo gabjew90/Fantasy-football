@@ -59,9 +59,27 @@ def engine_archive_at_tag(tag: str, out: Path) -> Path:
     codeload returns, so bootstrap.extract_engine handles both.
     """
     out.parent.mkdir(parents=True, exist_ok=True)
+    # THE TAG MAY NOT EXIST YET. The lock is bumped in the same PR as the
+    # engine change -- it has to be, or props-ci's lock check is red on every
+    # engine PR -- so between opening that PR and cutting the tag on the merge
+    # commit, the lock names a ref git cannot resolve. Fall back to HEAD, whose
+    # engine tree is the one the lock was just computed from.
+    #
+    # This cannot smuggle in the wrong engine: main() hashes whatever comes out
+    # of here against lock["engine_sha256"] and refuses on a mismatch. The tag
+    # is the preferred source because it is immutable, not because it is the
+    # only trustworthy one.
+    ref, why = tag, ""
+    if subprocess.run(["git", "rev-parse", "-q", "--verify", f"refs/tags/{tag}"],
+                      cwd=REPO, capture_output=True).returncode != 0:
+        ref, why = "HEAD", f" (tag {tag} not cut yet; built from HEAD)"
+        print(f"note: {tag} does not exist; vendoring the engine at HEAD instead. "
+              f"The hash check below is what makes this safe.", file=sys.stderr)
     with out.open("wb") as fh:
-        subprocess.run(["git", "archive", "--format=tar.gz", tag, "props/engine"],
+        subprocess.run(["git", "archive", "--format=tar.gz", ref, "props/engine"],
                        cwd=REPO, check=True, stdout=fh)
+    if why:
+        print(f"vendored engine source: {ref}{why}", file=sys.stderr)
     return out
 
 
@@ -115,20 +133,20 @@ def main(argv: list[str] | None = None) -> int:
                         stage / "scripts" / "engine_version.py")
         shutil.copyfile(PROPS / "engine.lock.json", stage / "engine.lock.json")
 
-        engine_archive_at_tag(tag, stage / "vendor" / "engine.tar.gz")
+        archive = engine_archive_at_tag(tag, stage / "vendor" / "engine.tar.gz")
 
-        # Verify what is actually being shipped, by unpacking it the way the
-        # bootstrap will: a fallback nobody checked is a fallback that can be
-        # wrong exactly when it is needed.
+        # Verify THE FILE BEING SHIPPED, by unpacking it the way the bootstrap
+        # will: a fallback nobody checked is a fallback that can be wrong
+        # exactly when it is needed. This used to re-export the tag into a
+        # second tarball and hash that, which checked a different artifact than
+        # the one in the zip and resolved the ref twice -- so the archive could
+        # in principle differ from what was verified.
         check = Path(tmp) / "check"
-        subprocess.run(["git", "archive", "--format=tar", tag, "props/engine"],
-                       cwd=REPO, check=True,
-                       stdout=(Path(tmp) / "check.tar").open("wb"))
         check.mkdir(parents=True, exist_ok=True)
-        shutil.unpack_archive(str(Path(tmp) / "check.tar"), str(check), format="tar")
+        shutil.unpack_archive(str(archive), str(check), format="gztar")
         vendored_hash = engine_version.tree_hash(check / "props" / "engine")
         if vendored_hash != lock["engine_sha256"]:
-            print(f"the engine at {tag} does not match the lock "
+            print(f"the vendored engine does not match the lock "
                   f"({vendored_hash[:12]} vs {lock['engine_sha256'][:12]})",
                   file=sys.stderr)
             return 1
