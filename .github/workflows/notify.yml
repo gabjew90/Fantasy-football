@@ -1,9 +1,13 @@
 # Failure notifier: opens an [ACT NOW] issue (with an @mention -> email +
-# app push) whenever weekly or gate goes red. Zero secrets, zero deps.
+# app push) whenever weekly, gate or props goes red. Zero secrets, zero deps.
+#
+# `props` was added 2026-09-17: it runs every 15 minutes and commits the
+# betting record, and its failures were silent. A capture that dies takes a
+# snapshot with it, and a closing line cannot be captured retrospectively.
 name: notify
 on:
   workflow_run:
-    workflows: [weekly, gate]
+    workflows: [weekly, gate, props]
     types: [completed]
 
 permissions:
