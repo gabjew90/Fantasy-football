@@ -418,6 +418,16 @@ def main():
     shape_ypc = float(np.average(ss, weights=ws)) if ss else 1.0
     print(f"model dispersion: rec r={rec_fit}  shape_ypc={shape_ypc:.3f}", file=sys.stderr)
 
+    # TEAM VOLUME DISPERSION, fit on the training weeks only.
+    # The live scorer takes this from the prior-season priors file; the
+    # backtest must not, because priors_{S} is built from season S -- the very
+    # season under test. Fitting it on train weeks keeps the walk-forward
+    # honest and matches build_priors.nb_dispersion_pooled exactly.
+    _tt_train = twt[twt.week.isin(TRAIN)].team_targets.values.astype(float)
+    _m, _v = _tt_train.mean(), _tt_train.var()
+    r_team_targets = float(_m ** 2 / (_v - _m)) if _v > _m else 30.0
+    print(f"team target dispersion (train weeks): r={r_team_targets:.2f}", file=sys.stderr)
+
     def r_of(mu, fit, clamp=(0.5, 30.0)):
         return float(np.clip(np.exp(fit["a"] + fit["b"]*np.log(max(mu, 1e-6))), *clamp))
     def draw(mu, ypc, fit):
@@ -434,13 +444,53 @@ def main():
     test_act = feat_te[feat_te.roster_status == "ACT"].reset_index(drop=True)
 
     def draw_block(mu_arr, ypc_arr, fit):
-        """Draw all players at once: (n_players, N) arrays. Replaces a per-row Python
-        loop that dominated runtime."""
+        """INDEPENDENT per-player draws. Kept only as the marginal comparator.
+
+        This is what the backtest used to score, and it is NOT the generative
+        model the live scorer runs: it gives each player his own negative
+        binomial, so two receivers on one team can both post a career day in
+        the same simulation off a team that only threw 24 times. Retained
+        because the difference between this and the joint draw below is itself
+        a measurement worth printing.
+        """
         r_arr = np.clip(np.exp(fit["a"] + fit["b"] * np.log(np.maximum(mu_arr, 1e-6))), 0.5, 30.0)
         p_arr = r_arr / (r_arr + mu_arr)
         rec = rng.negative_binomial(r_arr[:, None], p_arr[:, None], size=(len(mu_arr), N)).astype(float)
         shape_tot = np.maximum(np.clip(rec, 0, 25) * shape_ypc, 1e-6)
         yds = np.where(rec > 0, rng.gamma(shape_tot, (np.maximum(ypc_arr, 0.5) / shape_ypc)[:, None]), 0.0)
+        return rec, yds
+
+    def draw_block_joint(frame, shares, crs, ypts):
+        """THE LIVE PIPELINE'S DRAW: one team-volume draw per simulation, split
+        across that team's players, catches binomial on each player's own
+        targets, yards a sum of per-catch gammas.
+
+        Same call the scorer makes (model.simulate_team_game), so the CRPS this
+        backtest reports finally describes the sampler that prices the props.
+        Teammates end up negatively correlated within a simulation and every
+        player inherits the team's play-count variance -- both true of football
+        and both absent from the independent draw above.
+
+        Players are grouped by (team, week) because that is one team's game.
+        Arrays come back in `frame` row order.
+        """
+        rec = np.zeros((len(frame), N))
+        yds = np.zeros((len(frame), N))
+        pos = {ix: i for i, ix in enumerate(frame.index)}
+        for (team, week), g in frame.groupby(["team", "week"], sort=False):
+            # team_targets_env is a team-week property, so every row in the
+            # group carries the same value; take the first rather than a mean
+            # that would silently hide a data error.
+            tvol = float(g.team_targets_env.iloc[0])
+            out, _tt = M.simulate_team_game(
+                rng, N, tvol, r_team_targets,
+                {ix: float(shares[pos[ix]]) for ix in g.index},
+                {ix: float(crs[pos[ix]]) for ix in g.index},
+                {ix: float(ypts[pos[ix]]) for ix in g.index},
+                shape_ypc)
+            for ix, (r_, y_) in out.items():
+                rec[pos[ix]] = r_
+                yds[pos[ix]] = y_
         return rec, yds
 
     def crps_block(samples, y_arr):
@@ -460,8 +510,17 @@ def main():
     mu_a = np.maximum(test_act.team_targets_env.values * shareA * crA, 0.02)
     ypc_a = np.maximum(yptA / crA, 0.5)
 
-    recM, ydsM = draw_block(mu_m, ypc_m, rec_fit)
-    recA, ydsA = draw_block(mu_a, ypc_a, rec_fit_A)
+    # Both arms use the joint sampler, so the model-vs-baseline comparison
+    # isolates the SHRINKAGE, which is what baseline A exists to test. Mixing
+    # samplers across arms would confound the two.
+    ypt_m = test_act.ypt.values
+    recM, ydsM = draw_block_joint(test_act, test_act.ts.values,
+                                  test_act.cr.clip(lower=0.05).values, ypt_m)
+    recA, ydsA = draw_block_joint(test_act, shareA, crA, yptA)
+    # The old independent draw, kept as a diagnostic: the gap between these and
+    # the joint numbers is the cost of the sampler that was being measured
+    # instead of the one that ships.
+    recI, ydsI = draw_block(mu_m, ypc_m, rec_fit)
     y_rec = test_act.act_receptions.values.astype(float)
     y_yds = test_act.act_rec_yards.values.astype(float)
 
@@ -477,6 +536,7 @@ def main():
         "pit_rec": rpit_block(recM, y_rec), "pit_yds": rpit_block(ydsM, y_yds),
         "crps_rec_model": crps_block(recM, y_rec), "crps_rec_baseA": crps_block(recA, y_rec),
         "crps_yds_model": crps_block(ydsM, y_yds), "crps_yds_baseA": crps_block(ydsA, y_yds),
+        "crps_rec_indep": crps_block(recI, y_rec), "crps_yds_indep": crps_block(ydsI, y_yds),
     })
     out_rows = res_df
     res = out_rows.merge(gm, on=["team", "week"], how="left")
@@ -486,8 +546,12 @@ def main():
     # fraction of outcomes above the model MEDIAN (should be ~0.5, less for zero-heavy
     # counts) and a 10-bin PIT histogram (should be flat). ----
     print(f"\n=== Overall model vs baseline A, N={len(res)} ===", file=sys.stderr)
-    for col in ["crps_rec_model", "crps_rec_baseA", "crps_yds_model", "crps_yds_baseA"]:
+    for col in ["crps_rec_model", "crps_rec_baseA", "crps_rec_indep",
+                "crps_yds_model", "crps_yds_baseA", "crps_yds_indep"]:
         print(f"  {col}: {res[col].mean():.4f}", file=sys.stderr)
+    print("  (_indep = the old independent per-player draw, for comparison "
+          "only; _model and _baseA both use the live joint sampler)",
+          file=sys.stderr)
     # ---- BIAS DIAGNOSTIC (reviewer request): CRPS cannot see a one-directional shift ----
     print(f"\n=== Bias check (0.50 = unbiased median; PIT mean 0.50 = calibrated) ===", file=sys.stderr)
     for mk, act, mean_col in [("rec", "act_receptions", "mean_rec_model"), ("yds", "act_rec_yards", "mean_yds_model")]:
@@ -555,6 +619,10 @@ def main():
     json.dump({"env": args.env, "opponent": args.opponent, "N": len(res),
                "crps_rec_model": float(res.crps_rec_model.mean()), "crps_rec_baseA": float(res.crps_rec_baseA.mean()),
                "crps_yds_model": float(res.crps_yds_model.mean()), "crps_yds_baseA": float(res.crps_yds_baseA.mean()),
+               "crps_rec_indep": float(res.crps_rec_indep.mean()),
+               "crps_yds_indep": float(res.crps_yds_indep.mean()),
+               "sampler": "model.simulate_team_game (joint, shared with the live scorer)",
+               "team_targets_r": r_team_targets,
                "rec_dispersion": rec_fit, "shape_ypc": shape_ypc},
               open(OUT / f"backtest_{tag}_summary.json", "w"), indent=2)
 
