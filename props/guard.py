@@ -54,18 +54,75 @@ def emit(**kw) -> None:
 
 
 def load_games(season: int) -> list[dict]:
+    """The season's REG rows, from the day-old cache or the network.
+
+    A FAILED FETCH FALLS BACK TO A STALE CACHE rather than raising. The
+    schedule barely changes -- only December flex moves a kickoff -- so
+    yesterday's copy answers "is a game starting soon" correctly, and the
+    alternative was a run that could not name its own week (see main()).
+    """
     CACHE.mkdir(parents=True, exist_ok=True)
     cached = CACHE / f"games_{season}.json"
     if cached.exists():
         age = dt.datetime.now().timestamp() - cached.stat().st_mtime
         if age < 86400:
             return json.loads(cached.read_text(encoding="utf-8"))
-    with urllib.request.urlopen(GAMES_URL, timeout=30) as resp:
-        text = resp.read().decode("utf-8", "replace")
+    try:
+        with urllib.request.urlopen(GAMES_URL, timeout=30) as resp:
+            text = resp.read().decode("utf-8", "replace")
+    except Exception:
+        if cached.exists():
+            print("schedule fetch failed; using the stale cached copy", file=sys.stderr)
+            return json.loads(cached.read_text(encoding="utf-8"))
+        raise
     rows = [r for r in csv.DictReader(io.StringIO(text))
             if r.get("season") == str(season) and r.get("game_type") == "REG"]
     cached.write_text(json.dumps(rows), encoding="utf-8")
     return rows
+
+
+def week_from_calendar(now: dt.datetime, season: int) -> int:
+    """Best-effort NFL week when the schedule cannot be read at all.
+
+    Week 1 opens on the Thursday after Labor Day (the first Monday in
+    September), which is fixed by the calendar and needs no download. Used
+    only on the fallback path, where the alternative was emitting week=0 --
+    a week no game belongs to, so the run that was opened to protect a
+    closing capture could not capture anything.
+    """
+    sept = dt.date(season, 9, 1)
+    labor_day = sept + dt.timedelta(days=(7 - sept.weekday()) % 7)  # first Monday
+    kickoff_thursday = labor_day + dt.timedelta(days=3)
+    week = (now.date() - kickoff_thursday).days // 7 + 1
+    return max(1, min(18, week))
+
+
+def _period_marker(kind: str, key: str) -> Path:
+    return CACHE / f"ran_{kind}_{key}"
+
+
+def period_done(kind: str, key: str) -> bool:
+    return _period_marker(kind, key).exists()
+
+
+def mark_period(kind: str, key: str) -> None:
+    """Record that this kind ran for this period.
+
+    THE WINDOW STAYS WIDE, THE RUN HAPPENS ONCE. Narrowing the Tuesday
+    settle window to one 15-minute slot would have been the obvious fix and
+    the wrong one: GitHub fires this repo's crons a median 128 minutes late
+    (DECISIONS #70), which is exactly why the window is two hours. So the
+    window keeps absorbing the lag and the marker stops the other seven
+    ticks inside it from re-settling, re-scoring and re-pushing. The marker
+    lives in the Actions cache, so a cache miss costs one duplicate run
+    rather than eight.
+    """
+    try:
+        CACHE.mkdir(parents=True, exist_ok=True)
+        _period_marker(kind, key).write_text(dt.datetime.now(dt.timezone.utc).isoformat(),
+                                             encoding="utf-8")
+    except OSError:
+        pass          # a marker we cannot write is a duplicate run, not a failure
 
 
 def kickoff_utc(row: dict) -> dt.datetime | None:
@@ -116,8 +173,15 @@ def main() -> int:
              snapshot_type="decision")
         return 0
 
-    # Tuesday settle window.
+    # Tuesday settle window, once per ISO week.
     if now.weekday() == 1 and 14 <= now.hour < 16:
+        iso = now.isocalendar()
+        key = f"{iso[0]}-W{iso[1]:02d}"
+        if period_done("settle", key):
+            emit(run="false", mode="idle", season=season, week=0,
+                 snapshot_type="none")
+            return 0
+        mark_period("settle", key)
         emit(run="true", mode="settle", season=season, week=0,
              snapshot_type="decision")
         return 0
@@ -125,8 +189,12 @@ def main() -> int:
     try:
         games = load_games(season)
     except Exception as exc:  # network hiccup: open the window, do not lose a close
-        print(f"schedule unavailable ({exc}); opening window", file=sys.stderr)
-        emit(run="true", mode="capture", season=season, week=0,
+        # week=0 used to go out here, which no game belongs to, so the run
+        # this branch exists to protect could not capture anything.
+        week = week_from_calendar(now, season)
+        print(f"schedule unavailable ({exc}); opening window at calendar week {week}",
+              file=sys.stderr)
+        emit(run="true", mode="capture", season=season, week=week,
              snapshot_type="decision")
         return 0
 

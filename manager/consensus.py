@@ -125,6 +125,7 @@ def _espn(scoring: dict, season, raw_dir, index) -> tuple[dict[str, float], str 
     try:
         from draftkit import espn as espn_mod
         from draftkit import ids as ids_mod
+        from draftkit import seasondata
         raw = espn_mod.fetch_projections(season, Path(raw_dir))
         rows = espn_mod.parse_players(raw, season)
     except Exception as e:  # noqa: BLE001
@@ -134,9 +135,19 @@ def _espn(scoring: dict, season, raw_dir, index) -> tuple[dict[str, float], str 
     names = ids_mod.NameIndex(index)
     out = {}
     for r in rows:
-        # NameIndex matches on fantasy eligibility and prefers live players;
-        # ambiguity between two live players is still dropped, not guessed.
-        pid = names.resolve(r["name"], r["pos"], r.get("team") or "")
+        if r["pos"] == "DEF":
+            # UNREACHABLE TODAY, GUARDED ANYWAY. espn.parse_players filters to
+            # SKILL = QB/RB/WR/TE, so no team unit reaches here even though
+            # POS_BY_ID can name one. A team is matched by team code, never by
+            # name -- NameIndex keeps defences out of the name table entirely --
+            # so if SKILL ever grows this has to be the path, not resolve().
+            pid = names.defense(r.get("team") or "", seasondata.SLEEPER_CODE)
+        else:
+            # NameIndex matches on fantasy eligibility and prefers live
+            # players; ambiguity between two live players is still dropped,
+            # not guessed. parse_players carries no team, so the team
+            # tiebreak is inert on this reader by construction.
+            pid = names.resolve(r["name"], r["pos"], r.get("team") or "")
         if pid is not None:
             out[pid] = _score(r["line"], scoring)
     return out, None

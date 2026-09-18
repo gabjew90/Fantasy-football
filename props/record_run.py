@@ -79,7 +79,7 @@ def read_shadow_log(path: Path, snapshot_type: str, game: str) -> list[dict]:
     return rows
 
 
-def read_archive(path: Path, season: int, week: int, snapshot_type: str) -> list[dict]:
+def read_archive(path: Path, season: int, week: int | None, snapshot_type: str) -> list[dict]:
     rows = []
     with path.open(encoding="utf-8") as fh:
         for line in fh:
@@ -91,7 +91,18 @@ def read_archive(path: Path, season: int, week: int, snapshot_type: str) -> list
             except json.JSONDecodeError:
                 continue
             r.setdefault("season", season)
-            r.setdefault("week", week)
+            # The scorer stamps its own week on every quote, so this only
+            # fills a gap -- and it fills it ONLY when the run covered one
+            # unambiguous week. It used to take the lowest week among
+            # whatever shadow logs sat in the directory, which silently
+            # mislabelled quotes (and `week` is part of the dedupe key, so a
+            # mislabel duplicates the row rather than updating it).
+            if r.get("week") in (None, ""):
+                if week is None:
+                    print(f"{path.name}: a quote carries no week and this run "
+                          f"covers none or several; left unstamped", file=sys.stderr)
+                else:
+                    r["week"] = week
             r.setdefault("snapshot_type", snapshot_type)
             rows.append(r)
     return rows
@@ -130,7 +141,7 @@ def main() -> int:
     for f in archive_files:
         season = int(ARCHIVE_RE.search(f.name).group(1))
         weeks = sorted({w for (s, w) in by_week if s == season})
-        week = weeks[0] if weeks else 0
+        week = weeks[0] if len(weeks) == 1 else None
         summaries.append(persist.write_lines(
             season, read_archive(f, season, week, args.snapshot_type)))
 

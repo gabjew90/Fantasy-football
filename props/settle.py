@@ -172,8 +172,13 @@ def main() -> int:
         print("no matching weeks", file=sys.stderr)
         return 2
 
+    # The nflverse stats file is a cacheable INPUT, so it belongs in the
+    # workdir the props cache keeps, not in a hard-coded /tmp -- which exists
+    # on the Ubuntu runner but resolves to C:\tmp when settle is run by hand
+    # on the machine that holds the credentials.
     stats = load_stats(args.season,
-                       Path("/tmp") / f"stats_player_week_{args.season}.csv")
+                       persist.RECORD_ROOT.parent / ".cache"
+                       / f"stats_player_week_{args.season}.csv")
 
     out_rows, counts = [], {"settled": 0, "push": 0, "dnp": 0,
                             "unjoined": 0, "unplayed_week": 0}

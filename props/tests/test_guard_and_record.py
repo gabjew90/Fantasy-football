@@ -25,6 +25,29 @@ def _kick(day: str, time: str):
     return guard.kickoff_utc({"gameday": day, "gametime": time})
 
 
+def _FrozenDatetime(now):  # noqa: N802 - it stands in for a class
+    """dt.datetime with now() pinned, so the guard's clock is testable.
+
+    Subclassed rather than mocked because kickoff_utc also uses strptime and
+    the constructor, and those must keep working.
+    """
+    class _F(dt.datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return now.astimezone(tz) if tz else now.replace(tzinfo=None)
+    return _F
+
+
+def _run_guard(mod) -> dict:
+    """main()'s GITHUB_OUTPUT lines, as a dict."""
+    import contextlib
+    import io
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf):
+        assert mod.main() == 0
+    return dict(line.split("=", 1) for line in buf.getvalue().splitlines() if "=" in line)
+
+
 # ------------------------------------------------------------------- clock
 
 def test_september_kickoff_matches_the_verified_schedule():
@@ -102,3 +125,77 @@ def test_a_crash_during_the_rewrite_keeps_the_previous_file(tmp_path, monkeypatc
     with pytest.raises(KeyboardInterrupt):
         persist.append_jsonl(p, _rows(9), persist.PREDICTION_KEY)
     assert p.read_text(encoding="utf-8") == before, "the record was clobbered"
+
+
+# ------------------------------------------------ the window runs once, and
+# ------------------------------------------------ knows its week regardless
+
+def test_the_settle_window_opens_once_per_week_not_once_per_tick(monkeypatch, tmp_path):
+    """The window has to stay two hours wide because GitHub fires crons a
+    median 128 minutes late, so the duplicate ticks are stopped by a marker
+    instead of by narrowing the window."""
+    monkeypatch.setattr(guard, "CACHE", tmp_path)
+    monkeypatch.setattr(guard, "_period_marker",
+                        lambda kind, key: tmp_path / f"ran_{kind}_{key}")
+    tue = dt.datetime(2026, 9, 22, 14, 3, tzinfo=dt.timezone.utc)
+    assert tue.weekday() == 1
+
+    modes = []
+    for minutes in range(0, 120, 15):          # every tick inside the window
+        now = tue + dt.timedelta(minutes=minutes)
+        monkeypatch.setattr(guard.dt, "datetime", _FrozenDatetime(now))
+        out = _run_guard(guard)
+        modes.append(out["mode"])
+    assert modes[0] == "settle", "the first tick in the window settles"
+    assert set(modes[1:]) == {"idle"}, f"only one settle per week, got {modes}"
+
+    # ...and next week settles again
+    nxt = tue + dt.timedelta(days=7)
+    monkeypatch.setattr(guard.dt, "datetime", _FrozenDatetime(nxt))
+    assert _run_guard(guard)["mode"] == "settle"
+
+
+def test_an_unreadable_schedule_opens_the_window_with_a_real_week(monkeypatch, tmp_path):
+    """It used to emit week=0, which no game belongs to, so the run opened to
+    protect a closing capture could not capture anything."""
+    monkeypatch.setattr(guard, "CACHE", tmp_path)
+    monkeypatch.setattr(guard, "_period_marker", lambda kind, key: tmp_path / f"r_{kind}_{key}")
+
+    def boom(season):
+        raise OSError("dns")
+    monkeypatch.setattr(guard, "load_games", boom)
+    now = dt.datetime(2026, 9, 24, 18, 0, tzinfo=dt.timezone.utc)   # Thursday, week 3
+    monkeypatch.setattr(guard.dt, "datetime", _FrozenDatetime(now))
+    out = _run_guard(guard)
+    assert out["run"] == "true" and out["mode"] == "capture"
+    assert int(out["week"]) == 3, out
+
+
+def test_the_calendar_week_matches_the_real_schedule():
+    """Week 1 opens the Thursday after Labor Day. 2026: Labor Day Sep 7,
+    so week 1 is Sep 10 and week 2 is Sep 17 -- the night we verified."""
+    wk = guard.week_from_calendar
+    at = lambda m, d: dt.datetime(2026, m, d, 18, tzinfo=dt.timezone.utc)  # noqa: E731
+    assert wk(at(9, 10), 2026) == 1
+    assert wk(at(9, 17), 2026) == 2
+    assert wk(at(9, 20), 2026) == 2, "Sunday belongs to the week that opened Thursday"
+    assert wk(at(11, 1), 2026) == 8
+    # clamped at both ends: before the opener and after week 18
+    assert wk(at(8, 1), 2026) == 1
+    assert wk(dt.datetime(2027, 3, 1, 18, tzinfo=dt.timezone.utc), 2026) == 18
+
+
+def test_a_stale_cache_answers_when_the_fetch_fails(monkeypatch, tmp_path):
+    monkeypatch.setattr(guard, "CACHE", tmp_path)
+    cached = tmp_path / "games_2026.json"
+    cached.write_text(json.dumps([{"week": "2", "gameday": "2026-09-20",
+                                   "gametime": "13:00"}]), encoding="utf-8")
+    import os
+    old = dt.datetime.now().timestamp() - 200000        # older than a day
+    os.utime(cached, (old, old))
+
+    def boom(*a, **k):
+        raise OSError("dns")
+    monkeypatch.setattr(guard.urllib.request, "urlopen", boom)
+    rows = guard.load_games(2026)
+    assert rows and rows[0]["gameday"] == "2026-09-20", "stale beats nothing"
