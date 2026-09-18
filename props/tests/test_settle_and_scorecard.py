@@ -67,6 +67,12 @@ def record(tmp_path, monkeypatch):
     monkeypatch.setattr(settle.persist, "RECORD_ROOT", root)
     monkeypatch.setattr(scorecard.persist, "RECORD_ROOT", root)
     monkeypatch.setattr(settle, "load_stats", lambda season, cache: _stats_frame())
+    # The schedule is a network read behind a day-old cache. Tests that are
+    # not about game context get a fixed one rather than a machine-dependent
+    # one; the two tests below drive the real reader with a stub schedule.
+    monkeypatch.setattr(settle, "game_context", lambda season: {
+        (2, "SF"): {"team_points": 24.0, "opp_points": 17.0,
+                    "game_total": 41.0}})
     return root
 
 
@@ -204,3 +210,86 @@ def test_clv_pairs_one_call_with_one_close(record):
     assert row["line_close"] == 55.5, "the last close, not the first"
     assert row["line_move"] == pytest.approx(-4.0)
     assert bool(row["moved_our_way"]) is True, "an Under wants the number down"
+
+
+# ------------------------------------------- why the call missed, not just that
+
+def _rich_stats_frame() -> "pd.DataFrame":
+    """The same week, with the usage columns nflverse actually publishes."""
+    df = _stats_frame()
+    df["targets"] = [7, 2]
+    df["carries"] = [14, 0]
+    df["target_share"] = [0.212, 0.061]
+    df["air_yards_share"] = [0.184, 0.044]
+    df["wopr"] = [0.511, 0.131]
+    df["opponent_team"] = ["MIA", "MIA"]
+    return df
+
+
+def test_a_graded_call_carries_the_usage_and_the_game_that_explain_it(
+        record, monkeypatch):
+    """Grading says the Under won. Review asks why the projection was 22
+    yards high, and that question is only answerable if the row remembers how
+    much of the offence the player actually got and what the game looked
+    like."""
+    monkeypatch.setattr(settle, "load_stats",
+                        lambda season, cache: _rich_stats_frame())
+    _write(record, [_pred(model_mean=62.4)])
+    assert settle.main(["--season", "2026"]) == 0
+
+    row = _settled(record)[0]
+    assert float(row["actual"]) == 40.0
+    # 40 rushing yards against a 62.4 projection: the model was 22.4 high.
+    assert float(row["miss"]) == pytest.approx(-22.4)
+    assert int(float(row["carries"])) == 14
+    assert float(row["target_share"]) == pytest.approx(0.212)
+    assert float(row["wopr"]) == pytest.approx(0.511)
+    assert row["opponent"] == "MIA"
+    # SF 24, MIA 17 -- not a blowout, so a starter's snaps are not the story.
+    assert float(row["team_points"]) == 24.0
+    assert float(row["opp_points"]) == 17.0
+    assert float(row["game_total"]) == 41.0
+
+
+def test_a_row_with_no_projection_grades_anyway_and_leaves_miss_empty(
+        record, monkeypatch):
+    """`model_mean` is not in the settled schema's required core. A row that
+    predates it, or a market that does not produce one, still grades -- the
+    diagnostic is a bonus and may never gate a settle."""
+    monkeypatch.setattr(settle, "load_stats",
+                        lambda season, cache: _rich_stats_frame())
+    _write(record, [_pred()])
+    assert settle.main(["--season", "2026"]) == 0
+    row = _settled(record)[0]
+    assert row["status"] == "settled" and row["miss"] == ""
+
+
+def test_game_context_reads_the_schedule_and_ignores_unplayed_games(monkeypatch):
+    """Both teams get a row, and a game with no score yet contributes none --
+    otherwise week 3's fixtures would settle week 2's calls to 0-0."""
+    import guard
+    monkeypatch.setattr(guard, "load_games", lambda season: [
+        {"week": "2", "home_team": "SF", "away_team": "MIA",
+         "home_score": "24", "away_score": "17"},
+        {"week": "3", "home_team": "SF", "away_team": "ARI",
+         "home_score": "", "away_score": ""},
+    ])
+    ctx = settle.game_context(2026)
+    assert ctx[(2, "SF")] == {"team_points": 24.0, "opp_points": 17.0,
+                              "game_total": 41.0}
+    assert ctx[(2, "MIA")] == {"team_points": 17.0, "opp_points": 24.0,
+                               "game_total": 41.0}
+    assert (3, "SF") not in ctx
+
+
+def test_an_unreadable_schedule_costs_context_and_nothing_else(monkeypatch, capsys):
+    """settle runs on Tuesday against a record that is already written. A
+    schedule fetch that fails must not take the grades down with it."""
+    import guard
+
+    def boom(season):
+        raise OSError("no network")
+
+    monkeypatch.setattr(guard, "load_games", boom)
+    assert settle.game_context(2026) == {}
+    assert "game context unavailable" in capsys.readouterr().err

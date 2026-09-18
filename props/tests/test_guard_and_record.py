@@ -263,6 +263,7 @@ def _scorer_dir(tmp_path):
         json.dumps({"season": 2026, "week": 2, "event_id": "ev1",
                     "bookmaker": "sleeper", "market": "player_receptions",
                     "player": "A Player", "outcome": "Over", "point": 3.5,
+                    "commence_time": "2026-09-20T20:25:00+00:00",
                     "snapshot_type": "decision"}) + "\n",
         encoding="utf-8")
     return d
@@ -421,3 +422,42 @@ def test_no_engine_source_flag_leaves_the_field_off(tmp_path, monkeypatch):
             (tmp_path / "record" / "predictions/2026/wk02.jsonl").open(encoding="utf-8")
             if x.strip()]
     assert all("engine_source" not in r for r in rows)
+
+
+# ----------------------------------------------------- how early was the call?
+
+def test_every_prediction_row_learns_its_own_kickoff(tmp_path, monkeypatch):
+    """A Wednesday number and one taken forty minutes out are not the same
+    decision, and only the archive knows when the game starts. Reviewing a
+    losing week has to be able to ask whether the misses cluster at long lead
+    times -- which is a staleness problem -- or at short ones, which is the
+    market being right.
+    """
+    import record_run
+    engine = tmp_path / "engine"
+    engine.mkdir()
+    (engine / "SKILL.md").write_bytes(b"---\nname: x\n---\n")
+    monkeypatch.setattr(persist, "RECORD_ROOT", tmp_path / "record")
+    monkeypatch.setattr(sys, "argv", [
+        "record_run.py", "--dir", str(_scorer_dir(tmp_path)),
+        "--snapshot-type", "decision", "--engine-dir", str(engine)])
+    assert record_run.main() == 0
+
+    rows = [json.loads(x) for x in
+            (tmp_path / "record" / "predictions/2026/wk02.jsonl").open(
+                encoding="utf-8") if x.strip()]
+    assert rows
+    for row in rows:
+        assert row["commence_time"] == "2026-09-20T20:25:00+00:00"
+        # logged 2026-09-18T05:20:46Z, so a shade under 63 hours out.
+        assert row["minutes_to_kickoff"] == pytest.approx(3784.2, abs=0.1)
+
+
+def test_a_prediction_with_no_archived_kickoff_says_so_rather_than_guessing():
+    """An event the archive never saw leaves both fields off the row. A wrong
+    lead time is worse than a missing one: it would be averaged."""
+    import record_run
+    assert record_run.minutes_to_kickoff("2026-09-18T05:20:46Z", None) is None
+    assert record_run.minutes_to_kickoff(None, "2026-09-20T20:25:00+00:00") is None
+    assert record_run.minutes_to_kickoff("not a time",
+                                         "2026-09-20T20:25:00+00:00") is None

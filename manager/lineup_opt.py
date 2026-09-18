@@ -180,6 +180,15 @@ def build(ctx, store) -> str:
     # THE LEDGER ROW: the lineup as recommended, with every projection that
     # chose it and the whole pool it was chosen from, so hindsight can price
     # what the bench left behind.
+    #
+    # WHAT IT KNEW AT THE TIME. `status` and `contingency` are here because
+    # the question after a bad Sunday is not "was the lineup wrong" -- the
+    # score answers that -- but "did it start a player it had reason to
+    # doubt". Without the designations as they stood when the call was made,
+    # that is unanswerable: the injury snapshot lives in the store and moves
+    # every hour, so by Tuesday it no longer says what Sunday morning knew.
+    # A blank status is a real answer too: it means the platform reported
+    # him healthy at decision time.
     from . import ledger
     ledger.emit(store, ctx, "lineup", [{
         "subject": f"lineup:{week}", "mode": mode,
@@ -187,6 +196,9 @@ def build(ctx, store) -> str:
         "pool": [str(p["sleeper_id"]) for p in roster],
         "pos": {str(p["sleeper_id"]): p.get("pos") for p in roster},
         "projected": {str(p["sleeper_id"]): round(float(p.get("weekly") or 0.0), 2) for p in optimal},
+        "status": {str(p["sleeper_id"]): (p.get("status") or "")
+                   for p in roster if p.get("status")},
+        "contingency": dict(table),
         "swaps": list(swaps),
     }])
     # What the phone rendering needs beyond the ledger row.

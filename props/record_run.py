@@ -27,6 +27,7 @@ import csv
 import json
 import re
 import sys
+from datetime import datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -69,7 +70,8 @@ def _coerce(field: str, value: str):
 
 
 def read_shadow_log(path: Path, snapshot_type: str, game: str,
-                    stamp: dict | None = None) -> list[dict]:
+                    stamp: dict | None = None,
+                    kickoff: dict[str, str] | None = None) -> list[dict]:
     rows = []
     with path.open(encoding="utf-8") as fh:
         for raw in csv.DictReader(fh):
@@ -81,8 +83,55 @@ def read_shadow_log(path: Path, snapshot_type: str, game: str,
             # per-market label and has been wrong before; this is computed
             # from the tree that ran.
             row.update(stamp or {})
+            when = (kickoff or {}).get(str(row.get("event_id") or ""))
+            if when:
+                row["commence_time"] = when
+                row["minutes_to_kickoff"] = minutes_to_kickoff(
+                    row.get("logged_at_utc"), when)
             rows.append(row)
     return rows
+
+
+def kickoffs(paths: list[Path]) -> dict[str, str]:
+    """event_id -> commence_time, read from the scorer's line archive.
+
+    WHY A CALL NEEDS TO KNOW ITS OWN KICKOFF. Grading says a call won or
+    lost; reviewing it asks how far out it was made -- a Wednesday number
+    and one taken forty minutes before kickoff are not the same decision,
+    and closing-line value only means anything against the clock. The
+    archive carries commence_time and the shadow log does not, so the join
+    happens here, at the one moment both files are in hand.
+    """
+    out: dict[str, str] = {}
+    for path in paths:
+        with path.open(encoding="utf-8") as fh:
+            for line in fh:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    row = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                event, when = row.get("event_id"), row.get("commence_time")
+                if event and when:
+                    out.setdefault(str(event), str(when))
+    return out
+
+
+def minutes_to_kickoff(logged_at: str | None, commence: str | None) -> float | None:
+    """How long before kickoff the call was made. None if either is missing."""
+    if not logged_at or not commence:
+        return None
+    try:
+        a = datetime.fromisoformat(str(logged_at).replace("Z", "+00:00"))
+        b = datetime.fromisoformat(str(commence).replace("Z", "+00:00"))
+        # TypeError is the one that matters: subtracting a naive datetime
+        # from an aware one raises, and a book that ever drops the offset
+        # would take the whole capture down for a diagnostic column.
+        return round((b - a).total_seconds() / 60.0, 1)
+    except (ValueError, TypeError):
+        return None
 
 
 def read_archive(path: Path, season: int, week: int | None, snapshot_type: str,
@@ -163,13 +212,16 @@ def main() -> int:
         return 2
 
     summaries = []
+    # The archive is read first because it is where kickoff times live, and
+    # every prediction row wants one.
+    kickoff = kickoffs(archive_files)
     by_week: dict[tuple[int, int], list[dict]] = {}
     for f in shadow_files:
         m = SHADOW_RE.search(f.name)
         season, week = int(m.group(1)), int(m.group(2))
         game = f"{m.group(3)}@{m.group(4)}"
         by_week.setdefault((season, week), []).extend(
-            read_shadow_log(f, args.snapshot_type, game, stamp))
+            read_shadow_log(f, args.snapshot_type, game, stamp, kickoff))
     for (season, week), rows in sorted(by_week.items()):
         summaries.append(persist.write_predictions(season, week, rows))
 
