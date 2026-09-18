@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import os
 import json
 import re
 import sys
@@ -260,11 +261,18 @@ def main() -> int:
         existing[(str(r.get("season")), str(r.get("week")), str(r.get("event_id")),
                   str(r.get("book")), str(r.get("market")), str(r.get("player")),
                   str(r.get("side")), str(r.get("line")))] = r
-    with dest.open("w", encoding="utf-8", newline="") as fh:
+    # Atomic for the same reason persist.append_jsonl is: this rewrites the
+    # whole settled record, and a process killed mid-write would otherwise be
+    # committed truncated.
+    tmp = dest.with_name(dest.name + ".tmp")
+    with tmp.open("w", encoding="utf-8", newline="") as fh:
         w = csv.DictWriter(fh, fieldnames=SETTLED_FIELDS, extrasaction="ignore")
         w.writeheader()
         for r in existing.values():
             w.writerow(r)
+        fh.flush()
+        os.fsync(fh.fileno())
+    os.replace(tmp, dest)
 
     print(f"[{persist.mode()}] {dest}: {len(existing)} settled rows")
     print("  " + ", ".join(f"{k}={v}" for k, v in counts.items() if v))

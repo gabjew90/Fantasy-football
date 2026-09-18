@@ -96,9 +96,19 @@ def append_jsonl(path: Path, rows: list[dict], key_fields: tuple[str, ...]) -> d
         else:
             added += 1
         existing[k] = row
-    with path.open("w", encoding="utf-8") as fh:
+    # ATOMIC, BECAUSE THE RECORD CANNOT BE REBUILT. This merges the whole file
+    # in memory and then replaces it; truncating the real path first meant a
+    # runner timeout or an OOM kill mid-write left a half-written archive,
+    # which the workflow's `if: always()` commit step would then push over the
+    # only copy. os.replace is atomic within a filesystem, so a killed process
+    # leaves either the old file or the new one.
+    tmp = path.with_name(path.name + ".tmp")
+    with tmp.open("w", encoding="utf-8") as fh:
         for row in existing.values():
             fh.write(json.dumps(row, sort_keys=True) + "\n")
+        fh.flush()
+        os.fsync(fh.fileno())
+    os.replace(tmp, path)
     return {
         "path": str(path),
         "before": before,

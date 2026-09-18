@@ -33,6 +33,15 @@ import sys
 import urllib.request
 from pathlib import Path
 
+try:
+    from zoneinfo import ZoneInfo
+    EASTERN = ZoneInfo("America/New_York")
+except Exception:  # noqa: BLE001 — no tzdata on the host (rare; Windows without tzdata)
+    # Last resort only. EDT year-round is wrong for November games, but it is
+    # the same answer the old hard-coded arithmetic gave and it keeps the
+    # guard running rather than failing closed on every tick.
+    EASTERN = dt.timezone(dt.timedelta(hours=-4), "EDT-fallback")
+
 GAMES_URL = "https://raw.githubusercontent.com/nflverse/nfldata/master/data/games.csv"
 CACHE = Path(__file__).resolve().parent / ".cache"
 CAPTURE_LEAD_MIN = int(os.environ.get("PROPS_CAPTURE_LEAD_MIN", "360"))
@@ -60,18 +69,29 @@ def load_games(season: int) -> list[dict]:
 
 
 def kickoff_utc(row: dict) -> dt.datetime | None:
-    """games.csv carries gameday plus a US/Eastern gametime."""
+    """games.csv carries gameday plus a US/Eastern gametime.
+
+    THE OFFSET IS NOT ARITHMETIC. This used to switch from UTC-4 to UTC-5 at a
+    hard-coded November 5 and call the boundary error immaterial against a
+    six-hour capture window. Both halves were wrong: US DST ends on the FIRST
+    SUNDAY in November, which is November 1 in 2026, and the error is measured
+    against the sixty-minute CLOSE window, not the six-hour one. Every game on
+    Nov 1-4 was converted an hour early, which put `close` 90 minutes before
+    kickoff and shut the window 45 minutes BEFORE kickoff -- losing the closing
+    snapshot for all thirteen games of that slate, which is the one row CLV
+    cannot be reconstructed without. zoneinfo is standard library, so the guard
+    stays dependency-free and the rule comes from the tz database.
+    """
     try:
         d = dt.datetime.strptime(row["gameday"], "%Y-%m-%d").date()
         hh, mm = (int(x) for x in row["gametime"].split(":")[:2])
     except (KeyError, ValueError):
         return None
-    # Eastern is UTC-4 during the regular season through early November and
-    # UTC-5 after; the one-hour error at the boundary is immaterial against a
-    # six-hour capture window.
-    offset = 4 if d < dt.date(d.year, 11, 5) else 5
-    return dt.datetime(d.year, d.month, d.day, hh, mm,
-                       tzinfo=dt.timezone.utc) + dt.timedelta(hours=offset)
+    try:
+        local = dt.datetime(d.year, d.month, d.day, hh, mm, tzinfo=EASTERN)
+    except ValueError:
+        return None
+    return local.astimezone(dt.timezone.utc)
 
 
 def main() -> int:
