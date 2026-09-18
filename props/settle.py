@@ -73,9 +73,33 @@ SETTLED_FIELDS = [
     # scorecard could not separate two versions.
     "engine_hash", "engine_tag", "engine_source",
     "snapshot_type", "is_call",
-    "logged_at_utc", "actual", "result", "status", "won", "pnl_per_100",
+    "logged_at_utc", "commence_time", "minutes_to_kickoff",
+    "actual", "result", "status", "won", "pnl_per_100",
+    # WHY IT MISSED, not just whether it did. A losing call has two very
+    # different causes and the record has to tell them apart: the player's
+    # ROLE was smaller than the model assumed (targets, carries,
+    # target_share, air_yards_share, wopr), or the role was right and the
+    # GAME did not cooperate (opponent, the two scores). `miss` is the
+    # signed distance from the projection the call was built on, so a
+    # systematic bias reads as a column of same-signed numbers rather than
+    # as a feeling. All of it comes from the weekly stats settle already
+    # downloads plus the schedule the guard already caches.
+    "miss", "targets", "carries", "target_share", "air_yards_share", "wopr",
+    "opponent", "team_points", "opp_points", "game_total",
     "join_method",
 ]
+
+# nflverse weekly columns worth keeping beside a graded call, and the name
+# each takes in the record. A column the release drops is simply absent;
+# settling never fails over a diagnostic.
+DIAGNOSTIC_STATS = {
+    "targets": "targets",
+    "carries": "carries",
+    "target_share": "target_share",
+    "air_yards_share": "air_yards_share",
+    "wopr": "wopr",
+    "opponent_team": "opponent",
+}
 
 # A settled row's identity. The engine belongs in it for the same reason it
 # belongs in persist.PREDICTION_KEY: two versions' grades must not collapse
@@ -153,6 +177,40 @@ def load_stats(season: int, cache: Path) -> pd.DataFrame:
     return df
 
 
+def game_context(season: int) -> dict[tuple[int, str], dict]:
+    """(week, team) -> {team_points, opp_points, game_total} for played games.
+
+    Read through the guard, so this shares the schedule cache the capture
+    path already keeps rather than introducing a second copy. Without it a
+    losing Under cannot be told apart from a shootout no model would have
+    caught, which is the first thing worth knowing about a bad week.
+    """
+    try:
+        import guard
+        games = guard.load_games(season)
+    except Exception as exc:  # noqa: BLE001 -- context is a bonus, not a gate
+        print(f"game context unavailable ({exc.__class__.__name__}); settling "
+              f"without it", file=sys.stderr)
+        return {}
+    out: dict[tuple[int, str], dict] = {}
+    for g in games:
+        try:
+            week = int(g["week"])
+            home, away = g["home_team"], g["away_team"]
+            hs, as_ = g.get("home_score"), g.get("away_score")
+            if hs in (None, "") or as_ in (None, ""):
+                continue  # not played yet
+            hs, as_ = float(hs), float(as_)
+        except (KeyError, TypeError, ValueError):
+            continue
+        total = hs + as_
+        out[(week, home)] = {"team_points": hs, "opp_points": as_,
+                             "game_total": total}
+        out[(week, away)] = {"team_points": as_, "opp_points": hs,
+                             "game_total": total}
+    return out
+
+
 def settle_row(row: dict, actual: float) -> tuple[str, bool | None]:
     """Return (result, won) for a call given the actual stat."""
     market = MARKET_STAT.get(str(row.get("market", "")).strip())
@@ -205,6 +263,8 @@ def main(argv: list[str] | None = None) -> int:
     stats = load_stats(args.season,
                        persist.RECORD_ROOT.parent / ".cache"
                        / f"stats_player_week_{args.season}.csv")
+
+    context = game_context(args.season)
 
     out_rows, counts = [], {"settled": 0, "push": 0, "dnp": 0,
                             "unjoined": 0, "unplayed_week": 0,
@@ -265,6 +325,12 @@ def main(argv: list[str] | None = None) -> int:
                 out_rows.append(out)
                 continue
 
+            for src_col, dest in DIAGNOSTIC_STATS.items():
+                if src_col in stat_row:
+                    value = stat_row[src_col]
+                    out[dest] = None if pd.isna(value) else value
+            out.update(context.get((week, str(row.get("team") or "")), {}))
+
             stat_col = MARKET_STAT.get(str(row.get("market", "")).strip())
             if stat_col is None:
                 out.update(actual="", result="unknown_market", status="skipped",
@@ -273,6 +339,10 @@ def main(argv: list[str] | None = None) -> int:
                 continue
 
             actual = float(stat_row[stat_col])
+            try:
+                out["miss"] = round(actual - float(row["model_mean"]), 3)
+            except (KeyError, TypeError, ValueError):
+                out["miss"] = None
             result, won = settle_row(row, actual)
             out["actual"] = actual
             out["result"] = result

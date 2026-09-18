@@ -4441,3 +4441,53 @@ so an early-afternoon run also stamps the late games -- `calls.last_per` is
 written to tolerate exactly that); stamping `commence_time` onto prediction
 rows; the root `tests/` suite in CI; and a GitHub ruleset protecting
 `props-v*` against a forced tag move.
+
+## 2026-09-18 (76) -- the record can say whether a call was wrong, not yet why
+
+A scorecard that prints 11-14 has told you something is wrong and nothing
+about what. The stated purpose of capturing at all is to review calls and
+improve the model, and the record as it stood could not support the second
+half: grading joined an outcome to a probability and kept neither the usage
+that produced the outcome nor the game it happened in. Three gaps, all closed
+with data already in hand, none of them a new fetch.
+
+**Lead time.** Prediction rows carried `logged_at_utc` and nothing about the
+game's clock, so "the model is stale" and "the model is wrong" were the same
+column. The line archive carries `commence_time` and the shadow log does not,
+so `record_run` joins them at the one moment both files are open and stamps
+`commence_time` and `minutes_to_kickoff`. A row whose event the archive never
+saw gets neither field rather than a guess -- a wrong lead time is worse than
+a missing one, because a missing one is not averaged. This was listed as a
+deferred follow-up in (75); it moved up because it is an input to the review,
+not a refinement of it.
+
+**Why it missed.** Settled rows now carry `miss` (actual minus `model_mean`,
+signed, so a systematic bias reads as a column of same-signed numbers rather
+than as a feeling), the player's actual role (`targets`, `carries`,
+`target_share`, `air_yards_share`, `wopr`) and the game around it
+(`opponent`, `team_points`, `opp_points`, `game_total`). These separate the
+two failures that need different fixes: a role the model priced wrong, and a
+game script nothing could have priced. The usage columns are already in the
+weekly stats file settle downloads; the scores come through `guard.load_games`,
+which shares the schedule cache the capture path keeps. **A diagnostic never
+gates a settle** -- an unreadable schedule prints one line to stderr, costs the
+four context columns and grades the week anyway. Settle runs on Tuesday
+against a record that is already written; losing the grades to a failed
+schedule fetch would be trading the thing that matters for the thing that
+decorates it.
+
+**What the lineup knew.** The ledger's lineup row recorded the starters, the
+pool and every projection, which answers "was there a better lineup". It could
+not answer the question that actually follows a bad Sunday -- did the
+optimiser start someone it had reason to doubt -- because the injury
+designations live in the store and move every hour, and the if-inactive table
+was written to one key per week and overwritten each run. Both now ride on the
+row: `status` (only the non-empty designations; a blank status is a real
+answer, so absence from the map means the platform reported him healthy at
+decision time) and `contingency`.
+
+Not done, and still listed: narrowing the engine hash scope, per-row
+`snapshot_type`, and the CRPS tolerance gate, all of which wait on a second
+released engine or on evidence that the current scope is costing something.
+Nothing here changes a probability, a tier or a decision; it changes only what
+is written down beside them.

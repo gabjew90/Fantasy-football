@@ -61,6 +61,7 @@ can be re-derived later, not just scored:
 | `model_state` | the engine's own per-market label (`receiving_hier_v1`, …); it is hand-written and has been wrong, so it is not a version |
 | `snapshot_type` | `decision`, `open` or `close` |
 | `logged_at_utc`, `last_update` | when the call was made and when the book last moved |
+| `commence_time`, `minutes_to_kickoff` | when the game starts, and how far out the call was made |
 
 Rows are keyed on `(season, week, event_id, book, market, player, side, line,
 snapshot_type, engine_hash)` and de-duplicated on write, so re-running a game
@@ -114,6 +115,20 @@ Settled rows add `actual`, `result`, `status`, `won`, `pnl_per_100`,
 a book would have voided the prop; folding voids in as losses would bias every
 hit rate downward. Rows whose name could not be joined are kept with status
 `unjoined` and reported, never silently dropped.
+
+They also add the fields that say WHY a call missed, which is the only reason
+a record is worth keeping past the hit rate:
+
+| field | question it answers |
+| --- | --- |
+| `miss` | actual minus `model_mean`: how far off, and in which direction |
+| `targets`, `carries`, `target_share`, `air_yards_share`, `wopr` | was the ROLE the model assumed the role he got? |
+| `opponent`, `team_points`, `opp_points`, `game_total` | or was the role right and the GAME the problem? |
+
+Both come free: the usage columns are in the weekly stats file settle already
+downloads, and the scores are in the schedule the guard already caches. A
+diagnostic never gates a settle — a schedule that cannot be read costs the
+context columns and nothing else.
 
 ## Running it
 
@@ -220,6 +235,12 @@ week's news.
    grades WEAK calls as their own bucket so the assumption can be tested.
 3. **Closing line value.** Whether the line moved toward the call. CLV is the
    earliest reliable signal because it does not require the bet to win.
+4. **Diagnosing a bad run.** A hit rate says something is wrong; it never says
+   what. Sorting losing calls by `miss` and reading `target_share` beside
+   `game_total` separates the two failures that need different fixes — a role
+   the model priced wrong, and a game script nothing could have priced. Lead
+   time (`minutes_to_kickoff`) separates a third: calls that were stale rather
+   than wrong.
 
 Roughly 150 logged decisions with paired closing lines is the point at which
 these questions start to have answers. Until then the scorecard is a log, not
