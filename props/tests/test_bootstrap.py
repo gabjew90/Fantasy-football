@@ -133,18 +133,27 @@ def test_a_tarball_without_the_engine_is_an_error(tmp_path):
 
 @pytest.fixture
 def skill(tmp_path, monkeypatch):
-    """An installed skill: a vendored engine, a stamp, and a credential."""
+    """An installed skill: a vendored engine ARCHIVE, a stamp, a credential.
+
+    The fallback ships as a tarball because the skill uploader allows exactly
+    one SKILL.md per package and the engine carries its own -- a vendored
+    tree put two in the zip and the upload was refused.
+    """
     root = tmp_path / "skill"
-    vendor = _engine(root / "vendor" / "engine")
+    (root / "vendor").mkdir(parents=True, exist_ok=True)
     (root / "resources").mkdir(parents=True, exist_ok=True)
     (root / "resources" / "credential.env").write_text("ODDS_API_KEY=secret\n",
                                                        encoding="utf-8")
+    archive = root / "vendor" / "engine.tar.gz"
+    archive.write_bytes(_engine_tarball())
+    unpacked = tmp_path / "_unpacked"
+    bootstrap.extract_engine(archive.read_bytes(), unpacked)
     stamp = root / "vendor" / "ENGINE_STAMP.json"
     stamp.write_text(json.dumps({"engine_tag": "props-v1.0",
-                                 "engine_hash": ev.tree_hash(vendor)}),
+                                 "engine_hash": ev.tree_hash(unpacked)}),
                      encoding="utf-8")
     monkeypatch.setattr(bootstrap, "SKILL_ROOT", root)
-    monkeypatch.setattr(bootstrap, "VENDOR", vendor)
+    monkeypatch.setattr(bootstrap, "VENDOR_ARCHIVE", archive)
     monkeypatch.setattr(bootstrap, "VENDOR_STAMP", stamp)
     monkeypatch.setattr(bootstrap, "LOCAL_CREDENTIAL",
                         root / "resources" / "credential.env")
@@ -183,7 +192,7 @@ def test_the_credential_is_placed_but_never_printed(skill, tmp_path, capsys):
 
 
 def test_no_engine_at_all_is_the_only_hard_failure(tmp_path, monkeypatch, capsys):
-    monkeypatch.setattr(bootstrap, "VENDOR", tmp_path / "nothing")
+    monkeypatch.setattr(bootstrap, "VENDOR_ARCHIVE", tmp_path / "nothing.tar.gz")
     monkeypatch.setattr(bootstrap, "SKILL_ROOT", tmp_path / "skill")
     assert bootstrap.main(["--offline", "--dest", str(tmp_path / "run")]) == 3
     assert "NO ENGINE AVAILABLE" in capsys.readouterr().err
@@ -246,3 +255,48 @@ def test_placing_the_credential_does_not_change_the_engine_hash(tmp_path):
     (engine / "resources" / "credential.env").write_text("ODDS_API_KEY=x\n",
                                                          encoding="utf-8")
     assert ev.tree_hash(engine) == before
+
+
+# ------------------------------------------------------------ the package
+
+def test_the_built_skill_has_exactly_one_skill_md(tmp_path):
+    """THE UPLOADER'S RULE, learned the hard way: a package with two SKILL.md
+    files is refused ("Zip must contain exactly one SKILL.md file. Currently
+    there are 2"). The engine carries its own contract, so the vendored
+    fallback ships as a tarball rather than a tree."""
+    import subprocess
+    import sys as _sys
+    import zipfile
+    out = tmp_path / "test.skill"
+    rc = subprocess.run(
+        [_sys.executable, str(PROPS / "build_skill.py"), "--out", str(out)],
+        capture_output=True, text=True, cwd=PROPS.parent)
+    assert rc.returncode == 0, rc.stderr
+
+    names = zipfile.ZipFile(out).namelist()
+    skill_mds = [n for n in names if n.endswith("SKILL.md")]
+    assert skill_mds == ["nfl-prop-research/SKILL.md"], skill_mds
+    assert "nfl-prop-research/vendor/engine.tar.gz" in names
+    assert not any("vendor/engine/" in n for n in names), \
+        "the fallback must be archived, not a loose tree"
+    assert not any(n.endswith("credential.env") for n in names), \
+        "no credential unless one is passed in"
+
+
+def test_the_vendored_archive_unpacks_to_the_locked_engine(tmp_path):
+    """A fallback nobody checked is a fallback that can be wrong exactly when
+    it is needed."""
+    import subprocess
+    import sys as _sys
+    import zipfile
+    out = tmp_path / "test.skill"
+    subprocess.run([_sys.executable, str(PROPS / "build_skill.py"),
+                    "--out", str(out)], check=True, capture_output=True,
+                   cwd=PROPS.parent)
+    with zipfile.ZipFile(out) as z:
+        blob = z.read("nfl-prop-research/vendor/engine.tar.gz")
+        stamp = json.loads(z.read("nfl-prop-research/vendor/ENGINE_STAMP.json"))
+    dest = tmp_path / "unpacked"
+    assert bootstrap.extract_engine(blob, dest) == 29
+    assert ev.tree_hash(dest) == stamp["engine_hash"]
+    assert ev.tree_hash(dest) == ev.load_lock()["engine_sha256"]

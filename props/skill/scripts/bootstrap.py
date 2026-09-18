@@ -53,7 +53,12 @@ LOCK_URL = f"https://raw.githubusercontent.com/{REPO}/main/props/engine.lock.jso
 TARBALL = "https://codeload.github.com/{repo}/tar.gz/refs/tags/{tag}"
 TIMEOUT = 20
 
-VENDOR = SKILL_ROOT / "vendor" / "engine"
+# THE FALLBACK IS A TARBALL, NOT A TREE. The skill uploader requires exactly
+# one SKILL.md in the package, and the engine carries its own -- a vendored
+# tree put two in the zip and the upload was refused. An archive also means
+# one extraction-and-verify routine serves both the fetched and the vendored
+# path, so the tar safety checks cannot drift apart.
+VENDOR_ARCHIVE = SKILL_ROOT / "vendor" / "engine.tar.gz"
 VENDOR_STAMP = SKILL_ROOT / "vendor" / "ENGINE_STAMP.json"
 LOCAL_CREDENTIAL = SKILL_ROOT / "resources" / "credential.env"
 DEFAULT_DEST = Path(os.environ.get("NFL_ENGINE_ROOT", tempfile.gettempdir())) / "nfl-prop-engine"
@@ -166,14 +171,16 @@ def write_stamp(engine_dir: Path, info: dict) -> None:
 
 
 def use_vendored(dest: Path, reason: str, lock_tag: str | None) -> dict:
-    """The fallback. Copied out of the install, which may be read-only."""
-    if not VENDOR.is_dir():
+    """The fallback, unpacked from the archive the skill ships."""
+    if not VENDOR_ARCHIVE.is_file():
         raise RuntimeError(f"no engine at all: {reason}; and no vendored copy "
-                           f"at {VENDOR}")
+                           f"at {VENDOR_ARCHIVE}")
     run = dest / "vendored"
     if run.exists():
         shutil.rmtree(run, ignore_errors=True)
-    shutil.copytree(VENDOR, run)
+    if not extract_engine(VENDOR_ARCHIVE.read_bytes(), run):
+        raise RuntimeError(f"no engine at all: {reason}; and the vendored "
+                           f"archive held no props/engine/ files")
     stamp = engine_version.stamp(run, VENDOR_STAMP)
     vendor_tag = None
     try:

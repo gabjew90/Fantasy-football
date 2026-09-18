@@ -9,9 +9,15 @@ repo stays the only source of truth:
       scripts/bootstrap.py        props/skill/scripts/bootstrap.py
       scripts/engine_version.py   props/engine_version.py  (the hash spec)
       engine.lock.json            props/engine.lock.json
-      vendor/engine/**            props/engine at the locked tag
+      vendor/engine.tar.gz        props/engine at the locked tag, archived
       vendor/ENGINE_STAMP.json    what the fallback is
       resources/credential.env    ONLY from --credential, never from the repo
+
+THE FALLBACK IS AN ARCHIVE, NOT A TREE. The uploader requires exactly one
+SKILL.md in the package and the engine carries its own, so a vendored tree
+put two in the zip and the upload was refused. Archiving it also lets the
+bootstrap run one extraction-and-verify routine for both the fetched and the
+vendored engine.
 
 THE CREDENTIAL IS NEVER SOURCED FROM THE TREE. This repo is public. A
 `--credential` path that resolves inside the repo is refused, and the built
@@ -45,16 +51,18 @@ def _git(*args: str) -> str:
                           capture_output=True, text=True).stdout
 
 
-def engine_at_tag(tag: str, dest: Path) -> Path:
-    """props/engine as the tag has it, exported with git (no working-tree CRLF)."""
-    dest.mkdir(parents=True, exist_ok=True)
-    tar = dest / "engine.tar"
-    with tar.open("wb") as fh:
-        subprocess.run(["git", "archive", "--format=tar", tag, "props/engine"],
+def engine_archive_at_tag(tag: str, out: Path) -> Path:
+    """props/engine as the tag has it, as a .tar.gz with props/engine/ members.
+
+    git archive exports the index, so this is the LF content every other copy
+    hashes -- never the CRLF working tree. The member layout matches what
+    codeload returns, so bootstrap.extract_engine handles both.
+    """
+    out.parent.mkdir(parents=True, exist_ok=True)
+    with out.open("wb") as fh:
+        subprocess.run(["git", "archive", "--format=tar.gz", tag, "props/engine"],
                        cwd=REPO, check=True, stdout=fh)
-    shutil.unpack_archive(str(tar), str(dest), format="tar")
-    tar.unlink()
-    return dest / "props" / "engine"
+    return out
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -107,10 +115,18 @@ def main(argv: list[str] | None = None) -> int:
                         stage / "scripts" / "engine_version.py")
         shutil.copyfile(PROPS / "engine.lock.json", stage / "engine.lock.json")
 
-        engine = engine_at_tag(tag, Path(tmp) / "export")
-        shutil.copytree(engine, stage / "vendor" / "engine")
+        engine_archive_at_tag(tag, stage / "vendor" / "engine.tar.gz")
 
-        vendored_hash = engine_version.tree_hash(stage / "vendor" / "engine")
+        # Verify what is actually being shipped, by unpacking it the way the
+        # bootstrap will: a fallback nobody checked is a fallback that can be
+        # wrong exactly when it is needed.
+        check = Path(tmp) / "check"
+        subprocess.run(["git", "archive", "--format=tar", tag, "props/engine"],
+                       cwd=REPO, check=True,
+                       stdout=(Path(tmp) / "check.tar").open("wb"))
+        check.mkdir(parents=True, exist_ok=True)
+        shutil.unpack_archive(str(Path(tmp) / "check.tar"), str(check), format="tar")
+        vendored_hash = engine_version.tree_hash(check / "props" / "engine")
         if vendored_hash != lock["engine_sha256"]:
             print(f"the engine at {tag} does not match the lock "
                   f"({vendored_hash[:12]} vs {lock['engine_sha256'][:12]})",
