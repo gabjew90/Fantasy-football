@@ -4273,3 +4273,82 @@ dropped name, a footer nobody reads. The guard against that class is not
 more care at the call site, it is a measurement of the join itself -- how
 many rows matched, how many did not, and who they were -- which is why the
 new tests assert the counts and not just the happy path.
+
+## 2026-09-17 (74) -- the record learns which engine wrote it
+
+`props/engine/` is a vendored copy of the nfl-prop-research skill installed in
+Claude chat. It had been edited IN CHAT -- no history, no tests, no review --
+while the record it produces is committed to this repo every fifteen minutes a
+game is within six hours. Nothing on a row said which build made the call.
+`git tag` was empty, there was no version constant, and the only label,
+`model_state` from `score_game.py:1109`, is hand-written per market and
+currently says `receiving_hier_v1` for a model the registry and the report both
+call v2. Two engines' calls would have pooled into one scorecard with no way to
+separate them, and no way to notice.
+
+THE IDENTITY IS THE CONTENT. A git tag or commit sha cannot be computed by the
+chat container (no git, and the installed skill is not a checkout), Actions
+checks out at depth 1 with no tags, and two commits with identical engine trees
+are one engine rather than two. `props/engine_version.py` hashes the tree
+instead: every file, CRLF folded to LF, paths sorted bytewise, excluding
+`resources/credential.env` and build caches. The tag is a label from
+`props/engine.lock.json`, attached only when the computed hash agrees with it.
+
+The normalisation is not fussiness. This host checks out CRLF while the index,
+Actions and the installed skill are LF, so raw bytes would give one engine
+three identities. And the sort key is the ENCODED PATH, not the `Path` object:
+`sorted()` over `Path` compares case-folded on Windows, which puts `SKILL.md`
+after `scripts/` where git and POSIX put it before. Measured: the two orders
+produce different hashes for the same tree. Had that shipped, this laptop and
+the runner would have stamped byte-identical code with two hashes and the
+scorecard would have refused to pool it -- a failure that looks exactly like a
+real model change.
+
+Proof the definition holds, run three ways and reported in one line each: the
+CRLF working tree, `git archive HEAD` (the LF blobs Actions sees), and the
+INSTALLED skill at
+`…/skills-plugin/…/skills/nfl-prop-research` -- different line
+endings, plus a credential file the public repo must never hold -- all hash to
+`911a3de45e315fb1f5722b14753f5b070196c69b5128018fc16300b39e41e371`, 29 files.
+
+`engine_hash` joins `persist.PREDICTION_KEY`. That is what makes "never pool
+two engines" mechanically possible rather than a convention: without it,
+re-scoring a game under a new engine REPLACES the old engine's rows -- same
+line, same side -- overwriting their `p_model`, `gap` and `tier` and
+restamping them with the new version. The old engine's record would vanish and
+its survivors would misreport their own provenance. `LINE_KEY` does not gain
+it: a book quote is a market fact, so the stamp on an archive row says which
+build captured it.
+
+THE 103 EXISTING ROWS WERE BACKFILLED, NOT LEFT NULL. `git diff b4d8a0e HEAD --
+props/engine` is empty and the tree object is `9e754537` at every commit since
+it was vendored, so every recorded row provably came from this engine and the
+hash is derived rather than guessed (`props/tools/backfill_engine_stamp.py`
+computes it and refuses a hash on the command line). Leaving them null would
+have been worse than incomplete: with `engine_hash` in the key, the next
+capture of the same board -- identical lines, same engine -- would not have
+deduped against unstamped rows, so week 2 would have held two copies of one
+board and the scorecard would have refused to pool two "engines" that are the
+same code. Verified after backfilling by rebuilding a scorer-output directory
+from the record and re-filing it: 33 -> 33 and 70 -> 70, every row replaced,
+and the files byte-identical afterwards.
+
+WHERE THE LOCK CHECK DELIBERATELY DOES NOT LIVE. `props.yml` runs
+`pytest props/tests -q` before every capture, so an assertion in that
+directory that the engine matches the lock would convert an unreleased engine
+edit into a skipped NFL slate. A lost closing line is unrecoverable; a
+mislabelled tag is a one-line fix. So `record_run.py` stamps the computed hash
+either way, withholds the tag on a mismatch, and warns on stderr; the
+lock-match check belongs on pull requests, where a human is waiting, and it
+arrives with `props-ci.yml`. The only hard refusal left in the capture path is
+a missing `--engine-dir`: with no engine tree there is nothing to stamp, and an
+unstamped row cannot later be told apart from another version's.
+
+`notify.yml` now watches `props`. It runs every fifteen minutes and commits the
+record, and its failures were silent.
+
+Still to come, in order: one call per player/market per event (the record holds
+33 rows for a 32-line board because a line moved between two capture ticks and
+`line` is in the key -- correct as history, wrong as a call count); the chat
+bootstrap that makes the installed skill a thin loader fetching this repo at a
+tag; then the workflow pin, `props-ci.yml` and the release runbook.

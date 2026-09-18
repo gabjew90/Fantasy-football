@@ -13,9 +13,15 @@ silently losing rows:
           caller gets the error and decides.
 
 The record is append-and-dedupe, never overwrite. A prediction row is keyed by
-(season, week, event_id, book, market, player, side, line, snapshot_type); a
-second run of the same game re-writes the same keys instead of duplicating
-them, so re-running a game is safe and a changed line lands as a new row.
+(season, week, event_id, book, market, player, side, line, snapshot_type,
+engine_hash); a second run of the same game re-writes the same keys instead of
+duplicating them, so re-running a game is safe, a changed line lands as a new
+row, and a new ENGINE never overwrites an older engine's calls.
+
+A line archive row keeps its own key without the engine: a book quote is a
+market fact, so the stamp on it records which build captured it rather than
+which model produced it, and re-capturing the same quote under a new engine
+should still collapse to one row.
 """
 
 from __future__ import annotations
@@ -36,6 +42,13 @@ PREDICTION_KEY = (
     "side",
     "line",
     "snapshot_type",
+    # WHAT MAKES "NEVER POOL TWO ENGINES" POSSIBLE. Without the engine in the
+    # key, re-scoring a game under a new engine REPLACES the old engine's
+    # rows -- same line, same side -- overwriting their p_model, gap and tier
+    # and restamping them with the new version. The old engine's record would
+    # vanish and its survivors would lie about their provenance. With it: a
+    # new engine writes new rows, and the same engine re-run still dedupes.
+    "engine_hash",
 )
 
 LINE_KEY = (
@@ -103,7 +116,10 @@ def append_jsonl(path: Path, rows: list[dict], key_fields: tuple[str, ...]) -> d
     # only copy. os.replace is atomic within a filesystem, so a killed process
     # leaves either the old file or the new one.
     tmp = path.with_name(path.name + ".tmp")
-    with tmp.open("w", encoding="utf-8") as fh:
+    # newline="\n": the record is read on Linux and on this Windows host, and
+    # a file whose bytes depend on the writer's platform is a file whose
+    # diffs lie.
+    with tmp.open("w", encoding="utf-8", newline="\n") as fh:
         for row in existing.values():
             fh.write(json.dumps(row, sort_keys=True) + "\n")
         fh.flush()

@@ -17,6 +17,7 @@ import pytest
 PROPS = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROPS))
 
+import engine_version  # noqa: E402
 import guard  # noqa: E402
 import persist  # noqa: E402
 
@@ -199,3 +200,110 @@ def test_a_stale_cache_answers_when_the_fetch_fails(monkeypatch, tmp_path):
     monkeypatch.setattr(guard.urllib.request, "urlopen", boom)
     rows = guard.load_games(2026)
     assert rows and rows[0]["gameday"] == "2026-09-20", "stale beats nothing"
+
+
+# ------------------------------------------- the engine is part of the identity
+
+def _stamped(n, engine, week=2):
+    return [dict(r, engine_hash=engine, engine_tag=None) for r in _rows(n, week)]
+
+
+def test_two_engines_never_dedupe_into_one_row(tmp_path):
+    """The corruption this prevents: without engine_hash in the key, re-scoring
+    a game under a new engine REPLACES the old engine's rows -- same line, same
+    side -- overwriting p_model/gap/tier and restamping them with the new
+    version. The old engine's record would vanish and its survivors would lie
+    about which code made them."""
+    p = tmp_path / "wk02.jsonl"
+    first = persist.append_jsonl(p, _stamped(3, "aaa"), persist.PREDICTION_KEY)
+    second = persist.append_jsonl(p, _stamped(3, "bbb"), persist.PREDICTION_KEY)
+    assert (first["added"], first["replaced"]) == (3, 0)
+    assert (second["added"], second["replaced"]) == (3, 0), "engine B overwrote engine A"
+    assert second["after"] == 6
+    engines = {json.loads(line)["engine_hash"] for line in p.open(encoding="utf-8")}
+    assert engines == {"aaa", "bbb"}
+
+
+def test_the_same_engine_rerun_still_dedupes(tmp_path):
+    p = tmp_path / "wk02.jsonl"
+    persist.append_jsonl(p, _stamped(3, "aaa"), persist.PREDICTION_KEY)
+    again = persist.append_jsonl(p, _stamped(3, "aaa"), persist.PREDICTION_KEY)
+    assert (again["added"], again["replaced"], again["after"]) == (0, 3, 3)
+
+
+def test_an_unstamped_row_and_a_stamped_row_are_different_rows(tmp_path):
+    """Why the existing 103 rows had to be backfilled rather than left null:
+    persist._key stringifies a missing field to "", so an unstamped board and
+    the same board captured again would both persist."""
+    p = tmp_path / "wk02.jsonl"
+    persist.append_jsonl(p, _rows(2), persist.PREDICTION_KEY)          # no stamp
+    out = persist.append_jsonl(p, _stamped(2, "aaa"), persist.PREDICTION_KEY)
+    assert out["after"] == 4 and out["replaced"] == 0
+
+
+# ----------------------------------------------------- record_run stamps rows
+
+SHADOW_HEADER = ("logged_at_utc,season,week,event_id,book,market,player,team,slot,"
+                 "line,model_mean,side,p_model,p_push,p_novig,gap,price,ER,"
+                 "last_update,new_team,questionable,flag,model_state,decision,"
+                 "clears_edge_rule_if_validated,tier")
+
+
+def _scorer_dir(tmp_path):
+    """A directory shaped like the scorer's output: one shadow log, one archive."""
+    d = tmp_path / "out"
+    d.mkdir()
+    (d / "shadow_log_2026_wk02_MIA_SF.csv").write_text(
+        SHADOW_HEADER + "\n"
+        "2026-09-18T05:20:46Z,2026,2,ev1,sleeper,player_receptions,A Player,SF,WR1,"
+        "3.5,4.1,Over,0.61,0.0,0.55,0.06,-120,0.01,2026-09-18T05:14:11Z,False,False,"
+        ",receiving_hier_v1,PASS,False,STRONG\n",
+        encoding="utf-8")
+    (d / "line_archive_nfl_2026.jsonl").write_text(
+        json.dumps({"season": 2026, "week": 2, "event_id": "ev1",
+                    "bookmaker": "sleeper", "market": "player_receptions",
+                    "player": "A Player", "outcome": "Over", "point": 3.5,
+                    "snapshot_type": "decision"}) + "\n",
+        encoding="utf-8")
+    return d
+
+
+def test_record_run_stamps_every_row_from_the_tree_that_ran(tmp_path, monkeypatch, capsys):
+    """The stamp must describe the engine that produced the artifacts, so it
+    is computed from --engine-dir, never copied out of the lock."""
+    import record_run
+    engine = tmp_path / "engine"
+    (engine / "scripts").mkdir(parents=True)
+    (engine / "SKILL.md").write_bytes(b"---\nname: x\n---\n")
+    (engine / "scripts/model.py").write_bytes(b"x = 1\n")
+    monkeypatch.setattr(persist, "RECORD_ROOT", tmp_path / "record")
+
+    # main() reads sys.argv, so drive it that way.
+    monkeypatch.setattr(sys, "argv", [
+        "record_run.py", "--dir", str(_scorer_dir(tmp_path)),
+        "--snapshot-type", "decision", "--engine-dir", str(engine)])
+    assert record_run.main() == 0
+
+    expected = engine_version.tree_hash(engine)
+    for rel in ("predictions/2026/wk02.jsonl", "lines/2026/line_archive_2026.jsonl"):
+        rows = [json.loads(x) for x in
+                (tmp_path / "record" / rel).open(encoding="utf-8") if x.strip()]
+        assert rows, rel
+        for row in rows:
+            assert row["engine_hash"] == expected, rel
+            assert row["engine_tag"] is None, "a temp tree matches no lock"
+    out = capsys.readouterr().out
+    assert f"engine={expected[:12]}" in out and "tag=(untagged)" in out
+
+
+def test_record_run_refuses_to_file_rows_it_cannot_stamp(tmp_path, monkeypatch):
+    """With no engine tree there is nothing to stamp, and an unstamped row
+    cannot be told apart from another version's later. The ONLY hard refusal
+    in the capture path."""
+    import record_run
+    monkeypatch.setattr(persist, "RECORD_ROOT", tmp_path / "record")
+    monkeypatch.setattr(sys, "argv", [
+        "record_run.py", "--dir", str(_scorer_dir(tmp_path)),
+        "--engine-dir", str(tmp_path / "no-engine")])
+    assert record_run.main() == 2
+    assert not (tmp_path / "record").exists(), "nothing may be written"

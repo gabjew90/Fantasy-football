@@ -57,12 +57,38 @@ can be re-derived later, not just scored:
 | `model_mean` | the projection behind the probability, for diagnosing a miss |
 | `tier`, `decision`, `clears_edge_rule_if_validated` | what the rules said at the time |
 | `new_team`, `questionable`, `flag` | the known weaknesses of that specific call |
-| `model_state` | which model version produced it, so a later fix can be scoped |
+| `engine_hash`, `engine_tag` | the build of `engine/` that made the call |
+| `model_state` | the engine's own per-market label (`receiving_hier_v1`, …); it is hand-written and has been wrong, so it is not a version |
 | `snapshot_type` | `decision`, `open` or `close` |
 | `logged_at_utc`, `last_update` | when the call was made and when the book last moved |
 
 Rows are keyed on `(season, week, event_id, book, market, player, side, line,
-snapshot_type)` and de-duplicated on write, so re-running a game is safe.
+snapshot_type, engine_hash)` and de-duplicated on write, so re-running a game
+is safe — and a new engine never overwrites an older engine's calls. A line
+archive row keeps the same key without `engine_hash`: a book quote is a market
+fact, so the stamp on it says which build captured it, not which model
+produced it.
+
+### Which engine wrote a row
+
+`engine_hash` is a sha256 over `engine/`: every file, line endings normalised
+to LF, paths sorted bytewise, with `resources/credential.env` and build caches
+excluded. That definition is what lets three copies of the same engine agree —
+this repo's CRLF checkout, the LF tree on an Actions runner, and the installed
+Claude skill, which carries the credential file the public repo must not.
+Verified on all three: `911a3de4…`.
+
+`engine_tag` is the release name from `engine.lock.json`, attached **only**
+when the computed hash matches the lock. An edited engine still records rows;
+they carry the real hash and no tag. The hash is never read from the lock — a
+lock-sourced hash would keep claiming `props-v1.0` after the engine changed,
+which is the one lie the stamp exists to prevent.
+
+```bash
+python props/engine_version.py print                     # hash, tag, file count
+python props/engine_version.py verify                    # IDENTICAL or DRIFT (names the files)
+python props/engine_version.py write-lock --tag props-v1.1
+```
 
 Settled rows add `actual`, `result`, `status`, `won`, `pnl_per_100` and
 `join_method`. A player who did not play settles as `dnp`, not a loss, because

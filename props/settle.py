@@ -66,10 +66,35 @@ MARKET_STAT = {
 SETTLED_FIELDS = [
     "season", "week", "game", "event_id", "book", "market", "player", "team",
     "slot", "side", "line", "price", "p_model", "p_novig", "gap", "tier",
-    "decision", "new_team", "questionable", "model_state", "snapshot_type",
+    "decision", "new_team", "questionable", "model_state",
+    # The engine that made the call. These must be listed here or the
+    # DictWriter's extrasaction="ignore" below drops them silently, and the
+    # scorecard could not separate two versions.
+    "engine_hash", "engine_tag",
+    "snapshot_type",
     "logged_at_utc", "actual", "result", "status", "won", "pnl_per_100",
     "join_method",
 ]
+
+# A settled row's identity. The engine belongs in it for the same reason it
+# belongs in persist.PREDICTION_KEY: two versions' grades must not collapse
+# into one another.
+SETTLED_KEY = ("season", "week", "event_id", "book", "market", "player",
+               "side", "line", "engine_hash")
+
+
+def settled_key(row: dict) -> tuple[str, ...]:
+    """The key, with None and "" the same thing.
+
+    THIS FIXES A LATENT DUPLICATION BUG. The key used to be built with
+    `str(r.get("line"))`, which is "None" for a row written in this process
+    and "" for the same row read back from the CSV -- so the eight
+    anytime-TD rows (no line) keyed differently on write and on read, and
+    the first re-settle of a week would have duplicated every one of them.
+    Settle has never run, so it never bit.
+    """
+    return tuple("" if row.get(f) is None else str(row.get(f, ""))
+                 for f in SETTLED_KEY)
 
 
 def norm_name(s: str) -> str:
@@ -145,7 +170,7 @@ def settle_row(row: dict, actual: float) -> tuple[str, bool | None]:
     return ("over" if over else "under"), won
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--season", type=int, required=True)
     ap.add_argument("--week", type=int, help="settle only this week")
@@ -153,7 +178,7 @@ def main() -> int:
                     help="settle every week up to and including this one")
     ap.add_argument("--snapshot-type", default="decision",
                     help="which snapshot to grade (default: decision)")
-    args = ap.parse_args()
+    args = ap.parse_args(argv)
 
     pred_dir = persist.RECORD_ROOT / "predictions" / str(args.season)
     if not pred_dir.is_dir():
@@ -260,12 +285,9 @@ def main() -> int:
     if dest.exists():
         with dest.open(encoding="utf-8") as fh:
             for r in csv.DictReader(fh):
-                existing[(r["season"], r["week"], r["event_id"], r["book"],
-                          r["market"], r["player"], r["side"], r["line"])] = r
+                existing[settled_key(r)] = r
     for r in out_rows:
-        existing[(str(r.get("season")), str(r.get("week")), str(r.get("event_id")),
-                  str(r.get("book")), str(r.get("market")), str(r.get("player")),
-                  str(r.get("side")), str(r.get("line")))] = r
+        existing[settled_key(r)] = r
     # Atomic for the same reason persist.append_jsonl is: this rewrites the
     # whole settled record, and a process killed mid-write would otherwise be
     # committed truncated.
