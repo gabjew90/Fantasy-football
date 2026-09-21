@@ -14,8 +14,9 @@ pulls a decision-time quote from Sleeper Picks (The Odds API as fallback), and w
   line_archive_nfl_{season}.jsonl decision snapshot rows (merged with --prior-archive)
   shadow_log_{season}_wk{W}_{AWAY}_{HOME}.csv  one row per posted line, all PASS
 
-EVERY probability here is EXPLORATORY. receiving_hier_v2 is PROTOTYPE; rush_yds_v0 and
-anytime_td_v0 have no backtest at all. Nothing is a fair price or an entry threshold.
+EVERY probability here is EXPLORATORY. receiving_hier_v2 and anytime_td_v1 are PROTOTYPE
+(outcome-backtested, not tested against posted lines); rush_yds_v0 has no backtest at all.
+Nothing is a fair price or an entry threshold.
 Recommendation is PASS on every line, per the model registry.
 """
 import argparse, json, os, subprocess, sys
@@ -29,6 +30,7 @@ import pandas as pd
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import eligibility
 import model as MODEL
+import td_v1 as TDV1
 from model import norm_name, name_key_loose, is_team_entry, blend
 
 # The report contains "≥" and other non-cp1252 characters. The Linux
@@ -454,6 +456,29 @@ def main():
                 env[t]["carries"] = side["plays"] * (1 - side["pass_rate"])
                 env[t]["source"] = "market"
 
+    # ---------- 4c. anytime_td_v1 ----------
+    # The anytime-touchdown model, from the SAME module the backtest scores
+    # (td_v1), so the number validated is the number priced. It needs the
+    # market's implied points for both teams; without them, or if its inputs
+    # fail, every anytime price falls back to anytime_td_v0 and the sources
+    # table says so -- a missing v1 is visible, never silent.
+    V1TD = None
+    if all(env[t].get("implied_points") is not None for t in (HOME, AWAY)):
+        try:
+            _cur = TDV1.current_inputs(pbp, ros, snp, dcf, games, inj, SEASON, WEEK)
+            V1TD = TDV1.anytime_probabilities(TDV1.load_bundled(RES, PRIOR), _cur,
+                                              {t: env[t]["implied_points"] for t in (HOME, AWAY)})
+            SOURCES.append(("Anytime TD model", "who scores, and how likely", "ok",
+                            f"{TDV1.LABEL} (PROTOTYPE): {len(V1TD)} active players priced"))
+        except Exception as exc:  # noqa: BLE001 -- a failed v1 must not cost the slate
+            V1TD = None
+            SOURCES.append(("Anytime TD model", "who scores, and how likely", "FAILED",
+                            f"{TDV1.LABEL} unavailable ({type(exc).__name__}: {exc}); "
+                            "anytime prices fall back to anytime_td_v0"))
+    else:
+        SOURCES.append(("Anytime TD model", "who scores, and how likely", "unavailable",
+                        f"{TDV1.LABEL} needs the market's implied points; anytime_td_v0 used"))
+
     # ---------- 4b. opponent efficiency table (round 5) ----------
     # Backtest finding: at usable shrinkage (k0=50-150 plays) this made
     # reception-yards CRPS WORSE than not adjusting at all; only stops hurting
@@ -708,6 +733,14 @@ def main():
         e = env[pr.team]
         return (e["pass_td"] * (F_PASS_IN * pr.i10ts + (1 - F_PASS_IN) * pr.ts)
                 + e["rush_td"] * (F_RUSH_IN * pr.i10rs + (1 - F_RUSH_IN) * pr.rs))
+
+    def p_anytime(pr):
+        """(P(at least one touchdown), model). anytime_td_v1 wherever it priced
+        the player; anytime_td_v0 otherwise, and the second value says which,
+        so a fallback row can never pass for a v1 one."""
+        if V1TD is not None and pr.gsis_id in V1TD.index:
+            return float(V1TD.loc[pr.gsis_id, "p"]), TDV1.LABEL
+        return float(1 - np.exp(-td_lambda(pr))), "anytime_td_v0"
 
     # ---------- 6c. weather (NWS, Open-Meteo fallback) ----------
     weather = {"status": "skipped (closed roof)" if roof in ("closed", "dome") else "not attempted"}
@@ -1062,8 +1095,7 @@ def main():
                         if nm not in sims:
                             continue
                         pr = M[M.name == nm].iloc[0]
-                        lam = td_lambda(pr)
-                        p_yes = 1 - np.exp(-lam)
+                        p_yes, td_model = p_anytime(pr)
                         if o["description"] in no_price:
                             # two-sided market (Sleeper): strip the hold like any O/U line
                             iy_, in_ = amer_to_p(o["price"]), amer_to_p(no_price[o["description"]])
@@ -1076,7 +1108,7 @@ def main():
                             p_novig=p_imp, gap=p_yes - p_imp, price=o["price"],
                             ER=p_yes * payout(o["price"]) - (1 - p_yes),
                             last_update=mk["last_update"], new_team=bool(pr.new_team),
-                            questionable=bool(pr.questionable)))
+                            questionable=bool(pr.questionable), td_model=td_model))
 
     # Sleeper publishes its own depth rank per player (subject_pos_rank). Where it
     # disagrees with the nflverse depth chart we built the eligible set from, the book is
@@ -1201,6 +1233,7 @@ def main():
 
     def explain(r, m):
         e = env[m.team]; ev = m.evidence; out = []
+        withheld = False     # True for a v1 anytime price: no fair value is claimed
         book = {"draftkings": "DraftKings", "fanduel": "FanDuel", "sleeper": "Sleeper"}.get(r.book, str(r.book).title())
         if r.market == "player_anytime_td":
             out.append(f"**What the book says.** {book} pays {odds_words(r.price)} that he scores. "
@@ -1208,26 +1241,38 @@ def main():
                        + ("The 'won't score' side is priced too, so the book's cut is stripped out of that number."
                           if td_two_sided else
                           "No 'won't score' price is offered, so the book's cut is baked in and the true market number is a little lower."))
-            lam = td_lambda(m)
-            t_ = ev.get("i10_target_share", {}); c_ = ev.get("i10_carry_share", {})
-            hist = []
-            if t_ and pd.notna(t_.get('own_prior')) and t_['own_prior'] > 0.02:
-                hist.append(f"last season {pct(t_['own_prior'])} of the goal-line throws")
-            if c_ and pd.notna(c_.get('own_prior')) and c_['own_prior'] > 0.02:
-                hist.append(f"last season {pct(c_['own_prior'])} of the goal-line carries")
-            if t_ and pd.notna(t_.get('cur_rate')) and t_['cur_den'] > 0 and (t_['cur_num'] > 0 or m.i10ts > 0.05):
-                hist.append(f"this season {int(t_['cur_num'])} of {int(t_['cur_den'])} goal-line throws")
-            if c_ and pd.notna(c_.get('cur_rate')) and c_['cur_den'] > 0 and (c_['cur_num'] > 0 or m.i10rs > 0.05):
-                hist.append(f"this season {int(c_['cur_num'])} of {int(c_['cur_den'])} goal-line carries")
-            gl = e["pass_td"]*F_PASS_IN*m.i10ts + e["rush_td"]*F_RUSH_IN*m.i10rs
-            lg = lam - gl
-            out.append(f"**How we got our number.** {m.team} should score about {e['pass_td']:.1f} passing and {e['rush_td']:.1f} rushing TDs "
-                       f"in a typical game. About half of passing TDs and a quarter of rushing TDs are long plays from outside the 10, "
-                       f"the rest are punched in from the goal line, and the two get shared out differently. "
-                       f"Goal line: we expect {m['name']} to get {pct(m.i10ts)} of the throws and {pct(m.i10rs)} of the carries there"
-                       + (f" ({'; '.join(hist)})" if hist else "")
-                       + f", worth {gl:.2f} TDs. Long plays: his overall share of the offense ({pct(m.ts)} of throws, {pct(m.rs)} of runs) "
-                       f"is worth another {lg:.2f}. Total {lam:.2f} expected TDs, which is {in_ten(r.p_model)} ({pct(r.p_model)}) to score at least once.")
+            if V1TD is not None and m.gsis_id in V1TD.index:
+                v = V1TD.loc[m.gsis_id]
+                out.append(f"**How we got our number ({TDV1.LABEL}, prototype).** {m.team} should score about "
+                           f"{v['mu']:.1f} offensive touchdowns; the count runs slightly tighter than a Poisson "
+                           f"because a drive can end in at most one. {m['name']}'s share of each of them is "
+                           f"{pct(v['q'])}: his part of the carries from the 5 in, the other carries, and the "
+                           f"red-zone and deeper targets, blended toward last season's role, with any absent "
+                           f"teammate's share handed to the players who are active. That is "
+                           f"{in_ten(r.p_model)} ({pct(r.p_model)}) to score at least once. No fair price is shown: "
+                           "the model is not yet tested against posted lines.")
+                withheld = True
+            else:
+                lam = td_lambda(m)
+                t_ = ev.get("i10_target_share", {}); c_ = ev.get("i10_carry_share", {})
+                hist = []
+                if t_ and pd.notna(t_.get('own_prior')) and t_['own_prior'] > 0.02:
+                    hist.append(f"last season {pct(t_['own_prior'])} of the goal-line throws")
+                if c_ and pd.notna(c_.get('own_prior')) and c_['own_prior'] > 0.02:
+                    hist.append(f"last season {pct(c_['own_prior'])} of the goal-line carries")
+                if t_ and pd.notna(t_.get('cur_rate')) and t_['cur_den'] > 0 and (t_['cur_num'] > 0 or m.i10ts > 0.05):
+                    hist.append(f"this season {int(t_['cur_num'])} of {int(t_['cur_den'])} goal-line throws")
+                if c_ and pd.notna(c_.get('cur_rate')) and c_['cur_den'] > 0 and (c_['cur_num'] > 0 or m.i10rs > 0.05):
+                    hist.append(f"this season {int(c_['cur_num'])} of {int(c_['cur_den'])} goal-line carries")
+                gl = e["pass_td"]*F_PASS_IN*m.i10ts + e["rush_td"]*F_RUSH_IN*m.i10rs
+                lg = lam - gl
+                out.append(f"**How we got our number.** {m.team} should score about {e['pass_td']:.1f} passing and {e['rush_td']:.1f} rushing TDs "
+                           f"in a typical game. About half of passing TDs and a quarter of rushing TDs are long plays from outside the 10, "
+                           f"the rest are punched in from the goal line, and the two get shared out differently. "
+                           f"Goal line: we expect {m['name']} to get {pct(m.i10ts)} of the throws and {pct(m.i10rs)} of the carries there"
+                           + (f" ({'; '.join(hist)})" if hist else "")
+                           + f", worth {gl:.2f} TDs. Long plays: his overall share of the offense ({pct(m.ts)} of throws, {pct(m.rs)} of runs) "
+                           f"is worth another {lg:.2f}. Total {lam:.2f} expected TDs, which is {in_ten(r.p_model)} ({pct(r.p_model)}) to score at least once.")
         elif r.market in ("player_receptions", "player_reception_yds"):
             thing = "catches" if r.market == "player_receptions" else "receiving yards"
             out.append(f"**What the book says.** {book} sets the line at **{r.line} {thing}**, {r.side.lower()} priced at {odds_words(r.price)}. "
@@ -1270,7 +1315,9 @@ def main():
             book_side = "you lose roughly the book's cut, typically $5 to $8 per $100 on this kind of market"
         else:
             book_side = f"it loses about ${100*(1-r.p_novig*(1+payout(r.price))):.0f} (that's the book's cut)"
-        if dollars >= 0:
+        if withheld:
+            pass     # a prototype with no posted-line test makes no claim about what a bet is worth
+        elif dollars >= 0:
             out.append(f"**If our number is right:** a $100 bet here makes about **${dollars:.0f}** on average over many games. "
                        f"If the book's number is right, {book_side}.")
         else:
@@ -1380,15 +1427,6 @@ def main():
     SLOT_ORDER = {"QB1": 0, "RB1": 1, "WR1": 2, "WR2": 3, "TE1": 4, "WR3": 5, "RB2": 6, "PROXY": 7}
     def pct(x): return f"{100*x:.0f}%"
     def odds_str(a): a = int(a); return f"+{a}" if a > 0 else f"{a}"
-    def ev_price_for_yes(p_yes, min_er):
-        """American price at which Yes clears the edge rule: payout >= (1+min_er-p)/p."""
-        if p_yes <= 0.001: return None
-        payout = (1 + min_er - p_yes) / p_yes
-        if payout < 0: return None
-        amer = payout * 100 if payout >= 1 else -100 / payout
-        step = 25 if abs(amer) >= 500 else 5
-        return int(round(amer / step) * step)
-
     td_book = {}
     if not R.empty:
         for _, rr in R[R.market == "player_anytime_td"].iterrows():
@@ -1456,15 +1494,12 @@ def main():
                 L.append(f"| {call} | {c.prop} | {bl} | {u} | {o} |")
             if tdq:
                 bk, price, p_imp = sorted(tdq, key=lambda x: x[0] != "draftkings")[0]
-                lam = td_lambda(m); p_yes = 1 - np.exp(-lam)
-                need = ev_price_for_yes(p_yes, a.min_er)
-                if need is None:
-                    td_call = "no play"
-                else:
-                    ok = (price >= need) if need > 0 else (price >= need)
-                    td_call = f"**YES at {odds_str(price)}**" if ok else "no play"
-                    td_rule = f"take YES at {odds_str(need)} or longer"
-                L.append(f"| {td_call} | anytime TD | {odds_str(price)} (book {pct(p_imp)}, us {pct(p_yes)}) | {td_rule if need is not None else '—'} | |")
+                p_yes, td_src = p_anytime(m)
+                # NO FAIR ODDS for anytime touchdowns until logged lines have
+                # tested the model. A "take YES at +X" threshold IS a fair price,
+                # and quoting one would present a prototype as a pricing edge.
+                L.append(f"| no fair odds ({td_src}, prototype) | anytime TD | {odds_str(price)} "
+                         f"(book {pct(p_imp)}, us {pct(p_yes)}) | — | |")
             L.append("")
 
     # ---------- 8d. confidence tiers + parlay candidates ----------
@@ -1790,7 +1825,7 @@ def main():
               "",
               "<details><summary>Method in six lines</summary>\n",
               f"1. Data: nflverse play-by-play/rosters/injuries/snaps through week {WEEK-1}, 2025 priors bundled, prices from {books_used_str}, NWS weather.",
-              "2. Model: receiving_hier_v2 (receptions, rec yds), rush_yds_v0, anytime_td_v0; methodology v1.0 in resources/methodology.md.",
+              "2. Model: receiving_hier_v2 (receptions, rec yds), rush_yds_v0, anytime_td_v1 (anytime TD; v0 only as a labelled fallback); methodology v1.0 in resources/methodology.md.",
               "3. Validated against sportsbook lines: NOTHING. The 2025 walk-forward shows the model beats a naive baseline on CRPS and that its distribution is internally consistent (calibration_2025.csv places lines at fixed offsets from the model\u2019s own median, not at book numbers, across all player-weeks rather than the ones worth betting). No market has been tested against posted lines, so every prop is ineligible and the record is being built prospectively.",
               "4. Team TD totals are market-anchored, so a TD gap is a share disagreement only.",
               "5. Thresholds, not bets: 'take at X' is where the edge rule clears at -110; no call is a validated betting edge until logged closing lines say so.",
@@ -1981,7 +2016,7 @@ def main():
                      f"{'' if pd.isna(r.model_mean) else round(r.model_mean,1)} | {r.side} | {r.p_model:.3f} | {r.p_novig:.3f} | "
                      f"{r.gap:+.3f} | {r.price} | {r.ER:+.3f} |")
     L.append(f"\nModel states: receptions/receiving yards `receiving_hier_v2` PROTOTYPE; rushing yards `rush_yds_v0` no backtest; "
-             f"anytime TD `anytime_td_v0` no backtest. All MODEL_UNVALIDATED. Dispersion: receptions log r = "
+             f"anytime TD `anytime_td_v1` PROTOTYPE (outcome-backtested, no posted-line test; no fair odds). All MODEL_UNVALIDATED. Dispersion: receptions log r = "
              f"{P['receptions_dispersion']['a']:.3f} + {P['receptions_dispersion']['b']:.3f}·log μ; carries "
              f"{P['carries_dispersion']['a']:.3f} + {P['carries_dispersion']['b']:.3f}·log μ; per-catch Gamma shape {SH:.3f}; "
              f"K0={K0}; {N_SIM} draws, seed 20260917. Early-season prior-season blend is not the form validated in the 2025 backtest.")
