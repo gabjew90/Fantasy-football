@@ -76,7 +76,19 @@ def load_settled(season: int) -> pd.DataFrame:
         df["engine_hash"] = ""
     if "engine_tag" not in df.columns:
         df["engine_tag"] = None
+    df["market_key"] = market_key(df)
     return df
+
+
+def market_key(df: pd.DataFrame) -> pd.Series:
+    """The market, and for anytime TD the model that priced it. Rows captured
+    before td_model reached the record (props-v1.7) carry no stamp: they are
+    'model unknown', never assumed to be v1, so a v0-fallback row is not
+    pooled with v1 rows on the first graded week."""
+    tdm = df["td_model"] if "td_model" in df.columns else pd.Series(None, index=df.index, dtype=object)
+    tdm = tdm.where(tdm.notna() & (tdm.astype(str).str.strip() != ""), "model unknown")
+    return df["market"].where(df["market"] != "player_anytime_td",
+                              "player_anytime_td [" + tdm.astype(str) + "]")
 
 
 def engine_label(df: pd.DataFrame) -> str:
@@ -191,7 +203,8 @@ def render_sections(df: pd.DataFrame) -> tuple[list[str], list[dict]]:
     out += ["### By market", "",
             "| Market | Calls | Hit rate | Model said | Net/$100 |",
             "|---|---|---|---|---|"]
-    for mkt, b in df.groupby("market"):
+    keys = df["market_key"] if "market_key" in df.columns else market_key(df)
+    for mkt, b in df.groupby(keys):
         out.append(f"| {mkt} | {len(b)} | {b['won'].mean():.1%} | "
                    f"{b['p_model'].mean():.1%} | {b['pnl_per_100'].sum():+.0f} |")
     out += ["", "Receptions and receiving yards are the only backtested "

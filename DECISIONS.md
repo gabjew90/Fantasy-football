@@ -4824,3 +4824,35 @@ carried it. Fixed, with a test.
 
 **Review fixes.** The scenario re-runs now use only a snapshot written in the
 same run, and clear their output file before each re-run.
+
+## 2026-09-21 (83) -- the Out path: an absent player's share goes to his replacement, not the priced teammates
+
+The v1.6 Questionable section showed swings like McCaffrey Over 4.5 catches
+65% -> 82% if Kittle sat, from an Out path that handed an excluded player's
+whole share to every priced teammate pro rata. The user asked for a
+position-first rule, the cross-position fraction tuned on 2022-23 absence games
+and scored as-is on 2024-25.
+
+The data asked a different question first (reports/absence_tune.md). When a
+player with a 15%+ target share sits, players who had under 5% of targets go
+from 0.127 to 0.367 -- they absorb all of his 0.217 -- and priced teammates at
+other positions actually LOSE a little share. For a 20%+ carry share, the
+under-5% players go from 0.065 to 0.359. The replacement, not the priced
+teammates, takes the work. So the rule has two parameters: y, the fraction that
+stays with the priced set at all, and x, the part of that spread across all of
+them (the rest to his position).
+
+Tuned on 2022-23 (122 target events, 113 carry events), scored as-is on
+2024-25 (132 and 101 events):
+- targets: x = 0, y = 0 -- no targets to priced teammates. Test loss -31.3
+  (-42.1, -22.0) x 1e-4 against the shipped x = 1, y = 1.
+- carries: x = 0, y = 0.25 -- a quarter, to priced teammates at his position.
+  Test loss -157 (-229, -95).
+
+Consequence: the Kittle swing on catches and yards disappears. TD rows still
+move, through the TD model's own reallocation ('all', validated in the layer-2
+backtest); given this finding, that setting deserves the same absence check.
+Known limit: the replacement himself is still priced off his own small share.
+
+Also here: the scorecard labels anytime-TD rows by td_model, and rows recorded
+before td_model reached the record are 'model unknown', never v1.

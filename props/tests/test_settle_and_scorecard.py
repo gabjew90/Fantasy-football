@@ -293,3 +293,16 @@ def test_an_unreadable_schedule_costs_context_and_nothing_else(monkeypatch, caps
     monkeypatch.setattr(guard, "load_games", boom)
     assert settle.game_context(2026) == {}
     assert "game context unavailable" in capsys.readouterr().err
+
+
+def test_anytime_td_rows_without_a_model_stamp_are_model_unknown_not_v1():
+    """Rows captured before td_model reached the record carry no stamp. They
+    must not be pooled with v1 rows (or with the v0 fallback)."""
+    import pandas as pd
+    df = pd.DataFrame({"market": ["player_anytime_td", "player_anytime_td", "player_anytime_td",
+                                  "player_receptions"],
+                       "td_model": [None, "anytime_td_v1", "anytime_td_v0", None]})
+    keys = list(scorecard.market_key(df))
+    assert keys == ["player_anytime_td [model unknown]", "player_anytime_td [anytime_td_v1]",
+                    "player_anytime_td [anytime_td_v0]", "player_receptions"]
+    assert list(scorecard.market_key(df.drop(columns="td_model")))[0] == "player_anytime_td [model unknown]"
