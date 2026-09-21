@@ -50,6 +50,7 @@ V1 = {
     "cap": 0.99,                      # total share per channel; 0.99-0.999 tested, 0.99 best on tune
     "qb_beta": 40.0,                  # starter QB-rush rate shrunk by 40 team TDs (tuned 2022-23); None = team mix
     "qb_window": 3,                   # seasons of the starter's career the rate looks back over
+    "role": None,                     # role-conditional shares: None | "slot" | "tier" | "qb"
 }
 SKILL = {"QB": "QB", "RB": "RB", "FB": "RB", "WR": "WR", "TE": "TE"}
 LABEL = "anytime_td_v1"
@@ -160,17 +161,74 @@ def game_mix(ctx: dict, team: str, qb: str | None = None, beta=V1["qb_beta"]) ->
     return out[list(T.OFFENSIVE)]
 
 
+# ------------------------------------------------------------ role-conditional shares
+#
+# A share is a player's opportunities over his team's IN THE GAMES HE PLAYED.
+# A backup who played only while the starter was out therefore carries a
+# starter-sized share (Cincinnati's backup QB 0.958 of QB carries), and with
+# both active the channel sums past 1 and the cap squeezes the starter: a
+# starting QB is priced at 0.70 of his team's QB carries against 0.88 actual.
+# Role-conditional: an ACTIVE player's share comes only from past games in
+# which he held the role he holds now (pre-game depth chart), falling back to
+# all his games when he never held it.
+
+def _role(slot, pos, mode):
+    slot = slot if isinstance(slot, str) and slot[:2].isalpha() and slot[2:].isdigit() else None
+    if mode == "slot":
+        return slot or f"{pos}-other"
+    if slot is None:
+        return f"{pos}-other"
+    head, n = slot[:2], int(slot[2:])
+    if head == "WR":
+        return "WR-start" if n <= 3 else "WR-other"
+    return f"{head}1" if n == 1 else f"{head}-other"
+
+
+def role_filter(played_cur, played_pri, slots_cur, slots_pri, actives: pd.DataFrame, mode):
+    """(played_cur, played_pri) restricted, for each active player, to the
+    games in which he held his current role. mode: "slot" (exact depth-chart
+    slot), "tier" (QB1 / RB1 / WR1-3 / TE1 vs the rest), "qb" (tier, QBs only)."""
+    if mode is None:
+        return played_cur, played_pri
+    act = actives if "slot" in actives else actives.assign(slot=np.nan)
+    want = {pid: _role(sl, ps, mode) for pid, sl, ps in zip(act["player_id"], act["slot"], act["pos"])
+            if mode != "qb" or ps == "QB"}
+    key = ["season", "week", "team", "player_id"]
+    parts = []
+    for tag, pl, sl in (("cur", played_cur, slots_cur), ("pri", played_pri, slots_pri)):
+        if pl is None or len(pl) == 0:
+            continue
+        m = (pl.merge(sl[key + ["slot"]].drop_duplicates(key), on=key, how="left")
+             if sl is not None and len(sl) else pl.assign(slot=np.nan))
+        parts.append(m.assign(_w=tag))
+    if not parts:
+        return played_cur, played_pri
+    allp = pd.concat(parts, ignore_index=True)
+    now = allp["player_id"].map(want)
+    then = pd.Series([_role(sl, ps, mode) for sl, ps in zip(allp["slot"], allp["pos"])], index=allp.index)
+    match = now.notna() & (then == now)
+    has = match.groupby(allp["player_id"]).transform("any")
+    keep = now.isna() | match | ~has          # never held the role: keep every game
+    allp = allp[keep]
+    cols_c = list(played_cur.columns) if played_cur is not None else []
+    cols_p = list(played_pri.columns)
+    out_c = allp.loc[allp["_w"] == "cur", cols_c] if cols_c else played_cur
+    return out_c, allp.loc[allp["_w"] == "pri", cols_p]
+
+
 def week_shares(cnt_cur, cnt_pri, played_cur, played_pri, slots_pri, actives: pd.DataFrame,
                 kappa=V1["kappa"], moved=V1["moved"], slot_scale=V1["slot_scale"],
-                prior=True) -> tuple[pd.DataFrame, pd.DataFrame]:
+                prior=True, slots_cur=None, role=V1["role"]) -> tuple[pd.DataFrame, pd.DataFrame]:
     """(filled shares, raw shares) for every player, for one week.
-    `actives` has player_id, team, slot for the week being priced."""
+    `actives` has player_id, team, pos, slot for the week being priced."""
+    sp_played_pri = played_pri
+    played_cur, played_pri = role_filter(played_cur, played_pri, slots_cur, slots_pri, actives, role)
     raw = A.blended_shares(cnt_cur, cnt_pri, played_cur, played_pri, T.OFFENSIVE, kappa,
                            per_game(cnt_pri), current_team=dict(zip(actives["player_id"], actives["team"])),
                            moved_weight=moved)
     if not prior:
         return raw, raw
-    sp = A.slot_prior(cnt_pri, played_pri, slots_pri, T.OFFENSIVE)
+    sp = A.slot_prior(cnt_pri, sp_played_pri, slots_pri, T.OFFENSIVE)
     return A.fill_no_history(raw, actives, sp, T.OFFENSIVE, scale=slot_scale), raw
 
 
@@ -269,11 +327,12 @@ def current_inputs(pbp: pd.DataFrame, ros: pd.DataFrame, snaps: pd.DataFrame, dc
     roles = M.normalize_depth_charts(dc, _kick_lookup(g))
     sl = pd.DataFrame({"team": T._norm_team(roles["team"]), "week": roles["week"],
                        "player_id": roles["gsis_id"], "slot": roles["slot"]})
+    sl_all = sl[sl["week"] <= week].assign(season=season)
     sl = sl[sl["week"] == week].drop_duplicates(["team", "player_id"])
     act = act.merge(sl[["team", "player_id", "slot"]], on=["team", "player_id"], how="left")
     starts = qb_starts(before, qb_ids) if len(before) else None
     return {"cnt": cnt, "played": played, "tg": tg, "actives": act.drop_duplicates("player_id"),
-            "qbstarts": starts, "season": season, "week": week}
+            "qbstarts": starts, "season": season, "week": week, "slots": sl_all}
 
 
 def anytime_probabilities(bundled: dict, cur: dict, implied_by_team: dict[str, float]) -> pd.DataFrame:
@@ -289,7 +348,7 @@ def anytime_probabilities(bundled: dict, cur: dict, implied_by_team: dict[str, f
     ctx = context(hist, qb_hist=qh)
     act = cur["actives"]
     shares, _ = week_shares(cur["cnt"], bundled["cnt"], cur["played"], bundled["played"],
-                            bundled["slots"], act)
+                            bundled["slots"], act, slots_cur=cur.get("slots"))
     pos = dict(zip(pd.concat([bundled["played"], cur["played"], act])["player_id"],
                    pd.concat([bundled["played"], cur["played"], act])["pos"]))
     out = []

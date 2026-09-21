@@ -53,11 +53,13 @@ EPS = 1e-3
 PASS_CH, RUSH_CH = ("pass_rz", "pass_far"), ("rush_in5", "rush_far", "qb_rush")
 L1 = T.LAYER1                    # {"trials": 10, "gamma": 0.25, ...}
 
-# A configuration is (alloc, c, cap, qb_beta); alloc = (prior, slot scale, moved weight).
-BASE_ALLOC = ("none", 1.0, 0.5)                    # the spec before the slot prior
-FULL_ALLOC = ("slot", 1.0, MOVED)
-V1_ALLOC = ("slot", V.V1["slot_scale"], MOVED)
-V10 = (V1_ALLOC, None, 0.99, None)                 # anytime_td_v1 as first shipped (props-v1.4)
+# A configuration is (alloc, c, cap, qb_beta); alloc = (prior, slot scale, moved weight, role).
+BASE_ALLOC = ("none", 1.0, 0.5, None)              # the spec before the slot prior
+FULL_ALLOC = ("slot", 1.0, MOVED, None)
+V1_ALLOC = ("slot", V.V1["slot_scale"], MOVED, V.V1["role"])
+V10 = (("slot", V.V1["slot_scale"], MOVED, None), None, 0.99, None)   # v1 as first shipped (props-v1.4)
+V11 = (("slot", V.V1["slot_scale"], MOVED, None), None, 0.99, 40.0)   # v1.1 (props-v1.5)
+ROLES = [None, "slot", "tier", "qb"]
 SHIP = (V1_ALLOC, V.V1["c"], V.V1["cap"], V.V1["qb_beta"])   # what td_v1.V1 ships now
 SCALES = [0.4, 0.6, 1.0]
 C_GRID = [None, 80.0, 40.0, 20.0, 10.0, 5.0]
@@ -71,19 +73,22 @@ def configs(mode: str) -> list:
     x Beta c (td_layer2.md). grid-v11: share cap x the starter's QB-rush
     shrinkage (td_v1_1_tuning.md)."""
     if mode == "grid":
-        return [(BASE_ALLOC, None, 0.99, None)] + [(("slot", sc, MOVED), c, 0.99, None)
+        return [(BASE_ALLOC, None, 0.99, None)] + [(("slot", sc, MOVED, None), c, 0.99, None)
                                                    for sc in SCALES for c in C_GRID]
     if mode == "grid-v11":
-        return [(V1_ALLOC, None, cap, b) for cap in CAPS for b in QB_BETAS]
-    out = [(BASE_ALLOC, None, 0.99, None), (FULL_ALLOC, None, 0.99, None), V10, SHIP]
+        return [(V10[0], None, cap, b) for cap in CAPS for b in QB_BETAS]
+    if mode == "grid-role":
+        return [((V10[0][0], V10[0][1], V10[0][2], r), None, 0.99, 40.0) for r in ROLES]
+    out = [(BASE_ALLOC, None, 0.99, None), (FULL_ALLOC, None, 0.99, None), V10, V11, SHIP]
     out += [(SHIP[0], c, SHIP[2], SHIP[3]) for c in C_DIAG]
     return list(dict.fromkeys(out))
 
 
 def qid(qk) -> str:
     """Key of a per-touchdown share vector: (alloc, cap, qb_beta)."""
-    (p, sc, m), cap, b = qk
-    return f"{p}|x{sc:g}|m{m:g}|cap{cap:g}|qb{'team' if b is None else f'{b:g}'}"
+    (p, sc, m, r), cap, b = qk
+    return (f"{p}|x{sc:g}|m{m:g}" + (f"|role-{r}" if r else "")
+            + f"|cap{cap:g}|qb{'team' if b is None else f'{b:g}'}")
 
 
 def cid(cfg) -> str:
@@ -194,6 +199,7 @@ def run(D: dict, seasons: list[int], cfgs: list) -> tuple[pd.DataFrame, pd.DataF
     for s in seasons:
         pl_pri = played[played["season"] == s - 1]
         sl_pri = slots[slots["season"] == s - 1]
+        sl_cur = slots[slots["season"] == s]
         f = D["fin"][s - 1]
         pri_c, pri_e = cch[cch["season"] == s - 1], ceng[ceng["season"] == s - 1]
         pg_e = V.per_game(pri_e, A.ENGINE_CHANNELS)
@@ -220,7 +226,8 @@ def run(D: dict, seasons: list[int], cfgs: list) -> tuple[pd.DataFrame, pd.DataF
             for al in allocs:
                 filled[al], raw[al[2]] = V.week_shares(cur(cch), pri_c, pl_cur, pl_pri, sl_pri, now,
                                                        moved=al[2], slot_scale=al[1],
-                                                       prior=al[0] == "slot")
+                                                       prior=al[0] == "slot", slots_cur=sl_cur,
+                                                       role=al[3])
 
             for _, g in tg[(tg["season"] == s) & (tg["week"] == w)].iterrows():
                 act = now[(now["game_id"] == g["game_id"]) & (now["team"] == g["team"])]
@@ -326,9 +333,11 @@ def main(argv=None) -> int:
                     help="reproduce the layer-2 tuning run (slot scale x Beta concentration)")
     ap.add_argument("--grid-v11", action="store_true",
                     help="tune the share cap x the starter's QB-rush shrinkage")
+    ap.add_argument("--grid-role", action="store_true",
+                    help="tune role-conditional shares (off / exact slot / tier / QB only)")
     ap.add_argument("--report", default=None, help="report file name (default by mode)")
     a = ap.parse_args(argv)
-    mode = "grid" if a.grid else ("grid-v11" if a.grid_v11 else "ship")
+    mode = ("grid" if a.grid else "grid-v11" if a.grid_v11 else "grid-role" if a.grid_role else "ship")
     cfgs = configs(mode)
     tune = [int(x) for x in a.tune.split(",")]
     test = [int(x) for x in a.test.split(",")]
@@ -346,6 +355,10 @@ def main(argv=None) -> int:
     if mode == "grid-v11":
         best = min(tune_ll, key=tune_ll.get)
         write_v11(out / (a.report or "td_v1_1_tuning.md"), D, dtu, dte, mte, tune_ll, best, tune, test)
+        return 0
+    if mode == "grid-role":
+        best = min(tune_ll, key=tune_ll.get)
+        write_role(out / (a.report or "td_role_tuning.md"), dtu, dte, mte, tune_ll, best, tune, test)
         return 0
     # the grid CHOOSES; the default run scores what td_v1 ships, unchosen
     best = min(tune_ll, key=tune_ll.get) if mode == "grid" else SHIP
@@ -509,12 +522,12 @@ def write_v11(path: Path, D, dtu, dte, mass, tune_ll, best, tune, test):
     """The cap x starter-QB-rush tuning run: chosen on tune, scored on test."""
     path.parent.mkdir(parents=True, exist_ok=True)
     kb, k10 = cid(best), cid(V10)
-    cap_only = cid((V1_ALLOC, None, best[2], None))
-    qb_only = cid((V1_ALLOC, None, 0.99, best[3]))
+    cap_only = cid((V10[0], None, best[2], None))
+    qb_only = cid((V10[0], None, 0.99, best[3]))
     fmt_b = lambda b: "team mix" if b is None else f"{b:g}"  # noqa: E731
     L = ["# anytime_td_v1.1: the share cap and the starter's QB-rush rate", "",
          f"Tune {tune}, test {test}. Everything else is anytime_td_v1 as shipped in props-v1.4 "
-         f"(slot x{V1_ALLOC[1]:g}, moved {MOVED:g}, fixed share, Binomial({L1['trials']}), gamma {L1['gamma']}). "
+         f"(slot x{V10[0][1]:g}, moved {MOVED:g}, fixed share, Binomial({L1['trials']}), gamma {L1['gamma']}). "
          f"Two settings, chosen together on tune log loss given the team's offensive touchdowns:", "",
          "- **cap**: total share per channel after reallocation; the remainder is 'other'. v1 used 0.99; "
          "actives score 0.997 of offensive touchdowns.",
@@ -526,7 +539,7 @@ def write_v11(path: Path, D, dtu, dte, mass, tune_ll, best, tune, test):
     for cap in CAPS:
         cells = []
         for b in QB_BETAS:
-            cfg = (V1_ALLOC, None, cap, b)
+            cfg = (V10[0], None, cap, b)
             cells.append(f"**{tune_ll[cfg]:.5f}**" if cfg == best else f"{tune_ll[cfg]:.5f}")
         L.append(f"| {cap:g} | " + " | ".join(cells) + " |")
     L += ["", f"Chosen: **cap {best[2]:g}, QB rate {fmt_b(best[3])}**.", "",
@@ -534,7 +547,7 @@ def write_v11(path: Path, D, dtu, dte, mass, tune_ll, best, tune, test):
           "| cap | " + " | ".join(fmt_b(b) for b in QB_BETAS) + " |", "|---" * (len(QB_BETAS) + 1) + "|"]
     st = dtu[dtu["starter"]]
     for cap in CAPS:
-        L.append(f"| {cap:g} | " + " | ".join(f"{ll(st, 'n|' + cid((V1_ALLOC, None, cap, b))):.4f}"
+        L.append(f"| {cap:g} | " + " | ".join(f"{ll(st, 'n|' + cid((V10[0], None, cap, b))):.4f}"
                                               for b in QB_BETAS) + " |")
 
     d = dte
@@ -551,7 +564,7 @@ def write_v11(path: Path, D, dtu, dte, mass, tune_ll, best, tune, test):
                      f"{ll(d, 'e2e|' + k):.4f} | {_ci(boot(d, 'e2e|' + k, 'e2e|' + k10))} | {d['e2e|' + k].mean():.3f} |")
     mm = mass[mass["n_off"] > 0]
     actual = mm["actives_scored"].sum() / mm["n_off"].sum()
-    q10, qb_ = qid((V1_ALLOC, 0.99, None)), qid((best[0], best[2], best[3]))
+    q10, qb_ = qid((V10[0], 0.99, None)), qid((best[0], best[2], best[3]))
     L += ["", f"Summed share of actives per team-game: v1 {mass['sum_q|' + q10].mean():.3f}, chosen "
               f"{mass['sum_q|' + qb_].mean():.3f}; actives actually scored {actual:.3f} of offensive touchdowns.", "",
           "### Calibration, end to end (binned by the chosen model)", ""]
@@ -564,6 +577,57 @@ def write_v11(path: Path, D, dtu, dte, mass, tune_ll, best, tune, test):
     L += ["", "| position | v1 | chosen | n |", "|---|---|---|---|"]
     for p, g in d.groupby("pos"):
         L.append(f"| {p} | {ll(g, 'e2e|' + k10):.4f} | {ll(g, 'e2e|' + kb):.4f} | {len(g)} |")
+    path.write_text("\n".join(L) + "\n", encoding="utf-8")
+    print(f"wrote {path}", file=sys.stderr)
+
+
+def _top_ratio(d, col_q):
+    """Top-q player's realised / expected touchdowns given the team's count."""
+    x = d[d["n_off"] > 0].copy()
+    x["rank"] = x.groupby(["game_id", "team"])[col_q].rank(ascending=False, method="first")
+    t = x[x["rank"] == 1]
+    return float(t["tds"].sum() / (t[col_q] * t["n_off"]).sum())
+
+
+def write_role(path: Path, dtu, dte, mass, tune_ll, best, tune, test):
+    """Role-conditional shares: chosen on tune, scored on test, with the top
+    bins before and after -- the gate, since removing the squeeze raises every
+    starter's share, stars included, and stars already run about 10% high."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    base = [c for c in tune_ll if c[0][3] is None][0]
+    kb, k0 = cid(best), cid(base)
+    L = ["# Role-conditional shares", "",
+         f"Tune {tune}, test {test}. Base: anytime_td_v1.1 as shipped (props-v1.5/1.7). A player's share "
+         "normally comes from every game he played; role-conditional takes it only from games in which he "
+         "held his CURRENT pre-game depth-chart role (all games if he never held it). Roles: 'slot' exact "
+         "(WR2 is not WR1); 'tier' QB1 / RB1 / WR1-3 / TE1 vs the rest; 'qb' the tier rule for QBs only.", "",
+         "## Tune log loss, given offensive touchdowns", "", "| role | tune log loss |", "|---|---|"]
+    for c, v in sorted(tune_ll.items(), key=lambda kv: kv[1]):
+        L.append(f"| {c[0][3] or 'off (v1.1)'} | {v:.5f}{' **chosen**' if c == best else ''} |")
+    for tag, d in (("tune", dtu), ("test", dte)):
+        L += ["", f"## {tag.title()} {tune if tag == 'tune' else test}", "",
+              "| model | given offensive TDs | end to end | vs off, end to end | mean predicted | "
+              "top-q realised / expected |", "|---|---|---|---|---|---|"]
+        for c in sorted(tune_ll, key=lambda c: str(c[0][3])):
+            k = cid(c)
+            vs = "" if c == base else _ci(boot(d, "e2e|" + k, "e2e|" + k0))
+            L.append(f"| {c[0][3] or 'off (v1.1)'} | {ll(d, 'n|' + k):.4f} | {ll(d, 'e2e|' + k):.4f} | {vs} | "
+                     f"{d['e2e|' + k].mean():.3f} | {_top_ratio(d, 'q|' + qid((c[0], c[2], c[3]))):.3f} |")
+        L += ["", f"Actual scoring rate {d['scored'].mean():.3f}.", ""]
+        for lab, pre in (("End to end", "e2e|"), ("Given the team's offensive touchdowns", "n|")):
+            for name, k in (("off (v1.1)", k0), (f"chosen ({best[0][3]})", kb)):
+                if name.startswith("chosen") and kb == k0:
+                    continue
+                L += [f"### {lab}: calibration, {name}, binned by its own prediction", ""]
+                _calib(L, d, [pre + k], [name])
+                L.append("")
+        st = d[d["starter"]]
+        L += ["### Starting quarterbacks", "",
+              "| model | n | predicted P(score) | actual | log loss |", "|---|---|---|---|---|"]
+        for c in sorted(tune_ll, key=lambda c: str(c[0][3])):
+            k = "e2e|" + cid(c)
+            L.append(f"| {c[0][3] or 'off (v1.1)'} | {len(st)} | {st[k].mean():.3f} | {st['scored'].mean():.3f} | "
+                     f"{ll(st, k):.4f} |")
     path.write_text("\n".join(L) + "\n", encoding="utf-8")
     print(f"wrote {path}", file=sys.stderr)
 

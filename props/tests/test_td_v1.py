@@ -245,3 +245,45 @@ def test_the_bundled_quarterback_starts_cover_the_window():
     assert st is not None
     assert sorted(st["season"].unique()) == list(range(2025 - V.V1["qb_window"] + 1, 2026))
     assert not st.duplicated(["game_id", "team"]).any()   # one starter per team-game
+
+
+# ------------------------------------------------------------ role-conditional shares
+
+def _qb_world():
+    """Team A, prior season: the starter s played weeks 1-2 as QB1; the backup b
+    started week 3 while s was out. This week both are active, s at QB1."""
+    cnt = _cnt([(2025, 1, "g1", "A", "s", 5, 0, 0, 0, 0),
+                (2025, 2, "g2", "A", "s", 5, 0, 0, 0, 0),
+                (2025, 3, "g3", "A", "b", 5, 0, 0, 0, 0)])
+    played = _played([(2025, 1, "g1", "A", "s", "QB"), (2025, 2, "g2", "A", "s", "QB"),
+                      (2025, 1, "g1", "A", "b", "QB"), (2025, 2, "g2", "A", "b", "QB"),
+                      (2025, 3, "g3", "A", "b", "QB")])
+    slots = pd.DataFrame({"season": 2025, "week": [1, 1, 2, 2, 3], "team": "A",
+                          "player_id": ["s", "b", "s", "b", "b"],
+                          "slot": ["QB1", "QB2", "QB1", "QB2", "QB1"]})
+    act = pd.DataFrame({"player_id": ["s", "b"], "team": "A", "pos": "QB", "slot": ["QB1", "QB2"]})
+    return cnt, played, slots, act
+
+
+def test_a_fill_in_backup_no_longer_carries_a_starter_share():
+    """Games-played denominators give the backup 5/5 from the one game he
+    started; role-conditional keeps only his QB2 games, where he had none."""
+    cnt, played, slots, act = _qb_world()
+    empty_c, empty_p = cnt.iloc[0:0], played.iloc[0:0]
+    for role, b_expect in ((None, 5 / 15), ("tier", 0.0)):
+        _, raw = V.week_shares(empty_c, cnt, empty_p, played, slots, act, prior=False, role=role)
+        assert raw.loc["s", "qb_rush"] == pytest.approx(1.0)
+        assert raw.loc["b", "qb_rush"] == pytest.approx(b_expect)
+
+
+def test_role_off_leaves_the_played_frames_untouched():
+    cnt, played, slots, act = _qb_world()
+    c, p = V.role_filter(played.iloc[0:0], played, None, slots, act, None)
+    assert p.equals(played)
+
+
+def test_a_player_who_never_held_his_role_keeps_every_game():
+    cnt, played, slots, act = _qb_world()
+    act = act.assign(slot=["QB1", "QB3"])          # b is QB3 now, a role he never held
+    _, p = V.role_filter(played.iloc[0:0], played, None, slots, act, "slot")
+    assert len(p[p["player_id"] == "b"]) == 3
