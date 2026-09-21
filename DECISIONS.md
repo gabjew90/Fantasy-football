@@ -4914,3 +4914,36 @@ x share history/0.85/0.88/0.92/0.95): 0.92 with 40 is still best. And the
 diagnostic's QB columns are now labelled from the configs, not hard-coded versions.
 
 Lock at props-v1.9.
+
+## 2026-09-21 (85) -- layer 3: an exact joint model; structure real, not established on test; parlays stay gated
+
+Built as the user specified, with one design change the math allowed: pairs and
+small parlays have a CLOSED FORM given the joint pmf of the two teams' counts
+and each player's per-TD share, so layer 3 is exact rather than simulated -- no
+Monte Carlo noise, and its single-leg prices equal anytime_td_v1's to 1e-15.
+
+Pieces, each measured (reports/td_layer3.md; tuned 2022-23, scored 2024-25,
+pairs of players priced 10%+, ~25,000 of each kind):
+- teammates share their team's count: P(both) 0.0594 -> 0.0553 vs 0.0543
+  actual; -0.00032 (-0.00067, +0.00003), not established (tune established).
+- each team's channel mix conditioned on the opponent's count (the user's
+  channel-mix hypothesis, #84): cross-team pairs -0.00025 (-0.00041, -0.00009),
+  established.
+- the two counts are NOT independent: residual correlation +0.15 (+0.06, +0.23)
+  on 2024-25, +0.21 on 2022-23. A one-factor Gaussian copula (r = 0.5, tuned on
+  the likelihood of actual score pairs) preserves each team's distribution and
+  improves that likelihood in both eras; on pairs it is not established
+  (-0.00026, CI to +0.00012) and overshoots the level (0.0642 vs 0.0626).
+
+The gate stays closed. The structure is right in direction; the size of the
+gain is not established out of sample; and the largest remaining pair error is
+in the legs -- two high-priced players together run high (0.090 vs 0.079),
+the top-share passing-channel bias. That is the next single-leg item; layer 3
+is rerun after it.
+
+Also built: the market blend in SHADOW (props/blend.py). The record already
+holds p_model, p_novig and the outcome for every call, so the blend needs no
+engine change: the Tuesday scorecard fits logit(p) = a + b_model logit(p_model)
++ b_market logit(p_market) on settled v1 anytime-TD calls, within one engine
+version, with game-clustered intervals and leave-one-week-out log loss for
+model, market and blend -- and prints no weight below 300 calls.

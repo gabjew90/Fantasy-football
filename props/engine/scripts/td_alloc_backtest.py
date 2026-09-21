@@ -292,6 +292,8 @@ def run(D: dict, seasons: list[int], cfgs: list) -> tuple[pd.DataFrame, pd.DataF
                     cols[f"engl2|{k}"] = A.p_score_dist(q, pmf_eng, c)
                 nh_set = set(nohist_ids)
                 m_ship = by_cap.get(ship_key)
+                mix_ship = V.game_mix(ctx, g["team"], qb, SHIP[3]) if m_ship is not None else None
+                mu_team = float((pmf_new * np.arange(len(pmf_new))).sum())
                 for i, pid in enumerate(ids):
                     r = {**base, "player_id": pid, "pos": pos.get(pid), "no_history": pid in nh_set,
                          "starter": pid == qb, "new_starter": pid == qb and new_qb,
@@ -306,6 +308,9 @@ def run(D: dict, seasons: list[int], cfgs: list) -> tuple[pd.DataFrame, pd.DataF
                             r[f"s_{ch}"] = float(m_ship.loc[pid, ch])
                             r[f"td_{ch}"] = int(sc_ch.get((g["game_id"], pid, ch), 0))
                             r[f"T_{ch}"] = int(g[ch])
+                            r[f"w_{ch}"] = float(mix_ship[ch])
+                        r["mu_team"] = mu_team
+                        r["implied"] = float(g["implied"])
                     rows.append(r)
     return pd.DataFrame(rows), pd.DataFrame(mass)
 
