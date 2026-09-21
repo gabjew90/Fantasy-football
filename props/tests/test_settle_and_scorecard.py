@@ -306,3 +306,19 @@ def test_anytime_td_rows_without_a_model_stamp_are_model_unknown_not_v1():
     assert keys == ["player_anytime_td [model unknown]", "player_anytime_td [anytime_td_v1]",
                     "player_anytime_td [anytime_td_v0]", "player_receptions"]
     assert list(scorecard.market_key(df.drop(columns="td_model")))[0] == "player_anytime_td [model unknown]"
+
+
+def test_the_pooled_tables_hold_only_v1_anytime_rows():
+    import pandas as pd
+    df = pd.DataFrame({"market": ["player_anytime_td"] * 3 + ["player_receptions"],
+                       "td_model": ["anytime_td_v1", "anytime_td_v0", None, None],
+                       "won": [1, 0, 1, 0], "p_model": [0.3, 0.3, 0.3, 0.6], "p_novig": [0.3] * 4,
+                       "pnl_per_100": [100, -100, 100, -100], "tier_base": ["UNTIERED"] * 4,
+                       "week": [3] * 4, "engine_hash": ["h"] * 4, "questionable_teammate": [False] * 4})
+    out, _ = scorecard.render_sections(df)
+    text = "\n".join(out)
+    assert text.startswith("2 settled calls")              # v1 TD + receptions
+    assert "2 anytime-TD calls priced by the v0 fallback or by an unrecorded model" in text
+    assert "player_anytime_td [anytime_td_v0]" in text and "player_anytime_td [model unknown]" in text
+    only_other = df.iloc[1:3]
+    scorecard.render_sections(only_other)                     # no division by zero

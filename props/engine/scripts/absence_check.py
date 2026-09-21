@@ -60,6 +60,10 @@ def check(seasons) -> pd.DataFrame:
         games = t[["game_id", "week", "team", "team_tgt"]].drop_duplicates(["game_id", "team"])
         act = set(zip(ros.loc[ros["status"] == "ACT", "week"], ros.loc[ros["status"] == "ACT", "team"],
                       ros.loc[ros["status"] == "ACT", "gsis_id"]))
+        # an absence is a week ON THE ROSTER but not active, never a week before he
+        # joined or after he left (roster turnover, not absence)
+        out_rostered = set(zip(ros.loc[ros["status"] != "ACT", "week"], ros.loc[ros["status"] != "ACT", "team"],
+                               ros.loc[ros["status"] != "ACT", "gsis_id"]))
         for team, tt in t.groupby("team"):
             te = tt[tt["pos"] == "TE"].groupby("player_id").agg(tgt=("tgt", "sum"), share=("share", "mean"))
             te = te[te["share"] >= 0.15]
@@ -68,7 +72,7 @@ def check(seasons) -> pd.DataFrame:
             te1 = te["tgt"].idxmax()
             gt = games[games["team"] == team]
             played = set(tt.loc[tt["player_id"] == te1, "game_id"])
-            absent = [g for g, w in zip(gt["game_id"], gt["week"]) if (w, team, te1) not in act and g not in played]
+            absent = [g for g, w in zip(gt["game_id"], gt["week"]) if (w, team, te1) in out_rostered and g not in played]
             if not absent or not played:
                 continue
             s_te1 = float(tt.loc[tt["player_id"] == te1, "share"].mean())

@@ -163,9 +163,14 @@ def render_sections(df: pd.DataFrame) -> tuple[list[str], list[dict]]:
     """The four rollups for one engine's calls. (markdown lines, csv rows)."""
     out: list[str] = []
     rows: list[dict] = []
+    keys = df["market_key"] if "market_key" in df.columns else market_key(df)
+    # the pooled tables must not mix anytime-TD models: v0-fallback and
+    # 'model unknown' rows appear only in the By-market split below
+    other_td = keys.str.startswith("player_anytime_td") & (keys != "player_anytime_td [anytime_td_v1]")
+    full, df = df, df[~other_td]
     n = len(df)
     hits = int(df["won"].sum())
-    out += [f"{n} settled calls, {hits} winners ({hits / n:.1%}), "
+    out += [f"{n} settled calls, {hits} winners ({hits / max(n, 1):.1%}), "
             f"net {df['pnl_per_100'].sum():+.0f} per $100 flat-staked.", ""]
 
     out += ["### Calibration: does the model's probability mean anything?", "",
@@ -200,11 +205,13 @@ def render_sections(df: pd.DataFrame) -> tuple[list[str], list[dict]]:
             "book column, that assumption is costing money and the tier rule "
             "should change.", ""]
 
-    out += ["### By market", "",
-            "| Market | Calls | Hit rate | Model said | Net/$100 |",
+    out += ["### By market", ""]
+    if other_td.any():
+        out += [f"{int(other_td.sum())} anytime-TD calls priced by the v0 fallback or by an unrecorded "
+                "model are left out of the tables above and shown only here.", ""]
+    out += ["| Market | Calls | Hit rate | Model said | Net/$100 |",
             "|---|---|---|---|---|"]
-    keys = df["market_key"] if "market_key" in df.columns else market_key(df)
-    for mkt, b in df.groupby(keys):
+    for mkt, b in full.groupby(keys):
         out.append(f"| {mkt} | {len(b)} | {b['won'].mean():.1%} | "
                    f"{b['p_model'].mean():.1%} | {b['pnl_per_100'].sum():+.0f} |")
     out += ["", "Receptions and receiving yards are the only backtested "

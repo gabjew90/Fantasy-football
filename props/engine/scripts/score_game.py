@@ -645,9 +645,8 @@ def main():
 
     # A2: where an excluded player's share goes (reports/absence_tune.md). It does NOT
     # go pro rata to the priced teammates, as this path assumed until props-v1.8: when
-    # a 15%+ target player sits, the players who had under 5% of targets go from 0.127
-    # to 0.367 -- the call-up or promoted backup takes it -- and priced teammates gain
-    # nothing. A fraction y of his share stays with the priced set; of that, x goes to
+    # a 15%+ target player sits, the players who had under 5% of targets go from 0.112
+    # to 0.267 -- the call-up or promoted backup takes most of it. A fraction y of his share stays with the priced set; of that, x goes to
     # every priced teammate pro rata and 1 - x to priced teammates at HIS position.
     # Tuned 2022-23, scored as-is on 2024-25 absence games. Do NOT renormalise the
     # eligible set to sum to 1: it never covers a team's whole volume.
@@ -1854,7 +1853,7 @@ def main():
         T += ["## Game header\n",
               f"- **Frame:** {frame}. Team TD totals: " + ", ".join(f"{t} {env[t].get('pass_td',0)+env[t].get('rush_td',0):.1f} ({'market-anchored' if env[t].get('td_anchor')=='market' else 'history'})" for t in (AWAY, HOME)),
               f"- **Weather:** {wx}. 15 mph sustained-wind screen {'HIT' if (weather.get('wind_mph_max') or 0) > 15 else 'not hit'}.",
-              f"- **Injury designations (week {WEEK} report):** " + (", ".join(desig) if desig else "none on the eligible set") + ". Out/Doubtful removed; their share goes mostly to the replacement, not the priced teammates; Questionable priced as if playing, with a separate 'if he's out' pricing. Re-run inside 90 minutes of kickoff: a late scratch changes every share on that team.",
+              f"- **Injury designations (week {WEEK} report):** " + (", ".join(desig) if desig else "none on the eligible set") + ". Out/Doubtful removed; their share goes mostly to the replacement, a quarter to the priced teammates; Questionable priced as if playing, with a separate 'if he's out' pricing. Re-run inside 90 minutes of kickoff: a late scratch changes every share on that team.",
               f"- **Data cutoff:** 2026 weeks 1-{WEEK-1} play-by-play, week {WEEK} roster/injury/depth chart; prices snapshot {now()}; kickoff in {hrs:.1f} h.",
               "",
               "<details><summary>Method in six lines</summary>\n",
@@ -1966,7 +1965,7 @@ def main():
     excl = pop[pop.excluded]
     if len(excl):
         L.append(f"- **Out:** " + ", ".join(f"{r['name']} ({r.report_status or r.status})" for _, r in excl.iterrows())
-                 + ". Most of their usual share goes to whoever replaces them, not to the priced teammates: none of their targets and a quarter of their carries are handed on in our numbers.")
+                 + ". Most of their usual share goes to whoever replaces them, not to the priced teammates: a quarter of their targets and carries is handed on in our numbers, mostly to their position.")
     q = pop[pop.questionable]
     if len(q):
         L.append(f"- **Questionable:** " + ", ".join(r["name"] for _, r in q.iterrows()) + ". Priced as if they play their normal role; see 'If a Questionable player is out' for the other case.")
@@ -2111,9 +2110,10 @@ def apply_out_rule(M: pd.DataFrame, E: pd.DataFrame, teams, rule=None):
 # Out path (A2): (x, y) per share column. y = the fraction of an excluded
 # player's share that stays with the priced teammates; x = of that, the part
 # spread over all of them (the rest goes to his position). Tuned on 2022-23
-# absence games, scored as-is on 2024-25 (reports/absence_tune.md): targets
-# test loss -31.3 (-42.1, -22.0) vs the shipped (1, 1), carries -157 (-229, -95).
-OUT_RULE = {"ts": (0.0, 0.0), "i10ts": (0.0, 0.0), "rs": (0.0, 0.25), "i10rs": (0.0, 0.25)}
+# absence games, scored as-is on 2024-25 (reports/absence_tune.md); test loss
+# vs the shipped (1, 1): targets -14.9 (-21.5, -9.7), carries -96 (-136, -62),
+# inside-10 targets -90 (-121, -62), inside-10 carries -375 (-617, -206).
+OUT_RULE = {"ts": (0.2, 0.25), "i10ts": (0.0, 0.0), "rs": (0.0, 0.25), "i10rs": (0.0, 0.25)}
 POS_GROUP = {"FB": "RB", "HB": "RB"}
 SCEN_KEY = ["book", "market", "player", "side", "line"]
 MARKET_WORDS = {"player_receptions": "catches", "player_reception_yds": "receiving yards",
@@ -2129,8 +2129,8 @@ def run_scenarios(q: pd.DataFrame, R: pd.DataFrame, slug: str, snap_path: Path) 
     L = ["", "## If a Questionable player is out", "",
          "Every line above is priced as if the Questionable players play their normal role. Below, "
          "the same lines priced with each one OUT, the way an Out player is handled: most of his share "
-         "goes to his replacement, a quarter of his carries to teammates at his position, none of his "
-         "targets to the priced teammates (measured on 2024-25 absences). His own props void if he sits. Only lines whose probability moves by at least "
+         "goes to his replacement; a quarter of his targets and carries stays with the priced teammates, "
+         "mostly at his position (measured on 2024-25 absences). His own props void if he sits. Only lines whose probability moves by at least "
          "1 point are listed. Neither case is weighted by how likely he is to play: that call is yours."]
     # the scenario compares against THIS run's lines only: no merge with earlier logs
     argv, skip = [], False

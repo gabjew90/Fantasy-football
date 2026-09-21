@@ -4825,7 +4825,7 @@ carried it. Fixed, with a test.
 **Review fixes.** The scenario re-runs now use only a snapshot written in the
 same run, and clear their output file before each re-run.
 
-## 2026-09-21 (83) -- the Out path: an absent player's share goes to his replacement, not the priced teammates
+## 2026-09-21 (83) -- the Out path: an absent player's share goes mostly to his replacement
 
 The v1.6 Questionable section showed swings like McCaffrey Over 4.5 catches
 65% -> 82% if Kittle sat, from an Out path that handed an excluded player's
@@ -4833,26 +4833,37 @@ whole share to every priced teammate pro rata. The user asked for a
 position-first rule, the cross-position fraction tuned on 2022-23 absence games
 and scored as-is on 2024-25.
 
-The data asked a different question first (reports/absence_tune.md). When a
-player with a 15%+ target share sits, players who had under 5% of targets go
-from 0.127 to 0.367 -- they absorb all of his 0.217 -- and priced teammates at
-other positions actually LOSE a little share. For a 20%+ carry share, the
-under-5% players go from 0.065 to 0.359. The replacement, not the priced
-teammates, takes the work. So the rule has two parameters: y, the fraction that
-stays with the priced set at all, and x, the part of that spread across all of
-them (the rest to his position).
+The data asked a prior question (reports/absence_tune.md): does the share go to
+the priced teammates at all? When a player with a 15%+ target share sits,
+players who had under 5% of targets go from 0.112 to 0.267; for a 20%+ carry
+share, from 0.057 to 0.220. The replacement takes most of it. So the rule has
+two parameters: y, the fraction that stays with the priced set, and x, the part
+of that spread across all of them (the rest to his position). Goal-line
+(inside-10) targets and carries are measured and tuned on their own.
 
-Tuned on 2022-23 (122 target events, 113 carry events), scored as-is on
-2024-25 (132 and 101 events):
-- targets: x = 0, y = 0 -- no targets to priced teammates. Test loss -31.3
-  (-42.1, -22.0) x 1e-4 against the shipped x = 1, y = 1.
-- carries: x = 0, y = 0.25 -- a quarter, to priced teammates at his position.
-  Test loss -157 (-229, -95).
+Tuned on 2022-23, scored as-is on 2024-25; test loss vs the shipped x = 1, y = 1
+(x 1e-4 squared share, bootstrap over events):
+- targets x = 0.2, y = 0.25: -14.9 (-21.5, -9.7)
+- carries x = 0, y = 0.25: -96 (-136, -62)
+- inside-10 targets x = 0, y = 0: -90 (-121, -62)
+- inside-10 carries x = 0, y = 0.25: -375 (-617, -206)
 
-Consequence: the Kittle swing on catches and yards disappears. TD rows still
-move, through the TD model's own reallocation ('all', validated in the layer-2
-backtest); given this finding, that setting deserves the same absence check.
+Code review, before pushing, caught two defects in my first version of the
+harness and they changed the targets answer. An 'absence' was any week the
+player was not active for the team, including weeks before he joined or after
+he left -- roster turnover credited to 'replacements' (first cut: 0.127 ->
+0.367 and y = 0). And a teammate's share without him was pooled over games the
+teammate also missed. Both fixed: absences are weeks on that team's roster but
+not active; each teammate is measured only over games he was active in. The
+TE1 check (reports/absence_te1.md) was rerun with the same fix: against the old
+rule the lead back gets 0.08 of the predicted gain, other TEs 8.6x theirs.
+
+Consequence: the Kittle swing on catches and yards is gone. TD rows still move
+through the TD model's own reallocation ('all', validated in the layer-2
+backtest); given this finding that setting deserves the same absence check.
 Known limit: the replacement himself is still priced off his own small share.
 
-Also here: the scorecard labels anytime-TD rows by td_model, and rows recorded
-before td_model reached the record are 'model unknown', never v1.
+Scorecard: anytime-TD rows are labelled by td_model; rows recorded before
+td_model reached the record are 'model unknown', never v1. The calibration and
+tier tables use v1 anytime rows only; v0 and unknown rows appear only in the
+By-market split.

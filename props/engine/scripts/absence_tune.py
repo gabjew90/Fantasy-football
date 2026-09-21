@@ -15,10 +15,12 @@ seasons' absence games and scored as-is on TEST.
 
 EVENTS. For each team-season, every player who averaged a 15%+ target share
 (targets) or 20%+ carry share (carries) in the games he played, and missed
-games -- not on the game-day active list and no opportunity. His share and
-his teammates' shares are pooled over the games he played; the teammates'
-actual shares over the games he missed. ELIGIBLE approximates the scorer's
-priced set: a 5%+ share in the games he played.
+games while ON THAT TEAM'S ROSTER (weekly roster, not ACT). Weeks before he
+joined or after he left are not absences. Each teammate is measured only over
+games HE was active in: his share with the key player, and without him.
+ELIGIBLE approximates the scorer's priced set: a 5%+ share in the games he
+played. The inside-10 kinds use the same events (chosen on all plays) and
+measure goal-line targets and carries only.
 
 LOSS. Squared error of each eligible teammate's predicted share without him
 against his actual share, weighted by the number of absence games; a
@@ -39,8 +41,12 @@ import td_model as T  # noqa: E402
 from td_backtest import NV, fetch  # noqa: E402
 
 COLS = ["game_id", "season", "week", "season_type", "posteam", "play_type", "receiver_player_id",
-        "rusher_player_id", "two_point_attempt", "qb_kneel"]
-KINDS = {"targets": ("receiver_player_id", "pass", 0.15), "carries": ("rusher_player_id", "run", 0.20)}
+        "rusher_player_id", "two_point_attempt", "qb_kneel", "yardline_100"]
+# kind: (player column, play type, key-player share threshold, inside-10 only)
+KINDS = {"targets": ("receiver_player_id", "pass", 0.15, False),
+         "carries": ("rusher_player_id", "run", 0.20, False),
+         "i10_targets": ("receiver_player_id", "pass", 0.15, True),
+         "i10_carries": ("rusher_player_id", "run", 0.20, True)}
 XS = [round(x, 2) for x in np.linspace(0, 1, 11)]
 YS = [0.0, 0.25, 0.5, 0.75, 1.0]
 SHIPPED = (1.0, 1.0)
@@ -56,8 +62,10 @@ def season_frames(s: int):
                       low_memory=False)
     ros = ros[(ros["game_type"] == "REG") & ros["gsis_id"].notna()].assign(team=lambda r: T._norm_team(r["team"]))
     out = {}
-    for kind, (col, pt, _) in KINDS.items():
+    for kind, (col, pt, _, i10) in KINDS.items():
         p = pbp[(pbp["play_type"] == pt) & pbp[col].notna()]
+        if i10:
+            p = p[p["yardline_100"] <= 10]
         t = (p.assign(team=T._norm_team(p["posteam"]))
              .groupby(["season", "week", "game_id", "team", col]).size()
              .rename("n").reset_index().rename(columns={col: "player_id"}))
@@ -70,38 +78,65 @@ def season_frames(s: int):
 def events(seasons, kind: str) -> pd.DataFrame:
     """One row per (event, eligible teammate): share_in, share_out, pos, and
     the absent player's share and position."""
-    thr = KINDS[kind][2]
+    thr, i10 = KINDS[kind][2], KINDS[kind][3]
     rows = []
     for s in seasons:
         frames, ros = season_frames(s)
         t = frames[kind]
         pos = ros.drop_duplicates("gsis_id").set_index("gsis_id")["position"].replace({"FB": "RB"})
         t = t.assign(pos=t["player_id"].map(pos))
-        act = set(zip(ros.loc[ros["status"] == "ACT", "week"], ros.loc[ros["status"] == "ACT", "team"],
-                      ros.loc[ros["status"] == "ACT", "gsis_id"]))
+        st = ros[["week", "team", "gsis_id", "status"]]
+        act = set(zip(st.loc[st["status"] == "ACT", "week"], st.loc[st["status"] == "ACT", "team"],
+                      st.loc[st["status"] == "ACT", "gsis_id"]))
+        # ON THE ROSTER BUT NOT ACTIVE: the only weeks that are an absence. A week
+        # before he joined the team or after he left is roster turnover, not an
+        # absence, and would credit the departed players' share to 'replacements'.
+        out_rostered = set(zip(st.loc[st["status"] != "ACT", "week"], st.loc[st["status"] != "ACT", "team"],
+                               st.loc[st["status"] != "ACT", "gsis_id"]))
         games = t[["game_id", "week", "team", "team_n"]].drop_duplicates(["game_id", "team"])
+        full = frames["targets" if "targets" in kind else "carries"]      # key players chosen on ALL plays
         for team, tt in t.groupby("team"):
             gt = games[games["team"] == team]
-            key = tt.groupby("player_id").agg(n=("n", "sum"), share=("share", "mean"), pos=("pos", "first"))
+            ft = full[full["team"] == team]
+            key = ft.groupby("player_id").agg(share=("share", "mean"))
+            key["pos"] = key.index.map(pos)
             for kid, kr in key[(key["share"] >= thr) & key["pos"].isin(["RB", "WR", "TE"])].iterrows():
-                played = set(tt.loc[tt["player_id"] == kid, "game_id"])
-                absent = [g for g, w in zip(gt["game_id"], gt["week"]) if (w, team, kid) not in act and g not in played]
-                if not absent:
+                played = set(ft.loc[ft["player_id"] == kid, "game_id"])
+                wk = dict(zip(gt["game_id"], gt["week"]))
+                absent = [g for g in gt["game_id"] if (wk[g], team, kid) in out_rostered and g not in played]
+                played = [g for g in gt["game_id"] if g in played]
+                if not absent or not played:
                     continue
-                tin = gt[gt["game_id"].isin(played)]["team_n"].sum()
-                tout = gt[gt["game_id"].isin(absent)]["team_n"].sum()
                 others = tt[tt["player_id"] != kid]
-                a = others[others["game_id"].isin(played)].groupby("player_id")["n"].sum() / tin
-                b = others[others["game_id"].isin(absent)].groupby("player_id")["n"].sum() / tout
-                j = pd.DataFrame({"share_in": a, "share_out": b}).fillna(0.0)
+                cand = set(others["player_id"])
+                rows_j = []
+                for pid in cand:
+                    # each teammate only over games HE was active in, on both sides
+                    gi = [g for g in played if (wk[g], team, pid) in act]
+                    go = [g for g in absent if (wk[g], team, pid) in act]
+                    if not gi or not go:
+                        continue
+                    tin_p = gt[gt["game_id"].isin(gi)]["team_n"].sum()
+                    tout_p = gt[gt["game_id"].isin(go)]["team_n"].sum()
+                    if tin_p <= 0 or tout_p <= 0:
+                        continue
+                    mine = others[others["player_id"] == pid]
+                    rows_j.append({"player_id": pid, "share_in": mine[mine["game_id"].isin(gi)]["n"].sum() / tin_p,
+                                   "share_out": mine[mine["game_id"].isin(go)]["n"].sum() / tout_p})
+                if not rows_j:
+                    continue
+                j = pd.DataFrame(rows_j).set_index("player_id")
                 j["pos"] = j.index.map(pos)
+                tin = gt[gt["game_id"].isin(played)]["team_n"].sum()
+                if tin <= 0:
+                    continue
                 # what the players OUTSIDE the eligible set took, with him and without
                 small_in = float(j.loc[j["share_in"] < ELIG, "share_in"].sum())
                 small_out = float(j.loc[j["share_in"] < ELIG, "share_out"].sum())
                 j = j[j["share_in"] >= ELIG]
                 if j.empty:
                     continue
-                k_share = float(tt.loc[tt["player_id"] == kid, "n"].sum() / tin)
+                k_share = float(tt.loc[(tt["player_id"] == kid) & tt["game_id"].isin(played), "n"].sum() / tin)
                 rows.append(j.reset_index().assign(event=f"{s}_{team}_{kid}", season=s, team=team,
                                                    k_share=k_share, k_pos=kr["pos"], games_out=len(absent),
                                                    small_in=small_in, small_out=small_out))
@@ -194,8 +229,7 @@ def main(argv=None) -> int:
             _, pb, _, rb = gb[grp]
             L.append(f"| {grp} | {si:.3f} | {p1:.3f} | {pb:.3f} | {so:.3f} | {r1:.2f} | {rb:.2f} |")
         L.append("")
-    L += [f"Chosen: targets x = {chosen['targets'][0]:g}, y = {chosen['targets'][1]:g}; "
-          f"carries x = {chosen['carries'][0]:g}, y = {chosen['carries'][1]:g}.", ""]
+    L += ["Chosen: " + "; ".join(f"{k} x = {v[0]:g}, y = {v[1]:g}" for k, v in chosen.items()) + ".", ""]
     path = Path(a.out) / "absence_tune.md"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("\n".join(L) + "\n", encoding="utf-8")
