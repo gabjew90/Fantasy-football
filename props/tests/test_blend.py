@@ -45,3 +45,10 @@ def test_only_v1_anytime_calls_enter():
 def test_the_section_reports_weights_and_out_of_sample_loss():
     out = "\n".join(blend.blend_section(_calls(800, seed=2), reps=50))
     assert "logit(market)" in out and "Leave-one-week-out log loss" in out
+
+
+def test_each_book_gets_its_own_intercept():
+    a = _calls(600, seed=3).assign(book="sleeper")
+    b = _calls(600, seed=4).assign(book="draftkings")
+    out = "\n".join(blend.blend_section(pd.concat([a, b]), reps=30))
+    assert "books draftkings, sleeper" in out

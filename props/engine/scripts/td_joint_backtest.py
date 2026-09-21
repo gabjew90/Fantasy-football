@@ -119,7 +119,8 @@ def pairs(d: pd.DataFrame, shift: pd.DataFrame, r: float) -> tuple[pd.DataFrame,
             p1 = J.p_any(q1, P, own_axis=axis)
             p2 = J.p_any(q1, Pr, own_axis=axis)
             keep = (x[pcol] >= LEG_MIN).to_numpy()
-            info[t] = {"x": x[keep], "q0": q0[keep], "q1": q1[keep], "axis": axis}
+            info[t] = {"x": x[keep], "q0": q0[keep], "q1": q1[keep], "axis": axis,
+                       "p1": p1[keep], "p2": p2[keep]}
             legs_out.append(pd.DataFrame({"game_id": gid, "team": t, "player_id": x["player_id"],
                                           "scored": x["scored"], "p_v1": x[pcol], "p_joint0": p0,
                                           "p_shift": p1, "p_full": p2}))
@@ -129,6 +130,7 @@ def pairs(d: pd.DataFrame, shift: pd.DataFrame, r: float) -> tuple[pd.DataFrame,
             for i, j in combinations(range(n), 2):
                 a, b = I["x"].iloc[i], I["x"].iloc[j]
                 out.append({"game_id": gid, "kind": "teammates", "pA": a[pcol], "pB": b[pcol],
+                            "ind1": I["p1"][i] * I["p1"][j], "ind2": I["p2"][i] * I["p2"][j],
                             "both": int(a["scored"] and b["scored"]),
                             "joint0": J.p_all_same_team(I["q0"][[i, j]], P, own_axis=I["axis"]),
                             "joint1": J.p_all_same_team(I["q1"][[i, j]], P, own_axis=I["axis"]),
@@ -138,6 +140,7 @@ def pairs(d: pd.DataFrame, shift: pd.DataFrame, r: float) -> tuple[pd.DataFrame,
             for j in range(len(B_["x"])):
                 a, b = A_["x"].iloc[i], B_["x"].iloc[j]
                 out.append({"game_id": gid, "kind": "opponents", "pA": a[pcol], "pB": b[pcol],
+                            "ind1": A_["p1"][i] * B_["p1"][j], "ind2": A_["p2"][i] * B_["p2"][j],
                             "both": int(a["scored"] and b["scored"]),
                             "joint0": J.p_pair_cross(A_["q0"][i], B_["q0"][j], P),
                             "joint1": J.p_pair_cross(A_["q1"][i], B_["q1"][j], P),
@@ -165,6 +168,13 @@ def section(L, pr: pd.DataFrame, legs: pd.DataFrame, label: str):
             vs = "" if c == "indep" else ci(boot(g, c, "indep"))
             L.append(f"| {lab} | {g[c].mean():.4f} | {ll(g[c], g['both']).mean():.5f} | "
                      f"{((g[c] - g['both']) ** 2).mean():.5f} | {vs} |")
+        # LINKAGE ALONE: the shift and the copula also move each leg's own marginal,
+        # so against the v1 product a better leg would pass for dependence. Against
+        # the product of the model's OWN marginals, only the dependence is left.
+        L += ["", "Dependence alone, against the product of each model's own marginals:", "",
+              "| model | vs its own marginals' product (95% CI) |", "|---|---|",
+              f"| joint + mix shift | {ci(boot(g, 'joint1', 'ind1'))} |",
+              f"| joint + mix shift + correlated counts | {ci(boot(g, 'joint2', 'ind2'))} |"]
         # the lift: how far the joint model moves a pair from the product, and whether reality follows
         g = g.assign(lift=g["joint2"] / g["indep"])
         L += ["", "Binned by the full model's lift over the product: does reality move with it?", "",
@@ -197,7 +207,9 @@ def main(argv=None) -> int:
          "## Channel-mix multipliers by the opponent's offensive TDs (estimated on tune)", "",
          "| opponent TDs | " + " | ".join(J.CH) + " |", "|---" * (len(J.CH) + 1) + "|"]
     for b, r in shift.iterrows():
-        L.append(f"| {b if b < J.OPP_BUCKETS - 1 else f'{b}+'} | " + " | ".join(f"{v:.2f}" for v in r) + " |")
+        L.append(f"| {b if b < J.OPP_BUCKETS - 1 else f'{b}+'} ({shift.attrs['n_tds'][b]} TDs) | "
+                 + " | ".join(f"{v:.2f}" for v in r) + " |")
+    L += ["", "Each bucket's raw multipliers are shrunk toward 1 by 200 touchdowns.", ""]
     L += ["", "## Are the two teams' touchdown counts correlated beyond their implied totals?", "",
           "| seasons | games | residual correlation (95% CI) |", "|---|---|---|"]
     for lab, d in (("tune", dtu), ("test", dte)):

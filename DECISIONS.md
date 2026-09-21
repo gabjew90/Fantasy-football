@@ -4927,7 +4927,8 @@ pairs of players priced 10%+, ~25,000 of each kind):
 - teammates share their team's count: P(both) 0.0594 -> 0.0553 vs 0.0543
   actual; -0.00032 (-0.00067, +0.00003), not established (tune established).
 - each team's channel mix conditioned on the opponent's count (the user's
-  channel-mix hypothesis, #84): cross-team pairs -0.00025 (-0.00041, -0.00009),
+  channel-mix hypothesis, #84): the DEPENDENCE alone, against the product of the
+  shifted marginals, -0.00012 (-0.00020, -0.00004) on cross-team pairs,
   established.
 - the two counts are NOT independent: residual correlation +0.15 (+0.06, +0.23)
   on 2024-25, +0.21 on 2022-23. A one-factor Gaussian copula (r = 0.5, tuned on
@@ -4941,9 +4942,17 @@ in the legs -- two high-priced players together run high (0.090 vs 0.079),
 the top-share passing-channel bias. That is the next single-leg item; layer 3
 is rerun after it.
 
+Code review before pushing caught three things, all fixed: the mix shift was
+scored against v1's product although it also improves single legs, so its
+first figure (-0.00025) mixed a better leg with dependence -- the dependence
+alone is -0.00012; a thin opponent-count bucket was silently set to "no shift"
+and printed as if measured -- buckets are now shrunk toward 1 by 200 TDs with
+their counts shown; and the blend pooled books with different holds in one
+market term -- each book now has its own intercept.
+
 Also built: the market blend in SHADOW (props/blend.py). The record already
 holds p_model, p_novig and the outcome for every call, so the blend needs no
 engine change: the Tuesday scorecard fits logit(p) = a + b_model logit(p_model)
-+ b_market logit(p_market) on settled v1 anytime-TD calls, within one engine
-version, with game-clustered intervals and leave-one-week-out log loss for
++ b_market logit(p_market) + a per-book intercept on settled v1 anytime-TD
+calls, within one engine version, with game-clustered intervals and leave-one-week-out log loss for
 model, market and blend -- and prints no weight below 300 calls.

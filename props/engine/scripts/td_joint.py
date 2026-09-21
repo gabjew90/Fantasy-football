@@ -108,20 +108,25 @@ def copula_joint(pa: np.ndarray, pb: np.ndarray, r: float) -> np.ndarray:
 def mix_shift(tg: pd.DataFrame, min_tds: int = 200) -> pd.DataFrame:
     """Channel multipliers by the opponent's offensive-TD count (bucket 0..4+):
     the channel's share of a team's offensive TDs in that bucket over its
-    share overall. Estimated on the seasons given (the tune seasons)."""
+    share overall, SHRUNK toward 1 by a pseudo-count of `min_tds` touchdowns
+    (a thin bucket moves less; none is silently set to 1). Estimated on the
+    seasons given (the tune seasons). The bucket's TD count is in .attrs."""
     opp = tg[["game_id", "team", "off_tds"]].rename(columns={"team": "opp", "off_tds": "opp_tds"})
     t = tg.merge(opp, on=["game_id", "opp"])
     t["b"] = t["opp_tds"].clip(upper=OPP_BUCKETS - 1).astype(int)
     tot = t[CH].sum()
     base = tot / tot.sum()
-    rows = {}
+    rows, n_tds = {}, {}
     for b in range(OPP_BUCKETS):
         g = t.loc[t["b"] == b, CH].sum()
-        if g.sum() > 0 and g.sum() >= min_tds:
-            rows[b] = ((g / g.sum()) / base.where(base > 0)).fillna(1.0)   # a channel with no TDs: 1
-        else:
-            rows[b] = pd.Series(1.0, index=CH)
-    return pd.DataFrame(rows).T[CH]
+        n = float(g.sum())
+        n_tds[b] = int(n)
+        raw = ((g / n) / base.where(base > 0)).fillna(1.0) if n > 0 else pd.Series(1.0, index=CH)
+        w = n / (n + min_tds) if (n + min_tds) > 0 else 0.0
+        rows[b] = w * raw + (1 - w)                       # shrunk toward no shift
+    out = pd.DataFrame(rows).T[CH]
+    out.attrs["n_tds"] = n_tds
+    return out
 
 
 def mixes_by_opp(mix: pd.Series, shift: pd.DataFrame | None) -> np.ndarray:

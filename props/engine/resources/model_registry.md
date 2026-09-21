@@ -153,15 +153,17 @@ To `VALIDATED_BETTING`: everything above plus archive coverage (rows, bookmakers
 - Spec: exact, not simulated. Given the joint pmf of the two teams' offensive-TD counts and
   each player's per-TD share, P(A and B score) and any small parlay follow in closed form
   (inclusion-exclusion). Each team's channel mix is conditioned on the opponent's count
-  (multipliers tuned on 2022-23); the two counts are joined by a one-factor Gaussian copula,
+  (multipliers tuned on 2022-23, each bucket shrunk toward 1 by 200 TDs); the two counts are joined by a one-factor Gaussian copula,
   loading r = 0.5 tuned on the likelihood of actual score pairs, which leaves each team's
   own distribution exactly as layer 1 has it.
 - Test, pairs of players priced 10%+ (tuned 2022-23, scored 2024-25; about 25,000 pairs of
   each kind):
   - teammates: P(both) 0.0594 independent -> 0.0553 joint vs 0.0543 actual; log loss -0.00032
     (-0.00067, +0.00003), NOT established (tune -0.00056, established).
-  - opponents: mix shift -0.00025 (-0.00041, -0.00009), established; with correlated counts
-    -0.00026 (-0.00062, +0.00012), not established, level 0.0642 vs 0.0626 actual.
+  - opponents: the mix shift's DEPENDENCE alone (against the product of its own shifted
+    marginals, since the shift also improves single legs) -0.00012 (-0.00020, -0.00004),
+    established; against the v1 product -0.00018. With correlated counts -0.00019
+    (-0.00052, +0.00016), not established, level 0.0642 vs 0.0626 actual.
   - the two teams' TD counts correlate +0.15 (+0.06, +0.23) beyond their implied totals on
     2024-25 (+0.21 on 2022-23); the copula improves the count-pair likelihood in both eras.
 - Why the gate stays closed: the joint structure is right in direction but not established

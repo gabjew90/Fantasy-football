@@ -16,7 +16,8 @@ market and the blend. Below MIN_CALLS it says the record is too thin rather
 than printing a weight.
 
 One-way markets (most books quote no "won't score" side) carry their hold in
-p_novig; the intercept and b_market absorb it. Stdlib + numpy + pandas only.
+p_novig while Sleeper's two-sided prices are de-vigged, so each book gets its
+own intercept. Stdlib + numpy + pandas only.
 """
 
 from __future__ import annotations
@@ -70,7 +71,13 @@ def blend_section(df: pd.DataFrame, reps: int = 1000, seed: int = 17) -> list[st
         return out + [f"{len(d)} settled anytime_td_v1 calls in this engine version; the blend weight is not "
                       f"estimated below {MIN_CALLS}. The record is filling.", ""]
     y = d["won"].to_numpy(float)
-    X = np.column_stack([np.ones(len(d)), _logit(d["p_model"]), _logit(d["p_novig"])])
+    # ONE INTERCEPT PER BOOK: Sleeper's anytime prices are two-sided and de-vigged,
+    # one-way books' p_novig still carries the hold; pooled, the market term would
+    # measure the book mix rather than the market's information.
+    books = d["book"].astype(str).to_numpy() if "book" in d else np.array(["all"] * len(d))
+    ub = sorted(set(books))
+    dummies = [(books == b).astype(float) for b in ub[1:]]
+    X = np.column_stack([np.ones(len(d)), _logit(d["p_model"]), _logit(d["p_novig"]), *dummies])
     w = fit(X, y)
     # game-clustered bootstrap for the weights
     games = d["event_id"].astype(str).to_numpy() if "event_id" in d else np.arange(len(d)).astype(str)
@@ -90,7 +97,8 @@ def blend_section(df: pd.DataFrame, reps: int = 1000, seed: int = 17) -> list[st
         if tr.sum() >= 50:
             pb[te] = 1 / (1 + np.exp(-(X[te] @ fit(X[tr], y[tr]))))
     ok = ~np.isnan(pb)
-    return out + [f"{len(d)} settled anytime_td_v1 calls.", "",
+    return out + [f"{len(d)} settled anytime_td_v1 calls; books {', '.join(ub)} (each its own intercept; "
+                  f"the intercept row below is {ub[0]}'s).", "",
                   "| term | weight | 95% CI (game-clustered) |", "|---|---|---|",
                   f"| intercept | {w[0]:+.3f} | ({lo[0]:+.3f}, {hi[0]:+.3f}) |",
                   f"| logit(model) | {w[1]:+.3f} | ({lo[1]:+.3f}, {hi[1]:+.3f}) |",

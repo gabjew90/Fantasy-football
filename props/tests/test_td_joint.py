@@ -108,3 +108,14 @@ def test_normal_helpers_are_accurate():
     x = np.array([-2.5, -1.0, 0.0, 0.7, 2.0])
     assert J._ncdf(J._ndtri(J._ncdf(x))) == pytest.approx(J._ncdf(x), abs=1e-6)
     assert J._ncdf(np.array([0.0, 1.959964]))[1] == pytest.approx(0.975, abs=2e-7)
+
+
+def test_a_thin_bucket_is_shrunk_toward_one_not_set_to_one():
+    tg = pd.DataFrame({"game_id": ["g1", "g1"], "team": ["A", "B"], "opp": ["B", "A"], "off_tds": [0, 3],
+                       "qb_rush": [0, 0], "rush_in5": [0, 3], "rush_far": [0, 0], "pass_rz": [0, 0],
+                       "pass_far": [0, 0]})
+    sh = J.mix_shift(tg, min_tds=3)
+    assert sh.attrs["n_tds"][0] == 3                      # team B faced a scoreless opponent
+    assert sh.loc[0, "rush_in5"] == pytest.approx(1.0)    # all of B's TDs were rush_in5 = the base
+    sh_all = J.mix_shift(tg, min_tds=0)
+    assert np.isfinite(sh_all.to_numpy()).all()
