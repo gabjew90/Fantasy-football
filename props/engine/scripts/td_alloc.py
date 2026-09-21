@@ -25,7 +25,12 @@ from td_model import OFFENSIVE, _norm_team, classify_tds
 PBP_COLS_L2 = ["game_id", "season", "week", "season_type", "posteam", "defteam",
                "td_team", "touchdown", "pass_touchdown", "rush_touchdown",
                "yardline_100", "rusher_player_id", "play_type",
-               "receiver_player_id", "td_player_id", "qb_kneel", "two_point_attempt"]
+               "receiver_player_id", "td_player_id", "qb_kneel", "two_point_attempt",
+               "air_yards"]
+
+# Expected-touchdown weighting: buckets for the league TD rate per opportunity.
+YARD_BINS = [0, 1, 2, 3, 4, 5, 10, 15, 20, 30, 50, 100]
+AIR_BINS = [-100, 0, 5, 10, 20, 100]
 
 # The engine's current split, reproduced so the baseline is scored on the
 # same plays: all targets / inside-the-10 targets, all carries / inside-10.
@@ -65,21 +70,60 @@ def opportunities(pbp: pd.DataFrame, qb_ids: set[str]) -> pd.DataFrame:
                       "team": _norm_team(car["posteam"]), "player_id": car["rusher_player_id"],
                       "channel": np.where(car["rusher_player_id"].isin(qb_ids), "qb_rush",
                                           np.where(car["yardline_100"] <= 5, "rush_in5", "rush_far")),
-                      "engine": np.where(car["yardline_100"] <= 10, "car_i10", "car_all")})
+                      "engine": np.where(car["yardline_100"] <= 10, "car_i10", "car_all"),
+                      "kind": "car", "yardline_100": car["yardline_100"], "air_yards": np.nan,
+                      "td": ((car["rush_touchdown"] == 1) & (car["td_team"] == car["posteam"])).astype(int)})
     t = pd.DataFrame({"game_id": tgt["game_id"], "season": tgt["season"], "week": tgt["week"],
                       "team": _norm_team(tgt["posteam"]), "player_id": tgt["receiver_player_id"],
                       "channel": np.where(tgt["yardline_100"] <= 20, "pass_rz", "pass_far"),
-                      "engine": np.where(tgt["yardline_100"] <= 10, "tgt_i10", "tgt_all")})
+                      "engine": np.where(tgt["yardline_100"] <= 10, "tgt_i10", "tgt_all"),
+                      "kind": "tgt", "yardline_100": tgt["yardline_100"], "air_yards": tgt["air_yards"],
+                      "td": (tgt["pass_touchdown"] == 1).astype(int)})
     return pd.concat([c, t], ignore_index=True)
 
 
-def counts(opps: pd.DataFrame, key: str) -> pd.DataFrame:
-    """(season, week, game_id, team, player_id) x channel -> count.
+def _bucket(o: pd.DataFrame) -> pd.DataFrame:
+    yb = pd.cut(o["yardline_100"], YARD_BINS, labels=False).fillna(-1).astype(int)
+    ab = np.where(o["kind"] == "tgt",
+                  pd.cut(o["air_yards"], AIR_BINS, labels=False).fillna(-1), -2).astype(int)
+    return pd.DataFrame({"kind": o["kind"].to_numpy(), "yb": yb.to_numpy(), "ab": ab}, index=o.index)
+
+
+def xtd_table(opps: pd.DataFrame) -> tuple[pd.Series, pd.Series]:
+    """League touchdown rate per opportunity by (kind, yard-line bucket,
+    air-yards bucket), with a coarser (kind, yard-line) fallback. Fitted on
+    the season BEFORE the one being predicted.
+
+    WHY. Raw opportunity shares treat a running back's checkdown at his own
+    30 the same as a deep shot, and a carry from the 5 the same as one from
+    the 4. Both models so far differ only in how they BIN those counts, which
+    is why five channels could not beat the engine's two. Weighting each
+    opportunity by how often an opportunity like it scores changes the
+    information, not the bins.
+    """
+    b = _bucket(opps).assign(td=opps["td"].to_numpy())
+    fine = b.groupby(["kind", "yb", "ab"])["td"].mean()
+    coarse = b.groupby(["kind", "yb"])["td"].mean()
+    return fine, coarse
+
+
+def xtd_weights(opps: pd.DataFrame, table: tuple[pd.Series, pd.Series]) -> pd.Series:
+    fine, coarse = table
+    b = _bucket(opps)
+    w = pd.Series(pd.MultiIndex.from_frame(b[["kind", "yb", "ab"]]).map(fine.to_dict()), index=opps.index)
+    fb = pd.Series(pd.MultiIndex.from_frame(b[["kind", "yb"]]).map(coarse.to_dict()), index=opps.index)
+    return w.fillna(fb).fillna(0.0)
+
+
+def counts(opps: pd.DataFrame, key: str, weight: str | None = None) -> pd.DataFrame:
+    """(season, week, game_id, team, player_id) x channel -> count, or the sum
+    of `weight` (expected touchdowns) when given.
 
     For the engine key an inside-10 play ALSO counts in the `_all` column,
     because the engine's overall share is over every target or carry."""
-    g = (opps.groupby(["season", "week", "game_id", "team", "player_id", key]).size()
-         .unstack(key, fill_value=0).reset_index())
+    grp = opps.groupby(["season", "week", "game_id", "team", "player_id", key])
+    agg = grp.size() if weight is None else grp[weight].sum()
+    g = agg.unstack(key, fill_value=0).reset_index()
     g.columns.name = None
     if key == "engine":
         for a in ("tgt", "car"):
@@ -105,7 +149,8 @@ def _aggregate(opps: pd.DataFrame, played: pd.DataFrame, chans: list[str]) -> pd
 def blended_shares(cur: pd.DataFrame, pri: pd.DataFrame, played_cur: pd.DataFrame,
                    played_pri: pd.DataFrame, chans, kappa_games: float,
                    per_game: dict[str, float],
-                   current_team: dict[str, str] | None = None) -> pd.DataFrame:
+                   current_team: dict[str, str] | None = None,
+                   moved_weight: float = 0.5) -> pd.DataFrame:
     """Each player's share of each channel's opportunities, blended toward his
     prior-season role:
 
@@ -138,7 +183,9 @@ def blended_shares(cur: pd.DataFrame, pri: pd.DataFrame, played_cur: pd.DataFram
     out["pri_team"] = p["team"].reindex(ids)
     moved = (out["pri_team"].notna() & (out["pri_team"] != out["team"])).to_numpy()
     for ch in chans:
-        k = kappa_games * per_game[ch] * np.where(moved, 0.5, 1.0)
+        # moved_weight: how much a role from ANOTHER team counts. 0.5 was an
+        # untuned assumption; the layer-2 backtest now tunes it.
+        k = kappa_games * per_game[ch] * np.where(moved, moved_weight, 1.0)
         pri_s = (p[ch] / p[f"T_{ch}"]).reindex(ids).to_numpy()
         n_c = (c[ch].reindex(ids).fillna(0) if c is not None else pd.Series(0.0, index=ids)).to_numpy()
         N_c = (c[f"T_{ch}"].reindex(ids).fillna(0) if c is not None else pd.Series(0.0, index=ids)).to_numpy()
@@ -150,6 +197,48 @@ def blended_shares(cur: pd.DataFrame, pri: pd.DataFrame, played_cur: pd.DataFram
     out[chans] = out[chans].fillna(0.0).clip(0, 1)
     out[[f"pri_{ch}" for ch in chans]] = out[[f"pri_{ch}" for ch in chans]].fillna(0.0)
     return out
+
+
+def slot_prior(cnt: pd.DataFrame, played: pd.DataFrame, slots: pd.DataFrame, chans) -> pd.DataFrame:
+    """League share of each channel by depth-chart slot (QB1, RB1, WR2, ...),
+    from one season: summed player opportunities over summed team
+    opportunities in the games he held that slot. Players not in a listed
+    slot pool into 'OTHER'.
+
+    This is the engine's own fallback for a player with no history: the
+    first stage of score_game's blend is the slot prior when there is no
+    individual rate. Layer 2 gave such a player NO share, which is the likely
+    source of its lowest calibration bin predicting 0.014 against 0.028.
+    """
+    chans = list(chans)
+    team = cnt.groupby(["game_id", "team"])[chans].sum().add_prefix("T_").reset_index()
+    d = (played.merge(team, on=["game_id", "team"], how="inner")
+         .merge(cnt[["game_id", "team", "player_id", *chans]], on=["game_id", "team", "player_id"], how="left")
+         .merge(slots[["season", "week", "team", "player_id", "slot"]],
+                on=["season", "week", "team", "player_id"], how="left"))
+    d[chans] = d[chans].fillna(0)
+    d["slot"] = d["slot"].fillna("OTHER")
+    s = d.groupby("slot")[chans + [f"T_{c}" for c in chans]].sum()
+    return pd.DataFrame({c: s[c] / s[f"T_{c}"].where(s[f"T_{c}"] > 0) for c in chans}).fillna(0.0)
+
+
+def fill_no_history(shares: pd.DataFrame, actives: pd.DataFrame, prior: pd.DataFrame,
+                    chans) -> pd.DataFrame:
+    """Give every active player with NO share history his slot's league share.
+    `actives` has player_id, team and slot (pre-game depth chart; missing =
+    'OTHER'). Players who already have a share are untouched."""
+    chans = list(chans)
+    new = actives[~actives["player_id"].isin(shares.index)]
+    if new.empty:
+        return shares
+    slot = new["slot"].fillna("OTHER").where(new["slot"].fillna("OTHER").isin(prior.index), "OTHER")
+    rows = prior.reindex(slot.to_numpy()).fillna(0.0)
+    rows.index = new["player_id"].to_numpy()
+    rows["team"] = new["team"].to_numpy()
+    rows["pri_team"] = np.nan
+    for c in chans:
+        rows[f"pri_{c}"] = 0.0
+    return pd.concat([shares, rows[shares.columns.intersection(rows.columns)]])
 
 
 def candidates(shares: pd.DataFrame, team: str, chans) -> pd.DataFrame:

@@ -25,7 +25,9 @@ def _pbp(rows):
     cols = ["game_id", "season", "week", "season_type", "posteam", "play_type",
             "rusher_player_id", "receiver_player_id", "yardline_100", "qb_kneel",
             "two_point_attempt"]
-    return pd.DataFrame(rows, columns=cols)
+    d = pd.DataFrame(rows, columns=cols)
+    # columns opportunities() reads for expected-TD weighting; no scores here
+    return d.assign(rush_touchdown=0, pass_touchdown=0, td_team=d["posteam"], air_yards=8.0)
 
 
 # ----------------------------------------------------------- opportunities
@@ -163,6 +165,63 @@ def test_the_team_he_left_sees_his_share_as_vacated_not_as_an_active_player():
     # ...and with no reallocation it goes to 'other', not to anybody on A
     none = A.reallocate(a, {"x"}, {"rb": "RB", "x": "RB"}, ["rush_in5"], "none")
     assert none.loc["x", "rush_in5"] == pytest.approx(0.4)
+
+
+def test_the_moved_role_weight_is_a_real_setting():
+    """0.5 was an untuned assumption; the backtest now tunes it."""
+    pri, pl_pri, _ = _week1_mover()
+    cur = pd.DataFrame([(2025, 1, "q1", "B", "rb", 1), (2025, 1, "q1", "B", "y", 9)],
+                       columns=["season", "week", "game_id", "team", "player_id", "rush_in5"])
+    pl_cur = _played([(2025, 1, "q1", "B", "rb"), (2025, 1, "q1", "B", "y")])
+    full = A.blended_shares(cur, pri, pl_cur, pl_pri, ["rush_in5"], 1.0, {"rush_in5": 10.0},
+                            current_team={"rb": "B"}, moved_weight=1.0)
+    assert full.loc["rb", "rush_in5"] == pytest.approx((1 + 10 * 0.6) / 20)
+
+
+# -------------------------------------------------- expected-touchdown weights
+
+def _opps(rows):
+    return pd.DataFrame(rows, columns=["season", "kind", "yardline_100", "air_yards", "td"])
+
+
+def test_an_opportunity_counts_by_how_often_one_like_it_scores():
+    """A carry from the 1 and one from midfield are not the same opportunity;
+    raw counts said they were."""
+    prior = _opps([(2024, "car", 1, np.nan, 1), (2024, "car", 1, np.nan, 0),
+                   (2024, "car", 60, np.nan, 0), (2024, "car", 60, np.nan, 0)])
+    now = _opps([(2025, "car", 1, np.nan, 0), (2025, "car", 60, np.nan, 0)])
+    w = A.xtd_weights(now, A.xtd_table(prior))
+    assert w.tolist() == pytest.approx([0.5, 0.0])
+
+
+def test_targets_are_split_by_air_yards_and_fall_back_when_a_bucket_is_empty():
+    prior = _opps([(2024, "tgt", 60, 30, 1), (2024, "tgt", 60, 30, 0),
+                   (2024, "tgt", 60, 2, 0), (2024, "tgt", 60, 2, 0)])
+    now = _opps([(2025, "tgt", 60, 30, 0), (2025, "tgt", 60, 2, 0),
+                 (2025, "tgt", 60, 12, 0)])        # 10-19 air yards: unseen -> coarse bucket
+    w = A.xtd_weights(now, A.xtd_table(prior))
+    assert w.tolist() == pytest.approx([0.5, 0.0, 0.25])
+
+
+# ------------------------------------------------------------- slot prior
+
+def test_a_player_with_no_history_gets_his_slots_league_share():
+    cnt = pd.DataFrame([(2024, 1, "g", "A", "rb1", 8), (2024, 1, "g", "A", "rb2", 2)],
+                       columns=["season", "week", "game_id", "team", "player_id", "rush_in5"])
+    played = _played([(2024, 1, "g", "A", "rb1"), (2024, 1, "g", "A", "rb2")])
+    slots = pd.DataFrame({"season": [2024, 2024], "week": [1, 1], "team": ["A", "A"],
+                          "player_id": ["rb1", "rb2"], "slot": ["RB1", "RB2"]})
+    prior = A.slot_prior(cnt, played, slots, ["rush_in5"])
+    assert prior.loc["RB1", "rush_in5"] == pytest.approx(0.8)
+
+    shares = pd.DataFrame({"team": ["B"], "pri_team": ["B"], "rush_in5": [0.3], "pri_rush_in5": [0.3]},
+                          index=["vet"])
+    act = pd.DataFrame({"player_id": ["vet", "rookie", "nobody"], "team": ["B", "B", "B"],
+                        "slot": ["RB2", "RB1", None]})
+    out = A.fill_no_history(shares, act, prior, ["rush_in5"])
+    assert out.loc["vet", "rush_in5"] == pytest.approx(0.3)       # history kept
+    assert out.loc["rookie", "rush_in5"] == pytest.approx(0.8)    # RB1's league share
+    assert out.loc["nobody", "rush_in5"] == pytest.approx(0.0)    # no slot, no 'OTHER' row here
 
 
 def test_a_mover_with_current_games_is_blended_at_half_weight():
