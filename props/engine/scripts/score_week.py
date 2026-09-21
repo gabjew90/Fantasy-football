@@ -97,7 +97,11 @@ def main():
     ap.add_argument("--week", type=int, default=None)
     ap.add_argument("--games", default="", help="comma list AWAY@HOME; default = every game in the week")
     ap.add_argument("--skip-started", action="store_true", help="skip games whose kickoff has passed")
-    ap.add_argument("--source", choices=["sleeper", "oddsapi"], default="sleeper")
+    ap.add_argument("--source", choices=["sleeper", "oddsapi"], default=None,
+                    help="default: score_game decides (Sleeper; DraftKings for a TD-only run when credits allow)")
+    ap.add_argument("--date", default=None, help="only games on this date (YYYY-MM-DD); sets season and week")
+    ap.add_argument("--today", action="store_true", help="only today's games")
+    ap.add_argument("--markets", default="", help="passed to score_game: receptions, rec_yds, rush_yds, td")
     ap.add_argument("--no-oddsapi-fallback", action="store_true")
     ap.add_argument("--workdir", default=str(Path.home() / "nfl_wd"))
     ap.add_argument("--extra", default="", help="extra args passed through to score_game.py, quoted")
@@ -106,6 +110,14 @@ def main():
     wd = Path(a.workdir); wd.mkdir(parents=True, exist_ok=True)
     (wd / "logs").mkdir(exist_ok=True)
     games = pd.read_csv(fetch(GAMES_URL, wd / "games.csv"))
+    if a.today:
+        a.date = datetime.now().strftime("%Y-%m-%d")
+    if a.date:
+        on = games[(games.gameday == a.date) & (games.game_type == "REG")]
+        if on.empty:
+            nxt = games[(games.gameday > a.date) & (games.game_type == "REG")].gameday.min()
+            sys.exit(f"no regular-season games on {a.date}" + (f"; the next game day is {nxt}" if isinstance(nxt, str) else ""))
+        a.season, a.week = int(on.season.iloc[0]), int(on.week.iloc[0])
     if a.season is None:
         a.season = int(games[games.gameday.notna()].season.max())
     if a.week is None:
@@ -114,8 +126,15 @@ def main():
         unplayed = gs[gs.result.isna()]
         a.week = int(unplayed.week.min()) if not unplayed.empty else int(gs.week.max())
     W = games[(games.season == a.season) & (games.week == a.week) & (games.game_type == "REG")].copy()
+    if a.date:
+        W = W[W.gameday == a.date]
     if a.games:
-        want = {g.strip().upper() for g in a.games.split(",")}
+        alias = {"LAR": "LA", "WSH": "WAS", "JAC": "JAX", "LVR": "LV"}
+        want = set()
+        for g_ in a.games.split(","):
+            if "@" in g_:
+                aw, hm = (alias.get(x.strip().upper(), x.strip().upper()) for x in g_.split("@", 1))
+                want.add(f"{aw}@{hm}")
         W = W[(W.away_team + "@" + W.home_team).isin(want)]
     W["kick_utc"] = [eastern_to_utc(g, t) if isinstance(t, str) else pd.NaT for g, t in zip(W.gameday, W.gametime)]
     W = W.sort_values(["kick_utc", "away_team"])
@@ -130,8 +149,11 @@ def main():
     for _, g in W.iterrows():
         A, H = g.away_team, g.home_team
         cmd = [sys.executable, str(HERE / "score_game.py"), "--away", A, "--home", H,
-               "--season", str(a.season), "--week", str(a.week), "--workdir", str(wd),
-               "--source", a.source]
+               "--season", str(a.season), "--week", str(a.week), "--workdir", str(wd)]
+        if a.source:
+            cmd += ["--source", a.source]
+        if a.markets:
+            cmd += ["--markets", a.markets]
         if a.no_oddsapi_fallback:
             cmd.append("--no-oddsapi-fallback")
         if a.extra:
@@ -206,8 +228,8 @@ def main():
     # ---------- summary markdown (this is the chat-reply deliverable for a slate question) ----------
     L = [f"# {a.season} Week {a.week} slate", "",
          f"*{len(runs)} games scored {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%MZ')}, prices from "
-         f"{'Sleeper Picks' if a.source == 'sleeper' else 'The Odds API'}"
-         f"{' (Odds API fallback allowed)' if a.source == 'sleeper' and not a.no_oddsapi_fallback else ''}. "
+         f"{'The Odds API' if a.source == 'oddsapi' else 'Sleeper Picks' if a.source == 'sleeper' else 'Sleeper Picks by default (a TD-only run may use The Odds API when credits allow)'}"
+         f"{' (Odds API fallback allowed)' if a.source != 'oddsapi' and not a.no_oddsapi_fallback else ''}. "
          "Model opinion, not validated against closing lines. Lines for games more than a day out will move; re-run inside 90 minutes of kickoff.*", "",
          "## Runs", "", "| Game | Kickoff (UTC) | Roof | Spread | Total | Lines | Status |", "|---|---|---|---|---|---|---|"]
     for r in runs:

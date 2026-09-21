@@ -4956,3 +4956,49 @@ engine change: the Tuesday scorecard fits logit(p) = a + b_model logit(p_model)
 + b_market logit(p_market) + a per-book intercept on settled v1 anytime-TD
 calls, within one engine version, with game-clustered intervals and leave-one-week-out log loss for
 model, market and blend -- and prints no weight below 300 calls.
+
+## 2026-09-21 (86) -- engine conveniences from chat use: aliases, markets filter, TD board, fantasy export
+
+The user listed thirteen repo changes from using the engine in chat; all are in
+props-v1.11 except where noted.
+
+1. CLI team aliases LAR->LA, WSH->WAS, JAC->JAX, LVR->LV (score_game and
+   score_week --games).
+2. A matchup miss names where the pair actually meets that season. --week is
+   optional and resolves to the NEXT meeting (divisional teams meet twice).
+3. score_week --date YYYY-MM-DD / --today; an empty date names the next game day.
+4. --markets receptions,rec_yds,rush_yds,td filters every output and prints a
+   short summary (summary_*.md) instead of the full report, still written.
+5. Anytime-TD rows get their own td_board_*.csv (the bet card excludes them).
+6. The header's two TD figures are labelled: all TDs incl. defence and special
+   teams (the yardage model's anchor, e.g. NYG 2.2) vs offensive TDs (the mean
+   anytime_td_v1 prices from, e.g. 2.1). They differ by design.
+7. Quota reads "n/a (priced from Sleeper)" instead of None.
+8. The 'Everything else' <details> is closed unconditionally. It was opened
+   always but closed only when the betting card had rows, so a TD-only run left
+   it open; the MIA@SF full report balanced because it had a card.
+9. DraftKings anytime prices: ESPN's free prop feed was probed -- it lists
+   'Anytime Touchdown Scorer' markets but with EMPTY price fields, even for
+   upcoming games. So a TD-only run (--markets td) takes DK prices from The
+   Odds API when the newest cached quota shows 100+ credits, else Sleeper; the
+   sources table says which. Captures price every market, so they stay on
+   Sleeper.
+10. A run inside 60 minutes of kickoff is flagged as a candidate closing
+    snapshot (report housekeeping, log, summary).
+11. Engine SKILL.md: a fast-path section, and two output rules -- state plainly
+    when no row has positive EV (now the report's first line), and call
+    present_files on the report.
+12. fantasy_points_*.csv: each joint-simulation draw scored with league
+    settings (--fantasy-scoring ppr|half|std|file.json|'rec=0.5,...'; keys as
+    in leagues/*.yaml), median/p20/p80/mean and P(TD) per player. TDs are
+    drawn from anytime_td_v1 (team count, then each TD by per-TD share), so the
+    export's P(TD) matches the v1 price (McCaffrey 0.677 vs 0.680). QB rows are
+    rushing only: passing is not modelled. Yardage and TD draws are independent.
+13. Lock and tag props-v1.11.
+
+A defect found while testing: with --markets td the betting card is empty and
+had no columns, which crashed the player cards; the card now always has its
+columns.
+
+Checks: MIA@SF 2026 week 2 full run -- shadow log identical to props-v1.10,
+<details> balanced (3/3); TD-only run balanced (3/3) with the short summary.
