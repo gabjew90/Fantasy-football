@@ -37,6 +37,8 @@ import td_v1 as V  # noqa: E402
 
 QK_SHIP = (B.SHIP[0], B.SHIP[2], B.SHIP[3])
 QK_V10 = (B.V10[0], B.V10[2], B.V10[3])
+# the two QB columns are labelled from the configs, never by a hard-coded version
+LAB_V10, LAB_SHIP = "v1 team mix (props-v1.4)", f"shipped: {B.qid(QK_SHIP)}"
 K_BINS = [(1, 1, "1"), (2, 2, "2"), (3, 3, "3"), (4, 99, "4+")]
 RANKS = [(1, 1, "1 (top q)"), (2, 2, "2"), (3, 3, "3"), (4, 6, "4-6"), (7, 99, "7+")]
 
@@ -126,7 +128,7 @@ def qb_tables(L: list, d: pd.DataFrame, mass: pd.DataFrame, label: str) -> None:
     real = mm["qb_rush_tds"].sum() / mm["n_off"].sum()
     st = d[d["starter"]]
     L += [f"### {label}: starting quarterbacks", "",
-          "| | team mix (v1) | starter rate (v1.1) | realised |", "|---|---|---|---|",
+          f"| | {LAB_V10} | {LAB_SHIP} | realised |", "|---|---|---|---|",
           f"| qb_rush weight: mean, team-games with a TD | {mm['wqb|' + B.qid(QK_V10)].mean():.4f} | "
           f"{mm['wqb|' + B.qid(QK_SHIP)].mean():.4f} | {real:.4f} (QB-rush TDs / offensive TDs) |",
           f"| league fraction used as the shrinkage target | {mm['qb_league'].mean():.4f} | "

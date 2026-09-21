@@ -105,7 +105,8 @@ To `VALIDATED_BETTING`: everything above plus archive coverage (rows, bookmakers
     (0.123 vs 0.148 actual); the gain is ranking, not level. Raising the share cap above
     0.99 was tested (to 0.999) and was worse on tune at every setting: the low bin is not
     the cap.
-  - v1.2 (props-v1.9), the starter's share within qb_rush, tuned 2022-23
+  - v1.2 (props-v1.9), the starter's share within qb_rush, tuned 2022-23 JOINTLY with
+    qb_beta (3 x 5 grid; 0.92 with qb_beta 40 best, so qb_beta is unchanged)
     (`reports/td_qb_share.md`, `reports/td_qb_share_2016_19.md`). THE CASE IS CALIBRATION:
     starting QBs predicted 0.123 vs 0.148 actual on 2024-25 become 0.158; 0.092 vs 0.117 on
     2016-19 become 0.112. Log loss: established on tune (-0.0019 end to end); on 2024-25

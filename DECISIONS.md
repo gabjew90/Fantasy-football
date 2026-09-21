@@ -4907,4 +4907,10 @@ his rushing channels sit near 1. The over-prediction of stars is in their
 receiving-TD share -- the place for a calibration or a source fix, now that it
 has a location.
 
+Code review before pushing: qb_beta (40) had been tuned while the starter's
+within-channel share came from history, then qb_share tuned with qb_beta held
+fixed -- two parameters on the same product. Re-tuned jointly (qb_beta 20/40/80
+x share history/0.85/0.88/0.92/0.95): 0.92 with 40 is still best. And the
+diagnostic's QB columns are now labelled from the configs, not hard-coded versions.
+
 Lock at props-v1.9.

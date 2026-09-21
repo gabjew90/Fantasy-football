@@ -60,7 +60,8 @@ FULL_ALLOC = ("slot", 1.0, MOVED, None)
 V1_ALLOC = ("slot", V.V1["slot_scale"], MOVED, V.V1["qb_share"])
 V10 = (("slot", V.V1["slot_scale"], MOVED, None), None, 0.99, None)   # v1 as first shipped (props-v1.4)
 V11 = (("slot", V.V1["slot_scale"], MOVED, None), None, 0.99, 40.0)   # v1.1 (props-v1.5)
-QB_SHARES = [None, 0.80, 0.85, 0.88, 0.92, 0.95]
+QB_SHARES = [None, 0.85, 0.88, 0.92, 0.95]
+QB_BETAS_JOINT = [20.0, 40.0, 80.0]     # the starter's rate and his within-channel share are tuned together
 SHIP = (V1_ALLOC, V.V1["c"], V.V1["cap"], V.V1["qb_beta"])   # what td_v1.V1 ships now
 SCALES = [0.4, 0.6, 1.0]
 C_GRID = [None, 80.0, 40.0, 20.0, 10.0, 5.0]
@@ -79,7 +80,7 @@ def configs(mode: str) -> list:
     if mode == "grid-v11":
         return [(V10[0], None, cap, b) for cap in CAPS for b in QB_BETAS]
     if mode == "grid-qshare":
-        return [((V10[0][0], V10[0][1], V10[0][2], q), None, 0.99, 40.0) for q in QB_SHARES]
+        return [((V10[0][0], V10[0][1], V10[0][2], q), None, 0.99, b) for b in QB_BETAS_JOINT for q in QB_SHARES]
     out = [(BASE_ALLOC, None, 0.99, None), (FULL_ALLOC, None, 0.99, None), V10, V11, SHIP]
     out += [(SHIP[0], c, SHIP[2], SHIP[3]) for c in C_DIAG]
     return list(dict.fromkeys(out))
@@ -599,7 +600,8 @@ def _top_ratio(d, col_q):
 
 
 def _lab(c):
-    return "from history (v1.1)" if c[0][3] is None else f"{c[0][3]:g}"
+    s = "share from history" if c[0][3] is None else f"share {c[0][3]:g}"
+    return f"{s}, qb_beta {c[3]:g}" + (" (v1.1)" if c == V11 else "")
 
 
 def write_qshare(path: Path, dtu, dte, mass, tune_ll, best, tune, test):
@@ -607,22 +609,23 @@ def write_qshare(path: Path, dtu, dte, mass, tune_ll, best, tune, test):
     bins are reported before and after because the user set them as the gate
     (stars already run ~10% high, and nothing here may make that worse)."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    base = [c for c in tune_ll if c[0][3] is None][0]
+    base = V11
     kb, k0 = cid(best), cid(base)
     L = ["# The starting QB's share of his team's QB carries", "",
          f"Tune {tune}, test {test}. Base: anytime_td_v1.1 as shipped. From history the starter holds 0.70 of "
          "the QB-rush channel against 0.88 in reality (reports/td_diagnostics.md), because a fill-in backup's "
          "games-played denominator gives him a starter-sized share. Here the active QB highest on the pre-game "
          "depth chart gets a fixed share within qb_rush; the other players are scaled down, if needed, to fit "
-         "under the cap.", "",
-         "## Tune log loss, given offensive touchdowns", "", "| starter share | tune log loss |", "|---|---|"]
+         "under the cap. The starter's QB-rush RATE (qb_beta, the channel weight) and his share WITHIN the "
+         "channel multiply into the same probability, so they are tuned together.", "",
+         "## Tune log loss, given offensive touchdowns", "", "| configuration | tune log loss |", "|---|---|"]
     for c, v in sorted(tune_ll.items(), key=lambda kv: kv[1]):
         L.append(f"| {_lab(c)} | {v:.5f}{' **chosen**' if c == best else ''} |")
     for tag, d in (("tune", dtu), ("test", dte)):
         L += ["", f"## {tag.title()} {tune if tag == 'tune' else test}", "",
               "| starter share | given offensive TDs | end to end | vs v1.1, end to end | mean predicted | "
               "top-q realised / expected |", "|---|---|---|---|---|---|"]
-        for c in sorted(tune_ll, key=lambda c: -1 if c[0][3] is None else c[0][3]):
+        for c in sorted(tune_ll, key=lambda c: (c[3], -1 if c[0][3] is None else c[0][3])):
             k = cid(c)
             vs = "" if c == base else _ci(boot(d, "e2e|" + k, "e2e|" + k0))
             L.append(f"| {_lab(c)} | {ll(d, 'n|' + k):.4f} | {ll(d, 'e2e|' + k):.4f} | {vs} | "
@@ -630,13 +633,13 @@ def write_qshare(path: Path, dtu, dte, mass, tune_ll, best, tune, test):
         st = d[d["starter"]]
         L += ["", f"Actual scoring rate {d['scored'].mean():.3f}.", "", "### Starting quarterbacks", "",
               "| starter share | n | predicted P(score) | actual | log loss | vs v1.1 |", "|---|---|---|---|---|---|"]
-        for c in sorted(tune_ll, key=lambda c: -1 if c[0][3] is None else c[0][3]):
+        for c in sorted(tune_ll, key=lambda c: (c[3], -1 if c[0][3] is None else c[0][3])):
             k = "e2e|" + cid(c)
             vs = "" if c == base else _ci(boot(st, k, "e2e|" + k0))
             L.append(f"| {_lab(c)} | {len(st)} | {st[k].mean():.3f} | {st['scored'].mean():.3f} | "
                      f"{ll(st, k):.4f} | {vs} |")
         L += ["", "### THE GATE: the top bins, end to end, each model binned by its own prediction", ""]
-        for name, k in (("v1.1", k0), (f"starter share {_lab(best)}", kb)):
+        for name, k in (("v1.1", k0), (f"chosen: {_lab(best)}", kb)):
             if name != "v1.1" and kb == k0:
                 continue
             L += [f"{name}:", ""]
