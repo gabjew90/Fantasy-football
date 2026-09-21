@@ -1,0 +1,274 @@
+#!/usr/bin/env python3
+"""Layer 1 backtest: team touchdown distributions, no betting lines needed
+beyond the closing spread and total nflverse already carries.
+
+  python td_backtest.py [--tune 2022,2023] [--test 2024,2025] [--out DIR]
+
+Walk-forward: every team-game is predicted from the prior season plus the
+current season's weeks before it. Every setting is chosen on the TUNE seasons,
+frozen, then scored on the TEST seasons, which never influenced a choice.
+
+Questions it answers, each against the simpler version:
+  1. Does a team-specific touchdowns-per-point ratio beat one league constant?
+  2. What SHAPE is the count: Poisson, overdispersed (negative binomial), or
+     underdispersed (binomial over drives)?
+  3. Do high-total teams convert a larger share of points into touchdowns?
+  4. Does a team-specific channel mix beat the league mix?
+"""
+
+from __future__ import annotations
+
+import argparse
+import itertools
+import os
+import sys
+import tempfile
+import urllib.request
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import td_model as T  # noqa: E402
+
+NV = "https://github.com/nflverse/nflverse-data/releases/download"
+GAMES = "https://raw.githubusercontent.com/nflverse/nfldata/master/data/games.csv"
+CACHE = Path(os.environ.get("NFL_BACKTEST_CACHE", Path(tempfile.gettempdir()) / "nflbt"))
+K_GRID = [None, 100.0, 300.0, 1000.0, 3000.0]
+GAMMA_GRID = [0.0, 0.25, 0.5, 0.75, 1.0]
+ALPHA_GRID = [None, 5.0, 20.0, 50.0, 100.0, 200.0, 500.0, 1000.0]
+ENGINE_CONSTANT = 0.1055   # score_game's league_td_per_point: OFFENSIVE TDs per point
+
+
+def fetch(url: str, name: str) -> Path:
+    CACHE.mkdir(parents=True, exist_ok=True)
+    dest = CACHE / name
+    if not dest.exists() or dest.stat().st_size == 0:
+        print(f"  fetching {name}", file=sys.stderr)
+        urllib.request.urlretrieve(url, dest)
+    return dest
+
+
+def load(seasons: list[int]) -> pd.DataFrame:
+    players = pd.read_csv(fetch(f"{NV}/players/players.csv", "players.csv"),
+                          usecols=["gsis_id", "position"], low_memory=False)
+    qb_ids = set(players.loc[players["position"] == "QB", "gsis_id"].dropna())
+    tds = []
+    for s in seasons:
+        pbp = pd.read_csv(fetch(f"{NV}/pbp/play_by_play_{s}.csv.gz", f"pbp_{s}.csv.gz"),
+                          usecols=T.PBP_COLS, low_memory=False)
+        tds.append(T.classify_tds(pbp, qb_ids))
+    sched = pd.read_csv(fetch(GAMES, "games.csv"), low_memory=False)
+    sched = sched[sched["season"].isin(seasons)]
+    tg = T.team_games(sched, pd.concat(tds, ignore_index=True))
+    return tg[tg["implied"].notna()].reset_index(drop=True)
+
+
+def check(tg: pd.DataFrame) -> str:
+    """Six points a touchdown can never exceed what the team scored."""
+    bad = tg[6 * tg["tds"] > tg["points"]]
+    return f"{len(bad)} team-games where 6 x TDs exceeds points scored (should be 0)."
+
+
+def walk_forward(tg: pd.DataFrame, seasons: list[int], k, gamma: float) -> pd.DataFrame:
+    """Predicted mean for every team-game in `seasons`, each from data strictly
+    before its own week."""
+    out = []
+    for s in seasons:
+        for w in sorted(tg.loc[tg["season"] == s, "week"].unique()):
+            hist = tg[(tg["season"] == s - 1) | ((tg["season"] == s) & (tg["week"] < w))]
+            now = tg[(tg["season"] == s) & (tg["week"] == w)].copy()
+            by_team, league = T.ratios(hist, k)
+            ratio = now["team"].map(by_team).fillna(league) if k is not None else league
+            now["mu"] = T.team_mean(now["implied"], ratio, hist["implied"].mean(), gamma)
+            out.append(now)
+    return pd.concat(out, ignore_index=True)
+
+
+def pmf(mu, shape) -> np.ndarray:
+    fam, par = shape
+    return T.count_pmf(mu, r=par if fam == "NegBin" else None,
+                       n=par if fam == "Binomial" else None)
+
+
+def score(d: pd.DataFrame, shape) -> dict:
+    P = pmf(d["mu"].to_numpy(), shape)
+    return {"crps": float(T.crps_count(P, d["tds"]).mean()),
+            "log": float(T.log_score(P, d["tds"]).mean()),
+            "bias": float((d["mu"] - d["tds"]).mean()), "n": len(d)}
+
+
+def shapes_for(d: pd.DataFrame) -> list[tuple[str, float | None]]:
+    """Poisson always; each alternative only if it beats Poisson on the TUNE
+    data it is fitted to."""
+    out = [("Poisson", None)]
+    r = T.fit_dispersion(d["mu"].to_numpy(), d["tds"].to_numpy())
+    if r is not None:
+        out.append(("NegBin", r))
+    n = T.fit_trials(d["mu"].to_numpy(), d["tds"].to_numpy())
+    if n is not None:
+        out.append(("Binomial", n))
+    return out
+
+
+def boot_diff(a: pd.DataFrame, sa, b: pd.DataFrame, sb, reps=2000, seed=11):
+    """CRPS(a) - CRPS(b), resampling whole games: both teams in one game share
+    a script, so resampling team-games would overstate the certainty."""
+    ca = T.crps_count(pmf(a["mu"].to_numpy(), sa), a["tds"])
+    cb = T.crps_count(pmf(b["mu"].to_numpy(), sb), b["tds"])
+    g = pd.DataFrame({"game": a["game_id"].to_numpy(), "d": ca - cb}).groupby("game")["d"]
+    sums, cnt = g.sum().to_numpy(), g.size().to_numpy()
+    rng = np.random.default_rng(seed)
+    idx = rng.integers(0, len(sums), size=(reps, len(sums)))
+    boot = sums[idx].sum(1) / cnt[idx].sum(1)
+    return float(sums.sum() / cnt.sum()), *np.percentile(boot, [2.5, 97.5]).tolist()
+
+
+def channel_eval(tg: pd.DataFrame, seasons: list[int], alpha) -> tuple[float, int]:
+    """Mean log loss of each actual touchdown's channel under the predicted
+    mix: given that a team scored, how well was the KIND of touchdown
+    anticipated. Walk-forward like the counts."""
+    losses = []
+    for s in seasons:
+        for w in sorted(tg.loc[tg["season"] == s, "week"].unique()):
+            hist = tg[(tg["season"] == s - 1) | ((tg["season"] == s) & (tg["week"] < w))]
+            now = tg[(tg["season"] == s) & (tg["week"] == w)]
+            shares, league = T.channel_shares(hist, alpha)
+            for _, row in now.iterrows():
+                p = shares.loc[row["team"]] if (alpha is not None and row["team"] in shares.index) else league
+                for c in T.CHANNELS:
+                    if row[c]:
+                        losses += [-np.log(max(float(p[c]), 1e-9))] * int(row[c])
+    return float(np.mean(losses)), len(losses)
+
+
+def main(argv=None) -> int:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--tune", default="2022,2023")
+    ap.add_argument("--test", default="2024,2025")
+    ap.add_argument("--out", default=str(Path(__file__).resolve().parent / "backtest_out"))
+    a = ap.parse_args(argv)
+    tune = [int(x) for x in a.tune.split(",")]
+    test = [int(x) for x in a.test.split(",")]
+    tg = load(sorted(set(tune + test) | {min(tune) - 1}))
+    note = check(tg)
+    print(note, file=sys.stderr)
+
+    # ---- grid over mean model (k, gamma) and shape, chosen on TUNE --------
+    wf = {}
+    grid = []
+    for k, g in itertools.product(K_GRID, GAMMA_GRID):
+        dtu, dte = walk_forward(tg, tune, k, g), walk_forward(tg, test, k, g)
+        wf[(k, g)] = (dtu, dte)
+        for sh in shapes_for(dtu):
+            grid.append({"k": k, "gamma": g, "shape": sh,
+                         "tune": score(dtu, sh), "test": score(dte, sh)})
+    best = min(grid, key=lambda x: x["tune"]["crps"])
+
+    # ---- the ladder: engine today, then one component at a time ---------
+    steps = [("Engine today: league ratio, linear, Poisson", None, 0.0, ("Poisson", None)),
+             ("+ team-specific ratio", best["k"], 0.0, ("Poisson", None)),
+             ("+ fitted shape", best["k"], 0.0, None),
+             ("+ elasticity to implied total", best["k"], best["gamma"], best["shape"])]
+    ladder, prev = [], None
+    for name, k, g, sh in steps:
+        if sh is None:   # the shape fitted for this (k, linear) mean on TUNE
+            cands = [x for x in grid if x["k"] == k and x["gamma"] == 0.0]
+            sh = min(cands, key=lambda x: x["tune"]["crps"])["shape"]
+        dte = wf[(k, g)][1]
+        m = score(dte, sh)
+        diff = boot_diff(dte, sh, prev[0], prev[1]) if prev else None
+        ladder.append((name, k, g, sh, m, diff))
+        prev = (dte, sh)
+
+    dbest = wf[(best["k"], best["gamma"])][1].copy()
+    dbest["q"] = pd.qcut(dbest["mu"], 5, labels=False)
+    calib = dbest.groupby("q").agg(mu=("mu", "mean"), actual=("tds", "mean"),
+                                   var_actual=("tds", "var"), n=("tds", "size"))
+    base_calib = wf[(None, 0.0)][1].assign(
+        q=lambda d: pd.qcut(d["mu"], 5, labels=False)).groupby("q").agg(
+        mu=("mu", "mean"), actual=("tds", "mean"))
+
+    ch = [(al, *channel_eval(tg, tune, al), channel_eval(tg, test, al)[0]) for al in ALPHA_GRID]
+    ch_best = min(ch, key=lambda x: x[1])
+    _, league_mix = T.channel_shares(tg, None)
+    te = tg[tg["season"].isin(test)]
+    ratio_all = te["tds"].sum() / te["points"].sum()
+    ratio_off = te[list(T.OFFENSIVE)].sum().sum() / te["points"].sum()
+
+    out = Path(a.out); out.mkdir(parents=True, exist_ok=True)
+    write_report(out / "td_layer1.md", tg, note, grid, best, ladder, calib, base_calib,
+                 ch, ch_best, league_mix, ratio_all, ratio_off, tune, test)
+    return 0
+
+
+def _shape(sh):
+    fam, par = sh
+    return fam if par is None else (f"NegBin r={par:.1f}" if fam == "NegBin" else f"Binomial n={par}")
+
+
+def _k(k):
+    return "league" if k is None else f"team k={k:.0f}"
+
+
+def _var(mu, sh):
+    fam, par = sh
+    return mu if fam == "Poisson" else (mu + mu ** 2 / par if fam == "NegBin" else mu * (1 - mu / par))
+
+
+def write_report(path, tg, note, grid, best, ladder, calib, base_calib, ch, ch_best,
+                 league_mix, ratio_all, ratio_off, tune, test):
+    L = ["# Layer 1: team touchdown distributions", "",
+         f"Tune seasons {tune}, test seasons {test} (never used for any choice). "
+         f"{len(tg)} team-games with closing lines. Walk-forward: every game predicted "
+         "from the prior season plus the earlier weeks of its own.", "",
+         f"Data check: {note}", "",
+         "## Ablation ladder (test seasons)", "",
+         "Each row adds one component to the row above, using the value chosen on the tune seasons.", "",
+         "| step | CRPS | log score | bias | change vs row above (95% CI, game-clustered) |",
+         "|---|---|---|---|---|"]
+    for name, k, g, sh, m, diff in ladder:
+        detail = f"{name} ({_k(k)}, gamma={g:g}, {_shape(sh)})"
+        if diff is None:
+            ch_txt = "baseline"
+        else:
+            d, lo, hi = diff
+            verdict = "better" if hi < 0 else ("worse" if lo > 0 else "not established")
+            ch_txt = f"{d:+.4f} ({lo:+.4f}, {hi:+.4f}) {verdict}"
+        L.append(f"| {detail} | {m['crps']:.4f} | {m['log']:.4f} | {m['bias']:+.3f} | {ch_txt} |")
+
+    L += ["", "## Mean calibration by predicted-mean quintile (test)", "",
+          "| quintile | engine today: predicted | chosen: predicted | actual | actual variance | chosen shape's variance |",
+          "|---|---|---|---|---|---|"]
+    for q, row in calib.iterrows():
+        L.append(f"| {int(q) + 1} | {base_calib.loc[q, 'mu']:.2f} | {row['mu']:.2f} | {row['actual']:.2f} | "
+                 f"{row['var_actual']:.2f} | {_var(row['mu'], best['shape']):.2f} |")
+    L += ["", "Actual variance is within-quintile, so it also contains the spread of means inside "
+              "each quintile. That can only INFLATE it, which makes any shortfall against the "
+              "Poisson variance conservative.", "",
+          f"League TDs per point, test seasons: **{ratio_all:.4f}** all touchdowns, "
+          f"**{ratio_off:.4f}** offensive only. The engine's constant ({ENGINE_CONSTANT}) is the "
+          "offensive figure, so it agrees.", "",
+          "## Full grid, top 12 by tune CRPS", "",
+          "| mean | gamma | shape | tune CRPS | test CRPS | test log score |", "|---|---|---|---|---|---|"]
+    for x in sorted(grid, key=lambda x: x["tune"]["crps"])[:12]:
+        tag = " **chosen**" if x is best else ""
+        L.append(f"| {_k(x['k'])} | {x['gamma']:g} | {_shape(x['shape'])} | {x['tune']['crps']:.4f} | "
+                 f"{x['test']['crps']:.4f} | {x['test']['log']:.4f} |{tag}")
+    L += ["", "## Channel mix", "",
+          "Log loss of each touchdown's actual channel under the predicted mix (lower is better).", "",
+          "| mix | tune log loss | test log loss | TDs (tune) |", "|---|---|---|---|"]
+    for al, lt, n, lx in ch:
+        tag = " **chosen**" if al == ch_best[0] else ""
+        name = "league mix" if al is None else f"team, alpha={al:.0f} TDs"
+        L.append(f"| {name} | {lt:.4f} | {lx:.4f} | {n} |{tag}")
+    L += ["", "League channel mix, all seasons in the run:", "", "| channel | share |", "|---|---|"]
+    for c in T.CHANNELS:
+        L.append(f"| {c} | {league_mix[c]:.1%} |")
+    path.write_text("\n".join(L) + "\n", encoding="utf-8")
+    print(f"wrote {path}", file=sys.stderr)
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

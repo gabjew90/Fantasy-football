@@ -1,7 +1,7 @@
 {
   "algorithm": "props-engine-sha256-lf-1",
-  "engine_sha256": "553aeb009ecd2b42b21f3b46eadccc96e098560ee3af50be4bdbfeacc301ee13",
-  "file_count": 30,
+  "engine_sha256": "95c1ee26766f76960b920851d135b756b7d1ae995fdd25dd14cf9f2d4e69713c",
+  "file_count": 32,
   "files": {
     "SKILL.md": "7ab5ae183fb30a15a9aebd9564ffe382e232dd68aa87abb52be4361db676b166",
     "resources/calibration_2025.csv": "47e3922c7af818307831d70a3d2be4333200f3aee1d94dc6bbf6e0e9ccee4ac8",
@@ -32,7 +32,9 @@
     "scripts/model.py": "ae0da50fcaf1b0344d045bd371f902b3786ca8fba1abe0fee68f6e7653c2d527",
     "scripts/odds_client.py": "434186273bd0412a5545247228298951c5d0504a19c8a47c4c782bf3bb75aaa1",
     "scripts/score_game.py": "06f9e07b91cf638d3c7f253248f22843ab05ef8068188fedac7d5a94eaa33e1c",
-    "scripts/score_week.py": "1c91499ab89bc30c30b63e7f79e5d4472905e7e64e6d0b6a42b3796a13de06c4"
+    "scripts/score_week.py": "1c91499ab89bc30c30b63e7f79e5d4472905e7e64e6d0b6a42b3796a13de06c4",
+    "scripts/td_backtest.py": "5faa79716fd1c6535b09ec96134847bc5541027374105398f78135a81dd6977a",
+    "scripts/td_model.py": "7a5405b8cc50fb42e9d7a332d715767e47521dc8dcc54a96eddfcb4bca43ac88"
   },
-  "tag": "props-v1.3"
+  "tag": "props-v1.4"
 }
