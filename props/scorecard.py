@@ -28,6 +28,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import calls as calls_mod  # noqa: E402
+import blend  # noqa: E402
 import persist  # noqa: E402
 
 try:
@@ -314,6 +315,7 @@ def main(argv: list[str] | None = None) -> int:
         out += sections
         csv_rows += rows
         out += render_clv(clv, engine_hash)
+        out += blend.blend_section(group)
 
     if args.pool and len(engines) > 1:
         out += ["## All engines (pooled by request)", "",

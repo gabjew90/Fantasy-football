@@ -146,6 +146,33 @@ To `VALIDATED_BETTING`: everything above plus archive coverage (rows, bookmakers
   was byte-identical before and after the switch; summed per-touchdown share of each
   team's actives 0.990, as in the backtest.
 
+### td_joint_v0 (layer 3: joint touchdown probabilities)
+- Markets: none priced. Correlated anytime-TD pairs and parlays stay GATED.
+- Status: `PROTOTYPE` (research). Code `scripts/td_joint.py`, backtest `scripts/td_joint_backtest.py`,
+  `reports/td_layer3.md`.
+- Spec: exact, not simulated. Given the joint pmf of the two teams' offensive-TD counts and
+  each player's per-TD share, P(A and B score) and any small parlay follow in closed form
+  (inclusion-exclusion). Each team's channel mix is conditioned on the opponent's count
+  (multipliers tuned on 2022-23, each bucket shrunk toward 1 by 200 TDs); the two counts are joined by a one-factor Gaussian copula,
+  loading r = 0.5 tuned on the likelihood of actual score pairs, which leaves each team's
+  own distribution exactly as layer 1 has it.
+- Test, pairs of players priced 10%+ (tuned 2022-23, scored 2024-25; about 25,000 pairs of
+  each kind):
+  - teammates: P(both) 0.0594 independent -> 0.0553 joint vs 0.0543 actual; log loss -0.00032
+    (-0.00067, +0.00003), NOT established (tune -0.00056, established).
+  - opponents: the mix shift's DEPENDENCE alone (against the product of its own shifted
+    marginals, since the shift also improves single legs) -0.00012 (-0.00020, -0.00004),
+    established; against the v1 product -0.00018. With correlated counts -0.00019
+    (-0.00052, +0.00016), not established, level 0.0642 vs 0.0626 actual.
+  - the two teams' TD counts correlate +0.15 (+0.06, +0.23) beyond their implied totals on
+    2024-25 (+0.21 on 2022-23); the copula improves the count-pair likelihood in both eras.
+- Why the gate stays closed: the joint structure is right in direction but not established
+  on test, and the largest remaining pair error is inherited from the legs -- pairs of two
+  high-priced players run high (0.090 vs 0.079), the top-share players' passing-channel bias
+  (reports/td_diagnostics.md). Reopen after that is fixed and this backtest is rerun.
+- The copula moves single-leg prices by up to 0.3 points (the mix shift interacting with
+  correlated counts); v1's single-leg prices are unchanged because nothing prices from this.
+
 ### anytime_td_v0
 - Markets: player_anytime_td
 - Status: `SUPERSEDED` by anytime_td_v1 on 2026-09-21; retained as its fallback only.
