@@ -159,7 +159,10 @@ def decompose(tg: pd.DataFrame, seasons: list[int]) -> pd.DataFrame:
     out = g.agg(implied=("implied", "mean"), points=("points", "mean"),
                 tds=("tds", "mean"), n=("tds", "size"))
     out["gap"] = out["points"] - out["implied"]
-    out["gap_se"] = g["points"].std() / np.sqrt(out["n"])
+    # The SE of the GAP, from the spread of the gap itself. Using the spread
+    # of points counted the implied totals' own variation inside each
+    # quintile as noise, which inflated the SE and understated the effect.
+    out["gap_se"] = (d["points"] - d["implied"]).groupby(d["q"]).std() / np.sqrt(out["n"])
     out["td_per_pt"] = g["tds"].sum() / g["points"].sum()
     off = g[list(T.OFFENSIVE)].sum().sum(axis=1)
     out["off_td_per_pt"] = off / g["points"].sum()

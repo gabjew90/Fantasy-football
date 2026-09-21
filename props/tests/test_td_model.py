@@ -183,6 +183,21 @@ def test_historical_franchise_codes_join_to_play_by_play():
     assert tg.loc["LV", "tds"] == 3
 
 
+def test_the_decomposition_standard_error_is_of_the_gap_not_of_points():
+    """Review fix. If every team beats its total by exactly 1.0, the gap has
+    no noise at all and its SE is zero. The old formula used the spread of
+    POINTS, which inside a quintile still carries the implied totals' own
+    variation, and reported a nonzero SE for a perfectly measured effect."""
+    sys.path.insert(0, str(ENGINE))
+    import td_backtest as B
+    implied = np.linspace(15, 30, 50)
+    tg = pd.DataFrame({"season": 2024, "implied": implied, "points": implied + 1.0,
+                       "tds": 2, **{c: 0 for c in T.CHANNELS}})
+    dec = B.decompose(tg, [2024])
+    assert dec["gap"].to_numpy() == pytest.approx(1.0)
+    assert dec["gap_se"].to_numpy() == pytest.approx(0.0, abs=1e-9)
+
+
 def test_the_reconciliation_check_stops_on_touchdowns_that_went_missing():
     """The original check only caught touchdowns EXCEEDING the score, so a
     failed join -- zeros where points were scored -- passed it."""
