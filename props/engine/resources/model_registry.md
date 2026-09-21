@@ -67,6 +67,11 @@ To `VALIDATED_BETTING`: everything above plus archive coverage (rows, bookmakers
     last season's role (kappa 5 games); a role from another team counts 0.25; a player
     with no history gets 0.4 x his depth-chart slot's league share; an absent player's
     share is reallocated across the active roster.
+  - Channel mix: the team's (shrunk to league by 100 TDs), EXCEPT the QB-rush weight, which
+    is the starting quarterback's own QB-rush touchdowns over his teams' offensive
+    touchdowns in his starts over the last 3 seasons, shrunk to the league fraction by 40
+    team touchdowns (props-v1.5). The starter is the active QB highest on the pre-game
+    depth chart.
   - P(score) = 1 - sum_k P(N = k) (1 - q)^k, q = his per-touchdown share.
 - Test (outcome backtest, no lines): tuned 2022-23, scored 2024-25, 15,022 player-games on
   the game-day active list. `reports/td_v1.md`, `reports/td_layer1_frozen.md`,
@@ -84,16 +89,41 @@ To `VALIDATED_BETTING`: everything above plus archive coverage (rows, bookmakers
     nine priced players.
   - Tested and dropped: expected-touchdown weighting (+0.0026, worse); a Beta-distributed
     share (no effect, -0.0000); a team-specific TDs-per-point ratio.
+  - OUT OF SAMPLE, scored as-is on seasons no setting was chosen or inspected on: v1 as
+    first shipped on 2018-19, -0.0058 (-0.0081, -0.0037) end to end vs v0 structure,
+    carried entirely by allocation; v1.1 on 2016-17, -0.0055 (-0.0076, -0.0035), and
+    -0.0006 (-0.0010, -0.0002) vs v1 as first shipped. `reports/td_v1_2018_19.md`,
+    `reports/td_v1_2016_17.md`.
+  - v1.1 (props-v1.5), the starter's QB-rush rate, tuned 2022-23 (`reports/td_v1_1_tuning.md`):
+    vs v1 as first shipped, -0.0009 (-0.0016, -0.0003) end to end on 2024-25; on starting
+    QBs -0.0141 (-0.0214, -0.0064). QBs new to their team as starter: -0.0171, CI to
+    +0.0133, NOT established (n 67). Starting QBs are still under-predicted on average
+    (0.123 vs 0.148 actual); the gain is ranking, not level. Raising the share cap above
+    0.99 was tested (to 0.999) and was worse on tune at every setting: the low bin is not
+    the cap.
+  - The Beta share with the top bins in view (`reports/td_v1.md`): it squeezes every bin
+    in proportion, so the 0.45-0.6 bin comes down (c=20: 0.499 vs 0.492 actual) only by
+    pulling the 0.2-0.45 bins below their actual rates; log loss on rows priced above 0.45
+    is unchanged (0.6846 fixed, 0.6846 c=20). Not carried into layer 3. The top-bin excess
+    is real (2018-19 end to end: 0.507 vs 0.454 in 0.45-0.6) and has another cause.
 - NOT tested against posted sportsbook lines. So: no fair odds, no "take YES at +X"
   thresholds, never eligible (eligibility.py). The benchmark for edge is log loss vs the
   no-vig market on logged lines, plus CLV on TD prices, once the record holds them.
 - Known limits:
+  - Most anytime-TD markets are ONE-WAY: no "won't score" side is quoted (Sleeper is the
+    exception), so no-vig removal is unavailable and the comparison uses the book's raw
+    implied probability, which is biased against the bet by roughly the hold. Carried over
+    from anytime_td_v0 unchanged; disclose it wherever a TD gap is reported (the player
+    card does, per book).
   - The lowest probability bin is still low (0.022 predicted vs 0.032 actual) -- backups
     with history and small shares, not the no-history players.
-  - A player in a NEW role: a newly arrived starter has one game of evidence and a prior
-    from his old role at 0.25 weight. Worst for a running quarterback: on its first live
-    board (MIA@SF 2026 week 2) v1 priced Malik Willis at 4.6% against the book's 26%.
-    That is the case a usage model is least informed on and the market most.
+  - A player in a NEW role. For a starting quarterback the error was mostly the channel
+    mix, not his share: within qb_rush a starter's share is near 1, and Miami's team mix
+    after a pocket passer gave the QB-rush channel 0.063 of its touchdowns. On its first
+    live board (MIA@SF 2026 week 2) v1 priced Malik Willis at 4.6% against the book's 26%;
+    keyed to his own starts (4 QB-rush TDs of 10 team TDs, 2024-26) he is 19.8% on current
+    inputs (9.9% on that board's Sept 18 inputs). What remains is role news the market
+    has and usage data does not -- the market-as-prior layer's job.
   - Scorers are independent across teams, so it does not price correlated multi-scorer
     markets. That is layer 3.
 - Live check at release: on MIA@SF 2026 week 2, every non-touchdown output of the scorer
@@ -112,7 +142,10 @@ To `VALIDATED_BETTING`: everything above plus archive coverage (rows, bookmakers
 - Revision note: the first live version allocated ALL team TDs by inside-the-10 share. That
   under-rated explosive and high-volume players (Gibbs: 9 of 18 2025 TDs from outside the 10;
   J. Williams: 8 of 20) and over-rated goal-line specialists. Corrected 2026-09-17.
-- Test: NONE. No backtest has been run for this market.
+- Test: its STRUCTURE was reproduced and scored as the baseline in the anytime_td_v1
+  backtests (`reports/td_v1.md`). Measured property: it runs LOW -- mean predicted 0.135
+  vs 0.148 actual on 2024-25 (about 1.3 points), 0.133 vs 0.138 on 2018-19. When the
+  fallback fires, the player card and the sources table say so.
 - Known limits:
   - No complementary "No" side is quoted, so no-vig removal is unavailable; the comparison
     uses the bookmaker's raw implied probability and is therefore biased against the bet by

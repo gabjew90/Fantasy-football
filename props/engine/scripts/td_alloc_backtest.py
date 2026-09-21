@@ -2,6 +2,7 @@
 """Layer 2 backtest, and the end-to-end test against the engine's anytime model.
 
   python td_alloc_backtest.py [--tune 2022,2023] [--test 2024,2025] [--out DIR]
+                               [--grid | --grid-v11] [--report NAME]
 
 Population: every QB/RB/WR/TE on the GAME-DAY ACTIVE LIST (weekly-roster
 status ACT, known before kickoff). Walk-forward throughout: a game is priced
@@ -52,26 +53,42 @@ EPS = 1e-3
 PASS_CH, RUSH_CH = ("pass_rz", "pass_far"), ("rush_in5", "rush_far", "qb_rush")
 L1 = T.LAYER1                    # {"trials": 10, "gamma": 0.25, ...}
 
-# allocation keys: (prior, scale, moved). BASE is the spec before the slot prior.
-BASE_ALLOC = ("none", 1.0, 0.5)
+# A configuration is (alloc, c, cap, qb_beta); alloc = (prior, slot scale, moved weight).
+BASE_ALLOC = ("none", 1.0, 0.5)                    # the spec before the slot prior
+FULL_ALLOC = ("slot", 1.0, MOVED)
 V1_ALLOC = ("slot", V.V1["slot_scale"], MOVED)
-# Default run: the SHIPPED configuration and the two references it is
-# compared with. --grid reproduces the tuning run (slot scale x Beta c).
+V10 = (V1_ALLOC, None, 0.99, None)                 # anytime_td_v1 as first shipped (props-v1.4)
+SHIP = (V1_ALLOC, V.V1["c"], V.V1["cap"], V.V1["qb_beta"])   # what td_v1.V1 ships now
 SCALES = [0.4, 0.6, 1.0]
 C_GRID = [None, 80.0, 40.0, 20.0, 10.0, 5.0]
-ALLOCS = [BASE_ALLOC, ("slot", 1.0, MOVED), V1_ALLOC]
-CONFIGS = [(al, None) for al in ALLOCS]
+C_DIAG = [40.0, 20.0, 10.0]      # Beta concentrations shown beside the shipped share; never chosen by default
+CAPS = [0.99, 0.993, 0.995, 0.997, 0.999]
+QB_BETAS = [None, 10.0, 20.0, 40.0, 80.0]
 
 
-def use_grid() -> None:
-    global ALLOCS, CONFIGS
-    ALLOCS = [BASE_ALLOC] + [("slot", s, MOVED) for s in SCALES]
-    CONFIGS = [(BASE_ALLOC, None)] + [(al, c) for al in ALLOCS[1:] for c in C_GRID]
+def configs(mode: str) -> list:
+    """ship: the shipped model and its references (td_v1.md). grid: slot scale
+    x Beta c (td_layer2.md). grid-v11: share cap x the starter's QB-rush
+    shrinkage (td_v1_1_tuning.md)."""
+    if mode == "grid":
+        return [(BASE_ALLOC, None, 0.99, None)] + [(("slot", sc, MOVED), c, 0.99, None)
+                                                   for sc in SCALES for c in C_GRID]
+    if mode == "grid-v11":
+        return [(V1_ALLOC, None, cap, b) for cap in CAPS for b in QB_BETAS]
+    out = [(BASE_ALLOC, None, 0.99, None), (FULL_ALLOC, None, 0.99, None), V10, SHIP]
+    out += [(SHIP[0], c, SHIP[2], SHIP[3]) for c in C_DIAG]
+    return list(dict.fromkeys(out))
 
 
-def cid(alloc, c) -> str:
-    p, s, m = alloc
-    return f"{p}|x{s:g}|m{m:g}|c{'inf' if c is None else f'{c:g}'}"
+def qid(qk) -> str:
+    """Key of a per-touchdown share vector: (alloc, cap, qb_beta)."""
+    (p, sc, m), cap, b = qk
+    return f"{p}|x{sc:g}|m{m:g}|cap{cap:g}|qb{'team' if b is None else f'{b:g}'}"
+
+
+def cid(cfg) -> str:
+    al, c, cap, b = cfg
+    return f"{qid((al, cap, b))}|c{'inf' if c is None else f'{c:g}'}"
 
 
 def _kick_lookup(games: pd.DataFrame) -> dict:
@@ -146,19 +163,33 @@ def load(seasons: list[int]) -> dict:
     if cover < 0.95:
         raise SystemExit(f"only {cover:.1%} of players with a snap are on the active list")
     sc = pd.concat(sc, ignore_index=True)
-    return {"cch": A.counts(opps, "channel"), "ceng": A.counts(opps, "engine"),
+    return {"qb_ids": qb_ids, "cch": A.counts(opps, "channel"), "ceng": A.counts(opps, "engine"),
             "sc": sc, "scored_n": sc.groupby(["game_id", "player_id"])["tds"].sum().to_dict(),
             "played": played, "active": active, "slots": slots, "tg": tg, "fin": fin,
             "unmapped": unmapped, "cover": cover, "slot_cover": float(active["slot"].notna().mean())}
 
 
-def run(D: dict, seasons: list[int]) -> tuple[pd.DataFrame, pd.DataFrame]:
+def load_starts(seasons, qb_ids: set[str]) -> pd.DataFrame:
+    """Starting quarterbacks and their QB-rush touchdowns, for the starter's
+    career rate (td_v1.qb_starts) -- over `qb_window` seasons before the
+    earliest priced season as well, so week 1 has a history."""
+    out = []
+    for s in seasons:
+        pbp = pd.read_csv(fetch(f"{NV}/pbp/play_by_play_{s}.csv.gz", f"pbp_{s}.csv.gz"),
+                          usecols=A.PBP_COLS_L2, low_memory=False)
+        out.append(V.qb_starts(pbp, qb_ids))
+    return pd.concat(out, ignore_index=True)
+
+
+def run(D: dict, seasons: list[int], cfgs: list) -> tuple[pd.DataFrame, pd.DataFrame]:
     """(player rows, team-game mass rows). Every rebuild number here comes out
     of td_v1 -- the module score_game.py calls -- so what is validated is
     what ships. Only the ENGINE reproduction has its own code, because it
     models the other system."""
     cch, ceng, played, active, slots, tg = D["cch"], D["ceng"], D["played"], D["active"], D["slots"], D["tg"]
     scored_n = D["scored_n"]
+    allocs = list(dict.fromkeys(cfg[0] for cfg in cfgs))
+    qkeys = list(dict.fromkeys((cfg[0], cfg[2], cfg[3]) for cfg in cfgs))
     rows, mass = [], []
     for s in seasons:
         pl_pri = played[played["season"] == s - 1]
@@ -175,7 +206,9 @@ def run(D: dict, seasons: list[int]) -> tuple[pd.DataFrame, pd.DataFrame]:
             pos = dict(zip(both["player_id"], both["pos"]))
             team_now = dict(zip(now["player_id"], now["team"]))
             hist = tg[(tg["season"] == s - 1) | ((tg["season"] == s) & (tg["week"] < w))]
-            ctx = V.context(hist)
+            qh = V.qb_history(D["starts"], s, w)
+            ctx = V.context(hist, qb_hist=qh)
+            started_here = set(zip(qh["player_id"], qh["team"]))
             mix_team, mix_league, ratio_off = ctx["mix_team"], ctx["mix_league"], ctx["ratio_off"]
 
             # engine: counts, its own half-weight convention, the slot prior it has
@@ -184,7 +217,7 @@ def run(D: dict, seasons: list[int]) -> tuple[pd.DataFrame, pd.DataFrame]:
                                  current_team=team_now, moved_weight=0.5),
                 now, sp_e, A.ENGINE_CHANNELS)
             filled, raw = {}, {}
-            for al in ALLOCS:
+            for al in allocs:
                 filled[al], raw[al[2]] = V.week_shares(cur(cch), pri_c, pl_cur, pl_pri, sl_pri, now,
                                                        moved=al[2], slot_scale=al[1],
                                                        prior=al[0] == "slot")
@@ -194,6 +227,8 @@ def run(D: dict, seasons: list[int]) -> tuple[pd.DataFrame, pd.DataFrame]:
                 if act.empty:
                     continue
                 ids = list(act["player_id"])
+                qb = V.starter(act)
+                new_qb = qb is not None and (qb, g["team"]) not in started_here
                 mix = mix_team.loc[g["team"]] if g["team"] in mix_team.index else mix_league
                 n_off = int(g["off_tds"])
                 mu_eng = g["implied"] * ratio_off
@@ -217,24 +252,30 @@ def run(D: dict, seasons: list[int]) -> tuple[pd.DataFrame, pd.DataFrame]:
                 mrow = {"season": s, "week": w, "game_id": g["game_id"], "team": g["team"],
                         "n_off": n_off, "actives_scored": act_tds, "sum_q_engine": float(q_eng.sum()),
                         "nohist_q_engine": float(q_eng[nohist_ids].sum())}
-                qs = {}
-                for al in ALLOCS:
-                    qs[al] = V.game_q(filled[al], g["team"], ids, pos, ctx)
-                    mrow[f"sum_q|{al[0]}|x{al[1]:g}"] = float(qs[al].sum())
-                    mrow[f"nohist_q|{al[0]}|x{al[1]:g}"] = float(qs[al][nohist_ids].sum())
+                # td_v1.game_q is per_td(game_shares, game_mix); split here only so the
+                # reallocation is not repeated for every quarterback setting
+                qs, by_cap = {}, {}
+                for qk in qkeys:
+                    al, cap, b = qk
+                    if (al, cap) not in by_cap:
+                        by_cap[(al, cap)] = V.game_shares(filled[al], g["team"], ids, pos, MODE, cap)
+                    qs[qk] = V.per_td(by_cap[(al, cap)], V.game_mix(ctx, g["team"], qb, b)).clip(upper=0.999)
+                    mrow[f"sum_q|{qid(qk)}"] = float(qs[qk].sum())
+                    mrow[f"nohist_q|{qid(qk)}"] = float(qs[qk][nohist_ids].sum())
                 mass.append(mrow)
 
                 base = {"season": s, "week": w, "game_id": g["game_id"], "team": g["team"]}
                 cols = {}
-                for al, c in CONFIGS:
-                    q = qs[al].to_numpy()
-                    k = cid(al, c)
+                for cfg in cfgs:
+                    q = qs[(cfg[0], cfg[2], cfg[3])].to_numpy()
+                    k, c = cid(cfg), cfg[1]
                     cols[f"n|{k}"] = A.p_score_given(q, n_off, c)
                     cols[f"e2e|{k}"] = A.p_score_dist(q, pmf_new, c)
                     cols[f"engl2|{k}"] = A.p_score_dist(q, pmf_eng, c)
                 nh_set = set(nohist_ids)
                 for i, pid in enumerate(ids):
                     r = {**base, "player_id": pid, "pos": pos.get(pid), "no_history": pid in nh_set,
+                         "starter": pid == qb, "new_starter": pid == qb and new_qb,
                          "scored": int(scored_n.get((g["game_id"], pid), 0) > 0),
                          "eng_n": float(eng_n[i]), "eng_e2e": float(eng_e2e[i]),
                          "l1_engalloc": float(l1_engalloc[i])}
@@ -274,23 +315,34 @@ def main(argv=None) -> int:
     ap.add_argument("--test", default="2024,2025")
     ap.add_argument("--out", default=str(Path(__file__).resolve().parent / "backtest_out"))
     ap.add_argument("--grid", action="store_true",
-                    help="reproduce the tuning run (slot scale x Beta concentration) instead of "
-                         "scoring the shipped configuration")
+                    help="reproduce the layer-2 tuning run (slot scale x Beta concentration)")
+    ap.add_argument("--grid-v11", action="store_true",
+                    help="tune the share cap x the starter's QB-rush shrinkage")
+    ap.add_argument("--report", default=None, help="report file name (default by mode)")
     a = ap.parse_args(argv)
-    if a.grid:
-        use_grid()
+    mode = "grid" if a.grid else ("grid-v11" if a.grid_v11 else "ship")
+    cfgs = configs(mode)
     tune = [int(x) for x in a.tune.split(",")]
     test = [int(x) for x in a.test.split(",")]
-    D = load(sorted(set(tune + test) | {min(tune) - 1}))
+    # every scored season needs its prior season (a test window need not follow tune)
+    seasons = sorted({x for s in tune + test for x in (s, s - 1)})
+    D = load(seasons)
+    win = V.V1["qb_window"]
+    D["starts"] = load_starts(sorted({x for s in tune + test for x in range(s - win, s + 1)}), D["qb_ids"])
     print(f"loaded: active list covers {D['cover']:.1%} of snaps; {D['slot_cover']:.1%} of actives "
           f"hold a depth-chart slot", file=sys.stderr)
-    dtu, _mtu = run(D, tune)
-    dte, mte = run(D, test)
-    tune_ll = {cid(al, c): ll(dtu, f"n|{cid(al, c)}") for al, c in CONFIGS}
+    dtu, _mtu = run(D, tune, cfgs)
+    dte, mte = run(D, test, cfgs)
+    tune_ll = {cfg: ll(dtu, f"n|{cid(cfg)}") for cfg in cfgs}
+    out = Path(a.out)
+    if mode == "grid-v11":
+        best = min(tune_ll, key=tune_ll.get)
+        write_v11(out / (a.report or "td_v1_1_tuning.md"), D, dtu, dte, mte, tune_ll, best, tune, test)
+        return 0
     # the grid CHOOSES; the default run scores what td_v1 ships, unchosen
-    best = min(tune_ll, key=tune_ll.get) if a.grid else cid(V1_ALLOC, V.V1["c"])
-    name = "td_layer2.md" if a.grid else "td_v1.md"
-    write(Path(a.out) / name, D, dte, mte, tune_ll, best, tune, test, shipped=not a.grid)
+    best = min(tune_ll, key=tune_ll.get) if mode == "grid" else SHIP
+    name = a.report or ("td_layer2.md" if mode == "grid" else "td_v1.md")
+    write(out / name, D, dte, mte, tune_ll, best, tune, test, shipped=mode == "ship")
     return 0
 
 
@@ -303,85 +355,207 @@ def _calib(L, d, cols, labels, bins=(0, .05, .10, .20, .30, .45, .60, 1.0)):
                  + f" | {g['scored'].mean():.3f} | {len(g)} |")
 
 
+def _fixed(cfg):
+    return (cfg[0], None, cfg[2], cfg[3])
+
+
+def _qb_rows(L, d, pairs):
+    """Starting quarterbacks, and those starting for a team they had not
+    started for in the window -- the Willis case."""
+    L += ["| population | n | actual rate | " + " | ".join(f"{lab}: predicted / log loss" for lab, _ in pairs)
+          + " |", "|---" * (len(pairs) + 3) + "|"]
+    for name, g in (("all starting QBs", d[d["starter"]]), ("QB new to his team as a starter", d[d["new_starter"]])):
+        if len(g):
+            L.append(f"| {name} | {len(g)} | {g['scored'].mean():.3f} | "
+                     + " | ".join(f"{g[c].mean():.3f} / {ll(g, c):.4f}" for _, c in pairs) + " |")
+
+
 def write(path: Path, D, d, mass, tune_ll, best, tune, test, shipped=False):
     path.parent.mkdir(parents=True, exist_ok=True)
-    prev = cid(("slot", 1.0, MOVED), None)          # the previous best: full slot prior, fixed share
-    base = cid(BASE_ALLOC, None)
-    bal = best.rsplit("|c", 1)[0]
-    best_fixed = f"{bal}|cinf"
-    L = ["# Layer 2 and the end-to-end test", "",
+    prev = (FULL_ALLOC, None, 0.99, None)          # the previous best: full slot prior, fixed share
+    base = (BASE_ALLOC, None, 0.99, None)
+    best_fixed = _fixed(best)
+    kb, kp, kbase, kbf = cid(best), cid(prev), cid(base), cid(best_fixed)
+    L = [("# anytime_td_v1: layer 2 and the end-to-end test" if shipped else
+          "# Layer 2 and the end-to-end test"), "",
          f"Tune {tune}, test {test}. Population: QB/RB/WR/TE on the game-day active list, {len(d)} "
          f"player-games in test, {d['scored'].mean():.1%} of whom scored. Active list covers "
          f"{D['cover']:.1%} of snaps; {D['slot_cover']:.1%} of actives hold a depth-chart slot. "
          f"Five channels on raw counts; reallocation '{MODE}'; kappa {KAPPA:g}; moved-role weight "
          f"{MOVED:g}. The engine gets the slot prior it has in production.", "",
-         (f"**Shipped configuration, scored as-is: {best}** -- the parameters in td_v1.V1, which "
+         (f"**Shipped configuration, scored as-is: {kb}** -- the parameters in td_v1.V1, which "
           "score_game.py calls. Every rebuild number below comes out of that module." if shipped else
-          f"Chosen on tune: **{best}** (slot-prior scale x, Beta concentration c)."), "",
+          f"Chosen on tune: **{kb}** (slot-prior scale x, Beta concentration c)."), "",
          "## Where the touchdown mass goes (test, per team-game)", "",
          "Summed per-touchdown share of the team's ACTIVE players, against the fraction of the team's "
          "offensive touchdowns that active players actually scored. Anything below the actual line is "
          "probability the model never gives to anyone who plays.", ""]
     mm = mass[mass["n_off"] > 0]
     actual = mm["actives_scored"].sum() / mm["n_off"].sum()
-    key_prev, key_best = "|slot|x1", f"|{bal.split('|')[0]}|{bal.split('|')[1]}"
+    mk = lambda cfg: qid((cfg[0], cfg[2], cfg[3]))  # noqa: E731
     L += ["| | summed share of actives | of which: players with no history |", "|---|---|---|",
           f"| actual: fraction of offensive TDs scored by actives | **{actual:.3f}** | |",
           f"| engine | {mass['sum_q_engine'].mean():.3f} | {mass['nohist_q_engine'].mean():.3f} |",
-          f"| layer 2, no prior (previous spec) | {mass['sum_q|none|x1'].mean():.3f} | "
-          f"{mass['nohist_q|none|x1'].mean():.3f} |",
-          f"| layer 2, full slot prior | {mass[f'sum_q{key_prev}'].mean():.3f} | {mass[f'nohist_q{key_prev}'].mean():.3f} |",
-          f"| layer 2, chosen slot scale | {mass[f'sum_q{key_best}'].mean():.3f} | "
-          f"{mass[f'nohist_q{key_best}'].mean():.3f} |", ""]
+          f"| layer 2, no prior (previous spec) | {mass['sum_q|' + mk(base)].mean():.3f} | "
+          f"{mass['nohist_q|' + mk(base)].mean():.3f} |",
+          f"| layer 2, full slot prior | {mass['sum_q|' + mk(prev)].mean():.3f} | "
+          f"{mass['nohist_q|' + mk(prev)].mean():.3f} |"]
+    if shipped and V10 != best_fixed:
+        L.append(f"| anytime_td_v1 as first shipped (props-v1.4) | {mass['sum_q|' + mk(V10)].mean():.3f} | "
+                 f"{mass['nohist_q|' + mk(V10)].mean():.3f} |")
+    L += [f"| {'shipped' if shipped else 'chosen'} | {mass['sum_q|' + mk(best)].mean():.3f} | "
+          f"{mass['nohist_q|' + mk(best)].mean():.3f} |", ""]
 
     L += ["## Allocation, given the team's offensive touchdowns (test)", "",
           "| model | log loss | vs | change (95% CI, game-clustered) |", "|---|---|---|---|",
           f"| Engine (pass/rush, inside-10, slot prior) | {ll(d, 'eng_n'):.4f} | | baseline |",
-          f"| previous spec: no prior, fixed share | {ll(d, 'n|' + base):.4f} | engine | {_ci(boot(d, 'n|' + base, 'eng_n'))} |",
-          f"| full slot prior, fixed share | {ll(d, 'n|' + prev):.4f} | previous spec | {_ci(boot(d, 'n|' + prev, 'n|' + base))} |",
-          f"| chosen slot scale, fixed share | {ll(d, 'n|' + best_fixed):.4f} | full slot prior | "
-          f"{_ci(boot(d, 'n|' + best_fixed, 'n|' + prev))} |"]
-    if best != best_fixed:   # only the grid has a Beta row; the shipped share is fixed
-        L.append(f"| + Beta share (chosen: {best}) | {ll(d, 'n|' + best):.4f} | fixed share | "
-                 f"{_ci(boot(d, 'n|' + best, 'n|' + best_fixed))} |")
+          f"| previous spec: no prior, fixed share | {ll(d, 'n|' + kbase):.4f} | engine | {_ci(boot(d, 'n|' + kbase, 'eng_n'))} |",
+          f"| full slot prior, fixed share | {ll(d, 'n|' + kp):.4f} | previous spec | {_ci(boot(d, 'n|' + kp, 'n|' + kbase))} |"]
+    if shipped and V10 != best_fixed:
+        k10 = cid(V10)
+        L += [f"| v1 as first shipped (slot x{V10[0][1]:g}) | {ll(d, 'n|' + k10):.4f} | full slot prior | "
+              f"{_ci(boot(d, 'n|' + k10, 'n|' + kp))} |",
+              f"| shipped | {ll(d, 'n|' + kbf):.4f} | v1 as first shipped | {_ci(boot(d, 'n|' + kbf, 'n|' + k10))} |"]
+    else:
+        L.append(f"| chosen slot scale, fixed share | {ll(d, 'n|' + kbf):.4f} | full slot prior | "
+                 f"{_ci(boot(d, 'n|' + kbf, 'n|' + kp))} |")
+    if best != best_fixed:   # only the grid can choose a Beta share
+        L.append(f"| + Beta share (chosen: {kb}) | {ll(d, 'n|' + kb):.4f} | fixed share | "
+                 f"{_ci(boot(d, 'n|' + kb, 'n|' + kbf))} |")
     L += ["", f"{'Shipped' if shipped else 'Chosen'} vs engine directly: "
-              f"{_ci(boot(d, 'n|' + best, 'eng_n'))}.", "",
+              f"{_ci(boot(d, 'n|' + kb, 'eng_n'))}.", "",
           "### Calibration given offensive touchdowns", ""]
-    _calib(L, d, ["n|" + prev, "n|" + best], ["full slot, fixed share", "chosen"])
+    _calib(L, d, ["n|" + kp, "n|" + kb], ["full slot, fixed share", "shipped" if shipped else "chosen"])
     nh = d[d["no_history"]]
     L += ["", "### No-history players", "",
           "| model | mean predicted | actual rate | n |", "|---|---|---|---|",
           f"| engine (full slot prior) | {nh['eng_n'].mean():.3f} | {nh['scored'].mean():.3f} | {len(nh)} |",
-          f"| layer 2, full slot prior | {nh['n|' + prev].mean():.3f} | {nh['scored'].mean():.3f} | {len(nh)} |",
-          f"| layer 2, chosen | {nh['n|' + best].mean():.3f} | {nh['scored'].mean():.3f} | {len(nh)} |", ""]
+          f"| layer 2, full slot prior | {nh['n|' + kp].mean():.3f} | {nh['scored'].mean():.3f} | {len(nh)} |",
+          f"| layer 2, {'shipped' if shipped else 'chosen'} | {nh['n|' + kb].mean():.3f} | "
+          f"{nh['scored'].mean():.3f} | {len(nh)} |", ""]
 
-    e, r = "eng_e2e", "e2e|" + best
+    e, r = "eng_e2e", "e2e|" + kb
     L += ["## END TO END: what would be deployed (test)", "",
           "Engine = implied points x league offensive TDs/point, linear, Poisson; per-TD share from "
           "pass/rush + inside-10 usage with the slot prior: the structure of anytime_td_v0. "
-          f"v1 = layer 1 frozen (Binomial({L1['trials']}), gamma {L1['gamma']}) x layer 2 ({best}).", "",
+          f"v1 = layer 1 frozen (Binomial({L1['trials']}), gamma {L1['gamma']}) x layer 2 ({kb}).", "",
           "| model | log loss | Brier | mean predicted | vs engine (95% CI, game-clustered) |",
           "|---|---|---|---|---|",
           f"| Engine (anytime_td_v0 structure) | {ll(d, e):.4f} | {((d[e] - d['scored']) ** 2).mean():.4f} | "
-          f"{d[e].mean():.3f} | baseline |",
-          f"| v1 | {ll(d, r):.4f} | {((d[r] - d['scored']) ** 2).mean():.4f} | {d[r].mean():.3f} | "
-          f"{_ci(boot(d, r, e))} |", "", f"Actual scoring rate {d['scored'].mean():.3f}.", "",
+          f"{d[e].mean():.3f} | baseline |"]
+    if shipped and V10 != best:
+        r10 = "e2e|" + cid(V10)
+        L.append(f"| v1 as first shipped (props-v1.4) | {ll(d, r10):.4f} | {((d[r10] - d['scored']) ** 2).mean():.4f} | "
+                 f"{d[r10].mean():.3f} | {_ci(boot(d, r10, e))} |")
+    L += [f"| {'v1 shipped' if shipped else 'v1'} | {ll(d, r):.4f} | {((d[r] - d['scored']) ** 2).mean():.4f} | "
+          f"{d[r].mean():.3f} | {_ci(boot(d, r, e))} |", ""]
+    if shipped and V10 != best:
+        L += [f"Shipped vs v1 as first shipped: {_ci(boot(d, r, 'e2e|' + cid(V10)))}.", ""]
+    L += [f"Actual scoring rate {d['scored'].mean():.3f}.", "",
           "Cross terms -- each layer alone, the other as the engine has it:", "",
           "| model | log loss | mean predicted | vs engine |", "|---|---|---|---|",
           f"| layer 1 frozen, engine allocation | {ll(d, 'l1_engalloc'):.4f} | {d['l1_engalloc'].mean():.3f} | "
           f"{_ci(boot(d, 'l1_engalloc', e))} |",
-          f"| engine count model, v1 allocation | {ll(d, 'engl2|' + best):.4f} | {d['engl2|' + best].mean():.3f} | "
-          f"{_ci(boot(d, 'engl2|' + best, e))} |", "",
+          f"| engine count model, v1 allocation | {ll(d, 'engl2|' + kb):.4f} | {d['engl2|' + kb].mean():.3f} | "
+          f"{_ci(boot(d, 'engl2|' + kb, e))} |", "",
           "### Calibration, end to end", ""]
     _calib(L, d, [e, r], ["engine", "v1"])
     L += ["", "The 0.2-0.3 band is where most priced anytime lines sit.", "",
           "| position | engine | v1 | n |", "|---|---|---|---|"]
     for p, g in d.groupby("pos"):
         L.append(f"| {p} | {ll(g, e):.4f} | {ll(g, r):.4f} | {len(g)} |")
+
+    if shipped:
+        pairs = [("engine", "eng_e2e")] + ([("v1 as first shipped", "e2e|" + cid(V10))] if V10 != best else []) \
+            + [("shipped", r)]
+        L += ["", "### Starting quarterbacks, end to end", ""]
+        _qb_rows(L, d, pairs)
+        L += ["", "## The Beta share on the top bins (diagnostic, not used)", "",
+              "A concentration tuned on aggregate log loss can return 'no effect' even if it fixes the top "
+              "bins, which are 7% of rows. Rows are binned by the SHIPPED fixed-share prediction, so every "
+              "column describes the same players. c -> infinity is the fixed share.", ""]
+        diag = [(best[0], c, best[2], best[3]) for c in C_DIAG]
+        for tag, pre in (("End to end", "e2e|"), ("Given the team's offensive touchdowns", "n|")):
+            L += [f"### {tag}", ""]
+            _calib(L, d, [pre + cid(x) for x in diag] + [pre + kbf],
+                   [f"c={x[1]:g}" for x in diag] + ["fixed share"])
+            L.append("")
+        top = d[d["e2e|" + kbf] > 0.45]
+        L += ["| share | log loss, all | log loss, rows priced above 0.45 end to end | mean predicted there |",
+              "|---|---|---|---|"]
+        for x in diag + [best_fixed]:
+            k = "e2e|" + cid(x)
+            L.append(f"| {'fixed' if x[1] is None else f'c={x[1]:g}'} | {ll(d, k):.4f} | {ll(top, k):.4f} | "
+                     f"{top[k].mean():.3f} |")
+        L.append(f"| actual | | | {top['scored'].mean():.3f} (n {len(top)}) |")
+
     L += ["", "## Tuning (tune log loss, given offensive touchdowns)", "",
           "| configuration | tune log loss |", "|---|---|"]
     for k, v in sorted(tune_ll.items(), key=lambda kv: kv[1]):
-        L.append(f"| {k} | {v:.4f}{' **chosen**' if k == best else ''} |")
+        L.append(f"| {cid(k)} | {v:.4f}{' **chosen**' if k == best and not shipped else ''} |")
+    path.write_text("\n".join(L) + "\n", encoding="utf-8")
+    print(f"wrote {path}", file=sys.stderr)
+
+
+def write_v11(path: Path, D, dtu, dte, mass, tune_ll, best, tune, test):
+    """The cap x starter-QB-rush tuning run: chosen on tune, scored on test."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    kb, k10 = cid(best), cid(V10)
+    cap_only = cid((V1_ALLOC, None, best[2], None))
+    qb_only = cid((V1_ALLOC, None, 0.99, best[3]))
+    fmt_b = lambda b: "team mix" if b is None else f"{b:g}"  # noqa: E731
+    L = ["# anytime_td_v1.1: the share cap and the starter's QB-rush rate", "",
+         f"Tune {tune}, test {test}. Everything else is anytime_td_v1 as shipped in props-v1.4 "
+         f"(slot x{V1_ALLOC[1]:g}, moved {MOVED:g}, fixed share, Binomial({L1['trials']}), gamma {L1['gamma']}). "
+         f"Two settings, chosen together on tune log loss given the team's offensive touchdowns:", "",
+         "- **cap**: total share per channel after reallocation; the remainder is 'other'. v1 used 0.99; "
+         "actives score 0.997 of offensive touchdowns.",
+         f"- **QB rate**: the qb_rush weight in the channel mix. 'team mix' is v1 (the team's history); a "
+         f"number is the starter's QB-rush touchdowns over his teams' offensive touchdowns in his starts over "
+         f"the last {V.V1['qb_window']} seasons, shrunk toward the league fraction by that many team touchdowns.", "",
+         "## Tune log loss, given offensive touchdowns", "",
+         "| cap | " + " | ".join(fmt_b(b) for b in QB_BETAS) + " |", "|---" * (len(QB_BETAS) + 1) + "|"]
+    for cap in CAPS:
+        cells = []
+        for b in QB_BETAS:
+            cfg = (V1_ALLOC, None, cap, b)
+            cells.append(f"**{tune_ll[cfg]:.5f}**" if cfg == best else f"{tune_ll[cfg]:.5f}")
+        L.append(f"| {cap:g} | " + " | ".join(cells) + " |")
+    L += ["", f"Chosen: **cap {best[2]:g}, QB rate {fmt_b(best[3])}**.", "",
+          "Starting quarterbacks only, tune log loss given offensive touchdowns:", "",
+          "| cap | " + " | ".join(fmt_b(b) for b in QB_BETAS) + " |", "|---" * (len(QB_BETAS) + 1) + "|"]
+    st = dtu[dtu["starter"]]
+    for cap in CAPS:
+        L.append(f"| {cap:g} | " + " | ".join(f"{ll(st, 'n|' + cid((V1_ALLOC, None, cap, b))):.4f}"
+                                              for b in QB_BETAS) + " |")
+
+    d = dte
+    L += ["", "## Test", "",
+          f"{len(d)} player-games, {d['scored'].mean():.3f} scored.", "",
+          "| model | given offensive TDs | vs v1 | end to end | vs v1 | mean predicted, end to end |",
+          "|---|---|---|---|---|---|"]
+    for lab, k in (("v1 (props-v1.4)", k10), (f"cap {best[2]:g} only", cap_only),
+                   (f"QB rate {fmt_b(best[3])} only", qb_only), ("chosen, both", kb)):
+        if lab.startswith("v1"):
+            L.append(f"| {lab} | {ll(d, 'n|' + k):.4f} | | {ll(d, 'e2e|' + k):.4f} | | {d['e2e|' + k].mean():.3f} |")
+        elif k != k10:
+            L.append(f"| {lab} | {ll(d, 'n|' + k):.4f} | {_ci(boot(d, 'n|' + k, 'n|' + k10))} | "
+                     f"{ll(d, 'e2e|' + k):.4f} | {_ci(boot(d, 'e2e|' + k, 'e2e|' + k10))} | {d['e2e|' + k].mean():.3f} |")
+    mm = mass[mass["n_off"] > 0]
+    actual = mm["actives_scored"].sum() / mm["n_off"].sum()
+    q10, qb_ = qid((V1_ALLOC, 0.99, None)), qid((best[0], best[2], best[3]))
+    L += ["", f"Summed share of actives per team-game: v1 {mass['sum_q|' + q10].mean():.3f}, chosen "
+              f"{mass['sum_q|' + qb_].mean():.3f}; actives actually scored {actual:.3f} of offensive touchdowns.", "",
+          "### Calibration, end to end (binned by the chosen model)", ""]
+    _calib(L, d, ["e2e|" + k10, "e2e|" + kb], ["v1", "chosen"])
+    L += ["", "### Starting quarterbacks (test)", ""]
+    _qb_rows(L, d, [("engine", "eng_e2e"), ("v1", "e2e|" + k10), ("chosen", "e2e|" + kb)])
+    for name, g in (("starting QBs", d[d["starter"]]), ("QBs new to their team as starter", d[d["new_starter"]])):
+        if len(g) and kb != k10:
+            L.append(f"\n{name}, chosen vs v1 end to end: {_ci(boot(g, 'e2e|' + kb, 'e2e|' + k10))}.")
+    L += ["", "| position | v1 | chosen | n |", "|---|---|---|---|"]
+    for p, g in d.groupby("pos"):
+        L.append(f"| {p} | {ll(g, 'e2e|' + k10):.4f} | {ll(g, 'e2e|' + kb):.4f} | {len(g)} |")
     path.write_text("\n".join(L) + "\n", encoding="utf-8")
     print(f"wrote {path}", file=sys.stderr)
 

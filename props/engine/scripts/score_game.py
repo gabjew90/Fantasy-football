@@ -474,10 +474,11 @@ def main():
             V1TD = None
             SOURCES.append(("Anytime TD model", "who scores, and how likely", "FAILED",
                             f"{TDV1.LABEL} unavailable ({type(exc).__name__}: {exc}); "
-                            "anytime prices fall back to anytime_td_v0"))
+                            "anytime prices fall back to anytime_td_v0, which runs ~1.3 points low"))
     else:
         SOURCES.append(("Anytime TD model", "who scores, and how likely", "unavailable",
-                        f"{TDV1.LABEL} needs the market's implied points; anytime_td_v0 used"))
+                        f"{TDV1.LABEL} needs the market's implied points; anytime_td_v0 used "
+                        "(runs ~1.3 points low)"))
 
     # ---------- 4b. opponent efficiency table (round 5) ----------
     # Backtest finding: at usable shrinkage (k0=50-150 plays) this made
@@ -1273,6 +1274,9 @@ def main():
                            + (f" ({'; '.join(hist)})" if hist else "")
                            + f", worth {gl:.2f} TDs. Long plays: his overall share of the offense ({pct(m.ts)} of throws, {pct(m.rs)} of runs) "
                            f"is worth another {lg:.2f}. Total {lam:.2f} expected TDs, which is {in_ten(r.p_model)} ({pct(r.p_model)}) to score at least once.")
+                out.append(f"**Fallback.** This is the FALLBACK model ({TDV1.LABEL} could not run here), and it runs low: in the "
+                           "2024-25 backtest it predicted a 13.5% scoring rate against 14.8% actual, about 1.3 "
+                           "points too low on average, so a gap in the book's favour is partly ours.")
         elif r.market in ("player_receptions", "player_reception_yds"):
             thing = "catches" if r.market == "player_receptions" else "receiving yards"
             out.append(f"**What the book says.** {book} sets the line at **{r.line} {thing}**, {r.side.lower()} priced at {odds_words(r.price)}. "

@@ -12,13 +12,17 @@ same rule the yardage model follows since the pipelines were unified.
                role from another team counts 0.25; a player with no history
                gets 0.4 x his depth-chart slot's league share; an absent
                player's share is reallocated across the active roster
+  channel mix  the team's, except the QB-rush weight: the starting
+               quarterback's own QB-rush touchdowns over his teams' offensive
+               touchdowns in his starts (3 seasons), shrunk by 40 team TDs
   P(score)     1 - sum_k P(N = k) (1 - q)^k, q = the player's per-TD share
 
-Validated on 2024-25, tuned on 2022-23 (reports/td_layer1_frozen.md,
-reports/td_layer2.md). End to end vs the anytime_td_v0 structure, log loss
--0.0032 (-0.0055, -0.0011); mean predicted scoring rate 0.142 vs actual
-0.148, where v0 gives 0.135. It is still PROTOTYPE: none of this is tested
-against posted sportsbook lines, so it prices no fair odds.
+Tuned on 2022-23, scored on 2024-25 and AS-IS on 2016-17 and 2018-19
+(reports/td_v1.md, td_v1_1_tuning.md, td_v1_2016_17.md, td_v1_2018_19.md).
+End to end vs the anytime_td_v0 structure, log loss -0.0043 (-0.0065,
+-0.0022) on 2024-25; mean predicted scoring rate 0.145 vs actual 0.148, where
+v0 gives 0.135. It is still PROTOTYPE: none of this is tested against posted
+sportsbook lines, so it prices no fair odds.
 
 Stdlib + numpy + pandas only.
 """
@@ -43,6 +47,9 @@ V1 = {
     "mode": "all",                    # reallocation of an absent player's share
     "mix_alpha": 100.0,               # channel-mix pseudo-count, touchdowns
     "c": None,                        # Beta share concentration: tested, no effect, not used
+    "cap": 0.99,                      # total share per channel; 0.99-0.999 tested, 0.99 best on tune
+    "qb_beta": 40.0,                  # starter QB-rush rate shrunk by 40 team TDs (tuned 2022-23); None = team mix
+    "qb_window": 3,                   # seasons of the starter's career the rate looks back over
 }
 SKILL = {"QB": "QB", "RB": "RB", "FB": "RB", "WR": "WR", "TE": "TE"}
 LABEL = "anytime_td_v1"
@@ -63,13 +70,94 @@ def per_td(shares: pd.DataFrame, mix: pd.Series, chans=T.OFFENSIVE) -> pd.Series
     return sum(w[c] * shares[c] for c in chans)
 
 
-def context(hist: pd.DataFrame, alpha: float = V1["mix_alpha"]) -> dict:
+def context(hist: pd.DataFrame, alpha: float = V1["mix_alpha"],
+            qb_hist: pd.DataFrame | None = None) -> dict:
     """What layer 1 and the channel mix need from the team-game history
-    (prior season plus the current season's earlier weeks)."""
+    (prior season plus the current season's earlier weeks), and -- when
+    `qb_hist` is given -- each quarterback's QB-rush record as a starter
+    (qb_history)."""
     mix_team, mix_league = T.channel_shares(hist, alpha)
+    off = mix_league[list(T.OFFENSIVE)]
+    qb = None
+    if qb_hist is not None and len(qb_hist):
+        qb = qb_hist.groupby("player_id")[["qb_rush_tds", "off_tds"]].sum()
     return {"mix_team": mix_team, "mix_league": mix_league,
             "ratio_off": float(hist["off_tds"].sum() / hist["points"].sum()),
-            "ref": float(hist["implied"].mean())}
+            "ref": float(hist["implied"].mean()),
+            "qb": qb, "qb_league": float(off["qb_rush"] / off.sum())}
+
+
+# ------------------------------------------------------------ the starter's QB-rush rate
+#
+# Within qb_rush only quarterback carries count, so a starter's share of that
+# channel is near 1 whoever he is. What decides his price is how often the
+# TEAM's touchdowns are QB rushes -- and a team mix learned from last season
+# describes last season's quarterback: Miami after a pocket passer gave Malik
+# Willis a qb_rush weight of 0.063. Keyed to the starter instead: his QB-rush
+# touchdowns over his teams' offensive touchdowns in the games he started, over
+# the last `qb_window` seasons, shrunk toward the league fraction by `qb_beta`
+# team touchdowns.
+
+def qb_starts(pbp: pd.DataFrame, qb_ids: set[str]) -> pd.DataFrame:
+    """One row per team-game: the starting quarterback (most dropbacks plus
+    carries), his QB-rush touchdowns, and the team's offensive touchdowns."""
+    reg = pbp[pbp["season_type"] == "REG"]
+    cols = ["game_id", "season", "week", "posteam"]
+    drop = reg.loc[(reg["play_type"] == "pass") & reg["passer_player_id"].notna(),
+                   cols + ["passer_player_id"]].rename(columns={"passer_player_id": "player_id"})
+    run = reg.loc[(reg["play_type"] == "run") & reg["rusher_player_id"].isin(qb_ids),
+                  cols + ["rusher_player_id"]].rename(columns={"rusher_player_id": "player_id"})
+    plays = pd.concat([drop, run], ignore_index=True)
+    plays["team"] = T._norm_team(plays["posteam"])
+    n = plays.groupby(["season", "week", "game_id", "team", "player_id"]).size().rename("plays").reset_index()
+    st = (n.sort_values(["plays", "player_id"], ascending=[False, True])
+          .drop_duplicates(["game_id", "team"]).drop(columns="plays"))
+    ev = T.classify_tds(pbp, qb_ids)
+    ev = ev[ev["channel"].isin(T.OFFENSIVE)]
+    off = ev.assign(team=T._norm_team(ev["team"])).groupby(["game_id", "team"]).size().rename("off_tds")
+    sc = A.scorers(pbp, qb_ids)
+    qr = (sc[sc["channel"] == "qb_rush"].groupby(["game_id", "team", "player_id"])["tds"].sum()
+          .rename("qb_rush_tds"))
+    st = (st.merge(off, on=["game_id", "team"], how="left")
+          .merge(qr, on=["game_id", "team", "player_id"], how="left"))
+    st[["off_tds", "qb_rush_tds"]] = st[["off_tds", "qb_rush_tds"]].fillna(0).astype(int)
+    return st.sort_values(["season", "week", "game_id", "team"]).reset_index(drop=True)
+
+
+def qb_history(starts: pd.DataFrame, season: int, week: int, window: int = V1["qb_window"]) -> pd.DataFrame:
+    """Starts strictly before (season, week), within `window` prior seasons."""
+    s = starts
+    return s[(s["season"] >= season - window)
+             & ((s["season"] < season) | ((s["season"] == season) & (s["week"] < week)))]
+
+
+def starter(actives_team: pd.DataFrame) -> str | None:
+    """The active quarterback highest on the pre-game depth chart."""
+    qb = actives_team[actives_team["pos"] == "QB"]
+    if qb.empty:
+        return None
+    slot = qb["slot"].astype(str)
+    rank = slot.where(slot.str.fullmatch(r"QB\d"), "QB9")
+    return str(qb.assign(_r=rank.to_numpy()).sort_values(["_r", "player_id"])["player_id"].iloc[0])
+
+
+def game_mix(ctx: dict, team: str, qb: str | None = None, beta=V1["qb_beta"]) -> pd.Series:
+    """The team's offensive channel mix, normalised to 1. With `beta` set and a
+    starter named, the qb_rush weight is the starter's shrunk rate and the
+    other channels keep their team proportions in what remains."""
+    mix = ctx["mix_team"].loc[team] if team in ctx["mix_team"].index else ctx["mix_league"]
+    off = mix[list(T.OFFENSIVE)]
+    off = off / off.sum()
+    if beta is None or qb is None:
+        return off
+    h = ctx.get("qb")
+    tds, n = ((float(h.loc[qb, "qb_rush_tds"]), float(h.loc[qb, "off_tds"]))
+              if h is not None and qb in h.index else (0.0, 0.0))
+    r = (tds + beta * ctx["qb_league"]) / (n + beta)
+    rest = off.drop("qb_rush")
+    out = rest / rest.sum() * (1.0 - r)
+    out["qb_rush"] = r
+    return out[list(T.OFFENSIVE)]
 
 
 def week_shares(cnt_cur, cnt_pri, played_cur, played_pri, slots_pri, actives: pd.DataFrame,
@@ -86,13 +174,19 @@ def week_shares(cnt_cur, cnt_pri, played_cur, played_pri, slots_pri, actives: pd
     return A.fill_no_history(raw, actives, sp, T.OFFENSIVE, scale=slot_scale), raw
 
 
+def game_shares(shares: pd.DataFrame, team: str, ids: list[str], pos: dict,
+                mode=V1["mode"], cap=V1["cap"]) -> pd.DataFrame:
+    """Channel shares of each active player on `team`, after reallocation."""
+    return A.reallocate(A.candidates(shares, team, T.OFFENSIVE), set(ids), pos, T.OFFENSIVE,
+                        mode, cap).reindex(ids).fillna(0)
+
+
 def game_q(shares: pd.DataFrame, team: str, ids: list[str], pos: dict, ctx: dict,
-           mode=V1["mode"]) -> pd.Series:
-    """Per-touchdown share of each active player on `team`."""
-    m = A.reallocate(A.candidates(shares, team, T.OFFENSIVE), set(ids), pos, T.OFFENSIVE,
-                     mode).reindex(ids).fillna(0)
-    mix = ctx["mix_team"].loc[team] if team in ctx["mix_team"].index else ctx["mix_league"]
-    return per_td(m, mix).clip(upper=0.999)
+           mode=V1["mode"], cap=V1["cap"], qb: str | None = None, beta=V1["qb_beta"]) -> pd.Series:
+    """Per-touchdown share of each active player on `team`; `qb` is the
+    starting quarterback (starter())."""
+    m = game_shares(shares, team, ids, pos, mode, cap)
+    return per_td(m, game_mix(ctx, team, qb, beta)).clip(upper=0.999)
 
 
 def team_pmf(implied: float, ctx: dict, trials=V1["trials"], gamma=V1["gamma"]) -> np.ndarray:
@@ -100,20 +194,20 @@ def team_pmf(implied: float, ctx: dict, trials=V1["trials"], gamma=V1["gamma"]) 
     return T.count_pmf([mu], n=trials)[0]
 
 
-def game_detail(shares, team, ids, pos, ctx, implied, c=V1["c"]) -> pd.DataFrame:
+def game_detail(shares, team, ids, pos, ctx, implied, c=V1["c"], qb=None) -> pd.DataFrame:
     """For each active player on `team`: P(at least one touchdown), his
     per-touchdown share q, and the team's expected offensive touchdowns mu --
     the three numbers the report needs to explain the price."""
-    q = game_q(shares, team, ids, pos, ctx)
+    q = game_q(shares, team, ids, pos, ctx, qb=qb)
     pmf = team_pmf(implied, ctx)
     mu = float((pmf * np.arange(len(pmf))).sum())
     return pd.DataFrame({"p": A.p_score_dist(q.to_numpy(), pmf, c), "q": q.to_numpy(),
                          "mu": mu, "team": team}, index=ids)
 
 
-def game_probabilities(shares, team, ids, pos, ctx, implied, c=V1["c"]) -> pd.Series:
+def game_probabilities(shares, team, ids, pos, ctx, implied, c=V1["c"], qb=None) -> pd.Series:
     """P(at least one touchdown) for each active player on `team`."""
-    return game_detail(shares, team, ids, pos, ctx, implied, c)["p"]
+    return game_detail(shares, team, ids, pos, ctx, implied, c, qb)["p"]
 
 
 # ------------------------------------------------------------ live inputs
@@ -122,7 +216,10 @@ def load_bundled(res: Path, season: int) -> dict:
     """The prior season's raw inputs, bundled by build_td_priors.py. Raw, not
     derived, so the live path runs the same functions the backtest does."""
     r = lambda n: pd.read_csv(res / f"priors_{season}_td_{n}.csv", low_memory=False)  # noqa: E731
-    return {"cnt": r("counts"), "played": r("played"), "slots": r("slots"), "tg": r("teamgames")}
+    out = {"cnt": r("counts"), "played": r("played"), "slots": r("slots"), "tg": r("teamgames")}
+    qs = res / f"priors_{season}_td_qbstarts.csv"
+    out["qbstarts"] = pd.read_csv(qs) if qs.exists() else None
+    return out
 
 
 def _kick_lookup(games: pd.DataFrame) -> dict:
@@ -174,14 +271,22 @@ def current_inputs(pbp: pd.DataFrame, ros: pd.DataFrame, snaps: pd.DataFrame, dc
                        "player_id": roles["gsis_id"], "slot": roles["slot"]})
     sl = sl[sl["week"] == week].drop_duplicates(["team", "player_id"])
     act = act.merge(sl[["team", "player_id", "slot"]], on=["team", "player_id"], how="left")
-    return {"cnt": cnt, "played": played, "tg": tg, "actives": act.drop_duplicates("player_id")}
+    starts = qb_starts(before, qb_ids) if len(before) else None
+    return {"cnt": cnt, "played": played, "tg": tg, "actives": act.drop_duplicates("player_id"),
+            "qbstarts": starts, "season": season, "week": week}
 
 
 def anytime_probabilities(bundled: dict, cur: dict, implied_by_team: dict[str, float]) -> pd.DataFrame:
     """Indexed by gsis_id: p (P(at least one touchdown)), q, mu, team -- for
     every active player on the teams in `implied_by_team`. The live entry point."""
     hist = bundled["tg"] if cur["tg"] is None else pd.concat([bundled["tg"], cur["tg"]], ignore_index=True)
-    ctx = context(hist)
+    qh = None
+    if V1["qb_beta"] is not None:
+        parts = [x for x in (bundled.get("qbstarts"), cur.get("qbstarts")) if x is not None]
+        if not parts:
+            raise ValueError("qb_beta is set but no quarterback starts are bundled")
+        qh = qb_history(pd.concat(parts, ignore_index=True), cur["season"], cur["week"])
+    ctx = context(hist, qb_hist=qh)
     act = cur["actives"]
     shares, _ = week_shares(cur["cnt"], bundled["cnt"], cur["played"], bundled["played"],
                             bundled["slots"], act)
@@ -189,7 +294,8 @@ def anytime_probabilities(bundled: dict, cur: dict, implied_by_team: dict[str, f
                    pd.concat([bundled["played"], cur["played"], act])["pos"]))
     out = []
     for team, implied in implied_by_team.items():
-        ids = list(act.loc[act["team"] == team, "player_id"])
+        here = act[act["team"] == team]
+        ids = list(here["player_id"])
         if ids and implied is not None and np.isfinite(implied):
-            out.append(game_detail(shares, team, ids, pos, ctx, implied))
+            out.append(game_detail(shares, team, ids, pos, ctx, implied, qb=starter(here)))
     return pd.concat(out) if out else pd.DataFrame(columns=["p", "q", "mu", "team"])

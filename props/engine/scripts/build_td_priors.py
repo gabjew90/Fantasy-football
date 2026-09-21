@@ -3,8 +3,9 @@
 
   python build_td_priors.py --season 2025 [--out ../resources]
 
-Writes priors_{season}_td_{counts,played,slots,teamgames}.csv. Run once per
-offseason, like build_priors.py.
+Writes priors_{season}_td_{counts,played,slots,teamgames,qbstarts}.csv. Run once
+per offseason, like build_priors.py. qbstarts covers the qb_window seasons
+ending at --season: the starting quarterback's QB-rush record.
 
 RAW INPUTS, NOT DERIVED SHARES. The live scorer loads only the current
 season, so the prior season has to be bundled -- but if the bundle held
@@ -32,6 +33,7 @@ KEEP = {
     "teamgames": ["game_id", "season", "week", "team", "opp", "points", "implied", "spread",
                   "qb_rush", "rush_in5", "rush_far", "pass_rz", "pass_far", "dst_other",
                   "tds", "off_tds", "dst"],
+    "qbstarts": ["season", "week", "game_id", "team", "player_id", "qb_rush_tds", "off_tds"],
 }
 
 
@@ -43,9 +45,13 @@ def main(argv=None) -> int:
     D = B.load([a.season])
     frames = {"counts": D["cch"], "played": D["played"], "slots": D["slots"],
               "teamgames": D["tg"][D["tg"]["implied"].notna()]}
+    win = B.V.V1["qb_window"]
+    starts = B.load_starts(range(a.season - win + 1, a.season + 1), D["qb_ids"])
     out = Path(a.out)
-    for name, df in frames.items():
-        df = df[df["season"] == a.season][KEEP[name]].sort_values(KEEP[name][:5]).reset_index(drop=True)
+    for name, df in [*frames.items(), ("qbstarts", starts)]:
+        if name != "qbstarts":
+            df = df[df["season"] == a.season]
+        df = df[KEEP[name]].sort_values(KEEP[name][:5]).reset_index(drop=True)
         path = out / f"priors_{a.season}_td_{name}.csv"
         # lineterminator fixed so the bundled file hashes the same on every OS
         df.to_csv(path, index=False, lineterminator="\n")

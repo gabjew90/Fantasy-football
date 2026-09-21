@@ -1,15 +1,15 @@
 {
   "algorithm": "props-engine-sha256-lf-1",
-  "engine_sha256": "55de738f0a7665492348cfc6a7986fc962ea154279d5a76d4e0e236abfecf542",
-  "file_count": 40,
+  "engine_sha256": "46f857dea5738fd9f747a5616f36020b87ee53b823b510534d3ef14b47d06aa0",
+  "file_count": 41,
   "files": {
-    "SKILL.md": "5cb74c82cbd76a79385af27dd82a35096f430d462bc4b2c0b62e3e15aacac35b",
+    "SKILL.md": "76301764092676d4c871f59384203815c29dfff82077e2df63b304b3b007c9e7",
     "resources/calibration_2025.csv": "47e3922c7af818307831d70a3d2be4333200f3aee1d94dc6bbf6e0e9ccee4ac8",
     "resources/data_source_matrix.md": "2088a5ebe6164a75c11331367fda734d4b10ea217704320321a3f2aec6bb9c2b",
     "resources/execution_protocol.md": "5f54fb23a77d60ecc947d44b6f18ecf67c4357d6b49c70bc937726c1c14016c1",
     "resources/line_archive.md": "baf1b6b97ec439bdf26b73dc4c3ae23d0c4ee9f502db4be7baae70390cdb5c45",
     "resources/methodology.md": "8e395466e1ee32f8cd1936fd4636ba241b5be93b9e1f0ce4dc6d42ad112faf30",
-    "resources/model_registry.md": "0a2438105b8172bdd53c29aa6361625c4f1d5b0da3d8e742826f47d1ec63f896",
+    "resources/model_registry.md": "1ed0beaa5d78868e55f4f037564fb9b5c49b6eba070af2fb0f5229300ae1e0b2",
     "resources/modeling_framework.md": "51568adb4e4f69442a98190b3909c0e3c0c4042f5348289bb8799dab541ed2e7",
     "resources/priors_2024_opponent.csv": "aa37b5af3e6b758ce08c7d71179083e3af5df0c9bb3492fe848eb9e2a7d1f9e4",
     "resources/priors_2024_params.json": "6eb67b77139926c9e5d7e2a3fde2ff01c7175600be4d3e14260c3320598b007f",
@@ -24,6 +24,7 @@
     "resources/priors_2025_slots.csv": "7fad2a09088ce05b50055082289cb7279ea864e509f15b6902720bd7619dade5",
     "resources/priors_2025_td_counts.csv": "47f759872b5ce395f5ffad735d071be854d050fc09ca1ed233c559ac4662369c",
     "resources/priors_2025_td_played.csv": "e85d2aff479472327b353b54b73d69e604b7625e2e23a91eada2d0bf5f07efd8",
+    "resources/priors_2025_td_qbstarts.csv": "e1528d6be3eab0b8b6a2cd8b3127874fb2105a2fe6782a4a0b4827f6eb42a7a9",
     "resources/priors_2025_td_slots.csv": "af7c13b60f35bc1d064f44c25b66f361f6e1d79243283c74225136b8e69b6cec",
     "resources/priors_2025_td_teamgames.csv": "9367b685088f5a708a484a1d084cce5265477f3ed7f913a61f1488ee5a786298",
     "resources/priors_2025_teams.csv": "85c2c2e15743f74756b6a0770364e063ef80bce98e387d0cdcbe4ad332465375",
@@ -32,17 +33,17 @@
     "resources/stadium_coords.csv": "cf9ce9133fa57249347a2ee14c90b2ddc011602aed5398b1ebf3f7fd0ea71aa1",
     "scripts/backtest.py": "19646246709f5c9a39e2fc5eceba8af2d5135980a9011027131728298559a7f5",
     "scripts/build_priors.py": "51ff241ac3585feb63984c72f51e1b4c29946491942dea09e5357e5feaee8057",
-    "scripts/build_td_priors.py": "bb98881e3a4a0d3c64f1fbdee329ceaeed4b6be2e5a7202e9333ac46bb39a05e",
+    "scripts/build_td_priors.py": "b9457e49618b56943ffaf13c7ebfe0a47cf36794dd3849108178d1456e9bb0d3",
     "scripts/eligibility.py": "84c468a0b401b66128b4f21d1f311a42d7b8021744096ab077c52c519d7e9b8a",
     "scripts/model.py": "ae0da50fcaf1b0344d045bd371f902b3786ca8fba1abe0fee68f6e7653c2d527",
     "scripts/odds_client.py": "434186273bd0412a5545247228298951c5d0504a19c8a47c4c782bf3bb75aaa1",
-    "scripts/score_game.py": "dbd507b87b6dcc7bc8eb136e38ae03a6c2e7ed111e4a713feef93358be91643b",
+    "scripts/score_game.py": "79e4b5d4fda079f66704a652bf749bb328192b427a6954a19cb32d4768327f22",
     "scripts/score_week.py": "1c91499ab89bc30c30b63e7f79e5d4472905e7e64e6d0b6a42b3796a13de06c4",
-    "scripts/td_alloc.py": "1abadc4a243f98ea466c4630268184ef9d08e0b17971fb0c9fa7dfca87aa8885",
-    "scripts/td_alloc_backtest.py": "0f18e2be1b693c8cbf3073b75591c9338c150db70e24aaf5f0c912ff93d5ebb9",
+    "scripts/td_alloc.py": "a2e59e09e37a8fd79eaa282b8290abe7805ac6c16614fe259341ec9fb08d4d24",
+    "scripts/td_alloc_backtest.py": "c351ab00a7e61851b831366d597e4bd9d752ad5012b36b0e93d524db9f80a46d",
     "scripts/td_backtest.py": "0ae77781fea2de212154ff72f64b0792f15f77fabfda7cae944fce20b3c9895f",
     "scripts/td_model.py": "dce5f0d005a670c138dcf1b74398b0ddf70d4c82ef6a5c2b6730db70658d313c",
-    "scripts/td_v1.py": "12465fee6be7b126225dd5a9c014385ea3883530a865e75c1e7537e655beddc4"
+    "scripts/td_v1.py": "a82c363ed3a0b13464656a299a5c7209c63ce04eccbd2f20f08ff11f207e50ac"
   },
-  "tag": "props-v1.4"
+  "tag": "props-v1.5"
 }
