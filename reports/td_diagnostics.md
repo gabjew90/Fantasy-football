@@ -75,6 +75,22 @@ The 'final' rows are produced partly BY these touchdowns (goal-line rushing whil
 
 Sign check on spread: favourites by 3+ average 24.8 implied points vs 18.7 for underdogs by 3+.
 
+### [2022, 2023]: channel mix by the opponent's points
+
+| opponent | team-games | qb_rush | rush_in5 | rush_far | pass_rz | pass_far |
+|---|---|---|---|---|---|---|
+| opponent 13 or fewer | 214 | 0.072 | 0.200 | 0.138 | 0.388 | 0.202 |
+| opponent 14-26 | 530 | 0.096 | 0.202 | 0.117 | 0.412 | 0.172 |
+| opponent 27+ | 342 | 0.074 | 0.161 | 0.104 | 0.467 | 0.193 |
+
+Top-q player, WITHIN channels: realised channel TDs / (his channel share x the team's channel TDs). Flat across rows = the share holds and the mix moves.
+
+| opponent | team-games | rushing channels | passing channels | per-TD (all) | his mix: rushing share of expected |
+|---|---|---|---|---|---|
+| opponent 13 or fewer | 189 | 0.92 | 0.59 | 0.88 | 0.71 |
+| opponent 14-26 | 487 | 0.99 | 0.80 | 0.96 | 0.73 |
+| opponent 27+ | 319 | 1.06 | 0.69 | 0.86 | 0.66 |
+
 ## Confirmation: [2024, 2025]
 
 ### [2024, 2025]: realised touchdowns / expected (k x q), by rank of q within the team-game
@@ -147,6 +163,22 @@ The 'final' rows are produced partly BY these touchdowns (goal-line rushing whil
 | pre-game: underdog by 3+ | 412 | 0.090 | 0.190 | 0.100 | 0.434 | 0.186 |
 
 Sign check on spread: favourites by 3+ average 25.4 implied points vs 19.2 for underdogs by 3+.
+
+### [2024, 2025]: channel mix by the opponent's points
+
+| opponent | team-games | qb_rush | rush_in5 | rush_far | pass_rz | pass_far |
+|---|---|---|---|---|---|---|
+| opponent 13 or fewer | 194 | 0.076 | 0.247 | 0.137 | 0.392 | 0.147 |
+| opponent 14-26 | 505 | 0.070 | 0.183 | 0.126 | 0.435 | 0.186 |
+| opponent 27+ | 389 | 0.097 | 0.161 | 0.100 | 0.462 | 0.180 |
+
+Top-q player, WITHIN channels: realised channel TDs / (his channel share x the team's channel TDs). Flat across rows = the share holds and the mix moves.
+
+| opponent | team-games | rushing channels | passing channels | per-TD (all) | his mix: rushing share of expected |
+|---|---|---|---|---|---|
+| opponent 13 or fewer | 178 | 0.97 | 0.43 | 0.99 | 0.77 |
+| opponent 14-26 | 464 | 0.99 | 0.83 | 0.97 | 0.72 |
+| opponent 27+ | 363 | 0.98 | 0.71 | 0.81 | 0.66 |
 
 ### League QB-rush fraction of offensive touchdowns, by season
 

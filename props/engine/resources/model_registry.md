@@ -72,6 +72,10 @@ To `VALIDATED_BETTING`: everything above plus archive coverage (rows, bookmakers
     touchdowns in his starts over the last 3 seasons, shrunk to the league fraction by 40
     team touchdowns (props-v1.5). The starter is the active QB highest on the pre-game
     depth chart.
+  - The starter's share WITHIN qb_rush is fixed at 0.92 (props-v1.9), not taken from his
+    history, which ran 0.70 against 0.88 of his team's QB carries: games-played
+    denominators give a fill-in backup a starter-sized share and the cap squeezes both.
+    Other players' qb_rush shares are scaled to fit under the cap.
   - P(score) = 1 - sum_k P(N = k) (1 - q)^k, q = his per-touchdown share.
 - Test (outcome backtest, no lines): tuned 2022-23, scored 2024-25, 15,022 player-games on
   the game-day active list. `reports/td_v1.md`, `reports/td_layer1_frozen.md`,
@@ -101,6 +105,17 @@ To `VALIDATED_BETTING`: everything above plus archive coverage (rows, bookmakers
     (0.123 vs 0.148 actual); the gain is ranking, not level. Raising the share cap above
     0.99 was tested (to 0.999) and was worse on tune at every setting: the low bin is not
     the cap.
+  - v1.2 (props-v1.9), the starter's share within qb_rush, tuned 2022-23
+    (`reports/td_qb_share.md`, `reports/td_qb_share_2016_19.md`). THE CASE IS CALIBRATION:
+    starting QBs predicted 0.123 vs 0.148 actual on 2024-25 become 0.158; 0.092 vs 0.117 on
+    2016-19 become 0.112. Log loss: established on tune (-0.0019 end to end); on 2024-25
+    -0.0004 and on 2016-19 -0.0004, both NOT established. Top bins unchanged in both eras
+    (the gate); the lowest bin slips ~0.003 (backup QBs get less). Shipped vs v1 as first
+    shipped: -0.0013 (-0.0029, +0.0004), not established; vs the v0 structure -0.0047
+    (-0.0072, -0.0021).
+  - Role-conditional shares (a player's share only from games in his current depth-chart
+    role) tested and dropped: best variant -0.0003 on test, not established, and starting
+    QBs barely moved -- weekly depth charts do not mark fill-in starts (`reports/td_role_tuning.md`).
   - The Beta share with the top bins in view (`reports/td_v1.md`): it squeezes every bin
     in proportion, so the 0.45-0.6 bin comes down (c=20: 0.499 vs 0.492 actual) only by
     pulling the 0.2-0.45 bins below their actual rates; log loss on rows priced above 0.45

@@ -2,7 +2,7 @@
 
 Tune [2022, 2023], test [2024, 2025]. Population: QB/RB/WR/TE on the game-day active list, 15022 player-games in test, 14.8% of whom scored. Active list covers 100.0% of snaps; 45.1% of actives hold a depth-chart slot. Five channels on raw counts; reallocation 'all'; kappa 5; moved-role weight 0.25. The engine gets the slot prior it has in production.
 
-**Shipped configuration, scored as-is: slot|x0.4|m0.25|cap0.99|qb40|cinf** -- the parameters in td_v1.V1, which score_game.py calls. Every rebuild number below comes out of that module.
+**Shipped configuration, scored as-is: slot|x0.4|m0.25|qs0.92|cap0.99|qb40|cinf** -- the parameters in td_v1.V1, which score_game.py calls. Every rebuild number below comes out of that module.
 
 ## Where the touchdown mass goes (test, per team-game)
 
@@ -15,7 +15,7 @@ Summed per-touchdown share of the team's ACTIVE players, against the fraction of
 | layer 2, no prior (previous spec) | 0.990 | 0.000 |
 | layer 2, full slot prior | 0.990 | 0.024 |
 | anytime_td_v1 as first shipped (props-v1.4) | 0.990 | 0.011 |
-| shipped | 0.990 | 0.011 |
+| shipped | 0.989 | 0.011 |
 
 ## Allocation, given the team's offensive touchdowns (test)
 
@@ -25,21 +25,21 @@ Summed per-touchdown share of the team's ACTIVE players, against the fraction of
 | previous spec: no prior, fixed share | 0.3364 | engine | +0.0018 (-0.0018, +0.0056) not established |
 | full slot prior, fixed share | 0.3331 | previous spec | -0.0034 (-0.0067, -0.0005) better |
 | v1 as first shipped (slot x0.4) | 0.3318 | full slot prior | -0.0013 (-0.0018, -0.0008) better |
-| shipped | 0.3308 | v1 as first shipped | -0.0010 (-0.0016, -0.0003) better |
+| shipped | 0.3304 | v1 as first shipped | -0.0014 (-0.0030, +0.0004) not established |
 
-Shipped vs engine directly: -0.0038 (-0.0060, -0.0016) better.
+Shipped vs engine directly: -0.0043 (-0.0069, -0.0017) better.
 
 ### Calibration given offensive touchdowns
 
 | predicted P(score) | full slot, fixed share: predicted | shipped: predicted | actual rate | n |
 |---|---|---|---|---|
-| (-0.001, 0.05] | 0.020 | 0.016 | 0.024 | 5490 |
-| (0.05, 0.1] | 0.081 | 0.073 | 0.070 | 2576 |
-| (0.1, 0.2] | 0.145 | 0.144 | 0.142 | 2886 |
-| (0.2, 0.3] | 0.241 | 0.246 | 0.242 | 1621 |
-| (0.3, 0.45] | 0.359 | 0.367 | 0.370 | 1360 |
-| (0.45, 0.6] | 0.498 | 0.511 | 0.481 | 657 |
-| (0.6, 1.0] | 0.696 | 0.706 | 0.660 | 432 |
+| (-0.001, 0.05] | 0.025 | 0.015 | 0.025 | 5790 |
+| (0.05, 0.1] | 0.080 | 0.073 | 0.071 | 2285 |
+| (0.1, 0.2] | 0.142 | 0.145 | 0.143 | 2792 |
+| (0.2, 0.3] | 0.236 | 0.246 | 0.235 | 1668 |
+| (0.3, 0.45] | 0.355 | 0.366 | 0.372 | 1384 |
+| (0.45, 0.6] | 0.496 | 0.511 | 0.477 | 660 |
+| (0.6, 1.0] | 0.689 | 0.704 | 0.657 | 443 |
 
 ### No-history players
 
@@ -51,15 +51,15 @@ Shipped vs engine directly: -0.0038 (-0.0060, -0.0016) better.
 
 ## END TO END: what would be deployed (test)
 
-Engine = implied points x league offensive TDs/point, linear, Poisson; per-TD share from pass/rush + inside-10 usage with the slot prior: the structure of anytime_td_v0. v1 = layer 1 frozen (Binomial(10), gamma 0.25) x layer 2 (slot|x0.4|m0.25|cap0.99|qb40|cinf).
+Engine = implied points x league offensive TDs/point, linear, Poisson; per-TD share from pass/rush + inside-10 usage with the slot prior: the structure of anytime_td_v0. v1 = layer 1 frozen (Binomial(10), gamma 0.25) x layer 2 (slot|x0.4|m0.25|qs0.92|cap0.99|qb40|cinf).
 
 | model | log loss | Brier | mean predicted | vs engine (95% CI, game-clustered) |
 |---|---|---|---|---|
 | Engine (anytime_td_v0 structure) | 0.3608 | 0.1091 | 0.135 | baseline |
 | v1 as first shipped (props-v1.4) | 0.3575 | 0.1085 | 0.145 | -0.0034 (-0.0056, -0.0012) better |
-| v1 shipped | 0.3566 | 0.1082 | 0.145 | -0.0043 (-0.0065, -0.0022) better |
+| v1 shipped | 0.3562 | 0.1081 | 0.144 | -0.0047 (-0.0072, -0.0021) better |
 
-Shipped vs v1 as first shipped: -0.0009 (-0.0016, -0.0003) better.
+Shipped vs v1 as first shipped: -0.0013 (-0.0029, +0.0004) not established.
 
 Actual scoring rate 0.148.
 
@@ -68,26 +68,26 @@ Cross terms -- each layer alone, the other as the engine has it:
 | model | log loss | mean predicted | vs engine |
 |---|---|---|---|
 | layer 1 frozen, engine allocation | 0.3605 | 0.138 | -0.0004 (-0.0006, -0.0001) better |
-| engine count model, v1 allocation | 0.3569 | 0.142 | -0.0039 (-0.0061, -0.0019) better |
+| engine count model, v1 allocation | 0.3565 | 0.142 | -0.0043 (-0.0069, -0.0018) better |
 
 ### Calibration, end to end
 
 | predicted P(score) | engine: predicted | v1: predicted | actual rate | n |
 |---|---|---|---|---|
-| (-0.001, 0.05] | 0.029 | 0.023 | 0.031 | 4354 |
-| (0.05, 0.1] | 0.073 | 0.074 | 0.073 | 2939 |
-| (0.1, 0.2] | 0.131 | 0.144 | 0.147 | 3314 |
-| (0.2, 0.3] | 0.228 | 0.246 | 0.247 | 2109 |
-| (0.3, 0.45] | 0.330 | 0.362 | 0.368 | 1357 |
-| (0.45, 0.6] | 0.459 | 0.515 | 0.492 | 602 |
+| (-0.001, 0.05] | 0.034 | 0.020 | 0.031 | 4740 |
+| (0.05, 0.1] | 0.072 | 0.074 | 0.075 | 2393 |
+| (0.1, 0.2] | 0.126 | 0.144 | 0.146 | 3389 |
+| (0.2, 0.3] | 0.225 | 0.246 | 0.245 | 2179 |
+| (0.3, 0.45] | 0.329 | 0.362 | 0.365 | 1360 |
+| (0.45, 0.6] | 0.455 | 0.514 | 0.493 | 619 |
 | (0.6, 1.0] | 0.547 | 0.637 | 0.644 | 90 |
 
 The 0.2-0.3 band is where most priced anytime lines sit.
 
 | position | engine | v1 | n |
 |---|---|---|---|
-| QB | 0.2559 | 0.2464 | 2211 |
-| RB | 0.4129 | 0.4104 | 3713 |
+| QB | 0.2559 | 0.2439 | 2211 |
+| RB | 0.4129 | 0.4103 | 3713 |
 | TE | 0.3094 | 0.3073 | 3446 |
 | WR | 0.3990 | 0.3943 | 5652 |
 
@@ -95,8 +95,8 @@ The 0.2-0.3 band is where most priced anytime lines sit.
 
 | population | n | actual rate | engine: predicted / log loss | v1 as first shipped: predicted / log loss | shipped: predicted / log loss |
 |---|---|---|---|---|---|
-| all starting QBs | 1088 | 0.148 | 0.096 / 0.4074 | 0.130 / 0.4000 | 0.123 / 0.3860 |
-| QB new to his team as a starter | 67 | 0.104 | 0.041 / 0.3149 | 0.068 / 0.3480 | 0.068 / 0.3308 |
+| all starting QBs | 1088 | 0.148 | 0.096 / 0.4074 | 0.130 / 0.4000 | 0.158 / 0.3855 |
+| QB new to his team as a starter | 67 | 0.104 | 0.041 / 0.3149 | 0.068 / 0.3480 | 0.134 / 0.3094 |
 
 ## The Beta share on the top bins (diagnostic, not used)
 
@@ -106,42 +106,43 @@ A concentration tuned on aggregate log loss can return 'no effect' even if it fi
 
 | predicted P(score) | c=40: predicted | c=20: predicted | c=10: predicted | fixed share: predicted | actual rate | n |
 |---|---|---|---|---|---|---|
-| (-0.001, 0.05] | 0.022 | 0.022 | 0.021 | 0.023 | 0.031 | 4354 |
-| (0.05, 0.1] | 0.072 | 0.071 | 0.068 | 0.074 | 0.073 | 2939 |
-| (0.1, 0.2] | 0.141 | 0.138 | 0.133 | 0.144 | 0.147 | 3314 |
-| (0.2, 0.3] | 0.241 | 0.236 | 0.228 | 0.246 | 0.247 | 2109 |
-| (0.3, 0.45] | 0.356 | 0.350 | 0.339 | 0.362 | 0.368 | 1357 |
-| (0.45, 0.6] | 0.507 | 0.499 | 0.486 | 0.515 | 0.492 | 602 |
+| (-0.001, 0.05] | 0.020 | 0.019 | 0.019 | 0.020 | 0.031 | 4740 |
+| (0.05, 0.1] | 0.073 | 0.071 | 0.068 | 0.074 | 0.075 | 2393 |
+| (0.1, 0.2] | 0.141 | 0.138 | 0.133 | 0.144 | 0.146 | 3389 |
+| (0.2, 0.3] | 0.241 | 0.236 | 0.228 | 0.246 | 0.245 | 2179 |
+| (0.3, 0.45] | 0.356 | 0.349 | 0.339 | 0.362 | 0.365 | 1360 |
+| (0.45, 0.6] | 0.506 | 0.498 | 0.485 | 0.514 | 0.493 | 619 |
 | (0.6, 1.0] | 0.627 | 0.618 | 0.602 | 0.637 | 0.644 | 90 |
 
 ### Given the team's offensive touchdowns
 
 | predicted P(score) | c=40: predicted | c=20: predicted | c=10: predicted | fixed share: predicted | actual rate | n |
 |---|---|---|---|---|---|---|
-| (-0.001, 0.05] | 0.016 | 0.016 | 0.016 | 0.016 | 0.024 | 5490 |
-| (0.05, 0.1] | 0.072 | 0.071 | 0.069 | 0.073 | 0.070 | 2576 |
-| (0.1, 0.2] | 0.142 | 0.139 | 0.135 | 0.144 | 0.142 | 2886 |
-| (0.2, 0.3] | 0.241 | 0.236 | 0.228 | 0.246 | 0.242 | 1621 |
-| (0.3, 0.45] | 0.358 | 0.351 | 0.338 | 0.367 | 0.370 | 1360 |
-| (0.45, 0.6] | 0.500 | 0.489 | 0.471 | 0.511 | 0.481 | 657 |
-| (0.6, 1.0] | 0.691 | 0.677 | 0.651 | 0.706 | 0.660 | 432 |
+| (-0.001, 0.05] | 0.015 | 0.015 | 0.014 | 0.015 | 0.025 | 5790 |
+| (0.05, 0.1] | 0.072 | 0.071 | 0.069 | 0.073 | 0.071 | 2285 |
+| (0.1, 0.2] | 0.143 | 0.140 | 0.136 | 0.145 | 0.143 | 2792 |
+| (0.2, 0.3] | 0.241 | 0.236 | 0.228 | 0.246 | 0.235 | 1668 |
+| (0.3, 0.45] | 0.358 | 0.351 | 0.337 | 0.366 | 0.372 | 1384 |
+| (0.45, 0.6] | 0.500 | 0.489 | 0.471 | 0.511 | 0.477 | 660 |
+| (0.6, 1.0] | 0.689 | 0.675 | 0.650 | 0.704 | 0.657 | 443 |
 
 | share | log loss, all | log loss, rows priced above 0.45 end to end | mean predicted there |
 |---|---|---|---|
-| c=40 | 0.3567 | 0.6845 | 0.522 |
-| c=20 | 0.3569 | 0.6846 | 0.515 |
-| c=10 | 0.3574 | 0.6854 | 0.501 |
-| fixed | 0.3566 | 0.6846 | 0.531 |
-| actual | | | 0.512 (n 692) |
+| c=40 | 0.3563 | 0.6847 | 0.521 |
+| c=20 | 0.3565 | 0.6848 | 0.514 |
+| c=10 | 0.3570 | 0.6857 | 0.500 |
+| fixed | 0.3562 | 0.6847 | 0.530 |
+| actual | | | 0.512 (n 709) |
 
 ## Tuning (tune log loss, given offensive touchdowns)
 
 | configuration | tune log loss |
 |---|---|
-| slot|x0.4|m0.25|cap0.99|qb40|c40 | 0.3260 |
+| slot|x0.4|m0.25|qs0.92|cap0.99|qb40|c40 | 0.3241 |
+| slot|x0.4|m0.25|qs0.92|cap0.99|qb40|cinf | 0.3241 |
+| slot|x0.4|m0.25|qs0.92|cap0.99|qb40|c20 | 0.3242 |
+| slot|x0.4|m0.25|qs0.92|cap0.99|qb40|c10 | 0.3246 |
 | slot|x0.4|m0.25|cap0.99|qb40|cinf | 0.3260 |
-| slot|x0.4|m0.25|cap0.99|qb40|c20 | 0.3261 |
 | slot|x0.4|m0.25|cap0.99|qbteam|cinf | 0.3265 |
-| slot|x0.4|m0.25|cap0.99|qb40|c10 | 0.3265 |
 | slot|x1|m0.25|cap0.99|qbteam|cinf | 0.3273 |
 | none|x1|m0.5|cap0.99|qbteam|cinf | 0.3317 |
