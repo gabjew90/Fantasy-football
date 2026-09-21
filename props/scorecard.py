@@ -76,7 +76,19 @@ def load_settled(season: int) -> pd.DataFrame:
         df["engine_hash"] = ""
     if "engine_tag" not in df.columns:
         df["engine_tag"] = None
+    df["market_key"] = market_key(df)
     return df
+
+
+def market_key(df: pd.DataFrame) -> pd.Series:
+    """The market, and for anytime TD the model that priced it. Rows captured
+    before td_model reached the record (props-v1.7) carry no stamp: they are
+    'model unknown', never assumed to be v1, so a v0-fallback row is not
+    pooled with v1 rows on the first graded week."""
+    tdm = df["td_model"] if "td_model" in df.columns else pd.Series(None, index=df.index, dtype=object)
+    tdm = tdm.where(tdm.notna() & (tdm.astype(str).str.strip() != ""), "model unknown")
+    return df["market"].where(df["market"] != "player_anytime_td",
+                              "player_anytime_td [" + tdm.astype(str) + "]")
 
 
 def engine_label(df: pd.DataFrame) -> str:
@@ -151,9 +163,14 @@ def render_sections(df: pd.DataFrame) -> tuple[list[str], list[dict]]:
     """The four rollups for one engine's calls. (markdown lines, csv rows)."""
     out: list[str] = []
     rows: list[dict] = []
+    keys = df["market_key"] if "market_key" in df.columns else market_key(df)
+    # the pooled tables must not mix anytime-TD models: v0-fallback and
+    # 'model unknown' rows appear only in the By-market split below
+    other_td = keys.str.startswith("player_anytime_td") & (keys != "player_anytime_td [anytime_td_v1]")
+    full, df = df, df[~other_td]
     n = len(df)
     hits = int(df["won"].sum())
-    out += [f"{n} settled calls, {hits} winners ({hits / n:.1%}), "
+    out += [f"{n} settled calls, {hits} winners ({hits / max(n, 1):.1%}), "
             f"net {df['pnl_per_100'].sum():+.0f} per $100 flat-staked.", ""]
 
     out += ["### Calibration: does the model's probability mean anything?", "",
@@ -188,10 +205,13 @@ def render_sections(df: pd.DataFrame) -> tuple[list[str], list[dict]]:
             "book column, that assumption is costing money and the tier rule "
             "should change.", ""]
 
-    out += ["### By market", "",
-            "| Market | Calls | Hit rate | Model said | Net/$100 |",
+    out += ["### By market", ""]
+    if other_td.any():
+        out += [f"{int(other_td.sum())} anytime-TD calls priced by the v0 fallback or by an unrecorded "
+                "model are left out of the tables above and shown only here.", ""]
+    out += ["| Market | Calls | Hit rate | Model said | Net/$100 |",
             "|---|---|---|---|---|"]
-    for mkt, b in df.groupby("market"):
+    for mkt, b in full.groupby(keys):
         out.append(f"| {mkt} | {len(b)} | {b['won'].mean():.1%} | "
                    f"{b['p_model'].mean():.1%} | {b['pnl_per_100'].sum():+.0f} |")
     out += ["", "Receptions and receiving yards are the only backtested "
