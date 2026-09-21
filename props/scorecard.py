@@ -198,6 +198,19 @@ def render_sections(df: pd.DataFrame) -> tuple[list[str], list[dict]]:
             "markets; rushing and anytime TD have no backtest at all, so their "
             "rows here are the first evidence either way.", ""]
 
+    out += ["### Priced with a Questionable teammate", "",
+            "| Teammate Questionable at pricing | Calls | Hit rate | Model said | Net/$100 |",
+            "|---|---|---|---|---|"]
+    qt = df["questionable_teammate"] if "questionable_teammate" in df else pd.Series(False, index=df.index)
+    qt = qt.map(lambda v: str(v).strip().lower() in ("true", "1", "1.0"))
+    for lab, b in (("yes", df[qt]), ("no", df[~qt])):
+        if not b.empty:
+            out.append(f"| {lab} | {len(b)} | {b['won'].mean():.1%} | "
+                       f"{b['p_model'].mean():.1%} | {b['pnl_per_100'].sum():+.0f} |")
+    out += ["", "Those rows assume the teammate played. When he sat, they graded "
+            "against a line priced on the wrong roster; if 'yes' runs apart from "
+            "'no', that is the cost.", ""]
+
     out += ["### By week", "", "| Week | Calls | Hit rate | Net/$100 |",
             "|---|---|---|---|"]
     for wk, b in df.groupby("week"):

@@ -1000,7 +1000,11 @@ def main():
     # The lines this run priced, saved so the 'if he is out' runs price the SAME
     # lines without fetching again (no credits, no second archive row).
     snap_path = wd / f"odds_snapshot_{SEASON}_wk{WEEK:02d}_{AWAY}_{HOME}.json"
+    snap_written = False
+    if SNAP is None and data is None and snap_path.exists():
+        snap_path.unlink()          # an earlier run's lines must never price this run's scenarios
     if SNAP is None and data is not None:
+        snap_written = True
         snap_path.write_text(json.dumps({"market_env": market_env, "data": data, "eid": eid,
                                          "quote_meta": quote_meta, "sleeper_used": sleeper_used,
                                          "td_two_sided": td_two_sided}, default=str), encoding="utf-8")
@@ -1151,7 +1155,14 @@ def main():
                             "; ".join(slot_gaps)))
 
     R = pd.DataFrame(rows)
-    _bk_names = {"draftkings": "DraftKings", "fanduel": "FanDuel", "sleeper": "Sleeper Picks"}
+    # A row priced while a TEAMMATE is Questionable assumes he plays. If he sits,
+    # his own props void but this row still grades -- against a line priced on
+    # the wrong roster. Flagged so the scorecard can keep those rows apart.
+    _q = pop[pop.questionable & ~pop.excluded]
+    _q_by_team = {t: set(g["name"]) for t, g in _q.groupby("team")}
+    if not R.empty:
+        R["questionable_teammate"] = [bool(_q_by_team.get(t, set()) - {p}) for t, p in zip(R.team, R.player)]
+    _bk_names ={"draftkings": "DraftKings", "fanduel": "FanDuel", "sleeper": "Sleeper Picks"}
     books_used_str = (", ".join(_bk_names.get(b, str(b).title()) for b in sorted(R.book.unique()))
                       if not R.empty else "no price source")
     if unmatched_odds_names:
@@ -2059,7 +2070,7 @@ def main():
     log(f"\nwrote {OUT}/report_{slug}.md")
     if not ASSUME_OUT and not a.no_scenarios:
         q = pop[pop.questionable & ~pop.excluded]
-        if len(q) and snap_path.exists():
+        if len(q) and snap_written:
             L += run_scenarios(q, R, slug, snap_path)
             (OUT / f"report_{slug}.md").write_text("\n".join(L), encoding="utf-8")
         elif len(q):
@@ -2097,8 +2108,9 @@ def run_scenarios(q: pd.DataFrame, R: pd.DataFrame, slug: str, snap_path: Path) 
     for _, pl in q.iterrows():
         cmd = [sys.executable, str(Path(__file__).resolve()), *argv, "--assume-out", pl.gsis_id,
                "--odds-snapshot", str(snap_path), "--no-scenarios"]
-        r = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
         f = OUT / "scenarios" / f"shadow_log_{slug}.csv"
+        f.unlink(missing_ok=True)   # never read a leftover from an earlier scenario
+        r = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
         L += ["", f"### If {pl['name']} ({pl.team} {pl.pos}) is out", ""]
         if r.returncode != 0 or not f.exists():
             L.append(f"Scenario failed (exit {r.returncode}): {r.stderr.strip().splitlines()[-1][:200] if r.stderr.strip() else 'no output'}.")

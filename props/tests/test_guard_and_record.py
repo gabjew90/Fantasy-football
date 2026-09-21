@@ -461,3 +461,18 @@ def test_a_prediction_with_no_archived_kickoff_says_so_rather_than_guessing():
     assert record_run.minutes_to_kickoff(None, "2026-09-20T20:25:00+00:00") is None
     assert record_run.minutes_to_kickoff("not a time",
                                          "2026-09-20T20:25:00+00:00") is None
+
+
+def test_the_record_keeps_which_td_model_priced_a_row_and_the_questionable_teammate_flag(tmp_path):
+    """record_run copies only PRED_FIELDS out of the shadow log. td_model was
+    missing from that list, so every recorded row lost it; the teammate flag
+    would have gone the same way."""
+    import record_run
+    f = tmp_path / "shadow_log_2026_wk02_MIA_SF.csv"
+    f.write_text(SHADOW_HEADER + ",td_model,questionable_teammate\n"
+                 "2026-09-18T05:20:46Z,2026,2,ev1,sleeper,player_anytime_td,A Player,SF,WR1,"
+                 ",,Yes,0.31,0.0,0.30,0.01,150,0.01,2026-09-18T05:14:11Z,False,False,"
+                 ",anytime_td_v1,PASS,False,UNTIERED,anytime_td_v1,True\n", encoding="utf-8")
+    row = record_run.read_shadow_log(f, "decision", "MIA@SF")[0]
+    assert row["td_model"] == "anytime_td_v1"
+    assert row["questionable_teammate"] is True

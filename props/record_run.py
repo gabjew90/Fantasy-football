@@ -44,11 +44,16 @@ PRED_FIELDS = [
     "team", "slot", "line", "model_mean", "side", "p_model", "p_push",
     "p_novig", "gap", "price", "ER", "last_update", "new_team", "questionable",
     "flag", "model_state", "decision", "clears_edge_rule_if_validated", "tier",
+    # Which anytime-TD model priced the row. Listed here or it never reaches the
+    # record: only these fields are copied from the shadow log.
+    "td_model",
+    # Priced while a teammate was Questionable (assumed to play).
+    "questionable_teammate",
 ]
 
 NUMERIC = {"line", "model_mean", "p_model", "p_push", "p_novig", "gap", "price", "ER"}
 INTEGER = {"season", "week"}
-BOOLEAN = {"new_team", "questionable", "clears_edge_rule_if_validated"}
+BOOLEAN = {"new_team", "questionable", "clears_edge_rule_if_validated", "questionable_teammate"}
 
 
 def _coerce(field: str, value: str):

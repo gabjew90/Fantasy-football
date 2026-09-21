@@ -67,7 +67,7 @@ MARKET_STAT = {
 SETTLED_FIELDS = [
     "season", "week", "game", "event_id", "book", "market", "player", "team",
     "slot", "side", "line", "price", "p_model", "p_novig", "gap", "tier",
-    "decision", "new_team", "questionable", "model_state",
+    "decision", "new_team", "questionable", "questionable_teammate", "model_state",
     # Which anytime-TD model priced the row: anytime_td_v1, or the labelled v0
     # fallback when v1 could not run. Same engine hash, different model -- so
     # it has to survive into the settled file or the two would be graded as one.
