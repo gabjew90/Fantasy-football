@@ -4585,3 +4585,65 @@ backtest builds its own independent per-player draws via `draw_block` and
 never calls `simulate_team_game`, so the CRPS in CI does not measure the
 pipeline that makes the calls), the frozen holdout over weeks 2-4, and
 by-market calibration and returns in the scorecard.
+
+## 2026-09-21 (78) -- the expected-points start/sit model does not beat consensus
+
+The user proposed a start/sit framework: project opportunity from the implied
+total and spread, value each touch by field zone, apply a capped efficiency
+adjustment, use touchdown share as a variance proxy, and log decisions against
+consensus. Built as `manager/xfp.py`, evaluated by `scripts/xfp_eval.py`, report
+in `reports/xfp_eval.md`. Research only: nothing in the live manager calls it.
+
+**Method.** Touch values and the volume regression are calibrated on the prior
+season only. The framework's open knobs -- the prior's weight, a last-4-weeks
+window versus season-to-date, the efficiency step -- were tuned on a 2025
+walk-forward (weeks 2-18, each predicted from earlier data only, N = 2,674
+player-games), then frozen and tested on 2026 week 2, predicted from 2025 and
+week 1 alone. Population: RB/WR/TE who played and whom Sleeper projected at 5+.
+
+**Result: consensus wins, and not narrowly.**
+
+| | model | Sleeper weekly | season-rate consensus (verified pre-game) |
+| --- | --- | --- | --- |
+| 2026 wk2 MAE | 5.43 | 5.07 | 5.09 |
+| 2026 wk2 start/sit pairwise | 64.1% | 69.1% | 65.4% |
+| 2025 MAE | 5.49 | 5.38 | -- |
+
+On 2025 the gap is established: MAE +0.10, 95% CI (+0.02, +0.18), game-
+clustered. On week 2 alone it is +0.36 with a CI of (-0.10, +0.79) -- one week
+cannot establish it, but it points the same way. When the model and Sleeper
+order a pair differently, the model is right 43% of the time on 2025 and 37% on
+week 2. Its overrides lose.
+
+The conclusion does not rest on the unverifiable baseline. Sleeper's weekly
+`updated_at` is stamped at serve time, so its numbers cannot be proven pre-
+kickoff; the season-rate consensus committed Wed 2026-09-16 17:52 PT can, and it
+also beats the model. And the model was handed an advantage it still could not
+use: players ruled out were excluded rather than scored as its misses, because
+it has no injury feed.
+
+**Why, in one line:** consensus carries injury news, depth-chart moves and
+coaching reports -- the framework's own "manual override" step, which it names
+as where most of the edge is, and which a backtest by construction cannot run.
+
+**What the build did settle, and these are worth keeping:**
+
+- *The 1.5-point coin-flip rule is real.* Pairs whose projected gap is under
+  1.5 points are ordered correctly 52-56% of the time by the model AND by
+  Sleeper -- chance, for both. `lineup_opt.COINFLIP = 1.5` is measured now, not
+  assumed.
+- *Season-to-date beats last-4-weeks* at every one of the six (k, efficiency)
+  settings tried. The framework's "lean on the last 3 to 4 weeks" loses.
+- *The touchdown-share variance proxy does not work.* Spearman against relative
+  miss is -0.005 on 2025 and -0.11 on week 2; the claim was positive.
+- *Touch values, calibrated* (full PPR, 2025): outside-10 carry 0.51, 6-10 carry
+  0.86 (the framework said ~1.2), inside-5 2.33, targets RB 1.56 / WR 1.70 /
+  TE 1.80.
+- *The efficiency step* helped at every setting but by ~0.01 MAE, well inside
+  noise.
+
+Decision: consensus stays the projection source. The model is not wired into
+the lineup path. It remains as research, and the one lever plausibly worth
+testing before revisiting is the injury feed -- vacated opportunity when a
+teammate is ruled out -- since that is the information consensus has and it
+does not.
