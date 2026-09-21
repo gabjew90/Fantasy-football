@@ -21,7 +21,7 @@ Per rate (target share, catch rate, yards per target, rush share, yards per carr
 2. If he changed teams, the individual prior's weight is capped and the share is scaled by current/prior snap share.
 3. Final = blend(current-season rate, current opportunities, individual prior, K0_rate) where weight on current = n / (n + K0_rate), n in opportunity units.
 Kincaid target share: 0.15 prior, 0.21 current on 29 team targets, K0 = 80, weight on current 27%, final 0.16. Targets = 0.16 x 29 = 4.7.
-Injuries: Out/Doubtful removed and share redistributed to the eligible set; Questionable projected as a normal/limited/out mixture (scale 0.86 conditional on playing).
+Injuries: Out/Doubtful removed and share redistributed to the eligible set. Questionable: priced twice, as if he plays his normal role (the main run) and as if he is out with his share redistributed (the "if he is out" section, a full re-run on the same lines). No blended discount; the user decides.
 
 ## 4. Opponent adjustment
 Team-level prior-season efficiency allowed (catch rate, yards per target, yards per carry), shrunk toward league with k0 = 150 plays, applied as a multiplier. DET defense: 0.954 on catches, 1.013 on yards per target. Kincaid catches: 4.7 x 0.75 x 0.954 = 3.37 expected.
@@ -99,7 +99,6 @@ Two readings matter more than the signs.
 | Per-catch Gamma shape (league) | 1.065 | shape_ypc_per_catch |
 | League pass rate / plays per game | 0.540 / 56.8 | params |
 | League TD per point | 0.1055 | league_td_per_point |
-| Questionable scale (conditional on playing) | 0.86 | score_game.py |
 | New-team snap scaling | current / prior snap share | score_game.py |
 | Role stability threshold | |cur - own_prior| > 0.10 | score_game.py stability() |
 | Prior-driven gap threshold | (cur - blend) / blend > 0.10 | score_game.py |

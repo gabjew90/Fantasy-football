@@ -272,6 +272,12 @@ need not be surfaced. Write the reply as a premium prop guide with this structur
    projection, the goal-line share behind any TD call, the opponent multiplier if it
    moved the number, and any Watch flag (new team, Questionable, snap scaling, or a
    book-far-from-us gap that means the book likely knows something).
+   **Questionable players: give both cases, pick neither.** Every number in the run is
+   priced as if a Questionable player PLAYS his normal role (no discount). The report's
+   "If a Questionable player is out" section prices the same lines with him OUT and his
+   share handed to his teammates. Show both numbers side by side for every line that
+   moves, and state that his own props void if he sits. Do not weight the two cases by a
+   guess at whether he plays and do not recommend one: the user decides.
 5. **Bet card** — reproduce `bet_card_*.csv` as ONE table, sorted tier then EV: Tier,
    Player, Prop, Line, Book, Odds, Model %, No-vig %, Edge (pts), EV per $100, Kelly,
    Backtest hit rate for that probability bucket (receptions/rec yds only), Correlated with,

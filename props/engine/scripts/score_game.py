@@ -158,7 +158,19 @@ def main():
                     help="team-environment source. 'market' (spread/total re-centring) is UNVALIDATED: "
                          "2025 backtest showed no CRPS difference vs history. Default history.")
     ap.add_argument("--workdir", default="/tmp/nflrun")
+    ap.add_argument("--assume-out", default="",
+                    help="comma-separated gsis ids priced as OUT: the 'if he is out' case for a Questionable "
+                         "player. Outputs go to OUT/scenarios, which the record never reads.")
+    ap.add_argument("--odds-snapshot", default=None,
+                    help="price from the lines and spread/total a main run saved; no fetch, no credits, no archive")
+    ap.add_argument("--no-scenarios", action="store_true",
+                    help="skip the 'if he is out' pricing for Questionable players (captures do not need it)")
     a = ap.parse_args()
+    global OUT
+    ASSUME_OUT = {x for x in a.assume_out.split(",") if x}
+    SNAP = json.loads(Path(a.odds_snapshot).read_text(encoding="utf-8")) if a.odds_snapshot else None
+    if ASSUME_OUT:
+        OUT = OUT / "scenarios"
 
     AWAY, HOME = a.away.upper(), a.home.upper()
     wd = Path(a.workdir); wd.mkdir(parents=True, exist_ok=True)
@@ -206,7 +218,11 @@ def main():
     # --source oddsapi; the Sleeper path takes spread/total from the ESPN scoreboard,
     # which carries the same DK line for free.
     market_env = None
-    if not a.no_odds and a.source == "oddsapi":
+    if SNAP is not None:
+        market_env = SNAP.get("market_env")
+        SOURCES.append(("Market spread/total", "anchors each team's touchdown total to its implied points",
+                        "ok" if market_env else "unavailable", "the same as the main run (scenario; no fetch)"))
+    if SNAP is None and not a.no_odds and a.source == "oddsapi":
         home_name0, away_name0 = TEAM_NAMES.get(HOME), TEAM_NAMES.get(AWAY)
         try:
             ev0 = run_odds("events", ["--home", home_name0, "--away", away_name0,
@@ -233,7 +249,7 @@ def main():
                                     "ok", f"{HOME} {home_spread:+g}, total {total_line}"))
         except Exception as ex:
             log(f"  market environment pull failed ({type(ex).__name__}); falling back to history-only team environment")
-    if market_env is None and not a.no_odds:
+    if SNAP is None and market_env is None and not a.no_odds:
         # ESPN scoreboard fallback (allowlisted, no key, no quota). Carries the DraftKings
         # spread/total that ESPN displays; used only for the TD anchor, never for props.
         try:
@@ -406,6 +422,11 @@ def main():
     # A2: Out/Doubtful removed; Questionable flagged for regime treatment
     pop["excluded"] = pop.report_status.isin(["Out", "Doubtful"]) | (pop.status == "INA")
     pop["questionable"] = pop.report_status.eq("Questionable")
+    if ASSUME_OUT:
+        _ao = pop.gsis_id.isin(ASSUME_OUT)
+        pop.loc[_ao, "report_status"] = "Out (scenario)"
+        pop["excluded"] = pop["excluded"] | _ao
+        pop["questionable"] = pop["questionable"] & ~_ao
     n_excl = int(pop.excluded.sum())
     active = pop[~pop.excluded].copy()
 
@@ -466,6 +487,8 @@ def main():
     if all(env[t].get("implied_points") is not None for t in (HOME, AWAY)):
         try:
             _cur = TDV1.current_inputs(pbp, ros, snp, dcf, games, inj, SEASON, WEEK)
+            if ASSUME_OUT:
+                _cur["actives"] = _cur["actives"][~_cur["actives"]["player_id"].isin(ASSUME_OUT)]
             V1TD = TDV1.anytime_probabilities(TDV1.load_bundled(RES, PRIOR), _cur,
                                               {t: env[t]["implied_points"] for t in (HOME, AWAY)})
             SOURCES.append(("Anytime TD model", "who scores, and how likely", "ok",
@@ -601,26 +624,12 @@ def main():
                      ti10c_cur if cw is not None else None,
                      "i10_carry_share", "i10_carry_share", np.nan)
 
-        # Questionable regime mixture (modeling_framework.md): a Questionable
-        # player isn't modelled as if he's certain to play his normal share. We
-        # blend normal/limited/out scale factors by their stated base-rate
-        # weights so the displayed projection already reflects the discount,
-        # rather than showing the normal-regime number and only discounting the
-        # verdict text. The verdict layer still forces PASS regardless (see
-        # verdict_for) -- this changes what "our number" says, not whether we bet it.
-        if p.questionable:
-            # Conditional on PLAYING: if he sits, the prop voids, it doesn't settle at 0.
-            # So the 'out' regime is excluded and normal/limited are renormalised
-            # (0.55*1.0 + 0.30*0.6) / 0.85 = 0.86, not 0.73.
-            regimes = MODEL.questionable_regimes(1.0)
-            w_play = sum(w for reg, (w, sc) in regimes.items() if reg != "out")
-            mix_scale = sum(w * sc for reg, (w, sc) in regimes.items() if reg != "out") / w_play
-            ts *= mix_scale; rs_ *= mix_scale
-            i10ts_mix = (i10ts if pd.notna(i10ts) else ts) * mix_scale
-            i10rs_mix = (i10rs if pd.notna(i10rs) else rs_) * mix_scale
-        else:
-            i10ts_mix = i10ts if pd.notna(i10ts) else ts
-            i10rs_mix = i10rs if pd.notna(i10rs) else rs_
+        # A Questionable player is priced at his NORMAL share, as if he plays. The
+        # other case -- he is out and his share goes to his teammates -- is a
+        # separate full pricing (run_scenarios). The user sees both and decides;
+        # there is no blended discount.
+        i10ts_mix = i10ts if pd.notna(i10ts) else ts
+        i10rs_mix = i10rs if pd.notna(i10rs) else rs_
 
         recs.append(dict(team=t, gsis_id=pid, name=p["name"], pos=p.pos, slot=slot,
                          status=p.status, questionable=p.questionable, new_team=new_team,
@@ -887,7 +896,12 @@ def main():
             log(f"  Sleeper lines pull failed ({type(ex).__name__}: {ex})")
             return None
 
-    if not a.no_odds and not a.lines_file and a.source == "sleeper":
+    if SNAP is not None:
+        data, eid, quote_meta = SNAP["data"], SNAP["eid"], SNAP["quote_meta"]
+        sleeper_used, td_two_sided = SNAP["sleeper_used"], SNAP["td_two_sided"]
+        SOURCES.append(("Sportsbook prices", "the lines and odds being compared", "ok",
+                        "the same lines as the main run (scenario; no fetch, no credits)"))
+    if SNAP is None and not a.no_odds and not a.lines_file and a.source == "sleeper":
         _r = pull_sleeper(is_fallback=False)
         if _r:
             data, eid, quote_meta = _r["data"], _r["eid"], _r["quote_meta"]
@@ -897,7 +911,7 @@ def main():
             oddsapi_is_fallback = True
             log("  falling back to The Odds API (spends credits)")
 
-    if not a.no_odds and not a.lines_file and (a.source == "oddsapi" or oddsapi_is_fallback):
+    if SNAP is None and not a.no_odds and not a.lines_file and (a.source == "oddsapi" or oddsapi_is_fallback):
         home_name, away_name = TEAM_NAMES.get(HOME), TEAM_NAMES.get(AWAY)
         if not home_name or not away_name:
             sys.exit(f"NO TEAM-NAME MAPPING for {AWAY}/{HOME}; add to TEAM_NAMES before pricing")
@@ -954,11 +968,11 @@ def main():
                                 od.get("class", "failed"), f"quota remaining {od.get('quota',{}).get('x-requests-remaining')}; no prices this run"))
 
     # ---------- 7b. Sleeper as the fallback when the Odds API was tried first ----------
-    if not a.no_odds and not a.lines_file and a.source == "oddsapi" and data is None:
+    if SNAP is None and not a.no_odds and not a.lines_file and a.source == "oddsapi" and data is None:
         _r = pull_sleeper(is_fallback=True)
         if _r:
             data, eid, quote_meta = _r["data"], _r["eid"], _r["quote_meta"]
-    if not a.no_odds and not a.lines_file and data is None:
+    if SNAP is None and not a.no_odds and not a.lines_file and data is None:
         log("  no prices from any source this run")
 
     # ---------- 7c. manual lines file (explicit only) ----------
@@ -983,6 +997,13 @@ def main():
         quote_meta = {"quota": {}, "retrieved": now(), "event_id": eid, "archive": None}
         SOURCES.append(("Sportsbook prices (manual lines file)", "the lines and odds being compared", "ok",
                         f"{len(mf)} lines from {Path(a.lines_file).name}, entered {now()}; no archive row, no CLV"))
+    # The lines this run priced, saved so the 'if he is out' runs price the SAME
+    # lines without fetching again (no credits, no second archive row).
+    snap_path = wd / f"odds_snapshot_{SEASON}_wk{WEEK:02d}_{AWAY}_{HOME}.json"
+    if SNAP is None and data is not None:
+        snap_path.write_text(json.dumps({"market_env": market_env, "data": data, "eid": eid,
+                                         "quote_meta": quote_meta, "sleeper_used": sleeper_used,
+                                         "td_two_sided": td_two_sided}, default=str), encoding="utf-8")
     if data is not None:
         # consensus across all returned books (B)
         allrows = []
@@ -1216,7 +1237,9 @@ def main():
     def verdict_for(r, m):
         g = abs(r.gap)
         if m.questionable:
-            return ("Injury question", "He's listed Questionable. If he sits or plays hurt, this line is void or wrong. Skip it.")
+            return ("Injury question", "He's listed Questionable. This is priced as if he plays his normal role; "
+                                       "if he sits, the prop voids. The 'if he's out' section shows what changes for "
+                                       "everyone else. Your call.")
         if m.new_team:
             return ("New team, thin data", f"{m['name']} just moved from {m.prior_team}. We have one game with his new team; "
                     f"the sportsbook has watched practice, the depth chart and the game plan. When we disagree here, they're usually right.")
@@ -1481,7 +1504,7 @@ def main():
                 L.append(f"**Role.** {role}. Blending that, {proj} (medians; upside games run higher).\n")
             flags = []
             if m.new_team: flags.append(f"changed teams ({m.prior_team} to {t}); one game of new-team data, so the book knows his role better than we do")
-            if m.questionable: flags.append("listed Questionable; projection already discounted, but if he sits the prop voids")
+            if m.questionable: flags.append("listed Questionable; priced as if he plays his normal role; if he sits the prop voids")
             if m.role_scale != 1.0: flags.append(f"snap share on the new team scaled his projection by {m.role_scale:.2f}")
             if flags:
                 L.append("**Watch.** " + " ".join(f + "." for f in flags) + "\n")
@@ -1824,7 +1847,7 @@ def main():
         T += ["## Game header\n",
               f"- **Frame:** {frame}. Team TD totals: " + ", ".join(f"{t} {env[t].get('pass_td',0)+env[t].get('rush_td',0):.1f} ({'market-anchored' if env[t].get('td_anchor')=='market' else 'history'})" for t in (AWAY, HOME)),
               f"- **Weather:** {wx}. 15 mph sustained-wind screen {'HIT' if (weather.get('wind_mph_max') or 0) > 15 else 'not hit'}.",
-              f"- **Injury designations (week {WEEK} report):** " + (", ".join(desig) if desig else "none on the eligible set") + ". Out/Doubtful removed and share redistributed; Questionable scaled 0.86. Re-run inside 90 minutes of kickoff: a late scratch changes every share on that team.",
+              f"- **Injury designations (week {WEEK} report):** " + (", ".join(desig) if desig else "none on the eligible set") + ". Out/Doubtful removed and share redistributed; Questionable priced as if playing, with a separate 'if he's out' pricing. Re-run inside 90 minutes of kickoff: a late scratch changes every share on that team.",
               f"- **Data cutoff:** 2026 weeks 1-{WEEK-1} play-by-play, week {WEEK} roster/injury/depth chart; prices snapshot {now()}; kickoff in {hrs:.1f} h.",
               "",
               "<details><summary>Method in six lines</summary>\n",
@@ -1939,7 +1962,7 @@ def main():
                  + ". Their usual share of the ball was handed to their teammates in our numbers.")
     q = pop[pop.questionable]
     if len(q):
-        L.append(f"- **Questionable:** " + ", ".join(r["name"] for _, r in q.iterrows()) + ". We assume they play normally; treat their lines with caution.")
+        L.append(f"- **Questionable:** " + ", ".join(r["name"] for _, r in q.iterrows()) + ". Priced as if they play their normal role; see 'If a Questionable player is out' for the other case.")
     if not excl.empty is False and q.empty:
         L.append("- **Injuries:** no one relevant is out or questionable on the current report.")
     if roof in ("closed", "dome"):
@@ -2034,7 +2057,73 @@ def main():
     (OUT / f"report_{slug}.md").write_text("\n".join(L), encoding="utf-8")
     M.drop(columns=["evidence"]).to_csv(OUT / f"player_params_{slug}.csv", index=False)
     log(f"\nwrote {OUT}/report_{slug}.md")
+    if not ASSUME_OUT and not a.no_scenarios:
+        q = pop[pop.questionable & ~pop.excluded]
+        if len(q) and snap_path.exists():
+            L += run_scenarios(q, R, slug, snap_path)
+            (OUT / f"report_{slug}.md").write_text("\n".join(L), encoding="utf-8")
+        elif len(q):
+            L += ["", "## If a Questionable player is out", "",
+                  "Not priced: this run had no lines to price against."]
+            (OUT / f"report_{slug}.md").write_text("\n".join(L), encoding="utf-8")
     print("\n".join(L))
+
+
+SCEN_KEY = ["book", "market", "player", "side", "line"]
+MARKET_WORDS = {"player_receptions": "catches", "player_reception_yds": "receiving yards",
+                "player_rush_yds": "rushing yards"}
+
+
+def run_scenarios(q: pd.DataFrame, R: pd.DataFrame, slug: str, snap_path: Path) -> list[str]:
+    """For each Questionable player, price the game again with him OUT: a full
+    run of this script with --assume-out, on the lines this run saved. The
+    main run already priced the 'he plays' case at his normal share. Nothing
+    here is blended; the report shows both and the user decides. Scenario
+    outputs go to OUT/scenarios, which record_run never reads."""
+    L = ["", "## If a Questionable player is out", "",
+         "Every line above is priced as if the Questionable players play their normal role. Below, "
+         "the same lines priced with each one OUT, his share handed to his teammates the way an Out "
+         "player's is. His own props void if he sits. Only lines whose probability moves by at least "
+         "1 point are listed. Neither case is weighted by how likely he is to play: that call is yours."]
+    # the scenario compares against THIS run's lines only: no merge with earlier logs
+    argv, skip = [], False
+    for x in sys.argv[1:]:
+        if skip:
+            skip = False
+        elif x in ("--prior-log", "--prior-archive"):
+            skip = True
+        elif not x.startswith(("--prior-log=", "--prior-archive=")):
+            argv.append(x)
+    for _, pl in q.iterrows():
+        cmd = [sys.executable, str(Path(__file__).resolve()), *argv, "--assume-out", pl.gsis_id,
+               "--odds-snapshot", str(snap_path), "--no-scenarios"]
+        r = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
+        f = OUT / "scenarios" / f"shadow_log_{slug}.csv"
+        L += ["", f"### If {pl['name']} ({pl.team} {pl.pos}) is out", ""]
+        if r.returncode != 0 or not f.exists():
+            L.append(f"Scenario failed (exit {r.returncode}): {r.stderr.strip().splitlines()[-1][:200] if r.stderr.strip() else 'no output'}.")
+            continue
+        S = pd.read_csv(f)
+        dest = OUT / "scenarios" / f"shadow_log_{slug}_out_{pl.gsis_id}.csv"
+        f.replace(dest)
+        if R.empty:
+            L.append("No priced lines to compare.")
+            continue
+        j = R.merge(S[SCEN_KEY + ["p_model"]], on=SCEN_KEY, how="left", suffixes=("", "_out"))
+        j = j[j.player != pl["name"]]
+        j["move"] = j["p_model_out"] - j["p_model"]
+        j = j[j["move"].abs() >= 0.01].sort_values("move", key=lambda x: -x.abs())
+        if j.empty:
+            L.append("No other line moves by 1 point or more.")
+            continue
+        L += ["| player | line | book | market says | if he plays | if he's out | change |",
+              "|---|---|---|---|---|---|---|"]
+        for _, x in j.iterrows():
+            what = ("scores a TD" if x.market == "player_anytime_td" else
+                    f"{x.side} {x.line:g} {MARKET_WORDS.get(x.market, x.market)}")
+            L.append(f"| {x.player} ({x.team}) | {what} | {x.book} | {x.p_novig:.0%} | {x.p_model:.0%} | "
+                     f"{x.p_model_out:.0%} | {x.move:+.0%} |")
+    return L
 
 
 if __name__ == "__main__":
