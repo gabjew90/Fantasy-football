@@ -1,20 +1,27 @@
 """Touchdowns as a first-class model, built around the touchdown event.
 
-LAYER 1 (this file, so far): each team's touchdown count for a game as a
+LAYER 1 (this file): each team's touchdown count for a game as a
 DISTRIBUTION, split into scoring channels.
 
-  mean      = market implied points x the team's touchdowns-per-point ratio,
-              shrunk toward the league ratio by a pseudo-count in points;
-  shape     = negative binomial with dispersion r (r -> infinity is Poisson),
-              fitted rather than assumed;
+  target    = OFFENSIVE touchdowns -- the only ones an anytime prop on an
+              offensive player can settle on. Defence and special teams TDs
+              run ~0.13-0.15 a game whatever the total, so they are a flat
+              separate term, not something to bend with the implied total;
+  mean      = implied points x the league offensive touchdowns-per-point
+              ratio, with elasticity gamma to the implied total;
+  shape     = binomial with n trials. Measured, not assumed: offensive
+              touchdown counts are UNDERdispersed relative to Poisson, which
+              a negative binomial cannot represent. n is a DISPERSION
+              parameter, not a possession count -- it fitted 9 in 2016-19 and
+              11 in 2022-25 while drives per game did not fall;
   channels  = QB rush, rush inside the 5, rush from distance, red-zone pass,
               explosive pass, and defence/special teams, with each team's mix
               shrunk toward the league's.
 
-What this replaces: the engine converts implied points to touchdowns with ONE
-league constant (0.1055 per point), treats the count as Poisson, and splits it
-into pass and rush only. Each of those three is a choice the backtest in
-td_backtest.py tests against the simpler version rather than assumes.
+What this replaces: the engine converts implied points to offensive
+touchdowns with one constant (0.1055 per point), linear, Poisson. The
+binomial shape is the one component with a validated gain over that; see
+td_backtest.py and reports/td_layer1*.md.
 
 Stdlib + numpy + pandas only. This runs in the chat sandbox and on Actions,
 neither of which has polars or pyarrow.
@@ -29,23 +36,29 @@ CHANNELS = ("qb_rush", "rush_in5", "rush_far", "pass_rz", "pass_far", "dst_other
 OFFENSIVE = CHANNELS[:5]   # dst_other never reaches an offensive player's prop
 MAX_TD = 15            # support for count distributions; P(16+ TDs) is ~0
 
-# LAYER 1, FROZEN 2026-09-21: league touchdowns-per-point ratio, binomial over
-# 11 trials, linear in implied points.
+# LAYER 1, FROZEN: offensive touchdowns ~ Binomial(10), mean = implied points
+# x league offensive TDs-per-point x (implied / mean implied)^0.25; defence
+# and special teams a flat 0.144 per team-game. Tuned once on 2022-23 and
+# scored AS-IS, with no re-tuning, on 2024-25 and 2016-19
+# (reports/td_layer1_frozen.md). On offensive touchdowns, CRPS vs the engine:
 #
-# The team-specific ratio is NOT frozen in. It beat the league ratio on the
-# 2024-25 test seasons by CRPS 0.0012, but at the best setting the league
-# prior carries the weight of ~130 games, so a team's own history barely
-# moves it. A component worth 0.0012 that behaves like the league average is
-# not worth carrying into layers 2-5.
+#                   2024-25                    2016-19
+#   + binomial      -0.0079 (-0.0105,-0.0052)   -0.0067 (-0.0087,-0.0046)
+#   + gamma 0.25    -0.0066 (-0.0101,-0.0032)   -0.0027 (-0.0054,-0.0002)
 #
-# GAMMA IS PROVISIONAL. Elasticity to the implied total (0.25) was the second
-# largest gain, but it rests on 2022-25 alone and could be either of two
-# things with opposite meanings: high-total teams converting more of their
-# points into touchdowns, or high-total teams simply outscoring their market
-# total. It stays out of the frozen spec until the points decomposition and
-# an older-season check say which.
-LAYER1 = {"k_points": None, "trials": 11, "gamma": 0.0}
-GAMMA_PROVISIONAL = 0.25
+# GAMMA: the points decomposition shows offensive TDs per point rising with
+# the implied total in both eras (Q5/Q1 1.16 and 1.09; gamma=0.25 implies
+# 1.13), a conversion effect. The separate points effect -- top-quintile
+# teams beating their total by 1.14 in 2022-25, +0.18 in 2016-19 -- is not
+# modelled: it is one era's market, not a mechanism.
+#
+# D/ST is flat because it is flat: ~0.13-0.15 a game in every quintile.
+# Bending the TOTAL with gamma under-predicted the lowest quintile.
+#
+# NOT frozen in: the team-specific ratio (worth 0.0012 at a shrinkage that
+# made it the league ratio, and not chosen at all on 2016-19).
+LAYER1 = {"target": "off_tds", "k_points": None, "trials": 10, "gamma": 0.25,
+          "dst_per_game": 0.144}
 
 PBP_COLS = ["game_id", "season", "week", "season_type", "posteam", "defteam",
             "td_team", "touchdown", "pass_touchdown", "rush_touchdown",
@@ -123,6 +136,8 @@ def team_games(schedule: pd.DataFrame, tds: pd.DataFrame) -> pd.DataFrame:
     tg = tg.merge(counts, on=["game_id", "team"], how="left")
     tg[list(CHANNELS)] = tg[list(CHANNELS)].fillna(0).astype(int)
     tg["tds"] = tg[list(CHANNELS)].sum(axis=1)
+    tg["off_tds"] = tg[list(OFFENSIVE)].sum(axis=1)
+    tg["dst"] = tg["dst_other"]
     return tg
 
 
@@ -232,6 +247,19 @@ def ratios(history: pd.DataFrame, k_points: float | None) -> tuple[pd.Series, fl
         return pd.Series(dtype=float), float(league)
     by = history.groupby("team")[["tds", "points"]].sum()
     return (by["tds"] + k_points * league) / (by["points"] + k_points), float(league)
+
+
+def total_pmf(off_pmf: np.ndarray, dst_mean: float) -> np.ndarray:
+    """Distribution of ALL touchdowns: offensive count plus an independent
+    Poisson defence/special-teams count with a flat mean. Used only to score
+    the offensive model on the same total the earlier layer-1 runs scored."""
+    K = off_pmf.shape[1]
+    dst = count_pmf([dst_mean], max_k=K - 1)[0]
+    out = np.zeros_like(off_pmf)
+    for j in range(K):
+        out[:, j:] += off_pmf[:, [j]] * dst[None, :K - j]
+    out[:, -1] += np.clip(1.0 - out.sum(axis=1), 0.0, None)
+    return out
 
 
 def team_mean(implied, ratio, ref_implied: float, gamma: float = 0.0):

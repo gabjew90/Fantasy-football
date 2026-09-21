@@ -183,6 +183,25 @@ def test_historical_franchise_codes_join_to_play_by_play():
     assert tg.loc["LV", "tds"] == 3
 
 
+def test_offensive_and_dst_touchdowns_are_split_on_every_team_game():
+    """Layer 1 now targets offensive touchdowns; D/ST is a separate flat term.
+    The two must add back to the total exactly."""
+    tds = pd.DataFrame({"game_id": ["g"] * 3, "season": [2025] * 3, "week": [1] * 3,
+                        "team": ["H"] * 3, "channel": ["rush_in5", "pass_far", "dst_other"]})
+    tg = T.team_games(_sched(), tds).set_index("team")
+    assert tg.loc["H", "off_tds"] == 2 and tg.loc["H", "dst"] == 1
+    assert (tg["off_tds"] + tg["dst"] == tg["tds"]).all()
+
+
+def test_the_total_is_the_offensive_count_plus_an_independent_flat_dst_count():
+    k = np.arange(T.MAX_TD + 1)
+    P = T.total_pmf(T.count_pmf([2.4], n=10), 0.144)
+    assert P.sum() == pytest.approx(1.0)
+    assert (P[0] * k).sum() == pytest.approx(2.4 + 0.144, abs=1e-6)
+    # P(0 total) = P(0 offensive) x P(0 D/ST)
+    assert P[0, 0] == pytest.approx(T.count_pmf([2.4], n=10)[0, 0] * np.exp(-0.144))
+
+
 def test_the_decomposition_standard_error_is_of_the_gap_not_of_points():
     """Review fix. If every team beats its total by exactly 1.0, the gap has
     no noise at all and its SE is zero. The old formula used the spread of

@@ -187,14 +187,122 @@ def channel_eval(tg: pd.DataFrame, seasons: list[int], alpha) -> tuple[float, in
     return float(np.mean(losses)), len(losses)
 
 
+GAMMA_FROZEN = 0.25
+
+
+def wf_target(tg: pd.DataFrame, seasons: list[int], gamma: float, target: str) -> pd.DataFrame:
+    """Walk-forward mean for `target` ('off_tds' or 'tds'): league
+    target-per-point ratio from the history, times implied points, with
+    elasticity gamma."""
+    out = []
+    for s in seasons:
+        for w in sorted(tg.loc[tg["season"] == s, "week"].unique()):
+            hist = tg[(tg["season"] == s - 1) | ((tg["season"] == s) & (tg["week"] < w))]
+            now = tg[(tg["season"] == s) & (tg["week"] == w)].copy()
+            ratio = hist[target].sum() / hist["points"].sum()
+            now["mu"] = T.team_mean(now["implied"], ratio, hist["implied"].mean(), gamma)
+            out.append(now)
+    return pd.concat(out, ignore_index=True)
+
+
+def _crps(d, P, y):
+    return T.crps_count(P, d[y])
+
+
+def _boot_rows(d, a, b, reps=2000, seed=13):
+    g = pd.DataFrame({"g": d["game_id"].to_numpy(), "v": a - b}).groupby("g")["v"]
+    sums, cnt = g.sum().to_numpy(), g.size().to_numpy()
+    idx = np.random.default_rng(seed).integers(0, len(sums), size=(reps, len(sums)))
+    bs = sums[idx].sum(1) / cnt[idx].sum(1)
+    return float(sums.sum() / cnt.sum()), *np.percentile(bs, [2.5, 97.5]).tolist()
+
+
+def frozen(tg: pd.DataFrame, tune: list[int], evals: dict[str, list[int]]) -> list[str]:
+    """Score the FROZEN spec as-is, with no re-tuning on the seasons scored.
+
+    Tuned once on TUNE: n for offensive touchdowns at gamma = 0.25, and the
+    flat defence/special-teams mean. Then every evaluation set gets exactly
+    those numbers. The earlier older-season check re-tuned on 2016-17 and
+    so tested the PROCEDURE, not the spec that would ship.
+    """
+    dtu = wf_target(tg, tune, GAMMA_FROZEN, "off_tds")
+    n_off = T.fit_trials(dtu["mu"].to_numpy(), dtu["off_tds"].to_numpy())
+    dtu0 = wf_target(tg, tune, 0.0, "off_tds")
+    n_off0 = T.fit_trials(dtu0["mu"].to_numpy(), dtu0["off_tds"].to_numpy())
+    dst = float(tg.loc[tg["season"].isin(tune), "dst"].mean())
+    # the previous frozen spec, on ALL touchdowns, for the Q1 comparison
+    dtt = wf_target(tg, tune, GAMMA_FROZEN, "tds")
+    n_tot = T.fit_trials(dtt["mu"].to_numpy(), dtt["tds"].to_numpy())
+
+    L = ["# Layer 1, frozen spec scored as-is", "",
+         f"Tuned once on {tune}: offensive touchdowns ~ Binomial(n={n_off}) with mean = implied points "
+         f"x league offensive TDs-per-point x elasticity gamma={GAMMA_FROZEN}; defence and special "
+         f"teams a flat {dst:.3f} per team-game. Nothing below is re-tuned on the seasons it scores.", ""]
+    for label, seasons in evals.items():
+        e0 = wf_target(tg, seasons, 0.0, "off_tds")          # engine today: linear, Poisson
+        eg = wf_target(tg, seasons, GAMMA_FROZEN, "off_tds")
+        y = e0["off_tds"]
+        c_eng = T.crps_count(T.count_pmf(e0["mu"]), y)
+        c_bin = T.crps_count(T.count_pmf(e0["mu"], n=n_off0), y)
+        c_frz = T.crps_count(T.count_pmf(eg["mu"], n=n_off), y)
+        l_eng = T.log_score(T.count_pmf(e0["mu"]), y).mean()
+        l_frz = T.log_score(T.count_pmf(eg["mu"], n=n_off), y).mean()
+        ci = lambda x: f"{x[0]:+.4f} ({x[1]:+.4f}, {x[2]:+.4f}) " + (  # noqa: E731
+            "better" if x[2] < 0 else "worse" if x[1] > 0 else "not established")
+        L += [f"## {label}: seasons {seasons[0]}-{seasons[-1]}, {len(e0)} team-games", "",
+              "Offensive touchdowns (what an anytime prop settles on).", "",
+              "| model | CRPS | change vs row above (95% CI, game-clustered) |", "|---|---|---|",
+              f"| Engine today: league offensive ratio, linear, Poisson | {c_eng.mean():.4f} | baseline |",
+              f"| + binomial n={n_off0} | {c_bin.mean():.4f} | {ci(_boot_rows(e0, c_bin, c_eng))} |",
+              f"| + gamma={GAMMA_FROZEN}, binomial n={n_off} (FROZEN) | {c_frz.mean():.4f} | "
+              f"{ci(_boot_rows(e0, c_frz, c_bin))} |", "",
+              f"Log score: engine {l_eng:.4f}, frozen {l_frz:.4f}.", "",
+              "| quintile of implied | engine predicted | frozen predicted | actual offensive TDs | n |",
+              "|---|---|---|---|---|"]
+        q = pd.qcut(e0["implied"], 5, labels=False)
+        for k in range(5):
+            m = q == k
+            L.append(f"| {k + 1} | {e0.loc[m, 'mu'].mean():.3f} | {eg.loc[m, 'mu'].mean():.3f} | "
+                     f"{e0.loc[m, 'off_tds'].mean():.3f} | {int(m.sum())} |")
+        # ALL touchdowns: old spec (gamma on the total) vs offensive + flat D/ST
+        et = wf_target(tg, seasons, GAMMA_FROZEN, "tds")
+        P_old = T.count_pmf(et["mu"], n=n_tot)
+        P_new = T.total_pmf(T.count_pmf(eg["mu"], n=n_off), dst)
+        c_old, c_new = T.crps_count(P_old, et["tds"]), T.crps_count(P_new, et["tds"])
+        kk = np.arange(P_new.shape[1])
+        mean_new = (P_new * kk).sum(1)
+        L += ["", "All touchdowns: gamma applied to the TOTAL (previous spec) vs gamma on offensive "
+                  "touchdowns plus a flat D/ST term.", "",
+              f"CRPS {c_old.mean():.4f} -> {c_new.mean():.4f}: {ci(_boot_rows(et, c_new, c_old))}.", "",
+              "| quintile of implied | gamma on total | offensive + flat D/ST | actual all TDs |",
+              "|---|---|---|---|"]
+        for k in range(5):
+            m = (q == k).to_numpy()
+            L.append(f"| {k + 1} | {et.loc[m, 'mu'].mean():.3f} | {mean_new[m].mean():.3f} | "
+                     f"{et.loc[m, 'tds'].mean():.3f} |")
+        L.append("")
+    return L
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--tune", default="2022,2023")
     ap.add_argument("--test", default="2024,2025")
     ap.add_argument("--out", default=str(Path(__file__).resolve().parent / "backtest_out"))
+    ap.add_argument("--frozen", default=None,
+                    help="score the frozen spec as-is on these extra seasons too, e.g. 2016,2017,2018,2019")
     a = ap.parse_args(argv)
     tune = [int(x) for x in a.tune.split(",")]
     test = [int(x) for x in a.test.split(",")]
+    if a.frozen:
+        extra = [int(x) for x in a.frozen.split(",")]
+        tg = load(sorted(set(tune + test + extra) | {min(tune) - 1, min(extra) - 1}))
+        print(check(tg), file=sys.stderr)
+        L = frozen(tg, tune, {"Test": test, "Older seasons": extra})
+        out = Path(a.out); out.mkdir(parents=True, exist_ok=True)
+        (out / "td_layer1_frozen.md").write_text("\n".join(L) + "\n", encoding="utf-8")
+        print(f"wrote {out / 'td_layer1_frozen.md'}", file=sys.stderr)
+        return 0
     tg = load(sorted(set(tune + test) | {min(tune) - 1}))
     note = check(tg)
     print(note, file=sys.stderr)

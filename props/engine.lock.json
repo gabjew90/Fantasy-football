@@ -1,6 +1,6 @@
 {
   "algorithm": "props-engine-sha256-lf-1",
-  "engine_sha256": "3f02e5248c822b370a617deb9b7b4de31c6b962a37b18c78149f3c99d7ed7328",
+  "engine_sha256": "9f5c064ac024895793b131947b724992d43055452f4027c4ccd3d5deefa784e7",
   "file_count": 34,
   "files": {
     "SKILL.md": "7ab5ae183fb30a15a9aebd9564ffe382e232dd68aa87abb52be4361db676b166",
@@ -35,8 +35,8 @@
     "scripts/score_week.py": "1c91499ab89bc30c30b63e7f79e5d4472905e7e64e6d0b6a42b3796a13de06c4",
     "scripts/td_alloc.py": "4748c5b8eda595dcc2d7ce9d450664372734de32c4a2a49bc8602d9430fe9606",
     "scripts/td_alloc_backtest.py": "1772e7fe4727fa1a1ba40b948c17c15bc6d2c827c2f81fbd9f0332f8a3053083",
-    "scripts/td_backtest.py": "5c4c479150a12e7e295b077c1f98d80d1c99311bfda7ae9b7a3cc4072f0fced9",
-    "scripts/td_model.py": "9ec6b8f0b4f0274efd686d6652b16d9e6ce0d600ad2a8d3ed3f378ceaab4d6c4"
+    "scripts/td_backtest.py": "0ae77781fea2de212154ff72f64b0792f15f77fabfda7cae944fce20b3c9895f",
+    "scripts/td_model.py": "dce5f0d005a670c138dcf1b74398b0ddf70d4c82ef6a5c2b6730db70658d313c"
   },
   "tag": "props-v1.4"
 }
