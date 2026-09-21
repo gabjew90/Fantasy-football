@@ -223,7 +223,7 @@ def test_game_q_is_per_td_of_game_shares_and_game_mix():
     ids = list(cur["actives"]["player_id"])
     for cap, beta in ((0.99, None), (0.997, 20.0)):
         a = V.game_q(shares, "A", ids, pos, ctx, cap=cap, qb="qb", beta=beta)
-        b = V.per_td(V.game_shares(shares, "A", ids, pos, cap=cap),
+        b = V.per_td(V.game_shares(shares, "A", ids, pos, cap=cap, qb="qb"),
                      V.game_mix(ctx, "A", "qb", beta)).clip(upper=0.999)
         assert a.to_numpy() == pytest.approx(b.to_numpy())
 
@@ -245,3 +245,23 @@ def test_the_bundled_quarterback_starts_cover_the_window():
     assert st is not None
     assert sorted(st["season"].unique()) == list(range(2025 - V.V1["qb_window"] + 1, 2026))
     assert not st.duplicated(["game_id", "team"]).any()   # one starter per team-game
+
+
+# ------------------------------------------------------------ the starter's share within qb_rush
+
+def test_the_starter_gets_the_fixed_qb_rush_share_and_the_rest_fit_under_the_cap():
+    shares = pd.DataFrame({"team": "A", "pri_team": "A",
+                           **{c: 0.0 for c in CH}, **{f"pri_{c}": 0.0 for c in CH}},
+                          index=["s", "b", "rb"])
+    shares.loc["s", "qb_rush"], shares.loc["b", "qb_rush"], shares.loc["rb", "qb_rush"] = 0.60, 0.40, 0.0
+    shares.loc["rb", "rush_in5"] = 0.8
+    pos = {"s": "QB", "b": "QB", "rb": "RB"}
+    base = V.game_shares(shares, "A", ["s", "b", "rb"], pos, qb="s", qb_share=None)
+    assert base.loc["s", "qb_rush"] == pytest.approx(0.60 * 0.99)         # the cap squeezes both
+    m = V.game_shares(shares, "A", ["s", "b", "rb"], pos, qb="s", qb_share=0.88)
+    assert m.loc["s", "qb_rush"] == pytest.approx(0.88)
+    assert m.loc["b", "qb_rush"] == pytest.approx(0.99 - 0.88)             # scaled down to fit
+    assert m["qb_rush"].sum() <= 0.99 + 1e-9
+    assert m.loc["rb", "rush_in5"] == base.loc["rb", "rush_in5"]            # other channels untouched
+    # no starter named, or qb_share off: nothing changes
+    assert V.game_shares(shares, "A", ["s", "b", "rb"], pos, qb=None, qb_share=0.88).equals(base)

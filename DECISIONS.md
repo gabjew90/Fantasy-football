@@ -4867,3 +4867,50 @@ Scorecard: anytime-TD rows are labelled by td_model; rows recorded before
 td_model reached the record are 'model unknown', never v1. The calibration and
 tier tables use v1 anytime rows only; v0 and unknown rows appear only in the
 By-market split.
+
+## 2026-09-21 (84) -- the starter's QB-rush share fixed at 0.92; role-conditional shares null; the opponent-points effect is channel mix
+
+The user set the order: role-conditional shares first, gated on the top bins;
+then the opponent-points mix split, which feeds layer 3.
+
+**Role-conditional shares: null.** A player's share taken only from past games
+in his current pre-game depth-chart role, four variants (off, exact slot, tier,
+QBs only), tuned 2022-23, scored 2024-25 (reports/td_role_tuning.md). Best (QB
+only) -0.0003 on test, not established; starting QBs 0.117 -> 0.120 against
+0.152. Weekly depth charts do not mark fill-in starts -- Cincinnati's backup,
+whose starter-sized share started the diagnosis, goes only 0.958 -> 0.857. Not
+shipped; the code was not merged.
+
+**The direct fix: the starter's share within qb_rush fixed.** The active QB
+highest on the pre-game depth chart gets a tuned share of the QB-rush channel;
+others are scaled to fit under the cap. Tuned 0.92 on 2022-23 (-0.0019 end to
+end, established; starting QBs -0.0108). Scored as-is: 2024-25 -0.0004 and
+2016-19 -0.0004, neither established; starting-QB level 0.123 -> 0.158 vs 0.148
+and 0.092 -> 0.112 vs 0.117. The gate held: the 0.45-0.6 and 0.6+ bins are
+unchanged in both eras, so no per-rank calibration is triggered. The lowest bin
+slips ~0.003. Shipped on the calibration case, like v1, with the registry
+stating the gain is not established out of sample. Live on MIA@SF week 2:
+Purdy 13.0% -> 21.4% and Willis 9.9% -> 19.0% (books 27% and 26%); nothing
+else moves.
+
+**Opponent points (reports/td_diagnostics.md).** The user's hypothesis holds in
+both eras: when the opponent scores 27+, rushing TDs fall from 0.34-0.38 of a
+team's offensive TDs to 0.26 and red-zone passing TDs rise from 0.39 to 0.46,
+while the top-share player's share WITHIN the rushing channels stays at 1.06 and
+0.98. His per-TD share drops (0.86, 0.81) because the mix moved. For layer 3:
+condition each team's channel mix on the other team's simulated count; draw
+shares once per game.
+
+**Where the flat ~10% top-share bias lives.** The top-q player's share within
+the PASSING channels is 0.43-0.83 of expected in every opponent bucket, while
+his rushing channels sit near 1. The over-prediction of stars is in their
+receiving-TD share -- the place for a calibration or a source fix, now that it
+has a location.
+
+Code review before pushing: qb_beta (40) had been tuned while the starter's
+within-channel share came from history, then qb_share tuned with qb_beta held
+fixed -- two parameters on the same product. Re-tuned jointly (qb_beta 20/40/80
+x share history/0.85/0.88/0.92/0.95): 0.92 with 40 is still best. And the
+diagnostic's QB columns are now labelled from the configs, not hard-coded versions.
+
+Lock at props-v1.9.

@@ -50,6 +50,7 @@ V1 = {
     "cap": 0.99,                      # total share per channel; 0.99-0.999 tested, 0.99 best on tune
     "qb_beta": 40.0,                  # starter QB-rush rate shrunk by 40 team TDs (tuned 2022-23); None = team mix
     "qb_window": 3,                   # seasons of the starter's career the rate looks back over
+    "qb_share": 0.92,                 # the starter share WITHIN qb_rush (tuned 2022-23); None = from history
 }
 SKILL = {"QB": "QB", "RB": "RB", "FB": "RB", "WR": "WR", "TE": "TE"}
 LABEL = "anytime_td_v1"
@@ -175,17 +176,35 @@ def week_shares(cnt_cur, cnt_pri, played_cur, played_pri, slots_pri, actives: pd
 
 
 def game_shares(shares: pd.DataFrame, team: str, ids: list[str], pos: dict,
-                mode=V1["mode"], cap=V1["cap"]) -> pd.DataFrame:
-    """Channel shares of each active player on `team`, after reallocation."""
-    return A.reallocate(A.candidates(shares, team, T.OFFENSIVE), set(ids), pos, T.OFFENSIVE,
-                        mode, cap).reindex(ids).fillna(0)
+                mode=V1["mode"], cap=V1["cap"], qb: str | None = None,
+                qb_share=V1["qb_share"]) -> pd.DataFrame:
+    """Channel shares of each active player on `team`, after reallocation.
+
+    THE STARTER'S QB-RUSH SHARE. From history it runs 0.70 against 0.88 of
+    his team's QB carries in reality: shares come from games-played
+    denominators, so a backup who played only while the starter was out
+    carries a starter-sized share and the cap squeezes both. Depth charts do
+    not mark those games (a fill-in starter is often still listed QB2), so a
+    role filter cannot find them. With `qb_share` set, the named starter's
+    share within qb_rush is that value and the other players' qb_rush shares
+    are scaled down, if needed, to fit under the cap."""
+    m = A.reallocate(A.candidates(shares, team, T.OFFENSIVE), set(ids), pos, T.OFFENSIVE,
+                     mode, cap).reindex(ids).fillna(0)
+    if qb_share is not None and qb is not None and qb in m.index:
+        rest = m.index != qb
+        tot = float(m.loc[rest, "qb_rush"].sum())
+        room = max(cap - qb_share, 0.0)
+        if tot > room:
+            m.loc[rest, "qb_rush"] *= room / tot
+        m.loc[qb, "qb_rush"] = qb_share
+    return m
 
 
 def game_q(shares: pd.DataFrame, team: str, ids: list[str], pos: dict, ctx: dict,
            mode=V1["mode"], cap=V1["cap"], qb: str | None = None, beta=V1["qb_beta"]) -> pd.Series:
     """Per-touchdown share of each active player on `team`; `qb` is the
     starting quarterback (starter())."""
-    m = game_shares(shares, team, ids, pos, mode, cap)
+    m = game_shares(shares, team, ids, pos, mode, cap, qb=qb)
     return per_td(m, game_mix(ctx, team, qb, beta)).clip(upper=0.999)
 
 

@@ -37,6 +37,8 @@ import td_v1 as V  # noqa: E402
 
 QK_SHIP = (B.SHIP[0], B.SHIP[2], B.SHIP[3])
 QK_V10 = (B.V10[0], B.V10[2], B.V10[3])
+# the two QB columns are labelled from the configs, never by a hard-coded version
+LAB_V10, LAB_SHIP = "v1 team mix (props-v1.4)", f"shipped: {B.qid(QK_SHIP)}"
 K_BINS = [(1, 1, "1"), (2, 2, "2"), (3, 3, "3"), (4, 99, "4+")]
 RANKS = [(1, 1, "1 (top q)"), (2, 2, "2"), (3, 3, "3"), (4, 6, "4-6"), (7, 99, "7+")]
 
@@ -126,7 +128,7 @@ def qb_tables(L: list, d: pd.DataFrame, mass: pd.DataFrame, label: str) -> None:
     real = mm["qb_rush_tds"].sum() / mm["n_off"].sum()
     st = d[d["starter"]]
     L += [f"### {label}: starting quarterbacks", "",
-          "| | team mix (v1) | starter rate (v1.1) | realised |", "|---|---|---|---|",
+          f"| | {LAB_V10} | {LAB_SHIP} | realised |", "|---|---|---|---|",
           f"| qb_rush weight: mean, team-games with a TD | {mm['wqb|' + B.qid(QK_V10)].mean():.4f} | "
           f"{mm['wqb|' + B.qid(QK_SHIP)].mean():.4f} | {real:.4f} (QB-rush TDs / offensive TDs) |",
           f"| league fraction used as the shrinkage target | {mm['qb_league'].mean():.4f} | "
@@ -194,6 +196,48 @@ def mix_by_margin(L: list, tg: pd.DataFrame, seasons) -> None:
               f"{t.loc[t['spread'] <= -3, 'implied'].mean():.1f} for underdogs by 3+.", ""]
 
 
+def opponent_points(L: list, d: pd.DataFrame, tg: pd.DataFrame, seasons) -> None:
+    """Does the top-share player's lower share when the opponent scores 27+
+    come from the CHANNEL MIX (catch-up offense scores through the air) or
+    from his share WITHIN channels? Opponent points is post-game and loosely
+    tied to own scoring through pace, so this sizes the effect for the sim;
+    it is not a pre-game input."""
+    t = tg[tg["season"].isin(seasons)]
+    opp = t[["game_id", "team", "points"]].rename(columns={"team": "opp", "points": "opp_pts"})
+    t = t.merge(opp, on=["game_id", "opp"])
+    ch = list(T.OFFENSIVE)
+    buckets = [("opponent 13 or fewer", lambda x: x <= 13), ("opponent 14-26", lambda x: x.between(14, 26)),
+               ("opponent 27+", lambda x: x >= 27)]
+    L += [f"### {seasons}: channel mix by the opponent's points", "",
+          "| opponent | team-games | " + " | ".join(ch) + " |", "|---" * (len(ch) + 2) + "|"]
+    for lab, f in buckets:
+        g = t[f(t["opp_pts"])]
+        tot = g[ch].sum().sum()
+        L.append(f"| {lab} | {len(g)} | " + " | ".join(f"{g[c].sum() / tot:.3f}" for c in ch) + " |")
+    if "s_rush_in5" not in d:
+        L.append("")
+        return
+    top = d[(d["rank"] == 1)]
+    rush, pas = ["qb_rush", "rush_in5", "rush_far"], ["pass_rz", "pass_far"]
+    L += ["", "Top-q player, WITHIN channels: realised channel TDs / (his channel share x the team's channel TDs). "
+              "Flat across rows = the share holds and the mix moves.", "",
+          "| opponent | team-games | rushing channels | passing channels | per-TD (all) | his mix: rushing share of expected |",
+          "|---|---|---|---|---|---|"]
+    for lab, f in buckets:
+        g = top[f(top["opp_pts"])]
+        if g.empty:
+            continue
+        r_real = sum(g[f"td_{c}"].sum() for c in rush)
+        r_exp = sum((g[f"s_{c}"] * g[f"T_{c}"]).sum() for c in rush)
+        p_real = sum(g[f"td_{c}"].sum() for c in pas)
+        p_exp = sum((g[f"s_{c}"] * g[f"T_{c}"]).sum() for c in pas)
+        allr = g["tds"].sum() / (g["q"] * g["n_off"]).sum()
+        L.append(f"| {lab} | {len(g)} | {r_real / r_exp if r_exp else float('nan'):.2f} | "
+                 f"{p_real / p_exp if p_exp else float('nan'):.2f} | {allr:.2f} | "
+                 f"{r_exp / (r_exp + p_exp) if (r_exp + p_exp) else float('nan'):.2f} |")
+    L.append("")
+
+
 def league_drift(L: list, tg: pd.DataFrame) -> None:
     by = tg.groupby("season")[["qb_rush", "off_tds"]].sum()
     L += ["### League QB-rush fraction of offensive touchdowns, by season", "",
@@ -228,6 +272,7 @@ def main(argv=None) -> int:
         qb_tables(L, d[d["n_off"] > 0], m, str(seasons))
         starter_channel(L, m, D["cch"], str(seasons))
         mix_by_margin(L, D["tg"], seasons)
+        opponent_points(L, dp, D["tg"], seasons)
     league_drift(L, D["tg"])
     out = Path(a.out) / "td_diagnostics.md"
     out.parent.mkdir(parents=True, exist_ok=True)
