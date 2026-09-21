@@ -2,7 +2,7 @@
 
 Tune seasons [2022, 2023], test seasons [2024, 2025] (never used for any choice). 2718 team-games with closing lines. Walk-forward: every game predicted from the prior season plus the earlier weeks of its own.
 
-Data check: 0 team-games where 6 x TDs exceeds points scored (should be 0).
+Data check: reconciled: 0 team-games where 6 x TDs exceeds points; 12 genuine field-goal-only games of 14+ points, none clustered on one franchise-season.
 
 ## Ablation ladder (test seasons)
 
@@ -28,6 +28,18 @@ Each row adds one component to the row above, using the value chosen on the tune
 Actual variance is within-quintile, so it also contains the spread of means inside each quintile. That can only INFLATE it, which makes any shortfall against the Poisson variance conservative.
 
 League TDs per point, test seasons: **0.1114** all touchdowns, **0.1057** offensive only. The engine's constant (0.1055) is the offensive figure, so it agrees.
+
+## Points decomposition by implied-total quintile (all seasons in the run)
+
+TDs = points x TDs-per-point. A rising `points - implied` means high-total teams beat their market total (a points effect); a rising TDs-per-point means they convert more of their points into touchdowns (a conversion effect).
+
+| quintile | implied | actual points | points - implied (se) | TDs/point | offensive TDs/point | TDs | n |
+|---|---|---|---|---|---|---|---|
+| 1 | 16.9 | 17.3 | +0.45 (0.42) | 0.1048 | 0.0971 | 1.82 | 450 |
+| 2 | 20.1 | 20.3 | +0.25 (0.42) | 0.1061 | 0.1010 | 2.15 | 446 |
+| 3 | 22.2 | 22.1 | -0.10 (0.43) | 0.1102 | 0.1038 | 2.43 | 430 |
+| 4 | 24.2 | 24.3 | +0.07 (0.44) | 0.1122 | 0.1058 | 2.73 | 427 |
+| 5 | 27.3 | 28.4 | +1.14 (0.46) | 0.1179 | 0.1125 | 3.35 | 421 |
 
 ## Full grid, top 12 by tune CRPS
 

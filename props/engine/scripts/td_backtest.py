@@ -66,9 +66,26 @@ def load(seasons: list[int]) -> pd.DataFrame:
 
 
 def check(tg: pd.DataFrame) -> str:
-    """Six points a touchdown can never exceed what the team scored."""
-    bad = tg[6 * tg["tds"] > tg["points"]]
-    return f"{len(bad)} team-games where 6 x TDs exceeds points scored (should be 0)."
+    """Touchdowns reconciled against the final score, in BOTH directions.
+
+    Too many: six points a touchdown can never exceed what the team scored.
+    Too few: this is the check that was missing. A team whose touchdowns fail
+    to join (a franchise-code mismatch) shows up as a run of games with real
+    points and zero touchdowns, and the old check could not see it. Fourteen
+    points without a touchdown takes five field goals, so a franchise-season
+    with several such games is a join failure, not a kicker. That is a hard
+    stop: every number downstream would be built on it.
+    """
+    over = tg[6 * tg["tds"] > tg["points"]]
+    zero = tg[(tg["tds"] == 0) & (tg["points"] >= 14)]
+    per = zero.groupby(["season", "team"]).size()
+    broken = per[per >= 4]
+    if len(over) or len(broken):
+        raise SystemExit(f"touchdowns do not reconcile with scores: {len(over)} team-games over, "
+                         f"franchise-seasons with 4+ zero-TD games of 14+ points: "
+                         f"{broken.to_dict()} -- check team codes")
+    return (f"reconciled: 0 team-games where 6 x TDs exceeds points; {len(zero)} genuine "
+            f"field-goal-only games of 14+ points, none clustered on one franchise-season.")
 
 
 def walk_forward(tg: pd.DataFrame, seasons: list[int], k, gamma: float) -> pd.DataFrame:
@@ -123,6 +140,30 @@ def boot_diff(a: pd.DataFrame, sa, b: pd.DataFrame, sb, reps=2000, seed=11):
     idx = rng.integers(0, len(sums), size=(reps, len(sums)))
     boot = sums[idx].sum(1) / cnt[idx].sum(1)
     return float(sums.sum() / cnt.sum()), *np.percentile(boot, [2.5, 97.5]).tolist()
+
+
+def decompose(tg: pd.DataFrame, seasons: list[int]) -> pd.DataFrame:
+    """Where does the high-total shortfall come from? TDs = points x
+    (TDs / point), so by implied-total quintile:
+
+      points - implied   the MARKET side: do high-total teams beat their total?
+      TDs / point        the CONVERSION side: do they turn more points into TDs?
+
+    If the first rises and the second is flat, an elasticity on touchdowns is
+    patching a points bias in the total and belongs on the points, not on the
+    touchdown conversion. If the second rises, it is genuine conversion.
+    """
+    d = tg[tg["season"].isin(seasons)].copy()
+    d["q"] = pd.qcut(d["implied"], 5, labels=False)
+    g = d.groupby("q")
+    out = g.agg(implied=("implied", "mean"), points=("points", "mean"),
+                tds=("tds", "mean"), n=("tds", "size"))
+    out["gap"] = out["points"] - out["implied"]
+    out["gap_se"] = g["points"].std() / np.sqrt(out["n"])
+    out["td_per_pt"] = g["tds"].sum() / g["points"].sum()
+    off = g[list(T.OFFENSIVE)].sum().sum(axis=1)
+    out["off_td_per_pt"] = off / g["points"].sum()
+    return out
 
 
 def channel_eval(tg: pd.DataFrame, seasons: list[int], alpha) -> tuple[float, int]:
@@ -197,9 +238,11 @@ def main(argv=None) -> int:
     ratio_all = te["tds"].sum() / te["points"].sum()
     ratio_off = te[list(T.OFFENSIVE)].sum().sum() / te["points"].sum()
 
+    dec = decompose(tg, tune + test)
+
     out = Path(a.out); out.mkdir(parents=True, exist_ok=True)
     write_report(out / "td_layer1.md", tg, note, grid, best, ladder, calib, base_calib,
-                 ch, ch_best, league_mix, ratio_all, ratio_off, tune, test)
+                 ch, ch_best, league_mix, ratio_all, ratio_off, tune, test, dec)
     return 0
 
 
@@ -218,7 +261,7 @@ def _var(mu, sh):
 
 
 def write_report(path, tg, note, grid, best, ladder, calib, base_calib, ch, ch_best,
-                 league_mix, ratio_all, ratio_off, tune, test):
+                 league_mix, ratio_all, ratio_off, tune, test, dec=None):
     L = ["# Layer 1: team touchdown distributions", "",
          f"Tune seasons {tune}, test seasons {test} (never used for any choice). "
          f"{len(tg)} team-games with closing lines. Walk-forward: every game predicted "
@@ -250,7 +293,20 @@ def write_report(path, tg, note, grid, best, ladder, calib, base_calib, ch, ch_b
           f"League TDs per point, test seasons: **{ratio_all:.4f}** all touchdowns, "
           f"**{ratio_off:.4f}** offensive only. The engine's constant ({ENGINE_CONSTANT}) is the "
           "offensive figure, so it agrees.", "",
-          "## Full grid, top 12 by tune CRPS", "",
+          ]
+    if dec is not None:
+        L += ["## Points decomposition by implied-total quintile (all seasons in the run)", "",
+              "TDs = points x TDs-per-point. A rising `points - implied` means high-total teams beat "
+              "their market total (a points effect); a rising TDs-per-point means they convert more "
+              "of their points into touchdowns (a conversion effect).", "",
+              "| quintile | implied | actual points | points - implied (se) | TDs/point | offensive TDs/point | TDs | n |",
+              "|---|---|---|---|---|---|---|---|"]
+        for q, r in dec.iterrows():
+            L.append(f"| {int(q) + 1} | {r['implied']:.1f} | {r['points']:.1f} | "
+                     f"{r['gap']:+.2f} ({r['gap_se']:.2f}) | {r['td_per_pt']:.4f} | "
+                     f"{r['off_td_per_pt']:.4f} | {r['tds']:.2f} | {int(r['n'])} |")
+        L.append("")
+    L += ["## Full grid, top 12 by tune CRPS", "",
           "| mean | gamma | shape | tune CRPS | test CRPS | test log score |", "|---|---|---|---|---|---|"]
     for x in sorted(grid, key=lambda x: x["tune"]["crps"])[:12]:
         tag = " **chosen**" if x is best else ""

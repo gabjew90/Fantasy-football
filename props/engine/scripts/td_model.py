@@ -29,6 +29,24 @@ CHANNELS = ("qb_rush", "rush_in5", "rush_far", "pass_rz", "pass_far", "dst_other
 OFFENSIVE = CHANNELS[:5]   # dst_other never reaches an offensive player's prop
 MAX_TD = 15            # support for count distributions; P(16+ TDs) is ~0
 
+# LAYER 1, FROZEN 2026-09-21: league touchdowns-per-point ratio, binomial over
+# 11 trials, linear in implied points.
+#
+# The team-specific ratio is NOT frozen in. It beat the league ratio on the
+# 2024-25 test seasons by CRPS 0.0012, but at the best setting the league
+# prior carries the weight of ~130 games, so a team's own history barely
+# moves it. A component worth 0.0012 that behaves like the league average is
+# not worth carrying into layers 2-5.
+#
+# GAMMA IS PROVISIONAL. Elasticity to the implied total (0.25) was the second
+# largest gain, but it rests on 2022-25 alone and could be either of two
+# things with opposite meanings: high-total teams converting more of their
+# points into touchdowns, or high-total teams simply outscoring their market
+# total. It stays out of the frozen spec until the points decomposition and
+# an older-season check say which.
+LAYER1 = {"k_points": None, "trials": 11, "gamma": 0.0}
+GAMMA_PROVISIONAL = 0.25
+
 PBP_COLS = ["game_id", "season", "week", "season_type", "posteam", "defteam",
             "td_team", "touchdown", "pass_touchdown", "rush_touchdown",
             "yardline_100", "rusher_player_id", "play_type"]
@@ -64,6 +82,19 @@ def classify_tds(pbp: pd.DataFrame, qb_ids: set[str]) -> pd.DataFrame:
         columns={"td_team": "team"})
 
 
+# FRANCHISE CODES. nflverse play-by-play uses each franchise's CURRENT code
+# for every season; the schedule file uses the code of the TIME. Joined
+# unnormalised, every touchdown by Oakland (2015-19), San Diego (2015-16) and
+# St. Louis (2015) matched nothing and was recorded as ZERO -- and a team-
+# specific ratio then "learned" that those teams never score, which looked
+# like a 0.042 CRPS gain. Both sides are mapped to the current code.
+TEAM_ALIASES = {"OAK": "LV", "SD": "LAC", "STL": "LA"}
+
+
+def _norm_team(s: pd.Series) -> pd.Series:
+    return s.replace(TEAM_ALIASES)
+
+
 def team_games(schedule: pd.DataFrame, tds: pd.DataFrame) -> pd.DataFrame:
     """One row per team per regular-season game, zero-touchdown games
     included, with points scored, the market's implied points, and the
@@ -72,7 +103,9 @@ def team_games(schedule: pd.DataFrame, tds: pd.DataFrame) -> pd.DataFrame:
     nflverse `spread_line` is positive when the HOME team is favoured, so the
     home side's implied points are (total + spread) / 2.
     """
-    g = schedule[(schedule["game_type"] == "REG") & schedule["home_score"].notna()]
+    g = schedule[(schedule["game_type"] == "REG") & schedule["home_score"].notna()].copy()
+    g["home_team"], g["away_team"] = _norm_team(g["home_team"]), _norm_team(g["away_team"])
+    tds = tds.assign(team=_norm_team(tds["team"]))
     home = pd.DataFrame({"game_id": g["game_id"], "season": g["season"], "week": g["week"],
                          "team": g["home_team"], "opp": g["away_team"],
                          "points": g["home_score"],

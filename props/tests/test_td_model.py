@@ -167,3 +167,30 @@ def test_elasticity_bends_the_curve_without_moving_it_at_the_reference_total():
     assert mu[0] == pytest.approx(24 * 0.11)            # unchanged at the reference
     assert mu[1] > 30 * 0.11                             # high totals convert more
     assert T.team_mean([30.0], [0.11], 24.0, 0.0)[0] == pytest.approx(3.3)
+
+
+# ------------------------------------------------------------- franchise codes
+
+def test_historical_franchise_codes_join_to_play_by_play():
+    """The schedule says OAK for 2019; play-by-play says LV for every season.
+    Unnormalised, Oakland's touchdowns were silently recorded as zero."""
+    sched = pd.DataFrame({"game_id": ["g"], "season": [2019], "week": [1], "game_type": ["REG"],
+                          "home_team": ["OAK"], "away_team": ["DEN"], "home_score": [24],
+                          "away_score": [16], "spread_line": [2.0], "total_line": [43.0]})
+    tds = pd.DataFrame({"game_id": ["g"] * 3, "season": [2019] * 3, "week": [1] * 3,
+                        "team": ["LV"] * 3, "channel": ["rush_in5", "pass_rz", "pass_far"]})
+    tg = T.team_games(sched, tds).set_index("team")
+    assert tg.loc["LV", "tds"] == 3
+
+
+def test_the_reconciliation_check_stops_on_touchdowns_that_went_missing():
+    """The original check only caught touchdowns EXCEEDING the score, so a
+    failed join -- zeros where points were scored -- passed it."""
+    sys.path.insert(0, str(ENGINE))
+    import td_backtest as B
+    tg = pd.DataFrame({"season": [2019] * 5, "team": ["OAK"] * 5,
+                       "tds": [0] * 5, "points": [20, 24, 17, 27, 21]})
+    with pytest.raises(SystemExit, match="team codes"):
+        B.check(tg)
+    ok = pd.DataFrame({"season": [2024], "team": ["PIT"], "tds": [0], "points": [15]})
+    assert "reconciled" in B.check(ok)
