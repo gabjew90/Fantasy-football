@@ -149,7 +149,11 @@ jobs:
             --week ${{ steps.guard.outputs.week }} \
             --workdir props/.cache \
             ${{ github.event.inputs.games && format('--games {0}', github.event.inputs.games) || '' }} \
-            --skip-started
+            --skip-started \
+            --extra=--no-scenarios
+          # --no-scenarios: the 'if a Questionable player is out' pricing is for
+          # the reader in chat; it never enters the record, so a capture skips it.
+          # (Needs props-v1.6+; the lock bump ships with this line.)
           # One invocation, no `|| --dir .` fallback: record_run exits non-zero
           # for a missing directory AND for "no artifacts found" AND for a bug
           # inside persist, so the fallback masked every one of those as the

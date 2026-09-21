@@ -4749,3 +4749,32 @@ record deepens.
 
 At release, every non-touchdown output on MIA@SF 2026 week 2 was byte-identical
 to props-v1.4 with the same cached inputs. Lock at props-v1.5.
+
+## 2026-09-21 (81) -- questionable players are priced both ways, never blended
+
+User direction: "No need for discounted share, just provide the results for if
+he's playing or if he's out. User will make discretionary decision."
+
+The scorer used to scale a Questionable player's shares by 0.86 (a
+normal/limited mixture conditional on playing) and price his teammates as if he
+played. Now:
+
+- The main run prices a Questionable player at his NORMAL share, as if he plays.
+  No discount.
+- For each Questionable player, the scorer re-runs itself with him OUT
+  (`--assume-out`): his share is redistributed by the same path an Out player's
+  is, and anytime_td_v1 drops him from its active list. The report gains an
+  "If a Questionable player is out" section listing every line that moves by a
+  point or more, plays vs out, side by side. Neither case is weighted by a guess
+  at whether he plays.
+- The re-run prices the SAME lines: the main run saves its lines and spread/total
+  (`--odds-snapshot`), so the scenario fetches nothing, spends no Odds API
+  credits and writes no archive rows. Its outputs go to OUT/scenarios, which
+  record_run never reads, so a scenario can never enter the record.
+- Captures pass `--no-scenarios`: the record needs one pricing per line.
+
+Verified on MIA@SF 2026 week 2: with no Questionable players the outputs are
+byte-identical to props-v1.5; with George Kittle marked Questionable the
+section appears (McCaffrey Over 4.5 catches 65% -> 82% if Kittle is out).
+Eligibility still treats Questionable as ineligible; nothing is eligible while
+every market is unvalidated. Lock at props-v1.6.
