@@ -4705,3 +4705,47 @@ log loss vs the no-vig market and CLV on logged TD prices. The td_model column
 survives into the settled record so a v0-fallback row is never graded as v1.
 Known weak spot, flagged on the first live board: a newly arrived running
 quarterback (Malik Willis, 4.6% vs the book's 26%).
+
+
+## 2026-09-21 (80) -- anytime_td_v1.1: the starter's QB-rush rate; out-of-sample checks; cap and Beta closed
+
+The user reviewed v1 (#79) and raised six items. What was done with each:
+
+**1. The test set had been read three times.** Layer 2 and the end to end had no
+as-is check on an unseen era. v1 exactly as shipped in props-v1.4, scored as-is on
+2018-19: -0.0058 (-0.0081, -0.0037) end to end vs the v0 structure, all of it
+allocation (layer 1 alone +0.0000 there). The established claim is clean. The
+harness only loaded the season before the tune window, so a test window that did
+not follow tune crashed; it now loads the prior season of every scored season.
+
+**2. The 0.99 cap.** Tuned on 2022-23 from 0.99 to 0.999: worse at every step, at
+every QB setting. Raising the cap spreads the extra mass pro rata, i.e. mostly to
+high-share players, not to the low bin. The low-bin miss has another cause. Cap
+stays 0.99.
+
+**3. The Beta share on the top bins.** Tabled with the rows binned by the fixed-share
+prediction so every column is the same players. The Beta squeezes every bin in
+proportion: c=20 brings 0.45-0.6 to 0.499 (actual 0.492) only by pulling 0.2-0.45
+below actual, and log loss on the rows priced above 0.45 does not move (0.6846 vs
+0.6846). It is not a top-bin fix. Not carried into layer 3.
+
+**4. Willis.** Confirmed as the user diagnosed: his qb_rush share was 0.886 and
+Miami's qb_rush weight 0.063. The weight is now keyed to the starter: his QB-rush
+touchdowns over his teams' offensive touchdowns in his starts over 3 seasons,
+shrunk to league by beta team touchdowns. Tuned beta=40 on 2022-23. Test 2024-25:
+-0.0009 (-0.0016, -0.0003) end to end vs v1; starting QBs -0.0141 (-0.0214,
+-0.0064). Held out, 2016-17 (read for the first time, after the choice): -0.0006
+(-0.0010, -0.0002). New-to-team starters are not established (n 67). Willis goes
+from 9.5% to 19.8% on current inputs, book 26%. Starting QBs remain low on average
+(0.123 vs 0.148); the gain is ranking.
+
+**5. Registry carry-overs.** The one-way market disclosure is restored to the v1
+entry and the chat contract. The v0 fallback is now a measured property: the
+player card and the sources table say it runs about 1.3 points low.
+
+**6. Build order.** Accepted: layer 3 for structure, with the market-as-prior blend
+built in shadow alongside it so its weight can be estimated as the logged-line
+record deepens.
+
+At release, every non-touchdown output on MIA@SF 2026 week 2 was byte-identical
+to props-v1.4 with the same cached inputs. Lock at props-v1.5.

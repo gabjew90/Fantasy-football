@@ -288,7 +288,11 @@ need not be surfaced. Write the reply as a premium prop guide with this structur
    `resources/model_registry.md`). State each team's expected offensive touchdowns and
    the player's share of each, and say which model priced the row: the `td_model` column
    reads `anytime_td_v1`, or `anytime_td_v0` when v1 could not run (no market implied
-   total). Give NO fair odds and NO "take Yes at +X" threshold for any anytime TD: v1 is
+   total). When the row is `anytime_td_v0`, say it is the fallback and that it runs about
+   1.3 points low on average, so a gap in the book's favour is partly the model's. Most
+   anytime markets are one-way (no "won't score" side except at Sleeper), so the book's
+   number still carries its hold and is biased against the bet; say so with any TD gap.
+   Give NO fair odds and NO "take Yes at +X" threshold for any anytime TD: v1 is
    outcome-backtested but untested against posted lines. Its known weak spot is a player
    in a NEW role -- a newly arrived starter, especially a running quarterback -- where one
    game of evidence and a backup's prior leave the book far better informed; say so when

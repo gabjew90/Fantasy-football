@@ -25,7 +25,8 @@ from td_model import OFFENSIVE, _norm_team, classify_tds
 PBP_COLS_L2 = ["game_id", "season", "week", "season_type", "posteam", "defteam",
                "td_team", "touchdown", "pass_touchdown", "rush_touchdown",
                "yardline_100", "rusher_player_id", "play_type",
-               "receiver_player_id", "td_player_id", "qb_kneel", "two_point_attempt"]
+               "receiver_player_id", "td_player_id", "qb_kneel", "two_point_attempt",
+               "passer_player_id"]
 
 # Expected-touchdown weighting (each opportunity counted by the league TD rate
 # of opportunities like it) was built, scored and DROPPED: +0.0026 log loss,
@@ -227,7 +228,7 @@ def candidates(shares: pd.DataFrame, team: str, chans) -> pd.DataFrame:
 
 
 def reallocate(shares: pd.DataFrame, active: set[str], pos: dict[str, str], chans,
-               mode: str) -> pd.DataFrame:
+               mode: str, cap: float = 0.99) -> pd.DataFrame:
     """Keep only the active players, and decide where an inactive player's
     share goes.
 
@@ -236,7 +237,7 @@ def reallocate(shares: pd.DataFrame, active: set[str], pos: dict[str, str], chan
       position  to active teammates at HIS position, pro rata: the RB1 is
                 out, so the RB2 inherits the goal-line work.
 
-    Total share per channel is capped at 0.99 -- there is always an 'other'.
+    Total share per channel is capped at `cap` -- there is always an 'other'.
     """
     chans = list(chans)
     s = shares.copy()
@@ -258,8 +259,8 @@ def reallocate(shares: pd.DataFrame, active: set[str], pos: dict[str, str], chan
                         act.loc[m, ch] *= (have + gone) / have
     for ch in chans:
         tot = act[ch].sum()
-        if tot > 0.99:
-            act[ch] *= 0.99 / tot
+        if tot > cap:
+            act[ch] *= cap / tot
     return act[chans]
 
 
