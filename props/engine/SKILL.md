@@ -284,8 +284,15 @@ need not be surfaced. Write the reply as a premium prop guide with this structur
    Then the exposure lines from `exposure_*.csv`: each team-volume thesis ("BUF throws low"),
    how many legs ride on it, and P(all bettable legs hit) from the joint sim vs the
    independent product. State that same-player props are one bet, not two.
-   For anytime-TD calls, state each team's TD total and whether it is market-anchored;
-   if the history blend disagreed with the market by more than 20%, say so.
+   For anytime-TD calls, the model is `anytime_td_v1` (PROTOTYPE; see
+   `resources/model_registry.md`). State each team's expected offensive touchdowns and
+   the player's share of each, and say which model priced the row: the `td_model` column
+   reads `anytime_td_v1`, or `anytime_td_v0` when v1 could not run (no market implied
+   total). Give NO fair odds and NO "take Yes at +X" threshold for any anytime TD: v1 is
+   outcome-backtested but untested against posted lines. Its known weak spot is a player
+   in a NEW role -- a newly arrived starter, especially a running quarterback -- where one
+   game of evidence and a backup's prior leave the book far better informed; say so when
+   the gap is on such a player.
    Calibration: say plainly that NO market is validated against sportsbook lines.
    `resources/calibration_2025.csv` is a distributional self-check, not a track record:
    it places lines at fixed offsets from the model's own median, over every player-week

@@ -4647,3 +4647,61 @@ the lineup path. It remains as research, and the one lever plausibly worth
 testing before revisiting is the injury feed -- vacated opportunity when a
 teammate is ruled out -- since that is the information consensus has and it
 does not.
+
+## 2026-09-21 (79) -- anytime_td_v1 replaces v0; the case is calibration, and it is now established
+
+The user specified a five-layer touchdown model built around the touchdown
+event, and set the build order: team TD backtest, allocation backtest, sim,
+pricing. Layers 1 and 2 are done and ship as anytime_td_v1 (PROTOTYPE). Layer
+3 (the joint sim, for co-scoring) is next; parlays stay gated until it passes.
+
+**Layer 1, frozen.** Offensive touchdowns ~ Binomial(10), mean = implied
+points x league offensive TDs per point x (implied / mean)^0.25, D/ST a flat
+0.144 a game. Tuned on 2022-23 and scored AS-IS on 2024-25 and 2016-19; every
+step clears zero in both eras. The framework asked for a negative binomial on
+the premise of overdispersion; touchdown counts are UNDERdispersed (variance
+~0.76 of the mean), which a negative binomial cannot represent. n is a
+dispersion parameter, not a possession count. Team-specific TDs-per-point was
+worth nothing once shrunk.
+
+**Layer 2.** Five channels on raw opportunity counts, blended toward last
+season's role; a slot prior (x0.4) for players with no history; an absent
+player's share reallocated across the active roster. Given the team's
+touchdowns, better than the engine by -0.0029 (-0.0052, -0.0006).
+
+**End to end vs the anytime_td_v0 structure: -0.0034 (-0.0056, -0.0012).**
+The previous configuration was not established (-0.0021, CI to +0.0000); the
+scaled slot prior took it across. Split: layer 1 alone -0.0004, allocation
+-0.0030. The case the user made for the merge is calibration, and the mass
+diagnostic shows its mechanism directly: active players score 0.997 of their
+team's offensive touchdowns; v0 gives them 0.932 because an absent or
+departed player's share is never reassigned; v1 gives them 0.990. v0's mean
+predicted scoring rate is 0.135 against 0.148 actual, ~3 points low in the
+0.2-0.3 band where most lines sit -- the DET@BUF pattern. v1 predicts 0.145.
+
+**Five things tested and dropped, each against the simpler version:** the
+negative binomial; team-specific TDs-per-point; gamma applied to the total
+(D/ST is flat, so it bent the low end); expected-touchdown weighting of
+opportunities (+0.0026, worse -- the channels already carry the yard line);
+a Beta-distributed share (-0.0000, no effect).
+
+**Four harness defects caught before they measured anything:** franchise
+codes silently zeroing Oakland/San Diego/St. Louis touchdowns (a 0.042 CRPS
+"gain" that was the join); conditioning layer 2 on per-channel counts, which
+leaks the answer (QB log loss 0.32 -> 0.08 for that reason alone); movers
+counted on their old team in week 1; the active set taken from in-game snaps
+instead of the pre-game list. The reconciliation check now stops on missing
+touchdowns as well as excess ones.
+
+**One implementation.** scripts/td_v1.py is called by both score_game.py and
+the backtest, so the number validated is the number priced. The prior season
+is bundled as RAW inputs (build_td_priors.py, through the backtest's own
+loader), not finished shares. At release, every non-touchdown output of the
+scorer was byte-identical before and after on a live board.
+
+**No fair odds.** v1 is outcome-backtested, not tested against posted lines:
+no "take Yes at +X", no expected-value claim, never eligible. The edge test is
+log loss vs the no-vig market and CLV on logged TD prices. The td_model column
+survives into the settled record so a v0-fallback row is never graded as v1.
+Known weak spot, flagged on the first live board: a newly arrived running
+quarterback (Malik Willis, 4.6% vs the book's 26%).

@@ -25,12 +25,13 @@ from td_model import OFFENSIVE, _norm_team, classify_tds
 PBP_COLS_L2 = ["game_id", "season", "week", "season_type", "posteam", "defteam",
                "td_team", "touchdown", "pass_touchdown", "rush_touchdown",
                "yardline_100", "rusher_player_id", "play_type",
-               "receiver_player_id", "td_player_id", "qb_kneel", "two_point_attempt",
-               "air_yards"]
+               "receiver_player_id", "td_player_id", "qb_kneel", "two_point_attempt"]
 
-# Expected-touchdown weighting: buckets for the league TD rate per opportunity.
-YARD_BINS = [0, 1, 2, 3, 4, 5, 10, 15, 20, 30, 50, 100]
-AIR_BINS = [-100, 0, 5, 10, 20, 100]
+# Expected-touchdown weighting (each opportunity counted by the league TD rate
+# of opportunities like it) was built, scored and DROPPED: +0.0026 log loss,
+# CI (+0.0005, +0.0047). The channel bins already carry the yard line, and
+# weighting concentrates each share on fewer effective plays -- more variance,
+# no new signal. See reports/td_layer2.md.
 
 # The engine's current split, reproduced so the baseline is scored on the
 # same plays: all targets / inside-the-10 targets, all carries / inside-10.
@@ -70,60 +71,21 @@ def opportunities(pbp: pd.DataFrame, qb_ids: set[str]) -> pd.DataFrame:
                       "team": _norm_team(car["posteam"]), "player_id": car["rusher_player_id"],
                       "channel": np.where(car["rusher_player_id"].isin(qb_ids), "qb_rush",
                                           np.where(car["yardline_100"] <= 5, "rush_in5", "rush_far")),
-                      "engine": np.where(car["yardline_100"] <= 10, "car_i10", "car_all"),
-                      "kind": "car", "yardline_100": car["yardline_100"], "air_yards": np.nan,
-                      "td": ((car["rush_touchdown"] == 1) & (car["td_team"] == car["posteam"])).astype(int)})
+                      "engine": np.where(car["yardline_100"] <= 10, "car_i10", "car_all")})
     t = pd.DataFrame({"game_id": tgt["game_id"], "season": tgt["season"], "week": tgt["week"],
                       "team": _norm_team(tgt["posteam"]), "player_id": tgt["receiver_player_id"],
                       "channel": np.where(tgt["yardline_100"] <= 20, "pass_rz", "pass_far"),
-                      "engine": np.where(tgt["yardline_100"] <= 10, "tgt_i10", "tgt_all"),
-                      "kind": "tgt", "yardline_100": tgt["yardline_100"], "air_yards": tgt["air_yards"],
-                      "td": (tgt["pass_touchdown"] == 1).astype(int)})
+                      "engine": np.where(tgt["yardline_100"] <= 10, "tgt_i10", "tgt_all")})
     return pd.concat([c, t], ignore_index=True)
 
 
-def _bucket(o: pd.DataFrame) -> pd.DataFrame:
-    yb = pd.cut(o["yardline_100"], YARD_BINS, labels=False).fillna(-1).astype(int)
-    ab = np.where(o["kind"] == "tgt",
-                  pd.cut(o["air_yards"], AIR_BINS, labels=False).fillna(-1), -2).astype(int)
-    return pd.DataFrame({"kind": o["kind"].to_numpy(), "yb": yb.to_numpy(), "ab": ab}, index=o.index)
-
-
-def xtd_table(opps: pd.DataFrame) -> tuple[pd.Series, pd.Series]:
-    """League touchdown rate per opportunity by (kind, yard-line bucket,
-    air-yards bucket), with a coarser (kind, yard-line) fallback. Fitted on
-    the season BEFORE the one being predicted.
-
-    WHY. Raw opportunity shares treat a running back's checkdown at his own
-    30 the same as a deep shot, and a carry from the 5 the same as one from
-    the 4. Both models so far differ only in how they BIN those counts, which
-    is why five channels could not beat the engine's two. Weighting each
-    opportunity by how often an opportunity like it scores changes the
-    information, not the bins.
-    """
-    b = _bucket(opps).assign(td=opps["td"].to_numpy())
-    fine = b.groupby(["kind", "yb", "ab"])["td"].mean()
-    coarse = b.groupby(["kind", "yb"])["td"].mean()
-    return fine, coarse
-
-
-def xtd_weights(opps: pd.DataFrame, table: tuple[pd.Series, pd.Series]) -> pd.Series:
-    fine, coarse = table
-    b = _bucket(opps)
-    w = pd.Series(pd.MultiIndex.from_frame(b[["kind", "yb", "ab"]]).map(fine.to_dict()), index=opps.index)
-    fb = pd.Series(pd.MultiIndex.from_frame(b[["kind", "yb"]]).map(coarse.to_dict()), index=opps.index)
-    return w.fillna(fb).fillna(0.0)
-
-
-def counts(opps: pd.DataFrame, key: str, weight: str | None = None) -> pd.DataFrame:
-    """(season, week, game_id, team, player_id) x channel -> count, or the sum
-    of `weight` (expected touchdowns) when given.
+def counts(opps: pd.DataFrame, key: str) -> pd.DataFrame:
+    """(season, week, game_id, team, player_id) x channel -> count.
 
     For the engine key an inside-10 play ALSO counts in the `_all` column,
     because the engine's overall share is over every target or carry."""
-    grp = opps.groupby(["season", "week", "game_id", "team", "player_id", key])
-    agg = grp.size() if weight is None else grp[weight].sum()
-    g = agg.unstack(key, fill_value=0).reset_index()
+    g = (opps.groupby(["season", "week", "game_id", "team", "player_id", key]).size()
+         .unstack(key, fill_value=0).reset_index())
     g.columns.name = None
     if key == "engine":
         for a in ("tgt", "car"):
@@ -223,16 +185,21 @@ def slot_prior(cnt: pd.DataFrame, played: pd.DataFrame, slots: pd.DataFrame, cha
 
 
 def fill_no_history(shares: pd.DataFrame, actives: pd.DataFrame, prior: pd.DataFrame,
-                    chans) -> pd.DataFrame:
-    """Give every active player with NO share history his slot's league share.
-    `actives` has player_id, team and slot (pre-game depth chart; missing =
-    'OTHER'). Players who already have a share are untouched."""
+                    chans, scale: float = 1.0) -> pd.DataFrame:
+    """Give every active player with NO share history his slot's league share,
+    times `scale`. `actives` has player_id, team and slot (pre-game depth
+    chart; missing = 'OTHER'). Players who already have a share are untouched.
+
+    SCALE, because the full slot share runs 2.5x high on these players (0.098
+    predicted vs 0.035 actual on 572 player-games, and the engine's own slot
+    prior 0.089): a rookie or new arrival listed at RB1 is not a typical RB1.
+    The factor is tuned on the tune seasons."""
     chans = list(chans)
     new = actives[~actives["player_id"].isin(shares.index)]
     if new.empty:
         return shares
     slot = new["slot"].fillna("OTHER").where(new["slot"].fillna("OTHER").isin(prior.index), "OTHER")
-    rows = prior.reindex(slot.to_numpy()).fillna(0.0)
+    rows = prior.reindex(slot.to_numpy()).fillna(0.0) * scale
     rows.index = new["player_id"].to_numpy()
     rows["team"] = new["team"].to_numpy()
     rows["pri_team"] = np.nan
@@ -294,6 +261,45 @@ def reallocate(shares: pd.DataFrame, active: set[str], pos: dict[str, str], chan
         if tot > 0.99:
             act[ch] *= 0.99 / tot
     return act[chans]
+
+
+def none_moments(q, k_max: int, c: float | None) -> np.ndarray:
+    """E[(1 - s)^k] for k = 0..k_max, per player, where the per-touchdown
+    share s varies game to game as Beta(q*c, (1-q)*c) around its mean q.
+
+      E[(1 - s)^k] = B(a, b + k) / B(a, b) = prod_{j<k} (b + j) / (a + b + j)
+
+    WHY NOT (1 - q)^k. That uses the MEAN share, but (1 - s)^k is convex, so
+    by Jensen the mean-share formula understates P(no touchdown) -- and
+    overstates P(score) -- whenever the team scores more than once. The gap
+    is zero at one team touchdown, largest at mid-to-high shares, and
+    vanishes as P(score) nears 1; the rebuild's top bins ran high in exactly
+    that range (0.512 predicted vs 0.482 actual). c is the concentration:
+    c -> infinity is a fixed share.
+    """
+    q = np.clip(np.asarray(q, float), 0.0, 0.999)[:, None]
+    out = np.ones((q.shape[0], k_max + 1))
+    if k_max == 0:
+        return out
+    j = np.arange(k_max)[None, :]
+    if c is None:
+        r = np.repeat(1.0 - q, k_max, axis=1)
+    else:
+        a, b = q * c, (1.0 - q) * c
+        r = (b + j) / (a + b + j)
+    out[:, 1:] = np.cumprod(r, axis=1)
+    return out
+
+
+def p_score_given(q, k: int, c: float | None = None) -> np.ndarray:
+    """P(at least one touchdown) given the team scores exactly k."""
+    return 1.0 - none_moments(q, int(k), c)[:, int(k)]
+
+
+def p_score_dist(q, pmf: np.ndarray, c: float | None = None) -> np.ndarray:
+    """P(at least one touchdown) when the team's count has distribution `pmf`
+    over 0..K: P(none) = sum_k P(N = k) * E[(1 - s)^k]."""
+    return 1.0 - none_moments(q, len(pmf) - 1, c) @ np.asarray(pmf, float)
 
 
 def p_score(shares: pd.DataFrame, n_by_channel: dict[str, float]) -> pd.Series:

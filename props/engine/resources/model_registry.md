@@ -52,9 +52,57 @@ To `VALIDATED_BETTING`: everything above plus archive coverage (rows, bookmakers
   - No opponent run-defense adjustment.
 - Next step to `VALIDATED_DISTRIBUTION`: run the Gate A harness on this market.
 
+### anytime_td_v1
+- Markets: player_anytime_td
+- Status: `PROTOTYPE`. Replaces anytime_td_v0 (kept only as the labelled fallback when
+  v1 cannot run: no market implied total, or its inputs fail).
+- Code: `scripts/td_v1.py`, the single implementation. `score_game.py` prices from it and
+  `scripts/td_alloc_backtest.py` scores it, so the number validated is the number priced.
+- Spec:
+  - Team: offensive touchdowns ~ Binomial(10), mean = implied points x league offensive
+    TDs per point x (implied / mean implied)^0.25. Offensive only; defence and special
+    teams never settle an offensive player's anytime prop.
+  - Who scores: each active player's share of five opportunity channels (QB rush, rush
+    from the 5 in, rush beyond, red-zone targets, targets beyond the 20), blended toward
+    last season's role (kappa 5 games); a role from another team counts 0.25; a player
+    with no history gets 0.4 x his depth-chart slot's league share; an absent player's
+    share is reallocated across the active roster.
+  - P(score) = 1 - sum_k P(N = k) (1 - q)^k, q = his per-touchdown share.
+- Test (outcome backtest, no lines): tuned 2022-23, scored 2024-25, 15,022 player-games on
+  the game-day active list. `reports/td_v1.md`, `reports/td_layer1_frozen.md`,
+  `reports/td_layer2.md`.
+  - End to end vs the anytime_td_v0 structure: log loss **-0.0034 (-0.0056, -0.0012)**,
+    game-clustered. The previous configuration (no scaled slot prior) was NOT established
+    (-0.0021, CI to +0.0000); the scaled slot prior is what took it across.
+  - Split: layer 1 alone -0.0004 (established, small); allocation alone -0.0030.
+  - THE CASE IS CALIBRATION. v0 under-predicts the scoring rate (0.135 vs 0.148 actual) and
+    runs ~3 points low in the 0.2-0.3 band where most priced lines sit; v1 predicts 0.145.
+    The cause is allocation mass: active players score 0.997 of their team's offensive
+    touchdowns, v0 gives them 0.932 (absent and departed players' share never reassigned),
+    v1 gives them 0.990. A systematic low bias of that size suppresses real Yes edges
+    against a 25% relative edge floor -- the DET@BUF pattern, model below the book on all
+    nine priced players.
+  - Tested and dropped: expected-touchdown weighting (+0.0026, worse); a Beta-distributed
+    share (no effect, -0.0000); a team-specific TDs-per-point ratio.
+- NOT tested against posted sportsbook lines. So: no fair odds, no "take YES at +X"
+  thresholds, never eligible (eligibility.py). The benchmark for edge is log loss vs the
+  no-vig market on logged lines, plus CLV on TD prices, once the record holds them.
+- Known limits:
+  - The lowest probability bin is still low (0.022 predicted vs 0.032 actual) -- backups
+    with history and small shares, not the no-history players.
+  - A player in a NEW role: a newly arrived starter has one game of evidence and a prior
+    from his old role at 0.25 weight. Worst for a running quarterback: on its first live
+    board (MIA@SF 2026 week 2) v1 priced Malik Willis at 4.6% against the book's 26%.
+    That is the case a usage model is least informed on and the market most.
+  - Scorers are independent across teams, so it does not price correlated multi-scorer
+    markets. That is layer 3.
+- Live check at release: on MIA@SF 2026 week 2, every non-touchdown output of the scorer
+  was byte-identical before and after the switch; summed per-touchdown share of each
+  team's actives 0.990, as in the backtest.
+
 ### anytime_td_v0
 - Markets: player_anytime_td
-- Status: `PROTOTYPE`
+- Status: `SUPERSEDED` by anytime_td_v1 on 2026-09-21; retained as its fallback only.
 - Spec: project team passing and rushing TDs; split each into the goal-line portion (plays
   starting inside the 10) and the long-play portion using prior-season league fractions
   (2025: 48% of passing TDs and 74% of rushing TDs from inside the 10); allocate the

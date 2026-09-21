@@ -178,29 +178,46 @@ def test_the_moved_role_weight_is_a_real_setting():
     assert full.loc["rb", "rush_in5"] == pytest.approx((1 + 10 * 0.6) / 20)
 
 
-# -------------------------------------------------- expected-touchdown weights
+# ------------------------------------------------------------ Beta share
 
-def _opps(rows):
-    return pd.DataFrame(rows, columns=["season", "kind", "yardline_100", "air_yards", "td"])
-
-
-def test_an_opportunity_counts_by_how_often_one_like_it_scores():
-    """A carry from the 1 and one from midfield are not the same opportunity;
-    raw counts said they were."""
-    prior = _opps([(2024, "car", 1, np.nan, 1), (2024, "car", 1, np.nan, 0),
-                   (2024, "car", 60, np.nan, 0), (2024, "car", 60, np.nan, 0)])
-    now = _opps([(2025, "car", 1, np.nan, 0), (2025, "car", 60, np.nan, 0)])
-    w = A.xtd_weights(now, A.xtd_table(prior))
-    assert w.tolist() == pytest.approx([0.5, 0.0])
+def test_a_beta_share_matches_the_worked_example():
+    """The review's example: s = 0.25, three team touchdowns, c = 20.
+    Fixed share 1 - 0.75^3 = 0.578; Beta(5, 15): 1 - (15*16*17)/(20*21*22) = 0.558."""
+    assert A.p_score_given([0.25], 3, None)[0] == pytest.approx(1 - 0.75 ** 3)
+    assert A.p_score_given([0.25], 3, 20.0)[0] == pytest.approx(1 - (15 * 16 * 17) / (20 * 21 * 22))
+    assert A.p_score_given([0.25], 3, 20.0)[0] == pytest.approx(0.558, abs=0.0005)
 
 
-def test_targets_are_split_by_air_yards_and_fall_back_when_a_bucket_is_empty():
-    prior = _opps([(2024, "tgt", 60, 30, 1), (2024, "tgt", 60, 30, 0),
-                   (2024, "tgt", 60, 2, 0), (2024, "tgt", 60, 2, 0)])
-    now = _opps([(2025, "tgt", 60, 30, 0), (2025, "tgt", 60, 2, 0),
-                 (2025, "tgt", 60, 12, 0)])        # 10-19 air yards: unseen -> coarse bucket
-    w = A.xtd_weights(now, A.xtd_table(prior))
-    assert w.tolist() == pytest.approx([0.5, 0.0, 0.25])
+def test_a_varying_share_lowers_p_score_where_the_top_bins_ran_high():
+    """Jensen: (1 - s)^k is convex, so a share that varies game to game gives
+    a LOWER chance of scoring than its mean share whenever the team scores
+    more than once. The gap is NOT monotonic in the share: it is zero for a
+    single team touchdown (E[1 - s] = 1 - q exactly), largest at mid-to-high
+    shares, and vanishes as P(score) approaches 1. At three team touchdowns
+    that puts the correction in the 0.45-0.70 range, where the rebuild ran
+    high."""
+    q = np.array([0.05, 0.25, 0.90])
+    fixed, beta = A.p_score_given(q, 3, None), A.p_score_given(q, 3, 20.0)
+    assert (beta < fixed).all()
+    gap = fixed - beta
+    assert gap[1] > gap[0] and gap[1] > gap[2]          # peaks in the middle
+    assert A.p_score_given(q, 1, 20.0) == pytest.approx(A.p_score_given(q, 1, None))
+
+
+def test_huge_concentration_is_the_fixed_share_and_zero_share_never_scores():
+    assert A.p_score_given([0.3], 4, 1e9)[0] == pytest.approx(A.p_score_given([0.3], 4, None)[0], abs=1e-6)
+    assert A.p_score_given([0.0], 4, 20.0)[0] == pytest.approx(0.0)
+    assert A.p_score_given([0.3], 0, 20.0)[0] == pytest.approx(0.0)
+
+
+def test_the_unconditional_probability_mixes_over_the_team_count():
+    """P(none) = sum_k P(N = k) * E[(1 - s)^k]. With a fixed share and a
+    binomial count this collapses to (1 - p*q)^n, the closed form."""
+    import td_model as T
+    pmf = T.count_pmf([2.4], n=10)[0]
+    got = A.p_score_dist([0.2], pmf, None)[0]
+    assert got == pytest.approx(1 - (1 - 0.24 * 0.2) ** 10, abs=1e-9)
+    assert A.p_score_dist([0.2], pmf, 20.0)[0] < got
 
 
 # ------------------------------------------------------------- slot prior
@@ -222,6 +239,10 @@ def test_a_player_with_no_history_gets_his_slots_league_share():
     assert out.loc["vet", "rush_in5"] == pytest.approx(0.3)       # history kept
     assert out.loc["rookie", "rush_in5"] == pytest.approx(0.8)    # RB1's league share
     assert out.loc["nobody", "rush_in5"] == pytest.approx(0.0)    # no slot, no 'OTHER' row here
+    # the slot share runs 2.5x high on no-history players, so it can be scaled
+    scaled = A.fill_no_history(shares, act, prior, ["rush_in5"], scale=0.4)
+    assert scaled.loc["rookie", "rush_in5"] == pytest.approx(0.32)
+    assert scaled.loc["vet", "rush_in5"] == pytest.approx(0.3)    # history never scaled
 
 
 def test_a_mover_with_current_games_is_blended_at_half_weight():

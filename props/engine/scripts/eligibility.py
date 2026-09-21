@@ -49,7 +49,10 @@ MODEL_STATUS = {
     "player_receptions": "receiving_hier_v2, MODEL_UNVALIDATED (PROTOTYPE)",
     "player_reception_yds": "receiving_hier_v2, MODEL_UNVALIDATED (PROTOTYPE)",
     "player_rush_yds": "rush_yds_v0, MODEL_UNVALIDATED (no backtest)",
-    "player_anytime_td": "anytime_td_v0, MODEL_UNVALIDATED (no backtest)",
+    # v1: outcome-backtested (2024-25, end-to-end log loss -0.0034 vs v0's
+    # structure), still UNVALIDATED against posted lines -- so it prices no
+    # fair odds and is never eligible. See model_registry.md.
+    "player_anytime_td": "anytime_td_v1, MODEL_UNVALIDATED (PROTOTYPE)",
 }
 
 # Markets whose model has passed a holdout against posted lines. Empty, and it
