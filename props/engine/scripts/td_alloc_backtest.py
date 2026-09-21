@@ -251,7 +251,9 @@ def run(D: dict, seasons: list[int], cfgs: list) -> tuple[pd.DataFrame, pd.DataF
                 act_tds = sum(scored_n.get((g["game_id"], p), 0) for p in ids)
                 mrow = {"season": s, "week": w, "game_id": g["game_id"], "team": g["team"],
                         "n_off": n_off, "actives_scored": act_tds, "sum_q_engine": float(q_eng.sum()),
-                        "nohist_q_engine": float(q_eng[nohist_ids].sum())}
+                        "nohist_q_engine": float(q_eng[nohist_ids].sum()),
+                        "qb_rush_tds": int(g["qb_rush"]), "qb_league": ctx["qb_league"],
+                        "starter_id": qb, "new_starter": bool(new_qb)}
                 # td_v1.game_q is per_td(game_shares, game_mix); split here only so the
                 # reallocation is not repeated for every quarterback setting
                 qs, by_cap = {}, {}
@@ -259,7 +261,11 @@ def run(D: dict, seasons: list[int], cfgs: list) -> tuple[pd.DataFrame, pd.DataF
                     al, cap, b = qk
                     if (al, cap) not in by_cap:
                         by_cap[(al, cap)] = V.game_shares(filled[al], g["team"], ids, pos, MODE, cap)
-                    qs[qk] = V.per_td(by_cap[(al, cap)], V.game_mix(ctx, g["team"], qb, b)).clip(upper=0.999)
+                    mix_k = V.game_mix(ctx, g["team"], qb, b)
+                    qs[qk] = V.per_td(by_cap[(al, cap)], mix_k).clip(upper=0.999)
+                    mrow[f"wqb|{qid(qk)}"] = float(mix_k["qb_rush"])
+                    if qk == (SHIP[0], SHIP[2], SHIP[3]) and qb is not None:
+                        mrow["s_qb_pred"] = float(by_cap[(al, cap)].loc[qb, "qb_rush"])
                     mrow[f"sum_q|{qid(qk)}"] = float(qs[qk].sum())
                     mrow[f"nohist_q|{qid(qk)}"] = float(qs[qk][nohist_ids].sum())
                 mass.append(mrow)
@@ -269,6 +275,7 @@ def run(D: dict, seasons: list[int], cfgs: list) -> tuple[pd.DataFrame, pd.DataF
                 for cfg in cfgs:
                     q = qs[(cfg[0], cfg[2], cfg[3])].to_numpy()
                     k, c = cid(cfg), cfg[1]
+                    cols[f"q|{qid((cfg[0], cfg[2], cfg[3]))}"] = q
                     cols[f"n|{k}"] = A.p_score_given(q, n_off, c)
                     cols[f"e2e|{k}"] = A.p_score_dist(q, pmf_new, c)
                     cols[f"engl2|{k}"] = A.p_score_dist(q, pmf_eng, c)
@@ -277,6 +284,7 @@ def run(D: dict, seasons: list[int], cfgs: list) -> tuple[pd.DataFrame, pd.DataF
                     r = {**base, "player_id": pid, "pos": pos.get(pid), "no_history": pid in nh_set,
                          "starter": pid == qb, "new_starter": pid == qb and new_qb,
                          "scored": int(scored_n.get((g["game_id"], pid), 0) > 0),
+                         "tds": int(scored_n.get((g["game_id"], pid), 0)), "n_off": n_off,
                          "eng_n": float(eng_n[i]), "eng_e2e": float(eng_e2e[i]),
                          "l1_engalloc": float(l1_engalloc[i])}
                     for key, arr in cols.items():

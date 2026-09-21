@@ -1,7 +1,7 @@
 {
   "algorithm": "props-engine-sha256-lf-1",
-  "engine_sha256": "d7e9bd09ee5151e61d8c98e6c1f25149129bc5313afe0119e46ccd0b3fcd87a4",
-  "file_count": 41,
+  "engine_sha256": "4fa7976f1dc363554655b47b5f7f91d42baeb09ecc0b4dbf88b4c58796ae797d",
+  "file_count": 43,
   "files": {
     "SKILL.md": "adbd8ad7c09a4bbf85fbd45cc28dab03205b732bedc97846957199860726b76a",
     "resources/calibration_2025.csv": "47e3922c7af818307831d70a3d2be4333200f3aee1d94dc6bbf6e0e9ccee4ac8",
@@ -31,19 +31,21 @@
     "resources/prop_workflow.md": "fa3d9da47b757366936192ebe5ddbf698822f99bfc6162dc64eb697408296343",
     "resources/research_standard.md": "ad96e86bcbae405b9593d84420351820c4cac3026f993ac08a5af0ddc3913916",
     "resources/stadium_coords.csv": "cf9ce9133fa57249347a2ee14c90b2ddc011602aed5398b1ebf3f7fd0ea71aa1",
+    "scripts/absence_check.py": "0a97e975d96769ea15a8c65c7b3ae9681d1ab4f9bd9d98bd88671d9bc33f84a5",
     "scripts/backtest.py": "19646246709f5c9a39e2fc5eceba8af2d5135980a9011027131728298559a7f5",
     "scripts/build_priors.py": "51ff241ac3585feb63984c72f51e1b4c29946491942dea09e5357e5feaee8057",
     "scripts/build_td_priors.py": "b9457e49618b56943ffaf13c7ebfe0a47cf36794dd3849108178d1456e9bb0d3",
     "scripts/eligibility.py": "84c468a0b401b66128b4f21d1f311a42d7b8021744096ab077c52c519d7e9b8a",
     "scripts/model.py": "ae0da50fcaf1b0344d045bd371f902b3786ca8fba1abe0fee68f6e7653c2d527",
     "scripts/odds_client.py": "434186273bd0412a5545247228298951c5d0504a19c8a47c4c782bf3bb75aaa1",
-    "scripts/score_game.py": "2c249a3c8275d061651d03fbd7026ee7449e0454ddd33525da1927a89116eee1",
+    "scripts/score_game.py": "5c86db45c5a85c9110bf34bc964d8402555eddec7322c18163a6b0634634dea8",
     "scripts/score_week.py": "1c91499ab89bc30c30b63e7f79e5d4472905e7e64e6d0b6a42b3796a13de06c4",
     "scripts/td_alloc.py": "a2e59e09e37a8fd79eaa282b8290abe7805ac6c16614fe259341ec9fb08d4d24",
-    "scripts/td_alloc_backtest.py": "c351ab00a7e61851b831366d597e4bd9d752ad5012b36b0e93d524db9f80a46d",
+    "scripts/td_alloc_backtest.py": "6c740f75b4588cc125940450530f1d8563165709068c29f2e6cdf494cab3a678",
     "scripts/td_backtest.py": "0ae77781fea2de212154ff72f64b0792f15f77fabfda7cae944fce20b3c9895f",
+    "scripts/td_diagnostics.py": "6571bfb9fe2fba7b04a32cba85631525de6a8840141aaee596a66f72864aa7da",
     "scripts/td_model.py": "dce5f0d005a670c138dcf1b74398b0ddf70d4c82ef6a5c2b6730db70658d313c",
     "scripts/td_v1.py": "a82c363ed3a0b13464656a299a5c7209c63ce04eccbd2f20f08ff11f207e50ac"
   },
-  "tag": "props-v1.6"
+  "tag": "props-v1.7"
 }

@@ -4778,3 +4778,49 @@ byte-identical to props-v1.5; with George Kittle marked Questionable the
 section appears (McCaffrey Over 4.5 catches 65% -> 82% if Kittle is out).
 Eligibility still treats Questionable as ineligible; nothing is eligible while
 every market is unvalidated. Lock at props-v1.6.
+
+## 2026-09-21 (82) -- diagnostics before layer 3: no count effect, a top-share level bias, a QB share squeeze, an Out-path overstatement
+
+The user asked for two checks before the sim and two fixes to PR 36. Code
+review ran on everything before pushing; its main catch changed a conclusion.
+
+**Share by team TD count (reports/td_diagnostics.md).** The hypothesis was that
+q falls with k for the top-share player (late TDs to backups). It does not:
+realised/expected for the top-q player is roughly flat across k (0.86, 0.87,
+0.93, 0.93 on 2022-23; 1.00, 0.83, 0.94, 0.93 on 2024-25). A first cut by FINAL
+margin showed 0.76 when trailing -- but the player's own touchdowns move the
+final margin, so that split manufactures the effect (review finding). Split by
+what he cannot move: flat by pre-game spread (0.90-0.93); lower when the
+OPPONENT scores 27+ (0.81-0.86, CI below 1 in both eras). So: (a) the top-q
+player is over-predicted ~10% at every k and spread -- a level bias consistent
+with under-shrunk top shares, which a proportional Beta cannot fix; (b) a real
+but modest script signal tied to the opponent's scoring. Consequence for layer
+3: shares are drawn once per game, not per touchdown; the script latent links
+the opponent's scoring to the channel mix.
+
+**Starting-QB level.** Not the drift the user suspected: the channel weight is
+right on 2024-25 (0.0807 predicted vs 0.0810 realised). The miss is the
+starter's share WITHIN the QB-rush channel: 0.70 predicted vs 0.88 realised
+carry share, 0.71 vs 0.90 even for established starters. Mechanism: a share is
+his opportunities over his team's in the games HE played, so a backup who
+played only while the starter was out carries a starter-sized share (CIN's
+backup 0.958; Willis at GB 0.883). With both active the channel sums past 1
+and the 0.99 cap squeezes the starter (Love 0.52). The same flaw applies to any
+fill-in at any position. Proposed fix, not yet built: role-conditional shares
+(a player's share from games where he held his current depth-chart role).
+
+**Out path spot check (reports/absence_te1.md).** 48 team-seasons, 198 games
+where a TE1 (15%+ share) sat. Against the scorer's rule (absent share to the
+eligible set, pro rata), RBs get 0.55 and WRs 0.48 of the predicted gain, the
+lead back 0.24; other TEs take 9.7x theirs. The Kittle example (McCaffrey Over
+4.5 catches 65% -> 82%) is mostly an artefact. Proposed fix: redistribute by
+position first, as the TD layer's 'position' mode does.
+
+**Record fixes.** Rows priced while a teammate is Questionable carry
+questionable_teammate, kept through record, settle and a scorecard bucket.
+And a defect of mine: td_model was never in record_run's PRED_FIELDS, so the
+#79 claim that it survives into the settled record was false -- no recorded row
+carried it. Fixed, with a test.
+
+**Review fixes.** The scenario re-runs now use only a snapshot written in the
+same run, and clear their output file before each re-run.
