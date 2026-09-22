@@ -36,6 +36,20 @@ import persist  # noqa: E402
 
 SHADOW_RE = re.compile(r"shadow_log_(\d{4})_wk(\d{2})_([A-Z]{2,3})_([A-Z]{2,3})\.csv$")
 ARCHIVE_RE = re.compile(r"line_archive_nfl_(\d{4})\.jsonl$")
+JOINT_RE = re.compile(r"joint_td_(\d{4})_wk(\d{2})_([A-Z]{2,3})_([A-Z]{2,3})\.csv$")
+JOINT_NUM = {"p_a", "p_b", "p_indep", "p_joint"}
+
+
+def read_joint(path: Path, snapshot_type: str, game: str, stamp: dict) -> list[dict]:
+    """Layer-3 joint prices (shadow) as record rows."""
+    rows = []
+    with path.open(encoding="utf-8") as fh:
+        for raw in csv.DictReader(fh):
+            row = {k: (float(v) if k in JOINT_NUM and v not in ("", None) else v) for k, v in raw.items()}
+            row["season"], row["week"] = int(row["season"]), int(row["week"])
+            row.update(stamp, snapshot_type=snapshot_type, game=game, engine_run_file=path.name)
+            rows.append(row)
+    return rows
 
 # Fields kept on a prediction row. Everything needed to grade the call later
 # and to reconstruct why it was made, without carrying the whole model state.
@@ -229,6 +243,14 @@ def main() -> int:
             read_shadow_log(f, args.snapshot_type, game, stamp, kickoff))
     for (season, week), rows in sorted(by_week.items()):
         summaries.append(persist.write_predictions(season, week, rows))
+
+    joint_by_week: dict[tuple[int, int], list[dict]] = {}
+    for f in sorted(p for p in src.iterdir() if JOINT_RE.search(p.name)):
+        m = JOINT_RE.search(f.name)
+        joint_by_week.setdefault((int(m.group(1)), int(m.group(2))), []).extend(
+            read_joint(f, args.snapshot_type, f"{m.group(3)}@{m.group(4)}", stamp))
+    for (season, week), rows in sorted(joint_by_week.items()):
+        summaries.append(persist.write_joint(season, week, rows))
 
     for f in archive_files:
         season = int(ARCHIVE_RE.search(f.name).group(1))

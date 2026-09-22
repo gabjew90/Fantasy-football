@@ -271,6 +271,8 @@ Two rules for every reply:
   line says it; the reply says it in its opening lines, not buried under the tables.
 - **Call `present_files` on the report** (`report_*.md`, plus `summary_*.md` for a `--markets` run) so
   the user can open it.
+- **Never present `joint_td_*.csv` as parlay prices.** It is layer 3 in shadow, logged for grading
+  while parlays are gated; its numbers do not appear in the reply.
 
 When `score_game.py` has been run, the CHAT REPLY is the deliverable, not the report file.
 The archive JSONL and shadow-log CSV are still written (they feed closing-line value) but

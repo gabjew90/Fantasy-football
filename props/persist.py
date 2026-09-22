@@ -152,6 +152,21 @@ def write_predictions(season: int, week: int, rows: list[dict]) -> dict:
     return out
 
 
+# Layer-3 joint prices, logged in SHADOW. A pair is identified by its two legs;
+# re-runs of the same engine and snapshot replace, different engines coexist.
+JOINT_KEY = ("season", "week", "event_id", "player_a", "player_b", "snapshot_type", "engine_hash")
+
+
+def joint_path(season: int, week: int) -> Path:
+    return RECORD_ROOT / "joint" / str(season) / f"wk{week:02d}.jsonl"
+
+
+def write_joint(season: int, week: int, rows: list[dict]) -> dict:
+    out = append_jsonl(joint_path(season, week), rows, JOINT_KEY)
+    out["mode"] = mode()
+    return out
+
+
 def write_lines(season: int, rows: list[dict]) -> dict:
     out = append_jsonl(lines_path(season), rows, LINE_KEY)
     out["mode"] = mode()

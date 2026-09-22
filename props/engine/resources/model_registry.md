@@ -62,8 +62,10 @@ To `VALIDATED_BETTING`: everything above plus archive coverage (rows, bookmakers
   - Team: offensive touchdowns ~ Binomial(10), mean = implied points x league offensive
     TDs per point x (implied / mean implied)^0.25. Offensive only; defence and special
     teams never settle an offensive player's anytime prop.
-  - Who scores: each active player's share of five opportunity channels (QB rush, rush
-    from the 5 in, rush beyond, red-zone targets, targets beyond the 20), blended toward
+  - Who scores: each active player's share of six opportunity channels (QB rush, rush
+    from the 5 in, rush beyond, END-ZONE targets -- red-zone targets whose air yards reach the
+    end zone, other red-zone targets, targets beyond the 20; the end-zone split is
+    props-v1.12), blended toward
     last season's role (kappa 5 games); a role from another team counts 0.25; a player
     with no history gets 0.4 x his depth-chart slot's league share; an absent player's
     share is reallocated across the active roster.
@@ -114,6 +116,21 @@ To `VALIDATED_BETTING`: everything above plus archive coverage (rows, bookmakers
     (the gate); the lowest bin slips ~0.003 (backup QBs get less). Shipped vs v1 as first
     shipped: -0.0013 (-0.0029, +0.0004), not established; vs the v0 structure -0.0047
     (-0.0072, -0.0021).
+  - v1.3 (props-v1.12), the END-ZONE SPLIT (`reports/td_pass_ez.md`): red-zone targets and TDs
+    separated by whether the air yards reach the end zone. End-zone targets convert ~40% vs ~13%
+    for other red-zone targets; primary receivers hold more of the former (0.29 vs 0.22 share),
+    backs mostly the latter (checkdowns). Information, no fitted parameter. Paired vs v1.2 on
+    identical players: log loss flat in all three eras (2022-23 -0.0003, 2024-25 +0.0002,
+    2018-19 -0.0000, none established); position levels move toward actual in every era (RB
+    0.215 -> 0.204 vs 0.186, WR 0.140 -> 0.146 vs 0.154 on 2022-23; same direction 2024-25 and
+    2018-19); the 0.45-0.6 bin gap narrows in 2024-25 (0.021 -> 0.011) and 2018-19 (0.053 ->
+    0.042), widens in 2022-23 (0.030 -> 0.039). The top-q player's passing-channel ratio moves
+    from 0.43-0.83 to 0.81-0.86. Under six channels the shipped model vs the v0 structure is
+    -0.0044 (-0.0069, -0.0019) end to end on 2024-25 (`reports/td_v1.md`).
+  - A factor on the top-q player's passing shares (rank multiplier) was tuned on top of the
+    split and NOT shipped (`reports/td_top_pass.md`): it takes his realised/expected to ~1.0 in
+    both eras but the 0.45-0.6 bin flips to under-prediction on 2024-25 (0.505 vs 0.538), so it
+    fails the top-bin gate.
   - Role-conditional shares (a player's share only from games in his current depth-chart
     role) tested and dropped: best variant -0.0003 on test, not established, and starting
     QBs barely moved -- weekly depth charts do not mark fill-in starts (`reports/td_role_tuning.md`).
@@ -166,6 +183,26 @@ To `VALIDATED_BETTING`: everything above plus archive coverage (rows, bookmakers
     (-0.00052, +0.00016), not established, level 0.0642 vs 0.0626 actual.
   - the two teams' TD counts correlate +0.15 (+0.06, +0.23) beyond their implied totals on
     2024-25 (+0.21 on 2022-23); the copula improves the count-pair likelihood in both eras.
+- SHADOW (props-v1.12): joint + mix shift (independent counts) is computed for every pair of
+  anytime-TD legs priced 10%+ on every board and logged to `record/joint/` (`joint_td_*.csv`);
+  nothing renders. The copula is NOT in it: its r is provisional, set by matching the pooled
+  residual count correlation (+0.175 -> r = 0.43), and on pairs it is not established on
+  2024-25 and worse on 2018-19 (+0.00029).
+- Rerun after the end-zone split (`reports/td_layer3.md`, 2024-25 and 2018-19): three-teammate
+  combinations beat the leg product in both eras (-0.00060, -0.00085, both established);
+  teammate pairs established on 2018-19 (-0.00065), not on 2024-25 (-0.00033); the
+  cross-team mix shift's dependence is no longer established (-0.00002) once the channels
+  carry the end-zone split. Gate (b) FAILS in both eras: actual/predicted runs 0.8-0.95 in
+  most large buckets, the level inherited from the legs.
+- THE PARLAY GATE, fixed before the evidence (DECISIONS #87). Parlays open only when ALL hold:
+  (a) a star pass-share fix passes its top-bin gate -- the 0.45-0.6 bin within its current
+      gap or better in both eras; OPEN (end-zone split shipped, rank multiplier failed);
+  (b) on the pair and three-leg test, actual / predicted within 5% in every lift bucket with
+      1,000+ combinations, in both eras; FAILING;
+  (c) a three-leg check exists and is scored; DONE (above);
+  (d) single-leg CLV on logged anytime-TD lines is at least neutral, since no API carries
+      same-game-parlay prices and the pair validation rests on outcomes plus single-leg market
+      evidence; NOT YET MEASURABLE (the record is filling).
 - Why the gate stays closed: the joint structure is right in direction but not established
   on test, and the largest remaining pair error is inherited from the legs -- pairs of two
   high-priced players run high (0.090 vs 0.079), the top-share players' passing-channel bias

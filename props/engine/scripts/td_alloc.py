@@ -26,7 +26,7 @@ PBP_COLS_L2 = ["game_id", "season", "week", "season_type", "posteam", "defteam",
                "td_team", "touchdown", "pass_touchdown", "rush_touchdown",
                "yardline_100", "rusher_player_id", "play_type",
                "receiver_player_id", "td_player_id", "qb_kneel", "two_point_attempt",
-               "passer_player_id"]
+               "passer_player_id", "air_yards"]
 
 # Expected-touchdown weighting (each opportunity counted by the league TD rate
 # of opportunities like it) was built, scored and DROPPED: +0.0026 log loss,
@@ -60,7 +60,8 @@ def opportunities(pbp: pd.DataFrame, qb_ids: set[str]) -> pd.DataFrame:
 
     A quarterback's carry is a qb_rush opportunity from anywhere; anyone
     else's is rush_in5 from the 5 or closer, rush_far beyond it. A target is
-    pass_rz from the 20 or closer, pass_far beyond. Kneels and two-point
+    pass_ez from the 20 or closer with air yards reaching the end zone,
+    pass_rz any other red-zone target, pass_far beyond. Kneels and two-point
     tries are dropped. Each row also carries the engine's own split, so the
     baseline is scored on identical plays.
     """
@@ -75,7 +76,9 @@ def opportunities(pbp: pd.DataFrame, qb_ids: set[str]) -> pd.DataFrame:
                       "engine": np.where(car["yardline_100"] <= 10, "car_i10", "car_all")})
     t = pd.DataFrame({"game_id": tgt["game_id"], "season": tgt["season"], "week": tgt["week"],
                       "team": _norm_team(tgt["posteam"]), "player_id": tgt["receiver_player_id"],
-                      "channel": np.where(tgt["yardline_100"] <= 20, "pass_rz", "pass_far"),
+                      "channel": np.select([(tgt["yardline_100"] <= 20)
+                                            & (tgt["air_yards"].fillna(-99) >= tgt["yardline_100"]),
+                                            tgt["yardline_100"] <= 20], ["pass_ez", "pass_rz"], "pass_far"),
                       "engine": np.where(tgt["yardline_100"] <= 10, "tgt_i10", "tgt_all")})
     return pd.concat([c, t], ignore_index=True)
 

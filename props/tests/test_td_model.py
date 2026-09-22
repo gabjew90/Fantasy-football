@@ -25,7 +25,7 @@ def _pbp(rows):
     cols = ["game_id", "season", "week", "season_type", "posteam", "defteam", "td_team",
             "touchdown", "pass_touchdown", "rush_touchdown", "yardline_100",
             "rusher_player_id", "play_type"]
-    return pd.DataFrame(rows, columns=cols)
+    return pd.DataFrame(rows, columns=cols).assign(air_yards=5.0)
 
 
 # ------------------------------------------------------------------ channels
@@ -35,7 +35,7 @@ def test_every_touchdown_lands_in_exactly_one_channel():
         ("g", 2025, 1, "REG", "A", "B", "A", 1, 0, 1, 1, "qb1", "run"),     # QB sneak
         ("g", 2025, 1, "REG", "A", "B", "A", 1, 0, 1, 3, "rb1", "run"),     # rush inside 5
         ("g", 2025, 1, "REG", "A", "B", "A", 1, 0, 1, 40, "rb1", "run"),    # rush from distance
-        ("g", 2025, 1, "REG", "A", "B", "A", 1, 1, 0, 12, None, "pass"),    # red-zone pass
+        ("g", 2025, 1, "REG", "A", "B", "A", 1, 1, 0, 12, None, "pass"),    # red-zone pass, caught short
         ("g", 2025, 1, "REG", "A", "B", "A", 1, 1, 0, 55, None, "pass"),    # explosive pass
         ("g", 2025, 1, "REG", "A", "B", "B", 1, 0, 0, 30, None, "pass"),    # pick-six by B
         ("g", 2025, 1, "REG", "A", "B", None, 0, 0, 0, 30, None, "pass"),   # not a TD
@@ -44,6 +44,9 @@ def test_every_touchdown_lands_in_exactly_one_channel():
     got = T.classify_tds(_pbp(rows), qb_ids={"qb1"})
     assert got["channel"].tolist() == ["qb_rush", "rush_in5", "rush_far",
                                        "pass_rz", "pass_far", "dst_other"]
+    # the same red-zone TD caught in the end zone (air yards 12 from the 12) is pass_ez
+    ez = T.classify_tds(_pbp([rows[3]]).assign(air_yards=12.0), qb_ids={"qb1"})
+    assert ez["channel"].item() == "pass_ez"
     # the pick-six belongs to the team that SCORED it, not the offence
     assert got.iloc[-1]["team"] == "B"
 

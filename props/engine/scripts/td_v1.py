@@ -51,6 +51,7 @@ V1 = {
     "qb_beta": 40.0,                  # starter QB-rush rate shrunk by 40 team TDs (tuned 2022-23); None = team mix
     "qb_window": 3,                   # seasons of the starter's career the rate looks back over
     "qb_share": 0.92,                 # the starter share WITHIN qb_rush (tuned 2022-23); None = from history
+    "top_pass": None,                 # factor on the top-q player's passing-channel shares; None = off
 }
 SKILL = {"QB": "QB", "RB": "RB", "FB": "RB", "WR": "WR", "TE": "TE"}
 LABEL = "anytime_td_v1"
@@ -200,12 +201,39 @@ def game_shares(shares: pd.DataFrame, team: str, ids: list[str], pos: dict,
     return m
 
 
+PASS_CHANNELS = [c for c in T.OFFENSIVE if c.startswith("pass_")]
+
+
+def apply_top_pass(m: pd.DataFrame, mix: pd.Series, factor=V1["top_pass"]) -> pd.DataFrame:
+    """The team's top per-TD-share player (usually the lead back) scores
+    below his passing-channel shares: 0.81-0.86 of expected even after the
+    end-zone split, while his rushing channels sit at ~1 (reports/
+    td_diagnostics.md). With `factor` set, his pass-channel shares are
+    multiplied by it and the removed share goes to his teammates in the same
+    channel, pro rata -- so each channel's total is unchanged."""
+    if factor is None or len(m) < 2:
+        return m
+    top = per_td(m, mix).idxmax()
+    m = m.copy()
+    for ch in PASS_CHANNELS:
+        cut = float(m.loc[top, ch]) * (1.0 - factor)
+        rest = m.index != top
+        tot = float(m.loc[rest, ch].sum())
+        if cut <= 0 or tot <= 0:
+            continue
+        m.loc[top, ch] -= cut
+        m.loc[rest, ch] += cut * m.loc[rest, ch] / tot
+    return m
+
+
 def game_q(shares: pd.DataFrame, team: str, ids: list[str], pos: dict, ctx: dict,
-           mode=V1["mode"], cap=V1["cap"], qb: str | None = None, beta=V1["qb_beta"]) -> pd.Series:
+           mode=V1["mode"], cap=V1["cap"], qb: str | None = None, beta=V1["qb_beta"],
+           top_pass=V1["top_pass"]) -> pd.Series:
     """Per-touchdown share of each active player on `team`; `qb` is the
     starting quarterback (starter())."""
     m = game_shares(shares, team, ids, pos, mode, cap, qb=qb)
-    return per_td(m, game_mix(ctx, team, qb, beta)).clip(upper=0.999)
+    mix = game_mix(ctx, team, qb, beta)
+    return per_td(apply_top_pass(m, mix, top_pass), mix).clip(upper=0.999)
 
 
 def team_pmf(implied: float, ctx: dict, trials=V1["trials"], gamma=V1["gamma"]) -> np.ndarray:
@@ -217,11 +245,18 @@ def game_detail(shares, team, ids, pos, ctx, implied, c=V1["c"], qb=None) -> pd.
     """For each active player on `team`: P(at least one touchdown), his
     per-touchdown share q, and the team's expected offensive touchdowns mu --
     the three numbers the report needs to explain the price."""
-    q = game_q(shares, team, ids, pos, ctx, qb=qb)
+    mix = game_mix(ctx, team, qb)
+    m = apply_top_pass(game_shares(shares, team, ids, pos, qb=qb), mix, V1["top_pass"])
+    q = per_td(m, mix).clip(upper=0.999)                  # = game_q, spelled out to keep m and mix
     pmf = team_pmf(implied, ctx)
     mu = float((pmf * np.arange(len(pmf))).sum())
-    return pd.DataFrame({"p": A.p_score_dist(q.to_numpy(), pmf, c), "q": q.to_numpy(),
-                         "mu": mu, "team": team}, index=ids)
+    out = pd.DataFrame({"p": A.p_score_dist(q.to_numpy(), pmf, c), "q": q.to_numpy(),
+                        "mu": mu, "team": team}, index=ids)
+    # channel shares and the team mix, for layer 3 (joint prices in shadow)
+    for ch in T.OFFENSIVE:
+        out[f"s_{ch}"] = m[ch].to_numpy()
+        out[f"w_{ch}"] = float(mix[ch])
+    return out
 
 
 def game_probabilities(shares, team, ids, pos, ctx, implied, c=V1["c"], qb=None) -> pd.Series:

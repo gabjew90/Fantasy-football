@@ -32,8 +32,8 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-CHANNELS = ("qb_rush", "rush_in5", "rush_far", "pass_rz", "pass_far", "dst_other")
-OFFENSIVE = CHANNELS[:5]   # dst_other never reaches an offensive player's prop
+CHANNELS = ("qb_rush", "rush_in5", "rush_far", "pass_ez", "pass_rz", "pass_far", "dst_other")
+OFFENSIVE = CHANNELS[:6]   # dst_other never reaches an offensive player's prop
 MAX_TD = 15            # support for count distributions; P(16+ TDs) is ~0
 
 # LAYER 1, FROZEN: offensive touchdowns ~ Binomial(10), mean = implied points
@@ -62,7 +62,7 @@ LAYER1 = {"target": "off_tds", "k_points": None, "trials": 10, "gamma": 0.25,
 
 PBP_COLS = ["game_id", "season", "week", "season_type", "posteam", "defteam",
             "td_team", "touchdown", "pass_touchdown", "rush_touchdown",
-            "yardline_100", "rusher_player_id", "play_type"]
+            "yardline_100", "rusher_player_id", "play_type", "air_yards"]
 
 
 # ------------------------------------------------------------------ events
@@ -74,7 +74,8 @@ def classify_tds(pbp: pd.DataFrame, qb_ids: set[str]) -> pd.DataFrame:
       qb_rush    a rushing TD by a quarterback, from any distance;
       rush_in5   any other rushing TD from the 5 or closer at the snap;
       rush_far   any other rushing TD from beyond the 5;
-      pass_rz    a passing TD thrown from the red zone (20 or closer);
+      pass_ez    a red-zone passing TD caught IN the end zone (air yards reach it);
+      pass_rz    any other red-zone passing TD (caught short, carried in);
       pass_far   a passing TD from beyond the 20 -- the explosive play;
       dst_other  everything else: return and defensive TDs, plus the rare
                  offensive fumble recovery in the end zone. None of these
@@ -87,9 +88,12 @@ def classify_tds(pbp: pd.DataFrame, qb_ids: set[str]) -> pd.DataFrame:
     pas = own & (d["pass_touchdown"] == 1)
     qb = rush & d["rusher_player_id"].isin(qb_ids)
     yl = d["yardline_100"]
+    if "air_yards" not in d.columns:
+        raise KeyError("classify_tds needs air_yards to separate end-zone targets (pass_ez)")
+    ez = pas & (yl <= 20) & (d["air_yards"].fillna(-99) >= yl)
     d["channel"] = np.select(
-        [qb, rush & (yl <= 5), rush, pas & (yl <= 20), pas],
-        ["qb_rush", "rush_in5", "rush_far", "pass_rz", "pass_far"],
+        [qb, rush & (yl <= 5), rush, ez, pas & (yl <= 20), pas],
+        ["qb_rush", "rush_in5", "rush_far", "pass_ez", "pass_rz", "pass_far"],
         default="dst_other")
     return d[["game_id", "season", "week", "td_team", "channel"]].rename(
         columns={"td_team": "team"})

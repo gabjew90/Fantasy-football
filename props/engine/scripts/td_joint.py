@@ -190,3 +190,51 @@ def p_pair_cross(qa_opp: np.ndarray, qb_opp: np.ndarray, P: np.ndarray) -> float
     pa = 1.0 - (1.0 - qa)[None, :] ** K[:, None]          # [k_a, k_b]
     pb = 1.0 - (1.0 - qb)[:, None] ** K[None, :]          # [k_a, k_b]
     return float((pa * pb * P).sum())
+
+
+# ------------------------------------------------------------ sets across both teams, and r by moment
+
+def _incl_excl(q_set: np.ndarray, K: np.ndarray) -> np.ndarray:
+    """[k_own, k_opp]: P(every player in the set scores | counts), by
+    inclusion-exclusion; q_set is (n x k_opp). An empty set gives 1."""
+    n = q_set.shape[0]
+    total = np.zeros((len(K), len(K)))
+    for r in range(n + 1):
+        for sub in combinations(range(n), r):
+            qs = q_set[list(sub)].sum(axis=0) if sub else np.zeros(len(K))
+            total += (-1) ** r * (np.clip(1.0 - qs, 0.0, 1.0)[None, :] ** K[:, None])
+    return total
+
+
+def p_all(qa_set: np.ndarray, qb_set: np.ndarray, P: np.ndarray) -> float:
+    """P(every listed player scores): qa_set players on team a (axis 0 of P),
+    qb_set on team b. Each set is (n x buckets); either may be empty (0 x
+    buckets). Covers pairs, triples and any small parlay across both teams."""
+    K = np.arange(P.shape[0])
+    ia = _incl_excl(_q_at(qa_set, K), K) if len(qa_set) else np.ones((len(K), len(K)))
+    ib = _incl_excl(_q_at(qb_set, K), K) if len(qb_set) else np.ones((len(K), len(K)))
+    return float((ia * ib.T * P).sum())
+
+
+def implied_count_corr(r: float, mu_a: float, mu_b: float) -> float:
+    """Correlation of the two teams' counts that loading r implies."""
+    P = joint_counts(mu_a, mu_b, r=r)
+    K = np.arange(P.shape[0])
+    pa, pb = P.sum(1), P.sum(0)
+    ma, mb = (K * pa).sum(), (K * pb).sum()
+    cov = (K[:, None] * K[None, :] * P).sum() - ma * mb
+    return float(cov / np.sqrt(((K - ma) ** 2 * pa).sum() * ((K - mb) ** 2 * pb).sum()))
+
+
+def r_for_corr(target: float, mus: list[tuple[float, float]], lo: float = 0.0, hi: float = 0.95) -> float:
+    """The loading whose implied count correlation, averaged over these games'
+    means, equals `target` (bisection). Moment matching, not likelihood: the
+    score-pair likelihood rewarded r = 0.5 while the residual correlation it
+    should reproduce implies ~0.4."""
+    if target <= 0:
+        return 0.0
+    f = lambda r: np.mean([implied_count_corr(r, a, b) for a, b in mus]) - target  # noqa: E731
+    for _ in range(30):
+        mid = (lo + hi) / 2
+        lo, hi = (mid, hi) if f(mid) < 0 else (lo, mid)
+    return round((lo + hi) / 2, 3)

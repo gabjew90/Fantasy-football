@@ -27,6 +27,7 @@ CH = list(T.OFFENSIVE)
 
 
 def _cnt(rows):
+    rows = [tuple(r[:8]) + (0,) + tuple(r[8:]) if len(r) == 5 + len(CH) - 1 else r for r in rows]
     return pd.DataFrame(rows, columns=["season", "week", "game_id", "team", "player_id", *CH])
 
 
@@ -36,6 +37,7 @@ def _played(rows):
 
 def _tg(rows):
     """team-games: (game_id, season, week, team, points, implied, *channel counts)."""
+    rows = [tuple(r[:9]) + (0,) + tuple(r[9:]) if len(r) == 6 + len(CH) else r for r in rows]
     d = pd.DataFrame(rows, columns=["game_id", "season", "week", "team", "points", "implied",
                                     *CH, "dst_other"])
     d["off_tds"] = d[CH].sum(axis=1)
@@ -168,7 +170,7 @@ def _qb_pbp():
             ("g", 2025, 1, "REG", "A", "B", "run", None, "q1", None, "q1", "A", 1, 1, 0, 8, 0, 0),
             ("g", 2025, 1, "REG", "A", "B", "run", None, "rb", None, "rb", "A", 1, 1, 0, 2, 0, 0),
             ("g", 2025, 1, "REG", "B", "A", "pass", "qb", None, "x", "x", "B", 1, 0, 1, 30, 0, 0)]
-    return pd.DataFrame(rows, columns=cols)
+    return pd.DataFrame(rows, columns=cols).assign(air_yards=5.0)
 
 
 def test_qb_starts_names_the_starter_and_counts_his_qb_rush_touchdowns():

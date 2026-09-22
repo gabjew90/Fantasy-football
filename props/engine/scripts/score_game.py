@@ -30,6 +30,7 @@ import pandas as pd
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import eligibility
 import model as MODEL
+import td_joint as TDJ
 import td_v1 as TDV1
 from model import norm_name, name_key_loose, is_team_entry, blend
 
@@ -1371,6 +1372,18 @@ def main():
             TDB[[c for c in ["player", "team", "book", "price", "p_model", "p_novig", "gap", "td_model",
                              "questionable_teammate", "flag", "decision"] if c in TDB.columns]] \
                 .sort_values("p_model", ascending=False).to_csv(OUT / f"td_board_{slug}.csv", index=False)
+    # LAYER 3 IN SHADOW: exact joint prices for every pair of anytime-TD legs
+    # priced 10%+ (joint + mix shift, independent counts), logged for grading.
+    # Nothing renders: parlays stay gated (model_registry.md, td_joint_v0).
+    try:
+        J_ = joint_shadow(R, M, V1TD, AWAY, HOME, PRIOR)
+        if len(J_):
+            J_.insert(0, "event_id", quote_meta.get("event_id"))
+            J_.insert(0, "week", WEEK); J_.insert(0, "season", SEASON)
+            J_.insert(0, "logged_at_utc", now())
+            J_.to_csv(OUT / f"joint_td_{slug}.csv", index=False)
+    except Exception as exc:  # noqa: BLE001 -- shadow output must never cost the prop run
+        log(f"  joint shadow skipped ({type(exc).__name__}: {exc})")
     arch = OUT / f"line_archive_nfl_{SEASON}.jsonl"
     if a.prior_archive and Path(a.prior_archive).exists() and arch.exists():
         seen, merged = set(), []
@@ -2320,6 +2333,54 @@ def apply_out_rule(M: pd.DataFrame, E: pd.DataFrame, teams, rule=None):
 # inside-10 targets -90 (-121, -62), inside-10 carries -375 (-617, -206).
 OUT_RULE = {"ts": (0.2, 0.25), "i10ts": (0.0, 0.0), "rs": (0.0, 0.25), "i10rs": (0.0, 0.25)}
 POS_GROUP = {"FB": "RB", "HB": "RB"}
+JOINT_LEG_MIN = 0.10
+
+
+def joint_shadow(R, M, V1TD, away, home, prior) -> pd.DataFrame:
+    """Every pair of anytime-TD legs priced JOINT_LEG_MIN+ by anytime_td_v1:
+    the leg-by-leg product and the layer-3 joint price (teammates share their
+    team's count; each team's channel mix shifts with the opponent's count).
+    The copula is not used: r is provisional (DECISIONS #87)."""
+    if R.empty or V1TD is None or V1TD.empty:
+        return pd.DataFrame()
+    td = R[(R.market == "player_anytime_td") & (R.td_model == TDV1.LABEL) & (R.p_model >= JOINT_LEG_MIN)]
+    td = td.sort_values("p_model", ascending=False).drop_duplicates("player")
+    gsis = dict(zip(M["name"], M["gsis_id"]))
+    td = td[td.player.map(gsis).isin(V1TD.index)]
+    if len(td) < 2:
+        return pd.DataFrame()
+    mf = RES / f"priors_{prior}_td_mixshift.csv"
+    shift = pd.read_csv(mf, index_col=0)[TDJ.CH] if mf.exists() else None
+    mu = {t: float(V1TD[V1TD.team == t]["mu"].iloc[0]) for t in (away, home) if (V1TD.team == t).any()}
+    if len(mu) < 2:
+        return pd.DataFrame()
+    P = TDJ.joint_counts(mu[away], mu[home])
+    axis = {away: 0, home: 1}
+    q = {}
+    for t in (away, home):
+        v = V1TD[V1TD.team == t]
+        shares = v[[f"s_{c}" for c in TDJ.CH]].set_axis(TDJ.CH, axis=1)
+        mix = pd.Series([float(v[f"w_{c}"].iloc[0]) for c in TDJ.CH], index=TDJ.CH)
+        qm = TDJ.q_by_opp(shares, TDJ.mixes_by_opp(mix, shift))
+        q.update({g: qm[i] for i, g in enumerate(v.index)})
+    empty = np.zeros((0, TDJ.OPP_BUCKETS))
+    rows = []
+    legs = list(td.itertuples())
+    for i in range(len(legs)):
+        for j in range(i + 1, len(legs)):
+            a_, b_ = legs[i], legs[j]
+            ga, gb = gsis[a_.player], gsis[b_.player]
+            on_a = [q[g] for g, t in ((ga, a_.team), (gb, b_.team)) if axis[t] == 0]
+            on_b = [q[g] for g, t in ((ga, a_.team), (gb, b_.team)) if axis[t] == 1]
+            pj = TDJ.p_all(np.array(on_a) if on_a else empty, np.array(on_b) if on_b else empty, P)
+            rows.append({"player_a": a_.player, "team_a": a_.team, "player_b": b_.player, "team_b": b_.team,
+                         "kind": "teammates" if a_.team == b_.team else "opponents",
+                         "p_a": float(a_.p_model), "p_b": float(b_.p_model),
+                         "p_indep": float(a_.p_model * b_.p_model), "p_joint": pj,
+                         "joint_model": "td_joint_v0 (joint + mix shift; shadow)"})
+    return pd.DataFrame(rows)
+
+
 def ev_statement(R: pd.DataFrame) -> str:
     """Say plainly whether any priced row has positive expected value at the
     price actually posted -- the first thing a reader wants to know."""
