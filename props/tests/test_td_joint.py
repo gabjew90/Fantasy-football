@@ -148,7 +148,7 @@ def test_the_gate_table_fails_when_a_large_bucket_is_off():
     passing in the gate summary even when the row said FAIL."""
     import td_joint_backtest as JB
     n = JB.GATE_MIN + 10
-    g = pd.DataFrame({"indep": np.full(n, 0.10), "joint1": np.full(n, 0.10),
+    g = pd.DataFrame({"game_id": np.arange(n) % 50, "indep": np.full(n, 0.10), "joint1": np.full(n, 0.10),
                       "both": np.r_[np.ones(int(n * 0.2)), np.zeros(n - int(n * 0.2))]})   # actual 0.2 vs 0.1
     L = []
     assert JB.lift_table(L, g, "joint1", "t") is False
