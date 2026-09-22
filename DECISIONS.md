@@ -5000,5 +5000,11 @@ A defect found while testing: with --markets td the betting card is empty and
 had no columns, which crashed the player cards; the card now always has its
 columns.
 
+Code review before pushing: --today used the host clock, which is UTC in the
+chat container and on Actions, so on a Monday night it read Tuesday and missed
+Monday Night Football; it now uses the US Eastern date (games.csv's calendar),
+and so does score_game's next-meeting choice. And a --lines-file run was
+labelled 'priced from Sleeper' in housekeeping; the label names the real source.
+
 Checks: MIA@SF 2026 week 2 full run -- shadow log identical to props-v1.10,
 <details> balanced (3/3); TD-only run balanced (3/3) with the short summary.

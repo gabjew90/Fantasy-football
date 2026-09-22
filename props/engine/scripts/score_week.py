@@ -36,7 +36,7 @@ import pandas as pd
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
-from score_game import GAMES_URL, OUT, eastern_to_utc, fetch  # noqa: E402
+from score_game import GAMES_URL, OUT, eastern_to_utc, et_today, fetch  # noqa: E402
 
 # The report contains "≥" and other non-cp1252 characters. The Linux
 # runner writes UTF-8 by default so this was invisible in CI, while every
@@ -111,7 +111,7 @@ def main():
     (wd / "logs").mkdir(exist_ok=True)
     games = pd.read_csv(fetch(GAMES_URL, wd / "games.csv"))
     if a.today:
-        a.date = datetime.now().strftime("%Y-%m-%d")
+        a.date = et_today()          # games.csv dates are US Eastern; the host clock may be UTC
     if a.date:
         on = games[(games.gameday == a.date) & (games.game_type == "REG")]
         if on.empty:

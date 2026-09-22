@@ -74,3 +74,22 @@ def test_last_quota_reads_the_newest_cache_file(tmp_path, monkeypatch):
     (tmp_path / "cache" / "odds_x_1.json").write_text(json.dumps({"quota": {"x-requests-remaining": "412"}}),
                                                      encoding="utf-8")
     assert SG.last_oddsapi_quota() == 412
+
+
+def test_today_is_the_eastern_date_not_the_utc_one(monkeypatch):
+    """Monday 8:30 pm ET is Tuesday 00:30 UTC: --today must still say Monday."""
+    import datetime as dt
+
+    class Fake(dt.datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return dt.datetime(2026, 9, 22, 0, 30, tzinfo=dt.timezone.utc)
+    monkeypatch.setattr(SG, "datetime", Fake)
+    assert SG.et_today() == "2026-09-21"
+
+    class Winter(dt.datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return dt.datetime(2026, 12, 8, 4, 30, tzinfo=dt.timezone.utc)   # Mon 11:30 pm EST
+    monkeypatch.setattr(SG, "datetime", Winter)
+    assert SG.et_today() == "2026-12-07"

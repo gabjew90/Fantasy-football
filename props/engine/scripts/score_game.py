@@ -140,6 +140,22 @@ FANTASY_PRESETS = {"ppr": {"rec": 1.0}, "half": {"rec": 0.5}, "std": {"rec": 0.0
 FANTASY_BASE = {"rec": 1.0, "rec_yd": 0.1, "rush_yd": 0.1, "rush_td": 6.0, "rec_td": 6.0}
 
 
+def et_today() -> str:
+    """Today's date in US Eastern time, the calendar games.csv uses. The chat
+    container and Actions runners run on UTC, which is already tomorrow on a
+    Monday night. DST: second Sunday of March to first Sunday of November."""
+    from datetime import timedelta
+    now = datetime.now(timezone.utc)
+    y = now.year
+
+    def nth_sunday(month, n):
+        d = datetime(y, month, 1, tzinfo=timezone.utc)
+        first = d + timedelta(days=(6 - d.weekday()) % 7)
+        return first + timedelta(weeks=n - 1)
+    dst = nth_sunday(3, 2) + timedelta(hours=7) <= now < nth_sunday(11, 1) + timedelta(hours=6)
+    return (now - timedelta(hours=4 if dst else 5)).strftime("%Y-%m-%d")
+
+
 def resolve_team(x: str) -> str:
     x = x.strip().upper()
     return CLI_ALIASES.get(x, x)
@@ -308,7 +324,7 @@ def main():
         g = g[g.week == a.week]
     elif len(g) > 1:
         # no --week: the NEXT meeting (divisional teams meet twice), else the latest
-        upcoming = g[g.gameday >= datetime.now().strftime("%Y-%m-%d")]
+        upcoming = g[g.gameday >= et_today()]
         g = upcoming.sort_values("gameday").head(1) if len(upcoming) else g.sort_values("gameday").tail(1)
     if g.empty:
         seen = games[(games.season == SEASON) & (games.game_type == "REG")
@@ -2185,8 +2201,10 @@ def main():
     L.append("## Housekeeping\n")
     if quote_meta:
         _q = (quote_meta.get("quota") or {}).get("x-requests-remaining")
+        src_ = ("priced from Sleeper" if sleeper_used else
+                "priced from the manual lines file" if a.lines_file else "no quota header returned")
         L.append(f"- Prices captured {quote_meta['retrieved']} UTC. Odds API calls remaining this month: "
-                 + ("n/a (priced from Sleeper)" if sleeper_used or _q is None else f"{_q}") + ".")
+                 + (f"n/a ({src_})" if sleeper_used or a.lines_file or _q is None else f"{_q}") + ".")
     L.append(f"- Routes run and route participation: not available from any verified source, so not used.")
     L.append(f"- QB rushing yards left out on purpose: kneel-downs count against the prop and we don't model them yet.")
     if hrs > 1:
