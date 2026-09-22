@@ -37,7 +37,8 @@ import persist  # noqa: E402
 SHADOW_RE = re.compile(r"shadow_log_(\d{4})_wk(\d{2})_([A-Z]{2,3})_([A-Z]{2,3})\.csv$")
 ARCHIVE_RE = re.compile(r"line_archive_nfl_(\d{4})\.jsonl$")
 JOINT_RE = re.compile(r"joint_td_(\d{4})_wk(\d{2})_([A-Z]{2,3})_([A-Z]{2,3})\.csv$")
-JOINT_NUM = {"p_a", "p_b", "p_indep", "p_joint"}
+JOINT_NUM = {"p_a", "p_b", "p_indep", "p_joint", "p_joint_plain", "p_joint_shift", "p_joint_shift_copula",
+             "p_joint_copula"}
 
 
 def read_joint(path: Path, snapshot_type: str, game: str, stamp: dict) -> list[dict]:

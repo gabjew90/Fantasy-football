@@ -44,6 +44,17 @@ import pandas as pd
 import td_model as T
 
 OPP_BUCKETS = 5            # opponent offensive TDs 0, 1, 2, 3, 4+
+# The copula loading, PROVISIONAL: set by matching the pooled residual count
+# correlation (+0.175 over 2022-25 and 2018-19), not by likelihood. Used only in
+# the shadow log, never in a price.
+R_PROVISIONAL = 0.43
+# Dirichlet concentration of a team's split of its touchdowns (game-to-game
+# variation), tuned on the three-teammate class of 2022-23 (DECISIONS #89).
+DIRICHLET_C = 100.0
+# The committed gate output: which parlay classes are open and each one's model.
+GATE_FILE = "td_parlay_gate.json"
+STRUCTURES = {"joint": ("plain", False), "joint + mix shift": ("shift", False),
+              "joint + mix shift + copula": ("shift", True), "joint + copula": ("plain", True)}
 CH = list(T.OFFENSIVE)
 _GH_Z, _GH_W = np.polynomial.hermite_e.hermegauss(40)     # nodes/weights for a standard normal
 _GH_W = _GH_W / _GH_W.sum()
@@ -157,13 +168,32 @@ def _q_at(qb: np.ndarray, k_opp: np.ndarray) -> np.ndarray:
     return qb[..., np.minimum(k_opp, OPP_BUCKETS - 1)]
 
 
-def p_any(q_opp: np.ndarray, P: np.ndarray, own_axis: int = 0) -> np.ndarray:
+def _none_moment(qs: np.ndarray, K: np.ndarray, c: float | None) -> np.ndarray:
+    """[k_own, k_opp]: E[(1 - s)^k_own] where s is a combined per-TD share.
+
+    c None: s is fixed at qs, so (1 - qs)^k. With a DIRICHLET over the team's
+    shares (concentration c), a team's split of its touchdowns varies game to
+    game, and by the aggregation property any subset's combined share is
+    Beta(c qs, c (1 - qs)); its moments are prod_{j<k} (b + j) / (a + b + j).
+    Teammates' shares are then negatively correlated within a game, so three
+    teammates all scoring is rarer than a fixed split says."""
+    qs = np.clip(np.asarray(qs, float), 0.0, 0.999)
+    if c is None:
+        return (1.0 - qs)[None, :] ** K[:, None]
+    a, b = c * qs, c * (1.0 - qs)
+    j = np.arange(len(K) - 1)[:, None]
+    out = np.ones((len(K), len(qs)))
+    out[1:] = np.cumprod((b[None, :] + j) / (a[None, :] + b[None, :] + j), axis=0)
+    return out
+
+
+def p_any(q_opp: np.ndarray, P: np.ndarray, own_axis: int = 0, c: float | None = None) -> np.ndarray:
     """P(score) for each player of the team on `own_axis` of P.
-    q_opp: (players x buckets)."""
+    q_opp: (players x buckets); c: Dirichlet concentration (None = fixed shares)."""
     K = np.arange(P.shape[0])
     Pk = P if own_axis == 0 else P.T                       # [k_own, k_opp]
     q = _q_at(q_opp, K)                                   # players x k_opp
-    none = (1.0 - q)[:, None, :] ** K[None, :, None]      # players x k_own x k_opp
+    none = np.stack([_none_moment(qi, K, c) for qi in q]) if len(q) else np.zeros((0, len(K), len(K)))
     return 1.0 - (none * Pk[None]).sum(axis=(1, 2))
 
 
@@ -194,25 +224,27 @@ def p_pair_cross(qa_opp: np.ndarray, qb_opp: np.ndarray, P: np.ndarray) -> float
 
 # ------------------------------------------------------------ sets across both teams, and r by moment
 
-def _incl_excl(q_set: np.ndarray, K: np.ndarray) -> np.ndarray:
+def _incl_excl(q_set: np.ndarray, K: np.ndarray, c: float | None = None) -> np.ndarray:
     """[k_own, k_opp]: P(every player in the set scores | counts), by
-    inclusion-exclusion; q_set is (n x k_opp). An empty set gives 1."""
+    inclusion-exclusion; q_set is (n x k_opp). An empty set gives 1. c is the
+    Dirichlet concentration of the team's shares (None = fixed)."""
     n = q_set.shape[0]
     total = np.zeros((len(K), len(K)))
     for r in range(n + 1):
         for sub in combinations(range(n), r):
             qs = q_set[list(sub)].sum(axis=0) if sub else np.zeros(len(K))
-            total += (-1) ** r * (np.clip(1.0 - qs, 0.0, 1.0)[None, :] ** K[:, None])
+            total += (-1) ** r * _none_moment(np.clip(qs, 0.0, 1.0), K, c)
     return total
 
 
-def p_all(qa_set: np.ndarray, qb_set: np.ndarray, P: np.ndarray) -> float:
+def p_all(qa_set: np.ndarray, qb_set: np.ndarray, P: np.ndarray, c: float | None = None) -> float:
     """P(every listed player scores): qa_set players on team a (axis 0 of P),
     qb_set on team b. Each set is (n x buckets); either may be empty (0 x
-    buckets). Covers pairs, triples and any small parlay across both teams."""
+    buckets). Covers pairs, triples and any small parlay across both teams.
+    c: Dirichlet concentration of each team's shares (None = fixed shares)."""
     K = np.arange(P.shape[0])
-    ia = _incl_excl(_q_at(qa_set, K), K) if len(qa_set) else np.ones((len(K), len(K)))
-    ib = _incl_excl(_q_at(qb_set, K), K) if len(qb_set) else np.ones((len(K), len(K)))
+    ia = _incl_excl(_q_at(qa_set, K), K, c) if len(qa_set) else np.ones((len(K), len(K)))
+    ib = _incl_excl(_q_at(qb_set, K), K, c) if len(qb_set) else np.ones((len(K), len(K)))
     return float((ia * ib.T * P).sum())
 
 

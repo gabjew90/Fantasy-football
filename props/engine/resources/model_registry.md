@@ -211,7 +211,27 @@ To `VALIDATED_BETTING`: everything above plus archive coverage (rows, bookmakers
   mixed three legs (1.107) and three teammates. EVERY failing bucket's game-clustered 95%
   interval includes 1: pair intervals span about +-8%, three-leg intervals +-13-25%. With ~540
   games per era a 5% point tolerance is below the data's resolution (DECISIONS #88).
-- THE PARLAY GATE, fixed before the evidence (DECISIONS #87). Parlays open only when ALL hold:
+- props-v1.14 (DECISIONS #89): THE GATE IS A SCRIPT OUTPUT. `td_joint_backtest.py` writes
+  `td_parlay_gate.json` (bundled in resources/, copied to reports/), and the scorer renders only
+  what it opened. Current gate (a')/(b') and status (`reports/td_parlay_gate.json`):
+  (a') per era, the 0.45-0.6 single-leg bin's 95% interval of actual minus predicted contains 0:
+      PASS in 2024-25 (+0.024, -0.019 to +0.065) and 2018-19 (+0.013);
+  (b') per class, pooled over 2024-25 and 2018-19 (1,056 games), OPEN if |ratio - 1| <= 5% and
+      the 95% interval half-width < 10%, UNRESOLVED if the ratio is within 5% but wider, FAIL
+      otherwise; classes open individually:
+        cross-team pair   1.007 (0.955, 1.060)  OPEN        (joint + mix shift + copula)
+        teammate pair     1.014 (0.959, 1.074)  OPEN        (joint + mix shift + copula)
+        mixed 3-leg       0.991 (0.902, 1.085)  OPEN        (joint + mix shift + copula)
+        three teammates   0.969 (0.861, 1.084)  UNRESOLVED  (joint)
+  Each class's model is the candidate with the lowest pooled TUNE log loss for that class; the
+  differences are in the fourth decimal, so all four candidates are logged in shadow and the
+  graded record will settle it. A Dirichlet over each team's split of its TDs (c = 100, tuned on
+  the three-teammate class of 2022-23; single-leg log loss 0.34629 -> 0.34626, no harm) moved
+  three teammates from 0.926 (FAIL) to 0.969 and teammate pairs from 0.991 to 1.014.
+  The report renders a "Touchdown pairs" section for the open PAIR classes only (mixed 3-leg is
+  open but not rendered: the combinations explode, and pairs carry the volume). Both legs are
+  PROTOTYPE, so no fair odds. Gate (d), single-leg CLV, is set aside by the user for now.
+- THE PARLAY GATE as first fixed (DECISIONS #87), superseded by (a')/(b') above:
   (a) a star pass-share fix passes its top-bin gate -- the 0.45-0.6 bin within its current
       gap or better in both eras; OPEN (end-zone split shipped, rank multiplier failed);
   (b) on the pair and three-leg test, actual / predicted within 5% in every lift bucket with

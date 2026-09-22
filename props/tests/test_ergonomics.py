@@ -93,3 +93,55 @@ def test_today_is_the_eastern_date_not_the_utc_one(monkeypatch):
             return dt.datetime(2026, 12, 8, 4, 30, tzinfo=dt.timezone.utc)   # Mon 11:30 pm EST
     monkeypatch.setattr(SG, "datetime", Winter)
     assert SG.et_today() == "2026-12-07"
+
+
+def _pairs():
+    return pd.DataFrame({"kind": ["opponents", "teammates"], "player_a": ["A", "C"], "team_a": ["X", "X"],
+                         "player_b": ["B", "D"], "team_b": ["Y", "X"], "p_indep": [0.10, 0.10],
+                         "p_joint_plain": [0.10, 0.09], "p_joint_shift": [0.10, 0.09],
+                         "p_joint_shift_copula": [0.105, 0.09], "p_joint_copula": [0.105, 0.09]})
+
+
+def _gate(open_classes):
+    b = {c: {"ratio": 1.0, "ci": [0.95, 1.05], "games": 1000}
+         for c in ("cross-team pair", "teammate pair", "mixed 3-leg", "three teammates")}
+    return {"open_classes": open_classes, "b_prime": b,
+            "picks": {"cross-team pair": "joint + mix shift + copula", "teammate pair": "joint"}}
+
+
+def test_td_pairs_render_only_open_classes_from_the_committed_gate(tmp_path, monkeypatch):
+    monkeypatch.setattr(SG, "RES", tmp_path)
+    assert SG.td_pairs_section(_pairs()) == []                      # no gate file: nothing renders
+    (tmp_path / "td_parlay_gate.json").write_text(json.dumps(_gate(["cross-team pair"])), encoding="utf-8")
+    text = "\n".join(SG.td_pairs_section(_pairs()))
+    assert "cross-team pair" in text and "A (X) + B (Y) | 10.5%" in text     # its pick's column
+    assert "teammate pair (layer 3" not in text                               # not open: not shown
+    (tmp_path / "td_parlay_gate.json").write_text(json.dumps(_gate([])), encoding="utf-8")
+    assert SG.td_pairs_section(_pairs()) == []
+
+
+def test_joint_shadow_uses_the_gated_specification(tmp_path, monkeypatch):
+    """The rendered pairs must be the model the gate scored: its mix shift,
+    copula r and Dirichlet c come from the gate JSON, not from constants or a
+    table estimated on other seasons."""
+    import td_joint as TDJ
+    ch = TDJ.CH
+    V1TD = pd.DataFrame({"team": ["A", "A", "B"], "mu": [2.5, 2.5, 2.0]}, index=["a1", "a2", "b1"])
+    for c_ in ch:
+        V1TD[f"s_{c_}"] = [0.3, 0.2, 0.3]
+        V1TD[f"w_{c_}"] = 1.0 / len(ch)
+    M = pd.DataFrame({"name": ["P1", "P2", "Q1"], "gsis_id": ["a1", "a2", "b1"]})
+    R = pd.DataFrame({"market": "player_anytime_td", "td_model": SG.TDV1.LABEL, "player": ["P1", "P2", "Q1"],
+                      "team": ["A", "A", "B"], "p_model": [0.4, 0.3, 0.35]})
+    monkeypatch.setattr(SG, "RES", tmp_path)
+    no_gate = SG.joint_shadow(R, M, V1TD, "A", "B", 2025)
+    assert "spec bundled" in no_gate["joint_model"].iloc[0]
+    spec = {"copula_r": 0.0, "dirichlet_c": None,
+            "mix_shift": {"channels": list(ch), "rows": [[1.0] * len(ch)] * TDJ.OPP_BUCKETS}}
+    (tmp_path / "td_parlay_gate.json").write_text(json.dumps(spec), encoding="utf-8")
+    J = SG.joint_shadow(R, M, V1TD, "A", "B", 2025)
+    assert "spec gate" in J["joint_model"].iloc[0]
+    # r = 0 and no shift: every candidate collapses to plain joint, and cross-team equals the product
+    cross = J[J["kind"] == "opponents"]
+    assert np.allclose(cross["p_joint_copula"], cross["p_joint_plain"])
+    assert np.allclose(cross["p_joint_shift_copula"], cross["p_joint_shift"])
