@@ -2334,13 +2334,16 @@ def apply_out_rule(M: pd.DataFrame, E: pd.DataFrame, teams, rule=None):
 OUT_RULE = {"ts": (0.2, 0.25), "i10ts": (0.0, 0.0), "rs": (0.0, 0.25), "i10rs": (0.0, 0.25)}
 POS_GROUP = {"FB": "RB", "HB": "RB"}
 JOINT_LEG_MIN = 0.10
+# The shadow model is plain joint (teammates share their team's count): chosen on
+# the tune seasons over joint + mix shift and the copula variants (DECISIONS #88).
+JOINT_MIX_SHIFT = False
 
 
 def joint_shadow(R, M, V1TD, away, home, prior) -> pd.DataFrame:
     """Every pair of anytime-TD legs priced JOINT_LEG_MIN+ by anytime_td_v1:
-    the leg-by-leg product and the layer-3 joint price (teammates share their
-    team's count; each team's channel mix shifts with the opponent's count).
-    The copula is not used: r is provisional (DECISIONS #87)."""
+    the leg-by-leg product and the layer-3 joint price. The shadow model is
+    plain joint -- teammates share their team's count -- chosen on the tune
+    seasons over the mix shift and the copula (DECISIONS #88)."""
     if R.empty or V1TD is None or V1TD.empty:
         return pd.DataFrame()
     td = R[(R.market == "player_anytime_td") & (R.td_model == TDV1.LABEL) & (R.p_model >= JOINT_LEG_MIN)]
@@ -2361,7 +2364,7 @@ def joint_shadow(R, M, V1TD, away, home, prior) -> pd.DataFrame:
         v = V1TD[V1TD.team == t]
         shares = v[[f"s_{c}" for c in TDJ.CH]].set_axis(TDJ.CH, axis=1)
         mix = pd.Series([float(v[f"w_{c}"].iloc[0]) for c in TDJ.CH], index=TDJ.CH)
-        qm = TDJ.q_by_opp(shares, TDJ.mixes_by_opp(mix, shift))
+        qm = TDJ.q_by_opp(shares, TDJ.mixes_by_opp(mix, shift if JOINT_MIX_SHIFT else None))
         q.update({g: qm[i] for i, g in enumerate(v.index)})
     empty = np.zeros((0, TDJ.OPP_BUCKETS))
     rows = []
@@ -2377,7 +2380,7 @@ def joint_shadow(R, M, V1TD, away, home, prior) -> pd.DataFrame:
                          "kind": "teammates" if a_.team == b_.team else "opponents",
                          "p_a": float(a_.p_model), "p_b": float(b_.p_model),
                          "p_indep": float(a_.p_model * b_.p_model), "p_joint": pj,
-                         "joint_model": "td_joint_v0 (joint + mix shift; shadow)"})
+                         "joint_model": "td_joint_v0 (joint; shadow)"})
     return pd.DataFrame(rows)
 
 

@@ -131,6 +131,16 @@ To `VALIDATED_BETTING`: everything above plus archive coverage (rows, bookmakers
     split and NOT shipped (`reports/td_top_pass.md`): it takes his realised/expected to ~1.0 in
     both eras but the 0.45-0.6 bin flips to under-prediction on 2024-25 (0.505 vs 0.538), so it
     fails the top-bin gate.
+  - v1.4 (props-v1.13), the SLOT PULL (`reports/td_slot_pull.md`, `reports/td_slot_pull_2018_19.md`):
+    each active player's shares are shrunk 20% toward his pre-game depth-chart slot's league share
+    (empirical-Bayes; players ranked by an estimated share carry its noise). Tuned on 2022-23
+    JOINTLY with kappa (6 x 4 grid; 0.2 with kappa 5 best, kappa unchanged). Scored as-is:
+    2024-25 -0.0060 (-0.0084, -0.0039) and 2018-19 -0.0038 (-0.0056, -0.0021) end to end vs
+    v1.3, both established -- the largest single gain in the model's history. Shipped vs the
+    v0 structure: -0.0105 (-0.0136, -0.0076) on 2024-25, mean predicted 0.147 vs 0.148
+    (`reports/td_v1.md`). The lowest bin is fixed (0.020 vs 0.031 -> 0.030 vs 0.026). The top
+    bin: 2018-19 gap +0.042 -> -0.013; 2024-25 +0.011 -> -0.025 (under-predicted, and the
+    0.3-0.45 bin 0.362 vs 0.380) -- each about one standard error of a ~500-row bin.
   - Role-conditional shares (a player's share only from games in his current depth-chart
     role) tested and dropped: best variant -0.0003 on test, not established, and starting
     QBs barely moved -- weekly depth charts do not mark fill-in starts (`reports/td_role_tuning.md`).
@@ -194,6 +204,13 @@ To `VALIDATED_BETTING`: everything above plus archive coverage (rows, bookmakers
   cross-team mix shift's dependence is no longer established (-0.00002) once the channels
   carry the end-zone split. Gate (b) FAILS in both eras: actual/predicted runs 0.8-0.95 in
   most large buckets, the level inherited from the legs.
+- props-v1.13: the shadow model is PLAIN JOINT (teammates share their team's count), chosen on
+  tune over joint + mix shift and the two copula variants by the worst large lift bucket. Rerun
+  with the slot pull (`reports/td_layer3.md`): 2018-19 passes (b) for pairs and mixed three-leg
+  combinations, fails three teammates; 2024-25 passes teammate pairs, fails opponents (1.076),
+  mixed three legs (1.107) and three teammates. EVERY failing bucket's game-clustered 95%
+  interval includes 1: pair intervals span about +-8%, three-leg intervals +-13-25%. With ~540
+  games per era a 5% point tolerance is below the data's resolution (DECISIONS #88).
 - THE PARLAY GATE, fixed before the evidence (DECISIONS #87). Parlays open only when ALL hold:
   (a) a star pass-share fix passes its top-bin gate -- the 0.45-0.6 bin within its current
       gap or better in both eras; OPEN (end-zone split shipped, rank multiplier failed);

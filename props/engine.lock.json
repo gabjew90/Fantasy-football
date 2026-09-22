@@ -1,6 +1,6 @@
 {
   "algorithm": "props-engine-sha256-lf-1",
-  "engine_sha256": "b2819a2677a2c8d51aeed572ca38e0e18fa0b3695328c934c4d23b2cfd2d286c",
+  "engine_sha256": "fcb113aaa24d173de9c826d15e03035169fece198c5d55cb40ef85f47e0ac8b7",
   "file_count": 48,
   "files": {
     "SKILL.md": "d10dd02ea2868b346ce3d24f178ab0bbe7a84d9ab4e773379d990075b1020689",
@@ -9,7 +9,7 @@
     "resources/execution_protocol.md": "5f54fb23a77d60ecc947d44b6f18ecf67c4357d6b49c70bc937726c1c14016c1",
     "resources/line_archive.md": "baf1b6b97ec439bdf26b73dc4c3ae23d0c4ee9f502db4be7baae70390cdb5c45",
     "resources/methodology.md": "2d96c40403b1c63e1a4ea0a3c615f00e28d46f99122c5fd5ccbcf7704301772c",
-    "resources/model_registry.md": "baecb3f1fc44c1a822f6256dbe8572575a3a7ecb2762165ac21c3bb0ed55719c",
+    "resources/model_registry.md": "c55fb0a64d4e44356579e564024a9163c8d7fec8a8d6ac4a5dd5c2497e47c217",
     "resources/modeling_framework.md": "51568adb4e4f69442a98190b3909c0e3c0c4042f5348289bb8799dab541ed2e7",
     "resources/priors_2024_opponent.csv": "aa37b5af3e6b758ce08c7d71179083e3af5df0c9bb3492fe848eb9e2a7d1f9e4",
     "resources/priors_2024_params.json": "6eb67b77139926c9e5d7e2a3fde2ff01c7175600be4d3e14260c3320598b007f",
@@ -40,17 +40,17 @@
     "scripts/eligibility.py": "84c468a0b401b66128b4f21d1f311a42d7b8021744096ab077c52c519d7e9b8a",
     "scripts/model.py": "ae0da50fcaf1b0344d045bd371f902b3786ca8fba1abe0fee68f6e7653c2d527",
     "scripts/odds_client.py": "434186273bd0412a5545247228298951c5d0504a19c8a47c4c782bf3bb75aaa1",
-    "scripts/score_game.py": "c1e38131b3e0ff3eff6dcd726338cba3ee828afe16995d36e0ff42ef8dec1ea2",
+    "scripts/score_game.py": "67f0d3359e208fd9d1cfe198fd1ee659acb955cabaefe17accc0453f6ffd62bf",
     "scripts/score_week.py": "592581b8f806cfd01787985cd676614ec4ba59aedebbdf8cf2ba579ab3ad9b5b",
     "scripts/td_alloc.py": "7c407c949cac8f0f74d7f91589fd5d749f65d9053eb1c3f5f0dc63a700b3465b",
-    "scripts/td_alloc_backtest.py": "fe395f0132b05c7fb377f6418ed93a1dcee87b8c8b5b91f195072d416f415d6b",
+    "scripts/td_alloc_backtest.py": "e259d9f0e301a5d5d34e5a9e84bba222810f077d9c05a1f1f799a611914595a4",
     "scripts/td_backtest.py": "0ae77781fea2de212154ff72f64b0792f15f77fabfda7cae944fce20b3c9895f",
     "scripts/td_compare.py": "392fc3f11bb12bd0ed1b9ecbad3230d83c367e57dcc0a0901dc35a7456ce984d",
     "scripts/td_diagnostics.py": "118f13231ae143902d0cdc5009031a5e73b932f4d5653ea8f6f94b5244381b9e",
     "scripts/td_joint.py": "beb1f265931d710e3262d84c927c541ba72fdbc20a356100fbf1498139aee555",
-    "scripts/td_joint_backtest.py": "2e64f9d5218b11c8def29d955a8968b04e0f2dc0ace930b95587cb50f8a7e227",
+    "scripts/td_joint_backtest.py": "b6f4a66a3d275bc43ad0a914e496d29b4c99ae1ef72593d75e5630aff6d4a321",
     "scripts/td_model.py": "7c1635bbf515b4316f14771b177363a9f82a1ba7ad3393e479cd2dce26a25724",
-    "scripts/td_v1.py": "1e6c2fb11ab52d3d23ac51e83ede4901a39cc566d6477e18a223259b597552f3"
+    "scripts/td_v1.py": "4e54516734888fc588a7ad3fd9d0ad7dd16d96edcaa980adff3dbcda232ece0f"
   },
-  "tag": "props-v1.12"
+  "tag": "props-v1.13"
 }

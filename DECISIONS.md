@@ -5058,3 +5058,47 @@ its top-bin gate in both eras -- open; (b) actual/predicted within 5% in every
 lift bucket with 1,000+ combinations, both eras -- failing; (c) a three-leg
 check exists -- done; (d) single-leg CLV on logged TD lines at least neutral --
 not yet measurable. All four, or parlays stay closed.
+
+## 2026-09-22 (88) -- the slot pull ships (largest single gain); gates (a) and (b) as defined are below the data's resolution
+
+The user: forget (d), do (a) and (b).
+
+**(a) and the slot pull.** Both calibration misses -- the top-q player ~7% high
+at every TD count and spread, the lowest bin low -- are the two ends of one
+winner's-curse pattern: players ranked by an ESTIMATED share carry its noise.
+The textbook fix is empirical-Bayes shrinkage toward the middle, here each
+active player's depth-chart slot's league share. One parameter, tuned on
+2022-23 jointly with kappa (both shrink; the qb_beta lesson): 0.2 with kappa 5.
+Scored as-is: -0.0060 (-0.0084, -0.0039) on 2024-25 and -0.0038 (-0.0056,
+-0.0021) on 2018-19 vs v1.3, both established; vs the v0 structure -0.0105.
+Shipped (props-v1.13): an established out-of-sample gain in two eras is the
+standard every earlier change met, independent of the parlay gate.
+
+Gate (a) as defined (0.45-0.6 bin within its current gap or better, both eras):
+2018-19 passes (+0.042 -> -0.013); 2024-25 fails on the point estimate (+0.011
+-> -0.025). A ~500-row bin has a standard error of ~2.2 points, so both 2024-25
+numbers are about one standard error from zero.
+
+**(b).** The shadow model was re-chosen on tune by a rule fixed before the test
+eras were read (worst |actual/predicted - 1| over large lift buckets): plain
+joint beats joint + mix shift and both copula variants on tune; the live shadow
+now logs plain joint. With the slot pull the legs are no longer over-priced, so
+2018-19 passes pairs and mixed three-leg combinations. But every bucket was now
+scored with a game-clustered 95% interval, and EVERY failing bucket's interval
+includes 1 -- pairs +-8%, three legs +-13-25%, because combinations in a game
+share players and a script and each era has ~540 games. A 5% point tolerance is
+tighter than the data can resolve: a perfect model fails it often, a flawed one
+can pass it.
+
+The gate was the user's to set and is theirs to change; it has not been changed.
+Proposed, for the user: (a') the top bin within its 95% interval in each era;
+(b') every large bucket's 95% interval contains 1 in each era, AND the pooled
+two-era point estimate within 5%. Today (a') passes; (b') FAILS on three
+teammates in the low-lift bucket: 0.895 (2024-25) and 0.875 (2018-19), pooled
+~0.885. Each interval includes 1, but the same ~11% over-prediction in both eras
+looks like a real bias: the model's negative dependence among three teammates
+is too weak where the leg product is already small. A candidate cause is
+game-to-game variation in how a team splits its touchdowns (a player's share
+is not fixed within a season), which makes three teammates scoring together
+rarer than a fixed-share model says. (Code review caught the first draft of
+this paragraph claiming both proposed gates would pass.)
