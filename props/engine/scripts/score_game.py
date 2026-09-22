@@ -124,7 +124,10 @@ def run_odds(stage, args_list):
     r = subprocess.run(cmd, capture_output=True, text=True, cwd=str(HERE))
     if r.returncode != 0 and not r.stdout.strip():
         raise RuntimeError(f"odds_client {stage} failed: {r.stderr[:400]}")
-    return json.loads(r.stdout)
+    try:
+        return json.loads(r.stdout)
+    except json.JSONDecodeError:
+        raise RuntimeError(f"odds_client {stage} returned no JSON (exit {r.returncode}): {r.stderr.strip()[-300:]}")
 
 
 # ---------------------------------------------------------------- CLI conveniences
@@ -406,8 +409,13 @@ def main():
         # spread/total that ESPN displays; used only for the TD anchor, never for props.
         try:
             import urllib.request as _ur
-            sb = cached_json(wd / "espn_scoreboard.json", a.sleeper_cache_ttl, lambda: json.load(_ur.urlopen(_ur.Request(
-                "https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard",
+            # Ask for THIS game's week: the bare scoreboard shows the current week, which stays on
+            # the previous week until ESPN rolls over (Tuesday morning it still shows last week),
+            # so every game of an early-week run found no odds and fell back to anytime_td_v0.
+            sb = cached_json(wd / f"espn_scoreboard_{SEASON}_wk{WEEK:02d}.json", a.sleeper_cache_ttl,
+                             lambda: json.load(_ur.urlopen(_ur.Request(
+                "https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard"
+                f"?seasontype=2&week={WEEK}&dates={SEASON}",
                 headers={"User-Agent": "curl/8.5.0"}), timeout=20)))
             # ESPN codes differ from nflverse for two teams (WSH, LAR); an unmapped
             # comparison silently returns no spread/total for those games.
@@ -1062,10 +1070,20 @@ def main():
         home_name, away_name = TEAM_NAMES.get(HOME), TEAM_NAMES.get(AWAY)
         if not home_name or not away_name:
             sys.exit(f"NO TEAM-NAME MAPPING for {AWAY}/{HOME}; add to TEAM_NAMES before pricing")
-        ev = run_odds("events", ["--home", home_name, "--away", away_name,
-                                 "--key-file", str(RES / "credential.env")])
+        try:
+            ev = run_odds("events", ["--home", home_name, "--away", away_name,
+                                     "--key-file", str(RES / "credential.env")])
+        except RuntimeError as ex:
+            if not oddsapi_is_fallback:
+                raise
+            # a fallback that cannot reach the Odds API (no key, no credits, network) must not
+            # cost the game: continue without prices, exactly as an empty event match does
+            log(f"  Odds API fallback unavailable ({ex}); continuing WITHOUT prices")
+            ev = {"events": [], "fallback_failed": True}
         evs = ev.get("events", [])
-        if len(evs) != 1:
+        if ev.get("fallback_failed"):
+            pass
+        elif len(evs) != 1:
             # exactly one event must match by BOTH team names. Never fall back to date.
             log(f"  Odds API event match returned {len(evs)} events for {away_name} at {home_name}; "
                 f"continuing WITHOUT prices (EVENT_MATCH_FAILED)")
@@ -1080,7 +1098,9 @@ def main():
         if not evs:
             log("  no matching Odds API event; continuing without prices")
             SOURCES.append(("Sportsbook prices (The Odds API)", "the lines and odds being compared",
-                            "no event found", "the API has not posted this game yet"))
+                            *(("unavailable", "the fallback could not reach the API (key, credits or network)")
+                              if ev.get("fallback_failed") else
+                              ("no event found", "the API has not posted this game yet"))))
         else:
             eid = evs[0]["id"]
             books = "" if a.books == "all" else a.books
@@ -2022,9 +2042,13 @@ def main():
     if not LADDER.empty:
         LADDER.to_csv(OUT / f"ladder_{slug}.csv", index=False)
 
-    # shadow log: carry the tier so WEAK-tier calls grade as their own bucket
+    # shadow log: carry the tier so WEAK-tier calls grade as their own bucket. The CARD's final
+    # tier (after the edge floor and the prior-vs-market demotion), not the pre-floor confidence
+    # tier: logging the pre-floor one recorded "MODERATE" for rows the card calls LEAN.
     if not R.empty:
-        R["tier"] = [tier_of.get((r.player, r.market, r.side), "") for _, r in R.iterrows()]
+        final_tier = {(b.player, b.market, b.side): b.tier for b in BET.itertuples()} if not BET.empty else {}
+        R["tier"] = [final_tier.get((r.player, r.market, r.side), tier_of.get((r.player, r.market, r.side), ""))
+                     for _, r in R.iterrows()]
         R.to_csv(logf, index=False)
 
     # put the card at the top of the report, right after the header rule

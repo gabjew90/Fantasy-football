@@ -145,3 +145,12 @@ def test_joint_shadow_uses_the_gated_specification(tmp_path, monkeypatch):
     cross = J[J["kind"] == "opponents"]
     assert np.allclose(cross["p_joint_copula"], cross["p_joint_plain"])
     assert np.allclose(cross["p_joint_shift_copula"], cross["p_joint_shift"])
+
+
+def test_run_odds_empty_output_is_a_runtime_error(monkeypatch):
+    # An odds_client that prints nothing (no key on the host) must raise the error the Odds API
+    # fallback catches, not a JSONDecodeError that kills the game.
+    import subprocess
+    monkeypatch.setattr(subprocess, "run", lambda *a, **k: subprocess.CompletedProcess(a, 0, stdout="", stderr="no key"))
+    with pytest.raises(RuntimeError, match="no JSON"):
+        SG.run_odds("events", [])
