@@ -476,3 +476,20 @@ def test_the_record_keeps_which_td_model_priced_a_row_and_the_questionable_teamm
     row = record_run.read_shadow_log(f, "decision", "MIA@SF")[0]
     assert row["td_model"] == "anytime_td_v1"
     assert row["questionable_teammate"] is True
+
+
+def test_joint_prices_go_to_their_own_record_stream(tmp_path, monkeypatch):
+    """Layer-3 joint prices are logged in shadow: their own path and key, never
+    mixed into the prediction rows the scorecard grades."""
+    import record_run
+    monkeypatch.setattr(persist, "RECORD_ROOT", tmp_path / "record")
+    f = tmp_path / "joint_td_2026_wk02_MIA_SF.csv"
+    f.write_text("logged_at_utc,season,week,event_id,player_a,team_a,player_b,team_b,kind,p_a,p_b,p_indep,p_joint,joint_model\n"
+                 "2026-09-18T05:20:46Z,2026,2,ev1,A,SF,B,SF,teammates,0.5,0.3,0.15,0.14,td_joint_v0\n",
+                 encoding="utf-8")
+    rows = record_run.read_joint(f, "decision", "MIA@SF", {"engine_hash": "h", "engine_tag": None})
+    assert rows[0]["p_joint"] == 0.14 and rows[0]["season"] == 2026 and rows[0]["engine_hash"] == "h"
+    out = persist.write_joint(2026, 2, rows)
+    assert out["after"] == 1 and (tmp_path / "record" / "joint" / "2026" / "wk02.jsonl").exists()
+    assert not (tmp_path / "record" / "predictions").exists()
+    assert persist.write_joint(2026, 2, rows)["after"] == 1          # a re-run replaces, not duplicates

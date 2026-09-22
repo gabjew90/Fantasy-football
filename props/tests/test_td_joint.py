@@ -72,10 +72,10 @@ def test_mix_shift_multipliers_are_one_on_average():
     tg = pd.DataFrame({"game_id": ["g1", "g1", "g2", "g2"], "team": ["A", "B", "A", "B"],
                        "opp": ["B", "A", "B", "A"], "off_tds": [1, 4, 3, 2],
                        "qb_rush": [0, 1, 0, 0], "rush_in5": [1, 1, 1, 1], "rush_far": [0, 1, 1, 0],
-                       "pass_rz": [0, 1, 1, 1], "pass_far": [0, 0, 0, 0]})
+                       "pass_ez": [0, 0, 0, 0], "pass_rz": [0, 1, 1, 1], "pass_far": [0, 0, 0, 0]})
     sh = J.mix_shift(tg, min_tds=0)
     assert list(sh.columns) == J.CH and len(sh) == J.OPP_BUCKETS
-    m = J.mixes_by_opp(pd.Series({c: 0.2 for c in J.CH}), sh)
+    m = J.mixes_by_opp(pd.Series({c: 1.0 / len(J.CH) for c in J.CH}), sh)
     assert m.sum(axis=1) == pytest.approx(np.ones(J.OPP_BUCKETS))
 
 
@@ -112,10 +112,45 @@ def test_normal_helpers_are_accurate():
 
 def test_a_thin_bucket_is_shrunk_toward_one_not_set_to_one():
     tg = pd.DataFrame({"game_id": ["g1", "g1"], "team": ["A", "B"], "opp": ["B", "A"], "off_tds": [0, 3],
-                       "qb_rush": [0, 0], "rush_in5": [0, 3], "rush_far": [0, 0], "pass_rz": [0, 0],
+                       "qb_rush": [0, 0], "rush_in5": [0, 3], "rush_far": [0, 0], "pass_ez": [0, 0], "pass_rz": [0, 0],
                        "pass_far": [0, 0]})
     sh = J.mix_shift(tg, min_tds=3)
     assert sh.attrs["n_tds"][0] == 3                      # team B faced a scoreless opponent
     assert sh.loc[0, "rush_in5"] == pytest.approx(1.0)    # all of B's TDs were rush_in5 = the base
     sh_all = J.mix_shift(tg, min_tds=0)
     assert np.isfinite(sh_all.to_numpy()).all()
+
+
+def test_p_all_matches_the_pair_formulas_and_extends_to_three_legs():
+    P = J.copula_joint(T.count_pmf([2.6], n=T.LAYER1["trials"])[0], T.count_pmf([2.0], n=T.LAYER1["trials"])[0], 0.4)
+    qa, qb, qc = _flat([0.3])[0], _flat([0.2])[0], _flat([0.25])[0]
+    empty = np.zeros((0, J.OPP_BUCKETS))
+    assert J.p_all(np.array([qa, qb]), empty, P) == pytest.approx(J.p_all_same_team(np.array([qa, qb]), P))
+    assert J.p_all(qa[None], qc[None], P) == pytest.approx(J.p_pair_cross(qa, qc, P))
+    # three legs: two teammates and an opponent -- below the leg product for teammates,
+    # and exactly the product of the pair and the single when the counts are independent
+    P0 = J.copula_joint(T.count_pmf([2.6], n=T.LAYER1["trials"])[0], T.count_pmf([2.0], n=T.LAYER1["trials"])[0], 0.0)
+    pair = J.p_all(np.array([qa, qb]), empty, P0)
+    single = J.p_all(empty, qc[None], P0)
+    assert J.p_all(np.array([qa, qb]), qc[None], P0) == pytest.approx(pair * single)
+
+
+def test_r_is_set_by_matching_the_correlation():
+    mus = [(2.5, 2.1), (3.0, 1.6)]
+    r = J.r_for_corr(0.16, mus)
+    got = np.mean([J.implied_count_corr(r, a, b) for a, b in mus])
+    assert got == pytest.approx(0.16, abs=2e-3)
+    assert J.r_for_corr(0.0, mus) == 0.0
+
+
+def test_the_gate_table_fails_when_a_large_bucket_is_off():
+    """Regression: a numpy bool is never `is False`, so every bucket read as
+    passing in the gate summary even when the row said FAIL."""
+    import td_joint_backtest as JB
+    n = JB.GATE_MIN + 10
+    g = pd.DataFrame({"indep": np.full(n, 0.10), "joint1": np.full(n, 0.10),
+                      "both": np.r_[np.ones(int(n * 0.2)), np.zeros(n - int(n * 0.2))]})   # actual 0.2 vs 0.1
+    L = []
+    assert JB.lift_table(L, g, "joint1", "t") is False
+    g["both"] = np.r_[np.ones(int(n * 0.1)), np.zeros(n - int(n * 0.1))]
+    assert JB.lift_table([], g, "joint1", "t") is True

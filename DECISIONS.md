@@ -5008,3 +5008,53 @@ labelled 'priced from Sleeper' in housekeeping; the label names the real source.
 
 Checks: MIA@SF 2026 week 2 full run -- shadow log identical to props-v1.10,
 <details> balanced (3/3); TD-only run balanced (3/3) with the short summary.
+
+## 2026-09-22 (87) -- the end-zone split ships; the rank multiplier fails its gate; layer 3 in shadow; the parlay gate fixed
+
+The user's review of #85: fix the star receiving bias first (it gates parlays),
+try the end-zone split before a fitted factor, do not ship the copula at r = 0.5,
+ship joint + mix shift in shadow, and define the parlay gate now.
+
+**The end-zone split -- and the hypothesis behind it was wrong in the useful
+direction.** The expectation was that primary receivers' red-zone share
+overstates their TDs (bracket coverage). Measured on 2022-25: their share of
+END-ZONE targets is HIGHER than of other red-zone targets (0.29 vs 0.22), and
+end-zone targets convert ~40% vs ~13%. Pooling the two bins under-prices
+WR1/TE1s (red-zone share 0.25 vs TD share 0.27; the split reproduces 0.27) and
+over-prices backs, whose red-zone targets are checkdowns -- and the top-q
+player is usually the lead back, which is where the passing-channel bias sat.
+Shipped as a sixth channel, pass_ez (props-v1.12). Paired against v1.2 on
+identical players in 2022-23, 2024-25 and 2018-19: log loss flat, every
+position's level moves toward actual, the top-bin gap narrows in two eras of
+three, the top-q player's passing ratio goes from 0.43-0.83 to 0.81-0.86.
+
+**The rank multiplier (the fitted fallback) is not shipped.** Tuned on 2022-23
+on top of the split (0.7, grid edge): it fixes the top-q ratio (to ~1.0) and
+the tune-era top bin, but on 2024-25 the 0.45-0.6 bin flips to under-prediction
+(0.505 vs 0.538). Gate failed.
+
+**The copula** is not in the shadow model. r is set by matching the pooled
+residual count correlation (+0.175 -> r = 0.43), not by the score-pair
+likelihood (whose cusp at 0.5 the user flagged), and marked provisional; on
+pairs it is not established on 2024-25 and worse on 2018-19.
+
+**Layer 3 in shadow.** Joint + mix shift is computed for every pair of TD legs
+priced 10%+ on every board and logged to record/joint/ in its own stream
+(JOINT_KEY); nothing renders; the chat contract forbids quoting it as a parlay
+price. The mix-shift table is bundled from 2022-25.
+
+**The pair test rerun** (2024-25 and 2018-19, pairs and three-leg combinations):
+three-teammate parlays beat the leg product in both eras; teammate pairs are
+established in one; the cross-team shift's dependence vanished after the split.
+Gate (b) fails everywhere: actual/predicted 0.8-0.95 in most large buckets,
+the legs' level.
+
+**A defect of mine in the gate itself:** the summary table first read "pass"
+everywhere while the rows said FAIL -- a numpy bool is never `is False`. Fixed
+with a regression test before anything was reported.
+
+**THE PARLAY GATE (fixed now, per the user):** (a) a star pass-share fix passes
+its top-bin gate in both eras -- open; (b) actual/predicted within 5% in every
+lift bucket with 1,000+ combinations, both eras -- failing; (c) a three-leg
+check exists -- done; (d) single-leg CLV on logged TD lines at least neutral --
+not yet measurable. All four, or parlays stay closed.

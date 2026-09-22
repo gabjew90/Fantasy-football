@@ -26,13 +26,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import td_alloc_backtest as B  # noqa: E402
 
 KEEP = {
-    "counts": ["season", "week", "game_id", "team", "player_id",
-               "qb_rush", "rush_in5", "rush_far", "pass_rz", "pass_far"],
+    "counts": ["season", "week", "game_id", "team", "player_id", *B.T.OFFENSIVE],
     "played": ["season", "week", "game_id", "team", "player_id", "pos"],
     "slots": ["season", "week", "team", "player_id", "slot"],
     "teamgames": ["game_id", "season", "week", "team", "opp", "points", "implied", "spread",
-                  "qb_rush", "rush_in5", "rush_far", "pass_rz", "pass_far", "dst_other",
-                  "tds", "off_tds", "dst"],
+                  *B.T.CHANNELS, "tds", "off_tds", "dst"],
     "qbstarts": ["season", "week", "game_id", "team", "player_id", "qb_rush_tds", "off_tds"],
 }
 
@@ -47,6 +45,14 @@ def main(argv=None) -> int:
               "teamgames": D["tg"][D["tg"]["implied"].notna()]}
     win = B.V.V1["qb_window"]
     starts = B.load_starts(range(a.season - win + 1, a.season + 1), D["qb_ids"])
+    # layer 3: channel-mix multipliers by the opponent's TD count, from the four
+    # seasons ending at --season (the backtest estimated them on its tune seasons)
+    import td_joint as J
+    tg4 = B.load(list(range(a.season - 3, a.season + 1)))["tg"]
+    shift = J.mix_shift(tg4)
+    shift.index.name = "opp_tds"
+    shift.to_csv(Path(a.out) / f"priors_{a.season}_td_mixshift.csv", lineterminator="\n", float_format="%.6f")
+    print(f"wrote priors_{a.season}_td_mixshift.csv: TDs by bucket {shift.attrs['n_tds']}", file=sys.stderr)
     out = Path(a.out)
     for name, df in [*frames.items(), ("qbstarts", starts)]:
         if name != "qbstarts":

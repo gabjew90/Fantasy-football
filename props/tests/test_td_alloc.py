@@ -44,6 +44,9 @@ def test_opportunities_carry_the_same_channels_touchdowns_do():
     ]
     o = A.opportunities(_pbp(rows), {"qb"})
     assert o["channel"].tolist() == ["qb_rush", "rush_in5", "rush_far", "pass_rz", "pass_far"]
+    # a red-zone target whose air yards reach the end zone is pass_ez
+    ez = _pbp([("g", 2025, 1, "REG", "A", "pass", None, "wr", 6, 0, 0)])   # air 8 >= 6
+    assert A.opportunities(ez, {"qb"})["channel"].tolist() == ["pass_ez"]
     # the engine's split is inside-10 vs not, independent of the new channels
     assert o["engine"].tolist() == ["car_all", "car_i10", "car_i10", "tgt_all", "tgt_all"]
 

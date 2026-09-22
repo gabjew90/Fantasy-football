@@ -50,16 +50,17 @@ MODE = V.V1["mode"]
 MOVED = V.V1["moved"]
 SKILL = V.SKILL
 EPS = 1e-3
-PASS_CH, RUSH_CH = ("pass_rz", "pass_far"), ("rush_in5", "rush_far", "qb_rush")
+PASS_CH, RUSH_CH = ("pass_ez", "pass_rz", "pass_far"), ("rush_in5", "rush_far", "qb_rush")
 L1 = T.LAYER1                    # {"trials": 10, "gamma": 0.25, ...}
 
 # A configuration is (alloc, c, cap, qb_beta); alloc = (prior, slot scale, moved weight).
-# alloc = (prior, slot scale, moved weight, starter's qb_rush share or None)
-BASE_ALLOC = ("none", 1.0, 0.5, None)              # the spec before the slot prior
-FULL_ALLOC = ("slot", 1.0, MOVED, None)
-V1_ALLOC = ("slot", V.V1["slot_scale"], MOVED, V.V1["qb_share"])
-V10 = (("slot", V.V1["slot_scale"], MOVED, None), None, 0.99, None)   # v1 as first shipped (props-v1.4)
-V11 = (("slot", V.V1["slot_scale"], MOVED, None), None, 0.99, 40.0)   # v1.1 (props-v1.5)
+# alloc = (prior, slot scale, moved weight, starter's qb_rush share or None, top-pass factor or None)
+BASE_ALLOC = ("none", 1.0, 0.5, None, None)        # the spec before the slot prior
+FULL_ALLOC = ("slot", 1.0, MOVED, None, None)
+V1_ALLOC = ("slot", V.V1["slot_scale"], MOVED, V.V1["qb_share"], V.V1["top_pass"])
+V10 = (("slot", V.V1["slot_scale"], MOVED, None, None), None, 0.99, None)   # v1 as first shipped (props-v1.4)
+V11 = (("slot", V.V1["slot_scale"], MOVED, None, None), None, 0.99, 40.0)   # v1.1 (props-v1.5)
+TOP_PASS = [None, 0.95, 0.9, 0.85, 0.8, 0.7]
 QB_SHARES = [None, 0.85, 0.88, 0.92, 0.95]
 QB_BETAS_JOINT = [20.0, 40.0, 80.0]     # the starter's rate and his within-channel share are tuned together
 SHIP = (V1_ALLOC, V.V1["c"], V.V1["cap"], V.V1["qb_beta"])   # what td_v1.V1 ships now
@@ -75,12 +76,14 @@ def configs(mode: str) -> list:
     x Beta c (td_layer2.md). grid-v11: share cap x the starter's QB-rush
     shrinkage (td_v1_1_tuning.md)."""
     if mode == "grid":
-        return [(BASE_ALLOC, None, 0.99, None)] + [(("slot", sc, MOVED, None), c, 0.99, None)
+        return [(BASE_ALLOC, None, 0.99, None)] + [(("slot", sc, MOVED, None, None), c, 0.99, None)
                                                    for sc in SCALES for c in C_GRID]
     if mode == "grid-v11":
         return [(V10[0], None, cap, b) for cap in CAPS for b in QB_BETAS]
     if mode == "grid-qshare":
-        return [((V10[0][0], V10[0][1], V10[0][2], q), None, 0.99, b) for b in QB_BETAS_JOINT for q in QB_SHARES]
+        return [((V10[0][0], V10[0][1], V10[0][2], q, None), None, 0.99, b) for b in QB_BETAS_JOINT for q in QB_SHARES]
+    if mode == "grid-toppass":
+        return [((V10[0][0], V10[0][1], V10[0][2], V.V1["qb_share"], f), None, 0.99, V.V1["qb_beta"]) for f in TOP_PASS]
     out = [(BASE_ALLOC, None, 0.99, None), (FULL_ALLOC, None, 0.99, None), V10, V11, SHIP]
     out += [(SHIP[0], c, SHIP[2], SHIP[3]) for c in C_DIAG]
     return list(dict.fromkeys(out))
@@ -88,8 +91,8 @@ def configs(mode: str) -> list:
 
 def qid(qk) -> str:
     """Key of a per-touchdown share vector: (alloc, cap, qb_beta)."""
-    (p, sc, m, qs), cap, b = qk
-    return (f"{p}|x{sc:g}|m{m:g}" + ("" if qs is None else f"|qs{qs:g}")
+    (p, sc, m, qs, tp), cap, b = qk
+    return (f"{p}|x{sc:g}|m{m:g}" + ("" if qs is None else f"|qs{qs:g}") + ("" if tp is None else f"|tp{tp:g}")
             + f"|cap{cap:g}|qb{'team' if b is None else f'{b:g}'}")
 
 
@@ -273,7 +276,7 @@ def run(D: dict, seasons: list[int], cfgs: list) -> tuple[pd.DataFrame, pd.DataF
                         by_cap[(al, cap)] = V.game_shares(filled[al], g["team"], ids, pos, MODE, cap,
                                                           qb=qb, qb_share=al[3])
                     mix_k = V.game_mix(ctx, g["team"], qb, b)
-                    qs[qk] = V.per_td(by_cap[(al, cap)], mix_k).clip(upper=0.999)
+                    qs[qk] = V.per_td(V.apply_top_pass(by_cap[(al, cap)], mix_k, al[4]), mix_k).clip(upper=0.999)
                     mrow[f"wqb|{qid(qk)}"] = float(mix_k["qb_rush"])
                     if qk == (SHIP[0], SHIP[2], SHIP[3]) and qb is not None:
                         mrow["s_qb_pred"] = float(by_cap[(al, cap)].loc[qb, "qb_rush"])
@@ -350,9 +353,12 @@ def main(argv=None) -> int:
                     help="tune the share cap x the starter's QB-rush shrinkage")
     ap.add_argument("--grid-qshare", action="store_true",
                     help="tune the starter's share within the QB-rush channel")
+    ap.add_argument("--grid-toppass", action="store_true",
+                    help="tune the factor on the top-q player's passing-channel shares")
     ap.add_argument("--report", default=None, help="report file name (default by mode)")
     a = ap.parse_args(argv)
-    mode = ("grid" if a.grid else "grid-v11" if a.grid_v11 else "grid-qshare" if a.grid_qshare else "ship")
+    mode = ("grid" if a.grid else "grid-v11" if a.grid_v11 else "grid-qshare" if a.grid_qshare
+            else "grid-toppass" if a.grid_toppass else "ship")
     cfgs = configs(mode)
     tune = [int(x) for x in a.tune.split(",")]
     test = [int(x) for x in a.test.split(",")]
@@ -374,6 +380,10 @@ def main(argv=None) -> int:
     if mode == "grid-qshare":
         best = min(tune_ll, key=tune_ll.get)
         write_qshare(out / (a.report or "td_qb_share.md"), dtu, dte, mte, tune_ll, best, tune, test)
+        return 0
+    if mode == "grid-toppass":
+        best = min(tune_ll, key=tune_ll.get)
+        write_toppass(out / (a.report or "td_top_pass.md"), dtu, dte, tune_ll, best, tune, test)
         return 0
     # the grid CHOOSES; the default run scores what td_v1 ships, unchosen
     best = min(tune_ll, key=tune_ll.get) if mode == "grid" else SHIP
@@ -646,6 +656,38 @@ def write_qshare(path: Path, dtu, dte, mass, tune_ll, best, tune, test):
         L += ["", "### THE GATE: the top bins, end to end, each model binned by its own prediction", ""]
         for name, k in (("v1.1", k0), (f"chosen: {_lab(best)}", kb)):
             if name != "v1.1" and kb == k0:
+                continue
+            L += [f"{name}:", ""]
+            _calib(L, d, ["e2e|" + k], [name])
+            L.append("")
+    path.write_text("\n".join(L) + "\n", encoding="utf-8")
+    print(f"wrote {path}", file=sys.stderr)
+
+
+def write_toppass(path: Path, dtu, dte, tune_ll, best, tune, test):
+    """The top-q player's passing-channel factor: chosen on tune, scored on
+    test, with the gate bins and his realised / expected ratio."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    base = [c for c in tune_ll if c[0][4] is None][0]
+    lab = lambda c: "off" if c[0][4] is None else f"{c[0][4]:g}"  # noqa: E731
+    L = ["# The top-q player's passing-channel factor", "",
+         f"Tune {tune}, test {test}. On top of the end-zone split. The team's top per-TD-share player's pass-channel "
+         "shares are multiplied by the factor; the removed share goes to his teammates in the same channel, pro rata.", "",
+         "## Tune log loss, given offensive touchdowns", "", "| factor | tune log loss |", "|---|---|"]
+    for c, v in sorted(tune_ll.items(), key=lambda kv: kv[1]):
+        L.append(f"| {lab(c)} | {v:.5f}{' **chosen**' if c == best else ''} |")
+    for tag, d in (("tune", dtu), ("test", dte)):
+        L += ["", f"## {tag.title()} {tune if tag == 'tune' else test}", "",
+              "| factor | given offensive TDs | end to end | vs off, end to end | top-q realised / expected |",
+              "|---|---|---|---|---|"]
+        for c in sorted(tune_ll, key=lambda c: 2 if c[0][4] is None else c[0][4]):
+            k = cid(c)
+            vs = "" if c == base else _ci(boot(d, "e2e|" + k, "e2e|" + cid(base)))
+            L.append(f"| {lab(c)} | {ll(d, 'n|' + k):.4f} | {ll(d, 'e2e|' + k):.4f} | {vs} | "
+                     f"{_top_ratio(d, 'q|' + qid((c[0], c[2], c[3]))):.3f} |")
+        L += ["", "### THE GATE: the top bins, end to end, each model binned by its own prediction", ""]
+        for name, k in (("off", cid(base)), (f"chosen {lab(best)}", cid(best))):
+            if name != "off" and best == base:
                 continue
             L += [f"{name}:", ""]
             _calib(L, d, ["e2e|" + k], [name])
