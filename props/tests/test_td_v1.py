@@ -267,3 +267,15 @@ def test_the_starter_gets_the_fixed_qb_rush_share_and_the_rest_fit_under_the_cap
     assert m.loc["rb", "rush_in5"] == base.loc["rb", "rush_in5"]            # other channels untouched
     # no starter named, or qb_share off: nothing changes
     assert V.game_shares(shares, "A", ["s", "b", "rb"], pos, qb=None, qb_share=0.88).equals(base)
+
+
+def test_the_slot_pull_moves_shares_toward_the_slot_mean_and_leaves_no_history_players_alone():
+    bundled, cur = _world()
+    args = (cur["cnt"], bundled["cnt"], cur["played"], bundled["played"], bundled["slots"], cur["actives"])
+    off, _ = V.week_shares(*args, slot_pull=None)
+    on, _ = V.week_shares(*args, slot_pull=0.5)
+    sp = V.A.slot_prior(bundled["cnt"], bundled["played"], bundled["slots"], V.T.OFFENSIVE)
+    # the RB1 (history) moves halfway to the RB1 slot share
+    assert on.loc["rb", "rush_in5"] == pytest.approx(0.5 * off.loc["rb", "rush_in5"] + 0.5 * sp.loc["RB1", "rush_in5"])
+    # the rookie has no history: his slot-prior share is already the slot mean, untouched
+    assert on.loc["rookie", "rush_in5"] == pytest.approx(off.loc["rookie", "rush_in5"])

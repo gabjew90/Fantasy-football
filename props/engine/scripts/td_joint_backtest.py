@@ -154,13 +154,38 @@ def parlays(d: pd.DataFrame, shift: pd.DataFrame, r: float, max_legs: int = 3):
                              "ind1": float(np.prod([info[t]["p1"][i] for t, i in combo])),
                              "joint0": J.p_all(qa0, qb0, P0),
                              "joint1": J.p_all(qa1, qb1, P0),
-                             "joint2": J.p_all(qa1, qb1, Pr)})
+                             "joint2": J.p_all(qa1, qb1, Pr),
+                             "joint3": J.p_all(qa0, qb0, Pr)})
     pr = pd.DataFrame(rows)
     return pr[pr["legs"] == 2], pr[pr["legs"] == 3], pd.concat(legs_out, ignore_index=True)
 
 
 LIFT_BINS = [0, 0.8, 0.9, 0.97, 1.03, 1.1, 1.2, 1.5, 9]
+# The shadow model, chosen on TUNE by the worst-bucket rule below (props-v1.13 run: plain joint;
+# the mix shift and the copula each had a worse tune bucket). The gate tables score it.
+SHADOW = "joint0"
+CANDIDATES = {"joint0": "joint", "joint1": "joint + mix shift", "joint2": "joint + mix shift + copula",
+              "joint3": "joint + copula"}
+
+
+def worst_bucket(g: pd.DataFrame, model: str) -> float:
+    """Largest |actual / predicted - 1| over lift buckets with GATE_MIN+ combinations."""
+    g = g.assign(lift=g[model] / g["indep"])
+    errs = [abs(h["both"].mean() / h[model].mean() - 1)
+            for _b, h in g.groupby(pd.cut(g["lift"], LIFT_BINS), observed=True)
+            if len(h) >= GATE_MIN and h[model].mean() > 0]
+    return max(errs) if errs else float("nan")
 GATE_TOL, GATE_MIN = 0.05, 1000
+
+
+def ratio_ci(h: pd.DataFrame, model: str, reps: int = 400, seed: int = 21):
+    """95% interval for actual / predicted, resampling GAMES: combinations in a
+    game share players and a script, so they are not independent draws."""
+    x = h.groupby("game_id").agg(a=("both", "sum"), m=(model, "sum"))
+    a, m = x["a"].to_numpy(), x["m"].to_numpy()
+    idx = np.random.default_rng(seed).integers(0, len(a), size=(reps, len(a)))
+    r = a[idx].sum(1) / m[idx].sum(1)
+    return tuple(np.percentile(r, [2.5, 97.5]))
 
 
 def lift_table(L, g: pd.DataFrame, model: str, label: str) -> bool:
@@ -168,7 +193,8 @@ def lift_table(L, g: pd.DataFrame, model: str, label: str) -> bool:
     whether every bucket with GATE_MIN+ combinations is within GATE_TOL."""
     g = g.assign(lift=g[model] / g["indep"])
     L += [f"{label} -- by the model's lift over the leg product:", "",
-          "| lift | n | mean leg product | mean model | actual | actual / model | gate |", "|---|---|---|---|---|---|---|"]
+          "| lift | n | games | mean leg product | mean model | actual | actual / model (95% CI, game-clustered) | gate |",
+          "|---|---|---|---|---|---|---|---|"]
     ok = True
     for b, h in g.groupby(pd.cut(g["lift"], LIFT_BINS), observed=True):
         ratio = h["both"].mean() / h[model].mean() if h[model].mean() > 0 else float("nan")
@@ -176,8 +202,9 @@ def lift_table(L, g: pd.DataFrame, model: str, label: str) -> bool:
         # bool(): a numpy bool is never `is False`, which let a FAIL read as pass
         passed = bool(abs(ratio - 1) <= GATE_TOL) if tested else None
         ok = ok and (passed is not False)
-        L.append(f"| {b} | {len(h)} | {h['indep'].mean():.4f} | {h[model].mean():.4f} | {h['both'].mean():.4f} | "
-                 f"{ratio:.3f} | {'-' if not tested else ('pass' if passed else 'FAIL')} |")
+        lo, hi = ratio_ci(h, model) if tested else (float("nan"), float("nan"))
+        L.append(f"| {b} | {len(h)} | {h['game_id'].nunique()} | {h['indep'].mean():.4f} | {h[model].mean():.4f} | "
+                 f"{h['both'].mean():.4f} | {ratio:.3f} ({lo:.3f}, {hi:.3f}) | {'-' if not tested else ('pass' if passed else 'FAIL')} |")
     L.append("")
     return ok
 
@@ -201,7 +228,7 @@ def section(L, pr: pd.DataFrame, tri: pd.DataFrame, legs: pd.DataFrame, label: s
             dep = ci(boot(g, c, base)) if base and c != "joint0" else ""
             L.append(f"| {lab} | {g[c].mean():.4f} | {ll(g[c], g['both']).mean():.5f} | {vs} | {dep} |")
         L.append("")
-        gate[f"pairs {kind}"] = lift_table(L, g, "joint1", "Shadow model")
+        gate[f"pairs {kind}"] = lift_table(L, g, SHADOW, "Shadow model")
     for kind, g in tri.groupby("kind"):
         L += [f"### Three legs, {kind}: {len(g)} in {g['game_id'].nunique()} games; all scored {g['both'].mean():.4f}", "",
               "| model | mean P(all) | log loss | vs leg product (95% CI) |", "|---|---|---|---|"]
@@ -210,7 +237,7 @@ def section(L, pr: pd.DataFrame, tri: pd.DataFrame, legs: pd.DataFrame, label: s
             vs = "" if c == "indep" else ci(boot(g, c, "indep"))
             L.append(f"| {lab} | {g[c].mean():.5f} | {ll(g[c], g['both']).mean():.5f} | {vs} |")
         L.append("")
-        gate[f"three legs {kind}"] = lift_table(L, g, "joint1", "Shadow model")
+        gate[f"three legs {kind}"] = lift_table(L, g, SHADOW, "Shadow model")
     return gate
 
 
@@ -261,11 +288,30 @@ def main(argv=None) -> int:
     for rg in R_GRID:
         L.append(f"| {rg:g} | " + " | ".join(f"{count_loglik(runs[k], rg):.4f}" for k in runs) + " |")
     L.append("")
-    gates = {}
+    gates, combos = {}, {}
     for lab, d in runs.items():
         pr, tri, legs = parlays(d, shift, r)
+        combos[lab] = pd.concat([pr, tri], ignore_index=True)
         seasons = {"tune": tune, "test": test, "also": also}[lab]
         gates[lab] = section(L, pr, tri, legs, f"{lab.title()} {seasons}")
+    # THE SHADOW MODEL IS CHOSEN ON TUNE: the candidate whose worst lift bucket
+    # (1,000+ combinations, pairs and three legs, teammates and across teams)
+    # is closest to 1 on the tune seasons. The test eras only check it.
+    L += ["## Choosing the shadow model on tune: worst |actual / predicted - 1| over large lift buckets", "",
+          "| candidate | " + " | ".join(runs) + " |", "|---" * (len(runs) + 1) + "|"]
+    worst = {}
+    for c, name in CANDIDATES.items():
+        per = {lab: max(worst_bucket(g, c) for _k, g in combos[lab].groupby(["legs", "kind"])) for lab in runs}
+        worst[c] = per
+        L.append(f"| {name} | " + " | ".join(f"{per[lab]:.3f}" for lab in runs) + " |")
+    pick = min(worst, key=lambda c: worst[c]["tune"])
+    L += ["", f"Chosen on tune: **{CANDIDATES[pick]}**. Gate (b) holds in an era when its worst bucket is within "
+              f"{GATE_TOL:.0%}.", "", "| era | chosen model's worst bucket | gate (b) |", "|---|---|---|"]
+    for lab in runs:
+        if lab != "tune":
+            w = worst[pick][lab]
+            L.append(f"| {lab} | {w:.3f} | {'PASS' if w <= GATE_TOL else 'FAIL'} |")
+    L.append("")
     L += ["## Gate (b): every lift bucket with 1,000+ combinations within 5%, shadow model", "",
           "| era | " + " | ".join(next(iter(gates.values())).keys()) + " |",
           "|---" * (len(next(iter(gates.values()))) + 1) + "|"]

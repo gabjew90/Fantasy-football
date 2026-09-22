@@ -52,6 +52,7 @@ V1 = {
     "qb_window": 3,                   # seasons of the starter's career the rate looks back over
     "qb_share": 0.92,                 # the starter share WITHIN qb_rush (tuned 2022-23); None = from history
     "top_pass": None,                 # factor on the top-q player's passing-channel shares; None = off
+    "slot_pull": 0.2,                 # shrink toward the slot league share (tuned 2022-23 jointly with kappa)
 }
 SKILL = {"QB": "QB", "RB": "RB", "FB": "RB", "WR": "WR", "TE": "TE"}
 LABEL = "anytime_td_v1"
@@ -164,16 +165,33 @@ def game_mix(ctx: dict, team: str, qb: str | None = None, beta=V1["qb_beta"]) ->
 
 def week_shares(cnt_cur, cnt_pri, played_cur, played_pri, slots_pri, actives: pd.DataFrame,
                 kappa=V1["kappa"], moved=V1["moved"], slot_scale=V1["slot_scale"],
-                prior=True) -> tuple[pd.DataFrame, pd.DataFrame]:
+                prior=True, slot_pull=V1["slot_pull"]) -> tuple[pd.DataFrame, pd.DataFrame]:
     """(filled shares, raw shares) for every player, for one week.
-    `actives` has player_id, team, slot for the week being priced."""
+    `actives` has player_id, team, slot for the week being priced.
+
+    SLOT PULL. Players ranked by an ESTIMATED share carry the estimate's noise:
+    the top-ranked are partly lucky, the bottom partly unlucky. The top-q player
+    scores ~7% below his share at every TD count and spread, and the lowest bin
+    runs low -- both ends of one winner's-curse pattern. With `slot_pull` = w,
+    each active player with history gets (1 - w) x his share + w x his
+    depth-chart slot's league share (the empirical-Bayes middle)."""
     raw = A.blended_shares(cnt_cur, cnt_pri, played_cur, played_pri, T.OFFENSIVE, kappa,
                            per_game(cnt_pri), current_team=dict(zip(actives["player_id"], actives["team"])),
                            moved_weight=moved)
     if not prior:
         return raw, raw
     sp = A.slot_prior(cnt_pri, played_pri, slots_pri, T.OFFENSIVE)
-    return A.fill_no_history(raw, actives, sp, T.OFFENSIVE, scale=slot_scale), raw
+    out = A.fill_no_history(raw, actives, sp, T.OFFENSIVE, scale=slot_scale)
+    if slot_pull:
+        act = actives[actives["player_id"].isin(raw.index)].drop_duplicates("player_id")
+        slot = act["slot"].fillna("OTHER") if "slot" in act else pd.Series("OTHER", index=act.index)
+        slot = slot.where(slot.isin(sp.index), "OTHER")
+        target = sp.reindex(slot.to_numpy()).fillna(0.0)[list(T.OFFENSIVE)].to_numpy()
+        ids = act["player_id"].to_numpy()
+        cur = out.loc[ids, list(T.OFFENSIVE)].to_numpy(float)
+        out = out.copy()
+        out.loc[ids, list(T.OFFENSIVE)] = (1 - slot_pull) * cur + slot_pull * target
+    return out, raw
 
 
 def game_shares(shares: pd.DataFrame, team: str, ids: list[str], pos: dict,
