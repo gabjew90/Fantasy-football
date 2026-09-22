@@ -1,5 +1,7 @@
 # anytime_td_v1: layer 2 and the end-to-end test
 
+*Scored under the six channels of props-v1.12 (end-zone split). 'v1.0 settings (current channels)' is v1.0's allocation re-run on these channels, not the literal props-v1.4 model; its published figures are in the props-v1.4 tag's reports/td_v1.md.*
+
 Tune [2022, 2023], test [2024, 2025]. Population: QB/RB/WR/TE on the game-day active list, 15022 player-games in test, 14.8% of whom scored. Active list covers 100.0% of snaps; 45.1% of actives hold a depth-chart slot. Five channels on raw counts; reallocation 'all'; kappa 5; moved-role weight 0.25. The engine gets the slot prior it has in production.
 
 **Shipped configuration, scored as-is: slot|x0.4|m0.25|qs0.92|cap0.99|qb40|cinf** -- the parameters in td_v1.V1, which score_game.py calls. Every rebuild number below comes out of that module.
@@ -14,7 +16,7 @@ Summed per-touchdown share of the team's ACTIVE players, against the fraction of
 | engine | 0.932 | 0.022 |
 | layer 2, no prior (previous spec) | 0.990 | 0.000 |
 | layer 2, full slot prior | 0.990 | 0.025 |
-| anytime_td_v1 as first shipped (props-v1.4) | 0.990 | 0.011 |
+| v1.0 settings (current channels) | 0.990 | 0.011 |
 | shipped | 0.989 | 0.011 |
 
 ## Allocation, given the team's offensive touchdowns (test)
@@ -24,8 +26,8 @@ Summed per-touchdown share of the team's ACTIVE players, against the fraction of
 | Engine (pass/rush, inside-10, slot prior) | 0.3347 | | baseline |
 | previous spec: no prior, fixed share | 0.3369 | engine | +0.0022 (-0.0014, +0.0061) not established |
 | full slot prior, fixed share | 0.3334 | previous spec | -0.0035 (-0.0068, -0.0006) better |
-| v1 as first shipped (slot x0.4) | 0.3321 | full slot prior | -0.0013 (-0.0018, -0.0008) better |
-| shipped | 0.3307 | v1 as first shipped | -0.0014 (-0.0030, +0.0004) not established |
+| v1.0 settings (current channels) (slot x0.4) | 0.3321 | full slot prior | -0.0013 (-0.0018, -0.0008) better |
+| shipped | 0.3307 | v1.0 settings (current channels) | -0.0014 (-0.0030, +0.0004) not established |
 
 Shipped vs engine directly: -0.0040 (-0.0066, -0.0014) better.
 
@@ -56,10 +58,10 @@ Engine = implied points x league offensive TDs/point, linear, Poisson; per-TD sh
 | model | log loss | Brier | mean predicted | vs engine (95% CI, game-clustered) |
 |---|---|---|---|---|
 | Engine (anytime_td_v0 structure) | 0.3608 | 0.1091 | 0.135 | baseline |
-| v1 as first shipped (props-v1.4) | 0.3577 | 0.1085 | 0.145 | -0.0031 (-0.0054, -0.0009) better |
+| v1.0 settings (current channels) (props-v1.4) | 0.3577 | 0.1085 | 0.145 | -0.0031 (-0.0054, -0.0009) better |
 | v1 shipped | 0.3564 | 0.1081 | 0.145 | -0.0044 (-0.0069, -0.0019) better |
 
-Shipped vs v1 as first shipped: -0.0013 (-0.0029, +0.0004) not established.
+Shipped vs v1.0 settings (current channels): -0.0013 (-0.0029, +0.0004) not established.
 
 Actual scoring rate 0.148.
 
@@ -93,7 +95,7 @@ The 0.2-0.3 band is where most priced anytime lines sit.
 
 ### Starting quarterbacks, end to end
 
-| population | n | actual rate | engine: predicted / log loss | v1 as first shipped: predicted / log loss | shipped: predicted / log loss |
+| population | n | actual rate | engine: predicted / log loss | v1.0 settings (current channels): predicted / log loss | shipped: predicted / log loss |
 |---|---|---|---|---|---|
 | all starting QBs | 1088 | 0.148 | 0.096 / 0.4074 | 0.131 / 0.4000 | 0.158 / 0.3855 |
 | QB new to his team as a starter | 67 | 0.104 | 0.041 / 0.3149 | 0.068 / 0.3480 | 0.134 / 0.3094 |

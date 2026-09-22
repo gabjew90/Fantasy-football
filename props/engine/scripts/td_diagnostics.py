@@ -218,7 +218,9 @@ def opponent_points(L: list, d: pd.DataFrame, tg: pd.DataFrame, seasons) -> None
         L.append("")
         return
     top = d[(d["rank"] == 1)]
-    rush, pas = ["qb_rush", "rush_in5", "rush_far"], ["pass_rz", "pass_far"]
+    # from the model's channel list, so a channel split can never drop out of the ratio
+    pas = [c for c in T.OFFENSIVE if c.startswith("pass_")]
+    rush = [c for c in T.OFFENSIVE if not c.startswith("pass_")]
     L += ["", "Top-q player, WITHIN channels: realised channel TDs / (his channel share x the team's channel TDs). "
               "Flat across rows = the share holds and the mix moves.", "",
           "| opponent | team-games | rushing channels | passing channels | per-TD (all) | his mix: rushing share of expected |",

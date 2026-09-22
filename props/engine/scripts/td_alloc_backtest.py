@@ -58,7 +58,9 @@ L1 = T.LAYER1                    # {"trials": 10, "gamma": 0.25, ...}
 BASE_ALLOC = ("none", 1.0, 0.5, None, None)        # the spec before the slot prior
 FULL_ALLOC = ("slot", 1.0, MOVED, None, None)
 V1_ALLOC = ("slot", V.V1["slot_scale"], MOVED, V.V1["qb_share"], V.V1["top_pass"])
-V10 = (("slot", V.V1["slot_scale"], MOVED, None, None), None, 0.99, None)   # v1 as first shipped (props-v1.4)
+# V10: v1.0's SETTINGS. The channels are global, so under a channel change this is v1.0's
+# allocation re-run on the current channels -- not the literal model props-v1.4 priced.
+V10 = (("slot", V.V1["slot_scale"], MOVED, None, None), None, 0.99, None)
 V11 = (("slot", V.V1["slot_scale"], MOVED, None, None), None, 0.99, 40.0)   # v1.1 (props-v1.5)
 TOP_PASS = [None, 0.95, 0.9, 0.85, 0.8, 0.7]
 QB_SHARES = [None, 0.85, 0.88, 0.92, 0.95]
@@ -447,7 +449,7 @@ def write(path: Path, D, d, mass, tune_ll, best, tune, test, shipped=False):
           f"| layer 2, full slot prior | {mass['sum_q|' + mk(prev)].mean():.3f} | "
           f"{mass['nohist_q|' + mk(prev)].mean():.3f} |"]
     if shipped and V10 != best_fixed:
-        L.append(f"| anytime_td_v1 as first shipped (props-v1.4) | {mass['sum_q|' + mk(V10)].mean():.3f} | "
+        L.append(f"| v1.0 settings (current channels) | {mass['sum_q|' + mk(V10)].mean():.3f} | "
                  f"{mass['nohist_q|' + mk(V10)].mean():.3f} |")
     L += [f"| {'shipped' if shipped else 'chosen'} | {mass['sum_q|' + mk(best)].mean():.3f} | "
           f"{mass['nohist_q|' + mk(best)].mean():.3f} |", ""]
@@ -459,9 +461,9 @@ def write(path: Path, D, d, mass, tune_ll, best, tune, test, shipped=False):
           f"| full slot prior, fixed share | {ll(d, 'n|' + kp):.4f} | previous spec | {_ci(boot(d, 'n|' + kp, 'n|' + kbase))} |"]
     if shipped and V10 != best_fixed:
         k10 = cid(V10)
-        L += [f"| v1 as first shipped (slot x{V10[0][1]:g}) | {ll(d, 'n|' + k10):.4f} | full slot prior | "
+        L += [f"| v1.0 settings (current channels) (slot x{V10[0][1]:g}) | {ll(d, 'n|' + k10):.4f} | full slot prior | "
               f"{_ci(boot(d, 'n|' + k10, 'n|' + kp))} |",
-              f"| shipped | {ll(d, 'n|' + kbf):.4f} | v1 as first shipped | {_ci(boot(d, 'n|' + kbf, 'n|' + k10))} |"]
+              f"| shipped | {ll(d, 'n|' + kbf):.4f} | v1.0 settings (current channels) | {_ci(boot(d, 'n|' + kbf, 'n|' + k10))} |"]
     else:
         L.append(f"| chosen slot scale, fixed share | {ll(d, 'n|' + kbf):.4f} | full slot prior | "
                  f"{_ci(boot(d, 'n|' + kbf, 'n|' + kp))} |")
@@ -491,12 +493,12 @@ def write(path: Path, D, d, mass, tune_ll, best, tune, test, shipped=False):
           f"{d[e].mean():.3f} | baseline |"]
     if shipped and V10 != best:
         r10 = "e2e|" + cid(V10)
-        L.append(f"| v1 as first shipped (props-v1.4) | {ll(d, r10):.4f} | {((d[r10] - d['scored']) ** 2).mean():.4f} | "
+        L.append(f"| v1.0 settings (current channels) | {ll(d, r10):.4f} | {((d[r10] - d['scored']) ** 2).mean():.4f} | "
                  f"{d[r10].mean():.3f} | {_ci(boot(d, r10, e))} |")
     L += [f"| {'v1 shipped' if shipped else 'v1'} | {ll(d, r):.4f} | {((d[r] - d['scored']) ** 2).mean():.4f} | "
           f"{d[r].mean():.3f} | {_ci(boot(d, r, e))} |", ""]
     if shipped and V10 != best:
-        L += [f"Shipped vs v1 as first shipped: {_ci(boot(d, r, 'e2e|' + cid(V10)))}.", ""]
+        L += [f"Shipped vs v1.0 settings (current channels): {_ci(boot(d, r, 'e2e|' + cid(V10)))}.", ""]
     L += [f"Actual scoring rate {d['scored'].mean():.3f}.", "",
           "Cross terms -- each layer alone, the other as the engine has it:", "",
           "| model | log loss | mean predicted | vs engine |", "|---|---|---|---|",
@@ -512,7 +514,7 @@ def write(path: Path, D, d, mass, tune_ll, best, tune, test, shipped=False):
         L.append(f"| {p} | {ll(g, e):.4f} | {ll(g, r):.4f} | {len(g)} |")
 
     if shipped:
-        pairs = [("engine", "eng_e2e")] + ([("v1 as first shipped", "e2e|" + cid(V10))] if V10 != best else []) \
+        pairs = [("engine", "eng_e2e")] + ([("v1.0 settings (current channels)", "e2e|" + cid(V10))] if V10 != best else []) \
             + [("shipped", r)]
         L += ["", "### Starting quarterbacks, end to end", ""]
         _qb_rows(L, d, pairs)
