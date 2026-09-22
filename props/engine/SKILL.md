@@ -246,8 +246,31 @@ legs per entry, and that alternate lines two units past the median beat any post
 this objective (quote the ladder). Note the 90%+ tail runs ~4 pts optimistic in the 2025
 backtest.
 
+## Fast path
+For a narrow question, run only what it needs:
+- **One game, specific markets:** `python scripts/score_game.py --away NYG --home LA --markets td`
+  (markets: `receptions`, `rec_yds`, `rush_yds`, `td`, comma-separated). `--week` is optional and
+  resolves to the next meeting; `LAR`, `WSH`, `JAC`, `LVR` are accepted. A `--markets` run prints a
+  short summary (also saved as `summary_*.md`) instead of the full report, which is still written.
+- **Today's games / one date:** `python scripts/score_week.py --today` or `--date YYYY-MM-DD`
+  (`--markets` passes through).
+- **Anytime TD:** every priced TD row is also in `td_board_*.csv` (the bet card leaves TD rows out).
+  A TD-only run takes DraftKings prices from The Odds API when the cached quota shows 100+ credits,
+  otherwise Sleeper; the sources table says which, and so must the reply.
+- **Fantasy numbers:** `fantasy_points_*.csv` has median, p20 and p80 per player from the joint
+  simulation (`--fantasy-scoring ppr|half|std|file.json|'rec=0.5,...'`). QB rows are rushing only:
+  passing is not modelled.
+- **Inside 60 minutes of kickoff** the report flags a candidate closing snapshot; say so in the reply.
+  The scheduled capture records the official close.
+
 ## Output
 Use the exact report structure in `resources/prop_workflow.md`.
+
+Two rules for every reply:
+- **State plainly when no row has positive expected value** at the posted prices. The report's first
+  line says it; the reply says it in its opening lines, not buried under the tables.
+- **Call `present_files` on the report** (`report_*.md`, plus `summary_*.md` for a `--markets` run) so
+  the user can open it.
 
 When `score_game.py` has been run, the CHAT REPLY is the deliverable, not the report file.
 The archive JSONL and shadow-log CSV are still written (they feed closing-line value) but

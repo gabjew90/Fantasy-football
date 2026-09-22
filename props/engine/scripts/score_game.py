@@ -125,6 +125,127 @@ def run_odds(stage, args_list):
     return json.loads(r.stdout)
 
 
+# ---------------------------------------------------------------- CLI conveniences
+# Abbreviations people type that games.csv spells differently.
+CLI_ALIASES = {"LAR": "LA", "WSH": "WAS", "JAC": "JAX", "LVR": "LV"}
+MARKET_ALIASES = {"receptions": "player_receptions", "rec": "player_receptions",
+                  "rec_yds": "player_reception_yds", "receiving_yards": "player_reception_yds",
+                  "rush_yds": "player_rush_yds", "rushing_yards": "player_rush_yds",
+                  "td": "player_anytime_td", "anytime_td": "player_anytime_td", "atd": "player_anytime_td"}
+# A TD-only run takes DraftKings anytime prices from The Odds API when the last
+# known quota leaves at least this many credits; otherwise Sleeper. (ESPN's
+# free prop feed lists anytime-TD markets but carries no price for them.)
+TD_QUOTA_MIN = 100
+FANTASY_PRESETS = {"ppr": {"rec": 1.0}, "half": {"rec": 0.5}, "std": {"rec": 0.0}}
+FANTASY_BASE = {"rec": 1.0, "rec_yd": 0.1, "rush_yd": 0.1, "rush_td": 6.0, "rec_td": 6.0}
+
+
+def et_today() -> str:
+    """Today's date in US Eastern time, the calendar games.csv uses. The chat
+    container and Actions runners run on UTC, which is already tomorrow on a
+    Monday night. DST: second Sunday of March to first Sunday of November."""
+    from datetime import timedelta
+    now = datetime.now(timezone.utc)
+    y = now.year
+
+    def nth_sunday(month, n):
+        d = datetime(y, month, 1, tzinfo=timezone.utc)
+        first = d + timedelta(days=(6 - d.weekday()) % 7)
+        return first + timedelta(weeks=n - 1)
+    dst = nth_sunday(3, 2) + timedelta(hours=7) <= now < nth_sunday(11, 1) + timedelta(hours=6)
+    return (now - timedelta(hours=4 if dst else 5)).strftime("%Y-%m-%d")
+
+
+def resolve_team(x: str) -> str:
+    x = x.strip().upper()
+    return CLI_ALIASES.get(x, x)
+
+
+def parse_markets(spec: str | None) -> set[str]:
+    """--markets receptions,rec_yds,rush_yds,td -> the engine's market keys."""
+    if not spec:
+        return set()
+    out = set()
+    for t in spec.split(","):
+        t = t.strip().lower()
+        if not t:
+            continue
+        key = MARKET_ALIASES.get(t, t if t.startswith("player_") else None)
+        if key is None:
+            sys.exit(f"--markets: unknown market '{t}'. Use: {', '.join(sorted(MARKET_ALIASES))}")
+        out.add(key)
+    return out
+
+
+def last_oddsapi_quota() -> int | None:
+    """Remaining Odds API credits from the newest cached odds response, if any."""
+    files = sorted((HERE / "cache").glob("odds_*.json"), key=lambda f: f.stat().st_mtime)
+    for f in reversed(files):
+        try:
+            q = json.loads(f.read_text(encoding="utf-8")).get("quota", {})
+            v = q.get("x-requests-remaining")
+            if v is not None:
+                return int(float(v))
+        except Exception:  # noqa: BLE001 -- a bad cache file just means "unknown"
+            continue
+    return None
+
+
+def parse_scoring(spec: str) -> dict:
+    """--fantasy-scoring ppr | half | std | path/to.json | 'rec=0.5,rec_yd=0.1,...'.
+    Keys follow the league files: rec, rec_yd, rush_yd, rush_td, rec_td."""
+    sc = dict(FANTASY_BASE)
+    if spec in FANTASY_PRESETS:
+        sc.update(FANTASY_PRESETS[spec])
+    elif spec.endswith(".json") and Path(spec).exists():
+        sc.update({k: float(v) for k, v in json.loads(Path(spec).read_text(encoding="utf-8")).items() if k in sc})
+    else:
+        for kv in spec.split(","):
+            if "=" in kv:
+                k, v = kv.split("=", 1)
+                if k.strip() in sc:
+                    sc[k.strip()] = float(v)
+    return sc
+
+
+def fantasy_table(M, sims, V1TD, td_lambda, scoring: dict, rng, n_sim: int) -> pd.DataFrame:
+    """Fantasy points per player from the joint simulation's draws: receptions,
+    receiving and rushing yards from the yardage model's draws; touchdowns
+    drawn from anytime_td_v1 (each team's offensive-TD count, then each TD to a
+    player by his per-TD share) or, for a player v1 did not price, Poisson from
+    the v0 rate. Passing is not modelled, so a QB row is rushing only."""
+    import td_model as _T
+    tds = {}
+    for t in M.team.unique():
+        Mt = M[M.team == t]
+        v = V1TD[V1TD.team == t] if V1TD is not None and len(V1TD) else None
+        if v is not None and len(v):
+            mu = float(v["mu"].iloc[0])
+            pmf = _T.count_pmf([mu], n=_T.LAYER1["trials"])[0]
+            N = rng.choice(len(pmf), size=n_sim, p=pmf / pmf.sum())
+            ids = [g for g in Mt.gsis_id if g in v.index]
+            q = np.array([float(v.loc[g, "q"]) for g in ids])
+            pv = np.append(q, max(1.0 - q.sum(), 0.0))
+            alloc = rng.multinomial(N, pv / pv.sum())
+            for j, g in enumerate(ids):
+                tds[g] = alloc[:, j]
+        for _, m in Mt.iterrows():
+            if m.gsis_id not in tds:
+                tds[m.gsis_id] = rng.poisson(max(td_lambda(m), 0.0), size=n_sim)
+    rows = []
+    for _, m in M.iterrows():
+        sm = sims[m["name"]]
+        td_pts = scoring["rec_td"] if m.pos in ("WR", "TE") else scoring["rush_td"]
+        pts = (sm["receptions"] * scoring["rec"] + sm["rec_yards"] * scoring["rec_yd"]
+               + sm["rush_yards"] * scoring["rush_yd"] + tds[m.gsis_id] * td_pts)
+        rows.append({"player": m["name"], "team": m.team, "pos": m.pos, "slot": m.slot,
+                     "median": float(np.median(pts)), "p20": float(np.percentile(pts, 20)),
+                     "p80": float(np.percentile(pts, 80)), "mean": float(pts.mean()),
+                     "p_td": float((tds[m.gsis_id] > 0).mean()),
+                     "note": "rushing only: passing not modelled" if m.pos == "QB" else ""})
+    return pd.DataFrame(rows).sort_values("median", ascending=False)
+
+
 # Joint (parlay) pricing is gated off until a joint-outcome holdout exists.
 # The research escape hatch is --enable-parlays, which stamps the output as
 # unvalidated; it exists so the validation itself can be built.
@@ -146,9 +267,10 @@ def main():
     ap.add_argument("--min-er", type=float, default=0.03)
     ap.add_argument("--prior-archive"); ap.add_argument("--prior-log")
     ap.add_argument("--no-odds", action="store_true")
-    ap.add_argument("--source", choices=["sleeper", "oddsapi"], default="sleeper",
+    ap.add_argument("--source", choices=["sleeper", "oddsapi"], default=None,
                     help="price source: Sleeper Picks (default; no key, no quota, pick'em multipliers converted to American) "
-                         "or The Odds API (DK/FD, 8 credits a run). Whichever is not chosen is the automatic fallback.")
+                         "or The Odds API (DK/FD, 8 credits a run). Whichever is not chosen is the automatic fallback. "
+                         f"A TD-only run (--markets td) defaults to The Odds API when the cached quota shows {TD_QUOTA_MIN}+ credits.")
     ap.add_argument("--no-oddsapi-fallback", action="store_true",
                     help="never spend Odds API credits, even when Sleeper has no lines for this game")
     ap.add_argument("--sleeper-cache-ttl", type=int, default=int(os.environ.get("SLEEPER_CACHE_TTL", "600")),
@@ -165,14 +287,30 @@ def main():
                     help="price from the lines and spread/total a main run saved; no fetch, no credits, no archive")
     ap.add_argument("--no-scenarios", action="store_true",
                     help="skip the 'if he is out' pricing for Questionable players (captures do not need it)")
+    ap.add_argument("--markets", default="",
+                    help="only these markets: receptions, rec_yds, rush_yds, td (comma list); prints a short summary")
+    ap.add_argument("--fantasy-scoring", default="ppr",
+                    help="fantasy_points_*.csv scoring: ppr | half | std | path.json | 'rec=0.5,rec_yd=0.1,...'")
     a = ap.parse_args()
+    MARKETS = parse_markets(a.markets)
+    SOURCE_NOTE = None
+    if a.source is None:
+        q_left = last_oddsapi_quota()
+        if MARKETS == {"player_anytime_td"} and q_left is not None and q_left >= TD_QUOTA_MIN:
+            a.source = "oddsapi"
+            SOURCE_NOTE = f"TD-only run: DraftKings anytime prices from The Odds API ({q_left} credits left before this run)"
+        else:
+            a.source = "sleeper"
+            if MARKETS == {"player_anytime_td"}:
+                SOURCE_NOTE = (f"TD-only run on Sleeper: Odds API quota {'unknown' if q_left is None else q_left} "
+                               f"(needs {TD_QUOTA_MIN}+ to switch to DraftKings)")
     global OUT
     ASSUME_OUT = {x for x in a.assume_out.split(",") if x}
     SNAP = json.loads(Path(a.odds_snapshot).read_text(encoding="utf-8")) if a.odds_snapshot else None
     if ASSUME_OUT:
         OUT = OUT / "scenarios"
 
-    AWAY, HOME = a.away.upper(), a.home.upper()
+    AWAY, HOME = resolve_team(a.away), resolve_team(a.home)
     wd = Path(a.workdir); wd.mkdir(parents=True, exist_ok=True)
     OUT.mkdir(parents=True, exist_ok=True)
     rng = np.random.default_rng(20260917)
@@ -184,8 +322,18 @@ def main():
               & (games.away_team == AWAY) & (games.home_team == HOME)]
     if a.week:
         g = g[g.week == a.week]
+    elif len(g) > 1:
+        # no --week: the NEXT meeting (divisional teams meet twice), else the latest
+        upcoming = g[g.gameday >= et_today()]
+        g = upcoming.sort_values("gameday").head(1) if len(upcoming) else g.sort_values("gameday").tail(1)
     if g.empty:
-        sys.exit(f"MATCHUP NOT FOUND: {AWAY} at {HOME} in {SEASON} REG. Check team abbreviations.")
+        seen = games[(games.season == SEASON) & (games.game_type == "REG")
+                     & (games.away_team.isin([AWAY, HOME])) & (games.home_team.isin([AWAY, HOME]))]
+        where = "; ".join(f"week {int(r.week)}: {r.away_team} at {r.home_team} ({r.gameday})" for r in seen.itertuples())
+        sys.exit(f"MATCHUP NOT FOUND: {AWAY} at {HOME}" + (f" week {a.week}" if a.week else "")
+                 + f" in {SEASON} REG. " + (f"These teams meet: {where}." if where else
+                                             "They do not meet this season; check the abbreviations "
+                                             f"(aliases accepted: {', '.join(f'{k}->{v}' for k, v in CLI_ALIASES.items())})."))
     G = g.iloc[0]; WEEK = int(G.week)
     roof = str(G.roof).lower()
     log(f"verified: {AWAY} at {HOME}, {SEASON} week {WEEK}, {G.gameday} {G.gametime} ET, "
@@ -203,6 +351,8 @@ def main():
     resid = np.array(P["carry_residual_quantiles"])
 
     SOURCES = []   # (name, what it's for, status, detail)
+    if SOURCE_NOTE:
+        SOURCES.append(("Price source choice", "which book prices this run", "ok", SOURCE_NOTE))
     SOURCES.append(("Schedule (nflverse games.csv)", "matchup, kickoff, stadium, roof", "ok",
                     f"{AWAY} at {HOME} week {WEEK} verified"))
     SOURCES.append((f"Prior-season priors ({PRIOR}, bundled)", "each player's baseline rates",
@@ -1149,6 +1299,8 @@ def main():
                             "whether the book agrees with our depth-chart slot", "ok",
                             "; ".join(slot_gaps)))
 
+    if MARKETS:
+        rows = [r_ for r_ in rows if r_["market"] in MARKETS]
     R = pd.DataFrame(rows)
     # A row priced while a TEAMMATE is Questionable assumes he plays. If he sits,
     # his own props void but this row still grades -- against a line priced on
@@ -1213,6 +1365,12 @@ def main():
             keep="last")
     if not R.empty:
         R.to_csv(logf, index=False)
+        # anytime TD has its own board: the bet card leaves TD rows out
+        TDB = R[R.market == "player_anytime_td"]
+        if len(TDB):
+            TDB[[c for c in ["player", "team", "book", "price", "p_model", "p_novig", "gap", "td_model",
+                             "questionable_teammate", "flag", "decision"] if c in TDB.columns]] \
+                .sort_values("p_model", ascending=False).to_csv(OUT / f"td_board_{slug}.csv", index=False)
     arch = OUT / f"line_archive_nfl_{SEASON}.jsonl"
     if a.prior_archive and Path(a.prior_archive).exists() and arch.exists():
         seen, merged = set(), []
@@ -1378,6 +1536,8 @@ def main():
     CARD_MARKETS = [("player_receptions", "receptions", "catches", 0.5),
                     ("player_reception_yds", "rec_yards", "rec yds", 0.5),
                     ("player_rush_yds", "rush_yards", "rush yds", 0.5)]
+    if MARKETS:
+        CARD_MARKETS = [c for c in CARD_MARKETS if c[0] in MARKETS]
 
     def thresholds(samples, step):
         """Smallest half-integer line where P(under) >= P_NEEDED, and largest where
@@ -1438,7 +1598,10 @@ def main():
                                   er=float(brow.ER) if brow is not None else None,
                                   eligible=eligible, would_play_if_validated=priced,
                                   strength=abs((samp < bl).mean() - 0.5) if bl is not None else 0))
-    CARD = pd.DataFrame(card_rows)
+    # the columns are fixed so an empty card (a --markets td run prices no yardage) still has them
+    CARD = pd.DataFrame(card_rows, columns=["player", "team", "prop", "book", "book_line", "our_median",
+                                            "under_at", "over_at", "call", "why", "price", "er",
+                                            "eligible", "would_play_if_validated", "strength"])
     if not CARD.empty:
         # `is_play` was a string-prefix test on rendered display text. It is
         # now the enforced verdict, and the price-aware "would play if the
@@ -1451,6 +1614,7 @@ def main():
     L = []
     L.append(f"# {AWAY} at {HOME}")
     L.append(f"### {SEASON} Week {WEEK} · {G.gameday} {G.gametime} ET · {G.stadium}\n")
+    L.append(ev_statement(R) + "\n")
 
     # ---------- player-by-player card, in depth-chart order ----------
     L.append("*Model opinion, not yet tested against sportsbooks; six weeks of logged results decide whether to trust it. "
@@ -1851,7 +2015,12 @@ def main():
               if weather.get("status") == "ok" else f"weather {weather.get('status')}")
         desig = [f"{r['name']} {r.report_status}" for _, r in pop.iterrows() if isinstance(r.get("report_status"), str) and r.report_status]
         T += ["## Game header\n",
-              f"- **Frame:** {frame}. Team TD totals: " + ", ".join(f"{t} {env[t].get('pass_td',0)+env[t].get('rush_td',0):.1f} ({'market-anchored' if env[t].get('td_anchor')=='market' else 'history'})" for t in (AWAY, HOME)),
+              f"- **Frame:** {frame}. Team TD totals, all touchdowns incl. defence and special teams (the yardage "
+              f"model's anchor): " + ", ".join(f"{t} {env[t].get('pass_td',0)+env[t].get('rush_td',0):.1f} ({'market-anchored' if env[t].get('td_anchor')=='market' else 'history'})" for t in (AWAY, HOME))
+              + ("" if V1TD is None or V1TD.empty else
+                 ". Offensive touchdowns only, the mean the anytime-TD model prices from: "
+                 + ", ".join(f"{t} {float(V1TD[V1TD.team == t]['mu'].iloc[0]):.1f}" for t in (AWAY, HOME)
+                             if (V1TD.team == t).any()) + ". The two differ by design, not by error."),
               f"- **Weather:** {wx}. 15 mph sustained-wind screen {'HIT' if (weather.get('wind_mph_max') or 0) > 15 else 'not hit'}.",
               f"- **Injury designations (week {WEEK} report):** " + (", ".join(desig) if desig else "none on the eligible set") + ". Out/Doubtful removed; their share goes mostly to the replacement, a quarter to the priced teammates; Questionable priced as if playing, with a separate 'if he's out' pricing. Re-run inside 90 minutes of kickoff: a late scratch changes every share on that team.",
               f"- **Data cutoff:** 2026 weeks 1-{WEEK-1} play-by-play, week {WEEK} roster/injury/depth chart; prices snapshot {now()}; kickoff in {hrs:.1f} h.",
@@ -2031,11 +2200,18 @@ def main():
     # ---- housekeeping ----
     L.append("## Housekeeping\n")
     if quote_meta:
-        L.append(f"- Prices captured {quote_meta['retrieved']} UTC. API calls remaining this month: {quote_meta['quota'].get('x-requests-remaining')}.")
+        _q = (quote_meta.get("quota") or {}).get("x-requests-remaining")
+        src_ = ("priced from Sleeper" if sleeper_used else
+                "priced from the manual lines file" if a.lines_file else "no quota header returned")
+        L.append(f"- Prices captured {quote_meta['retrieved']} UTC. Odds API calls remaining this month: "
+                 + (f"n/a ({src_})" if sleeper_used or a.lines_file or _q is None else f"{_q}") + ".")
     L.append(f"- Routes run and route participation: not available from any verified source, so not used.")
     L.append(f"- QB rushing yards left out on purpose: kneel-downs count against the prop and we don't model them yet.")
     if hrs > 1:
         L.append(f"- **Kickoff is in {hrs:.1f} hours.** To track how these lines moved, open a chat inside the last hour and ask for a closing capture.")
+    elif hrs > 0:
+        L.append(f"- **Candidate closing snapshot:** kickoff in {hrs * 60:.0f} minutes, inside the closing window. The "
+                 "scheduled capture records the official close; this run is a reference copy.")
     L.append(f"- Full technical detail (every line, every book, model parameters) is in the attached CSV files.")
     L.append("")
 
@@ -2055,14 +2231,21 @@ def main():
              f"K0={K0}; {N_SIM} draws, seed 20260917. Early-season prior-season blend is not the form validated in the 2025 backtest.")
     L.append("</details>")
 
-    if not CARD.empty:
-        L.append("\n</details>")
+    L.append("\n</details>")       # closes 'Everything else', which is opened unconditionally
     # encoding is explicit: the report contains "≥" and Windows defaults to
     # cp1252, which cannot encode it. The Linux runner never saw this because
     # it defaults to UTF-8, so the bug was invisible in CI and fatal locally.
     (OUT / f"report_{slug}.md").write_text("\n".join(L), encoding="utf-8")
     M.drop(columns=["evidence"]).to_csv(OUT / f"player_params_{slug}.csv", index=False)
+    try:
+        FP = fantasy_table(M, sims, V1TD, td_lambda, parse_scoring(a.fantasy_scoring),
+                           np.random.default_rng(20260922), N_SIM)
+        FP.to_csv(OUT / f"fantasy_points_{slug}.csv", index=False)
+    except Exception as exc:  # noqa: BLE001 -- the export must never cost the prop run
+        log(f"  fantasy export skipped ({type(exc).__name__}: {exc})")
     log(f"\nwrote {OUT}/report_{slug}.md")
+    if hrs > 0 and hrs <= 1:
+        log(f"  CANDIDATE CLOSING SNAPSHOT: kickoff in {hrs * 60:.0f} minutes")
     if not ASSUME_OUT and not a.no_scenarios:
         q = pop[pop.questionable & ~pop.excluded]
         if len(q) and snap_written:
@@ -2072,7 +2255,29 @@ def main():
             L += ["", "## If a Questionable player is out", "",
                   "Not priced: this run had no lines to price against."]
             (OUT / f"report_{slug}.md").write_text("\n".join(L), encoding="utf-8")
-    print("\n".join(L))
+    if MARKETS:
+        S_ = short_summary(R, AWAY, HOME, SEASON, WEEK, books_used_str, hrs, sorted(MARKETS))
+        (OUT / f"summary_{slug}.md").write_text("\n".join(S_), encoding="utf-8")
+        print("\n".join(S_))
+        print(f"\n(full report: {OUT / f'report_{slug}.md'})")
+    else:
+        print("\n".join(L))
+
+
+def short_summary(R, away, home, season, week, books, hrs, markets) -> list[str]:
+    """The --markets fast path: just the asked-for markets, one table."""
+    out = [f"# {away} at {home}, {season} week {week}: {', '.join(m.replace('player_', '') for m in markets)}", "",
+           f"Prices: {books}." + (f" Candidate closing snapshot (kickoff in {hrs * 60:.0f} min)." if 0 < hrs <= 1 else ""),
+           "", ev_statement(R), ""]
+    if R.empty:
+        return out
+    out += ["| player | market | side / line | book | price | model | market | gap |", "|---|---|---|---|---|---|---|---|"]
+    for r in R.sort_values(["market", "p_model"], ascending=[True, False]).itertuples():
+        ln = "" if pd.isna(r.line) else f" {r.line:g}"
+        out.append(f"| {r.player} ({r.team}) | {r.market.replace('player_', '')} | {r.side}{ln} | {r.book} | "
+                   f"{int(r.price):+d} | {r.p_model:.0%} | {r.p_novig:.0%} | {r.gap:+.0%} |")
+    out += ["", "No row is eligible to bet: no market is validated against sportsbook lines."]
+    return out
 
 
 def apply_out_rule(M: pd.DataFrame, E: pd.DataFrame, teams, rule=None):
@@ -2115,6 +2320,18 @@ def apply_out_rule(M: pd.DataFrame, E: pd.DataFrame, teams, rule=None):
 # inside-10 targets -90 (-121, -62), inside-10 carries -375 (-617, -206).
 OUT_RULE = {"ts": (0.2, 0.25), "i10ts": (0.0, 0.0), "rs": (0.0, 0.25), "i10rs": (0.0, 0.25)}
 POS_GROUP = {"FB": "RB", "HB": "RB"}
+def ev_statement(R: pd.DataFrame) -> str:
+    """Say plainly whether any priced row has positive expected value at the
+    price actually posted -- the first thing a reader wants to know."""
+    if R.empty:
+        return "**No lines were priced for this game.**"
+    pos = R[pd.to_numeric(R["ER"], errors="coerce") > 0]
+    if pos.empty:
+        return "**No row has positive expected value at the posted prices.**"
+    return (f"**{len(pos)} of {len(R)} priced rows have positive expected value at the posted price** "
+            "-- none is eligible to bet (no market is validated against sportsbook lines).")
+
+
 SCEN_KEY = ["book", "market", "player", "side", "line"]
 MARKET_WORDS = {"player_receptions": "catches", "player_reception_yds": "receiving yards",
                 "player_rush_yds": "rushing yards"}
