@@ -64,11 +64,14 @@ PRED_FIELDS = [
     "td_model",
     # Priced while a teammate was Questionable (assumed to play).
     "questionable_teammate",
+    # Layer 4 (anytime TD): the de-vigged market, the provisional blend and its weight
+    "two_sided", "p_market", "p_blend", "blend_w",
 ]
 
-NUMERIC = {"line", "model_mean", "p_model", "p_push", "p_novig", "gap", "price", "ER"}
+NUMERIC = {"line", "model_mean", "p_model", "p_push", "p_novig", "gap", "price", "ER", "p_market", "p_blend",
+           "blend_w"}
 INTEGER = {"season", "week"}
-BOOLEAN = {"new_team", "questionable", "clears_edge_rule_if_validated", "questionable_teammate"}
+BOOLEAN = {"new_team", "questionable", "clears_edge_rule_if_validated", "questionable_teammate", "two_sided"}
 
 
 def _coerce(field: str, value: str):

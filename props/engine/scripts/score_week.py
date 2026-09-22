@@ -225,6 +225,23 @@ def main():
         C = C.sort_values(["tier_rank", "validated_rank", "ev_per_100"], ascending=[True, True, False])
         C.to_csv(OUT / f"slate_card_{a.season}_wk{a.week:02d}.csv", index=False)
 
+    # ---------- cross-game TD parlays: one leg per game, legs past the floor on their own ----------
+    import td_builder as TB
+    boards = []
+    for r in runs:
+        A, H = r["game"].split("@")
+        f = OUT / f"td_board_{a.season}_wk{a.week:02d}_{A}_{H}.csv"
+        if f.exists() and r["status"] != "FAILED":
+            b = pd.read_csv(f)
+            if {"p_blend", "p_market"} <= set(b.columns):
+                boards.append(b.assign(game=r["game"]))
+    TBOARD = pd.concat(boards, ignore_index=True) if boards else pd.DataFrame()
+    TLEGS = TB.candidate_legs(TBOARD) if len(TBOARD) else pd.DataFrame()
+    TPAR = TB.build(TBOARD) if len(TBOARD) else pd.DataFrame()
+    if len(TPAR):
+        TPAR.to_csv(OUT / f"parlay_builder_{a.season}_wk{a.week:02d}.csv", index=False)
+    PARLAY_MD = TB.markdown(TPAR, TLEGS) if len(TBOARD) else []
+
     # ---------- summary markdown (this is the chat-reply deliverable for a slate question) ----------
     L = [f"# {a.season} Week {a.week} slate", "",
          f"*{len(runs)} games scored {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%MZ')}, prices from "
@@ -322,6 +339,7 @@ def main():
               "model\u2019s own median across every player-week, so it measures distributional self-consistency, not whether the "
               "model beats a book on the calls it would actually make. Rushing yards and anytime TD have no backtest at all. "
               "Team TD totals are anchored to the same-book spread and total.*"]
+    L += [""] + PARLAY_MD
     L += ["", "Per-game guides, cards, ladders, parlays and shadow logs are in the outputs folder under each game's name."]
     md = "\n".join(L)
     (OUT / f"slate_summary_{a.season}_wk{a.week:02d}.md").write_text(

@@ -260,6 +260,17 @@ For a narrow question, run only what it needs:
 - **Fantasy numbers:** `fantasy_points_*.csv` has median, p20 and p80 per player from the joint
   simulation (`--fantasy-scoring ppr|half|std|file.json|'rec=0.5,...'`). QB rows are rushing only:
   passing is not modelled.
+- **Anytime-TD price to quote: the blend.** Every TD row carries `p_model` (anytime_td_v1),
+  `p_market` (de-vigged: exact for Sleeper's two-sided prices, a provisional hold removed from one-way
+  books) and `p_blend` (layer 4, their logit blend at the PROVISIONAL weight 0.5). Quote all three; the
+  edge that matters is the blend against the market. The settled record fits the real weight.
+- **Parlays across games:** the slate summary's "Cross-game TD parlays" section combines only legs
+  that clear the TD edge floor on the blend on their own, one per game (legs in different games are
+  independent, so the parlay is their product), and gives each combination's fair probability,
+  fair price and minimum payout. When no leg qualifies, say so plainly. Same-game opposing scorers:
+  the report's "Touchdown pairs" section gives the correlated price (~4% lift) -- whether it is an
+  edge depends on whether the book's same-game pricing credits the correlation, which only the
+  book's quote shows; ask the user to type it in.
 - **Inside 60 minutes of kickoff** the report flags a candidate closing snapshot; say so in the reply.
   The scheduled capture records the official close.
 
