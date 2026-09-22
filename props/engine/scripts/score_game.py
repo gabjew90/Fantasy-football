@@ -2354,13 +2354,25 @@ def joint_shadow(R, M, V1TD, away, home, prior) -> pd.DataFrame:
     td = td[td.player.map(gsis).isin(V1TD.index)]
     if len(td) < 2:
         return pd.DataFrame()
-    mf = RES / f"priors_{prior}_td_mixshift.csv"
-    shift = pd.read_csv(mf, index_col=0)[TDJ.CH] if mf.exists() else None
+    # THE GATED SPECIFICATION: when the committed gate exists, the shadow and the
+    # rendered pairs use exactly the mix shift, copula r and Dirichlet c it
+    # validated -- a table estimated on other seasons would render a model the
+    # gate never scored. Without the gate file, the bundled table and constants
+    # feed the shadow log only (nothing renders then).
+    gf = RES / TDJ.GATE_FILE
+    spec = json.loads(gf.read_text(encoding="utf-8")) if gf.exists() else {}
+    if spec.get("mix_shift"):
+        shift = pd.DataFrame(spec["mix_shift"]["rows"], columns=spec["mix_shift"]["channels"])[TDJ.CH]
+    else:
+        mf = RES / f"priors_{prior}_td_mixshift.csv"
+        shift = pd.read_csv(mf, index_col=0)[TDJ.CH] if mf.exists() else None
+    r_cop = float(spec.get("copula_r", TDJ.R_PROVISIONAL))
+    c_dir = spec.get("dirichlet_c", TDJ.DIRICHLET_C)
     mu = {t: float(V1TD[V1TD.team == t]["mu"].iloc[0]) for t in (away, home) if (V1TD.team == t).any()}
     if len(mu) < 2:
         return pd.DataFrame()
     P0 = TDJ.joint_counts(mu[away], mu[home])
-    Pr = TDJ.joint_counts(mu[away], mu[home], r=TDJ.R_PROVISIONAL)
+    Pr = TDJ.joint_counts(mu[away], mu[home], r=r_cop)
     axis = {away: 0, home: 1}
     q0, q1 = {}, {}
     for t in (away, home):
@@ -2382,16 +2394,15 @@ def joint_shadow(R, M, V1TD, away, home, prior) -> pd.DataFrame:
             def pj(q, P):
                 on_a = [q[g] for g, t in ((ga, a_.team), (gb, b_.team)) if axis[t] == 0]
                 on_b = [q[g] for g, t in ((ga, a_.team), (gb, b_.team)) if axis[t] == 1]
-                return TDJ.p_all(np.array(on_a) if on_a else empty, np.array(on_b) if on_b else empty, P,
-                                 TDJ.DIRICHLET_C)
+                return TDJ.p_all(np.array(on_a) if on_a else empty, np.array(on_b) if on_b else empty, P, c_dir)
             rows.append({"player_a": a_.player, "team_a": a_.team, "player_b": b_.player, "team_b": b_.team,
                          "kind": "teammates" if a_.team == b_.team else "opponents",
                          "p_a": float(a_.p_model), "p_b": float(b_.p_model),
                          "p_indep": float(a_.p_model * b_.p_model),
                          "p_joint_plain": pj(q0, P0), "p_joint_shift": pj(q1, P0),
                          "p_joint_shift_copula": pj(q1, Pr), "p_joint_copula": pj(q0, Pr),
-                         "joint_model": f"td_joint_v0 shadow, four candidates, copula r {TDJ.R_PROVISIONAL}, "
-                                        f"Dirichlet c {TDJ.DIRICHLET_C:g}"})
+                         "joint_model": f"td_joint_v0 shadow, four candidates, copula r {r_cop:g}, "
+                                        f"Dirichlet c {c_dir}, spec {'gate' if spec else 'bundled'}"})
     return pd.DataFrame(rows)
 
 

@@ -5134,6 +5134,14 @@ mixed 3-leg 0.991 (+-0.092) OPEN, three teammates 0.969 (+-0.112) UNRESOLVED.
 Before the Dirichlet three teammates FAILED at 0.926. Mixed 3-leg opening was
 not expected; it clears both clauses (2018-19 alone is 0.927).
 
+Code review before pushing: the scorer rendered the opened classes with the
+2022-25 mix-shift table and a hard-coded r, while the gate had scored the
+2022-23 table and r = 0.432 -- a model the gate never validated, under a
+heading saying the gate opened it. The gate JSON now carries the full
+specification it validated (mix-shift multipliers, copula r, Dirichlet c), and
+the scorer builds both the shadow and the rendered pairs from it; the rerun
+reproduced the identical verdict.
+
 The report renders the open pair classes (prototype, no fair odds); mixed 3-leg
 is open but not rendered; three teammates never renders. Gate (d) (single-leg
 CLV) is set aside by the user for now.

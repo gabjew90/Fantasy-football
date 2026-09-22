@@ -432,7 +432,9 @@ def main(argv=None) -> int:
         section(L, pr, tri, legs, f"{lab.title()} {seasons}", picks)
     gate = parlay_gate(combos, legs_by, picks, [e for e in runs if e != "tune"])
     gate.update({"engine": B.cid(B.SHIP), "tune": tune, "test": test, "also": also,
-                 "picks": {k: CANDIDATES[v] for k, v in picks.items()}, "copula_r": r, "dirichlet_c": c})
+                 "picks": {k: CANDIDATES[v] for k, v in picks.items()}, "copula_r": r, "dirichlet_c": c,
+                 # the FULL specification the gate validated, so the scorer renders exactly this model
+                 "mix_shift": {"channels": list(shift.columns), "rows": shift.round(6).values.tolist()}})
     L += gate_markdown(gate, picks_table)
     out_dir = Path(a.out)
     out_dir.mkdir(parents=True, exist_ok=True)
