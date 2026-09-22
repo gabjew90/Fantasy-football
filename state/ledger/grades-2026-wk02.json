@@ -1,0 +1,63 @@
+{
+ "graded": 7,
+ "graded_at": "2026-09-22T19:28:46Z",
+ "lineup": {
+  "best_pts": 139.62,
+  "chosen_pts": 130.32,
+  "efficiency": 0.933,
+  "left_on_bench": 9.3,
+  "projected_pts": 146.51
+ },
+ "scout": {
+  "actual_margin": 17.18,
+  "brier": 0.2173,
+  "graded": true,
+  "margin_error": 14.89,
+  "won": 1.0
+ },
+ "season": "2026",
+ "trade_offer": [],
+ "waiver_add": [
+  {
+   "add_pts": 1.9,
+   "cls": "breakout",
+   "delta": -0.6,
+   "drop_pts": 2.5,
+   "name": "Wan'Dale Robinson",
+   "rank": 1
+  },
+  {
+   "add_pts": 3.7,
+   "cls": "breakout",
+   "delta": 1.2,
+   "drop_pts": 2.5,
+   "name": "Brenton Strange",
+   "rank": 2
+  },
+  {
+   "add_pts": 3.0,
+   "cls": "speculative",
+   "delta": null,
+   "drop_pts": null,
+   "name": "DeeJay Dallas",
+   "rank": 3
+  },
+  {
+   "add_pts": 0,
+   "cls": "breakout",
+   "delta": -2.5,
+   "drop_pts": 2.5,
+   "name": "Dean Connors",
+   "rank": 4
+  },
+  {
+   "add_pts": null,
+   "cls": "breakout",
+   "delta": null,
+   "drop_pts": 2.5,
+   "name": "Kyler Murray",
+   "rank": 5
+  }
+ ],
+ "week": 2
+}

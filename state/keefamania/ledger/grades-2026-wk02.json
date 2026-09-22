@@ -1,0 +1,71 @@
+{
+ "graded": 8,
+ "graded_at": "2026-09-22T19:28:52Z",
+ "lineup": {
+  "best_pts": 92.44,
+  "chosen_pts": 81.84,
+  "efficiency": 0.885,
+  "left_on_bench": 10.6,
+  "projected_pts": 128.33
+ },
+ "scout": {
+  "actual_margin": -11.42,
+  "brier": 0.194,
+  "graded": true,
+  "margin_error": -7.59,
+  "won": 0.0
+ },
+ "season": "2026",
+ "trade_offer": [],
+ "waiver_add": [
+  {
+   "add_pts": 11.3,
+   "cls": "breakout",
+   "delta": 2.4,
+   "drop_pts": 8.9,
+   "name": "Rachaad White",
+   "rank": 1
+  },
+  {
+   "add_pts": 15.12,
+   "cls": "breakout",
+   "delta": 6.22,
+   "drop_pts": 8.9,
+   "name": "Bo Nix",
+   "rank": 2
+  },
+  {
+   "add_pts": 8.0,
+   "cls": "streamer",
+   "delta": 2.0,
+   "drop_pts": 6.0,
+   "name": "Cam Little",
+   "rank": 3
+  },
+  {
+   "add_pts": 5.2,
+   "cls": "speculative",
+   "delta": -3.7,
+   "drop_pts": 8.9,
+   "name": "Kayshon Boutte",
+   "rank": 3
+  },
+  {
+   "add_pts": 18.3,
+   "cls": "breakout",
+   "delta": 9.4,
+   "drop_pts": 8.9,
+   "name": "Jake Ferguson",
+   "rank": 4
+  },
+  {
+   "add_pts": null,
+   "cls": "breakout",
+   "delta": null,
+   "drop_pts": 8.9,
+   "name": "Michael Pittman",
+   "rank": 5
+  }
+ ],
+ "week": 2
+}
