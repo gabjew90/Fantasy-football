@@ -91,6 +91,17 @@ def survival_pick(d):
     return None, "no calibrated-market lines"
 
 
+def slate_pick_order(ok):
+    """Candidates for the slate-wide single pick, best first: no role flag, book not disagreeing,
+    then the rule's own order (backtested market at >= 55%, then >= 50%, then any-market
+    fallbacks) before model probability."""
+    top = ok[(~ok.new_team.astype(bool)) & (~ok.questionable.astype(bool))
+             & (~ok.rule.str.contains("DISAGREES"))].copy()
+    top["rule_rank"] = [0 if (m in CAL_MARKETS and "55%" in r) else 1 if m in CAL_MARKETS else 2
+                        for m, r in zip(top.market, top.rule)]
+    return top.sort_values(["rule_rank", "p_model"], ascending=[True, False])
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--season", type=int, default=None)
@@ -208,7 +219,7 @@ def main():
                              price=int(pick.price), p_model=round(float(pick.p_model), 3),
                              p_novig=round(float(pick.p_novig), 3),
                              model_mean=round(float(pick.model_mean), 2) if pd.notna(pick.model_mean) else None,
-                             line=pick.line, tier=tier, new_team=bool(pick.new_team),
+                             line=pick.line, tier=tier, market=pick.market, new_team=bool(pick.new_team),
                              questionable=bool(pick.questionable), rule=rule, book=pick.book))
         if bc.exists() and r["status"] == "ok":
             c = pd.read_csv(bc); c["game"] = r["game"]; cards.append(c)
@@ -246,13 +257,14 @@ def main():
     L = [f"# {a.season} Week {a.week} slate", "",
          f"*{len(runs)} games scored {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%MZ')}, prices from "
          f"{'The Odds API' if a.source == 'oddsapi' else 'Sleeper Picks' if a.source == 'sleeper' else 'Sleeper Picks by default (a TD-only run may use The Odds API when credits allow)'}"
-         f"{' (Odds API fallback allowed)' if a.source != 'oddsapi' and not a.no_oddsapi_fallback else ''}. "
+         f"{', Odds API fallback allowed' if a.source == 'sleeper' and not a.no_oddsapi_fallback else ''}. "
          "Model opinion, not validated against closing lines. Lines for games more than a day out will move; re-run inside 90 minutes of kickoff.*", "",
          "## Runs", "", "| Game | Kickoff (UTC) | Roof | Spread | Total | Lines | Status |", "|---|---|---|---|---|---|---|"]
     for r in runs:
         L.append(f"| {r['game']} | {r['kickoff_utc']} | {r['roof']} | {r['spread'] or '—'} | {r['total'] or '—'} | {r['n_lines']} | {r['status']}{(' — ' + r['error']) if r['error'] else ''} |")
     L += ["", "## One must-win pick per game", "",
-          "*Rule: receptions/receiving yards only, book no-vig >= 55% on the same side, then highest model probability. "
+          "*Rule: receptions/receiving yards, book no-vig >= 55% on the same side, then highest model probability; "
+          "if no such line is posted, the same at >= 50%, then ANY market at >= 50% (flagged 'no backtest'). "
           "Players who changed teams or are Questionable are excluded, the same exclusion the slate-wide pick applies; "
           "a row marked 'role-flagged fallback' is a game where no unflagged line qualified. "
           "These maximise P(win), not EV; every one is a juiced favourite side. Sleeper requires 2+ leg entries, and "
@@ -265,7 +277,8 @@ def main():
         if s["new_team"]: flags.append("new team")
         if s["questionable"]: flags.append("Questionable")
         if "DISAGREES" in s["rule"]: flags.append("book disagrees")
-        if "50%" in s["rule"]: flags.append("book near coin flip")
+        if s["market"] not in CAL_MARKETS: flags.append(f"no backtest ({MK_LABEL.get(s['market'], s['market'])})")
+        if s["p_novig"] < 0.55 and "DISAGREES" not in s["rule"]: flags.append("book near coin flip")
         if "role-flagged fallback" in s["rule"]: flags.append("role-flagged fallback")
         if s.get("slot") in ("RB2", "WR3", "proxy") or str(s.get("slot", "")).startswith("proxy"): flags.append(f"depth role ({s['slot']})")
         L.append(f"| {s['game']} | {s['player']} ({s['team']}) **{s['prop']}** | {s['price']:+d} | {s['p_model']:.0%} | {s['p_novig']:.0%} | "
@@ -279,15 +292,19 @@ def main():
             # game -- no role-change flag (new team / Questionable), book on the same side,
             # then highest model probability. Depth-role players are eligible; their slot is
             # printed so a thin role is visible rather than silently excluded.
-            top = ok[(~ok.new_team) & (~ok.questionable)
-                     & (~ok.rule.str.contains("DISAGREES"))].sort_values("p_model", ascending=False)
+            # the rule's own order across games too: a backtested market at >= 55% beats one at
+            # >= 50%, which beats any-market fallbacks, before model probability is compared
+            top = slate_pick_order(ok)
             if not top.empty:
                 t = top.iloc[0]
                 L += ["", f"**Single pick across the slate:** {t.player} ({t.team}) {t.prop} at {int(t.price):+d} in {t.game} "
                           f"— model {t.p_model:.0%}, book {t.p_novig:.0%}; {t.slot}, no role-change flag, book on the same side."
                           + (f" Note: {t.slot} usage is the most volatile input in the model, so this is the "
                              "highest-probability pick on the slate, not the most stable role on it."
-                             if t.slot in ("RB2", "WR3", "proxy") else "")]
+                             if t.slot in ("RB2", "WR3", "proxy") else "")
+                          + (f" No receptions or receiving-yards line qualified anywhere on the slate, so this is a "
+                             f"{MK_LABEL.get(t.market, t.market)} pick with no backtest behind it."
+                             if t.market not in CAL_MARKETS else "")]
     if not C.empty:
         sm = C[C.tier_base.isin(["STRONG", "MODERATE"])]
         n_s = int((sm.tier_base == "STRONG").sum()); n_m = int((sm.tier_base == "MODERATE").sum())
