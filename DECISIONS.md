@@ -5093,6 +5093,12 @@ can pass it.
 The gate was the user's to set and is theirs to change; it has not been changed.
 Proposed, for the user: (a') the top bin within its 95% interval in each era;
 (b') every large bucket's 95% interval contains 1 in each era, AND the pooled
-two-era point estimate within 5%. Under (a')/(b') as proposed, both would pass
-today -- which is exactly why the choice has to be made on principle, not after
-seeing that.
+two-era point estimate within 5%. Today (a') passes; (b') FAILS on three
+teammates in the low-lift bucket: 0.895 (2024-25) and 0.875 (2018-19), pooled
+~0.885. Each interval includes 1, but the same ~11% over-prediction in both eras
+looks like a real bias: the model's negative dependence among three teammates
+is too weak where the leg product is already small. A candidate cause is
+game-to-game variation in how a team splits its touchdowns (a player's share
+is not fixed within a season), which makes three teammates scoring together
+rarer than a fixed-share model says. (Code review caught the first draft of
+this paragraph claiming both proposed gates would pass.)

@@ -301,10 +301,19 @@ def main(argv=None) -> int:
           "| candidate | " + " | ".join(runs) + " |", "|---" * (len(runs) + 1) + "|"]
     worst = {}
     for c, name in CANDIDATES.items():
-        per = {lab: max(worst_bucket(g, c) for _k, g in combos[lab].groupby(["legs", "kind"])) for lab in runs}
+        # nanmax: a group with no large bucket must not decide the score by iteration order
+        per = {lab: float(np.nanmax([worst_bucket(g, c) for _k, g in combos[lab].groupby(["legs", "kind"])] + [np.nan]))
+               if combos[lab].size else float("nan") for lab in runs}
         worst[c] = per
         L.append(f"| {name} | " + " | ".join(f"{per[lab]:.3f}" for lab in runs) + " |")
-    pick = min(worst, key=lambda c: worst[c]["tune"])
+    scored = {c: v for c, v in worst.items() if np.isfinite(v["tune"])}
+    pick = min(scored, key=lambda c: scored[c]["tune"])
+    if pick != SHADOW:
+        # the gate tables above scored SHADOW; a different tune pick means they grade the wrong model
+        msg = (f"MISMATCH: tune picks {CANDIDATES[pick]} but the gate tables and the live shadow use "
+               f"{CANDIDATES[SHADOW]}. Set SHADOW (and score_game's JOINT_MIX_SHIFT) to the pick and rerun.")
+        print(msg, file=sys.stderr)
+        L += [f"**{msg}**", ""]
     L += ["", f"Chosen on tune: **{CANDIDATES[pick]}**. Gate (b) holds in an era when its worst bucket is within "
               f"{GATE_TOL:.0%}.", "", "| era | chosen model's worst bucket | gate (b) |", "|---|---|---|"]
     for lab in runs:
