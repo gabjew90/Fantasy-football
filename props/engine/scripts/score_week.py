@@ -91,6 +91,17 @@ def survival_pick(d):
     return None, "no calibrated-market lines"
 
 
+def slate_pick_order(ok):
+    """Candidates for the slate-wide single pick, best first: no role flag, book not disagreeing,
+    then the rule's own order (backtested market at >= 55%, then >= 50%, then any-market
+    fallbacks) before model probability."""
+    top = ok[(~ok.new_team.astype(bool)) & (~ok.questionable.astype(bool))
+             & (~ok.rule.str.contains("DISAGREES"))].copy()
+    top["rule_rank"] = [0 if (m in CAL_MARKETS and "55%" in r) else 1 if m in CAL_MARKETS else 2
+                        for m, r in zip(top.market, top.rule)]
+    return top.sort_values(["rule_rank", "p_model"], ascending=[True, False])
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--season", type=int, default=None)
@@ -283,10 +294,7 @@ def main():
             # printed so a thin role is visible rather than silently excluded.
             # the rule's own order across games too: a backtested market at >= 55% beats one at
             # >= 50%, which beats any-market fallbacks, before model probability is compared
-            top = ok[(~ok.new_team) & (~ok.questionable) & (~ok.rule.str.contains("DISAGREES"))].copy()
-            top["rule_rank"] = [0 if (m in CAL_MARKETS and "55%" in r) else 1 if m in CAL_MARKETS else 2
-                                for m, r in zip(top.market, top.rule)]
-            top = top.sort_values(["rule_rank", "p_model"], ascending=[True, False])
+            top = slate_pick_order(ok)
             if not top.empty:
                 t = top.iloc[0]
                 L += ["", f"**Single pick across the slate:** {t.player} ({t.team}) {t.prop} at {int(t.price):+d} in {t.game} "

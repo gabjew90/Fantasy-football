@@ -154,3 +154,23 @@ def test_run_odds_empty_output_is_a_runtime_error(monkeypatch):
     monkeypatch.setattr(subprocess, "run", lambda *a, **k: subprocess.CompletedProcess(a, 0, stdout="", stderr="no key"))
     with pytest.raises(RuntimeError, match="no JSON"):
         SG.run_odds("events", [])
+
+
+def test_espn_scoreboard_asks_for_the_game_week():
+    # The bare scoreboard still shows last week on Tuesday; an early-week run then found no
+    # spread/total for any game and priced every TD with the v0 fallback.
+    u = SG.espn_scoreboard_url(2026, 3)
+    assert "seasontype=2" in u and "week=3" in u and "dates=2026" in u
+
+
+def test_slate_pick_prefers_backtested_market_over_higher_td_probability():
+    import score_week as SW
+    ok = pd.DataFrame([
+        dict(player="TD back", market="player_anytime_td", rule="any market, book agrees (no-vig >= 50%)",
+             p_model=0.76, new_team=False, questionable=False),
+        dict(player="Catcher", market="player_receptions", rule="calibrated market, book agrees (no-vig >= 55%)",
+             p_model=0.66, new_team=False, questionable=False),
+        dict(player="Disagree", market="player_receptions", rule="calibrated market, BOOK DISAGREES (weakest class)",
+             p_model=0.90, new_team=False, questionable=False),
+    ])
+    assert SW.slate_pick_order(ok).player.tolist() == ["Catcher", "TD back"]

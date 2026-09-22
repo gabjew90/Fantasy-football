@@ -119,6 +119,13 @@ def amer_to_p(a): return 100 / (a + 100) if a > 0 else -a / (-a + 100)
 def payout(a): return a / 100 if a > 0 else 100 / (-a)
 
 
+def espn_scoreboard_url(season, week):
+    """The regular-season scoreboard for ONE week. The bare endpoint shows the current week,
+    which lags a day behind at the Tuesday rollover."""
+    return ("https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard"
+            f"?seasontype=2&week={int(week)}&dates={int(season)}")
+
+
 def run_odds(stage, args_list):
     cmd = [sys.executable, str(HERE / "odds_client.py"), stage] + args_list
     r = subprocess.run(cmd, capture_output=True, text=True, cwd=str(HERE))
@@ -413,9 +420,7 @@ def main():
             # the previous week until ESPN rolls over (Tuesday morning it still shows last week),
             # so every game of an early-week run found no odds and fell back to anytime_td_v0.
             sb = cached_json(wd / f"espn_scoreboard_{SEASON}_wk{WEEK:02d}.json", a.sleeper_cache_ttl,
-                             lambda: json.load(_ur.urlopen(_ur.Request(
-                "https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard"
-                f"?seasontype=2&week={WEEK}&dates={SEASON}",
+                             lambda: json.load(_ur.urlopen(_ur.Request(espn_scoreboard_url(SEASON, WEEK),
                 headers={"User-Agent": "curl/8.5.0"}), timeout=20)))
             # ESPN codes differ from nflverse for two teams (WSH, LAR); an unmapped
             # comparison silently returns no spread/total for those games.
