@@ -36,10 +36,13 @@ def test_fair_odds_round_trip():
 def _boards():
     rows = [("G1", "A", "T1", "draftkings", 300, 0.40, 0.24, 0.32),     # edge 33%, +EV
             ("G1", "B", "T2", "draftkings", 250, 0.34, 0.27, 0.30),     # edge 11%: fails floor
-            ("G2", "C", "T3", "draftkings", 280, 0.38, 0.25, 0.32),     # edge 28%, +EV
+            ("G2", "C", "T3", "draftkings", 280, 0.42, 0.25, 0.32),     # blend edge ~32%, +EV
             ("G3", "D", "T5", "draftkings", 400, 0.30, 0.18, 0.24),     # edge 33%, +EV
-            ("G3", "E", "T6", "sleeper", 350, 0.30, 0.20, 0.26)]        # edge 30%, +EV, same game as D
-    return pd.DataFrame(rows, columns=["game", "player", "team", "book", "price", "p_model", "p_market", "p_blend"])
+            ("G3", "E", "T6", "sleeper", 350, 0.34, 0.20, 0.26)]        # blend edge ~32%, +EV, same game as D
+    d = pd.DataFrame(rows, columns=["game", "player", "team", "book", "price", "p_model", "p_market", "p_blend"])
+    # the builder recomputes the blend on the consensus market; keep the fixture's blends consistent
+    d["p_blend"] = TM.blend(d["p_model"].to_numpy(), d["p_market"].to_numpy())
+    return d.assign(td_model="anytime_td_v1", two_sided=False)
 
 
 def test_only_legs_past_the_floor_on_their_own_are_candidates():
@@ -53,8 +56,10 @@ def test_parlays_use_one_leg_per_game_and_multiply_independent_legs():
     assert not P["players"].str.contains(r"D \(T5\) \+ E \(T6\)").any()        # same game G3: never together
     for r in P.itertuples():
         assert len(set(r.games.split(" / "))) == r.legs
+    legs = TB.candidate_legs(_boards()).set_index("player")
     top3 = P[P["legs"] == 3].iloc[0]
-    assert top3["p_fair"] == pytest.approx(0.32 * 0.32 * 0.26) or top3["p_fair"] == pytest.approx(0.32 * 0.32 * 0.24)
+    names = [s_.split(" (")[0] for s_ in top3["players"].split(" + ")]
+    assert top3["p_fair"] == pytest.approx(float(np.prod([legs.loc[n, "p_blend"] for n in names])))
     assert top3["min_payout_decimal"] == pytest.approx(round(1 / top3["p_fair"], 2))
     one_book = P[(P["legs"] == 2) & (P["book"] == "draftkings")].iloc[0]
     assert np.isfinite(one_book["book_product_decimal"])
@@ -62,7 +67,24 @@ def test_parlays_use_one_leg_per_game_and_multiply_independent_legs():
     assert with_sleeper["book_product_decimal"].isna().all()                  # Sleeper pays from a table
 
 
+def test_the_edge_is_measured_against_the_consensus_not_the_shopped_book():
+    """A stale one-way book with the best price must not supply 'the market'."""
+    b = pd.DataFrame({"game": "G", "player": "A", "team": "T", "td_model": "anytime_td_v1",
+                      "book": ["draftkings", "sleeper"], "price": [300, 230], "p_model": 0.34,
+                      "p_market": [0.234, 0.30], "p_blend": 0.0, "two_sided": [False, True]})
+    legs = TB.candidate_legs(b, floor=0.0)
+    row = legs.iloc[0]
+    assert row["book"] == "draftkings"                       # EV at the best posted price
+    assert row["p_market"] == pytest.approx(0.30)            # but the market is the two-sided consensus
+    assert row["edge_rel"] < 0.10
+
+
+def test_fallback_legs_never_enter():
+    b = _boards().assign(td_model="anytime_td_v0")
+    assert TB.candidate_legs(b).empty
+
+
 def test_no_qualifying_leg_says_so_plainly():
-    b = _boards().assign(p_blend=0.20)
+    b = _boards().assign(p_model=0.20)
     text = "\n".join(TB.markdown(TB.build(b), TB.candidate_legs(b)))
     assert "No anytime-TD leg on the slate clears the edge floor" in text

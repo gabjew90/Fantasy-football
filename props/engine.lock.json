@@ -1,6 +1,6 @@
 {
   "algorithm": "props-engine-sha256-lf-1",
-  "engine_sha256": "019a5d7c46cd08eb7cfe455df705944d7eae719353a68ab0bf30ccbc58946d61",
+  "engine_sha256": "40dedba3a08e07e66e950c48c6e2ba5cf55bc8a9b4ca1eb44491dbc1dd13fd27",
   "file_count": 51,
   "files": {
     "SKILL.md": "7bd575fcbcd3dce795ae3da998fb4f144942154ff11c20d248771f2081e10401",
@@ -46,7 +46,7 @@
     "scripts/td_alloc.py": "7c407c949cac8f0f74d7f91589fd5d749f65d9053eb1c3f5f0dc63a700b3465b",
     "scripts/td_alloc_backtest.py": "e259d9f0e301a5d5d34e5a9e84bba222810f077d9c05a1f1f799a611914595a4",
     "scripts/td_backtest.py": "0ae77781fea2de212154ff72f64b0792f15f77fabfda7cae944fce20b3c9895f",
-    "scripts/td_builder.py": "649f94548897689c08264d9e4cfe36a7d5b65b4428910a9f86534e59139a9a72",
+    "scripts/td_builder.py": "9798da2c8efbb44af303b4e77daf5ca41e594d7a84dc6175da85f32237bc8f3f",
     "scripts/td_compare.py": "392fc3f11bb12bd0ed1b9ecbad3230d83c367e57dcc0a0901dc35a7456ce984d",
     "scripts/td_diagnostics.py": "118f13231ae143902d0cdc5009031a5e73b932f4d5653ea8f6f94b5244381b9e",
     "scripts/td_joint.py": "879617fbf4f918a77e569ab874d122c0c689ec3269d5b990ee7fc40fecb1a918",

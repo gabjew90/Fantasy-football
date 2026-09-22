@@ -7,8 +7,10 @@ Sleeper's ~12% per leg a 3-leg entry pays ~68% of fair). So the builder only
 combines legs that are already past the edge floor on their own:
 
   - one leg per game (and so one per team): independence holds;
-  - each leg's probability is the layer-4 BLEND (model and de-vigged market,
-    td_market.py) -- the provisional price, not the unblended model;
+  - each leg's probability is the layer-4 BLEND of the model and the player's
+    CONSENSUS de-vigged market (td_market.py), not the shopped book's number;
+    expected value is then taken at the best posted price;
+  - anytime_td_v1 legs only (never the v0 fallback);
   - each leg clears the TD edge floor: blend at least 25% above the market
     (relative), and positive expected value at the posted price;
   - 2 or 3 legs.
@@ -35,16 +37,38 @@ EDGE_FLOOR_TD = 0.25       # relative edge, as the tier rules use for TD props
 TOP_LEGS = 8
 
 
+V1_LABEL = "anytime_td_v1"
+
+
+def consensus_market(rows: pd.DataFrame) -> float:
+    """One market probability per player: the two-sided (exactly de-vigged)
+    price where any book offers one, else the median de-vigged one-way price.
+    NOT the best-priced book's number -- measuring the edge against the book
+    you are shopping would pick the lowest market opinion as 'the market'."""
+    two = rows[rows["two_sided"].astype(str).str.lower().isin(["true", "1"])] if "two_sided" in rows else rows.iloc[0:0]
+    return float(two["p_market"].mean()) if len(two) else float(rows["p_market"].median())
+
+
 def candidate_legs(boards: pd.DataFrame, floor: float = EDGE_FLOOR_TD) -> pd.DataFrame:
-    """The best-priced row per player, kept only if it clears the floor on its
-    own. `boards` = the slate's td_board rows with a `game` column."""
+    """One row per player: the best posted price, with the edge measured on
+    the blend of the model and the CONSENSUS market, kept only if it clears
+    the floor on its own. Only anytime_td_v1 legs (never the v0 fallback).
+    `boards` = the slate's td_board rows with a `game` column."""
     if boards.empty:
         return boards
     b = boards.copy()
+    if "td_model" in b:
+        b = b[b["td_model"] == V1_LABEL]
+    if b.empty:
+        return b
     b["dec"] = b["price"].map(TM.decimal_from_american)
+    cons = b.groupby(["game", "player"]).apply(consensus_market).rename("p_consensus")
     b = b.sort_values("dec", ascending=False).drop_duplicates(["game", "player"])
+    b = b.join(cons, on=["game", "player"])
+    b["p_market"] = b["p_consensus"]
+    b["p_blend"] = TM.blend(b["p_model"].to_numpy(), b["p_consensus"].to_numpy())
     b["edge_rel"] = b["p_blend"] / b["p_market"] - 1
-    b["ev"] = b["p_blend"] * b["dec"] - 1
+    b["ev"] = b["p_blend"] * b["dec"] - 1                  # at the best POSTED price
     return b[(b["edge_rel"] >= floor) & (b["ev"] > 0)].sort_values("ev", ascending=False)
 
 

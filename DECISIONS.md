@@ -5176,3 +5176,11 @@ minimum decimal payout (= the Sleeper multiplier) and, for a single
 sportsbook, the product price and its EV. Sleeper pays from a fixed pick'em
 table, so no product price is shown there. When no leg qualifies the summary
 says so. No new validation: the legs are independent by construction.
+
+Code review before pushing: (1) the builder measured each leg's edge against
+the BEST-PRICED book's own market -- price shopping then picks the lowest market
+opinion as "the market" and inflates the edge (a stale one-way +300 against a
+two-sided +230 read as +20% instead of ~7%). The edge is now measured on the
+blend with each player's CONSENSUS market (the two-sided no-vig where any book
+offers one, else the median de-vigged price), and EV is taken at the best posted
+price. (2) v0-fallback legs could enter a parlay; only anytime_td_v1 legs do.
