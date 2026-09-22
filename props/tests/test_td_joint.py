@@ -154,3 +154,34 @@ def test_the_gate_table_fails_when_a_large_bucket_is_off():
     assert JB.lift_table(L, g, "joint1", "t") is False
     g["both"] = np.r_[np.ones(int(n * 0.1)), np.zeros(n - int(n * 0.1))]
     assert JB.lift_table([], g, "joint1", "t") is True
+
+
+# ------------------------------------------------------------ Dirichlet shares
+
+def test_dirichlet_matches_simulation_and_lowers_three_teammates():
+    """Exact Beta-moment inclusion-exclusion vs simulating a Dirichlet split per
+    game; and three teammates together fall while each leg barely moves."""
+    q = np.array([0.35, 0.25, 0.20])
+    pmf = T.count_pmf([2.8], n=T.LAYER1["trials"])[0]
+    P = np.outer(pmf, T.count_pmf([2.0], n=T.LAYER1["trials"])[0])
+    c = 8.0
+    exact = J.p_all(_flat(q), np.zeros((0, J.OPP_BUCKETS)), P, c=c)
+    rng = np.random.default_rng(4)
+    n = 200_000
+    k = rng.choice(len(pmf), size=n, p=pmf)
+    s = rng.dirichlet(c * np.append(q, 1 - q.sum()), size=n)
+    draws = np.array([rng.multinomial(kk, ss) for kk, ss in zip(k[:40_000], s[:40_000])])
+    sim = float((draws[:, :3] > 0).all(axis=1).mean())
+    assert exact == pytest.approx(sim, abs=0.006)
+    fixed = J.p_all(_flat(q), np.zeros((0, J.OPP_BUCKETS)), P)
+    assert exact < fixed
+    legs_fixed = J.p_any(_flat(q), P)
+    legs_dir = J.p_any(_flat(q), P, c=c)
+    assert np.all(legs_dir < legs_fixed) and np.max(legs_fixed - legs_dir) < 0.06
+
+
+def test_dirichlet_with_huge_concentration_is_the_fixed_share_model():
+    q = np.array([0.3, 0.2])
+    P = J.joint_counts(2.5, 2.0)
+    assert J.p_all(_flat(q), np.zeros((0, J.OPP_BUCKETS)), P, c=1e7) == pytest.approx(
+        J.p_all(_flat(q), np.zeros((0, J.OPP_BUCKETS)), P), abs=1e-5)

@@ -12,17 +12,25 @@ Models of P(all):
                leg assumes. The baseline.
   joint        exact (td_joint): teammates share their team's count.
   joint + mix  each team's channel mix conditioned on the opponent's count
-    shift      (multipliers estimated on TUNE). THE SHADOW MODEL: logged on
-               every board, never rendered while parlays are gated.
+    shift      (multipliers estimated on TUNE).
   + copula     the two counts joined by a one-factor Gaussian copula, r set
                by MATCHING the pooled residual count correlation (moment
                matching; the score-pair likelihood rewarded a cusp at 0.5).
-               PROVISIONAL, not in the shadow model.
+               PROVISIONAL.
+  --dirichlet  each team's split of its TDs varies game to game (Dirichlet,
+               concentration c tuned on the three-teammate class of TUNE),
+               applied to every candidate.
 
-Dependence alone is scored against the product of each model's OWN marginals
-(the mix shift also moves single legs). Parlay gate (b) is checked here: in
-every lift bucket with 1,000+ combinations, actual / predicted within 5%, in
-the test era and the second era.
+All four candidates are logged in shadow on every board. Each parlay class
+(cross-team pair, teammate pair, mixed 3-leg, three teammates) gets the
+candidate with the lowest pooled TUNE log loss for that class.
+
+THE PARLAY GATE is computed here and written to td_parlay_gate.json -- never a
+hand-written verdict (DECISIONS #89): (a') per era, the 0.45-0.6 single-leg
+bin's 95% interval of actual minus predicted contains 0; (b') per class, pooled
+over the gate eras, OPEN if |actual/predicted - 1| <= 5% AND the 95% interval
+half-width < 10%, UNRESOLVED if the ratio is within 5% but the interval is
+wider, FAIL otherwise. Classes open individually, and only if (a') passes.
 
 Every per-player input comes out of td_alloc_backtest.run, which calls td_v1.
 """
@@ -93,7 +101,7 @@ def count_residual_corr(d: pd.DataFrame, reps=2000, seed=9):
     return r, *np.percentile(bs, [2.5, 97.5]), len(a)
 
 
-def legs_by_game(d: pd.DataFrame, shift: pd.DataFrame, r: float):
+def legs_by_game(d: pd.DataFrame, shift: pd.DataFrame, r: float, c: float | None = None):
     """Per game: the joint count tables and each team's legs (10%+ players)
     with their per-TD shares by opponent count. Yields (gid, P0, Pr, teams,
     info, leg_rows)."""
@@ -115,9 +123,9 @@ def legs_by_game(d: pd.DataFrame, shift: pd.DataFrame, r: float):
             mix = pd.Series(x[wch].iloc[0].to_numpy(), index=J.CH)
             q0 = J.q_by_opp(shares, J.mixes_by_opp(mix, None))
             q1 = J.q_by_opp(shares, J.mixes_by_opp(mix, shift))
-            p0 = J.p_any(q0, P0, own_axis=axis)
-            p1 = J.p_any(q1, P0, own_axis=axis)
-            p2 = J.p_any(q1, Pr, own_axis=axis)
+            p0 = J.p_any(q0, P0, own_axis=axis, c=c)
+            p1 = J.p_any(q1, P0, own_axis=axis, c=c)
+            p2 = J.p_any(q1, Pr, own_axis=axis, c=c)
             keep = (x[pcol] >= LEG_MIN).to_numpy()
             info[t] = {"x": x[keep].reset_index(drop=True), "q0": q0[keep], "q1": q1[keep],
                        "p1": p1[keep], "p2": p2[keep], "pv": x.loc[keep, pcol].to_numpy()}
@@ -126,7 +134,7 @@ def legs_by_game(d: pd.DataFrame, shift: pd.DataFrame, r: float):
         yield gid, P0, Pr, (ta, tb), info, pd.concat(legs, ignore_index=True)
 
 
-def parlays(d: pd.DataFrame, shift: pd.DataFrame, r: float, max_legs: int = 3):
+def parlays(d: pd.DataFrame, shift: pd.DataFrame, r: float, max_legs: int = 3, c: float | None = None):
     """(pair rows, triple rows, leg rows). Every combination of 2 and 3 legs
     in a game, teammates and across teams. Models per combination:
       indep    product of anytime_td_v1 prices (leg by leg)
@@ -135,7 +143,7 @@ def parlays(d: pd.DataFrame, shift: pd.DataFrame, r: float, max_legs: int = 3):
       joint2   joint + mix shift + copula (r provisional)."""
     rows, legs_out = [], []
     empty = np.zeros((0, J.OPP_BUCKETS))
-    for gid, P0, Pr, (ta, tb), info, legs in legs_by_game(d, shift, r):
+    for gid, P0, Pr, (ta, tb), info, legs in legs_by_game(d, shift, r, c):
         legs_out.append(legs)
         pool = [(ta, i) for i in range(len(info[ta]["x"]))] + [(tb, i) for i in range(len(info[tb]["x"]))]
         for k in range(2, max_legs + 1):
@@ -152,29 +160,21 @@ def parlays(d: pd.DataFrame, shift: pd.DataFrame, r: float, max_legs: int = 3):
                 rows.append({"game_id": gid, "legs": k, "kind": kind, "both": both,
                              "indep": float(np.prod([info[t]["pv"][i] for t, i in combo])),
                              "ind1": float(np.prod([info[t]["p1"][i] for t, i in combo])),
-                             "joint0": J.p_all(qa0, qb0, P0),
-                             "joint1": J.p_all(qa1, qb1, P0),
-                             "joint2": J.p_all(qa1, qb1, Pr),
-                             "joint3": J.p_all(qa0, qb0, Pr)})
+                             "joint0": J.p_all(qa0, qb0, P0, c),
+                             "joint1": J.p_all(qa1, qb1, P0, c),
+                             "joint2": J.p_all(qa1, qb1, Pr, c),
+                             "joint3": J.p_all(qa0, qb0, Pr, c)})
     pr = pd.DataFrame(rows)
     return pr[pr["legs"] == 2], pr[pr["legs"] == 3], pd.concat(legs_out, ignore_index=True)
 
 
 LIFT_BINS = [0, 0.8, 0.9, 0.97, 1.03, 1.1, 1.2, 1.5, 9]
-# The shadow model, chosen on TUNE by the worst-bucket rule below (props-v1.13 run: plain joint;
-# the mix shift and the copula each had a worse tune bucket). The gate tables score it.
-SHADOW = "joint0"
+# The four candidate joint models, each logged in shadow; each parlay class gets its own
+# tune-chosen model (select_per_class).
 CANDIDATES = {"joint0": "joint", "joint1": "joint + mix shift", "joint2": "joint + mix shift + copula",
               "joint3": "joint + copula"}
 
 
-def worst_bucket(g: pd.DataFrame, model: str) -> float:
-    """Largest |actual / predicted - 1| over lift buckets with GATE_MIN+ combinations."""
-    g = g.assign(lift=g[model] / g["indep"])
-    errs = [abs(h["both"].mean() / h[model].mean() - 1)
-            for _b, h in g.groupby(pd.cut(g["lift"], LIFT_BINS), observed=True)
-            if len(h) >= GATE_MIN and h[model].mean() > 0]
-    return max(errs) if errs else float("nan")
 GATE_TOL, GATE_MIN = 0.05, 1000
 
 
@@ -209,36 +209,155 @@ def lift_table(L, g: pd.DataFrame, model: str, label: str) -> bool:
     return ok
 
 
-def section(L, pr: pd.DataFrame, tri: pd.DataFrame, legs: pd.DataFrame, label: str) -> dict:
+def section(L, pr: pd.DataFrame, tri: pd.DataFrame, legs: pd.DataFrame, label: str, picks: dict) -> None:
     L += [f"## {label}", ""]
     chk = float((legs["p_joint0"] - legs["p_v1"]).abs().max())
     chk2 = float((legs["p_full"] - legs["p_shift"]).abs().max())
     L += [f"Consistency: the joint model's single-leg prices (no shift) equal anytime_td_v1's to {chk:.1e}; "
           f"the copula moves single legs by up to {chk2:.1e}. Single-leg log loss with the mix shift "
           f"{ll(legs['p_shift'], legs['scored']).mean():.5f} vs v1 {ll(legs['p_v1'], legs['scored']).mean():.5f}.", ""]
-    gate = {}
     for kind, g in pr.groupby("kind"):
         L += [f"### Pairs, {kind}: {len(g)} in {g['game_id'].nunique()} games; both scored {g['both'].mean():.4f}", "",
               "| model | mean P(both) | log loss | vs leg product (95% CI) | dependence alone: vs its own marginals |",
               "|---|---|---|---|---|"]
-        for lab, c, base in (("leg by leg (v1 product)", "indep", None), ("joint", "joint0", "indep"),
-                             ("joint + mix shift (SHADOW)", "joint1", "ind1"),
-                             ("joint + mix shift + copula (provisional)", "joint2", None)):
-            vs = "" if c == "indep" else ci(boot(g.rename(columns={"both": "both"}), c, "indep"))
-            dep = ci(boot(g, c, base)) if base and c != "joint0" else ""
+        for lab, c, base in (("leg by leg (v1 product)", "indep", None), *[(n, c_, "ind1" if c_ == "joint1" else None)
+                                                                            for c_, n in CANDIDATES.items()]):
+            vs = "" if c == "indep" else ci(boot(g, c, "indep"))
+            dep = ci(boot(g, c, base)) if base else ""
             L.append(f"| {lab} | {g[c].mean():.4f} | {ll(g[c], g['both']).mean():.5f} | {vs} | {dep} |")
         L.append("")
-        gate[f"pairs {kind}"] = lift_table(L, g, SHADOW, "Shadow model")
+        cls = CLASSES[(2, kind)]
+        lift_table(L, g, picks[cls], f"{cls}, tune-chosen model ({CANDIDATES[picks[cls]]}), descriptive")
     for kind, g in tri.groupby("kind"):
         L += [f"### Three legs, {kind}: {len(g)} in {g['game_id'].nunique()} games; all scored {g['both'].mean():.4f}", "",
               "| model | mean P(all) | log loss | vs leg product (95% CI) |", "|---|---|---|---|"]
-        for lab, c in (("leg by leg (v1 product)", "indep"), ("joint + mix shift (SHADOW)", "joint1"),
-                       ("joint + mix shift + copula (provisional)", "joint2")):
+        for lab, c in (("leg by leg (v1 product)", "indep"), *[(n, c_) for c_, n in CANDIDATES.items()]):
             vs = "" if c == "indep" else ci(boot(g, c, "indep"))
             L.append(f"| {lab} | {g[c].mean():.5f} | {ll(g[c], g['both']).mean():.5f} | {vs} |")
         L.append("")
-        gate[f"three legs {kind}"] = lift_table(L, g, SHADOW, "Shadow model")
-    return gate
+        cls = CLASSES[(3, kind)]
+        lift_table(L, g, picks[cls], f"{cls}, tune-chosen model ({CANDIDATES[picks[cls]]}), descriptive")
+
+
+C_GRID = [None, 100.0, 50.0, 30.0, 20.0, 12.0, 8.0]
+
+
+def tune_dirichlet(d: pd.DataFrame, shift: pd.DataFrame, r: float) -> tuple[float | None, list]:
+    """The concentration c, chosen on the THREE-TEAMMATE class of the tune
+    seasons by log loss (plain joint), and the single-leg log loss at each c
+    as the no-harm check."""
+    rows = []
+    for c in C_GRID:
+        ll3, legs_ll, n3 = [], [], 0
+        for gid, P0, Pr, (ta, tb), info, legs in legs_by_game(d, shift, r, c):
+            legs_ll.append(ll(legs["p_joint0"], legs["scored"]))
+            for t, axis_empty in ((ta, False), (tb, True)):
+                I = info[t]
+                for combo in combinations(range(len(I["x"])), 3):
+                    qs = I["q0"][list(combo)]
+                    empty = np.zeros((0, J.OPP_BUCKETS))
+                    p = J.p_all(empty, qs, P0, c) if axis_empty else J.p_all(qs, empty, P0, c)
+                    y = int(all(I["x"].loc[i, "scored"] for i in combo))
+                    ll3.append(float(ll([p], [y])[0])); n3 += 1
+        rows.append({"c": c, "three_teammates_ll": float(np.mean(ll3)), "n": n3,
+                     "single_leg_ll": float(np.concatenate(legs_ll).mean())})
+    best = min(rows, key=lambda r_: r_["three_teammates_ll"])["c"]
+    return best, rows
+
+
+CLASSES = {(2, "opponents"): "cross-team pair", (2, "teammates"): "teammate pair",
+           (3, "mixed"): "mixed 3-leg", (3, "teammates"): "three teammates"}
+GATE_RATIO, GATE_HALFWIDTH = 0.05, 0.10
+A_BIN = (0.45, 0.60)
+
+
+def class_of(df: pd.DataFrame) -> pd.Series:
+    return pd.Series([CLASSES[(lg, k)] for lg, k in zip(df["legs"], df["kind"])], index=df.index)
+
+
+def select_per_class(tune: pd.DataFrame) -> tuple[dict, pd.DataFrame]:
+    """Each class's shadow model: the candidate with the lowest pooled tune log
+    loss over that class's combinations (not the worst bucket, a noisy
+    selector that punished level and threw out the established mix shift)."""
+    t = tune.assign(cls=class_of(tune))
+    table = pd.DataFrame({c: t.groupby("cls").apply(lambda g, c=c: float(ll(g[c], g["both"]).mean()))
+                          for c in CANDIDATES})
+    return {cls: table.loc[cls].idxmin() for cls in table.index}, table
+
+
+def _pooled_ratio(g: pd.DataFrame, col: str, reps: int = 1000, seed: int = 29):
+    """Pooled actual / predicted with a 95% interval, resampling GAMES across
+    every era pooled (game_id carries the season, so it is unique)."""
+    x = g.groupby("game_id").agg(a=("both", "sum"), m=(col, "sum"))
+    a, m = x["a"].to_numpy(), x["m"].to_numpy()
+    idx = np.random.default_rng(seed).integers(0, len(a), size=(reps, len(a)))
+    bs = a[idx].sum(1) / m[idx].sum(1)
+    lo, hi = np.percentile(bs, [2.5, 97.5])
+    return float(a.sum() / m.sum()), float(lo), float(hi), len(a)
+
+
+def parlay_gate(combos: dict, legs: dict, picks: dict, gate_eras: list) -> dict:
+    """THE PARLAY GATE, computed -- never hand-written (DECISIONS #89).
+    (a') per era, the 0.45-0.6 single-leg bin: the game-clustered 95% interval
+         of actual minus predicted contains 0.
+    (b') per parlay class, pooled over the gate eras with that class's tune-
+         chosen model: OPEN if |ratio - 1| <= 5% AND the interval half-width
+         < 10%; UNRESOLVED if the ratio is within 5% but the interval is wider
+         (noise, not a pass); FAIL otherwise. Classes open individually."""
+    out = {"a_prime": {}, "b_prime": {}}
+    for era in gate_eras:
+        lg = legs[era]
+        b = lg[(lg["p_v1"] > A_BIN[0]) & (lg["p_v1"] <= A_BIN[1])]
+        x = b.groupby("game_id").agg(a=("scored", "sum"), m=("p_v1", "sum"), n=("scored", "size"))
+        a, m, n = x["a"].to_numpy(), x["m"].to_numpy(), x["n"].to_numpy()
+        idx = np.random.default_rng(31).integers(0, len(a), size=(2000, len(a)))
+        gaps = (a[idx].sum(1) - m[idx].sum(1)) / n[idx].sum(1)
+        lo, hi = np.percentile(gaps, [2.5, 97.5])
+        gap = float((a.sum() - m.sum()) / n.sum())
+        out["a_prime"][era] = {"rows": int(n.sum()), "predicted": float(m.sum() / n.sum()),
+                               "actual": float(a.sum() / n.sum()), "gap": gap, "ci": [float(lo), float(hi)],
+                               "pass": bool(lo <= 0 <= hi)}
+    pooled = pd.concat([combos[e] for e in gate_eras], ignore_index=True)
+    pooled = pooled.assign(cls=class_of(pooled))
+    for cls, g in pooled.groupby("cls"):
+        col = picks[cls]
+        ratio, lo, hi, games = _pooled_ratio(g, col)
+        half = (hi - lo) / 2
+        within = abs(ratio - 1) <= GATE_RATIO
+        status = "OPEN" if within and half < GATE_HALFWIDTH else ("UNRESOLVED" if within else "FAIL")
+        per_era = {e: _pooled_ratio(g[g["era"] == e], col)[:3] for e in gate_eras}
+        out["b_prime"][cls] = {"model": CANDIDATES[col], "combinations": int(len(g)), "games": games,
+                               "ratio": ratio, "ci": [lo, hi], "half_width": half, "status": status,
+                               "per_era": {e: {"ratio": v[0], "ci": [v[1], v[2]]} for e, v in per_era.items()}}
+    out["a_prime_pass"] = all(v["pass"] for v in out["a_prime"].values())
+    out["open_classes"] = sorted(c for c, v in out["b_prime"].items() if v["status"] == "OPEN"
+                                 and out["a_prime_pass"])
+    return out
+
+
+def gate_markdown(g: dict, picks_table: pd.DataFrame) -> list[str]:
+    L = ["## Shadow model per class, chosen on tune by pooled log loss", "",
+         "| class | " + " | ".join(CANDIDATES.values()) + " | chosen |", "|---" * (len(CANDIDATES) + 2) + "|"]
+    for cls, row in picks_table.iterrows():
+        best = row.idxmin()
+        L.append(f"| {cls} | " + " | ".join(f"{row[c]:.5f}" for c in CANDIDATES) + f" | {CANDIDATES[best]} |")
+    L += ["", "## THE PARLAY GATE (computed by this script; DECISIONS #89)", "",
+          "(a') per era, the 0.45-0.6 single-leg bin: the 95% interval of actual minus predicted contains 0.", "",
+          "| era | rows | predicted | actual | gap (95% CI) | (a') |", "|---|---|---|---|---|---|"]
+    for era, v in g["a_prime"].items():
+        L.append(f"| {era} | {v['rows']} | {v['predicted']:.3f} | {v['actual']:.3f} | {v['gap']:+.3f} "
+                 f"({v['ci'][0]:+.3f}, {v['ci'][1]:+.3f}) | {'pass' if v['pass'] else 'FAIL'} |")
+    L += ["", f"(b') per class, pooled over the gate eras: OPEN if |ratio - 1| <= {GATE_RATIO:.0%} and the 95% "
+              f"interval half-width < {GATE_HALFWIDTH:.0%}; UNRESOLVED if the ratio is within {GATE_RATIO:.0%} but the "
+              "interval is wider; FAIL otherwise. Classes open individually, and only if (a') passes.", "",
+          "| class | model | combinations | games | pooled ratio (95% CI) | half-width | per era | status |",
+          "|---|---|---|---|---|---|---|---|"]
+    for cls, v in g["b_prime"].items():
+        pe = "; ".join(f"{e} {r['ratio']:.3f}" for e, r in v["per_era"].items())
+        L.append(f"| {cls} | {v['model']} | {v['combinations']} | {v['games']} | {v['ratio']:.3f} "
+                 f"({v['ci'][0]:.3f}, {v['ci'][1]:.3f}) | {v['half_width']:.3f} | {pe} | **{v['status']}** |")
+    L += ["", f"Open classes: **{', '.join(g['open_classes']) or 'none'}**.", ""]
+    return L
 
 
 def main(argv=None) -> int:
@@ -247,6 +366,8 @@ def main(argv=None) -> int:
     ap.add_argument("--test", default="2024,2025")
     ap.add_argument("--also", default="2016,2017,2018,2019", help="a second era scored as-is (gate (b))")
     ap.add_argument("--out", default=str(Path(__file__).resolve().parent / "backtest_out"))
+    ap.add_argument("--dirichlet", action="store_true",
+                    help="tune a Dirichlet concentration on the three-teammate class (tune) and apply it to every model")
     a = ap.parse_args(argv)
     tune = [int(x) for x in a.tune.split(",")]
     test = [int(x) for x in a.test.split(",")]
@@ -288,46 +409,36 @@ def main(argv=None) -> int:
     for rg in R_GRID:
         L.append(f"| {rg:g} | " + " | ".join(f"{count_loglik(runs[k], rg):.4f}" for k in runs) + " |")
     L.append("")
-    gates, combos = {}, {}
+    c = None
+    if a.dirichlet:
+        c, c_rows = tune_dirichlet(runs["tune"], shift, r)
+        L += ["## Dirichlet concentration c, tuned on the three-teammate class (tune)", "",
+              "| c | three-teammate log loss (tune) | combinations | single-leg log loss (no-harm check) |",
+              "|---|---|---|---|"]
+        for row in c_rows:
+            lab_c = "fixed shares" if row["c"] is None else f"{row['c']:g}"
+            mark = " **chosen**" if row["c"] == c else ""
+            L.append(f"| {lab_c} | {row['three_teammates_ll']:.5f}{mark} | {row['n']} | {row['single_leg_ll']:.5f} |")
+        L += ["", "Applied to every candidate and era below.", ""]
+    combos, legs_by, parts = {}, {}, {}
     for lab, d in runs.items():
-        pr, tri, legs = parlays(d, shift, r)
-        combos[lab] = pd.concat([pr, tri], ignore_index=True)
+        pr, tri, legs = parlays(d, shift, r, c=c)
+        combos[lab] = pd.concat([pr, tri], ignore_index=True).assign(era=lab)
+        legs_by[lab] = legs.assign(era=lab)
+        parts[lab] = (pr, tri, legs)
+    picks, picks_table = select_per_class(combos["tune"])
+    for lab, (pr, tri, legs) in parts.items():
         seasons = {"tune": tune, "test": test, "also": also}[lab]
-        gates[lab] = section(L, pr, tri, legs, f"{lab.title()} {seasons}")
-    # THE SHADOW MODEL IS CHOSEN ON TUNE: the candidate whose worst lift bucket
-    # (1,000+ combinations, pairs and three legs, teammates and across teams)
-    # is closest to 1 on the tune seasons. The test eras only check it.
-    L += ["## Choosing the shadow model on tune: worst |actual / predicted - 1| over large lift buckets", "",
-          "| candidate | " + " | ".join(runs) + " |", "|---" * (len(runs) + 1) + "|"]
-    worst = {}
-    for c, name in CANDIDATES.items():
-        # nanmax: a group with no large bucket must not decide the score by iteration order
-        per = {lab: float(np.nanmax([worst_bucket(g, c) for _k, g in combos[lab].groupby(["legs", "kind"])] + [np.nan]))
-               if combos[lab].size else float("nan") for lab in runs}
-        worst[c] = per
-        L.append(f"| {name} | " + " | ".join(f"{per[lab]:.3f}" for lab in runs) + " |")
-    scored = {c: v for c, v in worst.items() if np.isfinite(v["tune"])}
-    pick = min(scored, key=lambda c: scored[c]["tune"])
-    if pick != SHADOW:
-        # the gate tables above scored SHADOW; a different tune pick means they grade the wrong model
-        msg = (f"MISMATCH: tune picks {CANDIDATES[pick]} but the gate tables and the live shadow use "
-               f"{CANDIDATES[SHADOW]}. Set SHADOW (and score_game's JOINT_MIX_SHIFT) to the pick and rerun.")
-        print(msg, file=sys.stderr)
-        L += [f"**{msg}**", ""]
-    L += ["", f"Chosen on tune: **{CANDIDATES[pick]}**. Gate (b) holds in an era when its worst bucket is within "
-              f"{GATE_TOL:.0%}.", "", "| era | chosen model's worst bucket | gate (b) |", "|---|---|---|"]
-    for lab in runs:
-        if lab != "tune":
-            w = worst[pick][lab]
-            L.append(f"| {lab} | {w:.3f} | {'PASS' if w <= GATE_TOL else 'FAIL'} |")
-    L.append("")
-    L += ["## Gate (b): every lift bucket with 1,000+ combinations within 5%, shadow model", "",
-          "| era | " + " | ".join(next(iter(gates.values())).keys()) + " |",
-          "|---" * (len(next(iter(gates.values()))) + 1) + "|"]
-    for lab, gg in gates.items():
-        if lab == "tune":
-            continue
-        L.append(f"| {lab} | " + " | ".join("pass" if v else "FAIL" for v in gg.values()) + " |")
+        section(L, pr, tri, legs, f"{lab.title()} {seasons}", picks)
+    gate = parlay_gate(combos, legs_by, picks, [e for e in runs if e != "tune"])
+    gate.update({"engine": B.cid(B.SHIP), "tune": tune, "test": test, "also": also,
+                 "picks": {k: CANDIDATES[v] for k, v in picks.items()}, "copula_r": r, "dirichlet_c": c})
+    L += gate_markdown(gate, picks_table)
+    out_dir = Path(a.out)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    import json as _json
+    (out_dir / "td_parlay_gate.json").write_text(_json.dumps(gate, indent=1, default=float) + "\n",
+                                                 encoding="utf-8")
     path = Path(a.out) / "td_layer3.md"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("\n".join(L) + "\n", encoding="utf-8")

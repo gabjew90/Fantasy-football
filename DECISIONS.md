@@ -5102,3 +5102,38 @@ game-to-game variation in how a team splits its touchdowns (a player's share
 is not fixed within a season), which makes three teammates scoring together
 rarer than a fixed-share model says. (Code review caught the first draft of
 this paragraph claiming both proposed gates would pass.)
+
+## 2026-09-22 (89) -- the parlay gate is a script; three classes open; the Dirichlet moves three teammates to unresolved
+
+The user adopted (a') as written and (b') with a resolution clause, because
+"every interval contains 1" passes on noise: per class, the pooled two-era ratio
+within 5% AND the pooled interval half-width under 10%; a class meeting the
+first but not the second is UNRESOLVED and stays closed; classes open
+individually. And the gate is a script output committed with the run, never a
+hand-written verdict -- #88's draft claiming both proposed gates would pass is
+the reason. td_joint_backtest.py now writes td_parlay_gate.json, and the scorer
+reads the bundled copy to decide what renders.
+
+The user also judged the worst-bucket selector wrong (it punished the copula's
+level and threw out the established mix shift) and asked that all four
+candidates be logged in shadow. Each class now gets the candidate with the
+lowest pooled tune log loss; all four are logged on every board. On the
+end-zone re-binning the user asked about: pass_rz was redefined and pass_ez
+added, and the mix multipliers were re-estimated on the new bins both in the
+backtest (at run time) and in the bundled table.
+
+The Dirichlet: each team's split of its touchdowns varies game to game, which
+makes three teammates together rarer than a fixed split implies while leaving
+single legs nearly unchanged. Exact (Beta moments in the inclusion-exclusion;
+matches a 40,000-game simulation). c = 100 tuned on the three-teammate class of
+2022-23; single-leg log loss unharmed (0.34629 -> 0.34626).
+
+The computed gate (2024-25 and 2018-19, 1,056 games): (a') passes both eras;
+cross-team pairs 1.007 (+-0.052) OPEN, teammate pairs 1.014 (+-0.057) OPEN,
+mixed 3-leg 0.991 (+-0.092) OPEN, three teammates 0.969 (+-0.112) UNRESOLVED.
+Before the Dirichlet three teammates FAILED at 0.926. Mixed 3-leg opening was
+not expected; it clears both clauses (2018-19 alone is 0.927).
+
+The report renders the open pair classes (prototype, no fair odds); mixed 3-leg
+is open but not rendered; three teammates never renders. Gate (d) (single-leg
+CLV) is set aside by the user for now.

@@ -1372,9 +1372,10 @@ def main():
             TDB[[c for c in ["player", "team", "book", "price", "p_model", "p_novig", "gap", "td_model",
                              "questionable_teammate", "flag", "decision"] if c in TDB.columns]] \
                 .sort_values("p_model", ascending=False).to_csv(OUT / f"td_board_{slug}.csv", index=False)
-    # LAYER 3 IN SHADOW: exact joint prices for every pair of anytime-TD legs
-    # priced 10%+ (joint + mix shift, independent counts), logged for grading.
-    # Nothing renders: parlays stay gated (model_registry.md, td_joint_v0).
+    # LAYER 3: exact joint prices for every pair of anytime-TD legs priced 10%+,
+    # all four candidate structures, logged for grading. The report renders
+    # only the classes the committed gate opened (td_pairs_section).
+    J_ = pd.DataFrame()
     try:
         J_ = joint_shadow(R, M, V1TD, AWAY, HOME, PRIOR)
         if len(J_):
@@ -2210,6 +2211,9 @@ def main():
              "lines closed. If we consistently beat the close, the numbers are real. If not, they aren't.")
     L.append("")
 
+    # ---- touchdown pairs: only the classes the committed gate opened ----
+    L += td_pairs_section(J_)
+
     # ---- housekeeping ----
     L.append("## Housekeeping\n")
     if quote_meta:
@@ -2334,16 +2338,14 @@ def apply_out_rule(M: pd.DataFrame, E: pd.DataFrame, teams, rule=None):
 OUT_RULE = {"ts": (0.2, 0.25), "i10ts": (0.0, 0.0), "rs": (0.0, 0.25), "i10rs": (0.0, 0.25)}
 POS_GROUP = {"FB": "RB", "HB": "RB"}
 JOINT_LEG_MIN = 0.10
-# The shadow model is plain joint (teammates share their team's count): chosen on
-# the tune seasons over joint + mix shift and the copula variants (DECISIONS #88).
-JOINT_MIX_SHIFT = False
 
 
 def joint_shadow(R, M, V1TD, away, home, prior) -> pd.DataFrame:
     """Every pair of anytime-TD legs priced JOINT_LEG_MIN+ by anytime_td_v1:
-    the leg-by-leg product and the layer-3 joint price. The shadow model is
-    plain joint -- teammates share their team's count -- chosen on the tune
-    seasons over the mix shift and the copula (DECISIONS #88)."""
+    the leg-by-leg product and ALL FOUR candidate joint prices -- plain joint
+    (teammates share their team's count), + mix shift, + mix shift + copula,
+    + copula. Shadow logging costs nothing, and the graded record is what will
+    settle which structure is right (DECISIONS #89). Nothing renders."""
     if R.empty or V1TD is None or V1TD.empty:
         return pd.DataFrame()
     td = R[(R.market == "player_anytime_td") & (R.td_model == TDV1.LABEL) & (R.p_model >= JOINT_LEG_MIN)]
@@ -2357,15 +2359,18 @@ def joint_shadow(R, M, V1TD, away, home, prior) -> pd.DataFrame:
     mu = {t: float(V1TD[V1TD.team == t]["mu"].iloc[0]) for t in (away, home) if (V1TD.team == t).any()}
     if len(mu) < 2:
         return pd.DataFrame()
-    P = TDJ.joint_counts(mu[away], mu[home])
+    P0 = TDJ.joint_counts(mu[away], mu[home])
+    Pr = TDJ.joint_counts(mu[away], mu[home], r=TDJ.R_PROVISIONAL)
     axis = {away: 0, home: 1}
-    q = {}
+    q0, q1 = {}, {}
     for t in (away, home):
         v = V1TD[V1TD.team == t]
         shares = v[[f"s_{c}" for c in TDJ.CH]].set_axis(TDJ.CH, axis=1)
         mix = pd.Series([float(v[f"w_{c}"].iloc[0]) for c in TDJ.CH], index=TDJ.CH)
-        qm = TDJ.q_by_opp(shares, TDJ.mixes_by_opp(mix, shift if JOINT_MIX_SHIFT else None))
-        q.update({g: qm[i] for i, g in enumerate(v.index)})
+        m0 = TDJ.q_by_opp(shares, TDJ.mixes_by_opp(mix, None))
+        m1 = TDJ.q_by_opp(shares, TDJ.mixes_by_opp(mix, shift))
+        q0.update({g: m0[i] for i, g in enumerate(v.index)})
+        q1.update({g: m1[i] for i, g in enumerate(v.index)})
     empty = np.zeros((0, TDJ.OPP_BUCKETS))
     rows = []
     legs = list(td.itertuples())
@@ -2373,15 +2378,59 @@ def joint_shadow(R, M, V1TD, away, home, prior) -> pd.DataFrame:
         for j in range(i + 1, len(legs)):
             a_, b_ = legs[i], legs[j]
             ga, gb = gsis[a_.player], gsis[b_.player]
-            on_a = [q[g] for g, t in ((ga, a_.team), (gb, b_.team)) if axis[t] == 0]
-            on_b = [q[g] for g, t in ((ga, a_.team), (gb, b_.team)) if axis[t] == 1]
-            pj = TDJ.p_all(np.array(on_a) if on_a else empty, np.array(on_b) if on_b else empty, P)
+
+            def pj(q, P):
+                on_a = [q[g] for g, t in ((ga, a_.team), (gb, b_.team)) if axis[t] == 0]
+                on_b = [q[g] for g, t in ((ga, a_.team), (gb, b_.team)) if axis[t] == 1]
+                return TDJ.p_all(np.array(on_a) if on_a else empty, np.array(on_b) if on_b else empty, P,
+                                 TDJ.DIRICHLET_C)
             rows.append({"player_a": a_.player, "team_a": a_.team, "player_b": b_.player, "team_b": b_.team,
                          "kind": "teammates" if a_.team == b_.team else "opponents",
                          "p_a": float(a_.p_model), "p_b": float(b_.p_model),
-                         "p_indep": float(a_.p_model * b_.p_model), "p_joint": pj,
-                         "joint_model": "td_joint_v0 (joint; shadow)"})
+                         "p_indep": float(a_.p_model * b_.p_model),
+                         "p_joint_plain": pj(q0, P0), "p_joint_shift": pj(q1, P0),
+                         "p_joint_shift_copula": pj(q1, Pr), "p_joint_copula": pj(q0, Pr),
+                         "joint_model": f"td_joint_v0 shadow, four candidates, copula r {TDJ.R_PROVISIONAL}, "
+                                        f"Dirichlet c {TDJ.DIRICHLET_C:g}"})
     return pd.DataFrame(rows)
+
+
+PAIR_COL = {"joint": "p_joint_plain", "joint + mix shift": "p_joint_shift",
+            "joint + mix shift + copula": "p_joint_shift_copula", "joint + copula": "p_joint_copula"}
+PAIR_CLASS = {"opponents": "cross-team pair", "teammates": "teammate pair"}
+
+
+def td_pairs_section(J_: pd.DataFrame, top: int = 6) -> list[str]:
+    """Anytime-TD pairs for the parlay classes the committed gate OPENED
+    (resources/td_parlay_gate.json, written by td_joint_backtest.py -- never a
+    hand-written verdict). Each class uses its own tune-chosen model. A class
+    that is unresolved or failing never renders, and neither does anything
+    when the gate file is missing."""
+    gf = RES / TDJ.GATE_FILE
+    if J_ is None or J_.empty or not gf.exists():
+        return []
+    gate = json.loads(gf.read_text(encoding="utf-8"))
+    out = []
+    for kind, cls in PAIR_CLASS.items():
+        if cls not in gate.get("open_classes", []):
+            continue
+        col = PAIR_COL[gate["picks"][cls]]
+        g = J_[J_["kind"] == kind].sort_values(col, ascending=False).head(top)
+        if g.empty:
+            continue
+        v = gate["b_prime"][cls]
+        out += ["", f"### Touchdown pairs: {cls} (layer 3, PROTOTYPE -- no fair odds)", "",
+                f"*Open by the committed gate: pooled actual/predicted {v['ratio']:.3f} "
+                f"({v['ci'][0]:.3f}-{v['ci'][1]:.3f}) over {v['games']} games. Model: {gate['picks'][cls]}. "
+                "Both legs are PROTOTYPE, so neither is a fair price; the lift is how far scoring together "
+                "differs from multiplying the two legs.*", "",
+                "| pair | P(both) | legs multiplied | lift |", "|---|---|---|---|"]
+        for r in g.itertuples():
+            out.append(f"| {r.player_a} ({r.team_a}) + {r.player_b} ({r.team_b}) | {getattr(r, col):.1%} | "
+                       f"{r.p_indep:.1%} | {getattr(r, col) / r.p_indep:.2f} |")
+    if out:
+        out = ["", "## Touchdown pairs"] + out + ["", "Three teammates together is not shown: its class is not open."]
+    return out
 
 
 def ev_statement(R: pd.DataFrame) -> str:

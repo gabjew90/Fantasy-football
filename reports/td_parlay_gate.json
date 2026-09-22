@@ -1,0 +1,167 @@
+{
+ "a_prime": {
+  "test": {
+   "rows": 503,
+   "predicted": 0.5044917788841627,
+   "actual": 0.5288270377733598,
+   "gap": 0.024335258889197083,
+   "ci": [
+    -0.018870000655932438,
+    0.06547646711844661
+   ],
+   "pass": true
+  },
+  "also": {
+   "rows": 319,
+   "predicted": 0.5044111576044601,
+   "actual": 0.5172413793103449,
+   "gap": 0.012830221705884708,
+   "ci": [
+    -0.04397626588845485,
+    0.06837114977226143
+   ],
+   "pass": true
+  }
+ },
+ "b_prime": {
+  "cross-team pair": {
+   "model": "joint + mix shift + copula",
+   "combinations": 56886,
+   "games": 1056,
+   "ratio": 1.006689193393009,
+   "ci": [
+    0.9548907553380782,
+    1.0596206471086314
+   ],
+   "half_width": 0.05236494588527657,
+   "status": "OPEN",
+   "per_era": {
+    "test": {
+     "ratio": 1.0489118612520303,
+     "ci": [
+      0.969917354707803,
+      1.124590184843496
+     ]
+    },
+    "also": {
+     "ratio": 0.9625623600009313,
+     "ci": [
+      0.8862874273165842,
+      1.0323673721068287
+     ]
+    }
+   }
+  },
+  "mixed 3-leg": {
+   "model": "joint + mix shift + copula",
+   "combinations": 377591,
+   "games": 1056,
+   "ratio": 0.9912904967862798,
+   "ci": [
+    0.9016166322007829,
+    1.0854166168857724
+   ],
+   "half_width": 0.09189999234249474,
+   "status": "OPEN",
+   "per_era": {
+    "test": {
+     "ratio": 1.054088680333553,
+     "ci": [
+      0.918637599224889,
+      1.1875019574632197
+     ]
+    },
+    "also": {
+     "ratio": 0.9273835268356551,
+     "ci": [
+      0.8044170809405057,
+      1.0563859468042154
+     ]
+    }
+   }
+  },
+  "teammate pair": {
+   "model": "joint + mix shift + copula",
+   "combinations": 51969,
+   "games": 1056,
+   "ratio": 1.0142981941436733,
+   "ci": [
+    0.9594393329922896,
+    1.0736046223213225
+   ],
+   "half_width": 0.05708264466451646,
+   "status": "OPEN",
+   "per_era": {
+    "test": {
+     "ratio": 1.0480729647192977,
+     "ci": [
+      0.9666703142225574,
+      1.125302484447315
+     ]
+    },
+    "also": {
+     "ratio": 0.979855789036435,
+     "ci": [
+      0.8972348178034197,
+      1.0595122706532651
+     ]
+    }
+   }
+  },
+  "three teammates": {
+   "model": "joint",
+   "combinations": 104264,
+   "games": 1056,
+   "ratio": 0.9692362127559869,
+   "ci": [
+    0.861212623588633,
+    1.0842911325684488
+   ],
+   "half_width": 0.11153925448990787,
+   "status": "UNRESOLVED",
+   "per_era": {
+    "test": {
+     "ratio": 1.0207228229795398,
+     "ci": [
+      0.8573222186711227,
+      1.1908817029165972
+     ]
+    },
+    "also": {
+     "ratio": 0.9193807622090907,
+     "ci": [
+      0.7728913955049058,
+      1.070253345612053
+     ]
+    }
+   }
+  }
+ },
+ "a_prime_pass": true,
+ "open_classes": [
+  "cross-team pair",
+  "mixed 3-leg",
+  "teammate pair"
+ ],
+ "engine": "slot|x0.4|m0.25|qs0.92|pull0.2|cap0.99|qb40|cinf",
+ "tune": [
+  2022,
+  2023
+ ],
+ "test": [
+  2024,
+  2025
+ ],
+ "also": [
+  2018,
+  2019
+ ],
+ "picks": {
+  "cross-team pair": "joint + mix shift + copula",
+  "mixed 3-leg": "joint + mix shift + copula",
+  "teammate pair": "joint + mix shift + copula",
+  "three teammates": "joint"
+ },
+ "copula_r": 0.432,
+ "dirichlet_c": 100.0
+}

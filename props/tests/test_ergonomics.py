@@ -93,3 +93,28 @@ def test_today_is_the_eastern_date_not_the_utc_one(monkeypatch):
             return dt.datetime(2026, 12, 8, 4, 30, tzinfo=dt.timezone.utc)   # Mon 11:30 pm EST
     monkeypatch.setattr(SG, "datetime", Winter)
     assert SG.et_today() == "2026-12-07"
+
+
+def _pairs():
+    return pd.DataFrame({"kind": ["opponents", "teammates"], "player_a": ["A", "C"], "team_a": ["X", "X"],
+                         "player_b": ["B", "D"], "team_b": ["Y", "X"], "p_indep": [0.10, 0.10],
+                         "p_joint_plain": [0.10, 0.09], "p_joint_shift": [0.10, 0.09],
+                         "p_joint_shift_copula": [0.105, 0.09], "p_joint_copula": [0.105, 0.09]})
+
+
+def _gate(open_classes):
+    b = {c: {"ratio": 1.0, "ci": [0.95, 1.05], "games": 1000}
+         for c in ("cross-team pair", "teammate pair", "mixed 3-leg", "three teammates")}
+    return {"open_classes": open_classes, "b_prime": b,
+            "picks": {"cross-team pair": "joint + mix shift + copula", "teammate pair": "joint"}}
+
+
+def test_td_pairs_render_only_open_classes_from_the_committed_gate(tmp_path, monkeypatch):
+    monkeypatch.setattr(SG, "RES", tmp_path)
+    assert SG.td_pairs_section(_pairs()) == []                      # no gate file: nothing renders
+    (tmp_path / "td_parlay_gate.json").write_text(json.dumps(_gate(["cross-team pair"])), encoding="utf-8")
+    text = "\n".join(SG.td_pairs_section(_pairs()))
+    assert "cross-team pair" in text and "A (X) + B (Y) | 10.5%" in text     # its pick's column
+    assert "teammate pair (layer 3" not in text                               # not open: not shown
+    (tmp_path / "td_parlay_gate.json").write_text(json.dumps(_gate([])), encoding="utf-8")
+    assert SG.td_pairs_section(_pairs()) == []
