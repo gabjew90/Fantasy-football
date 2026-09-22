@@ -173,6 +173,22 @@ To `VALIDATED_BETTING`: everything above plus archive coverage (rows, bookmakers
   was byte-identical before and after the switch; summed per-touchdown share of each
   team's actives 0.990, as in the backtest.
 
+### td_market_v0 (layer 4: the market as a prior)
+- Markets: player_anytime_td (a second price beside anytime_td_v1, logged on every row).
+- Status: `PROTOTYPE`, PROVISIONAL weight. Code `scripts/td_market.py`.
+- Spec: logit p_blend = w logit p_model + (1 - w) logit p_market, w = 0.5 (provisional). p_market is
+  de-vigged: exact for a two-sided market (Sleeper, Yes / (Yes + No)); for a one-way market a
+  provisional 7% relative hold is removed from the Yes price.
+- Why: the largest single-leg errors are role news the market has and usage data does not; with one
+  player per team, a parlay is a bundle of single-leg opinions, so the single-leg price is where the
+  remaining value is.
+- Test: none yet; by design. Every priced TD row logs p_model, p_market, p_blend and blend_w through
+  the record and the settled file, and the Tuesday scorecard's shadow fit (`props/blend.py`, per-book
+  intercepts, game-clustered intervals, leave-one-week-out) estimates the real weight and hold once
+  300 v1 calls have settled in one engine version.
+- The cross-game parlay builder (`scripts/td_builder.py`, slate summary) uses p_blend: legs must
+  clear the TD edge floor (25% relative, positive EV) on their own, one per game.
+
 ### td_joint_v0 (layer 3: joint touchdown probabilities)
 - Markets: none priced. Correlated anytime-TD pairs and parlays stay GATED.
 - Status: `PROTOTYPE` (research). Code `scripts/td_joint.py`, backtest `scripts/td_joint_backtest.py`,

@@ -31,6 +31,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import eligibility
 import model as MODEL
 import td_joint as TDJ
+import td_market as TDM
 import td_v1 as TDV1
 from model import norm_name, name_key_loose, is_team_entry, blend
 
@@ -1268,19 +1269,26 @@ def main():
                             continue
                         pr = M[M.name == nm].iloc[0]
                         p_yes, td_model = p_anytime(pr)
-                        if o["description"] in no_price:
+                        two_sided = o["description"] in no_price
+                        if two_sided:
                             # two-sided market (Sleeper): strip the hold like any O/U line
                             iy_, in_ = amer_to_p(o["price"]), amer_to_p(no_price[o["description"]])
                             p_imp = iy_ / (iy_ + in_)
                         else:
                             p_imp = amer_to_p(o["price"])
+                        # LAYER 4: the de-vigged market and the blend at a PROVISIONAL weight,
+                        # logged beside the model so the settled record can fit the real weight
+                        p_mkt = TDM.market_prob(p_imp, two_sided)
+                        p_bl = float(TDM.blend(p_yes, p_mkt))
                         rows.append(dict(book=b["key"], market="player_anytime_td",
                             player=nm, team=pr.team, slot=pr.slot, line=np.nan,
                             model_mean=np.nan, side="Yes", p_model=p_yes, p_push=0.0,
                             p_novig=p_imp, gap=p_yes - p_imp, price=o["price"],
                             ER=p_yes * payout(o["price"]) - (1 - p_yes),
                             last_update=mk["last_update"], new_team=bool(pr.new_team),
-                            questionable=bool(pr.questionable), td_model=td_model))
+                            questionable=bool(pr.questionable), td_model=td_model,
+                            two_sided=bool(two_sided), p_market=p_mkt, p_blend=p_bl,
+                            blend_w=TDM.BLEND_W_MODEL))
 
     # Sleeper publishes its own depth rank per player (subject_pos_rank). Where it
     # disagrees with the nflverse depth chart we built the eligible set from, the book is
@@ -1369,8 +1377,9 @@ def main():
         # anytime TD has its own board: the bet card leaves TD rows out
         TDB = R[R.market == "player_anytime_td"]
         if len(TDB):
-            TDB[[c for c in ["player", "team", "book", "price", "p_model", "p_novig", "gap", "td_model",
-                             "questionable_teammate", "flag", "decision"] if c in TDB.columns]] \
+            TDB[[c for c in ["player", "team", "book", "price", "p_model", "p_novig", "two_sided", "p_market",
+                             "p_blend", "blend_w", "gap", "td_model", "questionable_teammate", "flag",
+                             "decision"] if c in TDB.columns]] \
                 .sort_values("p_model", ascending=False).to_csv(OUT / f"td_board_{slug}.csv", index=False)
     # LAYER 3: exact joint prices for every pair of anytime-TD legs priced 10%+,
     # all four candidate structures, logged for grading. The report renders

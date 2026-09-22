@@ -1,15 +1,15 @@
 {
   "algorithm": "props-engine-sha256-lf-1",
-  "engine_sha256": "2b6b23656f752dc9309ff13e8249bdd8740c2959774e3109eac990ab3e052b40",
-  "file_count": 49,
+  "engine_sha256": "019a5d7c46cd08eb7cfe455df705944d7eae719353a68ab0bf30ccbc58946d61",
+  "file_count": 51,
   "files": {
-    "SKILL.md": "20dc44845ed7f0baaa62b5b438b97c1a9e7c9c645922106bb965b95b11742917",
+    "SKILL.md": "7bd575fcbcd3dce795ae3da998fb4f144942154ff11c20d248771f2081e10401",
     "resources/calibration_2025.csv": "47e3922c7af818307831d70a3d2be4333200f3aee1d94dc6bbf6e0e9ccee4ac8",
     "resources/data_source_matrix.md": "2088a5ebe6164a75c11331367fda734d4b10ea217704320321a3f2aec6bb9c2b",
     "resources/execution_protocol.md": "5f54fb23a77d60ecc947d44b6f18ecf67c4357d6b49c70bc937726c1c14016c1",
     "resources/line_archive.md": "baf1b6b97ec439bdf26b73dc4c3ae23d0c4ee9f502db4be7baae70390cdb5c45",
     "resources/methodology.md": "2d96c40403b1c63e1a4ea0a3c615f00e28d46f99122c5fd5ccbcf7704301772c",
-    "resources/model_registry.md": "e019dbdc4a7457346ae4ecf2dc5a368c7be5438cf3eb23bedadfc489c8a9bf31",
+    "resources/model_registry.md": "51974218eef841fedb651c8d86010b2b4b629c46da40e8736fa6f9fc9461741e",
     "resources/modeling_framework.md": "51568adb4e4f69442a98190b3909c0e3c0c4042f5348289bb8799dab541ed2e7",
     "resources/priors_2024_opponent.csv": "aa37b5af3e6b758ce08c7d71179083e3af5df0c9bb3492fe848eb9e2a7d1f9e4",
     "resources/priors_2024_params.json": "6eb67b77139926c9e5d7e2a3fde2ff01c7175600be4d3e14260c3320598b007f",
@@ -41,17 +41,19 @@
     "scripts/eligibility.py": "84c468a0b401b66128b4f21d1f311a42d7b8021744096ab077c52c519d7e9b8a",
     "scripts/model.py": "ae0da50fcaf1b0344d045bd371f902b3786ca8fba1abe0fee68f6e7653c2d527",
     "scripts/odds_client.py": "434186273bd0412a5545247228298951c5d0504a19c8a47c4c782bf3bb75aaa1",
-    "scripts/score_game.py": "cc6e53d5aeff5dc072aa51978179e057637faf333742d11143a91538b7dfe1ce",
-    "scripts/score_week.py": "592581b8f806cfd01787985cd676614ec4ba59aedebbdf8cf2ba579ab3ad9b5b",
+    "scripts/score_game.py": "55afb24a6da705aa65239ef5f536b94050802186aa3b5d84b5817097540fe78c",
+    "scripts/score_week.py": "97f054a79fada79d4901f90cad444859312f5030f63811862d6f5279db256536",
     "scripts/td_alloc.py": "7c407c949cac8f0f74d7f91589fd5d749f65d9053eb1c3f5f0dc63a700b3465b",
     "scripts/td_alloc_backtest.py": "e259d9f0e301a5d5d34e5a9e84bba222810f077d9c05a1f1f799a611914595a4",
     "scripts/td_backtest.py": "0ae77781fea2de212154ff72f64b0792f15f77fabfda7cae944fce20b3c9895f",
+    "scripts/td_builder.py": "649f94548897689c08264d9e4cfe36a7d5b65b4428910a9f86534e59139a9a72",
     "scripts/td_compare.py": "392fc3f11bb12bd0ed1b9ecbad3230d83c367e57dcc0a0901dc35a7456ce984d",
     "scripts/td_diagnostics.py": "118f13231ae143902d0cdc5009031a5e73b932f4d5653ea8f6f94b5244381b9e",
     "scripts/td_joint.py": "879617fbf4f918a77e569ab874d122c0c689ec3269d5b990ee7fc40fecb1a918",
     "scripts/td_joint_backtest.py": "cefa68ad90b7016faedaa8d0d3b91cb670a5f9391149d4128724d4440b2277b7",
+    "scripts/td_market.py": "6fc9206c479c99620a0b3b56c5e49a6f05530e36be75698adac3602d1817966a",
     "scripts/td_model.py": "7c1635bbf515b4316f14771b177363a9f82a1ba7ad3393e479cd2dce26a25724",
     "scripts/td_v1.py": "4e54516734888fc588a7ad3fd9d0ad7dd16d96edcaa980adff3dbcda232ece0f"
   },
-  "tag": "props-v1.14"
+  "tag": "props-v1.15"
 }

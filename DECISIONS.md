@@ -5145,3 +5145,34 @@ reproduced the identical verdict.
 The report renders the open pair classes (prototype, no fair odds); mixed 3-leg
 is open but not rendered; three teammates never renders. Gate (d) (single-leg
 CLV) is set aside by the user for now.
+
+
+## 2026-09-22 (90) -- layer 4 live (provisional); the cross-game parlay builder
+
+The user's read: cross-game legs are independent, so a cross-game parlay is the
+product of its legs and is +EV only if every leg is; each leg's hold compounds
+(Sleeper ~12% a leg, a 3-leg entry pays ~68% of fair). Same-game opposing
+scorers are the one place the joint model matters (the +0.15 count correlation,
+~4% lift, confirmed at 1.007 of actual), and whether that is an edge depends on
+the book's same-game engine, which only a typed-in quote shows. Teammate work
+changes none of the user's prices. So the remaining value is the single-leg
+price, and layer 4 -- the market blend -- is the whole game.
+
+**Layer 4, live, provisional (td_market.py).** Every anytime-TD row now carries
+the de-vigged market (exact for Sleeper's two-sided prices; a provisional 7%
+hold removed from one-way books) and the logit blend of model and market at a
+provisional weight of 0.5, logged beside the model through the record and the
+settled file. The shadow fit already in the Tuesday scorecard (blend.py)
+estimates the real weight and per-book hold once 300 v1 calls settle; no
+weight is claimed before then. On MIA@SF week 2 the blend moves every price
+halfway toward the book on the logit scale (Deebo Samuel's model edge of 25%
+relative becomes 12%).
+
+**The cross-game builder (td_builder.py, in the slate summary).** The top
+single-leg TD edges on the blend, one leg per game (and so one per team), 2 or
+3 legs, each clearing the TD edge floor on its own (25% relative, positive EV
+at the posted price); the combined fair probability, fair American price, the
+minimum decimal payout (= the Sleeper multiplier) and, for a single
+sportsbook, the product price and its EV. Sleeper pays from a fixed pick'em
+table, so no product price is shown there. When no leg qualifies the summary
+says so. No new validation: the legs are independent by construction.
