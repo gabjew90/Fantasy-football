@@ -1,139 +1,9 @@
 {
- "week": 2,
- "generated_pt": "2026-09-21T10:38:58.755364-07:00",
+ "week": 3,
+ "generated_pt": "2026-09-22T17:48:47.711726-07:00",
  "checks": [
   {
-   "id": "wk2:lineup_plan:0917T1445",
-   "kind": "lineup_plan",
-   "info": "lineup plan pass (Thursday)",
-   "target_pt": "2026-09-17T14:45:00-07:00",
-   "due_utc": "2026-09-17T21:35:00+00:00",
-   "due_pt": "2026-09-17T14:35:00-07:00",
-   "window_min": 45,
-   "done": false
-  },
-  {
-   "id": "wk2:slate_check:0917T1555",
-   "kind": "slate_check",
-   "info": "inactives check \u2014 BUF, DET lock Thu 09/17 05:15 PM PT",
-   "target_pt": "2026-09-17T15:55:00-07:00",
-   "due_utc": "2026-09-17T22:45:00+00:00",
-   "due_pt": "2026-09-17T15:45:00-07:00",
-   "window_min": 45,
-   "done": false,
-   "teams": [
-    "BUF",
-    "DET"
-   ],
-   "kickoff": "2026-09-17T17:15:00-07:00"
-  },
-  {
-   "id": "wk2:lineup_plan:0920T0730",
-   "kind": "lineup_plan",
-   "info": "lineup plan pass (Sunday)",
-   "target_pt": "2026-09-20T07:30:00-07:00",
-   "due_utc": "2026-09-20T14:20:00+00:00",
-   "due_pt": "2026-09-20T07:20:00-07:00",
-   "window_min": 45,
-   "done": false
-  },
-  {
-   "id": "wk2:slate_check:0920T0840",
-   "kind": "slate_check",
-   "info": "inactives check \u2014 ATL, BAL, CAR, GB, HOU, MIN, NE, NO, PHI, PIT, TB lock Sun 09/20 10:00 AM PT",
-   "target_pt": "2026-09-20T08:40:00-07:00",
-   "due_utc": "2026-09-20T15:30:00+00:00",
-   "due_pt": "2026-09-20T08:30:00-07:00",
-   "window_min": 45,
-   "done": false,
-   "teams": [
-    "ATL",
-    "BAL",
-    "CAR",
-    "GB",
-    "HOU",
-    "MIN",
-    "NE",
-    "NO",
-    "PHI",
-    "PIT",
-    "TB"
-   ],
-   "kickoff": "2026-09-20T10:00:00-07:00"
-  },
-  {
-   "id": "wk2:slate_check:0920T1145",
-   "kind": "slate_check",
-   "info": "inactives check \u2014 JAX lock Sun 09/20 01:05 PM PT",
-   "target_pt": "2026-09-20T11:45:00-07:00",
-   "due_utc": "2026-09-20T18:35:00+00:00",
-   "due_pt": "2026-09-20T11:35:00-07:00",
-   "window_min": 45,
-   "done": false,
-   "teams": [
-    "JAX"
-   ],
-   "kickoff": "2026-09-20T13:05:00-07:00"
-  },
-  {
-   "id": "wk2:slate_check:0920T1205",
-   "kind": "slate_check",
-   "info": "inactives check \u2014 DAL, MIA, SF, WAS lock Sun 09/20 01:25 PM PT",
-   "target_pt": "2026-09-20T12:05:00-07:00",
-   "due_utc": "2026-09-20T18:55:00+00:00",
-   "due_pt": "2026-09-20T11:55:00-07:00",
-   "window_min": 45,
-   "done": false,
-   "teams": [
-    "DAL",
-    "MIA",
-    "SF",
-    "WAS"
-   ],
-   "kickoff": "2026-09-20T13:25:00-07:00"
-  },
-  {
-   "id": "wk2:slate_check:0920T1600",
-   "kind": "slate_check",
-   "info": "inactives check \u2014 IND, KC lock Sun 09/20 05:20 PM PT",
-   "target_pt": "2026-09-20T16:00:00-07:00",
-   "due_utc": "2026-09-20T22:50:00+00:00",
-   "due_pt": "2026-09-20T15:50:00-07:00",
-   "window_min": 45,
-   "done": false,
-   "teams": [
-    "IND",
-    "KC"
-   ],
-   "kickoff": "2026-09-20T17:20:00-07:00"
-  },
-  {
-   "id": "wk2:lineup_plan:0921T1445",
-   "kind": "lineup_plan",
-   "info": "lineup plan pass (Monday)",
-   "target_pt": "2026-09-21T14:45:00-07:00",
-   "due_utc": "2026-09-21T21:35:00+00:00",
-   "due_pt": "2026-09-21T14:35:00-07:00",
-   "window_min": 45,
-   "done": false
-  },
-  {
-   "id": "wk2:slate_check:0921T1555",
-   "kind": "slate_check",
-   "info": "inactives check \u2014 LAR, NYG lock Mon 09/21 05:15 PM PT",
-   "target_pt": "2026-09-21T15:55:00-07:00",
-   "due_utc": "2026-09-21T22:45:00+00:00",
-   "due_pt": "2026-09-21T15:45:00-07:00",
-   "window_min": 45,
-   "done": false,
-   "teams": [
-    "LAR",
-    "NYG"
-   ],
-   "kickoff": "2026-09-21T17:15:00-07:00"
-  },
-  {
-   "id": "wk2:waiver_brief:0922T1700",
+   "id": "wk3:waiver_brief:0922T1700",
    "kind": "waiver_brief",
    "info": "waiver brief (bids due 7:00 PM PT)",
    "target_pt": "2026-09-22T17:00:00-07:00",
@@ -143,7 +13,7 @@
    "done": false
   },
   {
-   "id": "wk2:injury_sweep:0923T0800",
+   "id": "wk3:injury_sweep:0923T0800",
    "kind": "injury_sweep",
    "info": "injury designation sweep",
    "target_pt": "2026-09-23T08:00:00-07:00",
@@ -153,7 +23,7 @@
    "done": false
   },
   {
-   "id": "wk2:injury_sweep:0923T1600",
+   "id": "wk3:injury_sweep:0923T1600",
    "kind": "injury_sweep",
    "info": "injury designation sweep",
    "target_pt": "2026-09-23T16:00:00-07:00",
@@ -163,7 +33,7 @@
    "done": false
   },
   {
-   "id": "wk2:injury_sweep:0924T0800",
+   "id": "wk3:injury_sweep:0924T0800",
    "kind": "injury_sweep",
    "info": "injury designation sweep",
    "target_pt": "2026-09-24T08:00:00-07:00",
@@ -173,7 +43,32 @@
    "done": false
   },
   {
-   "id": "wk2:injury_sweep:0924T1600",
+   "id": "wk3:lineup_plan:0924T1445",
+   "kind": "lineup_plan",
+   "info": "lineup plan pass (Thursday)",
+   "target_pt": "2026-09-24T14:45:00-07:00",
+   "due_utc": "2026-09-24T21:35:00+00:00",
+   "due_pt": "2026-09-24T14:35:00-07:00",
+   "window_min": 45,
+   "done": false
+  },
+  {
+   "id": "wk3:slate_check:0924T1555",
+   "kind": "slate_check",
+   "info": "inactives check \u2014 ATL, GB lock Thu 09/24 05:15 PM PT",
+   "target_pt": "2026-09-24T15:55:00-07:00",
+   "due_utc": "2026-09-24T22:45:00+00:00",
+   "due_pt": "2026-09-24T15:45:00-07:00",
+   "window_min": 45,
+   "done": false,
+   "teams": [
+    "ATL",
+    "GB"
+   ],
+   "kickoff": "2026-09-24T17:15:00-07:00"
+  },
+  {
+   "id": "wk3:injury_sweep:0924T1600",
    "kind": "injury_sweep",
    "info": "injury designation sweep",
    "target_pt": "2026-09-24T16:00:00-07:00",
@@ -183,7 +78,7 @@
    "done": false
   },
   {
-   "id": "wk2:injury_sweep:0925T0800",
+   "id": "wk3:injury_sweep:0925T0800",
    "kind": "injury_sweep",
    "info": "injury designation sweep",
    "target_pt": "2026-09-25T08:00:00-07:00",
@@ -193,7 +88,7 @@
    "done": false
   },
   {
-   "id": "wk2:scout:0925T1200",
+   "id": "wk3:scout:0925T1200",
    "kind": "scout",
    "info": "opponent scout",
    "target_pt": "2026-09-25T12:00:00-07:00",
@@ -203,7 +98,7 @@
    "done": false
   },
   {
-   "id": "wk2:injury_sweep:0925T1600",
+   "id": "wk3:injury_sweep:0925T1600",
    "kind": "injury_sweep",
    "info": "injury designation sweep",
    "target_pt": "2026-09-25T16:00:00-07:00",
@@ -213,7 +108,7 @@
    "done": false
   },
   {
-   "id": "wk2:injury_sweep:0926T0800",
+   "id": "wk3:injury_sweep:0926T0800",
    "kind": "injury_sweep",
    "info": "injury designation sweep",
    "target_pt": "2026-09-26T08:00:00-07:00",
@@ -223,7 +118,7 @@
    "done": false
   },
   {
-   "id": "wk2:injury_sweep:0926T1600",
+   "id": "wk3:injury_sweep:0926T1600",
    "kind": "injury_sweep",
    "info": "injury designation sweep",
    "target_pt": "2026-09-26T16:00:00-07:00",
@@ -231,6 +126,111 @@
    "due_pt": "2026-09-26T15:50:00-07:00",
    "window_min": 45,
    "done": false
+  },
+  {
+   "id": "wk3:lineup_plan:0927T0730",
+   "kind": "lineup_plan",
+   "info": "lineup plan pass (Sunday)",
+   "target_pt": "2026-09-27T07:30:00-07:00",
+   "due_utc": "2026-09-27T14:20:00+00:00",
+   "due_pt": "2026-09-27T07:20:00-07:00",
+   "window_min": 45,
+   "done": false
+  },
+  {
+   "id": "wk3:slate_check:0927T0840",
+   "kind": "slate_check",
+   "info": "inactives check \u2014 BUF, CIN, DET, IND, KC, LAC, MIA, NE, NYG, PIT, SEA, TEN, WAS lock Sun 09/27 10:00 AM PT",
+   "target_pt": "2026-09-27T08:40:00-07:00",
+   "due_utc": "2026-09-27T15:30:00+00:00",
+   "due_pt": "2026-09-27T08:30:00-07:00",
+   "window_min": 45,
+   "done": false,
+   "teams": [
+    "BUF",
+    "CIN",
+    "DET",
+    "IND",
+    "KC",
+    "LAC",
+    "MIA",
+    "NE",
+    "NYG",
+    "PIT",
+    "SEA",
+    "TEN",
+    "WAS"
+   ],
+   "kickoff": "2026-09-27T10:00:00-07:00"
+  },
+  {
+   "id": "wk3:slate_check:0927T1145",
+   "kind": "slate_check",
+   "info": "inactives check \u2014 MIN, SF, TB lock Sun 09/27 01:05 PM PT",
+   "target_pt": "2026-09-27T11:45:00-07:00",
+   "due_utc": "2026-09-27T18:35:00+00:00",
+   "due_pt": "2026-09-27T11:35:00-07:00",
+   "window_min": 45,
+   "done": false,
+   "teams": [
+    "MIN",
+    "SF",
+    "TB"
+   ],
+   "kickoff": "2026-09-27T13:05:00-07:00"
+  },
+  {
+   "id": "wk3:slate_check:0927T1205",
+   "kind": "slate_check",
+   "info": "inactives check \u2014 BAL, NO lock Sun 09/27 01:25 PM PT",
+   "target_pt": "2026-09-27T12:05:00-07:00",
+   "due_utc": "2026-09-27T18:55:00+00:00",
+   "due_pt": "2026-09-27T11:55:00-07:00",
+   "window_min": 45,
+   "done": false,
+   "teams": [
+    "BAL",
+    "NO"
+   ],
+   "kickoff": "2026-09-27T13:25:00-07:00"
+  },
+  {
+   "id": "wk3:slate_check:0927T1600",
+   "kind": "slate_check",
+   "info": "inactives check \u2014 DEN lock Sun 09/27 05:20 PM PT",
+   "target_pt": "2026-09-27T16:00:00-07:00",
+   "due_utc": "2026-09-27T22:50:00+00:00",
+   "due_pt": "2026-09-27T15:50:00-07:00",
+   "window_min": 45,
+   "done": false,
+   "teams": [
+    "DEN"
+   ],
+   "kickoff": "2026-09-27T17:20:00-07:00"
+  },
+  {
+   "id": "wk3:lineup_plan:0928T1445",
+   "kind": "lineup_plan",
+   "info": "lineup plan pass (Monday)",
+   "target_pt": "2026-09-28T14:45:00-07:00",
+   "due_utc": "2026-09-28T21:35:00+00:00",
+   "due_pt": "2026-09-28T14:35:00-07:00",
+   "window_min": 45,
+   "done": false
+  },
+  {
+   "id": "wk3:slate_check:0928T1555",
+   "kind": "slate_check",
+   "info": "inactives check \u2014 PHI lock Mon 09/28 05:15 PM PT",
+   "target_pt": "2026-09-28T15:55:00-07:00",
+   "due_utc": "2026-09-28T22:45:00+00:00",
+   "due_pt": "2026-09-28T15:45:00-07:00",
+   "window_min": 45,
+   "done": false,
+   "teams": [
+    "PHI"
+   ],
+   "kickoff": "2026-09-28T17:15:00-07:00"
   }
  ]
 }
