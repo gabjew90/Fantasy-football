@@ -5354,3 +5354,45 @@ before a teammate joined the team counted as games without him. Deferred to
 step 5: a chat container has the skill's Yahoo credentials, not this repo's
 env vars, so Keefamania from chat reads the sync copy until the skill passes
 them through.
+
+## 2026-09-24 (95) -- consolidation step 4a: the usage evidence table and measured noise bands
+
+The start/sit and waiver frameworks' first two questions -- how big is the role,
+and has it changed beyond normal noise -- as code (fantasy/evidence.py), keyed
+by gsis id: snap share (snap counts joined through the pfr id, never by name),
+target, carry and air-yard shares, aDOT, WOPR, inside-10 targets and carries,
+two-minute opportunities. Built from play-by-play through core.fetch.
+
+**noise_bands_v0** is what "judged against the normal week-to-week noise of
+that metric" means: the robust SD (1.4826 x MAD) of a player-week around the
+player's own season mean, players with 8+ weeks, by position AND usage level.
+A role CHANGED when the last two games differ from the earlier ones by more
+than a calibrated z times the SD of that difference (sd x sqrt(1/2 +
+1/n_earlier)); fewer than four games is INSUFFICIENT_SAMPLE.
+
+The threshold is MEASURED, not assumed. The code review asked for the flag's
+false-alarm rate, measured by shuffling each player's games (no role change,
+same distribution): a fixed 2-SD rule fired on 8-36% of shuffled 2025 seasons
+(QB snap share, nearly all-or-nothing, worst). Each threshold is now the 95th
+percentile of the shuffled 2024 statistic -- z 2.3-3.0 for most metrics, 4.3
+for TE air-yard share, 6.6 for QB snap share -- and on shuffled 2025 seasons
+the flags fire 3.3-7.0% (limit 10%). Bands within 12% across seasons.
+
+The same review found one SD per position hid a backup's 10% -> 25% carry
+jump inside a band sized by starters' swings (hence the level split and the
+robust SD), a missing snap row could slide an older week into the recent
+window (now INSUFFICIENT), a game with unusually few snaps read as a role
+change (now marked "includes a partial game" -- an injury and a benching look
+alike in snap counts, so it is labelled, not dropped), and air-yard share ran
+past 100% in screen-heavy weeks (shares now use air yards floored at zero).
+
+The first fit FAILED the stability check on three bands -- TE carry share
+(its SD moved 2.4x), QB target share, RB air-yard share -- metrics that mean
+nothing for the position (a tight end has ~0.6% of carries). Each position is
+now flagged and judged only on the metrics that define its role (QB snaps and
+carries; RB snaps, carries, targets, WOPR; WR/TE snaps, targets, air yards,
+WOPR). That scope was chosen after seeing the failure, so the report prints
+the excluded rows beside the rest rather than dropping them.
+
+The lineup report gains an "Opportunity and role" section; its "not covered
+yet" line now names only the opponent-adjusted matchup (question 4).

@@ -27,7 +27,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
-KINDS = ("prop_model", "projection_source", "range_model")
+KINDS = ("prop_model", "projection_source", "range_model", "measurement")
 STATUSES = ("live", "provisional", "shadow", "deprecated")
 
 
@@ -93,6 +93,12 @@ COMPONENTS: tuple[Component, ...] = (
                    "(Keefamania) of outcomes and beat a bucket-scaled normal by ~2% on pinball loss; "
                    "QB is no better than that baseline and its low tail runs heavy -- stated with every "
                    "QB range"),
+    Component("noise_bands_v0", "measurement", "fantasy/evidence.py", "live",
+              evidence=("reports/noise_bands_v0.md", "fantasy/resources/noise_bands_v0.json"),
+              note="week-to-week noise of each role-defining usage metric (snap, target, carry, air-yard "
+                   "share, WOPR) by position and usage level (robust SD); the change threshold is calibrated "
+                   "to a 5% false-alarm rate on shuffled 2024 seasons and fires 3.3-7.0% on shuffled 2025 "
+                   "seasons; bands within 12% across seasons"),
     Component("weekly_blend_v0", "projection_source", "fantasy/weekly.py", "provisional",
               note="the weekly mean `nfl fantasy lineup` optimises: Sleeper, blended with market_points "
                    "where the player has a full market board, at a weight decaying from 0.6 in week 1 to 0 "
