@@ -52,8 +52,10 @@ three markets passed 1-2, yet 23-31% of outcomes fell outside the 10-90 range
 and an 85% Over won about 77-80%. Right on average but too narrow overstates
 every edge. The harness reports; it promotes nothing by itself.
 
-**First result:** all three markets pass 1-2 and fail 3-4. Receptions 25.5%
-outside p10-p90, receiving yards 23.0%, rushing yards 31.3%; the miss is
+**Result (after the code review's live-faithfulness fixes):** all three
+markets pass 1-2 and fail the width/calibration bar. Receptions 26.1% outside
+p10-p90, receiving yards 23.0% (width at the edge, calibration off 4 points),
+rushing yards 32.1%; an 85% Over wins 75-81%. The miss is
 worst on the low side (players bust more often than the model allows).
 
 ## Later steps, each its own PR, each judged by this harness
@@ -71,6 +73,11 @@ worst on the low side (players bust more often than the model allows).
    step 2.
 5. The Vegas-line environment (`market_fit`) and a market blend layer, tested
    on two seasons instead of one.
+
+Follow-up outside these steps: the slate's must-win pick (`score_week.py`,
+`CAL_MARKETS`) still prefers receptions and receiving yards as the calibrated
+markets. The harness shows they miss the calibration bar too; revisit the
+rule once step 2 lands.
 
 Each change is tuned on 2022-23 only and reported on 2024-25, against the
 version before it, like the TD model.

@@ -46,11 +46,14 @@ from dataclasses import dataclass, field
 #
 # A market moves out of this dict when a holdout against posted lines exists.
 MODEL_STATUS = {
-    # The three yardage labels: 2022-25 harness (reports/yardage_harness.md),
-    # unbiased on average but too narrow -- tail probabilities run high.
-    "player_receptions": "receiving_hier_v2, MODEL_UNVALIDATED (PROTOTYPE, too narrow)",
-    "player_reception_yds": "receiving_hier_v2, MODEL_UNVALIDATED (PROTOTYPE, too narrow)",
-    "player_rush_yds": "rush_yds_v0, MODEL_UNVALIDATED (PROTOTYPE, too narrow)",
+    # These strings are written to every record row as model_state, so they
+    # stay fixed across releases: the evidence changes, the label does not. The
+    # 2022-25 yardage harness (reports/yardage_harness.md) now backtests all
+    # three yardage markets -- unbiased on average, too narrow, so tail
+    # probabilities run high -- which the reports say in words.
+    "player_receptions": "receiving_hier_v2, MODEL_UNVALIDATED (PROTOTYPE)",
+    "player_reception_yds": "receiving_hier_v2, MODEL_UNVALIDATED (PROTOTYPE)",
+    "player_rush_yds": "rush_yds_v0, MODEL_UNVALIDATED (no backtest)",
     # v1: outcome-backtested (2024-25, end-to-end log loss -0.0034 vs v0's
     # structure), still UNVALIDATED against posted lines -- so it prices no
     # fair odds and is never eligible. See model_registry.md.

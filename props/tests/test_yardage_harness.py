@@ -95,3 +95,36 @@ def test_width_counts_outcomes_outside_the_model_p10_p90(backtest):
     assert backtest.summarize(d, "rec")["outside_p10_p90"] == pytest.approx(0.20, abs=0.01)
     d["pit_rec"] = [0.02 if i % 3 == 0 else 0.5 for i in range(n)]   # a third land below p10: too narrow
     assert backtest.summarize(d, "rec")["outside_p10_p90"] == pytest.approx(1 / 3, abs=0.01)
+
+
+def _verdict_inputs(backtest, gain, pit, gap):
+    frames = []
+    for season in (2024, 2025):
+        d = _frame([gain] * 30, season=season)
+        d["pit_rec"] = pit(len(d))
+        frames.append(d)
+    rel = pd.DataFrame({"market": "receptions", "side": ["Over", "Under"] * 3,
+                        "bucket": ["60-70", "60-70", "70-80", "70-80", "80-90", "80-90"],
+                        "n": 100, "p_model_mean": 0.75, "hit_rate": 0.75 + gap})
+    return pd.concat(frames, ignore_index=True), rel
+
+
+def test_the_verdict_needs_all_four_parts(backtest):
+    uniform = lambda n: [(i + 0.5) / n for i in range(n)]
+    narrow = lambda n: [0.02 if i % 3 == 0 else 0.5 + 0.3 * (i % 2) for i in range(n)]
+    res, rel = _verdict_inputs(backtest, 0.05, uniform, 0.0)
+    assert backtest.market_verdict(res, rel, [2024, 2025], "rec")["passes"]
+    res, rel = _verdict_inputs(backtest, 0.05, narrow, 0.0)
+    v = backtest.market_verdict(res, rel, [2024, 2025], "rec")
+    assert not v["passes"] and not v["width_ok"] and v["beats_baseline_each_test_season"]
+    res, rel = _verdict_inputs(backtest, 0.05, uniform, -0.05)
+    v = backtest.market_verdict(res, rel, [2024, 2025], "rec")
+    assert not v["passes"] and v["width_ok"] and not v["calibration_ok"]
+    res, rel = _verdict_inputs(backtest, 0.0, uniform, 0.0)
+    assert not backtest.market_verdict(res, rel, [2024, 2025], "rec")["beats_baseline_each_test_season"]
+
+
+def test_priors_are_never_built_into_the_engine(backtest, tmp_path):
+    with pytest.raises(SystemExit, match="refusing"):
+        backtest.ensure_priors(1999, backtest.RES, build=True)
+    assert backtest.priors_cache_dir().name.startswith("priors-")

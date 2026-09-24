@@ -45,8 +45,8 @@ settings, the scorer's own joint samplers (rushing moved into
 `model.simulate_team_rush`; score_game output byte-identical). Weeks 2-18.
 Receptions, receiving yards and rushing yards all beat baseline A on both
 test seasons with intervals excluding zero and are unbiased on average, and
-all three are too NARROW: 25.5%, 23.0% and 31.3% of outcomes fall outside
-the model's p10-p90 (20% expected), and an 85% Over wins about 77-80%. The
+all three are too NARROW: 26.1%, 23.0% and 32.1% of outcomes fall outside
+the model's p10-p90 (20% expected), and an 85% Over wins about 75-81%. The
 `calibration_2025.csv` that looked calibrated predates the joint sampler; the
 round-9 code reproduces the overconfidence under the old single-season
 protocol too, so this is the model, not the harness. Width is now part of

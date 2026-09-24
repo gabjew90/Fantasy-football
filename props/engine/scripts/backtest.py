@@ -100,10 +100,31 @@ def dl(url, name):
     return dest
 
 
+def code_tag(*sources):
+    """12 hex of the code that produced a cached artifact, so a cache built by
+    older code is never read as if the current code had built it."""
+    import hashlib
+    h = hashlib.sha256()
+    for s in sources:
+        h.update(s.encode("utf-8") if isinstance(s, str) else Path(s).read_bytes().replace(b"\r\n", b"\n"))
+    return h.hexdigest()[:12]
+
+
+# Bump when make_population / make_features / the frames build change meaning.
+FEATURE_VERSION = "2"
+
+
+def priors_cache_dir():
+    """The harness's own priors, in a directory named for the builder that made
+    them (build_priors.py and the model.py it imports). Change either and the
+    next run rebuilds instead of silently reusing priors from older code."""
+    return CACHE / f"priors-{code_tag(HERE / 'build_priors.py', HERE / 'model.py')}"
+
+
 def ensure_priors(season, priors_dir, build):
     """priors_{season}_*.* in priors_dir, built by build_priors.py when missing
-    and `build` is set. The harness builds every season it needs with the
-    current builder rather than mixing in committed files built by older code."""
+    and `build` is set. Never builds into the engine's own resources: new files
+    there would change the engine hash that props/engine.lock.json pins."""
     f = Path(priors_dir) / f"priors_{season}_params.json"
     if f.exists():
         return f
@@ -111,6 +132,9 @@ def ensure_priors(season, priors_dir, build):
         sys.exit(f"priors_{season}_params.json is missing from {priors_dir}: a walk-forward test of "
                  f"{season + 1} needs the priors the live scorer would have had, which are built from "
                  f"{season}. Run build_priors.py --season {season}, or pass --build-priors.")
+    if Path(priors_dir).resolve() == RES.resolve():
+        sys.exit(f"refusing to build priors_{season} into the engine's resources ({RES}): the files would "
+                 f"change the engine hash. Leave --priors-dir unset to use the harness cache.")
     print(f"building priors for {season} into {priors_dir}", file=sys.stderr)
     subprocess.run([sys.executable, str(HERE / "build_priors.py"), "--season", str(season),
                     "--out", str(priors_dir), "--workdir", str(CACHE / "priors_work")], check=True)
@@ -138,7 +162,11 @@ def run_season(args, S, TRAIN, TEST, OUT, live):
 
     # ---- self-contained data build (round 7): derive every frame from nflverse for
     # ANY season, cached so repeat runs are instant. ----
-    frames_cache = OUT / f"_frames_{S}.pkl"
+    # Keyed by the depth-chart normaliser and FEATURE_VERSION: a frame built by
+    # older code is rebuilt, never read as current.
+    import inspect
+    data_tag = code_tag(inspect.getsource(M.normalize_depth_charts), FEATURE_VERSION)
+    frames_cache = OUT / f"_frames_{S}_{data_tag}.pkl"
     pbp_full = pd.read_csv(dl(f"{NV}/pbp/play_by_play_{S}.csv.gz", f"pbp_{S}.csv.gz"), low_memory=False)
     pbp_full = pbp_full[pbp_full.season_type == "REG"]
     if frames_cache.exists():
@@ -205,6 +233,21 @@ def run_season(args, S, TRAIN, TEST, OUT, live):
     ypc_default = float(P0.get("league_mean_ypc", 4.2)) if live else 4.2
 
     role_lookup = roles.drop_duplicates("gsis_id", keep="first").set_index("gsis_id")["slot"]
+    # LIVE MODE: the slot as the scorer sees it -- the latest pre-game depth
+    # chart at or before this week, never a later one. The single-season
+    # protocol keeps its first-slot-of-the-season convention (which can read a
+    # depth chart from after the week under test) so old results reproduce.
+    _slots_by_pid = {pid: (g.week.to_numpy(), g.slot.to_numpy())
+                     for pid, g in roles.sort_values("week", kind="stable").groupby("gsis_id")}
+
+    def slot_of(pid, W):
+        if not live:
+            return role_lookup.get(pid, "PROXY")
+        wk = _slots_by_pid.get(pid)
+        if wk is None:
+            return "PROXY"
+        i = int(np.searchsorted(wk[0], W, side="right")) - 1
+        return str(wk[1][i]) if i >= 0 else "PROXY"
 
     def make_population(weeks):
         played = set(zip(gm.team, gm.week))
@@ -248,7 +291,14 @@ def run_season(args, S, TRAIN, TEST, OUT, live):
             prior_weeks_played = [w for w in played_weeks[team] if w < W]
             for pid in grp.gsis_id:
                 elig_weeks = [w for w in prior_weeks_played if (w, team, pid) in act_set]
-                window = elig_weeks[-4:]
+                # LIVE MODE: every ACT week this season with this team, over the
+                # team's actual totals in those weeks -- score_game's evidence
+                # (weeks_act / act_weeks). The single-season protocol used his
+                # last four ACT weeks.
+                window = elig_weeks if live else elig_weeks[-4:]
+                last4 = elig_weeks[-4:]
+                cc4 = sum(tc_by_tw.get((team, w), 0.0) for w in last4)
+                ca4 = sum(float(rush_key.loc[(team, w, pid)].carries) for w in last4 if (team, w, pid) in rush_key.index)
                 tg = rc = ry = tt = ca = ry2 = cc = 0.0
                 for w in window:
                     tt += tt_by_tw.get((team, w), 0.0); cc += tc_by_tw.get((team, w), 0.0)
@@ -257,7 +307,7 @@ def run_season(args, S, TRAIN, TEST, OUT, live):
                     if (team, w, pid) in rush_key.index:
                         uu_ = rush_key.loc[(team, w, pid)]; ca += uu_.carries; ry2 += uu_.rush_yards
                 n_games = len(window)
-                slot = role_lookup.get(pid, "PROXY")
+                slot = slot_of(pid, W)
                 a_ = rec_key.loc[(team, W, pid)] if (team, W, pid) in rec_key.index else None
                 u_ = rush_key.loc[(team, W, pid)] if (team, W, pid) in rush_key.index else None
                 rows.append(dict(team=team, week=W, gsis_id=pid, slot=slot,
@@ -265,6 +315,7 @@ def run_season(args, S, TRAIN, TEST, OUT, live):
                     own_ts=(tg / tt if tt > 0 else np.nan), own_cr=(rc / tg if tg > 0 else np.nan),
                     own_ypt=(ry / tg if tg > 0 else np.nan),
                     own_rs=(ca / cc if cc > 0 else np.nan), own_ypc=(ry2 / ca if ca > 0 else np.nan),
+                    rs_last4=(ca4 / cc4 if cc4 > 0 else np.nan),
                     act_targets=int(a_.targets) if a_ is not None else 0,
                     act_receptions=float(a_.receptions) if a_ is not None else 0.0,
                     act_rec_yards=float(a_.rec_yards) if a_ is not None else 0.0,
@@ -463,13 +514,12 @@ def run_season(args, S, TRAIN, TEST, OUT, live):
 
     # Train weeks are needed only for the within-season fits (--dispersion train)
     # and the legacy --env market slopes. Live mode fits nothing on the season.
-    need_train = dispersion == "train" or args.env == "market"
     MKT_SLOPES = fit_market_slopes(TRAIN) if args.env == "market" else None
 
     # Feature caching: population and raw per-player features depend only on the season
     # and week list, NOT on --env / --opponent / K0.
     def cached_features(weeks, label):
-        key = f"{S}_{label}_{'-'.join(map(str, weeks))}"
+        key = f"{S}_{label}_{'live' if live else 'legacy'}_{data_tag}_{'-'.join(map(str, weeks))}"
         f = OUT / f"_featcache_{key}.pkl"
         if f.exists():
             return pd.read_pickle(f)
@@ -573,18 +623,22 @@ def run_season(args, S, TRAIN, TEST, OUT, live):
                                   test_act.cr.clip(lower=0.05).values, test_act.ypt.values)
     recA, ydsA = draw_block_joint(test_act, shareA, crA, yptA)
     recI, ydsI = draw_block(mu_m, ypc_m, rec_fit)
+    y_rec = test_act.act_receptions.values.astype(float)
+    y_yds = test_act.act_rec_yards.values.astype(float)
+    # The receiving PITs draw their tie-break uniforms BEFORE the rushing
+    # draws, in the order the single-season protocol always used, so its
+    # PIT numbers reproduce exactly.
+    pit_rec, pit_yds = rpit_block(recM, y_rec), rpit_block(ydsM, y_yds)
     rushM = draw_block_rush(test_act, test_act.rs.fillna(0.0).values, test_act.ypc.values)
     rushA = draw_block_rush(test_act, test_act.own_rs.fillna(test_act.rs).fillna(0.0).values,
                             test_act.own_ypc.fillna(test_act.ypc).values)
-    y_rec = test_act.act_receptions.values.astype(float)
-    y_yds = test_act.act_rec_yards.values.astype(float)
     y_rush = test_act.act_rush_yards.values.astype(float)
     # The rushing population is fixed before the game and identical for every
     # model version: RB depth-chart slots, plus anyone with 20%+ of the team's
     # carries over his last four games. QBs are out (their rush props settle on
     # kneel-downs, which this data drops; see rush_yds_v0).
     slot_s = test_act.slot.astype(str)
-    rush_pop = ((slot_s.str.startswith("RB") | (test_act.own_rs.fillna(0.0) >= 0.20))
+    rush_pop = ((slot_s.str.startswith("RB") | (test_act.rs_last4.fillna(0.0) >= 0.20))
                 & ~slot_s.str.startswith("QB")).values
     nan_ = np.full(len(test_act), np.nan)
 
@@ -598,7 +652,7 @@ def run_season(args, S, TRAIN, TEST, OUT, live):
         "mean_rush_model": np.where(rush_pop, rushM.mean(1), nan_),
         "above_med_rec": y_rec > np.median(recM, axis=1), "above_med_yds": y_yds > np.median(ydsM, axis=1),
         "above_med_rush": y_rush > np.median(rushM, axis=1),
-        "pit_rec": rpit_block(recM, y_rec), "pit_yds": rpit_block(ydsM, y_yds),
+        "pit_rec": pit_rec, "pit_yds": pit_yds,
         "pit_rush": np.where(rush_pop, rpit_block(rushM, y_rush), nan_),
         "crps_rec_model": crps_block(recM, y_rec), "crps_rec_baseA": crps_block(recA, y_rec),
         "crps_yds_model": crps_block(ydsM, y_yds), "crps_yds_baseA": crps_block(ydsA, y_yds),
@@ -676,6 +730,25 @@ def reliability_table(C):
         n=("hit", "size"), p_model_mean=("p_model", "mean"), hit_rate=("hit", "mean")).reset_index()
 
 
+def market_verdict(all_res, rel_weeks5, test, mk):
+    """The four-part bar for `live` (docs/plans/2026-09-24-yardage-harness.md):
+    beats baseline A on each test season, unbiased, the right width, and every
+    60-90% reliability bucket (weeks 5-18) within tolerance."""
+    label = MARKETS[mk][1]
+    per_test = [summarize(all_res[all_res.season == s], mk) for s in test]
+    pooled = summarize(all_res[all_res.season.isin(test)], mk)
+    beats = all(p is not None and p["ci"][0] > 0 for p in per_test)
+    unbiased = pooled is not None and not pooled["biased"]
+    width_ok = pooled is not None and abs(pooled["outside_p10_p90"] - WIDTH_TARGET) <= WIDTH_TOL + 1e-9
+    r5 = rel_weeks5[(rel_weeks5.market == label) & rel_weeks5.bucket.astype(str).isin(RELIABILITY_BUCKETS)]
+    worst_gap = float((r5.hit_rate - r5.p_model_mean).abs().max()) if len(r5) else float("nan")
+    calib_ok = bool(len(r5)) and worst_gap <= RELIABILITY_TOL
+    return {"passes": bool(beats and unbiased and width_ok and calib_ok),
+            "beats_baseline_each_test_season": beats, "unbiased": unbiased,
+            "outside_p10_p90": None if pooled is None else pooled["outside_p10_p90"],
+            "width_ok": width_ok, "worst_reliability_gap": worst_gap, "calibration_ok": calib_ok}
+
+
 def harness_report(all_res, calib, metas, args, out_base):
     tune, test = parse_weeks(args.tune), parse_weeks(args.test)
     slices = [("weeks 2-4", lambda d: d[d.week.isin(EARLY_WEEKS)]),
@@ -721,24 +794,13 @@ def harness_report(all_res, calib, metas, args, out_base):
                 L.append(f"| {gname} | {sname} | {s['n']} | {s['crps_model']:.3f} | {s['crps_baseA']:.3f} | "
                          f"{s['gain']:+.3f} ({lo:+.3f}, {hi:+.3f}){sig} | {s['actual_over_model']:.3f} | "
                          f"{s['pit_mean']:.3f} | {s['outside_p10_p90']:.3f} | {'BIASED' if s['biased'] else ''} |")
-        per_test = [summarize(all_res[all_res.season == s], mk) for s in test]
-        pooled = summarize(all_res[all_res.season.isin(test)], mk)
-        beats = all(p is not None and p["ci"][0] > 0 for p in per_test)
-        unbiased = pooled is not None and not pooled["biased"]
-        width_ok = pooled is not None and abs(pooled["outside_p10_p90"] - WIDTH_TARGET) <= WIDTH_TOL
-        r5 = rel_frames["weeks 5-18"]
-        r5 = r5[(r5.market == label) & r5.bucket.astype(str).isin(RELIABILITY_BUCKETS)]
-        worst_gap = float((r5.hit_rate - r5.p_model_mean).abs().max()) if len(r5) else float("nan")
-        calib_ok = bool(len(r5)) and worst_gap <= RELIABILITY_TOL
-        ok = beats and unbiased and width_ok and calib_ok
-        verdicts[mk] = {"passes": ok, "beats_baseline_each_test_season": beats, "unbiased": unbiased,
-                        "outside_p10_p90": None if pooled is None else pooled["outside_p10_p90"],
-                        "width_ok": width_ok, "worst_reliability_gap": worst_gap, "calibration_ok": calib_ok}
+        v = verdicts[mk] = market_verdict(all_res, rel_frames["weeks 5-18"], test, mk)
         yn = lambda b: "yes" if b else "**no**"
-        L += ["", f"**Verdict on the test seasons: {'PASSES' if ok else 'DOES NOT PASS'}** -- "
-              f"beats baseline A each season: {yn(beats)}; unbiased: {yn(unbiased)}; width "
-              f"({verdicts[mk]['outside_p10_p90'] or float('nan'):.3f} outside p10-p90): {yn(width_ok)}; calibration (worst "
-              f"60-90% gap {worst_gap:.3f}): {yn(calib_ok)}.", ""]
+        width = float("nan") if v["outside_p10_p90"] is None else v["outside_p10_p90"]
+        L += ["", f"**Verdict on the test seasons: {'PASSES' if v['passes'] else 'DOES NOT PASS'}** -- "
+              f"beats baseline A each season: {yn(v['beats_baseline_each_test_season'])}; unbiased: "
+              f"{yn(v['unbiased'])}; width ({width:.3f} outside p10-p90): {yn(v['width_ok'])}; calibration "
+              f"(worst 60-90% gap {v['worst_reliability_gap']:.3f}): {yn(v['calibration_ok'])}.", ""]
 
     # reliability, pooled test seasons, by slice: CRPS and the mean can both
     # look fine while the distribution is too narrow, and a too-narrow
@@ -902,8 +964,9 @@ def main(argv=None):
 
     if args.priors_dir is None:
         # Every season's priors come from the CURRENT builder, not a mix of
-        # committed files built by older code.
-        args.priors_dir = str(CACHE / "priors")
+        # committed files built by older code; the directory is named for the
+        # builder's code, so a changed builder rebuilds.
+        args.priors_dir = str(priors_cache_dir())
         args.build_priors = True
     Path(args.priors_dir).mkdir(parents=True, exist_ok=True)
     if args.from_results:

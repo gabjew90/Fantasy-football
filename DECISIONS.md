@@ -5510,9 +5510,9 @@ Step 1 is measurement only:
   scored for the first time. The old single-season protocol still runs.
 - **Result:** receptions, receiving yards and rushing yards all beat
   baseline A on both test seasons (intervals exclude zero) and are unbiased
-  on average -- and all three are too narrow: 25.5%, 23.0% and 31.3% of
+  on average -- and all three are too narrow: 26.1%, 23.0% and 32.1% of
   outcomes outside the model's p10-p90 (20% expected); an 85% Over wins about
-  77-80%. The miss is worst on the low side.
+  75-81%. The miss is worst on the low side.
 - **User decision: width is part of the bar, and fixing it comes first.** A
   market is `live` only if it also has 20% +/- 3 outside p10-p90 and every
   60-90% reliability bucket within 3 points. `receiving_hier_v2` moves from
@@ -5521,3 +5521,21 @@ Step 1 is measurement only:
   under the old protocol too). Nothing in the pricer changes: no market was
   eligible as a play before this either, since none is validated against
   posted lines.
+
+Code review (high), 9 of 10 fixed before merge: live mode used each player's
+last four games as this season's evidence where the scorer uses every game
+(now the full season, with the scorer's denominators -- the averages improved
+to 1.00 and the width verdict held); the cached priors, frames and features
+were keyed only by season, so a changed builder would have been read stale
+(now keyed by the code that built them, priors never built into the engine's
+own resources); relabelling the model status would have changed the
+model_state strings in record rows mid-season (the labels are kept, the
+comment carries the evidence); the rushing draws shifted the single-season
+protocol's PIT randomization (restored order); live mode read a player's
+first slot of the season, which can come from a later week (now the latest
+pre-game chart at or before the week; the single-season protocol keeps its
+convention); the four-part verdict had no test; a falsy-zero in the width
+line; dead state. Skipped, recorded as a follow-up in the plan: the slate's
+must-win pick still treats receptions and receiving yards as the calibrated
+markets. The scorer's sampler output is byte-identical; its report wording
+about model states changed.
