@@ -1,0 +1,37 @@
+# The root test suite, including the consolidation guardrails
+# (tests/test_core_guardrails.py): no new module may fetch football data or
+# compute fantasy points outside core/, and every model and projection source
+# is registered with its evidence. Until this workflow existed the root suite
+# ran only on the machine of whoever remembered to run it, so a guardrail
+# there was advice, not a check (docs/plans/2026-09-24-consolidation-plan.md).
+#
+# props/tests keeps its own gate in props-ci.yml; the capture path runs it
+# again before every capture.
+name: tests
+
+on:
+  pull_request:
+  push:
+    branches-ignore: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  root-suite:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          cache: pip
+      - run: pip install -r requirements.txt pytest
+      - name: root suite
+        run: python -m pytest tests -q

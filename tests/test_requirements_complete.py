@@ -20,7 +20,7 @@ import pathlib
 import re
 import sys
 
-PKGS = ("draftkit", "manager")
+PKGS = ("core", "draftkit", "manager")
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 
 # import name -> distribution name, where they differ

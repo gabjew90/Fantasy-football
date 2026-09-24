@@ -42,3 +42,7 @@ data/draftrig/ref_*.csv
 
 # build output: the .skill carries the API key, so it must never be committed
 dist/
+
+# core.fetch cache (docs/plans/2026-09-24-consolidation-plan.md)
+data/cache/
+experiments/out/

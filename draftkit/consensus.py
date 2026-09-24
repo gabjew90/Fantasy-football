@@ -32,6 +32,8 @@ from pathlib import Path
 
 import polars as pl
 
+from core.scoring import ScoringMissing, league_scoring, score
+
 BASE = "https://api.sleeper.app"
 POSITIONS = ("QB", "RB", "WR", "TE")
 CACHE_TTL = 12 * 3600
@@ -94,8 +96,7 @@ def score_rows(rows: list[dict], scoring: dict, games: float,
         line = {k: v for k, v in stats.items() if not k.startswith("adp_") and k != "gp"}
         if not line:
             continue
-        pts = sum(float(scoring[k]) * float(v) for k, v in line.items()
-                  if k in scoring and v is not None)
+        pts = score(line, scoring)
         p = r.get("player") or {}
         out.append({
             "sleeper_id": str(r.get("player_id")),
@@ -118,10 +119,11 @@ def score_rows(rows: list[dict], scoring: dict, games: float,
 
 
 def scoring_from_cfg(cfg) -> dict[str, float]:
-    block = cfg.get("scoring") or (cfg.get("expected") or {}).get("scoring") or {}
-    if not block:
-        raise ConsensusUnavailable("league yaml carries no scoring block")
-    return {k: float(v) for k, v in block.items()}
+    # ConsensusUnavailable, not ScoringMissing: callers degrade on this type
+    try:
+        return league_scoring(cfg)
+    except ScoringMissing as e:
+        raise ConsensusUnavailable(str(e)) from e
 
 
 def load_consensus(cfg, getter=_get_json, ttl: int = CACHE_TTL) -> tuple[pl.DataFrame, dict]:

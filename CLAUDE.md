@@ -25,6 +25,29 @@
   docs/plans/2026-08-29-draft-engine-v2-plan.md — CLV, historical sim,
   input accuracy. Self-graded boards validate nothing.
 
+## Architecture (consolidation since 2026-09-24)
+The plan is docs/plans/2026-09-24-consolidation-plan.md. tests/test_core_guardrails.py
+enforces the structural rules in CI (the fetch and scoring ratchets, registry
+completeness, experiment expiry). The rest -- replace rather than add, knobs in
+yaml, promotion on a measured delta -- are review rules: no test catches them,
+so the PR review must.
+- **One data layer.** nflverse, Sleeper, the ID map and prop lines are read
+  through `core.fetch` (age-checked, recorded in a `core.manifest.Manifest`).
+  Players are joined by ID through `core.ids`, never by name alone. Fantasy
+  points come from `core.scoring` and the league yaml. A new module that
+  fetches or scores on its own fails CI; the allowlists of old offenders may
+  only shrink.
+- **Every model and projection source is registered** in `core/registry.py`
+  with a status (live / provisional / shadow / deprecated) and its evidence.
+  No evidence, no `live`. `provisional` says why and what would validate it.
+- **Improve by replacing, not adding.** A new version of a model goes in the
+  same place behind the same interface, runs in `shadow`, and is promoted only
+  on a measured harness delta; the old version is deleted in the promoting PR.
+  A methodology overhaul starts with a short design note naming the hypothesis
+  and the metric. Knobs live in yaml, so a re-tune is a config diff plus a report.
+- **No parallel engines.** One-off studies go in `experiments/` (outputs
+  gitignored) and are promoted or deleted within 30 days.
+
 ## Record integrity
 - `date_checked` on an override means the FACT was verified against a dated
   source on that date. Not edited, ported, or rescaled. Rows are `candidate`

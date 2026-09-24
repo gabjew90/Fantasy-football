@@ -14,6 +14,8 @@ from pathlib import Path
 
 import polars as pl
 
+from core.scoring import score
+
 from .sleeper import BASE, get_json
 
 ALL_TEAMS = {
@@ -120,10 +122,9 @@ def nfl_state(getter=get_json) -> dict:
             "season_type": s.get("season_type", "regular")}
 
 
-def score_projection(stats: dict, scoring: dict) -> float:
-    """Score a Sleeper stat-projection dict with the league's own settings."""
-    return sum(float(scoring[k]) * float(v)
-               for k, v in (stats or {}).items() if k in scoring and v is not None)
+# The one scoring function lives in core.scoring; this name is kept for the
+# callers that import it from here.
+score_projection = score
 
 
 def weekly_projections(scoring: dict, season: str, week: int,

@@ -14,85 +14,25 @@ from __future__ import annotations
 
 import polars as pl
 
-# League scoring (verified against Sleeper scoring_settings 2026-08-19).
-# Applied to nflverse weekly stat columns.
-SCORING = {
-    "passing_yards": 0.04,
-    "passing_tds": 4.0,
-    "passing_interceptions": -1.0,
-    "rushing_yards": 0.1,
-    "rushing_tds": 6.0,
-    "receptions": 1.0,
-    "receiving_yards": 0.1,
-    "receiving_tds": 6.0,
-    "passing_2pt_conversions": 2.0,
-    "rushing_2pt_conversions": 2.0,
-    "receiving_2pt_conversions": 2.0,
-    "sack_fumbles_lost": -2.0,
-    "rushing_fumbles_lost": -2.0,
-    "receiving_fumbles_lost": -2.0,
-    "special_teams_tds": 6.0,
-}
+from core.scoring import NFLVERSE_BASE
+from core.scoring import fantasy_points_expr, league_scoring, nflverse_weights  # noqa: F401
 
-
-# league-yaml scoring keys (Sleeper-style) -> nflverse weekly stat columns
-_YAML_TO_NFLVERSE = {
-    "pass_yd": "passing_yards", "pass_td": "passing_tds",
-    "pass_int": "passing_interceptions", "rush_yd": "rushing_yards",
-    "rush_td": "rushing_tds", "rec": "receptions", "rec_yd": "receiving_yards",
-    "rec_td": "receiving_tds",
-    "pass_2pt": "passing_2pt_conversions", "rush_2pt": "rushing_2pt_conversions",
-    "rec_2pt": "receiving_2pt_conversions", "st_td": "special_teams_tds",
-    # fumbles map to all three nflverse fumble columns
-}
+# A copy, not an alias: a caller mutating this name must not change the base
+# every league's nflverse weights are laid over.
+SCORING = dict(NFLVERSE_BASE)
 
 
 def scoring_from_cfg(cfg) -> dict[str, float]:
-    """League scoring for the stats dataset. A league yaml may carry a
-    `scoring:` block (Sleeper-style keys); without one, the historic
-    full-PPR constants apply (Omnibeta's verified settings). Keys nflverse
-    has no column for (e.g. 40+ yard TD bonuses) are ignored here — that
-    is a documented approximation, not silent: see the league yaml."""
-    block = None
-    if cfg is not None:
-        block = cfg.get("scoring") or (cfg.get("expected") or {}).get("scoring")
-    if cfg is not None and not block:
-        raise ValueError(
-            "league yaml carries no scoring (add scoring: or expected.scoring) — "
-            "refusing the silent full-PPR fallback (CLAUDE.md: league facts live "
-            "in leagues/<name>.yaml)")
-    if not block:
+    """League scoring for the stats dataset, as nflverse column weights.
+
+    With no cfg, Omnibeta's verified full-PPR constants (core.scoring
+    NFLVERSE_BASE). With a cfg, its scoring block is required -- a missing
+    one raises rather than falling back (CLAUDE.md: league facts live in
+    leagues/<name>.yaml). Keys nflverse has no column for (e.g. 40+ yard TD
+    bonuses) are dropped: a documented approximation, see the league yaml."""
+    if cfg is None:
         return dict(SCORING)
-    return nflverse_weights(block, base=SCORING)
-
-
-def nflverse_weights(block: dict, base: dict[str, float] | None = None) -> dict[str, float]:
-    """Sleeper-style scoring keys -> nflverse weekly stat columns.
-
-    The keys Sleeper uses (`pass_yd`, `sack`, `def_td`, `bonus_rec_te`, ...)
-    are NOT nflverse column names, and handing them to `fantasy_points_expr`
-    raises ColumnNotFoundError the first time the weekly frame is non-empty
-    -- which for a function shipped in the preseason was week 1. Keys
-    nflverse has no column for (kicking, team defense, bonuses) are dropped;
-    that is the documented approximation, not silent.
-    """
-    out = dict(base or {})
-    for k, v in (block or {}).items():
-        col = _YAML_TO_NFLVERSE.get(k)
-        if col:
-            out[col] = float(v)
-        elif k == "fum_lost":
-            for c in ("sack_fumbles_lost", "rushing_fumbles_lost",
-                      "receiving_fumbles_lost"):
-                out[c] = float(v)
-    return out
-
-
-def fantasy_points_expr(scoring: dict[str, float] | None = None) -> pl.Expr:
-    expr = pl.lit(0.0)
-    for col, w in (scoring or SCORING).items():
-        expr = expr + pl.col(col).fill_null(0.0).cast(pl.Float64) * w
-    return expr.alias("fpts")
+    return nflverse_weights(league_scoring(cfg), base=SCORING)
 
 
 SEASON_GAMES = 17  # NFL regular-season length; 16 is the projection convention

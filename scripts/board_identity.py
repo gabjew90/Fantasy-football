@@ -59,7 +59,7 @@ def parse_set(items: list[str]) -> dict:
 
 def build(league: str, overrides: dict) -> pl.DataFrame:
     import draftkit.consensus as consensus
-    import draftkit.ids as ids
+    import core.ids as ids
     from draftkit.projections import PROJECTION_FNS
     from draftkit.tiers import TIERS_COLUMNS, finish_board
     from draftkit.tilts import apply_tilts, prior_top5_by_pos

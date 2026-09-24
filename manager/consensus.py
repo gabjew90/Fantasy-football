@@ -31,6 +31,8 @@ import statistics
 import time as _time
 from pathlib import Path
 
+from core.scoring import league_scoring, score
+
 log = logging.getLogger("manager")
 
 TTL = 12 * 3600
@@ -95,11 +97,10 @@ def _positions(index) -> dict[str, str]:
 
 
 def _scoring(cfg) -> dict:
-    return dict(cfg.get("scoring") or (cfg.get("expected") or {}).get("scoring") or {})
+    return league_scoring(cfg, required=False)
 
 
-def _score(line: dict, scoring: dict) -> float:
-    return sum(scoring.get(k, 0.0) * v for k, v in (line or {}).items() if v is not None)
+_score = score
 
 
 def _sleeper(scoring: dict, season) -> tuple[dict[str, float], str | None]:

@@ -5208,3 +5208,42 @@ it has run (the per-week marker already stops a second run), through
 Thursday 12:00 UTC; a due capture takes the tick first, since a missed close
 cannot be recovered and a settle can wait one tick. Week 2 is settled by a
 dispatched run after this merges.
+
+## 2026-09-24 (92) -- consolidation step 1: core/, the registry, and guardrails that run in CI
+
+The user's goal (plan: docs/plans/2026-09-24-consolidation-plan.md): serve
+discretionary props and discretionary fantasy decisions from one data layer,
+four models, one CLI and one skill, and make improvement mean replacing a
+versioned component rather than adding a parallel engine. The inventory behind
+it found play-by-play fetched in six places with no shared cache, fantasy
+scoring implemented six times, name normalizers in five, and nine things
+producing numbers across three packages.
+
+Step 1 is a refactor: no output changes.
+- `core/scoring.py` is the one scoring function. seasondata.score_projection,
+  manager.consensus._score and draftkit.consensus's inline sum are now the same
+  object; draftkit.dataset re-exports the nflverse column map; a sixth copy
+  found by the new guardrail in scripts/projection_backtest.py moved over too.
+  The manager keeps its historic "no scoring block -> unpriced" behaviour behind
+  an explicit `required=False` until it moves onto fantasy/.
+- `core/ids.py` is draftkit/ids.py, moved (draftkit.ids re-exports it), plus
+  `sleeper_gsis`: Sleeper id -> nflverse gsis id. Live on 2026-09-24 it mapped
+  7,403 players, 1,231 of them only through the gsis_id Sleeper carries (the
+  DynastyProcess map lacks many rookies), covered 737 of 816 active skill
+  players (the rest have no NFL snaps), and listed four disagreements -- two a
+  mutual swap -- that name matching would have hidden.
+- `core/fetch.py` + `core/manifest.py`: the age-checked, .part-then-rename,
+  stale-but-loud download from props-v1.17, generalised, recording every read.
+  The ID map now loads through it. The fantasy gate will read the manifest
+  instead of a hand-written receipt.
+- `core/registry.py`: every model and projection source with a status. Honest
+  labels: rush_yds_v0, the td_market blend weight and the rest-of-season
+  consensus are `provisional` (in use, unvalidated, with what would validate
+  them); model_projection, xfp and the props fantasy export are `deprecated`
+  with the step that deletes them.
+- Guardrails (tests/test_core_guardrails.py): no new module may fetch football
+  data or re-implement scoring outside core/ (ratchet allowlists that may only
+  shrink); the registry must be complete; experiments/ carry an expiry date.
+- `.github/workflows/tests.yml` runs the root suite on every PR. Until now it
+  ran only on whoever's machine, so a guardrail there would have been advice.
+- CLAUDE.md gains the architecture rules.
