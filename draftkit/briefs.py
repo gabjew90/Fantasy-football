@@ -101,7 +101,7 @@ class SleeperSource:
         return get_transactions(self.client, self.cfg.league_id, week)
 
 
-def build_context(cfg, week: int | None = None, source=None) -> dict:
+def build_context(cfg, week: int | None = None, source=None, write_state: bool = True) -> dict:
     """One fetch pass; every downstream brief reads from this dict.
 
     `week` overrides the live NFL week. It exists so a week-dependent change
@@ -244,7 +244,10 @@ def build_context(cfg, week: int | None = None, source=None) -> dict:
     txns: list[dict] | None = None
     try:
         txns = source.transactions(week)
-        seasondata.append_transactions(cfg, txns)
+        # write_state=False: a read-only caller (the `nfl fantasy` commands, and
+        # any chat run) must not append to the tracked transactions log
+        if write_state:
+            seasondata.append_transactions(cfg, txns)
     except Exception:  # noqa: BLE001
         stale.append("transactions")
     # A source's own warnings (a scoring block that disagrees with the yaml,

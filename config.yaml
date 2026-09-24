@@ -275,3 +275,16 @@ inseason:
     speculative: [0.05, 0.12]
     streamer: [0.01, 0.03]
     max_week_commit: 0.80
+
+# The fantasy decision commands (nfl fantasy ...; docs/plans/2026-09-24-consolidation-plan.md).
+# Knobs here are tuning, not code: a change is a config diff plus a harness report.
+fantasy:
+  # weekly_blend_v0 (PROVISIONAL, core/registry.py): the weight on market_points in
+  # the weekly mean, where the player has a FULL market board. The user's start/sit
+  # framework: prefer the market early, when one or two games cannot establish a
+  # role but the book has priced one; let the projection carry it by mid-season.
+  # Linear from `week1` in week 1 to 0 at `zero_by_week`. Not measured -- both
+  # inputs are recorded with every decision so the ledger can grade the blend.
+  market_weight:
+    week1: 0.6
+    zero_by_week: 9

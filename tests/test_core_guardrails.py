@@ -134,3 +134,12 @@ def test_every_projection_source_is_registered():
         rel = f.relative_to(ROOT).as_posix()
         assert m, f"{rel} has no NAME"
         assert m.group(1) in names, f"{rel} ({m.group(1)}) is not in core/registry.py"
+
+
+def test_core_imports_nothing_above_it():
+    """core/ is the data layer everything sits on; if it imports the league,
+    manager, draft or props code, the layers stop being layers."""
+    bad = re.compile(r"^\s*(from|import)\s+(draftkit|manager|fantasy|props)\b", re.M)
+    for f in sorted((ROOT / "core").glob("*.py")):
+        hits = bad.findall(f.read_text(encoding="utf-8"))
+        assert not hits, f"core/{f.name} imports {sorted({h[1] for h in hits})}"

@@ -47,6 +47,10 @@ def from_rows(rows: list, scoring: dict) -> SourceResult:
     return out
 
 
-def project(season: int, week: int, scoring: dict, *, cache_dir=None, manifest=None) -> SourceResult:
-    path = F.sleeper_projections(season, week, cache_dir=cache_dir, manifest=manifest)
+ALL_POSITIONS = ("QB", "RB", "WR", "TE", "K", "DEF")
+
+
+def project(season: int, week: int, scoring: dict, *, positions=ALL_POSITIONS, cache_dir=None,
+            manifest=None) -> SourceResult:
+    path = F.sleeper_projections(season, week, positions=positions, cache_dir=cache_dir, manifest=manifest)
     return from_rows(json.loads(path.read_text(encoding="utf-8")), scoring)

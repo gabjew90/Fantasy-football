@@ -143,12 +143,15 @@ tuning item.
 2. Done: distribution contract; `fantasy/sources/` with `sleeper_weekly` and
    `market_points` (migrated); the measured range model `dispersion_v0`.
    The rest-of-season consensus moves in with step 4, which first needs it.
-3. `nfl` CLI with `status`, `fantasy lineup` (existing optimizer),
-   `fantasy scenario` (existing absence path); the gate reads the manifest;
-   the ledger writes a row per decision.
+3. Done: `nfl` CLI with `status`, `fantasy lineup` (existing optimizer,
+   P(win)-maximising swaps), `fantasy scenario` (the engine's absence path);
+   the gate reads the manifest; `--record` writes a ledger row (scheduled
+   runs only; chat is read-only).
 4. `fantasy waiver` on `marginal` plus the evidence table and the framework
    builds; horizon as an argument.
-5. One skill; the two retired.
+5. One skill; the two retired. The bootstrap fetches the whole repo at the tag (core/, fantasy/,
+   draftkit/, manager/ and the props engine, not only props/engine), and passes the skill's Yahoo
+   credentials through as this repo's env vars and token file, so Keefamania reads live from chat.
 6. Props adopts `core` behind byte-identical checks; draft moves under
    `draft/`; retired paths deleted; Actions slimmed to props capture/settle,
    the Tuesday brief and ledger grading.

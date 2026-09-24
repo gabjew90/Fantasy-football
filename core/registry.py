@@ -68,8 +68,11 @@ COMPONENTS: tuple[Component, ...] = (
                    "real weight once 300 v1 calls settle",
               markets=("player_anytime_td",)),
     Component("props_fantasy_export", "projection_source", "props/engine/scripts/score_game.py",
-              "deprecated", retire_in="step 3: becomes the scoring step of `fantasy scenario`",
-              note="fantasy_points_*.csv from the joint simulation; no code consumer"),
+              "provisional",
+              note="fantasy points from the props engine's joint simulation (fantasy_points_*.csv); since "
+                   "step 3 the MODEL answer of `nfl fantasy scenario`, keyed by gsis_id. Never backtested as "
+                   "fantasy points: a walk-forward against weekly actuals would validate it. Passing is not "
+                   "modelled, so a QB row is rushing only"),
 
     # ---------------------------------------------------------- fantasy
     Component("sleeper_weekly", "projection_source", "fantasy/sources/sleeper_weekly.py", "provisional",
@@ -90,6 +93,11 @@ COMPONENTS: tuple[Component, ...] = (
                    "(Keefamania) of outcomes and beat a bucket-scaled normal by ~2% on pinball loss; "
                    "QB is no better than that baseline and its low tail runs heavy -- stated with every "
                    "QB range"),
+    Component("weekly_blend_v0", "projection_source", "fantasy/weekly.py", "provisional",
+              note="the weekly mean `nfl fantasy lineup` optimises: Sleeper, blended with market_points "
+                   "where the player has a full market board, at a weight decaying from 0.6 in week 1 to 0 "
+                   "by week 9 (config.yaml fantasy.market_weight). The user's framework, not a measurement: "
+                   "every decision records both inputs, so the ledger can grade the blend against each"),
     Component("rest_of_season_consensus", "projection_source", "manager/consensus.py",
               "provisional",
               note="Sleeper + ESPN + FantasyPros rescaled to a common basis; the ledger "

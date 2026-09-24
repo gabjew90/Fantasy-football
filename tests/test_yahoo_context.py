@@ -261,7 +261,7 @@ def test_the_manager_context_dispatches_on_platform(monkeypatch):
     from manager import context
     seen = {}
 
-    def fake_build(cfg, week=None, source=None):
+    def fake_build(cfg, week=None, source=None, write_state=True):
         seen["platform"] = getattr(source, "platform", "sleeper")
         raise RuntimeError("stop here")
 

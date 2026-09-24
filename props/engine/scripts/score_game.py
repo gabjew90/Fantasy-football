@@ -299,9 +299,13 @@ def fantasy_table(M, sims, V1TD, td_lambda, scoring: dict, rng, n_sim: int) -> p
         td_pts = scoring["rec_td"] if m.pos in ("WR", "TE") else scoring["rush_td"]
         pts = (sm["receptions"] * scoring["rec"] + sm["rec_yards"] * scoring["rec_yd"]
                + sm["rush_yards"] * scoring["rush_yd"] + tds[m.gsis_id] * td_pts)
-        rows.append({"player": m["name"], "team": m.team, "pos": m.pos, "slot": m.slot,
+        # gsis_id: the fantasy scenario command joins on it, never on the name;
+        # p10-p90 are the percentiles the fantasy projection contract uses
+        rows.append({"player": m["name"], "gsis_id": m.gsis_id, "team": m.team, "pos": m.pos, "slot": m.slot,
                      "median": float(np.median(pts)), "p20": float(np.percentile(pts, 20)),
                      "p80": float(np.percentile(pts, 80)), "mean": float(pts.mean()),
+                     "p10": float(np.percentile(pts, 10)), "p25": float(np.percentile(pts, 25)),
+                     "p75": float(np.percentile(pts, 75)), "p90": float(np.percentile(pts, 90)),
                      "p_td": float((tds[m.gsis_id] > 0).mean()),
                      "note": "rushing only: passing not modelled" if m.pos == "QB" else ""})
     return pd.DataFrame(rows).sort_values("median", ascending=False)
