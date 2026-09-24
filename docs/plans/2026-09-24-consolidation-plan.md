@@ -152,7 +152,8 @@ tuning item.
    rule and the role cause (4b). Still open from section 6: the opponent-
    adjusted matchup read (weighted low by design) and the role-DURATION
    probability (a base-rate study), both to be built behind the registry.
-5. One skill; the two retired. The bootstrap fetches the whole repo at the tag (core/, fantasy/,
+5. Done in code (nfl-v1.0): `skill/` (release spec, bootstrap, build) and `CHAT.md`;
+   the user builds and installs the skill, then retires the two old ones. One skill; the two retired. The bootstrap fetches the whole repo at the tag (core/, fantasy/,
    draftkit/, manager/ and the props engine, not only props/engine), and passes the skill's Yahoo
    credentials through as this repo's env vars and token file, so Keefamania reads live from chat.
 6. Props adopts `core` behind byte-identical checks; draft moves under

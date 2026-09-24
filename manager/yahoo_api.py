@@ -55,8 +55,9 @@ def _basic() -> dict[str, str]:
 
 def auth_url() -> str:
     cid, _ = _creds()
-    return (f"{AUTH_URL}?client_id={cid}&redirect_uri=oob&response_type=code"
-            f"&language=en-us")
+    from urllib.parse import urlencode
+    return f"{AUTH_URL}?" + urlencode({"client_id": cid, "redirect_uri": redirect_uri(),
+                                       "response_type": "code", "language": "en-us"})
 
 
 def _save(tok: dict, path: Path = TOKEN_PATH) -> dict:
@@ -93,8 +94,16 @@ def _token_call(data: dict) -> dict:
     return r.json()
 
 
+def redirect_uri() -> str:
+    """The redirect URI the app was registered with. This repo's app uses the
+    out-of-band "oob". The chat skill authenticates with a different app whose
+    registered URI is whatever its bundle says; the skill's bootstrap passes it
+    as YAHOO_REDIRECT_URI so the refresh names the URI that app holds."""
+    return os.environ.get("YAHOO_REDIRECT_URI") or "oob"
+
+
 def exchange(code: str, path: Path = TOKEN_PATH) -> dict:
-    tok = _token_call({"grant_type": "authorization_code", "redirect_uri": "oob",
+    tok = _token_call({"grant_type": "authorization_code", "redirect_uri": redirect_uri(),
                        "code": code.strip()})
     return _save(tok, path)
 
@@ -103,7 +112,7 @@ def refresh(path: Path = TOKEN_PATH) -> dict:
     tok = _load(path)
     if not tok or not tok.get("refresh_token"):
         raise YahooAuthError("no refresh token on disk -- run the authorization flow first")
-    new = _token_call({"grant_type": "refresh_token", "redirect_uri": "oob",
+    new = _token_call({"grant_type": "refresh_token", "redirect_uri": redirect_uri(),
                        "refresh_token": tok["refresh_token"]})
     new.setdefault("refresh_token", tok["refresh_token"])
     return _save(new, path)
