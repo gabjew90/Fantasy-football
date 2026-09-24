@@ -28,6 +28,9 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
       - uses: actions/setup-python@v5
         with:
           python-version: "3.10"
@@ -35,3 +38,8 @@ jobs:
       - run: pip install -r requirements.txt pytest
       - name: root suite
         run: python -m pytest tests -q
+      # The release chat runs: the tag nfl.lock.json names (or HEAD, before the
+      # tag is cut on the merge commit) must hash to the lock. Checked against
+      # the TAG, not the working tree -- main moves ahead of the release freely.
+      - name: release lock
+        run: python skill/release.py check-lock

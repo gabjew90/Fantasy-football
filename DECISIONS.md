@@ -5438,3 +5438,38 @@ best-by-mean lineup leaves out); the consensus refetched three sources every
 run (cached locally for 12 hours, since the manager's store is committed state);
 and a team behind ranked by this week's p90 instead of rest-of-season upside
 (now the most optimistic source's rate).
+
+## 2026-09-24 (97) -- consolidation step 5: one chat skill, `nfl-research`
+
+The two chat skills (nfl-prop-research, nfl-fantasy-research) become one
+harness. What chat runs is a RELEASE: the files `skill/release.py` defines
+(core/, fantasy/, draftkit/, manager/, props/engine/, leagues/, nfl.py,
+config.yaml, CHAT.md and the tracked data they read -- 178 files, 3.4 MB),
+hashed with the props algorithm's rules (LF-normalised, byte-sorted paths),
+locked in `nfl.lock.json` and tagged `nfl-v1.0`. The props engine lock stays
+as it is; props capture in Actions still runs `props/engine.lock.json`.
+
+- **The routing and output rules live in the repo** (`CHAT.md`, shipped in
+  the release), so a rule change ships with a tag and never needs a
+  reinstall. The installed SKILL.md says only: run the bootstrap, read
+  `$REPO_DIR/CHAT.md`, disclose the release.
+- **Credentials pass through, never through the repo.** The bootstrap copies
+  the skill's `credential.env` to where the props engine looks and turns the
+  Yahoo bundle into `YAHOO_*` variables in a `.env` beside the release (both
+  outside the hashed file set, so a cached release still verifies). Yahoo
+  checks a refresh against the registered redirect URI, and the chat app's is
+  not this repo's "oob", so `manager/yahoo_api.redirect_uri()` reads
+  `YAHOO_REDIRECT_URI` first. Keefamania now reads live from chat, which also
+  ends its stale-sync CONDITIONAL there.
+- **The lock is checked against its tag in CI** (`release.py check-lock`),
+  not against the working tree: main moves ahead of the release freely, and a
+  PR that changes fantasy code does not have to bump the lock. Before the tag
+  is cut, HEAD stands in for it.
+- **The vendored fallback is the release as an archive** (the uploader takes
+  one SKILL.md per package, and the release carries the props engine's).
+  Any fetch or verify failure runs it and says so on the first reply line.
+
+Measured before merge: a clean copy of the release file set, with nothing
+else from the repo, ran `nfl status`, `fantasy lineup --league omnibeta` and
+`fantasy lineup --league keefamania` (live Yahoo, gate PASS). Chat itself is
+tested after the user builds and installs the skill.
