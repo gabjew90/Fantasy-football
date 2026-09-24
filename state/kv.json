@@ -26,14 +26,14 @@
     }
    },
    "10213": {
-    "mean": 133.0,
+    "mean": 133.4,
     "n": 3,
     "per_source": {
-     "espn": 150.1,
+     "espn": 151.4,
      "fantasypros": 122.9,
      "sleeper": 125.9
     },
-    "spread": 27.2,
+    "spread": 28.5,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -41,13 +41,13 @@
     }
    },
    "10214": {
-    "mean": 17.6,
+    "mean": 17.4,
     "n": 2,
     "per_source": {
-     "espn": 29.4,
+     "espn": 28.9,
      "sleeper": 5.9
     },
-    "spread": 23.5,
+    "spread": 23.0,
     "weights": {
      "espn": 1.0,
      "sleeper": 1.0
@@ -76,14 +76,14 @@
     }
    },
    "10218": {
-    "mean": 66.3,
+    "mean": 67.5,
     "n": 3,
     "per_source": {
-     "espn": 111.9,
+     "espn": 115.6,
      "fantasypros": 50.3,
      "sleeper": 36.7
     },
-    "spread": 75.2,
+    "spread": 78.9,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -91,14 +91,14 @@
     }
    },
    "10219": {
-    "mean": 94.6,
+    "mean": 94.7,
     "n": 3,
     "per_source": {
-     "espn": 62.4,
+     "espn": 62.7,
      "fantasypros": 88.8,
      "sleeper": 132.5
     },
-    "spread": 70.1,
+    "spread": 69.8,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -106,10 +106,10 @@
     }
    },
    "10222": {
-    "mean": 146.2,
+    "mean": 135.6,
     "n": 3,
     "per_source": {
-     "espn": 150.6,
+     "espn": 119.0,
      "fantasypros": 90.3,
      "sleeper": 197.6
     },
@@ -121,10 +121,10 @@
     }
    },
    "10225": {
-    "mean": 8.0,
+    "mean": 8.1,
     "n": 1,
     "per_source": {
-     "espn": 8.0
+     "espn": 8.1
     },
     "spread": 0.0,
     "weights": {
@@ -132,14 +132,14 @@
     }
    },
    "10226": {
-    "mean": 71.1,
+    "mean": 65.5,
     "n": 3,
     "per_source": {
-     "espn": 64.3,
+     "espn": 47.6,
      "fantasypros": 57.7,
      "sleeper": 91.3
     },
-    "spread": 33.6,
+    "spread": 43.7,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -158,10 +158,10 @@
     }
    },
    "10229": {
-    "mean": 205.3,
+    "mean": 205.9,
     "n": 3,
     "per_source": {
-     "espn": 199.1,
+     "espn": 200.9,
      "fantasypros": 189.5,
      "sleeper": 227.3
     },
@@ -173,27 +173,27 @@
     }
    },
    "10231": {
-    "mean": 29.9,
+    "mean": 29.7,
     "n": 2,
     "per_source": {
-     "espn": 17.8,
+     "espn": 17.5,
      "sleeper": 41.9
     },
-    "spread": 24.1,
+    "spread": 24.4,
     "weights": {
      "espn": 1.0,
      "sleeper": 1.0
     }
    },
    "10232": {
-    "mean": 165.8,
+    "mean": 166.3,
     "n": 3,
     "per_source": {
-     "espn": 183.3,
+     "espn": 185.0,
      "fantasypros": 148.0,
      "sleeper": 166.0
     },
-    "spread": 35.3,
+    "spread": 37.0,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -201,10 +201,10 @@
     }
    },
    "10234": {
-    "mean": 25.6,
+    "mean": 25.9,
     "n": 1,
     "per_source": {
-     "espn": 25.6
+     "espn": 25.9
     },
     "spread": 0.0,
     "weights": {
@@ -225,14 +225,14 @@
     }
    },
    "10236": {
-    "mean": 192.6,
+    "mean": 187.1,
     "n": 3,
     "per_source": {
-     "espn": 195.3,
-     "fantasypros": 219.0,
+     "espn": 191.2,
+     "fantasypros": 206.6,
      "sleeper": 163.6
     },
-    "spread": 55.4,
+    "spread": 43.0,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -240,27 +240,27 @@
     }
    },
    "10444": {
-    "mean": 18.1,
+    "mean": 18.9,
     "n": 2,
     "per_source": {
-     "fantasypros": 29.6,
+     "fantasypros": 31.1,
      "sleeper": 6.6
     },
-    "spread": 23.0,
+    "spread": 24.5,
     "weights": {
      "fantasypros": 1.0,
      "sleeper": 1.0
     }
    },
    "10859": {
-    "mean": 198.1,
+    "mean": 196.7,
     "n": 3,
     "per_source": {
-     "espn": 196.3,
+     "espn": 192.2,
      "fantasypros": 201.4,
      "sleeper": 196.5
     },
-    "spread": 5.1,
+    "spread": 9.2,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -279,23 +279,23 @@
     }
    },
    "10871": {
-    "mean": 25.1,
+    "mean": 24.9,
     "n": 2,
     "per_source": {
-     "espn": 18.8,
+     "espn": 18.4,
      "sleeper": 31.4
     },
-    "spread": 12.6,
+    "spread": 13.0,
     "weights": {
      "espn": 1.0,
      "sleeper": 1.0
     }
    },
    "10955": {
-    "mean": 112.2,
+    "mean": 111.4,
     "n": 1,
     "per_source": {
-     "fantasypros": 112.2
+     "fantasypros": 111.4
     },
     "spread": 0.0,
     "weights": {
@@ -314,10 +314,10 @@
     }
    },
    "11056": {
-    "mean": 32.8,
+    "mean": 38.0,
     "n": 1,
     "per_source": {
-     "espn": 32.8
+     "espn": 38.0
     },
     "spread": 0.0,
     "weights": {
@@ -325,10 +325,10 @@
     }
    },
    "11058": {
-    "mean": 40.7,
+    "mean": 100.1,
     "n": 1,
     "per_source": {
-     "fantasypros": 40.7
+     "fantasypros": 100.1
     },
     "spread": 0.0,
     "weights": {
@@ -336,10 +336,10 @@
     }
    },
    "11157": {
-    "mean": 0.6,
+    "mean": 8.6,
     "n": 1,
     "per_source": {
-     "espn": 0.6
+     "espn": 8.6
     },
     "spread": 0.0,
     "weights": {
@@ -347,23 +347,23 @@
     }
    },
    "11168": {
-    "mean": 16.7,
+    "mean": 19.6,
     "n": 2,
     "per_source": {
-     "espn": 9.3,
+     "espn": 15.0,
      "sleeper": 24.1
     },
-    "spread": 14.8,
+    "spread": 9.1,
     "weights": {
      "espn": 1.0,
      "sleeper": 1.0
     }
    },
    "11199": {
-    "mean": 50.1,
+    "mean": 50.2,
     "n": 3,
     "per_source": {
-     "espn": 57.3,
+     "espn": 57.6,
      "fantasypros": 34.9,
      "sleeper": 58.0
     },
@@ -375,13 +375,13 @@
     }
    },
    "11201": {
-    "mean": 26.1,
+    "mean": 25.6,
     "n": 2,
     "per_source": {
-     "espn": 47.8,
+     "espn": 46.9,
      "sleeper": 4.4
     },
-    "spread": 43.4,
+    "spread": 42.5,
     "weights": {
      "espn": 1.0,
      "sleeper": 1.0
@@ -401,16 +401,14 @@
     }
    },
    "11256": {
-    "mean": 15.6,
-    "n": 3,
+    "mean": 15.2,
+    "n": 2,
     "per_source": {
-     "espn": 16.3,
-     "fantasypros": 18.0,
+     "fantasypros": 17.8,
      "sleeper": 12.5
     },
-    "spread": 5.5,
+    "spread": 5.3,
     "weights": {
-     "espn": 1.0,
      "fantasypros": 1.0,
      "sleeper": 1.0
     }
@@ -438,10 +436,10 @@
     }
    },
    "11304": {
-    "mean": 3.5,
+    "mean": 3.4,
     "n": 1,
     "per_source": {
-     "espn": 3.5
+     "espn": 3.4
     },
     "spread": 0.0,
     "weights": {
@@ -460,10 +458,10 @@
     }
    },
    "11370": {
-    "mean": 52.9,
+    "mean": 53.1,
     "n": 3,
     "per_source": {
-     "espn": 54.8,
+     "espn": 55.3,
      "fantasypros": 47.6,
      "sleeper": 56.3
     },
@@ -497,10 +495,10 @@
     }
    },
    "11421": {
-    "mean": 21.7,
+    "mean": 24.5,
     "n": 1,
     "per_source": {
-     "espn": 21.7
+     "espn": 24.5
     },
     "spread": 0.0,
     "weights": {
@@ -508,27 +506,27 @@
     }
    },
    "11433": {
-    "mean": 17.4,
+    "mean": 17.1,
     "n": 2,
     "per_source": {
-     "espn": 29.1,
+     "espn": 28.5,
      "sleeper": 5.7
     },
-    "spread": 23.4,
+    "spread": 22.8,
     "weights": {
      "espn": 1.0,
      "sleeper": 1.0
     }
    },
    "11435": {
-    "mean": 53.1,
+    "mean": 53.2,
     "n": 3,
     "per_source": {
-     "espn": 30.0,
+     "espn": 30.2,
      "fantasypros": 72.9,
      "sleeper": 56.5
     },
-    "spread": 42.9,
+    "spread": 42.7,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -539,11 +537,11 @@
     "mean": 13.7,
     "n": 3,
     "per_source": {
-     "espn": 24.1,
+     "espn": 24.2,
      "fantasypros": 9.5,
      "sleeper": 7.5
     },
-    "spread": 16.6,
+    "spread": 16.7,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -551,23 +549,23 @@
     }
    },
    "11510": {
-    "mean": 16.5,
+    "mean": 16.6,
     "n": 2,
     "per_source": {
-     "espn": 24.0,
+     "espn": 24.1,
      "sleeper": 9.0
     },
-    "spread": 15.0,
+    "spread": 15.1,
     "weights": {
      "espn": 1.0,
      "sleeper": 1.0
     }
    },
    "11533": {
-    "mean": 144.8,
+    "mean": 143.7,
     "n": 1,
     "per_source": {
-     "fantasypros": 144.8
+     "fantasypros": 143.7
     },
     "spread": 0.0,
     "weights": {
@@ -575,10 +573,10 @@
     }
    },
    "11539": {
-    "mean": 126.9,
+    "mean": 125.9,
     "n": 1,
     "per_source": {
-     "fantasypros": 126.9
+     "fantasypros": 125.9
     },
     "spread": 0.0,
     "weights": {
@@ -589,24 +587,24 @@
     "mean": 11.1,
     "n": 2,
     "per_source": {
-     "fantasypros": 9.8,
+     "fantasypros": 9.7,
      "sleeper": 12.4
     },
-    "spread": 2.6,
+    "spread": 2.7,
     "weights": {
      "fantasypros": 1.0,
      "sleeper": 1.0
     }
    },
    "11559": {
-    "mean": 170.4,
+    "mean": 171.8,
     "n": 3,
     "per_source": {
-     "espn": 239.0,
-     "fantasypros": 130.9,
+     "espn": 239.6,
+     "fantasypros": 134.5,
      "sleeper": 141.2
     },
-    "spread": 108.1,
+    "spread": 105.1,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -614,14 +612,14 @@
     }
    },
    "11560": {
-    "mean": 284.3,
+    "mean": 283.6,
     "n": 3,
     "per_source": {
-     "espn": 264.4,
-     "fantasypros": 291.2,
+     "espn": 265.0,
+     "fantasypros": 288.5,
      "sleeper": 297.3
     },
-    "spread": 32.9,
+    "spread": 32.3,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -632,24 +630,24 @@
     "mean": 11.2,
     "n": 2,
     "per_source": {
-     "fantasypros": 9.8,
+     "fantasypros": 9.7,
      "sleeper": 12.7
     },
-    "spread": 2.9,
+    "spread": 3.0,
     "weights": {
      "fantasypros": 1.0,
      "sleeper": 1.0
     }
    },
    "11563": {
-    "mean": 288.4,
+    "mean": 287.8,
     "n": 3,
     "per_source": {
-     "espn": 290.2,
-     "fantasypros": 281.4,
+     "espn": 290.9,
+     "fantasypros": 278.8,
      "sleeper": 293.7
     },
-    "spread": 12.3,
+    "spread": 14.9,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -657,14 +655,14 @@
     }
    },
    "11564": {
-    "mean": 315.3,
+    "mean": 314.6,
     "n": 3,
     "per_source": {
-     "espn": 319.4,
-     "fantasypros": 307.6,
+     "espn": 320.2,
+     "fantasypros": 304.7,
      "sleeper": 318.8
     },
-    "spread": 11.8,
+    "spread": 15.5,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -672,27 +670,27 @@
     }
    },
    "11565": {
-    "mean": 12.6,
+    "mean": 12.4,
     "n": 2,
     "per_source": {
-     "fantasypros": 11.5,
+     "fantasypros": 11.3,
      "sleeper": 13.6
     },
-    "spread": 2.1,
+    "spread": 2.3,
     "weights": {
      "fantasypros": 1.0,
      "sleeper": 1.0
     }
    },
    "11566": {
-    "mean": 266.9,
+    "mean": 266.3,
     "n": 3,
     "per_source": {
-     "espn": 232.2,
-     "fantasypros": 261.8,
+     "espn": 232.7,
+     "fantasypros": 259.4,
      "sleeper": 306.7
     },
-    "spread": 74.5,
+    "spread": 74.0,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -762,11 +760,11 @@
     "mean": 55.1,
     "n": 3,
     "per_source": {
-     "espn": 19.3,
+     "espn": 19.4,
      "fantasypros": 80.9,
      "sleeper": 65.1
     },
-    "spread": 61.6,
+    "spread": 61.5,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -774,14 +772,14 @@
     }
    },
    "11576": {
-    "mean": 77.3,
+    "mean": 77.5,
     "n": 3,
     "per_source": {
-     "espn": 94.1,
+     "espn": 94.6,
      "fantasypros": 85.6,
      "sleeper": 52.2
     },
-    "spread": 41.9,
+    "spread": 42.4,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -789,10 +787,10 @@
     }
    },
    "11577": {
-    "mean": 31.6,
+    "mean": 31.7,
     "n": 3,
     "per_source": {
-     "espn": 30.9,
+     "espn": 31.1,
      "fantasypros": 30.1,
      "sleeper": 33.8
     },
@@ -817,14 +815,14 @@
     }
    },
    "11581": {
-    "mean": 119.0,
+    "mean": 119.4,
     "n": 3,
     "per_source": {
-     "espn": 76.5,
+     "espn": 77.7,
      "fantasypros": 131.6,
      "sleeper": 149.0
     },
-    "spread": 72.5,
+    "spread": 71.3,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -832,29 +830,27 @@
     }
    },
    "11583": {
-    "mean": 129.1,
-    "n": 3,
+    "mean": 146.4,
+    "n": 2,
     "per_source": {
-     "espn": 94.3,
      "fantasypros": 138.0,
      "sleeper": 154.9
     },
-    "spread": 60.6,
+    "spread": 16.9,
     "weights": {
-     "espn": 1.0,
      "fantasypros": 1.0,
      "sleeper": 1.0
     }
    },
    "11584": {
-    "mean": 216.9,
+    "mean": 217.3,
     "n": 3,
     "per_source": {
-     "espn": 236.0,
+     "espn": 237.3,
      "fantasypros": 217.3,
      "sleeper": 197.3
     },
-    "spread": 38.7,
+    "spread": 40.0,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -862,14 +858,14 @@
     }
    },
    "11586": {
-    "mean": 144.3,
+    "mean": 144.6,
     "n": 3,
     "per_source": {
-     "espn": 132.6,
+     "espn": 133.7,
      "fantasypros": 164.9,
      "sleeper": 135.3
     },
-    "spread": 32.3,
+    "spread": 31.2,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -901,26 +897,26 @@
     }
    },
    "11592": {
-    "mean": 58.5,
+    "mean": 58.0,
     "n": 2,
     "per_source": {
-     "espn": 39.2,
+     "espn": 38.3,
      "fantasypros": 77.7
     },
-    "spread": 38.5,
+    "spread": 39.4,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0
     }
    },
    "11593": {
-    "mean": 29.2,
+    "mean": 28.9,
     "n": 2,
     "per_source": {
-     "espn": 29.0,
+     "espn": 28.4,
      "sleeper": 29.4
     },
-    "spread": 0.4,
+    "spread": 1.0,
     "weights": {
      "espn": 1.0,
      "sleeper": 1.0
@@ -938,14 +934,14 @@
     }
    },
    "11596": {
-    "mean": 32.6,
+    "mean": 32.5,
     "n": 3,
     "per_source": {
-     "espn": 17.4,
+     "espn": 17.0,
      "fantasypros": 53.0,
      "sleeper": 27.5
     },
-    "spread": 35.6,
+    "spread": 36.0,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -953,14 +949,14 @@
     }
    },
    "11597": {
-    "mean": 68.0,
+    "mean": 67.6,
     "n": 3,
     "per_source": {
-     "espn": 49.2,
+     "espn": 48.2,
      "fantasypros": 77.7,
      "sleeper": 77.0
     },
-    "spread": 28.5,
+    "spread": 29.5,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -968,13 +964,13 @@
     }
    },
    "11599": {
-    "mean": 20.9,
+    "mean": 20.8,
     "n": 2,
     "per_source": {
-     "espn": 8.5,
+     "espn": 8.3,
      "sleeper": 33.2
     },
-    "spread": 24.7,
+    "spread": 24.9,
     "weights": {
      "espn": 1.0,
      "sleeper": 1.0
@@ -994,14 +990,14 @@
     }
    },
    "11603": {
-    "mean": 126.3,
+    "mean": 125.6,
     "n": 3,
     "per_source": {
-     "espn": 107.6,
+     "espn": 105.4,
      "fantasypros": 128.9,
      "sleeper": 142.4
     },
-    "spread": 34.8,
+    "spread": 37.0,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -1009,10 +1005,10 @@
     }
    },
    "11604": {
-    "mean": 235.9,
+    "mean": 234.3,
     "n": 3,
     "per_source": {
-     "espn": 230.7,
+     "espn": 225.9,
      "fantasypros": 252.6,
      "sleeper": 224.5
     },
@@ -1035,27 +1031,27 @@
     }
    },
    "11608": {
-    "mean": 69.6,
+    "mean": 70.0,
     "n": 2,
     "per_source": {
-     "espn": 107.9,
+     "espn": 108.8,
      "sleeper": 31.3
     },
-    "spread": 76.6,
+    "spread": 77.5,
     "weights": {
      "espn": 1.0,
      "sleeper": 1.0
     }
    },
    "11610": {
-    "mean": 131.9,
+    "mean": 132.4,
     "n": 3,
     "per_source": {
-     "espn": 155.0,
+     "espn": 156.5,
      "fantasypros": 109.5,
      "sleeper": 131.3
     },
-    "spread": 45.5,
+    "spread": 47.0,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -1066,10 +1062,10 @@
     "mean": 8.4,
     "n": 2,
     "per_source": {
-     "espn": 15.1,
+     "espn": 15.2,
      "sleeper": 1.7
     },
-    "spread": 13.4,
+    "spread": 13.5,
     "weights": {
      "espn": 1.0,
      "sleeper": 1.0
@@ -1087,14 +1083,14 @@
     }
    },
    "11618": {
-    "mean": 104.4,
+    "mean": 103.2,
     "n": 3,
     "per_source": {
-     "espn": 97.1,
-     "fantasypros": 88.8,
+     "espn": 97.9,
+     "fantasypros": 84.4,
      "sleeper": 127.4
     },
-    "spread": 38.6,
+    "spread": 43.0,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -1102,70 +1098,12 @@
     }
    },
    "11620": {
-    "mean": 182.2,
+    "mean": 182.5,
     "n": 3,
     "per_source": {
-     "espn": 168.4,
+     "espn": 169.5,
      "fantasypros": 170.2,
      "sleeper": 207.9
-    },
-    "spread": 39.5,
-    "weights": {
-     "espn": 1.0,
-     "fantasypros": 1.0,
-     "sleeper": 1.0
-    }
-   },
-   "11623": {
-    "mean": 32.1,
-    "n": 2,
-    "per_source": {
-     "espn": 41.0,
-     "sleeper": 23.3
-    },
-    "spread": 17.7,
-    "weights": {
-     "espn": 1.0,
-     "sleeper": 1.0
-    }
-   },
-   "11624": {
-    "mean": 160.4,
-    "n": 3,
-    "per_source": {
-     "espn": 177.6,
-     "fantasypros": 142.1,
-     "sleeper": 161.5
-    },
-    "spread": 35.5,
-    "weights": {
-     "espn": 1.0,
-     "fantasypros": 1.0,
-     "sleeper": 1.0
-    }
-   },
-   "11625": {
-    "mean": 136.9,
-    "n": 3,
-    "per_source": {
-     "espn": 168.8,
-     "fantasypros": 143.6,
-     "sleeper": 98.3
-    },
-    "spread": 70.5,
-    "weights": {
-     "espn": 1.0,
-     "fantasypros": 1.0,
-     "sleeper": 1.0
-    }
-   },
-   "11626": {
-    "mean": 71.3,
-    "n": 3,
-    "per_source": {
-     "espn": 93.2,
-     "fantasypros": 54.8,
-     "sleeper": 66.0
     },
     "spread": 38.4,
     "weights": {
@@ -1174,15 +1112,73 @@
      "sleeper": 1.0
     }
    },
-   "11627": {
-    "mean": 62.2,
+   "11623": {
+    "mean": 31.1,
+    "n": 2,
+    "per_source": {
+     "espn": 39.0,
+     "sleeper": 23.3
+    },
+    "spread": 15.7,
+    "weights": {
+     "espn": 1.0,
+     "sleeper": 1.0
+    }
+   },
+   "11624": {
+    "mean": 160.9,
     "n": 3,
     "per_source": {
-     "espn": 50.9,
+     "espn": 179.2,
+     "fantasypros": 142.1,
+     "sleeper": 161.5
+    },
+    "spread": 37.1,
+    "weights": {
+     "espn": 1.0,
+     "fantasypros": 1.0,
+     "sleeper": 1.0
+    }
+   },
+   "11625": {
+    "mean": 137.4,
+    "n": 3,
+    "per_source": {
+     "espn": 170.3,
+     "fantasypros": 143.6,
+     "sleeper": 98.3
+    },
+    "spread": 72.0,
+    "weights": {
+     "espn": 1.0,
+     "fantasypros": 1.0,
+     "sleeper": 1.0
+    }
+   },
+   "11626": {
+    "mean": 71.5,
+    "n": 3,
+    "per_source": {
+     "espn": 93.7,
+     "fantasypros": 54.8,
+     "sleeper": 66.0
+    },
+    "spread": 38.9,
+    "weights": {
+     "espn": 1.0,
+     "fantasypros": 1.0,
+     "sleeper": 1.0
+    }
+   },
+   "11627": {
+    "mean": 62.4,
+    "n": 3,
+    "per_source": {
+     "espn": 51.4,
      "fantasypros": 69.6,
      "sleeper": 66.1
     },
-    "spread": 18.7,
+    "spread": 18.2,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -1190,14 +1186,14 @@
     }
    },
    "11628": {
-    "mean": 145.7,
+    "mean": 146.0,
     "n": 3,
     "per_source": {
-     "espn": 114.6,
+     "espn": 115.6,
      "fantasypros": 136.2,
      "sleeper": 186.2
     },
-    "spread": 71.6,
+    "spread": 70.6,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -1205,27 +1201,27 @@
     }
    },
    "11629": {
-    "mean": 32.0,
+    "mean": 32.2,
     "n": 2,
     "per_source": {
-     "espn": 34.2,
+     "espn": 34.5,
      "sleeper": 29.9
     },
-    "spread": 4.3,
+    "spread": 4.6,
     "weights": {
      "espn": 1.0,
      "sleeper": 1.0
     }
    },
    "11630": {
-    "mean": 65.5,
+    "mean": 65.8,
     "n": 3,
     "per_source": {
-     "espn": 112.0,
+     "espn": 113.0,
      "fantasypros": 57.7,
      "sleeper": 26.8
     },
-    "spread": 85.2,
+    "spread": 86.2,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -1233,10 +1229,10 @@
     }
    },
    "11631": {
-    "mean": 172.7,
+    "mean": 173.2,
     "n": 3,
     "per_source": {
-     "espn": 174.7,
+     "espn": 176.3,
      "fantasypros": 148.0,
      "sleeper": 195.4
     },
@@ -1248,10 +1244,10 @@
     }
    },
    "11632": {
-    "mean": 225.5,
+    "mean": 226.1,
     "n": 3,
     "per_source": {
-     "espn": 231.6,
+     "espn": 233.3,
      "fantasypros": 210.2,
      "sleeper": 234.7
     },
@@ -1263,10 +1259,10 @@
     }
    },
    "11635": {
-    "mean": 208.2,
+    "mean": 209.0,
     "n": 3,
     "per_source": {
-     "espn": 207.0,
+     "espn": 209.3,
      "fantasypros": 189.5,
      "sleeper": 228.2
     },
@@ -1278,14 +1274,14 @@
     }
    },
    "11637": {
-    "mean": 87.8,
+    "mean": 88.1,
     "n": 3,
     "per_source": {
-     "espn": 100.6,
+     "espn": 101.5,
      "fantasypros": 77.0,
      "sleeper": 85.8
     },
-    "spread": 23.6,
+    "spread": 24.5,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -1307,11 +1303,11 @@
     "mean": 44.7,
     "n": 3,
     "per_source": {
-     "espn": 23.3,
+     "espn": 23.4,
      "fantasypros": 66.6,
      "sleeper": 44.1
     },
-    "spread": 43.3,
+    "spread": 43.2,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -1319,14 +1315,14 @@
     }
    },
    "11646": {
-    "mean": 188.1,
+    "mean": 188.6,
     "n": 3,
     "per_source": {
-     "espn": 226.7,
+     "espn": 228.2,
      "fantasypros": 171.7,
      "sleeper": 165.9
     },
-    "spread": 60.8,
+    "spread": 62.3,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -1372,17 +1368,6 @@
      "sleeper": 1.0
     }
    },
-   "11653": {
-    "mean": 79.7,
-    "n": 1,
-    "per_source": {
-     "fantasypros": 79.7
-    },
-    "spread": 0.0,
-    "weights": {
-     "fantasypros": 1.0
-    }
-   },
    "11655": {
     "mean": 90.5,
     "n": 2,
@@ -1397,14 +1382,14 @@
     }
    },
    "1166": {
-    "mean": 95.1,
+    "mean": 104.9,
     "n": 3,
     "per_source": {
-     "espn": 61.3,
-     "fantasypros": 184.9,
+     "espn": 61.4,
+     "fantasypros": 214.0,
      "sleeper": 39.2
     },
-    "spread": 145.7,
+    "spread": 174.8,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -1423,14 +1408,14 @@
     }
    },
    "11729": {
-    "mean": 29.2,
+    "mean": 29.3,
     "n": 3,
     "per_source": {
-     "espn": 63.0,
+     "espn": 63.3,
      "fantasypros": 20.6,
      "sleeper": 4.0
     },
-    "spread": 59.0,
+    "spread": 59.3,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -1449,14 +1434,14 @@
     }
    },
    "11783": {
-    "mean": 112.1,
+    "mean": 112.5,
     "n": 3,
     "per_source": {
-     "espn": 130.6,
+     "espn": 131.8,
      "fantasypros": 84.4,
      "sleeper": 121.2
     },
-    "spread": 46.2,
+    "spread": 47.4,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -1464,10 +1449,10 @@
     }
    },
    "11786": {
-    "mean": 136.6,
+    "mean": 137.2,
     "n": 1,
     "per_source": {
-     "fantasypros": 136.6
+     "fantasypros": 137.2
     },
     "spread": 0.0,
     "weights": {
@@ -1475,10 +1460,10 @@
     }
    },
    "11792": {
-    "mean": 118.7,
+    "mean": 122.7,
     "n": 1,
     "per_source": {
-     "fantasypros": 118.7
+     "fantasypros": 122.7
     },
     "spread": 0.0,
     "weights": {
@@ -1497,10 +1482,10 @@
     }
    },
    "11834": {
-    "mean": 122.9,
+    "mean": 123.2,
     "n": 3,
     "per_source": {
-     "espn": 127.7,
+     "espn": 128.8,
      "fantasypros": 130.3,
      "sleeper": 110.6
     },
@@ -1534,10 +1519,10 @@
     }
    },
    "12015": {
-    "mean": 126.9,
+    "mean": 125.9,
     "n": 1,
     "per_source": {
-     "fantasypros": 126.9
+     "fantasypros": 125.9
     },
     "spread": 0.0,
     "weights": {
@@ -1545,14 +1530,14 @@
     }
    },
    "12048": {
-    "mean": 34.8,
+    "mean": 34.9,
     "n": 3,
     "per_source": {
-     "espn": 9.5,
+     "espn": 9.6,
      "fantasypros": 69.8,
      "sleeper": 25.2
     },
-    "spread": 60.3,
+    "spread": 60.2,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -1573,14 +1558,25 @@
     }
    },
    "12185": {
-    "mean": 113.9,
+    "mean": 113.0,
     "n": 1,
     "per_source": {
-     "fantasypros": 113.9
+     "fantasypros": 113.0
     },
     "spread": 0.0,
     "weights": {
      "fantasypros": 1.0
+    }
+   },
+   "12389": {
+    "mean": 4.6,
+    "n": 1,
+    "per_source": {
+     "espn": 4.6
+    },
+    "spread": 0.0,
+    "weights": {
+     "espn": 1.0
     }
    },
    "12455": {
@@ -1639,10 +1635,10 @@
     "mean": 11.1,
     "n": 2,
     "per_source": {
-     "fantasypros": 9.8,
+     "fantasypros": 9.7,
      "sleeper": 12.4
     },
-    "spread": 2.6,
+    "spread": 2.7,
     "weights": {
      "fantasypros": 1.0,
      "sleeper": 1.0
@@ -1662,14 +1658,14 @@
     }
    },
    "12472": {
-    "mean": 32.8,
+    "mean": 33.0,
     "n": 3,
     "per_source": {
-     "espn": 62.1,
+     "espn": 62.5,
      "fantasypros": 31.7,
      "sleeper": 4.7
     },
-    "spread": 57.4,
+    "spread": 57.8,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -1677,10 +1673,10 @@
     }
    },
    "12473": {
-    "mean": 32.2,
+    "mean": 32.0,
     "n": 3,
     "per_source": {
-     "espn": 28.0,
+     "espn": 27.3,
      "fantasypros": 53.0,
      "sleeper": 15.7
     },
@@ -1692,14 +1688,14 @@
     }
    },
    "12474": {
-    "mean": 102.6,
+    "mean": 102.9,
     "n": 3,
     "per_source": {
-     "espn": 120.9,
+     "espn": 121.7,
      "fantasypros": 103.1,
      "sleeper": 83.8
     },
-    "spread": 37.1,
+    "spread": 37.9,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -1731,14 +1727,14 @@
     }
    },
    "12481": {
-    "mean": 194.7,
+    "mean": 199.0,
     "n": 3,
     "per_source": {
-     "espn": 178.4,
+     "espn": 191.3,
      "fantasypros": 204.6,
      "sleeper": 201.2
     },
-    "spread": 26.2,
+    "spread": 13.3,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -1759,10 +1755,10 @@
     }
    },
    "12483": {
-    "mean": 73.8,
+    "mean": 74.0,
     "n": 3,
     "per_source": {
-     "espn": 72.4,
+     "espn": 73.0,
      "fantasypros": 71.1,
      "sleeper": 77.9
     },
@@ -1774,10 +1770,10 @@
     }
    },
    "12485": {
-    "mean": 33.6,
+    "mean": 33.7,
     "n": 3,
     "per_source": {
-     "espn": 37.1,
+     "espn": 37.4,
      "fantasypros": 25.2,
      "sleeper": 38.4
     },
@@ -1815,14 +1811,14 @@
     }
    },
    "12489": {
-    "mean": 145.0,
+    "mean": 145.2,
     "n": 3,
     "per_source": {
-     "espn": 140.1,
+     "espn": 140.9,
      "fantasypros": 150.7,
      "sleeper": 144.1
     },
-    "spread": 10.6,
+    "spread": 9.8,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -1830,14 +1826,14 @@
     }
    },
    "12490": {
-    "mean": 178.5,
+    "mean": 178.8,
     "n": 3,
     "per_source": {
-     "espn": 159.3,
+     "espn": 160.1,
      "fantasypros": 201.4,
      "sleeper": 174.8
     },
-    "spread": 42.1,
+    "spread": 41.3,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -1845,14 +1841,14 @@
     }
    },
    "12492": {
-    "mean": 101.9,
+    "mean": 102.1,
     "n": 3,
     "per_source": {
-     "espn": 95.2,
+     "espn": 96.0,
      "fantasypros": 114.0,
      "sleeper": 96.4
     },
-    "spread": 18.8,
+    "spread": 18.0,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -1860,14 +1856,14 @@
     }
    },
    "12493": {
-    "mean": 140.6,
+    "mean": 134.3,
     "n": 3,
     "per_source": {
-     "espn": 140.5,
+     "espn": 121.7,
      "fantasypros": 139.5,
      "sleeper": 141.8
     },
-    "spread": 2.3,
+    "spread": 20.1,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -1878,11 +1874,11 @@
     "mean": 25.3,
     "n": 3,
     "per_source": {
-     "espn": 22.6,
+     "espn": 22.7,
      "fantasypros": 30.1,
      "sleeper": 23.2
     },
-    "spread": 7.5,
+    "spread": 7.4,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -1903,14 +1899,14 @@
     }
    },
    "12497": {
-    "mean": 49.9,
+    "mean": 50.0,
     "n": 3,
     "per_source": {
-     "espn": 17.7,
+     "espn": 17.9,
      "fantasypros": 40.0,
      "sleeper": 92.0
     },
-    "spread": 74.3,
+    "spread": 74.1,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -1918,14 +1914,14 @@
     }
    },
    "12498": {
-    "mean": 80.9,
+    "mean": 78.9,
     "n": 3,
     "per_source": {
-     "espn": 66.7,
+     "espn": 60.8,
      "fantasypros": 79.5,
      "sleeper": 96.4
     },
-    "spread": 29.7,
+    "spread": 35.6,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -1933,14 +1929,14 @@
     }
    },
    "12499": {
-    "mean": 67.8,
+    "mean": 68.0,
     "n": 3,
     "per_source": {
-     "espn": 77.1,
+     "espn": 77.8,
      "fantasypros": 69.6,
      "sleeper": 56.7
     },
-    "spread": 20.4,
+    "spread": 21.1,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -1951,24 +1947,24 @@
     "mean": 11.1,
     "n": 2,
     "per_source": {
-     "fantasypros": 9.8,
+     "fantasypros": 9.7,
      "sleeper": 12.4
     },
-    "spread": 2.6,
+    "spread": 2.7,
     "weights": {
      "fantasypros": 1.0,
      "sleeper": 1.0
     }
    },
    "12501": {
-    "mean": 168.5,
+    "mean": 169.2,
     "n": 3,
     "per_source": {
-     "espn": 178.5,
+     "espn": 180.7,
      "fantasypros": 156.9,
      "sleeper": 170.0
     },
-    "spread": 21.6,
+    "spread": 23.8,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -1976,14 +1972,14 @@
     }
    },
    "12502": {
-    "mean": 127.1,
+    "mean": 126.2,
     "n": 3,
     "per_source": {
-     "espn": 134.4,
+     "espn": 131.7,
      "fantasypros": 116.6,
      "sleeper": 130.3
     },
-    "spread": 17.8,
+    "spread": 15.1,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -1994,11 +1990,11 @@
     "mean": 33.2,
     "n": 3,
     "per_source": {
-     "espn": 7.2,
+     "espn": 7.3,
      "fantasypros": 29.6,
      "sleeper": 62.8
     },
-    "spread": 55.6,
+    "spread": 55.5,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -2006,14 +2002,14 @@
     }
    },
    "12504": {
-    "mean": 46.6,
+    "mean": 46.8,
     "n": 3,
     "per_source": {
-     "espn": 28.4,
+     "espn": 29.2,
      "fantasypros": 79.3,
      "sleeper": 32.0
     },
-    "spread": 50.9,
+    "spread": 50.1,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -2024,7 +2020,7 @@
     "mean": 26.2,
     "n": 3,
     "per_source": {
-     "espn": 25.4,
+     "espn": 25.6,
      "fantasypros": 19.2,
      "sleeper": 33.9
     },
@@ -2036,14 +2032,14 @@
     }
    },
    "12506": {
-    "mean": 177.2,
+    "mean": 175.4,
     "n": 3,
     "per_source": {
-     "espn": 162.1,
-     "fantasypros": 189.0,
+     "espn": 158.7,
+     "fantasypros": 187.2,
      "sleeper": 180.4
     },
-    "spread": 26.9,
+    "spread": 28.5,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -2051,14 +2047,14 @@
     }
    },
    "12507": {
-    "mean": 229.4,
+    "mean": 229.8,
     "n": 3,
     "per_source": {
-     "espn": 209.1,
+     "espn": 210.3,
      "fantasypros": 236.3,
      "sleeper": 242.9
     },
-    "spread": 33.8,
+    "spread": 32.6,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -2066,29 +2062,25 @@
     }
    },
    "12508": {
-    "mean": 283.7,
-    "n": 3,
+    "mean": 294.5,
+    "n": 1,
     "per_source": {
-     "espn": 280.1,
-     "fantasypros": 276.5,
      "sleeper": 294.5
     },
-    "spread": 18.0,
+    "spread": 0.0,
     "weights": {
-     "espn": 1.0,
-     "fantasypros": 1.0,
      "sleeper": 1.0
     }
    },
    "12509": {
-    "mean": 116.8,
+    "mean": 117.3,
     "n": 3,
     "per_source": {
-     "espn": 120.7,
+     "espn": 122.0,
      "fantasypros": 116.9,
      "sleeper": 112.9
     },
-    "spread": 7.8,
+    "spread": 9.1,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -2118,10 +2110,10 @@
     }
    },
    "12512": {
-    "mean": 183.2,
+    "mean": 183.5,
     "n": 3,
     "per_source": {
-     "espn": 179.2,
+     "espn": 180.2,
      "fantasypros": 174.4,
      "sleeper": 196.0
     },
@@ -2133,10 +2125,10 @@
     }
    },
    "12514": {
-    "mean": 208.3,
+    "mean": 209.0,
     "n": 3,
     "per_source": {
-     "espn": 208.6,
+     "espn": 210.5,
      "fantasypros": 192.4,
      "sleeper": 224.0
     },
@@ -2170,14 +2162,14 @@
     }
    },
    "12517": {
-    "mean": 196.8,
+    "mean": 195.6,
     "n": 3,
     "per_source": {
-     "espn": 168.5,
+     "espn": 164.8,
      "fantasypros": 206.6,
      "sleeper": 215.4
     },
-    "spread": 46.9,
+    "spread": 50.6,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -2185,14 +2177,14 @@
     }
    },
    "12518": {
-    "mean": 204.5,
+    "mean": 207.2,
     "n": 3,
     "per_source": {
-     "espn": 205.7,
-     "fantasypros": 206.6,
+     "espn": 201.4,
+     "fantasypros": 219.0,
      "sleeper": 201.1
     },
-    "spread": 5.5,
+    "spread": 17.9,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -2200,10 +2192,10 @@
     }
    },
    "12519": {
-    "mean": 192.8,
+    "mean": 193.3,
     "n": 3,
     "per_source": {
-     "espn": 188.9,
+     "espn": 190.2,
      "fantasypros": 180.6,
      "sleeper": 209.0
     },
@@ -2226,14 +2218,14 @@
     }
    },
    "12521": {
-    "mean": 61.2,
+    "mean": 61.0,
     "n": 3,
     "per_source": {
-     "espn": 42.6,
+     "espn": 41.8,
      "fantasypros": 68.9,
      "sleeper": 72.2
     },
-    "spread": 29.6,
+    "spread": 30.4,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -2241,14 +2233,14 @@
     }
    },
    "12522": {
-    "mean": 226.3,
+    "mean": 225.7,
     "n": 3,
     "per_source": {
-     "espn": 228.8,
-     "fantasypros": 224.2,
+     "espn": 229.3,
+     "fantasypros": 222.1,
      "sleeper": 225.8
     },
-    "spread": 4.6,
+    "spread": 7.2,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -2267,27 +2259,27 @@
     }
    },
    "12524": {
-    "mean": 96.0,
+    "mean": 98.8,
     "n": 2,
     "per_source": {
-     "fantasypros": 94.9,
+     "fantasypros": 100.5,
      "sleeper": 97.1
     },
-    "spread": 2.2,
+    "spread": 3.4,
     "weights": {
      "fantasypros": 1.0,
      "sleeper": 1.0
     }
    },
    "12526": {
-    "mean": 216.7,
+    "mean": 217.2,
     "n": 3,
     "per_source": {
-     "espn": 235.2,
+     "espn": 236.6,
      "fantasypros": 193.9,
      "sleeper": 221.0
     },
-    "spread": 41.3,
+    "spread": 42.7,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -2295,14 +2287,14 @@
     }
    },
    "12527": {
-    "mean": 254.9,
+    "mean": 255.4,
     "n": 3,
     "per_source": {
-     "espn": 259.5,
+     "espn": 260.8,
      "fantasypros": 252.1,
      "sleeper": 253.2
     },
-    "spread": 7.4,
+    "spread": 8.7,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -2310,14 +2302,14 @@
     }
    },
    "12529": {
-    "mean": 170.7,
+    "mean": 171.0,
     "n": 3,
     "per_source": {
-     "espn": 155.7,
+     "espn": 156.6,
      "fantasypros": 185.5,
      "sleeper": 171.0
     },
-    "spread": 29.8,
+    "spread": 28.9,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -2325,14 +2317,14 @@
     }
    },
    "12530": {
-    "mean": 78.5,
+    "mean": 78.3,
     "n": 3,
     "per_source": {
-     "espn": 54.2,
-     "fantasypros": 84.6,
+     "espn": 54.4,
+     "fantasypros": 84.0,
      "sleeper": 96.6
     },
-    "spread": 42.4,
+    "spread": 42.2,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -2353,10 +2345,10 @@
     }
    },
    "12533": {
-    "mean": 139.2,
+    "mean": 139.4,
     "n": 3,
     "per_source": {
-     "espn": 134.3,
+     "espn": 135.0,
      "fantasypros": 155.4,
      "sleeper": 127.9
     },
@@ -2368,14 +2360,14 @@
     }
    },
    "12534": {
-    "mean": 146.4,
+    "mean": 146.6,
     "n": 3,
     "per_source": {
-     "espn": 124.3,
+     "espn": 125.0,
      "fantasypros": 160.2,
      "sleeper": 154.6
     },
-    "spread": 35.9,
+    "spread": 35.2,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -2383,14 +2375,14 @@
     }
    },
    "12535": {
-    "mean": 85.2,
+    "mean": 85.0,
     "n": 3,
     "per_source": {
-     "espn": 87.1,
-     "fantasypros": 81.4,
+     "espn": 87.9,
+     "fantasypros": 79.9,
      "sleeper": 87.1
     },
-    "spread": 5.7,
+    "spread": 8.0,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -2398,14 +2390,14 @@
     }
    },
    "12536": {
-    "mean": 83.7,
+    "mean": 85.1,
     "n": 3,
     "per_source": {
-     "espn": 60.7,
+     "espn": 65.1,
      "fantasypros": 105.1,
      "sleeper": 85.2
     },
-    "spread": 44.4,
+    "spread": 40.0,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -2427,11 +2419,11 @@
     "mean": 54.5,
     "n": 3,
     "per_source": {
-     "espn": 10.5,
+     "espn": 10.6,
      "fantasypros": 63.6,
      "sleeper": 89.4
     },
-    "spread": 78.9,
+    "spread": 78.8,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -2452,13 +2444,13 @@
     }
    },
    "12542": {
-    "mean": 3.4,
+    "mean": 3.8,
     "n": 2,
     "per_source": {
-     "espn": 2.3,
+     "espn": 2.9,
      "sleeper": 4.6
     },
-    "spread": 2.3,
+    "spread": 1.7,
     "weights": {
      "espn": 1.0,
      "sleeper": 1.0
@@ -2481,7 +2473,7 @@
     "mean": 34.9,
     "n": 3,
     "per_source": {
-     "espn": 24.6,
+     "espn": 24.7,
      "fantasypros": 23.8,
      "sleeper": 56.2
     },
@@ -2493,14 +2485,14 @@
     }
    },
    "12545": {
-    "mean": 284.8,
+    "mean": 284.7,
     "n": 3,
     "per_source": {
-     "espn": 299.3,
-     "fantasypros": 286.3,
+     "espn": 300.0,
+     "fantasypros": 285.3,
      "sleeper": 268.9
     },
-    "spread": 30.4,
+    "spread": 31.1,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -2508,10 +2500,10 @@
     }
    },
    "12547": {
-    "mean": 52.9,
+    "mean": 53.8,
     "n": 3,
     "per_source": {
-     "espn": 56.3,
+     "espn": 59.2,
      "fantasypros": 71.1,
      "sleeper": 31.2
     },
@@ -2549,13 +2541,13 @@
     }
    },
    "12658": {
-    "mean": 20.5,
+    "mean": 20.4,
     "n": 2,
     "per_source": {
-     "espn": 9.2,
+     "espn": 9.0,
      "sleeper": 31.9
     },
-    "spread": 22.7,
+    "spread": 22.9,
     "weights": {
      "espn": 1.0,
      "sleeper": 1.0
@@ -2573,23 +2565,23 @@
     }
    },
    "12699": {
-    "mean": 29.4,
+    "mean": 29.6,
     "n": 2,
     "per_source": {
-     "espn": 57.7,
+     "espn": 58.2,
      "sleeper": 1.0
     },
-    "spread": 56.7,
+    "spread": 57.2,
     "weights": {
      "espn": 1.0,
      "sleeper": 1.0
     }
    },
    "12711": {
-    "mean": 126.9,
+    "mean": 125.9,
     "n": 1,
     "per_source": {
-     "fantasypros": 126.9
+     "fantasypros": 125.9
     },
     "spread": 0.0,
     "weights": {
@@ -2597,10 +2589,10 @@
     }
    },
    "12713": {
-    "mean": 125.3,
+    "mean": 122.7,
     "n": 1,
     "per_source": {
-     "fantasypros": 125.3
+     "fantasypros": 122.7
     },
     "spread": 0.0,
     "weights": {
@@ -2608,14 +2600,14 @@
     }
    },
    "12718": {
-    "mean": 39.6,
+    "mean": 41.6,
     "n": 3,
     "per_source": {
-     "espn": 26.8,
+     "espn": 32.7,
      "fantasypros": 50.3,
      "sleeper": 41.7
     },
-    "spread": 23.5,
+    "spread": 17.6,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -2647,10 +2639,10 @@
     }
    },
    "12817": {
-    "mean": 9.1,
+    "mean": 8.9,
     "n": 1,
     "per_source": {
-     "espn": 9.1
+     "espn": 8.9
     },
     "spread": 0.0,
     "weights": {
@@ -2669,10 +2661,10 @@
     }
    },
    "12961": {
-    "mean": 113.9,
+    "mean": 113.0,
     "n": 1,
     "per_source": {
-     "fantasypros": 113.9
+     "fantasypros": 113.0
     },
     "spread": 0.0,
     "weights": {
@@ -2680,10 +2672,10 @@
     }
    },
    "13013": {
-    "mean": 9.0,
+    "mean": 8.8,
     "n": 1,
     "per_source": {
-     "espn": 9.0
+     "espn": 8.8
     },
     "spread": 0.0,
     "weights": {
@@ -2737,23 +2729,23 @@
     }
    },
    "13150": {
-    "mean": 16.3,
+    "mean": 16.4,
     "n": 2,
     "per_source": {
-     "espn": 25.9,
+     "espn": 26.1,
      "sleeper": 6.7
     },
-    "spread": 19.2,
+    "spread": 19.4,
     "weights": {
      "espn": 1.0,
      "sleeper": 1.0
     }
    },
    "13264": {
-    "mean": 24.0,
+    "mean": 32.5,
     "n": 1,
     "per_source": {
-     "espn": 24.0
+     "espn": 32.5
     },
     "spread": 0.0,
     "weights": {
@@ -2774,14 +2766,14 @@
     }
    },
    "13269": {
-    "mean": 175.1,
+    "mean": 191.1,
     "n": 3,
     "per_source": {
-     "espn": 179.3,
-     "fantasypros": 135.8,
+     "espn": 179.8,
+     "fantasypros": 183.2,
      "sleeper": 210.2
     },
-    "spread": 74.4,
+    "spread": 30.4,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -2789,13 +2781,13 @@
     }
    },
    "13270": {
-    "mean": 41.8,
+    "mean": 41.1,
     "n": 2,
     "per_source": {
-     "fantasypros": 44.4,
+     "fantasypros": 42.9,
      "sleeper": 39.3
     },
-    "spread": 5.1,
+    "spread": 3.6,
     "weights": {
      "fantasypros": 1.0,
      "sleeper": 1.0
@@ -2805,10 +2797,10 @@
     "mean": 34.0,
     "n": 2,
     "per_source": {
-     "fantasypros": 13.1,
+     "fantasypros": 13.0,
      "sleeper": 54.9
     },
-    "spread": 41.8,
+    "spread": 41.9,
     "weights": {
      "fantasypros": 1.0,
      "sleeper": 1.0
@@ -2826,14 +2818,14 @@
     }
    },
    "13274": {
-    "mean": 71.0,
+    "mean": 71.1,
     "n": 3,
     "per_source": {
-     "espn": 32.7,
+     "espn": 33.0,
      "fantasypros": 81.4,
      "sleeper": 98.9
     },
-    "spread": 66.2,
+    "spread": 65.9,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -2841,13 +2833,13 @@
     }
    },
    "13275": {
-    "mean": 11.7,
+    "mean": 12.4,
     "n": 2,
     "per_source": {
-     "fantasypros": 9.8,
+     "fantasypros": 11.3,
      "sleeper": 13.6
     },
-    "spread": 3.8,
+    "spread": 2.3,
     "weights": {
      "fantasypros": 1.0,
      "sleeper": 1.0
@@ -2870,10 +2862,10 @@
     "mean": 16.7,
     "n": 2,
     "per_source": {
-     "espn": 28.1,
+     "espn": 28.2,
      "sleeper": 5.2
     },
-    "spread": 22.9,
+    "spread": 23.0,
     "weights": {
      "espn": 1.0,
      "sleeper": 1.0
@@ -2893,14 +2885,14 @@
     }
    },
    "13279": {
-    "mean": 174.3,
+    "mean": 174.8,
     "n": 3,
     "per_source": {
-     "espn": 190.1,
+     "espn": 191.8,
      "fantasypros": 155.4,
      "sleeper": 177.3
     },
-    "spread": 34.7,
+    "spread": 36.4,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -2908,14 +2900,14 @@
     }
    },
    "13281": {
-    "mean": 117.4,
+    "mean": 117.7,
     "n": 3,
     "per_source": {
-     "espn": 109.5,
+     "espn": 110.5,
      "fantasypros": 131.7,
      "sleeper": 111.0
     },
-    "spread": 22.2,
+    "spread": 21.2,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -2934,14 +2926,14 @@
     }
    },
    "13285": {
-    "mean": 116.4,
+    "mean": 116.6,
     "n": 3,
     "per_source": {
-     "espn": 133.0,
+     "espn": 133.7,
      "fantasypros": 111.0,
      "sleeper": 105.2
     },
-    "spread": 27.8,
+    "spread": 28.5,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -2949,14 +2941,14 @@
     }
    },
    "13286": {
-    "mean": 170.6,
+    "mean": 170.8,
     "n": 3,
     "per_source": {
-     "espn": 159.3,
+     "espn": 160.1,
      "fantasypros": 182.4,
      "sleeper": 170.0
     },
-    "spread": 23.1,
+    "spread": 22.3,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -2964,14 +2956,14 @@
     }
    },
    "13287": {
-    "mean": 208.6,
+    "mean": 209.0,
     "n": 3,
     "per_source": {
-     "espn": 192.1,
+     "espn": 193.1,
      "fantasypros": 222.0,
      "sleeper": 211.8
     },
-    "spread": 29.9,
+    "spread": 28.9,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -2982,11 +2974,11 @@
     "mean": 42.6,
     "n": 3,
     "per_source": {
-     "espn": 19.7,
+     "espn": 19.8,
      "fantasypros": 44.4,
      "sleeper": 63.7
     },
-    "spread": 44.0,
+    "spread": 43.9,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -2994,13 +2986,13 @@
     }
    },
    "13289": {
-    "mean": 15.9,
+    "mean": 15.8,
     "n": 2,
     "per_source": {
-     "fantasypros": 9.8,
+     "fantasypros": 9.7,
      "sleeper": 22.0
     },
-    "spread": 12.2,
+    "spread": 12.3,
     "weights": {
      "fantasypros": 1.0,
      "sleeper": 1.0
@@ -3020,14 +3012,14 @@
     }
    },
    "13294": {
-    "mean": 135.3,
+    "mean": 135.6,
     "n": 3,
     "per_source": {
-     "espn": 92.4,
+     "espn": 93.3,
      "fantasypros": 145.1,
      "sleeper": 168.5
     },
-    "spread": 76.1,
+    "spread": 75.2,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -3035,14 +3027,14 @@
     }
    },
    "13296": {
-    "mean": 121.4,
+    "mean": 118.6,
     "n": 3,
     "per_source": {
-     "espn": 140.5,
+     "espn": 132.3,
      "fantasypros": 128.8,
      "sleeper": 94.8
     },
-    "spread": 45.7,
+    "spread": 37.5,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -3061,14 +3053,14 @@
     }
    },
    "13298": {
-    "mean": 158.9,
+    "mean": 159.4,
     "n": 3,
     "per_source": {
-     "espn": 167.9,
+     "espn": 169.4,
      "fantasypros": 152.5,
      "sleeper": 156.4
     },
-    "spread": 15.4,
+    "spread": 16.9,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -3076,10 +3068,10 @@
     }
    },
    "13299": {
-    "mean": 33.9,
+    "mean": 33.7,
     "n": 3,
     "per_source": {
-     "espn": 28.3,
+     "espn": 27.7,
      "fantasypros": 45.9,
      "sleeper": 27.4
     },
@@ -3091,10 +3083,10 @@
     }
    },
    "13301": {
-    "mean": 89.9,
+    "mean": 90.1,
     "n": 3,
     "per_source": {
-     "espn": 84.9,
+     "espn": 85.6,
      "fantasypros": 109.5,
      "sleeper": 75.2
     },
@@ -3119,27 +3111,27 @@
     }
    },
    "13303": {
-    "mean": 17.8,
+    "mean": 17.6,
     "n": 2,
     "per_source": {
-     "fantasypros": 11.5,
+     "fantasypros": 11.3,
      "sleeper": 24.0
     },
-    "spread": 12.5,
+    "spread": 12.7,
     "weights": {
      "fantasypros": 1.0,
      "sleeper": 1.0
     }
    },
    "13305": {
-    "mean": 85.5,
+    "mean": 85.6,
     "n": 3,
     "per_source": {
-     "espn": 51.3,
+     "espn": 51.5,
      "fantasypros": 107.8,
      "sleeper": 97.5
     },
-    "spread": 56.5,
+    "spread": 56.3,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -3147,13 +3139,13 @@
     }
    },
    "13306": {
-    "mean": 20.1,
+    "mean": 20.0,
     "n": 2,
     "per_source": {
-     "fantasypros": 9.8,
+     "fantasypros": 9.7,
      "sleeper": 30.3
     },
-    "spread": 20.5,
+    "spread": 20.6,
     "weights": {
      "fantasypros": 1.0,
      "sleeper": 1.0
@@ -3163,11 +3155,11 @@
     "mean": 31.1,
     "n": 3,
     "per_source": {
-     "espn": 9.0,
+     "espn": 8.9,
      "fantasypros": 54.8,
      "sleeper": 29.5
     },
-    "spread": 45.8,
+    "spread": 45.9,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -3186,10 +3178,10 @@
     }
    },
    "13311": {
-    "mean": 86.2,
+    "mean": 87.1,
     "n": 3,
     "per_source": {
-     "espn": 92.3,
+     "espn": 94.8,
      "fantasypros": 99.2,
      "sleeper": 67.2
     },
@@ -3223,14 +3215,14 @@
     }
    },
    "13317": {
-    "mean": 97.4,
+    "mean": 97.7,
     "n": 3,
     "per_source": {
-     "espn": 98.2,
+     "espn": 99.1,
      "fantasypros": 96.2,
      "sleeper": 97.9
     },
-    "spread": 2.0,
+    "spread": 2.9,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -3249,14 +3241,14 @@
     }
    },
    "13319": {
-    "mean": 33.4,
+    "mean": 33.3,
     "n": 3,
     "per_source": {
-     "espn": 9.6,
+     "espn": 9.4,
      "fantasypros": 51.2,
      "sleeper": 39.4
     },
-    "spread": 41.6,
+    "spread": 41.8,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -3264,14 +3256,14 @@
     }
    },
    "13320": {
-    "mean": 58.8,
+    "mean": 58.9,
     "n": 3,
     "per_source": {
-     "espn": 25.4,
+     "espn": 25.7,
      "fantasypros": 72.5,
      "sleeper": 78.5
     },
-    "spread": 53.1,
+    "spread": 52.8,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -3279,14 +3271,14 @@
     }
    },
    "13322": {
-    "mean": 32.3,
+    "mean": 32.1,
     "n": 3,
     "per_source": {
-     "espn": 17.4,
+     "espn": 17.0,
      "fantasypros": 45.9,
      "sleeper": 33.5
     },
-    "spread": 28.5,
+    "spread": 28.9,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -3318,14 +3310,14 @@
     }
    },
    "13329": {
-    "mean": 42.5,
+    "mean": 42.6,
     "n": 3,
     "per_source": {
-     "espn": 25.5,
+     "espn": 25.8,
      "fantasypros": 41.4,
      "sleeper": 60.6
     },
-    "spread": 35.1,
+    "spread": 34.8,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -3333,10 +3325,10 @@
     }
    },
    "13330": {
-    "mean": 119.6,
+    "mean": 119.1,
     "n": 3,
     "per_source": {
-     "espn": 122.5,
+     "espn": 121.2,
      "fantasypros": 136.0,
      "sleeper": 100.2
     },
@@ -3348,14 +3340,14 @@
     }
    },
    "13333": {
-    "mean": 18.7,
+    "mean": 19.2,
     "n": 3,
     "per_source": {
-     "espn": 6.1,
-     "fantasypros": 26.6,
+     "espn": 6.2,
+     "fantasypros": 28.1,
      "sleeper": 23.3
     },
-    "spread": 20.5,
+    "spread": 21.9,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -3374,10 +3366,10 @@
     }
    },
    "13337": {
-    "mean": 82.1,
+    "mean": 82.2,
     "n": 3,
     "per_source": {
-     "espn": 82.7,
+     "espn": 83.1,
      "fantasypros": 98.3,
      "sleeper": 65.2
     },
@@ -3389,14 +3381,14 @@
     }
    },
    "13338": {
-    "mean": 53.9,
+    "mean": 54.8,
     "n": 3,
     "per_source": {
-     "espn": 64.3,
+     "espn": 66.9,
      "fantasypros": 65.1,
      "sleeper": 32.4
     },
-    "spread": 32.7,
+    "spread": 34.5,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -3415,14 +3407,14 @@
     }
    },
    "13345": {
-    "mean": 72.5,
+    "mean": 72.6,
     "n": 3,
     "per_source": {
-     "espn": 25.3,
+     "espn": 25.5,
      "fantasypros": 128.4,
      "sleeper": 63.9
     },
-    "spread": 103.1,
+    "spread": 102.9,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -3430,14 +3422,14 @@
     }
    },
    "13346": {
-    "mean": 155.5,
+    "mean": 156.0,
     "n": 3,
     "per_source": {
-     "espn": 176.3,
+     "espn": 177.9,
      "fantasypros": 155.4,
      "sleeper": 134.7
     },
-    "spread": 41.6,
+    "spread": 43.2,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -3519,14 +3511,14 @@
     }
    },
    "13380": {
-    "mean": 39.2,
+    "mean": 39.3,
     "n": 3,
     "per_source": {
-     "espn": 31.2,
+     "espn": 31.6,
      "fantasypros": 47.4,
      "sleeper": 39.0
     },
-    "spread": 16.2,
+    "spread": 15.8,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -3534,13 +3526,13 @@
     }
    },
    "1339": {
-    "mean": 22.4,
+    "mean": 22.2,
     "n": 2,
     "per_source": {
-     "espn": 8.0,
+     "espn": 7.8,
      "sleeper": 36.7
     },
-    "spread": 28.7,
+    "spread": 28.9,
     "weights": {
      "espn": 1.0,
      "sleeper": 1.0
@@ -3550,10 +3542,10 @@
     "mean": 34.0,
     "n": 2,
     "per_source": {
-     "espn": 8.4,
+     "espn": 8.5,
      "sleeper": 59.6
     },
-    "spread": 51.2,
+    "spread": 51.1,
     "weights": {
      "espn": 1.0,
      "sleeper": 1.0
@@ -3658,14 +3650,14 @@
     }
    },
    "13413": {
-    "mean": 63.2,
+    "mean": 63.7,
     "n": 3,
     "per_source": {
-     "espn": 16.6,
-     "fantasypros": 78.5,
+     "espn": 16.8,
+     "fantasypros": 79.9,
      "sleeper": 94.5
     },
-    "spread": 77.9,
+    "spread": 77.7,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -3673,10 +3665,10 @@
     }
    },
    "13414": {
-    "mean": 98.2,
+    "mean": 98.4,
     "n": 3,
     "per_source": {
-     "espn": 95.1,
+     "espn": 95.6,
      "fantasypros": 126.9,
      "sleeper": 72.7
     },
@@ -3723,14 +3715,14 @@
     }
    },
    "13420": {
-    "mean": 53.6,
+    "mean": 55.2,
     "n": 3,
     "per_source": {
-     "espn": 37.6,
-     "fantasypros": 84.4,
+     "espn": 38.0,
+     "fantasypros": 88.8,
      "sleeper": 38.7
     },
-    "spread": 46.8,
+    "spread": 50.8,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -3738,10 +3730,10 @@
     }
    },
    "13421": {
-    "mean": 54.1,
+    "mean": 53.7,
     "n": 3,
     "per_source": {
-     "espn": 48.0,
+     "espn": 47.0,
      "fantasypros": 81.2,
      "sleeper": 33.0
     },
@@ -3764,13 +3756,15 @@
     }
    },
    "13423": {
-    "mean": 22.2,
-    "n": 1,
+    "mean": 15.2,
+    "n": 2,
     "per_source": {
+     "espn": 8.3,
      "fantasypros": 22.2
     },
-    "spread": 0.0,
+    "spread": 13.9,
     "weights": {
+     "espn": 1.0,
      "fantasypros": 1.0
     }
    },
@@ -3778,7 +3772,7 @@
     "mean": 37.9,
     "n": 3,
     "per_source": {
-     "espn": 37.7,
+     "espn": 37.9,
      "fantasypros": 39.6,
      "sleeper": 36.3
     },
@@ -3834,14 +3828,14 @@
     }
    },
    "13434": {
-    "mean": 43.9,
+    "mean": 43.7,
     "n": 3,
     "per_source": {
-     "espn": 31.2,
+     "espn": 30.6,
      "fantasypros": 38.9,
      "sleeper": 61.6
     },
-    "spread": 30.4,
+    "spread": 31.0,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -3860,14 +3854,14 @@
     }
    },
    "13477": {
-    "mean": 29.8,
+    "mean": 33.2,
     "n": 3,
     "per_source": {
-     "espn": 18.4,
+     "espn": 28.6,
      "fantasypros": 40.0,
      "sleeper": 31.0
     },
-    "spread": 21.6,
+    "spread": 11.4,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -3897,14 +3891,14 @@
     }
    },
    "13533": {
-    "mean": 39.3,
+    "mean": 39.8,
     "n": 3,
     "per_source": {
-     "espn": 12.0,
-     "fantasypros": 42.9,
+     "espn": 12.1,
+     "fantasypros": 44.4,
      "sleeper": 63.0
     },
-    "spread": 51.0,
+    "spread": 50.9,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -3912,10 +3906,10 @@
     }
    },
    "13545": {
-    "mean": 123.6,
+    "mean": 121.1,
     "n": 1,
     "per_source": {
-     "fantasypros": 123.6
+     "fantasypros": 121.1
     },
     "spread": 0.0,
     "weights": {
@@ -3923,14 +3917,14 @@
     }
    },
    "1373": {
-    "mean": 238.2,
+    "mean": 239.3,
     "n": 3,
     "per_source": {
-     "espn": 246.7,
-     "fantasypros": 245.4,
+     "espn": 247.3,
+     "fantasypros": 248.0,
      "sleeper": 222.5
     },
-    "spread": 24.2,
+    "spread": 25.5,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -3938,10 +3932,10 @@
     }
    },
    "13770": {
-    "mean": 0.6,
+    "mean": 2.2,
     "n": 1,
     "per_source": {
-     "espn": 0.6
+     "espn": 2.2
     },
     "spread": 0.0,
     "weights": {
@@ -3949,23 +3943,23 @@
     }
    },
    "1379": {
-    "mean": 30.1,
+    "mean": 30.2,
     "n": 2,
     "per_source": {
-     "espn": 40.3,
+     "espn": 40.5,
      "sleeper": 19.9
     },
-    "spread": 20.4,
+    "spread": 20.6,
     "weights": {
      "espn": 1.0,
      "sleeper": 1.0
     }
    },
    "13833": {
-    "mean": 109.0,
+    "mean": 106.6,
     "n": 1,
     "per_source": {
-     "fantasypros": 109.0
+     "fantasypros": 106.6
     },
     "spread": 0.0,
     "weights": {
@@ -3995,10 +3989,10 @@
     }
    },
    "13968": {
-    "mean": 105.7,
+    "mean": 104.9,
     "n": 1,
     "per_source": {
-     "fantasypros": 105.7
+     "fantasypros": 104.9
     },
     "spread": 0.0,
     "weights": {
@@ -4017,14 +4011,14 @@
     }
    },
    "1466": {
-    "mean": 191.4,
+    "mean": 190.0,
     "n": 3,
     "per_source": {
-     "espn": 210.4,
+     "espn": 206.0,
      "fantasypros": 192.5,
      "sleeper": 171.4
     },
-    "spread": 39.0,
+    "spread": 34.6,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -4032,51 +4026,64 @@
     }
    },
    "1479": {
-    "mean": 123.1,
+    "mean": 123.5,
     "n": 3,
     "per_source": {
-     "espn": 145.5,
+     "espn": 146.7,
      "fantasypros": 116.9,
      "sleeper": 106.8
     },
-    "spread": 38.7,
+    "spread": 39.9,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
      "sleeper": 1.0
     }
    },
-   "1837": {
-    "mean": 11.1,
+   "1737": {
+    "mean": 12.9,
     "n": 2,
     "per_source": {
-     "fantasypros": 9.8,
+     "espn": 14.9,
+     "sleeper": 10.8
+    },
+    "spread": 4.1,
+    "weights": {
+     "espn": 1.0,
+     "sleeper": 1.0
+    }
+   },
+   "1837": {
+    "mean": 11.0,
+    "n": 2,
+    "per_source": {
+     "fantasypros": 9.7,
      "sleeper": 12.3
     },
-    "spread": 2.5,
+    "spread": 2.6,
     "weights": {
      "fantasypros": 1.0,
      "sleeper": 1.0
     }
    },
    "19": {
-    "mean": 20.1,
+    "mean": 20.0,
     "n": 2,
     "per_source": {
-     "fantasypros": 11.5,
+     "fantasypros": 11.3,
      "sleeper": 28.7
     },
-    "spread": 17.2,
+    "spread": 17.4,
     "weights": {
      "fantasypros": 1.0,
      "sleeper": 1.0
     }
    },
    "1945": {
-    "mean": 122.0,
+    "mean": 117.9,
     "n": 1,
     "per_source": {
-     "fantasypros": 122.0
+     "fantasypros": 117.9
     },
     "spread": 0.0,
     "weights": {
@@ -4084,10 +4091,10 @@
     }
    },
    "2020": {
-    "mean": 126.9,
+    "mean": 125.9,
     "n": 1,
     "per_source": {
-     "fantasypros": 126.9
+     "fantasypros": 125.9
     },
     "spread": 0.0,
     "weights": {
@@ -4106,14 +4113,14 @@
     }
    },
    "2078": {
-    "mean": 22.8,
+    "mean": 22.3,
     "n": 3,
     "per_source": {
-     "espn": 9.2,
-     "fantasypros": 31.1,
+     "espn": 9.3,
+     "fantasypros": 29.6,
      "sleeper": 28.0
     },
-    "spread": 21.9,
+    "spread": 20.3,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -4121,14 +4128,14 @@
     }
    },
    "2133": {
-    "mean": 202.1,
+    "mean": 204.0,
     "n": 3,
     "per_source": {
-     "espn": 235.3,
+     "espn": 240.8,
      "fantasypros": 180.6,
      "sleeper": 190.5
     },
-    "spread": 54.7,
+    "spread": 60.2,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -4158,10 +4165,10 @@
     }
    },
    "2216": {
-    "mean": 198.4,
+    "mean": 199.0,
     "n": 3,
     "per_source": {
-     "espn": 192.9,
+     "espn": 194.6,
      "fantasypros": 182.1,
      "sleeper": 220.2
     },
@@ -4173,14 +4180,14 @@
     }
    },
    "2306": {
-    "mean": 13.7,
+    "mean": 98.7,
     "n": 3,
     "per_source": {
-     "espn": 16.7,
-     "fantasypros": 11.5,
+     "espn": 237.8,
+     "fantasypros": 45.4,
      "sleeper": 12.9
     },
-    "spread": 5.2,
+    "spread": 224.9,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -4188,14 +4195,14 @@
     }
    },
    "2307": {
-    "mean": 44.7,
+    "mean": 60.8,
     "n": 3,
     "per_source": {
-     "espn": 75.1,
-     "fantasypros": 45.8,
+     "espn": 75.3,
+     "fantasypros": 94.0,
      "sleeper": 13.1
     },
-    "spread": 62.0,
+    "spread": 80.9,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -4203,13 +4210,13 @@
     }
    },
    "2359": {
-    "mean": 15.6,
+    "mean": 15.7,
     "n": 2,
     "per_source": {
-     "espn": 26.4,
+     "espn": 26.6,
      "sleeper": 4.8
     },
-    "spread": 21.6,
+    "spread": 21.8,
     "weights": {
      "espn": 1.0,
      "sleeper": 1.0
@@ -4227,14 +4234,14 @@
     }
    },
    "2449": {
-    "mean": 167.6,
+    "mean": 168.2,
     "n": 3,
     "per_source": {
-     "espn": 178.3,
+     "espn": 180.0,
      "fantasypros": 167.3,
      "sleeper": 157.3
     },
-    "spread": 21.0,
+    "spread": 22.7,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -4242,10 +4249,10 @@
     }
    },
    "2471": {
-    "mean": 9.4,
+    "mean": 9.5,
     "n": 1,
     "per_source": {
-     "espn": 9.4
+     "espn": 9.5
     },
     "spread": 0.0,
     "weights": {
@@ -4253,14 +4260,14 @@
     }
    },
    "2505": {
-    "mean": 115.6,
+    "mean": 114.8,
     "n": 3,
     "per_source": {
-     "espn": 97.0,
+     "espn": 94.7,
      "fantasypros": 127.2,
      "sleeper": 122.6
     },
-    "spread": 30.2,
+    "spread": 32.5,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -4279,10 +4286,10 @@
     }
    },
    "2747": {
-    "mean": 138.3,
+    "mean": 135.6,
     "n": 1,
     "per_source": {
-     "fantasypros": 138.3
+     "fantasypros": 135.6
     },
     "spread": 0.0,
     "weights": {
@@ -4323,10 +4330,10 @@
     }
    },
    "3155": {
-    "mean": 44.3,
+    "mean": 42.0,
     "n": 1,
     "per_source": {
-     "espn": 44.3
+     "espn": 42.0
     },
     "spread": 0.0,
     "weights": {
@@ -4334,27 +4341,27 @@
     }
    },
    "3161": {
-    "mean": 15.2,
+    "mean": 15.1,
     "n": 2,
     "per_source": {
-     "fantasypros": 18.0,
+     "fantasypros": 17.8,
      "sleeper": 12.4
     },
-    "spread": 5.6,
+    "spread": 5.4,
     "weights": {
      "fantasypros": 1.0,
      "sleeper": 1.0
     }
    },
    "3163": {
-    "mean": 285.1,
+    "mean": 284.5,
     "n": 3,
     "per_source": {
-     "espn": 281.4,
-     "fantasypros": 294.5,
+     "espn": 282.1,
+     "fantasypros": 291.8,
      "sleeper": 279.5
     },
-    "spread": 15.0,
+    "spread": 12.3,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -4362,14 +4369,14 @@
     }
    },
    "3198": {
-    "mean": 249.5,
+    "mean": 250.0,
     "n": 3,
     "per_source": {
-     "espn": 256.3,
+     "espn": 257.7,
      "fantasypros": 247.4,
      "sleeper": 244.9
     },
-    "spread": 11.4,
+    "spread": 12.8,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -4388,27 +4395,27 @@
     }
    },
    "3202": {
-    "mean": 30.0,
+    "mean": 29.7,
     "n": 2,
     "per_source": {
-     "espn": 26.7,
+     "espn": 26.1,
      "sleeper": 33.2
     },
-    "spread": 6.5,
+    "spread": 7.1,
     "weights": {
      "espn": 1.0,
      "sleeper": 1.0
     }
    },
    "3214": {
-    "mean": 156.3,
+    "mean": 155.4,
     "n": 3,
     "per_source": {
-     "espn": 161.6,
+     "espn": 159.0,
      "fantasypros": 153.7,
      "sleeper": 153.5
     },
-    "spread": 8.1,
+    "spread": 5.5,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -4416,14 +4423,14 @@
     }
    },
    "3257": {
-    "mean": 204.1,
+    "mean": 205.3,
     "n": 3,
     "per_source": {
-     "espn": 236.4,
-     "fantasypros": 216.0,
+     "espn": 237.0,
+     "fantasypros": 218.8,
      "sleeper": 160.0
     },
-    "spread": 76.4,
+    "spread": 77.0,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -4431,27 +4438,27 @@
     }
    },
    "3269": {
-    "mean": 45.3,
+    "mean": 45.7,
     "n": 2,
     "per_source": {
-     "espn": 86.5,
+     "espn": 87.3,
      "sleeper": 4.1
     },
-    "spread": 82.4,
+    "spread": 83.2,
     "weights": {
      "espn": 1.0,
      "sleeper": 1.0
     }
    },
    "3271": {
-    "mean": 41.5,
+    "mean": 41.4,
     "n": 3,
     "per_source": {
-     "espn": 19.1,
+     "espn": 18.8,
      "fantasypros": 72.4,
      "sleeper": 32.9
     },
-    "spread": 53.3,
+    "spread": 53.6,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -4459,27 +4466,27 @@
     }
    },
    "3286": {
-    "mean": 82.8,
+    "mean": 83.2,
     "n": 2,
     "per_source": {
-     "espn": 92.2,
+     "espn": 93.0,
      "sleeper": 73.4
     },
-    "spread": 18.8,
+    "spread": 19.6,
     "weights": {
      "espn": 1.0,
      "sleeper": 1.0
     }
    },
    "3294": {
-    "mean": 296.7,
+    "mean": 296.0,
     "n": 3,
     "per_source": {
-     "espn": 295.6,
-     "fantasypros": 294.5,
+     "espn": 296.3,
+     "fantasypros": 291.8,
      "sleeper": 299.9
     },
-    "spread": 5.4,
+    "spread": 8.1,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -4500,10 +4507,10 @@
     }
    },
    "3451": {
-    "mean": 143.1,
+    "mean": 142.1,
     "n": 1,
     "per_source": {
-     "fantasypros": 143.1
+     "fantasypros": 142.1
     },
     "spread": 0.0,
     "weights": {
@@ -4511,14 +4518,14 @@
     }
    },
    "3634": {
-    "mean": 75.6,
+    "mean": 76.4,
     "n": 3,
     "per_source": {
-     "espn": 119.3,
-     "fantasypros": 79.9,
+     "espn": 120.0,
+     "fantasypros": 81.4,
      "sleeper": 27.7
     },
-    "spread": 91.6,
+    "spread": 92.3,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -4526,10 +4533,10 @@
     }
    },
    "3678": {
-    "mean": 115.5,
+    "mean": 114.6,
     "n": 1,
     "per_source": {
-     "fantasypros": 115.5
+     "fantasypros": 114.6
     },
     "spread": 0.0,
     "weights": {
@@ -4548,14 +4555,14 @@
     }
    },
    "4017": {
-    "mean": 145.2,
+    "mean": 154.8,
     "n": 3,
     "per_source": {
-     "espn": 232.1,
-     "fantasypros": 101.4,
+     "espn": 232.6,
+     "fantasypros": 129.7,
      "sleeper": 102.1
     },
-    "spread": 130.7,
+    "spread": 130.5,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -4576,10 +4583,10 @@
     }
    },
    "4034": {
-    "mean": 281.4,
+    "mean": 281.9,
     "n": 3,
     "per_source": {
-     "espn": 280.5,
+     "espn": 282.0,
      "fantasypros": 272.8,
      "sleeper": 291.0
     },
@@ -4591,14 +4598,14 @@
     }
    },
    "4035": {
-    "mean": 95.6,
+    "mean": 95.8,
     "n": 3,
     "per_source": {
-     "espn": 134.9,
+     "espn": 135.6,
      "fantasypros": 88.8,
      "sleeper": 63.0
     },
-    "spread": 71.9,
+    "spread": 72.6,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -4606,14 +4613,14 @@
     }
    },
    "4037": {
-    "mean": 162.6,
+    "mean": 163.0,
     "n": 3,
     "per_source": {
-     "espn": 148.4,
+     "espn": 149.7,
      "fantasypros": 165.8,
      "sleeper": 173.6
     },
-    "spread": 25.2,
+    "spread": 23.9,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -4621,14 +4628,14 @@
     }
    },
    "4039": {
-    "mean": 89.6,
+    "mean": 89.8,
     "n": 3,
     "per_source": {
-     "espn": 92.0,
+     "espn": 92.8,
      "fantasypros": 90.3,
      "sleeper": 86.4
     },
-    "spread": 5.6,
+    "spread": 6.4,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -4647,14 +4654,14 @@
     }
    },
    "4046": {
-    "mean": 294.0,
+    "mean": 293.3,
     "n": 3,
     "per_source": {
-     "espn": 302.8,
-     "fantasypros": 294.5,
+     "espn": 303.5,
+     "fantasypros": 291.8,
      "sleeper": 284.7
     },
-    "spread": 18.1,
+    "spread": 18.8,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -4665,20 +4672,20 @@
     "mean": 12.2,
     "n": 2,
     "per_source": {
-     "espn": 9.1,
+     "espn": 8.9,
      "sleeper": 15.4
     },
-    "spread": 6.3,
+    "spread": 6.5,
     "weights": {
      "espn": 1.0,
      "sleeper": 1.0
     }
    },
    "4066": {
-    "mean": 96.9,
+    "mean": 96.2,
     "n": 3,
     "per_source": {
-     "espn": 107.0,
+     "espn": 104.8,
      "fantasypros": 113.0,
      "sleeper": 70.7
     },
@@ -4727,10 +4734,10 @@
     }
    },
    "4144": {
-    "mean": 49.5,
+    "mean": 49.2,
     "n": 3,
     "per_source": {
-     "espn": 56.2,
+     "espn": 55.2,
      "fantasypros": 56.5,
      "sleeper": 35.9
     },
@@ -4742,10 +4749,10 @@
     }
    },
    "4147": {
-    "mean": 70.6,
+    "mean": 70.7,
     "n": 3,
     "per_source": {
-     "espn": 70.6,
+     "espn": 70.9,
      "fantasypros": 71.4,
      "sleeper": 69.8
     },
@@ -4768,14 +4775,14 @@
     }
    },
    "4177": {
-    "mean": 74.5,
+    "mean": 76.3,
     "n": 3,
     "per_source": {
-     "espn": 91.9,
+     "espn": 97.3,
      "fantasypros": 74.0,
      "sleeper": 57.6
     },
-    "spread": 34.3,
+    "spread": 39.7,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -4794,23 +4801,23 @@
     }
    },
    "4189": {
-    "mean": 15.6,
+    "mean": 15.3,
     "n": 2,
     "per_source": {
-     "espn": 25.5,
+     "espn": 24.9,
      "sleeper": 5.7
     },
-    "spread": 19.8,
+    "spread": 19.2,
     "weights": {
      "espn": 1.0,
      "sleeper": 1.0
     }
    },
    "4195": {
-    "mean": 115.5,
+    "mean": 114.6,
     "n": 1,
     "per_source": {
-     "fantasypros": 115.5
+     "fantasypros": 114.6
     },
     "spread": 0.0,
     "weights": {
@@ -4818,10 +4825,10 @@
     }
    },
    "4199": {
-    "mean": 156.8,
+    "mean": 157.1,
     "n": 3,
     "per_source": {
-     "espn": 165.3,
+     "espn": 166.2,
      "fantasypros": 168.1,
      "sleeper": 137.1
     },
@@ -4833,14 +4840,14 @@
     }
    },
    "421": {
-    "mean": 283.3,
+    "mean": 282.7,
     "n": 3,
     "per_source": {
-     "espn": 292.4,
-     "fantasypros": 281.4,
+     "espn": 293.2,
+     "fantasypros": 278.8,
      "sleeper": 276.2
     },
-    "spread": 16.2,
+    "spread": 17.0,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -4848,14 +4855,14 @@
     }
    },
    "4217": {
-    "mean": 188.7,
+    "mean": 187.8,
     "n": 3,
     "per_source": {
-     "espn": 209.5,
-     "fantasypros": 187.2,
+     "espn": 205.2,
+     "fantasypros": 189.0,
      "sleeper": 169.3
     },
-    "spread": 40.2,
+    "spread": 35.9,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -4874,10 +4881,21 @@
     }
    },
    "4227": {
-    "mean": 126.9,
+    "mean": 125.9,
     "n": 1,
     "per_source": {
-     "fantasypros": 126.9
+     "fantasypros": 125.9
+    },
+    "spread": 0.0,
+    "weights": {
+     "fantasypros": 1.0
+    }
+   },
+   "4233": {
+    "mean": 79.1,
+    "n": 1,
+    "per_source": {
+     "fantasypros": 79.1
     },
     "spread": 0.0,
     "weights": {
@@ -4907,10 +4925,10 @@
     }
    },
    "4314": {
-    "mean": 37.2,
+    "mean": 36.4,
     "n": 1,
     "per_source": {
-     "espn": 37.2
+     "espn": 36.4
     },
     "spread": 0.0,
     "weights": {
@@ -4929,10 +4947,10 @@
     }
    },
    "4353": {
-    "mean": 6.8,
+    "mean": 6.9,
     "n": 1,
     "per_source": {
-     "espn": 6.8
+     "espn": 6.9
     },
     "spread": 0.0,
     "weights": {
@@ -4951,14 +4969,14 @@
     }
    },
    "4454": {
-    "mean": 87.3,
+    "mean": 87.6,
     "n": 3,
     "per_source": {
-     "espn": 109.0,
+     "espn": 109.9,
      "fantasypros": 75.5,
      "sleeper": 77.4
     },
-    "spread": 33.5,
+    "spread": 34.4,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -4977,10 +4995,10 @@
     }
    },
    "4574": {
-    "mean": 9.8,
+    "mean": 9.7,
     "n": 1,
     "per_source": {
-     "fantasypros": 9.8
+     "fantasypros": 9.7
     },
     "spread": 0.0,
     "weights": {
@@ -5021,10 +5039,10 @@
     }
    },
    "4866": {
-    "mean": 243.3,
+    "mean": 243.8,
     "n": 3,
     "per_source": {
-     "espn": 242.7,
+     "espn": 244.0,
      "fantasypros": 242.6,
      "sleeper": 244.7
     },
@@ -5036,14 +5054,14 @@
     }
    },
    "4881": {
-    "mean": 325.8,
+    "mean": 325.1,
     "n": 3,
     "per_source": {
-     "espn": 341.0,
-     "fantasypros": 312.5,
+     "espn": 341.8,
+     "fantasypros": 309.6,
      "sleeper": 324.0
     },
-    "spread": 28.5,
+    "spread": 32.2,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -5051,14 +5069,14 @@
     }
    },
    "4892": {
-    "mean": 270.2,
+    "mean": 270.7,
     "n": 3,
     "per_source": {
-     "espn": 275.9,
-     "fantasypros": 261.8,
+     "espn": 276.5,
+     "fantasypros": 262.6,
      "sleeper": 272.9
     },
-    "spread": 14.1,
+    "spread": 13.9,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -5066,14 +5084,14 @@
     }
    },
    "4943": {
-    "mean": 244.7,
+    "mean": 251.2,
     "n": 3,
     "per_source": {
-     "espn": 249.1,
-     "fantasypros": 224.2,
+     "espn": 249.7,
+     "fantasypros": 243.1,
      "sleeper": 260.7
     },
-    "spread": 36.5,
+    "spread": 17.6,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -5105,14 +5123,14 @@
     }
    },
    "4981": {
-    "mean": 86.7,
+    "mean": 87.0,
     "n": 3,
     "per_source": {
-     "espn": 102.8,
+     "espn": 103.7,
      "fantasypros": 79.9,
      "sleeper": 77.3
     },
-    "spread": 25.5,
+    "spread": 26.4,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -5120,14 +5138,14 @@
     }
    },
    "4983": {
-    "mean": 187.2,
+    "mean": 187.8,
     "n": 3,
     "per_source": {
-     "espn": 199.1,
+     "espn": 200.9,
      "fantasypros": 183.5,
      "sleeper": 179.0
     },
-    "spread": 20.1,
+    "spread": 21.9,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -5135,14 +5153,14 @@
     }
    },
    "4984": {
-    "mean": 363.0,
+    "mean": 362.2,
     "n": 3,
     "per_source": {
-     "espn": 374.7,
-     "fantasypros": 356.7,
+     "espn": 375.6,
+     "fantasypros": 353.4,
      "sleeper": 357.5
     },
-    "spread": 18.0,
+    "spread": 22.2,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -5161,14 +5179,14 @@
     }
    },
    "4993": {
-    "mean": 111.5,
+    "mean": 110.6,
     "n": 3,
     "per_source": {
-     "espn": 118.3,
+     "espn": 115.7,
      "fantasypros": 111.3,
      "sleeper": 104.9
     },
-    "spread": 13.4,
+    "spread": 10.8,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -5176,23 +5194,23 @@
     }
    },
    "4995": {
-    "mean": 6.5,
+    "mean": 6.3,
     "n": 2,
     "per_source": {
-     "espn": 8.9,
+     "espn": 8.7,
      "sleeper": 4.0
     },
-    "spread": 4.9,
+    "spread": 4.7,
     "weights": {
      "espn": 1.0,
      "sleeper": 1.0
     }
    },
    "5001": {
-    "mean": 161.1,
+    "mean": 160.5,
     "n": 3,
     "per_source": {
-     "espn": 159.2,
+     "espn": 157.5,
      "fantasypros": 173.1,
      "sleeper": 150.9
     },
@@ -5204,13 +5222,13 @@
     }
    },
    "5008": {
-    "mean": 21.3,
+    "mean": 21.1,
     "n": 2,
     "per_source": {
-     "espn": 32.8,
+     "espn": 32.2,
      "sleeper": 9.9
     },
-    "spread": 22.9,
+    "spread": 22.3,
     "weights": {
      "espn": 1.0,
      "sleeper": 1.0
@@ -5228,14 +5246,14 @@
     }
    },
    "5012": {
-    "mean": 165.0,
+    "mean": 163.8,
     "n": 3,
     "per_source": {
-     "espn": 170.0,
+     "espn": 166.5,
      "fantasypros": 162.5,
      "sleeper": 162.5
     },
-    "spread": 7.5,
+    "spread": 4.0,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -5243,14 +5261,14 @@
     }
    },
    "5022": {
-    "mean": 151.9,
+    "mean": 150.8,
     "n": 3,
     "per_source": {
-     "espn": 160.8,
+     "espn": 157.5,
      "fantasypros": 159.0,
      "sleeper": 136.0
     },
-    "spread": 24.8,
+    "spread": 23.0,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -5258,14 +5276,14 @@
     }
    },
    "5045": {
-    "mean": 169.3,
+    "mean": 169.8,
     "n": 3,
     "per_source": {
-     "espn": 179.6,
+     "espn": 181.3,
      "fantasypros": 153.9,
      "sleeper": 174.3
     },
-    "spread": 25.7,
+    "spread": 27.4,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -5284,10 +5302,10 @@
     }
    },
    "5095": {
-    "mean": 113.9,
+    "mean": 113.0,
     "n": 1,
     "per_source": {
-     "fantasypros": 113.9
+     "fantasypros": 113.0
     },
     "spread": 0.0,
     "weights": {
@@ -5295,10 +5313,10 @@
     }
    },
    "5119": {
-    "mean": 100.9,
+    "mean": 40.4,
     "n": 1,
     "per_source": {
-     "fantasypros": 100.9
+     "fantasypros": 40.4
     },
     "spread": 0.0,
     "weights": {
@@ -5361,10 +5379,10 @@
     }
    },
    "5189": {
-    "mean": 130.1,
+    "mean": 129.2,
     "n": 1,
     "per_source": {
-     "fantasypros": 130.1
+     "fantasypros": 129.2
     },
     "spread": 0.0,
     "weights": {
@@ -5383,25 +5401,27 @@
     }
    },
    "5773": {
-    "mean": 13.8,
-    "n": 1,
+    "mean": 19.8,
+    "n": 2,
     "per_source": {
-     "espn": 13.8
+     "espn": 13.9,
+     "sleeper": 25.6
     },
-    "spread": 0.0,
+    "spread": 11.7,
     "weights": {
-     "espn": 1.0
+     "espn": 1.0,
+     "sleeper": 1.0
     }
    },
    "5844": {
-    "mean": 153.4,
+    "mean": 152.3,
     "n": 3,
     "per_source": {
-     "espn": 158.6,
+     "espn": 155.3,
      "fantasypros": 146.6,
      "sleeper": 155.0
     },
-    "spread": 12.0,
+    "spread": 8.7,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -5409,10 +5429,10 @@
     }
    },
    "5846": {
-    "mean": 173.8,
+    "mean": 174.4,
     "n": 3,
     "per_source": {
-     "espn": 178.3,
+     "espn": 179.9,
      "fantasypros": 159.9,
      "sleeper": 183.3
     },
@@ -5435,14 +5455,14 @@
     }
    },
    "5849": {
-    "mean": 284.4,
+    "mean": 286.0,
     "n": 3,
     "per_source": {
-     "espn": 307.1,
-     "fantasypros": 265.1,
+     "espn": 307.8,
+     "fantasypros": 269.1,
      "sleeper": 281.1
     },
-    "spread": 42.0,
+    "spread": 38.7,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -5450,14 +5470,14 @@
     }
    },
    "5850": {
-    "mean": 149.3,
+    "mean": 149.6,
     "n": 3,
     "per_source": {
-     "espn": 159.9,
+     "espn": 160.7,
      "fantasypros": 150.7,
      "sleeper": 137.4
     },
-    "spread": 22.5,
+    "spread": 23.3,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -5465,14 +5485,14 @@
     }
    },
    "5857": {
-    "mean": 49.1,
+    "mean": 48.7,
     "n": 3,
     "per_source": {
-     "espn": 55.8,
+     "espn": 54.7,
      "fantasypros": 54.8,
      "sleeper": 36.6
     },
-    "spread": 19.2,
+    "spread": 18.2,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -5480,14 +5500,14 @@
     }
    },
    "5859": {
-    "mean": 174.1,
+    "mean": 169.1,
     "n": 3,
     "per_source": {
-     "espn": 178.1,
+     "espn": 163.3,
      "fantasypros": 179.1,
      "sleeper": 165.0
     },
-    "spread": 14.1,
+    "spread": 15.8,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -5495,14 +5515,14 @@
     }
    },
    "5870": {
-    "mean": 239.8,
+    "mean": 241.4,
     "n": 3,
     "per_source": {
-     "espn": 247.6,
-     "fantasypros": 250.3,
+     "espn": 248.2,
+     "fantasypros": 254.5,
      "sleeper": 221.5
     },
-    "spread": 28.8,
+    "spread": 33.0,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -5510,14 +5530,14 @@
     }
    },
    "5872": {
-    "mean": 166.8,
+    "mean": 167.3,
     "n": 3,
     "per_source": {
-     "espn": 189.2,
+     "espn": 190.9,
      "fantasypros": 155.4,
      "sleeper": 155.7
     },
-    "spread": 33.8,
+    "spread": 35.5,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -5525,14 +5545,14 @@
     }
    },
    "5892": {
-    "mean": 193.9,
+    "mean": 194.2,
     "n": 3,
     "per_source": {
-     "espn": 168.0,
+     "espn": 168.9,
      "fantasypros": 207.7,
      "sleeper": 206.1
     },
-    "spread": 39.7,
+    "spread": 38.8,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -5540,10 +5560,10 @@
     }
    },
    "5906": {
-    "mean": 66.2,
+    "mean": 65.8,
     "n": 3,
     "per_source": {
-     "espn": 67.5,
+     "espn": 66.1,
      "fantasypros": 54.8,
      "sleeper": 76.4
     },
@@ -5555,10 +5575,10 @@
     }
    },
    "5927": {
-    "mean": 193.6,
+    "mean": 194.2,
     "n": 3,
     "per_source": {
-     "espn": 195.3,
+     "espn": 197.1,
      "fantasypros": 171.7,
      "sleeper": 213.8
     },
@@ -5581,10 +5601,10 @@
     }
    },
    "5947": {
-    "mean": 155.6,
+    "mean": 156.0,
     "n": 3,
     "per_source": {
-     "espn": 152.3,
+     "espn": 153.7,
      "fantasypros": 145.1,
      "sleeper": 169.3
     },
@@ -5596,10 +5616,10 @@
     }
    },
    "5967": {
-    "mean": 151.3,
+    "mean": 151.5,
     "n": 3,
     "per_source": {
-     "espn": 147.8,
+     "espn": 148.6,
      "fantasypros": 145.9,
      "sleeper": 160.1
     },
@@ -5622,40 +5642,40 @@
     }
    },
    "5973": {
-    "mean": 44.3,
+    "mean": 43.7,
     "n": 2,
     "per_source": {
-     "espn": 57.2,
+     "espn": 56.0,
      "sleeper": 31.4
     },
-    "spread": 25.8,
+    "spread": 24.6,
     "weights": {
      "espn": 1.0,
      "sleeper": 1.0
     }
    },
    "5985": {
-    "mean": 24.2,
+    "mean": 24.6,
     "n": 2,
     "per_source": {
-     "espn": 38.7,
+     "espn": 39.4,
      "sleeper": 9.8
     },
-    "spread": 28.9,
+    "spread": 29.6,
     "weights": {
      "espn": 1.0,
      "sleeper": 1.0
     }
    },
    "5995": {
-    "mean": 70.9,
+    "mean": 71.1,
     "n": 3,
     "per_source": {
-     "espn": 94.3,
+     "espn": 94.8,
      "fantasypros": 50.7,
      "sleeper": 67.7
     },
-    "spread": 43.6,
+    "spread": 44.1,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -5663,13 +5683,13 @@
     }
    },
    "6001": {
-    "mean": 40.2,
+    "mean": 39.7,
     "n": 2,
     "per_source": {
-     "espn": 48.8,
+     "espn": 47.7,
      "sleeper": 31.6
     },
-    "spread": 17.2,
+    "spread": 16.1,
     "weights": {
      "espn": 1.0,
      "sleeper": 1.0
@@ -5679,24 +5699,24 @@
     "mean": 18.9,
     "n": 2,
     "per_source": {
-     "fantasypros": 9.8,
+     "fantasypros": 9.7,
      "sleeper": 28.0
     },
-    "spread": 18.2,
+    "spread": 18.3,
     "weights": {
      "fantasypros": 1.0,
      "sleeper": 1.0
     }
    },
    "6039": {
-    "mean": 51.9,
+    "mean": 52.0,
     "n": 3,
     "per_source": {
-     "espn": 74.6,
+     "espn": 74.9,
      "fantasypros": 25.4,
      "sleeper": 55.8
     },
-    "spread": 49.2,
+    "spread": 49.5,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -5704,10 +5724,10 @@
     }
    },
    "6083": {
-    "mean": 104.1,
+    "mean": 103.3,
     "n": 1,
     "per_source": {
-     "fantasypros": 104.1
+     "fantasypros": 103.3
     },
     "spread": 0.0,
     "weights": {
@@ -5726,14 +5746,14 @@
     }
    },
    "6130": {
-    "mean": 43.4,
+    "mean": 45.3,
     "n": 3,
     "per_source": {
-     "espn": 68.0,
+     "espn": 73.7,
      "fantasypros": 31.7,
      "sleeper": 30.6
     },
-    "spread": 37.4,
+    "spread": 43.1,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -5752,13 +5772,13 @@
     }
    },
    "6149": {
-    "mean": 63.3,
+    "mean": 61.8,
     "n": 2,
     "per_source": {
-     "fantasypros": 50.3,
+     "fantasypros": 47.4,
      "sleeper": 76.3
     },
-    "spread": 26.0,
+    "spread": 28.9,
     "weights": {
      "fantasypros": 1.0,
      "sleeper": 1.0
@@ -5776,14 +5796,14 @@
     }
    },
    "6271": {
-    "mean": 55.6,
+    "mean": 55.3,
     "n": 3,
     "per_source": {
-     "espn": 62.9,
-     "fantasypros": 28.1,
+     "espn": 63.5,
+     "fantasypros": 26.6,
      "sleeper": 75.8
     },
-    "spread": 47.7,
+    "spread": 49.2,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -5791,23 +5811,23 @@
     }
    },
    "6427": {
-    "mean": 9.9,
+    "mean": 10.0,
     "n": 2,
     "per_source": {
-     "espn": 16.9,
+     "espn": 17.0,
      "sleeper": 3.0
     },
-    "spread": 13.9,
+    "spread": 14.0,
     "weights": {
      "espn": 1.0,
      "sleeper": 1.0
     }
    },
    "650": {
-    "mean": 109.0,
+    "mean": 108.2,
     "n": 1,
     "per_source": {
-     "fantasypros": 109.0
+     "fantasypros": 108.2
     },
     "spread": 0.0,
     "weights": {
@@ -5815,10 +5835,10 @@
     }
    },
    "6528": {
-    "mean": 107.4,
+    "mean": 108.2,
     "n": 1,
     "per_source": {
-     "fantasypros": 107.4
+     "fantasypros": 108.2
     },
     "spread": 0.0,
     "weights": {
@@ -5826,10 +5846,10 @@
     }
    },
    "6650": {
-    "mean": 126.9,
+    "mean": 125.9,
     "n": 1,
     "per_source": {
-     "fantasypros": 126.9
+     "fantasypros": 125.9
     },
     "spread": 0.0,
     "weights": {
@@ -5848,27 +5868,27 @@
     }
    },
    "6768": {
-    "mean": 58.2,
+    "mean": 58.1,
     "n": 2,
     "per_source": {
-     "fantasypros": 29.5,
+     "fantasypros": 29.2,
      "sleeper": 87.0
     },
-    "spread": 57.5,
+    "spread": 57.8,
     "weights": {
      "fantasypros": 1.0,
      "sleeper": 1.0
     }
    },
    "6770": {
-    "mean": 300.8,
+    "mean": 300.2,
     "n": 3,
     "per_source": {
-     "espn": 301.0,
-     "fantasypros": 299.4,
+     "espn": 301.8,
+     "fantasypros": 296.6,
      "sleeper": 302.1
     },
-    "spread": 2.7,
+    "spread": 5.5,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -5876,14 +5896,14 @@
     }
    },
    "6783": {
-    "mean": 101.0,
+    "mean": 101.3,
     "n": 3,
     "per_source": {
-     "espn": 88.8,
+     "espn": 89.6,
      "fantasypros": 94.7,
      "sleeper": 119.6
     },
-    "spread": 30.8,
+    "spread": 30.0,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -5891,14 +5911,14 @@
     }
    },
    "6786": {
-    "mean": 262.9,
+    "mean": 276.6,
     "n": 3,
     "per_source": {
-     "espn": 280.5,
-     "fantasypros": 239.8,
+     "espn": 283.1,
+     "fantasypros": 278.3,
      "sleeper": 268.5
     },
-    "spread": 40.7,
+    "spread": 14.6,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -5906,14 +5926,14 @@
     }
    },
    "6790": {
-    "mean": 208.4,
+    "mean": 208.7,
     "n": 3,
     "per_source": {
-     "espn": 188.7,
+     "espn": 189.8,
      "fantasypros": 228.4,
      "sleeper": 208.0
     },
-    "spread": 39.7,
+    "spread": 38.6,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -5921,14 +5941,14 @@
     }
    },
    "6794": {
-    "mean": 262.1,
+    "mean": 263.0,
     "n": 3,
     "per_source": {
-     "espn": 299.2,
+     "espn": 301.9,
      "fantasypros": 236.8,
      "sleeper": 250.4
     },
-    "spread": 62.4,
+    "spread": 65.1,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -5936,14 +5956,14 @@
     }
    },
    "6797": {
-    "mean": 282.6,
+    "mean": 282.0,
     "n": 3,
     "per_source": {
-     "espn": 264.8,
-     "fantasypros": 289.6,
+     "espn": 265.5,
+     "fantasypros": 286.9,
      "sleeper": 293.5
     },
-    "spread": 28.7,
+    "spread": 28.0,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -5951,10 +5971,10 @@
     }
    },
    "6801": {
-    "mean": 212.6,
+    "mean": 213.2,
     "n": 3,
     "per_source": {
-     "espn": 217.2,
+     "espn": 218.9,
      "fantasypros": 198.3,
      "sleeper": 222.4
     },
@@ -5979,14 +5999,14 @@
     }
    },
    "6804": {
-    "mean": 277.8,
+    "mean": 276.6,
     "n": 3,
     "per_source": {
-     "espn": 268.9,
-     "fantasypros": 288.0,
+     "espn": 269.6,
+     "fantasypros": 283.7,
      "sleeper": 276.5
     },
-    "spread": 19.1,
+    "spread": 14.1,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -5994,14 +6014,14 @@
     }
    },
    "6806": {
-    "mean": 157.6,
+    "mean": 157.9,
     "n": 3,
     "per_source": {
-     "espn": 161.9,
+     "espn": 162.8,
      "fantasypros": 150.7,
      "sleeper": 160.2
     },
-    "spread": 11.2,
+    "spread": 12.1,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -6009,10 +6029,10 @@
     }
    },
    "6813": {
-    "mean": 296.8,
+    "mean": 297.3,
     "n": 3,
     "per_source": {
-     "espn": 307.6,
+     "espn": 309.2,
      "fantasypros": 312.4,
      "sleeper": 270.3
     },
@@ -6024,14 +6044,14 @@
     }
    },
    "6819": {
-    "mean": 162.2,
+    "mean": 162.7,
     "n": 3,
     "per_source": {
-     "espn": 179.4,
+     "espn": 181.0,
      "fantasypros": 136.2,
      "sleeper": 170.9
     },
-    "spread": 43.2,
+    "spread": 44.8,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -6050,10 +6070,10 @@
     }
    },
    "6826": {
-    "mean": 67.5,
+    "mean": 67.1,
     "n": 3,
     "per_source": {
-     "espn": 62.8,
+     "espn": 61.5,
      "fantasypros": 60.1,
      "sleeper": 79.7
     },
@@ -6065,10 +6085,10 @@
     }
    },
    "6828": {
-    "mean": 5.4,
+    "mean": 79.7,
     "n": 1,
     "per_source": {
-     "espn": 5.4
+     "espn": 79.7
     },
     "spread": 0.0,
     "weights": {
@@ -6098,14 +6118,14 @@
     }
    },
    "6865": {
-    "mean": 81.2,
+    "mean": 81.0,
     "n": 3,
     "per_source": {
-     "espn": 73.8,
+     "espn": 73.1,
      "fantasypros": 93.6,
      "sleeper": 76.3
     },
-    "spread": 19.8,
+    "spread": 20.5,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -6113,27 +6133,27 @@
     }
    },
    "6869": {
-    "mean": 33.5,
+    "mean": 33.1,
     "n": 2,
     "per_source": {
-     "espn": 39.2,
+     "espn": 38.4,
      "sleeper": 27.8
     },
-    "spread": 11.4,
+    "spread": 10.6,
     "weights": {
      "espn": 1.0,
      "sleeper": 1.0
     }
    },
    "6904": {
-    "mean": 312.3,
+    "mean": 311.5,
     "n": 3,
     "per_source": {
-     "espn": 317.4,
-     "fantasypros": 310.9,
+     "espn": 318.1,
+     "fantasypros": 308.0,
      "sleeper": 308.5
     },
-    "spread": 8.9,
+    "spread": 10.1,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -6152,10 +6172,10 @@
     }
    },
    "6931": {
-    "mean": 11.7,
+    "mean": 11.8,
     "n": 1,
     "per_source": {
-     "espn": 11.7
+     "espn": 11.8
     },
     "spread": 0.0,
     "weights": {
@@ -6207,10 +6227,10 @@
     }
    },
    "7002": {
-    "mean": 156.9,
+    "mean": 155.8,
     "n": 3,
     "per_source": {
-     "espn": 156.7,
+     "espn": 153.5,
      "fantasypros": 173.1,
      "sleeper": 140.9
     },
@@ -6222,14 +6242,14 @@
     }
    },
    "7021": {
-    "mean": 156.6,
+    "mean": 153.5,
     "n": 3,
     "per_source": {
-     "espn": 145.3,
+     "espn": 136.1,
      "fantasypros": 163.3,
      "sleeper": 161.1
     },
-    "spread": 18.0,
+    "spread": 27.2,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -6248,10 +6268,10 @@
     }
    },
    "7042": {
-    "mean": 123.6,
+    "mean": 124.3,
     "n": 1,
     "per_source": {
-     "fantasypros": 123.6
+     "fantasypros": 124.3
     },
     "spread": 0.0,
     "weights": {
@@ -6259,10 +6279,10 @@
     }
    },
    "7049": {
-    "mean": 99.0,
+    "mean": 99.3,
     "n": 3,
     "per_source": {
-     "espn": 100.9,
+     "espn": 101.8,
      "fantasypros": 90.3,
      "sleeper": 105.7
     },
@@ -6274,13 +6294,13 @@
     }
    },
    "7075": {
-    "mean": 12.3,
+    "mean": 12.2,
     "n": 2,
     "per_source": {
-     "espn": 16.7,
+     "espn": 16.3,
      "sleeper": 8.0
     },
-    "spread": 8.7,
+    "spread": 8.3,
     "weights": {
      "espn": 1.0,
      "sleeper": 1.0
@@ -6290,24 +6310,24 @@
     "mean": 11.2,
     "n": 2,
     "per_source": {
-     "fantasypros": 9.8,
+     "fantasypros": 9.7,
      "sleeper": 12.7
     },
-    "spread": 2.9,
+    "spread": 3.0,
     "weights": {
      "fantasypros": 1.0,
      "sleeper": 1.0
     }
    },
    "7090": {
-    "mean": 73.1,
+    "mean": 75.7,
     "n": 3,
     "per_source": {
-     "espn": 72.0,
+     "espn": 79.7,
      "fantasypros": 74.0,
      "sleeper": 73.4
     },
-    "spread": 2.0,
+    "spread": 6.3,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -6339,10 +6359,10 @@
     }
    },
    "7521": {
-    "mean": 23.6,
+    "mean": 23.8,
     "n": 1,
     "per_source": {
-     "espn": 23.6
+     "espn": 23.8
     },
     "spread": 0.0,
     "weights": {
@@ -6350,14 +6370,14 @@
     }
    },
    "7523": {
-    "mean": 302.2,
+    "mean": 301.6,
     "n": 3,
     "per_source": {
-     "espn": 296.1,
-     "fantasypros": 309.2,
+     "espn": 296.9,
+     "fantasypros": 306.4,
      "sleeper": 301.4
     },
-    "spread": 13.1,
+    "spread": 9.5,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -6365,14 +6385,14 @@
     }
    },
    "7525": {
-    "mean": 236.3,
+    "mean": 237.5,
     "n": 3,
     "per_source": {
-     "espn": 248.7,
-     "fantasypros": 230.9,
+     "espn": 250.9,
+     "fantasypros": 232.4,
      "sleeper": 229.2
     },
-    "spread": 19.5,
+    "spread": 21.7,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -6380,10 +6400,10 @@
     }
    },
    "7526": {
-    "mean": 215.2,
+    "mean": 215.9,
     "n": 3,
     "per_source": {
-     "espn": 214.5,
+     "espn": 216.4,
      "fantasypros": 210.2,
      "sleeper": 221.0
     },
@@ -6395,23 +6415,23 @@
     }
    },
    "7527": {
-    "mean": 19.1,
+    "mean": 19.0,
     "n": 2,
     "per_source": {
-     "fantasypros": 11.5,
+     "fantasypros": 11.3,
      "sleeper": 26.7
     },
-    "spread": 15.2,
+    "spread": 15.4,
     "weights": {
      "fantasypros": 1.0,
      "sleeper": 1.0
     }
    },
    "7528": {
-    "mean": 48.0,
+    "mean": 50.0,
     "n": 3,
     "per_source": {
-     "espn": 39.9,
+     "espn": 46.0,
      "fantasypros": 77.7,
      "sleeper": 26.3
     },
@@ -6434,10 +6454,10 @@
     }
    },
    "7535": {
-    "mean": 17.8,
+    "mean": 17.4,
     "n": 1,
     "per_source": {
-     "espn": 17.8
+     "espn": 17.4
     },
     "spread": 0.0,
     "weights": {
@@ -6445,27 +6465,27 @@
     }
    },
    "7536": {
-    "mean": 18.2,
+    "mean": 17.9,
     "n": 2,
     "per_source": {
-     "espn": 28.4,
+     "espn": 27.8,
      "sleeper": 8.0
     },
-    "spread": 20.4,
+    "spread": 19.8,
     "weights": {
      "espn": 1.0,
      "sleeper": 1.0
     }
    },
    "7543": {
-    "mean": 189.7,
+    "mean": 190.0,
     "n": 3,
     "per_source": {
-     "espn": 168.2,
+     "espn": 169.1,
      "fantasypros": 195.1,
      "sleeper": 205.7
     },
-    "spread": 37.5,
+    "spread": 36.6,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -6473,14 +6493,14 @@
     }
    },
    "7547": {
-    "mean": 297.1,
+    "mean": 298.1,
     "n": 3,
     "per_source": {
-     "espn": 328.5,
+     "espn": 331.5,
      "fantasypros": 284.2,
      "sleeper": 278.5
     },
-    "spread": 50.0,
+    "spread": 53.0,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -6488,14 +6508,14 @@
     }
    },
    "7553": {
-    "mean": 171.4,
+    "mean": 170.2,
     "n": 3,
     "per_source": {
-     "espn": 169.5,
+     "espn": 166.0,
      "fantasypros": 173.1,
      "sleeper": 171.6
     },
-    "spread": 3.6,
+    "spread": 7.1,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -6514,27 +6534,29 @@
     }
    },
    "7562": {
-    "mean": 24.6,
-    "n": 2,
+    "mean": 18.0,
+    "n": 3,
     "per_source": {
+     "espn": 4.7,
      "fantasypros": 38.5,
      "sleeper": 10.7
     },
-    "spread": 27.8,
+    "spread": 33.8,
     "weights": {
+     "espn": 1.0,
      "fantasypros": 1.0,
      "sleeper": 1.0
     }
    },
    "7564": {
-    "mean": 309.5,
+    "mean": 310.4,
     "n": 3,
     "per_source": {
-     "espn": 323.5,
+     "espn": 326.0,
      "fantasypros": 296.0,
      "sleeper": 309.1
     },
-    "spread": 27.5,
+    "spread": 30.0,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -6542,14 +6564,14 @@
     }
    },
    "7567": {
-    "mean": 134.1,
+    "mean": 134.3,
     "n": 3,
     "per_source": {
-     "espn": 113.5,
+     "espn": 114.1,
      "fantasypros": 136.4,
      "sleeper": 152.3
     },
-    "spread": 38.8,
+    "spread": 38.2,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -6568,10 +6590,10 @@
     }
    },
    "7569": {
-    "mean": 242.9,
+    "mean": 237.9,
     "n": 3,
     "per_source": {
-     "espn": 249.6,
+     "espn": 234.7,
      "fantasypros": 219.1,
      "sleeper": 260.0
     },
@@ -6583,14 +6605,14 @@
     }
    },
    "7571": {
-    "mean": 113.6,
+    "mean": 113.9,
     "n": 3,
     "per_source": {
-     "espn": 120.0,
+     "espn": 121.1,
      "fantasypros": 118.4,
      "sleeper": 102.3
     },
-    "spread": 17.7,
+    "spread": 18.8,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -6598,36 +6620,36 @@
     }
    },
    "7585": {
-    "mean": 10.9,
+    "mean": 10.8,
     "n": 2,
     "per_source": {
-     "fantasypros": 9.8,
+     "fantasypros": 9.7,
      "sleeper": 12.0
     },
-    "spread": 2.2,
+    "spread": 2.3,
     "weights": {
      "fantasypros": 1.0,
      "sleeper": 1.0
     }
    },
    "7587": {
-    "mean": 51.1,
+    "mean": 51.6,
     "n": 2,
     "per_source": {
-     "espn": 97.3,
+     "espn": 98.2,
      "sleeper": 4.9
     },
-    "spread": 92.4,
+    "spread": 93.3,
     "weights": {
      "espn": 1.0,
      "sleeper": 1.0
     }
    },
    "7588": {
-    "mean": 224.4,
+    "mean": 224.8,
     "n": 3,
     "per_source": {
-     "espn": 226.4,
+     "espn": 227.6,
      "fantasypros": 234.7,
      "sleeper": 212.0
     },
@@ -6639,27 +6661,27 @@
     }
    },
    "7591": {
-    "mean": 23.1,
+    "mean": 23.0,
     "n": 2,
     "per_source": {
-     "fantasypros": 11.5,
+     "fantasypros": 11.3,
      "sleeper": 34.7
     },
-    "spread": 23.2,
+    "spread": 23.4,
     "weights": {
      "fantasypros": 1.0,
      "sleeper": 1.0
     }
    },
    "7594": {
-    "mean": 172.9,
+    "mean": 175.3,
     "n": 3,
     "per_source": {
-     "espn": 196.4,
+     "espn": 203.5,
      "fantasypros": 174.4,
      "sleeper": 147.9
     },
-    "spread": 48.5,
+    "spread": 55.6,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -6667,27 +6689,27 @@
     }
    },
    "7595": {
-    "mean": 6.0,
+    "mean": 6.1,
     "n": 2,
     "per_source": {
-     "espn": 7.8,
+     "espn": 7.9,
      "sleeper": 4.2
     },
-    "spread": 3.6,
+    "spread": 3.7,
     "weights": {
      "espn": 1.0,
      "sleeper": 1.0
     }
    },
    "7600": {
-    "mean": 129.9,
+    "mean": 128.9,
     "n": 3,
     "per_source": {
-     "espn": 139.4,
+     "espn": 136.5,
      "fantasypros": 121.9,
      "sleeper": 128.4
     },
-    "spread": 17.5,
+    "spread": 14.6,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -6717,23 +6739,23 @@
     }
    },
    "7610": {
-    "mean": 12.2,
+    "mean": 12.1,
     "n": 2,
     "per_source": {
-     "fantasypros": 9.8,
+     "fantasypros": 9.7,
      "sleeper": 14.6
     },
-    "spread": 4.8,
+    "spread": 4.9,
     "weights": {
      "fantasypros": 1.0,
      "sleeper": 1.0
     }
    },
    "7611": {
-    "mean": 175.5,
+    "mean": 175.8,
     "n": 3,
     "per_source": {
-     "espn": 176.6,
+     "espn": 177.6,
      "fantasypros": 180.8,
      "sleeper": 169.0
     },
@@ -6756,10 +6778,10 @@
     }
    },
    "7670": {
-    "mean": 43.0,
+    "mean": 43.1,
     "n": 3,
     "per_source": {
-     "espn": 41.6,
+     "espn": 42.0,
      "fantasypros": 54.8,
      "sleeper": 32.6
     },
@@ -6771,14 +6793,14 @@
     }
    },
    "7694": {
-    "mean": 54.9,
+    "mean": 54.2,
     "n": 3,
     "per_source": {
-     "espn": 83.4,
+     "espn": 81.4,
      "fantasypros": 49.5,
      "sleeper": 31.8
     },
-    "spread": 51.6,
+    "spread": 49.6,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -6786,14 +6808,14 @@
     }
    },
    "7716": {
-    "mean": 33.9,
+    "mean": 33.7,
     "n": 3,
     "per_source": {
-     "espn": 25.6,
+     "espn": 25.1,
      "fantasypros": 44.2,
      "sleeper": 31.8
     },
-    "spread": 18.6,
+    "spread": 19.1,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -6812,14 +6834,14 @@
     }
    },
    "7828": {
-    "mean": 51.9,
+    "mean": 51.6,
     "n": 3,
     "per_source": {
-     "espn": 43.5,
+     "espn": 42.6,
      "fantasypros": 53.0,
      "sleeper": 59.1
     },
-    "spread": 15.6,
+    "spread": 16.5,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -6827,10 +6849,10 @@
     }
    },
    "7839": {
-    "mean": 130.1,
+    "mean": 129.2,
     "n": 1,
     "per_source": {
-     "fantasypros": 130.1
+     "fantasypros": 129.2
     },
     "spread": 0.0,
     "weights": {
@@ -6838,36 +6860,36 @@
     }
    },
    "7842": {
-    "mean": 18.4,
+    "mean": 18.1,
     "n": 2,
     "per_source": {
-     "espn": 26.7,
+     "espn": 26.2,
      "sleeper": 10.1
     },
-    "spread": 16.6,
+    "spread": 16.1,
     "weights": {
      "espn": 1.0,
      "sleeper": 1.0
     }
    },
    "7891": {
-    "mean": 28.0,
+    "mean": 27.6,
     "n": 2,
     "per_source": {
-     "espn": 28.6,
+     "espn": 28.0,
      "sleeper": 27.3
     },
-    "spread": 1.3,
+    "spread": 0.7,
     "weights": {
      "espn": 1.0,
      "sleeper": 1.0
     }
    },
    "7922": {
-    "mean": 97.6,
+    "mean": 96.9,
     "n": 1,
     "per_source": {
-     "fantasypros": 97.6
+     "fantasypros": 96.9
     },
     "spread": 0.0,
     "weights": {
@@ -6908,14 +6930,14 @@
     }
    },
    "8110": {
-    "mean": 158.9,
+    "mean": 157.8,
     "n": 3,
     "per_source": {
-     "espn": 149.0,
+     "espn": 145.9,
      "fantasypros": 167.8,
      "sleeper": 159.8
     },
-    "spread": 18.8,
+    "spread": 21.9,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -6923,14 +6945,14 @@
     }
    },
    "8111": {
-    "mean": 125.2,
+    "mean": 124.3,
     "n": 3,
     "per_source": {
-     "espn": 133.2,
+     "espn": 130.5,
      "fantasypros": 120.1,
      "sleeper": 122.3
     },
-    "spread": 13.1,
+    "spread": 10.4,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -6938,14 +6960,14 @@
     }
    },
    "8112": {
-    "mean": 236.4,
+    "mean": 237.2,
     "n": 3,
     "per_source": {
-     "espn": 249.4,
+     "espn": 251.7,
      "fantasypros": 211.7,
      "sleeper": 248.2
     },
-    "spread": 37.7,
+    "spread": 40.0,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -6964,27 +6986,29 @@
     }
    },
    "8117": {
-    "mean": 40.0,
-    "n": 2,
+    "mean": 27.7,
+    "n": 3,
     "per_source": {
+     "espn": 3.0,
      "fantasypros": 45.9,
      "sleeper": 34.2
     },
-    "spread": 11.7,
+    "spread": 42.9,
     "weights": {
+     "espn": 1.0,
      "fantasypros": 1.0,
      "sleeper": 1.0
     }
    },
    "8119": {
-    "mean": 76.9,
+    "mean": 77.2,
     "n": 3,
     "per_source": {
-     "espn": 101.8,
+     "espn": 102.7,
      "fantasypros": 57.7,
      "sleeper": 71.2
     },
-    "spread": 44.1,
+    "spread": 45.0,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -6992,14 +7016,14 @@
     }
    },
    "8121": {
-    "mean": 151.2,
+    "mean": 153.0,
     "n": 3,
     "per_source": {
-     "espn": 139.9,
+     "espn": 145.2,
      "fantasypros": 152.5,
      "sleeper": 161.2
     },
-    "spread": 21.3,
+    "spread": 16.0,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -7007,14 +7031,14 @@
     }
    },
    "8126": {
-    "mean": 148.9,
+    "mean": 149.3,
     "n": 3,
     "per_source": {
-     "espn": 129.5,
+     "espn": 130.6,
      "fantasypros": 146.5,
      "sleeper": 170.7
     },
-    "spread": 41.2,
+    "spread": 40.1,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -7022,14 +7046,16 @@
     }
    },
    "8127": {
-    "mean": 69.5,
-    "n": 2,
+    "mean": 61.1,
+    "n": 3,
     "per_source": {
+     "espn": 44.3,
      "fantasypros": 100.7,
      "sleeper": 38.4
     },
     "spread": 62.3,
     "weights": {
+     "espn": 1.0,
      "fantasypros": 1.0,
      "sleeper": 1.0
     }
@@ -7046,14 +7072,14 @@
     }
    },
    "8130": {
-    "mean": 260.5,
+    "mean": 258.6,
     "n": 3,
     "per_source": {
-     "espn": 282.0,
+     "espn": 276.1,
      "fantasypros": 266.7,
      "sleeper": 232.9
     },
-    "spread": 49.1,
+    "spread": 43.2,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -7061,14 +7087,14 @@
     }
    },
    "8131": {
-    "mean": 184.9,
+    "mean": 180.7,
     "n": 3,
     "per_source": {
-     "espn": 217.2,
+     "espn": 204.5,
      "fantasypros": 180.2,
      "sleeper": 157.3
     },
-    "spread": 59.9,
+    "spread": 47.2,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -7076,10 +7102,10 @@
     }
    },
    "8132": {
-    "mean": 102.9,
+    "mean": 103.1,
     "n": 3,
     "per_source": {
-     "espn": 114.1,
+     "espn": 114.7,
      "fantasypros": 117.3,
      "sleeper": 77.2
     },
@@ -7091,10 +7117,10 @@
     }
    },
    "8134": {
-    "mean": 159.5,
+    "mean": 160.0,
     "n": 3,
     "per_source": {
-     "espn": 164.1,
+     "espn": 165.6,
      "fantasypros": 143.6,
      "sleeper": 170.7
     },
@@ -7106,14 +7132,14 @@
     }
    },
    "8135": {
-    "mean": 21.6,
+    "mean": 21.7,
     "n": 3,
     "per_source": {
-     "espn": 7.9,
+     "espn": 8.0,
      "fantasypros": 22.2,
      "sleeper": 34.8
     },
-    "spread": 26.9,
+    "spread": 26.8,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -7121,10 +7147,10 @@
     }
    },
    "8136": {
-    "mean": 139.0,
+    "mean": 139.2,
     "n": 3,
     "per_source": {
-     "espn": 138.2,
+     "espn": 138.9,
      "fantasypros": 150.7,
      "sleeper": 128.1
     },
@@ -7136,14 +7162,14 @@
     }
    },
    "8137": {
-    "mean": 233.3,
+    "mean": 233.5,
     "n": 3,
     "per_source": {
-     "espn": 223.7,
-     "fantasypros": 232.4,
+     "espn": 225.8,
+     "fantasypros": 230.9,
      "sleeper": 243.7
     },
-    "spread": 20.0,
+    "spread": 17.9,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -7151,14 +7177,14 @@
     }
    },
    "8138": {
-    "mean": 253.3,
+    "mean": 253.7,
     "n": 3,
     "per_source": {
-     "espn": 240.9,
+     "espn": 242.1,
      "fantasypros": 260.1,
      "sleeper": 258.8
     },
-    "spread": 19.2,
+    "spread": 18.0,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -7177,14 +7203,14 @@
     }
    },
    "8142": {
-    "mean": 144.5,
+    "mean": 144.9,
     "n": 3,
     "per_source": {
-     "espn": 121.0,
+     "espn": 122.1,
      "fantasypros": 134.7,
      "sleeper": 177.9
     },
-    "spread": 56.9,
+    "spread": 55.8,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -7192,14 +7218,14 @@
     }
    },
    "8144": {
-    "mean": 243.3,
+    "mean": 244.6,
     "n": 3,
     "per_source": {
-     "espn": 257.7,
-     "fantasypros": 238.3,
+     "espn": 260.0,
+     "fantasypros": 239.8,
      "sleeper": 233.9
     },
-    "spread": 23.8,
+    "spread": 26.1,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -7207,27 +7233,27 @@
     }
    },
    "8145": {
-    "mean": 21.5,
+    "mean": 22.0,
     "n": 2,
     "per_source": {
-     "espn": 33.6,
+     "espn": 34.6,
      "sleeper": 9.3
     },
-    "spread": 24.3,
+    "spread": 25.3,
     "weights": {
      "espn": 1.0,
      "sleeper": 1.0
     }
    },
    "8146": {
-    "mean": 221.4,
+    "mean": 222.0,
     "n": 3,
     "per_source": {
-     "espn": 233.4,
+     "espn": 235.4,
      "fantasypros": 205.8,
      "sleeper": 224.9
     },
-    "spread": 27.6,
+    "spread": 29.6,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -7235,23 +7261,23 @@
     }
    },
    "8147": {
-    "mean": 24.6,
+    "mean": 28.4,
     "n": 2,
     "per_source": {
-     "espn": 0.5,
+     "espn": 8.1,
      "sleeper": 48.8
     },
-    "spread": 48.3,
+    "spread": 40.7,
     "weights": {
      "espn": 1.0,
      "sleeper": 1.0
     }
    },
    "8148": {
-    "mean": 186.5,
+    "mean": 187.0,
     "n": 3,
     "per_source": {
-     "espn": 180.1,
+     "espn": 181.7,
      "fantasypros": 173.2,
      "sleeper": 206.2
     },
@@ -7263,14 +7289,14 @@
     }
    },
    "8150": {
-    "mean": 207.0,
+    "mean": 207.5,
     "n": 3,
     "per_source": {
-     "espn": 194.2,
+     "espn": 195.6,
      "fantasypros": 218.8,
      "sleeper": 208.0
     },
-    "spread": 24.6,
+    "spread": 23.2,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -7278,10 +7304,10 @@
     }
    },
    "8151": {
-    "mean": 271.8,
+    "mean": 272.2,
     "n": 3,
     "per_source": {
-     "espn": 281.1,
+     "espn": 282.5,
      "fantasypros": 290.2,
      "sleeper": 244.0
     },
@@ -7293,14 +7319,14 @@
     }
    },
    "8154": {
-    "mean": 79.4,
+    "mean": 79.5,
     "n": 3,
     "per_source": {
-     "espn": 85.7,
+     "espn": 86.2,
      "fantasypros": 82.5,
      "sleeper": 69.9
     },
-    "spread": 15.8,
+    "spread": 16.3,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -7308,14 +7334,14 @@
     }
    },
    "8155": {
-    "mean": 222.6,
+    "mean": 223.0,
     "n": 3,
     "per_source": {
-     "espn": 230.0,
+     "espn": 231.2,
      "fantasypros": 226.8,
      "sleeper": 211.0
     },
-    "spread": 19.0,
+    "spread": 20.2,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -7323,14 +7349,14 @@
     }
    },
    "8161": {
-    "mean": 262.7,
+    "mean": 263.1,
     "n": 3,
     "per_source": {
-     "espn": 246.3,
-     "fantasypros": 271.6,
+     "espn": 246.9,
+     "fantasypros": 272.3,
      "sleeper": 270.1
     },
-    "spread": 25.3,
+    "spread": 25.4,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -7338,10 +7364,10 @@
     }
    },
    "8162": {
-    "mean": 9.8,
+    "mean": 9.7,
     "n": 1,
     "per_source": {
-     "fantasypros": 9.8
+     "fantasypros": 9.7
     },
     "spread": 0.0,
     "weights": {
@@ -7349,14 +7375,14 @@
     }
    },
    "8167": {
-    "mean": 210.2,
+    "mean": 211.0,
     "n": 3,
     "per_source": {
-     "espn": 220.1,
+     "espn": 222.6,
      "fantasypros": 202.8,
      "sleeper": 207.6
     },
-    "spread": 17.3,
+    "spread": 19.8,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -7364,27 +7390,27 @@
     }
    },
    "8168": {
-    "mean": 4.3,
+    "mean": 12.9,
     "n": 2,
     "per_source": {
-     "espn": 5.7,
+     "espn": 22.8,
      "sleeper": 3.0
     },
-    "spread": 2.7,
+    "spread": 19.8,
     "weights": {
      "espn": 1.0,
      "sleeper": 1.0
     }
    },
    "8172": {
-    "mean": 116.7,
+    "mean": 116.0,
     "n": 3,
     "per_source": {
-     "espn": 108.5,
+     "espn": 106.3,
      "fantasypros": 130.7,
      "sleeper": 110.9
     },
-    "spread": 22.2,
+    "spread": 24.4,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -7403,10 +7429,10 @@
     }
    },
    "8180": {
-    "mean": 107.4,
+    "mean": 107.6,
     "n": 3,
     "per_source": {
-     "espn": 96.8,
+     "espn": 97.6,
      "fantasypros": 94.7,
      "sleeper": 130.6
     },
@@ -7431,14 +7457,14 @@
     }
    },
    "8183": {
-    "mean": 303.9,
+    "mean": 303.2,
     "n": 3,
     "per_source": {
-     "espn": 314.6,
-     "fantasypros": 297.8,
+     "espn": 315.3,
+     "fantasypros": 295.0,
      "sleeper": 299.2
     },
-    "spread": 16.8,
+    "spread": 20.3,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -7446,14 +7472,14 @@
     }
    },
    "8188": {
-    "mean": 73.5,
+    "mean": 73.7,
     "n": 3,
     "per_source": {
-     "espn": 82.3,
+     "espn": 83.1,
      "fantasypros": 75.5,
      "sleeper": 62.6
     },
-    "spread": 19.7,
+    "spread": 20.5,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -7483,13 +7509,13 @@
     }
    },
    "8204": {
-    "mean": 6.6,
+    "mean": 11.5,
     "n": 2,
     "per_source": {
-     "espn": 3.3,
+     "espn": 13.2,
      "sleeper": 9.8
     },
-    "spread": 6.5,
+    "spread": 3.4,
     "weights": {
      "espn": 1.0,
      "sleeper": 1.0
@@ -7531,29 +7557,40 @@
     }
    },
    "8210": {
-    "mean": 131.6,
+    "mean": 130.8,
     "n": 3,
     "per_source": {
-     "espn": 116.4,
+     "espn": 114.0,
      "fantasypros": 134.2,
      "sleeper": 144.1
     },
-    "spread": 27.7,
+    "spread": 30.1,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
      "sleeper": 1.0
     }
    },
+   "8219": {
+    "mean": 1.9,
+    "n": 1,
+    "per_source": {
+     "espn": 1.9
+    },
+    "spread": 0.0,
+    "weights": {
+     "espn": 1.0
+    }
+   },
    "8225": {
-    "mean": 37.2,
+    "mean": 37.0,
     "n": 3,
     "per_source": {
-     "espn": 34.5,
+     "espn": 33.8,
      "fantasypros": 37.1,
      "sleeper": 40.1
     },
-    "spread": 5.6,
+    "spread": 6.3,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -7561,14 +7598,14 @@
     }
    },
    "8228": {
-    "mean": 177.2,
+    "mean": 178.0,
     "n": 3,
     "per_source": {
-     "espn": 186.5,
+     "espn": 189.0,
      "fantasypros": 174.4,
      "sleeper": 170.6
     },
-    "spread": 15.9,
+    "spread": 18.4,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -7598,10 +7635,10 @@
     }
    },
    "8259": {
-    "mean": 130.1,
+    "mean": 129.2,
     "n": 1,
     "per_source": {
-     "fantasypros": 130.1
+     "fantasypros": 129.2
     },
     "spread": 0.0,
     "weights": {
@@ -7609,13 +7646,13 @@
     }
    },
    "827": {
-    "mean": 11.4,
+    "mean": 11.3,
     "n": 2,
     "per_source": {
-     "fantasypros": 9.8,
+     "fantasypros": 9.7,
      "sleeper": 12.9
     },
-    "spread": 3.1,
+    "spread": 3.2,
     "weights": {
      "fantasypros": 1.0,
      "sleeper": 1.0
@@ -7633,10 +7670,10 @@
     }
    },
    "8408": {
-    "mean": 126.5,
+    "mean": 126.7,
     "n": 3,
     "per_source": {
-     "espn": 116.3,
+     "espn": 116.9,
      "fantasypros": 109.4,
      "sleeper": 153.7
     },
@@ -7659,26 +7696,26 @@
     }
    },
    "8489": {
-    "mean": 11.3,
+    "mean": 11.1,
     "n": 2,
     "per_source": {
-     "espn": 17.2,
+     "espn": 16.9,
      "sleeper": 5.4
     },
-    "spread": 11.8,
+    "spread": 11.5,
     "weights": {
      "espn": 1.0,
      "sleeper": 1.0
     }
    },
    "8527": {
-    "mean": 10.3,
+    "mean": 10.4,
     "n": 2,
     "per_source": {
-     "espn": 16.0,
+     "espn": 16.2,
      "sleeper": 4.6
     },
-    "spread": 11.4,
+    "spread": 11.6,
     "weights": {
      "espn": 1.0,
      "sleeper": 1.0
@@ -7696,14 +7733,14 @@
     }
    },
    "8676": {
-    "mean": 140.3,
+    "mean": 140.8,
     "n": 3,
     "per_source": {
-     "espn": 166.0,
+     "espn": 167.5,
      "fantasypros": 116.9,
      "sleeper": 138.1
     },
-    "spread": 49.1,
+    "spread": 50.6,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -7735,27 +7772,27 @@
     }
    },
    "8917": {
-    "mean": 52.0,
+    "mean": 52.2,
     "n": 2,
     "per_source": {
-     "espn": 32.6,
+     "espn": 32.9,
      "sleeper": 71.5
     },
-    "spread": 38.9,
+    "spread": 38.6,
     "weights": {
      "espn": 1.0,
      "sleeper": 1.0
     }
    },
    "9221": {
-    "mean": 349.1,
+    "mean": 349.8,
     "n": 3,
     "per_source": {
-     "espn": 364.4,
+     "espn": 366.3,
      "fantasypros": 353.6,
      "sleeper": 329.4
     },
-    "spread": 35.0,
+    "spread": 36.9,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -7763,14 +7800,14 @@
     }
    },
    "9224": {
-    "mean": 255.1,
+    "mean": 255.5,
     "n": 3,
     "per_source": {
-     "espn": 253.2,
+     "espn": 254.5,
      "fantasypros": 256.9,
      "sleeper": 255.2
     },
-    "spread": 3.7,
+    "spread": 2.4,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -7778,14 +7815,14 @@
     }
    },
    "9225": {
-    "mean": 68.5,
+    "mean": 68.6,
     "n": 3,
     "per_source": {
-     "espn": 46.6,
+     "espn": 46.9,
      "fantasypros": 93.6,
      "sleeper": 65.2
     },
-    "spread": 47.0,
+    "spread": 46.7,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -7793,14 +7830,14 @@
     }
    },
    "9226": {
-    "mean": 259.5,
+    "mean": 260.0,
     "n": 3,
     "per_source": {
-     "espn": 280.1,
+     "espn": 281.7,
      "fantasypros": 241.0,
      "sleeper": 257.4
     },
-    "spread": 39.1,
+    "spread": 40.7,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -7822,11 +7859,11 @@
     "mean": 263.4,
     "n": 3,
     "per_source": {
-     "espn": 281.6,
-     "fantasypros": 274.9,
+     "espn": 282.7,
+     "fantasypros": 273.9,
      "sleeper": 233.6
     },
-    "spread": 48.0,
+    "spread": 49.1,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -7834,13 +7871,13 @@
     }
    },
    "9229": {
-    "mean": 16.4,
+    "mean": 16.3,
     "n": 2,
     "per_source": {
-     "fantasypros": 11.5,
+     "fantasypros": 11.3,
      "sleeper": 21.3
     },
-    "spread": 9.8,
+    "spread": 10.0,
     "weights": {
      "fantasypros": 1.0,
      "sleeper": 1.0
@@ -7858,14 +7895,14 @@
     }
    },
    "9479": {
-    "mean": 70.5,
+    "mean": 70.1,
     "n": 3,
     "per_source": {
-     "espn": 62.8,
+     "espn": 61.5,
      "fantasypros": 63.6,
      "sleeper": 85.1
     },
-    "spread": 22.3,
+    "spread": 23.6,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -7873,14 +7910,14 @@
     }
    },
    "9480": {
-    "mean": 151.8,
+    "mean": 150.8,
     "n": 3,
     "per_source": {
-     "espn": 137.1,
+     "espn": 134.2,
      "fantasypros": 157.2,
      "sleeper": 161.0
     },
-    "spread": 23.9,
+    "spread": 26.8,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -7899,14 +7936,14 @@
     }
    },
    "9482": {
-    "mean": 91.4,
+    "mean": 90.7,
     "n": 3,
     "per_source": {
-     "espn": 101.6,
+     "espn": 99.5,
      "fantasypros": 91.8,
      "sleeper": 80.8
     },
-    "spread": 20.8,
+    "spread": 18.7,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -7914,14 +7951,14 @@
     }
    },
    "9484": {
-    "mean": 180.1,
+    "mean": 179.1,
     "n": 3,
     "per_source": {
-     "espn": 171.5,
+     "espn": 168.6,
      "fantasypros": 194.3,
      "sleeper": 174.4
     },
-    "spread": 22.8,
+    "spread": 25.7,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -7929,14 +7966,14 @@
     }
    },
    "9486": {
-    "mean": 120.8,
+    "mean": 121.2,
     "n": 3,
     "per_source": {
-     "espn": 149.8,
+     "espn": 151.2,
      "fantasypros": 142.1,
      "sleeper": 70.4
     },
-    "spread": 79.4,
+    "spread": 80.8,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -7944,14 +7981,14 @@
     }
    },
    "9487": {
-    "mean": 223.8,
+    "mean": 224.5,
     "n": 3,
     "per_source": {
-     "espn": 243.3,
+     "espn": 245.5,
      "fantasypros": 217.6,
      "sleeper": 210.4
     },
-    "spread": 32.9,
+    "spread": 35.1,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -7959,14 +7996,14 @@
     }
    },
    "9488": {
-    "mean": 301.2,
+    "mean": 302.2,
     "n": 3,
     "per_source": {
-     "espn": 328.0,
+     "espn": 331.0,
      "fantasypros": 293.1,
      "sleeper": 282.6
     },
-    "spread": 45.4,
+    "spread": 48.4,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -7974,14 +8011,14 @@
     }
    },
    "9493": {
-    "mean": 309.2,
+    "mean": 289.7,
     "n": 3,
     "per_source": {
-     "espn": 338.9,
-     "fantasypros": 278.3,
+     "espn": 320.3,
+     "fantasypros": 238.3,
      "sleeper": 310.5
     },
-    "spread": 60.6,
+    "spread": 82.0,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -7989,14 +8026,14 @@
     }
    },
    "9494": {
-    "mean": 59.9,
+    "mean": 60.1,
     "n": 3,
     "per_source": {
-     "espn": 46.3,
+     "espn": 46.7,
      "fantasypros": 63.6,
      "sleeper": 69.9
     },
-    "spread": 23.6,
+    "spread": 23.2,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -8004,14 +8041,14 @@
     }
    },
    "9500": {
-    "mean": 169.1,
+    "mean": 170.6,
     "n": 3,
     "per_source": {
-     "espn": 164.8,
+     "espn": 169.2,
      "fantasypros": 170.2,
      "sleeper": 172.3
     },
-    "spread": 7.5,
+    "spread": 3.1,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -8019,14 +8056,14 @@
     }
    },
    "9501": {
-    "mean": 86.9,
+    "mean": 88.0,
     "n": 3,
     "per_source": {
-     "espn": 100.3,
-     "fantasypros": 79.9,
+     "espn": 105.1,
+     "fantasypros": 78.5,
      "sleeper": 80.4
     },
-    "spread": 20.4,
+    "spread": 26.6,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -8034,27 +8071,27 @@
     }
    },
    "9502": {
-    "mean": 49.6,
+    "mean": 51.1,
     "n": 2,
     "per_source": {
-     "fantasypros": 47.4,
+     "fantasypros": 50.3,
      "sleeper": 51.9
     },
-    "spread": 4.5,
+    "spread": 1.6,
     "weights": {
      "fantasypros": 1.0,
      "sleeper": 1.0
     }
    },
    "9504": {
-    "mean": 118.9,
+    "mean": 120.0,
     "n": 3,
     "per_source": {
-     "espn": 107.3,
+     "espn": 110.5,
      "fantasypros": 124.3,
      "sleeper": 125.2
     },
-    "spread": 17.9,
+    "spread": 14.7,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -8077,14 +8114,14 @@
     }
    },
    "9508": {
-    "mean": 116.0,
+    "mean": 116.2,
     "n": 3,
     "per_source": {
-     "espn": 138.3,
+     "espn": 139.0,
      "fantasypros": 95.1,
      "sleeper": 114.6
     },
-    "spread": 43.2,
+    "spread": 43.9,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -8092,14 +8129,14 @@
     }
    },
    "9509": {
-    "mean": 314.8,
+    "mean": 315.3,
     "n": 3,
     "per_source": {
-     "espn": 288.5,
+     "espn": 290.0,
      "fantasypros": 333.0,
      "sleeper": 322.9
     },
-    "spread": 44.5,
+    "spread": 43.0,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -8107,14 +8144,14 @@
     }
    },
    "9511": {
-    "mean": 85.8,
+    "mean": 85.9,
     "n": 3,
     "per_source": {
-     "espn": 70.0,
+     "espn": 70.5,
      "fantasypros": 90.4,
      "sleeper": 96.9
     },
-    "spread": 26.9,
+    "spread": 26.4,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -8122,14 +8159,14 @@
     }
    },
    "96": {
-    "mean": 206.2,
+    "mean": 206.8,
     "n": 3,
     "per_source": {
-     "espn": 222.7,
-     "fantasypros": 220.9,
+     "espn": 223.2,
+     "fantasypros": 222.1,
      "sleeper": 175.0
     },
-    "spread": 47.7,
+    "spread": 48.2,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -8137,14 +8174,14 @@
     }
    },
    "9753": {
-    "mean": 96.3,
+    "mean": 96.6,
     "n": 3,
     "per_source": {
-     "espn": 133.0,
+     "espn": 133.7,
      "fantasypros": 88.8,
      "sleeper": 67.2
     },
-    "spread": 65.8,
+    "spread": 66.5,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -8152,14 +8189,14 @@
     }
    },
    "9754": {
-    "mean": 158.2,
+    "mean": 158.8,
     "n": 3,
     "per_source": {
-     "espn": 165.6,
+     "espn": 167.5,
      "fantasypros": 145.1,
      "sleeper": 163.9
     },
-    "spread": 20.5,
+    "spread": 22.4,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -8167,14 +8204,14 @@
     }
    },
    "9756": {
-    "mean": 162.4,
+    "mean": 162.9,
     "n": 3,
     "per_source": {
-     "espn": 173.5,
+     "espn": 175.0,
      "fantasypros": 142.1,
      "sleeper": 171.7
     },
-    "spread": 31.4,
+    "spread": 32.9,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -8195,14 +8232,14 @@
     }
    },
    "9758": {
-    "mean": 253.8,
+    "mean": 254.9,
     "n": 3,
     "per_source": {
-     "espn": 258.7,
-     "fantasypros": 256.9,
+     "espn": 259.4,
+     "fantasypros": 259.4,
      "sleeper": 245.8
     },
-    "spread": 12.9,
+    "spread": 13.6,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -8210,14 +8247,14 @@
     }
    },
    "9997": {
-    "mean": 232.6,
+    "mean": 233.3,
     "n": 3,
     "per_source": {
-     "espn": 246.1,
+     "espn": 248.3,
      "fantasypros": 223.5,
      "sleeper": 228.2
     },
-    "spread": 22.6,
+    "spread": 24.8,
     "weights": {
      "espn": 1.0,
      "fantasypros": 1.0,
@@ -8236,10 +8273,10 @@
     }
    },
    "ARI": {
-    "mean": 86.2,
+    "mean": 84.0,
     "n": 1,
     "per_source": {
-     "fantasypros": 86.2
+     "fantasypros": 84.0
     },
     "spread": 0.0,
     "weights": {
@@ -8247,10 +8284,10 @@
     }
    },
    "ATL": {
-    "mean": 84.6,
+    "mean": 87.2,
     "n": 1,
     "per_source": {
-     "fantasypros": 84.6
+     "fantasypros": 87.2
     },
     "spread": 0.0,
     "weights": {
@@ -8258,10 +8295,10 @@
     }
    },
    "BAL": {
-    "mean": 100.9,
+    "mean": 100.1,
     "n": 1,
     "per_source": {
-     "fantasypros": 100.9
+     "fantasypros": 100.1
     },
     "spread": 0.0,
     "weights": {
@@ -8269,10 +8306,10 @@
     }
    },
    "BUF": {
-    "mean": 96.0,
+    "mean": 95.3,
     "n": 1,
     "per_source": {
-     "fantasypros": 96.0
+     "fantasypros": 95.3
     },
     "spread": 0.0,
     "weights": {
@@ -8280,10 +8317,10 @@
     }
    },
    "CAR": {
-    "mean": 86.2,
+    "mean": 85.6,
     "n": 1,
     "per_source": {
-     "fantasypros": 86.2
+     "fantasypros": 85.6
     },
     "spread": 0.0,
     "weights": {
@@ -8291,10 +8328,10 @@
     }
    },
    "CHI": {
-    "mean": 87.8,
+    "mean": 88.8,
     "n": 1,
     "per_source": {
-     "fantasypros": 87.8
+     "fantasypros": 88.8
     },
     "spread": 0.0,
     "weights": {
@@ -8302,10 +8339,10 @@
     }
    },
    "CIN": {
-    "mean": 94.3,
+    "mean": 92.0,
     "n": 1,
     "per_source": {
-     "fantasypros": 94.3
+     "fantasypros": 92.0
     },
     "spread": 0.0,
     "weights": {
@@ -8313,10 +8350,10 @@
     }
    },
    "CLE": {
-    "mean": 96.0,
+    "mean": 95.3,
     "n": 1,
     "per_source": {
-     "fantasypros": 96.0
+     "fantasypros": 95.3
     },
     "spread": 0.0,
     "weights": {
@@ -8324,10 +8361,10 @@
     }
    },
    "DAL": {
-    "mean": 89.5,
+    "mean": 88.8,
     "n": 1,
     "per_source": {
-     "fantasypros": 89.5
+     "fantasypros": 88.8
     },
     "spread": 0.0,
     "weights": {
@@ -8335,10 +8372,10 @@
     }
    },
    "DEN": {
-    "mean": 107.4,
+    "mean": 106.6,
     "n": 1,
     "per_source": {
-     "fantasypros": 107.4
+     "fantasypros": 106.6
     },
     "spread": 0.0,
     "weights": {
@@ -8346,10 +8383,10 @@
     }
    },
    "DET": {
-    "mean": 94.3,
+    "mean": 93.6,
     "n": 1,
     "per_source": {
-     "fantasypros": 94.3
+     "fantasypros": 93.6
     },
     "spread": 0.0,
     "weights": {
@@ -8357,10 +8394,10 @@
     }
    },
    "GB": {
-    "mean": 96.0,
+    "mean": 95.3,
     "n": 1,
     "per_source": {
-     "fantasypros": 96.0
+     "fantasypros": 95.3
     },
     "spread": 0.0,
     "weights": {
@@ -8368,10 +8405,10 @@
     }
    },
    "HOU": {
-    "mean": 112.2,
+    "mean": 111.4,
     "n": 1,
     "per_source": {
-     "fantasypros": 112.2
+     "fantasypros": 111.4
     },
     "spread": 0.0,
     "weights": {
@@ -8379,10 +8416,10 @@
     }
    },
    "IND": {
-    "mean": 91.1,
+    "mean": 90.4,
     "n": 1,
     "per_source": {
-     "fantasypros": 91.1
+     "fantasypros": 90.4
     },
     "spread": 0.0,
     "weights": {
@@ -8390,10 +8427,10 @@
     }
    },
    "JAX": {
-    "mean": 104.1,
+    "mean": 101.7,
     "n": 1,
     "per_source": {
-     "fantasypros": 104.1
+     "fantasypros": 101.7
     },
     "spread": 0.0,
     "weights": {
@@ -8401,10 +8438,10 @@
     }
    },
    "KC": {
-    "mean": 97.6,
+    "mean": 96.9,
     "n": 1,
     "per_source": {
-     "fantasypros": 97.6
+     "fantasypros": 96.9
     },
     "spread": 0.0,
     "weights": {
@@ -8412,10 +8449,10 @@
     }
    },
    "LAC": {
-    "mean": 96.0,
+    "mean": 95.3,
     "n": 1,
     "per_source": {
-     "fantasypros": 96.0
+     "fantasypros": 95.3
     },
     "spread": 0.0,
     "weights": {
@@ -8423,10 +8460,10 @@
     }
    },
    "LAR": {
-    "mean": 107.4,
+    "mean": 106.6,
     "n": 1,
     "per_source": {
-     "fantasypros": 107.4
+     "fantasypros": 106.6
     },
     "spread": 0.0,
     "weights": {
@@ -8434,10 +8471,10 @@
     }
    },
    "LV": {
-    "mean": 87.8,
+    "mean": 87.2,
     "n": 1,
     "per_source": {
-     "fantasypros": 87.8
+     "fantasypros": 87.2
     },
     "spread": 0.0,
     "weights": {
@@ -8445,10 +8482,10 @@
     }
    },
    "MIA": {
-    "mean": 81.3,
+    "mean": 80.7,
     "n": 1,
     "per_source": {
-     "fantasypros": 81.3
+     "fantasypros": 80.7
     },
     "spread": 0.0,
     "weights": {
@@ -8456,10 +8493,10 @@
     }
    },
    "MIN": {
-    "mean": 104.1,
+    "mean": 103.3,
     "n": 1,
     "per_source": {
-     "fantasypros": 104.1
+     "fantasypros": 103.3
     },
     "spread": 0.0,
     "weights": {
@@ -8467,10 +8504,10 @@
     }
    },
    "NE": {
-    "mean": 102.5,
+    "mean": 103.3,
     "n": 1,
     "per_source": {
-     "fantasypros": 102.5
+     "fantasypros": 103.3
     },
     "spread": 0.0,
     "weights": {
@@ -8478,10 +8515,10 @@
     }
    },
    "NO": {
-    "mean": 91.1,
+    "mean": 93.6,
     "n": 1,
     "per_source": {
-     "fantasypros": 91.1
+     "fantasypros": 93.6
     },
     "spread": 0.0,
     "weights": {
@@ -8489,10 +8526,10 @@
     }
    },
    "NYG": {
-    "mean": 91.1,
+    "mean": 90.4,
     "n": 1,
     "per_source": {
-     "fantasypros": 91.1
+     "fantasypros": 90.4
     },
     "spread": 0.0,
     "weights": {
@@ -8500,10 +8537,10 @@
     }
    },
    "NYJ": {
-    "mean": 86.2,
+    "mean": 85.6,
     "n": 1,
     "per_source": {
-     "fantasypros": 86.2
+     "fantasypros": 85.6
     },
     "spread": 0.0,
     "weights": {
@@ -8511,10 +8548,10 @@
     }
    },
    "PHI": {
-    "mean": 105.7,
+    "mean": 104.9,
     "n": 1,
     "per_source": {
-     "fantasypros": 105.7
+     "fantasypros": 104.9
     },
     "spread": 0.0,
     "weights": {
@@ -8522,10 +8559,10 @@
     }
    },
    "PIT": {
-    "mean": 102.5,
+    "mean": 101.7,
     "n": 1,
     "per_source": {
-     "fantasypros": 102.5
+     "fantasypros": 101.7
     },
     "spread": 0.0,
     "weights": {
@@ -8533,10 +8570,10 @@
     }
    },
    "SEA": {
-    "mean": 115.5,
+    "mean": 114.6,
     "n": 1,
     "per_source": {
-     "fantasypros": 115.5
+     "fantasypros": 114.6
     },
     "spread": 0.0,
     "weights": {
@@ -8544,10 +8581,10 @@
     }
    },
    "SF": {
-    "mean": 97.6,
+    "mean": 96.9,
     "n": 1,
     "per_source": {
-     "fantasypros": 97.6
+     "fantasypros": 96.9
     },
     "spread": 0.0,
     "weights": {
@@ -8555,10 +8592,10 @@
     }
    },
    "TB": {
-    "mean": 92.7,
+    "mean": 90.4,
     "n": 1,
     "per_source": {
-     "fantasypros": 92.7
+     "fantasypros": 90.4
     },
     "spread": 0.0,
     "weights": {
@@ -8566,10 +8603,10 @@
     }
    },
    "TEN": {
-    "mean": 89.5,
+    "mean": 85.6,
     "n": 1,
     "per_source": {
-     "fantasypros": 89.5
+     "fantasypros": 85.6
     },
     "spread": 0.0,
     "weights": {
@@ -8577,10 +8614,10 @@
     }
    },
    "WAS": {
-    "mean": 83.0,
+    "mean": 82.3,
     "n": 1,
     "per_source": {
-     "fantasypros": 83.0
+     "fantasypros": 82.3
     },
     "spread": 0.0,
     "weights": {
@@ -8589,17 +8626,20 @@
    }
   },
   "notes": [
-   "fantasypros: fantasypros ros PPR: 451 players, 2 unmatched, updated 9/22",
+   "fantasypros: fantasypros ros PPR: 442 players, 2 unmatched, updated 9/24",
    "fantasypros is rest-of-season; scaled x1.13 onto a season basis (15 of 17 weeks left) \u2014 exact only for players who have missed no games",
-   "espn: DB, FB could not be fitted against sleeper (no shared players) \u2014 scaled on the overall 1.052 instead",
-   "fantasypros: DB, DEF, K could not be fitted against sleeper (no shared players) \u2014 scaled on the overall 0.897 instead",
-   "consensus over 3 live sources (espn x1, fantasypros x1, sleeper x1), 652 players, rescaled against sleeper (espn on 228, fantasypros on 258), 224 priced by all",
-   "\u26a0 rescale fitted on 224 players spanning 56\u2013379 pts and extrapolated to the whole pool \u2014 wire-level players sit below that range; widest factors espn/TE 1.142, fantasypros/RB 0.875, fantasypros/WR 0.816"
+   "espn: DB, FB could not be fitted against sleeper (no shared players) \u2014 scaled on the overall 1.057 instead",
+   "fantasypros: DB, DEF, K could not be fitted against sleeper (no shared players) \u2014 scaled on the overall 0.890 instead",
+   "consensus over 3 live sources (espn x1, fantasypros x1, sleeper x1), 655 players, rescaled against sleeper (espn on 226, fantasypros on 257), 222 priced by all",
+   "\u26a0 rescale fitted on 222 players spanning 56\u2013379 pts and extrapolated to the whole pool \u2014 wire-level players sit below that range; widest factors espn/TE 1.118, fantasypros/QB 0.894, fantasypros/RB 0.875, fantasypros/WR 0.816"
   ],
-  "ts": 1790116661.0731487
+  "ts": 1790285997.367878
  },
  "contingency:1": {},
  "contingency:2": {},
+ "contingency:3": {
+  "DJ Moore": "Devaughn Vele (WR, 11.5 pts)"
+ },
  "ecr": {
   "data": {
    "aaron jones": {

@@ -50,7 +50,7 @@
    "due_utc": "2026-09-24T21:35:00+00:00",
    "due_pt": "2026-09-24T14:35:00-07:00",
    "window_min": 45,
-   "done": false
+   "done": true
   },
   {
    "id": "wk3:slate_check:0924T1555",
