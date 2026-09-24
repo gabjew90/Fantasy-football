@@ -55,8 +55,9 @@ def _basic() -> dict[str, str]:
 
 def auth_url() -> str:
     cid, _ = _creds()
-    return (f"{AUTH_URL}?client_id={cid}&redirect_uri={redirect_uri()}&response_type=code"
-            f"&language=en-us")
+    from urllib.parse import urlencode
+    return f"{AUTH_URL}?" + urlencode({"client_id": cid, "redirect_uri": redirect_uri(),
+                                       "response_type": "code", "language": "en-us"})
 
 
 def _save(tok: dict, path: Path = TOKEN_PATH) -> dict:
@@ -95,9 +96,9 @@ def _token_call(data: dict) -> dict:
 
 def redirect_uri() -> str:
     """The redirect URI the app was registered with. This repo's app uses the
-    out-of-band "oob"; the chat skill's app was registered with a localhost
-    URL, and Yahoo checks the refresh against the registration, so the skill's
-    bootstrap sets YAHOO_REDIRECT_URI from its bundle."""
+    out-of-band "oob". The chat skill authenticates with a different app whose
+    registered URI is whatever its bundle says; the skill's bootstrap passes it
+    as YAHOO_REDIRECT_URI so the refresh names the URI that app holds."""
     return os.environ.get("YAHOO_REDIRECT_URI") or "oob"
 
 

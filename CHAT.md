@@ -32,7 +32,7 @@ names a week.
 | props for the slate / all games / today | `nfl.py status`, then **Props** with `score_week.py` |
 | who to start / sit, this week's matchup | `nfl.py fantasy lineup --league L` |
 | waiver targets at RB / WR / TE | `nfl.py fantasy waiver --league L --pos RB,WR --horizon H` |
-| should I pick up X over someone on my bench | the same waiver run; find X in the candidate table and the cut it pairs with |
+| should I pick up X over someone on my bench | the same waiver run at X's position; find X in the candidate table and the cut it pairs with |
 | how does X do if teammate Y is out | `nfl.py fantasy scenario --league L --player "X" --out "Y"` |
 | is it too early / what is posted yet | `nfl.py status [--league L]` |
 | a fantasy and a betting question together | both commands, two labelled sections, never mixed |
@@ -41,6 +41,11 @@ names a week.
 `--horizon stream`. "Stash", "league winner", "rest of season", "playoffs" ->
 `--horizon season`. Unsaid -> run both; lead with season and label which
 horizon each recommendation serves.
+
+**A named add outside the pool.** The waiver run scores a capped pool (the
+best by consensus rate plus the biggest recent usage gains). When X is not
+in its table, say X fell outside the evaluated pool and was not scored. Do
+not estimate X's value in chat.
 
 **Name resolution.** `scenario` exits 2 with `SCENARIO: ...` when a name
 matches nobody, matches several players, names two teams, or the team is on

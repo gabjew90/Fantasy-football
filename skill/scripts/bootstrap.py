@@ -161,6 +161,11 @@ def place_credentials(repo_dir: Path) -> dict:
                 target = repo_dir / ".env"
                 target.write_text("".join(f"{k}={v}\n" for k, v in env.items()), encoding="utf-8")
                 _private(target)
+                # The bundle is authoritative. A token file an earlier session's
+                # refresh left in a cached release would otherwise win over it
+                # (manager.yahoo_api reads the file before the env seed), and a
+                # reinstalled bundle with a new refresh token would never be used.
+                (repo_dir / "data" / "raw" / "yahoo" / "token.json").unlink(missing_ok=True)
                 out["yahoo"] = True
         except (OSError, ValueError):
             pass            # an unreadable bundle is reported as absent, never echoed
@@ -245,7 +250,8 @@ def resolve(dest: Path, tag: str | None = None, offline: bool = False) -> dict:
             shutil.rmtree(run, ignore_errors=True)
         partial.rename(run)
         return {"repo_dir": str(run), "release_hash": release.tree_hash(run),
-                "release_tag": lock_tag if lock is not None else None, "release_source": "fetched",
+                "release_tag": lock_tag if lock is not None else None,
+                "release_source": "fetched" if lock is not None else "fetched-unverified",
                 "fallback_reason": None, "lock_tag": lock.get("tag") if lock else None}
     except Exception as exc:  # noqa: BLE001 -- every failure falls back
         return use_vendored(dest, str(exc), lock_tag)

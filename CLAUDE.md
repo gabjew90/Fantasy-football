@@ -51,7 +51,9 @@ so the PR review must.
   `nfl.lock.json` names (files defined in `skill/release.py`), places the
   credentials and reads `CHAT.md`, which holds the routing and output rules.
   A change reaches chat only with a new `nfl-v*` tag and a lock bump
-  (`python skill/release.py write-lock --tag nfl-vX.Y`); CI checks the lock
+  (`python skill/release.py write-lock --tag nfl-vX.Y` on the branch; after
+  the merge, `python skill/release.py cut-tag` on main, which tags only a
+  commit that matches the lock, then push the tag). CI checks the lock
   against its tag. The user builds the .skill (`skill/build.py`) because it
   carries their credentials; Claude Code never does.
 

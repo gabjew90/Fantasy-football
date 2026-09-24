@@ -5468,6 +5468,24 @@ as it is; props capture in Actions still runs `props/engine.lock.json`.
 - **The vendored fallback is the release as an archive** (the uploader takes
   one SKILL.md per package, and the release carries the props engine's).
   Any fetch or verify failure runs it and says so on the first reply line.
+- **The tag is cut by `release.py cut-tag`, never by hand**: it tags main's
+  HEAD only when HEAD matches the lock. A lock written on a branch describes
+  that branch; if another release-touching PR merged first, a hand-cut tag
+  would send every chat session to the fallback and fail check-lock on every
+  later PR.
+- **The Odds API key is optional.** Sleeper is the primary price source; the
+  Odds API is its fallback for a game Sleeper has no lines for, and the
+  DK/FD closing source under `--source oddsapi`. A skill built without the key
+  prices from Sleeper and says so.
+
+Code review (high), all fixed before merge: the hand-cut tag above; a token
+file left by an earlier refresh overrode a reinstalled Yahoo bundle (the
+bootstrap now deletes it when it places the bundle); CHAT.md sent "add X over
+my bench" to the waiver table with no rule for an X outside the capped pool;
+check-lock had no test; an unverified `--tag` fetch was disclosed as plain
+"fetched"; the redirect-URI docstring asserted an unread value; the auth URL
+was not URL-encoded; and git archive took one pathspec per release file
+(Windows' 32K command line), now the whole ref filtered in Python.
 
 Measured before merge: a clean copy of the release file set, with nothing
 else from the repo, ran `nfl status`, `fantasy lineup --league omnibeta` and

@@ -2,7 +2,7 @@
  "algorithm": "nfl-release-sha256-lf-1",
  "file_count": 178,
  "files": {
-  "CHAT.md": "302fd04e612dbf0cb9e44ce8f73733c128caab06ecb07e9daeab58c31b68a8de",
+  "CHAT.md": "a72c2e088c2b947ae9479825d1d781688206b40ae4b29eccbf618ea94ca7a580",
   "config.yaml": "6bb984752e302548f7892672d2d70b66468c1c089f7baa46d5f2b8d847042e02",
   "core/__init__.py": "8ac9ed217e439f5828616ab66ec9ff17336c2cbbbeae391d0f9bfa001eaed571",
   "core/fetch.py": "95fc16bbd91a3a19086c8c2f64c9d101abc85baae2452c1ed778c84a21f9ad33",
@@ -122,7 +122,7 @@
   "manager/waiver_brief.py": "db7fa2ced3c3717c373affb5539b2f8381f70ff2ddb5c8fc736274969a826602",
   "manager/xfp.py": "22f8d225f1896e9a360fdd0cf7e7ad30088f09523327f79c445ef1af3d3b032d",
   "manager/yahoo.py": "73cf6976f884977b589055f87c01af8085d2c2dbcce9c4f6724e12b5c45581b5",
-  "manager/yahoo_api.py": "8f7401db7fbe8cbbb10976796dc2ad03ba884dcfa4023bcd00172465e0c38dfa",
+  "manager/yahoo_api.py": "4a101f7aa12033a3000430a4acdf186800d77c235bf34da5bbc40293abc7024e",
   "manager/yahoo_context.py": "0aa541b5c73457d09f4aa3bbfdda14d66d8051835370073fb9f2a12f57f9ab34",
   "manager/yahoo_sync.py": "3ea0dba0ea5b03e561952cbdd2b40eba7b9a7c328691258915b7c29aadc54b90",
   "nfl.py": "30e7c450bcf74225dbe286047dd094fce9b4b8ad7406b3575d9e3ff5f6228303",
@@ -181,6 +181,6 @@
   "tiers.csv": "04a1a79d43e9f2445ba3dc4ea262b00fbd58efea1f41e8b0393cb4c7f8afee41",
   "tiers.keefamania.csv": "11e6546b56caa807a572da86d5c3d81097bafd2d2550e25653882d78b2962e94"
  },
- "sha256": "7fe64c03cbe08bc22adc7fc2c45cb39369ef7ace28a9bfcc0fdaf57f416565a4",
+ "sha256": "04ccdab0cf3950a6f933fadd512f12985e86866927b21fa768164da6f70fc323",
  "tag": "nfl-v1.0"
 }

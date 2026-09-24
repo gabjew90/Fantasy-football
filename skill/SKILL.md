@@ -21,7 +21,7 @@ Its last lines:
 REPO_DIR=/tmp/nfl-release/<tag>
 RELEASE_TAG=<tag named in nfl.lock.json on main>
 RELEASE_HASH=<sha256 of the release>
-RELEASE_SOURCE=fetched | cached | VENDORED_FALLBACK
+RELEASE_SOURCE=fetched | cached | fetched-unverified | VENDORED_FALLBACK
 DEPS=ok | installed: ... | missing: ...
 YAHOO=live | absent ...
 ODDS_KEY=present | absent ...
@@ -37,13 +37,15 @@ Do not run anything from this skill's own directory except `bootstrap.py`.
 ## Disclose which release ran
 
 The first line of every reply names it: `release <tag> (<hash7>, <source>)`.
-If `RELEASE_SOURCE=VENDORED_FALLBACK`, the bootstrap printed a banner with the
+`fetched-unverified` means a `--tag` other than the lock's was asked for and
+nothing checked it: say so in that line. If `RELEASE_SOURCE=VENDORED_FALLBACK`, the bootstrap printed a banner with the
 reason and the tag it could not reach. Repeat it. An old release is usable;
 an old release passing as the current one is not.
 
 ## Credentials
 
-`resources/credential.env` (the Odds API key) and
+`resources/credential.env` (the Odds API key -- optional: Sleeper is the
+primary price source, the Odds API only its fallback) and
 `resources/Yahoo_Fantasy_Connection.json` stay in this skill. The bootstrap
 copies them into the release directory, where the engine looks. Never read,
 print, quote or cite them.

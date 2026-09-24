@@ -197,3 +197,63 @@ def test_the_skill_and_its_scripts_are_stdlib_only():
         src = (ROOT / f).read_text(encoding="utf-8")
         for lib in ("pandas", "numpy", "requests", "yaml", "polars"):
             assert f"import {lib}" not in src and f"from {lib}" not in src, (f, lib)
+
+
+@pytest.fixture
+def repo(tmp_path, monkeypatch):
+    """A throwaway git repo holding a small release, committed."""
+    import subprocess
+    for k, v in {"GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t", "GIT_COMMITTER_NAME": "t",
+                 "GIT_COMMITTER_EMAIL": "t@t"}.items():
+        monkeypatch.setenv(k, v)
+    root = _tree(tmp_path / "repo", {**RELEASE, "reports/r.md": b"not released\n"})
+
+    def git(*a):
+        return subprocess.run(["git", "-C", str(root), *a], check=True, capture_output=True, text=True).stdout
+    git("init", "-q")
+    git("-c", "core.autocrlf=false", "add", "-A")
+    git("commit", "-q", "-m", "one")
+    return root, git
+
+
+def test_check_lock_uses_head_before_the_tag_and_the_tag_after(repo):
+    root, git = repo
+    lock = R.build_lock(root, "nfl-v9")
+    ok, msg = R.check_lock(lock, root)
+    assert ok and "HEAD (tag nfl-v9 not cut yet)" in msg
+    git("tag", "nfl-v9")
+    (root / "core" / "fetch.py").write_bytes(b"x = 99\n")          # main moves ahead of the release
+    git("commit", "-qam", "two")
+    ok, msg = R.check_lock(lock, root)
+    assert ok and msg.startswith("tag nfl-v9"), "the lock is checked against its tag, not HEAD"
+    ok, msg = R.check_lock(dict(lock, files={**lock["files"], "core/fetch.py": "0" * 64}), root)
+    assert not ok and "changed: core/fetch.py" in msg
+    assert not R.check_lock(dict(lock, algorithm="other"), root)[0]
+
+
+def test_cut_tag_refuses_a_head_that_does_not_match_the_lock(repo):
+    root, git = repo
+    lock = R.build_lock(root, "nfl-v9")
+    (root / "fantasy" / "lineup.py").write_bytes(b"y = 3\n")       # another PR merged before the tag
+    git("commit", "-qam", "other")
+    ok, msg = R.cut_tag(lock, root)
+    assert not ok and "not tagging" in msg and "nfl-v9" not in git("tag")
+    ok, msg = R.cut_tag(R.build_lock(root, "nfl-v9"), root)
+    assert ok and "nfl-v9" in git("tag")
+    assert not R.cut_tag(R.build_lock(root, "nfl-v9"), root)[0], "an existing tag is never moved"
+
+
+def test_contents_at_ignores_files_outside_the_release(repo):
+    root, _ = repo
+    got = R.contents_at("HEAD", root)
+    assert set(got) == set(RELEASE) and R.contents_at("refs/tags/nope", root) is None
+
+
+def test_a_placed_yahoo_bundle_replaces_a_stale_token_file(tmp_path, monkeypatch):
+    p = tmp_path / "y.json"
+    p.write_text(json.dumps({"client": {"client_id": "c", "client_secret": "s", "redirect_uri": "oob"},
+                             "tokens": {"refresh_token": "new"}}), encoding="utf-8")
+    monkeypatch.setattr(B, "YAHOO_BUNDLE", p)
+    monkeypatch.setattr(B, "ODDS_CREDENTIAL", tmp_path / "none.env")
+    stale = _tree(tmp_path / "run", {"data/raw/yahoo/token.json": b'{"refresh_token": "old"}'})
+    assert B.place_credentials(stale)["yahoo"] and not (stale / "data/raw/yahoo/token.json").exists()

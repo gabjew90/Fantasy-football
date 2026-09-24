@@ -13,6 +13,8 @@ does.
   python skill/release.py hash                  the working tree's release hash
   python skill/release.py write-lock --tag T    write nfl.lock.json for tag T
   python skill/release.py verify [--dir D]      does D match the lock?
+  python skill/release.py check-lock            CI: does the lock's tag (or HEAD) match it?
+  python skill/release.py cut-tag               on main after the merge: tag HEAD if it matches
 
 Stdlib only: the bootstrap imports it before anything is installed.
 """
@@ -110,22 +112,27 @@ def compare(root: Path, lock: dict) -> tuple[bool, list[str]]:
     return ok, notes
 
 
-def digests_at(ref: str, root: Path = REPO_ROOT) -> dict[str, str] | None:
-    """{rel: digest} for every release file as git holds it at `ref`, or None
-    when `ref` does not resolve."""
+def contents_at(ref: str, root: Path = REPO_ROOT) -> dict[str, bytes] | None:
+    """{rel: bytes} for every release file as git holds it at `ref`, or None
+    when `ref` does not resolve. The whole ref is archived and filtered here
+    (5.8 MB), rather than passing each path to git: a pathspec per file grows
+    the command line with the release, and Windows caps it at 32K."""
     import io
     import subprocess
     import tarfile
     git = ["git", "-C", str(root)]
     if subprocess.run([*git, "rev-parse", "-q", "--verify", f"{ref}^{{commit}}"], capture_output=True).returncode:
         return None
-    names = subprocess.run([*git, "ls-tree", "-r", "--name-only", "-z", ref],
-                           capture_output=True, check=True).stdout.decode("utf-8").split("\0")
-    rels = [p for p in names if p and included(p)]
-    blob = subprocess.run([*git, "archive", "--format=tar", ref, "--", *rels], capture_output=True, check=True).stdout
+    blob = subprocess.run([*git, "archive", "--format=tar", ref], capture_output=True, check=True).stdout
     with tarfile.open(fileobj=io.BytesIO(blob)) as tar:
-        return {m.name: hashlib.sha256(tar.extractfile(m).read().replace(b"\r\n", b"\n")).hexdigest()
-                for m in tar.getmembers() if m.isfile()}
+        return {m.name: tar.extractfile(m).read() for m in tar.getmembers() if m.isfile() and included(m.name)}
+
+
+def digests_at(ref: str, root: Path = REPO_ROOT) -> dict[str, str] | None:
+    got = contents_at(ref, root)
+    if got is None:
+        return None
+    return {rel: hashlib.sha256(data.replace(b"\r\n", b"\n")).hexdigest() for rel, data in got.items()}
 
 
 def check_lock(lock: dict, root: Path = REPO_ROOT) -> tuple[bool, str]:
@@ -158,6 +165,27 @@ def check_lock(lock: dict, root: Path = REPO_ROOT) -> tuple[bool, str]:
     return True, f"{where} matches {LOCK_NAME} ({lock['sha256'][:12]}, {len(have)} files)"
 
 
+def cut_tag(lock: dict, root: Path = REPO_ROOT) -> tuple[bool, str]:
+    """Tag HEAD as the lock's release -- only if HEAD matches the lock.
+
+    The lock is written on a branch; the tag is cut on main after the merge.
+    If anything else touching the release merged in between, the merge commit
+    is not the tree the lock describes, and a tag there would send every chat
+    session to the fallback and fail check-lock on every later PR. So the tag
+    is cut by this, never by hand. It does not push."""
+    import subprocess
+    tag = lock.get("tag") or ""
+    if subprocess.run(["git", "-C", str(root), "rev-parse", "-q", "--verify", f"refs/tags/{tag}"],
+                      capture_output=True).returncode == 0:
+        return False, f"tag {tag} already exists; tags are never moved -- bump the lock to a new tag"
+    ok, msg = check_lock(lock, root)
+    if not ok:
+        return False, msg + " -- not tagging"
+    subprocess.run(["git", "-C", str(root), "tag", "-a", tag, "-m", f"nfl release {tag}: {lock['sha256'][:12]}",
+                    "HEAD"], check=True)
+    return True, f"tagged HEAD {tag} ({lock['sha256'][:12]}); push it with: git push origin {tag}"
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(prog="python skill/release.py")
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -169,10 +197,12 @@ def main(argv=None) -> int:
     v.add_argument("--dir", type=Path, default=REPO_ROOT)
     v.add_argument("--lock", type=Path, default=REPO_ROOT / LOCK_NAME)
     sub.add_parser("check-lock", help="CI: the lock's tag (or HEAD, before it is cut) hashes to the lock")
+    sub.add_parser("cut-tag", help="after the merge, on main: tag HEAD as the lock's release if it matches")
     a = ap.parse_args(argv)
-    if a.cmd == "check-lock":
-        ok, msg = check_lock(json.loads((REPO_ROOT / LOCK_NAME).read_text(encoding="utf-8")))
-        print(("OK " if ok else "LOCK MISMATCH ") + msg)
+    if a.cmd in ("check-lock", "cut-tag"):
+        lock = json.loads((REPO_ROOT / LOCK_NAME).read_text(encoding="utf-8"))
+        ok, msg = (check_lock if a.cmd == "check-lock" else cut_tag)(lock)
+        print(("OK " if ok else "REFUSED " if a.cmd == "cut-tag" else "LOCK MISMATCH ") + msg)
         return 0 if ok else 1
     if a.cmd == "files":
         print("\n".join(files(REPO_ROOT)))

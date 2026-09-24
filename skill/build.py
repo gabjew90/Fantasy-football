@@ -25,10 +25,12 @@ anywhere, and Claude Code never builds it -- the user does.
 from __future__ import annotations
 
 import argparse
+import io
 import json
 import shutil
 import subprocess
 import sys
+import tarfile
 import tempfile
 import zipfile
 from pathlib import Path
@@ -54,13 +56,16 @@ def release_archive(lock: dict, out: Path) -> str:
     and the tag is cut on the merge commit. Then HEAD is archived instead; the
     caller hashes what came out against the lock and refuses a mismatch, so
     this cannot vendor the wrong release."""
-    tag = lock["tag"]
-    ref = tag if subprocess.run(["git", "rev-parse", "-q", "--verify", f"refs/tags/{tag}"],
-                                cwd=REPO, capture_output=True).returncode == 0 else "HEAD"
+    ref = f"refs/tags/{lock['tag']}"
+    got = release.contents_at(ref, REPO)
+    if got is None:
+        ref, got = "HEAD", release.contents_at("HEAD", REPO)
     out.parent.mkdir(parents=True, exist_ok=True)
-    with out.open("wb") as fh:
-        subprocess.run(["git", "archive", "--format=tar.gz", "--prefix=release/", ref, "--",
-                        *sorted(lock["files"])], cwd=REPO, check=True, stdout=fh)
+    with tarfile.open(out, "w:gz") as tar:
+        for rel in sorted(got):
+            info = tarfile.TarInfo(f"release/{rel}")
+            info.size = len(got[rel])
+            tar.addfile(info, io.BytesIO(got[rel]))
     return ref
 
 
@@ -107,7 +112,8 @@ def main(argv: list[str] | None = None) -> int:
         bootstrap.extract_release(archive.read_bytes(), check)
         ok, notes = release.compare(check, lock)
         if not ok:
-            print(f"the vendored release does not match the lock: {'; '.join(notes[:4])}", file=sys.stderr)
+            print(f"the vendored release ({ref}) does not match the lock: {'; '.join(notes[:4])}. "
+                  "Pull main and fetch tags (git pull --tags), then build again.", file=sys.stderr)
             return 1
         commit = _git("rev-parse", ref, text=True).stdout.strip()
         (stage / "vendor" / "RELEASE_STAMP.json").write_text(
