@@ -56,6 +56,7 @@ from draftkit.config import Config, _deep_merge  # noqa: E402
 from draftkit.consensus import adp_key  # noqa: E402
 from draftkit.dataset import build_usage, fantasy_points_expr, scoring_from_cfg  # noqa: E402
 from draftkit.ids import SleeperIndex, load_id_map  # noqa: E402
+from core.scoring import score  # noqa: E402
 from draftkit.market import _attach_sleeper_ids, load_ffc_adp  # noqa: E402
 from draftkit.projections import default_projection  # noqa: E402
 from draftkit.sleeper import SleeperClient  # noqa: E402
@@ -150,7 +151,7 @@ def week1_lines(rows: list[dict], scoring: dict, cutoff_ms: int,
         if upd and upd > cutoff_ms and not bulk:
             late += 1
             continue
-        pts = sum(float(scoring[k]) * float(v) for k, v in line.items() if k in scoring and v is not None)
+        pts = score(line, scoring)
         keep.append({"sleeper_id": str(r.get("player_id")), "lines": pts * games})
     df = (pl.DataFrame(keep).unique(subset="sleeper_id", keep="first") if keep
           else pl.DataFrame(schema={"sleeper_id": pl.Utf8, "lines": pl.Float64}))

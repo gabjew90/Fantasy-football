@@ -54,6 +54,8 @@ import polars as pl
 from .consensus import POSITIONS as SLEEPER_POSITIONS
 from .consensus import ConsensusUnavailable, fetch_position
 from .role import GATED, STARTERS, depth_orders
+from core.scoring import league_scoring
+
 from .seasondata import score_projection
 
 log = logging.getLogger("draftkit")
@@ -772,9 +774,7 @@ def load_external(cfg, index, getter=None) -> tuple[pl.DataFrame, dict]:
     what each contributed and what the sheet could not match."""
     p = cfg.get("projections") or {}
     ext = p.get("external") or {}
-    scoring = {k: float(v) for k, v in (cfg.get("scoring") or (cfg.get("expected") or {}).get("scoring") or {}).items()}
-    if not scoring:
-        raise ValueError("league yaml carries no scoring block")
+    scoring = league_scoring(cfg)
     mode = str(ext.get("combine", "first"))
     frames, report = [], {"sources": [], "sheet_unmatched": [], "espn_unmatched": [], "combine": mode}
     for name in ext.get("sources") or ["sleeper"]:
