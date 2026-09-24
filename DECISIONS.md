@@ -5396,3 +5396,45 @@ the excluded rows beside the rest rather than dropping them.
 
 The lineup report gains an "Opportunity and role" section; its "not covered
 yet" line now names only the opponent-adjusted matchup (question 4).
+
+## 2026-09-24 (96) -- consolidation step 4b: `nfl fantasy waiver`
+
+The user's waiver framework as a command (FAAB out of scope, their decision):
+
+- **Horizon first** (`--horizon`). `stream`: an add is worth the rise in THIS
+  week's P(win) with him in the best lineup and the chosen cut gone. `season`:
+  the points he adds to the best lineup over the remaining weeks, counting only
+  weeks he would start, byes included, fantasy-playoff weeks shown apart. The
+  rest-of-season rate is the manager's consensus (Sleeper, ESPN, FantasyPros;
+  registered provisional).
+- **Role vs output** from the evidence table and its calibrated flag;
+  **why** a role changed names a same-position teammate who played earlier and
+  has been absent since. The probability that a changed role lasts is NOT
+  modelled yet, and the report says so -- a base-rate study is its own piece.
+- **Standing**: a contender (top half) ranks season adds by points added; a
+  team behind ranks them by ceiling among the adds that improve the lineup.
+- **The blocking rule**: an established role (60%+ of snaps, role not falling)
+  is never proposed as a cut on production alone.
+
+First run found a false STAND PAT: the blocking rule was applied after the cut
+was chosen, bench players who never start all cost zero, the tie fell to a
+protected backup QB, and every pairing was refused. Protected players are now
+excluded before the cut is chosen, and ties go to the cheapest cut. Omnibeta
+week 3, RB/WR, season: Wan'Dale Robinson for Emmett Johnson, +7.9 season
+points, all of it bye-week coverage (a 2-0 first-place roster has no hole the
+wire fills); WR/TE stream: stand pat.
+
+Candidates are UNROSTERED in the league; claim eligibility (waiver period, add
+limits) is not checked, and every report says so.
+
+Code review (high), all fixed before merge: the role cause could never name a
+teammate (positions were looked up only for players in the report, and the
+teammate who explains a role almost never is); all-zero standings (week 1, or a
+failed Yahoo read) read as a tie for first; injured players were credited full
+rest-of-season weeks (missed weeks are now assumed from status -- Out/Doubtful
+this week, IR/PUP/NFI the four-week minimum -- and said to be assumptions);
+with no lineup set, starters became cut options (the bench is now whoever the
+best-by-mean lineup leaves out); the consensus refetched three sources every
+run (cached locally for 12 hours, since the manager's store is committed state);
+and a team behind ranked by this week's p90 instead of rest-of-season upside
+(now the most optimistic source's rate).

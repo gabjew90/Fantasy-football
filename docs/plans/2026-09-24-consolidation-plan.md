@@ -147,8 +147,11 @@ tuning item.
    P(win)-maximising swaps), `fantasy scenario` (the engine's absence path);
    the gate reads the manifest; `--record` writes a ledger row (scheduled
    runs only; chat is read-only).
-4. `fantasy waiver` on `marginal` plus the evidence table and the framework
-   builds; horizon as an argument.
+4. Done: the evidence table with calibrated role-change flags (4a), and
+   `fantasy waiver` with the horizon as an argument, standing, the blocking
+   rule and the role cause (4b). Still open from section 6: the opponent-
+   adjusted matchup read (weighted low by design) and the role-DURATION
+   probability (a base-rate study), both to be built behind the registry.
 5. One skill; the two retired. The bootstrap fetches the whole repo at the tag (core/, fantasy/,
    draftkit/, manager/ and the props engine, not only props/engine), and passes the skill's Yahoo
    credentials through as this repo's env vars and token file, so Keefamania reads live from chat.

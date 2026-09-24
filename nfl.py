@@ -6,6 +6,7 @@
   python nfl.py props slate [--week W] [--skip-started] [--markets ...]
   python nfl.py fantasy lineup --league L [--week W] [--record]
   python nfl.py fantasy scenario --league L --player NAME|ID --out NAME|ID [--week W]
+  python nfl.py fantasy waiver --league L [--pos RB,WR,TE] [--horizon stream|season] [--week W]
 
 Reports and decision records go to $NFL_OUT (default /mnt/user-data/outputs).
 `--record` appends to the graded ledger. A chat session never passes it (chat
@@ -80,6 +81,10 @@ def cmd_fantasy(a) -> int:
     if a.what == "lineup":
         from fantasy import lineup as LU
         r = LU.run(a.league, a.week, record=a.record)
+    elif a.what == "waiver":
+        from fantasy import waiver as WV
+        pos = tuple(x.strip().upper() for x in (a.pos or "RB,WR,TE").split(",") if x.strip())
+        r = WV.run(a.league, pos, a.horizon, a.week)
     else:
         if not (a.player and a.out):
             print("fantasy scenario needs --player and --out", file=sys.stderr)
@@ -120,12 +125,15 @@ def main(argv=None) -> int:
     p.set_defaults(fn=cmd_props)
 
     f = sub.add_parser("fantasy", help="fantasy decisions")
-    f.add_argument("what", choices=("lineup", "scenario"))
+    f.add_argument("what", choices=("lineup", "scenario", "waiver"))
     f.add_argument("--league", required=True)
     f.add_argument("--week", type=int)
     f.add_argument("--record", action="store_true", help="append to the graded ledger (scheduled runs only)")
     f.add_argument("--player")
     f.add_argument("--out")
+    f.add_argument("--pos", help="waiver: positions, e.g. RB,WR (default RB,WR,TE)")
+    f.add_argument("--horizon", choices=("stream", "season"), default="season",
+                   help="waiver: stream (this week) or season (a league-winner candidate)")
     f.set_defaults(fn=cmd_fantasy)
 
     a = ap.parse_args(argv)
