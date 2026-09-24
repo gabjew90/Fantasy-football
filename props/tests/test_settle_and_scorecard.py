@@ -322,3 +322,22 @@ def test_the_pooled_tables_hold_only_v1_anytime_rows():
     assert "player_anytime_td [anytime_td_v0]" in text and "player_anytime_td [model unknown]" in text
     only_other = df.iloc[1:3]
     scorecard.render_sections(only_other)                     # no division by zero
+
+
+def test_load_stats_refreshes_a_file_older_than_its_max_age(tmp_path, monkeypatch):
+    # A settle file cached before week N was played would grade week N as unplayed.
+    import os
+    import time
+    import urllib.request
+    import settle
+    csv_ = "season_type,week,player_name,player_display_name\nREG,{w},A.Brown,A.J. Brown\n"
+
+    def fake(url, dest):
+        Path(dest).write_text(csv_.format(w=2), encoding="utf-8")
+    monkeypatch.setattr(urllib.request, "urlretrieve", fake)
+    f = tmp_path / "stats_player_week_2026.csv"
+    f.write_text(csv_.format(w=1), encoding="utf-8")
+    old = time.time() - 4 * 3600
+    os.utime(f, (old, old))
+    df = settle.load_stats(2026, f, max_age_s=3 * 3600)
+    assert df["week"].tolist() == [2]

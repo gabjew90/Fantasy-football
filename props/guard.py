@@ -15,7 +15,9 @@ Windows:
   capture   a game kicks off within CAPTURE_LEAD_MIN (default 6 hours). Inside
             CLOSE_WINDOW_MIN (default 60) of any kickoff the snapshot becomes
             `close`, which is the row closing-line value is computed from.
-  settle    Tuesday 14:00-16:00 UTC, after nflverse publishes weekly stats.
+  settle    from Tuesday 14:00 UTC (after nflverse publishes weekly stats)
+            until it has run, through Thursday 12:00 UTC, once per ISO week;
+            a due capture takes the tick first.
 
 Schedule is read from props/.cache/schedule_<season>.json when present,
 otherwise from nflverse games.csv (one small fetch, cached for a day). If the
@@ -155,6 +157,13 @@ def mark_period(kind: str, key: str) -> None:
         pass          # a marker we cannot write is a duplicate run, not a failure
 
 
+def in_settle_span(now: dt.datetime) -> bool:
+    """Tuesday 14:00 UTC (nflverse has published the weekly stats) through
+    Thursday 12:00 UTC."""
+    wd, h = now.weekday(), now.hour
+    return (wd == 1 and h >= 14) or wd == 2 or (wd == 3 and h < 12)
+
+
 def kickoff_utc(row: dict) -> dt.datetime | None:
     """games.csv carries gameday plus a US/Eastern gametime.
 
@@ -203,15 +212,18 @@ def main() -> int:
              snapshot_type="decision")
         return 0
 
-    # Tuesday settle window, once per ISO week.
-    if now.weekday() == 1 and 14 <= now.hour < 16:
-        iso = now.isocalendar()
-        key = f"{iso[0]}-W{iso[1]:02d}"
-        if period_done("settle", key):
-            emit(run="false", mode="idle", season=season, week=0,
-                 snapshot_type="none")
-            return 0
-        mark_period("settle", key)
+    # SETTLE IS DUE FROM TUESDAY 14:00 UTC UNTIL IT HAS RUN, not inside a
+    # two-hour window. The window was meant to absorb GitHub's cron lag and
+    # did not: on 2026-09-22 the scheduled ticks landed at 12:28 and 17:13 UTC,
+    # both outside 14:00-16:00, so week 2 was never graded. The per-week
+    # marker already stops a second run; the span ends Thursday 12:00 UTC so a
+    # missed settle cannot collide with the Thursday opening sweep.
+    iso = now.isocalendar()
+    settle_key = f"{iso[0]}-W{iso[1]:02d}"
+    settle_due = in_settle_span(now) and not period_done("settle", settle_key)
+
+    def settle() -> int:
+        mark_period("settle", settle_key)
         emit(run="true", mode="settle", season=season, week=0,
              snapshot_type="decision")
         return 0
@@ -219,6 +231,8 @@ def main() -> int:
     try:
         games = load_games(season)
     except Exception as exc:  # network hiccup: open the window, do not lose a close
+        if settle_due:
+            return settle()
         # week=0 used to go out here, which no game belongs to, so the run
         # this branch exists to protect could not capture anything.
         week = week_from_calendar(now, season)
@@ -256,6 +270,10 @@ def main() -> int:
             soonest, soonest_week = lead, int(g["week"])
 
     if soonest is None:
+        # a due capture wins over settle (a missed close is unrecoverable; a
+        # settle can run on the next tick), so settle is checked only here
+        if settle_due:
+            return settle()
         emit(run="false", mode="idle", season=season, week=0,
              snapshot_type="none")
         return 0

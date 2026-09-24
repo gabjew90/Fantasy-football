@@ -138,6 +138,7 @@ def test_the_settle_window_opens_once_per_week_not_once_per_tick(monkeypatch, tm
     monkeypatch.setattr(guard, "CACHE", tmp_path)
     monkeypatch.setattr(guard, "_period_marker",
                         lambda kind, key: tmp_path / f"ran_{kind}_{key}")
+    monkeypatch.setattr(guard, "load_games", lambda season: [])
     tue = dt.datetime(2026, 9, 22, 14, 3, tzinfo=dt.timezone.utc)
     assert tue.weekday() == 1
 
@@ -154,6 +155,56 @@ def test_the_settle_window_opens_once_per_week_not_once_per_tick(monkeypatch, tm
     nxt = tue + dt.timedelta(days=7)
     monkeypatch.setattr(guard.dt, "datetime", _FrozenDatetime(nxt))
     assert _run_guard(guard)["mode"] == "settle"
+
+
+def _settle_env(monkeypatch, tmp_path, games=()):
+    monkeypatch.setattr(guard, "CACHE", tmp_path)
+    monkeypatch.setattr(guard, "_period_marker",
+                        lambda kind, key: tmp_path / f"ran_{kind}_{key}")
+    monkeypatch.setattr(guard, "load_games", lambda season: list(games))
+
+
+def _mode_at(monkeypatch, when):
+    monkeypatch.setattr(guard.dt, "datetime", _FrozenDatetime(when))
+    return _run_guard(guard)["mode"]
+
+
+def test_a_late_cron_tick_still_settles(monkeypatch, tmp_path):
+    """2026-09-22: the scheduled ticks landed at 12:28 and 17:13 UTC, both
+    outside the old 14:00-16:00 window, and week 2 was never graded."""
+    _settle_env(monkeypatch, tmp_path)
+    utc = dt.timezone.utc
+    assert _mode_at(monkeypatch, dt.datetime(2026, 9, 22, 12, 28, tzinfo=utc)) == "idle", "before stats publish"
+    assert _mode_at(monkeypatch, dt.datetime(2026, 9, 22, 17, 13, tzinfo=utc)) == "settle"
+    assert _mode_at(monkeypatch, dt.datetime(2026, 9, 22, 20, 13, tzinfo=utc)) == "idle", "once per week"
+    assert _mode_at(monkeypatch, dt.datetime(2026, 9, 23, 6, 42, tzinfo=utc)) == "idle"
+
+
+def test_a_settle_missed_on_tuesday_runs_on_wednesday_but_not_after_thursday_noon(monkeypatch, tmp_path):
+    _settle_env(monkeypatch, tmp_path)
+    utc = dt.timezone.utc
+    assert _mode_at(monkeypatch, dt.datetime(2026, 9, 24, 12, 16, tzinfo=utc)) == "idle", "span closed"
+    assert _mode_at(monkeypatch, dt.datetime(2026, 9, 23, 12, 17, tzinfo=utc)) == "settle"
+
+
+def test_a_due_capture_takes_the_tick_and_settle_follows(monkeypatch, tmp_path):
+    """A missed close cannot be recovered; a settle can wait one tick."""
+    kick = {"season": "2026", "week": "3", "gameday": "2026-09-22", "gametime": "13:30",
+            "game_type": "REG"}                      # 17:30 UTC, a hypothetical Tuesday game
+    _settle_env(monkeypatch, tmp_path, games=[kick])
+    utc = dt.timezone.utc
+    assert _mode_at(monkeypatch, dt.datetime(2026, 9, 22, 15, 0, tzinfo=utc)) == "capture"
+    assert _mode_at(monkeypatch, dt.datetime(2026, 9, 22, 19, 0, tzinfo=utc)) == "settle"
+
+
+def test_an_unreadable_schedule_settles_when_settle_is_due(monkeypatch, tmp_path):
+    monkeypatch.setattr(guard, "CACHE", tmp_path)
+    monkeypatch.setattr(guard, "_period_marker", lambda kind, key: tmp_path / f"r_{kind}_{key}")
+
+    def boom(season):
+        raise OSError("dns")
+    monkeypatch.setattr(guard, "load_games", boom)
+    assert _mode_at(monkeypatch, dt.datetime(2026, 9, 22, 17, 0, tzinfo=dt.timezone.utc)) == "settle"
 
 
 def test_an_unreadable_schedule_opens_the_window_with_a_real_week(monkeypatch, tmp_path):
