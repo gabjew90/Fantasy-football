@@ -157,7 +157,7 @@ def refresh_season_inputs(season, wd) -> dict:
     for name, (url, dest) in season_inputs(season, wd).items():
         try:
             fetch(url, dest)
-            ages[name] = round((time.time() - Path(dest).stat().st_mtime) / 3600, 1)
+            ages[name] = round(max(0.0, time.time() - Path(dest).stat().st_mtime) / 3600, 1)
         except Exception as ex:  # noqa: BLE001 -- the per-game run reports it
             ages[name] = f"unavailable ({type(ex).__name__})"
     return ages
