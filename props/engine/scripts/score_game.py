@@ -15,7 +15,9 @@ pulls a decision-time quote from Sleeper Picks (The Odds API as fallback), and w
   shadow_log_{season}_wk{W}_{AWAY}_{HOME}.csv  one row per posted line, all PASS
 
 EVERY probability here is EXPLORATORY. receiving_hier_v2 and anytime_td_v1 are PROTOTYPE
-(outcome-backtested, not tested against posted lines); rush_yds_v0 has no backtest at all.
+(outcome-backtested, not tested against posted lines); rush_yds_v0 is PROTOTYPE too. The
+2022-25 yardage harness (reports/yardage_harness.md) finds all three yardage markets unbiased
+but too NARROW, so probabilities far from 50% run high.
 Nothing is a fair price or an entry threshold.
 Recommendation is PASS on every line, per the model registry.
 """
@@ -912,25 +914,12 @@ def main():
                                                     shares_t, crs_t, ypt_t, SH, other_bucket=True)
         team_targets_draw[t] = tt_draw
         # carries: same joint structure, per-carry yards from the empirical league residual grid
-        rs_t = np.clip(np.array([float(v) for v in Mt.rs]), 0, None)
-        rest = max(1.0 - rs_t.sum(), 0.0)
-        p_norm = np.append(rs_t, rest); p_norm = p_norm / p_norm.sum()
-        rc = TVD["carries_r"]; mu_c = max(env[t]["carries"], 1e-6)
-        tc_draw = rng.negative_binomial(rc, rc / (rc + mu_c), size=N_SIM)
+        car_t, rush_t, tc_draw = MODEL.simulate_team_rush(rng, N_SIM, env[t]["carries"], TVD["carries_r"],
+                                                          [float(v) for v in Mt.rs], [float(v) for v in Mt.ypc], resid)
         team_carries_draw[t] = tc_draw
-        alloc = np.zeros((N_SIM, len(p_norm)), dtype=int); remaining = tc_draw.copy(); rem_p = 1.0
-        for j in range(len(p_norm) - 1):
-            pj = np.clip(p_norm[j] / rem_p, 0, 1) if rem_p > 0 else 0.0
-            alloc[:, j] = rng.binomial(remaining, pj); remaining = remaining - alloc[:, j]; rem_p -= p_norm[j]
         for j, (_, m) in enumerate(Mt.iterrows()):
-            car = alloc[:, j]
-            rush = np.zeros(N_SIM)
-            if car.max() > 0:
-                mx = int(car.max())
-                draws = rng.choice(resid, size=(N_SIM, mx)) + float(m.ypc)
-                rush = (draws * (np.arange(mx)[None, :] < car[:, None])).sum(1)
             rec, yds = out_rec[m["name"]]
-            sims[m["name"]] = {"receptions": rec, "rec_yards": yds, "rush_yards": rush, "carries": car.astype(float)}
+            sims[m["name"]] = {"receptions": rec, "rec_yards": yds, "rush_yards": rush_t[j], "carries": car_t[j]}
     M["mu_rec"] = [max(env[r.team]["targets"] * r.ts * max(r.cr, 0.05), 0.02) for _, r in M.iterrows()]
     M["mu_car"] = [max(env[r.team]["carries"] * r.rs, 0.02) for _, r in M.iterrows()]
 
@@ -2328,7 +2317,7 @@ def main():
             L.append(f"| {r.book} | {r.market.replace('player_','')} | {r.player} | {'' if pd.isna(r.line) else r.line} | "
                      f"{'' if pd.isna(r.model_mean) else round(r.model_mean,1)} | {r.side} | {r.p_model:.3f} | {r.p_novig:.3f} | "
                      f"{r.gap:+.3f} | {r.price} | {r.ER:+.3f} |")
-    L.append(f"\nModel states: receptions/receiving yards `receiving_hier_v2` PROTOTYPE; rushing yards `rush_yds_v0` no backtest; "
+    L.append(f"\nModel states: receptions/receiving yards `receiving_hier_v2` and rushing yards `rush_yds_v0` PROTOTYPE (2022-25 harness: unbiased but too narrow, so probabilities far from 50% run high); "
              f"anytime TD `anytime_td_v1` PROTOTYPE (outcome-backtested, no posted-line test; no fair odds). All MODEL_UNVALIDATED. Dispersion: receptions log r = "
              f"{P['receptions_dispersion']['a']:.3f} + {P['receptions_dispersion']['b']:.3f}·log μ; carries "
              f"{P['carries_dispersion']['a']:.3f} + {P['carries_dispersion']['b']:.3f}·log μ; per-catch Gamma shape {SH:.3f}; "

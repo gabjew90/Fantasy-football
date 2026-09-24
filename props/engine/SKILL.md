@@ -223,8 +223,8 @@ section looks wrong, fix `score_week.py` and re-run. Do not reproduce a full per
 unless the user asks about one game.
 
 Card sort is tier, then backtested market (receptions and receiving yards) ahead of rushing
-and anytime TD, then EV. Sorting on EV alone floats the two markets with no backtest to the
-top of the card, where they read as the best plays on the slate.
+and anytime TD, then EV. Sorting on EV alone floats the two markets with the least calibration
+evidence to the top of the card, where they read as the best plays on the slate.
 
 Tier filtering uses the BASE tier. Card tiers carry parenthetical annotations
 ("MODERATE (gap is prior-vs-market: ...)", "STRONG (note: history had this team at ...)"),
@@ -346,7 +346,9 @@ need not be surfaced. Write the reply as a premium prop guide with this structur
    it places lines at fixed offsets from the model's own median, over every player-week
    rather than the ones worth betting, and reuses each player-week 8-10 times so its `n`
    column overstates the evidence by about an order of magnitude. Quote it only with that
-   description attached. Rushing and TD have no backtest at all; say so.
+   description attached. The 2022-25 yardage harness (`reports/yardage_harness.md` in the
+   repo) finds receptions, receiving yards and rushing yards unbiased on average but too
+   narrow: a model 85% wins about 77-80%. Say so whenever a probability far from 50% is quoted.
    Ladder: `ladder_*.csv` holds P(stat <= k) per player for pricing alternate lines;
    surface it for the top two or three plays when the book's line sits inside the ladder.
 6. **Parlays — DISABLED, do not price them.** `parlays_*.csv` is no longer written.

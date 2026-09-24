@@ -471,6 +471,44 @@ def questionable_flip_check(samples_by_regime, line):
 
 
 # ---------------------------------------------------------------- joint simulation
+def simulate_team_rush(rng, n_sim, team_carries_mean, carries_r, rush_shares, ypc, carry_resid):
+    """One team's carries, drawn jointly, and each player's rushing yards.
+
+    1. Team carries ~ NegBinomial(team_carries_mean, carries_r), one draw per
+       simulation shared by every player on the team.
+    2. Split across the players, plus an 'other' bucket for the share the
+       eligible set does not cover, by sequential conditional binomials.
+    3. Each carry gains the player's mean yards per carry plus a residual drawn
+       from the prior season's league carry-yardage grid, so heavy tails and
+       negative runs survive.
+
+    score_game.py and backtest.py both call this, so the harness grades the
+    sampler that prices the props. The RNG call order is the one the scorer
+    ran inline before it moved here (its output is byte-identical).
+    Returns (carries per player, yards per player, team carries), the lists
+    in `rush_shares` order.
+    """
+    rs = np.clip(np.asarray(rush_shares, dtype=float), 0, None)
+    rest = max(1.0 - rs.sum(), 0.0)
+    p_norm = np.append(rs, rest); p_norm = p_norm / p_norm.sum()
+    mu_c = max(team_carries_mean, 1e-6)
+    tc_draw = rng.negative_binomial(carries_r, carries_r / (carries_r + mu_c), size=n_sim)
+    alloc = np.zeros((n_sim, len(p_norm)), dtype=int); remaining = tc_draw.copy(); rem_p = 1.0
+    for j in range(len(p_norm) - 1):
+        pj = np.clip(p_norm[j] / rem_p, 0, 1) if rem_p > 0 else 0.0
+        alloc[:, j] = rng.binomial(remaining, pj); remaining = remaining - alloc[:, j]; rem_p -= p_norm[j]
+    carries, yards = [], []
+    for j in range(len(rs)):
+        car = alloc[:, j]
+        rush = np.zeros(n_sim)
+        if car.max() > 0:
+            mx = int(car.max())
+            draws = rng.choice(carry_resid, size=(n_sim, mx)) + float(ypc[j])
+            rush = (draws * (np.arange(mx)[None, :] < car[:, None])).sum(1)
+        carries.append(car.astype(float)); yards.append(rush)
+    return carries, yards, tc_draw
+
+
 def simulate_team_game(rng, n_sim, team_volume_mean, team_volume_r, player_shares,
                         player_catch_rates, player_ypt, per_catch_shape, other_bucket=True):
     """Draw one team's targets jointly with all eligible receivers in one pass.

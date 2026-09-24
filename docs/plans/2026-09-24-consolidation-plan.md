@@ -159,7 +159,9 @@ tuning item.
 6. Props adopts `core` behind byte-identical checks; draft moves under
    `draft/`; retired paths deleted; Actions slimmed to props capture/settle,
    the Tuesday brief and ledger grading.
-7. First tuning items on the new rails: the QB-out reallocation rule, then
+7. Replaced by docs/plans/2026-09-24-yardage-harness.md (the yardage props to the TD model's
+   standard; the QB-out rule becomes one question inside it). Originally: first tuning items on
+   the new rails: the QB-out reallocation rule, then
    whatever the ledger shows is weakest.
 
 ## 8. Risks

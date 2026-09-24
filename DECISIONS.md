@@ -5491,3 +5491,33 @@ Measured before merge: a clean copy of the release file set, with nothing
 else from the repo, ran `nfl status`, `fantasy lineup --league omnibeta` and
 `fantasy lineup --league keefamania` (live Yahoo, gate PASS). Chat itself is
 tested after the user builds and installs the skill.
+
+## 2026-09-24 (98) -- the yardage harness: four seasons, and the models are too narrow
+
+The yardage markets are brought to the anytime-TD model's standard
+(docs/plans/2026-09-24-yardage-harness.md; replaces consolidation step 7).
+Step 1 is measurement only:
+
+- **Grade the sampler that ships.** Rushing yards were drawn inline in
+  score_game.py; the draw moved to `model.simulate_team_rush` and the scorer
+  and backtest both call it. score_game output checked byte-identical before
+  and after (KC@MIA week 3; only the kickoff clock line differs).
+- **`backtest.py --seasons`**: 2022-2025 walk-forward, each season from priors
+  built from the season before by the current builder (the rebuilt 2024
+  priors match the committed ones), the live scorer's opponent settings and
+  team-volume blend, dispersions from the priors, nothing fitted on the
+  season under test. Weeks 2-18, reported as 2-4 and 5-18. Rushing yards are
+  scored for the first time. The old single-season protocol still runs.
+- **Result:** receptions, receiving yards and rushing yards all beat
+  baseline A on both test seasons (intervals exclude zero) and are unbiased
+  on average -- and all three are too narrow: 25.5%, 23.0% and 31.3% of
+  outcomes outside the model's p10-p90 (20% expected); an 85% Over wins about
+  77-80%. The miss is worst on the low side.
+- **User decision: width is part of the bar, and fixing it comes first.** A
+  market is `live` only if it also has 20% +/- 3 outside p10-p90 and every
+  60-90% reliability bucket within 3 points. `receiving_hier_v2` moves from
+  live to provisional in core/registry.py (its evidence, calibration_2025.csv,
+  predates the joint sampler; the current code reproduces the overconfidence
+  under the old protocol too). Nothing in the pricer changes: no market was
+  eligible as a play before this either, since none is validated against
+  posted lines.
