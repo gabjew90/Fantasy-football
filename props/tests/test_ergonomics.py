@@ -174,3 +174,59 @@ def test_slate_pick_prefers_backtested_market_over_higher_td_probability():
              p_model=0.90, new_team=False, questionable=False),
     ])
     assert SW.slate_pick_order(ok).player.tolist() == ["Catcher", "TD back"]
+
+
+def _age(path, seconds):
+    import os
+    import time
+    t = time.time() - seconds
+    os.utime(path, (t, t))
+
+
+def test_fetch_refreshes_a_stale_copy_and_keeps_a_fresh_one(tmp_path, monkeypatch):
+    # The props cache is restored every tick; a fetch that only checked existence
+    # priced every capture on the first capture's play-by-play and injuries.
+    import urllib.request
+    calls = []
+
+    def fake(url, dest):
+        calls.append(url)
+        Path(dest).write_text("new", encoding="utf-8")
+    monkeypatch.setattr(urllib.request, "urlretrieve", fake)
+    f = tmp_path / "pbp_2026.csv"
+    f.write_text("old", encoding="utf-8")
+    _age(f, 60)
+    SG.fetch("u", f, max_age_s=3600)
+    assert calls == [] and f.read_text(encoding="utf-8") == "old"
+    _age(f, 7200)
+    SG.fetch("u", f, max_age_s=3600)
+    assert calls == ["u"] and f.read_text(encoding="utf-8") == "new"
+
+
+def test_fetch_keeps_the_stale_copy_when_the_refresh_fails(tmp_path, monkeypatch):
+    import urllib.request
+
+    def boom(url, dest):
+        Path(dest).write_text("partial", encoding="utf-8")
+        raise OSError("network")
+    monkeypatch.setattr(urllib.request, "urlretrieve", boom)
+    f = tmp_path / "injuries_2026.csv"
+    f.write_text("old", encoding="utf-8")
+    _age(f, 99999)
+    assert SG.fetch("u", f, max_age_s=3600) == f
+    assert f.read_text(encoding="utf-8") == "old"
+    assert not (tmp_path / "injuries_2026.csv.part").exists()
+    g = tmp_path / "missing.csv"
+    with pytest.raises(OSError):
+        SG.fetch("u", g, max_age_s=3600)
+
+
+def test_season_inputs_refresh_once_and_report_their_age(tmp_path, monkeypatch):
+    # score_week refreshes these once per slate and pins the per-game runs to them.
+    got = []
+    monkeypatch.setattr(SG, "fetch", lambda url, dest, max_age_s=None: got.append(Path(dest).name)
+                        or Path(dest).write_text("x", encoding="utf-8") or dest)
+    ages = SG.refresh_season_inputs(2026, tmp_path)
+    assert set(ages) == {"pbp", "rosters", "injuries", "depth_charts", "snaps", "games"}
+    assert all(isinstance(v, float) and v < 0.1 for v in ages.values())
+    assert sorted(got) == sorted(p.name for _, p in SG.season_inputs(2026, tmp_path).values())

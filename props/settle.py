@@ -159,11 +159,28 @@ def american_pnl(price: float, won: bool) -> float:
     return price if price > 0 else 10000.0 / abs(price)
 
 
-def load_stats(season: int, cache: Path) -> pd.DataFrame:
+STATS_MAX_AGE_S = 3 * 3600
+
+
+def load_stats(season: int, cache: Path, max_age_s: int = STATS_MAX_AGE_S) -> pd.DataFrame:
+    """The season's weekly player stats, refreshed when the copy is older than
+    `max_age_s`. It used to download only when missing, and the props workflow
+    restores its cache every run, so the first settle's file -- holding only the
+    weeks played by then -- would have graded every later week as unplayed."""
+    import time
     cache.parent.mkdir(parents=True, exist_ok=True)
-    if not cache.exists():
+    if not cache.exists() or time.time() - cache.stat().st_mtime >= max_age_s:
         import urllib.request
-        urllib.request.urlretrieve(STATS_URL.format(season=season), cache)
+        tmp = cache.with_name(cache.name + ".part")
+        try:
+            urllib.request.urlretrieve(STATS_URL.format(season=season), tmp)
+            tmp.replace(cache)
+        except Exception as ex:  # noqa: BLE001
+            tmp.unlink(missing_ok=True)
+            if not cache.exists():
+                raise
+            print(f"stats refresh failed ({type(ex).__name__}); grading from the "
+                  f"copy dated {time.ctime(cache.stat().st_mtime)}", file=sys.stderr)
     df = pd.read_csv(cache, low_memory=False)
     df = df[df["season_type"] == "REG"].copy()
     for col in ("receptions", "receiving_yards", "rushing_yards",

@@ -28,7 +28,7 @@ Survival rule ("if you could have only one bet in this game and had to win it"):
 
 Per-game failures do not stop the slate; they are reported in the runs table.
 """
-import argparse, re as _re, subprocess, sys, time
+import argparse, os, re as _re, subprocess, sys, time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -36,7 +36,8 @@ import pandas as pd
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
-from score_game import GAMES_URL, OUT, eastern_to_utc, et_today, fetch  # noqa: E402
+from score_game import (GAMES_URL, OUT, eastern_to_utc, et_today, fetch,  # noqa: E402
+                        refresh_season_inputs)
 
 # The report contains "≥" and other non-cp1252 characters. The Linux
 # runner writes UTF-8 by default so this was invisible in CI, while every
@@ -156,6 +157,14 @@ def main():
         sys.exit(f"no games for {a.season} week {a.week} after filters")
 
     print(f"slate: {a.season} week {a.week}, {len(W)} games, source={a.source}, workdir={wd}")
+    # ONE VERSION OF THE INPUTS PER SLATE. Refresh the current-season files once,
+    # here, then pin every per-game run to them; otherwise a refresh age passing
+    # mid-slate prices the early games on one injury report and the late games on
+    # another. The ages print to this process's stdout, which is the log a
+    # scheduled run keeps (the per-game output goes to files under the workdir).
+    input_ages = refresh_season_inputs(a.season, wd)
+    print("inputs, hours old: " + ", ".join(f"{k} {v}" for k, v in input_ages.items()))
+    child_env = dict(os.environ, NFL_FETCH_MAX_AGE_S=str(7 * 86400))
     runs = []
     for _, g in W.iterrows():
         A, H = g.away_team, g.home_team
@@ -172,7 +181,7 @@ def main():
         t0 = time.time()
         log_path = wd / "logs" / f"{A}_{H}.log"
         with open(log_path, "w", encoding="utf-8") as fh:
-            rc = subprocess.run(cmd, stdout=fh, stderr=subprocess.STDOUT).returncode
+            rc = subprocess.run(cmd, stdout=fh, stderr=subprocess.STDOUT, env=child_env).returncode
         secs = round(time.time() - t0, 1)
         # errors="replace": this log is parsed for the spread/total, and a
         # slate must not die because one game's report held a character the
@@ -259,6 +268,7 @@ def main():
          f"{'The Odds API' if a.source == 'oddsapi' else 'Sleeper Picks' if a.source == 'sleeper' else 'Sleeper Picks by default (a TD-only run may use The Odds API when credits allow)'}"
          f"{', Odds API fallback allowed' if a.source == 'sleeper' and not a.no_oddsapi_fallback else ''}. "
          "Model opinion, not validated against closing lines. Lines for games more than a day out will move; re-run inside 90 minutes of kickoff.*", "",
+         "*nflverse inputs, hours old at scoring: " + ", ".join(f"{k} {v}" for k, v in input_ages.items()) + ".*", "",
          "## Runs", "", "| Game | Kickoff (UTC) | Roof | Spread | Total | Lines | Status |", "|---|---|---|---|---|---|---|"]
     for r in runs:
         L.append(f"| {r['game']} | {r['kickoff_utc']} | {r['roof']} | {r['spread'] or '—'} | {r['total'] or '—'} | {r['n_lines']} | {r['status']}{(' — ' + r['error']) if r['error'] else ''} |")

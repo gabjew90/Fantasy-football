@@ -19,7 +19,7 @@ EVERY probability here is EXPLORATORY. receiving_hier_v2 and anytime_td_v1 are P
 Nothing is a fair price or an entry threshold.
 Recommendation is PASS on every line, per the model registry.
 """
-import argparse, json, os, subprocess, sys
+import argparse, json, os, subprocess, sys, time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -105,13 +105,62 @@ def eastern_to_utc(date_str, time_str):
 def log(m): print(m, file=sys.stderr)
 
 
-def fetch(url, dest):
+FETCH_MAX_AGE_S = int(os.environ.get("NFL_FETCH_MAX_AGE_S", str(6 * 3600)))
+
+
+def fetch(url, dest, max_age_s=None):
+    """Download `url` to `dest` unless a copy younger than `max_age_s` exists.
+
+    THE AGE CHECK IS THE POINT. This used to return any file that existed. The
+    props workflow restores props/.cache on every tick, so the first capture's
+    play-by-play, injuries, depth charts, rosters and snaps were reused for every
+    capture after it: week 3 would have been priced without week 2's usage or
+    this week's injury report. A failed refresh falls back to the stale copy and
+    says so -- a capture on older inputs beats no capture."""
     import urllib.request
-    if Path(dest).exists():
+    dest = Path(dest)
+    max_age_s = FETCH_MAX_AGE_S if max_age_s is None else max_age_s
+    if dest.exists() and time.time() - dest.stat().st_mtime < max_age_s:
         return dest
     log(f"  fetch {url.rsplit('/',1)[-1]}")
-    urllib.request.urlretrieve(url, dest)
+    tmp = dest.with_name(dest.name + ".part")
+    try:
+        urllib.request.urlretrieve(url, tmp)
+        tmp.replace(dest)
+    except Exception as ex:  # noqa: BLE001
+        tmp.unlink(missing_ok=True)
+        if not dest.exists():
+            raise
+        age_h = (time.time() - dest.stat().st_mtime) / 3600
+        log(f"  STALE INPUT: refresh of {dest.name} failed ({type(ex).__name__}); "
+            f"using the copy from {age_h:.1f} h ago")
     return dest
+
+
+def season_inputs(season, wd) -> dict:
+    """The current-season nflverse files a capture reads: name -> (url, local path).
+    One list, so score_week can refresh them once for the whole slate."""
+    wd = Path(wd)
+    return {"pbp": (f"{NFLVERSE}/pbp/play_by_play_{season}.csv", wd / f"pbp_{season}.csv"),
+            "rosters": (f"{NFLVERSE}/weekly_rosters/roster_weekly_{season}.csv", wd / f"ros_{season}.csv"),
+            "injuries": (f"{NFLVERSE}/injuries/injuries_{season}.csv", wd / f"inj_{season}.csv"),
+            "depth_charts": (f"{NFLVERSE}/depth_charts/depth_charts_{season}.csv", wd / f"dc_{season}.csv"),
+            "snaps": (f"{NFLVERSE}/snap_counts/snap_counts_{season}.csv", wd / f"snap_{season}.csv"),
+            "games": (GAMES_URL, wd / "games.csv")}
+
+
+def refresh_season_inputs(season, wd) -> dict:
+    """Refresh every current-season input once and return each file's age in
+    hours. score_week calls this before the first game so one slate is priced
+    on one version of the inputs, then pins the per-game fetches to it."""
+    ages = {}
+    for name, (url, dest) in season_inputs(season, wd).items():
+        try:
+            fetch(url, dest)
+            ages[name] = round((time.time() - Path(dest).stat().st_mtime) / 3600, 1)
+        except Exception as ex:  # noqa: BLE001 -- the per-game run reports it
+            ages[name] = f"unavailable ({type(ex).__name__})"
+    return ages
 
 
 # ---------------------------------------------------------------- odds helpers
@@ -443,17 +492,13 @@ def main():
                         "unavailable", "team TD totals fall back to the history blend; TD calls capped at MODERATE"))
 
     # ---------- 2. current-season evidence ----------
-    pbp = pd.read_csv(fetch(f"{NFLVERSE}/pbp/play_by_play_{SEASON}.csv", wd / f"pbp_{SEASON}.csv"),
-                      low_memory=False)
+    cur = season_inputs(SEASON, wd)
+    pbp = pd.read_csv(fetch(*cur["pbp"]), low_memory=False)
     pbp = pbp[(pbp.season_type == "REG") & (pbp.week < WEEK)]
-    ros = pd.read_csv(fetch(f"{NFLVERSE}/weekly_rosters/roster_weekly_{SEASON}.csv",
-                            wd / f"ros_{SEASON}.csv"), low_memory=False)
-    inj = pd.read_csv(fetch(f"{NFLVERSE}/injuries/injuries_{SEASON}.csv",
-                            wd / f"inj_{SEASON}.csv"), low_memory=False)
-    dcf = pd.read_csv(fetch(f"{NFLVERSE}/depth_charts/depth_charts_{SEASON}.csv",
-                            wd / f"dc_{SEASON}.csv"), low_memory=False)
-    snp = pd.read_csv(fetch(f"{NFLVERSE}/snap_counts/snap_counts_{SEASON}.csv",
-                            wd / f"snap_{SEASON}.csv"))
+    ros = pd.read_csv(fetch(*cur["rosters"]), low_memory=False)
+    inj = pd.read_csv(fetch(*cur["injuries"]), low_memory=False)
+    dcf = pd.read_csv(fetch(*cur["depth_charts"]), low_memory=False)
+    snp = pd.read_csv(fetch(*cur["snaps"]))
 
     passes = pbp[(pbp.play_type == "pass") & pbp.receiver_player_id.notna()]
     rushes = pbp[(pbp.play_type == "run") & (pbp.qb_kneel != 1) & pbp.rusher_player_id.notna()]

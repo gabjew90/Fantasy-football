@@ -5184,3 +5184,27 @@ two-sided +230 read as +20% instead of ~7%). The edge is now measured on the
 blend with each player's CONSENSUS market (the two-sided no-vig where any book
 offers one, else the median de-vigged price), and EV is taken at the best posted
 price. (2) v0-fallback legs could enter a parlay; only anytime_td_v1 legs do.
+
+## 2026-09-24 (91) -- the capture refreshes its inputs; settle runs when the cron finally fires
+
+Two capture-path defects found while inventorying the repo for the
+consolidation plan.
+
+**Stale inputs.** `score_game.fetch` returned any file that already existed,
+and `props.yml` restores `props/.cache` on every tick. So the first capture's
+play-by-play, weekly rosters, injuries, depth charts and snap counts were
+reused by every capture after it: week 3 would have been priced without week
+2's usage or this week's injury report. `settle.load_stats` had the same
+shape, which would have graded every week after the first settle as unplayed.
+Both now refresh a copy older than a set age (6 h for the scorer, 3 h for
+settle) and fall back to the stale copy, loudly, when the refresh fails -- a
+capture on older inputs beats no capture. Engine change: props-v1.17.
+
+**Settle never ran for week 2.** The guard settled only inside Tuesday
+14:00-16:00 UTC, a window meant to absorb GitHub's cron lag. It did not: on
+2026-09-22 the scheduled ticks landed at 12:28 and 17:13 UTC, both outside it,
+and there is no settled file. Settle is now due from Tuesday 14:00 UTC until
+it has run (the per-week marker already stops a second run), through
+Thursday 12:00 UTC; a due capture takes the tick first, since a missed close
+cannot be recovered and a settle can wait one tick. Week 2 is settled by a
+dispatched run after this merges.
