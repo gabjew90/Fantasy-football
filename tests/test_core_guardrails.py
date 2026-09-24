@@ -121,3 +121,16 @@ def test_every_experiment_carries_an_unexpired_date():
         exp = dt.date.fromisoformat(m.group(1))
         assert exp >= today, f"{rel} expired on {exp}: promote it or delete it"
         assert (exp - today).days <= 30, f"{rel} expires {exp}, more than 30 days out"
+
+
+def test_every_projection_source_is_registered():
+    """A module in fantasy/sources/ is a projection source; its NAME must be a
+    registry entry, or it is a parallel engine nobody validated."""
+    names = {c.name for c in registry.COMPONENTS}
+    for f in sorted((ROOT / "fantasy" / "sources").glob("*.py")):
+        if f.name == "__init__.py":
+            continue
+        m = re.search(r'^NAME\s*=\s*"([^"]+)"', f.read_text(encoding="utf-8"), re.M)
+        rel = f.relative_to(ROOT).as_posix()
+        assert m, f"{rel} has no NAME"
+        assert m.group(1) in names, f"{rel} ({m.group(1)}) is not in core/registry.py"

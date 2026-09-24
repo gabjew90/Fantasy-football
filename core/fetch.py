@@ -35,6 +35,7 @@ CURRENT_SEASON_MAX_AGE_S = 6 * 3600
 REFERENCE_MAX_AGE_S = 24 * 3600
 HISTORIC_MAX_AGE_S = 30 * 86400
 LINES_MAX_AGE_S = 600
+PROJECTIONS_MAX_AGE_S = 3600
 
 NFLVERSE = "https://github.com/nflverse/nflverse-data/releases/download"
 NFLVERSE_FILES = {
@@ -159,3 +160,37 @@ def sleeper_lines(*, cache_dir=None, manifest=None, max_age_s: float = LINES_MAX
     """Sleeper Picks prop lines, two-sided, no key and no quota."""
     return fetch(SLEEPER_LINES_URL, Path(cache_dir or DEFAULT_CACHE) / "sleeper_lines.json",
                  max_age_s, name="sleeper lines", manifest=manifest, **kw)
+
+
+SKILL_POSITIONS = ("QB", "RB", "WR", "TE")
+
+
+def _week_max_age(season: int) -> float:
+    return CURRENT_SEASON_MAX_AGE_S if season >= current_season() else HISTORIC_MAX_AGE_S
+
+
+def sleeper_projections(season: int, week: int, *, cache_dir=None, manifest=None,
+                        max_age_s: float | None = None, **kw) -> Path:
+    """Sleeper's weekly projections (Rotowire-sourced stat lines) for the skill
+    positions. Past weeks are served as they stood at the final pre-kickoff
+    update; checked 2026-09-24, weekly residuals for 2024 ran ~7 points of
+    standard deviation, which a post-game revision would not produce."""
+    pos = "".join(f"&position[]={p}" for p in SKILL_POSITIONS)
+    url = f"https://api.sleeper.app/projections/nfl/{season}/{week}?season_type=regular{pos}"
+    # this season's projections move until kickoff (inactives zeroed Sunday
+    # morning), so an hour, not the six the season's nflverse files get
+    default = PROJECTIONS_MAX_AGE_S if season >= current_season() else HISTORIC_MAX_AGE_S
+    return fetch(url, Path(cache_dir or DEFAULT_CACHE) / "sleeper" / f"proj_{season}_wk{week:02d}.json",
+                 default if max_age_s is None else max_age_s,
+                 name=f"sleeper projections {season} wk{week}", manifest=manifest, **kw)
+
+
+def sleeper_stats(season: int, week: int, *, cache_dir=None, manifest=None,
+                  max_age_s: float | None = None, **kw) -> Path:
+    """Sleeper's weekly actual stat lines, keyed by Sleeper id (the same keys the
+    league scoring uses). Undocumented; verified against play-by-play for one
+    player-season on 2026-09-21 by the fantasy skill."""
+    url = f"https://api.sleeper.app/v1/stats/nfl/regular/{season}/{week}"
+    return fetch(url, Path(cache_dir or DEFAULT_CACHE) / "sleeper" / f"stats_{season}_wk{week:02d}.json",
+                 _week_max_age(season) if max_age_s is None else max_age_s,
+                 name=f"sleeper stats {season} wk{week}", manifest=manifest, **kw)

@@ -5247,3 +5247,48 @@ Step 1 is a refactor: no output changes.
 - `.github/workflows/tests.yml` runs the root suite on every PR. Until now it
   ran only on whoever's machine, so a guardrail there would have been advice.
 - CLAUDE.md gains the architecture rules.
+
+## 2026-09-24 (93) -- consolidation step 2: the projection contract, two weekly sources, and a measured range
+
+**The contract** (fantasy/contract.py): every projection is a mean plus, when
+known, quantiles at p10/p25/p50/p75/p90, validated for coherence. Floor and
+ceiling are p10 and p90 -- computed, never adjectives -- which is what the
+user's start/sit rule (likely win: better floor; likely loss: better ceiling)
+needs.
+
+**Two weekly sources behind it**, both registered:
+- `sleeper_weekly`: Sleeper's weekly projection scored in the league's scoring.
+- `market_points`: migrated from the fantasy skill. Conversions unchanged (the
+  tests pin four golden values from the skill's script); it now reads through
+  core.fetch, scores through core.scoring, keys players by Sleeper id instead
+  of name, and fixes one bug: a QB's anytime-TD price was scored as a passing
+  TD (4) when the market pays for the QB's own score (a rush, 6). QB market
+  totals remain partial -- no passing-TD market is ever posted -- and say so.
+
+**The range: dispersion_v0** (fantasy/dispersion.py). Empirical quantiles of
+(actual - projected) by position and projection size, from Sleeper's pre-game
+weekly projections vs Sleeper's actuals, interpolated between bucket centres.
+Fitted on 2024, tested on 2025. Both leagues PASS: the p10-p90 range held
+81.6% of 2025 outcomes for Omnibeta and 80.5% for Keefamania, and it beats the
+baseline on pinball loss overall -- by about 2% (1.465 vs 1.494 Omnibeta,
+1.351 vs 1.384 Keefamania). The baseline is a normal sized to each projection
+bucket and floored like the table; the first version used one normal per
+position, which a bucketed table beats almost by construction (code review),
+and against it the margin looked like 7-10%. Two things were measured before
+trusting it:
+- *Leakage.* Sleeper's past projections carry a last_modified after kickoff. A
+  post-game revision would show near-zero residuals; the 2024 spread was ~7
+  points per player-week, which pre-game projections produce.
+- *Ties.* The first run failed on a p25 miss driven by tight ends: 24.5% of
+  2025 TE weeks sit exactly on a p10 of 0.0. Coverage for a distribution with
+  atoms is a bracket (strictly below, at or below); the verdict uses it. The
+  change was made only after measuring the ties, and the report prints both.
+Kept, not tuned away, and carried with every range at that position: QB is no
+better than the scaled normal and its low tail runs heavy (14.5-15% of 2025
+weeks below p10); RB outcomes ran under Sleeper's projections (p25-p75 each
+3-5 points high), a bias of the source rather than a width problem. TE has no
+caveat once ties are counted. Two-way players (Travis Hunter: fantasy_positions
+['DB', 'WR']) are placed at their first fantasy position.
+
+The rest-of-season consensus moves into fantasy/ in step 4, where the waiver
+command first needs it; step 2 is the weekly (start/sit) layer.

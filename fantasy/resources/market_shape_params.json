@@ -1,0 +1,525 @@
+{
+ "built": "2026-09-18",
+ "fit_seasons": [
+  2024,
+  2025
+ ],
+ "method": "per-game stat pooled within (stat, position group, SEASON-MEDIAN bin). mean_over_median = median across players of (player-season mean / player-season median); the shipped value averages the 2024 and 2025 fits and both are kept. gamma_shape = 1/var(per-game stat / player-season mean), used only to locate the market median relative to the posted line. Binning on the MEDIAN, not the mean, is deliberate: the median is what a posted line gives you, and mean-binned ratios were unstable across seasons in the low bins (WR rec yds 2.02 in 2024 vs 4.74 in 2025).",
+ "holdout_check": {
+  "design": "2024 ratios applied to each 2025 player-season median, compared with that player-season mean",
+  "results": {
+   "rec_yds|WR|0": {
+    "n_players": 19,
+    "mae": 4.645,
+    "bias": 0.285,
+    "mean_level": 14.6
+   },
+   "rec_yds|WR|1": {
+    "n_players": 47,
+    "mae": 3.244,
+    "bias": 0.196,
+    "mean_level": 22.1
+   },
+   "rec_yds|WR|2": {
+    "n_players": 34,
+    "mae": 5.158,
+    "bias": -1.053,
+    "mean_level": 41.7
+   },
+   "rec_yds|WR|3": {
+    "n_players": 23,
+    "mae": 4.417,
+    "bias": 0.864,
+    "mean_level": 60.3
+   },
+   "rec_yds|WR|4": {
+    "n_players": 8,
+    "mae": 8.555,
+    "bias": -8.555,
+    "mean_level": 87.0
+   },
+   "rec_yds|TE|0": {
+    "n_players": 19,
+    "mae": 2.456,
+    "bias": 0.932,
+    "mean_level": 11.3
+   },
+   "rec_yds|TE|1": {
+    "n_players": 24,
+    "mae": 3.383,
+    "bias": 0.631,
+    "mean_level": 19.7
+   },
+   "rec_yds|TE|2": {
+    "n_players": 24,
+    "mae": 3.831,
+    "bias": 0.791,
+    "mean_level": 36.8
+   },
+   "rec_yds|RB|0": {
+    "n_players": 26,
+    "mae": 2.56,
+    "bias": -1.195,
+    "mean_level": 9.7
+   },
+   "rec_yds|RB|1": {
+    "n_players": 30,
+    "mae": 3.257,
+    "bias": -1.175,
+    "mean_level": 19.0
+   },
+   "catches|WR|0": {
+    "n_players": 39,
+    "mae": 0.232,
+    "bias": 0.074,
+    "mean_level": 1.3
+   },
+   "catches|WR|1": {
+    "n_players": 52,
+    "mae": 0.331,
+    "bias": 0.005,
+    "mean_level": 2.7
+   },
+   "catches|WR|2": {
+    "n_players": 30,
+    "mae": 0.417,
+    "bias": 0.191,
+    "mean_level": 4.2
+   },
+   "catches|WR|3": {
+    "n_players": 9,
+    "mae": 0.429,
+    "bias": 0.1,
+    "mean_level": 6.6
+   },
+   "catches|TE|0": {
+    "n_players": 27,
+    "mae": 0.226,
+    "bias": -0.031,
+    "mean_level": 1.3
+   },
+   "catches|TE|1": {
+    "n_players": 30,
+    "mae": 0.36,
+    "bias": 0.041,
+    "mean_level": 2.7
+   },
+   "catches|TE|2": {
+    "n_players": 17,
+    "mae": 0.334,
+    "bias": 0.168,
+    "mean_level": 4.3
+   },
+   "catches|RB|0": {
+    "n_players": 35,
+    "mae": 0.262,
+    "bias": -0.06,
+    "mean_level": 1.2
+   },
+   "catches|RB|1": {
+    "n_players": 31,
+    "mae": 0.355,
+    "bias": -0.159,
+    "mean_level": 2.6
+   },
+   "rush_yds|RB|0": {
+    "n_players": 13,
+    "mae": 5.607,
+    "bias": 3.295,
+    "mean_level": 13.2
+   },
+   "rush_yds|RB|1": {
+    "n_players": 19,
+    "mae": 4.184,
+    "bias": -1.737,
+    "mean_level": 28.8
+   },
+   "rush_yds|RB|2": {
+    "n_players": 28,
+    "mae": 4.734,
+    "bias": -1.265,
+    "mean_level": 51.2
+   },
+   "rush_yds|RB|3": {
+    "n_players": 13,
+    "mae": 6.452,
+    "bias": -0.85,
+    "mean_level": 77.0
+   },
+   "rush_yds|QB|0": {
+    "n_players": 9,
+    "mae": 1.561,
+    "bias": -0.423,
+    "mean_level": 8.3
+   },
+   "rush_yds|QB|1": {
+    "n_players": 16,
+    "mae": 2.193,
+    "bias": 0.671,
+    "mean_level": 20.5
+   },
+   "pass_yds|QB|1": {
+    "n_players": 13,
+    "mae": 15.152,
+    "bias": -2.665,
+    "mean_level": 200.6
+   },
+   "pass_yds|QB|2": {
+    "n_players": 14,
+    "mae": 13.083,
+    "bias": 11.145,
+    "mean_level": 237.8
+   }
+  }
+ },
+ "params": {
+  "catches|RB|0": {
+   "mean_over_median": 1.1153,
+   "var_z": 0.8856,
+   "gamma_shape": 1.129,
+   "n_players": 35,
+   "n_games": 506,
+   "med_lo": 0.5,
+   "med_hi": 1.5,
+   "ratio_2025": 1.1333,
+   "ratio_2024": 1.0973,
+   "seasons": 2
+  },
+  "catches|RB|1": {
+   "mean_over_median": 1.069,
+   "var_z": 0.484,
+   "gamma_shape": 2.066,
+   "n_players": 31,
+   "n_games": 464,
+   "med_lo": 1.5,
+   "med_hi": 3,
+   "ratio_2025": 1.0938,
+   "ratio_2024": 1.0442,
+   "seasons": 2
+  },
+  "catches|TE|0": {
+   "mean_over_median": 1.202,
+   "var_z": 0.5541,
+   "gamma_shape": 1.805,
+   "n_players": 27,
+   "n_games": 316,
+   "med_lo": 0.5,
+   "med_hi": 1.5,
+   "ratio_2025": 1.2222,
+   "ratio_2024": 1.1818,
+   "seasons": 2
+  },
+  "catches|TE|1": {
+   "mean_over_median": 1.0594,
+   "var_z": 0.3985,
+   "gamma_shape": 2.51,
+   "n_players": 30,
+   "n_games": 409,
+   "med_lo": 1.5,
+   "med_hi": 3,
+   "ratio_2025": 1.0563,
+   "ratio_2024": 1.0625,
+   "seasons": 2
+  },
+  "catches|TE|2": {
+   "mean_over_median": 1.025,
+   "var_z": 0.2446,
+   "gamma_shape": 4.089,
+   "n_players": 17,
+   "n_games": 243,
+   "med_lo": 3,
+   "med_hi": 5,
+   "ratio_2025": 1.0,
+   "ratio_2024": 1.05,
+   "seasons": 2
+  },
+  "catches|WR|0": {
+   "mean_over_median": 1.2777,
+   "var_z": 0.8477,
+   "gamma_shape": 1.18,
+   "n_players": 39,
+   "n_games": 475,
+   "med_lo": 0.5,
+   "med_hi": 1.5,
+   "ratio_2025": 1.2222,
+   "ratio_2024": 1.3333,
+   "seasons": 2
+  },
+  "catches|WR|1": {
+   "mean_over_median": 1.0901,
+   "var_z": 0.4154,
+   "gamma_shape": 2.408,
+   "n_players": 52,
+   "n_games": 739,
+   "med_lo": 1.5,
+   "med_hi": 3,
+   "ratio_2025": 1.0802,
+   "ratio_2024": 1.1,
+   "seasons": 2
+  },
+  "catches|WR|2": {
+   "mean_over_median": 1.0084,
+   "var_z": 0.2306,
+   "gamma_shape": 4.337,
+   "n_players": 30,
+   "n_games": 463,
+   "med_lo": 3,
+   "med_hi": 5,
+   "ratio_2025": 0.9858,
+   "ratio_2024": 1.031,
+   "seasons": 2
+  },
+  "catches|WR|3": {
+   "mean_over_median": 0.9975,
+   "var_z": 0.1553,
+   "gamma_shape": 6.44,
+   "n_players": 9,
+   "n_games": 131,
+   "med_lo": 5,
+   "med_hi": 1000000000.0,
+   "ratio_2025": 0.9832,
+   "ratio_2024": 1.0119,
+   "seasons": 2
+  },
+  "pass_yds|QB|0": {
+   "mean_over_median": 1.0727,
+   "var_z": 0.275,
+   "gamma_shape": 3.636,
+   "n_players": 8,
+   "n_games": 92,
+   "med_lo": 50,
+   "med_hi": 180,
+   "ratio_2025": 1.0727,
+   "ratio_2024": null,
+   "seasons": 1
+  },
+  "pass_yds|QB|1": {
+   "mean_over_median": 0.9694,
+   "var_z": 0.1396,
+   "gamma_shape": 7.162,
+   "n_players": 13,
+   "n_games": 182,
+   "med_lo": 180,
+   "med_hi": 230,
+   "ratio_2025": 0.984,
+   "ratio_2024": 0.9549,
+   "seasons": 2
+  },
+  "pass_yds|QB|2": {
+   "mean_over_median": 0.984,
+   "var_z": 0.1098,
+   "gamma_shape": 9.11,
+   "n_players": 14,
+   "n_games": 203,
+   "med_lo": 230,
+   "med_hi": 270,
+   "ratio_2025": 0.9652,
+   "ratio_2024": 1.0028,
+   "seasons": 2
+  },
+  "rec_yds|RB|0": {
+   "mean_over_median": 1.3742,
+   "var_z": 1.3939,
+   "gamma_shape": 0.717,
+   "n_players": 26,
+   "n_games": 371,
+   "med_lo": 2,
+   "med_hi": 10,
+   "ratio_2025": 1.4284,
+   "ratio_2024": 1.32,
+   "seasons": 2
+  },
+  "rec_yds|RB|1": {
+   "mean_over_median": 1.2504,
+   "var_z": 0.8386,
+   "gamma_shape": 1.192,
+   "n_players": 30,
+   "n_games": 445,
+   "med_lo": 10,
+   "med_hi": 25,
+   "ratio_2025": 1.3052,
+   "ratio_2024": 1.1957,
+   "seasons": 2
+  },
+  "rec_yds|RB|2": {
+   "mean_over_median": 0.9702,
+   "var_z": 0.4362,
+   "gamma_shape": 2.292,
+   "n_players": 8,
+   "n_games": 107,
+   "med_lo": 25,
+   "med_hi": 45,
+   "ratio_2025": null,
+   "ratio_2024": 0.9702,
+   "seasons": 1
+  },
+  "rec_yds|TE|0": {
+   "mean_over_median": 1.4722,
+   "var_z": 0.961,
+   "gamma_shape": 1.041,
+   "n_players": 19,
+   "n_games": 226,
+   "med_lo": 2,
+   "med_hi": 10,
+   "ratio_2025": 1.3571,
+   "ratio_2024": 1.5873,
+   "seasons": 2
+  },
+  "rec_yds|TE|1": {
+   "mean_over_median": 1.197,
+   "var_z": 0.6632,
+   "gamma_shape": 1.508,
+   "n_players": 24,
+   "n_games": 308,
+   "med_lo": 10,
+   "med_hi": 25,
+   "ratio_2025": 1.1575,
+   "ratio_2024": 1.2366,
+   "seasons": 2
+  },
+  "rec_yds|TE|2": {
+   "mean_over_median": 1.1171,
+   "var_z": 0.4443,
+   "gamma_shape": 2.25,
+   "n_players": 24,
+   "n_games": 343,
+   "med_lo": 25,
+   "med_hi": 45,
+   "ratio_2025": 1.112,
+   "ratio_2024": 1.1221,
+   "seasons": 2
+  },
+  "rec_yds|WR|0": {
+   "mean_over_median": 1.8443,
+   "var_z": 1.3468,
+   "gamma_shape": 0.742,
+   "n_players": 19,
+   "n_games": 225,
+   "med_lo": 2,
+   "med_hi": 10,
+   "ratio_2025": 1.7231,
+   "ratio_2024": 1.9655,
+   "seasons": 2
+  },
+  "rec_yds|WR|1": {
+   "mean_over_median": 1.318,
+   "var_z": 0.9672,
+   "gamma_shape": 1.034,
+   "n_players": 47,
+   "n_games": 618,
+   "med_lo": 10,
+   "med_hi": 25,
+   "ratio_2025": 1.3441,
+   "ratio_2024": 1.2919,
+   "seasons": 2
+  },
+  "rec_yds|WR|2": {
+   "mean_over_median": 1.1498,
+   "var_z": 0.5242,
+   "gamma_shape": 1.908,
+   "n_players": 34,
+   "n_games": 516,
+   "med_lo": 25,
+   "med_hi": 45,
+   "ratio_2025": 1.1734,
+   "ratio_2024": 1.1261,
+   "seasons": 2
+  },
+  "rec_yds|WR|3": {
+   "mean_over_median": 1.0619,
+   "var_z": 0.3286,
+   "gamma_shape": 3.043,
+   "n_players": 23,
+   "n_games": 323,
+   "med_lo": 45,
+   "med_hi": 70,
+   "ratio_2025": 1.0476,
+   "ratio_2024": 1.0762,
+   "seasons": 2
+  },
+  "rec_yds|WR|4": {
+   "mean_over_median": 0.9669,
+   "var_z": 0.218,
+   "gamma_shape": 4.586,
+   "n_players": 8,
+   "n_games": 128,
+   "med_lo": 70,
+   "med_hi": 1000000000.0,
+   "ratio_2025": 1.0084,
+   "ratio_2024": 0.9255,
+   "seasons": 2
+  },
+  "rush_yds|QB|0": {
+   "mean_over_median": 1.3758,
+   "var_z": 1.3348,
+   "gamma_shape": 0.749,
+   "n_players": 9,
+   "n_games": 120,
+   "med_lo": 2,
+   "med_hi": 10,
+   "ratio_2025": 1.3361,
+   "ratio_2024": 1.4154,
+   "seasons": 2
+  },
+  "rush_yds|QB|1": {
+   "mean_over_median": 1.141,
+   "var_z": 0.5777,
+   "gamma_shape": 1.731,
+   "n_players": 16,
+   "n_games": 218,
+   "med_lo": 10,
+   "med_hi": 30,
+   "ratio_2025": 1.1345,
+   "ratio_2024": 1.1475,
+   "seasons": 2
+  },
+  "rush_yds|RB|0": {
+   "mean_over_median": 2.1319,
+   "var_z": 1.7529,
+   "gamma_shape": 0.57,
+   "n_players": 13,
+   "n_games": 188,
+   "med_lo": 2,
+   "med_hi": 10,
+   "ratio_2025": 1.725,
+   "ratio_2024": 2.5387,
+   "seasons": 2
+  },
+  "rush_yds|RB|1": {
+   "mean_over_median": 1.2468,
+   "var_z": 0.7347,
+   "gamma_shape": 1.361,
+   "n_players": 19,
+   "n_games": 264,
+   "med_lo": 10,
+   "med_hi": 30,
+   "ratio_2025": 1.2716,
+   "ratio_2024": 1.2219,
+   "seasons": 2
+  },
+  "rush_yds|RB|2": {
+   "mean_over_median": 1.0648,
+   "var_z": 0.3603,
+   "gamma_shape": 2.775,
+   "n_players": 28,
+   "n_games": 423,
+   "med_lo": 30,
+   "med_hi": 60,
+   "ratio_2025": 1.0666,
+   "ratio_2024": 1.0631,
+   "seasons": 2
+  },
+  "rush_yds|RB|3": {
+   "mean_over_median": 0.9986,
+   "var_z": 0.2277,
+   "gamma_shape": 4.391,
+   "n_players": 13,
+   "n_games": 202,
+   "med_lo": 60,
+   "med_hi": 1000000000.0,
+   "ratio_2025": 0.9981,
+   "ratio_2024": 0.9991,
+   "seasons": 2
+  }
+ }
+}
