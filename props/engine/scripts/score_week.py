@@ -274,7 +274,7 @@ def main():
         L.append(f"| {r['game']} | {r['kickoff_utc']} | {r['roof']} | {r['spread'] or '—'} | {r['total'] or '—'} | {r['n_lines']} | {r['status']}{(' — ' + r['error']) if r['error'] else ''} |")
     L += ["", "## One must-win pick per game", "",
           "*Rule: receptions/receiving yards, book no-vig >= 55% on the same side, then highest model probability; "
-          "if no such line is posted, the same at >= 50%, then ANY market at >= 50% (flagged 'no backtest'). "
+          "if no such line is posted, the same at >= 50%, then ANY market at >= 50% (flagged 'least calibration evidence'). "
           "Players who changed teams or are Questionable are excluded, the same exclusion the slate-wide pick applies; "
           "a row marked 'role-flagged fallback' is a game where no unflagged line qualified. "
           "These maximise P(win), not EV; every one is a juiced favourite side. Sleeper requires 2+ leg entries, and "
@@ -287,7 +287,7 @@ def main():
         if s["new_team"]: flags.append("new team")
         if s["questionable"]: flags.append("Questionable")
         if "DISAGREES" in s["rule"]: flags.append("book disagrees")
-        if s["market"] not in CAL_MARKETS: flags.append(f"no backtest ({MK_LABEL.get(s['market'], s['market'])})")
+        if s["market"] not in CAL_MARKETS: flags.append(f"least calibration evidence ({MK_LABEL.get(s['market'], s['market'])})")
         if s["p_novig"] < 0.55 and "DISAGREES" not in s["rule"]: flags.append("book near coin flip")
         if "role-flagged fallback" in s["rule"]: flags.append("role-flagged fallback")
         if s.get("slot") in ("RB2", "WR3", "proxy") or str(s.get("slot", "")).startswith("proxy"): flags.append(f"depth role ({s['slot']})")
@@ -313,7 +313,7 @@ def main():
                              "highest-probability pick on the slate, not the most stable role on it."
                              if t.slot in ("RB2", "WR3", "proxy") else "")
                           + (f" No receptions or receiving-yards line qualified anywhere on the slate, so this is a "
-                             f"{MK_LABEL.get(t.market, t.market)} pick with no backtest behind it."
+                             f"{MK_LABEL.get(t.market, t.market)} pick, from a market with the least calibration evidence."
                              if t.market not in CAL_MARKETS else "")]
     if not C.empty:
         sm = C[C.tier_base.isin(["STRONG", "MODERATE"])]
@@ -364,7 +364,7 @@ def main():
               "", "*Calibration: no market has been validated against sportsbook lines. Receptions and receiving yards have a "
               "2025 walk-forward behind them (resources/calibration_2025.csv), but it places lines at fixed offsets from the "
               "model\u2019s own median across every player-week, so it measures distributional self-consistency, not whether the "
-              "model beats a book on the calls it would actually make. Rushing yards and anytime TD have no backtest at all. "
+              "model beats a book on the calls it would actually make. The 2022-25 yardage harness finds receptions, receiving yards and rushing yards unbiased but too narrow (a model 85% Over wins about 75-81%). "
               "Team TD totals are anchored to the same-book spread and total.*"]
     L += [""] + PARLAY_MD
     L += ["", "Per-game guides, cards, ladders, parlays and shadow logs are in the outputs folder under each game's name."]

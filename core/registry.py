@@ -45,15 +45,17 @@ class Component:
 
 COMPONENTS: tuple[Component, ...] = (
     # ------------------------------------------------------------- props
-    Component("receiving_hier_v2", "prop_model", "props/engine/scripts/model.py", "live",
-              evidence=("props/engine/resources/calibration_2025.csv",
-                        "props/engine/resources/model_registry.md"),
-              note="2025 walk-forward CRPS beats the naive baseline; not yet tested "
-                   "against posted lines (the record is building that)",
+    Component("receiving_hier_v2", "prop_model", "props/engine/scripts/model.py", "provisional",
+              evidence=("reports/yardage_harness.md", "props/engine/resources/model_registry.md"),
+              note="yardage harness 2022-25: beats baseline A on both test seasons and is unbiased, "
+                   "but too NARROW (receptions 26.1%, yards 23.0% outside p10-p90 vs 20%; an 85% Over wins "
+                   "~81%); fails the width/calibration bar. calibration_2025.csv predates the joint "
+                   "sampler and is not evidence",
               markets=("player_receptions", "player_reception_yds")),
     Component("rush_yds_v0", "prop_model", "props/engine/scripts/model.py", "provisional",
-              note="no backtest (model_registry: Test NONE); a walk-forward CRPS run "
-                   "like receiving_hier_v2's would validate or retire it",
+              evidence=("reports/yardage_harness.md",),
+              note="yardage harness 2022-25: beats baseline A on both test seasons and is unbiased, "
+                   "but too NARROW (32.1% outside p10-p90 vs 20%; an 85% Over wins ~75%); no run-defense adjustment, no QB rushing",
               markets=("player_rush_yds",)),
     Component("anytime_td_v1", "prop_model", "props/engine/scripts/td_v1.py", "live",
               evidence=("reports/td_v1.md", "reports/td_layer1.md", "reports/td_layer2.md"),

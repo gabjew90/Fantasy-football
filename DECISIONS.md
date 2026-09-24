@@ -5491,3 +5491,51 @@ Measured before merge: a clean copy of the release file set, with nothing
 else from the repo, ran `nfl status`, `fantasy lineup --league omnibeta` and
 `fantasy lineup --league keefamania` (live Yahoo, gate PASS). Chat itself is
 tested after the user builds and installs the skill.
+
+## 2026-09-24 (98) -- the yardage harness: four seasons, and the models are too narrow
+
+The yardage markets are brought to the anytime-TD model's standard
+(docs/plans/2026-09-24-yardage-harness.md; replaces consolidation step 7).
+Step 1 is measurement only:
+
+- **Grade the sampler that ships.** Rushing yards were drawn inline in
+  score_game.py; the draw moved to `model.simulate_team_rush` and the scorer
+  and backtest both call it. score_game output checked byte-identical before
+  and after (KC@MIA week 3; only the kickoff clock line differs).
+- **`backtest.py --seasons`**: 2022-2025 walk-forward, each season from priors
+  built from the season before by the current builder (the rebuilt 2024
+  priors match the committed ones), the live scorer's opponent settings and
+  team-volume blend, dispersions from the priors, nothing fitted on the
+  season under test. Weeks 2-18, reported as 2-4 and 5-18. Rushing yards are
+  scored for the first time. The old single-season protocol still runs.
+- **Result:** receptions, receiving yards and rushing yards all beat
+  baseline A on both test seasons (intervals exclude zero) and are unbiased
+  on average -- and all three are too narrow: 26.1%, 23.0% and 32.1% of
+  outcomes outside the model's p10-p90 (20% expected); an 85% Over wins about
+  75-81%. The miss is worst on the low side.
+- **User decision: width is part of the bar, and fixing it comes first.** A
+  market is `live` only if it also has 20% +/- 3 outside p10-p90 and every
+  60-90% reliability bucket within 3 points. `receiving_hier_v2` moves from
+  live to provisional in core/registry.py (its evidence, calibration_2025.csv,
+  predates the joint sampler; the current code reproduces the overconfidence
+  under the old protocol too). Nothing in the pricer changes: no market was
+  eligible as a play before this either, since none is validated against
+  posted lines.
+
+Code review (high), 9 of 10 fixed before merge: live mode used each player's
+last four games as this season's evidence where the scorer uses every game
+(now the full season, with the scorer's denominators -- the averages improved
+to 1.00 and the width verdict held); the cached priors, frames and features
+were keyed only by season, so a changed builder would have been read stale
+(now keyed by the code that built them, priors never built into the engine's
+own resources); relabelling the model status would have changed the
+model_state strings in record rows mid-season (the labels are kept, the
+comment carries the evidence); the rushing draws shifted the single-season
+protocol's PIT randomization (restored order); live mode read a player's
+first slot of the season, which can come from a later week (now the latest
+pre-game chart at or before the week; the single-season protocol keeps its
+convention); the four-part verdict had no test; a falsy-zero in the width
+line; dead state. Skipped, recorded as a follow-up in the plan: the slate's
+must-win pick still treats receptions and receiving yards as the calibrated
+markets. The scorer's sampler output is byte-identical; its report wording
+about model states changed.

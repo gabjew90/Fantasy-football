@@ -37,6 +37,21 @@ To `VALIDATED_BETTING`: everything above plus archive coverage (rows, bookmakers
   - no archived-line test; betting validation unavailable
 - Next steps to `VALIDATED_DISTRIBUTION`: rerun on the eligible population under the guard, with hierarchical and rolling-utilization baselines and game-level bootstrap intervals; report roster carryover per test week.
 
+### Round 10 (2026-09-24): the yardage harness, four seasons
+`backtest.py --seasons 2022,2023,2024,2025 --tune 2022,2023 --test 2024,2025`
+(report: `reports/yardage_harness.md`, plan: `docs/plans/2026-09-24-yardage-harness.md`).
+Each season walk-forward from priors built from the season before, live scorer
+settings, the scorer's own joint samplers (rushing moved into
+`model.simulate_team_rush`; score_game output byte-identical). Weeks 2-18.
+Receptions, receiving yards and rushing yards all beat baseline A on both
+test seasons with intervals excluding zero and are unbiased on average, and
+all three are too NARROW: 26.1%, 23.0% and 32.1% of outcomes fall outside
+the model's p10-p90 (20% expected), and an 85% Over wins about 75-81%. The
+`calibration_2025.csv` that looked calibrated predates the joint sampler; the
+round-9 code reproduces the overconfidence under the old single-season
+protocol too, so this is the model, not the harness. Width is now part of
+the bar; widening is the next change.
+
 ### rush_yds_v0
 - Markets: player_rush_yds
 - Status: `PROTOTYPE`
