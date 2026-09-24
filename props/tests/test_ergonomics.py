@@ -65,6 +65,9 @@ def test_the_fantasy_export_scores_draws_with_the_league_settings():
     assert by.loc["R", "median"] == pytest.approx(2 + 1.0 + 7.0)
     half = SG.fantasy_table(M, sims, V1TD, lambda m: 0.0, SG.parse_scoring("half"), np.random.default_rng(1), n)
     assert half.set_index("player").loc["W", "median"] == pytest.approx(2.5 + 6.0)
+    # the fantasy scenario command joins on the id and reads the contract's percentiles
+    assert by.loc["W", "gsis_id"] == "w"
+    assert by.loc["W", "p10"] <= by.loc["W", "p25"] <= by.loc["W", "median"] <= by.loc["W", "p75"] <= by.loc["W", "p90"]
 
 
 def test_last_quota_reads_the_newest_cache_file(tmp_path, monkeypatch):

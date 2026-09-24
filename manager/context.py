@@ -48,7 +48,7 @@ def state_dir() -> Path:
     return Path("state") / str(name)
 
 
-def league_context() -> dict:
+def league_context(write_state: bool = True) -> dict:
     cfg = Config.load(league=_LEAGUE)
     # The league-side reads come from whichever platform hosts the league
     # (draftkit.briefs.SleeperSource is the seam). Yahoo was refused here
@@ -65,7 +65,7 @@ def league_context() -> dict:
         raise RuntimeError(
             f"the in-season manager cannot run league {cfg.league_name!r}: "
             f"platform is {platform!r}; sleeper and yahoo are supported.")
-    ctx = build_context(cfg, week=_WEEK, source=source)
+    ctx = build_context(cfg, week=_WEEK, source=source, write_state=write_state)
     ctx["my_rid"] = int(ctx["my_roster"]["roster_id"])
 
     users_by_rid = {}

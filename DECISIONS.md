@@ -5292,3 +5292,65 @@ caveat once ties are counted. Two-way players (Travis Hunter: fantasy_positions
 
 The rest-of-season consensus moves into fantasy/ in step 4, where the waiver
 command first needs it; step 2 is the weekly (start/sit) layer.
+
+## 2026-09-24 (94) -- consolidation step 3: `nfl` -- status, lineup, scenario; a gate that reads what was retrieved
+
+One CLI, `python nfl.py`, for both use cases (props game|slate pass through to
+the props engine unchanged).
+
+**`nfl status`** says what is posted before anything is priced: per game the
+kickoff, spread, total and Sleeper board; whether Sleeper's weekly projections
+are published; whether the week's practice reports and game designations are
+in; and, for a league, where its roster comes from and how old it is. Its
+first real run found Keefamania's roster data 185 hours old: the Yahoo sync
+has not run since 2026-09-16, when the local scheduled jobs were switched off,
+so the automated Keefamania manager has worked from a week-old roster since.
+
+**`nfl fantasy lineup`** applies the user's start/sit framework. The weekly
+mean is `weekly_blend_v0` (PROVISIONAL): Sleeper's projection, blended with
+market_points where the player has a full market board at a weight decaying
+from 0.6 in week 1 to 0 by week 9 (config.yaml), with dispersion_v0's range.
+The decision rule -- likely to win, better floor; likely to lose, better
+ceiling -- is implemented as maximising P(win) over the best-by-mean lineup
+and every legal one-player swap, drawing each week from the player's
+quantiles; a test pins that a favourite then prefers the steady player and an
+underdog the volatile one at equal means. Opportunity/role evidence and an
+opponent-adjusted matchup are named in every report as not yet covered (step 4).
+Scoring uses the platform's settings over the yaml (the only place K and DEF
+weights live); the gate checks the yaml against them.
+
+**The gate** (fantasy/gate.py) computes, from the Manifest and the league view:
+roster read during this run; every yaml scoring key equal to the platform's,
+stat by stat (a key the platform does not report fails as unverified); no stale
+input; every player covered. For Yahoo it reads the RAW API scoring: the Yahoo
+source fills missing keys from the yaml, so comparing against it would have
+verified the yaml against itself. A FAIL makes the verdict CONDITIONAL.
+
+**`nfl fantasy scenario`** answers "how does X project if teammate Y is out"
+three ways, side by side: the props engine priced as posted and with Y out
+(`--assume-out`, the measured absence rule); the games Y actually missed this
+season and last; the market now. First run (Bijan Robinson without Drake
+London): model +0.6, but in 2025's five London-less games Bijan averaged 17.9
+against 23.4 -- the kind of disagreement the side-by-side exists to show. QB
+absences are PROVISIONAL (the rule was not tuned for them). props-v1.18 adds
+gsis_id and p10/p25/p75/p90 to the engine's fantasy table so the join is by
+id; props_fantasy_export moves from deprecated to provisional as its consumer.
+
+**Chat stays read-only.** A chat run writes its report and decision record to
+the outputs folder; only `--record` appends to the graded ledger. No scheduled
+run passes it yet -- wiring the scheduled jobs to this command is part of step
+6's Actions rework -- so until then these recommendations are not graded.
+When they are, the scheduled run and chat run the same command, so what is
+graded is what chat says.
+
+Code review (high) fixed before merge: every run appended to the tracked
+transactions log (build_context now takes write_state=False for read-only
+callers); locked players could be swapped and finished games were still
+projected (a final game now counts its actual score, and nobody whose game has
+kicked off moves); P(win) was drawn around a different mean than the one shown
+(draws are re-centred on the displayed mean) and could draw weeks below zero
+(floored); the scenario loaded a whole league just for its scoring; and weeks
+before a teammate joined the team counted as games without him. Deferred to
+step 5: a chat container has the skill's Yahoo credentials, not this repo's
+env vars, so Keefamania from chat reads the sync copy until the skill passes
+them through.

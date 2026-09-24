@@ -130,3 +130,15 @@ def fantasy_points_expr(weights: dict[str, float] | None = None):
     for col, w in (weights or NFLVERSE_BASE).items():
         expr = expr + pl.col(col).fill_null(0.0).cast(pl.Float64) * w
     return expr.alias("fpts")
+
+
+def score_frame(df, weights: dict[str, float] | None = None):
+    """Pandas: points from nflverse weekly columns, as a Series. `weights` are
+    nflverse column weights (see nflverse_weights); a column the frame lacks
+    contributes nothing."""
+    import pandas as pd
+    total = pd.Series(0.0, index=df.index)
+    for col, w in (weights or NFLVERSE_BASE).items():
+        if col in df.columns:
+            total = total + pd.to_numeric(df[col], errors="coerce").fillna(0.0) * float(w)
+    return total

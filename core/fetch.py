@@ -52,8 +52,11 @@ PLAYERIDS_URL = "https://raw.githubusercontent.com/dynastyprocess/data/master/fi
 SLEEPER_PLAYERS_URL = "https://api.sleeper.app/v1/players/nfl"
 SLEEPER_LINES_URL = "https://api.sleeper.app/lines/available?dynamic=true"
 
-# Sleeper's lines endpoint and ESPN refuse a bare urllib user agent.
+# Sleeper's lines endpoint refuses a bare urllib user agent; ESPN refuses a
+# browser-looking one that is not a browser (403, 2026-09-24) but answers curl,
+# which is what the props engine has always sent it.
 HEADERS = {"User-Agent": "Mozilla/5.0 (fantasy-football core.fetch)"}
+CURL_HEADERS = {"User-Agent": "curl/8.5.0"}
 
 
 def current_season(today: dt.date | None = None) -> int:
@@ -62,8 +65,8 @@ def current_season(today: dt.date | None = None) -> int:
     return today.year if today.month >= 3 else today.year - 1
 
 
-def _download(url: str, dest: Path, timeout: int) -> None:
-    req = urllib.request.Request(url, headers=HEADERS)
+def _download(url: str, dest: Path, timeout: int, headers: dict | None = None) -> None:
+    req = urllib.request.Request(url, headers=headers or HEADERS)
     with urllib.request.urlopen(req, timeout=timeout) as resp, open(dest, "wb") as fh:
         while True:
             chunk = resp.read(1 << 20)
@@ -77,7 +80,8 @@ def _mtime(p: Path) -> dt.datetime:
 
 
 def fetch(url: str, dest: str | Path, max_age_s: float, *, name: str | None = None,
-          manifest: Manifest | None = None, timeout: int = 120, downloader=None) -> Path:
+          manifest: Manifest | None = None, timeout: int = 120, downloader=None,
+          headers: dict | None = None) -> Path:
     """`dest`, refreshed from `url` when missing or older than `max_age_s`.
 
     Raises only when there is no usable copy at all. `downloader(url, path,
@@ -85,7 +89,7 @@ def fetch(url: str, dest: str | Path, max_age_s: float, *, name: str | None = No
     dest = Path(dest)
     dest.parent.mkdir(parents=True, exist_ok=True)
     name = name or dest.name
-    dl = downloader or _download
+    dl = downloader or (lambda u, d, t: _download(u, d, t, headers))
     if dest.exists() and time.time() - dest.stat().st_mtime < max_age_s:
         if manifest is not None:
             manifest.record(name, source=url, status="cached", path=dest, fetched_at=_mtime(dest))
@@ -162,6 +166,18 @@ def sleeper_lines(*, cache_dir=None, manifest=None, max_age_s: float = LINES_MAX
                  max_age_s, name="sleeper lines", manifest=manifest, **kw)
 
 
+def espn_scoreboard(season: int, week: int, *, cache_dir=None, manifest=None,
+                    max_age_s: float = LINES_MAX_AGE_S * 3, **kw) -> Path:
+    """ESPN's scoreboard for ONE regular-season week: kickoffs and the DraftKings
+    spread and total ESPN displays. The bare endpoint shows the current week,
+    which lags a day at the Tuesday rollover (DECISIONS: props-v1.16)."""
+    url = ("https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard"
+           f"?seasontype=2&week={int(week)}&dates={int(season)}")
+    kw.setdefault("headers", CURL_HEADERS)
+    return fetch(url, Path(cache_dir or DEFAULT_CACHE) / "espn" / f"scoreboard_{season}_wk{week:02d}.json",
+                 max_age_s, name=f"espn scoreboard {season} wk{week}", manifest=manifest, **kw)
+
+
 SKILL_POSITIONS = ("QB", "RB", "WR", "TE")
 
 
@@ -169,18 +185,19 @@ def _week_max_age(season: int) -> float:
     return CURRENT_SEASON_MAX_AGE_S if season >= current_season() else HISTORIC_MAX_AGE_S
 
 
-def sleeper_projections(season: int, week: int, *, cache_dir=None, manifest=None,
+def sleeper_projections(season: int, week: int, *, positions=SKILL_POSITIONS, cache_dir=None, manifest=None,
                         max_age_s: float | None = None, **kw) -> Path:
     """Sleeper's weekly projections (Rotowire-sourced stat lines) for the skill
     positions. Past weeks are served as they stood at the final pre-kickoff
     update; checked 2026-09-24, weekly residuals for 2024 ran ~7 points of
     standard deviation, which a post-game revision would not produce."""
-    pos = "".join(f"&position[]={p}" for p in SKILL_POSITIONS)
+    pos = "".join(f"&position[]={p}" for p in positions)
     url = f"https://api.sleeper.app/projections/nfl/{season}/{week}?season_type=regular{pos}"
+    tag = "" if tuple(positions) == SKILL_POSITIONS else "_" + "-".join(positions)
     # this season's projections move until kickoff (inactives zeroed Sunday
     # morning), so an hour, not the six the season's nflverse files get
     default = PROJECTIONS_MAX_AGE_S if season >= current_season() else HISTORIC_MAX_AGE_S
-    return fetch(url, Path(cache_dir or DEFAULT_CACHE) / "sleeper" / f"proj_{season}_wk{week:02d}.json",
+    return fetch(url, Path(cache_dir or DEFAULT_CACHE) / "sleeper" / f"proj_{season}_wk{week:02d}{tag}.json",
                  default if max_age_s is None else max_age_s,
                  name=f"sleeper projections {season} wk{week}", manifest=manifest, **kw)
 
