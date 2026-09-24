@@ -33,6 +33,7 @@ from core.manifest import Manifest
 from draftkit.lineup import optimal_lineup
 
 from . import environment as E
+from . import evidence as EV
 from . import gate as G
 from . import league as LG
 from . import weekly as W
@@ -125,6 +126,7 @@ def run(league: str, week: int | None = None, *, record: bool = False, out_dir: 
     projs, env, notes = W.project_players(pids, view.info, view.season, view.week, view.scoring,
                                           league, m, (cfg.get("fantasy") or {}).get("market_weight"))
     gate = G.evaluate(m, view.scoring_yaml, view.scoring_platform, view.my_players, projs)
+    ev = EV.for_sleeper(view.my_players, view.info, view.season, manifest=m)
 
     now = dt.datetime.now(dt.timezone.utc)
     locked_ids = {p for p in view.my_players if E.started(env.get((view.info.get(p) or {}).get("team")), now)}
@@ -200,6 +202,16 @@ def run(league: str, week: int | None = None, *, record: bool = False, out_dir: 
                      f"{total(ids) - total(cands[0][1]):+.1f} | {pw[lab]:.1%} | {fl(ins, 'floor')} / {fl(outs, 'floor')} | "
                      f"{fl(ins, 'ceiling')} / {fl(outs, 'ceiling')} |")
 
+    L += ["", "## Opportunity and role (framework questions 1 and 2)", "",
+          "*This season, by week. A role CHANGED when the last two weeks differ from the earlier ones by more "
+          "than two noise standard deviations of that metric (noise_bands_v0); fewer than four weeks is "
+          "INSUFFICIENT_SAMPLE. Usage, not box score.*", "",
+          "| Player | Weeks | Snap % (season / last) | Target share | Carry share | WOPR | Inside-10 tgt+car | Role |",
+          "|---|---|---|---|---|---|---|---|"]
+    for pid in [p for p in chosen + [b for b in view.my_players if b not in chosen]
+                if (view.info.get(p) or {}).get("pos") in ("QB", "RB", "WR", "TE")]:
+        L.append(_ev_row(pid, view.info, ev.get(pid) or {}))
+
     bench = [p for p in view.my_players if p not in chosen]
     if bench:
         L += ["", "## Bench", "", "| Pos | Player | Opp | Implied pts | Spread | Status | Mean | Floor (p10) | "
@@ -221,8 +233,7 @@ def run(league: str, week: int | None = None, *, record: bool = False, out_dir: 
           "- **Floor / ceiling** are the 10th / 90th percentile weeks from dispersion_v0 (fitted 2024, tested on 2025: "
           "the p10-p90 range held ~80% of outcomes).",
           "- **P(win)** assumes players are independent -- a same-team or same-game stack's variance is understated.",
-          "- **Not covered yet:** opportunity and role-stability evidence (snap, target, carry and air-yard shares with "
-          "their week-to-week noise) and an opponent-adjusted matchup read. Both arrive with the evidence table (step 4)."]
+          "- **Not covered yet:** an opponent-adjusted matchup read (framework question 4, weighted low by design)."]
     if cav:
         L += [f"- **Range caveats** (reports/dispersion_v0.{league}.md): {'; '.join(cav)}."]
     if no_range:
@@ -231,7 +242,9 @@ def run(league: str, week: int | None = None, *, record: bool = False, out_dir: 
     L += ["", f"*{m.summary_line()}*"] + ([f"*Notes: {'; '.join(notes + view.notes)}*"] if notes or view.notes else [])
     md = "\n".join(L) + "\n"
 
+    rec_evidence = {p: {k: v for k, v in (e or {}).items() if k != "series"} for p, e in ev.items()}
     rec = {"command": "fantasy lineup", "league": league, "season": view.season, "week": view.week,
+           "evidence": rec_evidence,
            "generated_at_utc": now.isoformat(), "gate": gate.to_dict(), "manifest": m.to_dict(),
            "me": view.my_name, "opponent": view.opp_name, "opponent_lineup": theirs, "opponent_lineup_from": their_how,
            "recommended": {"label": label, "starters": chosen, "p_win": pw.get(label)},
@@ -254,6 +267,25 @@ def run(league: str, week: int | None = None, *, record: bool = False, out_dir: 
     if record:
         _record(view, chosen, projs, pw.get(label), gate)
     return res
+
+
+def _pct(v):
+    return "—" if v is None else f"{100 * v:.0f}%"
+
+
+def _ev_row(pid, info, e) -> str:
+    if not e or not e.get("weeks"):
+        return f"| {_name(pid, info)} | 0 | {e.get('note') or 'no usage this season'} | | | | | |"
+    mean, ser = e.get("mean") or {}, e.get("series") or {}
+    last_snap = (ser.get("snap_pct") or [None])[-1]
+    changed = [f"{m.replace('_', ' ')} {f['earlier']:.0%}->{f['recent']:.0%}"
+               for m, f in (e.get("role_change") or {}).items() if f.get("changed")]
+    role = e.get("trajectory", "") + (f" ({'; '.join(changed)})" if changed else "")
+    t = e.get("totals") or {}
+    wopr = "—" if mean.get("wopr") is None else f"{mean['wopr']:.2f}"
+    return (f"| {_name(pid, info)} | {e['weeks']} | {_pct(mean.get('snap_pct'))} / {_pct(last_snap)} | "
+            f"{_pct(mean.get('tgt_share'))} | {_pct(mean.get('carry_share'))} | {wopr} | "
+            f"{t.get('i10_tgt', 0)}+{t.get('i10_car', 0)} | {role} |")
 
 
 def _row(pid, info, projs) -> str:
