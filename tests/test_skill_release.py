@@ -128,10 +128,14 @@ def test_a_tampered_tarball_falls_back_loudly(tmp_path, online):
     v = tmp_path / "vendor"
     v.mkdir()
     (v / "release.tar.gz").write_bytes(_tarball(RELEASE, prefix="release/"))
-    (v / "RELEASE_STAMP.json").write_text(json.dumps({"tag": "nfl-v8"}), encoding="utf-8")
+    (v / "RELEASE_STAMP.json").write_text(json.dumps({"tag": "nfl-v8", "sha256": lock["sha256"]}), encoding="utf-8")
     info = B.resolve(tmp_path / "dest")
     assert info["release_source"] == "VENDORED_FALLBACK" and "changed: core/fetch.py" in info["fallback_reason"]
     assert info["release_tag"] == "nfl-v8" and info["lock_tag"] == "nfl-v9"
+    # a vendored copy that does not match its own stamp claims no tag
+    (v / "RELEASE_STAMP.json").write_text(json.dumps({"tag": "nfl-v8", "sha256": "0" * 64}), encoding="utf-8")
+    info = B.resolve(tmp_path / "dest")
+    assert info["release_tag"] is None and "does not match its stamp" in info["fallback_reason"]
 
 
 def test_no_release_at_all_is_the_only_hard_failure(tmp_path, online):

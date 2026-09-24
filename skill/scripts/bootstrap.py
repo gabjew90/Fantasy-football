@@ -197,12 +197,16 @@ def use_vendored(dest: Path, reason: str, lock_tag: str | None) -> dict:
         shutil.rmtree(run, ignore_errors=True)
     if not extract_release(VENDOR_ARCHIVE.read_bytes(), run):
         raise RuntimeError(f"no release at all: {reason}; and the vendored archive held no release files")
-    tag = None
+    stamp = {}
     try:
-        tag = json.loads(VENDOR_STAMP.read_text(encoding="utf-8")).get("tag")
+        stamp = json.loads(VENDOR_STAMP.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         pass
-    return {"repo_dir": str(run), "release_hash": release.tree_hash(run), "release_tag": tag,
+    got = release.tree_hash(run)
+    tag = stamp.get("tag") if stamp.get("sha256") == got else None   # a tag is claimed only on a match
+    if tag is None:
+        reason += f"; the vendored copy does not match its stamp either ({got[:12]})"
+    return {"repo_dir": str(run), "release_hash": got, "release_tag": tag,
             "release_source": "VENDORED_FALLBACK", "fallback_reason": reason, "lock_tag": lock_tag}
 
 
@@ -274,7 +278,7 @@ def main(argv: list[str] | None = None) -> int:
     print(f"RELEASE_HASH={info['release_hash']}")
     print(f"RELEASE_SOURCE={info['release_source']}")
     print(f"DEPS={deps}")
-    print(f"YAHOO={'live' if creds['yahoo'] else 'absent (Yahoo leagues read the last sync, if any)'}")
+    print(f"YAHOO={'live' if creds['yahoo'] else 'absent (no Yahoo bundle in this skill: Keefamania cannot be read)'}")
     print(f"ODDS_KEY={'present' if creds['odds_key'] else 'absent (Sleeper prices only)'}")
     if info["fallback_reason"]:
         print(f"FALLBACK_REASON={info['fallback_reason']}")
