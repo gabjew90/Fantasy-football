@@ -27,7 +27,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
-KINDS = ("prop_model", "projection_source")
+KINDS = ("prop_model", "projection_source", "range_model")
 STATUSES = ("live", "provisional", "shadow", "deprecated")
 
 
@@ -72,6 +72,24 @@ COMPONENTS: tuple[Component, ...] = (
               note="fantasy_points_*.csv from the joint simulation; no code consumer"),
 
     # ---------------------------------------------------------- fantasy
+    Component("sleeper_weekly", "projection_source", "fantasy/sources/sleeper_weekly.py", "provisional",
+              note="Sleeper's weekly projection in league scoring. Its errors are measured (the "
+                   "dispersion_v0 reports: ~7 points per player-week, RB outcomes ran under it in "
+                   "2025) but its accuracy has never been compared with market_points; the ledger's "
+                   "graded weeks will do that"),
+    Component("market_points", "projection_source", "fantasy/sources/market_points.py", "live",
+              evidence=("fantasy/resources/market_shape_params.json",),
+              note="posted Sleeper Picks lines converted to expected points; the shape table's "
+                   "holdout (2024 ratios on 2025) is in its holdout_check block. Partial coverage: "
+                   "only players with posted markets, never a QB's passing TDs"),
+    Component("dispersion_v0", "range_model", "fantasy/dispersion.py", "live",
+              evidence=("reports/dispersion_v0.omnibeta.md", "reports/dispersion_v0.keefamania.md",
+                        "fantasy/resources/dispersion_v0.omnibeta.json",
+                        "fantasy/resources/dispersion_v0.keefamania.json"),
+              note="fit 2024, tested 2025: the p10-p90 range held 81.6% (Omnibeta) / 80.5% "
+                   "(Keefamania) of outcomes and beat a bucket-scaled normal by ~2% on pinball loss; "
+                   "QB is no better than that baseline and its low tail runs heavy -- stated with every "
+                   "QB range"),
     Component("rest_of_season_consensus", "projection_source", "manager/consensus.py",
               "provisional",
               note="Sleeper + ESPN + FantasyPros rescaled to a common basis; the ledger "

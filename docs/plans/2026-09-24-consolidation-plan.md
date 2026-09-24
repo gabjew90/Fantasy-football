@@ -140,8 +140,9 @@ tuning item.
 1. `core/`: age-checked fetch + cache, crosswalk, one scoring function, snapshot
    manifest, registry and guardrail tests. Existing callers of the duplicated
    scorers move onto `core.scoring`.
-2. Distribution contract; `fantasy/sources/` with the consensus and
-   `market_points` migrated in.
+2. Done: distribution contract; `fantasy/sources/` with `sleeper_weekly` and
+   `market_points` (migrated); the measured range model `dispersion_v0`.
+   The rest-of-season consensus moves in with step 4, which first needs it.
 3. `nfl` CLI with `status`, `fantasy lineup` (existing optimizer),
    `fantasy scenario` (existing absence path); the gate reads the manifest;
    the ledger writes a row per decision.
