@@ -5796,3 +5796,50 @@ it on nflverse `passing_yards`. The other markets' output is byte-identical to
 props-v1.23 (KC@MIA: only new rows and the disclosure lines differ). Live
 check: Mahomes 235 vs Sleeper 236.5; Malik Willis 162 vs 177.5, flagged WEAK
 (new team).
+
+## 2026-09-25 (106) -- the Vegas-line environment: tuned, not better; the yardage market blend in shadow
+
+Plan step 5, two parts.
+
+**The market environment (`--env market_fit`).** Each team's plays and pass
+rate blended between its own history (the live environment) and a
+regression on its own spread and the game total fitted on the season before,
+at weights 0.25 / 0.5 / 0.75 / 1.0, each paired against the live run on the
+tune seasons 2022-23 (reports/market_env_tuning.md,
+props/tools/pick_market_env.py). The rule was fixed before the last two
+runs finished: CRPS summed over the five markets, each relative to live;
+among weights not measurably worse than the best, the smallest, live
+counting as 0. Best: 0.5 (4.985 against live's 5.000), but live is not
+measurably worse -- on the score itself resampled by games (+0.0154, CI
+-0.0020 to +0.0322) and on the tuner's per-row composite (+0.0047, CI
+-0.0008 to +0.0101; the code review found this one weights receiver rows
+about 7 to 1, so both are reported) -- so **the live environment stays** and
+the test seasons were not read. Per market at 0.5: QB passing 1.5% better
+(interval excludes 0), receptions 0.07%, receiving yards 0.25% and rushing
+0.30% better, QB rushing 0.6% worse. The QB-passing gain is a
+lead -- a pass-volume-only market environment would be a new design, chosen
+on these seasons and read once on 2024-25. No engine change: the scorer's
+output is untouched. (The docstring of `model.market_environment_fitted`
+has the spread sign backwards; the code is consistent. Fixed with the next
+engine change rather than cutting a version for a docstring.)
+
+**The market blend.** Blending each yardage probability toward the book's
+de-vigged number cannot be tested on 2022-25: there are no posted prop lines
+for those seasons. It is learned from the settled record instead, exactly as
+the TD layer is (#90): `props/blend.py` now fits
+logit p = a + b_model logit(p_model) + b_market logit(p_novig) on settled
+yardage calls -- receptions, receiving, rushing and QB passing yards pooled,
+an intercept per book and per market -- within one engine version, printed
+on the Tuesday scorecard. Nothing is priced from it; below 300 calls it
+prints no weight, and with one settled week it says the out-of-sample check
+needs two (it printed "nan" before, for TD too). First look, props-v1.3's
+371 week-2 calls: model weight +0.12 (CI -0.68 to +0.90), market +1.24
+(-0.34 to +2.93) -- one week, too thin to read.
+
+Found on the way, and the next thing to fix: the scorecard keys every
+section on the engine version, and every release so far has cut one, even
+when no price moved (props-v1.24 changed no existing market's output). Week
+2's calls are split across four engine versions; the blend's 300-call floor
+is per version. Narrowing the engine hash to what can change a price is the
+plan's listed follow-up, and it now gates both blends.
+

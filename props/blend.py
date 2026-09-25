@@ -17,7 +17,14 @@ than printing a weight.
 
 One-way markets (most books quote no "won't score" side) carry their hold in
 p_novig while Sleeper's two-sided prices are de-vigged, so each book gets its
-own intercept. Stdlib + numpy + pandas only.
+own intercept.
+
+YARDAGE (plan step 5, 2026-09-25): the same fit on the yardage calls --
+receptions, receiving, rushing and QB passing yards -- pooled, with an
+intercept per book and per market. p_model and p_novig are the probabilities
+of the side the call took, so the fit asks the same question: given the
+book's number, does the model's add anything, and how much? Stdlib + numpy +
+pandas only.
 """
 
 from __future__ import annotations
@@ -26,7 +33,9 @@ import numpy as np
 import pandas as pd
 
 MIN_CALLS = 300
+MIN_LEVEL_CALLS = 30      # a market (or book) with fewer calls, or one outcome only, shares the base intercept
 EPS = 1e-4
+YARDAGE_MARKETS = ("player_receptions", "player_reception_yds", "player_rush_yds", "player_pass_yds")
 
 
 def _logit(p):
@@ -64,19 +73,52 @@ def v1_td_calls(df: pd.DataFrame) -> pd.DataFrame:
     return d.dropna(subset=["p_model", "p_novig", "won"])
 
 
+def yardage_calls(df: pd.DataFrame) -> pd.DataFrame:
+    """Settled yardage calls (not pushes), with both numbers."""
+    d = df[df["market"].isin(YARDAGE_MARKETS)].copy()
+    for c in ("p_model", "p_novig", "won"):
+        d[c] = pd.to_numeric(d[c], errors="coerce")
+    return d.dropna(subset=["p_model", "p_novig", "won"])
+
+
 def blend_section(df: pd.DataFrame, reps: int = 1000, seed: int = 17) -> list[str]:
-    d = v1_td_calls(df)
     out = ["### Market blend (shadow: nothing priced from it)", ""]
+    for d, noun, levels in [
+            (v1_td_calls(df), "anytime_td_v1 calls", ()),
+            (yardage_calls(df), "yardage calls (receptions, receiving, rushing and QB passing yards)", ("market",))]:
+        try:
+            out += _weights(d, noun, levels, reps, seed)
+        except (np.linalg.LinAlgError, FloatingPointError, ValueError) as ex:
+            # a shadow fit must never cost the Tuesday scorecard
+            out += [f"{len(d)} settled {noun}; the blend fit failed ({type(ex).__name__}: {ex}) and "
+                    "prints no weight this week.", ""]
+    return out
+
+
+def _level_dummies(vals: np.ndarray, y: np.ndarray) -> list[np.ndarray]:
+    """One intercept per level with enough calls and both outcomes; the rest
+    share the base. A tiny level whose calls all won (or all lost) would
+    otherwise be perfectly separated and send its coefficient to infinity."""
+    keep = [v for v in sorted(set(vals))
+            if (vals == v).sum() >= MIN_LEVEL_CALLS and 0 < y[vals == v].mean() < 1]
+    return [(vals == v).astype(float) for v in keep[1:]]
+
+
+def _weights(d: pd.DataFrame, noun: str, levels: tuple, reps: int, seed: int) -> list[str]:
+    """The fit, its game-clustered interval and leave-one-week-out log loss for
+    one family of calls; one intercept per book and per level in `levels`."""
     if len(d) < MIN_CALLS:
-        return out + [f"{len(d)} settled anytime_td_v1 calls in this engine version; the blend weight is not "
-                      f"estimated below {MIN_CALLS}. The record is filling.", ""]
+        return [f"{len(d)} settled {noun} in this engine version; the blend weight is not "
+                f"estimated below {MIN_CALLS}. The record is filling.", ""]
     y = d["won"].to_numpy(float)
     # ONE INTERCEPT PER BOOK: Sleeper's anytime prices are two-sided and de-vigged,
     # one-way books' p_novig still carries the hold; pooled, the market term would
     # measure the book mix rather than the market's information.
     books = d["book"].astype(str).to_numpy() if "book" in d else np.array(["all"] * len(d))
     ub = sorted(set(books))
-    dummies = [(books == b).astype(float) for b in ub[1:]]
+    dummies = _level_dummies(books, y)
+    for lv in levels:
+        dummies += _level_dummies(d[lv].astype(str).to_numpy(), y)
     X = np.column_stack([np.ones(len(d)), _logit(d["p_model"]), _logit(d["p_novig"]), *dummies])
     w = fit(X, y)
     # game-clustered bootstrap for the weights
@@ -97,13 +139,18 @@ def blend_section(df: pd.DataFrame, reps: int = 1000, seed: int = 17) -> list[st
         if tr.sum() >= 50:
             pb[te] = 1 / (1 + np.exp(-(X[te] @ fit(X[tr], y[tr]))))
     ok = ~np.isnan(pb)
-    return out + [f"{len(d)} settled anytime_td_v1 calls; books {', '.join(ub)} (each its own intercept; "
-                  f"the intercept row below is {ub[0]}'s).", "",
-                  "| term | weight | 95% CI (game-clustered) |", "|---|---|---|",
-                  f"| intercept | {w[0]:+.3f} | ({lo[0]:+.3f}, {hi[0]:+.3f}) |",
-                  f"| logit(model) | {w[1]:+.3f} | ({lo[1]:+.3f}, {hi[1]:+.3f}) |",
-                  f"| logit(market) | {w[2]:+.3f} | ({lo[2]:+.3f}, {hi[2]:+.3f}) |", "",
-                  "Leave-one-week-out log loss on the same calls: "
-                  f"model {_ll(d['p_model'].to_numpy()[ok], y[ok]).mean():.4f}, "
-                  f"market {_ll(d['p_novig'].to_numpy()[ok], y[ok]).mean():.4f}, "
-                  f"blend {_ll(pb[ok], y[ok]).mean():.4f} ({int(ok.sum())} calls).", ""]
+    per = "".join(f" and per {lv}" for lv in levels)
+    # out of sample needs a second week to hold out; one week says so, not "nan"
+    oos = ("Leave-one-week-out log loss on the same calls: "
+           f"model {_ll(d['p_model'].to_numpy()[ok], y[ok]).mean():.4f}, "
+           f"market {_ll(d['p_novig'].to_numpy()[ok], y[ok]).mean():.4f}, "
+           f"blend {_ll(pb[ok], y[ok]).mean():.4f} ({int(ok.sum())} calls)." if ok.any() else
+           f"No out-of-sample check yet: it holds out one week at a time and needs at least two "
+           f"({len(np.unique(weeks))} settled so far).")
+    return [f"{len(d)} settled {noun}; books {', '.join(ub)} (an intercept per book{per}; "
+            f"the intercept row below is {ub[0]}'s).", "",
+            "| term | weight | 95% CI (game-clustered) |", "|---|---|---|",
+            f"| intercept | {w[0]:+.3f} | ({lo[0]:+.3f}, {hi[0]:+.3f}) |",
+            f"| logit(model) | {w[1]:+.3f} | ({lo[1]:+.3f}, {hi[1]:+.3f}) |",
+            f"| logit(market) | {w[2]:+.3f} | ({lo[2]:+.3f}, {hi[2]:+.3f}) |", "",
+            oos, ""]

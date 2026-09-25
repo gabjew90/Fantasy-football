@@ -52,3 +52,58 @@ def test_each_book_gets_its_own_intercept():
     b = _calls(600, seed=4).assign(book="draftkings")
     out = "\n".join(blend.blend_section(pd.concat([a, b]), reps=30))
     assert "books draftkings, sleeper" in out
+
+
+def _yard_calls(n, seed=0, b_model=0.3, b_market=1.0):
+    rng = np.random.default_rng(seed)
+    lk = rng.normal(0.1, 0.25, n)
+    lm = lk + rng.normal(0.15, 0.3, n)          # the model leans off the market
+    p = 1 / (1 + np.exp(-(b_model * lm + b_market * lk)))
+    return pd.DataFrame({"market": rng.choice(list(blend.YARDAGE_MARKETS), n), "book": "sleeper",
+                         "p_model": 1 / (1 + np.exp(-lm)), "p_novig": 1 / (1 + np.exp(-lk)),
+                         "won": (rng.random(n) < p).astype(float), "event_id": rng.integers(0, n // 20, n),
+                         "week": rng.integers(1, 8, n)})
+
+
+def test_yardage_calls_get_their_own_section_and_pushes_drop_out():
+    d = _yard_calls(900, seed=5)
+    d.loc[:9, "won"] = np.nan                       # pushes
+    assert len(blend.yardage_calls(pd.concat([d, _calls(40)]))) == 890
+    out = "\n".join(blend.blend_section(d, reps=30))
+    assert "settled yardage calls" in out and "per market" in out and "Leave-one-week-out" in out
+    assert "0 settled anytime_td_v1 calls" in out
+
+
+def test_thin_yardage_record_prints_no_weight():
+    out = "\n".join(blend.blend_section(_yard_calls(120)))
+    assert "120 settled yardage calls" in out and "logit(model)" not in out
+
+
+def test_one_settled_week_says_so_instead_of_nan():
+    out = "\n".join(blend.blend_section(_yard_calls(600, seed=7).assign(week=2), reps=20))
+    assert "needs at least two (1 settled so far)" in out and "nan" not in out
+
+
+def test_a_tiny_or_one_sided_market_shares_the_base_intercept():
+    d = _yard_calls(900, seed=8).assign(market="player_receptions")
+    tiny = _yard_calls(200, seed=9).head(12).assign(market="player_pass_yds", won=0.0)   # all lost: separable
+    out = "\n".join(blend.blend_section(pd.concat([d, tiny], ignore_index=True), reps=20))
+    assert "912 settled yardage calls" in out and "fit failed" not in out
+    w_line = next(l for l in out.splitlines() if l.startswith("| logit(model)"))
+    assert "inf" not in w_line and "nan" not in w_line
+    assert len(blend._level_dummies(np.array(["a"] * 40 + ["b"] * 5), np.r_[np.ones(20), np.zeros(25)])) == 0
+
+
+def test_one_market_family_fits_without_a_market_dummy():
+    d = _yard_calls(700, seed=10).assign(market="player_reception_yds")
+    out = "\n".join(blend.blend_section(d, reps=20))
+    assert "700 settled yardage calls" in out and "logit(market)" in out
+
+
+def test_a_failed_fit_is_reported_not_raised(monkeypatch):
+    def boom(*_a, **_k):
+        raise np.linalg.LinAlgError("Singular matrix")
+    monkeypatch.setattr(blend, "fit", boom)
+    out = "\n".join(blend.blend_section(_yard_calls(400, seed=11), reps=5))
+    assert "the blend fit failed (LinAlgError" in out
+
