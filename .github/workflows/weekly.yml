@@ -6,6 +6,9 @@
 # start time on its day, once per period (manager/jobs.py SCHEDULE), so the
 # lag costs at most an hour plus GitHub's delay. Delivery stays content-hash
 # idempotent. The repo is public, so the hourly install costs no minutes.
+# SCHEDULE OFF since 2026-09-25 (DECISIONS #109): the user asked for no
+# scheduled fantasy notifications. Manual runs only (Actions tab -> Run
+# workflow); restoring the schedule block below is the whole undo.
 name: weekly
 on:
   workflow_dispatch:
@@ -13,8 +16,8 @@ on:
       job:
         description: force one job (plan/waivers/scout/lineup/health)
         required: false
-  schedule:
-    - cron: "0 * * * *"
+  # schedule:
+  #   - cron: "0 * * * *"
 
 permissions:
   contents: write

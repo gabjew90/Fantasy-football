@@ -161,7 +161,11 @@ tuning item.
    credentials through as this repo's env vars and token file, so Keefamania reads live from chat.
 6. Props adopts `core` behind byte-identical checks; draft moves under
    `draft/`; retired paths deleted; Actions slimmed to props capture/settle,
-   the Tuesday brief and ledger grading.
+   the Tuesday brief and ledger grading. **2026-09-25:** the props-only loader
+   and xfp deleted; model_projection frozen until August (DECISIONS #108);
+   the user asked for NO scheduled fantasy notifications, so the fantasy
+   schedules are off entirely and the scheduled `nfl fantasy lineup
+   --record` is dropped (DECISIONS #109) -- Actions runs props only.
 7. Replaced by docs/plans/2026-09-24-yardage-harness.md (the yardage props to the TD model's
    standard; the QB-out rule becomes one question inside it). Originally: first tuning items on
    the new rails: the QB-out reallocation rule, then

@@ -5910,3 +5910,18 @@ protects), the source-gate backtest and the tail-curve gate run through it.
 deleted when the draft switches to `fantasy/sources` and Omnibeta's board is
 rebuilt on the external source. The registry says so (`retire_in`).
 
+## 2026-09-25 (109) -- scheduled fantasy notifications switched off
+
+Step 6 planned to slim Actions to props capture/settle, the Tuesday brief and
+ledger grading, plus a scheduled `nfl fantasy lineup --record`. Asked which
+fantasy notifications to keep -- injury alerts, waivers and weekly grading,
+the game-day lineup check, scout and week-plan notices -- the user answered
+"No need for these". So `weekly.yml` (hourly manager cron: planner, health,
+waivers, scout, lineup, ledger, injury watch) and `gate.yml` (the 15-minute
+pre-lock checks) lose their `schedule:` block and keep `workflow_dispatch`:
+nothing runs or opens an issue unless dispatched by hand, and restoring the
+block is the whole undo. No code is deleted -- `manager/` and `fantasy/` stay
+usable from chat and the CLI. `props.yml` (captures, the Tuesday settle, the
+scorecard) is unchanged. The scheduled `nfl fantasy lineup --record` is not
+built; the ledger fills only from explicit `--record` runs.
+
