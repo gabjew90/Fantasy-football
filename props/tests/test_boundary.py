@@ -61,14 +61,11 @@ def test_no_credential_file_anywhere_in_the_tree():
     assert not offenders, f"credential-shaped files in props/: {offenders}"
 
 
-def test_the_loader_ships_no_engine_of_its_own():
-    """props/skill/ is the loader. If an engine appeared inside it there
-    would be two engines again, which is the problem all of this solves.
-    The vendored fallback is assembled at build time from a git tag."""
-    skill = PROPS / "skill"
-    if not skill.is_dir():
-        return
-    stray = [p.relative_to(skill).as_posix() for p in skill.rglob("*")
-             if p.is_file() and p.name in ("score_game.py", "score_week.py",
-                                           "model.py", "odds_client.py")]
-    assert not stray, f"engine code vendored into the loader: {stray}"
+def test_there_is_one_chat_skill_and_it_is_not_here():
+    """The props-only loader (props/skill/, props/build_skill.py) was retired
+    on 2026-09-25: chat runs the one skill in skill/ (nfl-research), which
+    fetches the whole release, props engine included. A second loader here
+    would be a second way for chat to run an engine."""
+    leftovers = [q for q in (PROPS / "skill").rglob("*")
+                 if q.is_file() and "__pycache__" not in q.parts] if (PROPS / "skill").exists() else []
+    assert not leftovers and not (PROPS / "build_skill.py").exists(), leftovers
