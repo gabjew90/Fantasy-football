@@ -245,3 +245,50 @@ def test_model_id_prefers_the_rows_own_price_then_the_map_then_the_engine():
 def test_the_stamp_carries_both_identities(tmp_path):
     s = ev.stamp(_pricer(tmp_path), tmp_path / "no-lock.json")
     assert s["engine_hash"] == ev.tree_hash(tmp_path) and s["price_hash"] == ev.price_hash(tmp_path)
+
+
+def test_a_pricer_that_will_not_parse_never_costs_the_stamp(tmp_path, capsys):
+    root = _pricer(tmp_path)
+    (root / "scripts/helper.py").write_bytes(b"def broken(:\n")
+    s = ev.stamp(root, tmp_path / "no-lock.json")
+    assert s["engine_hash"] == ev.tree_hash(root) and s["price_hash"] is None
+    assert "price_hash unavailable" in capsys.readouterr().err
+    assert ev.model_id(s, {}) == s["engine_hash"]
+
+
+def test_release_order_is_numeric():
+    tags = ["props-v1.10", "props-v1.9", "props-v1.2", "props-v1.24"]
+    assert sorted(tags, key=ev.tag_order) == ["props-v1.2", "props-v1.9", "props-v1.10", "props-v1.24"]
+
+
+def test_the_price_map_path_is_read_when_asked_not_when_imported(tmp_path, monkeypatch):
+    m = tmp_path / "prices.json"
+    m.write_text('{"engines": {"eee": {"tag": "props-v9.0", "price_hash": "ppp"}}}', encoding="utf-8")
+    monkeypatch.setattr(ev, "PRICE_MAP_PATH", m)
+    assert ev.model_id({"engine_hash": "eee"}) == "ppp"
+
+
+def test_the_price_map_is_built_from_the_tags_trees(tmp_path):
+    """Two tags: the second changes only SKILL.md. Two trees, one pricing model,
+    named for the earlier release; --check agrees with what it wrote."""
+    import shutil
+    import subprocess
+    if shutil.which("git") is None:
+        pytest.skip("no git")
+    repo = tmp_path / "repo"
+    _pricer(repo / "props" / "engine")
+    run = lambda *a: subprocess.run(["git", "-C", str(repo), *a], check=True, capture_output=True)
+    run("init", "-q")
+    run("-c", "user.email=t@t", "-c", "user.name=t", "add", ".")
+    run("-c", "user.email=t@t", "-c", "user.name=t", "commit", "-qm", "a")
+    run("tag", "props-v1.9")
+    (repo / "props/engine/SKILL.md").write_bytes(SKILL + b"more prose\n")
+    run("-c", "user.email=t@t", "-c", "user.name=t", "commit", "-qam", "b")
+    run("tag", "props-v1.10")
+    m = ev.build_price_map(repo)["engines"]
+    assert len(m) == 2 and len({v["price_hash"] for v in m.values()}) == 1
+    assert [v["tag"] for v in m.values()] == ["props-v1.9", "props-v1.10"]
+    assert m[ev.tree_hash(repo / "props/engine")]["tag"] == "props-v1.10"
+    out = tmp_path / "prices.json"
+    assert ev.main(["price-map", "--repo", str(repo), "--out", str(out)]) == 0
+    assert ev.main(["price-map", "--repo", str(repo), "--out", str(out), "--check"]) == 0

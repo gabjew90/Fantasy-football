@@ -10,6 +10,38 @@
    "tag": "props-v1.1",
    "price_hash": "5cbed8f7132098783ce53b4e884acb0f9b017ef80517f17654d12dd12d6b5b05"
   },
+  "e02ac8b22db8b56f41dc2fa186aafa7bc24809313ab51d0e08797e6de895c62d": {
+   "tag": "props-v1.2",
+   "price_hash": "e30c9d28ec62a2d53f67b87e91ba96f077d5ed1c454b24e549212b4d62a75431"
+  },
+  "553aeb009ecd2b42b21f3b46eadccc96e098560ee3af50be4bdbfeacc301ee13": {
+   "tag": "props-v1.3",
+   "price_hash": "17455e4ad023bbe189db8ff7ed87f1e1de96d6c05c0e72218af476ed41dfbb77"
+  },
+  "55de738f0a7665492348cfc6a7986fc962ea154279d5a76d4e0e236abfecf542": {
+   "tag": "props-v1.4",
+   "price_hash": "2db2877b616ba44ff5b87e154150f6d53d22ca2a208a5b40bd1dceb66adddeba"
+  },
+  "46f857dea5738fd9f747a5616f36020b87ee53b823b510534d3ef14b47d06aa0": {
+   "tag": "props-v1.5",
+   "price_hash": "dab01cf9b88d431678853278ab05721b03948b68834a680579cc88c983ed663c"
+  },
+  "d7e9bd09ee5151e61d8c98e6c1f25149129bc5313afe0119e46ccd0b3fcd87a4": {
+   "tag": "props-v1.6",
+   "price_hash": "9893836f747a6c3d6d67e06d94797209302111cc6dd814a61df2cbb32c4c636f"
+  },
+  "4fa7976f1dc363554655b47b5f7f91d42baeb09ecc0b4dbf88b4c58796ae797d": {
+   "tag": "props-v1.7",
+   "price_hash": "93ebbb8cb2c458fb760c18a0d35eede030e5573d3b44517c63f479c4db811809"
+  },
+  "31d10e9b799d080ea18d6c05cf0dba2aa4118537fb64d8f03973b8ee6eeec6bb": {
+   "tag": "props-v1.8",
+   "price_hash": "e85fd046a1d12e76a121527867b9c499fb70ab55b1c2a0e5771c15c27a4bbc74"
+  },
+  "551345b829ad089b5270172a7c554cb3542ff1fa0d0873cd421e8c7ec23adee9": {
+   "tag": "props-v1.9",
+   "price_hash": "2a06287310a110047a619821a9d18c48dd934c531854969294e9ef8d897aadbd"
+  },
   "d54ff9d12d00cf4232a1900736e39c652984bfbc504d126624c6c18f1da01953": {
    "tag": "props-v1.10",
    "price_hash": "2a06287310a110047a619821a9d18c48dd934c531854969294e9ef8d897aadbd"
@@ -50,10 +82,6 @@
    "tag": "props-v1.19",
    "price_hash": "3e8b1b3a97a2c99818fd0153e4aae7e3c8bdf02175ece00afff0bdd8b3abde7c"
   },
-  "e02ac8b22db8b56f41dc2fa186aafa7bc24809313ab51d0e08797e6de895c62d": {
-   "tag": "props-v1.2",
-   "price_hash": "e30c9d28ec62a2d53f67b87e91ba96f077d5ed1c454b24e549212b4d62a75431"
-  },
   "13e3c642a0c05e2671476b8ec3bbdc18fca6e281e99743147ebaa33737fef939": {
    "tag": "props-v1.20",
    "price_hash": "14b7404f6ccc3db69e7093c865f6df23a2d0d50edfaafc91d2a17685eafc9efc"
@@ -73,34 +101,6 @@
   "905f1f4a594c5ea17203832586e4c982bf4811727b8a8950cfe850d449b27e6c": {
    "tag": "props-v1.24",
    "price_hash": "232c97b0ca28616d81dea295ca29c5247df09f529546d6fdde75907176affec9"
-  },
-  "553aeb009ecd2b42b21f3b46eadccc96e098560ee3af50be4bdbfeacc301ee13": {
-   "tag": "props-v1.3",
-   "price_hash": "17455e4ad023bbe189db8ff7ed87f1e1de96d6c05c0e72218af476ed41dfbb77"
-  },
-  "55de738f0a7665492348cfc6a7986fc962ea154279d5a76d4e0e236abfecf542": {
-   "tag": "props-v1.4",
-   "price_hash": "2db2877b616ba44ff5b87e154150f6d53d22ca2a208a5b40bd1dceb66adddeba"
-  },
-  "46f857dea5738fd9f747a5616f36020b87ee53b823b510534d3ef14b47d06aa0": {
-   "tag": "props-v1.5",
-   "price_hash": "dab01cf9b88d431678853278ab05721b03948b68834a680579cc88c983ed663c"
-  },
-  "d7e9bd09ee5151e61d8c98e6c1f25149129bc5313afe0119e46ccd0b3fcd87a4": {
-   "tag": "props-v1.6",
-   "price_hash": "9893836f747a6c3d6d67e06d94797209302111cc6dd814a61df2cbb32c4c636f"
-  },
-  "4fa7976f1dc363554655b47b5f7f91d42baeb09ecc0b4dbf88b4c58796ae797d": {
-   "tag": "props-v1.7",
-   "price_hash": "93ebbb8cb2c458fb760c18a0d35eede030e5573d3b44517c63f479c4db811809"
-  },
-  "31d10e9b799d080ea18d6c05cf0dba2aa4118537fb64d8f03973b8ee6eeec6bb": {
-   "tag": "props-v1.8",
-   "price_hash": "e85fd046a1d12e76a121527867b9c499fb70ab55b1c2a0e5771c15c27a4bbc74"
-  },
-  "551345b829ad089b5270172a7c554cb3542ff1fa0d0873cd421e8c7ec23adee9": {
-   "tag": "props-v1.9",
-   "price_hash": "2a06287310a110047a619821a9d18c48dd934c531854969294e9ef8d897aadbd"
   }
  }
 }

@@ -5875,3 +5875,10 @@ tool no longer splits the record. The rest is cadence: a pricer change
 merged mid-week splits that week's slate, so the record is deepest when
 pricer releases land between slates.
 
+The call rule changes with it, so a re-settle re-elects calls wherever two
+releases share a pricing model. Measured on today's record: no call changes
+(week 2's releases are four pricing models; week 3 ran on one release). From
+the code review: the stamp never lets the price hash cost a capture (a
+pricer module that will not parse leaves the row on its engine hash, with a
+warning), tags are read in release order, and changing what counts as the
+price means a new `PRICE_ALGORITHM` and a regenerated map in the same change.

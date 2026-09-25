@@ -40,6 +40,13 @@ both; the call rule and the scorecard group on the pricing model
 `engine_prices.json`, computed from each release tag's tree (the
 `price-map` command), never typed.
 
+CHANGING WHAT COUNTS AS THE PRICE (the entry scripts, the resource rule, the
+formula) means a new PRICE_ALGORITHM and a regenerated engine_prices.json in
+the same change: rows keep the hash computed when they were captured, so two
+definitions would otherwise sit in one record and identical pricers would
+stop pooling without a word. The algorithm name is hashed in, so the two can
+never collide.
+
 Stdlib only, and it must stay that way: the bootstrap imports this before
 any `pip install` has run, in a container with nothing installed.
 
@@ -160,9 +167,14 @@ def price_hash(root: Path) -> str:
     return h.hexdigest()
 
 
+def load_price_map(path: str | Path | None = None) -> dict:
+    """{engine_hash: {"tag", "price_hash"}}; empty when the file is absent.
+    The path is resolved at call time (PRICE_MAP_PATH unless given)."""
+    return _read_price_map(str(path or PRICE_MAP_PATH))
+
+
 @functools.lru_cache(maxsize=4)
-def load_price_map(path: str = str(PRICE_MAP_PATH)) -> dict:
-    """{engine_hash: {"tag", "price_hash"}}; empty when the file is absent."""
+def _read_price_map(path: str) -> dict:
     try:
         return json.loads(Path(path).read_text(encoding="utf-8")).get("engines", {})
     except (OSError, ValueError):
@@ -182,25 +194,34 @@ def model_id(row: dict, price_map: dict | None = None) -> str:
     return m["price_hash"] if m else eh
 
 
+def tag_order(tag: str) -> tuple:
+    """props-v1.9 before props-v1.10: release order, not string order."""
+    return tuple(int(x) if x.isdigit() else -1 for x in tag.rsplit("v", 1)[-1].split("."))
+
+
 def build_price_map(repo: Path, pattern: str = "props-v*") -> dict:
     """engine_hash -> {tag, price_hash} for every release tag, each computed
-    from that tag's own tree (git archive), never copied."""
-    tags = subprocess.run(["git", "-C", str(repo), "tag", "--list", pattern], check=True,
-                          capture_output=True, text=True).stdout.split()
+    from that tag's own tree (git archive), never copied. Identical trees
+    keep the EARLIEST release's name."""
+    tags = sorted(subprocess.run(["git", "-C", str(repo), "tag", "--list", pattern], check=True,
+                                 capture_output=True, text=True).stdout.split(), key=tag_order)
     engines: dict[str, dict] = {}
     for tag in tags:
         blob = subprocess.run(["git", "-C", str(repo), "archive", "--format=tar", tag, "props/engine"],
                               check=True, capture_output=True).stdout
         with tempfile.TemporaryDirectory() as tmp:
             with tarfile.open(fileobj=io.BytesIO(blob)) as tf:
-                tf.extractall(tmp, members=[m for m in tf.getmembers()
-                                            if m.isfile() and m.name.startswith("props/engine/")])
+                members = [m for m in tf.getmembers() if m.isfile() and m.name.startswith("props/engine/")]
+                if hasattr(tarfile, "data_filter"):          # 3.12+: refuse links and absolute paths
+                    tf.extractall(tmp, members=members, filter="data")
+                else:
+                    tf.extractall(tmp, members=members)
             root = Path(tmp) / "props" / "engine"
             eh, ph = tree_hash(root), price_hash(root)
         prev = engines.get(eh)
         engines[eh] = {"tag": prev["tag"] if prev else tag, "price_hash": ph}
     return {"algorithm": PRICE_ALGORITHM, "note": "engine_prices.json: written by engine_version.py price-map",
-            "engines": dict(sorted(engines.items(), key=lambda kv: kv[1]["tag"]))}
+            "engines": dict(sorted(engines.items(), key=lambda kv: tag_order(kv[1]["tag"])))}
 
 
 def build_lock(root: Path, tag: str | None) -> dict:
@@ -236,7 +257,17 @@ def stamp(root: Path = ENGINE_DIR, lock_path: Path = LOCK_PATH) -> dict:
     h = tree_hash(root)
     lock = load_lock(lock_path)
     tag = lock.get("tag") if lock and lock.get("engine_sha256") == h else None
-    return {"engine_hash": h, "engine_tag": tag, "price_hash": price_hash(root)}
+    # THE PRICE HASH MUST NEVER COST A CAPTURE. It parses the pricer's
+    # scripts; a module the scorer imports only on a rare branch could carry
+    # a syntax error the slate never hit. Then the row carries no price_hash
+    # and groups on its engine_hash (model_id's last resort), loudly.
+    try:
+        ph = price_hash(root)
+    except Exception as ex:  # noqa: BLE001
+        print(f"WARNING: price_hash unavailable ({type(ex).__name__}: {ex}); rows carry the engine hash only",
+              file=sys.stderr)
+        ph = None
+    return {"engine_hash": h, "engine_tag": tag, "price_hash": ph}
 
 
 def compare(root: Path, lock: dict) -> tuple[bool, list[str]]:
@@ -292,6 +323,7 @@ def main(argv: list[str] | None = None) -> int:
     if a.cmd == "price-map":
         m = build_price_map(a.repo)
         a.out.write_text(json.dumps(m, indent=1) + "\n", encoding="utf-8")
+        _read_price_map.cache_clear()
         n_models = len({v["price_hash"] for v in m["engines"].values()})
         print(f"wrote {a.out}: {len(m['engines'])} engine trees, {n_models} pricing models")
         return 0
