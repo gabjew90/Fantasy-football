@@ -1,9 +1,9 @@
 {
   "algorithm": "props-engine-sha256-lf-1",
-  "engine_sha256": "3e6b61999fefe45e21d3e939b5d4a1f69a0546cac16369ca6d7c46f2e0d11252",
+  "engine_sha256": "06497d9a2a92c359d4696c929277b986362b4a33ff7545e166bda82f9839e3b1",
   "file_count": 52,
   "files": {
-    "SKILL.md": "fbacd622668a07715934b7e73985492a53fe80345079d9e59010a82ed60f78cf",
+    "SKILL.md": "dd19c9ac036d80513685282e401b3d6fdeface2d64a131c9ed516efed5a1169e",
     "resources/calibration_2025.csv": "47e3922c7af818307831d70a3d2be4333200f3aee1d94dc6bbf6e0e9ccee4ac8",
     "resources/data_source_matrix.md": "2088a5ebe6164a75c11331367fda734d4b10ea217704320321a3f2aec6bb9c2b",
     "resources/execution_protocol.md": "5f54fb23a77d60ecc947d44b6f18ecf67c4357d6b49c70bc937726c1c14016c1",
@@ -56,5 +56,5 @@
     "scripts/td_model.py": "7c1635bbf515b4316f14771b177363a9f82a1ba7ad3393e479cd2dce26a25724",
     "scripts/td_v1.py": "4e54516734888fc588a7ad3fd9d0ad7dd16d96edcaa980adff3dbcda232ece0f"
   },
-  "tag": "props-v1.21"
+  "tag": "props-v1.22"
 }

@@ -96,3 +96,12 @@ def test_every_command_reads_the_record_from_the_league_view():
                          slots=None, flex_slots=None, info={}, scoring_yaml={}, scoring_platform={},
                          ctx={"rosters": rosters})
     assert view.standing["record"] == "1-1" and view.standing["rank"] == 2
+
+
+def test_the_lineup_report_states_the_record_unmistakably():
+    from fantasy.lineup import record_line
+    assert record_line({"record": "1-1", "rank": 8, "teams": 10, "unavailable": False}) == \
+        "**Record:** 1-1, 8th of 10 teams."
+    assert "2nd of 12" in record_line({"record": "3-0", "rank": 2, "teams": 12, "unavailable": False})
+    assert "11th of 12" in record_line({"record": "0-3", "rank": 11, "teams": 12, "unavailable": False})
+    assert "not available" in record_line({"record": "0-0", "rank": None, "teams": 12, "unavailable": True})

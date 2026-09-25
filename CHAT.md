@@ -14,6 +14,9 @@ cd "$REPO_DIR" && python nfl.py <command>
 
 ## The three rules that come first
 
+The order of every reply: the release line; for a fantasy answer, the gate
+line (one line); then the answer. Nothing else comes before the answer.
+
 1. **Answer in the reply, not in a file.** The commands write reports; those
    are working material. The reply itself carries the answer -- the decision in
    the first lines, then the reasons, in prose and short tables. Never answer
@@ -22,7 +25,7 @@ cd "$REPO_DIR" && python nfl.py <command>
 2. **Never ask the user for anything a command can read.** Record, standings,
    roster, starters, the opponent, this week's projections and scores, injury
    designations, waiver options -- run the command. The lineup report prints
-   the record (`**Record:** 1-1, 8 of 10.`); `fantasy waiver` does too. Ask
+   the record (`**Record:** 1-1, 8th of 10 teams.`); `fantasy waiver` does too. Ask
    only for what no command holds: an offer on the table, a preference, or the
    league when context cannot settle it.
 3. **Setup is silent.** Run the bootstrap and read its last lines. If it

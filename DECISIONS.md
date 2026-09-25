@@ -5654,3 +5654,10 @@ three faults in the harness contract, not the models:
 
 Trades: a trade is a two-sided waiver move, so `fantasy trade` will reuse the
 waiver engine's season gain -- next.
+
+Code review (high), all 4 fixed: the props contract (props/engine/SKILL.md)
+still ordered `present_files` on every props report, so props answers would
+have kept arriving as files (now: the reply is the answer; a file only when
+asked -- props-v1.22); three rules each claimed a reply's first lines (the
+order is now stated: release line, gate line, answer); '8 of 10' could read as
+a record (now '8th of 10 teams'); the record line had no test.
