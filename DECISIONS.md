@@ -5760,18 +5760,34 @@ two facts the sampler lacked, both measured on 2021-25 play-by-play first:
   time or after an injury). His share is drawn per game from the prior
   season's grid, which is how the book settles his number.
 
-Harness, 2024-25 (reports/yardage_harness.md): actual/model 0.976, PIT
-0.503, 19.0% outside p10-p90 -- right on average and the right width, with no
-width tuning (`eff_sd_pass` exists and is off). Beats baseline A pooled
-(+1.10, interval excludes 0) and in 2025; in 2024 +0.86 with an interval that
-includes 0. Every 60-90% bucket within 3 points except Under 80-90%: 18 bets,
-won 67% against 81%.
+Harness, 2024-25 (reports/yardage_harness.md, 940 starter-games):
+actual/model 0.986, PIT 0.508, 18.1% outside p10-p90 -- right on average and
+the right width, with no width tuning (`eff_sd_pass` exists and is off).
+Beats baseline A pooled (+1.08, 95% CI +0.15 to +1.99) and in 2025 (+1.30);
+in 2024 +0.86 with an interval that includes 0 (-0.55 to +2.30). Every
+60-90% bucket within 3 points except Under 80-90% (16 bets, won 62.5%
+against 81%) and Over 60-70% (+3.2 points, 0.2 over).
 
 **User decision:** priced, the misses noted, the bar unchanged for every
-market -- the same call as the backs in #100. Where the gain lives: weeks 2-4
-(+5.0 yards); from week 5 the model ties the no-shrinkage version. Mid-season
-it ran 5-6% high in 2022-24 (exact in 2025) -- watched, below the 5% limit
-pooled.
+market -- the same call as the backs in #100 (the 18-bet bucket was put to
+the user; the 0.2-point miss appeared on the rerun below and falls under the
+user's standing call that sub-point misses are noise). Where the gain lives:
+weeks 2-4 (+4.9 yards); from week 5 the model ties the no-shrinkage version
+(+0.18, interval includes 0). Mid-season it ran 4.3-5.4% high in 2022-24 and
+2% low in 2025 -- watched, within the 5% limit pooled.
+
+**The starter, from the code review.** The starting QB was the QB with the
+most expected carries. The scorer's QB pool is the depth-chart QB1 plus any
+QB with 20%+ of the team's carries -- exactly the running backup who would
+win that contest and take the team's passing yards. `starter_qb_index` now
+takes the depth-chart slot first (QB1, then QB2; a QB with no QB slot last)
+and carries only as a tie-break, in the scorer and the harness alike, and the
+harness grades that starter -- including a backup who starts when QB1 is out
+-- instead of every QB1-slot row. QB rushing is graded on the same starter:
+1870 player-weeks, not 1898 (one starter per team-game; some team-weeks had
+two QB1 rows); unchanged on every shared row, and it still passes (21.9%
+outside p10-p90, worst bucket 2.9 points). A posted passing line for a QB
+the model does not start is logged and named in the report.
 
 Scorer: `player_pass_yds` for the starting QB (the same starter the QB
 rushing prop uses), priced from Sleeper's `passing_yards` (the primary

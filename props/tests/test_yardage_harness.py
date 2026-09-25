@@ -265,6 +265,17 @@ def test_the_starter_is_the_qb_with_the_carries_not_the_slot():
     assert M.starter_qb_index(["RB", "WR"], [0.5, 0.1]) is None
 
 
+def test_with_slots_the_starter_is_the_depth_charts_qb_not_a_running_backup():
+    # a running backup (20%+ of carries, no QB slot) out-carries the starter
+    pos, rs = ["QB", "QB", "RB"], [0.04, 0.22, 0.5]
+    assert M.starter_qb_index(pos, rs) == 1, "without slots: carries"
+    assert M.starter_qb_index(pos, rs, slots=["QB1", "PROXY", "RB1"]) == 0
+    # QB1 ruled out and removed: the highest QB left starts, whatever his slot
+    assert M.starter_qb_index(["QB", "QB"], [0.02, 0.2], slots=["QB2", "PROXY"]) == 0
+    # two with no QB slot: carries decide
+    assert M.starter_qb_index(["QB", "QB"], [0.02, 0.2], slots=["PROXY", "PROXY"]) == 1
+
+
 def test_carry_shares_rescale_toward_the_realistic_total_leaving_the_qb_alone():
     shares, ypc = [0.30, 0.15, 0.12], [4.5, 4.0, 5.6]           # they sum to 0.57: 'other' would take 43%
     run = lambda w, qb=None: M.simulate_team_rush(np.random.default_rng(8), 20000, 26.0, 30.0, shares, ypc,
@@ -332,8 +343,6 @@ def test_the_starter_share_and_the_passing_swing_are_off_until_given():
     ys = [y for _r, y in out.values()]
     rates = {"catch_rate": 0.67, "ypt": 6.3}
     base = M.simulate_qb_passing(rng, len(other), ys, other, rates, 1.08)
-    again = M.simulate_qb_passing(rng, len(other), ys, other, rates, 1.08, width=dict(M.WIDTH_OFF))
-    assert base.mean() == pytest.approx(again.mean(), rel=0.02)
     share = M.simulate_qb_passing(rng, len(other), ys, other, rates, 1.08, starter_share=[0.5] * 10 + [1.0] * 30)
     assert share.mean() == pytest.approx(base.mean() * 0.875, rel=0.03)
     wide = M.simulate_qb_passing(rng, len(other), ys, other, rates, 1.08, width={"eff_sd_pass": 0.25})

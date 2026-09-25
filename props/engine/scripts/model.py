@@ -697,14 +697,26 @@ def own_spread_from_book(book_home_spread, is_home):
     return -float(book_home_spread) if is_home else float(book_home_spread)
 
 
-def starter_qb_index(positions, rush_shares):
-    """Which of a team's active players is the starting QB: the QB with the
-    largest expected carry share. Not the depth-chart slot -- when QB1 is ruled
-    out, the backup who starts keeps his QB2 slot."""
+def starter_qb_index(positions, rush_shares, slots=None):
+    """Which of a team's active players is the starting QB. With `slots`: the
+    QB highest on the pre-game depth chart (QB1 before QB2; a QB with no QB
+    slot last), then the largest expected carry share. The slot comes first
+    because a running backup used in packages can out-carry the starter, and
+    the passing yards (and kneels) belong to the passer; a QB1 who is ruled
+    out is not in the list, so the backup who starts is the highest left,
+    whatever his slot. Without `slots`: the largest expected carry share."""
     qbs = [j for j, pos in enumerate(positions) if str(pos).startswith("QB")]
     if not qbs:
         return None
-    return max(qbs, key=lambda j: float(rush_shares[j]) if rush_shares[j] == rush_shares[j] else -1.0)
+
+    def rank(j):
+        s = str(slots[j]) if slots is not None else ""
+        return int(s[2:]) if s.startswith("QB") and s[2:].isdigit() else 99
+
+    def carries(j):
+        v = rush_shares[j]
+        return float(v) if v == v else -1.0
+    return min(qbs, key=lambda j: (rank(j), -carries(j)))
 
 
 def simulate_team_game(rng, n_sim, team_volume_mean, team_volume_r, player_shares,

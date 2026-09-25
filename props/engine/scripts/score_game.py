@@ -942,7 +942,7 @@ def main():
             t_spread = (MODEL.own_spread_from_book(market_env["home_spread"], t == HOME)
                         if market_env is not None else None)
             kg = MODEL.kneel_grid(P, t_spread)            # no spread yet: the pooled grid
-            qb_i = MODEL.starter_qb_index(list(Mt.pos), [float(v) for v in Mt.rs])
+            qb_i = MODEL.starter_qb_index(list(Mt.pos), [float(v) for v in Mt.rs], slots=list(Mt.slot))
             p_kneel = [kg if j == qb_i else None for j in range(len(Mt))]
             if qb_i is not None:
                 STARTER_QB[t] = Mt.name.iloc[qb_i]
@@ -963,6 +963,7 @@ def main():
     # Drawn after both teams, from child streams, so the kneel-down streams keep
     # their order and no other number moves.
     PASS_ON = (QB_RUSH_ON and "other_receiver_rates" in P and "qb_starter_pass_share_quantiles" in P)
+    pass_skipped = set()     # (player, team): a posted passing line for a QB the model does not start
     if PASS_ON:
         _share = np.array(P["qb_starter_pass_share_quantiles"])
         for t in (AWAY, HOME):
@@ -1352,7 +1353,14 @@ def main():
                         if nm not in sims or "Over" not in oo or "Under" not in oo:
                             continue
                         if col not in sims[nm]:
-                            continue   # passing yards: the starting QB only
+                            # passing yards: the starting QB only
+                            if mk["key"] == "player_pass_yds" and PASS_ON:
+                                tm_ = M[M.name == nm].team.iloc[0]
+                                if (nm, tm_) not in pass_skipped:
+                                    pass_skipped.add((nm, tm_))
+                                    log(f"  passing line for {nm} not priced: the model's starter for {tm_} is "
+                                        f"{STARTER_QB.get(tm_) or 'none'}")
+                            continue
                         pr = M[M.name == nm].iloc[0]
                         if mk["key"] == "player_rush_yds" and pr.pos == "QB" and (
                                 not QB_RUSH_ON or STARTER_QB.get(pr.team) != nm):
@@ -1894,8 +1902,7 @@ def main():
     # draw, so within-team correlation is real). Cross-team legs are independent draws.
     # TD legs are not simulated per draw and are excluded from joint pricing.
     def leg_hits(row):
-        col = {"player_receptions": "receptions", "player_reception_yds": "rec_yards", "player_rush_yds": "rush_yards",
-               "player_pass_yds": "pass_yards"}.get(row["market"])
+        col = {**COUNT_MARKETS, **YARD_MARKETS}.get(row["market"])
         if col is None or row["player"] not in sims or col not in sims[row["player"]]: return None
         sv = sims[row["player"]][col]
         return (sv > row["line"]) if row["side"] == "Over" else (sv < row["line"])
@@ -2022,8 +2029,7 @@ def main():
         return max(0.0, (b * p - q) / b)
     MKT_SHORT = {"player_receptions": "catches", "player_reception_yds": "rec yds",
                  "player_rush_yds": "rush yds", "player_anytime_td": "anytime TD", "player_pass_yds": "pass yds"}
-    SIM_COL = {"player_receptions": "receptions", "player_reception_yds": "rec_yards", "player_rush_yds": "rush_yards",
-               "player_pass_yds": "pass_yards"}
+    SIM_COL = {**COUNT_MARKETS, **YARD_MARKETS}
     tier_of = {}
     if not CONF.empty:
         for _, c in CONF.iterrows():
@@ -2380,13 +2386,20 @@ def main():
         L.append("- QB rushing yards (the starter only) include kneel-downs, which the book counts, drawn by the "
                  "team's pregame spread. The newest yardage market: its graded record, including where it runs "
                  "high or low, is in the repo's reports/yardage_harness.md.")
+    else:
+        L.append(f"- QB rushing yards left out on purpose: kneel-downs count against the prop and we don't model them yet.")
     if PASS_ON:
         L.append("- QB passing yards (the starter only) are his receivers' yards in the same simulation, times a "
                  "starter's usual share of the team's passing yards. Graded 2022-25 in reports/yardage_harness.md: "
                  "right on average and the right width; it beats the unshrunk version early in the season and ties it "
                  "from week 5.")
-    else:
-        L.append(f"- QB rushing yards left out on purpose: kneel-downs count against the prop and we don't model them yet.")
+        if pass_skipped:
+            L.append("- Passing lines posted for a QB the model does not start, not priced: "
+                     + "; ".join(f"{nm} ({tm}; the model's starter is {STARTER_QB.get(tm) or 'none'})"
+                                 for nm, tm in sorted(pass_skipped)) + ".")
+        if (a.source == "oddsapi" or oddsapi_is_fallback) and not sleeper_used and not a.lines_file:
+            L.append("- QB passing yards were not priced this run: Sleeper Picks carries them, and the Odds API "
+                     "fallback request does not include them.")
     if hrs > 1:
         L.append(f"- **Kickoff is in {hrs:.1f} hours.** To track how these lines moved, open a chat inside the last hour and ask for a closing capture.")
     elif hrs > 0:

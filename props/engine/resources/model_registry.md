@@ -110,15 +110,18 @@ next fix).
   against him, as the book settles it; mean 0.96). Gross of sacks, as books
   settle. `model.simulate_qb_passing`; its draws come from child streams, so
   every other market's output is byte-identical (KC@MIA checked).
-- Test (reports/yardage_harness.md, 2024-25): actual/model 0.976, PIT 0.503,
-  19.0% outside p10-p90; beats baseline A pooled (+1.10, 95% CI +0.18 to
-  +2.01) and in 2025 (+1.34), not in 2024 (+0.86, CI -0.53 to +2.27); every
-  60-90% bucket within 3 points except Under 80-90% (18 bets, -14 points).
-  The user judged both misses sample size and priced it (DECISIONS #105);
-  the bar is unchanged.
-- Known: the gain over baseline A is early season (weeks 2-4 +5.0 yards);
-  from week 5 the two tie. Mid-season the model ran 5-6% high in 2022-24
-  (2025: exact).
+- The starter (scorer and harness): `starter_qb_index`, depth-chart slot
+  first, then carries -- a running backup cannot take the passing yards, and
+  a backup who starts when QB1 is out is priced and graded.
+- Test (reports/yardage_harness.md, 2024-25, 940 starter-games):
+  actual/model 0.986, PIT 0.508, 18.1% outside p10-p90; beats baseline A
+  pooled (+1.08, 95% CI +0.15 to +1.99) and in 2025 (+1.30), not in 2024
+  (+0.86, CI -0.55 to +2.30); every 60-90% bucket within 3 points except
+  Under 80-90% (16 bets, -18 points) and Over 60-70% (+3.2). Priced by the
+  user's decision (DECISIONS #105); the bar is unchanged.
+- Known: the gain over baseline A is early season (weeks 2-4 +4.9 yards);
+  from week 5 the two tie. Mid-season the model ran 4.3-5.4% high in 2022-24
+  and 2% low in 2025.
 - `eff_sd_pass` (a game-wide passing swing) exists and is off: the width
   already passes.
 
