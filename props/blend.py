@@ -33,6 +33,7 @@ import numpy as np
 import pandas as pd
 
 MIN_CALLS = 300
+MIN_LEVEL_CALLS = 30      # a market (or book) with fewer calls, or one outcome only, shares the base intercept
 EPS = 1e-4
 YARDAGE_MARKETS = ("player_receptions", "player_reception_yds", "player_rush_yds", "player_pass_yds")
 
@@ -82,10 +83,25 @@ def yardage_calls(df: pd.DataFrame) -> pd.DataFrame:
 
 def blend_section(df: pd.DataFrame, reps: int = 1000, seed: int = 17) -> list[str]:
     out = ["### Market blend (shadow: nothing priced from it)", ""]
-    out += _weights(v1_td_calls(df), "anytime_td_v1 calls", (), reps, seed)
-    out += _weights(yardage_calls(df), "yardage calls (receptions, receiving, rushing and QB passing yards)",
-                    ("market",), reps, seed)
+    for d, noun, levels in [
+            (v1_td_calls(df), "anytime_td_v1 calls", ()),
+            (yardage_calls(df), "yardage calls (receptions, receiving, rushing and QB passing yards)", ("market",))]:
+        try:
+            out += _weights(d, noun, levels, reps, seed)
+        except (np.linalg.LinAlgError, FloatingPointError, ValueError) as ex:
+            # a shadow fit must never cost the Tuesday scorecard
+            out += [f"{len(d)} settled {noun}; the blend fit failed ({type(ex).__name__}: {ex}) and "
+                    "prints no weight this week.", ""]
     return out
+
+
+def _level_dummies(vals: np.ndarray, y: np.ndarray) -> list[np.ndarray]:
+    """One intercept per level with enough calls and both outcomes; the rest
+    share the base. A tiny level whose calls all won (or all lost) would
+    otherwise be perfectly separated and send its coefficient to infinity."""
+    keep = [v for v in sorted(set(vals))
+            if (vals == v).sum() >= MIN_LEVEL_CALLS and 0 < y[vals == v].mean() < 1]
+    return [(vals == v).astype(float) for v in keep[1:]]
 
 
 def _weights(d: pd.DataFrame, noun: str, levels: tuple, reps: int, seed: int) -> list[str]:
@@ -100,10 +116,9 @@ def _weights(d: pd.DataFrame, noun: str, levels: tuple, reps: int, seed: int) ->
     # measure the book mix rather than the market's information.
     books = d["book"].astype(str).to_numpy() if "book" in d else np.array(["all"] * len(d))
     ub = sorted(set(books))
-    dummies = [(books == b).astype(float) for b in ub[1:]]
+    dummies = _level_dummies(books, y)
     for lv in levels:
-        vals = d[lv].astype(str).to_numpy()
-        dummies += [(vals == v).astype(float) for v in sorted(set(vals))[1:]]
+        dummies += _level_dummies(d[lv].astype(str).to_numpy(), y)
     X = np.column_stack([np.ones(len(d)), _logit(d["p_model"]), _logit(d["p_novig"]), *dummies])
     w = fit(X, y)
     # game-clustered bootstrap for the weights

@@ -18,19 +18,26 @@ time it runs.
 
 **The rule, fixed before the 0.75 and 1.0 runs finished:** CRPS summed over
 the five markets, each relative to the live model's; among weights not
-measurably worse than the best (paired game-block interval on the per-row
-composite), the smallest -- the live model counts as weight 0.
+measurably worse than the best, the smallest -- the live model counts as
+weight 0. Computed by `props/tools/pick_market_env.py` from the runs'
+`--save-results` pickles.
 
-| W | Score (live = 5) | Composite vs the best, 95% CI | Not measurably worse |
-|---|---|---|---|
-| 0 (live) | 5.0000 | +0.0047 (-0.0008, +0.0100) | yes -- **chosen** |
-| 0.25 | 4.9856 | +0.0002 (-0.0027, +0.0030) | yes |
-| 0.5 | 4.9846 | best | yes |
-| 0.75 | 4.9942 | +0.0037 (+0.0007, +0.0067) | no |
-| 1.0 | 5.0197 | +0.0121 (+0.0066, +0.0179) | no |
+"Not measurably worse" two ways, 95% intervals resampling whole games. The
+first run of the rule used only the second (the code review found it
+weights a player-row by how many markets it is graded in, so the receiving
+markets, about 7 rows in 8, dominate it); the first is the score itself, each
+market weighing the same. They agree.
+
+| W | Score (live = 5) | Score vs the best (markets equal) | Per-row composite vs the best | Not measurably worse |
+|---|---|---|---|---|
+| 0 (live) | 5.0000 | +0.0154 (-0.0020, +0.0322) | +0.0047 (-0.0008, +0.0101) | yes, both -- **chosen** |
+| 0.25 | 4.9856 | +0.0010 (-0.0080, +0.0095) | +0.0002 (-0.0027, +0.0030) | yes, both |
+| 0.5 | 4.9846 | best | best | -- |
+| 0.75 | 4.9942 | +0.0096 (+0.0002, +0.0188) | +0.0037 (+0.0007, +0.0067) | no |
+| 1.0 | 5.0197 | +0.0351 (+0.0177, +0.0530) | +0.0121 (+0.0066, +0.0179) | no |
 
 **Result: the live environment stays.** The best weight is not measurably
-better than no market at all.
+better than no market at all, on either reading.
 
 Per market, CRPS gain over live (positive = better), 95% interval resampling
 whole games, 2022-23:
@@ -42,8 +49,9 @@ whole games, 2022-23:
 | 0.75 | -0.0015 (-0.0057, +0.0027) | +0.0187 (-0.0250, +0.0622) | +0.0406 (-0.0694, +0.1568) | -0.0868 (-0.1846, +0.0049) | +0.6518 (-0.0371, +1.3598) |
 | 1.0 | -0.0060 (-0.0116, -0.0006) | -0.0093 (-0.0666, +0.0480) | -0.0100 (-0.1514, +0.1382) | -0.1588 (-0.2932, -0.0367) | +0.2644 (-0.6427, +1.1786) |
 
-As a share of live CRPS at W = 0.5: receptions -0.07%, receiving yards
--0.25%, rushing yards -0.30%, QB rushing +0.59% (worse), QB passing -1.52%.
+As a share of live CRPS at W = 0.5 (negative = better): receptions -0.07%,
+receiving yards -0.25%, rushing yards -0.30%, QB rushing +0.59% (worse), QB
+passing -1.52%.
 
 **The lead, not acted on.** QB passing is the one market with a clear gain
 (1.1-1.5% at W 0.25-0.5, intervals excluding 0); QB rushing moves the other

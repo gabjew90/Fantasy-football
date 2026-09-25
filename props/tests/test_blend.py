@@ -83,3 +83,27 @@ def test_one_settled_week_says_so_instead_of_nan():
     out = "\n".join(blend.blend_section(_yard_calls(600, seed=7).assign(week=2), reps=20))
     assert "needs at least two (1 settled so far)" in out and "nan" not in out
 
+
+def test_a_tiny_or_one_sided_market_shares_the_base_intercept():
+    d = _yard_calls(900, seed=8).assign(market="player_receptions")
+    tiny = _yard_calls(200, seed=9).head(12).assign(market="player_pass_yds", won=0.0)   # all lost: separable
+    out = "\n".join(blend.blend_section(pd.concat([d, tiny], ignore_index=True), reps=20))
+    assert "912 settled yardage calls" in out and "fit failed" not in out
+    w_line = next(l for l in out.splitlines() if l.startswith("| logit(model)"))
+    assert "inf" not in w_line and "nan" not in w_line
+    assert len(blend._level_dummies(np.array(["a"] * 40 + ["b"] * 5), np.r_[np.ones(20), np.zeros(25)])) == 0
+
+
+def test_one_market_family_fits_without_a_market_dummy():
+    d = _yard_calls(700, seed=10).assign(market="player_reception_yds")
+    out = "\n".join(blend.blend_section(d, reps=20))
+    assert "700 settled yardage calls" in out and "logit(market)" in out
+
+
+def test_a_failed_fit_is_reported_not_raised(monkeypatch):
+    def boom(*_a, **_k):
+        raise np.linalg.LinAlgError("Singular matrix")
+    monkeypatch.setattr(blend, "fit", boom)
+    out = "\n".join(blend.blend_section(_yard_calls(400, seed=11), reps=5))
+    assert "the blend fit failed (LinAlgError" in out
+

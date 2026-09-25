@@ -5805,14 +5805,18 @@ Plan step 5, two parts.
 rate blended between its own history (the live environment) and a
 regression on its own spread and the game total fitted on the season before,
 at weights 0.25 / 0.5 / 0.75 / 1.0, each paired against the live run on the
-tune seasons 2022-23 (reports/market_env_tuning.md). The rule was fixed
-before the last two runs finished: CRPS summed over the five markets, each
-relative to live; among weights not measurably worse than the best, the
-smallest, live counting as 0. Best: 0.5 (4.985 against live's 5.000), but
-live is not measurably worse (composite +0.0047, CI -0.0008 to +0.0100), so
-**the live environment stays** and the test seasons were not read. Per
-market at 0.5: QB passing 1.5% better (interval excludes 0), receiving and
-rushing 0.1-0.3% better, QB rushing 0.6% worse. The QB-passing gain is a
+tune seasons 2022-23 (reports/market_env_tuning.md,
+props/tools/pick_market_env.py). The rule was fixed before the last two
+runs finished: CRPS summed over the five markets, each relative to live;
+among weights not measurably worse than the best, the smallest, live
+counting as 0. Best: 0.5 (4.985 against live's 5.000), but live is not
+measurably worse -- on the score itself resampled by games (+0.0154, CI
+-0.0020 to +0.0322) and on the tuner's per-row composite (+0.0047, CI
+-0.0008 to +0.0101; the code review found this one weights receiver rows
+about 7 to 1, so both are reported) -- so **the live environment stays** and
+the test seasons were not read. Per market at 0.5: QB passing 1.5% better
+(interval excludes 0), receptions 0.07%, receiving yards 0.25% and rushing
+0.30% better, QB rushing 0.6% worse. The QB-passing gain is a
 lead -- a pass-volume-only market environment would be a new design, chosen
 on these seasons and read once on 2024-25. No engine change: the scorer's
 output is untouched. (The docstring of `model.market_environment_fitted`
