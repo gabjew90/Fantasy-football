@@ -51,7 +51,7 @@ for _stream in (sys.stdout, sys.stderr):
 
 CAL_MARKETS = {"player_receptions", "player_reception_yds"}
 MK_LABEL = {"player_receptions": "catches", "player_reception_yds": "rec yds",
-            "player_rush_yds": "rush yds", "player_anytime_td": "anytime TD"}
+            "player_rush_yds": "rush yds", "player_anytime_td": "anytime TD", "player_pass_yds": "pass yds"}
 
 
 def base_tier(t):

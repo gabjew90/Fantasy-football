@@ -47,6 +47,7 @@ def test_a_player_with_no_share_gets_no_carries_and_the_draw_is_seeded():
 def test_the_scorer_calls_the_shared_rush_sampler():
     src = (ENGINE / "score_game.py").read_text(encoding="utf-8")
     assert "MODEL.simulate_team_rush(" in src
+    assert "MODEL.simulate_qb_passing(" in src, "passing yards come from the shared sampler the harness grades"
     assert "rng.choice(resid" not in src, "a second inline copy of the rushing draw is back"
 
 
@@ -292,4 +293,59 @@ def test_the_tuner_adds_markets_on_their_own_populations_relative_to_their_basel
     assert list(out) == [1.0, 2.0, 1.0, 2.0], "each row scored on its own market, relative to its own base"
     none = f.assign(rush_pop=False, qb_pop=False)
     assert backtest.composite_rows(none, ("rush", "qbrush"), {"rush": 10.0, "qbrush": 4.0}).isna().all()
+
+
+# ---- QB passing (plan step 4) ----------------------------------------------
+def _team(seed=11, n=20000, **kw):
+    rng = np.random.default_rng(seed)
+    out, tt = M.simulate_team_game(rng, n, 34.0, 35.0, {"a": 0.25, "b": 0.15, "qb": 0.0},
+                                   {"a": 0.65, "b": 0.6, "qb": 0.5}, {"a": 8.5, "b": 7.0, "qb": 5.0}, 1.08, **kw)
+    return rng, out, tt
+
+
+def test_asking_for_the_other_bucket_costs_no_draw_and_moves_no_receiver():
+    _rng0, base, tt0 = _team()
+    _rng1, out, tt1 = _team(return_other=True)
+    other = out.pop(M.OTHER)
+    assert np.array_equal(tt0, tt1) and set(out) == set(base)
+    assert all(np.array_equal(out[k][0], base[k][0]) and np.array_equal(out[k][1], base[k][1]) for k in base)
+    assert other.mean() == pytest.approx(34.0 * 0.60, rel=0.03), "the bucket holds the 60% no one else covers"
+
+
+def test_qb_passing_is_his_receivers_plus_the_other_bucket_and_moves_no_one():
+    rng, out, _tt = _team(return_other=True)
+    other = out.pop(M.OTHER)
+    ys = [y for _r, y in out.values()]
+    before = rng.bit_generator.state
+    tracked_only = M.simulate_qb_passing(rng, len(other), ys, None, None, 1.08)
+    assert rng.bit_generator.state == before, "the QB's draws come from a child stream"
+    assert np.allclose(tracked_only, sum(ys)), "with nothing else on, exactly the receivers' total"
+    rates = {"catch_rate": 0.67, "ypt": 6.3}
+    full = M.simulate_qb_passing(rng, len(other), ys, other, rates, 1.08)
+    assert (full - tracked_only).mean() == pytest.approx(other.mean() * 6.3, rel=0.05)
+    assert (full >= tracked_only).all()
+
+
+def test_the_starter_share_and_the_passing_swing_are_off_until_given():
+    rng, out, _tt = _team(return_other=True)
+    other = out.pop(M.OTHER)
+    ys = [y for _r, y in out.values()]
+    rates = {"catch_rate": 0.67, "ypt": 6.3}
+    base = M.simulate_qb_passing(rng, len(other), ys, other, rates, 1.08)
+    again = M.simulate_qb_passing(rng, len(other), ys, other, rates, 1.08, width=dict(M.WIDTH_OFF))
+    assert base.mean() == pytest.approx(again.mean(), rel=0.02)
+    share = M.simulate_qb_passing(rng, len(other), ys, other, rates, 1.08, starter_share=[0.5] * 10 + [1.0] * 30)
+    assert share.mean() == pytest.approx(base.mean() * 0.875, rel=0.03)
+    wide = M.simulate_qb_passing(rng, len(other), ys, other, rates, 1.08, width={"eff_sd_pass": 0.25})
+    assert wide.mean() == pytest.approx(base.mean(), rel=0.02), "the swing keeps the mean"
+    assert wide.std() > base.std() * 1.05
+    with pytest.raises(ValueError):
+        M.validate_width({"eff_sd_pass": -0.1})
+
+
+def test_passing_is_graded_on_the_starting_qb_only(backtest):
+    assert backtest.POPULATION["pass"] == "pass_pop"
+    d = pd.DataFrame({"season": 2024, "week": 5, "game_id": [f"g{i}" for i in range(4)],
+                      "pass_pop": [True, False, True, False], "crps_pass_model": [40.0, np.nan, 50.0, np.nan]})
+    assert list(backtest.market_rows(d, "pass").crps_pass_model) == [40.0, 50.0]
 

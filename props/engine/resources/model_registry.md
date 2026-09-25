@@ -98,6 +98,30 @@ and kept live (DECISIONS #100). Known and not noise: QBs ran ~12% high in 2025;
 backs run ~4% low pooled because shares summing past 1 are scaled down (the
 next fix).
 
+### Round 13 (2026-09-25): QB passing yards, props-v1.24 -- `pass_yds_v0`
+
+- Markets: player_pass_yds, the starting QB only.
+- Spec: his receivers' yards in the SAME simulation (`simulate_team_game`),
+  plus the 'other' bucket's targets at the depth receivers' catch rate and
+  yards per target (`other_receiver_rates`: season target share under 5%, the
+  prior season's), times his share of the team's passing yards this game,
+  drawn from the prior season's grid (`qb_starter_pass_share_quantiles`: the
+  QB who threw the team's first pass, so an injury or a benching counts
+  against him, as the book settles it; mean 0.96). Gross of sacks, as books
+  settle. `model.simulate_qb_passing`; its draws come from child streams, so
+  every other market's output is byte-identical (KC@MIA checked).
+- Test (reports/yardage_harness.md, 2024-25): actual/model 0.976, PIT 0.503,
+  19.0% outside p10-p90; beats baseline A pooled (+1.10, 95% CI +0.18 to
+  +2.01) and in 2025 (+1.34), not in 2024 (+0.86, CI -0.53 to +2.27); every
+  60-90% bucket within 3 points except Under 80-90% (18 bets, -14 points).
+  The user judged both misses sample size and priced it (DECISIONS #105);
+  the bar is unchanged.
+- Known: the gain over baseline A is early season (weeks 2-4 +5.0 yards);
+  from week 5 the two tie. Mid-season the model ran 5-6% high in 2022-24
+  (2025: exact).
+- `eff_sd_pass` (a game-wide passing swing) exists and is off: the width
+  already passes.
+
 ### rush_yds_v0
 - Markets: player_rush_yds
 - Status: `PROTOTYPE`

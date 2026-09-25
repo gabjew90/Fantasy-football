@@ -55,6 +55,9 @@ MODEL_STATUS = {
     "player_receptions": "receiving_hier_v2, MODEL_UNVALIDATED (PROTOTYPE)",
     "player_reception_yds": "receiving_hier_v2, MODEL_UNVALIDATED (PROTOTYPE)",
     "player_rush_yds": "rush_yds_v0, MODEL_UNVALIDATED (no backtest)",
+    # the starting QB's passing yards (plan step 4, props-v1.24): outcome-graded
+    # in the same harness, not tested against posted lines
+    "player_pass_yds": "pass_yds_v0, MODEL_UNVALIDATED (PROTOTYPE)",
     # v1: outcome-backtested (2024-25, end-to-end log loss -0.0034 vs v0's
     # structure), still UNVALIDATED against posted lines -- so it prices no
     # fair odds and is never eligible. See model_registry.md.

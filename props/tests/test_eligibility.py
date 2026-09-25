@@ -110,8 +110,9 @@ def test_validating_a_market_makes_it_eligible(monkeypatch):
 
 def test_every_priced_market_has_a_status_and_an_unknown_one_is_unvalidated():
     for market in ("player_receptions", "player_reception_yds",
-                   "player_rush_yds", "player_anytime_td"):
+                   "player_rush_yds", "player_pass_yds", "player_anytime_td"):
         assert "MODEL_UNVALIDATED" in E.model_status(market)
+        assert "no model" not in E.model_status(market)
     assert "MODEL_UNVALIDATED" in E.model_status("player_something_new")
 
 

@@ -63,6 +63,16 @@ COMPONENTS: tuple[Component, ...] = (
                    "high in 2025. The run-defense adjustment is measured to help. Not tested against posted "
                    "lines",
               markets=("player_rush_yds",)),
+    Component("pass_yds_v0", "prop_model", "props/engine/scripts/model.py", "live",
+              evidence=("reports/yardage_harness.md",),
+              note="props-v1.24 (DECISIONS #105): the starting QB's passing yards from his receivers' draws "
+                   "in the same simulation, plus the depth receivers, times a starter's share. 2024-25: "
+                   "actual/model 0.976, 19.0% outside p10-p90, beats baseline A pooled (+1.10, interval "
+                   "excludes 0) and in 2025; 2024's interval includes 0 (+0.86), and one 18-bet 80-90% "
+                   "bucket misses by 14 points (all others within 3) -- USER DECISION: priced, bar unchanged. "
+                   "The gain is early season (weeks 2-4 +5.0); from week 5 it ties baseline A. Not tested "
+                   "against posted lines",
+              markets=("player_pass_yds",)),
     Component("anytime_td_v1", "prop_model", "props/engine/scripts/td_v1.py", "live",
               evidence=("reports/td_v1.md", "reports/td_layer1.md", "reports/td_layer2.md"),
               note="layers 1-2: team TD count and per-channel scorer shares",

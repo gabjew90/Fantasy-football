@@ -492,9 +492,17 @@ def questionable_flip_check(samples_by_regime, line):
 #               the shares leave: 30% when they sum to 0.7, when historically
 #               ~12% of carries go elsewhere -- the eligible players then ran
 #               21% above their projection (2022-23 diagnosis, DECISIONS #103).
+#   eff_sd_pass  log-sd of a per-game multiplier on the starting QB's passing
+#               yards (the receivers' efficiencies are drawn independently, so
+#               nothing else carries a game-wide passing swing)
 WIDTH_OFF = {"share_conc_targets": None, "share_conc_carries": None, "catch_conc": None,
              "eff_sd_rec": 0.0, "eff_sd_rush": 0.0, "share_conc_qb": None, "eff_sd_qb": None,
-             "rush_other_share": None, "rush_norm_strength": 0.0, "rush_norm_qb": False}
+             "rush_other_share": None, "rush_norm_strength": 0.0, "rush_norm_qb": False,
+             "eff_sd_pass": 0.0}
+
+# simulate_team_game(..., return_other=True) files the 'other' bucket's targets
+# under this key, for simulate_qb_passing.
+OTHER = "__other__"
 
 
 def validate_width(w):
@@ -700,7 +708,8 @@ def starter_qb_index(positions, rush_shares):
 
 
 def simulate_team_game(rng, n_sim, team_volume_mean, team_volume_r, player_shares,
-                        player_catch_rates, player_ypt, per_catch_shape, other_bucket=True, width=None):
+                        player_catch_rates, player_ypt, per_catch_shape, other_bucket=True, width=None,
+                        return_other=False):
     """Draw one team's targets jointly with all eligible receivers in one pass.
 
     1. Team targets ~ NegBinomial(team_volume_mean, team_volume_r) -- one draw per
@@ -715,6 +724,8 @@ def simulate_team_game(rng, n_sim, team_volume_mean, team_volume_r, player_share
     makes every player's outcome share the team's own play-count variance --
     both true of real football and both absent from independent per-player draws.
     Returns {player_index: (receptions_array, yards_array)}, plus team_targets_array.
+    With `return_other` (and the other bucket on), the dict also holds
+    OTHER -> the bucket's targets per simulation; that costs no random draw.
     """
     w = {**WIDTH_OFF, **(width or {})}
     names = list(player_shares.keys())
@@ -751,4 +762,35 @@ def simulate_team_game(rng, n_sim, team_volume_mean, team_volume_r, player_share
         if w["eff_sd_rec"]:
             yds = yds * _game_multiplier(rng, n_sim, w["eff_sd_rec"])
         out[name] = (rec, yds)
+    if return_other and other_bucket:
+        out[OTHER] = alloc[:, -1].astype(float)
     return out, team_targets
+
+
+def simulate_qb_passing(rng, n_sim, receiver_yards, other_targets, other_rates, per_catch_shape,
+                        starter_share=None, width=None):
+    """The starting QB's passing yards (plan step 4), from the SAME simulation
+    as his receivers: every tracked receiver's yards, plus the 'other' bucket's
+    targets at the depth receivers' catch rate and yards per target (the
+    prior season's, `other_receiver_rates`), times his share of the team's
+    passing yards this game, drawn from the prior season's grid -- the QB who
+    threw the team's first pass, so an injury or a benching counts against
+    him, as the book settles it. Sacks do not enter: a QB's passing yards are
+    gross. Every draw comes from a child stream (`rng.spawn`), which does not
+    advance `rng`: no receiver's or rusher's numbers move."""
+    w = {**WIDTH_OFF, **(width or {})}
+    g = rng.spawn(1)[0]
+    total = np.zeros(n_sim)
+    for y in receiver_yards:
+        total = total + np.asarray(y, dtype=float)
+    if other_targets is not None and other_rates:
+        cr = min(max(float(other_rates["catch_rate"]), 0.05), 1.0)
+        ypc = max(float(other_rates["ypt"]), 0.5) / cr
+        rec = g.binomial(np.asarray(other_targets).astype(np.int64), cr).astype(float)
+        shape_total = np.clip(rec, 0, 25) * per_catch_shape
+        total = total + np.where(rec > 0, g.gamma(np.maximum(shape_total, 1e-6), ypc / per_catch_shape), 0.0)
+    if w["eff_sd_pass"]:
+        total = total * _game_multiplier(g, n_sim, w["eff_sd_pass"])
+    if starter_share is not None:
+        total = total * g.choice(np.asarray(starter_share, dtype=float), size=n_sim)
+    return total

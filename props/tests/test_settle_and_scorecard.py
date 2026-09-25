@@ -46,7 +46,7 @@ def _stat(display: str, abbrev: str) -> dict:
     return {
         "season": 2026, "week": 2, "team": "SF",
         "player_name": abbrev, "player_display_name": display,
-        "receptions": 4, "receiving_yards": 30, "rushing_yards": 40,
+        "receptions": 4, "receiving_yards": 30, "rushing_yards": 40, "passing_yards": 250,
         "receiving_tds": 0, "rushing_tds": 0, "_anytime_td": 0,
         "_name": settle.norm_name(display),
         "_loose": settle.loose_key(abbrev),
@@ -107,6 +107,13 @@ def test_settle_grades_history_and_flags_the_call(record):
     # the comparison produced; either way both Unders won on 40 rushing yards.
     assert all(str(r["won"]) in ("1", "True") for r in rows)
     assert all(r["engine_tag"] == "props-v1.0" for r in rows)
+
+
+def test_passing_yards_settle_on_the_qbs_own_passing_yards(record):
+    _write(record, [_pred(market="player_pass_yds", side="Over", line=240.5, model_state="pass_yds_v0")])
+    assert settle.main(["--season", "2026"]) == 0
+    (row,) = _settled(record)
+    assert str(row["won"]) in ("1", "True"), "250 passing yards beats an Over at 240.5"
 
 
 def test_a_second_settle_does_not_duplicate_rows_without_a_line(record):

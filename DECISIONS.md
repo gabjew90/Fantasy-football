@@ -5743,3 +5743,40 @@ same silence. The route back is a download from chat: it lands in the user's
 Downloads folder, which Claude Code reads directly for the audit (re-running
 the same commands on the same release) -- no upload step, and no credential
 given to chat to push anywhere.
+
+## 2026-09-25 (105) -- QB passing yards priced from the team simulation (props-v1.24)
+
+Plan step 4. The starting QB's passing yards are his receivers' yards in the
+same simulation that prices their props (`model.simulate_qb_passing`), plus
+two facts the sampler lacked, both measured on 2021-25 play-by-play first:
+
+- **Depth receivers.** 15-16% of a team's targets go to receivers under a 5%
+  season share; the sampler's 'other' bucket carried them with no yards. They
+  are now drawn at those receivers' prior-season catch rate (0.66) and yards
+  per target (6.3).
+- **The starter's share.** A team's passing yards equal its receiving yards to
+  0.15%, but the QB who threw first keeps 96% of them on average (someone
+  else also throws in about one game in five, usually a backup in garbage
+  time or after an injury). His share is drawn per game from the prior
+  season's grid, which is how the book settles his number.
+
+Harness, 2024-25 (reports/yardage_harness.md): actual/model 0.976, PIT
+0.503, 19.0% outside p10-p90 -- right on average and the right width, with no
+width tuning (`eff_sd_pass` exists and is off). Beats baseline A pooled
+(+1.10, interval excludes 0) and in 2025; in 2024 +0.86 with an interval that
+includes 0. Every 60-90% bucket within 3 points except Under 80-90%: 18 bets,
+won 67% against 81%.
+
+**User decision:** priced, the misses noted, the bar unchanged for every
+market -- the same call as the backs in #100. Where the gain lives: weeks 2-4
+(+5.0 yards); from week 5 the model ties the no-shrinkage version. Mid-season
+it ran 5-6% high in 2022-24 (exact in 2025) -- watched, below the 5% limit
+pooled.
+
+Scorer: `player_pass_yds` for the starting QB (the same starter the QB
+rushing prop uses), priced from Sleeper's `passing_yards` (the primary
+source, no quota); the Odds API fallback request is unchanged. Settle grades
+it on nflverse `passing_yards`. The other markets' output is byte-identical to
+props-v1.23 (KC@MIA: only new rows and the disclosure lines differ). Live
+check: Mahomes 235 vs Sleeper 236.5; Malik Willis 162 vs 177.5, flagged WEAK
+(new team).
