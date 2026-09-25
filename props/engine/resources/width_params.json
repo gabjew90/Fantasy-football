@@ -1,0 +1,9 @@
+{
+ "catch_conc": null,
+ "eff_sd_rec": 0.0,
+ "eff_sd_rush": 0.3,
+ "note": "backtest.py --tune-width; see reports/width_tuning.md",
+ "share_conc_carries": 20.0,
+ "share_conc_targets": 40.0,
+ "tuned_on": "2022,2023"
+}

@@ -15,9 +15,10 @@ pulls a decision-time quote from Sleeper Picks (The Odds API as fallback), and w
   shadow_log_{season}_wk{W}_{AWAY}_{HOME}.csv  one row per posted line, all PASS
 
 EVERY probability here is EXPLORATORY. receiving_hier_v2 and anytime_td_v1 are PROTOTYPE
-(outcome-backtested, not tested against posted lines); rush_yds_v0 is PROTOTYPE too. The
-2022-25 yardage harness (reports/yardage_harness.md) finds all three yardage markets unbiased
-but too NARROW, so probabilities far from 50% run high.
+(outcome-backtested, not tested against posted lines); rush_yds_v0 is PROTOTYPE too. Since
+props-v1.20 the yardage samplers carry the width settings (resources/width_params.json), and
+all three yardage markets pass the 2022-25 harness (reports/yardage_harness.md): unbiased,
+~20% of outcomes outside p10-p90, every 60-90% bucket within 3 points.
 Nothing is a fair price or an entry threshold.
 Recommendation is PASS on every line, per the model registry.
 """
@@ -902,6 +903,12 @@ def main():
     # made same-game-parlay probabilities impossible to state.
     SH = P["shape_ypc_per_catch"]
     TVD = P.get("team_volume_dispersion", {"targets_r": 30.0, "carries_r": 30.0})
+    # WIDTH SETTINGS (resources/width_params.json): game-to-game variation in
+    # shares, catch rate and yards per touch, tuned on 2022-23 by backtest.py
+    # --tune-width and judged on 2024-25 (reports/width_tuning.md,
+    # reports/yardage_harness.md). No file = the pre-width sampler, draw for draw.
+    _wf = RES / "width_params.json"
+    WIDTH = MODEL.validate_width(json.loads(_wf.read_text(encoding="utf-8"))) if _wf.exists() else None
     sims = {}
     team_targets_draw, team_carries_draw = {}, {}
     for t in (AWAY, HOME):
@@ -911,11 +918,12 @@ def main():
         crs_t = {n: float(v) for n, v in zip(Mt.name, Mt.cr)}
         ypt_t = {n: float(v) for n, v in zip(Mt.name, Mt.ypt)}
         out_rec, tt_draw = MODEL.simulate_team_game(rng, N_SIM, env[t]["targets"], TVD["targets_r"],
-                                                    shares_t, crs_t, ypt_t, SH, other_bucket=True)
+                                                    shares_t, crs_t, ypt_t, SH, other_bucket=True, width=WIDTH)
         team_targets_draw[t] = tt_draw
         # carries: same joint structure, per-carry yards from the empirical league residual grid
         car_t, rush_t, tc_draw = MODEL.simulate_team_rush(rng, N_SIM, env[t]["carries"], TVD["carries_r"],
-                                                          [float(v) for v in Mt.rs], [float(v) for v in Mt.ypc], resid)
+                                                          [float(v) for v in Mt.rs], [float(v) for v in Mt.ypc], resid,
+                                                          width=WIDTH)
         team_carries_draw[t] = tc_draw
         for j, (_, m) in enumerate(Mt.iterrows()):
             rec, yds = out_rec[m["name"]]
@@ -2317,7 +2325,7 @@ def main():
             L.append(f"| {r.book} | {r.market.replace('player_','')} | {r.player} | {'' if pd.isna(r.line) else r.line} | "
                      f"{'' if pd.isna(r.model_mean) else round(r.model_mean,1)} | {r.side} | {r.p_model:.3f} | {r.p_novig:.3f} | "
                      f"{r.gap:+.3f} | {r.price} | {r.ER:+.3f} |")
-    L.append(f"\nModel states: receptions/receiving yards `receiving_hier_v2` and rushing yards `rush_yds_v0` PROTOTYPE (2022-25 harness: unbiased but too narrow, so probabilities far from 50% run high); "
+    L.append(f"\nModel states: receptions/receiving yards `receiving_hier_v2` and rushing yards `rush_yds_v0` PROTOTYPE (2022-25 harness, with the width settings: unbiased and calibrated on outcomes; not tested against posted lines); "
              f"anytime TD `anytime_td_v1` PROTOTYPE (outcome-backtested, no posted-line test; no fair odds). All MODEL_UNVALIDATED. Dispersion: receptions log r = "
              f"{P['receptions_dispersion']['a']:.3f} + {P['receptions_dispersion']['b']:.3f}·log μ; carries "
              f"{P['carries_dispersion']['a']:.3f} + {P['carries_dispersion']['b']:.3f}·log μ; per-catch Gamma shape {SH:.3f}; "

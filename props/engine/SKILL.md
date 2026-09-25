@@ -347,8 +347,9 @@ need not be surfaced. Write the reply as a premium prop guide with this structur
    rather than the ones worth betting, and reuses each player-week 8-10 times so its `n`
    column overstates the evidence by about an order of magnitude. Quote it only with that
    description attached. The 2022-25 yardage harness (`reports/yardage_harness.md` in the
-   repo) finds receptions, receiving yards and rushing yards unbiased on average but too
-   narrow: a model 85% Over wins about 75-81%. Say so whenever a probability far from 50% is quoted.
+   repo) is the evidence now: since props-v1.20 receptions, receiving yards and rushing yards
+   are unbiased and calibrated on outcomes (a model 85% wins about 84-85%). None is tested
+   against posted lines yet; say that, not that the numbers are unvalidated guesses.
    Ladder: `ladder_*.csv` holds P(stat <= k) per player for pricing alternate lines;
    surface it for the top two or three plays when the book's line sits inside the ladder.
 6. **Parlays — DISABLED, do not price them.** `parlays_*.csv` is no longer written.

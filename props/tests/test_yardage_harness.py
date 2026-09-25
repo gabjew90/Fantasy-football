@@ -128,3 +128,76 @@ def test_priors_are_never_built_into_the_engine(backtest, tmp_path):
     with pytest.raises(SystemExit, match="refusing"):
         backtest.ensure_priors(1999, backtest.RES, build=True)
     assert backtest.priors_cache_dir().name.startswith("priors-")
+
+
+def _rec(width, seed=11, n=20000):
+    out, _ = M.simulate_team_game(np.random.default_rng(seed), n, 34.0, 35.0, {"a": 0.25, "b": 0.15},
+                                  {"a": 0.65, "b": 0.6}, {"a": 8.5, "b": 7.0}, 1.08, width=width)
+    return out["a"]
+
+
+def test_width_off_is_the_old_sampler_draw_for_draw():
+    for off in (None, {}, dict(M.WIDTH_OFF)):
+        r, y = _rec(off)
+        r0, y0 = _rec(None)
+        assert np.array_equal(r, r0) and np.array_equal(y, y0)
+
+
+@pytest.mark.parametrize("width", [{"share_conc_targets": 10.0}, {"catch_conc": 10.0}, {"eff_sd_rec": 0.4}])
+def test_each_receiving_width_setting_keeps_the_mean_and_widens(width):
+    r0, y0 = _rec(None)
+    r, y = _rec(width)
+    assert y.mean() == pytest.approx(y0.mean(), rel=0.03) and r.mean() == pytest.approx(r0.mean(), rel=0.03)
+    assert y.std() > y0.std() * 1.03
+
+
+@pytest.mark.parametrize("width", [{"share_conc_carries": 10.0}, {"eff_sd_rush": 0.4}])
+def test_each_rushing_width_setting_keeps_the_mean_and_widens(width):
+    def run(w):
+        return M.simulate_team_rush(np.random.default_rng(5), 20000, 26.0, 30.0, [0.55, 0.2], [4.5, 4.0], RESID,
+                                    width=w)[1][0]
+    y0, y = run(None), run(width)
+    assert y.mean() == pytest.approx(y0.mean(), rel=0.03)
+    assert y.std() > y0.std() * 1.03
+
+
+def test_width_settings_are_validated_never_silently_misread():
+    assert M.validate_width({"share_conc_targets": 40.0, "eff_sd_rush": 0.3, "note": "x"}) == \
+        {"share_conc_targets": 40.0, "eff_sd_rush": 0.3}
+    for bad in ({"share_conc_targets": 0}, {"catch_conc": -5}, {"eff_sd_rec": -0.1}, {"share_conc": 40}):
+        with pytest.raises(ValueError):
+            M.validate_width(bad)
+
+
+def test_the_shipped_width_file_is_valid():
+    import json
+    f = ENGINE.parent / "resources" / "width_params.json"
+    assert M.validate_width(json.loads(f.read_text(encoding="utf-8")))
+
+
+def test_the_harness_grades_the_shipped_sampler_unless_told_off(backtest):
+    from types import SimpleNamespace
+    assert backtest.width_of(SimpleNamespace(width=None)) == backtest.width_of(
+        SimpleNamespace(width=str(backtest.SHIPPED_WIDTH)))
+    assert backtest.width_of(SimpleNamespace(width="off")) == {}
+    assert backtest.width_of(SimpleNamespace(width='{"eff_sd_rush": 0.2}')) == {"eff_sd_rush": 0.2}
+
+
+def test_ties_are_settings_not_measurably_worse_than_the_best(backtest):
+    rows = [{"season": 2022, "game_id": f"g{g}", "x": 0.0} for g in range(60) for _ in range(5)]
+    base = pd.DataFrame(rows)
+    rng = np.random.default_rng(0)
+    noise = rng.normal(0, 0.05, len(base))
+    frames = [base.assign(x=noise),
+              base.assign(x=rng.normal(0, 0.05, len(base)) + 0.001),    # a hair worse, within its own noise
+              base.assign(x=noise + 0.2)]                                # clearly worse
+    flags = backtest.tie_flags(frames, lambda i: frames[i]["x"], best=0)
+    assert flags == [True, True, False], "a hair worse ties; clearly worse does not"
+
+
+def test_a_saved_run_says_what_it_is(backtest, tmp_path):
+    f = tmp_path / "t.pkl"
+    pd.to_pickle({"kind": "width_tuning", "grid": [], "frames": []}, f)
+    assert backtest.load_run(f, "width_tuning")["grid"] == []
+    with pytest.raises(SystemExit, match="not a harness run"):
+        backtest.load_run(f, "harness")

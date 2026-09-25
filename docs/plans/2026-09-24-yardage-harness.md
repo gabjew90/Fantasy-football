@@ -60,7 +60,12 @@ worst on the low side (players bust more often than the model allows).
 
 ## Later steps, each its own PR, each judged by this harness
 
-2. **Width first** (user decision, 2026-09-24). Candidate causes, each tested
+2. **Width first** (user decision, 2026-09-24) -- DONE, props-v1.20: target-share
+   and carry-share variation plus per-game yards per carry; all three markets pass
+   the four checks on 2024-25 (reports/width_tuning.md, reports/yardage_harness.md).
+   The setting VALUES were chosen on 2022-23 alone; WHICH knobs to try was decided after
+   the first harness run, which had shown every season (tune and test) too narrow.
+   Candidate causes, each tested
    against the version before it: a player's share of targets or carries is
    fixed within a game (real shares swing week to week -- a
    Dirichlet-multinomial split); yards per carry and per catch have no
@@ -75,9 +80,9 @@ worst on the low side (players bust more often than the model allows).
    on two seasons instead of one.
 
 Follow-up outside these steps: the slate's must-win pick (`score_week.py`,
-`CAL_MARKETS`) still prefers receptions and receiving yards as the calibrated
-markets. The harness shows they miss the calibration bar too; revisit the
-rule once step 2 lands.
+`CAL_MARKETS`) prefers receptions and receiving yards as the calibrated
+markets. Since step 2 rushing yards passes the same bar; whether it joins
+`CAL_MARKETS` is a separate decision about the pick rule.
 
 Each change is tuned on 2022-23 only and reported on 2024-25, against the
 version before it, like the TD model.

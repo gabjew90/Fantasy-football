@@ -5539,3 +5539,49 @@ line; dead state. Skipped, recorded as a follow-up in the plan: the slate's
 must-win pick still treats receptions and receiving yards as the calibrated
 markets. The scorer's sampler output is byte-identical; its report wording
 about model states changed.
+
+## 2026-09-24 (99) -- the width settings: the yardage markets pass (props-v1.20)
+
+Step 2 of docs/plans/2026-09-24-yardage-harness.md. The samplers held a
+player's share, catch rate and yards per touch fixed within a game; each can
+now vary game to game, mean-preserving, with "off" the old sampler draw for
+draw (score_game output byte-identical with no settings file). The settings
+live in props/engine/resources/width_params.json; the scorer reads them, and
+so does the harness by default (`--width off` reproduces the old sampler).
+
+- **Tuned on 2022-23 only** (`backtest.py --tune-width`, 36 settings,
+  reports/width_tuning.md). Each team-game starts every setting from the same
+  random state (common random numbers). The first run chose by CRPS alone and
+  picked a receiving setting that barely widened anything: the top settings
+  differed by ~0.1% of CRPS, noise. The rule became CRPS first, then among
+  settings not measurably worse than the best (paired game-block interval),
+  the width closest to 20% -- decided on the tune seasons. Which knobs to try
+  was chosen after the first harness run had shown every season too narrow;
+  the values were chosen without 2024-25. Chosen: target-share concentration
+  40; carry-share concentration 20 and a 0.3 log-sd on yards per carry; catch
+  rate and yards per catch fixed.
+- **2024-25: all three pass the four checks.** Outside p10-p90: receptions
+  19.0%, receiving yards 19.2%, rushing yards 19.6% (were 25.2 / 23.2 /
+  32.3); worst 60-90% bucket 2.8 / 3.0 / 2.9 points (receiving yards exactly
+  at the limit); a model 85% wins about 84-85%. Paired CRPS against the old
+  sampler, in the committed report: receptions and rushing better, receiving
+  yards 0.18% worse (interval excludes zero) -- accepted as the cost of
+  calibrated ranges, which is what prices a line.
+- `receiving_hier_v2` and `rush_yds_v0` are `live` in core/registry.py. Still
+  none is eligible as a play: that waits for a holdout against posted lines.
+- On KC@MIA 2026 week 3, 75-95% probabilities fall ~5 points (rushing ~8),
+  near-the-line ones ~2.5, means unchanged; fantasy p10-p90 bands widen ~9%
+  (the scenario command reads this export).
+- Chat gets this as nfl-v1.1.
+
+Code review (high), all 9 fixed before merge: the harness and the CI smoke
+graded the pre-width sampler unless told otherwise (they now default to the
+shipped settings); "the same random draws" was not true once a setting drew
+extra variates (each team-game now has its own seeded stream, and the tuning
+and test were re-run on it -- same choice, same verdicts); the paired
+comparison lived only in a scratch log (now a section of the report); a
+concentration of 0 would have handed every target to one player (settings are
+validated, 0 is refused); the tie rule had no test; the two --from-results
+pickle kinds could be confused (runs now say what they are); a JSON --width
+could be mistaken for a path on Windows; the knob-design caveat above; and
+tuning ran 108 pointless bootstraps.

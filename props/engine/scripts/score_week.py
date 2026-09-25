@@ -364,7 +364,7 @@ def main():
               "", "*Calibration: no market has been validated against sportsbook lines. Receptions and receiving yards have a "
               "2025 walk-forward behind them (resources/calibration_2025.csv), but it places lines at fixed offsets from the "
               "model\u2019s own median across every player-week, so it measures distributional self-consistency, not whether the "
-              "model beats a book on the calls it would actually make. The 2022-25 yardage harness finds receptions, receiving yards and rushing yards unbiased but too narrow (a model 85% Over wins about 75-81%). "
+              "model beats a book on the calls it would actually make. Since props-v1.20 the 2022-25 yardage harness finds receptions, receiving yards and rushing yards unbiased and calibrated on outcomes (a model 85% wins about 84-85%). "
               "Team TD totals are anchored to the same-book spread and total.*"]
     L += [""] + PARLAY_MD
     L += ["", "Per-game guides, cards, ladders, parlays and shadow logs are in the outputs folder under each game's name."]
