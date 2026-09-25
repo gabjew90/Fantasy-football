@@ -94,7 +94,7 @@ expected carries, not the QB1 slot (a benched starter's backup keeps QB2).
 bucket 2.9 points; CRPS against the RB-width version +0.042 (-0.001, +0.087).
 Running backs 20.3%, worst bucket 3.4 points (2.9 before the QB split; their
 CRPS change +0.002, within noise): 0.4 over the limit, judged noise by the user
-and kept live (DECISIONS #100). Known and not noise: QBs ran ~11% high in 2025;
+and kept live (DECISIONS #100). Known and not noise: QBs ran ~12% high in 2025;
 backs run ~4% low pooled because shares summing past 1 are scaled down (the
 next fix).
 

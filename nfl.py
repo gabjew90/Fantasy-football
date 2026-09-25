@@ -7,17 +7,31 @@
   python nfl.py fantasy lineup --league L [--week W] [--record]
   python nfl.py fantasy scenario --league L --player NAME|ID --out NAME|ID [--week W]
   python nfl.py fantasy waiver --league L [--pos RB,WR,TE] [--horizon stream|season] [--week W]
+  python nfl.py fantasy trade --league L --give NAMES --get NAMES [--back NAME:WEEK]
 
 Reports and decision records go to $NFL_OUT (default /mnt/user-data/outputs).
 `--record` appends to the graded ledger. A chat session never passes it (chat
 is read-only, as for the props record); the scheduled runs will, from step 6.
+
+TROUBLESHOOTING LOG (temporary, `session_log` in config.yaml; inside a chat
+release only, or with NFL_SESSION_LOG=1): every command
+appends one JSON line to $NFL_OUT/nfl_session_log.jsonl -- the release, the
+command and its arguments, exit code, duration, the error if one was raised,
+the data gate and the inputs' freshness, and the bootstrap's setup facts. No
+credential ever goes in it: arguments are player and league names, and the
+setup facts are booleans.
 """
 
 from __future__ import annotations
 
 import argparse
+import datetime as dt
+import json
+import os
 import subprocess
 import sys
+import time
+import traceback
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
@@ -103,6 +117,7 @@ def cmd_fantasy(a) -> int:
         except SC.ScenarioError as ex:
             print(f"SCENARIO: {ex}", file=sys.stderr)
             return 2
+    a._result = r
     print(r.markdown)
     print(f"report: {r.report_path}\ndecision record: {r.record_path}")
     return 0
@@ -149,7 +164,57 @@ def main(argv=None) -> int:
     f.set_defaults(fn=cmd_fantasy)
 
     a = ap.parse_args(argv)
-    return a.fn(a)
+    started, rc, err = time.time(), None, None
+    try:
+        rc = a.fn(a)
+        return rc
+    except BaseException as ex:  # noqa: BLE001 -- logged, then re-raised unchanged
+        err = "".join(traceback.format_exception_only(type(ex), ex)).strip()
+        raise
+    finally:
+        _session_log(argv if argv is not None else sys.argv[1:], rc, err, time.time() - started,
+                     getattr(a, "_result", None))
+
+
+def _gate_summary(gate) -> str | None:
+    """'PASS', or 'FAIL: <the failed checks>' (fantasy commands only)."""
+    if not isinstance(gate, dict):
+        return None
+    if gate.get("passed"):
+        return "PASS"
+    return "FAIL: " + "; ".join(str(c.get("name")) for c in gate.get("checks") or [] if not c.get("passed"))
+
+
+def _session_log(argv, rc, err, seconds, result) -> None:
+    """One line per command in $NFL_OUT/nfl_session_log.jsonl, when config.yaml
+    `session_log` is on. Never raises: a log must not break the command."""
+    try:
+        import yaml
+        cfg = yaml.safe_load((ROOT / "config.yaml").read_text(encoding="utf-8")) or {}
+        stamp = ROOT.with_name(ROOT.name + ".stamp.json")     # written by the chat bootstrap, beside the release
+        # a chat shakedown aid: on inside a chat release (the stamp exists) or
+        # when asked for, never silently in local or scheduled runs
+        if not cfg.get("session_log") or not (stamp.exists() or os.environ.get("NFL_SESSION_LOG") == "1"):
+            return
+        out = Path(os.environ.get("NFL_OUT", "/mnt/user-data/outputs"))
+        out.mkdir(parents=True, exist_ok=True)
+        lock = ROOT / "nfl.lock.json"
+        release = json.loads(lock.read_text(encoding="utf-8")).get("tag") if lock.exists() else None
+        setup = {}
+        if stamp.exists():
+            s = json.loads(stamp.read_text(encoding="utf-8"))
+            setup = {k: s.get(k) for k in ("release_source", "deps", "yahoo", "odds_key", "fallback_reason")}
+        rec = getattr(result, "record", None) or {}
+        line = {"at_utc": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"), "release": release,
+                "argv": list(argv), "exit": rc, "seconds": round(seconds, 1), "error": err, "setup": setup,
+                "gate": _gate_summary(rec.get("gate")),
+                "inputs": [{k: i.get(k) for k in ("name", "source", "status", "age_h", "detail")}
+                           for i in ((rec.get("manifest") or {}).get("entries") or [])][:30],
+                "report": str(getattr(result, "report_path", "") or "") or None}
+        with (out / "nfl_session_log.jsonl").open("a", encoding="utf-8") as fh:
+            fh.write(json.dumps(line, default=str) + "\n")
+    except Exception:  # noqa: BLE001
+        pass
 
 
 if __name__ == "__main__":

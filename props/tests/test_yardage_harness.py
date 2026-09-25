@@ -262,3 +262,34 @@ def test_the_starter_is_the_qb_with_the_carries_not_the_slot():
     assert M.starter_qb_index(["RB1", "QB2", "WR1"], [0.5, 0.12, 0.02]) == 1
     assert M.starter_qb_index(["QB", "QB", "RB"], [0.02, 0.15, 0.5]) == 1
     assert M.starter_qb_index(["RB", "WR"], [0.5, 0.1]) is None
+
+
+def test_carry_shares_rescale_toward_the_realistic_total_leaving_the_qb_alone():
+    shares, ypc = [0.30, 0.15, 0.12], [4.5, 4.0, 5.6]           # they sum to 0.57: 'other' would take 43%
+    run = lambda w, qb=None: M.simulate_team_rush(np.random.default_rng(8), 20000, 26.0, 30.0, shares, ypc,
+                                                  RESID, width=w, qb_index=qb)
+    off = run(None)
+    full = run({"rush_other_share": 0.12, "rush_norm_strength": 1.0}, qb=2)
+    # the backs are scaled to 1 - 0.12 - 0.12 = 0.76 of the carries; the QB keeps his 12%
+    assert (full[0][0].mean() + full[0][1].mean()) / 26.0 == pytest.approx(0.76, rel=0.03)
+    assert full[0][2].mean() == pytest.approx(off[0][2].mean(), rel=0.03)
+    same = run({"rush_other_share": 0.12, "rush_norm_strength": 0.0}, qb=2)
+    assert all(np.array_equal(a, b) for a, b in zip(same[1], run(None, qb=2)[1])), "strength 0 = off"
+
+
+def test_rescaling_settings_are_validated():
+    assert M.validate_width({"rush_other_share": 0.1, "rush_norm_strength": 0.5})
+    for bad in ({"rush_other_share": 1.2}, {"rush_norm_strength": 2.0}, {"rush_other_share": -0.1}):
+        with pytest.raises(ValueError):
+            M.validate_width(bad)
+
+
+def test_the_tuner_adds_markets_on_their_own_populations_relative_to_their_baselines(backtest):
+    f = pd.DataFrame({"crps_rush_model": [10.0, 20.0, 5.0, float("nan")],
+                      "crps_qbrush_model": [float("nan"), float("nan"), 4.0, 8.0],
+                      "rush_pop": [True, True, False, False], "qb_pop": [False, False, True, True]})
+    out = backtest.composite_rows(f, ("rush", "qbrush"), {"rush": 10.0, "qbrush": 4.0})
+    assert list(out) == [1.0, 2.0, 1.0, 2.0], "each row scored on its own market, relative to its own base"
+    none = f.assign(rush_pop=False, qb_pop=False)
+    assert backtest.composite_rows(none, ("rush", "qbrush"), {"rush": 10.0, "qbrush": 4.0}).isna().all()
+

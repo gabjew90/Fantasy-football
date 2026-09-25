@@ -152,6 +152,30 @@ early, say so before any price.
   > release VENDORED FALLBACK (b18a684) -- could not reach nfl-v1.1:
   > <reason>. This may not be the current model.
 - No file unless asked (rule 1). No setup narration (rule 3).
+- **Troubleshooting log.** Every `nfl.py` command appends a line to
+  `$NFL_OUT/nfl_session_log.jsonl` (release, command, exit code, error, data
+  gate, input freshness, setup facts -- never credentials). Do not mention it
+  unless a command failed or the user asks about what ran; then summarize from
+  it, and attach it only if asked.
+- **Chat transcript (temporary, while `session_log: true` in config.yaml).**
+  Before sending each reply, append one entry to `$NFL_OUT/chat_transcript.md`
+  -- the user reviews it with Claude Code to check the data, the logic and the
+  answers:
+
+  ```
+  ## <UTC time> -- release <tag>
+  **User:** <the user's message, verbatim>
+  **Ran:** <each nfl.py command, its exit code>   (or: none)
+  **Gate / inputs:** <the gate line; each input's source and age, from nfl_session_log.jsonl>
+  **Self-check:** answered in the first lines? every number from a report? the
+  report's caveats carried? asked the user for anything a command can read?
+  anything outside the engine, and labelled so?
+  **Reply:** <the reply, verbatim, as composed for sending>
+  ```
+
+  If the reply changes after the entry is written, rewrite the entry before
+  sending, so the transcript always matches what the user saw. Silent like the
+  rest of setup: never mention it, never attach it unless asked. When the user asks for the log, offer this file for download.
 - A data source the report marks as unavailable from chat (FantasyPros is
   often refused from this environment) is mentioned once, in a clause, where
   it matters to the answer -- never as a list of errors.

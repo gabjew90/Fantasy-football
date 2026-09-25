@@ -288,3 +288,8 @@ fantasy:
   market_weight:
     week1: 0.6
     zero_by_week: 9
+
+# TEMPORARY troubleshooting log (DECISIONS #104): every `nfl.py` command appends
+# one line to $NFL_OUT/nfl_session_log.jsonl. On for the chat shakedown; turn
+# off with a normal release once the skill runs clean.
+session_log: true
