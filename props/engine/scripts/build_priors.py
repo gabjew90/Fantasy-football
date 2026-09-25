@@ -41,6 +41,8 @@ GAMES_URL = "https://raw.githubusercontent.com/nflverse/nfldata/master/data/game
 K0_DEFAULT = 4.0          # tuned on 2025 held-out fold (weeks 5-6 fit / 7-8 score)
 R_CLAMP = [0.5, 30.0]
 RESID_QUANTILES = 2001    # per-carry yardage residual grid
+KNEEL_QUANTILES = 201     # per-team-game QB kneel-yards grid, per spread bucket
+KNEEL_SPREAD_EDGES = (-3.0, 3.0, 7.0)   # dog 3+ | pick +-3 | fav 3-7 | fav 7+
 
 
 def fetch(url, dest):
@@ -263,6 +265,33 @@ def main():
     ry = rushes.rushing_yards.dropna().values
     resid = np.quantile(ry - ry.mean(), np.linspace(0, 1, RESID_QUANTILES))
 
+    # ---- QB rushing (docs/plans/2026-09-24-yardage-harness.md, step 3) --------
+    # A QB's carries are not shaped like a running back's: scrambles run long
+    # and a QB rarely loses yards (2022-24: 5th percentile 0 vs -2 league-wide).
+    # So QBs get their own carry grid, the same length as the league grid (the
+    # sampler's draw count is then unchanged for everyone else). And the book
+    # settles a QB's rushing yards WITH his kneel-downs, which the carry data
+    # drops: the per-team-game kneel yards are kept by the team's pregame spread
+    # (a favourite kneels more often), as quantile grids the sampler draws from.
+    qb_ids = set(roster.loc[roster.position == "QB", "gsis_id"].dropna())
+    qy = rushes[rushes.rusher_player_id.isin(qb_ids)].rushing_yards.dropna().values
+    qb_resid = np.quantile(qy - qy.mean(), np.linspace(0, 1, RESID_QUANTILES))
+    kneels = pbp[(pbp.play_type == "qb_kneel") & pbp.rusher_player_id.notna()]
+    kn = kneels.groupby(["game_id", "posteam"]).rushing_yards.sum()
+    kneel_rows = []
+    for _, r in g.iterrows():
+        if pd.isna(r.spread_line):
+            continue
+        for team, own in ((r.home_team, r.spread_line), (r.away_team, -r.spread_line)):
+            kneel_rows.append({"spread": float(own), "yds": float(kn.get((r.game_id, team), 0.0))})
+    kr = pd.DataFrame(kneel_rows)
+    edges = list(KNEEL_SPREAD_EDGES)
+    kr["bucket"] = np.digitize(kr.spread, edges)
+    kneel_grids = [np.round(np.quantile(kr[kr.bucket == b].yds, np.linspace(0, 1, KNEEL_QUANTILES)), 3).tolist()
+                   for b in range(len(edges) + 1)]
+    print(f"QB carries: {len(qy)} (ypc {qy.mean():.2f}); kneel yards per team-game by spread bucket: "
+          + ", ".join(f"{np.mean(gr):+.2f}" for gr in kneel_grids), file=sys.stderr)
+
     pts = g.home_score.sum() + g.away_score.sum()
     td_per_pt = float((tw.rush_td.sum() + tw.pass_td.sum()) / pts)
     # Fraction of TDs scored on plays starting inside the 10. The rest are long
@@ -405,6 +434,11 @@ def main():
         "shape_ypc_per_catch": shape_ypc,
         "league_mean_ypc": float(ry.mean()),
         "carry_residual_quantiles": [round(float(x), 4) for x in resid],
+        "qb_mean_ypc": float(qy.mean()),
+        "qb_carry_residual_quantiles": [round(float(x), 4) for x in qb_resid],
+        # the team's own pregame spread, POSITIVE = favoured (nflverse's
+        # spread_line is the home side's); grid b covers [edges[b-1], edges[b])
+        "qb_kneel_yards_by_spread": {"edges": edges, "grids": kneel_grids},
         "league_td_per_point": td_per_pt,
         "pass_td_frac_inside10": f_pass_in10, "rush_td_frac_inside10": f_rush_in10,
         "note": ("Built by build_priors.py. Rates are prior-season season-long and are used "

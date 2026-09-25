@@ -481,8 +481,12 @@ def questionable_flip_check(samples_by_regime, line):
 #               (a player's share varies around its mean; smaller = wider)
 #   catch_conc  Beta concentration of each player's catch rate
 #   eff_sd      log-sd of a per-game multiplier on yards per catch / per carry
+#   share_conc_qb  the starting QB's share of carries, varied on its own (Beta)
+#               while the rest split what is left; None = he is one more
+#               component of the carries Dirichlet, as before
+#   eff_sd_qb   his own yards-per-carry swing; None = eff_sd_rush
 WIDTH_OFF = {"share_conc_targets": None, "share_conc_carries": None, "catch_conc": None,
-             "eff_sd_rec": 0.0, "eff_sd_rush": 0.0}
+             "eff_sd_rec": 0.0, "eff_sd_rush": 0.0, "share_conc_qb": None, "eff_sd_qb": None}
 
 
 def validate_width(w):
@@ -499,6 +503,8 @@ def validate_width(w):
         if k.startswith(("share_conc", "catch_conc")):
             if v is not None and not (isinstance(v, (int, float)) and v > 0):
                 raise ValueError(f"{k} must be null (off) or > 0, got {v!r}")
+        elif k == "eff_sd_qb" and v is None:
+            continue                                   # None = inherit eff_sd_rush
         elif not (isinstance(v, (int, float)) and v >= 0):
             raise ValueError(f"{k} must be >= 0, got {v!r}")
     return out
@@ -531,13 +537,43 @@ def _allocate(rng, totals, p_norm, conc, fill_last):
     return alloc
 
 
+def _allocate_qb_first(rng, totals, p_norm, qb, conc_qb, conc_rest):
+    """Split carries with the starting QB's share varying on its own.
+
+    His share each simulation ~ Beta(conc_qb * q, conc_qb * (1 - q)); everyone
+    else (and 'other') splits the remainder in proportion to their shares,
+    through a Dirichlet at conc_rest when it is set. Means are preserved: a QB
+    scramble does not come out of a running back's carries the way two backs
+    compete for the same ones, so the RB-tuned concentration overstated his
+    swing (2022-25: 15% of his outcomes outside p10-p90, 26% with none)."""
+    n, k = len(totals), len(p_norm)
+    q = float(p_norm[qb])
+    P = np.zeros((n, k))
+    P[:, qb] = rng.beta(max(conc_qb * q, 1e-9), max(conc_qb * (1.0 - q), 1e-9), size=n)
+    rest = [j for j in range(k) if j != qb]
+    base = p_norm[rest] / max(1.0 - q, 1e-12)
+    if conc_rest is not None:
+        g = rng.gamma(np.maximum(conc_rest * base, 1e-9), size=(n, len(rest)))
+        D = g / g.sum(axis=1, keepdims=True)
+    else:
+        D = np.broadcast_to(base, (n, len(rest)))
+    P[:, rest] = (1.0 - P[:, [qb]]) * D
+    alloc = np.zeros((n, k), dtype=int)
+    remaining = totals.copy()
+    rem_p = np.ones(n)
+    for j in range(k - 1):
+        pj = np.clip(np.divide(P[:, j], rem_p, out=np.zeros(n), where=rem_p > 0), 0.0, 1.0)
+        alloc[:, j] = rng.binomial(remaining, pj); remaining = remaining - alloc[:, j]; rem_p = rem_p - P[:, j]
+    return alloc
+
+
 def _game_multiplier(rng, n_sim, sd):
     """Mean-one lognormal multiplier, one per simulation (a player's game)."""
     return np.exp(sd * rng.standard_normal(n_sim) - 0.5 * sd * sd)
 
 
 def simulate_team_rush(rng, n_sim, team_carries_mean, carries_r, rush_shares, ypc, carry_resid,
-                       width=None):
+                       width=None, player_resid=None, player_kneel=None, qb_index=None):
     """One team's carries, drawn jointly, and each player's rushing yards.
 
     1. Team carries ~ NegBinomial(team_carries_mean, carries_r), one draw per
@@ -553,28 +589,62 @@ def simulate_team_rush(rng, n_sim, team_carries_mean, carries_r, rush_shares, yp
     ran inline before it moved here (its output is byte-identical).
     Returns (carries per player, yards per player, team carries), the lists
     in `rush_shares` order.
+
+    QB RUSHING (plan step 3). `qb_index` names the starting QB, for the
+    QB-only width settings (share_conc_qb, eff_sd_qb). `player_resid[j]`, when given, replaces the league
+    carry grid for player j (a QB's carries are shaped differently); it must be
+    the league grid's length, so the draw consumes the same randomness and
+    every other player's numbers are unchanged. `player_kneel[j]`, when given,
+    is a grid of per-game kneel-down yards added to player j's total -- the
+    book settles a QB's rushing yards with them. Kneels come from a child
+    stream (`rng.spawn`), which does not advance `rng`: adding them moves no
+    one else's draws.
     """
     w = {**WIDTH_OFF, **(width or {})}
+    if player_resid is not None and any(
+            r is not None and len(r) != len(carry_resid) for r in player_resid):
+        raise ValueError("a per-player carry grid must be the league grid's length")
     rs = np.clip(np.asarray(rush_shares, dtype=float), 0, None)
     rest = max(1.0 - rs.sum(), 0.0)
     p_norm = np.append(rs, rest); p_norm = p_norm / p_norm.sum()
     mu_c = max(team_carries_mean, 1e-6)
     tc_draw = rng.negative_binomial(carries_r, carries_r / (carries_r + mu_c), size=n_sim)
-    alloc = _allocate(rng, tc_draw, p_norm, w["share_conc_carries"], fill_last=False)
+    if qb_index is not None and w["share_conc_qb"]:
+        alloc = _allocate_qb_first(rng, tc_draw, p_norm, int(qb_index), w["share_conc_qb"], w["share_conc_carries"])
+    else:
+        alloc = _allocate(rng, tc_draw, p_norm, w["share_conc_carries"], fill_last=False)
     carries, yards = [], []
     for j in range(len(rs)):
         car = alloc[:, j]
         rush = np.zeros(n_sim)
         if car.max() > 0:
             mx = int(car.max())
-            draws = rng.choice(carry_resid, size=(n_sim, mx)) + float(ypc[j])
+            grid = carry_resid if player_resid is None or player_resid[j] is None else player_resid[j]
+            draws = rng.choice(grid, size=(n_sim, mx)) + float(ypc[j])
             rush = (draws * (np.arange(mx)[None, :] < car[:, None])).sum(1)
-        if w["eff_sd_rush"]:
+        sd = w["eff_sd_rush"]
+        if qb_index is not None and j == int(qb_index) and w["eff_sd_qb"] is not None:
+            sd = w["eff_sd_qb"]
+        if sd:
             # the game's yards per carry = ypc x a mean-one multiplier; the
             # carry residuals stay as drawn
-            rush = rush + car * float(ypc[j]) * (_game_multiplier(rng, n_sim, w["eff_sd_rush"]) - 1.0)
+            rush = rush + car * float(ypc[j]) * (_game_multiplier(rng, n_sim, sd) - 1.0)
         carries.append(car.astype(float)); yards.append(rush)
+    if player_kneel is not None and any(k is not None for k in player_kneel):
+        kneel_rng = rng.spawn(1)[0]
+        for j, grid in enumerate(player_kneel):
+            if grid is not None:
+                yards[j] = yards[j] + kneel_rng.choice(np.asarray(grid, dtype=float), size=n_sim)
     return carries, yards, tc_draw
+
+
+def kneel_grid(params, team_spread):
+    """The per-game kneel-down yards grid for a team's QB, by the team's own
+    pregame spread (POSITIVE = favoured); None when the priors predate it."""
+    k = params.get("qb_kneel_yards_by_spread")
+    if not k or team_spread is None or pd.isna(team_spread):
+        return None
+    return k["grids"][int(np.digitize([float(team_spread)], k["edges"])[0])]
 
 
 def simulate_team_game(rng, n_sim, team_volume_mean, team_volume_r, player_shares,

@@ -5585,3 +5585,30 @@ validated, 0 is refused); the tie rule had no test; the two --from-results
 pickle kinds could be confused (runs now say what they are); a JSON --width
 could be mistaken for a path on Windows; the knob-design caveat above; and
 tuning ran 108 pointless bootstraps.
+
+## 2026-09-24 (100) -- QB rushing priced; two 0.2-point misses judged noise (props-v1.21)
+
+Step 3 of docs/plans/2026-09-24-yardage-harness.md.
+
+- **Run defense:** the scorer already adjusts yards per carry for the
+  opposing defense. Measured on the harness: dropping it makes rushing CRPS
+  worse (-0.056, interval excludes zero). It stays; the "no run-defense
+  adjustment" notes were stale.
+- **QB rushing is simulated and priced.** Own carry grid (QBs rarely lose
+  yards; scrambles run long), the starter's kneel-downs drawn by the team's
+  pregame spread (the book counts them), and his own width settings -- the
+  RB-tuned ones made QBs too wide (14.9% outside p10-p90). Tuned on 2022-23
+  (reports/width_tuning_qb.md): QB share concentration 80, QB yards-per-carry
+  sd 0.15. Every non-QB number is byte-identical to props-v1.20 on a live game;
+  only the QB split moves the backs' carries distribution, not its mean.
+- **2024-25:** QB rushing 22.0% outside p10-p90, worst calibration bucket 3.2
+  points, CRPS better than the RB-width version (interval excludes zero);
+  running backs 20.3% and 3.2 points (2.9 before the QB split; their CRPS
+  change +0.004, within noise). Both miss the 3.0 limit by 0.2.
+- **USER DECISION:** the 0.2-point misses are noise; do not let them stop
+  progress. Both stay live and QB rushing props are priced. The 3.0 limit is
+  unchanged for future changes -- this is a recorded judgement on this
+  release, not a looser rule, and the report still prints the strict verdict.
+- **Known, not noise, disclosed:** QBs ran ~10% high in 2025 (the report
+  line on every props page says so); running backs run ~4% low pooled,
+  because players' shares that sum past 1 are scaled down -- the next fix.
