@@ -136,10 +136,6 @@ COMPONENTS: tuple[Component, ...] = (
     Component("model_projection", "projection_source", "draftkit/projections.py", "deprecated",
               evidence=("reports/projection_backtest.omnibeta.md",),
               retire_in="step 6", note="the in-house season model; lost its own backtest"),
-    Component("xfp", "projection_source", "manager/xfp.py", "deprecated",
-              evidence=("reports/xfp_eval.md",), retire_in="step 6",
-              note="research only; its opportunity metrics move into the fantasy "
-                   "evidence table, not a projection"),
 )
 
 

@@ -43,10 +43,9 @@ FETCH_ALLOWED = {
     "props/engine/scripts/score_game.py", "props/engine/scripts/td_alloc_backtest.py",
     "props/engine/scripts/td_backtest.py", "props/guard.py", "props/settle.py",
     "scripts/derive_absence_bands.py", "scripts/derive_baselines.py", "scripts/derive_bench_rates.py",
-    "scripts/forward_snapshot.py", "scripts/projection_backtest.py", "scripts/xfp_eval.py",
+    "scripts/forward_snapshot.py", "scripts/projection_backtest.py",
 }
 SCORING_ALLOWED = {
-    "manager/xfp.py",                          # deprecated, deleted in step 6
     "props/engine/scripts/score_game.py",      # props adopts core last (step 6)
 }
 
