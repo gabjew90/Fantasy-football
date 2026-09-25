@@ -640,11 +640,33 @@ def simulate_team_rush(rng, n_sim, team_carries_mean, carries_r, rush_shares, yp
 
 def kneel_grid(params, team_spread):
     """The per-game kneel-down yards grid for a team's QB, by the team's own
-    pregame spread (POSITIVE = favoured); None when the priors predate it."""
+    pregame spread (POSITIVE = favoured). No spread yet: the grid over every
+    team-game. None only when the priors predate the QB model."""
     k = params.get("qb_kneel_yards_by_spread")
-    if not k or team_spread is None or pd.isna(team_spread):
+    if not k:
         return None
+    if team_spread is None or pd.isna(team_spread):
+        return k.get("pooled")
     return k["grids"][int(np.digitize([float(team_spread)], k["edges"])[0])]
+
+
+def own_spread_from_book(book_home_spread, is_home):
+    """The team's own pregame spread, POSITIVE = favoured, from a book's home
+    spread (NEGATIVE = home favoured: 'KC -7'). nflverse's spread_line is the
+    opposite sign; the kneel grids and market fits use positive = favoured."""
+    if book_home_spread is None or pd.isna(book_home_spread):
+        return None
+    return -float(book_home_spread) if is_home else float(book_home_spread)
+
+
+def starter_qb_index(positions, rush_shares):
+    """Which of a team's active players is the starting QB: the QB with the
+    largest expected carry share. Not the depth-chart slot -- when QB1 is ruled
+    out, the backup who starts keeps his QB2 slot."""
+    qbs = [j for j, pos in enumerate(positions) if str(pos).startswith("QB")]
+    if not qbs:
+        return None
+    return max(qbs, key=lambda j: float(rush_shares[j]) if rush_shares[j] == rush_shares[j] else -1.0)
 
 
 def simulate_team_game(rng, n_sim, team_volume_mean, team_volume_r, player_shares,

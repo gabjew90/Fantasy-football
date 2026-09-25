@@ -56,11 +56,12 @@ COMPONENTS: tuple[Component, ...] = (
               markets=("player_receptions", "player_reception_yds")),
     Component("rush_yds_v0", "prop_model", "props/engine/scripts/model.py", "live",
               evidence=("reports/yardage_harness.md", "reports/width_tuning.md", "reports/width_tuning_qb.md"),
-              note="props-v1.21 (DECISIONS #100): running backs 20.3% outside p10-p90, worst bucket 3.2 "
-                   "points; starting QBs (carry grid + kneel-downs, own width settings) 22.0%, 3.2. Both "
-                   "miss the 3.0 calibration limit by 0.2 -- USER DECISION: treated as noise, kept live. "
-                   "Known: backs run ~4% low (shares summing past 1 are scaled down); QBs ran ~10% high "
-                   "in 2025. The run-defense adjustment is measured to help. Not tested against posted lines",
+              note="props-v1.21 (DECISIONS #100): starting QBs (carry grid + kneel-downs, own width "
+                   "settings) pass all four checks -- 22.0% outside p10-p90, worst bucket 2.9 points; running "
+                   "backs 20.3% and 3.4 points, 0.4 over the calibration limit -- USER DECISION: noise, kept "
+                   "live. Known: backs run ~4% low (shares summing past 1 are scaled down); QBs ran ~11% "
+                   "high in 2025. The run-defense adjustment is measured to help. Not tested against posted "
+                   "lines",
               markets=("player_rush_yds",)),
     Component("anytime_td_v1", "prop_model", "props/engine/scripts/td_v1.py", "live",
               evidence=("reports/td_v1.md", "reports/td_layer1.md", "reports/td_layer2.md"),

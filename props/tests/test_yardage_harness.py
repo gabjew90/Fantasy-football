@@ -243,3 +243,22 @@ def test_the_qb_first_split_keeps_every_mean_and_is_off_until_set():
     for j, q in enumerate(shares):
         assert on[0][j].mean() == pytest.approx(26.0 * q, rel=0.04)
     assert on[0][2].std() < base[0][2].std(), "his own, tighter swing than the RB-tuned Dirichlet gave him"
+
+
+def test_book_spread_becomes_the_teams_own_positive_when_favoured():
+    # a book's 'KC -7' at home is home_spread -7: KC is favoured by 7
+    assert M.own_spread_from_book(-7.0, is_home=True) == 7.0
+    assert M.own_spread_from_book(-7.0, is_home=False) == -7.0
+    assert M.own_spread_from_book(None, is_home=True) is None
+
+
+def test_no_spread_yet_uses_the_pooled_kneel_grid():
+    P = {"qb_kneel_yards_by_spread": {"edges": [-3.0, 3.0, 7.0], "grids": [[1], [2], [3], [4]], "pooled": [0]}}
+    assert M.kneel_grid(P, None) == [0] and M.kneel_grid(P, float("nan")) == [0]
+
+
+def test_the_starter_is_the_qb_with_the_carries_not_the_slot():
+    # QB1 ruled out and removed: the backup keeps his QB2 slot and is the starter
+    assert M.starter_qb_index(["RB1", "QB2", "WR1"], [0.5, 0.12, 0.02]) == 1
+    assert M.starter_qb_index(["QB", "QB", "RB"], [0.02, 0.15, 0.5]) == 1
+    assert M.starter_qb_index(["RB", "WR"], [0.5, 0.1]) is None

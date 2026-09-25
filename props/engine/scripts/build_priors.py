@@ -289,6 +289,8 @@ def main():
     kr["bucket"] = np.digitize(kr.spread, edges)
     kneel_grids = [np.round(np.quantile(kr[kr.bucket == b].yds, np.linspace(0, 1, KNEEL_QUANTILES)), 3).tolist()
                    for b in range(len(edges) + 1)]
+    # for a game priced before any spread is posted: every team-game, any spread
+    kneel_pooled = np.round(np.quantile(kr.yds, np.linspace(0, 1, KNEEL_QUANTILES)), 3).tolist()
     print(f"QB carries: {len(qy)} (ypc {qy.mean():.2f}); kneel yards per team-game by spread bucket: "
           + ", ".join(f"{np.mean(gr):+.2f}" for gr in kneel_grids), file=sys.stderr)
 
@@ -320,7 +322,9 @@ def main():
     _rows = []
     for _, r in g.iterrows():
         for team, is_home in [(r.home_team, 1), (r.away_team, 0)]:
-            sp = r.spread_line if is_home else -r.spread_line   # team's own spread, negative = favored
+            # the team's own spread: nflverse spread_line is the HOME side's and
+            # POSITIVE when home is favoured, so this is positive = favoured
+            sp = r.spread_line if is_home else -r.spread_line
             t_ = tw[(tw.team == team) & (tw.week == r.week)]
             if len(t_) and pd.notna(r.spread_line) and pd.notna(r.total_line):
                 pl = float(t_.targets.iloc[0] + t_.carries.iloc[0])
@@ -438,7 +442,7 @@ def main():
         "qb_carry_residual_quantiles": [round(float(x), 4) for x in qb_resid],
         # the team's own pregame spread, POSITIVE = favoured (nflverse's
         # spread_line is the home side's); grid b covers [edges[b-1], edges[b])
-        "qb_kneel_yards_by_spread": {"edges": edges, "grids": kneel_grids},
+        "qb_kneel_yards_by_spread": {"edges": edges, "grids": kneel_grids, "pooled": kneel_pooled},
         "league_td_per_point": td_per_pt,
         "pass_td_frac_inside10": f_pass_in10, "rush_td_frac_inside10": f_rush_in10,
         "note": ("Built by build_priors.py. Rates are prior-season season-long and are used "

@@ -74,8 +74,8 @@ worst on the low side (players bust more often than the model allows).
 3. Rushing yards: opponent run-defense adjustment, QB rushing (kneel-downs
    count at the book). -- DONE, props-v1.21: the run-defense adjustment already
    existed and measures as helping; QB rushing is simulated (own carry grid,
-   kneel-downs by spread, own width settings) and priced. Both rushing markets
-   miss the calibration limit by 0.2 points; the user judged it noise
+   kneel-downs by spread, own width settings) and priced, and passes. Running
+   backs miss the calibration limit by 0.4 points; the user judged it noise
    (DECISIONS #100). Next fix found on the way: backs run ~4% low because shares
    summing past 1 are scaled down.
 4. QB passing yards from the team simulation (the team's receiving yards are

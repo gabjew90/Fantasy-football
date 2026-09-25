@@ -914,6 +914,7 @@ def main():
     # kneel-down grids (props-v1.21; reports/yardage_harness.md, DECISIONS #100):
     # the book settles them WITH kneel-downs, which the sampler now draws.
     QB_RUSH_ON = QB_RESID is not None
+    STARTER_QB = {}      # team -> the QB treated as the starter (kneels, QB width)
     sims = {}
     team_targets_draw, team_carries_draw = {}, {}
     for t in (AWAY, HOME):
@@ -932,15 +933,15 @@ def main():
         p_resid = p_kneel = None
         if QB_RESID is not None:
             p_resid = [QB_RESID if pos == "QB" else None for pos in Mt.pos]
-            t_spread = None
-            if market_env is not None:
-                # market_env's home_spread is the book's (negative = home favoured);
-                # the kneel grid wants the team's own, positive = favoured
-                t_spread = -market_env["home_spread"] if t == HOME else market_env["home_spread"]
-            kg = MODEL.kneel_grid(P, t_spread)
-            p_kneel = [kg if sl == "QB1" else None for sl in Mt.slot]
-        _slots = list(Mt.slot)
-        qb_i = _slots.index("QB1") if (QB_RESID is not None and "QB1" in _slots) else None
+            t_spread = (MODEL.own_spread_from_book(market_env["home_spread"], t == HOME)
+                        if market_env is not None else None)
+            kg = MODEL.kneel_grid(P, t_spread)            # no spread yet: the pooled grid
+            qb_i = MODEL.starter_qb_index(list(Mt.pos), [float(v) for v in Mt.rs])
+            p_kneel = [kg if j == qb_i else None for j in range(len(Mt))]
+            if qb_i is not None:
+                STARTER_QB[t] = Mt.name.iloc[qb_i]
+        else:
+            qb_i = None
         car_t, rush_t, tc_draw = MODEL.simulate_team_rush(rng, N_SIM, env[t]["carries"], TVD["carries_r"],
                                                           [float(v) for v in Mt.rs], [float(v) for v in Mt.ypc], resid,
                                                           width=WIDTH, player_resid=p_resid, player_kneel=p_kneel,
@@ -1330,8 +1331,9 @@ def main():
                         if nm not in sims or "Over" not in oo or "Under" not in oo:
                             continue
                         pr = M[M.name == nm].iloc[0]
-                        if mk["key"] == "player_rush_yds" and pr.pos == "QB" and not QB_RUSH_ON:
-                            continue   # priors without the QB model: kneels not simulated
+                        if mk["key"] == "player_rush_yds" and pr.pos == "QB" and (
+                                not QB_RUSH_ON or STARTER_QB.get(pr.team) != nm):
+                            continue   # only the starter is graded (kneels, QB width); backups are not
                         s = sims[nm][col]; L = oo["Over"]["point"]
                         p_o = float(np.mean(s > L))
                         p_push = float(np.mean(s == L)) if float(L).is_integer() else 0.0
@@ -1682,7 +1684,8 @@ def main():
     card_rows = []
     for _, m in M.iterrows():
         for mkey, col, label, step in CARD_MARKETS:
-            if mkey == "player_rush_yds" and m.pos == "QB" and not QB_RUSH_ON:
+            if mkey == "player_rush_yds" and m.pos == "QB" and (
+                    not QB_RUSH_ON or STARTER_QB.get(m.team) != m["name"]):
                 continue
             samp = sims[m["name"]][col]
             if samp.mean() < 0.3:
@@ -2331,8 +2334,9 @@ def main():
                  + (f"n/a ({src_})" if sleeper_used or a.lines_file or _q is None else f"{_q}") + ".")
     L.append(f"- Routes run and route participation: not available from any verified source, so not used.")
     if QB_RUSH_ON:
-        L.append("- QB rushing yards include kneel-downs (the book counts them), drawn by the team's pregame spread. "
-                 "Caveat: on 2025 the model ran about 10% high on QB rushing (reports/yardage_harness.md).")
+        L.append("- QB rushing yards (the starter only) include kneel-downs, which the book counts, drawn by the "
+                 "team's pregame spread. The newest yardage market: its graded record, including where it runs "
+                 "high or low, is in the repo's reports/yardage_harness.md.")
     else:
         L.append(f"- QB rushing yards left out on purpose: kneel-downs count against the prop and we don't model them yet.")
     if hrs > 1:
