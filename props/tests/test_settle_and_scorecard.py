@@ -331,23 +331,50 @@ def test_the_pooled_tables_hold_only_v1_anytime_rows():
     scorecard.render_sections(only_other)                     # no division by zero
 
 
-def test_load_stats_refreshes_a_file_older_than_its_max_age(tmp_path, monkeypatch):
-    # A settle file cached before week N was played would grade week N as unplayed.
+STATS_CSV = "season_type,week,player_name,player_display_name\nREG,{w},A.Brown,A.J. Brown\n"
+
+
+def _cached_stats(tmp_path, week, age_h):
     import os
     import time
-    import urllib.request
-    import settle
-    csv_ = "season_type,week,player_name,player_display_name\nREG,{w},A.Brown,A.J. Brown\n"
-
-    def fake(url, dest):
-        Path(dest).write_text(csv_.format(w=2), encoding="utf-8")
-    monkeypatch.setattr(urllib.request, "urlretrieve", fake)
-    f = tmp_path / "stats_player_week_2026.csv"
-    f.write_text(csv_.format(w=1), encoding="utf-8")
-    old = time.time() - 4 * 3600
+    f = tmp_path / "nflverse" / "stats_player_week_2026.csv"
+    f.parent.mkdir(parents=True, exist_ok=True)
+    f.write_text(STATS_CSV.format(w=week), encoding="utf-8")
+    old = time.time() - age_h * 3600
     os.utime(f, (old, old))
-    df = settle.load_stats(2026, f, max_age_s=3 * 3600)
+    return f
+
+
+def test_load_stats_refreshes_a_file_older_than_its_max_age(tmp_path):
+    # A settle file cached before week N was played would grade week N as unplayed.
+    import settle
+    _cached_stats(tmp_path, week=1, age_h=4)
+    seen = []
+
+    def fake(url, dest, timeout):
+        seen.append(url)
+        Path(dest).write_text(STATS_CSV.format(w=2), encoding="utf-8")
+    df = settle.load_stats(2026, tmp_path, max_age_s=3 * 3600, downloader=fake)
     assert df["week"].tolist() == [2]
+    assert seen == ["https://github.com/nflverse/nflverse-data/releases/download/"
+                    "stats_player/stats_player_week_2026.csv"], "the same file settle always read"
+
+
+def test_a_failed_or_empty_refresh_grades_from_the_last_good_copy(tmp_path, capsys):
+    import settle
+    _cached_stats(tmp_path, week=1, age_h=4)
+
+    def empty(url, dest, timeout):
+        Path(dest).write_text("", encoding="utf-8")
+    df = settle.load_stats(2026, tmp_path, max_age_s=3 * 3600, downloader=empty)
+    assert df["week"].tolist() == [1] and "grading from the copy" in capsys.readouterr().err
+
+    def down(url, dest, timeout):
+        raise OSError("HTTP 503")
+    df = settle.load_stats(2026, tmp_path, max_age_s=0, downloader=down)
+    assert df["week"].tolist() == [1]
+    with pytest.raises(OSError):
+        settle.load_stats(2026, tmp_path / "empty", max_age_s=0, downloader=down)
 
 
 def test_releases_that_share_a_pricing_model_are_one_section(record):

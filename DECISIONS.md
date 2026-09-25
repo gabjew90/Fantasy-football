@@ -5925,3 +5925,27 @@ usable from chat and the CLI. `props.yml` (captures, the Tuesday settle, the
 scorecard) is unchanged. The scheduled `nfl fantasy lineup --record` is not
 built; the ledger fills only from explicit `--record` runs.
 
+## 2026-09-25 (110) -- the rest of step 6: the engine stays self-contained; settle fetches through core; the draft move waits for August
+
+Two user decisions and one change:
+
+- **The props engine does not import `core/`.** The capture runs the engine
+  from a release tag while `core/` would come from `main`, so the engine's
+  stamp would stop describing the code that priced a line. The engine stays
+  one versioned unit; the plan's "props adopts core" applies to the glue
+  around it.
+- **Settle fetches through `core.fetch`.** Same file, same refresh rule, plus
+  core's guard that an empty response never replaces the last good copy;
+  `props/settle.py` leaves the fetch allowlist. The cache moves to
+  `props/.cache/nflverse/` (one extra download the first time). Settle keeps
+  its OWN name normaliser: it strips accents and only a trailing suffix,
+  core's (`core.ids.normalize_name`) does neither and needs polars and
+  rapidfuzz, which the props runner does not install -- swapping them would
+  change which call joins which stat line, which is not a refactor. A test
+  pins that props reaches core only through its stdlib modules. `guard.py`
+  keeps its own day-cached schedule reader: it runs every 15 minutes before
+  anything is installed, and caches a different shape.
+- **The draft move under `draft/` waits for August**, with the frozen
+  `model_projection` (#108): one change to the draft code, when it is being
+  worked on anyway.
+

@@ -40,7 +40,9 @@ import unicodedata
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(1, str(Path(__file__).resolve().parents[1]))      # the repo root, for core/
 import calls as calls_mod  # noqa: E402
+from core import fetch as core_fetch  # noqa: E402  -- stdlib only: safe on the props runner
 import persist  # noqa: E402
 
 try:
@@ -49,8 +51,6 @@ except ImportError:  # pragma: no cover
     print("pandas is required: pip install -r props/requirements.txt", file=sys.stderr)
     raise
 
-NFLVERSE = "https://github.com/nflverse/nflverse-data/releases/download"
-STATS_URL = NFLVERSE + "/stats_player/stats_player_week_{season}.csv"
 
 SUFFIX = re.compile(r"\s+(jr|sr|ii|iii|iv|v)\.?$", re.IGNORECASE)
 
@@ -168,26 +168,25 @@ def american_pnl(price: float, won: bool) -> float:
 STATS_MAX_AGE_S = 3 * 3600
 
 
-def load_stats(season: int, cache: Path, max_age_s: int = STATS_MAX_AGE_S) -> pd.DataFrame:
+def load_stats(season: int, cache_dir: Path, max_age_s: int = STATS_MAX_AGE_S,
+               downloader=None) -> pd.DataFrame:
     """The season's weekly player stats, refreshed when the copy is older than
     `max_age_s`. It used to download only when missing, and the props workflow
     restores its cache every run, so the first settle's file -- holding only the
-    weeks played by then -- would have graded every later week as unplayed."""
-    import time
-    cache.parent.mkdir(parents=True, exist_ok=True)
-    if not cache.exists() or time.time() - cache.stat().st_mtime >= max_age_s:
-        import urllib.request
-        tmp = cache.with_name(cache.name + ".part")
-        try:
-            urllib.request.urlretrieve(STATS_URL.format(season=season), tmp)
-            tmp.replace(cache)
-        except Exception as ex:  # noqa: BLE001
-            tmp.unlink(missing_ok=True)
-            if not cache.exists():
-                raise
-            print(f"stats refresh failed ({type(ex).__name__}); grading from the "
-                  f"copy dated {time.ctime(cache.stat().st_mtime)}", file=sys.stderr)
-    df = pd.read_csv(cache, low_memory=False)
+    weeks played by then -- would have graded every later week as unplayed.
+
+    Fetched through core.fetch (consolidation step 6): the same URL and refresh
+    rule, plus core's guard that an empty response never replaces the last
+    good copy. A failed refresh with a copy in hand grades from that copy and
+    says so; with no copy at all it raises."""
+    m = core_fetch.Manifest("settle")
+    path = core_fetch.nflverse("player_stats_week", season, cache_dir=cache_dir, manifest=m,
+                               max_age_s=max_age_s, downloader=downloader)
+    e = m.get(f"nflverse player_stats_week {season}") or {}
+    if e.get("status") == "stale":
+        print(f"stats refresh failed ({e.get('detail', '')}); grading from the copy fetched "
+              f"{e.get('fetched_at', 'earlier')}", file=sys.stderr)
+    df = pd.read_csv(path, low_memory=False)
     df = df[df["season_type"] == "REG"].copy()
     for col in ("receptions", "receiving_yards", "rushing_yards", "passing_yards",
                 "receiving_tds", "rushing_tds"):
@@ -288,9 +287,7 @@ def main(argv: list[str] | None = None) -> int:
     # workdir the props cache keeps, not in a hard-coded /tmp -- which exists
     # on the Ubuntu runner but resolves to C:\tmp when settle is run by hand
     # on the machine that holds the credentials.
-    stats = load_stats(args.season,
-                       persist.RECORD_ROOT.parent / ".cache"
-                       / f"stats_player_week_{args.season}.csv")
+    stats = load_stats(args.season, persist.RECORD_ROOT.parent / ".cache")
 
     context = game_context(args.season)
 
