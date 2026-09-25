@@ -128,3 +128,34 @@ def test_priors_are_never_built_into_the_engine(backtest, tmp_path):
     with pytest.raises(SystemExit, match="refusing"):
         backtest.ensure_priors(1999, backtest.RES, build=True)
     assert backtest.priors_cache_dir().name.startswith("priors-")
+
+
+def _rec(width, seed=11, n=20000):
+    out, _ = M.simulate_team_game(np.random.default_rng(seed), n, 34.0, 35.0, {"a": 0.25, "b": 0.15},
+                                  {"a": 0.65, "b": 0.6}, {"a": 8.5, "b": 7.0}, 1.08, width=width)
+    return out["a"]
+
+
+def test_width_off_is_the_old_sampler_draw_for_draw():
+    for off in (None, {}, dict(M.WIDTH_OFF)):
+        r, y = _rec(off)
+        r0, y0 = _rec(None)
+        assert np.array_equal(r, r0) and np.array_equal(y, y0)
+
+
+@pytest.mark.parametrize("width", [{"share_conc_targets": 10.0}, {"catch_conc": 10.0}, {"eff_sd_rec": 0.4}])
+def test_each_receiving_width_setting_keeps_the_mean_and_widens(width):
+    r0, y0 = _rec(None)
+    r, y = _rec(width)
+    assert y.mean() == pytest.approx(y0.mean(), rel=0.03) and r.mean() == pytest.approx(r0.mean(), rel=0.03)
+    assert y.std() > y0.std() * 1.03
+
+
+@pytest.mark.parametrize("width", [{"share_conc_carries": 10.0}, {"eff_sd_rush": 0.4}])
+def test_each_rushing_width_setting_keeps_the_mean_and_widens(width):
+    def run(w):
+        return M.simulate_team_rush(np.random.default_rng(5), 20000, 26.0, 30.0, [0.55, 0.2], [4.5, 4.0], RESID,
+                                    width=w)[1][0]
+    y0, y = run(None), run(width)
+    assert y.mean() == pytest.approx(y0.mean(), rel=0.03)
+    assert y.std() > y0.std() * 1.03

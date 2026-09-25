@@ -52,6 +52,26 @@ round-9 code reproduces the overconfidence under the old single-season
 protocol too, so this is the model, not the harness. Width is now part of
 the bar; widening is the next change.
 
+### Round 11 (2026-09-24): the width settings, props-v1.20
+The round-10 finding (right on average, too narrow) traced to four things the
+joint sampler held fixed within a game. Each is now a mean-preserving setting
+in model.py (`WIDTH_OFF` = the old sampler draw for draw): Dirichlet variation
+of a player's share of targets / carries, Beta variation of the catch rate,
+and a lognormal per-game multiplier on yards per catch / per carry. Tuned on
+2022-23 only (`backtest.py --tune-width`, reports/width_tuning.md): CRPS first,
+and among settings not measurably worse than the best, the width closest to
+20%. Chosen: target-share concentration 40; carry-share concentration 20 with a
+0.3 log-sd on yards per carry; catch rate and yards per catch fixed.
+
+2024-25 (never read by the tuning), reports/yardage_harness.md: all three pass
+the four checks. Outside p10-p90: receptions 26.1% -> 19.9%, receiving yards
+23.0% -> 19.2%, rushing yards 32.1% -> 19.7%; worst 60-90% bucket 4.6/4.2/9.8 ->
+1.8/2.8/2.8 points. Paired CRPS vs the old sampler: receptions +0.004 and
+rushing +0.147 (better), receiving yards -0.027 (0.2% worse, interval excludes
+zero) -- the cost of honest ranges on that market. On a live game (KC@MIA
+2026 wk 3) 75-95% probabilities fall ~5 points (rushing ~8), near-the-line
+ones ~2.5; means unchanged.
+
 ### rush_yds_v0
 - Markets: player_rush_yds
 - Status: `PROTOTYPE`

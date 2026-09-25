@@ -151,9 +151,11 @@ def crps_block(samples, y_arr):
     return t1 - 0.5 * t2
 
 
-def run_season(args, S, TRAIN, TEST, OUT, live):
-    """One season, walk-forward. Returns (per-player-week results, meta)."""
-    rng = np.random.default_rng(20260917 + (S - 2025 if live else 0))
+def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
+    """One season, walk-forward. Returns (per-player-week results, meta), or,
+    given `widths`, one (results, meta) per width setting -- features are built
+    once and every setting is scored on the same random draws."""
+    seed = 20260917 + (S - 2025 if live else 0)
     opp = dict(LIVE_OPP) if live else dict(level=args.opp_level, mode=args.opp_mode, k0=args.opp_k0,
                                            metrics=args.opp_metrics)
     dispersion = args.dispersion or ("prior" if live else "train")
@@ -564,125 +566,136 @@ def run_season(args, S, TRAIN, TEST, OUT, live):
 
     test_act = feat_te[feat_te.roster_status == "ACT"].reset_index(drop=True)
 
-    def draw_block(mu_arr, ypc_arr, fit):
-        """INDEPENDENT per-player draws. Kept only as the marginal comparator:
-        it is NOT the generative model the live scorer runs."""
-        r_arr = np.clip(np.exp(fit["a"] + fit["b"] * np.log(np.maximum(mu_arr, 1e-6))), 0.5, 30.0)
-        p_arr = r_arr / (r_arr + mu_arr)
-        rec_ = rng.negative_binomial(r_arr[:, None], p_arr[:, None], size=(len(mu_arr), N)).astype(float)
-        shape_tot = np.maximum(np.clip(rec_, 0, 25) * shape_ypc, 1e-6)
-        yds = np.where(rec_ > 0, rng.gamma(shape_tot, (np.maximum(ypc_arr, 0.5) / shape_ypc)[:, None]), 0.0)
-        return rec_, yds
+    def score(width, full=True):
+        rng = np.random.default_rng(seed)
 
-    def draw_block_joint(frame, shares, crs, ypts):
-        """THE LIVE PIPELINE'S DRAW (model.simulate_team_game): one team-volume
-        draw per simulation, split across that team's players."""
-        rec_ = np.zeros((len(frame), N))
-        yds = np.zeros((len(frame), N))
-        pos_ = {ix: i for i, ix in enumerate(frame.index)}
-        for (team, week), g in frame.groupby(["team", "week"], sort=False):
-            tvol = float(g.team_targets_env.iloc[0])
-            out, _tt = M.simulate_team_game(
-                rng, N, tvol, r_team_targets,
-                {ix: float(shares[pos_[ix]]) for ix in g.index},
-                {ix: float(crs[pos_[ix]]) for ix in g.index},
-                {ix: float(ypts[pos_[ix]]) for ix in g.index},
-                shape_ypc)
-            for ix, (r_, y_) in out.items():
-                rec_[pos_[ix]] = r_
-                yds[pos_[ix]] = y_
-        return rec_, yds
+        def draw_block(mu_arr, ypc_arr, fit):
+            """INDEPENDENT per-player draws. Kept only as the marginal comparator:
+            it is NOT the generative model the live scorer runs."""
+            r_arr = np.clip(np.exp(fit["a"] + fit["b"] * np.log(np.maximum(mu_arr, 1e-6))), 0.5, 30.0)
+            p_arr = r_arr / (r_arr + mu_arr)
+            rec_ = rng.negative_binomial(r_arr[:, None], p_arr[:, None], size=(len(mu_arr), N)).astype(float)
+            shape_tot = np.maximum(np.clip(rec_, 0, 25) * shape_ypc, 1e-6)
+            yds = np.where(rec_ > 0, rng.gamma(shape_tot, (np.maximum(ypc_arr, 0.5) / shape_ypc)[:, None]), 0.0)
+            return rec_, yds
 
-    def draw_block_rush(frame, shares, ypcs):
-        """THE LIVE PIPELINE'S RUSHING DRAW (model.simulate_team_rush): one team
-        carries draw per simulation, split across the team's eligible players,
-        each carry the player's ypc plus a residual from the prior season's
-        league grid."""
-        yds = np.zeros((len(frame), N))
-        pos_ = {ix: i for i, ix in enumerate(frame.index)}
-        for (team, week), g in frame.groupby(["team", "week"], sort=False):
-            idx = [pos_[ix] for ix in g.index]
-            _car, y_, _tc = M.simulate_team_rush(rng, N, float(g.team_carries_env.iloc[0]), r_team_carries,
-                                                 shares[idx], ypcs[idx], carry_resid)
-            for k, i in enumerate(idx):
-                yds[i] = y_[k]
-        return yds
+        def draw_block_joint(frame, shares, crs, ypts):
+            """THE LIVE PIPELINE'S DRAW (model.simulate_team_game): one team-volume
+            draw per simulation, split across that team's players."""
+            rec_ = np.zeros((len(frame), N))
+            yds = np.zeros((len(frame), N))
+            pos_ = {ix: i for i, ix in enumerate(frame.index)}
+            for (team, week), g in frame.groupby(["team", "week"], sort=False):
+                tvol = float(g.team_targets_env.iloc[0])
+                out, _tt = M.simulate_team_game(
+                    rng, N, tvol, r_team_targets,
+                    {ix: float(shares[pos_[ix]]) for ix in g.index},
+                    {ix: float(crs[pos_[ix]]) for ix in g.index},
+                    {ix: float(ypts[pos_[ix]]) for ix in g.index},
+                    shape_ypc, width=width)
+                for ix, (r_, y_) in out.items():
+                    rec_[pos_[ix]] = r_
+                    yds[pos_[ix]] = y_
+            return rec_, yds
 
-    def rpit_block(samples, y_arr):
-        return (samples < y_arr[:, None]).mean(1) + rng.uniform(size=len(y_arr)) * (samples == y_arr[:, None]).mean(1)
+        def draw_block_rush(frame, shares, ypcs):
+            """THE LIVE PIPELINE'S RUSHING DRAW (model.simulate_team_rush): one team
+            carries draw per simulation, split across the team's eligible players,
+            each carry the player's ypc plus a residual from the prior season's
+            league grid."""
+            yds = np.zeros((len(frame), N))
+            pos_ = {ix: i for i, ix in enumerate(frame.index)}
+            for (team, week), g in frame.groupby(["team", "week"], sort=False):
+                idx = [pos_[ix] for ix in g.index]
+                _car, y_, _tc = M.simulate_team_rush(rng, N, float(g.team_carries_env.iloc[0]), r_team_carries,
+                                                     shares[idx], ypcs[idx], carry_resid, width=width)
+                for k, i in enumerate(idx):
+                    yds[i] = y_[k]
+            return yds
 
-    mu_m = np.maximum(test_act.team_targets_env * test_act.ts * test_act.cr.clip(lower=0.05), 0.02).values
-    ypc_m = np.maximum(test_act.ypt / test_act.cr.clip(lower=0.05), 0.5).values
-    shareA = test_act.own_ts.fillna(test_act.ts).values
-    crA = test_act.own_cr.fillna(test_act.cr).clip(lower=0.05).values
-    yptA = test_act.own_ypt.fillna(test_act.ypt).values
+        def rpit_block(samples, y_arr):
+            return (samples < y_arr[:, None]).mean(1) + rng.uniform(size=len(y_arr)) * (samples == y_arr[:, None]).mean(1)
 
-    # Both arms use the joint sampler, so the model-vs-baseline comparison
-    # isolates the SHRINKAGE, which is what baseline A exists to test.
-    recM, ydsM = draw_block_joint(test_act, test_act.ts.values,
-                                  test_act.cr.clip(lower=0.05).values, test_act.ypt.values)
-    recA, ydsA = draw_block_joint(test_act, shareA, crA, yptA)
-    recI, ydsI = draw_block(mu_m, ypc_m, rec_fit)
-    y_rec = test_act.act_receptions.values.astype(float)
-    y_yds = test_act.act_rec_yards.values.astype(float)
-    # The receiving PITs draw their tie-break uniforms BEFORE the rushing
-    # draws, in the order the single-season protocol always used, so its
-    # PIT numbers reproduce exactly.
-    pit_rec, pit_yds = rpit_block(recM, y_rec), rpit_block(ydsM, y_yds)
-    rushM = draw_block_rush(test_act, test_act.rs.fillna(0.0).values, test_act.ypc.values)
-    rushA = draw_block_rush(test_act, test_act.own_rs.fillna(test_act.rs).fillna(0.0).values,
-                            test_act.own_ypc.fillna(test_act.ypc).values)
-    y_rush = test_act.act_rush_yards.values.astype(float)
-    # The rushing population is fixed before the game and identical for every
-    # model version: RB depth-chart slots, plus anyone with 20%+ of the team's
-    # carries over his last four games. QBs are out (their rush props settle on
-    # kneel-downs, which this data drops; see rush_yds_v0).
-    slot_s = test_act.slot.astype(str)
-    rush_pop = ((slot_s.str.startswith("RB") | (test_act.rs_last4.fillna(0.0) >= 0.20))
-                & ~slot_s.str.startswith("QB")).values
-    nan_ = np.full(len(test_act), np.nan)
+        mu_m = np.maximum(test_act.team_targets_env * test_act.ts * test_act.cr.clip(lower=0.05), 0.02).values
+        ypc_m = np.maximum(test_act.ypt / test_act.cr.clip(lower=0.05), 0.5).values
+        shareA = test_act.own_ts.fillna(test_act.ts).values
+        crA = test_act.own_cr.fillna(test_act.cr).clip(lower=0.05).values
+        yptA = test_act.own_ypt.fillna(test_act.ypt).values
 
-    res_df = pd.DataFrame({
-        "season": S, "team": test_act.team, "week": test_act.week, "gsis_id": test_act.gsis_id, "slot": test_act.slot,
-        "abs_spread": test_act.abs_spread,
-        "act_receptions": y_rec, "act_rec_yards": y_yds, "act_rush_yards": y_rush, "rush_pop": rush_pop,
-        "med_rec_model": np.median(recM, axis=1), "med_yds_model": np.median(ydsM, axis=1),
-        "med_rush_model": np.where(rush_pop, np.median(rushM, axis=1), nan_),
-        "mean_rec_model": recM.mean(1), "mean_yds_model": ydsM.mean(1),
-        "mean_rush_model": np.where(rush_pop, rushM.mean(1), nan_),
-        "above_med_rec": y_rec > np.median(recM, axis=1), "above_med_yds": y_yds > np.median(ydsM, axis=1),
-        "above_med_rush": y_rush > np.median(rushM, axis=1),
-        "pit_rec": pit_rec, "pit_yds": pit_yds,
-        "pit_rush": np.where(rush_pop, rpit_block(rushM, y_rush), nan_),
-        "crps_rec_model": crps_block(recM, y_rec), "crps_rec_baseA": crps_block(recA, y_rec),
-        "crps_yds_model": crps_block(ydsM, y_yds), "crps_yds_baseA": crps_block(ydsA, y_yds),
-        "crps_rush_model": np.where(rush_pop, crps_block(rushM, y_rush), nan_),
-        "crps_rush_baseA": np.where(rush_pop, crps_block(rushA, y_rush), nan_),
-        "crps_rec_indep": crps_block(recI, y_rec), "crps_yds_indep": crps_block(ydsI, y_yds),
-    })
-    res = res_df.merge(gm, on=["team", "week"], how="left")
+        # Both arms use the joint sampler, so the model-vs-baseline comparison
+        # isolates the SHRINKAGE, which is what baseline A exists to test.
+        recM, ydsM = draw_block_joint(test_act, test_act.ts.values,
+                                      test_act.cr.clip(lower=0.05).values, test_act.ypt.values)
+        if full:
+            recA, ydsA = draw_block_joint(test_act, shareA, crA, yptA)
+            recI, ydsI = draw_block(mu_m, ypc_m, rec_fit)
+        else:                                   # tuning: the model arm is all that is compared
+            recA, ydsA, recI, ydsI = recM, ydsM, recM, ydsM
+        y_rec = test_act.act_receptions.values.astype(float)
+        y_yds = test_act.act_rec_yards.values.astype(float)
+        # The receiving PITs draw their tie-break uniforms BEFORE the rushing
+        # draws, in the order the single-season protocol always used, so its
+        # PIT numbers reproduce exactly.
+        pit_rec, pit_yds = rpit_block(recM, y_rec), rpit_block(ydsM, y_yds)
+        rushM = draw_block_rush(test_act, test_act.rs.fillna(0.0).values, test_act.ypc.values)
+        rushA = draw_block_rush(test_act, test_act.own_rs.fillna(test_act.rs).fillna(0.0).values,
+                                test_act.own_ypc.fillna(test_act.ypc).values) if full else rushM
+        y_rush = test_act.act_rush_yards.values.astype(float)
+        # The rushing population is fixed before the game and identical for every
+        # model version: RB depth-chart slots, plus anyone with 20%+ of the team's
+        # carries over his last four games. QBs are out (their rush props settle on
+        # kneel-downs, which this data drops; see rush_yds_v0).
+        slot_s = test_act.slot.astype(str)
+        rush_pop = ((slot_s.str.startswith("RB") | (test_act.rs_last4.fillna(0.0) >= 0.20))
+                    & ~slot_s.str.startswith("QB")).values
+        nan_ = np.full(len(test_act), np.nan)
 
-    # RELIABILITY AT SYNTHETIC LINES (calibration a bettor can read): lines at
-    # fixed offsets from the model median (not model quantiles, which would be
-    # circular); the realized hit rate per predicted-probability bucket.
-    calib = []
-    for mk, samples, y, keep in [("rec", recM, y_rec, np.ones(len(y_rec), bool)), ("yds", ydsM, y_yds, np.ones(len(y_yds), bool)),
-                                 ("rush", rushM, y_rush, rush_pop)]:
-        smp, yy = samples[keep], y[keep]
-        med = np.median(smp, axis=1)
-        for o in MARKETS[mk][2]:
-            for side, L in [("Under", med + o), ("Over", np.maximum(med - o, 0.5))]:
-                if mk == "rec":
-                    L = np.floor(L) + 0.5 if side == "Under" else np.ceil(L) - 0.5
-                    L = np.maximum(L, 0.5)
-                p = (smp < L[:, None]).mean(1) if side == "Under" else (smp > L[:, None]).mean(1)
-                hit = (yy < L) if side == "Under" else (yy > L)
-                calib.append(pd.DataFrame({"season": S, "market": MARKETS[mk][1], "side": side,
-                                           "week": test_act.week.values[keep], "p_model": p, "hit": hit.astype(float)}))
-    meta = {"season": S, "priors": PRIOR, "dispersion": dispersion, "live": live, "opp": opp,
-            "rec_dispersion": rec_fit, "shape_ypc": shape_ypc, "team_targets_r": r_team_targets,
-            "team_carries_r": r_team_carries, "calib": pd.concat(calib, ignore_index=True)}
-    return res, meta
+        res_df = pd.DataFrame({
+            "season": S, "team": test_act.team, "week": test_act.week, "gsis_id": test_act.gsis_id, "slot": test_act.slot,
+            "abs_spread": test_act.abs_spread,
+            "act_receptions": y_rec, "act_rec_yards": y_yds, "act_rush_yards": y_rush, "rush_pop": rush_pop,
+            "med_rec_model": np.median(recM, axis=1), "med_yds_model": np.median(ydsM, axis=1),
+            "med_rush_model": np.where(rush_pop, np.median(rushM, axis=1), nan_),
+            "mean_rec_model": recM.mean(1), "mean_yds_model": ydsM.mean(1),
+            "mean_rush_model": np.where(rush_pop, rushM.mean(1), nan_),
+            "above_med_rec": y_rec > np.median(recM, axis=1), "above_med_yds": y_yds > np.median(ydsM, axis=1),
+            "above_med_rush": y_rush > np.median(rushM, axis=1),
+            "pit_rec": pit_rec, "pit_yds": pit_yds,
+            "pit_rush": np.where(rush_pop, rpit_block(rushM, y_rush), nan_),
+            "crps_rec_model": crps_block(recM, y_rec), "crps_rec_baseA": crps_block(recA, y_rec),
+            "crps_yds_model": crps_block(ydsM, y_yds), "crps_yds_baseA": crps_block(ydsA, y_yds),
+            "crps_rush_model": np.where(rush_pop, crps_block(rushM, y_rush), nan_),
+            "crps_rush_baseA": np.where(rush_pop, crps_block(rushA, y_rush), nan_),
+            "crps_rec_indep": crps_block(recI, y_rec), "crps_yds_indep": crps_block(ydsI, y_yds),
+        })
+        res = res_df.merge(gm, on=["team", "week"], how="left")
+
+        # RELIABILITY AT SYNTHETIC LINES (calibration a bettor can read): lines at
+        # fixed offsets from the model median (not model quantiles, which would be
+        # circular); the realized hit rate per predicted-probability bucket.
+        calib = []
+        for mk, samples, y, keep in [("rec", recM, y_rec, np.ones(len(y_rec), bool)), ("yds", ydsM, y_yds, np.ones(len(y_yds), bool)),
+                                     ("rush", rushM, y_rush, rush_pop)]:
+            smp, yy = samples[keep], y[keep]
+            med = np.median(smp, axis=1)
+            for o in MARKETS[mk][2]:
+                for side, L in [("Under", med + o), ("Over", np.maximum(med - o, 0.5))]:
+                    if mk == "rec":
+                        L = np.floor(L) + 0.5 if side == "Under" else np.ceil(L) - 0.5
+                        L = np.maximum(L, 0.5)
+                    p = (smp < L[:, None]).mean(1) if side == "Under" else (smp > L[:, None]).mean(1)
+                    hit = (yy < L) if side == "Under" else (yy > L)
+                    calib.append(pd.DataFrame({"season": S, "market": MARKETS[mk][1], "side": side,
+                                               "week": test_act.week.values[keep], "p_model": p, "hit": hit.astype(float)}))
+        meta = {"season": S, "priors": PRIOR, "dispersion": dispersion, "live": live, "opp": opp,
+                "rec_dispersion": rec_fit, "shape_ypc": shape_ypc, "team_targets_r": r_team_targets,
+                "team_carries_r": r_team_carries, "width": dict(width or {}),
+                "calib": pd.concat(calib, ignore_index=True)}
+        return res, meta
+
+    if widths is None:
+        return score(width_of(args))
+    return [score(w, full=False) for w in widths]
 
 
 # ------------------------------------------------------------------ reporting
@@ -728,6 +741,140 @@ def reliability_table(C):
     C = C.assign(bucket=pd.cut(C.p_model, bins, right=False, labels=["50-60", "60-70", "70-80", "80-90", "90+"]))
     return C.dropna(subset=["bucket"]).groupby(["market", "side", "bucket"], observed=True).agg(
         n=("hit", "size"), p_model_mean=("p_model", "mean"), hit_rate=("hit", "mean")).reset_index()
+
+
+def width_of(args):
+    """--width: a JSON object or a path to one (model.WIDTH_OFF keys); unset = off."""
+    if not getattr(args, "width", None):
+        return {}
+    src = Path(args.width)
+    w = json.loads(src.read_text(encoding="utf-8") if src.exists() else args.width)
+    unknown = set(w) - set(M.WIDTH_OFF) - {"note", "tuned_on"}
+    if unknown:
+        sys.exit(f"--width: unknown settings {sorted(unknown)}; known: {sorted(M.WIDTH_OFF)}")
+    return {k: v for k, v in w.items() if k in M.WIDTH_OFF}
+
+
+# The tuning grid. Receiving and rushing use separate samplers, so one run can
+# score a receiving setting and a rushing setting at once; the two lists are
+# zipped (the shorter cycles) and each side is chosen on its own markets.
+# Index 0 of both is "off", so config 0 is today's sampler.
+RECEIVING_GRID = [{"share_conc_targets": ct, "catch_conc": cc, "eff_sd_rec": er}
+                  for ct in (None, 40.0, 20.0, 10.0) for cc in (None, 30.0, 10.0) for er in (0.0, 0.2, 0.4)]
+RUSHING_GRID = [{"share_conc_carries": cc, "eff_sd_rush": er}
+                for cc in (None, 40.0, 20.0, 10.0) for er in (0.0, 0.15, 0.3, 0.45)]
+
+
+def _off(v):
+    return v is None or (isinstance(v, float) and np.isnan(v)) or v == 0
+
+
+def tune_width(args, OUT):
+    """Choose the width settings on the TUNE seasons only, by CRPS (a proper
+    score: it rewards the right width, not merely a wider one). Writes the
+    report and, with --width-out, the chosen settings as JSON."""
+    seasons = parse_weeks(args.tune)
+    n = max(len(RECEIVING_GRID), len(RUSHING_GRID))
+    grid = [{**RECEIVING_GRID[i % len(RECEIVING_GRID)], **RUSHING_GRID[i % len(RUSHING_GRID)]} for i in range(n)]
+    if args.from_results:
+        grid, frames = pd.read_pickle(args.from_results)
+    else:
+        per_cfg = [[] for _ in grid]
+        for S in seasons:
+            for i, (res, _meta) in enumerate(run_season(args, S, parse_weeks(args.train_weeks),
+                                                        parse_weeks(args.weeks), OUT, live=True, widths=grid)):
+                per_cfg[i].append(res)
+        frames = [pd.concat(f, ignore_index=True) for f in per_cfg]
+        if args.save_results:
+            pd.to_pickle((grid, frames), args.save_results)
+    rows = []
+    for i, cfg in enumerate(grid):
+        res = frames[i]
+        row = {"i": i, **{k: (np.nan if v is None else v) for k, v in cfg.items()}}
+        for mk in MARKETS:
+            s = summarize(res, mk)
+            row.update({f"{mk}_crps": s["crps_model"], f"{mk}_width": s["outside_p10_p90"],
+                        f"{mk}_ratio": s["actual_over_model"], f"{mk}_pit": s["pit_mean"]})
+        rows.append(row)
+    T = pd.DataFrame(rows)
+    base = T.iloc[0]
+    T["rec_score"] = T.rec_crps / base.rec_crps + T.yds_crps / base.yds_crps
+
+    # THE CHOICE RULE. CRPS first: every setting whose CRPS is not measurably
+    # worse than the best one (paired game-block interval for the difference
+    # reaches zero) is a tie. Among the ties, the width closest to 0.20 wins.
+    # The first tuning run showed why: the top receiving settings differed by
+    # ~0.1% of CRPS -- noise -- while their widths ran from 0.20 to 0.26.
+    def rec_rows(i):
+        f = frames[i]
+        return f.crps_rec_model / base.rec_crps + f.crps_yds_model / base.yds_crps
+
+    def rush_rows(i):
+        f = frames[i]
+        return f.crps_rush_model.where(f.rush_pop.astype(bool))
+
+    def ties(score_col, per_row):
+        best = int(T[score_col].idxmin())
+        tied = []
+        for i in range(len(T)):
+            d = frames[i].assign(_diff=per_row(i) - per_row(best)).dropna(subset=["_diff"])
+            lo, _hi = game_block_ci(d, d["_diff"])
+            tied.append(bool(i == best or not lo > 0))
+        return tied
+
+    T["rec_tie"] = ties("rec_score", rec_rows)
+    T["rush_tie"] = ties("rush_crps", rush_rows)
+    T["rec_width_miss"] = ((T.rec_width - WIDTH_TARGET).abs() + (T.yds_width - WIDTH_TARGET).abs()) / 2
+    T["rush_width_miss"] = (T.rush_width - WIDTH_TARGET).abs()
+    rec_pick = T[T.rec_tie].sort_values(["rec_width_miss", "rec_score"]).iloc[0]
+    rush_pick = T[T.rush_tie].sort_values(["rush_width_miss", "rush_crps"]).iloc[0]
+    chosen = {k: (None if _off(rec_pick[k]) else float(rec_pick[k])) for k in RECEIVING_GRID[0]}
+    chosen.update({k: (None if _off(rush_pick[k]) else float(rush_pick[k])) for k in RUSHING_GRID[0]})
+    for k in ("eff_sd_rec", "eff_sd_rush"):
+        chosen[k] = chosen[k] or 0.0
+    fmt = lambda v: "off" if _off(v) else f"{v:g}"
+    L = ["# Width tuning: tune seasons only", "",
+         f"*Generated by `backtest.py --tune-width --tune {args.tune}`. Do not edit by hand. The test seasons "
+         "were not read.*", "",
+         "Every setting is scored on the same random draws. **The choice rule:** CRPS first (lower is better; "
+         "a proper score, so it rewards the right width, not merely a wider one) -- every setting whose CRPS is "
+         "not measurably worse than the best (paired game-block 95% interval reaching zero) is a **tie**; among "
+         "the ties, the **width** closest to 0.20 (the share of outcomes outside the model's p10-p90) wins. "
+         "Receiving settings are scored on receptions + receiving yards CRPS, each relative to today's sampler; "
+         "rushing settings on rushing-yards CRPS.", "",
+         "## Receiving", "", "| Share conc. | Catch conc. | Yards/catch sd | Receptions CRPS | Width | "
+         "Rec. yards CRPS | Width | Score | Tie with best |", "|---|---|---|---|---|---|---|---|---|"]
+    seen = set()
+    for _, r in T.sort_values("rec_score").iterrows():
+        key = (fmt(r.share_conc_targets), fmt(r.catch_conc), fmt(r.eff_sd_rec))
+        if key in seen:
+            continue
+        seen.add(key)
+        L.append(f"| {key[0]} | {key[1]} | {key[2]} | {r.rec_crps:.4f} | {r.rec_width:.3f} | {r.yds_crps:.3f} | "
+                 f"{r.yds_width:.3f} | {r.rec_score:.4f} | {'yes' if r.rec_tie else ''}"
+                 f"{' **chosen**' if r.i == rec_pick.i else ''} |")
+    L += ["", "## Rushing", "", "| Share conc. | Yards/carry sd | Rushing CRPS | Width | Actual/model | "
+          "Tie with best |", "|---|---|---|---|---|---|"]
+    seen = set()
+    for _, r in T.sort_values("rush_crps").iterrows():
+        key = (fmt(r.share_conc_carries), fmt(r.eff_sd_rush))
+        if key in seen:
+            continue
+        seen.add(key)
+        L.append(f"| {key[0]} | {key[1]} | {r.rush_crps:.3f} | {r.rush_width:.3f} | {r.rush_ratio:.3f} | "
+                 f"{'yes' if r.rush_tie else ''}{' **chosen**' if r.i == rush_pick.i else ''} |")
+    L += ["", "## Chosen", "", "```json", json.dumps(chosen, indent=1, sort_keys=True), "```", "",
+          f"Today's sampler on the tune seasons: receptions width {base.rec_width:.3f}, receiving yards "
+          f"{base.yds_width:.3f}, rushing yards {base.rush_width:.3f}. The test-season verdict comes from a "
+          "harness run with `--width` set to these values."]
+    out_base = Path(args.report) if args.report else OUT / "width_tuning"
+    Path(str(out_base) + ".md").write_text("\n".join(L) + "\n", encoding="utf-8")
+    Path(str(out_base) + ".csv").write_text(T.to_csv(index=False), encoding="utf-8")
+    if args.width_out:
+        Path(args.width_out).write_text(json.dumps(
+            {**chosen, "tuned_on": args.tune, "note": "backtest.py --tune-width; see reports/width_tuning.md"},
+            indent=1, sort_keys=True) + "\n", encoding="utf-8")
+    print(f"chosen: {chosen}", file=sys.stderr)
 
 
 def market_verdict(all_res, rel_weeks5, test, mk):
@@ -832,7 +979,7 @@ def harness_report(all_res, calib, metas, args, out_base):
         L.append(f"- {m['season']}: priors {m['priors']}, dispersion from {m['dispersion']}, opponent "
                  f"{m['opp']['level']} k0={m['opp']['k0']:g} on {m['opp']['metrics']}; team targets r="
                  f"{m['team_targets_r']:.1f}, carries r={m['team_carries_r']:.1f}, per-catch shape "
-                 f"{m['shape_ypc']:.3f}")
+                 f"{m['shape_ypc']:.3f}; width settings {m.get('width') or 'off (the pre-2026-09-24 sampler)'}")
     Path(str(out_base) + ".md").write_text("\n".join(L) + "\n", encoding="utf-8")
     Path(str(out_base) + ".json").write_text(json.dumps(
         {"seasons": args.seasons, "tune": args.tune, "test": args.test, "verdicts": verdicts,
@@ -928,6 +1075,11 @@ def main(argv=None):
     ap.add_argument("--save-results", default=None,
                     help="harness: pickle (results, calibration rows, settings) of the whole run")
     ap.add_argument("--from-results", default=None, help="harness: re-render the report from a --save-results pickle")
+    ap.add_argument("--width", default=None,
+                    help="width settings for the samplers: a JSON object or a path to one (default: off)")
+    ap.add_argument("--tune-width", action="store_true",
+                    help="choose the width settings on the --tune seasons; writes --report (.md/.csv)")
+    ap.add_argument("--width-out", default=None, help="--tune-width: write the chosen settings to this JSON file")
     ap.add_argument("--dispersion", choices=["prior", "train"], default=None,
                     help="prior = the priors_{S-1} values the scorer reads (harness default); "
                          "train = fit on --train-weeks of the season (single-season default)")
@@ -956,7 +1108,7 @@ def main(argv=None):
     args = ap.parse_args(argv)
     OUT = Path(args.out); OUT.mkdir(parents=True, exist_ok=True)
 
-    if not args.seasons:
+    if not args.seasons and not args.tune_width:
         res, meta = run_season(args, args.season, parse_weeks(args.train_weeks), parse_weeks(args.test_weeks),
                                OUT, live=False)
         single_season_output(args, res, meta, OUT)
@@ -969,6 +1121,9 @@ def main(argv=None):
         args.priors_dir = str(priors_cache_dir())
         args.build_priors = True
     Path(args.priors_dir).mkdir(parents=True, exist_ok=True)
+    if args.tune_width:
+        tune_width(args, OUT)
+        return 0
     if args.from_results:
         # Re-render the report from a saved run: the simulations are the slow
         # part and a report change should not need them.

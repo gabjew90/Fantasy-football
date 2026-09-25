@@ -471,7 +471,54 @@ def questionable_flip_check(samples_by_regime, line):
 
 
 # ---------------------------------------------------------------- joint simulation
-def simulate_team_rush(rng, n_sim, team_carries_mean, carries_r, rush_shares, ypc, carry_resid):
+# WIDTH SETTINGS (docs/plans/2026-09-24-yardage-harness.md, step 2). The 2022-25
+# harness found every yardage market right on average and too NARROW: shares,
+# catch rates and yards per touch were fixed within a game. Each setting below
+# lets one of them vary game to game, mean-preserving. None / 0.0 is the old
+# sampler EXACTLY (no extra random draws, so output is byte-identical); the
+# values the scorer uses are tuned on 2022-23 by backtest.py --tune-width.
+#   share_conc  Dirichlet concentration of the split of team targets / carries
+#               (a player's share varies around its mean; smaller = wider)
+#   catch_conc  Beta concentration of each player's catch rate
+#   eff_sd      log-sd of a per-game multiplier on yards per catch / per carry
+WIDTH_OFF = {"share_conc_targets": None, "share_conc_carries": None, "catch_conc": None,
+             "eff_sd_rec": 0.0, "eff_sd_rush": 0.0}
+
+
+def _allocate(rng, totals, p_norm, conc, fill_last):
+    """Split each simulation's team total across the players (+ 'other').
+
+    conc None: fixed shares, sequential conditional binomials (the original
+    sampler, call for call). conc > 0: each simulation first draws its own
+    shares from Dirichlet(conc * p_norm), so a player's share swings from game
+    to game around the same mean."""
+    k = len(p_norm)
+    alloc = np.zeros((len(totals), k), dtype=int)
+    remaining = totals.copy()
+    if conc is None:
+        rem_p = 1.0
+        for j in range(k - 1):
+            pj = np.clip(p_norm[j] / rem_p, 0.0, 1.0) if rem_p > 0 else 0.0
+            alloc[:, j] = rng.binomial(remaining, pj); remaining = remaining - alloc[:, j]; rem_p -= p_norm[j]
+    else:
+        g = rng.gamma(np.maximum(conc * p_norm, 1e-9), size=(len(totals), k))
+        P = g / g.sum(axis=1, keepdims=True)
+        rem_p = np.ones(len(totals))
+        for j in range(k - 1):
+            pj = np.clip(np.divide(P[:, j], rem_p, out=np.zeros(len(totals)), where=rem_p > 0), 0.0, 1.0)
+            alloc[:, j] = rng.binomial(remaining, pj); remaining = remaining - alloc[:, j]; rem_p = rem_p - P[:, j]
+    if fill_last:
+        alloc[:, -1] = remaining
+    return alloc
+
+
+def _game_multiplier(rng, n_sim, sd):
+    """Mean-one lognormal multiplier, one per simulation (a player's game)."""
+    return np.exp(sd * rng.standard_normal(n_sim) - 0.5 * sd * sd)
+
+
+def simulate_team_rush(rng, n_sim, team_carries_mean, carries_r, rush_shares, ypc, carry_resid,
+                       width=None):
     """One team's carries, drawn jointly, and each player's rushing yards.
 
     1. Team carries ~ NegBinomial(team_carries_mean, carries_r), one draw per
@@ -488,15 +535,13 @@ def simulate_team_rush(rng, n_sim, team_carries_mean, carries_r, rush_shares, yp
     Returns (carries per player, yards per player, team carries), the lists
     in `rush_shares` order.
     """
+    w = {**WIDTH_OFF, **(width or {})}
     rs = np.clip(np.asarray(rush_shares, dtype=float), 0, None)
     rest = max(1.0 - rs.sum(), 0.0)
     p_norm = np.append(rs, rest); p_norm = p_norm / p_norm.sum()
     mu_c = max(team_carries_mean, 1e-6)
     tc_draw = rng.negative_binomial(carries_r, carries_r / (carries_r + mu_c), size=n_sim)
-    alloc = np.zeros((n_sim, len(p_norm)), dtype=int); remaining = tc_draw.copy(); rem_p = 1.0
-    for j in range(len(p_norm) - 1):
-        pj = np.clip(p_norm[j] / rem_p, 0, 1) if rem_p > 0 else 0.0
-        alloc[:, j] = rng.binomial(remaining, pj); remaining = remaining - alloc[:, j]; rem_p -= p_norm[j]
+    alloc = _allocate(rng, tc_draw, p_norm, w["share_conc_carries"], fill_last=False)
     carries, yards = [], []
     for j in range(len(rs)):
         car = alloc[:, j]
@@ -505,12 +550,16 @@ def simulate_team_rush(rng, n_sim, team_carries_mean, carries_r, rush_shares, yp
             mx = int(car.max())
             draws = rng.choice(carry_resid, size=(n_sim, mx)) + float(ypc[j])
             rush = (draws * (np.arange(mx)[None, :] < car[:, None])).sum(1)
+        if w["eff_sd_rush"]:
+            # the game's yards per carry = ypc x a mean-one multiplier; the
+            # carry residuals stay as drawn
+            rush = rush + car * float(ypc[j]) * (_game_multiplier(rng, n_sim, w["eff_sd_rush"]) - 1.0)
         carries.append(car.astype(float)); yards.append(rush)
     return carries, yards, tc_draw
 
 
 def simulate_team_game(rng, n_sim, team_volume_mean, team_volume_r, player_shares,
-                        player_catch_rates, player_ypt, per_catch_shape, other_bucket=True):
+                        player_catch_rates, player_ypt, per_catch_shape, other_bucket=True, width=None):
     """Draw one team's targets jointly with all eligible receivers in one pass.
 
     1. Team targets ~ NegBinomial(team_volume_mean, team_volume_r) -- one draw per
@@ -526,6 +575,7 @@ def simulate_team_game(rng, n_sim, team_volume_mean, team_volume_r, player_share
     both true of real football and both absent from independent per-player draws.
     Returns {player_index: (receptions_array, yards_array)}, plus team_targets_array.
     """
+    w = {**WIDTH_OFF, **(width or {})}
     names = list(player_shares.keys())
     shares = np.array([player_shares[n] for n in names], dtype=float)
     shares = np.clip(shares, 0, None)
@@ -541,24 +591,23 @@ def simulate_team_game(rng, n_sim, team_volume_mean, team_volume_r, player_share
 
     # vectorized multinomial: sequential conditional binomials, no Python loop
     p_norm = shares / shares.sum()
-    alloc = np.zeros((n_sim, len(p_norm)), dtype=int)
-    remaining = team_targets.copy()
-    remaining_p = 1.0
-    for j in range(len(p_norm) - 1):
-        pj = np.clip(p_norm[j] / remaining_p, 0.0, 1.0) if remaining_p > 0 else 0.0
-        alloc[:, j] = rng.binomial(remaining, pj)
-        remaining = remaining - alloc[:, j]
-        remaining_p -= p_norm[j]
-    alloc[:, -1] = remaining
+    alloc = _allocate(rng, team_targets, p_norm, w["share_conc_targets"], fill_last=True)
 
     out = {}
     for j, name in enumerate(names):
-        tg = alloc[:, j].astype(float)
         cr = max(player_catch_rates.get(name, 0.3), 0.05)
-        rec = rng.binomial(alloc[:, j], cr).astype(float)
+        if w["catch_conc"]:
+            # this game's catch rate ~ Beta around the player's rate
+            c = w["catch_conc"]
+            cr_game = rng.beta(max(c * cr, 1e-3), max(c * (1.0 - cr), 1e-3), size=n_sim)
+            rec = rng.binomial(alloc[:, j], cr_game).astype(float)
+        else:
+            rec = rng.binomial(alloc[:, j], cr).astype(float)
         ypt = max(player_ypt.get(name, 7.0), 0.5)
         ypc = ypt / cr
         shape_total = np.clip(rec, 0, 25) * per_catch_shape
         yds = np.where(rec > 0, rng.gamma(np.maximum(shape_total, 1e-6), ypc / per_catch_shape), 0.0)
+        if w["eff_sd_rec"]:
+            yds = yds * _game_multiplier(rng, n_sim, w["eff_sd_rec"])
         out[name] = (rec, yds)
     return out, team_targets

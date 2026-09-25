@@ -5539,3 +5539,32 @@ line; dead state. Skipped, recorded as a follow-up in the plan: the slate's
 must-win pick still treats receptions and receiving yards as the calibrated
 markets. The scorer's sampler output is byte-identical; its report wording
 about model states changed.
+
+## 2026-09-24 (99) -- the width settings: the yardage markets pass (props-v1.20)
+
+Step 2 of docs/plans/2026-09-24-yardage-harness.md. The samplers held a
+player's share, catch rate and yards per touch fixed within a game; each can
+now vary game to game, mean-preserving, with "off" the old sampler draw for
+draw (score_game output byte-identical with no settings file). The settings
+live in props/engine/resources/width_params.json and the scorer reads them.
+
+- **Tuned on 2022-23 only** (`backtest.py --tune-width`, 36 settings on common
+  random numbers, reports/width_tuning.md). The first run chose by CRPS alone
+  and picked a receiving setting that barely widened anything: the top dozen
+  differed by ~0.1% of CRPS, noise. The rule became CRPS first, then among
+  settings not measurably worse than the best (paired game-block interval),
+  the width closest to 20% -- decided on the tune seasons, before 2024-25 was
+  read. Chosen: target-share concentration 40; carry-share concentration 20
+  and a 0.3 log-sd on yards per carry; catch rate and yards per catch fixed.
+- **2024-25: all three pass the four checks.** Outside p10-p90: receptions
+  19.9%, receiving yards 19.2%, rushing yards 19.7% (were 26.1 / 23.0 /
+  32.1); worst 60-90% bucket 1.8 / 2.8 / 2.8 points (were 4.6 / 4.2 / 9.8); a
+  model 85% wins about 84-85%. Paired CRPS against the old sampler: receptions
+  and rushing better, receiving yards 0.2% worse (interval excludes zero) --
+  accepted as the cost of calibrated ranges, which is what prices a line.
+- `receiving_hier_v2` and `rush_yds_v0` are `live` in core/registry.py. Still
+  none is eligible as a play: that waits for a holdout against posted lines.
+- On KC@MIA 2026 week 3, 75-95% probabilities fall ~5 points (rushing ~8),
+  near-the-line ones ~2.5, means unchanged; fantasy p10-p90 bands widen ~9%
+  (the scenario command reads this export).
+- Chat gets this as nfl-v1.1.
