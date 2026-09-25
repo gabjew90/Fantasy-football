@@ -87,9 +87,11 @@ TEAM_NAMES = {
     "PIT": "Pittsburgh Steelers", "SEA": "Seattle Seahawks", "SF": "San Francisco 49ers",
     "TB": "Tampa Bay Buccaneers", "TEN": "Tennessee Titans", "WAS": "Washington Commanders",
 }
-YARD_MARKETS = {"player_reception_yds": "rec_yards", "player_rush_yds": "rush_yards"}
+YARD_MARKETS = {"player_reception_yds": "rec_yards", "player_rush_yds": "rush_yards",
+                "player_pass_yds": "pass_yards"}
 COUNT_MARKETS = {"player_receptions": "receptions"}
-CONSENSUS_TOL = {"player_receptions": 1.0, "player_reception_yds": 4.0, "player_rush_yds": 5.0}
+CONSENSUS_TOL = {"player_receptions": 1.0, "player_reception_yds": 4.0, "player_rush_yds": 5.0,
+                 "player_pass_yds": 10.0}
 
 
 def now(): return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -195,6 +197,7 @@ CLI_ALIASES = {"LAR": "LA", "WSH": "WAS", "JAC": "JAX", "LVR": "LV"}
 MARKET_ALIASES = {"receptions": "player_receptions", "rec": "player_receptions",
                   "rec_yds": "player_reception_yds", "receiving_yards": "player_reception_yds",
                   "rush_yds": "player_rush_yds", "rushing_yards": "player_rush_yds",
+                  "pass_yds": "player_pass_yds", "passing_yards": "player_pass_yds",
                   "td": "player_anytime_td", "anytime_td": "player_anytime_td", "atd": "player_anytime_td"}
 # A TD-only run takes DraftKings anytime prices from The Odds API when the last
 # known quota leaves at least this many credits; otherwise Sleeper. (ESPN's
@@ -917,6 +920,7 @@ def main():
     STARTER_QB = {}      # team -> the QB treated as the starter (kneels, QB width)
     sims = {}
     team_targets_draw, team_carries_draw = {}, {}
+    pass_inputs = {}     # team -> (every receiver's yards draws, the other bucket's targets)
     for t in (AWAY, HOME):
         Mt = M[M.team == t]
         names = list(Mt.name)
@@ -924,7 +928,9 @@ def main():
         crs_t = {n: float(v) for n, v in zip(Mt.name, Mt.cr)}
         ypt_t = {n: float(v) for n, v in zip(Mt.name, Mt.ypt)}
         out_rec, tt_draw = MODEL.simulate_team_game(rng, N_SIM, env[t]["targets"], TVD["targets_r"],
-                                                    shares_t, crs_t, ypt_t, SH, other_bucket=True, width=WIDTH)
+                                                    shares_t, crs_t, ypt_t, SH, other_bucket=True, width=WIDTH,
+                                                    return_other=True)
+        pass_inputs[t] = ([out_rec[n][1] for n in names], out_rec.pop(MODEL.OTHER))
         team_targets_draw[t] = tt_draw
         # carries: same joint structure, per-carry yards from the empirical league residual grid.
         # QBs (plan step 3): their own carry grid, and the starter's kneel-downs by the
@@ -936,7 +942,7 @@ def main():
             t_spread = (MODEL.own_spread_from_book(market_env["home_spread"], t == HOME)
                         if market_env is not None else None)
             kg = MODEL.kneel_grid(P, t_spread)            # no spread yet: the pooled grid
-            qb_i = MODEL.starter_qb_index(list(Mt.pos), [float(v) for v in Mt.rs])
+            qb_i = MODEL.starter_qb_index(list(Mt.pos), [float(v) for v in Mt.rs], slots=list(Mt.slot))
             p_kneel = [kg if j == qb_i else None for j in range(len(Mt))]
             if qb_i is not None:
                 STARTER_QB[t] = Mt.name.iloc[qb_i]
@@ -950,6 +956,21 @@ def main():
         for j, (_, m) in enumerate(Mt.iterrows()):
             rec, yds = out_rec[m["name"]]
             sims[m["name"]] = {"receptions": rec, "rec_yards": yds, "rush_yards": rush_t[j], "carries": car_t[j]}
+    # QB PASSING (plan step 4, props-v1.24; reports/yardage_harness.md, DECISIONS
+    # #105): the starter's passing yards are his receivers' yards in THIS
+    # simulation, plus the other bucket's targets at the depth receivers' rates,
+    # times his share of the team's passing yards (the prior season's grid).
+    # Drawn after both teams, from child streams, so the kneel-down streams keep
+    # their order and no other number moves.
+    PASS_ON = (QB_RUSH_ON and "other_receiver_rates" in P and "qb_starter_pass_share_quantiles" in P)
+    pass_skipped = set()     # (player, team): a posted passing line for a QB the model does not start
+    if PASS_ON:
+        _share = np.array(P["qb_starter_pass_share_quantiles"])
+        for t in (AWAY, HOME):
+            if STARTER_QB.get(t) is not None:
+                ys_t, other_t = pass_inputs[t]
+                sims[STARTER_QB[t]]["pass_yards"] = MODEL.simulate_qb_passing(
+                    rng, N_SIM, ys_t, other_t, P["other_receiver_rates"], SH, starter_share=_share, width=WIDTH)
     M["mu_rec"] = [max(env[r.team]["targets"] * r.ts * max(r.cr, 0.05), 0.02) for _, r in M.iterrows()]
     M["mu_car"] = [max(env[r.team]["carries"] * r.rs, 0.02) for _, r in M.iterrows()]
 
@@ -1056,7 +1077,8 @@ def main():
             slp = cached_json(wd / "sleeper_players.json", 86400, lambda: json.load(
                 _ur.urlopen(_ur.Request("https://api.sleeper.app/v1/players/nfl", headers=_hdr), timeout=120)))
             WT = {"receptions": "player_receptions", "receiving_yards": "player_reception_yds",
-                  "rushing_yards": "player_rush_yds", "anytime_touchdowns": "player_anytime_td"}
+                  "rushing_yards": "player_rush_yds", "anytime_touchdowns": "player_anytime_td",
+                  "passing_yards": "player_pass_yds"}
             def mult_to_amer(m):
                 m = float(m)
                 return int(round((m - 1) * 100)) if m >= 2 else int(round(-100 / (m - 1)))
@@ -1330,6 +1352,15 @@ def main():
                             continue
                         if nm not in sims or "Over" not in oo or "Under" not in oo:
                             continue
+                        if col not in sims[nm]:
+                            # passing yards: the starting QB only
+                            if mk["key"] == "player_pass_yds" and PASS_ON:
+                                tm_ = M[M.name == nm].team.iloc[0]
+                                if (nm, tm_) not in pass_skipped:
+                                    pass_skipped.add((nm, tm_))
+                                    log(f"  passing line for {nm} not priced: the model's starter for {tm_} is "
+                                        f"{STARTER_QB.get(tm_) or 'none'}")
+                            continue
                         pr = M[M.name == nm].iloc[0]
                         if mk["key"] == "player_rush_yds" and pr.pos == "QB" and (
                                 not QB_RUSH_ON or STARTER_QB.get(pr.team) != nm):
@@ -1506,7 +1537,8 @@ def main():
 
     # ---------- 8b/9. report, written for a casual reader ----------
     MKT = {"player_receptions": "catches", "player_reception_yds": "receiving yards",
-           "player_rush_yds": "rushing yards", "player_anytime_td": "to score a touchdown"}
+           "player_rush_yds": "rushing yards", "player_anytime_td": "to score a touchdown",
+           "player_pass_yds": "passing yards"}
 
     def pct(x): return f"{100*x:.0f}%"
     def odds_words(a):
@@ -1601,6 +1633,14 @@ def main():
                          + (f" for about **{r.model_mean:.0f} yards**" if r.market == "player_reception_yds" else "") + ".")
             parts.append(f"Run that 20,000 times with normal game-to-game swings and he lands **{r.side.lower()} {r.line}** {in_ten(r.p_model)} ({pct(r.p_model)}).")
             out.append("**How we got our number.** " + " ".join(parts))
+        elif r.market == "player_pass_yds":
+            out.append(f"**What the book says.** {book} sets the line at **{r.line} passing yards**, {r.side.lower()} priced at {odds_words(r.price)}. "
+                       f"With the book's cut removed, that's {in_ten(r.p_novig)} ({pct(r.p_novig)}) on the {r.side.lower()}.")
+            out.append(f"**How we got our number.** {m.team} should throw about {e['targets']:.0f} times. His passing yards are "
+                       f"his receivers' yards in the same simulated games -- each receiver's share, catch rate and yards per "
+                       f"target, plus the throws to depth players -- times the share of the team's passing yards a starter "
+                       f"usually keeps (an injury or a benching counts against him, as the book settles it): about "
+                       f"**{r.model_mean:.0f} yards**. He lands **{r.side.lower()} {r.line}** {in_ten(r.p_model)} ({pct(r.p_model)}).")
         else:
             out.append(f"**What the book says.** {book} sets the line at **{r.line} rushing yards**, {r.side.lower()} priced at {odds_words(r.price)}. "
                        f"With the book's cut removed, that's {in_ten(r.p_novig)} ({pct(r.p_novig)}) on the {r.side.lower()}.")
@@ -1652,7 +1692,8 @@ def main():
     P_NEEDED = (1 + a.min_er) / (1 + 100 / 110)
     CARD_MARKETS = [("player_receptions", "receptions", "catches", 0.5),
                     ("player_reception_yds", "rec_yards", "rec yds", 0.5),
-                    ("player_rush_yds", "rush_yards", "rush yds", 0.5)]
+                    ("player_rush_yds", "rush_yards", "rush yds", 0.5),
+                    ("player_pass_yds", "pass_yards", "pass yds", 0.5)]
     if MARKETS:
         CARD_MARKETS = [c for c in CARD_MARKETS if c[0] in MARKETS]
 
@@ -1687,6 +1728,8 @@ def main():
             if mkey == "player_rush_yds" and m.pos == "QB" and (
                     not QB_RUSH_ON or STARTER_QB.get(m.team) != m["name"]):
                 continue
+            if col not in sims[m["name"]]:
+                continue           # passing yards: the starting QB only
             samp = sims[m["name"]][col]
             if samp.mean() < 0.3:
                 continue
@@ -1777,7 +1820,9 @@ def main():
             if pd.notna(rs_.get("cur_rate")) and rs_.get("cur_den", 0) > 0 and rs_["cur_num"] > 0 and rs_["cur_rate"] >= 0.08:
                 bits.append(f"{int(rs_['cur_num'])} of {int(rs_['cur_den'])} carries this season")
             if m.pos == "QB":
-                L.append("**Role.** Starting quarterback. Passing props are not modeled here; "
+                L.append("**Role.** Starting quarterback. "
+                         + ("Passing yards come from his receivers' draws in the same simulation; " if PASS_ON else
+                            "Passing props are not modeled here; ")
                          + ("rushing yards include his kneel-downs, which the book counts.\n" if QB_RUSH_ON else
                             "rushing yards are excluded because kneel-downs count against the prop and are "
                             "not simulated.\n"))
@@ -1857,8 +1902,8 @@ def main():
     # draw, so within-team correlation is real). Cross-team legs are independent draws.
     # TD legs are not simulated per draw and are excluded from joint pricing.
     def leg_hits(row):
-        col = {"player_receptions": "receptions", "player_reception_yds": "rec_yards", "player_rush_yds": "rush_yards"}.get(row["market"])
-        if col is None or row["player"] not in sims: return None
+        col = {**COUNT_MARKETS, **YARD_MARKETS}.get(row["market"])
+        if col is None or row["player"] not in sims or col not in sims[row["player"]]: return None
         sv = sims[row["player"]][col]
         return (sv > row["line"]) if row["side"] == "Over" else (sv < row["line"])
     parlay_rows = []
@@ -1983,8 +2028,8 @@ def main():
         b = payout(price); q = 1 - p - push
         return max(0.0, (b * p - q) / b)
     MKT_SHORT = {"player_receptions": "catches", "player_reception_yds": "rec yds",
-                 "player_rush_yds": "rush yds", "player_anytime_td": "anytime TD"}
-    SIM_COL = {"player_receptions": "receptions", "player_reception_yds": "rec_yards", "player_rush_yds": "rush_yards"}
+                 "player_rush_yds": "rush yds", "player_anytime_td": "anytime TD", "player_pass_yds": "pass yds"}
+    SIM_COL = {**COUNT_MARKETS, **YARD_MARKETS}
     tier_of = {}
     if not CONF.empty:
         for _, c in CONF.iterrows():
@@ -2019,7 +2064,7 @@ def main():
             # call Under (or below and we call Over), the gap exists because the model trusts
             # the prior more than the market does. Flag it and demote STRONG to MODERATE.
             prior_driven = False
-            if mk != "player_anytime_td":
+            if mk not in ("player_anytime_td", "player_pass_yds"):   # a QB's own share is not the driver
                 mm = M[M.name == pl].iloc[0]
                 key = "rush_share" if mk == "player_rush_yds" else "target_share"
                 ev_ = mm.evidence.get(key, {}) if isinstance(mm.evidence, dict) else {}
@@ -2103,7 +2148,7 @@ def main():
     lad = []
     for pl, sd in sims.items():
         tm = M[M.name == pl].team.iloc[0]
-        rec = sd.get("receptions"); ry = sd.get("rec_yards"); ru = sd.get("rush_yards")
+        rec = sd.get("receptions"); ry = sd.get("rec_yards"); ru = sd.get("rush_yards"); pa = sd.get("pass_yards")
         if rec is not None and rec.mean() > 0.3:
             for k in range(0, 12):
                 lad.append(dict(player=pl, team=tm, stat="catches", threshold=k, p_at_or_below=float(np.mean(rec <= k)), p_over_half=float(np.mean(rec > k + 0.5))))
@@ -2115,6 +2160,10 @@ def main():
             m = float(np.median(ru))
             for L_ in range(max(5, int(m - 40) // 5 * 5), int(m + 50) // 5 * 5 + 1, 5):
                 lad.append(dict(player=pl, team=tm, stat="rush yds", threshold=L_ + 0.5, p_at_or_below=float(np.mean(ru < L_ + 0.5)), p_over_half=float(np.mean(ru > L_ + 0.5))))
+        if pa is not None:
+            m = float(np.median(pa))
+            for L_ in range(max(100, int(m - 90) // 10 * 10), int(m + 100) // 10 * 10 + 1, 10):
+                lad.append(dict(player=pl, team=tm, stat="pass yds", threshold=L_ + 0.5, p_at_or_below=float(np.mean(pa < L_ + 0.5)), p_over_half=float(np.mean(pa > L_ + 0.5))))
     LADDER = pd.DataFrame(lad)
     if not LADDER.empty:
         LADDER.to_csv(OUT / f"ladder_{slug}.csv", index=False)
@@ -2151,7 +2200,7 @@ def main():
               "",
               "<details><summary>Method in six lines</summary>\n",
               f"1. Data: nflverse play-by-play/rosters/injuries/snaps through week {WEEK-1}, 2025 priors bundled, prices from {books_used_str}, NWS weather.",
-              "2. Model: receiving_hier_v2 (receptions, rec yds), rush_yds_v0, anytime_td_v1 (anytime TD; v0 only as a labelled fallback); methodology v1.0 in resources/methodology.md.",
+              "2. Model: receiving_hier_v2 (receptions, rec yds), rush_yds_v0, pass_yds_v0 (the starting QB), anytime_td_v1 (anytime TD; v0 only as a labelled fallback); methodology v1.0 in resources/methodology.md.",
               "3. Validated against sportsbook lines: NOTHING. The 2025 walk-forward shows the model beats a naive baseline on CRPS and that its distribution is internally consistent (calibration_2025.csv places lines at fixed offsets from the model\u2019s own median, not at book numbers, across all player-weeks rather than the ones worth betting). No market has been tested against posted lines, so every prop is ineligible and the record is being built prospectively.",
               "4. Team TD totals are market-anchored, so a TD gap is a share disagreement only.",
               "5. Thresholds, not bets: 'take at X' is where the edge rule clears at -110; no call is a validated betting edge until logged closing lines say so.",
@@ -2339,6 +2388,18 @@ def main():
                  "high or low, is in the repo's reports/yardage_harness.md.")
     else:
         L.append(f"- QB rushing yards left out on purpose: kneel-downs count against the prop and we don't model them yet.")
+    if PASS_ON:
+        L.append("- QB passing yards (the starter only) are his receivers' yards in the same simulation, times a "
+                 "starter's usual share of the team's passing yards. Graded 2022-25 in reports/yardage_harness.md: "
+                 "right on average and the right width; it beats the unshrunk version early in the season and ties it "
+                 "from week 5.")
+        if pass_skipped:
+            L.append("- Passing lines posted for a QB the model does not start, not priced: "
+                     + "; ".join(f"{nm} ({tm}; the model's starter is {STARTER_QB.get(tm) or 'none'})"
+                                 for nm, tm in sorted(pass_skipped)) + ".")
+        if (a.source == "oddsapi" or oddsapi_is_fallback) and not sleeper_used and not a.lines_file:
+            L.append("- QB passing yards were not priced this run: Sleeper Picks carries them, and the Odds API "
+                     "fallback request does not include them.")
     if hrs > 1:
         L.append(f"- **Kickoff is in {hrs:.1f} hours.** To track how these lines moved, open a chat inside the last hour and ask for a closing capture.")
     elif hrs > 0:
@@ -2356,7 +2417,7 @@ def main():
             L.append(f"| {r.book} | {r.market.replace('player_','')} | {r.player} | {'' if pd.isna(r.line) else r.line} | "
                      f"{'' if pd.isna(r.model_mean) else round(r.model_mean,1)} | {r.side} | {r.p_model:.3f} | {r.p_novig:.3f} | "
                      f"{r.gap:+.3f} | {r.price} | {r.ER:+.3f} |")
-    L.append(f"\nModel states: receptions/receiving yards `receiving_hier_v2` and rushing yards `rush_yds_v0` PROTOTYPE (2022-25 harness, with the width settings: unbiased and calibrated on outcomes; not tested against posted lines); "
+    L.append(f"\nModel states: receptions/receiving yards `receiving_hier_v2`, rushing yards `rush_yds_v0` and QB passing yards `pass_yds_v0` PROTOTYPE (2022-25 harness, with the width settings: unbiased and calibrated on outcomes; not tested against posted lines); "
              f"anytime TD `anytime_td_v1` PROTOTYPE (outcome-backtested, no posted-line test; no fair odds). All MODEL_UNVALIDATED. Dispersion: receptions log r = "
              f"{P['receptions_dispersion']['a']:.3f} + {P['receptions_dispersion']['b']:.3f}·log μ; carries "
              f"{P['carries_dispersion']['a']:.3f} + {P['carries_dispersion']['b']:.3f}·log μ; per-catch Gamma shape {SH:.3f}; "
@@ -2573,7 +2634,7 @@ def ev_statement(R: pd.DataFrame) -> str:
 
 SCEN_KEY = ["book", "market", "player", "side", "line"]
 MARKET_WORDS = {"player_receptions": "catches", "player_reception_yds": "receiving yards",
-                "player_rush_yds": "rushing yards"}
+                "player_rush_yds": "rushing yards", "player_pass_yds": "passing yards"}
 
 
 def run_scenarios(q: pd.DataFrame, R: pd.DataFrame, slug: str, snap_path: Path) -> list[str]:

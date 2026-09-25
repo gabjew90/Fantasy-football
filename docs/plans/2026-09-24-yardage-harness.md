@@ -7,7 +7,7 @@ against the version before it. The yardage markets were not:
 |---|---|
 | receptions, receiving yards (`receiving_hier_v2`) | one season (2025 weeks 9-18); a known 4.5% volume bias on 2024 |
 | rushing yards (`rush_yds_v0`) | none |
-| QB passing yards | not modelled |
+| QB passing yards | not modelled (priced since props-v1.24, `pass_yds_v0`) |
 
 This plan replaces step 7 of the consolidation plan (the QB-out rule), which
 becomes one question inside it.
@@ -82,7 +82,9 @@ worst on the low side (players bust more often than the model allows).
    5% limit and the diagnosis is recorded for the next attempt.
 4. QB passing yards from the team simulation (the team's receiving yards are
    the QB's passing yards before sacks), plus who is under center. It inherits
-   step 2.
+   step 2. **Done (props-v1.24, DECISIONS #105):** calibrated and the right
+   width; misses the bar on 2024's interval and one 18-bet bucket, priced by
+   the user's decision.
 5. The Vegas-line environment (`market_fit`) and a market blend layer, tested
    on two seasons instead of one.
 

@@ -5743,3 +5743,56 @@ same silence. The route back is a download from chat: it lands in the user's
 Downloads folder, which Claude Code reads directly for the audit (re-running
 the same commands on the same release) -- no upload step, and no credential
 given to chat to push anywhere.
+
+## 2026-09-25 (105) -- QB passing yards priced from the team simulation (props-v1.24)
+
+Plan step 4. The starting QB's passing yards are his receivers' yards in the
+same simulation that prices their props (`model.simulate_qb_passing`), plus
+two facts the sampler lacked, both measured on 2021-25 play-by-play first:
+
+- **Depth receivers.** 15-16% of a team's targets go to receivers under a 5%
+  season share; the sampler's 'other' bucket carried them with no yards. They
+  are now drawn at those receivers' prior-season catch rate (0.66) and yards
+  per target (6.3).
+- **The starter's share.** A team's passing yards equal its receiving yards to
+  0.15%, but the QB who threw first keeps 96% of them on average (someone
+  else also throws in about one game in five, usually a backup in garbage
+  time or after an injury). His share is drawn per game from the prior
+  season's grid, which is how the book settles his number.
+
+Harness, 2024-25 (reports/yardage_harness.md, 940 starter-games):
+actual/model 0.986, PIT 0.508, 18.1% outside p10-p90 -- right on average and
+the right width, with no width tuning (`eff_sd_pass` exists and is off).
+Beats baseline A pooled (+1.08, 95% CI +0.15 to +1.99) and in 2025 (+1.30);
+in 2024 +0.86 with an interval that includes 0 (-0.55 to +2.30). Every
+60-90% bucket within 3 points except Under 80-90% (16 bets, won 62.5%
+against 81%) and Over 60-70% (+3.2 points, 0.2 over).
+
+**User decision:** priced, the misses noted, the bar unchanged for every
+market -- the same call as the backs in #100 (the 18-bet bucket was put to
+the user; the 0.2-point miss appeared on the rerun below and falls under the
+user's standing call that sub-point misses are noise). Where the gain lives:
+weeks 2-4 (+4.9 yards); from week 5 the model ties the no-shrinkage version
+(+0.18, interval includes 0). Mid-season it ran 4.3-5.4% high in 2022-24 and
+2% low in 2025 -- watched, within the 5% limit pooled.
+
+**The starter, from the code review.** The starting QB was the QB with the
+most expected carries. The scorer's QB pool is the depth-chart QB1 plus any
+QB with 20%+ of the team's carries -- exactly the running backup who would
+win that contest and take the team's passing yards. `starter_qb_index` now
+takes the depth-chart slot first (QB1, then QB2; a QB with no QB slot last)
+and carries only as a tie-break, in the scorer and the harness alike, and the
+harness grades that starter -- including a backup who starts when QB1 is out
+-- instead of every QB1-slot row. QB rushing is graded on the same starter:
+1870 player-weeks, not 1898 (one starter per team-game; some team-weeks had
+two QB1 rows); unchanged on every shared row, and it still passes (21.9%
+outside p10-p90, worst bucket 2.9 points). A posted passing line for a QB
+the model does not start is logged and named in the report.
+
+Scorer: `player_pass_yds` for the starting QB (the same starter the QB
+rushing prop uses), priced from Sleeper's `passing_yards` (the primary
+source, no quota); the Odds API fallback request is unchanged. Settle grades
+it on nflverse `passing_yards`. The other markets' output is byte-identical to
+props-v1.23 (KC@MIA: only new rows and the disclosure lines differ). Live
+check: Mahomes 235 vs Sleeper 236.5; Malik Willis 162 vs 177.5, flagged WEAK
+(new team).

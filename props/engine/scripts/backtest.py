@@ -48,12 +48,15 @@ N = 1000
 
 # market key -> (actual column, label, synthetic-line offsets for the reliability table)
 # market -> the population column its rows are graded on (absent = every row)
-POPULATION = {"rush": "rush_pop", "qbrush": "qb_pop"}
+POPULATION = {"rush": "rush_pop", "qbrush": "qb_pop", "pass": "pass_pop"}
 MARKETS = {"rec": ("act_receptions", "receptions", [0.5, 1.5, 2.5, 3.5]),
            "yds": ("act_rec_yards", "receiving yards", [5, 10, 15, 20, 30]),
            "rush": ("act_rush_yards", "rushing yards", [5, 10, 15, 20, 30]),
            # the starting QB's rushing yards as the book settles them: kneel-downs in
-           "qbrush": ("act_qb_rush_yards", "QB rushing yards", [5, 10, 15, 20, 30])}
+           "qbrush": ("act_qb_rush_yards", "QB rushing yards", [5, 10, 15, 20, 30]),
+           # the starting QB's passing yards (plan step 4): his receivers' yards in
+           # the same simulation, plus the other bucket, times his share
+           "pass": ("act_pass_yards", "QB passing yards", [10, 20, 30, 40, 60])}
 # THE LIVE SCORER'S OPPONENT SETTINGS (score_game.py section 5): team level, fixed
 # shrinkage k0=150 plays, applied to catch rate, ypt and ypc. The single-season
 # defaults below (posgrp, k0=1000) are the round-5 ones, kept for reproduction.
@@ -115,7 +118,7 @@ def code_tag(*sources):
 
 
 # Bump when make_population / make_features / the frames build change meaning.
-FEATURE_VERSION = "3"
+FEATURE_VERSION = "4"
 
 
 def priors_cache_dir():
@@ -177,7 +180,7 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
     pbp_full = pd.read_csv(dl(f"{NV}/pbp/play_by_play_{S}.csv.gz", f"pbp_{S}.csv.gz"), low_memory=False)
     pbp_full = pbp_full[pbp_full.season_type == "REG"]
     if frames_cache.exists():
-        games, gm, roles, roster, rec, rush, twt, twc, kneel = pd.read_pickle(frames_cache)
+        games, gm, roles, roster, rec, rush, twt, twc, kneel, pas = pd.read_pickle(frames_cache)
     else:
         games_all = pd.read_csv(dl(GAMES, "games.csv"))
         games = games_all[(games_all.season == S) & (games_all.game_type == "REG")].copy()
@@ -218,7 +221,13 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
         kneel = pbp_full[(pbp_full.play_type == "qb_kneel") & pbp_full.rusher_player_id.notna()].groupby(
             ["posteam", "week", "rusher_player_id"]).rushing_yards.sum().rename("kneel_yards").reset_index().rename(
             columns={"posteam": "team", "rusher_player_id": "gsis_id"})
-        pd.to_pickle((games, gm, roles, roster, rec, rush, twt, twc, kneel), frames_cache)
+        # a QB's passing yards as the book settles them: gross (sacks carry no
+        # passing yards), his own throws only
+        ppass = pbp_full[(pbp_full.play_type == "pass") & pbp_full.passer_player_id.notna()]
+        pas = ppass.assign(y=ppass.passing_yards.fillna(0.0)).groupby(
+            ["posteam", "week", "passer_player_id"]).y.sum().rename("pass_yards").reset_index().rename(
+            columns={"posteam": "team", "passer_player_id": "gsis_id"})
+        pd.to_pickle((games, gm, roles, roster, rec, rush, twt, twc, kneel, pas), frames_cache)
 
     if "spread_line" not in games.columns:
         sys.exit("games.csv has no spread_line/total_line -- cannot backtest --env market")
@@ -247,6 +256,11 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
     qb_resid = (np.array(P0["qb_carry_residual_quantiles"])
                 if live and "qb_carry_residual_quantiles" in P0 else None)
     ypc_default = float(P0.get("league_mean_ypc", 4.2)) if live else 4.2
+    # QB passing (plan step 4), live mode only, when the priors carry the depth
+    # receivers' rates and the starter's share grid
+    pass_on = live and "other_receiver_rates" in P0 and "qb_starter_pass_share_quantiles" in P0
+    other_rates = P0.get("other_receiver_rates") if pass_on else None
+    pass_share = np.array(P0["qb_starter_pass_share_quantiles"]) if pass_on else None
 
     role_lookup = roles.drop_duplicates("gsis_id", keep="first").set_index("gsis_id")["slot"]
     # LIVE MODE: the slot as the scorer sees it -- the latest pre-game depth
@@ -298,6 +312,7 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
         rec_key = rec_agg.set_index(["team", "week", "gsis_id"])
         rush_key = rush_agg.set_index(["team", "week", "gsis_id"])
         kneel_key = kneel.set_index(["team", "week", "gsis_id"])["kneel_yards"]
+        pass_key = pas.set_index(["team", "week", "gsis_id"])["pass_yards"]
         act_set = set(roster[roster.status == "ACT"].set_index(["week", "team", "gsis_id"]).index)
         played_weeks = gm.groupby("team")["week"].apply(lambda s: sorted(s)).to_dict()
         tt_by_tw = twt.set_index(["team", "week"])["team_targets"]
@@ -338,7 +353,8 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
                     act_rec_yards=float(a_.rec_yards) if a_ is not None else 0.0,
                     act_carries=int(u_.carries) if u_ is not None else 0,
                     act_rush_yards=float(u_.rush_yards) if u_ is not None else 0.0,
-                    act_kneel_yards=float(kneel_key.get((team, W, pid), 0.0))))
+                    act_kneel_yards=float(kneel_key.get((team, W, pid), 0.0)),
+                    act_pass_yards=float(pass_key.get((team, W, pid), 0.0))))
         feat = pd.DataFrame(rows)
         feat = feat.merge(pop[["team", "week", "gsis_id", "roster_status"]], on=["team", "week", "gsis_id"], how="left")
         return feat
@@ -612,22 +628,31 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
 
         def draw_block_joint(frame, shares, crs, ypts, arm):
             """THE LIVE PIPELINE'S DRAW (model.simulate_team_game): one team-volume
-            draw per simulation, split across that team's players."""
+            draw per simulation, split across that team's players. With QB
+            passing on, also each team-game's starting-QB passing yards from the
+            same draws (model.simulate_qb_passing), keyed (team, week)."""
             rec_ = np.zeros((len(frame), N))
             yds = np.zeros((len(frame), N))
+            passing = {}
             pos_ = {ix: i for i, ix in enumerate(frame.index)}
             for (team, week), g in frame.groupby(["team", "week"], sort=False):
                 tvol = float(g.team_targets_env.iloc[0])
+                g_rng = game_rng(team, week, arm)
                 out, _tt = M.simulate_team_game(
-                    game_rng(team, week, arm), N, tvol, r_team_targets,
+                    g_rng, N, tvol, r_team_targets,
                     {ix: float(shares[pos_[ix]]) for ix in g.index},
                     {ix: float(crs[pos_[ix]]) for ix in g.index},
                     {ix: float(ypts[pos_[ix]]) for ix in g.index},
-                    shape_ypc, width=width)
+                    shape_ypc, width=width, return_other=pass_on)
+                other_t = out.pop(M.OTHER, None)
                 for ix, (r_, y_) in out.items():
                     rec_[pos_[ix]] = r_
                     yds[pos_[ix]] = y_
-            return rec_, yds
+                if pass_on:
+                    passing[(team, week)] = M.simulate_qb_passing(
+                        g_rng, N, [y_ for _r, y_ in out.values()], other_t, other_rates, shape_ypc,
+                        starter_share=pass_share, width=width)
+            return rec_, yds, passing
 
         def draw_block_rush(frame, shares, ypcs, arm):
             """THE LIVE PIPELINE'S RUSHING DRAW (model.simulate_team_rush): one team
@@ -645,7 +670,7 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
                 if qb_resid is not None:
                     p_resid = [qb_resid if sl.startswith("QB") else None for sl in slots]
                     kg = M.kneel_grid(P0, g.team_spread.iloc[0])
-                    qb_start = M.starter_qb_index(slots, list(shares[idx]))
+                    qb_start = M.starter_qb_index(slots, list(shares[idx]), slots=slots)
                     p_kneel = [kg if j == qb_start else None for j in range(len(slots))]
                 qb_i = qb_start if qb_resid is not None else None
                 _car, y_, _tc = M.simulate_team_rush(game_rng(team, week, arm), N,
@@ -675,12 +700,13 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
 
         # Both arms use the joint sampler, so the model-vs-baseline comparison
         # isolates the SHRINKAGE, which is what baseline A exists to test.
-        recM, ydsM = draw_block_joint(tr, tr.ts.values, tr.cr.clip(lower=0.05).values, tr.ypt.values, arm=1)
+        recM, ydsM, passTW = draw_block_joint(tr, tr.ts.values, tr.cr.clip(lower=0.05).values, tr.ypt.values,
+                                              arm=1)
         if full:
-            recA, ydsA = draw_block_joint(tr, shareA, crA, yptA, arm=2)
+            recA, ydsA, passTW_A = draw_block_joint(tr, shareA, crA, yptA, arm=2)
             recI, ydsI = draw_block(mu_m, ypc_m, rec_fit)
         else:                                   # tuning: the model arm is all that is compared
-            recA, ydsA, recI, ydsI = recM, ydsM, recM, ydsM
+            recA, ydsA, recI, ydsI, passTW_A = recM, ydsM, recM, ydsM, passTW
         y_rec = tr.act_receptions.values.astype(float)
         y_yds = tr.act_rec_yards.values.astype(float)
         # The receiving PITs draw their tie-break uniforms BEFORE the rushing
@@ -699,10 +725,34 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
         # carries over his last four games. QBs are graded separately (qb_pop):
         # the starting QB, whose book number includes his kneel-downs.
         slot_s = test_act.slot.astype(str)
+        # THE STARTING QB, by the scorer's rule (model.starter_qb_index: depth-chart
+        # slot first, then carries): QB1, or the backup who starts when QB1 is out
+        starter = np.zeros(len(test_act), bool)
+        for _tw, g_ in test_act.groupby(["team", "week"], sort=False):
+            sl_ = g_.slot.astype(str).tolist()
+            j_ = M.starter_qb_index(sl_, list(g_.rs.fillna(0.0).values), slots=sl_)
+            if j_ is not None:
+                starter[g_.index[j_]] = True
         rush_pop = ((slot_s.str.startswith("RB") | (test_act.rs_last4.fillna(0.0) >= 0.20))
                     & ~slot_s.str.startswith("QB")).values
-        qb_pop = ((slot_s == "QB1").values if qb_resid is not None else np.zeros(len(test_act), bool))
+        qb_pop = (starter.copy() if qb_resid is not None else np.zeros(len(test_act), bool))
         nan_ = np.full(len(test_act), np.nan)
+        # QB PASSING: the same starting QB, priced from his team-game's
+        # receiving draws. Only his rows are built and scored.
+        tw_keys = list(zip(test_act.team, test_act.week))
+        pass_pop = (starter & np.array([k in passTW for k in tw_keys])
+                    if pass_on else np.zeros(len(test_act), bool))
+        p_ix = np.flatnonzero(pass_pop)
+        passM = np.array([passTW[tw_keys[i]] for i in p_ix]).reshape(len(p_ix), N)
+        passA = np.array([passTW_A[tw_keys[i]] for i in p_ix]).reshape(len(p_ix), N)
+        y_pass = test_act.act_pass_yards.values.astype(float)
+        y_pass_p = y_pass[p_ix]
+
+        def pass_rows(vals):
+            """Starting-QB passing values back onto every row; NaN elsewhere."""
+            out = np.full(len(test_act), np.nan, dtype=float)
+            out[p_ix] = vals
+            return out
 
         def full_rows(vals):
             """Receiving values back onto every row; NaN on the starting QB's."""
@@ -716,6 +766,7 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
             "act_receptions": test_act.act_receptions.values.astype(float),
             "act_rec_yards": test_act.act_rec_yards.values.astype(float),
             "act_rush_yards": y_rush, "act_qb_rush_yards": y_qb, "rush_pop": rush_pop, "qb_pop": qb_pop,
+            "act_pass_yards": y_pass, "pass_pop": pass_pop,
             # diagnostics: projected vs actual carries, and how far the team's
             # eligible players' carry shares sum past 1 (the sampler then scales)
             "mean_car_model": carM, "act_carries": test_act.act_carries.values.astype(float),
@@ -727,6 +778,11 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
             "mean_rec_model": full_rows(recM.mean(1)), "mean_yds_model": full_rows(ydsM.mean(1)),
             "mean_rush_model": np.where(rush_pop, rushM.mean(1), nan_),
             "mean_qbrush_model": np.where(qb_pop, rushM.mean(1), nan_),
+            "med_pass_model": pass_rows(np.median(passM, axis=1)),
+            "mean_pass_model": pass_rows(passM.mean(1)),
+            "above_med_pass": pass_rows(y_pass_p > np.median(passM, axis=1)),
+            "crps_pass_model": pass_rows(crps_block(passM, y_pass_p)),
+            "crps_pass_baseA": pass_rows(crps_block(passA, y_pass_p)),
             "above_med_rec": full_rows(y_rec > np.median(recM, axis=1)),
             "above_med_yds": full_rows(y_yds > np.median(ydsM, axis=1)),
             "above_med_rush": y_rush > np.median(rushM, axis=1),
@@ -734,6 +790,8 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
             "pit_rec": full_rows(pit_rec), "pit_yds": full_rows(pit_yds),
             "pit_rush": np.where(rush_pop, rpit_block(rushM, y_rush), nan_),
             "pit_qbrush": np.where(qb_pop, rpit_block(rushM, y_qb), nan_),
+            # drawn after every other PIT, so theirs are unchanged
+            "pit_pass": pass_rows(rpit_block(passM, y_pass_p)),
             "crps_rec_model": full_rows(crps_block(recM, y_rec)), "crps_rec_baseA": full_rows(crps_block(recA, y_rec)),
             "crps_yds_model": full_rows(crps_block(ydsM, y_yds)), "crps_yds_baseA": full_rows(crps_block(ydsA, y_yds)),
             "crps_rush_model": np.where(rush_pop, crps_block(rushM, y_rush), nan_),
@@ -752,7 +810,8 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
                 ("rec", recM, y_rec, np.ones(len(y_rec), bool), tr.week.values),
                 ("yds", ydsM, y_yds, np.ones(len(y_yds), bool), tr.week.values),
                 ("rush", rushM, y_rush, rush_pop, test_act.week.values),
-                ("qbrush", rushM, y_qb, qb_pop, test_act.week.values)]:
+                ("qbrush", rushM, y_qb, qb_pop, test_act.week.values),
+                ("pass", passM, y_pass_p, np.ones(len(p_ix), bool), test_act.week.values[p_ix])]:
             if not keep.any():
                 continue
             smp, yy = samples[keep], y[keep]
@@ -1110,7 +1169,7 @@ def harness_report(all_res, calib, metas, args, out_base, comparison=None):
     groups = [(str(s), [s]) for s in sorted(all_res.season.unique())]
     groups += [(f"tune {'+'.join(map(str, tune))}", tune), (f"TEST {'+'.join(map(str, test))}", test)]
     summary = {}
-    L = ["# Yardage harness: receptions, receiving yards, rushing yards", "",
+    L = ["# Yardage harness: receptions, receiving yards, rushing yards, QB rushing and passing yards", "",
          "*Generated by `props/engine/scripts/backtest.py` "
          f"`--seasons {args.seasons} --tune {args.tune} --test {args.test}`. Do not edit by hand.*", "",
          "Each season is predicted walk-forward from priors built from the season before, with the live "
@@ -1132,7 +1191,7 @@ def harness_report(all_res, calib, metas, args, out_base, comparison=None):
         reliability[sname] = rel_frames[sname].to_dict(orient="records")
     verdicts = {}
     for mk, (_act, label, _o) in MARKETS.items():
-        L += [f"## {label.capitalize()}", "",
+        L += [f"## {label[0].upper() + label[1:]}", "",
               "| Seasons | Weeks | N | CRPS model | CRPS baseline A | Gain (95% CI) | Actual/model | PIT mean "
               "| Outside p10-p90 (0.20) | |",
               "|---|---|---|---|---|---|---|---|---|---|"]
@@ -1191,7 +1250,7 @@ def harness_report(all_res, calib, metas, args, out_base, comparison=None):
           "- Questionable-player regimes, injury-report exclusions (the harness uses the game-day "
           "active list, which the injury report approximates before kickoff), and prices: this "
           "grades distributions against outcomes, not against posted lines.",
-          "- QB rushing and passing yards (plan steps 2 and 3).", "",
+          "", 
           "## Settings", ""]
     for m in metas:
         L.append(f"- {m['season']}: priors {m['priors']}, dispersion from {m['dispersion']}, opponent "

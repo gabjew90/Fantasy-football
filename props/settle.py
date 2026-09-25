@@ -8,6 +8,7 @@ Settlement rules, matching how books settle these markets:
   receptions        stat > line -> Over wins; stat < line -> Under wins
   reception_yds     same, on receiving_yards
   rush_yds          same, on rushing_yards
+  pass_yds          same, on passing_yards (the QB's own, gross of sacks)
   anytime_td        rushing_tds + receiving_tds >= 1 -> Yes wins
 A half-point line cannot push. A whole-number line that lands exactly on the
 stat is recorded as `push` and excluded from hit-rate denominators.
@@ -57,10 +58,12 @@ MARKET_STAT = {
     "player_receptions": "receptions",
     "player_reception_yds": "receiving_yards",
     "player_rush_yds": "rushing_yards",
+    "player_pass_yds": "passing_yards",
     "player_anytime_td": "_anytime_td",
     "receptions": "receptions",
     "reception_yds": "receiving_yards",
     "rush_yds": "rushing_yards",
+    "pass_yds": "passing_yards",
     "anytime_td": "_anytime_td",
 }
 
@@ -183,7 +186,7 @@ def load_stats(season: int, cache: Path, max_age_s: int = STATS_MAX_AGE_S) -> pd
                   f"copy dated {time.ctime(cache.stat().st_mtime)}", file=sys.stderr)
     df = pd.read_csv(cache, low_memory=False)
     df = df[df["season_type"] == "REG"].copy()
-    for col in ("receptions", "receiving_yards", "rushing_yards",
+    for col in ("receptions", "receiving_yards", "rushing_yards", "passing_yards",
                 "receiving_tds", "rushing_tds"):
         if col not in df.columns:
             df[col] = 0

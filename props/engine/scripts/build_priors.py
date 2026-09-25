@@ -42,6 +42,8 @@ K0_DEFAULT = 4.0          # tuned on 2025 held-out fold (weeks 5-6 fit / 7-8 sco
 R_CLAMP = [0.5, 30.0]
 RESID_QUANTILES = 2001    # per-carry yardage residual grid
 KNEEL_QUANTILES = 201     # per-team-game QB kneel-yards grid, per spread bucket
+PASS_SHARE_QUANTILES = 201  # per-team-game grid of the starting QB's share of team passing yards
+OTHER_SHARE = 0.05        # a receiver under this season target share is a depth receiver
 KNEEL_SPREAD_EDGES = (-3.0, 3.0, 7.0)   # dog 3+ | pick +-3 | fav 3-7 | fav 7+
 
 
@@ -291,6 +293,32 @@ def main():
                    for b in range(len(edges) + 1)]
     # for a game priced before any spread is posted: every team-game, any spread
     kneel_pooled = np.round(np.quantile(kr.yds, np.linspace(0, 1, KNEEL_QUANTILES)), 3).tolist()
+    # ---- QB passing (plan step 4) ------------------------------------------
+    # The starting QB's passing yards = his team's receiving yards x his share
+    # of them. The sampler needs what a target to a receiver OUTSIDE the
+    # eligible set is worth -- depth receivers, season target share under
+    # OTHER_SHARE -- and the starter's share of the team's passing yards per
+    # game: the QB who threw the team's first pass, so an injury or a benching
+    # mid-game counts against him, as the book settles it.
+    pt = rec.groupby(["team", "gsis_id"])[["targets", "receptions", "rec_yards"]].sum()
+    pt["share"] = pt.targets / pt.groupby(level="team").targets.transform("sum")
+    depth = pt[pt.share < OTHER_SHARE]
+    other_rates = {"share_below": OTHER_SHARE,
+                   "catch_rate": round(float(depth.receptions.sum() / depth.targets.sum()), 4),
+                   "ypt": round(float(depth.rec_yards.sum() / depth.targets.sum()), 4),
+                   "target_frac": round(float(depth.targets.sum() / pt.targets.sum()), 4)}
+    pp = pbp[(pbp.play_type == "pass") & pbp.passer_player_id.notna()].sort_values(["game_id", "play_id"])
+    first_passer = pp.groupby(["game_id", "posteam"]).passer_player_id.first()
+    by_passer = pp.assign(y=pp.passing_yards.fillna(0.0)).groupby(
+        ["game_id", "posteam", "passer_player_id"]).y.sum()
+    team_py = by_passer.groupby(level=["game_id", "posteam"]).sum()
+    starter_frac = np.array([by_passer.get((gid, tm, first_passer[(gid, tm)]), 0.0) / tot
+                             for (gid, tm), tot in team_py.items() if tot > 0])
+    pass_share_grid = np.round(np.quantile(starter_frac, np.linspace(0, 1, PASS_SHARE_QUANTILES)), 4).tolist()
+    print(f"QB passing: depth receivers (share < {OTHER_SHARE}) take {other_rates['target_frac']:.3f} of targets, "
+          f"catch rate {other_rates['catch_rate']:.3f}, ypt {other_rates['ypt']:.2f}; the starter's share of "
+          f"team passing yards averages {starter_frac.mean():.4f} over {len(starter_frac)} team-games",
+          file=sys.stderr)
     print(f"QB carries: {len(qy)} (ypc {qy.mean():.2f}); kneel yards per team-game by spread bucket: "
           + ", ".join(f"{np.mean(gr):+.2f}" for gr in kneel_grids), file=sys.stderr)
 
@@ -443,6 +471,8 @@ def main():
         # the team's own pregame spread, POSITIVE = favoured (nflverse's
         # spread_line is the home side's); grid b covers [edges[b-1], edges[b])
         "qb_kneel_yards_by_spread": {"edges": edges, "grids": kneel_grids, "pooled": kneel_pooled},
+        "other_receiver_rates": other_rates,
+        "qb_starter_pass_share_quantiles": pass_share_grid,
         "league_td_per_point": td_per_pt,
         "pass_td_frac_inside10": f_pass_in10, "rush_td_frac_inside10": f_rush_in10,
         "note": ("Built by build_priors.py. Rates are prior-season season-long and are used "

@@ -170,7 +170,7 @@ is recorded on every call and printed in the source table. When the quota is gon
   which carries the DraftKings line; used for the TD anchor only, never for props.
 - `--source sleeper` prices the card from Sleeper Picks (api.sleeper.app/lines/available,
   no key, no quota, allowlisted; verified 2026-09-17). Two-sided lines for receptions,
-  receiving yards, rushing yards and anytime TD on most starters, with dynamic payout
+  receiving yards, rushing yards, QB passing yards and anytime TD on most starters, with dynamic payout
   multipliers converted to American odds (1.78 -> -128). Sleeper is a pick'em product
   (2+ leg entries, ~12% overround per leg vs ~4.5% at DK/FD), so EV at Sleeper prices is
   lower for the same line; model % and no-vig % are comparable to a sportsbook's. Rows are
@@ -249,7 +249,7 @@ backtest.
 ## Fast path
 For a narrow question, run only what it needs:
 - **One game, specific markets:** `python scripts/score_game.py --away NYG --home LA --markets td`
-  (markets: `receptions`, `rec_yds`, `rush_yds`, `td`, comma-separated). `--week` is optional and
+  (markets: `receptions`, `rec_yds`, `rush_yds`, `pass_yds`, `td`, comma-separated). `--week` is optional and
   resolves to the next meeting; `LAR`, `WSH`, `JAC`, `LVR` are accepted. A `--markets` run prints a
   short summary (also saved as `summary_*.md`) instead of the full report, which is still written.
 - **Today's games / one date:** `python scripts/score_week.py --today` or `--date YYYY-MM-DD`
@@ -259,7 +259,7 @@ For a narrow question, run only what it needs:
   otherwise Sleeper; the sources table says which, and so must the reply.
 - **Fantasy numbers:** `fantasy_points_*.csv` has median, p20 and p80 per player from the joint
   simulation (`--fantasy-scoring ppr|half|std|file.json|'rec=0.5,...'`). QB rows are rushing only:
-  passing is not modelled.
+  passing yards are priced as a prop (below) but not yet scored as fantasy points.
 - **Anytime-TD price to quote: the blend.** Every TD row carries `p_model` (anytime_td_v1),
   `p_market` (de-vigged: exact for Sleeper's two-sided prices, a provisional hold removed from one-way
   books) and `p_blend` (layer 4, their logit blend at the PROVISIONAL weight 0.5). Quote all three; the
@@ -350,6 +350,10 @@ need not be surfaced. Write the reply as a premium prop guide with this structur
    repo) is the evidence now: since props-v1.20 receptions, receiving yards and rushing yards
    are unbiased and calibrated on outcomes (a model 85% wins about 84-85%). None is tested
    against posted lines yet; say that, not that the numbers are unvalidated guesses.
+   QB passing yards (props-v1.24, the starting QB only) are his receivers' yards in the same
+   simulation times a starter's usual share: right on average and the right width, but its
+   edge over the no-shrinkage version is early season only and one small bucket missed --
+   priced by the user's decision (DECISIONS #105). Say so when quoting one.
    Ladder: `ladder_*.csv` holds P(stat <= k) per player for pricing alternate lines;
    surface it for the top two or three plays when the book's line sits inside the ladder.
 6. **Parlays — DISABLED, do not price them.** `parlays_*.csv` is no longer written.
