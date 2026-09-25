@@ -5882,3 +5882,31 @@ the code review: the stamp never lets the price hash cost a capture (a
 pricer module that will not parse leaves the row on its engine hash, with a
 warning), tags are read in release order, and changing what counts as the
 price means a new `PRICE_ALGORITHM` and a regenerated map in the same change.
+
+## 2026-09-25 (108) -- consolidation step 6: the props-only loader and xfp retired
+
+Two deletions from the consolidation plan (section 2 and step 6), each
+checked for a live consumer first:
+
+- **The props-only chat loader** (`props/skill/`, `props/build_skill.py`,
+  `props/tests/test_bootstrap.py`; PR #77). The user retired the
+  nfl-prop-research skill on 2026-09-24; chat runs the one skill in
+  `skill/`. Every protection the old tests pinned is covered by
+  `tests/test_skill_release.py` for the one bootstrap; the absolute-path case
+  moved there. The two suites' `bootstrap` modules no longer collide, so
+  `pytest tests props/tests` runs in one call.
+- **`manager/xfp.py`** with `scripts/xfp_eval.py` and its tests. Research
+  only, no caller anywhere; its opportunity metrics (snap, target and
+  air-yards share, WOPR) live in `fantasy/evidence.py`. It leaves the
+  scoring allowlist, which now holds only the props engine's
+  `parse_scoring`. `reports/xfp_eval.md` stays as the evidence the decision
+  rests on; the script that generated it is in git history.
+
+**Not deleted: `model_projection`.** Draft-only -- nothing in-season calls
+it -- but `config.yaml` still names it as the projection source Omnibeta
+drafted on, and `scripts/board_identity.py` (a byte-identity check CLAUDE.md
+protects), the source-gate backtest and the tail-curve gate run through it.
+**User decision:** frozen with the draft engine until August draft prep,
+deleted when the draft switches to `fantasy/sources` and Omnibeta's board is
+rebuilt on the external source. The registry says so (`retire_in`).
+

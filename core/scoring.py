@@ -15,9 +15,9 @@ both are served:
 It replaced the copies in draftkit.seasondata.score_projection (now an alias),
 the inline sums in draftkit.consensus.score_rows and
 scripts/projection_backtest.py, manager.consensus._score, and draftkit.dataset's
-column map. Two remain on an allowlist that may only shrink: manager.xfp
-(deleted in step 6) and the props engine's parse_scoring (props adopts core
-last). tests/test_core_guardrails.py fails on any new copy.
+column map. One remains on an allowlist that may only shrink: the props
+engine's parse_scoring (props adopts core last; manager.xfp, the other, was
+deleted in step 6). tests/test_core_guardrails.py fails on any new copy.
 """
 
 from __future__ import annotations
