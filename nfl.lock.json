@@ -1,8 +1,8 @@
 {
  "algorithm": "nfl-release-sha256-lf-1",
- "file_count": 179,
+ "file_count": 180,
  "files": {
-  "CHAT.md": "9fa5b8897eec7674739fe78d76666e0c7d75d14710f14568b6304208a79a52ad",
+  "CHAT.md": "d67c72c3bfae197ca885edcd89d0b92760e096a4bd62dc5c6e08e03fbadf474f",
   "config.yaml": "6bb984752e302548f7892672d2d70b66468c1c089f7baa46d5f2b8d847042e02",
   "core/__init__.py": "8ac9ed217e439f5828616ab66ec9ff17336c2cbbbeae391d0f9bfa001eaed571",
   "core/fetch.py": "95fc16bbd91a3a19086c8c2f64c9d101abc85baae2452c1ed778c84a21f9ad33",
@@ -87,6 +87,7 @@
   "fantasy/sources/__init__.py": "8af3e9471cfda72f6c3ad11096323fa7d96632bd9634eeb8742c741a16885862",
   "fantasy/sources/market_points.py": "f18efb522e936243661f60f40e3fd4ab51474788175c7d92c4e8d78f81c4d7b2",
   "fantasy/sources/sleeper_weekly.py": "aa17feebc8f391a96b12cc1b1b2da78ba66b3fbb8fa25b6ab0bb26724268bae9",
+  "fantasy/trade.py": "144e264878767ee81e420ea7b9222c4abe376876f0038c9c103ee5d516ddb922",
   "fantasy/waiver.py": "0daace7b1ec1e59330ec84213715485d388b6078d57b345ca379e02669bdfbdb",
   "fantasy/weekly.py": "c53f0560d40ed9c5c99da07822ab87297b2ab76ef39a3cd36932aece3c6c2247",
   "fantasy/winprob.py": "d8791fd112bbe14d4906a96083d31c2601d1823d828d34c151bc9ba22279c5d6",
@@ -125,7 +126,7 @@
   "manager/yahoo_api.py": "4a101f7aa12033a3000430a4acdf186800d77c235bf34da5bbc40293abc7024e",
   "manager/yahoo_context.py": "0aa541b5c73457d09f4aa3bbfdda14d66d8051835370073fb9f2a12f57f9ab34",
   "manager/yahoo_sync.py": "3ea0dba0ea5b03e561952cbdd2b40eba7b9a7c328691258915b7c29aadc54b90",
-  "nfl.py": "30e7c450bcf74225dbe286047dd094fce9b4b8ad7406b3575d9e3ff5f6228303",
+  "nfl.py": "7c1d4e3a5e6087a65f0d4b06d3ccfd770662f95753727a12b507d9c44c20dae8",
   "props/engine/SKILL.md": "dd19c9ac036d80513685282e401b3d6fdeface2d64a131c9ed516efed5a1169e",
   "props/engine/resources/calibration_2025.csv": "47e3922c7af818307831d70a3d2be4333200f3aee1d94dc6bbf6e0e9ccee4ac8",
   "props/engine/resources/data_source_matrix.md": "2088a5ebe6164a75c11331367fda734d4b10ea217704320321a3f2aec6bb9c2b",
@@ -182,6 +183,6 @@
   "tiers.csv": "04a1a79d43e9f2445ba3dc4ea262b00fbd58efea1f41e8b0393cb4c7f8afee41",
   "tiers.keefamania.csv": "11e6546b56caa807a572da86d5c3d81097bafd2d2550e25653882d78b2962e94"
  },
- "sha256": "32b014904cfa39fd571c172242d21f1e51198275c561c41c83d5291669b491a9",
- "tag": "nfl-v1.3"
+ "sha256": "1be8cfd0a1eccc81782325b557ed0ee6329054e35e48bca1d8664e445e466a5d",
+ "tag": "nfl-v1.4"
 }

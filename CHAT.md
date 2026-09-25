@@ -61,6 +61,8 @@ names a week.
 | who to start / sit, this week's matchup | `nfl.py fantasy lineup --league L` |
 | waiver targets at RB / WR / TE | `nfl.py fantasy waiver --league L --pos RB,WR --horizon H` |
 | should I pick up X over someone on my bench | the same waiver run at X's position; find X in the candidate table and the cut it pairs with |
+| should I trade X for Y / is this offer fair | `nfl.py fantasy trade --league L --give "X" --get "Y"` (comma lists for 2-for-1s) |
+| hold or sell an injured player | the trade command on the offer or a realistic one, with `--back "X:WEEK"` from the latest reporting |
 | how does X do if teammate Y is out | `nfl.py fantasy scenario --league L --player "X" --out "Y"` |
 | is it too early / what is posted yet | `nfl.py status [--league L]` |
 | a fantasy and a betting question together | both commands, two labelled sections, never mixed |
@@ -79,8 +81,17 @@ not estimate X's value in chat.
 matches nobody, matches several players, names two teams, or the team is on
 bye. Relay that message and ask; do not guess a player.
 
-**No command covers it** (trades, draft, rest-of-season rankings, dynasty,
-DFS): say the release does not model it. A further opinion is allowed only
+**Trades** are the waiver arithmetic run on both rosters: season points your
+best lineup gains or loses (weeks a player would start; byes and missed weeks
+out; fantasy playoffs on their own), and the same for the partner -- an offer
+that only helps you is one they refuse. An injured player's return: when the
+news gives a timeline, pass it with `--back "NAME:WEEK"` and say where it came
+from; otherwise the report assumes the NFL minimum for his status and says so.
+Lead with the verdict for you, then whether the partner gains, then why. The
+command resolves names on the rosters; `TRADE: ...` means a name matched nobody
+or several players, or the players you get sit on more than one roster -- ask.
+
+**No command covers it** (draft, rest-of-season rankings, dynasty, DFS): say the release does not model it. A further opinion is allowed only
 labelled as outside the engine, and it cites no engine number it did not
 print.
 

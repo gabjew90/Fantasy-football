@@ -81,6 +81,14 @@ def cmd_fantasy(a) -> int:
     if a.what == "lineup":
         from fantasy import lineup as LU
         r = LU.run(a.league, a.week, record=a.record)
+    elif a.what == "trade":
+        from fantasy import trade as TR
+        split = lambda v: [x.strip() for x in (v or "").split(",") if x.strip()]
+        try:
+            r = TR.run(a.league, split(a.give), split(a.get), back=a.back or [], week=a.week)
+        except TR.TradeError as ex:
+            print(f"TRADE: {ex}", file=sys.stderr)
+            return 2
     elif a.what == "waiver":
         from fantasy import waiver as WV
         pos = tuple(x.strip().upper() for x in (a.pos or "RB,WR,TE").split(",") if x.strip())
@@ -125,13 +133,17 @@ def main(argv=None) -> int:
     p.set_defaults(fn=cmd_props)
 
     f = sub.add_parser("fantasy", help="fantasy decisions")
-    f.add_argument("what", choices=("lineup", "scenario", "waiver"))
+    f.add_argument("what", choices=("lineup", "scenario", "waiver", "trade"))
     f.add_argument("--league", required=True)
     f.add_argument("--week", type=int)
     f.add_argument("--record", action="store_true", help="append to the graded ledger (scheduled runs only)")
     f.add_argument("--player")
     f.add_argument("--out")
     f.add_argument("--pos", help="waiver: positions, e.g. RB,WR (default RB,WR,TE)")
+    f.add_argument("--give", help="trade: players leaving my roster, comma-separated")
+    f.add_argument("--get", help="trade: players arriving, comma-separated, all from one roster")
+    f.add_argument("--back", action="append",
+                   help="trade: NAME:WEEK, the first week a player plays (repeatable); overrides the status minimum")
     f.add_argument("--horizon", choices=("stream", "season"), default="season",
                    help="waiver: stream (this week) or season (a league-winner candidate)")
     f.set_defaults(fn=cmd_fantasy)

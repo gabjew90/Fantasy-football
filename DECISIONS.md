@@ -5661,3 +5661,25 @@ have kept arriving as files (now: the reply is the answer; a file only when
 asked -- props-v1.22); three rules each claimed a reply's first lines (the
 order is now stated: release line, gate line, answer); '8 of 10' could read as
 a record (now '8th of 10 teams'); the record line had no test.
+
+## 2026-09-24 (102) -- `nfl fantasy trade`: the waiver arithmetic on both rosters (nfl-v1.4)
+
+The user's point: a waiver add/drop is a trade with the wire, so trades need no
+engine of their own. `fantasy/trade.py` reuses waiver.season_gain (best lineup
+week by week, only weeks a player would start, byes and expected missed weeks,
+fantasy-playoff weeks shown on their own), the consensus rates, the standing
+and the blocking rule, and runs them for BOTH rosters -- a trade that only
+helps me is an offer the partner refuses, so the report says whether they gain.
+
+- Names resolve on the rosters ('AJ Brown' finds 'A.J. Brown'); a miss, an
+  ambiguity or players from two rosters is an error, never a guess.
+- `--back "NAME:WEEK"` carries a reported return week (the session log's A.J.
+  Brown case: IR alone assumed the four-week minimum against a six-week
+  report); otherwise the status minimum is assumed and labelled.
+- Roster size: an overfull side drops its cheapest unprotected bench player
+  (never the arrival); a side left short fills the spot with the free agent who
+  adds most to its lineup -- the best free agent by rate was a QB who would
+  never start (first run: Henry + Deebo for Bowers read -45.1 with an empty
+  spot, -22.9 with the right replacement).
+- Verdict bands: 5 season points either way, the waiver command's season line.
+  Not modelled: role duration, league trade rules, the partner's own valuation.
