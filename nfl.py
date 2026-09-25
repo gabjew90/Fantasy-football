@@ -13,7 +13,8 @@ Reports and decision records go to $NFL_OUT (default /mnt/user-data/outputs).
 `--record` appends to the graded ledger. A chat session never passes it (chat
 is read-only, as for the props record); the scheduled runs will, from step 6.
 
-TROUBLESHOOTING LOG (temporary, `session_log` in config.yaml): every command
+TROUBLESHOOTING LOG (temporary, `session_log` in config.yaml; inside a chat
+release only, or with NFL_SESSION_LOG=1): every command
 appends one JSON line to $NFL_OUT/nfl_session_log.jsonl -- the release, the
 command and its arguments, exit code, duration, the error if one was raised,
 the data gate and the inputs' freshness, and the bootstrap's setup facts. No
@@ -190,13 +191,15 @@ def _session_log(argv, rc, err, seconds, result) -> None:
     try:
         import yaml
         cfg = yaml.safe_load((ROOT / "config.yaml").read_text(encoding="utf-8")) or {}
-        if not cfg.get("session_log"):
+        stamp = ROOT.with_name(ROOT.name + ".stamp.json")     # written by the chat bootstrap, beside the release
+        # a chat shakedown aid: on inside a chat release (the stamp exists) or
+        # when asked for, never silently in local or scheduled runs
+        if not cfg.get("session_log") or not (stamp.exists() or os.environ.get("NFL_SESSION_LOG") == "1"):
             return
         out = Path(os.environ.get("NFL_OUT", "/mnt/user-data/outputs"))
         out.mkdir(parents=True, exist_ok=True)
         lock = ROOT / "nfl.lock.json"
         release = json.loads(lock.read_text(encoding="utf-8")).get("tag") if lock.exists() else None
-        stamp = ROOT.with_name(ROOT.name + ".stamp.json")     # written by the chat bootstrap, beside the release
         setup = {}
         if stamp.exists():
             s = json.loads(stamp.read_text(encoding="utf-8"))

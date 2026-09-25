@@ -59,7 +59,7 @@ COMPONENTS: tuple[Component, ...] = (
               note="props-v1.21 (DECISIONS #100): starting QBs (carry grid + kneel-downs, own width "
                    "settings) pass all four checks -- 22.0% outside p10-p90, worst bucket 2.9 points; running "
                    "backs 20.3% and 3.4 points, 0.4 over the calibration limit -- USER DECISION: noise, kept "
-                   "live. Known: backs run ~4% low (shares summing past 1 are scaled down); QBs ran ~11% "
+                   "live. Known: backs run ~4% low (shares summing past 1 are scaled down); QBs ran ~12% "
                    "high in 2025. The run-defense adjustment is measured to help. Not tested against posted "
                    "lines",
               markets=("player_rush_yds",)),

@@ -275,6 +275,7 @@ def test_the_bootstrap_retries_an_externally_managed_pip():
 def test_every_command_leaves_a_troubleshooting_line_without_secrets(tmp_path, monkeypatch):
     import nfl
     monkeypatch.setenv("NFL_OUT", str(tmp_path))
+    monkeypatch.setenv("NFL_SESSION_LOG", "1")
     monkeypatch.setenv("YAHOO_CLIENT_SECRET", "s3cret-value")
 
     class R:

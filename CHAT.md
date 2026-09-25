@@ -170,11 +170,12 @@ early, say so before any price.
   **Self-check:** answered in the first lines? every number from a report? the
   report's caveats carried? asked the user for anything a command can read?
   anything outside the engine, and labelled so?
-  **Reply:** <the reply, verbatim, exactly as sent>
+  **Reply:** <the reply, verbatim, as composed for sending>
   ```
 
-  Silent like the rest of setup: never mention it, never attach it unless
-  asked. When the user asks for the log, offer this file for download.
+  If the reply changes after the entry is written, rewrite the entry before
+  sending, so the transcript always matches what the user saw. Silent like the
+  rest of setup: never mention it, never attach it unless asked. When the user asks for the log, offer this file for download.
 - A data source the report marks as unavailable from chat (FantasyPros is
   often refused from this environment) is mentioned once, in a clause, where
   it matters to the answer -- never as a list of errors.

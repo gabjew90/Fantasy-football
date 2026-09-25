@@ -282,3 +282,14 @@ def test_rescaling_settings_are_validated():
     for bad in ({"rush_other_share": 1.2}, {"rush_norm_strength": 2.0}, {"rush_other_share": -0.1}):
         with pytest.raises(ValueError):
             M.validate_width(bad)
+
+
+def test_the_tuner_adds_markets_on_their_own_populations_relative_to_their_baselines(backtest):
+    f = pd.DataFrame({"crps_rush_model": [10.0, 20.0, 5.0, float("nan")],
+                      "crps_qbrush_model": [float("nan"), float("nan"), 4.0, 8.0],
+                      "rush_pop": [True, True, False, False], "qb_pop": [False, False, True, True]})
+    out = backtest.composite_rows(f, ("rush", "qbrush"), {"rush": 10.0, "qbrush": 4.0})
+    assert list(out) == [1.0, 2.0, 1.0, 2.0], "each row scored on its own market, relative to its own base"
+    none = f.assign(rush_pop=False, qb_pop=False)
+    assert backtest.composite_rows(none, ("rush", "qbrush"), {"rush": 10.0, "qbrush": 4.0}).isna().all()
+

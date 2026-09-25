@@ -5615,7 +5615,7 @@ Step 3 of docs/plans/2026-09-24-yardage-harness.md.
   backs stay live. The 3.0 limit is unchanged for future changes -- this is a
   recorded judgement on this release, not a looser rule, and the report still
   prints the strict verdict.
-- **Known, not noise:** QBs ran ~11% high in 2025; running backs run ~4% low
+- **Known, not noise:** QBs ran ~12% high in 2025; running backs run ~4% low
   pooled, because players' shares that sum past 1 are scaled down -- the next
   fix.
 
@@ -5712,7 +5712,8 @@ The running backs ran ~4% under their projection on 2024-25 (DECISIONS #100).
   (`--tune-grid rushnorm`: backs + QB rushing together; reports/
   width_tuning_rushnorm.md).
 - **Result on 2024-25: no better than what ships.** Backs 4.8% low (live:
-  3.9%), QBs 6.7% high and BIASED (live: 4.7%), CRPS changes within noise.
+  3.9%), QBs 7.2% high and BIASED (live: 4.9%), CRPS changes within noise.
+  (Model excess = 1 / (actual/model) - 1.)
   Not shipped. The scorer's output is byte-identical to props-v1.22 (KC@MIA).
 - **Disclosed:** two design variants (rescale the QB too, or not) were each
   run on 2024-25 before the choice between them was put into the 2022-23
