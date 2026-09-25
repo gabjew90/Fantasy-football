@@ -201,3 +201,64 @@ def test_a_saved_run_says_what_it_is(backtest, tmp_path):
     assert backtest.load_run(f, "width_tuning")["grid"] == []
     with pytest.raises(SystemExit, match="not a harness run"):
         backtest.load_run(f, "harness")
+
+
+def _rush(**kw):
+    return M.simulate_team_rush(np.random.default_rng(9), 5000, 26.0, 30.0, [0.5, 0.15, 0.1], [4.5, 5.6, 4.0],
+                                RESID, **kw)
+
+
+def test_qb_grid_and_kneels_move_only_the_qb():
+    base_car, base_y, base_tc = _rush()
+    qb_grid = RESID * 0.5          # zero-mean, a different shape, the league grid's length
+    kneels = [-1.0] * 100 + [0.0] * 101                          # a kneel-yards grid
+    car, y, tc = _rush(player_resid=[None, qb_grid, None], player_kneel=[None, kneels, None])
+    assert np.array_equal(tc, base_tc) and all(np.array_equal(a, b) for a, b in zip(car, base_car))
+    assert np.array_equal(y[0], base_y[0]) and np.array_equal(y[2], base_y[2]), "the RBs' numbers do not move"
+    assert not np.array_equal(y[1], base_y[1])
+    assert (y[1] - base_y[1]).mean() < 0, "kneel-downs only ever take yards away here"
+
+
+def test_a_qb_grid_of_another_length_is_refused():
+    with pytest.raises(ValueError, match="length"):
+        _rush(player_resid=[None, np.zeros(11), None])
+
+
+def test_the_kneel_grid_follows_the_teams_own_spread():
+    P = {"qb_kneel_yards_by_spread": {"edges": [-3.0, 3.0, 7.0], "grids": [["dog"], ["pk"], ["fav"], ["big"]]}}
+    assert M.kneel_grid(P, -6.5) == ["dog"] and M.kneel_grid(P, 0.0) == ["pk"]
+    assert M.kneel_grid(P, 3.0) == ["fav"] and M.kneel_grid(P, 10.0) == ["big"]
+    assert M.kneel_grid(P, None) is None and M.kneel_grid({}, 3.0) is None
+
+
+def test_the_qb_first_split_keeps_every_mean_and_is_off_until_set():
+    shares, ypc = [0.45, 0.2, 0.12], [4.5, 4.0, 5.6]
+    off = M.simulate_team_rush(np.random.default_rng(4), 20000, 26.0, 30.0, shares, ypc, RESID,
+                               width={"share_conc_carries": 20.0}, qb_index=2)
+    base = M.simulate_team_rush(np.random.default_rng(4), 20000, 26.0, 30.0, shares, ypc, RESID,
+                                width={"share_conc_carries": 20.0})
+    assert all(np.array_equal(a, b) for a, b in zip(off[1], base[1])), "qb_index alone changes nothing"
+    on = M.simulate_team_rush(np.random.default_rng(4), 20000, 26.0, 30.0, shares, ypc, RESID,
+                              width={"share_conc_carries": 20.0, "share_conc_qb": 80.0}, qb_index=2)
+    for j, q in enumerate(shares):
+        assert on[0][j].mean() == pytest.approx(26.0 * q, rel=0.04)
+    assert on[0][2].std() < base[0][2].std(), "his own, tighter swing than the RB-tuned Dirichlet gave him"
+
+
+def test_book_spread_becomes_the_teams_own_positive_when_favoured():
+    # a book's 'KC -7' at home is home_spread -7: KC is favoured by 7
+    assert M.own_spread_from_book(-7.0, is_home=True) == 7.0
+    assert M.own_spread_from_book(-7.0, is_home=False) == -7.0
+    assert M.own_spread_from_book(None, is_home=True) is None
+
+
+def test_no_spread_yet_uses_the_pooled_kneel_grid():
+    P = {"qb_kneel_yards_by_spread": {"edges": [-3.0, 3.0, 7.0], "grids": [[1], [2], [3], [4]], "pooled": [0]}}
+    assert M.kneel_grid(P, None) == [0] and M.kneel_grid(P, float("nan")) == [0]
+
+
+def test_the_starter_is_the_qb_with_the_carries_not_the_slot():
+    # QB1 ruled out and removed: the backup keeps his QB2 slot and is the starter
+    assert M.starter_qb_index(["RB1", "QB2", "WR1"], [0.5, 0.12, 0.02]) == 1
+    assert M.starter_qb_index(["QB", "QB", "RB"], [0.02, 0.15, 0.5]) == 1
+    assert M.starter_qb_index(["RB", "WR"], [0.5, 0.1]) is None

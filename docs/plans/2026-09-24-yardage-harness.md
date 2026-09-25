@@ -72,7 +72,12 @@ worst on the low side (players bust more often than the model allows).
    game-level swing; no allowance for leaving a game early. Tuned on 2022-23
    only, judged on 2024-25.
 3. Rushing yards: opponent run-defense adjustment, QB rushing (kneel-downs
-   count at the book).
+   count at the book). -- DONE, props-v1.21: the run-defense adjustment already
+   existed and measures as helping; QB rushing is simulated (own carry grid,
+   kneel-downs by spread, own width settings) and priced, and passes. Running
+   backs miss the calibration limit by 0.4 points; the user judged it noise
+   (DECISIONS #100). Next fix found on the way: backs run ~4% low because shares
+   summing past 1 are scaled down.
 4. QB passing yards from the team simulation (the team's receiving yards are
    the QB's passing yards before sacks), plus who is under center. It inherits
    step 2.

@@ -60,26 +60,51 @@ Criteria for `live` (docs/plans/2026-09-24-yardage-harness.md), all on the test 
 
 | Seasons | Weeks | N | CRPS model | CRPS baseline A | Gain (95% CI) | Actual/model | PIT mean | Outside p10-p90 (0.20) | |
 |---|---|---|---|---|---|---|---|---|---|
-| 2022 | weeks 2-4 | 189 | 17.170 | 18.743 | +1.572 (+0.763, +2.482) **(excl. 0)** | 0.992 | 0.510 | 0.222 |  |
-| 2022 | weeks 5-18 | 821 | 17.080 | 17.303 | +0.223 (+0.045, +0.397) **(excl. 0)** | 1.016 | 0.506 | 0.230 |  |
-| 2022 | all weeks | 1010 | 17.097 | 17.572 | +0.476 (+0.255, +0.698) **(excl. 0)** | 1.011 | 0.507 | 0.229 |  |
-| 2023 | weeks 2-4 | 175 | 15.686 | 16.575 | +0.888 (+0.023, +1.775) **(excl. 0)** | 0.961 | 0.506 | 0.217 |  |
-| 2023 | weeks 5-18 | 811 | 15.386 | 15.586 | +0.201 (-0.002, +0.407) | 0.993 | 0.502 | 0.179 |  |
-| 2023 | all weeks | 986 | 15.439 | 15.762 | +0.323 (+0.089, +0.557) **(excl. 0)** | 0.987 | 0.503 | 0.186 |  |
-| 2024 | weeks 2-4 | 185 | 16.971 | 18.271 | +1.300 (+0.441, +2.146) **(excl. 0)** | 1.042 | 0.520 | 0.238 |  |
-| 2024 | weeks 5-18 | 851 | 15.300 | 15.507 | +0.208 (+0.035, +0.396) **(excl. 0)** | 1.003 | 0.499 | 0.193 |  |
-| 2024 | all weeks | 1036 | 15.598 | 16.001 | +0.403 (+0.208, +0.624) **(excl. 0)** | 1.010 | 0.503 | 0.201 |  |
-| 2025 | weeks 2-4 | 187 | 15.898 | 18.388 | +2.490 (+0.910, +4.107) **(excl. 0)** | 1.037 | 0.522 | 0.193 |  |
-| 2025 | weeks 5-18 | 810 | 17.266 | 17.593 | +0.327 (-0.005, +0.673) | 1.035 | 0.523 | 0.191 |  |
-| 2025 | all weeks | 997 | 17.009 | 17.742 | +0.733 (+0.340, +1.163) **(excl. 0)** | 1.036 | 0.523 | 0.192 |  |
-| tune 2022+2023 | weeks 2-4 | 364 | 16.457 | 17.700 | +1.244 (+0.661, +1.845) **(excl. 0)** | 0.977 | 0.508 | 0.220 |  |
-| tune 2022+2023 | weeks 5-18 | 1632 | 16.238 | 16.450 | +0.212 (+0.083, +0.346) **(excl. 0)** | 1.005 | 0.504 | 0.205 |  |
-| tune 2022+2023 | all weeks | 1996 | 16.278 | 16.678 | +0.400 (+0.238, +0.566) **(excl. 0)** | 0.999 | 0.505 | 0.207 |  |
-| TEST 2024+2025 | weeks 2-4 | 372 | 16.431 | 18.330 | +1.898 (+1.018, +2.785) **(excl. 0)** | 1.039 | 0.521 | 0.215 |  |
-| TEST 2024+2025 | weeks 5-18 | 1661 | 16.259 | 16.524 | +0.266 (+0.078, +0.450) **(excl. 0)** | 1.019 | 0.511 | 0.192 |  |
-| TEST 2024+2025 | all weeks | 2033 | 16.290 | 16.855 | +0.564 (+0.339, +0.802) **(excl. 0)** | 1.023 | 0.513 | 0.196 |  |
+| 2022 | weeks 2-4 | 189 | 17.189 | 18.757 | +1.568 (+0.790, +2.448) **(excl. 0)** | 1.000 | 0.512 | 0.238 |  |
+| 2022 | weeks 5-18 | 821 | 17.051 | 17.257 | +0.207 (+0.026, +0.378) **(excl. 0)** | 1.028 | 0.511 | 0.219 |  |
+| 2022 | all weeks | 1010 | 17.077 | 17.538 | +0.461 (+0.249, +0.678) **(excl. 0)** | 1.023 | 0.511 | 0.223 |  |
+| 2023 | weeks 2-4 | 175 | 15.721 | 16.650 | +0.928 (+0.073, +1.805) **(excl. 0)** | 0.969 | 0.508 | 0.206 |  |
+| 2023 | weeks 5-18 | 811 | 15.343 | 15.503 | +0.160 (-0.049, +0.368) | 1.005 | 0.507 | 0.179 |  |
+| 2023 | all weeks | 986 | 15.410 | 15.707 | +0.297 (+0.062, +0.536) **(excl. 0)** | 0.998 | 0.507 | 0.184 |  |
+| 2024 | weeks 2-4 | 185 | 17.040 | 18.310 | +1.270 (+0.398, +2.139) **(excl. 0)** | 1.049 | 0.523 | 0.249 |  |
+| 2024 | weeks 5-18 | 851 | 15.289 | 15.474 | +0.185 (+0.004, +0.377) **(excl. 0)** | 1.021 | 0.506 | 0.195 |  |
+| 2024 | all weeks | 1036 | 15.602 | 15.980 | +0.378 (+0.178, +0.603) **(excl. 0)** | 1.026 | 0.509 | 0.205 |  |
+| 2025 | weeks 2-4 | 187 | 15.890 | 18.456 | +2.566 (+0.931, +4.242) **(excl. 0)** | 1.060 | 0.530 | 0.198 | BIASED |
+| 2025 | weeks 5-18 | 810 | 17.211 | 17.604 | +0.393 (+0.053, +0.739) **(excl. 0)** | 1.049 | 0.527 | 0.201 |  |
+| 2025 | all weeks | 997 | 16.963 | 17.764 | +0.801 (+0.402, +1.232) **(excl. 0)** | 1.051 | 0.527 | 0.201 | BIASED |
+| tune 2022+2023 | weeks 2-4 | 364 | 16.483 | 17.744 | +1.260 (+0.683, +1.863) **(excl. 0)** | 0.986 | 0.510 | 0.223 |  |
+| tune 2022+2023 | weeks 5-18 | 1632 | 16.202 | 16.386 | +0.184 (+0.050, +0.317) **(excl. 0)** | 1.017 | 0.509 | 0.199 |  |
+| tune 2022+2023 | all weeks | 1996 | 16.253 | 16.633 | +0.380 (+0.216, +0.547) **(excl. 0)** | 1.011 | 0.509 | 0.203 |  |
+| TEST 2024+2025 | weeks 2-4 | 372 | 16.462 | 18.383 | +1.921 (+1.024, +2.846) **(excl. 0)** | 1.055 | 0.527 | 0.223 | BIASED |
+| TEST 2024+2025 | weeks 5-18 | 1661 | 16.227 | 16.513 | +0.286 (+0.093, +0.479) **(excl. 0)** | 1.035 | 0.516 | 0.198 |  |
+| TEST 2024+2025 | all weeks | 2033 | 16.270 | 16.855 | +0.586 (+0.355, +0.824) **(excl. 0)** | 1.039 | 0.518 | 0.203 |  |
 
-**Verdict on the test seasons: PASSES** -- beats baseline A each season: yes; unbiased: yes; width (0.196 outside p10-p90): yes; calibration (worst 60-90% gap 0.029): yes.
+**Verdict on the test seasons: DOES NOT PASS** -- beats baseline A each season: yes; unbiased: yes; width (0.203 outside p10-p90): yes; calibration (worst 60-90% gap 0.034): **no**.
+
+## Qb rushing yards
+
+| Seasons | Weeks | N | CRPS model | CRPS baseline A | Gain (95% CI) | Actual/model | PIT mean | Outside p10-p90 (0.20) | |
+|---|---|---|---|---|---|---|---|---|---|
+| 2022 | weeks 2-4 | 91 | 8.822 | 9.598 | +0.776 (+0.094, +1.448) **(excl. 0)** | 0.993 | 0.502 | 0.242 |  |
+| 2022 | weeks 5-18 | 377 | 9.231 | 9.408 | +0.177 (+0.012, +0.343) **(excl. 0)** | 1.155 | 0.551 | 0.228 | BIASED |
+| 2022 | all weeks | 468 | 9.152 | 9.445 | +0.294 (+0.098, +0.490) **(excl. 0)** | 1.123 | 0.541 | 0.231 | BIASED |
+| 2023 | weeks 2-4 | 92 | 9.355 | 9.861 | +0.505 (-0.272, +1.301) | 0.953 | 0.515 | 0.207 |  |
+| 2023 | weeks 5-18 | 378 | 8.167 | 8.348 | +0.182 (+0.022, +0.351) **(excl. 0)** | 0.987 | 0.505 | 0.196 |  |
+| 2023 | all weeks | 470 | 8.399 | 8.644 | +0.245 (+0.049, +0.454) **(excl. 0)** | 0.980 | 0.507 | 0.198 |  |
+| 2024 | weeks 2-4 | 92 | 8.457 | 9.933 | +1.476 (+0.583, +2.446) **(excl. 0)** | 0.810 | 0.439 | 0.196 | BIASED |
+| 2024 | weeks 5-18 | 389 | 9.252 | 9.423 | +0.171 (+0.011, +0.339) **(excl. 0)** | 1.075 | 0.527 | 0.252 | BIASED |
+| 2024 | all weeks | 481 | 9.100 | 9.520 | +0.420 (+0.195, +0.662) **(excl. 0)** | 1.013 | 0.510 | 0.241 |  |
+| 2025 | weeks 2-4 | 90 | 8.260 | 9.964 | +1.704 (+0.457, +2.993) **(excl. 0)** | 0.845 | 0.462 | 0.100 | BIASED |
+| 2025 | weeks 5-18 | 389 | 8.264 | 8.444 | +0.180 (-0.068, +0.420) | 0.906 | 0.487 | 0.221 | BIASED |
+| 2025 | all weeks | 479 | 8.263 | 8.729 | +0.466 (+0.160, +0.794) **(excl. 0)** | 0.893 | 0.482 | 0.198 | BIASED |
+| tune 2022+2023 | weeks 2-4 | 183 | 9.090 | 9.730 | +0.640 (+0.108, +1.145) **(excl. 0)** | 0.972 | 0.508 | 0.224 |  |
+| tune 2022+2023 | weeks 5-18 | 755 | 8.698 | 8.878 | +0.179 (+0.063, +0.293) **(excl. 0)** | 1.072 | 0.528 | 0.212 | BIASED |
+| tune 2022+2023 | all weeks | 938 | 8.775 | 9.044 | +0.269 (+0.130, +0.417) **(excl. 0)** | 1.051 | 0.524 | 0.214 | BIASED |
+| TEST 2024+2025 | weeks 2-4 | 182 | 8.359 | 9.948 | +1.589 (+0.805, +2.420) **(excl. 0)** | 0.827 | 0.451 | 0.148 | BIASED |
+| TEST 2024+2025 | weeks 5-18 | 778 | 8.758 | 8.933 | +0.175 (+0.032, +0.320) **(excl. 0)** | 0.990 | 0.507 | 0.237 |  |
+| TEST 2024+2025 | all weeks | 960 | 8.682 | 9.126 | +0.443 (+0.247, +0.644) **(excl. 0)** | 0.953 | 0.496 | 0.220 |  |
+
+**Verdict on the test seasons: PASSES** -- beats baseline A each season: yes; unbiased: yes; width (0.220 outside p10-p90): yes; calibration (worst 60-90% gap 0.029): yes.
 
 ## Reliability at synthetic lines, test seasons
 
@@ -89,6 +114,16 @@ Lines placed at fixed offsets from the model median; a calibrated 70% bucket win
 
 | Market | Side | Model probability | N | Model mean | Realized | Gap |
 |---|---|---|---|---|---|---|
+| QB rushing yards | Over | 50-60 | 500 | 0.562 | 0.570 | +0.008 |
+| QB rushing yards | Over | 60-70 | 896 | 0.650 | 0.666 | +0.017 |
+| QB rushing yards | Over | 70-80 | 843 | 0.751 | 0.744 | -0.008 |
+| QB rushing yards | Over | 80-90 | 824 | 0.844 | 0.816 | -0.028 |
+| QB rushing yards | Over | 90+ | 357 | 0.935 | 0.896 | -0.039 |
+| QB rushing yards | Under | 50-60 | 193 | 0.583 | 0.658 | +0.075 |
+| QB rushing yards | Under | 60-70 | 798 | 0.651 | 0.652 | +0.001 |
+| QB rushing yards | Under | 70-80 | 918 | 0.753 | 0.761 | +0.008 |
+| QB rushing yards | Under | 80-90 | 1104 | 0.851 | 0.822 | -0.029 |
+| QB rushing yards | Under | 90+ | 877 | 0.943 | 0.918 | -0.025 |
 | receiving yards | Over | 50-60 | 5493 | 0.563 | 0.587 | +0.024 |
 | receiving yards | Over | 60-70 | 7210 | 0.648 | 0.678 | +0.030 |
 | receiving yards | Over | 70-80 | 6014 | 0.749 | 0.776 | +0.027 |
@@ -109,21 +144,31 @@ Lines placed at fixed offsets from the model median; a calibrated 70% bucket win
 | receptions | Under | 70-80 | 3974 | 0.752 | 0.760 | +0.008 |
 | receptions | Under | 80-90 | 5909 | 0.853 | 0.856 | +0.002 |
 | receptions | Under | 90+ | 5821 | 0.943 | 0.936 | -0.007 |
-| rushing yards | Over | 50-60 | 1385 | 0.567 | 0.582 | +0.015 |
-| rushing yards | Over | 60-70 | 2307 | 0.648 | 0.670 | +0.022 |
-| rushing yards | Over | 70-80 | 1979 | 0.747 | 0.740 | -0.006 |
-| rushing yards | Over | 80-90 | 1695 | 0.848 | 0.843 | -0.005 |
-| rushing yards | Over | 90+ | 799 | 0.929 | 0.929 | -0.000 |
-| rushing yards | Under | 50-60 | 1562 | 0.569 | 0.556 | -0.013 |
-| rushing yards | Under | 60-70 | 2849 | 0.650 | 0.625 | -0.025 |
-| rushing yards | Under | 70-80 | 2245 | 0.748 | 0.737 | -0.011 |
-| rushing yards | Under | 80-90 | 1270 | 0.844 | 0.815 | -0.029 |
-| rushing yards | Under | 90+ | 379 | 0.934 | 0.836 | -0.098 |
+| rushing yards | Over | 50-60 | 1329 | 0.565 | 0.588 | +0.023 |
+| rushing yards | Over | 60-70 | 2310 | 0.648 | 0.667 | +0.018 |
+| rushing yards | Over | 70-80 | 1957 | 0.747 | 0.746 | -0.002 |
+| rushing yards | Over | 80-90 | 1719 | 0.849 | 0.853 | +0.005 |
+| rushing yards | Over | 90+ | 860 | 0.929 | 0.914 | -0.015 |
+| rushing yards | Under | 50-60 | 1504 | 0.569 | 0.539 | -0.030 |
+| rushing yards | Under | 60-70 | 2808 | 0.650 | 0.616 | -0.034 |
+| rushing yards | Under | 70-80 | 2265 | 0.748 | 0.726 | -0.022 |
+| rushing yards | Under | 80-90 | 1310 | 0.844 | 0.820 | -0.024 |
+| rushing yards | Under | 90+ | 418 | 0.934 | 0.849 | -0.085 |
 
 ### weeks 2-4
 
 | Market | Side | Model probability | N | Model mean | Realized | Gap |
 |---|---|---|---|---|---|---|
+| QB rushing yards | Over | 50-60 | 93 | 0.570 | 0.484 | -0.086 |
+| QB rushing yards | Over | 60-70 | 253 | 0.654 | 0.688 | +0.034 |
+| QB rushing yards | Over | 70-80 | 225 | 0.755 | 0.653 | -0.102 |
+| QB rushing yards | Over | 80-90 | 216 | 0.847 | 0.796 | -0.050 |
+| QB rushing yards | Over | 90+ | 108 | 0.937 | 0.935 | -0.001 |
+| QB rushing yards | Under | 50-60 | 66 | 0.582 | 0.667 | +0.085 |
+| QB rushing yards | Under | 60-70 | 211 | 0.650 | 0.725 | +0.075 |
+| QB rushing yards | Under | 70-80 | 244 | 0.754 | 0.820 | +0.066 |
+| QB rushing yards | Under | 80-90 | 248 | 0.851 | 0.907 | +0.056 |
+| QB rushing yards | Under | 90+ | 141 | 0.939 | 0.950 | +0.012 |
 | receiving yards | Over | 50-60 | 1107 | 0.566 | 0.579 | +0.013 |
 | receiving yards | Over | 60-70 | 1742 | 0.648 | 0.670 | +0.022 |
 | receiving yards | Over | 70-80 | 1467 | 0.746 | 0.783 | +0.037 |
@@ -144,30 +189,32 @@ Lines placed at fixed offsets from the model median; a calibrated 70% bucket win
 | receptions | Under | 70-80 | 944 | 0.752 | 0.762 | +0.009 |
 | receptions | Under | 80-90 | 1362 | 0.853 | 0.861 | +0.008 |
 | receptions | Under | 90+ | 1180 | 0.938 | 0.942 | +0.004 |
-| rushing yards | Over | 50-60 | 323 | 0.566 | 0.585 | +0.019 |
-| rushing yards | Over | 60-70 | 519 | 0.649 | 0.684 | +0.035 |
-| rushing yards | Over | 70-80 | 422 | 0.746 | 0.711 | -0.035 |
-| rushing yards | Over | 80-90 | 397 | 0.853 | 0.836 | -0.017 |
-| rushing yards | Over | 90+ | 169 | 0.929 | 0.917 | -0.012 |
-| rushing yards | Under | 50-60 | 347 | 0.569 | 0.530 | -0.038 |
-| rushing yards | Under | 60-70 | 641 | 0.650 | 0.602 | -0.047 |
-| rushing yards | Under | 70-80 | 499 | 0.747 | 0.697 | -0.049 |
-| rushing yards | Under | 80-90 | 296 | 0.843 | 0.791 | -0.052 |
-| rushing yards | Under | 90+ | 77 | 0.932 | 0.857 | -0.075 |
+| rushing yards | Over | 50-60 | 305 | 0.567 | 0.603 | +0.036 |
+| rushing yards | Over | 60-70 | 522 | 0.649 | 0.676 | +0.027 |
+| rushing yards | Over | 70-80 | 422 | 0.749 | 0.718 | -0.031 |
+| rushing yards | Over | 80-90 | 404 | 0.854 | 0.834 | -0.020 |
+| rushing yards | Over | 90+ | 177 | 0.931 | 0.915 | -0.015 |
+| rushing yards | Under | 50-60 | 334 | 0.569 | 0.551 | -0.018 |
+| rushing yards | Under | 60-70 | 635 | 0.650 | 0.584 | -0.066 |
+| rushing yards | Under | 70-80 | 514 | 0.749 | 0.712 | -0.036 |
+| rushing yards | Under | 80-90 | 298 | 0.846 | 0.779 | -0.067 |
+| rushing yards | Under | 90+ | 79 | 0.935 | 0.886 | -0.049 |
 
 
-## Change against the reference run (harness_off.pkl)
+## Change against the reference run (harness_qb.pkl)
 
 Paired by player-week, the model's own CRPS, reference minus this run (positive = this run is better), with a 95% interval from resampling whole games. All four seasons.
 
 | Games | Market | N | Reference CRPS | Change (95% CI) |
 |---|---|---|---|---|
-| all games | receptions | 13167 | 1.0374 | +0.0034 (+0.0016, +0.0051) **(excl. 0)** |
-| all games | receiving yards | 13167 | 13.4514 | -0.0236 (-0.0404, -0.0063) **(excl. 0)** |
-| all games | rushing yards | 4029 | 16.4702 | +0.1860 (+0.1309, +0.2436) **(excl. 0)** |
-| |spread|>=7 | receptions | 3441 | 1.0160 | +0.0020 (-0.0014, +0.0053) |
-| |spread|>=7 | receiving yards | 3441 | 13.0012 | -0.0197 (-0.0496, +0.0103) |
-| |spread|>=7 | rushing yards | 1056 | 15.9246 | +0.1043 (-0.0016, +0.2120) |
+| all games | receptions | 13167 | 1.0340 | +0.0000 (+0.0000, +0.0000) |
+| all games | receiving yards | 13167 | 13.4750 | +0.0000 (+0.0000, +0.0000) |
+| all games | rushing yards | 4029 | 16.2637 | +0.0021 (-0.0187, +0.0226) |
+| all games | QB rushing yards | 1898 | 8.7697 | +0.0417 (-0.0013, +0.0866) |
+| |spread|>=7 | receptions | 3441 | 1.0140 | +0.0000 (+0.0000, +0.0000) |
+| |spread|>=7 | receiving yards | 3441 | 13.0209 | +0.0000 (+0.0000, +0.0000) |
+| |spread|>=7 | rushing yards | 1056 | 15.7962 | +0.0028 (-0.0372, +0.0431) |
+| |spread|>=7 | QB rushing yards | 484 | 9.0333 | -0.0035 (-0.0948, +0.0848) |
 
 ## What this does not reproduce from the live scorer
 
@@ -178,7 +225,7 @@ Paired by player-week, the model's own CRPS, reference minus this run (positive 
 
 ## Settings
 
-- 2022: priors 2021, dispersion from prior, opponent team k0=150 on catch_rate,ypt,ypc; team targets r=31.6, carries r=22.8, per-catch shape 1.060; width settings {'share_conc_targets': 40.0, 'share_conc_carries': 20.0, 'catch_conc': None, 'eff_sd_rec': 0.0, 'eff_sd_rush': 0.3}
-- 2023: priors 2022, dispersion from prior, opponent team k0=150 on catch_rate,ypt,ypc; team targets r=25.4, carries r=23.3, per-catch shape 1.056; width settings {'share_conc_targets': 40.0, 'share_conc_carries': 20.0, 'catch_conc': None, 'eff_sd_rec': 0.0, 'eff_sd_rush': 0.3}
-- 2024: priors 2023, dispersion from prior, opponent team k0=150 on catch_rate,ypt,ypc; team targets r=52.8, carries r=25.4, per-catch shape 0.945; width settings {'share_conc_targets': 40.0, 'share_conc_carries': 20.0, 'catch_conc': None, 'eff_sd_rec': 0.0, 'eff_sd_rush': 0.3}
-- 2025: priors 2024, dispersion from prior, opponent team k0=150 on catch_rate,ypt,ypc; team targets r=35.7, carries r=26.4, per-catch shape 1.084; width settings {'share_conc_targets': 40.0, 'share_conc_carries': 20.0, 'catch_conc': None, 'eff_sd_rec': 0.0, 'eff_sd_rush': 0.3}
+- 2022: priors 2021, dispersion from prior, opponent team k0=150 on catch_rate,ypt,ypc; team targets r=31.6, carries r=22.8, per-catch shape 1.060; width settings {'share_conc_targets': 40.0, 'share_conc_carries': 20.0, 'catch_conc': None, 'eff_sd_rec': 0.0, 'eff_sd_rush': 0.3, 'share_conc_qb': 80.0, 'eff_sd_qb': 0.15}
+- 2023: priors 2022, dispersion from prior, opponent team k0=150 on catch_rate,ypt,ypc; team targets r=25.4, carries r=23.3, per-catch shape 1.056; width settings {'share_conc_targets': 40.0, 'share_conc_carries': 20.0, 'catch_conc': None, 'eff_sd_rec': 0.0, 'eff_sd_rush': 0.3, 'share_conc_qb': 80.0, 'eff_sd_qb': 0.15}
+- 2024: priors 2023, dispersion from prior, opponent team k0=150 on catch_rate,ypt,ypc; team targets r=52.8, carries r=25.4, per-catch shape 0.945; width settings {'share_conc_targets': 40.0, 'share_conc_carries': 20.0, 'catch_conc': None, 'eff_sd_rec': 0.0, 'eff_sd_rush': 0.3, 'share_conc_qb': 80.0, 'eff_sd_qb': 0.15}
+- 2025: priors 2024, dispersion from prior, opponent team k0=150 on catch_rate,ypt,ypc; team targets r=35.7, carries r=26.4, per-catch shape 1.084; width settings {'share_conc_targets': 40.0, 'share_conc_carries': 20.0, 'catch_conc': None, 'eff_sd_rec': 0.0, 'eff_sd_rush': 0.3, 'share_conc_qb': 80.0, 'eff_sd_qb': 0.15}

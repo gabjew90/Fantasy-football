@@ -5585,3 +5585,46 @@ validated, 0 is refused); the tie rule had no test; the two --from-results
 pickle kinds could be confused (runs now say what they are); a JSON --width
 could be mistaken for a path on Windows; the knob-design caveat above; and
 tuning ran 108 pointless bootstraps.
+
+## 2026-09-24 (100) -- QB rushing priced; the backs' calibration miss judged noise (props-v1.21)
+
+Step 3 of docs/plans/2026-09-24-yardage-harness.md.
+
+- **Run defense:** the scorer already adjusts yards per carry for the
+  opposing defense. Measured on the harness: dropping it makes rushing CRPS
+  worse (-0.056, interval excludes zero). It stays; the "no run-defense
+  adjustment" notes were stale.
+- **QB rushing is simulated and priced (the starter only).** Own carry grid
+  (QBs rarely lose yards; scrambles run long); kneel-downs drawn by the team's
+  pregame spread (the book counts them), from a pooled grid when no spread is
+  posted yet; his own width settings, because the RB-tuned ones made QBs too
+  wide (14.9% outside p10-p90). Tuned on 2022-23 (reports/width_tuning_qb.md):
+  QB share concentration 80, QB yards-per-carry sd 0.15. The starter is the
+  active QB with the most expected carries, not the QB1 slot.
+- **What moves on a live game (KC@MIA 2026 week 3, against props-v1.20):** the
+  QB carry grid and kneel-downs alone leave every non-QB number byte-identical
+  (measured). The QB split changes the backs' carries distribution (not its
+  mean) and shifts the random stream for the second team's draws, so other
+  players move at Monte-Carlo level -- at most 1.2 probability points on that
+  game.
+- **2024-25:** QB rushing passes all four checks (22.0% outside p10-p90, worst
+  calibration bucket 2.9 points). Running backs: 20.3% and 3.4 points (2.9
+  before the QB split; their CRPS change +0.002, within noise) -- 0.4 over the
+  3.0 limit.
+- **USER DECISION:** the miss is noise; do not let it stop progress. Running
+  backs stay live. The 3.0 limit is unchanged for future changes -- this is a
+  recorded judgement on this release, not a looser rule, and the report still
+  prints the strict verdict.
+- **Known, not noise:** QBs ran ~11% high in 2025; running backs run ~4% low
+  pooled, because players' shares that sum past 1 are scaled down -- the next
+  fix.
+
+Code review (high), all 8 fixed before merge: the byte-identity claim above
+(re-measured and corrected); no posted spread meant no kneel-downs while the
+report said they were counted (pooled grid); the starter was the QB1 slot
+(now the QB with the carries -- which also moved QB rushing from 3.2 to 2.9);
+backup QBs were priced from an ungraded setup (starters only now); a 2025
+caveat was pinned in the scorer's report text (it now points to the harness
+report); a sign comment in build_priors contradicted nflverse's convention;
+the book-spread conversion had no test; the QB tuning report called the old
+behaviour "as shipped".

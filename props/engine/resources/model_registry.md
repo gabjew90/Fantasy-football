@@ -75,6 +75,29 @@ honest ranges on that market. On a live game (KC@MIA
 2026 wk 3) 75-95% probabilities fall ~5 points (rushing ~8), near-the-line
 ones ~2.5; means unchanged.
 
+### Round 12 (2026-09-24): QB rushing, props-v1.21
+Run defense: the scorer already adjusts yards per carry for the opposing
+defense (team level, k0=150); dropping it on the harness makes rushing CRPS
+worse (-0.056, interval excludes zero), so it stays.
+
+QB rushing is now simulated and priced. A QB's carries get their own grid
+(build_priors `qb_carry_residual_quantiles`, same length as the league grid so
+no other player's draws move); the starter's kneel-downs -- which the book
+counts and the carry data drops -- are drawn from per-team-game kneel yards by
+the team's pregame spread (`qb_kneel_yards_by_spread`; 2025: -0.57 yards as a
+3+ underdog to -1.30 as a 7+ favourite), from a child RNG stream. The RB-tuned
+width settings made QBs too wide (14.9% outside p10-p90; 26.1% with none), so
+the starter got his own (`share_conc_qb` 80, `eff_sd_qb` 0.15; tuned on 2022-23,
+reports/width_tuning_qb.md). The starter is the active QB with the most
+expected carries, not the QB1 slot (a benched starter's backup keeps QB2).
+2024-25: QB rushing passes all four checks -- 22.0% outside p10-p90, worst
+bucket 2.9 points; CRPS against the RB-width version +0.042 (-0.001, +0.087).
+Running backs 20.3%, worst bucket 3.4 points (2.9 before the QB split; their
+CRPS change +0.002, within noise): 0.4 over the limit, judged noise by the user
+and kept live (DECISIONS #100). Known and not noise: QBs ran ~11% high in 2025;
+backs run ~4% low pooled because shares summing past 1 are scaled down (the
+next fix).
+
 ### rush_yds_v0
 - Markets: player_rush_yds
 - Status: `PROTOTYPE`
