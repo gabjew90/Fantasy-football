@@ -280,8 +280,8 @@ Use the exact report structure in `resources/prop_workflow.md`.
 Two rules for every reply:
 - **State plainly when no row has positive expected value** at the posted prices. The report's first
   line says it; the reply says it in its opening lines, not buried under the tables.
-- **Call `present_files` on the report** (`report_*.md`, plus `summary_*.md` for a `--markets` run) so
-  the user can open it.
+- **The reply is the answer; the report is not.** Do not attach or offer the report file
+  (`present_files`) unless the user asks for it -- quote what matters from it in the reply.
 - **Touchdown pairs:** quote only the report's "Touchdown pairs" section, which renders just the
   parlay classes the committed gate opened (cross-team and teammate pairs today). Both legs are
   PROTOTYPE, so give no fair odds; say how far the pair differs from multiplying its legs. Never

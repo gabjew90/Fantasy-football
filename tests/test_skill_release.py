@@ -257,3 +257,16 @@ def test_a_placed_yahoo_bundle_replaces_a_stale_token_file(tmp_path, monkeypatch
     monkeypatch.setattr(B, "ODDS_CREDENTIAL", tmp_path / "none.env")
     stale = _tree(tmp_path / "run", {"data/raw/yahoo/token.json": b'{"refresh_token": "old"}'})
     assert B.place_credentials(stale)["yahoo"] and not (stale / "data/raw/yahoo/token.json").exists()
+
+
+def test_chat_answers_in_the_reply_and_never_asks_for_league_data():
+    text = (ROOT / "CHAT.md").read_text(encoding="utf-8")
+    assert "Answer in the reply, not in a file" in text
+    assert "Never ask the user for anything a command can read" in text
+    assert "--break-system-packages" in text, "the retry the container's pip needs"
+    assert "Call `present_files` on the report" not in text, "the rule that turned answers into files is gone"
+
+
+def test_the_bootstrap_retries_an_externally_managed_pip():
+    src = (ROOT / "skill" / "scripts" / "bootstrap.py").read_text(encoding="utf-8")
+    assert "externally-managed" in src and "--break-system-packages" in src

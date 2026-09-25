@@ -117,6 +117,18 @@ def _name(pid, info):
     return f"{i.get('name') or pid} ({i.get('team') or 'FA'})"
 
 
+def _ordinal(n: int) -> str:
+    return f"{n}{'th' if 10 <= n % 100 <= 20 else {1: 'st', 2: 'nd', 3: 'rd'}.get(n % 10, 'th')}"
+
+
+def record_line(st: dict) -> str:
+    """The standing, stated so it cannot be misread: '1-1, 8th of 10 teams'.
+    Every lineup report heads with it, so chat never has to ask for it."""
+    if st.get("unavailable") or st.get("rank") is None:
+        return "**Record:** not available yet (no games played, or the platform's standings did not load)."
+    return f"**Record:** {st['record']}, {_ordinal(int(st['rank']))} of {st['teams']} teams."
+
+
 def run(league: str, week: int | None = None, *, record: bool = False, out_dir: Path | None = None,
         write: bool = True) -> LineupResult:
     m = Manifest(f"fantasy lineup {league}")
@@ -152,6 +164,7 @@ def run(league: str, week: int | None = None, *, record: bool = False, out_dir: 
 
     # ------------------------------------------------------------ report
     L = [f"# Start/sit -- {league}, {view.season} week {view.week}", "", f"**{gate.line()}**", ""]
+    L += [record_line(view.standing), ""]
     if theirs:
         fav = pw.get(label, 0.5) >= 0.5
         L += [f"**{view.my_name} vs {view.opp_name}.** Recommended lineup projects {total(chosen):.1f} "
@@ -246,6 +259,7 @@ def run(league: str, week: int | None = None, *, record: bool = False, out_dir: 
     rec = {"command": "fantasy lineup", "league": league, "season": view.season, "week": view.week,
            "evidence": rec_evidence,
            "generated_at_utc": now.isoformat(), "gate": gate.to_dict(), "manifest": m.to_dict(),
+           "standing": view.standing,
            "me": view.my_name, "opponent": view.opp_name, "opponent_lineup": theirs, "opponent_lineup_from": their_how,
            "recommended": {"label": label, "starters": chosen, "p_win": pw.get(label)},
            "current": {"starters": current, "p_win": pw_current},
