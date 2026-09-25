@@ -152,6 +152,9 @@ def run(league: str, week: int | None = None, *, record: bool = False, out_dir: 
 
     # ------------------------------------------------------------ report
     L = [f"# Start/sit -- {league}, {view.season} week {view.week}", "", f"**{gate.line()}**", ""]
+    st = view.standing
+    L += [("**Record:** not available yet (no games played, or the platform's standings did not load)."
+           if st["unavailable"] else f"**Record:** {st['record']}, {st['rank']} of {st['teams']}."), ""]
     if theirs:
         fav = pw.get(label, 0.5) >= 0.5
         L += [f"**{view.my_name} vs {view.opp_name}.** Recommended lineup projects {total(chosen):.1f} "
@@ -246,6 +249,7 @@ def run(league: str, week: int | None = None, *, record: bool = False, out_dir: 
     rec = {"command": "fantasy lineup", "league": league, "season": view.season, "week": view.week,
            "evidence": rec_evidence,
            "generated_at_utc": now.isoformat(), "gate": gate.to_dict(), "manifest": m.to_dict(),
+           "standing": view.standing,
            "me": view.my_name, "opponent": view.opp_name, "opponent_lineup": theirs, "opponent_lineup_from": their_how,
            "recommended": {"label": label, "starters": chosen, "p_win": pw.get(label)},
            "current": {"starters": current, "p_win": pw_current},

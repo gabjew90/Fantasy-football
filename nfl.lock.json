@@ -2,7 +2,7 @@
  "algorithm": "nfl-release-sha256-lf-1",
  "file_count": 179,
  "files": {
-  "CHAT.md": "a72c2e088c2b947ae9479825d1d781688206b40ae4b29eccbf618ea94ca7a580",
+  "CHAT.md": "19bc389e927bdd9d5e5610577beb63bea71f07ed0fc6eed54babb345d867e453",
   "config.yaml": "6bb984752e302548f7892672d2d70b66468c1c089f7baa46d5f2b8d847042e02",
   "core/__init__.py": "8ac9ed217e439f5828616ab66ec9ff17336c2cbbbeae391d0f9bfa001eaed571",
   "core/fetch.py": "95fc16bbd91a3a19086c8c2f64c9d101abc85baae2452c1ed778c84a21f9ad33",
@@ -77,8 +77,8 @@
   "fantasy/environment.py": "58621d274bf7fafa7531d2bbbbd70e23ffde36ae4163427d4d15fb449711099b",
   "fantasy/evidence.py": "68e343d1439a7b55497ddf58f42ed679efcf13843a1a3b2c1107b3f1cb3563e1",
   "fantasy/gate.py": "2dbe8838c32ac03704c155067a3b2f197932fa0d8ec29be6d015485f917f7e93",
-  "fantasy/league.py": "20faf30c41df0d991a46610e6b398b3313f260de58388fbffa928e6ee2bfc64f",
-  "fantasy/lineup.py": "98cd0d3292b0e9be4d605c837b6e960f15f36b01c8bf3cf4d555c7f6b6fe498b",
+  "fantasy/league.py": "13484f01390a4e7b63dfc5f886dbb5ab4a79d486a3c7d93ceacd793c88d454c2",
+  "fantasy/lineup.py": "0f29a9bf1a7f8b4010d45d3e461a8eeacaceba2d177d21e0a78c7b5dedbbcd13",
   "fantasy/resources/dispersion_v0.keefamania.json": "9daca0c1686d057506ac63f5dfddb28a5aa419babc0313a0310cceb10baa2d6b",
   "fantasy/resources/dispersion_v0.omnibeta.json": "2dcfcc9f2bf56fe51d1f1f2fefb60014af913fa0507c23a9587f6e6bc8aac0fe",
   "fantasy/resources/market_shape_params.json": "a9250ef44c98538a5f2dd6a49c342aeaee0633028701bf33d03c7082285d6c8e",
@@ -87,7 +87,7 @@
   "fantasy/sources/__init__.py": "8af3e9471cfda72f6c3ad11096323fa7d96632bd9634eeb8742c741a16885862",
   "fantasy/sources/market_points.py": "f18efb522e936243661f60f40e3fd4ab51474788175c7d92c4e8d78f81c4d7b2",
   "fantasy/sources/sleeper_weekly.py": "aa17feebc8f391a96b12cc1b1b2da78ba66b3fbb8fa25b6ab0bb26724268bae9",
-  "fantasy/waiver.py": "84690f5aa7b1dba09e7deebad92475ff732b2b4eb5d7a6893816e9ad534f8744",
+  "fantasy/waiver.py": "0daace7b1ec1e59330ec84213715485d388b6078d57b345ca379e02669bdfbdb",
   "fantasy/weekly.py": "c53f0560d40ed9c5c99da07822ab87297b2ab76ef39a3cd36932aece3c6c2247",
   "fantasy/winprob.py": "d8791fd112bbe14d4906a96083d31c2601d1823d828d34c151bc9ba22279c5d6",
   "leagues/keefamania.yaml": "2753a032b809a3ad49bc3827a983488f60e32697c07455b491496bbf1a332246",
@@ -101,7 +101,7 @@
   "manager/deliver.py": "5a351cf32b22c25ba0f33f0c0d3a9e9b10df69646bce92dbd0ac92c69661d3d4",
   "manager/ecr.py": "8b220d21ec3d093150994bbfeaacf6cbbdd18dc4a907cfc063400fd36b94877d",
   "manager/faab.py": "dfae389a6c82a60065fcfa415a8b919c3f3186b33957c1f3c51832ed0fd5d5ae",
-  "manager/fantasypros.py": "23092b45feca77f243536465328267c19e0025916fb98208ea5d4694b3ad5e8c",
+  "manager/fantasypros.py": "d768f93e0a39d8b6e1c3dc06da82c880a240ee15a51e1d6d52431a326db44a8d",
   "manager/games.py": "2995d1af1f2e7a50cb856339379e5fec32598086db8bd86d3f8171d4a61c90e8",
   "manager/gate.py": "0f320912fa4ad51b223a507854bab21b8ba89dcdfbfc999c0b8346bab35003a5",
   "manager/injuries.py": "fac66f69dbc1274ee716f2bfb433df1dc1f8012cadb9a8de36d3eee59e305590",
@@ -182,6 +182,6 @@
   "tiers.csv": "04a1a79d43e9f2445ba3dc4ea262b00fbd58efea1f41e8b0393cb4c7f8afee41",
   "tiers.keefamania.csv": "11e6546b56caa807a572da86d5c3d81097bafd2d2550e25653882d78b2962e94"
  },
- "sha256": "bcdaf17239b9f6cf94696deb755e5eb8e85893f41873c5c30845ad1a2545bddf",
- "tag": "nfl-v1.2"
+ "sha256": "7e4c2f062b77036065f7a76acea52f7b776438c6bb11a1e0219384c48f7328b3",
+ "tag": "nfl-v1.3"
 }

@@ -12,6 +12,31 @@ Every command below runs from `$REPO_DIR` (the bootstrap prints it):
 cd "$REPO_DIR" && python nfl.py <command>
 ```
 
+## The three rules that come first
+
+1. **Answer in the reply, not in a file.** The commands write reports; those
+   are working material. The reply itself carries the answer -- the decision in
+   the first lines, then the reasons, in prose and short tables. Never answer
+   with a file, and never offer or attach one (`present_files`) unless the user
+   asks for a file.
+2. **Never ask the user for anything a command can read.** Record, standings,
+   roster, starters, the opponent, this week's projections and scores, injury
+   designations, waiver options -- run the command. The lineup report prints
+   the record (`**Record:** 1-1, 8 of 10.`); `fantasy waiver` does too. Ask
+   only for what no command holds: an offer on the table, a preference, or the
+   league when context cannot settle it.
+3. **Setup is silent.** Run the bootstrap and read its last lines. If it
+   printed `DEPS=missing: <names>`, run once, without comment:
+
+   ```bash
+   python -m pip install -q --break-system-packages <names>
+   ```
+
+   The container's Python refuses a plain `pip install`; that flag is why the
+   bootstrap's own attempt can fail. Say nothing about installing unless the
+   retry fails -- then name the command that cannot run, and do not answer
+   from memory instead.
+
 ## The two leagues
 
 | League | Platform | Name to pass |
@@ -112,10 +137,10 @@ early, say so before any price.
   On the fallback path:
   > release VENDORED FALLBACK (b18a684) -- could not reach nfl-v1.1:
   > <reason>. This may not be the current model.
-- Call `present_files` on the report the command wrote (the path it prints
-  after `report:`).
-- `DEPS=missing: ...` from the bootstrap: say which command could not run and
-  why; do not answer from memory instead.
+- No file unless asked (rule 1). No setup narration (rule 3).
+- A data source the report marks as unavailable from chat (FantasyPros is
+  often refused from this environment) is mentioned once, in a clause, where
+  it matters to the answer -- never as a list of errors.
 
 ## Chat is read-only
 

@@ -84,3 +84,15 @@ def test_a_player_expected_to_miss_weeks_scores_nothing_in_them():
     tot, _ = WV.season_gain(dict(rates, add=16.0), pos, team, SLOTS, FLEX, weeks, {}, drop="bench",
                             out_until={"add": 7})
     assert tot - base == pytest.approx((16 - 14) * 2)
+
+
+def test_every_command_reads_the_record_from_the_league_view():
+    from fantasy import league as LG
+    rosters = [{"roster_id": 1, "settings": {"wins": 1, "losses": 1, "fpts": 200}},
+               {"roster_id": 2, "settings": {"wins": 2, "losses": 0, "fpts": 150}}]
+    assert WV.standing is LG.standing
+    view = LG.LeagueView(league="x", platform="sleeper", season=2026, week=3, my_rid=1, opp_rid=2, my_name="me",
+                         opp_name="them", my_players=[], opp_players=[], my_starters=[], opp_starters=[],
+                         slots=None, flex_slots=None, info={}, scoring_yaml={}, scoring_platform={},
+                         ctx={"rosters": rosters})
+    assert view.standing["record"] == "1-1" and view.standing["rank"] == 2

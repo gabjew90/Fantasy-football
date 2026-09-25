@@ -152,7 +152,8 @@ def fetch(scoring: dict, season, index, kind: str = ROS, week: int | None = None
             # to discard 446 skill rows already parsed and drop the consensus
             # to two sources for that build. injuries() in this same module
             # degrades partially; these two must not disagree.
-            failed.append(f"{fp_pos} ({e.__class__.__name__})")
+            code = getattr(getattr(e, "response", None), "status_code", None)
+            failed.append(f"{fp_pos} ({e.__class__.__name__}{f' {code}' if code else ''})")
             continue
         if body.get("last_updated"):
             stamps.append(str(body["last_updated"]))

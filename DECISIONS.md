@@ -5628,3 +5628,29 @@ caveat was pinned in the scorer's report text (it now points to the harness
 report); a sign comment in build_priors contradicted nflverse's convention;
 the book-spread conversion had no test; the QB tuning report called the old
 behaviour "as shipped".
+
+## 2026-09-24 (101) -- chat answers in the reply and never asks for league data (nfl-v1.3)
+
+The user's first chat session with the single skill (log 2026-09-24) found
+three faults in the harness contract, not the models:
+
+- **It answered with files.** CHAT.md told chat to call `present_files` on
+  every report, so the report became the deliverable. Rule 1 now: the answer
+  is the reply -- decision first, then reasons; a file only when asked.
+- **It asked for the user's Keefamania record** -- twice -- though the league
+  data held it: the lineup report did not print it and the contract never
+  forbade asking. The standing now lives with the league read
+  (fantasy/league.py, a LeagueView property) and heads every lineup report
+  ("Record: 1-1, 8 of 10") and its decision record; rule 2 forbids asking the
+  user for anything a command can read.
+- **It installed packages out loud.** The chat container's Python is
+  "externally managed" and refuses a plain pip install, so the bootstrap's
+  own install failed and chat installed by hand, narrating it. Rule 3: finish
+  the install silently with --break-system-packages; the bootstrap now retries
+  with that flag itself (reaches chat on the next skill rebuild; the contract
+  covers it until then).
+- FantasyPros failures now carry the HTTP status, so a source refused from
+  chat's network reads as that, not as a mystery.
+
+Trades: a trade is a two-sided waiver move, so `fantasy trade` will reuse the
+waiver engine's season gain -- next.

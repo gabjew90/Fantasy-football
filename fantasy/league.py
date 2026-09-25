@@ -47,11 +47,38 @@ class LeagueView:
     ctx: dict = field(default_factory=dict, repr=False)
 
     @property
+    def standing(self) -> dict:
+        """My record and place in the league, from the platform's standings."""
+        return standing(self.ctx.get("rosters") or [], self.my_rid)
+
+    @property
     def scoring(self) -> dict:
         """What projections are scored in: the platform's settings (the
         authority, and the only place K and DEF weights live), over the yaml.
         The gate separately checks that every yaml key agrees with it."""
         return {**self.scoring_yaml, **self.scoring_platform}
+
+
+def standing(rosters: list, my_rid: int) -> dict:
+    """My place in the standings from the league's own win/loss (then points).
+
+    Lives here, with the league read, so every decision command can print the
+    record -- chat once asked the user for a record the data already held."""
+    rows = []
+    for r in rosters:
+        st = r.get("settings") or {}
+        rows.append((int(r["roster_id"]), int(st.get("wins") or 0), int(st.get("losses") or 0),
+                     float(st.get("fpts") or 0) + float(st.get("fpts_decimal") or 0) / 100))
+    rows.sort(key=lambda x: (-x[1], x[2], -x[3]))
+    rank = next((i + 1 for i, r in enumerate(rows) if r[0] == my_rid), None)
+    n = len(rows)
+    me = next((r for r in rows if r[0] == my_rid), (my_rid, 0, 0, 0.0))
+    if all(r[1] == 0 and r[2] == 0 and r[3] == 0 for r in rows):
+        # every team 0-0 with no points: week 1, or the platform's standings did
+        # not come through (a Yahoo read failure fills zeros) -- not a tie for first
+        return {"rank": None, "teams": n, "record": "0-0", "contender": True, "unavailable": True}
+    return {"rank": rank, "teams": n, "record": f"{me[1]}-{me[2]}",
+            "contender": rank is not None and rank <= max(1, n // 2), "unavailable": False}
 
 
 def _record_league_read(ctx: dict, league: str, manifest: Manifest) -> None:

@@ -182,6 +182,11 @@ def ensure_dependencies(install: bool = True) -> str:
     if not install:
         return "missing: " + ", ".join(missing)
     r = subprocess.run([sys.executable, "-m", "pip", "install", "-q", *missing], capture_output=True, text=True)
+    if r.returncode != 0 and "externally-managed" in (r.stderr + r.stdout):
+        # the chat container's Python is "externally managed" (PEP 668) and
+        # refuses a plain install; this is a throwaway container, so override
+        r = subprocess.run([sys.executable, "-m", "pip", "install", "-q", "--break-system-packages", *missing],
+                           capture_output=True, text=True)
     still = [pip for mod, pip in DEPENDENCIES.items() if importlib.util.find_spec(mod) is None]
     if r.returncode != 0 or still:
         return "missing: " + ", ".join(still or missing)

@@ -71,23 +71,7 @@ class WaiverResult:
 
 # ------------------------------------------------------------------ pieces
 
-def standing(rosters: list, my_rid: int) -> dict:
-    """My place in the standings from the league's own win/loss (then points)."""
-    rows = []
-    for r in rosters:
-        st = r.get("settings") or {}
-        rows.append((int(r["roster_id"]), int(st.get("wins") or 0), int(st.get("losses") or 0),
-                     float(st.get("fpts") or 0) + float(st.get("fpts_decimal") or 0) / 100))
-    rows.sort(key=lambda x: (-x[1], x[2], -x[3]))
-    rank = next((i + 1 for i, r in enumerate(rows) if r[0] == my_rid), None)
-    n = len(rows)
-    me = next((r for r in rows if r[0] == my_rid), (my_rid, 0, 0, 0.0))
-    if all(r[1] == 0 and r[2] == 0 and r[3] == 0 for r in rows):
-        # every team 0-0 with no points: week 1, or the platform's standings did
-        # not come through (a Yahoo read failure fills zeros) -- not a tie for first
-        return {"rank": None, "teams": n, "record": "0-0", "contender": True, "unavailable": True}
-    return {"rank": rank, "teams": n, "record": f"{me[1]}-{me[2]}",
-            "contender": rank is not None and rank <= max(1, n // 2), "unavailable": False}
+standing = LG.standing          # moved to league.py; every command reads it
 
 
 def byes_by_team(games: pd.DataFrame, season: int, weeks) -> dict:
