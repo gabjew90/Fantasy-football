@@ -485,8 +485,16 @@ def questionable_flip_check(samples_by_regime, line):
 #               while the rest split what is left; None = he is one more
 #               component of the carries Dirichlet, as before
 #   eff_sd_qb   his own yards-per-carry swing; None = eff_sd_rush
+#   rush_other_share    the share of a team's carries that goes to players
+#   rush_norm_strength  outside the eligible set, and how far (0-1) the
+#               eligible players' carry shares (all but the starting QB) are
+#               rescaled so they sum to 1 - rush_other_share - his share. Without it the 'other' bucket is whatever
+#               the shares leave: 30% when they sum to 0.7, when historically
+#               ~12% of carries go elsewhere -- the eligible players then ran
+#               21% above their projection (2022-23 diagnosis, DECISIONS #103).
 WIDTH_OFF = {"share_conc_targets": None, "share_conc_carries": None, "catch_conc": None,
-             "eff_sd_rec": 0.0, "eff_sd_rush": 0.0, "share_conc_qb": None, "eff_sd_qb": None}
+             "eff_sd_rec": 0.0, "eff_sd_rush": 0.0, "share_conc_qb": None, "eff_sd_qb": None,
+             "rush_other_share": None, "rush_norm_strength": 0.0, "rush_norm_qb": False}
 
 
 def validate_width(w):
@@ -505,6 +513,15 @@ def validate_width(w):
                 raise ValueError(f"{k} must be null (off) or > 0, got {v!r}")
         elif k == "eff_sd_qb" and v is None:
             continue                                   # None = inherit eff_sd_rush
+        elif k == "rush_other_share":
+            if v is not None and not (isinstance(v, (int, float)) and 0 <= v < 1):
+                raise ValueError(f"{k} must be null (off) or in [0, 1), got {v!r}")
+        elif k == "rush_norm_qb":
+            if not isinstance(v, bool):
+                raise ValueError(f"{k} must be true or false, got {v!r}")
+        elif k == "rush_norm_strength":
+            if not (isinstance(v, (int, float)) and 0 <= v <= 1):
+                raise ValueError(f"{k} must be in [0, 1], got {v!r}")
         elif not (isinstance(v, (int, float)) and v >= 0):
             raise ValueError(f"{k} must be >= 0, got {v!r}")
     return out
@@ -605,6 +622,19 @@ def simulate_team_rush(rng, n_sim, team_carries_mean, carries_r, rush_shares, yp
             r is not None and len(r) != len(carry_resid) for r in player_resid):
         raise ValueError("a per-player carry grid must be the league grid's length")
     rs = np.clip(np.asarray(rush_shares, dtype=float), 0, None)
+    if w["rush_other_share"] is not None and w["rush_norm_strength"] and rs.sum() > 0:
+        # rush_norm_qb False: the starting QB's share is left alone (his carries
+        # are mostly scrambles) and the rest are rescaled toward what he and
+        # 'other' leave; True: everyone is rescaled together. Which is better
+        # is a tuning question (reports/width_tuning_rushnorm.md), scored on
+        # the backs AND the QB.
+        keep = np.zeros(len(rs), dtype=bool)
+        if qb_index is not None and not w["rush_norm_qb"]:
+            keep[int(qb_index)] = True
+        others, target = rs[~keep].sum(), 1.0 - w["rush_other_share"] - rs[keep].sum()
+        if others > 0 and target > 0:
+            rs = rs.copy()
+            rs[~keep] = rs[~keep] * (target / others) ** w["rush_norm_strength"]
     rest = max(1.0 - rs.sum(), 0.0)
     p_norm = np.append(rs, rest); p_norm = p_norm / p_norm.sum()
     mu_c = max(team_carries_mean, 1e-6)

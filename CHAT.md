@@ -152,6 +152,11 @@ early, say so before any price.
   > release VENDORED FALLBACK (b18a684) -- could not reach nfl-v1.1:
   > <reason>. This may not be the current model.
 - No file unless asked (rule 1). No setup narration (rule 3).
+- **Troubleshooting log.** Every `nfl.py` command appends a line to
+  `$NFL_OUT/nfl_session_log.jsonl` (release, command, exit code, error, data
+  gate, input freshness, setup facts -- never credentials). Do not mention it
+  unless a command failed or the user asks about what ran; then summarize from
+  it, and attach it only if asked.
 - A data source the report marks as unavailable from chat (FantasyPros is
   often refused from this environment) is mentioned once, in a clause, where
   it matters to the answer -- never as a list of errors.

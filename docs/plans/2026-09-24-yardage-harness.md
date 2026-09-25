@@ -77,7 +77,9 @@ worst on the low side (players bust more often than the model allows).
    kneel-downs by spread, own width settings) and priced, and passes. Running
    backs miss the calibration limit by 0.4 points; the user judged it noise
    (DECISIONS #100). Next fix found on the way: backs run ~4% low because shares
-   summing past 1 are scaled down.
+   summing past 1 are scaled down. A rescaling fix was tuned and tested and did
+   not beat the live model on 2024-25 (DECISIONS #103); the bias stays below the
+   5% limit and the diagnosis is recorded for the next attempt.
 4. QB passing yards from the team simulation (the team's receiving yards are
    the QB's passing yards before sacks), plus who is under center. It inherits
    step 2.

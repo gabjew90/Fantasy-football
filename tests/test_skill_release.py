@@ -270,3 +270,20 @@ def test_chat_answers_in_the_reply_and_never_asks_for_league_data():
 def test_the_bootstrap_retries_an_externally_managed_pip():
     src = (ROOT / "skill" / "scripts" / "bootstrap.py").read_text(encoding="utf-8")
     assert "externally-managed" in src and "--break-system-packages" in src
+
+
+def test_every_command_leaves_a_troubleshooting_line_without_secrets(tmp_path, monkeypatch):
+    import nfl
+    monkeypatch.setenv("NFL_OUT", str(tmp_path))
+    monkeypatch.setenv("YAHOO_CLIENT_SECRET", "s3cret-value")
+
+    class R:
+        record = {"gate": {"passed": False, "checks": [{"name": "roster fresh", "passed": False}]},
+                  "manifest": {"entries": [{"name": "league roster", "source": "yahoo", "status": "stale",
+                                            "age_h": 185.0, "detail": ""}]}}
+        report_path = tmp_path / "lineup.md"
+    nfl._session_log(["fantasy", "lineup", "--league", "keefamania"], 0, None, 2.5, R())
+    line = json.loads((tmp_path / "nfl_session_log.jsonl").read_text(encoding="utf-8").splitlines()[-1])
+    assert line["argv"][-1] == "keefamania" and line["exit"] == 0 and line["gate"] == "FAIL: roster fresh"
+    assert line["inputs"][0]["age_h"] == 185.0
+    assert "s3cret" not in json.dumps(line)

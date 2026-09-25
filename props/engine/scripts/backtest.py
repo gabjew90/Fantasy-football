@@ -635,6 +635,8 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
             each carry the player's ypc plus a residual from the prior season's
             league grid."""
             yds = np.zeros((len(frame), N))
+            car_mean = np.zeros(len(frame))           # diagnostics: where the carries go
+            share_sum = np.zeros(len(frame))
             pos_ = {ix: i for i, ix in enumerate(frame.index)}
             for (team, week), g in frame.groupby(["team", "week"], sort=False):
                 idx = [pos_[ix] for ix in g.index]
@@ -650,9 +652,12 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
                                                      float(g.team_carries_env.iloc[0]), r_team_carries,
                                                      shares[idx], ypcs[idx], carry_resid, width=width,
                                                      player_resid=p_resid, player_kneel=p_kneel, qb_index=qb_i)
+                tot = float(np.clip(np.asarray(shares[idx], dtype=float), 0, None).sum())
                 for k, i in enumerate(idx):
                     yds[i] = y_[k]
-            return yds
+                    car_mean[i] = float(_car[k].mean())
+                    share_sum[i] = tot
+            return yds, car_mean, share_sum
 
         def rpit_block(samples, y_arr):
             return (samples < y_arr[:, None]).mean(1) + rng.uniform(size=len(y_arr)) * (samples == y_arr[:, None]).mean(1)
@@ -682,9 +687,10 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
         # draws, in the order the single-season protocol always used, so its
         # PIT numbers reproduce exactly.
         pit_rec, pit_yds = rpit_block(recM, y_rec), rpit_block(ydsM, y_yds)
-        rushM = draw_block_rush(test_act, test_act.rs.fillna(0.0).values, test_act.ypc.values, arm=3)
+        rushM, carM, share_sumM = draw_block_rush(test_act, test_act.rs.fillna(0.0).values, test_act.ypc.values,
+                                                  arm=3)
         rushA = draw_block_rush(test_act, test_act.own_rs.fillna(test_act.rs).fillna(0.0).values,
-                                test_act.own_ypc.fillna(test_act.ypc).values, arm=4) if full else rushM
+                                test_act.own_ypc.fillna(test_act.ypc).values, arm=4)[0] if full else rushM
         y_rush = test_act.act_rush_yards.values.astype(float)
         # the book's number for a QB: carries plus kneel-downs
         y_qb = y_rush + test_act.act_kneel_yards.values.astype(float)
@@ -710,6 +716,11 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
             "act_receptions": test_act.act_receptions.values.astype(float),
             "act_rec_yards": test_act.act_rec_yards.values.astype(float),
             "act_rush_yards": y_rush, "act_qb_rush_yards": y_qb, "rush_pop": rush_pop, "qb_pop": qb_pop,
+            # diagnostics: projected vs actual carries, and how far the team's
+            # eligible players' carry shares sum past 1 (the sampler then scales)
+            "mean_car_model": carM, "act_carries": test_act.act_carries.values.astype(float),
+            "rs_model": test_act.rs.fillna(0.0).values, "team_share_sum": share_sumM,
+            "team_carries_env": test_act.team_carries_env.values,
             "med_rec_model": full_rows(np.median(recM, axis=1)), "med_yds_model": full_rows(np.median(ydsM, axis=1)),
             "med_rush_model": np.where(rush_pop, np.median(rushM, axis=1), nan_),
             "med_qbrush_model": np.where(qb_pop, np.median(rushM, axis=1), nan_),
@@ -850,6 +861,11 @@ RUSHING_GRID = [{"share_conc_carries": cc, "eff_sd_rush": er}
 # shipped values. Index 0 is "as shipped" (the QB inside the carries Dirichlet).
 QB_GRID = [{"share_conc_qb": sc, "eff_sd_qb": ef}
            for sc in (None, 80.0, 40.0, 20.0) for ef in (None, 0.0, 0.15, 0.3)]
+# --tune-width rushnorm: the eligible players' carry shares rescaled toward
+# 1 - rush_other_share (2022-23: ~12% of carries went to players outside the set)
+RUSHNORM_GRID = [{"rush_other_share": None, "rush_norm_strength": 0.0, "rush_norm_qb": False}] + [
+    {"rush_other_share": o, "rush_norm_strength": a, "rush_norm_qb": q}
+    for o in (0.08, 0.10, 0.12, 0.14) for a in (0.5, 1.0) for q in (False, True)]
 
 
 def _off(v):
@@ -870,52 +886,91 @@ def tie_flags(frames, per_row, best):
     return tied
 
 
-def tune_width_qb(args, OUT):
-    """--tune-width --tune-grid qb: the starting QB's own width settings on the
-    TUNE seasons, everything else held at the shipped values. Same rule as the
-    main grid: QB-rushing CRPS first, the width closest to 0.20 among ties."""
+# --tune-width --tune-grid NAME: one family of settings, every other setting
+# held at the shipped values. name -> (grid, graded market, tie-break, intro).
+# Index 0 of each grid is "off" (the shipped sampler without that family).
+SUBGRIDS = {
+    "qb": (QB_GRID, ("qbrush",), "width",
+           "The starting QB's own settings. *Off* = no QB-only setting: the QB is one more component of the "
+           "carries Dirichlet and shares eff_sd_rush (the sampler before props-v1.21)."),
+    "rushnorm": (RUSHNORM_GRID, ("rush", "qbrush"), "bias",
+                 "How the eligible players' carry shares are rescaled toward 1 - rush_other_share, with or "
+                 "without the starting QB (rush_norm_qb). *Off* = no rescaling: the 'other' bucket is whatever "
+                 "the shares leave (the sampler before props-v1.23)."),
+}
+
+
+def tune_subgrid(args, OUT):
+    """Choose one family of sampler settings on the TUNE seasons, scored on
+    EVERY market the family touches. The rule: the markets' CRPS, each
+    relative to the family switched off, summed; among settings not measurably
+    worse than the best, the one closest to the target -- width 0.20 for a
+    width family, actual/model mean 1.00 for a level family (averaged over the
+    markets)."""
+    name = args.tune_grid
+    grid_part, mks, tie_break, intro = SUBGRIDS[name]
+    mks = (mks,) if isinstance(mks, str) else tuple(mks)
     shipped = width_of(argparse.Namespace(width=None))
-    grid = [{**shipped, **g} for g in QB_GRID]
+    grid = [{**shipped, **g} for g in grid_part]
     frames = [[] for _ in grid]
     for S in parse_weeks(args.tune):
         for i, (res, _m) in enumerate(run_season(args, S, parse_weeks(args.train_weeks), parse_weeks(args.weeks),
                                                  OUT, live=True, widths=grid)):
             frames[i].append(res)
     frames = [pd.concat(f, ignore_index=True) for f in frames]
+    keys = list(grid_part[0])
     rows = []
     for i, cfg in enumerate(grid):
-        s = summarize(frames[i], "qbrush", ci=False)
-        rows.append({"i": i, "share_conc_qb": cfg.get("share_conc_qb"), "eff_sd_qb": cfg.get("eff_sd_qb"),
-                     "crps": s["crps_model"], "width": s["outside_p10_p90"], "ratio": s["actual_over_model"]})
+        row = {"i": i, **{k: cfg.get(k) for k in keys}}
+        for mk in mks:
+            s_ = summarize(frames[i], mk, ci=False)
+            row.update({f"{mk}_crps": s_["crps_model"], f"{mk}_width": s_["outside_p10_p90"],
+                        f"{mk}_ratio": s_["actual_over_model"]})
+        rows.append(row)
     T = pd.DataFrame(rows)
-    qb_rows = lambda i: frames[i].crps_qbrush_model.where(frames[i].qb_pop.astype(bool))
-    T["tie"] = tie_flags(frames, qb_rows, int(T.crps.idxmin()))
-    T["miss"] = (T.width - WIDTH_TARGET).abs()
-    pick = T[T.tie].sort_values(["miss", "crps"]).iloc[0]
+    base = T.iloc[0]
+    T["score"] = sum(T[f"{mk}_crps"] / base[f"{mk}_crps"] for mk in mks)
+
+    def per_row(i):
+        f, total = frames[i], None
+        for mk in mks:
+            pop = POPULATION.get(mk)
+            part = f[f"crps_{mk}_model"] / base[f"{mk}_crps"]
+            if pop:
+                part = part.where(f[pop].astype(bool))
+            total = part if total is None else total.add(part, fill_value=0.0)
+        return total
+
+    T["tie"] = tie_flags(frames, per_row, int(T.score.idxmin()))
+    T["miss"] = (sum((T[f"{mk}_width"] - WIDTH_TARGET).abs() for mk in mks) if tie_break == "width" else
+                 sum((T[f"{mk}_ratio"] - 1.0).abs() for mk in mks)) / len(mks)
+    pick = T[T.tie].sort_values(["miss", "score"]).iloc[0]
     chosen = dict(grid[int(pick.i)])
-    fmt = lambda v: "off" if v is None or (isinstance(v, float) and np.isnan(v)) else f"{v:g}"
-    L = ["# QB rushing width tuning: tune seasons only", "",
-         f"*Generated by `backtest.py --tune-width --tune-grid qb --tune {args.tune}`. Do not edit by hand. The "
-         "test seasons were not read.*", "",
-         "The starting QB's own settings, every other width setting held at the shipped values "
-         f"(`{json.dumps(shipped, sort_keys=True)}`). Same rule as the main grid: QB-rushing CRPS first; among "
-         "settings not measurably worse than the best, the width closest to 0.20. *Off* = no QB-only "
-         "setting: the QB is one more component of the carries Dirichlet and shares eff_sd_rush (the "
-         "sampler before props-v1.21).", "",
-         "| QB share conc. | QB yards/carry sd | QB rushing CRPS | Width | Actual/model | Tie with best |",
-         "|---|---|---|---|---|---|"]
-    for _, r in T.sort_values("crps").iterrows():
-        L.append(f"| {fmt(r.share_conc_qb)} | {fmt(r.eff_sd_qb)} | {r.crps:.3f} | {r.width:.3f} | {r.ratio:.3f} | "
-                 f"{'yes' if r.tie else ''}{' **chosen**' if r.i == pick.i else ''} |")
+    fmt = lambda v: ("off" if v is None or (isinstance(v, float) and np.isnan(v)) else
+                     ("yes" if v is True else "no" if v is False else f"{v:g}"))
+    target = "the width closest to 0.20" if tie_break == "width" else "the actual/model mean closest to 1.00"
+    labels = " + ".join(MARKETS[mk][1] for mk in mks)
+    L = [f"# {labels.capitalize()} tuning ({name}): tune seasons only", "",
+         f"*Generated by `backtest.py --tune-width --tune-grid {name} --tune {args.tune}`. Do not edit by hand. "
+         "The test seasons were not read.*", "",
+         intro + f" Every other setting is held at the shipped values (`{json.dumps(shipped, sort_keys=True)}`). "
+         f"Rule: CRPS summed over {labels} (each relative to the family off) first; among settings not "
+         f"measurably worse than the best, {target}.", "",
+         "| " + " | ".join(keys) + " | " + " | ".join(f"{MARKETS[mk][1]} CRPS | width | actual/model" for mk in mks)
+         + " | Score | Tie with best |", "|" + "---|" * (len(keys) + 3 * len(mks) + 2)]
+    for _, r in T.sort_values("score").iterrows():
+        L.append("| " + " | ".join(fmt(r[k]) for k in keys) + " | "
+                 + " | ".join(f"{r[f'{mk}_crps']:.3f} | {r[f'{mk}_width']:.3f} | {r[f'{mk}_ratio']:.3f}" for mk in mks)
+                 + f" | {r.score:.4f} | {'yes' if r.tie else ''}{' **chosen**' if r.i == pick.i else ''} |")
     L += ["", "## Chosen", "", "```json", json.dumps(chosen, indent=1, sort_keys=True), "```"]
-    out_base = Path(args.report) if args.report else OUT / "width_tuning_qb"
+    out_base = Path(args.report) if args.report else OUT / f"width_tuning_{name}"
     Path(str(out_base) + ".md").write_text("\n".join(L) + "\n", encoding="utf-8")
     Path(str(out_base) + ".csv").write_text(T.to_csv(index=False), encoding="utf-8")
     if args.width_out:
         Path(args.width_out).write_text(json.dumps(
             {**chosen, "tuned_on": args.tune,
-             "note": "backtest.py --tune-width (reports/width_tuning.md) and --tune-grid qb "
-                     "(reports/width_tuning_qb.md)"},
+             "note": "backtest.py --tune-width (reports/width_tuning.md) and --tune-grid qb / rushnorm "
+                     "(reports/width_tuning_qb.md, reports/width_tuning_rushnorm.md)"},
             indent=1, sort_keys=True) + "\n", encoding="utf-8")
     print(f"chosen: {chosen}", file=sys.stderr)
 
@@ -1252,8 +1307,9 @@ def main(argv=None):
     ap.add_argument("--tune-width", action="store_true",
                     help="choose the width settings on the --tune seasons; writes --report (.md/.csv)")
     ap.add_argument("--width-out", default=None, help="--tune-width: write the chosen settings to this JSON file")
-    ap.add_argument("--tune-grid", choices=["main", "qb"], default="main",
-                    help="--tune-width: the receiving/rushing grid, or the starting QB's own settings")
+    ap.add_argument("--tune-grid", choices=["main", "qb", "rushnorm"], default="main",
+                    help="--tune-width: the receiving/rushing grid, the starting QB's own settings, or the "
+                         "carry-share rescaling")
     ap.add_argument("--dispersion", choices=["prior", "train"], default=None,
                     help="prior = the priors_{S-1} values the scorer reads (harness default); "
                          "train = fit on --train-weeks of the season (single-season default)")
@@ -1299,7 +1355,7 @@ def main(argv=None):
         args.build_priors = True
     Path(args.priors_dir).mkdir(parents=True, exist_ok=True)
     if args.tune_width:
-        (tune_width_qb if args.tune_grid == "qb" else tune_width)(args, OUT)
+        (tune_width if args.tune_grid == "main" else tune_subgrid)(args, OUT)
         return 0
     if args.from_results:
         # Re-render the report from a saved run: the simulations are the slow

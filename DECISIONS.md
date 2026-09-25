@@ -5695,3 +5695,39 @@ in the waiver command too (now `waiver.miss_weeks`); a team behind was judged
 on points, not upside, against the user's framework; `--back` matched
 namesakes anywhere (now the traded players only); the data gate checked my
 roster only (now both); and the both-sides evaluation had no test.
+
+## 2026-09-25 (103) -- the backs' 4% under-projection: diagnosed, a fix tried, not shipped (props-v1.23)
+
+The running backs ran ~4% under their projection on 2024-25 (DECISIONS #100).
+
+- **Diagnosis (2022-23 only, new harness columns: projected vs actual
+  carries, and the team's eligible-share sum).** When a team's eligible
+  players' carry shares sum below 0.8 (15% of team-games), the sampler's
+  'other' bucket takes whatever is left -- up to 30% -- and those players ran
+  21% ABOVE their projection; above 1.0 they ran 4-9% below. Historically ~12%
+  of carries go to players outside the eligible set.
+- **The fix tried:** rescale the eligible shares toward 1 - rush_other_share
+  (model.py `rush_other_share`, `rush_norm_strength`, `rush_norm_qb`, off by
+  default), tuned by a new tuner that scores EVERY market a setting touches
+  (`--tune-grid rushnorm`: backs + QB rushing together; reports/
+  width_tuning_rushnorm.md).
+- **Result on 2024-25: no better than what ships.** Backs 4.8% low (live:
+  3.9%), QBs 6.7% high and BIASED (live: 4.7%), CRPS changes within noise.
+  Not shipped. The scorer's output is byte-identical to props-v1.22 (KC@MIA).
+- **Disclosed:** two design variants (rescale the QB too, or not) were each
+  run on 2024-25 before the choice between them was put into the 2022-23
+  tuning; the final choice was the tuning's, and it did not pass.
+- The backs' bias remains, below the 5% limit; the next attempt starts from
+  this diagnosis (the share-sum bins), not from scratch.
+
+## 2026-09-25 (104) -- a temporary troubleshooting log for chat (nfl-v1.5)
+
+The user's suggestion after the first chat session: every `nfl.py` command
+appends one JSON line to $NFL_OUT/nfl_session_log.jsonl -- release, command
+and arguments, exit code, duration, the error if raised, the data gate
+(PASS / FAIL: which checks), each input's source, status and age, the report
+path, and the bootstrap's setup facts (release source, missing packages,
+Yahoo live, odds key present -- booleans, never values). It never raises. On
+for the chat shakedown via `session_log: true` in config.yaml; turning it off
+is a one-line release. CHAT.md: chat does not mention it unless something
+failed or the user asks, and attaches it only when asked.
