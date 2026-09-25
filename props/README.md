@@ -58,6 +58,7 @@ can be re-derived later, not just scored:
 | `tier`, `decision`, `clears_edge_rule_if_validated` | what the rules said at the time |
 | `new_team`, `questionable`, `flag` | the known weaknesses of that specific call |
 | `engine_hash`, `engine_tag` | the build of `engine/` that made the call |
+| `price_hash` | the part of that build that can change a price (since 2026-09-25) |
 | `model_state` | the engine's own per-market label (`receiving_hier_v1`, …); it is hand-written and has been wrong, so it is not a version |
 | `snapshot_type` | `decision`, `open` or `close` |
 | `logged_at_utc`, `last_update` | when the call was made and when the book last moved |
@@ -85,10 +86,24 @@ they carry the real hash and no tag. The hash is never read from the lock — a
 lock-sourced hash would keep claiming `props-v1.0` after the engine changed,
 which is the one lie the stamp exists to prevent.
 
+`price_hash` is the same formula over the part of `engine/` that can change a
+price: `score_game.py`, `score_week.py` and every script they import or launch
+(read from their source, so a new module is picked up by itself), plus every
+data file under `resources/` but the prose (`*.md`). A docs, test or
+offline-tool edit changes `engine_hash` and leaves `price_hash` alone. The
+call rule and the scorecard group on the **pricing model**
+(`engine_version.model_id`: the row's `price_hash`, else the one
+`engine_prices.json` maps its `engine_hash` to, else the `engine_hash`
+itself), so two releases that price identically are one record, and a
+scorecard section names every release in it. `engine_prices.json` covers the
+rows written before `price_hash` existed; each entry is computed from its
+release tag's tree, and CI recomputes all of them.
+
 ```bash
-python props/engine_version.py print                     # hash, tag, file count
+python props/engine_version.py print                     # hash, tag, price hash, file count
 python props/engine_version.py verify                    # IDENTICAL or DRIFT (names the files)
 python props/engine_version.py write-lock --tag props-v1.1
+python props/engine_version.py price-map [--check]       # engine_prices.json from the props-v* tags
 ```
 
 ### What counts as one call

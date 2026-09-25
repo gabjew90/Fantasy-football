@@ -77,6 +77,14 @@ def load_settled(season: int) -> pd.DataFrame:
         df["engine_hash"] = ""
     if "engine_tag" not in df.columns:
         df["engine_tag"] = None
+    # THE PRICING MODEL (DECISIONS #107). A settled file written before
+    # model_id existed gets it derived here, by the same function settle uses.
+    if "model_id" not in df.columns:
+        df["model_id"] = None
+    missing = df["model_id"].isna() | (df["model_id"].astype(str).str.strip() == "")
+    if missing.any():
+        df.loc[missing, "model_id"] = [calls_mod.engine_version.model_id(r)
+                                       for r in df.loc[missing].to_dict("records")]
     df["market_key"] = market_key(df)
     return df
 
@@ -92,12 +100,17 @@ def market_key(df: pd.DataFrame) -> pd.Series:
                               "player_anytime_td [" + tdm.astype(str) + "]")
 
 
+def _tag_order(tag: str) -> tuple:
+    return tuple(int(x) if x.isdigit() else x for x in tag.replace("props-v", "").split("."))
+
+
 def engine_label(df: pd.DataFrame) -> str:
-    """How an engine is named in a heading: its tag, else a short hash."""
-    tag = next((t for t in df.get("engine_tag", []) if isinstance(t, str) and t), None)
-    if tag:
-        return tag
-    h = next((x for x in df.get("engine_hash", []) if isinstance(x, str) and x), "")
+    """How a pricing model is named in a heading: the release tags that share
+    it, else a short hash."""
+    tags = sorted({t for t in df.get("engine_tag", []) if isinstance(t, str) and t}, key=_tag_order)
+    if tags:
+        return tags[0] if len(tags) == 1 else f"{', '.join(tags)} (one pricing model)"
+    h = next((x for x in df.get("model_id", []) if isinstance(x, str) and x), "")
     return h[:12] if h else "unidentified engine"
 
 
@@ -124,14 +137,14 @@ def clv_table(season: int) -> pd.DataFrame:
     # engine: if the engine changed between the decision and the close, the
     # deciding engine still gets its CLV. It must be the LAST close -- see
     # calls.last_per on why the first would misreport an early-window run.
-    market_key = tuple(f for f in calls_mod.CALL_KEY if f != "engine_hash")
+    market_key = tuple(f for f in calls_mod.CALL_KEY if f != "model_id")
     closes = calls_mod.last_per(rows, "close", market_key)
     if not decisions or not closes:
         return pd.DataFrame()
 
     paired = []
     for key, dec in decisions.items():
-        close = closes.get(tuple(key[:-1]))    # drop engine_hash
+        close = closes.get(tuple(key[:-1]))    # drop model_id
         if close is None:
             continue
         # Both sides come from the predictions file, so both carry `line`.
@@ -149,6 +162,7 @@ def clv_table(season: int) -> pd.DataFrame:
             "event_id": dec.get("event_id"), "book": dec.get("book"),
             "market": dec.get("market"), "player": dec.get("player"),
             "side": dec.get("side"), "engine_hash": dec.get("engine_hash"),
+            "model_id": key[-1],
             "engine_tag": dec.get("engine_tag"),
             "line_dec": float(dec["line"]), "line_close": float(close_line),
             "line_move": move,
@@ -185,7 +199,8 @@ def render_sections(df: pd.DataFrame) -> tuple[list[str], list[dict]]:
         rows.append({"bucket": f"{lo:.0%}-{hi:.0%}", "n": len(b),
                      "hit_rate": hr, "stated": stated, "diff": hr - stated,
                      "net": b["pnl_per_100"].sum(),
-                     "engine_hash": df["engine_hash"].iloc[0] if n else ""})
+                     "engine_hash": df["engine_hash"].iloc[0] if n else "",
+                     "model_id": df["model_id"].iloc[0] if n and "model_id" in df else ""})
         out.append(f"| {lo:.0%}-{hi:.0%} | {len(b)} | {hr:.1%} | {stated:.1%} "
                    f"| {hr - stated:+.1%} | {b['pnl_per_100'].sum():+.0f} |")
     out += ["", "A bucket needs roughly 50 calls before its hit rate says "
@@ -241,10 +256,10 @@ def render_sections(df: pd.DataFrame) -> tuple[list[str], list[dict]]:
     return out, rows
 
 
-def render_clv(clv: pd.DataFrame, engine_hash: str | None = None) -> list[str]:
-    """The CLV paragraph, for one engine or (engine_hash=None) for all."""
-    if engine_hash is not None and not clv.empty and "engine_hash" in clv:
-        clv = clv[clv["engine_hash"] == engine_hash]
+def render_clv(clv: pd.DataFrame, model: str | None = None) -> list[str]:
+    """The CLV paragraph, for one pricing model or (model=None) for all."""
+    if model is not None and not clv.empty and "model_id" in clv:
+        clv = clv[clv["model_id"] == model]
     out = ["### Closing line value", ""]
     if clv.empty:
         out += ["No paired decision/close snapshots yet. CLV needs a closing "
@@ -292,7 +307,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     clv = clv_table(args.season)
-    engines = list(df.groupby("engine_hash", dropna=False))
+    engines = list(df.groupby("model_id", dropna=False))
 
     out += [f"{len(df)} calls ({graded} priced lines graded, so "
             f"{graded - len(df)} superseded by a later line).", ""]
@@ -304,7 +319,7 @@ def main(argv: list[str] | None = None) -> int:
     # judgement to make, not this script's.
     if len(engines) > 1:
         labels = ", ".join(engine_label(g) for _h, g in engines)
-        out += [f"**{len(engines)} engine versions in the record ({labels}); "
+        out += [f"**{len(engines)} pricing models in the record ({labels}); "
                 f"they are not pooled.** Pass `--pool` to pool them "
                 f"explicitly.", ""]
 

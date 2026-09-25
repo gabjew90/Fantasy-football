@@ -81,6 +81,9 @@ jobs:
           else
             echo "::notice title=tag not cut yet::the lock names $TAG, which does not exist yet; it is cut on the merge commit"
           fi
+          # rows stamped before price_hash existed are grouped through this
+          # table; every entry must recompute from its release tag
+          python props/engine_version.py price-map --check
 
       - name: did the model change?
         id: changed

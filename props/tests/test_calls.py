@@ -169,3 +169,17 @@ def test_the_close_side_ignores_the_engine():
     best = calls.last_per(rows, "close", market_key)
     assert len(best) == 1, "one market, one closing line"
     assert list(best.values())[0]["line"] == 48.5
+
+
+def test_two_releases_with_one_pricing_model_make_one_call():
+    """A docs-only release re-captures the same line under a new engine hash;
+    same price_hash, so the later tick is the call, not a second call."""
+    import calls
+    a = {"season": 2026, "week": 3, "event_id": "e", "book": "sleeper", "market": "player_receptions",
+         "player": "P", "side": "Over", "line": 4.5, "snapshot_type": "decision",
+         "engine_hash": "aaa", "price_hash": "ppp", "logged_at_utc": "2026-09-20T10:00:00Z"}
+    b = dict(a, engine_hash="bbb", logged_at_utc="2026-09-20T11:00:00Z")
+    c = dict(a, engine_hash="ccc", price_hash="qqq", logged_at_utc="2026-09-20T12:00:00Z")
+    best, _ties = calls.select_calls([a, b, c])
+    assert len(best) == 2, "two pricing models, two calls"
+    assert {r["engine_hash"] for r in best.values()} == {"bbb", "ccc"}

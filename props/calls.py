@@ -9,13 +9,16 @@ Counted naively that is two calls, two graded rows, and a closing-line-value
 join that fans out.
 
 THE RULE. A call is the `decision` row with the latest `logged_at_utc` for one
-(season, week, event, book, market, player, engine). `side` and `line` are
+(season, week, event, book, market, player, pricing model). `side` and `line` are
 attributes of the call, not part of its identity -- if the model flipped sides
 between ticks that is still one call, and the last one is the one that would
 have been placed.
 
-Per engine, because two engine versions' calls are never pooled (see
-DECISIONS #74); each version's record has to stand on its own.
+Per PRICING MODEL, because two models' calls are never pooled (see
+DECISIONS #74); each has to stand on its own. The pricing model is
+`engine_version.model_id` (DECISIONS #107): two releases whose pricer and
+data are identical are one model, so a re-capture after a docs-only release
+supersedes the earlier tick instead of counting as a second call.
 
 `open` and `close` rows are never calls. A game captured only inside the
 closing window therefore has no call, and that is deliberate: a price-only
@@ -36,16 +39,24 @@ like a change in hit rate. Stdlib only.
 
 from __future__ import annotations
 
+import sys
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Iterable
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import engine_version  # noqa: E402
+
+# `model_id` is derived (engine_version.model_id), never stored on a
+# prediction row; the last field is dropped wherever the engine must not count.
 CALL_KEY = ("season", "week", "event_id", "book", "market", "player",
-            "engine_hash")
+            "model_id")
 
 
 def call_key(row: dict) -> tuple[str, ...]:
     """The identity of the decision a row belongs to."""
-    return tuple("" if row.get(f) is None else str(row.get(f, ""))
+    return tuple(engine_version.model_id(row) if f == "model_id" else
+                 ("" if row.get(f) is None else str(row.get(f, "")))
                  for f in CALL_KEY)
 
 

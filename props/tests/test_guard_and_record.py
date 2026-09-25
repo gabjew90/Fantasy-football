@@ -337,12 +337,14 @@ def test_record_run_stamps_every_row_from_the_tree_that_ran(tmp_path, monkeypatc
     assert record_run.main() == 0
 
     expected = engine_version.tree_hash(engine)
+    expected_price = engine_version.price_hash(engine)
     for rel in ("predictions/2026/wk02.jsonl", "lines/2026/line_archive_2026.jsonl"):
         rows = [json.loads(x) for x in
                 (tmp_path / "record" / rel).open(encoding="utf-8") if x.strip()]
         assert rows, rel
         for row in rows:
             assert row["engine_hash"] == expected, rel
+            assert row["price_hash"] == expected_price, rel
             assert row["engine_tag"] is None, "a temp tree matches no lock"
     out = capsys.readouterr().out
     assert f"engine={expected[:12]}" in out and "tag=(untagged)" in out
