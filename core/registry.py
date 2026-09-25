@@ -50,13 +50,14 @@ COMPONENTS: tuple[Component, ...] = (
                         "props/engine/resources/model_registry.md"),
               note="with the width settings (props-v1.20, resources/width_params.json, tuned on 2022-23): "
                    "passes all four harness checks on 2024-25 -- beats baseline A each season, unbiased, "
-                   "19.9% / 19.2% outside p10-p90, every 60-90% bucket within 3 points. Not yet tested "
+                   "19.0% / 19.2% outside p10-p90, every 60-90% bucket within 3 points (yards exactly at "
+                   "the limit). Not yet tested "
                    "against posted lines (eligibility.VALIDATED_MARKETS)",
               markets=("player_receptions", "player_reception_yds")),
     Component("rush_yds_v0", "prop_model", "props/engine/scripts/model.py", "live",
               evidence=("reports/yardage_harness.md", "reports/width_tuning.md"),
               note="with the width settings (props-v1.20): passes all four harness checks on 2024-25 "
-                   "(19.7% outside p10-p90, worst bucket 2.8 points). Non-QB only: no QB rushing, no "
+                   "(19.6% outside p10-p90, worst bucket 2.9 points). Non-QB only: no QB rushing, no "
                    "run-defense adjustment yet (plan step 3). Not tested against posted lines",
               markets=("player_rush_yds",)),
     Component("anytime_td_v1", "prop_model", "props/engine/scripts/td_v1.py", "live",

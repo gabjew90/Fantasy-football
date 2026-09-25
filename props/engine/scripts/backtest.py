@@ -28,7 +28,7 @@ Single season (the round-4..9 protocol, unchanged, so old results reproduce):
 Data comes from nflverse, cached in NFL_BACKTEST_CACHE (default: the system
 temp dir /nflbt, shared with td_backtest.py).
 """
-import argparse, json, os, re, subprocess, sys, tempfile
+import argparse, json, os, re, subprocess, sys, tempfile, zlib
 from pathlib import Path
 
 import numpy as np
@@ -579,7 +579,19 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
             yds = np.where(rec_ > 0, rng.gamma(shape_tot, (np.maximum(ypc_arr, 0.5) / shape_ypc)[:, None]), 0.0)
             return rec_, yds
 
-        def draw_block_joint(frame, shares, crs, ypts):
+        def game_rng(team, week, arm):
+            """LIVE MODE: every team-game draws from its own stream, seeded by the
+            season, the arm and the team-game. Two width settings then start each
+            team-game from the same random state (common random numbers), however
+            many extra variates an earlier team-game consumed -- so a paired
+            difference between settings is the settings, not Monte-Carlo drift.
+            The single-season protocol keeps its one stream so old results
+            reproduce."""
+            if not live:
+                return rng
+            return np.random.default_rng([seed, arm, int(week), zlib.crc32(str(team).encode("utf-8"))])
+
+        def draw_block_joint(frame, shares, crs, ypts, arm):
             """THE LIVE PIPELINE'S DRAW (model.simulate_team_game): one team-volume
             draw per simulation, split across that team's players."""
             rec_ = np.zeros((len(frame), N))
@@ -588,7 +600,7 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
             for (team, week), g in frame.groupby(["team", "week"], sort=False):
                 tvol = float(g.team_targets_env.iloc[0])
                 out, _tt = M.simulate_team_game(
-                    rng, N, tvol, r_team_targets,
+                    game_rng(team, week, arm), N, tvol, r_team_targets,
                     {ix: float(shares[pos_[ix]]) for ix in g.index},
                     {ix: float(crs[pos_[ix]]) for ix in g.index},
                     {ix: float(ypts[pos_[ix]]) for ix in g.index},
@@ -598,7 +610,7 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
                     yds[pos_[ix]] = y_
             return rec_, yds
 
-        def draw_block_rush(frame, shares, ypcs):
+        def draw_block_rush(frame, shares, ypcs, arm):
             """THE LIVE PIPELINE'S RUSHING DRAW (model.simulate_team_rush): one team
             carries draw per simulation, split across the team's eligible players,
             each carry the player's ypc plus a residual from the prior season's
@@ -607,7 +619,8 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
             pos_ = {ix: i for i, ix in enumerate(frame.index)}
             for (team, week), g in frame.groupby(["team", "week"], sort=False):
                 idx = [pos_[ix] for ix in g.index]
-                _car, y_, _tc = M.simulate_team_rush(rng, N, float(g.team_carries_env.iloc[0]), r_team_carries,
+                _car, y_, _tc = M.simulate_team_rush(game_rng(team, week, arm), N,
+                                                     float(g.team_carries_env.iloc[0]), r_team_carries,
                                                      shares[idx], ypcs[idx], carry_resid, width=width)
                 for k, i in enumerate(idx):
                     yds[i] = y_[k]
@@ -625,9 +638,9 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
         # Both arms use the joint sampler, so the model-vs-baseline comparison
         # isolates the SHRINKAGE, which is what baseline A exists to test.
         recM, ydsM = draw_block_joint(test_act, test_act.ts.values,
-                                      test_act.cr.clip(lower=0.05).values, test_act.ypt.values)
+                                      test_act.cr.clip(lower=0.05).values, test_act.ypt.values, arm=1)
         if full:
-            recA, ydsA = draw_block_joint(test_act, shareA, crA, yptA)
+            recA, ydsA = draw_block_joint(test_act, shareA, crA, yptA, arm=2)
             recI, ydsI = draw_block(mu_m, ypc_m, rec_fit)
         else:                                   # tuning: the model arm is all that is compared
             recA, ydsA, recI, ydsI = recM, ydsM, recM, ydsM
@@ -637,9 +650,9 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
         # draws, in the order the single-season protocol always used, so its
         # PIT numbers reproduce exactly.
         pit_rec, pit_yds = rpit_block(recM, y_rec), rpit_block(ydsM, y_yds)
-        rushM = draw_block_rush(test_act, test_act.rs.fillna(0.0).values, test_act.ypc.values)
+        rushM = draw_block_rush(test_act, test_act.rs.fillna(0.0).values, test_act.ypc.values, arm=3)
         rushA = draw_block_rush(test_act, test_act.own_rs.fillna(test_act.rs).fillna(0.0).values,
-                                test_act.own_ypc.fillna(test_act.ypc).values) if full else rushM
+                                test_act.own_ypc.fillna(test_act.ypc).values, arm=4) if full else rushM
         y_rush = test_act.act_rush_yards.values.astype(float)
         # The rushing population is fixed before the game and identical for every
         # model version: RB depth-chart slots, plus anyone with 20%+ of the team's
@@ -718,13 +731,13 @@ def market_rows(res, mk):
     return d.dropna(subset=[f"crps_{mk}_model"])
 
 
-def summarize(res, mk):
+def summarize(res, mk, ci=True):
     d = market_rows(res, mk)
     if d.empty:
         return None
     act = MARKETS[mk][0]
     diff = d[f"crps_{mk}_baseA"] - d[f"crps_{mk}_model"]
-    lo, hi = game_block_ci(d, diff)
+    lo, hi = game_block_ci(d, diff) if ci else (float("nan"), float("nan"))
     ratio = float(d[act].mean() / max(d[f"mean_{mk}_model"].mean(), 1e-9))
     pitm = float(d[f"pit_{mk}"].mean())
     # WIDTH: the share of outcomes outside the model's own 10-90 range, each
@@ -743,16 +756,28 @@ def reliability_table(C):
         n=("hit", "size"), p_model_mean=("p_model", "mean"), hit_rate=("hit", "mean")).reset_index()
 
 
+SHIPPED_WIDTH = RES / "width_params.json"
+
+
 def width_of(args):
-    """--width: a JSON object or a path to one (model.WIDTH_OFF keys); unset = off."""
-    if not getattr(args, "width", None):
+    """The sampler's width settings for this run.
+
+    Unset: the SHIPPED settings (resources/width_params.json, what score_game
+    reads), so a harness run grades the sampler that prices props unless told
+    otherwise. `--width off`: the pre-2026-09-24 sampler (reproduces the older
+    records). Otherwise a JSON object, or a path to one."""
+    spec = getattr(args, "width", None)
+    if spec is None:
+        if not SHIPPED_WIDTH.exists():
+            return {}
+        spec = str(SHIPPED_WIDTH)
+    if spec == "off":
         return {}
-    src = Path(args.width)
-    w = json.loads(src.read_text(encoding="utf-8") if src.exists() else args.width)
-    unknown = set(w) - set(M.WIDTH_OFF) - {"note", "tuned_on"}
-    if unknown:
-        sys.exit(f"--width: unknown settings {sorted(unknown)}; known: {sorted(M.WIDTH_OFF)}")
-    return {k: v for k, v in w.items() if k in M.WIDTH_OFF}
+    text = spec if spec.lstrip().startswith("{") else Path(spec).read_text(encoding="utf-8")
+    try:
+        return M.validate_width(json.loads(text))
+    except ValueError as ex:
+        sys.exit(f"--width: {ex}")
 
 
 # The tuning grid. Receiving and rushing use separate samplers, so one run can
@@ -769,6 +794,20 @@ def _off(v):
     return v is None or (isinstance(v, float) and np.isnan(v)) or v == 0
 
 
+def tie_flags(frames, per_row, best):
+    """For each setting: is its per-player-week score NOT measurably worse than
+    the best setting's? Worse means the paired game-block 95% interval for
+    (this - best) lies entirely above zero; anything else is a tie. `per_row(i)`
+    gives setting i's score per player-week (lower is better), aligned across
+    settings; NaN rows (outside a market's population) drop out."""
+    tied = []
+    for i in range(len(frames)):
+        d = frames[i].assign(_diff=per_row(i) - per_row(best)).dropna(subset=["_diff"])
+        lo, _hi = game_block_ci(d, d["_diff"])
+        tied.append(bool(i == best or not lo > 0))
+    return tied
+
+
 def tune_width(args, OUT):
     """Choose the width settings on the TUNE seasons only, by CRPS (a proper
     score: it rewards the right width, not merely a wider one). Writes the
@@ -777,7 +816,8 @@ def tune_width(args, OUT):
     n = max(len(RECEIVING_GRID), len(RUSHING_GRID))
     grid = [{**RECEIVING_GRID[i % len(RECEIVING_GRID)], **RUSHING_GRID[i % len(RUSHING_GRID)]} for i in range(n)]
     if args.from_results:
-        grid, frames = pd.read_pickle(args.from_results)
+        saved = load_run(args.from_results, "width_tuning")
+        grid, frames = saved["grid"], saved["frames"]
     else:
         per_cfg = [[] for _ in grid]
         for S in seasons:
@@ -786,13 +826,13 @@ def tune_width(args, OUT):
                 per_cfg[i].append(res)
         frames = [pd.concat(f, ignore_index=True) for f in per_cfg]
         if args.save_results:
-            pd.to_pickle((grid, frames), args.save_results)
+            pd.to_pickle({"kind": "width_tuning", "grid": grid, "frames": frames}, args.save_results)
     rows = []
     for i, cfg in enumerate(grid):
         res = frames[i]
         row = {"i": i, **{k: (np.nan if v is None else v) for k, v in cfg.items()}}
         for mk in MARKETS:
-            s = summarize(res, mk)
+            s = summarize(res, mk, ci=False)          # tuning scores the model arm only
             row.update({f"{mk}_crps": s["crps_model"], f"{mk}_width": s["outside_p10_p90"],
                         f"{mk}_ratio": s["actual_over_model"], f"{mk}_pit": s["pit_mean"]})
         rows.append(row)
@@ -813,17 +853,8 @@ def tune_width(args, OUT):
         f = frames[i]
         return f.crps_rush_model.where(f.rush_pop.astype(bool))
 
-    def ties(score_col, per_row):
-        best = int(T[score_col].idxmin())
-        tied = []
-        for i in range(len(T)):
-            d = frames[i].assign(_diff=per_row(i) - per_row(best)).dropna(subset=["_diff"])
-            lo, _hi = game_block_ci(d, d["_diff"])
-            tied.append(bool(i == best or not lo > 0))
-        return tied
-
-    T["rec_tie"] = ties("rec_score", rec_rows)
-    T["rush_tie"] = ties("rush_crps", rush_rows)
+    T["rec_tie"] = tie_flags(frames, rec_rows, int(T.rec_score.idxmin()))
+    T["rush_tie"] = tie_flags(frames, rush_rows, int(T.rush_crps.idxmin()))
     T["rec_width_miss"] = ((T.rec_width - WIDTH_TARGET).abs() + (T.yds_width - WIDTH_TARGET).abs()) / 2
     T["rush_width_miss"] = (T.rush_width - WIDTH_TARGET).abs()
     rec_pick = T[T.rec_tie].sort_values(["rec_width_miss", "rec_score"]).iloc[0]
@@ -836,7 +867,8 @@ def tune_width(args, OUT):
     L = ["# Width tuning: tune seasons only", "",
          f"*Generated by `backtest.py --tune-width --tune {args.tune}`. Do not edit by hand. The test seasons "
          "were not read.*", "",
-         "Every setting is scored on the same random draws. **The choice rule:** CRPS first (lower is better; "
+         "Each team-game starts every setting from the same random state (common random numbers). "
+         "**The choice rule:** CRPS first (lower is better; "
          "a proper score, so it rewards the right width, not merely a wider one) -- every setting whose CRPS is "
          "not measurably worse than the best (paired game-block 95% interval reaching zero) is a **tie**; among "
          "the ties, the **width** closest to 0.20 (the share of outcomes outside the model's p10-p90) wins. "
@@ -896,7 +928,7 @@ def market_verdict(all_res, rel_weeks5, test, mk):
             "width_ok": width_ok, "worst_reliability_gap": worst_gap, "calibration_ok": calib_ok}
 
 
-def harness_report(all_res, calib, metas, args, out_base):
+def harness_report(all_res, calib, metas, args, out_base, comparison=None):
     tune, test = parse_weeks(args.tune), parse_weeks(args.test)
     slices = [("weeks 2-4", lambda d: d[d.week.isin(EARLY_WEEKS)]),
               ("weeks 5-18", lambda d: d[d.week >= 5]), ("all weeks", lambda d: d)]
@@ -965,6 +997,17 @@ def harness_report(all_res, calib, metas, args, out_base):
             L.append(f"| {r.market} | {r.side} | {r.bucket} | {int(r.n)} | {r.p_model_mean:.3f} | "
                      f"{r.hit_rate:.3f} | {r.hit_rate - r.p_model_mean:+.3f} |")
         L.append("")
+    if comparison:
+        L += ["", f"## Change against the reference run ({comparison['reference']})", "",
+              "Paired by player-week, the model's own CRPS, reference minus this run (positive = this run is "
+              "better), with a 95% interval from resampling whole games. All four seasons.", "",
+              "| Games | Market | N | Reference CRPS | Change (95% CI) |", "|---|---|---|---|---|"]
+        for subset, per_mk in comparison["subsets"].items():
+            for mk, c in per_mk.items():
+                lo, hi = c["ci"]
+                sig = " **(excl. 0)**" if (lo > 0 or hi < 0) else ""
+                L.append(f"| {subset} | {MARKETS[mk][1]} | {c['n']} | {c['crps_ref']:.4f} | "
+                         f"{c['gain']:+.4f} ({lo:+.4f}, {hi:+.4f}){sig} |")
     L += ["", "## What this does not reproduce from the live scorer", "",
           "- The snap-share role scaling and the new-team cap on the prior-season rate "
           "(`blended_rate(role_scale=..., new_team=...)`): the harness has no pre-game snap feed.",
@@ -983,19 +1026,32 @@ def harness_report(all_res, calib, metas, args, out_base):
     Path(str(out_base) + ".md").write_text("\n".join(L) + "\n", encoding="utf-8")
     Path(str(out_base) + ".json").write_text(json.dumps(
         {"seasons": args.seasons, "tune": args.tune, "test": args.test, "verdicts": verdicts,
-         "summary": summary, "reliability_test": reliability}, indent=1, sort_keys=True, default=str) + "\n",
+         "summary": summary, "reliability_test": reliability, "comparison": comparison}, indent=1, sort_keys=True, default=str) + "\n",
         encoding="utf-8")
     print(f"wrote {out_base}.md and .json", file=sys.stderr)
     for mk, v in verdicts.items():
         print(f"  {MARKETS[mk][1]}: {'PASSES' if v['passes'] else 'does not pass'}", file=sys.stderr)
 
 
+def load_run(path, kind):
+    """A --save-results pickle of the given kind ('harness' or 'width_tuning')."""
+    obj = pd.read_pickle(path)
+    if isinstance(obj, dict) and obj.get("kind") == kind:
+        return obj
+    got = obj.get("kind") if isinstance(obj, dict) else type(obj).__name__
+    sys.exit(f"{path} is a {got} run, not a {kind} run")
+
+
 def compare_runs(res, ref_path):
     """Paired game-block bootstrap on the MODEL's own CRPS, this run vs a
-    reference run's results pickle (positive = this run better)."""
+    reference run (positive = this run better). Printed, and returned so the
+    harness report can carry it."""
     ref = pd.read_pickle(ref_path)
-    if isinstance(ref, tuple):          # a harness --save-results pickle: (results, calibration, settings)
+    if isinstance(ref, dict) and ref.get("kind") == "harness":
+        ref = ref["results"]
+    elif isinstance(ref, tuple):        # pickles written before the runs described themselves
         ref = ref[0]
+    out = {"reference": Path(ref_path).name, "subsets": {}}
     keys =[k for k in ("season", "team", "week", "gsis_id") if k in res.columns and k in ref.columns]
     d0 = res.merge(ref, on=keys, suffixes=("", "_ref"))
     print(f"\n=== Paired game-block bootstrap, THIS run vs {Path(ref_path).name}, model CRPS only "
@@ -1004,6 +1060,7 @@ def compare_runs(res, ref_path):
         if len(dd) < 50:
             continue
         print(f"  -- {subset_name}, N={len(dd)} --", file=sys.stderr)
+        out["subsets"][subset_name] = {}
         for mk in MARKETS:
             if f"crps_{mk}_model_ref" not in dd.columns:
                 continue
@@ -1014,6 +1071,9 @@ def compare_runs(res, ref_path):
             lo, hi = game_block_ci(d, diff)
             print(f"    {mk}: {diff.mean():+.4f}  95% CI ({lo:+.4f}, {hi:+.4f})  "
                   f"{'excludes 0' if lo > 0 or hi < 0 else 'includes 0'}", file=sys.stderr)
+            out["subsets"][subset_name][mk] = {"n": int(len(d)), "gain": float(diff.mean()),
+                                               "ci": [lo, hi], "crps_ref": float(d[f"crps_{mk}_model_ref"].mean())}
+    return out
 
 
 def single_season_output(args, res, meta, OUT):
@@ -1127,7 +1187,8 @@ def main(argv=None):
     if args.from_results:
         # Re-render the report from a saved run: the simulations are the slow
         # part and a report change should not need them.
-        all_res, calib, metas = pd.read_pickle(args.from_results)
+        saved = load_run(args.from_results, "harness")
+        all_res, calib, metas = saved["results"], saved["calib"], saved["metas"]
     else:
         frames, calibs, metas = [], [], []
         for S in parse_weeks(args.seasons):
@@ -1136,10 +1197,9 @@ def main(argv=None):
         all_res = pd.concat(frames, ignore_index=True)
         calib = pd.concat(calibs, ignore_index=True)
     if args.save_results:
-        pd.to_pickle((all_res, calib, metas), args.save_results)
-    if args.compare_to:
-        compare_runs(all_res, args.compare_to)
-    harness_report(all_res, calib, metas, args,
+        pd.to_pickle({"kind": "harness", "results": all_res, "calib": calib, "metas": metas}, args.save_results)
+    comparison = compare_runs(all_res, args.compare_to) if args.compare_to else None
+    harness_report(all_res, calib, metas, args, comparison=comparison, out_base=
                    Path(args.report) if args.report else OUT / "yardage_harness")
     return 0
 

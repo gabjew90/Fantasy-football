@@ -63,6 +63,8 @@ worst on the low side (players bust more often than the model allows).
 2. **Width first** (user decision, 2026-09-24) -- DONE, props-v1.20: target-share
    and carry-share variation plus per-game yards per carry; all three markets pass
    the four checks on 2024-25 (reports/width_tuning.md, reports/yardage_harness.md).
+   The setting VALUES were chosen on 2022-23 alone; WHICH knobs to try was decided after
+   the first harness run, which had shown every season (tune and test) too narrow.
    Candidate causes, each tested
    against the version before it: a player's share of targets or carries is
    fixed within a game (real shares swing week to week -- a

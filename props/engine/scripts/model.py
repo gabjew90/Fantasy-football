@@ -485,6 +485,25 @@ WIDTH_OFF = {"share_conc_targets": None, "share_conc_carries": None, "catch_conc
              "eff_sd_rec": 0.0, "eff_sd_rush": 0.0}
 
 
+def validate_width(w):
+    """The width settings a file or flag may carry, checked: concentrations
+    None or > 0, log-sds >= 0. Documentation keys (note, tuned_on) pass through
+    unused; anything else is an error, never silently ignored. Returns the
+    settings dict. A concentration of 0 is NOT "off" (it would hand every
+    target to one player); off is null."""
+    unknown = set(w) - set(WIDTH_OFF) - {"note", "tuned_on"}
+    if unknown:
+        raise ValueError(f"unknown width settings {sorted(unknown)}; known: {sorted(WIDTH_OFF)}")
+    out = {k: w[k] for k in WIDTH_OFF if k in w}
+    for k, v in out.items():
+        if k.startswith(("share_conc", "catch_conc")):
+            if v is not None and not (isinstance(v, (int, float)) and v > 0):
+                raise ValueError(f"{k} must be null (off) or > 0, got {v!r}")
+        elif not (isinstance(v, (int, float)) and v >= 0):
+            raise ValueError(f"{k} must be >= 0, got {v!r}")
+    return out
+
+
 def _allocate(rng, totals, p_norm, conc, fill_last):
     """Split each simulation's team total across the players (+ 'other').
 

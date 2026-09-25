@@ -908,8 +908,7 @@ def main():
     # --tune-width and judged on 2024-25 (reports/width_tuning.md,
     # reports/yardage_harness.md). No file = the pre-width sampler, draw for draw.
     _wf = RES / "width_params.json"
-    WIDTH = ({k: v for k, v in json.loads(_wf.read_text(encoding="utf-8")).items() if k in MODEL.WIDTH_OFF}
-             if _wf.exists() else None)
+    WIDTH = MODEL.validate_width(json.loads(_wf.read_text(encoding="utf-8"))) if _wf.exists() else None
     sims = {}
     team_targets_draw, team_carries_draw = {}, {}
     for t in (AWAY, HOME):
