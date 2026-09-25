@@ -40,7 +40,10 @@ Keep:
   two-sided lines exist. No in-house fantasy model.
 
 Delete (each in the PR that retires it, after its replacement has a week of use):
-- draftkit `model_projection` and its role gate (retired; lost its own backtest)
+- draftkit `model_projection` and its role gate (retired; lost its own backtest).
+  **Frozen until August draft prep** (user decision 2026-09-25, DECISIONS #108): still
+  Omnibeta's draft source and the path the board byte-identity check runs; deleted when
+  the draft switches to `fantasy/sources`.
 - manager `xfp.py` (research only, no live consumer)
 - the props fantasy export as a separate deliverable (it becomes the scoring step
   of `fantasy scenario`)

@@ -5902,3 +5902,11 @@ checked for a live consumer first:
   `parse_scoring`. `reports/xfp_eval.md` stays as the evidence the decision
   rests on; the script that generated it is in git history.
 
+**Not deleted: `model_projection`.** Draft-only -- nothing in-season calls
+it -- but `config.yaml` still names it as the projection source Omnibeta
+drafted on, and `scripts/board_identity.py` (a byte-identity check CLAUDE.md
+protects), the source-gate backtest and the tail-curve gate run through it.
+**User decision:** frozen with the draft engine until August draft prep,
+deleted when the draft switches to `fantasy/sources` and Omnibeta's board is
+rebuilt on the external source. The registry says so (`retire_in`).
+

@@ -135,7 +135,9 @@ COMPONENTS: tuple[Component, ...] = (
                    "scoring; the draft board's projection"),
     Component("model_projection", "projection_source", "draftkit/projections.py", "deprecated",
               evidence=("reports/projection_backtest.omnibeta.md",),
-              retire_in="step 6", note="the in-house season model; lost its own backtest"),
+              retire_in="August draft prep",
+              note="the in-house season model; lost its own backtest. Draft-only, frozen: still "
+                   "Omnibeta's draft source and the board-identity path (DECISIONS #108)"),
 )
 
 
