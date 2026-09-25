@@ -57,6 +57,15 @@ SEASON_GAMES = 17
 # known: Out/Doubtful this week; IR/PUP/NFI the NFL's four-week minimum.
 # Assumptions, stated in every report -- not a model of injury duration.
 MISS_WEEKS = {"out": 1, "doubtful": 1, "ir": 4, "pup": 4, "nfi": 4, "sus": 1, "suspended": 1}
+# Yahoo's status codes, read as the same statuses (Sleeper spells them out)
+STATUS_ALIAS = {"o": "out", "d": "doubtful", "ir-r": "ir", "ir+": "ir", "pup-r": "pup", "pup-p": "pup",
+                "nfi-r": "nfi", "nfi-a": "nfi", "susp": "sus"}
+
+
+def miss_weeks(status: str | None) -> int:
+    """Weeks a player is assumed to miss from his platform status (0 = none)."""
+    s = (status or "").strip().lower()
+    return MISS_WEEKS.get(STATUS_ALIAS.get(s, s), 0)
 ESTABLISHED_SNAP = 0.60
 STAND_PAT = {"stream": 0.01, "season": 5.0}     # P(win) points / season points below which: stand pat
 
@@ -246,8 +255,7 @@ def run(league: str, positions=("RB", "WR", "TE"), horizon: str = "season", week
         pos = {p: (info.get(p) or {}).get("pos") for p in pids}
         mine = {p: rate.get(p, 0.0) for p in view.my_players}
         playoff = int(((ctx.get("league") or {}).get("settings") or {}).get("playoff_week_start") or 15)
-        out_until = {p: view.week + MISS_WEEKS.get(((info.get(p) or {}).get("status") or "").lower(), 0)
-                     for p in pids}
+        out_until = {p: view.week + miss_weeks((info.get(p) or {}).get("status")) for p in pids}
         base_total, base_wk = season_gain(mine, pos, team_nv, view.slots, view.flex_slots, weeks, byes,
                                           out_until=out_until)
         for c in cands:

@@ -5676,10 +5676,22 @@ helps me is an offer the partner refuses, so the report says whether they gain.
 - `--back "NAME:WEEK"` carries a reported return week (the session log's A.J.
   Brown case: IR alone assumed the four-week minimum against a six-week
   report); otherwise the status minimum is assumed and labelled.
-- Roster size: an overfull side drops its cheapest unprotected bench player
-  (never the arrival); a side left short fills the spot with the free agent who
-  adds most to its lineup -- the best free agent by rate was a QB who would
-  never start (first run: Henry + Deebo for Bowers read -45.1 with an empty
-  spot, -22.9 with the right replacement).
+- Roster size: the league's ACTIVE limit (roster positions less IR slots;
+  players in IR slots do not count). An overfull side drops whoever costs its
+  lineup least (never the arrival, never an established role); a side left
+  short fills the spot with the free agent who adds most to its lineup -- the
+  best free agent by rate was a QB who would never start (first run: Henry +
+  Deebo for Bowers read -45.1 with an empty spot, -22.9 with the right
+  replacement).
 - Verdict bands: 5 season points either way, the waiver command's season line.
   Not modelled: role duration, league trade rules, the partner's own valuation.
+
+Code review (high), all 6 fixed before merge: the roster limit was inferred
+from the longer roster, IR stashes included -- the partner in one test trade
+gained a phantom free agent and read +3.7 instead of -12.0; the drop took the
+lowest rate, which on the partner's roster was its only defense (-97.3 instead
+of -3.0); Yahoo's status codes (O, D, PUP-R, IR-R) were not read as statuses,
+in the waiver command too (now `waiver.miss_weeks`); a team behind was judged
+on points, not upside, against the user's framework; `--back` matched
+namesakes anywhere (now the traded players only); the data gate checked my
+roster only (now both); and the both-sides evaluation had no test.

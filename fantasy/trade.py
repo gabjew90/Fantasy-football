@@ -95,26 +95,59 @@ def parse_back(specs: list[str]) -> dict[str, int]:
 
 
 def settle_roster(ids: list[str], size: int, rate: dict, protected: set, locked: set,
-                  free_agents: list[str] = (), value=None) -> tuple[list[str], list[str], list[str]]:
-    """Fit a roster to its size after a trade: over, and the cheapest
-    droppable players go (never protected, never the players just received);
+                  free_agents: list[str] = (), value=None, reserve: set = frozenset()) -> tuple[list[str], list[str], list[str]]:
+    """Fit a roster to its ACTIVE size after a trade (`reserve` = players in IR
+    slots, who do not count): over, and the cheapest droppable players go
+    (never protected, never the players just received, never an IR stash);
     under, and each open spot takes the free agent that raises `value(roster)`
     the most (by rate when no value function is given).
     Returns (roster, dropped, added)."""
     ids = list(ids)
     dropped, added = [], []
-    while len(ids) > size:
-        cands = sorted((p for p in ids if p not in protected and p not in locked), key=lambda p: rate.get(p, 0.0))
+    active = lambda: sum(1 for p in ids if p not in reserve)
+    while active() > size:
+        cands = [p for p in ids if p not in protected and p not in locked and p not in reserve]
         if not cands:
             break
-        dropped.append(cands[0])
-        ids.remove(cands[0])
+        # the drop that costs the lineup least -- not the lowest rate: the lowest
+        # rate on a roster is often its only defense or kicker, whose loss empties
+        # a starting slot all season (first run: -97 for the partner)
+        cut = (max(cands, key=lambda p: (value([q for q in ids if q != p]), -rate.get(p, 0.0)))
+               if value is not None else min(cands, key=lambda p: rate.get(p, 0.0)))
+        dropped.append(cut)
+        ids.remove(cut)
     pool = [fa for fa in free_agents if fa not in ids]
-    while len(ids) < size and pool:
+    while active() < size and pool:
         best = (max(pool, key=lambda fa: value(ids + [fa])) if value is not None
                 else max(pool, key=lambda fa: rate.get(fa, 0.0)))
         ids.append(best); added.append(best); pool.remove(best)
     return ids, dropped, added
+
+
+def evaluate_side(before: list[str], out_ids: set, in_ids: set, *, limit: int, reserve: set, rate: dict,
+                  protected: set, free: list[str], value, upside_value, weeks: list[int], playoff: int) -> dict:
+    """One side of a trade: the roster after it (fitted to the limit), and what
+    it does to that side's best lineup. `value(ids)` / `upside_value(ids)` give
+    (season total, points by week) at the mean and at the upside rates."""
+    after = [p for p in before if p not in out_ids] + list(in_ids)
+    after, dropped, added = settle_roster(after, limit, rate, protected, set(in_ids), free,
+                                          value=lambda ids: value(ids)[0], reserve=reserve - set(out_ids))
+    b_tot, b_wk = value(before)
+    a_tot, a_wk = value(after)
+    return {"gain": a_tot - b_tot, "playoff_gain": sum(a_wk[w] - b_wk[w] for w in weeks if w >= playoff),
+            "upside_gain": upside_value(after)[0] - upside_value(before)[0], "dropped": dropped, "added": added,
+            "open_spots": max(sum(1 for p in before if p not in reserve)
+                              - sum(1 for p in after if p not in reserve), 0) if not added else 0,
+            "by_week": {w: round(a_wk[w] - b_wk[w], 2) for w in weeks}}
+
+
+def verdict_for(me: dict, contender: bool) -> tuple[str, str]:
+    """('worth it' | 'roughly even' | 'not worth it', the basis). A contender
+    goes by points added; a team behind by UPSIDE (the user's framework: the
+    standing adjusts the whole reading)."""
+    gain, basis = (me["gain"], "points added") if contender else (me["upside_gain"], "upside (you are behind)")
+    v = "worth it" if gain >= WORTH_IT else "not worth it" if gain <= -WORTH_IT else "roughly even"
+    return v, basis
 
 
 def side_value(ids: list[str], rate: dict, pos: dict, team: dict, slots, flex, weeks, byes, out_until) -> tuple[float, dict]:
@@ -172,6 +205,12 @@ def run(league: str, give: list[str], get: list[str], back: list[str] | None = N
         info[p] = {"name": d.get("full_name"), "pos": fantasy_position(d), "team": d.get("team"),
                    "status": d.get("injury_status") or ""}
     pids = list(dict.fromkeys(mine + theirs + free))
+    # the league's ACTIVE roster limit (IR slots excluded) and who sits in IR:
+    # inferring the size from roster lengths let a stashed IR player make a
+    # 2-for-1 look free
+    lg = ctx.get("league") or {}
+    limit = sum(1 for p in (lg.get("roster_positions") or []) if str(p).upper() not in ("IR", "IR+")) or None
+    reserve = {int(r["roster_id"]): {str(x) for x in (r.get("reserve") or [])} for r in ctx["rosters"]}
 
     games = pd.read_csv(F.schedule(manifest=m), low_memory=False)
     last = int(ctx.get("last_week") or 17)
@@ -180,55 +219,58 @@ def run(league: str, give: list[str], get: list[str], back: list[str] | None = N
     team_nv = {p: {"LAR": "LA"}.get((info.get(p) or {}).get("team"), (info.get(p) or {}).get("team")) for p in pids}
     pos = {p: (info.get(p) or {}).get("pos") for p in pids}
     playoff = int(((ctx.get("league") or {}).get("settings") or {}).get("playoff_week_start") or 15)
+    # --back applies to the players in the trade only, so a namesake elsewhere
+    # is never benched by it
+    trade_ids = set(gave) | set(got)
+    back_for = {}
+    for nm, wk in names_back.items():
+        hits = [p for p in trade_ids if normalize_name((info.get(p) or {}).get("name") or "") == nm]
+        if not hits:
+            raise TradeError(f"--back names '{nm}', who is not in this trade")
+        back_for.update({p: wk for p in hits})
     out_until, assumed = {}, {}
     for p in pids:
-        nm = normalize_name((info.get(p) or {}).get("name") or "")
-        status = ((info.get(p) or {}).get("status") or "").lower()
-        if nm in names_back:
-            out_until[p] = names_back[nm]
-            assumed[p] = f"back week {names_back[nm]} (as given)"
-        elif WV.MISS_WEEKS.get(status):
-            out_until[p] = view.week + WV.MISS_WEEKS[status]
+        status = (info.get(p) or {}).get("status") or ""
+        if p in back_for:
+            out_until[p] = back_for[p]
+            assumed[p] = f"back week {back_for[p]} (as given)"
+        elif WV.miss_weeks(status):
+            out_until[p] = view.week + WV.miss_weeks(status)
             assumed[p] = f"back week {out_until[p]} (assumed from '{status}': the NFL minimum, not a prognosis)"
 
     ev = EV.for_sleeper(pids, info, view.season, manifest=m)
-    projs, _env, notes = W.project_players(view.my_players, dict(view.info), view.season, view.week, view.scoring,
+    # the gate covers BOTH rosters: the verdict rests on the partner's side too
+    both = list(dict.fromkeys(mine + theirs))
+    info_both = {**dict(view.info), **{p: info[p] for p in both if p in info}}
+    projs, _env, notes = W.project_players(both, info_both, view.season, view.week, view.scoring,
                                            league, m, (cfg.get("fantasy") or {}).get("market_weight"))
-    gate = G.evaluate(m, view.scoring_yaml, view.scoring_platform, view.my_players, projs)
-    size = max(len(mine), len(theirs))      # the league's roster size, as the fuller side shows it
+    gate = G.evaluate(m, view.scoring_yaml, view.scoring_platform, both, projs)
 
-    taken = set()
+    value = lambda ids: side_value(ids, rate, pos, team_nv, view.slots, view.flex_slots, weeks, byes, out_until)
+    upside_value = lambda ids: side_value(ids, upside, pos, team_nv, view.slots, view.flex_slots, weeks, byes,
+                                          out_until)
 
-    def evaluate(before: list[str], out_ids: set, in_ids: set) -> dict:
-        after = [p for p in before if p not in out_ids] + list(in_ids)
-        protected = WV.protected_cuts([p for p in after if p not in in_ids], ev)
-        value = lambda ids: side_value(ids, rate, pos, team_nv, view.slots, view.flex_slots, weeks, byes,
-                                       out_until)[0]
-        after, dropped, added = settle_roster(after, max(len(before), size), rate, protected, set(in_ids),
-                                              [p for p in free if p not in taken], value=value)
-        taken.update(added)
-        b_tot, b_wk = side_value(before, rate, pos, team_nv, view.slots, view.flex_slots, weeks, byes, out_until)
-        a_tot, a_wk = side_value(after, rate, pos, team_nv, view.slots, view.flex_slots, weeks, byes, out_until)
-        u_b, _ = side_value(before, upside, pos, team_nv, view.slots, view.flex_slots, weeks, byes, out_until)
-        u_a, _ = side_value(after, upside, pos, team_nv, view.slots, view.flex_slots, weeks, byes, out_until)
-        return {"gain": a_tot - b_tot, "playoff_gain": sum(a_wk[w] - b_wk[w] for w in weeks if w >= playoff),
-                "upside_gain": u_a - u_b, "dropped": dropped, "added": added,
-                "open_spots": max(len(before) - len(after), 0),
-                "by_week": {w: round(a_wk[w] - b_wk[w], 2) for w in weeks}}
+    def side(before, rid, out_ids, in_ids, pool):
+        # never blame a trade for an overflow the roster already had
+        active_now = sum(1 for p in before if p not in reserve.get(rid, set()))
+        lim = max(limit or 0, active_now)
+        return evaluate_side(before, set(out_ids), set(in_ids), limit=lim, reserve=reserve.get(rid, set()),
+                             rate=rate, protected=WV.protected_cuts([p for p in before if p not in out_ids], ev),
+                             free=pool, value=value, upside_value=upside_value, weeks=weeks, playoff=playoff)
 
-    me = evaluate(mine, set(gave), set(got))
-    them = evaluate(theirs, set(got), set(gave))
+    me = side(mine, my, gave, got, free)
+    them = side(theirs, partner, got, gave, [p for p in free if p not in me["added"]])
     stand = view.standing
-    verdict = ("worth it" if me["gain"] >= WORTH_IT else "not worth it" if me["gain"] <= -WORTH_IT
-               else "roughly even")
+    verdict, basis = verdict_for(me, bool(stand.get("contender", True)))
     realistic = ("they gain too" if them["gain"] > 0 else
                  "they lose little" if them["gain"] > -WORTH_IT else "they lose clearly -- unlikely to be accepted")
 
-    md = markdown(league, view, stand, gate, gave, got, info, rate, upside, ev, me, them, verdict, realistic,
+    md = markdown(league, view, stand, gate, gave, got, info, rate, upside, ev, me, them, verdict, basis, realistic,
                   assumed, playoff, ctx["users_by_rid"].get(partner, "partner"), m, notes + con_notes)
     rec = {"command": "fantasy trade", "league": league, "season": view.season, "week": view.week,
            "give": sorted(gave), "get": sorted(got), "partner_rid": partner, "standing": stand,
-           "gate": gate.to_dict(), "me": me, "them": them, "verdict": verdict, "realistic": realistic,
+           "gate": gate.to_dict(), "me": me, "them": them, "verdict": verdict, "verdict_basis": basis,
+           "realistic": realistic, "roster_limit": limit,
            "assumed_returns": assumed, "manifest": m.to_dict(), "notes": notes}
     res = TradeResult(md, rec)
     if write:
@@ -247,13 +289,13 @@ def _n(p, info):
     return f"{d.get('name') or p} ({d.get('pos') or '?'}, {d.get('team') or 'FA'})"
 
 
-def markdown(league, view, stand, gate, gave, got, info, rate, upside, ev, me, them, verdict, realistic,
+def markdown(league, view, stand, gate, gave, got, info, rate, upside, ev, me, them, verdict, basis, realistic,
              assumed, playoff, partner_name, m, notes) -> str:
     L = [f"# Trade -- {league}, {view.season} week {view.week}", "", f"**{gate.line()}**", "",
          record_line(stand), "",
          f"**Give** {', '.join(_n(p, info) for p in gave)}  **for** {', '.join(_n(p, info) for p in got)} "
          f"(from {partner_name}).", "",
-         f"**For you: {verdict}** -- {me['gain']:+.1f} season points to your best lineup "
+         f"**For you: {verdict}** (on {basis}) -- {me['gain']:+.1f} season points to your best lineup "
          f"({me['playoff_gain']:+.1f} in the fantasy playoffs, week {playoff} on). "
          f"**For them:** {them['gain']:+.1f} ({realistic}).", ""]
     if not stand.get("contender", True):
@@ -271,7 +313,7 @@ def markdown(league, view, stand, gate, gave, got, info, rate, upside, ev, me, t
     for label, side in (("You", me), ("They", them)):
         if side["dropped"]:
             L += ["", f"{label} must drop to fit the roster: {', '.join(_n(p, info) for p in side['dropped'])} "
-                  "(cheapest by rest-of-season rate; established roles are never dropped)."]
+                  "(the drop that costs that lineup least; established roles are never dropped)."]
         if side["added"]:
             L += ["", f"{label} fill the open roster spot with the free agent who helps that lineup most: "
                   + ", ".join(f"{_n(p, info)} ({rate.get(p, 0.0):.1f}/game)" for p in side["added"]) + "."]
