@@ -92,6 +92,23 @@ def test_extraction_refuses_a_path_outside_the_release(tmp_path, bad):
         B.extract_release(buf.getvalue(), tmp_path / "out")
 
 
+def test_an_absolute_member_lands_inside_the_release_or_nowhere(tmp_path):
+    """The path is rebuilt from the archive's own layout, so a leading '/'
+    cannot reach outside the destination (the retired props loader had this
+    test; the one bootstrap keeps it)."""
+    buf = io.BytesIO()
+    with tarfile.open(fileobj=buf, mode="w:gz") as tar:
+        for name in ("/core/evil.py", "/etc/passwd"):
+            info = tarfile.TarInfo(name)
+            info.size = 1
+            tar.addfile(info, io.BytesIO(b"x"))
+    out = tmp_path / "out"
+    B.extract_release(buf.getvalue(), out)
+    written = [p for p in tmp_path.rglob("*") if p.is_file()]
+    assert all(out in p.parents for p in written), written
+    assert not (out / "etc").exists(), "a path outside the release file set is never written"
+
+
 def test_extraction_refuses_a_link(tmp_path):
     with pytest.raises(RuntimeError, match="link"):
         B.extract_release(_tarball(RELEASE, links=["core/link.py"]), tmp_path / "out")

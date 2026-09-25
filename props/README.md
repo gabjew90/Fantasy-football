@@ -22,7 +22,7 @@ That record is what this subtree builds.
 
 ```
 props/
-  engine/            the nfl-prop-research skill, vendored
+  engine/            the props engine (chat runs it through the one skill, skill/)
     scripts/         score_game.py, score_week.py, model.py, odds_client.py, ...
     resources/       prior-season tables, model registry, calibration, methodology
     SKILL.md         the skill's own contract; the authority on how calls are made
@@ -159,9 +159,9 @@ python props/settle.py --season 2026 --week 2
 python props/scorecard.py --season 2026
 ```
 
-The scorecard groups by engine. With more than one version in the record it
-prints a section each and **no** combined total: pooling two models' calls
-produces one number that describes neither. `--pool` is the explicit override
+The scorecard groups by pricing model (see "Which engine wrote a row"). With
+more than one in the record it prints a section each and **no** combined
+total: pooling two models' calls produces one number that describes neither. `--pool` is the explicit override
 for when you have decided the versions are comparable.
 
 `persist.py` declares its mode on every write. `local` means the rows are on
@@ -172,7 +172,8 @@ disk but not committed; only `github` (inside the workflow) persists them.
 Three rules:
 
 1. **The repo is the only engine.** `props/engine/` at a tagged release is the
-   model. A chat session fetches it every session through the loader; the
+   model. A chat session fetches it every session through the one chat skill
+   (`skill/`, nfl-research, at the release `nfl.lock.json` names); the
    workflow exports it from the tag on every capture. Nothing runs an engine
    that is not in this repo.
 2. **Chat is read-only; the workflow is the only writer.** Opening sweep
@@ -208,16 +209,13 @@ Until that tag exists, `record_run.py` stamps the computed hash and leaves
 with `engine_source=main-fallback` on every row. Both are loud and neither
 loses a capture.
 
-Rebuild and reinstall the `.skill` only when `bootstrap.py` or the loader's
-`SKILL.md` changed, or to refresh the vendored fallback:
-
-```bash
-python props/build_skill.py --credential "<path outside this repo>/credential.env" \
-    --out dist/nfl-prop-research.skill
-```
-
-That file carries the API key. Treat it as a secret; `dist/` is gitignored
-and a test fails the build if a credential is ever tracked here.
+The chat skill is `skill/` (nfl-research): `skill/build.py` builds it,
+the user installs it, and it is rebuilt only when its bootstrap or its
+`SKILL.md` changes (see `skill/` and `CHAT.md`). The props-only loader that
+used to live here (`props/skill/`, `props/build_skill.py`) was retired on
+2026-09-25. A built `.skill` carries API keys: treat it as a secret; `dist/`
+is gitignored and a test fails the build if a credential is ever tracked
+here.
 
 ## The workflow
 
