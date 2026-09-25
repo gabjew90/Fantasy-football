@@ -52,3 +52,34 @@ def test_each_book_gets_its_own_intercept():
     b = _calls(600, seed=4).assign(book="draftkings")
     out = "\n".join(blend.blend_section(pd.concat([a, b]), reps=30))
     assert "books draftkings, sleeper" in out
+
+
+def _yard_calls(n, seed=0, b_model=0.3, b_market=1.0):
+    rng = np.random.default_rng(seed)
+    lk = rng.normal(0.1, 0.25, n)
+    lm = lk + rng.normal(0.15, 0.3, n)          # the model leans off the market
+    p = 1 / (1 + np.exp(-(b_model * lm + b_market * lk)))
+    return pd.DataFrame({"market": rng.choice(list(blend.YARDAGE_MARKETS), n), "book": "sleeper",
+                         "p_model": 1 / (1 + np.exp(-lm)), "p_novig": 1 / (1 + np.exp(-lk)),
+                         "won": (rng.random(n) < p).astype(float), "event_id": rng.integers(0, n // 20, n),
+                         "week": rng.integers(1, 8, n)})
+
+
+def test_yardage_calls_get_their_own_section_and_pushes_drop_out():
+    d = _yard_calls(900, seed=5)
+    d.loc[:9, "won"] = np.nan                       # pushes
+    assert len(blend.yardage_calls(pd.concat([d, _calls(40)]))) == 890
+    out = "\n".join(blend.blend_section(d, reps=30))
+    assert "settled yardage calls" in out and "per market" in out and "Leave-one-week-out" in out
+    assert "0 settled anytime_td_v1 calls" in out
+
+
+def test_thin_yardage_record_prints_no_weight():
+    out = "\n".join(blend.blend_section(_yard_calls(120)))
+    assert "120 settled yardage calls" in out and "logit(model)" not in out
+
+
+def test_one_settled_week_says_so_instead_of_nan():
+    out = "\n".join(blend.blend_section(_yard_calls(600, seed=7).assign(week=2), reps=20))
+    assert "needs at least two (1 settled so far)" in out and "nan" not in out
+

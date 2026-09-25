@@ -86,7 +86,11 @@ worst on the low side (players bust more often than the model allows).
    width; misses the bar on 2024's interval and one 18-bet bucket, priced by
    the user's decision.
 5. The Vegas-line environment (`market_fit`) and a market blend layer, tested
-   on two seasons instead of one.
+   on two seasons instead of one. **Done 2026-09-25 (DECISIONS #106):** the
+   market environment was tuned on 2022-23 and is not better than the live
+   one (reports/market_env_tuning.md); the live environment stays. The market
+   blend for yardage runs in shadow on the Tuesday scorecard, as the TD one
+   does, until the settled record can fit its weight.
 
 Follow-up outside these steps: the slate's must-win pick (`score_week.py`,
 `CAL_MARKETS`) prefers receptions and receiving yards as the calibrated
