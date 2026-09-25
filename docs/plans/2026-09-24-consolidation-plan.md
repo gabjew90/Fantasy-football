@@ -166,6 +166,9 @@ tuning item.
    the user asked for NO scheduled fantasy notifications, so the fantasy
    schedules are off entirely and the scheduled `nfl fantasy lineup
    --record` is dropped (DECISIONS #109) -- Actions runs props only.
+   The engine stays self-contained (props glue adopts core: settle fetches
+   through core.fetch); the draft move waits for August (DECISIONS #110).
+   Step 6 is closed.
 7. Replaced by docs/plans/2026-09-24-yardage-harness.md (the yardage props to the TD model's
    standard; the QB-out rule becomes one question inside it). Originally: first tuning items on
    the new rails: the QB-out reallocation rule, then

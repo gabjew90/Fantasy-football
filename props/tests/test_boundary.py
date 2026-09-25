@@ -61,6 +61,24 @@ def test_no_credential_file_anywhere_in_the_tree():
     assert not offenders, f"credential-shaped files in props/: {offenders}"
 
 
+def test_props_reaches_core_only_through_its_stdlib_modules():
+    """The props runner installs props/requirements.txt, not the repo's: core
+    modules that need polars or rapidfuzz (core.ids) would fail a settle.
+    props may use core.fetch / core.manifest / core.scoring, nothing else."""
+    import re
+    allowed = {"fetch", "manifest", "scoring"}
+    bad = []
+    for f in PROPS.rglob("*.py"):
+        if "tests" in f.parts or "__pycache__" in f.parts:
+            continue
+        for mod in re.findall(r"from core import (\w+)|import core\.(\w+)|from core\.(\w+) import",
+                              f.read_text(encoding="utf-8")):
+            name = next(x for x in mod if x)
+            if name not in allowed:
+                bad.append(f"{f.relative_to(PROPS).as_posix()}: core.{name}")
+    assert not bad, bad
+
+
 def test_there_is_one_chat_skill_and_it_is_not_here():
     """The props-only loader (props/skill/, props/build_skill.py) was retired
     on 2026-09-25: chat runs the one skill in skill/ (nfl-research), which

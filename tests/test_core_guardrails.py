@@ -41,7 +41,7 @@ FETCH_ALLOWED = {
     "props/engine/scripts/absence_check.py", "props/engine/scripts/absence_tune.py",
     "props/engine/scripts/backtest.py", "props/engine/scripts/build_priors.py",
     "props/engine/scripts/score_game.py", "props/engine/scripts/td_alloc_backtest.py",
-    "props/engine/scripts/td_backtest.py", "props/guard.py", "props/settle.py",
+    "props/engine/scripts/td_backtest.py", "props/guard.py",
     "scripts/derive_absence_bands.py", "scripts/derive_baselines.py", "scripts/derive_bench_rates.py",
     "scripts/forward_snapshot.py", "scripts/projection_backtest.py",
 }
