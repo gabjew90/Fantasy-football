@@ -7,6 +7,12 @@ drafted 2026-08-23) and **Keefamania** (Yahoo, 10-team half PPR, 1 FLEX,
 draft Sat 2026-09-05 — see `docs/draft-day-runbook.md`). Decisions and their
 evidence live in `DECISIONS.md`; this README is the map, not the record.
 
+> **Scheduled fantasy notifications are OFF since 2026-09-25** (the user's call,
+> DECISIONS #109): `weekly.yml` and `gate.yml` run only when dispatched by hand;
+> fantasy questions go through chat (`nfl fantasy ...`). Props capture and
+> grading (`props.yml`) still run on their schedule. What follows describes
+> the schedule as it ran, and is what restoring it would bring back.
+>
 > **In-season cadence (draft complete 2026-08-23 — finished #1 of 12 on the board):**
 > The auto-manager runs on GitHub Actions (`.github/workflows/weekly.yml`, hourly
 > since 2026-09-16 — GitHub's cron lag made fixed windows miss, DECISIONS #70) and

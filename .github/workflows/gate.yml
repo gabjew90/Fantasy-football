@@ -3,11 +3,14 @@
 # window guard against state/gate_hours.json (written by the Monday planner),
 # so ticks outside decision windows exit in seconds and conserve free-tier
 # minutes; Python/deps only install when there is real work.
+# SCHEDULE OFF since 2026-09-25 (DECISIONS #109): the user asked for no
+# scheduled fantasy notifications. Manual runs only (Actions tab -> Run
+# workflow); restoring the schedule block below is the whole undo.
 name: gate
 on:
   workflow_dispatch:
-  schedule:
-    - cron: "*/15 * * * *"
+  # schedule:
+  #   - cron: "*/15 * * * *"
 
 permissions:
   contents: write
