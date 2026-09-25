@@ -156,7 +156,7 @@ def test_the_scorecard_refuses_to_pool_two_engines(record):
     settle.main(["--season", "2026"])
     assert scorecard.main(["--season", "2026"]) == 0
     text = (record / "scorecard.md").read_text(encoding="utf-8")
-    assert "2 engine versions in the record" in text
+    assert "2 pricing models in the record" in text
     assert "they are not pooled" in text
     assert "## Engine props-v1.0" in text and "## Engine props-v1.1" in text
     assert "pooled by request" not in text, "no grand total without --pool"
@@ -348,3 +348,16 @@ def test_load_stats_refreshes_a_file_older_than_its_max_age(tmp_path, monkeypatc
     os.utime(f, (old, old))
     df = settle.load_stats(2026, f, max_age_s=3 * 3600)
     assert df["week"].tolist() == [2]
+
+
+def test_releases_that_share_a_pricing_model_are_one_section(record):
+    _write(record, [_pred(engine_hash="aaa", engine_tag="props-v1.21", price_hash="ppp"),
+                    _pred(engine_hash="bbb", engine_tag="props-v1.22", price_hash="ppp",
+                          player="Other Player")])
+    settle.main(["--season", "2026"])
+    rows = _settled(record)
+    assert {r["model_id"] for r in rows} == {"ppp"} and {r["price_hash"] for r in rows} == {"ppp"}
+    assert scorecard.main(["--season", "2026"]) == 0
+    text = (record / "scorecard.md").read_text(encoding="utf-8")
+    assert "## Engine props-v1.21, props-v1.22 (one pricing model)" in text
+    assert "pricing models in the record" not in text

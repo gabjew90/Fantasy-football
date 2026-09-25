@@ -80,6 +80,9 @@ SETTLED_FIELDS = [
     # DictWriter's extrasaction="ignore" below drops them silently, and the
     # scorecard could not separate two versions.
     "engine_hash", "engine_tag", "engine_source",
+    # The pricing model (DECISIONS #107): the part of the engine that can move
+    # a price, and the derived id the call rule and the scorecard group on.
+    "price_hash", "model_id",
     "snapshot_type", "is_call",
     "logged_at_utc", "commence_time", "minutes_to_kickoff",
     "actual", "result", "status", "won", "pnl_per_100",
@@ -338,6 +341,7 @@ def main(argv: list[str] | None = None) -> int:
             out["season"], out["week"] = args.season, week
             out["join_method"] = how or ""
             out["is_call"] = int(bool(row.get("is_call")))
+            out["model_id"] = calls_mod.engine_version.model_id(row)
 
             if stat_row is None:
                 out.update(actual="", result="", status="dnp", won="",

@@ -184,3 +184,64 @@ def test_the_pre_install_modules_import_no_third_party(module):
     src = (PROPS / f"{module}.py").read_text(encoding="utf-8")
     for banned in ("import pandas", "import numpy", "import requests", "import scipy"):
         assert banned not in src, f"{module}.py must stay stdlib-only ({banned})"
+
+
+# ---- the pricing model (DECISIONS #107) ------------------------------------
+def _pricer(root: Path, **extra: bytes) -> Path:
+    files = {"SKILL.md": SKILL,
+             "scripts/score_game.py": b"import model\nimport helper as H\nODDS = 'odds_client.py'\n",
+             "scripts/score_week.py": b"import pandas\n",
+             "scripts/model.py": MODEL, "scripts/helper.py": b"x = 1\n",
+             "scripts/odds_client.py": b"y = 2\n", "scripts/backtest.py": b"import model\n",
+             "resources/priors.json": b"{}\n", "resources/notes.md": b"prose\n"}
+    files.update({k.replace("__", "/"): v for k, v in extra.items()})
+    return _tree(root, files)
+
+
+def test_the_pricer_is_found_from_its_imports_and_the_scripts_it_launches(tmp_path):
+    root = _pricer(tmp_path)
+    assert ev.pricer_scripts(root) == ["helper.py", "model.py", "odds_client.py", "score_game.py", "score_week.py"]
+    assert [r for r, _ in ev.price_files(root)] == [
+        "resources/priors.json", "scripts/helper.py", "scripts/model.py", "scripts/odds_client.py",
+        "scripts/score_game.py", "scripts/score_week.py"]
+
+
+@pytest.mark.parametrize("rel,moves", [
+    ("SKILL.md", False), ("resources/notes.md", False), ("scripts/backtest.py", False),
+    ("scripts/model.py", True), ("scripts/helper.py", True), ("scripts/odds_client.py", True),
+    ("resources/priors.json", True)])
+def test_only_what_can_change_a_price_moves_the_price_hash(tmp_path, rel, moves):
+    a = _pricer(tmp_path / "a")
+    b = _pricer(tmp_path / "b")
+    (b / rel).write_bytes((b / rel).read_bytes() + b"# edit\n")
+    assert (ev.price_hash(a) != ev.price_hash(b)) is moves
+    assert ev.tree_hash(a) != ev.tree_hash(b), "the whole-tree identity still sees every edit"
+
+
+def test_a_module_the_pricer_starts_importing_joins_the_price(tmp_path):
+    a = _pricer(tmp_path / "a")
+    before = ev.price_hash(a)
+    (a / "scripts/new_layer.py").write_bytes(b"z = 3\n")
+    assert ev.price_hash(a) == before, "not imported yet: not part of the price"
+    (a / "scripts/model.py").write_bytes(MODEL + b"import new_layer\n")
+    assert "new_layer.py" in ev.pricer_scripts(a)
+
+
+def test_the_price_hash_ignores_line_endings(tmp_path):
+    a = _pricer(tmp_path / "a")
+    b = _pricer(tmp_path / "b")
+    (b / "scripts/model.py").write_bytes(MODEL.replace(b"\n", b"\r\n"))
+    assert ev.price_hash(a) == ev.price_hash(b)
+
+
+def test_model_id_prefers_the_rows_own_price_then_the_map_then_the_engine():
+    pm = {"eee": {"tag": "props-v1.9", "price_hash": "ppp"}}
+    assert ev.model_id({"price_hash": "own", "engine_hash": "eee"}, pm) == "own"
+    assert ev.model_id({"engine_hash": "eee"}, pm) == "ppp"
+    assert ev.model_id({"engine_hash": "zzz"}, pm) == "zzz", "an unmapped engine keeps a bucket of its own"
+    assert ev.model_id({}, pm) == ""
+
+
+def test_the_stamp_carries_both_identities(tmp_path):
+    s = ev.stamp(_pricer(tmp_path), tmp_path / "no-lock.json")
+    assert s["engine_hash"] == ev.tree_hash(tmp_path) and s["price_hash"] == ev.price_hash(tmp_path)

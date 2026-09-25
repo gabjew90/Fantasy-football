@@ -1,0 +1,106 @@
+{
+ "algorithm": "props-price-sha256-lf-1",
+ "note": "engine_prices.json: written by engine_version.py price-map",
+ "engines": {
+  "911a3de45e315fb1f5722b14753f5b070196c69b5128018fc16300b39e41e371": {
+   "tag": "props-v1.0",
+   "price_hash": "4fd1094acc2b32b0d57c539fc92f7ed3eaed83b4bb2e301510d24bb5e4a0964e"
+  },
+  "37b8ec713240221a2c90b36a2cf6b6f6f5cb57f40215e9896ffb110caa32484a": {
+   "tag": "props-v1.1",
+   "price_hash": "5cbed8f7132098783ce53b4e884acb0f9b017ef80517f17654d12dd12d6b5b05"
+  },
+  "d54ff9d12d00cf4232a1900736e39c652984bfbc504d126624c6c18f1da01953": {
+   "tag": "props-v1.10",
+   "price_hash": "2a06287310a110047a619821a9d18c48dd934c531854969294e9ef8d897aadbd"
+  },
+  "b18a684e53977e696950a0f734fccdfd32835e64a727aefa409e0917c0d4c7dc": {
+   "tag": "props-v1.11",
+   "price_hash": "770e7a45d87440cddffe06d9bc1cec5d72a85aaef4144a66e46890ca94d28ec5"
+  },
+  "b2819a2677a2c8d51aeed572ca38e0e18fa0b3695328c934c4d23b2cfd2d286c": {
+   "tag": "props-v1.12",
+   "price_hash": "088bf2b276960f65d1edf3e4c418ef96b48a7e66c1fb7c7dc1d6ed98239411ea"
+  },
+  "fcb113aaa24d173de9c826d15e03035169fece198c5d55cb40ef85f47e0ac8b7": {
+   "tag": "props-v1.13",
+   "price_hash": "a54ee66a6d2b54574071c8438b8afa65a6eea3535c7b5a36f0878bb926db5c37"
+  },
+  "2b6b23656f752dc9309ff13e8249bdd8740c2959774e3109eac990ab3e052b40": {
+   "tag": "props-v1.14",
+   "price_hash": "9436d7c1df324121cccde256b0ad957b2d91910e03bce284fa8dcc8b62493a0b"
+  },
+  "40dedba3a08e07e66e950c48c6e2ba5cf55bc8a9b4ca1eb44491dbc1dd13fd27": {
+   "tag": "props-v1.15",
+   "price_hash": "70304455980f393b8ff789781e3a7185927028277d311faf5478a176b6c087a0"
+  },
+  "89e8ca9f680f47cd2e746e20c0f13b55333830ac6a2ec8645e2ec242e8fbbb81": {
+   "tag": "props-v1.16",
+   "price_hash": "5e9e96a4086543c384e064882e351d4ad5e3d573200ef2ef98586fef77f2a8d9"
+  },
+  "01f6947311fb16c01e89ccb54b344b1b7c68297e4354f5f488f9c8ceae2b7969": {
+   "tag": "props-v1.17",
+   "price_hash": "cce7fbf4214a11d5b8529e741c7b317ba52639cccd717581e750ecb2e554758e"
+  },
+  "b3ea0025335268c4582cd68d0e454dcce39dde03c26fb100491ed76aa901a185": {
+   "tag": "props-v1.18",
+   "price_hash": "c049ee262f2e825453ecd71be1f4913563848cd2dace287d9d7a6f6ffc369862"
+  },
+  "619fc949b089d5f78cbc4a40df4777897bc5d19c052c3bd1492f4be3b2c5d32d": {
+   "tag": "props-v1.19",
+   "price_hash": "3e8b1b3a97a2c99818fd0153e4aae7e3c8bdf02175ece00afff0bdd8b3abde7c"
+  },
+  "e02ac8b22db8b56f41dc2fa186aafa7bc24809313ab51d0e08797e6de895c62d": {
+   "tag": "props-v1.2",
+   "price_hash": "e30c9d28ec62a2d53f67b87e91ba96f077d5ed1c454b24e549212b4d62a75431"
+  },
+  "13e3c642a0c05e2671476b8ec3bbdc18fca6e281e99743147ebaa33737fef939": {
+   "tag": "props-v1.20",
+   "price_hash": "14b7404f6ccc3db69e7093c865f6df23a2d0d50edfaafc91d2a17685eafc9efc"
+  },
+  "3e6b61999fefe45e21d3e939b5d4a1f69a0546cac16369ca6d7c46f2e0d11252": {
+   "tag": "props-v1.21",
+   "price_hash": "8040483558252536d37284d820c407080ec1f0e124296480183a759e4b9b6531"
+  },
+  "06497d9a2a92c359d4696c929277b986362b4a33ff7545e166bda82f9839e3b1": {
+   "tag": "props-v1.22",
+   "price_hash": "8040483558252536d37284d820c407080ec1f0e124296480183a759e4b9b6531"
+  },
+  "4118f3df6cc9f1c2d1883278f3faddd2e5a4a64731673d6e8234d48dea4b3c9e": {
+   "tag": "props-v1.23",
+   "price_hash": "7d421ba268ed23c62acf33eb26f7c63c14bfabe4c01d273bf04cac35d9d873d4"
+  },
+  "905f1f4a594c5ea17203832586e4c982bf4811727b8a8950cfe850d449b27e6c": {
+   "tag": "props-v1.24",
+   "price_hash": "232c97b0ca28616d81dea295ca29c5247df09f529546d6fdde75907176affec9"
+  },
+  "553aeb009ecd2b42b21f3b46eadccc96e098560ee3af50be4bdbfeacc301ee13": {
+   "tag": "props-v1.3",
+   "price_hash": "17455e4ad023bbe189db8ff7ed87f1e1de96d6c05c0e72218af476ed41dfbb77"
+  },
+  "55de738f0a7665492348cfc6a7986fc962ea154279d5a76d4e0e236abfecf542": {
+   "tag": "props-v1.4",
+   "price_hash": "2db2877b616ba44ff5b87e154150f6d53d22ca2a208a5b40bd1dceb66adddeba"
+  },
+  "46f857dea5738fd9f747a5616f36020b87ee53b823b510534d3ef14b47d06aa0": {
+   "tag": "props-v1.5",
+   "price_hash": "dab01cf9b88d431678853278ab05721b03948b68834a680579cc88c983ed663c"
+  },
+  "d7e9bd09ee5151e61d8c98e6c1f25149129bc5313afe0119e46ccd0b3fcd87a4": {
+   "tag": "props-v1.6",
+   "price_hash": "9893836f747a6c3d6d67e06d94797209302111cc6dd814a61df2cbb32c4c636f"
+  },
+  "4fa7976f1dc363554655b47b5f7f91d42baeb09ecc0b4dbf88b4c58796ae797d": {
+   "tag": "props-v1.7",
+   "price_hash": "93ebbb8cb2c458fb760c18a0d35eede030e5573d3b44517c63f479c4db811809"
+  },
+  "31d10e9b799d080ea18d6c05cf0dba2aa4118537fb64d8f03973b8ee6eeec6bb": {
+   "tag": "props-v1.8",
+   "price_hash": "e85fd046a1d12e76a121527867b9c499fb70ab55b1c2a0e5771c15c27a4bbc74"
+  },
+  "551345b829ad089b5270172a7c554cb3542ff1fa0d0873cd421e8c7ec23adee9": {
+   "tag": "props-v1.9",
+   "price_hash": "2a06287310a110047a619821a9d18c48dd934c531854969294e9ef8d897aadbd"
+  }
+ }
+}

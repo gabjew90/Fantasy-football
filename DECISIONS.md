@@ -5843,3 +5843,35 @@ when no price moved (props-v1.24 changed no existing market's output). Week
 is per version. Narrowing the engine hash to what can change a price is the
 plan's listed follow-up, and it now gates both blends.
 
+## 2026-09-25 (107) -- the record groups on the pricing model, not the whole engine tree
+
+The problem (#106): the scorecard keys every section on `engine_hash`, a hash
+of the whole `props/engine/` tree, and never pools two. Every edit -- a
+docs line, a harness report's generator, an offline tuning script -- made a
+new "engine", and the week-2 calls sit in four sections. The shadow blends
+need 300 calls per section.
+
+**The user agreed to the change.** `engine_hash` keeps its job: the lock pins
+it, the bootstrap verifies it, and every row still carries it. A second
+identity, `price_hash`, covers only what can change a price: the pricer's
+scripts (`score_game.py`, `score_week.py` and everything they import or
+launch, read from the source with `ast`, today 11 of 21 scripts) and every
+data file under `resources/` but the `*.md` prose -- 33 of the 52 files.
+`record_run` stamps both. `calls.CALL_KEY` and the scorecard use
+`engine_version.model_id`: the row's own `price_hash`, else the one
+`props/engine_prices.json` maps its `engine_hash` to, else the `engine_hash`
+itself. `engine_prices.json` is computed from each `props-v*` tag's tree
+(`engine_version.py price-map`), and props-ci recomputes every entry
+(`--check`); no committed record row is rewritten. Settle writes
+`price_hash` and `model_id` into the settled file; a scorecard section
+names every release in it ("props-v1.21, props-v1.22 (one pricing model)").
+
+**Measured, not predicted:** the 25 release trees are 23 pricing models --
+only v1.9/v1.10 and v1.21/v1.22 merge -- because nearly every release did
+change pricer code, if often without moving an output (props-v1.23's
+switched-off settings are in model.py). Week 2 stays in four sections. What
+changes is the future: a release that touches only docs, the harness or a
+tool no longer splits the record. The rest is cadence: a pricer change
+merged mid-week splits that week's slate, so the record is deepest when
+pricer releases land between slates.
+

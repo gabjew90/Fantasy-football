@@ -108,7 +108,7 @@ def _weights(d: pd.DataFrame, noun: str, levels: tuple, reps: int, seed: int) ->
     """The fit, its game-clustered interval and leave-one-week-out log loss for
     one family of calls; one intercept per book and per level in `levels`."""
     if len(d) < MIN_CALLS:
-        return [f"{len(d)} settled {noun} in this engine version; the blend weight is not "
+        return [f"{len(d)} settled {noun} in this pricing model; the blend weight is not "
                 f"estimated below {MIN_CALLS}. The record is filling.", ""]
     y = d["won"].to_numpy(float)
     # ONE INTERCEPT PER BOOK: Sleeper's anytime prices are two-sided and de-vigged,
