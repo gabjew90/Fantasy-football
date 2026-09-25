@@ -5731,3 +5731,14 @@ Yahoo live, odds key present -- booleans, never values). It never raises. On
 for the chat shakedown via `session_log: true` in config.yaml; turning it off
 is a one-line release. CHAT.md: chat does not mention it unless something
 failed or the user asks, and attaches it only when asked.
+
+The user then asked for the log to carry the conversation itself -- verbatim
+prompts and replies -- so the data sources, the logic and the quality of the
+answers can be checked. `nfl.py` cannot see either, so CHAT.md now has chat
+append each turn to $NFL_OUT/chat_transcript.md before replying: the message
+verbatim, the commands and exit codes, the gate and input ages, a five-point
+self-check against CHAT.md's rules, and the reply verbatim. Same switch,
+same silence. The route back is a download from chat: it lands in the user's
+Downloads folder, which Claude Code reads directly for the audit (re-running
+the same commands on the same release) -- no upload step, and no credential
+given to chat to push anywhere.

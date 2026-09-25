@@ -287,3 +287,8 @@ def test_every_command_leaves_a_troubleshooting_line_without_secrets(tmp_path, m
     assert line["argv"][-1] == "keefamania" and line["exit"] == 0 and line["gate"] == "FAIL: roster fresh"
     assert line["inputs"][0]["age_h"] == 185.0
     assert "s3cret" not in json.dumps(line)
+
+
+def test_chat_keeps_a_verbatim_transcript_while_the_log_is_on():
+    text = (ROOT / "CHAT.md").read_text(encoding="utf-8")
+    assert "chat_transcript.md" in text and "verbatim" in text and "Self-check" in text
