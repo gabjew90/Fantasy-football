@@ -113,7 +113,10 @@ SKILL = ("QB", "RB", "WR", "TE")
 # has been missing for weeks: his absence is already in the usage data and the
 # projections, and listing him only buries the news.
 GAME_WEEK = ("Questionable", "Doubtful", "Out")
-TEAMMATE_OUT = ("Out", "Doubtful")
+TEAMMATE_OUT = ("Out", "Doubtful", "IR", "PUP")
+# ...except a FRESH placement: an IR/PUP teammate whose Sleeper news is this
+# recent was most likely placed this week, and his absence is not in the data yet.
+FRESH_IR_DAYS = 7
 
 
 STATUS_LEAD_MIN = 90          # a designation is settled with the inactive list, ~90 minutes before kickoff
@@ -164,9 +167,13 @@ def injury_watch(my_pids, info, players, league: str) -> list[dict]:
     volume. Long-term absences (IR, PUP) are already in the data. From Sleeper's player
     data at run time. A teammate Out or Doubtful comes with the scenario
     command that prices his absence."""
+    import time as _time
+    fresh_after_ms = (_time.time() - FRESH_IR_DAYS * 86400) * 1000
     by_team: dict[str, list] = {}
     for sid, p in (players or {}).items():
-        if p.get("team") and p.get("position") in SKILL and p.get("injury_status") in GAME_WEEK:
+        status = p.get("injury_status")
+        fresh_ir = status in ("IR", "PUP") and (p.get("news_updated") or 0) >= fresh_after_ms
+        if p.get("team") and p.get("position") in SKILL and (status in GAME_WEEK or fresh_ir):
             depth = p.get("depth_chart_order") or 99
             relevant = depth <= (1 if p.get("position") == "QB" else 2) or (p.get("search_rank") or 9999) <= 200
             if relevant:

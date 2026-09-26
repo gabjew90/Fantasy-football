@@ -141,7 +141,9 @@ def test_an_unreachable_consensus_source_is_a_failed_input():
     from core.manifest import Manifest
     from fantasy import waiver as WV
     m = Manifest("t")
-    WV.record_consensus_failures(m, ["fantasypros: fantasypros unavailable (HTTPError)", "consensus over 2 live sources"])
+    WV.record_consensus_failures(m, ["fantasypros: fantasypros unavailable (HTTPError)", "consensus over 2 live sources",
+                                     "espn: DB could not be fitted (data unavailable for DB)"])
+    assert m.get("espn (rest-of-season consensus)") is None, "only the exact failure wording counts"
     e = m.get("fantasypros (rest-of-season consensus)")
     assert e["status"] == "failed" and "HTTPError" in e["detail"]
 

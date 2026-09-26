@@ -149,3 +149,14 @@ def test_a_two_game_injury_exit_is_marked_partial():
     e = EV.evidence_for(["wr"], pd.DataFrame(rows), {"wr": "WR"}, {})["wr"]
     assert e["partial_weeks"] == [2]
 
+
+def test_a_backup_who_takes_over_has_no_partial_games():
+    """25%, 30%, 85%, 90%: a role that GREW. Measuring each week against the
+    other weeks would mark weeks 1-2 as exits and dismiss the change."""
+    rows = [{"gsis_id": "rb", "week": w, "team": "NYJ", "snap_pct": sp, "tgt_share": 0.1, "ay_share": 0.0,
+             "wopr": 0.2, "carry_share": 0.3, "adot": 2.0, "i10_tgt": 0, "i10_car": 0, "two_min": 0,
+             "targets": 2, "carries": 8}
+            for w, sp in ((1, 0.25), (2, 0.30), (3, 0.85), (4, 0.90))]
+    e = EV.evidence_for(["rb"], pd.DataFrame(rows), {"rb": "RB"}, {})["rb"]
+    assert e["partial_weeks"] == []
+

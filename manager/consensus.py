@@ -166,6 +166,8 @@ def _fantasypros(scoring, season, index, store=None
         from . import fantasypros as fp_mod
         return fp_mod.points(scoring, season, index, store=store)
     except Exception as e:  # noqa: BLE001
+        # "<source> unavailable (<error>)": fantasy/waiver.record_consensus_failures
+        # matches this wording to log the source as a failed input
         return {}, f"fantasypros unavailable ({e.__class__.__name__})"
 
 

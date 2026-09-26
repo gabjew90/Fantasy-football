@@ -68,12 +68,14 @@ LEVEL_EDGES = {"snap_pct": (0.0, 0.5, 0.8, 1.01), "tgt_share": (0.0, 0.1, 0.2, 1
                "ay_share": (0.0, 0.1, 0.25, 1.01), "wopr": (0.0, 0.25, 0.5, 10.0),
                "carry_share": (0.0, 0.15, 0.4, 1.01)}
 MIN_LEVEL_N = 100
-# A week under 60% of the player's usual snap share -- the median of his OTHER
-# weeks -- is marked "partial game". Leave-one-out because a two-game sample
-# otherwise hides the partial game inside its own median, and 60% because a
-# second-quarter injury exit lands near half a game: DJ Moore, 2026 week 2,
-# left in the second quarter at 31% of snaps against a two-game median of 54%,
-# and the old rule (40% of a median that included that week) never marked it.
+# A week under 60% of the level the player had ALREADY ESTABLISHED -- the
+# median of his earlier weeks this season -- is marked "partial game": a dip,
+# as an exit or a benching makes. Earlier weeks, not all other weeks, because
+# a backup who takes over (25%, 30%, 85%, 90%) would otherwise have his first
+# weeks read as exits and his real role change dismissed; the first week has
+# no level to dip from and is never marked. 60% because a second-quarter exit
+# lands near half a game: DJ Moore, 2026 week 2, 31% of snaps after 77% in
+# week 1 -- the old rule (40% of a median that included that week) missed it.
 PARTIAL_SNAP = 0.6
 PBP_COLS = ["season", "week", "season_type", "posteam", "pass_attempt", "rush_attempt", "receiver_player_id",
             "rusher_player_id", "air_yards", "yardline_100", "half_seconds_remaining", "qb_kneel", "sack",
@@ -260,10 +262,10 @@ def evidence_for(gsis_ids, usage: pd.DataFrame, positions: dict, bands: dict | N
         series = row["series"].get("snap_pct", [])
         row["partial_weeks"] = []
         for i, (w, v) in enumerate(zip(row["week_list"], series)):
-            others = [x for j, x in enumerate(series) if j != i and not _missing(x)]
-            if _missing(v) or not others:
+            before = [x for x in series[:i] if not _missing(x)]
+            if _missing(v) or not before:
                 continue
-            med = float(np.median(others))
+            med = float(np.median(before))
             if med and v < PARTIAL_SNAP * med:
                 row["partial_weeks"].append(w)
         if row["trajectory"] == "CHANGED" and set(row["partial_weeks"]) & set(row["week_list"][-2:]):

@@ -298,3 +298,18 @@ def test_lock_order_says_when_a_status_settles_and_who_locks_first():
     assert all("Already Played" not in x for x in watch[0]["locks_before"]), "a started game is not a coming lock"
     assert len(watch[0]["locks_before"]) == 1, "only his position: the WR who locks first is not a swap for a TE"
 
+
+def test_a_teammate_placed_on_ir_this_week_is_watched_an_old_one_is_not():
+    import time as _time
+    from fantasy import lineup as LU
+    now_ms = _time.time() * 1000
+    info = {"1": {"name": "Tight End", "pos": "TE", "team": "LAR"}}
+    players = {"1": {"team": "LAR", "position": "TE"},
+               "2": {"team": "LAR", "position": "WR", "full_name": "Fresh Ir", "injury_status": "IR",
+                     "depth_chart_order": 1, "news_updated": now_ms - 2 * 86400 * 1000},
+               "3": {"team": "LAR", "position": "WR", "full_name": "Old Ir", "injury_status": "IR",
+                     "depth_chart_order": 1, "news_updated": now_ms - 40 * 86400 * 1000}}
+    (row,) = LU.injury_watch(["1"], info, players, "omnibeta")
+    assert [t["name"] for t in row["teammates"]] == ["Fresh Ir"]
+    assert row["teammates"][0]["scenario"], "a fresh IR absence gets the scenario to price it"
+

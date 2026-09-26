@@ -141,10 +141,13 @@ def record_consensus_failures(m, notes) -> None:
     """A rest-of-season source that could not be read (FantasyPros refuses the
     chat container) goes into the manifest as a FAILED input, so the session
     log's command table shows it -- a note alone never reached the log."""
+    import re
     for n in notes or []:
-        if "unavailable" in n and ":" in n:
-            name = n.split(":", 1)[0].strip()
-            m.record(f"{name} (rest-of-season consensus)", source="manager/consensus.py", status="failed",
+        # manager/consensus.py words a source it could not read exactly so:
+        # "<label>: <label> unavailable (<error>)"
+        hit = re.match(r"^(\w+): \1 unavailable \(", n or "")
+        if hit:
+            m.record(f"{hit.group(1)} (rest-of-season consensus)", source="manager/consensus.py", status="failed",
                      detail=n[:200])
 
 

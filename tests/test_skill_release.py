@@ -369,3 +369,10 @@ def test_chat_answers_a_log_request_with_one_file():
     chat = (ROOT / "CHAT.md").read_text(encoding="utf-8")
     assert "the answer is ONE file" in chat and "nfl.py log" in chat and "session_review.md" in chat
 
+
+def test_a_stray_byte_does_not_cost_the_log(tmp_path):
+    import nfl
+    (tmp_path / "chat_transcript.md").write_bytes(b"**User:** caf\xe9 lineup?\n")
+    text = nfl.session_report(tmp_path).read_text(encoding="utf-8")
+    assert "lineup?" in text
+
