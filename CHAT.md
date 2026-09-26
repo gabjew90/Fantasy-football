@@ -148,11 +148,13 @@ early, say so before any price.
    a close call:
    - a teammate **Out or Doubtful**: run the scenario command the row names
      and include both sides in the first reply;
-   - the player himself **designated** (Questionable or worse): check his
-     practice participation and the latest team reporting (outside the
-     engine, and labelled so), and say when his status is settled -- about 90
-     minutes before his kickoff -- and whether that is after one of your
-     other players locks;
+   - the player himself **designated** (Questionable or worse): quote his
+     practice participation and probability of playing from the watch
+     (FantasyPros, when the row carries it -- the release reads it with the
+     key in this skill's credential file); only when the row has none, check
+     the latest team reporting (outside the engine, and labelled so). Say
+     when his status is settled and who locks first -- the watch's "Settled
+     by" and "locking before then" columns;
    - a week marked **partial** in the evidence table is an exit or a
      benching: never cite its snap share as a change in role.
    These are standing rules because chat keeps nothing between sessions. Never

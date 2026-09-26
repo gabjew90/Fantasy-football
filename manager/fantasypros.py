@@ -380,6 +380,9 @@ def _row(x) -> dict:
         # starter, which is a far worse error than saying "unknown".
         "play_prob": _num(x.get("probability_of_playing")),
         "practice": [p for p in practice if p],
+        # the same three reports IN PLACE -- None where a day had none -- so a
+        # reader can tell "Limited, then Full" from "no report, then Limited"
+        "practice_days": [p or None for p in practice],
         "ir_weeks": list(x.get("ir_weeks") or []),
         "injury": (x.get("injury_type") or "").strip() or None,
     }
@@ -455,6 +458,8 @@ def injuries(rows: dict, season, week, store=None
 
     partial = note is not None
     if not partial:
+        # THIS WORDING IS READ: fantasy.lineup.fp_practice treats a note that
+        # starts "fantasypros injuries:" as a finished run, anything else as not
         note = (f"fantasypros injuries: {len(out)} reports over {asked} players "
                 f"in {calls} calls" + (f", {split} batch(es) split" if split else ""))
     # NEVER CACHE A RUN THAT DID NOT FINISH. fetch() already refuses to, and

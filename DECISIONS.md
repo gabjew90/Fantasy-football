@@ -6148,3 +6148,31 @@ quotes; tests for quoted, commented and Windows-written lines and for keyed
 needs real FantasyPros player ids, and the probe's question is only whether
 the key is accepted.
 
+## 2026-09-26 (117) -- FantasyPros practice reports in the lineup's injury watch (nfl-v1.14)
+
+Chat, after the user added the key to its skill: "FantasyPros API, called with
+the key -- works with the key (HTTP 200 ... count 379 injuries)". So the
+injury watch now carries what chat had been web-searching: each designated
+player's practice participation (the week's three reports) and FantasyPros'
+probability of playing, for his own row and for each designated teammate.
+
+- `fantasy.lineup.fp_practice` asks `manager.fantasypros.injuries` about
+  exactly the players the watch names -- no healthy player spends a keyed
+  call -- joined sleeper -> fantasypros through the DynastyProcess id map, not
+  the keyless ranking feed (the chat container reaches that only some
+  sessions).
+- It is an input like any other: recorded in the manifest (so the session
+  log shows it), never raising; without a key the watch says in one line why
+  there are no practice reports, and the manifest records nothing (a key the
+  environment does not have is not a failed fetch).
+- CHAT.md rule 8: quote practice and probability from the watch; web-search
+  team reporting only when the row has none.
+
+Code review: four findings, all fixed before merge. Practice reports now keep
+their place (a dash for a day without one, "latest last"; a new
+`practice_days` field beside the existing one, which trade radar keeps); a
+watched player the lookup found nothing for says "no FantasyPros report"; a
+finished lookup is read from the one success wording injuries() uses
+(commented there as load-bearing), not from "failed" anywhere in a note; the
+table cells are two tested helpers.
+
