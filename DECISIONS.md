@@ -5959,7 +5959,7 @@ second-quarter exit, which the first reply cited as role evidence. Chat then
 promised to "be more aware next time" -- a promise it cannot keep, since it
 keeps nothing between sessions. The fix is in the repository:
 
-- **Injury watch** in  (and in its record): each rostered
+- **Injury watch** in `nfl fantasy lineup` (and in its record): each rostered
   skill player's own designation, and THIS WEEK's designations (Questionable,
   Doubtful, Out) on the teammates who move his volume -- the starting QB, a
   depth-chart 1-2 RB/WR/TE, or a top-200 Sleeper rank. Long-term IR/PUP are
@@ -5967,7 +5967,7 @@ keeps nothing between sessions. The fix is in the repository:
   IR). A teammate Out or Doubtful comes with the scenario command that prices
   his absence. Live on Omnibeta week 3: Ferguson <- Puka Nacua Doubtful, with
   the command; Moore Questionable.
-- **Partial games** (): a week is compared with the
+- **Partial games** (`fantasy/evidence.py`): a week is compared with the
   median of the player's OTHER weeks, and the cut is 60% of it (was 40% of a
   median that included the week itself). Moore's week 2 is now marked, and
   the evidence row shows "(partial: wk 2)".
