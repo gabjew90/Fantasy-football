@@ -6096,11 +6096,23 @@ would also bring what chat has been web-searching: practice participation and
 game-status probabilities. Keys cannot live in the public repo, so a new key
 is the one change that needs the chat skill rebuilt (code never does; the
 user asked, and was told so). Before asking for that rebuild,
-`nfl.py status --probe-sources` (`core/probe.py`) tells which it would be: an
-API that is REACHED and refuses for the missing key (a key fixes it), a bot
-wall -- an HTML block page -- or no connection (a key does not). No key is
-sent or read; only whether one is set. Rows go into the session log.
-Baseline from the user's machine: the partner feed answers; the API answers
-403 as data, not a block page -- so chat's 403 on the feed is about the chat
-environment, and the API question is what chat's own run settles.
+`nfl.py status --probe-sources` tells which it would be. The requests are
+made by `manager/fantasypros.reachability` -- the partner feed through the
+real `_rows` call, the API as `_injury_page` calls it minus the key -- and
+`core/probe.py` reads the answers: a bot wall (an HTML block page) or no
+connection means a key would not help; the API's own no-key answer means a
+key should, stated as "consistent with a missing key", never proof, since an
+address block at the same gateway can answer the same way and only a keyed
+call settles it. Every verdict carries its evidence (status, content type,
+body excerpt). No key is sent or read; a missing key is "absent", not a
+failed input. Rows go into the session log.
+Baseline from the user's machine: the partner feed answers (106 running
+backs); the API answers HTTP 403, application/json, {"message":"Forbidden"}
+-- so chat's 403 on the feed is about the chat environment, and the API
+question is what chat's own run settles.
+
+Code review (the new rule): six findings, all fixed before merge -- the probe
+first sent its own request rather than the real fetch's, read any JSON 403 as
+"a key fixes it", copied the endpoints and hard-coded the season, counted a
+missing key as a failed input, and recorded no evidence.
 

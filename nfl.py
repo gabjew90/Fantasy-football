@@ -63,10 +63,13 @@ def _season_week(season, week):
 def cmd_status(a) -> int:
     from core import status as ST
     if a.probe_sources:
-        # can this environment reach FantasyPros, and would a key help? (core/probe.py)
+        # can this environment reach FantasyPros, and would a key help? The
+        # requests are the real fetch's (manager/fantasypros); core/probe reads them
         from types import SimpleNamespace
+        from core import fetch as F
         from core import probe as PR
-        rows = PR.run()
+        from manager import fantasypros as FP
+        rows = FP.reachability(a.season or F.current_season())
         a._result = SimpleNamespace(record={"manifest": {"entries": rows}}, report_path=None)
         print(PR.markdown(rows))
         return 0

@@ -1,75 +1,59 @@
-"""Can this environment reach a data source, and if not, why?
+"""Reading a reachability check: can this environment reach a data source, and
+if not, would an API key help?
 
 The chat container is refused by FantasyPros' keyless partner feed (HTTP 403,
-every session). FantasyPros' official API takes the user's key -- which only
-the GitHub secrets hold -- and would also bring practice participation and
+every session). FantasyPros' official API takes the user's key -- held only
+in the GitHub secrets -- and would also bring practice participation and
 game-status probabilities. Before the user rebuilds the chat skill to carry
-that key, this answers whether it would help: an API that REACHES and refuses
-for the missing key is fixed by a key; a bot wall (an HTML block page) or no
-connection is not. No key is sent, and none is read -- only whether
-FANTASYPROS_API_KEY is set, as a boolean.
+that key, the check says which it would be. The requests themselves are made
+by the module that owns them (manager/fantasypros.reachability), with the
+real fetch's own URL and headers, so the check tests what the commands
+actually send; this module only classifies the answers. Stdlib only.
 
-Stdlib only.
+What a 403 can and cannot tell. An HTML block page is a bot wall: a key would
+not get past it. A 403 carrying JSON is the server answering, which is what
+FantasyPros' API returns to any request without a key -- {"message":
+"Forbidden"}, as seen from outside chat on 2026-09-26 -- but an address
+block at the same gateway can answer the same way. So a JSON 403 that
+matches the no-key answer is "consistent with a missing key", never proof;
+only a keyed call settles it.
 """
 
 from __future__ import annotations
 
-import os
-import urllib.error
-import urllib.request
+NO_KEY_ANSWER = '{"message":"Forbidden"}'      # the API's reply to a keyless request, from outside chat
 
-TIMEOUT = 15
-PROBES = (
-    ("FantasyPros partner feed (keyless projections)",
-     "https://partners.fantasypros.com/api/v1/consensus-rankings.php?position=RB&scoring=PPR&type=ros&year=2026"),
-    ("FantasyPros API (keyed: projections, injuries, practice)",
-     "https://api.fantasypros.com/public/v2/json/nfl/injuries?year=2026&week=1"),
-)
+
+def evidence(code, content_type: str, body: str) -> str:
+    snip = " ".join((body or "").split())[:80]
+    return f"HTTP {code}, {content_type or 'no content type'}, body {snip!r}"
 
 
 def classify(code: int | None, content_type: str, body: str, error: str | None = None) -> tuple[str, str]:
-    """(status, what it means). status: 'fresh' when the source answered,
-    'failed' otherwise -- the words the session log already counts."""
+    """(status, what it means -- with the evidence). status is 'fresh' when
+    the source answered with data, 'failed' otherwise: the words the session
+    log counts."""
     if error is not None:
         return "failed", f"unreachable from here ({error}): neither a key nor a rebuild helps"
     low = (body or "")[:2000].lower()
     walled = "html" in (content_type or "").lower() or "<html" in low or "cloudflare" in low or "captcha" in low
+    ev = evidence(code, content_type, body)
     if code == 200:
-        return "fresh", "reachable: it answered"
+        return "fresh", f"reachable: it answered ({ev})"
     if code in (401, 403) and walled:
-        return "failed", f"HTTP {code} from a bot wall (an HTML block page): a key would not get past it"
+        return "failed", f"a bot wall, an HTML block page: a key would not get past it ({ev})"
+    if code in (401, 403) and " ".join((body or "").split()) == NO_KEY_ANSWER:
+        return "failed", ("the API's no-key answer, the same one it gives from outside chat: consistent with a "
+                          f"missing key, so a key should help -- only a keyed call can rule out an address block ({ev})")
     if code in (401, 403):
-        return "failed", (f"HTTP {code} as data (not a block page): the server was reached and refused the "
-                          "request as unauthorised -- a key is what it wants")
-    return "failed", f"HTTP {code}: answered, but not with data"
-
-
-def probe(url: str) -> tuple[str, str]:
-    req = urllib.request.Request(url, headers={"User-Agent": "nfl-research/1.0 (reachability check)",
-                                               "Accept": "application/json"})
-    try:
-        with urllib.request.urlopen(req, timeout=TIMEOUT) as r:
-            return classify(r.status, r.headers.get("Content-Type", ""), r.read(4096).decode("utf-8", "replace"))
-    except urllib.error.HTTPError as e:
-        body = e.read(4096).decode("utf-8", "replace") if e.fp else ""
-        return classify(e.code, e.headers.get("Content-Type", "") if e.headers else "", body)
-    except Exception as e:  # noqa: BLE001 -- the point is to report it
-        return classify(None, "", "", f"{type(e).__name__}: {e}"[:120])
-
-
-def run() -> list[dict]:
-    """One row per probe, in the session log's input shape."""
-    rows = [{"name": name, "source": url.split("?")[0], "status": st, "detail": what, "age_h": 0.0}
-            for name, url in PROBES for st, what in [probe(url)]]
-    rows.append({"name": "FANTASYPROS_API_KEY in this environment", "source": "environment",
-                 "status": "fresh" if os.environ.get("FANTASYPROS_API_KEY") else "failed",
-                 "detail": "set" if os.environ.get("FANTASYPROS_API_KEY") else "not set", "age_h": 0.0})
-    return rows
+        return "failed", f"refused, with an answer unlike the API's no-key reply: a key may not help ({ev})"
+    return "failed", f"answered, but not with data ({ev})"
 
 
 def markdown(rows: list[dict]) -> str:
     L = ["## Can this environment reach the data sources?", "",
          "| Source | Result | What it means |", "|---|---|---|"]
     for r in rows:
-        L.append(f"| {r['name']} | {'OK' if r['status'] == 'fresh' else 'NO'} | {r['detail']} |")
+        mark = {"fresh": "OK", "absent": "--"}.get(r["status"], "NO")
+        L.append(f"| {r['name']} | {mark} | {r['detail']} |")
     return "\n".join(L) + "\n"
