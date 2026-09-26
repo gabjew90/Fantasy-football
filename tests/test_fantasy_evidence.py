@@ -137,3 +137,15 @@ def test_a_partial_game_is_marked_not_hidden():
     e = EV.evidence_for(["wr"], pd.DataFrame(rows), {"wr": "WR"}, bands)["wr"]
     assert e["partial_weeks"] == [4]
     assert e["trajectory"] == "CHANGED (includes a partial game)"
+
+
+def test_a_two_game_injury_exit_is_marked_partial():
+    """DJ Moore, 2026: 77% of snaps in week 1, 31% in week 2 (left in the
+    second quarter). The partial game must not hide inside its own median."""
+    rows = [{"gsis_id": "wr", "week": w, "team": "CHI", "snap_pct": sp, "tgt_share": 0.2, "ay_share": 0.2,
+             "wopr": 0.4, "carry_share": 0.0, "adot": 9.0, "i10_tgt": 0, "i10_car": 0, "two_min": 0,
+             "targets": 5, "carries": 0}
+            for w, sp in ((1, 0.77), (2, 0.31))]
+    e = EV.evidence_for(["wr"], pd.DataFrame(rows), {"wr": "WR"}, {})["wr"]
+    assert e["partial_weeks"] == [2]
+

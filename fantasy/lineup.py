@@ -108,6 +108,51 @@ def decide(cands, theirs, projs):
     return best_label, dict(cands)[best_label], pw
 
 
+SKILL = ("QB", "RB", "WR", "TE")
+# THIS WEEK'S designations only. A teammate on IR, PUP or out for the season
+# has been missing for weeks: his absence is already in the usage data and the
+# projections, and listing him only buries the news.
+GAME_WEEK = ("Questionable", "Doubtful", "Out")
+TEAMMATE_OUT = ("Out", "Doubtful")
+
+
+def injury_watch(my_pids, info, players, league: str) -> list[dict]:
+    """For each of my skill players: his own designation, and every designated
+    skill-position teammate who matters -- the starting QB, a depth-chart 1-2
+    RB/WR/TE, or a top-200 Sleeper search rank -- carrying a THIS-WEEK
+    designation (Questionable, Doubtful, Out): the absences that move his
+    volume. Long-term absences (IR, PUP) are already in the data. From Sleeper's player
+    data at run time. A teammate Out or Doubtful comes with the scenario
+    command that prices his absence."""
+    by_team: dict[str, list] = {}
+    for sid, p in (players or {}).items():
+        if p.get("team") and p.get("position") in SKILL and p.get("injury_status") in GAME_WEEK:
+            depth = p.get("depth_chart_order") or 99
+            relevant = depth <= (1 if p.get("position") == "QB" else 2) or (p.get("search_rank") or 9999) <= 200
+            if relevant:
+                by_team.setdefault(p["team"], []).append((str(sid), p))
+    rows = []
+    for pid in my_pids:
+        me = info.get(pid) or {}
+        if me.get("pos") not in SKILL:
+            continue
+        raw = (players or {}).get(pid) or {}
+        mates = sorted((p for sid, p in by_team.get(me.get("team"), []) if sid != pid),
+                       key=lambda p: (p.get("position") or "", p.get("depth_chart_order") or 99))
+        own = raw.get("injury_status") or ""
+        if not own and not mates:
+            continue
+        rows.append({"pid": pid, "name": me.get("name"), "team": me.get("team"), "own": own,
+                     "own_part": raw.get("injury_body_part") or "", "practice": raw.get("practice_participation") or "",
+                     "teammates": [{"name": p.get("full_name"), "pos": p.get("position"),
+                                    "status": p.get("injury_status"), "part": p.get("injury_body_part") or "",
+                                    "scenario": (f'nfl.py fantasy scenario --league {league} --player "{me.get("name")}" '
+                                                 f'--out "{p.get("full_name")}"'
+                                                 if p.get("injury_status") in TEAMMATE_OUT else "")}
+                                   for p in mates]})
+    return rows
+
+
 def _fmt(v, d=1):
     return "—" if v is None else f"{v:.{d}f}"
 
@@ -215,10 +260,29 @@ def run(league: str, week: int | None = None, *, record: bool = False, out_dir: 
                      f"{total(ids) - total(cands[0][1]):+.1f} | {pw[lab]:.1%} | {fl(ins, 'floor')} / {fl(outs, 'floor')} | "
                      f"{fl(ins, 'ceiling')} / {fl(outs, 'ceiling')} |")
 
+    watch = injury_watch(view.my_players, view.info, view.ctx.get("players"), league)
+    L += ["", "## Injury watch (game-day status, framework question 5)", "",
+          "*Sleeper designations at run time: yours, and this week's designations (Questionable, Doubtful, Out) on the "
+          "teammates who move your players' volume (the starting QB, depth chart 1-2 at RB/WR/TE, or top-200); "
+          "long-term IR/PUP absences are already in the data. Practice participation and news are not in this report; a close call "
+          "involving any row here is checked against them before it is answered.*", ""]
+    if watch:
+        L += ["| Your player | His status | Designated teammates | Price the absence |", "|---|---|---|---|"]
+        for w in watch:
+            own = (f"**{w['own']}**" + (f" ({w['own_part']})" if w["own_part"] else "")
+                   + (f", practice: {w['practice']}" if w["practice"] else "")) if w["own"] else "none"
+            mates = "; ".join(f"{t['name']} ({t['pos']}) {t['status']}" + (f" ({t['part']})" if t["part"] else "")
+                              for t in w["teammates"]) or "none"
+            runs = "<br>".join(f"`{t['scenario']}`" for t in w["teammates"] if t["scenario"]) or "--"
+            L.append(f"| {w['name']} ({w['team']}) | {own} | {mates} | {runs} |")
+    else:
+        L += ["No designations on your players or their key teammates."]
+
     L += ["", "## Opportunity and role (framework questions 1 and 2)", "",
           "*This season, by week. A role CHANGED when the last two weeks differ from the earlier ones by more "
           "than two noise standard deviations of that metric (noise_bands_v0); fewer than four weeks is "
-          "INSUFFICIENT_SAMPLE. Usage, not box score.*", "",
+          "INSUFFICIENT_SAMPLE. Usage, not box score. A week marked partial (under 60% of the player's usual "
+          "snaps) is an exit or a benching, not a role: its snap share is not role evidence.*", "",
           "| Player | Weeks | Snap % (season / last) | Target share | Carry share | WOPR | Inside-10 tgt+car | Role |",
           "|---|---|---|---|---|---|---|---|"]
     for pid in [p for p in chosen + [b for b in view.my_players if b not in chosen]
@@ -257,7 +321,7 @@ def run(league: str, week: int | None = None, *, record: bool = False, out_dir: 
 
     rec_evidence = {p: {k: v for k, v in (e or {}).items() if k != "series"} for p, e in ev.items()}
     rec = {"command": "fantasy lineup", "league": league, "season": view.season, "week": view.week,
-           "evidence": rec_evidence,
+           "evidence": rec_evidence, "injury_watch": watch,
            "generated_at_utc": now.isoformat(), "gate": gate.to_dict(), "manifest": m.to_dict(),
            "standing": view.standing,
            "me": view.my_name, "opponent": view.opp_name, "opponent_lineup": theirs, "opponent_lineup_from": their_how,
@@ -297,7 +361,9 @@ def _ev_row(pid, info, e) -> str:
     role = e.get("trajectory", "") + (f" ({'; '.join(changed)})" if changed else "")
     t = e.get("totals") or {}
     wopr = "—" if mean.get("wopr") is None else f"{mean['wopr']:.2f}"
-    return (f"| {_name(pid, info)} | {e['weeks']} | {_pct(mean.get('snap_pct'))} / {_pct(last_snap)} | "
+    partial = e.get("partial_weeks") or []
+    mark = f" (partial: wk {', '.join(str(w) for w in partial)})" if partial else ""
+    return (f"| {_name(pid, info)} | {e['weeks']} | {_pct(mean.get('snap_pct'))} / {_pct(last_snap)}{mark} | "
             f"{_pct(mean.get('tgt_share'))} | {_pct(mean.get('carry_share'))} | {wopr} | "
             f"{t.get('i10_tgt', 0)}+{t.get('i10_car', 0)} | {role} |")
 

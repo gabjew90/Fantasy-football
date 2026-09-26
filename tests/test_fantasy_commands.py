@@ -251,3 +251,32 @@ def test_a_read_only_context_does_not_append_transactions(monkeypatch):
     assert "write_state" in inspect.signature(briefs.build_context).parameters
     src = inspect.getsource(briefs.build_context)
     assert "if write_state:" in src and "append_transactions" in src.split("if write_state:")[1][:200]
+
+
+def test_the_injury_watch_names_designated_teammates_and_the_scenario_to_run():
+    from fantasy import lineup as LU
+    info = {"1": {"name": "Terrance Ferguson", "pos": "TE", "team": "LAR"},
+            "2": {"name": "DJ Moore", "pos": "WR", "team": "CHI"},
+            "3": {"name": "Deebo Samuel", "pos": "WR", "team": "SF"}}
+    players = {"1": {"team": "LAR", "position": "TE"},
+               "2": {"team": "CHI", "position": "WR", "injury_status": "Questionable", "injury_body_part": "Shoulder",
+                     "depth_chart_order": 1},
+               "3": {"team": "SF", "position": "WR"},
+               "9": {"team": "LAR", "position": "WR", "full_name": "Puka Nacua", "injury_status": "Doubtful",
+                     "injury_body_part": "Hip", "depth_chart_order": 1},
+               "8": {"team": "LAR", "position": "WR", "full_name": "Deep Reserve", "injury_status": "Out",
+                     "depth_chart_order": 5},
+               "7": {"team": "LAR", "position": "LB", "full_name": "A Linebacker", "injury_status": "Out",
+                     "depth_chart_order": 1},
+               "6": {"team": "LAR", "position": "WR", "full_name": "Long Term", "injury_status": "IR",
+                     "depth_chart_order": 1},
+               "5": {"team": "LAR", "position": "QB", "full_name": "Backup Qb", "injury_status": "Questionable",
+                     "depth_chart_order": 2}}
+    rows = {r["name"]: r for r in LU.injury_watch(["1", "2", "3"], info, players, "omnibeta")}
+    assert set(rows) == {"Terrance Ferguson", "DJ Moore"}, "a player with nothing to watch has no row"
+    fer = rows["Terrance Ferguson"]
+    assert [t["name"] for t in fer["teammates"]] == ["Puka Nacua"],         "only this week's designations, on teammates who move his volume (not IR, not a backup QB)"
+    assert fer["teammates"][0]["scenario"] == (
+        'nfl.py fantasy scenario --league omnibeta --player "Terrance Ferguson" --out "Puka Nacua"')
+    assert rows["DJ Moore"]["own"] == "Questionable" and rows["DJ Moore"]["own_part"] == "Shoulder"
+

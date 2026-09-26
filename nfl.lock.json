@@ -2,7 +2,7 @@
  "algorithm": "nfl-release-sha256-lf-1",
  "file_count": 179,
  "files": {
-  "CHAT.md": "ee09a9d0e37a60dea6895537a64f64b91bafb1eeeaeaa515eedd285c7714852e",
+  "CHAT.md": "5e59859adf37741c5932a90751784fd7b01dd7421dc2adafbc12d47958c22100",
   "config.yaml": "7e7e2de6f52d3bbf13c0d7c6850ea6925a2d279fa714546e48b26ec3354f695e",
   "core/__init__.py": "8ac9ed217e439f5828616ab66ec9ff17336c2cbbbeae391d0f9bfa001eaed571",
   "core/fetch.py": "95fc16bbd91a3a19086c8c2f64c9d101abc85baae2452c1ed778c84a21f9ad33",
@@ -75,10 +75,10 @@
   "fantasy/contract.py": "719ef72a5f354627fe2e6112e7b532b69927a7a154e5a8eefae073cdc1f8163b",
   "fantasy/dispersion.py": "a380d0efe71d385c3b4916c167d61103182944ba14eb11bd49076b2972944fdb",
   "fantasy/environment.py": "58621d274bf7fafa7531d2bbbbd70e23ffde36ae4163427d4d15fb449711099b",
-  "fantasy/evidence.py": "68e343d1439a7b55497ddf58f42ed679efcf13843a1a3b2c1107b3f1cb3563e1",
+  "fantasy/evidence.py": "a7e6ce4c08d443ce58a1da92d2d8fce646036ca89a630790d95d7b73ce2ebf1d",
   "fantasy/gate.py": "2dbe8838c32ac03704c155067a3b2f197932fa0d8ec29be6d015485f917f7e93",
   "fantasy/league.py": "13484f01390a4e7b63dfc5f886dbb5ab4a79d486a3c7d93ceacd793c88d454c2",
-  "fantasy/lineup.py": "dc30e61acc0899e657f3f700bf29fbdaf5b4e72fc963b5471ae90d1b49de1901",
+  "fantasy/lineup.py": "c2a1a35da81861000b74e2bac692bd125855ad27c00032bd99bbedf978edb1c8",
   "fantasy/resources/dispersion_v0.keefamania.json": "9daca0c1686d057506ac63f5dfddb28a5aa419babc0313a0310cceb10baa2d6b",
   "fantasy/resources/dispersion_v0.omnibeta.json": "2dcfcc9f2bf56fe51d1f1f2fefb60014af913fa0507c23a9587f6e6bc8aac0fe",
   "fantasy/resources/market_shape_params.json": "a9250ef44c98538a5f2dd6a49c342aeaee0633028701bf33d03c7082285d6c8e",
@@ -182,6 +182,6 @@
   "tiers.csv": "04a1a79d43e9f2445ba3dc4ea262b00fbd58efea1f41e8b0393cb4c7f8afee41",
   "tiers.keefamania.csv": "11e6546b56caa807a572da86d5c3d81097bafd2d2550e25653882d78b2962e94"
  },
- "sha256": "d0318d0ada8623811bac01c3100ce9fae5fecf0c5d13e77418b698275e0ceae9",
- "tag": "nfl-v1.7"
+ "sha256": "93b2190a23e85a427d0caecb01d66ea7a89cdc81790fa4236a6c736df2a15128",
+ "tag": "nfl-v1.8"
 }

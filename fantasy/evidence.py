@@ -68,7 +68,13 @@ LEVEL_EDGES = {"snap_pct": (0.0, 0.5, 0.8, 1.01), "tgt_share": (0.0, 0.1, 0.2, 1
                "ay_share": (0.0, 0.1, 0.25, 1.01), "wopr": (0.0, 0.25, 0.5, 10.0),
                "carry_share": (0.0, 0.15, 0.4, 1.01)}
 MIN_LEVEL_N = 100
-PARTIAL_SNAP = 0.4        # a week under 40% of the player's median snap share is marked "partial game"
+# A week under 60% of the player's usual snap share -- the median of his OTHER
+# weeks -- is marked "partial game". Leave-one-out because a two-game sample
+# otherwise hides the partial game inside its own median, and 60% because a
+# second-quarter injury exit lands near half a game: DJ Moore, 2026 week 2,
+# left in the second quarter at 31% of snaps against a two-game median of 54%,
+# and the old rule (40% of a median that included that week) never marked it.
+PARTIAL_SNAP = 0.6
 PBP_COLS = ["season", "week", "season_type", "posteam", "pass_attempt", "rush_attempt", "receiver_player_id",
             "rusher_player_id", "air_yards", "yardline_100", "half_seconds_remaining", "qb_kneel", "sack",
             "two_point_attempt"]
@@ -251,10 +257,15 @@ def evidence_for(gsis_ids, usage: pd.DataFrame, positions: dict, bands: dict | N
         # A game with unusually few snaps is MARKED, not dropped: an in-game
         # injury and a benching look the same in snap counts, and hiding either
         # would be wrong. The verdict says a partial game is in the window.
-        snaps = [v for v in row["series"].get("snap_pct", []) if not _missing(v)]
-        med = float(np.median(snaps)) if snaps else None
-        row["partial_weeks"] = [w for w, v in zip(row["week_list"], row["series"].get("snap_pct", []))
-                                if med and not _missing(v) and v < PARTIAL_SNAP * med]
+        series = row["series"].get("snap_pct", [])
+        row["partial_weeks"] = []
+        for i, (w, v) in enumerate(zip(row["week_list"], series)):
+            others = [x for j, x in enumerate(series) if j != i and not _missing(x)]
+            if _missing(v) or not others:
+                continue
+            med = float(np.median(others))
+            if med and v < PARTIAL_SNAP * med:
+                row["partial_weeks"].append(w)
         if row["trajectory"] == "CHANGED" and set(row["partial_weeks"]) & set(row["week_list"][-2:]):
             row["trajectory"] = "CHANGED (includes a partial game)"
         out[g] = row

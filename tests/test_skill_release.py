@@ -336,3 +336,9 @@ def test_the_transcript_reply_is_the_full_text_not_a_summary():
     chat = (ROOT / "CHAT.md").read_text(encoding="utf-8")
     assert "VERBATIM: the full text exactly as sent" in chat and "not a\n  summary" in chat
 
+
+def test_chat_checks_injuries_before_answering_and_never_promises_to_remember():
+    chat = (ROOT / "CHAT.md").read_text(encoding="utf-8")
+    assert "Injuries are checked BEFORE a start/sit answer" in chat
+    assert "chat keeps nothing between sessions" in chat
+
