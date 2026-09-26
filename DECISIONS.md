@@ -6116,3 +6116,24 @@ first sent its own request rather than the real fetch's, read any JSON 403 as
 "a key fixes it", copied the endpoints and hard-coded the season, counted a
 missing key as a failed input, and recorded no evidence.
 
+## 2026-09-26 (116) -- the FantasyPros key from the chat skill's credential file
+
+Chat's own probe run (release nfl-v1.12): the keyless partner feed answered
+this session (HTTP 200, 106 running backs -- intermittent from chat, blocked
+in earlier sessions), and the keyed API gave its no-key 403. Chat also found
+the gap: `manager/fantasypros._api_key` read only the environment, and the
+chat bootstrap copies `credential.env` beside the props engine without
+exporting anything. The fallback is in the repo, so the harness code does not
+change: `_api_key` reads a `FANTASYPROS_API_KEY=...` line from that file when
+the environment has none. With a key present, `status --probe-sources` makes
+the one call that tells a missing key from an address block -- the API with
+the key -- and reports "works with the key" or "refused WITH the key". The
+key goes in the request header only; no row holds it, even if the server
+echoes it back.
+
+The user adds the key through chat, which can edit its own skill: a line in
+the skill's `resources/credential.env`. What the key then brings is used today
+by `manager/fantasypros.injuries` (practice participation, game-status
+probabilities); wiring it into the lineup report's injury watch is the next
+step.
+

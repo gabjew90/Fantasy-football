@@ -55,6 +55,7 @@ from __future__ import annotations
 
 import logging
 import time as _time
+from pathlib import Path
 
 import requests
 
@@ -275,9 +276,26 @@ MAX_CALLS = 10           # stay under the measured ~12 before a 429
 INJURY_TTL = 3 * 3600
 
 
+# The chat skill carries its keys in resources/credential.env, which its
+# bootstrap copies here, beside the props engine (the Odds API key's file).
+# Keys never live in this public repository; only the installed skill has one.
+CREDENTIAL_FILE = Path(__file__).resolve().parents[1] / "props" / "engine" / "resources" / "credential.env"
+
+
 def _api_key():
+    """FANTASYPROS_API_KEY from the environment (GitHub Actions, a local .env),
+    else a `FANTASYPROS_API_KEY=...` line in the credential file the chat
+    skill places beside the release. Never printed or logged."""
     import os
-    return os.environ.get("FANTASYPROS_API_KEY") or None
+    import re
+    key = os.environ.get("FANTASYPROS_API_KEY")
+    if key:
+        return key
+    try:
+        m = re.search(r"^\s*FANTASYPROS_API_KEY\s*=\s*([^\s#]+)", CREDENTIAL_FILE.read_text(encoding="utf-8"), re.M)
+    except OSError:
+        return None
+    return m.group(1) if m else None
 
 
 def reachability(season: int) -> list[dict]:
@@ -311,10 +329,22 @@ def reachability(season: int) -> list[dict]:
         st, what = PR.classify(None, "", "", f"{type(e).__name__}: {e}"[:120])
     rows.append({"name": "FantasyPros API (keyed: injuries and practice, projections), called without the key",
                  "source": f"{API}/nfl/injuries", "status": st, "detail": what, "age_h": 0.0})
-    has_key = bool(_api_key())
-    rows.append({"name": "FANTASYPROS_API_KEY in this environment", "source": "environment",
-                 "status": "fresh" if has_key else "absent", "detail": "set" if has_key else "not set",
-                 "age_h": 0.0})
+    key = _api_key()
+    rows.append({"name": "FANTASYPROS_API_KEY in this environment", "source": "environment or credential.env",
+                 "status": "fresh" if key else "absent", "detail": "set" if key else "not set", "age_h": 0.0})
+    if key:
+        # THE KEYED CALL: the only thing that tells a missing key from an address
+        # block. The key goes in the header and nowhere else; the row never holds it.
+        try:
+            r = requests.get(f"{API}/nfl/injuries", timeout=TIMEOUT, headers={"x-api-key": key},
+                             params={"year": season, "week": 1})
+            ev = PR.evidence(r.status_code, r.headers.get("Content-Type", ""), r.text[:2000]).replace(key, "<key>")
+            st, what = (("fresh", f"works with the key ({ev})") if r.status_code == 200 else
+                        ("failed", f"refused WITH the key -- the key is wrong, or this address is blocked ({ev})"))
+        except Exception as e:  # noqa: BLE001
+            st, what = PR.classify(None, "", "", f"{type(e).__name__}"[:120])
+        rows.append({"name": "FantasyPros API, called with the key", "source": f"{API}/nfl/injuries",
+                     "status": st, "detail": what, "age_h": 0.0})
     return rows
 
 
