@@ -5949,3 +5949,32 @@ Two user decisions and one change:
   `model_projection` (#108): one change to the draft code, when it is being
   worked on anyway.
 
+## 2026-09-26 (111) -- injuries before the start/sit answer: the injury watch, partial games, and a standing chat rule (nfl-v1.8)
+
+From the second downloaded chat log (release nfl-v1.7). Asked Vele or Deebo,
+chat answered from the lineup report and missed three injury facts until the
+user raised them: Puka Nacua (Doubtful) behind the Ferguson/Fannin coin flip,
+DJ Moore's game-time status, and that Moore's 31% week-2 snap share was a
+second-quarter exit, which the first reply cited as role evidence. Chat then
+promised to "be more aware next time" -- a promise it cannot keep, since it
+keeps nothing between sessions. The fix is in the repository:
+
+- **Injury watch** in  (and in its record): each rostered
+  skill player's own designation, and THIS WEEK's designations (Questionable,
+  Doubtful, Out) on the teammates who move his volume -- the starting QB, a
+  depth-chart 1-2 RB/WR/TE, or a top-200 Sleeper rank. Long-term IR/PUP are
+  left out (already in the data; the first draft listed six SF receivers on
+  IR). A teammate Out or Doubtful comes with the scenario command that prices
+  his absence. Live on Omnibeta week 3: Ferguson <- Puka Nacua Doubtful, with
+  the command; Moore Questionable.
+- **Partial games** (): a week is compared with the
+  median of the player's OTHER weeks, and the cut is 60% of it (was 40% of a
+  median that included the week itself). Moore's week 2 is now marked, and
+  the evidence row shows "(partial: wk 2)".
+- **CHAT.md rule 8**: injuries are checked before a start/sit answer -- run
+  the scenario a watch row names, check a designated player's practice
+  participation and news (outside the engine, labelled) and when his status
+  settles; never cite a partial game's snap share as a role change; never
+  promise to remember.
+No props engine change (props-v1.24 IDENTICAL).
+

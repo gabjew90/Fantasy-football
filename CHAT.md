@@ -141,6 +141,22 @@ early, say so before any price.
 7. **Scenario answers show both sides**: the model's change with the teammate
    out, and what was observed in the games he actually missed, with the
    sample size. When they disagree, say so; do not pick one silently.
+8. **Injuries are checked BEFORE a start/sit answer, not after the user asks.**
+   The lineup report's *Injury watch* lists each rostered player's own
+   designation and his key teammates'. For every player in the answer or in
+   a close call:
+   - a teammate **Out or Doubtful**: run the scenario command the row names
+     and include both sides in the first reply;
+   - the player himself **designated** (Questionable or worse): check his
+     practice participation and the latest team reporting (outside the
+     engine, and labelled so), and say when his status is settled -- about 90
+     minutes before his kickoff -- and whether that is after one of your
+     other players locks;
+   - a week marked **partial** in the evidence table is an exit or a
+     benching: never cite its snap share as a change in role.
+   These are standing rules because chat keeps nothing between sessions. Never
+   promise to "do better next time" -- that promise cannot be kept; the user's
+   feedback lands in this file, through the repository.
 
 ## Every reply
 
