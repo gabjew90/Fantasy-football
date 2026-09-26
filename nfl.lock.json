@@ -103,7 +103,7 @@
   "manager/deliver.py": "5a351cf32b22c25ba0f33f0c0d3a9e9b10df69646bce92dbd0ac92c69661d3d4",
   "manager/ecr.py": "8b220d21ec3d093150994bbfeaacf6cbbdd18dc4a907cfc063400fd36b94877d",
   "manager/faab.py": "dfae389a6c82a60065fcfa415a8b919c3f3186b33957c1f3c51832ed0fd5d5ae",
-  "manager/fantasypros.py": "008c9cdc33b16a7646aedc5600a4227be2378558cd6158bf2688699397a4d026",
+  "manager/fantasypros.py": "12cdcbe2bd440e3dadca4f8b39372a12ac6b02ab1ab64dd4136716fad8d1e9e9",
   "manager/games.py": "2995d1af1f2e7a50cb856339379e5fec32598086db8bd86d3f8171d4a61c90e8",
   "manager/gate.py": "0f320912fa4ad51b223a507854bab21b8ba89dcdfbfc999c0b8346bab35003a5",
   "manager/injuries.py": "fac66f69dbc1274ee716f2bfb433df1dc1f8012cadb9a8de36d3eee59e305590",
@@ -183,6 +183,6 @@
   "tiers.csv": "04a1a79d43e9f2445ba3dc4ea262b00fbd58efea1f41e8b0393cb4c7f8afee41",
   "tiers.keefamania.csv": "11e6546b56caa807a572da86d5c3d81097bafd2d2550e25653882d78b2962e94"
  },
- "sha256": "8930ccd20b5c5eb441b2adcb0f4a1c7e3c87bc9dd44c36324f3a5356c93df6a6",
- "tag": "nfl-v1.12"
+ "sha256": "01072c8d973f7f1fb384158b7e0e4c0bdad6753d9466875527209b63c17d1a69",
+ "tag": "nfl-v1.13"
 }
