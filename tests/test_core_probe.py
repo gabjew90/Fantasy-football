@@ -85,3 +85,26 @@ def test_the_key_is_read_from_the_skills_credential_file_and_never_shown(tmp_pat
     assert "fp-secret-9" not in repr(rows), "the key never lands in a row, even echoed back"
     monkeypatch.setattr(FP, "CREDENTIAL_FILE", tmp_path / "missing.env")
     assert FP._api_key() is None
+
+
+@pytest.mark.parametrize("line", ['FANTASYPROS_API_KEY="fp-9"', "FANTASYPROS_API_KEY='fp-9'",
+                                  "FANTASYPROS_API_KEY = fp-9  # added by chat"])
+def test_a_quoted_or_commented_key_line_reads_as_the_bare_key(tmp_path, monkeypatch, line):
+    from manager import fantasypros as FP
+    cred = tmp_path / "credential.env"
+    cred.write_bytes(("ODDS_API_KEY=abc\r\n" + line + "\r\n").encode("utf-8"))   # a Windows-written file
+    monkeypatch.delenv("FANTASYPROS_API_KEY", raising=False)
+    monkeypatch.setattr(FP, "CREDENTIAL_FILE", cred)
+    assert FP._api_key() == "fp-9"
+
+
+@pytest.mark.parametrize("code,verdict", [(403, "refused WITH the key"), (401, "refused WITH the key"),
+                                          (400, "the key was accepted")])
+def test_a_keyed_answer_is_read_by_what_it_says_about_the_key(monkeypatch, code, verdict):
+    pytest.importorskip("requests")
+    from manager import fantasypros as FP
+    monkeypatch.setenv("FANTASYPROS_API_KEY", "fp-9")
+    monkeypatch.setattr(FP, "_rows", lambda *a, **k: ([{}], {}))
+    monkeypatch.setattr(FP.requests, "get", lambda url, timeout, params, headers=None:
+                        _Resp(code if headers else 403, "application/json", '{"message":"x"}'))
+    assert verdict in FP.reachability(2026)[-1]["detail"]

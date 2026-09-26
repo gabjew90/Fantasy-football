@@ -295,7 +295,8 @@ def _api_key():
         m = re.search(r"^\s*FANTASYPROS_API_KEY\s*=\s*([^\s#]+)", CREDENTIAL_FILE.read_text(encoding="utf-8"), re.M)
     except OSError:
         return None
-    return m.group(1) if m else None
+    # a value written the way .env files often are, in quotes, is the key without them
+    return (m.group(1).strip("\"'") or None) if m else None
 
 
 def reachability(season: int) -> list[dict]:
@@ -339,8 +340,13 @@ def reachability(season: int) -> list[dict]:
             r = requests.get(f"{API}/nfl/injuries", timeout=TIMEOUT, headers={"x-api-key": key},
                              params={"year": season, "week": 1})
             ev = PR.evidence(r.status_code, r.headers.get("Content-Type", ""), r.text[:2000]).replace(key, "<key>")
-            st, what = (("fresh", f"works with the key ({ev})") if r.status_code == 200 else
-                        ("failed", f"refused WITH the key -- the key is wrong, or this address is blocked ({ev})"))
+            # 401/403 is the key (or the address) refused; anything else means the
+            # key got through and the server answered the request itself -- this
+            # call leaves out the player ids a real injuries call sends
+            st, what = (("failed", f"refused WITH the key -- the key is wrong, or this address is blocked ({ev})")
+                        if r.status_code in (401, 403) else
+                        ("fresh", f"works with the key ({ev})") if r.status_code == 200 else
+                        ("fresh", f"the key was accepted; the server answered the request itself ({ev})"))
         except Exception as e:  # noqa: BLE001
             st, what = PR.classify(None, "", "", f"{type(e).__name__}"[:120])
         rows.append({"name": "FantasyPros API, called with the key", "source": f"{API}/nfl/injuries",

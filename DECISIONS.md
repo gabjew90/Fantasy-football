@@ -6132,8 +6132,19 @@ key goes in the request header only; no row holds it, even if the server
 echoes it back.
 
 The user adds the key through chat, which can edit its own skill: a line in
-the skill's `resources/credential.env`. What the key then brings is used today
-by `manager/fantasypros.injuries` (practice participation, game-status
-probabilities); wiring it into the lineup report's injury watch is the next
-step.
+the skill's `resources/credential.env`. What the key brings is the public/v2
+injuries endpoint -- practice participation and game-status probabilities --
+used today by `manager/fantasypros.injuries`; wiring it into the lineup
+report's injury watch is the next step. It does NOT bring projections: the
+module's own measurement stands (api.fantasypros.com/v2 answers a real key, a
+bogus key and none alike), so the third projection source stays the keyless
+partner feed, which chat reaches in some sessions and not others.
+
+Code review: four findings. Fixed -- a keyed answer other than 401/403 (the
+probe omits the player ids a real call sends) now reads as "the key was
+accepted", not as a refusal; a quoted value in the file is the key without its
+quotes; tests for quoted, commented and Windows-written lines and for keyed
+400/401/403. Skipped -- calling `_injury_page` itself for the keyed probe: it
+needs real FantasyPros player ids, and the probe's question is only whether
+the key is accepted.
 
