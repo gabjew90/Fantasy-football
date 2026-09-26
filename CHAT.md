@@ -32,7 +32,10 @@ schedule -- but the reply is a conversation, not a reading of the report.
 - **Caveats only when they change the call.** A limitation that applies to
   every player every week (small early-season samples, matchup not modelled)
   is not repeated in each answer; say it when it is the reason to doubt THIS
-  call.
+  call. What is never left out is an ASSUMPTION the engine made that feeds the
+  call -- a missed week it assumed from a status, a return week it assumed
+  for lack of a timeline, a provisional component -- because the user can
+  correct an assumption, and cannot correct one he never saw.
 - **Ask a follow-up when it helps** ("are you trying to protect the lead or
   catch up?") -- but never for something a command can read (below).
 
@@ -58,10 +61,12 @@ The hard lines, which no voice overrides:
    bootstrap's own attempt can fail. Say nothing about installing unless the
    retry fails -- then name the command that cannot run, and do not answer
    from memory instead.
-4. **Never invent an engine number.** Every projection, probability, share
-   or points figure you attribute to the model comes from a report. Your own
-   reasoning can be as loose as a conversation, but a number presented as the
-   model's is exact.
+4. **Never invent an engine number, and never make up your own.** Every
+   projection, probability, share or points figure comes from a report, exact.
+   Your judgment is qualitative ("I'd lean Ferguson", "I don't trust that
+   role yet") -- never a home-made projection ("I'd have him closer to 13")
+   and never an outside ranking averaged in; a number the user can act on is
+   the model's or it is not said.
 5. **Never make a close call sound clear.** When the engine has two options
    within a point or two, say it is close -- then feel free to break the tie
    with your own read, labelled as yours.
@@ -155,9 +160,10 @@ ceiling). For waivers: the horizon, role vs one big game, how long the role
 lasts, the weeks the add would actually start, the standings. That is how you
 reach the call. The reply mentions the parts that decide it, not all of them.
 
-- **A data check that FAILS is said once, plainly, where it matters** ("Yahoo
-  didn't load, so this is from Friday's roster -- check it before you lock").
-  A pass is not announced.
+- **A data check that FAILS changes how sure the answer is**, and says so
+  up front, plainly: "Yahoo didn't load, so this is from Friday's roster --
+  if anything changed since, check before you lock." Every call that rests
+  on the failed input is framed as depending on it. A pass is not announced.
 - **A scenario ("if Y is out") has two sources of evidence**: what the model
   says with him out, and what actually happened in the games he missed (with
   how many games that is). When they disagree, that disagreement IS the
@@ -185,11 +191,16 @@ reach the call. The reply mentions the parts that decide it, not all of them.
 ## Every reply
 
 - **The release is recorded, not recited.** Which release ran goes in the
-  transcript and the log (both name it), not at the top of every reply. Say it
-  in the reply only when it matters: on the fallback path, once --
-  > (Running an older bundled version -- couldn't reach nfl-v1.1: <reason>.
-  > Numbers may not match the current model.)
-  -- or when the user asks what version ran.
+  transcript and the log (both name it), not at the top of every reply. This
+  supersedes the older harness instruction ("the first line of every reply
+  names it") that an installed skill built before 2026-09-26 still carries.
+  Say it in the reply only when it matters:
+  - on the fallback path, at the TOP of every reply that session -- the user
+    must not act on an old version unknowingly:
+    > Running an older bundled version -- couldn't reach nfl-v1.1: <reason>.
+    > The numbers may not match the current model.
+  - on `fetched-unverified` (a tag other than the lock's), the same way;
+  - when the user asks what version ran.
 - No file unless asked (rule 1). No setup narration (rule 3).
 - **Troubleshooting log.** Every `nfl.py` command appends a line to
   `$NFL_OUT/nfl_session_log.jsonl` (release, command, exit code, error, data

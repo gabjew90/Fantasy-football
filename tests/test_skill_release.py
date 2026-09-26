@@ -389,3 +389,21 @@ def test_chat_talks_like_a_person_and_keeps_the_hard_lines():
                  "Injuries are checked BEFORE a start/sit answer", "Answer in the reply, not in a file"):
         assert hard in chat, hard
     assert "The gate line comes first" not in chat and "First line names the release" not in chat
+
+
+def test_the_harness_and_the_contract_agree_on_naming_the_release():
+    """The installed skill's SKILL.md is read first: if it still demanded a
+    release line on every reply, CHAT.md's conversational voice would lose."""
+    harness = (ROOT / "skill" / "SKILL.md").read_text(encoding="utf-8")
+    chat = (ROOT / "CHAT.md").read_text(encoding="utf-8")
+    assert "The first line of every reply names it" not in harness
+    assert "CHAT.md` decides how replies name the release" in harness
+    assert "supersedes the older harness instruction" in chat, "an installed skill built before this still says it"
+    assert "at the TOP of every reply that session" in chat, "a fallback is never tucked away"
+
+
+def test_the_voice_keeps_the_numbers_honest():
+    chat = (ROOT / "CHAT.md").read_text(encoding="utf-8")
+    assert "never a home-made projection" in chat and "outside ranking averaged in" in chat
+    assert "Every call that rests" in chat and "ASSUMPTION the engine made" in chat
+

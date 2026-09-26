@@ -36,11 +36,13 @@ Do not run anything from this skill's own directory except `bootstrap.py`.
 
 ## Disclose which release ran
 
-The first line of every reply names it: `release <tag> (<hash7>, <source>)`.
-`fetched-unverified` means a `--tag` other than the lock's was asked for and
-nothing checked it: say so in that line. If `RELEASE_SOURCE=VENDORED_FALLBACK`, the bootstrap printed a banner with the
-reason and the tag it could not reach. Repeat it. An old release is usable;
-an old release passing as the current one is not.
+`$REPO_DIR/CHAT.md` decides how replies name the release: normally it is
+recorded in the transcript and the log, not recited in every reply. The
+exceptions are the ones that matter: `fetched-unverified` (a `--tag` other than
+the lock's, nothing checked it) and `RELEASE_SOURCE=VENDORED_FALLBACK` (the
+bootstrap printed a banner with the reason and the tag it could not reach) go
+at the top of every reply. An old release is usable; an old release passing as
+the current one is not.
 
 ## Credentials
 

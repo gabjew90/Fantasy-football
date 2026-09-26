@@ -6207,3 +6207,14 @@ The rewrite separates how chat THINKS from how it TALKS:
 - The transcript's self-check now asks whether a friend who knows football
   would find the answer natural.
 
+Code review: six findings, all fixed before merge. The important one: the
+installed harness's own SKILL.md still ordered "the first line of every reply
+names it", read before CHAT.md -- skill/SKILL.md now defers to CHAT.md, and
+CHAT.md says it supersedes that older line an installed skill still carries
+(a test pins the two agreeing). Protections the first draft loosened are back
+in voice-neutral form: no home-made projections or averaged-in rankings (the
+judgment is qualitative); a failed data check makes every call resting on it
+conditional; an ASSUMPTION the engine made (missed weeks, a return week, a
+provisional part) is always stated; a fallback or unverified release goes at
+the top of every reply that session.
+
