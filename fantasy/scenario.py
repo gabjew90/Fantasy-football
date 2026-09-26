@@ -210,8 +210,12 @@ def run(league: str, player: str, out: str, week: int | None = None, *, out_dir:
         snap = workdir / f"odds_snapshot_{season}_wk{wk:02d}_{away}_{home}.json"
         scen_csv = run_engine(away, home, season, wk, scoring, tmp, workdir, assume_out=out_gsis, snapshot=snap)
         base, scen = model_row(base_csv, gsis), model_row(scen_csv, gsis)
+        # did the as-posted run already leave the teammate out? (the engine
+        # excludes Out/Doubtful from ITS injury report, which can lag Sleeper's)
+        out_in_base = model_row(base_csv, out_gsis) is not None
     except ScenarioError as ex:
         base = scen = None
+        out_in_base = True
         notes.append(str(ex))
     m.record("props engine (as posted, and with the teammate out)", source="props/engine score_game.py",
              status="fresh" if base else "failed", fetched_at=dt.datetime.now(dt.timezone.utc) if base else None,
@@ -234,7 +238,8 @@ def run(league: str, player: str, out: str, week: int | None = None, *, out_dir:
         notes.append(f"market_points unavailable ({type(ex).__name__})")
 
     gate = G.scoring_only(yaml_sc, plat_sc)
-    md = markdown(league, season, wk, p, o, pos, out_pos, away, home, base, scen, obs, mk, gate, m, notes)
+    md = markdown(league, season, wk, p, o, pos, out_pos, away, home, base, scen, obs, mk, gate, m, notes,
+                  out_in_base=out_in_base)
     rec = {"command": "fantasy scenario", "league": league, "season": season, "week": wk,
            "generated_at_utc": dt.datetime.now(dt.timezone.utc).isoformat(),
            "player": {"sleeper_id": pid, "gsis_id": gsis, "name": p.get("full_name"), "pos": pos, "team": p.get("team")},
@@ -257,7 +262,8 @@ def _q(d, q):
     return "—" if not d else f"{d['quantiles'][q]:.1f}"
 
 
-def markdown(league, season, wk, p, o, pos, out_pos, away, home, base, scen, obs, mk, gate, m, notes) -> str:
+def markdown(league, season, wk, p, o, pos, out_pos, away, home, base, scen, obs, mk, gate, m, notes,
+             out_in_base: bool = True) -> str:
     pn, on = p.get("full_name"), o.get("full_name")
     L = [f"# {pn} if {on} is out -- {away}@{home}, {season} week {wk}", "",
          f"*League scoring: {league}. {gate.line().replace('LEAGUE DATA GATE', 'Scoring check')}*", ""]
@@ -270,11 +276,13 @@ def markdown(league, season, wk, p, o, pos, out_pos, away, home, base, scen, obs
             L.append(f"| {lab} | {d['mean']:.1f} | {_q(d, 0.1)} | {_q(d, 0.25)} | {_q(d, 0.5)} | {_q(d, 0.75)} | "
                      f"{_q(d, 0.9)} | {d['p_td']:.0%} |")
         L += ["", f"**Change: {scen['mean'] - base['mean']:+.1f} points** ({(scen['mean'] / base['mean'] - 1) if base['mean'] else 0:+.0%})."]
-        if (o.get("injury_status") or "") in ("Out", "Doubtful", "IR"):
-            L += ["", f"**{on} is already {o.get('injury_status')} on the injury report, so the engine's as-posted run "
-                  f"already prices the game WITHOUT him.** Both rows are the no-{on} game and the change is zero by "
-                  "construction -- not evidence that his absence does not matter. The engine has no with-him "
-                  "number here; the observed and market rows below are the comparison."]
+        if not out_in_base:
+            tag = o.get("injury_status")
+            L += ["", f"**The engine's as-posted run already leaves {on} out**"
+                  + (f" (he is {tag} on the injury report)" if tag else "")
+                  + f", so both rows price the no-{on} game and the change is zero by construction -- not evidence "
+                  "that his absence does not matter. The engine has no with-him number here; the observed and "
+                  "market rows below are the comparison."]
         if out_pos == "QB":
             L += ["", "**PROVISIONAL.** The absence rule moves targets and carries between teammates; it was not tuned "
                   "for a quarterback, whose absence changes the team's passing volume and efficiency as well. "

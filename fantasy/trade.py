@@ -179,6 +179,7 @@ def run(league: str, give: list[str], get: list[str], back: list[str] | None = N
     from manager.context import state_dir
     from manager.store import Store
     con, con_notes = WV._consensus(ctx, league, view.season, Store(state_dir(), read_only=True))
+    WV.record_consensus_failures(m, con_notes)
     rate = {p: v["mean"] / WV.SEASON_GAMES for p, v in con.items()}
     upside = {p: max((v.get("per_source") or {}).values(), default=v["mean"]) / WV.SEASON_GAMES
               for p, v in con.items()}

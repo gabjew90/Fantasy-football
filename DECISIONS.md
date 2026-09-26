@@ -6041,3 +6041,49 @@ in the manifest, so the command table does not show it; kickoff times and
 lock order in the lineup report (rule 8 needed the scoreboard by hand);
 start weeks per waiver add. No props engine change.
 
+## 2026-09-26 (114) -- lock order, start weeks, a failed consensus source in the log; the review rule written down
+
+The three items #113 left open, at the user's go-ahead:
+
+- **Lock order in the lineup report's injury watch.** Each row now says when
+  the designation settles (the inactive list, 90 minutes before that team's
+  kickoff, in Pacific time) and which of the user's players AT THE SAME
+  POSITION lock before then -- the players he would swap in. Live, Omnibeta
+  week 3: Ferguson (Puka Nacua Doubtful) settles Sun 3:50 PM PT; Harold
+  Fannin locks Sun 10:00 AM PT -- the choice comes before the news. The first
+  draft listed the whole roster, defence included; position-matched is the
+  answer to the question.
+- **Start weeks per season waiver add.** `season_gain` can report the weeks
+  a player is in the best lineup; the season table gets a "Starts (weeks)"
+  column ("5, 8, 11, 13-14" for Brenton Strange's +14.4), so a season gain
+  can be checked against the bye weeks it fills.
+- **A consensus source that could not be read** (FantasyPros refuses the chat
+  container) is now a FAILED input in the waiver and trade manifests, so the
+  session log's command table shows it; before, it was only a note.
+
+And the user's standing rule, now in CLAUDE.md: a code review after every
+major piece of work, before its PR merges, not skipped for small or chat-only
+changes. PRs #77-#84 merged without one; they are reviewed together with this
+change before it merges.
+
+**The review (#77-#84 plus this change), six findings, all fixed:**
+- **Partial games mis-flagged a role that GREW.** Measured against all other
+  weeks, a backup who took over (25%, 30%, 85%, 90%) had weeks 1-2 marked as
+  exits, and rule 8 would have had chat dismiss the change. A week is now a
+  partial game when it dips under 60% of the level ALREADY ESTABLISHED (the
+  median of earlier weeks); week 1 is never marked. Moore's week 2 is still
+  marked (31% after 77%).
+- **A teammate placed on IR this week was filtered out** with the long-term
+  IR list. An IR/PUP teammate whose Sleeper news is under 7 days old is
+  watched (and gets the scenario command). Heuristic: news recency also
+  admits a long-term IR player who happens to be in the news (live: Jonathon
+  Brooks) -- one extra row beats a missed absence.
+- **The scenario's already-out note** followed Sleeper's status; it now
+  follows the engine: shown only when the as-posted run did not price the
+  teammate (the engine reads the nflverse injury report, which can lag).
+- **`nfl.py log`** reads its parts tolerating a stray byte.
+- **A failed consensus source** is matched on consensus.py's exact wording
+  ("<source>: <source> unavailable (<error>)"), commented there as
+  load-bearing, not on any note containing "unavailable".
+- A test for the rising snap series.
+

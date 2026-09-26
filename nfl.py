@@ -134,11 +134,11 @@ def session_report(out: Path) -> Path:
         p = out / name
         if not p.exists():
             return None
-        text = p.read_text(encoding="utf-8").strip()
+        text = p.read_text(encoding="utf-8", errors="replace").strip()      # a stray byte must not cost the log
         # a part's own headings sit one level under this file's sections
         return "\n".join("#" + ln if nest and ln.startswith("#") else ln for ln in text.splitlines())
 
-    raw = read("nfl_session_log.jsonl") or ""
+    raw = read("nfl_session_log.jsonl") or ""                           # (read() tolerates a stray byte)
     rows = []
     for line in raw.splitlines():
         try:

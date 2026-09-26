@@ -17,10 +17,18 @@
 ## Engineering
 - Windows host: file I/O is always `encoding="utf-8"`; console output goes
   through the UTF-8 reconfigure in cli.main.
-- Tests run with `venv/Scripts/python.exe -m pytest tests -q` and must pass
-  before any merge to main. Reports in `reports/` are generated artifacts.
-- The in-season auto-manager (`manager/`) runs on GitHub Actions; its state
-  lives in committed `state/*.json`. Delivery is GitHub Issues.
+- Tests run with `venv/Scripts/python.exe -m pytest tests props/tests -q` and
+  must pass before any merge to main. Reports in `reports/` are generated
+  artifacts.
+- **A code review after every major piece of work, before its PR merges.**
+  Run the code-review skill (high) on the branch diff, report the findings,
+  fix them or say why not, and re-report their outcomes. A run of small
+  follow-up PRs is reviewed together at the latest when the run ends. The
+  user's standing rule (2026-09-26): it is not skipped for being a "small"
+  or "chat-only" change.
+- The in-season auto-manager (`manager/`) has NO schedule since 2026-09-25
+  (the user's call, DECISIONS #109): `weekly.yml` and `gate.yml` run only when
+  dispatched by hand. `props.yml` is the only scheduled workflow.
 - Engine changes ship behind the validation loop in
   docs/plans/2026-08-29-draft-engine-v2-plan.md — CLV, historical sim,
   input accuracy. Self-graded boards validate nothing.

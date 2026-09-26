@@ -124,3 +124,26 @@ def test_a_team_behind_stands_pat_only_when_no_add_clears_the_threshold():
     ranked, _ = WV.rank_adds(rows, "season", contender=True)
     assert [r["add"] for r in ranked] == ["henry", "strange", "sutton"], "a contender ranks by gain"
 
+
+def test_the_season_gain_says_which_weeks_the_add_starts():
+    from fantasy import waiver as WV
+    rates = {"a": 10.0, "b": 8.0, "bench": 2.0}
+    pos = {"a": "WR", "b": "WR", "bench": "WR", "add": "WR"}
+    team = {"a": "AAA", "b": "BBB", "bench": "CCC", "add": "DDD"}
+    starts = []
+    WV.season_gain(dict(rates, add=7.0), pos, team, {"WR": 2}, [], [3, 4, 5, 6], {"AAA": {5}},
+                   drop="bench", starts_of="add", starts=starts)
+    assert starts == [5], "he starts only in the week the WR1 is on bye"
+    assert WV.week_spans([3, 4, 5, 9, 11, 12]) == "3-5, 9, 11-12" and WV.week_spans([]) == "none"
+
+
+def test_an_unreachable_consensus_source_is_a_failed_input():
+    from core.manifest import Manifest
+    from fantasy import waiver as WV
+    m = Manifest("t")
+    WV.record_consensus_failures(m, ["fantasypros: fantasypros unavailable (HTTPError)", "consensus over 2 live sources",
+                                     "espn: DB could not be fitted (data unavailable for DB)"])
+    assert m.get("espn (rest-of-season consensus)") is None, "only the exact failure wording counts"
+    e = m.get("fantasypros (rest-of-season consensus)")
+    assert e["status"] == "failed" and "HTTPError" in e["detail"]
+
