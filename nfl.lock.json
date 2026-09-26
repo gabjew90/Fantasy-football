@@ -1,8 +1,8 @@
 {
  "algorithm": "nfl-release-sha256-lf-1",
- "file_count": 180,
+ "file_count": 183,
  "files": {
-  "CHAT.md": "e0aa78ae9ec973e38cbb51a85d4b6d65fc935c6cc6066e547499f68ae3a1968c",
+  "CHAT.md": "0d439b921516f00c1adb0e6f87613258b58654abd9bf1141d301547e0d4657e6",
   "config.yaml": "7e7e2de6f52d3bbf13c0d7c6850ea6925a2d279fa714546e48b26ec3354f695e",
   "core/__init__.py": "8ac9ed217e439f5828616ab66ec9ff17336c2cbbbeae391d0f9bfa001eaed571",
   "core/fetch.py": "95fc16bbd91a3a19086c8c2f64c9d101abc85baae2452c1ed778c84a21f9ad33",
@@ -73,18 +73,20 @@
   "draftkit/web_page.py": "a143436ae8dcb05bfd8688e73a1549bbfed2956f8741c8d081d8edf8393bc290",
   "draftkit/weekly.py": "99679db994cd1c9ff0105f1b457fc5b0280a6cc13ac8befd9ef24b3206accb39",
   "fantasy/__init__.py": "22a9c23933fd14cf889e14c0074513fd328948e5d1cae46f4947a606dadcefe4",
+  "fantasy/ask.py": "2c663660532b62eadfb1274492ddad5e2c2cbd3149c3d10561837ad16ce61121",
   "fantasy/contract.py": "719ef72a5f354627fe2e6112e7b532b69927a7a154e5a8eefae073cdc1f8163b",
   "fantasy/dispersion.py": "a380d0efe71d385c3b4916c167d61103182944ba14eb11bd49076b2972944fdb",
   "fantasy/environment.py": "58621d274bf7fafa7531d2bbbbd70e23ffde36ae4163427d4d15fb449711099b",
   "fantasy/evidence.py": "3229f153177b327170fe3219a8502d524af80b77aa7c77884319af313283fe97",
   "fantasy/gate.py": "2dbe8838c32ac03704c155067a3b2f197932fa0d8ec29be6d015485f917f7e93",
   "fantasy/league.py": "13484f01390a4e7b63dfc5f886dbb5ab4a79d486a3c7d93ceacd793c88d454c2",
-  "fantasy/lineup.py": "254df49b76dd31a36f7b7db84e300200858057a8b801dc11070d5716f590c431",
+  "fantasy/lineup.py": "0fbf886e812dc3197804481046099fc7f21a6585761e7fb500c043e3d9f597d8",
   "fantasy/resources/dispersion_v0.keefamania.json": "9daca0c1686d057506ac63f5dfddb28a5aa419babc0313a0310cceb10baa2d6b",
   "fantasy/resources/dispersion_v0.omnibeta.json": "2dcfcc9f2bf56fe51d1f1f2fefb60014af913fa0507c23a9587f6e6bc8aac0fe",
   "fantasy/resources/market_shape_params.json": "a9250ef44c98538a5f2dd6a49c342aeaee0633028701bf33d03c7082285d6c8e",
   "fantasy/resources/noise_bands_v0.json": "f907f5065b4d6f16b8b4f1e9fdb82bb5cce78864294abf0f475f6db8aa3618fe",
   "fantasy/scenario.py": "7edd05299ec6646658a90a2812f8ec1836dcd3fa851c7c0c0277ba1e6e62f6b5",
+  "fantasy/snapshot.py": "58e2653b8c1bf786666425c6455347031020f2c3faecf51a4973b5edaefa8597",
   "fantasy/sources/__init__.py": "8af3e9471cfda72f6c3ad11096323fa7d96632bd9634eeb8742c741a16885862",
   "fantasy/sources/market_points.py": "f18efb522e936243661f60f40e3fd4ab51474788175c7d92c4e8d78f81c4d7b2",
   "fantasy/sources/sleeper_weekly.py": "aa17feebc8f391a96b12cc1b1b2da78ba66b3fbb8fa25b6ab0bb26724268bae9",
@@ -126,7 +128,8 @@
   "manager/yahoo_api.py": "4a101f7aa12033a3000430a4acdf186800d77c235bf34da5bbc40293abc7024e",
   "manager/yahoo_context.py": "0aa541b5c73457d09f4aa3bbfdda14d66d8051835370073fb9f2a12f57f9ab34",
   "manager/yahoo_sync.py": "3ea0dba0ea5b03e561952cbdd2b40eba7b9a7c328691258915b7c29aadc54b90",
-  "nfl.py": "bb61728002ac256a02e3537d49fe6d66f96321204b0930e22ae188b515b69a74",
+  "nfl.py": "a12e40e7c2c22be1cec9b1f9897688c62c6ab3f288894c3bd4f853a9c5a61d77",
+  "props/ask.py": "4d2151b5adbc2ef220b4df7613255c6909348e175730b6bc8be36a4402dad1bc",
   "props/engine/SKILL.md": "6e2891c663006b5428fa8d950a76af21481a1b9089f70cb96391ca2306c29bf6",
   "props/engine/resources/calibration_2025.csv": "47e3922c7af818307831d70a3d2be4333200f3aee1d94dc6bbf6e0e9ccee4ac8",
   "props/engine/resources/data_source_matrix.md": "2088a5ebe6164a75c11331367fda734d4b10ea217704320321a3f2aec6bb9c2b",
@@ -183,6 +186,6 @@
   "tiers.csv": "04a1a79d43e9f2445ba3dc4ea262b00fbd58efea1f41e8b0393cb4c7f8afee41",
   "tiers.keefamania.csv": "11e6546b56caa807a572da86d5c3d81097bafd2d2550e25653882d78b2962e94"
  },
- "sha256": "ec0700cf84a298532e32f766bd4d70eee1601107433b3b5a63c5b3fa952b9c83",
- "tag": "nfl-v1.15"
+ "sha256": "b7536be20cd72cdaf2b5c36c250a161c0463cfbac5761f1b9193581bac0f4402",
+ "tag": "nfl-v1.16"
 }
