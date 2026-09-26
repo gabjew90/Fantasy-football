@@ -376,3 +376,16 @@ def test_a_stray_byte_does_not_cost_the_log(tmp_path):
     text = nfl.session_report(tmp_path).read_text(encoding="utf-8")
     assert "lineup?" in text
 
+
+
+def test_chat_talks_like_a_person_and_keeps_the_hard_lines():
+    """The user, 2026-09-26: the data is solid but the answers are rigid --
+    chat should use the engine as a tool and answer flexibly."""
+    chat = (ROOT / "CHAT.md").read_text(encoding="utf-8")
+    for voice in ("the engine is your tool, the voice is yours", "Lead with the call",
+                  "Caveats only when they change the call", "The release is recorded, not recited"):
+        assert voice in chat, voice
+    for hard in ("Never invent an engine number", "Never make a close call sound clear",
+                 "Injuries are checked BEFORE a start/sit answer", "Answer in the reply, not in a file"):
+        assert hard in chat, hard
+    assert "The gate line comes first" not in chat and "First line names the release" not in chat
