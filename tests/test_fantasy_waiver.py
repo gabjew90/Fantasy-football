@@ -105,3 +105,22 @@ def test_the_lineup_report_states_the_record_unmistakably():
     assert "2nd of 12" in record_line({"record": "3-0", "rank": 2, "teams": 12, "unavailable": False})
     assert "11th of 12" in record_line({"record": "0-3", "rank": 11, "teams": 12, "unavailable": False})
     assert "not available" in record_line({"record": "0-0", "rank": None, "teams": 12, "unavailable": True})
+
+
+def test_a_team_behind_stands_pat_only_when_no_add_clears_the_threshold():
+    """Keefamania, 2026 week 3: the upside leader added +0.7 while five other
+    adds cleared +5, and the report said STAND PAT."""
+    from fantasy import waiver as WV
+    rows = [{"add": "sutton", "drop": "ej", "gain": 0.7, "ros_upside": 20.0},
+            {"add": "henry", "drop": "ej", "gain": 7.4, "ros_upside": 12.0},
+            {"add": "strange", "drop": "ej", "gain": 6.9, "ros_upside": 13.0},
+            {"add": "nobody", "drop": None, "gain": 9.0, "ros_upside": 30.0}]
+    ranked, stand_pat = WV.rank_adds(rows, "season", contender=False)
+    assert not stand_pat
+    assert [r["add"] for r in ranked] == ["strange", "henry", "sutton"], \
+        "adds that clear come first, by upside among them; no cut, no add"
+    ranked, stand_pat = WV.rank_adds([rows[0]], "season", contender=False)
+    assert stand_pat and ranked[0]["add"] == "sutton"
+    ranked, _ = WV.rank_adds(rows, "season", contender=True)
+    assert [r["add"] for r in ranked] == ["henry", "strange", "sutton"], "a contender ranks by gain"
+

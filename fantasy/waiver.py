@@ -284,12 +284,7 @@ def run(league: str, positions=("RB", "WR", "TE"), horizon: str = "season", week
         r["cause"] = None if not cause else ", ".join(
             f"{(info.get(inv.get(x)) or {}).get('name') or (players.get(inv.get(x)) or {}).get('full_name') or x}"
             f" ({(players.get(inv.get(x)) or {}).get('injury_status') or 'active'})" for x in cause.split(","))
-    # a team behind ranks season adds by rest-of-season UPSIDE (the most optimistic
-    # source's rate), not this week's p90, which an injured stash reads as zero
-    key = (lambda r: -r["gain"]) if horizon == "stream" or stand["contender"] else \
-        (lambda r: -r["ros_upside"])
-    ranked = sorted([r for r in rows if r["gain"] > 0.05 and r["drop"]], key=key)
-    stand_pat = not ranked or ranked[0]["gain"] < STAND_PAT[horizon]
+    ranked, stand_pat = rank_adds(rows, horizon, stand["contender"])
 
     md = markdown(league, view, horizon, positions, stand, gate, ranked, drops, protected, projs, ev, info,
                   rate, stand_pat, m, notes + con_notes)
@@ -319,6 +314,22 @@ def _pct(v):
     return "—" if v is None else f"{100 * v:.0f}%"
 
 
+def rank_adds(rows: list[dict], horizon: str, contender: bool) -> tuple[list[dict], bool]:
+    """(ranked adds, stand pat?). Only adds that improve the lineup and come
+    with a cut are ranked. A team behind ranks season adds by rest-of-season
+    UPSIDE (the most optimistic source's rate) -- not this week's p90, which
+    an injured stash reads as zero -- but only AMONG THE ADDS THAT CLEAR THE
+    THRESHOLD, which come first; stand pat means no add clears it. (The first
+    version tested only the upside leader's gain: Keefamania, 2026 week 3,
+    printed STAND PAT on Courtland Sutton's +0.7 while its own table held five
+    tight ends above +5.)"""
+    limit = STAND_PAT[horizon]
+    key = (lambda r: -r["gain"]) if horizon == "stream" or contender else (lambda r: -r["ros_upside"])
+    ranked = sorted([r for r in rows if r["gain"] > 0.05 and r["drop"]],
+                    key=lambda r: (r["gain"] < limit, key(r)))
+    return ranked, (not ranked or ranked[0]["gain"] < limit)
+
+
 def markdown(league, view, horizon, positions, stand, gate, ranked, drops, protected, projs, ev, info,
              rate, stand_pat, m, notes) -> str:
     unit = "P(win) this week" if horizon == "stream" else "season points added (weeks he would start)"
@@ -334,9 +345,9 @@ def markdown(league, view, horizon, positions, stand, gate, ranked, drops, prote
     if stand_pat:
         limit = (f"{STAND_PAT[horizon] * 100:g} percentage point of this week's P(win)" if horizon == "stream"
                  else f"{STAND_PAT[horizon]:g} season points")
+        best = max(ranked, key=lambda r: r["gain"]) if ranked else None
         L += [f"**STAND PAT -- DO NOT CUT.** No add improves the lineup by the threshold ({limit})"
-              + (f"; the best, {_n(ranked[0]['add'], info)}, adds {_gain(ranked[0], horizon)}."
-                 if ranked else "."), ""]
+              + (f"; the best, {_n(best['add'], info)}, adds {_gain(best, horizon)}." if best else "."), ""]
     L += [f"## Adds, ranked ({unit})", "",
           "| Add | Drop | Gain | " + ("Playoff wks | " if horizon == "season" else "") +
           "This week (mean / p10 / p90) | ROS rate | Snap % | Tgt / carry share | Role | Why the role changed |",
