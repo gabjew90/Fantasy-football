@@ -6218,3 +6218,51 @@ conditional; an ASSUMPTION the engine made (missed weeks, a return week, a
 provisional part) is always stated; a fallback or unverified release goes at
 the top of every reply that session.
 
+
+## 2026-09-26 (119) -- question tools: chat composes answers from small commands, not reports (nfl-v1.16)
+
+The user, after #118: "Do you really need to make a report? Shouldn't you
+give the chat the right tools and analysis at its disposal?" Right: #118
+fixed the voice, but every chat command still built a whole report (seven
+to ten seconds, one shape) and chat read an answer out of it. A question
+like "Fannin or Ferguson?", "what if I start Kraft?", "chance Kelce gets 60?"
+had no command of its own.
+
+Built (repo only; no engine change, no new kind of number):
+- fantasy/snapshot.py -- the league read once per chat session: every
+  roster, every player on an NFL team with this week's weekly_blend_v0
+  projection and range, the scoreboard, and the data gate as it stood. JSON
+  in a session cache ($NFL_CACHE, else the temp dir -- never $NFL_OUT, the
+  folder the user downloads from), reused for 20 minutes; `--fresh` re-reads; a broken
+  file is rebuilt, never trusted. A follow-up takes about a second.
+- fantasy/ask.py -- `fantasy player` (one or more players: owner, game,
+  status with FantasyPros practice and when it settles vs who locks first,
+  projection and range, usage and role, designated teammates; two or more
+  add the winprob head-to-head), `fantasy swap` (P(win) against the lineup
+  actually SET, never moving a locked player; without --bench every legal
+  seat, best first), `fantasy roster` (mine, the opponent's, any manager's).
+  A partial name resolves only when unique -- or when exactly one match is
+  on the user's roster, then with a note naming the others.
+- props/ask.py -- `props player` (every line priced for him, the engine's
+  call and thresholds, his TD row as model/market/blend, the 'if he's out'
+  scenario runs, fantasy points, the report's own paragraph on him),
+  `props line` (any line off the ladder; whole numbers carry the push; a
+  line the ladder lacks is bracketed, never interpolated), `props best`
+  (the card in the engine's order, game or slate, or the survival picks),
+  `props matchup` (the report's game frame). It runs score_game for the
+  player's game when no run under 20 minutes exists, into one cache dir with
+  one shared workdir, and READS the files the engine writes -- it computes
+  no probability.
+- The engine's honesty rules travel with the numbers: every props answer
+  prints the `Rule:` lines that apply (no market tested against posted
+  lines -- with the harness's calibration stated so it is not called a
+  guess; TD: no fair odds, blend vs market; v0 fallback runs low; new team;
+  Questionable priced as playing; WEAK/large gap = the book knows
+  something). CHAT.md: follow every rule, say one when it bears on the reply.
+- CHAT.md routes questions to the tools first; the reports stay for the
+  whole decision (set my lineup, waivers, trades, a full game or slate).
+- skill/release.py ships props/ask.py (it lives outside props/engine/), and a
+  test fails when nfl.py imports a module the release leaves out.
+
+Kept, deliberately: the four fantasy commands and the props guide are
+unchanged (the scheduled runs, the ledger and the tests depend on them).

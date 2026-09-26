@@ -36,7 +36,8 @@ LOCK_NAME = "nfl.lock.json"
 # they read. Not reports, state, tests, docs or the draft spreadsheets.
 INCLUDE_DIRS = ("core/", "fantasy/", "draftkit/", "manager/", "props/engine/", "leagues/")
 INCLUDE_FILES = ("CHAT.md", "nfl.py", "config.yaml", "requirements.txt", "tiers.csv", "tiers.keefamania.csv",
-                 "data/processed/absence_bands.json")
+                 "data/processed/absence_bands.json",
+                 "props/ask.py")        # the props question tools: outside the engine, read its output files
 INCLUDE_GLOBS = ("data/external/*.csv",)
 EXCLUDE_PARTS = ("__pycache__", "backtest_out")
 EXCLUDE_SUFFIXES = (".pyc", ".pyo", ".env", ".pkl", ".tmp", ".part")
