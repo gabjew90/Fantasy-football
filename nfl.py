@@ -198,12 +198,31 @@ def _session_log(argv, rc, err, seconds, result) -> None:
             return
         out = Path(os.environ.get("NFL_OUT", "/mnt/user-data/outputs"))
         out.mkdir(parents=True, exist_ok=True)
+        # THE RELEASE. nfl.lock.json is not part of a release (it describes
+        # one), so inside chat the tag comes from the bootstrap's stamp; a
+        # checkout still has the lock.
+        s = json.loads(stamp.read_text(encoding="utf-8")) if stamp.exists() else {}
         lock = ROOT / "nfl.lock.json"
-        release = json.loads(lock.read_text(encoding="utf-8")).get("tag") if lock.exists() else None
-        setup = {}
-        if stamp.exists():
-            s = json.loads(stamp.read_text(encoding="utf-8"))
-            setup = {k: s.get(k) for k in ("release_source", "deps", "yahoo", "odds_key", "fallback_reason")}
+        release = (s.get("release_tag") or s.get("lock_tag")
+                   or (json.loads(lock.read_text(encoding="utf-8")).get("tag") if lock.exists() else None))
+        setup = {k: s.get(k) for k in ("release_source", "yahoo", "odds_key", "fallback_reason")} if s else {}
+        # packages as they are NOW, not as the bootstrap found them: chat may
+        # install one after setup, and a stale "missing" misleads the audit
+        import importlib.util
+        mods = {"pandas": "pandas", "numpy": "numpy", "polars": "polars", "rapidfuzz": "rapidfuzz",
+                "yaml": "PyYAML", "requests": "requests", "dotenv": "python-dotenv", "nflreadpy": "nflreadpy"}
+        gone = [pip for mod, pip in mods.items() if importlib.util.find_spec(mod) is None]
+        setup["deps_at_setup"] = s.get("deps")
+        setup["deps_now"] = "ok" if not gone else "missing: " + ", ".join(gone)
+        # the chat container brings its own pandas/numpy (the bootstrap does not
+        # force this repo's pins), and a newer pandas can behave differently
+        from importlib import metadata as _md
+        setup["versions"] = {}
+        for dist in ("pandas", "numpy", "polars"):
+            try:
+                setup["versions"][dist] = _md.version(dist)
+            except _md.PackageNotFoundError:
+                setup["versions"][dist] = None
         rec = getattr(result, "record", None) or {}
         line = {"at_utc": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"), "release": release,
                 "argv": list(argv), "exit": rc, "seconds": round(seconds, 1), "error": err, "setup": setup,
