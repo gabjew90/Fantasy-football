@@ -6087,3 +6087,20 @@ change before it merges.
   load-bearing, not on any note containing "unavailable".
 - A test for the rising snap series.
 
+## 2026-09-26 (115) -- can chat reach FantasyPros? a check before any rebuild
+
+Chat is refused (HTTP 403) by FantasyPros' KEYLESS partner feed every
+session, so its rest-of-season consensus runs on two sources. FantasyPros'
+official API takes the user's key -- held only in the GitHub secrets -- and
+would also bring what chat has been web-searching: practice participation and
+game-status probabilities. Keys cannot live in the public repo, so a new key
+is the one change that needs the chat skill rebuilt (code never does; the
+user asked, and was told so). Before asking for that rebuild,
+`nfl.py status --probe-sources` (`core/probe.py`) tells which it would be: an
+API that is REACHED and refuses for the missing key (a key fixes it), a bot
+wall -- an HTML block page -- or no connection (a key does not). No key is
+sent or read; only whether one is set. Rows go into the session log.
+Baseline from the user's machine: the partner feed answers; the API answers
+403 as data, not a block page -- so chat's 403 on the feed is about the chat
+environment, and the API question is what chat's own run settles.
+
