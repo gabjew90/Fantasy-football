@@ -104,19 +104,27 @@ def cmd_props(a) -> int:
             elif a.what == "line":
                 if len(a.args) < 3:
                     raise PA.AskError('props line needs NAME STAT LINE, e.g. "Travis Kelce" "rec yds" 60.5')
-                r = PA.line(a.args[0], " ".join(a.args[1:-1]), float(a.args[-1]), season=a.season, week=a.week,
+                try:
+                    value = float(a.args[-1])
+                except ValueError:
+                    raise PA.AskError(f"'{a.args[-1]}' is not a line; props line needs NAME STAT LINE, "
+                                      'the name in quotes: "Travis Kelce" "rec yds" 60.5') from None
+                r = PA.line(a.args[0], " ".join(a.args[1:-1]), value, season=a.season, week=a.week,
                             game=a.game, fresh=a.fresh)
             elif a.what == "best":
                 r = PA.best(a.game or (a.args[0] if a.args else None), slate=a.slate, market=a.market or None,
                             n=a.n, survival=a.survival, season=a.season, week=a.week, fresh=a.fresh)
             else:
                 r = PA.matchup(a.game or (a.args[0] if a.args else ""), season=a.season, week=a.week, fresh=a.fresh)
-        except (PA.AskError, ValueError) as ex:
+        except PA.AskError as ex:            # only the tool's own refusals: anything else is a bug, and raises
             print(f"ASK: {ex}", file=sys.stderr)
             return 2
         a._result = r
         print(r.render(a.json), end="")
         return 0
+    if len(a.args) > (1 if a.what == "game" else 0):
+        print(f"props {a.what}: unexpected arguments {' '.join(a.args)}", file=sys.stderr)
+        return 2
     a.game = a.game or (a.args[0] if a.args else None)
     if a.what == "game":
         if not a.game or "@" not in a.game:
@@ -138,6 +146,11 @@ def cmd_props(a) -> int:
 
 
 def cmd_fantasy(a) -> int:
+    if a.names and a.what != "player":
+        # a name only `player` reads would otherwise be ignored in silence
+        print(f"fantasy {a.what}: unexpected arguments {' '.join(a.names)} (names go in --player/--start/--give...)",
+              file=sys.stderr)
+        return 2
     if a.what in ("player", "swap", "roster"):
         from fantasy import ask as FA
         from fantasy import snapshot as SN

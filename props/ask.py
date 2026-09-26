@@ -144,7 +144,14 @@ def price_game(season: int, week: int, away: str, home: str, *, fresh: bool = Fa
            "--season", str(season), "--week", str(week), "--workdir", str(d / "work")]
     r = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace",
                        env={**os.environ, "NFL_OUT": str(d)})
-    if r.returncode != 0 or not log.exists() or (age is not None and _age_min(log) >= age):
+    wrote = log.exists() and (age is None or _age_min(log) < age)
+    if r.returncode == 0 and not wrote:
+        # the engine writes its shadow log only when a book posted lines: a
+        # clean run without one is "nothing posted", not a failure -- and an
+        # older log beside it is out of date, so it is never served
+        raise AskError(f"no book has posted player props for {away}@{home} yet (the engine ran and priced "
+                       "nothing); `nfl.py status` shows how many lines each game has")
+    if r.returncode != 0:
         tail = (r.stderr or r.stdout or "").strip().splitlines()[-3:]
         raise AskError(f"the engine could not price {away}@{home} (exit {r.returncode}): " + " / ".join(tail)[:400])
     return {"slug": s, "dir": d, "age_min": _age_min(log), "ran": True}
@@ -279,17 +286,19 @@ def team_of(name: str) -> tuple[str, str]:
     game in the cache names yet."""
     from core import fetch as F
     players = json.loads(F.sleeper_players().read_text(encoding="utf-8"))
-    rows = {}
+    rows: dict[str, list[str]] = {}          # full name -> the team of EVERY active player holding it
     for p in players.values():
         if p.get("team") and p.get("position") in ("QB", "RB", "WR", "TE") and p.get("active"):
-            rows.setdefault(p.get("full_name") or "", p.get("team"))
+            rows.setdefault(p.get("full_name") or "", []).append(p.get("team"))
     hits = match(name, list(rows))
     if not hits:
         raise AskError(f"no active QB/RB/WR/TE named '{name}'")
-    if len(hits) > 1:
+    both = [(h, t) for h in hits for t in rows[h]]
+    if len(both) > 1:
         raise AskError(f"'{name}' matches more than one player: "
-                       + ", ".join(f"{h} ({rows[h]})" for h in hits[:6]) + ". Use the full name.")
-    return hits[0], rows[hits[0]]
+                       + ", ".join(f"{h} ({t})" for h, t in both[:6])
+                       + ". Use the full name, and --game AWAY@HOME when two share it.")
+    return both[0]
 
 
 def locate(name: str, season: int, week: int, game: str | None, fresh: bool) -> tuple[dict, dict, str]:
@@ -297,11 +306,14 @@ def locate(name: str, season: int, week: int, game: str | None, fresh: bool) -> 
     if game:
         away, home = parse_game(game)
     else:
-        # a game already priced this session that names him
+        # a game already priced this session that names him -- by his FULL
+        # name only: a partial one ("Williams") matching the one game priced
+        # so far says nothing about the fifteen that are not, so it goes to
+        # the league-wide lookup, which lists every match
         found = []
         for p in sorted(root().glob(f"player_params_{season}_wk{week:02d}_*.csv")):
             pp = _safe_csv(p)
-            if pp is not None and match(name, pp["name"].astype(str).tolist()):
+            if pp is not None and norm(name) in {norm(x) for x in pp["name"].astype(str)}:
                 found.append(p.stem.split(f"_wk{week:02d}_", 1)[1])
         if len(found) == 1:
             away, home = found[0].split("_", 1)
@@ -521,8 +533,9 @@ def best(game: str | None = None, *, slate: bool = False, market: str | None = N
         C = _csv(run["dir"], name)
         if C is None or C.empty:
             raise AskError(f"the slate run wrote no {'survival picks' if survival else 'card rows'}")
-        if mk and "prop" in C:
-            C = C[C.prop == mk]
+        if mk:
+            # the market column: a survival row's 'prop' is "Under 2.5 catches"
+            C = C[C["market"].map(LABEL) == mk] if "market" in C else C[C["prop"] == mk]
         C = C.head(n)
         summ = run["dir"] / f"slate_summary_{season}_wk{week:02d}.md"
         # the engine's slate-wide single pick heads a survival answer; a card
@@ -532,7 +545,7 @@ def best(game: str | None = None, *, slate: bool = False, market: str | None = N
         data = {"scope": "slate", "survival": survival, "rows": C.to_dict("records"), "headline": head}
         L = [f"{season} week {week} slate -- run {run['age_min']:.0f} min old"
              + ("" if run["ran"] else "; `--fresh` re-prices every game (minutes)")] + ([head] if head else []) + [""]
-        L += [_row_text(r) for r in C.to_dict("records")]
+        L += [_row_text(r) for r in C.to_dict("records")] or ["- no rows" + (f" for {mk}" if mk else "")]
         if survival:
             L += ["", "Rule: a must-win pick maximises P(win) at a juiced price -- bad EV on its own; Sleeper needs "
                       "2+ legs; an alternate line two units past the median beats any posted line for this "

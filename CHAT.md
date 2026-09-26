@@ -175,8 +175,12 @@ A narrower question ("is the Kelce over any good?", "chance he gets 60
 yards?", "best bet in this game?") goes to the question tools, and gets a
 direct answer in the same conversational voice as a fantasy answer. They
 carry the engine's rules with their numbers (the `Rule:` lines), so the
-engine's contract below is not needed for them. Its full "prop guide"
-structure is for a full game breakdown or a slate:
+engine's contract below is not needed for them. That includes a narrow
+SLATE question -- the best play this week, a must-win pick, the top catches
+unders: `props best --slate` answers it, its rows already in the engine's
+order (never re-sort or re-rank them yourself). The engine contract's "the
+reply is slate_summary reproduced in full" is for a request for the slate
+as a whole, and so is its full "prop guide" structure for one game:
 
 ```bash
 export ENGINE_DIR="$REPO_DIR/props/engine"

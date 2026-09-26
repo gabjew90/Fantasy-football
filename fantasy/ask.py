@@ -139,7 +139,10 @@ def projection(snap: Snapshot, sid: str) -> dict:
            "p10": _r(p.q(0.10)), "p25": _r(p.q(0.25)), "p50": _r(p.q(0.50)), "p75": _r(p.q(0.75)), "p90": _r(p.q(0.90)),
            "sleeper": _r(d.get("sleeper")), "market": _r(d.get("market")), "market_partial": d.get("market_partial"),
            "market_weight": d.get("market_weight"), "zero_reason": d.get("zero_reason"), "flag": d.get("flag"),
-           "final": bool(d.get("final")), "projected_before_kickoff": _r(d.get("projected"))}
+           "final": bool(d.get("final")), "projected_before_kickoff": _r(d.get("projected")),
+           # dispersion_v0's own warnings for this position (a percentile that
+           # missed on the test season): an assumption the range rests on
+           "range_caveats": d.get("range_caveats") or None}
     return {k: v for k, v in out.items() if v is not None}
 
 
@@ -393,13 +396,12 @@ def _baseline(snap: Snapshot) -> tuple[list, str]:
 
 
 def _opponent(snap: Snapshot) -> tuple[list, str]:
-    if snap.opp_rid is None:
-        return [], "no opponent this week"
-    t = snap.teams[snap.opp_rid]
-    best = _best(snap, t["players"])
-    if len(t["starters"]) >= len(best):
-        return list(t["starters"]), "the lineup they have set"
-    return best, "their best-by-mean lineup (they have not set a full one)"
+    """The lineup command's own rule (lineup.opponent_lineup), sized by MY
+    best lineup as it is there."""
+    t = snap.teams.get(snap.opp_rid) or {"players": [], "starters": []}
+    return LU.opponent_lineup(snap.opp_rid is not None, t["players"], t["starters"],
+                              len(_best(snap, snap.my_players)), snap.info, snap.projections,
+                              snap.slots, snap.flex_slots)
 
 
 def _best(snap: Snapshot, pids) -> list:
@@ -475,6 +477,8 @@ def _player_lines(r: dict) -> list[str]:
                     else f"; market {p['market']} at {100 * (p.get('market_weight') or 0):.0f}% weight")
         L.append(f"Projection: {p['mean']} pts.{rng} ({src}.)" + (f" Flagged {p['flag']}: projected as if he plays."
                                                                   if p.get("flag") else ""))
+        if p.get("range_caveats"):
+            L.append("Range caveat (dispersion_v0 test season): " + "; ".join(p["range_caveats"]) + ".")
     if u is not None:
         if not u.get("weeks"):
             L.append(f"Usage: {u.get('note')}.")

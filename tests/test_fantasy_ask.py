@@ -223,3 +223,53 @@ def test_a_designated_player_says_when_his_status_settles_and_who_locks_first(mo
     assert row["status"] == "Questionable" and row["status_settles_pt"]
     assert [x.split(" (")[0] for x in row["my_players_locking_first"]] == ["Jake Ferguson"]
     assert "locking before then: Jake Ferguson" in r.text
+
+
+def test_a_range_caveat_travels_with_the_projection(monkeypatch):
+    monkeypatch.setattr(A.EV, "for_sleeper", lambda pids, info, season, manifest=None: {})
+    s = _snap()
+    p = s.projections["1"]
+    s.projections["1"] = Projection(p.player_id, p.source, p.horizon, p.mean, p.quantiles,
+                                    dict(p.detail, range_caveats=["QB p10: 14.5% of outcomes vs 10%"]), p.range_from)
+    r = A.players(s, ["Josh Allen"])
+    assert r.data["players"][0]["projection"]["range_caveats"] == ["QB p10: 14.5% of outcomes vs 10%"]
+    assert "Range caveat" in r.text
+
+
+def test_the_swap_prices_the_same_opponent_as_the_lineup_command():
+    from fantasy import lineup as LU
+    s = _snap(teams={1: {"name": "me", "players": ["1", "4", "5", "6", "3"], "starters": ["1", "4", "5"]},
+                     2: {"name": "rival", "players": ["2", "6x"], "starters": []}})
+    theirs, how = A._opponent(s)
+    assert how.startswith("their best-by-mean") and theirs == ["2"]
+    assert LU.opponent_lineup(False, [], [], 3, {}, {}, {}, ()) == ([], "no opponent this week")
+
+
+# ------------------------------------------------------------------ nfl.py wiring
+
+def _nfl(monkeypatch, capsys, argv, snap=None):
+    import nfl
+    monkeypatch.setattr(A.EV, "for_sleeper", lambda pids, info, season, manifest=None: {})
+    monkeypatch.setattr(S, "load", lambda league, week=None, fresh=False: snap or _snap())
+    rc = nfl.main(argv)
+    out = capsys.readouterr()
+    return rc, out.out, out.err
+
+
+def test_nfl_takes_names_after_the_options_and_renders_json(monkeypatch, capsys):
+    rc, out, _ = _nfl(monkeypatch, capsys, ["fantasy", "player", "--league", "omnibeta", "Kelce", "Puka Nacua"])
+    assert rc == 0 and "Travis Kelce" in out and "Puka Nacua" in out and "Head to head" in out
+    rc, out, _ = _nfl(monkeypatch, capsys, ["fantasy", "player", "--league", "omnibeta", "--json", "Kelce"])
+    assert rc == 0 and json.loads(out)["players"][0]["name"] == "Travis Kelce"
+
+
+def test_nfl_turns_a_tool_refusal_into_exit_2_and_rejects_stray_names(monkeypatch, capsys):
+    rc, _, err = _nfl(monkeypatch, capsys, ["fantasy", "swap", "--league", "omnibeta", "--start", "Kelce"])
+    assert rc == 2 and err.startswith("ASK: ") and "not on your roster" in err
+    rc, _, err = _nfl(monkeypatch, capsys, ["fantasy", "roster", "--league", "omnibeta", "Kelce"])
+    assert rc == 2 and "unexpected arguments Kelce" in err
+    rc, _, err = _nfl(monkeypatch, capsys, ["props", "slate", "KC@MIA"])
+    assert rc == 2 and "unexpected arguments" in err
+    rc, _, err = _nfl(monkeypatch, capsys, ["props", "line", "Travis", "Kelce", "catches"])
+    assert rc == 2 and "is not a line" in err
+

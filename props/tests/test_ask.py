@@ -275,3 +275,65 @@ def test_an_engine_failure_is_the_error_not_a_stale_answer(tmp_path, monkeypatch
     monkeypatch.setattr(A.subprocess, "run", lambda cmd, **kw: R())
     with pytest.raises(A.AskError, match="no such game"):
         A.price_game(2026, 3, "KC", "MIA")
+
+
+def test_a_clean_run_with_no_lines_says_nothing_is_posted(tmp_path, monkeypatch):
+    monkeypatch.setenv("NFL_CACHE", str(tmp_path))
+
+    class R:
+        returncode, stdout, stderr = 0, "", ""
+    monkeypatch.setattr(A.subprocess, "run", lambda cmd, **kw: R())
+    with pytest.raises(A.AskError, match="no book has posted"):
+        A.price_game(2026, 3, "KC", "MIA")
+    # an OLD log beside a clean run with nothing new is out of date, never served
+    (A.root()).mkdir(parents=True, exist_ok=True)
+    log = A.root() / f"shadow_log_{SLUG}.csv"
+    log.write_text("x\n1\n", encoding="utf-8")
+    old = time.time() - 60 * (A.TTL_MIN + 5)
+    os.utime(log, (old, old))
+    with pytest.raises(A.AskError, match="no book has posted"):
+        A.price_game(2026, 3, "KC", "MIA")
+
+
+def test_a_partial_name_never_rides_on_the_one_game_already_priced(game, monkeypatch):
+    """'Walker' matches nobody here, 'Kelce' is partial: the league-wide lookup
+    decides, so a namesake in an unpriced game is not answered by this one."""
+    looked = []
+
+    def fake_team_of(name):
+        looked.append(name)
+        raise A.AskError(f"'{name}' matches more than one player: X (KC), Y (DAL)")
+    monkeypatch.setattr(A, "team_of", fake_team_of)
+    with pytest.raises(A.AskError, match="more than one"):
+        A.player("Kelce")
+    assert looked == ["Kelce"]
+    assert A.player("Travis Kelce").data["player"] == "Travis Kelce", "a full name still uses the priced game"
+
+
+def test_two_active_players_with_one_name_are_ambiguous(monkeypatch, tmp_path):
+    import json as _json
+    f = tmp_path / "players.json"
+    f.write_text(_json.dumps({"1": {"full_name": "Mike Williams", "team": "NYJ", "position": "WR", "active": True},
+                              "2": {"full_name": "Mike Williams", "team": "PIT", "position": "WR", "active": True}}),
+                 encoding="utf-8")
+    from core import fetch as F
+    monkeypatch.setattr(F, "sleeper_players", lambda **kw: f)
+    with pytest.raises(A.AskError, match="NYJ.*PIT"):
+        A.team_of("Mike Williams")
+
+
+def test_a_market_filter_works_on_survival_rows(tmp_path, monkeypatch):
+    monkeypatch.setenv("NFL_CACHE", str(tmp_path))
+    d = A.root()
+    d.mkdir(parents=True)
+    pd.DataFrame([dict(game="CAR@CLE", player="A", team="CAR", prop="Under 2.5 catches", price=-149, p_model=0.67,
+                       p_novig=0.53, line=2.5, tier="STRONG", market="player_receptions", rule="r", book="sleeper"),
+                  dict(game="HOU@IND", player="B", team="HOU", prop="Over 51.5 rec yds", price=-128, p_model=0.59,
+                       p_novig=0.5, line=51.5, tier="STRONG", market="player_reception_yds", rule="r", book="sleeper")]
+                 ).to_csv(d / "slate_survival_2026_wk03.csv", index=False)
+    monkeypatch.setattr(A, "price_slate", lambda s, w, fresh=False: {"dir": d, "age_min": 1.0, "ran": False})
+    monkeypatch.setattr(A, "season_week", lambda s=None, w=None: (2026, 3))
+    r = A.best(slate=True, survival=True, market="catches")
+    assert [x["player"] for x in r.data["rows"]] == ["A"]
+    assert "Under 2.5 catches" in r.text and "2.5 Under" not in r.text
+

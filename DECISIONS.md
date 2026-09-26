@@ -6266,3 +6266,19 @@ Built (repo only; no engine change, no new kind of number):
 
 Kept, deliberately: the four fantasy commands and the props guide are
 unchanged (the scheduled runs, the ledger and the tests depend on them).
+
+Code review: ten findings, all fixed before merge. The ones that mattered:
+a partial props name ("Williams") matching the one game priced so far was
+answered from it -- the cached-game shortcut now takes a full name only, and
+the league-wide lookup lists every match (and two active players sharing a
+full name are ambiguous, not first-wins); a clean engine run with no posted
+lines read as an engine failure -- now "no book has posted props yet", and
+an older log beside it is never served; a bare ValueError catch turned tool
+bugs into "ASK" name questions -- only the tool's own refusals are ASK now;
+CHAT.md now says outright that a narrow slate question is answered from
+`props best --slate` in the engine's order, and "slate_summary in full" is
+for the slate as a whole. Also: stray arguments are refused instead of
+ignored, dispersion_v0's range caveats travel with a projection, and the
+opponent-lineup rule is one function (lineup.opponent_lineup) for the report
+and the swap tool. props/ask.season_week stays a copy of nfl._season_week:
+props may not import beyond core.fetch (test_boundary).
