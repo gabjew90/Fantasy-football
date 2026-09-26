@@ -88,6 +88,19 @@ def candidates(my_pids, info, projs, slots, flex_slots, locked=frozenset(), curr
     return out
 
 
+def opponent_lineup(has_opp: bool, opp_players, opp_starters, n_start: int, info, projs, slots,
+                    flex_slots) -> tuple[list, str]:
+    """(the opponent's starters, where they came from): the lineup they have
+    set when it is full, else their best by mean. The ONE rule -- the lineup
+    report and the swap tool (fantasy.ask) must price the same opponent."""
+    if not has_opp:
+        return [], "no opponent this week"
+    if len(opp_starters) >= n_start:
+        return list(opp_starters), "the lineup they have set"
+    return ([r["sleeper_id"] for r in optimal_lineup(_rows(opp_players, info, projs), slots, flex_slots=flex_slots)],
+            "their best-by-mean lineup (they have not set a full one)")
+
+
 def change(label: str) -> tuple[list, list]:
     """(players in, players out) from a candidate label."""
     if not label.startswith("in:"):
@@ -308,14 +321,8 @@ def run(league: str, week: int | None = None, *, record: bool = False, out_dir: 
     cands = candidates(view.my_players, view.info, projs, view.slots, view.flex_slots,
                        locked=locked_ids, current=current_set)
     n_start = len(cands[0][1])
-    if view.opp_rid is None:
-        theirs, their_how = [], "no opponent this week"
-    elif len(view.opp_starters) >= n_start:
-        theirs, their_how = view.opp_starters, "the lineup they have set"
-    else:
-        theirs = [r["sleeper_id"] for r in optimal_lineup(_rows(view.opp_players, view.info, projs),
-                                                          view.slots, flex_slots=view.flex_slots)]
-        their_how = "their best-by-mean lineup (they have not set a full one)"
+    theirs, their_how = opponent_lineup(view.opp_rid is not None, view.opp_players, view.opp_starters, n_start,
+                                        view.info, projs, view.slots, view.flex_slots)
     label, chosen, pw = decide(cands, theirs, projs) if theirs else (cands[0][0], cands[0][1], {})
     current = view.my_starters if len(view.my_starters) >= n_start else None
     pw_current = WP.p_win(current, theirs, projs) if (current and theirs) else None

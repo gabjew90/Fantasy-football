@@ -2,14 +2,24 @@
 """One CLI for the two use cases (docs/plans/2026-09-24-consolidation-plan.md).
 
   python nfl.py status [--season S] [--week W] [--league L]
-  python nfl.py props game AWAY@HOME [--markets td,...] [--week W]
+  python nfl.py props game AWAY@HOME [--markets td,...] [--week W]      # the full prop guide
   python nfl.py props slate [--week W] [--skip-started] [--markets ...]
+  python nfl.py props player NAME [--game AWAY@HOME]                     # question tools (props/ask.py)
+  python nfl.py props line NAME STAT LINE
+  python nfl.py props best AWAY@HOME | --slate [--survival] [--market M] [--n N]
+  python nfl.py props matchup AWAY@HOME
+  python nfl.py fantasy player --league L NAME [NAME ...]               # question tools (fantasy/ask.py)
+  python nfl.py fantasy swap --league L --start NAME [--bench NAME]
+  python nfl.py fantasy roster --league L [--team me|opp|MANAGER]
   python nfl.py fantasy lineup --league L [--week W] [--record]
   python nfl.py fantasy scenario --league L --player NAME|ID --out NAME|ID [--week W]
   python nfl.py fantasy waiver --league L [--pos RB,WR,TE] [--horizon stream|season] [--week W]
   python nfl.py fantasy trade --league L --give NAMES --get NAMES [--back NAME:WEEK]
   python nfl.py log                  # the session in ONE file: review, transcript, commands
 
+The question tools print a few plain lines (or JSON with --json) from a
+session cache ($NFL_CACHE, else <temp>/nfl_cache -- never the outputs folder),
+reused for 20 minutes (--fresh re-reads).
 Reports and decision records go to $NFL_OUT (default /mnt/user-data/outputs).
 `--record` appends to the graded ledger. A chat session never passes it (chat
 is read-only, as for the props record); the scheduled runs will, from step 6.
@@ -84,6 +94,38 @@ def cmd_status(a) -> int:
 
 
 def cmd_props(a) -> int:
+    if a.what in ("player", "line", "best", "matchup"):
+        from props import ask as PA
+        try:
+            if a.what == "player":
+                if not a.args:
+                    raise PA.AskError("props player needs a NAME")
+                r = PA.player(" ".join(a.args), season=a.season, week=a.week, game=a.game, fresh=a.fresh)
+            elif a.what == "line":
+                if len(a.args) < 3:
+                    raise PA.AskError('props line needs NAME STAT LINE, e.g. "Travis Kelce" "rec yds" 60.5')
+                try:
+                    value = float(a.args[-1])
+                except ValueError:
+                    raise PA.AskError(f"'{a.args[-1]}' is not a line; props line needs NAME STAT LINE, "
+                                      'the name in quotes: "Travis Kelce" "rec yds" 60.5') from None
+                r = PA.line(a.args[0], " ".join(a.args[1:-1]), value, season=a.season, week=a.week,
+                            game=a.game, fresh=a.fresh)
+            elif a.what == "best":
+                r = PA.best(a.game or (a.args[0] if a.args else None), slate=a.slate, market=a.market or None,
+                            n=a.n, survival=a.survival, season=a.season, week=a.week, fresh=a.fresh)
+            else:
+                r = PA.matchup(a.game or (a.args[0] if a.args else ""), season=a.season, week=a.week, fresh=a.fresh)
+        except PA.AskError as ex:            # only the tool's own refusals: anything else is a bug, and raises
+            print(f"ASK: {ex}", file=sys.stderr)
+            return 2
+        a._result = r
+        print(r.render(a.json), end="")
+        return 0
+    if len(a.args) > (1 if a.what == "game" else 0):
+        print(f"props {a.what}: unexpected arguments {' '.join(a.args)}", file=sys.stderr)
+        return 2
+    a.game = a.game or (a.args[0] if a.args else None)
     if a.what == "game":
         if not a.game or "@" not in a.game:
             print("props game needs AWAY@HOME", file=sys.stderr)
@@ -104,6 +146,30 @@ def cmd_props(a) -> int:
 
 
 def cmd_fantasy(a) -> int:
+    if a.names and a.what != "player":
+        # a name only `player` reads would otherwise be ignored in silence
+        print(f"fantasy {a.what}: unexpected arguments {' '.join(a.names)} (names go in --player/--start/--give...)",
+              file=sys.stderr)
+        return 2
+    if a.what in ("player", "swap", "roster"):
+        from fantasy import ask as FA
+        from fantasy import snapshot as SN
+        try:
+            snap = SN.load(a.league, a.week, fresh=a.fresh)
+            if a.what == "player":
+                r = FA.players(snap, a.names)
+            elif a.what == "swap":
+                if not a.start:
+                    raise FA.AskError("fantasy swap needs --start NAME")
+                r = FA.swap(snap, a.start, a.bench or [])
+            else:
+                r = FA.roster(snap, a.team or "me")
+        except FA.AskError as ex:
+            print(f"ASK: {ex}", file=sys.stderr)
+            return 2
+        a._result = r
+        print(r.render(a.json), end="")
+        return 0
     if a.what == "lineup":
         from fantasy import lineup as LU
         r = LU.run(a.league, a.week, record=a.record)
@@ -214,8 +280,15 @@ def main(argv=None) -> int:
     s.set_defaults(fn=cmd_status)
 
     p = sub.add_parser("props", help="price a game or the slate (the props engine)")
-    p.add_argument("what", choices=("game", "slate"))
-    p.add_argument("game", nargs="?")
+    p.add_argument("what", choices=("game", "slate", "player", "line", "best", "matchup"))
+    p.add_argument("args", nargs="*", help="game: AWAY@HOME; player: NAME; line: NAME STAT LINE; best/matchup: AWAY@HOME")
+    p.add_argument("--game", help="question tools: the game, AWAY@HOME (found from the player's team when omitted)")
+    p.add_argument("--slate", action="store_true", help="best: the whole week's card")
+    p.add_argument("--survival", action="store_true", help="best --slate: the engine's one must-win pick per game")
+    p.add_argument("--market", default="", help="best: one market (catches, rec yds, rush yds, pass yds, td)")
+    p.add_argument("--n", type=int, default=8, help="best: how many rows")
+    p.add_argument("--fresh", action="store_true", help="question tools: re-price instead of reusing a run under 20 min old")
+    p.add_argument("--json", action="store_true", help="question tools: the numbers as JSON")
     p.add_argument("--season", type=int)
     p.add_argument("--week", type=int)
     p.add_argument("--markets", default="")
@@ -223,7 +296,13 @@ def main(argv=None) -> int:
     p.set_defaults(fn=cmd_props)
 
     f = sub.add_parser("fantasy", help="fantasy decisions")
-    f.add_argument("what", choices=("lineup", "scenario", "waiver", "trade"))
+    f.add_argument("what", choices=("lineup", "scenario", "waiver", "trade", "player", "swap", "roster"))
+    f.add_argument("names", nargs="*", help="player: one or more players (two or more: head to head)")
+    f.add_argument("--start", action="append", help="swap: the player to start (repeatable)")
+    f.add_argument("--bench", action="append", help="swap: the starter who sits (omit: every legal choice is tried)")
+    f.add_argument("--team", help="roster: me (default), opp, or a manager's name")
+    f.add_argument("--fresh", action="store_true", help="question tools: re-read the league instead of the session snapshot")
+    f.add_argument("--json", action="store_true", help="question tools: the numbers as JSON")
     f.add_argument("--league", required=True)
     f.add_argument("--week", type=int)
     f.add_argument("--record", action="store_true", help="append to the graded ledger (scheduled runs only)")
@@ -241,7 +320,15 @@ def main(argv=None) -> int:
     lg = sub.add_parser("log", help="the chat session in one file: review, transcript, commands")
     lg.set_defaults(fn=cmd_log)
 
-    a = ap.parse_args(argv)
+    # names may follow the options ("fantasy player --league L Kelce Kraft"):
+    # argparse fills a subcommand's nargs="*" positional before it sees them,
+    # so the leftovers are appended to it -- anything else left over is an error
+    a, extra = ap.parse_known_args(argv)
+    spill = "names" if hasattr(a, "names") else ("args" if hasattr(a, "args") else None)
+    if extra and (spill is None or any(x.startswith("-") for x in extra)):
+        ap.error(f"unrecognized arguments: {' '.join(extra)}")
+    if extra:
+        setattr(a, spill, list(getattr(a, spill) or []) + extra)
     started, rc, err = time.time(), None, None
     try:
         rc = a.fn(a)

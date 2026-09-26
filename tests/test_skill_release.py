@@ -48,7 +48,7 @@ RELEASE = {"nfl.py": b"print('hi')\n", "CHAT.md": b"# chat\n", "core/fetch.py": 
 def test_the_release_holds_code_and_league_files_never_credentials_or_state():
     for rel in ("nfl.py", "CHAT.md", "config.yaml", "core/fetch.py", "fantasy/lineup.py", "manager/yahoo_api.py",
                 "props/engine/scripts/score_game.py", "props/engine/SKILL.md", "leagues/keefamania.yaml",
-                "data/external/fantasypros_2026.csv"):
+                "data/external/fantasypros_2026.csv", "props/ask.py", "fantasy/ask.py", "fantasy/snapshot.py"):
         assert R.included(rel), rel
     for rel in (".env", "props/engine/resources/credential.env", "core/__pycache__/x.pyc", "state/a.json",
                 "reports/x.md", "tests/test_x.py", "props/record/wk02.jsonl", "props/engine/scripts/backtest_out/a",
@@ -406,4 +406,20 @@ def test_the_voice_keeps_the_numbers_honest():
     chat = (ROOT / "CHAT.md").read_text(encoding="utf-8")
     assert "never a home-made projection" in chat and "outside ranking averaged in" in chat
     assert "Every call that rests" in chat and "ASSUMPTION the engine made" in chat
+
+
+def test_every_module_nfl_py_imports_ships_in_the_release():
+    """nfl.py runs inside the release, not the repository: a module it imports
+    that the release leaves out fails only in chat (props/ask.py, 2026-09-26,
+    caught in review)."""
+    import re
+    root = Path(R.__file__).resolve().parents[1]
+    src = (root / "nfl.py").read_text(encoding="utf-8")
+    missing = []
+    for pkg, mods in re.findall(r"^\s*from (\w+) import ([\w ,]+?)(?: as \w+)?$", src, flags=re.M):
+        for mod in (m.strip().split(" as ")[0] for m in mods.split(",")):
+            rel = f"{pkg}/{mod}.py"
+            if (root / rel).exists() and not R.included(rel):
+                missing.append(rel)
+    assert not missing, f"nfl.py imports modules the release does not ship: {missing}"
 
