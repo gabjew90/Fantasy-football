@@ -313,3 +313,39 @@ def test_a_teammate_placed_on_ir_this_week_is_watched_an_old_one_is_not():
     assert [t["name"] for t in row["teammates"]] == ["Fresh Ir"]
     assert row["teammates"][0]["scenario"], "a fresh IR absence gets the scenario to price it"
 
+
+def test_fantasypros_practice_is_looked_up_for_the_watched_players_by_id(monkeypatch):
+    import polars as pl
+    from core.manifest import Manifest
+    from fantasy import lineup as LU
+    from manager import fantasypros as FP
+    import core.ids as IDS
+    watch = [{"pid": "moore", "own": "Questionable", "teammates": []},
+             {"pid": "fer", "own": "", "teammates": [{"sid": "puka"}]}]
+    monkeypatch.setattr(FP, "_api_key", lambda: "k")
+    monkeypatch.setattr(IDS, "load_id_map", lambda *a, **k: pl.DataFrame(
+        {"sleeper_id": ["moore", "puka", "fer", "other"], "fantasypros_id": ["11", "22", "33", None]}))
+    asked = {}
+
+    def injuries(rows, season, week, store=None):
+        asked.update(rows)
+        return ({"moore": {"practice": ["Limited", "DNP", "Limited"], "play_prob": 0.65},
+                 "puka": {"practice": ["DNP", "DNP", "DNP"], "play_prob": 0.1}}, "fantasypros injuries: 2 reports")
+    monkeypatch.setattr(FP, "injuries", injuries)
+    m = Manifest("t")
+    data, note = LU.fp_practice(watch, 2026, 3, m)
+    assert asked == {"moore": {"fp_id": "11"}, "puka": {"fp_id": "22"}}, "only the designated, never the healthy"
+    assert LU._fp_text(data["moore"]) == "practice Limited / DNP / Limited; plays 65% (FantasyPros)"
+    assert m.get("fantasypros injuries (practice, probability of playing)")["status"] == "fresh"
+
+
+def test_without_the_key_the_watch_says_so_and_nothing_fails(monkeypatch):
+    from core.manifest import Manifest
+    from fantasy import lineup as LU
+    from manager import fantasypros as FP
+    monkeypatch.setattr(FP, "_api_key", lambda: None)
+    m = Manifest("t")
+    data, note = LU.fp_practice([{"pid": "x", "own": "Questionable", "teammates": []}], 2026, 3, m)
+    assert data == {} and "FANTASYPROS_API_KEY" in note
+    assert m.get("fantasypros injuries (practice, probability of playing)") is None
+

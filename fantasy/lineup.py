@@ -184,20 +184,64 @@ def injury_watch(my_pids, info, players, league: str) -> list[dict]:
         if me.get("pos") not in SKILL:
             continue
         raw = (players or {}).get(pid) or {}
-        mates = sorted((p for sid, p in by_team.get(me.get("team"), []) if sid != pid),
-                       key=lambda p: (p.get("position") or "", p.get("depth_chart_order") or 99))
+        mates = sorted(((sid, p) for sid, p in by_team.get(me.get("team"), []) if sid != pid),
+                       key=lambda sp: (sp[1].get("position") or "", sp[1].get("depth_chart_order") or 99))
         own = raw.get("injury_status") or ""
         if not own and not mates:
             continue
         rows.append({"pid": pid, "name": me.get("name"), "team": me.get("team"), "own": own,
                      "own_part": raw.get("injury_body_part") or "", "practice": raw.get("practice_participation") or "",
-                     "teammates": [{"name": p.get("full_name"), "pos": p.get("position"),
+                     "teammates": [{"sid": sid, "name": p.get("full_name"), "pos": p.get("position"),
                                     "status": p.get("injury_status"), "part": p.get("injury_body_part") or "",
                                     "scenario": (f'nfl.py fantasy scenario --league {league} --player "{me.get("name")}" '
                                                  f'--out "{p.get("full_name")}"'
                                                  if p.get("injury_status") in TEAMMATE_OUT else "")}
-                                   for p in mates]})
+                                   for sid, p in mates]})
     return rows
+
+
+def fp_practice(watch: list[dict], season: int, week: int, manifest) -> tuple[dict[str, dict], str]:
+    """FantasyPros' injury report -- practice participation and the
+    probability of playing -- for exactly the players the injury watch names
+    (a designated player of mine, his designated teammates). Joined through the
+    DynastyProcess id map (sleeper -> fantasypros), not the keyless ranking
+    feed, which the chat container reaches only some sessions. Needs
+    FANTASYPROS_API_KEY (the chat skill's credential file, GitHub secrets, a
+    local .env); without it, ({}, why). Never raises: a missing practice report
+    is a gap in the watch, not a failed lineup."""
+    sids = {w["pid"] for w in watch if w.get("own")} | {t["sid"] for w in watch for t in w["teammates"]}
+    if not sids:
+        return {}, "no designated players to look up"
+    try:
+        from core import fetch as F
+        from core import ids as IDS
+        from manager import fantasypros as FP
+        if not FP._api_key():
+            return {}, "FantasyPros practice reports need FANTASYPROS_API_KEY, which this environment does not have"
+        idm = IDS.load_id_map(F.DEFAULT_CACHE, manifest=manifest)
+        fp = {s: f for s, f in zip(idm["sleeper_id"].to_list(), idm["fantasypros_id"].to_list())
+              if s in sids and f}
+        data, note = FP.injuries({s: {"fp_id": f} for s, f in fp.items()}, season, week)
+    except Exception as e:  # noqa: BLE001
+        data, note = {}, f"FantasyPros practice reports failed ({type(e).__name__})"
+    bad = (note or "").startswith(("DATA MISSING", "⚠")) or "failed" in (note or "")
+    manifest.record("fantasypros injuries (practice, probability of playing)",
+                    source="api.fantasypros.com/public/v2/json/nfl/injuries",
+                    status="failed" if bad else "fresh", detail=(note or "")[:200],
+                    fetched_at=None if bad else dt.datetime.now(dt.timezone.utc))
+    return data, note or ""
+
+
+def _fp_text(r: dict | None) -> str:
+    """'practice DNP / Limited / Full; plays 65% (FantasyPros)', or ''."""
+    if not r:
+        return ""
+    bits = []
+    if r.get("practice"):
+        bits.append("practice " + " / ".join(str(p) for p in r["practice"]))
+    if r.get("play_prob") is not None:
+        bits.append(f"plays {r['play_prob']:.0%}")
+    return ("; ".join(bits) + " (FantasyPros)") if bits else ""
 
 
 def _fmt(v, d=1):
@@ -311,16 +355,23 @@ def run(league: str, week: int | None = None, *, record: bool = False, out_dir: 
     L += ["", "## Injury watch (game-day status, framework question 5)", "",
           "*Sleeper designations at run time: yours, and this week's designations (Questionable, Doubtful, Out) on the "
           "teammates who move your players' volume (the starting QB, depth chart 1-2 at RB/WR/TE, or top-200); "
-          "long-term IR/PUP absences are already in the data. Practice participation and news are not in this report; a close call "
-          "involving any row here is checked against them before it is answered.*", ""]
+          "long-term IR/PUP absences are already in the data. Practice participation and the probability of "
+          "playing come from FantasyPros' injury report where this environment has the key; news is not in this "
+          "report, and a close call involving any row here is checked against it before it is answered.*", ""]
+    fp, fp_note = fp_practice(watch, view.season, view.week, m) if watch else ({}, "")
+    if watch and not fp:
+        L += [f"*No FantasyPros practice reports this run: {fp_note}.*", ""]
     if watch:
         lock_order(watch, view.my_players, view.info, env, now)
         L += ["| Your player | His status | Designated teammates | Settled by | Your players at his position locking before then "
               "| Price the absence |", "|---|---|---|---|---|---|"]
         for w in watch:
+            fp_own = _fp_text(fp.get(w["pid"]))
             own = (f"**{w['own']}**" + (f" ({w['own_part']})" if w["own_part"] else "")
-                   + (f", practice: {w['practice']}" if w["practice"] else "")) if w["own"] else "none"
+                   + (f"; {fp_own}" if fp_own else (f", practice: {w['practice']}" if w["practice"] else ""))
+                   ) if w["own"] else "none"
             mates = "; ".join(f"{t['name']} ({t['pos']}) {t['status']}" + (f" ({t['part']})" if t["part"] else "")
+                              + (f" -- {_fp_text(fp.get(t['sid']))}" if _fp_text(fp.get(t["sid"])) else "")
                               for t in w["teammates"]) or "none"
             runs = "<br>".join(f"`{t['scenario']}`" for t in w["teammates"] if t["scenario"]) or "--"
             settled = w.get("status_known_pt") or "kickoff unknown"
@@ -372,7 +423,7 @@ def run(league: str, week: int | None = None, *, record: bool = False, out_dir: 
 
     rec_evidence = {p: {k: v for k, v in (e or {}).items() if k != "series"} for p, e in ev.items()}
     rec = {"command": "fantasy lineup", "league": league, "season": view.season, "week": view.week,
-           "evidence": rec_evidence, "injury_watch": watch,
+           "evidence": rec_evidence, "injury_watch": watch, "fantasypros_injuries": fp,
            "generated_at_utc": now.isoformat(), "gate": gate.to_dict(), "manifest": m.to_dict(),
            "standing": view.standing,
            "me": view.my_name, "opponent": view.opp_name, "opponent_lineup": theirs, "opponent_lineup_from": their_how,
