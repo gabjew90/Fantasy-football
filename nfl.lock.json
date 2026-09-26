@@ -2,7 +2,7 @@
  "algorithm": "nfl-release-sha256-lf-1",
  "file_count": 180,
  "files": {
-  "CHAT.md": "1629a12cac5779622cb21a2b0a6475db44b561476aab8d12afb522810bebcdb3",
+  "CHAT.md": "743a77301f5b92e22a0820e58e921233a51dd494426f50bb40fb8500a8d0eb71",
   "config.yaml": "7e7e2de6f52d3bbf13c0d7c6850ea6925a2d279fa714546e48b26ec3354f695e",
   "core/__init__.py": "8ac9ed217e439f5828616ab66ec9ff17336c2cbbbeae391d0f9bfa001eaed571",
   "core/fetch.py": "95fc16bbd91a3a19086c8c2f64c9d101abc85baae2452c1ed778c84a21f9ad33",
@@ -79,7 +79,7 @@
   "fantasy/evidence.py": "3229f153177b327170fe3219a8502d524af80b77aa7c77884319af313283fe97",
   "fantasy/gate.py": "2dbe8838c32ac03704c155067a3b2f197932fa0d8ec29be6d015485f917f7e93",
   "fantasy/league.py": "13484f01390a4e7b63dfc5f886dbb5ab4a79d486a3c7d93ceacd793c88d454c2",
-  "fantasy/lineup.py": "0d7449ee25a5038b64c6a7ffc9e2688f6ff49c8c5af9ad509597d9d4e58f1abc",
+  "fantasy/lineup.py": "254df49b76dd31a36f7b7db84e300200858057a8b801dc11070d5716f590c431",
   "fantasy/resources/dispersion_v0.keefamania.json": "9daca0c1686d057506ac63f5dfddb28a5aa419babc0313a0310cceb10baa2d6b",
   "fantasy/resources/dispersion_v0.omnibeta.json": "2dcfcc9f2bf56fe51d1f1f2fefb60014af913fa0507c23a9587f6e6bc8aac0fe",
   "fantasy/resources/market_shape_params.json": "a9250ef44c98538a5f2dd6a49c342aeaee0633028701bf33d03c7082285d6c8e",
@@ -103,7 +103,7 @@
   "manager/deliver.py": "5a351cf32b22c25ba0f33f0c0d3a9e9b10df69646bce92dbd0ac92c69661d3d4",
   "manager/ecr.py": "8b220d21ec3d093150994bbfeaacf6cbbdd18dc4a907cfc063400fd36b94877d",
   "manager/faab.py": "dfae389a6c82a60065fcfa415a8b919c3f3186b33957c1f3c51832ed0fd5d5ae",
-  "manager/fantasypros.py": "12cdcbe2bd440e3dadca4f8b39372a12ac6b02ab1ab64dd4136716fad8d1e9e9",
+  "manager/fantasypros.py": "83bf72ac956f92879a6051413851807f2d350757da2c2a546650dc747e797cc9",
   "manager/games.py": "2995d1af1f2e7a50cb856339379e5fec32598086db8bd86d3f8171d4a61c90e8",
   "manager/gate.py": "0f320912fa4ad51b223a507854bab21b8ba89dcdfbfc999c0b8346bab35003a5",
   "manager/injuries.py": "fac66f69dbc1274ee716f2bfb433df1dc1f8012cadb9a8de36d3eee59e305590",
@@ -183,6 +183,6 @@
   "tiers.csv": "04a1a79d43e9f2445ba3dc4ea262b00fbd58efea1f41e8b0393cb4c7f8afee41",
   "tiers.keefamania.csv": "11e6546b56caa807a572da86d5c3d81097bafd2d2550e25653882d78b2962e94"
  },
- "sha256": "01072c8d973f7f1fb384158b7e0e4c0bdad6753d9466875527209b63c17d1a69",
- "tag": "nfl-v1.13"
+ "sha256": "2857f71a3012c76f64f4a65830fa5e9e9a6c407c6d99154f9b0a4bb4162e513a",
+ "tag": "nfl-v1.14"
 }
