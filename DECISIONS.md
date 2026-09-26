@@ -5978,3 +5978,32 @@ keeps nothing between sessions. The fix is in the repository:
   promise to remember.
 No props engine change (props-v1.24 IDENTICAL).
 
+## 2026-09-26 (112) -- the teammate-out scenario crash on pandas 3, fixed mid-week (props-v1.25)
+
+Both downloaded chat logs showed `nfl fantasy scenario` losing its model half:
+"TypeError: Invalid value 'Out (scenario)' for dtype 'float64'". The chat
+container runs pandas 3.0.2 and numpy 2.4.4; this repo pins pandas 1.5.3. When
+no eligible player in a game carries a designation, the injury report's status
+column is all NaN, pandas types it float64, and pandas 3 refuses the string
+the scenario writes into it (1.5.3 converts it silently, which is why no test
+and no Actions run saw it). Reproduced in a scratch pandas-3.0.2 environment
+(all-NaN fails; all-None and mixed columns do not).
+
+Fix: the two status columns are object columns, and the Out/Doubtful/
+Questionable/assumed-out logic is one tested function,
+`score_game.apply_designations`; `props/tests/test_designations.py` pins it
+and passes on pandas 1.5.3 and 3.0.2.
+
+Measured:
+- Under pandas 1.5.3 the fix is byte-identical, for a plain KC@MIA run and a
+  Kelce-out scenario run: every output file.
+- Under pandas 3.0.2 the unfixed pricer already priced KC@MIA identically to
+  1.5.3 -- the betting card, ladder and player parameters byte for byte;
+  fantasy points differing only in the 15th decimal place. Chat's prices match
+  the capture's; the crash was the only break found.
+
+Released mid-week at the user's call ("just fix it now"): a pricer change
+starts a new pricing model (#107), so week 3's graded record shows two
+sections -- the calls made before the tag on props-v1.24, after it on
+props-v1.25.
+

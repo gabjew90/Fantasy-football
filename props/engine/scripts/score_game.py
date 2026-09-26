@@ -244,6 +244,24 @@ def parse_markets(spec: str | None) -> set[str]:
     return out
 
 
+def apply_designations(pop: pd.DataFrame, assume_out=frozenset()) -> pd.DataFrame:
+    """A2: Out/Doubtful removed, Questionable flagged for regime treatment, and
+    a scenario's assumed-out players marked out whatever their report says.
+    `report_status` is made an object column first: an all-NaN one is float64,
+    and pandas 3 refuses a string written into it (the chat-log crash,
+    2026-09-26)."""
+    pop = pop.copy()
+    pop["report_status"] = pop["report_status"].astype(object)
+    pop["excluded"] = pop.report_status.isin(["Out", "Doubtful"]) | (pop.status == "INA")
+    pop["questionable"] = pop.report_status.eq("Questionable")
+    if assume_out:
+        ao = pop.gsis_id.isin(assume_out)
+        pop.loc[ao, "report_status"] = "Out (scenario)"
+        pop["excluded"] = pop["excluded"] | ao
+        pop["questionable"] = pop["questionable"] & ~ao
+    return pop
+
+
 def last_oddsapi_quota() -> int | None:
     """Remaining Odds API credits from the newest cached odds response, if any."""
     files = sorted((HERE / "cache").glob("odds_*.json"), key=lambda f: f.stat().st_mtime)
@@ -636,17 +654,14 @@ def main():
     else:
         pop = pop.merge(roles[["team", "gsis_id", "slot"]], on=["team", "gsis_id"], how="left")
         pop["slot"] = pop["slot"].fillna("PROXY")
-    pop["report_status"] = [inj_status.get((t, p)) for t, p in zip(pop.team, pop.gsis_id)]
-    pop["practice_status"] = [inj_practice.get((t, p)) for t, p in zip(pop.team, pop.gsis_id)]
-
-    # A2: Out/Doubtful removed; Questionable flagged for regime treatment
-    pop["excluded"] = pop.report_status.isin(["Out", "Doubtful"]) | (pop.status == "INA")
-    pop["questionable"] = pop.report_status.eq("Questionable")
-    if ASSUME_OUT:
-        _ao = pop.gsis_id.isin(ASSUME_OUT)
-        pop.loc[_ao, "report_status"] = "Out (scenario)"
-        pop["excluded"] = pop["excluded"] | _ao
-        pop["questionable"] = pop["questionable"] & ~_ao
+    # Text columns, stored as objects: a game where nobody carries a designation
+    # gives an all-NaN list, which pandas types float64, and pandas 3 (what the
+    # chat container runs) refuses the "Out (scenario)" string written below.
+    pop["report_status"] = pd.Series([inj_status.get((t, p)) for t, p in zip(pop.team, pop.gsis_id)],
+                                     index=pop.index, dtype=object)
+    pop["practice_status"] = pd.Series([inj_practice.get((t, p)) for t, p in zip(pop.team, pop.gsis_id)],
+                                       index=pop.index, dtype=object)
+    pop = apply_designations(pop, ASSUME_OUT)
     n_excl = int(pop.excluded.sum())
     active = pop[~pop.excluded].copy()
 
