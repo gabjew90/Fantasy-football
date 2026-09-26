@@ -6168,3 +6168,11 @@ probability of playing, for his own row and for each designated teammate.
 - CHAT.md rule 8: quote practice and probability from the watch; web-search
   team reporting only when the row has none.
 
+Code review: four findings, all fixed before merge. Practice reports now keep
+their place (a dash for a day without one, "latest last"; a new
+`practice_days` field beside the existing one, which trade radar keeps); a
+watched player the lookup found nothing for says "no FantasyPros report"; a
+finished lookup is read from the one success wording injuries() uses
+(commented there as load-bearing), not from "failed" anywhere in a note; the
+table cells are two tested helpers.
+

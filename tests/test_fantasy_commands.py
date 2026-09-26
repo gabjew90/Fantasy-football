@@ -335,7 +335,7 @@ def test_fantasypros_practice_is_looked_up_for_the_watched_players_by_id(monkeyp
     m = Manifest("t")
     data, note = LU.fp_practice(watch, 2026, 3, m)
     assert asked == {"moore": {"fp_id": "11"}, "puka": {"fp_id": "22"}}, "only the designated, never the healthy"
-    assert LU._fp_text(data["moore"]) == "practice Limited / DNP / Limited; plays 65% (FantasyPros)"
+    assert LU._fp_text(data["moore"]) == "practice Limited / DNP / Limited, latest last; plays 65% (FantasyPros)"
     assert m.get("fantasypros injuries (practice, probability of playing)")["status"] == "fresh"
 
 
@@ -348,4 +348,20 @@ def test_without_the_key_the_watch_says_so_and_nothing_fails(monkeypatch):
     data, note = LU.fp_practice([{"pid": "x", "own": "Questionable", "teammates": []}], 2026, 3, m)
     assert data == {} and "FANTASYPROS_API_KEY" in note
     assert m.get("fantasypros injuries (practice, probability of playing)") is None
+
+
+def test_the_watch_cells_keep_the_report_order_and_say_when_fantasypros_has_nothing():
+    from fantasy import lineup as LU
+    fp = {"moore": {"practice_days": [None, "Limited", "Full"], "play_prob": 0.8},
+          "puka": {"practice_days": ["DNP", "DNP", "DNP"], "play_prob": 0.05}}
+    w = {"pid": "moore", "own": "Questionable", "own_part": "Shoulder", "practice": "",
+         "teammates": [{"sid": "puka", "name": "Puka Nacua", "pos": "WR", "status": "Doubtful", "part": "Hip"},
+                       {"sid": "other", "name": "Colby Parkinson", "pos": "TE", "status": "Questionable", "part": ""}]}
+    assert LU._own_cell(w, fp) == ("**Questionable** (Shoulder); practice - / Limited / Full, latest last; "
+                                   "plays 80% (FantasyPros)")
+    mates = LU._mates_cell(w, fp)
+    assert "Puka Nacua (WR) Doubtful (Hip) -- practice DNP / DNP / DNP, latest last; plays 5% (FantasyPros)" in mates
+    assert "Colby Parkinson (TE) Questionable -- no FantasyPros report" in mates
+    assert LU._mates_cell(w, {}) == "Puka Nacua (WR) Doubtful (Hip); Colby Parkinson (TE) Questionable", \
+        "no lookup, no FantasyPros text"
 

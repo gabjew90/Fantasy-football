@@ -224,7 +224,8 @@ def fp_practice(watch: list[dict], season: int, week: int, manifest) -> tuple[di
         data, note = FP.injuries({s: {"fp_id": f} for s, f in fp.items()}, season, week)
     except Exception as e:  # noqa: BLE001
         data, note = {}, f"FantasyPros practice reports failed ({type(e).__name__})"
-    bad = (note or "").startswith(("DATA MISSING", "⚠")) or "failed" in (note or "")
+    # a finished run is the one note injuries() words "fantasypros injuries: ..."
+    bad = not (note or "").startswith("fantasypros injuries:")
     manifest.record("fantasypros injuries (practice, probability of playing)",
                     source="api.fantasypros.com/public/v2/json/nfl/injuries",
                     status="failed" if bad else "fresh", detail=(note or "")[:200],
@@ -232,16 +233,41 @@ def fp_practice(watch: list[dict], season: int, week: int, manifest) -> tuple[di
     return data, note or ""
 
 
-def _fp_text(r: dict | None) -> str:
-    """'practice DNP / Limited / Full; plays 65% (FantasyPros)', or ''."""
+def _fp_text(r: dict | None, looked_up: bool = False) -> str:
+    """'practice DNP / Limited / Full, latest last; plays 65% (FantasyPros)';
+    'no FantasyPros report' when the lookup ran and has nothing for him; ''
+    when there was no lookup. A day without a report shows as a dash, so the
+    order means something."""
     if not r:
-        return ""
+        return "no FantasyPros report" if looked_up else ""
     bits = []
-    if r.get("practice"):
-        bits.append("practice " + " / ".join(str(p) for p in r["practice"]))
+    days = r.get("practice_days")
+    if days and any(days):
+        bits.append("practice " + " / ".join(str(p) if p else "-" for p in days) + ", latest last")
+    elif r.get("practice"):
+        bits.append("practice " + " / ".join(str(p) for p in r["practice"]) + ", latest last")
     if r.get("play_prob") is not None:
         bits.append(f"plays {r['play_prob']:.0%}")
-    return ("; ".join(bits) + " (FantasyPros)") if bits else ""
+    return ("; ".join(bits) + " (FantasyPros)") if bits else "no FantasyPros practice or probability"
+
+
+def _own_cell(w: dict, fp: dict) -> str:
+    """The watch's 'His status' cell: Sleeper's tag, then FantasyPros' report."""
+    if not w["own"]:
+        return "none"
+    fp_own = _fp_text(fp.get(w["pid"]), looked_up=bool(fp))
+    return (f"**{w['own']}**" + (f" ({w['own_part']})" if w["own_part"] else "")
+            + (f"; {fp_own}" if fp_own else (f", practice: {w['practice']}" if w["practice"] else "")))
+
+
+def _mates_cell(w: dict, fp: dict) -> str:
+    """The watch's 'Designated teammates' cell, each with FantasyPros' report."""
+    out = []
+    for t in w["teammates"]:
+        txt = _fp_text(fp.get(t["sid"]), looked_up=bool(fp))
+        out.append(f"{t['name']} ({t['pos']}) {t['status']}" + (f" ({t['part']})" if t["part"] else "")
+                   + (f" -- {txt}" if txt else ""))
+    return "; ".join(out) or "none"
 
 
 def _fmt(v, d=1):
@@ -366,13 +392,7 @@ def run(league: str, week: int | None = None, *, record: bool = False, out_dir: 
         L += ["| Your player | His status | Designated teammates | Settled by | Your players at his position locking before then "
               "| Price the absence |", "|---|---|---|---|---|---|"]
         for w in watch:
-            fp_own = _fp_text(fp.get(w["pid"]))
-            own = (f"**{w['own']}**" + (f" ({w['own_part']})" if w["own_part"] else "")
-                   + (f"; {fp_own}" if fp_own else (f", practice: {w['practice']}" if w["practice"] else ""))
-                   ) if w["own"] else "none"
-            mates = "; ".join(f"{t['name']} ({t['pos']}) {t['status']}" + (f" ({t['part']})" if t["part"] else "")
-                              + (f" -- {_fp_text(fp.get(t['sid']))}" if _fp_text(fp.get(t["sid"])) else "")
-                              for t in w["teammates"]) or "none"
+            own, mates = _own_cell(w, fp), _mates_cell(w, fp)
             runs = "<br>".join(f"`{t['scenario']}`" for t in w["teammates"] if t["scenario"]) or "--"
             settled = w.get("status_known_pt") or "kickoff unknown"
             before = ", ".join(w.get("locks_before") or []) or "none"
