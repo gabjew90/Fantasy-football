@@ -94,11 +94,14 @@ def byes_by_team(games: pd.DataFrame, season: int, weeks) -> dict:
 
 
 def season_gain(roster_rates: dict, pos: dict, team: dict, slots, flex_slots, weeks, byes: dict,
-                add: str | None = None, drop: str | None = None, out_until: dict | None = None) -> tuple[float, dict]:
+                add: str | None = None, drop: str | None = None, out_until: dict | None = None,
+                starts_of: str | None = None, starts: list | None = None) -> tuple[float, dict]:
     """Points of my best lineup summed over `weeks`, with `add` in and `drop`
     out, each week's lineup chosen from the players who have a game and are
     not expected to miss it (`out_until`: player -> first week he plays).
-    Returns (total, points by week)."""
+    Returns (total, points by week). Given `starts_of` and a `starts` list,
+    appends each week that player is in the best lineup -- what makes a
+    season gain checkable ("+14.9 over weeks 3-9")."""
     ids = [p for p in roster_rates if p != drop] + ([add] if add else [])
     back = out_until or {}
     by_week, total = {}, 0.0
@@ -106,7 +109,10 @@ def season_gain(roster_rates: dict, pos: dict, team: dict, slots, flex_slots, we
         rows = [{"sleeper_id": p, "pos": pos.get(p),
                  "weekly": 0.0 if (w in byes.get(team.get(p), set()) or w < back.get(p, 0))
                  else roster_rates.get(p, 0.0)} for p in ids]
-        pts = sum(r["weekly"] for r in optimal_lineup(rows, slots, flex_slots=flex_slots))
+        lineup = optimal_lineup(rows, slots, flex_slots=flex_slots)
+        pts = sum(r["weekly"] for r in lineup)
+        if starts is not None and starts_of is not None and any(r["sleeper_id"] == starts_of for r in lineup):
+            starts.append(w)
         by_week[w] = pts
         total += pts
     return total, by_week
@@ -129,6 +135,17 @@ def _consensus(ctx, league: str, season: int, store):
     f.parent.mkdir(parents=True, exist_ok=True)
     f.write_text(json.dumps({"data": con, "notes": notes}), encoding="utf-8")
     return con, notes
+
+
+def record_consensus_failures(m, notes) -> None:
+    """A rest-of-season source that could not be read (FantasyPros refuses the
+    chat container) goes into the manifest as a FAILED input, so the session
+    log's command table shows it -- a note alone never reached the log."""
+    for n in notes or []:
+        if "unavailable" in n and ":" in n:
+            name = n.split(":", 1)[0].strip()
+            m.record(f"{name} (rest-of-season consensus)", source="manager/consensus.py", status="failed",
+                     detail=n[:200])
 
 
 def protected_cuts(drops, ev: dict) -> set:
@@ -189,6 +206,7 @@ def run(league: str, positions=("RB", "WR", "TE"), horizon: str = "season", week
     from manager.context import state_dir
     from manager.store import Store
     con, con_notes = _consensus(ctx, league, view.season, Store(state_dir(), read_only=True))
+    record_consensus_failures(m, con_notes)
     rate = {p: v["mean"] / SEASON_GAMES for p, v in con.items()}
     upside = {p: max((v.get("per_source") or {}).values(), default=v["mean"]) / SEASON_GAMES for p, v in con.items()}
 
@@ -261,14 +279,16 @@ def run(league: str, positions=("RB", "WR", "TE"), horizon: str = "season", week
         for c in cands:
             best = None
             for d in eligible:                                               # cheapest cut first: ties go to it
+                st: list = []
                 tot, wk = season_gain(dict(mine, **{c: rate.get(c, 0.0)}), pos, team_nv, view.slots,
-                                      view.flex_slots, weeks, byes, drop=d, out_until=out_until)
+                                      view.flex_slots, weeks, byes, drop=d, out_until=out_until,
+                                      starts_of=c, starts=st)
                 gain = tot - base_total
                 po = sum(wk[w] - base_wk[w] for w in weeks if w >= playoff)
                 if best is None or gain > best[1]:
-                    best = (d, gain, po)
+                    best = (d, gain, po, st)
             rows.append({"add": c, "drop": best[0] if best else None, "gain": best[1] if best else 0.0,
-                         "playoff_gain": best[2] if best else 0.0})
+                         "playoff_gain": best[2] if best else 0.0, "start_weeks": best[3] if best else []})
 
     # EVERY player's position, not only the ones in this report: the teammate who
     # explains a role change is almost never a candidate or on my roster
@@ -314,6 +334,19 @@ def _pct(v):
     return "—" if v is None else f"{100 * v:.0f}%"
 
 
+def week_spans(weeks) -> str:
+    """[3, 4, 5, 9] -> "3-5, 9"; nothing -> "none"."""
+    ws = sorted(set(weeks or []))
+    if not ws:
+        return "none"
+    spans, start = [], ws[0]
+    for a, b in zip(ws, ws[1:] + [None]):
+        if b != a + 1:
+            spans.append(f"{start}-{a}" if a != start else f"{a}")
+            start = b
+    return ", ".join(spans)
+
+
 def rank_adds(rows: list[dict], horizon: str, contender: bool) -> tuple[list[dict], bool]:
     """(ranked adds, stand pat?). Only adds that improve the lineup and come
     with a cut are ranked. A team behind ranks season adds by rest-of-season
@@ -349,9 +382,9 @@ def markdown(league, view, horizon, positions, stand, gate, ranked, drops, prote
         L += [f"**STAND PAT -- DO NOT CUT.** No add improves the lineup by the threshold ({limit})"
               + (f"; the best, {_n(best['add'], info)}, adds {_gain(best, horizon)}." if best else "."), ""]
     L += [f"## Adds, ranked ({unit})", "",
-          "| Add | Drop | Gain | " + ("Playoff wks | " if horizon == "season" else "") +
+          "| Add | Drop | Gain | " + ("Starts (weeks) | Playoff wks | " if horizon == "season" else "") +
           "This week (mean / p10 / p90) | ROS rate | Snap % | Tgt / carry share | Role | Why the role changed |",
-          "|---|---|---|" + ("---|" if horizon == "season" else "") + "---|---|---|---|---|---|"]
+          "|---|---|---|" + ("---|---|" if horizon == "season" else "") + "---|---|---|---|---|---|"]
     for r in ranked[:12]:
         c, e = r["add"], ev.get(r["add"]) or {}
         mean = e.get("mean") or {}
@@ -359,7 +392,8 @@ def markdown(league, view, horizon, positions, stand, gate, ranked, drops, prote
         wk = "—" if pr is None else f"{pr.mean:.1f} / {pr.floor if pr.floor is not None else 0:.1f} / " \
                                     f"{pr.ceiling if pr.ceiling is not None else 0:.1f}"
         L.append(f"| {_n(c, info)} | {_n(r['drop'], info) if r['drop'] else '—'} | {_gain(r, horizon)} | "
-                 + (f"{r.get('playoff_gain', 0):+.1f} | " if horizon == "season" else "")
+                 + (f"{week_spans(r.get('start_weeks'))} | {r.get('playoff_gain', 0):+.1f} | "
+                    if horizon == "season" else "")
                  + f"{wk} | {rate.get(c, 0):.1f} | {_pct(mean.get('snap_pct'))} | "
                  f"{_pct(mean.get('tgt_share'))} / {_pct(mean.get('carry_share'))} | {r.get('trajectory') or '—'} | "
                  f"{('teammate out: ' + r['cause']) if r.get('cause') else '—'} |")

@@ -6041,3 +6041,28 @@ in the manifest, so the command table does not show it; kickoff times and
 lock order in the lineup report (rule 8 needed the scoreboard by hand);
 start weeks per waiver add. No props engine change.
 
+## 2026-09-26 (114) -- lock order, start weeks, a failed consensus source in the log; the review rule written down
+
+The three items #113 left open, at the user's go-ahead:
+
+- **Lock order in the lineup report's injury watch.** Each row now says when
+  the designation settles (the inactive list, 90 minutes before that team's
+  kickoff, in Pacific time) and which of the user's players AT THE SAME
+  POSITION lock before then -- the players he would swap in. Live, Omnibeta
+  week 3: Ferguson (Puka Nacua Doubtful) settles Sun 3:50 PM PT; Harold
+  Fannin locks Sun 10:00 AM PT -- the choice comes before the news. The first
+  draft listed the whole roster, defence included; position-matched is the
+  answer to the question.
+- **Start weeks per season waiver add.** `season_gain` can report the weeks
+  a player is in the best lineup; the season table gets a "Starts (weeks)"
+  column ("5, 8, 11, 13-14" for Brenton Strange's +14.4), so a season gain
+  can be checked against the bye weeks it fills.
+- **A consensus source that could not be read** (FantasyPros refuses the chat
+  container) is now a FAILED input in the waiver and trade manifests, so the
+  session log's command table shows it; before, it was only a note.
+
+And the user's standing rule, now in CLAUDE.md: a code review after every
+major piece of work, before its PR merges, not skipped for small or chat-only
+changes. PRs #77-#84 merged without one; they are reviewed together with this
+change before it merges.
+

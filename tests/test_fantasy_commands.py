@@ -280,3 +280,21 @@ def test_the_injury_watch_names_designated_teammates_and_the_scenario_to_run():
         'nfl.py fantasy scenario --league omnibeta --player "Terrance Ferguson" --out "Puka Nacua"')
     assert rows["DJ Moore"]["own"] == "Questionable" and rows["DJ Moore"]["own_part"] == "Shoulder"
 
+
+def test_lock_order_says_when_a_status_settles_and_who_locks_first():
+    import datetime as _dt
+    from fantasy import lineup as LU
+    info = {"fer": {"name": "Terrance Ferguson", "team": "LAR", "pos": "TE"},
+            "fan": {"name": "Harold Fannin", "team": "CLE", "pos": "TE"},
+            "wr": {"name": "Early Receiver", "team": "CLE", "pos": "WR"},
+            "gone": {"name": "Already Played", "team": "ATL", "pos": "TE"}}
+    env = {"LAR": {"kickoff_utc": "2026-09-28T00:20:00Z"},      # Sunday night
+           "CLE": {"kickoff_utc": "2026-09-27T17:00:00Z"},      # Sunday 10:00 PT
+           "ATL": {"kickoff_utc": "2026-09-25T00:15:00Z"}}      # Thursday, already started
+    watch = [{"pid": "fer", "team": "LAR"}]
+    LU.lock_order(watch, ["fer", "fan", "wr", "gone"], info, env, _dt.datetime(2026, 9, 26, 6, 0, tzinfo=_dt.timezone.utc))
+    assert watch[0]["status_known_pt"].startswith("Sun 3:50 PM") or "UTC" in watch[0]["status_known_pt"]
+    assert watch[0]["locks_before"] and watch[0]["locks_before"][0].startswith("Harold Fannin")
+    assert all("Already Played" not in x for x in watch[0]["locks_before"]), "a started game is not a coming lock"
+    assert len(watch[0]["locks_before"]) == 1, "only his position: the WR who locks first is not a swap for a TE"
+

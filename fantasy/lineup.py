@@ -116,6 +116,46 @@ GAME_WEEK = ("Questionable", "Doubtful", "Out")
 TEAMMATE_OUT = ("Out", "Doubtful")
 
 
+STATUS_LEAD_MIN = 90          # a designation is settled with the inactive list, ~90 minutes before kickoff
+
+
+def _kick(env_row):
+    k = (env_row or {}).get("kickoff_utc")
+    return dt.datetime.fromisoformat(k.replace("Z", "+00:00")) if k else None
+
+
+def _pt(t: dt.datetime) -> str:
+    try:
+        from zoneinfo import ZoneInfo
+        t = t.astimezone(ZoneInfo("America/Los_Angeles"))
+    except Exception:  # noqa: BLE001 -- no tz database: UTC, and say so
+        return t.strftime("%a %H:%M UTC")
+    return t.strftime("%a %I:%M %p PT").replace(" 0", " ")
+
+
+def lock_order(watch: list[dict], my_pids, info, env: dict, now: dt.datetime) -> None:
+    """For each injury-watch row, when the designation is settled (the
+    inactive list, STATUS_LEAD_MIN before that team's kickoff) and which of
+    my players AT HIS POSITION -- the ones I would swap him with -- lock
+    before then: the rule-8 question "do I have to choose before the news?".
+    Filled in place; nothing when kickoffs are unknown."""
+    for w in watch:
+        k = _kick(env.get(w["team"]))
+        if k is None:
+            continue
+        known = k - dt.timedelta(minutes=STATUS_LEAD_MIN)
+        w["status_known_pt"] = _pt(known)
+        earlier = []
+        my_pos = (info.get(w["pid"]) or {}).get("pos")
+        for p in my_pids:
+            if p == w["pid"] or (info.get(p) or {}).get("pos") != my_pos:
+                continue
+            kp = _kick(env.get((info.get(p) or {}).get("team")))
+            if kp is not None and now < kp < known:
+                earlier.append((kp, (info.get(p) or {}).get("name") or p))
+        w["locks_before"] = [f"{n} ({_pt(t)})" for t, n in sorted(earlier)]
+
+
 def injury_watch(my_pids, info, players, league: str) -> list[dict]:
     """For each of my skill players: his own designation, and every designated
     skill-position teammate who matters -- the starting QB, a depth-chart 1-2
@@ -267,14 +307,18 @@ def run(league: str, week: int | None = None, *, record: bool = False, out_dir: 
           "long-term IR/PUP absences are already in the data. Practice participation and news are not in this report; a close call "
           "involving any row here is checked against them before it is answered.*", ""]
     if watch:
-        L += ["| Your player | His status | Designated teammates | Price the absence |", "|---|---|---|---|"]
+        lock_order(watch, view.my_players, view.info, env, now)
+        L += ["| Your player | His status | Designated teammates | Settled by | Your players at his position locking before then "
+              "| Price the absence |", "|---|---|---|---|---|---|"]
         for w in watch:
             own = (f"**{w['own']}**" + (f" ({w['own_part']})" if w["own_part"] else "")
                    + (f", practice: {w['practice']}" if w["practice"] else "")) if w["own"] else "none"
             mates = "; ".join(f"{t['name']} ({t['pos']}) {t['status']}" + (f" ({t['part']})" if t["part"] else "")
                               for t in w["teammates"]) or "none"
             runs = "<br>".join(f"`{t['scenario']}`" for t in w["teammates"] if t["scenario"]) or "--"
-            L.append(f"| {w['name']} ({w['team']}) | {own} | {mates} | {runs} |")
+            settled = w.get("status_known_pt") or "kickoff unknown"
+            before = ", ".join(w.get("locks_before") or []) or "none"
+            L.append(f"| {w['name']} ({w['team']}) | {own} | {mates} | {settled} | {before} | {runs} |")
     else:
         L += ["No designations on your players or their key teammates."]
 
