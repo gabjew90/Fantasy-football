@@ -342,3 +342,30 @@ def test_chat_checks_injuries_before_answering_and_never_promises_to_remember():
     assert "Injuries are checked BEFORE a start/sit answer" in chat
     assert "chat keeps nothing between sessions" in chat
 
+
+def test_the_session_log_is_one_file_with_review_transcript_and_commands(tmp_path):
+    import json as _json
+    import nfl
+    (tmp_path / "session_review.md").write_text("1. The stand-pat check used the wrong row.", encoding="utf-8")
+    (tmp_path / "chat_transcript.md").write_text("## 06:35 UTC\n**User:** lineups?\n**Reply:**\nStart Deebo.",
+                                                encoding="utf-8")
+    lines = [{"at_utc": "2026-09-26T06:35:09+00:00", "release": "nfl-v1.9", "argv": ["fantasy", "lineup"], "exit": 0,
+              "seconds": 8.5, "error": None, "gate": "PASS", "setup": {"deps_now": "ok"},
+              "inputs": [{"name": "fantasypros", "status": "failed", "detail": "HTTP 403"}], "report": "/x/lineup.md"},
+             {"at_utc": "2026-09-26T06:40:00+00:00", "release": "nfl-v1.9", "argv": ["log"], "exit": 0}]
+    (tmp_path / "nfl_session_log.jsonl").write_text("\n".join(_json.dumps(x) for x in lines) + "\n", encoding="utf-8")
+    text = nfl.session_report(tmp_path).read_text(encoding="utf-8")
+    for needed in ("Release nfl-v1.9; 1 command(s)", "## Review of the session", "stand-pat check",
+                   "## Transcript (verbatim)", "Start Deebo.", "`fantasy lineup`", "fantasypros: failed (HTTP 403)",
+                   "Raw command log"):
+        assert needed in text, needed
+    empty = tmp_path / "empty"
+    empty.mkdir()
+    text = nfl.session_report(empty).read_text(encoding="utf-8")
+    assert "Chat wrote no review" in text and "No transcript" in text and "No commands logged" in text
+
+
+def test_chat_answers_a_log_request_with_one_file():
+    chat = (ROOT / "CHAT.md").read_text(encoding="utf-8")
+    assert "the answer is ONE file" in chat and "nfl.py log" in chat and "session_review.md" in chat
+

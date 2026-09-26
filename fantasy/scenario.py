@@ -270,6 +270,11 @@ def markdown(league, season, wk, p, o, pos, out_pos, away, home, base, scen, obs
             L.append(f"| {lab} | {d['mean']:.1f} | {_q(d, 0.1)} | {_q(d, 0.25)} | {_q(d, 0.5)} | {_q(d, 0.75)} | "
                      f"{_q(d, 0.9)} | {d['p_td']:.0%} |")
         L += ["", f"**Change: {scen['mean'] - base['mean']:+.1f} points** ({(scen['mean'] / base['mean'] - 1) if base['mean'] else 0:+.0%})."]
+        if (o.get("injury_status") or "") in ("Out", "Doubtful", "IR"):
+            L += ["", f"**{on} is already {o.get('injury_status')} on the injury report, so the engine's as-posted run "
+                  f"already prices the game WITHOUT him.** Both rows are the no-{on} game and the change is zero by "
+                  "construction -- not evidence that his absence does not matter. The engine has no with-him "
+                  "number here; the observed and market rows below are the comparison."]
         if out_pos == "QB":
             L += ["", "**PROVISIONAL.** The absence rule moves targets and carries between teammates; it was not tuned "
                   "for a quarterback, whose absence changes the team's passing volume and efficiency as well. "

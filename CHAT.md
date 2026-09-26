@@ -194,7 +194,21 @@ early, say so before any price.
 
   If the reply changes after the entry is written, rewrite the entry before
   sending, so the transcript always matches what the user saw. Silent like the
-  rest of setup: never mention it, never attach it unless asked. When the user asks for the log, offer this file for download.
+  rest of setup: never mention it, never attach it unless asked.
+- **When the user asks for the log(s), the answer is ONE file.**
+  1. Review the whole session and write `$NFL_OUT/session_review.md`: what
+     went wrong or looked wrong, ordered by impact, each with its evidence
+     (the command, the report line, the numbers) -- engine bugs, data and
+     input problems, gaps that forced work outside the engine, and your own
+     process misses (a rule in this file not followed, a transcript entry not
+     verbatim). Say plainly when nothing went wrong. No fixes applied in
+     chat: chat is read-only; the review is what Claude Code works from.
+  2. Run `python $REPO_DIR/nfl.py log`. It writes one file -- the review,
+     the verbatim transcript and every command with its exit code, gate and
+     failed inputs -- and prints its path.
+  3. Attach that file, and only that file. Summarize the review in two or
+     three lines of the reply.
+  `$NFL_OUT` defaults to `/mnt/user-data/outputs` when it is not set.
 - A data source the report marks as unavailable from chat (FantasyPros is
   often refused from this environment) is mentioned once, in a clause, where
   it matters to the answer -- never as a list of errors.

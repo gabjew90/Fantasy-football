@@ -6007,3 +6007,37 @@ starts a new pricing model (#107), so week 3's graded record shows two
 sections -- the calls made before the tag on props-v1.24, after it on
 props-v1.25.
 
+## 2026-09-26 (113) -- one file when the user asks for the logs; two bugs the third log found (nfl-v1.10)
+
+The user asked that "give me the logs" return a single file that includes the
+transcript and a review of the session for issues. `python nfl.py log` now
+writes `$NFL_OUT/nfl_session_<UTC>.md`: chat's review (`session_review.md`,
+written by chat first), the verbatim transcript, and a table of every command
+with its exit code, gate and failed or stale inputs, then the raw JSON lines.
+A missing part says so. CHAT.md: a log request is answered with that one file
+and a two-or-three-line summary; the review lists engine bugs, input
+problems, gaps that forced work outside the engine and chat's own process
+misses, each with its evidence -- and chat applies no fixes.
+
+Chat's own review of the third session (release nfl-v1.9) found two real bugs:
+
+- **Waiver stand pat tested the wrong row for a team behind.** Season adds
+  for a team behind are ranked by upside, and the stand-pat check read only
+  the upside leader's gain: Keefamania week 3 printed STAND PAT on Courtland
+  Sutton's +0.7 while its table held Hunter Henry +7.4 and four more tight
+  ends above the +5 threshold. `waiver.rank_adds` now puts the adds that
+  clear the threshold first (by upside among them for a team behind, by gain
+  for a contender) and stands pat only when none does; the stand-pat line
+  names the largest gain.
+- **The teammate-out scenario read "no change" for Ferguson without Puka
+  Nacua**, which chat took for the engine ignoring the absence. The cause is
+  different: Nacua was already Doubtful, the engine's as-posted run already
+  leaves Out/Doubtful players out, so both runs priced the no-Nacua game. The
+  report now says so -- the change is zero by construction, the engine has no
+  with-him number, and the observed and market rows are the comparison.
+
+Noted, not built: FantasyPros refusing chat (HTTP 403, known) is not recorded
+in the manifest, so the command table does not show it; kickoff times and
+lock order in the lineup report (rule 8 needed the scoreboard by hand);
+start weeks per waiver add. No props engine change.
+

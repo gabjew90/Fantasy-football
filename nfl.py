@@ -8,6 +8,7 @@
   python nfl.py fantasy scenario --league L --player NAME|ID --out NAME|ID [--week W]
   python nfl.py fantasy waiver --league L [--pos RB,WR,TE] [--horizon stream|season] [--week W]
   python nfl.py fantasy trade --league L --give NAMES --get NAMES [--back NAME:WEEK]
+  python nfl.py log                  # the session in ONE file: review, transcript, commands
 
 Reports and decision records go to $NFL_OUT (default /mnt/user-data/outputs).
 `--record` appends to the graded ledger. A chat session never passes it (chat
@@ -123,6 +124,67 @@ def cmd_fantasy(a) -> int:
     return 0
 
 
+def session_report(out: Path) -> Path:
+    """The chat session in one file, for the user to download: chat's review of
+    the session (session_review.md, written by chat before it runs this), the
+    verbatim transcript (chat_transcript.md), and every command the session
+    ran (nfl_session_log.jsonl) as a table plus the raw lines. A part that is
+    missing says so; nothing is left out silently."""
+    def read(name: str, nest: bool = False) -> str | None:
+        p = out / name
+        if not p.exists():
+            return None
+        text = p.read_text(encoding="utf-8").strip()
+        # a part's own headings sit one level under this file's sections
+        return "\n".join("#" + ln if nest and ln.startswith("#") else ln for ln in text.splitlines())
+
+    raw = read("nfl_session_log.jsonl") or ""
+    rows = []
+    for line in raw.splitlines():
+        try:
+            rows.append(json.loads(line))
+        except ValueError:
+            continue
+    rows = [r for r in rows if (r.get("argv") or [None])[0] != "log"]
+    releases = sorted({r.get("release") or "unknown" for r in rows}) or ["unknown"]
+    failed = [r for r in rows if r.get("exit") not in (0, None) or r.get("error")]
+    bad_inputs = [(r, i) for r in rows for i in (r.get("inputs") or []) if i.get("status") in ("failed", "stale")]
+    setup = (rows[-1].get("setup") if rows else None) or {}
+    when = (f"{rows[0]['at_utc']} to {rows[-1]['at_utc']}" if rows else "no commands logged")
+    L = [f"# NFL research session -- {dt.datetime.now(dt.timezone.utc):%Y-%m-%d %H:%M} UTC", "",
+         f"Release {', '.join(releases)}; {len(rows)} command(s), {when}; "
+         f"{len(failed)} failed; {len(bad_inputs)} input(s) failed or stale.",
+         f"Setup: source {setup.get('release_source')}, packages at setup {setup.get('deps_at_setup')}, "
+         f"now {setup.get('deps_now')}, versions {setup.get('versions')}.", ""]
+    L += ["## Review of the session", "",
+          read("session_review.md", nest=True) or "*Chat wrote no review (session_review.md is missing).*", ""]
+    L += ["## Transcript (verbatim)", "",
+          read("chat_transcript.md", nest=True) or "*No transcript (chat_transcript.md is missing).*", ""]
+    L += ["## Commands", ""]
+    if rows:
+        L += ["| UTC | Command | Exit | Seconds | Gate | Failed or stale inputs | Report |", "|---|---|---|---|---|---|---|"]
+        for r in rows:
+            bad = "; ".join(f"{i.get('name')}: {i.get('status')}" + (f" ({i.get('detail')})" if i.get("detail") else "")
+                            for i in (r.get("inputs") or []) if i.get("status") in ("failed", "stale")) or "--"
+            err = f" ERROR: {r['error']}" if r.get("error") else ""
+            L.append(f"| {str(r.get('at_utc', ''))[11:19]} | `{' '.join(r.get('argv') or [])}` | {r.get('exit')}{err} | "
+                     f"{r.get('seconds')} | {r.get('gate') or '--'} | {bad} | {Path(str(r.get('report') or '')).name or '--'} |")
+        L += ["", "<details><summary>Raw command log (nfl_session_log.jsonl)</summary>", "", "```json", raw, "```",
+              "", "</details>"]
+    else:
+        L += ["*No commands logged (nfl_session_log.jsonl is missing or empty).*"]
+    path = out / f"nfl_session_{dt.datetime.now(dt.timezone.utc):%Y-%m-%d_%H%M}.md"
+    path.write_text("\n".join(L) + "\n", encoding="utf-8")
+    return path
+
+
+def cmd_log(a) -> int:
+    out = Path(os.environ.get("NFL_OUT", "/mnt/user-data/outputs"))
+    out.mkdir(parents=True, exist_ok=True)
+    print(f"session report: {session_report(out)}")
+    return 0
+
+
 def main(argv=None) -> int:
     try:
         from dotenv import load_dotenv
@@ -162,6 +224,9 @@ def main(argv=None) -> int:
     f.add_argument("--horizon", choices=("stream", "season"), default="season",
                    help="waiver: stream (this week) or season (a league-winner candidate)")
     f.set_defaults(fn=cmd_fantasy)
+
+    lg = sub.add_parser("log", help="the chat session in one file: review, transcript, commands")
+    lg.set_defaults(fn=cmd_log)
 
     a = ap.parse_args(argv)
     started, rc, err = time.time(), None, None
