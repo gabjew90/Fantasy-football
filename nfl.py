@@ -62,6 +62,17 @@ def _season_week(season, week):
 
 def cmd_status(a) -> int:
     from core import status as ST
+    if a.probe_sources:
+        # can this environment reach FantasyPros, and would a key help? The
+        # requests are the real fetch's (manager/fantasypros); core/probe reads them
+        from types import SimpleNamespace
+        from core import fetch as F
+        from core import probe as PR
+        from manager import fantasypros as FP
+        rows = FP.reachability(a.season or F.current_season())
+        a._result = SimpleNamespace(record={"manifest": {"entries": rows}}, report_path=None)
+        print(PR.markdown(rows))
+        return 0
     league = None
     if a.league:
         from draftkit.config import Config
@@ -198,6 +209,8 @@ def main(argv=None) -> int:
     s.add_argument("--season", type=int)
     s.add_argument("--week", type=int)
     s.add_argument("--league")
+    s.add_argument("--probe-sources", action="store_true",
+                   help="can this environment reach FantasyPros, and would an API key help?")
     s.set_defaults(fn=cmd_status)
 
     p = sub.add_parser("props", help="price a game or the slate (the props engine)")

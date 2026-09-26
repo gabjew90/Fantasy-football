@@ -65,6 +65,7 @@ names a week.
 | hold or sell an injured player | the trade command on the offer or a realistic one, with `--back "X:WEEK"` from the latest reporting |
 | how does X do if teammate Y is out | `nfl.py fantasy scenario --league L --player "X" --out "Y"` |
 | is it too early / what is posted yet | `nfl.py status [--league L]` |
+| can chat reach FantasyPros / check the data sources | `nfl.py status --probe-sources` -- report its table verbatim, with what each row means |
 | a fantasy and a betting question together | both commands, two labelled sections, never mixed |
 
 **Waiver horizon is step zero.** "Streamer", "this week", "bye fill" ->

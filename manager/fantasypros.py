@@ -280,6 +280,44 @@ def _api_key():
     return os.environ.get("FANTASYPROS_API_KEY") or None
 
 
+def reachability(season: int) -> list[dict]:
+    """Can this environment reach FantasyPros, and would the API key help?
+    (`nfl.py status --probe-sources`; the reading is core/probe.py.)
+
+    The partner feed is called through `_rows` itself -- the real request,
+    URL and headers -- so the check cannot pass while the commands fail. The
+    API is called as `_injury_page` calls it, minus the key: no key is sent
+    or read, only whether one is set. Rows are in the session log's input
+    shape."""
+    from core import probe as PR
+
+    def answer(resp):
+        return PR.classify(resp.status_code, resp.headers.get("Content-Type", ""), resp.text[:2000])
+
+    rows = []
+    try:
+        players, _body = _rows("RB", "PPR", season, ROS)
+        st, what = PR.classify(200, "application/json", f"{len(players)} running backs returned")
+    except requests.HTTPError as e:
+        st, what = answer(e.response) if e.response is not None else PR.classify(None, "", "", str(e)[:120])
+    except Exception as e:  # noqa: BLE001 -- the point is to report it
+        st, what = PR.classify(None, "", "", f"{type(e).__name__}: {e}"[:120])
+    rows.append({"name": "FantasyPros partner feed (keyless projections, as the consensus calls it)",
+                 "source": URL, "status": st, "detail": what, "age_h": 0.0})
+    try:
+        r = requests.get(f"{API}/nfl/injuries", timeout=TIMEOUT, params={"year": season, "week": 1})
+        st, what = answer(r)
+    except Exception as e:  # noqa: BLE001
+        st, what = PR.classify(None, "", "", f"{type(e).__name__}: {e}"[:120])
+    rows.append({"name": "FantasyPros API (keyed: injuries and practice, projections), called without the key",
+                 "source": f"{API}/nfl/injuries", "status": st, "detail": what, "age_h": 0.0})
+    has_key = bool(_api_key())
+    rows.append({"name": "FANTASYPROS_API_KEY in this environment", "source": "environment",
+                 "status": "fresh" if has_key else "absent", "detail": "set" if has_key else "not set",
+                 "age_h": 0.0})
+    return rows
+
+
 def _injury_page(fp_ids, season, week, key):
     """Returns (rows, truncated). `truncated` when the cap hid matches."""
     r = requests.get(f"{API}/nfl/injuries", timeout=TIMEOUT,
