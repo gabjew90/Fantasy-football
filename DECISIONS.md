@@ -6176,3 +6176,45 @@ finished lookup is read from the one success wording injuries() uses
 (commented there as load-bearing), not from "failed" anywhere in a note; the
 table cells are two tested helpers.
 
+## 2026-09-26 (118) -- chat uses the engine as a tool and answers in its own voice (nfl-v1.15)
+
+The user: the data is solid, but the answers are rigid and stiff -- "I thought
+the chat would just use the engine as a tool but still answer flexibly." The
+cause was CHAT.md: a fixed opening (release line, then gate line) on every
+reply; the user's framework walked out loud in a fixed order; every caveat the
+report printed repeated in every answer; report vocabulary quoted as-is. Each
+rule answered a real miss; stacked, they turned a conversation into a reading
+of the report.
+
+The rewrite separates how chat THINKS from how it TALKS:
+- The framework, the injury checks and the scenarios are still done before
+  answering -- homework, not the reply's outline.
+- The reply leads with the call and what decides it, matches its length to
+  the question, brings chat's own judgment (news, matchup, the user's
+  situation) marked as chat's, and raises a caveat only when it bears on
+  this call. Follow-up questions are allowed; asking for what a command can
+  read still is not.
+- The release is recorded in the transcript and log, not recited in every
+  reply (only on the fallback path, or when asked). A data check is announced
+  only when it fails.
+- Hard lines kept: never invent a number and call it the model's; never make
+  a close call sound clear; injuries checked before answering; the answer in
+  the reply, not a file; no betting language in a fantasy answer.
+- Props: the engine's contract keeps the substance and its honesty rules;
+  its full "prop guide" structure is for a full-game request, and a narrow
+  question gets a direct answer in the same voice. (props/engine/SKILL.md is
+  unchanged -- no engine release for a voice change.)
+- The transcript's self-check now asks whether a friend who knows football
+  would find the answer natural.
+
+Code review: six findings, all fixed before merge. The important one: the
+installed harness's own SKILL.md still ordered "the first line of every reply
+names it", read before CHAT.md -- skill/SKILL.md now defers to CHAT.md, and
+CHAT.md says it supersedes that older line an installed skill still carries
+(a test pins the two agreeing). Protections the first draft loosened are back
+in voice-neutral form: no home-made projections or averaged-in rankings (the
+judgment is qualitative); a failed data check makes every call resting on it
+conditional; an ASSUMPTION the engine made (missed weeks, a return week, a
+provisional part) is always stated; a fallback or unverified release goes at
+the top of every reply that session.
+
