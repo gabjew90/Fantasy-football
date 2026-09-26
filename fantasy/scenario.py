@@ -214,7 +214,8 @@ def run(league: str, player: str, out: str, week: int | None = None, *, out_dir:
         base = scen = None
         notes.append(str(ex))
     m.record("props engine (as posted, and with the teammate out)", source="props/engine score_game.py",
-             status="fresh" if base else "failed", fetched_at=dt.datetime.now(dt.timezone.utc) if base else None)
+             status="fresh" if base else "failed", fetched_at=dt.datetime.now(dt.timezone.utc) if base else None,
+             detail="" if base else (notes[-1] if notes else "no model row")[:200])
 
     # OBSERVED: games the teammate missed, this season and last
     stats = {}

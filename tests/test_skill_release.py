@@ -310,3 +310,29 @@ def test_every_command_leaves_a_troubleshooting_line_without_secrets(tmp_path, m
 def test_chat_keeps_a_verbatim_transcript_while_the_log_is_on():
     text = (ROOT / "CHAT.md").read_text(encoding="utf-8")
     assert "chat_transcript.md" in text and "verbatim" in text and "Self-check" in text
+
+
+def test_the_log_names_the_release_from_the_stamp_and_checks_packages_now(tmp_path, monkeypatch):
+    """Inside chat there is no nfl.lock.json (it describes a release, it is not
+    in one): the tag comes from the bootstrap's stamp. Packages are checked
+    when the command runs, beside what the bootstrap found."""
+    import json as _json
+    import nfl
+    root = tmp_path / "release"
+    root.mkdir()
+    (root / "config.yaml").write_text("session_log: true\n", encoding="utf-8")
+    root.with_name(root.name + ".stamp.json").write_text(_json.dumps(
+        {"release_tag": "nfl-v9.9", "release_source": "fetched", "deps": "missing: polars"}), encoding="utf-8")
+    monkeypatch.setattr(nfl, "ROOT", root)
+    monkeypatch.setenv("NFL_OUT", str(tmp_path / "out"))
+    nfl._session_log(["status"], 0, None, 0.1, None)
+    line = _json.loads((tmp_path / "out" / "nfl_session_log.jsonl").read_text(encoding="utf-8").splitlines()[0])
+    assert line["release"] == "nfl-v9.9"
+    assert line["setup"]["deps_at_setup"] == "missing: polars" and line["setup"]["deps_now"].startswith(("ok", "missing"))
+    assert line["setup"]["versions"]["pandas"], "the pandas that actually ran"
+
+
+def test_the_transcript_reply_is_the_full_text_not_a_summary():
+    chat = (ROOT / "CHAT.md").read_text(encoding="utf-8")
+    assert "VERBATIM: the full text exactly as sent" in chat and "not a\n  summary" in chat
+

@@ -170,7 +170,10 @@ early, say so before any price.
   **Self-check:** answered in the first lines? every number from a report? the
   report's caveats carried? asked the user for anything a command can read?
   anything outside the engine, and labelled so?
-  **Reply:** <the reply, verbatim, as composed for sending>
+  **Reply:**
+  <the reply, VERBATIM: the full text exactly as sent, every line -- not a
+  summary, not a paraphrase, however long. The transcript exists to judge
+  whether the answer read well; a summary hides exactly that.>
   ```
 
   If the reply changes after the entry is written, rewrite the entry before
