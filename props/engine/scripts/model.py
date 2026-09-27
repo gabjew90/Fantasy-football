@@ -129,6 +129,11 @@ DEFAULT_K0 = {
 }
 
 
+# the role slots a depth chart seats: QB1, RB1-2, WR1-3, TE1 -- ONE list for
+# both schemas, so the backtest seasons and the live season cannot drift apart
+STARTER_DEPTH = (("QB", 1), ("RB", 2), ("WR", 3), ("TE", 1))
+
+
 def normalize_depth_charts(dc, kick_lookup=None):
     """Return team/week/gsis_id/slot from either nflverse depth-chart schema.
 
@@ -156,7 +161,6 @@ def normalize_depth_charts(dc, kick_lookup=None):
         # each snapshot's slots once (rows in their original order, positions
         # QB/RB/WR/TE), then a lookup per (team, week). Identical output, row
         # for row (props-v1.26, checked against the old loop on 2026 week 3).
-        order = [("QB", 1), ("RB", 2), ("WR", 3), ("TE", 1)]
         times = {t: pd.DatetimeIndex(g.dt.unique()).sort_values() for t, g in d.groupby("team", sort=False)}
         rows_of = d.groupby(["team", "dt"], sort=False).indices          # (team, dt) -> row positions, in order
         slots = {}
@@ -164,7 +168,7 @@ def normalize_depth_charts(dc, kick_lookup=None):
         def slots_at(key):
             if key not in slots:
                 g = d.iloc[rows_of[key]]
-                slots[key] = [(x.gsis_id, f"{pos}{int(x.pos_rank)}") for pos, mx in order
+                slots[key] = [(x.gsis_id, f"{pos}{int(x.pos_rank)}") for pos, mx in STARTER_DEPTH
                               for _, x in g[(g.pos_abb == pos) & (g.pos_rank <= mx)].iterrows()]
             return slots[key]
         for (team, wk), kt in (kick_lookup or {}).items():
@@ -197,7 +201,7 @@ def normalize_depth_charts(dc, kick_lookup=None):
         d = d.sort_values([team_col, "week", "position", rank_col], kind="mergesort")
         d = d.drop_duplicates([team_col, "week", "position", "gsis_id"])
         d["_ord"] = d.groupby([team_col, "week", "position"]).cumcount() + 1
-        for pos, mx in [("QB", 1), ("RB", 2), ("WR", 3), ("TE", 1)]:
+        for pos, mx in STARTER_DEPTH:
             sub = d[(d["position"] == pos) & (d["_ord"] <= mx)]
             for _, x in sub.iterrows():
                 out.append({"team": x[team_col], "week": int(x["week"]), "gsis_id": x.gsis_id,

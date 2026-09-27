@@ -56,7 +56,8 @@ def _table():
                  dict(dt=dt, team="KC", pos_abb="RB", pos_rank=1, gsis_id="kc_rb1")]
     rows += [dict(dt="2026-09-12T00:00Z", team="BUF", pos_abb="QB", pos_rank=1, gsis_id="buf_qb"),
              dict(dt="not a time", team="BUF", pos_abb="QB", pos_rank=1, gsis_id="junk"),
-             dict(dt="2026-09-12T00:00Z", team="BUF", pos_abb="RB", pos_rank=None, gsis_id="buf_rb_norank")]
+             dict(dt="2026-09-12T00:00Z", team="BUF", pos_abb="RB", pos_rank=None, gsis_id="buf_rb_norank"),
+             dict(dt="2026-09-12T00:00Z", team=None, pos_abb="QB", pos_rank=1, gsis_id="no_team")]
     return pd.DataFrame(rows)
 
 
@@ -80,5 +81,5 @@ def test_it_takes_the_latest_snapshot_strictly_before_kickoff():
     assert wr1 == {1: "kc_wr_a", 2: "kc_wr_a", 3: "kc_wr_b"}
     assert 0 not in set(out[out.team == "KC"].week), "no snapshot before kickoff, no roles"
     assert set(out[out.team == "BUF"].gsis_id) == {"buf_qb"}
-    assert "NYJ" not in set(out.team)
+    assert "NYJ" not in set(out.team) and "no_team" not in set(out.gsis_id), "a row without a team seats nobody"
     assert "kc_wr_d" not in set(out.gsis_id) and "kc_qb2" not in set(out.gsis_id) and "kc_k" not in set(out.gsis_id)

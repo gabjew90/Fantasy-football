@@ -6312,5 +6312,14 @@ Proof it changes nothing (the byte-identical check, CLAUDE.md):
   code and the new).
 
 A pure speed change still moves the pricer's price_hash, so the scorecard
-starts a new pricing-model bucket at props-v1.26. It prices identically to
-props-v1.25 (above); pooling the two with `scorecard.py --pool` is sound.
+starts a new pricing-model bucket at props-v1.26, though it prices
+identically to props-v1.25 (above). The two stay apart: `scorecard.py
+--pool` would pool EVERY engine version, not these two, so it is not the
+tool. If the v1.25 bucket ever needs merging, it is an explicit mapping of
+the two price hashes, recorded here first.
+
+Review: five findings, all fixed -- the locks bumped (props-v1.26,
+nfl-v1.17); the pooling advice above corrected; the starter-depth list is
+one constant for both schemas (STARTER_DEPTH), so the backtest seasons and
+the live one cannot drift; the equivalence test gained a row with no team;
+the engine contract's "45 s cold" slate claim replaced by the measured time.
