@@ -149,15 +149,31 @@ def normalize_depth_charts(dc, kick_lookup=None):
         d["dt"] = pd.to_datetime(d["dt"], errors="coerce", utc=True)
         d = d.dropna(subset=["dt"])
         d = d[d.pos_abb.isin(["QB", "RB", "WR", "TE"])]
+        # Each (team, week) takes the team's latest snapshot before kickoff. The
+        # loop used to filter the WHOLE table per (team, week) -- ~550 scans a
+        # season, 8 of a live game's 11 s -- although every week after the last
+        # snapshot maps to the same one. So: each team's snapshot times once,
+        # each snapshot's slots once (rows in their original order, positions
+        # QB/RB/WR/TE), then a lookup per (team, week). Identical output, row
+        # for row (props-v1.26, checked against the old loop on 2026 week 3).
+        order = [("QB", 1), ("RB", 2), ("WR", 3), ("TE", 1)]
+        times = {t: pd.DatetimeIndex(g.dt.unique()).sort_values() for t, g in d.groupby("team", sort=False)}
+        rows_of = d.groupby(["team", "dt"], sort=False).indices          # (team, dt) -> row positions, in order
+        slots = {}
+
+        def slots_at(key):
+            if key not in slots:
+                g = d.iloc[rows_of[key]]
+                slots[key] = [(x.gsis_id, f"{pos}{int(x.pos_rank)}") for pos, mx in order
+                              for _, x in g[(g.pos_abb == pos) & (g.pos_rank <= mx)].iterrows()]
+            return slots[key]
         for (team, wk), kt in (kick_lookup or {}).items():
-            sub = d[(d.team == team) & (d.dt < kt)]
-            if sub.empty:
-                continue
-            sub = sub[sub.dt == sub.dt.max()]
-            for pos, mx in [("QB", 1), ("RB", 2), ("WR", 3), ("TE", 1)]:
-                for _, x in sub[(sub.pos_abb == pos) & (sub.pos_rank <= mx)].iterrows():
-                    out.append({"team": team, "week": wk, "gsis_id": x.gsis_id,
-                                "slot": f"{pos}{int(x.pos_rank)}"})
+            ts = times.get(team)
+            i = 0 if ts is None else ts.searchsorted(kt, side="left")      # first snapshot at/after kickoff
+            if i == 0:
+                continue                                                  # none strictly before it
+            for gsis, slot in slots_at((team, ts[i - 1])):
+                out.append({"team": team, "week": wk, "gsis_id": gsis, "slot": slot})
     else:
         d = dc.copy()
         team_col = "club_code" if "club_code" in cols else "team"
