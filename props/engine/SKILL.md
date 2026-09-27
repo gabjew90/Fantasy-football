@@ -47,7 +47,7 @@ Helpers in `scripts/`:
   table and the calibration note, so the chat reply is a copy of the file and nothing is
   assembled by hand), `slate_survival_*.csv` (one must-win pick per game, rule below),
   `slate_card_*.csv` (every card row, sorted tier then backtested market then EV) and
-  `slate_runs_*.csv`. A 16-game week takes about 45 s cold.
+  `slate_runs_*.csv`. A 15-game week took about 3 minutes on the Windows host (props-v1.26, 2026-09-27; 9 before it): about 5 s a game plus a full re-run per Questionable player for the 'if he's out' pricing.
 - `odds_client.py` — Odds API stages, header capture, caching, archive rows. Never prints
   the key. Prefer it over ad hoc curl.
 - `build_priors.py` — OFFSEASON ONLY. Rebuilds `resources/priors_{season}_*` from a

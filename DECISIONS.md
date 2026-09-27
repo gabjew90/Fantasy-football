@@ -6282,3 +6282,44 @@ ignored, dispersion_v0's range caveats travel with a projection, and the
 opponent-lineup rule is one function (lineup.opponent_lineup) for the report
 and the swap tool. props/ask.season_week stays a copy of nfl._season_week:
 props may not import beyond core.fetch (test_boundary).
+
+## 2026-09-27 (120) -- props engine: the depth-chart step 10x faster, identical output (props-v1.26)
+
+The user asked why props takes so long (the week-3 slate took 9 minutes on
+the Windows host). Measured on CIN@PIT: 11 s for the game, 32 s with its two
+"if he's out" re-runs; 8 of the 11 s was one step. anytime_td_v1's
+current_inputs calls model.normalize_depth_charts with the whole season's
+kickoffs (~550 team-weeks), and the modern-schema branch filtered the WHOLE
+depth-chart table once per team-week -- 200 snapshots a team, most weeks
+mapping to the same latest one.
+
+Now: each team's snapshot times once, a binary search per team-week for the
+latest snapshot strictly before kickoff, and each snapshot's slots computed
+once, on first use, from its rows in table order. The legacy (<=2024) branch
+is untouched.
+
+Proof it changes nothing (the byte-identical check, CLAUDE.md):
+- the function, old vs new, on the real 2026 depth charts and the season's
+  kickoffs: identical CSV, row for row, on pandas 1.5.3 and 3.0.2, plus
+  hand-made edge cases (a kickoff exactly at a snapshot, before any
+  snapshot, a team the table lacks) -- 6.5 s -> 0.6 s;
+- four games end to end from a frozen workdir and saved lines
+  (--odds-snapshot): all 40 output CSVs identical except the run timestamp
+  columns (snapshot_utc, logged_at_utc); every report line identical except
+  timestamps. A game: 12 s -> 5.5 s;
+- props/tests/test_depth_charts.py keeps the old loop as the reference and
+  pins the two equal on a table built to hit the edges (it passes on the old
+  code and the new).
+
+A pure speed change still moves the pricer's price_hash, so the scorecard
+starts a new pricing-model bucket at props-v1.26, though it prices
+identically to props-v1.25 (above). The two stay apart: `scorecard.py
+--pool` would pool EVERY engine version, not these two, so it is not the
+tool. If the v1.25 bucket ever needs merging, it is an explicit mapping of
+the two price hashes, recorded here first.
+
+Review: five findings, all fixed -- the locks bumped (props-v1.26,
+nfl-v1.17); the pooling advice above corrected; the starter-depth list is
+one constant for both schemas (STARTER_DEPTH), so the backtest seasons and
+the live one cannot drift; the equivalence test gained a row with no team;
+the engine contract's "45 s cold" slate claim replaced by the measured time.
