@@ -18,7 +18,7 @@ from __future__ import annotations
 import pandas as pd
 
 from core import fetch as F
-from core.scoring import NFLVERSE_BASE, nflverse_weights, score_frame
+from core.scoring import NFLVERSE_BASE, nflverse_weights, score_frame, unmodelled_keys
 
 LOG_WEEKS = 6
 RECEIVING = ("targets", "receptions", "receiving_yards", "receiving_tds")
@@ -27,6 +27,13 @@ PASSING = ("attempts", "completions", "passing_yards", "passing_tds", "passing_i
 LABEL = {"targets": "Tgt", "receptions": "Rec", "receiving_yards": "Rec yds", "receiving_tds": "Rec TD",
          "carries": "Car", "rushing_yards": "Rush yds", "rushing_tds": "Rush TD", "attempts": "Att",
          "completions": "Cmp", "passing_yards": "Pass yds", "passing_tds": "Pass TD", "passing_interceptions": "INT"}
+
+
+def not_counted(scoring: dict) -> list[str]:
+    """League scoring keys the nflverse columns cannot price (yardage
+    bonuses, return yards...): the game log's points leave them out, so they
+    can sit below the platform's -- said wherever the points are shown."""
+    return [k for k in unmodelled_keys(scoring) if float(scoring.get(k) or 0) != 0]
 
 
 def columns_for(pos: str | None) -> tuple:

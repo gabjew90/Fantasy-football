@@ -223,6 +223,7 @@ def players(snap: Snapshot, names: list[str], *, with_usage: bool = True, with_f
             row["game_log"] = BX.game_log(box["cur"], g, i.get("pos"), snap.scoring) if box.get("cur") is not None else []
             row["last_season"] = (BX.season_summary(box["prev"], g, i.get("pos"), snap.scoring)
                                   if box.get("prev") is not None else None)
+            row["scoring_not_counted"] = BX.not_counted(snap.scoring)
         rows.append(row)
     data = {"league": snap.league, "season": snap.season, "week": snap.week, "players": rows,
             "fantasypros_note": fp_note or None, "name_notes": notes or None}
@@ -484,7 +485,8 @@ def _player_lines(r: dict) -> list[str]:
         L.append(f"Scored {p['mean']} (final; projected {p.get('projected_before_kickoff')} before kickoff).")
     elif p.get("zero_reason"):
         L.append(f"Projection: 0 -- {p['zero_reason']}.")
-        if str(p["zero_reason"]).startswith("status") and not _has_practice(r.get("fantasypros")):
+        if (str(p["zero_reason"]).startswith("status") and not _has_practice(r.get("fantasypros"))
+                and _early_week()):
             # the engine zeroes Out/IR as a rule, and Sleeper's tag is all it
             # reads: early in a week that can still be the IN-GAME tag from
             # Sunday (Mike Evans, 2026 week 4: "Out", reported day-to-day)
@@ -517,7 +519,9 @@ def _player_lines(r: dict) -> list[str]:
                      + (f"; partial game wk {', '.join(str(w) for w in u['partial_weeks'])} (an exit or benching, "
                         "not a role)" if u.get("partial_weeks") else "") + ".")
     if r.get("game_log"):
-        L += ["", "Game log (league scoring):", ""] + BX.log_table(r["game_log"], r["pos"]) + [""]
+        left = r.get("scoring_not_counted")
+        L += ["", "Game log (league scoring" + (f"; not counted: {', '.join(left)}" if left else "") + "):", ""] \
+            + BX.log_table(r["game_log"], r["pos"]) + [""]
     if r.get("last_season"):
         L.append("Last season: " + BX.summary_line(r["last_season"], r["pos"]))
     for o in r.get("bench_options") or []:
@@ -553,6 +557,18 @@ def _h2h_lines(snap: Snapshot, h: dict) -> list[str]:
         L.append("Already final (the actual score stands in for a projection): "
                  + ", ".join(_label(snap, s) for s in h["final"]) + ".")
     return L
+
+
+def _early_week(now: dt.datetime | None = None) -> bool:
+    """Monday or Tuesday, Pacific: before the week's first practice report,
+    when a designation can still be the one from the last game."""
+    now = now or dt.datetime.now(dt.timezone.utc)
+    try:
+        from zoneinfo import ZoneInfo
+        now = now.astimezone(ZoneInfo("America/Los_Angeles"))
+    except Exception:  # noqa: BLE001
+        pass
+    return now.weekday() in (0, 1)
 
 
 def _has_practice(fp_row) -> bool:

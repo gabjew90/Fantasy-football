@@ -238,7 +238,8 @@ def session_report(out: Path) -> Path:
     # is counted here, where the user sees it, not left to chat to confess
     tr = read("chat_transcript.md") or ""
     import re as _re
-    replies = _re.findall(r"\*\*Reply:\*\*(.*?)(?=\n#+ |\Z)", tr, flags=_re.S)
+    # an entry starts "## <UTC time> -- release ..."; a reply may carry its own headings
+    replies = _re.findall(r"\*\*Reply:\*\*(.*?)(?=\n## [^\n]*(?:UTC|release)|\Z)", tr, flags=_re.S)
     # a SHORT reply is fine ("Start Deebo."); a placeholder or an empty one is not
     stub = [x for x in replies if not x.strip()
             or _re.search(r"\(\s*as sent|as sent (?:above|below)|see (?:above|below)|\(same as", x, _re.I)]

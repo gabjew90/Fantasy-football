@@ -6471,3 +6471,11 @@ engine output -- a check chat does not have to remember -- not as new rules:
    and last season in per-game terms.
 7. Most transcript entries said "(as sent below)". `nfl.py log` now counts
    placeholder or empty replies and puts the count at the top of the file.
+
+Review: five findings, all fixed. The Out-tag caveat is a Monday/Tuesday
+one (it printed all week without a practice report); the transcript check
+stops at the next entry, not at a heading inside a reply; adds that improve
+the lineup but have no eligible cut are named, not folded into "no gain";
+game-log points say which league scoring keys they cannot count (yardage
+bonuses and the like); bench options are tested with locks and without an
+opponent.

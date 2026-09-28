@@ -362,7 +362,8 @@ def run(league: str, positions=("RB", "WR", "TE"), horizon: str = "season", week
 
     md = markdown(league, view, horizon, positions, stand, gate, ranked, drops, protected, projs, ev, info,
                   rate, stand_pat, m, notes + con_notes, rolled=rolled, team_ctx=team_ctx,
-                  scored={"candidates": len(cands), "improving": len(ranked)})
+                  scored={"candidates": len(cands), "improving": len(ranked),
+                          "no_cut": [r for r in rows if r["gain"] > MIN_LISTED[horizon] and not r["drop"]]})
     rec = {"command": "fantasy waiver", "league": league, "season": view.season, "week": view.week,
            "horizon": horizon, "positions": list(positions), "standing": stand, "gate": gate.to_dict(),
            "scored_candidates": cands,
@@ -478,8 +479,12 @@ def markdown(league, view, horizon, positions, stand, gate, ranked, drops, prote
     if scored:
         L += ["", f"*{scored['candidates']} unrostered players were scored (the top {POOL_SIZE} by rest-of-season "
               f"value plus up to {USAGE_ADDS} by last week's usage); {scored['improving']} improve your lineup and "
-              "are named above. A player not named in this report was either outside that pool or scored with no "
-              "gain -- `fantasy player` shows his week either way.*"]
+              "are named above. A player not named in this report was outside that pool or scored with no gain "
+              "-- `fantasy player` shows his week either way.*"]
+        if scored.get("no_cut"):
+            L += ["", "**Improve your lineup but have no eligible cut** (every bench player is protected or "
+                  "needed): " + "; ".join(f"{_n(r['add'], info)} {_gain(r, horizon)}" for r in scored["no_cut"][:10])
+                  + "."]
     for c, tc in (team_ctx or {}).items():
         L += ["", f"### {_n(c, info)} among his teammates", ""] + EV.team_table(tc)
     if protected:

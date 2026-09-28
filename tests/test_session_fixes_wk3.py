@@ -72,11 +72,14 @@ def test_a_head_to_head_of_finished_games_is_the_score_not_a_simulation():
 
 def test_an_out_zero_says_it_takes_the_tag_at_face_value(monkeypatch):
     monkeypatch.setattr(A.EV, "for_sleeper", lambda pids, info, season, manifest=None, team=False: {})
+    monkeypatch.setattr(A, "_early_week", lambda now=None: True)      # the caveat is a Monday/Tuesday one
     s = _snap()
     s.projections["6"] = Projection("6", "weekly_blend_v0", WEEK, 0.0, detail={"zero_reason": "status Out"})
     s.info["6"] = dict(s.info["6"], status="Out")
     text = A.players(s, ["Garrett Wilson"]).text
     assert "Projection: 0 -- status Out." in text and "Assumption: the 0 takes Sleeper's status at face value" in text
+    monkeypatch.setattr(A, "_early_week", lambda now=None: False)
+    assert "Assumption:" not in A.players(s, ["Garrett Wilson"]).text, "later in the week the tag stands"
 
 
 # ------------------------------------------------------------------ bench options
@@ -126,3 +129,36 @@ def test_the_log_counts_transcript_entries_that_are_not_verbatim(tmp_path):
         "## 20:41 UTC\n**User:** ok\n**Reply:**\nStart Deebo.\n", encoding="utf-8")
     text = nfl.session_report(tmp_path).read_text(encoding="utf-8")
     assert "**Transcript: 1 of 3 entries do not hold the reply verbatim**" in text, "a short real reply is fine"
+
+
+def test_bench_options_respect_locks_and_a_week_without_an_opponent():
+    s = _snap()
+    past = (dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=1)).isoformat(timespec="minutes").replace("+00:00", "Z")
+    locked_bench = _snap(env=dict(s.env, DAL=dict(s.env["DAL"], kickoff_utc=past)))
+    assert A.bench_options(locked_bench, "4") == [], "Jake's game started: he cannot come in"
+    locked_starter = _snap(env=dict(s.env, LAR=dict(s.env["LAR"], kickoff_utc=past)))
+    assert A.bench_options(locked_starter, "4") == [], "Terrance's game started: he cannot go out"
+    no_opp = _snap(opp_rid=None)
+    opts = A.bench_options(no_opp, "4")
+    assert opts and opts[0]["p_win_with"] is None and opts[0]["mean"] == 10.0
+
+
+def test_the_out_caveat_is_for_early_in_the_week_only():
+    mon = dt.datetime(2026, 9, 28, 20, tzinfo=dt.timezone.utc)      # Monday 1 PM PT
+    sat = dt.datetime(2026, 10, 3, 20, tzinfo=dt.timezone.utc)      # Saturday
+    assert A._early_week(mon) is True and A._early_week(sat) is False
+
+
+def test_a_reply_with_its_own_headings_is_still_verbatim(tmp_path):
+    import nfl
+    (tmp_path / "chat_transcript.md").write_text(
+        "## 20:30 UTC -- release nfl-v1.22\n**User:** lineup?\n**Reply:**\n### The call\nStart Fannin.\n"
+        "## 20:40 UTC -- release nfl-v1.22\n**User:** ok\n**Reply:** (as sent below)\n", encoding="utf-8")
+    text = nfl.session_report(tmp_path).read_text(encoding="utf-8")
+    assert "**Transcript: 1 of 2 entries" in text
+
+
+def test_the_game_log_names_the_scoring_it_leaves_out():
+    assert BX.not_counted({"rec": 0.5, "bonus_rec_yd_100": 3.0, "rush_yd": 0.1}) == ["bonus_rec_yd_100"]
+    assert BX.not_counted({"rec": 0.5}) == []
+
