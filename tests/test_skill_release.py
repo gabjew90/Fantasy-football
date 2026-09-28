@@ -425,33 +425,46 @@ def test_every_module_nfl_py_imports_ships_in_the_release():
 
 
 # The file rules of the OLDEST harness still installed: the skill the user
-# built at nfl-v1.0 (vendored release 04ccdab). Its bootstrap extracts only
-# what these rules include. Update this only when every installed skill has
-# been rebuilt from a newer skill/release.py -- never to make a test pass.
+# built at nfl-v1.0 (vendored release 04ccdab). Its bootstrap unpacks what
+# these rules include, and its compare() then demands the tree hold EXACTLY
+# the lock's files -- so a file it skips is "missing" and a file it unpacks
+# that the lock lacks is "extra"; either sends chat to the vendored release.
+# Update only when every installed skill has been rebuilt from a newer
+# skill/release.py -- never to make a test pass.
 HARNESS_RULES = {
     "dirs": ("core/", "fantasy/", "draftkit/", "manager/", "props/engine/", "leagues/"),
     "files": ("CHAT.md", "nfl.py", "config.yaml", "requirements.txt", "tiers.csv", "tiers.keefamania.csv",
               "data/processed/absence_bands.json"),
     "globs": ("data/external/*.csv",),
+    "exclude_parts": ("__pycache__", "backtest_out"),
+    "exclude_suffixes": (".pyc", ".pyo", ".env", ".pkl", ".tmp", ".part"),
+    "exclude_names": ("credential.env", ".env"),
 }
 
 
 def _harness_includes(rel: str) -> bool:
     import fnmatch
-    r = HARNESS_RULES
+    r, parts = HARNESS_RULES, rel.split("/")
+    if (any(p in r["exclude_parts"] for p in parts) or rel.endswith(r["exclude_suffixes"])
+            or parts[-1] in r["exclude_names"]):
+        return False
     return (rel in r["files"] or any(rel.startswith(d) for d in r["dirs"])
             or any(fnmatch.fnmatch(rel, g) for g in r["globs"]))
 
 
-def test_every_release_file_is_one_the_installed_harness_will_unpack():
-    """A file the installed bootstrap does not unpack is MISSING to the lock
-    check, and chat falls back to the vendored release. nfl-v1.16 and v1.17
-    shipped props/ask.py, outside the v1.0 harness's rules: chat ran nfl-v1.0
-    for two days (DECISIONS #121)."""
+def test_the_release_is_exactly_what_the_installed_harness_unpacks():
+    """nfl-v1.16 and v1.17 shipped props/ask.py, outside the v1.0 harness's
+    rules: it was never unpacked, and chat ran nfl-v1.0 for two days
+    (DECISIONS #121). Both directions are checked: nothing the harness skips,
+    nothing it unpacks that the release leaves out."""
     root = Path(R.__file__).resolve().parents[1]
-    outside = [rel for rel in R.files(root) if not _harness_includes(rel)]
-    assert not outside, (f"release files the installed harness (nfl-v1.0 rules) never unpacks: {outside} -- "
-                         "move them under an included directory, or rebuild the skill first")
+    tracked = R._tracked(root)
+    if tracked is None:
+        pytest.skip("not a git checkout: the tarball's contents are the tracked files")
+    release = set(R.files(root))
+    harness = {rel for rel in tracked if _harness_includes(rel) and (root / rel).is_file()}
+    assert not release - harness, f"release files the installed harness never unpacks: {sorted(release - harness)}"
+    assert not harness - release, f"files the installed harness unpacks that the lock lacks: {sorted(harness - release)}"
 
 
 def test_the_bootstrap_unpacks_what_the_lock_names_not_its_own_rules(tmp_path, monkeypatch):
