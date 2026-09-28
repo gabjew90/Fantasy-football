@@ -67,3 +67,29 @@ def games_left(env: dict, now: dt.datetime | None = None) -> tuple[int, int]:
     left = sum(1 for row in games.values() if not started(row, now))
     return left, len(games)
 
+
+# A decision made now is for NEXT week once most of this one is played: on a
+# Monday with only the late game left, week 3 is settled. Below this share of
+# games still to kick off, an unasked-for week moves on -- for waivers and the
+# question tools alike (the 2026-09-28 session: `fantasy player` answered for
+# week 3 while `fantasy waiver` had moved to week 4, and chat nearly quoted
+# week 3's "plays 100%" for a player FantasyPros gave 51% for week 4).
+ROLL_BELOW = 0.5
+
+
+def decision_week(season: int, week: int, manifest=None, now: dt.datetime | None = None,
+                  last_week: int = 18) -> tuple[int, str | None]:
+    """(the week a decision is for, why it moved or None). Never past the
+    league's last week; a scoreboard that cannot be read means no move -- the
+    roll is a convenience, and its failure must not cost the answer."""
+    if week >= last_week:
+        return week, None
+    try:
+        left, total = games_left(week_environment(season, week, manifest=manifest), now)
+    except Exception:  # noqa: BLE001
+        return week, None
+    if total and left / total < ROLL_BELOW:
+        return week + 1, (f"week {week} has {left} of {total} games still to kick off, so this is week "
+                          f"{week + 1} (pass --week {week} for this week)")
+    return week, None
+

@@ -6442,3 +6442,40 @@ share of the volume was dropped -- kept, marked "?"; the header named a week
 range over games, hiding byes -- it lists the weeks; role-change text printed
 WOPR x100 as a percent; the table gained the season level of the lead share;
 a test's cross-module import no longer assumes tests/ is a package.
+
+## 2026-09-28 (125) -- fixes from the first full nfl-v1.21 chat session (nfl-v1.22)
+
+The user's session log (40 commands, gate PASS throughout, the question tools
+used as intended) and chat's own review turned up seven things, fixed as
+engine output -- a check chat does not have to remember -- not as new rules:
+1. Waivers named only the top 12 adds; chat, told "not in the table =
+   outside the pool", said Sutton was not scored (he was the 13th). Every
+   other improving add is now named under **Also scored**, with the count
+   scored and the pool rule; CHAT.md's "outside the pool" rule reads it.
+2. Chat answered several Ferguson questions before finding Fannin on the
+   bench at 10.8 vs 6.2 (+6.3 points of P(win)). `fantasy player` on one of
+   my starters now lists the bench players who could take his seat and
+   project higher, with the swap's P(win) and the command.
+3. Mike Evans read "Out, 0" from the in-game tag while news said
+   day-to-day. A status zero with no practice report this week now says it
+   takes Sleeper's tag at face value and may be Sunday's tag.
+4. A head-to-head of two finished games printed "100% ... +8.9" (the final
+   scores). All-final pairs now print the scores; a mixed pair names which
+   player is already final.
+5. On Monday `fantasy player` answered for week 3 while `fantasy waiver` had
+   rolled to week 4. The roll (environment.decision_week) now serves both,
+   and every question-tool answer carries the **Week:** line.
+6. Chat read nflverse CSVs by hand for box scores and "points without TDs".
+   fantasy/boxscore.py: `fantasy player` prints the game log (the position's
+   box score columns, league-scoring points and points without touchdowns)
+   and last season in per-game terms.
+7. Most transcript entries said "(as sent below)". `nfl.py log` now counts
+   placeholder or empty replies and puts the count at the top of the file.
+
+Review: five findings, all fixed. The Out-tag caveat is a Monday/Tuesday
+one (it printed all week without a practice report); the transcript check
+stops at the next entry, not at a heading inside a reply; adds that improve
+the lineup but have no eligible cut are named, not folded into "no gain";
+game-log points say which league scoring keys they cannot count (yardage
+bonuses and the like); bench options are tested with locks and without an
+opponent.

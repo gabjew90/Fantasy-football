@@ -73,6 +73,7 @@ class Snapshot:
     gate: dict
     manifest: dict
     notes: list = field(default_factory=list)
+    rolled: str | None = None    # why the week moved on (environment.decision_week), or None
 
     # ------------------------------------------------------------ views
     @property
@@ -113,6 +114,17 @@ class Snapshot:
 def build(league: str, week: int | None = None) -> Snapshot:
     m = Manifest(f"fantasy snapshot {league}")
     view = LG.load(league, week, m)
+    rolled = None
+    if week is None:
+        from . import environment as E
+        wk, rolled = E.decision_week(view.season, view.week, m, last_week=int(view.ctx.get("last_week") or 18))
+        if rolled:
+            nxt = LG.load(league, wk, m)
+            if nxt.opp_rid is None and view.opp_rid is not None:
+                rolled = (f"week {view.week} is nearly over, but week {wk}'s matchup is not available yet, so "
+                          f"this is week {view.week} -- pass --week {wk} once it is")
+            else:
+                view = nxt
     ctx = view.ctx
     raw_players = ctx.get("players") or {}
     by_rid = {int(r["roster_id"]): r for r in ctx["rosters"]}
@@ -150,7 +162,7 @@ def build(league: str, week: int | None = None) -> Snapshot:
         my_rid=view.my_rid, opp_rid=view.opp_rid, teams=teams, slots=dict(view.slots),
         flex_slots=tuple(frozenset(s) for s in (view.flex_slots or ())), standing=view.standing,
         scoring=view.scoring, players=players, info=info, projections=projs, env=env,
-        gate=gate.to_dict(), manifest=m.to_dict(), notes=notes + view.notes)
+        gate=gate.to_dict(), manifest=m.to_dict(), notes=notes + view.notes, rolled=rolled)
 
 
 def path_for(league: str, week: int | None) -> Path:

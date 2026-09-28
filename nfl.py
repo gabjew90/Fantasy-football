@@ -233,6 +233,20 @@ def session_report(out: Path) -> Path:
          f"{len(failed)} failed; {len(bad_inputs)} input(s) failed or stale.",
          f"Setup: source {setup.get('release_source')}, packages at setup {setup.get('deps_at_setup')}, "
          f"now {setup.get('deps_now')}, versions {setup.get('versions')}.", ""]
+    # a transcript entry whose reply is a placeholder ("(as sent below)")
+    # defeats the transcript's purpose -- judging how the answers read; it
+    # is counted here, where the user sees it, not left to chat to confess
+    tr = read("chat_transcript.md") or ""
+    import re as _re
+    # an entry starts "## <UTC time> -- release ..."; a reply may carry its own headings
+    replies = _re.findall(r"\*\*Reply:\*\*(.*?)(?=\n## [^\n]*(?:UTC|release)|\Z)", tr, flags=_re.S)
+    # a SHORT reply is fine ("Start Deebo."); a placeholder or an empty one is not
+    stub = [x for x in replies if not x.strip()
+            or _re.search(r"\(\s*as sent|as sent (?:above|below)|see (?:above|below)|\(same as", x, _re.I)]
+    if stub:
+        L += [f"**Transcript: {len(stub)} of {len(replies)} entries do not hold the reply verbatim** "
+              "(a placeholder such as \"(as sent below)\" instead of the text) -- those answers cannot be "
+              "reviewed from this file.", ""]
     L += ["## Review of the session", "",
           read("session_review.md", nest=True) or "*Chat wrote no review (session_review.md is missing).*", ""]
     L += ["## Transcript (verbatim)", "",

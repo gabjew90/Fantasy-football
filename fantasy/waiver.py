@@ -75,35 +75,17 @@ STAND_PAT = {"stream": 0.01, "season": 5.0}     # P(win) points / season points 
 # 2026-09-28 -- five points of P(win) for a stream -- so every stream table
 # hid the +1..+5-point adds its own stand-pat rule was measuring against.
 MIN_LISTED = {"stream": 0.005, "season": 0.05}
-# An add made now plays NEXT week once most of this one is played: on a Monday
-# with only the late game left, week 3's P(win) is settled and every stream
-# add read as zero (the 2026 week-3 defense log). Below this share of games
-# still to kick off, an unasked-for week moves on, and the report says so.
-ROLL_BELOW = 0.5
+# the week roll is environment.decision_week, shared with the question tools
+ROLL_BELOW = E.ROLL_BELOW
+decision_week = E.decision_week
 TEAM_CONTEXT_ADDS = 3           # the top adds shown among their teammates
+TABLE_ROWS = 12                 # adds in the table; every other scored add is NAMED below it
 
 
 def display_name(d: dict, sid: str) -> str:
     """Sleeper's name for a player; a team defense has no full_name there, so
     its city and nickname ("Chicago Bears"); the id only when neither exists."""
     return d.get("full_name") or f"{d.get('first_name') or ''} {d.get('last_name') or ''}".strip() or sid
-
-
-def decision_week(season: int, week: int, manifest=None, now: dt.datetime | None = None,
-                  last_week: int = 18) -> tuple[int, str | None]:
-    """(the week waiver adds are for, why it moved or None). Never past the
-    league's last week; a scoreboard that cannot be read means no move -- the
-    roll is a convenience, and its failure must not cost the answer."""
-    if week >= last_week:
-        return week, None
-    try:
-        left, total = E.games_left(E.week_environment(season, week, manifest=manifest), now)
-    except Exception:  # noqa: BLE001
-        return week, None
-    if total and left / total < ROLL_BELOW:
-        return week + 1, (f"week {week} has {left} of {total} games still to kick off, so adds are evaluated "
-                          f"for week {week + 1} (pass --week {week} for this week)")
-    return week, None
 
 
 @dataclass
@@ -379,9 +361,12 @@ def run(league: str, positions=("RB", "WR", "TE"), horizon: str = "season", week
             team_ctx[r["add"]] = tc
 
     md = markdown(league, view, horizon, positions, stand, gate, ranked, drops, protected, projs, ev, info,
-                  rate, stand_pat, m, notes + con_notes, rolled=rolled, team_ctx=team_ctx)
+                  rate, stand_pat, m, notes + con_notes, rolled=rolled, team_ctx=team_ctx,
+                  scored={"candidates": len(cands), "improving": len(ranked),
+                          "no_cut": [r for r in rows if r["gain"] > MIN_LISTED[horizon] and not r["drop"]]})
     rec = {"command": "fantasy waiver", "league": league, "season": view.season, "week": view.week,
            "horizon": horizon, "positions": list(positions), "standing": stand, "gate": gate.to_dict(),
+           "scored_candidates": cands,
            "week_rolled": rolled,
            "stand_pat": stand_pat, "adds": ranked[:15], "protected_cuts": sorted(protected),
            "drops": [{"player": p, "ros_rate": round(rate.get(p, 0.0), 2), "protected": p in protected}
@@ -447,7 +432,8 @@ def rank_adds(rows: list[dict], horizon: str, contender: bool) -> tuple[list[dic
 
 
 def markdown(league, view, horizon, positions, stand, gate, ranked, drops, protected, projs, ev, info,
-             rate, stand_pat, m, notes, rolled: str | None = None, team_ctx: dict | None = None) -> str:
+             rate, stand_pat, m, notes, rolled: str | None = None, team_ctx: dict | None = None,
+             scored: dict | None = None) -> str:
     unit = "P(win) this week" if horizon == "stream" else "season points added (weeks he would start)"
     L = [f"# Waiver -- {league}, {view.season} week {view.week}: {', '.join(positions)}, {horizon} horizon", "",
          f"**{gate.line()}**", "",
@@ -470,7 +456,7 @@ def markdown(league, view, horizon, positions, stand, gate, ranked, drops, prote
           "| Add | Drop | Gain | " + ("Starts (weeks) | Playoff wks | " if horizon == "season" else "") +
           "This week (mean / p10 / p90) | ROS rate | Snap % | Tgt / carry share | Role | Why the role changed |",
           "|---|---|---|" + ("---|---|" if horizon == "season" else "") + "---|---|---|---|---|---|"]
-    for r in ranked[:12]:
+    for r in ranked[:TABLE_ROWS]:
         c, e = r["add"], ev.get(r["add"]) or {}
         mean = e.get("mean") or {}
         pr = projs.get(c)
@@ -484,6 +470,21 @@ def markdown(league, view, horizon, positions, stand, gate, ranked, drops, prote
                  + f"{wk} | {rate.get(c, 0):.1f} | {_pct(mean.get('snap_pct'))} | "
                  f"{_pct(mean.get('tgt_share'))} / {_pct(mean.get('carry_share'))} | {r.get('trajectory') or '—'} | "
                  f"{('teammate out: ' + r['cause']) if r.get('cause') else '—'} |")
+    # WHO WAS SCORED, said outright. The table used to stop at 12 with nothing
+    # after it, and chat -- told "not in the table = outside the pool" -- said
+    # Courtland Sutton was not evaluated when he was the 13th add (+0.9).
+    if len(ranked) > TABLE_ROWS:
+        L += ["", "**Also scored, below the table:** " + "; ".join(
+            f"{_n(r['add'], info)} {_gain(r, horizon)}" for r in ranked[TABLE_ROWS:]) + "."]
+    if scored:
+        L += ["", f"*{scored['candidates']} unrostered players were scored (the top {POOL_SIZE} by rest-of-season "
+              f"value plus up to {USAGE_ADDS} by last week's usage); {scored['improving']} improve your lineup and "
+              "are named above. A player not named in this report was outside that pool or scored with no gain "
+              "-- `fantasy player` shows his week either way.*"]
+        if scored.get("no_cut"):
+            L += ["", "**Improve your lineup but have no eligible cut** (every bench player is protected or "
+                  "needed): " + "; ".join(f"{_n(r['add'], info)} {_gain(r, horizon)}" for r in scored["no_cut"][:10])
+                  + "."]
     for c, tc in (team_ctx or {}).items():
         L += ["", f"### {_n(c, info)} among his teammates", ""] + EV.team_table(tc)
     if protected:

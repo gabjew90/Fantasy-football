@@ -28,6 +28,7 @@ from core import ids as IDS
 from core.manifest import Manifest
 from draftkit.lineup import optimal_lineup
 
+from . import boxscore as BX
 from . import environment as E
 from . import evidence as EV
 from . import lineup as LU
@@ -180,7 +181,8 @@ def header(snap: Snapshot) -> str:
         f"{c.get('name')} ({c.get('detail')})" for c in g.get("checks") or [] if not c.get("passed"))
     built = dt.datetime.fromisoformat(snap.built_at_utc)
     return (f"{snap.league}, {snap.season} week {snap.week} -- league read {snap.age_min():.0f} min ago "
-            f"({LU._pt(built)}; `--fresh` re-reads) -- league data check: {check}")
+            f"({LU._pt(built)}; `--fresh` re-reads) -- league data check: {check}"
+            + (f"\n**Week:** {snap.rolled}." if getattr(snap, "rolled", None) else ""))
 
 
 # ------------------------------------------------------------------ tools
@@ -200,7 +202,7 @@ def players(snap: Snapshot, names: list[str], *, with_usage: bool = True, with_f
     LU.lock_order(watch, snap.my_players, snap.info, snap.env, dt.datetime.now(dt.timezone.utc))
     fp, fp_note = (LU.fp_practice(watch, snap.season, snap.week, m) if (watch and with_fp) else ({}, ""))
     by_pid = {w["pid"]: w for w in watch}
-    rows = []
+    rows, box = [], {}
     for sid in sids:
         i, raw = snap.info.get(sid) or {}, snap.players.get(sid) or {}
         w = by_pid.get(sid) or {}
@@ -214,6 +216,14 @@ def players(snap: Snapshot, names: list[str], *, with_usage: bool = True, with_f
                "usage": usage(ev.get(sid)) if with_usage else None,
                "designated_teammates": [{k: t.get(k) for k in ("name", "pos", "status", "part", "scenario")}
                                         | {"fantasypros": fp.get(t["sid"])} for t in w.get("teammates") or []]}
+        row["bench_options"] = bench_options(snap, sid)
+        g = (ev.get(sid) or {}).get("gsis_id")
+        if with_usage and g and i.get("pos") in ("QB", "RB", "WR", "TE"):
+            box = box or _box_stats(snap.season, m)
+            row["game_log"] = BX.game_log(box["cur"], g, i.get("pos"), snap.scoring) if box.get("cur") is not None else []
+            row["last_season"] = (BX.season_summary(box["prev"], g, i.get("pos"), snap.scoring)
+                                  if box.get("prev") is not None else None)
+            row["scoring_not_counted"] = BX.not_counted(snap.scoring)
         rows.append(row)
     data = {"league": snap.league, "season": snap.season, "week": snap.week, "players": rows,
             "fantasypros_note": fp_note or None, "name_notes": notes or None}
@@ -233,6 +243,12 @@ def head_to_head(snap: Snapshot, sids: list[str]) -> dict:
     """P(A outscores B) for two players; for three or more, each one's chance
     of being the top scorer. Draws come from fantasy.winprob (independent
     players: two in the same game are drawn as if unrelated)."""
+    final = {s: bool((snap.projections.get(s).detail or {}).get("final")) if s in snap.projections else False
+             for s in sids}
+    if all(final.values()):
+        # every game is over: the "projections" are the final scores, and a
+        # simulated head-to-head of two fixed numbers only restates them
+        return {"all_final": True, "scores": {s: round(snap.projections[s].mean, 1) for s in sids}}
     draws = {s: WP.draws(snap.projections.get(s), WP.N_DRAWS, WP._seed(s, 7)) for s in sids}
     same_game = sorted({(snap.info.get(a) or {}).get("name") for a in sids for b in sids if a < b
                         and _same_game(snap, a, b)} - {None})
@@ -247,6 +263,7 @@ def head_to_head(snap: Snapshot, sids: list[str]) -> dict:
         top = np.argmax(stack, axis=0)
         out = {"p_top_scorer": {s: round(float(np.mean(top == k)), 3) for k, s in enumerate(sids)}}
     out["same_game"] = bool(same_game)
+    out["final"] = sorted(s for s, f in final.items() if f)
     return out
 
 
@@ -468,6 +485,14 @@ def _player_lines(r: dict) -> list[str]:
         L.append(f"Scored {p['mean']} (final; projected {p.get('projected_before_kickoff')} before kickoff).")
     elif p.get("zero_reason"):
         L.append(f"Projection: 0 -- {p['zero_reason']}.")
+        if (str(p["zero_reason"]).startswith("status") and not _has_practice(r.get("fantasypros"))
+                and _early_week()):
+            # the engine zeroes Out/IR as a rule, and Sleeper's tag is all it
+            # reads: early in a week that can still be the IN-GAME tag from
+            # Sunday (Mike Evans, 2026 week 4: "Out", reported day-to-day)
+            L.append("Assumption: the 0 takes Sleeper's status at face value. Before this week's practice reports "
+                     "(the first is Wednesday) it can still be the in-game tag from his last game -- check the "
+                     "news before treating him as out.")
     else:
         rng = (f" Range: bad week {p['p10']}, median {p['p50']}, good week {p['p90']} (10th/50th/90th percentile)."
                if p.get("p10") is not None else " No measured range for this position.")
@@ -493,6 +518,17 @@ def _player_lines(r: dict) -> list[str]:
                      f"Role: {u.get('role')}" + (f" ({ch})" if ch else "")
                      + (f"; partial game wk {', '.join(str(w) for w in u['partial_weeks'])} (an exit or benching, "
                         "not a role)" if u.get("partial_weeks") else "") + ".")
+    if r.get("game_log"):
+        left = r.get("scoring_not_counted")
+        L += ["", "Game log (league scoring" + (f"; not counted: {', '.join(left)}" if left else "") + "):", ""] \
+            + BX.log_table(r["game_log"], r["pos"]) + [""]
+    if r.get("last_season"):
+        L.append("Last season: " + BX.summary_line(r["last_season"], r["pos"]))
+    for o in r.get("bench_options") or []:
+        d = "" if o["p_win_now"] is None else (f"; P(win) {o['p_win_now']:.1%} -> {o['p_win_with']:.1%}"
+                                               f" ({(o['p_win_with'] - o['p_win_now']) * 100:+.1f} percentage points)")
+        L.append(f"Bench option: {o['name']} ({o['pos']}) projects {o['mean']} vs his {o['his_mean']}{d}. "
+                 f"`{o['command']}`")
     if u is not None and u.get("team_context"):
         L += [""] + EV.team_table(u["team_context"]) + [""]
     for t in r["designated_teammates"]:
@@ -504,6 +540,9 @@ def _player_lines(r: dict) -> list[str]:
 
 
 def _h2h_lines(snap: Snapshot, h: dict) -> list[str]:
+    if h.get("all_final"):
+        return ["Their games are all over, so there is no head-to-head to simulate: "
+                + "; ".join(f"{_label(snap, s)} scored {v}" for s, v in h["scores"].items()) + "."]
     L = []
     if "p_first_outscores_second" in h:
         a, b = h["first"], h["second"]
@@ -514,4 +553,78 @@ def _h2h_lines(snap: Snapshot, h: dict) -> list[str]:
             f"{_label(snap, s)} {p:.0%}" for s, p in sorted(h["p_top_scorer"].items(), key=lambda kv: -kv[1])) + ".")
     if h.get("same_game"):
         L.append("Two of them share a game; they are drawn independently, so that head-to-head is approximate.")
+    if h.get("final"):
+        L.append("Already final (the actual score stands in for a projection): "
+                 + ", ".join(_label(snap, s) for s in h["final"]) + ".")
     return L
+
+
+def _early_week(now: dt.datetime | None = None) -> bool:
+    """Monday or Tuesday, Pacific: before the week's first practice report,
+    when a designation can still be the one from the last game."""
+    now = now or dt.datetime.now(dt.timezone.utc)
+    try:
+        from zoneinfo import ZoneInfo
+        now = now.astimezone(ZoneInfo("America/Los_Angeles"))
+    except Exception:  # noqa: BLE001
+        pass
+    return now.weekday() in (0, 1)
+
+
+def _has_practice(fp_row) -> bool:
+    return bool(fp_row) and (any(fp_row.get("practice_days") or []) or bool(fp_row.get("practice")))
+
+
+BENCH_OPTIONS = 2
+
+
+def bench_options(snap: Snapshot, sid: str) -> list[dict]:
+    """For a starter of MINE whose game has not started: bench players who
+    could take his seat and project higher, with the P(win) of the swap --
+    the check chat kept making late ("Fannin on your bench projects 10.8 to
+    Ferguson's 6.2", found only when the user asked about a waiver TE).
+    Measured against the lineup actually set, like `fantasy swap`."""
+    t = snap.teams.get(snap.my_rid) or {}
+    if sid not in t.get("starters", []):
+        return []
+    now = dt.datetime.now(dt.timezone.utc)
+    started = lambda p: E.started(snap.env.get((snap.info.get(p) or {}).get("team")), now)  # noqa: E731
+    if started(sid):
+        return []
+    base, _ = _baseline(snap)
+    if sid not in base:
+        return []
+    mine = snap.projections.get(sid)
+    his = mine.mean if mine else 0.0
+    theirs, _ = _opponent(snap)
+    pw0 = WP.p_win(base, theirs, snap.projections) if theirs else None
+    out = []
+    for b in t.get("players", []):
+        pb = snap.projections.get(b)
+        if b in base or started(b) or pb is None or pb.mean <= his:
+            continue
+        ids = _legal(snap, [p for p in base if p != sid] + [b])
+        if ids is None:
+            continue
+        pw = WP.p_win(ids, theirs, snap.projections) if theirs else None
+        i = snap.info.get(b) or {}
+        out.append({"id": b, "name": i.get("name"), "pos": i.get("pos"), "mean": round(pb.mean, 1),
+                    "his_mean": round(his, 1), "p_win_now": pw0, "p_win_with": pw,
+                    "command": (f'nfl.py fantasy swap --league {snap.league} --start "{i.get("name")}" '
+                                f'--bench "{(snap.info.get(sid) or {}).get("name")}"')})
+    out.sort(key=lambda o: -((o["p_win_with"] or 0) if o["p_win_with"] is not None else o["mean"]))
+    return out[:BENCH_OPTIONS]
+
+
+def _box_stats(season: int, m: Manifest) -> dict:
+    """This season's and last season's weekly box scores, once per call. A
+    missing file (last season's, early in a new one) is a gap, never a
+    failed answer."""
+    out = {}
+    for key, yr in (("cur", season), ("prev", season - 1)):
+        try:
+            out[key] = BX.load(yr, m)
+        except Exception:  # noqa: BLE001
+            out[key] = None
+    return out
+
