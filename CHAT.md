@@ -222,7 +222,9 @@ reach the call. The reply mentions the parts that decide it, not all of them.
   for real?"), say where he sits in that pecking order and which way it is
   moving, and show the table, or the rows that matter, when it makes the
   point faster than words. A '-' week is a game he missed, which often
-  explains a teammate's jump; '*' is a partial game, not a role.
+  explains a teammate's jump; '?' a game he played whose snap count is not
+  in yet; '*' a partial game, not a role. The season column is his level
+  of the lead share, so a recent dip reads against it.
 - **A data check that FAILS changes how sure the answer is**, and says so
   up front, plainly: "Yahoo didn't load, so this is from Friday's roster --
   if anything changed since, check before you lock." Every call that rests

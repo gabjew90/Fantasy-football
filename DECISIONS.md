@@ -6434,3 +6434,11 @@ answers, and props may not import the fantasy code.
 Early-season caveat stays as it is: three games per player, so the role flag
 reads INSUFFICIENT_SAMPLE until week four; the table shows direction.
 
+
+Review: six findings, all fixed. A played week whose snap count is missing
+(snaps publish after play-by-play) read '-', "did not play" -- now '?',
+from a per-week `played` flag; a teammate with no id-map position but a
+share of the volume was dropped -- kept, marked "?"; the header named a week
+range over games, hiding byes -- it lists the weeks; role-change text printed
+WOPR x100 as a percent; the table gained the season level of the lead share;
+a test's cross-module import no longer assumes tests/ is a package.

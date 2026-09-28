@@ -85,7 +85,7 @@ def test_the_player_is_always_kept_and_a_qb_has_no_group():
 def test_the_table_marks_the_player_gaps_and_partial_games():
     tc = EV.team_context("wr1", _usage(), POS, None, NAMES)
     L = EV.team_table(tc)
-    assert L[0].startswith("Team context -- KC WR/TE, weeks 1-4")
+    assert L[0].startswith("Team context -- KC WR/TE, weeks 1, 2, 3, 4")
     wr1 = next(x for x in L if "**WR1**" in x)
     assert "90 / 90 / 90 / 90" in wr1 and "28 / 28 / 28 / 28" in wr1 and "0.42 / 0.42 / 0.42 / 0.42" in wr1
     wr2 = next(x for x in L if "| WR2 (WR)" in x)
@@ -94,10 +94,33 @@ def test_the_table_marks_the_player_gaps_and_partial_games():
 
 def test_the_player_tool_prints_the_table(monkeypatch):
     from fantasy import ask as A
-    from tests.test_fantasy_ask import _snap
+    from test_fantasy_ask import _snap        # tests/ is on sys.path (no package)
     tc = EV.team_context("wr1", _usage(), POS, None, NAMES)
     monkeypatch.setattr(A.EV, "for_sleeper", lambda pids, info, season, manifest=None, team=False:
                         {p: {"weeks": 4, "mean": {}, "series": {}, "team_context": tc} for p in pids})
     r = A.players(_snap(), ["Puka Nacua"])
     assert "Team context -- KC WR/TE" in r.text
     assert r.data["players"][0]["usage"]["team_context"]["rows"][0]["gsis_id"] == "wr2"
+
+
+def test_a_missing_snap_count_is_not_a_missed_game_and_an_unmapped_teammate_stays():
+    u = _usage()
+    u.loc[(u.gsis_id == "wr1") & (u.week == 4), "snap_pct"] = float("nan")     # snaps not published yet
+    u = pd.concat([u, _u([_wk("rookie", "KC", 4, 0.6, tgt=0.25)])], ignore_index=True)   # not in the id map
+    tc = EV.team_context("wr1", u, POS, None, NAMES)
+    row = next(r for r in tc["rows"] if r["is_player"])
+    assert row["by_week"]["snap_pct"][3] is None and row["played"][3] is True
+    mine = next(x for x in EV.team_table(tc) if "**WR1**" in x)
+    assert "90 / 90 / 90 / ?" in mine, "played, snap count missing: '?', never '-'"
+    rookie = next(r for r in tc["rows"] if r["gsis_id"] == "rookie")
+    assert rookie["pos"] == "?", "kept, marked unknown -- his 25% is in the team totals"
+
+
+def test_byes_show_in_the_header_and_wopr_is_never_a_percent():
+    u = _usage()
+    u = u[u.week != 2]                                    # a bye in week 2
+    tc = EV.team_context("wr1", u, POS, None, NAMES)
+    assert EV.team_table(tc)[0].startswith("Team context -- KC WR/TE, weeks 1, 3, 4")
+    tc["rows"][0]["role_changed"] = {"wopr": {"earlier": 0.45, "recent": 0.62}}
+    assert "wopr 0.45->0.62" in "\n".join(EV.team_table(tc))
+

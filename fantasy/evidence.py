@@ -325,9 +325,13 @@ def team_context(gsis: str, usage: pd.DataFrame, positions: dict, bands: dict | 
     same usage table and the same evidence_for (partial games, role flags
     judged against noise_bands_v0) as the player's own line, restricted to
     this team -- a player traded in has only his weeks here. A week the team
-    played and a player has no row is None: he missed it (or had not arrived).
-    Sorted by the last two weeks of the group's lead metric; the asked-for
-    player is always kept. None for a QB, K or DEF, or with no usage."""
+    played and a player has no row is None: he missed it (or had not arrived);
+    `played` says which weeks he has a row, so a missing SNAP count (snaps
+    publish after play-by-play, or the pfr id did not join) is not read as a
+    missed game. A teammate with no position in the id map but a share of
+    the group's volume is kept with position "?", not dropped: his share is
+    in the team totals either way. Sorted by the last two weeks of the lead
+    metric; the asked-for player is always kept. None for a QB, K or DEF."""
     group = TEAM_GROUPS.get(positions.get(gsis))
     mine = usage[usage["gsis_id"] == gsis]
     if group is None or mine.empty:
@@ -335,9 +339,11 @@ def team_context(gsis: str, usage: pd.DataFrame, positions: dict, bands: dict | 
     team = mine.sort_values("week")["team"].iloc[-1]
     t = usage[usage["team"] == team]
     wks = sorted(int(w) for w in t["week"].dropna().unique())[-weeks:]
-    members = [g for g in t["gsis_id"].dropna().unique() if positions.get(g) in group]
-    ev = evidence_for(members, t, positions, bands)
     metrics, lead, i10 = TEAM_METRICS[group], TEAM_LEAD[group], TEAM_I10[group]
+    window = t[t["week"].isin(wks)]
+    unmapped = set(window.loc[window[lead] > 0, "gsis_id"].dropna()) - {g for g in positions if positions.get(g)}
+    members = [g for g in t["gsis_id"].dropna().unique() if positions.get(g) in group or g in unmapped]
+    ev = evidence_for(members, t, positions, bands)
     rows = []
     for g in members:
         d = t[t["gsis_id"] == g].drop_duplicates("week").set_index("week")
@@ -347,8 +353,9 @@ def team_context(gsis: str, usage: pd.DataFrame, positions: dict, bands: dict | 
         e = ev.get(g) or {}
         changed = {m: {"earlier": f.get("earlier"), "recent": f.get("recent")}
                    for m, f in (e.get("role_change") or {}).items() if f.get("changed")}
-        rows.append({"gsis_id": g, "name": names.get(g, g), "pos": positions.get(g), "is_player": g == gsis,
-                     "by_week": by, "season": {m: (e.get("mean") or {}).get(m) for m in metrics},
+        rows.append({"gsis_id": g, "name": names.get(g, g), "pos": positions.get(g) or "?", "is_player": g == gsis,
+                     "by_week": by, "played": [w in d.index for w in wks],
+                     "season": {m: (e.get("mean") or {}).get(m) for m in metrics},
                      "inside10": int((e.get("totals") or {}).get(i10, 0)), "weeks_played": e.get("weeks", 0),
                      "partial_weeks": e.get("partial_weeks") or [], "role": e.get("trajectory"),
                      "role_changed": changed or None,
@@ -359,45 +366,57 @@ def team_context(gsis: str, usage: pd.DataFrame, positions: dict, bands: dict | 
         kept = rows[:top - 1] + [r for r in rows if r["is_player"]]
     for r in kept:
         r.pop("_recent")
-    return {"team": team, "group": "/".join(group), "weeks": wks, "metrics": list(metrics),
+    return {"team": team, "group": "/".join(group), "weeks": wks, "metrics": list(metrics), "lead": lead,
             "inside10_metric": i10, "rows": kept}
 
 
-METRIC_LABEL = {"snap_pct": "Snap %", "tgt_share": "Target share", "wopr": "WOPR", "carry_share": "Carry share"}
+METRIC_LABEL = {"snap_pct": "Snap %", "tgt_share": "Target share", "wopr": "WOPR", "carry_share": "Carry share",
+                "ay_share": "Air-yard share"}
 I10_LABEL = {"i10_tgt": "Inside-10 targets", "i10_car": "Inside-10 carries"}
+NOT_A_SHARE = ("wopr", "adot")           # printed as numbers, never x100 as a percent
 
 
-def _cell(vals, metric, partial_idx=()) -> str:
-    """'71 / 85 / 90' by week (oldest first); '-' a week he did not play;
-    '*' a partial game (an exit or a benching, not role evidence)."""
+def _num(v, metric) -> str:
+    return f"{v:.2f}" if metric in NOT_A_SHARE else f"{100 * v:.0f}"
+
+
+def _cell(vals, metric, partial_idx=(), played=None) -> str:
+    """'71 / 85 / 90' by week (oldest first); '-' a week he did not play; '?'
+    a week he played with no value (a snap count not published or not
+    joined); '*' a partial game (an exit or a benching, not role evidence)."""
     out = []
     for k, v in enumerate(vals):
         if v is None:
-            out.append("-")
+            out.append("?" if (played and k < len(played) and played[k]) else "-")
         else:
-            txt = f"{v:.2f}" if metric == "wopr" else f"{100 * v:.0f}"
-            out.append(txt + ("*" if k in partial_idx else ""))
+            out.append(_num(v, metric) + ("*" if k in partial_idx else ""))
     return " / ".join(out)
 
 
 def team_table(tc: dict) -> list[str]:
     """The player among the teammates he competes with, as a table: each
-    metric by week (the last few team games, oldest first), inside-10 volume
-    and the role flag. The player's own row is bold."""
+    metric by game (the team's last few, oldest first, listed by week so a
+    bye shows), his season level of the lead metric, inside-10 volume and the
+    role flag. The player's own row is bold."""
     wks, metrics = tc["weeks"], tc["metrics"]
-    head = (f"Team context -- {tc['team']} {tc['group']}, weeks {wks[0]}-{wks[-1]} (oldest first; "
-            "'-' did not play, '*' partial game; shares in %):") if wks else f"Team context -- {tc['team']}:"
+    lead = tc.get("lead", metrics[1] if len(metrics) > 1 else metrics[0])
+    head = (f"Team context -- {tc['team']} {tc['group']}, weeks {', '.join(str(w) for w in wks)} (oldest first; "
+            "'-' did not play, '?' no snap count yet, '*' partial game; shares in %):") if wks \
+        else f"Team context -- {tc['team']}:"
     L = [head, "",
-         "| Player | " + " | ".join(METRIC_LABEL.get(m, m) for m in metrics) + f" | {I10_LABEL[tc['inside10_metric']]} | Role |",
-         "|---" * (len(metrics) + 3) + "|"]
+         "| Player | " + " | ".join(METRIC_LABEL.get(m, m) for m in metrics)
+         + f" | Season {METRIC_LABEL.get(lead, lead).lower()} | {I10_LABEL[tc['inside10_metric']]} | Role |",
+         "|---" * (len(metrics) + 4) + "|"]
     for r in tc["rows"]:
         partial = {wks.index(w) for w in r.get("partial_weeks") or [] if w in wks}
         name = f"**{r['name']}** ({r['pos']})" if r["is_player"] else f"{r['name']} ({r['pos']})"
-        changed = "; ".join(f"{METRIC_LABEL.get(k, k).lower()} {100 * (v.get('earlier') or 0):.0f}->"
-                            f"{100 * (v.get('recent') or 0):.0f}" for k, v in (r.get("role_changed") or {}).items())
+        changed = "; ".join(f"{METRIC_LABEL.get(k, k).lower()} {_num(v.get('earlier') or 0, k)}->"
+                            f"{_num(v.get('recent') or 0, k)}" for k, v in (r.get("role_changed") or {}).items())
         role = (r.get("role") or "--") + (f" ({changed})" if changed else "")
-        L.append(f"| {name} | " + " | ".join(_cell(r["by_week"].get(m) or [], m, partial) for m in metrics)
-                 + f" | {r['inside10']} | {role} |")
+        season = (r.get("season") or {}).get(lead)
+        L.append(f"| {name} | " + " | ".join(_cell(r["by_week"].get(m) or [], m, partial, r.get("played"))
+                                             for m in metrics)
+                 + f" | {'--' if season is None else _num(season, lead)} | {r['inside10']} | {role} |")
     return L
 
 
