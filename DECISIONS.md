@@ -6389,3 +6389,16 @@ point, not on "1 percentage point of P(win)"; the replaced starter comes from
 the lineup actually SET, at the add's position. Skipped: the roll reads the
 league twice (about 2 s, Mondays and Tuesdays only).
 
+
+## 2026-09-28 (123) -- the skill's description covers what the release answers (nfl-v1.20)
+
+claude.ai decides whether to use a skill from its description. skill/SKILL.md
+still described nfl-v1.0: "start/sit ... waiver targets at RB/WR/TE ... how a
+player projects if a teammate is out" -- no trades, defenses or kickers, no
+head-to-head or what-if questions, no "chance he clears a line". A question
+outside it may never reach the engine. The description now lists every kind
+of question the release answers (697 of the 1024 characters allowed), and a
+test pins the length and the main triggers. The credentials paragraph names
+the FantasyPros key. skill/SKILL.md is not in the release, so the release
+hash is unchanged; the lock moves to nfl-v1.20 so the rebuild prompt can
+clone a tag that holds the new SKILL.md.

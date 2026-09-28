@@ -478,3 +478,16 @@ def test_the_bootstrap_unpacks_what_the_lock_names_not_its_own_rules(tmp_path, m
     assert (out / "props" / "newtool.py").exists() and not (out / "core" / "fetch.py").exists()
     assert not R.included("props/newtool.py"), "the rules alone would have skipped it"
 
+
+def test_the_skill_description_covers_what_the_release_answers():
+    """claude.ai reads the description to decide whether to use the skill at
+    all: a question the description does not cover may never reach the engine
+    (it said "waiver targets at RB/WR/TE" through nfl-v1.19, with trades,
+    defenses and the question tools already shipped)."""
+    text = (ROOT / "skill" / "SKILL.md").read_text(encoding="utf-8")
+    desc = next(ln for ln in text.splitlines() if ln.startswith("description: "))[len("description: "):]
+    assert len(desc) <= 1024, f"claude.ai caps a skill description at 1024 characters ({len(desc)})"
+    for must in ("start", "waiver", "defense", "kicker", "trade", "teammate is out", "props", "any line",
+                 "this week", "Omnibeta", "Keefamania"):
+        assert must in desc, must
+
