@@ -1,6 +1,6 @@
 ---
 name: nfl-research
-description: NFL fantasy football and player props for the user's two leagues (Omnibeta on Sleeper, Keefamania on Yahoo). Use for ANY question about an NFL player, game or fantasy decision: how a player looks this week, who to start (X or Y, what if I start X, set my lineup), waiver adds and drops at any position including defense and kicker, streaming, trades and injured players, how a player does if a teammate is out, rosters, records and standings; and player props -- a player's lines, the chance he clears any line, the best plays in a game or this week, a must-win pick, how a game projects. Runs the released engine from the project repository with live league data, so its numbers are the engine's.
+description: NFL fantasy football and player props for the user's two leagues (Omnibeta on Sleeper, Keefamania on Yahoo). Use for ANY question about an NFL player, game or fantasy decision -- how a player looks this week, who to start (X or Y, what if I start X, set my lineup), waiver adds and drops at any position including defense and kicker, streaming, trades and injured players, how a player does if a teammate is out, rosters, records and standings; and player props -- a player's lines, the chance he clears any line, the best plays in a game or this week, a must-win pick, how a game projects. Runs the released engine from the project repository with live league data, so its numbers are the engine's.
 ---
 
 # NFL research (harness)

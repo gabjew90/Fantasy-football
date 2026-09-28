@@ -6402,3 +6402,8 @@ test pins the length and the main triggers. The credentials paragraph names
 the FantasyPros key. skill/SKILL.md is not in the release, so the release
 hash is unchanged; the lock moves to nfl-v1.20 so the rebuild prompt can
 clone a tag that holds the new SKILL.md.
+
+Review: the first rewrite put "decision: how" in the unquoted YAML
+description -- a nested mapping to YAML, so the frontmatter would not parse
+and the rebuilt skill would be refused. The colon is gone, and the test now
+parses the frontmatter the way the uploader does.

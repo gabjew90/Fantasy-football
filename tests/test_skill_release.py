@@ -484,8 +484,13 @@ def test_the_skill_description_covers_what_the_release_answers():
     all: a question the description does not cover may never reach the engine
     (it said "waiver targets at RB/WR/TE" through nfl-v1.19, with trades,
     defenses and the question tools already shipped)."""
+    import yaml
     text = (ROOT / "skill" / "SKILL.md").read_text(encoding="utf-8")
-    desc = next(ln for ln in text.splitlines() if ln.startswith("description: "))[len("description: "):]
+    # parsed as the uploader parses it: a ": " inside a plain YAML scalar is a
+    # nested mapping, and the whole frontmatter is refused (caught in review)
+    front = yaml.safe_load(text.split("---")[1])
+    assert set(front) >= {"name", "description"} and front["name"] == "nfl-research"
+    desc = front["description"]
     assert len(desc) <= 1024, f"claude.ai caps a skill description at 1024 characters ({len(desc)})"
     for must in ("start", "waiver", "defense", "kicker", "trade", "teammate is out", "props", "any line",
                  "this week", "Omnibeta", "Keefamania"):
