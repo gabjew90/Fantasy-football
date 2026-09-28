@@ -47,7 +47,8 @@ the current one is not.
 ## Credentials
 
 `resources/credential.env` (the Odds API key -- optional: Sleeper is the
-primary price source, the Odds API only its fallback) and
+primary price source, the Odds API only its fallback -- and the FantasyPros
+key, for practice reports and the probability of playing) and
 `resources/Yahoo_Fantasy_Connection.json` stay in this skill. The bootstrap
 copies them into the release directory, where the engine looks. Never read,
 print, quote or cite them.
