@@ -6381,3 +6381,11 @@ Browns, Colts) did not include one of them. CHAT.md: an empty table is not
 "not covered"; defenses and kickers are projected (no range); follow the
 Week line; outside reads sit beside the engine's ranking, labelled.
 
+Review: seven findings, six fixed. The roll never passes the league's last
+week and a scoreboard it cannot read means no roll, not a crash; when next
+week's matchup is not published (or synced) yet, the report stays on this
+week and says so; a stream week with no opponent stands pat on one projected
+point, not on "1 percentage point of P(win)"; the replaced starter comes from
+the lineup actually SET, at the add's position. Skipped: the roll reads the
+league twice (about 2 s, Mondays and Tuesdays only).
+

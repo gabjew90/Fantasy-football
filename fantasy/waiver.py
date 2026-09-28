@@ -82,9 +82,23 @@ MIN_LISTED = {"stream": 0.005, "season": 0.05}
 ROLL_BELOW = 0.5
 
 
-def decision_week(season: int, week: int, manifest=None, now: dt.datetime | None = None) -> tuple[int, str | None]:
-    """(the week waiver adds are for, why it moved or None)."""
-    left, total = E.games_left(E.week_environment(season, week, manifest=manifest), now)
+def display_name(d: dict, sid: str) -> str:
+    """Sleeper's name for a player; a team defense has no full_name there, so
+    its city and nickname ("Chicago Bears"); the id only when neither exists."""
+    return d.get("full_name") or f"{d.get('first_name') or ''} {d.get('last_name') or ''}".strip() or sid
+
+
+def decision_week(season: int, week: int, manifest=None, now: dt.datetime | None = None,
+                  last_week: int = 18) -> tuple[int, str | None]:
+    """(the week waiver adds are for, why it moved or None). Never past the
+    league's last week; a scoreboard that cannot be read means no move -- the
+    roll is a convenience, and its failure must not cost the answer."""
+    if week >= last_week:
+        return week, None
+    try:
+        left, total = E.games_left(E.week_environment(season, week, manifest=manifest), now)
+    except Exception:  # noqa: BLE001
+        return week, None
     if total and left / total < ROLL_BELOW:
         return week + 1, (f"week {week} has {left} of {total} games still to kick off, so adds are evaluated "
                           f"for week {week + 1} (pass --week {week} for this week)")
@@ -223,9 +237,17 @@ def run(league: str, positions=("RB", "WR", "TE"), horizon: str = "season", week
     view = LG.load(league, week, m)
     rolled = None
     if week is None:
-        wk, rolled = decision_week(view.season, view.week, m)
+        wk, rolled = decision_week(view.season, view.week, m,
+                                   last_week=int(view.ctx.get("last_week") or 18))
         if rolled:
-            view = LG.load(league, wk, m)
+            nxt = LG.load(league, wk, m)
+            if nxt.opp_rid is None and view.opp_rid is not None:
+                # next week's pairing is not published (or not synced) yet: an
+                # opponent-less week would price every add in points instead
+                rolled = (f"week {view.week} is nearly over, but week {wk}'s matchup is not available yet, "
+                          f"so adds are evaluated for week {view.week} -- pass --week {wk} once it is")
+            else:
+                view = nxt
     ctx, cfg = view.ctx, view.ctx["cfg"]
     players = json.loads(F.sleeper_players(manifest=m).read_text(encoding="utf-8"))
     rostered = {str(p) for r in ctx["rosters"] for p in (r.get("players") or [])}
@@ -259,9 +281,7 @@ def run(league: str, positions=("RB", "WR", "TE"), horizon: str = "season", week
     info = dict(view.info)
     for p in cands:
         d = players.get(p) or {}
-        # a team defense has no full_name in Sleeper's table: "Chicago Bears"
-        info[p] = {"name": d.get("full_name") or f"{d.get('first_name', '')} {d.get('last_name', '')}".strip() or p,
-                   "pos": fantasy_position(d), "team": d.get("team"),
+        info[p] = {"name": display_name(d, p), "pos": fantasy_position(d), "team": d.get("team"),
                    "status": d.get("injury_status") or ""}
     pids = list(dict.fromkeys(view.my_players + view.opp_players + cands))
     projs, env, notes = W.project_players(pids, info, view.season, view.week, view.scoring, league, m,
@@ -298,7 +318,8 @@ def run(league: str, positions=("RB", "WR", "TE"), horizon: str = "season", week
                 gain = (WP.p_win(lineup, theirs, projs) - pw0) if theirs else \
                     (sum(projs[p].mean for p in lineup) - sum(projs[p].mean for p in base))
                 if best is None or gain > best[1]:
-                    best = (d, gain, [p for p in base if p not in lineup and p != d])
+                    best = (d, gain, [p for p in starting if p not in lineup and p != d
+                                      and (info.get(p) or {}).get("pos") == (info.get(c) or {}).get("pos")])
             # the starter the add pushes out of the lineup: this week it can be
             # the cut instead of the bench player, at the same P(win)
             rows.append({"add": c, "drop": best[0] if best else None, "gain": best[1] if best else 0.0,
@@ -388,6 +409,14 @@ def week_spans(weeks) -> str:
     return ", ".join(spans)
 
 
+STREAM_POINTS = 1.0            # a stream week with no opponent: one projected point is the stand-pat line
+
+
+def points_only(rows: list[dict], horizon: str) -> bool:
+    """A stream run with no opponent measures gains in points."""
+    return horizon == "stream" and bool(rows) and all(r.get("unit") == "points" for r in rows)
+
+
 def rank_adds(rows: list[dict], horizon: str, contender: bool) -> tuple[list[dict], bool]:
     """(ranked adds, stand pat?). Only adds that improve the lineup and come
     with a cut are ranked. A team behind ranks season adds by rest-of-season
@@ -397,9 +426,11 @@ def rank_adds(rows: list[dict], horizon: str, contender: bool) -> tuple[list[dic
     version tested only the upside leader's gain: Keefamania, 2026 week 3,
     printed STAND PAT on Courtland Sutton's +0.7 while its own table held five
     tight ends above +5.)"""
-    limit = STAND_PAT[horizon]
+    limit, floor = STAND_PAT[horizon], MIN_LISTED[horizon]
+    if points_only(rows, horizon):
+        limit, floor = STREAM_POINTS, MIN_LISTED["season"]      # no opponent: this week's points, not P(win)
     key = (lambda r: -r["gain"]) if horizon == "stream" or contender else (lambda r: -r["ros_upside"])
-    ranked = sorted([r for r in rows if r["gain"] > MIN_LISTED[horizon] and r["drop"]],
+    ranked = sorted([r for r in rows if r["gain"] > floor and r["drop"]],
                     key=lambda r: (r["gain"] < limit, key(r)))
     return ranked, (not ranked or ranked[0]["gain"] < limit)
 
@@ -417,7 +448,9 @@ def markdown(league, view, horizon, positions, stand, gate, ranked, drops, prote
          + " Candidates are UNROSTERED in the league; whether one is claimable right now (waiver period, "
            "add limits) is not checked.*", ""] + ([f"**Week:** {rolled}.", ""] if rolled else [])
     if stand_pat:
-        limit = (f"{STAND_PAT[horizon] * 100:g} percentage point of this week's P(win)" if horizon == "stream"
+        limit = (f"{STREAM_POINTS:g} projected point this week (no opponent to win against)"
+                 if points_only(ranked, horizon)
+                 else f"{STAND_PAT[horizon] * 100:g} percentage point of this week's P(win)" if horizon == "stream"
                  else f"{STAND_PAT[horizon]:g} season points")
         best = max(ranked, key=lambda r: r["gain"]) if ranked else None
         L += [f"**STAND PAT -- DO NOT CUT.** No add improves the lineup by the threshold ({limit})"
