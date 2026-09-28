@@ -6479,3 +6479,21 @@ the lineup but have no eligible cut are named, not folded into "no gain";
 game-log points say which league scoring keys they cannot count (yardage
 bonuses and the like); bench options are tested with locks and without an
 opponent.
+
+## 2026-09-28 (126) -- a player's season value in `fantasy player` (nfl-v1.23)
+
+The last gap from the 2026-09-28 session: for stash and hold questions chat
+read full-season consensus totals from data/cache/core/consensus by hand.
+The snapshot now carries the waiver command's own consensus (Sleeper, ESPN,
+FantasyPros, rescaled onto one season basis; its 12-hour cache; failures
+recorded like the waiver's) for every player in it, and `fantasy player`
+prints a *Season value* line: points a game (total / 17, the waiver's rate),
+the full-season total and each source's number, with the rescale caveat. A
+consensus failure is a note and an empty table, never a failed snapshot; an
+older snapshot file without the field still loads. CHAT.md: quote it, never
+the cache.
+
+Review: three findings, all fixed. The consensus is built before the gate,
+as in the waiver command, so a failed source counts against "inputs not
+stale" in both; the line names a source with no number for the player; the
+rescale caveat prints once per answer, not once per player.

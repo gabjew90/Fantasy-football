@@ -74,6 +74,7 @@ class Snapshot:
     manifest: dict
     notes: list = field(default_factory=list)
     rolled: str | None = None    # why the week moved on (environment.decision_week), or None
+    consensus: dict = field(default_factory=dict)   # sid -> the waiver's rest-of-season consensus row
 
     # ------------------------------------------------------------ views
     @property
@@ -155,6 +156,9 @@ def build(league: str, week: int | None = None) -> Snapshot:
                                           (cfg.get("fantasy") or {}).get("market_weight"))
     rostered = {s for t in teams.values() for s in t["players"]}
     projs = {s: p for s, p in projs.items() if s in rostered or p.mean > 0}
+    # before the gate, as in the waiver command: a failed consensus source
+    # counts against "inputs not stale" here exactly as it does there
+    consensus = season_consensus(ctx, league, view.season, set(players), m, notes)
     gate = G.evaluate(m, view.scoring_yaml, view.scoring_platform, view.my_players, projs)
     return Snapshot(
         league=league, platform=view.platform, season=view.season, week=view.week,
@@ -162,7 +166,29 @@ def build(league: str, week: int | None = None) -> Snapshot:
         my_rid=view.my_rid, opp_rid=view.opp_rid, teams=teams, slots=dict(view.slots),
         flex_slots=tuple(frozenset(s) for s in (view.flex_slots or ())), standing=view.standing,
         scoring=view.scoring, players=players, info=info, projections=projs, env=env,
-        gate=gate.to_dict(), manifest=m.to_dict(), notes=notes + view.notes, rolled=rolled)
+        gate=gate.to_dict(), manifest=m.to_dict(), notes=notes + view.notes, rolled=rolled,
+        consensus=consensus)
+
+
+def season_consensus(ctx: dict, league: str, season: int, keep: set, m: Manifest, notes: list) -> dict:
+    """The waiver command's own rest-of-season consensus (Sleeper, ESPN and
+    FantasyPros, rescaled onto one season basis, its 12-hour cache), for the
+    players in the snapshot -- so `fantasy player` can say what a player is
+    worth over the season without chat reading the cache by hand (the
+    2026-09-28 session did, for every stash question). A failure is a note
+    and an empty table, never a failed snapshot."""
+    try:
+        from manager.context import state_dir
+        from manager.store import Store
+
+        from . import waiver as WV
+        con, con_notes = WV._consensus(ctx, league, season, Store(state_dir(), read_only=True))
+        WV.record_consensus_failures(m, con_notes)
+    except Exception as ex:  # noqa: BLE001
+        notes.append(f"season consensus unavailable ({type(ex).__name__})")
+        return {}
+    return {sid: {"mean": v.get("mean"), "n": v.get("n"), "per_source": v.get("per_source") or {}}
+            for sid, v in con.items() if sid in keep and v.get("mean") is not None}
 
 
 def path_for(league: str, week: int | None) -> Path:
