@@ -160,7 +160,7 @@ def test_a_roster_lists_starters_first_and_finds_a_team_by_manager():
 
 
 def test_a_player_answer_carries_the_game_the_range_and_the_data_age(monkeypatch):
-    monkeypatch.setattr(A.EV, "for_sleeper", lambda pids, info, season, manifest=None: {})
+    monkeypatch.setattr(A.EV, "for_sleeper", lambda pids, info, season, manifest=None, team=False: {})
     s = _snap()
     r = A.players(s, ["Kelce", "Terrance Ferguson"])
     k = r.data["players"][0]
@@ -171,7 +171,7 @@ def test_a_player_answer_carries_the_game_the_range_and_the_data_age(monkeypatch
 
 
 def test_a_failed_gate_is_printed_on_every_answer(monkeypatch):
-    monkeypatch.setattr(A.EV, "for_sleeper", lambda pids, info, season, manifest=None: {})
+    monkeypatch.setattr(A.EV, "for_sleeper", lambda pids, info, season, manifest=None, team=False: {})
     s = _snap(gate={"passed": False, "checks": [{"name": "roster read after the request", "passed": False,
                                                  "detail": "cached copy"}]})
     assert "FAIL -- roster read after the request (cached copy)" in A.players(s, ["Kelce"]).text
@@ -211,7 +211,7 @@ def test_the_snapshot_is_reused_while_young_and_rebuilt_when_old(monkeypatch, tm
 
 
 def test_a_designated_player_says_when_his_status_settles_and_who_locks_first(monkeypatch):
-    monkeypatch.setattr(A.EV, "for_sleeper", lambda pids, info, season, manifest=None: {})
+    monkeypatch.setattr(A.EV, "for_sleeper", lambda pids, info, season, manifest=None, team=False: {})
     s = _snap()
     early = (dt.datetime.now(UTC) + dt.timedelta(hours=2)).isoformat(timespec="minutes").replace("+00:00", "Z")
     later = (dt.datetime.now(UTC) + dt.timedelta(hours=8)).isoformat(timespec="minutes").replace("+00:00", "Z")
@@ -226,7 +226,7 @@ def test_a_designated_player_says_when_his_status_settles_and_who_locks_first(mo
 
 
 def test_a_range_caveat_travels_with_the_projection(monkeypatch):
-    monkeypatch.setattr(A.EV, "for_sleeper", lambda pids, info, season, manifest=None: {})
+    monkeypatch.setattr(A.EV, "for_sleeper", lambda pids, info, season, manifest=None, team=False: {})
     s = _snap()
     p = s.projections["1"]
     s.projections["1"] = Projection(p.player_id, p.source, p.horizon, p.mean, p.quantiles,
@@ -249,7 +249,7 @@ def test_the_swap_prices_the_same_opponent_as_the_lineup_command():
 
 def _nfl(monkeypatch, capsys, argv, snap=None):
     import nfl
-    monkeypatch.setattr(A.EV, "for_sleeper", lambda pids, info, season, manifest=None: {})
+    monkeypatch.setattr(A.EV, "for_sleeper", lambda pids, info, season, manifest=None, team=False: {})
     monkeypatch.setattr(S, "load", lambda league, week=None, fresh=False: snap or _snap())
     rc = nfl.main(argv)
     out = capsys.readouterr()

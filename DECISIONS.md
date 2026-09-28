@@ -6407,3 +6407,38 @@ Review: the first rewrite put "decision: how" in the unquoted YAML
 description -- a nested mapping to YAML, so the frontmatter would not parse
 and the rebuilt skill would be refused. The colon is gone, and the test now
 parses the frontmatter the way the uploader does.
+
+## 2026-09-28 (124) -- every player is shown among his teammates (nfl-v1.21)
+
+The user: a player asked about -- on waivers or anywhere -- should be seen
+relative to his teammates, snap share, WOPR and the weekly trend. An add's
+value is his place in his team's pecking order and its direction, which a
+line of his own averages cannot show (a 20% target share as the clear WR2
+behind an injured WR1 is not a 20% share as the fourth option).
+
+evidence.team_context: the player's position group on his CURRENT team --
+receivers WR and TE together (they share targets), backs together (carries);
+none for a QB, K or DEF -- with each metric for the team's last four games
+(receivers: snap %, target share, WOPR; backs: snap %, carry share, target
+share), inside-10 volume, partial games and the noise_bands_v0 role flag,
+all from the same usage table and evidence_for as the player's own line,
+restricted to this team (a traded player shows only his weeks here). A week
+the team played and a player did not is a gap, never a zero. Sorted by the
+last two weeks of the lead metric; the asked-for player is always kept.
+Shown by `fantasy player` (always, via for_sleeper(team=True)) and under the
+top three adds of `fantasy waiver`; CHAT.md tells chat to frame a player's
+role this way and show the table when it makes the point faster. Props are
+unchanged: the props engine's own role paragraph already travels with its
+answers, and props may not import the fantasy code.
+
+Early-season caveat stays as it is: three games per player, so the role flag
+reads INSUFFICIENT_SAMPLE until week four; the table shows direction.
+
+
+Review: six findings, all fixed. A played week whose snap count is missing
+(snaps publish after play-by-play) read '-', "did not play" -- now '?',
+from a per-week `played` flag; a teammate with no id-map position but a
+share of the volume was dropped -- kept, marked "?"; the header named a week
+range over games, hiding byes -- it lists the weeks; role-change text printed
+WOPR x100 as a percent; the table gained the season level of the lead share;
+a test's cross-module import no longer assumes tests/ is a package.

@@ -80,6 +80,7 @@ MIN_LISTED = {"stream": 0.005, "season": 0.05}
 # add read as zero (the 2026 week-3 defense log). Below this share of games
 # still to kick off, an unasked-for week moves on, and the report says so.
 ROLL_BELOW = 0.5
+TEAM_CONTEXT_ADDS = 3           # the top adds shown among their teammates
 
 
 def display_name(d: dict, sid: str) -> str:
@@ -366,9 +367,19 @@ def run(league: str, positions=("RB", "WR", "TE"), horizon: str = "season", week
             f"{(info.get(inv.get(x)) or {}).get('name') or (players.get(inv.get(x)) or {}).get('full_name') or x}"
             f" ({(players.get(inv.get(x)) or {}).get('injury_status') or 'active'})" for x in cause.split(","))
     ranked, stand_pat = rank_adds(rows, horizon, stand["contender"])
+    # the top adds among the teammates they compete with: an add's value is his
+    # place in that pecking order and which way it moves, not his line alone
+    bands = EV.load_bands()
+    names = {g: (players.get(s) or {}).get("full_name") or g for s, g in gmap.items()}
+    team_ctx = {}
+    for r in ranked[:TEAM_CONTEXT_ADDS]:
+        g = gmap.get(r["add"])
+        tc = EV.team_context(g, usage, pos_map, bands, names) if g else None
+        if tc:
+            team_ctx[r["add"]] = tc
 
     md = markdown(league, view, horizon, positions, stand, gate, ranked, drops, protected, projs, ev, info,
-                  rate, stand_pat, m, notes + con_notes, rolled=rolled)
+                  rate, stand_pat, m, notes + con_notes, rolled=rolled, team_ctx=team_ctx)
     rec = {"command": "fantasy waiver", "league": league, "season": view.season, "week": view.week,
            "horizon": horizon, "positions": list(positions), "standing": stand, "gate": gate.to_dict(),
            "week_rolled": rolled,
@@ -436,7 +447,7 @@ def rank_adds(rows: list[dict], horizon: str, contender: bool) -> tuple[list[dic
 
 
 def markdown(league, view, horizon, positions, stand, gate, ranked, drops, protected, projs, ev, info,
-             rate, stand_pat, m, notes, rolled: str | None = None) -> str:
+             rate, stand_pat, m, notes, rolled: str | None = None, team_ctx: dict | None = None) -> str:
     unit = "P(win) this week" if horizon == "stream" else "season points added (weeks he would start)"
     L = [f"# Waiver -- {league}, {view.season} week {view.week}: {', '.join(positions)}, {horizon} horizon", "",
          f"**{gate.line()}**", "",
@@ -473,6 +484,8 @@ def markdown(league, view, horizon, positions, stand, gate, ranked, drops, prote
                  + f"{wk} | {rate.get(c, 0):.1f} | {_pct(mean.get('snap_pct'))} | "
                  f"{_pct(mean.get('tgt_share'))} / {_pct(mean.get('carry_share'))} | {r.get('trajectory') or '—'} | "
                  f"{('teammate out: ' + r['cause']) if r.get('cause') else '—'} |")
+    for c, tc in (team_ctx or {}).items():
+        L += ["", f"### {_n(c, info)} among his teammates", ""] + EV.team_table(tc)
     if protected:
         L += ["", "**Never proposed as a cut** (an established role -- 60%+ of snaps, role not falling -- is not "
               "dropped on production alone): " + ", ".join(_n(p, info) for p in sorted(protected)) + ".", ""]
