@@ -156,8 +156,10 @@ def build(league: str, week: int | None = None) -> Snapshot:
                                           (cfg.get("fantasy") or {}).get("market_weight"))
     rostered = {s for t in teams.values() for s in t["players"]}
     projs = {s: p for s, p in projs.items() if s in rostered or p.mean > 0}
-    gate = G.evaluate(m, view.scoring_yaml, view.scoring_platform, view.my_players, projs)
+    # before the gate, as in the waiver command: a failed consensus source
+    # counts against "inputs not stale" here exactly as it does there
     consensus = season_consensus(ctx, league, view.season, set(players), m, notes)
+    gate = G.evaluate(m, view.scoring_yaml, view.scoring_platform, view.my_players, projs)
     return Snapshot(
         league=league, platform=view.platform, season=view.season, week=view.week,
         built_at_utc=dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),

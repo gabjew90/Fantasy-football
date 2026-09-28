@@ -235,6 +235,10 @@ def players(snap: Snapshot, names: list[str], *, with_usage: bool = True, with_f
         L += _player_lines(r) + [""]
     if fp_note and not fp:
         L.append(f"(No FantasyPros practice reports: {fp_note}.)")
+    if any(r.get("season_consensus") for r in rows):
+        # once per answer, not once per player
+        L.append("(Season value: rest-of-season sources are rescaled onto the full season -- exact only for a "
+                 "player who has missed no games.)")
     if data.get("head_to_head"):
         L += _h2h_lines(snap, data["head_to_head"])
     return AskResult("\n".join(L).rstrip() + "\n", data, _record(snap, m))
@@ -508,10 +512,10 @@ def _player_lines(r: dict) -> list[str]:
     c = r.get("season_consensus")
     if c:
         src = ", ".join(f"{k} {v:.0f}" for k, v in sorted(c["per_source"].items()))
+        gone = [k for k in CONSENSUS_SOURCES if k not in c["per_source"]]
         L.append(f"Season value (consensus of {c['n']} source{'s' if c['n'] != 1 else ''}, the waiver command's): "
-                 f"{c['per_game']} points a game, {c['season_total']:.0f} on a full-season basis ({src}). "
-                 "Rest-of-season sources are rescaled onto the full season, exact only for a player who has "
-                 "missed no games.")
+                 f"{c['per_game']} points a game, {c['season_total']:.0f} on a full-season basis ({src})"
+                 + (f"; no {', '.join(gone)} number for him" if gone else "") + ".")
     if u is not None:
         if not u.get("weeks"):
             L.append(f"Usage: {u.get('note')}.")
@@ -635,6 +639,9 @@ def _box_stats(season: int, m: Manifest) -> dict:
         except Exception:  # noqa: BLE001
             out[key] = None
     return out
+
+
+CONSENSUS_SOURCES = ("sleeper", "espn", "fantasypros")
 
 
 def season_line(snap: Snapshot, sid: str) -> dict | None:

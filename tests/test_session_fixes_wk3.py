@@ -195,3 +195,13 @@ def test_an_older_snapshot_file_without_consensus_still_loads():
     d.pop("rolled", None)
     back = S.Snapshot.from_json(json.loads(json.dumps(d, default=str)))
     assert back.consensus == {} and back.rolled is None
+
+
+def test_the_season_value_names_a_missing_source_and_the_caveat_prints_once(monkeypatch):
+    monkeypatch.setattr(A.EV, "for_sleeper", lambda pids, info, season, manifest=None, team=False: {})
+    s = _snap(consensus={"5": {"mean": 136.0, "n": 2, "per_source": {"sleeper": 126.0, "espn": 146.0}},
+                         "6": {"mean": 170.0, "n": 3, "per_source": {"sleeper": 1.0, "espn": 1.0, "fantasypros": 1.0}}})
+    text = A.players(s, ["Puka Nacua", "Garrett Wilson"]).text
+    assert "no fantasypros number for him" in text
+    assert text.count("rescaled onto the full season") == 1
+

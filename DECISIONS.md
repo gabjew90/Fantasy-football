@@ -6492,3 +6492,8 @@ the full-season total and each source's number, with the rescale caveat. A
 consensus failure is a note and an empty table, never a failed snapshot; an
 older snapshot file without the field still loads. CHAT.md: quote it, never
 the cache.
+
+Review: three findings, all fixed. The consensus is built before the gate,
+as in the waiver command, so a failed source counts against "inputs not
+stale" in both; the line names a source with no number for the player; the
+rescale caveat prints once per answer, not once per player.
