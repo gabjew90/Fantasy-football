@@ -48,7 +48,7 @@ RELEASE = {"nfl.py": b"print('hi')\n", "CHAT.md": b"# chat\n", "core/fetch.py": 
 def test_the_release_holds_code_and_league_files_never_credentials_or_state():
     for rel in ("nfl.py", "CHAT.md", "config.yaml", "core/fetch.py", "fantasy/lineup.py", "manager/yahoo_api.py",
                 "props/engine/scripts/score_game.py", "props/engine/SKILL.md", "leagues/keefamania.yaml",
-                "data/external/fantasypros_2026.csv", "props/ask.py", "fantasy/ask.py", "fantasy/snapshot.py"):
+                "data/external/fantasypros_2026.csv", "core/props_ask.py", "fantasy/ask.py", "fantasy/snapshot.py"):
         assert R.included(rel), rel
     for rel in (".env", "props/engine/resources/credential.env", "core/__pycache__/x.pyc", "state/a.json",
                 "reports/x.md", "tests/test_x.py", "props/record/wk02.jsonl", "props/engine/scripts/backtest_out/a",
@@ -422,4 +422,46 @@ def test_every_module_nfl_py_imports_ships_in_the_release():
             if (root / rel).exists() and not R.included(rel):
                 missing.append(rel)
     assert not missing, f"nfl.py imports modules the release does not ship: {missing}"
+
+
+# The file rules of the OLDEST harness still installed: the skill the user
+# built at nfl-v1.0 (vendored release 04ccdab). Its bootstrap extracts only
+# what these rules include. Update this only when every installed skill has
+# been rebuilt from a newer skill/release.py -- never to make a test pass.
+HARNESS_RULES = {
+    "dirs": ("core/", "fantasy/", "draftkit/", "manager/", "props/engine/", "leagues/"),
+    "files": ("CHAT.md", "nfl.py", "config.yaml", "requirements.txt", "tiers.csv", "tiers.keefamania.csv",
+              "data/processed/absence_bands.json"),
+    "globs": ("data/external/*.csv",),
+}
+
+
+def _harness_includes(rel: str) -> bool:
+    import fnmatch
+    r = HARNESS_RULES
+    return (rel in r["files"] or any(rel.startswith(d) for d in r["dirs"])
+            or any(fnmatch.fnmatch(rel, g) for g in r["globs"]))
+
+
+def test_every_release_file_is_one_the_installed_harness_will_unpack():
+    """A file the installed bootstrap does not unpack is MISSING to the lock
+    check, and chat falls back to the vendored release. nfl-v1.16 and v1.17
+    shipped props/ask.py, outside the v1.0 harness's rules: chat ran nfl-v1.0
+    for two days (DECISIONS #121)."""
+    root = Path(R.__file__).resolve().parents[1]
+    outside = [rel for rel in R.files(root) if not _harness_includes(rel)]
+    assert not outside, (f"release files the installed harness (nfl-v1.0 rules) never unpacks: {outside} -- "
+                         "move them under an included directory, or rebuild the skill first")
+
+
+def test_the_bootstrap_unpacks_what_the_lock_names_not_its_own_rules(tmp_path, monkeypatch):
+    """A file outside this harness's rules but named in the lock is unpacked;
+    one the lock does not name is not, whatever the rules say."""
+    files = dict(RELEASE, **{"props/newtool.py": b"z = 3\n"})
+    blob = _tarball(files)
+    out = tmp_path / "out"
+    wanted = set(files) - {"core/fetch.py"}
+    assert B.extract_release(blob, out, wanted) == len(wanted)
+    assert (out / "props" / "newtool.py").exists() and not (out / "core" / "fetch.py").exists()
+    assert not R.included("props/newtool.py"), "the rules alone would have skipped it"
 

@@ -48,7 +48,7 @@ KEEP = ("full_name", "first_name", "last_name", "position", "fantasy_positions",
 
 def cache_dir() -> Path:
     """$NFL_CACHE, else the system temp dir -- never $NFL_OUT, which is the
-    folder the user downloads from (props/ask.py uses the same root)."""
+    folder the user downloads from (core/props_ask.py uses the same root)."""
     return Path(os.environ.get("NFL_CACHE") or Path(tempfile.gettempdir()) / "nfl_cache")
 
 
