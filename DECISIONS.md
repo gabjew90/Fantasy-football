@@ -6351,3 +6351,41 @@ For the next skill build (optional, whenever the user rebuilds): the
 bootstrap now unpacks exactly the files the LOCK names, not its own frozen
 rules, so a rebuilt harness can never fall behind the file set again; and a
 rebuild refreshes the vendored fallback, still nfl-v1.0.
+
+## 2026-09-28 (122) -- stream waivers: the adds were hidden, the week was over, and the units were wrong (nfl-v1.19)
+
+Second finding from the user's week-3 defense log: `fantasy waiver --pos DEF
+--horizon stream` printed an empty table and chat concluded "the engine does
+not score team defenses", then built its whole recommendation from web
+articles. The engine does project defenses; three bugs hid it:
+- rank_adds listed only gains above 0.05 -- season POINTS in a season run,
+  but five percentage points of P(win) in a stream run, whose own stand-pat
+  line is one point. Every stream table since the command existed hid the
+  +0.5..+5-point adds. Now MIN_LISTED per horizon (stream 0.005, the lineup
+  command's noise floor; season 0.05).
+- On a Monday the "current week" is the one ending: 1 of 16 week-3 games
+  left, so every add read as zero. With fewer than half a week's games still
+  to kick off and no --week asked, waivers evaluate the next week and say so
+  (**Week:** line; decision_week, environment.games_left).
+- With no opponent lineup set the stream gain silently fell back to points
+  and printed x100 as "pp". The opponent now comes from
+  lineup.opponent_lineup (set lineup, else best by mean); a true no-opponent
+  week labels its gain as points.
+Also: a defense shows its name (Sleeper's table has no full_name for one),
+an add names the starter it replaces (the cut can be him instead, same
+P(win) this week), and a missing range reads "no measured range", not 0.0.
+
+On the week-3 data (omnibeta, week 4): Chicago +1.1 pp, New Orleans +0.8,
+Giants +0.5 over the Bengals -- chat's outside-the-engine list (Tampa Bay,
+Browns, Colts) did not include one of them. CHAT.md: an empty table is not
+"not covered"; defenses and kickers are projected (no range); follow the
+Week line; outside reads sit beside the engine's ranking, labelled.
+
+Review: seven findings, six fixed. The roll never passes the league's last
+week and a scoreboard it cannot read means no roll, not a crash; when next
+week's matchup is not published (or synced) yet, the report stays on this
+week and says so; a stream week with no opponent stands pat on one projected
+point, not on "1 percentage point of P(win)"; the replaced starter comes from
+the lineup actually SET, at the add's position. Skipped: the roll reads the
+league twice (about 2 s, Mondays and Tuesdays only).
+

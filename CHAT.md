@@ -109,6 +109,7 @@ names a week.
 | how does the game project | `nfl.py props matchup AWAY@HOME` |
 | a full breakdown of a game / the slate | `nfl.py status`, then **Props** below (the engine's full guide) |
 | waiver targets at RB / WR / TE | `nfl.py fantasy waiver --league L --pos RB,WR --horizon H` |
+| stream a defense or kicker | `nfl.py fantasy waiver --league L --pos DEF --horizon stream` (or `--pos K`) |
 | should I pick up X over someone on my bench | the same waiver run at X's position; find X in the candidate table and the cut it pairs with |
 | should I trade X for Y / is this offer fair | `nfl.py fantasy trade --league L --give "X" --get "Y"` (comma lists for 2-for-1s) |
 | hold or sell an injured player | the trade command on the offer or a realistic one, with `--back "X:WEEK"` from the latest reporting |
@@ -140,6 +141,15 @@ names a week.
 `--horizon stream`. "Stash", "league winner", "rest of season", "playoffs" ->
 `--horizon season`. Unsaid -> run both; lead with season and label which
 horizon each recommendation serves.
+
+**An empty add table is not "the engine doesn't cover it".** It means no
+add clears the listing floor for that week; say so. Defenses and kickers ARE
+projected (Sleeper's weekly number, no measured range -- say that when the
+call is close). Waivers are for the week an add can play: after most of a
+week is played the command evaluates the next one and says so on its
+**Week:** line -- follow it, and pass `--week N` only when the user names one.
+Matchup reads, injury news and "who's hot" are welcome as your own judgment
+next to the engine's ranking, labelled; they do not replace it.
 
 **A named add outside the pool.** The waiver run scores a capped pool (the
 best by consensus rate plus the biggest recent usage gains). When X is not

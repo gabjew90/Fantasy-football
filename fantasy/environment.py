@@ -56,3 +56,14 @@ def started(env_row: dict | None, now: dt.datetime | None = None) -> bool:
         return False
     k = dt.datetime.fromisoformat(env_row["kickoff_utc"].replace("Z", "+00:00"))
     return (now or dt.datetime.now(dt.timezone.utc)) >= k
+
+
+def games_left(env: dict, now: dt.datetime | None = None) -> tuple[int, int]:
+    """(games not yet kicked off, games) for a week's scoreboard rows. Each
+    game appears twice in `env` (one row per team), keyed here by its pair."""
+    games = {}
+    for team, row in (env or {}).items():
+        games[frozenset((team, row.get("opp")))] = row
+    left = sum(1 for row in games.values() if not started(row, now))
+    return left, len(games)
+

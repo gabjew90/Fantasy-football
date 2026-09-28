@@ -147,3 +147,60 @@ def test_an_unreachable_consensus_source_is_a_failed_input():
     e = m.get("fantasypros (rest-of-season consensus)")
     assert e["status"] == "failed" and "HTTPError" in e["detail"]
 
+
+
+def test_a_stream_lists_the_adds_its_own_stand_pat_rule_measures():
+    """Stream gains are a change in P(win). A 0.05 floor meant for season points
+    hid every add under +5 percentage points; the stand-pat line is +1."""
+    rows = [{"add": "a", "drop": "x", "gain": 0.011, "ros_upside": 1.0},      # +1.1 pp: clears stand pat
+            {"add": "b", "drop": "x", "gain": 0.007, "ros_upside": 1.0},      # +0.7 pp: listed, below the line
+            {"add": "c", "drop": "x", "gain": 0.003, "ros_upside": 1.0}]      # +0.3 pp: simulation noise
+    ranked, stand_pat = WV.rank_adds(rows, "stream", contender=True)
+    assert [r["add"] for r in ranked] == ["a", "b"] and stand_pat is False
+    ranked, stand_pat = WV.rank_adds(rows[1:], "stream", contender=True)
+    assert [r["add"] for r in ranked] == ["b"] and stand_pat is True
+    assert WV._gain(rows[0], "stream") == "+1.1 pp"
+    assert "not P(win)" in WV._gain(dict(rows[0], unit="points", gain=0.9), "stream")
+
+
+def test_a_week_nearly_played_hands_waivers_to_the_next(monkeypatch):
+    import datetime as dt
+    from fantasy import environment as E
+    now = dt.datetime(2026, 9, 28, 20, tzinfo=dt.timezone.utc)
+    past, later = "2026-09-27T17:00Z", "2026-09-29T00:15Z"
+    env = {t: {"opp": o, "kickoff_utc": past} for t, o in (("KC", "MIA"), ("MIA", "KC"), ("BUF", "LAC"), ("LAC", "BUF"),
+                                                              ("NYJ", "DET"), ("DET", "NYJ"))}
+    env.update({"PHI": {"opp": "CHI", "kickoff_utc": later}, "CHI": {"opp": "PHI", "kickoff_utc": later}})
+    assert E.games_left(env, now) == (1, 4)
+    monkeypatch.setattr(E, "week_environment", lambda season, week, manifest=None: env)
+    wk, why = WV.decision_week(2026, 3, now=now)
+    assert wk == 4 and "1 of 4 games" in why and "--week 3" in why
+    early = {t: dict(r, kickoff_utc=later) for t, r in env.items()}
+    monkeypatch.setattr(E, "week_environment", lambda season, week, manifest=None: early)
+    assert WV.decision_week(2026, 3, now=now) == (3, None), "a week still ahead stays"
+
+
+def test_the_roll_stops_at_the_last_week_and_survives_a_dead_scoreboard(monkeypatch):
+    from fantasy import environment as E
+
+    def boom(*a, **k):
+        raise OSError("scoreboard unreachable")
+    monkeypatch.setattr(E, "week_environment", boom)
+    assert WV.decision_week(2026, 3) == (3, None), "no scoreboard: no roll, no crash"
+    assert WV.decision_week(2026, 17, last_week=17) == (17, None), "never past the league's last week"
+
+
+def test_a_stream_without_an_opponent_stands_pat_on_points_not_p_win():
+    rows = [{"add": "a", "drop": "x", "gain": 0.4, "ros_upside": 1.0, "unit": "points"},
+            {"add": "b", "drop": "x", "gain": 1.6, "ros_upside": 1.0, "unit": "points"}]
+    ranked, stand_pat = WV.rank_adds(rows, "stream", contender=True)
+    assert [r["add"] for r in ranked] == ["b", "a"] and stand_pat is False
+    ranked, stand_pat = WV.rank_adds(rows[:1], "stream", contender=True)
+    assert stand_pat is True, "0.4 points is under the one-point line, whatever 0.4 would be as P(win)"
+
+
+def test_a_defense_is_named_by_its_city_and_nickname():
+    assert WV.display_name({"first_name": "Chicago", "last_name": "Bears", "position": "DEF"}, "CHI") == "Chicago Bears"
+    assert WV.display_name({"full_name": "Travis Kelce"}, "1") == "Travis Kelce"
+    assert WV.display_name({}, "CHI") == "CHI"
+
