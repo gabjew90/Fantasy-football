@@ -151,10 +151,13 @@ week is played the command evaluates the next one and says so on its
 Matchup reads, injury news and "who's hot" are welcome as your own judgment
 next to the engine's ranking, labelled; they do not replace it.
 
-**A named add outside the pool.** The waiver run scores a capped pool (the
-best by consensus rate plus the biggest recent usage gains). When X is not
-in its table, say X fell outside the evaluated pool and was not scored. Do
-not estimate X's value in chat.
+**A named add the report does not list.** The waiver run scores a capped
+pool (the best by consensus rate plus the biggest recent usage gains), lists
+the top adds in its table and NAMES every other add that improves your
+lineup under **Also scored**. When X is in neither, say he was outside the
+pool or scored with no gain for your lineup, run `fantasy player` on him for
+his week and his place among his teammates, and do not estimate his season
+value in chat.
 
 **Name resolution.** `scenario` exits 2 with `SCENARIO: ...` when a name
 matches nobody, matches several players, names two teams, or the team is on
@@ -290,7 +293,9 @@ reach the call. The reply mentions the parts that decide it, not all of them.
   **Reply:**
   <the reply, VERBATIM: the full text exactly as sent, every line -- not a
   summary, not a paraphrase, however long. The transcript exists to judge
-  whether the answer read well; a summary hides exactly that.>
+  whether the answer read well; a summary hides exactly that. Never a
+  placeholder ("(as sent below)", "see above"): `nfl.py log` counts those
+  and puts the count at the top of the file the user reads.>
   ```
 
   If the reply changes after the entry is written, rewrite the entry before

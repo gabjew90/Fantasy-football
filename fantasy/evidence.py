@@ -291,7 +291,8 @@ def for_sleeper(pids, info: dict, season: int, *, manifest: Manifest | None = No
     want = {str(p): gmap.get(str(p)) for p in pids}
     pos = {g: (info.get(p) or {}).get("pos") for p, g in want.items() if g}
     ev = evidence_for([g for g in want.values() if g], usage, pos, bands)
-    out = {p: (ev.get(g) if g else {"note": "no nflverse id for this player"}) for p, g in want.items()}
+    out = {p: (dict(ev.get(g) or {}, gsis_id=g) if g else {"note": "no nflverse id for this player"})
+           for p, g in want.items()}
     if team:
         from .contract import fantasy_position
         # every player's position and name, not just the ones asked about: the
