@@ -217,6 +217,10 @@ ceiling). For waivers: the horizon, role vs one big game, how long the role
 lasts, the weeks the add would actually start, the standings. That is how you
 reach the call. The reply mentions the parts that decide it, not all of them.
 
+- **Season value is the engine's, not the cache's.** `fantasy player` prints
+  a *Season value* line: the waiver command's own consensus (Sleeper, ESPN,
+  FantasyPros) per game and on a full-season basis, with each source. Quote
+  it for stash and hold questions; never read the consensus cache by hand.
 - **A player is judged among his teammates.** `fantasy player` (and each top
   add in `fantasy waiver`) prints a *Team context* table: his position group
   -- receivers WR and TE together, backs together -- with snap %, target or

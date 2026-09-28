@@ -162,3 +162,36 @@ def test_the_game_log_names_the_scoring_it_leaves_out():
     assert BX.not_counted({"rec": 0.5, "bonus_rec_yd_100": 3.0, "rush_yd": 0.1}) == ["bonus_rec_yd_100"]
     assert BX.not_counted({"rec": 0.5}) == []
 
+
+
+# ------------------------------------------------------------------ season value
+
+def test_the_season_value_is_the_waiver_consensus_per_game(monkeypatch):
+    monkeypatch.setattr(A.EV, "for_sleeper", lambda pids, info, season, manifest=None, team=False: {})
+    s = _snap(consensus={"5": {"mean": 170.0, "n": 3, "per_source": {"sleeper": 180.0, "espn": 170.0,
+                                                                     "fantasypros": 160.0}}})
+    row = A.season_line(s, "5")
+    assert row == {"season_total": 170.0, "per_game": 10.0, "n": 3,
+                   "per_source": {"sleeper": 180.0, "espn": 170.0, "fantasypros": 160.0}}
+    assert A.season_line(s, "6") is None
+    text = A.players(s, ["Puka Nacua"]).text
+    assert "Season value (consensus of 3 sources" in text and "10.0 points a game, 170 on a full-season basis" in text
+
+
+def test_a_consensus_failure_is_a_note_not_a_failed_snapshot(monkeypatch):
+    from fantasy import snapshot as S
+    monkeypatch.setattr(WV, "_consensus", lambda *a, **k: (_ for _ in ()).throw(OSError("espn down")))
+    notes: list = []
+    assert S.season_consensus({}, "omnibeta", 2026, {"1"}, __import__("core.manifest", fromlist=["Manifest"]).Manifest("t"),
+                              notes) == {}
+    assert notes == ["season consensus unavailable (OSError)"]
+
+
+def test_an_older_snapshot_file_without_consensus_still_loads():
+    import json
+    from fantasy import snapshot as S
+    d = _snap().to_json()
+    d.pop("consensus", None)
+    d.pop("rolled", None)
+    back = S.Snapshot.from_json(json.loads(json.dumps(d, default=str)))
+    assert back.consensus == {} and back.rolled is None

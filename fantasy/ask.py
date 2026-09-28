@@ -211,6 +211,7 @@ def players(snap: Snapshot, names: list[str], *, with_usage: bool = True, with_f
                "status": i.get("status") or raw.get("injury_status") or "",
                "injury": raw.get("injury_body_part"), "practice_sleeper": raw.get("practice_participation"),
                "fantasypros": fp.get(sid), "projection": projection(snap, sid),
+               "season_consensus": season_line(snap, sid),
                "status_settles_pt": w.get("status_known_pt") if w.get("own") else None,
                "my_players_locking_first": (w.get("locks_before") or None) if w.get("own") else None,
                "usage": usage(ev.get(sid)) if with_usage else None,
@@ -504,6 +505,13 @@ def _player_lines(r: dict) -> list[str]:
                                                                   if p.get("flag") else ""))
         if p.get("range_caveats"):
             L.append("Range caveat (dispersion_v0 test season): " + "; ".join(p["range_caveats"]) + ".")
+    c = r.get("season_consensus")
+    if c:
+        src = ", ".join(f"{k} {v:.0f}" for k, v in sorted(c["per_source"].items()))
+        L.append(f"Season value (consensus of {c['n']} source{'s' if c['n'] != 1 else ''}, the waiver command's): "
+                 f"{c['per_game']} points a game, {c['season_total']:.0f} on a full-season basis ({src}). "
+                 "Rest-of-season sources are rescaled onto the full season, exact only for a player who has "
+                 "missed no games.")
     if u is not None:
         if not u.get("weeks"):
             L.append(f"Usage: {u.get('note')}.")
@@ -627,4 +635,16 @@ def _box_stats(season: int, m: Manifest) -> dict:
         except Exception:  # noqa: BLE001
             out[key] = None
     return out
+
+
+def season_line(snap: Snapshot, sid: str) -> dict | None:
+    """The snapshot's consensus row for a player, per game as the waiver
+    command rates him (season total / 17), with each source's total."""
+    from .waiver import SEASON_GAMES
+    c = (getattr(snap, "consensus", None) or {}).get(sid)
+    if not c or c.get("mean") is None:
+        return None
+    return {"season_total": round(float(c["mean"]), 1), "per_game": round(float(c["mean"]) / SEASON_GAMES, 1),
+            "n": int(c.get("n") or len(c.get("per_source") or {})),
+            "per_source": {k: round(float(v), 1) for k, v in (c.get("per_source") or {}).items()}}
 
