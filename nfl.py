@@ -4,7 +4,7 @@
   python nfl.py status [--season S] [--week W] [--league L]
   python nfl.py props game AWAY@HOME [--markets td,...] [--week W]      # the full prop guide
   python nfl.py props slate [--week W] [--skip-started] [--markets ...]
-  python nfl.py props player NAME [--game AWAY@HOME]                     # question tools (props/ask.py)
+  python nfl.py props player NAME [--game AWAY@HOME]                     # question tools (core/props_ask.py)
   python nfl.py props line NAME STAT LINE
   python nfl.py props best AWAY@HOME | --slate [--survival] [--market M] [--n N]
   python nfl.py props matchup AWAY@HOME
@@ -95,7 +95,7 @@ def cmd_status(a) -> int:
 
 def cmd_props(a) -> int:
     if a.what in ("player", "line", "best", "matchup"):
-        from props import ask as PA
+        from core import props_ask as PA
         try:
             if a.what == "player":
                 if not a.args:

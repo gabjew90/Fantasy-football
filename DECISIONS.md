@@ -6323,3 +6323,31 @@ nfl-v1.17); the pooling advice above corrected; the starter-depth list is
 one constant for both schemas (STARTER_DEPTH), so the backtest seasons and
 the live one cannot drift; the equivalence test gained a row with no team;
 the engine contract's "45 s cold" slate claim replaced by the measured time.
+
+## 2026-09-28 (121) -- chat ran the vendored nfl-v1.0 for two days: the harness never unpacked props/ask.py (nfl-v1.18)
+
+The user's week-3 defense log opened "VENDORED FALLBACK (04ccdab). Could not
+reach nfl-v1.17 (hash mismatch: missing props/ask.py)". Cause: the installed
+skill unpacks a release with ITS OWN copy of skill/release.py, frozen when
+the user built it (nfl-v1.0 rules: core/, fantasy/, draftkit/, manager/,
+props/engine/, leagues/ and a few files). #119 added props/ask.py to the
+repo's rules only; the installed bootstrap skipped it, the lock check found
+it missing, and every chat since nfl-v1.16 ran nfl-v1.0 -- no question
+tools, no FantasyPros practice data, none of v1.1-v1.17. Our own tests
+passed because they test the repo's rules, not the installed ones.
+
+Fixed without a reinstall:
+- the props tools move to core/props_ask.py, inside a directory the v1.0
+  harness already unpacks (props may still reach core only via fetch,
+  manifest and scoring; this module is core, so the boundary is unchanged);
+- tests/test_skill_release.py pins HARNESS_RULES (the v1.0 rules) and fails
+  when any release file falls outside them -- the check that would have
+  caught this;
+- replayed: the nfl-v1.0 bootstrap and release.py, run on the v1.17 tarball,
+  reproduce "missing: props/ask.py"; on the v1.18 tree they unpack 183 files
+  and verify against the lock.
+
+For the next skill build (optional, whenever the user rebuilds): the
+bootstrap now unpacks exactly the files the LOCK names, not its own frozen
+rules, so a rebuilt harness can never fall behind the file set again; and a
+rebuild refreshes the vendored fallback, still nfl-v1.0.

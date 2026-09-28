@@ -1,4 +1,4 @@
-"""The props question tools (props/ask.py).
+"""The props question tools (core/props_ask.py).
 
 The engine is not run: a game's output files are written by hand into a temp
 NFL_OUT, the way score_game.py writes them. What is pinned is that every
@@ -15,7 +15,7 @@ import time
 import pandas as pd
 import pytest
 
-from props import ask as A
+from core import props_ask as A
 
 SLUG = "2026_wk03_KC_MIA"
 REPORT = """# KC at MIA

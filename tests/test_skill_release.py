@@ -48,7 +48,7 @@ RELEASE = {"nfl.py": b"print('hi')\n", "CHAT.md": b"# chat\n", "core/fetch.py": 
 def test_the_release_holds_code_and_league_files_never_credentials_or_state():
     for rel in ("nfl.py", "CHAT.md", "config.yaml", "core/fetch.py", "fantasy/lineup.py", "manager/yahoo_api.py",
                 "props/engine/scripts/score_game.py", "props/engine/SKILL.md", "leagues/keefamania.yaml",
-                "data/external/fantasypros_2026.csv", "props/ask.py", "fantasy/ask.py", "fantasy/snapshot.py"):
+                "data/external/fantasypros_2026.csv", "core/props_ask.py", "fantasy/ask.py", "fantasy/snapshot.py"):
         assert R.included(rel), rel
     for rel in (".env", "props/engine/resources/credential.env", "core/__pycache__/x.pyc", "state/a.json",
                 "reports/x.md", "tests/test_x.py", "props/record/wk02.jsonl", "props/engine/scripts/backtest_out/a",
@@ -422,4 +422,59 @@ def test_every_module_nfl_py_imports_ships_in_the_release():
             if (root / rel).exists() and not R.included(rel):
                 missing.append(rel)
     assert not missing, f"nfl.py imports modules the release does not ship: {missing}"
+
+
+# The file rules of the OLDEST harness still installed: the skill the user
+# built at nfl-v1.0 (vendored release 04ccdab). Its bootstrap unpacks what
+# these rules include, and its compare() then demands the tree hold EXACTLY
+# the lock's files -- so a file it skips is "missing" and a file it unpacks
+# that the lock lacks is "extra"; either sends chat to the vendored release.
+# Update only when every installed skill has been rebuilt from a newer
+# skill/release.py -- never to make a test pass.
+HARNESS_RULES = {
+    "dirs": ("core/", "fantasy/", "draftkit/", "manager/", "props/engine/", "leagues/"),
+    "files": ("CHAT.md", "nfl.py", "config.yaml", "requirements.txt", "tiers.csv", "tiers.keefamania.csv",
+              "data/processed/absence_bands.json"),
+    "globs": ("data/external/*.csv",),
+    "exclude_parts": ("__pycache__", "backtest_out"),
+    "exclude_suffixes": (".pyc", ".pyo", ".env", ".pkl", ".tmp", ".part"),
+    "exclude_names": ("credential.env", ".env"),
+}
+
+
+def _harness_includes(rel: str) -> bool:
+    import fnmatch
+    r, parts = HARNESS_RULES, rel.split("/")
+    if (any(p in r["exclude_parts"] for p in parts) or rel.endswith(r["exclude_suffixes"])
+            or parts[-1] in r["exclude_names"]):
+        return False
+    return (rel in r["files"] or any(rel.startswith(d) for d in r["dirs"])
+            or any(fnmatch.fnmatch(rel, g) for g in r["globs"]))
+
+
+def test_the_release_is_exactly_what_the_installed_harness_unpacks():
+    """nfl-v1.16 and v1.17 shipped props/ask.py, outside the v1.0 harness's
+    rules: it was never unpacked, and chat ran nfl-v1.0 for two days
+    (DECISIONS #121). Both directions are checked: nothing the harness skips,
+    nothing it unpacks that the release leaves out."""
+    root = Path(R.__file__).resolve().parents[1]
+    tracked = R._tracked(root)
+    if tracked is None:
+        pytest.skip("not a git checkout: the tarball's contents are the tracked files")
+    release = set(R.files(root))
+    harness = {rel for rel in tracked if _harness_includes(rel) and (root / rel).is_file()}
+    assert not release - harness, f"release files the installed harness never unpacks: {sorted(release - harness)}"
+    assert not harness - release, f"files the installed harness unpacks that the lock lacks: {sorted(harness - release)}"
+
+
+def test_the_bootstrap_unpacks_what_the_lock_names_not_its_own_rules(tmp_path, monkeypatch):
+    """A file outside this harness's rules but named in the lock is unpacked;
+    one the lock does not name is not, whatever the rules say."""
+    files = dict(RELEASE, **{"props/newtool.py": b"z = 3\n"})
+    blob = _tarball(files)
+    out = tmp_path / "out"
+    wanted = set(files) - {"core/fetch.py"}
+    assert B.extract_release(blob, out, wanted) == len(wanted)
+    assert (out / "props" / "newtool.py").exists() and not (out / "core" / "fetch.py").exists()
+    assert not R.included("props/newtool.py"), "the rules alone would have skipped it"
 

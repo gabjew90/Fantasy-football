@@ -36,8 +36,13 @@ LOCK_NAME = "nfl.lock.json"
 # they read. Not reports, state, tests, docs or the draft spreadsheets.
 INCLUDE_DIRS = ("core/", "fantasy/", "draftkit/", "manager/", "props/engine/", "leagues/")
 INCLUDE_FILES = ("CHAT.md", "nfl.py", "config.yaml", "requirements.txt", "tiers.csv", "tiers.keefamania.csv",
-                 "data/processed/absence_bands.json",
-                 "props/ask.py")        # the props question tools: outside the engine, read its output files
+                 "data/processed/absence_bands.json")
+# CHANGING THE RULES ABOVE DOES NOT REACH AN INSTALLED HARNESS. The installed
+# skill unpacks a release with its own copy of this file, as of its build, and
+# skips everything that copy does not include -- then the lock check fails and
+# chat runs the vendored fallback (props/ask.py, nfl-v1.16/17, DECISIONS #121).
+# A file must fit the rules of the OLDEST harness in use (HARNESS_RULES in
+# tests/test_skill_release.py) or wait for a rebuilt skill.
 INCLUDE_GLOBS = ("data/external/*.csv",)
 EXCLUDE_PARTS = ("__pycache__", "backtest_out")
 EXCLUDE_SUFFIXES = (".pyc", ".pyo", ".env", ".pkl", ".tmp", ".part")

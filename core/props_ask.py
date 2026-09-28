@@ -21,7 +21,13 @@ playing -- because the engine's contract travels with its numbers, not with a
 report.
 
 This module computes no probability. Every number is read from an engine file.
-Stdlib plus pandas, and core.fetch only (props/tests/test_boundary.py).
+Stdlib plus pandas, and core.fetch only.
+
+It lives in core/, not props/: the installed chat harness unpacks a release
+by its OWN copy of the file rules (skill/release.py as of its build), and a
+harness built at nfl-v1.0 only knows core/, fantasy/, draftkit/, manager/,
+props/engine/ and leagues/. As props/ask.py it was never unpacked, the lock
+check failed, and chat ran the vendored nfl-v1.0 (DECISIONS #121).
 """
 
 from __future__ import annotations

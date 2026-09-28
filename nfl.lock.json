@@ -9,6 +9,7 @@
   "core/ids.py": "a139ac00a1875c7499fba5afbe275aa51e9ad1fca6df30ffa0aa5974d1308d38",
   "core/manifest.py": "dcdb9e164a30fbe102f7559661157c33f08c9dd6455aee6f185761260f921195",
   "core/probe.py": "b3ef1cd2f783157b4dcd75f93cacf4f00613fa4c787b921ee9e0fe452c74bdee",
+  "core/props_ask.py": "580307b523c6c39a7164cd8036dcf1a4cf1e11a9bdd36c2811d443fd6032eb9a",
   "core/registry.py": "edf4afe6031ae5b6973e3a4143942da48d2c395aa35d53ab23b922c26558a0bd",
   "core/scoring.py": "59ef214f5cab6f137f6c786055d3e2d0ada0108b74b2bd795ad94204da49c9b9",
   "core/status.py": "5f09b233b568849dc5f8cdd7a76e2936245823e5d837d9b49e502f2bb837b16f",
@@ -86,7 +87,7 @@
   "fantasy/resources/market_shape_params.json": "a9250ef44c98538a5f2dd6a49c342aeaee0633028701bf33d03c7082285d6c8e",
   "fantasy/resources/noise_bands_v0.json": "f907f5065b4d6f16b8b4f1e9fdb82bb5cce78864294abf0f475f6db8aa3618fe",
   "fantasy/scenario.py": "7edd05299ec6646658a90a2812f8ec1836dcd3fa851c7c0c0277ba1e6e62f6b5",
-  "fantasy/snapshot.py": "58e2653b8c1bf786666425c6455347031020f2c3faecf51a4973b5edaefa8597",
+  "fantasy/snapshot.py": "ebec7dd65e75d88b4fb550c48e578dcf44b3fe48d8a1d87c933a6751771a5d1e",
   "fantasy/sources/__init__.py": "8af3e9471cfda72f6c3ad11096323fa7d96632bd9634eeb8742c741a16885862",
   "fantasy/sources/market_points.py": "f18efb522e936243661f60f40e3fd4ab51474788175c7d92c4e8d78f81c4d7b2",
   "fantasy/sources/sleeper_weekly.py": "aa17feebc8f391a96b12cc1b1b2da78ba66b3fbb8fa25b6ab0bb26724268bae9",
@@ -128,8 +129,7 @@
   "manager/yahoo_api.py": "4a101f7aa12033a3000430a4acdf186800d77c235bf34da5bbc40293abc7024e",
   "manager/yahoo_context.py": "0aa541b5c73457d09f4aa3bbfdda14d66d8051835370073fb9f2a12f57f9ab34",
   "manager/yahoo_sync.py": "3ea0dba0ea5b03e561952cbdd2b40eba7b9a7c328691258915b7c29aadc54b90",
-  "nfl.py": "a12e40e7c2c22be1cec9b1f9897688c62c6ab3f288894c3bd4f853a9c5a61d77",
-  "props/ask.py": "4d2151b5adbc2ef220b4df7613255c6909348e175730b6bc8be36a4402dad1bc",
+  "nfl.py": "f5171edf889365da98ef32aa1c792da0e25ec8f08f05816feabd13ae804b03c2",
   "props/engine/SKILL.md": "49988ae6857a9d22e51a384d2caf8c1531889a9119a9f717867ee63b38862e85",
   "props/engine/resources/calibration_2025.csv": "47e3922c7af818307831d70a3d2be4333200f3aee1d94dc6bbf6e0e9ccee4ac8",
   "props/engine/resources/data_source_matrix.md": "2088a5ebe6164a75c11331367fda734d4b10ea217704320321a3f2aec6bb9c2b",
@@ -186,6 +186,6 @@
   "tiers.csv": "04a1a79d43e9f2445ba3dc4ea262b00fbd58efea1f41e8b0393cb4c7f8afee41",
   "tiers.keefamania.csv": "11e6546b56caa807a572da86d5c3d81097bafd2d2550e25653882d78b2962e94"
  },
- "sha256": "9f4af85dcb2fda1525ff7682e95ff4f34f3c9f8740f9e3210e1a290e87372867",
- "tag": "nfl-v1.17"
+ "sha256": "d7d4840da679d75e7d9638b912550350361276a87c412dd69bc6afcd74d62352",
+ "tag": "nfl-v1.18"
 }

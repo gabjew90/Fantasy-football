@@ -83,10 +83,16 @@ def fetch_lock(url: str = LOCK_URL) -> dict:
     raise RuntimeError(f"lock unreadable: {last}")
 
 
-def safe_members(tar: tarfile.TarFile):
+def safe_members(tar: tarfile.TarFile, wanted: set | None = None):
     """Release files only, from inside the archive. A tarball is untrusted: an
     absolute path, a `..` segment or a link could write anywhere, so the path
-    is recomputed (the leading `<repo>-<tag>/` directory dropped) and checked."""
+    is recomputed (the leading `<repo>-<tag>/` directory dropped) and checked.
+
+    WHICH files: the ones the lock names (`wanted`) when there is a lock --
+    not this harness's own copy of the release rules, which are frozen at the
+    skill's build. A harness built at nfl-v1.0 skipped props/ask.py, the lock
+    check then called it missing, and chat ran the vendored release for two
+    days (DECISIONS #121). Without a lock (an unverified --tag), the rules."""
     for member in tar.getmembers():
         name = member.name.replace("\\", "/")
         if "/" not in name:
@@ -96,7 +102,7 @@ def safe_members(tar: tarfile.TarFile):
             continue
         if rel.startswith("/") or ".." in Path(rel).parts:
             raise RuntimeError(f"refusing a tar member outside the release: {name}")
-        if not release.included(rel):
+        if not (rel in wanted if wanted is not None else release.included(rel)):
             continue
         if not member.isfile():
             if member.issym() or member.islnk():
@@ -105,7 +111,7 @@ def safe_members(tar: tarfile.TarFile):
         yield rel, member
 
 
-def extract_release(blob: bytes, dest: Path) -> int:
+def extract_release(blob: bytes, dest: Path, wanted: set | None = None) -> int:
     dest.mkdir(parents=True, exist_ok=True)
     written = 0
     with tempfile.NamedTemporaryFile(suffix=".tar.gz", delete=False) as tmp:
@@ -113,7 +119,7 @@ def extract_release(blob: bytes, dest: Path) -> int:
         tmp_path = Path(tmp.name)
     try:
         with tarfile.open(tmp_path, "r:gz") as tar:
-            for rel, member in safe_members(tar):
+            for rel, member in safe_members(tar, wanted):
                 target = dest / rel
                 target.parent.mkdir(parents=True, exist_ok=True)
                 src = tar.extractfile(member)
@@ -247,7 +253,7 @@ def resolve(dest: Path, tag: str | None = None, offline: bool = False) -> dict:
             blob = _get(url, timeout=90)
         except (urllib.error.URLError, OSError) as exc:
             raise RuntimeError(f"tarball {url}: {exc}") from exc
-        if not extract_release(blob, partial):
+        if not extract_release(blob, partial, set((lock or {}).get("files") or {}) or None):
             raise RuntimeError(f"tarball {url} held no release files")
         if lock is not None:
             verify(partial, lock)
