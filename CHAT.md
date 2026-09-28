@@ -214,6 +214,15 @@ ceiling). For waivers: the horizon, role vs one big game, how long the role
 lasts, the weeks the add would actually start, the standings. That is how you
 reach the call. The reply mentions the parts that decide it, not all of them.
 
+- **A player is judged among his teammates.** `fantasy player` (and each top
+  add in `fantasy waiver`) prints a *Team context* table: his position group
+  -- receivers WR and TE together, backs together -- with snap %, target or
+  carry share and WOPR week by week, inside-10 volume and the role flag.
+  Whenever the question turns on his role (an add, a start, a trade, "is he
+  for real?"), say where he sits in that pecking order and which way it is
+  moving, and show the table, or the rows that matter, when it makes the
+  point faster than words. A '-' week is a game he missed, which often
+  explains a teammate's jump; '*' is a partial game, not a role.
 - **A data check that FAILS changes how sure the answer is**, and says so
   up front, plainly: "Yahoo didn't load, so this is from Friday's roster --
   if anything changed since, check before you lock." Every call that rests

@@ -274,10 +274,13 @@ def evidence_for(gsis_ids, usage: pd.DataFrame, positions: dict, bands: dict | N
     return out
 
 
-def for_sleeper(pids, info: dict, season: int, *, manifest: Manifest | None = None) -> dict:
+def for_sleeper(pids, info: dict, season: int, *, manifest: Manifest | None = None, team: bool = False) -> dict:
     """sleeper_id -> evidence row, for the fantasy commands: Sleeper ids are
     joined to gsis through core.ids (the ID map, then Sleeper's own gsis_id),
-    this season's usage is built once, and a player with no gsis id says so."""
+    this season's usage is built once, and a player with no gsis id says so.
+
+    With `team`, each row also carries `team_context`: the player among the
+    teammates he competes with for the same volume (team_context below)."""
     players = json.loads(F.sleeper_players(manifest=manifest).read_text(encoding="utf-8"))
     gmap, _ = IDS.sleeper_gsis(IDS.load_id_map(F.DEFAULT_CACHE, manifest=manifest), players)
     try:
@@ -288,7 +291,114 @@ def for_sleeper(pids, info: dict, season: int, *, manifest: Manifest | None = No
     want = {str(p): gmap.get(str(p)) for p in pids}
     pos = {g: (info.get(p) or {}).get("pos") for p, g in want.items() if g}
     ev = evidence_for([g for g in want.values() if g], usage, pos, bands)
-    return {p: (ev.get(g) if g else {"note": "no nflverse id for this player"}) for p, g in want.items()}
+    out = {p: (ev.get(g) if g else {"note": "no nflverse id for this player"}) for p, g in want.items()}
+    if team:
+        from .contract import fantasy_position
+        # every player's position and name, not just the ones asked about: the
+        # teammates in the table are almost never on a fantasy roster
+        pos_all = {g: fantasy_position(players.get(s)) for s, g in gmap.items()}
+        pos_all.update({g: v for g, v in pos.items() if v})
+        names = {g: (players.get(s) or {}).get("full_name") or g for s, g in gmap.items()}
+        for p, g in want.items():
+            if g and isinstance(out.get(p), dict):
+                tc = team_context(g, usage, pos_all, bands, names)
+                if tc:
+                    out[p] = dict(out[p], team_context=tc)
+    return out
+
+
+# The teammates a player competes with for the same volume: receivers share
+# targets (WR and TE together), backs share carries. A QB, K or DEF has none.
+TEAM_GROUPS = {"WR": ("WR", "TE"), "TE": ("WR", "TE"), "RB": ("RB",)}
+TEAM_METRICS = {("WR", "TE"): ("snap_pct", "tgt_share", "wopr"),
+                ("RB",): ("snap_pct", "carry_share", "tgt_share")}
+TEAM_LEAD = {("WR", "TE"): "tgt_share", ("RB",): "carry_share"}      # what "recent usage" sorts on
+TEAM_I10 = {("WR", "TE"): "i10_tgt", ("RB",): "i10_car"}
+TEAM_WEEKS = 4
+TEAM_ROWS = 6
+
+
+def team_context(gsis: str, usage: pd.DataFrame, positions: dict, bands: dict | None, names: dict, *,
+                 weeks: int = TEAM_WEEKS, top: int = TEAM_ROWS) -> dict | None:
+    """The player among his position group on his CURRENT team, week by week:
+    the pecking order and which way it moves. The group's rows come from the
+    same usage table and the same evidence_for (partial games, role flags
+    judged against noise_bands_v0) as the player's own line, restricted to
+    this team -- a player traded in has only his weeks here. A week the team
+    played and a player has no row is None: he missed it (or had not arrived).
+    Sorted by the last two weeks of the group's lead metric; the asked-for
+    player is always kept. None for a QB, K or DEF, or with no usage."""
+    group = TEAM_GROUPS.get(positions.get(gsis))
+    mine = usage[usage["gsis_id"] == gsis]
+    if group is None or mine.empty:
+        return None
+    team = mine.sort_values("week")["team"].iloc[-1]
+    t = usage[usage["team"] == team]
+    wks = sorted(int(w) for w in t["week"].dropna().unique())[-weeks:]
+    members = [g for g in t["gsis_id"].dropna().unique() if positions.get(g) in group]
+    ev = evidence_for(members, t, positions, bands)
+    metrics, lead, i10 = TEAM_METRICS[group], TEAM_LEAD[group], TEAM_I10[group]
+    rows = []
+    for g in members:
+        d = t[t["gsis_id"] == g].drop_duplicates("week").set_index("week")
+        by = {m: [None if (w not in d.index or pd.isna(d.at[w, m])) else round(float(d.at[w, m]), 3) for w in wks]
+              for m in metrics if m in d.columns}
+        recent = [v for v in (by.get(lead) or [])[-2:] if v is not None]
+        e = ev.get(g) or {}
+        changed = {m: {"earlier": f.get("earlier"), "recent": f.get("recent")}
+                   for m, f in (e.get("role_change") or {}).items() if f.get("changed")}
+        rows.append({"gsis_id": g, "name": names.get(g, g), "pos": positions.get(g), "is_player": g == gsis,
+                     "by_week": by, "season": {m: (e.get("mean") or {}).get(m) for m in metrics},
+                     "inside10": int((e.get("totals") or {}).get(i10, 0)), "weeks_played": e.get("weeks", 0),
+                     "partial_weeks": e.get("partial_weeks") or [], "role": e.get("trajectory"),
+                     "role_changed": changed or None,
+                     "_recent": sum(recent) / len(recent) if recent else -1.0})
+    rows.sort(key=lambda r: -r["_recent"])
+    kept = rows[:top]
+    if not any(r["is_player"] for r in kept):
+        kept = rows[:top - 1] + [r for r in rows if r["is_player"]]
+    for r in kept:
+        r.pop("_recent")
+    return {"team": team, "group": "/".join(group), "weeks": wks, "metrics": list(metrics),
+            "inside10_metric": i10, "rows": kept}
+
+
+METRIC_LABEL = {"snap_pct": "Snap %", "tgt_share": "Target share", "wopr": "WOPR", "carry_share": "Carry share"}
+I10_LABEL = {"i10_tgt": "Inside-10 targets", "i10_car": "Inside-10 carries"}
+
+
+def _cell(vals, metric, partial_idx=()) -> str:
+    """'71 / 85 / 90' by week (oldest first); '-' a week he did not play;
+    '*' a partial game (an exit or a benching, not role evidence)."""
+    out = []
+    for k, v in enumerate(vals):
+        if v is None:
+            out.append("-")
+        else:
+            txt = f"{v:.2f}" if metric == "wopr" else f"{100 * v:.0f}"
+            out.append(txt + ("*" if k in partial_idx else ""))
+    return " / ".join(out)
+
+
+def team_table(tc: dict) -> list[str]:
+    """The player among the teammates he competes with, as a table: each
+    metric by week (the last few team games, oldest first), inside-10 volume
+    and the role flag. The player's own row is bold."""
+    wks, metrics = tc["weeks"], tc["metrics"]
+    head = (f"Team context -- {tc['team']} {tc['group']}, weeks {wks[0]}-{wks[-1]} (oldest first; "
+            "'-' did not play, '*' partial game; shares in %):") if wks else f"Team context -- {tc['team']}:"
+    L = [head, "",
+         "| Player | " + " | ".join(METRIC_LABEL.get(m, m) for m in metrics) + f" | {I10_LABEL[tc['inside10_metric']]} | Role |",
+         "|---" * (len(metrics) + 3) + "|"]
+    for r in tc["rows"]:
+        partial = {wks.index(w) for w in r.get("partial_weeks") or [] if w in wks}
+        name = f"**{r['name']}** ({r['pos']})" if r["is_player"] else f"{r['name']} ({r['pos']})"
+        changed = "; ".join(f"{METRIC_LABEL.get(k, k).lower()} {100 * (v.get('earlier') or 0):.0f}->"
+                            f"{100 * (v.get('recent') or 0):.0f}" for k, v in (r.get("role_changed") or {}).items())
+        role = (r.get("role") or "--") + (f" ({changed})" if changed else "")
+        L.append(f"| {name} | " + " | ".join(_cell(r["by_week"].get(m) or [], m, partial) for m in metrics)
+                 + f" | {r['inside10']} | {role} |")
+    return L
 
 
 def shuffled_z(usage: pd.DataFrame, positions: dict, bands: dict, *, shuffles: int = 20,

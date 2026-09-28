@@ -164,7 +164,7 @@ def usage(ev: dict | None) -> dict:
             "inside10_targets": (e.get("totals") or {}).get("i10_tgt"),
             "inside10_carries": (e.get("totals") or {}).get("i10_car"),
             "role": e.get("trajectory"), "role_changed": changed or None,
-            "partial_weeks": e.get("partial_weeks") or None}
+            "partial_weeks": e.get("partial_weeks") or None, "team_context": e.get("team_context")}
 
 
 def _record(snap: Snapshot, m: Manifest) -> dict:
@@ -193,7 +193,7 @@ def players(snap: Snapshot, names: list[str], *, with_usage: bool = True, with_f
     notes: list = []
     sids = list(dict.fromkeys(resolve(snap, n, notes) for n in names))
     m = Manifest(f"fantasy player {snap.league}")
-    ev = EV.for_sleeper(sids, snap.info, snap.season, manifest=m) if with_usage else {}
+    ev = EV.for_sleeper(sids, snap.info, snap.season, manifest=m, team=True) if with_usage else {}
     watch = LU.injury_watch(sids, snap.info, snap.players, snap.league)
     # when his status settles, and which of MY players at his position lock
     # before then -- the "do I have to choose before the news?" question
@@ -493,6 +493,8 @@ def _player_lines(r: dict) -> list[str]:
                      f"Role: {u.get('role')}" + (f" ({ch})" if ch else "")
                      + (f"; partial game wk {', '.join(str(w) for w in u['partial_weeks'])} (an exit or benching, "
                         "not a role)" if u.get("partial_weeks") else "") + ".")
+    if u is not None and u.get("team_context"):
+        L += [""] + EV.team_table(u["team_context"]) + [""]
     for t in r["designated_teammates"]:
         fpt = LU._fp_text(t.get("fantasypros")) if t.get("fantasypros") else ""
         L.append(f"Teammate: {t['name']} ({t['pos']}) {t['status']}" + (f" ({t['part']})" if t.get("part") else "")
