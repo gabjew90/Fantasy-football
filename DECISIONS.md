@@ -6497,3 +6497,26 @@ Review: three findings, all fixed. The consensus is built before the gate,
 as in the waiver command, so a failed source counts against "inputs not
 stale" in both; the line names a source with no number for the player; the
 rescale caveat prints once per answer, not once per player.
+
+## 2026-09-29 (127) -- chat may use tables and report language; it may not paste the output (nfl-v1.24)
+
+The user: "I don't mind seeing tables and report language, as long as it's
+not a direct copy and paste of a generated artifact; chat should have the
+freedom to show the necessary data, explain analysis, and form logical
+arguments and recommendations." #118 had over-corrected: it banned report
+vocabulary and fixed structure outright. The line is copying, not form.
+CHAT.md now: lead with the call, then make the case -- show the data that
+carries the argument (tables, side-by-side numbers, trends) and the terms of
+the trade when they make the point, explained once if not obvious; length
+and structure follow the question, headings allowed. The one forbidden shape
+is the tool's output handed back: pasted report text, or a table dropped in
+untouched and left to speak for itself. A command's table can be the
+evidence when cut to what matters and interpreted. The hard lines are
+unchanged (engine numbers only, close calls kept close, assumptions stated).
+
+Review: the no-copy rule collided with the props engine contract, which
+requires a full game guide or slate breakdown to reproduce its bet card and
+slate summary in full. CHAT.md now names that exception: an artifact the
+user asks for is reproduced as the contract requires, with the analysis
+around it; a test pins it.
+

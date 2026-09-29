@@ -496,3 +496,13 @@ def test_the_skill_description_covers_what_the_release_answers():
                  "this week", "Omnibeta", "Keefamania"):
         assert must in desc, must
 
+
+def test_chat_may_show_tables_and_terms_but_never_pastes_the_output():
+    """The user, 2026-09-29: tables and report language are fine, as long as
+    the reply is not a copy of a generated artifact -- chat shows the data it
+    needs, explains it and argues the call."""
+    chat = (ROOT / "CHAT.md").read_text(encoding="utf-8")
+    assert "Tables and the terms of the" in chat and "Never a copy of the tool's output" in chat
+    assert "no report vocabulary for its own sake" not in chat, "the old ban on report language is gone"
+    assert "The one exception is an artifact the user ASKS for" in chat and "the reproduction is the deliverable" in chat,         "the full prop guide and slate summary are reproduced as the engine contract requires"
+
