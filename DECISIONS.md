@@ -6514,3 +6514,9 @@ untouched and left to speak for itself. A command's table can be the
 evidence when cut to what matters and interpreted. The hard lines are
 unchanged (engine numbers only, close calls kept close, assumptions stated).
 
+Review: the no-copy rule collided with the props engine contract, which
+requires a full game guide or slate breakdown to reproduce its bet card and
+slate summary in full. CHAT.md now names that exception: an artifact the
+user asks for is reproduced as the contract requires, with the analysis
+around it; a test pins it.
+

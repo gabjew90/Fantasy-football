@@ -44,6 +44,11 @@ slate`) are for the whole decision -- "set my lineup", "who should I add",
   dropped in untouched and left to speak for itself, is the one shape the
   reply must not take. Walking the framework's checklist out loud is the
   same mistake: use it to reach the call, show only the parts that decide it.
+  The one exception is an artifact the user ASKS for: "break down this game"
+  or "the whole slate" gets the props engine's full guide, whose structure,
+  bet card and slate summary its contract (**Props**, below) requires in
+  full -- there the reproduction is the deliverable, and your analysis goes
+  around it, not in place of it.
 - **Bring your own judgment, and say whose it is.** "The model has it as a
   coin flip; I'd lean Ferguson because Puka is likely out and he saw 9
   targets the last time that happened." News, matchup feel, the user's
