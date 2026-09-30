@@ -49,6 +49,7 @@ from . import environment as E
 from . import evidence as EV
 from . import gate as G
 from . import league as LG
+from . import trending as TR
 from . import weekly as W
 from . import winprob as WP
 from .contract import fantasy_position
@@ -56,6 +57,7 @@ from .contract import fantasy_position
 OUT = Path(os.environ.get("NFL_OUT", "/mnt/user-data/outputs"))
 POOL_SIZE = 60              # unrostered players considered, by rest-of-season value
 USAGE_ADDS = 20             # plus this many by last-week usage, so a fresh role is not missed
+TREND_ADDS = 25             # plus Sleeper's top trending adds at these positions: the ones people ask about
 SEASON_GAMES = 17
 # Weeks a player is assumed to miss from his status, where no return date is
 # known: Out/Doubtful this week; IR/PUP/NFI the NFL's four-week minimum.
@@ -307,7 +309,16 @@ def run(league: str, positions=("RB", "WR", "TE"), horizon: str = "season", week
     inv = {g: s for s, g in gmap.items()}
     by_usage = [inv[g] for g in recent.sort_values("opp", ascending=False)["gsis_id"]
                 if g in inv and inv[g] in pool and inv[g] not in by_value][:USAGE_ADDS]
-    cands = by_value + by_usage
+    # Sleeper's trending adds (NFL-wide, last 24 hours): the timing signal, and
+    # the players the user is about to ask about -- never "outside the pool"
+    trend = TR.load(m)
+    if trend.get("note"):
+        notes_pre = [trend["note"]]
+    else:
+        notes_pre = []
+    by_trend = [p for p, _ in sorted(trend["add"].items(), key=lambda kv: kv[1], reverse=True)
+                if p in pool and p not in by_value and p not in by_usage][:TREND_ADDS]
+    cands = by_value + by_usage + by_trend
 
     info = dict(view.info)
     for p in cands:
@@ -318,6 +329,7 @@ def run(league: str, positions=("RB", "WR", "TE"), horizon: str = "season", week
     pids = list(dict.fromkeys(view.my_players + view.opp_players + cands))
     projs, env, notes = W.project_players(pids, info, view.season, view.week, view.scoring, league, m,
                                           (cfg.get("fantasy") or {}).get("market_weight"))
+    notes = notes_pre + list(notes)
     ev = EV.for_sleeper(view.my_players + cands, info, view.season, manifest=m)
     gate = G.evaluate(m, view.scoring_yaml, view.scoring_platform, view.my_players, projs)
     stand = standing(ctx["rosters"], view.my_rid)
@@ -413,6 +425,8 @@ def run(league: str, positions=("RB", "WR", "TE"), horizon: str = "season", week
         c = r["add"]
         e = ev.get(c) or {}
         r["ceiling"] = projs[c].ceiling if c in projs else None
+        r["trend_adds"] = trend["add"].get(c)
+        r["trend_rank"] = trend["rank"]["add"].get(c)
         r["ros_upside"] = round(upside.get(c, rate.get(c, 0.0)), 2)
         r["trajectory"] = e.get("trajectory")
         g = gmap.get(c)
@@ -439,7 +453,8 @@ def run(league: str, positions=("RB", "WR", "TE"), horizon: str = "season", week
                                      and not r.get("open_spot")],
                           "no_gain": [r["add"] for r in rows if r["gain"] <= MIN_LISTED[horizon]
                                       and not any(i["add"] == r["add"] and i["season_out"] for i in injured)]},
-                  kept=kept, keep_missing=keep_missing, room=room, injured=injured, bye_cal=bye_cal)
+                  kept=kept, keep_missing=keep_missing, room=room, injured=injured, bye_cal=bye_cal,
+                  trend=trend)
     rec = {"command": "fantasy waiver", "league": league, "season": view.season, "week": view.week,
            "horizon": horizon, "positions": list(positions), "standing": stand, "gate": gate.to_dict(),
            "scored_candidates": cands,
@@ -447,6 +462,8 @@ def run(league: str, positions=("RB", "WR", "TE"), horizon: str = "season", week
            "stand_pat": stand_pat, "adds": ranked[:15], "protected_cuts": sorted(protected),
            "kept": sorted(kept), "keep_missing": keep_missing, "roster_room": room, "injured_adds": injured,
            "bye_calendar": bye_cal,
+           "likely_gone": TR.likely_gone(cands, trend),
+           "trending_drops": {p: trend["drop"][p] for p in view.my_players if p in trend["drop"]},
            "drops": [{"player": p, "ros_rate": round(rate.get(p, 0.0), 2), "protected": p in protected,
                       "kept": p in kept, "flag": cut_role(ev.get(p) or {})[1]} for p in drops],
            "manifest": m.to_dict(), "notes": notes}
@@ -512,7 +529,8 @@ def rank_adds(rows: list[dict], horizon: str, contender: bool) -> tuple[list[dic
 def markdown(league, view, horizon, positions, stand, gate, ranked, drops, protected, projs, ev, info,
              rate, stand_pat, m, notes, rolled: str | None = None, team_ctx: dict | None = None,
              scored: dict | None = None, kept=(), keep_missing=(), room: dict | None = None,
-             injured=(), bye_cal=None) -> str:
+             injured=(), bye_cal=None, trend: dict | None = None) -> str:
+    trend = trend or {"add": {}, "drop": {}, "rank": {"add": {}, "drop": {}}, "note": "no trending data"}
     unit = "P(win) this week" if horizon == "stream" else "season points added (weeks he would start)"
     L = [f"# Waiver -- {league}, {view.season} week {view.week}: {', '.join(positions)}, {horizon} horizon", "",
          f"**{gate.line()}**", "",
@@ -540,8 +558,9 @@ def markdown(league, view, horizon, positions, stand, gate, ranked, drops, prote
               + (f"; the best, {_n(best['add'], info)}, adds {_gain(best, horizon)}." if best else "."), ""]
     L += [f"## Adds, ranked ({unit})", "",
           "| Add | Drop | Gain | " + ("Starts (weeks) | Playoff wks | " if horizon == "season" else "") +
-          "This week (mean / p10 / p90) | ROS rate | Snap % | Tgt / carry share | Role | Why the role changed |",
-          "|---|---|---|" + ("---|---|" if horizon == "season" else "") + "---|---|---|---|---|---|"]
+          "This week (mean / p10 / p90) | ROS rate | Adds 24h (Sleeper, all leagues) | Snap % | Tgt / carry share | "
+          "Role | Why the role changed |",
+          "|---|---|---|" + ("---|---|" if horizon == "season" else "") + "---|---|---|---|---|---|---|"]
     for r in ranked[:TABLE_ROWS]:
         c, e = r["add"], ev.get(r["add"]) or {}
         mean = e.get("mean") or {}
@@ -554,9 +573,22 @@ def markdown(league, view, horizon, positions, stand, gate, ranked, drops, prote
         L.append(f"| {_n(c, info)} | {cut + rep} | {_gain(r, horizon)} | "
                  + (f"{week_spans(r.get('start_weeks'))} | {r.get('playoff_gain', 0):+.1f} | "
                     if horizon == "season" else "")
-                 + f"{wk} | {rate.get(c, 0):.1f} | {_pct(mean.get('snap_pct'))} | "
+                 + f"{wk} | {rate.get(c, 0):.1f} | {TR.cell(c, trend)} | {_pct(mean.get('snap_pct'))} | "
                  f"{_pct(mean.get('tgt_share'))} / {_pct(mean.get('carry_share'))} | {r.get('trajectory') or '—'} | "
                  f"{('teammate out: ' + r['cause']) if r.get('cause') else '—'} |")
+    # TIMING: who will not be on waivers next week. Sleeper's top trending adds
+    # across all its leagues -- the count is shown, no probability is claimed.
+    scored_ids = [r["add"] for r in ranked] + [r["add"] for r in (scored or {}).get("no_cut", [])] \
+        + list((scored or {}).get("no_gain") or [])
+    gone = TR.likely_gone(scored_ids, trend)
+    if trend.get("note"):
+        L += ["", f"**Trending unavailable this run** ({trend['note']}): whether an add is being claimed "
+              "everywhere -- the now-or-never signal -- is not known."]
+    elif gone:
+        L += ["", f"**Likely gone after this waiver period** (top {TR.GONE_RANK} trending adds across all Sleeper "
+              "leagues, last 24 hours -- decide on these now or accept they are gone): " + "; ".join(
+                  f"{_n(p, info)} {TR.fmt_count(trend['add'][p])} adds (#{trend['rank']['add'][p]})" for p in gone)
+              + ". Their gain above is what each is worth; this line is only whether you can wait."]
     # WHO WAS SCORED, said outright. The table used to stop at 12 with nothing
     # after it, and chat -- told "not in the table = outside the pool" -- said
     # Courtland Sutton was not evaluated when he was the 13th add (+0.9).
@@ -565,7 +597,8 @@ def markdown(league, view, horizon, positions, stand, gate, ranked, drops, prote
             f"{_n(r['add'], info)} {_gain(r, horizon)}" for r in ranked[TABLE_ROWS:]) + "."]
     if scored:
         L += ["", f"*{scored['candidates']} unrostered players were scored (the top {POOL_SIZE} by rest-of-season "
-              f"value plus up to {USAGE_ADDS} by last week's usage); {scored['improving']} improve your lineup and "
+              f"value, up to {USAGE_ADDS} by last week's usage and up to {TREND_ADDS} of Sleeper's trending adds); "
+              f"{scored['improving']} improve your lineup and "
               "are named above; the rest are named below. A player not named anywhere in this report was "
               "outside that pool -- `fantasy player` shows his week either way.*"]
         if scored.get("no_gain"):
@@ -595,14 +628,16 @@ def markdown(league, view, horizon, positions, stand, gate, ranked, drops, prote
               + (", ".join(_n(p, info) for p in sorted(kept)) or "nobody on this roster")
               + (f". Not on your roster: {', '.join(keep_missing)}" if keep_missing else "") + ".", ""]
     L += ["", "## Your bench, as cut candidates", "",
-          "| Player | ROS rate | Snap % | Tgt / carry share | Role | Cut? |", "|---|---|---|---|---|---|"]
+          "| Player | ROS rate | Drops 24h (Sleeper, all leagues) | Snap % | Tgt / carry share | Role | Cut? |",
+          "|---|---|---|---|---|---|---|"]
     for p in sorted(drops, key=lambda x: rate.get(x, 0.0)):
         e = ev.get(p) or {}
         mean = e.get("mean") or {}
         flag = cut_role(e)[1]
         verdict = ("NO -- your keep list" if p in kept else "NO -- established role" if p in protected else
                    "eligible" + (f" (flag: {flag})" if flag else ""))
-        L.append(f"| {_n(p, info)} | {rate.get(p, 0):.1f} | {_pct(mean.get('snap_pct'))} | "
+        L.append(f"| {_n(p, info)} | {rate.get(p, 0):.1f} | {TR.cell(p, trend, 'drop')} | "
+                 f"{_pct(mean.get('snap_pct'))} | "
                  f"{_pct(mean.get('tgt_share'))} / {_pct(mean.get('carry_share'))} | {e.get('trajectory') or '—'} | "
                  f"{verdict} |")
     if bye_cal is not None:
@@ -617,6 +652,9 @@ def markdown(league, view, horizon, positions, stand, gate, ranked, drops, prote
           "- **Missed weeks are assumed from status**, not modelled: Out or Doubtful misses this week; IR, PUP or "
           "NFI the NFL's four-week minimum; an ACL or Achilles injury on a player on IR or Out, the rest of the "
           "season.",
+          "- **Adds / drops 24h** are Sleeper's trending counts across ALL its leagues (not this league), last 24 "
+          "hours, with the player's rank in that list: how contested an add is, and whether a bench player is "
+          "being cut everywhere. A count, not a probability.",
           "- **Not modelled yet:** the PROBABILITY a changed role lasts (role duration), and claim eligibility. "
           "Weigh a role built on a teammate's absence by when that teammate returns.",
           "", f"*{m.summary_line()}*"] + ([f"*Notes: {'; '.join(notes)}*"] if notes else [])

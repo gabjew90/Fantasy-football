@@ -32,6 +32,7 @@ from . import boxscore as BX
 from . import environment as E
 from . import evidence as EV
 from . import lineup as LU
+from . import trending as TR
 from . import winprob as WP
 from .snapshot import Snapshot
 
@@ -220,6 +221,9 @@ def players(snap: Snapshot, names: list[str], *, with_usage: bool = True, with_f
                "injury": raw.get("injury_body_part"), "practice_sleeper": raw.get("practice_participation"),
                "fantasypros": fp.get(sid), "projection": projection(snap, sid),
                "season_consensus": season_line(snap, sid),
+               "trending": {k: (getattr(snap, "trending", None) or {}).get(k, {}).get(sid) for k in ("add", "drop")}
+               | {"rank": {k: ((getattr(snap, "trending", None) or {}).get("rank") or {}).get(k, {}).get(sid)
+                           for k in ("add", "drop")}},
                "status_settles_pt": w.get("status_known_pt") if w.get("own") else None,
                "my_players_locking_first": (w.get("locks_before") or None) if w.get("own") else None,
                "usage": usage(ev.get(sid)) if with_usage else None,
@@ -242,8 +246,11 @@ def players(snap: Snapshot, names: list[str], *, with_usage: bool = True, with_f
     if len(sids) >= 2:
         data["head_to_head"] = head_to_head(snap, sids)
     L = [header(snap), ""] + [f"({n}.)" for n in notes] + ([""] if notes else [])
+    trend = getattr(snap, "trending", None) or {}
     for r in rows:
-        L += _player_lines(r) + [""]
+        L += _player_lines(r, trend) + [""]
+    if trend.get("note"):
+        L.append(f"({trend['note']}: whether an add is being claimed everywhere is not known this run.)")
     if fp_note and not fp:
         L.append(f"(No FantasyPros practice reports: {fp_note}.)")
     if any(r.get("season_consensus") for r in rows):
@@ -469,7 +476,7 @@ def _pct(v):
     return "--" if v is None else f"{100 * v:.0f}%"
 
 
-def _player_lines(r: dict) -> list[str]:
+def _player_lines(r: dict, trend: dict | None = None) -> list[str]:
     o, g, p, u = r["owner"], r["game"], r["projection"], r["usage"]
     own = {"you": "yours", "your opponent": f"your opponent's ({o.get('team_name')})",
            "another team": f"on {o.get('team_name')}'s roster", "free agent": "a free agent"}[o["who"]]
@@ -531,6 +538,8 @@ def _player_lines(r: dict) -> list[str]:
                  + (f"; no {', '.join(gone)} number for him" if gone else "") + "."
                  + (f" The sources disagree widely ({c['split']}): at least one has likely not caught up with a "
                     "change in his role, so the consensus is unreliable for him." if c.get("split") else ""))
+    if trend and TR.line(r["id"], trend):
+        L.append(TR.line(r["id"], trend))
     if u is not None:
         if not u.get("weeks"):
             L.append(f"Usage: {u.get('note')}.")
