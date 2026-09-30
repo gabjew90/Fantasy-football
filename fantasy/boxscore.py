@@ -29,11 +29,18 @@ LABEL = {"targets": "Tgt", "receptions": "Rec", "receiving_yards": "Rec yds", "r
          "completions": "Cmp", "passing_yards": "Pass yds", "passing_tds": "Pass TD", "passing_interceptions": "INT"}
 
 
+# kicker and team-defense scoring: never part of a skill player's points
+NOT_OFFENSE = ("def_", "fgm", "fgmiss", "xpm", "xpmiss", "pts_allow", "st_", "blk_kick", "sack", "safe", "int",
+               "fum_rec", "ff", "yds_allow", "tkl", "qb_hit", "pass_def")
+
+
 def not_counted(scoring: dict) -> list[str]:
-    """League scoring keys the nflverse columns cannot price (yardage
-    bonuses, return yards...): the game log's points leave them out, so they
-    can sit below the platform's -- said wherever the points are shown."""
-    return [k for k in unmodelled_keys(scoring) if float(scoring.get(k) or 0) != 0]
+    """League scoring keys for an OFFENSIVE player that the nflverse columns
+    cannot price (yardage bonuses, return yards...): the log's points leave
+    them out, so they can sit below the platform's -- said wherever the
+    points are shown. Kicker and defense keys are not his and are not listed."""
+    return [k for k in unmodelled_keys(scoring) if float(scoring.get(k) or 0) != 0
+            and not any(k == p or k.startswith(p) for p in NOT_OFFENSE)]
 
 
 def columns_for(pos: str | None) -> tuple:
@@ -105,3 +112,105 @@ def summary_line(s: dict, pos: str | None) -> str:
     tds = ", ".join(f"{s[c]} {LABEL[c].lower()}" for c in cols if c.endswith("_tds") or c == "passing_interceptions")
     return (f"{s['season']} ({s['team']}): {s['games']} games, {s['pts_per_game']} pts per game "
             f"({s['pts_no_td_per_game']} without TDs); per game {per}; season {tds}.")
+
+
+# ------------------------------------------------------------------ the full weekly stat line
+#
+# One table per player: what he was GIVEN (snap share, target / carry share,
+# air-yard share, WOPR -- fantasy.evidence, the engine's usage) beside what he
+# DID with it (the box score, air yards, aDOT, yards after catch, first
+# downs), a row per game and a season row. The 2026-09-30 session: the user
+# asked twice for "the full stats", and chat pulled air yards, aDOT and YAC
+# from nflverse outside the engine because no command printed them.
+
+STAT_LINE = {
+    "REC": {"usage": ("snap_pct", "tgt_share", "ay_share", "wopr"),
+            "box": ("targets", "receptions", "receiving_yards", "receiving_air_yards", "adot",
+                    "receiving_yards_after_catch", "receiving_first_downs", "receiving_tds", "carries",
+                    "rushing_yards")},
+    "RB": {"usage": ("snap_pct", "carry_share", "tgt_share"),
+           "box": ("carries", "rushing_yards", "ypc", "rushing_first_downs", "rushing_tds", "targets", "receptions",
+                   "receiving_yards", "receiving_tds")},
+    "QB": {"usage": ("snap_pct", "carry_share"),
+           "box": ("attempts", "completions", "passing_yards", "passing_air_yards", "passing_tds",
+                   "passing_interceptions", "sacks_suffered", "carries", "rushing_yards", "rushing_tds")},
+}
+SECONDARY = {"REC": ("carries", "rushing_yards")}          # shown only when not all zero
+USAGE_LABEL = {"snap_pct": "Snap %", "tgt_share": "Tgt share", "ay_share": "Air-yd share", "wopr": "WOPR",
+               "carry_share": "Carry share"}
+BOX_LABEL = dict(LABEL, receiving_air_yards="Air yds", adot="aDOT", receiving_yards_after_catch="YAC",
+                 receiving_first_downs="1st downs", rushing_first_downs="Rush 1st downs", ypc="YPC",
+                 passing_air_yards="Pass air yds", sacks_suffered="Sacked", receiving_yards="Rec yds")
+
+
+def _kind(pos: str | None) -> str:
+    return "QB" if pos == "QB" else "RB" if pos == "RB" else "REC"
+
+
+def _derived(row: dict) -> dict:
+    tg, car = row.get("targets") or 0, row.get("carries") or 0
+    row["adot"] = None if not tg or row.get("receiving_air_yards") is None else round(row["receiving_air_yards"] / tg, 1)
+    row["ypc"] = None if not car or row.get("rushing_yards") is None else round(row["rushing_yards"] / car, 1)
+    return row
+
+
+def stat_line(stats: pd.DataFrame, gsis: str, pos: str | None, scoring: dict, usage_by_week: dict,
+              season_usage: dict | None = None, weeks: int = LOG_WEEKS) -> dict | None:
+    """{kind, rows: [per game, oldest first], season: {...}}. A week with
+    usage but no box-score row (stats not published yet) keeps its usage and
+    shows the box as missing; a week with neither is not a game he played."""
+    kind = _kind(pos)
+    spec = STAT_LINE[kind]
+    d = stats[stats["player_id"] == gsis].sort_values("week") if stats is not None else stats
+    have = d is not None and not d.empty
+    raw = [c for c in spec["box"] if c not in ("adot", "ypc")]
+    box = {}
+    if have:
+        pts, no_td = score_frame(d, _weights(scoring)), score_frame(d, _weights(scoring, touchdowns=False))
+        for (_, r), p, n in zip(d.iterrows(), pts, no_td):
+            box[int(r["week"])] = dict({c: (None if c not in r or pd.isna(r[c]) else int(round(float(r[c]))))
+                                        for c in raw}, opp=r.get("opponent_team"),
+                                       pts=round(float(p), 1), pts_no_td=round(float(n), 1))
+    wks = sorted(set(box) | {int(w) for w in usage_by_week})[-weeks:]
+    if not wks:
+        return None
+    rows = []
+    for w in wks:
+        # a week with usage but no box row (stats not published yet) keeps every
+        # box field, empty -- the same keys every row, for the table and the JSON
+        empty = dict({c: None for c in raw}, opp=None, pts=None, pts_no_td=None)
+        r = {"week": w, **{m: (usage_by_week.get(w) or {}).get(m) for m in spec["usage"]}, **(box.get(w) or empty)}
+        rows.append(_derived(r))
+    season = {m: (season_usage or {}).get(m) for m in spec["usage"]}
+    if have:
+        for c in raw:
+            season[c] = int(pd.to_numeric(d[c], errors="coerce").fillna(0).sum()) if c in d.columns else None
+        season["pts"] = round(float(score_frame(d, _weights(scoring)).sum()), 1)
+        season["pts_no_td"] = round(float(score_frame(d, _weights(scoring, touchdowns=False)).sum()), 1)
+        season["games"] = int(d["week"].nunique())
+    return {"kind": kind, "rows": rows, "season": _derived(season)}
+
+
+def _fmt(v, col) -> str:
+    if v is None:
+        return "--"
+    if col in USAGE_LABEL:
+        return f"{v:.2f}" if col == "wopr" else f"{100 * v:.0f}"
+    return f"{v:g}" if isinstance(v, float) else str(v)
+
+
+def stat_line_table(sl: dict) -> list[str]:
+    spec = STAT_LINE[sl["kind"]]
+    every = sl["rows"] + [sl["season"]]
+    box = [c for c in spec["box"] if c not in SECONDARY.get(sl["kind"], ()) or any((r.get(c) or 0) for r in every)]
+    cols = list(spec["usage"]) + box
+    head = ["Wk", "Opp"] + [USAGE_LABEL.get(c) or BOX_LABEL.get(c, c) for c in cols] + ["Pts", "Pts without TDs"]
+    L = ["| " + " | ".join(head) + " |", "|---" * len(head) + "|"]
+    for r in sl["rows"]:
+        L.append(f"| {r['week']} | {r.get('opp') or '--'} | " + " | ".join(_fmt(r.get(c), c) for c in cols)
+                 + f" | {_fmt(r.get('pts'), 'pts')} | {_fmt(r.get('pts_no_td'), 'pts')} |")
+    s = sl["season"]
+    g = s.get("games")
+    L.append(f"| **Season**{f' ({g} g)' if g else ''} | | " + " | ".join(_fmt(s.get(c), c) for c in cols)
+             + f" | {_fmt(s.get('pts'), 'pts')} | {_fmt(s.get('pts_no_td'), 'pts')} |")
+    return L
