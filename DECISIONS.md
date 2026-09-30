@@ -6662,3 +6662,10 @@ A count, not a probability: it is NFL-wide, not this league, and the top-25
 cut is Sleeper's own list length, typed, not measured. #129's deferral of
 "now-or-never timing" is closed by this; role duration stays open.
 
+Review: six findings, four fixed -- a stale copy (the hourly refresh failed
+and core.fetch served the old file) is now said in the report and the player
+line instead of passing as "the last 24 hours"; "likely gone" is not said of
+a player already on a roster; CHAT.md says "unlikely", not "will not"; the
+record's likely_gone is the same scored set as the report's. Not done: the
+manager's own trending fetcher (manager/waiver_brief.py) still duplicates
+core.fetch.sleeper_trending -- the Actions path, a separate release.

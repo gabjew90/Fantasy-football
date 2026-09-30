@@ -210,6 +210,7 @@ def players(snap: Snapshot, names: list[str], *, with_usage: bool = True, with_f
     fp, fp_note = (LU.fp_practice(watch, snap.season, snap.week, m) if (watch and with_fp) else ({}, ""))
     by_pid = {w["pid"]: w for w in watch}
     byes = E.load_byes(snap.season, m)
+    trend = getattr(snap, "trending", None) or {}
     rows, box = [], {}
     for sid in sids:
         i, raw = snap.info.get(sid) or {}, snap.players.get(sid) or {}
@@ -221,9 +222,9 @@ def players(snap: Snapshot, names: list[str], *, with_usage: bool = True, with_f
                "injury": raw.get("injury_body_part"), "practice_sleeper": raw.get("practice_participation"),
                "fantasypros": fp.get(sid), "projection": projection(snap, sid),
                "season_consensus": season_line(snap, sid),
-               "trending": {k: (getattr(snap, "trending", None) or {}).get(k, {}).get(sid) for k in ("add", "drop")}
-               | {"rank": {k: ((getattr(snap, "trending", None) or {}).get("rank") or {}).get(k, {}).get(sid)
-                           for k in ("add", "drop")}},
+               "trending": {k: (trend.get(k) or {}).get(sid) for k in ("add", "drop")}
+               | {"rank": {k: (trend.get("rank") or {}).get(k, {}).get(sid) for k in ("add", "drop")},
+                  "stale": trend.get("stale")},
                "status_settles_pt": w.get("status_known_pt") if w.get("own") else None,
                "my_players_locking_first": (w.get("locks_before") or None) if w.get("own") else None,
                "usage": usage(ev.get(sid)) if with_usage else None,
@@ -246,7 +247,6 @@ def players(snap: Snapshot, names: list[str], *, with_usage: bool = True, with_f
     if len(sids) >= 2:
         data["head_to_head"] = head_to_head(snap, sids)
     L = [header(snap), ""] + [f"({n}.)" for n in notes] + ([""] if notes else [])
-    trend = getattr(snap, "trending", None) or {}
     for r in rows:
         L += _player_lines(r, trend) + [""]
     if trend.get("note"):
@@ -538,8 +538,8 @@ def _player_lines(r: dict, trend: dict | None = None) -> list[str]:
                  + (f"; no {', '.join(gone)} number for him" if gone else "") + "."
                  + (f" The sources disagree widely ({c['split']}): at least one has likely not caught up with a "
                     "change in his role, so the consensus is unreliable for him." if c.get("split") else ""))
-    if trend and TR.line(r["id"], trend):
-        L.append(TR.line(r["id"], trend))
+    if trend and TR.line(r["id"], trend, rostered=o["who"] != "free agent"):
+        L.append(TR.line(r["id"], trend, rostered=o["who"] != "free agent"))
     if u is not None:
         if not u.get("weeks"):
             L.append(f"Usage: {u.get('note')}.")

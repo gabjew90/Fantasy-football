@@ -194,9 +194,9 @@ room** line counts open spots and IR slots; an add whose cut reads "none
 
 **Timing is the trending count, value is the gain.** The waiver table's
 *Adds 24h* column and its **Likely gone after this waiver period** line are
-Sleeper's trending adds across all its leagues (a top-25 add will not be on
-waivers next week); `fantasy player` prints the same as a *Sleeper trending*
-line. That is the now-or-never signal: for a player on that line, the
+Sleeper's trending adds across all its leagues (a top-25 add is unlikely to
+be on waivers next week -- a count, not a certainty); `fantasy player` prints
+the same as a *Sleeper trending* line, and says when the copy is old. That is the now-or-never signal: for a player on that line, the
 question is not "is he worth +0.7" but "claim him now against who he
 replaces, or accept he is gone" -- say which, with the gain as the price.
 The *Drops 24h* column on the bench table says whether a cut candidate is

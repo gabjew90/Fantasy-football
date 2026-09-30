@@ -23,7 +23,8 @@ def _fake_fetch(tmp_path, fail=()):
         if kind in fail:
             raise OSError("blocked")
         p = tmp_path / f"trending_{kind}.json"
-        p.write_text(json.dumps(ADDS if kind == "add" else DROPS), encoding="utf-8")
+        if not p.exists():                       # like the real cache: an existing copy keeps its age
+            p.write_text(json.dumps(ADDS if kind == "add" else DROPS), encoding="utf-8")
         return p
     return sleeper_trending
 
@@ -94,7 +95,7 @@ def test_the_player_tool_prints_the_trending_line_and_an_old_snapshot_still_load
     tr = {"add": {"5": 940059}, "drop": {}, "rank": {"add": {"5": 4}, "drop": {}}, "note": None}
     s = _snap(trending=tr)
     text = A.players(s, ["Puka Nacua"]).text
-    assert "Sleeper trending: added in 940k Sleeper leagues in the last 24 hours (#4 of trending adds, likely gone" in text
+    assert "Sleeper trending: added in 940k Sleeper leagues in the last 24 hours (#4 of trending adds)." in text
     assert "Garrett Wilson" not in text
     s2 = _snap(trending={"add": {}, "drop": {}, "rank": {"add": {}, "drop": {}}, "note": "Sleeper trending adds unavailable (OSError)"})
     assert "(Sleeper trending adds unavailable (OSError): whether an add is being claimed" in A.players(s2, ["Puka Nacua"]).text
@@ -102,3 +103,31 @@ def test_the_player_tool_prints_the_trending_line_and_an_old_snapshot_still_load
     old = s.to_json()
     old.pop("trending")
     assert Snapshot.from_json(json.loads(json.dumps(old, default=str))).trending == {}, "a cache from before this field"
+
+
+def test_an_old_copy_is_said_in_the_report_and_the_line(monkeypatch, tmp_path):
+    import os
+    import time
+    monkeypatch.setattr(F, "sleeper_trending", _fake_fetch(tmp_path))
+    tr = REAL_LOAD()
+    assert tr["stale"] is None and tr["age_h"] == 0
+    old = time.time() - 30 * 3600
+    for k in ("add", "drop"):
+        os.utime(tmp_path / f"trending_{k}.json", (old, old))
+    tr = REAL_LOAD()
+    assert tr["stale"].startswith("Sleeper trending counts are from a copy 30 hours old")
+    assert "in the cached copy" in TR.line("g", tr) and "30 hours old" in TR.line("g", tr)
+    md = _md(tr)
+    assert "**Sleeper trending counts are from a copy 30 hours old" in md and "Likely gone" in md
+
+
+def test_a_rostered_player_is_not_likely_gone(monkeypatch, tmp_path):
+    monkeypatch.setattr(F, "sleeper_trending", _fake_fetch(tmp_path))
+    tr = REAL_LOAD()
+    assert "likely gone" in TR.line("g", tr) and "likely gone" not in TR.line("g", tr, rostered=True)
+    from tests.test_fantasy_ask import _snap
+    monkeypatch.setattr(A.EV, "for_sleeper", lambda pids, info, season, manifest=None, team=False: {})
+    s = _snap(trending={"add": {"5": 940059}, "drop": {}, "rank": {"add": {"5": 4}, "drop": {}}, "note": None})
+    text = A.players(s, ["Puka Nacua"]).text                   # Nacua is on my roster in the fixture
+    assert "added in 940k" in text and "likely gone" not in text
+

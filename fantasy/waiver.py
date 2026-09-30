@@ -462,7 +462,8 @@ def run(league: str, positions=("RB", "WR", "TE"), horizon: str = "season", week
            "stand_pat": stand_pat, "adds": ranked[:15], "protected_cuts": sorted(protected),
            "kept": sorted(kept), "keep_missing": keep_missing, "roster_room": room, "injured_adds": injured,
            "bye_calendar": bye_cal,
-           "likely_gone": TR.likely_gone(cands, trend),
+           "likely_gone": TR.likely_gone([r["add"] for r in rows], trend),   # the scored adds, as the report
+           "trending_stale": trend.get("stale"),
            "trending_drops": {p: trend["drop"][p] for p in view.my_players if p in trend["drop"]},
            "drops": [{"player": p, "ros_rate": round(rate.get(p, 0.0), 2), "protected": p in protected,
                       "kept": p in kept, "flag": cut_role(ev.get(p) or {})[1]} for p in drops],
@@ -581,6 +582,8 @@ def markdown(league, view, horizon, positions, stand, gate, ranked, drops, prote
     scored_ids = [r["add"] for r in ranked] + [r["add"] for r in (scored or {}).get("no_cut", [])] \
         + list((scored or {}).get("no_gain") or [])
     gone = TR.likely_gone(scored_ids, trend)
+    if trend.get("stale"):
+        L += ["", f"**{trend['stale']}.** The counts below and the likely-gone line are from that copy."]
     if trend.get("note"):
         L += ["", f"**Trending unavailable this run** ({trend['note']}): whether an add is being claimed "
               "everywhere -- the now-or-never signal -- is not known."]
