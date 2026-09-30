@@ -6632,3 +6632,40 @@ empty too); trade's assumption line now says to pass --back for him.
 
 Tests: tests/test_log_fixes_0930.py (23).
 
+
+## 2026-09-30 (130) -- Sleeper trending adds and drops: the waiver timing signal (nfl-v1.27)
+
+The user, on #129's "now-or-never timing needs a probability the engine does
+not have": "you don't need a probability engine for waivers, can't u see the
+trending ones on Sleeper". Yes. Sleeper publishes trending adds and drops
+across all its leagues over the last 24 hours (`/players/nfl/trending/add`,
+`/drop`; the old auto-manager brief read it, the decision commands never
+did). Ollie Gordon: 6.4M adds the day this shipped; Braelon Allen 2.8M;
+Kenyon Sadiq 2.5M; Achane the top drop.
+
+- `core.fetch.sleeper_trending` (an hour's cache, manifest-recorded);
+  `fantasy/trending.py` loads both lists, ranks them, formats counts.
+- Waiver: an *Adds 24h (Sleeper, all leagues)* column with the rank; a
+  **Likely gone after this waiver period** line naming the scored adds in the
+  top 25 -- "their gain above is what each is worth; this line is only
+  whether you can wait"; up to 25 trending adds join the scored pool, so the
+  player everyone is claiming is never "outside the pool"; *Drops 24h* on
+  the bench table. Trending unavailable is said, never shown as no one
+  trending.
+- `fantasy player`: a *Sleeper trending* line (adds and drops, rank, "likely
+  gone" for a top-25 add).
+- CHAT.md: timing is the trending count, value is the gain; for a
+  likely-gone add the call is "claim now against who he replaces, or accept
+  he is gone".
+
+A count, not a probability: it is NFL-wide, not this league, and the top-25
+cut is Sleeper's own list length, typed, not measured. #129's deferral of
+"now-or-never timing" is closed by this; role duration stays open.
+
+Review: six findings, four fixed -- a stale copy (the hourly refresh failed
+and core.fetch served the old file) is now said in the report and the player
+line instead of passing as "the last 24 hours"; "likely gone" is not said of
+a player already on a roster; CHAT.md says "unlikely", not "will not"; the
+record's likely_gone is the same scored set as the report's. Not done: the
+manager's own trending fetcher (manager/waiver_brief.py) still duplicates
+core.fetch.sleeper_trending -- the Actions path, a separate release.

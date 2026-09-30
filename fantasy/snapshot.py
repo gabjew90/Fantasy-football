@@ -75,6 +75,7 @@ class Snapshot:
     notes: list = field(default_factory=list)
     rolled: str | None = None    # why the week moved on (environment.decision_week), or None
     consensus: dict = field(default_factory=dict)   # sid -> the waiver's rest-of-season consensus row
+    trending: dict = field(default_factory=dict)    # Sleeper's trending adds/drops (fantasy/trending.load)
 
     # ------------------------------------------------------------ views
     @property
@@ -159,6 +160,10 @@ def build(league: str, week: int | None = None) -> Snapshot:
     # before the gate, as in the waiver command: a failed consensus source
     # counts against "inputs not stale" here exactly as it does there
     consensus = season_consensus(ctx, league, view.season, set(players), m, notes)
+    from . import trending as TR
+    trend = TR.load(m)
+    if trend.get("note"):
+        notes.append(trend["note"])
     gate = G.evaluate(m, view.scoring_yaml, view.scoring_platform, view.my_players, projs)
     return Snapshot(
         league=league, platform=view.platform, season=view.season, week=view.week,
@@ -167,7 +172,7 @@ def build(league: str, week: int | None = None) -> Snapshot:
         flex_slots=tuple(frozenset(s) for s in (view.flex_slots or ())), standing=view.standing,
         scoring=view.scoring, players=players, info=info, projections=projs, env=env,
         gate=gate.to_dict(), manifest=m.to_dict(), notes=notes + view.notes, rolled=rolled,
-        consensus=consensus)
+        consensus=consensus, trending=trend)
 
 
 def season_consensus(ctx: dict, league: str, season: int, keep: set, m: Manifest, notes: list) -> dict:

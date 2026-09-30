@@ -19,5 +19,9 @@ def _no_schedule_read(monkeypatch):
     (games.csv, refetched when stale): the suite never does. A test that needs
     byes builds them (fantasy.environment.bye_weeks on a small frame)."""
     from fantasy import environment as E
+    from fantasy import trending as TR
     monkeypatch.setattr(E, "load_byes", lambda season, manifest=None: {})
+    # the same for Sleeper's trending lists (tests/test_trending.py keeps the real one)
+    monkeypatch.setattr(TR, "load", lambda manifest=None: {"add": {}, "drop": {}, "rank": {"add": {}, "drop": {}},
+                                                           "note": None})
 

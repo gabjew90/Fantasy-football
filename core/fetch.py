@@ -166,6 +166,21 @@ def sleeper_lines(*, cache_dir=None, manifest=None, max_age_s: float = LINES_MAX
                  max_age_s, name="sleeper lines", manifest=manifest, **kw)
 
 
+TRENDING_MAX_AGE_S = 3600
+
+
+def sleeper_trending(kind: str, *, cache_dir=None, manifest=None, max_age_s: float = TRENDING_MAX_AGE_S,
+                     limit: int = 100, **kw) -> Path:
+    """Sleeper's trending adds or drops ("add" / "drop"): [{player_id, count}]
+    over the last 24 hours across its leagues, most first. An hour old at most:
+    it is the waiver command's timing signal (fantasy/trending.py)."""
+    if kind not in ("add", "drop"):
+        raise ValueError("kind is add or drop")
+    url = f"https://api.sleeper.app/v1/players/nfl/trending/{kind}?lookback_hours=24&limit={int(limit)}"
+    return fetch(url, Path(cache_dir or DEFAULT_CACHE) / "sleeper" / f"trending_{kind}.json", max_age_s,
+                 name=f"Sleeper trending {kind}s", manifest=manifest, **kw)
+
+
 def espn_scoreboard(season: int, week: int, *, cache_dir=None, manifest=None,
                     max_age_s: float = LINES_MAX_AGE_S * 3, **kw) -> Path:
     """ESPN's scoreboard for ONE regular-season week: kickoffs and the DraftKings
