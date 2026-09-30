@@ -167,7 +167,8 @@ def usage(ev: dict | None) -> dict:
             "role": e.get("trajectory"), "role_changed": changed or None,
             "partial_weeks": e.get("partial_weeks") or None, "team_context": e.get("team_context"),
             "by_week": {int(w): {m: (ser.get(m) or [None] * len(e.get("week_list") or []))[k]
-                                 for m in ("snap_pct", "tgt_share", "ay_share", "wopr", "carry_share")
+                                 for m in ("snap_pct", "tgt_share", "ay_share", "wopr", "carry_share",
+                                           "i10_tgt", "i10_car")
                                  if ser.get(m) is not None and k < len(ser.get(m))}
                         for k, w in enumerate(e.get("week_list") or [])},
             "season_mean": {m: mean.get(m) for m in ("snap_pct", "tgt_share", "ay_share", "wopr", "carry_share")}}

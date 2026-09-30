@@ -30,7 +30,9 @@ LABEL = {"targets": "Tgt", "receptions": "Rec", "receiving_yards": "Rec yds", "r
 
 
 # kicker and team-defense scoring: never part of a skill player's points
-NOT_OFFENSE = ("def_", "fgm", "fgmiss", "xpm", "xpmiss", "pts_allow", "st_", "blk_kick", "sack", "safe", "int",
+# (not "st_": st_td, st_fum_rec and st_ff also score an offensive player's
+# returns and special-teams plays, and the note must name them)
+NOT_OFFENSE = ("def_", "fgm", "fgmiss", "xpm", "xpmiss", "pts_allow", "blk_kick", "sack", "safe", "int",
                "fum_rec", "ff", "yds_allow", "tkl", "qb_hit", "pass_def")
 
 
@@ -124,23 +126,32 @@ def summary_line(s: dict, pos: str | None) -> str:
 # from nflverse outside the engine because no command printed them.
 
 STAT_LINE = {
-    "REC": {"usage": ("snap_pct", "tgt_share", "ay_share", "wopr"),
+    "REC": {"usage": ("snap_pct", "tgt_share", "ay_share", "wopr", "i10_tgt"),
             "box": ("targets", "receptions", "receiving_yards", "receiving_air_yards", "adot",
                     "receiving_yards_after_catch", "receiving_first_downs", "receiving_tds", "carries",
                     "rushing_yards")},
-    "RB": {"usage": ("snap_pct", "carry_share", "tgt_share"),
-           "box": ("carries", "rushing_yards", "ypc", "rushing_first_downs", "rushing_tds", "targets", "receptions",
-                   "receiving_yards", "receiving_tds")},
+    # a back: the workload (snap, carry and target share), the goal-line role
+    # (carries and targets inside the 10 -- where his touchdowns come from),
+    # the rushing (yards per carry, runs of 10+ yards, first downs, EPA per
+    # carry: how well the carries went, not just how many) and the receiving
+    "RB": {"usage": ("snap_pct", "carry_share", "tgt_share", "i10_car", "i10_tgt"),
+           "box": ("carries", "rushing_yards", "ypc", "rushing_10", "rushing_first_downs", "epa_per_carry",
+                   "rushing_tds", "targets", "receptions", "receiving_yards", "receiving_yards_after_catch",
+                   "receiving_tds")},
     "QB": {"usage": ("snap_pct", "carry_share"),
            "box": ("attempts", "completions", "passing_yards", "passing_air_yards", "passing_tds",
                    "passing_interceptions", "sacks_suffered", "carries", "rushing_yards", "rushing_tds")},
 }
 SECONDARY = {"REC": ("carries", "rushing_yards")}          # shown only when not all zero
 USAGE_LABEL = {"snap_pct": "Snap %", "tgt_share": "Tgt share", "ay_share": "Air-yd share", "wopr": "WOPR",
-               "carry_share": "Carry share"}
+               "carry_share": "Carry share", "i10_car": "Inside-10 car", "i10_tgt": "Inside-10 tgt"}
+USAGE_COUNTS = ("i10_car", "i10_tgt")          # usage that is a count, not a share: summed in the season row
+DERIVED = ("adot", "ypc", "epa_per_carry")
+FLOAT_BOX = ("rushing_epa",)                  # kept to two decimals, never rounded to a whole number
 BOX_LABEL = dict(LABEL, receiving_air_yards="Air yds", adot="aDOT", receiving_yards_after_catch="YAC",
                  receiving_first_downs="1st downs", rushing_first_downs="Rush 1st downs", ypc="YPC",
-                 passing_air_yards="Pass air yds", sacks_suffered="Sacked", receiving_yards="Rec yds")
+                 passing_air_yards="Pass air yds", sacks_suffered="Sacked", receiving_yards="Rec yds",
+                 rushing_10="10+ yd runs", epa_per_carry="EPA/carry")
 
 
 def _kind(pos: str | None) -> str:
@@ -151,11 +162,13 @@ def _derived(row: dict) -> dict:
     tg, car = row.get("targets") or 0, row.get("carries") or 0
     row["adot"] = None if not tg or row.get("receiving_air_yards") is None else round(row["receiving_air_yards"] / tg, 1)
     row["ypc"] = None if not car or row.get("rushing_yards") is None else round(row["rushing_yards"] / car, 1)
+    row["epa_per_carry"] = (None if not car or row.get("rushing_epa") is None
+                            else round(row["rushing_epa"] / car, 2))
     return row
 
 
 def stat_line(stats: pd.DataFrame, gsis: str, pos: str | None, scoring: dict, usage_by_week: dict,
-              season_usage: dict | None = None, weeks: int = LOG_WEEKS) -> dict | None:
+              season_usage: dict | None = None, weeks: int | None = None) -> dict | None:
     """{kind, rows: [per game, oldest first], season: {...}}. A week with
     usage but no box-score row (stats not published yet) keeps its usage and
     shows the box as missing; a week with neither is not a game he played."""
@@ -163,15 +176,21 @@ def stat_line(stats: pd.DataFrame, gsis: str, pos: str | None, scoring: dict, us
     spec = STAT_LINE[kind]
     d = stats[stats["player_id"] == gsis].sort_values("week") if stats is not None else stats
     have = d is not None and not d.empty
-    raw = [c for c in spec["box"] if c not in ("adot", "ypc")]
+    raw = [c for c in spec["box"] if c not in DERIVED]
+    if "epa_per_carry" in spec["box"]:
+        raw.append("rushing_epa")                       # read to derive EPA per carry
     box = {}
     if have:
         pts, no_td = score_frame(d, _weights(scoring)), score_frame(d, _weights(scoring, touchdowns=False))
         for (_, r), p, n in zip(d.iterrows(), pts, no_td):
-            box[int(r["week"])] = dict({c: (None if c not in r or pd.isna(r[c]) else int(round(float(r[c]))))
+            box[int(r["week"])] = dict({c: (None if c not in r or pd.isna(r[c]) else
+                                            round(float(r[c]), 2) if c in FLOAT_BOX else int(round(float(r[c]))))
                                         for c in raw}, opp=r.get("opponent_team"),
                                        pts=round(float(p), 1), pts_no_td=round(float(n), 1))
-    wks = sorted(set(box) | {int(w) for w in usage_by_week})[-weeks:]
+    # every game of the season by default: the rows add up to the season row,
+    # and "the full data" means no early weeks cut off
+    wks = sorted(set(box) | {int(w) for w in usage_by_week})
+    wks = wks[-weeks:] if weeks else wks
     if not wks:
         return None
     rows = []
@@ -181,10 +200,14 @@ def stat_line(stats: pd.DataFrame, gsis: str, pos: str | None, scoring: dict, us
         empty = dict({c: None for c in raw}, opp=None, pts=None, pts_no_td=None)
         r = {"week": w, **{m: (usage_by_week.get(w) or {}).get(m) for m in spec["usage"]}, **(box.get(w) or empty)}
         rows.append(_derived(r))
-    season = {m: (season_usage or {}).get(m) for m in spec["usage"]}
+    season = {m: (season_usage or {}).get(m) for m in spec["usage"] if m not in USAGE_COUNTS}
+    for m in spec["usage"]:
+        if m in USAGE_COUNTS:                           # a count: the season is the sum, not the mean
+            season[m] = int(sum((usage_by_week.get(w) or {}).get(m) or 0 for w in usage_by_week))
     if have:
         for c in raw:
-            season[c] = int(pd.to_numeric(d[c], errors="coerce").fillna(0).sum()) if c in d.columns else None
+            tot = pd.to_numeric(d[c], errors="coerce").fillna(0).sum() if c in d.columns else None
+            season[c] = None if tot is None else (round(float(tot), 2) if c in FLOAT_BOX else int(tot))
         season["pts"] = round(float(score_frame(d, _weights(scoring)).sum()), 1)
         season["pts_no_td"] = round(float(score_frame(d, _weights(scoring, touchdowns=False)).sum()), 1)
         season["games"] = int(d["week"].nunique())
@@ -194,8 +217,12 @@ def stat_line(stats: pd.DataFrame, gsis: str, pos: str | None, scoring: dict, us
 def _fmt(v, col) -> str:
     if v is None:
         return "--"
+    if col in USAGE_COUNTS:
+        return str(int(v))
     if col in USAGE_LABEL:
         return f"{v:.2f}" if col == "wopr" else f"{100 * v:.0f}"
+    if col == "epa_per_carry":
+        return f"{v:+.2f}"
     return f"{v:g}" if isinstance(v, float) else str(v)
 
 

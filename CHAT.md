@@ -21,8 +21,8 @@ data in full AND your analysis of it: what it means, which way it is moving,
 and the case for the call.
 
 **Reach for the question tools first.** `fantasy player / swap / roster` and
-`props player / line / best / matchup` each answer one question in a few
-lines, from a session cache (the league and each priced game are read once and
+`props player / line / best / matchup` each answer one question, from a
+session cache (the league and each priced game are read once and
 reused for 20 minutes), so you can ask as many as the conversation needs:
 look a player up, compare two, try a swap, check a line, follow up. The
 full reports (`fantasy lineup / waiver / trade / scenario`, `props game /
@@ -244,10 +244,9 @@ reach the call. The reply mentions the parts that decide it, not all of them.
   add in `fantasy waiver`) prints a *Team context* table: his position group
   -- receivers WR and TE together, backs together -- with snap %, target or
   carry share and WOPR week by week, inside-10 volume and the role flag.
-  Whenever the question turns on his role (an add, a start, a trade, "is he
-  for real?"), say where he sits in that pecking order and which way it is
-  moving, and show the table, or the rows that matter, when it makes the
-  point faster than words. A '-' week is a game he missed, which often
+  It goes in every player answer IN FULL (**The full data, every time**,
+  above), and the analysis says where he sits in that pecking order and
+  which way it is moving. A '-' week is a game he missed, which often
   explains a teammate's jump; '?' a game he played whose snap count is not
   in yet; '*' a partial game, not a role. The season column is his level
   of the lead share, so a recent dip reads against it.

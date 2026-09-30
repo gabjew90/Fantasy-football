@@ -6547,3 +6547,20 @@ no command printed them.
   your lineup**), so "not evaluated" and "no gain" are told apart; chat said
   Robinson "scored no gain" without knowing which.
 
+
+Running backs, at the user's request the same day ("do the equivalent for
+running backs, with the data appropriate for an RB"): the back's line is
+snap %, carry share, target share, carries and targets inside the 10 (the
+goal-line role, from the engine's usage, summed in the season row -- a
+count, not a share), carries, yards, YPC, runs of 10+ yards, rushing first
+downs, rushing EPA per carry (how well the carries went, not only how many),
+rushing TDs, targets, receptions, receiving yards, yards after catch and
+receiving TDs. Receivers gain inside-10 targets per week.
+
+Review: five findings, all fixed. CHAT.md's team-context bullet still said
+"show the table, or the rows that matter" -- it now points at the full-data
+rule; the stat line showed only the last six games while the season row
+summed all of them -- every game is a row now; "st_" was dropped from the
+not-counted filter (st_fum_rec / st_ff can score an offensive player); the
+"question tools answer in a few lines" wording is gone; a test pins a
+mid-season trade and the rows adding up to the season row.

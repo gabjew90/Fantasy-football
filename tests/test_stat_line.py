@@ -76,3 +76,42 @@ def test_waivers_name_the_scored_adds_that_gain_nothing():
                      scored={"candidates": 80, "improving": 1, "no_cut": [], "no_gain": ["b"]})
     assert "**Scored, no gain for your lineup:** Wan'Dale Robinson (TEN, WR)." in md
     assert "not named anywhere in this report was outside that pool" in md
+
+
+def test_every_game_of_the_season_is_a_row_and_a_trade_keeps_both_teams():
+    base = dict(season=2026, season_type="REG", carries=0, rushing_yards=0, rushing_tds=0, receptions=3,
+                receiving_yards=30, receiving_air_yards=20, receiving_yards_after_catch=10, receiving_first_downs=1,
+                receiving_tds=0)
+    rows = [dict(base, player_id="wr", week=w, team="BUF" if w <= 4 else "KC", opponent_team="X", targets=5)
+            for w in range(1, 10)]
+    usage = {w: {"snap_pct": 0.8, "tgt_share": 0.2, "ay_share": 0.2, "wopr": 0.44} for w in range(1, 10)}
+    sl = BX.stat_line(pd.DataFrame(rows), "wr", "WR", HALF, usage)
+    assert [r["week"] for r in sl["rows"]] == list(range(1, 10)), "no early weeks cut off"
+    assert sl["season"]["targets"] == 45 == sum(r["targets"] for r in sl["rows"]), "rows add up to the season"
+    assert BX.stat_line(pd.DataFrame(rows), "wr", "WR", HALF, usage, weeks=3)["rows"][0]["week"] == 7
+
+
+def test_special_teams_scoring_is_named_when_not_counted():
+    left = BX.not_counted({"rec": 0.5, "st_td": 6.0, "st_fum_rec": 2.0, "def_td": 6.0})
+    assert left == ["st_fum_rec"], "st_td is counted (special_teams_tds); an uncounted st_ key is named"
+
+
+def test_a_back_gets_goal_line_work_explosive_runs_and_epa_per_carry():
+    d = pd.DataFrame([dict(season=2026, season_type="REG", team="DAL", player_id="rb", week=w, opponent_team="X",
+                           carries=c, rushing_yards=y, rushing_10=ex, rushing_first_downs=fd, rushing_epa=epa,
+                           rushing_tds=td, targets=3, receptions=2, receiving_yards=12,
+                           receiving_yards_after_catch=14, receiving_tds=0)
+                      for w, c, y, ex, fd, epa, td in ((1, 12, 41, 0, 2, 1.39, 1), (3, 19, 98, 3, 7, -0.9, 1))])
+    usage = {1: {"snap_pct": 0.71, "carry_share": 0.67, "tgt_share": 0.17, "i10_car": 3, "i10_tgt": 1},
+             3: {"snap_pct": 0.76, "carry_share": 0.63, "tgt_share": 0.08, "i10_car": 4, "i10_tgt": 0}}
+    sl = BX.stat_line(d, "rb", "RB", HALF, usage, {"snap_pct": 0.74, "carry_share": 0.65, "tgt_share": 0.12})
+    wk3 = sl["rows"][1]
+    assert wk3["rushing_10"] == 3 and wk3["epa_per_carry"] == round(-0.9 / 19, 2) and wk3["rushing_epa"] == -0.9
+    s = sl["season"]
+    assert s["i10_car"] == 7 and s["i10_tgt"] == 1, "goal-line work is a count: summed, not averaged"
+    assert s["rushing_epa"] == 0.49 and s["epa_per_carry"] == round(0.49 / 31, 2)
+    head = BX.stat_line_table(sl)[0]
+    for col in ("Inside-10 car", "Inside-10 tgt", "10+ yd runs", "EPA/carry", "YAC", "YPC"):
+        assert col in head, col
+    assert "| 3 | X | 76 | 63 | 8 | 4 | 0 |" in "\n".join(BX.stat_line_table(sl))
+
