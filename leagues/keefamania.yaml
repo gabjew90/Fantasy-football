@@ -264,3 +264,10 @@ engine:
   prefer:
     - ["Ja'Marr Chase", "Puka Nacua"]
     - ["Javonte Williams", "Jeremiyah Love"]
+
+# The in-season fantasy commands (nfl fantasy ...). `keep`: players the waiver
+# and trade commands never propose as a cut -- handcuffs and trade chips whose
+# value the engine cannot see (user, 2026-09-30). Names or Sleeper ids.
+fantasy:
+  keep:
+    - Emmett Johnson

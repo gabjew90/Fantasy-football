@@ -235,11 +235,16 @@ def run(league: str, give: list[str], get: list[str], back: list[str] | None = N
         if p in back_for:
             out_until[p] = back_for[p]
             assumed[p] = f"back week {back_for[p]} (as given)"
+        elif WV.season_ending(status, (players.get(p) or {}).get("injury_body_part")):
+            out_until[p] = view.week + WV.SEASON_OUT
+            assumed[p] = (f"out for the season (assumed from '{status}', "
+                          f"{(players.get(p) or {}).get('injury_body_part')})")
         elif WV.miss_weeks(status):
             out_until[p] = view.week + WV.miss_weeks(status)
             assumed[p] = f"back week {out_until[p]} (assumed from '{status}': the NFL minimum, not a prognosis)"
 
     ev = EV.for_sleeper(pids, info, view.season, manifest=m)
+    kept, _ = LG.keep_list(cfg, mine, info)          # the league file's keep list: never the overflow cut
     # the gate covers BOTH rosters: the verdict rests on the partner's side too
     both = list(dict.fromkeys(mine + theirs))
     info_both = {**dict(view.info), **{p: info[p] for p in both if p in info}}
@@ -256,7 +261,8 @@ def run(league: str, give: list[str], get: list[str], back: list[str] | None = N
         active_now = sum(1 for p in before if p not in reserve.get(rid, set()))
         lim = max(limit or 0, active_now)
         return evaluate_side(before, set(out_ids), set(in_ids), limit=lim, reserve=reserve.get(rid, set()),
-                             rate=rate, protected=WV.protected_cuts([p for p in before if p not in out_ids], ev),
+                             rate=rate, protected=WV.protected_cuts([p for p in before if p not in out_ids], ev)
+                             | (kept if rid == my else set()),
                              free=pool, value=value, upside_value=upside_value, weeks=weeks, playoff=playoff)
 
     me = side(mine, my, gave, got, free)

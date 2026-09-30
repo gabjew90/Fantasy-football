@@ -68,9 +68,11 @@ class ScenarioResult:
 
 # ---------------------------------------------------------------- identity
 
-def resolve(name_or_id: str, players: dict) -> str:
+def resolve(name_or_id: str, players: dict, team: str | None = None) -> str:
     """A Sleeper id from an id or a name. An ambiguous name is an error that
-    lists the candidates -- a guess would price the wrong player."""
+    lists the candidates -- a guess would price the wrong player -- unless
+    `team` (the --player's team, for the teammate in --out) leaves exactly one:
+    "Justin Jefferson" beside Jordan Addison is Minnesota's (2026-09-30)."""
     s = str(name_or_id).strip()
     if s in players:
         return s
@@ -79,6 +81,9 @@ def resolve(name_or_id: str, players: dict) -> str:
     if pid:
         return pid
     cands = idx.candidates(s)
+    same = [c for c in cands if team and (players.get(c) or {}).get("team") == team]
+    if len(same) == 1:
+        return same[0]
     if cands:
         opts = ", ".join(f"{players[c].get('full_name')} ({players[c].get('team') or 'FA'}, id {c})" for c in cands)
         raise ScenarioError(f"'{s}' matches more than one player: {opts}. Pass the id.")
@@ -179,7 +184,8 @@ def run(league: str, player: str, out: str, week: int | None = None, *, out_dir:
     yaml_sc, plat_sc = LG.load_scoring(league, m)      # scoring only: this command uses no roster
     scoring = {**yaml_sc, **plat_sc}
     players = json.loads(F.sleeper_players(manifest=m).read_text(encoding="utf-8"))
-    pid, out_pid = resolve(player, players), resolve(out, players)
+    pid = resolve(player, players)
+    out_pid = resolve(out, players, team=(players.get(pid) or {}).get("team"))
     p, o = players[pid], players[out_pid]
     if not p.get("team") or p.get("team") != o.get("team"):
         raise ScenarioError(f"{p.get('full_name')} ({p.get('team')}) and {o.get('full_name')} ({o.get('team')}) "

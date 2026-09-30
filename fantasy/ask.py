@@ -208,12 +208,14 @@ def players(snap: Snapshot, names: list[str], *, with_usage: bool = True, with_f
     LU.lock_order(watch, snap.my_players, snap.info, snap.env, dt.datetime.now(dt.timezone.utc))
     fp, fp_note = (LU.fp_practice(watch, snap.season, snap.week, m) if (watch and with_fp) else ({}, ""))
     by_pid = {w["pid"]: w for w in watch}
+    byes = E.load_byes(snap.season, m)
     rows, box = [], {}
     for sid in sids:
         i, raw = snap.info.get(sid) or {}, snap.players.get(sid) or {}
         w = by_pid.get(sid) or {}
         row = {"id": sid, "name": i.get("name"), "pos": i.get("pos"), "team": i.get("team"),
                "owner": owner(snap, sid), "game": _game(snap, i.get("team")),
+               "bye": (byes.get(i.get("team")) or [None])[0],
                "status": i.get("status") or raw.get("injury_status") or "",
                "injury": raw.get("injury_body_part"), "practice_sleeper": raw.get("practice_participation"),
                "fantasypros": fp.get(sid), "projection": projection(snap, sid),
@@ -473,7 +475,8 @@ def _player_lines(r: dict) -> list[str]:
            "another team": f"on {o.get('team_name')}'s roster", "free agent": "a free agent"}[o["who"]]
     if o["who"] in ("you", "your opponent"):
         own += ", starting" if o["starting"] else ", on the bench"
-    L = [f"**{r['name']}** -- {r['pos']}, {r['team'] or 'no team'}; {own}."]
+    bye = f" (bye week {r['bye']})" if r.get("bye") else ""
+    L = [f"**{r['name']}** -- {r['pos']}, {r['team'] or 'no team'}{bye}; {own}."]
     if g:
         fav = "" if g.get("spread") is None else (f", favoured by {-g['spread']:g}" if g["spread"] < 0 else
                                                   f", {g['spread']:g}-point underdog" if g["spread"] > 0 else ", a pick'em")
@@ -524,7 +527,9 @@ def _player_lines(r: dict) -> list[str]:
         gone = [k for k in CONSENSUS_SOURCES if k not in c["per_source"]]
         L.append(f"Season value (consensus of {c['n']} source{'s' if c['n'] != 1 else ''}, the waiver command's): "
                  f"{c['per_game']} points a game, {c['season_total']:.0f} on a full-season basis ({src})"
-                 + (f"; no {', '.join(gone)} number for him" if gone else "") + ".")
+                 + (f"; no {', '.join(gone)} number for him" if gone else "") + "."
+                 + (f" The sources disagree widely ({c['split']}): at least one has likely not caught up with a "
+                    "change in his role, so the consensus is unreliable for him." if c.get("split") else ""))
     if u is not None:
         if not u.get("weeks"):
             L.append(f"Usage: {u.get('note')}.")
@@ -665,7 +670,22 @@ def season_line(snap: Snapshot, sid: str) -> dict | None:
     c = (getattr(snap, "consensus", None) or {}).get(sid)
     if not c or c.get("mean") is None:
         return None
+    per = {k: round(float(v), 1) for k, v in (c.get("per_source") or {}).items()}
     return {"season_total": round(float(c["mean"]), 1), "per_game": round(float(c["mean"]) / SEASON_GAMES, 1),
-            "n": int(c.get("n") or len(c.get("per_source") or {})),
-            "per_source": {k: round(float(v), 1) for k, v in (c.get("per_source") or {}).items()}}
+            "n": int(c.get("n") or len(per)), "per_source": per, "split": source_split(per)}
+
+
+SPLIT_RATIO, SPLIT_POINTS = 2.0, 30.0   # PROVISIONAL: the top source 2x the bottom AND 30+ season points apart
+
+
+def source_split(per: dict) -> str | None:
+    """"sleeper 22 vs espn 152" when the sources are far enough apart that one
+    is probably stale (Ollie Gordon, 2026-09-30: Sleeper had not repriced him
+    for Achane's season-ending injury); None otherwise."""
+    if len(per) < 2:
+        return None
+    (lo_k, lo), (hi_k, hi) = min(per.items(), key=lambda kv: kv[1]), max(per.items(), key=lambda kv: kv[1])
+    if hi - lo >= SPLIT_POINTS and hi >= SPLIT_RATIO * max(lo, 0.0):
+        return f"{lo_k} {lo:.0f} vs {hi_k} {hi:.0f}"
+    return None
 

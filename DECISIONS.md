@@ -6564,3 +6564,62 @@ summed all of them -- every game is a row now; "st_" was dropped from the
 not-counted filter (st_fum_rec / st_ff can score an offensive player); the
 "question tools answer in a few lines" wording is gone; a test pins a
 mid-season trade and the rows adding up to the season row.
+
+
+## 2026-09-30 (129) -- season-ending injuries, the cut rule's volume test, the keep list, roster room and byes (nfl-v1.26)
+
+From the 09-30 05:50 session log (13 engine items; chat caught most of them by
+hand, which is the job the engine should do).
+
+- **Season-ending injuries.** A player on IR or Out whose injury detail
+  (Sleeper's injury_body_part) names an ACL or an Achilles misses the rest of
+  the season in waiver and trade (`waiver.season_ending`, SEASON_OUT). The
+  four-week IR minimum ranked De'Von Achane ("Knee - ACL") the top season add
+  in both leagues, back week 8. Questionable or PUP with the same detail is a
+  player recovering from an old tear and keeps the old rule. The waiver report
+  now names every injured add and what was assumed ("out for the season", or
+  "back week N, the NFL minimum -- check the news").
+- **The cut rule needs volume, and flags instead of refusing.** An established
+  role is 60%+ snaps AND a target share of 15%+ (WR; 12% TE) or a carry share
+  of 30%+ (RB), with neither a role change beyond noise downward nor a last
+  game under 3/4 of the earlier ones. Snaps alone protected Xavier Worthy (83%
+  snaps, 9% targets, falling 24 -> 16 -> 9); the user: the engine should not
+  refuse just because of snaps. A bench player with the snaps but not the rest
+  is eligible and the bench table says why. The share thresholds are
+  PROVISIONAL, typed, not measured -- like the 60% they sit beside.
+- **The keep list** (`fantasy: keep:` in leagues/<name>.yaml, names or ids):
+  never proposed as a cut by waiver, never the overflow cut in trade. Emmett
+  Johnson (both leagues) and Kaelon Black (Omnibeta), the user's handcuffs /
+  trade chips, which every waiver run had offered as the drop.
+- **Roster room** (`league.roster_room`): open active spots and empty IR slots
+  from the platform's own slot assignment (Yahoo selected_position, Sleeper
+  reserve), and the active players IR-eligible to move there. With room, an
+  add is priced with no cut first (a tie goes to no cut); each row assumes it
+  is the only add.
+- **Byes**: the player tool's header, and a bye calendar at the end of the
+  waiver and lineup reports (`environment.bye_weeks / bye_calendar`).
+- Smaller: the season value line flags sources that disagree widely (top 2x
+  the bottom AND 30+ points apart, PROVISIONAL -- Gordon: Sleeper 22, ESPN
+  152); a scenario's `--out` name resolves on the `--player`'s team first
+  (Jefferson beside Addison is Minnesota's); a lineup for a future week says
+  its injury statuses are today's.
+
+Not done, and why:
+- **Now-or-never waiver timing** (Gordon and Allen gone after this week) and
+  **how long a borrowed role lasts**: both need a probability the engine does
+  not have (claim competition, a teammate's return date). The report already
+  names the teammate a role was borrowed from; the gamble stays chat's
+  labelled judgment.
+- **Multi-player free-agent swaps** (`trade --give A,B --get C,D` with free
+  agents): the waiver arithmetic is one-for-one; a two-for-two needs the
+  season_gain loop over pairs. Worth doing when it recurs.
+- **An in-game split command** (a player's usage before and after a teammate
+  left mid-game) and **partial games in the scenario's observed split**: both
+  need play-by-play exit times; the partial-game marker already tells chat a
+  game is mixed.
+- **Reconciling Sleeper with the props scenario model**: they are different
+  models; the waiver gain uses the weekly projection (Sleeper blended with the
+  market) and the scenario report says which it prints.
+
+Tests: tests/test_log_fixes_0930.py (19).
+

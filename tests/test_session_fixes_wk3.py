@@ -172,7 +172,7 @@ def test_the_season_value_is_the_waiver_consensus_per_game(monkeypatch):
                                                                      "fantasypros": 160.0}}})
     row = A.season_line(s, "5")
     assert row == {"season_total": 170.0, "per_game": 10.0, "n": 3,
-                   "per_source": {"sleeper": 180.0, "espn": 170.0, "fantasypros": 160.0}}
+                   "per_source": {"sleeper": 180.0, "espn": 170.0, "fantasypros": 160.0}, "split": None}
     assert A.season_line(s, "6") is None
     text = A.players(s, ["Puka Nacua"]).text
     assert "Season value (consensus of 3 sources" in text and "10.0 points a game, 170 on a full-season basis" in text
