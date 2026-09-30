@@ -334,6 +334,13 @@ def run(league: str, week: int | None = None, *, record: bool = False, out_dir: 
     # ------------------------------------------------------------ report
     L = [f"# Start/sit -- {league}, {view.season} week {view.week}", "", f"**{gate.line()}**", ""]
     L += [record_line(view.standing), ""]
+    live = (view.ctx.get("state") or {}).get("week")
+    if str(live).isdigit() and view.week > int(live):
+        # a future week is scored with TODAY's designations: an Out player
+        # now is Out in week 6 too (2026-09-30, Etienne in `--week 6`)
+        L += [f"*Week {view.week} is ahead of the live week ({live}): injury statuses are today's, carried "
+              "forward, and the projections are early (Sleeper only until the books post lines). Rerun it "
+              "that week.*", ""]
     if theirs:
         fav = pw.get(label, 0.5) >= 0.5
         L += [f"**{view.my_name} vs {view.opp_name}.** Recommended lineup projects {total(chosen):.1f} "
@@ -424,6 +431,14 @@ def run(league: str, week: int | None = None, *, record: bool = False, out_dir: 
               "Ceiling (p90) | Sleeper | Market (weight) |", "|---|---|---|---|---|---|---|---|---|---|---|"]
         L += [_row(p, view.info, projs) for p in sorted(bench, key=lambda p: -(projs[p].mean if p in projs else 0))]
 
+    # the weeks ahead that take players out, so a bye is planned for, not met
+    # (2026-09-30: Keefamania week 6 loses four starters)
+    last_wk = int(view.ctx.get("last_week") or 17)
+    bye_cal = E.bye_calendar(view.my_players, view.info, E.load_byes(view.season, m),
+                             range(view.week, last_wk + 1), chosen)
+    L += ["", "## Your bye calendar", "", "*Every week left in which a player on your roster has a bye; this "
+          "week's recommended starters in bold.*", ""] + E.bye_table(bye_cal, lambda p: _name(p, view.info))
+
     by_pos = {}
     for p in chosen:
         for c in (projs[p].detail.get("range_caveats") or []) if p in projs else []:
@@ -455,7 +470,7 @@ def run(league: str, week: int | None = None, *, record: bool = False, out_dir: 
            "standing": view.standing,
            "me": view.my_name, "opponent": view.opp_name, "opponent_lineup": theirs, "opponent_lineup_from": their_how,
            "recommended": {"label": label, "starters": chosen, "p_win": pw.get(label)},
-           "current": {"starters": current, "p_win": pw_current},
+           "current": {"starters": current, "p_win": pw_current}, "bye_calendar": bye_cal,
            "candidates": [{"label": lab, "starters": ids, "p_win": pw.get(lab)} for lab, ids in cands],
            "projections": {p: {"mean": pr.mean, "quantiles": {str(k): v for k, v in pr.quantiles.items()},
                                "detail": {k: v for k, v in pr.detail.items() if k != "env"},

@@ -21,7 +21,10 @@ The user's waiver framework (docs/plans/2026-09-24-consolidation-plan.md, s6):
                         rest-of-season upside among the adds that improve it.
 
 Drops obey the blocking rule: a player with an established role (60%+ of
-snaps, role not falling) is never proposed as a cut on production alone.
+snaps AND the volume that goes with it, role not falling) is never proposed as
+a cut on production alone; the league file's keep list is never proposed at
+all. An open roster spot (or an IR-eligible player who can move to an empty IR
+slot) lets an add come with no cut.
 
 Candidates are UNROSTERED in the league; whether one is claimable now (waiver
 period, add limits) is not checked, and the report says so. FAAB is out of
@@ -63,11 +66,37 @@ STATUS_ALIAS = {"o": "out", "d": "doubtful", "ir-r": "ir", "ir+": "ir", "pup-r":
                 "nfi-r": "nfi", "nfi-a": "nfi", "susp": "sus"}
 
 
-def miss_weeks(status: str | None) -> int:
-    """Weeks a player is assumed to miss from his platform status (0 = none)."""
+SEASON_OUT = 99                 # "misses the rest of the season": past any week the season has
+# An injury that ends a season, read from the injury detail (Sleeper's
+# injury_body_part: "Knee - ACL", "Achilles") on a player who is OUT NOW (IR or
+# Out). The four-week IR minimum ranked De'Von Achane (IR, "Knee - ACL") the
+# top season add in both leagues, back week 8 (2026-09-30). A Questionable or
+# PUP player with the same detail is recovering from an old tear, not a new one.
+SEASON_ENDING = ("acl", "achilles")
+SEASON_ENDING_STATUS = ("ir", "out")
+
+
+def season_ending(status: str | None, part: str | None) -> bool:
+    s = (status or "").strip().lower()
+    s = STATUS_ALIAS.get(s, s)
+    words = (part or "").lower().replace("-", " ").replace("+", " ").split()
+    return s in SEASON_ENDING_STATUS and any(w in words for w in SEASON_ENDING)
+
+
+def miss_weeks(status: str | None, part: str | None = None) -> int:
+    """Weeks a player is assumed to miss from his platform status (0 = none);
+    SEASON_OUT for a season-ending injury (season_ending)."""
+    if season_ending(status, part):
+        return SEASON_OUT
     s = (status or "").strip().lower()
     return MISS_WEEKS.get(STATUS_ALIAS.get(s, s), 0)
 ESTABLISHED_SNAP = 0.60
+# The VOLUME an established role also needs (PROVISIONAL, not measured): snaps
+# alone protected Xavier Worthy -- 83% of snaps, a 9% target share, falling
+# 24 -> 16 -> 9 -- and the user objected (2026-09-30). A QB has no share test.
+ESTABLISHED_SHARE = {"WR": ("tgt_share", 0.15), "TE": ("tgt_share", 0.12), "RB": ("carry_share", 0.30)}
+FALLING_RATIO = 0.75            # last game under 3/4 of his earlier games' mean: falling
+SHARE_LABEL = {"tgt_share": "target share", "carry_share": "carry share"}
 STAND_PAT = {"stream": 0.01, "season": 5.0}     # P(win) points / season points below which: stand pat
 # the smallest gain LISTED, in each horizon's own unit: stream gains are a
 # change in P(win) (0.005 = the lineup command's simulation-noise floor, half a
@@ -102,13 +131,10 @@ standing = LG.standing          # moved to league.py; every command reads it
 
 
 def byes_by_team(games: pd.DataFrame, season: int, weeks) -> dict:
-    """team (nflverse code) -> set of weeks in `weeks` it has no game."""
-    g = games[(games.season == season) & (games.game_type == "REG")]
-    plays = {}
-    for _, r in g.iterrows():
-        plays.setdefault(r.home_team, set()).add(int(r.week))
-        plays.setdefault(r.away_team, set()).add(int(r.week))
-    return {t: {w for w in weeks if w not in ws} for t, ws in plays.items()}
+    """team (nflverse code) -> set of weeks in `weeks` it has no game: the
+    season arithmetic's form of environment.bye_weeks (one bye rule)."""
+    ws = set(weeks)
+    return {E.SLEEPER_TO_NFLVERSE.get(t, t): set(b) & ws for t, b in E.bye_weeks(games, season).items()}
 
 
 def season_gain(roster_rates: dict, pos: dict, team: dict, slots, flex_slots, weeks, byes: dict,
@@ -169,20 +195,42 @@ def record_consensus_failures(m, notes) -> None:
                      detail=n[:200])
 
 
+def cut_role(e: dict) -> tuple[bool, str | None]:
+    """(protected?, why not) for one bench player. Protected = an established
+    role: 60%+ of snaps, the volume that goes with them (ESTABLISHED_SHARE),
+    and neither a role change beyond noise downward nor a last game under
+    FALLING_RATIO of the earlier ones. A player with the snaps but not the
+    rest is ELIGIBLE, and the note says why, so the report flags him instead of
+    refusing him."""
+    mean = e.get("mean") or {}
+    snap = mean.get("snap_pct")
+    if snap is None or snap < ESTABLISHED_SNAP:
+        return False, None
+    if any(f.get("changed") and f.get("diff", 0) < 0 for f in (e.get("role_change") or {}).values()):
+        return False, f"{snap:.0%} of snaps, but the role fell beyond noise"
+    metric, floor = ESTABLISHED_SHARE.get(e.get("pos"), (None, None))
+    if metric:
+        share = mean.get(metric)
+        if share is not None and share < floor:
+            return False, f"{snap:.0%} of snaps but a {share:.0%} {SHARE_LABEL[metric]}: snaps without the volume"
+        s = (e.get("series") or {}).get(metric) or []
+        earlier = [v for v in s[:-1] if v is not None]
+        # a PARTIAL last game (an in-game exit) is not a role: evidence marks it
+        partial = bool(e.get("week_list")) and e["week_list"][-1] in (e.get("partial_weeks") or [])
+        if (len(earlier) >= 2 and s[-1] is not None and not partial
+                and s[-1] < FALLING_RATIO * (sum(earlier) / len(earlier))):
+            trail = " -> ".join("--" if v is None else f"{100 * v:.0f}" for v in s)
+            return False, f"{snap:.0%} of snaps, but his {SHARE_LABEL[metric]} is falling ({trail}%)"
+    return True, None
+
+
 def protected_cuts(drops, ev: dict) -> set:
-    """THE BLOCKING RULE: an established role (60%+ of snaps, role not
-    falling) is never a cut on production alone. Applied BEFORE a cut is
-    chosen: applied after, bench players who never start all cost zero, the
-    tie fell to a protected backup QB, and every pairing was refused -- a
-    false STAND PAT (first run, 2026-09-24)."""
-    out = set()
-    for p in drops:
-        e = ev.get(p) or {}
-        snap = (e.get("mean") or {}).get("snap_pct")
-        falling = any(f.get("changed") and f.get("diff", 0) < 0 for f in (e.get("role_change") or {}).values())
-        if snap is not None and snap >= ESTABLISHED_SNAP and not falling:
-            out.add(p)
-    return out
+    """THE BLOCKING RULE (cut_role): an established role is never a cut on
+    production alone. Applied BEFORE a cut is chosen: applied after, bench
+    players who never start all cost zero, the tie fell to a protected backup
+    QB, and every pairing was refused -- a false STAND PAT (first run,
+    2026-09-24)."""
+    return {p for p in drops if cut_role(ev.get(p) or {})[0]}
 
 
 def cut_order(drops, protected: set, rate: dict) -> list:
@@ -266,6 +314,7 @@ def run(league: str, positions=("RB", "WR", "TE"), horizon: str = "season", week
         d = players.get(p) or {}
         info[p] = {"name": display_name(d, p), "pos": fantasy_position(d), "team": d.get("team"),
                    "status": d.get("injury_status") or ""}
+    part = {p: (players.get(p) or {}).get("injury_body_part") for p in view.my_players + cands}
     pids = list(dict.fromkeys(view.my_players + view.opp_players + cands))
     projs, env, notes = W.project_players(pids, info, view.season, view.week, view.scoring, league, m,
                                           (cfg.get("fantasy") or {}).get("market_weight"))
@@ -278,7 +327,15 @@ def run(league: str, positions=("RB", "WR", "TE"), horizon: str = "season", week
     starting = view.my_starters or _cands(view.my_players, info, projs, view.slots, view.flex_slots)[0][1]
     drops = [p for p in view.my_players if p not in starting]
     protected = protected_cuts(drops, ev)
-    eligible = cut_order(drops, protected, rate)
+    kept, keep_missing = LG.keep_list(cfg, view.my_players, info)
+    eligible = cut_order([d for d in drops if d not in kept], protected, rate)
+    # room for an add with no cut: an open spot, or an IR-eligible player who
+    # can move to an empty IR slot. None goes FIRST, so a tie goes to no cut.
+    room = LG.roster_room(ctx, view.my_rid)
+    free = room["open"] + len(room["ir_ready"])
+    cuts = ([None] if free else []) + eligible
+    how_free = ("an open roster spot" if room["open"] else
+                "move " + " or ".join(_n(p, info) for p in room["ir_ready"]) + " to IR first") if free else None
 
     rows = []
     if horizon == "stream":
@@ -293,7 +350,7 @@ def run(league: str, positions=("RB", "WR", "TE"), horizon: str = "season", week
         pw0 = WP.p_win(base, theirs, projs) if theirs else None
         for c in cands:
             best = None
-            for d in eligible:                                               # cheapest cut first: ties go to it
+            for d in cuts:                                                   # cheapest cut first: ties go to it
                 roster = [p for p in view.my_players if p != d] + [c]
                 lineup = _cands(roster, info, projs, view.slots, view.flex_slots)[0][1]
                 if c not in lineup:
@@ -306,7 +363,8 @@ def run(league: str, positions=("RB", "WR", "TE"), horizon: str = "season", week
             # the starter the add pushes out of the lineup: this week it can be
             # the cut instead of the bench player, at the same P(win)
             rows.append({"add": c, "drop": best[0] if best else None, "gain": best[1] if best else 0.0,
-                         "replaces": best[2] if best else [], "unit": "pwin" if theirs else "points"})
+                         "replaces": best[2] if best else [], "unit": "pwin" if theirs else "points",
+                         "open_spot": how_free if best and best[0] is None else None})
     else:
         games = pd.read_csv(F.schedule(manifest=m), low_memory=False)
         last = int(ctx.get("last_week") or 17)
@@ -317,12 +375,12 @@ def run(league: str, positions=("RB", "WR", "TE"), horizon: str = "season", week
         pos = {p: (info.get(p) or {}).get("pos") for p in pids}
         mine = {p: rate.get(p, 0.0) for p in view.my_players}
         playoff = int(((ctx.get("league") or {}).get("settings") or {}).get("playoff_week_start") or 15)
-        out_until = {p: view.week + miss_weeks((info.get(p) or {}).get("status")) for p in pids}
+        out_until = {p: view.week + miss_weeks((info.get(p) or {}).get("status"), part.get(p)) for p in pids}
         base_total, base_wk = season_gain(mine, pos, team_nv, view.slots, view.flex_slots, weeks, byes,
                                           out_until=out_until)
         for c in cands:
             best = None
-            for d in eligible:                                               # cheapest cut first: ties go to it
+            for d in cuts:                                                   # cheapest cut first: ties go to it
                 st: list = []
                 tot, wk = season_gain(dict(mine, **{c: rate.get(c, 0.0)}), pos, team_nv, view.slots,
                                       view.flex_slots, weeks, byes, drop=d, out_until=out_until,
@@ -332,7 +390,21 @@ def run(league: str, positions=("RB", "WR", "TE"), horizon: str = "season", week
                 if best is None or gain > best[1]:
                     best = (d, gain, po, st)
             rows.append({"add": c, "drop": best[0] if best else None, "gain": best[1] if best else 0.0,
-                         "playoff_gain": best[2] if best else 0.0, "start_weeks": best[3] if best else []})
+                         "playoff_gain": best[2] if best else 0.0, "start_weeks": best[3] if best else [],
+                         "open_spot": how_free if best and best[0] is None else None})
+    # the injured adds, and what the season horizon assumed about each: out
+    # for the season (scored nothing), or back after the NFL minimum with no
+    # timeline known -- a guess the reader must check against the news
+    injured = []
+    for c in cands:
+        st_, pt_ = (info.get(c) or {}).get("status"), part.get(c)
+        mw = miss_weeks(st_, pt_)
+        if mw >= SEASON_OUT or (horizon == "season" and mw >= 4):
+            injured.append({"add": c, "status": st_, "part": pt_, "season_out": mw >= SEASON_OUT,
+                            "back": None if mw >= SEASON_OUT else view.week + mw})
+    last_wk_s = int(ctx.get("last_week") or 17)
+    byes_s = (E.bye_weeks(games, view.season) or None) if horizon == "season" else E.load_byes(view.season, m)
+    bye_cal = E.bye_calendar(view.my_players, info, byes_s, range(view.week, last_wk_s + 1), starting)
 
     # EVERY player's position, not only the ones in this report: the teammate who
     # explains a role change is almost never a candidate or on my roster
@@ -363,15 +435,20 @@ def run(league: str, positions=("RB", "WR", "TE"), horizon: str = "season", week
     md = markdown(league, view, horizon, positions, stand, gate, ranked, drops, protected, projs, ev, info,
                   rate, stand_pat, m, notes + con_notes, rolled=rolled, team_ctx=team_ctx,
                   scored={"candidates": len(cands), "improving": len(ranked),
-                          "no_cut": [r for r in rows if r["gain"] > MIN_LISTED[horizon] and not r["drop"]],
-                          "no_gain": [r["add"] for r in rows if r["gain"] <= MIN_LISTED[horizon]]})
+                          "no_cut": [r for r in rows if r["gain"] > MIN_LISTED[horizon] and not r["drop"]
+                                     and not r.get("open_spot")],
+                          "no_gain": [r["add"] for r in rows if r["gain"] <= MIN_LISTED[horizon]
+                                      and not any(i["add"] == r["add"] and i["season_out"] for i in injured)]},
+                  kept=kept, keep_missing=keep_missing, room=room, injured=injured, bye_cal=bye_cal)
     rec = {"command": "fantasy waiver", "league": league, "season": view.season, "week": view.week,
            "horizon": horizon, "positions": list(positions), "standing": stand, "gate": gate.to_dict(),
            "scored_candidates": cands,
            "week_rolled": rolled,
            "stand_pat": stand_pat, "adds": ranked[:15], "protected_cuts": sorted(protected),
-           "drops": [{"player": p, "ros_rate": round(rate.get(p, 0.0), 2), "protected": p in protected}
-                     for p in drops],
+           "kept": sorted(kept), "keep_missing": keep_missing, "roster_room": room, "injured_adds": injured,
+           "bye_calendar": bye_cal,
+           "drops": [{"player": p, "ros_rate": round(rate.get(p, 0.0), 2), "protected": p in protected,
+                      "kept": p in kept, "flag": cut_role(ev.get(p) or {})[1]} for p in drops],
            "manifest": m.to_dict(), "notes": notes}
     res = WaiverResult(md, rec)
     if write:
@@ -427,14 +504,15 @@ def rank_adds(rows: list[dict], horizon: str, contender: bool) -> tuple[list[dic
     if points_only(rows, horizon):
         limit, floor = STREAM_POINTS, MIN_LISTED["season"]      # no opponent: this week's points, not P(win)
     key = (lambda r: -r["gain"]) if horizon == "stream" or contender else (lambda r: -r["ros_upside"])
-    ranked = sorted([r for r in rows if r["gain"] > floor and r["drop"]],
+    ranked = sorted([r for r in rows if r["gain"] > floor and (r["drop"] or r.get("open_spot"))],
                     key=lambda r: (r["gain"] < limit, key(r)))
     return ranked, (not ranked or ranked[0]["gain"] < limit)
 
 
 def markdown(league, view, horizon, positions, stand, gate, ranked, drops, protected, projs, ev, info,
              rate, stand_pat, m, notes, rolled: str | None = None, team_ctx: dict | None = None,
-             scored: dict | None = None) -> str:
+             scored: dict | None = None, kept=(), keep_missing=(), room: dict | None = None,
+             injured=(), bye_cal=None) -> str:
     unit = "P(win) this week" if horizon == "stream" else "season points added (weeks he would start)"
     L = [f"# Waiver -- {league}, {view.season} week {view.week}: {', '.join(positions)}, {horizon} horizon", "",
          f"**{gate.line()}**", "",
@@ -445,6 +523,13 @@ def markdown(league, view, horizon, positions, stand, gate, ranked, drops, prote
              "improve the lineup."))
          + " Candidates are UNROSTERED in the league; whether one is claimable right now (waiver period, "
            "add limits) is not checked.*", ""] + ([f"**Week:** {rolled}.", ""] if rolled else [])
+    if room is not None:
+        L += [f"**Roster room:** {room['active']} active players for {room['limit'] or '?'} spots "
+              f"({room['open']} open); IR {len(room['reserve'])} of {room['ir_slots']} slots used"
+              + (f" -- {', '.join(_n(p, info) for p in room['ir_ready'])} can move to IR, opening a spot"
+                 if room["ir_ready"] else "")
+              + (". An add below with no cut uses that room; each row assumes it is your only add."
+                 if room["open"] or room["ir_ready"] else "."), ""]
     if stand_pat:
         limit = (f"{STREAM_POINTS:g} projected point this week (no opponent to win against)"
                  if points_only(ranked, horizon)
@@ -465,7 +550,8 @@ def markdown(league, view, horizon, positions, stand, gate, ranked, drops, prote
         wk = "—" if pr is None else f"{pr.mean:.1f} / {rng}"
         rep = (f" -- or cut {', '.join(_n(x, info) for x in r['replaces'])}, the starter he replaces"
                if r.get("replaces") else "")
-        L.append(f"| {_n(c, info)} | {(_n(r['drop'], info) if r['drop'] else '—') + rep} | {_gain(r, horizon)} | "
+        cut = _n(r["drop"], info) if r["drop"] else (f"none ({r['open_spot']})" if r.get("open_spot") else "—")
+        L.append(f"| {_n(c, info)} | {cut + rep} | {_gain(r, horizon)} | "
                  + (f"{week_spans(r.get('start_weeks'))} | {r.get('playoff_gain', 0):+.1f} | "
                     if horizon == "season" else "")
                  + f"{wk} | {rate.get(c, 0):.1f} | {_pct(mean.get('snap_pct'))} | "
@@ -488,22 +574,40 @@ def markdown(league, view, horizon, positions, stand, gate, ranked, drops, prote
             L += ["", "**Scored, no gain for your lineup:** "
                   + ", ".join(_n(p, info) for p in scored["no_gain"]) + "."]
         if scored.get("no_cut"):
-            L += ["", "**Improve your lineup but have no eligible cut** (every bench player is protected or "
-                  "needed): " + "; ".join(f"{_n(r['add'], info)} {_gain(r, horizon)}" for r in scored["no_cut"][:10])
+            L += ["", "**Improve your lineup but have no eligible cut** (every bench player is on your keep list, "
+                  "protected, or needed): " + "; ".join(f"{_n(r['add'], info)} {_gain(r, horizon)}" for r in scored["no_cut"][:10])
                   + "."]
+    if injured:
+        L += ["", "**Injured adds -- what was assumed:** " + "; ".join(
+            f"{_n(i['add'], info)} ({i['status']}{', ' + i['part'] if i.get('part') else ''}): "
+            + ("out for the season (a season-ending injury on a player out now), so he scored nothing"
+               if i["season_out"] else
+               f"back week {i['back']}, the NFL minimum -- no timeline is known, so check the news before "
+               "claiming") for i in injured) + "."]
     for c, tc in (team_ctx or {}).items():
         L += ["", f"### {_n(c, info)} among his teammates", ""] + EV.team_table(tc)
     if protected:
-        L += ["", "**Never proposed as a cut** (an established role -- 60%+ of snaps, role not falling -- is not "
-              "dropped on production alone): " + ", ".join(_n(p, info) for p in sorted(protected)) + ".", ""]
+        L += ["", "**Never proposed as a cut** (an established role -- 60%+ of snaps with the target or carry "
+              "share to match, not falling -- is not dropped on production alone): "
+              + ", ".join(_n(p, info) for p in sorted(protected)) + ".", ""]
+    if kept or keep_missing:
+        L += ["", "**Your keep list** (`fantasy: keep:` in the league file) -- never proposed as a cut: "
+              + (", ".join(_n(p, info) for p in sorted(kept)) or "nobody on this roster")
+              + (f". Not on your roster: {', '.join(keep_missing)}" if keep_missing else "") + ".", ""]
     L += ["", "## Your bench, as cut candidates", "",
           "| Player | ROS rate | Snap % | Tgt / carry share | Role | Cut? |", "|---|---|---|---|---|---|"]
     for p in sorted(drops, key=lambda x: rate.get(x, 0.0)):
         e = ev.get(p) or {}
         mean = e.get("mean") or {}
+        flag = cut_role(e)[1]
+        verdict = ("NO -- your keep list" if p in kept else "NO -- established role" if p in protected else
+                   "eligible" + (f" (flag: {flag})" if flag else ""))
         L.append(f"| {_n(p, info)} | {rate.get(p, 0):.1f} | {_pct(mean.get('snap_pct'))} | "
                  f"{_pct(mean.get('tgt_share'))} / {_pct(mean.get('carry_share'))} | {e.get('trajectory') or '—'} | "
-                 f"{'NO -- established role' if p in protected else 'eligible'} |")
+                 f"{verdict} |")
+    if bye_cal is not None:
+        L += ["", "## Your bye calendar", "", "*Every week left in which a player on your roster has a bye; "
+              "the lineup you have set now in bold.*", ""] + E.bye_table(bye_cal, lambda p: _n(p, info))
     L += ["", "## How to read this", "",
           "- **ROS rate** is the rest-of-season consensus (Sleeper, ESPN, FantasyPros) per game; the season gain "
           "counts only the weeks the player would start in your best lineup, byes included.",
@@ -511,7 +615,8 @@ def markdown(league, view, horizon, positions, stand, gate, ranked, drops, prote
           "INSUFFICIENT_SAMPLE. **Why the role changed** names a same-position teammate who played earlier and "
           "has been absent since.",
           "- **Missed weeks are assumed from status**, not modelled: Out or Doubtful misses this week; IR, PUP or "
-          "NFI the NFL's four-week minimum.",
+          "NFI the NFL's four-week minimum; an ACL or Achilles injury on a player on IR or Out, the rest of the "
+          "season.",
           "- **Not modelled yet:** the PROBABILITY a changed role lasts (role duration), and claim eligibility. "
           "Weigh a role built on a teammate's absence by when that teammate returns.",
           "", f"*{m.summary_line()}*"] + ([f"*Notes: {'; '.join(notes)}*"] if notes else [])

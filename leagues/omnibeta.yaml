@@ -105,3 +105,11 @@ flex_split:            # derived by scripts/derive_flex_split.py (plan A4); a le
   TE: 0.000
   derived: 2026-09-02
   board: tiers.csv
+
+# The in-season fantasy commands (nfl fantasy ...). `keep`: players the waiver
+# and trade commands never propose as a cut -- handcuffs and trade chips whose
+# value the engine cannot see (user, 2026-09-30). Names or Sleeper ids.
+fantasy:
+  keep:
+    - Emmett Johnson
+    - Kaelon Black

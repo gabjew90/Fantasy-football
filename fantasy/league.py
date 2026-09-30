@@ -59,6 +59,51 @@ class LeagueView:
         return {**self.scoring_yaml, **self.scoring_platform}
 
 
+def roster_room(ctx: dict, rid) -> dict:
+    """Room on a roster for an add WITHOUT a drop, from the platform's own slot
+    assignment (Yahoo's selected_position, Sleeper's reserve list):
+      open      active spots (every lineup and bench slot; IR excluded) unfilled
+      ir_open   IR slots unfilled
+      ir_ready  players on the ACTIVE roster whose status the league lets sit
+                in IR, up to the empty IR slots -- moving one there opens a spot
+    Before this every waiver pairing needed a cut: Keefamania's two IR slots and
+    A.J. Brown (IR) on the bench were invisible (2026-09-30)."""
+    lg = ctx.get("league") or {}
+    r = next((x for x in ctx.get("rosters") or [] if str(x.get("roster_id")) == str(rid)), {})
+    # Yahoo's NA slot holds only a Not-Active player: an empty one is no room
+    limit = sum(1 for p in (lg.get("roster_positions") or []) if str(p).upper() not in ("IR", "IR+", "NA"))
+    reserve = {str(x) for x in (r.get("reserve") or [])}
+    taxi = {str(x) for x in (r.get("taxi") or [])}            # Sleeper's taxi squad sits outside the roster
+    active = [str(x) for x in (r.get("players") or []) if str(x) not in reserve | taxi]
+    ir_slots = int((lg.get("settings") or {}).get("reserve_slots") or 0)
+    allow = set(ctx.get("reserve_allow") or ())
+    status = {str(p["sleeper_id"]): p.get("status") for p in (ctx.get("roster_players") or {}).get(rid, [])}
+    ir_open = max(ir_slots - len(reserve), 0)
+    return {"limit": limit or None, "active": len(active), "open": max(limit - len(active), 0) if limit else 0,
+            "reserve": sorted(reserve), "ir_slots": ir_slots, "ir_open": ir_open,
+            "ir_ready": [p for p in active if status.get(p) in allow][:ir_open]}
+
+
+def keep_list(cfg, my_players, info: dict) -> tuple[set, list]:
+    """The players the league file says are never proposed as a cut --
+    `fantasy: keep:` in leagues/<name>.yaml, names or Sleeper ids: handcuffs
+    and trade chips whose value the engine cannot see (the user held Emmett
+    Johnson and Kaelon Black as leverage; every waiver run offered them as the
+    cut, 2026-09-30). Returns (ids on my roster, entries matching no one on it)."""
+    from core.ids import normalize_name
+    want = [str(x).strip() for x in ((cfg.get("fantasy") or {}).get("keep") or []) if str(x).strip()]
+    by_name = {}
+    for p in my_players:
+        by_name.setdefault(normalize_name((info.get(p) or {}).get("name") or ""), set()).add(str(p))
+    kept, missing = set(), []
+    for w in want:
+        hit = {w} & set(map(str, my_players)) or by_name.get(normalize_name(w), set())
+        kept |= hit
+        if not hit:
+            missing.append(w)
+    return kept, missing
+
+
 def standing(rosters: list, my_rid: int) -> dict:
     """My place in the standings from the league's own win/loss (then points).
 

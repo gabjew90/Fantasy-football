@@ -11,3 +11,13 @@ import pytest
 @pytest.fixture(autouse=True)
 def _isolate_league_env(monkeypatch):
     monkeypatch.delenv("DRAFTKIT_LEAGUE", raising=False)
+
+
+@pytest.fixture(autouse=True)
+def _no_schedule_read(monkeypatch):
+    """The player tool and the reports read byes from the real schedule
+    (games.csv, refetched when stale): the suite never does. A test that needs
+    byes builds them (fantasy.environment.bye_weeks on a small frame)."""
+    from fantasy import environment as E
+    monkeypatch.setattr(E, "load_byes", lambda season, manifest=None: {})
+

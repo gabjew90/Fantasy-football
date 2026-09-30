@@ -50,6 +50,67 @@ def week_environment(season: int, week: int, *, cache_dir=None, manifest=None) -
     return parse_scoreboard(sb)
 
 
+NFLVERSE_TO_SLEEPER = {"LA": "LAR"}
+SLEEPER_TO_NFLVERSE = {v: k for k, v in NFLVERSE_TO_SLEEPER.items()}
+
+
+def bye_weeks(games, season: int) -> dict:
+    """team (Sleeper code) -> its regular-season bye week(s), from nflverse
+    games.csv (a DataFrame): the weeks up to the last scheduled one it has no game."""
+    g = games[(games.season == season) & (games.game_type == "REG")]
+    if g.empty:
+        return {}
+    plays: dict = {}
+    for _, r in g.iterrows():
+        for t in (r.home_team, r.away_team):
+            plays.setdefault(NFLVERSE_TO_SLEEPER.get(t, t), set()).add(int(r.week))
+    last = int(g.week.max())
+    return {t: sorted(set(range(1, last + 1)) - ws) for t, ws in plays.items()}
+
+
+def load_byes(season: int, manifest=None) -> dict | None:
+    """bye_weeks from the cached schedule; None when the schedule cannot be
+    read, recorded in the manifest as FAILED -- a missing bye is context, never
+    fatal, but it is never shown as "no byes" either."""
+    import pandas as pd
+    try:
+        return bye_weeks(pd.read_csv(F.schedule(manifest=manifest), low_memory=False), season) or None
+    except Exception as ex:  # noqa: BLE001
+        if manifest is not None:
+            manifest.record("schedule (bye weeks)", source="core/fetch.py schedule", status="failed",
+                            detail=f"{type(ex).__name__}: {ex}"[:200])
+        return None
+
+
+def bye_calendar(pids, info: dict, byes: dict | None, weeks, starters=()) -> list[dict] | None:
+    """[{week, players (ids), starters (ids)}] for each week in `weeks` in which
+    any of `pids` has a bye -- the roster's bye calendar; None when the byes
+    are unknown (the schedule was not read)."""
+    if byes is None:
+        return None
+    out = []
+    for w in weeks:
+        off = [p for p in pids if w in byes.get((info.get(p) or {}).get("team"), ())]
+        if off:
+            out.append({"week": int(w), "players": off, "starters": [p for p in off if p in set(starters)]})
+    return out
+
+
+def bye_table(cal: list[dict], name) -> list[str]:
+    """The bye calendar as markdown: starters (the lineup set now) in bold."""
+    if cal is None:
+        return ["**Bye calendar unavailable:** the schedule could not be read this run (see the inputs line) -- "
+                "check byes before any multi-week decision."]
+    if not cal:
+        return ["No byes left for this roster."]
+    L = ["| Week | On bye | Starters out |", "|---|---|---|"]
+    for c in cal:
+        L.append(f"| {c['week']} | " + ", ".join(f"**{name(p)}**" if p in c["starters"] else name(p)
+                                                 for p in c["players"])
+                 + f" | {len(c['starters'])} |")
+    return L
+
+
 def started(env_row: dict | None, now: dt.datetime | None = None) -> bool:
     """True once the team's game has kicked off (its players are locked)."""
     if not env_row or not env_row.get("kickoff_utc"):

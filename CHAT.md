@@ -180,7 +180,21 @@ his place among his teammates, and do not estimate his season value in chat.
 
 **Name resolution.** `scenario` exits 2 with `SCENARIO: ...` when a name
 matches nobody, matches several players, names two teams, or the team is on
-bye. Relay that message and ask; do not guess a player.
+bye. Relay that message and ask; do not guess a player. (A teammate named in
+`--out` is looked for on the `--player`'s team first.)
+
+**Who the waiver command will and won't cut.** Never proposed: the players on
+the league's keep list (the user's handcuffs and trade chips -- don't argue
+for cutting them either) and established roles (60%+ of snaps with the target
+or carry share to match, not falling). A bench player marked **eligible
+(flag: ...)** has the snaps without the volume, or a falling share: say what
+the flag says -- cutting him is a judgment call, not a refusal. The **Roster
+room** line counts open spots and IR slots; an add whose cut reads "none
+(an open roster spot)" or "none (move X to IR first)" costs no one.
+
+**Injured adds.** The report's *Injured adds* line says what it assumed: an
+ACL or Achilles on a player out now ends his season (he scores nothing); any
+other IR return is the NFL minimum, a guess -- check the news before a claim.
 
 **Trades** are the waiver arithmetic run on both rosters: season points your
 best lineup gains or loses (weeks a player would start; byes and missed weeks
@@ -240,6 +254,14 @@ reach the call. The reply mentions the parts that decide it, not all of them.
   a *Season value* line: the waiver command's own consensus (Sleeper, ESPN,
   FantasyPros) per game and on a full-season basis, with each source. Quote
   it for stash and hold questions; never read the consensus cache by hand.
+  When the line says the sources **disagree widely**, the consensus is
+  unreliable for him: say so and reason from his role instead.
+- **Byes belong in every roster answer, unasked.** `fantasy player` gives the
+  bye in the player's header; the waiver and lineup reports end with the
+  roster's *bye calendar*. When a bye touches the decision -- an add who
+  would start through a bye crunch, a week that takes out several starters --
+  raise it before the user has to. A lineup for a future week says its
+  injury statuses are today's; relay that.
 - **A player is judged among his teammates.** `fantasy player` (and each top
   add in `fantasy waiver`) prints a *Team context* table: his position group
   -- receivers WR and TE together, backs together -- with snap %, target or
