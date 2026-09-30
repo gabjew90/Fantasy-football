@@ -6520,3 +6520,47 @@ slate summary in full. CHAT.md now names that exception: an artifact the
 user asks for is reproduced as the contract requires, with the analysis
 around it; a test pins it.
 
+## 2026-09-30 (128) -- the full weekly stat line, and full data in every player answer (nfl-v1.25)
+
+The user's 2026-09-30 session (Wan'Dale Robinson): chat trimmed the answer
+to four teammates and three usage columns, following v1.24's "cut to the rows
+and columns that matter"; the user asked twice for "the full stats" and then
+set the standard: "I like to have the full data and a detailed analysis and
+narrative that doesn't just restate the data." And chat had to pull air
+yards, aDOT, YAC and first downs from nflverse outside the engine, because
+no command printed them.
+- fantasy/boxscore.stat_line: ONE table per player, a row per game and a
+  season row -- the engine's usage (snap %, target / carry share, air-yard
+  share, WOPR) beside the box score (receivers: targets, receptions, yards,
+  air yards, aDOT, YAC, first downs, TDs; backs: carries, yards, YPC, rushing
+  first downs, TDs, receiving; QBs: attempts, completions, yards, air yards,
+  TDs, INTs, sacks, rushing) and league-scoring points with and without TDs.
+  `fantasy player` prints it in place of the bare game log. The "not
+  counted" note lists only offensive scoring keys (it was listing every
+  kicker and defense key).
+- CHAT.md: the full data every time -- the stat line and team context
+  tables in full for any player answer, every player's in a comparison,
+  never trimmed for length -- and then an analysis that interprets and
+  never restates the tables. This replaces v1.24's trimming rule (#127),
+  which read as "show less". The full prop guide exception is unchanged.
+- Waivers name the scored players who add nothing (**Scored, no gain for
+  your lineup**), so "not evaluated" and "no gain" are told apart; chat said
+  Robinson "scored no gain" without knowing which.
+
+
+Running backs, at the user's request the same day ("do the equivalent for
+running backs, with the data appropriate for an RB"): the back's line is
+snap %, carry share, target share, carries and targets inside the 10 (the
+goal-line role, from the engine's usage, summed in the season row -- a
+count, not a share), carries, yards, YPC, runs of 10+ yards, rushing first
+downs, rushing EPA per carry (how well the carries went, not only how many),
+rushing TDs, targets, receptions, receiving yards, yards after catch and
+receiving TDs. Receivers gain inside-10 targets per week.
+
+Review: five findings, all fixed. CHAT.md's team-context bullet still said
+"show the table, or the rows that matter" -- it now points at the full-data
+rule; the stat line showed only the last six games while the season row
+summed all of them -- every game is a row now; "st_" was dropped from the
+not-counted filter (st_fum_rec / st_ff can score an offensive player); the
+"question tools answer in a few lines" wording is gone; a test pins a
+mid-season trade and the rows adding up to the season row.

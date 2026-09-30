@@ -165,7 +165,13 @@ def usage(ev: dict | None) -> dict:
             "inside10_targets": (e.get("totals") or {}).get("i10_tgt"),
             "inside10_carries": (e.get("totals") or {}).get("i10_car"),
             "role": e.get("trajectory"), "role_changed": changed or None,
-            "partial_weeks": e.get("partial_weeks") or None, "team_context": e.get("team_context")}
+            "partial_weeks": e.get("partial_weeks") or None, "team_context": e.get("team_context"),
+            "by_week": {int(w): {m: (ser.get(m) or [None] * len(e.get("week_list") or []))[k]
+                                 for m in ("snap_pct", "tgt_share", "ay_share", "wopr", "carry_share",
+                                           "i10_tgt", "i10_car")
+                                 if ser.get(m) is not None and k < len(ser.get(m))}
+                        for k, w in enumerate(e.get("week_list") or [])},
+            "season_mean": {m: mean.get(m) for m in ("snap_pct", "tgt_share", "ay_share", "wopr", "carry_share")}}
 
 
 def _record(snap: Snapshot, m: Manifest) -> dict:
@@ -222,6 +228,9 @@ def players(snap: Snapshot, names: list[str], *, with_usage: bool = True, with_f
         if with_usage and g and i.get("pos") in ("QB", "RB", "WR", "TE"):
             box = box or _box_stats(snap.season, m)
             row["game_log"] = BX.game_log(box["cur"], g, i.get("pos"), snap.scoring) if box.get("cur") is not None else []
+            u_ = row.get("usage") or {}
+            row["stat_line"] = BX.stat_line(box.get("cur"), g, i.get("pos"), snap.scoring, u_.get("by_week") or {},
+                                            u_.get("season_mean"))
             row["last_season"] = (BX.season_summary(box["prev"], g, i.get("pos"), snap.scoring)
                                   if box.get("prev") is not None else None)
             row["scoring_not_counted"] = BX.not_counted(snap.scoring)
@@ -530,7 +539,12 @@ def _player_lines(r: dict) -> list[str]:
                      f"Role: {u.get('role')}" + (f" ({ch})" if ch else "")
                      + (f"; partial game wk {', '.join(str(w) for w in u['partial_weeks'])} (an exit or benching, "
                         "not a role)" if u.get("partial_weeks") else "") + ".")
-    if r.get("game_log"):
+    if r.get("stat_line"):
+        left = r.get("scoring_not_counted")
+        L += ["", "Weekly stat line (usage from the engine, box score from nflverse; points in league scoring"
+              + (f", not counting {', '.join(left)}" if left else "") + "; '--' not available):", ""] \
+            + BX.stat_line_table(r["stat_line"]) + [""]
+    elif r.get("game_log"):
         left = r.get("scoring_not_counted")
         L += ["", "Game log (league scoring" + (f"; not counted: {', '.join(left)}" if left else "") + "):", ""] \
             + BX.log_table(r["game_log"], r["pos"]) + [""]
