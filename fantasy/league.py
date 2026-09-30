@@ -70,9 +70,11 @@ def roster_room(ctx: dict, rid) -> dict:
     A.J. Brown (IR) on the bench were invisible (2026-09-30)."""
     lg = ctx.get("league") or {}
     r = next((x for x in ctx.get("rosters") or [] if str(x.get("roster_id")) == str(rid)), {})
-    limit = sum(1 for p in (lg.get("roster_positions") or []) if str(p).upper() not in ("IR", "IR+"))
+    # Yahoo's NA slot holds only a Not-Active player: an empty one is no room
+    limit = sum(1 for p in (lg.get("roster_positions") or []) if str(p).upper() not in ("IR", "IR+", "NA"))
     reserve = {str(x) for x in (r.get("reserve") or [])}
-    active = [str(x) for x in (r.get("players") or []) if str(x) not in reserve]
+    taxi = {str(x) for x in (r.get("taxi") or [])}            # Sleeper's taxi squad sits outside the roster
+    active = [str(x) for x in (r.get("players") or []) if str(x) not in reserve | taxi]
     ir_slots = int((lg.get("settings") or {}).get("reserve_slots") or 0)
     allow = set(ctx.get("reserve_allow") or ())
     status = {str(p["sleeper_id"]): p.get("status") for p in (ctx.get("roster_players") or {}).get(rid, [])}

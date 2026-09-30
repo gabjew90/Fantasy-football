@@ -238,7 +238,8 @@ def run(league: str, give: list[str], get: list[str], back: list[str] | None = N
         elif WV.season_ending(status, (players.get(p) or {}).get("injury_body_part")):
             out_until[p] = view.week + WV.SEASON_OUT
             assumed[p] = (f"out for the season (assumed from '{status}', "
-                          f"{(players.get(p) or {}).get('injury_body_part')})")
+                          f"{(players.get(p) or {}).get('injury_body_part')}; if he is rehabbing an OLD "
+                          "tear with a return date, pass --back NAME:WEEK)")
         elif WV.miss_weeks(status):
             out_until[p] = view.week + WV.miss_weeks(status)
             assumed[p] = f"back week {out_until[p]} (assumed from '{status}': the NFL minimum, not a prognosis)"

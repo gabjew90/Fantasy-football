@@ -215,7 +215,7 @@ def players(snap: Snapshot, names: list[str], *, with_usage: bool = True, with_f
         w = by_pid.get(sid) or {}
         row = {"id": sid, "name": i.get("name"), "pos": i.get("pos"), "team": i.get("team"),
                "owner": owner(snap, sid), "game": _game(snap, i.get("team")),
-               "bye": (byes.get(i.get("team")) or [None])[0],
+               "bye": (byes.get(i.get("team")) or [None])[0] if byes is not None else "unknown",
                "status": i.get("status") or raw.get("injury_status") or "",
                "injury": raw.get("injury_body_part"), "practice_sleeper": raw.get("practice_participation"),
                "fantasypros": fp.get(sid), "projection": projection(snap, sid),
@@ -475,7 +475,8 @@ def _player_lines(r: dict) -> list[str]:
            "another team": f"on {o.get('team_name')}'s roster", "free agent": "a free agent"}[o["who"]]
     if o["who"] in ("you", "your opponent"):
         own += ", starting" if o["starting"] else ", on the bench"
-    bye = f" (bye week {r['bye']})" if r.get("bye") else ""
+    bye = (" (bye week unknown: the schedule was not read)" if r.get("bye") == "unknown" else
+           f" (bye week {r['bye']})" if r.get("bye") else "")
     L = [f"**{r['name']}** -- {r['pos']}, {r['team'] or 'no team'}{bye}; {own}."]
     if g:
         fav = "" if g.get("spread") is None else (f", favoured by {-g['spread']:g}" if g["spread"] < 0 else

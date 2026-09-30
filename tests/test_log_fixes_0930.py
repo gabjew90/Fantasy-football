@@ -15,6 +15,8 @@ from fantasy import league as LG
 from fantasy import scenario as SC
 from fantasy import waiver as WV
 
+REAL_LOAD_BYES = E.load_byes          # before conftest autouse stub replaces it
+
 
 # ------------------------------------------------------------ season-ending
 
@@ -72,6 +74,34 @@ def test_a_missing_last_game_is_not_read_as_a_falling_share():
     assert WV.cut_role(e) == (True, None)
 
 
+def test_a_partial_last_game_is_an_exit_not_a_falling_share():
+    e = dict(_ev("WR", 0.85, [0.22, 0.24, 0.05]), week_list=[1, 2, 3], partial_weeks=[3])
+    assert WV.cut_role(e) == (True, None)
+
+
+def test_na_slots_and_taxi_players_are_not_active_room():
+    ctx = _ctx([str(i) for i in range(15)], [], {})
+    ctx["league"]["roster_positions"].append("NA")
+    assert LG.roster_room(ctx, 3)["open"] == 0, "an empty NA slot is no room"
+    ctx = _ctx([str(i) for i in range(15)] + ["t1"], [], {})
+    ctx["rosters"][0]["taxi"] = ["t1"]
+    assert LG.roster_room(ctx, 3)["active"] == 15
+
+
+def test_a_schedule_that_was_not_read_is_said_not_shown_as_no_byes(monkeypatch):
+    assert E.bye_calendar(["g"], {"g": {"team": "DET"}}, None, range(4, 6)) is None
+    assert E.bye_table(None, str)[0].startswith("**Bye calendar unavailable:**")
+    from core import fetch as F
+
+    def boom(**kw):
+        raise OSError("blocked")
+    monkeypatch.setattr(F, "schedule", boom)
+    rec = {}
+    m = types.SimpleNamespace(record=lambda name, **kw: rec.update(name=name, **kw))
+    assert REAL_LOAD_BYES(2026, m) is None
+    assert rec["status"] == "failed" and "blocked" in rec["detail"]
+
+
 # ------------------------------------------------------------ keep list
 
 class _Cfg(dict):
@@ -86,10 +116,11 @@ def test_the_keep_list_matches_names_and_ids_on_my_roster():
     assert LG.keep_list(_Cfg(), ["10"], info) == (set(), [])
 
 
-def test_the_league_files_carry_the_users_keep_list():
+def test_each_league_files_keep_list_is_a_list_of_names_or_ids():
     from draftkit.config import Config
-    assert Config.load(league="keefamania").get("fantasy")["keep"] == ["Emmett Johnson"]
-    assert Config.load(league="omnibeta").get("fantasy")["keep"] == ["Emmett Johnson", "Kaelon Black"]
+    for lg in ("keefamania", "omnibeta"):
+        keep = (Config.load(league=lg).get("fantasy") or {}).get("keep") or []
+        assert isinstance(keep, list) and all(isinstance(x, (str, int)) and str(x).strip() for x in keep), lg
 
 
 # ------------------------------------------------------------ roster room

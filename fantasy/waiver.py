@@ -131,13 +131,10 @@ standing = LG.standing          # moved to league.py; every command reads it
 
 
 def byes_by_team(games: pd.DataFrame, season: int, weeks) -> dict:
-    """team (nflverse code) -> set of weeks in `weeks` it has no game."""
-    g = games[(games.season == season) & (games.game_type == "REG")]
-    plays = {}
-    for _, r in g.iterrows():
-        plays.setdefault(r.home_team, set()).add(int(r.week))
-        plays.setdefault(r.away_team, set()).add(int(r.week))
-    return {t: {w for w in weeks if w not in ws} for t, ws in plays.items()}
+    """team (nflverse code) -> set of weeks in `weeks` it has no game: the
+    season arithmetic's form of environment.bye_weeks (one bye rule)."""
+    ws = set(weeks)
+    return {E.SLEEPER_TO_NFLVERSE.get(t, t): set(b) & ws for t, b in E.bye_weeks(games, season).items()}
 
 
 def season_gain(roster_rates: dict, pos: dict, team: dict, slots, flex_slots, weeks, byes: dict,
@@ -218,7 +215,10 @@ def cut_role(e: dict) -> tuple[bool, str | None]:
             return False, f"{snap:.0%} of snaps but a {share:.0%} {SHARE_LABEL[metric]}: snaps without the volume"
         s = (e.get("series") or {}).get(metric) or []
         earlier = [v for v in s[:-1] if v is not None]
-        if len(earlier) >= 2 and s[-1] is not None and s[-1] < FALLING_RATIO * (sum(earlier) / len(earlier)):
+        # a PARTIAL last game (an in-game exit) is not a role: evidence marks it
+        partial = bool(e.get("week_list")) and e["week_list"][-1] in (e.get("partial_weeks") or [])
+        if (len(earlier) >= 2 and s[-1] is not None and not partial
+                and s[-1] < FALLING_RATIO * (sum(earlier) / len(earlier))):
             trail = " -> ".join("--" if v is None else f"{100 * v:.0f}" for v in s)
             return False, f"{snap:.0%} of snaps, but his {SHARE_LABEL[metric]} is falling ({trail}%)"
     return True, None
@@ -403,7 +403,7 @@ def run(league: str, positions=("RB", "WR", "TE"), horizon: str = "season", week
             injured.append({"add": c, "status": st_, "part": pt_, "season_out": mw >= SEASON_OUT,
                             "back": None if mw >= SEASON_OUT else view.week + mw})
     last_wk_s = int(ctx.get("last_week") or 17)
-    byes_s = E.bye_weeks(games, view.season) if horizon == "season" else E.load_byes(view.season, m)
+    byes_s = (E.bye_weeks(games, view.season) or None) if horizon == "season" else E.load_byes(view.season, m)
     bye_cal = E.bye_calendar(view.my_players, info, byes_s, range(view.week, last_wk_s + 1), starting)
 
     # EVERY player's position, not only the ones in this report: the teammate who
@@ -574,8 +574,8 @@ def markdown(league, view, horizon, positions, stand, gate, ranked, drops, prote
             L += ["", "**Scored, no gain for your lineup:** "
                   + ", ".join(_n(p, info) for p in scored["no_gain"]) + "."]
         if scored.get("no_cut"):
-            L += ["", "**Improve your lineup but have no eligible cut** (every bench player is protected or "
-                  "needed): " + "; ".join(f"{_n(r['add'], info)} {_gain(r, horizon)}" for r in scored["no_cut"][:10])
+            L += ["", "**Improve your lineup but have no eligible cut** (every bench player is on your keep list, "
+                  "protected, or needed): " + "; ".join(f"{_n(r['add'], info)} {_gain(r, horizon)}" for r in scored["no_cut"][:10])
                   + "."]
     if injured:
         L += ["", "**Injured adds -- what was assumed:** " + "; ".join(

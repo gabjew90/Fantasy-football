@@ -6621,5 +6621,14 @@ Not done, and why:
   models; the waiver gain uses the weekly projection (Sleeper blended with the
   market) and the scenario report says which it prints.
 
-Tests: tests/test_log_fixes_0930.py (19).
+Review: nine findings, eight fixed. A schedule that cannot be read now says so ("bye calendar
+unavailable", recorded FAILED in the manifest) instead of printing "no byes left"; a partial
+last game (an in-game exit) no longer reads as a falling share; roster room ignores Yahoo NA slots
+and Sleeper taxi players; the no-cut line names the keep list; waiver.byes_by_team derives from
+environment.bye_weeks (one bye rule); the suite stubs the schedule read (conftest) and no longer
+pins the user's keep-list names. Not fixed: an IR player rehabbing an OLD ACL is also read as out
+for the season -- the injury feed carries no date to tell them apart (Achane's start date is
+empty too); trade's assumption line now says to pass --back for him.
+
+Tests: tests/test_log_fixes_0930.py (23).
 
