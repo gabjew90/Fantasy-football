@@ -6669,3 +6669,33 @@ a player already on a roster; CHAT.md says "unlikely", not "will not"; the
 record's likely_gone is the same scored set as the report's. Not done: the
 manager's own trending fetcher (manager/waiver_brief.py) still duplicates
 core.fetch.sleeper_trending -- the Actions path, a separate release.
+
+
+## 2026-10-01 (131) -- engine docs corrected: the opponent adjustment and the rushing entry (props-v1.27, nfl-v1.28)
+
+Found while answering "is the model using the Steelers' defense this year?":
+two engine documents described code that changed weeks ago. Docs only --
+the price hash is identical (1df22e40...), so the record does not split.
+
+- `methodology.md` section 4 said the opponent adjustment used PRIOR-season
+  efficiency. The scorer builds it from the CURRENT season's play-by-play
+  (weeks 1 to N-1) and never reads the priors' opponent table. Corrected,
+  with what that means early in a season (three games keep about a third of
+  a defense's difference from league).
+- `model_registry.md` `rush_yds_v0` still said "Test: NONE", "QB rushing
+  excluded" and "no opponent run-defense adjustment" -- superseded by rounds
+  10 (the yardage harness), 12 (QB rushing priced; yards per carry adjusted
+  for the defense, kept because dropping it worsened CRPS).
+
+Left as is, recorded here: the comment above step 4b in `score_game.py`
+still describes the round-5 "near-no-op k0_opp=1000" setting; the code below
+it uses k0=150. Fixing a comment in a pricer script changes the price hash
+and would split the record mid-validation, so it waits for the next real
+pricing change.
+
+Review: four findings, all fixed -- methodology sections 5 (the round-11 width
+settings and the QB markets were missing) and 10 (still citing the pre-joint-sampler
+calibration table as current) were stale too; the header now names the models it
+covers and defers to the registry; the registry says why rushing stays PROTOTYPE
+(no promotion package filed) and points the right way to rounds 10-12.
+

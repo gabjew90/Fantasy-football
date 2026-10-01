@@ -133,12 +133,21 @@ next fix).
   prior season's empirical league carry-yardage distribution (quantile grid in
   `priors_{season}_params.json`), so heavy tails and negative runs are preserved rather than
   fitted to a symmetric family. Carry counts use their own NB dispersion fit.
-- Test: NONE. No backtest has been run for this market.
+- Test: the yardage harness (round 10, 2022-25, test 2024-25) -- beats baseline A on both
+  test seasons, unbiased on average, too narrow until round 11 widened it. Not tested
+  against sportsbook lines (no market is).
 - Known limits:
-  - QB rushing yards are excluded at scoring time: kneel-downs are dropped from the carry
-    data but sportsbooks settle QB rush props including kneels, which flips short lines.
-  - No opponent run-defense adjustment.
-- Next step to `VALIDATED_DISTRIBUTION`: run the Gate A harness on this market.
+  - QB rushing: priced since round 12 (props-v1.21) on its own carry grid; kneel-downs,
+    which the book settles, are part of it.
+  - Run defense: the opposing defense's yards per carry IS applied (team level, current
+    season, k0=150; round 12 kept it -- dropping it worsened rushing CRPS).
+  - (Corrected 2026-10-01: this entry still said "Test: NONE", "QB rushing excluded" and
+    "no run-defense adjustment" -- each superseded by rounds 10-12, above this entry.)
+- Why still `PROTOTYPE`: the harness results are strong, but the formal promotion package
+  (frozen spec, windows, block-bootstrap intervals, the pre-game guard statement -- see
+  "Promotion requirements") has not been filed, so no fair odds are shown.
+- Next step to `VALIDATED_DISTRIBUTION`: the prospective record graded against sportsbook
+  closing lines (props/record).
 
 ### anytime_td_v1
 - Markets: player_anytime_td
