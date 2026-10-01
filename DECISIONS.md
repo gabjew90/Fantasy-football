@@ -6699,3 +6699,42 @@ calibration table as current) were stale too; the header now names the models it
 covers and defers to the registry; the registry says why rushing stays PROTOTYPE
 (no promotion package filed) and points the right way to rounds 10-12.
 
+
+## 2026-10-01 (132) -- last season's defense as the opponent prior: measured, does not ship
+
+The first of the "can do now" model improvements (the user picked it: "go").
+Today each defense's efficiency multiplier is shrunk toward league average;
+the alternative shrinks it toward a fraction C of last season's own shrunk
+ratio, from the table build_priors.py already writes and the scorer never
+read. Built behind `model.OPP_PRIOR_CARRY` (0 = today, byte for byte, unit-
+tested) and run on the yardage harness at C = 0, 0.25, 0.5, 0.75, 1.0.
+
+Decision rule fixed before the results: pick C on 2022-23, ship only if on
+2024-25 it is no worse on catches, receiving and rushing yards, one gain has
+an interval excluding zero, and the width/calibration checks still pass.
+
+Result: no setting clears it. Every paired difference, tune and test seasons,
+weeks 2-4 and 5-18, has a game-block interval that includes zero; the
+largest point estimate is 0.16% of the score (early-season receiving yards,
+tune) and early-season rushing on the test seasons leans worse. Table and
+reading in `reports/opp_prior_carry.md`.
+
+Not merged: the code stays on branch `props/prior-defense` (6c8db71). Merging
+it at C = 0 would change no price but would change the price hash (a pricer-
+script edit), splitting the prospective record the user is accumulating for
+the sportsbook validation -- for a switch that is off. The registry gets a
+round-14 entry with the next engine release that changes a price.
+
+Side finding, recorded so nobody re-derives it: the C = 0 run reproduces the
+committed reports/yardage_harness.md -- rushing yards does NOT pass today
+(calibration 0.034 against 0.03) and QB passing yards does NOT (a clear gain
+in 2025, not in 2024; its 0.181 bucket is 16 cases, Under at 80-90%, the one
+round 13 flagged). Round 11's "all three pass" predates rounds 12-13, and
+the card's "rushing yards ARE calibrated" rule line overstates rushing by
+that much.
+
+Review: three findings -- the QB passing per-season claim was wrong (fixed
+above); the 0.181 gap equalling the 0.181 width looked like a mis-wired
+column and is a real 16-case bucket (no change); the props rule line now
+qualifies rushing and says passing yards do not pass the harness.
+

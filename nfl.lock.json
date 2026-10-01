@@ -9,7 +9,7 @@
   "core/ids.py": "a139ac00a1875c7499fba5afbe275aa51e9ad1fca6df30ffa0aa5974d1308d38",
   "core/manifest.py": "dcdb9e164a30fbe102f7559661157c33f08c9dd6455aee6f185761260f921195",
   "core/probe.py": "b3ef1cd2f783157b4dcd75f93cacf4f00613fa4c787b921ee9e0fe452c74bdee",
-  "core/props_ask.py": "580307b523c6c39a7164cd8036dcf1a4cf1e11a9bdd36c2811d443fd6032eb9a",
+  "core/props_ask.py": "d94a88e998679383e9f6a73dea66e8dedccb8302ce30876eb329f8c75079ae9d",
   "core/registry.py": "edf4afe6031ae5b6973e3a4143942da48d2c395aa35d53ab23b922c26558a0bd",
   "core/scoring.py": "59ef214f5cab6f137f6c786055d3e2d0ada0108b74b2bd795ad94204da49c9b9",
   "core/status.py": "5f09b233b568849dc5f8cdd7a76e2936245823e5d837d9b49e502f2bb837b16f",
@@ -188,6 +188,6 @@
   "tiers.csv": "04a1a79d43e9f2445ba3dc4ea262b00fbd58efea1f41e8b0393cb4c7f8afee41",
   "tiers.keefamania.csv": "11e6546b56caa807a572da86d5c3d81097bafd2d2550e25653882d78b2962e94"
  },
- "sha256": "44602a33188714966f23bcdd184bf7fc23d88771c5c02b7bb297f7375f17a31c",
- "tag": "nfl-v1.28"
+ "sha256": "12d0b59c3cd4ec5dff688face121304473e359e11e7b3e18e01a39058992a871",
+ "tag": "nfl-v1.29"
 }
