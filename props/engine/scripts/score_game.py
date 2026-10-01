@@ -437,6 +437,10 @@ def main():
     pri_players = pd.read_csv(RES / f"priors_{PRIOR}_players.csv").set_index("gsis_id")
     pri_slots = pd.read_csv(RES / f"priors_{PRIOR}_slots.csv").set_index("slot")
     pri_teams = pd.read_csv(RES / f"priors_{PRIOR}_teams.csv").set_index("team")
+    # the prior season's defenses (round 14): the point this season's defense
+    # is shrunk toward when MODEL.OPP_PRIOR_CARRY > 0; unread at 0
+    _opp_prior_f = RES / f"priors_{PRIOR}_opponent.csv"
+    opp_prior = pd.read_csv(_opp_prior_f) if _opp_prior_f.exists() else None
     resid = np.array(P["carry_residual_quantiles"])
 
     SOURCES = []   # (name, what it's for, status, detail)
@@ -824,9 +828,9 @@ def main():
             # receptions unchanged). The earlier "harmful" verdict was entirely
             # that bug. Between-defense YPT spread is ~8% SD.
             opp_mult = 1.0
-            if opp_metric is not None and len(opp_table):
+            if opp_metric is not None and (len(opp_table) or (MODEL.OPP_PRIOR_CARRY and opp_prior is not None)):
                 opp_mult = MODEL.opponent_multiplier(opp_table, opp_team, "ALL", opp_metric,
-                                                     k0_opp=150.0, mode="fixed")
+                                                     k0_opp=150.0, mode="fixed", prior_table=opp_prior)
             final, chain = MODEL.blended_rate(
                 own_pri, n_pri_opp, sp, rate_k0,
                 cur_num=cur_num, cur_den=cur_den,

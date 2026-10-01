@@ -243,6 +243,10 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
     P0 = json.load(open(ensure_priors(PRIOR, pdir, args.build_priors)))
     pri_players = pd.read_csv(pdir / f"priors_{PRIOR}_players.csv").set_index("gsis_id")
     pri_teams = pd.read_csv(pdir / f"priors_{PRIOR}_teams.csv", index_col=0)
+    _opp_prior_f = pdir / f"priors_{PRIOR}_opponent.csv"
+    opp_prior = pd.read_csv(_opp_prior_f) if (live and _opp_prior_f.exists()) else None
+    opp_carry = (M.OPP_PRIOR_CARRY if getattr(args, "opp_prior_carry", None) is None
+                 else float(args.opp_prior_carry)) if live else 0.0
     print(f"priors: {PRIOR} (the season before the one under test), "
           f"{len(pri_players)} players", file=sys.stderr)
     K0R = P0.get("k0_per_rate", M.DEFAULT_K0)
@@ -499,8 +503,10 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
             if args.opponent and opp_team:
                 posgrp = "ALL" if opp["level"] == "team" else re_first_letters(slot)
                 otab = opp_tabs[W]
-                if len(otab):
-                    om = lambda met: M.opponent_multiplier(otab, opp_team, posgrp, met, k0_opp=opp["k0"], mode=opp["mode"])
+                if len(otab) or (opp_carry and opp_prior is not None):
+                    om = lambda met: M.opponent_multiplier(otab, opp_team, posgrp, met, k0_opp=opp["k0"],
+                                                           mode=opp["mode"], prior_table=opp_prior,
+                                                           prior_carry=opp_carry)
                     if "catch_rate" in mets: cr = float(np.clip(cr * om("catch_rate"), 0.05, 1.0))
                     if "ypt" in mets: ypt = float(ypt * om("ypt"))
                     if "ypc" in mets: ypc = float(ypc * om("ypc"))
@@ -1399,6 +1405,9 @@ def main(argv=None):
     ap.add_argument("--live-opp-metrics", default=None,
                     help="harness ABLATION: the opponent-adjusted rates in live mode (default: the scorer's, "
                          "catch_rate,ypt,ypc); e.g. catch_rate,ypt drops the run-defense adjustment")
+    ap.add_argument("--opp-prior-carry", type=float, default=None,
+                    help="harness (live mode): weight on the prior season's defense as the opponent "
+                         "shrinkage target (default model.OPP_PRIOR_CARRY; 0 = league average)")
     ap.add_argument("--historical-blend", action="store_true", default=True,
                     help="two-stage: prior-season own rate -> slot prior -> this season (what the live scorer does)")
     ap.add_argument("--no-historical-blend", dest="historical_blend", action="store_false",

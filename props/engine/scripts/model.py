@@ -417,9 +417,20 @@ def build_opponent_table(pbp, roles):
     return df.merge(pd.DataFrame(ks), on=["posgrp", "metric"], how="left")
 
 
-def opponent_multiplier(opp_table, defteam, posgrp, metric, k0_opp=150.0, mode="fixed"):
-    """Multiplicative opponent-efficiency adjustment, shrunk toward 1.0 (league average)
-    by plays faced.
+# Round 14 (2026-10-01): the weight on LAST season's defense as the point a
+# defense is shrunk toward, instead of league average (1.0). 0.0 = the pre-
+# round-14 behaviour, byte for byte. Measured on the yardage harness before it
+# changes from 0.0 (model_registry.md, round 14).
+OPP_PRIOR_CARRY = 0.0
+
+
+def opponent_multiplier(opp_table, defteam, posgrp, metric, k0_opp=150.0, mode="fixed",
+                        prior_table=None, prior_carry=None):
+    """Multiplicative opponent-efficiency adjustment, shrunk by plays faced
+    toward a TARGET: league average (1.0), or -- with `prior_table` (the prior
+    season's build_opponent_table) and a carry above 0 -- 1 + carry x (last
+    season's own shrunk multiplier - 1). A defense with no plays yet this season
+    gets the target alone. carry 0 (the default) returns exactly the old value.
 
     History worth keeping: earlier rounds concluded this adjustment was useless or
     actively harmful (fixed shrinkage measured -0.34 CRPS on reception yards). That
@@ -437,15 +448,25 @@ def opponent_multiplier(opp_table, defteam, posgrp, metric, k0_opp=150.0, mode="
     build_opponent_table instead; it also helps (+0.052) but fixed k0=150 is simpler
     and marginally better, so it is the default.
     """
+    carry = OPP_PRIOR_CARRY if prior_carry is None else float(prior_carry)
+    target = 1.0
+    if carry and prior_table is not None and len(prior_table):
+        # last season's ratio, itself shrunk by ITS plays (a full season: ~550
+        # plays keep ~80%), then only `carry` of the distance from league
+        last = opponent_multiplier(prior_table, defteam, posgrp, metric, k0_opp=k0_opp, mode=mode,
+                                   prior_carry=0.0)
+        target = 1.0 + carry * (last - 1.0)
+    if opp_table is None or not len(opp_table):
+        return target
     row = opp_table[(opp_table.team == defteam) & (opp_table.posgrp == posgrp)
                     & (opp_table.metric == metric)]
     if row.empty or row.iloc[0].league <= 0:
-        return 1.0
+        return target
     r = row.iloc[0]
     raw_ratio = r.value / r.league
     k = float(r.k_eb) if (mode == "eb" and "k_eb" in row and pd.notna(r.k_eb)) else k0_opp
     w = r.n / (r.n + k)
-    return 1.0 * (1 - w) + raw_ratio * w
+    return target * (1 - w) + raw_ratio * w
 
 
 # ---------------------------------------------------------------- TD allocation
