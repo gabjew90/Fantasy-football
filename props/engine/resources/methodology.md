@@ -1,9 +1,9 @@
 # nfl-prop-research: how the numbers are built
-Version 1.0, 2026-09-17. Applies to model core `model.py` at registry entries receiving_hier_v2 (receptions, receiving yards), rush_yds_v0, anytime_td_v0. Running example: Dalton Kincaid, BUF TE1, DET@BUF 2026 week 2, Under 4.5 catches.
+Version 1.0, 2026-09-17; sections 4 and 5 and the validation status brought up to date 2026-10-01 (props-v1.27). Applies to model core `model.py` at registry entries receiving_hier_v2 (receptions, receiving yards), rush_yds_v0, pass_yds_v0, anytime_td_v1, with the round-11 width settings. `model_registry.md` is the authority where the two differ. Running example: Dalton Kincaid, BUF TE1, DET@BUF 2026 week 2, Under 4.5 catches.
 
 ## 1. Data
 - nflverse play-by-play, current season (weeks 1 to N-1): targets, catches, carries, yards, TDs, goal-line (inside-10) plays.
-- nflverse prior season, pre-processed offseason by `build_priors.py` into `priors_{season}_*`: per-player shares and rates, per-slot league priors, per-team volumes, opponent efficiency allowed, dispersion fits, TD constants.
+- nflverse prior season, pre-processed offseason by `build_priors.py` into `priors_{season}_*`: per-player shares and rates, per-slot league priors, per-team volumes, opponent efficiency allowed (built, not read by the scorer -- section 4), dispersion fits, TD constants.
 - Weekly rosters (ACT/INA), injury report, depth charts, snap counts for the target week.
 - The Odds API: spreads, totals, allowlisted player props, all books returned.
 - NWS hourly forecast at the stadium (Open-Meteo fallback).
@@ -24,7 +24,7 @@ Kincaid target share: 0.15 prior, 0.21 current on 29 team targets, K0 = 80, weig
 Injuries: Out/Doubtful removed. Their share mostly goes to the replacement, not the priced teammates: a quarter of their targets and carries is handed on, mostly to teammates at their position (none of their goal-line targets), tuned on 2022-23 absence games and scored on 2024-25 (reports/absence_tune.md). Questionable: priced twice, as if he plays his normal role (the main run) and as if he is out with his share redistributed (the "if he is out" section, a full re-run on the same lines). No blended discount; the user decides.
 
 ## 4. Opponent adjustment
-Team-level prior-season efficiency allowed (catch rate, yards per target, yards per carry), shrunk toward league with k0 = 150 plays, applied as a multiplier. DET defense: 0.954 on catches, 1.013 on yards per target. Kincaid catches: 4.7 x 0.75 x 0.954 = 3.37 expected.
+Team-level efficiency allowed (catch rate, yards per target, yards per carry) from the CURRENT season's play-by-play (weeks 1 to N-1, all positions together), shrunk toward league with k0 = 150 plays, applied as a multiplier (`model.build_opponent_table` on the scorer's `pbp`, `opponent_multiplier(..., k0_opp=150, mode="fixed")`). The prior season's defense does not enter: the `priors_{season}` opponent table is built but the scorer does not read it. Early in a season the shrinkage dominates -- three games (~75 plays) keep about a third of a defense's difference from league. Rushing gets the yards-per-carry multiplier too (round 12: dropping it worsened rushing CRPS). Position-group matchups were tested and are too thin to use. (Corrected 2026-10-01: this section said "prior-season", which the code has not done.) DET defense: 0.954 on catches, 1.013 on yards per target. Kincaid catches: 4.7 x 0.75 x 0.954 = 3.37 expected.
 
 ## 5. Simulation
 20,000 draws, seed fixed.
@@ -34,7 +34,9 @@ Team-level prior-season efficiency allowed (catch rate, yards per target, yards 
 - Receiving yards: Gamma with league-wide per-catch shape 1.065 and player-specific scale (his yards per catch). Shape is not per player.
 - Rushing yards: per-carry draws from the empirical 2025 residual quantile grid around the player's yards per carry.
 - TDs: team pass and rush TDs allocated by goal-line share for the inside-10 fraction and by overall share for the rest; P(at least one) = 1 - exp(-lambda).
-Kincaid: median 3 catches, P(<4.5) = 14,327 / 20,000 = 71.6%.
+- Width (round 11, props-v1.20; registry): four mean-preserving per-game variations the draws above used to hold fixed -- Dirichlet variation of a player's target share (concentration 40) and carry share (20), and a lognormal per-game multiplier on yards per carry (log-sd 0.3); catch rate and yards per catch stay fixed. Without them every yardage market was too narrow (26-32% of outcomes outside p10-p90, 20% expected).
+- QB markets: passing yards (round 13, `pass_yds_v0`) from his receivers' yards in the same simulation times his share of the team's passing; QB rushing (round 12) on its own carry grid, kneel-downs included as books settle.
+Kincaid: median 3 catches, P(<4.5) = 14,327 / 20,000 = 71.6% (computed before the round-11 width; the same call now reads a few points nearer 50%).
 
 ## 6. Book number
 Both sides' American prices converted to implied probability, normalised to remove vig. DK -167 Under implies 62.5% raw, about 59% no-vig.
@@ -54,6 +56,8 @@ Floors: 6 points for count and yardage props; 25% relative edge for TD props.
 The team TD total comes from the market's implied points. A TD gap therefore lives only in the allocation (goal-line share, overall share), not in the team's scoring expectation. Treat a TD gap as a share disagreement, not a game disagreement, and never as equivalent to a receptions gap.
 
 ## 10. Validation status
+**Superseded as the current evidence (2026-10-01): read the registry's rounds 10-13.** The yardage harness (round 10: four seasons 2022-25, tuned on 2022-23, tested on 2024-25, weeks 2-18) found receptions, receiving and rushing yards beat the naive baseline and are unbiased, but too NARROW -- and showed the calibration table below predates the joint sampler. Round 11's width settings fixed the width on the untouched test seasons (outside p10-p90: 19.0% / 19.2% / 19.6%, every 60-90% bucket within 3 points). Round 13 added QB passing yards. What follows is the 2026-09-18 single-season record, kept for lineage. Against sportsbook lines the status is unchanged: nothing is validated.
+
 Walk-forward 2025 backtest of receptions and receiving yards (train weeks 5-8, test 9-18, N = 1,895 player-weeks).
 
 **These numbers were re-measured on 2026-09-18 after the backtest was made to run the live pipeline.** The previous figures (1.0082 / 13.2764) described a harness that differed from the scorer in three ways: it drew each player from his own negative binomial instead of calling `simulate_team_game`; it blended the current season straight onto the slot prior, never reading a prior-season individual rate; and it loaded `priors_{S}`, which `build_priors.py --season S` builds from season S -- the season under test -- so the K0 constants, league rates and `market_env_fit` were fitted on data including the test weeks.
