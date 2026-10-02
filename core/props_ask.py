@@ -58,7 +58,7 @@ SLEEPER_TO_NFLVERSE = {"LAR": "LA"}
 UNVALIDATED = ("No market is tested against posted sportsbook lines, so no row is eligible to bet and a "
                "positive EV is the model's opinion, not an edge. (Catches and receiving yards ARE calibrated "
                "on 2022-25 outcomes -- a model 85% has won about 84-85%; rushing yards nearly so, one "
-               "probability band 3.4 points off against a 3-point limit -- so they are not guesses; they are "
+               "probability band 3.2 points off against a 3-point limit -- so they are not guesses; they are "
                "untested against the book. QB passing yards do not pass that test yet: better than the naive "
                "baseline in 2025, not in 2024.)")
 TD_V0_RULE = ("This TD row is anytime_td_v0, the fallback (v1 could not run: no market implied total); it runs "

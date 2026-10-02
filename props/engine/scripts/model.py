@@ -512,13 +512,23 @@ def questionable_flip_check(samples_by_regime, line):
 #               the shares leave: 30% when they sum to 0.7, when historically
 #               ~12% of carries go elsewhere -- the eligible players then ran
 #               21% above their projection (2022-23 diagnosis, DECISIONS #103).
+#   rush_norm_lead  how much of that rescaling the team's LEAD back takes
+#               (round 15). None = the multiplicative rescale above (#103:
+#               everyone in proportion). A number in [0, 1]: the gap to the
+#               target (times rush_norm_strength) is ADDED, split across the
+#               rescaled players in proportion to their shares, with the lead
+#               back's weight multiplied by this -- 1.0 is #103's split, 0 puts
+#               the whole correction on the others. 2022-23: in team-games
+#               whose shares sum below 0.8 the #2 backs ran +43% on carries,
+#               the lead backs +17%; above 1.0 the #2s ran 12-19% under while
+#               the leads were on (DECISIONS #133).
 #   eff_sd_pass  log-sd of a per-game multiplier on the starting QB's passing
 #               yards (the receivers' efficiencies are drawn independently, so
 #               nothing else carries a game-wide passing swing)
 WIDTH_OFF = {"share_conc_targets": None, "share_conc_carries": None, "catch_conc": None,
              "eff_sd_rec": 0.0, "eff_sd_rush": 0.0, "share_conc_qb": None, "eff_sd_qb": None,
              "rush_other_share": None, "rush_norm_strength": 0.0, "rush_norm_qb": False,
-             "eff_sd_pass": 0.0}
+             "rush_norm_lead": None, "eff_sd_pass": 0.0}
 
 # simulate_team_game(..., return_other=True) files the 'other' bucket's targets
 # under this key, for simulate_qb_passing.
@@ -550,6 +560,9 @@ def validate_width(w):
         elif k == "rush_norm_strength":
             if not (isinstance(v, (int, float)) and 0 <= v <= 1):
                 raise ValueError(f"{k} must be in [0, 1], got {v!r}")
+        elif k == "rush_norm_lead":
+            if v is not None and not (isinstance(v, (int, float)) and 0 <= v <= 1):
+                raise ValueError(f"{k} must be null (proportional, #103) or in [0, 1], got {v!r}")
         elif not (isinstance(v, (int, float)) and v >= 0):
             raise ValueError(f"{k} must be >= 0, got {v!r}")
     return out
@@ -617,6 +630,61 @@ def _game_multiplier(rng, n_sim, sd):
     return np.exp(sd * rng.standard_normal(n_sim) - 0.5 * sd * sd)
 
 
+def rescale_rush_shares(rush_shares, width, qb_index=None):
+    """The eligible players' carry shares after the rush_norm settings
+    (WIDTH_OFF's notes): unchanged when rush_other_share is off; else rescaled
+    toward 1 - rush_other_share - the starting QB's share (he is left alone
+    unless rush_norm_qb). rush_norm_lead None: multiplicative, everyone in
+    proportion (#103). A number: the gap (times rush_norm_strength) ADDED in
+    proportion to share, the lead back's weight scaled by it (round 15)."""
+    w = {**WIDTH_OFF, **(width or {})}
+    rs = np.clip(np.asarray(rush_shares, dtype=float), 0, None)
+    if w["rush_other_share"] is None or not w["rush_norm_strength"] or rs.sum() <= 0:
+        return rs
+    # rush_norm_qb False: the starting QB's share is left alone (his carries
+    # are mostly scrambles) and the rest are rescaled toward what he and
+    # 'other' leave; True: everyone is rescaled together. Which is better
+    # is a tuning question (reports/width_tuning_rushnorm.md), scored on
+    # the backs AND the QB.
+    keep = np.zeros(len(rs), dtype=bool)
+    if qb_index is not None and not w["rush_norm_qb"]:
+        keep[int(qb_index)] = True
+    others, target = rs[~keep].sum(), 1.0 - w["rush_other_share"] - rs[keep].sum()
+    if not (others > 0 and target > 0):
+        return rs
+    rs = rs.copy()
+    if w.get("rush_norm_lead") is None:
+        # #103's form, kept byte-identical for its records. It LACKS the QB
+        # guard below: in overshoot games it removes the sampler's trim on the
+        # QB (round 15 found ~2% on QB rushing) -- use rush_norm_lead 1.0 for
+        # the same proportional split with the guard.
+        rs[~keep] = rs[~keep] * (target / others) ** w["rush_norm_strength"]
+        return rs
+    # THE QB KEEPS EXACTLY THE SHARE THE SAMPLER WOULD HAVE GIVEN HIM WITHOUT
+    # THE RESCALE: his raw share, divided by the raw total when the shares
+    # overshoot 1 (the sampler's normalisation). Without this the rescale
+    # removed that division in overshoot games and the starting QBs' rushing
+    # rose ~2% -- a side effect, not a decision (round 15 review, DECISIONS #133).
+    raw_total = rs.sum()
+    if keep.any() and raw_total > 1.0:
+        rs[keep] = rs[keep] / raw_total
+        target = 1.0 - w["rush_other_share"] - rs[keep].sum()
+    idx = np.flatnonzero(~keep)
+    wts = rs[idx].copy()
+    # every player tied for the largest share counts as the lead -- never
+    # whichever the roster frame happened to list first
+    wts[rs[idx] == rs[idx].max()] *= float(w["rush_norm_lead"])
+    if wts.sum() > 0 and target > 0:
+        gap = (target - others) * w["rush_norm_strength"]
+        rs[idx] = np.clip(rs[idx] + gap * wts / wts.sum(), 0.0, None)
+    room = 1.0 - rs[keep].sum()
+    if rs[idx].sum() > room > 0:
+        # still over 1 (a partial-strength rescale of an overshoot): trim the
+        # others, never the QB, so the sampler's normalisation leaves him alone
+        rs[idx] = rs[idx] * room / rs[idx].sum()
+    return rs
+
+
 def simulate_team_rush(rng, n_sim, team_carries_mean, carries_r, rush_shares, ypc, carry_resid,
                        width=None, player_resid=None, player_kneel=None, qb_index=None):
     """One team's carries, drawn jointly, and each player's rushing yards.
@@ -649,20 +717,7 @@ def simulate_team_rush(rng, n_sim, team_carries_mean, carries_r, rush_shares, yp
     if player_resid is not None and any(
             r is not None and len(r) != len(carry_resid) for r in player_resid):
         raise ValueError("a per-player carry grid must be the league grid's length")
-    rs = np.clip(np.asarray(rush_shares, dtype=float), 0, None)
-    if w["rush_other_share"] is not None and w["rush_norm_strength"] and rs.sum() > 0:
-        # rush_norm_qb False: the starting QB's share is left alone (his carries
-        # are mostly scrambles) and the rest are rescaled toward what he and
-        # 'other' leave; True: everyone is rescaled together. Which is better
-        # is a tuning question (reports/width_tuning_rushnorm.md), scored on
-        # the backs AND the QB.
-        keep = np.zeros(len(rs), dtype=bool)
-        if qb_index is not None and not w["rush_norm_qb"]:
-            keep[int(qb_index)] = True
-        others, target = rs[~keep].sum(), 1.0 - w["rush_other_share"] - rs[keep].sum()
-        if others > 0 and target > 0:
-            rs = rs.copy()
-            rs[~keep] = rs[~keep] * (target / others) ** w["rush_norm_strength"]
+    rs = rescale_rush_shares(rush_shares, w, qb_index)
     rest = max(1.0 - rs.sum(), 0.0)
     p_norm = np.append(rs, rest); p_norm = p_norm / p_norm.sum()
     mu_c = max(team_carries_mean, 1e-6)

@@ -6738,3 +6738,51 @@ above); the 0.181 gap equalling the 0.181 width looked like a mis-wired
 column and is a real 16-case bucket (no change); the props rule line now
 qualifies rushing and says passing yards do not pass the harness.
 
+
+## 2026-10-01 (133) -- the backs' carry shares rescaled toward a realistic total (props-v1.28, nfl-v1.30)
+
+The second "can do now" item, chosen from the harness's own defect list: the
+running backs ran ~4% above their rushing projection on 2024-25 (5.5% early,
+BIASED), and rushing yards missed calibration. #103 tried a full-strength
+proportional rescale on 2025-09-25 and did not ship.
+
+- Diagnosed on 2022-23 only: the miss tracks how far the priced carry shares
+  miss a realistic total, and the #2 backs carry most of it.
+- Hypothesis tested and WRONG: putting the correction on the #2 backs alone
+  (new setting rush_norm_lead 0) scored worse than no rescale. The tuner chose
+  half strength, proportional (rush_other_share 0.12, strength 0.5, lead 1.0).
+- First verdict run: rushing clearly better, but QB rushing lost its PASS --
+  the rescale removed the sampler's trimming of the QB in overshoot games (+2%
+  on QBs who already ran hot in 2024-25). Fixed structurally: the QB keeps
+  exactly the share the shipped sampler gives him. Re-tuned on 2022-23 (same
+  pick). DISCLOSED: 2024-25 had been seen once for this family before the guard.
+- Guarded verdict vs props-v1.27: rushing yards +0.243 CRPS on 2024-25
+  (+0.092, +0.392), weeks 5-18 +0.309 (clear), weeks 2-4 noise; 2026 weeks 2-3
+  (never tuned or diagnosed on) +0.219, same direction, within noise; QB
+  rushing -0.001 (unchanged), other markets identical. Rushing still misses
+  calibration (0.034 -> 0.032). QB rushing's calibration flag moved 0.029 ->
+  0.039 on stream noise with identical projections -- a harness fragility
+  (pass/fail at a threshold flipping on draw noise), recorded in
+  reports/rush_lead.md, not fixed here.
+- The user's call (two decisions, asked): fix the QB leak first; then ship,
+  released Friday 2026-10-02 morning so Thursday's game stays on one engine and
+  all of Sunday is priced by the new one. The pricing model changes, so the
+  prospective record starts a new bucket from that release.
+
+Two items from the defect list dropped on measurement, not opinion: early
+receiver over-projection flips sign by season (2022-23 under, 2024-25 over --
+league variation, not a model defect); early QB rushing running hot appears
+only in 2024-25 (2022-23 weeks 2-4 at 0.973), so no tune-season evidence
+exists to fit a fix to; checked again as 2026 weeks accumulate.
+
+Tests: props/tests/test_rush_lead.py (rescale math, the QB's sampler share in
+every combination, tied leads, validation, the shipped settings, and that the
+scorer and the harness hand the rush simulator the same inputs).
+
+Review: five findings, all fixed -- reports/yardage_harness.md re-rendered
+from the guarded verdict run's saved results (the harness grades the shipped
+settings, so the report of record now matches the model that prices); tied
+lead backs share the lead weight (argmax took the first listed; no effect at
+the shipped 1.0); #103's mode is commented as lacking the QB guard; the
+report's live-check range corrected; a parity test pins both call sites.
+

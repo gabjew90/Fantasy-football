@@ -98,6 +98,23 @@ and kept live (DECISIONS #100). Known and not noise: QBs ran ~12% high in 2025;
 backs run ~4% low pooled because shares summing past 1 are scaled down (the
 next fix).
 
+### Round 15 (2026-10-01): the backs' carry shares, props-v1.28
+
+- The defect: on props-v1.27 the running backs ran ~4% above their rushing projection on
+  2024-25 (5.5% in weeks 2-4, BIASED). Diagnosed on 2022-23 only: it tracks how far the
+  priced players' carry shares miss a realistic total -- below 0.8 both backs ran over
+  (lead +17%, #2 +43%), above 1.0 the #2 backs ran 12-19% under.
+- The change (`model.rescale_rush_shares`, width_params.json): half the gap to
+  1 - 0.12 is closed, ADDED in proportion to share (rush_norm_lead 1.0); the starting QB
+  keeps exactly the share the sampler gave him before. Putting the correction on the #2
+  backs alone (rush_norm_lead 0) was tested and scored worse than no rescale.
+- Verdict (vs props-v1.27, paired): rushing yards +0.243 CRPS on 2024-25, interval
+  +0.092 to +0.392 (weeks 5-18 +0.309, clear; weeks 2-4 within noise); 2026 weeks 2-3,
+  never tuned on, +0.219 (within noise, same direction); QB rushing -0.001 (unchanged);
+  every other market identical. Still DOES NOT PASS calibration (0.034 -> 0.032); QB
+  rushing's calibration flag moved 0.029 -> 0.039 on stream noise, its projections
+  unchanged. Full write-up: reports/rush_lead.md. DECISIONS #133.
+
 ### Round 13 (2026-09-25): QB passing yards, props-v1.24 -- `pass_yds_v0`
 
 - Markets: player_pass_yds, the starting QB only.

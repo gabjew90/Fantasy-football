@@ -35,6 +35,7 @@ Team-level efficiency allowed (catch rate, yards per target, yards per carry) fr
 - Rushing yards: per-carry draws from the empirical 2025 residual quantile grid around the player's yards per carry.
 - TDs: team pass and rush TDs allocated by goal-line share for the inside-10 fraction and by overall share for the rest; P(at least one) = 1 - exp(-lambda).
 - Width (round 11, props-v1.20; registry): four mean-preserving per-game variations the draws above used to hold fixed -- Dirichlet variation of a player's target share (concentration 40) and carry share (20), and a lognormal per-game multiplier on yards per carry (log-sd 0.3); catch rate and yards per catch stay fixed. Without them every yardage market was too narrow (26-32% of outcomes outside p10-p90, 20% expected).
+- Carry shares (round 15, props-v1.28): when the priced players' carry shares miss 1 - 0.12, half the gap is closed, added in proportion to share; the starting QB keeps exactly the share the sampler gave him before. Without it the backs ran ~4% over their rushing projection (registry round 15).
 - QB markets: passing yards (round 13, `pass_yds_v0`) from his receivers' yards in the same simulation times his share of the team's passing; QB rushing (round 12) on its own carry grid, kneel-downs included as books settle.
 Kincaid: median 3 catches, P(<4.5) = 14,327 / 20,000 = 71.6% (computed before the round-11 width; the same call now reads a few points nearer 50%).
 
