@@ -167,6 +167,12 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
            if live else dict(level=args.opp_level, mode=args.opp_mode, k0=args.opp_k0,
                              metrics=args.opp_metrics))
     dispersion = args.dispersion or ("prior" if live else "train")
+    # round 16: the market pass-volume weight -- --env market_pass (the tuning runs:
+    # --pace-weight), else --market-pass-weight, else what the scorer ships; live only
+    mpw = ((args.pace_weight if args.pace_weight is not None else M.MARKET_PASS_WEIGHT)
+           if args.env == "market_pass" else
+           (M.MARKET_PASS_WEIGHT if getattr(args, "market_pass_weight", None) is None
+            else float(args.market_pass_weight))) if live else 0.0
     print(f"season={S} env={args.env} opponent={args.opponent} ({opp['level']}, k0={opp['k0']:g}) "
           f"historical_blend={args.historical_blend} dispersion={dispersion} live={live}", file=sys.stderr)
 
@@ -245,7 +251,11 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
     pri_teams = pd.read_csv(pdir / f"priors_{PRIOR}_teams.csv", index_col=0)
     print(f"priors: {PRIOR} (the season before the one under test), "
           f"{len(pri_players)} players", file=sys.stderr)
-    K0R = P0.get("k0_per_rate", M.DEFAULT_K0)
+    _k0o = None
+    if getattr(args, "k0", None):
+        _k0o = {kv.split("=")[0].strip(): float(kv.split("=")[1]) for kv in args.k0.split(",") if kv.strip()}
+    K0R = M.k0_rates(P0.get("k0_per_rate", M.DEFAULT_K0), override=_k0o)
+    print(f"shrinkage constants: {K0R}", file=sys.stderr)
     K0_TEAM = float(P0.get("K0", 4.0))
     league_pass_rate = P0.get("league_pass_rate", 0.55)
     MKT_FIT = P0.get("market_env_fit", {})
@@ -513,6 +523,15 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
                 targets_env = league_plays * league_pass_rate
                 carries_env = league_plays * (1 - league_pass_rate)
             team_pr = targets_env / max(targets_env + carries_env, 1e-6)   # team's own history pass rate
+            if env_mode in ("history", "market_pass") and mpw and opp_team:
+                # round 16: the market moves the pass volume only (model.market_pass_volume)
+                key3 = None
+                if (r.team, opp_team, W) in game_lines.index: key3 = (r.team, opp_team, W); is_home3 = True
+                elif (opp_team, r.team, W) in game_lines.index: key3 = (opp_team, r.team, W); is_home3 = False
+                if key3 is not None:
+                    sl3, tl3 = game_lines.loc[key3, ["spread_line", "total_line"]]
+                    targets_env, carries_env = M.market_pass_volume(sl3 if is_home3 else -sl3, tl3, MKT_FIT,
+                                                                    targets_env, carries_env, mpw)
             if env_mode == "market_fit" and opp_team:
                 key2 = None
                 if (r.team, opp_team, W) in game_lines.index: key2 = (r.team, opp_team, W); is_home2 = True
@@ -521,7 +540,8 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
                     sl, tl = game_lines.loc[key2, ["spread_line", "total_line"]]
                     team_spread = sl if is_home2 else -sl
                     me = M.market_environment_fitted(team_spread, tl, MKT_FIT,
-                                                     targets_env + carries_env, team_pr, args.pace_weight)
+                                                     targets_env + carries_env, team_pr,
+                                                     0.5 if args.pace_weight is None else args.pace_weight)
                     targets_env = me["plays"] * me["pass_rate"]
                     carries_env = me["plays"] * (1 - me["pass_rate"])
             if env_mode == "market" and opp_team:
@@ -927,6 +947,16 @@ RUSHNORM_GRID = [{"rush_other_share": None, "rush_norm_strength": 0.0, "rush_nor
     for o in (0.08, 0.10, 0.12, 0.14) for a in (0.5, 1.0) for q in (False, True)]
 
 
+# --tune-width rushlead (round 15): the same rescale, but the correction lands
+# on the backs behind the lead one (rush_norm_lead = the lead's weight in the
+# split; 1.0 = #103's proportional rescale, 0 = none of it on the lead back).
+# The QB stays out of it (#103 found rescaling him made QB rushing worse).
+RUSHLEAD_GRID = [{"rush_other_share": None, "rush_norm_strength": 0.0, "rush_norm_qb": False,
+                  "rush_norm_lead": None}] + [
+    {"rush_other_share": o, "rush_norm_strength": a, "rush_norm_qb": False, "rush_norm_lead": ld}
+    for o in (0.10, 0.12, 0.14) for a in (0.5, 1.0) for ld in (0.0, 0.25, 0.5, 1.0)]
+
+
 def _off(v):
     return v is None or (isinstance(v, float) and np.isnan(v)) or v == 0
 
@@ -952,6 +982,11 @@ SUBGRIDS = {
     "qb": (QB_GRID, ("qbrush",), "width",
            "The starting QB's own settings. *Off* = no QB-only setting: the QB is one more component of the "
            "carries Dirichlet and shares eff_sd_rush (the sampler before props-v1.21)."),
+    "rushlead": (RUSHLEAD_GRID, ("rush", "qbrush"), "bias",
+                 "Round 15: the eligible carry shares rescaled toward 1 - rush_other_share with the correction "
+                 "ADDED and split away from the lead back (rush_norm_lead = his weight in the split; 1.0 = "
+                 "#103's proportional rescale). *Off* = no rescaling (what ships). Diagnosis behind it (2022-23 "
+                 "only, DECISIONS #133): the #2 backs carry the miss in both directions."),
     "rushnorm": (RUSHNORM_GRID, ("rush", "qbrush"), "bias",
                  "How the eligible players' carry shares are rescaled toward 1 - rush_other_share, with or "
                  "without the starting QB (rush_norm_qb). *Off* = no rescaling: the 'other' bucket is whatever "
@@ -1374,7 +1409,7 @@ def main(argv=None):
     ap.add_argument("--tune-width", action="store_true",
                     help="choose the width settings on the --tune seasons; writes --report (.md/.csv)")
     ap.add_argument("--width-out", default=None, help="--tune-width: write the chosen settings to this JSON file")
-    ap.add_argument("--tune-grid", choices=["main", "qb", "rushnorm"], default="main",
+    ap.add_argument("--tune-grid", choices=["main", "qb", "rushnorm", "rushlead"], default="main",
                     help="--tune-width: the receiving/rushing grid, the starting QB's own settings, or the "
                          "carry-share rescaling")
     ap.add_argument("--dispersion", choices=["prior", "train"], default=None,
@@ -1382,8 +1417,18 @@ def main(argv=None):
                          "train = fit on --train-weeks of the season (single-season default)")
     ap.add_argument("--priors-dir", default=None, help="where priors_{S-1}_* live (default: the engine's resources)")
     ap.add_argument("--build-priors", action="store_true", help="build missing priors with build_priors.py")
-    ap.add_argument("--env", choices=["history", "market", "league", "market_fit"], default="history")
-    ap.add_argument("--pace-weight", type=float, default=0.5)
+    ap.add_argument("--env", choices=["history", "market", "league", "market_fit", "market_pass"], default="history",
+                    help="history = what the scorer runs: the team's own volume, the targets blended "
+                         "model.MARKET_PASS_WEIGHT toward the market fit (round 16; 0 with --market-pass-weight 0), "
+                         "and model.K0_FIXED over the fitted shrinkage (round 17; --k0 to override). Runs before "
+                         "props-v1.28 reproduce with --market-pass-weight 0 and the priors' own constants.")
+    ap.add_argument("--market-pass-weight", type=float, default=None,
+                    help="round 16: weight on the market's fitted pass volume (default model.MARKET_PASS_WEIGHT, "
+                         "what the scorer runs; 0 = history alone). --env market_pass is the same thing, kept "
+                         "for the tuning runs that used it with --pace-weight")
+    ap.add_argument("--pace-weight", type=float, default=None,
+                    help="--env market_fit: the market weight (default 0.5); --env market_pass: the pass-volume "
+                         "weight (default model.MARKET_PASS_WEIGHT, the shipped 0.25)")
     ap.add_argument("--env-window", type=int, default=0, help="0 = expanding mean; N = trailing N games for team volume")
     ap.add_argument("--drift-correct", action="store_true", default=True,
                     help="scale the expanding team mean by a league-wide recent/expanding volume ratio")
@@ -1399,6 +1444,9 @@ def main(argv=None):
     ap.add_argument("--live-opp-metrics", default=None,
                     help="harness ABLATION: the opponent-adjusted rates in live mode (default: the scorer's, "
                          "catch_rate,ypt,ypc); e.g. catch_rate,ypt drops the run-defense adjustment")
+    ap.add_argument("--k0", default=None,
+                    help="round 17: fixed shrinkage constants over the priors' fit, e.g. 'ypt=40,catch_rate=20' "
+                         "(default: model.K0_FIXED)")
     ap.add_argument("--historical-blend", action="store_true", default=True,
                     help="two-stage: prior-season own rate -> slot prior -> this season (what the live scorer does)")
     ap.add_argument("--no-historical-blend", dest="historical_blend", action="store_false",

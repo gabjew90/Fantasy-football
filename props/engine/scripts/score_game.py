@@ -431,7 +431,7 @@ def main():
     PRIOR = a.prior_season or SEASON - 1
     P = json.load(open(RES / f"priors_{PRIOR}_params.json"))
     K0 = P["K0"]                              # fallback flat constant, kept for any rate not in k0_per_rate
-    K0R = P.get("k0_per_rate", MODEL.DEFAULT_K0)   # per-rate constants, tuned by build_priors.py (round 5)
+    K0R = MODEL.k0_rates(P.get("k0_per_rate", MODEL.DEFAULT_K0))   # build_priors.py's fit, MODEL.K0_FIXED over it
     LEAGUE_PASS_RATE = P.get("league_pass_rate", 0.55)
     LEAGUE_PLAYS = P.get("league_plays_per_game", 64.0)
     pri_players = pd.read_csv(RES / f"priors_{PRIOR}_players.csv").set_index("gsis_id")
@@ -683,7 +683,8 @@ def main():
                 env[t][c] = env[t][c] * _drift[key]
         env[t]["td_total_history"] = env[t]["pass_td"] + env[t]["rush_td"]
         env[t]["td_anchor"] = "history"
-        env[t]["source"] = "history"
+        env[t]["source"] = ("history (no spread/total this run: the market pass volume could not be applied)"
+                            if market_env is None and MODEL.MARKET_PASS_WEIGHT else "history")
         if market_env is not None:
             hs, tl = market_env["home_spread"], market_env["total_line"]
             implied_pts = (tl - hs) / 2 if t == HOME else (tl + hs) / 2
@@ -702,6 +703,13 @@ def main():
             env[t]["td_total_market"] = total_td_mkt
             env[t]["implied_points"] = implied_pts
             env[t]["td_anchor"] = "market"
+            if a.env != "market" and MODEL.MARKET_PASS_WEIGHT and P.get("market_env_fit"):
+                # round 16: the market's fitted pass volume at MODEL.MARKET_PASS_WEIGHT;
+                # carries keep the team's history (DECISIONS #134)
+                env[t]["targets"], env[t]["carries"] = MODEL.market_pass_volume(
+                    MODEL.team_spread_from_home(hs, t == HOME), tl, P["market_env_fit"],
+                    env[t]["targets"], env[t]["carries"], MODEL.MARKET_PASS_WEIGHT)
+                env[t]["source"] = f"history + market pass volume ({MODEL.MARKET_PASS_WEIGHT:g})"
             if a.env == "market":
                 hist_targets, hist_carries = env[t]["targets"], env[t]["carries"]
                 team_pr = hist_targets / max(hist_targets + hist_carries, 1e-6)
@@ -2312,7 +2320,13 @@ def main():
     L.append(f"- **What we're working with:** {n_weeks} week{'s' if n_weeks!=1 else ''} of this season, plus each player's full {PRIOR} season as a starting point.")
     for t in (AWAY, HOME):
         e = env[t]
-        src_note = " (anchored to the market's spread and total; unvalidated option)" if e.get("source") == "market" else " (from the team's own recent games, plus last season)"
+        src = e.get("source") or "history"
+        src_note = (" (anchored to the market's spread and total; unvalidated option)" if src == "market" else
+                    f" (the team's own recent games plus last season, the throws {100 * MODEL.MARKET_PASS_WEIGHT:.0f}% "
+                    "from the market's spread/total fit)" if src.startswith("history + market pass") else
+                    " (from the team's own recent games, plus last season -- no spread/total this run, so the "
+                    "market's share of the throws was not applied)" if src.startswith("history (no spread") else
+                    " (from the team's own recent games, plus last season)")
         L.append(f"- **{t}'s offense, typical game{src_note}:** about {e['targets']:.0f} throws, {e['carries']:.0f} runs, "
                  f"{e['pass_td']+e['rush_td']:.1f} offensive touchdowns.")
     L.append("- **Matchup (opponent defense):** included at the team level, weighted by how much real "

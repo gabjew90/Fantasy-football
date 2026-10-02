@@ -245,12 +245,40 @@ def league_drift_ratio(team_week_volume, target_week, recent_games=3, min_prior_
 
 
 # ---------------------------------------------------------------- team environment
+# Round 17 (2026-10-01): fixed shrinkage constants (opportunities) for the rates
+# whose per-season fit (build_priors.py: four weeks of one season, a 5-2560 grid)
+# is unstable -- yards per target fitted 160 for 2022, 640 for 2023, 160 for
+# 2025; catch rate 320 then 40. Empty = the per-season fit for every rate (the
+# pre-round-17 model, byte for byte). Measured on the yardage harness before it
+# is filled (DECISIONS #134).
+K0_FIXED = {"ypt": 80, "catch_rate": 40, "target_share": 80}
+
+
+def k0_rates(fitted, override=None):
+    """The per-rate shrinkage constants a pricing run uses: the priors' fitted
+    `k0_per_rate` (else DEFAULT_K0), with K0_FIXED -- or `override`, for the
+    harness -- replacing the rates it names."""
+    out = dict(fitted or DEFAULT_K0)
+    fixed = K0_FIXED if override is None else override
+    out.update(fixed)
+    # build_priors.py derives the goal-line shares' constants from the share
+    # constants rescaled to goal-line volume; a fixed share constant carries its
+    # goal-line one along (same ratio, same floor of 2) unless that is fixed too
+    for share, i10 in (("target_share", "i10_target_share"), ("rush_share", "i10_carry_share")):
+        base = (fitted or {}).get(share)
+        if share in fixed and i10 not in fixed and i10 in out and base:
+            out[i10] = max(2, round(float(out[i10]) * float(fixed[share]) / float(base)))
+    return out
+
+
 def market_environment_fitted(team_spread, total, mkt_fit, team_pace_blend, team_pr_blend,
                                pace_weight=0.5):
     """Team plays and pass rate from FITTED market coefficients (build_priors.py) rather
     than a hand-set shift, blended with the team's own pace/pass-rate history.
 
-    team_spread: this team's own spread (negative = favored).
+    team_spread: this team's own spread, POSITIVE = favoured (nflverse spread_line
+    convention, as build_priors.py fits `market_env_fit`; corrected 2026-10-01 --
+    this said "negative = favored", DECISIONS #106).
     team_pace_blend / team_pr_blend: the team's history-blended plays and pass rate.
     pace_weight: how much of the market's fitted prediction to take vs the team's own
     history. The fit's R^2 on 2025 is ~0.02 for plays and ~0.04 for pass rate: the market
@@ -266,7 +294,40 @@ def market_environment_fitted(team_spread, total, mkt_fit, team_pace_blend, team
     w = float(np.clip(pace_weight, 0.0, 1.0))
     return {"plays": (1 - w) * team_pace_blend + w * mkt_plays,
             "pass_rate": float(np.clip((1 - w) * team_pr_blend + w * mkt_pr, 0.35, 0.75)),
-            "implied_points": (total - team_spread) / 2, "source": "market-fitted"}
+            "implied_points": (total + team_spread) / 2, "source": "market-fitted"}
+
+
+# Round 16 (2026-10-01, DECISIONS #134): the weight on the market's fitted pass
+# volume, 0 = the team's history alone (pre-round-16). Chosen on 2022-23 (the
+# smallest weight at which catches, receiving and QB passing yards were each
+# clearly better; rule declared after the tune results, disclosed) and read once
+# on 2024-25: QB passing +0.30 CRPS, catches +0.001 (both intervals excluding 0),
+# nothing worse. The live scorer and the harness default both read this.
+MARKET_PASS_WEIGHT = 0.25
+
+
+def team_spread_from_home(home_spread, is_home):
+    """The fitted market functions' spread (this team's own, POSITIVE = favoured)
+    from the scorer's same-book home spread (NEGATIVE = home favoured, the ESPN /
+    Odds API convention)."""
+    return -float(home_spread) if is_home else float(home_spread)
+
+
+def market_pass_volume(team_spread, total, mkt_fit, team_targets_blend, team_carries_blend,
+                       pace_weight=0.5):
+    """Round 16: the market's fitted environment applied to the PASS volume only.
+    Team targets move toward the market-fitted plays x pass rate (weight
+    `pace_weight`); carries keep the team's own history. DECISIONS #106 found the
+    full market environment helped QB passing yards (1.5%, interval excluding
+    zero) and hurt QB rushing (0.6%); this keeps the throwing side and leaves the
+    running side as it was. Returns (targets, carries)."""
+    if not mkt_fit:
+        return team_targets_blend, team_carries_blend
+    me = market_environment_fitted(team_spread, total, mkt_fit, team_targets_blend + team_carries_blend,
+                                   team_targets_blend / max(team_targets_blend + team_carries_blend, 1e-6),
+                                   pace_weight=1.0)
+    w = float(np.clip(pace_weight, 0.0, 1.0))
+    return (1 - w) * team_targets_blend + w * me["plays"] * me["pass_rate"], team_carries_blend
 
 
 def market_implied_environment(spread_home, total, home_pass_rate, away_pass_rate,
@@ -512,13 +573,23 @@ def questionable_flip_check(samples_by_regime, line):
 #               the shares leave: 30% when they sum to 0.7, when historically
 #               ~12% of carries go elsewhere -- the eligible players then ran
 #               21% above their projection (2022-23 diagnosis, DECISIONS #103).
+#   rush_norm_lead  how much of that rescaling the team's LEAD back takes
+#               (round 15). None = the multiplicative rescale above (#103:
+#               everyone in proportion). A number in [0, 1]: the gap to the
+#               target (times rush_norm_strength) is ADDED, split across the
+#               rescaled players in proportion to their shares, with the lead
+#               back's weight multiplied by this -- 1.0 is #103's split, 0 puts
+#               the whole correction on the others. 2022-23: in team-games
+#               whose shares sum below 0.8 the #2 backs ran +43% on carries,
+#               the lead backs +17%; above 1.0 the #2s ran 12-19% under while
+#               the leads were on (DECISIONS #133).
 #   eff_sd_pass  log-sd of a per-game multiplier on the starting QB's passing
 #               yards (the receivers' efficiencies are drawn independently, so
 #               nothing else carries a game-wide passing swing)
 WIDTH_OFF = {"share_conc_targets": None, "share_conc_carries": None, "catch_conc": None,
              "eff_sd_rec": 0.0, "eff_sd_rush": 0.0, "share_conc_qb": None, "eff_sd_qb": None,
              "rush_other_share": None, "rush_norm_strength": 0.0, "rush_norm_qb": False,
-             "eff_sd_pass": 0.0}
+             "rush_norm_lead": None, "eff_sd_pass": 0.0}
 
 # simulate_team_game(..., return_other=True) files the 'other' bucket's targets
 # under this key, for simulate_qb_passing.
@@ -550,6 +621,9 @@ def validate_width(w):
         elif k == "rush_norm_strength":
             if not (isinstance(v, (int, float)) and 0 <= v <= 1):
                 raise ValueError(f"{k} must be in [0, 1], got {v!r}")
+        elif k == "rush_norm_lead":
+            if v is not None and not (isinstance(v, (int, float)) and 0 <= v <= 1):
+                raise ValueError(f"{k} must be null (proportional, #103) or in [0, 1], got {v!r}")
         elif not (isinstance(v, (int, float)) and v >= 0):
             raise ValueError(f"{k} must be >= 0, got {v!r}")
     return out
@@ -617,6 +691,61 @@ def _game_multiplier(rng, n_sim, sd):
     return np.exp(sd * rng.standard_normal(n_sim) - 0.5 * sd * sd)
 
 
+def rescale_rush_shares(rush_shares, width, qb_index=None):
+    """The eligible players' carry shares after the rush_norm settings
+    (WIDTH_OFF's notes): unchanged when rush_other_share is off; else rescaled
+    toward 1 - rush_other_share - the starting QB's share (he is left alone
+    unless rush_norm_qb). rush_norm_lead None: multiplicative, everyone in
+    proportion (#103). A number: the gap (times rush_norm_strength) ADDED in
+    proportion to share, the lead back's weight scaled by it (round 15)."""
+    w = {**WIDTH_OFF, **(width or {})}
+    rs = np.clip(np.asarray(rush_shares, dtype=float), 0, None)
+    if w["rush_other_share"] is None or not w["rush_norm_strength"] or rs.sum() <= 0:
+        return rs
+    # rush_norm_qb False: the starting QB's share is left alone (his carries
+    # are mostly scrambles) and the rest are rescaled toward what he and
+    # 'other' leave; True: everyone is rescaled together. Which is better
+    # is a tuning question (reports/width_tuning_rushnorm.md), scored on
+    # the backs AND the QB.
+    keep = np.zeros(len(rs), dtype=bool)
+    if qb_index is not None and not w["rush_norm_qb"]:
+        keep[int(qb_index)] = True
+    others, target = rs[~keep].sum(), 1.0 - w["rush_other_share"] - rs[keep].sum()
+    if not (others > 0 and target > 0):
+        return rs
+    rs = rs.copy()
+    if w.get("rush_norm_lead") is None:
+        # #103's form, kept byte-identical for its records. It LACKS the QB
+        # guard below: in overshoot games it removes the sampler's trim on the
+        # QB (round 15 found ~2% on QB rushing) -- use rush_norm_lead 1.0 for
+        # the same proportional split with the guard.
+        rs[~keep] = rs[~keep] * (target / others) ** w["rush_norm_strength"]
+        return rs
+    # THE QB KEEPS EXACTLY THE SHARE THE SAMPLER WOULD HAVE GIVEN HIM WITHOUT
+    # THE RESCALE: his raw share, divided by the raw total when the shares
+    # overshoot 1 (the sampler's normalisation). Without this the rescale
+    # removed that division in overshoot games and the starting QBs' rushing
+    # rose ~2% -- a side effect, not a decision (round 15 review, DECISIONS #133).
+    raw_total = rs.sum()
+    if keep.any() and raw_total > 1.0:
+        rs[keep] = rs[keep] / raw_total
+        target = 1.0 - w["rush_other_share"] - rs[keep].sum()
+    idx = np.flatnonzero(~keep)
+    wts = rs[idx].copy()
+    # every player tied for the largest share counts as the lead -- never
+    # whichever the roster frame happened to list first
+    wts[rs[idx] == rs[idx].max()] *= float(w["rush_norm_lead"])
+    if wts.sum() > 0 and target > 0:
+        gap = (target - others) * w["rush_norm_strength"]
+        rs[idx] = np.clip(rs[idx] + gap * wts / wts.sum(), 0.0, None)
+    room = 1.0 - rs[keep].sum()
+    if rs[idx].sum() > room > 0:
+        # still over 1 (a partial-strength rescale of an overshoot): trim the
+        # others, never the QB, so the sampler's normalisation leaves him alone
+        rs[idx] = rs[idx] * room / rs[idx].sum()
+    return rs
+
+
 def simulate_team_rush(rng, n_sim, team_carries_mean, carries_r, rush_shares, ypc, carry_resid,
                        width=None, player_resid=None, player_kneel=None, qb_index=None):
     """One team's carries, drawn jointly, and each player's rushing yards.
@@ -649,20 +778,7 @@ def simulate_team_rush(rng, n_sim, team_carries_mean, carries_r, rush_shares, yp
     if player_resid is not None and any(
             r is not None and len(r) != len(carry_resid) for r in player_resid):
         raise ValueError("a per-player carry grid must be the league grid's length")
-    rs = np.clip(np.asarray(rush_shares, dtype=float), 0, None)
-    if w["rush_other_share"] is not None and w["rush_norm_strength"] and rs.sum() > 0:
-        # rush_norm_qb False: the starting QB's share is left alone (his carries
-        # are mostly scrambles) and the rest are rescaled toward what he and
-        # 'other' leave; True: everyone is rescaled together. Which is better
-        # is a tuning question (reports/width_tuning_rushnorm.md), scored on
-        # the backs AND the QB.
-        keep = np.zeros(len(rs), dtype=bool)
-        if qb_index is not None and not w["rush_norm_qb"]:
-            keep[int(qb_index)] = True
-        others, target = rs[~keep].sum(), 1.0 - w["rush_other_share"] - rs[keep].sum()
-        if others > 0 and target > 0:
-            rs = rs.copy()
-            rs[~keep] = rs[~keep] * (target / others) ** w["rush_norm_strength"]
+    rs = rescale_rush_shares(rush_shares, w, qb_index)
     rest = max(1.0 - rs.sum(), 0.0)
     p_norm = np.append(rs, rest); p_norm = p_norm / p_norm.sum()
     mu_c = max(team_carries_mean, 1e-6)

@@ -98,6 +98,72 @@ and kept live (DECISIONS #100). Known and not noise: QBs ran ~12% high in 2025;
 backs run ~4% low pooled because shares summing past 1 are scaled down (the
 next fix).
 
+### Round 19 (2026-10-01): QB passing scaled by implied points -- measured, not shipped
+
+- The shipped model's QB passing runs 19% high for teams implied <= 18 points and 6-7% low at
+  25+ (2022-23; 2024-25 shows the same, and was seen while diagnosing). Tested: the QB's yards
+  times (implied / 22) ** beta. Tune 2022-23: beta 0.5 +0.49 CRPS (within noise, ties off),
+  1.0 and 1.5 clearly worse; the rule (smallest beta among ties, 0 counting) keeps it off.
+  Scaling the whole distribution double-counts what the model already knows about good and bad
+  offenses; the miss is likelier a benching / blowout-exit risk that depends on implied points.
+  Code: tag archive/props-pass-implied. DECISIONS #137.
+
+### Round 18 (2026-10-01): fixed shrinkage for target share, props-v1.28
+
+- Found by a residual sweep of the round-15-17 model (2022-23, consistent in both seasons):
+  receivers with the lowest target share so far ran 11-15% above projection. The per-season
+  fit for target share was 20 and 40 for those seasons (80 for 2026). Fixed at 80
+  (`model.K0_FIXED`). Tune: 80 best, 40 and 160 and the fit measurably worse. Held out
+  2024-25: catches +0.003 (+0.002, +0.004), receiving yards +0.025 (+0.012, +0.038), QB
+  passing +0.04 (noise). 2026 weeks 2-3 identical to the decimal -- this season's fit is
+  already 80, so no 2026 price moves; it guards the seasons whose fit lands elsewhere.
+  DECISIONS #136.
+
+### Round 17 (2026-10-01): fixed shrinkage for yards per target and catch rate, props-v1.28
+
+- The defect: build_priors.py fits each rate's shrinkage constant on weeks 5-8 of one season
+  over a 5-2560 grid, and the fit is unstable (yards per target 160 / 640 / 160 for the
+  2022 / 2023 / 2026 priors; catch rate 320 then 40). With 640 the model nearly ignored
+  current-season efficiency: on 2023 the least efficient receivers ran 18% under their
+  receiving-yards projection, the most efficient 10% over.
+- The change (`model.K0_FIXED`, applied by `model.k0_rates` in the scorer and the harness):
+  80 targets for yards per target, 40 for catch rate; every other rate keeps the fit.
+- Tune 2022-23: the yearly fit measurably worse than the best fixed setting; the chosen one
+  (the smallest change among those tied with the best) clearly better on catches, receiving
+  and QB passing yards. Held out, 2024-25: receiving yards +0.019 (+0.001, +0.036), catches
+  0.000, QB passing +0.079 (noise; weeks 2-4 +0.36, clear); calibration better on catches
+  and receiving yards. reports/passing_rounds_16_17.md, DECISIONS #135.
+
+### Round 16 (2026-10-01): the market's fitted pass volume, props-v1.28
+
+- From DECISIONS #106's lead: team targets blend toward the market-fitted plays x pass rate
+  (`model.market_pass_volume`) at `model.MARKET_PASS_WEIGHT` = 0.25; carries keep the history.
+  The scorer converts its home spread (negative = home favoured) to each team's own
+  (positive = favoured) with `model.team_spread_from_home`.
+- Tune 2022-23: 0.25 is the smallest weight at which catches, receiving and QB passing
+  yards are each clearly better than no change. DISCLOSED: the pre-set rule (#106's combined-
+  score tie test) picked 0; the per-market rule was adopted after the tune results, by the
+  user's decision, with 2024-25 read once. Held out: QB passing +0.298 (+0.085, +0.481),
+  catches +0.001 (+0.000, +0.002), receiving yards +0.012 (noise); rushing untouched.
+  reports/passing_rounds_16_17.md, DECISIONS #134.
+
+### Round 15 (2026-10-01): the backs' carry shares, props-v1.28
+
+- The defect: on props-v1.27 the running backs ran ~4% above their rushing projection on
+  2024-25 (5.5% in weeks 2-4, BIASED). Diagnosed on 2022-23 only: it tracks how far the
+  priced players' carry shares miss a realistic total -- below 0.8 both backs ran over
+  (lead +17%, #2 +43%), above 1.0 the #2 backs ran 12-19% under.
+- The change (`model.rescale_rush_shares`, width_params.json): half the gap to
+  1 - 0.12 is closed, ADDED in proportion to share (rush_norm_lead 1.0); the starting QB
+  keeps exactly the share the sampler gave him before. Putting the correction on the #2
+  backs alone (rush_norm_lead 0) was tested and scored worse than no rescale.
+- Verdict (vs props-v1.27, paired): rushing yards +0.243 CRPS on 2024-25, interval
+  +0.092 to +0.392 (weeks 5-18 +0.309, clear; weeks 2-4 within noise); 2026 weeks 2-3,
+  never tuned on, +0.219 (within noise, same direction); QB rushing -0.001 (unchanged);
+  every other market identical. Still DOES NOT PASS calibration (0.034 -> 0.032); QB
+  rushing's calibration flag moved 0.029 -> 0.039 on stream noise, its projections
+  unchanged. Full write-up: reports/rush_lead.md. DECISIONS #133.
+
 ### Round 13 (2026-09-25): QB passing yards, props-v1.24 -- `pass_yds_v0`
 
 - Markets: player_pass_yds, the starting QB only.

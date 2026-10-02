@@ -13,13 +13,15 @@ Kincaid: 2025 = 15% target share over 14 games, catch rate 75%, 7.6 yards per ta
 ## 2. Team environment (how many chances exist)
 Throws and runs per game: the team's prior-season mean blended with its current-season games (K0 = 4 games), times a league-wide drift ratio (recent 3 weeks / expanding, clipped 0.85 to 1.15, inactive before week 5). BUF: 29 throws, 29 runs.
 Team offensive TDs: market-anchored. Implied points from the same-book spread and total, times the league TD-per-point constant, split pass/rush by the team's history. BUF: 30.0 implied points, 3.2 TDs. If the spread/total is unavailable the history blend is used and TD calls are capped at MODERATE.
-Not conditioned on game script: the volume draw is centred on the blend regardless of whether the team is expected to be ahead or behind. `--env market_fit` shifts the centre by spread and total (fit on 2025, R2 0.02 to 0.04) and is not default. Within a team all players share one volume draw; across teams the draws are independent. Consequence: the whole pie shrinking together is simulated within a team, but the state that shrinks it (leading, trailing) is not, and cross-team script correlation is absent. Open registry gap.
+Game script enters the PASS volume only, and only a little: since round 16 (props-v1.28) team targets blend 25% toward the market-fitted plays x pass rate, which depend on the team's spread and the total (fit R2 0.02 to 0.04; about one throw across 20 points of spread). Carries, and the full `--env market_fit` re-centring, are not conditioned on it. Within a team all players share one volume draw; across teams the draws are independent. Consequence: the whole pie shrinking together is simulated within a team, but the state that shrinks it (leading, trailing) is not, and cross-team script correlation is absent. Open registry gap.
+
+Pass volume (round 16, props-v1.28): team targets blend 25% toward the market-fitted plays x pass rate (the team's spread and the total, fitted on the prior season); carries keep the history. `model.MARKET_PASS_WEIGHT`.
 
 ## 3. Player share (how many of those chances are his)
 Per rate (target share, catch rate, yards per target, rush share, yards per carry, goal-line shares):
 1. Individual prior = his own prior-season rate, shrunk toward the slot prior by games played.
 2. If he changed teams, the individual prior's weight is capped and the share is scaled by current/prior snap share.
-3. Final = blend(current-season rate, current opportunities, individual prior, K0_rate) where weight on current = n / (n + K0_rate), n in opportunity units.
+3. Final = blend(current-season rate, current opportunities, individual prior, K0_rate) where weight on current = n / (n + K0_rate), n in opportunity units. Since rounds 17-18 (props-v1.28) K0 for yards per target, catch rate and target share is FIXED (80, 40 and 80, `model.K0_FIXED`); the per-season fit swung by up to 4x and is kept for the other rates.
 Kincaid target share: 0.15 prior, 0.21 current on 29 team targets, K0 = 80, weight on current 27%, final 0.16. Targets = 0.16 x 29 = 4.7.
 Injuries: Out/Doubtful removed. Their share mostly goes to the replacement, not the priced teammates: a quarter of their targets and carries is handed on, mostly to teammates at their position (none of their goal-line targets), tuned on 2022-23 absence games and scored on 2024-25 (reports/absence_tune.md). Questionable: priced twice, as if he plays his normal role (the main run) and as if he is out with his share redistributed (the "if he is out" section, a full re-run on the same lines). No blended discount; the user decides.
 
@@ -35,6 +37,7 @@ Team-level efficiency allowed (catch rate, yards per target, yards per carry) fr
 - Rushing yards: per-carry draws from the empirical 2025 residual quantile grid around the player's yards per carry.
 - TDs: team pass and rush TDs allocated by goal-line share for the inside-10 fraction and by overall share for the rest; P(at least one) = 1 - exp(-lambda).
 - Width (round 11, props-v1.20; registry): four mean-preserving per-game variations the draws above used to hold fixed -- Dirichlet variation of a player's target share (concentration 40) and carry share (20), and a lognormal per-game multiplier on yards per carry (log-sd 0.3); catch rate and yards per catch stay fixed. Without them every yardage market was too narrow (26-32% of outcomes outside p10-p90, 20% expected).
+- Carry shares (round 15, props-v1.28): when the priced players' carry shares miss 1 - 0.12, half the gap is closed, added in proportion to share; the starting QB keeps exactly the share the sampler gave him before. Without it the backs ran ~4% over their rushing projection (registry round 15).
 - QB markets: passing yards (round 13, `pass_yds_v0`) from his receivers' yards in the same simulation times his share of the team's passing; QB rushing (round 12) on its own carry grid, kneel-downs included as books settle.
 Kincaid: median 3 catches, P(<4.5) = 14,327 / 20,000 = 71.6% (computed before the round-11 width; the same call now reads a few points nearer 50%).
 

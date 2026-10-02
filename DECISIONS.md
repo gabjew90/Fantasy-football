@@ -6738,3 +6738,170 @@ above); the 0.181 gap equalling the 0.181 width looked like a mis-wired
 column and is a real 16-case bucket (no change); the props rule line now
 qualifies rushing and says passing yards do not pass the harness.
 
+
+## 2026-10-01 (133) -- the backs' carry shares rescaled toward a realistic total (props-v1.28, nfl-v1.30)
+
+The second "can do now" item, chosen from the harness's own defect list: the
+running backs ran ~4% above their rushing projection on 2024-25 (5.5% early,
+BIASED), and rushing yards missed calibration. #103 tried a full-strength
+proportional rescale on 2025-09-25 and did not ship.
+
+- Diagnosed on 2022-23 only: the miss tracks how far the priced carry shares
+  miss a realistic total, and the #2 backs carry most of it.
+- Hypothesis tested and WRONG: putting the correction on the #2 backs alone
+  (new setting rush_norm_lead 0) scored worse than no rescale. The tuner chose
+  half strength, proportional (rush_other_share 0.12, strength 0.5, lead 1.0).
+- First verdict run: rushing clearly better, but QB rushing lost its PASS --
+  the rescale removed the sampler's trimming of the QB in overshoot games (+2%
+  on QBs who already ran hot in 2024-25). Fixed structurally: the QB keeps
+  exactly the share the shipped sampler gives him. Re-tuned on 2022-23 (same
+  pick). DISCLOSED: 2024-25 had been seen once for this family before the guard.
+- Guarded verdict vs props-v1.27: rushing yards +0.243 CRPS on 2024-25
+  (+0.092, +0.392), weeks 5-18 +0.309 (clear), weeks 2-4 noise; 2026 weeks 2-3
+  (never tuned or diagnosed on) +0.219, same direction, within noise; QB
+  rushing -0.001 (unchanged), other markets identical. Rushing still misses
+  calibration (0.034 -> 0.032). QB rushing's calibration flag moved 0.029 ->
+  0.039 on stream noise with identical projections -- a harness fragility
+  (pass/fail at a threshold flipping on draw noise), recorded in
+  reports/rush_lead.md, not fixed here.
+- The user's call (two decisions, asked): fix the QB leak first; then ship,
+  released Friday 2026-10-02 morning so Thursday's game stays on one engine and
+  all of Sunday is priced by the new one. The pricing model changes, so the
+  prospective record starts a new bucket from that release.
+
+Two items from the defect list dropped on measurement, not opinion: early
+receiver over-projection flips sign by season (2022-23 under, 2024-25 over --
+league variation, not a model defect); early QB rushing running hot appears
+only in 2024-25 (2022-23 weeks 2-4 at 0.973), so no tune-season evidence
+exists to fit a fix to; checked again as 2026 weeks accumulate.
+
+Tests: props/tests/test_rush_lead.py (rescale math, the QB's sampler share in
+every combination, tied leads, validation, the shipped settings, and that the
+scorer and the harness hand the rush simulator the same inputs).
+
+Review: five findings, all fixed -- reports/yardage_harness.md re-rendered
+from the guarded verdict run's saved results (the harness grades the shipped
+settings, so the report of record now matches the model that prices); tied
+lead backs share the lead weight (argmax took the first listed; no effect at
+the shipped 1.0); #103's mode is commented as lacking the QB guard; the
+report's live-check range corrected; a parity test pins both call sites.
+
+Also in this release, owed since #106 ("fixed with the next engine change"):
+`model.market_environment_fitted`'s docstring said negative = favoured; the fit
+and every caller use positive = favoured. Its unused `implied_points` field had
+the same sign flip ((total - spread)/2); now (total + spread)/2. No caller reads
+it, so no price moves.
+
+
+## 2026-10-01 (134) -- pass volume nudged toward the market (props-v1.28)
+
+#106's lead, built: the market's fitted environment moves a team's PASS volume
+only (targets blend 25% toward the fitted plays x pass rate; carries keep the
+history). Tuned on 2022-23 at weights 0.25 / 0.5 / 0.75 / 1.0.
+
+The pre-set rule (#106's: the smallest weight not measurably worse than the
+best on the combined score, 0 counting) picked 0 -- the combined-score tie test
+is the one #106's review found weights receiver rows ~7 to 1. At 0.25 each of
+catches, receiving and QB passing yards was clearly better than no change on
+its own. Asked, the user chose a per-market rule (the smallest weight where
+every affected market is clearly better: 0.25), DISCLOSED as set after the
+tune results, with 2024-25 read once: QB passing +0.298 (+0.085, +0.481),
+catches +0.001 (+0.000, +0.002), receiving yards +0.012 (noise), rushing
+untouched; 2026 weeks 2-3 positive on every market, none clearly.
+
+## 2026-10-01 (135) -- fixed shrinkage constants for yards per target and catch rate (props-v1.28)
+
+Found while testing the receiver yardage shape (#5 on the improvement list,
+which itself measured fine: widths right at every depth). The per-season fit of
+the shrinkage constants (build_priors.py: weeks 5-8 of one season, a 5-2560
+grid) swings by 4x: yards per target 160 / 640 / 160, catch rate 320 then 40.
+The 640 year had the worst error (least efficient receivers 18% under, most
+efficient 10% over). Fixed at 80 (yards per target) and 40 (catch rate) --
+the rule, set before the grid: among settings tied with the best on 2022-23,
+the smallest change from today. The yearly fit was measurably worse than the
+best. Held out (2024-25, read once): receiving yards +0.019 (+0.001, +0.036),
+catches 0.000, QB passing +0.079 (noise; weeks 2-4 +0.36, clear); calibration
+better on catches and receiving yards. Smaller than on the tune seasons
+because 2024-25's fits happened to be sensible -- insurance against the bad-fit
+year as much as a gain. The live 2026 fit is 160, so it halves today's pull.
+
+The user's call: rounds 15, 16 and 17 ship together on Friday 2026-10-02 so the
+prospective record splits once.
+
+The combined release, checked on all four seasons with the shipped settings,
+against props-v1.27 on 2024-25: catches +0.002, receiving yards +0.032, rushing
+yards +0.243, QB passing +0.356 (all clear), QB rushing -0.001; 2026 weeks 2-3
+positive on all five. The passing changes add up (no bad interaction). QB
+passing now beats the naive baseline in both test seasons (it did not in
+2024) and still misses one calibration band by a point.
+reports/yardage_harness.md re-rendered from this run.
+
+Review (rounds 16-17): five findings, all fixed -- the report's volume label
+now says the throws are 25% from the market fit; methodology section 2 no
+longer says the volume ignores game script; a game whose spread/total cannot
+be fetched says so in its report instead of silently dropping the pass blend;
+backtest --help states what the defaults now include (and how to reproduce a
+pre-v1.28 run); --env market_pass defaults to the shipped 0.25, not 0.5.
+
+
+## 2026-10-01 (136) -- target share's shrinkage fixed too (props-v1.28)
+
+"Keep going": a residual sweep of the round-15-17 model, cut by segment, kept
+only misses in the same direction in both tune seasons. Receivers with the
+lowest target share so far ran 11-15% above projection (1,448 player-games) --
+the per-season target-share fit was 20 and 40 for those seasons. Fixed at 80
+(rule set before the grid: best on 2022-23, ties broken toward this season's
+live 80). Tune: 80 best, 40, 160 and the fit measurably worse. Held out once:
+catches +0.003, receiving yards +0.025 (both clear), QB passing noise. 2026
+weeks 2-3 identical to the decimal (this season's fit is 80): no 2026 price
+moves, so it rides Friday's release at no extra record split -- flagged to the
+user for veto before the merge.
+
+Also found by the sweep, not acted on: QB passing over-projected in weeks
+13-18 (~8%, both seasons) and for away teams (~5%); WR2 catches ~5% high.
+
+## 2026-10-01 (137) -- QB passing scaled by implied points: measured, not shipped
+
+The sweep's biggest miss: QB passing 19% high for teams implied <= 18 points,
+6-7% low at 25+ (receivers barely). DISCLOSED: 2024-25 was printed while
+reading the shape. Tested (implied / 22) ** beta on the QB's yards: on
+2022-23 beta 0.5 was +0.49 CRPS within noise (tied with off), 1.0 and 1.5
+clearly worse, so the rule -- the smallest beta among ties, 0 counting -- keeps
+it off. Likely reason: scaling the whole distribution double-counts what the
+model already has on good and bad offenses; the matching design is a benching
+/ blowout-exit risk that depends on implied points, to be judged on fresh 2026
+games since 2024-25 has been seen. Code kept at tag archive/props-pass-implied
+(a tag, so no CI run; the unmerged branch earlier tonight sent a failure email).
+
+The release as shipped (rounds 15-18) against props-v1.27, held out 2024-25:
+catches +0.005, receiving yards +0.057, rushing yards +0.243, QB passing +0.393
+(all clear), QB rushing -0.001. reports/yardage_harness.md re-rendered from it.
+
+Review (round 18): three findings, all fixed -- a fixed share constant now
+carries its goal-line constant along (build_priors.py's ratio; this season's
+80 -> 5 unchanged, and the yardage harness does not read goal-line shares, so
+no reported number moves); the rule line says two QB passing bands miss by
+under a point; the report's title names round 18.
+
+
+## 2026-10-01 (138) -- touchdowns: the deep split of long receiving TDs, measured, not shipped
+
+Asked for touchdown low-hanging fruit. A residual sweep of the shipped
+anytime_td_v1 on 2022-23 (misses in the same direction in both seasons) found
+backs priced 10-25% scoring 25-35% less than predicted; by channel, the cause
+looked like long receiving TDs (targets beyond the 20): backs credited with ~2x
+their actual, receivers ~30% short, because the channel prices every target
+there alike. Tested the v1.3-style fix -- split those targets and TDs at
+nflverse's own deep cut (15 air yards), no fitted parameter -- with the bar set
+before: log loss better in both recent eras, one clearly, 2018-19 not worse.
+
+Result: flat everywhere (2022-23 -0.0003, 2024-25 +0.0001, 2018-19 -0.0001, no
+interval excludes zero). Position levels move toward actual in every era (RB
+down, WR up) but the best backs overshoot low (45%+: 0.498 vs 0.541 on
+2024-25), and the 10-25% back over-prediction mostly is not there in 2024-25
+(0.167 vs 0.159) -- partly an artifact of the tune seasons. v1.3 shipped with a
+similar profile on the "adds information" argument; this one was held to the
+stricter pre-set bar and does not clear it. Code: tag archive/props-td-deep-split
+(it also derives the backtest's pass channels from the channel set instead of a
+hard-coded tuple -- worth keeping if the split is ever revisited).
+
