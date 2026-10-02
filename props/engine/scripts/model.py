@@ -251,7 +251,7 @@ def league_drift_ratio(team_week_volume, target_week, recent_games=3, min_prior_
 # 2025; catch rate 320 then 40. Empty = the per-season fit for every rate (the
 # pre-round-17 model, byte for byte). Measured on the yardage harness before it
 # is filled (DECISIONS #134).
-K0_FIXED = {"ypt": 80, "catch_rate": 40}
+K0_FIXED = {"ypt": 80, "catch_rate": 40, "target_share": 80}
 
 
 def k0_rates(fitted, override=None):
@@ -259,7 +259,15 @@ def k0_rates(fitted, override=None):
     `k0_per_rate` (else DEFAULT_K0), with K0_FIXED -- or `override`, for the
     harness -- replacing the rates it names."""
     out = dict(fitted or DEFAULT_K0)
-    out.update(K0_FIXED if override is None else override)
+    fixed = K0_FIXED if override is None else override
+    out.update(fixed)
+    # build_priors.py derives the goal-line shares' constants from the share
+    # constants rescaled to goal-line volume; a fixed share constant carries its
+    # goal-line one along (same ratio, same floor of 2) unless that is fixed too
+    for share, i10 in (("target_share", "i10_target_share"), ("rush_share", "i10_carry_share")):
+        base = (fitted or {}).get(share)
+        if share in fixed and i10 not in fixed and i10 in out and base:
+            out[i10] = max(2, round(float(out[i10]) * float(fixed[share]) / float(base)))
     return out
 
 

@@ -6843,3 +6843,43 @@ be fetched says so in its report instead of silently dropping the pass blend;
 backtest --help states what the defaults now include (and how to reproduce a
 pre-v1.28 run); --env market_pass defaults to the shipped 0.25, not 0.5.
 
+
+## 2026-10-01 (136) -- target share's shrinkage fixed too (props-v1.28)
+
+"Keep going": a residual sweep of the round-15-17 model, cut by segment, kept
+only misses in the same direction in both tune seasons. Receivers with the
+lowest target share so far ran 11-15% above projection (1,448 player-games) --
+the per-season target-share fit was 20 and 40 for those seasons. Fixed at 80
+(rule set before the grid: best on 2022-23, ties broken toward this season's
+live 80). Tune: 80 best, 40, 160 and the fit measurably worse. Held out once:
+catches +0.003, receiving yards +0.025 (both clear), QB passing noise. 2026
+weeks 2-3 identical to the decimal (this season's fit is 80): no 2026 price
+moves, so it rides Friday's release at no extra record split -- flagged to the
+user for veto before the merge.
+
+Also found by the sweep, not acted on: QB passing over-projected in weeks
+13-18 (~8%, both seasons) and for away teams (~5%); WR2 catches ~5% high.
+
+## 2026-10-01 (137) -- QB passing scaled by implied points: measured, not shipped
+
+The sweep's biggest miss: QB passing 19% high for teams implied <= 18 points,
+6-7% low at 25+ (receivers barely). DISCLOSED: 2024-25 was printed while
+reading the shape. Tested (implied / 22) ** beta on the QB's yards: on
+2022-23 beta 0.5 was +0.49 CRPS within noise (tied with off), 1.0 and 1.5
+clearly worse, so the rule -- the smallest beta among ties, 0 counting -- keeps
+it off. Likely reason: scaling the whole distribution double-counts what the
+model already has on good and bad offenses; the matching design is a benching
+/ blowout-exit risk that depends on implied points, to be judged on fresh 2026
+games since 2024-25 has been seen. Code kept at tag archive/props-pass-implied
+(a tag, so no CI run; the unmerged branch earlier tonight sent a failure email).
+
+The release as shipped (rounds 15-18) against props-v1.27, held out 2024-25:
+catches +0.005, receiving yards +0.057, rushing yards +0.243, QB passing +0.393
+(all clear), QB rushing -0.001. reports/yardage_harness.md re-rendered from it.
+
+Review (round 18): three findings, all fixed -- a fixed share constant now
+carries its goal-line constant along (build_priors.py's ratio; this season's
+80 -> 5 unchanged, and the yardage harness does not read goal-line shares, so
+no reported number moves); the rule line says two QB passing bands miss by
+under a point; the report's title names round 18.
+

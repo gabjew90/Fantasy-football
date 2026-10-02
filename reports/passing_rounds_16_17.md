@@ -1,4 +1,4 @@
-# Rounds 16 and 17: pass volume toward the market, and stable receiver-efficiency shrinkage (props-v1.28)
+# Rounds 16-18: pass volume toward the market, and stable receiver shrinkage (props-v1.28)
 
 *2026-10-01. Shipped with round 15 (the backs' carry shares, `reports/rush_lead.md`) in one
 release so the prospective record splits once. Each round was tuned on 2022-23 and read once on
@@ -76,3 +76,23 @@ QB passing now beats the naive baseline in BOTH test seasons (2024 +1.66, 2025 +
 clear -- props-v1.27 did not in 2024) but still misses calibration (Over 80-90%, -0.040 on 158
 cases; the -0.092 bucket is 14 cases); rushing 0.032 and QB rushing 0.039 as in round 15.
 `reports/yardage_harness.md` is re-rendered from this run.
+
+## Round 18, added the same night: target share's shrinkage fixed at 80
+
+A residual sweep of the round-15-17 model (2022-23 only, misses in the same direction in both
+seasons) found receivers with the lowest target share so far running 11-15% above projection; the
+per-season target-share fit was 20 and 40 for those seasons. Tune: 80 best, 40 / 160 / the fit
+measurably worse. Held out 2024-25: catches +0.003 [+0.002, +0.004], receiving yards +0.025
+[+0.012, +0.038]. 2026 weeks 2-3 identical to the decimal: this season's fit is already 80.
+
+## The release as shipped (rounds 15-18), against props-v1.27
+
+| Seasons | Catches | Receiving yards | Rushing yards | QB rushing | QB passing |
+|---|---|---|---|---|---|
+| test 2024-25 | **+0.005 [+0.003, +0.007]** | **+0.057 [+0.031, +0.082]** | **+0.243 [+0.092, +0.392]** | -0.001 [-0.022, +0.020] | **+0.393 [+0.110, +0.640]** |
+| tune 2022-23 | +0.011 | +0.148 | +0.327 | -0.008 | +0.856 |
+
+`reports/yardage_harness.md` is re-rendered from this run: catches and receiving yards PASS
+(calibration 0.027 / 0.025); rushing (0.032), QB rushing (0.039) and QB passing (0.055) still miss
+one calibration band each; QB passing beats the naive baseline in both test seasons.
+

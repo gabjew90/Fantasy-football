@@ -98,6 +98,27 @@ and kept live (DECISIONS #100). Known and not noise: QBs ran ~12% high in 2025;
 backs run ~4% low pooled because shares summing past 1 are scaled down (the
 next fix).
 
+### Round 19 (2026-10-01): QB passing scaled by implied points -- measured, not shipped
+
+- The shipped model's QB passing runs 19% high for teams implied <= 18 points and 6-7% low at
+  25+ (2022-23; 2024-25 shows the same, and was seen while diagnosing). Tested: the QB's yards
+  times (implied / 22) ** beta. Tune 2022-23: beta 0.5 +0.49 CRPS (within noise, ties off),
+  1.0 and 1.5 clearly worse; the rule (smallest beta among ties, 0 counting) keeps it off.
+  Scaling the whole distribution double-counts what the model already knows about good and bad
+  offenses; the miss is likelier a benching / blowout-exit risk that depends on implied points.
+  Code: tag archive/props-pass-implied. DECISIONS #137.
+
+### Round 18 (2026-10-01): fixed shrinkage for target share, props-v1.28
+
+- Found by a residual sweep of the round-15-17 model (2022-23, consistent in both seasons):
+  receivers with the lowest target share so far ran 11-15% above projection. The per-season
+  fit for target share was 20 and 40 for those seasons (80 for 2026). Fixed at 80
+  (`model.K0_FIXED`). Tune: 80 best, 40 and 160 and the fit measurably worse. Held out
+  2024-25: catches +0.003 (+0.002, +0.004), receiving yards +0.025 (+0.012, +0.038), QB
+  passing +0.04 (noise). 2026 weeks 2-3 identical to the decimal -- this season's fit is
+  already 80, so no 2026 price moves; it guards the seasons whose fit lands elsewhere.
+  DECISIONS #136.
+
 ### Round 17 (2026-10-01): fixed shrinkage for yards per target and catch rate, props-v1.28
 
 - The defect: build_priors.py fits each rate's shrinkage constant on weeks 5-8 of one season

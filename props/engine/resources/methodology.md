@@ -21,7 +21,7 @@ Pass volume (round 16, props-v1.28): team targets blend 25% toward the market-fi
 Per rate (target share, catch rate, yards per target, rush share, yards per carry, goal-line shares):
 1. Individual prior = his own prior-season rate, shrunk toward the slot prior by games played.
 2. If he changed teams, the individual prior's weight is capped and the share is scaled by current/prior snap share.
-3. Final = blend(current-season rate, current opportunities, individual prior, K0_rate) where weight on current = n / (n + K0_rate), n in opportunity units. Since round 17 (props-v1.28) K0 for yards per target and catch rate is FIXED (80 and 40 targets, `model.K0_FIXED`); the per-season fit swung 160 / 640 / 160 and is kept for the other rates.
+3. Final = blend(current-season rate, current opportunities, individual prior, K0_rate) where weight on current = n / (n + K0_rate), n in opportunity units. Since rounds 17-18 (props-v1.28) K0 for yards per target, catch rate and target share is FIXED (80, 40 and 80, `model.K0_FIXED`); the per-season fit swung by up to 4x and is kept for the other rates.
 Kincaid target share: 0.15 prior, 0.21 current on 29 team targets, K0 = 80, weight on current 27%, final 0.16. Targets = 0.16 x 29 = 4.7.
 Injuries: Out/Doubtful removed. Their share mostly goes to the replacement, not the priced teammates: a quarter of their targets and carries is handed on, mostly to teammates at their position (none of their goal-line targets), tuned on 2022-23 absence games and scored on 2024-25 (reports/absence_tune.md). Questionable: priced twice, as if he plays his normal role (the main run) and as if he is out with his share redistributed (the "if he is out" section, a full re-run on the same lines). No blended discount; the user decides.
 
