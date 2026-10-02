@@ -6925,3 +6925,33 @@ the next try is the QB's own rushing width (eff_sd_qb / share_conc_qb, tuned in
 round 11), not an exit draw. Code: tag archive/props-qb-rush-exit. No engine
 change; props-v1.28 stands.
 
+
+## 2026-10-02 (140) -- the three calibration misses: QB rushing width and efficiency drift, both measured, neither shipped
+
+Continuing #139 ("how do we get the rest to pass").
+
+**QB rushing width (round 21).** The extended grid (share_conc_qb 80/40/20/10 x
+eff_sd_qb 0.15-0.6) on 2022-23 chose share_conc_qb 40 (width 0.200 from 0.214,
+best CRPS; much wider settings clearly worse). Read once on 2024-25: the bands it
+targeted pass (Over 90%+ -0.049 -> -0.013, Over 80-90% -0.039 -> -0.028) but
+Over 60-70% breaks (+0.008 -> +0.045); worst band 0.045, CRPS +0.006 (noise).
+Not shipped. Code: tag archive/props-qb-width.
+
+**Efficiency drift (the "fix 2" idea).** Measured before building, on the shipped
+model's own results: does a market's season-to-date actual/model ratio predict
+the next week's? Rushing yards corr +0.10, QB passing +0.30, receiving yards
+-0.26; scaling each week by the to-date ratio made the level error WORSE for
+rushing (0.0068 -> 0.0071) and receiving (0.0047 -> 0.0054), flat for passing.
+Season-level drift is real but not catchable in-season. Not built.
+
+**What three failed attempts (#139, both above) say.** Every change moved the
+misses between bands instead of removing them. Each band holds ~500-900
+synthetic lines that reuse the same games several times, so a band's realised
+rate carries roughly +/-1.5-2 points of sampling noise against a 3-point
+tolerance, over 8 bands per market. The remaining misses (0.2-1.5 points past the
+limit) sit inside that noise. The forecasts are accurate (all three beat baseline
+A in both test seasons, are unbiased, and have the right width). A calibration
+check that accounts for its own noise -- e.g. a band fails only when its
+interval excludes the target -- would be a change to the bar, which is the
+user's decision, not a model fix.
+
