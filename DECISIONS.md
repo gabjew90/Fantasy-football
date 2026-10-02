@@ -6786,3 +6786,9 @@ lead backs share the lead weight (argmax took the first listed; no effect at
 the shipped 1.0); #103's mode is commented as lacking the QB guard; the
 report's live-check range corrected; a parity test pins both call sites.
 
+Also in this release, owed since #106 ("fixed with the next engine change"):
+`model.market_environment_fitted`'s docstring said negative = favoured; the fit
+and every caller use positive = favoured. Its unused `implied_points` field had
+the same sign flip ((total - spread)/2); now (total + spread)/2. No caller reads
+it, so no price moves.
+

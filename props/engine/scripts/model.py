@@ -250,7 +250,9 @@ def market_environment_fitted(team_spread, total, mkt_fit, team_pace_blend, team
     """Team plays and pass rate from FITTED market coefficients (build_priors.py) rather
     than a hand-set shift, blended with the team's own pace/pass-rate history.
 
-    team_spread: this team's own spread (negative = favored).
+    team_spread: this team's own spread, POSITIVE = favoured (nflverse spread_line
+    convention, as build_priors.py fits `market_env_fit`; corrected 2026-10-01 --
+    this said "negative = favored", DECISIONS #106).
     team_pace_blend / team_pr_blend: the team's history-blended plays and pass rate.
     pace_weight: how much of the market's fitted prediction to take vs the team's own
     history. The fit's R^2 on 2025 is ~0.02 for plays and ~0.04 for pass rate: the market
@@ -266,7 +268,7 @@ def market_environment_fitted(team_spread, total, mkt_fit, team_pace_blend, team
     w = float(np.clip(pace_weight, 0.0, 1.0))
     return {"plays": (1 - w) * team_pace_blend + w * mkt_plays,
             "pass_rate": float(np.clip((1 - w) * team_pr_blend + w * mkt_pr, 0.35, 0.75)),
-            "implied_points": (total - team_spread) / 2, "source": "market-fitted"}
+            "implied_points": (total + team_spread) / 2, "source": "market-fitted"}
 
 
 def market_implied_environment(spread_home, total, home_pass_rate, away_pass_rate,

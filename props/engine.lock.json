@@ -1,6 +1,6 @@
 {
   "algorithm": "props-engine-sha256-lf-1",
-  "engine_sha256": "347572d6c6facb07daae3757ca3159639a63c007aaf65d1256d6d2e249e2c93c",
+  "engine_sha256": "9d1edd1e12cfb97a0ef908617989a5c6d42ec056332441ec7f6608e474fdee8d",
   "file_count": 52,
   "files": {
     "SKILL.md": "49988ae6857a9d22e51a384d2caf8c1531889a9119a9f717867ee63b38862e85",
@@ -40,7 +40,7 @@
     "scripts/build_priors.py": "1757899778f704cf2bd074c9750f54de1edb9ff14d1429027d5096715ac707e3",
     "scripts/build_td_priors.py": "c7330a57e68c1b7c5f8a9304bfbddbb4be0ca285d9f37ef383173d3e3049c27f",
     "scripts/eligibility.py": "f1672cff3d7ae2d52ca94b5952451e92c794bfcd21ab2224b0e35e7f152445b5",
-    "scripts/model.py": "8f1f7d7e362e1e80b4f4eb67386065953ec824999abc2ff063665bec8d537f9b",
+    "scripts/model.py": "5c959e54b75a757279297a13cd217bc9eb8ba0a7c719de07d4515e9a8fafaaa6",
     "scripts/odds_client.py": "434186273bd0412a5545247228298951c5d0504a19c8a47c4c782bf3bb75aaa1",
     "scripts/score_game.py": "67fa4f036f71c73cf5030d9dfc06448492be88226ed39d2fe9dd314887355348",
     "scripts/score_week.py": "467056affa3957ac3c4eb7ed827820cd47b1ec7991d82ff1485e7142bf7ecaca",
