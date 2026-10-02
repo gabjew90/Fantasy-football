@@ -915,8 +915,17 @@ def simulate_team_game(rng, n_sim, team_volume_mean, team_volume_r, player_share
     return out, team_targets
 
 
+# Round 20 (2026-10-02): the starting QB's rushing yards scaled by the SAME
+# starter-share draw his passing yards use (the prior season's grid of how much
+# of the team's passing a starter kept: injuries, benchings, blowout exits). On
+# props-v1.28 QB rushing Overs priced 80-90% won 80.5% (model 84.4%) and 90%+
+# won 88.5% (93.4%): the games a QB leaves early were missing from his rushing.
+# False = off, byte for byte; measured on the yardage harness first (DECISIONS #139).
+QB_RUSH_EXIT = False
+
+
 def simulate_qb_passing(rng, n_sim, receiver_yards, other_targets, other_rates, per_catch_shape,
-                        starter_share=None, width=None):
+                        starter_share=None, width=None, return_share=False):
     """The starting QB's passing yards (plan step 4), from the SAME simulation
     as his receivers: every tracked receiver's yards, plus the 'other' bucket's
     targets at the depth receivers' catch rate and yards per target (the
@@ -939,6 +948,10 @@ def simulate_qb_passing(rng, n_sim, receiver_yards, other_targets, other_rates, 
         total = total + np.where(rec > 0, g.gamma(np.maximum(shape_total, 1e-6), ypc / per_catch_shape), 0.0)
     if w["eff_sd_pass"]:
         total = total * _game_multiplier(g, n_sim, w["eff_sd_pass"])
+    share = np.ones(n_sim)
     if starter_share is not None:
-        total = total * g.choice(np.asarray(starter_share, dtype=float), size=n_sim)
-    return total
+        share = g.choice(np.asarray(starter_share, dtype=float), size=n_sim)
+        total = total * share
+    # return_share: the per-simulation starter share as well, so the caller can
+    # apply the same game (the same exit) to his rushing -- no extra random draw
+    return (total, share) if return_share else total

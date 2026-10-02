@@ -992,8 +992,12 @@ def main():
         for t in (AWAY, HOME):
             if STARTER_QB.get(t) is not None:
                 ys_t, other_t = pass_inputs[t]
-                sims[STARTER_QB[t]]["pass_yards"] = MODEL.simulate_qb_passing(
-                    rng, N_SIM, ys_t, other_t, P["other_receiver_rates"], SH, starter_share=_share, width=WIDTH)
+                sims[STARTER_QB[t]]["pass_yards"], _qs = MODEL.simulate_qb_passing(
+                    rng, N_SIM, ys_t, other_t, P["other_receiver_rates"], SH, starter_share=_share, width=WIDTH,
+                    return_share=True)
+                if MODEL.QB_RUSH_EXIT:
+                    # round 20: the same simulated game, the same exit, for his rushing
+                    sims[STARTER_QB[t]]["rush_yards"] = sims[STARTER_QB[t]]["rush_yards"] * _qs
     M["mu_rec"] = [max(env[r.team]["targets"] * r.ts * max(r.cr, 0.05), 0.02) for _, r in M.iterrows()]
     M["mu_car"] = [max(env[r.team]["carries"] * r.rs, 0.02) for _, r in M.iterrows()]
 

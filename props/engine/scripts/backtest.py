@@ -173,6 +173,9 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
            if args.env == "market_pass" else
            (M.MARKET_PASS_WEIGHT if getattr(args, "market_pass_weight", None) is None
             else float(args.market_pass_weight))) if live else 0.0
+    # round 20: the QB's rushing shares his passing's starter-share draw (live only)
+    qb_exit = live and (M.QB_RUSH_EXIT if getattr(args, "qb_rush_exit", None) is None
+                        else args.qb_rush_exit == "on")
     print(f"season={S} env={args.env} opponent={args.opponent} ({opp['level']}, k0={opp['k0']:g}) "
           f"historical_blend={args.historical_blend} dispersion={dispersion} live={live}", file=sys.stderr)
 
@@ -654,6 +657,7 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
             rec_ = np.zeros((len(frame), N))
             yds = np.zeros((len(frame), N))
             passing = {}
+            qshare = {}            # round 20: each team-game's starter-share draws
             pos_ = {ix: i for i, ix in enumerate(frame.index)}
             for (team, week), g in frame.groupby(["team", "week"], sort=False):
                 tvol = float(g.team_targets_env.iloc[0])
@@ -669,9 +673,10 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
                     rec_[pos_[ix]] = r_
                     yds[pos_[ix]] = y_
                 if pass_on:
-                    passing[(team, week)] = M.simulate_qb_passing(
+                    passing[(team, week)], qshare[(team, week)] = M.simulate_qb_passing(
                         g_rng, N, [y_ for _r, y_ in out.values()], other_t, other_rates, shape_ypc,
-                        starter_share=pass_share, width=width)
+                        starter_share=pass_share, width=width, return_share=True)
+            draw_block_joint.qshare = qshare
             return rec_, yds, passing
 
         def draw_block_rush(frame, shares, ypcs, arm):
@@ -722,8 +727,11 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
         # isolates the SHRINKAGE, which is what baseline A exists to test.
         recM, ydsM, passTW = draw_block_joint(tr, tr.ts.values, tr.cr.clip(lower=0.05).values, tr.ypt.values,
                                               arm=1)
+        qshareM = dict(getattr(draw_block_joint, "qshare", {}))
+        qshareA = qshareM
         if full:
             recA, ydsA, passTW_A = draw_block_joint(tr, shareA, crA, yptA, arm=2)
+            qshareA = dict(getattr(draw_block_joint, "qshare", {}))
             recI, ydsI = draw_block(mu_m, ypc_m, rec_fit)
         else:                                   # tuning: the model arm is all that is compared
             recA, ydsA, recI, ydsI, passTW_A = recM, ydsM, recM, ydsM, passTW
@@ -756,6 +764,17 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
         rush_pop = ((slot_s.str.startswith("RB") | (test_act.rs_last4.fillna(0.0) >= 0.20))
                     & ~slot_s.str.startswith("QB")).values
         qb_pop = (starter.copy() if qb_resid is not None else np.zeros(len(test_act), bool))
+        if qb_exit:
+            # round 20: the starting QB's rushing scaled by his team-game's
+            # starter-share draws -- the same simulated games his passing used
+            rushM = rushM.copy()
+            rushA = rushA.copy() if rushA is not rushM else rushM
+            for i in np.flatnonzero(starter):
+                k_ = (test_act.team.iloc[i], test_act.week.iloc[i])
+                if k_ in qshareM:
+                    rushM[i] = rushM[i] * qshareM[k_]
+                if full and k_ in qshareA and rushA is not rushM:
+                    rushA[i] = rushA[i] * qshareA[k_]
         nan_ = np.full(len(test_act), np.nan)
         # QB PASSING: the same starting QB, priced from his team-game's
         # receiving draws. Only his rows are built and scored.
@@ -1444,6 +1463,9 @@ def main(argv=None):
     ap.add_argument("--live-opp-metrics", default=None,
                     help="harness ABLATION: the opponent-adjusted rates in live mode (default: the scorer's, "
                          "catch_rate,ypt,ypc); e.g. catch_rate,ypt drops the run-defense adjustment")
+    ap.add_argument("--qb-rush-exit", choices=["on", "off"], default=None,
+                    help="round 20: scale the starting QB's rushing by his passing's starter-share draw "
+                         "(default model.QB_RUSH_EXIT)")
     ap.add_argument("--k0", default=None,
                     help="round 17: fixed shrinkage constants over the priors' fit, e.g. 'ypt=40,catch_rate=20' "
                          "(default: model.K0_FIXED)")
