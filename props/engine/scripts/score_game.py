@@ -683,7 +683,8 @@ def main():
                 env[t][c] = env[t][c] * _drift[key]
         env[t]["td_total_history"] = env[t]["pass_td"] + env[t]["rush_td"]
         env[t]["td_anchor"] = "history"
-        env[t]["source"] = "history"
+        env[t]["source"] = ("history (no spread/total this run: the market pass volume could not be applied)"
+                            if market_env is None and MODEL.MARKET_PASS_WEIGHT else "history")
         if market_env is not None:
             hs, tl = market_env["home_spread"], market_env["total_line"]
             implied_pts = (tl - hs) / 2 if t == HOME else (tl + hs) / 2
@@ -2319,7 +2320,13 @@ def main():
     L.append(f"- **What we're working with:** {n_weeks} week{'s' if n_weeks!=1 else ''} of this season, plus each player's full {PRIOR} season as a starting point.")
     for t in (AWAY, HOME):
         e = env[t]
-        src_note = " (anchored to the market's spread and total; unvalidated option)" if e.get("source") == "market" else " (from the team's own recent games, plus last season)"
+        src = e.get("source") or "history"
+        src_note = (" (anchored to the market's spread and total; unvalidated option)" if src == "market" else
+                    f" (the team's own recent games plus last season, the throws {100 * MODEL.MARKET_PASS_WEIGHT:.0f}% "
+                    "from the market's spread/total fit)" if src.startswith("history + market pass") else
+                    " (from the team's own recent games, plus last season -- no spread/total this run, so the "
+                    "market's share of the throws was not applied)" if src.startswith("history (no spread") else
+                    " (from the team's own recent games, plus last season)")
         L.append(f"- **{t}'s offense, typical game{src_note}:** about {e['targets']:.0f} throws, {e['carries']:.0f} runs, "
                  f"{e['pass_td']+e['rush_td']:.1f} offensive touchdowns.")
     L.append("- **Matchup (opponent defense):** included at the team level, weighted by how much real "

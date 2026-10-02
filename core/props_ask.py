@@ -59,8 +59,8 @@ UNVALIDATED = ("No market is tested against posted sportsbook lines, so no row i
                "positive EV is the model's opinion, not an edge. (Catches and receiving yards ARE calibrated "
                "on 2022-25 outcomes -- a model 85% has won about 84-85%; rushing yards nearly so, one "
                "probability band 3.2 points off against a 3-point limit -- so they are not guesses; they are "
-               "untested against the book. QB passing yards do not pass that test yet: better than the naive "
-               "baseline in 2025, not in 2024.)")
+               "untested against the book. QB passing yards beat the naive baseline in both test seasons but miss "
+               "one probability band by a point, so they do not fully pass that test yet.)")
 TD_V0_RULE = ("This TD row is anytime_td_v0, the fallback (v1 could not run: no market implied total); it runs "
               "about 1.3 points low on average, so a gap in the book's favour is partly the model's.")
 NEW_TEAM_RULE = ("He changed teams: one or two games of new-team evidence, so the book knows his role better "

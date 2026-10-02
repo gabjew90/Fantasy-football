@@ -169,7 +169,8 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
     dispersion = args.dispersion or ("prior" if live else "train")
     # round 16: the market pass-volume weight -- --env market_pass (the tuning runs:
     # --pace-weight), else --market-pass-weight, else what the scorer ships; live only
-    mpw = (args.pace_weight if args.env == "market_pass" else
+    mpw = ((args.pace_weight if args.pace_weight is not None else M.MARKET_PASS_WEIGHT)
+           if args.env == "market_pass" else
            (M.MARKET_PASS_WEIGHT if getattr(args, "market_pass_weight", None) is None
             else float(args.market_pass_weight))) if live else 0.0
     print(f"season={S} env={args.env} opponent={args.opponent} ({opp['level']}, k0={opp['k0']:g}) "
@@ -539,7 +540,8 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
                     sl, tl = game_lines.loc[key2, ["spread_line", "total_line"]]
                     team_spread = sl if is_home2 else -sl
                     me = M.market_environment_fitted(team_spread, tl, MKT_FIT,
-                                                     targets_env + carries_env, team_pr, args.pace_weight)
+                                                     targets_env + carries_env, team_pr,
+                                                     0.5 if args.pace_weight is None else args.pace_weight)
                     targets_env = me["plays"] * me["pass_rate"]
                     carries_env = me["plays"] * (1 - me["pass_rate"])
             if env_mode == "market" and opp_team:
@@ -1415,12 +1417,18 @@ def main(argv=None):
                          "train = fit on --train-weeks of the season (single-season default)")
     ap.add_argument("--priors-dir", default=None, help="where priors_{S-1}_* live (default: the engine's resources)")
     ap.add_argument("--build-priors", action="store_true", help="build missing priors with build_priors.py")
-    ap.add_argument("--env", choices=["history", "market", "league", "market_fit", "market_pass"], default="history")
+    ap.add_argument("--env", choices=["history", "market", "league", "market_fit", "market_pass"], default="history",
+                    help="history = what the scorer runs: the team's own volume, the targets blended "
+                         "model.MARKET_PASS_WEIGHT toward the market fit (round 16; 0 with --market-pass-weight 0), "
+                         "and model.K0_FIXED over the fitted shrinkage (round 17; --k0 to override). Runs before "
+                         "props-v1.28 reproduce with --market-pass-weight 0 and the priors' own constants.")
     ap.add_argument("--market-pass-weight", type=float, default=None,
                     help="round 16: weight on the market's fitted pass volume (default model.MARKET_PASS_WEIGHT, "
                          "what the scorer runs; 0 = history alone). --env market_pass is the same thing, kept "
                          "for the tuning runs that used it with --pace-weight")
-    ap.add_argument("--pace-weight", type=float, default=0.5)
+    ap.add_argument("--pace-weight", type=float, default=None,
+                    help="--env market_fit: the market weight (default 0.5); --env market_pass: the pass-volume "
+                         "weight (default model.MARKET_PASS_WEIGHT, the shipped 0.25)")
     ap.add_argument("--env-window", type=int, default=0, help="0 = expanding mean; N = trailing N games for team volume")
     ap.add_argument("--drift-correct", action="store_true", default=True,
                     help="scale the expanding team mean by a league-wide recent/expanding volume ratio")

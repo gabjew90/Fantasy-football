@@ -98,6 +98,34 @@ and kept live (DECISIONS #100). Known and not noise: QBs ran ~12% high in 2025;
 backs run ~4% low pooled because shares summing past 1 are scaled down (the
 next fix).
 
+### Round 17 (2026-10-01): fixed shrinkage for yards per target and catch rate, props-v1.28
+
+- The defect: build_priors.py fits each rate's shrinkage constant on weeks 5-8 of one season
+  over a 5-2560 grid, and the fit is unstable (yards per target 160 / 640 / 160 for the
+  2022 / 2023 / 2026 priors; catch rate 320 then 40). With 640 the model nearly ignored
+  current-season efficiency: on 2023 the least efficient receivers ran 18% under their
+  receiving-yards projection, the most efficient 10% over.
+- The change (`model.K0_FIXED`, applied by `model.k0_rates` in the scorer and the harness):
+  80 targets for yards per target, 40 for catch rate; every other rate keeps the fit.
+- Tune 2022-23: the yearly fit measurably worse than the best fixed setting; the chosen one
+  (the smallest change among those tied with the best) clearly better on catches, receiving
+  and QB passing yards. Held out, 2024-25: receiving yards +0.019 (+0.001, +0.036), catches
+  0.000, QB passing +0.079 (noise; weeks 2-4 +0.36, clear); calibration better on catches
+  and receiving yards. reports/passing_rounds_16_17.md, DECISIONS #135.
+
+### Round 16 (2026-10-01): the market's fitted pass volume, props-v1.28
+
+- From DECISIONS #106's lead: team targets blend toward the market-fitted plays x pass rate
+  (`model.market_pass_volume`) at `model.MARKET_PASS_WEIGHT` = 0.25; carries keep the history.
+  The scorer converts its home spread (negative = home favoured) to each team's own
+  (positive = favoured) with `model.team_spread_from_home`.
+- Tune 2022-23: 0.25 is the smallest weight at which catches, receiving and QB passing
+  yards are each clearly better than no change. DISCLOSED: the pre-set rule (#106's combined-
+  score tie test) picked 0; the per-market rule was adopted after the tune results, by the
+  user's decision, with 2024-25 read once. Held out: QB passing +0.298 (+0.085, +0.481),
+  catches +0.001 (+0.000, +0.002), receiving yards +0.012 (noise); rushing untouched.
+  reports/passing_rounds_16_17.md, DECISIONS #134.
+
 ### Round 15 (2026-10-01): the backs' carry shares, props-v1.28
 
 - The defect: on props-v1.27 the running backs ran ~4% above their rushing projection on

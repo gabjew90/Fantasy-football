@@ -6792,3 +6792,54 @@ and every caller use positive = favoured. Its unused `implied_points` field had
 the same sign flip ((total - spread)/2); now (total + spread)/2. No caller reads
 it, so no price moves.
 
+
+## 2026-10-01 (134) -- pass volume nudged toward the market (props-v1.28)
+
+#106's lead, built: the market's fitted environment moves a team's PASS volume
+only (targets blend 25% toward the fitted plays x pass rate; carries keep the
+history). Tuned on 2022-23 at weights 0.25 / 0.5 / 0.75 / 1.0.
+
+The pre-set rule (#106's: the smallest weight not measurably worse than the
+best on the combined score, 0 counting) picked 0 -- the combined-score tie test
+is the one #106's review found weights receiver rows ~7 to 1. At 0.25 each of
+catches, receiving and QB passing yards was clearly better than no change on
+its own. Asked, the user chose a per-market rule (the smallest weight where
+every affected market is clearly better: 0.25), DISCLOSED as set after the
+tune results, with 2024-25 read once: QB passing +0.298 (+0.085, +0.481),
+catches +0.001 (+0.000, +0.002), receiving yards +0.012 (noise), rushing
+untouched; 2026 weeks 2-3 positive on every market, none clearly.
+
+## 2026-10-01 (135) -- fixed shrinkage constants for yards per target and catch rate (props-v1.28)
+
+Found while testing the receiver yardage shape (#5 on the improvement list,
+which itself measured fine: widths right at every depth). The per-season fit of
+the shrinkage constants (build_priors.py: weeks 5-8 of one season, a 5-2560
+grid) swings by 4x: yards per target 160 / 640 / 160, catch rate 320 then 40.
+The 640 year had the worst error (least efficient receivers 18% under, most
+efficient 10% over). Fixed at 80 (yards per target) and 40 (catch rate) --
+the rule, set before the grid: among settings tied with the best on 2022-23,
+the smallest change from today. The yearly fit was measurably worse than the
+best. Held out (2024-25, read once): receiving yards +0.019 (+0.001, +0.036),
+catches 0.000, QB passing +0.079 (noise; weeks 2-4 +0.36, clear); calibration
+better on catches and receiving yards. Smaller than on the tune seasons
+because 2024-25's fits happened to be sensible -- insurance against the bad-fit
+year as much as a gain. The live 2026 fit is 160, so it halves today's pull.
+
+The user's call: rounds 15, 16 and 17 ship together on Friday 2026-10-02 so the
+prospective record splits once.
+
+The combined release, checked on all four seasons with the shipped settings,
+against props-v1.27 on 2024-25: catches +0.002, receiving yards +0.032, rushing
+yards +0.243, QB passing +0.356 (all clear), QB rushing -0.001; 2026 weeks 2-3
+positive on all five. The passing changes add up (no bad interaction). QB
+passing now beats the naive baseline in both test seasons (it did not in
+2024) and still misses one calibration band by a point.
+reports/yardage_harness.md re-rendered from this run.
+
+Review (rounds 16-17): five findings, all fixed -- the report's volume label
+now says the throws are 25% from the market fit; methodology section 2 no
+longer says the volume ignores game script; a game whose spread/total cannot
+be fetched says so in its report instead of silently dropping the pass blend;
+backtest --help states what the defaults now include (and how to reproduce a
+pre-v1.28 run); --env market_pass defaults to the shipped 0.25, not 0.5.
+

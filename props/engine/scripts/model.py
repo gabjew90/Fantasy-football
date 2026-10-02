@@ -251,7 +251,7 @@ def league_drift_ratio(team_week_volume, target_week, recent_games=3, min_prior_
 # 2025; catch rate 320 then 40. Empty = the per-season fit for every rate (the
 # pre-round-17 model, byte for byte). Measured on the yardage harness before it
 # is filled (DECISIONS #134).
-K0_FIXED = {}
+K0_FIXED = {"ypt": 80, "catch_rate": 40}
 
 
 def k0_rates(fitted, override=None):
