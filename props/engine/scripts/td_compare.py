@@ -83,7 +83,7 @@ def main(argv=None) -> int:
     t_old, r_old = top_ratio(d, "q_old")
     t_new, r_new = top_ratio(d, "q_new")
     L.append(f"Top-q player realised / expected TDs: old {r_old:.3f}, new {r_new:.3f}.")
-    pas = [c for c in ("pass_ez", "pass_rz", "pass_far") if f"s_{c}" in t_new.columns]
+    pas = [c for c in t_new.columns.str.slice(2).unique() if c.startswith("pass_") and f"s_{c}" in t_new.columns]
     rus = [c for c in ("qb_rush", "rush_in5", "rush_far") if f"s_{c}" in t_new.columns]
     if pas:
         pr = sum(t_new[f"td_{c}"].sum() for c in pas) / sum((t_new[f"s_{c}"] * t_new[f"T_{c}"]).sum() for c in pas)

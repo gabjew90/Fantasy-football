@@ -50,7 +50,8 @@ MODE = V.V1["mode"]
 MOVED = V.V1["moved"]
 SKILL = V.SKILL
 EPS = 1e-3
-PASS_CH, RUSH_CH = ("pass_ez", "pass_rz", "pass_far"), ("rush_in5", "rush_far", "qb_rush")
+PASS_CH = tuple(c for c in T.OFFENSIVE if c.startswith("pass_"))   # follows the channel set (deep split)
+RUSH_CH = ("rush_in5", "rush_far", "qb_rush")
 L1 = T.LAYER1                    # {"trials": 10, "gamma": 0.25, ...}
 
 # A configuration is (alloc, c, cap, qb_beta); alloc = (prior, slot scale, moved weight).

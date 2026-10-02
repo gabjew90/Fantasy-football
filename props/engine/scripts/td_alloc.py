@@ -18,7 +18,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from td_model import OFFENSIVE, _norm_team, classify_tds
+from td_model import DEEP_AIR, OFFENSIVE, SPLIT_FAR, _norm_team, classify_tds
 
 # Layer 2 needs, beyond layer 1's columns: who was targeted, who scored, and
 # which plays to drop.
@@ -78,7 +78,10 @@ def opportunities(pbp: pd.DataFrame, qb_ids: set[str]) -> pd.DataFrame:
                       "team": _norm_team(tgt["posteam"]), "player_id": tgt["receiver_player_id"],
                       "channel": np.select([(tgt["yardline_100"] <= 20)
                                             & (tgt["air_yards"].fillna(-99) >= tgt["yardline_100"]),
-                                            tgt["yardline_100"] <= 20], ["pass_ez", "pass_rz"], "pass_far"),
+                                            tgt["yardline_100"] <= 20,
+                                            SPLIT_FAR & (tgt["air_yards"].fillna(-99) >= DEEP_AIR)],
+                                           ["pass_ez", "pass_rz", "pass_deep"],
+                                           "pass_short" if SPLIT_FAR else "pass_far"),
                       "engine": np.where(tgt["yardline_100"] <= 10, "tgt_i10", "tgt_all")})
     return pd.concat([c, t], ignore_index=True)
 

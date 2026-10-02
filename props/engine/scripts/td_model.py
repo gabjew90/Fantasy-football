@@ -32,8 +32,20 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-CHANNELS = ("qb_rush", "rush_in5", "rush_far", "pass_ez", "pass_rz", "pass_far", "dst_other")
-OFFENSIVE = CHANNELS[:6]   # dst_other never reaches an offensive player's prop
+import os
+
+# THE DEEP SPLIT (v1.5 candidate, 2026-10-01): passing touchdowns and targets
+# from beyond the 20 split by air yards at nflverse's own 'deep' cut (15) -- no
+# fitted parameter. On 2022-23 the single pass_far channel credited backs with
+# about twice their long receiving TDs and receivers with ~30% too few: it
+# priced a back's checkdown from midfield like a receiver's deep target.
+# TD_SPLIT_FAR=1 switches it on (the experiment); the default is the shipped six.
+DEEP_AIR = 15
+SPLIT_FAR = os.environ.get("TD_SPLIT_FAR", "0") == "1"
+CHANNELS = (("qb_rush", "rush_in5", "rush_far", "pass_ez", "pass_rz", "pass_deep", "pass_short", "dst_other")
+            if SPLIT_FAR else
+            ("qb_rush", "rush_in5", "rush_far", "pass_ez", "pass_rz", "pass_far", "dst_other"))
+OFFENSIVE = CHANNELS[:-1]  # dst_other never reaches an offensive player's prop
 MAX_TD = 15            # support for count distributions; P(16+ TDs) is ~0
 
 # LAYER 1, FROZEN: offensive touchdowns ~ Binomial(10), mean = implied points
@@ -91,10 +103,17 @@ def classify_tds(pbp: pd.DataFrame, qb_ids: set[str]) -> pd.DataFrame:
     if "air_yards" not in d.columns:
         raise KeyError("classify_tds needs air_yards to separate end-zone targets (pass_ez)")
     ez = pas & (yl <= 20) & (d["air_yards"].fillna(-99) >= yl)
-    d["channel"] = np.select(
-        [qb, rush & (yl <= 5), rush, ez, pas & (yl <= 20), pas],
-        ["qb_rush", "rush_in5", "rush_far", "pass_ez", "pass_rz", "pass_far"],
-        default="dst_other")
+    if SPLIT_FAR:
+        deep = d["air_yards"].fillna(-99) >= DEEP_AIR
+        d["channel"] = np.select(
+            [qb, rush & (yl <= 5), rush, ez, pas & (yl <= 20), pas & deep, pas],
+            ["qb_rush", "rush_in5", "rush_far", "pass_ez", "pass_rz", "pass_deep", "pass_short"],
+            default="dst_other")
+    else:
+        d["channel"] = np.select(
+            [qb, rush & (yl <= 5), rush, ez, pas & (yl <= 20), pas],
+            ["qb_rush", "rush_in5", "rush_far", "pass_ez", "pass_rz", "pass_far"],
+            default="dst_other")
     return d[["game_id", "season", "week", "td_team", "channel"]].rename(
         columns={"td_team": "team"})
 
