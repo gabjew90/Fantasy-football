@@ -6883,3 +6883,25 @@ carries its goal-line constant along (build_priors.py's ratio; this season's
 no reported number moves); the rule line says two QB passing bands miss by
 under a point; the report's title names round 18.
 
+
+## 2026-10-01 (138) -- touchdowns: the deep split of long receiving TDs, measured, not shipped
+
+Asked for touchdown low-hanging fruit. A residual sweep of the shipped
+anytime_td_v1 on 2022-23 (misses in the same direction in both seasons) found
+backs priced 10-25% scoring 25-35% less than predicted; by channel, the cause
+looked like long receiving TDs (targets beyond the 20): backs credited with ~2x
+their actual, receivers ~30% short, because the channel prices every target
+there alike. Tested the v1.3-style fix -- split those targets and TDs at
+nflverse's own deep cut (15 air yards), no fitted parameter -- with the bar set
+before: log loss better in both recent eras, one clearly, 2018-19 not worse.
+
+Result: flat everywhere (2022-23 -0.0003, 2024-25 +0.0001, 2018-19 -0.0001, no
+interval excludes zero). Position levels move toward actual in every era (RB
+down, WR up) but the best backs overshoot low (45%+: 0.498 vs 0.541 on
+2024-25), and the 10-25% back over-prediction mostly is not there in 2024-25
+(0.167 vs 0.159) -- partly an artifact of the tune seasons. v1.3 shipped with a
+similar profile on the "adds information" argument; this one was held to the
+stricter pre-set bar and does not clear it. Code: tag archive/props-td-deep-split
+(it also derives the backtest's pass channels from the channel set instead of a
+hard-coded tuple -- worth keeping if the split is ever revisited).
+
