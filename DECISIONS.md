@@ -6905,3 +6905,23 @@ stricter pre-set bar and does not clear it. Code: tag archive/props-td-deep-spli
 (it also derives the backtest's pass channels from the channel set instead of a
 hard-coded tuple -- worth keeping if the split is ever revisited).
 
+
+## 2026-10-02 (139) -- QB rushing scaled by the passing exit draw: measured, not shipped
+
+Asked how to get the three failing yardage markets to pass. QB rushing's misses
+were Overs priced very high (80-90%: model 84.4%, won 80.5%; 90%+: 93.4% vs
+88.5%), read as missing early exits: QB passing draws a starter share (last
+season's grid of benchings, injuries, blowout pulls) and QB rushing did not.
+Tested, no parameter: the starter's rushing scaled by the SAME per-simulation
+share draw (model.QB_RUSH_EXIT). Rule set before the run: QB rushing not clearly
+worse on 2024-25, its calibration check passing, 2026 not clearly worse.
+
+Result on 2024-25: calibration WORSE (worst band 0.039 -> 0.045; the 90%+ Over
+band fixed, -0.049 -> -0.021, but 80-90% Overs -0.045 and 70-80% Overs +0.036);
+CRPS +0.029 (noise); level 0.953 -> 0.997. Tune seasons: level 1.051 -> 1.097
+(worse; QBs there were already under-projected). The draw mostly shrank every QB
+~4%. The 80-90% miss is likelier scramble variance in full games than exits --
+the next try is the QB's own rushing width (eff_sd_qb / share_conc_qb, tuned in
+round 11), not an exit draw. Code: tag archive/props-qb-rush-exit. No engine
+change; props-v1.28 stands.
+
