@@ -431,7 +431,7 @@ def main():
     PRIOR = a.prior_season or SEASON - 1
     P = json.load(open(RES / f"priors_{PRIOR}_params.json"))
     K0 = P["K0"]                              # fallback flat constant, kept for any rate not in k0_per_rate
-    K0R = P.get("k0_per_rate", MODEL.DEFAULT_K0)   # per-rate constants, tuned by build_priors.py (round 5)
+    K0R = MODEL.k0_rates(P.get("k0_per_rate", MODEL.DEFAULT_K0))   # build_priors.py's fit, MODEL.K0_FIXED over it
     LEAGUE_PASS_RATE = P.get("league_pass_rate", 0.55)
     LEAGUE_PLAYS = P.get("league_plays_per_game", 64.0)
     pri_players = pd.read_csv(RES / f"priors_{PRIOR}_players.csv").set_index("gsis_id")
