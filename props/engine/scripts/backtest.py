@@ -940,6 +940,13 @@ RUSHING_GRID = [{"share_conc_carries": cc, "eff_sd_rush": er}
 # shipped values. Index 0 is "as shipped" (the QB inside the carries Dirichlet).
 QB_GRID = [{"share_conc_qb": sc, "eff_sd_qb": ef}
            for sc in (None, 80.0, 40.0, 20.0) for ef in (None, 0.0, 0.15, 0.3)]
+# --tune-width qbwide (round 21): the same two QB settings on a grid extended
+# toward WIDER (props-v1.28's QB rushing: 21.8% outside p10-p90, Overs priced
+# 80-90% won 80.5% vs 84.4%). Index 0 = what ships (share_conc_qb 80, eff_sd_qb 0.15).
+QBWIDE_GRID = [{"share_conc_qb": 80.0, "eff_sd_qb": 0.15}] + [
+    {"share_conc_qb": sc, "eff_sd_qb": ef}
+    for sc in (80.0, 40.0, 20.0, 10.0) for ef in (0.15, 0.3, 0.45, 0.6)
+    if not (sc == 80.0 and ef == 0.15)]
 # --tune-width rushnorm: the eligible players' carry shares rescaled toward
 # 1 - rush_other_share (2022-23: ~12% of carries went to players outside the set)
 RUSHNORM_GRID = [{"rush_other_share": None, "rush_norm_strength": 0.0, "rush_norm_qb": False}] + [
@@ -982,6 +989,9 @@ SUBGRIDS = {
     "qb": (QB_GRID, ("qbrush",), "width",
            "The starting QB's own settings. *Off* = no QB-only setting: the QB is one more component of the "
            "carries Dirichlet and shares eff_sd_rush (the sampler before props-v1.21)."),
+    "qbwide": (QBWIDE_GRID, ("qbrush",), "width",
+               "Round 21: the starting QB's carry-share concentration and per-game yards-per-carry swing on a "
+               "grid extended toward wider. *Off* here = what ships (80 / 0.15)."),
     "rushlead": (RUSHLEAD_GRID, ("rush", "qbrush"), "bias",
                  "Round 15: the eligible carry shares rescaled toward 1 - rush_other_share with the correction "
                  "ADDED and split away from the lead back (rush_norm_lead = his weight in the split; 1.0 = "
@@ -1409,7 +1419,7 @@ def main(argv=None):
     ap.add_argument("--tune-width", action="store_true",
                     help="choose the width settings on the --tune seasons; writes --report (.md/.csv)")
     ap.add_argument("--width-out", default=None, help="--tune-width: write the chosen settings to this JSON file")
-    ap.add_argument("--tune-grid", choices=["main", "qb", "rushnorm", "rushlead"], default="main",
+    ap.add_argument("--tune-grid", choices=["main", "qb", "rushnorm", "rushlead", "qbwide"], default="main",
                     help="--tune-width: the receiving/rushing grid, the starting QB's own settings, or the "
                          "carry-share rescaling")
     ap.add_argument("--dispersion", choices=["prior", "train"], default=None,
