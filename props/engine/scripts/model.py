@@ -271,6 +271,39 @@ def market_environment_fitted(team_spread, total, mkt_fit, team_pace_blend, team
             "implied_points": (total + team_spread) / 2, "source": "market-fitted"}
 
 
+# Round 16 (2026-10-01, DECISIONS #134): the weight on the market's fitted pass
+# volume, 0 = the team's history alone (pre-round-16). Chosen on 2022-23 (the
+# smallest weight at which catches, receiving and QB passing yards were each
+# clearly better; rule declared after the tune results, disclosed) and read once
+# on 2024-25: QB passing +0.30 CRPS, catches +0.001 (both intervals excluding 0),
+# nothing worse. The live scorer and the harness default both read this.
+MARKET_PASS_WEIGHT = 0.25
+
+
+def team_spread_from_home(home_spread, is_home):
+    """The fitted market functions' spread (this team's own, POSITIVE = favoured)
+    from the scorer's same-book home spread (NEGATIVE = home favoured, the ESPN /
+    Odds API convention)."""
+    return -float(home_spread) if is_home else float(home_spread)
+
+
+def market_pass_volume(team_spread, total, mkt_fit, team_targets_blend, team_carries_blend,
+                       pace_weight=0.5):
+    """Round 16: the market's fitted environment applied to the PASS volume only.
+    Team targets move toward the market-fitted plays x pass rate (weight
+    `pace_weight`); carries keep the team's own history. DECISIONS #106 found the
+    full market environment helped QB passing yards (1.5%, interval excluding
+    zero) and hurt QB rushing (0.6%); this keeps the throwing side and leaves the
+    running side as it was. Returns (targets, carries)."""
+    if not mkt_fit:
+        return team_targets_blend, team_carries_blend
+    me = market_environment_fitted(team_spread, total, mkt_fit, team_targets_blend + team_carries_blend,
+                                   team_targets_blend / max(team_targets_blend + team_carries_blend, 1e-6),
+                                   pace_weight=1.0)
+    w = float(np.clip(pace_weight, 0.0, 1.0))
+    return (1 - w) * team_targets_blend + w * me["plays"] * me["pass_rate"], team_carries_blend
+
+
 def market_implied_environment(spread_home, total, home_pass_rate, away_pass_rate,
                                 league_plays_per_game, pass_rate_slope=None,
                                 plays_slope=None, league_total=None):

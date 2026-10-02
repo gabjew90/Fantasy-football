@@ -702,6 +702,13 @@ def main():
             env[t]["td_total_market"] = total_td_mkt
             env[t]["implied_points"] = implied_pts
             env[t]["td_anchor"] = "market"
+            if a.env != "market" and MODEL.MARKET_PASS_WEIGHT and P.get("market_env_fit"):
+                # round 16: the market's fitted pass volume at MODEL.MARKET_PASS_WEIGHT;
+                # carries keep the team's history (DECISIONS #134)
+                env[t]["targets"], env[t]["carries"] = MODEL.market_pass_volume(
+                    MODEL.team_spread_from_home(hs, t == HOME), tl, P["market_env_fit"],
+                    env[t]["targets"], env[t]["carries"], MODEL.MARKET_PASS_WEIGHT)
+                env[t]["source"] = f"history + market pass volume ({MODEL.MARKET_PASS_WEIGHT:g})"
             if a.env == "market":
                 hist_targets, hist_carries = env[t]["targets"], env[t]["carries"]
                 team_pr = hist_targets / max(hist_targets + hist_carries, 1e-6)

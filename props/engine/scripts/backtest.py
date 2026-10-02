@@ -167,6 +167,11 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
            if live else dict(level=args.opp_level, mode=args.opp_mode, k0=args.opp_k0,
                              metrics=args.opp_metrics))
     dispersion = args.dispersion or ("prior" if live else "train")
+    # round 16: the market pass-volume weight -- --env market_pass (the tuning runs:
+    # --pace-weight), else --market-pass-weight, else what the scorer ships; live only
+    mpw = (args.pace_weight if args.env == "market_pass" else
+           (M.MARKET_PASS_WEIGHT if getattr(args, "market_pass_weight", None) is None
+            else float(args.market_pass_weight))) if live else 0.0
     print(f"season={S} env={args.env} opponent={args.opponent} ({opp['level']}, k0={opp['k0']:g}) "
           f"historical_blend={args.historical_blend} dispersion={dispersion} live={live}", file=sys.stderr)
 
@@ -513,6 +518,15 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
                 targets_env = league_plays * league_pass_rate
                 carries_env = league_plays * (1 - league_pass_rate)
             team_pr = targets_env / max(targets_env + carries_env, 1e-6)   # team's own history pass rate
+            if env_mode in ("history", "market_pass") and mpw and opp_team:
+                # round 16: the market moves the pass volume only (model.market_pass_volume)
+                key3 = None
+                if (r.team, opp_team, W) in game_lines.index: key3 = (r.team, opp_team, W); is_home3 = True
+                elif (opp_team, r.team, W) in game_lines.index: key3 = (opp_team, r.team, W); is_home3 = False
+                if key3 is not None:
+                    sl3, tl3 = game_lines.loc[key3, ["spread_line", "total_line"]]
+                    targets_env, carries_env = M.market_pass_volume(sl3 if is_home3 else -sl3, tl3, MKT_FIT,
+                                                                    targets_env, carries_env, mpw)
             if env_mode == "market_fit" and opp_team:
                 key2 = None
                 if (r.team, opp_team, W) in game_lines.index: key2 = (r.team, opp_team, W); is_home2 = True
@@ -1397,7 +1411,11 @@ def main(argv=None):
                          "train = fit on --train-weeks of the season (single-season default)")
     ap.add_argument("--priors-dir", default=None, help="where priors_{S-1}_* live (default: the engine's resources)")
     ap.add_argument("--build-priors", action="store_true", help="build missing priors with build_priors.py")
-    ap.add_argument("--env", choices=["history", "market", "league", "market_fit"], default="history")
+    ap.add_argument("--env", choices=["history", "market", "league", "market_fit", "market_pass"], default="history")
+    ap.add_argument("--market-pass-weight", type=float, default=None,
+                    help="round 16: weight on the market's fitted pass volume (default model.MARKET_PASS_WEIGHT, "
+                         "what the scorer runs; 0 = history alone). --env market_pass is the same thing, kept "
+                         "for the tuning runs that used it with --pace-weight")
     ap.add_argument("--pace-weight", type=float, default=0.5)
     ap.add_argument("--env-window", type=int, default=0, help="0 = expanding mean; N = trailing N games for team volume")
     ap.add_argument("--drift-correct", action="store_true", default=True,
