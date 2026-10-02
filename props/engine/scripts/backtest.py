@@ -271,6 +271,14 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
     pass_on = live and "other_receiver_rates" in P0 and "qb_starter_pass_share_quantiles" in P0
     other_rates = P0.get("other_receiver_rates") if pass_on else None
     pass_share = np.array(P0["qb_starter_pass_share_quantiles"]) if pass_on else None
+    # round 19: each team-game's market-implied points (nflverse lines: spread_line
+    # positive = home favoured), for the QB passing scale; None where a line is missing
+    implied_of = {}
+    for _, g_ in games.iterrows():
+        if pd.notna(g_.spread_line) and pd.notna(g_.total_line):
+            implied_of[(g_.home_team, int(g_.week))] = (float(g_.total_line) + float(g_.spread_line)) / 2
+            implied_of[(g_.away_team, int(g_.week))] = (float(g_.total_line) - float(g_.spread_line)) / 2
+    pib = M.PASS_IMPLIED_BETA if getattr(args, "pass_implied_beta", None) is None else float(args.pass_implied_beta)
 
     role_lookup = roles.drop_duplicates("gsis_id", keep="first").set_index("gsis_id")["slot"]
     # LIVE MODE: the slot as the scorer sees it -- the latest pre-game depth
@@ -671,7 +679,8 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
                 if pass_on:
                     passing[(team, week)] = M.simulate_qb_passing(
                         g_rng, N, [y_ for _r, y_ in out.values()], other_t, other_rates, shape_ypc,
-                        starter_share=pass_share, width=width)
+                        starter_share=pass_share, width=width,
+                        implied_points=implied_of.get((team, int(week))), implied_beta=pib)
             return rec_, yds, passing
 
         def draw_block_rush(frame, shares, ypcs, arm):
@@ -1444,6 +1453,9 @@ def main(argv=None):
     ap.add_argument("--live-opp-metrics", default=None,
                     help="harness ABLATION: the opponent-adjusted rates in live mode (default: the scorer's, "
                          "catch_rate,ypt,ypc); e.g. catch_rate,ypt drops the run-defense adjustment")
+    ap.add_argument("--pass-implied-beta", type=float, default=None,
+                    help="round 19: the QB passing scale's exponent on implied points / 22 "
+                         "(default model.PASS_IMPLIED_BETA; 0 = off)")
     ap.add_argument("--k0", default=None,
                     help="round 17: fixed shrinkage constants over the priors' fit, e.g. 'ypt=40,catch_rate=20' "
                          "(default: model.K0_FIXED)")

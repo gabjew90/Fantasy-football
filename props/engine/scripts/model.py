@@ -907,8 +907,18 @@ def simulate_team_game(rng, n_sim, team_volume_mean, team_volume_r, player_share
     return out, team_targets
 
 
+# Round 19 (2026-10-01): the starting QB's passing yards scaled by his team's
+# market-implied points, (implied / PASS_IMPLIED_REF) ** PASS_IMPLIED_BETA. On
+# 2022-23 the shipped model's QB passing ran 19% high for teams implied <= 18
+# points and 6-7% low at 25+; receivers showed only a faint version, so the
+# miss sits in the QB layer (benchings, blowout exits, backups). 0.0 = off,
+# byte for byte; measured on the yardage harness before it moves (DECISIONS #137).
+PASS_IMPLIED_BETA = 0.0
+PASS_IMPLIED_REF = 22.0          # about the league's mean implied team points
+
+
 def simulate_qb_passing(rng, n_sim, receiver_yards, other_targets, other_rates, per_catch_shape,
-                        starter_share=None, width=None):
+                        starter_share=None, width=None, implied_points=None, implied_beta=None):
     """The starting QB's passing yards (plan step 4), from the SAME simulation
     as his receivers: every tracked receiver's yards, plus the 'other' bucket's
     targets at the depth receivers' catch rate and yards per target (the
@@ -933,4 +943,8 @@ def simulate_qb_passing(rng, n_sim, receiver_yards, other_targets, other_rates, 
         total = total * _game_multiplier(g, n_sim, w["eff_sd_pass"])
     if starter_share is not None:
         total = total * g.choice(np.asarray(starter_share, dtype=float), size=n_sim)
+    beta = PASS_IMPLIED_BETA if implied_beta is None else float(implied_beta)
+    if beta and implied_points is not None and np.isfinite(implied_points) and implied_points > 0:
+        # no random draw: every other number stays where it was
+        total = total * (float(implied_points) / PASS_IMPLIED_REF) ** beta
     return total
