@@ -245,7 +245,11 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
     pri_teams = pd.read_csv(pdir / f"priors_{PRIOR}_teams.csv", index_col=0)
     print(f"priors: {PRIOR} (the season before the one under test), "
           f"{len(pri_players)} players", file=sys.stderr)
-    K0R = P0.get("k0_per_rate", M.DEFAULT_K0)
+    _k0o = None
+    if getattr(args, "k0", None):
+        _k0o = {kv.split("=")[0].strip(): float(kv.split("=")[1]) for kv in args.k0.split(",") if kv.strip()}
+    K0R = M.k0_rates(P0.get("k0_per_rate", M.DEFAULT_K0), override=_k0o)
+    print(f"shrinkage constants: {K0R}", file=sys.stderr)
     K0_TEAM = float(P0.get("K0", 4.0))
     league_pass_rate = P0.get("league_pass_rate", 0.55)
     MKT_FIT = P0.get("market_env_fit", {})
@@ -1414,6 +1418,9 @@ def main(argv=None):
     ap.add_argument("--live-opp-metrics", default=None,
                     help="harness ABLATION: the opponent-adjusted rates in live mode (default: the scorer's, "
                          "catch_rate,ypt,ypc); e.g. catch_rate,ypt drops the run-defense adjustment")
+    ap.add_argument("--k0", default=None,
+                    help="round 17: fixed shrinkage constants over the priors' fit, e.g. 'ypt=40,catch_rate=20' "
+                         "(default: model.K0_FIXED)")
     ap.add_argument("--historical-blend", action="store_true", default=True,
                     help="two-stage: prior-season own rate -> slot prior -> this season (what the live scorer does)")
     ap.add_argument("--no-historical-blend", dest="historical_blend", action="store_false",

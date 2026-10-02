@@ -245,6 +245,24 @@ def league_drift_ratio(team_week_volume, target_week, recent_games=3, min_prior_
 
 
 # ---------------------------------------------------------------- team environment
+# Round 17 (2026-10-01): fixed shrinkage constants (opportunities) for the rates
+# whose per-season fit (build_priors.py: four weeks of one season, a 5-2560 grid)
+# is unstable -- yards per target fitted 160 for 2022, 640 for 2023, 160 for
+# 2025; catch rate 320 then 40. Empty = the per-season fit for every rate (the
+# pre-round-17 model, byte for byte). Measured on the yardage harness before it
+# is filled (DECISIONS #134).
+K0_FIXED = {}
+
+
+def k0_rates(fitted, override=None):
+    """The per-rate shrinkage constants a pricing run uses: the priors' fitted
+    `k0_per_rate` (else DEFAULT_K0), with K0_FIXED -- or `override`, for the
+    harness -- replacing the rates it names."""
+    out = dict(fitted or DEFAULT_K0)
+    out.update(K0_FIXED if override is None else override)
+    return out
+
+
 def market_environment_fitted(team_spread, total, mkt_fit, team_pace_blend, team_pr_blend,
                                pace_weight=0.5):
     """Team plays and pass rate from FITTED market coefficients (build_priors.py) rather
