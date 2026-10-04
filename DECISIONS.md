@@ -6962,12 +6962,14 @@ Found live on the week-4 board: Dalton Schultz (HOU) priced at 21% of targets
 from 25 of 112 this season, much of it while Nico Collins sat (Collins 10 of
 37), with Collins active again; both Schultz Overs were STRONG. Round 22
 counted a player's in-season SHARE evidence only over the weeks every key
-teammate (prior-season share >= threshold) active this week also played;
+teammate (prior-season share >= threshold, in-season share when he has no
+prior) active this week also played;
 efficiency kept every week. Pre-registered grid and rules in
 reports/returning_teammate.md, tuned on 2022-23 only.
 
-Target side (thresholds 0.15, 0.20): worse in both tune seasons, 0.15 clearly
-(catches -0.011 / -0.007, receiving yards -0.079 / -0.055). The share built
+Target side (thresholds 0.15, 0.20): worse in both tune seasons, 0.15 most
+(catches -0.011 / -0.007, both intervals exclude zero; receiving yards -0.079 /
+-0.055, the 2023 interval just includes zero). The share built
 while a key teammate sits is real evidence about the player's role; discarding
 it leans on the prior and costs accuracy, consistent with OUT_RULE keeping only
 a quarter of an absent player's share with the priced set. Carry side (0.35,
