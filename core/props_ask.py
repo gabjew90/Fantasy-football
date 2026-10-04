@@ -384,6 +384,7 @@ def research_fields(b) -> dict:
             "p_over_model": _f(get("p_over_model")), "p_over_book": _f(get("p_over_book")),
             "implied": _f(get("implied")), "projected": _f(get("projected")),
             "unit": get("unit") if isinstance(get("unit"), str) else None,
+            "over_needs": _f(get("over_needs")), "under_needs": _f(get("under_needs")),
             "last_game": {k: _f(get(k)) for k in ("snap", "snap_base", "ts", "ts_base", "cs", "cs_base")},
             "backfield": ({k[3:]: _f(get(k)) for k in ("bf_early", "bf_early_base", "bf_passdown", "bf_passdown_base",
                                                         "bf_i5_base", "bf_i5_n", "bf_i5_team")}
@@ -405,6 +406,11 @@ def research_text(x: dict, label: str, book: str = "", line=None) -> str:
         bits.append(f"Over {x['p_over_model']:.0%} model / {x['p_over_book']:.0%} book")
     if x.get("implied") is not None:
         bits.append(f"the line implies {x['implied']:.1f} {x.get('unit') or ''} (we project {x['projected']:.1f})")
+    if x.get("over_needs") is not None or x.get("under_needs") is not None:
+        u = x.get("unit") or ""
+        o = "beyond the search range" if x.get("over_needs") is None else f"above {x['over_needs']:.1f} {u}"
+        un = "beyond the search range" if x.get("under_needs") is None else f"at {x['under_needs']:.1f} {u} or fewer"
+        bits.append(f"at these prices the Over pays {o}, the Under {un}")
     lg = x.get("last_game") or {}
     if lg.get("snap") is not None:
         share = ("carries", lg.get("cs"), lg.get("cs_base")) if label == "rush yds" else ("targets", lg.get("ts"), lg.get("ts_base"))

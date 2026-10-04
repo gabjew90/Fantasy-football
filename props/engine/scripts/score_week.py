@@ -55,6 +55,18 @@ MK_LABEL = {"player_receptions": "catches", "player_reception_yds": "rec yds",
             "player_rush_yds": "rush yds", "player_anytime_td": "anytime TD", "player_pass_yds": "pass yds"}
 
 
+def break_even_cell(x) -> str:
+    """The workload each side needs to beat its own price (score_game.break_even_cell,
+    read here from the research CSV)."""
+    unit = x.get("unit") if isinstance(x.get("unit"), str) else ""
+    o, u = x.get("over_needs"), x.get("under_needs")
+    if not unit or (o is None or pd.isna(o)) and (u is None or pd.isna(u)):
+        return "—"
+    over = "Over: beyond the search range" if o is None or pd.isna(o) else f"Over above {o:.1f}"
+    under = "Under: beyond the search range" if u is None or pd.isna(u) else f"Under at {u:.1f} or fewer"
+    return f"{over} {unit}; {under}"
+
+
 def base_tier(t):
     """Card/shadow-log tiers carry parenthetical annotations; strip to STRONG/MODERATE/LEAN/WEAK."""
     return str(t).split(" (")[0].strip() if isinstance(t, str) else ""
@@ -291,8 +303,9 @@ def main():
               "already moves his target share for it since props-v1.29; before that it beat or "
               "missed the model's next-week projection in 2022-25 (reports/role_shift_check.md); whether the BOOK also "
               "reacts late is what the bet journal decides. 'Line implies' is the targets per game at which the line is a "
-              "fair 50/50.*", "",
-              "| Game | Player | Prop | Line | Line implies | Last game | Flags |", "|---|---|---|---|---|---|---|"]
+              "fair 50/50; 'pays at this price' is the workload each side needs to beat its own price.*", "",
+              "| Game | Player | Prop | Line | Line implies | Pays at this price if he gets | Last game | Flags |",
+              "|---|---|---|---|---|---|---|---|"]
         if len(flagged):
             for _, x in flagged.sort_values(["game", "player"]).iterrows():
                 imp = (f"{x.implied:.1f} {x.unit} (we project {x.projected:.1f})"
@@ -300,9 +313,9 @@ def main():
                 last = (f"snaps {100*x.snap:.0f}% (earlier {100*x.snap_base:.0f}%), targets {100*x.ts:.0f}% "
                         f"(earlier {100*x.ts_base:.0f}%)" if pd.notna(x.snap) else "—")
                 L.append(f"| {x.game} | {x.player} ({x.team}) | {MK_LABEL.get(x.market, x.market)} | {x.line:g} | "
-                         f"{imp} | {last} | {x['flags']} |")
+                         f"{imp} | {break_even_cell(x)} | {last} | {x['flags']} |")
         else:
-            L.append("| — | no receiving role-shift flags this slate | | | | | |")
+            L.append("| — | no receiving role-shift flags this slate | | | | | | |")
 
         L += ["", "## Notes by game", "",
               "| Game | Lines | Role-shift flags | New-team players | Teammates out or back | Sleeper depth-rank gaps |",

@@ -65,14 +65,14 @@ def test_the_research_table_has_its_columns_on_every_row(run):
     i = lines.index("## Research table")
     header = next(ln for ln in lines[i:] if ln.startswith("| Player |"))
     assert header == ("| Player | Prop | Line | Price | Our projection | Over: model / book | Line implies | "
-                      "Last game | Flags |")
+                      "Pays at this price if he gets | Last game | Flags |")
     j = lines.index(header)
     rows = [ln for ln in lines[j + 2:] if ln.startswith("|")]
     rows = rows[:next((k for k, ln in enumerate(rows) if not ln.startswith("| ") or "(DAL)" not in ln
                        and "(HOU)" not in ln), len(rows))]
     assert len(rows) == research.drop_duplicates(["player", "market", "line", "book"]).shape[0] > 10
     for ln in rows:
-        assert ln.count("|") == 10, ln
+        assert ln.count("|") == 11, ln
         assert re.search(r"O [+-]\d+ / U [+-]\d+", ln), "both prices on every row"
 
 
@@ -81,6 +81,20 @@ def test_line_implies_and_flags_are_filled(run):
     rec = research[research.market == "player_receptions"]
     assert rec.implied.notna().mean() > 0.8, "the implied workload resolves for most catches lines"
     assert research["flags"].fillna("").str.contains("Nico Collins active").any(), "the teammate-back flag"
+
+
+def test_the_break_even_workload_straddles_the_coin_flip(run):
+    _rep, research, _e = run
+    d = research[research.market.isin(["player_receptions", "player_reception_yds", "player_rush_yds"])]
+    both = d.dropna(subset=["over_needs", "under_needs", "implied"])
+    assert len(both) >= 0.7 * len(d), "the break-even search resolves for most lines"
+    half = both[((both.line % 1) == 0.5) & (both.be_over > 0.5) & (both.be_under > 0.5)]
+    assert len(half) > 10
+    # both sides at minus money: the Over needs more than a coin flip and the Under less. A
+    # plus-money side (Boutte's Under at +122 needs 45%) can pay past the coin flip.
+    assert (half.over_needs >= half.implied - 0.05).all() and (half.under_needs <= half.implied + 0.05).all()
+    assert (both.over_needs > both.under_needs).all(), "the gap between them is the cut"
+    assert both.be_over.between(0.3, 0.8).all() and both.be_under.between(0.3, 0.8).all()
 
 
 def test_a_backs_three_jobs_and_the_snap_rule_are_shown(run):

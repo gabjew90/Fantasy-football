@@ -1701,25 +1701,28 @@ def main():
             continue
         m_ = M[M.name == r_.player].iloc[0]
         si = sim_inputs[m_.team]
-        ck = (r_.player, r_.market, float(r_.line))
+        # the posted prices: the break-even workload is read at the price this book shows
+        px_ = (r_.get("price_over"), r_.get("price_under"))
+        ck = (r_.player, r_.market, float(r_.line), str(px_))
         if ck not in _implied_cache and ASSUME_OUT:
-            _implied_cache[ck] = (None, None, None)     # scenario run: nobody reads its research
+            _implied_cache[ck] = (None, None, None, None, None)     # scenario run: nobody reads its research
         if ck not in _implied_cache:
             if r_.market in ("player_receptions", "player_reception_yds"):
                 _implied_cache[ck] = RSCH.implied_targets(
                     float(r_.line), "receptions" if r_.market == "player_receptions" else "rec_yards",
                     env[m_.team]["targets"], TVD["targets_r"], float(m_.ts), float(m_.cr), float(m_.ypt),
-                    SH, width=WIDTH)
+                    SH, width=WIDTH, prices=px_)
                 _implied_cache[ck] += ("targets",)
             elif r_.market == "player_rush_yds":
                 j_ = si["names"].index(r_.player)
                 _implied_cache[ck] = RSCH.implied_carries(
                     float(r_.line), j_, env[m_.team]["carries"], TVD["carries_r"], si["rs"], si["ypc"], resid,
-                    width=WIDTH, player_resid=si["p_resid"], player_kneel=si["p_kneel"], qb_index=si["qb_i"])
+                    width=WIDTH, player_resid=si["p_resid"], player_kneel=si["p_kneel"], qb_index=si["qb_i"],
+                    prices=px_)
                 _implied_cache[ck] += ("carries",)
             else:
-                _implied_cache[ck] = (None, None, None)
-        imp, proj, unit = _implied_cache[ck]
+                _implied_cache[ck] = (None, None, None, None, None)
+        imp, proj, over_needs, under_needs, unit = _implied_cache[ck]
         p_over = r_.p_model if r_.side == "Over" else 1 - r_.p_model - (0.0 if pd.isna(r_.p_push) else r_.p_push)
         nv_over = r_.p_novig if r_.side == "Over" else 1 - r_.p_novig
         s_ = sims[r_.player][next(c for k, c in {**YARD_MARKETS, **COUNT_MARKETS}.items() if k == r_.market)]
@@ -1738,7 +1741,8 @@ def main():
             price_over=r_.get("price_over"), price_under=r_.get("price_under"),
             median=float(np.median(s_)), p10=float(np.quantile(s_, 0.1)), p90=float(np.quantile(s_, 0.9)),
             p_over_model=float(p_over), p_over_book=float(nv_over),
-            implied=imp, projected=proj, unit=unit,
+            implied=imp, projected=proj, unit=unit, over_needs=over_needs, under_needs=under_needs,
+            be_over=RSCH.breakeven(px_[0]), be_under=RSCH.breakeven(px_[1]),
             snap=(u_ or {}).get("snap"), snap_base=(u_ or {}).get("snap_base"),
             ts=(u_ or {}).get("ts"), ts_base=(u_ or {}).get("ts_base"),
             cs=(u_ or {}).get("cs"), cs_base=(u_ or {}).get("cs_base"),
@@ -2061,8 +2065,9 @@ def main():
             # research rows: line, price, projection, the two Over chances, what the line implies
             mine = RESEARCH[RESEARCH.player == m["name"]] if len(RESEARCH) else RESEARCH
             if len(mine) or tdq:
-                L.append("| Prop | Line | Price | Our projection | Over: model / book | Line implies |")
-                L.append("|---|---|---|---|---|---|")
+                L.append("| Prop | Line | Price | Our projection | Over: model / book | Line implies | "
+                         "Pays at this price if he gets |")
+                L.append("|---|---|---|---|---|---|---|")
                 for _, x in mine.iterrows():
                     L.append(research_cells(x, MKT))
                 if tdq:
@@ -2070,7 +2075,7 @@ def main():
                     p_yes, td_src = p_anytime(m)
                     # anytime TD: the two chances only; no fair odds from a prototype
                     L.append(f"| anytime TD ({td_src}, prototype) | — | {odds_str(price)} | — | "
-                             f"{pct(p_yes)} / {pct(p_imp)} | — |")
+                             f"{pct(p_yes)} / {pct(p_imp)} | — | — |")
             L.append("")
 
     # ---------- 8d. confidence tiers + parlay candidates ----------
@@ -2383,13 +2388,14 @@ def main():
               "2. Model: receiving_hier_v2 (receptions, rec yds), rush_yds_v0, pass_yds_v0 (the starting QB), anytime_td_v1 (anytime TD; v0 only as a labelled fallback); methodology v1.0 in resources/methodology.md.",
               "3. Validated against sportsbook lines: NOTHING. The 2025 walk-forward shows the model beats a naive baseline on CRPS and that its distribution is internally consistent (calibration_2025.csv places lines at fixed offsets from the model\u2019s own median, not at book numbers, across all player-weeks rather than the ones worth betting). No market has been tested against posted lines, so every prop is ineligible and the record is being built prospectively.",
               "4. Team TD totals are market-anchored, so a TD gap is a share disagreement only.",
-              "5. Line implies: the targets (or carries) per game at which the posted line is a fair 50/50, from the same simulation with only his share moved.",
+              "5. Line implies: the targets (or carries) per game at which the posted line is a fair 50/50, from the same simulation with only his share moved; 'pays at this price' is the same search at each side's break-even win rate (vig included).",
               "6. No bet labels. " + gate_sentence(GATE),
               "\n</details>\n"]
         T += ["## Research table\n",
               f"*Every priced line, snapshot {now()}, grouped by team. {RESEARCH_NOTE.strip('*')}*\n",
-              "| Player | Prop | Line | Price | Our projection | Over: model / book | Line implies | Last game | Flags |",
-              "|---|---|---|---|---|---|---|---|---|"]
+              "| Player | Prop | Line | Price | Our projection | Over: model / book | Line implies | "
+              "Pays at this price if he gets | Last game | Flags |",
+              "|---|---|---|---|---|---|---|---|---|---|"]
         if len(RESEARCH):
             for _, x in RESEARCH.sort_values(["team", "player", "market", "line"]).iterrows():
                 cells = research_cells(x, MKT).strip("|").split("|")
@@ -2520,6 +2526,10 @@ def main():
              "always add to more than 100%; we strip that out so it's a fair comparison.")
     L.append("- **Line implies** is the workload (targets or carries per game) at which the posted line is a fair 50/50, "
              "holding his catch rate and yards per touch. Compare it with what he has been getting.")
+    L.append("- **Pays at this price if he gets** is the same search at each side's own price: the Over beats its price only "
+             "above the first number, the Under only at or below the second. The gap between them is the book's cut. It "
+             "tells you how much role your view needs, not whether the view is right; the model's chances are not shown "
+             "to be calibrated within 3 points (reports/calibration_bar_v2.md).")
     if not td_two_sided:
         L.append("- **Touchdown prices** have no 'won't score' side to remove the cut from, so the book's number there is a bit high.")
     L.append("- **Why there are no bet labels:** the model beats simple baselines on past seasons, but it has not shown it "
@@ -2779,7 +2789,7 @@ def td_pairs_section(J_: pd.DataFrame, top: int = 6) -> list[str]:
 RESEARCH_NOTE = ("*Each line: the book's line and price, our projection (median, with the 10th-90th percentile "
                  "range), the chance of the Over by our model and by the book's price (its cut removed), and what the "
                  "line implies: the targets or carries per game at which the line is a fair 50/50, next to what we "
-                 "project. Flags mark a teammate out or back, a new team, a Questionable tag, and the receiving "
+                 "project; then the workload each side needs to beat its own price. Flags mark a teammate out or back, a new team, a Questionable tag, and the receiving "
                  "role-shift pattern (reports/role_shift_check.md).*")
 
 
@@ -2859,8 +2869,22 @@ def research_statement(RESEARCH: pd.DataFrame, gate=None) -> str:
 BOOK_NAME = {"sleeper": "Sleeper", "draftkings": "DraftKings", "fanduel": "FanDuel"}
 
 
+def break_even_cell(x) -> str:
+    """The workload each side needs to beat its own price (research.py): the
+    Over pays above the first number, the Under at or below the second."""
+    unit_ = x.get("unit") if isinstance(x.get("unit"), str) else ""
+    o, u = x.get("over_needs"), x.get("under_needs")
+    if not unit_ or (o is None or pd.isna(o)) and (u is None or pd.isna(u)):
+        return "—"
+    fmt = lambda v, word: f"{word} beyond the search range" if v is None or pd.isna(v) else None
+    over = fmt(o, "Over:") or f"Over above {o:.1f}"
+    under = fmt(u, "Under:") or f"Under at {u:.1f} or fewer"
+    return f"{over} {unit_}; {under}"
+
+
 def research_cells(x, MKT) -> str:
-    """One research row's cells: | prop | line | price | projection | Over model / book | line implies |."""
+    """One research row's cells: | prop | line | price | projection | Over model / book | line implies |
+    break-even workload |."""
     def odds(a):
         try:
             a = int(a)
@@ -2878,7 +2902,8 @@ def research_cells(x, MKT) -> str:
     book = str(x.get("book", "sleeper"))
     label = MKT.get(x.market, x.market) + ("" if book == "sleeper" else f" ({BOOK_NAME.get(book, book)})")
     return (f"| {label} | {x.line:g} | O {odds(x.price_over)} / U {odds(x.price_under)} | "
-            f"{n0(x['median'])} ({n0(x['p10'])} to {n0(x['p90'])}) | {100*x.p_over_model:.0f}% / {100*x.p_over_book:.0f}% | {imp} |")
+            f"{n0(x['median'])} ({n0(x['p10'])} to {n0(x['p90'])}) | {100*x.p_over_model:.0f}% / {100*x.p_over_book:.0f}% | {imp} | "
+            f"{break_even_cell(x)} |")
 
 
 def backfield_line(b):
