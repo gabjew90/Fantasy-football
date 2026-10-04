@@ -78,6 +78,8 @@ SETTLED_FIELDS = [
     "td_model",
     # round 23's factor on his target share (DECISIONS #145); 1.0 = not moved
     "snap_react",
+    # Sleeper's prices for both sides (DECISIONS #147)
+    "price_over", "price_under",
     # The engine that made the call. These must be listed here or the
     # DictWriter's extrasaction="ignore" below drops them silently, and the
     # scorecard could not separate two versions.

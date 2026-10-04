@@ -165,6 +165,11 @@ jobs:
             --snapshot-type ${{ steps.guard.outputs.snapshot_type }} \
             --engine-dir "$ENGINE_DIR" \
             --engine-source "$ENGINE_SOURCE"
+          # Sleeper against DraftKings/FanDuel (DECISIONS #147): one snapshot per
+          # game in the window, ~4 credits, never below 100; never costs a capture
+          python props/compare.py --season ${{ steps.guard.outputs.season }} \
+            --week ${{ steps.guard.outputs.week }} --engine-dir "$ENGINE_DIR" \
+            || echo "::warning::compare skipped; the capture is unaffected"
 
       - name: settle
         if: steps.guard.outputs.run == 'true' && steps.guard.outputs.mode == 'settle'

@@ -7083,3 +7083,20 @@ never archived (the line record stays Sleeper's), and any failure (no key,
 no event, no credits) is a sources-table note, never a lost run. The rows
 carry their book's name in the research table and feed the existing "Where
 the books disagree" section. Off by default; the captures do not use it.
+
+## 2026-10-03 (147) -- Sleeper against DraftKings/FanDuel, one snapshot per game
+
+The one edge that would not depend on the model: Sleeper Picks' fixed prices
+on lines that may lag the sharper books. props/compare.py runs after every
+capture and, once per game inside the capture window, logs DraftKings and
+FanDuel player lines (free events call, then ~4 Odds API credits; never
+below 100 left; the user chose one snapshot per game on the free plan; no
+key or any failure is a printed reason, never a lost capture) to
+props/record/compare/. The record now keeps Sleeper's Over and Under prices.
+The scorecard's "Sleeper against DraftKings/FanDuel" section grades the side
+the consensus favours, at Sleeper's own price, when Sleeper's line is off
+the consensus (0.5 catch, 2.5 rushing/receiving yards, 5 passing yards) or
+its no-vig price is 3+ points off at the same line. Reading rule, fixed
+before any data (reports/sleeper_vs_books.md): an edge only after 200+ graded
+discrepancies with a game-clustered 95% interval above zero. Speed-dependent
+and paid items were ruled out by the user.

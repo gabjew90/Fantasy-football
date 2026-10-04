@@ -176,6 +176,108 @@ def clv_table(season: int) -> pd.DataFrame:
     return pd.DataFrame(paired)
 
 
+BOOKS_MIN = 200                     # reports/sleeper_vs_books.md: the reading rule's sample
+LINE_OFF = {"player_receptions": 0.5, "player_reception_yds": 2.5, "player_rush_yds": 2.5,
+            "player_pass_yds": 5.0}
+PRICE_OFF = 0.03
+
+
+def _novig_over(po, pu):
+    """The no-vig Over chance from two American prices."""
+    io = 100 / (po + 100) if po > 0 else -po / (-po + 100)
+    iu = 100 / (pu + 100) if pu > 0 else -pu / (-pu + 100)
+    return io / (io + iu)
+
+
+def books_consensus(rows: list[dict]) -> dict:
+    """(week, player key, market) -> (consensus line, consensus no-vig Over
+    chance at that line) from DraftKings/FanDuel comparison rows."""
+    import settle as _s
+    by: dict = {}
+    for r in rows:
+        k = (int(r["week"]), _s.norm_name(str(r["player"])), r["market"], r["book"], float(r["line"]))
+        by.setdefault(k, {})[r["side"]] = int(r["price"])
+    per: dict = {}
+    for (wk, nm, mk, bk, ln), sides in by.items():
+        if "Over" in sides and "Under" in sides:
+            per.setdefault((wk, nm, mk), []).append((ln, _novig_over(sides["Over"], sides["Under"])))
+    out = {}
+    for k, v in per.items():
+        lines = sorted(x[0] for x in v)
+        med = lines[len(lines) // 2] if len(lines) % 2 else (lines[len(lines) // 2 - 1] + lines[len(lines) // 2]) / 2
+        at = [p for ln, p in v if ln == med] or [p for _ln, p in v]
+        out[k] = (med, sum(at) / len(at))
+    return out
+
+
+def books_rows(df: pd.DataFrame, rows: list[dict]) -> pd.DataFrame:
+    """Each settled Sleeper call joined to the consensus, with the favoured side
+    graded at Sleeper's own price (reports/sleeper_vs_books.md)."""
+    import settle as _s
+    if not rows or df.empty or "price_over" not in df.columns:
+        return pd.DataFrame()
+    cons = books_consensus(rows)
+    out = []
+    for _, r in df[df["market"].isin(list(LINE_OFF))].iterrows():
+        try:
+            line, actual = float(r["line"]), float(r["actual"])
+            po, pu = int(float(r["price_over"])), int(float(r["price_under"]))
+        except (TypeError, ValueError):
+            continue
+        c = cons.get((int(r["week"]), _s.norm_name(str(r["player"])), r["market"]))
+        if c is None:
+            continue
+        d = line - c[0]
+        if abs(d) >= LINE_OFF[r["market"]]:
+            kind, fav = "line off", ("Under" if d > 0 else "Over")
+        elif d == 0 and abs(c[1] - _novig_over(po, pu)) >= PRICE_OFF:
+            kind, fav = "price off", ("Over" if c[1] > _novig_over(po, pu) else "Under")
+        else:
+            continue
+        if actual == line:
+            won, pnl = None, 0.0
+        else:
+            won = (actual > line) if fav == "Over" else (actual < line)
+            pnl = _s.american_pnl(po if fav == "Over" else pu, won)
+        price = po if fav == "Over" else pu
+        out.append({"kind": kind, "event_id": r.get("event_id"), "won": won, "pnl": pnl,
+                    "breakeven": (abs(price) / (abs(price) + 100) if price < 0 else 100 / (price + 100))})
+    return pd.DataFrame(out)
+
+
+def books_section(df: pd.DataFrame, season: int) -> list[str]:
+    """Sleeper against DraftKings/FanDuel: the consensus-favoured side at
+    Sleeper's price, by discrepancy type, with the pre-registered reading rule."""
+    root = persist.RECORD_ROOT / "compare" / str(season)
+    rows = []
+    for f in sorted(root.glob("wk*.jsonl")) if root.exists() else []:
+        with f.open(encoding="utf-8") as fh:
+            rows += [json.loads(ln) for ln in fh if ln.strip()]
+    out = ["## Sleeper against DraftKings/FanDuel", "",
+           "Not the model: when Sleeper's line or price sits off the DraftKings/FanDuel consensus, the side the "
+           "consensus favours, bet at Sleeper's price (reports/sleeper_vs_books.md).", ""]
+    b = books_rows(df, rows)
+    if b.empty:
+        return out + [f"{len(rows)} comparison rows logged; no settled Sleeper call has a matching discrepancy yet.", ""]
+    out += ["| Discrepancy | Bets | Won | Win rate | Break-even | Net per $100 (95% CI) |", "|---|---|---|---|---|---|"]
+    rng = np.random.default_rng(7)
+    for kind, g in list(b.groupby("kind")) + [("both, pooled", b)]:
+        graded = g[g.won.notna()]
+        games = g.event_id.astype(str).to_numpy()
+        ug = np.unique(games)
+        boots = []
+        for _ in range(500):
+            take = np.concatenate([np.flatnonzero(games == x) for x in rng.choice(ug, len(ug))])
+            boots.append(g.pnl.to_numpy()[take].mean())
+        lo, hi = np.percentile(boots, [2.5, 97.5]) if len(ug) > 1 else (np.nan, np.nan)
+        wr = graded.won.astype(bool).mean() if len(graded) else float("nan")
+        out.append(f"| {kind} | {len(g)} | {int(graded.won.astype(bool).sum())} | {wr:.1%} | "
+                   f"{g.breakeven.mean():.1%} | {g.pnl.mean():+.1f} ({lo:+.1f}, {hi:+.1f}) |")
+    verdict = ("**edge by the pre-set rule**" if len(b) >= BOOKS_MIN and np.isfinite(lo) and lo > 0
+               else f"no verdict yet: the rule needs {BOOKS_MIN}+ bets and an interval above zero")
+    return out + ["", f"{len(b)} graded discrepancies: {verdict}.", ""]
+
+
 def snap_rule_section(df: pd.DataFrame) -> list[str]:
     """DECISIONS #145: the receiving calls the snap-change rule moved (round 23)
     against the ones it did not -- the fresh check on its 2024-25 overshoot for
@@ -404,6 +506,7 @@ def main(argv: list[str] | None = None) -> int:
     # engine reads it (the report's first line quotes it).
     gate = write_label_gate(args.season, df, engines)
     out += label_gate_md(gate)
+    out += books_section(df, args.season)
 
     csv_rows: list[dict] = []
     for engine_hash, group in engines:
