@@ -173,6 +173,11 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
            if args.env == "market_pass" else
            (M.MARKET_PASS_WEIGHT if getattr(args, "market_pass_weight", None) is None
             else float(args.market_pass_weight))) if live else 0.0
+    # round 22: key-teammate share thresholds (live only; None = off)
+    kt_ts = (M.KEY_TEAMMATE_TS if getattr(args, "key_ts", None) is None
+             else (None if args.key_ts == "off" else float(args.key_ts)))
+    kt_rs = (M.KEY_TEAMMATE_RS if getattr(args, "key_rs", None) is None
+             else (None if args.key_rs == "off" else float(args.key_rs)))
     print(f"season={S} env={args.env} opponent={args.opponent} ({opp['level']}, k0={opp['k0']:g}) "
           f"historical_blend={args.historical_blend} dispersion={dispersion} live={live}", file=sys.stderr)
 
@@ -328,11 +333,38 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
         tt_by_tw = twt.set_index(["team", "week"])["team_targets"]
         tc_by_tw = twc.set_index(["team", "week"])["team_carries"]
 
+        def share_counts(team, pid, weeks_):
+            """(own targets, team targets, own carries, team carries) over weeks_."""
+            tg_ = tt_ = ca_ = cc_ = 0.0
+            for w in weeks_:
+                tt_ += tt_by_tw.get((team, w), 0.0); cc_ += tc_by_tw.get((team, w), 0.0)
+                if (team, w, pid) in rec_key.index:
+                    tg_ += rec_key.loc[(team, w, pid)].targets
+                if (team, w, pid) in rush_key.index:
+                    ca_ += rush_key.loc[(team, w, pid)].carries
+            return tg_, tt_, ca_, cc_
+
         rows = []
         for (team, W), grp in pop.groupby(["team", "week"]):
             prior_weeks_played = [w for w in played_weeks[team] if w < W]
+            # round 22: the KEY teammates active this week (live mode only)
+            act_weeks_of = {pid: [w for w in prior_weeks_played if (w, team, pid) in act_set]
+                            for pid in grp.gsis_id}
+            keys_ts, keys_rs = set(), set()
+            if live and (kt_ts is not None or kt_rs is not None):
+                for pid, st_ in zip(grp.gsis_id, grp.roster_status):
+                    if st_ != "ACT":
+                        continue
+                    pri_ = pri_players.loc[pid] if pid in pri_players.index else None
+                    tg_, tt_, ca_, cc_ = share_counts(team, pid, act_weeks_of[pid])
+                    if kt_ts is not None and M.key_share(
+                            pri_.target_share if pri_ is not None else None, tg_, tt_) >= kt_ts:
+                        keys_ts.add(pid)
+                    if kt_rs is not None and M.key_share(
+                            pri_.rush_share if pri_ is not None else None, ca_, cc_) >= kt_rs:
+                        keys_rs.add(pid)
             for pid in grp.gsis_id:
-                elig_weeks = [w for w in prior_weeks_played if (w, team, pid) in act_set]
+                elig_weeks = act_weeks_of[pid]
                 # LIVE MODE: every ACT week this season with this team, over the
                 # team's actual totals in those weeks -- score_game's evidence
                 # (weeks_act / act_weeks). The single-season protocol used his
@@ -348,15 +380,26 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
                         rr_ = rec_key.loc[(team, w, pid)]; tg += rr_.targets; rc += rr_.receptions; ry += rr_.rec_yards
                     if (team, w, pid) in rush_key.index:
                         uu_ = rush_key.loc[(team, w, pid)]; ca += uu_.carries; ry2 += uu_.rush_yards
+                # round 22: share evidence over the weeks every key teammate also
+                # played; efficiency (receptions, yards) keeps the full window
+                tg_s, tt_s, ca_s, cc_s = tg, tt, ca, cc
+                if keys_ts - {pid}:
+                    w_ts = M.coactive_weeks(window, [act_weeks_of[k] for k in keys_ts - {pid}])
+                    tg_s, tt_s, _, _ = share_counts(team, pid, w_ts)
+                if keys_rs - {pid}:
+                    w_rs = M.coactive_weeks(window, [act_weeks_of[k] for k in keys_rs - {pid}])
+                    _, _, ca_s, cc_s = share_counts(team, pid, w_rs)
                 n_games = len(window)
                 slot = slot_of(pid, W)
                 a_ = rec_key.loc[(team, W, pid)] if (team, W, pid) in rec_key.index else None
                 u_ = rush_key.loc[(team, W, pid)] if (team, W, pid) in rush_key.index else None
                 rows.append(dict(team=team, week=W, gsis_id=pid, slot=slot,
-                    n_games_prior=n_games, n_tt=tt, n_tg=tg, n_cc=cc, n_ca=ca,
-                    own_ts=(tg / tt if tt > 0 else np.nan), own_cr=(rc / tg if tg > 0 else np.nan),
+                    n_games_prior=n_games, n_tt=tt_s, n_tg=tg, n_cc=cc_s, n_ca=ca,
+                    own_ts=(tg_s / tt_s if tt_s > 0 else np.nan), own_cr=(rc / tg if tg > 0 else np.nan),
                     own_ypt=(ry / tg if tg > 0 else np.nan),
-                    own_rs=(ca / cc if cc > 0 else np.nan), own_ypc=(ry2 / ca if ca > 0 else np.nan),
+                    own_rs=(ca_s / cc_s if cc_s > 0 else np.nan), own_ypc=(ry2 / ca if ca > 0 else np.nan),
+                    # baseline A keeps the raw full-window shares (round 22 leaves it fixed)
+                    raw_ts=(tg / tt if tt > 0 else np.nan), raw_rs=(ca / cc if cc > 0 else np.nan),
                     rs_last4=(ca4 / cc4 if cc4 > 0 else np.nan),
                     act_targets=int(a_.targets) if a_ is not None else 0,
                     act_receptions=float(a_.receptions) if a_ is not None else 0.0,
@@ -496,6 +539,10 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
 
             ts = two_stage("target_share", "team_targets_n", "ts", np.nan,
                            "target_share", 80, r.own_ts, r.n_tt)
+            if pd.isna(ts):
+                # round 22: no prior, no slot prior and no co-active week -- the
+                # scorer's slot_val falls back to the mean slot prior; so does this
+                ts = float(np.nanmean(sp["ts"].values))
             cr = two_stage("catch_rate", "targets_n", "cr", 0.6,
                            "catch_rate", 40, r.own_cr, r.n_tg)
             ypt = two_stage("ypt", "targets_n", "ypt", 7.0,
@@ -576,9 +623,16 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
     # and week list, NOT on --env / --opponent / K0.
     def cached_features(weeks, label):
         key = f"{S}_{label}_{'live' if live else 'legacy'}_{data_tag}_{'-'.join(map(str, weeks))}"
+        if live and (kt_ts is not None or kt_rs is not None):
+            # round 22 changes the share features: never read the plain cache
+            key += f"_kt{kt_ts}-{kt_rs}"
         f = OUT / f"_featcache_{key}.pkl"
         if f.exists():
-            return pd.read_pickle(f)
+            feat = pd.read_pickle(f)
+            if "raw_ts" not in feat:
+                # a cache from before round 22 was built unfiltered: raw = own
+                feat = feat.assign(raw_ts=feat.own_ts, raw_rs=feat.own_rs)
+            return feat
         pop = make_population(weeks); feat = make_features(pop)
         feat.to_pickle(f)
         return feat
@@ -714,7 +768,7 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
         tr = test_act[rec_mask].reset_index(drop=True)
         mu_m = np.maximum(tr.team_targets_env * tr.ts * tr.cr.clip(lower=0.05), 0.02).values
         ypc_m = np.maximum(tr.ypt / tr.cr.clip(lower=0.05), 0.5).values
-        shareA = tr.own_ts.fillna(tr.ts).values
+        shareA = tr.raw_ts.fillna(tr.ts).values
         crA = tr.own_cr.fillna(tr.cr).clip(lower=0.05).values
         yptA = tr.own_ypt.fillna(tr.ypt).values
 
@@ -735,7 +789,7 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
         pit_rec, pit_yds = rpit_block(recM, y_rec), rpit_block(ydsM, y_yds)
         rushM, carM, share_sumM = draw_block_rush(test_act, test_act.rs.fillna(0.0).values, test_act.ypc.values,
                                                   arm=3)
-        rushA = draw_block_rush(test_act, test_act.own_rs.fillna(test_act.rs).fillna(0.0).values,
+        rushA = draw_block_rush(test_act, test_act.raw_rs.fillna(test_act.rs).fillna(0.0).values,
                                 test_act.own_ypc.fillna(test_act.ypc).values, arm=4)[0] if full else rushM
         y_rush = test_act.act_rush_yards.values.astype(float)
         # the book's number for a QB: carries plus kneel-downs
@@ -1444,6 +1498,10 @@ def main(argv=None):
     ap.add_argument("--live-opp-metrics", default=None,
                     help="harness ABLATION: the opponent-adjusted rates in live mode (default: the scorer's, "
                          "catch_rate,ypt,ypc); e.g. catch_rate,ypt drops the run-defense adjustment")
+    ap.add_argument("--key-ts", default=None,
+                    help="round 22: key-teammate target-share threshold, or 'off' (default model.KEY_TEAMMATE_TS)")
+    ap.add_argument("--key-rs", default=None,
+                    help="round 22: key-teammate carry-share threshold, or 'off' (default model.KEY_TEAMMATE_RS)")
     ap.add_argument("--k0", default=None,
                     help="round 17: fixed shrinkage constants over the priors' fit, e.g. 'ypt=40,catch_rate=20' "
                          "(default: model.K0_FIXED)")

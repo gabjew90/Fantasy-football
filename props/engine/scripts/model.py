@@ -254,6 +254,39 @@ def league_drift_ratio(team_week_volume, target_week, recent_games=3, min_prior_
 K0_FIXED = {"ypt": 80, "catch_rate": 40, "target_share": 80}
 
 
+# Round 22 (2026-10-03): a teammate's absence inflates the season share of the
+# players who stayed on the field. HOU 2026 week 4: Schultz had 25 of 112 team
+# targets, most of them in the weeks Nico Collins missed (Collins: 10 of 37),
+# and Collins was active again. When a KEY teammate (prior-season share at or
+# above the threshold; his in-season share when he has no prior) is active this
+# week, a player's in-season SHARE evidence counts only the weeks that teammate
+# also played. Efficiency evidence (catch rate, ypt, ypc) keeps every week.
+# None = off, byte for byte; measured on the yardage harness first (DECISIONS #141).
+KEY_TEAMMATE_TS = None      # target share threshold (receiving markets)
+KEY_TEAMMATE_RS = None      # carry share threshold (rushing markets)
+
+
+def key_share(prior_share, cur_num=None, cur_den=None):
+    """The share that decides whether a teammate is KEY: his prior-season share,
+    else his in-season share, else 0."""
+    if prior_share is not None and pd.notna(prior_share):
+        return float(prior_share)
+    if cur_den is not None and cur_den > 0 and cur_num is not None:
+        return float(cur_num) / float(cur_den)
+    return 0.0
+
+
+def coactive_weeks(own_weeks, mate_weeks):
+    """The weeks in `own_weeks` in which every key teammate also played.
+    `mate_weeks` is an iterable of week collections, one per key teammate who is
+    active THIS week. With no key teammates every own week is kept."""
+    out = list(own_weeks)
+    for mw in mate_weeks:
+        s = set(mw)
+        out = [w for w in out if w in s]
+    return out
+
+
 def k0_rates(fitted, override=None):
     """The per-rate shrinkage constants a pricing run uses: the priors' fitted
     `k0_per_rate` (else DEFAULT_K0), with K0_FIXED -- or `override`, for the

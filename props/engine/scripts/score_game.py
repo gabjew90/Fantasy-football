@@ -766,6 +766,49 @@ def main():
             return float(pri_slots.loc[slot, col])
         return float(pri_slots[col].mean()) if col in pri_slots else default
 
+    # round 22 (DECISIONS #141): the KEY teammates active this week. A player's
+    # in-season share counts only the weeks every key teammate also played, so a
+    # share built while the WR1 sat is not priced as if he were still out.
+    def act_weeks_for(t, pid):
+        return sorted(ros[(ros.season == SEASON) & (ros.week < WEEK) & (ros.team == t)
+                          & (ros.gsis_id == pid) & (ros.status == "ACT")].week.unique())
+    wk_tg = passes.groupby(["posteam", "receiver_player_id", "week"]).size()
+    wk_ca = rushes.groupby(["posteam", "rusher_player_id", "week"]).size()
+    tw_key = tw.set_index(["team", "week"])
+    def share_counts(t, pid, weeks_):
+        tg_ = sum(float(wk_tg.get((t, pid, w), 0)) for w in weeks_)
+        ca_ = sum(float(wk_ca.get((t, pid, w), 0)) for w in weeks_)
+        tt_ = sum(float(tw_key.targets.get((t, w), 0)) for w in weeks_)
+        cc_ = sum(float(tw_key.carries.get((t, w), 0)) for w in weeks_)
+        return tg_, tt_, ca_, cc_
+    act_weeks_of = {(p.team, p.gsis_id): act_weeks_for(p.team, p.gsis_id) for _, p in active.iterrows()}
+    key_mates = {"ts": {}, "rs": {}}
+    for kcol, thr, pcol in (("ts", MODEL.KEY_TEAMMATE_TS, "target_share"),
+                            ("rs", MODEL.KEY_TEAMMATE_RS, "rush_share")):
+        if thr is None:
+            continue
+        for _, p in active.iterrows():
+            pri_ = pri_players.loc[p.gsis_id] if p.gsis_id in pri_players.index else None
+            tg_, tt_, ca_, cc_ = share_counts(p.team, p.gsis_id, act_weeks_of[(p.team, p.gsis_id)])
+            num, den = (tg_, tt_) if kcol == "ts" else (ca_, cc_)
+            if MODEL.key_share(pri_[pcol] if pri_ is not None else None, num, den) >= thr:
+                key_mates[kcol].setdefault(p.team, []).append((p.gsis_id, p["name"]))
+
+    def coactive_share(t, pid, act_weeks, kcol, num, den):
+        """(num, den, note): the share evidence over the weeks every key teammate
+        also played; note names them when weeks were dropped."""
+        mates = [(k, nm) for k, nm in key_mates[kcol].get(t, []) if k != pid]
+        if not mates or num is None:
+            return num, den, None
+        w_ = MODEL.coactive_weeks(act_weeks, [act_weeks_of[(t, k)] for k, _ in mates])
+        if len(w_) == len(act_weeks):
+            return num, den, None
+        missed = [nm for k, nm in mates if set(act_weeks) - set(act_weeks_of[(t, k)])]
+        tg_, tt_, ca_, cc_ = share_counts(t, pid, w_)
+        n_, d_ = (tg_, tt_) if kcol == "ts" else (ca_, cc_)
+        note = f"counting only the {len(w_)} week{'s' if len(w_) != 1 else ''} {' and '.join(missed)} also played"
+        return (n_, d_, note) if d_ > 0 else (None, None, note)
+
     recs = []
     for _, p in active.iterrows():
         t, pid, slot = p.team, p.gsis_id, p.slot
@@ -847,16 +890,22 @@ def main():
             ev_chain[pri_col] = chain
             return final
 
-        ts = rate(cw.targets if cw is not None else None, tt_cur if cw is not None else None,
-                  "target_share", "target_share", 0.05)
+        ts_num, ts_den, ts_note = coactive_share(
+            t, pid, list(act_weeks), "ts", cw.targets if cw is not None else None,
+            tt_cur if cw is not None else None)
+        ts = rate(ts_num, ts_den, "target_share", "target_share", 0.05)
+        ev_chain["target_share"]["coactive"] = ts_note
         cr = rate(cw.receptions if (cw is not None and cw.targets > 0) else None,
                   cw.targets if (cw is not None and cw.targets > 0) else None,
                   "catch_rate", "catch_rate", 0.62, opp_metric="catch_rate")
         ypt = rate(cw.rec_yards if (cw is not None and cw.targets > 0) else None,
                    cw.targets if (cw is not None and cw.targets > 0) else None,
                    "ypt", "ypt", 7.0, opp_metric="ypt")
-        rs_ = rate(cw.carries if cw is not None else None, tc_cur if cw is not None else None,
-                   "rush_share", "rush_share", 0.03)
+        rs_num, rs_den, rs_note = coactive_share(
+            t, pid, list(act_weeks), "rs", cw.carries if cw is not None else None,
+            tc_cur if cw is not None else None)
+        rs_ = rate(rs_num, rs_den, "rush_share", "rush_share", 0.03)
+        ev_chain["rush_share"]["coactive"] = rs_note
         ypc = rate(cw.rush_yards if (cw is not None and cw.carries > 0) else None,
                    cw.carries if (cw is not None and cw.carries > 0) else None,
                    "ypc", "ypc", P["league_mean_ypc"], opp_metric="ypc")
@@ -1646,7 +1695,8 @@ def main():
             if ts_ and pd.notna(ts_.get("own_prior")):
                 hist.append(f"last season he got {pct(ts_['own_prior'])} of his team's throws over {int(ts_['n_prior'])} games")
             if ts_ and pd.notna(ts_.get("cur_rate")) and ts_["cur_den"] > 0:
-                hist.append(f"this season he has {int(ts_['cur_num'])} of {int(ts_['cur_den'])} ({pct(ts_['cur_rate'])})")
+                hist.append(f"this season he has {int(ts_['cur_num'])} of {int(ts_['cur_den'])} ({pct(ts_['cur_rate'])})"
+                            + (f", {ts_['coactive']}" if ts_.get("coactive") else ""))
             if hist:
                 parts.append("His share: " + "; ".join(hist) + f". A typical {m.slot} gets {pct(ts_['slot_prior'])}.")
             if ts_ and ts_.get("scaled"):
@@ -1673,7 +1723,8 @@ def main():
             if rs_ and pd.notna(rs_.get("own_prior")):
                 hist.append(f"last season he took {pct(rs_['own_prior'])} of his team's carries over {int(rs_['n_prior'])} games")
             if rs_ and pd.notna(rs_.get("cur_rate")) and rs_["cur_den"] > 0:
-                hist.append(f"this season {int(rs_['cur_num'])} of {int(rs_['cur_den'])} ({pct(rs_['cur_rate'])})")
+                hist.append(f"this season {int(rs_['cur_num'])} of {int(rs_['cur_den'])} ({pct(rs_['cur_rate'])})"
+                            + (f", {rs_['coactive']}" if rs_.get("coactive") else ""))
             if hist:
                 parts.append("His share: " + "; ".join(hist) + ".")
             parts.append(f"We project **{pct(m.rs)}** of the carries = about **{m.mu_car:.1f} carries** at about {m.ypc:.1f} yards each "
