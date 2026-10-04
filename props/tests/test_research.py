@@ -64,3 +64,14 @@ def test_the_role_flag_is_the_pre_registered_rule():
     down = RS.usage_change([(1, 0.80, 0.20, 0.0), (2, 0.80, 0.20, 0.0), (3, 0.60, 0.19, 0.0)])
     assert RS.role_flag(down, 3)[0] == "role down"
     assert RS.role_flag(None, 3) is None
+
+
+def test_the_scorers_research_block_never_draws_from_the_pricing_stream():
+    """score_game prices every line from ONE sequential generator (`rng`); a draw
+    from it in the research block would shift every recorded p_model. The
+    block must reach randomness only through research.py's own generators."""
+    src = (ENGINE / "score_game.py").read_text(encoding="utf-8")
+    block = src[src.index("# ---------- 8a. research columns"):src.index("# ---------- 8b/9. report")]
+    assert "rng" not in block and "random" not in block
+    assert "pd.DataFrame(rows)" in block, "research rows come from this run's lines, not the prior-log merge"
+    assert "ASSUME_OUT" in block, "no implied-workload search inside an 'if he's out' scenario run"

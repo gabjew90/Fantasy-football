@@ -1593,19 +1593,26 @@ def main():
         pri_ = pri_players.loc[m_.gsis_id] if m_.gsis_id in pri_players.index else None
         if pri_ is None or not pd.notna(pri_.target_share) or float(pri_.target_share) < 0.15:
             continue
-        aw_ = ros[(ros.season == SEASON) & (ros.week < WEEK) & (ros.team == m_.team)
-                  & (ros.gsis_id == m_.gsis_id) & (ros.status == "ACT")].week.nunique()
-        played_ = tw[(tw.team == m_.team) & (tw.week < WEEK)].week.nunique()
-        if played_ and aw_ < played_:
+        on_ = ros[(ros.season == SEASON) & (ros.week < WEEK) & (ros.team == m_.team)
+                  & (ros.gsis_id == m_.gsis_id)]
+        on_ = on_[on_.week.isin(set(tw[tw.team == m_.team].week))]   # weeks the team played
+        listed_ = on_.week.nunique()
+        missed_ = on_[on_.status != "ACT"].week.nunique()
+        if missed_:
             BACK_NOTE[m_.team] = BACK_NOTE.get(m_.team, []) + [
-                f"{m_['name']} active (missed {played_ - aw_} of {played_} weeks)"]
+                f"{m_['name']} active (missed {missed_} of {listed_} weeks)"]
     research_rows, _implied_cache = [], {}
-    for _, r_ in (R[R.market != "player_anytime_td"] if len(R) else R).iterrows():
+    # THIS run's lines only: R has been merged with --prior-log above, and an
+    # earlier capture's line (58.5 before it moved to 59.5) is not a line now
+    _now = pd.DataFrame(rows)
+    for _, r_ in (_now[_now.market != "player_anytime_td"] if len(_now) else _now).iterrows():
         if r_.player not in sims or not (M.name == r_.player).any():
-            continue     # a row carried from a prior log for a player not priced now
+            continue
         m_ = M[M.name == r_.player].iloc[0]
         si = sim_inputs[m_.team]
         ck = (r_.player, r_.market, float(r_.line))
+        if ck not in _implied_cache and ASSUME_OUT:
+            _implied_cache[ck] = (None, None, None)     # scenario run: nobody reads its research
         if ck not in _implied_cache:
             if r_.market in ("player_receptions", "player_reception_yds"):
                 _implied_cache[ck] = RSCH.implied_targets(
@@ -2214,26 +2221,6 @@ def main():
         BET["tier_rank"] = BET.tier.str.split(" ").str[0].map(tier_rank).fillna(4)
         BET = BET.sort_values(["tier_rank", "ev_per_100"], ascending=[True, False]).drop(columns="tier_rank")
         BET.to_csv(OUT / f"bet_card_{slug}.csv", index=False)
-
-    # portfolio exposure: how many card legs ride on each team's pass/run volume, and the
-    # joint probability that the whole cluster hits (from the joint simulation)
-    EXPO = []
-    if not BET.empty:
-        for (tm, vol), g in BET[BET.correlated_with.str.contains("throws|runs", regex=True, na=False)].assign(
-                vol=lambda d: d.correlated_with.str.extract(r"(throws (?:low|high)|runs (?:low|high))")[0]).groupby(["team", "vol"]):
-            g2 = g[~g.tier.str.startswith("WEAK") & ~g.tier.str.startswith("LEAN")]
-            hits = []
-            for _, r in g2.iterrows():
-                col = SIM_COL.get(r.market)
-                if col and r.player in sims:
-                    sv = sims[r.player][col]; hits.append((sv > r.line) if r.side == "Over" else (sv < r.line))
-            joint = float(np.mean(np.logical_and.reduce(hits))) if hits else np.nan
-            indep = float(np.prod([h.mean() for h in hits])) if hits else np.nan
-            EXPO.append(dict(team=tm, thesis=f"{tm} {vol}", legs_total=len(g), legs_bettable=len(g2),
-                             players=", ".join(g.player.unique()), p_all_bettable_hit=joint, p_if_independent=indep))
-    EXPO = pd.DataFrame(EXPO)
-    if not EXPO.empty:
-        EXPO.to_csv(OUT / f"exposure_{slug}.csv", index=False)
 
     # ladder: P(stat <= k) for every modeled player, so alternate lines can be priced
     lad = []

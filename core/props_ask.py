@@ -198,7 +198,7 @@ def load(run: dict) -> dict:
     d, s = run["dir"], run["slug"]
     out = {k: _csv(d, f"{k}_{s}.csv") for k in
            ("shadow_log", "betting_card", "bet_card", "td_board", "ladder", "player_params", "fantasy_points",
-            "exposure", "research")}
+            "research")}
     rep = d / f"report_{s}.md"
     out["report"] = rep.read_text(encoding="utf-8", errors="replace") if rep.exists() else ""
     out["scenarios"] = {p.stem.rsplit("_out_", 1)[1]: _safe_csv(p)

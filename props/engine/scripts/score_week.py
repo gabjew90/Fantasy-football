@@ -11,7 +11,8 @@ shadow log and bet card back and writes:
 
   slate_summary_{season}_wk{W}.md   the chat-reply deliverable for a slate question
   slate_survival_{season}_wk{W}.csv one "must-win" pick per game (rule below)
-  slate_card_{season}_wk{W}.csv     every STRONG/MODERATE card row across the slate, by EV
+  slate_research_{season}_wk{W}.csv every priced line's research row (line implies, usage, flags)
+  slate_card_{season}_wk{W}.csv     the old card rows, written for the record only, never shown
   slate_runs_{season}_wk{W}.csv     per-game run status (lines, spread/total, exit code)
 
 Survival rule ("if you could have only one bet in this game and had to win it"):
