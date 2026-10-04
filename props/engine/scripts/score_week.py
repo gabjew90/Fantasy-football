@@ -406,7 +406,7 @@ def main():
             n_role = x[fl.str.contains("role up|role down")].player.nunique()
             n_new = x[fl.str.contains("new team")].player.nunique()
             notes = sorted({part.strip() for f in fl for part in f.split(";")
-                            if part.strip().endswith(" out") or " active (missed" in part})
+                            if _re.search(r" out(,|$)", part.strip()) or " back (missed" in part})
             L.append(f"| {g} | {lines_by_game.get(g, 0)} | {n_role} | {n_new} | {'; '.join(notes) or '—'} | "
                      f"{rank_by_game.get(g, 0)} |")
         thin = [r["game"] for r in runs if 0 < r["n_lines"] < 24]

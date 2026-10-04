@@ -1711,6 +1711,9 @@ def main():
     # USAGE / ROLE: computed before the share blend (section 5), which round 23 reads
     # teammates handled by the out rule, and key teammates back from a missed week
     OUT_NOTE = {t_: [] for t_ in (AWAY, HOME)}
+    # WAS LAST WEEK A PREVIEW (DECISIONS #157)? Same starting QB, same key
+    # absences. A mark built on last week's workload transfers when it was.
+    PREVIEW_DIFF = {t_: [] for t_ in (AWAY, HOME)}
     _tg = passes[["posteam", "week"]].assign(pid=passes.receiver_player_id)
     _cr = rushes[["posteam", "week"]].assign(pid=rushes.rusher_player_id)
     _db_ = pbp[(pbp.play_type == "pass") & pbp.passer_player_id.notna()]
@@ -1722,20 +1725,36 @@ def main():
         if RSCH.out_matters(e_.gsis_id, e_.team, _tg, _cr, _db,
                             None if pri_ is None else pri_.get("target_share"),
                             None if pri_ is None else pri_.get("rush_share"), weeks=set(_wk)):
-            OUT_NOTE[e_.team].append(f"{e_['name']} out")
+            played_lw = _snp_w.get((e_.team, norm_name(e_["name"]), WEEK - 1), 0) > 0
+            OUT_NOTE[e_.team].append(f"{e_['name']} out, " + ("played last week" if played_lw else "also out last week"))
+            if played_lw:
+                PREVIEW_DIFF[e_.team].append(f"{e_['name']} newly out")
     BACK_NOTE = {}
     for _, m_ in M.iterrows():
         pri_ = pri_players.loc[m_.gsis_id] if m_.gsis_id in pri_players.index else None
         if pri_ is None or not pd.notna(pri_.target_share) or float(pri_.target_share) < 0.15:
             continue
-        on_ = ros[(ros.season == SEASON) & (ros.week < WEEK) & (ros.team == m_.team)
-                  & (ros.gsis_id == m_.gsis_id)]
-        on_ = on_[on_.week.isin(set(tw[tw.team == m_.team].week))]   # weeks the team played
-        listed_ = on_.week.nunique()
-        missed_ = on_[on_.status != "ACT"].week.nunique()
-        if missed_:
-            BACK_NOTE[m_.team] = BACK_NOTE.get(m_.team, []) + [
-                f"{m_['name']} active (missed {missed_} of {listed_} weeks)"]
+        # BACK means he missed the game just played and plays today: a teammate
+        # who missed week 2 but played last week is not returning (DECISIONS #157)
+        if (m_.team, WEEK - 1) not in _tw_i.index:
+            continue                       # the team was on a bye last week
+        if _snp_w.get((m_.team, norm_name(m_["name"]), WEEK - 1), 0) > 0:
+            continue
+        BACK_NOTE[m_.team] = BACK_NOTE.get(m_.team, []) + [f"{m_['name']} back (missed last week)"]
+        PREVIEW_DIFF[m_.team].append(f"{m_['name']} back")
+    _lwp = pbp[(pbp.week == WEEK - 1) & (pbp.play_type == "pass") & pbp.passer_player_id.notna()]
+    PREVIEW = {}
+    for t_ in (AWAY, HOME):
+        q_ = _lwp[_lwp.posteam == t_]
+        sq_ = STARTER_QB.get(t_)
+        if len(q_) and sq_ is not None:
+            lw_id = q_.passer_player_id.value_counts().index[0]
+            today_id = M[(M.team == t_) & (M.name == sq_)].gsis_id
+            if len(today_id) and today_id.iloc[0] != lw_id:
+                lw_nm = q_[q_.passer_player_id == lw_id].passer_player_name.iloc[0]
+                PREVIEW_DIFF[t_].insert(0, f"QB change ({lw_nm} last week, {sq_} today)")
+        PREVIEW[t_] = ("last week was a preview: same QB, same key absences" if not PREVIEW_DIFF[t_]
+                       else "last week differs: " + "; ".join(PREVIEW_DIFF[t_]))
     research_rows, _implied_cache, _edges_cache = [], {}, {}
     # THIS run's lines only: R has been merged with --prior-log above, and an
     # earlier capture's line (58.5 before it moved to 59.5) is not a line now
@@ -1790,7 +1809,7 @@ def main():
             implied=imp, projected=proj, unit=unit, over_needs=over_needs, under_needs=under_needs,
             be_over=RSCH.breakeven(px_[0]), be_under=RSCH.breakeven(px_[1]),
             **_edges_cache.get(ck, {}),
-            usage_week=(u_ or {}).get("week"),
+            usage_week=(u_ or {}).get("week"), preview=PREVIEW.get(m_.team),
             snap=(u_ or {}).get("snap"), snap_base=(u_ or {}).get("snap_base"),
             ts=(u_ or {}).get("ts"), ts_base=(u_ or {}).get("ts_base"),
             cs=(u_ or {}).get("cs"), cs_base=(u_ or {}).get("cs_base"),

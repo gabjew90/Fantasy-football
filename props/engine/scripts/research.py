@@ -18,6 +18,8 @@ score_game.py is never touched and the search is smooth in the multiplier.
 """
 from __future__ import annotations
 
+import re
+
 import numpy as np
 
 import model as MODEL
@@ -266,8 +268,9 @@ def worth_a_look(x, last_week):
         return None
     flags = [f.strip() for f in str(x.get("flags") or "").split(";") if f.strip()]
     me = str(x.get("player", ""))
-    up = any(f == "role up" for f in flags) or any(f.endswith(" out") and not f.startswith(me) for f in flags)
-    down = any(f == "role down" for f in flags) or any("active (missed" in f for f in flags)
+    outs = [re.match(r"^(.+?) out(,|$)", f) for f in flags]
+    up = any(f == "role up" for f in flags) or any(m_ and m_.group(1) != me for m_ in outs)
+    down = any(f == "role down" for f in flags) or any(" back (missed last week)" in f for f in flags)
     # a role or teammate story sets the direction; stories pulling both ways
     # (more snaps, but the star teammate is back) mark nothing; a new team
     # with no other story allows either side
@@ -279,10 +282,12 @@ def worth_a_look(x, last_week):
         return None
     m = LOOK_MARGIN[unit]
     o, u = x.get("over_needs"), x.get("under_needs")
+    pv = x.get("preview")
+    tail = f"; {pv}" if isinstance(pv, str) and pv else ""
     if up and o is not None and o == o and n >= o + m:
-        return "Over", f"last game {n:.0f} {unit}; the Over pays above {o:.1f}"
+        return "Over", f"last game {n:.0f} {unit}; the Over pays above {o:.1f}{tail}"
     if down and u is not None and u == u and n <= u - m:
-        return "Under", f"last game {n:.0f} {unit}; the Under pays at {u:.1f} or fewer"
+        return "Under", f"last game {n:.0f} {unit}; the Under pays at {u:.1f} or fewer{tail}"
     return None
 
 

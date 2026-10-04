@@ -7222,3 +7222,16 @@ by the user.
   Sleeper's own price for that side.
 - Last game shows share / count, earlier weeks share / per-game count
   ("targets 19% / 7 (25% / 8.0)"), at the user's request.
+
+## 2026-10-04 (157) -- was last week a preview? The marks say so
+
+- Every research row carries its team's note: "last week was a preview: same
+  QB, same key absences", or "last week differs: QB change / X newly out / X
+  back". A "worth a look" mark ends with it, because a mark rests on last
+  week's workload and that transfers only when last week looked like today.
+- A teammate is "back" only when he missed the game just played and plays
+  today (Zay Flowers missed week 2 but played week 3: not back). An out
+  teammate's flag says whether he also missed last week.
+- SKILL.md carries the narration for bold lines (story, transfer, price,
+  line, failure, then a ranking), from the 2026 week-4 read the user asked
+  the skill to capture.

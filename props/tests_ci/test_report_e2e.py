@@ -84,7 +84,9 @@ def test_line_implies_and_flags_are_filled(run):
     _rep, research, _e = run
     rec = research[research.market == "player_receptions"]
     assert rec.implied.notna().mean() > 0.8, "the implied workload resolves for most catches lines"
-    assert research["flags"].fillna("").str.contains("Nico Collins active").any(), "the teammate-back flag"
+    assert research["flags"].fillna("").str.contains("Nico Collins back \\(missed last week\\)").any(), \
+        "the teammate-back flag: he missed week 3 and plays week 4"
+    assert research["preview"].dropna().str.contains("Nico Collins back").any(), "Houston's week 3 is not a preview"
 
 
 def test_the_break_even_workload_straddles_the_coin_flip(run):

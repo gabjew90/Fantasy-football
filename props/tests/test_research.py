@@ -178,8 +178,12 @@ def test_usage_carries_the_counts_when_given():
 
 def test_worth_a_look_needs_a_story_and_last_games_workload_past_the_price():
     base = dict(player="Woody Marks", market="player_rush_yds", unit="carries", over_needs=11.4, under_needs=9.3,
-                cn=6.0, tn=1.0, usage_week=3, flags="Nico Collins active (missed 2 of 3 weeks)")
+                cn=6.0, tn=1.0, usage_week=3, flags="Nico Collins back (missed last week)")
     assert RS.worth_a_look(base, 3) == ("Under", "last game 6 carries; the Under pays at 9.3 or fewer")
+    assert RS.worth_a_look(dict(base, preview="last week differs: Nico Collins back"), 3)[1].endswith(
+        "; last week differs: Nico Collins back"), "the mark says whether last week transfers"
+    assert RS.worth_a_look(dict(base, flags="Zay Flowers active (missed 1 of 3 weeks)"), 3) is None, \
+        "an old miss is not a return"
     assert RS.worth_a_look(dict(base, flags=""), 3) is None, "no story, no mark"
     assert RS.worth_a_look(dict(base, cn=7.0), 3) is None, "7 carries is inside the 3-carry margin"
     assert RS.worth_a_look(dict(base, usage_week=2), 3) is None, "last game must be the one just played"
@@ -189,10 +193,12 @@ def test_worth_a_look_needs_a_story_and_last_games_workload_past_the_price():
     assert RS.worth_a_look(hig, 3) is None, "role up, but last game's 6 targets do not clear the Over's 8.5"
     assert RS.worth_a_look(dict(hig, tn=10.0), 3) is None, "10 targets is inside the 2-target margin"
     assert RS.worth_a_look(dict(hig, tn=11.0), 3) == ("Over", "last game 11 targets; the Over pays above 8.5")
-    assert RS.worth_a_look(dict(hig, flags="Marks out", tn=11.0), 3)[0] == "Over", "a teammate out points Over"
-    assert RS.worth_a_look(dict(hig, flags="Tee Higgins out", tn=11.0), 3) is None, "his own out is not a story"
+    assert RS.worth_a_look(dict(hig, flags="Marks out, also out last week", tn=11.0), 3)[0] == "Over", \
+        "a teammate out points Over"
+    assert RS.worth_a_look(dict(hig, flags="Tee Higgins out, played last week", tn=11.0), 3) is None, \
+        "his own out is not a story"
     # a story sets the direction even for a player on a new team
     assert RS.worth_a_look(dict(hig, flags="role down; new team (from ATL)", tn=11.0), 3) is None
     assert RS.worth_a_look(dict(hig, flags="new team (from ATL)", tn=4.0), 3)[0] == "Under", "new team alone: either"
-    assert RS.worth_a_look(dict(hig, flags="role up; Puka Nacua active (missed 2 of 3 weeks)", tn=13.0), 3) is None,         "more snaps but the star teammate back: the stories conflict, no mark"
+    assert RS.worth_a_look(dict(hig, flags="role up; Puka Nacua back (missed last week)", tn=13.0), 3) is None,         "more snaps but the star teammate back: the stories conflict, no mark"
     assert RS.worth_a_look(dict(hig, unit=None), 3) is None
