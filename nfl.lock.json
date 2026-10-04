@@ -172,7 +172,7 @@
   "props/engine/scripts/model.py": "456ceae0d2058aab958dd8f84c0b32735a60662efbb7da596907c321837ad595",
   "props/engine/scripts/odds_client.py": "434186273bd0412a5545247228298951c5d0504a19c8a47c4c782bf3bb75aaa1",
   "props/engine/scripts/research.py": "4ba4c2ab100bef0e27c888af32d6f9f2bba3148ed6b2fe81166993419f5dc184",
-  "props/engine/scripts/score_game.py": "9f3d9899543e780cbb4aa666b1a7fa4e617cf2f71aa21b490ca53068da47258d",
+  "props/engine/scripts/score_game.py": "cac2950e441039fb0f95ac96377fb91c073300c2bf20e1353ac11f0341d31ede",
   "props/engine/scripts/score_week.py": "d89ca89e18e1145fc1f094ef1f619c3c34d499f082b0eb53509e3d64a08ea68c",
   "props/engine/scripts/td_alloc.py": "7c407c949cac8f0f74d7f91589fd5d749f65d9053eb1c3f5f0dc63a700b3465b",
   "props/engine/scripts/td_alloc_backtest.py": "e259d9f0e301a5d5d34e5a9e84bba222810f077d9c05a1f1f799a611914595a4",
@@ -189,6 +189,6 @@
   "tiers.csv": "04a1a79d43e9f2445ba3dc4ea262b00fbd58efea1f41e8b0393cb4c7f8afee41",
   "tiers.keefamania.csv": "11e6546b56caa807a572da86d5c3d81097bafd2d2550e25653882d78b2962e94"
  },
- "sha256": "6d67d0eddc4d372a80721c2680b5146e346c14d97c7dba9e25ccf053ab642f6c",
+ "sha256": "b4009059d681ff1137f5b5ddf317232f2b2bd7fc166f211a012e1428ee847ecc",
  "tag": "nfl-v1.31"
 }
