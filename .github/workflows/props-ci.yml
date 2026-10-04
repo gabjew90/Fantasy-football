@@ -1,4 +1,4 @@
-# The gate on props/ changes. Three checks, and deliberately no more.
+# The gate on props/ changes. Four checks, and deliberately no more.
 #
 # WHY THIS EXISTS SEPARATELY FROM props.yml. props.yml runs
 # `pytest props/tests` before every capture, so anything asserted there can
@@ -63,6 +63,12 @@ jobs:
 
       - name: props tests
         run: python -m pytest props/tests -q
+
+      - name: one report rendered end to end, offline
+        # props/tests_ci: renders DAL at HOU from a trimmed fixture and checks
+        # what the user reads (research table, no bet language). On pull
+        # requests only -- props.yml never runs it, so it cannot cost a capture.
+        run: python -m pytest props/tests_ci -q
 
       - name: the engine matches its lock
         # The check kept out of the capture path. It also catches a lock that

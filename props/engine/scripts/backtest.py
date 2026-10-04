@@ -48,7 +48,8 @@ N = 1000
 
 # market key -> (actual column, label, synthetic-line offsets for the reliability table)
 # market -> the population column its rows are graded on (absent = every row)
-POPULATION = {"rush": "rush_pop", "qbrush": "qb_pop", "pass": "pass_pop"}
+POPULATION = {"rush": "rush_pop", "qbrush": "qb_pop", "pass": "pass_pop", "car": "rush_pop",
+              "cmp": "pass_pop"}
 MARKETS = {"rec": ("act_receptions", "receptions", [0.5, 1.5, 2.5, 3.5]),
            "yds": ("act_rec_yards", "receiving yards", [5, 10, 15, 20, 30]),
            "rush": ("act_rush_yards", "rushing yards", [5, 10, 15, 20, 30]),
@@ -56,7 +57,12 @@ MARKETS = {"rec": ("act_receptions", "receptions", [0.5, 1.5, 2.5, 3.5]),
            "qbrush": ("act_qb_rush_yards", "QB rushing yards", [5, 10, 15, 20, 30]),
            # the starting QB's passing yards (plan step 4): his receivers' yards in
            # the same simulation, plus the other bucket, times his share
-           "pass": ("act_pass_yards", "QB passing yards", [10, 20, 30, 40, 60])}
+           "pass": ("act_pass_yards", "QB passing yards", [10, 20, 30, 40, 60]),
+           # rushing attempts (props-v1.30 candidate): the carries the rushing draw
+           # already makes, graded on the same rushing population (backs, not QBs)
+           "car": ("act_carries", "rushing attempts", [0.5, 1.5, 2.5, 3.5]),
+           # the starting QB's completions (reports/qb_completions.md)
+           "cmp": ("act_completions", "QB completions", [0.5, 1.5, 2.5, 3.5])}
 # THE LIVE SCORER'S OPPONENT SETTINGS (score_game.py section 5): team level, fixed
 # shrinkage k0=150 plays, applied to catch rate, ypt and ypc. The single-season
 # defaults below (posgrp, k0=1000) are the round-5 ones, kept for reproduction.
@@ -71,6 +77,8 @@ BIAS_PIT, BIAS_RATIO = 0.03, 0.05
 # 60-90% reliability bucket on weeks 5-18 within RELIABILITY_TOL.
 WIDTH_TARGET, WIDTH_TOL, RELIABILITY_TOL = 0.20, 0.03, 0.03
 RELIABILITY_BUCKETS = ("60-70", "70-80", "80-90")
+BUCKET_BINS, BUCKET_LABELS = [0.5, 0.6, 0.7, 0.8, 0.9, 1.0001], ["50-60", "60-70", "70-80", "80-90", "90+"]
+MIN_GAMES = 10      # below this many games an interval from resampling them is not trusted
 
 
 def parse_weeks(s):
@@ -173,6 +181,12 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
            if args.env == "market_pass" else
            (M.MARKET_PASS_WEIGHT if getattr(args, "market_pass_weight", None) is None
             else float(args.market_pass_weight))) if live else 0.0
+    # round 23: target share reacts to last week's snap change (live only; None = off)
+    sr_gamma = (M.SNAP_REACT if getattr(args, "snap_react", None) is None
+                else (None if args.snap_react == "off" else float(args.snap_react)))
+    # round 25: the exponent for a snap increase (None = same as sr_gamma)
+    sr_up = (M.SNAP_REACT_UP if getattr(args, "snap_react_up", None) is None
+             else (None if args.snap_react_up == "same" else float(args.snap_react_up)))
     print(f"season={S} env={args.env} opponent={args.opponent} ({opp['level']}, k0={opp['k0']:g}) "
           f"historical_blend={args.historical_blend} dispersion={dispersion} live={live}", file=sys.stderr)
 
@@ -496,6 +510,8 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
 
             ts = two_stage("target_share", "team_targets_n", "ts", np.nan,
                            "target_share", 80, r.own_ts, r.n_tt)
+            if sr_gamma is not None:
+                ts = M.snap_react(ts, r.get("snap_last"), r.get("snap_base"), sr_gamma, gamma_up=sr_up)
             cr = two_stage("catch_rate", "targets_n", "cr", 0.6,
                            "catch_rate", 40, r.own_cr, r.n_tg)
             ypt = two_stage("ypt", "targets_n", "ypt", 7.0,
@@ -572,6 +588,29 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
     # and the legacy --env market slopes. Live mode fits nothing on the season.
     MKT_SLOPES = fit_market_slopes(TRAIN) if args.env == "market" else None
 
+    def add_snap_features(feat):
+        """Round 23: each player-week's snap share LAST week (it must be W-1)
+        and the mean of his earlier weeks (at least two) with the same team --
+        what the scorer reads from the same nflverse file before kickoff."""
+        sn = pd.read_csv(dl(f"{NV}/snap_counts/snap_counts_{S}.csv", f"snap_counts_{S}.csv"), low_memory=False)
+        sn = sn[sn.game_type == "REG"]
+        pl = pd.read_csv(dl(f"{NV}/players/players.csv", "players.csv"), usecols=["gsis_id", "pfr_id"],
+                         low_memory=False).dropna()
+        sn = sn.assign(gsis_id=sn.pfr_player_id.map(dict(zip(pl.pfr_id, pl.gsis_id)))).dropna(subset=["gsis_id"])
+        sn = sn[sn.offense_pct > 0]
+        by = {k: g.sort_values("week")[["week", "offense_pct"]].to_numpy()
+              for k, g in sn.groupby(["team", "gsis_id"])}
+        last, base = [], []
+        for team, W, pid in zip(feat.team, feat.week, feat.gsis_id):
+            a = by.get((team, pid))
+            if a is None:
+                last.append(np.nan); base.append(np.nan); continue
+            prev = a[a[:, 0] < W]
+            if len(prev) < 3 or prev[-1, 0] != W - 1:
+                last.append(np.nan); base.append(np.nan); continue
+            last.append(float(prev[-1, 1])); base.append(float(prev[:-1, 1].mean()))
+        return feat.assign(snap_last=last, snap_base=base)
+
     # Feature caching: population and raw per-player features depend only on the season
     # and week list, NOT on --env / --opponent / K0.
     def cached_features(weeks, label):
@@ -583,6 +622,14 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
         feat.to_pickle(f)
         return feat
     feat_te = cached_features(TEST, "test")
+    _pp = pbp_full[(pbp_full.play_type == "pass") & pbp_full.passer_player_id.notna()]
+    _cmp = (_pp.assign(c=_pp.complete_pass.fillna(0)).groupby(["posteam", "week", "passer_player_id"]).c.sum()
+            .rename("act_completions").reset_index()
+            .rename(columns={"posteam": "team", "passer_player_id": "gsis_id"}))
+    feat_te = feat_te.merge(_cmp, on=["team", "week", "gsis_id"], how="left").assign(
+        act_completions=lambda d: d.act_completions.fillna(0.0))
+    if live and sr_gamma is not None:
+        feat_te = add_snap_features(feat_te)
     feat_te = build_shrunk(feat_te[["team", "week", "gsis_id", "roster_status"]], feat_te, TEST, args.env)
     if not live:
         feat_te = feat_te[feat_te.slot != "QB1"].reset_index(drop=True)
@@ -654,6 +701,7 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
             rec_ = np.zeros((len(frame), N))
             yds = np.zeros((len(frame), N))
             passing = {}
+            completions = {}
             pos_ = {ix: i for i, ix in enumerate(frame.index)}
             for (team, week), g in frame.groupby(["team", "week"], sort=False):
                 tvol = float(g.team_targets_env.iloc[0])
@@ -672,6 +720,9 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
                     passing[(team, week)] = M.simulate_qb_passing(
                         g_rng, N, [y_ for _r, y_ in out.values()], other_t, other_rates, shape_ypc,
                         starter_share=pass_share, width=width)
+                    completions[(team, week)] = M.simulate_qb_completions(
+                        g_rng, N, [r_ for r_, _y in out.values()], other_t, other_rates, starter_share=pass_share)
+            draw_block_joint.completions = completions
             return rec_, yds, passing
 
         def draw_block_rush(frame, shares, ypcs, arm):
@@ -680,6 +731,7 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
             each carry the player's ypc plus a residual from the prior season's
             league grid."""
             yds = np.zeros((len(frame), N))
+            cars = np.zeros((len(frame), N))          # the carries draws (rushing attempts market)
             car_mean = np.zeros(len(frame))           # diagnostics: where the carries go
             share_sum = np.zeros(len(frame))
             pos_ = {ix: i for i, ix in enumerate(frame.index)}
@@ -700,9 +752,10 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
                 tot = float(np.clip(np.asarray(shares[idx], dtype=float), 0, None).sum())
                 for k, i in enumerate(idx):
                     yds[i] = y_[k]
+                    cars[i] = _car[k]
                     car_mean[i] = float(_car[k].mean())
                     share_sum[i] = tot
-            return yds, car_mean, share_sum
+            return yds, car_mean, share_sum, cars
 
         def rpit_block(samples, y_arr):
             return (samples < y_arr[:, None]).mean(1) + rng.uniform(size=len(y_arr)) * (samples == y_arr[:, None]).mean(1)
@@ -722,21 +775,28 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
         # isolates the SHRINKAGE, which is what baseline A exists to test.
         recM, ydsM, passTW = draw_block_joint(tr, tr.ts.values, tr.cr.clip(lower=0.05).values, tr.ypt.values,
                                               arm=1)
+        cmpTW = dict(getattr(draw_block_joint, "completions", {}))
         if full:
             recA, ydsA, passTW_A = draw_block_joint(tr, shareA, crA, yptA, arm=2)
+            cmpTW_A = dict(getattr(draw_block_joint, "completions", {}))
             recI, ydsI = draw_block(mu_m, ypc_m, rec_fit)
         else:                                   # tuning: the model arm is all that is compared
             recA, ydsA, recI, ydsI, passTW_A = recM, ydsM, recM, ydsM, passTW
+            cmpTW_A = cmpTW
         y_rec = tr.act_receptions.values.astype(float)
         y_yds = tr.act_rec_yards.values.astype(float)
         # The receiving PITs draw their tie-break uniforms BEFORE the rushing
         # draws, in the order the single-season protocol always used, so its
         # PIT numbers reproduce exactly.
         pit_rec, pit_yds = rpit_block(recM, y_rec), rpit_block(ydsM, y_yds)
-        rushM, carM, share_sumM = draw_block_rush(test_act, test_act.rs.fillna(0.0).values, test_act.ypc.values,
-                                                  arm=3)
-        rushA = draw_block_rush(test_act, test_act.own_rs.fillna(test_act.rs).fillna(0.0).values,
-                                test_act.own_ypc.fillna(test_act.ypc).values, arm=4)[0] if full else rushM
+        rushM, carM, share_sumM, carsM = draw_block_rush(test_act, test_act.rs.fillna(0.0).values,
+                                                         test_act.ypc.values, arm=3)
+        if full:
+            rushA, _cA, _sA, carsA = draw_block_rush(test_act, test_act.own_rs.fillna(test_act.rs).fillna(0.0).values,
+                                                     test_act.own_ypc.fillna(test_act.ypc).values, arm=4)
+        else:
+            rushA, carsA = rushM, carsM
+        y_car = test_act.act_carries.values.astype(float)
         y_rush = test_act.act_rush_yards.values.astype(float)
         # the book's number for a QB: carries plus kneel-downs
         y_qb = y_rush + test_act.act_kneel_yards.values.astype(float)
@@ -767,6 +827,10 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
         passA = np.array([passTW_A[tw_keys[i]] for i in p_ix]).reshape(len(p_ix), N)
         y_pass = test_act.act_pass_yards.values.astype(float)
         y_pass_p = y_pass[p_ix]
+        cmpM = np.array([cmpTW[tw_keys[i]] for i in p_ix]).reshape(len(p_ix), N)
+        cmpA = np.array([cmpTW_A[tw_keys[i]] for i in p_ix]).reshape(len(p_ix), N)
+        y_cmp = test_act.act_completions.values.astype(float)
+        y_cmp_p = y_cmp[p_ix]
 
         def pass_rows(vals):
             """Starting-QB passing values back onto every row; NaN elsewhere."""
@@ -812,6 +876,19 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
             "pit_qbrush": np.where(qb_pop, rpit_block(rushM, y_qb), nan_),
             # drawn after every other PIT, so theirs are unchanged
             "pit_pass": pass_rows(rpit_block(passM, y_pass_p)),
+            "pit_car": np.where(rush_pop, rpit_block(carsM, y_car), nan_),
+            "med_car_model": np.where(rush_pop, np.median(carsM, axis=1), nan_),
+            "above_med_car": y_car > np.median(carsM, axis=1),
+            "crps_car_model": np.where(rush_pop, crps_block(carsM, y_car), nan_),
+            "crps_car_baseA": np.where(rush_pop, crps_block(carsA, y_car), nan_),
+            # QB completions, drawn after every other PIT (reports/qb_completions.md)
+            "act_completions": y_cmp,
+            "pit_cmp": pass_rows(rpit_block(cmpM, y_cmp_p)),
+            "med_cmp_model": pass_rows(np.median(cmpM, axis=1)),
+            "mean_cmp_model": pass_rows(cmpM.mean(1)),
+            "above_med_cmp": pass_rows(y_cmp_p > np.median(cmpM, axis=1)),
+            "crps_cmp_model": pass_rows(crps_block(cmpM, y_cmp_p)),
+            "crps_cmp_baseA": pass_rows(crps_block(cmpA, y_cmp_p)),
             "crps_rec_model": full_rows(crps_block(recM, y_rec)), "crps_rec_baseA": full_rows(crps_block(recA, y_rec)),
             "crps_yds_model": full_rows(crps_block(ydsM, y_yds)), "crps_yds_baseA": full_rows(crps_block(ydsA, y_yds)),
             "crps_rush_model": np.where(rush_pop, crps_block(rushM, y_rush), nan_),
@@ -826,25 +903,31 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
         # fixed offsets from the model median (not model quantiles, which would be
         # circular); the realized hit rate per predicted-probability bucket.
         calib = []
-        for mk, samples, y, keep, weeks_ in [
-                ("rec", recM, y_rec, np.ones(len(y_rec), bool), tr.week.values),
-                ("yds", ydsM, y_yds, np.ones(len(y_yds), bool), tr.week.values),
-                ("rush", rushM, y_rush, rush_pop, test_act.week.values),
-                ("qbrush", rushM, y_qb, qb_pop, test_act.week.values),
-                ("pass", passM, y_pass_p, np.ones(len(p_ix), bool), test_act.week.values[p_ix])]:
+        game_of = {(t_, int(w_)): g_ for t_, w_, g_ in zip(gm.team, gm.week, gm.game_id)}
+        games_r = np.array([game_of.get((t_, int(w_)), f"{t_}_{w_}") for t_, w_ in zip(tr.team, tr.week)])
+        games_a = np.array([game_of.get((t_, int(w_)), f"{t_}_{w_}") for t_, w_ in zip(test_act.team, test_act.week)])
+        for mk, samples, y, keep, weeks_, games_ in [
+                ("rec", recM, y_rec, np.ones(len(y_rec), bool), tr.week.values, games_r),
+                ("yds", ydsM, y_yds, np.ones(len(y_yds), bool), tr.week.values, games_r),
+                ("rush", rushM, y_rush, rush_pop, test_act.week.values, games_a),
+                ("qbrush", rushM, y_qb, qb_pop, test_act.week.values, games_a),
+                ("pass", passM, y_pass_p, np.ones(len(p_ix), bool), test_act.week.values[p_ix], games_a[p_ix]),
+                ("car", carsM, y_car, rush_pop, test_act.week.values, games_a),
+                ("cmp", cmpM, y_cmp_p, np.ones(len(p_ix), bool), test_act.week.values[p_ix], games_a[p_ix])]:
             if not keep.any():
                 continue
             smp, yy = samples[keep], y[keep]
             med = np.median(smp, axis=1)
             for o in MARKETS[mk][2]:
                 for side, L in [("Under", med + o), ("Over", np.maximum(med - o, 0.5))]:
-                    if mk == "rec":
+                    if mk in ("rec", "car", "cmp"):     # counts: lines at the half
                         L = np.floor(L) + 0.5 if side == "Under" else np.ceil(L) - 0.5
                         L = np.maximum(L, 0.5)
                     p = (smp < L[:, None]).mean(1) if side == "Under" else (smp > L[:, None]).mean(1)
                     hit = (yy < L) if side == "Under" else (yy > L)
                     calib.append(pd.DataFrame({"season": S, "market": MARKETS[mk][1], "side": side,
-                                               "week": weeks_[keep], "p_model": p, "hit": hit.astype(float)}))
+                                               "week": weeks_[keep], "p_model": p, "hit": hit.astype(float),
+                                               "game": games_[keep]}))
         meta = {"season": S, "priors": PRIOR, "dispersion": dispersion, "live": live, "opp": opp,
                 "rec_dispersion": rec_fit, "shape_ypc": shape_ypc, "team_targets_r": r_team_targets,
                 "team_carries_r": r_team_carries, "width": dict(width or {}),
@@ -863,7 +946,7 @@ def game_block_ci(d, diff, reps=2000, seed=1):
     key = d["season"].astype(str) + "_" + d["game_id"].astype(str)
     g = pd.DataFrame({"k": key.values, "diff": diff.values}).groupby("k")["diff"]
     sums, cnt = g.sum().values, g.size().values
-    if len(sums) < 10:
+    if len(sums) < MIN_GAMES:
         return float("nan"), float("nan")
     idx = np.random.default_rng(seed).integers(0, len(sums), size=(reps, len(sums)))
     boot = sums[idx].sum(1) / cnt[idx].sum(1)
@@ -898,8 +981,7 @@ def summarize(res, mk, ci=True):
 
 
 def reliability_table(C):
-    bins = [0.5, 0.6, 0.7, 0.8, 0.9, 1.0001]
-    C = C.assign(bucket=pd.cut(C.p_model, bins, right=False, labels=["50-60", "60-70", "70-80", "80-90", "90+"]))
+    C = C.assign(bucket=pd.cut(C.p_model, BUCKET_BINS, right=False, labels=BUCKET_LABELS))
     return C.dropna(subset=["bucket"]).groupby(["market", "side", "bucket"], observed=True).agg(
         n=("hit", "size"), p_model_mean=("p_model", "mean"), hit_rate=("hit", "mean")).reset_index()
 
@@ -1178,23 +1260,110 @@ def tune_width(args, OUT):
     print(f"chosen: {chosen}", file=sys.stderr)
 
 
-def market_verdict(all_res, rel_weeks5, test, mk):
-    """The four-part bar for `live` (docs/plans/2026-09-24-yardage-harness.md):
-    beats baseline A on each test season, unbiased, the right width, and every
-    60-90% reliability bucket (weeks 5-18) within tolerance."""
+PASS, FAIL, INSUFF = "PASS", "FAIL", "INSUFFICIENT DATA"
+
+
+def three_state(lo, hi, lo_ok, hi_ok):
+    """Equivalence-style verdict on an interval (DECISIONS #150): PASS when the
+    whole 95% interval sits inside the acceptable range [lo_ok, hi_ok], FAIL
+    when it sits wholly outside, INSUFFICIENT DATA when it spans both."""
+    if not (np.isfinite(lo) and np.isfinite(hi)):
+        return INSUFF
+    if lo >= lo_ok and hi <= hi_ok:
+        return PASS
+    if hi < lo_ok or lo > hi_ok:
+        return FAIL
+    return INSUFF
+
+
+def band_intervals(C5, reps=1000, seed=3):
+    """Per (side, bucket) reliability band: realized minus mean predicted
+    probability, with a 95% interval from resampling whole GAMES (every player
+    and every synthetic line of a game stay together). C5: one market's lines,
+    test seasons, weeks 5-18, with a `game` column."""
+    if C5.empty:
+        return pd.DataFrame()
+    C5 = C5.assign(gkey=C5.season.astype(str) + "_" + C5.game.astype(str))
+    agg = C5.groupby(["gkey", "side", "bucket"], observed=True).agg(
+        n=("hit", "size"), h=("hit", "sum"), p=("p_model", "sum")).reset_index()
+    bands = agg[["side", "bucket"]].drop_duplicates().reset_index(drop=True)
+    games = np.sort(agg.gkey.unique())
+    gi = {g: i for i, g in enumerate(games)}
+    K, G = len(bands), len(games)
+    bi = {(r.side, r.bucket): i for i, r in bands.iterrows()}
+    H, Pm, Nn = np.zeros((G, K)), np.zeros((G, K)), np.zeros((G, K))
+    for r in agg.itertuples():
+        j, k = gi[r.gkey], bi[(r.side, r.bucket)]
+        H[j, k], Pm[j, k], Nn[j, k] = r.h, r.p, r.n
+    idx = np.random.default_rng(seed).integers(0, G, size=(reps, G))
+    nb = Nn[idx].sum(1)
+    gap_b = (H[idx].sum(1) - Pm[idx].sum(1)) / np.where(nb > 0, nb, np.nan)
+    lo, hi = np.nanpercentile(gap_b, [2.5, 97.5], axis=0)
+    n_tot, n_g = Nn.sum(0), (Nn > 0).sum(0)
+    lo, hi = np.where(n_g >= MIN_GAMES, lo, np.nan), np.where(n_g >= MIN_GAMES, hi, np.nan)
+    out = bands.assign(n_lines=[int(x) for x in n_tot], n_games=[int(x) for x in n_g],
+                       gap=(H.sum(0) - Pm.sum(0)) / np.where(n_tot > 0, n_tot, np.nan), lo=lo, hi=hi)
+    out["status"] = [three_state(a, b, -RELIABILITY_TOL, RELIABILITY_TOL) for a, b in zip(out.lo, out.hi)]
+    return out
+
+
+def market_verdict(all_res, calib, test, mk):
+    """The bar for `live` (docs/plans/2026-09-24-yardage-harness.md, revised by
+    DECISIONS #150), each part PASS / FAIL / INSUFFICIENT DATA on the test
+    seasons with 95% intervals from resampling whole games:
+    - baseline: pooled gain over baseline A above zero, and no test season
+      clearly worse (its interval below zero);
+    - bias: actual/model mean within 5% (relative bias = mean(actual - model)
+      / mean(model)), and the PIT mean within 0.47-0.53;
+    - width: outcomes outside the model's p10-p90 within 0.20 +/- 0.03;
+    - calibration: every 60-90% reliability band (weeks 5-18) within 0.03.
+    The market PASSES only when every part passes; any FAIL fails it; else
+    INSUFFICIENT DATA."""
     label = MARKETS[mk][1]
     per_test = [summarize(all_res[all_res.season == s], mk) for s in test]
     pooled = summarize(all_res[all_res.season.isin(test)], mk)
-    beats = all(p is not None and p["ci"][0] > 0 for p in per_test)
-    unbiased = pooled is not None and not pooled["biased"]
-    width_ok = pooled is not None and abs(pooled["outside_p10_p90"] - WIDTH_TARGET) <= WIDTH_TOL + 1e-9
-    r5 = rel_weeks5[(rel_weeks5.market == label) & rel_weeks5.bucket.astype(str).isin(RELIABILITY_BUCKETS)]
-    worst_gap = float((r5.hit_rate - r5.p_model_mean).abs().max()) if len(r5) else float("nan")
-    calib_ok = bool(len(r5)) and worst_gap <= RELIABILITY_TOL
-    return {"passes": bool(beats and unbiased and width_ok and calib_ok),
-            "beats_baseline_each_test_season": beats, "unbiased": unbiased,
-            "outside_p10_p90": None if pooled is None else pooled["outside_p10_p90"],
-            "width_ok": width_ok, "worst_reliability_gap": worst_gap, "calibration_ok": calib_ok}
+    d = market_rows(all_res[all_res.season.isin(test)], mk)
+    out = {"label": label, "n_player_games": int(len(d)),
+           "n_games": int((d.season.astype(str) + "_" + d.game_id.astype(str)).nunique()) if len(d) else 0}
+    if pooled is None or d.empty:
+        return {**out, "status": INSUFF, "passes": False}
+    # baseline
+    plo, phi = pooled["ci"]
+    season_worse = any(p is not None and p["ci"][1] < 0 for p in per_test)
+    base = FAIL if (phi < 0 or season_worse) else (PASS if plo > 0 else INSUFF)
+    # bias (relative), with the PIT mean as a point check
+    act, mod = d[MARKETS[mk][0]].astype(float), d[f"mean_{mk}_model"].astype(float)
+    rb = float((act - mod).mean() / max(mod.mean(), 1e-9))
+    rlo, rhi = game_block_ci(d, (act - mod) / max(mod.mean(), 1e-9))
+    bias = three_state(rlo, rhi, -BIAS_RATIO, BIAS_RATIO)
+    pitm = pooled["pit_mean"]
+    if abs(pitm - 0.5) > BIAS_PIT and bias == PASS:
+        bias = INSUFF
+    # width
+    dp = d.dropna(subset=[f"pit_{mk}"])
+    tails = ((dp[f"pit_{mk}"] < 0.1) | (dp[f"pit_{mk}"] > 0.9)).astype(float)
+    wlo, whi = game_block_ci(dp, tails)
+    width = three_state(wlo, whi, WIDTH_TARGET - WIDTH_TOL, WIDTH_TARGET + WIDTH_TOL)
+    # calibration
+    C5 = calib[(calib.market == label) & calib.season.isin(test) & (calib.week >= 5)]
+    C5 = C5.assign(bucket=pd.cut(C5.p_model, BUCKET_BINS, right=False, labels=BUCKET_LABELS))
+    C5 = C5[C5.bucket.astype(str).isin(RELIABILITY_BUCKETS)]
+    bands = band_intervals(C5) if "game" in C5.columns else pd.DataFrame()
+    if bands.empty:
+        cal = INSUFF
+    elif (bands.status == FAIL).any():
+        cal = FAIL
+    elif (bands.status == PASS).all():
+        cal = PASS
+    else:
+        cal = INSUFF
+    parts = [base, bias, width, cal]
+    status = FAIL if FAIL in parts else (PASS if all(x == PASS for x in parts) else INSUFF)
+    return {**out, "status": status, "passes": status == PASS,
+            "baseline": base, "baseline_ci": [plo, phi], "season_clearly_worse": season_worse,
+            "bias": bias, "relative_bias": rb, "relative_bias_ci": [rlo, rhi], "pit_mean": pitm,
+            "width": width, "outside_p10_p90": float(tails.mean()), "width_ci": [wlo, whi],
+            "calibration": cal, "bands": bands.to_dict(orient="records") if len(bands) else []}
 
 
 def harness_report(all_res, calib, metas, args, out_base, comparison=None):
@@ -1242,13 +1411,27 @@ def harness_report(all_res, calib, metas, args, out_base, comparison=None):
                 L.append(f"| {gname} | {sname} | {s['n']} | {s['crps_model']:.3f} | {s['crps_baseA']:.3f} | "
                          f"{s['gain']:+.3f} ({lo:+.3f}, {hi:+.3f}){sig} | {s['actual_over_model']:.3f} | "
                          f"{s['pit_mean']:.3f} | {s['outside_p10_p90']:.3f} | {'BIASED' if s['biased'] else ''} |")
-        v = verdicts[mk] = market_verdict(all_res, rel_frames["weeks 5-18"], test, mk)
-        yn = lambda b: "yes" if b else "**no**"
-        width = float("nan") if v["outside_p10_p90"] is None else v["outside_p10_p90"]
-        L += ["", f"**Verdict on the test seasons: {'PASSES' if v['passes'] else 'DOES NOT PASS'}** -- "
-              f"beats baseline A each season: {yn(v['beats_baseline_each_test_season'])}; unbiased: "
-              f"{yn(v['unbiased'])}; width ({width:.3f} outside p10-p90): {yn(v['width_ok'])}; calibration "
-              f"(worst 60-90% gap {v['worst_reliability_gap']:.3f}): {yn(v['calibration_ok'])}.", ""]
+        v = verdicts[mk] = market_verdict(all_res, calib, test, mk)
+        st = lambda x: x if x == PASS else f"**{x}**"
+        word = {PASS: "PASSES", FAIL: "DOES NOT PASS", INSUFF: "INSUFFICIENT DATA"}[v["status"]]
+        if "baseline" in v:
+            L += ["", f"**Verdict on the test seasons: {word}** ({v['n_games']} games, {v['n_player_games']} "
+                  f"player-games) -- baseline: {st(v['baseline'])} (pooled gain interval "
+                  f"{v['baseline_ci'][0]:+.3f} to {v['baseline_ci'][1]:+.3f}"
+                  + ("; a test season clearly worse" if v["season_clearly_worse"] else "") + "); "
+                  f"bias: {st(v['bias'])} (relative {v['relative_bias']:+.1%}, 95% {v['relative_bias_ci'][0]:+.1%} "
+                  f"to {v['relative_bias_ci'][1]:+.1%}; PIT {v['pit_mean']:.3f}); width: {st(v['width'])} "
+                  f"({v['outside_p10_p90']:.3f} outside p10-p90, 95% {v['width_ci'][0]:.3f} to "
+                  f"{v['width_ci'][1]:.3f}); calibration: {st(v['calibration'])}.", ""]
+            if v["bands"]:
+                L += ["| Band (weeks 5-18) | Lines | Games | Gap | 95% (games resampled) | Status |",
+                      "|---|---|---|---|---|---|"]
+                for b in v["bands"]:
+                    L.append(f"| {b['side']} {b['bucket']} | {b['n_lines']} | {b['n_games']} | {b['gap']:+.3f} | "
+                             f"{b['lo']:+.3f} to {b['hi']:+.3f} | {st(b['status'])} |")
+                L.append("")
+        else:
+            L += ["", f"**Verdict on the test seasons: {word}** -- no rows.", ""]
 
     # reliability, pooled test seasons, by slice: CRPS and the mean can both
     # look fine while the distribution is too narrow, and a too-narrow
@@ -1299,7 +1482,7 @@ def harness_report(all_res, calib, metas, args, out_base, comparison=None):
         encoding="utf-8")
     print(f"wrote {out_base}.md and .json", file=sys.stderr)
     for mk, v in verdicts.items():
-        print(f"  {MARKETS[mk][1]}: {'PASSES' if v['passes'] else 'does not pass'}", file=sys.stderr)
+        print(f"  {MARKETS[mk][1]}: {v['status']}", file=sys.stderr)
 
 
 def load_run(path, kind):
@@ -1444,6 +1627,11 @@ def main(argv=None):
     ap.add_argument("--live-opp-metrics", default=None,
                     help="harness ABLATION: the opponent-adjusted rates in live mode (default: the scorer's, "
                          "catch_rate,ypt,ypc); e.g. catch_rate,ypt drops the run-defense adjustment")
+    ap.add_argument("--snap-react-up", default=None,
+                    help="round 25: exponent for a snap increase, or 'same' (default model.SNAP_REACT_UP)")
+    ap.add_argument("--snap-react", default=None,
+                    help="round 23: target share x (last week's snaps / earlier weeks') ** g, or 'off' "
+                         "(default model.SNAP_REACT)")
     ap.add_argument("--k0", default=None,
                     help="round 17: fixed shrinkage constants over the priors' fit, e.g. 'ypt=40,catch_rate=20' "
                          "(default: model.K0_FIXED)")

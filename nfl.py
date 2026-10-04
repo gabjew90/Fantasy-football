@@ -298,7 +298,7 @@ def main(argv=None) -> int:
     p.add_argument("args", nargs="*", help="game: AWAY@HOME; player: NAME; line: NAME STAT LINE; best/matchup: AWAY@HOME")
     p.add_argument("--game", help="question tools: the game, AWAY@HOME (found from the player's team when omitted)")
     p.add_argument("--slate", action="store_true", help="best: the whole week's card")
-    p.add_argument("--survival", action="store_true", help="best --slate: the engine's one must-win pick per game")
+    p.add_argument("--survival", action="store_true", help="retired: the must-win pick is off until the record earns it (DECISIONS #142)")
     p.add_argument("--market", default="", help="best: one market (catches, rec yds, rush yds, pass yds, td)")
     p.add_argument("--n", type=int, default=8, help="best: how many rows")
     p.add_argument("--fresh", action="store_true", help="question tools: re-price instead of reusing a run under 20 min old")

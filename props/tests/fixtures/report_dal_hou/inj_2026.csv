@@ -1,0 +1,56 @@
+season,season_type,game_type,team,week,gsis_id,position,full_name,first_name,last_name,report_primary_injury,report_secondary_injury,report_status,practice_primary_injury,practice_secondary_injury,practice_status
+2026,REG,REG,DAL,1,00-0033093,DT,Jonathan Bullard,Jonathan,Bullard,,,,Groin,,Full Participation in Practice
+2026,REG,REG,DAL,1,00-0037563,RB,Malik Davis,Malik,Davis,Hip,,Out,Hip,,Limited Participation in Practice
+2026,REG,REG,DAL,1,00-0038547,TE,Luke Schoonmaker,Luke,Schoonmaker,,,,Not injury related - personal matter,,Did Not Participate In Practice
+2026,REG,REG,DAL,1,00-0040017,T,Ajani Cornelius,Ajani,Cornelius,,,,Knee,,Full Participation in Practice
+2026,REG,REG,HOU,1,00-0032071,T,Trent Brown,Trenton,Brown,,,,Wrist,,Full Participation in Practice
+2026,REG,REG,HOU,1,00-0039108,DE,Will Anderson Jr.,William,Anderson,,,,Not injury related - resting player,,Did Not Participate In Practice
+2026,REG,REG,HOU,1,00-0041440,DT,Kayden McDonald,Kayden,McDonald,,,,Ankle,,Did Not Participate In Practice
+2026,REG,REG,HOU,1,00-0041465,LB,Wade Woodaz,Wade,Woodaz,,,,Thumb,,Full Participation in Practice
+2026,REG,REG,DAL,2,00-0033877,S,Malik Hooker,Malik,Hooker,Forearm,,Out,Forearm,,Did Not Participate In Practice
+2026,REG,REG,DAL,2,00-0037310,LB,James Houston,James,Houston,,,,Shoulder,,Full Participation in Practice
+2026,REG,REG,DAL,2,00-0038556,LB,DeMarvion Overshown,DeMarvion,Overshown,Hamstring,,Out,Hamstring,,Did Not Participate In Practice
+2026,REG,REG,DAL,2,00-0040017,T,Ajani Cornelius,Ajani,Cornelius,,,,Knee,,Full Participation in Practice
+2026,REG,REG,HOU,2,00-0031364,DE,Jadeveon Clowney,Jadeveon,Clowney,Knee,,Out,Knee,,Did Not Participate In Practice
+2026,REG,REG,HOU,2,00-0032071,T,Trent Brown,Trenton,Brown,,,,Hand,Wrist,Full Participation in Practice
+2026,REG,REG,HOU,2,00-0034383,TE,Dalton Schultz,Dalton,Schultz,,,,Not injury related - resting player,,Did Not Participate In Practice
+2026,REG,REG,HOU,2,00-0036554,WR,Nico Collins,Nico,Collins,Hamstring,,Out,Hamstring,,Did Not Participate In Practice
+2026,REG,REG,HOU,2,00-0037633,LB,Jacob Hummel,Jacob,Hummel,Groin,,Out,Groin,,Did Not Participate In Practice
+2026,REG,REG,HOU,2,00-0038127,DE,Logan Hall,Logan,Hall,,,,Not injury related - resting player,,Did Not Participate In Practice
+2026,REG,REG,HOU,2,00-0038131,G,Ed Ingram,Edward,Ingram,Groin,,Out,Groin,,Did Not Participate In Practice
+2026,REG,REG,HOU,2,00-0039108,DE,Will Anderson Jr.,William,Anderson,,,,Not injury related - resting player,,Limited Participation in Practice
+2026,REG,REG,HOU,2,00-0041465,LB,Wade Woodaz,Wade,Woodaz,,,,Thumb,,Full Participation in Practice
+2026,REG,REG,DAL,3,00-0033877,S,Malik Hooker,Malik,Hooker,Forearm,,Out,Forearm,,Did Not Participate In Practice
+2026,REG,REG,DAL,3,00-0035227,S,P.J. Locke,James,Locke,Foot,,Out,Foot,,Did Not Participate In Practice
+2026,REG,REG,DAL,3,00-0037310,LB,James Houston,James,Houston,,,,Shoulder,,Full Participation in Practice
+2026,REG,REG,DAL,3,00-0037839,CB,Cobie Durant,Decobie,Durant,Hamstring,,Out,Hamstring,,Did Not Participate In Practice
+2026,REG,REG,DAL,3,00-0038556,LB,DeMarvion Overshown,DeMarvion,Overshown,Hamstring,,Out,Hamstring,,Did Not Participate In Practice
+2026,REG,REG,HOU,3,00-0031364,DE,Jadeveon Clowney,Jadeveon,Clowney,Knee,,Out,Knee,,Did Not Participate In Practice
+2026,REG,REG,HOU,3,00-0032071,T,Trent Brown,Trenton,Brown,Knee,Wrist,Questionable,Knee,Wrist,Full Participation in Practice
+2026,REG,REG,HOU,3,00-0034355,S,M.J. Stewart,Marvin,Stewart,Knee,,Out,Knee,,Limited Participation in Practice
+2026,REG,REG,HOU,3,00-0034383,TE,Dalton Schultz,Dalton,Schultz,,,,Not injury related - resting player,,Did Not Participate In Practice
+2026,REG,REG,HOU,3,00-0036554,WR,Nico Collins,Nico,Collins,Hamstring,,Out,Hamstring,,Did Not Participate In Practice
+2026,REG,REG,HOU,3,00-0037130,S,Reed Blankenship,Reed,Blankenship,,,,Thumb,,Full Participation in Practice
+2026,REG,REG,HOU,3,00-0037633,LB,Jacob Hummel,Jacob,Hummel,Groin,,Out,Groin,,Did Not Participate In Practice
+2026,REG,REG,HOU,3,00-0038127,DE,Logan Hall,Logan,Hall,,,,Knee,,Did Not Participate In Practice
+2026,REG,REG,HOU,3,00-0038131,G,Ed Ingram,Edward,Ingram,Groin,,Out,Groin,,Did Not Participate In Practice
+2026,REG,REG,HOU,3,00-0039108,DE,Will Anderson Jr.,William,Anderson,,,,Not injury related - resting player,,Limited Participation in Practice
+2026,REG,REG,HOU,3,00-0041465,LB,Wade Woodaz,Wade,Woodaz,,,,Thumb,,Full Participation in Practice
+2026,REG,REG,DAL,4,00-0033877,S,Malik Hooker,Malik,Hooker,,,,Forearm,,Full Participation in Practice
+2026,REG,REG,DAL,4,00-0037310,LB,James Houston,James,Houston,,,,Shoulder,,Full Participation in Practice
+2026,REG,REG,DAL,4,00-0037839,CB,Cobie Durant,Decobie,Durant,Hamstring,,Out,Hamstring,,Did Not Participate In Practice
+2026,REG,REG,DAL,4,00-0038556,LB,DeMarvion Overshown,DeMarvion,Overshown,Hamstring,,Out,Hamstring,,Did Not Participate In Practice
+2026,REG,REG,DAL,4,00-0040008,CB,Shavon Revel Jr.,Shavon,Revel,,,,Knee,Ankle,Full Participation in Practice
+2026,REG,REG,HOU,4,00-0031364,DE,Jadeveon Clowney,Jadeveon,Clowney,Knee,,Questionable,Knee,,Did Not Participate In Practice
+2026,REG,REG,HOU,4,00-0032071,T,Trent Brown,Trenton,Brown,,,,Illness,Knee,Full Participation in Practice
+2026,REG,REG,HOU,4,00-0034355,S,M.J. Stewart,Marvin,Stewart,Knee,,Out,Knee,,Did Not Participate In Practice
+2026,REG,REG,HOU,4,00-0034383,TE,Dalton Schultz,Dalton,Schultz,,,,Not injury related - resting player,,Limited Participation in Practice
+2026,REG,REG,HOU,4,00-0035166,LB,Azeez Al-Shaair,Azeez,Al-Shaair,Groin,,Out,Groin,,Did Not Participate In Practice
+2026,REG,REG,HOU,4,00-0036554,WR,Nico Collins,Nico,Collins,,,,Hamstring,,Full Participation in Practice
+2026,REG,REG,HOU,4,00-0037457,LB,Jake Hansen,Jake,Hansen,Calf,,Questionable,Calf,,Full Participation in Practice
+2026,REG,REG,HOU,4,00-0038127,DE,Logan Hall,Logan,Hall,Knee,,Questionable,Knee,,Limited Participation in Practice
+2026,REG,REG,HOU,4,00-0038131,G,Ed Ingram,Edward,Ingram,Groin,,Questionable,Groin,,Full Participation in Practice
+2026,REG,REG,HOU,4,00-0039108,DE,Will Anderson Jr.,William,Anderson,,,,Ankle,,Full Participation in Practice
+2026,REG,REG,HOU,4,00-0039603,RB,British Brooks,British,Brooks,,,,Hamstring,,Did Not Participate In Practice
+2026,REG,REG,HOU,4,00-0039838,S,Calen Bullock,Calen,Bullock,,,,Quadricep,,Full Participation in Practice
+2026,REG,REG,HOU,4,00-0041465,LB,Wade Woodaz,Wade,Woodaz,,,,Ankle,Thumb,Full Participation in Practice

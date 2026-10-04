@@ -165,10 +165,20 @@ jobs:
             --snapshot-type ${{ steps.guard.outputs.snapshot_type }} \
             --engine-dir "$ENGINE_DIR" \
             --engine-source "$ENGINE_SOURCE"
+          # Sleeper against DraftKings/FanDuel (DECISIONS #147): one snapshot per
+          # game in the window, ~4 credits, never below 100; never costs a capture
+          python props/compare.py --season ${{ steps.guard.outputs.season }} \
+            --week ${{ steps.guard.outputs.week }} --engine-dir "$ENGINE_DIR" \
+            || echo "::warning::compare skipped; the capture is unaffected"
 
       - name: settle
         if: steps.guard.outputs.run == 'true' && steps.guard.outputs.mode == 'settle'
-        run: python props/settle.py --season ${{ steps.guard.outputs.season }}
+        run: |
+          python props/settle.py --season ${{ steps.guard.outputs.season }}
+          # the user's bet journal (DECISIONS #142), graded from the same stats file
+          # a journal problem must not cost the week's record or scorecard
+          python props/journal.py grade --season ${{ steps.guard.outputs.season }} \
+            || echo "::warning::journal grading failed; the model's record is unaffected"
 
       - name: scorecard
         if: steps.guard.outputs.run == 'true' && steps.guard.outputs.mode != 'capture'
@@ -180,6 +190,8 @@ jobs:
           git config user.name "props-record"
           git config user.email "actions@users.noreply.github.com"
           git add props/record
+          # the journal exists once the first bet is logged
+          if [ -d props/journal ]; then git add props/journal; fi
           git diff --cached --quiet || git commit -m "props: ${{ steps.guard.outputs.mode }} $(TZ=America/Los_Angeles date '+%a %m/%d %H:%M PT')"
           git pull --rebase --autostash origin ${{ github.ref_name }}
           git push

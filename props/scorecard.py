@@ -29,9 +29,11 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import calls as calls_mod  # noqa: E402
 import blend  # noqa: E402
+import journal  # noqa: E402
 import persist  # noqa: E402
 
 try:
+    import numpy as np
     import pandas as pd
 except ImportError:  # pragma: no cover
     print("pandas is required: pip install -r props/requirements.txt", file=sys.stderr)
@@ -174,6 +176,142 @@ def clv_table(season: int) -> pd.DataFrame:
     return pd.DataFrame(paired)
 
 
+BOOKS_MIN = 200                     # reports/sleeper_vs_books.md: the reading rule's sample
+LINE_OFF = {"player_receptions": 0.5, "player_reception_yds": 2.5, "player_rush_yds": 2.5,
+            "player_pass_yds": 5.0}
+PRICE_OFF = 0.03
+
+
+def _novig_over(po, pu):
+    """The no-vig Over chance from two American prices."""
+    io = 100 / (po + 100) if po > 0 else -po / (-po + 100)
+    iu = 100 / (pu + 100) if pu > 0 else -pu / (-pu + 100)
+    return io / (io + iu)
+
+
+def books_consensus(rows: list[dict]) -> dict:
+    """(week, player key, market) -> (consensus line, consensus no-vig Over
+    chance at that line) from DraftKings/FanDuel comparison rows."""
+    import settle as _s
+    by: dict = {}
+    for r in rows:
+        k = (int(r["week"]), _s.norm_name(str(r["player"])), r["market"], r["book"], float(r["line"]))
+        by.setdefault(k, {})[r["side"]] = int(r["price"])
+    per: dict = {}
+    for (wk, nm, mk, bk, ln), sides in by.items():
+        if "Over" in sides and "Under" in sides:
+            per.setdefault((wk, nm, mk), []).append((ln, _novig_over(sides["Over"], sides["Under"])))
+    out = {}
+    for k, v in per.items():
+        lines = sorted(x[0] for x in v)
+        med = lines[len(lines) // 2] if len(lines) % 2 else (lines[len(lines) // 2 - 1] + lines[len(lines) // 2]) / 2
+        at = [p for ln, p in v if ln == med]
+        # no book at the median line (DK 3.5, FD 4.5): no consensus PRICE there,
+        # only a consensus line -- prices quoted at different lines never average
+        out[k] = (med, sum(at) / len(at) if at else None)
+    return out
+
+
+def books_rows(df: pd.DataFrame, rows: list[dict]) -> pd.DataFrame:
+    """Each settled Sleeper call joined to the consensus, with the favoured side
+    graded at Sleeper's own price (reports/sleeper_vs_books.md)."""
+    import settle as _s
+    if not rows or df.empty or "price_over" not in df.columns:
+        return pd.DataFrame()
+    cons = books_consensus(rows)
+    out = []
+    # one bet per Sleeper line: the same line can be a call under two pricing
+    # models in one week (an engine release mid-week)
+    d0 = df[df["market"].isin(list(LINE_OFF))].drop_duplicates(["week", "player", "market", "line"], keep="last")
+    for _, r in d0.iterrows():
+        try:
+            line, actual = float(r["line"]), float(r["actual"])
+            po, pu = int(float(r["price_over"])), int(float(r["price_under"]))
+        except (TypeError, ValueError):
+            continue
+        c = cons.get((int(r["week"]), _s.norm_name(str(r["player"])), r["market"]))
+        if c is None:
+            continue
+        d = line - c[0]
+        if abs(d) >= LINE_OFF[r["market"]]:
+            kind, fav = "line off", ("Under" if d > 0 else "Over")
+        elif d == 0 and c[1] is not None and abs(c[1] - _novig_over(po, pu)) >= PRICE_OFF:
+            kind, fav = "price off", ("Over" if c[1] > _novig_over(po, pu) else "Under")
+        else:
+            continue
+        if actual == line:
+            won, pnl = None, 0.0
+        else:
+            won = (actual > line) if fav == "Over" else (actual < line)
+            pnl = _s.american_pnl(po if fav == "Over" else pu, won)
+        price = po if fav == "Over" else pu
+        out.append({"kind": kind, "event_id": r.get("event_id"), "won": won, "pnl": pnl,
+                    "breakeven": (abs(price) / (abs(price) + 100) if price < 0 else 100 / (price + 100))})
+    return pd.DataFrame(out)
+
+
+def books_section(df: pd.DataFrame, season: int) -> list[str]:
+    """Sleeper against DraftKings/FanDuel: the consensus-favoured side at
+    Sleeper's price, by discrepancy type, with the pre-registered reading rule."""
+    root = persist.RECORD_ROOT / "compare" / str(season)
+    rows = []
+    for f in sorted(root.glob("wk*.jsonl")) if root.exists() else []:
+        with f.open(encoding="utf-8") as fh:
+            rows += [json.loads(ln) for ln in fh if ln.strip()]
+    out = ["## Sleeper against DraftKings/FanDuel", "",
+           "Not the model: when Sleeper's line or price sits off the DraftKings/FanDuel consensus, the side the "
+           "consensus favours, bet at Sleeper's price (reports/sleeper_vs_books.md).", ""]
+    b = books_rows(df, rows)
+    if b.empty:
+        return out + [f"{len(rows)} comparison rows logged; no settled Sleeper call has a matching discrepancy yet.", ""]
+    out += ["| Discrepancy | Bets | Won | Win rate | Break-even | Net per $100 (95% CI) |", "|---|---|---|---|---|---|"]
+    rng = np.random.default_rng(7)
+    for kind, g in list(b.groupby("kind")) + [("both, pooled", b)]:
+        graded = g[g.won.notna()]
+        games = g.event_id.astype(str).to_numpy()
+        ug = np.unique(games)
+        boots = []
+        for _ in range(500):
+            take = np.concatenate([np.flatnonzero(games == x) for x in rng.choice(ug, len(ug))])
+            boots.append(g.pnl.to_numpy()[take].mean())
+        lo, hi = np.percentile(boots, [2.5, 97.5]) if len(ug) > 1 else (np.nan, np.nan)
+        wr = graded.won.astype(bool).mean() if len(graded) else float("nan")
+        out.append(f"| {kind} | {len(g)} | {int(graded.won.astype(bool).sum())} | {wr:.1%} | "
+                   f"{g.breakeven.mean():.1%} | {g.pnl.mean():+.1f} ({lo:+.1f}, {hi:+.1f}) |")
+    verdict = ("**edge by the pre-set rule**" if len(b) >= BOOKS_MIN and np.isfinite(lo) and lo > 0
+               else f"no verdict yet: the rule needs {BOOKS_MIN}+ bets and an interval above zero")
+    return out + ["", f"{len(b)} graded discrepancies: {verdict}.", ""]
+
+
+def snap_rule_section(df: pd.DataFrame) -> list[str]:
+    """DECISIONS #145: the receiving calls the snap-change rule moved (round 23)
+    against the ones it did not -- the fresh check on its 2024-25 overshoot for
+    receivers whose snaps jumped. `miss` is actual minus the model's mean."""
+    if "snap_react" not in df.columns:
+        return []
+    d = df[df["market"].isin(["player_receptions", "player_reception_yds"])].copy()
+    d["snap_react"] = pd.to_numeric(d["snap_react"], errors="coerce")
+    d = d.dropna(subset=["snap_react"])
+    if d.empty:
+        return []
+    d["moved"] = np.select([d.snap_react > 1.005, d.snap_react < 0.995], ["raised", "lowered"], "not moved")
+    out = ["### The snap-change rule's calls", "",
+           "Receiving calls whose target share the rule raised, lowered, or left alone. If the rule overshoots, "
+           "the raised group's miss runs negative (and the lowered group's positive).", "",
+           "| Market | Rule | Calls | Hit rate | Model said | Book said | Mean miss |", "|---|---|---|---|---|---|---|"]
+    for mk, label in (("player_receptions", "catches"), ("player_reception_yds", "receiving yards")):
+        for grp in ("raised", "lowered", "not moved"):
+            g = d[(d.market == mk) & (d.moved == grp)]
+            if g.empty:
+                continue
+            won = pd.to_numeric(g["won"], errors="coerce")
+            miss = pd.to_numeric(g.get("miss"), errors="coerce")
+            out.append(f"| {label} | {grp} | {len(g)} | {won.mean():.1%} | "
+                       f"{pd.to_numeric(g.p_model, errors='coerce').mean():.1%} | "
+                       f"{pd.to_numeric(g.p_novig, errors='coerce').mean():.1%} | {miss.mean():+.2f} |")
+    return out + ["", "A group needs about 50 calls before its numbers say anything.", ""]
+
+
 def render_sections(df: pd.DataFrame) -> tuple[list[str], list[dict]]:
     """The four rollups for one engine's calls. (markdown lines, csv rows)."""
     out: list[str] = []
@@ -263,8 +401,11 @@ def render_clv(clv: pd.DataFrame, model: str | None = None) -> list[str]:
     out = ["### Closing line value", ""]
     if clv.empty:
         out += ["No paired decision/close snapshots yet. CLV needs a closing "
-                "capture inside 60 minutes of kickoff; without it, closing-line "
-                "value is unavailable and must not be estimated.", ""]
+                "capture inside 60 minutes of kickoff, and the scheduled runs fire "
+                "too late to make one (speed is off by the user's choice); without "
+                "it, closing-line value is unavailable and must not be estimated. "
+                "The bet journal measures late-line value instead: each bet "
+                "against the last line the capture logged before kickoff.", ""]
         return out
     share = clv["moved_our_way"].mean()
     out += [f"{len(clv)} calls have both snapshots. The line moved toward "
@@ -273,6 +414,64 @@ def render_clv(clv: pd.DataFrame, model: str | None = None) -> list[str]:
             "Beating the close consistently is the signal that survives "
             "small samples. Winning without it is variance.", ""]
     return out
+
+
+GATE_FILE = "model_weight.json"
+
+
+def write_label_gate(season: int, df: pd.DataFrame, engines) -> dict:
+    """model_weight.json beside the record: per pricing model and pooled, the
+    model's weight on settled yardage calls and whether the gate is open."""
+    import datetime as dt
+    gate = {"season": season, "updated_utc": dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "rule": ("decided only at the week " + ", ".join(map(str, blend.REVIEW_WEEKS)) + " reviews, on the "
+                     "calls through that week: labels return only when the whole 95% interval of the model's "
+                     "weight is above zero AND the top-tier calls' net per $100 at Sleeper's recorded prices "
+                     "has its whole 95% interval above zero"),
+            "engines": [], "pooled": blend.yardage_gate(df)}
+    for engine_hash, group in engines:
+        g = blend.yardage_gate(group)
+        g.update(engine=engine_label(group), model_id=str(engine_hash))
+        gate["engines"].append(g)
+    # TWO ENGINES ARE NOT ONE SAMPLE: the gate opens on the CURRENT pricing
+    # model's own calls (the one with the latest graded week, then the most
+    # calls); the pooled fit is context only
+    graded = [g for g in gate["engines"] if g["weeks"]]
+    gate["current"] = (max(graded, key=lambda g: (max(g["weeks"]), g["n_calls"])) if graded else None)
+    (persist.RECORD_ROOT / GATE_FILE).write_text(json.dumps(gate, indent=1, sort_keys=True) + "\n",
+                                                encoding="utf-8")
+    return gate
+
+
+def label_gate_md(gate: dict) -> list[str]:
+    """The scorecard's gate section: one row per pricing model, then pooled."""
+    out = ["## Label gate", "",
+           "The research board shows no bet labels. The gate is decided only at the reviews after weeks "
+           + ", ".join(map(str, blend.REVIEW_WEEKS)) + ", on the calls through that week, and opens only when "
+           "both hold: the model's number earns weight beside the book's price (the whole 95% interval above "
+           "zero), and the top-tier calls made money at Sleeper's recorded prices (the whole 95% interval of "
+           "net per $100 above zero). Between reviews it holds; the running weight is context only.", "",
+           "| Pricing model | Calls | Weeks | Running weight (95% CI) | Last review | Weight at review | "
+           "Top-tier net per $100 at review | Gate |", "|---|---|---|---|---|---|---|---|"]
+    rows = ([(g["engine"] + (" (current)" if g is gate.get("current") else ""), g) for g in gate["engines"]]
+            + [("all models, pooled (context only)", gate["pooled"])])
+    for name, g in rows:
+        wk = f"{min(g['weeks'])}-{max(g['weeks'])}" if g.get("weeks") else "—"
+        w_cell = lambda w: (f"{w['w_model']:+.3f} ({w['lo']:+.3f}, {w['hi']:+.3f})" if w.get("estimated")
+                            else f"not estimated below {blend.MIN_CALLS} calls")
+        ar = g.get("at_review")
+        if ar:
+            pr = ar["profit"]
+            rev = f"week {ar['week']} ({ar['n_calls']} calls)"
+            wrev = w_cell(ar["weight"])
+            prof = (f"{pr['net_per_100']:+.1f} ({pr['lo']:+.1f}, {pr['hi']:+.1f}), {pr['n_bets']} bets"
+                    if pr.get("estimated") else f"{pr['n_bets']} bets, not estimated below {blend.MIN_BETS}")
+        else:
+            rev = f"none yet (first after week {g.get('next_review') or blend.REVIEW_WEEKS[0]})"
+            wrev = prof = "—"
+        state = "**OPEN**" if g.get("gate_open") else "closed"
+        out.append(f"| {name} | {g['n_calls']} | {wk} | {w_cell(g)} | {rev} | {wrev} | {prof} | {state} |")
+    return out + [""]
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -288,9 +487,10 @@ def main(argv: list[str] | None = None) -> int:
     out = [f"# Props scorecard — {args.season}", ""]
 
     if settled.empty:
+        write_label_gate(args.season, settled, [])
         out += ["No settled calls yet. Run `props/settle.py` after results "
                 "publish (nflverse weekly stats land Tuesday morning ET).", ""]
-        (persist.RECORD_ROOT / "scorecard.md").write_text("\n".join(out),
+        (persist.RECORD_ROOT / "scorecard.md").write_text("\n".join(out + journal.summary_md(args.season)),
                                                           encoding="utf-8")
         print("no settled rows yet")
         return 0
@@ -298,10 +498,11 @@ def main(argv: list[str] | None = None) -> int:
     graded = len(settled)
     df = settled[settled["is_call"] == 1]
     if df.empty:
+        write_label_gate(args.season, df, [])
         out += [f"{graded} rows graded, none of them a call. A call is the "
                 f"last decision for a market; if every row is a superseded "
                 f"line, re-run props/settle.py.", ""]
-        (persist.RECORD_ROOT / "scorecard.md").write_text("\n".join(out),
+        (persist.RECORD_ROOT / "scorecard.md").write_text("\n".join(out + journal.summary_md(args.season)),
                                                           encoding="utf-8")
         print("no calls among the settled rows")
         return 0
@@ -323,6 +524,13 @@ def main(argv: list[str] | None = None) -> int:
                 f"they are not pooled.** Pass `--pool` to pool them "
                 f"explicitly.", ""]
 
+    # THE LABEL GATE (DECISIONS #144): the model's weight beside the book on the
+    # settled yardage calls, per pricing model and pooled, written where the
+    # engine reads it (the report's first line quotes it).
+    gate = write_label_gate(args.season, df, engines)
+    out += label_gate_md(gate)
+    out += books_section(df, args.season)
+
     csv_rows: list[dict] = []
     for engine_hash, group in engines:
         out += [f"## Engine {engine_label(group)}", ""]
@@ -330,6 +538,7 @@ def main(argv: list[str] | None = None) -> int:
         out += sections
         csv_rows += rows
         out += render_clv(clv, engine_hash)
+        out += snap_rule_section(group)
         out += blend.blend_section(group)
 
     if args.pool and len(engines) > 1:
@@ -340,7 +549,7 @@ def main(argv: list[str] | None = None) -> int:
         out += sections
         out += render_clv(clv)
 
-    (persist.RECORD_ROOT / "scorecard.md").write_text("\n".join(out), encoding="utf-8")
+    (persist.RECORD_ROOT / "scorecard.md").write_text("\n".join(out + journal.summary_md(args.season)), encoding="utf-8")
     if csv_rows:
         pd.DataFrame(csv_rows).to_csv(persist.RECORD_ROOT / "scorecard.csv", index=False)
     print(f"[{persist.mode()}] wrote {persist.RECORD_ROOT / 'scorecard.md'} "

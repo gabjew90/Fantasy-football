@@ -21,7 +21,7 @@ SLUG = "2026_wk03_KC_MIA"
 REPORT = """# KC at MIA
 ### 2026 Week 3 · 2026-09-27 13:00 ET · Hard Rock Stadium
 
-**2 of 3 priced rows have positive expected value at the posted price** -- none is eligible to bet (no market is validated against sportsbook lines).
+**3 lines priced.** A research sheet, not a bet list: through week 3 the model's numbers added nothing beside the book's price (props/record/scorecard.md), so no line carries a bet label.
 
 ## Game header
 
@@ -105,6 +105,18 @@ def game(tmp_path, monkeypatch):
                   dict(player="Travis Kelce", team="KC", prop="catches", side="Over", line=4.5, book="sleeper",
                        price=-116, model_p=0.548, novig_p=0.479, edge_pts=7.0, ev_per_100=9.0, tier="STRONG",
                        note=None, correlated_with="KC throws high")]).to_csv(d / f"bet_card_{SLUG}.csv", index=False)
+    # the research rows: Kelce carries the receiving role-shift flag, so a game's
+    # research answer lists him first although Rice sorts ahead by name/team order
+    pd.DataFrame([dict(player="Rashee Rice", team="KC", pos="WR", market="player_receptions", line=5.5,
+                       book="sleeper", price_over=-120, price_under=-110, median=5.0, p10=2.0, p90=9.0,
+                       p_over_model=0.40, p_over_book=0.50, implied=8.9, projected=7.6, unit="targets",
+                       snap=0.9, snap_base=0.88, ts=0.24, ts_base=0.25, cs=0.0, cs_base=0.0, flags=""),
+                  dict(player="Travis Kelce", team="KC", pos="TE", market="player_receptions", line=4.5,
+                       book="sleeper", price_over=-116, price_under=-141, median=5.0, p10=2.0, p90=10.0,
+                       p_over_model=0.548, p_over_book=0.479, implied=6.3, projected=7.1, unit="targets",
+                       snap=0.86, snap_base=0.66, ts=0.20, ts_base=0.19, cs=0.0, cs_base=0.0,
+                       flags="role up; Rashee Rice active (missed 1 of 2 weeks)")]).to_csv(
+        d / f"research_{SLUG}.csv", index=False)
     pd.DataFrame([dict(player="Travis Kelce", team="KC", book="sleeper", price=129, p_model=0.26, p_novig=0.386,
                        p_market=0.386, p_blend=0.32, decision="PASS", flag=None)]).to_csv(
         d / f"td_board_{SLUG}.csv", index=False)
@@ -140,7 +152,9 @@ def test_a_player_answer_is_every_priced_line_read_unchanged(game):
     r = A.player("Kelce", game="KC@MIA")
     lines = {x["market"]: x for x in r.data["lines"]}
     assert lines["catches"]["p_model"] == 0.548 and lines["catches"]["p_novig_same_side"] == 0.479
-    assert lines["catches"]["call"] == "no play" and lines["catches"]["under_from"] == 5.5
+    assert lines["catches"]["implied"] == 6.3 and lines["catches"]["price_under"] == -141
+    assert "call" not in lines["catches"] and "ev_per_100" not in lines["catches"], "no bet language"
+    assert "the line implies 6.3 targets (we project 7.1)" in r.text and "EV" not in r.text
     assert lines["anytime TD"]["p_blend"] == 0.32 and lines["anytime TD"]["p_market"] == 0.386
     assert r.data["fantasy_points"]["median"] == 11.8
     assert r.data["engine_on_him"][0] == "Travis Kelce — TE1", "the report's own words on him"
@@ -149,7 +163,8 @@ def test_a_player_answer_is_every_priced_line_read_unchanged(game):
 def test_a_player_answer_carries_the_rules_that_apply_to_it(game):
     r = A.player("Travis Kelce", game="KC@MIA")
     assert A.UNVALIDATED in r.data["rules"] and A.TD_RULE in r.data["rules"], "a TD row brings the no-fair-odds rule"
-    assert any("market likely holds info" in x or "knowing something" in x for x in r.data["rules"])
+    assert any(x.startswith("Role-shift flag") and "already moves" in x for x in r.data["rules"]), "Kelce carries the flag"
+    assert not any("WEAK" in x for x in r.data["rules"])
     assert "no fair odds" in r.text
     assert A.NEW_TEAM_RULE not in r.data["rules"] and A.TD_V0_RULE not in r.data["rules"]
     rice = A.player("Rashee Rice", game="KC@MIA")
@@ -209,13 +224,13 @@ def test_an_unknown_stat_is_refused(game):
 
 # ------------------------------------------------------------------ best, matchup
 
-def test_the_card_keeps_the_engines_order(game):
+def test_research_rows_list_the_flagged_lines_first(game):
     r = A.best("KC@MIA")
-    assert [x["player"] for x in r.data["card"]] == ["Rashee Rice", "Travis Kelce"]
-    assert r.data["headline"].startswith("**2 of 3 priced rows")
-    assert A.UNVALIDATED in r.text and A.TD_RULE in r.text
+    assert [x["player"] for x in r.data["research"]] == ["Travis Kelce", "Rashee Rice"], "flagged rows first"
+    assert r.data["headline"].startswith("**3 lines priced.**")
+    assert A.UNVALIDATED in r.text and A.TD_RULE in r.text and "EV" not in r.text and "STRONG" not in r.text
     only = A.best("KC@MIA", market="td")
-    assert only.data["card"] == [] and only.data["td_board"], "--market td shows the TD board only"
+    assert only.data["research"] == [] and only.data["td_board"], "--market td shows the TD board only"
 
 
 def test_the_matchup_is_the_reports_frame(game):
@@ -322,18 +337,23 @@ def test_two_active_players_with_one_name_are_ambiguous(monkeypatch, tmp_path):
         A.team_of("Mike Williams")
 
 
-def test_a_market_filter_works_on_survival_rows(tmp_path, monkeypatch):
+def test_the_must_win_pick_is_retired_and_the_slate_gives_research_leads(tmp_path, monkeypatch):
     monkeypatch.setenv("NFL_CACHE", str(tmp_path))
     d = A.root()
     d.mkdir(parents=True)
-    pd.DataFrame([dict(game="CAR@CLE", player="A", team="CAR", prop="Under 2.5 catches", price=-149, p_model=0.67,
-                       p_novig=0.53, line=2.5, tier="STRONG", market="player_receptions", rule="r", book="sleeper"),
-                  dict(game="HOU@IND", player="B", team="HOU", prop="Over 51.5 rec yds", price=-128, p_model=0.59,
-                       p_novig=0.5, line=51.5, tier="STRONG", market="player_reception_yds", rule="r", book="sleeper")]
-                 ).to_csv(d / "slate_survival_2026_wk03.csv", index=False)
+    pd.DataFrame([dict(game="CAR@CLE", player="A", team="CAR", market="player_receptions", line=2.5, book="sleeper",
+                       price_over=-120, price_under=-110, median=2.0, p10=0.0, p90=5.0, p_over_model=0.4,
+                       p_over_book=0.5, implied=4.1, projected=3.6, unit="targets", flags=""),
+                  dict(game="HOU@IND", player="B", team="HOU", market="player_reception_yds", line=51.5,
+                       book="sleeper", price_over=-128, price_under=-102, median=55.0, p10=12.0, p90=110.0,
+                       p_over_model=0.55, p_over_book=0.5, implied=6.0, projected=6.6, unit="targets",
+                       flags="role up")]).to_csv(d / "slate_research_2026_wk03.csv", index=False)
     monkeypatch.setattr(A, "price_slate", lambda s, w, fresh=False: {"dir": d, "age_min": 1.0, "ran": False})
     monkeypatch.setattr(A, "season_week", lambda s=None, w=None: (2026, 3))
-    r = A.best(slate=True, survival=True, market="catches")
-    assert [x["player"] for x in r.data["rows"]] == ["A"]
-    assert "Under 2.5 catches" in r.text and "2.5 Under" not in r.text
+    with pytest.raises(A.AskError, match="must-win pick is off"):
+        A.best(slate=True, survival=True)
+    r = A.best(slate=True)
+    assert [x["player"] for x in r.data["rows"]] == ["B", "A"], "the flagged lead first"
+    assert [x["player"] for x in A.best(slate=True, market="catches").data["rows"]] == ["A"]
+    assert "EV" not in r.text and "STRONG" not in r.text
 

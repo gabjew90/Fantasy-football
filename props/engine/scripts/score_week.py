@@ -11,7 +11,8 @@ shadow log and bet card back and writes:
 
   slate_summary_{season}_wk{W}.md   the chat-reply deliverable for a slate question
   slate_survival_{season}_wk{W}.csv one "must-win" pick per game (rule below)
-  slate_card_{season}_wk{W}.csv     every STRONG/MODERATE card row across the slate, by EV
+  slate_research_{season}_wk{W}.csv every priced line's research row (line implies, usage, flags)
+  slate_card_{season}_wk{W}.csv     the old card rows, written for the record only, never shown
   slate_runs_{season}_wk{W}.csv     per-game run status (lines, spread/total, exit code)
 
 Survival rule ("if you could have only one bet in this game and had to win it"):
@@ -38,6 +39,7 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 from score_game import (GAMES_URL, OUT, eastern_to_utc, et_today, fetch,  # noqa: E402
                         refresh_season_inputs)
+import research as RSCH  # noqa: E402
 
 # The report contains "≥" and other non-cp1252 characters. The Linux
 # runner writes UTF-8 by default so this was invisible in CI, while every
@@ -212,6 +214,7 @@ def main():
 
     # ---------- aggregate ----------
     surv, cards, unders = [], [], 0
+    research = []
     for r in runs:
         A, H = r["game"].split("@")
         sl = OUT / f"shadow_log_{a.season}_wk{a.week:02d}_{A}_{H}.csv"
@@ -232,6 +235,11 @@ def main():
                              questionable=bool(pick.questionable), rule=rule, book=pick.book))
         if bc.exists() and r["status"] == "ok":
             c = pd.read_csv(bc); c["game"] = r["game"]; cards.append(c)
+        rf = OUT / f"research_{a.season}_wk{a.week:02d}_{A}_{H}.csv"
+        if rf.exists() and r["status"] == "ok":
+            x = pd.read_csv(rf)
+            if len(x):
+                research.append(x.assign(game=r["game"]))
     S = pd.DataFrame(surv)
     S.to_csv(OUT / f"slate_survival_{a.season}_wk{a.week:02d}.csv", index=False)
     C = pd.concat(cards, ignore_index=True) if cards else pd.DataFrame()
@@ -260,7 +268,6 @@ def main():
     TPAR = TB.build(TBOARD) if len(TBOARD) else pd.DataFrame()
     if len(TPAR):
         TPAR.to_csv(OUT / f"parlay_builder_{a.season}_wk{a.week:02d}.csv", index=False)
-    PARLAY_MD = TB.markdown(TPAR, TLEGS) if len(TBOARD) else []
 
     # ---------- summary markdown (this is the chat-reply deliverable for a slate question) ----------
     L = [f"# {a.season} Week {a.week} slate", "",
@@ -272,101 +279,56 @@ def main():
          "## Runs", "", "| Game | Kickoff (UTC) | Roof | Spread | Total | Lines | Status |", "|---|---|---|---|---|---|---|"]
     for r in runs:
         L.append(f"| {r['game']} | {r['kickoff_utc']} | {r['roof']} | {r['spread'] or '—'} | {r['total'] or '—'} | {r['n_lines']} | {r['status']}{(' — ' + r['error']) if r['error'] else ''} |")
-    L += ["", "## One must-win pick per game", "",
-          "*Rule: receptions/receiving yards, book no-vig >= 55% on the same side, then highest model probability; "
-          "if no such line is posted, the same at >= 50%, then ANY market at >= 50% (flagged 'least calibration evidence'). "
-          "Players who changed teams or are Questionable are excluded, the same exclusion the slate-wide pick applies; "
-          "a row marked 'role-flagged fallback' is a game where no unflagged line qualified. "
-          "These maximise P(win), not EV; every one is a juiced favourite side. Sleeper requires 2+ leg entries, and "
-          "alternate lines two units past the median beat any posted line for this objective.*", "",
-          "| Game | Pick | Price | Model | Book (no-vig) | Model mean vs line | Tier | Flags |", "|---|---|---|---|---|---|---|---|"]
-    for s in surv:
-        if s.get("pick") == "none":
-            L.append(f"| {s['game']} | none | | | | | | {s['rule']} |"); continue
-        flags = []
-        if s["new_team"]: flags.append("new team")
-        if s["questionable"]: flags.append("Questionable")
-        if "DISAGREES" in s["rule"]: flags.append("book disagrees")
-        if s["market"] not in CAL_MARKETS: flags.append(f"least calibration evidence ({MK_LABEL.get(s['market'], s['market'])})")
-        if s["p_novig"] < 0.55 and "DISAGREES" not in s["rule"]: flags.append("book near coin flip")
-        if "role-flagged fallback" in s["rule"]: flags.append("role-flagged fallback")
-        if s.get("slot") in ("RB2", "WR3", "proxy") or str(s.get("slot", "")).startswith("proxy"): flags.append(f"depth role ({s['slot']})")
-        L.append(f"| {s['game']} | {s['player']} ({s['team']}) **{s['prop']}** | {s['price']:+d} | {s['p_model']:.0%} | {s['p_novig']:.0%} | "
-                 f"{s['model_mean']} vs {s['line']:g} | {s['tier']} | {', '.join(flags)} |" if pd.notna(s['line']) else
-                 f"| {s['game']} | {s['player']} ({s['team']}) **{s['prop']}** | {s['price']:+d} | {s['p_model']:.0%} | {s['p_novig']:.0%} | — | {s['tier']} | {', '.join(flags)} |")
-    if not S.empty and "p_model" in S:
-        ok = S[S.get("pick", pd.Series(dtype=str)) != "none"] if "pick" in S else S
-        ok = ok.dropna(subset=["p_model"]) if "p_model" in ok else ok
-        if not ok.empty:
-            # slate-wide single pick: same rule as the per-game pick, applied across every
-            # game -- no role-change flag (new team / Questionable), book on the same side,
-            # then highest model probability. Depth-role players are eligible; their slot is
-            # printed so a thin role is visible rather than silently excluded.
-            # the rule's own order across games too: a backtested market at >= 55% beats one at
-            # >= 50%, which beats any-market fallbacks, before model probability is compared
-            top = slate_pick_order(ok)
-            if not top.empty:
-                t = top.iloc[0]
-                L += ["", f"**Single pick across the slate:** {t.player} ({t.team}) {t.prop} at {int(t.price):+d} in {t.game} "
-                          f"— model {t.p_model:.0%}, book {t.p_novig:.0%}; {t.slot}, no role-change flag, book on the same side."
-                          + (f" Note: {t.slot} usage is the most volatile input in the model, so this is the "
-                             "highest-probability pick on the slate, not the most stable role on it."
-                             if t.slot in ("RB2", "WR3", "proxy") else "")
-                          + (f" No receptions or receiving-yards line qualified anywhere on the slate, so this is a "
-                             f"{MK_LABEL.get(t.market, t.market)} pick, from a market with the least calibration evidence."
-                             if t.market not in CAL_MARKETS else "")]
-    if not C.empty:
-        sm = C[C.tier_base.isin(["STRONG", "MODERATE"])]
-        n_s = int((sm.tier_base == "STRONG").sum()); n_m = int((sm.tier_base == "MODERATE").sum())
-        L += ["", f"## Slate card: STRONG and MODERATE legs ({n_s} STRONG, {n_m} MODERATE, of {len(C)} card rows)", "",
-              "*Sorted by tier, then backtested markets (receptions, receiving yards) ahead of rushing and anytime TD, "
-              "then EV. A MODERATE row cleared the edge floor but failed the prior-vs-market test: this season's share "
-              "runs above the blend on an Under call, or below it on an Over, so part of the edge is the model's prior "
-              "against a role the book may already have repriced.*", "",
-              "| Tier | Game | Player | Prop | Line | Odds | Model | No-vig | Edge | EV/$100 | Note |", "|---|---|---|---|---|---|---|---|---|---|---|"]
-        for _, c in sm.iterrows():
-            ann = str(c.tier).split(" (", 1)[1].rstrip(")") if isinstance(c.tier, str) and " (" in c.tier else ""
-            if "share runs above" in ann:
-                ann = "share runs above blend"
-            elif "share runs below" in ann:
-                ann = "share runs below blend"
-            base_note = c.note if isinstance(c.note, str) and c.note else ""
-            if ann.startswith("share runs"):  # the annotation already says it; don't say it twice
-                base_note = "; ".join(x for x in base_note.split("; ") if x != "prior-vs-market gap")
-            note = "; ".join(x for x in [base_note, ann] if x)
-            L.append(f"| {c.tier_base} | {c.game} | {c.player} ({c.team}) | {c.side} {c.prop} | {c.line if pd.notna(c.line) else '—'} | {int(c.price):+d} | "
-                     f"{c.model_p:.0%} | {c.novig_p:.0%} | {c.edge_pts:+.0f} | {c.ev_per_100:+.0f} | {note} |")
-        n_u = int((C.side == "Under").sum()); n_o = int((C.side == "Over").sum())
-        L += ["", f"Board: {len(C)} card rows across the slate, {n_u} Under / {n_o} Over. "
-                  "The Under lean is unresolved until logged results settle it."]
-
-        # ---------- trust notes, one line per game, computed not narrated ----------
-        L += ["", "## Trust notes by game", "",
-              "| Game | Lines | STRONG | MODERATE | WEAK | New-team rows | Book disagrees (STRONG) | Sleeper depth-rank gaps |",
+    # The must-win picks and the cross-game TD parlays are still computed and
+    # written (slate_survival_*.csv, parlay_builder_*.csv) but not shown: no
+    # picks until the record shows the model adds weight beside the book's
+    # price (DECISIONS #142, the user's call 2026-10-03).
+    RS = pd.concat(research, ignore_index=True) if research else pd.DataFrame()
+    if len(RS):
+        RS.to_csv(OUT / f"slate_research_{a.season}_wk{a.week:02d}.csv", index=False)
+        flagged = RS[RS["flags"].fillna("").str.contains("role up|role down")]
+        L += ["", "## Research leads across the slate", "",
+              "*Not picks. The role-shift pattern (snaps moved while targets had not caught up yet) -- the projection "
+              "already moves his target share for it since props-v1.29; before that it beat or "
+              "missed the model's next-week projection in 2022-25 (reports/role_shift_check.md); whether the BOOK also "
+              "reacts late is what the bet journal decides. 'Line implies' is the targets per game at which the line is a "
+              "fair 50/50; 'pays at this price' is the workload each side needs to beat its own price.*", "",
+              "| Game | Player | Prop | Line | Line implies | Pays at this price if he gets | Last game | Flags |",
               "|---|---|---|---|---|---|---|---|"]
+        if len(flagged):
+            for _, x in flagged.sort_values(["game", "player"]).iterrows():
+                imp = (f"{x.implied:.1f} {x.unit} (we project {x.projected:.1f})"
+                       if pd.notna(x.implied) and pd.notna(x.projected) else "—")
+                last = (f"snaps {100*x.snap:.0f}% (earlier {100*x.snap_base:.0f}%), targets {100*x.ts:.0f}% "
+                        f"(earlier {100*x.ts_base:.0f}%)" if pd.notna(x.snap) else "—")
+                L.append(f"| {x.game} | {x.player} ({x.team}) | {MK_LABEL.get(x.market, x.market)} | {x.line:g} | "
+                         f"{imp} | {RSCH.break_even_cell(x)} | {last} | {x['flags']} |")
+        else:
+            L.append("| — | no receiving role-shift flags this slate | | | | | | |")
+
+        L += ["", "## Notes by game", "",
+              "| Game | Lines | Role-shift flags | New-team players | Teammates out or back | Sleeper depth-rank gaps |",
+              "|---|---|---|---|---|---|"]
         rank_by_game = {r["game"]: r.get("rank_gaps", 0) for r in runs}
         lines_by_game = {r["game"]: r["n_lines"] for r in runs}
-        by_game = {g: c for g, c in C.groupby("game", sort=False)}
-        for g in [r["game"] for r in runs if r["game"] in by_game]:  # kickoff order, not card order
-            c = by_game[g]
-            st = c[c.tier_base == "STRONG"]
-            new_rows = int(c.note.fillna("").str.contains("new team").sum()) if "note" in c else 0
-            disagree = int((st.novig_p < 0.47).sum())
-            L.append(f"| {g} | {lines_by_game.get(g, 0)} | {int((c.tier_base == 'STRONG').sum())} | "
-                     f"{int((c.tier_base == 'MODERATE').sum())} | {int((c.tier_base == 'WEAK').sum())} | "
-                     f"{new_rows} | {disagree} | {rank_by_game.get(g, 0)} |")
+        by_game = {g: x for g, x in RS.groupby("game", sort=False)}
+        for g in [r["game"] for r in runs if r["game"] in by_game]:  # kickoff order
+            x = by_game[g]
+            fl = x["flags"].fillna("")
+            n_role = x[fl.str.contains("role up|role down")].player.nunique()
+            n_new = x[fl.str.contains("new team")].player.nunique()
+            notes = sorted({part.strip() for f in fl for part in f.split(";")
+                            if part.strip().endswith(" out") or " active (missed" in part})
+            L.append(f"| {g} | {lines_by_game.get(g, 0)} | {n_role} | {n_new} | {'; '.join(notes) or '—'} | "
+                     f"{rank_by_game.get(g, 0)} |")
         thin = [r["game"] for r in runs if 0 < r["n_lines"] < 24]
         L += ["", "*A thin board (under ~24 posted lines) means a narrower set of starters was priced, not a cleaner read"
-              + (": " + ", ".join(thin) + "." if thin else "."),
-              "A high WEAK count means role turnover or a large model-book gap is doing the work; where the book disagrees "
-              "on our side, 'the book knows something the model doesn't' is a live explanation and those rows grade as "
-              "their own bucket at the week-8 review. Sleeper depth-rank gaps are logged, never acted on.*",
+              + (": " + ", ".join(thin) + "." if thin else ".") + " Sleeper depth-rank gaps are logged, never acted on.*",
               "", "*Calibration: no market has been validated against sportsbook lines. Receptions and receiving yards have a "
               "2025 walk-forward behind them (resources/calibration_2025.csv), but it places lines at fixed offsets from the "
               "model\u2019s own median across every player-week, so it measures distributional self-consistency, not whether the "
               "model beats a book on the calls it would actually make. Since props-v1.20 the 2022-25 yardage harness finds receptions, receiving yards and rushing yards unbiased and calibrated on outcomes (a model 85% wins about 84-85%). "
               "Team TD totals are anchored to the same-book spread and total.*"]
-    L += [""] + PARLAY_MD
     L += ["", "Per-game guides, cards, ladders, parlays and shadow logs are in the outputs folder under each game's name."]
     md = "\n".join(L)
     (OUT / f"slate_summary_{a.season}_wk{a.week:02d}.md").write_text(

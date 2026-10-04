@@ -254,6 +254,39 @@ def league_drift_ratio(team_week_volume, target_week, recent_games=3, min_prior_
 K0_FIXED = {"ypt": 80, "catch_rate": 40, "target_share": 80}
 
 
+# Round 23 (2026-10-03): the share blend reacts to a role change late. On
+# props-v1.28's 2022-25 harness results a receiver whose snaps jumped 15+
+# points last week while his targets lagged caught +0.28 to +0.51 more than
+# projected the next week, and one whose snaps fell missed by about 0.55
+# (reports/role_shift_check.md). The fix: scale the blended target share by
+# (last week's snap share / his earlier weeks') ** SNAP_REACT, clipped to
+# SNAP_REACT_CLIP; it needs last week to be the week before this one and two
+# earlier weeks with the same team. None = off, byte for byte; measured on the
+# yardage harness first (reports/snap_react.md, DECISIONS #143).
+SNAP_REACT = 0.5
+SNAP_REACT_CLIP = (0.6, 1.6)
+# Round 25 (2026-10-03): a separate exponent for a snap INCREASE (ratio > 1),
+# after round 23 overshot receivers whose snaps jumped in 2024-25. None = the
+# same exponent both ways (round 23, byte for byte); measured first
+# (reports/snap_react.md, round 25).
+SNAP_REACT_UP = None
+
+
+def snap_react(share, snap_last, snap_base, gamma, clip=SNAP_REACT_CLIP, gamma_up=None):
+    """The target share moved by last week's snap change; unchanged when off or
+    when either snap number is missing."""
+    if gamma is None or share is None:
+        return share
+    try:
+        sl, sb, sh = float(snap_last), float(snap_base), float(share)
+    except (TypeError, ValueError):
+        return share
+    if not (np.isfinite(sl) and np.isfinite(sb) and np.isfinite(sh)) or sb < 0.05 or sl <= 0:
+        return share
+    g = float(gamma_up) if (gamma_up is not None and sl > sb) else float(gamma)
+    return sh * float(np.clip((sl / sb) ** g, clip[0], clip[1]))
+
+
 def k0_rates(fitted, override=None):
     """The per-rate shrinkage constants a pricing run uses: the priors' fitted
     `k0_per_rate` (else DEFAULT_K0), with K0_FIXED -- or `override`, for the
@@ -913,6 +946,24 @@ def simulate_team_game(rng, n_sim, team_volume_mean, team_volume_r, player_share
     if return_other and other_bucket:
         out[OTHER] = alloc[:, -1].astype(float)
     return out, team_targets
+
+
+def simulate_qb_completions(rng, n_sim, receiver_receptions, other_targets, other_rates, starter_share=None):
+    """The starting QB's completions (reports/qb_completions.md): his receivers'
+    catches in the SAME simulation, plus the 'other' bucket's targets caught at
+    the depth receivers' rate, times his share of the team's passing (the prior
+    season's grid), rounded. Its own child stream, drawn after passing yards:
+    no other number moves."""
+    g = rng.spawn(1)[0]
+    total = np.zeros(n_sim)
+    for r in receiver_receptions:
+        total = total + np.asarray(r, dtype=float)
+    if other_targets is not None and other_rates:
+        cr = min(max(float(other_rates["catch_rate"]), 0.05), 1.0)
+        total = total + g.binomial(np.asarray(other_targets).astype(np.int64), cr).astype(float)
+    if starter_share is not None:
+        total = total * g.choice(np.asarray(starter_share, dtype=float), size=n_sim)
+    return np.round(total)
 
 
 def simulate_qb_passing(rng, n_sim, receiver_yards, other_targets, other_rates, per_catch_shape,

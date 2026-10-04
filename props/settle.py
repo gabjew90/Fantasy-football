@@ -76,6 +76,10 @@ SETTLED_FIELDS = [
     # fallback when v1 could not run. Same engine hash, different model -- so
     # it has to survive into the settled file or the two would be graded as one.
     "td_model",
+    # round 23's factor on his target share (DECISIONS #145); 1.0 = not moved
+    "snap_react",
+    # Sleeper's prices for both sides (DECISIONS #147)
+    "price_over", "price_under",
     # The engine that made the call. These must be listed here or the
     # DictWriter's extrasaction="ignore" below drops them silently, and the
     # scorecard could not separate two versions.

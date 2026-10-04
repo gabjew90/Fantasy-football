@@ -73,3 +73,13 @@ def test_props_code_alone_is_fine():
 def test_fantasy_state_and_the_betting_record_together_are_both_state():
     assert offending(["state/kv.json",
                               "props/record/predictions/2026/wk02.jsonl"]) == ([], [])
+
+
+def test_the_bet_journal_is_state_like_the_record():
+    """props/journal/ is graded and committed by the props workflow beside the
+    record (DECISIONS #142): a journal entry alone commits cleanly, and a code
+    change swept in with it is refused."""
+    assert offending(["props/journal/2026.jsonl"]) == ([], [])
+    assert offending(["props/journal/2026.jsonl", "props/record/scorecard.md"]) == ([], [])
+    state, code = offending(["props/journal/2026.jsonl", "props/journal.py"])
+    assert state == ["props/journal/2026.jsonl"] and code == ["props/journal.py"]

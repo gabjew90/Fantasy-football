@@ -98,6 +98,17 @@ and kept live (DECISIONS #100). Known and not noise: QBs ran ~12% high in 2025;
 backs run ~4% low pooled because shares summing past 1 are scaled down (the
 next fix).
 
+### Round 23 (2026-10-03): target share reacts to last week's snap change, props-v1.29
+
+- Found by the research board's role-shift check (reports/role_shift_check.md): a receiver
+  whose snaps moved 15+ points last week while his targets lagged beat or missed the next
+  week's catches by about half a catch, in 2022-23 and 2024-25. Fix: blended target share x
+  (last week's snaps / his earlier weeks') ** 0.5, clipped [0.6, 1.6], when last week is the
+  week before this one and he has two earlier weeks with the team (`model.SNAP_REACT`).
+  Tune: 0.5 best, 1.0 overshot. Held out 2024-25: catches +0.009 (+0.004, +0.014), receiving
+  yards +0.044 (noise), QB passing -0.07 (noise pooled; 2024 alone worse). First acts in
+  week 4 of a season. DECISIONS #143; reports/snap_react.md.
+
 ### Round 19 (2026-10-01): QB passing scaled by implied points -- measured, not shipped
 
 - The shipped model's QB passing runs 19% high for teams implied <= 18 points and 6-7% low at

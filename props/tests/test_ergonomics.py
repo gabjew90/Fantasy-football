@@ -36,11 +36,31 @@ def test_scoring_presets_json_and_inline(tmp_path):
     assert SG.parse_scoring("rec=0.25")["rec"] == 0.25
 
 
-def test_the_positive_ev_statement_is_plain():
-    R = pd.DataFrame({"ER": [-0.1, -0.02]})
-    assert SG.ev_statement(R) == "**No row has positive expected value at the posted prices.**"
-    assert "1 of 2 priced rows" in SG.ev_statement(pd.DataFrame({"ER": [0.05, -0.02]}))
-    assert "No lines" in SG.ev_statement(pd.DataFrame())
+def test_the_research_statement_says_what_the_sheet_is():
+    R = pd.DataFrame({"player": ["A", "A", "B"], "market": ["m", "m", "m"], "line": [1.5, 1.5, 2.5]})
+    out = SG.research_statement(R)
+    assert out.startswith("**2 lines priced.**") and "no line carries a bet label" in out
+    assert "No yardage" in SG.research_statement(pd.DataFrame())
+
+
+def test_research_cells_show_both_prices_and_the_implied_workload():
+    x = pd.Series({"market": "player_receptions", "line": 4.5, "price_over": -116, "price_under": -141,
+                   "median": 5.0, "p10": 2.0, "p90": 10.0, "p_over_model": 0.587, "p_over_book": 0.479,
+                   "implied": 6.298, "projected": 7.07, "unit": "targets"})
+    row = SG.research_cells(x, {"player_receptions": "catches"})
+    assert row == "| catches | 4.5 | O -116 / U -141 | 5 (2 to 10) | 59% / 48% | 6.3 targets (we project 7.1) | — |",         "no break-even search yet: the cell says so"
+    x2 = x.copy()
+    x2["over_needs"], x2["under_needs"], x2["be_over"], x2["be_under"] = 6.512, None, 0.537, 0.585
+    assert SG.research_cells(x2, {}).endswith("| Over above 6.5 targets; Under: beyond the search range |")
+    x2["be_under"] = None                       # no Under posted: never "beyond the search range"
+    assert SG.research_cells(x2, {}).endswith("| Over above 6.5 targets; Under: no price posted |")
+    assert "-0" not in SG.research_cells(x.assign(p10=-0.3) if hasattr(x, "assign") else x, {})
+
+
+def test_usage_line_compares_last_game_with_earlier_weeks():
+    u = {"week": 3, "snap": 0.54, "snap_base": 0.67, "ts": 0.12, "ts_base": 0.25, "cs": 0.0, "cs_base": 0.0}
+    assert SG.usage_line(u, short=True) == "wk3: snaps 54% (67%), targets 12% (25%)"
+    assert SG.usage_line(None) is None
 
 
 def test_the_markets_summary_lists_only_what_was_priced():
@@ -48,7 +68,7 @@ def test_the_markets_summary_lists_only_what_was_priced():
                       "line": [np.nan], "book": ["sleeper"], "price": [150], "p_model": [0.3],
                       "p_novig": [0.33], "gap": [-0.03], "ER": [-0.1]})
     out = "\n".join(SG.short_summary(R, "A", "B", 2026, 3, "Sleeper Picks", 0.5, ["player_anytime_td"]))
-    assert "No row has positive expected value" in out and "Candidate closing snapshot" in out
+    assert "No bet labels" in out and "Candidate closing snapshot" in out
     assert "| A (X) | anytime_td | Yes | sleeper | +150 | 30% | 33% | -3% |" in out
 
 

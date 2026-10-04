@@ -98,31 +98,71 @@ def test_width_counts_outcomes_outside_the_model_p10_p90(backtest):
     assert backtest.summarize(d, "rec")["outside_p10_p90"] == pytest.approx(1 / 3, abs=0.01)
 
 
-def _verdict_inputs(backtest, gain, pit, gap):
-    frames = []
+UNIFORM = [0.05 + 0.1 * i for i in range(10)]            # 2 of 10 outside p10-p90 in every game
+NARROW = [0.02, 0.03, 0.97, 0.98, 0.3, 0.4, 0.5, 0.6, 0.7, 0.5]   # 4 of 10: too narrow
+
+
+def _verdict_inputs(gain, pits=UNIFORM, hits=lambda g: 15, n_games=30, ratio=1.0):
+    """Two test seasons of n_games games, ten players each; per game and
+    reliability band, 20 lines at p=0.75 with hits(g) of them landing."""
+    res, cal = [], []
     for season in (2024, 2025):
-        d = _frame([gain] * 30, season=season)
-        d["pit_rec"] = pit(len(d))
-        frames.append(d)
-    rel = pd.DataFrame({"market": "receptions", "side": ["Over", "Under"] * 3,
-                        "bucket": ["60-70", "60-70", "70-80", "70-80", "80-90", "80-90"],
-                        "n": 100, "p_model_mean": 0.75, "hit_rate": 0.75 + gap})
-    return pd.concat(frames, ignore_index=True), rel
+        sg = gain(season) if callable(gain) else gain
+        for g in range(n_games):
+            for i in range(10):
+                res.append({"season": season, "game_id": f"g{g}", "week": 5 + g % 10,
+                            "crps_rec_model": 1.0, "crps_rec_baseA": 1.0 + sg,
+                            "act_receptions": 3.0 * ratio, "mean_rec_model": 3.0, "pit_rec": pits[i]})
+            for side in ("Over", "Under"):
+                for p_ in (0.65, 0.75, 0.85):
+                    h = hits(g) + round((p_ - 0.75) * 20)
+                    cal += [{"season": season, "market": "receptions", "side": side, "week": 5 + g % 10,
+                             "p_model": p_, "hit": float(k < h), "game": f"g{g}"} for k in range(20)]
+    return pd.DataFrame(res), pd.DataFrame(cal)
 
 
-def test_the_verdict_needs_all_four_parts(backtest):
-    uniform = lambda n: [(i + 0.5) / n for i in range(n)]
-    narrow = lambda n: [0.02 if i % 3 == 0 else 0.5 + 0.3 * (i % 2) for i in range(n)]
-    res, rel = _verdict_inputs(backtest, 0.05, uniform, 0.0)
-    assert backtest.market_verdict(res, rel, [2024, 2025], "rec")["passes"]
-    res, rel = _verdict_inputs(backtest, 0.05, narrow, 0.0)
-    v = backtest.market_verdict(res, rel, [2024, 2025], "rec")
-    assert not v["passes"] and not v["width_ok"] and v["beats_baseline_each_test_season"]
-    res, rel = _verdict_inputs(backtest, 0.05, uniform, -0.05)
-    v = backtest.market_verdict(res, rel, [2024, 2025], "rec")
-    assert not v["passes"] and v["width_ok"] and not v["calibration_ok"]
-    res, rel = _verdict_inputs(backtest, 0.0, uniform, 0.0)
-    assert not backtest.market_verdict(res, rel, [2024, 2025], "rec")["beats_baseline_each_test_season"]
+def test_every_part_must_pass_on_its_interval(backtest):
+    v = backtest.market_verdict(*_verdict_inputs(0.05), [2024, 2025], "rec")
+    assert v["status"] == "PASS" and v["passes"], v
+    assert v["n_games"] == 60 and v["n_player_games"] == 600
+    assert {b["status"] for b in v["bands"]} == {"PASS"} and len(v["bands"]) == 6
+
+
+def test_a_clear_miss_fails_and_a_noisy_one_is_insufficient(backtest):
+    # every band 0.05 under its predicted chance in every game: a clear FAIL
+    v = backtest.market_verdict(*_verdict_inputs(0.05, hits=lambda g: 14), [2024, 2025], "rec")
+    assert v["calibration"] == "FAIL" and v["status"] == "FAIL"
+    # games swing +-0.25 around a perfect average: the interval spans the tolerance
+    v = backtest.market_verdict(*_verdict_inputs(0.05, hits=lambda g: 20 if g % 2 else 10), [2024, 2025], "rec")
+    assert v["calibration"] == "INSUFFICIENT DATA" and v["status"] == "INSUFFICIENT DATA"
+    v = backtest.market_verdict(*_verdict_inputs(0.05, pits=NARROW), [2024, 2025], "rec")
+    assert v["width"] == "FAIL" and v["outside_p10_p90"] == pytest.approx(0.4)
+    v = backtest.market_verdict(*_verdict_inputs(0.05, ratio=0.93), [2024, 2025], "rec")
+    assert v["bias"] == "FAIL" and v["relative_bias"] == pytest.approx(-0.07)
+
+
+def test_the_baseline_is_pooled_with_no_season_clearly_worse(backtest):
+    v = backtest.market_verdict(*_verdict_inputs(0.0), [2024, 2025], "rec")
+    assert v["baseline"] == "INSUFFICIENT DATA", "no gain is not proof of a loss"
+    # 2024 strong, 2025 slightly better than the baseline but not significant: pooled decides
+    v = backtest.market_verdict(*_verdict_inputs(lambda s: 0.10 if s == 2024 else 0.0), [2024, 2025], "rec")
+    assert v["baseline"] == "PASS" and not v["season_clearly_worse"]
+    v = backtest.market_verdict(*_verdict_inputs(lambda s: 0.15 if s == 2024 else -0.05), [2024, 2025], "rec")
+    assert v["baseline_ci"][0] > 0 and v["season_clearly_worse"] and v["baseline"] == "FAIL"
+
+
+def test_calibration_lines_without_games_cannot_pass(backtest):
+    res, cal = _verdict_inputs(0.05)
+    v = backtest.market_verdict(res, cal.drop(columns="game"), [2024, 2025], "rec")
+    assert v["calibration"] == "INSUFFICIENT DATA" and not v["passes"]
+
+
+def test_three_state_reads_the_whole_interval(backtest):
+    t = backtest.three_state
+    assert t(-0.01, 0.02, -0.03, 0.03) == "PASS"
+    assert t(-0.06, -0.04, -0.03, 0.03) == "FAIL"
+    assert t(-0.05, 0.01, -0.03, 0.03) == "INSUFFICIENT DATA"
+    assert t(float("nan"), 0.0, -0.03, 0.03) == "INSUFFICIENT DATA"
 
 
 def test_priors_are_never_built_into_the_engine(backtest, tmp_path):
@@ -358,3 +398,17 @@ def test_passing_is_graded_on_the_starting_qb_only(backtest):
                       "pass_pop": [True, False, True, False], "crps_pass_model": [40.0, np.nan, 50.0, np.nan]})
     assert list(backtest.market_rows(d, "pass").crps_pass_model) == [40.0, 50.0]
 
+
+
+def test_a_band_seen_in_few_games_is_not_judged(backtest):
+    res, cal = _verdict_inputs(0.05, n_games=4)            # 8 games over two seasons
+    v = backtest.market_verdict(res, cal, [2024, 2025], "rec")
+    assert {b["status"] for b in v["bands"]} == {"INSUFFICIENT DATA"}
+    assert all(isinstance(b["n_games"], int) for b in v["bands"]), "plain ints for the JSON"
+
+
+def test_rows_without_a_pit_do_not_count_as_inside_the_band(backtest):
+    res, cal = _verdict_inputs(0.05, pits=NARROW)
+    res.loc[res.index % 10 >= 4, "pit_rec"] = np.nan     # only the four tail rows keep a PIT
+    v = backtest.market_verdict(res, cal, [2024, 2025], "rec")
+    assert v["outside_p10_p90"] == pytest.approx(1.0)

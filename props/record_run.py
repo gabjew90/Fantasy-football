@@ -66,10 +66,16 @@ PRED_FIELDS = [
     "questionable_teammate",
     # Layer 4 (anytime TD): the de-vigged market, the provisional blend and its weight
     "two_sided", "p_market", "p_blend", "blend_w",
+    # round 23's factor on the player's target share (1.0 = not moved), so the
+    # scorecard can grade the calls the snap-change rule moved (DECISIONS #145)
+    "snap_react",
+    # Sleeper's prices for BOTH sides, so the Sleeper-vs-books check can grade
+    # either side at Sleeper's own price (DECISIONS #147)
+    "price_over", "price_under",
 ]
 
 NUMERIC = {"line", "model_mean", "p_model", "p_push", "p_novig", "gap", "price", "ER", "p_market", "p_blend",
-           "blend_w"}
+           "blend_w", "snap_react", "price_over", "price_under"}
 INTEGER = {"season", "week"}
 BOOLEAN = {"new_team", "questionable", "clears_edge_rule_if_validated", "questionable_teammate", "two_sided"}
 

@@ -6955,3 +6955,243 @@ check that accounts for its own noise -- e.g. a band fails only when its
 interval excludes the target -- would be a change to the bar, which is the
 user's decision, not a model fix.
 
+
+## 2026-10-03 (141) -- returning key teammates: in-season shares over co-active weeks, measured, not shipped
+
+Found live on the week-4 board: Dalton Schultz (HOU) priced at 21% of targets
+from 25 of 112 this season, much of it while Nico Collins sat (Collins 10 of
+37), with Collins active again; both Schultz Overs were STRONG. Round 22
+counted a player's in-season SHARE evidence only over the weeks every key
+teammate (prior-season share >= threshold, in-season share when he has no
+prior) active this week also played;
+efficiency kept every week. Pre-registered grid and rules in
+reports/returning_teammate.md, tuned on 2022-23 only.
+
+Target side (thresholds 0.15, 0.20): worse in both tune seasons, 0.15 most
+(catches -0.011 / -0.007, both intervals exclude zero; receiving yards -0.079 /
+-0.055, the 2023 interval just includes zero). The share built
+while a key teammate sits is real evidence about the player's role; discarding
+it leans on the prior and costs accuracy, consistent with OUT_RULE keeping only
+a quarter of an absent player's share with the priced set. Carry side (0.35,
+0.50): flat; the pre-set pick (0.35) is negative in 2023. Nothing passed, so
+2024-25 stays unread. Code: tag archive/props-returning-teammate.
+
+Same session: the settled record (weeks 2-3, 1,180 yardage/catch calls, engines
+before props-v1.28) won ~50% in every gap bucket while the model claimed 53-71%;
+STRONG won 45.3% (n=296, -$19.55 per $100), LEAN 55.5%. The tiers are not
+validated against prices; re-tiering on the market blend (p_blend, already on
+the Tuesday scorecard) is the open proposal, the user's call.
+
+## 2026-10-03 (142) -- the props board becomes a research sheet; the bet journal
+
+The user chose betting as the tool's purpose and asked what the real problem
+was. The settled record (weeks 2-3, 1,180 yardage/catch calls, engines before
+props-v1.28): a logistic blend gives the model's number a weight of +0.02
+(95% -0.47 to +0.50) beside the book's; the book alone predicted week 3 better
+than the model (log loss 0.694 vs 0.723); STRONG calls won 45.3% (n=296) at
+prices needing ~56%. The board ranked lines by model-book disagreement, which
+ranks them by how likely the model is missing something. The model was
+validated against a naive baseline, never against the market.
+
+What changed (props-v1.29, nfl-v1.31; plan docs/plans/2026-10-03-props-research-board.md):
+- **No bet labels anywhere the user reads.** STRONG/MODERATE/LEAN/WEAK, EV,
+  Kelly, stakes, "take UNDER if", game-script theses, the must-win pick and the
+  cross-game TD parlays leave the report, slate summary, `props ask` and chat
+  (the user chose to remove the picks too). Their CSVs are still written and
+  the shadow log keeps `tier`, so the scorecard keeps measuring the model
+  against the book; labels return only when the record shows the model earning
+  weight beside the book for the current engine version.
+- **Research columns** (scripts/research.py, own generators; on pinned odds
+  every p_model, p_novig, model_mean and tier is identical to v1.28): both
+  prices, projection with its 10th-90th range, the Over by model and by book,
+  **line implies** (targets or carries per game at which the line is a fair
+  50/50, by bisection on his share with common random numbers), last game's
+  snaps and share against his earlier weeks, and flags (teammate out, a key
+  teammate back from missed weeks, new team, Questionable).
+- **Receiving role-shift flag**, pre-registered and checked on 2022-25
+  (reports/role_shift_check.md): snaps up 15+ points with targets lagging beat
+  the model's next-week catches by +0.51 (2022-23) / +0.28 (2024-25, CI
+  +0.09 to +0.48); snaps down with targets holding missed by -0.58 / -0.55.
+  Rushing flags had too few rows and are not shown.
+- **Bet journal** (props/journal.py, props/journal/<season>.jsonl): every bet
+  with the verified change, the workload the line implies, how it fails, and
+  the price; graded by the Tuesday settle run with settle's own rules, its own
+  scorecard section (record vs break-even), never pooled with the model's
+  record. A player absent from the week's stats goes to 'check' (did not play
+  and played-for-zero look the same in nflverse's weekly file and the book pays
+  them differently) and is settled with `journal resolve`.
+
+Owed: the model's own blind spot the flag exposed (it reacts to snap changes
+late) is a candidate engine change, measured the usual way before it ships.
+
+## 2026-10-03 (143) -- target share reacts to last week's snap change (round 23, shipped at 0.5)
+
+The research board's role-shift check (#142) showed the share blend reacting
+to a role change late. Round 23 scales the blended target share by (last
+week's snap share / his earlier weeks') ** 0.5, clipped to [0.6, 1.6], when
+last week is the week before this one and he has two earlier weeks with the
+team (model.SNAP_REACT, one function for scorer and harness). Pre-registered
+in reports/snap_react.md; tuned on 2022-23 (0.25 / 0.5 / 1.0; 1.0 overshot),
+read once on 2024-25: receptions +0.0089 (+0.0043, +0.0136), receiving yards
++0.0437 (-0.0051, +0.0921), QB passing -0.0745 (-0.1765, +0.0256), rushing
+unchanged in the harness (separate streams). Live, the scorer shares one
+random stream across target and rush draws, so a moved target share shifts
+rushing probabilities by simulation noise (under 0.01 on DAL@HOU). Passes the ship rule; shipped with the research board
+(props-v1.29). Disclosed: QB passing alone is worse in 2024 by season, and its
+worst calibration band (14 rows) moved 0.055 -> 0.162 -- noise-sized, watched
+on the settled record from week 4, the first week the rule acts in 2026.
+
+## 2026-10-03 (144) -- the label gate: the record decides, in code
+
+The research board's "no bet labels until the record shows otherwise" was a
+sentence with no code behind it, and its "through week 3" figures were
+hard-coded. Now the Tuesday scorecard fits the model's weight beside the book
+on settled yardage calls (blend.yardage_gate: the same logistic fit as the
+scorecard's market blend, game-clustered 95% interval, not estimated below
+300 calls), per pricing model and pooled, and writes it to
+props/record/model_weight.json with a "Label gate" section on the scorecard.
+The report's first line, method note and short summary quote the pooled
+number (the engine reads the repo copy, or the published copy from chat,
+cached six hours, and says so when it cannot read either). The gate is OPEN
+only when the whole interval sits above zero; then the scorecard and the
+report say so and bringing labels back is the user's call. At release:
+pooled weeks 2-3, 1,180 calls, weight +0.029 (-0.452, +0.564) -- closed; no
+single pricing model has 300 calls with an estimable weight above zero.
+
+Review fix (same day): the gate opens on the CURRENT pricing model's own calls
+(the one with the latest graded week), never on the pooled fit -- two engines
+are not one sample. The pooled number is quoted as context only. The file is
+rewritten even when nothing is graded, so a new season never quotes the last.
+
+## 2026-10-03 (145) -- the record grades the snap-change rule's own calls
+
+Round 23 (#143) overshot for receivers whose snaps jumped in 2024-25 (-0.38
+catches, post-hoc slice). Every priced row now logs `snap_react` (the factor
+on his target share, 1.0 = not moved) through the shadow log, the record and
+the settled file, and the scorecard adds "The snap-change rule's calls":
+receiving calls the rule raised, lowered or left alone -- hit rate, model,
+book and mean miss. A raised group whose miss runs negative is the overshoot,
+read on fresh 2026 calls from week 4.
+
+## 2026-10-03 (146) -- other books beside Sleeper, opt-in
+
+With one book there is no comparison against sharper prices. `score_game.py
+--compare-books` adds DraftKings and FanDuel player lines (receptions,
+receiving, rushing and passing yards) from The Odds API for that game, after
+Sleeper's: about 4 credits, never below COMPARE_QUOTA_MIN (100) remaining,
+never archived (the line record stays Sleeper's), and any failure (no key,
+no event, no credits) is a sources-table note, never a lost run. The rows
+carry their book's name in the research table and feed the existing "Where
+the books disagree" section. Off by default; the captures do not use it.
+
+## 2026-10-03 (147) -- Sleeper against DraftKings/FanDuel, one snapshot per game
+
+The one edge that would not depend on the model: Sleeper Picks' fixed prices
+on lines that may lag the sharper books. props/compare.py runs after every
+capture and, once per game inside the capture window, logs DraftKings and
+FanDuel player lines (free events call, then ~4 Odds API credits; never
+below 100 left; the user chose one snapshot per game on the free plan; no
+key or any failure is a printed reason, never a lost capture) to
+props/record/compare/. The record now keeps Sleeper's Over and Under prices.
+The scorecard's "Sleeper against DraftKings/FanDuel" section grades the side
+the consensus favours, at Sleeper's own price, when Sleeper's line is off
+the consensus (0.5 catch, 2.5 rushing/receiving yards, 5 passing yards) or
+its no-vig price is 3+ points off at the same line. Reading rule, fixed
+before any data (reports/sleeper_vs_books.md): an edge only after 200+ graded
+discrepancies with a game-clustered 95% interval above zero. Speed-dependent
+and paid items were ruled out by the user.
+
+## 2026-10-03 (148) -- late-line value leads the bet journal
+
+Closing-line value is the number that separates skill from luck in ~100-200
+bets, but the record holds no closing snapshot: all 4,414 archived quotes are
+decision captures (a close needs a run inside the last hour, and the
+scheduled runs fire too late; speed-dependent work is ruled out). The model's
+own calls cannot use a late line either -- a call IS the last captured line.
+So the journal measures late-line value: each bet's line and price against
+the last Sleeper quote the capture logged before kickoff for that player,
+market and side (points moved your way; at the same line, the late price's
+implied chance minus yours). It is stamped at grading and leads the journal
+section, labelled as the last captured line, not the true close.
+
+## 2026-10-03 (149) -- workload markets and the snap overshoot: three measured nulls
+
+- Rushing attempts, round 24: widening carries (share_conc_carries 8,
+  eff_sd_rush 0.1, chosen on 2022-23 with rushing yards held to its bar) fixed
+  the width on 2024-25 (0.189) but calibration stayed 0.060 off and baseline A
+  was not beaten every season. Not priced; rushing yards stay on the shipped
+  settings (reports/rush_attempts.md).
+- QB completions (the receivers' catches in the same game times the starter's
+  share): ~5% high on 2024-25, calibration 0.058 off. Not priced; the harness
+  keeps grading it (reports/qb_completions.md). Pass attempts not attempted.
+- Round 25, a separate exponent for a snap increase: no value helped both tune
+  seasons; dropped, 2024-25 unread (reports/snap_react.md).
+Speed-dependent and paid work (inactives alerts, charting data) was ruled out
+by the user.
+
+## 2026-10-03 (150) -- the live bar reads intervals: PASS / FAIL / INSUFFICIENT DATA
+
+- Every part of the bar (docs/plans/2026-09-24-yardage-harness.md) now reads
+  a 95% interval from resampling whole games -- a game's players and its
+  synthetic lines stay together -- and returns PASS (wholly inside the
+  tolerance), FAIL (wholly outside) or INSUFFICIENT DATA (spanning it).
+  Tolerances unchanged: bias 5% (relative, mean(actual - model)/mean(model),
+  PIT mean 0.47-0.53 as a point check), width 0.20 +/- 0.03, every 60-90%
+  reliability band within 0.03 of its mean predicted probability.
+- "Beats baseline A each test season" becomes pooled gain above zero with no
+  test season clearly worse (its interval wholly below zero).
+- Every verdict states its unique games and player-games. Calibration lines
+  carry their game; older saved results cannot pass.
+- A market passes only when all four parts pass; a priced market that lands
+  at INSUFFICIENT DATA is "not shown to be calibrated", never "rescued".
+  Pre-registered in reports/calibration_bar_v2.md before the re-run.
+
+## 2026-10-03 (151) -- the label gate: fixed reviews, and profit at the price
+
+- The gate is decided only at the reviews after weeks 8, 12 and 18, on the
+  calls through that week (frozen pre-kickoff decision rows); between reviews
+  it holds. The running weight is context and cannot open it.
+- A second condition: the selection rule -- the board's internal STRONG tier
+  on yardage calls, at the price Sleeper showed when the call was logged --
+  must show net per $100 with its whole 95% interval (games resampled) above
+  zero, on at least 100 bets. A positive weight beside the book is not an
+  edge after the hold; this is the number a bettor keeps.
+
+## 2026-10-03 (152) -- journal bets carry an angle chosen at log time
+
+- `journal add` requires --angle: injury (redistribution), role (change),
+  return (teammate back) or other. Chosen when the bet is logged, never after
+  the game, so the summary's by-angle table cannot be fitted to results. Rows
+  logged before angles show as untagged.
+
+## 2026-10-03 (153) -- the scenario layer: your workload assumptions, priced, never recorded
+
+- Every research row shows the workload at which each side beats its own
+  price ("Pays at this price if he gets": Over above X, Under at Y or fewer),
+  from the same cached simulation as 'line implies'; both judge a whole line
+  on wins / (wins + losses), so pushes count right. No price moves.
+- `--assume` (scenario.py) takes the user's judgment as OPPORTUNITY: targets
+  or carries per game, catch rate, yards per touch, team pass/rush volume.
+  What one player gains his teammates give up in proportion (the depth
+  receivers too, for targets); the team total holds; receptions and yards
+  share one target draw; the QB's passing yards follow his receivers.
+- The board is priced as usual; a separate scenario run (OUT/scenarios, which
+  record_run never reads) prices the same lines again, and the report adds
+  "Your scenario (experimental)" with the board's chance, the scenario's,
+  each side's break-even and net per $100 IF the assumptions hold. Three
+  scenarios per bet (conservative/base/aggressive) were not built: one
+  assumption plus the break-even workload covers the same ground.
+- Touchdowns are not adjusted: anytime_td_v1 has not been through a harness
+  test, so TD stays evidence-only.
+
+## 2026-10-03 (154) -- scenario bets carry their assumption in the journal
+
+- `journal add` takes --assumption (the --assume rule), --over-board and
+  --over-scenario (the two Over chances the scenario table shows; the bet's
+  side is derived, a whole-line push ignored) and --pays-if (the break-even
+  cell). A scenario chance without its assumption is refused; touchdowns
+  take none.
+- The summary adds "Your scenarios": what the board said, what your
+  scenario said, the win rate and late-line value for those bets. If the
+  adjustments add information, the win rate lands nearer the scenario's
+  number than the board's -- about 100 graded bets to tell.
