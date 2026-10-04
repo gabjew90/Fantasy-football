@@ -202,3 +202,23 @@ def test_worth_a_look_needs_a_story_and_last_games_workload_past_the_price():
     assert RS.worth_a_look(dict(hig, flags="new team (from ATL)", tn=4.0), 3)[0] == "Under", "new team alone: either"
     assert RS.worth_a_look(dict(hig, flags="role up; Puka Nacua back (missed last week)", tn=13.0), 3) is None,         "more snaps but the star teammate back: the stories conflict, no mark"
     assert RS.worth_a_look(dict(hig, unit=None), 3) is None
+
+
+def test_a_qb_out_is_a_story_for_the_backs_only():
+    rec = dict(player="Luther Burden III", market="player_receptions", unit="targets", over_needs=7.3,
+               under_needs=6.1, tn=11.0, cn=0.0, usage_week=3, flags="Caleb Williams (QB) out, also out last week")
+    assert RS.worth_a_look(rec, 3) is None, "a backup QB is not an Over story for a receiver"
+    rb = dict(player="D'Andre Swift", market="player_rush_yds", unit="carries", over_needs=16.5,
+              under_needs=13.8, cn=20.0, tn=2.0, usage_week=3, flags="Caleb Williams (QB) out, also out last week")
+    assert RS.worth_a_look(rb, 3)[0] == "Over", "the backs carry more"
+
+
+def test_the_preview_note_and_qb_change():
+    import pandas as pd
+    assert RS.preview_note([]) == "last week was a preview: same QB, same key absences"
+    assert RS.preview_note(["Breece Hall newly out"]) == "last week differs: Breece Hall newly out"
+    lw = pd.DataFrame({"passer_player_id": ["k"] * 30 + ["w"] * 2,
+                       "passer_player_name": ["C.Keenum"] * 30 + ["C.Williams"] * 2})
+    assert RS.qb_change(lw, "k", "Case Keenum") is None, "same starter"
+    assert RS.qb_change(lw, "t", "Kyle Trask") == "QB change (C.Keenum last week, Kyle Trask today)"
+    assert RS.qb_change(lw, None, None) is None and RS.qb_change(lw.iloc[0:0], "k", "x") is None

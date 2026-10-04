@@ -255,6 +255,24 @@ def out_matters(pid, team, targets, carries, dropbacks, prior_ts=None, prior_rs=
 LOOK_MARGIN = {"targets": 2.0, "carries": 3.0}
 
 
+def preview_note(diffs) -> str:
+    """The team's 'was last week a preview' note (DECISIONS #157)."""
+    return ("last week was a preview: same QB, same key absences" if not diffs
+            else "last week differs: " + "; ".join(diffs))
+
+
+def qb_change(last_week_passers, today_id, today_name):
+    """'QB change (X last week, Y today)' or None. last_week_passers: the team's
+    pass plays last week with passer_player_id / passer_player_name."""
+    if today_id is None or last_week_passers is None or not len(last_week_passers):
+        return None
+    lw_id = last_week_passers.passer_player_id.value_counts().index[0]
+    if lw_id == today_id:
+        return None
+    lw_nm = last_week_passers[last_week_passers.passer_player_id == lw_id].passer_player_name.iloc[0]
+    return f"QB change ({lw_nm} last week, {today_name} today)"
+
+
 def worth_a_look(x, last_week):
     """(side, why) or None for one research row (a dict). x needs flags,
     player, market, unit, over_needs, under_needs, tn / cn and usage_week."""
@@ -269,7 +287,12 @@ def worth_a_look(x, last_week):
     flags = [f.strip() for f in str(x.get("flags") or "").split(";") if f.strip()]
     me = str(x.get("player", ""))
     outs = [re.match(r"^(.+?) out(,|$)", f) for f in flags]
-    up = any(f == "role up" for f in flags) or any(m_ and m_.group(1) != me for m_ in outs)
+    rush = x.get("market") == "player_rush_yds"
+    # a teammate out hands his work on (Over) -- except the starting QB: a
+    # backup thins the passing game, so a QB out is a story for the backs'
+    # carries only, never for a receiver
+    up = any(f == "role up" for f in flags) or any(
+        m_ and m_.group(1).replace(" (QB)", "") != me and (rush or not m_.group(1).endswith(" (QB)")) for m_ in outs)
     down = any(f == "role down" for f in flags) or any(" back (missed last week)" in f for f in flags)
     # a role or teammate story sets the direction; stories pulling both ways
     # (more snaps, but the star teammate is back) mark nothing; a new team

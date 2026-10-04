@@ -385,6 +385,8 @@ def research_fields(b) -> dict:
             "implied": _f(get("implied")), "projected": _f(get("projected")),
             "unit": get("unit") if isinstance(get("unit"), str) else None,
             "over_needs": _f(get("over_needs")), "under_needs": _f(get("under_needs")),
+            "look": get("look") if isinstance(get("look"), str) else None,
+            "preview": get("preview") if isinstance(get("preview"), str) else None,
             "be_over": _f(get("be_over")), "be_under": _f(get("be_under")),
             "last_game": {k: _f(get(k)) for k in ("snap", "snap_base", "ts", "ts_base", "cs", "cs_base",
                                                   "tn", "tn_base", "cn", "cn_base")},
@@ -417,6 +419,10 @@ def research_text(x: dict, label: str, book: str = "", line=None) -> str:
         bits.append("if the model's numbers are right, at these prices "
                     + side("Over", x.get("over_needs"), x.get("be_over"), "above {v:.1f} {u}") + ", "
                     + side("Under", x.get("under_needs"), x.get("be_under"), "at {v:.1f} {u} or fewer"))
+    if x.get("look"):
+        bits.insert(0, f"WORTH A LOOK ({x['look']}), not a bet")
+    if x.get("preview"):
+        bits.append(x["preview"])
     lg = x.get("last_game") or {}
     if lg.get("snap") is not None:
         rush = label == "rush yds"

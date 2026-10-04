@@ -1726,7 +1726,9 @@ def main():
                             None if pri_ is None else pri_.get("target_share"),
                             None if pri_ is None else pri_.get("rush_share"), weeks=set(_wk)):
             played_lw = _snp_w.get((e_.team, norm_name(e_["name"]), WEEK - 1), 0) > 0
-            OUT_NOTE[e_.team].append(f"{e_['name']} out, " + ("played last week" if played_lw else "also out last week"))
+            qb_tag = " (QB)" if str(e_.get("pos")) == "QB" else ""
+            OUT_NOTE[e_.team].append(f"{e_['name']}{qb_tag} out, "
+                                     + ("played last week" if played_lw else "also out last week"))
             if played_lw:
                 PREVIEW_DIFF[e_.team].append(f"{e_['name']} newly out")
     BACK_NOTE = {}
@@ -1740,21 +1742,22 @@ def main():
             continue                       # the team was on a bye last week
         if _snp_w.get((m_.team, norm_name(m_["name"]), WEEK - 1), 0) > 0:
             continue
+        if bool(m_.new_team) and not any(k_[0] == m_.team and k_[1] == norm_name(m_["name"]) for k_ in _snp_w.index):
+            # never played for this team: he JOINS, he is not back
+            BACK_NOTE[m_.team] = BACK_NOTE.get(m_.team, []) + [f"{m_['name']} joins (new this week)"]
+            PREVIEW_DIFF[m_.team].append(f"{m_['name']} joins")
+            continue
         BACK_NOTE[m_.team] = BACK_NOTE.get(m_.team, []) + [f"{m_['name']} back (missed last week)"]
         PREVIEW_DIFF[m_.team].append(f"{m_['name']} back")
     _lwp = pbp[(pbp.week == WEEK - 1) & (pbp.play_type == "pass") & pbp.passer_player_id.notna()]
     PREVIEW = {}
     for t_ in (AWAY, HOME):
-        q_ = _lwp[_lwp.posteam == t_]
         sq_ = STARTER_QB.get(t_)
-        if len(q_) and sq_ is not None:
-            lw_id = q_.passer_player_id.value_counts().index[0]
-            today_id = M[(M.team == t_) & (M.name == sq_)].gsis_id
-            if len(today_id) and today_id.iloc[0] != lw_id:
-                lw_nm = q_[q_.passer_player_id == lw_id].passer_player_name.iloc[0]
-                PREVIEW_DIFF[t_].insert(0, f"QB change ({lw_nm} last week, {sq_} today)")
-        PREVIEW[t_] = ("last week was a preview: same QB, same key absences" if not PREVIEW_DIFF[t_]
-                       else "last week differs: " + "; ".join(PREVIEW_DIFF[t_]))
+        tid_ = M[(M.team == t_) & (M.name == sq_)].gsis_id if sq_ is not None else []
+        qc_ = RSCH.qb_change(_lwp[_lwp.posteam == t_], tid_.iloc[0] if len(tid_) else None, sq_)
+        if qc_:
+            PREVIEW_DIFF[t_].insert(0, qc_)
+        PREVIEW[t_] = RSCH.preview_note(PREVIEW_DIFF[t_])
     research_rows, _implied_cache, _edges_cache = [], {}, {}
     # THIS run's lines only: R has been merged with --prior-log above, and an
     # earlier capture's line (58.5 before it moved to 59.5) is not a line now
@@ -1829,7 +1832,10 @@ def main():
         if not SCENARIO and not R.empty and RESEARCH["look"].notna().any():
             lk = {(r.player, r.market, float(r.line), r.book): r.look for r in RESEARCH.itertuples()
                   if isinstance(r.look, str)}
-            R["look"] = [lk.get((r.player, r.market, float(r.line), r.book)) if pd.notna(r.line) else None
+            this_run = set(_now.logged_at_utc) if "logged_at_utc" in _now else set()
+            R["look"] = [lk.get((r.player, r.market, float(r.line), r.book))
+                         if pd.notna(r.line) and r.logged_at_utc in this_run
+                         else (getattr(r, "look", None) if "look" in R.columns else None)
                          for r in R.itertuples()]
             (R[~R.book.isin(COMPARE_BOOKS)] if a.compare_books else R).to_csv(logf, index=False)
     RESEARCH.to_csv(OUT / f"research_{slug}.csv", index=False)
