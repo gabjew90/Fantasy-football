@@ -48,7 +48,7 @@ N = 1000
 
 # market key -> (actual column, label, synthetic-line offsets for the reliability table)
 # market -> the population column its rows are graded on (absent = every row)
-POPULATION = {"rush": "rush_pop", "qbrush": "qb_pop", "pass": "pass_pop"}
+POPULATION = {"rush": "rush_pop", "qbrush": "qb_pop", "pass": "pass_pop", "car": "rush_pop"}
 MARKETS = {"rec": ("act_receptions", "receptions", [0.5, 1.5, 2.5, 3.5]),
            "yds": ("act_rec_yards", "receiving yards", [5, 10, 15, 20, 30]),
            "rush": ("act_rush_yards", "rushing yards", [5, 10, 15, 20, 30]),
@@ -56,7 +56,10 @@ MARKETS = {"rec": ("act_receptions", "receptions", [0.5, 1.5, 2.5, 3.5]),
            "qbrush": ("act_qb_rush_yards", "QB rushing yards", [5, 10, 15, 20, 30]),
            # the starting QB's passing yards (plan step 4): his receivers' yards in
            # the same simulation, plus the other bucket, times his share
-           "pass": ("act_pass_yards", "QB passing yards", [10, 20, 30, 40, 60])}
+           "pass": ("act_pass_yards", "QB passing yards", [10, 20, 30, 40, 60]),
+           # rushing attempts (props-v1.30 candidate): the carries the rushing draw
+           # already makes, graded on the same rushing population (backs, not QBs)
+           "car": ("act_carries", "rushing attempts", [0.5, 1.5, 2.5, 3.5])}
 # THE LIVE SCORER'S OPPONENT SETTINGS (score_game.py section 5): team level, fixed
 # shrinkage k0=150 plays, applied to catch rate, ypt and ypc. The single-season
 # defaults below (posgrp, k0=1000) are the round-5 ones, kept for reproduction.
@@ -710,6 +713,7 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
             each carry the player's ypc plus a residual from the prior season's
             league grid."""
             yds = np.zeros((len(frame), N))
+            cars = np.zeros((len(frame), N))          # the carries draws (rushing attempts market)
             car_mean = np.zeros(len(frame))           # diagnostics: where the carries go
             share_sum = np.zeros(len(frame))
             pos_ = {ix: i for i, ix in enumerate(frame.index)}
@@ -730,9 +734,10 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
                 tot = float(np.clip(np.asarray(shares[idx], dtype=float), 0, None).sum())
                 for k, i in enumerate(idx):
                     yds[i] = y_[k]
+                    cars[i] = _car[k]
                     car_mean[i] = float(_car[k].mean())
                     share_sum[i] = tot
-            return yds, car_mean, share_sum
+            return yds, car_mean, share_sum, cars
 
         def rpit_block(samples, y_arr):
             return (samples < y_arr[:, None]).mean(1) + rng.uniform(size=len(y_arr)) * (samples == y_arr[:, None]).mean(1)
@@ -763,10 +768,14 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
         # draws, in the order the single-season protocol always used, so its
         # PIT numbers reproduce exactly.
         pit_rec, pit_yds = rpit_block(recM, y_rec), rpit_block(ydsM, y_yds)
-        rushM, carM, share_sumM = draw_block_rush(test_act, test_act.rs.fillna(0.0).values, test_act.ypc.values,
-                                                  arm=3)
-        rushA = draw_block_rush(test_act, test_act.own_rs.fillna(test_act.rs).fillna(0.0).values,
-                                test_act.own_ypc.fillna(test_act.ypc).values, arm=4)[0] if full else rushM
+        rushM, carM, share_sumM, carsM = draw_block_rush(test_act, test_act.rs.fillna(0.0).values,
+                                                         test_act.ypc.values, arm=3)
+        if full:
+            rushA, _cA, _sA, carsA = draw_block_rush(test_act, test_act.own_rs.fillna(test_act.rs).fillna(0.0).values,
+                                                     test_act.own_ypc.fillna(test_act.ypc).values, arm=4)
+        else:
+            rushA, carsA = rushM, carsM
+        y_car = test_act.act_carries.values.astype(float)
         y_rush = test_act.act_rush_yards.values.astype(float)
         # the book's number for a QB: carries plus kneel-downs
         y_qb = y_rush + test_act.act_kneel_yards.values.astype(float)
@@ -842,6 +851,11 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
             "pit_qbrush": np.where(qb_pop, rpit_block(rushM, y_qb), nan_),
             # drawn after every other PIT, so theirs are unchanged
             "pit_pass": pass_rows(rpit_block(passM, y_pass_p)),
+            "pit_car": np.where(rush_pop, rpit_block(carsM, y_car), nan_),
+            "med_car_model": np.where(rush_pop, np.median(carsM, axis=1), nan_),
+            "above_med_car": y_car > np.median(carsM, axis=1),
+            "crps_car_model": np.where(rush_pop, crps_block(carsM, y_car), nan_),
+            "crps_car_baseA": np.where(rush_pop, crps_block(carsA, y_car), nan_),
             "crps_rec_model": full_rows(crps_block(recM, y_rec)), "crps_rec_baseA": full_rows(crps_block(recA, y_rec)),
             "crps_yds_model": full_rows(crps_block(ydsM, y_yds)), "crps_yds_baseA": full_rows(crps_block(ydsA, y_yds)),
             "crps_rush_model": np.where(rush_pop, crps_block(rushM, y_rush), nan_),
@@ -861,14 +875,15 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
                 ("yds", ydsM, y_yds, np.ones(len(y_yds), bool), tr.week.values),
                 ("rush", rushM, y_rush, rush_pop, test_act.week.values),
                 ("qbrush", rushM, y_qb, qb_pop, test_act.week.values),
-                ("pass", passM, y_pass_p, np.ones(len(p_ix), bool), test_act.week.values[p_ix])]:
+                ("pass", passM, y_pass_p, np.ones(len(p_ix), bool), test_act.week.values[p_ix]),
+                ("car", carsM, y_car, rush_pop, test_act.week.values)]:
             if not keep.any():
                 continue
             smp, yy = samples[keep], y[keep]
             med = np.median(smp, axis=1)
             for o in MARKETS[mk][2]:
                 for side, L in [("Under", med + o), ("Over", np.maximum(med - o, 0.5))]:
-                    if mk == "rec":
+                    if mk in ("rec", "car"):     # counts: lines at the half
                         L = np.floor(L) + 0.5 if side == "Under" else np.ceil(L) - 0.5
                         L = np.maximum(L, 0.5)
                     p = (smp < L[:, None]).mean(1) if side == "Under" else (smp > L[:, None]).mean(1)
