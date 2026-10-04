@@ -1,0 +1,126 @@
+{
+ "current": {
+  "engine": "props-v1.25",
+  "estimated": true,
+  "gate_open": false,
+  "hi": 0.906,
+  "lo": -0.49,
+  "model_id": "8b04ff332eab6762535a3cb8e10a7e7c42a96db1e96530deb61e45c684d614b9",
+  "n_calls": 397,
+  "next_review": 8,
+  "review_week": null,
+  "w_model": 0.301,
+  "weeks": [
+   3
+  ]
+ },
+ "engines": [
+  {
+   "engine": "props-v1.3",
+   "estimated": true,
+   "gate_open": false,
+   "hi": 0.945,
+   "lo": -0.692,
+   "model_id": "17455e4ad023bbe189db8ff7ed87f1e1de96d6c05c0e72218af476ed41dfbb77",
+   "n_calls": 371,
+   "next_review": 8,
+   "review_week": null,
+   "w_model": 0.115,
+   "weeks": [
+    2
+   ]
+  },
+  {
+   "engine": "props-v1.26",
+   "estimated": false,
+   "gate_open": false,
+   "model_id": "1df22e40b3d974065ebf02ae2051c5b73add5d4d16c07e17789fbc3cdbeb227d",
+   "n_calls": 51,
+   "next_review": 8,
+   "review_week": null,
+   "weeks": [
+    3
+   ]
+  },
+  {
+   "engine": "props-v1.0",
+   "estimated": false,
+   "gate_open": false,
+   "model_id": "4fd1094acc2b32b0d57c539fc92f7ed3eaed83b4bb2e301510d24bb5e4a0964e",
+   "n_calls": 24,
+   "next_review": 8,
+   "review_week": null,
+   "weeks": [
+    2
+   ]
+  },
+  {
+   "engine": "props-v1.1",
+   "estimated": false,
+   "gate_open": false,
+   "model_id": "5cbed8f7132098783ce53b4e884acb0f9b017ef80517f17654d12dd12d6b5b05",
+   "n_calls": 24,
+   "next_review": 8,
+   "review_week": null,
+   "weeks": [
+    2
+   ]
+  },
+  {
+   "engine": "props-v1.25",
+   "estimated": true,
+   "gate_open": false,
+   "hi": 0.906,
+   "lo": -0.49,
+   "model_id": "8b04ff332eab6762535a3cb8e10a7e7c42a96db1e96530deb61e45c684d614b9",
+   "n_calls": 397,
+   "next_review": 8,
+   "review_week": null,
+   "w_model": 0.301,
+   "weeks": [
+    3
+   ]
+  },
+  {
+   "engine": "props-v1.7",
+   "estimated": false,
+   "gate_open": false,
+   "model_id": "93ebbb8cb2c458fb760c18a0d35eede030e5573d3b44517c63f479c4db811809",
+   "n_calls": 23,
+   "next_review": 8,
+   "review_week": null,
+   "weeks": [
+    2
+   ]
+  },
+  {
+   "engine": "props-v1.18",
+   "estimated": false,
+   "gate_open": false,
+   "model_id": "c049ee262f2e825453ecd71be1f4913563848cd2dace287d9d7a6f6ffc369862",
+   "n_calls": 290,
+   "next_review": 8,
+   "review_week": null,
+   "weeks": [
+    3
+   ]
+  }
+ ],
+ "pooled": {
+  "estimated": true,
+  "gate_open": false,
+  "hi": 0.564,
+  "lo": -0.452,
+  "n_calls": 1180,
+  "next_review": 8,
+  "review_week": null,
+  "w_model": 0.029,
+  "weeks": [
+   2,
+   3
+  ]
+ },
+ "rule": "decided only at the week 8, 12, 18 reviews, on the calls through that week: labels return only when the whole 95% interval of the model's weight is above zero AND the top-tier calls' net per $100 at Sleeper's recorded prices has its whole 95% interval above zero",
+ "season": 2026,
+ "updated_utc": "2026-10-04T15:12:50Z"
+}

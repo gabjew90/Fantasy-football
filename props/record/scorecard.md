@@ -4,6 +4,27 @@
 
 **7 pricing models in the record (props-v1.3, props-v1.26, props-v1.0, props-v1.1, props-v1.25, props-v1.7, props-v1.18); they are not pooled.** Pass `--pool` to pool them explicitly.
 
+## Label gate
+
+The research board shows no bet labels. The gate is decided only at the reviews after weeks 8, 12, 18, on the calls through that week, and opens only when both hold: the model's number earns weight beside the book's price (the whole 95% interval above zero), and the top-tier calls made money at Sleeper's recorded prices (the whole 95% interval of net per $100 above zero). Between reviews it holds; the running weight is context only.
+
+| Pricing model | Calls | Weeks | Running weight (95% CI) | Last review | Weight at review | Top-tier net per $100 at review | Gate |
+|---|---|---|---|---|---|---|---|
+| props-v1.3 | 371 | 2-2 | +0.115 (-0.692, +0.945) | none yet (first after week 8) | — | — | closed |
+| props-v1.26 | 51 | 3-3 | not estimated below 300 calls | none yet (first after week 8) | — | — | closed |
+| props-v1.0 | 24 | 2-2 | not estimated below 300 calls | none yet (first after week 8) | — | — | closed |
+| props-v1.1 | 24 | 2-2 | not estimated below 300 calls | none yet (first after week 8) | — | — | closed |
+| props-v1.25 (current) | 397 | 3-3 | +0.301 (-0.490, +0.906) | none yet (first after week 8) | — | — | closed |
+| props-v1.7 | 23 | 2-2 | not estimated below 300 calls | none yet (first after week 8) | — | — | closed |
+| props-v1.18 | 290 | 3-3 | not estimated below 300 calls | none yet (first after week 8) | — | — | closed |
+| all models, pooled (context only) | 1180 | 2-3 | +0.029 (-0.452, +0.564) | none yet (first after week 8) | — | — | closed |
+
+## Sleeper against DraftKings/FanDuel
+
+Not the model: when Sleeper's line or price sits off the DraftKings/FanDuel consensus, the side the consensus favours, bet at Sleeper's price (reports/sleeper_vs_books.md).
+
+0 comparison rows logged; no settled Sleeper call has a matching discrepancy yet.
+
 ## Engine props-v1.3
 
 371 settled calls, 188 winners (50.7%), net -3942 per $100 flat-staked.
@@ -483,3 +504,7 @@ Beating the close consistently is the signal that survives small samples. Winnin
 120 settled anytime_td_v1 calls in this pricing model; the blend weight is not estimated below 300. The record is filling.
 
 290 settled yardage calls (receptions, receiving, rushing and QB passing yards) in this pricing model; the blend weight is not estimated below 300. The record is filling.
+
+## Bet journal
+
+No bets logged yet. Log one with `python props/journal.py add ...` (all four checklist answers required); it is graded here every Tuesday.
