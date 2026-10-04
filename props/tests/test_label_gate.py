@@ -48,21 +48,39 @@ def test_the_scorecard_writes_the_gate_the_engine_reads(tmp_path, monkeypatch):
     gate = scorecard.write_label_gate(2026, df, [("m1", df)])
     on_disk = json.loads((tmp_path / scorecard.GATE_FILE).read_text(encoding="utf-8"))
     assert on_disk["pooled"]["n_calls"] == 400 and on_disk["engines"][0]["model_id"] == "m1"
-    assert "| all models, pooled | 400 |" in "\n".join(scorecard.label_gate_md(gate))
+    assert "| all models, pooled (context only) | 400 |" in "\n".join(scorecard.label_gate_md(gate))
 
 
 def test_the_report_quotes_the_record_or_says_it_could_not_read_it():
     assert "could not be read" in SG.gate_sentence(None)
-    thin = {"pooled": {"n_calls": 120, "weeks": [4], "estimated": False, "gate_open": False}}
-    assert "too few to estimate" in SG.gate_sentence(thin)
-    shut = {"pooled": {"n_calls": 1180, "weeks": [2, 3], "estimated": True, "gate_open": False,
-                       "w_model": 0.029, "lo": -0.452, "hi": 0.564}}
-    s = SG.gate_sentence(shut)
-    assert "weeks 2-3, 1180 calls" in s and "+0.03 (95% -0.45 to +0.56)" in s and "Labels return only" in s
-    opened = {"pooled": dict(shut["pooled"], gate_open=True, lo=0.1)}
+    pooled = {"n_calls": 1180, "weeks": [2, 3], "estimated": True, "gate_open": False,
+              "w_model": 0.029, "lo": -0.452, "hi": 0.564}
+    thin = {"pooled": pooled, "current": {"engine": "props-v1.29", "n_calls": 120, "weeks": [4],
+                                          "estimated": False, "gate_open": False}}
+    s = SG.gate_sentence(thin)
+    assert "current pricing model (props-v1.29) has 120 graded calls" in s and "too few to estimate" in s
+    assert "Across every pricing model (weeks 2-3, 1180 calls) it is +0.03 (95% -0.45 to +0.56)" in s
+    shut = {"pooled": pooled, "current": dict(pooled, engine="props-v1.25", n_calls=400, weeks=[3])}
+    assert "Labels return only" in SG.gate_sentence(shut)
+    # pooled clearing zero never opens the gate for a current model that has not
+    opened_pool = {"pooled": dict(pooled, gate_open=True, lo=0.1), "current": thin["current"]}
+    assert "OPEN" not in SG.gate_sentence(opened_pool)
+    opened = {"pooled": pooled, "current": dict(shut["current"], gate_open=True, lo=0.1)}
     assert "label gate is OPEN" in SG.gate_sentence(opened)
+    assert "No call has been graded yet" in SG.gate_sentence({"pooled": {"n_calls": 0}, "current": None})
     assert SG.research_statement(pd.DataFrame({"player": ["A"], "market": ["m"], "line": [1.5]}), shut) \
         .startswith("**1 lines priced.** A research sheet, not a bet list. Graded so far")
+
+
+def test_the_current_model_is_the_latest_graded_one_and_empty_paths_refresh(tmp_path, monkeypatch):
+    import persist
+    monkeypatch.setattr(persist, "RECORD_ROOT", tmp_path)
+    old = _calls(350, False).assign(week=3, model_id="old")
+    new = _calls(320, False, seed=5).assign(week=4, model_id="new")
+    gate = scorecard.write_label_gate(2026, pd.concat([old, new]), [("old", old), ("new", new)])
+    assert gate["current"]["model_id"] == "new"
+    empty = scorecard.write_label_gate(2027, pd.DataFrame(), [])
+    assert empty["current"] is None and empty["pooled"]["n_calls"] == 0
 
 
 def test_the_scorecard_grades_the_calls_the_snap_rule_moved():

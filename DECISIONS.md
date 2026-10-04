@@ -7058,6 +7058,11 @@ report say so and bringing labels back is the user's call. At release:
 pooled weeks 2-3, 1,180 calls, weight +0.029 (-0.452, +0.564) -- closed; no
 single pricing model has 300 calls with an estimable weight above zero.
 
+Review fix (same day): the gate opens on the CURRENT pricing model's own calls
+(the one with the latest graded week), never on the pooled fit -- two engines
+are not one sample. The pooled number is quoted as context only. The file is
+rewritten even when nothing is graded, so a new season never quotes the last.
+
 ## 2026-10-03 (145) -- the record grades the snap-change rule's own calls
 
 Round 23 (#143) overshot for receivers whose snaps jumped in 2024-25 (-0.38

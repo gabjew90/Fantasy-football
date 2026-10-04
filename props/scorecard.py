@@ -320,6 +320,11 @@ def write_label_gate(season: int, df: pd.DataFrame, engines) -> dict:
         g = blend.yardage_gate(group)
         g.update(engine=engine_label(group), model_id=str(engine_hash))
         gate["engines"].append(g)
+    # TWO ENGINES ARE NOT ONE SAMPLE: the gate opens on the CURRENT pricing
+    # model's own calls (the one with the latest graded week, then the most
+    # calls); the pooled fit is context only
+    graded = [g for g in gate["engines"] if g["weeks"]]
+    gate["current"] = (max(graded, key=lambda g: (max(g["weeks"]), g["n_calls"])) if graded else None)
     (persist.RECORD_ROOT / GATE_FILE).write_text(json.dumps(gate, indent=1, sort_keys=True) + "\n",
                                                 encoding="utf-8")
     return gate
@@ -331,7 +336,8 @@ def label_gate_md(gate: dict) -> list[str]:
            "The research board shows no bet labels. They return only when the model's number earns weight "
            "beside the book's price on settled yardage calls: the whole 95% interval above zero.", "",
            "| Pricing model | Calls | Weeks | Model weight (95% CI) | Gate |", "|---|---|---|---|---|"]
-    rows = [(g["engine"], g) for g in gate["engines"]] + [("all models, pooled", gate["pooled"])]
+    rows = ([(g["engine"] + (" (current)" if g is gate.get("current") else ""), g) for g in gate["engines"]]
+            + [("all models, pooled (context only)", gate["pooled"])])
     for name, g in rows:
         wk = f"{min(g['weeks'])}-{max(g['weeks'])}" if g.get("weeks") else "—"
         if g.get("estimated"):
@@ -356,6 +362,7 @@ def main(argv: list[str] | None = None) -> int:
     out = [f"# Props scorecard — {args.season}", ""]
 
     if settled.empty:
+        write_label_gate(args.season, settled, [])
         out += ["No settled calls yet. Run `props/settle.py` after results "
                 "publish (nflverse weekly stats land Tuesday morning ET).", ""]
         (persist.RECORD_ROOT / "scorecard.md").write_text("\n".join(out + journal.summary_md(args.season)),
@@ -366,6 +373,7 @@ def main(argv: list[str] | None = None) -> int:
     graded = len(settled)
     df = settled[settled["is_call"] == 1]
     if df.empty:
+        write_label_gate(args.season, df, [])
         out += [f"{graded} rows graded, none of them a call. A call is the "
                 f"last decision for a market; if every row is a superseded "
                 f"line, re-run props/settle.py.", ""]

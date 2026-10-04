@@ -1628,7 +1628,9 @@ def main():
             subset=["season", "week", "event_id", "book", "market", "player", "line", "side"],
             keep="last")
     if not R.empty:
-        R.to_csv(logf, index=False)
+        # --compare-books rows (DraftKings/FanDuel) are for reading, never for the
+        # record: their quotes are not archived, so they stay out of the shadow log
+        (R[~R.book.isin(COMPARE_BOOKS)] if a.compare_books else R).to_csv(logf, index=False)
         # anytime TD has its own board: the bet card leaves TD rows out
         TDB = R[R.market == "player_anytime_td"]
         if len(TDB):
@@ -2804,23 +2806,31 @@ def load_label_gate(wd=None):
 
 
 def gate_sentence(gate) -> str:
-    """One sentence on the graded record: the model's weight beside the book's
-    price and whether the label gate is open."""
-    g = (gate or {}).get("pooled") if isinstance(gate, dict) else None
-    if not g:
+    """One sentence on the graded record. The gate opens only on the CURRENT
+    pricing model's own calls (two engines are not one sample); the pooled fit
+    across every model is quoted as context."""
+    if not isinstance(gate, dict) or "pooled" not in gate:
         return ("The graded record could not be read on this run, so no line carries a bet label "
                 "(props/record/scorecard.md has it).")
-    wk = f"weeks {min(g['weeks'])}-{max(g['weeks'])}" if g.get("weeks") else "no weeks yet"
-    if not g.get("estimated"):
-        return (f"Graded so far: {g['n_calls']} calls ({wk}), too few to estimate whether the model adds anything "
-                "beside the book's price, so no line carries a bet label.")
-    if g.get("gate_open"):
-        return (f"Graded so far ({wk}, {g['n_calls']} calls, every pricing model): the model's number carries a weight "
-                f"of {g['w_model']:+.2f} (95% {g['lo']:+.2f} to {g['hi']:+.2f}) beside the book's price -- the whole "
-                "range is above zero, so the label gate is OPEN; the scorecard says so and labels are the user's call.")
-    return (f"Graded so far ({wk}, {g['n_calls']} calls, every pricing model): the model's number carries a weight of "
-            f"{g['w_model']:+.2f} (95% {g['lo']:+.2f} to {g['hi']:+.2f}) beside the book's price. Labels return only "
-            "when that whole range sits above zero.")
+    cur, pool = gate.get("current"), gate.get("pooled") or {}
+    wk = lambda g: f"weeks {min(g['weeks'])}-{max(g['weeks'])}" if g.get("weeks") else "no weeks yet"
+    ci = lambda g: f"{g['w_model']:+.2f} (95% {g['lo']:+.2f} to {g['hi']:+.2f})"
+    ctx = (f" Across every pricing model ({wk(pool)}, {pool['n_calls']} calls) it is {ci(pool)}."
+           if pool.get("estimated") else "")
+    if not cur:
+        return "No call has been graded yet, so no line carries a bet label." + ctx
+    if not cur.get("estimated"):
+        return (f"The current pricing model ({cur.get('engine', 'latest')}) has {cur['n_calls']} graded calls "
+                f"({wk(cur)}), too few to estimate whether its numbers add anything beside the book's price, so "
+                "no line carries a bet label." + ctx)
+    if cur.get("gate_open"):
+        return (f"Graded so far, the current pricing model ({cur.get('engine', 'latest')}, {wk(cur)}, "
+                f"{cur['n_calls']} calls) carries a weight of {ci(cur)} beside the book's price -- the whole range "
+                "is above zero, so the label gate is OPEN; the scorecard says so and labels are the user's call."
+                + ctx)
+    return (f"Graded so far, the current pricing model ({cur.get('engine', 'latest')}, {wk(cur)}, "
+            f"{cur['n_calls']} calls) carries a weight of {ci(cur)} beside the book's price. Labels return only "
+            "when that whole range sits above zero." + ctx)
 
 
 def research_statement(RESEARCH: pd.DataFrame, gate=None) -> str:

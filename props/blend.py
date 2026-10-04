@@ -138,6 +138,8 @@ def yardage_gate(df: pd.DataFrame, reps: int = 1000, seed: int = 17) -> dict:
     beside the book's on settled yardage calls. The research board shows no bet
     labels; the gate is OPEN only when the whole 95% interval of the model's
     weight sits above zero. Below MIN_CALLS it is not estimated."""
+    if df is None or df.empty or "market" not in df.columns:
+        return {"n_calls": 0, "weeks": [], "estimated": False, "gate_open": False}
     d = yardage_calls(df)
     weeks = sorted(int(w) for w in pd.to_numeric(d["week"], errors="coerce").dropna().unique()) if len(d) else []
     out = {"n_calls": int(len(d)), "weeks": weeks, "estimated": False, "gate_open": False}
