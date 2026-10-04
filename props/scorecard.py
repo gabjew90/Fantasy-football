@@ -29,6 +29,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import calls as calls_mod  # noqa: E402
 import blend  # noqa: E402
+import journal  # noqa: E402
 import persist  # noqa: E402
 
 try:
@@ -290,7 +291,7 @@ def main(argv: list[str] | None = None) -> int:
     if settled.empty:
         out += ["No settled calls yet. Run `props/settle.py` after results "
                 "publish (nflverse weekly stats land Tuesday morning ET).", ""]
-        (persist.RECORD_ROOT / "scorecard.md").write_text("\n".join(out),
+        (persist.RECORD_ROOT / "scorecard.md").write_text("\n".join(out + journal.summary_md(args.season)),
                                                           encoding="utf-8")
         print("no settled rows yet")
         return 0
@@ -301,7 +302,7 @@ def main(argv: list[str] | None = None) -> int:
         out += [f"{graded} rows graded, none of them a call. A call is the "
                 f"last decision for a market; if every row is a superseded "
                 f"line, re-run props/settle.py.", ""]
-        (persist.RECORD_ROOT / "scorecard.md").write_text("\n".join(out),
+        (persist.RECORD_ROOT / "scorecard.md").write_text("\n".join(out + journal.summary_md(args.season)),
                                                           encoding="utf-8")
         print("no calls among the settled rows")
         return 0
@@ -340,7 +341,7 @@ def main(argv: list[str] | None = None) -> int:
         out += sections
         out += render_clv(clv)
 
-    (persist.RECORD_ROOT / "scorecard.md").write_text("\n".join(out), encoding="utf-8")
+    (persist.RECORD_ROOT / "scorecard.md").write_text("\n".join(out + journal.summary_md(args.season)), encoding="utf-8")
     if csv_rows:
         pd.DataFrame(csv_rows).to_csv(persist.RECORD_ROOT / "scorecard.csv", index=False)
     print(f"[{persist.mode()}] wrote {persist.RECORD_ROOT / 'scorecard.md'} "

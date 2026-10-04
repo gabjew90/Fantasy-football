@@ -23,7 +23,7 @@ import sys
 # game is near, and the same hazard applies -- `record_run.py` in `local` mode
 # writes into the checkout, so a hand-run while editing code sweeps rows into
 # a code commit and makes the diff unreviewable.
-STATE_PREFIXES = ("state/", "props/record/")
+STATE_PREFIXES = ("state/", "props/record/", "props/journal/")
 CODE_PREFIXES = ("draftkit/", "manager/", "scripts/", "tests/", "props/")
 
 

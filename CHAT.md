@@ -249,7 +249,7 @@ write it (chat is read-only); give them one line to paste into a Claude Code
 session, with the four checklist answers filled from the conversation:
 
 ```text
-journal add "<player>" <market> <over|under> <line> <price> --change "<the verified change>" --implies "<the workload the line implies vs what he gets>" --fails "<how it fails>"
+python props/journal.py add "<player>" <market> <over|under> <line> <price> --team <TEAM> --change "<the verified change>" --implies "<the workload the line implies vs what he gets>" --fails "<how it fails>"
 ``` The engine contract's "the
 reply is slate_summary reproduced in full" is for a request for the slate
 as a whole, and so is its full "prop guide" structure for one game:

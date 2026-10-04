@@ -168,7 +168,10 @@ jobs:
 
       - name: settle
         if: steps.guard.outputs.run == 'true' && steps.guard.outputs.mode == 'settle'
-        run: python props/settle.py --season ${{ steps.guard.outputs.season }}
+        run: |
+          python props/settle.py --season ${{ steps.guard.outputs.season }}
+          # the user's bet journal (DECISIONS #142), graded from the same stats file
+          python props/journal.py grade --season ${{ steps.guard.outputs.season }}
 
       - name: scorecard
         if: steps.guard.outputs.run == 'true' && steps.guard.outputs.mode != 'capture'
@@ -180,6 +183,8 @@ jobs:
           git config user.name "props-record"
           git config user.email "actions@users.noreply.github.com"
           git add props/record
+          # the journal exists once the first bet is logged
+          if [ -d props/journal ]; then git add props/journal; fi
           git diff --cached --quiet || git commit -m "props: ${{ steps.guard.outputs.mode }} $(TZ=America/Los_Angeles date '+%a %m/%d %H:%M PT')"
           git pull --rebase --autostash origin ${{ github.ref_name }}
           git push
