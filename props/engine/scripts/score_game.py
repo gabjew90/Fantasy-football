@@ -1717,9 +1717,11 @@ def main():
     _db = _db_[["posteam", "week"]].assign(pid=_db_.passer_player_id)
     for _, e_ in pop[pop.excluded].iterrows():
         pri_ = pri_players.loc[e_.gsis_id] if e_.gsis_id in pri_players.index else None
+        _wk = ros[(ros.season == SEASON) & (ros.week < WEEK) & (ros.team == e_.team)
+                  & (ros.gsis_id == e_.gsis_id) & (ros.status == "ACT")].week
         if RSCH.out_matters(e_.gsis_id, e_.team, _tg, _cr, _db,
                             None if pri_ is None else pri_.get("target_share"),
-                            None if pri_ is None else pri_.get("rush_share")):
+                            None if pri_ is None else pri_.get("rush_share"), weeks=set(_wk)):
             OUT_NOTE[e_.team].append(f"{e_['name']} out")
     BACK_NOTE = {}
     for _, m_ in M.iterrows():
@@ -1734,7 +1736,7 @@ def main():
         if missed_:
             BACK_NOTE[m_.team] = BACK_NOTE.get(m_.team, []) + [
                 f"{m_['name']} active (missed {missed_} of {listed_} weeks)"]
-    research_rows, _implied_cache = [], {}
+    research_rows, _implied_cache, _edges_cache = [], {}, {}
     # THIS run's lines only: R has been merged with --prior-log above, and an
     # earlier capture's line (58.5 before it moved to 59.5) is not a line now
     _now = pd.DataFrame(rows)
@@ -1755,6 +1757,7 @@ def main():
                     env[m_.team]["targets"], TVD["targets_r"], float(m_.ts), float(m_.cr), float(m_.ypt),
                     SH, width=WIDTH, prices=px_)
                 _implied_cache[ck] += ("targets",)
+                _edges_cache[ck] = RSCH.edges_for()
             elif r_.market == "player_rush_yds":
                 j_ = si["names"].index(r_.player)
                 _implied_cache[ck] = RSCH.implied_carries(
@@ -1762,6 +1765,7 @@ def main():
                     width=WIDTH, player_resid=si["p_resid"], player_kneel=si["p_kneel"], qb_index=si["qb_i"],
                     prices=px_)
                 _implied_cache[ck] += ("carries",)
+                _edges_cache[ck] = RSCH.edges_for()
             else:
                 _implied_cache[ck] = (None, None, None, None, None)
         imp, proj, over_needs, under_needs, unit = _implied_cache[ck]
@@ -1785,6 +1789,8 @@ def main():
             p_over_model=float(p_over), p_over_book=float(nv_over),
             implied=imp, projected=proj, unit=unit, over_needs=over_needs, under_needs=under_needs,
             be_over=RSCH.breakeven(px_[0]), be_under=RSCH.breakeven(px_[1]),
+            **_edges_cache.get(ck, {}),
+            usage_week=(u_ or {}).get("week"),
             snap=(u_ or {}).get("snap"), snap_base=(u_ or {}).get("snap_base"),
             ts=(u_ or {}).get("ts"), ts_base=(u_ or {}).get("ts_base"),
             cs=(u_ or {}).get("cs"), cs_base=(u_ or {}).get("cs_base"),

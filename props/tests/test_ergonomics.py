@@ -275,3 +275,24 @@ def test_the_slate_board_orders_games_by_total_and_can_show_overs_only():
     r = next(ln for ln in O if ln.startswith("| B (CIN)"))
     assert "| -118 |" in r and "| 8.5 targets |" in r and "U -139" not in r
     assert "The Over pays if he gets more than" in "\n".join(O)
+
+
+def test_kickoff_reads_the_way_people_say_it_and_missing_totals_sort_last():
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "engine" / "scripts"))
+    import score_week as W
+    for said, want in [("13:00", "13:00"), ("1:00", "13:00"), ("1pm", "13:00"), ("1:00 PM", "13:00"),
+                       ("4:25", "16:25"), ("16:05", "16:05"), ("8:20pm", "20:20"), ("9:30", "09:30"),
+                       ("9:30am", "09:30"), ("1 pm ET", "13:00")]:
+        assert W.eastern_kickoff(said) == want, said
+    with pytest.raises(SystemExit, match="write an Eastern time"):
+        W.eastern_kickoff("noon-ish")
+    row = dict(player="A", team="X", market="player_receptions", line=2.5, book="sleeper", price_over=-110,
+               price_under=-110, median=3.0, p10=1.0, p90=6.0, p_over_model=0.5, p_over_book=0.5, implied=5.0,
+               projected=5.0, unit="targets", over_needs=5.5, under_needs=4.5, be_over=0.52, be_under=0.52,
+               snap=0.8, snap_base=0.7, ts=0.2, ts_base=0.18, cs=0.0, cs_base=0.0, usage_week=3, flags="")
+    RS = pd.DataFrame([dict(row, game="A@B"), dict(row, game="C@D")])
+    runs = [dict(game="A@B", total="", kickoff_utc="Sun"), dict(game="C@D", total="41.5", kickoff_utc="Sun")]
+    B = W.slate_board(RS, runs, sort="total")
+    heads = [ln for ln in B if ln.startswith("## ")]
+    assert heads[0].startswith("## C @ D") and heads[1].startswith("## A @ B — total —")
+    assert any("| wk3: snaps 80% (70%), targets 20% (18%) |" in ln for ln in B), "the report's wording"

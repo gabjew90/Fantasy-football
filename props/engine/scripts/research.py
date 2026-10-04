@@ -80,6 +80,19 @@ def _break_even_ks(share_over, prices):
             None if be_u is None else _bisect(share_over, 1 - be_u))
 
 
+def search_edges(share_over, prices):
+    """Where a failed break-even search ran out: for each side, 'max' when even
+    the most work the simulation can give him is not enough (Over) or still
+    pays (Under), 'min' at the other end; None when the search found a number
+    or the side has no price."""
+    be_o, be_u = (breakeven(prices[0]), breakeven(prices[1])) if prices else (None, None)
+    hi = share_over(K_HI)
+
+    def edge(target):
+        return None if target is None else ("max" if hi < target else "min")
+    return edge(be_o), edge(None if be_u is None else 1 - be_u)
+
+
 def break_even_cell(x) -> str:
     """The research table's 'Pays at this price if he gets' cell: the Over beats
     its own price above over_needs, the Under at or below under_needs. A side
@@ -91,12 +104,44 @@ def break_even_cell(x) -> str:
     if not unit or (blank(bo) and blank(bu)):
         return "—"
 
-    def side(v, be, word, fmt):
+    edge = {k: x.get(k) for k in ("over_edge", "under_edge", "over_limit", "under_limit")}
+
+    def side(v, be, word, fmt, key):
         if blank(be):
             return f"{word}: no price posted"
-        return f"{word}: beyond the search range" if blank(v) else fmt.format(v=float(v))
-    return (f"{side(o, bo, 'Over', 'Over above {v:.1f}')} {unit}; "
-            f"{side(u, bu, 'Under', 'Under at {v:.1f} or fewer')}")
+        if not blank(v):
+            return fmt.format(v=float(v))
+        e, lim = edge.get(f"{key}_edge"), edge.get(f"{key}_limit")
+        if isinstance(e, str) and not blank(lim):
+            # the search ran out: say where, in his units
+            if key == "over":
+                return (f"Over: needs more than {float(lim):.1f} {unit} (about all the work the simulation "
+                        "gives him: the line rests on his efficiency or the team's volume)" if e == "max"
+                        else f"Over: pays even at {float(lim):.1f} {unit}")
+            return (f"Under: pays even at {float(lim):.1f} {unit}" if e == "max"
+                    else f"Under: needs fewer than {float(lim):.1f} {unit}")
+        return f"{word}: beyond the search range"
+    return (f"{side(o, bo, 'Over', 'Over above {v:.1f} ' + unit, 'over')}; "
+            f"{side(u, bu, 'Under', 'Under at {v:.1f} or fewer', 'under')}")
+
+
+LAST_EDGES = {}     # the latest search's edges, read by edges_for(); set by _edge_cache
+
+
+def _edge_cache(share_over, prices, k_o, k_u, work):
+    """Record, for a side whose search failed, which end it ran out at and the
+    workload there, so the cell can say 'needs more than 19 carries' rather
+    than 'beyond the search range'."""
+    eo, eu = search_edges(share_over, prices)
+    lim = lambda e: None if e is None else work(K_HI if e == "max" else K_LO)
+    LAST_EDGES.clear()
+    LAST_EDGES.update(over_edge=eo if k_o is None else None, under_edge=eu if k_u is None else None)
+    LAST_EDGES.update(over_limit=lim(LAST_EDGES["over_edge"]), under_limit=lim(LAST_EDGES["under_edge"]))
+
+
+def edges_for() -> dict:
+    """The edges of the last implied_* call made with prices (see _edge_cache)."""
+    return dict(LAST_EDGES)
 
 
 def implied_targets(line, stat, team_targets_mean, targets_r, share, catch_rate, ypt,
@@ -129,6 +174,7 @@ def implied_targets(line, stat, team_targets_mean, targets_r, share, catch_rate,
     if prices is None:
         return work(k), proj
     k_o, k_u = _break_even_ks(share_over, prices)
+    _edge_cache(share_over, prices, k_o, k_u, work)
     return work(k), proj, work(k_o), work(k_u)
 
 
@@ -163,6 +209,7 @@ def implied_carries(line, j, team_carries_mean, carries_r, rush_shares, ypc, res
     if prices is None:
         return work(k), proj
     k_o, k_u = _break_even_ks(share_over, prices)
+    _edge_cache(share_over, prices, k_o, k_u, work)
     return work(k), proj, work(k_o), work(k_u)
 
 
@@ -170,26 +217,29 @@ def implied_carries(line, j, team_carries_mean, carries_r, rush_shares, ypc, res
 OUT_TARGET_SHARE, OUT_CARRY_SHARE, OUT_PASS_SHARE = 0.10, 0.15, 0.50
 
 
-def role_share(plays, pid, team):
-    """His share of the team's plays in the weeks he took part this season.
-    plays: DataFrame with posteam, week, pid. None when he has no play."""
+def role_share(plays, pid, team, weeks=None):
+    """His share of the team's plays in the weeks he was available this season:
+    `weeks` (the weeks he was on the active roster) plus any week he had a play,
+    so the games he played without a target still count. plays: DataFrame
+    with posteam, week, pid. None when he has no play at all."""
     d = plays[plays.posteam == team]
-    weeks = set(d.loc[d.pid == pid, "week"])
-    if not weeks:
+    mine = set(d.loc[d.pid == pid, "week"])
+    if not mine:
         return None
+    weeks = mine | set(weeks or ())
     dd = d[d.week.isin(weeks)]
     return float((dd.pid == pid).mean()) if len(dd) else None
 
 
-def out_matters(pid, team, targets, carries, dropbacks, prior_ts=None, prior_rs=None) -> bool:
+def out_matters(pid, team, targets, carries, dropbacks, prior_ts=None, prior_rs=None, weeks=None) -> bool:
     """True when an Out player's absence is worth a flag: this season he threw
     half the team's passes, drew 10%+ of its targets or took 15%+ of its
     carries in the weeks he played; with no play this season, last season's
     shares decide (never a slot default -- an unknown depth player is not
     news). A depth receiver with two targets in two games is not flagged."""
-    shares = [(role_share(dropbacks, pid, team), OUT_PASS_SHARE),
-              (role_share(targets, pid, team), OUT_TARGET_SHARE),
-              (role_share(carries, pid, team), OUT_CARRY_SHARE)]
+    shares = [(role_share(dropbacks, pid, team, weeks), OUT_PASS_SHARE),
+              (role_share(targets, pid, team, weeks), OUT_TARGET_SHARE),
+              (role_share(carries, pid, team, weeks), OUT_CARRY_SHARE)]
     if any(s is not None for s, _ in shares):
         return any(s is not None and s >= cut for s, cut in shares)
     return bool((prior_ts or 0) >= OUT_TARGET_SHARE or (prior_rs or 0) >= OUT_CARRY_SHARE)

@@ -148,3 +148,23 @@ def test_an_out_teammate_is_named_only_when_he_had_a_real_role():
     assert not RS.out_matters("rookie", "CIN", t, c, e), "no play and no prior: unknown, not flagged"
     assert RS.out_matters("vet", "CIN", t, c, e, prior_ts=0.22), "out all season: last season's share decides"
     assert not RS.out_matters("vet", "CIN", t, c, e, prior_ts=float("nan"))
+
+
+def test_games_without_a_target_still_count_toward_his_share():
+    import pandas as pd
+    t = pd.DataFrame({"posteam": "CIN", "week": [1] * 30 + [2] * 30 + [3] * 30,
+                      "pid": ["g"] * 4 + ["x"] * 26 + ["x"] * 60})
+    e = pd.DataFrame(columns=["posteam", "week", "pid"])
+    assert RS.role_share(t, "g", "CIN") == pytest.approx(4 / 30), "only the week he was targeted"
+    assert RS.role_share(t, "g", "CIN", weeks={1, 2, 3}) == pytest.approx(4 / 90), "every week he was active"
+    assert not RS.out_matters("g", "CIN", t, e, e, weeks={1, 2, 3}), "a gadget week is not a role"
+
+
+def test_a_search_that_runs_out_says_where_in_his_units():
+    imp, proj, o, u = RS.implied_targets(40.5, "receptions", 34.0, 30.0, 0.2, 0.7, 8.0, 1.06, prices=(-130, -127))
+    e = RS.edges_for()
+    assert o is None and e["over_edge"] == "max" and e["over_limit"] > proj
+    cell = RS.break_even_cell({"unit": "targets", "over_needs": o, "under_needs": u, "be_over": RS.breakeven(-130),
+                               "be_under": RS.breakeven(-127), **e})
+    assert cell.startswith(f"Over: needs more than {e['over_limit']:.1f} targets (about all the work")
+    assert "beyond the search range" not in cell

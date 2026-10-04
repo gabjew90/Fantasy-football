@@ -9,10 +9,11 @@ the Sleeper lines pull, the Sleeper player table and the ESPN scoreboard are fet
 for the whole slate (about 4 s per game after the first). Then it reads every game's
 shadow log and bet card back and writes:
 
-  slate_summary_{season}_wk{W}.md   the chat-reply deliverable for a slate question
+  slate_summary_{season}_wk{W}.md   runs, research leads and notes by game (the slate overview)
   slate_survival_{season}_wk{W}.csv one "must-win" pick per game (rule below)
   slate_research_{season}_wk{W}.csv every priced line's research row (line implies, usage, flags)
-  slate_board_{season}_wk{W}.md     every game's full research table in ONE file, ordered by
+  slate_board_{season}_wk{W}.md     THE chat reply for "the props for these games": every
+                                    game's full research table in ONE file, ordered by
                                     kickoff or (--sort total) by the game total, highest first;
                                     --overs-only shows the Over side of each line
   slate_card_{season}_wk{W}.csv     the old card rows, written for the record only, never shown
@@ -59,6 +60,23 @@ MK_LABEL = {"player_receptions": "catches", "player_reception_yds": "rec yds",
             "player_rush_yds": "rush yds", "player_anytime_td": "anytime TD", "player_pass_yds": "pass yds"}
 
 
+def eastern_kickoff(s: str) -> str:
+    """'13:00', '1:00', '1pm', '1:00 PM', '4:25' -> nflverse's 'HH:MM' Eastern time.
+    A bare hour from 1 to 8 is the afternoon or evening (no NFL game kicks off
+    between 1 and 8 in the morning); 9:30 stays the London morning game."""
+    import re
+    t = str(s).strip().lower().replace(" ", "").replace("et", "")
+    m = re.fullmatch(r"(\d{1,2})(?::(\d{2}))?(am|pm)?", t)
+    if not m:
+        raise SystemExit(f"--kickoff {s!r}: write an Eastern time like 13:00 or 1pm")
+    h, mi, ap = int(m.group(1)), int(m.group(2) or 0), m.group(3)
+    if ap == "pm" and h < 12:
+        h += 12
+    elif ap is None and 1 <= h <= 8:
+        h += 12
+    return f"{h:02d}:{mi:02d}"
+
+
 def _num(v):
     try:
         x = float(v)
@@ -72,7 +90,7 @@ def slate_board(RS, runs, sort="kickoff", overs_only=False) -> list[str]:
     props for these games"), games ordered by kickoff or by game total, highest
     first. --overs-only keeps the Over side of each line: its price, the two
     Over chances and the workload the Over needs at its price."""
-    from score_game import research_cells
+    from score_game import research_cells, usage_line
     MKT = {"player_receptions": "catches", "player_reception_yds": "rec yds", "player_rush_yds": "rush yds",
            "player_pass_yds": "pass yds"}
     games = [r for r in runs if r["game"] in set(RS.game)]
@@ -98,9 +116,11 @@ def slate_board(RS, runs, sort="kickoff", overs_only=False) -> list[str]:
             rush = x.market == "player_rush_yds"
             if x.market == "player_pass_yds" or _num(x.get("snap")) is None:
                 last = "—"
-            else:
-                sh = ("carries", x.get("cs"), x.get("cs_base")) if rush else ("targets", x.get("ts"), x.get("ts_base"))
-                last = f"snaps {pc(x.get('snap'))} ({pc(x.get('snap_base'))}), {sh[0]} {pc(sh[1])} ({pc(sh[2])})"
+            else:      # the game report's own wording (score_game.usage_line)
+                last = usage_line({k: x.get(k) for k in ("snap", "snap_base", "ts", "ts_base", "cs", "cs_base")}
+                                  | {"week": int(_num(x.get("usage_week")) or 0)}, rush=rush, short=True)
+                if not _num(x.get("usage_week")):
+                    last = last.split(": ", 1)[-1]
             fl = x["flags"] if isinstance(x.get("flags"), str) and x["flags"] else "—"
             cells = research_cells(x, MKT).strip("|").split("|")
             if overs_only:
@@ -214,7 +234,8 @@ def main():
                 want.add(f"{aw}@{hm}")
         W = W[(W.away_team + "@" + W.home_team).isin(want)]
     if a.kickoff:
-        W = W[W.gametime.astype(str).str.strip() == a.kickoff.strip()]
+        want_t = eastern_kickoff(a.kickoff)
+        W = W[W.gametime.astype(str).str.strip() == want_t]
     W["kick_utc"] = [eastern_to_utc(g, t) if isinstance(t, str) else pd.NaT for g, t in zip(W.gameday, W.gametime)]
     W = W.sort_values(["kick_utc", "away_team"])
     now_utc = datetime.now(timezone.utc)
