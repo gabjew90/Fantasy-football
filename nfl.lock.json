@@ -2,7 +2,7 @@
  "algorithm": "nfl-release-sha256-lf-1",
  "file_count": 187,
  "files": {
-  "CHAT.md": "37b509aa28adf2ffe2b682cb8d4820c5860596c662d90a125c2faeb6ab376913",
+  "CHAT.md": "dfc9016cf02f1c16923436cea9d9a5300a93a2585eb8af06fa8128eb3fcc52e7",
   "config.yaml": "7e7e2de6f52d3bbf13c0d7c6850ea6925a2d279fa714546e48b26ec3354f695e",
   "core/__init__.py": "8ac9ed217e439f5828616ab66ec9ff17336c2cbbbeae391d0f9bfa001eaed571",
   "core/fetch.py": "ec51eabfede0b0809ad36c30395d649a78ec3780a0453f4b28975d250f2deabe",
@@ -190,6 +190,6 @@
   "tiers.csv": "04a1a79d43e9f2445ba3dc4ea262b00fbd58efea1f41e8b0393cb4c7f8afee41",
   "tiers.keefamania.csv": "11e6546b56caa807a572da86d5c3d81097bafd2d2550e25653882d78b2962e94"
  },
- "sha256": "13123ede9721fcdc1affe759bc38655f4b17ebb06fdf9beac51bf83ccdde2e48",
+ "sha256": "d29daf9b184781933bb6faa9c73d788bb5041d821bc182b988920ba224bbf31a",
  "tag": "nfl-v1.33"
 }
