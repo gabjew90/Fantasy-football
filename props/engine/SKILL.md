@@ -245,6 +245,10 @@ For a narrow question, run only what it needs:
   information; no TD row is a pick. The settled record fits the real weight.
 - **Parlays:** none are shown or priced (DECISIONS #142). If asked, say so and give the single legs'
   research rows instead.
+- **Other books (opt-in):** `--compare-books` adds DraftKings and FanDuel player lines beside Sleeper's for
+  that game (~4 Odds API credits; skipped below 100 credits or with no key, and the sources table says
+  which). Their rows are labelled with the book, and "Where the books disagree" compares them. Use it on
+  the games the user is researching, not the whole slate.
 - **Inside 60 minutes of kickoff** the report flags a candidate closing snapshot; say so in the reply.
   The scheduled capture records the official close.
 

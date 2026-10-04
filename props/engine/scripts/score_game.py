@@ -189,7 +189,10 @@ def run_odds(stage, args_list):
     try:
         return json.loads(r.stdout)
     except json.JSONDecodeError:
-        raise RuntimeError(f"odds_client {stage} returned no JSON (exit {r.returncode}): {r.stderr.strip()[-300:]}")
+        # odds_client prints its own plain reason on stdout (e.g. no key in this
+        # environment); it never contains the key itself
+        raise RuntimeError(f"odds_client {stage} returned no JSON (exit {r.returncode}): "
+                           f"{(r.stdout.strip() or r.stderr.strip())[-300:]}")
 
 
 # ---------------------------------------------------------------- CLI conveniences
@@ -261,6 +264,11 @@ def apply_designations(pop: pd.DataFrame, assume_out=frozenset()) -> pd.DataFram
         pop["excluded"] = pop["excluded"] | ao
         pop["questionable"] = pop["questionable"] & ~ao
     return pop
+
+
+COMPARE_QUOTA_MIN = 100      # --compare-books never spends the last credits
+COMPARE_BOOKS = ("draftkings", "fanduel")
+COMPARE_MARKETS = "player_receptions,player_reception_yds,player_rush_yds,player_pass_yds"
 
 
 def last_oddsapi_quota() -> int | None:
@@ -361,6 +369,9 @@ def main():
                     help="price source: Sleeper Picks (default; no key, no quota, pick'em multipliers converted to American) "
                          "or The Odds API (DK/FD, 8 credits a run). Whichever is not chosen is the automatic fallback. "
                          f"A TD-only run (--markets td) defaults to The Odds API when the cached quota shows {TD_QUOTA_MIN}+ credits.")
+    ap.add_argument("--compare-books", action="store_true",
+                    help="beside Sleeper, pull DraftKings and FanDuel player lines from The Odds API for this game "
+                         "(~4 credits; skipped when no key or fewer than COMPARE_QUOTA_MIN credits remain)")
     ap.add_argument("--no-oddsapi-fallback", action="store_true",
                     help="never spend Odds API credits, even when Sleeper has no lines for this game")
     ap.add_argument("--sleeper-cache-ttl", type=int, default=int(os.environ.get("SLEEPER_CACHE_TTL", "600")),
@@ -1243,6 +1254,38 @@ def main():
         else:
             oddsapi_is_fallback = True
             log("  falling back to The Odds API (spends credits)")
+
+    # ---------- 7a2. other books beside Sleeper (--compare-books, DECISIONS #146) ----------
+    # DraftKings and FanDuel player lines for THIS game, appended to Sleeper's so the
+    # research table and "Where the books disagree" show them. Opt-in, a few credits,
+    # never the last ones; any failure is a sources note, never a lost run.
+    if SNAP is None and not a.no_odds and not a.lines_file and a.compare_books and data is not None and sleeper_used:
+        _q = last_oddsapi_quota()
+        _src = ("Other books (The Odds API)", "DraftKings and FanDuel beside Sleeper")
+        if _q is not None and _q < COMPARE_QUOTA_MIN:
+            SOURCES.append((*_src, "skipped", f"{_q} credits left; needs {COMPARE_QUOTA_MIN}+"))
+        else:
+            try:
+                home_name, away_name = TEAM_NAMES.get(HOME), TEAM_NAMES.get(AWAY)
+                ev = run_odds("events", ["--home", home_name, "--away", away_name,
+                                         "--key-file", str(RES / "credential.env")])
+                evs = [e for e in ev.get("events", []) if e["home_team"] == home_name and e["away_team"] == away_name]
+                if len(evs) != 1:
+                    raise RuntimeError(f"{len(evs)} matching events")
+                eid2 = evs[0]["id"]
+                od = run_odds("odds", [eid2, "--key-file", str(RES / "credential.env"),
+                                       "--markets", COMPARE_MARKETS, "--books", ",".join(COMPARE_BOOKS)])
+                cf = ([HERE / "cache" / od["reused_cache"]] if od.get("reused_cache") else
+                      sorted((HERE / "cache").glob(f"odds_{eid2}_*.json"), key=lambda f: f.stat().st_mtime))
+                extra = []
+                if od.get("class") == "OK" and cf:
+                    extra = [b for b in json.load(open(cf[-1]))["data"].get("bookmakers", []) if b["key"] in COMPARE_BOOKS]
+                data["bookmakers"] = list(data["bookmakers"]) + extra
+                SOURCES.append((*_src, "ok" if extra else "no lines",
+                                f"{', '.join(b['key'] for b in extra) or 'no book posted these markets'}; "
+                                f"{(od.get('quota') or {}).get('x-requests-remaining')} credits left"))
+            except Exception as ex:  # noqa: BLE001 -- a comparison must never cost the run
+                SOURCES.append((*_src, "unavailable", f"{type(ex).__name__}: {str(ex)[:120]}"))
 
     if SNAP is None and not a.no_odds and not a.lines_file and (a.source == "oddsapi" or oddsapi_is_fallback):
         home_name, away_name = TEAM_NAMES.get(HOME), TEAM_NAMES.get(AWAY)
@@ -2789,6 +2832,9 @@ def research_statement(RESEARCH: pd.DataFrame, gate=None) -> str:
     return f"**{n} lines priced.** A research sheet, not a bet list. " + gate_sentence(gate)
 
 
+BOOK_NAME = {"sleeper": "Sleeper", "draftkings": "DraftKings", "fanduel": "FanDuel"}
+
+
 def research_cells(x, MKT) -> str:
     """One research row's cells: | prop | line | price | projection | Over model / book | line implies |."""
     def odds(a):
@@ -2805,7 +2851,9 @@ def research_cells(x, MKT) -> str:
     else:
         imp = "—"
     n0 = lambda v: f"{int(round(float(v))) + 0}"
-    return (f"| {MKT.get(x.market, x.market)} | {x.line:g} | O {odds(x.price_over)} / U {odds(x.price_under)} | "
+    book = str(x.get("book", "sleeper"))
+    label = MKT.get(x.market, x.market) + ("" if book == "sleeper" else f" ({BOOK_NAME.get(book, book)})")
+    return (f"| {label} | {x.line:g} | O {odds(x.price_over)} / U {odds(x.price_under)} | "
             f"{n0(x['median'])} ({n0(x['p10'])} to {n0(x['p90'])}) | {100*x.p_over_model:.0f}% / {100*x.p_over_book:.0f}% | {imp} |")
 
 

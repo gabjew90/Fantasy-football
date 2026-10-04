@@ -90,3 +90,21 @@ def test_the_role_flag_never_claims_an_adjustment_the_snap_rule_skips():
     u = RS.usage_change([(1, 0.03, 0.02, 0.0), (2, 0.03, 0.02, 0.0), (3, 0.30, 0.03, 0.0)])
     assert RS.role_flag(u, 3) is None, "earlier snaps under 5%: model.snap_react does not act, so no flag"
     assert M.snap_react(0.02, 0.30, 0.03, 0.5) == 0.02
+
+
+def test_a_research_row_names_its_book_when_it_is_not_sleeper():
+    import pandas as pd
+    import score_game as SG
+    x = pd.Series({"market": "player_receptions", "line": 4.5, "book": "draftkings", "price_over": -120,
+                   "price_under": -105, "median": 5.0, "p10": 2.0, "p90": 9.0, "p_over_model": 0.55,
+                   "p_over_book": 0.52, "implied": 6.0, "projected": 6.5, "unit": "targets"})
+    assert SG.research_cells(x, {"player_receptions": "catches"}).startswith("| catches (DraftKings) | 4.5 |")
+    assert SG.research_cells(x.copy().replace({"draftkings": "sleeper"}), {"player_receptions": "catches"})         .startswith("| catches | 4.5 |")
+
+
+def test_compare_books_is_opt_in_guarded_and_never_fatal():
+    src = (ENGINE / "score_game.py").read_text(encoding="utf-8")
+    block = src[src.index("# ---------- 7a2. other books"):src.index("if SNAP is None and not a.no_odds and not a.lines_file and (a.source")]
+    assert "a.compare_books" in block and "COMPARE_QUOTA_MIN" in block
+    assert "except Exception" in block, "a failed comparison is a sources note, never a lost run"
+    assert "--archive" not in block, "a comparison pull never writes the line archive"

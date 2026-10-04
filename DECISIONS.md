@@ -7067,3 +7067,14 @@ the settled file, and the scorecard adds "The snap-change rule's calls":
 receiving calls the rule raised, lowered or left alone -- hit rate, model,
 book and mean miss. A raised group whose miss runs negative is the overshoot,
 read on fresh 2026 calls from week 4.
+
+## 2026-10-03 (146) -- other books beside Sleeper, opt-in
+
+With one book there is no comparison against sharper prices. `score_game.py
+--compare-books` adds DraftKings and FanDuel player lines (receptions,
+receiving, rushing and passing yards) from The Odds API for that game, after
+Sleeper's: about 4 credits, never below COMPARE_QUOTA_MIN (100) remaining,
+never archived (the line record stays Sleeper's), and any failure (no key,
+no event, no credits) is a sources-table note, never a lost run. The rows
+carry their book's name in the research table and feed the existing "Where
+the books disagree" section. Off by default; the captures do not use it.
