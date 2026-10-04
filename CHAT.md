@@ -232,7 +232,10 @@ and the label gate (DECISIONS #144, #151: decided at the week 8/12/18 reviews, o
 and none quotes EV, Kelly or a stake. What a props answer gives instead: the
 line and both prices, our projection, the Over by the model and by the book,
 what the line implies (the targets or carries at which it is a fair 50/50,
-next to what he has been getting), last game's usage, and the flags. The
+next to what he has been getting), the workload each side needs to beat its
+own price ("if the model's numbers are right, the Over pays above 7.5
+targets" -- conditional, never a pick: it says how much role a view needs, not
+that the view is right), last game's usage, and the flags. The
 VOICE is this file's.
 
 A narrower question ("is the Kelce over any good?", "chance he gets 60
@@ -243,7 +246,11 @@ engine's contract below is not needed for them. A "best bet" or "must-win
 pick" question gets no pick: say why in a sentence, then give `props best`
 (the research rows, role-shift flags first) or `props best --slate` (the
 slate's leads), in the engine's order (never re-sort or re-rank them
-yourself).
+yourself). A what-if on workload ("what if Marks gets 14 carries?", "what
+if Houston throws less?") is a scenario run, not arithmetic: run the game
+with `--assume` (props/engine/SKILL.md, fast path) and give its "Your
+scenario" table in full; its returns hold only if the user's assumptions
+do, and say so.
 
 **Bets go in the journal.** When the user says they bet a prop, chat cannot
 write it (chat is read-only); give them one line to paste into a Claude Code
@@ -254,6 +261,11 @@ it is chosen now, never after the game):
 ```text
 python props/journal.py add "<player>" <market> <over|under> <line> <price> --team <TEAM> --angle <injury|role|return|other> --change "<the verified change>" --implies "<the workload the line implies vs what he gets>" --fails "<how it fails>"
 ```
+
+A bet that came from a "Your scenario" table also carries the assumption, the
+two Over chances that table shows for its line and the break-even cell, copied
+as shown (never recomputed): `--assumption "<the --assume rule>" --over-board
+<board %> --over-scenario <scenario %> --pays-if "<the cell>"`.
 
 An anytime-TD bet has no line: `python props/journal.py add "<player>" td <yes|no> <price> --team <TEAM> --angle ... --change ... --implies ... --fails ...`. The engine contract's "the
 reply is slate_summary reproduced in full" is for a request for the slate

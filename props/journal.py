@@ -11,6 +11,11 @@ pooling them would describe neither (DECISIONS #142).
         --change "targets fell to 12% in the one game Collins played" \\
         --implies "4.5 needs ~6.3 targets; with Collins back he got ~4" \\
         --fails "Collins re-aggravates the injury, or HOU trails and throws 45 times"
+    # from a scenario run (score_game --assume): the assumption, the two Over
+    # chances the 'Your scenario' table shows, and the break-even workload
+    python props/journal.py add "Woody Marks" rush_yds over 33.5 -130 --team HOU --angle return \\
+        --change ... --implies ... --fails ... --assumption "Woody Marks: carries=14" \\
+        --over-board 37% --over-scenario 70% --pays-if "Over above 11.2 carries; Under at 9.2 or fewer"
     python props/journal.py list [--open]
     python props/journal.py grade --season 2026
     python props/journal.py summary --season 2026
@@ -97,9 +102,41 @@ ANGLES = {"injury": "injury redistribution", "role": "role change", "return": "t
           "other": "other"}
 
 
+def _chance(v, name):
+    """'70%' or 0.70 -> 0.70; None stays None."""
+    if v is None or str(v).strip() == "":
+        return None
+    t = str(v).strip()
+    try:
+        x = float(t.rstrip("%"))
+    except ValueError:
+        raise ValueError(f"--{name} {t} is not a chance (e.g. 70% or 0.70)") from None
+    x = x / 100 if (t.endswith("%") or x > 1) else x
+    if not 0 <= x <= 1:
+        raise ValueError(f"--{name} must be between 0 and 100%")
+    return x
+
+
+def _check_rules(rules) -> None:
+    """The assumption must read as --assume rules (props/engine/scripts/scenario.py),
+    so a journaled scenario can be run again exactly."""
+    import re
+    eng = Path(__file__).resolve().parent / "engine" / "scripts"
+    if str(eng) not in sys.path:
+        sys.path.insert(0, str(eng))
+    import scenario
+    teams = {r.partition(":")[0].strip().upper() for r in rules
+             if re.fullmatch(r"[A-Za-z]{2,3}", r.partition(":")[0].strip())}
+    try:
+        scenario.parse(rules, teams)
+    except ValueError as exc:
+        raise ValueError(f"--assumption is not an --assume rule: {exc}") from None
+
+
 def make_entry(player: str, market: str, side: str, line, price: int, *, change: str, implies: str,
                fails: str, angle: str, team: str | None = None, book: str = "sleeper", stake: float = 1.0,
-               season: int, week: int, now: dt.datetime | None = None) -> dict:
+               season: int, week: int, now: dt.datetime | None = None, assumption=None,
+               over_board=None, over_scenario=None, pays_if: str | None = None) -> dict:
     """One journal row, validated. Raises ValueError with a plain reason."""
     mk = MARKETS.get(" ".join(str(market).lower().replace("-", " ").split()), MARKETS.get(str(market).lower()))
     if mk is None:
@@ -126,12 +163,30 @@ def make_entry(player: str, market: str, side: str, line, price: int, *, change:
         raise ValueError(f"--angle is required, one of {', '.join(ANGLES)} (chosen now, never after the game)")
     if stake <= 0:
         raise ValueError("stake must be positive (units)")
+    # YOUR SCENARIO (DECISIONS #154): the assumption and the chances it gave, so
+    # the journal can later say whether your adjustments beat the board's number.
+    # The table shows Over chances; the bet's own side is derived here (a push
+    # on a whole line is ignored, which moves it by a point at most).
+    assumption = [a.strip() for a in (assumption or []) if str(a).strip()]
+    ob, osc = _chance(over_board, "over-board"), _chance(over_scenario, "over-scenario")
+    if not assumption and (osc is not None or ob is not None or (pays_if or "").strip()):
+        raise ValueError("--over-board, --over-scenario and --pays-if come from a scenario run: "
+                         "add the --assumption they came from")
+    if assumption:
+        _check_rules(assumption)
+    if mk == "player_anytime_td" and (assumption or osc is not None):
+        raise ValueError("touchdowns are not adjusted by a scenario (DECISIONS #153)")
+    side_p = (lambda o: None if o is None else (o if side_ == "over" else 1 - o))
+    scen = {}
+    if assumption:
+        scen = {"assumption": "; ".join(assumption), "p_board": side_p(ob), "p_scenario": side_p(osc),
+                "pays_if": (pays_if or "").strip() or None}
     now = now or dt.datetime.now(dt.timezone.utc)
     return {"id": uuid.uuid4().hex[:10], "logged_at_utc": now.strftime("%Y-%m-%dT%H:%M:%SZ"),
             "season": int(season), "week": int(week), "player": player.strip(),
             "team": (team or "").upper() or None, "market": mk, "side": side_, "line": line, "price": price,
             "book": book, "stake": float(stake), "change": change.strip(), "implies": implies.strip(),
-            "fails": fails.strip(), "angle": angle_, "status": "open"}
+            "fails": fails.strip(), "angle": angle_, "status": "open", **scen}
 
 
 def grade(season: int, stats=None, now: dt.datetime | None = None) -> dict:
@@ -288,6 +343,31 @@ def breakeven(price: int) -> float:
     return abs(price) / (abs(price) + 100) if price < 0 else 100 / (price + 100)
 
 
+def scenario_table(rows: list[dict]) -> list[str]:
+    """Bets logged from a scenario run: what the board said, what your scenario
+    said, and what happened. If your adjustments carry information, the win
+    rate tracks your number more closely than the board's."""
+    sc = [r for r in rows if r.get("assumption") and r.get("p_scenario") is not None]
+    if not sc:
+        return []
+    done = [r for r in sc if r.get("status") == "graded"]
+    def mean(rs, k):
+        v = [float(r[k]) for r in rs if r.get(k) is not None]
+        return "—" if not v else f"{sum(v) / len(v):.0%}"
+    lv = [r for r in sc if r.get("clv_points") is not None]
+    beat = sum(1 for r in lv if r["clv_points"] > 0 or (r["clv_points"] == 0 and (r.get("clv_price") or 0) > 0))
+    won = sum(1 for r in done if r.get("won"))
+    out = ["**Your scenarios** (bets logged from a `--assume` run; chances are for the side you bet):", "",
+           "| Bets | Graded | The board said | Your scenario said | Won | Beat the late line |",
+           "|---|---|---|---|---|---|",
+           f"| {len(sc)} | {len(done)} | {mean(sc, 'p_board')} | {mean(sc, 'p_scenario')} | "
+           + (f"{won / len(done):.0%} ({won} of {len(done)})" if done else "—")
+           + f" | {f'{beat} of {len(lv)}' if lv else '—'} |", "",
+           "If your adjustments add information, the win rate lands nearer your number than the board's; "
+           "it takes about 100 graded bets to tell. The late-line column shows sooner.", ""]
+    return out
+
+
 def angle_table(rows: list[dict]) -> list[str]:
     """The record split by the angle chosen at log time: which kind of story
     gets the better number, and which wins. Small samples per angle say even
@@ -350,8 +430,9 @@ def summary_md(season: int) -> list[str]:
         out.append("A few dozen bets say little; about 100 is where the win rate starts to separate from luck.")
         out.append("")
     out += angle_table(rows)
-    out += ["| Week | Player | Bet | Angle | Price | Late line | Result | Net | The change |",
-            "|---|---|---|---|---|---|---|---|---|"]
+    out += scenario_table(rows)
+    out += ["| Week | Player | Bet | Angle | Price | Late line | Result | Net | The change | Your scenario |",
+            "|---|---|---|---|---|---|---|---|---|---|"]
     for r in sorted(rows, key=lambda r: (r["week"], r["logged_at_utc"])):
         bet = (f"{r['side']} {LABEL.get(r['market'], r['market'])}" if r.get("line") is None
                else f"{r['side']} {r['line']:g} {LABEL.get(r['market'], r['market'])}")
@@ -360,8 +441,14 @@ def summary_md(season: int) -> list[str]:
         late = ("—" if r.get("late_line") is None else
                 f"{r['late_line']:g} {int(r['late_price']):+d} ({r.get('clv_points', 0):+g})")
         ang = ANGLES.get(r.get("angle"), r.get("angle") or "untagged")
+        scn = "—"
+        if r.get("assumption"):
+            ch = ("" if r.get("p_scenario") is None else
+                  f" ({r['p_scenario']:.0%} vs board {r['p_board']:.0%})" if r.get("p_board") is not None
+                  else f" ({r['p_scenario']:.0%})")
+            scn = f"{r['assumption']}{ch}"
         out.append(f"| {r['week']} | {r['player']} | {bet} | {ang} | {int(r['price']):+d} | {late} | {res} | {net} | "
-                   f"{r['change']} |")
+                   f"{r['change']} | {scn} |")
     return out + [""]
 
 
@@ -380,6 +467,11 @@ def main(argv: list[str] | None = None) -> int:
     a.add_argument("--implies", required=True, help="the workload the line implies vs what he gets")
     a.add_argument("--fails", required=True, help="how the bet fails")
     a.add_argument("--season", type=int, default=None); a.add_argument("--week", type=int, default=None)
+    a.add_argument("--assumption", action="append", default=[],
+                   help="from a scenario run: the --assume rule(s) behind this bet (repeatable)")
+    a.add_argument("--over-board", default=None, help="the board's Over chance from the scenario table (e.g. 37%%)")
+    a.add_argument("--over-scenario", default=None, help="your scenario's Over chance (e.g. 70%%)")
+    a.add_argument("--pays-if", default=None, help="the break-even workload cell, as the board shows it")
     ls = sub.add_parser("list"); ls.add_argument("--season", type=int, default=None)
     ls.add_argument("--open", action="store_true")
     g = sub.add_parser("grade"); g.add_argument("--season", type=int, required=True)
@@ -396,7 +488,9 @@ def main(argv: list[str] | None = None) -> int:
             raise SystemExit("an anytime TD bet has no line: journal add PLAYER td yes PRICE ...")
         try:
             e = make_entry(args.player, args.market, args.side, line, args.price, change=args.change,
-                           implies=args.implies, fails=args.fails, angle=args.angle, team=args.team, book=args.book,
+                           implies=args.implies, fails=args.fails, angle=args.angle, assumption=args.assumption,
+                           over_board=args.over_board, over_scenario=args.over_scenario, pays_if=args.pays_if,
+                           team=args.team, book=args.book,
                            stake=args.stake, season=season,
                            week=args.week or current_week(season))
         except ValueError as exc:

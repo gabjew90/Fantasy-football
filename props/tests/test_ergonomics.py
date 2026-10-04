@@ -48,7 +48,12 @@ def test_research_cells_show_both_prices_and_the_implied_workload():
                    "median": 5.0, "p10": 2.0, "p90": 10.0, "p_over_model": 0.587, "p_over_book": 0.479,
                    "implied": 6.298, "projected": 7.07, "unit": "targets"})
     row = SG.research_cells(x, {"player_receptions": "catches"})
-    assert row == "| catches | 4.5 | O -116 / U -141 | 5 (2 to 10) | 59% / 48% | 6.3 targets (we project 7.1) |"
+    assert row == "| catches | 4.5 | O -116 / U -141 | 5 (2 to 10) | 59% / 48% | 6.3 targets (we project 7.1) | — |",         "no break-even search yet: the cell says so"
+    x2 = x.copy()
+    x2["over_needs"], x2["under_needs"], x2["be_over"], x2["be_under"] = 6.512, None, 0.537, 0.585
+    assert SG.research_cells(x2, {}).endswith("| Over above 6.5 targets; Under: beyond the search range |")
+    x2["be_under"] = None                       # no Under posted: never "beyond the search range"
+    assert SG.research_cells(x2, {}).endswith("| Over above 6.5 targets; Under: no price posted |")
     assert "-0" not in SG.research_cells(x.assign(p10=-0.3) if hasattr(x, "assign") else x, {})
 
 

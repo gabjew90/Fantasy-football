@@ -39,6 +39,7 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 from score_game import (GAMES_URL, OUT, eastern_to_utc, et_today, fetch,  # noqa: E402
                         refresh_season_inputs)
+import research as RSCH  # noqa: E402
 
 # The report contains "≥" and other non-cp1252 characters. The Linux
 # runner writes UTF-8 by default so this was invisible in CI, while every
@@ -291,8 +292,9 @@ def main():
               "already moves his target share for it since props-v1.29; before that it beat or "
               "missed the model's next-week projection in 2022-25 (reports/role_shift_check.md); whether the BOOK also "
               "reacts late is what the bet journal decides. 'Line implies' is the targets per game at which the line is a "
-              "fair 50/50.*", "",
-              "| Game | Player | Prop | Line | Line implies | Last game | Flags |", "|---|---|---|---|---|---|---|"]
+              "fair 50/50; 'pays at this price' is the workload each side needs to beat its own price.*", "",
+              "| Game | Player | Prop | Line | Line implies | Pays at this price if he gets | Last game | Flags |",
+              "|---|---|---|---|---|---|---|---|"]
         if len(flagged):
             for _, x in flagged.sort_values(["game", "player"]).iterrows():
                 imp = (f"{x.implied:.1f} {x.unit} (we project {x.projected:.1f})"
@@ -300,9 +302,9 @@ def main():
                 last = (f"snaps {100*x.snap:.0f}% (earlier {100*x.snap_base:.0f}%), targets {100*x.ts:.0f}% "
                         f"(earlier {100*x.ts_base:.0f}%)" if pd.notna(x.snap) else "—")
                 L.append(f"| {x.game} | {x.player} ({x.team}) | {MK_LABEL.get(x.market, x.market)} | {x.line:g} | "
-                         f"{imp} | {last} | {x['flags']} |")
+                         f"{imp} | {RSCH.break_even_cell(x)} | {last} | {x['flags']} |")
         else:
-            L.append("| — | no receiving role-shift flags this slate | | | | | |")
+            L.append("| — | no receiving role-shift flags this slate | | | | | | |")
 
         L += ["", "## Notes by game", "",
               "| Game | Lines | Role-shift flags | New-team players | Teammates out or back | Sleeper depth-rank gaps |",

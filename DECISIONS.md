@@ -7163,3 +7163,35 @@ by the user.
   return (teammate back) or other. Chosen when the bet is logged, never after
   the game, so the summary's by-angle table cannot be fitted to results. Rows
   logged before angles show as untagged.
+
+## 2026-10-03 (153) -- the scenario layer: your workload assumptions, priced, never recorded
+
+- Every research row shows the workload at which each side beats its own
+  price ("Pays at this price if he gets": Over above X, Under at Y or fewer),
+  from the same cached simulation as 'line implies'; both judge a whole line
+  on wins / (wins + losses), so pushes count right. No price moves.
+- `--assume` (scenario.py) takes the user's judgment as OPPORTUNITY: targets
+  or carries per game, catch rate, yards per touch, team pass/rush volume.
+  What one player gains his teammates give up in proportion (the depth
+  receivers too, for targets); the team total holds; receptions and yards
+  share one target draw; the QB's passing yards follow his receivers.
+- The board is priced as usual; a separate scenario run (OUT/scenarios, which
+  record_run never reads) prices the same lines again, and the report adds
+  "Your scenario (experimental)" with the board's chance, the scenario's,
+  each side's break-even and net per $100 IF the assumptions hold. Three
+  scenarios per bet (conservative/base/aggressive) were not built: one
+  assumption plus the break-even workload covers the same ground.
+- Touchdowns are not adjusted: anytime_td_v1 has not been through a harness
+  test, so TD stays evidence-only.
+
+## 2026-10-03 (154) -- scenario bets carry their assumption in the journal
+
+- `journal add` takes --assumption (the --assume rule), --over-board and
+  --over-scenario (the two Over chances the scenario table shows; the bet's
+  side is derived, a whole-line push ignored) and --pays-if (the break-even
+  cell). A scenario chance without its assumption is refused; touchdowns
+  take none.
+- The summary adds "Your scenarios": what the board said, what your
+  scenario said, the win rate and late-line value for those bets. If the
+  adjustments add information, the win rate lands nearer the scenario's
+  number than the board's -- about 100 graded bets to tell.
