@@ -276,6 +276,43 @@ def render_clv(clv: pd.DataFrame, model: str | None = None) -> list[str]:
     return out
 
 
+GATE_FILE = "model_weight.json"
+
+
+def write_label_gate(season: int, df: pd.DataFrame, engines) -> dict:
+    """model_weight.json beside the record: per pricing model and pooled, the
+    model's weight on settled yardage calls and whether the gate is open."""
+    import datetime as dt
+    gate = {"season": season, "updated_utc": dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "rule": "labels return only when the whole 95% interval of the model's weight is above zero",
+            "engines": [], "pooled": blend.yardage_gate(df)}
+    for engine_hash, group in engines:
+        g = blend.yardage_gate(group)
+        g.update(engine=engine_label(group), model_id=str(engine_hash))
+        gate["engines"].append(g)
+    (persist.RECORD_ROOT / GATE_FILE).write_text(json.dumps(gate, indent=1, sort_keys=True) + "\n",
+                                                encoding="utf-8")
+    return gate
+
+
+def label_gate_md(gate: dict) -> list[str]:
+    """The scorecard's gate section: one row per pricing model, then pooled."""
+    out = ["## Label gate", "",
+           "The research board shows no bet labels. They return only when the model's number earns weight "
+           "beside the book's price on settled yardage calls: the whole 95% interval above zero.", "",
+           "| Pricing model | Calls | Weeks | Model weight (95% CI) | Gate |", "|---|---|---|---|---|"]
+    rows = [(g["engine"], g) for g in gate["engines"]] + [("all models, pooled", gate["pooled"])]
+    for name, g in rows:
+        wk = f"{min(g['weeks'])}-{max(g['weeks'])}" if g.get("weeks") else "—"
+        if g.get("estimated"):
+            cell = f"{g['w_model']:+.3f} ({g['lo']:+.3f}, {g['hi']:+.3f})"
+            state = "**OPEN**" if g["gate_open"] else "closed"
+        else:
+            cell, state = f"not estimated below {blend.MIN_CALLS} calls", "closed"
+        out.append(f"| {name} | {g['n_calls']} | {wk} | {cell} | {state} |")
+    return out + [""]
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--season", type=int, required=True)
@@ -323,6 +360,12 @@ def main(argv: list[str] | None = None) -> int:
         out += [f"**{len(engines)} pricing models in the record ({labels}); "
                 f"they are not pooled.** Pass `--pool` to pool them "
                 f"explicitly.", ""]
+
+    # THE LABEL GATE (DECISIONS #144): the model's weight beside the book on the
+    # settled yardage calls, per pricing model and pooled, written where the
+    # engine reads it (the report's first line quotes it).
+    gate = write_label_gate(args.season, df, engines)
+    out += label_gate_md(gate)
 
     csv_rows: list[dict] = []
     for engine_hash, group in engines:

@@ -1619,6 +1619,8 @@ def main():
 
 
 
+    GATE = load_label_gate(wd)
+
     # ---------- 8a. research columns (props-v1.29, DECISIONS #142) ----------
     # What the line implies (the workload that makes it a fair 50/50), usage
     # last game against earlier weeks, and the flags. Own generators only
@@ -1932,7 +1934,7 @@ def main():
     L = []
     L.append(f"# {AWAY} at {HOME}")
     L.append(f"### {SEASON} Week {WEEK} · {G.gameday} {G.gametime} ET · {G.stadium}\n")
-    L.append(research_statement(RESEARCH) + "\n")
+    L.append(research_statement(RESEARCH, GATE) + "\n")
 
     # ---------- player-by-player research rows, in depth-chart order ----------
 
@@ -2119,7 +2121,8 @@ def main():
 
     # ---- plain-English summary box ----
     L.append("> **Read this first.** This report puts the sportsbook's numbers next to ours so you can research a prop. "
-             "It does **not** recommend bets: through week 3 the model's numbers added nothing beside the book's price, and "
+             "It does **not** recommend bets: the model has not shown it adds anything beside the book's price (the first "
+             "line gives the graded record), and "
              "its biggest disagreements were mostly the model missing something. Use it to test a workload story -- what the "
              "line implies, what the player has been getting, and what changed -- then log any bet you make in the journal "
              "so the process is graded.\n")
@@ -2332,7 +2335,7 @@ def main():
               "3. Validated against sportsbook lines: NOTHING. The 2025 walk-forward shows the model beats a naive baseline on CRPS and that its distribution is internally consistent (calibration_2025.csv places lines at fixed offsets from the model\u2019s own median, not at book numbers, across all player-weeks rather than the ones worth betting). No market has been tested against posted lines, so every prop is ineligible and the record is being built prospectively.",
               "4. Team TD totals are market-anchored, so a TD gap is a share disagreement only.",
               "5. Line implies: the targets (or carries) per game at which the posted line is a fair 50/50, from the same simulation with only his share moved.",
-              "6. No bet labels: through week 3 the model's number added no weight beside the book's price (blend weight +0.02, 95% -0.47 to +0.50); labels return only when the record shows otherwise.",
+              "6. No bet labels. " + gate_sentence(GATE),
               "\n</details>\n"]
         T += ["## Research table\n",
               f"*Every priced line, snapshot {now()}, grouped by team. {RESEARCH_NOTE.strip('*')}*\n",
@@ -2470,9 +2473,9 @@ def main():
              "holding his catch rate and yards per touch. Compare it with what he has been getting.")
     if not td_two_sided:
         L.append("- **Touchdown prices** have no 'won't score' side to remove the cut from, so the book's number there is a bit high.")
-    L.append("- **Why there are no bet labels:** the model beats simple baselines on past seasons, but through week 3 its "
-             "numbers added nothing beside the book's price. Every run still logs every line, and the Tuesday scorecard keeps "
-             "measuring; bets you make are graded separately in the journal.")
+    L.append("- **Why there are no bet labels:** the model beats simple baselines on past seasons, but it has not shown it "
+             "adds anything beside the book's price (the report's first line gives the current graded record). Every run "
+             "still logs every line, the Tuesday scorecard keeps measuring, and bets you make are graded in the journal.")
     L.append("")
 
     # ---- touchdown pairs: only the classes the committed gate opened ----
@@ -2554,7 +2557,7 @@ def main():
                   "Not priced: this run had no lines to price against."]
             (OUT / f"report_{slug}.md").write_text("\n".join(L), encoding="utf-8")
     if MARKETS:
-        S_ = short_summary(R, AWAY, HOME, SEASON, WEEK, books_used_str, hrs, sorted(MARKETS))
+        S_ = short_summary(R, AWAY, HOME, SEASON, WEEK, books_used_str, hrs, sorted(MARKETS), gate=GATE)
         (OUT / f"summary_{slug}.md").write_text("\n".join(S_), encoding="utf-8")
         print("\n".join(S_))
         print(f"\n(full report: {OUT / f'report_{slug}.md'})")
@@ -2562,11 +2565,11 @@ def main():
         print("\n".join(L))
 
 
-def short_summary(R, away, home, season, week, books, hrs, markets) -> list[str]:
+def short_summary(R, away, home, season, week, books, hrs, markets, gate=None) -> list[str]:
     """The --markets fast path: just the asked-for markets, one table."""
     out = [f"# {away} at {home}, {season} week {week}: {', '.join(m.replace('player_', '') for m in markets)}", "",
            f"Prices: {books}." + (f" Candidate closing snapshot (kickoff in {hrs * 60:.0f} min)." if 0 < hrs <= 1 else ""),
-           "", "**No bet labels**: a research view; through week 3 the model's numbers added nothing beside the book's price.", ""]
+           "", "**No bet labels**: a research view. " + gate_sentence(gate), ""]
     if R.empty:
         return out
     out += ["| player | market | side / line | book | price | model | market | gap |", "|---|---|---|---|---|---|---|---|"]
@@ -2731,13 +2734,56 @@ RESEARCH_NOTE = ("*Each line: the book's line and price, our projection (median,
                  "role-shift pattern (reports/role_shift_check.md).*")
 
 
-def research_statement(RESEARCH: pd.DataFrame) -> str:
-    """The report's first line: what this sheet is, and what it is not."""
+GATE_URL = "https://raw.githubusercontent.com/gabjew90/Fantasy-football/main/props/record/model_weight.json"
+
+
+def load_label_gate(wd=None):
+    """The label gate the Tuesday scorecard writes (props/record/model_weight.json,
+    DECISIONS #144): the repo copy when the engine runs inside the repo, else the
+    published copy (chat), cached six hours. None when neither can be read --
+    the report then says so instead of quoting a number."""
+    local = Path(__file__).resolve().parents[2] / "record" / "model_weight.json"
+    try:
+        if local.exists():
+            return json.loads(local.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        pass
+    try:
+        import urllib.request as _ur
+        loader = lambda: json.load(_ur.urlopen(_ur.Request(GATE_URL, headers={"User-Agent": "Mozilla/5.0"}),
+                                               timeout=15))
+        return cached_json(Path(wd) / "model_weight.json", 6 * 3600, loader) if wd else loader()
+    except Exception:  # noqa: BLE001 -- the gate is context, never a reason to fail a run
+        return None
+
+
+def gate_sentence(gate) -> str:
+    """One sentence on the graded record: the model's weight beside the book's
+    price and whether the label gate is open."""
+    g = (gate or {}).get("pooled") if isinstance(gate, dict) else None
+    if not g:
+        return ("The graded record could not be read on this run, so no line carries a bet label "
+                "(props/record/scorecard.md has it).")
+    wk = f"weeks {min(g['weeks'])}-{max(g['weeks'])}" if g.get("weeks") else "no weeks yet"
+    if not g.get("estimated"):
+        return (f"Graded so far: {g['n_calls']} calls ({wk}), too few to estimate whether the model adds anything "
+                "beside the book's price, so no line carries a bet label.")
+    if g.get("gate_open"):
+        return (f"Graded so far ({wk}, {g['n_calls']} calls, every pricing model): the model's number carries a weight "
+                f"of {g['w_model']:+.2f} (95% {g['lo']:+.2f} to {g['hi']:+.2f}) beside the book's price -- the whole "
+                "range is above zero, so the label gate is OPEN; the scorecard says so and labels are the user's call.")
+    return (f"Graded so far ({wk}, {g['n_calls']} calls, every pricing model): the model's number carries a weight of "
+            f"{g['w_model']:+.2f} (95% {g['lo']:+.2f} to {g['hi']:+.2f}) beside the book's price. Labels return only "
+            "when that whole range sits above zero.")
+
+
+def research_statement(RESEARCH: pd.DataFrame, gate=None) -> str:
+    """The report's first line: what this sheet is, what it is not, and the
+    graded record behind that."""
     if RESEARCH is None or not len(RESEARCH):
         return "**No yardage or catch lines were priced for this game.**"
     n = RESEARCH.drop_duplicates(["player", "market", "line"]).shape[0]
-    return (f"**{n} lines priced.** A research sheet, not a bet list: through week 3 the model's numbers added nothing "
-            "beside the book's price (props/record/scorecard.md), so no line carries a bet label.")
+    return f"**{n} lines priced.** A research sheet, not a bet list. " + gate_sentence(gate)
 
 
 def research_cells(x, MKT) -> str:

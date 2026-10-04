@@ -55,8 +55,9 @@ STAT_ALIASES = {"catches": "catches", "receptions": "catches", "rec": "catches",
                 "rush yds": "rush yds", "rushing yards": "rush yds", "rushing": "rush yds",
                 "pass yds": "pass yds", "passing yards": "pass yds", "passing": "pass yds"}
 SLEEPER_TO_NFLVERSE = {"LAR": "LA"}
-UNVALIDATED = ("No bet labels: through week 3 the model's numbers added nothing beside the book's price (a blend "
-               "fit gave the model a weight of +0.02, 95% -0.47 to +0.50), so a gap between them is information, "
+UNVALIDATED = ("No bet labels: the model has not shown it adds anything beside the book's price (the report's first "
+               "line quotes the current graded record; labels return only when the model's weight is clearly above "
+               "zero), so a gap between them is information, "
                "not an edge -- and a big gap was usually the model missing something. (Catches and receiving "
                "yards ARE calibrated on 2022-25 outcomes -- a model 85% has won about 84-85%; rushing yards nearly so, one "
                "probability band 3.2 points off against a 3-point limit -- so they are not guesses; they are "

@@ -104,12 +104,9 @@ def _level_dummies(vals: np.ndarray, y: np.ndarray) -> list[np.ndarray]:
     return [(vals == v).astype(float) for v in keep[1:]]
 
 
-def _weights(d: pd.DataFrame, noun: str, levels: tuple, reps: int, seed: int) -> list[str]:
-    """The fit, its game-clustered interval and leave-one-week-out log loss for
-    one family of calls; one intercept per book and per level in `levels`."""
-    if len(d) < MIN_CALLS:
-        return [f"{len(d)} settled {noun} in this pricing model; the blend weight is not "
-                f"estimated below {MIN_CALLS}. The record is filling.", ""]
+def _design(d: pd.DataFrame, levels: tuple):
+    """The blend's design matrix: intercept, logit(model), logit(market), then an
+    intercept per book and per level in `levels`. Returns (X, y, books)."""
     y = d["won"].to_numpy(float)
     # ONE INTERCEPT PER BOOK: Sleeper's anytime prices are two-sided and de-vigged,
     # one-way books' p_novig still carries the hold; pooled, the market term would
@@ -120,8 +117,11 @@ def _weights(d: pd.DataFrame, noun: str, levels: tuple, reps: int, seed: int) ->
     for lv in levels:
         dummies += _level_dummies(d[lv].astype(str).to_numpy(), y)
     X = np.column_stack([np.ones(len(d)), _logit(d["p_model"]), _logit(d["p_novig"]), *dummies])
-    w = fit(X, y)
-    # game-clustered bootstrap for the weights
+    return X, y, ub
+
+
+def _boot(d: pd.DataFrame, X: np.ndarray, y: np.ndarray, reps: int, seed: int):
+    """Game-clustered bootstrap: the 95% interval of every weight."""
     games = d["event_id"].astype(str).to_numpy() if "event_id" in d else np.arange(len(d)).astype(str)
     ug = np.unique(games)
     rng = np.random.default_rng(seed)
@@ -130,7 +130,39 @@ def _weights(d: pd.DataFrame, noun: str, levels: tuple, reps: int, seed: int) ->
     for _ in range(reps):
         take = np.concatenate([idx_by[g] for g in rng.choice(ug, size=len(ug))])
         bs.append(fit(X[take], y[take]))
-    lo, hi = np.percentile(np.array(bs), [2.5, 97.5], axis=0)
+    return np.percentile(np.array(bs), [2.5, 97.5], axis=0)
+
+
+def yardage_gate(df: pd.DataFrame, reps: int = 1000, seed: int = 17) -> dict:
+    """THE LABEL GATE (DECISIONS #144): how much weight the model's number earns
+    beside the book's on settled yardage calls. The research board shows no bet
+    labels; the gate is OPEN only when the whole 95% interval of the model's
+    weight sits above zero. Below MIN_CALLS it is not estimated."""
+    d = yardage_calls(df)
+    weeks = sorted(int(w) for w in pd.to_numeric(d["week"], errors="coerce").dropna().unique()) if len(d) else []
+    out = {"n_calls": int(len(d)), "weeks": weeks, "estimated": False, "gate_open": False}
+    if len(d) < MIN_CALLS:
+        return out
+    try:
+        X, y, _ub = _design(d, ("market",))
+        w = fit(X, y)
+        lo, hi = _boot(d, X, y, reps, seed)
+    except (np.linalg.LinAlgError, FloatingPointError, ValueError):
+        return out
+    out.update(estimated=True, w_model=round(float(w[1]), 3), lo=round(float(lo[1]), 3),
+               hi=round(float(hi[1]), 3), gate_open=bool(lo[1] > 0))
+    return out
+
+
+def _weights(d: pd.DataFrame, noun: str, levels: tuple, reps: int, seed: int) -> list[str]:
+    """The fit, its game-clustered interval and leave-one-week-out log loss for
+    one family of calls; one intercept per book and per level in `levels`."""
+    if len(d) < MIN_CALLS:
+        return [f"{len(d)} settled {noun} in this pricing model; the blend weight is not "
+                f"estimated below {MIN_CALLS}. The record is filling.", ""]
+    X, y, ub = _design(d, levels)
+    w = fit(X, y)
+    lo, hi = _boot(d, X, y, reps, seed)
     # out of sample: leave one week out
     pb = np.full(len(d), np.nan)
     weeks = d["week"].to_numpy()

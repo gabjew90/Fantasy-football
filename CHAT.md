@@ -225,9 +225,10 @@ print.
 
 The props engine's own contract governs the SUBSTANCE of a props answer --
 markets, the research table, the credential order, and its honesty rules.
-The board is a RESEARCH SHEET, not a bet list (DECISIONS #142): through week 3
-the model's numbers added nothing beside the book's price, and its STRONG
-calls won 45%. So no answer calls a line a play, a lean, an edge or a value,
+The board is a RESEARCH SHEET, not a bet list (DECISIONS #142): the model
+has not shown it adds anything beside the book's price (weeks 2-3: its STRONG
+calls won 45%), and the report's first line quotes the current graded record
+and the label gate (DECISIONS #144). So no answer calls a line a play, a lean, an edge or a value,
 and none quotes EV, Kelly or a stake. What a props answer gives instead: the
 line and both prices, our projection, the Over by the model and by the book,
 what the line implies (the targets or carries at which it is a fair 50/50,

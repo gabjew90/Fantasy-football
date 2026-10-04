@@ -208,7 +208,7 @@ When the user asks to test or verify The Odds API connection, market inventory, 
 6. Never manufacture missing route, injury, weather, or pricing data.
 7. Use verified historical seasons as statistical priors for future outcomes when relevant; keep observed current-season utilization and historical priors separately identified. An explicit user restriction to current-season-only evidence overrides historical-prior permission.
 8. Do not equate a positive estimated edge with high confidence.
-9. Give no Over/Under recommendation, pick or bet label: through week 3 the model's numbers added nothing beside the book's price (DECISIONS #142). The board is a research sheet; labels return only when the settled record shows the model earning weight beside the book for the current engine version.
+9. Give no Over/Under recommendation, pick or bet label: the model has not shown it adds anything beside the book's price (DECISIONS #142); the report's first line quotes the current graded record and the label gate (DECISIONS #144). The board is a research sheet; labels return only when the settled record shows the model earning weight beside the book for the current engine version.
 10. Model state is read from `resources/model_registry.md`, never assigned at runtime. A model with no registry entry, or a registry entry below `VALIDATED`, is `MODEL_UNVALIDATED` for pricing purposes. Only `MODEL_VALIDATED, EDGE_SUFFICIENT` can offer an actionable entry threshold, and only after a fresh quote.
 11. Every odds retrieval appends to the line archive per `resources/line_archive.md`.
 
@@ -253,7 +253,7 @@ Use the exact report structure in `resources/prop_workflow.md`.
 
 Two rules for every reply:
 - **Say plainly, in the opening lines, that the board carries no bet labels and why** (the report's
-  first line: the model's numbers added nothing beside the book's price through week 3). Never call a
+  first line quotes the graded record and the label gate). Never call a
   line a play, a lean, an edge or a value, and quote no EV, Kelly or stake.
 - **The reply is the answer; the report is not.** Do not attach or offer the report file
   (`present_files`) unless the user asks for it -- quote what matters from it in the reply.

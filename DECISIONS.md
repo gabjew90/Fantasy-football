@@ -7040,3 +7040,20 @@ rushing probabilities by simulation noise (under 0.01 on DAL@HOU). Passes the sh
 (props-v1.29). Disclosed: QB passing alone is worse in 2024 by season, and its
 worst calibration band (14 rows) moved 0.055 -> 0.162 -- noise-sized, watched
 on the settled record from week 4, the first week the rule acts in 2026.
+
+## 2026-10-03 (144) -- the label gate: the record decides, in code
+
+The research board's "no bet labels until the record shows otherwise" was a
+sentence with no code behind it, and its "through week 3" figures were
+hard-coded. Now the Tuesday scorecard fits the model's weight beside the book
+on settled yardage calls (blend.yardage_gate: the same logistic fit as the
+scorecard's market blend, game-clustered 95% interval, not estimated below
+300 calls), per pricing model and pooled, and writes it to
+props/record/model_weight.json with a "Label gate" section on the scorecard.
+The report's first line, method note and short summary quote the pooled
+number (the engine reads the repo copy, or the published copy from chat,
+cached six hours, and says so when it cannot read either). The gate is OPEN
+only when the whole interval sits above zero; then the scorecard and the
+report say so and bringing labels back is the user's call. At release:
+pooled weeks 2-3, 1,180 calls, weight +0.029 (-0.452, +0.564) -- closed; no
+single pricing model has 300 calls with an estimable weight above zero.
