@@ -7,7 +7,7 @@ against what the line implies, placed at a price. It is kept apart from the
 model's record on purpose -- a handicapped bet is not a model call, and
 pooling them would describe neither (DECISIONS #142).
 
-    python props/journal.py add "Dalton Schultz" catches under 4.5 -141 --team HOU \\
+    python props/journal.py add "Dalton Schultz" catches under 4.5 -141 --team HOU --angle return \\
         --change "targets fell to 12% in the one game Collins played" \\
         --implies "4.5 needs ~6.3 targets; with Collins back he got ~4" \\
         --fails "Collins re-aggravates the injury, or HOU trails and throws 45 times"
@@ -16,7 +16,9 @@ pooling them would describe neither (DECISIONS #142).
     python props/journal.py summary --season 2026
 
 All three checklist answers are required: a bet that cannot state its change,
-its implied workload and its failure case is not logged. Stdlib + pandas.
+its implied workload and its failure case is not logged. So is its angle,
+chosen when the bet is logged and never after (injury, role, return, other),
+so the summary can say which kind of story actually pays. Stdlib + pandas.
 """
 from __future__ import annotations
 
@@ -90,8 +92,13 @@ def current_week(season: int, now: dt.datetime | None = None) -> int:
     return guard.week_from_calendar(now, season)
 
 
+# the kind of story behind a bet, chosen at log time (DECISIONS #152)
+ANGLES = {"injury": "injury redistribution", "role": "role change", "return": "teammate returning",
+          "other": "other"}
+
+
 def make_entry(player: str, market: str, side: str, line, price: int, *, change: str, implies: str,
-               fails: str, team: str | None = None, book: str = "sleeper", stake: float = 1.0,
+               fails: str, angle: str, team: str | None = None, book: str = "sleeper", stake: float = 1.0,
                season: int, week: int, now: dt.datetime | None = None) -> dict:
     """One journal row, validated. Raises ValueError with a plain reason."""
     mk = MARKETS.get(" ".join(str(market).lower().replace("-", " ").split()), MARKETS.get(str(market).lower()))
@@ -114,6 +121,9 @@ def make_entry(player: str, market: str, side: str, line, price: int, *, change:
     for name, val in (("change", change), ("implies", implies), ("fails", fails)):
         if not str(val or "").strip():
             raise ValueError(f"--{name} is required: a bet that cannot state it is not logged")
+    angle_ = str(angle or "").strip().lower()
+    if angle_ not in ANGLES:
+        raise ValueError(f"--angle is required, one of {', '.join(ANGLES)} (chosen now, never after the game)")
     if stake <= 0:
         raise ValueError("stake must be positive (units)")
     now = now or dt.datetime.now(dt.timezone.utc)
@@ -121,7 +131,7 @@ def make_entry(player: str, market: str, side: str, line, price: int, *, change:
             "season": int(season), "week": int(week), "player": player.strip(),
             "team": (team or "").upper() or None, "market": mk, "side": side_, "line": line, "price": price,
             "book": book, "stake": float(stake), "change": change.strip(), "implies": implies.strip(),
-            "fails": fails.strip(), "status": "open"}
+            "fails": fails.strip(), "angle": angle_, "status": "open"}
 
 
 def grade(season: int, stats=None, now: dt.datetime | None = None) -> dict:
@@ -278,6 +288,34 @@ def breakeven(price: int) -> float:
     return abs(price) / (abs(price) + 100) if price < 0 else 100 / (price + 100)
 
 
+def angle_table(rows: list[dict]) -> list[str]:
+    """The record split by the angle chosen at log time: which kind of story
+    gets the better number, and which wins. Small samples per angle say even
+    less than the whole, and the table says so."""
+    if not rows:
+        return []
+    out = ["**By angle** (chosen when the bet was logged):", "",
+           "| Angle | Bets | Graded | Won | Win rate | Break-even | Net per $100 | Beat the late line |",
+           "|---|---|---|---|---|---|---|---|"]
+    order = list(ANGLES) + sorted({r.get("angle") or "untagged" for r in rows} - set(ANGLES))
+    for a in order:
+        rs = [r for r in rows if (r.get("angle") or "untagged") == a]
+        if not rs:
+            continue
+        done = [r for r in rs if r.get("status") == "graded"]
+        settled = [r for r in rs if r.get("status") in ("graded", "void")]
+        stake = sum(float(r.get("stake", 1.0)) for r in done)
+        wins = sum(1 for r in done if r.get("won"))
+        lv = [r for r in rs if r.get("clv_points") is not None]
+        beat = sum(1 for r in lv if r["clv_points"] > 0 or (r["clv_points"] == 0 and (r.get("clv_price") or 0) > 0))
+        out.append(f"| {ANGLES.get(a, a)} | {len(rs)} | {len(done)} | {wins} | "
+                   + (f"{wins / len(done):.0%} | {sum(breakeven(int(r['price'])) for r in done) / len(done):.0%} | "
+                      f"{sum(float(r.get('pnl_per_100', 0.0)) for r in settled) / stake:+.1f}" if done and stake
+                      else "— | — | —")
+                   + f" | {f'{beat} of {len(lv)}' if lv else '—'} |")
+    return out + ["", "Each angle is its own small sample: read the late-line column first.", ""]
+
+
 def summary_md(season: int) -> list[str]:
     """The scorecard's journal section."""
     rows = read(season)
@@ -311,8 +349,9 @@ def summary_md(season: int) -> list[str]:
                 f"| {len(done)} | {wins} | {wins / len(done):.0%} | {be:.0%} | {net / stake:+.1f} |", ""]
         out.append("A few dozen bets say little; about 100 is where the win rate starts to separate from luck.")
         out.append("")
-    out += ["| Week | Player | Bet | Price | Late line | Result | Net | The change |",
-            "|---|---|---|---|---|---|---|---|"]
+    out += angle_table(rows)
+    out += ["| Week | Player | Bet | Angle | Price | Late line | Result | Net | The change |",
+            "|---|---|---|---|---|---|---|---|---|"]
     for r in sorted(rows, key=lambda r: (r["week"], r["logged_at_utc"])):
         bet = (f"{r['side']} {LABEL.get(r['market'], r['market'])}" if r.get("line") is None
                else f"{r['side']} {r['line']:g} {LABEL.get(r['market'], r['market'])}")
@@ -320,7 +359,8 @@ def summary_md(season: int) -> list[str]:
         net = "" if r.get("pnl_per_100") is None else f"{float(r['pnl_per_100']):+.0f}"
         late = ("—" if r.get("late_line") is None else
                 f"{r['late_line']:g} {int(r['late_price']):+d} ({r.get('clv_points', 0):+g})")
-        out.append(f"| {r['week']} | {r['player']} | {bet} | {int(r['price']):+d} | {late} | {res} | {net} | "
+        ang = ANGLES.get(r.get("angle"), r.get("angle") or "untagged")
+        out.append(f"| {r['week']} | {r['player']} | {bet} | {ang} | {int(r['price']):+d} | {late} | {res} | {net} | "
                    f"{r['change']} |")
     return out + [""]
 
@@ -334,6 +374,8 @@ def main(argv: list[str] | None = None) -> int:
     a.add_argument("price", type=int)
     a.add_argument("--team"); a.add_argument("--book", default="sleeper")
     a.add_argument("--stake", type=float, default=1.0, help="units (default 1)")
+    a.add_argument("--angle", required=True, choices=list(ANGLES),
+                   help="the kind of story: injury (redistribution), role (change), return (teammate back), other")
     a.add_argument("--change", required=True, help="the verified change in his duties")
     a.add_argument("--implies", required=True, help="the workload the line implies vs what he gets")
     a.add_argument("--fails", required=True, help="how the bet fails")
@@ -354,7 +396,7 @@ def main(argv: list[str] | None = None) -> int:
             raise SystemExit("an anytime TD bet has no line: journal add PLAYER td yes PRICE ...")
         try:
             e = make_entry(args.player, args.market, args.side, line, args.price, change=args.change,
-                           implies=args.implies, fails=args.fails, team=args.team, book=args.book,
+                           implies=args.implies, fails=args.fails, angle=args.angle, team=args.team, book=args.book,
                            stake=args.stake, season=season,
                            week=args.week or current_week(season))
         except ValueError as exc:

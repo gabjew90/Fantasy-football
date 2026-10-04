@@ -424,7 +424,10 @@ def write_label_gate(season: int, df: pd.DataFrame, engines) -> dict:
     model's weight on settled yardage calls and whether the gate is open."""
     import datetime as dt
     gate = {"season": season, "updated_utc": dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-            "rule": "labels return only when the whole 95% interval of the model's weight is above zero",
+            "rule": ("decided only at the week " + ", ".join(map(str, blend.REVIEW_WEEKS)) + " reviews, on the "
+                     "calls through that week: labels return only when the whole 95% interval of the model's "
+                     "weight is above zero AND the top-tier calls' net per $100 at Sleeper's recorded prices "
+                     "has its whole 95% interval above zero"),
             "engines": [], "pooled": blend.yardage_gate(df)}
     for engine_hash, group in engines:
         g = blend.yardage_gate(group)
@@ -443,19 +446,31 @@ def write_label_gate(season: int, df: pd.DataFrame, engines) -> dict:
 def label_gate_md(gate: dict) -> list[str]:
     """The scorecard's gate section: one row per pricing model, then pooled."""
     out = ["## Label gate", "",
-           "The research board shows no bet labels. They return only when the model's number earns weight "
-           "beside the book's price on settled yardage calls: the whole 95% interval above zero.", "",
-           "| Pricing model | Calls | Weeks | Model weight (95% CI) | Gate |", "|---|---|---|---|---|"]
+           "The research board shows no bet labels. The gate is decided only at the reviews after weeks "
+           + ", ".join(map(str, blend.REVIEW_WEEKS)) + ", on the calls through that week, and opens only when "
+           "both hold: the model's number earns weight beside the book's price (the whole 95% interval above "
+           "zero), and the top-tier calls made money at Sleeper's recorded prices (the whole 95% interval of "
+           "net per $100 above zero). Between reviews it holds; the running weight is context only.", "",
+           "| Pricing model | Calls | Weeks | Running weight (95% CI) | Last review | Weight at review | "
+           "Top-tier net per $100 at review | Gate |", "|---|---|---|---|---|---|---|---|"]
     rows = ([(g["engine"] + (" (current)" if g is gate.get("current") else ""), g) for g in gate["engines"]]
             + [("all models, pooled (context only)", gate["pooled"])])
     for name, g in rows:
         wk = f"{min(g['weeks'])}-{max(g['weeks'])}" if g.get("weeks") else "—"
-        if g.get("estimated"):
-            cell = f"{g['w_model']:+.3f} ({g['lo']:+.3f}, {g['hi']:+.3f})"
-            state = "**OPEN**" if g["gate_open"] else "closed"
+        w_cell = lambda w: (f"{w['w_model']:+.3f} ({w['lo']:+.3f}, {w['hi']:+.3f})" if w.get("estimated")
+                            else f"not estimated below {blend.MIN_CALLS} calls")
+        ar = g.get("at_review")
+        if ar:
+            pr = ar["profit"]
+            rev = f"week {ar['week']} ({ar['n_calls']} calls)"
+            wrev = w_cell(ar["weight"])
+            prof = (f"{pr['net_per_100']:+.1f} ({pr['lo']:+.1f}, {pr['hi']:+.1f}), {pr['n_bets']} bets"
+                    if pr.get("estimated") else f"{pr['n_bets']} bets, not estimated below {blend.MIN_BETS}")
         else:
-            cell, state = f"not estimated below {blend.MIN_CALLS} calls", "closed"
-        out.append(f"| {name} | {g['n_calls']} | {wk} | {cell} | {state} |")
+            rev = f"none yet (first after week {g.get('next_review') or blend.REVIEW_WEEKS[0]})"
+            wrev = prof = "—"
+        state = "**OPEN**" if g.get("gate_open") else "closed"
+        out.append(f"| {name} | {g['n_calls']} | {wk} | {w_cell(g)} | {rev} | {wrev} | {prof} | {state} |")
     return out + [""]
 
 

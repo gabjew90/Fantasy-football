@@ -208,7 +208,7 @@ When the user asks to test or verify The Odds API connection, market inventory, 
 6. Never manufacture missing route, injury, weather, or pricing data.
 7. Use verified historical seasons as statistical priors for future outcomes when relevant; keep observed current-season utilization and historical priors separately identified. An explicit user restriction to current-season-only evidence overrides historical-prior permission.
 8. Do not equate a positive estimated edge with high confidence.
-9. Give no Over/Under recommendation, pick or bet label: the model has not shown it adds anything beside the book's price (DECISIONS #142); the report's first line quotes the current graded record and the label gate (DECISIONS #144). The board is a research sheet; labels return only when the settled record shows the model earning weight beside the book for the current engine version.
+9. Give no Over/Under recommendation, pick or bet label: the model has not shown it adds anything beside the book's price (DECISIONS #142); the report's first line quotes the current graded record and the label gate (DECISIONS #144). The board is a research sheet; labels return only at a fixed review (after weeks 8, 12 and 18) where the settled record shows, for the current engine version, the model earning weight beside the book AND its top-tier calls making money at Sleeper's recorded prices (DECISIONS #151).
 10. Model state is read from `resources/model_registry.md`, never assigned at runtime. A model with no registry entry, or a registry entry below `VALIDATED`, is `MODEL_UNVALIDATED` for pricing purposes. Only `MODEL_VALIDATED, EDGE_SUFFICIENT` can offer an actionable entry threshold, and only after a fresh quote.
 11. Every odds retrieval appends to the line archive per `resources/line_archive.md`.
 
@@ -340,7 +340,8 @@ need not be surfaced. Write the reply as a premium prop guide with this structur
    single legs instead.
 7. **Close** — the receiving role-shift flags on the board, if any, and one line on the
    journal: a bet the user makes is logged with its four checklist answers (the verified
-   change, the workload the line implies, how it fails, the price) and graded on Tuesday.
+   change, the workload the line implies, how it fails, the price) and its angle (injury,
+   role, return or other, chosen when logged), and graded on Tuesday.
    Engineering notes never go in the guide; raise them in a separate paragraph after it.
 
 The shadow log still carries the internal `tier` column so the scorecard can keep

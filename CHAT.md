@@ -228,7 +228,7 @@ markets, the research table, the credential order, and its honesty rules.
 The board is a RESEARCH SHEET, not a bet list (DECISIONS #142): the model
 has not shown it adds anything beside the book's price (weeks 2-3: its STRONG
 calls won 45%), and the report's first line quotes the current graded record
-and the label gate (DECISIONS #144). So no answer calls a line a play, a lean, an edge or a value,
+and the label gate (DECISIONS #144, #151: decided at the week 8/12/18 reviews, on weight beside the book and profit at Sleeper's prices). So no answer calls a line a play, a lean, an edge or a value,
 and none quotes EV, Kelly or a stake. What a props answer gives instead: the
 line and both prices, our projection, the Over by the model and by the book,
 what the line implies (the targets or carries at which it is a fair 50/50,
@@ -247,13 +247,15 @@ yourself).
 
 **Bets go in the journal.** When the user says they bet a prop, chat cannot
 write it (chat is read-only); give them one line to paste into a Claude Code
-session, with the four checklist answers filled from the conversation:
+session, with the four checklist answers filled from the conversation and
+the angle the user names (injury, role, return or other; ask if unclear --
+it is chosen now, never after the game):
 
 ```text
-python props/journal.py add "<player>" <market> <over|under> <line> <price> --team <TEAM> --change "<the verified change>" --implies "<the workload the line implies vs what he gets>" --fails "<how it fails>"
+python props/journal.py add "<player>" <market> <over|under> <line> <price> --team <TEAM> --angle <injury|role|return|other> --change "<the verified change>" --implies "<the workload the line implies vs what he gets>" --fails "<how it fails>"
 ```
 
-An anytime-TD bet has no line: `python props/journal.py add "<player>" td <yes|no> <price> --team <TEAM> --change ... --implies ... --fails ...`. The engine contract's "the
+An anytime-TD bet has no line: `python props/journal.py add "<player>" td <yes|no> <price> --team <TEAM> --angle ... --change ... --implies ... --fails ...`. The engine contract's "the
 reply is slate_summary reproduced in full" is for a request for the slate
 as a whole, and so is its full "prop guide" structure for one game:
 

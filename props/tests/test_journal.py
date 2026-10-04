@@ -20,7 +20,7 @@ import settle  # noqa: E402
 
 NOW = dt.datetime(2026, 10, 3, 21, 0, tzinfo=dt.timezone.utc)
 WHY = dict(change="targets fell to 12% with Collins back", implies="4.5 needs ~6.3 targets",
-           fails="HOU trails and throws 45 times")
+           fails="HOU trails and throws 45 times", angle="return")
 
 
 @pytest.fixture
@@ -46,7 +46,7 @@ def test_an_entry_needs_all_three_checklist_answers():
     assert e["market"] == "player_receptions" and e["team"] == "HOU" and e["status"] == "open"
     with pytest.raises(ValueError, match="--fails is required"):
         J.make_entry("X", "catches", "over", 3.5, -110, season=2026, week=4,
-                     change="a", implies="b", fails=" ")
+                     change="a", implies="b", fails=" ", angle="role")
     with pytest.raises(ValueError, match="American odds"):
         J.make_entry("X", "catches", "over", 3.5, 1.9, season=2026, week=4, **WHY)
     with pytest.raises(ValueError, match="unknown market"):
@@ -57,13 +57,16 @@ def test_an_entry_needs_all_three_checklist_answers():
 
 def test_add_writes_one_line_and_refuses_a_bet_without_its_reasons(root, capsys):
     rc = J.main(["add", "Dalton Schultz", "catches", "under", "4.5", "-141", "--team", "HOU", "--season", "2026",
-                 "--week", "4", "--change", WHY["change"], "--implies", WHY["implies"], "--fails", WHY["fails"]])
+                 "--week", "4", "--angle", "return", "--change", WHY["change"], "--implies", WHY["implies"], "--fails", WHY["fails"]])
     assert rc == 0 and len(J.read(2026)) == 1
     raw = (root / "2026.jsonl").read_bytes()
     assert b"\r\n" not in raw and json.loads(raw.decode().strip())["player"] == "Dalton Schultz"
     with pytest.raises(SystemExit):
         J.main(["add", "X", "catches", "over", "3.5", "-110", "--season", "2026", "--week", "4",
-                "--change", "a", "--implies", "b"])   # argparse: --fails missing
+                "--angle", "role", "--change", "a", "--implies", "b"])   # argparse: --fails missing
+    with pytest.raises(SystemExit):
+        J.main(["add", "X", "catches", "over", "3.5", "-110", "--season", "2026", "--week", "4",
+                "--change", "a", "--implies", "b", "--fails", "c"])   # argparse: --angle missing
     assert len(J.read(2026)) == 1
 
 
@@ -165,3 +168,22 @@ def test_a_td_bet_finds_its_late_yes_quote():
          "commence_time": "2026-10-04T17:00:00+00:00"}
     ll = J.late_line(bet, [q])
     assert ll["late_price"] == 130 and ll["clv_price"] > 0, "bought at +150, late +130: the price moved your way"
+
+
+def test_the_angle_is_required_at_log_time_and_splits_the_summary(root):
+    with pytest.raises(ValueError, match="--angle is required"):
+        J.make_entry("X", "catches", "over", 3.5, -110, season=2026, week=4,
+                     **{**WHY, "angle": "hunch"})
+    a = J.make_entry("A", "catches", "under", 4.5, -125, season=2026, week=4, **{**WHY, "angle": "injury"})
+    a.update(status="graded", won=True, pnl_per_100=80.0, clv_points=0.5)
+    b = J.make_entry("B", "catches", "over", 2.5, -125, season=2026, week=4, **{**WHY, "angle": "injury"})
+    b.update(status="graded", won=False, pnl_per_100=-100.0, clv_points=0.0)
+    c = J.make_entry("C", "rec_yds", "over", 40.5, -110, season=2026, week=5, **{**WHY, "angle": "role"})
+    old = J.make_entry("D", "catches", "over", 1.5, -150, season=2026, week=3, **WHY)
+    old.pop("angle")                                    # a row logged before angles existed
+    J.write(2026, [a, b, c, old])
+    md = "\n".join(J.summary_md(2026))
+    assert "| injury redistribution | 2 | 2 | 1 | 50% | 56% | -10.0 | 1 of 2 |" in md
+    assert "| role change | 1 | 0 | 0 | — | — | — | — |" in md
+    assert "| untagged | 1 |" in md and "| teammate returning |" not in md
+    assert "| 4 | A | under 4.5 catches | injury redistribution | -125 |" in md

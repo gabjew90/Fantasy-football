@@ -133,26 +133,94 @@ def _boot(d: pd.DataFrame, X: np.ndarray, y: np.ndarray, reps: int, seed: int):
     return np.percentile(np.array(bs), [2.5, 97.5], axis=0)
 
 
-def yardage_gate(df: pd.DataFrame, reps: int = 1000, seed: int = 17) -> dict:
-    """THE LABEL GATE (DECISIONS #144): how much weight the model's number earns
-    beside the book's on settled yardage calls. The research board shows no bet
-    labels; the gate is OPEN only when the whole 95% interval of the model's
-    weight sits above zero. Below MIN_CALLS it is not estimated."""
-    if df is None or df.empty or "market" not in df.columns:
-        return {"n_calls": 0, "weeks": [], "estimated": False, "gate_open": False}
-    d = yardage_calls(df)
-    weeks = sorted(int(w) for w in pd.to_numeric(d["week"], errors="coerce").dropna().unique()) if len(d) else []
-    out = {"n_calls": int(len(d)), "weeks": weeks, "estimated": False, "gate_open": False}
+# THE GATE IS DECIDED AT FIXED REVIEWS ONLY (DECISIONS #151): after these
+# weeks are graded, on the calls through that week. Between reviews it holds,
+# so watching the running number week by week cannot open it on a lucky run.
+REVIEW_WEEKS = (8, 12, 18)
+# the bet-selection rule the profit condition grades: the board's internal top
+# tier (the label a bet would carry), at the price Sleeper showed when logged
+SELECTION_TIERS = ("STRONG",)
+SELECTION_BOOK = "sleeper"
+MIN_BETS = 100
+MIN_GAMES = 10      # an interval from resampling fewer games is not trusted
+
+
+def _weight(d: pd.DataFrame, reps: int, seed: int) -> dict:
+    """The model's weight beside the book, with its game-clustered interval."""
     if len(d) < MIN_CALLS:
-        return out
+        return {"estimated": False}
     try:
         X, y, _ub = _design(d, ("market",))
         w = fit(X, y)
         lo, hi = _boot(d, X, y, reps, seed)
     except (np.linalg.LinAlgError, FloatingPointError, ValueError):
+        return {"estimated": False}
+    return {"estimated": True, "w_model": round(float(w[1]), 3), "lo": round(float(lo[1]), 3),
+            "hi": round(float(hi[1]), 3)}
+
+
+def selection_profit(df: pd.DataFrame, reps: int = 2000, seed: int = 23) -> dict:
+    """What the selection rule actually made: net per $100 on settled top-tier
+    yardage calls at Sleeper's recorded prices, with a 95% interval from
+    resampling whole games. A positive weight beside the book is not a
+    betting edge after the hold; this is."""
+    d = df[df["market"].isin(YARDAGE_MARKETS)] if "market" in df.columns else df.iloc[0:0]
+    if "tier" in d.columns:
+        d = d[d["tier"].astype(str).str.startswith(SELECTION_TIERS)]
+    else:
+        d = d.iloc[0:0]
+    if "book" in d.columns:
+        d = d[d["book"].astype(str) == SELECTION_BOOK]
+    pnl = pd.to_numeric(d["pnl_per_100"], errors="coerce") if "pnl_per_100" in d.columns else pd.Series(dtype=float)
+    d = d.assign(_pnl=pnl).dropna(subset=["_pnl"])
+    out = {"n_bets": int(len(d)), "estimated": False}
+    if len(d) < MIN_BETS:
         return out
-    out.update(estimated=True, w_model=round(float(w[1]), 3), lo=round(float(lo[1]), 3),
-               hi=round(float(hi[1]), 3), gate_open=bool(lo[1] > 0))
+    games = d["event_id"].astype(str).to_numpy() if "event_id" in d.columns else np.arange(len(d)).astype(str)
+    g = pd.DataFrame({"g": games, "p": d["_pnl"].to_numpy()}).groupby("g")["p"]
+    sums, cnt = g.sum().to_numpy(), g.size().to_numpy()
+    if len(sums) < MIN_GAMES:
+        return {**out, "n_games": int(len(sums))}
+    idx = np.random.default_rng(seed).integers(0, len(sums), size=(reps, len(sums)))
+    lo, hi = np.percentile(sums[idx].sum(1) / cnt[idx].sum(1), [2.5, 97.5])
+    return {**out, "estimated": True, "net_per_100": round(float(d["_pnl"].mean()), 2),
+            "lo": round(float(lo), 2), "hi": round(float(hi), 2), "n_games": int(len(sums))}
+
+
+def yardage_gate(df: pd.DataFrame, reps: int = 1000, seed: int = 17) -> dict:
+    """THE LABEL GATE (DECISIONS #144, #151). The research board shows no bet
+    labels. At each review (after weeks 8, 12 and 18 are graded), on the calls
+    through that week, the gate opens only when BOTH hold:
+    1. the model's number earns weight beside the book's price on settled
+       yardage calls (the whole 95% interval above zero), and
+    2. the selection rule made money at Sleeper's recorded prices (the whole
+       95% interval of net per $100 above zero).
+    Between reviews the decision holds. The running weight on every graded
+    call is reported as context and never opens the gate."""
+    if df is None or df.empty or "market" not in df.columns:
+        return {"n_calls": 0, "weeks": [], "estimated": False, "gate_open": False,
+                "review_week": None, "next_review": REVIEW_WEEKS[0]}
+    d = yardage_calls(df)
+    wk = pd.to_numeric(d["week"], errors="coerce")
+    weeks = sorted(int(w) for w in wk.dropna().unique()) if len(d) else []
+    # a review counts for a pricing model only when it has calls through that
+    # week: a model first used in week 10 is first reviewed after week 12
+    reached = [r for r in REVIEW_WEEKS if weeks and min(weeks) <= r <= max(weeks)]
+    review = reached[-1] if reached else None
+    running = _weight(d, reps, seed)
+    out = {"n_calls": int(len(d)), "weeks": weeks, "review_week": review,
+           "next_review": next((r for r in REVIEW_WEEKS if not weeks or r > max(weeks)), None),
+           **running, "gate_open": False}
+    if review is None:
+        return out
+    dr = d[wk <= review]
+    w = running if len(dr) == len(d) else _weight(dr, reps, seed)
+    pr = selection_profit(df[pd.to_numeric(df["week"], errors="coerce") <= review])
+    weight_ok = bool(w.get("estimated") and w["lo"] > 0)
+    profit_ok = bool(pr.get("estimated") and pr["lo"] > 0)
+    out["at_review"] = {"week": review, "n_calls": int(len(dr)), "weight": w, "weight_ok": weight_ok,
+                        "profit": pr, "profit_ok": profit_ok}
+    out["gate_open"] = weight_ok and profit_ok
     return out
 
 

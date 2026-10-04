@@ -2820,18 +2820,31 @@ def gate_sentence(gate) -> str:
            if pool.get("estimated") else "")
     if not cur:
         return "No call has been graded yet, so no line carries a bet label." + ctx
+    name = cur.get("engine", "latest")
+    nxt = cur.get("next_review")
+    rule = ("Labels return only at a review (after weeks 8, 12 and 18) where the model's weight beside the "
+            "book AND the top-tier calls' profit at Sleeper's recorded prices both sit wholly above zero"
+            + (f"; the next is after week {nxt}." if nxt else "."))
+    ar = cur.get("at_review")
+    if ar:
+        w, pr = ar["weight"], ar["profit"]
+        wtxt = (f"carried a weight of {ci(w)} beside the book's price" if w.get("estimated")
+                else f"had too few calls ({ar['n_calls']}) to estimate its weight")
+        ptxt = (f"its top-tier calls made {pr['net_per_100']:+.1f} per $100 at Sleeper's recorded prices "
+                f"(95% {pr['lo']:+.1f} to {pr['hi']:+.1f}, {pr['n_bets']} bets)" if pr.get("estimated")
+                else f"its top-tier calls ({pr['n_bets']} bets) were too few to judge profit")
+        head = f"At the week-{ar['week']} review the current pricing model ({name}) {wtxt}, and {ptxt}"
+        if cur.get("gate_open"):
+            return (head + " -- both wholly above zero, so the label gate is OPEN until the next review; the "
+                    "scorecard says so and labels are the user's call." + ctx)
+        return head + ". " + rule + ctx
     if not cur.get("estimated"):
-        return (f"The current pricing model ({cur.get('engine', 'latest')}) has {cur['n_calls']} graded calls "
-                f"({wk(cur)}), too few to estimate whether its numbers add anything beside the book's price, so "
-                "no line carries a bet label." + ctx)
-    if cur.get("gate_open"):
-        return (f"Graded so far, the current pricing model ({cur.get('engine', 'latest')}, {wk(cur)}, "
-                f"{cur['n_calls']} calls) carries a weight of {ci(cur)} beside the book's price -- the whole range "
-                "is above zero, so the label gate is OPEN; the scorecard says so and labels are the user's call."
-                + ctx)
-    return (f"Graded so far, the current pricing model ({cur.get('engine', 'latest')}, {wk(cur)}, "
-            f"{cur['n_calls']} calls) carries a weight of {ci(cur)} beside the book's price. Labels return only "
-            "when that whole range sits above zero." + ctx)
+        return (f"The current pricing model ({name}) has {cur['n_calls']} graded calls ({wk(cur)}), too few to "
+                "estimate whether its numbers add anything beside the book's price, so no line carries a bet "
+                "label. " + rule + ctx)
+    return (f"Graded so far, the current pricing model ({name}, {wk(cur)}, {cur['n_calls']} calls) carries a "
+            f"running weight of {ci(cur)} beside the book's price; no review has been reached, so no line carries "
+            "a bet label. " + rule + ctx)
 
 
 def research_statement(RESEARCH: pd.DataFrame, gate=None) -> str:

@@ -7128,3 +7128,38 @@ section, labelled as the last captured line, not the true close.
   seasons; dropped, 2024-25 unread (reports/snap_react.md).
 Speed-dependent and paid work (inactives alerts, charting data) was ruled out
 by the user.
+
+## 2026-10-03 (150) -- the live bar reads intervals: PASS / FAIL / INSUFFICIENT DATA
+
+- Every part of the bar (docs/plans/2026-09-24-yardage-harness.md) now reads
+  a 95% interval from resampling whole games -- a game's players and its
+  synthetic lines stay together -- and returns PASS (wholly inside the
+  tolerance), FAIL (wholly outside) or INSUFFICIENT DATA (spanning it).
+  Tolerances unchanged: bias 5% (relative, mean(actual - model)/mean(model),
+  PIT mean 0.47-0.53 as a point check), width 0.20 +/- 0.03, every 60-90%
+  reliability band within 0.03 of its mean predicted probability.
+- "Beats baseline A each test season" becomes pooled gain above zero with no
+  test season clearly worse (its interval wholly below zero).
+- Every verdict states its unique games and player-games. Calibration lines
+  carry their game; older saved results cannot pass.
+- A market passes only when all four parts pass; a priced market that lands
+  at INSUFFICIENT DATA is "not shown to be calibrated", never "rescued".
+  Pre-registered in reports/calibration_bar_v2.md before the re-run.
+
+## 2026-10-03 (151) -- the label gate: fixed reviews, and profit at the price
+
+- The gate is decided only at the reviews after weeks 8, 12 and 18, on the
+  calls through that week (frozen pre-kickoff decision rows); between reviews
+  it holds. The running weight is context and cannot open it.
+- A second condition: the selection rule -- the board's internal STRONG tier
+  on yardage calls, at the price Sleeper showed when the call was logged --
+  must show net per $100 with its whole 95% interval (games resampled) above
+  zero, on at least 100 bets. A positive weight beside the book is not an
+  edge after the hold; this is the number a bettor keeps.
+
+## 2026-10-03 (152) -- journal bets carry an angle chosen at log time
+
+- `journal add` requires --angle: injury (redistribution), role (change),
+  return (teammate back) or other. Chosen when the bet is logged, never after
+  the game, so the summary's by-angle table cannot be fitted to results. Rows
+  logged before angles show as untagged.
