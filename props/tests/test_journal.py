@@ -198,8 +198,15 @@ def test_a_scenario_bet_keeps_its_assumption_and_both_chances(root):
         "an Under's chance is one minus the Over the table shows"
     plain = J.make_entry("X", "catches", "over", 3.5, -110, season=2026, week=4, **WHY)
     assert "assumption" not in plain and "p_scenario" not in plain, "a bet with no scenario carries no fields"
-    with pytest.raises(ValueError, match="needs the --assumption"):
-        J.make_entry("X", "catches", "over", 3.5, -110, season=2026, week=4, over_scenario="60%", **WHY)
+    for loose in ({"over_scenario": "60%"}, {"over_board": "40%"}, {"pays_if": "Over above 5 targets"}):
+        with pytest.raises(ValueError, match="add the --assumption"):
+            J.make_entry("X", "catches", "over", 3.5, -110, season=2026, week=4, **loose, **WHY)
+    with pytest.raises(ValueError, match="not an --assume rule"):
+        J.make_entry("X", "catches", "over", 3.5, -110, season=2026, week=4,
+                     assumption=["Woody Marks carries 14"], **WHY)
+    both = J.make_entry("X", "catches", "over", 3.5, -110, season=2026, week=4,
+                        assumption=["HOU: pass=-3", "X: targets=8"], **WHY)
+    assert both["assumption"] == "HOU: pass=-3; X: targets=8"
     with pytest.raises(ValueError, match="not adjusted by a scenario"):
         J.make_entry("X", "td", "yes", None, 150, season=2026, week=4, assumption=["X: targets=8"], **WHY)
     with pytest.raises(ValueError, match="not a chance"):
@@ -209,7 +216,9 @@ def test_a_scenario_bet_keeps_its_assumption_and_both_chances(root):
     J.write(2026, [e, plain])
     md = "\n".join(J.summary_md(2026))
     assert "| 1 | 1 | 63% | 70% | 100% (1 of 1) | 1 of 1 |" in md
-    assert "| Woody Marks: carries=9 (70% vs board 63%) |" in md and md.count("| — |\n") >= 1
+    assert "| Woody Marks: carries=9 (70% vs board 63%) |" in md
+    plain_row = next(ln for ln in md.splitlines() if ln.startswith("| 4 | X |"))
+    assert plain_row.endswith(f"| {WHY['change']} | — |"), plain_row
 
 
 def test_the_cli_takes_the_scenario_fields(root):

@@ -117,6 +117,22 @@ def _chance(v, name):
     return x
 
 
+def _check_rules(rules) -> None:
+    """The assumption must read as --assume rules (props/engine/scripts/scenario.py),
+    so a journaled scenario can be run again exactly."""
+    import re
+    eng = Path(__file__).resolve().parent / "engine" / "scripts"
+    if str(eng) not in sys.path:
+        sys.path.insert(0, str(eng))
+    import scenario
+    teams = {r.partition(":")[0].strip().upper() for r in rules
+             if re.fullmatch(r"[A-Za-z]{2,3}", r.partition(":")[0].strip())}
+    try:
+        scenario.parse(rules, teams)
+    except ValueError as exc:
+        raise ValueError(f"--assumption is not an --assume rule: {exc}") from None
+
+
 def make_entry(player: str, market: str, side: str, line, price: int, *, change: str, implies: str,
                fails: str, angle: str, team: str | None = None, book: str = "sleeper", stake: float = 1.0,
                season: int, week: int, now: dt.datetime | None = None, assumption=None,
@@ -153,8 +169,11 @@ def make_entry(player: str, market: str, side: str, line, price: int, *, change:
     # on a whole line is ignored, which moves it by a point at most).
     assumption = [a.strip() for a in (assumption or []) if str(a).strip()]
     ob, osc = _chance(over_board, "over-board"), _chance(over_scenario, "over-scenario")
-    if osc is not None and not assumption:
-        raise ValueError("--over-scenario needs the --assumption it came from")
+    if not assumption and (osc is not None or ob is not None or (pays_if or "").strip()):
+        raise ValueError("--over-board, --over-scenario and --pays-if come from a scenario run: "
+                         "add the --assumption they came from")
+    if assumption:
+        _check_rules(assumption)
     if mk == "player_anytime_td" and (assumption or osc is not None):
         raise ValueError("touchdowns are not adjusted by a scenario (DECISIONS #153)")
     side_p = (lambda o: None if o is None else (o if side_ == "over" else 1 - o))
