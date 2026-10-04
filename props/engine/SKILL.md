@@ -282,7 +282,9 @@ need not be surfaced. Write the reply as a premium prop guide with this structur
    projection (median and 10th-90th range), the Over by the model and by the book, and
    what the line implies (targets or carries per game at which it is a fair 50/50, next to
    what we project) -- then the role: last-season share and games, this season's count,
-   last game's snaps and share against his earlier weeks, the opponent multiplier if it
+   last game's snaps and share against his earlier weeks, a back's three jobs (early-down
+   carries, passing-down targets, inside-5 carries; last game against earlier weeks), the
+   opponent multiplier if it
    moved the number, and any Watch flag (new team, Questionable, snap scaling, the
    receiving role-shift flag with its 2022-25 wording, a teammate out or back).
    **Questionable players: give both cases, pick neither.** Every number in the run is

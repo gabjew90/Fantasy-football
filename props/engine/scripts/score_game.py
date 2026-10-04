@@ -775,7 +775,12 @@ def main():
     _tg_w = passes.groupby(["posteam", "receiver_player_id", "week"]).size()
     _ca_w = rushes.groupby(["posteam", "rusher_player_id", "week"]).size()
     _tw_i = tw.set_index(["team", "week"])
-    USAGE, ROLE = {}, {}
+    USAGE, ROLE, BACKFIELD = {}, {}, {}
+    # a back's three jobs by week (research columns): early-down carries,
+    # passing-down targets (3rd/4th down or the last two minutes of a half),
+    # inside-5 carries. Display only: nothing here moves a price.
+    _rush_job = rushes[["posteam", "week", "down", "yardline_100", "rusher_player_id"]]
+    _pass_job = passes[["posteam", "week", "down", "half_seconds_remaining", "receiver_player_id"]]
     for _, m_ in active.iterrows():
         key_ = norm_name(m_["name"])
         wks = []
@@ -787,6 +792,20 @@ def main():
                             float(_ca_w.get((m_.team, m_.gsis_id, w_), 0)) / tc_ if tc_ else np.nan))
         USAGE[m_["name"]] = RSCH.usage_change(sorted(wks))
         ROLE[m_["name"]] = RSCH.role_flag(USAGE[m_["name"]], WEEK - 1)
+        if str(m_.get("pos")) in ("RB", "FB", "HB"):
+            bwk = []
+            for w_ in sorted(w[0] for w in wks):
+                r_t = _rush_job[(_rush_job.posteam == m_.team) & (_rush_job.week == w_)]
+                p_t = _pass_job[(_pass_job.posteam == m_.team) & (_pass_job.week == w_)]
+                e_t = r_t[r_t.down.isin([1, 2])]
+                d_t = p_t[p_t.down.isin([3, 4]) | (p_t.half_seconds_remaining <= 120)]
+                g_t = r_t[r_t.yardline_100 <= 5]
+                bwk.append((w_,
+                            float((e_t.rusher_player_id == m_.gsis_id).sum()) / len(e_t) if len(e_t) else np.nan,
+                            float((d_t.receiver_player_id == m_.gsis_id).sum()) / len(d_t) if len(d_t) else np.nan,
+                            float((g_t.rusher_player_id == m_.gsis_id).sum()) / len(g_t) if len(g_t) else np.nan,
+                            int((g_t.rusher_player_id == m_.gsis_id).sum()), len(g_t)))
+            BACKFIELD[m_["name"]] = RSCH.backfield_jobs(bwk)
 
     recs = []
     for _, p in active.iterrows():
@@ -1672,6 +1691,7 @@ def main():
             snap=(u_ or {}).get("snap"), snap_base=(u_ or {}).get("snap_base"),
             ts=(u_ or {}).get("ts"), ts_base=(u_ or {}).get("ts_base"),
             cs=(u_ or {}).get("cs"), cs_base=(u_ or {}).get("cs_base"),
+            **{f"bf_{k}": v for k, v in (BACKFIELD.get(r_.player) or {}).items() if k != "week"},
             flags="; ".join(flags_)))
     RESEARCH = pd.DataFrame(research_rows)
     if len(RESEARCH):
@@ -1983,6 +2003,9 @@ def main():
             ul_ = usage_line(USAGE.get(m["name"]), rush=m.mu_car >= 3)
             if ul_:
                 L.append(f"**Last game.** {ul_}\n")
+            bj_ = backfield_line(BACKFIELD.get(m["name"]))
+            if bj_:
+                L.append(f"**Backfield jobs.** {bj_}\n")
 
             # research rows: line, price, projection, the two Over chances, what the line implies
             mine = RESEARCH[RESEARCH.player == m["name"]] if len(RESEARCH) else RESEARCH
@@ -2735,6 +2758,17 @@ def research_cells(x, MKT) -> str:
     n0 = lambda v: f"{int(round(float(v))) + 0}"
     return (f"| {MKT.get(x.market, x.market)} | {x.line:g} | O {odds(x.price_over)} / U {odds(x.price_under)} | "
             f"{n0(x['median'])} ({n0(x['p10'])} to {n0(x['p90'])}) | {100*x.p_over_model:.0f}% / {100*x.p_over_book:.0f}% | {imp} |")
+
+
+def backfield_line(b):
+    """A back's three jobs, last game against his earlier weeks (research.backfield_jobs)."""
+    if not b:
+        return None
+    pc = lambda v: "—" if v is None or pd.isna(v) else f"{100*v:.0f}%"
+    return (f"Week {b['week']}: early-down carries {pc(b['early'])} (earlier {pc(b['early_base'])}), "
+            f"passing-down targets {pc(b['passdown'])} (earlier {pc(b['passdown_base'])}), "
+            f"inside-5 carries {b['i5_n']} of {b['i5_team']} (earlier share {pc(b['i5_base'])}). "
+            "Passing downs are 3rd and 4th down plus the last two minutes of a half.")
 
 
 def usage_line(u, rush=False, short=False):

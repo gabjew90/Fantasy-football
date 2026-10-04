@@ -75,3 +75,12 @@ def test_the_scorers_research_block_never_draws_from_the_pricing_stream():
     assert "rng" not in block and "random" not in block
     assert "pd.DataFrame(rows)" in block, "research rows come from this run's lines, not the prior-log merge"
     assert "ASSUME_OUT" in block, "no implied-workload search inside an 'if he's out' scenario run"
+
+
+def test_backfield_jobs_compare_the_last_game_with_earlier_weeks():
+    assert RS.backfield_jobs([(1, 0.6, 0.1, 0.5, 1, 2), (2, 0.6, 0.1, 0.5, 1, 2)]) is None
+    b = RS.backfield_jobs([(1, 0.60, 0.30, 1.0, 2, 2), (2, 0.70, 0.10, float("nan"), 0, 0),
+                           (3, 0.55, 0.00, 0.0, 0, 1)])
+    assert b["week"] == 3 and abs(b["early_base"] - 0.65) < 1e-12 and abs(b["passdown_base"] - 0.20) < 1e-12
+    assert b["i5_base"] == 1.0, "a week with no team inside-5 carry says nothing about his share"
+    assert (b["i5_n"], b["i5_team"]) == (0, 1)

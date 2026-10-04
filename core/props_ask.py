@@ -384,6 +384,9 @@ def research_fields(b) -> dict:
             "implied": _f(get("implied")), "projected": _f(get("projected")),
             "unit": get("unit") if isinstance(get("unit"), str) else None,
             "last_game": {k: _f(get(k)) for k in ("snap", "snap_base", "ts", "ts_base", "cs", "cs_base")},
+            "backfield": ({k[3:]: _f(get(k)) for k in ("bf_early", "bf_early_base", "bf_passdown", "bf_passdown_base",
+                                                        "bf_i5_base", "bf_i5_n", "bf_i5_team")}
+                          if get("bf_early") is not None and not pd.isna(get("bf_early")) else None),
             "flags": get("flags") if isinstance(get("flags"), str) else ""}
 
 
@@ -407,6 +410,13 @@ def research_text(x: dict, label: str, book: str = "", line=None) -> str:
         pc = lambda v: "—" if v is None else f"{100*v:.0f}%"
         bits.append(f"last game snaps {pc(lg['snap'])} (earlier {pc(lg.get('snap_base'))}), {share[0]} {pc(share[1])} "
                     f"(earlier {pc(share[2])})")
+    bf = x.get("backfield")
+    if bf and label in ("rush yds", "catches", "rec yds"):
+        pc = lambda v: "—" if v is None else f"{100*v:.0f}%"
+        bits.append(f"backfield jobs last game: early-down carries {pc(bf.get('early'))} (earlier "
+                    f"{pc(bf.get('early_base'))}), passing-down targets {pc(bf.get('passdown'))} (earlier "
+                    f"{pc(bf.get('passdown_base'))}), inside-5 carries {int(bf.get('i5_n') or 0)} of "
+                    f"{int(bf.get('i5_team') or 0)}")
     if x.get("flags"):
         bits.append(f"flags: {x['flags']}")
     return "; ".join(bits)

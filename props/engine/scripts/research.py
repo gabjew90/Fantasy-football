@@ -116,3 +116,21 @@ def role_flag(u, last_week_expected):
         return ("role down", "snaps fell while targets held; in 2022-25 this pattern caught "
                              "about 0.55 fewer passes than the model projected the next week")
     return None
+
+
+def backfield_jobs(weeks):
+    """A back's three jobs, last game against his earlier weeks. weeks: sorted
+    list of (week, early-down carry share, passing-down target share, inside-5
+    carry share, inside-5 carries, team inside-5 carries) for the weeks he
+    played this season with this team. Passing downs are 3rd/4th down or the
+    last two minutes of a half. None with fewer than three weeks (the same
+    LAST/BASE as usage_change)."""
+    if len(weeks) < 3:
+        return None
+    last, base = weeks[-1], weeks[:-1]
+    mean = lambda i: float(np.nanmean([w[i] for w in base])) if any(np.isfinite(w[i]) for w in base) else np.nan
+    return {"week": int(last[0]),
+            "early": last[1], "early_base": mean(1),
+            "passdown": last[2], "passdown_base": mean(2),
+            "i5": last[3], "i5_base": mean(3),
+            "i5_n": int(last[4]), "i5_team": int(last[5])}
