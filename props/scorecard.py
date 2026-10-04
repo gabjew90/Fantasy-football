@@ -205,8 +205,10 @@ def books_consensus(rows: list[dict]) -> dict:
     for k, v in per.items():
         lines = sorted(x[0] for x in v)
         med = lines[len(lines) // 2] if len(lines) % 2 else (lines[len(lines) // 2 - 1] + lines[len(lines) // 2]) / 2
-        at = [p for ln, p in v if ln == med] or [p for _ln, p in v]
-        out[k] = (med, sum(at) / len(at))
+        at = [p for ln, p in v if ln == med]
+        # no book at the median line (DK 3.5, FD 4.5): no consensus PRICE there,
+        # only a consensus line -- prices quoted at different lines never average
+        out[k] = (med, sum(at) / len(at) if at else None)
     return out
 
 
@@ -218,7 +220,10 @@ def books_rows(df: pd.DataFrame, rows: list[dict]) -> pd.DataFrame:
         return pd.DataFrame()
     cons = books_consensus(rows)
     out = []
-    for _, r in df[df["market"].isin(list(LINE_OFF))].iterrows():
+    # one bet per Sleeper line: the same line can be a call under two pricing
+    # models in one week (an engine release mid-week)
+    d0 = df[df["market"].isin(list(LINE_OFF))].drop_duplicates(["week", "player", "market", "line"], keep="last")
+    for _, r in d0.iterrows():
         try:
             line, actual = float(r["line"]), float(r["actual"])
             po, pu = int(float(r["price_over"])), int(float(r["price_under"]))
@@ -230,7 +235,7 @@ def books_rows(df: pd.DataFrame, rows: list[dict]) -> pd.DataFrame:
         d = line - c[0]
         if abs(d) >= LINE_OFF[r["market"]]:
             kind, fav = "line off", ("Under" if d > 0 else "Over")
-        elif d == 0 and abs(c[1] - _novig_over(po, pu)) >= PRICE_OFF:
+        elif d == 0 and c[1] is not None and abs(c[1] - _novig_over(po, pu)) >= PRICE_OFF:
             kind, fav = "price off", ("Over" if c[1] > _novig_over(po, pu) else "Under")
         else:
             continue

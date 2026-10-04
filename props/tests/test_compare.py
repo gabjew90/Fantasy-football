@@ -99,3 +99,16 @@ def test_the_scorecard_grades_the_consensus_side_at_sleepers_price(tmp_path, mon
     C.compare_path(2026, 4).write_text("\n".join(json.dumps(r) for r in rows), encoding="utf-8")
     md = "\n".join(scorecard.books_section(settled, 2026))
     assert "| line off | 1 | 1 | 100.0% |" in md and "no verdict yet" in md
+
+
+def test_one_bet_per_sleeper_line_and_no_price_from_mismatched_lines():
+    rows = C.rows_from(_payload(), 2026, 4, "t")
+    dup = pd.DataFrame([{"week": 4, "player": "Dalton Schultz", "market": "player_receptions", "line": 4.5,
+                         "actual": 3, "price_over": -116, "price_under": -141, "event_id": "s1"}] * 2)
+    assert len(scorecard.books_rows(dup, rows)) == 1, "two pricing models' calls on one line are one bet"
+    split = [dict(r) for r in rows]
+    for r in split:
+        if r["book"] == "fanduel":
+            r["line"] = 4.5
+    cons = scorecard.books_consensus(split)
+    assert cons[(4, "dalton schultz", "player_receptions")] == (4.0, None)
