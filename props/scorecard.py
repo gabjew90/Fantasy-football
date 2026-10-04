@@ -401,8 +401,11 @@ def render_clv(clv: pd.DataFrame, model: str | None = None) -> list[str]:
     out = ["### Closing line value", ""]
     if clv.empty:
         out += ["No paired decision/close snapshots yet. CLV needs a closing "
-                "capture inside 60 minutes of kickoff; without it, closing-line "
-                "value is unavailable and must not be estimated.", ""]
+                "capture inside 60 minutes of kickoff, and the scheduled runs fire "
+                "too late to make one (speed is off by the user's choice); without "
+                "it, closing-line value is unavailable and must not be estimated. "
+                "The bet journal measures late-line value instead: each bet "
+                "against the last line the capture logged before kickoff.", ""]
         return out
     share = clv["moved_our_way"].mean()
     out += [f"{len(clv)} calls have both snapshots. The line moved toward "

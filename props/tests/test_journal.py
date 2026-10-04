@@ -25,7 +25,9 @@ WHY = dict(change="targets fell to 12% with Collins back", implies="4.5 needs ~6
 
 @pytest.fixture
 def root(tmp_path, monkeypatch):
+    import persist
     monkeypatch.setattr(J, "JOURNAL_ROOT", tmp_path / "journal")
+    monkeypatch.setattr(persist, "RECORD_ROOT", tmp_path / "record")     # no real line archive
     return tmp_path / "journal"
 
 
@@ -87,7 +89,8 @@ def test_grading_uses_settles_rules_and_leaves_unknown_names_open(root):
         "absent from the week: did not play OR played for zero -- never guessed"
     assert by["Ghost Player"]["status"] == "open", "an unresolved name stays open, never graded as a loss"
     assert by["Jake Ferguson"]["status"] == "open", "week 5 has no stats yet"
-    assert c == {"graded": 2, "void": 1, "check": 1, "unjoined": 1, "unplayed": 1, "open_left": 2}
+    assert c == {"graded": 2, "void": 1, "check": 1, "unjoined": 1, "unplayed": 1, "open_left": 2,
+                 "late_lines": 0}
     # resolve by hand from the box score: he played and caught nothing -> the Over loses
     r = J.resolve(2026, by["Xavier Hutchinson"]["id"], actual=0, now=NOW)
     assert r["status"] == "graded" and r["won"] is False and r["pnl_per_100"] == -100.0
@@ -125,3 +128,31 @@ def test_the_journal_lives_beside_the_record_so_tests_never_read_the_real_one(tm
     monkeypatch.delenv("PROPS_JOURNAL_ROOT", raising=False)
     monkeypatch.setattr(persist, "RECORD_ROOT", tmp_path / "record")
     assert J.journal_path(2026) == tmp_path / "journal" / "2026.jsonl"
+
+
+def test_late_line_value_against_the_last_quote_before_kickoff():
+    bet = J.make_entry("Dalton Schultz", "catches", "under", 4.5, -141, team="HOU", season=2026, week=4, **WHY)
+    q = lambda point, price, at, side="Under": {"bookmaker": "sleeper", "market": "player_receptions",
+                                               "outcome": side, "player": "Dalton Schultz", "point": point,
+                                               "price_american": price, "retrieved_at_utc": at, "season": 2026,
+                                               "week": 4, "commence_time": "2026-10-04T17:00:00+00:00"}
+    archive = [q(4.5, -141, "2026-10-03T20:00:00Z"), q(4.0, -125, "2026-10-04T14:00:00Z"),
+               q(3.5, -120, "2026-10-04T18:00:00Z"),          # after kickoff: ignored
+               q(4.0, -110, "2026-10-04T15:00:00Z", side="Over")]  # the other side: ignored
+    ll = J.late_line(bet, archive)
+    assert ll["late_line"] == 4.0 and ll["late_price"] == -125 and ll["clv_points"] == 0.5, \
+        "an Under bought at 4.5 that closed 4.0 beat the late line by half a catch"
+    same = J.late_line(bet, [q(4.5, -160, "2026-10-04T14:00:00Z")])
+    assert same["clv_points"] == 0 and same["clv_price"] > 0, "same line, the late price costs more: value"
+    assert J.late_line(bet, []) is None
+
+
+def test_the_summary_leads_with_late_line_value(root):
+    a = J.make_entry("A", "catches", "under", 4.5, -125, season=2026, week=4, **WHY)
+    a.update(late_line=4.0, late_price=-125, clv_points=0.5)
+    b = J.make_entry("B", "catches", "over", 2.5, -125, season=2026, week=4, **WHY)
+    b.update(late_line=2.5, late_price=-125, clv_points=0.0)
+    J.write(2026, [a, b])
+    md = "\n".join(J.summary_md(2026))
+    assert "**Late-line value, the first number to watch:** 1 of 2 bets got a better number" in md
+    assert "1 tied" in md and "| 4 -125 (+0.5) |" in md

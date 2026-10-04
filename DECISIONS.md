@@ -7100,3 +7100,16 @@ its no-vig price is 3+ points off at the same line. Reading rule, fixed
 before any data (reports/sleeper_vs_books.md): an edge only after 200+ graded
 discrepancies with a game-clustered 95% interval above zero. Speed-dependent
 and paid items were ruled out by the user.
+
+## 2026-10-03 (148) -- late-line value leads the bet journal
+
+Closing-line value is the number that separates skill from luck in ~100-200
+bets, but the record holds no closing snapshot: all 4,414 archived quotes are
+decision captures (a close needs a run inside the last hour, and the
+scheduled runs fire too late; speed-dependent work is ruled out). The model's
+own calls cannot use a late line either -- a call IS the last captured line.
+So the journal measures late-line value: each bet's line and price against
+the last Sleeper quote the capture logged before kickoff for that player,
+market and side (points moved your way; at the same line, the late price's
+implied chance minus yours). It is stamped at grading and leads the journal
+section, labelled as the last captured line, not the true close.

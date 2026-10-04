@@ -173,6 +173,7 @@ def grade(season: int, stats=None, now: dt.datetime | None = None) -> dict:
         counts["graded" if won is not None else "void"] += 1
     counts["open_left"] = sum(1 for r in rows if r.get("status") == "open")
     write(season, rows)
+    counts["late_lines"] = add_late_lines(season)
     return counts
 
 
@@ -201,6 +202,72 @@ def resolve(season: int, bet_id: str, *, actual: float | None = None, void: bool
     return r
 
 
+def implied(price: int) -> float:
+    """The raw implied chance of an American price (vig included)."""
+    return abs(price) / (abs(price) + 100) if price < 0 else 100 / (price + 100)
+
+
+def late_line(bet: dict, archive: list[dict]) -> dict | None:
+    """The last Sleeper quote the capture logged before kickoff for this bet's
+    player, market and side (DECISIONS #148). Not the true close -- a capture
+    inside the final hour needs speed, which is off -- but the latest line the
+    record holds, usually a few hours out."""
+    import settle
+    nm = settle.norm_name(bet["player"])
+    side = "Over" if bet["side"] in ("over", "yes") else "Under"
+    best = None
+    for q in archive:
+        if (q.get("bookmaker") != "sleeper" or q.get("market") != bet["market"]
+                or q.get("outcome") != side or settle.norm_name(str(q.get("player", ""))) != nm):
+            continue
+        if q.get("season") != bet["season"] or int(q.get("week") or -1) != int(bet["week"]):
+            continue
+        if q.get("commence_time") and q.get("retrieved_at_utc") and \
+                q["retrieved_at_utc"] > q["commence_time"].replace("+00:00", "Z"):
+            continue
+        if best is None or q["retrieved_at_utc"] > best["retrieved_at_utc"]:
+            best = q
+    if best is None:
+        return None
+    out = {"late_line": best.get("point"), "late_price": best.get("price_american"),
+           "late_at_utc": best.get("retrieved_at_utc")}
+    if bet.get("line") is not None and best.get("point") is not None:
+        # positive = the number moved your way: an Over bought below the late
+        # line, an Under bought above it
+        mv = float(best["point"]) - float(bet["line"])
+        out["clv_points"] = round(mv if side == "Over" else -mv, 2)
+        if mv == 0 and best.get("price_american") is not None:
+            # same line: the late price for your side costs more = you got value
+            out["clv_price"] = round(implied(int(best["price_american"])) - implied(int(bet["price"])), 4)
+    return out
+
+
+def read_archive(season: int) -> list[dict]:
+    import persist
+    p = persist.lines_path(season)
+    if not p.exists():
+        return []
+    with p.open(encoding="utf-8") as fh:
+        return [json.loads(ln) for ln in fh if ln.strip()]
+
+
+def add_late_lines(season: int, archive: list[dict] | None = None) -> int:
+    """Stamp the late line on every bet that has none yet; returns how many."""
+    rows = read(season)
+    archive = read_archive(season) if archive is None else archive
+    n = 0
+    for r in rows:
+        if r.get("late_line") is not None:
+            continue
+        ll = late_line(r, archive)
+        if ll:
+            r.update(ll)
+            n += 1
+    if n:
+        write(season, rows)
+    return n
+
+
 def breakeven(price: int) -> float:
     """The win rate a price needs to break even."""
     return abs(price) / (abs(price) + 100) if price < 0 else 100 / (price + 100)
@@ -221,6 +288,15 @@ def summary_md(season: int) -> list[str]:
                f"{n_open} open" + (f", {n_check} to check (`journal resolve`)" if n_check else "")
                + ". Kept apart from the model's record: these are the user's handicapped bets.")
     out.append("")
+    lv = [r for r in rows if r.get("clv_points") is not None]
+    if lv:
+        beat = sum(1 for r in lv if r["clv_points"] > 0 or (r["clv_points"] == 0 and (r.get("clv_price") or 0) > 0))
+        tied = sum(1 for r in lv if r["clv_points"] == 0 and not r.get("clv_price"))
+        out += ["**Late-line value, the first number to watch:** "
+                f"{beat} of {len(lv)} bets got a better number than the last line Sleeper showed before kickoff "
+                f"({beat / len(lv):.0%}; {tied} tied); mean move your way {sum(r['clv_points'] for r in lv) / len(lv):+.2f} "
+                "points. Beating the late line shows up in about 100-200 bets; the win rate needs far more. It is the "
+                "last line the capture logged (usually a few hours out), not the true close.", ""]
     if done:
         wins = sum(1 for r in done if r.get("won"))
         stake = sum(float(r.get("stake", 1.0)) for r in done)
@@ -230,13 +306,17 @@ def summary_md(season: int) -> list[str]:
                 f"| {len(done)} | {wins} | {wins / len(done):.0%} | {be:.0%} | {net / stake:+.1f} |", ""]
         out.append("A few dozen bets say little; about 100 is where the win rate starts to separate from luck.")
         out.append("")
-    out += ["| Week | Player | Bet | Price | Result | Net | The change |", "|---|---|---|---|---|---|---|"]
+    out += ["| Week | Player | Bet | Price | Late line | Result | Net | The change |",
+            "|---|---|---|---|---|---|---|---|"]
     for r in sorted(rows, key=lambda r: (r["week"], r["logged_at_utc"])):
         bet = (f"{r['side']} {LABEL.get(r['market'], r['market'])}" if r.get("line") is None
                else f"{r['side']} {r['line']:g} {LABEL.get(r['market'], r['market'])}")
         res = r.get("status") if r.get("status") != "graded" else ("won" if r.get("won") else "lost")
         net = "" if r.get("pnl_per_100") is None else f"{float(r['pnl_per_100']):+.0f}"
-        out.append(f"| {r['week']} | {r['player']} | {bet} | {int(r['price']):+d} | {res} | {net} | {r['change']} |")
+        late = ("—" if r.get("late_line") is None else
+                f"{r['late_line']:g} {int(r['late_price']):+d} ({r.get('clv_points', 0):+g})")
+        out.append(f"| {r['week']} | {r['player']} | {bet} | {int(r['price']):+d} | {late} | {res} | {net} | "
+                   f"{r['change']} |")
     return out + [""]
 
 
