@@ -214,7 +214,8 @@ def late_line(bet: dict, archive: list[dict]) -> dict | None:
     record holds, usually a few hours out."""
     import settle
     nm = settle.norm_name(bet["player"])
-    side = "Over" if bet["side"] in ("over", "yes") else "Under"
+    # the archive labels anytime-TD quotes Yes / No, yardage quotes Over / Under
+    side = {"over": "Over", "under": "Under", "yes": "Yes", "no": "No"}[bet["side"]]
     best = None
     for q in archive:
         if (q.get("bookmaker") != "sleeper" or q.get("market") != bet["market"]
@@ -231,7 +232,11 @@ def late_line(bet: dict, archive: list[dict]) -> dict | None:
         return None
     out = {"late_line": best.get("point"), "late_price": best.get("price_american"),
            "late_at_utc": best.get("retrieved_at_utc")}
-    if bet.get("line") is not None and best.get("point") is not None:
+    if bet.get("line") is None and best.get("price_american") is not None:
+        # anytime TD: no line, so the price is the whole value (late price costs more = value)
+        out["clv_points"] = 0.0
+        out["clv_price"] = round(implied(int(best["price_american"])) - implied(int(bet["price"])), 4)
+    elif bet.get("line") is not None and best.get("point") is not None:
         # positive = the number moved your way: an Over bought below the late
         # line, an Under bought above it
         mv = float(best["point"]) - float(bet["line"])

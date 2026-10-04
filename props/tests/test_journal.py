@@ -156,3 +156,12 @@ def test_the_summary_leads_with_late_line_value(root):
     md = "\n".join(J.summary_md(2026))
     assert "**Late-line value, the first number to watch:** 1 of 2 bets got a better number" in md
     assert "1 tied" in md and "| 4 -125 (+0.5) |" in md
+
+
+def test_a_td_bet_finds_its_late_yes_quote():
+    bet = J.make_entry("X", "td", "yes", None, 150, season=2026, week=4, **WHY)
+    q = {"bookmaker": "sleeper", "market": "player_anytime_td", "outcome": "Yes", "player": "X", "point": None,
+         "price_american": 130, "retrieved_at_utc": "2026-10-04T14:00:00Z", "season": 2026, "week": 4,
+         "commence_time": "2026-10-04T17:00:00+00:00"}
+    ll = J.late_line(bet, [q])
+    assert ll["late_price"] == 130 and ll["clv_price"] > 0, "bought at +150, late +130: the price moved your way"
