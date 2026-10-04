@@ -767,6 +767,27 @@ def main():
             return float(pri_slots.loc[slot, col])
         return float(pri_slots[col].mean()) if col in pri_slots else default
 
+    # Usage by week (research columns, props-v1.29) -- built BEFORE the share
+    # blend because round 23 (model.SNAP_REACT) moves target share by last
+    # week's snap change: LAST = the latest week before this one, BASE = his
+    # earlier weeks with this team (research.usage_change).
+    _snp_w = snp_.groupby(["team", "key", "week"])["offense_pct"].mean()
+    _tg_w = passes.groupby(["posteam", "receiver_player_id", "week"]).size()
+    _ca_w = rushes.groupby(["posteam", "rusher_player_id", "week"]).size()
+    _tw_i = tw.set_index(["team", "week"])
+    USAGE, ROLE = {}, {}
+    for _, m_ in active.iterrows():
+        key_ = norm_name(m_["name"])
+        wks = []
+        for (t_, k_, w_), sv in _snp_w.items():
+            if t_ == m_.team and k_ == key_ and sv > 0 and (m_.team, w_) in _tw_i.index:
+                tt_ = float(_tw_i.loc[(m_.team, w_), "targets"]); tc_ = float(_tw_i.loc[(m_.team, w_), "carries"])
+                wks.append((int(w_), float(sv),
+                            float(_tg_w.get((m_.team, m_.gsis_id, w_), 0)) / tt_ if tt_ else np.nan,
+                            float(_ca_w.get((m_.team, m_.gsis_id, w_), 0)) / tc_ if tc_ else np.nan))
+        USAGE[m_["name"]] = RSCH.usage_change(sorted(wks))
+        ROLE[m_["name"]] = RSCH.role_flag(USAGE[m_["name"]], WEEK - 1)
+
     recs = []
     for _, p in active.iterrows():
         t, pid, slot = p.team, p.gsis_id, p.slot
@@ -850,6 +871,12 @@ def main():
 
         ts = rate(cw.targets if cw is not None else None, tt_cur if cw is not None else None,
                   "target_share", "target_share", 0.05)
+        # round 23: last week's snap change moves the target share (off when SNAP_REACT is None)
+        u_sr = USAGE.get(p["name"])
+        if MODEL.SNAP_REACT is not None and u_sr and u_sr["week"] == WEEK - 1:
+            ts_before = ts
+            ts = MODEL.snap_react(ts, u_sr["snap"], u_sr["snap_base"], MODEL.SNAP_REACT)
+            ev_chain["target_share"]["snap_react"] = (ts / ts_before) if ts_before else None
         cr = rate(cw.receptions if (cw is not None and cw.targets > 0) else None,
                   cw.targets if (cw is not None and cw.targets > 0) else None,
                   "catch_rate", "catch_rate", 0.62, opp_metric="catch_rate")
@@ -1568,22 +1595,7 @@ def main():
     # What the line implies (the workload that makes it a fair 50/50), usage
     # last game against earlier weeks, and the flags. Own generators only
     # (research.py): no price moves.
-    _snp_w = snp_.groupby(["team", "key", "week"])["offense_pct"].mean()
-    _tg_w = passes.groupby(["posteam", "receiver_player_id", "week"]).size()
-    _ca_w = rushes.groupby(["posteam", "rusher_player_id", "week"]).size()
-    _tw_i = tw.set_index(["team", "week"])
-    USAGE, ROLE = {}, {}
-    for _, m_ in M.iterrows():
-        key_ = norm_name(m_["name"])
-        wks = []
-        for (t_, k_, w_), sv in _snp_w.items():
-            if t_ == m_.team and k_ == key_ and sv > 0 and (m_.team, w_) in _tw_i.index:
-                tt_ = float(_tw_i.loc[(m_.team, w_), "targets"]); tc_ = float(_tw_i.loc[(m_.team, w_), "carries"])
-                wks.append((int(w_), float(sv),
-                            float(_tg_w.get((m_.team, m_.gsis_id, w_), 0)) / tt_ if tt_ else np.nan,
-                            float(_ca_w.get((m_.team, m_.gsis_id, w_), 0)) / tc_ if tc_ else np.nan))
-        USAGE[m_["name"]] = RSCH.usage_change(sorted(wks))
-        ROLE[m_["name"]] = RSCH.role_flag(USAGE[m_["name"]], WEEK - 1)
+    # USAGE / ROLE: computed before the share blend (section 5), which round 23 reads
     # teammates handled by the out rule, and key teammates back from a missed week
     OUT_NOTE = {t_: [] for t_ in (AWAY, HOME)}
     for _, e_ in pop[pop.excluded].iterrows():

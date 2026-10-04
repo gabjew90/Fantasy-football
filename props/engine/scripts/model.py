@@ -254,6 +254,33 @@ def league_drift_ratio(team_week_volume, target_week, recent_games=3, min_prior_
 K0_FIXED = {"ypt": 80, "catch_rate": 40, "target_share": 80}
 
 
+# Round 23 (2026-10-03): the share blend reacts to a role change late. On
+# props-v1.28's 2022-25 harness results a receiver whose snaps jumped 15+
+# points last week while his targets lagged caught +0.28 to +0.51 more than
+# projected the next week, and one whose snaps fell missed by about 0.55
+# (reports/role_shift_check.md). The fix: scale the blended target share by
+# (last week's snap share / his earlier weeks') ** SNAP_REACT, clipped to
+# SNAP_REACT_CLIP; it needs last week to be the week before this one and two
+# earlier weeks with the same team. None = off, byte for byte; measured on the
+# yardage harness first (reports/snap_react.md, DECISIONS #143).
+SNAP_REACT = 0.5
+SNAP_REACT_CLIP = (0.6, 1.6)
+
+
+def snap_react(share, snap_last, snap_base, gamma, clip=SNAP_REACT_CLIP):
+    """The target share moved by last week's snap change; unchanged when off or
+    when either snap number is missing."""
+    if gamma is None or share is None:
+        return share
+    try:
+        sl, sb, sh = float(snap_last), float(snap_base), float(share)
+    except (TypeError, ValueError):
+        return share
+    if not (np.isfinite(sl) and np.isfinite(sb) and np.isfinite(sh)) or sb < 0.05 or sl <= 0:
+        return share
+    return sh * float(np.clip((sl / sb) ** float(gamma), clip[0], clip[1]))
+
+
 def k0_rates(fitted, override=None):
     """The per-rate shrinkage constants a pricing run uses: the priors' fitted
     `k0_per_rate` (else DEFAULT_K0), with K0_FIXED -- or `override`, for the

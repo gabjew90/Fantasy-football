@@ -173,6 +173,9 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
            if args.env == "market_pass" else
            (M.MARKET_PASS_WEIGHT if getattr(args, "market_pass_weight", None) is None
             else float(args.market_pass_weight))) if live else 0.0
+    # round 23: target share reacts to last week's snap change (live only; None = off)
+    sr_gamma = (M.SNAP_REACT if getattr(args, "snap_react", None) is None
+                else (None if args.snap_react == "off" else float(args.snap_react)))
     print(f"season={S} env={args.env} opponent={args.opponent} ({opp['level']}, k0={opp['k0']:g}) "
           f"historical_blend={args.historical_blend} dispersion={dispersion} live={live}", file=sys.stderr)
 
@@ -496,6 +499,8 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
 
             ts = two_stage("target_share", "team_targets_n", "ts", np.nan,
                            "target_share", 80, r.own_ts, r.n_tt)
+            if sr_gamma is not None:
+                ts = M.snap_react(ts, r.get("snap_last"), r.get("snap_base"), sr_gamma)
             cr = two_stage("catch_rate", "targets_n", "cr", 0.6,
                            "catch_rate", 40, r.own_cr, r.n_tg)
             ypt = two_stage("ypt", "targets_n", "ypt", 7.0,
@@ -572,6 +577,29 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
     # and the legacy --env market slopes. Live mode fits nothing on the season.
     MKT_SLOPES = fit_market_slopes(TRAIN) if args.env == "market" else None
 
+    def add_snap_features(feat):
+        """Round 23: each player-week's snap share LAST week (it must be W-1)
+        and the mean of his earlier weeks (at least two) with the same team --
+        what the scorer reads from the same nflverse file before kickoff."""
+        sn = pd.read_csv(dl(f"{NV}/snap_counts/snap_counts_{S}.csv", f"snap_counts_{S}.csv"), low_memory=False)
+        sn = sn[sn.game_type == "REG"]
+        pl = pd.read_csv(dl(f"{NV}/players/players.csv", "players.csv"), usecols=["gsis_id", "pfr_id"],
+                         low_memory=False).dropna()
+        sn = sn.assign(gsis_id=sn.pfr_player_id.map(dict(zip(pl.pfr_id, pl.gsis_id)))).dropna(subset=["gsis_id"])
+        sn = sn[sn.offense_pct > 0]
+        by = {k: g.sort_values("week")[["week", "offense_pct"]].to_numpy()
+              for k, g in sn.groupby(["team", "gsis_id"])}
+        last, base = [], []
+        for team, W, pid in zip(feat.team, feat.week, feat.gsis_id):
+            a = by.get((team, pid))
+            if a is None:
+                last.append(np.nan); base.append(np.nan); continue
+            prev = a[a[:, 0] < W]
+            if len(prev) < 3 or prev[-1, 0] != W - 1:
+                last.append(np.nan); base.append(np.nan); continue
+            last.append(float(prev[-1, 1])); base.append(float(prev[:-1, 1].mean()))
+        return feat.assign(snap_last=last, snap_base=base)
+
     # Feature caching: population and raw per-player features depend only on the season
     # and week list, NOT on --env / --opponent / K0.
     def cached_features(weeks, label):
@@ -583,6 +611,8 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
         feat.to_pickle(f)
         return feat
     feat_te = cached_features(TEST, "test")
+    if live and sr_gamma is not None:
+        feat_te = add_snap_features(feat_te)
     feat_te = build_shrunk(feat_te[["team", "week", "gsis_id", "roster_status"]], feat_te, TEST, args.env)
     if not live:
         feat_te = feat_te[feat_te.slot != "QB1"].reset_index(drop=True)
@@ -1444,6 +1474,9 @@ def main(argv=None):
     ap.add_argument("--live-opp-metrics", default=None,
                     help="harness ABLATION: the opponent-adjusted rates in live mode (default: the scorer's, "
                          "catch_rate,ypt,ypc); e.g. catch_rate,ypt drops the run-defense adjustment")
+    ap.add_argument("--snap-react", default=None,
+                    help="round 23: target share x (last week's snaps / earlier weeks') ** g, or 'off' "
+                         "(default model.SNAP_REACT)")
     ap.add_argument("--k0", default=None,
                     help="round 17: fixed shrinkage constants over the priors' fit, e.g. 'ypt=40,catch_rate=20' "
                          "(default: model.K0_FIXED)")
