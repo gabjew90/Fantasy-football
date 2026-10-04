@@ -222,3 +222,11 @@ def test_the_preview_note_and_qb_change():
     assert RS.qb_change(lw, "k", "Case Keenum") is None, "same starter"
     assert RS.qb_change(lw, "t", "Kyle Trask") == "QB change (C.Keenum last week, Kyle Trask today)"
     assert RS.qb_change(lw, None, None) is None and RS.qb_change(lw.iloc[0:0], "k", "x") is None
+
+
+def test_a_returning_back_counts_as_a_key_teammate():
+    assert RS.is_key_teammate(prior_ts=0.20), "a target earner"
+    assert RS.is_key_teammate(prior_ts=0.03, prior_rs=0.28), "a back with a real share of the carries (Jaylen Wright)"
+    assert RS.is_key_teammate(season_rs=0.40), "this season's carries count too"
+    assert not RS.is_key_teammate(prior_ts=0.05, prior_rs=0.04, season_ts=float("nan"))
+    assert not RS.is_key_teammate()

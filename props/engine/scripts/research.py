@@ -219,6 +219,14 @@ def implied_carries(line, j, team_carries_mean, carries_r, rush_shares, ypc, res
 OUT_TARGET_SHARE, OUT_CARRY_SHARE, OUT_PASS_SHARE = 0.10, 0.15, 0.50
 
 
+def is_key_teammate(prior_ts=None, prior_rs=None, season_ts=None, season_rs=None, cut=0.15) -> bool:
+    """A teammate whose return (or arrival) moves work: 15%+ of the targets or
+    of the carries, last season or this one (DECISIONS #157)."""
+    vals_t = [v for v in (prior_ts, season_ts) if v is not None and v == v]
+    vals_r = [v for v in (prior_rs, season_rs) if v is not None and v == v]
+    return max(vals_t + [0.0]) >= cut or max(vals_r + [0.0]) >= cut
+
+
 def role_share(plays, pid, team, weeks=None):
     """His share of the team's plays in the weeks he was available this season:
     `weeks` (the weeks he was on the active roster) plus any week he had a play,

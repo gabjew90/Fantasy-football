@@ -316,3 +316,10 @@ def test_each_game_on_the_board_opens_with_its_context_line():
         " · HOU: last week differs: Nico Collins back*")
     assert W.game_context("ARI@NYG", "NYG +2.5", "44.5", {}) == "*ARI by 2.5 · implied points ARI 23.5, NYG 21.0*"
     assert W.game_context("A@B", "", "", {}) == ""
+
+
+def test_a_spread_written_with_an_alias_still_names_the_right_favourite():
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "engine" / "scripts"))
+    import score_week as W
+    assert W.game_context("TEN@JAX", "JAC -3", "44.0", {}) == "*JAX by 3 · implied points JAX 23.5, TEN 20.5*"
+    assert W.game_context("TEN@JAX", "XXX -3", "44.0", {}) == "", "an unknown team code says nothing rather than guess"

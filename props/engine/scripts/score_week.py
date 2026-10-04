@@ -93,8 +93,9 @@ def game_context(game, spread, total, previews) -> str:
     bits = []
     t = _num(total)
     m = _re.fullmatch(r"\s*([A-Z]{2,3})\s*([+-]?\d+(?:\.\d+)?)\s*", str(spread or ""))
-    if m:
-        team, pts = m.group(1), float(m.group(2))
+    alias = {"LAR": "LA", "WSH": "WAS", "JAC": "JAX", "LVR": "LV"}
+    if m and alias.get(m.group(1), m.group(1)) in (away, home):
+        team, pts = alias.get(m.group(1), m.group(1)), float(m.group(2))
         fav, dog = (team, away if team == home else home) if pts < 0 else (away if team == home else home, team)
         bits.append("pick'em" if pts == 0 else f"{fav} by {abs(pts):g}")
         if t is not None:

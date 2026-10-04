@@ -248,7 +248,7 @@ pick" question gets no pick: say why in a sentence, then give `props best`
 slate's leads), in the engine's order (never re-sort or re-rank them
 yourself). A slate or game request gets a short preview narrative per game (the script from
 the spread and implied points, each team's situation and role changes, where the
-model and book disagree and why) before its bold lines -- props/engine/SKILL.md,
+model and book disagree and why, never a cause the record has not measured) before its bold lines -- props/engine/SKILL.md,
 fast path. Bold lines on the board are "worth a look" marks, never bets: narrate them the way
 props/engine/SKILL.md (fast path) lays out -- story and direction, whether last week was a
 preview, what the price demands, which line, how it fails -- then rank them by how well the

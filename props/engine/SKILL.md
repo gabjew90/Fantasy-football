@@ -252,8 +252,10 @@ For a narrow question, run only what it needs:
   throws; a low total with a backup QB plays conservative), and each team's "last week was a
   preview / differs" note. Then each side's situation: the role changes that matter (who took
   over a backfield, whose target share jumped or collapsed, a returning star and who it takes
-  from), where the model and the book disagree AND WHY (a stale prior on a new role, the
-  model's known low bias on QB passing yards, a game script the model does not price), and
+  from), where the model and the book disagree AND WHY (a stale prior on a new role, a game script
+  the model does not price; when the model sits below most QB passing lines, say the gap is
+  unexplained -- the harness found QB passing unbiased on 2024-25 outcomes, so neither side
+  is known to be right), and
   what to watch. A game with nothing to find says so in a sentence. Never call a line a bet.
   Then narrate the bold lines, analytically, in plain English -- interpret, do not recite the
   row's numbers back:
