@@ -32,7 +32,7 @@ HERE = Path(__file__).resolve().parent
 if str(HERE) not in sys.path:
     sys.path.insert(0, str(HERE))
 
-JOURNAL_ROOT = Path(os.environ.get("PROPS_JOURNAL_ROOT", HERE / "journal"))
+JOURNAL_ROOT: Path | None = None    # None: beside the record (persist.RECORD_ROOT.parent / "journal")
 
 MARKETS = {
     "catches": "player_receptions", "receptions": "player_receptions", "rec": "player_receptions",
@@ -46,7 +46,14 @@ LABEL = {"player_receptions": "catches", "player_reception_yds": "rec yds", "pla
 
 
 def journal_path(season: int) -> Path:
-    return JOURNAL_ROOT / f"{season}.jsonl"
+    if JOURNAL_ROOT is not None:
+        base = JOURNAL_ROOT
+    elif os.environ.get("PROPS_JOURNAL_ROOT"):
+        base = Path(os.environ["PROPS_JOURNAL_ROOT"])
+    else:
+        import persist
+        base = persist.RECORD_ROOT.parent / "journal"
+    return base / f"{season}.jsonl"
 
 
 def read(season: int) -> list[dict]:
@@ -98,6 +105,8 @@ def make_entry(player: str, market: str, side: str, line, price: int, *, change:
     else:
         if side_ not in ("over", "under"):
             raise ValueError("a yardage or catches bet is 'over' or 'under'")
+        if line is None or str(line).strip() == "":
+            raise ValueError("a yardage or catches bet needs its line, e.g. 4.5")
         line = float(line)
     price = int(price)
     if abs(price) < 100:
@@ -120,7 +129,7 @@ def grade(season: int, stats=None, now: dt.datetime | None = None) -> dict:
     stat file, name join and win/push rules. Returns counts."""
     import settle
     rows = read(season)
-    counts = {"graded": 0, "void": 0, "unjoined": 0, "unplayed": 0, "open_left": 0}
+    counts = {"graded": 0, "void": 0, "check": 0, "unjoined": 0, "unplayed": 0, "open_left": 0}
     if not any(r.get("status") == "open" for r in rows):
         return counts      # nothing to grade: no download, no file written
     if stats is None:
@@ -145,12 +154,14 @@ def grade(season: int, stats=None, now: dt.datetime | None = None) -> dict:
             m = wk[wk["_name"] == nm]
             hit = m.iloc[0] if len(m) == 1 else None
         if hit is None:
-            # absent from the week's stats: did not play (void) only if the name is
-            # known to the season file; otherwise an unresolved name, left open
+            # Absent from the week's stats. nflverse's weekly file has no row for a
+            # player who did not play AND none for one who played and recorded
+            # nothing -- the book voids the first and pays the second at 0. Never
+            # guess: a known name goes to 'check' for `journal resolve`; an
+            # unknown one stays open.
             if (stats["_name"] == nm).any():
-                r.update(status="void", result="dnp", actual=None, won=None, pnl_per_100=0.0,
-                         graded_at_utc=now.strftime("%Y-%m-%dT%H:%M:%SZ"))
-                counts["void"] += 1
+                r.update(status="check", result="not in the week's stats: did he play?")
+                counts["check"] += 1
             else:
                 counts["unjoined"] += 1
             continue
@@ -163,6 +174,31 @@ def grade(season: int, stats=None, now: dt.datetime | None = None) -> dict:
     counts["open_left"] = sum(1 for r in rows if r.get("status") == "open")
     write(season, rows)
     return counts
+
+
+def resolve(season: int, bet_id: str, *, actual: float | None = None, void: bool = False,
+            now: dt.datetime | None = None) -> dict:
+    """Settle one bet by hand: `actual` (he played; his real stat, 0 included)
+    or `void` (he did not play). Returns the updated row."""
+    import settle
+    if (actual is None) == (not void):
+        raise ValueError("give exactly one of --actual or --void")
+    rows = read(season)
+    hit = [r for r in rows if r["id"] == bet_id]
+    if not hit:
+        raise ValueError(f"no bet {bet_id} in the {season} journal")
+    r = hit[0]
+    now = now or dt.datetime.now(dt.timezone.utc)
+    stamp = now.strftime("%Y-%m-%dT%H:%M:%SZ")
+    if void:
+        r.update(status="void", result="dnp", actual=None, won=None, pnl_per_100=0.0, graded_at_utc=stamp)
+    else:
+        result, won = settle.settle_row({"market": r["market"], "side": r["side"], "line": r["line"]}, float(actual))
+        pnl = settle.american_pnl(r["price"], won) * float(r.get("stake", 1.0))
+        r.update(status="graded" if won is not None else "void", result=result, actual=float(actual), won=won,
+                 pnl_per_100=round(pnl, 2), graded_at_utc=stamp)
+    write(season, rows)
+    return r
 
 
 def breakeven(price: int) -> float:
@@ -180,8 +216,10 @@ def summary_md(season: int) -> list[str]:
     done = [r for r in rows if r.get("status") == "graded"]
     n_open = sum(1 for r in rows if r.get("status") == "open")
     n_void = sum(1 for r in rows if r.get("status") == "void")
+    n_check = sum(1 for r in rows if r.get("status") == "check")
     out.append(f"{len(rows)} bets logged: {len(done)} graded, {n_void} void (push or did not play), "
-               f"{n_open} open. Kept apart from the model's record: these are the user's handicapped bets.")
+               f"{n_open} open" + (f", {n_check} to check (`journal resolve`)" if n_check else "")
+               + ". Kept apart from the model's record: these are the user's handicapped bets.")
     out.append("")
     if done:
         wins = sum(1 for r in done if r.get("won"))
@@ -219,6 +257,10 @@ def main(argv: list[str] | None = None) -> int:
     ls.add_argument("--open", action="store_true")
     g = sub.add_parser("grade"); g.add_argument("--season", type=int, required=True)
     sm = sub.add_parser("summary"); sm.add_argument("--season", type=int, default=None)
+    rv = sub.add_parser("resolve", help="settle a 'check' bet by hand from the box score")
+    rv.add_argument("id"); rv.add_argument("--season", type=int, default=None)
+    rv.add_argument("--actual", type=float, default=None, help="his real stat (0 if he played and got none)")
+    rv.add_argument("--void", action="store_true", help="he did not play")
     args = ap.parse_args(argv)
     season = getattr(args, "season", None) or dt.datetime.now(dt.timezone.utc).year
     if args.cmd == "add":
@@ -244,6 +286,14 @@ def main(argv: list[str] | None = None) -> int:
             if args.open and r.get("status") != "open":
                 continue
             print(json.dumps(r, sort_keys=True))
+        return 0
+    if args.cmd == "resolve":
+        try:
+            r = resolve(season, args.id, actual=args.actual, void=args.void)
+        except ValueError as exc:
+            print(f"not resolved: {exc}", file=sys.stderr)
+            return 2
+        print(f"{r['id']}: {r['status']} ({r.get('result')}), net {r.get('pnl_per_100')}")
         return 0
     if args.cmd == "grade":
         c = grade(season)

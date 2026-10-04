@@ -83,15 +83,21 @@ def test_grading_uses_settles_rules_and_leaves_unknown_names_open(root):
     assert by["Dalton Schultz"]["won"] is True and by["Dalton Schultz"]["pnl_per_100"] == pytest.approx(70.92, abs=0.01)
     assert by["Nico Collins"]["won"] is True and by["Nico Collins"]["actual"] == 91
     assert by["Woody Marks"]["status"] == "void" and by["Woody Marks"]["result"] == "push"
-    assert by["Xavier Hutchinson"]["status"] == "void" and by["Xavier Hutchinson"]["result"] == "dnp", \
-        "known to the season file, absent from the week: did not play"
+    assert by["Xavier Hutchinson"]["status"] == "check", \
+        "absent from the week: did not play OR played for zero -- never guessed"
     assert by["Ghost Player"]["status"] == "open", "an unresolved name stays open, never graded as a loss"
     assert by["Jake Ferguson"]["status"] == "open", "week 5 has no stats yet"
-    assert c == {"graded": 2, "void": 2, "unjoined": 1, "unplayed": 1, "open_left": 2}
+    assert c == {"graded": 2, "void": 1, "check": 1, "unjoined": 1, "unplayed": 1, "open_left": 2}
+    # resolve by hand from the box score: he played and caught nothing -> the Over loses
+    r = J.resolve(2026, by["Xavier Hutchinson"]["id"], actual=0, now=NOW)
+    assert r["status"] == "graded" and r["won"] is False and r["pnl_per_100"] == -100.0
+    with pytest.raises(ValueError, match="exactly one"):
+        J.resolve(2026, by["Jake Ferguson"]["id"])
 
 
 def test_nothing_open_means_no_download_and_no_file(root):
-    assert J.grade(2026, stats=None) == {"graded": 0, "void": 0, "unjoined": 0, "unplayed": 0, "open_left": 0}
+    assert J.grade(2026, stats=None) == {"graded": 0, "void": 0, "check": 0, "unjoined": 0, "unplayed": 0,
+                                         "open_left": 0}
     assert not (root / "2026.jsonl").exists()
 
 
@@ -106,3 +112,16 @@ def test_the_scorecard_section_reports_the_record_against_break_even(root):
     assert "3 bets logged: 2 graded, 0 void (push or did not play), 1 open" in md
     assert "| 2 | 1 | 50% | 56% | -10.0 |" in md, "break-even at -125 is 55.6%"
     assert J.breakeven(-125) == pytest.approx(0.5556, abs=1e-4) and J.breakeven(150) == pytest.approx(0.4)
+
+
+def test_a_yardage_bet_without_a_line_is_refused_plainly():
+    with pytest.raises(ValueError, match="needs its line"):
+        J.make_entry("X", "catches", "over", None, -110, season=2026, week=4, **WHY)
+
+
+def test_the_journal_lives_beside_the_record_so_tests_never_read_the_real_one(tmp_path, monkeypatch):
+    import persist
+    monkeypatch.setattr(J, "JOURNAL_ROOT", None)
+    monkeypatch.delenv("PROPS_JOURNAL_ROOT", raising=False)
+    monkeypatch.setattr(persist, "RECORD_ROOT", tmp_path / "record")
+    assert J.journal_path(2026) == tmp_path / "journal" / "2026.jsonl"

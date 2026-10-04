@@ -250,7 +250,9 @@ session, with the four checklist answers filled from the conversation:
 
 ```text
 python props/journal.py add "<player>" <market> <over|under> <line> <price> --team <TEAM> --change "<the verified change>" --implies "<the workload the line implies vs what he gets>" --fails "<how it fails>"
-``` The engine contract's "the
+```
+
+An anytime-TD bet has no line: `python props/journal.py add "<player>" td <yes|no> <price> --team <TEAM> --change ... --implies ... --fails ...`. The engine contract's "the
 reply is slate_summary reproduced in full" is for a request for the slate
 as a whole, and so is its full "prop guide" structure for one game:
 
