@@ -1,6 +1,6 @@
 {
   "algorithm": "props-engine-sha256-lf-1",
-  "engine_sha256": "b337046caf8d701824f395eb03c7b7a32e40025a06ffa8a6f6eb292e3268984d",
+  "engine_sha256": "a80d2566b63c08e089848556188d6ca4b99314c8a94db92f3e9e75f7d2bbb63b",
   "file_count": 53,
   "files": {
     "SKILL.md": "77aaea5517dde5fc1431a1aeba95d62836a7bd68f548f62b96ee50fe2e38d9dc",
@@ -36,7 +36,7 @@
     "resources/width_params.json": "ccd5629e29bf3e14bae8e050f256d04a107a8bb37ff6222de490564e93d93176",
     "scripts/absence_check.py": "fa45e3fb4a1985b38771f0c58ed002956b163ee16439778ac7391ece1ba25079",
     "scripts/absence_tune.py": "4bb4daaf1861f93ff8d57504e9fff5e0b0b828306d8210b688c87aa25ef27d1d",
-    "scripts/backtest.py": "329c7e84308348b1242d92d69dba56a7f9efda384c600f30ad3bfe67e51992c5",
+    "scripts/backtest.py": "7c6d843c114b37a0e4396e9105b38d492c231c7146138de2f6fcc349ce1ae734",
     "scripts/build_priors.py": "1757899778f704cf2bd074c9750f54de1edb9ff14d1429027d5096715ac707e3",
     "scripts/build_td_priors.py": "c7330a57e68c1b7c5f8a9304bfbddbb4be0ca285d9f37ef383173d3e3049c27f",
     "scripts/eligibility.py": "f1672cff3d7ae2d52ca94b5952451e92c794bfcd21ab2224b0e35e7f152445b5",
