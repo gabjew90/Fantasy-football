@@ -1,6 +1,6 @@
 {
   "algorithm": "props-engine-sha256-lf-1",
-  "engine_sha256": "a80d2566b63c08e089848556188d6ca4b99314c8a94db92f3e9e75f7d2bbb63b",
+  "engine_sha256": "ec07062e4061af8c7520253bbb7355d722f86335ce3493fe9eab4a607ad6c322",
   "file_count": 53,
   "files": {
     "SKILL.md": "77aaea5517dde5fc1431a1aeba95d62836a7bd68f548f62b96ee50fe2e38d9dc",
@@ -29,7 +29,7 @@
     "resources/priors_2025_td_slots.csv": "af7c13b60f35bc1d064f44c25b66f361f6e1d79243283c74225136b8e69b6cec",
     "resources/priors_2025_td_teamgames.csv": "f2726a5664c7f7063bf897997873f4a2d47be20d2a35979083a6a046c85f7828",
     "resources/priors_2025_teams.csv": "85c2c2e15743f74756b6a0770364e063ef80bce98e387d0cdcbe4ad332465375",
-    "resources/prop_workflow.md": "fa3d9da47b757366936192ebe5ddbf698822f99bfc6162dc64eb697408296343",
+    "resources/prop_workflow.md": "feeb57f07996a09c1b4110ff689c058aebb1cb58e712de871ccc0a36a1f7a733",
     "resources/research_standard.md": "ad96e86bcbae405b9593d84420351820c4cac3026f993ac08a5af0ddc3913916",
     "resources/stadium_coords.csv": "cf9ce9133fa57249347a2ee14c90b2ddc011602aed5398b1ebf3f7fd0ea71aa1",
     "resources/td_parlay_gate.json": "9619f7de2f262d87c15fbedcc65d95de98c8fc16f87ea9b81630ca0969ddf0f4",
@@ -42,8 +42,8 @@
     "scripts/eligibility.py": "f1672cff3d7ae2d52ca94b5952451e92c794bfcd21ab2224b0e35e7f152445b5",
     "scripts/model.py": "456ceae0d2058aab958dd8f84c0b32735a60662efbb7da596907c321837ad595",
     "scripts/odds_client.py": "434186273bd0412a5545247228298951c5d0504a19c8a47c4c782bf3bb75aaa1",
-    "scripts/research.py": "0df45cd038224f521eb6b5d012d618442a3368d55d209075af78ff2653ad9664",
-    "scripts/score_game.py": "07ef464177b93228c28414a94f7ad84a279bb522907e3552205c64507cb46a9b",
+    "scripts/research.py": "4ba4c2ab100bef0e27c888af32d6f9f2bba3148ed6b2fe81166993419f5dc184",
+    "scripts/score_game.py": "8782b4719306b9e028a18455786230eaa8f4e195cf8ee066b43e110daee05775",
     "scripts/score_week.py": "d89ca89e18e1145fc1f094ef1f619c3c34d499f082b0eb53509e3d64a08ea68c",
     "scripts/td_alloc.py": "7c407c949cac8f0f74d7f91589fd5d749f65d9053eb1c3f5f0dc63a700b3465b",
     "scripts/td_alloc_backtest.py": "e259d9f0e301a5d5d34e5a9e84bba222810f077d9c05a1f1f799a611914595a4",
