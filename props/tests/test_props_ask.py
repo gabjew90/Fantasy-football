@@ -163,7 +163,7 @@ def test_a_player_answer_is_every_priced_line_read_unchanged(game):
 def test_a_player_answer_carries_the_rules_that_apply_to_it(game):
     r = A.player("Travis Kelce", game="KC@MIA")
     assert A.UNVALIDATED in r.data["rules"] and A.TD_RULE in r.data["rules"], "a TD row brings the no-fair-odds rule"
-    assert any(x.startswith("Receiving role-shift flag") for x in r.data["rules"]), "Kelce carries the flag"
+    assert any(x.startswith("Role-shift flag") and "already moves" in x for x in r.data["rules"]), "Kelce carries the flag"
     assert not any("WEAK" in x for x in r.data["rules"])
     assert "no fair odds" in r.text
     assert A.NEW_TEAM_RULE not in r.data["rules"] and A.TD_V0_RULE not in r.data["rules"]

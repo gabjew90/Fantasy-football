@@ -475,7 +475,10 @@ def player(name: str, *, season: int | None = None, week: int | None = None, gam
         rules.append(f"{full} is Questionable: every number is priced as if he plays his normal role, and his "
                      "props void if he sits. Neither case is weighted by how likely he is to play.")
     if any("role up" in (r.get("flags") or "") or "role down" in (r.get("flags") or "") for r in rows):
-        rules.append("Receiving role-shift flag: last game his snaps moved while his targets had not caught up. In "
+        rules.append("Role-shift flag: last game his snaps moved while his targets had not caught up. Since "
+                     "props-v1.29 the projection already moves his target share for it (the snap-change rule); "
+                     "the flag marks a role change worth researching, not a model miss. Before that rule, "
+                     "in "
                      "2022-25 that pattern beat (role up) or missed (role down) the model's next-week catches "
                      "projection by about half a catch; whether the book also reacts late is untested.")
     data = {"player": full, "game": run["slug"], "when": _when(run, files), "role": role, "fantasy_points": pts,

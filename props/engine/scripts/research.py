@@ -103,18 +103,20 @@ def usage_change(weeks):
 
 
 def role_flag(u, last_week_expected):
-    """The receiving role-shift flag (reports/role_shift_check.md), or None.
-    The flag needs last week to be the week before this one."""
+    """The role-shift flag (reports/role_shift_check.md), or None. It needs last
+    week to be the week before this one. Since round 23 (model.SNAP_REACT) the
+    projection already moves his target share for this; the flag points the
+    research at the role change, it no longer claims the model misses it."""
     if u is None or u["week"] != last_week_expected:
         return None
     d_snap = u["snap"] - u["snap_base"]
     d_ts = u["ts"] - u["ts_base"]
     if d_snap >= SNAP_JUMP and d_ts < SHARE_LAG:
-        return ("role up", "snaps jumped while targets lagged; in 2022-25 this pattern caught "
-                           "0.3-0.5 more passes than the model projected the next week")
+        return ("role up", "snaps jumped while his targets lagged; the projection already raises his "
+                           "target share for it (snap-change rule)")
     if d_snap <= -SNAP_JUMP and d_ts > -SHARE_LAG:
-        return ("role down", "snaps fell while targets held; in 2022-25 this pattern caught "
-                             "about 0.55 fewer passes than the model projected the next week")
+        return ("role down", "snaps fell while his targets held; the projection already lowers his "
+                             "target share for it (snap-change rule)")
     return None
 
 

@@ -287,7 +287,8 @@ def main():
         RS.to_csv(OUT / f"slate_research_{a.season}_wk{a.week:02d}.csv", index=False)
         flagged = RS[RS["flags"].fillna("").str.contains("role up|role down")]
         L += ["", "## Research leads across the slate", "",
-              "*Not picks. The receiving role-shift pattern (snaps moved while targets had not caught up yet) beat or "
+              "*Not picks. The role-shift pattern (snaps moved while targets had not caught up yet) -- the projection "
+              "already moves his target share for it since props-v1.29; before that it beat or "
               "missed the model's next-week projection in 2022-25 (reports/role_shift_check.md); whether the BOOK also "
               "reacts late is what the bet journal decides. 'Line implies' is the targets per game at which the line is a "
               "fair 50/50.*", "",

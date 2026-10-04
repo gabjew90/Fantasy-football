@@ -71,3 +71,39 @@ numbers without a flag.
 
 What this does not say: whether the BOOK also reacts late. The flag marks a
 model blind spot worth researching; the journal decides whether it pays.
+
+## Addendum (2026-10-03): by position, and against the round-23 model
+
+The same flag and read, split into receivers/tight ends and backs, against
+props-v1.28 and against round 23 (target share x (last/earlier snaps) ** 0.5,
+reports/snap_react.md). Flagged minus unflagged catches residual (95% CI,
+team-week resampling):
+
+| Model | Period | Position | Flag | Rows | Difference |
+|---|---|---|---|---|---|
+| v1.28 | 2022-23 | WR/TE | role up | 200 | +0.547 (+0.281, +0.863) |
+| v1.28 | 2022-23 | WR/TE | role down | 145 | -0.712 (-0.966, -0.442) |
+| v1.28 | 2022-23 | RB | role up | 105 | +0.280 (-0.035, +0.589) |
+| v1.28 | 2022-23 | RB | role down | 89 | -0.386 (-0.677, -0.035) |
+| v1.28 | 2024-25 | WR/TE | role up | 210 | +0.076 (-0.182, +0.338) |
+| v1.28 | 2024-25 | WR/TE | role down | 141 | -0.635 (-0.889, -0.332) |
+| v1.28 | 2024-25 | RB | role up | 123 | +0.609 (+0.284, +0.930) |
+| v1.28 | 2024-25 | RB | role down | 81 | -0.378 (-0.652, -0.048) |
+| round 23 | 2022-23 | WR/TE | role up | 200 | +0.064 (-0.201, +0.343) |
+| round 23 | 2022-23 | WR/TE | role down | 145 | -0.139 (-0.396, +0.123) |
+| round 23 | 2022-23 | RB | role up | 105 | -0.150 (-0.436, +0.155) |
+| round 23 | 2022-23 | RB | role down | 89 | +0.079 (-0.206, +0.412) |
+| round 23 | 2024-25 | WR/TE | role up | 210 | -0.381 (-0.649, -0.103) |
+| round 23 | 2024-25 | WR/TE | role down | 141 | -0.084 (-0.357, +0.206) |
+| round 23 | 2024-25 | RB | role up | 123 | +0.153 (-0.185, +0.459) |
+| round 23 | 2024-25 | RB | role down | 81 | +0.097 (-0.207, +0.383) |
+
+- Under v1.28 the pattern holds for backs as well as receivers (the advice that
+  "snaps are not routes" for backs did not show up in the catches residual).
+- Round 23 absorbs it: every cell is within noise except WR/TE role up in
+  2024-25, now -0.38 (an overshoot; 2022-23 shows none). That slice is
+  post-hoc, so the rule is not changed on it; an asymmetric or position-aware
+  exponent is the next test, pre-registered on 2022-23.
+- The flag's wording changes accordingly: it marks a role change worth
+  researching, and says the projection already moves his share for it. It no
+  longer claims the model misses it.
