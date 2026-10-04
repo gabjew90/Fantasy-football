@@ -84,3 +84,9 @@ def test_backfield_jobs_compare_the_last_game_with_earlier_weeks():
     assert b["week"] == 3 and abs(b["early_base"] - 0.65) < 1e-12 and abs(b["passdown_base"] - 0.20) < 1e-12
     assert b["i5_base"] == 1.0, "a week with no team inside-5 carry says nothing about his share"
     assert (b["i5_n"], b["i5_team"]) == (0, 1)
+
+
+def test_the_role_flag_never_claims_an_adjustment_the_snap_rule_skips():
+    u = RS.usage_change([(1, 0.03, 0.02, 0.0), (2, 0.03, 0.02, 0.0), (3, 0.30, 0.03, 0.0)])
+    assert RS.role_flag(u, 3) is None, "earlier snaps under 5%: model.snap_react does not act, so no flag"
+    assert M.snap_react(0.02, 0.30, 0.03, 0.5) == 0.02

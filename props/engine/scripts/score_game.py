@@ -1672,7 +1672,7 @@ def main():
         p_over = r_.p_model if r_.side == "Over" else 1 - r_.p_model - (0.0 if pd.isna(r_.p_push) else r_.p_push)
         nv_over = r_.p_novig if r_.side == "Over" else 1 - r_.p_novig
         s_ = sims[r_.player][next(c for k, c in {**YARD_MARKETS, **COUNT_MARKETS}.items() if k == r_.market)]
-        u_ = USAGE.get(r_.player)
+        u_ = USAGE.get(r_.player) if r_.market != "player_pass_yds" else None
         flags_ = []
         if ROLE.get(r_.player) and r_.market != "player_rush_yds" and m_.pos != "QB":
             flags_.append(ROLE[r_.player][0])
@@ -2341,7 +2341,7 @@ def main():
         if len(RESEARCH):
             for _, x in RESEARCH.sort_values(["team", "player", "market", "line"]).iterrows():
                 cells = research_cells(x, MKT).strip("|").split("|")
-                ul_ = usage_line(USAGE.get(x.player), rush=x.market == "player_rush_yds", short=True) or "—"
+                ul_ = usage_line(None if x.market == "player_pass_yds" else USAGE.get(x.player), rush=x.market == "player_rush_yds", short=True) or "—"
                 T.append(f"| {x.player} ({x.team}) |{'|'.join(cells)}| {ul_} | {x['flags'] if isinstance(x['flags'], str) and x['flags'] else '—'} |")
         T.append("")
         L[3:3] = T

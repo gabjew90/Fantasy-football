@@ -8,22 +8,23 @@ Concise summary of: verified matchup and kickoff (local time and UTC), venue/roo
 ### 2. Primary Analytical Angles
 Discuss only supported angles: opportunity concentration, target/rush competition, goal-line priority, inside-the-5 usage, explosive-play dependence, game-script sensitivity, distributional skew, current injury implications. Distinguish observed facts from inference.
 
-### 3. Actionable Recommendation Table
-Use exactly these columns:
+### 3. Research Table
+No recommendations (DECISIONS #142): the board is a research sheet until the settled
+record shows the model earning weight beside the book. Use these columns:
 
-| Player | Team | Prop Market | Model (registry ID, state) | Actionable Line & Price | Recommendation | Quant Thesis & Median Divergence |
-|---|---|---|---|---|---|---|
+| Player | Team | Prop Market | Line & Price (Over / Under) | Our projection (median, p10-p90) | Over: model / book | Line implies | Last game | Flags |
+|---|---|---|---|---|---|---|---|---|
 
 Rules:
-- `Recommendation` is `Over`, `Under`, `Yes`, or `PASS / DATA_INSUFFICIENT`.
-- `Model` shows the registry entry ID and one of `MODEL_UNVALIDATED`, `MODEL_VALIDATED, EDGE_INSUFFICIENT`, `MODEL_VALIDATED, EDGE_SUFFICIENT`. With no registry entry write `none, MODEL_UNVALIDATED`.
-- Do not force a minimum number of bets.
-- Keep the observed quote separate from the actionable entry threshold.
-- For `MODEL_UNVALIDATED`, omit a fair price and threshold; diagnostic estimates may appear labeled exploratory.
-- For `EDGE_INSUFFICIENT`, fair odds with uncertainty may appear; the recommendation is PASS.
-- Only `EDGE_SUFFICIENT` shows an actionable price, and only after the decision-snapshot refresh.
+- No Over/Under/Yes/PASS call, no fair odds, no entry threshold, no EV, Kelly or stake.
+- `Line implies` is the targets or carries per game at which the line is a fair 50/50.
+- Keep the observed quote (bookmaker, `last_update`) beside the model's numbers.
+- For anytime TD give the model, the market and their blend; no fair odds.
 
-For each modeled prop include below the table: historical baseline and sample window; current-season opportunity and role update; matchup adjustment or `N/A`; model family, mean/median, uncertainty interval; proposed line; `p_win/p_push/p_loss` or `p_yes`; fair odds; edge-rule arithmetic (`p_model − p_novig`, ER at offered price, ER at lower bound) and the minimum acceptable price; observed quote with bookmaker and `last_update`; integer-line push treatment.
+For each line the user asks about include below the table: historical baseline and sample
+window; current-season opportunity and role update (last game against earlier weeks, a
+back's three jobs); matchup adjustment or `N/A`; model family, median and interval; the
+role-shift or teammate flags and what they mean; integer-line push treatment.
 
 ### 4. Evidence & Data Gaps
 Source manifest:
@@ -33,5 +34,7 @@ Source manifest:
 
 Include: calculation assumptions, modeling assumptions, simulation seed/count if used, missing route/charting data, unresolved injury information, missing sportsbook prices, weather uncertainty, quota remaining, archive rows written and where they were saved.
 
-## Recommendation discipline
-No recommendation is required. Prefer `PASS` when: line/price missing, unresolved injury materially changes opportunity, role is ambiguous, route-dependent thesis cannot be verified, one-game evidence cannot support a credible distribution, modeled edge is within uncertainty, or the model's registry status does not permit pricing.
+## Research discipline
+No recommendation is given. Say plainly when a thesis cannot be checked: line/price missing,
+unresolved injury, ambiguous role, a route-dependent thesis (no route data), or one game of
+evidence. The user's bets go in the journal with their four checklist answers.

@@ -109,6 +109,8 @@ def role_flag(u, last_week_expected):
     research at the role change, it no longer claims the model misses it."""
     if u is None or u["week"] != last_week_expected:
         return None
+    if not (u["snap_base"] >= 0.05):
+        return None     # the snap rule does not act below 5% of earlier snaps; neither does the flag
     d_snap = u["snap"] - u["snap_base"]
     d_ts = u["ts"] - u["ts_base"]
     if d_snap >= SNAP_JUMP and d_ts < SHARE_LAG:
