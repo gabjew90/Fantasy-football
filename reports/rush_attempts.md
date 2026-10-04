@@ -55,3 +55,22 @@ would also widen rushing yards, which is calibrated now, so the fix is a
 carries-specific source of variance (e.g. a game-script component that moves a
 back's carries and yards together), pre-registered and tuned on 2022-23 with
 rushing yards held to its current bar. Not attempted today.
+
+## Round 24 (pre-registered 2026-10-03, before any run): widen carries, hold rushing yards
+
+Two settings move together: `share_conc_carries` (lower = a back's share of the
+team's carries varies more game to game, which widens carries AND yards) and
+`eff_sd_rush` (lower = less game-to-game noise in yards per carry, which
+narrows yards only). Grid on 2022-23 only: share_conc_carries in {20 (shipped),
+12, 8} x eff_sd_rush in {0.3 (shipped), 0.2, 0.1}.
+
+Selection (tune seasons): keep the settings under which rushing YARDS still
+pass width (0.20 +/- 0.03) and calibration (every 60-90% bucket within 0.03);
+among those, the lowest rushing-attempts CRPS; ties (within 0.005) go to the
+lower rushing-yards CRPS. If no setting keeps rushing yards passing, round 24
+is dropped.
+
+Ship rule (2024-25, read once): rushing attempts pass the full four-part bar,
+rushing yards still pass the full bar, and rushing yards' CRPS is not worse
+than props-v1.29 with a paired interval excluding zero. Otherwise attempts
+stay unpriced and this report records the result.

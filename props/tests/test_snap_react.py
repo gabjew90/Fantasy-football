@@ -36,7 +36,14 @@ def test_the_move_is_clipped():
 def test_scorer_and_harness_call_the_same_rule():
     sg = (ENGINE / "score_game.py").read_text(encoding="utf-8")
     bt = (ENGINE / "backtest.py").read_text(encoding="utf-8")
-    assert "MODEL.snap_react(ts, u_sr[\"snap\"], u_sr[\"snap_base\"], MODEL.SNAP_REACT)" in sg
+    assert "MODEL.snap_react(ts, u_sr[\"snap\"], u_sr[\"snap_base\"], MODEL.SNAP_REACT," in sg
+    assert "gamma_up=MODEL.SNAP_REACT_UP" in sg
     assert "u_sr[\"week\"] == WEEK - 1" in sg, "last week must be the week before this one"
-    assert "M.snap_react(ts, r.get(\"snap_last\"), r.get(\"snap_base\"), sr_gamma)" in bt
+    assert "M.snap_react(ts, r.get(\"snap_last\"), r.get(\"snap_base\"), sr_gamma, gamma_up=sr_up)" in bt
     assert "prev[-1, 0] != W - 1" in bt and "len(prev) < 3" in bt, "the same LAST/BASE as the scorer"
+
+
+def test_a_separate_exponent_for_a_snap_increase():
+    assert math.isclose(M.snap_react(0.2, 0.9, 0.6, 0.5, gamma_up=0.25), 0.2 * 1.5 ** 0.25), "increase: gamma_up"
+    assert math.isclose(M.snap_react(0.2, 0.6, 0.9, 0.5, gamma_up=0.25), 0.2 * (0.6 / 0.9) ** 0.5), "decrease: gamma"
+    assert M.snap_react(0.2, 0.9, 0.6, 0.5) == M.snap_react(0.2, 0.9, 0.6, 0.5, gamma_up=None), "None = round 23"

@@ -905,7 +905,8 @@ def main():
         u_sr = USAGE.get(p["name"])
         if MODEL.SNAP_REACT is not None and u_sr and u_sr["week"] == WEEK - 1:
             ts_before = ts
-            ts = MODEL.snap_react(ts, u_sr["snap"], u_sr["snap_base"], MODEL.SNAP_REACT)
+            ts = MODEL.snap_react(ts, u_sr["snap"], u_sr["snap_base"], MODEL.SNAP_REACT,
+                                  gamma_up=MODEL.SNAP_REACT_UP)
             ev_chain["target_share"]["snap_react"] = (ts / ts_before) if ts_before else None
         cr = rate(cw.receptions if (cw is not None and cw.targets > 0) else None,
                   cw.targets if (cw is not None and cw.targets > 0) else None,

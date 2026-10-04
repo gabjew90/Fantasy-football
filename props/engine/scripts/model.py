@@ -265,9 +265,14 @@ K0_FIXED = {"ypt": 80, "catch_rate": 40, "target_share": 80}
 # yardage harness first (reports/snap_react.md, DECISIONS #143).
 SNAP_REACT = 0.5
 SNAP_REACT_CLIP = (0.6, 1.6)
+# Round 25 (2026-10-03): a separate exponent for a snap INCREASE (ratio > 1),
+# after round 23 overshot receivers whose snaps jumped in 2024-25. None = the
+# same exponent both ways (round 23, byte for byte); measured first
+# (reports/snap_react.md, round 25).
+SNAP_REACT_UP = None
 
 
-def snap_react(share, snap_last, snap_base, gamma, clip=SNAP_REACT_CLIP):
+def snap_react(share, snap_last, snap_base, gamma, clip=SNAP_REACT_CLIP, gamma_up=None):
     """The target share moved by last week's snap change; unchanged when off or
     when either snap number is missing."""
     if gamma is None or share is None:
@@ -278,7 +283,8 @@ def snap_react(share, snap_last, snap_base, gamma, clip=SNAP_REACT_CLIP):
         return share
     if not (np.isfinite(sl) and np.isfinite(sb) and np.isfinite(sh)) or sb < 0.05 or sl <= 0:
         return share
-    return sh * float(np.clip((sl / sb) ** float(gamma), clip[0], clip[1]))
+    g = float(gamma_up) if (gamma_up is not None and sl > sb) else float(gamma)
+    return sh * float(np.clip((sl / sb) ** g, clip[0], clip[1]))
 
 
 def k0_rates(fitted, override=None):

@@ -80,3 +80,23 @@ simulation noise (under 0.01); Dalton Schultz (snaps 54% last week vs 67%)
 projects 6.3 targets instead of 7.1 and his catches Over goes 59% -> 50%.
 2026 weeks 2-3 cannot test it (it first acts in week 4); the settled record
 from week 4 is the fresh check.
+
+## Round 25 (pre-registered 2026-10-03, before any run): a separate exponent for a snap increase
+
+reports/role_shift_check.md's addendum found round 23 overshooting receivers
+whose snaps jumped in 2024-25 (WR/TE role up: -0.38 catches, interval
+excluding zero) while 2022-23 showed no overshoot. That slice was seen on the
+held-out seasons, so the test is set on 2022-23 only and 2024-25 is read once.
+
+Change: `model.SNAP_REACT_UP`, the exponent used when last week's snaps are
+ABOVE his earlier weeks (decreases keep 0.5). Grid on 2022-23: SNAP_REACT_UP
+in {0.5 (= round 23), 0.35, 0.25, 0.0}.
+
+Selection: the value with the largest paired CRPS gain against round 23 on
+receptions + receiving yards summed over 2022-23, kept only if positive in
+both seasons for both markets; otherwise round 25 is dropped (round 23 stays
+as shipped).
+
+Ship rule (2024-25, read once): receptions or receiving yards better than
+round 23 with an interval excluding zero, and no market worse with an
+interval excluding zero.

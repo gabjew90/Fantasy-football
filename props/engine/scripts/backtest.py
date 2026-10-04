@@ -179,6 +179,9 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
     # round 23: target share reacts to last week's snap change (live only; None = off)
     sr_gamma = (M.SNAP_REACT if getattr(args, "snap_react", None) is None
                 else (None if args.snap_react == "off" else float(args.snap_react)))
+    # round 25: the exponent for a snap increase (None = same as sr_gamma)
+    sr_up = (M.SNAP_REACT_UP if getattr(args, "snap_react_up", None) is None
+             else (None if args.snap_react_up == "same" else float(args.snap_react_up)))
     print(f"season={S} env={args.env} opponent={args.opponent} ({opp['level']}, k0={opp['k0']:g}) "
           f"historical_blend={args.historical_blend} dispersion={dispersion} live={live}", file=sys.stderr)
 
@@ -503,7 +506,7 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
             ts = two_stage("target_share", "team_targets_n", "ts", np.nan,
                            "target_share", 80, r.own_ts, r.n_tt)
             if sr_gamma is not None:
-                ts = M.snap_react(ts, r.get("snap_last"), r.get("snap_base"), sr_gamma)
+                ts = M.snap_react(ts, r.get("snap_last"), r.get("snap_base"), sr_gamma, gamma_up=sr_up)
             cr = two_stage("catch_rate", "targets_n", "cr", 0.6,
                            "catch_rate", 40, r.own_cr, r.n_tg)
             ypt = two_stage("ypt", "targets_n", "ypt", 7.0,
@@ -1489,6 +1492,8 @@ def main(argv=None):
     ap.add_argument("--live-opp-metrics", default=None,
                     help="harness ABLATION: the opponent-adjusted rates in live mode (default: the scorer's, "
                          "catch_rate,ypt,ypc); e.g. catch_rate,ypt drops the run-defense adjustment")
+    ap.add_argument("--snap-react-up", default=None,
+                    help="round 25: exponent for a snap increase, or 'same' (default model.SNAP_REACT_UP)")
     ap.add_argument("--snap-react", default=None,
                     help="round 23: target share x (last week's snaps / earlier weeks') ** g, or 'off' "
                          "(default model.SNAP_REACT)")
