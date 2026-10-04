@@ -1005,7 +1005,7 @@ def main():
                 M.loc[m, col] = M.loc[m, col] / tot
     if RULES:
         try:
-            SC.check_players(RULES, M.name)
+            RULES = SC.resolve_players(RULES, M.name, M.team, pop[pop.excluded].name)
             if a.scenario_run:       # YOUR scenario: team volume, efficiency and targets (carries below)
                 M, env = SC.apply_before_sim(M, env, RULES)
         except ValueError as exc:
@@ -1065,7 +1065,7 @@ def main():
             qb_i = None
         rs_t = [float(v) for v in Mt.rs]
         car_want = {names.index(r_["who"]): r_["value"] for r_ in RULES
-                    if a.scenario_run and not r_["team"] and r_["key"] == "carries" and r_["who"] in names}
+                    if a.scenario_run and not r_["team"] and r_["key"] == "carries" and r_["team_of"] == t}
         if car_want:                 # YOUR scenario: carries per game, teammates give up the difference
             try:
                 rs_t = SC.solve_carries(rs_t, car_want, SC.rush_effective_fn(
@@ -2640,9 +2640,12 @@ def main():
     log(f"\nwrote {OUT}/report_{slug}.md")
     if hrs > 0 and hrs <= 1:
         log(f"  CANDIDATE CLOSING SNAPSHOT: kickoff in {hrs * 60:.0f} minutes")
+    SCEN_L = []
     if RULES and not SCENARIO:
         snap_ = Path(a.odds_snapshot) if a.odds_snapshot else (snap_path if snap_written else None)
-        L += run_user_scenario(R, RESEARCH, slug, snap_, RULES)
+        # THIS run's lines only, never the --prior-log merge (an earlier capture's chance is not the board's)
+        SCEN_L = run_user_scenario(pd.DataFrame(rows) if rows else R.iloc[0:0], RESEARCH, slug, snap_, RULES)
+        L += SCEN_L
         (OUT / f"report_{slug}.md").write_text("\n".join(L), encoding="utf-8")
     if not SCENARIO and not a.no_scenarios:
         q = pop[pop.questionable & ~pop.excluded]
@@ -2654,7 +2657,7 @@ def main():
                   "Not priced: this run had no lines to price against."]
             (OUT / f"report_{slug}.md").write_text("\n".join(L), encoding="utf-8")
     if MARKETS:
-        S_ = short_summary(R, AWAY, HOME, SEASON, WEEK, books_used_str, hrs, sorted(MARKETS), gate=GATE)
+        S_ = short_summary(R, AWAY, HOME, SEASON, WEEK, books_used_str, hrs, sorted(MARKETS), gate=GATE) + SCEN_L
         (OUT / f"summary_{slug}.md").write_text("\n".join(S_), encoding="utf-8")
         print("\n".join(S_))
         print(f"\n(full report: {OUT / f'report_{slug}.md'})")
@@ -2975,7 +2978,7 @@ def run_scenarios(q: pd.DataFrame, R: pd.DataFrame, slug: str, snap_path: Path) 
          "mostly at his position (measured on 2024-25 absences). His own props void if he sits. Only lines whose probability moves by at least "
          "1 point are listed. Neither case is weighted by how likely he is to play: that call is yours."]
     # the scenario compares against THIS run's lines only: no merge with earlier logs
-    argv = _drop_assume(_scenario_argv())
+    argv = _scenario_argv(("--prior-log", "--prior-archive", "--assume"))
     for _, pl in q.iterrows():
         cmd = [sys.executable, str(Path(__file__).resolve()), *argv, "--assume-out", pl.gsis_id,
                "--odds-snapshot", str(snap_path), "--no-scenarios"]
@@ -3018,29 +3021,17 @@ def _sides(x):
     return over, 1 - over - push, push
 
 
-def _drop_assume(argv):
-    """An 'if he is out' run prices the board as it stands, never the user's assumptions."""
-    out, skip = [], False
-    for x in argv:
-        if skip:
-            skip = False
-        elif x == "--assume":
-            skip = True
-        elif not x.startswith("--assume="):
-            out.append(x)
-    return out
-
-
-def _scenario_argv():
-    """This run's arguments minus the earlier-log merges (a scenario compares
-    against THIS run's lines only)."""
+def _scenario_argv(drop=("--prior-log", "--prior-archive")):
+    """This run's arguments minus the given flags and their values. A scenario
+    compares against THIS run's lines only (no earlier-log merges); an 'if he
+    is out' run also drops --assume (it prices the board as it stands)."""
     argv, skip = [], False
     for x in sys.argv[1:]:
         if skip:
             skip = False
-        elif x in ("--prior-log", "--prior-archive"):
+        elif x in drop:
             skip = True
-        elif not x.startswith(("--prior-log=", "--prior-archive=")):
+        elif not x.startswith(tuple(f"{d}=" for d in drop)):
             argv.append(x)
     return argv
 
@@ -3075,6 +3066,8 @@ def run_user_scenario(R: pd.DataFrame, RESEARCH: pd.DataFrame, slug: str, snap: 
     base = R[R.market != "player_anytime_td"].drop_duplicates(key)
     j = base.merge(S[key + ["side", "p_model", "p_push"]].drop_duplicates(key), on=key, how="left",
                    suffixes=("", "_sc"))
+    pays = ({(r.player, r.market, float(r.line), r.book): RSCH.break_even_cell(r)
+             for _, r in RESEARCH.iterrows()} if len(RESEARCH) else {})
     named = {x["who"] for x in rules if not x["team"]}
     teams_named = {x["who"] for x in rules if x["team"]}
     rows = []
@@ -3088,13 +3081,11 @@ def run_user_scenario(R: pd.DataFrame, RESEARCH: pd.DataFrame, slug: str, snap: 
         po, pu = x.get("price_over"), x.get("price_under")
         ev_o = SC.net_per_100(po, o1, u1) if pd.notna(po) else None
         ev_u = SC.net_per_100(pu, u1, o1) if pd.notna(pu) else None
-        rr = (RESEARCH[(RESEARCH.player == x.player) & (RESEARCH.market == x.market) & (RESEARCH.line == x.line)
-                       & (RESEARCH.book == x.book)] if len(RESEARCH) else RESEARCH)
         rows.append(dict(player=x.player, team=x.team, market=x.market, line=float(x.line), book=x.book,
                          price_over=po, price_under=pu, be_over=RSCH.breakeven(po), be_under=RSCH.breakeven(pu),
                          over_model=o0, over_scenario=o1, under_scenario=u1, push_scenario=p1,
                          net_over=ev_o, net_under=ev_u,
-                         pays_if=RSCH.break_even_cell(rr.iloc[0]) if len(rr) else "—",
+                         pays_if=pays.get((x.player, x.market, float(x.line), x.book), "—"),
                          named=x.player in named))
     if not rows:
         return L + ["No line moves by half a point or more under these assumptions."]

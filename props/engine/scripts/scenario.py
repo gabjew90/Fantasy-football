@@ -11,6 +11,10 @@ player gains his teammates lose.
 
 Grammar, one rule per --assume, keys comma-separated:
 
+    PLAYER may carry his team to tell two same-named players apart:
+    'Mike Williams (NYJ): targets=6'. Names match loosely ('woody marks',
+    'DJ Moore' for 'D.J. Moore').
+
     PLAYER: targets=N    targets per game (teammates and the depth receivers
                          give up the difference in proportion; the team total
                          does not move)
@@ -31,9 +35,12 @@ assumptions, not confidence intervals. No touchdown price is adjusted.
 """
 from __future__ import annotations
 
+import re
+
 import numpy as np
 
 import model as MODEL
+from model import norm_name
 
 PLAYER_KEYS = ("targets", "carries", "catch", "ypt", "ypc")
 TEAM_KEYS = ("pass", "rush", "ypt")
@@ -67,7 +74,11 @@ def parse(rules, teams) -> list[dict]:
         who = " ".join(who.split())
         if not sep or not who or not body.strip():
             raise ValueError(f"'{raw}': write it as 'PLAYER: key=value' or 'TEAM: key=value'")
-        is_team = who.upper() in teams
+        team_of = None
+        m_ = re.fullmatch(r"(.+?)\s*\(([A-Za-z]{2,3})\)", who)
+        if m_ and m_.group(2).upper() in teams:
+            who, team_of = m_.group(1).strip(), m_.group(2).upper()
+        is_team = who.upper() in teams and team_of is None
         allowed = TEAM_KEYS if is_team else PLAYER_KEYS
         for kv in body.split(","):
             k, eq, v = kv.partition("=")
@@ -93,16 +104,34 @@ def parse(rules, teams) -> list[dict]:
                 elif x < 0 or (k in ("ypt", "ypc") and x == 0):
                     raise ValueError(f"'{raw}': {k} must be positive")
             out.append({"who": who.upper() if is_team else who, "team": is_team, "key": k, "value": x,
+                        "team_of": who.upper() if is_team else team_of,
                         "text": f"{who.upper() if is_team else who}: {k}={v.strip()}"})
     return out
 
 
-def check_players(rules, names) -> None:
-    """Every player a rule names must be in this game's priced player list."""
-    missing = sorted({r["who"] for r in rules if not r["team"] and r["who"] not in set(names)})
-    if missing:
-        raise ValueError("not in this game's player list: " + ", ".join(missing)
-                         + " (use the name exactly as the report shows it)")
+def resolve_players(rules, names, teams, out_names=()) -> list[dict]:
+    """Each player rule's name as the report spells it, and his team. Loose
+    match (model.norm_name); a name on both teams needs its team; a player
+    ruled out says so. Raises ValueError."""
+    by = {}
+    for n, t in zip(names, teams):
+        by.setdefault(norm_name(n), []).append((n, t))
+    out_keys = {norm_name(n) for n in out_names}
+    resolved = []
+    for r in rules:
+        if r["team"]:
+            resolved.append(r)
+            continue
+        hits = [h for h in by.get(norm_name(r["who"]), []) if r["team_of"] in (None, h[1])]
+        if not hits:
+            why = ("is ruled out for this game, so he has no line to move" if norm_name(r["who"]) in out_keys
+                   else "is not in this game's player list (check the spelling against the report)")
+            raise ValueError(f"{r['who']} {why}")
+        if len(hits) > 1:
+            raise ValueError(f"{r['who']} plays for both teams' lists: write '{r['who']} ({hits[0][1]}): ...'")
+        n, t = hits[0]
+        resolved.append({**r, "who": n, "team_of": t, "text": r["text"].replace(r["who"], n, 1)})
+    return resolved
 
 
 def describe(rules) -> str:
@@ -126,14 +155,16 @@ def apply_before_sim(M, env, rules):
             m = M.team == t
             M.loc[m, "ypt"] = M.loc[m, "ypt"] * (1 + r["value"] / 100)
     col = {"catch": "cr", "ypt": "ypt", "ypc": "ypc"}
+    me = lambda r: (M.name == r["who"]) & (M.team == r["team_of"])
     for r in (r for r in rules if not r["team"] and r["key"] in col):
-        M.loc[M.name == r["who"], col[r["key"]]] = r["value"]
+        M.loc[me(r), col[r["key"]]] = r["value"]
     # targets: the named players are fixed at their new share; every other
     # tracked teammate AND the depth receivers ('other') give up the difference
     # in proportion, so the team total never moves
-    want = {r["who"]: r["value"] for r in rules if not r["team"] and r["key"] == "targets"}
     for t in M.team.unique():
         m = M.team == t
+        want = {r["who"]: r["value"] for r in rules
+                if not r["team"] and r["key"] == "targets" and r["team_of"] == t}
         fixed = M.index[m & M.name.isin(want.keys())]
         if not len(fixed):
             continue
@@ -197,6 +228,12 @@ def solve_carries(rs, fixed, effective):
                 cur[j] = lo
                 nxt = with_fixed({k: cur[k] for k in fixed})
             cur = nxt
+    got = effective(cur)
+    miss = {j: got[j] for j, want in fixed.items() if abs(got[j] - want) > 0.3}
+    if miss:
+        raise ValueError("these carries cannot all be met together: "
+                         + ", ".join(f"you set {fixed[j]:g}, the most the team allows is about {v:.1f}"
+                                     for j, v in miss.items()))
     return cur
 
 

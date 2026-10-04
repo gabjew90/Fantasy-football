@@ -32,8 +32,19 @@ def test_rules_read_plainly_and_refuse_what_they_cannot_read():
                      ("X: ypc=0", "must be positive")]:
         with pytest.raises(ValueError, match=why):
             SC.parse([bad], {"DAL", "HOU"})
-    with pytest.raises(ValueError, match="not in this game's player list: Ghost"):
-        SC.check_players(SC.parse(["Ghost: targets=5"], {"DAL"}), ["Woody Marks"])
+    names, teams = ["Woody Marks", "D.J. Moore", "Mike Williams", "Mike Williams"], ["HOU", "CHI", "NYJ", "LAC"]
+    r = SC.resolve_players(SC.parse(["woody marks: carries=14", "DJ Moore: targets=7",
+                                     "Mike Williams (LAC): catch=60%"], {"HOU", "CHI", "NYJ", "LAC"}),
+                           names, teams)
+    assert [(x["who"], x["team_of"]) for x in r] == [("Woody Marks", "HOU"), ("D.J. Moore", "CHI"),
+                                                    ("Mike Williams", "LAC")]
+    assert r[1]["text"] == "D.J. Moore: targets=7"
+    with pytest.raises(ValueError, match="Ghost is not in this game's player list"):
+        SC.resolve_players(SC.parse(["Ghost: targets=5"], {"HOU"}), names, teams)
+    with pytest.raises(ValueError, match="Nico Collins is ruled out"):
+        SC.resolve_players(SC.parse(["Nico Collins: targets=5"], {"HOU"}), names, teams, ["Nico Collins"])
+    with pytest.raises(ValueError, match=r"write 'Mike Williams \(NYJ\): \.\.\.'"):
+        SC.resolve_players(SC.parse(["Mike Williams: targets=5"], {"NYJ", "LAC"}), names, teams)
 
 
 def _team():
@@ -43,9 +54,13 @@ def _team():
     return M, env
 
 
+def _rules(M, rules):
+    return SC.resolve_players(SC.parse(rules, {"DAL", "HOU"}), M.name, M.team)
+
+
 def test_targets_come_out_of_teammates_and_the_depth_receivers_in_proportion():
     M, env = _team()
-    M2, env2 = SC.apply_before_sim(M, env, SC.parse(["A: targets=10.2"], {"DAL", "HOU"}))
+    M2, env2 = SC.apply_before_sim(M, env, _rules(M, ["A: targets=10.2"]))
     hou = M2[M2.team == "HOU"].set_index("name").ts
     assert hou["A"] == pytest.approx(0.30), "10.2 of 34 targets"
     g = (1 - 0.30) / (1 - 0.25)
@@ -57,14 +72,13 @@ def test_targets_come_out_of_teammates_and_the_depth_receivers_in_proportion():
 
 def test_team_rules_apply_before_the_player_targets():
     M, env = _team()
-    M2, env2 = SC.apply_before_sim(M, env, SC.parse(["HOU: pass=-4, ypt=-10%", "B: targets=6, ypt=9.5"],
-                                                    {"DAL", "HOU"}))
+    M2, env2 = SC.apply_before_sim(M, env, _rules(M, ["HOU: pass=-4, ypt=-10%", "B: targets=6, ypt=9.5"]))
     assert env2["HOU"]["targets"] == 30.0 and env["HOU"]["targets"] == 34.0
     b = M2.set_index("name").loc["B"]
     assert b.ts == pytest.approx(6 / 30) and b.ypt == 9.5, "his own ypt wins over the team change"
     assert M2.set_index("name").loc["A", "ypt"] == pytest.approx(7.2)
     with pytest.raises(ValueError, match="add up to"):
-        SC.apply_before_sim(M, env, SC.parse(["A: targets=20", "B: targets=14"], {"DAL", "HOU"}))
+        SC.apply_before_sim(M, env, _rules(M, ["A: targets=20", "B: targets=14"]))
 
 
 def test_carries_hit_the_number_and_teammates_give_up_the_difference():
@@ -80,6 +94,8 @@ def test_carries_hit_the_number_and_teammates_give_up_the_difference():
     assert after[0] < before[0] and after[2] < before[2]
     with pytest.raises(ValueError, match="more than the team's carries allow"):
         SC.solve_carries(rs, {1: 40.0}, eff)
+    with pytest.raises(ValueError, match="cannot all be met together"):
+        SC.solve_carries(rs, {0: 15.0, 1: 14.0}, eff)     # 29 of a 26-carry team
 
 
 def test_net_per_100_at_an_american_price():
@@ -92,4 +108,10 @@ def test_the_board_never_reads_the_assumptions():
     src = (ENGINE / "score_game.py").read_text(encoding="utf-8")
     assert "if a.scenario_run:       # YOUR scenario" in src, "assumptions apply only inside the scenario run"
     assert "SCENARIO = bool(ASSUME_OUT) or a.scenario_run" in src and 'OUT = OUT / "scenarios"' in src
-    assert "argv = _drop_assume(_scenario_argv())" in src, "an 'if he is out' run never carries them"
+    assert 'argv = _scenario_argv(("--prior-log", "--prior-archive", "--assume"))' in src,         "an 'if he is out' run never carries them"
+    assert "run_user_scenario(pd.DataFrame(rows) if rows" in src, "this run's lines, never the prior-log merge"
+
+
+def test_the_fast_path_summary_carries_your_scenario():
+    src = (ENGINE / "score_game.py").read_text(encoding="utf-8")
+    assert "gate=GATE) + SCEN_L" in src, "a --markets run prints the scenario table chat reads"
