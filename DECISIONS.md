@@ -6955,3 +6955,27 @@ check that accounts for its own noise -- e.g. a band fails only when its
 interval excludes the target -- would be a change to the bar, which is the
 user's decision, not a model fix.
 
+
+## 2026-10-03 (141) -- returning key teammates: in-season shares over co-active weeks, measured, not shipped
+
+Found live on the week-4 board: Dalton Schultz (HOU) priced at 21% of targets
+from 25 of 112 this season, much of it while Nico Collins sat (Collins 10 of
+37), with Collins active again; both Schultz Overs were STRONG. Round 22
+counted a player's in-season SHARE evidence only over the weeks every key
+teammate (prior-season share >= threshold) active this week also played;
+efficiency kept every week. Pre-registered grid and rules in
+reports/returning_teammate.md, tuned on 2022-23 only.
+
+Target side (thresholds 0.15, 0.20): worse in both tune seasons, 0.15 clearly
+(catches -0.011 / -0.007, receiving yards -0.079 / -0.055). The share built
+while a key teammate sits is real evidence about the player's role; discarding
+it leans on the prior and costs accuracy, consistent with OUT_RULE keeping only
+a quarter of an absent player's share with the priced set. Carry side (0.35,
+0.50): flat; the pre-set pick (0.35) is negative in 2023. Nothing passed, so
+2024-25 stays unread. Code: tag archive/props-returning-teammate.
+
+Same session: the settled record (weeks 2-3, 1,180 yardage/catch calls, engines
+before props-v1.28) won ~50% in every gap bucket while the model claimed 53-71%;
+STRONG won 45.3% (n=296, -$19.55 per $100), LEAN 55.5%. The tiers are not
+validated against prices; re-tiering on the market blend (p_blend, already on
+the Tuesday scorecard) is the open proposal, the user's call.
