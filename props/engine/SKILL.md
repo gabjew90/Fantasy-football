@@ -231,6 +231,14 @@ For a narrow question, run only what it needs:
   (markets: `receptions`, `rec_yds`, `rush_yds`, `pass_yds`, `td`, comma-separated). `--week` is optional and
   resolves to the next meeting; `LAR`, `WSH`, `JAC`, `LVR` are accepted. A `--markets` run prints a
   short summary (also saved as `summary_*.md`) instead of the full report, which is still written.
+- **Your scenario (a what-if on workload):** add `--assume "PLAYER: carries=14"` (or `targets=8`,
+  `catch=70%`, `ypt=9`, `ypc=4.5`; a team: `"HOU: pass=-3"`, `rush=+2`, `ypt=-5%`), repeatable. The
+  board is priced as usual; the report adds **Your scenario (experimental)**: every line priced again
+  with only those inputs changed (teammates give up what one player gains; the team total holds),
+  beside the board's chance, each side's break-even and its net per $100 IF the assumptions are right.
+  Reproduce that table in full, say the numbers are conditional on the user's assumptions (which are
+  assumptions, not confidence intervals), and never call a line a play. Touchdowns are not adjusted.
+  Never recorded (outputs in `scenarios/`).
 - **Today's games / one date:** `python scripts/score_week.py --today` or `--date YYYY-MM-DD`
   (`--markets` passes through).
 - **Anytime TD:** every priced TD row is also in `td_board_*.csv` (the research table leaves TD rows out).

@@ -246,7 +246,11 @@ engine's contract below is not needed for them. A "best bet" or "must-win
 pick" question gets no pick: say why in a sentence, then give `props best`
 (the research rows, role-shift flags first) or `props best --slate` (the
 slate's leads), in the engine's order (never re-sort or re-rank them
-yourself).
+yourself). A what-if on workload ("what if Marks gets 14 carries?", "what
+if Houston throws less?") is a scenario run, not arithmetic: run the game
+with `--assume` (props/engine/SKILL.md, fast path) and give its "Your
+scenario" table in full; its returns hold only if the user's assumptions
+do, and say so.
 
 **Bets go in the journal.** When the user says they bet a prop, chat cannot
 write it (chat is read-only); give them one line to paste into a Claude Code

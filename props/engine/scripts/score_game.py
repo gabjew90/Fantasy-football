@@ -34,6 +34,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import eligibility
 import model as MODEL
 import research as RSCH
+import scenario as SC
 import td_joint as TDJ
 import td_market as TDM
 import td_v1 as TDV1
@@ -384,6 +385,12 @@ def main():
     ap.add_argument("--assume-out", default="",
                     help="comma-separated gsis ids priced as OUT: the 'if he is out' case for a Questionable "
                          "player. Outputs go to OUT/scenarios, which the record never reads.")
+    ap.add_argument("--assume", action="append", default=[],
+                    help="YOUR scenario, repeatable: 'PLAYER: targets=8' / 'carries=14' / 'catch=70%%' / 'ypt=9' / "
+                         "'ypc=4.5', or 'TEAM: pass=-3' / 'rush=+2' / 'ypt=-5%%'. The board is priced as usual; the "
+                         "report adds 'Your scenario' with every line priced again under the assumptions "
+                         "(scenario.py). Experimental, never recorded.")
+    ap.add_argument("--scenario-run", action="store_true", help=argparse.SUPPRESS)
     ap.add_argument("--odds-snapshot", default=None,
                     help="price from the lines and spread/total a main run saved; no fetch, no credits, no archive")
     ap.add_argument("--no-scenarios", action="store_true",
@@ -408,10 +415,19 @@ def main():
     global OUT
     ASSUME_OUT = {x for x in a.assume_out.split(",") if x}
     SNAP = json.loads(Path(a.odds_snapshot).read_text(encoding="utf-8")) if a.odds_snapshot else None
-    if ASSUME_OUT:
+    # a scenario run ('if he is out', or the user's own assumptions) writes to
+    # OUT/scenarios, which record_run never reads, and skips the research search
+    SCENARIO = bool(ASSUME_OUT) or a.scenario_run
+    if SCENARIO:
         OUT = OUT / "scenarios"
 
     AWAY, HOME = resolve_team(a.away), resolve_team(a.home)
+    try:
+        RULES = SC.parse(a.assume, {AWAY, HOME})
+    except ValueError as exc:
+        sys.exit(f"--assume: {exc}")
+    if a.scenario_run and not RULES:
+        sys.exit("--scenario-run needs at least one --assume")
     wd = Path(a.workdir); wd.mkdir(parents=True, exist_ok=True)
     OUT.mkdir(parents=True, exist_ok=True)
     rng = np.random.default_rng(20260917)
@@ -987,6 +1003,13 @@ def main():
             tot = M.loc[m, col].sum()
             if tot > 1.0:
                 M.loc[m, col] = M.loc[m, col] / tot
+    if RULES:
+        try:
+            SC.check_players(RULES, M.name)
+            if a.scenario_run:       # YOUR scenario: team volume, efficiency and targets (carries below)
+                M, env = SC.apply_before_sim(M, env, RULES)
+        except ValueError as exc:
+            sys.exit(f"--assume: {exc}")
 
     # ---------- 6. simulate: JOINT per-team draws (round 5, review item 6) ----------
     # One team-targets draw and one team-carries draw per simulation, shared by every
@@ -1040,11 +1063,22 @@ def main():
                 STARTER_QB[t] = Mt.name.iloc[qb_i]
         else:
             qb_i = None
+        rs_t = [float(v) for v in Mt.rs]
+        car_want = {names.index(r_["who"]): r_["value"] for r_ in RULES
+                    if a.scenario_run and not r_["team"] and r_["key"] == "carries" and r_["who"] in names}
+        if car_want:                 # YOUR scenario: carries per game, teammates give up the difference
+            try:
+                rs_t = SC.solve_carries(rs_t, car_want, SC.rush_effective_fn(
+                    env[t]["carries"], TVD["carries_r"], [float(v) for v in Mt.ypc], resid, WIDTH,
+                    p_resid, p_kneel, qb_i))
+            except ValueError as exc:
+                sys.exit(f"--assume ({t}): {exc}")
+            M.loc[Mt.index, "rs"] = rs_t
         sim_inputs[t] = dict(names=names, shares=shares_t, crs=crs_t, ypt=ypt_t,
-                             rs=[float(v) for v in Mt.rs], ypc=[float(v) for v in Mt.ypc],
+                             rs=rs_t, ypc=[float(v) for v in Mt.ypc],
                              p_resid=p_resid, p_kneel=p_kneel, qb_i=qb_i)
         car_t, rush_t, tc_draw = MODEL.simulate_team_rush(rng, N_SIM, env[t]["carries"], TVD["carries_r"],
-                                                          [float(v) for v in Mt.rs], [float(v) for v in Mt.ypc], resid,
+                                                          rs_t, [float(v) for v in Mt.ypc], resid,
                                                           width=WIDTH, player_resid=p_resid, player_kneel=p_kneel,
                                                           qb_index=qb_i)
         team_carries_draw[t] = tc_draw
@@ -1704,7 +1738,7 @@ def main():
         # the posted prices: the break-even workload is read at the price this book shows
         px_ = (r_.get("price_over"), r_.get("price_under"))
         ck = (r_.player, r_.market, float(r_.line), str(px_))
-        if ck not in _implied_cache and ASSUME_OUT:
+        if ck not in _implied_cache and SCENARIO:
             _implied_cache[ck] = (None, None, None, None, None)     # scenario run: nobody reads its research
         if ck not in _implied_cache:
             if r_.market in ("player_receptions", "player_reception_yds"):
@@ -2606,7 +2640,11 @@ def main():
     log(f"\nwrote {OUT}/report_{slug}.md")
     if hrs > 0 and hrs <= 1:
         log(f"  CANDIDATE CLOSING SNAPSHOT: kickoff in {hrs * 60:.0f} minutes")
-    if not ASSUME_OUT and not a.no_scenarios:
+    if RULES and not SCENARIO:
+        snap_ = Path(a.odds_snapshot) if a.odds_snapshot else (snap_path if snap_written else None)
+        L += run_user_scenario(R, RESEARCH, slug, snap_, RULES)
+        (OUT / f"report_{slug}.md").write_text("\n".join(L), encoding="utf-8")
+    if not SCENARIO and not a.no_scenarios:
         q = pop[pop.questionable & ~pop.excluded]
         if len(q) and snap_written:
             L += run_scenarios(q, R, slug, snap_path)
@@ -2937,14 +2975,7 @@ def run_scenarios(q: pd.DataFrame, R: pd.DataFrame, slug: str, snap_path: Path) 
          "mostly at his position (measured on 2024-25 absences). His own props void if he sits. Only lines whose probability moves by at least "
          "1 point are listed. Neither case is weighted by how likely he is to play: that call is yours."]
     # the scenario compares against THIS run's lines only: no merge with earlier logs
-    argv, skip = [], False
-    for x in sys.argv[1:]:
-        if skip:
-            skip = False
-        elif x in ("--prior-log", "--prior-archive"):
-            skip = True
-        elif not x.startswith(("--prior-log=", "--prior-archive=")):
-            argv.append(x)
+    argv = _drop_assume(_scenario_argv())
     for _, pl in q.iterrows():
         cmd = [sys.executable, str(Path(__file__).resolve()), *argv, "--assume-out", pl.gsis_id,
                "--odds-snapshot", str(snap_path), "--no-scenarios"]
@@ -2975,6 +3006,119 @@ def run_scenarios(q: pd.DataFrame, R: pd.DataFrame, slug: str, snap_path: Path) 
                     f"{x.side} {x.line:g} {MARKET_WORDS.get(x.market, x.market)}")
             L.append(f"| {x.player} ({x.team}) | {what} | {x.book} | {x.p_novig:.0%} | {x.p_model:.0%} | "
                      f"{x.p_model_out:.0%} | {x.move:+.0%} |")
+    return L
+
+
+def _sides(x):
+    """(P(Over), P(Under), P(push)) from a shadow-log row, which carries the
+    model's favoured side only."""
+    push = 0.0 if pd.isna(x.p_push) else float(x.p_push)
+    p = float(x.p_model)
+    over = p if x.side == "Over" else 1 - p - push
+    return over, 1 - over - push, push
+
+
+def _drop_assume(argv):
+    """An 'if he is out' run prices the board as it stands, never the user's assumptions."""
+    out, skip = [], False
+    for x in argv:
+        if skip:
+            skip = False
+        elif x == "--assume":
+            skip = True
+        elif not x.startswith("--assume="):
+            out.append(x)
+    return out
+
+
+def _scenario_argv():
+    """This run's arguments minus the earlier-log merges (a scenario compares
+    against THIS run's lines only)."""
+    argv, skip = [], False
+    for x in sys.argv[1:]:
+        if skip:
+            skip = False
+        elif x in ("--prior-log", "--prior-archive"):
+            skip = True
+        elif not x.startswith(("--prior-log=", "--prior-archive=")):
+            argv.append(x)
+    return argv
+
+
+def run_user_scenario(R: pd.DataFrame, RESEARCH: pd.DataFrame, slug: str, snap: Path | None, rules) -> list[str]:
+    """YOUR scenario (scenario.py, DECISIONS #153): the same lines priced again
+    with the user's workload assumptions, beside the board's own numbers, the
+    break-even at each side's price and what each side would return IF the
+    assumptions are right. Written to OUT/scenarios, never recorded."""
+    L = ["", "## Your scenario (experimental)", "",
+         f"**Your assumptions:** {SC.describe(rules)}. These are assumptions, not confidence intervals. Every "
+         "line below is priced again from the same simulation with only those inputs changed: what one player "
+         "gains in targets or carries his teammates give up in proportion, receptions and receiving yards move "
+         "together, and the starting QB's passing yards follow his receivers. The model's chances are not shown "
+         "to be calibrated within 3 points (reports/calibration_bar_v2.md), so a return of a few dollars per $100 "
+         "sits inside that error. Touchdown prices are not adjusted.", ""]
+    if snap is None or not Path(snap).exists():
+        return L + ["Not priced: this run saved no lines to price against."]
+    if R.empty:
+        return L + ["No priced lines to compare."]
+    cmd = [sys.executable, str(Path(__file__).resolve()), *_scenario_argv(), "--scenario-run",
+           "--odds-snapshot", str(snap), "--no-scenarios"]
+    f = OUT / "scenarios" / f"shadow_log_{slug}.csv"
+    f.unlink(missing_ok=True)
+    r = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
+    if r.returncode != 0 or not f.exists():
+        tail = r.stderr.strip().splitlines()[-1][:300] if r.stderr.strip() else "no output"
+        return L + [f"Scenario failed (exit {r.returncode}): {tail}"]
+    S = pd.read_csv(f)
+    f.replace(OUT / "scenarios" / f"shadow_log_{slug}_assume.csv")
+    key = ["book", "market", "player", "line"]
+    base = R[R.market != "player_anytime_td"].drop_duplicates(key)
+    j = base.merge(S[key + ["side", "p_model", "p_push"]].drop_duplicates(key), on=key, how="left",
+                   suffixes=("", "_sc"))
+    named = {x["who"] for x in rules if not x["team"]}
+    teams_named = {x["who"] for x in rules if x["team"]}
+    rows = []
+    for _, x in j.iterrows():
+        if pd.isna(x.get("p_model_sc")):
+            continue
+        o0, u0, _p0 = _sides(x)
+        o1, u1, p1 = _sides(pd.Series({"p_model": x.p_model_sc, "side": x.side_sc, "p_push": x.p_push_sc}))
+        if abs(o1 - o0) < 0.005 and x.player not in named and x.team not in teams_named:
+            continue
+        po, pu = x.get("price_over"), x.get("price_under")
+        ev_o = SC.net_per_100(po, o1, u1) if pd.notna(po) else None
+        ev_u = SC.net_per_100(pu, u1, o1) if pd.notna(pu) else None
+        rr = (RESEARCH[(RESEARCH.player == x.player) & (RESEARCH.market == x.market) & (RESEARCH.line == x.line)
+                       & (RESEARCH.book == x.book)] if len(RESEARCH) else RESEARCH)
+        rows.append(dict(player=x.player, team=x.team, market=x.market, line=float(x.line), book=x.book,
+                         price_over=po, price_under=pu, be_over=RSCH.breakeven(po), be_under=RSCH.breakeven(pu),
+                         over_model=o0, over_scenario=o1, under_scenario=u1, push_scenario=p1,
+                         net_over=ev_o, net_under=ev_u,
+                         pays_if=RSCH.break_even_cell(rr.iloc[0]) if len(rr) else "—",
+                         named=x.player in named))
+    if not rows:
+        return L + ["No line moves by half a point or more under these assumptions."]
+    T = pd.DataFrame(rows)
+    T["move"] = (T.over_scenario - T.over_model).abs()
+    T = T.sort_values(["named", "move"], ascending=[False, False])
+    odds = lambda v: "—" if v is None or pd.isna(v) else (f"+{int(v)}" if v > 0 else f"{int(v)}")
+    pc = lambda v: "—" if v is None or pd.isna(v) else f"{100 * v:.0f}%"
+    money = lambda v: "—" if v is None or pd.isna(v) else f"{v:+.1f}"
+    L += ["| Player | Prop | Line | Price (O / U) | Break-even (O / U) | Over: board / your scenario | "
+          "If your scenario is right, net per $100: Over / Under | Pays at this price if he gets |",
+          "|---|---|---|---|---|---|---|---|"]
+    for _, x in T.iterrows():
+        L.append(f"| {x.player} ({x.team}) | {MARKET_WORDS.get(x.market, x.market)} | {x.line:g} | "
+                 f"O {odds(x.price_over)} / U {odds(x.price_under)} | {pc(x.be_over)} / {pc(x.be_under)} | "
+                 f"{pc(x.over_model)} / {pc(x.over_scenario)} | {money(x.net_over)} / {money(x.net_under)} | "
+                 f"{x.pays_if} |")
+    L += ["", "Lines are listed for the players and teams you named, then any other line whose Over moves by half "
+          "a point or more. 'Pays at this price' is the board's break-even workload: compare it with the "
+          "workload you assumed."]
+    out = {"logged_at_utc": now(), "assumptions": [x["text"] for x in rules], "rules": rules,
+           "lines": T.drop(columns=["move"]).to_dict(orient="records")}
+    (OUT / "scenarios" / f"scenario_{slug}.json").write_text(json.dumps(out, indent=1, default=str) + "\n",
+                                                            encoding="utf-8")
     return L
 
 

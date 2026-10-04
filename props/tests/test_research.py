@@ -75,7 +75,7 @@ def test_the_scorers_research_block_never_draws_from_the_pricing_stream():
     block = src[src.index("# ---------- 8a. research columns"):src.index("# ---------- 8b/9. report")]
     assert "rng" not in block and "random" not in block
     assert "pd.DataFrame(rows)" in block, "research rows come from this run's lines, not the prior-log merge"
-    assert "ASSUME_OUT" in block, "no implied-workload search inside an 'if he's out' scenario run"
+    assert "SCENARIO" in block, "no implied-workload search inside a scenario run ('if he's out' or yours)"
 
 
 def test_backfield_jobs_compare_the_last_game_with_earlier_weeks():
