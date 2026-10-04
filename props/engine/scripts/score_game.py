@@ -1463,7 +1463,10 @@ def main():
                             side=side, p_model=pw, p_push=p_push, p_novig=pn, gap=pw - pn,
                             price=px, ER=er, last_update=mk["last_update"],
                             new_team=bool(pr.new_team), questionable=bool(pr.questionable),
-                            price_over=oo["Over"]["price"], price_under=oo["Under"]["price"]))
+                            price_over=oo["Over"]["price"], price_under=oo["Under"]["price"],
+                            # round 23's factor on his target share, logged so the
+                            # scorecard can grade the calls the rule moved (#145)
+                            snap_react=float(pr.evidence.get("target_share", {}).get("snap_react") or 1.0)))
                 elif mk["key"] == "player_anytime_td":
                     no_price = {o["description"]: o["price"] for o in mk["outcomes"] if o["name"] == "No"}
                     for o in mk["outcomes"]:

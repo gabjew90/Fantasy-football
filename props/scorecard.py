@@ -33,6 +33,7 @@ import journal  # noqa: E402
 import persist  # noqa: E402
 
 try:
+    import numpy as np
     import pandas as pd
 except ImportError:  # pragma: no cover
     print("pandas is required: pip install -r props/requirements.txt", file=sys.stderr)
@@ -173,6 +174,35 @@ def clv_table(season: int) -> pd.DataFrame:
             "tier_dec": dec.get("tier"), "p_model_dec": dec.get("p_model"),
         })
     return pd.DataFrame(paired)
+
+
+def snap_rule_section(df: pd.DataFrame) -> list[str]:
+    """DECISIONS #145: the receiving calls the snap-change rule moved (round 23)
+    against the ones it did not -- the fresh check on its 2024-25 overshoot for
+    receivers whose snaps jumped. `miss` is actual minus the model's mean."""
+    if "snap_react" not in df.columns:
+        return []
+    d = df[df["market"].isin(["player_receptions", "player_reception_yds"])].copy()
+    d["snap_react"] = pd.to_numeric(d["snap_react"], errors="coerce")
+    d = d.dropna(subset=["snap_react"])
+    if d.empty:
+        return []
+    d["moved"] = np.select([d.snap_react > 1.005, d.snap_react < 0.995], ["raised", "lowered"], "not moved")
+    out = ["### The snap-change rule's calls", "",
+           "Receiving calls whose target share the rule raised, lowered, or left alone. If the rule overshoots, "
+           "the raised group's miss runs negative (and the lowered group's positive).", "",
+           "| Market | Rule | Calls | Hit rate | Model said | Book said | Mean miss |", "|---|---|---|---|---|---|---|"]
+    for mk, label in (("player_receptions", "catches"), ("player_reception_yds", "receiving yards")):
+        for grp in ("raised", "lowered", "not moved"):
+            g = d[(d.market == mk) & (d.moved == grp)]
+            if g.empty:
+                continue
+            won = pd.to_numeric(g["won"], errors="coerce")
+            miss = pd.to_numeric(g.get("miss"), errors="coerce")
+            out.append(f"| {label} | {grp} | {len(g)} | {won.mean():.1%} | "
+                       f"{pd.to_numeric(g.p_model, errors='coerce').mean():.1%} | "
+                       f"{pd.to_numeric(g.p_novig, errors='coerce').mean():.1%} | {miss.mean():+.2f} |")
+    return out + ["", "A group needs about 50 calls before its numbers say anything.", ""]
 
 
 def render_sections(df: pd.DataFrame) -> tuple[list[str], list[dict]]:
@@ -374,6 +404,7 @@ def main(argv: list[str] | None = None) -> int:
         out += sections
         csv_rows += rows
         out += render_clv(clv, engine_hash)
+        out += snap_rule_section(group)
         out += blend.blend_section(group)
 
     if args.pool and len(engines) > 1:

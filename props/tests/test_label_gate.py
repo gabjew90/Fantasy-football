@@ -63,3 +63,14 @@ def test_the_report_quotes_the_record_or_says_it_could_not_read_it():
     assert "label gate is OPEN" in SG.gate_sentence(opened)
     assert SG.research_statement(pd.DataFrame({"player": ["A"], "market": ["m"], "line": [1.5]}), shut) \
         .startswith("**1 lines priced.** A research sheet, not a bet list. Graded so far")
+
+
+def test_the_scorecard_grades_the_calls_the_snap_rule_moved():
+    df = pd.DataFrame({"market": ["player_receptions"] * 4 + ["player_rush_yds"],
+                       "snap_react": [1.2, 1.1, 0.8, 1.0, 1.3], "won": [1, 0, 1, 1, 0],
+                       "p_model": [0.6] * 5, "p_novig": [0.5] * 5, "miss": [-1.0, -0.5, 0.5, 0.0, 9.0]})
+    md = "\n".join(scorecard.snap_rule_section(df))
+    assert "| catches | raised | 2 | 50.0% | 60.0% | 50.0% | -0.75 |" in md
+    assert "| catches | lowered | 1 |" in md and "| catches | not moved | 1 |" in md
+    assert "rush" not in md, "rushing calls are not the rule's"
+    assert scorecard.snap_rule_section(df.drop(columns="snap_react")) == [], "records before the field: no section"

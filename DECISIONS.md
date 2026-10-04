@@ -7057,3 +7057,13 @@ only when the whole interval sits above zero; then the scorecard and the
 report say so and bringing labels back is the user's call. At release:
 pooled weeks 2-3, 1,180 calls, weight +0.029 (-0.452, +0.564) -- closed; no
 single pricing model has 300 calls with an estimable weight above zero.
+
+## 2026-10-03 (145) -- the record grades the snap-change rule's own calls
+
+Round 23 (#143) overshot for receivers whose snaps jumped in 2024-25 (-0.38
+catches, post-hoc slice). Every priced row now logs `snap_react` (the factor
+on his target share, 1.0 = not moved) through the shadow log, the record and
+the settled file, and the scorecard adds "The snap-change rule's calls":
+receiving calls the rule raised, lowered or left alone -- hit rate, model,
+book and mean miss. A raised group whose miss runs negative is the overshoot,
+read on fresh 2026 calls from week 4.
