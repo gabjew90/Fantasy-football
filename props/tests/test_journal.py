@@ -187,3 +187,35 @@ def test_the_angle_is_required_at_log_time_and_splits_the_summary(root):
     assert "| role change | 1 | 0 | 0 | — | — | — | — |" in md
     assert "| untagged | 1 |" in md and "| teammate returning |" not in md
     assert "| 4 | A | under 4.5 catches | injury redistribution | -125 |" in md
+
+
+def test_a_scenario_bet_keeps_its_assumption_and_both_chances(root):
+    e = J.make_entry("Woody Marks", "rush_yds", "under", 33.5, -125, team="HOU", season=2026, week=4,
+                     assumption=["Woody Marks: carries=9"], over_board="37%", over_scenario=0.30,
+                     pays_if="Over above 11.2 carries; Under at 9.2 or fewer", **WHY)
+    assert e["assumption"] == "Woody Marks: carries=9" and e["pays_if"].startswith("Over above 11.2")
+    assert e["p_board"] == pytest.approx(0.63) and e["p_scenario"] == pytest.approx(0.70), \
+        "an Under's chance is one minus the Over the table shows"
+    plain = J.make_entry("X", "catches", "over", 3.5, -110, season=2026, week=4, **WHY)
+    assert "assumption" not in plain and "p_scenario" not in plain, "a bet with no scenario carries no fields"
+    with pytest.raises(ValueError, match="needs the --assumption"):
+        J.make_entry("X", "catches", "over", 3.5, -110, season=2026, week=4, over_scenario="60%", **WHY)
+    with pytest.raises(ValueError, match="not adjusted by a scenario"):
+        J.make_entry("X", "td", "yes", None, 150, season=2026, week=4, assumption=["X: targets=8"], **WHY)
+    with pytest.raises(ValueError, match="not a chance"):
+        J.make_entry("X", "catches", "over", 3.5, -110, season=2026, week=4, assumption=["X: targets=8"],
+                     over_scenario="lots", **WHY)
+    e.update(status="graded", won=True, pnl_per_100=80.0, clv_points=0.5)
+    J.write(2026, [e, plain])
+    md = "\n".join(J.summary_md(2026))
+    assert "| 1 | 1 | 63% | 70% | 100% (1 of 1) | 1 of 1 |" in md
+    assert "| Woody Marks: carries=9 (70% vs board 63%) |" in md and md.count("| — |\n") >= 1
+
+
+def test_the_cli_takes_the_scenario_fields(root):
+    rc = J.main(["add", "Woody Marks", "rush_yds", "over", "33.5", "-130", "--team", "HOU", "--season", "2026",
+                 "--week", "4", "--angle", "return", "--change", "a", "--implies", "b", "--fails", "c",
+                 "--assumption", "Woody Marks: carries=14", "--over-board", "37%", "--over-scenario", "70%",
+                 "--pays-if", "Over above 11.2 carries; Under at 9.2 or fewer"])
+    r = J.read(2026)[0]
+    assert rc == 0 and r["p_scenario"] == pytest.approx(0.70) and r["p_board"] == pytest.approx(0.37)

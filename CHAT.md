@@ -262,6 +262,11 @@ it is chosen now, never after the game):
 python props/journal.py add "<player>" <market> <over|under> <line> <price> --team <TEAM> --angle <injury|role|return|other> --change "<the verified change>" --implies "<the workload the line implies vs what he gets>" --fails "<how it fails>"
 ```
 
+A bet that came from a "Your scenario" table also carries the assumption, the
+two Over chances that table shows for its line and the break-even cell, copied
+as shown (never recomputed): `--assumption "<the --assume rule>" --over-board
+<board %> --over-scenario <scenario %> --pays-if "<the cell>"`.
+
 An anytime-TD bet has no line: `python props/journal.py add "<player>" td <yes|no> <price> --team <TEAM> --angle ... --change ... --implies ... --fails ...`. The engine contract's "the
 reply is slate_summary reproduced in full" is for a request for the slate
 as a whole, and so is its full "prop guide" structure for one game:

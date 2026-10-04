@@ -7183,3 +7183,15 @@ by the user.
   assumption plus the break-even workload covers the same ground.
 - Touchdowns are not adjusted: anytime_td_v1 has not been through a harness
   test, so TD stays evidence-only.
+
+## 2026-10-03 (154) -- scenario bets carry their assumption in the journal
+
+- `journal add` takes --assumption (the --assume rule), --over-board and
+  --over-scenario (the two Over chances the scenario table shows; the bet's
+  side is derived, a whole-line push ignored) and --pays-if (the break-even
+  cell). A scenario chance without its assumption is refused; touchdowns
+  take none.
+- The summary adds "Your scenarios": what the board said, what your
+  scenario said, the win rate and late-line value for those bets. If the
+  adjustments add information, the win rate lands nearer the scenario's
+  number than the board's -- about 100 graded bets to tell.
