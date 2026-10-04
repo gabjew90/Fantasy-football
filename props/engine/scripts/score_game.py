@@ -1734,7 +1734,13 @@ def main():
     BACK_NOTE = {}
     for _, m_ in M.iterrows():
         pri_ = pri_players.loc[m_.gsis_id] if m_.gsis_id in pri_players.index else None
-        if pri_ is None or not pd.notna(pri_.target_share) or float(pri_.target_share) < 0.15:
+        # a KEY teammate: 15%+ of the targets OR the carries last season, or this
+        # season in the weeks he played (a back who returns matters too)
+        key_ts = [float(v) for v in ([] if pri_ is None else [pri_.get("target_share")]) if pd.notna(v)]
+        key_rs = [float(v) for v in ([] if pri_ is None else [pri_.get("rush_share")]) if pd.notna(v)]
+        s_ts = RSCH.role_share(_tg, m_.gsis_id, m_.team)
+        s_rs = RSCH.role_share(_cr, m_.gsis_id, m_.team)
+        if not (max(key_ts + [s_ts or 0]) >= 0.15 or max(key_rs + [s_rs or 0]) >= 0.15):
             continue
         # BACK means he missed the game just played and plays today: a teammate
         # who missed week 2 but played last week is not returning (DECISIONS #157)
