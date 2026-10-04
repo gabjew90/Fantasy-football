@@ -250,13 +250,21 @@ def test_a_power_play_is_one_all_or_nothing_entry_with_graded_legs(root):
     rows[1].update(won=True)
     J.write(2026, rows)
     assert "| 2 / 2 | won | +10.00 |" in "\n".join(J.summary_md(2026))
+    assert all(r["stake"] == 1.0 for r in rows), "a leg is one unit in the record; the dollars are the entry's"
+    rows[1].update(status="void", won=None)
+    J.write(2026, rows)
+    assert "| check (a leg voided or needs a box score) | — |" in "\n".join(J.summary_md(2026))
+    rows[0].update(won=False)
+    J.write(2026, rows)
+    assert "| lost | -5.00 |" in "\n".join(J.summary_md(2026)), "a lost leg loses the entry, void or not"
 
 
 def test_the_cli_logs_an_entry(root):
     rc = J.main(["entry", "--stake", "5", "--payout", "100", "--angle", "role", "--why", "Houston redistributes",
                  "--season", "2026", "--week", "4", "--leg", "Dalton Schultz|rec_yds|under|40.5|HOU|return",
-                 "--leg", "CeeDee Lamb|td|yes||DAL"])
+                 "--leg", "CeeDee Lamb|td|yes||DAL", "--leg", "Drake London|td|yes|"])
     rows = J.read(2026)
-    assert rc == 0 and len(rows) == 2 and rows[1]["line"] is None and rows[1]["market"] == "player_anytime_td"
+    assert rc == 0 and len(rows) == 3 and rows[1]["line"] is None and rows[1]["market"] == "player_anytime_td"
+    assert rows[2]["team"] is None, "the team is optional on a leg"
     assert J.main(["entry", "--stake", "5", "--payout", "100", "--angle", "role", "--why", "x", "--season", "2026",
                    "--week", "4", "--leg", "bad leg"]) == 2

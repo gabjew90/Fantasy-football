@@ -375,7 +375,7 @@ def make_power_play(legs, *, stake: float, payout: float, angle: str, why: str, 
         leg_angle = (leg[5] if len(leg) > 5 and leg[5] else angle)
         r = make_entry(player, market, side, line, price, change=why, implies="(entry leg)",
                        fails="any leg misses: the whole entry loses", angle=leg_angle, team=team,
-                       stake=stake / len(legs), season=season, week=week, now=now)
+                       stake=1.0, season=season, week=week, now=now)     # a leg is one unit; the dollars are the entry's
         r.update(entry_id=eid, entry_legs=len(legs), entry_stake=float(stake), entry_payout=float(payout),
                  after_kickoff=bool(after_kickoff))
         rows.append(r)
@@ -585,12 +585,12 @@ def main(argv: list[str] | None = None) -> int:
         legs = []
         for spec in args.leg:
             parts = [x.strip() for x in spec.split("|")]
-            if len(parts) < 5 or parts[5:] and parts[5] not in ANGLES:
-                print(f"not logged: leg '{spec}' -- write it as 'Player|market|side|line|TEAM[|angle]'",
+            if len(parts) < 4 or parts[5:] and parts[5] not in ANGLES:
+                print(f"not logged: leg '{spec}' -- write it as 'Player|market|side|line[|TEAM[|angle]]'",
                       file=sys.stderr)
                 return 2
-            legs.append((parts[0], parts[1], parts[2], parts[3] or None, parts[4] or None,
-                         parts[5] if len(parts) > 5 else None))
+            parts += [""] * (6 - len(parts))
+            legs.append((parts[0], parts[1], parts[2], parts[3] or None, parts[4] or None, parts[5] or None))
         try:
             rows_ = make_power_play(legs, stake=args.stake, payout=args.payout, angle=args.angle, why=args.why,
                                     season=season, week=args.week or current_week(season),
