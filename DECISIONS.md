@@ -6955,3 +6955,45 @@ check that accounts for its own noise -- e.g. a band fails only when its
 interval excludes the target -- would be a change to the bar, which is the
 user's decision, not a model fix.
 
+
+## 2026-10-03 (142) -- the props board becomes a research sheet; the bet journal
+
+The user chose betting as the tool's purpose and asked what the real problem
+was. The settled record (weeks 2-3, 1,180 yardage/catch calls, engines before
+props-v1.28): a logistic blend gives the model's number a weight of +0.02
+(95% -0.47 to +0.50) beside the book's; the book alone predicted week 3 better
+than the model (log loss 0.694 vs 0.723); STRONG calls won 45.3% (n=296) at
+prices needing ~56%. The board ranked lines by model-book disagreement, which
+ranks them by how likely the model is missing something. The model was
+validated against a naive baseline, never against the market.
+
+What changed (props-v1.29, nfl-v1.31; plan docs/plans/2026-10-03-props-research-board.md):
+- **No bet labels anywhere the user reads.** STRONG/MODERATE/LEAN/WEAK, EV,
+  Kelly, stakes, "take UNDER if", game-script theses, the must-win pick and the
+  cross-game TD parlays leave the report, slate summary, `props ask` and chat
+  (the user chose to remove the picks too). Their CSVs are still written and
+  the shadow log keeps `tier`, so the scorecard keeps measuring the model
+  against the book; labels return only when the record shows the model earning
+  weight beside the book for the current engine version.
+- **Research columns** (scripts/research.py, own generators; on pinned odds
+  every p_model, p_novig, model_mean and tier is identical to v1.28): both
+  prices, projection with its 10th-90th range, the Over by model and by book,
+  **line implies** (targets or carries per game at which the line is a fair
+  50/50, by bisection on his share with common random numbers), last game's
+  snaps and share against his earlier weeks, and flags (teammate out, a key
+  teammate back from missed weeks, new team, Questionable).
+- **Receiving role-shift flag**, pre-registered and checked on 2022-25
+  (reports/role_shift_check.md): snaps up 15+ points with targets lagging beat
+  the model's next-week catches by +0.51 (2022-23) / +0.28 (2024-25, CI
+  +0.09 to +0.48); snaps down with targets holding missed by -0.58 / -0.55.
+  Rushing flags had too few rows and are not shown.
+- **Bet journal** (props/journal.py, props/journal/<season>.jsonl): every bet
+  with the verified change, the workload the line implies, how it fails, and
+  the price; graded by the Tuesday settle run with settle's own rules, its own
+  scorecard section (record vs break-even), never pooled with the model's
+  record. A player absent from the week's stats goes to 'check' (did not play
+  and played-for-zero look the same in nflverse's weekly file and the book pays
+  them differently) and is settled with `journal resolve`.
+
+Owed: the model's own blind spot the flag exposed (it reacts to snap changes
+late) is a candidate engine change, measured the usual way before it ships.
