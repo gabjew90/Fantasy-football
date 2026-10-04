@@ -246,8 +246,17 @@ For a narrow question, run only what it needs:
   table in one file, in that order -- and prints it: for "the props for these games", reproduce it
   in full (never trim rows), then a short read of what stands out per game. A **bold** prop is "worth a look"
   (DECISIONS #156): a role story plus last game's workload already past that side's break-even.
-  Never call a bold line a bet. Narrate the bold lines game by game, analytically, in plain
-  English -- interpret, do not recite the row's numbers back:
+  **Every game gets a short preview narrative**, in the board's order, BEFORE its bold lines:
+  read the game, do not recite the table. Start from the context line under its heading --
+  who is favoured and the implied points (the script: a big favourite runs late, an underdog
+  throws; a low total with a backup QB plays conservative), and each team's "last week was a
+  preview / differs" note. Then each side's situation: the role changes that matter (who took
+  over a backfield, whose target share jumped or collapsed, a returning star and who it takes
+  from), where the model and the book disagree AND WHY (a stale prior on a new role, the
+  model's known low bias on QB passing yards, a game script the model does not price), and
+  what to watch. A game with nothing to find says so in a sentence. Never call a line a bet.
+  Then narrate the bold lines, analytically, in plain English -- interpret, do not recite the
+  row's numbers back:
   1. **The story and its direction**: who is out or back, whose role moved, and why that points
      Over or Under for THIS player (a running back's real story is often a teammate in the
      backfield, not the receiver the flag names).

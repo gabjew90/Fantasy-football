@@ -7235,3 +7235,14 @@ by the user.
 - SKILL.md carries the narration for bold lines (story, transfer, price,
   line, failure, then a ranking), from the 2026 week-4 read the user asked
   the skill to capture.
+
+## 2026-10-04 (158) -- every game gets a preview narrative
+
+- The slate board opens each game with a context line: the favourite, each
+  team's implied points from the total and spread, and each side's "last week
+  was a preview / differs" note.
+- SKILL.md and CHAT.md ask for a short preview narrative per game before its
+  bold lines: the script, each side's role changes, where the model and the
+  book disagree and why (stale priors, the QB-passing low bias, game script),
+  what to watch -- interpretation, not a recital of the table. The user asked
+  for it on the 2026 week-4 slate.

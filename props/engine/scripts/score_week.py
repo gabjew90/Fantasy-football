@@ -85,6 +85,27 @@ def _num(v):
     return None if x != x else x
 
 
+def game_context(game, spread, total, previews) -> str:
+    """The line under a game's heading that a narrative starts from: who is
+    favoured, each team's implied points (total and spread), and whether last
+    week was a preview for each side (research.preview_note)."""
+    away, home = game.split("@")
+    bits = []
+    t = _num(total)
+    m = _re.fullmatch(r"\s*([A-Z]{2,3})\s*([+-]?\d+(?:\.\d+)?)\s*", str(spread or ""))
+    if m:
+        team, pts = m.group(1), float(m.group(2))
+        fav, dog = (team, away if team == home else home) if pts < 0 else (away if team == home else home, team)
+        bits.append("pick'em" if pts == 0 else f"{fav} by {abs(pts):g}")
+        if t is not None:
+            hi, lo = t / 2 + abs(pts) / 2, t / 2 - abs(pts) / 2
+            bits.append(f"implied points {fav} {hi:.1f}, {dog} {lo:.1f}")
+    for tm in (away, home):
+        if previews.get(tm):
+            bits.append(f"{tm}: {previews[tm]}")
+    return ("*" + " · ".join(bits) + "*") if bits else ""
+
+
 def slate_board(RS, runs, sort="kickoff", overs_only=False) -> list[str]:
     """Every game's full research table in one place (the chat reply for "the
     props for these games"), games ordered by kickoff or by game total, highest
@@ -111,8 +132,12 @@ def slate_board(RS, runs, sort="kickoff", overs_only=False) -> list[str]:
     for r in games:
         G = RS[RS.game == r["game"]].sort_values(["team", "player", "market", "line"])
         tot = f"total {r['total']}" if r.get("total") else "total —"
-        out += ["", f"## {r['game'].replace('@', ' @ ')} — {tot}, {r['kickoff_utc']} ({len(G)} lines)", "",
-                *head, "|---|---|---|---|---|---|---|---|---|---|"]
+        pv = ({tm: x["preview"].dropna().iloc[0] for tm, x in G.groupby("team") if x["preview"].notna().any()}
+              if "preview" in G.columns else {})
+        ctx = game_context(r["game"], r.get("spread"), r.get("total"), pv)
+        out += ["", f"## {r['game'].replace('@', ' @ ')} — {tot}, {r['kickoff_utc']} ({len(G)} lines)", ""]
+        out += [ctx, ""] if ctx else []
+        out += [*head, "|---|---|---|---|---|---|---|---|---|---|"]
         for _, x in G.iterrows():
             rush = x.market == "player_rush_yds"
             if x.market == "player_pass_yds" or _num(x.get("snap")) is None:

@@ -305,3 +305,14 @@ def test_last_game_shows_the_count_beside_the_share():
     assert "targets 19% of the team's, 6 (earlier 25%, 8.2 a game)" in SG.usage_line(u)
     old = {k: v for k, v in u.items() if k not in ("tn", "tn_base", "cn", "cn_base")}
     assert SG.usage_line(old, short=True) == "wk3: snaps 93% (72%), targets 19% (25%)", "older files: shares only"
+
+
+def test_each_game_on_the_board_opens_with_its_context_line():
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "engine" / "scripts"))
+    import score_week as W
+    pv = {"DAL": "last week was a preview: same QB, same key absences", "HOU": "last week differs: Nico Collins back"}
+    assert W.game_context("DAL@HOU", "HOU -3", "48.5", pv) == (
+        "*HOU by 3 · implied points HOU 25.8, DAL 22.8 · DAL: last week was a preview: same QB, same key absences"
+        " · HOU: last week differs: Nico Collins back*")
+    assert W.game_context("ARI@NYG", "NYG +2.5", "44.5", {}) == "*ARI by 2.5 · implied points ARI 23.5, NYG 21.0*"
+    assert W.game_context("A@B", "", "", {}) == ""
