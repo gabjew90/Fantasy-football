@@ -9,14 +9,14 @@ what the question needs:
 
   player   every line priced for one player, with the engine's read on him
   line     the engine's probability at any line the user names (the ladder)
-  best     the game's card in the engine's own order, or the slate's
+  best     the research rows for a game (role-shift flags first), or the slate's leads
   matchup  the game frame: spread, total, implied points, weather, designations,
            each team's projected volume
 
 A game is priced once and reused for TTL_MIN minutes (lines move; `--fresh`
 re-prices). Every answer carries the snapshot time and the engine's honesty
-lines that apply to it -- no market is validated against posted lines, so no
-row is a bet; anytime TD gets no fair odds; a Questionable player is priced as
+lines that apply to it -- no row carries a bet label (the model has not shown
+it adds anything beside the book's price); anytime TD gets no fair odds; a Questionable player is priced as
 playing -- because the engine's contract travels with its numbers, not with a
 report.
 
@@ -55,9 +55,10 @@ STAT_ALIASES = {"catches": "catches", "receptions": "catches", "rec": "catches",
                 "rush yds": "rush yds", "rushing yards": "rush yds", "rushing": "rush yds",
                 "pass yds": "pass yds", "passing yards": "pass yds", "passing": "pass yds"}
 SLEEPER_TO_NFLVERSE = {"LAR": "LA"}
-UNVALIDATED = ("No market is tested against posted sportsbook lines, so no row is eligible to bet and a "
-               "positive EV is the model's opinion, not an edge. (Catches and receiving yards ARE calibrated "
-               "on 2022-25 outcomes -- a model 85% has won about 84-85%; rushing yards nearly so, one "
+UNVALIDATED = ("No bet labels: through week 3 the model's numbers added nothing beside the book's price (a blend "
+               "fit gave the model a weight of +0.02, 95% -0.47 to +0.50), so a gap between them is information, "
+               "not an edge -- and a big gap was usually the model missing something. (Catches and receiving "
+               "yards ARE calibrated on 2022-25 outcomes -- a model 85% has won about 84-85%; rushing yards nearly so, one "
                "probability band 3.2 points off against a 3-point limit -- so they are not guesses; they are "
                "untested against the book. QB passing yards beat the naive baseline in both test seasons but two "
                "probability bands miss by under a point, so they do not fully pass that test yet.)")
@@ -197,7 +198,7 @@ def load(run: dict) -> dict:
     d, s = run["dir"], run["slug"]
     out = {k: _csv(d, f"{k}_{s}.csv") for k in
            ("shadow_log", "betting_card", "bet_card", "td_board", "ladder", "player_params", "fantasy_points",
-            "exposure")}
+            "exposure", "research")}
     rep = d / f"report_{s}.md"
     out["report"] = rep.read_text(encoding="utf-8", errors="replace") if rep.exists() else ""
     out["scenarios"] = {p.stem.rsplit("_out_", 1)[1]: _safe_csv(p)
@@ -245,7 +246,7 @@ def player_section(report: str, name: str) -> list[str]:
 
 
 def headline(report: str) -> str:
-    """The report's first bold line: how many rows have positive EV, and that none is eligible."""
+    """The report's first bold line: how many lines were priced, and that none carries a bet label."""
     return next((ln for ln in report.splitlines() if ln.startswith("**")), "")
 
 
@@ -357,23 +358,58 @@ def _record(run: dict, what: str) -> dict:
                                       "age_h": round((run.get("age_min") or 0) / 60, 2), "detail": what}]}}
 
 
-def _line_row(r, bc: pd.DataFrame | None) -> dict:
+def _line_row(r, rs: pd.DataFrame | None) -> dict:
     lab = LABEL.get(r.market, r.market)
-    out = {"market": lab, "book": r.book, "line": None if pd.isna(r.line) else float(r.line), "side": r.side,
-           "price": int(r.price) if not pd.isna(r.price) else None,
+    out = {"market": lab, "book": r.book, "line": None if pd.isna(r.line) else float(r.line),
            "p_model": round(float(r.p_model), 3), "p_novig_same_side": round(float(r.p_novig), 3),
-           "gap_pts": round(100 * float(r.gap), 1), "ev_per_100": round(100 * float(r.ER), 1),
-           "tier": None if pd.isna(r.tier) else r.tier, "flag": None if pd.isna(r.flag) else r.flag,
-           "decision": r.decision, "eligible": bool(r.eligible), "why_not": r.ineligible_because,
-           "model": r.model_state}
+           "side": r.side, "price": int(r.price) if not pd.isna(r.price) else None,
+           "flag": None if pd.isna(r.flag) else r.flag, "model": r.model_state}
     if r.market == "player_anytime_td":
         out.update(td_model=r.td_model, p_market=_f(r.p_market), p_blend=_f(r.p_blend), blend_w=_f(r.blend_w))
-    if bc is not None:
-        b = bc[(bc.player == r.player) & (bc.prop == lab) & (bc.book == r.book)]
+    elif rs is not None and len(rs):
+        b = rs[(rs.player == r.player) & (rs.market == r.market) & (rs.line == r.line) & (rs.book == r.book)]
         if not b.empty:
             b = b.iloc[0]
-            out.update(call=b.call, median=_f(b.our_median), under_from=_f(b.under_at), over_from=_f(b.over_at))
+            out.update(research_fields(b))
     return out
+
+
+def research_fields(b) -> dict:
+    """One research row (research_*.csv) as the answer's fields."""
+    get = lambda k: b[k] if k in b.index else None
+    return {"price_over": None if pd.isna(get("price_over")) else int(get("price_over")),
+            "price_under": None if pd.isna(get("price_under")) else int(get("price_under")),
+            "median": _f(get("median")), "p10": _f(get("p10")), "p90": _f(get("p90")),
+            "p_over_model": _f(get("p_over_model")), "p_over_book": _f(get("p_over_book")),
+            "implied": _f(get("implied")), "projected": _f(get("projected")),
+            "unit": get("unit") if isinstance(get("unit"), str) else None,
+            "last_game": {k: _f(get(k)) for k in ("snap", "snap_base", "ts", "ts_base", "cs", "cs_base")},
+            "flags": get("flags") if isinstance(get("flags"), str) else ""}
+
+
+def research_text(x: dict, label: str, book: str = "", line=None) -> str:
+    """The research fields as one sentence: prices, projection, the two Over
+    chances, what the line implies, flags."""
+    def odds(a):
+        return "—" if a is None else (f"+{a}" if a > 0 else f"{a}")
+    ln = "" if line is None else f"{line:g} "
+    bits = [f"{ln}{label}" + (f" at {book}" if book else "")
+            + f" (O {odds(x.get('price_over'))} / U {odds(x.get('price_under'))})"]
+    if x.get("median") is not None:
+        bits.append(f"our projection {x['median']:.0f} ({x['p10']:.0f} to {x['p90']:.0f})")
+    if x.get("p_over_model") is not None:
+        bits.append(f"Over {x['p_over_model']:.0%} model / {x['p_over_book']:.0%} book")
+    if x.get("implied") is not None:
+        bits.append(f"the line implies {x['implied']:.1f} {x.get('unit') or ''} (we project {x['projected']:.1f})")
+    lg = x.get("last_game") or {}
+    if lg.get("snap") is not None:
+        share = ("carries", lg.get("cs"), lg.get("cs_base")) if label == "rush yds" else ("targets", lg.get("ts"), lg.get("ts_base"))
+        pc = lambda v: "—" if v is None else f"{100*v:.0f}%"
+        bits.append(f"last game snaps {pc(lg['snap'])} (earlier {pc(lg.get('snap_base'))}), {share[0]} {pc(share[1])} "
+                    f"(earlier {pc(share[2])})")
+    if x.get("flags"):
+        bits.append(f"flags: {x['flags']}")
+    return "; ".join(bits)
 
 
 def _f(v):
@@ -385,7 +421,7 @@ def player(name: str, *, season: int | None = None, week: int | None = None, gam
     season, week = season_week(season, week)
     run, files, full = locate(name, season, week, game, fresh)
     sl, pp, fp = files["shadow_log"], files["player_params"], files["fantasy_points"]
-    rows = [] if sl is None else [_line_row(r, files["betting_card"]) for r in sl[sl.player == full].itertuples()]
+    rows = [] if sl is None else [_line_row(r, files["research"]) for r in sl[sl.player == full].itertuples()]
     role = {}
     if pp is not None and not pp[pp.name == full].empty:
         x = pp[pp.name == full].iloc[0]
@@ -428,9 +464,10 @@ def player(name: str, *, season: int | None = None, week: int | None = None, gam
     if role.get("questionable"):
         rules.append(f"{full} is Questionable: every number is priced as if he plays his normal role, and his "
                      "props void if he sits. Neither case is weighted by how likely he is to play.")
-    if any((r.get("tier") or "").startswith("WEAK") or "likely holds info" in str(r.get("flag") or "") for r in rows):
-        rules.append("A WEAK row or a 'market likely holds info' flag means the gap is more likely the book "
-                     "knowing something (a role or injury) than an edge.")
+    if any("role up" in (r.get("flags") or "") or "role down" in (r.get("flags") or "") for r in rows):
+        rules.append("Receiving role-shift flag: last game his snaps moved while his targets had not caught up. In "
+                     "2022-25 that pattern beat (role up) or missed (role down) the model's next-week catches "
+                     "projection by about half a catch; whether the book also reacts late is untested.")
     data = {"player": full, "game": run["slug"], "when": _when(run, files), "role": role, "fantasy_points": pts,
             "lines": rows, "ladder": lad, "if_teammate_out": moves, "engine_on_him": text_role, "rules": rules}
     L = [f"{frame(files['report'])['title']} -- {_when(run, files)}", ""]
@@ -445,14 +482,13 @@ def player(name: str, *, season: int | None = None, week: int | None = None, gam
             if r["market"] == "anytime TD":
                 L.append(f"- anytime TD at {r['book']} {r['price']:+d}: model {r['p_model']:.0%}, market "
                          f"{(r.get('p_market') or 0):.0%}, blend {(r.get('p_blend') or 0):.0%} "
-                         f"({r.get('td_model')}); {r['decision']}" + (f"; {r['flag']}" if r.get("flag") else "") + ".")
+                         f"({r.get('td_model')})" + (f"; {r['flag']}" if r.get("flag") else "") + ".")
                 continue
-            call = f" Engine's call: {r['call']}" + (f" (under from {r['under_from']:g}, over from {r['over_from']:g}; its median {r['median']:.1f})"
-                                                      if r.get("under_from") is not None else "") + "." if r.get("call") else ""
-            L.append(f"- {r['side']} {r['line']:g} {r['market']} at {r['book']} {r['price']:+d}: model {r['p_model']:.0%}, "
-                     f"book {r['p_novig_same_side']:.0%} (no-vig, same side), gap {r['gap_pts']:+.0f} pts, "
-                     f"EV {r['ev_per_100']:+.0f} per $100" + (f", tier {r['tier']}" if r.get("tier") else "")
-                     + (f"; {r['flag']}" if r.get("flag") else "") + "." + call)
+            if r.get("p_over_model") is not None:
+                L.append("- " + research_text(r, r["market"], r["book"], r["line"]) + ".")
+            else:
+                L.append(f"- {r['line']:g} {r['market']} at {r['book']}: model {r['p_model']:.0%} vs book "
+                         f"{r['p_novig_same_side']:.0%} on the {r['side']}" + (f"; {r['flag']}" if r.get("flag") else "") + ".")
     else:
         L.append("No book posted a line for him in this run.")
     if moves:
@@ -529,35 +565,28 @@ def line(name: str, stat: str, value: float, *, season: int | None = None, week:
 def best(game: str | None = None, *, slate: bool = False, market: str | None = None, n: int = 8,
          survival: bool = False, season: int | None = None, week: int | None = None,
          fresh: bool = False) -> AskResult:
-    """The card in the engine's own order (tier, then backtested market, then
-    EV) -- never re-sorted here. For a game: its bet card and TD board. For the
-    slate: slate_card, or with --survival the engine's one must-win pick per game."""
+    """Research rows, never a bet list. For a game: every priced line with the
+    receiving role-shift flags first, then the TD board. For the slate: the
+    leads across games (slate_research), flagged rows first."""
+    if survival:
+        raise AskError("the must-win pick is off: no picks until the record shows the model adds something "
+                       "beside the book's price (DECISIONS #142). `props best --slate` gives the research leads.")
     season, week = season_week(season, week)
     mk = None if not market else STAT_ALIASES.get(" ".join(market.lower().replace("_", " ").split()),
                                                   "anytime TD" if "td" in market.lower() else market)
-    if slate or survival:
+    if slate:
         run = price_slate(season, week, fresh=fresh)
-        name = (f"slate_survival_{season}_wk{week:02d}.csv" if survival else f"slate_card_{season}_wk{week:02d}.csv")
-        C = _csv(run["dir"], name)
+        C = _csv(run["dir"], f"slate_research_{season}_wk{week:02d}.csv")
         if C is None or C.empty:
-            raise AskError(f"the slate run wrote no {'survival picks' if survival else 'card rows'}")
+            raise AskError("the slate run wrote no research rows")
+        C = _flagged_first(C)
         if mk:
-            # the market column: a survival row's 'prop' is "Under 2.5 catches"
-            C = C[C["market"].map(LABEL) == mk] if "market" in C else C[C["prop"] == mk]
+            C = C[C["market"].map(LABEL) == mk]
         C = C.head(n)
-        summ = run["dir"] / f"slate_summary_{season}_wk{week:02d}.md"
-        # the engine's slate-wide single pick heads a survival answer; a card
-        # answer has no one-line headline of its own
-        head = next((ln for ln in (summ.read_text(encoding="utf-8").splitlines() if summ.exists() else [])
-                     if ln.startswith("**Single pick")), "") if survival else ""
-        data = {"scope": "slate", "survival": survival, "rows": C.to_dict("records"), "headline": head}
+        data = {"scope": "slate", "rows": C.to_dict("records")}
         L = [f"{season} week {week} slate -- run {run['age_min']:.0f} min old"
-             + ("" if run["ran"] else "; `--fresh` re-prices every game (minutes)")] + ([head] if head else []) + [""]
-        L += [_row_text(r) for r in C.to_dict("records")] or ["- no rows" + (f" for {mk}" if mk else "")]
-        if survival:
-            L += ["", "Rule: a must-win pick maximises P(win) at a juiced price -- bad EV on its own; Sleeper needs "
-                      "2+ legs; an alternate line two units past the median beats any posted line for this "
-                      "objective (quote the ladder); the 90%+ tail ran ~4 points optimistic in 2025."]
+             + ("" if run["ran"] else "; `--fresh` re-prices every game (minutes)"), ""]
+        L += [_research_row_text(r) for r in C.to_dict("records")] or ["- no rows" + (f" for {mk}" if mk else "")]
         L += [f"Rule: {UNVALIDATED}"]
         return AskResult("\n".join(L) + "\n", data, _record(dict(run, slug="slate"), "props best slate"))
     if not game:
@@ -565,44 +594,39 @@ def best(game: str | None = None, *, slate: bool = False, market: str | None = N
     away, home = parse_game(game)
     run = price_game(season, week, away, home, fresh=fresh)
     files = load(run)
-    bc, td = files["bet_card"], files["td_board"]
-    rows = [] if bc is None else bc[(bc.prop == mk) if mk else bc.prop.notna()].head(n).to_dict("records")
+    rs, td = files["research"], files["td_board"]
+    if rs is not None and mk:
+        rs = rs[rs.market.map(LABEL) == mk]
+    rows = [] if rs is None else _flagged_first(rs).head(n).to_dict("records")
     tds = [] if (td is None or (mk and mk != "anytime TD")) else td.head(n).to_dict("records")
     data = {"scope": "game", "game": run["slug"], "when": _when(run, files), "headline": headline(files["report"]),
-            "card": rows, "td_board": tds}
+            "research": rows, "td_board": tds}
     L = [f"{frame(files['report'])['title']} -- {_when(run, files)}", headline(files["report"]), ""]
-    L += ["Card (the engine's order):"] + ([_row_text(r) for r in rows] or ["- no card rows"])
+    L += ["Research rows (receiving role-shift flags first):"] + ([_research_row_text(r) for r in rows]
+                                                                 or ["- no priced lines"])
     if tds:
         L += ["", "Anytime TD board:"] + [
             f"- {r['player']} ({r['team']}) {r['book']} {int(r['price']):+d}: model {r['p_model']:.0%}, market "
-            f"{r['p_market']:.0%}, blend {r['p_blend']:.0%}; {r['decision']}"
+            f"{r['p_market']:.0%}, blend {r['p_blend']:.0%}"
             + (f"; {r['flag']}" if isinstance(r.get("flag"), str) else "") for r in tds]
         L += [f"Rule: {TD_RULE}"]
     L += [f"Rule: {UNVALIDATED}"]
     return AskResult("\n".join(L) + "\n", data, _record(run, f"props best {away}@{home}"))
 
 
-def _row_text(r: dict) -> str:
-    def g(k, d=None):
-        v = r.get(k, d)
-        return d if v is None or (isinstance(v, float) and pd.isna(v)) else v
-    # a card row has side, line and prop apart; a survival row carries them in
-    # one 'prop' string ("Under 2.5 catches")
-    what = (f"{g('side')} {g('line'):g} {g('prop')}" if g("side") is not None and g("line") is not None
-            else str(g("prop", g("market", ""))))
-    tier = str(g("tier", "") or "").split(" ")[0]
-    game = f" [{g('game')}]" if g("game") else ""
-    parts = [f"- {tier + ' ' if tier else ''}{g('player')} ({g('team')}){game}: {what} at {g('book', '')} "
-             f"{int(g('price', 0)):+d}"]
-    if g("model_p") is not None:
-        parts.append(f"model {float(g('model_p')):.0%} vs book {float(g('novig_p', 0)):.0%}, "
-                     f"edge {float(g('edge_pts', 0)):+.0f} pts, EV {float(g('ev_per_100', 0)):+.0f}/$100")
-    elif g("p_model") is not None:
-        parts.append(f"model {float(g('p_model')):.0%}" + (f", book {float(g('p_novig')):.0%}" if g("p_novig") is not None else ""))
-    for k in ("rule", "note", "correlated_with"):
-        if g(k):
-            parts.append(str(g(k)))
-    return "; ".join(parts)
+def _flagged_first(R: pd.DataFrame) -> pd.DataFrame:
+    """Research rows with the receiving role-shift flags first, then by team and player."""
+    fl = R["flags"].fillna("") if "flags" in R else pd.Series("", index=R.index)
+    return (R.assign(_f=(~fl.str.contains("role up|role down")).astype(int))
+             .sort_values(["_f", "team", "player", "market"]).drop(columns="_f"))
+
+
+def _research_row_text(r: dict) -> str:
+    """One research row (a dict from research_*.csv) as a line of text."""
+    x = research_fields(pd.Series(r))
+    game = f" [{r['game']}]" if r.get("game") else ""
+    return f"- {r['player']} ({r['team']}){game}: " + research_text(x, LABEL.get(r["market"], r["market"]),
+                                                                    r.get("book", ""), r.get("line"))
 
 
 def matchup(game: str, *, season: int | None = None, week: int | None = None, fresh: bool = False) -> AskResult:

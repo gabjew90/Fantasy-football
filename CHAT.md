@@ -224,18 +224,33 @@ print.
 ## Props
 
 The props engine's own contract governs the SUBSTANCE of a props answer --
-markets, tiers, the edge rule, the credential order, the survival pick, and
-its honesty rules (no row with positive expected value is said plainly; the
-model is not validated against sportsbooks). The VOICE is this file's.
+markets, the research table, the credential order, and its honesty rules.
+The board is a RESEARCH SHEET, not a bet list (DECISIONS #142): through week 3
+the model's numbers added nothing beside the book's price, and its STRONG
+calls won 45%. So no answer calls a line a play, a lean, an edge or a value,
+and none quotes EV, Kelly or a stake. What a props answer gives instead: the
+line and both prices, our projection, the Over by the model and by the book,
+what the line implies (the targets or carries at which it is a fair 50/50,
+next to what he has been getting), last game's usage, and the flags. The
+VOICE is this file's.
 
 A narrower question ("is the Kelce over any good?", "chance he gets 60
 yards?", "best bet in this game?") goes to the question tools, and gets a
 direct answer in the same conversational voice as a fantasy answer. They
 carry the engine's rules with their numbers (the `Rule:` lines), so the
-engine's contract below is not needed for them. That includes a narrow
-SLATE question -- the best play this week, a must-win pick, the top catches
-unders: `props best --slate` answers it, its rows already in the engine's
-order (never re-sort or re-rank them yourself). The engine contract's "the
+engine's contract below is not needed for them. A "best bet" or "must-win
+pick" question gets no pick: say why in a sentence, then give `props best`
+(the research rows, role-shift flags first) or `props best --slate` (the
+slate's leads), in the engine's order (never re-sort or re-rank them
+yourself).
+
+**Bets go in the journal.** When the user says they bet a prop, chat cannot
+write it (chat is read-only); give them one line to paste into a Claude Code
+session, with the four checklist answers filled from the conversation:
+
+```text
+journal add "<player>" <market> <over|under> <line> <price> --change "<the verified change>" --implies "<the workload the line implies vs what he gets>" --fails "<how it fails>"
+``` The engine contract's "the
 reply is slate_summary reproduced in full" is for a request for the slate
 as a whole, and so is its full "prop guide" structure for one game:
 

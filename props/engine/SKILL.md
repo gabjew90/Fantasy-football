@@ -42,12 +42,13 @@ Helpers in `scripts/`:
   Runs `score_game.py` for every game off ONE shared workdir (nflverse files, the Sleeper
   lines pull, the Sleeper player table and the ESPN scoreboard are fetched once; ~2-3 s per
   game after the first), tolerates per-game failures, then writes `slate_summary_*.md`
-  (the chat deliverable for slate questions; carries the runs table, the one-pick-per-game
-  table, the slate-wide pick, the STRONG **and** MODERATE card, a computed per-game trust
-  table and the calibration note, so the chat reply is a copy of the file and nothing is
-  assembled by hand), `slate_survival_*.csv` (one must-win pick per game, rule below),
-  `slate_card_*.csv` (every card row, sorted tier then backtested market then EV) and
-  `slate_runs_*.csv`. A 15-game week took about 3 minutes on the Windows host (props-v1.26, 2026-09-27; 9 before it): about 5 s a game plus a full re-run per Questionable player for the 'if he's out' pricing.
+  (the chat deliverable for slate questions; carries the runs table, the research leads
+  across the slate -- every receiving role-shift flag with what its line implies -- a
+  computed per-game notes table and the calibration note, so the chat reply is a copy of
+  the file and nothing is assembled by hand), `slate_research_*.csv` (every priced line's
+  research row) and `slate_runs_*.csv`. `slate_survival_*.csv`, `slate_card_*.csv` and
+  `parlay_builder_*.csv` are still written for the record but are never shown: no picks
+  (DECISIONS #142). A 15-game week took about 3 minutes on the Windows host (props-v1.26, 2026-09-27; 9 before it): about 5 s a game plus a full re-run per Questionable player for the 'if he's out' pricing.
 - `odds_client.py` — Odds API stages, header capture, caching, archive rows. Never prints
   the key. Prefer it over ad hoc curl.
 - `build_priors.py` — OFFSEASON ONLY. Rebuilds `resources/priors_{season}_*` from a
@@ -207,44 +208,22 @@ When the user asks to test or verify The Odds API connection, market inventory, 
 6. Never manufacture missing route, injury, weather, or pricing data.
 7. Use verified historical seasons as statistical priors for future outcomes when relevant; keep observed current-season utilization and historical priors separately identified. An explicit user restriction to current-season-only evidence overrides historical-prior permission.
 8. Do not equate a positive estimated edge with high confidence.
-9. Give an Over/Under recommendation only when the line, price, and probability estimate are sufficiently supported.
+9. Give no Over/Under recommendation, pick or bet label: through week 3 the model's numbers added nothing beside the book's price (DECISIONS #142). The board is a research sheet; labels return only when the settled record shows the model earning weight beside the book for the current engine version.
 10. Model state is read from `resources/model_registry.md`, never assigned at runtime. A model with no registry entry, or a registry entry below `VALIDATED`, is `MODEL_UNVALIDATED` for pricing purposes. Only `MODEL_VALIDATED, EDGE_SUFFICIENT` can offer an actionable entry threshold, and only after a fresh quote.
 11. Every odds retrieval appends to the line archive per `resources/line_archive.md`.
 
-## Slate questions and the survival pick
-When the user asks about more than one game ("evaluate all the week N games", "one pick per
-game", "what's the best play this week"), run `score_week.py`, not 16 separate guides. The
-chat reply is `slate_summary_*.md`, reproduced in full and in order: the runs table (spread,
-total, lines, status), the one-pick-per-game table, the slate-wide single pick, the
-STRONG/MODERATE slate card, the per-game trust table, and the calibration note. Every one of
-those is computed by the scorer. Do not recompute, re-sort, re-filter or hand-assemble any of
-them in the reply, and do not write trust notes from your own reading of the CSVs; if a
-section looks wrong, fix `score_week.py` and re-run. Do not reproduce a full per-game guide
-unless the user asks about one game.
+## Slate questions
+When the user asks about more than one game ("evaluate all the week N games", "what's on
+the board this week"), run `score_week.py`, not 16 separate guides. The chat reply is
+`slate_summary_*.md`, reproduced in full and in order: the runs table (spread, total, lines,
+status), the research leads across the slate, the notes-by-game table, and the calibration
+note. Every one of those is computed by the scorer. Do not recompute, re-sort, re-filter or
+hand-assemble any of them in the reply; if a section looks wrong, fix `score_week.py` and
+re-run. Do not reproduce a full per-game guide unless the user asks about one game.
 
-Card sort is tier, then backtested market (receptions and receiving yards) ahead of rushing
-and anytime TD, then EV. Sorting on EV alone floats the two markets with the least calibration
-evidence to the top of the card, where they read as the best plays on the slate.
-
-Tier filtering uses the BASE tier. Card tiers carry parenthetical annotations
-("MODERATE (gap is prior-vs-market: ...)", "STRONG (note: history had this team at ...)"),
-so an exact string match on "STRONG"/"MODERATE" silently drops rows.
-
-"Do-or-die" / "must-win" / "if you could only have one bet" is a different objective from
-the card and gets a different rule, implemented in `score_week.py` and quoted from
-`slate_survival_*.csv`, never hand-picked: receptions and receiving yards only (the
-backtested markets); players who changed teams or are Questionable excluded; the book must
-agree (no-vig >= 0.55 on the same side); then the highest model probability. Fallbacks in
-order: no-vig >= 0.50 calibrated; any market >= 0.50; calibrated with the book disagreeing
-(flagged). If no unflagged line qualifies at any tier, the rule re-runs on the full frame and
-the pick is marked "role-flagged fallback". The per-game picks and the slate-wide pick apply
-the SAME exclusion, so the two scopes cannot disagree about who is eligible. A depth-role
-player (RB2/WR3/proxy) can win either and the output names his slot, because excluding him
-would be a different objective than "highest probability". Say plainly that
-these maximise P(win) at a juiced price and are bad EV in isolation, that Sleeper needs 2+
-legs per entry, and that alternate lines two units past the median beat any posted line for
-this objective (quote the ladder). Note the 90%+ tail runs ~4 pts optimistic in the 2025
-backtest.
+"Best play", "one pick per game", "must-win", "if you could only have one bet": there is no
+pick. Say why in one sentence (the model has not shown it adds anything beside the book's
+price; weeks 2-3, STRONG calls won 45%) and offer the research leads and the journal.
 
 ## Fast path
 For a narrow question, run only what it needs:
@@ -254,7 +233,7 @@ For a narrow question, run only what it needs:
   short summary (also saved as `summary_*.md`) instead of the full report, which is still written.
 - **Today's games / one date:** `python scripts/score_week.py --today` or `--date YYYY-MM-DD`
   (`--markets` passes through).
-- **Anytime TD:** every priced TD row is also in `td_board_*.csv` (the bet card leaves TD rows out).
+- **Anytime TD:** every priced TD row is also in `td_board_*.csv` (the research table leaves TD rows out).
   A TD-only run takes DraftKings prices from The Odds API when the cached quota shows 100+ credits,
   otherwise Sleeper; the sources table says which, and so must the reply.
 - **Fantasy numbers:** `fantasy_points_*.csv` has median, p20 and p80 per player from the joint
@@ -262,15 +241,10 @@ For a narrow question, run only what it needs:
   passing yards are priced as a prop (below) but not yet scored as fantasy points.
 - **Anytime-TD price to quote: the blend.** Every TD row carries `p_model` (anytime_td_v1),
   `p_market` (de-vigged: exact for Sleeper's two-sided prices, a provisional hold removed from one-way
-  books) and `p_blend` (layer 4, their logit blend at the PROVISIONAL weight 0.5). Quote all three; the
-  edge that matters is the blend against the market. The settled record fits the real weight.
-- **Parlays across games:** the slate summary's "Cross-game TD parlays" section combines only legs
-  that clear the TD edge floor on the blend on their own, one per game (legs in different games are
-  independent, so the parlay is their product), and gives each combination's fair probability,
-  fair price and minimum payout. When no leg qualifies, say so plainly. Same-game opposing scorers:
-  the report's "Touchdown pairs" section gives the correlated price (~4% lift) -- whether it is an
-  edge depends on whether the book's same-game pricing credits the correlation, which only the
-  book's quote shows; ask the user to type it in.
+  books) and `p_blend` (layer 4, their logit blend at the PROVISIONAL weight 0.5). Quote all three as
+  information; no TD row is a pick. The settled record fits the real weight.
+- **Parlays:** none are shown or priced (DECISIONS #142). If asked, say so and give the single legs'
+  research rows instead.
 - **Inside 60 minutes of kickoff** the report flags a candidate closing snapshot; say so in the reply.
   The scheduled capture records the official close.
 
@@ -278,8 +252,9 @@ For a narrow question, run only what it needs:
 Use the exact report structure in `resources/prop_workflow.md`.
 
 Two rules for every reply:
-- **State plainly when no row has positive expected value** at the posted prices. The report's first
-  line says it; the reply says it in its opening lines, not buried under the tables.
+- **Say plainly, in the opening lines, that the board carries no bet labels and why** (the report's
+  first line: the model's numbers added nothing beside the book's price through week 3). Never call a
+  line a play, a lean, an edge or a value, and quote no EV, Kelly or stake.
 - **The reply is the answer; the report is not.** Do not attach or offer the report file
   (`present_files`) unless the user asks for it -- quote what matters from it in the reply.
 - **Touchdown pairs:** quote only the report's "Touchdown pairs" section, which renders just the
@@ -303,32 +278,25 @@ need not be surfaced. Write the reply as a premium prop guide with this structur
    target, yards per carry, with sample size) and the multiplier applied to the opposing
    receivers/rushers. State plainly if the effect is small.
 4. **Per team, starters in depth-chart order** (QB1, RB1, WR1, WR2, TE1, WR3; RB2/proxy
-   only if they have a play). Each: a bold call block first, written as if-then rules
-   ("UNDER 7.5 catches — Under from 7.5, Over from 6.5"; "TD YES at +100 — take Yes at
-   -120 or longer"; "no play at 87.5 — Under from 90.5, Over from 82.5"). Then the
-   rationale: last-season share and games, this season's count, blended median
-   projection, the goal-line share behind any TD call, the opponent multiplier if it
-   moved the number, and any Watch flag (new team, Questionable, snap scaling, or a
-   book-far-from-us gap that means the book likely knows something).
+   only if they have a line). Each: the research rows first -- line, both prices, our
+   projection (median and 10th-90th range), the Over by the model and by the book, and
+   what the line implies (targets or carries per game at which it is a fair 50/50, next to
+   what we project) -- then the role: last-season share and games, this season's count,
+   last game's snaps and share against his earlier weeks, the opponent multiplier if it
+   moved the number, and any Watch flag (new team, Questionable, snap scaling, the
+   receiving role-shift flag with its 2022-25 wording, a teammate out or back).
    **Questionable players: give both cases, pick neither.** Every number in the run is
    priced as if a Questionable player PLAYS his normal role (no discount). The report's
    "If a Questionable player is out" section prices the same lines with him OUT and his
    share handed to his teammates. Show both numbers side by side for every line that
    moves, and state that his own props void if he sits. Do not weight the two cases by a
    guess at whether he plays and do not recommend one: the user decides.
-5. **Bet card** — reproduce `bet_card_*.csv` as ONE table, sorted tier then EV: Tier,
-   Player, Prop, Line, Book, Odds, Model %, No-vig %, Edge (pts), EV per $100, Kelly,
-   Backtest hit rate for that probability bucket (receptions/rec yds only), Correlated with,
-   Note. One row per (player, prop, side) at the best price across books; the best
-   available line is in the CSV. Tiers: STRONG = stable role and edge at or above the floor
-   (6 pts; TD props use relative edge >= 25% of the book's number); LEAN = stable but under
-   the floor, no bet; WEAK = new team, Questionable, or gap over 15 pts, treat as the book
-   knowing something. Do not hand-compute any of these numbers in the reply; quote the CSV.
-   Write the no-vig as the probability of the SAME side as the call, never the other side.
-   Then the exposure lines from `exposure_*.csv`: each team-volume thesis ("BUF throws low"),
-   how many legs ride on it, and P(all bettable legs hit) from the joint sim vs the
-   independent product. State that same-player props are one bet, not two.
-   For anytime-TD calls, the model is `anytime_td_v1` (PROTOTYPE; see
+5. **Research table** — reproduce the report's "Research table" (from `research_*.csv`) as ONE
+   table, grouped by team: Player, Prop, Line, Price (Over / Under), Our projection, Over:
+   model / book, Line implies, Last game, Flags. Do not hand-compute any of these numbers
+   and do not re-sort them by the model-book gap: ranking by gap ranked lines by how likely
+   the model was missing something.
+   For anytime-TD rows, the model is `anytime_td_v1` (PROTOTYPE; see
    `resources/model_registry.md`). State each team's expected offensive touchdowns and
    the player's share of each, and say which model priced the row: the `td_model` column
    reads `anytime_td_v1`, or `anytime_td_v0` when v1 could not run (no market implied
@@ -354,8 +322,8 @@ need not be surfaced. Write the reply as a premium prop guide with this structur
    simulation times a starter's usual share: right on average and the right width, but its
    edge over the no-shrinkage version is early season only and one small bucket missed --
    priced by the user's decision (DECISIONS #105). Say so when quoting one.
-   Ladder: `ladder_*.csv` holds P(stat <= k) per player for pricing alternate lines;
-   surface it for the top two or three plays when the book's line sits inside the ladder.
+   Ladder: `ladder_*.csv` holds P(stat <= k) per player; quote it when the user asks about
+   an alternate line.
 6. **Parlays — DISABLED, do not price them.** `parlays_*.csv` is no longer written.
    The simulation does induce real within-team correlation, which is exactly why a
    parlay number built from it reads as authoritative, but the joint distribution has
@@ -364,13 +332,13 @@ need not be surfaced. Write the reply as a premium prop guide with this structur
    turns a +450 fair price into a losing bet, and marginal CRPS cannot detect that. If
    asked for a parlay, say it is gated pending a joint-outcome holdout and give the
    single legs instead.
-7. **Board summary** — plays count and Under/Over split, and the one-line note that the
-   Under lean is unresolved until logged results settle it. Engineering notes (scorer
-   changes, repackaging questions) never go in the report or the card; raise them in a
-   separate paragraph after the guide, or not at all.
+7. **Close** — the receiving role-shift flags on the board, if any, and one line on the
+   journal: a bet the user makes is logged with its four checklist answers (the verified
+   change, the workload the line implies, how it fails, the price) and graded on Tuesday.
+   Engineering notes never go in the guide; raise them in a separate paragraph after it.
 
-The shadow log carries a `tier` column so WEAK-tier calls are graded as their own bucket
-at the week-8 review (do they hit at the model's rate or the book's?).
+The shadow log still carries the internal `tier` column so the scorecard can keep
+measuring whether the model's confident calls beat the book. It is never shown.
 
 Prose and short bullet blocks are fine; no per-row PASS language; exploratory status is
 stated once in the header, not repeated per line.
@@ -393,7 +361,7 @@ Before finalizing:
 - no missing route metric fabricated
 - no unsupported future distribution invented from one game
 - model state taken from the registry, not self-assigned
-- edge rule from `modeling_framework.md` applied with the stated threshold
+- no pick, lean, edge, EV, Kelly or stake language in the reply
 - any actionable quote refreshed immediately before valuation with source update time and quota headers
 - archive rows written for every retrieved market and presented or pushed
 - no API key present in output, cache, archive, or logs
