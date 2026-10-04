@@ -166,6 +166,35 @@ def implied_carries(line, j, team_carries_mean, carries_r, rush_shares, ypc, res
     return work(k), proj, work(k_o), work(k_u)
 
 
+# an Out teammate is named on the board only when he had a real role (DECISIONS #155)
+OUT_TARGET_SHARE, OUT_CARRY_SHARE, OUT_PASS_SHARE = 0.10, 0.15, 0.50
+
+
+def role_share(plays, pid, team):
+    """His share of the team's plays in the weeks he took part this season.
+    plays: DataFrame with posteam, week, pid. None when he has no play."""
+    d = plays[plays.posteam == team]
+    weeks = set(d.loc[d.pid == pid, "week"])
+    if not weeks:
+        return None
+    dd = d[d.week.isin(weeks)]
+    return float((dd.pid == pid).mean()) if len(dd) else None
+
+
+def out_matters(pid, team, targets, carries, dropbacks, prior_ts=None, prior_rs=None) -> bool:
+    """True when an Out player's absence is worth a flag: this season he threw
+    half the team's passes, drew 10%+ of its targets or took 15%+ of its
+    carries in the weeks he played; with no play this season, last season's
+    shares decide (never a slot default -- an unknown depth player is not
+    news). A depth receiver with two targets in two games is not flagged."""
+    shares = [(role_share(dropbacks, pid, team), OUT_PASS_SHARE),
+              (role_share(targets, pid, team), OUT_TARGET_SHARE),
+              (role_share(carries, pid, team), OUT_CARRY_SHARE)]
+    if any(s is not None for s, _ in shares):
+        return any(s is not None and s >= cut for s, cut in shares)
+    return bool((prior_ts or 0) >= OUT_TARGET_SHARE or (prior_rs or 0) >= OUT_CARRY_SHARE)
+
+
 def usage_change(weeks):
     """weeks: list of (week, snap_share, target_share, carry_share), sorted, the
     player's weeks before this one with this team. LAST = the latest week, BASE

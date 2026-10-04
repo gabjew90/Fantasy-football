@@ -7195,3 +7195,16 @@ by the user.
   scenario said, the win rate and late-line value for those bets. If the
   adjustments add information, the win rate lands nearer the scenario's
   number than the board's -- about 100 graded bets to tell.
+
+## 2026-10-04 (155) -- one slate board in total order; Out teammates only when they mattered
+
+- score_week writes slate_board_*.md: every game's full research table in one
+  file, by kickoff or --sort total (highest first), --overs-only for the Over
+  side, --kickoff HH:MM for one window. The user asked for "highest scoring
+  games" twice; it had been assembled by hand.
+- A teammate ruled out is flagged only when he had a real role this season
+  (half the passes, 10%+ of the targets or 15%+ of the carries in the weeks
+  he played; last season's shares if he has not played). A depth receiver
+  with two targets in two games was being named on every teammate's row.
+- The slate summary's calibration note now quotes the interval bar (#150)
+  instead of the pre-#150 "calibrated on outcomes".

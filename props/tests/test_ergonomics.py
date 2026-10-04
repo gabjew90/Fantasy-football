@@ -253,3 +253,25 @@ def test_season_inputs_refresh_once_and_report_their_age(tmp_path, monkeypatch):
     assert set(ages) == {"pbp", "rosters", "injuries", "depth_charts", "snaps", "games"}
     assert all(isinstance(v, float) and v < 0.1 for v in ages.values())
     assert sorted(got) == sorted(p.name for _, p in SG.season_inputs(2026, tmp_path).values())
+
+
+def test_the_slate_board_orders_games_by_total_and_can_show_overs_only():
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "engine" / "scripts"))
+    import score_week as W
+    row = dict(player="A", team="CIN", market="player_receptions", line=4.5, book="sleeper", price_over=-118,
+               price_under=-139, median=5.0, p10=2.0, p90=9.0, p_over_model=0.55, p_over_book=0.48, implied=8.0,
+               projected=8.5, unit="targets", over_needs=8.5, under_needs=7.1, be_over=0.54, be_under=0.58,
+               snap=0.93, snap_base=0.72, ts=0.19, ts_base=0.25, cs=0.0, cs_base=0.0, flags="role up")
+    RS = pd.DataFrame([dict(row, game="GB@TB"), dict(row, game="JAX@CIN", player="B")])
+    runs = [dict(game="GB@TB", total="38.5", kickoff_utc="Sun 17:00Z"),
+            dict(game="JAX@CIN", total="51.5", kickoff_utc="Sun 17:00Z")]
+    B = W.slate_board(RS, runs, sort="total")
+    heads = [ln for ln in B if ln.startswith("## ")]
+    assert heads[0].startswith("## JAX @ CIN — total 51.5") and heads[1].startswith("## GB @ TB — total 38.5")
+    assert any("| Over above 8.5 targets; Under at 7.1 or fewer |" in ln for ln in B)
+    assert [ln for ln in W.slate_board(RS, runs) if ln.startswith("## ")][0].startswith("## GB @ TB"), \
+        "kickoff order keeps the run order"
+    O = W.slate_board(RS, runs, sort="total", overs_only=True)
+    r = next(ln for ln in O if ln.startswith("| B (CIN)"))
+    assert "| -118 |" in r and "| 8.5 targets |" in r and "U -139" not in r
+    assert "The Over pays if he gets more than" in "\n".join(O)

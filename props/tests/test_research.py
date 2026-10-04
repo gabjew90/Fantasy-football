@@ -132,3 +132,19 @@ def test_break_even_workload_at_the_posted_prices():
 def test_a_whole_line_coin_flip_ignores_pushes_like_the_prices_do():
     imp, _p, o, u = RS.implied_targets(4.0, "receptions", 34.0, 30.0, 0.2, 0.7, 8.0, 1.06, prices=(-110, -110))
     assert u < imp < o, "the coin flip sits between the two break-evens on a whole line too"
+
+
+def test_an_out_teammate_is_named_only_when_he_had_a_real_role():
+    import pandas as pd
+    t = pd.DataFrame({"posteam": "CIN", "week": [2] * 36 + [3] * 38,
+                      "pid": ["chase"] * 12 + ["young"] + ["x"] * 23 + ["chase"] * 12 + ["young"] + ["x"] * 25})
+    c = pd.DataFrame({"posteam": "CIN", "week": [2] * 25, "pid": ["brown"] * 18 + ["x"] * 7})
+    d = pd.DataFrame({"posteam": "CHI", "week": [1] * 30, "pid": ["caleb"] * 30})
+    e = pd.DataFrame(columns=["posteam", "week", "pid"])
+    assert not RS.out_matters("young", "CIN", t, c, e), "two targets in two games is not news"
+    assert RS.out_matters("chase", "CIN", t, c, e), "a third of the targets is"
+    assert RS.out_matters("brown", "CIN", t, c, e), "the lead back"
+    assert RS.out_matters("caleb", "CHI", e, e, d), "the starting QB"
+    assert not RS.out_matters("rookie", "CIN", t, c, e), "no play and no prior: unknown, not flagged"
+    assert RS.out_matters("vet", "CIN", t, c, e, prior_ts=0.22), "out all season: last season's share decides"
+    assert not RS.out_matters("vet", "CIN", t, c, e, prior_ts=float("nan"))

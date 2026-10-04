@@ -1711,8 +1711,16 @@ def main():
     # USAGE / ROLE: computed before the share blend (section 5), which round 23 reads
     # teammates handled by the out rule, and key teammates back from a missed week
     OUT_NOTE = {t_: [] for t_ in (AWAY, HOME)}
+    _tg = passes[["posteam", "week"]].assign(pid=passes.receiver_player_id)
+    _cr = rushes[["posteam", "week"]].assign(pid=rushes.rusher_player_id)
+    _db_ = pbp[(pbp.play_type == "pass") & pbp.passer_player_id.notna()]
+    _db = _db_[["posteam", "week"]].assign(pid=_db_.passer_player_id)
     for _, e_ in pop[pop.excluded].iterrows():
-        OUT_NOTE[e_.team].append(f"{e_['name']} out")
+        pri_ = pri_players.loc[e_.gsis_id] if e_.gsis_id in pri_players.index else None
+        if RSCH.out_matters(e_.gsis_id, e_.team, _tg, _cr, _db,
+                            None if pri_ is None else pri_.get("target_share"),
+                            None if pri_ is None else pri_.get("rush_share")):
+            OUT_NOTE[e_.team].append(f"{e_['name']} out")
     BACK_NOTE = {}
     for _, m_ in M.iterrows():
         pri_ = pri_players.loc[m_.gsis_id] if m_.gsis_id in pri_players.index else None

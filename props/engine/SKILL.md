@@ -240,7 +240,11 @@ For a narrow question, run only what it needs:
   assumptions, not confidence intervals), and never call a line a play. Touchdowns are not adjusted.
   Never recorded (outputs in `scenarios/`).
 - **Today's games / one date:** `python scripts/score_week.py --today` or `--date YYYY-MM-DD`
-  (`--markets` passes through).
+  (`--markets` passes through). `--kickoff 13:00` keeps one window (Eastern time: 13:00 is the
+  10am PT games); `--sort total` orders the games by their total, highest first; `--overs-only`
+  shows the Over side only. A slate run writes `slate_board_*.md` -- every game's full research
+  table in one file, in that order -- and prints it: for "the props for these games", reproduce it
+  in full (never trim rows), then a short read of what stands out per game.
 - **Anytime TD:** every priced TD row is also in `td_board_*.csv` (the research table leaves TD rows out).
   A TD-only run takes DraftKings prices from The Odds API when the cached quota shows 100+ credits,
   otherwise Sleeper; the sources table says which, and so must the reply.
