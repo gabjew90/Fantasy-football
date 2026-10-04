@@ -2869,17 +2869,7 @@ def research_statement(RESEARCH: pd.DataFrame, gate=None) -> str:
 BOOK_NAME = {"sleeper": "Sleeper", "draftkings": "DraftKings", "fanduel": "FanDuel"}
 
 
-def break_even_cell(x) -> str:
-    """The workload each side needs to beat its own price (research.py): the
-    Over pays above the first number, the Under at or below the second."""
-    unit_ = x.get("unit") if isinstance(x.get("unit"), str) else ""
-    o, u = x.get("over_needs"), x.get("under_needs")
-    if not unit_ or (o is None or pd.isna(o)) and (u is None or pd.isna(u)):
-        return "—"
-    fmt = lambda v, word: f"{word} beyond the search range" if v is None or pd.isna(v) else None
-    over = fmt(o, "Over:") or f"Over above {o:.1f}"
-    under = fmt(u, "Under:") or f"Under at {u:.1f} or fewer"
-    return f"{over} {unit_}; {under}"
+break_even_cell = RSCH.break_even_cell
 
 
 def research_cells(x, MKT) -> str:

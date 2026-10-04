@@ -285,7 +285,9 @@ need not be surfaced. Write the reply as a premium prop guide with this structur
    only if they have a line). Each: the research rows first -- line, both prices, our
    projection (median and 10th-90th range), the Over by the model and by the book, and
    what the line implies (targets or carries per game at which it is a fair 50/50, next to
-   what we project) -- then the role: last-season share and games, this season's count,
+   what we project), and what each side needs at its own price (the Over pays above the
+   first workload, the Under at or below the second, if the model's numbers are right;
+   it is how much role a view needs, never a pick) -- then the role: last-season share and games, this season's count,
    last game's snaps and share against his earlier weeks, a back's three jobs (early-down
    carries, passing-down targets, inside-5 carries; last game against earlier weeks), the
    opponent multiplier if it
@@ -299,7 +301,7 @@ need not be surfaced. Write the reply as a premium prop guide with this structur
    guess at whether he plays and do not recommend one: the user decides.
 5. **Research table** — reproduce the report's "Research table" (from `research_*.csv`) as ONE
    table, grouped by team: Player, Prop, Line, Price (Over / Under), Our projection, Over:
-   model / book, Line implies, Last game, Flags. Do not hand-compute any of these numbers
+   model / book, Line implies, Pays at this price if he gets, Last game, Flags. Do not hand-compute any of these numbers
    and do not re-sort them by the model-book gap: ranking by gap ranked lines by how likely
    the model was missing something.
    For anytime-TD rows, the model is `anytime_td_v1` (PROTOTYPE; see

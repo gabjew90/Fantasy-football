@@ -385,6 +385,7 @@ def research_fields(b) -> dict:
             "implied": _f(get("implied")), "projected": _f(get("projected")),
             "unit": get("unit") if isinstance(get("unit"), str) else None,
             "over_needs": _f(get("over_needs")), "under_needs": _f(get("under_needs")),
+            "be_over": _f(get("be_over")), "be_under": _f(get("be_under")),
             "last_game": {k: _f(get(k)) for k in ("snap", "snap_base", "ts", "ts_base", "cs", "cs_base")},
             "backfield": ({k[3:]: _f(get(k)) for k in ("bf_early", "bf_early_base", "bf_passdown", "bf_passdown_base",
                                                         "bf_i5_base", "bf_i5_n", "bf_i5_team")}
@@ -406,11 +407,15 @@ def research_text(x: dict, label: str, book: str = "", line=None) -> str:
         bits.append(f"Over {x['p_over_model']:.0%} model / {x['p_over_book']:.0%} book")
     if x.get("implied") is not None:
         bits.append(f"the line implies {x['implied']:.1f} {x.get('unit') or ''} (we project {x['projected']:.1f})")
-    if x.get("over_needs") is not None or x.get("under_needs") is not None:
-        u = x.get("unit") or ""
-        o = "beyond the search range" if x.get("over_needs") is None else f"above {x['over_needs']:.1f} {u}"
-        un = "beyond the search range" if x.get("under_needs") is None else f"at {x['under_needs']:.1f} {u} or fewer"
-        bits.append(f"at these prices the Over pays {o}, the Under {un}")
+    if x.get("unit") and (x.get("be_over") is not None or x.get("be_under") is not None):
+        u = x["unit"]
+        def side(word, v, be, fmt):     # no price posted is not the same as a search out of range
+            if be is None:
+                return f"the {word} has no price posted"
+            return f"the {word}'s break-even is outside the search range" if v is None else f"the {word} pays " + fmt.format(v=v, u=u)
+        bits.append("if the model's numbers are right, at these prices "
+                    + side("Over", x.get("over_needs"), x.get("be_over"), "above {v:.1f} {u}") + ", "
+                    + side("Under", x.get("under_needs"), x.get("be_under"), "at {v:.1f} {u} or fewer"))
     lg = x.get("last_game") or {}
     if lg.get("snap") is not None:
         share = ("carries", lg.get("cs"), lg.get("cs_base")) if label == "rush yds" else ("targets", lg.get("ts"), lg.get("ts_base"))

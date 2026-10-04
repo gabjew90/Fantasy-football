@@ -39,6 +39,7 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 from score_game import (GAMES_URL, OUT, eastern_to_utc, et_today, fetch,  # noqa: E402
                         refresh_season_inputs)
+import research as RSCH  # noqa: E402
 
 # The report contains "≥" and other non-cp1252 characters. The Linux
 # runner writes UTF-8 by default so this was invisible in CI, while every
@@ -53,18 +54,6 @@ for _stream in (sys.stdout, sys.stderr):
 CAL_MARKETS = {"player_receptions", "player_reception_yds"}
 MK_LABEL = {"player_receptions": "catches", "player_reception_yds": "rec yds",
             "player_rush_yds": "rush yds", "player_anytime_td": "anytime TD", "player_pass_yds": "pass yds"}
-
-
-def break_even_cell(x) -> str:
-    """The workload each side needs to beat its own price (score_game.break_even_cell,
-    read here from the research CSV)."""
-    unit = x.get("unit") if isinstance(x.get("unit"), str) else ""
-    o, u = x.get("over_needs"), x.get("under_needs")
-    if not unit or (o is None or pd.isna(o)) and (u is None or pd.isna(u)):
-        return "—"
-    over = "Over: beyond the search range" if o is None or pd.isna(o) else f"Over above {o:.1f}"
-    under = "Under: beyond the search range" if u is None or pd.isna(u) else f"Under at {u:.1f} or fewer"
-    return f"{over} {unit}; {under}"
 
 
 def base_tier(t):
@@ -313,7 +302,7 @@ def main():
                 last = (f"snaps {100*x.snap:.0f}% (earlier {100*x.snap_base:.0f}%), targets {100*x.ts:.0f}% "
                         f"(earlier {100*x.ts_base:.0f}%)" if pd.notna(x.snap) else "—")
                 L.append(f"| {x.game} | {x.player} ({x.team}) | {MK_LABEL.get(x.market, x.market)} | {x.line:g} | "
-                         f"{imp} | {break_even_cell(x)} | {last} | {x['flags']} |")
+                         f"{imp} | {RSCH.break_even_cell(x)} | {last} | {x['flags']} |")
         else:
             L.append("| — | no receiving role-shift flags this slate | | | | | | |")
 

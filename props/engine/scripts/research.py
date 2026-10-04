@@ -46,7 +46,9 @@ def _bisect(p_over_at, target=0.5, lo=K_LO, hi=K_HI, iters=14):
 
 
 def breakeven(price) -> float | None:
-    """The win rate an American price needs (its own vig included), or None."""
+    """The win rate an American price needs (its own vig included), or None.
+    The same rule as props/journal.py breakeven(); the engine ships without
+    props/, so the two are kept in step by hand."""
     try:
         a = float(price)
     except (TypeError, ValueError):
@@ -56,24 +58,51 @@ def breakeven(price) -> float | None:
     return abs(a) / (abs(a) + 100) if a < 0 else 100 / (a + 100)
 
 
-def _break_even_ks(sim_of_k, line, prices):
-    """The multipliers where each side breaks even at its price. A side wins on
-    one side of the line and pushes on it, so the condition is wins / (wins +
-    losses) = break-even. Over: share_over(k) = be_over. Under: share_over(k)
-    = 1 - be_under. Returns (k_over, k_under); None where a price is missing
-    or the workload is outside the search range."""
-    def share_over(k):
+def _share_over(sim_of_k, line):
+    """The Over's share of the bets that do not push: wins / (wins + losses).
+    On a half line it is P(stat > line); on a whole line a push refunds, so
+    this is what a price is judged against."""
+    def f(k):
         x = sim_of_k(k)
         gt, lt = float((x > line).mean()), float((x < line).mean())
         return gt / (gt + lt) if gt + lt > 0 else 0.5
+    return f
+
+
+def _break_even_ks(share_over, prices):
+    """The multipliers where each side breaks even at its price. Over:
+    share_over(k) = be_over. Under: share_over(k) = 1 - be_under. Returns
+    (k_over, k_under); None where the workload is outside the search range or
+    the side has no price (break_even_cell tells the two apart by be_over /
+    be_under)."""
     be_o, be_u = (breakeven(prices[0]), breakeven(prices[1])) if prices else (None, None)
     return (None if be_o is None else _bisect(share_over, be_o),
             None if be_u is None else _bisect(share_over, 1 - be_u))
 
 
+def break_even_cell(x) -> str:
+    """The research table's 'Pays at this price if he gets' cell: the Over beats
+    its own price above over_needs, the Under at or below under_needs. A side
+    with no posted price (no be_over / be_under) says so rather than reading as
+    a search that ran out of range."""
+    unit = x.get("unit") if isinstance(x.get("unit"), str) else ""
+    blank = lambda v: v is None or bool(np.isnan(float(v)))
+    o, u, bo, bu = (x.get(k) for k in ("over_needs", "under_needs", "be_over", "be_under"))
+    if not unit or (blank(bo) and blank(bu)):
+        return "—"
+
+    def side(v, be, word, fmt):
+        if blank(be):
+            return f"{word}: no price posted"
+        return f"{word}: beyond the search range" if blank(v) else fmt.format(v=float(v))
+    return (f"{side(o, bo, 'Over', 'Over above {v:.1f}')} {unit}; "
+            f"{side(u, bu, 'Under', 'Under at {v:.1f} or fewer')}")
+
+
 def implied_targets(line, stat, team_targets_mean, targets_r, share, catch_rate, ypt,
                     per_catch_shape, width=None, prices=None):
-    """Targets per game at which P(stat > line) = 0.5 for a receiver, holding
+    """Targets per game at which the line is a coin flip for a receiver (P(stat >
+    line) = 0.5 on a half line; Overs and Unders equally likely on a whole line), holding
     his catch rate and yards per target. stat: 'receptions' or 'rec_yards'.
     Returns (implied targets, projected targets) or (None, projected). With
     prices=(over, under) it also returns the targets at which the Over and the
@@ -95,16 +124,17 @@ def implied_targets(line, stat, team_targets_mean, targets_r, share, catch_rate,
         return cache[k]
 
     work = lambda k: None if k is None else team_targets_mean * min(share * k, 0.95)
-    k = _bisect(lambda k: float((sim(k) > line).mean()))
+    share_over = _share_over(sim, line)
+    k = _bisect(share_over)
     if prices is None:
         return work(k), proj
-    k_o, k_u = _break_even_ks(sim, line, prices)
+    k_o, k_u = _break_even_ks(share_over, prices)
     return work(k), proj, work(k_o), work(k_u)
 
 
 def implied_carries(line, j, team_carries_mean, carries_r, rush_shares, ypc, resid,
                     width=None, player_resid=None, player_kneel=None, qb_index=None, prices=None):
-    """Carries per game at which P(rush yards > line) = 0.5 for player j,
+    """Carries per game at which the line is a coin flip for player j (as above),
     scaling only his share inside the FULL team call (the share rescale
     depends on every teammate). Returns (implied mean carries, projected mean
     carries), the effective carries the simulation gives him. With
@@ -128,10 +158,11 @@ def implied_carries(line, j, team_carries_mean, carries_r, rush_shares, ypc, res
     if shares[j] <= 0 or line is None:
         return (None, proj) if prices is None else (None, proj, None, None)
     work = lambda k: None if k is None else float(run(k)[0].mean())
-    k = _bisect(lambda k: float((run(k)[1] > line).mean()))
+    share_over = _share_over(lambda k: run(k)[1], line)
+    k = _bisect(share_over)
     if prices is None:
         return work(k), proj
-    k_o, k_u = _break_even_ks(lambda k: run(k)[1], line, prices)
+    k_o, k_u = _break_even_ks(share_over, prices)
     return work(k), proj, work(k_o), work(k_u)
 
 

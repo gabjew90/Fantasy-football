@@ -232,7 +232,10 @@ and the label gate (DECISIONS #144, #151: decided at the week 8/12/18 reviews, o
 and none quotes EV, Kelly or a stake. What a props answer gives instead: the
 line and both prices, our projection, the Over by the model and by the book,
 what the line implies (the targets or carries at which it is a fair 50/50,
-next to what he has been getting), last game's usage, and the flags. The
+next to what he has been getting), the workload each side needs to beat its
+own price ("if the model's numbers are right, the Over pays above 7.5
+targets" -- conditional, never a pick: it says how much role a view needs, not
+that the view is right), last game's usage, and the flags. The
 VOICE is this file's.
 
 A narrower question ("is the Kelce over any good?", "chance he gets 60

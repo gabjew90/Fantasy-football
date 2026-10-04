@@ -7,6 +7,7 @@ import sys
 from pathlib import Path
 
 import numpy as np
+import pytest
 
 ENGINE = Path(__file__).resolve().parents[1] / "engine" / "scripts"
 sys.path.insert(0, str(ENGINE))
@@ -108,3 +109,26 @@ def test_compare_books_is_opt_in_guarded_and_never_fatal():
     assert "a.compare_books" in block and "COMPARE_QUOTA_MIN" in block
     assert "except Exception" in block, "a failed comparison is a sources note, never a lost run"
     assert "--archive" not in block, "a comparison pull never writes the line archive"
+
+
+def test_break_even_workload_at_the_posted_prices():
+    assert RS.breakeven(-141) == pytest.approx(141 / 241) and RS.breakeven(110) == pytest.approx(100 / 210)
+    assert RS.breakeven(None) is None and RS.breakeven(float("nan")) is None and RS.breakeven(1.9) is None
+    imp, proj, o, u = RS.implied_targets(4.5, "receptions", 34.0, 30.0, 0.2, 0.7, 8.0, 1.06, prices=(-141, 110))
+    assert (imp, proj) == RS.implied_targets(4.5, "receptions", 34.0, 30.0, 0.2, 0.7, 8.0, 1.06), \
+        "asking for the break-even never moves the coin flip"
+    # at -141 the Over needs 58.5% of non-pushes: more targets than the coin flip; at +110 the Under
+    # needs 47.6%, so it pays a little past the coin flip
+    assert o > imp and u > imp and o > u
+    assert abs(_p_over(o, 4.5) - 141 / 241) < 0.03 and abs(_p_over(u, 4.5) - (1 - 100 / 210)) < 0.03
+    # a side with no price gives no number, and the cell says why
+    _i, _p, o2, u2 = RS.implied_targets(4.5, "receptions", 34.0, 30.0, 0.2, 0.7, 8.0, 1.06, prices=(-141, None))
+    assert o2 == pytest.approx(o) and u2 is None
+    cell = RS.break_even_cell({"unit": "targets", "over_needs": o2, "under_needs": u2,
+                               "be_over": RS.breakeven(-141), "be_under": None})
+    assert cell == f"Over above {o2:.1f} targets; Under: no price posted"
+
+
+def test_a_whole_line_coin_flip_ignores_pushes_like_the_prices_do():
+    imp, _p, o, u = RS.implied_targets(4.0, "receptions", 34.0, 30.0, 0.2, 0.7, 8.0, 1.06, prices=(-110, -110))
+    assert u < imp < o, "the coin flip sits between the two break-evens on a whole line too"
