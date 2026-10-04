@@ -7208,3 +7208,17 @@ by the user.
   with two targets in two games was being named on every teammate's row.
 - The slate summary's calibration note now quotes the interval bar (#150)
   instead of the pre-#150 "calibrated on outcomes".
+
+## 2026-10-04 (156) -- "worth a look" marks, graded; last game's counts beside the shares
+
+- A research line is marked (bold prop, "worth a look: SIDE (why)" in its
+  flags) when a role story points one way -- more snaps or a key teammate
+  out: Over; fewer snaps or a key teammate back: Under; a new team with no
+  other story: either -- AND last game's actual workload is already past that
+  side's break-even by 2 targets or 3 carries. Stories pulling both ways
+  mark nothing. Fixed on counts only (no result existed): margin 1/2 marked
+  36 lines of 219 on 2026 week 4, 2/3 marked 19. Not a bet label: every mark
+  is logged on the shadow row (`look`) and graded on the scorecard at
+  Sleeper's own price for that side.
+- Last game shows share / count, earlier weeks share / per-game count
+  ("targets 19% / 7 (25% / 8.0)"), at the user's request.

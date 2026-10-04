@@ -72,6 +72,8 @@ PRED_FIELDS = [
     # Sleeper's prices for BOTH sides, so the Sleeper-vs-books check can grade
     # either side at Sleeper's own price (DECISIONS #147)
     "price_over", "price_under",
+    # the worth-a-look side, if the row was marked (DECISIONS #156)
+    "look",
 ]
 
 NUMERIC = {"line", "model_mean", "p_model", "p_push", "p_novig", "gap", "price", "ER", "p_market", "p_blend",

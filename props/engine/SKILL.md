@@ -244,7 +244,10 @@ For a narrow question, run only what it needs:
   10am PT games); `--sort total` orders the games by their total, highest first; `--overs-only`
   shows the Over side only. A slate run writes `slate_board_*.md` -- every game's full research
   table in one file, in that order -- and prints it: for "the props for these games", reproduce it
-  in full (never trim rows), then a short read of what stands out per game.
+  in full (never trim rows), then a short read of what stands out per game. A **bold** prop is "worth a look"
+  (DECISIONS #156): a role story plus last game's workload already past that side's break-even.
+  Narrate each bold line analytically -- why the story points that way, whether last game's
+  workload is likely to repeat, what the price demands, how it fails -- and never call it a bet.
 - **Anytime TD:** every priced TD row is also in `td_board_*.csv` (the research table leaves TD rows out).
   A TD-only run takes DraftKings prices from The Odds API when the cached quota shows 100+ credits,
   otherwise Sleeper; the sources table says which, and so must the reply.

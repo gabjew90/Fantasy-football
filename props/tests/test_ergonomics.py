@@ -296,3 +296,12 @@ def test_kickoff_reads_the_way_people_say_it_and_missing_totals_sort_last():
     heads = [ln for ln in B if ln.startswith("## ")]
     assert heads[0].startswith("## C @ D") and heads[1].startswith("## A @ B — total —")
     assert any("| wk3: snaps 80% (70%), targets 20% (18%) |" in ln for ln in B), "the report's wording"
+
+
+def test_last_game_shows_the_count_beside_the_share():
+    u = {"week": 3, "snap": 0.93, "snap_base": 0.72, "ts": 0.19, "ts_base": 0.25, "cs": 0.0, "cs_base": 0.0,
+         "tn": 6.0, "tn_base": 8.25, "cn": 0.0, "cn_base": 0.0}
+    assert SG.usage_line(u, short=True) == "wk3: snaps 93% (72%), targets 19% / 6 (25% / 8.2)"
+    assert "targets 19% of the team's, 6 (earlier 25%, 8.2 a game)" in SG.usage_line(u)
+    old = {k: v for k, v in u.items() if k not in ("tn", "tn_base", "cn", "cn_base")}
+    assert SG.usage_line(old, short=True) == "wk3: snaps 93% (72%), targets 19% (25%)", "older files: shares only"

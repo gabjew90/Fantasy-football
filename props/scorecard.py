@@ -283,6 +283,34 @@ def books_section(df: pd.DataFrame, season: int) -> list[str]:
     return out + ["", f"{len(b)} graded discrepancies: {verdict}.", ""]
 
 
+def look_section(df: pd.DataFrame) -> list[str]:
+    """DECISIONS #156: every 'worth a look' mark graded on the side it marked,
+    at Sleeper's own price for that side. Pushes are not graded."""
+    if "look" not in df.columns:
+        return []
+    import settle as _s
+    d = df[df["look"].isin(["Over", "Under"])].copy()
+    d["won"] = pd.to_numeric(d["won"], errors="coerce")
+    d = d.dropna(subset=["won"])
+    if d.empty:
+        return ["### Worth a look", "", "No marked line has been graded yet.", ""]
+    d["look_won"] = np.where(d["side"] == d["look"], d["won"], 1 - d["won"])
+    d["look_price"] = np.where(d["look"] == "Over", pd.to_numeric(d.get("price_over"), errors="coerce"),
+                               pd.to_numeric(d.get("price_under"), errors="coerce"))
+    d = d.dropna(subset=["look_price"])
+    d["pnl"] = [_s.american_pnl(p_, bool(w)) for p_, w in zip(d["look_price"], d["look_won"])]
+    d["be"] = [abs(p_) / (abs(p_) + 100) if p_ < 0 else 100 / (p_ + 100) for p_ in d["look_price"]]
+    out = ["### Worth a look", "",
+           "Every bold line, graded on the side it marked at Sleeper's own price for that side. A mark is a "
+           "role story plus last game's workload already past that side's break-even; it is not a bet label. "
+           "About 100 marks are needed before the win rate says much.", "",
+           "| Market | Marks | Won | Win rate | Break-even | Net per $100 |", "|---|---|---|---|---|---|"]
+    for mk, g in list(d.groupby("market")) + [("all", d)]:
+        out.append(f"| {mk.replace('player_', '')} | {len(g)} | {int(g.look_won.sum())} | {g.look_won.mean():.0%} | "
+                   f"{g.be.mean():.0%} | {g.pnl.mean():+.1f} |")
+    return out + [""]
+
+
 def snap_rule_section(df: pd.DataFrame) -> list[str]:
     """DECISIONS #145: the receiving calls the snap-change rule moved (round 23)
     against the ones it did not -- the fresh check on its 2024-25 overshoot for
@@ -539,6 +567,7 @@ def main(argv: list[str] | None = None) -> int:
         csv_rows += rows
         out += render_clv(clv, engine_hash)
         out += snap_rule_section(group)
+        out += look_section(group)
         out += blend.blend_section(group)
 
     if args.pool and len(engines) > 1:

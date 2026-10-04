@@ -105,8 +105,9 @@ def slate_board(RS, runs, sort="kickoff", overs_only=False) -> list[str]:
                                                      else "by kickoff"), "",
            "*A research sheet, not a bet list: no line carries a bet label until the record earns it at a review "
            "(weeks 8, 12, 18). 'Line implies' is the workload that makes the line a coin flip; 'pays' is the "
-           "workload a side needs to beat its own price. Last game: snap share and target (or carry) share, "
-           "earlier weeks in brackets.*"]
+           "workload a side needs to beat its own price. Last game: snap share and target (or carry) share / "
+           "count, earlier weeks in brackets. A **bold** prop is worth a look, not a bet: a role story plus last "
+           "game's workload already past that side's break-even; the scorecard grades every one.*"]
     for r in games:
         G = RS[RS.game == r["game"]].sort_values(["team", "player", "market", "line"])
         tot = f"total {r['total']}" if r.get("total") else "total —"
@@ -117,7 +118,8 @@ def slate_board(RS, runs, sort="kickoff", overs_only=False) -> list[str]:
             if x.market == "player_pass_yds" or _num(x.get("snap")) is None:
                 last = "—"
             else:      # the game report's own wording (score_game.usage_line)
-                last = usage_line({k: x.get(k) for k in ("snap", "snap_base", "ts", "ts_base", "cs", "cs_base")}
+                last = usage_line({k: _num(x.get(k)) for k in ("snap", "snap_base", "ts", "ts_base", "cs",
+                                                              "cs_base", "tn", "tn_base", "cn", "cn_base")}
                                   | {"week": int(_num(x.get("usage_week")) or 0)}, rush=rush, short=True)
                 if not _num(x.get("usage_week")):
                     last = last.split(": ", 1)[-1]

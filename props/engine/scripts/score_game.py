@@ -814,9 +814,9 @@ def main():
         for (t_, k_, w_), sv in _snp_w.items():
             if t_ == m_.team and k_ == key_ and sv > 0 and (m_.team, w_) in _tw_i.index:
                 tt_ = float(_tw_i.loc[(m_.team, w_), "targets"]); tc_ = float(_tw_i.loc[(m_.team, w_), "carries"])
-                wks.append((int(w_), float(sv),
-                            float(_tg_w.get((m_.team, m_.gsis_id, w_), 0)) / tt_ if tt_ else np.nan,
-                            float(_ca_w.get((m_.team, m_.gsis_id, w_), 0)) / tc_ if tc_ else np.nan))
+                n_t, n_c = float(_tg_w.get((m_.team, m_.gsis_id, w_), 0)), float(_ca_w.get((m_.team, m_.gsis_id, w_), 0))
+                wks.append((int(w_), float(sv), n_t / tt_ if tt_ else np.nan, n_c / tc_ if tc_ else np.nan,
+                            n_t, n_c))
         USAGE[m_["name"]] = RSCH.usage_change(sorted(wks))
         ROLE[m_["name"]] = RSCH.role_flag(USAGE[m_["name"]], WEEK - 1)
         if str(m_.get("pos")) in ("RB", "FB", "HB"):
@@ -1794,11 +1794,25 @@ def main():
             snap=(u_ or {}).get("snap"), snap_base=(u_ or {}).get("snap_base"),
             ts=(u_ or {}).get("ts"), ts_base=(u_ or {}).get("ts_base"),
             cs=(u_ or {}).get("cs"), cs_base=(u_ or {}).get("cs_base"),
+            tn=(u_ or {}).get("tn"), tn_base=(u_ or {}).get("tn_base"),
+            cn=(u_ or {}).get("cn"), cn_base=(u_ or {}).get("cn_base"),
             **{f"bf_{k}": v for k, v in (BACKFIELD.get(r_.player) or {}).items() if k != "week"},
             flags="; ".join(flags_)))
+        lk_ = RSCH.worth_a_look(research_rows[-1], WEEK - 1)
+        research_rows[-1]["look"] = lk_[0] if lk_ else None
+        if lk_:
+            research_rows[-1]["flags"] = "; ".join(
+                [f"worth a look: {lk_[0]} ({lk_[1]})"] + ([research_rows[-1]["flags"]] if research_rows[-1]["flags"] else []))
     RESEARCH = pd.DataFrame(research_rows)
     if len(RESEARCH):
         RESEARCH = RESEARCH.drop_duplicates(["player", "market", "line", "book"])
+        # WORTH A LOOK goes on the logged rows (DECISIONS #156): the scorecard grades every mark
+        if not SCENARIO and not R.empty and RESEARCH["look"].notna().any():
+            lk = {(r.player, r.market, float(r.line), r.book): r.look for r in RESEARCH.itertuples()
+                  if isinstance(r.look, str)}
+            R["look"] = [lk.get((r.player, r.market, float(r.line), r.book)) if pd.notna(r.line) else None
+                         for r in R.itertuples()]
+            (R[~R.book.isin(COMPARE_BOOKS)] if a.compare_books else R).to_csv(logf, index=False)
     RESEARCH.to_csv(OUT / f"research_{slug}.csv", index=False)
 
     # ---------- 8b/9. report, written for a casual reader ----------
@@ -2844,7 +2858,9 @@ def td_pairs_section(J_: pd.DataFrame, top: int = 6) -> list[str]:
 RESEARCH_NOTE = ("*Each line: the book's line and price, our projection (median, with the 10th-90th percentile "
                  "range), the chance of the Over by our model and by the book's price (its cut removed), and what the "
                  "line implies: the targets or carries per game at which the line is a fair 50/50, next to what we "
-                 "project; then the workload each side needs to beat its own price. Flags mark a teammate out or back, a new team, a Questionable tag, and the receiving "
+                 "project; then the workload each side needs to beat its own price. A **bold** prop is worth a "
+                 "look, not a bet: a role story plus last game's workload already past that side's break-even "
+                 "(DECISIONS #156; the scorecard grades every one). Flags mark a teammate out or back, a new team, a Questionable tag, and the receiving "
                  "role-shift pattern (reports/role_shift_check.md).*")
 
 
@@ -2946,6 +2962,8 @@ def research_cells(x, MKT) -> str:
     n0 = lambda v: f"{int(round(float(v))) + 0}"
     book = str(x.get("book", "sleeper"))
     label = MKT.get(x.market, x.market) + ("" if book == "sleeper" else f" ({BOOK_NAME.get(book, book)})")
+    if isinstance(x.get("look"), str):       # worth a look (research.worth_a_look): bold, never a bet label
+        label = f"**{label}**"
     return (f"| {label} | {x.line:g} | O {odds(x.price_over)} / U {odds(x.price_under)} | "
             f"{n0(x['median'])} ({n0(x['p10'])} to {n0(x['p90'])}) | {100*x.p_over_model:.0f}% / {100*x.p_over_book:.0f}% | {imp} | "
             f"{break_even_cell(x)} |")
@@ -2967,11 +2985,18 @@ def usage_line(u, rush=False, short=False):
     if not u:
         return None
     pc = lambda v: "—" if v is None or pd.isna(v) else f"{100*v:.0f}%"
+    blank = lambda v: v is None or (isinstance(v, float) and np.isnan(v))
+    # share / count: '19% / 6' last game, '25% / 8.3' a game before it (the user's format)
+    n, nb = (u.get("cn"), u.get("cn_base")) if rush else (u.get("tn"), u.get("tn_base"))
+    last_n = "" if blank(n) else f" / {float(n):.0f}"
+    base_n = "" if blank(nb) else f" / {float(nb):.1f}"
     share = ("carries", u["cs"], u["cs_base"]) if rush else ("targets", u["ts"], u["ts_base"])
     if short:
-        return f"wk{u['week']}: snaps {pc(u['snap'])} ({pc(u['snap_base'])}), {share[0]} {pc(share[1])} ({pc(share[2])})"
+        return (f"wk{u['week']}: snaps {pc(u['snap'])} ({pc(u['snap_base'])}), "
+                f"{share[0]} {pc(share[1])}{last_n} ({pc(share[2])}{base_n})")
     return (f"Week {u['week']}: snaps {pc(u['snap'])} (earlier weeks {pc(u['snap_base'])}), "
-            f"{share[0]} {pc(share[1])} of the team's (earlier {pc(share[2])}).")
+            f"{share[0]} {pc(share[1])} of the team's{last_n.replace(' / ', ', ')} "
+            f"(earlier {pc(share[2])}{base_n.replace(' / ', ', ') + ' a game' if base_n else ''}).")
 
 
 SCEN_KEY = ["book", "market", "player", "side", "line"]

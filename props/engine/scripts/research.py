@@ -245,19 +245,65 @@ def out_matters(pid, team, targets, carries, dropbacks, prior_ts=None, prior_rs=
     return bool((prior_ts or 0) >= OUT_TARGET_SHARE or (prior_rs or 0) >= OUT_CARRY_SHARE)
 
 
+# WORTH A LOOK (DECISIONS #156), fixed before any result: a story about his
+# role this week, AND last game's actual workload already beyond the side's
+# break-even workload by a clear margin, in the story's direction. Not a bet
+# label: it marks where the user's own read has the most to work with, and the
+# scorecard grades every mark at Sleeper's prices.
+LOOK_MARGIN = {"targets": 2.0, "carries": 3.0}
+
+
+def worth_a_look(x, last_week):
+    """(side, why) or None for one research row (a dict). x needs flags,
+    player, market, unit, over_needs, under_needs, tn / cn and usage_week."""
+    unit = x.get("unit")
+    if unit not in LOOK_MARGIN:
+        return None
+    if x.get("usage_week") is None or int(x["usage_week"]) != int(last_week):
+        return None          # last game must be the game just played
+    n = x.get("cn") if x.get("market") == "player_rush_yds" else x.get("tn")
+    if n is None or n != n:
+        return None
+    flags = [f.strip() for f in str(x.get("flags") or "").split(";") if f.strip()]
+    me = str(x.get("player", ""))
+    up = any(f == "role up" for f in flags) or any(f.endswith(" out") and not f.startswith(me) for f in flags)
+    down = any(f == "role down" for f in flags) or any("active (missed" in f for f in flags)
+    # a role or teammate story sets the direction; stories pulling both ways
+    # (more snaps, but the star teammate is back) mark nothing; a new team
+    # with no other story allows either side
+    if up and down:
+        return None
+    if not (up or down) and any(f.startswith("new team") for f in flags):
+        up = down = True
+    if not (up or down):
+        return None
+    m = LOOK_MARGIN[unit]
+    o, u = x.get("over_needs"), x.get("under_needs")
+    if up and o is not None and o == o and n >= o + m:
+        return "Over", f"last game {n:.0f} {unit}; the Over pays above {o:.1f}"
+    if down and u is not None and u == u and n <= u - m:
+        return "Under", f"last game {n:.0f} {unit}; the Under pays at {u:.1f} or fewer"
+    return None
+
+
 def usage_change(weeks):
-    """weeks: list of (week, snap_share, target_share, carry_share), sorted, the
-    player's weeks before this one with this team. LAST = the latest week, BASE
-    = the mean of the earlier ones (at least two). None when too few weeks."""
+    """weeks: list of (week, snap_share, target_share, carry_share[, targets,
+    carries]), sorted, the player's weeks before this one with this team. LAST
+    = the latest week, BASE = the mean of the earlier ones (at least two). With
+    the counts, tn / cn are last game's targets and carries and tn_base /
+    cn_base the earlier weeks' per-game average. None when too few weeks."""
     if len(weeks) < 3:
         return None
     last = weeks[-1]
     base = weeks[:-1]
     mean = lambda i: float(np.nanmean([w[i] for w in base]))
-    return {"week": int(last[0]),
-            "snap": last[1], "snap_base": mean(1),
-            "ts": last[2], "ts_base": mean(2),
-            "cs": last[3], "cs_base": mean(3)}
+    out = {"week": int(last[0]),
+           "snap": last[1], "snap_base": mean(1),
+           "ts": last[2], "ts_base": mean(2),
+           "cs": last[3], "cs_base": mean(3)}
+    if all(len(w) >= 6 for w in weeks):
+        out.update(tn=float(last[4]), tn_base=mean(4), cn=float(last[5]), cn_base=mean(5))
+    return out
 
 
 def role_flag(u, last_week_expected):

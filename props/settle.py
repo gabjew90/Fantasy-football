@@ -80,6 +80,8 @@ SETTLED_FIELDS = [
     "snap_react",
     # Sleeper's prices for both sides (DECISIONS #147)
     "price_over", "price_under",
+    # the worth-a-look side (DECISIONS #156)
+    "look",
     # The engine that made the call. These must be listed here or the
     # DictWriter's extrasaction="ignore" below drops them silently, and the
     # scorecard could not separate two versions.

@@ -142,3 +142,13 @@ def test_a_model_first_used_after_a_review_week_waits_for_the_next_one():
     assert g["review_week"] is None and g["next_review"] == 12 and not g["gate_open"]
     g = blend.yardage_gate(_calls(3000, True, weeks=(10, 13)), reps=200)   # weeks 10-12
     assert g["review_week"] == 12
+
+
+def test_the_scorecard_grades_each_mark_on_its_own_side():
+    df = pd.DataFrame({"market": ["player_rush_yds"] * 3, "side": ["Over", "Under", "Under"],
+                       "look": ["Under", "Under", None], "won": [1, 1, 0],
+                       "price_over": [-130] * 3, "price_under": [-125] * 3})
+    md = "\n".join(scorecard.look_section(df))
+    # row 1: model side Over won, so the marked Under LOST; row 2: marked Under won at -125
+    assert "| rush_yds | 2 | 1 | 50% | 56% | -10.0 |" in md
+    assert scorecard.look_section(df.drop(columns="look")) == []
