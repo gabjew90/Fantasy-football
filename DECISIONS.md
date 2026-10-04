@@ -7246,3 +7246,15 @@ by the user.
   book disagree and why (stale priors, the QB-passing low bias, game script),
   what to watch -- interpretation, not a recital of the table. The user asked
   for it on the 2026 week-4 slate.
+
+## 2026-10-04 (159) -- Power Plays are logged as entries
+
+- The user's Sleeper bets are Power Plays: every leg must hit; $5 on 5 legs
+  pays $100 total (20x), confirmed from the app. A single-pick price
+  overstates the hurdle: inside a 5-leg 20x entry each leg is about 1.82x
+  (−122), 54.9% to break even if the legs are independent.
+- `journal entry` logs one entry (stake, total payout, legs); each leg is
+  a journal row at the per-leg price, graded one by one for the scorecard,
+  and the summary's Entries table settles the entry all-or-nothing at its
+  real payout. Entries logged after kickoff are flagged and are not clean
+  pre-game decisions.

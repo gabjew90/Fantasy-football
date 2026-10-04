@@ -273,6 +273,12 @@ two Over chances that table shows for its line and the break-even cell, copied
 as shown (never recomputed): `--assumption "<the --assume rule>" --over-board
 <board %> --over-scenario <scenario %> --pays-if "<the cell>"`.
 
+A Sleeper Power Play (every leg must hit) is ONE entry with its total payout:
+`python props/journal.py entry --stake <$> --payout <total it pays> --angle <...> --why "<the entry's reason>" --leg "<Player>|<market>|<side>|<line>|<TEAM>[|<angle>]" --leg ...`
+(line empty for an anytime TD; add `--after-kickoff` if any leg's game had started).
+Each leg is priced at the entry's per-leg rate (a 5-leg 20x entry is about −122 a
+leg, 54.9% to break even), and the entry counts only if every leg hits.
+
 An anytime-TD bet has no line: `python props/journal.py add "<player>" td <yes|no> <price> --team <TEAM> --angle ... --change ... --implies ... --fails ...`. The engine contract's "the
 reply is slate_summary reproduced in full" is for a request for the slate
 as a whole, and so is its full "prop guide" structure for one game:

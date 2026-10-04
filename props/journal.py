@@ -16,6 +16,9 @@ pooling them would describe neither (DECISIONS #142).
     python props/journal.py add "Woody Marks" rush_yds over 33.5 -130 --team HOU --angle return \\
         --change ... --implies ... --fails ... --assumption "Woody Marks: carries=14" \\
         --over-board 37% --over-scenario 70% --pays-if "Over above 11.2 carries; Under at 9.2 or fewer"
+    # a Sleeper Power Play: one all-or-nothing entry, its legs graded one by one
+    python props/journal.py entry --stake 5 --payout 100 --angle role --why "Houston redistributes around Collins" \\
+        --leg "Dalton Schultz|rec_yds|under|40.5|HOU" --leg "Woody Marks|rush_yds|under|36.5|HOU" ...
     python props/journal.py list [--open]
     python props/journal.py grade --season 2026
     python props/journal.py summary --season 2026
@@ -343,6 +346,72 @@ def breakeven(price: int) -> float:
     return abs(price) / (abs(price) + 100) if price < 0 else 100 / (price + 100)
 
 
+def leg_price(stake: float, payout: float, n: int) -> int:
+    """The per-leg American price of an all-or-nothing entry: the n-th root of
+    its total return (DECISIONS #159). $5 to win $100 total on 5 legs is 20x,
+    1.82x a leg, about -122 -- each leg needs about 54.9% if they are
+    independent."""
+    if stake <= 0 or payout <= stake or n < 1:
+        raise ValueError("an entry needs a positive stake, a total payout above it, and at least one leg")
+    m = (payout / stake) ** (1.0 / n)
+    return int(round((m - 1) * 100)) if m >= 2 else int(round(-100 / (m - 1)))
+
+
+def make_power_play(legs, *, stake: float, payout: float, angle: str, why: str, season: int, week: int,
+                    after_kickoff: bool = False, now: dt.datetime | None = None) -> list[dict]:
+    """One row per leg of a Power Play, sharing an entry id. legs: list of
+    (player, market, side, line, team[, angle]). Each leg is priced at the
+    entry's per-leg price so the scorecard can grade legs; the entry itself
+    wins only if every leg does."""
+    if not str(why or "").strip():
+        raise ValueError("--why is required: the entry's reason in a sentence")
+    if len(legs) < 2:
+        raise ValueError("a Power Play has at least two legs")
+    price = leg_price(stake, payout, len(legs))
+    eid = "pp" + uuid.uuid4().hex[:8]
+    rows = []
+    for leg in legs:
+        player, market, side, line, team = (list(leg) + [None] * 5)[:5]
+        leg_angle = (leg[5] if len(leg) > 5 and leg[5] else angle)
+        r = make_entry(player, market, side, line, price, change=why, implies="(entry leg)",
+                       fails="any leg misses: the whole entry loses", angle=leg_angle, team=team,
+                       stake=stake / len(legs), season=season, week=week, now=now)
+        r.update(entry_id=eid, entry_legs=len(legs), entry_stake=float(stake), entry_payout=float(payout),
+                 after_kickoff=bool(after_kickoff))
+        rows.append(r)
+    return rows
+
+
+def entries_table(rows: list[dict]) -> list[str]:
+    """Power Plays as entries: all-or-nothing, at the real payout."""
+    ents = {}
+    for r in rows:
+        if r.get("entry_id"):
+            ents.setdefault(r["entry_id"], []).append(r)
+    if not ents:
+        return []
+    out = ["**Entries** (Sleeper Power Plays: every leg must hit):", "",
+           "| Logged | Legs | Stake | Pays (total) | Legs won / graded | Result | Net |", "|---|---|---|---|---|---|---|"]
+    for eid, legs in ents.items():
+        st, pay = float(legs[0]["entry_stake"]), float(legs[0]["entry_payout"])
+        graded = [x for x in legs if x.get("status") == "graded"]
+        won = sum(1 for x in graded if x.get("won"))
+        if any(x.get("status") == "graded" and not x.get("won") for x in legs):
+            res, net = "lost", -st
+        elif all(x.get("status") == "graded" and x.get("won") for x in legs):
+            res, net = "won", pay - st
+        elif any(x.get("status") in ("void", "check") for x in legs):
+            res, net = "check (a leg voided or needs a box score)", None
+        else:
+            res, net = "open", None
+        late = " (after kickoff)" if legs[0].get("after_kickoff") else ""
+        names = ", ".join(f"{x['player']} {x['side']}" for x in legs)
+        out.append(f"| week {legs[0]['week']}{late} | {names} | ${st:g} | ${pay:g} | {won} / {len(graded)} | {res} | "
+                   + ("—" if net is None else f"{net:+.2f}") + " |")
+    return out + ["", "Entries logged after kickoff are kept but are not clean pre-game decisions; the "
+                      "legs are still graded one by one on the scorecard.", ""]
+
+
 def scenario_table(rows: list[dict]) -> list[str]:
     """Bets logged from a scenario run: what the board said, what your scenario
     said, and what happened. If your adjustments carry information, the win
@@ -431,6 +500,7 @@ def summary_md(season: int) -> list[str]:
         out.append("")
     out += angle_table(rows)
     out += scenario_table(rows)
+    out += entries_table(rows)
     out += ["| Week | Player | Bet | Angle | Price | Late line | Result | Net | The change | Your scenario |",
             "|---|---|---|---|---|---|---|---|---|---|"]
     for r in sorted(rows, key=lambda r: (r["week"], r["logged_at_utc"])):
@@ -472,6 +542,15 @@ def main(argv: list[str] | None = None) -> int:
     a.add_argument("--over-board", default=None, help="the board's Over chance from the scenario table (e.g. 37%%)")
     a.add_argument("--over-scenario", default=None, help="your scenario's Over chance (e.g. 70%%)")
     a.add_argument("--pays-if", default=None, help="the break-even workload cell, as the board shows it")
+    pp = sub.add_parser("entry", help="log a Sleeper Power Play: all-or-nothing legs at the real payout")
+    pp.add_argument("--stake", type=float, required=True, help="dollars staked on the entry")
+    pp.add_argument("--payout", type=float, required=True, help="the TOTAL the entry pays if every leg hits")
+    pp.add_argument("--leg", action="append", required=True,
+                    help="'Player|market|side|line|TEAM[|angle]' (line empty for an anytime TD), repeatable")
+    pp.add_argument("--angle", required=True, choices=list(ANGLES), help="the entry's story (a leg can override)")
+    pp.add_argument("--why", required=True, help="the entry's reason in a sentence")
+    pp.add_argument("--after-kickoff", action="store_true", help="logged after a leg's game started")
+    pp.add_argument("--season", type=int, default=None); pp.add_argument("--week", type=int, default=None)
     ls = sub.add_parser("list"); ls.add_argument("--season", type=int, default=None)
     ls.add_argument("--open", action="store_true")
     g = sub.add_parser("grade"); g.add_argument("--season", type=int, required=True)
@@ -501,6 +580,27 @@ def main(argv: list[str] | None = None) -> int:
         ln = "" if e["line"] is None else f"{e['line']:g} "
         print(f"logged {e['id']}: week {e['week']} {e['player']} {e['side']} "
               f"{ln}{LABEL[e['market']]} {e['price']:+d} -> {journal_path(season)}")
+        return 0
+    if args.cmd == "entry":
+        legs = []
+        for spec in args.leg:
+            parts = [x.strip() for x in spec.split("|")]
+            if len(parts) < 5 or parts[5:] and parts[5] not in ANGLES:
+                print(f"not logged: leg '{spec}' -- write it as 'Player|market|side|line|TEAM[|angle]'",
+                      file=sys.stderr)
+                return 2
+            legs.append((parts[0], parts[1], parts[2], parts[3] or None, parts[4] or None,
+                         parts[5] if len(parts) > 5 else None))
+        try:
+            rows_ = make_power_play(legs, stake=args.stake, payout=args.payout, angle=args.angle, why=args.why,
+                                    season=season, week=args.week or current_week(season),
+                                    after_kickoff=args.after_kickoff)
+        except ValueError as exc:
+            print(f"not logged: {exc}", file=sys.stderr)
+            return 2
+        write(season, read(season) + rows_)
+        print(f"logged entry {rows_[0]['entry_id']}: {len(rows_)} legs, ${args.stake:g} to ${args.payout:g}, "
+              f"each leg at {rows_[0]['price']:+d} -> {journal_path(season)}")
         return 0
     if args.cmd == "list":
         for r in read(season):
