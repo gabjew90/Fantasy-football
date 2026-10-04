@@ -100,3 +100,18 @@ as shipped).
 Ship rule (2024-25, read once): receptions or receiving yards better than
 round 23 with an interval excluding zero, and no market worse with an
 interval excluding zero.
+
+## Round 25 result (2026-10-03): measured, not shipped
+
+Tune 2022-23, paired against round 23 (positive = better):
+
+| SNAP_REACT_UP | 2022 catches | 2022 rec yds | 2023 catches | 2023 rec yds |
+|---|---|---|---|---|
+| 0.35 | +0.0004 | +0.0023 | -0.0003 | -0.0063 |
+| 0.25 | +0.0001 | -0.0024 | -0.0019 | -0.0198 |
+| 0.0 | -0.0033 | -0.0341 | -0.0090 (-0.0140, -0.0038) | -0.0900 (-0.1423, -0.0395) |
+
+None is positive in both seasons for both markets, so round 25 is dropped and
+2024-25 was not read. The 2024-25 overshoot does not exist on the tune
+seasons; the record's "snap-change rule's calls" section (#145) watches it on
+2026 calls.

@@ -48,7 +48,8 @@ N = 1000
 
 # market key -> (actual column, label, synthetic-line offsets for the reliability table)
 # market -> the population column its rows are graded on (absent = every row)
-POPULATION = {"rush": "rush_pop", "qbrush": "qb_pop", "pass": "pass_pop", "car": "rush_pop"}
+POPULATION = {"rush": "rush_pop", "qbrush": "qb_pop", "pass": "pass_pop", "car": "rush_pop",
+              "cmp": "pass_pop"}
 MARKETS = {"rec": ("act_receptions", "receptions", [0.5, 1.5, 2.5, 3.5]),
            "yds": ("act_rec_yards", "receiving yards", [5, 10, 15, 20, 30]),
            "rush": ("act_rush_yards", "rushing yards", [5, 10, 15, 20, 30]),
@@ -59,7 +60,9 @@ MARKETS = {"rec": ("act_receptions", "receptions", [0.5, 1.5, 2.5, 3.5]),
            "pass": ("act_pass_yards", "QB passing yards", [10, 20, 30, 40, 60]),
            # rushing attempts (props-v1.30 candidate): the carries the rushing draw
            # already makes, graded on the same rushing population (backs, not QBs)
-           "car": ("act_carries", "rushing attempts", [0.5, 1.5, 2.5, 3.5])}
+           "car": ("act_carries", "rushing attempts", [0.5, 1.5, 2.5, 3.5]),
+           # the starting QB's completions (reports/qb_completions.md)
+           "cmp": ("act_completions", "QB completions", [0.5, 1.5, 2.5, 3.5])}
 # THE LIVE SCORER'S OPPONENT SETTINGS (score_game.py section 5): team level, fixed
 # shrinkage k0=150 plays, applied to catch rate, ypt and ypc. The single-season
 # defaults below (posgrp, k0=1000) are the round-5 ones, kept for reproduction.
@@ -617,6 +620,12 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
         feat.to_pickle(f)
         return feat
     feat_te = cached_features(TEST, "test")
+    _pp = pbp_full[(pbp_full.play_type == "pass") & pbp_full.passer_player_id.notna()]
+    _cmp = (_pp.assign(c=_pp.complete_pass.fillna(0)).groupby(["posteam", "week", "passer_player_id"]).c.sum()
+            .rename("act_completions").reset_index()
+            .rename(columns={"posteam": "team", "passer_player_id": "gsis_id"}))
+    feat_te = feat_te.merge(_cmp, on=["team", "week", "gsis_id"], how="left").assign(
+        act_completions=lambda d: d.act_completions.fillna(0.0))
     if live and sr_gamma is not None:
         feat_te = add_snap_features(feat_te)
     feat_te = build_shrunk(feat_te[["team", "week", "gsis_id", "roster_status"]], feat_te, TEST, args.env)
@@ -690,6 +699,7 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
             rec_ = np.zeros((len(frame), N))
             yds = np.zeros((len(frame), N))
             passing = {}
+            completions = {}
             pos_ = {ix: i for i, ix in enumerate(frame.index)}
             for (team, week), g in frame.groupby(["team", "week"], sort=False):
                 tvol = float(g.team_targets_env.iloc[0])
@@ -708,6 +718,9 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
                     passing[(team, week)] = M.simulate_qb_passing(
                         g_rng, N, [y_ for _r, y_ in out.values()], other_t, other_rates, shape_ypc,
                         starter_share=pass_share, width=width)
+                    completions[(team, week)] = M.simulate_qb_completions(
+                        g_rng, N, [r_ for r_, _y in out.values()], other_t, other_rates, starter_share=pass_share)
+            draw_block_joint.completions = completions
             return rec_, yds, passing
 
         def draw_block_rush(frame, shares, ypcs, arm):
@@ -760,11 +773,14 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
         # isolates the SHRINKAGE, which is what baseline A exists to test.
         recM, ydsM, passTW = draw_block_joint(tr, tr.ts.values, tr.cr.clip(lower=0.05).values, tr.ypt.values,
                                               arm=1)
+        cmpTW = dict(getattr(draw_block_joint, "completions", {}))
         if full:
             recA, ydsA, passTW_A = draw_block_joint(tr, shareA, crA, yptA, arm=2)
+            cmpTW_A = dict(getattr(draw_block_joint, "completions", {}))
             recI, ydsI = draw_block(mu_m, ypc_m, rec_fit)
         else:                                   # tuning: the model arm is all that is compared
             recA, ydsA, recI, ydsI, passTW_A = recM, ydsM, recM, ydsM, passTW
+            cmpTW_A = cmpTW
         y_rec = tr.act_receptions.values.astype(float)
         y_yds = tr.act_rec_yards.values.astype(float)
         # The receiving PITs draw their tie-break uniforms BEFORE the rushing
@@ -809,6 +825,10 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
         passA = np.array([passTW_A[tw_keys[i]] for i in p_ix]).reshape(len(p_ix), N)
         y_pass = test_act.act_pass_yards.values.astype(float)
         y_pass_p = y_pass[p_ix]
+        cmpM = np.array([cmpTW[tw_keys[i]] for i in p_ix]).reshape(len(p_ix), N)
+        cmpA = np.array([cmpTW_A[tw_keys[i]] for i in p_ix]).reshape(len(p_ix), N)
+        y_cmp = test_act.act_completions.values.astype(float)
+        y_cmp_p = y_cmp[p_ix]
 
         def pass_rows(vals):
             """Starting-QB passing values back onto every row; NaN elsewhere."""
@@ -859,6 +879,14 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
             "above_med_car": y_car > np.median(carsM, axis=1),
             "crps_car_model": np.where(rush_pop, crps_block(carsM, y_car), nan_),
             "crps_car_baseA": np.where(rush_pop, crps_block(carsA, y_car), nan_),
+            # QB completions, drawn after every other PIT (reports/qb_completions.md)
+            "act_completions": y_cmp,
+            "pit_cmp": pass_rows(rpit_block(cmpM, y_cmp_p)),
+            "med_cmp_model": pass_rows(np.median(cmpM, axis=1)),
+            "mean_cmp_model": pass_rows(cmpM.mean(1)),
+            "above_med_cmp": pass_rows(y_cmp_p > np.median(cmpM, axis=1)),
+            "crps_cmp_model": pass_rows(crps_block(cmpM, y_cmp_p)),
+            "crps_cmp_baseA": pass_rows(crps_block(cmpA, y_cmp_p)),
             "crps_rec_model": full_rows(crps_block(recM, y_rec)), "crps_rec_baseA": full_rows(crps_block(recA, y_rec)),
             "crps_yds_model": full_rows(crps_block(ydsM, y_yds)), "crps_yds_baseA": full_rows(crps_block(ydsA, y_yds)),
             "crps_rush_model": np.where(rush_pop, crps_block(rushM, y_rush), nan_),
@@ -879,14 +907,15 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
                 ("rush", rushM, y_rush, rush_pop, test_act.week.values),
                 ("qbrush", rushM, y_qb, qb_pop, test_act.week.values),
                 ("pass", passM, y_pass_p, np.ones(len(p_ix), bool), test_act.week.values[p_ix]),
-                ("car", carsM, y_car, rush_pop, test_act.week.values)]:
+                ("car", carsM, y_car, rush_pop, test_act.week.values),
+                ("cmp", cmpM, y_cmp_p, np.ones(len(p_ix), bool), test_act.week.values[p_ix])]:
             if not keep.any():
                 continue
             smp, yy = samples[keep], y[keep]
             med = np.median(smp, axis=1)
             for o in MARKETS[mk][2]:
                 for side, L in [("Under", med + o), ("Over", np.maximum(med - o, 0.5))]:
-                    if mk in ("rec", "car"):     # counts: lines at the half
+                    if mk in ("rec", "car", "cmp"):     # counts: lines at the half
                         L = np.floor(L) + 0.5 if side == "Under" else np.ceil(L) - 0.5
                         L = np.maximum(L, 0.5)
                     p = (smp < L[:, None]).mean(1) if side == "Under" else (smp > L[:, None]).mean(1)

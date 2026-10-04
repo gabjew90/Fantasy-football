@@ -47,3 +47,14 @@ def test_a_separate_exponent_for_a_snap_increase():
     assert math.isclose(M.snap_react(0.2, 0.9, 0.6, 0.5, gamma_up=0.25), 0.2 * 1.5 ** 0.25), "increase: gamma_up"
     assert math.isclose(M.snap_react(0.2, 0.6, 0.9, 0.5, gamma_up=0.25), 0.2 * (0.6 / 0.9) ** 0.5), "decrease: gamma"
     assert M.snap_react(0.2, 0.9, 0.6, 0.5) == M.snap_react(0.2, 0.9, 0.6, 0.5, gamma_up=None), "None = round 23"
+
+
+def test_completions_add_the_receivers_catches_and_never_move_the_parent_stream():
+    import numpy as np
+    rng = np.random.default_rng(1)
+    before = np.random.default_rng(1).random()
+    c = M.simulate_qb_completions(rng, 4000, [np.full(4000, 5.0), np.full(4000, 3.0)], np.full(4000, 4),
+                                  {"catch_rate": 0.5, "ypt": 6.0})
+    assert abs(c.mean() - 10.0) < 0.1, "5 + 3 + half of 4 depth targets"
+    assert float(np.all(c == np.round(c))) == 1.0, "whole catches"
+    assert rng.random() == before, "spawn does not advance the parent stream"

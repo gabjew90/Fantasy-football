@@ -7113,3 +7113,18 @@ the last Sleeper quote the capture logged before kickoff for that player,
 market and side (points moved your way; at the same line, the late price's
 implied chance minus yours). It is stamped at grading and leads the journal
 section, labelled as the last captured line, not the true close.
+
+## 2026-10-03 (149) -- workload markets and the snap overshoot: three measured nulls
+
+- Rushing attempts, round 24: widening carries (share_conc_carries 8,
+  eff_sd_rush 0.1, chosen on 2022-23 with rushing yards held to its bar) fixed
+  the width on 2024-25 (0.189) but calibration stayed 0.060 off and baseline A
+  was not beaten every season. Not priced; rushing yards stay on the shipped
+  settings (reports/rush_attempts.md).
+- QB completions (the receivers' catches in the same game times the starter's
+  share): ~5% high on 2024-25, calibration 0.058 off. Not priced; the harness
+  keeps grading it (reports/qb_completions.md). Pass attempts not attempted.
+- Round 25, a separate exponent for a snap increase: no value helped both tune
+  seasons; dropped, 2024-25 unread (reports/snap_react.md).
+Speed-dependent and paid work (inactives alerts, charting data) was ruled out
+by the user.

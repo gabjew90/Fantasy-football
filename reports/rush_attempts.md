@@ -74,3 +74,15 @@ Ship rule (2024-25, read once): rushing attempts pass the full four-part bar,
 rushing yards still pass the full bar, and rushing yards' CRPS is not worse
 than props-v1.29 with a paired interval excluding zero. Otherwise attempts
 stay unpriced and this report records the result.
+
+## Round 24 result (2026-10-03): rushing attempts still do not pass -- not priced
+
+Tune 2022-23: settings that kept rushing yards passing were (20, 0.3), (12,
+0.3), (12, 0.2), (8, 0.2), (8, 0.1); the lowest attempts CRPS tied at 2.788-
+2.789 and the tie-break (rushing-yards CRPS) chose share_conc_carries 8,
+eff_sd_rush 0.1 (attempts width 0.193 on tune, from 0.269). Read once on
+2024-25: rushing yards PASS (width 0.201, calibration 0.030; CRPS +0.020
+(-0.023, +0.060) vs v1.29, noise); rushing attempts width 0.189 (fixed) but
+calibration worst 0.060 and baseline A not beaten in every season -- DOES NOT
+PASS. By the ship rule nothing changes: attempts stay unpriced, rushing yards
+stay on the shipped settings.

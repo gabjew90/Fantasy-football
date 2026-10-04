@@ -948,6 +948,24 @@ def simulate_team_game(rng, n_sim, team_volume_mean, team_volume_r, player_share
     return out, team_targets
 
 
+def simulate_qb_completions(rng, n_sim, receiver_receptions, other_targets, other_rates, starter_share=None):
+    """The starting QB's completions (reports/qb_completions.md): his receivers'
+    catches in the SAME simulation, plus the 'other' bucket's targets caught at
+    the depth receivers' rate, times his share of the team's passing (the prior
+    season's grid), rounded. Its own child stream, drawn after passing yards:
+    no other number moves."""
+    g = rng.spawn(1)[0]
+    total = np.zeros(n_sim)
+    for r in receiver_receptions:
+        total = total + np.asarray(r, dtype=float)
+    if other_targets is not None and other_rates:
+        cr = min(max(float(other_rates["catch_rate"]), 0.05), 1.0)
+        total = total + g.binomial(np.asarray(other_targets).astype(np.int64), cr).astype(float)
+    if starter_share is not None:
+        total = total * g.choice(np.asarray(starter_share, dtype=float), size=n_sim)
+    return np.round(total)
+
+
 def simulate_qb_passing(rng, n_sim, receiver_yards, other_targets, other_rates, per_catch_shape,
                         starter_share=None, width=None):
     """The starting QB's passing yards (plan step 4), from the SAME simulation
