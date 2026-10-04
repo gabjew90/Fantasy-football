@@ -240,7 +240,42 @@ For a narrow question, run only what it needs:
   assumptions, not confidence intervals), and never call a line a play. Touchdowns are not adjusted.
   Never recorded (outputs in `scenarios/`).
 - **Today's games / one date:** `python scripts/score_week.py --today` or `--date YYYY-MM-DD`
-  (`--markets` passes through).
+  (`--markets` passes through). `--kickoff 13:00` keeps one window (Eastern time: 13:00 is the
+  10am PT games); `--sort total` orders the games by their total, highest first; `--overs-only`
+  shows the Over side only. A slate run writes `slate_board_*.md` -- every game's full research
+  table in one file, in that order -- and prints it: for "the props for these games", reproduce it
+  in full (never trim rows), then a short read of what stands out per game. A **bold** prop is "worth a look"
+  (DECISIONS #156): a role story plus last game's workload already past that side's break-even.
+  **Every game gets a short preview narrative**, in the board's order, BEFORE its bold lines:
+  read the game, do not recite the table. Start from the context line under its heading --
+  who is favoured and the implied points (the script: a big favourite runs late, an underdog
+  throws; a low total with a backup QB plays conservative), and each team's "last week was a
+  preview / differs" note. Then each side's situation: the role changes that matter (who took
+  over a backfield, whose target share jumped or collapsed, a returning star and who it takes
+  from), where the model and the book disagree AND WHY (a stale prior on a new role, a game script
+  the model does not price; when the model sits below most QB passing lines, say the gap is
+  unexplained -- the harness found QB passing unbiased on 2024-25 outcomes, so neither side
+  is known to be right), and
+  what to watch. A game with nothing to find says so in a sentence. Never call a line a bet.
+  Then narrate the bold lines, analytically, in plain English -- interpret, do not recite the
+  row's numbers back:
+  1. **The story and its direction**: who is out or back, whose role moved, and why that points
+     Over or Under for THIS player (a running back's real story is often a teammate in the
+     backfield, not the receiver the flag names).
+  2. **Does last week transfer?** Each mark ends with the team's note: "last week was a preview:
+     same QB, same key absences" (the strongest evidence: last week already showed today's
+     situation) or "last week differs: QB change / X newly out / X back" (last week's workload
+     was earned in a different situation; say what changes and which way).
+  3. **What the price demands**: how far past the break-even last week's workload sits, and
+     whether his EARLIER role also clears it (if it does, the read survives even a reversion).
+     A target spike without a snap increase is the least sticky kind; snaps and targets rising
+     together is the most.
+  4. **Which line suits the read**: catches vs yards by price (a −185 side needs 65%), and by
+     the read itself (backup-QB volume suits catches over yards; one long play beats a yards Under).
+  5. **How it fails**: game script, a teammate's health, efficiency vs volume.
+  Close with a ranking of the bold lines by how well the read holds up (strongest / one real
+  question / demanding or shaky), then the reminders: Sleeper entries need 2+ picks that each
+  stand alone; log any bet in the journal with its angle.
 - **Anytime TD:** every priced TD row is also in `td_board_*.csv` (the research table leaves TD rows out).
   A TD-only run takes DraftKings prices from The Odds API when the cached quota shows 100+ credits,
   otherwise Sleeper; the sources table says which, and so must the reply.

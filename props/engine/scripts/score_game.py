@@ -814,9 +814,9 @@ def main():
         for (t_, k_, w_), sv in _snp_w.items():
             if t_ == m_.team and k_ == key_ and sv > 0 and (m_.team, w_) in _tw_i.index:
                 tt_ = float(_tw_i.loc[(m_.team, w_), "targets"]); tc_ = float(_tw_i.loc[(m_.team, w_), "carries"])
-                wks.append((int(w_), float(sv),
-                            float(_tg_w.get((m_.team, m_.gsis_id, w_), 0)) / tt_ if tt_ else np.nan,
-                            float(_ca_w.get((m_.team, m_.gsis_id, w_), 0)) / tc_ if tc_ else np.nan))
+                n_t, n_c = float(_tg_w.get((m_.team, m_.gsis_id, w_), 0)), float(_ca_w.get((m_.team, m_.gsis_id, w_), 0))
+                wks.append((int(w_), float(sv), n_t / tt_ if tt_ else np.nan, n_c / tc_ if tc_ else np.nan,
+                            n_t, n_c))
         USAGE[m_["name"]] = RSCH.usage_change(sorted(wks))
         ROLE[m_["name"]] = RSCH.role_flag(USAGE[m_["name"]], WEEK - 1)
         if str(m_.get("pos")) in ("RB", "FB", "HB"):
@@ -1711,22 +1711,59 @@ def main():
     # USAGE / ROLE: computed before the share blend (section 5), which round 23 reads
     # teammates handled by the out rule, and key teammates back from a missed week
     OUT_NOTE = {t_: [] for t_ in (AWAY, HOME)}
+    # WAS LAST WEEK A PREVIEW (DECISIONS #157)? Same starting QB, same key
+    # absences. A mark built on last week's workload transfers when it was.
+    PREVIEW_DIFF = {t_: [] for t_ in (AWAY, HOME)}
+    _tg = passes[["posteam", "week"]].assign(pid=passes.receiver_player_id)
+    _cr = rushes[["posteam", "week"]].assign(pid=rushes.rusher_player_id)
+    _db_ = pbp[(pbp.play_type == "pass") & pbp.passer_player_id.notna()]
+    _db = _db_[["posteam", "week"]].assign(pid=_db_.passer_player_id)
     for _, e_ in pop[pop.excluded].iterrows():
-        OUT_NOTE[e_.team].append(f"{e_['name']} out")
+        pri_ = pri_players.loc[e_.gsis_id] if e_.gsis_id in pri_players.index else None
+        _wk = ros[(ros.season == SEASON) & (ros.week < WEEK) & (ros.team == e_.team)
+                  & (ros.gsis_id == e_.gsis_id) & (ros.status == "ACT")].week
+        if RSCH.out_matters(e_.gsis_id, e_.team, _tg, _cr, _db,
+                            None if pri_ is None else pri_.get("target_share"),
+                            None if pri_ is None else pri_.get("rush_share"), weeks=set(_wk)):
+            played_lw = _snp_w.get((e_.team, norm_name(e_["name"]), WEEK - 1), 0) > 0
+            qb_tag = " (QB)" if str(e_.get("pos")) == "QB" else ""
+            OUT_NOTE[e_.team].append(f"{e_['name']}{qb_tag} out, "
+                                     + ("played last week" if played_lw else "also out last week"))
+            if played_lw:
+                PREVIEW_DIFF[e_.team].append(f"{e_['name']} newly out")
     BACK_NOTE = {}
     for _, m_ in M.iterrows():
         pri_ = pri_players.loc[m_.gsis_id] if m_.gsis_id in pri_players.index else None
-        if pri_ is None or not pd.notna(pri_.target_share) or float(pri_.target_share) < 0.15:
+        # a KEY teammate: 15%+ of the targets OR the carries last season, or this
+        # season in the weeks he played (a back who returns matters too)
+        if not RSCH.is_key_teammate(None if pri_ is None else pri_.get("target_share"),
+                                    None if pri_ is None else pri_.get("rush_share"),
+                                    RSCH.role_share(_tg, m_.gsis_id, m_.team),
+                                    RSCH.role_share(_cr, m_.gsis_id, m_.team)):
             continue
-        on_ = ros[(ros.season == SEASON) & (ros.week < WEEK) & (ros.team == m_.team)
-                  & (ros.gsis_id == m_.gsis_id)]
-        on_ = on_[on_.week.isin(set(tw[tw.team == m_.team].week))]   # weeks the team played
-        listed_ = on_.week.nunique()
-        missed_ = on_[on_.status != "ACT"].week.nunique()
-        if missed_:
-            BACK_NOTE[m_.team] = BACK_NOTE.get(m_.team, []) + [
-                f"{m_['name']} active (missed {missed_} of {listed_} weeks)"]
-    research_rows, _implied_cache = [], {}
+        # BACK means he missed the game just played and plays today: a teammate
+        # who missed week 2 but played last week is not returning (DECISIONS #157)
+        if (m_.team, WEEK - 1) not in _tw_i.index:
+            continue                       # the team was on a bye last week
+        if _snp_w.get((m_.team, norm_name(m_["name"]), WEEK - 1), 0) > 0:
+            continue
+        if bool(m_.new_team) and not any(k_[0] == m_.team and k_[1] == norm_name(m_["name"]) for k_ in _snp_w.index):
+            # never played for this team: he JOINS, he is not back
+            BACK_NOTE[m_.team] = BACK_NOTE.get(m_.team, []) + [f"{m_['name']} joins (new this week)"]
+            PREVIEW_DIFF[m_.team].append(f"{m_['name']} joins")
+            continue
+        BACK_NOTE[m_.team] = BACK_NOTE.get(m_.team, []) + [f"{m_['name']} back (missed last week)"]
+        PREVIEW_DIFF[m_.team].append(f"{m_['name']} back")
+    _lwp = pbp[(pbp.week == WEEK - 1) & (pbp.play_type == "pass") & pbp.passer_player_id.notna()]
+    PREVIEW = {}
+    for t_ in (AWAY, HOME):
+        sq_ = STARTER_QB.get(t_)
+        tid_ = M[(M.team == t_) & (M.name == sq_)].gsis_id if sq_ is not None else []
+        qc_ = RSCH.qb_change(_lwp[_lwp.posteam == t_], tid_.iloc[0] if len(tid_) else None, sq_)
+        if qc_:
+            PREVIEW_DIFF[t_].insert(0, qc_)
+        PREVIEW[t_] = RSCH.preview_note(PREVIEW_DIFF[t_])
+    research_rows, _implied_cache, _edges_cache = [], {}, {}
     # THIS run's lines only: R has been merged with --prior-log above, and an
     # earlier capture's line (58.5 before it moved to 59.5) is not a line now
     _now = pd.DataFrame(rows)
@@ -1747,6 +1784,7 @@ def main():
                     env[m_.team]["targets"], TVD["targets_r"], float(m_.ts), float(m_.cr), float(m_.ypt),
                     SH, width=WIDTH, prices=px_)
                 _implied_cache[ck] += ("targets",)
+                _edges_cache[ck] = RSCH.edges_for()
             elif r_.market == "player_rush_yds":
                 j_ = si["names"].index(r_.player)
                 _implied_cache[ck] = RSCH.implied_carries(
@@ -1754,6 +1792,7 @@ def main():
                     width=WIDTH, player_resid=si["p_resid"], player_kneel=si["p_kneel"], qb_index=si["qb_i"],
                     prices=px_)
                 _implied_cache[ck] += ("carries",)
+                _edges_cache[ck] = RSCH.edges_for()
             else:
                 _implied_cache[ck] = (None, None, None, None, None)
         imp, proj, over_needs, under_needs, unit = _implied_cache[ck]
@@ -1777,14 +1816,33 @@ def main():
             p_over_model=float(p_over), p_over_book=float(nv_over),
             implied=imp, projected=proj, unit=unit, over_needs=over_needs, under_needs=under_needs,
             be_over=RSCH.breakeven(px_[0]), be_under=RSCH.breakeven(px_[1]),
+            **_edges_cache.get(ck, {}),
+            usage_week=(u_ or {}).get("week"), preview=PREVIEW.get(m_.team),
             snap=(u_ or {}).get("snap"), snap_base=(u_ or {}).get("snap_base"),
             ts=(u_ or {}).get("ts"), ts_base=(u_ or {}).get("ts_base"),
             cs=(u_ or {}).get("cs"), cs_base=(u_ or {}).get("cs_base"),
+            tn=(u_ or {}).get("tn"), tn_base=(u_ or {}).get("tn_base"),
+            cn=(u_ or {}).get("cn"), cn_base=(u_ or {}).get("cn_base"),
             **{f"bf_{k}": v for k, v in (BACKFIELD.get(r_.player) or {}).items() if k != "week"},
             flags="; ".join(flags_)))
+        lk_ = RSCH.worth_a_look(research_rows[-1], WEEK - 1)
+        research_rows[-1]["look"] = lk_[0] if lk_ else None
+        if lk_:
+            research_rows[-1]["flags"] = "; ".join(
+                [f"worth a look: {lk_[0]} ({lk_[1]})"] + ([research_rows[-1]["flags"]] if research_rows[-1]["flags"] else []))
     RESEARCH = pd.DataFrame(research_rows)
     if len(RESEARCH):
         RESEARCH = RESEARCH.drop_duplicates(["player", "market", "line", "book"])
+        # WORTH A LOOK goes on the logged rows (DECISIONS #156): the scorecard grades every mark
+        if not SCENARIO and not R.empty and RESEARCH["look"].notna().any():
+            lk = {(r.player, r.market, float(r.line), r.book): r.look for r in RESEARCH.itertuples()
+                  if isinstance(r.look, str)}
+            this_run = set(_now.logged_at_utc) if "logged_at_utc" in _now else set()
+            R["look"] = [lk.get((r.player, r.market, float(r.line), r.book))
+                         if pd.notna(r.line) and r.logged_at_utc in this_run
+                         else (getattr(r, "look", None) if "look" in R.columns else None)
+                         for r in R.itertuples()]
+            (R[~R.book.isin(COMPARE_BOOKS)] if a.compare_books else R).to_csv(logf, index=False)
     RESEARCH.to_csv(OUT / f"research_{slug}.csv", index=False)
 
     # ---------- 8b/9. report, written for a casual reader ----------
@@ -2830,7 +2888,9 @@ def td_pairs_section(J_: pd.DataFrame, top: int = 6) -> list[str]:
 RESEARCH_NOTE = ("*Each line: the book's line and price, our projection (median, with the 10th-90th percentile "
                  "range), the chance of the Over by our model and by the book's price (its cut removed), and what the "
                  "line implies: the targets or carries per game at which the line is a fair 50/50, next to what we "
-                 "project; then the workload each side needs to beat its own price. Flags mark a teammate out or back, a new team, a Questionable tag, and the receiving "
+                 "project; then the workload each side needs to beat its own price. A **bold** prop is worth a "
+                 "look, not a bet: a role story plus last game's workload already past that side's break-even "
+                 "(DECISIONS #156; the scorecard grades every one). Flags mark a teammate out or back, a new team, a Questionable tag, and the receiving "
                  "role-shift pattern (reports/role_shift_check.md).*")
 
 
@@ -2932,6 +2992,8 @@ def research_cells(x, MKT) -> str:
     n0 = lambda v: f"{int(round(float(v))) + 0}"
     book = str(x.get("book", "sleeper"))
     label = MKT.get(x.market, x.market) + ("" if book == "sleeper" else f" ({BOOK_NAME.get(book, book)})")
+    if isinstance(x.get("look"), str):       # worth a look (research.worth_a_look): bold, never a bet label
+        label = f"**{label}**"
     return (f"| {label} | {x.line:g} | O {odds(x.price_over)} / U {odds(x.price_under)} | "
             f"{n0(x['median'])} ({n0(x['p10'])} to {n0(x['p90'])}) | {100*x.p_over_model:.0f}% / {100*x.p_over_book:.0f}% | {imp} | "
             f"{break_even_cell(x)} |")
@@ -2953,11 +3015,18 @@ def usage_line(u, rush=False, short=False):
     if not u:
         return None
     pc = lambda v: "—" if v is None or pd.isna(v) else f"{100*v:.0f}%"
+    blank = lambda v: v is None or (isinstance(v, float) and np.isnan(v))
+    # share / count: '19% / 6' last game, '25% / 8.3' a game before it (the user's format)
+    n, nb = (u.get("cn"), u.get("cn_base")) if rush else (u.get("tn"), u.get("tn_base"))
+    last_n = "" if blank(n) else f" / {float(n):.0f}"
+    base_n = "" if blank(nb) else f" / {float(nb):.1f}"
     share = ("carries", u["cs"], u["cs_base"]) if rush else ("targets", u["ts"], u["ts_base"])
     if short:
-        return f"wk{u['week']}: snaps {pc(u['snap'])} ({pc(u['snap_base'])}), {share[0]} {pc(share[1])} ({pc(share[2])})"
+        return (f"wk{u['week']}: snaps {pc(u['snap'])} ({pc(u['snap_base'])}), "
+                f"{share[0]} {pc(share[1])}{last_n} ({pc(share[2])}{base_n})")
     return (f"Week {u['week']}: snaps {pc(u['snap'])} (earlier weeks {pc(u['snap_base'])}), "
-            f"{share[0]} {pc(share[1])} of the team's (earlier {pc(share[2])}).")
+            f"{share[0]} {pc(share[1])} of the team's{last_n.replace(' / ', ', ')} "
+            f"(earlier {pc(share[2])}{base_n.replace(' / ', ', ') + ' a game' if base_n else ''}).")
 
 
 SCEN_KEY = ["book", "market", "player", "side", "line"]

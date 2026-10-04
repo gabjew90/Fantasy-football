@@ -385,8 +385,11 @@ def research_fields(b) -> dict:
             "implied": _f(get("implied")), "projected": _f(get("projected")),
             "unit": get("unit") if isinstance(get("unit"), str) else None,
             "over_needs": _f(get("over_needs")), "under_needs": _f(get("under_needs")),
+            "look": get("look") if isinstance(get("look"), str) else None,
+            "preview": get("preview") if isinstance(get("preview"), str) else None,
             "be_over": _f(get("be_over")), "be_under": _f(get("be_under")),
-            "last_game": {k: _f(get(k)) for k in ("snap", "snap_base", "ts", "ts_base", "cs", "cs_base")},
+            "last_game": {k: _f(get(k)) for k in ("snap", "snap_base", "ts", "ts_base", "cs", "cs_base",
+                                                  "tn", "tn_base", "cn", "cn_base")},
             "backfield": ({k[3:]: _f(get(k)) for k in ("bf_early", "bf_early_base", "bf_passdown", "bf_passdown_base",
                                                         "bf_i5_base", "bf_i5_n", "bf_i5_team")}
                           if get("bf_early") is not None and not pd.isna(get("bf_early")) else None),
@@ -416,12 +419,19 @@ def research_text(x: dict, label: str, book: str = "", line=None) -> str:
         bits.append("if the model's numbers are right, at these prices "
                     + side("Over", x.get("over_needs"), x.get("be_over"), "above {v:.1f} {u}") + ", "
                     + side("Under", x.get("under_needs"), x.get("be_under"), "at {v:.1f} {u} or fewer"))
+    if x.get("look"):
+        bits.insert(0, f"WORTH A LOOK ({x['look']}), not a bet")
+    if x.get("preview"):
+        bits.append(x["preview"])
     lg = x.get("last_game") or {}
     if lg.get("snap") is not None:
-        share = ("carries", lg.get("cs"), lg.get("cs_base")) if label == "rush yds" else ("targets", lg.get("ts"), lg.get("ts_base"))
+        rush = label == "rush yds"
+        share = ("carries", lg.get("cs"), lg.get("cs_base")) if rush else ("targets", lg.get("ts"), lg.get("ts_base"))
+        n, nb = (lg.get("cn"), lg.get("cn_base")) if rush else (lg.get("tn"), lg.get("tn_base"))
         pc = lambda v: "—" if v is None else f"{100*v:.0f}%"
-        bits.append(f"last game snaps {pc(lg['snap'])} (earlier {pc(lg.get('snap_base'))}), {share[0]} {pc(share[1])} "
-                    f"(earlier {pc(share[2])})")
+        bits.append(f"last game snaps {pc(lg['snap'])} (earlier {pc(lg.get('snap_base'))}), {share[0]} {pc(share[1])}"
+                    + ("" if n is None else f" / {n:.0f}")
+                    + f" (earlier {pc(share[2])}" + ("" if nb is None else f" / {nb:.1f} a game") + ")")
     bf = x.get("backfield")
     if bf and label in ("rush yds", "catches", "rec yds"):
         pc = lambda v: "—" if v is None else f"{100*v:.0f}%"

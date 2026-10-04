@@ -228,3 +228,43 @@ def test_the_cli_takes_the_scenario_fields(root):
                  "--pays-if", "Over above 11.2 carries; Under at 9.2 or fewer"])
     r = J.read(2026)[0]
     assert rc == 0 and r["p_scenario"] == pytest.approx(0.70) and r["p_board"] == pytest.approx(0.37)
+
+
+def test_a_power_play_is_one_all_or_nothing_entry_with_graded_legs(root):
+    assert J.leg_price(5, 100, 5) == -122, "20x over five legs is 1.82x a leg"
+    with pytest.raises(ValueError, match="positive stake"):
+        J.leg_price(5, 4, 2)
+    legs = [("Dalton Schultz", "rec_yds", "under", 40.5, "HOU", "return"),
+            ("Tyler Allgeier", "rush_yds", "under", 21.5, "ARI")]
+    rows = J.make_power_play(legs, stake=5, payout=15, angle="role", why="role reads", season=2026, week=4,
+                             after_kickoff=True)
+    assert len({r["entry_id"] for r in rows}) == 1 and [r["angle"] for r in rows] == ["return", "role"]
+    assert all(r["price"] == J.leg_price(5, 15, 2) and r["after_kickoff"] for r in rows)
+    with pytest.raises(ValueError, match="at least two legs"):
+        J.make_power_play(legs[:1], stake=5, payout=10, angle="role", why="x", season=2026, week=4)
+    rows[0].update(status="graded", won=True)
+    rows[1].update(status="graded", won=False)
+    J.write(2026, rows)
+    md = "\n".join(J.summary_md(2026))
+    assert "| week 4 (after kickoff) | Dalton Schultz under, Tyler Allgeier under | $5 | $15 | 1 / 2 | lost | -5.00 |" in md
+    rows[1].update(won=True)
+    J.write(2026, rows)
+    assert "| 2 / 2 | won | +10.00 |" in "\n".join(J.summary_md(2026))
+    assert all(r["stake"] == 1.0 for r in rows), "a leg is one unit in the record; the dollars are the entry's"
+    rows[1].update(status="void", won=None)
+    J.write(2026, rows)
+    assert "| check (a leg voided or needs a box score) | — |" in "\n".join(J.summary_md(2026))
+    rows[0].update(won=False)
+    J.write(2026, rows)
+    assert "| lost | -5.00 |" in "\n".join(J.summary_md(2026)), "a lost leg loses the entry, void or not"
+
+
+def test_the_cli_logs_an_entry(root):
+    rc = J.main(["entry", "--stake", "5", "--payout", "100", "--angle", "role", "--why", "Houston redistributes",
+                 "--season", "2026", "--week", "4", "--leg", "Dalton Schultz|rec_yds|under|40.5|HOU|return",
+                 "--leg", "CeeDee Lamb|td|yes||DAL", "--leg", "Drake London|td|yes|"])
+    rows = J.read(2026)
+    assert rc == 0 and len(rows) == 3 and rows[1]["line"] is None and rows[1]["market"] == "player_anytime_td"
+    assert rows[2]["team"] is None, "the team is optional on a leg"
+    assert J.main(["entry", "--stake", "5", "--payout", "100", "--angle", "role", "--why", "x", "--season", "2026",
+                   "--week", "4", "--leg", "bad leg"]) == 2

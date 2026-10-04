@@ -132,3 +132,101 @@ def test_break_even_workload_at_the_posted_prices():
 def test_a_whole_line_coin_flip_ignores_pushes_like_the_prices_do():
     imp, _p, o, u = RS.implied_targets(4.0, "receptions", 34.0, 30.0, 0.2, 0.7, 8.0, 1.06, prices=(-110, -110))
     assert u < imp < o, "the coin flip sits between the two break-evens on a whole line too"
+
+
+def test_an_out_teammate_is_named_only_when_he_had_a_real_role():
+    import pandas as pd
+    t = pd.DataFrame({"posteam": "CIN", "week": [2] * 36 + [3] * 38,
+                      "pid": ["chase"] * 12 + ["young"] + ["x"] * 23 + ["chase"] * 12 + ["young"] + ["x"] * 25})
+    c = pd.DataFrame({"posteam": "CIN", "week": [2] * 25, "pid": ["brown"] * 18 + ["x"] * 7})
+    d = pd.DataFrame({"posteam": "CHI", "week": [1] * 30, "pid": ["caleb"] * 30})
+    e = pd.DataFrame(columns=["posteam", "week", "pid"])
+    assert not RS.out_matters("young", "CIN", t, c, e), "two targets in two games is not news"
+    assert RS.out_matters("chase", "CIN", t, c, e), "a third of the targets is"
+    assert RS.out_matters("brown", "CIN", t, c, e), "the lead back"
+    assert RS.out_matters("caleb", "CHI", e, e, d), "the starting QB"
+    assert not RS.out_matters("rookie", "CIN", t, c, e), "no play and no prior: unknown, not flagged"
+    assert RS.out_matters("vet", "CIN", t, c, e, prior_ts=0.22), "out all season: last season's share decides"
+    assert not RS.out_matters("vet", "CIN", t, c, e, prior_ts=float("nan"))
+
+
+def test_games_without_a_target_still_count_toward_his_share():
+    import pandas as pd
+    t = pd.DataFrame({"posteam": "CIN", "week": [1] * 30 + [2] * 30 + [3] * 30,
+                      "pid": ["g"] * 4 + ["x"] * 26 + ["x"] * 60})
+    e = pd.DataFrame(columns=["posteam", "week", "pid"])
+    assert RS.role_share(t, "g", "CIN") == pytest.approx(4 / 30), "only the week he was targeted"
+    assert RS.role_share(t, "g", "CIN", weeks={1, 2, 3}) == pytest.approx(4 / 90), "every week he was active"
+    assert not RS.out_matters("g", "CIN", t, e, e, weeks={1, 2, 3}), "a gadget week is not a role"
+
+
+def test_a_search_that_runs_out_says_where_in_his_units():
+    imp, proj, o, u = RS.implied_targets(40.5, "receptions", 34.0, 30.0, 0.2, 0.7, 8.0, 1.06, prices=(-130, -127))
+    e = RS.edges_for()
+    assert o is None and e["over_edge"] == "max" and e["over_limit"] > proj
+    cell = RS.break_even_cell({"unit": "targets", "over_needs": o, "under_needs": u, "be_over": RS.breakeven(-130),
+                               "be_under": RS.breakeven(-127), **e})
+    assert cell.startswith(f"Over: needs more than {e['over_limit']:.1f} targets (about all the work")
+    assert "beyond the search range" not in cell
+
+
+def test_usage_carries_the_counts_when_given():
+    u = RS.usage_change([(1, 0.70, 0.25, 0.0, 9, 0), (2, 0.74, 0.25, 0.0, 8, 0), (3, 0.93, 0.19, 0.0, 6, 0)])
+    assert (u["tn"], u["tn_base"], u["cn"]) == (6.0, 8.5, 0.0)
+    assert "tn" not in RS.usage_change([(1, 0.6, 0.2, 0.0), (2, 0.6, 0.2, 0.0), (3, 0.6, 0.2, 0.0)])
+
+
+def test_worth_a_look_needs_a_story_and_last_games_workload_past_the_price():
+    base = dict(player="Woody Marks", market="player_rush_yds", unit="carries", over_needs=11.4, under_needs=9.3,
+                cn=6.0, tn=1.0, usage_week=3, flags="Nico Collins back (missed last week)")
+    assert RS.worth_a_look(base, 3) == ("Under", "last game 6 carries; the Under pays at 9.3 or fewer")
+    assert RS.worth_a_look(dict(base, preview="last week differs: Nico Collins back"), 3)[1].endswith(
+        "; last week differs: Nico Collins back"), "the mark says whether last week transfers"
+    assert RS.worth_a_look(dict(base, flags="Zay Flowers active (missed 1 of 3 weeks)"), 3) is None, \
+        "an old miss is not a return"
+    assert RS.worth_a_look(dict(base, flags=""), 3) is None, "no story, no mark"
+    assert RS.worth_a_look(dict(base, cn=7.0), 3) is None, "7 carries is inside the 3-carry margin"
+    assert RS.worth_a_look(dict(base, usage_week=2), 3) is None, "last game must be the one just played"
+    assert RS.worth_a_look(dict(base, flags="role up"), 3) is None, "a role-up story never marks an Under"
+    hig = dict(player="Tee Higgins", market="player_receptions", unit="targets", over_needs=8.5,
+               under_needs=7.1, tn=6.0, cn=0.0, usage_week=3, flags="role up")
+    assert RS.worth_a_look(hig, 3) is None, "role up, but last game's 6 targets do not clear the Over's 8.5"
+    assert RS.worth_a_look(dict(hig, tn=10.0), 3) is None, "10 targets is inside the 2-target margin"
+    assert RS.worth_a_look(dict(hig, tn=11.0), 3) == ("Over", "last game 11 targets; the Over pays above 8.5")
+    assert RS.worth_a_look(dict(hig, flags="Marks out, also out last week", tn=11.0), 3)[0] == "Over", \
+        "a teammate out points Over"
+    assert RS.worth_a_look(dict(hig, flags="Tee Higgins out, played last week", tn=11.0), 3) is None, \
+        "his own out is not a story"
+    # a story sets the direction even for a player on a new team
+    assert RS.worth_a_look(dict(hig, flags="role down; new team (from ATL)", tn=11.0), 3) is None
+    assert RS.worth_a_look(dict(hig, flags="new team (from ATL)", tn=4.0), 3)[0] == "Under", "new team alone: either"
+    assert RS.worth_a_look(dict(hig, flags="role up; Puka Nacua back (missed last week)", tn=13.0), 3) is None,         "more snaps but the star teammate back: the stories conflict, no mark"
+    assert RS.worth_a_look(dict(hig, unit=None), 3) is None
+
+
+def test_a_qb_out_is_a_story_for_the_backs_only():
+    rec = dict(player="Luther Burden III", market="player_receptions", unit="targets", over_needs=7.3,
+               under_needs=6.1, tn=11.0, cn=0.0, usage_week=3, flags="Caleb Williams (QB) out, also out last week")
+    assert RS.worth_a_look(rec, 3) is None, "a backup QB is not an Over story for a receiver"
+    rb = dict(player="D'Andre Swift", market="player_rush_yds", unit="carries", over_needs=16.5,
+              under_needs=13.8, cn=20.0, tn=2.0, usage_week=3, flags="Caleb Williams (QB) out, also out last week")
+    assert RS.worth_a_look(rb, 3)[0] == "Over", "the backs carry more"
+
+
+def test_the_preview_note_and_qb_change():
+    import pandas as pd
+    assert RS.preview_note([]) == "last week was a preview: same QB, same key absences"
+    assert RS.preview_note(["Breece Hall newly out"]) == "last week differs: Breece Hall newly out"
+    lw = pd.DataFrame({"passer_player_id": ["k"] * 30 + ["w"] * 2,
+                       "passer_player_name": ["C.Keenum"] * 30 + ["C.Williams"] * 2})
+    assert RS.qb_change(lw, "k", "Case Keenum") is None, "same starter"
+    assert RS.qb_change(lw, "t", "Kyle Trask") == "QB change (C.Keenum last week, Kyle Trask today)"
+    assert RS.qb_change(lw, None, None) is None and RS.qb_change(lw.iloc[0:0], "k", "x") is None
+
+
+def test_a_returning_back_counts_as_a_key_teammate():
+    assert RS.is_key_teammate(prior_ts=0.20), "a target earner"
+    assert RS.is_key_teammate(prior_ts=0.03, prior_rs=0.28), "a back with a real share of the carries (Jaylen Wright)"
+    assert RS.is_key_teammate(season_rs=0.40), "this season's carries count too"
+    assert not RS.is_key_teammate(prior_ts=0.05, prior_rs=0.04, season_ts=float("nan"))
+    assert not RS.is_key_teammate()

@@ -46,3 +46,6 @@ dist/
 # core.fetch cache (docs/plans/2026-09-24-consolidation-plan.md)
 data/cache/
 experiments/out/
+
+# the yardage harness cache and outputs (generated, large)
+props/engine/scripts/backtest_out/

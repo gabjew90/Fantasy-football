@@ -9,9 +9,13 @@ the Sleeper lines pull, the Sleeper player table and the ESPN scoreboard are fet
 for the whole slate (about 4 s per game after the first). Then it reads every game's
 shadow log and bet card back and writes:
 
-  slate_summary_{season}_wk{W}.md   the chat-reply deliverable for a slate question
+  slate_summary_{season}_wk{W}.md   runs, research leads and notes by game (the slate overview)
   slate_survival_{season}_wk{W}.csv one "must-win" pick per game (rule below)
   slate_research_{season}_wk{W}.csv every priced line's research row (line implies, usage, flags)
+  slate_board_{season}_wk{W}.md     THE chat reply for "the props for these games": every
+                                    game's full research table in ONE file, ordered by
+                                    kickoff or (--sort total) by the game total, highest first;
+                                    --overs-only shows the Over side of each line
   slate_card_{season}_wk{W}.csv     the old card rows, written for the record only, never shown
   slate_runs_{season}_wk{W}.csv     per-game run status (lines, spread/total, exit code)
 
@@ -54,6 +58,107 @@ for _stream in (sys.stdout, sys.stderr):
 CAL_MARKETS = {"player_receptions", "player_reception_yds"}
 MK_LABEL = {"player_receptions": "catches", "player_reception_yds": "rec yds",
             "player_rush_yds": "rush yds", "player_anytime_td": "anytime TD", "player_pass_yds": "pass yds"}
+
+
+def eastern_kickoff(s: str) -> str:
+    """'13:00', '1:00', '1pm', '1:00 PM', '4:25' -> nflverse's 'HH:MM' Eastern time.
+    A bare hour from 1 to 8 is the afternoon or evening (no NFL game kicks off
+    between 1 and 8 in the morning); 9:30 stays the London morning game."""
+    import re
+    t = str(s).strip().lower().replace(" ", "").replace("et", "")
+    m = re.fullmatch(r"(\d{1,2})(?::(\d{2}))?(am|pm)?", t)
+    if not m:
+        raise SystemExit(f"--kickoff {s!r}: write an Eastern time like 13:00 or 1pm")
+    h, mi, ap = int(m.group(1)), int(m.group(2) or 0), m.group(3)
+    if ap == "pm" and h < 12:
+        h += 12
+    elif ap is None and 1 <= h <= 8:
+        h += 12
+    return f"{h:02d}:{mi:02d}"
+
+
+def _num(v):
+    try:
+        x = float(v)
+    except (TypeError, ValueError):
+        return None
+    return None if x != x else x
+
+
+def game_context(game, spread, total, previews) -> str:
+    """The line under a game's heading that a narrative starts from: who is
+    favoured, each team's implied points (total and spread), and whether last
+    week was a preview for each side (research.preview_note)."""
+    away, home = game.split("@")
+    bits = []
+    t = _num(total)
+    m = _re.fullmatch(r"\s*([A-Z]{2,3})\s*([+-]?\d+(?:\.\d+)?)\s*", str(spread or ""))
+    alias = {"LAR": "LA", "WSH": "WAS", "JAC": "JAX", "LVR": "LV"}
+    if m and alias.get(m.group(1), m.group(1)) in (away, home):
+        team, pts = alias.get(m.group(1), m.group(1)), float(m.group(2))
+        fav, dog = (team, away if team == home else home) if pts < 0 else (away if team == home else home, team)
+        bits.append("pick'em" if pts == 0 else f"{fav} by {abs(pts):g}")
+        if t is not None:
+            hi, lo = t / 2 + abs(pts) / 2, t / 2 - abs(pts) / 2
+            bits.append(f"implied points {fav} {hi:.1f}, {dog} {lo:.1f}")
+    for tm in (away, home):
+        if previews.get(tm):
+            bits.append(f"{tm}: {previews[tm]}")
+    return ("*" + " · ".join(bits) + "*") if bits else ""
+
+
+def slate_board(RS, runs, sort="kickoff", overs_only=False) -> list[str]:
+    """Every game's full research table in one place (the chat reply for "the
+    props for these games"), games ordered by kickoff or by game total, highest
+    first. --overs-only keeps the Over side of each line: its price, the two
+    Over chances and the workload the Over needs at its price."""
+    from score_game import research_cells, usage_line
+    MKT = {"player_receptions": "catches", "player_reception_yds": "rec yds", "player_rush_yds": "rush yds",
+           "player_pass_yds": "pass yds"}
+    games = [r for r in runs if r["game"] in set(RS.game)]
+    if sort == "total":
+        games = sorted(games, key=lambda r: -(_num(r.get("total")) or -1))
+    pc = lambda v: "—" if _num(v) is None else f"{100 * _num(v):.0f}%"
+    head = (["| Player | Prop | Line | Over price | Our projection | Over: model / book | Line implies | "
+             "The Over pays if he gets more than | Last game | Flags |"] if overs_only else
+            ["| Player | Prop | Line | Price | Our projection | Over: model / book | Line implies | "
+             "Pays at this price if he gets | Last game | Flags |"])
+    out = [f"# Slate board: {len(games)} games, " + ("game total, highest first" if sort == "total"
+                                                     else "by kickoff"), "",
+           "*A research sheet, not a bet list: no line carries a bet label until the record earns it at a review "
+           "(weeks 8, 12, 18). 'Line implies' is the workload that makes the line a coin flip; 'pays' is the "
+           "workload a side needs to beat its own price. Last game: snap share and target (or carry) share / "
+           "count, earlier weeks in brackets. A **bold** prop is worth a look, not a bet: a role story plus last "
+           "game's workload already past that side's break-even; the scorecard grades every one.*"]
+    for r in games:
+        G = RS[RS.game == r["game"]].sort_values(["team", "player", "market", "line"])
+        tot = f"total {r['total']}" if r.get("total") else "total —"
+        pv = ({tm: x["preview"].dropna().iloc[0] for tm, x in G.groupby("team") if x["preview"].notna().any()}
+              if "preview" in G.columns else {})
+        ctx = game_context(r["game"], r.get("spread"), r.get("total"), pv)
+        out += ["", f"## {r['game'].replace('@', ' @ ')} — {tot}, {r['kickoff_utc']} ({len(G)} lines)", ""]
+        out += [ctx, ""] if ctx else []
+        out += [*head, "|---|---|---|---|---|---|---|---|---|---|"]
+        for _, x in G.iterrows():
+            rush = x.market == "player_rush_yds"
+            if x.market == "player_pass_yds" or _num(x.get("snap")) is None:
+                last = "—"
+            else:      # the game report's own wording (score_game.usage_line)
+                last = usage_line({k: _num(x.get(k)) for k in ("snap", "snap_base", "ts", "ts_base", "cs",
+                                                              "cs_base", "tn", "tn_base", "cn", "cn_base")}
+                                  | {"week": int(_num(x.get("usage_week")) or 0)}, rush=rush, short=True)
+                if not _num(x.get("usage_week")):
+                    last = last.split(": ", 1)[-1]
+            fl = x["flags"] if isinstance(x.get("flags"), str) and x["flags"] else "—"
+            cells = research_cells(x, MKT).strip("|").split("|")
+            if overs_only:
+                po = _num(x.get("price_over"))
+                cells[2] = " — " if po is None else f" {'+' if po > 0 else ''}{int(po)} "
+                o, u = _num(x.get("over_needs")), x.get("unit") if isinstance(x.get("unit"), str) else ""
+                cells[6] = (" — " if not u else " no Over price posted " if _num(x.get("be_over")) is None
+                            else " beyond the search range " if o is None else f" {o:.1f} {u} ")
+            out.append(f"| {x.player} ({x.team}) |{'|'.join(cells)}| {last} | {fl} |")
+    return out + [""]
 
 
 def base_tier(t):
@@ -119,6 +224,12 @@ def main():
     ap.add_argument("--no-oddsapi-fallback", action="store_true")
     ap.add_argument("--workdir", default=str(Path.home() / "nfl_wd"))
     ap.add_argument("--extra", default="", help="extra args passed through to score_game.py, quoted")
+    ap.add_argument("--kickoff", default=None,
+                    help="only games kicking off at this Eastern time, e.g. 13:00 (the 10am PT window)")
+    ap.add_argument("--sort", choices=["kickoff", "total"], default="kickoff",
+                    help="order of the slate board: kickoff time, or game total highest first")
+    ap.add_argument("--overs-only", action="store_true",
+                    help="the slate board shows the Over side only (price, chance, the workload it needs)")
     a = ap.parse_args()
 
     wd = Path(a.workdir); wd.mkdir(parents=True, exist_ok=True)
@@ -150,6 +261,9 @@ def main():
                 aw, hm = (alias.get(x.strip().upper(), x.strip().upper()) for x in g_.split("@", 1))
                 want.add(f"{aw}@{hm}")
         W = W[(W.away_team + "@" + W.home_team).isin(want)]
+    if a.kickoff:
+        want_t = eastern_kickoff(a.kickoff)
+        W = W[W.gametime.astype(str).str.strip() == want_t]
     W["kick_utc"] = [eastern_to_utc(g, t) if isinstance(t, str) else pd.NaT for g, t in zip(W.gameday, W.gametime)]
     W = W.sort_values(["kick_utc", "away_team"])
     now_utc = datetime.now(timezone.utc)
@@ -318,7 +432,7 @@ def main():
             n_role = x[fl.str.contains("role up|role down")].player.nunique()
             n_new = x[fl.str.contains("new team")].player.nunique()
             notes = sorted({part.strip() for f in fl for part in f.split(";")
-                            if part.strip().endswith(" out") or " active (missed" in part})
+                            if _re.search(r" out(,|$)", part.strip()) or " back (missed" in part})
             L.append(f"| {g} | {lines_by_game.get(g, 0)} | {n_role} | {n_new} | {'; '.join(notes) or '—'} | "
                      f"{rank_by_game.get(g, 0)} |")
         thin = [r["game"] for r in runs if 0 < r["n_lines"] < 24]
@@ -327,13 +441,17 @@ def main():
               "", "*Calibration: no market has been validated against sportsbook lines. Receptions and receiving yards have a "
               "2025 walk-forward behind them (resources/calibration_2025.csv), but it places lines at fixed offsets from the "
               "model\u2019s own median across every player-week, so it measures distributional self-consistency, not whether the "
-              "model beats a book on the calls it would actually make. Since props-v1.20 the 2022-25 yardage harness finds receptions, receiving yards and rushing yards unbiased and calibrated on outcomes (a model 85% wins about 84-85%). "
+              "model beats a book on the calls it would actually make. Under the interval bar (DECISIONS #150, reports/calibration_bar_v2.md) every priced market beats its baseline but none is yet shown calibrated within 3 points on 2024-25: receptions and receiving yards come closest. "
               "Team TD totals are anchored to the same-book spread and total.*"]
     L += ["", "Per-game guides, cards, ladders, parlays and shadow logs are in the outputs folder under each game's name."]
     md = "\n".join(L)
     (OUT / f"slate_summary_{a.season}_wk{a.week:02d}.md").write_text(
         md, encoding="utf-8")
     print("\n" + md)
+    if len(RS):
+        B = slate_board(RS, runs, sort=a.sort, overs_only=a.overs_only)
+        (OUT / f"slate_board_{a.season}_wk{a.week:02d}.md").write_text("\n".join(B), encoding="utf-8")
+        print("\n" + "\n".join(B))
 
 
 if __name__ == "__main__":

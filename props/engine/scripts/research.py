@@ -18,6 +18,8 @@ score_game.py is never touched and the search is smooth in the multiplier.
 """
 from __future__ import annotations
 
+import re
+
 import numpy as np
 
 import model as MODEL
@@ -80,6 +82,19 @@ def _break_even_ks(share_over, prices):
             None if be_u is None else _bisect(share_over, 1 - be_u))
 
 
+def search_edges(share_over, prices):
+    """Where a failed break-even search ran out: for each side, 'max' when even
+    the most work the simulation can give him is not enough (Over) or still
+    pays (Under), 'min' at the other end; None when the search found a number
+    or the side has no price."""
+    be_o, be_u = (breakeven(prices[0]), breakeven(prices[1])) if prices else (None, None)
+    hi = share_over(K_HI)
+
+    def edge(target):
+        return None if target is None else ("max" if hi < target else "min")
+    return edge(be_o), edge(None if be_u is None else 1 - be_u)
+
+
 def break_even_cell(x) -> str:
     """The research table's 'Pays at this price if he gets' cell: the Over beats
     its own price above over_needs, the Under at or below under_needs. A side
@@ -91,12 +106,44 @@ def break_even_cell(x) -> str:
     if not unit or (blank(bo) and blank(bu)):
         return "—"
 
-    def side(v, be, word, fmt):
+    edge = {k: x.get(k) for k in ("over_edge", "under_edge", "over_limit", "under_limit")}
+
+    def side(v, be, word, fmt, key):
         if blank(be):
             return f"{word}: no price posted"
-        return f"{word}: beyond the search range" if blank(v) else fmt.format(v=float(v))
-    return (f"{side(o, bo, 'Over', 'Over above {v:.1f}')} {unit}; "
-            f"{side(u, bu, 'Under', 'Under at {v:.1f} or fewer')}")
+        if not blank(v):
+            return fmt.format(v=float(v))
+        e, lim = edge.get(f"{key}_edge"), edge.get(f"{key}_limit")
+        if isinstance(e, str) and not blank(lim):
+            # the search ran out: say where, in his units
+            if key == "over":
+                return (f"Over: needs more than {float(lim):.1f} {unit} (about all the work the simulation "
+                        "gives him: the line rests on his efficiency or the team's volume)" if e == "max"
+                        else f"Over: pays even at {float(lim):.1f} {unit}")
+            return (f"Under: pays even at {float(lim):.1f} {unit}" if e == "max"
+                    else f"Under: needs fewer than {float(lim):.1f} {unit}")
+        return f"{word}: beyond the search range"
+    return (f"{side(o, bo, 'Over', 'Over above {v:.1f} ' + unit, 'over')}; "
+            f"{side(u, bu, 'Under', 'Under at {v:.1f} or fewer', 'under')}")
+
+
+LAST_EDGES = {}     # the latest search's edges, read by edges_for(); set by _edge_cache
+
+
+def _edge_cache(share_over, prices, k_o, k_u, work):
+    """Record, for a side whose search failed, which end it ran out at and the
+    workload there, so the cell can say 'needs more than 19 carries' rather
+    than 'beyond the search range'."""
+    eo, eu = search_edges(share_over, prices)
+    lim = lambda e: None if e is None else work(K_HI if e == "max" else K_LO)
+    LAST_EDGES.clear()
+    LAST_EDGES.update(over_edge=eo if k_o is None else None, under_edge=eu if k_u is None else None)
+    LAST_EDGES.update(over_limit=lim(LAST_EDGES["over_edge"]), under_limit=lim(LAST_EDGES["under_edge"]))
+
+
+def edges_for() -> dict:
+    """The edges of the last implied_* call made with prices (see _edge_cache)."""
+    return dict(LAST_EDGES)
 
 
 def implied_targets(line, stat, team_targets_mean, targets_r, share, catch_rate, ypt,
@@ -129,6 +176,7 @@ def implied_targets(line, stat, team_targets_mean, targets_r, share, catch_rate,
     if prices is None:
         return work(k), proj
     k_o, k_u = _break_even_ks(share_over, prices)
+    _edge_cache(share_over, prices, k_o, k_u, work)
     return work(k), proj, work(k_o), work(k_u)
 
 
@@ -163,22 +211,135 @@ def implied_carries(line, j, team_carries_mean, carries_r, rush_shares, ypc, res
     if prices is None:
         return work(k), proj
     k_o, k_u = _break_even_ks(share_over, prices)
+    _edge_cache(share_over, prices, k_o, k_u, work)
     return work(k), proj, work(k_o), work(k_u)
 
 
+# an Out teammate is named on the board only when he had a real role (DECISIONS #155)
+OUT_TARGET_SHARE, OUT_CARRY_SHARE, OUT_PASS_SHARE = 0.10, 0.15, 0.50
+
+
+def is_key_teammate(prior_ts=None, prior_rs=None, season_ts=None, season_rs=None, cut=0.15) -> bool:
+    """A teammate whose return (or arrival) moves work: 15%+ of the targets or
+    of the carries, last season or this one (DECISIONS #157)."""
+    vals_t = [v for v in (prior_ts, season_ts) if v is not None and v == v]
+    vals_r = [v for v in (prior_rs, season_rs) if v is not None and v == v]
+    return max(vals_t + [0.0]) >= cut or max(vals_r + [0.0]) >= cut
+
+
+def role_share(plays, pid, team, weeks=None):
+    """His share of the team's plays in the weeks he was available this season:
+    `weeks` (the weeks he was on the active roster) plus any week he had a play,
+    so the games he played without a target still count. plays: DataFrame
+    with posteam, week, pid. None when he has no play at all."""
+    d = plays[plays.posteam == team]
+    mine = set(d.loc[d.pid == pid, "week"])
+    if not mine:
+        return None
+    weeks = mine | set(weeks or ())
+    dd = d[d.week.isin(weeks)]
+    return float((dd.pid == pid).mean()) if len(dd) else None
+
+
+def out_matters(pid, team, targets, carries, dropbacks, prior_ts=None, prior_rs=None, weeks=None) -> bool:
+    """True when an Out player's absence is worth a flag: this season he threw
+    half the team's passes, drew 10%+ of its targets or took 15%+ of its
+    carries in the weeks he played; with no play this season, last season's
+    shares decide (never a slot default -- an unknown depth player is not
+    news). A depth receiver with two targets in two games is not flagged."""
+    shares = [(role_share(dropbacks, pid, team, weeks), OUT_PASS_SHARE),
+              (role_share(targets, pid, team, weeks), OUT_TARGET_SHARE),
+              (role_share(carries, pid, team, weeks), OUT_CARRY_SHARE)]
+    if any(s is not None for s, _ in shares):
+        return any(s is not None and s >= cut for s, cut in shares)
+    return bool((prior_ts or 0) >= OUT_TARGET_SHARE or (prior_rs or 0) >= OUT_CARRY_SHARE)
+
+
+# WORTH A LOOK (DECISIONS #156), fixed before any result: a story about his
+# role this week, AND last game's actual workload already beyond the side's
+# break-even workload by a clear margin, in the story's direction. Not a bet
+# label: it marks where the user's own read has the most to work with, and the
+# scorecard grades every mark at Sleeper's prices.
+LOOK_MARGIN = {"targets": 2.0, "carries": 3.0}
+
+
+def preview_note(diffs) -> str:
+    """The team's 'was last week a preview' note (DECISIONS #157)."""
+    return ("last week was a preview: same QB, same key absences" if not diffs
+            else "last week differs: " + "; ".join(diffs))
+
+
+def qb_change(last_week_passers, today_id, today_name):
+    """'QB change (X last week, Y today)' or None. last_week_passers: the team's
+    pass plays last week with passer_player_id / passer_player_name."""
+    if today_id is None or last_week_passers is None or not len(last_week_passers):
+        return None
+    lw_id = last_week_passers.passer_player_id.value_counts().index[0]
+    if lw_id == today_id:
+        return None
+    lw_nm = last_week_passers[last_week_passers.passer_player_id == lw_id].passer_player_name.iloc[0]
+    return f"QB change ({lw_nm} last week, {today_name} today)"
+
+
+def worth_a_look(x, last_week):
+    """(side, why) or None for one research row (a dict). x needs flags,
+    player, market, unit, over_needs, under_needs, tn / cn and usage_week."""
+    unit = x.get("unit")
+    if unit not in LOOK_MARGIN:
+        return None
+    if x.get("usage_week") is None or int(x["usage_week"]) != int(last_week):
+        return None          # last game must be the game just played
+    n = x.get("cn") if x.get("market") == "player_rush_yds" else x.get("tn")
+    if n is None or n != n:
+        return None
+    flags = [f.strip() for f in str(x.get("flags") or "").split(";") if f.strip()]
+    me = str(x.get("player", ""))
+    outs = [re.match(r"^(.+?) out(,|$)", f) for f in flags]
+    rush = x.get("market") == "player_rush_yds"
+    # a teammate out hands his work on (Over) -- except the starting QB: a
+    # backup thins the passing game, so a QB out is a story for the backs'
+    # carries only, never for a receiver
+    up = any(f == "role up" for f in flags) or any(
+        m_ and m_.group(1).replace(" (QB)", "") != me and (rush or not m_.group(1).endswith(" (QB)")) for m_ in outs)
+    down = any(f == "role down" for f in flags) or any(" back (missed last week)" in f for f in flags)
+    # a role or teammate story sets the direction; stories pulling both ways
+    # (more snaps, but the star teammate is back) mark nothing; a new team
+    # with no other story allows either side
+    if up and down:
+        return None
+    if not (up or down) and any(f.startswith("new team") for f in flags):
+        up = down = True
+    if not (up or down):
+        return None
+    m = LOOK_MARGIN[unit]
+    o, u = x.get("over_needs"), x.get("under_needs")
+    pv = x.get("preview")
+    tail = f"; {pv}" if isinstance(pv, str) and pv else ""
+    if up and o is not None and o == o and n >= o + m:
+        return "Over", f"last game {n:.0f} {unit}; the Over pays above {o:.1f}{tail}"
+    if down and u is not None and u == u and n <= u - m:
+        return "Under", f"last game {n:.0f} {unit}; the Under pays at {u:.1f} or fewer{tail}"
+    return None
+
+
 def usage_change(weeks):
-    """weeks: list of (week, snap_share, target_share, carry_share), sorted, the
-    player's weeks before this one with this team. LAST = the latest week, BASE
-    = the mean of the earlier ones (at least two). None when too few weeks."""
+    """weeks: list of (week, snap_share, target_share, carry_share[, targets,
+    carries]), sorted, the player's weeks before this one with this team. LAST
+    = the latest week, BASE = the mean of the earlier ones (at least two). With
+    the counts, tn / cn are last game's targets and carries and tn_base /
+    cn_base the earlier weeks' per-game average. None when too few weeks."""
     if len(weeks) < 3:
         return None
     last = weeks[-1]
     base = weeks[:-1]
     mean = lambda i: float(np.nanmean([w[i] for w in base]))
-    return {"week": int(last[0]),
-            "snap": last[1], "snap_base": mean(1),
-            "ts": last[2], "ts_base": mean(2),
-            "cs": last[3], "cs_base": mean(3)}
+    out = {"week": int(last[0]),
+           "snap": last[1], "snap_base": mean(1),
+           "ts": last[2], "ts_base": mean(2),
+           "cs": last[3], "cs_base": mean(3)}
+    if all(len(w) >= 6 for w in weeks):
+        out.update(tn=float(last[4]), tn_base=mean(4), cn=float(last[5]), cn_base=mean(5))
+    return out
 
 
 def role_flag(u, last_week_expected):

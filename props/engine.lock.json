@@ -1,9 +1,9 @@
 {
   "algorithm": "props-engine-sha256-lf-1",
-  "engine_sha256": "eb246a57b3fa3e55b00184a26207dbba582f260585f4fbfb7f8dde7347f4049d",
+  "engine_sha256": "9e82843e42d2f407f9355d8b2f4bd2f2485a20e734be99cd76f91354d6c8142f",
   "file_count": 54,
   "files": {
-    "SKILL.md": "61a53d52d7735db1a866f797b7d4b84bcd0c4dd797ab1cb0418be896c6c188cc",
+    "SKILL.md": "cd8ff6ab09574daed65dc0291c18ff42724628f2bfbf85ee29c73a565272a103",
     "resources/calibration_2025.csv": "47e3922c7af818307831d70a3d2be4333200f3aee1d94dc6bbf6e0e9ccee4ac8",
     "resources/data_source_matrix.md": "2088a5ebe6164a75c11331367fda734d4b10ea217704320321a3f2aec6bb9c2b",
     "resources/execution_protocol.md": "5f54fb23a77d60ecc947d44b6f18ecf67c4357d6b49c70bc937726c1c14016c1",
@@ -42,10 +42,10 @@
     "scripts/eligibility.py": "f1672cff3d7ae2d52ca94b5952451e92c794bfcd21ab2224b0e35e7f152445b5",
     "scripts/model.py": "4e967fb31e1a0c17e5d68a181c494a1c0b405eafc42ca1726063911e5cb5d77c",
     "scripts/odds_client.py": "434186273bd0412a5545247228298951c5d0504a19c8a47c4c782bf3bb75aaa1",
-    "scripts/research.py": "1cd2bfb2de59248451917c569d0946566cc9cb4b47224f3b41a57eae6702e064",
+    "scripts/research.py": "1ea5fd6a54ed16ccda57dbc61325a9ef6de1037560e36b056f374b9f152c9263",
     "scripts/scenario.py": "7fee8c05e6211bdef256faf8525afa0d1f9f431429a36722a2681e8eeb1f1f01",
-    "scripts/score_game.py": "4acc81781fc2ac25265d8fe821967db34f351b0299ae8be448030f7591565ca3",
-    "scripts/score_week.py": "bd42b3a7ef57a5b7bef8bda69f3beb79887bb72e46282237754e5c776382df61",
+    "scripts/score_game.py": "96231ad3178cfca8f2b75309479c0a28846f1dd09d91229c2dc8031ee0d51592",
+    "scripts/score_week.py": "2752b2f4ec45f6ba7b207ebed99d126e7407cc42d5e299413548d935e762591c",
     "scripts/td_alloc.py": "7c407c949cac8f0f74d7f91589fd5d749f65d9053eb1c3f5f0dc63a700b3465b",
     "scripts/td_alloc_backtest.py": "e259d9f0e301a5d5d34e5a9e84bba222810f077d9c05a1f1f799a611914595a4",
     "scripts/td_backtest.py": "0ae77781fea2de212154ff72f64b0792f15f77fabfda7cae944fce20b3c9895f",
@@ -58,5 +58,5 @@
     "scripts/td_model.py": "7c1635bbf515b4316f14771b177363a9f82a1ba7ad3393e479cd2dce26a25724",
     "scripts/td_v1.py": "4e54516734888fc588a7ad3fd9d0ad7dd16d96edcaa980adff3dbcda232ece0f"
   },
-  "tag": "props-v1.30"
+  "tag": "props-v1.31"
 }

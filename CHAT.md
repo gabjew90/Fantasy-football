@@ -246,7 +246,13 @@ engine's contract below is not needed for them. A "best bet" or "must-win
 pick" question gets no pick: say why in a sentence, then give `props best`
 (the research rows, role-shift flags first) or `props best --slate` (the
 slate's leads), in the engine's order (never re-sort or re-rank them
-yourself). A what-if on workload ("what if Marks gets 14 carries?", "what
+yourself). A slate or game request gets a short preview narrative per game (the script from
+the spread and implied points, each team's situation and role changes, where the
+model and book disagree and why, never a cause the record has not measured) before its bold lines -- props/engine/SKILL.md,
+fast path. Bold lines on the board are "worth a look" marks, never bets: narrate them the way
+props/engine/SKILL.md (fast path) lays out -- story and direction, whether last week was a
+preview, what the price demands, which line, how it fails -- then rank them by how well the
+read holds up. A what-if on workload ("what if Marks gets 14 carries?", "what
 if Houston throws less?") is a scenario run, not arithmetic: run the game
 with `--assume` (props/engine/SKILL.md, fast path) and give its "Your
 scenario" table in full; its returns hold only if the user's assumptions
@@ -266,6 +272,12 @@ A bet that came from a "Your scenario" table also carries the assumption, the
 two Over chances that table shows for its line and the break-even cell, copied
 as shown (never recomputed): `--assumption "<the --assume rule>" --over-board
 <board %> --over-scenario <scenario %> --pays-if "<the cell>"`.
+
+A Sleeper Power Play (every leg must hit) is ONE entry with its total payout:
+`python props/journal.py entry --stake <$> --payout <total it pays> --angle <...> --why "<the entry's reason>" --leg "<Player>|<market>|<side>|<line>|<TEAM>[|<angle>]" --leg ...`
+(line empty for an anytime TD; add `--after-kickoff` if any leg's game had started).
+Each leg is priced at the entry's per-leg rate (a 5-leg 20x entry is about −122 a
+leg, 54.9% to break even), and the entry counts only if every leg hits.
 
 An anytime-TD bet has no line: `python props/journal.py add "<player>" td <yes|no> <price> --team <TEAM> --angle ... --change ... --implies ... --fails ...`. The engine contract's "the
 reply is slate_summary reproduced in full" is for a request for the slate

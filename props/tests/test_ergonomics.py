@@ -253,3 +253,73 @@ def test_season_inputs_refresh_once_and_report_their_age(tmp_path, monkeypatch):
     assert set(ages) == {"pbp", "rosters", "injuries", "depth_charts", "snaps", "games"}
     assert all(isinstance(v, float) and v < 0.1 for v in ages.values())
     assert sorted(got) == sorted(p.name for _, p in SG.season_inputs(2026, tmp_path).values())
+
+
+def test_the_slate_board_orders_games_by_total_and_can_show_overs_only():
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "engine" / "scripts"))
+    import score_week as W
+    row = dict(player="A", team="CIN", market="player_receptions", line=4.5, book="sleeper", price_over=-118,
+               price_under=-139, median=5.0, p10=2.0, p90=9.0, p_over_model=0.55, p_over_book=0.48, implied=8.0,
+               projected=8.5, unit="targets", over_needs=8.5, under_needs=7.1, be_over=0.54, be_under=0.58,
+               snap=0.93, snap_base=0.72, ts=0.19, ts_base=0.25, cs=0.0, cs_base=0.0, flags="role up")
+    RS = pd.DataFrame([dict(row, game="GB@TB"), dict(row, game="JAX@CIN", player="B")])
+    runs = [dict(game="GB@TB", total="38.5", kickoff_utc="Sun 17:00Z"),
+            dict(game="JAX@CIN", total="51.5", kickoff_utc="Sun 17:00Z")]
+    B = W.slate_board(RS, runs, sort="total")
+    heads = [ln for ln in B if ln.startswith("## ")]
+    assert heads[0].startswith("## JAX @ CIN — total 51.5") and heads[1].startswith("## GB @ TB — total 38.5")
+    assert any("| Over above 8.5 targets; Under at 7.1 or fewer |" in ln for ln in B)
+    assert [ln for ln in W.slate_board(RS, runs) if ln.startswith("## ")][0].startswith("## GB @ TB"), \
+        "kickoff order keeps the run order"
+    O = W.slate_board(RS, runs, sort="total", overs_only=True)
+    r = next(ln for ln in O if ln.startswith("| B (CIN)"))
+    assert "| -118 |" in r and "| 8.5 targets |" in r and "U -139" not in r
+    assert "The Over pays if he gets more than" in "\n".join(O)
+
+
+def test_kickoff_reads_the_way_people_say_it_and_missing_totals_sort_last():
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "engine" / "scripts"))
+    import score_week as W
+    for said, want in [("13:00", "13:00"), ("1:00", "13:00"), ("1pm", "13:00"), ("1:00 PM", "13:00"),
+                       ("4:25", "16:25"), ("16:05", "16:05"), ("8:20pm", "20:20"), ("9:30", "09:30"),
+                       ("9:30am", "09:30"), ("1 pm ET", "13:00")]:
+        assert W.eastern_kickoff(said) == want, said
+    with pytest.raises(SystemExit, match="write an Eastern time"):
+        W.eastern_kickoff("noon-ish")
+    row = dict(player="A", team="X", market="player_receptions", line=2.5, book="sleeper", price_over=-110,
+               price_under=-110, median=3.0, p10=1.0, p90=6.0, p_over_model=0.5, p_over_book=0.5, implied=5.0,
+               projected=5.0, unit="targets", over_needs=5.5, under_needs=4.5, be_over=0.52, be_under=0.52,
+               snap=0.8, snap_base=0.7, ts=0.2, ts_base=0.18, cs=0.0, cs_base=0.0, usage_week=3, flags="")
+    RS = pd.DataFrame([dict(row, game="A@B"), dict(row, game="C@D")])
+    runs = [dict(game="A@B", total="", kickoff_utc="Sun"), dict(game="C@D", total="41.5", kickoff_utc="Sun")]
+    B = W.slate_board(RS, runs, sort="total")
+    heads = [ln for ln in B if ln.startswith("## ")]
+    assert heads[0].startswith("## C @ D") and heads[1].startswith("## A @ B — total —")
+    assert any("| wk3: snaps 80% (70%), targets 20% (18%) |" in ln for ln in B), "the report's wording"
+
+
+def test_last_game_shows_the_count_beside_the_share():
+    u = {"week": 3, "snap": 0.93, "snap_base": 0.72, "ts": 0.19, "ts_base": 0.25, "cs": 0.0, "cs_base": 0.0,
+         "tn": 6.0, "tn_base": 8.25, "cn": 0.0, "cn_base": 0.0}
+    assert SG.usage_line(u, short=True) == "wk3: snaps 93% (72%), targets 19% / 6 (25% / 8.2)"
+    assert "targets 19% of the team's, 6 (earlier 25%, 8.2 a game)" in SG.usage_line(u)
+    old = {k: v for k, v in u.items() if k not in ("tn", "tn_base", "cn", "cn_base")}
+    assert SG.usage_line(old, short=True) == "wk3: snaps 93% (72%), targets 19% (25%)", "older files: shares only"
+
+
+def test_each_game_on_the_board_opens_with_its_context_line():
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "engine" / "scripts"))
+    import score_week as W
+    pv = {"DAL": "last week was a preview: same QB, same key absences", "HOU": "last week differs: Nico Collins back"}
+    assert W.game_context("DAL@HOU", "HOU -3", "48.5", pv) == (
+        "*HOU by 3 · implied points HOU 25.8, DAL 22.8 · DAL: last week was a preview: same QB, same key absences"
+        " · HOU: last week differs: Nico Collins back*")
+    assert W.game_context("ARI@NYG", "NYG +2.5", "44.5", {}) == "*ARI by 2.5 · implied points ARI 23.5, NYG 21.0*"
+    assert W.game_context("A@B", "", "", {}) == ""
+
+
+def test_a_spread_written_with_an_alias_still_names_the_right_favourite():
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "engine" / "scripts"))
+    import score_week as W
+    assert W.game_context("TEN@JAX", "JAC -3", "44.0", {}) == "*JAX by 3 · implied points JAX 23.5, TEN 20.5*"
+    assert W.game_context("TEN@JAX", "XXX -3", "44.0", {}) == "", "an unknown team code says nothing rather than guess"

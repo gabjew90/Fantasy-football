@@ -7195,3 +7195,66 @@ by the user.
   scenario said, the win rate and late-line value for those bets. If the
   adjustments add information, the win rate lands nearer the scenario's
   number than the board's -- about 100 graded bets to tell.
+
+## 2026-10-04 (155) -- one slate board in total order; Out teammates only when they mattered
+
+- score_week writes slate_board_*.md: every game's full research table in one
+  file, by kickoff or --sort total (highest first), --overs-only for the Over
+  side, --kickoff HH:MM for one window. The user asked for "highest scoring
+  games" twice; it had been assembled by hand.
+- A teammate ruled out is flagged only when he had a real role this season
+  (half the passes, 10%+ of the targets or 15%+ of the carries in the weeks
+  he played; last season's shares if he has not played). A depth receiver
+  with two targets in two games was being named on every teammate's row.
+- The slate summary's calibration note now quotes the interval bar (#150)
+  instead of the pre-#150 "calibrated on outcomes".
+
+## 2026-10-04 (156) -- "worth a look" marks, graded; last game's counts beside the shares
+
+- A research line is marked (bold prop, "worth a look: SIDE (why)" in its
+  flags) when a role story points one way -- more snaps or a key teammate
+  out: Over; fewer snaps or a key teammate back: Under; a new team with no
+  other story: either -- AND last game's actual workload is already past that
+  side's break-even by 2 targets or 3 carries. Stories pulling both ways
+  mark nothing. Fixed on counts only (no result existed): margin 1/2 marked
+  36 lines of 219 on 2026 week 4, 2/3 marked 19. Not a bet label: every mark
+  is logged on the shadow row (`look`) and graded on the scorecard at
+  Sleeper's own price for that side.
+- Last game shows share / count, earlier weeks share / per-game count
+  ("targets 19% / 7 (25% / 8.0)"), at the user's request.
+
+## 2026-10-04 (157) -- was last week a preview? The marks say so
+
+- Every research row carries its team's note: "last week was a preview: same
+  QB, same key absences", or "last week differs: QB change / X newly out / X
+  back". A "worth a look" mark ends with it, because a mark rests on last
+  week's workload and that transfers only when last week looked like today.
+- A teammate is "back" only when he missed the game just played and plays
+  today (Zay Flowers missed week 2 but played week 3: not back). An out
+  teammate's flag says whether he also missed last week.
+- SKILL.md carries the narration for bold lines (story, transfer, price,
+  line, failure, then a ranking), from the 2026 week-4 read the user asked
+  the skill to capture.
+
+## 2026-10-04 (158) -- every game gets a preview narrative
+
+- The slate board opens each game with a context line: the favourite, each
+  team's implied points from the total and spread, and each side's "last week
+  was a preview / differs" note.
+- SKILL.md and CHAT.md ask for a short preview narrative per game before its
+  bold lines: the script, each side's role changes, where the model and the
+  book disagree and why (stale priors, the QB-passing low bias, game script),
+  what to watch -- interpretation, not a recital of the table. The user asked
+  for it on the 2026 week-4 slate.
+
+## 2026-10-04 (159) -- Power Plays are logged as entries
+
+- The user's Sleeper bets are Power Plays: every leg must hit; $5 on 5 legs
+  pays $100 total (20x), confirmed from the app. A single-pick price
+  overstates the hurdle: inside a 5-leg 20x entry each leg is about 1.82x
+  (−122), 54.9% to break even if the legs are independent.
+- `journal entry` logs one entry (stake, total payout, legs); each leg is
+  a journal row at the per-leg price, graded one by one for the scorecard,
+  and the summary's Entries table settles the entry all-or-nothing at its
+  real payout. Entries logged after kickoff are flagged and are not clean
+  pre-game decisions.
