@@ -909,6 +909,15 @@ def main():
                          ts=ts, cr=cr, ypt=ypt, rs=rs_, ypc=ypc,
                          i10ts=i10ts_mix, i10rs=i10rs_mix))
     M = pd.DataFrame(recs)
+    if MODEL.SNAP_REACT is not None:
+        _sr_moved = sum(1 for ev in M.evidence
+                        if abs((ev.get("target_share", {}).get("snap_react") or 1.0) - 1.0) > 0.005)
+        _sr_ready = sum(1 for u in USAGE.values() if u and u["week"] == WEEK - 1)
+        _sr_last = max((u["week"] for u in USAGE.values() if u), default=None)
+        SOURCES.append(("Snap-change rule (round 23)", "target share moved by last week's snap share",
+                        "ok" if _sr_ready else "no player has last week's snaps yet",
+                        f"{_sr_moved} of {_sr_ready} players with week {WEEK - 1} snaps moved; "
+                        f"latest snap week in the file: {_sr_last}"))
     miss = M[M.snap_pct.isna()]
     if len(miss):
         log(f"  snap-share join missed {len(miss)}/{len(M)} players (role_scale=1 for them): "
@@ -1762,6 +1771,12 @@ def main():
                 parts.append("His share: " + "; ".join(hist) + f". A typical {m.slot} gets {pct(ts_['slot_prior'])}.")
             if ts_ and ts_.get("scaled"):
                 parts.append("Because he changed teams, we scaled that by how many snaps he's playing now versus last year.")
+            f_sr = ts_.get("snap_react") if ts_ else None
+            u_ex = USAGE.get(m["name"])
+            if f_sr and abs(f_sr - 1.0) > 0.005 and u_ex:
+                parts.append(f"Last week he played {pct(u_ex['snap'])} of the snaps against {pct(u_ex['snap_base'])} "
+                             f"in his earlier weeks, which moves that share by x{f_sr:.2f} (the snap-change rule, "
+                             f"reports/snap_react.md).")
             parts.append(f"Blending those, we project **{pct(m.ts)}** of the throws = about **{e['targets']*m.ts:.1f} targets**, "
                          f"and he catches roughly {pct(m.cr)} of his targets, so about **{m.mu_rec:.1f} catches**"
                          + (f" for about **{r.model_mean:.0f} yards**" if r.market == "player_reception_yds" else "") + ".")

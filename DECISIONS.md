@@ -7034,7 +7034,9 @@ team (model.SNAP_REACT, one function for scorer and harness). Pre-registered
 in reports/snap_react.md; tuned on 2022-23 (0.25 / 0.5 / 1.0; 1.0 overshot),
 read once on 2024-25: receptions +0.0089 (+0.0043, +0.0136), receiving yards
 +0.0437 (-0.0051, +0.0921), QB passing -0.0745 (-0.1765, +0.0256), rushing
-untouched. Passes the ship rule; shipped with the research board
+unchanged in the harness (separate streams). Live, the scorer shares one
+random stream across target and rush draws, so a moved target share shifts
+rushing probabilities by simulation noise (under 0.01 on DAL@HOU). Passes the ship rule; shipped with the research board
 (props-v1.29). Disclosed: QB passing alone is worse in 2024 by season, and its
 worst calibration band (14 rows) moved 0.055 -> 0.162 -- noise-sized, watched
 on the settled record from week 4, the first week the rule acts in 2026.
