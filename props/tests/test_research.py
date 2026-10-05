@@ -436,7 +436,7 @@ def test_the_gauge_compares_the_volume_the_line_takes_with_ours():
     lk = {"cap": 31.0, "own": True, "n": 183, "games": 10}
     d = RS.carry_yards_read(None, 29.5, model_ypc=4.5, proj_carries=9.1, season_car=30, season_yds=132,
                             luckfree_ypc=132 / 30, luck=lk)
-    assert ("At 4.4 yards a carry with the luck taken out (every run past 31 yards, his own 95th percentile "
+    assert ("At 4.4 yards a carry with the luck taken out (every run past 31 yards, his own 99th percentile "
             "over his last 10 games and 183 runs, counted as 31), 30 yards takes") in RS.carry_yards_sentence(d), \
         "with no carries line the gauge still names the cap it used"
     d = RS.carry_yards_read(None, 36.5, model_ypc=2.5, proj_carries=11.8)
@@ -452,17 +452,17 @@ def test_the_gauge_compares_the_volume_the_line_takes_with_ours():
 
 
 
-def test_the_luck_line_is_the_players_own_95th_percentile_play():
+def test_the_luck_line_is_the_players_own_99th_percentile_play():
     plays = list(range(1, 101))                       # 100 plays of 1..100 yards
     lk = RS.player_luck_line(plays)
-    assert lk["own"] and lk["n"] == 100 and lk["cap"] == pytest.approx(np.percentile(plays, 95))
+    assert lk["own"] and lk["n"] == 100 and lk["cap"] == pytest.approx(np.percentile(plays, 99))
     few = RS.player_luck_line([5, 8, 55])
     assert few == {"cap": None, "own": False, "n": 3}, "too few plays: no percentile"
     assert RS.luck_free_rate([5, 8, 55], few) == pytest.approx(6.5), "too few: his longest play left out"
-    assert RS.luck_free_rate([5, 8, 120], lk) == pytest.approx((5 + 8 + np.percentile(plays, 95)) / 3)
+    assert RS.luck_free_rate([5, 8, 120], lk) == pytest.approx((5 + 8 + np.percentile(plays, 99)) / 3)
     assert RS.luck_free_rate([9], few) is None and RS.luck_free_rate([], lk) is None
     assert RS.luck_words(dict(lk, games=10), "run") == \
-        "every run past 95 yards, his own 95th percentile over his last 10 games and 100 runs, counted as 95"
+        "every run past 99 yards, his own 99th percentile over his last 10 games and 100 runs, counted as 99"
     assert RS.luck_words(dict(few, games=2), "run") == \
         "his longest run left out -- only 3 runs in his last 2 games, too few for a percentile"
     assert RS.player_luck_line(list(range(1, 21)))["own"], "20 plays of his own is enough"
@@ -479,7 +479,7 @@ def test_the_luck_free_check_reads_his_last_10_games():
     # the window is the last 10 games: prior games 3..9 (7 games) + this season's 3
     plays = [y for g in prior[("00-001", "run")][-7:] for y in g] + [4.0, 6.0, 60.0, 1.0, 5.0]
     assert luck["games"] == 10 and luck["n"] == len(plays) == 26 and luck["own"]
-    assert luck["cap"] == pytest.approx(np.percentile(plays, 95))
+    assert luck["cap"] == pytest.approx(np.percentile(plays, 99))
     assert rate == pytest.approx(sum(min(y, luck["cap"]) for y in plays) / len(plays)), "rate: the same 10 games"
     # too few plays in the window: his longest left out; under 10 carries: no rate
     luck, rate = RS.luck_for({}, {"00-002": [[3.0, 4.0, 30.0], [2.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0]]},
@@ -513,3 +513,36 @@ def test_the_gauge_says_whose_volume_each_number_is():
     d = RS.catch_yards_read(6.5, 81.5, model_ypc=16.4, proj_catches=5.8)
     assert "The book's own catches line is 6.5: the yards line takes less than the book's own volume." \
         in RS.catch_yards_sentence(d)
+
+
+
+def test_fantasy_points_allowed_by_position():
+    import pandas as pd
+    pbp = pd.DataFrame([
+        # ATL defence, game 1: a WR catch for 20 and a TD (1 + 2 + 6), an RB run for 30 (3)
+        dict(game_id="g1", defteam="ATL", play_type="pass", complete_pass=1, receiver_player_id="wr1",
+             rusher_player_id=None, receiving_yards=20, rushing_yards=None, pass_touchdown=1, rush_touchdown=0, qb_kneel=0),
+        dict(game_id="g1", defteam="ATL", play_type="run", complete_pass=None, receiver_player_id=None,
+             rusher_player_id="rb1", receiving_yards=None, rushing_yards=30, pass_touchdown=0, rush_touchdown=0, qb_kneel=0),
+        # a QB kneel and a QB run: not counted
+        dict(game_id="g1", defteam="ATL", play_type="run", complete_pass=None, receiver_player_id=None,
+             rusher_player_id="qb1", receiving_yards=None, rushing_yards=-1, pass_touchdown=0, rush_touchdown=0, qb_kneel=1),
+        # ATL game 2: an incomplete pass to the TE (0) and a FB catch for 5 (1.5, counts as RB)
+        dict(game_id="g2", defteam="ATL", play_type="pass", complete_pass=0, receiver_player_id="te1",
+             rusher_player_id=None, receiving_yards=0, rushing_yards=None, pass_touchdown=0, rush_touchdown=0, qb_kneel=0),
+        dict(game_id="g2", defteam="ATL", play_type="pass", complete_pass=1, receiver_player_id="fb1",
+             rusher_player_id=None, receiving_yards=5, rushing_yards=None, pass_touchdown=0, rush_touchdown=0, qb_kneel=0),
+        # NO defence, one game: a TE catch for 10 (2)
+        dict(game_id="g3", defteam="NO", play_type="pass", complete_pass=1, receiver_player_id="te1",
+             rusher_player_id=None, receiving_yards=10, rushing_yards=None, pass_touchdown=0, rush_touchdown=0, qb_kneel=0),
+    ])
+    pos = {"wr1": "WR", "rb1": "RB", "qb1": "QB", "te1": "TE", "fb1": "FB"}
+    pa = RS.points_allowed(pbp, pos)
+    assert pa["_games"] == {"ATL": 2, "NO": 1}
+    assert pa["ATL"]["WR"][0] == pytest.approx(9.0 / 2) and pa["ATL"]["RB"][0] == pytest.approx((3 + 1.5) / 2)
+    assert pa["ATL"]["TE"][0] == 0.0 and pa["NO"]["TE"] == (pytest.approx(2.0), 1)
+    assert pa["ATL"]["RB"][1] == 1 and pa["NO"]["RB"][1] == 2, "rank 1 = most allowed"
+    line = RS.points_allowed_line(pa, ("ATL", "NO"))
+    assert line.startswith("ATL's defence allows RB 2.2 (1 of 2") and "League average: RB 1.1" in line
+    assert "context, not an adjustment" in line
+    assert RS.points_allowed_line(pa, ("ATL", "DAL")) is None and RS.points_allowed(None, pos) == {}

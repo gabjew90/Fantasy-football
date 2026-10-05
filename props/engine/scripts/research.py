@@ -343,14 +343,13 @@ def to_clear(line) -> int:
 YPC_BAND = 1.0
 YPC_MIN_CATCHES = 8
 # THE LUCK LINE for the achievability gauge (user's design, 2026-10-05; DECISIONS #167):
-# a play past the player's OWN 95th percentile for that prop -- his catches for receiving
-# yards, his runs for rushing yards, last season and this one together -- counts as a lucky
-# breakaway and is counted at that line. "Too few" = under LUCK_MIN_PLAYS of his own plays of
-# that kind (at 20 the 95th percentile still sits between his two longest; below it the line
-# would just be his single longest play); then his longest play this season is left out
-# instead (user's call). A definition for a descriptive gauge, not a fit
-# (reports/robust_ypc_check.md, for reference only)
-LUCK_PCT = 95
+# a play past the player's OWN 99th percentile for that prop over his last LUCK_WINDOW games
+# -- his catches for receiving yards, his runs for rushing yards -- counts as a lucky
+# breakaway and is counted at that line (user, 2026-10-05: the 95th cut a back's ordinary
+# 15-25-yard runs, which come most games). "Too few" = under LUCK_MIN_PLAYS of his plays of
+# that kind in the window; then his longest play is left out instead. A definition for a
+# descriptive gauge, not a fit (reports/robust_ypc_check.md, for reference only)
+LUCK_PCT = 99
 LUCK_MIN_PLAYS = 20
 # the luck-free check (luck line AND rate) reads his last this-many games, crossing into
 # last season while this one is short (user, 2026-10-05)
@@ -455,6 +454,64 @@ def gauge_sentence(g, rate, per, luck_clause, y_min, long_word, book_line=None, 
     if g["low"]:
         s += f" At this little volume one {SINGULAR.get(g['unit'], g['unit'])} either way decides it."
     return s
+
+
+POS_GROUPS = ("RB", "WR", "TE")
+
+
+def points_allowed(pbp, positions) -> dict:
+    """PPR fantasy points each defence has allowed per game to RBs, WRs and TEs this
+    season (DECISIONS #169): 1 a catch, 0.1 a receiving or rushing yard, 6 a receiving or
+    rushing touchdown; QB kneel-downs out; fumbles and two-point plays not counted.
+    positions = {gsis_id: position} (FB counts as RB). Returns {defteam: {pos: (ppg, rank)}}
+    plus "_league": {pos: league mean ppg} and "_games": {defteam: games}; rank 1 = most
+    allowed. Context for the narrative only: position matchups were tested as too noisy to
+    move the model (methodology)."""
+    need = {"game_id", "defteam", "play_type", "complete_pass", "receiver_player_id", "rusher_player_id",
+            "receiving_yards", "rushing_yards", "pass_touchdown", "rush_touchdown"}
+    if pbp is None or not need.issubset(pbp.columns) or not len(pbp):
+        return {}
+    pos = {k: ("RB" if v == "FB" else v) for k, v in positions.items()}
+    f0 = lambda s: s.fillna(0).astype(float)
+    rec = pbp[(pbp.play_type == "pass") & pbp.receiver_player_id.notna()]
+    kneel = pbp["qb_kneel"] == 1 if "qb_kneel" in pbp else False
+    run = pbp[(pbp.play_type == "run") & ~kneel & pbp.rusher_player_id.notna()]
+    rows = [(rec.defteam, rec.receiver_player_id,
+             f0(rec.complete_pass) + 0.1 * f0(rec.receiving_yards) + 6 * f0(rec.pass_touchdown)),
+            (run.defteam, run.rusher_player_id, 0.1 * f0(run.rushing_yards) + 6 * f0(run.rush_touchdown))]
+    import pandas as _pd
+    a = _pd.concat([_pd.DataFrame({"defteam": d.values, "pid": p.values, "pts": x.values}) for d, p, x in rows])
+    a["pos"] = a.pid.map(pos)
+    a = a[a.pos.isin(POS_GROUPS)]
+    games = pbp.groupby("defteam").game_id.nunique()
+    t = a.groupby(["defteam", "pos"]).pts.sum().unstack().reindex(columns=list(POS_GROUPS)).fillna(0.0)
+    t = t.div(games.reindex(t.index), axis=0)
+    rk = t.rank(ascending=False, method="min").astype(int)
+    out = {d: {p: (float(t.loc[d, p]), int(rk.loc[d, p])) for p in POS_GROUPS} for d in t.index}
+    out["_league"] = {p: float(t[p].mean()) for p in POS_GROUPS}
+    out["_games"] = {d: int(games[d]) for d in t.index}
+    out["_n"] = len(t.index)
+    return out
+
+
+def points_allowed_line(pa, teams) -> str | None:
+    """The game header's sentence: what each defence in this game allows by position."""
+    if not pa or not all(t in pa for t in teams):
+        return None
+    n = pa["_n"]
+    lg = pa["_league"]
+    def word(rank):
+        return ("most" if rank <= 8 else "fewest" if rank > n - 8 else "middle")
+    parts = []
+    for t in teams:
+        bits = ", ".join(f"{p} {pa[t][p][0]:.1f} ({pa[t][p][1]} of {n}"
+                         + ("" if word(pa[t][p][1]) == "middle" else f", among the {word(pa[t][p][1])}") + ")"
+                         for p in POS_GROUPS)
+        parts.append(f"{t}'s defence allows {bits}")
+    games = sorted(set(pa["_games"][t] for t in teams))
+    return ("; ".join(parts) + ". League average: " + ", ".join(f"{p} {lg[p]:.1f}" for p in POS_GROUPS)
+            + f". PPR points per game over {'/'.join(map(str, games))} games: a small sample, and position "
+            "matchups were tested as too noisy to move the model, so this is context, not an adjustment.")
 
 
 # Sleeper's lines that are read beside the priced ones, never priced (DECISIONS #164, #166)

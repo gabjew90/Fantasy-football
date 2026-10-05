@@ -1890,6 +1890,11 @@ def main():
                          else (getattr(r, "look", None) if "look" in R.columns else None)
                          for r in R.itertuples()]
             (R[~R.book.isin(COMPARE_BOOKS)] if a.compare_books else R).to_csv(logf, index=False)
+    # FANTASY POINTS ALLOWED by each defence to RBs, WRs and TEs (DECISIONS #169): context only
+    _pos_map = (ros.sort_values("week").drop_duplicates("gsis_id", keep="last").set_index("gsis_id").position.to_dict()
+                if {"gsis_id", "position", "week"}.issubset(ros.columns) else {})
+    PA = RSCH.points_allowed(pbp, _pos_map)
+    PA_LINE = RSCH.points_allowed_line(PA, (AWAY, HOME))
     # CATCHES, YARDS AND THE LONG ONE (DECISIONS #164): the book's three receiving lines
     # read together at the whole numbers that win them, against his yards a catch
     CATCH_READ, CARRY_READ = {}, {}
@@ -2616,6 +2621,7 @@ def main():
                  + ", ".join(f"{t} {float(V1TD[V1TD.team == t]['mu'].iloc[0]):.1f}" for t in (AWAY, HOME)
                              if (V1TD.team == t).any()) + ". The two differ by design, not by error."),
               f"- **Weather:** {wx}. 15 mph sustained-wind screen {'HIT' if (weather.get('wind_mph_max') or 0) > 15 else 'not hit'}.",
+              *([f"- **Fantasy points allowed:** {PA_LINE}"] if PA_LINE else []),
               f"- **Injury designations (week {WEEK} report):** " + (", ".join(desig) if desig else "none on the eligible set") + ". Out/Doubtful removed; their share goes mostly to the replacement, a quarter to the priced teammates; Questionable priced as if playing, with a separate 'if he's out' pricing. Re-run inside 90 minutes of kickoff: a late scratch changes every share on that team.",
               f"- **Data cutoff:** 2026 weeks 1-{WEEK-1} play-by-play, week {WEEK} roster/injury/depth chart; prices snapshot {now()}; kickoff in {hrs:.1f} h.",
               "",

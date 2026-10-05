@@ -249,8 +249,11 @@ For a narrow question, run only what it needs:
   **A single-game read is a full story, in this order** (user, 2026-10-05; DECISIONS #168).
   Headed sections, short paragraphs, tables where they help; thorough but easy to read:
   1. **The game.** The matchup and what each team has been, the weather (or roof), home and
-     away, the Vegas lines (spread, total, implied points and the script they point to), and the
-     injuries (who is out, questionable, back) -- plus any line moves since the morning.
+     away, the Vegas lines (spread, total, implied points and the script they point to), the
+     fantasy points each defence allows to RBs, WRs and TEs (the header's "Fantasy points
+     allowed" line: PPR per game and rank -- a small sample this early, context only, never a
+     reason on its own), and the injuries (who is out, questionable, back) -- plus any line
+     moves since the morning.
   2. **Each player with a priced line**, team by team: his volume and share LAST SEASON, THIS
      SEASON so far, and last game against his earlier games (targets or carries, share and count).
   3. **Teammates out or questionable** who move his work, and which way.
@@ -338,7 +341,7 @@ For a narrow question, run only what it needs:
   Over that needs his raw average needs another one. Lean on our figure for runners: their
   early-season yards a carry is noise.
   **The achievability gauge** ends both reads: the volume the yards line takes at his capped
-  yards a play (the luck line: a play past the player's OWN 95th percentile for that prop --
+  yards a play (the luck line: a play past the player's OWN 99th percentile for that prop --
   his catches or his runs, last season and this one -- counts as a lucky breakaway and is
   counted at the line; under 20 plays of his own, his longest play this season is left out
   instead; the report prints which it used; ours when his

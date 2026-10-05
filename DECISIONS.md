@@ -7398,3 +7398,15 @@ by the user.
   player's volume and share last season and this season, the teammates who move it, our
   and the book's expected volume, the lines with the luck-free check, then the
   if-thens. Headed and easy to read. A slate keeps the short per-game preview.
+
+## 2026-10-05 (169) -- the game story shows fantasy points allowed by position; the luck line moves to the 99th
+
+- The game header gets a "Fantasy points allowed" line: PPR points per game each
+  defence has allowed to RBs, WRs and TEs this season (1 a catch, 0.1 a yard, 6 a
+  touchdown; kneel-downs, fumbles and two-point plays out), its rank of 32 and the league
+  average (research.points_allowed). Context for the narrative only: position matchups
+  were tested as too noisy to move the model, and three games is a small sample.
+- The user moved the per-player luck line back to the 99th percentile of his last 10
+  games, for catches and runs (supersedes the 95th in #167): at the 95th a back's
+  ordinary 15-25-yard runs, which came in 6 of Bijan Robinson's last 10 games, counted
+  as luck.
