@@ -437,10 +437,13 @@ def gauge_sentence(g, rate, per, luck_clause, y_min, long_word, book_line=None, 
     if book_line is not None and book_line == book_line:
         fav = f", {book_fav} favoured" if book_fav else ""
         s += f" The book's own {g['unit']} line is {book_line:g}{fav}: "
-        if g["need"] > book_line:
+        # lines move in halves: within half a unit of the book's line is the book's volume
+        if g["need"] > book_line + 0.5:
             s += f"fewer than the yards line takes, so even the book's volume falls short without {long_word}."
+        elif g["need"] < book_line - 0.5:
+            s += "the yards line takes less than the book's own volume."
         else:
-            s += "the yards line takes no more than the book's own volume."
+            s += "about what the yards line takes."
     else:
         s += f" The book posts no {g['unit']} line for him, so this is against our volume only."
     if g["low"]:
