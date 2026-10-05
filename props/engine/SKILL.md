@@ -257,6 +257,20 @@ For a narrow question, run only what it needs:
   unexplained -- the harness found QB passing unbiased on 2024-25 outcomes, so neither side
   is known to be right), and
   what to watch. A game with nothing to find says so in a sentence. Never call a line a bet.
+  **Write for a reader without the table** (user, 2026-10-05). The narrative is read on its own,
+  often on a phone after the table has scrolled away: every line it discusses names the player,
+  the prop, the line, the side, and the number that decides it ("Kamara rushing yards, Over
+  36.5: he needs about 14 carries; the model gives him 12"). Never point at the table ("see the
+  row", "the zone above", "as the table shows"). That is not reciting the table: quote the one or
+  two numbers the decision turns on, interpret the rest.
+  **Spell out the if-then.** Every story ends in decisions the reader can act on, one per line,
+  each in the form "If <a condition he can check or a belief he holds>, then <the leg that fits:
+  player, prop, side, line> -- <what it needs>; if not, <skip it / the alternative>". Conditions
+  are observable before entry (the inactives list, a confirmed starter, a line move) or plainly a
+  belief ("if you think the Saints throw like they have all season"). Give the losing branch
+  too, and say which conditions are the same game script so legs that need opposite scripts
+  never share an entry. These are conditional on the reader's view, never picks: no "take",
+  "hammer", "best bet", and no ranking by expected profit.
   **Explore absences unprompted.** For every questionable or doubtful player with a role -- the
   rows' "<name> (<pos>) questionable" flags and the report's "Questionable, not priced here"
   line, which lists players the board does not price -- say who absorbs his work if he sits

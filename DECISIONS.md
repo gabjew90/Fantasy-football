@@ -7327,3 +7327,14 @@ by the user.
 - Scenarios: a team's pass / rush / ypt must carry its sign. "NO: pass=42" was
   read as 42 more targets on 2026-10-05; it now refuses with "a CHANGE, not a
   total".
+
+## 2026-10-05 (165) -- narratives stand without the table and end in if-then decisions
+
+- The user reads the narrative on its own, after the table has scrolled away. Every
+  line discussed now names the player, prop, side, line and the number that decides
+  it; nothing points at the table.
+- Each story ends in plain if-then decisions: a condition the reader can check
+  (inactives, a confirmed starter, a line move) or a stated belief, the leg that
+  fits and what it needs, and the losing branch. Legs needing opposite game scripts
+  are named so they never share an entry. Conditional on the reader's view, never
+  picks (SKILL.md fast path; CHAT.md).

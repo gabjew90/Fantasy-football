@@ -249,7 +249,10 @@ slate's leads), in the engine's order (never re-sort or re-rank them
 yourself). A slate or game request gets a short preview narrative per game (the script from
 the spread and implied points, each team's situation and role changes, where the
 model and book disagree and why, never a cause the record has not measured) before its bold lines -- props/engine/SKILL.md,
-fast path. Bold lines on the board are "worth a look" marks, never bets: narrate them the way
+fast path. Narratives stand on their own -- every line discussed names the player, prop, side,
+line and the number that decides it, never "see the table" -- and each story ends in plain
+if-then decisions (if <checkable condition or stated belief>, then <the leg that fits and what it
+needs>; if not, <skip / alternative>), conditional on the user's view, never picks. Bold lines on the board are "worth a look" marks, never bets: narrate them the way
 props/engine/SKILL.md (fast path) lays out -- story and direction, whether last week was a
 preview, what the price demands, which line, how it fails -- then rank them by how well the
 read holds up. A what-if on workload ("what if Marks gets 14 carries?", "what
