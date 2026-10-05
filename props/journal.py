@@ -398,7 +398,8 @@ def entries_table(rows: list[dict]) -> list[str]:
         won = sum(1 for x in graded if x.get("won"))
         paid = legs[0].get("entry_paid")
         if paid is not None:                     # what Sleeper actually paid (a reduced entry, say)
-            res, net = ("won" if paid > 0 else "lost") + " (as paid)", float(paid) - st
+            word = ("won" if paid > st else "refunded" if paid == st else "partly paid" if paid > 0 else "lost")
+            res, net = f"{word} (as paid)", float(paid) - st
         elif any(x.get("status") == "graded" and not x.get("won") for x in legs):
             res, net = "lost", -st
         elif all(x.get("status") == "graded" and x.get("won") for x in legs):
@@ -432,6 +433,22 @@ def entry_paid(season: int, entry_id: str, paid: float) -> int:
         raise ValueError(f"no entry {entry_id} in the {season} journal")
     write(season, rows)
     return n
+
+
+def entry_void(season: int, entry_id: str, player: str, now: dt.datetime | None = None) -> dict:
+    """Void the leg Sleeper dropped ('Reboot') by entry id and player name, the
+    two things the user can see in the app. Returns the voided leg."""
+    import settle
+    rows = read(season)
+    want = settle.norm_name(player)
+    hit = [r for r in rows if r.get("entry_id") == entry_id and settle.norm_name(r["player"]) == want]
+    if not hit:
+        raise ValueError(f"no leg for {player} in entry {entry_id}")
+    stamp = (now or dt.datetime.now(dt.timezone.utc)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    hit[0].update(status="void", result="dropped by Sleeper (Reboot)", actual=None, won=None, pnl_per_100=0.0,
+                  graded_at_utc=stamp)
+    write(season, rows)
+    return hit[0]
 
 
 def scenario_table(rows: list[dict]) -> list[str]:
@@ -573,6 +590,9 @@ def main(argv: list[str] | None = None) -> int:
     pp.add_argument("--why", required=True, help="the entry's reason in a sentence")
     pp.add_argument("--after-kickoff", action="store_true", help="logged after a leg's game started")
     pp.add_argument("--season", type=int, default=None); pp.add_argument("--week", type=int, default=None)
+    ev = sub.add_parser("entry-void", help="void the leg Sleeper dropped ('Reboot') by entry id and player")
+    ev.add_argument("entry_id"); ev.add_argument("--player", required=True)
+    ev.add_argument("--season", type=int, default=None)
     ep = sub.add_parser("entry-paid", help="record what Sleeper actually paid an entry (0 if it lost)")
     ep.add_argument("entry_id"); ep.add_argument("--paid", type=float, required=True)
     ep.add_argument("--season", type=int, default=None)
@@ -626,6 +646,14 @@ def main(argv: list[str] | None = None) -> int:
         write(season, read(season) + rows_)
         print(f"logged entry {rows_[0]['entry_id']}: {len(rows_)} legs, ${args.stake:g} to ${args.payout:g}, "
               f"each leg at {rows_[0]['price']:+d} -> {journal_path(season)}")
+        return 0
+    if args.cmd == "entry-void":
+        try:
+            r = entry_void(season, args.entry_id, args.player)
+        except ValueError as exc:
+            print(f"not voided: {exc}", file=sys.stderr)
+            return 2
+        print(f"entry {args.entry_id}: {r['player']} voided (dropped by Sleeper)")
         return 0
     if args.cmd == "entry-paid":
         try:

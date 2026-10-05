@@ -279,7 +279,7 @@ A Sleeper Power Play (every leg must hit) is ONE entry with its total payout:
 Each leg is priced at the entry's per-leg rate (a 5-leg 20x entry is about −122 a
 leg, 54.9% to break even), and the entry counts only if every leg hits. If Sleeper drops a leg ("Reboot": the player
 sat or left), the entry pays a smaller multiple only the app shows: void the leg with
-`python props/journal.py resolve <leg id> --void` and record the payout with
+`python props/journal.py entry-void <entry id> --player "<name>"` and record the payout with
 `python props/journal.py entry-paid <entry id> --paid <amount>` (0 if it lost).
 
 An anytime-TD bet has no line: `python props/journal.py add "<player>" td <yes|no> <price> --team <TEAM> --angle ... --change ... --implies ... --fails ...`. The engine contract's "the

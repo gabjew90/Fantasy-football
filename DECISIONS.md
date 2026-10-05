@@ -7274,6 +7274,6 @@ by the user.
 
 - Sleeper's "Reboot" drops a leg whose player sat or left and pays the entry as
   one fewer pick (the user's week-4 Rice leg). The journal voids that leg
-  (`resolve --void`), shows the entry as "check" until the payout is recorded, and
+  (`entry-void ENTRY --player NAME`), shows the entry as "check" until the payout is recorded, and
   `entry-paid` settles the entry at the amount Sleeper actually paid. The reduced
   multiple is not guessed.
