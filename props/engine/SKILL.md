@@ -246,6 +246,23 @@ For a narrow question, run only what it needs:
   table in one file, in that order -- and prints it: for "the props for these games", reproduce it
   in full (never trim rows), then a short read of what stands out per game. A **bold** prop is "worth a look"
   (DECISIONS #156): a role story plus last game's workload already past that side's break-even.
+  **A single-game read is a full story, in this order** (user, 2026-10-05; DECISIONS #168).
+  Headed sections, short paragraphs, tables where they help; thorough but easy to read:
+  1. **The game.** The matchup and what each team has been, the weather (or roof), home and
+     away, the Vegas lines (spread, total, implied points and the script they point to), and the
+     injuries (who is out, questionable, back) -- plus any line moves since the morning.
+  2. **Each player with a priced line**, team by team: his volume and share LAST SEASON, THIS
+     SEASON so far, and last game against his earlier games (targets or carries, share and count).
+  3. **Teammates out or questionable** who move his work, and which way.
+  4. **Expected volume and share, ours and the book's**: our projected targets or carries; the
+     book's own volume where it posts it (catches / carries lines, the side favoured); what each
+     yards line works out to ("line implies").
+  5. **The lines themselves**: catches vs yards, where our projection lands (zone), and the
+     luck-free check -- his luck-free yards a play over his last 10 games, the volume the yards
+     line takes at that rate, against our volume and the book's.
+  6. **If-thens**, one per line of decision, with the losing branch, and which groups of legs mix.
+  A slate (several games) keeps the short per-game preview below; the full story is for one game
+  or when the user asks for it.
   **Every game gets a short preview narrative**, in the board's order, BEFORE its bold lines:
   read the game, do not recite the table. Start from the context line under its heading --
   who is favoured and the implied points (the script: a big favourite runs late, an underdog
