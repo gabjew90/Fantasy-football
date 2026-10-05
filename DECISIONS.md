@@ -7258,3 +7258,14 @@ by the user.
   and the summary's Entries table settles the entry all-or-nothing at its
   real payout. Entries logged after kickoff are flagged and are not clean
   pre-game decisions.
+
+## 2026-10-04 (160) -- backfield takeovers: a "carries up / down" flag, earned
+
+- Pre-registered in reports/rb_takeover_check.md after week 4 (Hubbard took 83% of
+  Carolina's carries and ran for 122 while the model projected 14 carries). A back
+  whose carry share moved 20+ points last week beat (takeover) or missed (demotion)
+  the model's carry projection by about two carries the next week, in both 2022-23
+  and 2024-25 with 2024-25 intervals clear of zero.
+- Rushing rows carry the flag, and it points the "worth a look" mark (Over / Under)
+  for rushing lines only. The model itself is not changed: moving carry share by the
+  change is a separate tuning round under the usual protocol, because it moves prices.

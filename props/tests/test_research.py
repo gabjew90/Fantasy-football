@@ -230,3 +230,30 @@ def test_a_returning_back_counts_as_a_key_teammate():
     assert RS.is_key_teammate(season_rs=0.40), "this season's carries count too"
     assert not RS.is_key_teammate(prior_ts=0.05, prior_rs=0.04, season_ts=float("nan"))
     assert not RS.is_key_teammate()
+
+
+def test_the_board_flag_uses_the_tested_carry_weeks():
+    # weeks 1-2 on special teams with no carries do not count; weeks 3-5 do
+    wks = [(1, 0.10, 0.0, 0.0, 0, 0), (2, 0.12, 0.0, 0.0, 0, 0), (3, 0.40, 0.05, 0.30, 1, 8),
+           (4, 0.45, 0.05, 0.35, 1, 9), (5, 0.80, 0.06, 0.70, 2, 19)]
+    c = RS.carry_change(wks)
+    assert c["week"] == 5 and abs(c["cs_base"] - 0.325) < 1e-9 and RS.carry_flag(c, 5)[0] == "carries up"
+    assert RS.carry_change(wks[:4]) is None, "two carry weeks are not enough"
+    assert RS.carry_change([(1, 0.5, 0.1, 0.4)] * 4) is None, "no counts, no flag"
+
+
+def test_a_backfield_takeover_is_flagged_and_points_the_mark():
+    hub = {"week": 3, "snap": 0.84, "snap_base": 0.68, "ts": 0.10, "ts_base": 0.08, "cs": 0.83, "cs_base": 0.51}
+    assert RS.carry_flag(hub, 3)[0] == "carries up"
+    assert RS.carry_flag(dict(hub, cs=0.07, cs_base=0.42), 3)[0] == "carries down", "Allgeier"
+    assert RS.carry_flag(dict(hub, cs=0.60), 3) is None, "a 9-point move is not a takeover"
+    assert RS.carry_flag(hub, 4) is None, "last week must be the game just played"
+    assert RS.carry_flag(None, 3) is None
+    row = dict(player="Chuba Hubbard", market="player_rush_yds", unit="carries", over_needs=18.7, under_needs=15.7,
+               cn=22.0, tn=4.0, usage_week=3, flags="carries up")
+    assert RS.worth_a_look(row, 3)[0] == "Over", "a takeover points the rushing mark Over"
+    assert RS.worth_a_look(dict(row, cn=20.0), 3) is None, "20 carries is inside the 3-carry margin of 18.7"
+    assert RS.worth_a_look(dict(row, market="player_receptions", unit="targets", tn=9.0, over_needs=4.0), 3) is None, \
+        "the carries flag never points a receiving line"
+    dem = dict(row, flags="carries down", cn=2.0, over_needs=7.9, under_needs=6.2)
+    assert RS.worth_a_look(dem, 3)[0] == "Under"
