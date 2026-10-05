@@ -269,7 +269,14 @@ For a narrow question, run only what it needs:
   are observable before entry (the inactives list, a confirmed starter, a line move) or plainly a
   belief ("if you think the Saints throw like they have all season"). Give the losing branch
   too, and say which conditions are the same game script so legs that need opposite scripts
-  never share an entry. These are conditional on the reader's view, never picks: no "take",
+  never share an entry. When legs are grouped for building entries, say for every pair of
+  groups whether they mix, conflict, or mix only under a stated script -- a list of groups
+  alone reads as "don't mix these" (2026-10-05: Bijan's rushing Over and London's catches
+  Over were listed apart, though both came from the same Atlanta-leads game). Name the
+  conflicts with their reason (two backs splitting one team's carries; one team running out
+  the clock vs the same team throwing), and say when how strongly two legs move together is
+  judgment: the joint model is unchecked against real games and the what-if tool holds team
+  totals fixed. These are conditional on the reader's view, never picks: no "take",
   "hammer", "best bet", and no ranking by expected profit.
   **Explore absences unprompted.** For every questionable or doubtful player with a role -- the
   rows' "<name> (<pos>) questionable" flags and the report's "Questionable, not priced here"

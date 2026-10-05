@@ -7338,3 +7338,6 @@ by the user.
   fits and what it needs, and the losing branch. Legs needing opposite game scripts
   are named so they never share an entry. Conditional on the reader's view, never
   picks (SKILL.md fast path; CHAT.md).
+- Grouped legs say, pair by pair, whether the groups mix, conflict or mix only under
+  a stated script: listing Bijan's rushing Over and London's catches Over in separate
+  groups read as "don't combine" though both came from Atlanta's week-3 lead.
