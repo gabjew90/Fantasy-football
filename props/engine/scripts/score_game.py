@@ -1754,6 +1754,19 @@ def main():
                                      + ("played last week" if played_lw else "also out last week"))
             if played_lw:
                 PREVIEW_DIFF[e_.team].append(f"{e_['name']} newly out")
+    # QUESTIONABLE TEAMMATES with a real role, priced or not (DECISIONS #163): a TE2 the
+    # board does not price (Noah Fant, NO week 4) still moves the TE1 if he sits
+    QWATCH = {t_: [] for t_ in (AWAY, HOME)}
+    _out_names = {e_["name"] for _, e_ in pop[pop.excluded].iterrows()}
+    for _, j_ in iw[iw.team.isin([AWAY, HOME]) & iw.report_status.isin(["Questionable", "Doubtful"])].iterrows():
+        if j_.full_name in _out_names:
+            continue                    # already handled as out
+        ts_j = RSCH.role_share(_tg, j_.gsis_id, j_.team)
+        cs_j = RSCH.role_share(_cr, j_.gsis_id, j_.team)
+        sn_j = snap_cur.get((j_.team, norm_name(j_.full_name)))
+        if RSCH.worth_watching(ts_j, cs_j, sn_j):
+            QWATCH[j_.team].append(dict(name=j_.full_name, pos=str(j_.position), status=str(j_.report_status),
+                                        ts=ts_j, cs=cs_j, snap=sn_j, priced=j_.gsis_id in set(M.gsis_id)))
     BACK_NOTE = {}
     for _, m_ in M.iterrows():
         pri_ = pri_players.loc[m_.gsis_id] if m_.gsis_id in pri_players.index else None
@@ -1835,6 +1848,8 @@ def main():
         if bool(m_.questionable):
             flags_.append("questionable")
         flags_ += OUT_NOTE.get(m_.team, [])
+        flags_ += [f"{w_['name']} ({w_['pos']}) {w_['status'].lower()}" for w_ in QWATCH.get(m_.team, [])
+                   if w_["name"] != r_.player]
         flags_ += [b_ for b_ in BACK_NOTE.get(m_.team, []) if not b_.startswith(r_.player + " ")]
         research_rows.append(dict(
             player=r_.player, team=r_.team, pos=m_.pos, market=r_.market, line=float(r_.line), book=r_.book,
@@ -2593,7 +2608,14 @@ def main():
     q = pop[pop.questionable]
     if len(q):
         L.append(f"- **Questionable:** " + ", ".join(r["name"] for _, r in q.iterrows()) + ". Priced as if they play their normal role; see 'If a Questionable player is out' for the other case.")
-    if not excl.empty is False and q.empty:
+    unpriced_q = [w_ for t_ in (AWAY, HOME) for w_ in QWATCH.get(t_, []) if not w_["priced"]]
+    if unpriced_q:
+        pc_ = lambda v: "—" if v is None or v != v else f"{100 * v:.0f}%"
+        L.append("- **Questionable, not priced here:** " + "; ".join(
+            f"{w_['name']} ({w_['pos']}, {w_['status']}: {pc_(w_['ts'])} of targets, {pc_(w_['cs'])} of carries, "
+            f"{pc_(w_['snap'])} of snaps)" for w_ in unpriced_q)
+                 + ". If one sits, his work goes mostly to the teammates at his position: their rows carry his flag.")
+    if excl.empty and q.empty and not unpriced_q:
         L.append("- **Injuries:** no one relevant is out or questionable on the current report.")
     if roof in ("closed", "dome"):
         L.append("- **Weather:** indoors, not a factor.")

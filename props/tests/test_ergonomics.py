@@ -268,7 +268,7 @@ def test_the_slate_board_orders_games_by_total_and_can_show_overs_only():
     B = W.slate_board(RS, runs, sort="total")
     heads = [ln for ln in B if ln.startswith("## ")]
     assert heads[0].startswith("## JAX @ CIN — total 51.5") and heads[1].startswith("## GB @ TB — total 38.5")
-    assert any("| Over above 8.5 targets; Under at 7.1 or fewer |" in ln for ln in B)
+    assert any("| Over above 8.5 targets; Under at 7.1 or fewer · we project 8.5: no-bet zone |" in ln for ln in B)
     assert [ln for ln in W.slate_board(RS, runs) if ln.startswith("## ")][0].startswith("## GB @ TB"), \
         "kickoff order keeps the run order"
     O = W.slate_board(RS, runs, sort="total", overs_only=True)

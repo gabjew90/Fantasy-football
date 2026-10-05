@@ -7290,3 +7290,16 @@ by the user.
   excluded unless he is ACT, exactly like an Out player, so the out rule (A2,
   reports/absence_tune.md) hands his share on. Week 4 NO: Kamara 11.8 carries,
   Miller 7.5. Prices move, so this is a new engine version.
+
+## 2026-10-05 (163) -- questionable teammates are flagged and explored; the pays cell names the zone
+
+- A questionable or doubtful player with a role (5%+ of targets, 10%+ of carries
+  or 30%+ of snaps) puts "<name> (<pos>) questionable" on his teammates' rows,
+  priced or not, and the report lists the unpriced ones ("Questionable, not
+  priced here"). Noah Fant (NO TE2, 9.6% of team targets, below the 10% pricing
+  rule) was invisible on week 4 while his status nudged Juwan Johnson's targets.
+- SKILL.md: every narrative explores absences unprompted -- who absorbs the work,
+  which lines move and which way, the inactives list decides it, a what-if
+  quantifies it.
+- The pays cell ends with where our projection lands (Over zone / no-bet zone /
+  Under zone), and the skill explains how the zone comes from the two prices.

@@ -242,6 +242,22 @@ def test_the_board_flag_uses_the_tested_carry_weeks():
     assert RS.carry_change([(1, 0.5, 0.1, 0.4)] * 4) is None, "no counts, no flag"
 
 
+def test_a_questionable_role_player_is_worth_watching_even_unpriced():
+    assert RS.worth_watching(target_share=0.096), "Noah Fant: 12 of 125 targets, below the 10% pricing rule"
+    assert RS.worth_watching(carry_share=0.12) and RS.worth_watching(snap_share=0.47)
+    assert not RS.worth_watching(target_share=0.02, carry_share=0.0, snap_share=0.12), "a depth body is not news"
+    assert not RS.worth_watching(float("nan"), None, None)
+
+
+def test_the_pays_cell_says_which_zone_our_projection_is_in():
+    base = {"unit": "targets", "over_needs": 7.1, "under_needs": 5.7, "be_over": 0.56, "be_under": 0.57}
+    assert RS.break_even_cell({**base, "projected": 5.5}).endswith("· we project 5.5: Under zone")
+    assert RS.break_even_cell({**base, "projected": 6.3}).endswith("· we project 6.3: no-bet zone")
+    assert RS.break_even_cell({**base, "projected": 7.4}).endswith("· we project 7.4: Over zone")
+    assert "we project" not in RS.break_even_cell({**base, "projected": 5.5, "be_under": None}), \
+        "no zone when a side has no price"
+
+
 def test_a_backfield_takeover_is_flagged_and_points_the_mark():
     hub = {"week": 3, "snap": 0.84, "snap_base": 0.68, "ts": 0.10, "ts_base": 0.08, "cs": 0.83, "cs_base": 0.51}
     assert RS.carry_flag(hub, 3)[0] == "carries up"
