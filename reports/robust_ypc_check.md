@@ -33,14 +33,14 @@ same rule.
 
 ## Read
 
-- Catches: cap each catch at 30 yards (95th percentile). Best in 2024-25, better
-  than plain in both periods, and better than the league average.
-- Runs: cap each run at 29 yards (99th percentile). Best in 2024-25 and better
-  than plain in 2022-23 -- but every early figure lost to the league average, so
-  three games of yards a carry are mostly noise and the read leans on the model's
-  blended figure.
+- For reference only. The achievability gauge is descriptive, so its cap is a
+  definition, not a fit: the user set the luck line at the 99th percentile (catches
+  50 yards, runs 29). On prediction, capping beat the plain average for both, 30-38
+  yards edged 50 for catches, and 29 was best for runs.
 - Dropping the longest play was worse than the plain average every time: it always
   lowers a player's number, fluke or not.
+- Three games of yards a carry lost to the league average under every version, so
+  the runner's season figure carries a noise warning.
 
 These figures are report text only (research.catch_yards_read / carry_yards_read,
 DECISIONS #166): no price, probability or record changes.

@@ -414,10 +414,10 @@ def test_extra_lines_are_indexed_by_our_team_code():
 
 
 def test_the_season_yards_a_catch_is_shown_capped():
-    # London: 274 yards on 15 catches, 220 once each catch is capped at 30
+    # London: 274 yards on 15 catches, 220 once each catch is capped (made-up capped total)
     d = RS.catch_yards_read(6.5, 81.5, season_rec=15, season_yds=274, model_ypc=13.4, season_capped_yds=220)
     assert d["season_ypc_cap"] == pytest.approx(220 / 15)
-    assert "he has 18.3 this season on 15 catches (14.7 with each catch capped at 30 yards)" in RS.catch_yards_sentence(d)
+    assert "he has 18.3 this season on 15 catches (14.7 with each catch capped at 50 yards)" in RS.catch_yards_sentence(d)
     assert d["read"] == "about even", "context only: the verdict still compares the lines with ours"
     assert RS.catch_yards_read(6.5, 81.5, season_rec=5, season_yds=90, season_capped_yds=80)["season_ypc_cap"] is None
 

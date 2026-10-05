@@ -342,14 +342,11 @@ def to_clear(line) -> int:
 # one leg wins more often (DECISIONS #164)
 YPC_BAND = 1.0
 YPC_MIN_CATCHES = 8
-# each catch counted at most this many yards in the season context figure: the league's
-# 95th percentile catch in 2022-23; capped beat the plain average and dropping the longest
-# catch at predicting later yards a catch in both 2022-23 and 2024-25 (reports/robust_ypc_check.md)
-CATCH_CAP = 30
-# each run counted at most this many yards in the gauge: the league's 99th percentile carry
-# in 2022-23. Of caps at the 90th/95th/97.5th/99th percentile (11/14/20/29 yards) it best
-# predicted later yards a carry in 2024-25 (0.851 vs plain 0.936) and beat plain in 2022-23
-# too -- though every early figure still lost to the league average (reports/robust_ypc_check.md)
+# THE LUCK LINE for the achievability gauge (user's call, 2026-10-05): a play past the
+# league's 99th percentile (2022-23 plays) counts as a lucky breakaway and is counted at the
+# cap. The gauge describes a line, it does not predict, so this is a definition, not a fit;
+# reports/robust_ypc_check.md records how the caps compare as predictors, for reference only
+CATCH_CAP = 50
 RUN_CAP = 29
 
 
@@ -460,9 +457,8 @@ def catch_yards_read(catches_line=None, yards_line=None, season_rec=None, season
     with OUR yards a catch for him (the blended estimate: a raw season figure on 15
     catches carries a standard error near 2.5 yards, wider than the band). His season
     figure is context, used only when we have none, shown beside its capped version
-    (season_capped_yds: each catch counted at most CATCH_CAP yards), which predicted later
-    yards a catch better than the plain figure or dropping his longest catch
-    (reports/robust_ypc_check.md). A longest-catch line of 17.5 means
+    (season_capped_yds: each catch counted at most CATCH_CAP yards, the luck line). A
+    longest-catch line of 17.5 means
     one catch of 18; rest_ypc is what the other catches must average if he gets
     exactly that one. Nothing here is a model price."""
     ok = lambda v: v is not None and v == v
