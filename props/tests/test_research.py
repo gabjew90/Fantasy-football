@@ -431,7 +431,7 @@ def test_the_gauge_compares_the_volume_the_line_takes_with_ours():
     assert d["gauge"]["need"] == pytest.approx(90 / (323 / 66))
     s = RS.carry_yards_sentence(d)
     assert "90 yards takes about 18.4 carries; we project 17.5 (our volume), about what it takes." in s
-    assert "The book's own carries line is 19.5: about what the yards line takes." in s, "18.4 is within half a carry"
+    assert "The book's own carries line is 19.5: the yards line takes less than the book's own volume." in s
     lk = {"cap": 31.0, "own": True, "n": 353}
     d = RS.carry_yards_read(None, 29.5, model_ypc=4.5, proj_carries=9.1, season_car=30, season_yds=132,
                             season_luckfree_ypc=132 / 30, luck=lk)
