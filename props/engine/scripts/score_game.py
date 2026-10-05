@@ -257,7 +257,9 @@ def apply_designations(pop: pd.DataFrame, assume_out=frozenset()) -> pd.DataFram
     2026-09-26)."""
     pop = pop.copy()
     pop["report_status"] = pop["report_status"].astype(object)
-    pop["excluded"] = pop.report_status.isin(["Out", "Doubtful"]) | (pop.status == "INA")
+    # anything but ACT on this week's roster is not playing: INA (game-day inactive),
+    # RES (reserve/IR), PUP, SUS, DEV (practice squad), ... (DECISIONS #162)
+    pop["excluded"] = pop.report_status.isin(["Out", "Doubtful"]) | (pop.status != "ACT")
     pop["questionable"] = pop.report_status.eq("Questionable")
     if assume_out:
         ao = pop.gsis_id.isin(assume_out)
@@ -672,8 +674,13 @@ def main():
                     elig.add(pid)
         for pid in sorted(elig):
             r = rw[(rw.team == t) & (rw.gsis_id == pid)]
-            if r.empty or r.status.iloc[0] not in ("ACT", "INA"):
-                continue
+            if r.empty:
+                continue      # not on this team's roster any more (cut or traded): nothing to hand on
+            # ON THE ROSTER BUT NOT PLAYING (reserve/IR, PUP, suspended, practice squad):
+            # kept, and excluded below like an Out player, so his share is handed to his
+            # teammates by the out rule and the board says he is out. Dropping him here
+            # (the pre-2026-10-05 behaviour) left his carries with nobody (Travis Etienne,
+            # NO week 4).
             pop.append({"team": t, "gsis_id": pid, "name": r.full_name.iloc[0],
                         "pos": r.position.iloc[0], "status": r.status.iloc[0]})
     pop = pd.DataFrame(pop)

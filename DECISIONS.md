@@ -7277,3 +7277,16 @@ by the user.
   (`entry-void ENTRY --player NAME`), shows the entry as "check" until the payout is recorded, and
   `entry-paid` settles the entry at the amount Sleeper actually paid. The reduced
   multiple is not guessed.
+
+## 2026-10-05 (162) -- a player on reserve is out, and his share is handed on
+
+- The player pool kept only ACT/INA players from the week's roster, so a regular
+  moved to reserve/IR (or PUP, suspension, practice squad) vanished: no "out"
+  flag, a wrong "last week was a preview" note, and -- the price-moving part --
+  his share was handed to nobody. Travis Etienne (NO, 38-59% of snaps in weeks
+  1-3, reserve in week 4) left Kamara at 10.7 projected carries and Kendre Miller
+  at 6.8 while the book priced about 13 and 8.
+- Fix: any eligible player still on the team's roster stays in the pool and is
+  excluded unless he is ACT, exactly like an Out player, so the out rule (A2,
+  reports/absence_tune.md) hands his share on. Week 4 NO: Kamara 11.8 carries,
+  Miller 7.5. Prices move, so this is a new engine version.

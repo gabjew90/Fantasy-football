@@ -323,3 +323,12 @@ def test_a_spread_written_with_an_alias_still_names_the_right_favourite():
     import score_week as W
     assert W.game_context("TEN@JAX", "JAC -3", "44.0", {}) == "*JAX by 3 · implied points JAX 23.5, TEN 20.5*"
     assert W.game_context("TEN@JAX", "XXX -3", "44.0", {}) == "", "an unknown team code says nothing rather than guess"
+
+
+def test_a_player_on_reserve_is_out_like_a_ruled_out_player():
+    pop = pd.DataFrame({"team": ["NO"] * 4, "gsis_id": list("abcd"), "status": ["ACT", "RES", "INA", "ACT"],
+                        "report_status": [None, None, None, "Out"]})
+    p = SG.apply_designations(pop)
+    assert p.excluded.tolist() == [False, True, True, True], "reserve/IR, inactive and Out are all excluded"
+    src = (Path(SG.__file__)).read_text(encoding="utf-8")
+    assert 'if r.empty or r.status.iloc[0] not in ("ACT", "INA")' not in src,         "a player on reserve must stay in the pool so his share is handed on"
