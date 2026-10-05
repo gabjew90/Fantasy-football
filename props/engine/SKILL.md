@@ -335,7 +335,9 @@ need not be surfaced. Write the reply as a premium prop guide with this structur
    carries, passing-down targets, inside-5 carries; last game against earlier weeks), the
    opponent multiplier if it
    moved the number, and any Watch flag (new team, Questionable, snap scaling, the
-   receiving role-shift flag with its 2022-25 wording, a teammate out or back).
+   receiving role-shift flag with its 2022-25 wording, a back's "carries up / down" flag when his
+   carry share moved 20+ points last week (reports/rb_takeover_check.md: such backs beat or
+   missed the model's carries by about two the next week), a teammate out or back).
    **Questionable players: give both cases, pick neither.** Every number in the run is
    priced as if a Questionable player PLAYS his normal role (no discount). The report's
    "If a Questionable player is out" section prices the same lines with him OUT and his

@@ -299,9 +299,10 @@ def worth_a_look(x, last_week):
     # a teammate out hands his work on (Over) -- except the starting QB: a
     # backup thins the passing game, so a QB out is a story for the backs'
     # carries only, never for a receiver
-    up = any(f == "role up" for f in flags) or any(
+    up = any(f == "role up" for f in flags) or (rush and "carries up" in flags) or any(
         m_ and m_.group(1).replace(" (QB)", "") != me and (rush or not m_.group(1).endswith(" (QB)")) for m_ in outs)
-    down = any(f == "role down" for f in flags) or any(" back (missed last week)" in f for f in flags)
+    down = (any(f == "role down" for f in flags) or (rush and "carries down" in flags)
+            or any(" back (missed last week)" in f for f in flags))
     # a role or teammate story sets the direction; stories pulling both ways
     # (more snaps, but the star teammate is back) mark nothing; a new team
     # with no other story allows either side
@@ -359,6 +360,29 @@ def role_flag(u, last_week_expected):
     if d_snap <= -SNAP_JUMP and d_ts > -SHARE_LAG:
         return ("role down", "snaps fell while his targets held; the projection already lowers his "
                              "target share for it (snap-change rule)")
+    return None
+
+
+# reports/rb_takeover_check.md: fixed before the check, earned for backs on carries
+CARRY_JUMP = 0.20
+
+
+def carry_flag(u, last_week_expected):
+    """The backfield flag (reports/rb_takeover_check.md), or None: his carry share
+    last week against his earlier weeks. A takeover (+20 points or more) beat the
+    model's carry projection by about two carries the next week in 2022-25; a
+    demotion missed it by about two. Needs last week to be the week before this one."""
+    if u is None or u["week"] != last_week_expected:
+        return None
+    cs, base = u.get("cs"), u.get("cs_base")
+    if cs is None or base is None or cs != cs or base != base:
+        return None
+    if cs - base >= CARRY_JUMP:
+        return ("carries up", "his share of the carries jumped last week; backs who take over a backfield got about "
+                              "two more carries than the model projected the next week (2022-25)")
+    if cs - base <= -CARRY_JUMP:
+        return ("carries down", "his share of the carries fell last week; backs who lose the job got about two "
+                                "fewer carries than the model projected the next week (2022-25)")
     return None
 
 

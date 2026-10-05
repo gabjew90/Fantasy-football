@@ -400,7 +400,7 @@ def main():
     RS = pd.concat(research, ignore_index=True) if research else pd.DataFrame()
     if len(RS):
         RS.to_csv(OUT / f"slate_research_{a.season}_wk{a.week:02d}.csv", index=False)
-        flagged = RS[RS["flags"].fillna("").str.contains("role up|role down")]
+        flagged = RS[RS["flags"].fillna("").str.contains("role up|role down|carries up|carries down")]
         L += ["", "## Research leads across the slate", "",
               "*Not picks. The role-shift pattern (snaps moved while targets had not caught up yet) -- the projection "
               "already moves his target share for it since props-v1.29; before that it beat or "

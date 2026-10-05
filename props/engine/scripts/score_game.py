@@ -1803,6 +1803,10 @@ def main():
         flags_ = []
         if ROLE.get(r_.player) and r_.market != "player_rush_yds" and m_.pos != "QB":
             flags_.append(ROLE[r_.player][0])
+        if r_.market == "player_rush_yds" and m_.pos != "QB":
+            cf_ = RSCH.carry_flag(USAGE.get(r_.player), WEEK - 1)     # reports/rb_takeover_check.md
+            if cf_:
+                flags_.append(cf_[0])
         if bool(m_.new_team):
             flags_.append(f"new team (from {m_.prior_team})")
         if bool(m_.questionable):
@@ -2890,7 +2894,8 @@ RESEARCH_NOTE = ("*Each line: the book's line and price, our projection (median,
                  "line implies: the targets or carries per game at which the line is a fair 50/50, next to what we "
                  "project; then the workload each side needs to beat its own price. A **bold** prop is worth a "
                  "look, not a bet: a role story plus last game's workload already past that side's break-even "
-                 "(DECISIONS #156; the scorecard grades every one). Flags mark a teammate out or back, a new team, a Questionable tag, and the receiving "
+                 "(DECISIONS #156; the scorecard grades every one). 'Carries up / down' marks a back whose "
+                 "carry share moved 20+ points last week (reports/rb_takeover_check.md). Flags mark a teammate out or back, a new team, a Questionable tag, and the receiving "
                  "role-shift pattern (reports/role_shift_check.md).*")
 
 
