@@ -253,7 +253,7 @@ def test_a_power_play_is_one_all_or_nothing_entry_with_graded_legs(root):
     assert all(r["stake"] == 1.0 for r in rows), "a leg is one unit in the record; the dollars are the entry's"
     rows[1].update(status="void", won=None)
     J.write(2026, rows)
-    assert "| check (a leg voided or needs a box score) | — |" in "\n".join(J.summary_md(2026))
+    assert "| check: a leg was dropped" in "\n".join(J.summary_md(2026))
     rows[0].update(won=False)
     J.write(2026, rows)
     assert "| lost | -5.00 |" in "\n".join(J.summary_md(2026)), "a lost leg loses the entry, void or not"
@@ -268,3 +268,29 @@ def test_the_cli_logs_an_entry(root):
     assert rows[2]["team"] is None, "the team is optional on a leg"
     assert J.main(["entry", "--stake", "5", "--payout", "100", "--angle", "role", "--why", "x", "--season", "2026",
                    "--week", "4", "--leg", "bad leg"]) == 2
+
+
+def test_a_rebooted_leg_and_the_real_payout(root):
+    legs = [("A", "catches", "over", 3.5, "KC"), ("B", "catches", "over", 2.5, "KC"), ("C", "catches", "over", 4.5, "LV")]
+    rows = J.make_power_play(legs, stake=5, payout=47.5, angle="role", why="x", season=2026, week=4)
+    J.write(2026, rows)
+    assert J.main(["entry-void", rows[0]["entry_id"], "--player", "a", "--season", "2026"]) == 0   # 'Reboot'
+    assert J.read(2026)[0]["status"] == "void" and "Reboot" in J.read(2026)[0]["result"]
+    assert J.main(["entry-void", rows[0]["entry_id"], "--player", "Nobody", "--season", "2026"]) == 2
+    md = "\n".join(J.summary_md(2026))
+    assert "check: a leg was dropped" in md and "journal entry-paid" in md
+    assert J.main(["entry-paid", rows[0]["entry_id"], "--paid", "15", "--season", "2026"]) == 0
+    assert "| won (as paid) | +10.00 |" in "\n".join(J.summary_md(2026)), "settled at what Sleeper paid"
+    assert J.main(["entry-paid", "nope", "--paid", "1", "--season", "2026"]) == 2
+
+
+def test_entry_paid_labels_a_refund_honestly(root):
+    rows = J.make_power_play([("A", "catches", "over", 3.5, "KC"), ("B", "catches", "over", 2.5, "KC")],
+                             stake=5, payout=15, angle="role", why="x", season=2026, week=4)
+    J.write(2026, rows)
+    J.entry_paid(2026, rows[0]["entry_id"], 5)
+    assert "| refunded (as paid) | +0.00 |" in "\n".join(J.summary_md(2026))
+    J.entry_paid(2026, rows[0]["entry_id"], 0)
+    assert "| lost (as paid) | -5.00 |" in "\n".join(J.summary_md(2026))
+    with pytest.raises(ValueError, match="0 or more"):
+        J.entry_paid(2026, rows[0]["entry_id"], -1)

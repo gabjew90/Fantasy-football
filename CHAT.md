@@ -277,7 +277,10 @@ A Sleeper Power Play (every leg must hit) is ONE entry with its total payout:
 `python props/journal.py entry --stake <$> --payout <total it pays> --angle <...> --why "<the entry's reason>" --leg "<Player>|<market>|<side>|<line>|<TEAM>[|<angle>]" --leg ...`
 (line empty for an anytime TD; add `--after-kickoff` if any leg's game had started).
 Each leg is priced at the entry's per-leg rate (a 5-leg 20x entry is about −122 a
-leg, 54.9% to break even), and the entry counts only if every leg hits.
+leg, 54.9% to break even), and the entry counts only if every leg hits. If Sleeper drops a leg ("Reboot": the player
+sat or left), the entry pays a smaller multiple only the app shows: void the leg with
+`python props/journal.py entry-void <entry id> --player "<name>"` and record the payout with
+`python props/journal.py entry-paid <entry id> --paid <amount>` (0 if it lost).
 
 An anytime-TD bet has no line: `python props/journal.py add "<player>" td <yes|no> <price> --team <TEAM> --angle ... --change ... --implies ... --fails ...`. The engine contract's "the
 reply is slate_summary reproduced in full" is for a request for the slate
