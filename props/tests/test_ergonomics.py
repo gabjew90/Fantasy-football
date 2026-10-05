@@ -330,5 +330,10 @@ def test_a_player_on_reserve_is_out_like_a_ruled_out_player():
                         "report_status": [None, None, None, "Out"]})
     p = SG.apply_designations(pop)
     assert p.excluded.tolist() == [False, True, True, True], "reserve/IR, inactive and Out are all excluded"
-    src = (Path(SG.__file__)).read_text(encoding="utf-8")
-    assert 'if r.empty or r.status.iloc[0] not in ("ACT", "INA")' not in src,         "a player on reserve must stay in the pool so his share is handed on"
+    assert SG.keep_in_pool("RES", True), "on reserve after playing this season: in, so his share is handed on"
+    assert not SG.keep_in_pool("RES", False), "on reserve since before the season: already absent from the numbers"
+    assert SG.keep_in_pool("ACT", False) and SG.keep_in_pool("INA", False)
+    assert not SG.keep_in_pool("DEV", True) and not SG.keep_in_pool("CUT", True), "practice squad / cut: old handling"
+    p2 = SG.apply_designations(pd.DataFrame({"team": ["NO"] * 2, "gsis_id": list("xy"), "status": ["DEV", "PUP"],
+                                             "report_status": [None, None]}))
+    assert p2.excluded.tolist() == [False, True], "only the not-playing statuses are excluded"

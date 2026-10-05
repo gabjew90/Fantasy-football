@@ -249,6 +249,22 @@ def parse_markets(spec: str | None) -> set[str]:
     return out
 
 
+# Roster statuses that mean "on the team, not playing" (DECISIONS #162). INA is a
+# game-day inactive; the rest are reserve lists. Anything else that is not ACT
+# (practice squad, cut, traded) keeps the old handling: not in the pool at all.
+NOT_PLAYING = ("INA", "RES", "PUP", "SUS", "NFI")
+
+
+def keep_in_pool(status, played_this_season: bool) -> bool:
+    """Whether a rostered, eligible player enters the pool. ACT and INA always;
+    a reserve-list player only if he played this season -- his share is in his
+    teammates' numbers and must be handed on. One out since before the season
+    is already absent from them, so handing a prior share on would count it twice."""
+    if status in ("ACT", "INA"):
+        return True
+    return status in NOT_PLAYING and played_this_season
+
+
 def apply_designations(pop: pd.DataFrame, assume_out=frozenset()) -> pd.DataFrame:
     """A2: Out/Doubtful removed, Questionable flagged for regime treatment, and
     a scenario's assumed-out players marked out whatever their report says.
@@ -257,9 +273,8 @@ def apply_designations(pop: pd.DataFrame, assume_out=frozenset()) -> pd.DataFram
     2026-09-26)."""
     pop = pop.copy()
     pop["report_status"] = pop["report_status"].astype(object)
-    # anything but ACT on this week's roster is not playing: INA (game-day inactive),
-    # RES (reserve/IR), PUP, SUS, DEV (practice squad), ... (DECISIONS #162)
-    pop["excluded"] = pop.report_status.isin(["Out", "Doubtful"]) | (pop.status != "ACT")
+    # INA (game-day inactive) and the reserve lists are not playing (DECISIONS #162)
+    pop["excluded"] = pop.report_status.isin(["Out", "Doubtful"]) | pop.status.isin(NOT_PLAYING)
     pop["questionable"] = pop.report_status.eq("Questionable")
     if assume_out:
         ao = pop.gsis_id.isin(assume_out)
@@ -674,8 +689,8 @@ def main():
                     elig.add(pid)
         for pid in sorted(elig):
             r = rw[(rw.team == t) & (rw.gsis_id == pid)]
-            if r.empty:
-                continue      # not on this team's roster any more (cut or traded): nothing to hand on
+            if r.empty or not keep_in_pool(r.status.iloc[0], (t, pid) in cur.index):
+                continue      # off the roster, practice squad / cut / traded, or out since before the season
             # ON THE ROSTER BUT NOT PLAYING (reserve/IR, PUP, suspended, practice squad):
             # kept, and excluded below like an Out player, so his share is handed to his
             # teammates by the out rule and the board says he is out. Dropping him here
