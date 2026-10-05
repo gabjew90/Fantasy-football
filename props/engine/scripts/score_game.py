@@ -802,7 +802,7 @@ def main():
     _tg_w = passes.groupby(["posteam", "receiver_player_id", "week"]).size()
     _ca_w = rushes.groupby(["posteam", "rusher_player_id", "week"]).size()
     _tw_i = tw.set_index(["team", "week"])
-    USAGE, ROLE, BACKFIELD = {}, {}, {}
+    USAGE, ROLE, BACKFIELD, CARRY_U = {}, {}, {}, {}
     # a back's three jobs by week (research columns): early-down carries,
     # passing-down targets (3rd/4th down or the last two minutes of a half),
     # inside-5 carries. Display only: nothing here moves a price.
@@ -818,6 +818,7 @@ def main():
                 wks.append((int(w_), float(sv), n_t / tt_ if tt_ else np.nan, n_c / tc_ if tc_ else np.nan,
                             n_t, n_c))
         USAGE[m_["name"]] = RSCH.usage_change(sorted(wks))
+        CARRY_U[m_["name"]] = RSCH.carry_change(sorted(wks))     # the takeover flag's own definition
         ROLE[m_["name"]] = RSCH.role_flag(USAGE[m_["name"]], WEEK - 1)
         if str(m_.get("pos")) in ("RB", "FB", "HB"):
             bwk = []
@@ -1804,7 +1805,7 @@ def main():
         if ROLE.get(r_.player) and r_.market != "player_rush_yds" and m_.pos != "QB":
             flags_.append(ROLE[r_.player][0])
         if r_.market == "player_rush_yds" and m_.pos != "QB":
-            cf_ = RSCH.carry_flag(USAGE.get(r_.player), WEEK - 1)     # reports/rb_takeover_check.md
+            cf_ = RSCH.carry_flag(CARRY_U.get(r_.player), WEEK - 1)   # reports/rb_takeover_check.md
             if cf_:
                 flags_.append(cf_[0])
         if bool(m_.new_team):

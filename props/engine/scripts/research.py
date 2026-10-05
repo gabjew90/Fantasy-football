@@ -367,6 +367,18 @@ def role_flag(u, last_week_expected):
 CARRY_JUMP = 0.20
 
 
+def carry_change(weeks):
+    """The backfield flag's inputs, on the TESTED definition
+    (reports/rb_takeover_check.md): only weeks in which he carried. weeks:
+    usage_change's tuples with the counts (week, snap, ts, cs, targets,
+    carries). Returns {week, cs, cs_base} or None (fewer than three carry weeks)."""
+    w = [x for x in weeks if len(x) >= 6 and x[5] and x[5] > 0]
+    if len(w) < 3:
+        return None
+    return {"week": int(w[-1][0]), "cs": float(w[-1][3]),
+            "cs_base": float(np.nanmean([x[3] for x in w[:-1]]))}
+
+
 def carry_flag(u, last_week_expected):
     """The backfield flag (reports/rb_takeover_check.md), or None: his carry share
     last week against his earlier weeks. A takeover (+20 points or more) beat the

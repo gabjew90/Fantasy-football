@@ -232,6 +232,16 @@ def test_a_returning_back_counts_as_a_key_teammate():
     assert not RS.is_key_teammate()
 
 
+def test_the_board_flag_uses_the_tested_carry_weeks():
+    # weeks 1-2 on special teams with no carries do not count; weeks 3-5 do
+    wks = [(1, 0.10, 0.0, 0.0, 0, 0), (2, 0.12, 0.0, 0.0, 0, 0), (3, 0.40, 0.05, 0.30, 1, 8),
+           (4, 0.45, 0.05, 0.35, 1, 9), (5, 0.80, 0.06, 0.70, 2, 19)]
+    c = RS.carry_change(wks)
+    assert c["week"] == 5 and abs(c["cs_base"] - 0.325) < 1e-9 and RS.carry_flag(c, 5)[0] == "carries up"
+    assert RS.carry_change(wks[:4]) is None, "two carry weeks are not enough"
+    assert RS.carry_change([(1, 0.5, 0.1, 0.4)] * 4) is None, "no counts, no flag"
+
+
 def test_a_backfield_takeover_is_flagged_and_points_the_mark():
     hub = {"week": 3, "snap": 0.84, "snap_base": 0.68, "ts": 0.10, "ts_base": 0.08, "cs": 0.83, "cs_base": 0.51}
     assert RS.carry_flag(hub, 3)[0] == "carries up"
