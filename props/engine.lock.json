@@ -1,9 +1,9 @@
 {
   "algorithm": "props-engine-sha256-lf-1",
-  "engine_sha256": "f7ebca4eb191e02512fe0787e81537ba1a3ef40b2b1c7e49155f47ca035938a9",
+  "engine_sha256": "64a8a92e4cba45b31750fb33153445b39d1b1ea75e10ad7b9acf264245b4c1ca",
   "file_count": 54,
   "files": {
-    "SKILL.md": "829984a3bd91960382e1c6eb84f0a621dce9dfb1ce7ad700ba21618fd5d64c13",
+    "SKILL.md": "45eab5524a92431611ba550825120584e18a0a6f443afc5b2132993c9d813d5f",
     "resources/calibration_2025.csv": "47e3922c7af818307831d70a3d2be4333200f3aee1d94dc6bbf6e0e9ccee4ac8",
     "resources/data_source_matrix.md": "2088a5ebe6164a75c11331367fda734d4b10ea217704320321a3f2aec6bb9c2b",
     "resources/execution_protocol.md": "5f54fb23a77d60ecc947d44b6f18ecf67c4357d6b49c70bc937726c1c14016c1",
@@ -42,9 +42,9 @@
     "scripts/eligibility.py": "f1672cff3d7ae2d52ca94b5952451e92c794bfcd21ab2224b0e35e7f152445b5",
     "scripts/model.py": "4e967fb31e1a0c17e5d68a181c494a1c0b405eafc42ca1726063911e5cb5d77c",
     "scripts/odds_client.py": "434186273bd0412a5545247228298951c5d0504a19c8a47c4c782bf3bb75aaa1",
-    "scripts/research.py": "5945659e770fa4cf3f5a80b3fc6b47ee0a0b578fc808802e76da071d6925be51",
+    "scripts/research.py": "a4800aaf13695fb55b959d8f3822fb380e3378773bb541ad8b46adbcb1b01682",
     "scripts/scenario.py": "732ef233876bb13ae5dee3c8f04e5bf99b5634cb879bdeb744f56a47df557172",
-    "scripts/score_game.py": "473f6b4fbb0d9d055ce3c99f010469b9963c04126e9da6686c16d743ca191bfa",
+    "scripts/score_game.py": "1755065efe2c3739f73c598368870e8f1dc1fab97f475d0516eb785bbbad2611",
     "scripts/score_week.py": "5259ebc2f6e56571f7e0b03291e84d0e26d00f85dacf5256f40b07ac275fabeb",
     "scripts/td_alloc.py": "7c407c949cac8f0f74d7f91589fd5d749f65d9053eb1c3f5f0dc63a700b3465b",
     "scripts/td_alloc_backtest.py": "e259d9f0e301a5d5d34e5a9e84bba222810f077d9c05a1f1f799a611914595a4",
@@ -58,5 +58,5 @@
     "scripts/td_model.py": "7c1635bbf515b4316f14771b177363a9f82a1ba7ad3393e479cd2dce26a25724",
     "scripts/td_v1.py": "4e54516734888fc588a7ad3fd9d0ad7dd16d96edcaa980adff3dbcda232ece0f"
   },
-  "tag": "props-v1.34"
+  "tag": "props-v1.35"
 }
