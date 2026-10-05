@@ -327,7 +327,15 @@ For a narrow question, run only what it needs:
   instead; the report prints which it used; ours when his
   sample is small), against the volume we project: "comfortably more than it takes", "about what
   it takes" or "fewer than it takes". Use it to say whether a yards line is achievable without a
-  lucky breakaway. It is an average-game check, so a "comfortably" on a 1-2 catch player is still
+  lucky breakaway. **Say whose volume each number is.** "We project" is OUR model's volume, never
+  the book's. The gauge also quotes the book's own catches or carries line when Sleeper posts
+  one (with the side it favours) -- narrate against both: "90 yards takes about 21 carries
+  without a breakaway; we project 17.5, and the book's own carries line is 19.5 with the Under
+  favoured -- even the book's volume falls short, so the Over needs a workhorse game or a long
+  run". When the book posts no volume line for him, say the check is against our volume only and
+  add his recent games' volume and what the yards line works out to ("line implies" in the
+  table), so the reader sees three volumes side by side. It is an average-game check, so a
+  "comfortably" on a 1-2 catch player is still
   close to a coin flip (the gauge warns under 3 catches or 6 carries). Report text only: it never
   changes the model's price.
   Then narrate the bold lines, analytically, in plain English -- interpret, do not recite the

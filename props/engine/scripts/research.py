@@ -420,16 +420,29 @@ def volume_gauge(y_min, rate, proj, unit, low_volume):
             "low": float(proj) < low_volume}
 
 
-def gauge_sentence(g, rate, per, luck_clause, y_min, long_word):
-    """'At 4.4 yards a carry with the luck taken out (<how>), 90 yards takes about ...'."""
+def gauge_sentence(g, rate, per, luck_clause, y_min, long_word, book_line=None, book_fav=None):
+    """'At 4.4 yards a carry with the luck taken out (<how>), 90 yards takes about 20.6
+    carries; we project 17.5 (our volume), about what it takes. The book's own carries line
+    is 19.5, Under favoured: fewer than the yards line takes, so even the book's volume
+    falls short without a long run.' The book's volume line is quoted whenever it exists
+    (DECISIONS #167), so the reader sees whose volume each number is."""
     if not g:
         return None
     how = f"with the luck taken out ({luck_clause})" if luck_clause else "(our figure for him)"
     s = (f"At {rate:.1f} yards a {per} {how}, {y_min} yards takes about {g['need']:.1f} {g['unit']}; "
-         f"we project {g['proj']:.1f}, {g['word']}")
+         f"we project {g['proj']:.1f} (our volume), {g['word']}")
     if g["word"] == "fewer than it takes":
         s += f": the Over needs more {g['unit']} or {long_word}"
     s += "."
+    if book_line is not None and book_line == book_line:
+        fav = f", {book_fav} favoured" if book_fav else ""
+        s += f" The book's own {g['unit']} line is {book_line:g}{fav}: "
+        if g["need"] > book_line:
+            s += f"fewer than the yards line takes, so even the book's volume falls short without {long_word}."
+        else:
+            s += "the yards line takes no more than the book's own volume."
+    else:
+        s += f" The book posts no {g['unit']} line for him, so this is against our volume only."
     if g["low"]:
         s += f" At this little volume one {SINGULAR.get(g['unit'], g['unit'])} either way decides it."
     return s
@@ -575,7 +588,8 @@ def catch_yards_sentence(d) -> str | None:
                     f"need {d['need_ypc']:.1f} a catch.")
     if d.get("gauge") is not None:
         lc = luck_words(d.get("luck"), "catch") if d["season_ypc_luckfree"] is not None else None
-        bits.append(gauge_sentence(d["gauge"], d["gauge_rate"], "catch", lc, d["y_min"], "a long catch"))
+        bits.append(gauge_sentence(d["gauge"], d["gauge_rate"], "catch", lc, d["y_min"], "a long catch",
+                                   book_line=d["catches_line"]))
     if d["long_min"] is not None:
         if d["long_min"] >= d["y_min"]:
             bits.append(f"The longest-catch line ({d['longest_line']:g}) sits at or above his yards line: "
@@ -673,7 +687,8 @@ def carry_yards_sentence(d) -> str | None:
                     f"need {d['need_ypc']:.1f} a carry.")
     if d.get("gauge") is not None:
         lc = luck_words(d.get("luck"), "run") if d["season_ypc_luckfree"] is not None else None
-        bits.append(gauge_sentence(d["gauge"], d["gauge_rate"], "carry", lc, d["y_min"], "a long run"))
+        bits.append(gauge_sentence(d["gauge"], d["gauge_rate"], "carry", lc, d["y_min"], "a long run",
+                                   book_line=d["carries_line"], book_fav=d["carries_fav"]))
     if d["long_min"] is not None:
         if d["long_min"] >= d["y_min"]:
             bits.append(f"The longest-run line ({d['longest_line']:g}) sits at or above his yards line: "

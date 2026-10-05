@@ -430,7 +430,8 @@ def test_the_gauge_compares_the_volume_the_line_takes_with_ours():
                             season_luckfree_ypc=323 / 66)
     assert d["gauge"]["need"] == pytest.approx(90 / (323 / 66))
     s = RS.carry_yards_sentence(d)
-    assert "90 yards takes about 18.4 carries; we project 17.5, about what it takes." in s
+    assert "90 yards takes about 18.4 carries; we project 17.5 (our volume), about what it takes." in s
+    assert "The book's own carries line is 19.5: the yards line takes no more than the book's own volume." in s
     lk = {"cap": 31.0, "own": True, "n": 353}
     d = RS.carry_yards_read(None, 29.5, model_ypc=4.5, proj_carries=9.1, season_car=30, season_yds=132,
                             season_luckfree_ypc=132 / 30, luck=lk)
@@ -478,3 +479,16 @@ def test_the_luck_line_pools_last_season_with_this_one_but_rates_this_season():
     luck, rate = RS.luck_for(prior, {"00-001": [7.0, 30.0]}, "00-001", "catch")
     assert not luck["own"] and rate == pytest.approx(7.0), "4 catches pooled: his longest this season left out"
     assert RS.luck_for(prior, {}, "00-999", "run") == ({"cap": None, "own": False, "n": 0}, None)
+
+
+
+def test_the_gauge_says_whose_volume_each_number_is():
+    d = RS.carry_yards_read(19.5, 89.5, model_ypc=4.4, proj_carries=17.5, carries_fav="Under")
+    s = RS.carry_yards_sentence(d)
+    assert "we project 17.5 (our volume)" in s
+    assert "The book's own carries line is 19.5, Under favoured: fewer than the yards line takes" in s
+    d = RS.carry_yards_read(None, 29.5, model_ypc=4.3, proj_carries=9.1)
+    assert "The book posts no carries line for him, so this is against our volume only." in RS.carry_yards_sentence(d)
+    d = RS.catch_yards_read(6.5, 81.5, model_ypc=16.4, proj_catches=5.8)
+    assert "The book's own catches line is 6.5: the yards line takes no more than the book's own volume." \
+        in RS.catch_yards_sentence(d)
