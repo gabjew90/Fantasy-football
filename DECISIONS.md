@@ -7269,3 +7269,11 @@ by the user.
 - Rushing rows carry the flag, and it points the "worth a look" mark (Over / Under)
   for rushing lines only. The model itself is not changed: moving carry share by the
   change is a separate tuning round under the usual protocol, because it moves prices.
+
+## 2026-10-05 (161) -- a dropped Power Play leg settles at what Sleeper paid
+
+- Sleeper's "Reboot" drops a leg whose player sat or left and pays the entry as
+  one fewer pick (the user's week-4 Rice leg). The journal voids that leg
+  (`resolve --void`), shows the entry as "check" until the payout is recorded, and
+  `entry-paid` settles the entry at the amount Sleeper actually paid. The reduced
+  multiple is not guessed.

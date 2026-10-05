@@ -396,12 +396,16 @@ def entries_table(rows: list[dict]) -> list[str]:
         st, pay = float(legs[0]["entry_stake"]), float(legs[0]["entry_payout"])
         graded = [x for x in legs if x.get("status") == "graded"]
         won = sum(1 for x in graded if x.get("won"))
-        if any(x.get("status") == "graded" and not x.get("won") for x in legs):
+        paid = legs[0].get("entry_paid")
+        if paid is not None:                     # what Sleeper actually paid (a reduced entry, say)
+            res, net = ("won" if paid > 0 else "lost") + " (as paid)", float(paid) - st
+        elif any(x.get("status") == "graded" and not x.get("won") for x in legs):
             res, net = "lost", -st
         elif all(x.get("status") == "graded" and x.get("won") for x in legs):
             res, net = "won", pay - st
         elif any(x.get("status") in ("void", "check") for x in legs):
-            res, net = "check (a leg voided or needs a box score)", None
+            res, net = ("check: a leg was dropped (Sleeper 'Reboot' cuts the entry to fewer picks) or needs a "
+                        "box score -- record the payout with `journal entry-paid`"), None
         else:
             res, net = "open", None
         late = " (after kickoff)" if legs[0].get("after_kickoff") else ""
@@ -410,6 +414,24 @@ def entries_table(rows: list[dict]) -> list[str]:
                    + ("—" if net is None else f"{net:+.2f}") + " |")
     return out + ["", "Entries logged after kickoff are kept but are not clean pre-game decisions; the "
                       "legs are still graded one by one on the scorecard.", ""]
+
+
+def entry_paid(season: int, entry_id: str, paid: float) -> int:
+    """Record what Sleeper actually paid an entry (0 when it lost). A dropped leg
+    ('Reboot') cuts a Power Play to fewer picks at a smaller multiple, which only
+    the app knows; this settles the entry at the real amount. Returns legs updated."""
+    if paid < 0:
+        raise ValueError("--paid is what the entry returned, 0 or more")
+    rows = read(season)
+    n = 0
+    for r in rows:
+        if r.get("entry_id") == entry_id:
+            r["entry_paid"] = float(paid)
+            n += 1
+    if not n:
+        raise ValueError(f"no entry {entry_id} in the {season} journal")
+    write(season, rows)
+    return n
 
 
 def scenario_table(rows: list[dict]) -> list[str]:
@@ -551,6 +573,9 @@ def main(argv: list[str] | None = None) -> int:
     pp.add_argument("--why", required=True, help="the entry's reason in a sentence")
     pp.add_argument("--after-kickoff", action="store_true", help="logged after a leg's game started")
     pp.add_argument("--season", type=int, default=None); pp.add_argument("--week", type=int, default=None)
+    ep = sub.add_parser("entry-paid", help="record what Sleeper actually paid an entry (0 if it lost)")
+    ep.add_argument("entry_id"); ep.add_argument("--paid", type=float, required=True)
+    ep.add_argument("--season", type=int, default=None)
     ls = sub.add_parser("list"); ls.add_argument("--season", type=int, default=None)
     ls.add_argument("--open", action="store_true")
     g = sub.add_parser("grade"); g.add_argument("--season", type=int, required=True)
@@ -601,6 +626,14 @@ def main(argv: list[str] | None = None) -> int:
         write(season, read(season) + rows_)
         print(f"logged entry {rows_[0]['entry_id']}: {len(rows_)} legs, ${args.stake:g} to ${args.payout:g}, "
               f"each leg at {rows_[0]['price']:+d} -> {journal_path(season)}")
+        return 0
+    if args.cmd == "entry-paid":
+        try:
+            n = entry_paid(season, args.entry_id, args.paid)
+        except ValueError as exc:
+            print(f"not recorded: {exc}", file=sys.stderr)
+            return 2
+        print(f"entry {args.entry_id}: paid ${args.paid:g} ({n} legs)")
         return 0
     if args.cmd == "list":
         for r in read(season):
