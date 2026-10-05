@@ -1,6 +1,6 @@
 {
  "algorithm": "nfl-release-sha256-lf-1",
- "file_count": 187,
+ "file_count": 189,
  "files": {
   "CHAT.md": "c6ac5c21bb62851bed3ec7e0f3654752834ebeface768ce2dcdc3e6451bd2327",
   "config.yaml": "7e7e2de6f52d3bbf13c0d7c6850ea6925a2d279fa714546e48b26ec3354f695e",
@@ -132,7 +132,7 @@
   "manager/yahoo_context.py": "0aa541b5c73457d09f4aa3bbfdda14d66d8051835370073fb9f2a12f57f9ab34",
   "manager/yahoo_sync.py": "3ea0dba0ea5b03e561952cbdd2b40eba7b9a7c328691258915b7c29aadc54b90",
   "nfl.py": "78a94fe768aa2d271772852a8961e2e25fb6577d23f67f60f1a1a6d3bc4a87ac",
-  "props/engine/SKILL.md": "3048920805e8732980b77f66b203da70c1841012e5a35c0a37bdb2b31914cc8e",
+  "props/engine/SKILL.md": "05593dde7e6bbec518b32ee6424ded7e6064af123da9710e5f037d2658416d39",
   "props/engine/resources/calibration_2025.csv": "47e3922c7af818307831d70a3d2be4333200f3aee1d94dc6bbf6e0e9ccee4ac8",
   "props/engine/resources/data_source_matrix.md": "2088a5ebe6164a75c11331367fda734d4b10ea217704320321a3f2aec6bb9c2b",
   "props/engine/resources/execution_protocol.md": "5f54fb23a77d60ecc947d44b6f18ecf67c4357d6b49c70bc937726c1c14016c1",
@@ -148,6 +148,7 @@
   "props/engine/resources/priors_2024_teams.csv": "851133be4a2b23edd66a8dc91a24f31285b203071576f15451ce9abac257751e",
   "props/engine/resources/priors_2025_opponent.csv": "019d7c8568e450fb6aeeb07f9a147189aa649503e98eb3ec83b3dc1ffe8101b2",
   "props/engine/resources/priors_2025_params.json": "2193853605507c25797135eb733acd0bb802abcc99261aa0ebc8ecaf031fde44",
+  "props/engine/resources/priors_2025_play_yards.csv": "119aa0e73cc05a7af0193437ad6c3fb86238daa82f013f07f748101a7f599bfc",
   "props/engine/resources/priors_2025_players.csv": "6893d646ef5c58d9c6edaa6a4321012410cbf91406ab681f8873fb1f633a3688",
   "props/engine/resources/priors_2025_roles.csv": "a8abf4ec9c9c86c9f5577c65a6c9676411839a97fac4d9266e04d699ca4d3e97",
   "props/engine/resources/priors_2025_slots.csv": "7fad2a09088ce05b50055082289cb7279ea864e509f15b6902720bd7619dade5",
@@ -166,14 +167,15 @@
   "props/engine/scripts/absence_check.py": "fa45e3fb4a1985b38771f0c58ed002956b163ee16439778ac7391ece1ba25079",
   "props/engine/scripts/absence_tune.py": "4bb4daaf1861f93ff8d57504e9fff5e0b0b828306d8210b688c87aa25ef27d1d",
   "props/engine/scripts/backtest.py": "6b7af146f7bb373cb3eb56c9519d81de2ec622657048351da3f78853c537fd77",
+  "props/engine/scripts/build_play_yards.py": "e76eae6082d92103a608d27871ca1cfb3cc7a70be243dfbff959bedbbc3f2934",
   "props/engine/scripts/build_priors.py": "1757899778f704cf2bd074c9750f54de1edb9ff14d1429027d5096715ac707e3",
   "props/engine/scripts/build_td_priors.py": "c7330a57e68c1b7c5f8a9304bfbddbb4be0ca285d9f37ef383173d3e3049c27f",
   "props/engine/scripts/eligibility.py": "f1672cff3d7ae2d52ca94b5952451e92c794bfcd21ab2224b0e35e7f152445b5",
   "props/engine/scripts/model.py": "4e967fb31e1a0c17e5d68a181c494a1c0b405eafc42ca1726063911e5cb5d77c",
   "props/engine/scripts/odds_client.py": "434186273bd0412a5545247228298951c5d0504a19c8a47c4c782bf3bb75aaa1",
-  "props/engine/scripts/research.py": "4a22d0324c6fd885d51d25b9c66b02731c2a8a711e2143084e23b077993dd2d1",
+  "props/engine/scripts/research.py": "373fd5983ba453471cfd5efadfa0de76e212c9ea0c833601e20adfbfede5c2ce",
   "props/engine/scripts/scenario.py": "732ef233876bb13ae5dee3c8f04e5bf99b5634cb879bdeb744f56a47df557172",
-  "props/engine/scripts/score_game.py": "1755065efe2c3739f73c598368870e8f1dc1fab97f475d0516eb785bbbad2611",
+  "props/engine/scripts/score_game.py": "43cf2eb5a3cf0279c7787c2a81009a066bdc4c2dffa037d18596feb2cbfa100e",
   "props/engine/scripts/score_week.py": "5259ebc2f6e56571f7e0b03291e84d0e26d00f85dacf5256f40b07ac275fabeb",
   "props/engine/scripts/td_alloc.py": "7c407c949cac8f0f74d7f91589fd5d749f65d9053eb1c3f5f0dc63a700b3465b",
   "props/engine/scripts/td_alloc_backtest.py": "e259d9f0e301a5d5d34e5a9e84bba222810f077d9c05a1f1f799a611914595a4",
@@ -190,6 +192,6 @@
   "tiers.csv": "04a1a79d43e9f2445ba3dc4ea262b00fbd58efea1f41e8b0393cb4c7f8afee41",
   "tiers.keefamania.csv": "11e6546b56caa807a572da86d5c3d81097bafd2d2550e25653882d78b2962e94"
  },
- "sha256": "e7148cb31f52ef17f470ff39e0ad3c1e5e3db3b523dffb434603f937b80bcb05",
+ "sha256": "622d9a5d5d17eeb5340bf95574b868985f69fce8c48e78a05b90e1fd3941734c",
  "tag": "nfl-v1.38"
 }
