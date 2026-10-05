@@ -281,3 +281,80 @@ def test_a_backfield_takeover_is_flagged_and_points_the_mark():
         "the carries flag never points a receiving line"
     dem = dict(row, flags="carries down", cn=2.0, over_needs=7.9, under_needs=6.2)
     assert RS.worth_a_look(dem, 3)[0] == "Under"
+
+
+def test_lines_are_read_at_the_whole_number_that_wins_them():
+    assert RS.to_clear(3.5) == 4 and RS.to_clear(44.5) == 45
+    assert RS.to_clear(4) == 5, "a whole-number line pushes at 4, so the Over needs 5"
+    assert RS.to_clear(0.5) == 1
+
+
+def test_catches_and_yards_lines_read_together():
+    # Devaughn Vele, NO week 4: 3.5 catches, 44.5 yards -> 4 catches for 45 = 11.25 a catch
+    d = RS.catch_yards_read(3.5, 44.5, season_rec=14, season_yds=190, model_ypc=12.0, longest_line=17.5)
+    assert (d["c_min"], d["y_min"], d["long_min"]) == (4, 45, 18)
+    assert d["need_ypc"] == pytest.approx(11.25)
+    assert d["season_ypc"] == pytest.approx(190 / 14)
+    assert d["mid_ypc"] == pytest.approx(44.5 / 3.5)
+    assert d["read"] == "about even", "the lines ask 12.7 a catch; he gets 13.6, inside the 1-yard band"
+    assert d["long_share"] == pytest.approx(18 / 45)
+    assert d["rest_ypc"] == pytest.approx((45 - 18) / 3)
+    s = RS.catch_yards_sentence(d)
+    assert "ask 12.7 yards a catch (44.5 over 3.5)" in s and "4 catches for 45 yards -- need 11.2" in s
+    assert "one catch of 18" in s and "other 3 catches need 9.0 each" in s
+
+
+def test_the_lines_yards_a_catch_is_read_against_ours():
+    d = RS.catch_yards_read(3.5, 44.5, season_rec=15, season_yds=172)     # Vele, no model figure: his season
+    assert d["ref"] == "season" and d["read"] == "yards line rich"
+    assert "his yards Over still needs an extra catch or a long play" in RS.catch_yards_sentence(d)
+    # London: 18.3 a catch on 15 catches, mostly with the old QB; ours is 13.4 and the lines ask 14.6
+    d = RS.catch_yards_read(5.5, 80.5, season_rec=15, season_yds=275, model_ypc=13.4)
+    assert d["ref"] == "model" and d["read"] == "yards line rich", \
+        "ours carries the verdict; a raw season figure on 15 catches is noise at this band"
+    s = RS.catch_yards_sentence(d)
+    assert "we expect 13.4 from him, he has 18.3 this season on 15 catches" in s
+    d = RS.catch_yards_read(5.5, 60.5, model_ypc=13.4)
+    assert d["read"] == "yards line lean" and "the yards line usually comes with it" in RS.catch_yards_sentence(d)
+    assert RS.catch_yards_read(4.5, 49.5, model_ypc=11.5)["read"] == "about even"
+    s = RS.catch_yards_sentence(RS.catch_yards_read(1.5, 19.5, longest_line=12.5))
+    assert "his other catch needs 7.0" in s, "one remaining catch reads in the singular"
+
+
+def test_a_longest_line_at_or_above_the_yards_line_reads_as_one_catch():
+    d = RS.catch_yards_read(1.5, 12.5, longest_line=13.5)
+    assert d["rest_ypc"] is None
+    assert "one catch carrying all of his yards" in RS.catch_yards_sentence(d)
+    assert "108%" not in RS.catch_yards_sentence(d)
+
+
+def test_the_read_degrades_without_its_inputs():
+    assert RS.catch_yards_read(3.5, None) is None
+    d = RS.catch_yards_read(3.5, 44.5, season_rec=5, season_yds=90)
+    assert d["season_ypc"] is None and d["read"] is None, "five catches is too few to call his yards a catch"
+    d = RS.catch_yards_read(3.5, 44.5, season_rec=5, season_yds=90, model_ypc=12.0)
+    assert d["read"] == "about even" and "That is about ours" in RS.catch_yards_sentence(d)
+    d = RS.catch_yards_read(None, 44.5, longest_line=19.5)
+    assert d["need_ypc"] is None and d["rest_ypc"] is None and d["long_min"] == 20
+    assert RS.catch_yards_sentence(d).startswith("The longest-catch line (19.5)")
+    assert RS.catch_yards_sentence(RS.catch_yards_read(None, 44.5)) is None
+
+
+def test_longest_lines_come_from_sleeper_for_this_game_only():
+    opt = lambda team, out, v, status="active", game="pre_game": {
+        "subject_team": team, "outcome": out, "outcome_value": v, "status": status, "game_status": game}
+    mk = [
+        {"sport": "nfl", "wager_type": "longest_reception", "subject_id": "1",
+         "options": [opt("NO", "over", 19.5), opt("NO", "under", 19.5)]},
+        {"sport": "nfl", "wager_type": "longest_reception", "subject_id": "2", "line_type": "goblin",
+         "options": [opt("NO", "over", 9.5)]},                                  # not a normal line
+        {"sport": "nfl", "wager_type": "longest_reception", "subject_id": "3",
+         "options": [opt("DAL", "over", 22.5)]},                                # another game
+        {"sport": "nfl", "wager_type": "receptions", "subject_id": "1",
+         "options": [opt("NO", "over", 3.5)]},                                  # a priced market
+        {"sport": "nfl", "wager_type": "longest_reception", "subject_id": "4",
+         "options": [opt("ATL", "over", 26.5, game="in_progress")]},            # kicked off
+    ]
+    players = {"1": {"full_name": "Devaughn Vele"}, "2": {"full_name": "Bryce Lance"},
+               "3": {"full_name": "CeeDee Lamb"}, "4": {"first_name": "Drake", "last_name": "London"}}
+    assert RS.longest_lines(mk, players, {"NO", "ATL"}) == [{"name": "Devaughn Vele", "team": "NO", "line": 19.5}]

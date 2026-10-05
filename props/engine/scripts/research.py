@@ -331,6 +331,123 @@ def worth_a_look(x, last_week):
     return None
 
 
+def to_clear(line) -> int:
+    """The smallest whole number that wins the Over. Lines move in halves: 3.5 needs
+    4; a whole-number line of 4 needs 5 (4 pushes)."""
+    return int(np.floor(float(line))) + 1
+
+
+# a display band, picked, not measured: the lines' yards a catch within this much of
+# ours reads "about even". The read is arithmetic about the lines, never a claim that
+# one leg wins more often (DECISIONS #164)
+YPC_BAND = 1.0
+YPC_MIN_CATCHES = 8
+
+
+def longest_lines(markets, players, teams) -> list[dict]:
+    """Sleeper's longest-reception lines for this game: [{name, team, line}] (a list,
+    so the scenario snapshot can store it as JSON). markets = Sleeper's available-lines
+    feed and players its player map, both fetched by score_game; teams = the two Sleeper team codes. Read beside the
+    catches and yards lines only; never priced."""
+    out = []
+    for m in markets or []:
+        if (m.get("sport") != "nfl" or m.get("wager_type") != "longest_reception"
+                or m.get("line_type", "normal") != "normal"):
+            continue
+        opts = m.get("options") or []
+        if not opts or opts[0].get("subject_team") not in teams or opts[0].get("game_status") != "pre_game":
+            continue
+        info = players.get(m.get("subject_id"), {})
+        name = info.get("full_name") or f'{info.get("first_name", "")} {info.get("last_name", "")}'.strip()
+        over = next((o for o in opts if o.get("outcome") == "over" and o.get("status") == "active"), None)
+        if name and over is not None:
+            out.append({"name": name, "team": opts[0]["subject_team"], "line": float(over["outcome_value"])})
+    return out
+
+
+def catch_yards_read(catches_line=None, yards_line=None, season_rec=None, season_yds=None,
+                     model_ypc=None, longest_line=None) -> dict | None:
+    """How the book's catches, receiving-yards and longest-catch lines fit together
+    (DECISIONS #164). Every line is a half-point step, so each Over is read at the
+    whole number that wins it: 3.5 catches and 44.5 yards mean 4 catches for 45.
+    need_ypc is what those 4 catches must average to clear the yards (both Overs at
+    the minimum -- the fact behind stacking one player's two legs). mid_ypc = yards
+    line / catches line is the book's own yards a catch, and the read compares it
+    with OUR yards a catch for him (the blended estimate: a raw season figure on 15
+    catches carries a standard error near 2.5 yards, wider than the band). His season
+    figure is context, used only when we have none. A longest-catch line of 17.5 means
+    one catch of 18; rest_ypc is what the other catches must average if he gets
+    exactly that one. Nothing here is a model price."""
+    ok = lambda v: v is not None and v == v
+    if not ok(yards_line):
+        return None
+    y_min = to_clear(yards_line)
+    out = {"yards_line": float(yards_line), "y_min": y_min, "catches_line": None, "c_min": None,
+           "need_ypc": None, "mid_ypc": None, "season_ypc": None, "season_rec": None, "model_ypc": None,
+           "ref": None, "longest_line": None, "long_min": None, "long_share": None, "rest_ypc": None,
+           "read": None}
+    if ok(season_rec) and ok(season_yds) and season_rec >= YPC_MIN_CATCHES:
+        out.update(season_ypc=float(season_yds) / float(season_rec), season_rec=int(season_rec))
+    if ok(model_ypc) and model_ypc > 0:
+        out["model_ypc"] = float(model_ypc)
+    if ok(catches_line) and float(catches_line) > 0:
+        c_min = to_clear(catches_line)
+        out.update(catches_line=float(catches_line), c_min=c_min, need_ypc=y_min / c_min,
+                   mid_ypc=float(yards_line) / float(catches_line))
+    if ok(longest_line):
+        l_min = to_clear(longest_line)
+        out.update(longest_line=float(longest_line), long_min=l_min, long_share=l_min / y_min)
+        if out["c_min"] and out["c_min"] >= 2 and l_min < y_min:
+            out["rest_ypc"] = (y_min - l_min) / (out["c_min"] - 1)
+    out["ref"] = ("model" if out["model_ypc"] is not None
+                  else "season" if out["season_ypc"] is not None else None)
+    ref = out["model_ypc"] if out["ref"] == "model" else out["season_ypc"]
+    if out["mid_ypc"] is not None and ref is not None:
+        gap = out["mid_ypc"] - ref
+        out["read"] = ("yards line rich" if gap >= YPC_BAND
+                       else "yards line lean" if gap <= -YPC_BAND else "about even")
+    return out
+
+
+def catch_yards_sentence(d) -> str | None:
+    """The report's one-paragraph read of catch_yards_read."""
+    if not d or (d["need_ypc"] is None and d["long_min"] is None):
+        return None
+    bits = []
+    if d["need_ypc"] is not None:
+        s = f"The lines ask {d['mid_ypc']:.1f} yards a catch ({d['yards_line']:g} over {d['catches_line']:g})"
+        his = []
+        if d["model_ypc"] is not None:
+            his.append(f"we expect {d['model_ypc']:.1f} from him")
+        if d["season_ypc"] is not None:
+            his.append(f"he has {d['season_ypc']:.1f} this season on {d['season_rec']} catches")
+        bits.append(s + (f"; {', '.join(his)}" if his else "") + ".")
+        ours = "ours" if d["ref"] == "model" else "his season figure"
+        if d["read"] == "yards line rich":
+            bits.append(f"That is more per catch than {ours}: past the catches line, his yards Over still needs "
+                        "an extra catch or a long play.")
+        elif d["read"] == "yards line lean":
+            bits.append(f"That is less per catch than {ours}: if he clears the catches line, the yards line "
+                        "usually comes with it.")
+        elif d["read"] == "about even":
+            bits.append(f"That is about {ours}: the two lines ask the same of him.")
+        bits.append(f"Both Overs at the minimum -- {d['c_min']} catches for {d['y_min']} yards -- "
+                    f"need {d['need_ypc']:.1f} a catch.")
+    if d["long_min"] is not None:
+        if d["long_min"] >= d["y_min"]:
+            bits.append(f"The longest-catch line ({d['longest_line']:g}) sits at or above his yards line: "
+                        "the book sees one catch carrying all of his yards.")
+        else:
+            s = (f"The longest-catch line ({d['longest_line']:g}) means one catch of {d['long_min']}, "
+                 f"{100 * d['long_share']:.0f}% of the {d['y_min']} yards")
+            if d["rest_ypc"] is not None:
+                n_ = d["c_min"] - 1
+                s += (f"; with that one, his other catch needs {d['rest_ypc']:.1f}" if n_ == 1 else
+                      f"; with that one, his other {n_} catches need {d['rest_ypc']:.1f} each")
+            bits.append(s + ".")
+    return " ".join(bits)
+
+
 # a questionable player worth a flag on his teammates' rows, priced or not (DECISIONS #163)
 WATCH_TARGET_SHARE, WATCH_CARRY_SHARE, WATCH_SNAPS = 0.05, 0.10, 0.30
 

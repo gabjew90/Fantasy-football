@@ -1276,7 +1276,10 @@ def main():
             sleeper_used = True
             lu = datetime.fromtimestamp(latest / 1000, tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ") if latest else now()
             data_ = {"bookmakers": [{"key": "sleeper", "markets": [{"key": k, "last_update": lu, "outcomes": v} for k, v in mkts.items()]}],
-                     "sleeper_pos_rank": pos_rank}
+                     "sleeper_pos_rank": pos_rank,
+                     # the book's longest-catch lines: read beside his catches and yards lines
+                     # (research.catch_yards_read, DECISIONS #164), never priced, joined or archived
+                     "sleeper_longest": RSCH.longest_lines(sl, slp, _teams)}
             eid_ = f"sleeper_{gid}"
             arch_rows = [{"retrieved_at_utc": now(), "snapshot_type": "decision", "season": SEASON, "week": WEEK,
                           "event_id": eid_, "commence_time": kick.isoformat(), "home_team": TEAM_NAMES.get(HOME), "away_team": TEAM_NAMES.get(AWAY),
@@ -1886,6 +1889,38 @@ def main():
                          else (getattr(r, "look", None) if "look" in R.columns else None)
                          for r in R.itertuples()]
             (R[~R.book.isin(COMPARE_BOOKS)] if a.compare_books else R).to_csv(logf, index=False)
+    # CATCHES, YARDS AND THE LONG ONE (DECISIONS #164): the book's three receiving lines
+    # read together at the whole numbers that win them, against his yards a catch
+    CATCH_READ = {}
+    if len(RESEARCH):
+        _long = {(norm_name(x_["name"]), x_["team"]): x_["line"] for x_ in (data or {}).get("sleeper_longest") or []}
+        _season = prec.groupby("gsis_id")[["receptions", "rec_yards"]].sum()
+        for (p_, t_), g_ in RESEARCH[RESEARCH.market.isin(["player_receptions", "player_reception_yds"])].groupby(
+                ["player", "team"]):
+            # both lines from ONE book (Sleeper first): a ratio across two books is nobody's view
+            by_book = {b_: dict(zip(x_.market, x_.line)) for b_, x_ in g_.groupby("book")}
+            book_ = next((b_ for b_ in sorted(by_book, key=lambda b: b != "sleeper") if len(by_book[b_]) == 2),
+                         next((b_ for b_ in sorted(by_book, key=lambda b: b != "sleeper")
+                               if "player_reception_yds" in by_book[b_]), None))
+            if book_ is None:
+                continue
+            m_ = M[(M.name == p_) & (M.team == t_)].iloc[0]
+            sr_ = _season.loc[m_.gsis_id] if m_.gsis_id in _season.index else None
+            CATCH_READ[(p_, t_)] = RSCH.catch_yards_read(
+                catches_line=by_book[book_].get("player_receptions"), yards_line=by_book[book_]["player_reception_yds"],
+                season_rec=None if sr_ is None else float(sr_.receptions),
+                season_yds=None if sr_ is None else float(sr_.rec_yards),
+                model_ypc=float(m_.ypt) / float(m_.cr) if float(m_.cr) > 0 else None,
+                longest_line=_long.get((norm_name(p_), SLEEPER_TEAM.get(t_, t_))))
+        _cols = {"ypc_need": "need_ypc", "ypc_mid": "mid_ypc", "ypc_season": "season_ypc", "ypc_model": "model_ypc",
+                 "long_line": "longest_line", "long_rest_ypc": "rest_ypc", "ypc_read": "read"}
+        _rec = lambda r: r.market in ("player_receptions", "player_reception_yds")
+        for c_, k_ in _cols.items():
+            RESEARCH[c_] = [(CATCH_READ.get((r.player, r.team)) or {}).get(k_) if _rec(r) else None
+                            for r in RESEARCH.itertuples()]
+        # the sentence itself rides on both rows, so the chat answers carry it (core/props_ask)
+        RESEARCH["catch_yards"] = [RSCH.catch_yards_sentence(CATCH_READ.get((r.player, r.team))) if _rec(r) else None
+                                   for r in RESEARCH.itertuples()]
     RESEARCH.to_csv(OUT / f"research_{slug}.csv", index=False)
 
     # ---------- 8b/9. report, written for a casual reader ----------
@@ -2196,6 +2231,9 @@ def main():
             bj_ = backfield_line(BACKFIELD.get(m["name"]))
             if bj_:
                 L.append(f"**Backfield jobs.** {bj_}\n")
+            cy_ = RSCH.catch_yards_sentence(CATCH_READ.get((m["name"], t)))
+            if cy_:
+                L.append(f"**Catches and yards.** {cy_}\n")
 
             # research rows: line, price, projection, the two Over chances, what the line implies
             mine = RESEARCH[RESEARCH.player == m["name"]] if len(RESEARCH) else RESEARCH

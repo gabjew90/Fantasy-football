@@ -257,6 +257,27 @@ For a narrow question, run only what it needs:
   unexplained -- the harness found QB passing unbiased on 2024-25 outcomes, so neither side
   is known to be right), and
   what to watch. A game with nothing to find says so in a sentence. Never call a line a bet.
+  **Write for a reader without the table** (user, 2026-10-05). The narrative is read on its own,
+  often on a phone after the table has scrolled away: every line it discusses names the player,
+  the prop, the line, the side, and the number that decides it ("Kamara rushing yards, Over
+  36.5: he needs about 14 carries; the model gives him 12"). Never point at the table ("see the
+  row", "the zone above", "as the table shows"). That is not reciting the table: quote the one or
+  two numbers the decision turns on, interpret the rest.
+  **Spell out the if-then.** Every story ends in decisions the reader can act on, one per line,
+  each in the form "If <a condition he can check or a belief he holds>, then <the leg that fits:
+  player, prop, side, line> -- <what it needs>; if not, <skip it / the alternative>". Conditions
+  are observable before entry (the inactives list, a confirmed starter, a line move) or plainly a
+  belief ("if you think the Saints throw like they have all season"). Give the losing branch
+  too, and say which conditions are the same game script so legs that need opposite scripts
+  never share an entry. When legs are grouped for building entries, say for every pair of
+  groups whether they mix, conflict, or mix only under a stated script -- a list of groups
+  alone reads as "don't mix these" (2026-10-05: Bijan's rushing Over and London's catches
+  Over were listed apart, though both came from the same Atlanta-leads game). Name the
+  conflicts with their reason (two backs splitting one team's carries; one team running out
+  the clock vs the same team throwing), and say when how strongly two legs move together is
+  judgment: the joint model is unchecked against real games and the what-if tool holds team
+  totals fixed. These are conditional on the reader's view, never picks: no "take",
+  "hammer", "best bet", and no ranking by expected profit.
   **Explore absences unprompted.** For every questionable or doubtful player with a role -- the
   rows' "<name> (<pos>) questionable" flags and the report's "Questionable, not priced here"
   line, which lists players the board does not price -- say who absorbs his work if he sits
@@ -274,7 +295,19 @@ For a narrow question, run only what it needs:
   workload where each side reaches it (the Over pays above one number, the Under at or below the
   other); between them neither side reaches its price, because the two prices add to more than
   100% -- the book's cut, measured in targets or carries. It rests on the model's own catch rate
-  and spread, so it guides how much role a view needs; it is not a guarantee.
+  and spread, so it guides how much role a view needs; it is not a guarantee. In a Power Play
+  the listed price does not apply: every leg needs about 56% (4 picks, 10x) or 55% (5 picks,
+  20x), whichever side, so a plus-money Under is no cheaper there than any other leg.
+  **Catches and yards together.** Each receiver's "Catches and yards" line reads the book's
+  catches, receiving-yards and longest-catch lines against each other (DECISIONS #164). Lines
+  move in half points, so each Over means the next whole number (3.5 catches = 4, 44.5 yards =
+  45; a whole-number line pushes on itself). Use it whenever the user weighs "yards or catches":
+  the lines' own yards a catch against ours for him says whether his yards Over asks more than
+  his catches Over (his raw season figure is shown but is too noisy to carry the read);
+  "both Overs at the minimum" is what stacking his two legs needs; and the longest-catch line
+  says how much of the yards one play carries -- with one catch at that line, what the rest must
+  average. Narrate it as the book's view of how he gets his yards, not as a model edge: the
+  longest-catch line is the book's number only and is not priced here.
   Then narrate the bold lines, analytically, in plain English -- interpret, do not recite the
   row's numbers back:
   1. **The story and its direction**: who is out or back, whose role moved, and why that points

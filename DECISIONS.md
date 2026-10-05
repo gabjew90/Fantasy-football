@@ -7303,3 +7303,41 @@ by the user.
   quantifies it.
 - The pays cell ends with where our projection lands (Over zone / no-bet zone /
   Under zone), and the skill explains how the zone comes from the two prices.
+
+## 2026-10-05 (164) -- the book's catches, yards and longest-catch lines are read together
+
+- Each receiver's section gets a "Catches and yards" line: the lines' own yards a
+  catch (yards line / catches line, both from one book) against OUR yards a catch
+  for him -- the blended estimate; his raw season figure is shown beside it but
+  carries no verdict (15 catches give a standard error near 2.5 yards, wider than
+  the 1-yard "about even" band, which is a display choice, not a measured edge);
+  what both Overs need at the minimum; and Sleeper's longest-catch line -- one
+  catch at that line as a share of the yards, and what the other catches must
+  then average. The sentence also rides on the research CSV, so chat answers
+  (core/props_ask) carry it on the yards row.
+- Lines move in half points, so every Over is read at the whole number that wins
+  it (3.5 catches = 4, 44.5 yards = 45; a whole-number line pushes on itself).
+- The verdict uses the lines' ratio, not the minimum-clear figure: reading the
+  catches line a full step up makes "both Overs at the minimum" look easy for
+  nearly every player (the first draft read "rides on the catches" for 9 of 10
+  on ATL@NO).
+- Longest-catch lines are fetched from Sleeper for this read only: never priced,
+  joined, logged or archived. Pricing them waits on a pre-registered check of the
+  model's per-catch yards tail.
+- Scenarios: a team's pass / rush / ypt must carry its sign. "NO: pass=42" was
+  read as 42 more targets on 2026-10-05; it now refuses with "a CHANGE, not a
+  total".
+
+## 2026-10-05 (165) -- narratives stand without the table and end in if-then decisions
+
+- The user reads the narrative on its own, after the table has scrolled away. Every
+  line discussed now names the player, prop, side, line and the number that decides
+  it; nothing points at the table.
+- Each story ends in plain if-then decisions: a condition the reader can check
+  (inactives, a confirmed starter, a line move) or a stated belief, the leg that
+  fits and what it needs, and the losing branch. Legs needing opposite game scripts
+  are named so they never share an entry. Conditional on the reader's view, never
+  picks (SKILL.md fast path; CHAT.md).
+- Grouped legs say, pair by pair, whether the groups mix, conflict or mix only under
+  a stated script: listing Bijan's rushing Over and London's catches Over in separate
+  groups read as "don't combine" though both came from Atlanta's week-3 lead.
