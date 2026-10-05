@@ -346,6 +346,20 @@ def worth_watching(target_share=None, carry_share=None, snap_share=None) -> bool
             or (v(snap_share) and snap_share >= WATCH_SNAPS))
 
 
+def watch_applies(absent_pos, market, row_pos) -> bool:
+    """Which rows a questionable teammate's flag belongs on: a QB on every row; a
+    back on rushing rows and other backs' receiving rows; a receiver or tight end on
+    receiving rows. His position first -- that is who absorbs the work."""
+    a = str(absent_pos or "").upper()
+    if a == "QB":
+        return True
+    if a in ("RB", "FB", "HB"):
+        return market == "player_rush_yds" or str(row_pos).upper() in ("RB", "FB", "HB")
+    if a in ("WR", "TE"):
+        return market in ("player_receptions", "player_reception_yds")
+    return False
+
+
 def usage_change(weeks):
     """weeks: list of (week, snap_share, target_share, carry_share[, targets,
     carries]), sorted, the player's weeks before this one with this team. LAST

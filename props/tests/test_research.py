@@ -249,6 +249,14 @@ def test_a_questionable_role_player_is_worth_watching_even_unpriced():
     assert not RS.worth_watching(float("nan"), None, None)
 
 
+def test_a_questionable_flag_lands_where_his_work_goes():
+    assert RS.watch_applies("TE", "player_receptions", "TE") and RS.watch_applies("TE", "player_reception_yds", "WR")
+    assert not RS.watch_applies("TE", "player_rush_yds", "RB"), "a TE2's status is not a rushing story"
+    assert RS.watch_applies("RB", "player_rush_yds", "RB") and RS.watch_applies("RB", "player_receptions", "RB")
+    assert not RS.watch_applies("RB", "player_receptions", "WR")
+    assert RS.watch_applies("QB", "player_rush_yds", "RB"), "a QB's status touches every row"
+
+
 def test_the_pays_cell_says_which_zone_our_projection_is_in():
     base = {"unit": "targets", "over_needs": 7.1, "under_needs": 5.7, "be_over": 0.56, "be_under": 0.57}
     assert RS.break_even_cell({**base, "projected": 5.5}).endswith("· we project 5.5: Under zone")

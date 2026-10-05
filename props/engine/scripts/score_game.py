@@ -1734,6 +1734,7 @@ def main():
     # USAGE / ROLE: computed before the share blend (section 5), which round 23 reads
     # teammates handled by the out rule, and key teammates back from a missed week
     OUT_NOTE = {t_: [] for t_ in (AWAY, HOME)}
+    _flagged_out = set()      # gsis ids the out flag already names
     # WAS LAST WEEK A PREVIEW (DECISIONS #157)? Same starting QB, same key
     # absences. A mark built on last week's workload transfers when it was.
     PREVIEW_DIFF = {t_: [] for t_ in (AWAY, HOME)}
@@ -1752,15 +1753,15 @@ def main():
             qb_tag = " (QB)" if str(e_.get("pos")) == "QB" else ""
             OUT_NOTE[e_.team].append(f"{e_['name']}{qb_tag} out, "
                                      + ("played last week" if played_lw else "also out last week"))
+            _flagged_out.add(e_.gsis_id)
             if played_lw:
                 PREVIEW_DIFF[e_.team].append(f"{e_['name']} newly out")
     # QUESTIONABLE TEAMMATES with a real role, priced or not (DECISIONS #163): a TE2 the
     # board does not price (Noah Fant, NO week 4) still moves the TE1 if he sits
     QWATCH = {t_: [] for t_ in (AWAY, HOME)}
-    _out_names = {e_["name"] for _, e_ in pop[pop.excluded].iterrows()}
     for _, j_ in iw[iw.team.isin([AWAY, HOME]) & iw.report_status.isin(["Questionable", "Doubtful"])].iterrows():
-        if j_.full_name in _out_names:
-            continue                    # already handled as out
+        if j_.gsis_id in _flagged_out:
+            continue                    # the out flag already names him
         ts_j = RSCH.role_share(_tg, j_.gsis_id, j_.team)
         cs_j = RSCH.role_share(_cr, j_.gsis_id, j_.team)
         sn_j = snap_cur.get((j_.team, norm_name(j_.full_name)))
@@ -1849,7 +1850,7 @@ def main():
             flags_.append("questionable")
         flags_ += OUT_NOTE.get(m_.team, [])
         flags_ += [f"{w_['name']} ({w_['pos']}) {w_['status'].lower()}" for w_ in QWATCH.get(m_.team, [])
-                   if w_["name"] != r_.player]
+                   if w_["name"] != r_.player and RSCH.watch_applies(w_["pos"], r_.market, m_.pos)]
         flags_ += [b_ for b_ in BACK_NOTE.get(m_.team, []) if not b_.startswith(r_.player + " ")]
         research_rows.append(dict(
             player=r_.player, team=r_.team, pos=m_.pos, market=r_.market, line=float(r_.line), book=r_.book,
@@ -2612,8 +2613,8 @@ def main():
     if unpriced_q:
         pc_ = lambda v: "—" if v is None or v != v else f"{100 * v:.0f}%"
         L.append("- **Questionable, not priced here:** " + "; ".join(
-            f"{w_['name']} ({w_['pos']}, {w_['status']}: {pc_(w_['ts'])} of targets, {pc_(w_['cs'])} of carries, "
-            f"{pc_(w_['snap'])} of snaps)" for w_ in unpriced_q)
+            f"{w_['name']} ({w_['pos']}, {w_['status']}: {pc_(w_['ts'])} of targets and {pc_(w_['cs'])} of carries "
+            f"in the weeks he played, {pc_(w_['snap'])} of snaps)" for w_ in unpriced_q)
                  + ". If one sits, his work goes mostly to the teammates at his position: their rows carry his flag.")
     if excl.empty and q.empty and not unpriced_q:
         L.append("- **Injuries:** no one relevant is out or questionable on the current report.")
