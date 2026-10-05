@@ -7383,5 +7383,18 @@ by the user.
 - Earlier versions in the same session (league-wide caps at the 95th, then 99th
   percentile; own 99th) were superseded: own 99th sat at a player's longest one or
   two plays and trimmed almost nothing.
-- Every read prints the line it used ("every run past 15 yards, his own 95th
-  percentile over 353 runs, counted as 15"). Report text only: no price moves.
+- Every read prints the line it used ("every run past 14 yards, his own 95th
+  percentile over his last 10 games and 195 runs, counted as 14"). Report text only:
+  no price moves.
+- The window (user, later the same day): the luck line AND the luck-free rate both read
+  the player's last 10 games -- this season's, topped up with last season's final games
+  (the resource now stores each player's last 10 games of 2025, game by game). The rate
+  needs 8 catches / 10 carries in the window, else our figure. The gauge also quotes the
+  book's own catches or carries line, within half a unit reading as about the same.
+
+## 2026-10-05 (168) -- a single-game read is a full story in a fixed order
+
+- User: the game (matchup, weather, home/away, Vegas lines, injuries), then each
+  player's volume and share last season and this season, the teammates who move it, our
+  and the book's expected volume, the lines with the luck-free check, then the
+  if-thens. Headed and easy to read. A slate keeps the short per-game preview.

@@ -352,6 +352,9 @@ YPC_MIN_CATCHES = 8
 # (reports/robust_ypc_check.md, for reference only)
 LUCK_PCT = 95
 LUCK_MIN_PLAYS = 20
+# the luck-free check (luck line AND rate) reads his last this-many games, crossing into
+# last season while this one is short (user, 2026-10-05)
+LUCK_WINDOW = 10
 
 
 def player_luck_line(plays) -> dict:
@@ -375,14 +378,17 @@ def luck_free_rate(season_plays, luck) -> float | None:
     return (sum(v) - max(v)) / (len(v) - 1) if len(v) >= 2 else None
 
 
-def luck_for(prior_plays, current_plays, gid, kind):
-    """(luck line, luck-free rate) for one player and kind ("catch" | "run"):
-    prior_plays = {(gsis_id, kind): [yards]} from priors_*_play_yards.csv, current_plays
-    = {gsis_id: [yards]} this season. The line pools both seasons; the rate is this
-    season's plays only."""
-    cur = list(current_plays.get(gid, []) or [])
-    luck = player_luck_line(list(prior_plays.get((gid, kind), [])) + cur)
-    return luck, luck_free_rate(cur, luck)
+def luck_for(prior_games, current_games, gid, kind, window=LUCK_WINDOW):
+    """(luck line, luck-free rate) for one player and kind ("catch" | "run") over his
+    last `window` games: prior_games = {(gsis_id, kind): [[yards], ...]} oldest first
+    (last season's final games, priors_*_play_yards.csv), current_games = {gsis_id:
+    [[yards], ...]} this season, oldest first. Both the line and the rate read the same
+    window; the returned line carries `games`, the number of games in it."""
+    games = (list(prior_games.get((gid, kind), []) or []) + list(current_games.get(gid, []) or []))[-window:]
+    plays = [y for g in games for y in g]
+    luck = dict(player_luck_line(plays), games=len(games))
+    min_plays = YPC_MIN_CATCHES if kind == "catch" else RUN_MIN_CARRIES
+    return luck, (luck_free_rate(plays, luck) if len(plays) >= min_plays else None)
 
 
 def luck_words(luck, unit) -> str:
@@ -391,10 +397,10 @@ def luck_words(luck, unit) -> str:
         return ""
     plural = f"{unit}es" if unit == "catch" else f"{unit}s"
     if luck["own"]:
-        return (f"every {unit} past {luck['cap']:.0f} yards, his own {LUCK_PCT}th percentile over "
-                f"{luck['n']} {plural}, counted as {luck['cap']:.0f}")
-    return (f"his longest {unit} this season left out (only {luck['n']} {plural} of his own across "
-            f"last season and this one, too few for a percentile)")
+        return (f"every {unit} past {luck['cap']:.0f} yards, his own {LUCK_PCT}th percentile over his last "
+                f"{luck.get('games', '?')} games and {luck['n']} {plural}, counted as {luck['cap']:.0f}")
+    return (f"his longest {unit} left out -- only {luck['n']} {plural} in his last {luck.get('games', '?')} "
+            f"games, too few for a percentile")
 
 
 # display bands for the gauge, picked, not measured: projected volume within 15% of what
@@ -511,7 +517,7 @@ def favoured(mult_over, mult_under, gap=0.05):
 
 
 def catch_yards_read(catches_line=None, yards_line=None, season_rec=None, season_yds=None,
-                     model_ypc=None, longest_line=None, season_luckfree_ypc=None,
+                     model_ypc=None, longest_line=None, luckfree_ypc=None,
                      proj_catches=None, luck=None) -> dict | None:
     """How the book's catches, receiving-yards and longest-catch lines fit together
     (DECISIONS #164). Every line is a half-point step, so each Over is read at the
@@ -522,7 +528,7 @@ def catch_yards_read(catches_line=None, yards_line=None, season_rec=None, season
     with OUR yards a catch for him (the blended estimate: a raw season figure on 15
     catches carries a standard error near 2.5 yards, wider than the band). His season
     figure is context, used only when we have none, shown beside its capped version
-    (season_luckfree_ypc: research.luck_free_rate). A
+    (luckfree_ypc: research.luck_for, his last LUCK_WINDOW games). A
     longest-catch line of 17.5 means
     one catch of 18; rest_ypc is what the other catches must average if he gets
     exactly that one. Nothing here is a model price."""
@@ -536,8 +542,8 @@ def catch_yards_read(catches_line=None, yards_line=None, season_rec=None, season
            "read": None, "season_ypc_luckfree": None, "gauge": None, "gauge_rate": None, "luck": luck}
     if ok(season_rec) and ok(season_yds) and season_rec >= YPC_MIN_CATCHES:
         out.update(season_ypc=float(season_yds) / float(season_rec), season_rec=int(season_rec))
-        if ok(season_luckfree_ypc):
-            out["season_ypc_luckfree"] = float(season_luckfree_ypc)
+    if ok(luckfree_ypc):
+        out["season_ypc_luckfree"] = float(luckfree_ypc)
     if ok(model_ypc) and model_ypc > 0:
         out["model_ypc"] = float(model_ypc)
     if ok(catches_line) and float(catches_line) > 0:
@@ -573,10 +579,9 @@ def catch_yards_sentence(d) -> str | None:
         if d["model_ypc"] is not None:
             his.append(f"we expect {d['model_ypc']:.1f} from him")
         if d["season_ypc"] is not None:
-            h = f"he has {d['season_ypc']:.1f} this season on {d['season_rec']} catches"
-            if d["season_ypc_luckfree"] is not None:
-                h += f" ({d['season_ypc_luckfree']:.1f} with the luck taken out)"
-            his.append(h)
+            his.append(f"he has {d['season_ypc']:.1f} this season on {d['season_rec']} catches")
+        if d["season_ypc_luckfree"] is not None:
+            his.append(f"{d['season_ypc_luckfree']:.1f} luck-free over his last {(d.get('luck') or {}).get('games', '?')} games")
         bits.append(s + (f"; {', '.join(his)}" if his else "") + ".")
         ours = "ours" if d["ref"] == "model" else "his season figure"
         if d["read"] == "yards line rich":
@@ -615,7 +620,7 @@ RUN_MIN_CARRIES = 10      # context only (it carries no verdict), always shown w
 
 
 def carry_yards_read(carries_line=None, yards_line=None, model_ypc=None, proj_carries=None,
-                     season_car=None, season_yds=None, season_luckfree_ypc=None, longest_line=None,
+                     season_car=None, season_yds=None, luckfree_ypc=None, longest_line=None,
                      carries_fav=None, luck=None) -> dict | None:
     """The runner's version of catch_yards_read (DECISIONS #166): the book's carries,
     rushing-yards and longest-run lines read together at the whole numbers that win
@@ -638,8 +643,8 @@ def carry_yards_read(carries_line=None, yards_line=None, model_ypc=None, proj_ca
         out["model_ypc"] = float(model_ypc)
     if ok(season_car) and ok(season_yds) and season_car >= RUN_MIN_CARRIES:
         out.update(season_ypc=float(season_yds) / float(season_car), season_car=int(season_car))
-        if ok(season_luckfree_ypc):
-            out["season_ypc_luckfree"] = float(season_luckfree_ypc)
+    if ok(luckfree_ypc):
+        out["season_ypc_luckfree"] = float(luckfree_ypc)
     if ok(carries_line) and float(carries_line) > 0:
         c_min = to_clear(carries_line)
         out.update(carries_line=float(carries_line), c_min=c_min, need_ypc=y_min / c_min,
@@ -673,10 +678,10 @@ def carry_yards_sentence(d) -> str | None:
         if d["model_ypc"] is not None:
             his.append(f"we expect {d['model_ypc']:.1f}")
         if d["season_ypc"] is not None:
-            h = f"he has {d['season_ypc']:.1f} this season on {d['season_car']} carries"
-            if d["season_ypc_luckfree"] is not None:
-                h += f" ({d['season_ypc_luckfree']:.1f} with the luck taken out)"
-            his.append(h + " -- mostly noise this early: the league average predicts later games better")
+            his.append(f"he has {d['season_ypc']:.1f} this season on {d['season_car']} carries "
+                       "(mostly noise this early: the league average predicts later games better)")
+        if d["season_ypc_luckfree"] is not None:
+            his.append(f"{d['season_ypc_luckfree']:.1f} luck-free over his last {(d.get('luck') or {}).get('games', '?')} games")
         bits.append(s + (f"; {', '.join(his)}" if his else "") + ".")
         if d["read"] == "yards line rich":
             bits.append("That is more per carry than ours: past the carries line, his yards Over still needs "
