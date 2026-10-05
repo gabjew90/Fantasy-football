@@ -321,8 +321,10 @@ For a narrow question, run only what it needs:
   Over that needs his raw average needs another one. Lean on our figure for runners: their
   early-season yards a carry is noise.
   **The achievability gauge** ends both reads: the volume the yards line takes at his capped
-  yards a play (the luck line: catches past 50 yards and runs past 29 -- the league's 99th
-  percentile plays -- count as lucky breakaways and are counted at the cap; ours when his
+  yards a play (the luck line: a play past the player's OWN 95th percentile for that prop --
+  his catches or his runs, last season and this one -- counts as a lucky breakaway and is
+  counted at the line; under 20 plays of his own, his longest play this season is left out
+  instead; the report prints which it used; ours when his
   sample is small), against the volume we project: "comfortably more than it takes", "about what
   it takes" or "fewer than it takes". Use it to say whether a yards line is achievable without a
   lucky breakaway. It is an average-game check, so a "comfortably" on a 1-2 catch player is still

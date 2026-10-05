@@ -382,7 +382,7 @@ def test_carries_and_yards_lines_read_together():
     assert d["rest_ypc"] == pytest.approx((90 - 18) / 19)
     s = RS.carry_yards_sentence(d)
     assert s.startswith("The book's carries line is 19.5, Under favoured; we project 17.5.")
-    assert "5.3 this season on 66 carries (mostly noise this early" in s and "mostly a bet on the carries" in s
+    assert "5.3 this season on 66 carries -- mostly noise this early" in s and "mostly a bet on the carries" in s
     assert "one run of 18, 20% of the 90 yards; with that one, his other 19 carries need 3.8 each" in s
 
 
@@ -391,7 +391,7 @@ def test_the_carries_read_degrades_without_its_inputs():
     d = RS.carry_yards_read(11.5, 36.5, model_ypc=3.4, season_car=8, season_yds=30)
     assert d["season_ypc"] is None, "8 carries is too few to quote a season yards a carry"
     k = RS.carry_yards_read(11.5, 36.5, model_ypc=3.4, season_car=18, season_yds=51)
-    assert "he has 2.8 this season on 18 carries (mostly noise" in RS.carry_yards_sentence(k), \
+    assert "he has 2.8 this season on 18 carries -- mostly noise" in RS.carry_yards_sentence(k), \
         "Kamara's own number shows, with its count, though it carries no verdict"
     assert d["read"] == "about even" and d["carries_fav"] is None
     assert "Under favoured" not in RS.carry_yards_sentence(d) and "we project" not in RS.carry_yards_sentence(d)
@@ -415,22 +415,28 @@ def test_extra_lines_are_indexed_by_our_team_code():
 
 def test_the_season_yards_a_catch_is_shown_capped():
     # London: 274 yards on 15 catches, 220 once each catch is capped (made-up capped total)
-    d = RS.catch_yards_read(6.5, 81.5, season_rec=15, season_yds=274, model_ypc=13.4, season_capped_yds=220)
+    lk = {"cap": 41.0, "own": True, "n": 96}
+    d = RS.catch_yards_read(6.5, 81.5, season_rec=15, season_yds=274, model_ypc=13.4, season_luckfree_ypc=220 / 15, luck=lk)
     assert d["season_ypc_cap"] == pytest.approx(220 / 15)
-    assert "he has 18.3 this season on 15 catches (14.7 with each catch capped at 50 yards)" in RS.catch_yards_sentence(d)
+    assert "he has 18.3 this season on 15 catches (14.7 with the luck taken out)" in RS.catch_yards_sentence(d)
     assert d["read"] == "about even", "context only: the verdict still compares the lines with ours"
-    assert RS.catch_yards_read(6.5, 81.5, season_rec=5, season_yds=90, season_capped_yds=80)["season_ypc_cap"] is None
+    assert RS.catch_yards_read(6.5, 81.5, season_rec=5, season_yds=90, season_luckfree_ypc=16.0)["season_ypc_cap"] is None
 
 
 
 def test_the_gauge_compares_the_volume_the_line_takes_with_ours():
     # Bijan: 349 yards on 66 carries, 323 once his 55-yarder counts as 29; 90 yards takes 18.4
     d = RS.carry_yards_read(19.5, 89.5, model_ypc=5.3, proj_carries=17.5, season_car=66, season_yds=349,
-                            season_capped_yds=323)
+                            season_luckfree_ypc=323 / 66)
     assert d["gauge"]["need"] == pytest.approx(90 / (323 / 66))
     s = RS.carry_yards_sentence(d)
-    assert ("At his yards a carry with every run capped at 29 (4.9), 90 yards takes about 18.4 carries; "
-            "we project 17.5, about what it takes.") in s
+    assert "90 yards takes about 18.4 carries; we project 17.5, about what it takes." in s
+    lk = {"cap": 31.0, "own": True, "n": 353}
+    d = RS.carry_yards_read(None, 29.5, model_ypc=4.5, proj_carries=9.1, season_car=30, season_yds=132,
+                            season_luckfree_ypc=132 / 30, luck=lk)
+    assert ("At 4.4 yards a carry with the luck taken out (every run past 31 yards, his own 95th percentile "
+            "over 353 runs, counted as 31), 30 yards takes") in RS.carry_yards_sentence(d), \
+        "with no carries line the gauge still names the cap it used"
     d = RS.carry_yards_read(None, 36.5, model_ypc=2.5, proj_carries=11.8)
     assert "fewer than it takes: the Over needs more carries or a long run." in RS.carry_yards_sentence(d)
     d = RS.carry_yards_read(None, 29.5, model_ypc=4.5, proj_carries=9.1)
@@ -441,3 +447,20 @@ def test_the_gauge_compares_the_volume_the_line_takes_with_ours():
     s = RS.catch_yards_sentence(d)
     assert "20 yards takes about 1.5 catches; we project 2.2" in s and "one catch either way decides it" in s
     assert RS.volume_gauge(45, 11.5, None, "catches", 3.0) is None
+
+
+
+def test_the_luck_line_is_the_players_own_95th_percentile_play():
+    plays = list(range(1, 101))                       # 100 plays of 1..100 yards
+    lk = RS.player_luck_line(plays)
+    assert lk["own"] and lk["n"] == 100 and lk["cap"] == pytest.approx(np.percentile(plays, 95))
+    few = RS.player_luck_line([5, 8, 55])
+    assert few == {"cap": None, "own": False, "n": 3}, "too few plays: no percentile"
+    assert RS.luck_free_rate([5, 8, 55], few) == pytest.approx(6.5), "too few: his longest play left out"
+    assert RS.luck_free_rate([5, 8, 120], lk) == pytest.approx((5 + 8 + np.percentile(plays, 95)) / 3)
+    assert RS.luck_free_rate([9], few) is None and RS.luck_free_rate([], lk) is None
+    assert RS.luck_words(lk, "run") == "every run past 95 yards, his own 95th percentile over 100 runs, counted as 95"
+    assert RS.luck_words(few, "run") == "his longest run left out (3 runs of his own is too few for a percentile)"
+    assert RS.player_luck_line(list(range(1, 21)))["own"], "20 plays of his own is enough"
+    assert not RS.player_luck_line(list(range(1, 20)))["own"], "19 is too few"
+    assert RS.luck_words(None, "run") == ""

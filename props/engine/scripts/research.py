@@ -342,12 +342,48 @@ def to_clear(line) -> int:
 # one leg wins more often (DECISIONS #164)
 YPC_BAND = 1.0
 YPC_MIN_CATCHES = 8
-# THE LUCK LINE for the achievability gauge (user's call, 2026-10-05): a play past the
-# league's 99th percentile (2022-23 plays) counts as a lucky breakaway and is counted at the
-# cap. The gauge describes a line, it does not predict, so this is a definition, not a fit;
-# reports/robust_ypc_check.md records how the caps compare as predictors, for reference only
-CATCH_CAP = 50
-RUN_CAP = 29
+# THE LUCK LINE for the achievability gauge (user's design, 2026-10-05; DECISIONS #167):
+# a play past the player's OWN 95th percentile for that prop -- his catches for receiving
+# yards, his runs for rushing yards, last season and this one together -- counts as a lucky
+# breakaway and is counted at that line. "Too few" = under LUCK_MIN_PLAYS of his own plays of
+# that kind (at 20 the 95th percentile still sits between his two longest; below it the line
+# would just be his single longest play); then his longest play this season is left out
+# instead (user's call). A definition for a descriptive gauge, not a fit
+# (reports/robust_ypc_check.md, for reference only)
+LUCK_PCT = 95
+LUCK_MIN_PLAYS = 20
+
+
+def player_luck_line(plays) -> dict:
+    """The luck line for one player and one kind of play: {cap, own, n}. own: his
+    LUCK_PCT percentile play sets the cap. Otherwise (too few plays) cap is None and the
+    caller leaves his longest play out instead (luck_free_rate)."""
+    v = [float(x) for x in (plays or []) if x == x]
+    if len(v) >= LUCK_MIN_PLAYS:
+        return {"cap": float(np.percentile(v, LUCK_PCT)), "own": True, "n": len(v)}
+    return {"cap": None, "own": False, "n": len(v)}
+
+
+def luck_free_rate(season_plays, luck) -> float | None:
+    """His yards a play this season with the luck taken out: each play counted at most
+    the luck line, or -- when he has too few plays for one -- his longest play left out."""
+    v = [float(x) for x in (season_plays or []) if x == x]
+    if not v or not luck:
+        return None
+    if luck["own"]:
+        return sum(min(x, luck["cap"]) for x in v) / len(v)
+    return (sum(v) - max(v)) / (len(v) - 1) if len(v) >= 2 else None
+
+
+def luck_words(luck, unit) -> str:
+    """How the report names the luck line it used."""
+    if not luck:
+        return ""
+    plural = f"{unit}es" if unit == "catch" else f"{unit}s"
+    if luck["own"]:
+        return (f"every {unit} past {luck['cap']:.0f} yards, his own {LUCK_PCT}th percentile over "
+                f"{luck['n']} {plural}, counted as {luck['cap']:.0f}")
+    return f"his longest {unit} left out ({luck['n']} {plural} of his own is too few for a percentile)"
 
 
 # display bands for the gauge, picked, not measured: projected volume within 15% of what
@@ -373,10 +409,12 @@ def volume_gauge(y_min, rate, proj, unit, low_volume):
             "low": float(proj) < low_volume}
 
 
-def gauge_sentence(g, rate_words, rate, y_min, long_word):
+def gauge_sentence(g, rate, per, luck_clause, y_min, long_word):
+    """'At 4.4 yards a carry with the luck taken out (<how>), 90 yards takes about ...'."""
     if not g:
         return None
-    s = (f"At {rate_words} ({rate:.1f}), {y_min} yards takes about {g['need']:.1f} {g['unit']}; "
+    how = f"with the luck taken out ({luck_clause})" if luck_clause else "(our figure for him)"
+    s = (f"At {rate:.1f} yards a {per} {how}, {y_min} yards takes about {g['need']:.1f} {g['unit']}; "
          f"we project {g['proj']:.1f}, {g['word']}")
     if g["word"] == "fewer than it takes":
         s += f": the Over needs more {g['unit']} or {long_word}"
@@ -446,8 +484,8 @@ def favoured(mult_over, mult_under, gap=0.05):
 
 
 def catch_yards_read(catches_line=None, yards_line=None, season_rec=None, season_yds=None,
-                     model_ypc=None, longest_line=None, season_capped_yds=None,
-                     proj_catches=None) -> dict | None:
+                     model_ypc=None, longest_line=None, season_luckfree_ypc=None,
+                     proj_catches=None, luck=None) -> dict | None:
     """How the book's catches, receiving-yards and longest-catch lines fit together
     (DECISIONS #164). Every line is a half-point step, so each Over is read at the
     whole number that wins it: 3.5 catches and 44.5 yards mean 4 catches for 45.
@@ -457,7 +495,7 @@ def catch_yards_read(catches_line=None, yards_line=None, season_rec=None, season
     with OUR yards a catch for him (the blended estimate: a raw season figure on 15
     catches carries a standard error near 2.5 yards, wider than the band). His season
     figure is context, used only when we have none, shown beside its capped version
-    (season_capped_yds: each catch counted at most CATCH_CAP yards, the luck line). A
+    (season_luckfree_ypc: research.luck_free_rate). A
     longest-catch line of 17.5 means
     one catch of 18; rest_ypc is what the other catches must average if he gets
     exactly that one. Nothing here is a model price."""
@@ -468,11 +506,11 @@ def catch_yards_read(catches_line=None, yards_line=None, season_rec=None, season
     out = {"yards_line": float(yards_line), "y_min": y_min, "catches_line": None, "c_min": None,
            "need_ypc": None, "mid_ypc": None, "season_ypc": None, "season_rec": None, "model_ypc": None,
            "ref": None, "longest_line": None, "long_min": None, "long_share": None, "rest_ypc": None,
-           "read": None, "season_ypc_cap": None, "gauge": None, "gauge_rate": None}
+           "read": None, "season_ypc_cap": None, "gauge": None, "gauge_rate": None, "luck": luck}
     if ok(season_rec) and ok(season_yds) and season_rec >= YPC_MIN_CATCHES:
         out.update(season_ypc=float(season_yds) / float(season_rec), season_rec=int(season_rec))
-        if ok(season_capped_yds):
-            out["season_ypc_cap"] = float(season_capped_yds) / float(season_rec)
+        if ok(season_luckfree_ypc):
+            out["season_ypc_cap"] = float(season_luckfree_ypc)
     if ok(model_ypc) and model_ypc > 0:
         out["model_ypc"] = float(model_ypc)
     if ok(catches_line) and float(catches_line) > 0:
@@ -510,7 +548,7 @@ def catch_yards_sentence(d) -> str | None:
         if d["season_ypc"] is not None:
             h = f"he has {d['season_ypc']:.1f} this season on {d['season_rec']} catches"
             if d["season_ypc_cap"] is not None:
-                h += f" ({d['season_ypc_cap']:.1f} with each catch capped at {CATCH_CAP} yards)"
+                h += f" ({d['season_ypc_cap']:.1f} with the luck taken out)"
             his.append(h)
         bits.append(s + (f"; {', '.join(his)}" if his else "") + ".")
         ours = "ours" if d["ref"] == "model" else "his season figure"
@@ -525,9 +563,8 @@ def catch_yards_sentence(d) -> str | None:
         bits.append(f"Both Overs at the minimum -- {d['c_min']} catches for {d['y_min']} yards -- "
                     f"need {d['need_ypc']:.1f} a catch.")
     if d.get("gauge") is not None:
-        src = (f"his yards a catch with each catch capped at {CATCH_CAP}" if d["season_ypc_cap"] is not None
-               else "our yards a catch")
-        bits.append(gauge_sentence(d["gauge"], src, d["gauge_rate"], d["y_min"], "a long catch"))
+        lc = luck_words(d.get("luck"), "catch") if d["season_ypc_cap"] is not None else None
+        bits.append(gauge_sentence(d["gauge"], d["gauge_rate"], "catch", lc, d["y_min"], "a long catch"))
     if d["long_min"] is not None:
         if d["long_min"] >= d["y_min"]:
             bits.append(f"The longest-catch line ({d['longest_line']:g}) sits at or above his yards line: "
@@ -550,8 +587,8 @@ RUN_MIN_CARRIES = 10      # context only (it carries no verdict), always shown w
 
 
 def carry_yards_read(carries_line=None, yards_line=None, model_ypc=None, proj_carries=None,
-                     season_car=None, season_yds=None, season_capped_yds=None, longest_line=None,
-                     carries_fav=None) -> dict | None:
+                     season_car=None, season_yds=None, season_luckfree_ypc=None, longest_line=None,
+                     carries_fav=None, luck=None) -> dict | None:
     """The runner's version of catch_yards_read (DECISIONS #166): the book's carries,
     rushing-yards and longest-run lines read together at the whole numbers that win
     them, against OUR yards a carry. His season figure is shown with its count and a
@@ -566,14 +603,15 @@ def carry_yards_read(carries_line=None, yards_line=None, model_ypc=None, proj_ca
     out = {"yards_line": float(yards_line), "y_min": y_min, "carries_line": None, "c_min": None,
            "carries_fav": carries_fav, "proj_carries": float(proj_carries) if ok(proj_carries) else None,
            "need_ypc": None, "mid_ypc": None, "model_ypc": None, "season_ypc": None, "season_car": None,
-           "season_ypc_cap": None, "gauge": None, "gauge_rate": None, "longest_line": None, "long_min": None,
+           "season_ypc_cap": None, "gauge": None, "gauge_rate": None, "luck": luck,
+           "longest_line": None, "long_min": None,
            "long_share": None, "rest_ypc": None, "read": None}
     if ok(model_ypc) and model_ypc > 0:
         out["model_ypc"] = float(model_ypc)
     if ok(season_car) and ok(season_yds) and season_car >= RUN_MIN_CARRIES:
         out.update(season_ypc=float(season_yds) / float(season_car), season_car=int(season_car))
-        if ok(season_capped_yds):
-            out["season_ypc_cap"] = float(season_capped_yds) / float(season_car)
+        if ok(season_luckfree_ypc):
+            out["season_ypc_cap"] = float(season_luckfree_ypc)
     if ok(carries_line) and float(carries_line) > 0:
         c_min = to_clear(carries_line)
         out.update(carries_line=float(carries_line), c_min=c_min, need_ypc=y_min / c_min,
@@ -607,8 +645,10 @@ def carry_yards_sentence(d) -> str | None:
         if d["model_ypc"] is not None:
             his.append(f"we expect {d['model_ypc']:.1f}")
         if d["season_ypc"] is not None:
-            his.append(f"he has {d['season_ypc']:.1f} this season on {d['season_car']} carries "
-                       "(mostly noise this early: the league average predicts later games better)")
+            h = f"he has {d['season_ypc']:.1f} this season on {d['season_car']} carries"
+            if d["season_ypc_cap"] is not None:
+                h += f" ({d['season_ypc_cap']:.1f} with the luck taken out)"
+            his.append(h + " -- mostly noise this early: the league average predicts later games better")
         bits.append(s + (f"; {', '.join(his)}" if his else "") + ".")
         if d["read"] == "yards line rich":
             bits.append("That is more per carry than ours: past the carries line, his yards Over still needs "
@@ -621,9 +661,8 @@ def carry_yards_sentence(d) -> str | None:
         bits.append(f"Both Overs at the minimum -- {d['c_min']} carries for {d['y_min']} yards -- "
                     f"need {d['need_ypc']:.1f} a carry.")
     if d.get("gauge") is not None:
-        src = (f"his yards a carry with every run capped at {RUN_CAP}" if d["season_ypc_cap"] is not None
-               else "our yards a carry")
-        bits.append(gauge_sentence(d["gauge"], src, d["gauge_rate"], d["y_min"], "a long run"))
+        lc = luck_words(d.get("luck"), "run") if d["season_ypc_cap"] is not None else None
+        bits.append(gauge_sentence(d["gauge"], d["gauge_rate"], "carry", lc, d["y_min"], "a long run"))
     if d["long_min"] is not None:
         if d["long_min"] >= d["y_min"]:
             bits.append(f"The longest-run line ({d['longest_line']:g}) sits at or above his yards line: "

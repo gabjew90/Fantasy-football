@@ -7352,15 +7352,13 @@ by the user.
   count and a warning that it is mostly noise this early; both Overs at the minimum;
   and the longest-run line's share of the yards.
 - QBs are left out: their rushing line counts kneel-downs, which muddy a yards a carry.
-- Taking the luck out (user's design, 2026-10-05): a play past the league's 99th
-  percentile (2022-23 plays: catches 50 yards, runs 29) counts as a lucky breakaway and
-  is counted at the cap -- the user's definition for a descriptive gauge, not a fitted
-  parameter. reports/robust_ypc_check.md records how caps and "drop the longest" compare
-  as predictors of later yards a play, for reference: dropping the longest play was the
-  worst every time, so it is not shown; three games of yards a carry lost to the league
-  average, so the runner's season figure carries a noise warning.
+- Taking the luck out: see #167 for the luck line. reports/robust_ypc_check.md records
+  how caps and "drop the longest" compare as predictors of later yards a play, for
+  reference only (the gauge describes, it does not predict); three games of yards a
+  carry lost to the league average, so the runner's season figure carries a noise
+  warning.
 - The achievability gauge (user, 2026-10-05): the volume the yards line takes at his
-  capped yards a play (ours when his sample is small), against the volume we project --
+  luck-free yards a play (#167; ours when his sample is small), against the volume we project --
   "comfortably more than it takes" / "about what it takes" (within 15%, a display band)
   / "fewer than it takes", with a warning under 3 catches or 6 carries. Volume times
   rate is an average game, pulled up by big games, so it is never phrased as "his usual
@@ -7370,3 +7368,20 @@ by the user.
   logged or archived.
 - Prompted by Bijan Robinson, week 4: the book's 19.5 carries line favoured the Under
   while the lines asked 4.6 a carry, so his rushing-yards Over was a bet on 20 carries.
+
+## 2026-10-05 (167) -- the luck line is each player's own 95th-percentile play
+
+- User's design for the achievability gauge, settled over several messages: a play
+  past the player's OWN 95th percentile for that prop -- his catches for receiving
+  yards, his runs for rushing yards -- counts as a lucky breakaway and is counted at
+  that line. His plays from last season (resources/priors_2025_play_yards.csv, built
+  by scripts/build_play_yards.py) and this season are pooled, because three games
+  are far too few for a percentile.
+- "Too few" = under 20 plays of that kind (at 20 the 95th percentile still sits
+  between his two longest; below it the line would just be his longest play). Then
+  his longest play this season is left out instead.
+- Earlier versions in the same session (league-wide caps at the 95th, then 99th
+  percentile; own 99th) were superseded: own 99th sat at a player's longest one or
+  two plays and trimmed almost nothing.
+- Every read prints the line it used ("every run past 15 yards, his own 95th
+  percentile over 353 runs, counted as 15"). Report text only: no price moves.
