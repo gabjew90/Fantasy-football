@@ -342,16 +342,66 @@ def to_clear(line) -> int:
 # one leg wins more often (DECISIONS #164)
 YPC_BAND = 1.0
 YPC_MIN_CATCHES = 8
+# each catch counted at most this many yards in the season context figure: the league's
+# 95th percentile catch in 2022-23; capped beat the plain average and dropping the longest
+# catch at predicting later yards a catch in both 2022-23 and 2024-25 (reports/robust_ypc_check.md)
+CATCH_CAP = 30
+# each run counted at most this many yards in the gauge: the league's 99th percentile carry
+# in 2022-23. Of caps at the 90th/95th/97.5th/99th percentile (11/14/20/29 yards) it best
+# predicted later yards a carry in 2024-25 (0.851 vs plain 0.936) and beat plain in 2022-23
+# too -- though every early figure still lost to the league average (reports/robust_ypc_check.md)
+RUN_CAP = 29
 
 
-def longest_lines(markets, players, teams) -> list[dict]:
-    """Sleeper's longest-reception lines for this game: [{name, team, line}] (a list,
-    so the scenario snapshot can store it as JSON). markets = Sleeper's available-lines
-    feed and players its player map, both fetched by score_game; teams = the two Sleeper team codes. Read beside the
-    catches and yards lines only; never priced."""
+# display bands for the gauge, picked, not measured: projected volume within 15% of what
+# the yards line takes reads "about what it takes"
+GAUGE_BAND = 0.15
+SINGULAR = {"catches": "catch", "carries": "carry"}
+
+
+def volume_gauge(y_min, rate, proj, unit, low_volume):
+    """The achievability gauge (DECISIONS #166): the volume the yards line takes at a
+    typical yards a play (long plays capped, so one breakaway does not set the bar),
+    against the volume we project. Volume times rate is an AVERAGE game and averages are
+    pulled up by big games, so the gauge is phrased as volume needed vs projected and
+    never as "his usual game clears it". Description, not a price."""
+    ok = lambda v: v is not None and v == v
+    if not (ok(rate) and ok(proj)) or rate <= 0 or proj <= 0:
+        return None
+    need = y_min / float(rate)
+    ratio = float(proj) / need
+    word = ("comfortably more than it takes" if ratio >= 1 + GAUGE_BAND
+            else "fewer than it takes" if ratio <= 1 - GAUGE_BAND else "about what it takes")
+    return {"need": need, "proj": float(proj), "ratio": ratio, "word": word, "unit": unit,
+            "low": float(proj) < low_volume}
+
+
+def gauge_sentence(g, rate_words, rate, y_min, long_word):
+    if not g:
+        return None
+    s = (f"At {rate_words} ({rate:.1f}), {y_min} yards takes about {g['need']:.1f} {g['unit']}; "
+         f"we project {g['proj']:.1f}, {g['word']}")
+    if g["word"] == "fewer than it takes":
+        s += f": the Over needs more {g['unit']} or {long_word}"
+    s += "."
+    if g["low"]:
+        s += f" At this little volume one {SINGULAR.get(g['unit'], g['unit'])} either way decides it."
+    return s
+
+
+# Sleeper's lines that are read beside the priced ones, never priced (DECISIONS #164, #166)
+EXTRA_KINDS = ("longest_reception", "longest_rush", "rushing_attempts")
+
+
+def extra_lines(markets, players, teams, kinds=EXTRA_KINDS) -> list[dict]:
+    """Sleeper's unpriced lines for this game: [{name, team, kind, line, mult_over,
+    mult_under}] (a list, so the scenario snapshot can store it as JSON). markets =
+    Sleeper's available-lines feed and players its player map, both fetched by
+    score_game; teams = the two Sleeper team codes. Read beside the catches, carries
+    and yards lines only; never priced."""
     out = []
     for m in markets or []:
-        if (m.get("sport") != "nfl" or m.get("wager_type") != "longest_reception"
+        if (m.get("sport") != "nfl" or m.get("wager_type") not in kinds
                 or m.get("line_type", "normal") != "normal"):
             continue
         opts = m.get("options") or []
@@ -359,14 +409,48 @@ def longest_lines(markets, players, teams) -> list[dict]:
             continue
         info = players.get(m.get("subject_id"), {})
         name = info.get("full_name") or f'{info.get("first_name", "")} {info.get("last_name", "")}'.strip()
-        over = next((o for o in opts if o.get("outcome") == "over" and o.get("status") == "active"), None)
+        side = lambda o_: next((o for o in opts if o.get("outcome") == o_ and o.get("status") == "active"), None)
+        over, under = side("over"), side("under")
         if name and over is not None:
-            out.append({"name": name, "team": opts[0]["subject_team"], "line": float(over["outcome_value"])})
+            out.append({"name": name, "team": opts[0]["subject_team"], "kind": m["wager_type"],
+                        "line": float(over["outcome_value"]),
+                        "mult_over": float(over["payout_multiplier"]) if over.get("payout_multiplier") else None,
+                        "mult_under": (float(under["payout_multiplier"])
+                                       if under is not None and under.get("payout_multiplier") else None)})
     return out
 
 
+def extra_index(extra, sleeper_team=None) -> dict:
+    """extra_lines rows keyed for lookup: {(kind, norm_name, OUR team code): row}.
+    sleeper_team maps our codes to Sleeper's ({"LA": "LAR"}); the index turns
+    Sleeper's back into ours so callers look up with the code the report uses."""
+    back = {v: k for k, v in (sleeper_team or {}).items()}
+    return {(x["kind"], MODEL.norm_name(x["name"]), back.get(x["team"], x["team"])): x for x in extra or []}
+
+
+def extra_summary(extra) -> str:
+    """The sources-table detail for the unpriced lines: a count per kind."""
+    if not extra:
+        return "none posted for this game"
+    n = {}
+    for x in extra:
+        n[x["kind"]] = n.get(x["kind"], 0) + 1
+    words = {"longest_reception": "longest catch", "longest_rush": "longest run", "rushing_attempts": "carries"}
+    return ", ".join(f"{words.get(k, k)} {v}" for k, v in sorted(n.items()))
+
+
+def favoured(mult_over, mult_under, gap=0.05):
+    """Which side of a Sleeper line the book favours, from its payout multipliers:
+    the side paying less, when the two differ by more than `gap`; None when even."""
+    ok = lambda v: v is not None and v == v
+    if not (ok(mult_over) and ok(mult_under)) or abs(mult_over - mult_under) <= gap:
+        return None
+    return "Under" if mult_under < mult_over else "Over"
+
+
 def catch_yards_read(catches_line=None, yards_line=None, season_rec=None, season_yds=None,
-                     model_ypc=None, longest_line=None) -> dict | None:
+                     model_ypc=None, longest_line=None, season_capped_yds=None,
+                     proj_catches=None) -> dict | None:
     """How the book's catches, receiving-yards and longest-catch lines fit together
     (DECISIONS #164). Every line is a half-point step, so each Over is read at the
     whole number that wins it: 3.5 catches and 44.5 yards mean 4 catches for 45.
@@ -375,7 +459,10 @@ def catch_yards_read(catches_line=None, yards_line=None, season_rec=None, season
     line / catches line is the book's own yards a catch, and the read compares it
     with OUR yards a catch for him (the blended estimate: a raw season figure on 15
     catches carries a standard error near 2.5 yards, wider than the band). His season
-    figure is context, used only when we have none. A longest-catch line of 17.5 means
+    figure is context, used only when we have none, shown beside its capped version
+    (season_capped_yds: each catch counted at most CATCH_CAP yards), which predicted later
+    yards a catch better than the plain figure or dropping his longest catch
+    (reports/robust_ypc_check.md). A longest-catch line of 17.5 means
     one catch of 18; rest_ypc is what the other catches must average if he gets
     exactly that one. Nothing here is a model price."""
     ok = lambda v: v is not None and v == v
@@ -385,9 +472,11 @@ def catch_yards_read(catches_line=None, yards_line=None, season_rec=None, season
     out = {"yards_line": float(yards_line), "y_min": y_min, "catches_line": None, "c_min": None,
            "need_ypc": None, "mid_ypc": None, "season_ypc": None, "season_rec": None, "model_ypc": None,
            "ref": None, "longest_line": None, "long_min": None, "long_share": None, "rest_ypc": None,
-           "read": None}
+           "read": None, "season_ypc_cap": None, "gauge": None, "gauge_rate": None}
     if ok(season_rec) and ok(season_yds) and season_rec >= YPC_MIN_CATCHES:
         out.update(season_ypc=float(season_yds) / float(season_rec), season_rec=int(season_rec))
+        if ok(season_capped_yds):
+            out["season_ypc_cap"] = float(season_capped_yds) / float(season_rec)
     if ok(model_ypc) and model_ypc > 0:
         out["model_ypc"] = float(model_ypc)
     if ok(catches_line) and float(catches_line) > 0:
@@ -401,6 +490,9 @@ def catch_yards_read(catches_line=None, yards_line=None, season_rec=None, season
             out["rest_ypc"] = (y_min - l_min) / (out["c_min"] - 1)
     out["ref"] = ("model" if out["model_ypc"] is not None
                   else "season" if out["season_ypc"] is not None else None)
+    rate = out["season_ypc_cap"] if out["season_ypc_cap"] is not None else out["model_ypc"]
+    if rate is not None:
+        out.update(gauge_rate=rate, gauge=volume_gauge(y_min, rate, proj_catches, "catches", 3.0))
     ref = out["model_ypc"] if out["ref"] == "model" else out["season_ypc"]
     if out["mid_ypc"] is not None and ref is not None:
         gap = out["mid_ypc"] - ref
@@ -411,7 +503,7 @@ def catch_yards_read(catches_line=None, yards_line=None, season_rec=None, season
 
 def catch_yards_sentence(d) -> str | None:
     """The report's one-paragraph read of catch_yards_read."""
-    if not d or (d["need_ypc"] is None and d["long_min"] is None):
+    if not d or (d["need_ypc"] is None and d["long_min"] is None and d.get("gauge") is None):
         return None
     bits = []
     if d["need_ypc"] is not None:
@@ -420,7 +512,10 @@ def catch_yards_sentence(d) -> str | None:
         if d["model_ypc"] is not None:
             his.append(f"we expect {d['model_ypc']:.1f} from him")
         if d["season_ypc"] is not None:
-            his.append(f"he has {d['season_ypc']:.1f} this season on {d['season_rec']} catches")
+            h = f"he has {d['season_ypc']:.1f} this season on {d['season_rec']} catches"
+            if d["season_ypc_cap"] is not None:
+                h += f" ({d['season_ypc_cap']:.1f} with each catch capped at {CATCH_CAP} yards)"
+            his.append(h)
         bits.append(s + (f"; {', '.join(his)}" if his else "") + ".")
         ours = "ours" if d["ref"] == "model" else "his season figure"
         if d["read"] == "yards line rich":
@@ -433,6 +528,10 @@ def catch_yards_sentence(d) -> str | None:
             bits.append(f"That is about {ours}: the two lines ask the same of him.")
         bits.append(f"Both Overs at the minimum -- {d['c_min']} catches for {d['y_min']} yards -- "
                     f"need {d['need_ypc']:.1f} a catch.")
+    if d.get("gauge") is not None:
+        src = (f"his yards a catch with each catch capped at {CATCH_CAP}" if d["season_ypc_cap"] is not None
+               else "our yards a catch")
+        bits.append(gauge_sentence(d["gauge"], src, d["gauge_rate"], d["y_min"], "a long catch"))
     if d["long_min"] is not None:
         if d["long_min"] >= d["y_min"]:
             bits.append(f"The longest-catch line ({d['longest_line']:g}) sits at or above his yards line: "
@@ -444,6 +543,102 @@ def catch_yards_sentence(d) -> str | None:
                 n_ = d["c_min"] - 1
                 s += (f"; with that one, his other catch needs {d['rest_ypc']:.1f}" if n_ == 1 else
                       f"; with that one, his other {n_} catches need {d['rest_ypc']:.1f} each")
+            bits.append(s + ".")
+    return " ".join(bits)
+
+
+# yards a carry within this much of ours reads "about even": a display band, picked, not
+# measured, tighter than receiving because a carry gains about a third of a catch
+RUN_BAND = 0.5
+RUN_MIN_CARRIES = 10      # context only (it carries no verdict), always shown with its count
+
+
+def carry_yards_read(carries_line=None, yards_line=None, model_ypc=None, proj_carries=None,
+                     season_car=None, season_yds=None, season_capped_yds=None, longest_line=None,
+                     carries_fav=None) -> dict | None:
+    """The runner's version of catch_yards_read (DECISIONS #166): the book's carries,
+    rushing-yards and longest-run lines read together at the whole numbers that win
+    them, against OUR yards a carry. His season figure is shown with its count and a
+    warning: three games of yards a carry predicted later games WORSE than the league
+    average in 2022-25, raw, capped or without the longest run alike
+    (reports/robust_ypc_check.md). The book's carries line is shown beside our
+    projected carries, with the side it favours."""
+    ok = lambda v: v is not None and v == v
+    if not ok(yards_line):
+        return None
+    y_min = to_clear(yards_line)
+    out = {"yards_line": float(yards_line), "y_min": y_min, "carries_line": None, "c_min": None,
+           "carries_fav": carries_fav, "proj_carries": float(proj_carries) if ok(proj_carries) else None,
+           "need_ypc": None, "mid_ypc": None, "model_ypc": None, "season_ypc": None, "season_car": None,
+           "season_ypc_cap": None, "gauge": None, "gauge_rate": None, "longest_line": None, "long_min": None,
+           "long_share": None, "rest_ypc": None, "read": None}
+    if ok(model_ypc) and model_ypc > 0:
+        out["model_ypc"] = float(model_ypc)
+    if ok(season_car) and ok(season_yds) and season_car >= RUN_MIN_CARRIES:
+        out.update(season_ypc=float(season_yds) / float(season_car), season_car=int(season_car))
+        if ok(season_capped_yds):
+            out["season_ypc_cap"] = float(season_capped_yds) / float(season_car)
+    if ok(carries_line) and float(carries_line) > 0:
+        c_min = to_clear(carries_line)
+        out.update(carries_line=float(carries_line), c_min=c_min, need_ypc=y_min / c_min,
+                   mid_ypc=float(yards_line) / float(carries_line))
+    if ok(longest_line):
+        l_min = to_clear(longest_line)
+        out.update(longest_line=float(longest_line), long_min=l_min, long_share=l_min / y_min)
+        if out["c_min"] and out["c_min"] >= 2 and l_min < y_min:
+            out["rest_ypc"] = (y_min - l_min) / (out["c_min"] - 1)
+    rate = out["season_ypc_cap"] if out["season_ypc_cap"] is not None else out["model_ypc"]
+    if rate is not None:
+        out.update(gauge_rate=rate, gauge=volume_gauge(y_min, rate, out["proj_carries"], "carries", 6.0))
+    if out["mid_ypc"] is not None and out["model_ypc"] is not None:
+        gap = out["mid_ypc"] - out["model_ypc"]
+        out["read"] = ("yards line rich" if gap >= RUN_BAND
+                       else "yards line lean" if gap <= -RUN_BAND else "about even")
+    return out
+
+
+def carry_yards_sentence(d) -> str | None:
+    """The report's one-paragraph read of carry_yards_read."""
+    if not d or (d["carries_line"] is None and d["long_min"] is None and d.get("gauge") is None):
+        return None
+    bits = []
+    if d["carries_line"] is not None:
+        fav = f", {d['carries_fav']} favoured" if d["carries_fav"] else ""
+        we = f"; we project {d['proj_carries']:.1f}" if d["proj_carries"] is not None else ""
+        bits.append(f"The book's carries line is {d['carries_line']:g}{fav}{we}.")
+        s = f"The lines ask {d['mid_ypc']:.1f} yards a carry ({d['yards_line']:g} over {d['carries_line']:g})"
+        his = []
+        if d["model_ypc"] is not None:
+            his.append(f"we expect {d['model_ypc']:.1f}")
+        if d["season_ypc"] is not None:
+            his.append(f"he has {d['season_ypc']:.1f} this season on {d['season_car']} carries "
+                       "(mostly noise this early: the league average predicts later games better)")
+        bits.append(s + (f"; {', '.join(his)}" if his else "") + ".")
+        if d["read"] == "yards line rich":
+            bits.append("That is more per carry than ours: past the carries line, his yards Over still needs "
+                        "extra carries or a long run.")
+        elif d["read"] == "yards line lean":
+            bits.append("That is less per carry than ours: if he clears the carries line, the yards usually "
+                        "come with it, so his yards Over is mostly a bet on the carries.")
+        elif d["read"] == "about even":
+            bits.append("That is about ours: his yards Over is a bet on the carries.")
+        bits.append(f"Both Overs at the minimum -- {d['c_min']} carries for {d['y_min']} yards -- "
+                    f"need {d['need_ypc']:.1f} a carry.")
+    if d.get("gauge") is not None:
+        src = (f"his yards a carry with every run capped at {RUN_CAP}" if d["season_ypc_cap"] is not None
+               else "our yards a carry")
+        bits.append(gauge_sentence(d["gauge"], src, d["gauge_rate"], d["y_min"], "a long run"))
+    if d["long_min"] is not None:
+        if d["long_min"] >= d["y_min"]:
+            bits.append(f"The longest-run line ({d['longest_line']:g}) sits at or above his yards line: "
+                        "the book sees one run carrying all of his yards.")
+        else:
+            s = (f"The longest-run line ({d['longest_line']:g}) means one run of {d['long_min']}, "
+                 f"{100 * d['long_share']:.0f}% of the {d['y_min']} yards")
+            if d["rest_ypc"] is not None:
+                n_ = d["c_min"] - 1
+                s += (f"; with that one, his other carry needs {d['rest_ypc']:.1f}" if n_ == 1 else
+                      f"; with that one, his other {n_} carries need {d['rest_ypc']:.1f} each")
             bits.append(s + ".")
     return " ".join(bits)
 

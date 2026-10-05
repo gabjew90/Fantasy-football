@@ -308,6 +308,26 @@ For a narrow question, run only what it needs:
   says how much of the yards one play carries -- with one catch at that line, what the rest must
   average. Narrate it as the book's view of how he gets his yards, not as a model edge: the
   longest-catch line is the book's number only and is not priced here.
+  **Carries and yards** (backs and receivers, not QBs; DECISIONS #166) is the runner's version:
+  the book's carries line beside our projected carries (with the side the book favours), the
+  lines' yards a carry against ours, his season figure with its count and the warning that it is
+  mostly noise this early (three games of yards a carry predicted later games worse than the
+  league average in 2022-25; reports/robust_ypc_check.md), both Overs at the minimum, and the
+  longest-run line's share of the yards. When the lines ask about his usual yards a carry, his
+  rushing-yards Over is a bet on the carries: say so, and say where the book's carries line and
+  favoured side sit against ours (Bijan, week 4: 19.5, Under favoured, we 17.5 -- the market
+  does not expect 20). Receivers' season figures are shown beside a capped version (each catch
+  counted at most 30 yards), which predicted later yards a catch best of the versions tested;
+  a big gap between the two means his average was built on one or two long plays, so a yards
+  Over that needs his raw average needs another one. Lean on our figure for runners: their
+  early-season yards a carry is noise.
+  **The achievability gauge** ends both reads: the volume the yards line takes at his capped
+  yards a play (catches capped at 30, runs at 29 -- reports/robust_ypc_check.md; ours when his
+  sample is small), against the volume we project: "comfortably more than it takes", "about what
+  it takes" or "fewer than it takes". Use it to say whether a yards line is achievable without a
+  lucky breakaway. It is an average-game check, so a "comfortably" on a 1-2 catch player is still
+  close to a coin flip (the gauge warns under 3 catches or 6 carries). Report text only: it never
+  changes the model's price.
   Then narrate the bold lines, analytically, in plain English -- interpret, do not recite the
   row's numbers back:
   1. **The story and its direction**: who is out or back, whose role moved, and why that points

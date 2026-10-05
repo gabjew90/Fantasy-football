@@ -340,12 +340,15 @@ def test_the_read_degrades_without_its_inputs():
     assert RS.catch_yards_sentence(RS.catch_yards_read(None, 44.5)) is None
 
 
-def test_longest_lines_come_from_sleeper_for_this_game_only():
-    opt = lambda team, out, v, status="active", game="pre_game": {
-        "subject_team": team, "outcome": out, "outcome_value": v, "status": status, "game_status": game}
+def test_extra_lines_come_from_sleeper_for_this_game_only():
+    opt = lambda team, out, v, mult=None, status="active", game="pre_game": {
+        "subject_team": team, "outcome": out, "outcome_value": v, "status": status, "game_status": game,
+        **({"payout_multiplier": mult} if mult else {})}
     mk = [
         {"sport": "nfl", "wager_type": "longest_reception", "subject_id": "1",
          "options": [opt("NO", "over", 19.5), opt("NO", "under", 19.5)]},
+        {"sport": "nfl", "wager_type": "rushing_attempts", "subject_id": "5",
+         "options": [opt("ATL", "over", 19.5, "1.87"), opt("ATL", "under", 19.5, "1.70")]},
         {"sport": "nfl", "wager_type": "longest_reception", "subject_id": "2", "line_type": "goblin",
          "options": [opt("NO", "over", 9.5)]},                                  # not a normal line
         {"sport": "nfl", "wager_type": "longest_reception", "subject_id": "3",
@@ -356,5 +359,85 @@ def test_longest_lines_come_from_sleeper_for_this_game_only():
          "options": [opt("ATL", "over", 26.5, game="in_progress")]},            # kicked off
     ]
     players = {"1": {"full_name": "Devaughn Vele"}, "2": {"full_name": "Bryce Lance"},
-               "3": {"full_name": "CeeDee Lamb"}, "4": {"first_name": "Drake", "last_name": "London"}}
-    assert RS.longest_lines(mk, players, {"NO", "ATL"}) == [{"name": "Devaughn Vele", "team": "NO", "line": 19.5}]
+               "3": {"full_name": "CeeDee Lamb"}, "4": {"first_name": "Drake", "last_name": "London"},
+               "5": {"full_name": "Bijan Robinson"}}
+    got = RS.extra_lines(mk, players, {"NO", "ATL"})
+    assert got == [
+        {"name": "Devaughn Vele", "team": "NO", "kind": "longest_reception", "line": 19.5,
+         "mult_over": None, "mult_under": None},
+        {"name": "Bijan Robinson", "team": "ATL", "kind": "rushing_attempts", "line": 19.5,
+         "mult_over": 1.87, "mult_under": 1.70}]
+    assert RS.favoured(1.87, 1.70) == "Under" and RS.favoured(1.70, 1.87) == "Over"
+    assert RS.favoured(1.78, 1.78) is None and RS.favoured(1.80, None) is None
+
+
+def test_carries_and_yards_lines_read_together():
+    # Bijan Robinson, ATL week 4: 19.5 carries (Under favoured), 89.5 yards, longest run 17.5;
+    # 349 yards on 66 carries this season, 55 of them on one run
+    d = RS.carry_yards_read(19.5, 89.5, model_ypc=5.3, proj_carries=17.5, season_car=66, season_yds=349,
+                            longest_line=17.5, carries_fav="Under")
+    assert (d["c_min"], d["y_min"], d["long_min"]) == (20, 90, 18)
+    assert d["mid_ypc"] == pytest.approx(89.5 / 19.5) and d["need_ypc"] == pytest.approx(4.5)
+    assert d["read"] == "yards line lean", "4.6 asked against our 5.3 is past the half-yard band"
+    assert d["rest_ypc"] == pytest.approx((90 - 18) / 19)
+    s = RS.carry_yards_sentence(d)
+    assert s.startswith("The book's carries line is 19.5, Under favoured; we project 17.5.")
+    assert "5.3 this season on 66 carries (mostly noise this early" in s and "mostly a bet on the carries" in s
+    assert "one run of 18, 20% of the 90 yards; with that one, his other 19 carries need 3.8 each" in s
+
+
+def test_the_carries_read_degrades_without_its_inputs():
+    assert RS.carry_yards_read(11.5, None) is None
+    d = RS.carry_yards_read(11.5, 36.5, model_ypc=3.4, season_car=8, season_yds=30)
+    assert d["season_ypc"] is None, "8 carries is too few to quote a season yards a carry"
+    k = RS.carry_yards_read(11.5, 36.5, model_ypc=3.4, season_car=18, season_yds=51)
+    assert "he has 2.8 this season on 18 carries (mostly noise" in RS.carry_yards_sentence(k), \
+        "Kamara's own number shows, with its count, though it carries no verdict"
+    assert d["read"] == "about even" and d["carries_fav"] is None
+    assert "Under favoured" not in RS.carry_yards_sentence(d) and "we project" not in RS.carry_yards_sentence(d)
+    d = RS.carry_yards_read(None, 29.5, longest_line=14.5)
+    assert d["need_ypc"] is None and RS.carry_yards_sentence(d).startswith("The longest-run line (14.5)")
+    assert RS.carry_yards_sentence(RS.carry_yards_read(None, 29.5)) is None
+    assert RS.carry_yards_read(9.5, 29.5, model_ypc=2.5)["read"] == "yards line rich"
+
+
+
+def test_extra_lines_are_indexed_by_our_team_code():
+    rows = [{"name": "Puka Nacua", "team": "LAR", "kind": "longest_reception", "line": 24.5},
+            {"name": "Bijan Robinson", "team": "ATL", "kind": "rushing_attempts", "line": 19.5}]
+    ix = RS.extra_index(rows, {"LA": "LAR"})
+    assert ix[("longest_reception", M.norm_name("Puka Nacua"), "LA")]["line"] == 24.5, "Sleeper's LAR is our LA"
+    assert ix[("rushing_attempts", M.norm_name("Bijan Robinson"), "ATL")]["line"] == 19.5
+    assert RS.extra_summary(rows) == "longest catch 1, carries 1"
+    assert RS.extra_summary([]) == "none posted for this game"
+
+
+
+def test_the_season_yards_a_catch_is_shown_capped():
+    # London: 274 yards on 15 catches, 220 once each catch is capped at 30
+    d = RS.catch_yards_read(6.5, 81.5, season_rec=15, season_yds=274, model_ypc=13.4, season_capped_yds=220)
+    assert d["season_ypc_cap"] == pytest.approx(220 / 15)
+    assert "he has 18.3 this season on 15 catches (14.7 with each catch capped at 30 yards)" in RS.catch_yards_sentence(d)
+    assert d["read"] == "about even", "context only: the verdict still compares the lines with ours"
+    assert RS.catch_yards_read(6.5, 81.5, season_rec=5, season_yds=90, season_capped_yds=80)["season_ypc_cap"] is None
+
+
+
+def test_the_gauge_compares_the_volume_the_line_takes_with_ours():
+    # Bijan: 349 yards on 66 carries, 323 once his 55-yarder counts as 29; 90 yards takes 18.4
+    d = RS.carry_yards_read(19.5, 89.5, model_ypc=5.3, proj_carries=17.5, season_car=66, season_yds=349,
+                            season_capped_yds=323)
+    assert d["gauge"]["need"] == pytest.approx(90 / (323 / 66))
+    s = RS.carry_yards_sentence(d)
+    assert ("At his yards a carry with every run capped at 29 (4.9), 90 yards takes about 18.4 carries; "
+            "we project 17.5, about what it takes.") in s
+    d = RS.carry_yards_read(None, 36.5, model_ypc=2.5, proj_carries=11.8)
+    assert "fewer than it takes: the Over needs more carries or a long run." in RS.carry_yards_sentence(d)
+    d = RS.carry_yards_read(None, 29.5, model_ypc=4.5, proj_carries=9.1)
+    assert "comfortably more than it takes" in RS.carry_yards_sentence(d)
+    assert "his usual game clears it" not in RS.carry_yards_sentence(d), "an average game is not a usual game"
+    # a low-volume receiver gets the warning
+    d = RS.catch_yards_read(1.5, 19.5, model_ypc=13.4, proj_catches=2.2)
+    s = RS.catch_yards_sentence(d)
+    assert "20 yards takes about 1.5 catches; we project 2.2" in s and "one catch either way decides it" in s
+    assert RS.volume_gauge(45, 11.5, None, "catches", 3.0) is None

@@ -1277,9 +1277,10 @@ def main():
             lu = datetime.fromtimestamp(latest / 1000, tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ") if latest else now()
             data_ = {"bookmakers": [{"key": "sleeper", "markets": [{"key": k, "last_update": lu, "outcomes": v} for k, v in mkts.items()]}],
                      "sleeper_pos_rank": pos_rank,
-                     # the book's longest-catch lines: read beside his catches and yards lines
-                     # (research.catch_yards_read, DECISIONS #164), never priced, joined or archived
-                     "sleeper_longest": RSCH.longest_lines(sl, slp, _teams)}
+                     # the book's longest-catch, longest-run and carries lines: read beside the
+                     # priced lines (research.catch_yards_read / carry_yards_read, DECISIONS
+                     # #164, #166), never priced, joined or archived
+                     "sleeper_extra": RSCH.extra_lines(sl, slp, _teams)}
             eid_ = f"sleeper_{gid}"
             arch_rows = [{"retrieved_at_utc": now(), "snapshot_type": "decision", "season": SEASON, "week": WEEK,
                           "event_id": eid_, "commence_time": kick.isoformat(), "home_team": TEAM_NAMES.get(HOME), "away_team": TEAM_NAMES.get(AWAY),
@@ -1891,10 +1892,23 @@ def main():
             (R[~R.book.isin(COMPARE_BOOKS)] if a.compare_books else R).to_csv(logf, index=False)
     # CATCHES, YARDS AND THE LONG ONE (DECISIONS #164): the book's three receiving lines
     # read together at the whole numbers that win them, against his yards a catch
-    CATCH_READ = {}
+    CATCH_READ, CARRY_READ = {}, {}
     if len(RESEARCH):
-        _long = {(norm_name(x_["name"]), x_["team"]): x_["line"] for x_ in (data or {}).get("sleeper_longest") or []}
+        _extra_rows = (data or {}).get("sleeper_extra")
+        _extra = RSCH.extra_index(_extra_rows, SLEEPER_TEAM)
+        _xl = lambda kind, p_, t_: (_extra.get((kind, norm_name(p_), t_)) or {})
+        if _extra_rows is None:
+            SOURCES.append(("Unpriced Sleeper lines (longest catch, longest run, carries)",
+                            "read beside the priced lines: catches/carries and yards", "DATA MISSING",
+                            "prices did not come from Sleeper this run, so the catches and carries reads "
+                            "run without them"))
+        else:
+            SOURCES.append(("Unpriced Sleeper lines (longest catch, longest run, carries)",
+                            "read beside the priced lines: catches/carries and yards", "ok",
+                            RSCH.extra_summary(_extra_rows) + "; never priced"))
         _season = prec.groupby("gsis_id")[["receptions", "rec_yards"]].sum()
+        _season["capped"] = (passes[passes.complete_pass == 1].assign(_c=lambda d: d.receiving_yards.clip(upper=RSCH.CATCH_CAP))
+                             .groupby("receiver_player_id")._c.sum())
         for (p_, t_), g_ in RESEARCH[RESEARCH.market.isin(["player_receptions", "player_reception_yds"])].groupby(
                 ["player", "team"]):
             # both lines from ONE book (Sleeper first): a ratio across two books is nobody's view
@@ -1906,13 +1920,17 @@ def main():
                 continue
             m_ = M[(M.name == p_) & (M.team == t_)].iloc[0]
             sr_ = _season.loc[m_.gsis_id] if m_.gsis_id in _season.index else None
+            _tg_proj = next((float(v_) for v_ in g_.projected if pd.notna(v_)), None)   # projected targets
             CATCH_READ[(p_, t_)] = RSCH.catch_yards_read(
+                proj_catches=None if _tg_proj is None else _tg_proj * float(m_.cr),
                 catches_line=by_book[book_].get("player_receptions"), yards_line=by_book[book_]["player_reception_yds"],
                 season_rec=None if sr_ is None else float(sr_.receptions),
                 season_yds=None if sr_ is None else float(sr_.rec_yards),
+                season_capped_yds=None if sr_ is None or pd.isna(sr_.capped) else float(sr_.capped),
                 model_ypc=float(m_.ypt) / float(m_.cr) if float(m_.cr) > 0 else None,
-                longest_line=_long.get((norm_name(p_), SLEEPER_TEAM.get(t_, t_))))
-        _cols = {"ypc_need": "need_ypc", "ypc_mid": "mid_ypc", "ypc_season": "season_ypc", "ypc_model": "model_ypc",
+                longest_line=_xl("longest_reception", p_, t_).get("line"))
+        _cols = {"ypc_need": "need_ypc", "ypc_mid": "mid_ypc", "ypc_season": "season_ypc",
+                 "ypc_season_cap": "season_ypc_cap", "ypc_model": "model_ypc",
                  "long_line": "longest_line", "long_rest_ypc": "rest_ypc", "ypc_read": "read"}
         _rec = lambda r: r.market in ("player_receptions", "player_reception_yds")
         for c_, k_ in _cols.items():
@@ -1921,6 +1939,32 @@ def main():
         # the sentence itself rides on both rows, so the chat answers carry it (core/props_ask)
         RESEARCH["catch_yards"] = [RSCH.catch_yards_sentence(CATCH_READ.get((r.player, r.team))) if _rec(r) else None
                                    for r in RESEARCH.itertuples()]
+        # CARRIES, YARDS AND THE LONG RUN (DECISIONS #166): the runner's version, backs and
+        # receivers only -- a QB's rushing line counts kneel-downs, which muddy a yards a carry
+        _rs = rushes.groupby("rusher_player_id").rushing_yards.agg(car="size", yds="sum")
+        _rs["capped"] = rushes.assign(_c=rushes.rushing_yards.clip(upper=RSCH.RUN_CAP)).groupby("rusher_player_id")._c.sum()
+        _rush = RESEARCH[(RESEARCH.market == "player_rush_yds") & (RESEARCH.pos != "QB")]
+        # one rushing line per player, Sleeper's first: its carries line is Sleeper's too
+        _rush = _rush.sort_values("book", key=lambda b: b != "sleeper").drop_duplicates(["player", "team"])
+        for r_ in _rush.itertuples():
+            m_ = M[(M.name == r_.player) & (M.team == r_.team)].iloc[0]
+            att_ = _xl("rushing_attempts", r_.player, r_.team)
+            sr_ = _rs.loc[m_.gsis_id] if m_.gsis_id in _rs.index else None
+            CARRY_READ[(r_.player, r_.team)] = RSCH.carry_yards_read(
+                carries_line=att_.get("line"), yards_line=float(r_.line),
+                model_ypc=float(m_.ypc) if pd.notna(m_.ypc) else None, proj_carries=r_.projected,
+                season_car=None if sr_ is None else float(sr_.car), season_yds=None if sr_ is None else float(sr_.yds),
+                season_capped_yds=None if sr_ is None else float(sr_.capped),
+                longest_line=_xl("longest_rush", r_.player, r_.team).get("line"),
+                carries_fav=RSCH.favoured(att_.get("mult_over"), att_.get("mult_under")))
+        _runcols = {"car_line": "carries_line", "car_fav": "carries_fav", "run_ypc_mid": "mid_ypc",
+                    "run_ypc_model": "model_ypc", "run_ypc_season": "season_ypc",
+                    "long_run_line": "longest_line", "run_read": "read"}
+        for c_, k_ in _runcols.items():
+            RESEARCH[c_] = [(CARRY_READ.get((r.player, r.team)) or {}).get(k_) if r.market == "player_rush_yds" else None
+                            for r in RESEARCH.itertuples()]
+        RESEARCH["carry_yards"] = [RSCH.carry_yards_sentence(CARRY_READ.get((r.player, r.team)))
+                                   if r.market == "player_rush_yds" else None for r in RESEARCH.itertuples()]
     RESEARCH.to_csv(OUT / f"research_{slug}.csv", index=False)
 
     # ---------- 8b/9. report, written for a casual reader ----------
@@ -2234,6 +2278,9 @@ def main():
             cy_ = RSCH.catch_yards_sentence(CATCH_READ.get((m["name"], t)))
             if cy_:
                 L.append(f"**Catches and yards.** {cy_}\n")
+            ry_ = RSCH.carry_yards_sentence(CARRY_READ.get((m["name"], t)))
+            if ry_:
+                L.append(f"**Carries and yards.** {ry_}\n")
 
             # research rows: line, price, projection, the two Over chances, what the line implies
             mine = RESEARCH[RESEARCH.player == m["name"]] if len(RESEARCH) else RESEARCH

@@ -7341,3 +7341,37 @@ by the user.
 - Grouped legs say, pair by pair, whether the groups mix, conflict or mix only under
   a stated script: listing Bijan's rushing Over and London's catches Over in separate
   groups read as "don't combine" though both came from Atlanta's week-3 lead.
+
+## 2026-10-05 (166) -- the runner's version: carries, rushing yards and the longest run read together
+
+- Each back's or receiver's rushing line gets a "Carries and yards" read: Sleeper's
+  rushing-attempts line beside our projected carries, with the side the book favours
+  (from its payout multipliers, when they differ by more than 0.05); the lines' yards a
+  carry against ours, a half-yard band reading "about even" (picked, not measured --
+  a carry gains about a third of a catch); his season figure (10+ carries) with its
+  count and a warning that it is mostly noise this early; both Overs at the minimum;
+  and the longest-run line's share of the yards.
+- QBs are left out: their rushing line counts kneel-downs, which muddy a yards a carry.
+- Taking the anomalies out (user's idea, 2026-10-05), measured before shipping
+  (reports/robust_ypc_check.md, rule set before the run): from weeks 1-3, which figure
+  best predicts a player's yards a play over weeks 4-18? For catches, capping each catch
+  at 30 yards (the league 95th percentile, from 2022-23) won in both 2022-23 and 2024-25
+  (2024-25 error 2.07 vs plain 2.27, dropping the longest 2.54, median 2.94); the
+  receivers' season figure is now shown beside its capped version. For carries the
+  user asked for a higher cap; tested at the 90th/95th/97.5th/99th percentiles
+  (11/14/20/29 yards), the 99th won on 2024-25 (0.851 vs plain 0.936) and beat plain on
+  2022-23, so runs are capped at 29. Every early carry figure still lost to the league
+  average (0.57), so the runner's season figure carries a noise warning and the read
+  leans on ours. Dropping the longest play was worse than the plain average in all four
+  cases and is not shown.
+- The achievability gauge (user, 2026-10-05): the volume the yards line takes at his
+  capped yards a play (ours when his sample is small), against the volume we project --
+  "comfortably more than it takes" / "about what it takes" (within 15%, a display band)
+  / "fewer than it takes", with a warning under 3 catches or 6 carries. Volume times
+  rate is an average game, pulled up by big games, so it is never phrased as "his usual
+  game clears it". Report text only: no price moves.
+- The unpriced Sleeper lines are now one list (research.extra_lines: longest catch,
+  longest run, rushing attempts), replacing longest_lines. Still never priced, joined,
+  logged or archived.
+- Prompted by Bijan Robinson, week 4: the book's 19.5 carries line favoured the Under
+  while the lines asked 4.6 a carry, so his rushing-yards Over was a bet on 20 carries.
