@@ -417,10 +417,10 @@ def test_the_season_yards_a_catch_is_shown_capped():
     # London: 274 yards on 15 catches, 220 once each catch is capped (made-up capped total)
     lk = {"cap": 41.0, "own": True, "n": 96}
     d = RS.catch_yards_read(6.5, 81.5, season_rec=15, season_yds=274, model_ypc=13.4, season_luckfree_ypc=220 / 15, luck=lk)
-    assert d["season_ypc_cap"] == pytest.approx(220 / 15)
+    assert d["season_ypc_luckfree"] == pytest.approx(220 / 15)
     assert "he has 18.3 this season on 15 catches (14.7 with the luck taken out)" in RS.catch_yards_sentence(d)
     assert d["read"] == "about even", "context only: the verdict still compares the lines with ours"
-    assert RS.catch_yards_read(6.5, 81.5, season_rec=5, season_yds=90, season_luckfree_ypc=16.0)["season_ypc_cap"] is None
+    assert RS.catch_yards_read(6.5, 81.5, season_rec=5, season_yds=90, season_luckfree_ypc=16.0)["season_ypc_luckfree"] is None
 
 
 
@@ -460,7 +460,21 @@ def test_the_luck_line_is_the_players_own_95th_percentile_play():
     assert RS.luck_free_rate([5, 8, 120], lk) == pytest.approx((5 + 8 + np.percentile(plays, 95)) / 3)
     assert RS.luck_free_rate([9], few) is None and RS.luck_free_rate([], lk) is None
     assert RS.luck_words(lk, "run") == "every run past 95 yards, his own 95th percentile over 100 runs, counted as 95"
-    assert RS.luck_words(few, "run") == "his longest run left out (3 runs of his own is too few for a percentile)"
+    assert RS.luck_words(few, "run") == ("his longest run this season left out (only 3 runs of his own across "
+                                         "last season and this one, too few for a percentile)")
     assert RS.player_luck_line(list(range(1, 21)))["own"], "20 plays of his own is enough"
     assert not RS.player_luck_line(list(range(1, 20)))["own"], "19 is too few"
     assert RS.luck_words(None, "run") == ""
+
+
+
+def test_the_luck_line_pools_last_season_with_this_one_but_rates_this_season():
+    prior = {("00-001", "run"): [float(x) for x in range(1, 31)], ("00-001", "catch"): [5.0, 9.0]}
+    cur_runs = {"00-001": [4.0, 6.0, 60.0]}
+    luck, rate = RS.luck_for(prior, cur_runs, "00-001", "run")
+    assert luck["own"] and luck["n"] == 33, "30 runs last season + 3 this season"
+    assert luck["cap"] == pytest.approx(np.percentile(list(range(1, 31)) + [4, 6, 60], 95))
+    assert rate == pytest.approx((4 + 6 + min(60, luck["cap"])) / 3), "rate: this season's runs only"
+    luck, rate = RS.luck_for(prior, {"00-001": [7.0, 30.0]}, "00-001", "catch")
+    assert not luck["own"] and rate == pytest.approx(7.0), "4 catches pooled: his longest this season left out"
+    assert RS.luck_for(prior, {}, "00-999", "run") == ({"cap": None, "own": False, "n": 0}, None)

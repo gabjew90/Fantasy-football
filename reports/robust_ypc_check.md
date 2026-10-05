@@ -33,10 +33,12 @@ same rule.
 
 ## Read
 
-- For reference only. The achievability gauge is descriptive, so its cap is a
-  definition, not a fit: the user set the luck line at the 99th percentile (catches
-  50 yards, runs 29). On prediction, capping beat the plain average for both, 30-38
-  yards edged 50 for catches, and 29 was best for runs.
+- For reference only. The achievability gauge is descriptive, so its luck line is a
+  definition, not a fit: the user set it at each player's OWN 95th-percentile play for
+  the prop (last season and this one pooled; under 20 plays, his longest play left
+  out) -- DECISIONS #167. These league-wide caps were the earlier candidates. On
+  prediction, capping beat the plain average for both, 30-38 yards edged 50 for
+  catches, and 29 was best for runs.
 - Dropping the longest play was worse than the plain average every time: it always
   lowers a player's number, fluke or not.
 - Three games of yards a carry lost to the league average under every version, so

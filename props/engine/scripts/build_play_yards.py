@@ -6,7 +6,7 @@ Each row: gsis_id, kind ("catch" | "run"), n, yards (space-separated whole yards
 sorted). Runs leave out QB kneel-downs, as the scorer's rushing frame does. Read by
 score_game.py, so a live run never reprocesses last season's play-by-play.
 
-    python scripts/build_play_yards.py --season 2025 --pbp <pbp_2025.csv[.gz]>
+    python scripts/build_play_yards.py --season 2025 --pbp <that season's pbp file, csv or csv.gz>
 """
 from __future__ import annotations
 
@@ -40,7 +40,7 @@ def play_yards(pbp: pd.DataFrame) -> pd.DataFrame:
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--season", type=int, required=True)
-    ap.add_argument("--pbp", required=True, help="nflverse play_by_play_{season}.csv or .csv.gz")
+    ap.add_argument("--pbp", required=True, help="the season's nflverse play-by-play file, csv or csv.gz (a local file; nothing is fetched)")
     a = ap.parse_args(argv)
     pbp = pd.read_csv(a.pbp, usecols=lambda c: c in COLS, low_memory=False)
     out = play_yards(pbp)

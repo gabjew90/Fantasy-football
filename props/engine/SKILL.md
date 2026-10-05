@@ -316,8 +316,8 @@ For a narrow question, run only what it needs:
   longest-run line's share of the yards. When the lines ask about his usual yards a carry, his
   rushing-yards Over is a bet on the carries: say so, and say where the book's carries line and
   favoured side sit against ours (Bijan, week 4: 19.5, Under favoured, we 17.5 -- the market
-  does not expect 20). Receivers' season figures are shown beside a capped version (each catch
-  counted at most 50 yards, the luck line); a big gap between the two means his average was built on one or two long plays, so a yards
+  does not expect 20). Receivers' season figures are shown beside a luck-free version (the luck line
+  below); a big gap between the two means his average was built on one or two long plays, so a yards
   Over that needs his raw average needs another one. Lean on our figure for runners: their
   early-season yards a carry is noise.
   **The achievability gauge** ends both reads: the volume the yards line takes at his capped

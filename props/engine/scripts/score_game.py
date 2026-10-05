@@ -1911,15 +1911,11 @@ def main():
         # prop, last season's plays (resources) and this season's together
         _py_path = RES / f"priors_{PRIOR}_play_yards.csv"
         _py = pd.read_csv(_py_path) if _py_path.exists() else pd.DataFrame(columns=["gsis_id", "kind", "yards"])
-        _prior_plays = {(r.gsis_id, r.kind): [float(v) for v in str(r.yards).split()] for r in _py.itertuples()}
-        _cur_catch = passes[(passes.complete_pass == 1) & passes.receiving_yards.notna()].groupby(
-            "receiver_player_id").receiving_yards.apply(list)
-        _cur_run = rushes[rushes.rushing_yards.notna()].groupby("rusher_player_id").rushing_yards.apply(list)
-        def _luck(gid, kind):
-            cur = (_cur_catch if kind == "catch" else _cur_run).get(gid, [])
-            return RSCH.player_luck_line(_prior_plays.get((gid, kind), []) + list(cur))
-        def _capped(gid, kind, luck):
-            return RSCH.luck_free_rate((_cur_catch if kind == "catch" else _cur_run).get(gid, []), luck)
+        _prior_plays = {(str(r.gsis_id), r.kind): [float(v) for v in str(r.yards).split()] for r in _py.itertuples()}
+        _cur = {"catch": passes[(passes.complete_pass == 1) & passes.receiving_yards.notna()].groupby(
+                    "receiver_player_id").receiving_yards.apply(list).to_dict(),
+                "run": rushes[rushes.rushing_yards.notna()].groupby("rusher_player_id").rushing_yards.apply(list).to_dict()}
+        _luck = lambda gid, kind: RSCH.luck_for(_prior_plays, _cur[kind], str(gid), kind)
         if not _py_path.exists():
             SOURCES.append(("Last season's play yards (luck line)", "each player's own 99th-percentile play",
                             "DATA MISSING", f"{_py_path.name} not found; luck lines use this season's plays only"))
@@ -1935,9 +1931,9 @@ def main():
             m_ = M[(M.name == p_) & (M.team == t_)].iloc[0]
             sr_ = _season.loc[m_.gsis_id] if m_.gsis_id in _season.index else None
             _tg_proj = next((float(v_) for v_ in g_.projected if pd.notna(v_)), None)   # projected targets
-            lk_ = _luck(m_.gsis_id, "catch")
+            lk_, lfr_ = _luck(m_.gsis_id, "catch")
             CATCH_READ[(p_, t_)] = RSCH.catch_yards_read(
-                luck=lk_, season_luckfree_ypc=_capped(m_.gsis_id, "catch", lk_),
+                luck=lk_, season_luckfree_ypc=lfr_,
                 proj_catches=None if _tg_proj is None else _tg_proj * float(m_.cr),
                 catches_line=by_book[book_].get("player_receptions"), yards_line=by_book[book_]["player_reception_yds"],
                 season_rec=None if sr_ is None else float(sr_.receptions),
@@ -1945,7 +1941,7 @@ def main():
                 model_ypc=float(m_.ypt) / float(m_.cr) if float(m_.cr) > 0 else None,
                 longest_line=_xl("longest_reception", p_, t_).get("line"))
         _cols = {"ypc_need": "need_ypc", "ypc_mid": "mid_ypc", "ypc_season": "season_ypc",
-                 "ypc_season_cap": "season_ypc_cap", "ypc_model": "model_ypc",
+                 "ypc_season_luckfree": "season_ypc_luckfree", "ypc_model": "model_ypc",
                  "long_line": "longest_line", "long_rest_ypc": "rest_ypc", "ypc_read": "read"}
         _rec = lambda r: r.market in ("player_receptions", "player_reception_yds")
         for c_, k_ in _cols.items():
@@ -1964,9 +1960,9 @@ def main():
             m_ = M[(M.name == r_.player) & (M.team == r_.team)].iloc[0]
             att_ = _xl("rushing_attempts", r_.player, r_.team)
             sr_ = _rs.loc[m_.gsis_id] if m_.gsis_id in _rs.index else None
-            lk_ = _luck(m_.gsis_id, "run")
+            lk_, lfr_ = _luck(m_.gsis_id, "run")
             CARRY_READ[(r_.player, r_.team)] = RSCH.carry_yards_read(
-                luck=lk_, season_luckfree_ypc=_capped(m_.gsis_id, "run", lk_),
+                luck=lk_, season_luckfree_ypc=lfr_,
                 carries_line=att_.get("line"), yards_line=float(r_.line),
                 model_ypc=float(m_.ypc) if pd.notna(m_.ypc) else None, proj_carries=r_.projected,
                 season_car=None if sr_ is None else float(sr_.car), season_yds=None if sr_ is None else float(sr_.yds),
