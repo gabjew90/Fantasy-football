@@ -123,8 +123,16 @@ def break_even_cell(x) -> str:
             return (f"Under: pays even at {float(lim):.1f} {unit}" if e == "max"
                     else f"Under: needs fewer than {float(lim):.1f} {unit}")
         return f"{word}: beyond the search range"
-    return (f"{side(o, bo, 'Over', 'Over above {v:.1f} ' + unit, 'over')}; "
+    cell = (f"{side(o, bo, 'Over', 'Over above {v:.1f} ' + unit, 'over')}; "
             f"{side(u, bu, 'Under', 'Under at {v:.1f} or fewer', 'under')}")
+    p = x.get("projected")
+    if not (blank(o) or blank(u) or blank(p) or blank(bo) or blank(bu)):
+        # where OUR projection lands: the Over pays above o, the Under at or below u,
+        # and between them the book's cut leaves no bet
+        p = float(p)
+        zone = "Over zone" if p > float(o) else "Under zone" if p <= float(u) else "no-bet zone"
+        cell += f" · we project {p:.1f}: {zone}"
+    return cell
 
 
 LAST_EDGES = {}     # the latest search's edges, read by edges_for(); set by _edge_cache
@@ -321,6 +329,35 @@ def worth_a_look(x, last_week):
     if down and u is not None and u == u and n <= u - m:
         return "Under", f"last game {n:.0f} {unit}; the Under pays at {u:.1f} or fewer{tail}"
     return None
+
+
+# a questionable player worth a flag on his teammates' rows, priced or not (DECISIONS #163)
+WATCH_TARGET_SHARE, WATCH_CARRY_SHARE, WATCH_SNAPS = 0.05, 0.10, 0.30
+
+
+def worth_watching(target_share=None, carry_share=None, snap_share=None) -> bool:
+    """A questionable player whose absence would move his teammates' work: 5%+ of
+    the targets, 10%+ of the carries or 30%+ of the snaps this season. Lower than
+    the pricing rule on purpose -- a TE2 with 10% of the targets (Noah Fant, NO
+    week 4) is not priced but his status still nudges the TE1."""
+    v = lambda x: x is not None and x == x
+    return ((v(target_share) and target_share >= WATCH_TARGET_SHARE)
+            or (v(carry_share) and carry_share >= WATCH_CARRY_SHARE)
+            or (v(snap_share) and snap_share >= WATCH_SNAPS))
+
+
+def watch_applies(absent_pos, market, row_pos) -> bool:
+    """Which rows a questionable teammate's flag belongs on: a QB on every row; a
+    back on rushing rows and other backs' receiving rows; a receiver or tight end on
+    receiving rows. His position first -- that is who absorbs the work."""
+    a = str(absent_pos or "").upper()
+    if a == "QB":
+        return True
+    if a in ("RB", "FB", "HB"):
+        return market == "player_rush_yds" or str(row_pos).upper() in ("RB", "FB", "HB")
+    if a in ("WR", "TE"):
+        return market in ("player_receptions", "player_reception_yds")
+    return False
 
 
 def usage_change(weeks):

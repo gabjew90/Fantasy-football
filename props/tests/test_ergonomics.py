@@ -268,7 +268,7 @@ def test_the_slate_board_orders_games_by_total_and_can_show_overs_only():
     B = W.slate_board(RS, runs, sort="total")
     heads = [ln for ln in B if ln.startswith("## ")]
     assert heads[0].startswith("## JAX @ CIN — total 51.5") and heads[1].startswith("## GB @ TB — total 38.5")
-    assert any("| Over above 8.5 targets; Under at 7.1 or fewer |" in ln for ln in B)
+    assert any("| Over above 8.5 targets; Under at 7.1 or fewer · we project 8.5: no-bet zone |" in ln for ln in B)
     assert [ln for ln in W.slate_board(RS, runs) if ln.startswith("## ")][0].startswith("## GB @ TB"), \
         "kickoff order keeps the run order"
     O = W.slate_board(RS, runs, sort="total", overs_only=True)
@@ -323,3 +323,17 @@ def test_a_spread_written_with_an_alias_still_names_the_right_favourite():
     import score_week as W
     assert W.game_context("TEN@JAX", "JAC -3", "44.0", {}) == "*JAX by 3 · implied points JAX 23.5, TEN 20.5*"
     assert W.game_context("TEN@JAX", "XXX -3", "44.0", {}) == "", "an unknown team code says nothing rather than guess"
+
+
+def test_a_player_on_reserve_is_out_like_a_ruled_out_player():
+    pop = pd.DataFrame({"team": ["NO"] * 4, "gsis_id": list("abcd"), "status": ["ACT", "RES", "INA", "ACT"],
+                        "report_status": [None, None, None, "Out"]})
+    p = SG.apply_designations(pop)
+    assert p.excluded.tolist() == [False, True, True, True], "reserve/IR, inactive and Out are all excluded"
+    assert SG.keep_in_pool("RES", True), "on reserve after playing this season: in, so his share is handed on"
+    assert not SG.keep_in_pool("RES", False), "on reserve since before the season: already absent from the numbers"
+    assert SG.keep_in_pool("ACT", False) and SG.keep_in_pool("INA", False)
+    assert not SG.keep_in_pool("DEV", True) and not SG.keep_in_pool("CUT", True), "practice squad / cut: old handling"
+    p2 = SG.apply_designations(pd.DataFrame({"team": ["NO"] * 2, "gsis_id": list("xy"), "status": ["DEV", "PUP"],
+                                             "report_status": [None, None]}))
+    assert p2.excluded.tolist() == [False, True], "only the not-playing statuses are excluded"

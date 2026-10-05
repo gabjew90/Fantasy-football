@@ -7277,3 +7277,29 @@ by the user.
   (`entry-void ENTRY --player NAME`), shows the entry as "check" until the payout is recorded, and
   `entry-paid` settles the entry at the amount Sleeper actually paid. The reduced
   multiple is not guessed.
+
+## 2026-10-05 (162) -- a player on reserve is out, and his share is handed on
+
+- The player pool kept only ACT/INA players from the week's roster, so a regular
+  moved to reserve/IR (or PUP, suspension, practice squad) vanished: no "out"
+  flag, a wrong "last week was a preview" note, and -- the price-moving part --
+  his share was handed to nobody. Travis Etienne (NO, 38-59% of snaps in weeks
+  1-3, reserve in week 4) left Kamara at 10.7 projected carries and Kendre Miller
+  at 6.8 while the book priced about 13 and 8.
+- Fix: any eligible player still on the team's roster stays in the pool and is
+  excluded unless he is ACT, exactly like an Out player, so the out rule (A2,
+  reports/absence_tune.md) hands his share on. Week 4 NO: Kamara 11.8 carries,
+  Miller 7.5. Prices move, so this is a new engine version.
+
+## 2026-10-05 (163) -- questionable teammates are flagged and explored; the pays cell names the zone
+
+- A questionable or doubtful player with a role (5%+ of targets, 10%+ of carries
+  or 30%+ of snaps) puts "<name> (<pos>) questionable" on his teammates' rows,
+  priced or not, and the report lists the unpriced ones ("Questionable, not
+  priced here"). Noah Fant (NO TE2, 9.6% of team targets, below the 10% pricing
+  rule) was invisible on week 4 while his status nudged Juwan Johnson's targets.
+- SKILL.md: every narrative explores absences unprompted -- who absorbs the work,
+  which lines move and which way, the inactives list decides it, a what-if
+  quantifies it.
+- The pays cell ends with where our projection lands (Over zone / no-bet zone /
+  Under zone), and the skill explains how the zone comes from the two prices.

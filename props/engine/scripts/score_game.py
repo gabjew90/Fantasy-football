@@ -249,6 +249,22 @@ def parse_markets(spec: str | None) -> set[str]:
     return out
 
 
+# Roster statuses that mean "on the team, not playing" (DECISIONS #162). INA is a
+# game-day inactive; the rest are reserve lists. Anything else that is not ACT
+# (practice squad, cut, traded) keeps the old handling: not in the pool at all.
+NOT_PLAYING = ("INA", "RES", "PUP", "SUS", "NFI")
+
+
+def keep_in_pool(status, played_this_season: bool) -> bool:
+    """Whether a rostered, eligible player enters the pool. ACT and INA always;
+    a reserve-list player only if he played this season -- his share is in his
+    teammates' numbers and must be handed on. One out since before the season
+    is already absent from them, so handing a prior share on would count it twice."""
+    if status in ("ACT", "INA"):
+        return True
+    return status in NOT_PLAYING and played_this_season
+
+
 def apply_designations(pop: pd.DataFrame, assume_out=frozenset()) -> pd.DataFrame:
     """A2: Out/Doubtful removed, Questionable flagged for regime treatment, and
     a scenario's assumed-out players marked out whatever their report says.
@@ -257,7 +273,8 @@ def apply_designations(pop: pd.DataFrame, assume_out=frozenset()) -> pd.DataFram
     2026-09-26)."""
     pop = pop.copy()
     pop["report_status"] = pop["report_status"].astype(object)
-    pop["excluded"] = pop.report_status.isin(["Out", "Doubtful"]) | (pop.status == "INA")
+    # INA (game-day inactive) and the reserve lists are not playing (DECISIONS #162)
+    pop["excluded"] = pop.report_status.isin(["Out", "Doubtful"]) | pop.status.isin(NOT_PLAYING)
     pop["questionable"] = pop.report_status.eq("Questionable")
     if assume_out:
         ao = pop.gsis_id.isin(assume_out)
@@ -672,8 +689,13 @@ def main():
                     elig.add(pid)
         for pid in sorted(elig):
             r = rw[(rw.team == t) & (rw.gsis_id == pid)]
-            if r.empty or r.status.iloc[0] not in ("ACT", "INA"):
-                continue
+            if r.empty or not keep_in_pool(r.status.iloc[0], (t, pid) in cur.index):
+                continue      # off the roster, practice squad / cut / traded, or out since before the season
+            # ON THE ROSTER BUT NOT PLAYING (reserve/IR, PUP, suspended, practice squad):
+            # kept, and excluded below like an Out player, so his share is handed to his
+            # teammates by the out rule and the board says he is out. Dropping him here
+            # (the pre-2026-10-05 behaviour) left his carries with nobody (Travis Etienne,
+            # NO week 4).
             pop.append({"team": t, "gsis_id": pid, "name": r.full_name.iloc[0],
                         "pos": r.position.iloc[0], "status": r.status.iloc[0]})
     pop = pd.DataFrame(pop)
@@ -1712,6 +1734,7 @@ def main():
     # USAGE / ROLE: computed before the share blend (section 5), which round 23 reads
     # teammates handled by the out rule, and key teammates back from a missed week
     OUT_NOTE = {t_: [] for t_ in (AWAY, HOME)}
+    _flagged_out = set()      # gsis ids the out flag already names
     # WAS LAST WEEK A PREVIEW (DECISIONS #157)? Same starting QB, same key
     # absences. A mark built on last week's workload transfers when it was.
     PREVIEW_DIFF = {t_: [] for t_ in (AWAY, HOME)}
@@ -1730,8 +1753,21 @@ def main():
             qb_tag = " (QB)" if str(e_.get("pos")) == "QB" else ""
             OUT_NOTE[e_.team].append(f"{e_['name']}{qb_tag} out, "
                                      + ("played last week" if played_lw else "also out last week"))
+            _flagged_out.add(e_.gsis_id)
             if played_lw:
                 PREVIEW_DIFF[e_.team].append(f"{e_['name']} newly out")
+    # QUESTIONABLE TEAMMATES with a real role, priced or not (DECISIONS #163): a TE2 the
+    # board does not price (Noah Fant, NO week 4) still moves the TE1 if he sits
+    QWATCH = {t_: [] for t_ in (AWAY, HOME)}
+    for _, j_ in iw[iw.team.isin([AWAY, HOME]) & iw.report_status.isin(["Questionable", "Doubtful"])].iterrows():
+        if j_.gsis_id in _flagged_out:
+            continue                    # the out flag already names him
+        ts_j = RSCH.role_share(_tg, j_.gsis_id, j_.team)
+        cs_j = RSCH.role_share(_cr, j_.gsis_id, j_.team)
+        sn_j = snap_cur.get((j_.team, norm_name(j_.full_name)))
+        if RSCH.worth_watching(ts_j, cs_j, sn_j):
+            QWATCH[j_.team].append(dict(name=j_.full_name, pos=str(j_.position), status=str(j_.report_status),
+                                        ts=ts_j, cs=cs_j, snap=sn_j, priced=j_.gsis_id in set(M.gsis_id)))
     BACK_NOTE = {}
     for _, m_ in M.iterrows():
         pri_ = pri_players.loc[m_.gsis_id] if m_.gsis_id in pri_players.index else None
@@ -1813,6 +1849,8 @@ def main():
         if bool(m_.questionable):
             flags_.append("questionable")
         flags_ += OUT_NOTE.get(m_.team, [])
+        flags_ += [f"{w_['name']} ({w_['pos']}) {w_['status'].lower()}" for w_ in QWATCH.get(m_.team, [])
+                   if w_["name"] != r_.player and RSCH.watch_applies(w_["pos"], r_.market, m_.pos)]
         flags_ += [b_ for b_ in BACK_NOTE.get(m_.team, []) if not b_.startswith(r_.player + " ")]
         research_rows.append(dict(
             player=r_.player, team=r_.team, pos=m_.pos, market=r_.market, line=float(r_.line), book=r_.book,
@@ -2571,7 +2609,14 @@ def main():
     q = pop[pop.questionable]
     if len(q):
         L.append(f"- **Questionable:** " + ", ".join(r["name"] for _, r in q.iterrows()) + ". Priced as if they play their normal role; see 'If a Questionable player is out' for the other case.")
-    if not excl.empty is False and q.empty:
+    unpriced_q = [w_ for t_ in (AWAY, HOME) for w_ in QWATCH.get(t_, []) if not w_["priced"]]
+    if unpriced_q:
+        pc_ = lambda v: "—" if v is None or v != v else f"{100 * v:.0f}%"
+        L.append("- **Questionable, not priced here:** " + "; ".join(
+            f"{w_['name']} ({w_['pos']}, {w_['status']}: {pc_(w_['ts'])} of targets and {pc_(w_['cs'])} of carries "
+            f"in the weeks he played, {pc_(w_['snap'])} of snaps)" for w_ in unpriced_q)
+                 + ". If one sits, his work goes mostly to the teammates at his position: their rows carry his flag.")
+    if excl.empty and q.empty and not unpriced_q:
         L.append("- **Injuries:** no one relevant is out or questionable on the current report.")
     if roof in ("closed", "dome"):
         L.append("- **Weather:** indoors, not a factor.")

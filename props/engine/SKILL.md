@@ -257,6 +257,24 @@ For a narrow question, run only what it needs:
   unexplained -- the harness found QB passing unbiased on 2024-25 outcomes, so neither side
   is known to be right), and
   what to watch. A game with nothing to find says so in a sentence. Never call a line a bet.
+  **Explore absences unprompted.** For every questionable or doubtful player with a role -- the
+  rows' "<name> (<pos>) questionable" flags and the report's "Questionable, not priced here"
+  line, which lists players the board does not price -- say who absorbs his work if he sits
+  (his position first: a TE2 out nudges the TE1's targets; a back out nudges the other backs'
+  carries), which lines that moves and in which direction, and that the inactives list (about
+  90 minutes before kickoff) decides it. Quantify it with a what-if on the beneficiary
+  (`--assume "<TE1>: targets=<his usual + about half the absent player's>"`) or, for a priced
+  player, the report's "If a Questionable player is out" section. A leg that depends on the
+  status is a leg to place only once the status is known.
+  The "pays" cell ends with where OUR projection lands: Over zone (the projection already clears
+  the Over's break-even workload), Under zone, or no-bet zone (between the two, where the book's
+  cut eats either side). Explain it that way: the projection is what the model expects; the
+  thresholds are what each side needs at its price. How the zone is found, when asked: each price
+  sets the win rate its side needs (−164 needs 62%, +100 needs 50%); the simulation finds the
+  workload where each side reaches it (the Over pays above one number, the Under at or below the
+  other); between them neither side reaches its price, because the two prices add to more than
+  100% -- the book's cut, measured in targets or carries. It rests on the model's own catch rate
+  and spread, so it guides how much role a view needs; it is not a guarantee.
   Then narrate the bold lines, analytically, in plain English -- interpret, do not recite the
   row's numbers back:
   1. **The story and its direction**: who is out or back, whose role moved, and why that points
