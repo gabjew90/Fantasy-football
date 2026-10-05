@@ -274,7 +274,19 @@ For a narrow question, run only what it needs:
   workload where each side reaches it (the Over pays above one number, the Under at or below the
   other); between them neither side reaches its price, because the two prices add to more than
   100% -- the book's cut, measured in targets or carries. It rests on the model's own catch rate
-  and spread, so it guides how much role a view needs; it is not a guarantee.
+  and spread, so it guides how much role a view needs; it is not a guarantee. In a Power Play
+  the listed price does not apply: every leg needs about 56% (4 picks, 10x) or 55% (5 picks,
+  20x), whichever side, so a plus-money Under is no cheaper there than any other leg.
+  **Catches and yards together.** Each receiver's "Catches and yards" line reads the book's
+  catches, receiving-yards and longest-catch lines against each other (DECISIONS #164). Lines
+  move in half points, so each Over means the next whole number (3.5 catches = 4, 44.5 yards =
+  45; a whole-number line pushes on itself). Use it whenever the user weighs "yards or catches":
+  the lines' own yards a catch against ours for him says whether his yards Over asks more than
+  his catches Over (his raw season figure is shown but is too noisy to carry the read);
+  "both Overs at the minimum" is what stacking his two legs needs; and the longest-catch line
+  says how much of the yards one play carries -- with one catch at that line, what the rest must
+  average. Narrate it as the book's view of how he gets his yards, not as a model edge: the
+  longest-catch line is the book's number only and is not priced here.
   Then narrate the bold lines, analytically, in plain English -- interpret, do not recite the
   row's numbers back:
   1. **The story and its direction**: who is out or back, whose role moved, and why that points

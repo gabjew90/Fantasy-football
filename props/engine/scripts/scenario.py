@@ -92,6 +92,12 @@ def parse(rules, teams) -> list[dict]:
                     raise ValueError(f"'{raw}': a team's ypt is a percent change, e.g. ypt=-5%")
                 if k != "ypt" and pct:
                     raise ValueError(f"'{raw}': {k} is a change in {WORDS[k]}, e.g. {k}=-3")
+                if not v.strip().startswith(("+", "-")):
+                    # 'NO: pass=42' was read as 42 MORE targets (2026-10-05); a team value is
+                    # always a change, so it must carry its sign
+                    eg = "ypt=-5%" if k == "ypt" else f"{k}=+6"
+                    raise ValueError(f"'{raw}': a team's {k} is a CHANGE, not a total -- write the sign, "
+                                     f"e.g. {eg}")
                 if k == "ypt" and x <= -100:
                     raise ValueError(f"'{raw}': ypt cannot fall by 100% or more")
             else:

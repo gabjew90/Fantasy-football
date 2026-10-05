@@ -29,7 +29,9 @@ def test_rules_read_plainly_and_refuse_what_they_cannot_read():
                      ("HOU: targets=30", "team keys are"), ("X: targets=lots", "not a number"),
                      ("HOU: ypt=-5", "percent change"), ("HOU: pass=10%", "change in team targets"),
                      ("X: catch=140%", "between 0 and 100%"), ("X: carries=12%", "not a percent"),
-                     ("X: ypc=0", "must be positive")]:
+                     ("X: ypc=0", "must be positive"),
+                     ("HOU: pass=42", "CHANGE, not a total"), ("HOU: rush=3", "CHANGE, not a total"),
+                     ("HOU: ypt=5%", "CHANGE, not a total")]:
         with pytest.raises(ValueError, match=why):
             SC.parse([bad], {"DAL", "HOU"})
     names, teams = ["Woody Marks", "D.J. Moore", "Mike Williams", "Mike Williams"], ["HOU", "CHI", "NYJ", "LAC"]

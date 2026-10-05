@@ -357,3 +357,12 @@ def test_the_must_win_pick_is_retired_and_the_slate_gives_research_leads(tmp_pat
     assert [x["player"] for x in A.best(slate=True, market="catches").data["rows"]] == ["A"]
     assert "EV" not in r.text and "STRONG" not in r.text
 
+
+
+def test_the_catches_and_yards_read_rides_on_the_yards_answer_once():
+    row = pd.Series({"price_over": -130, "price_under": -127, "catch_yards": "The lines ask 12.7 yards a catch."})
+    f = A.research_fields(row)
+    assert f["catch_yards"] == "The lines ask 12.7 yards a catch."
+    assert "catches and yards: The lines ask 12.7" in A.research_text(f, "rec yds")
+    assert "catches and yards" not in A.research_text(f, "catches"), "once per player, on the yards row"
+    assert A.research_fields(pd.Series({"price_over": -110}))["catch_yards"] is None
