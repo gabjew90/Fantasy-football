@@ -1212,7 +1212,7 @@ def main():
         pri = pri_players.loc[p.gsis_id] if p.gsis_id in pri_players.index else None
         sl = p.slot
         excl_rates.append({
-            "team": p.team, "pos": POS_GROUP.get(p.pos, p.pos),
+            "team": p.team, "gsis_id": p.gsis_id, "pos": POS_GROUP.get(p.pos, p.pos),
             "ts": float(pri.target_share) if pri is not None and pd.notna(pri.target_share)
                   else slot_val(sl, "target_share", 0.0),
             "rs": float(pri.rush_share) if pri is not None and pd.notna(pri.rush_share)
@@ -1222,7 +1222,21 @@ def main():
             "i10rs": float(pri.i10_carry_share) if pri is not None and pd.notna(pri.i10_carry_share)
                      else slot_val(sl, "i10_carry_share", 0.0)})
     E = pd.DataFrame(excl_rates)
-    M, redistributed = apply_out_rule(M, E, (AWAY, HOME))
+    # ROUND 35 (DECISIONS #192): the carry handoff hands on the absent player's carry share
+    # THIS season (games he played), and to each teammate only the fraction of the absence
+    # not yet in his own share. A player who has not played this season keeps the shipped
+    # share (the round had no evidence for that case). Targets keep the shipped rule.
+    OUT_MULT = {"rs": {}}
+    if len(E):
+        _act = ros[(ros.season == SEASON) & (ros.week < WEEK) & (ros.status == "ACT")]
+        for i_, e_ in E.iterrows():
+            aw_ = {g_: set(w_) for g_, w_ in _act[_act.team == e_.team].groupby("gsis_id").week}
+            mates_ = list(M[M.team == e_.team].gsis_id)
+            sh_, fr_ = carry_handoff_inputs(rushes, passes, aw_, e_.team, e_.gsis_id, mates_)
+            if sh_ is not None:
+                E.loc[i_, "rs"] = sh_
+                OUT_MULT["rs"][i_] = fr_
+    M, redistributed = apply_out_rule(M, E, (AWAY, HOME), mult=OUT_MULT)
     for t in (AWAY, HOME):
         m = M.team == t
         # Shares are estimated per player with no joint constraint, so the eligible set's
@@ -3358,10 +3372,36 @@ def short_summary(R, away, home, season, week, books, hrs, markets, gate=None) -
     return out
 
 
-def apply_out_rule(M: pd.DataFrame, E: pd.DataFrame, teams, rule=None):
+def carry_handoff_inputs(rushes, passes, act_weeks, team, absent, mates):
+    """Round 35 (reports/round35_out_rule.md, DECISIONS #192): for the CARRY handoff,
+    the absent player's carry share THIS season in the games he played (a target or a
+    carry), and for each priced teammate the fraction of his own active games this season
+    in which the absent player played -- the part of the absence NOT already in that
+    teammate's share. rushes / passes: this season's plays before the game (posteam, week,
+    rusher_player_id / receiver_player_id); act_weeks: {gsis_id: set of weeks ACTIVE for
+    this team}. Returns (share or None when he has not played this season, {mate: fraction})."""
+    r = rushes[rushes.posteam == team]
+    p = passes[passes.posteam == team]
+    played = set(r.loc[r.rusher_player_id == absent, "week"]) | set(p.loc[p.receiver_player_id == absent, "week"])
+    if not played:
+        return None, {}
+    team_c = r.groupby("week").size()
+    den = float(team_c.reindex(sorted(played)).fillna(0).sum())
+    share = float((r.rusher_player_id == absent).sum()) / den if den > 0 else None
+    team_weeks = set(team_c.index) | set(p.week)
+    frac = {}
+    for j in mates:
+        wj = act_weeks.get(j, set()) & team_weeks
+        frac[j] = (len(wj & played) / len(wj)) if wj else 1.0
+    return share, frac
+
+
+def apply_out_rule(M: pd.DataFrame, E: pd.DataFrame, teams, rule=None, mult=None):
     """Hand each excluded player's share on under OUT_RULE. M: priced players
     (team, pos, ts, rs, i10ts, i10rs); E: excluded players (team, pos, and the
-    same share columns). Returns (M, {team: {col: share handed on}})."""
+    same share columns). mult: {col: {E row index: {teammate gsis_id: factor}}} --
+    round 35's carries: only the part of the absence not yet in a teammate's share is
+    handed to him. Returns (M, {team: {col: share handed on}})."""
     rule = OUT_RULE if rule is None else rule
     M = M.copy()
     grp = M["pos"].map(lambda x: POS_GROUP.get(x, x))
@@ -3384,6 +3424,9 @@ def apply_out_rule(M: pd.DataFrame, E: pd.DataFrame, teams, rule=None):
                     add[m] += x * f * base / base.sum()
                 if base_same.sum() > 0:
                     add[same] += (1 - x) * f * base_same / base_same.sum()
+                fac = ((mult or {}).get(col) or {}).get(e.name)
+                if fac:
+                    add = add * M["gsis_id"].map(fac).fillna(1.0)
                 M.loc[m, col] = M.loc[m, col].clip(lower=0) + add[m]
                 kept += float(add.sum())
             redistributed[t][col] = kept

@@ -40,3 +40,30 @@ absence events). The shipped (x, y) per column stay fixed; only WHAT is handed o
   part on 2022-24.
 - **Leave-one-season-out** reported beside it (props/tools/loso_select.py convention).
 - A pick that fails ships as a SHADOW line only if the user asks (DECISIONS #185 style).
+
+## Result (2026-10-06; props/tools/out_rule_test.py, reviewed; loss x 1e4, positive = better than V0)
+
+**Carries** (135 absence events, 518 games, 1,900 teammate-games):
+
+| | V1 vs V0 | V2 vs V0 |
+|---|---|---|
+| Selection 2022-24, all | +6.3 (-0.0, +12.5) | **+10.4 (+1.8, +19.7)** |
+| first game out (371) | +0.4 | +3.2 (-8.4, +14.7) |
+| continuing (1,024) | +8.4 | +13.0 (+2.6, +24.3) |
+| Confirmation 2025 | +7.5 (-0.3, +17.5) | +4.3 (-9.4, +22.9) |
+| Leave-one-season-out | -- | 2022 V1 +2.8; 2023 V2 +7.3; 2024 V2 +6.4; 2025 V2 +4.3 |
+
+**Verdict: V2 ships for carries** -- detectable on 2022-24, neither part worse, 2025 not
+negative, positive in every held-out season.
+
+**Targets** (149 events, 544 games, 3,843 teammate-games): V2 +0.33 (-0.11, +0.77) on
+2022-24, +0.59 on 2025, positive in every held-out season but not detectable: **targets keep
+the shipped rule.**
+
+As expected by the reviewer, the gain sits in continuing absences: handing on the same share
+every week overstated a long absence once the teammates' own shares had absorbed it. Shipped
+in score_game.py (carry_handoff_inputs, apply_out_rule mult): the absent player's carry share
+this season, scaled per teammate by the part of the absence not yet in his share; a player who
+has not played this season keeps the shipped share (no evidence for that case here); inside-10
+carries keep the shipped rule (not tested). The harness does not reproduce the Out rule (a
+disclosed gap), so the live code is checked by known-answer tests.

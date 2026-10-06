@@ -41,3 +41,24 @@ whole-distribution score the harness writes per player-game -- CRPS (lower is be
 line) -- paired on the reference's player-games, game-clustered 95% intervals: a bet market
 whose mean CRPS is worse by more than 0.5% blocks the ship. The harness's width, bias and
 calibration verdicts are recorded beside it, as registered.
+
+## Result (2026-10-06)
+
+Paired CRPS per player-game, the fix against the step 7 run (positive = the fix better;
+95% intervals resampling games):
+
+| Market | 2022-25 | Relative | Test 2024-25 | Relative |
+|---|---|---|---|---|
+| Receptions | -0.0008 (-0.0018, +0.0001) | -0.08% | -0.0002 (-0.0016, +0.0013) | -0.02% |
+| Receiving yards | -0.0084 (-0.0190, +0.0022) | -0.06% | -0.0083 (-0.0241, +0.0071) | -0.06% |
+| Rushing yards | +0.0160 (-0.0031, +0.0346) | +0.10% | +0.0182 (-0.0109, +0.0476) | +0.11% |
+| Rushing + receiving | +0.0192 (-0.0050, +0.0429) | +0.10% | +0.0254 (-0.0090, +0.0589) | +0.13% |
+| QB passing | -0.0357 (-0.0920, +0.0200) | -0.08% | -0.0631 (-0.1456, +0.0128) | -0.15% |
+
+No market is worse by 0.5%: **the fix ships** (resources/priors_2025_players.csv rebuilt;
+params and roles came out identical in content and were left as they were). Harness
+verdicts on the test seasons: receptions bias -2.0% -> -1.0%, receiving yards -1.7% -> -0.7%;
+widths essentially unchanged (receptions 18.3%, receiving yards 18.0%, rushing 23.3%,
+combined 24.9% FAIL, QB passing 14.6%). The fix is a definition correction: whole-distribution
+scores move by a tenth of a percent either way, and the largest change is the removal of
+inflated priors for part-time players, which reach the board through backups and the Out rule.

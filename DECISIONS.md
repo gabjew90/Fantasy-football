@@ -7686,3 +7686,22 @@ by the user.
   fewest"), and the game header carries each offence's and defence's EPA per play (all,
   dropbacks, runs) and points per drive with ranks -- nflverse play-by-play, nflfastR's
   pass / rush flags. Context only; no price reads them.
+
+## 2026-10-06 (192) -- the second outside review: snap join by ID, active-week priors, the carry handoff (round 35)
+
+- Checked against the code first; confirmed: snap counts were joined by name (Gainwell,
+  Bam Knight had no snaps), prior-season shares divided by team volume only in touch weeks
+  (part-timers inflated), games counted playoffs and byes, a blank roof read as outdoors.
+  All fixed (model.snap_names_from_roster, build_priors.active_week_denominators,
+  score_game.resolve_roof). The yards-per-carry weight test the review could not find is
+  round 27 (#177, on PR #125).
+- The priors fix ships on its pre-registered guard (reports/priors_active_weeks.md; the
+  guard moved from line log loss to paired CRPS before any read, because stand-in lines
+  move with projections): every bet market within 0.15%, bias improves on receptions and
+  receiving yards. resources/priors_2025_players.csv rebuilt.
+- Round 35 (reports/round35_out_rule.md): the CARRY handoff now hands on the absent
+  player's share this season, and to each teammate only the part of the absence not yet in
+  his share (+10.4 x1e-4 on 2022-24, detectable; 2025 +4.3; every held-out season
+  positive). Targets keep the shipped rule (positive, not detectable).
+- Next, from the same review: the new-team cap on efficiency rates (one test) and the
+  starter-share draw on QB passing (one round; the user bets passing as often as others).
