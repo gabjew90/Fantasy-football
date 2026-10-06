@@ -330,6 +330,36 @@ def market_environment_fitted(team_spread, total, mkt_fit, team_pace_blend, team
             "implied_points": (total + team_spread) / 2, "source": "market-fitted"}
 
 
+# Round 29 (reports/round29_market_runs.md): the weight on the market's fitted CARRIES
+# for the backs; 0 = runs from history alone (shipped). The starting QB's carries are
+# held where history put them (hold_qb_carries), since the full market environment hurt
+# QB rushing (#106).
+MARKET_RUSH_WEIGHT = 0.0
+
+
+def market_rush_volume(team_spread, total, mkt_fit, team_carries_blend, weight):
+    """Round 29: team carries moved `weight` toward the market's fitted carries (plays x
+    (1 - pass rate) from `mkt_fit`, the fit #134 uses for throws). Returns (carries,
+    factor = new / old) -- the factor is what hold_qb_carries divides the QB's share by."""
+    w = float(np.clip(weight or 0.0, 0.0, 1.0))
+    if not mkt_fit or not w or not team_carries_blend or team_carries_blend <= 0:
+        return team_carries_blend, 1.0
+    fp, fr = mkt_fit["plays"], mkt_fit["pass_rate"]
+    plays = fp["intercept"] + fp["per_spread_pt"] * team_spread + fp["per_total_pt"] * total
+    pr = float(np.clip(fr["intercept"] + fr["per_spread_pt"] * team_spread + fr["per_total_pt"] * total, 0.35, 0.75))
+    new = (1 - w) * team_carries_blend + w * plays * (1 - pr)
+    return new, new / team_carries_blend
+
+
+def hold_qb_carries(rush_shares, qb_index, factor):
+    """The starting QB's carry share divided by the team-carries factor, so his expected
+    carries stay where history put them and only the backs' and depth pool's move."""
+    rs = np.asarray(rush_shares, dtype=float).copy()
+    if qb_index is not None and factor and factor != 1.0:
+        rs[int(qb_index)] = rs[int(qb_index)] / factor
+    return rs
+
+
 # Round 16 (2026-10-01, DECISIONS #134): the weight on the market's fitted pass
 # volume, 0 = the team's history alone (pre-round-16). Chosen on 2022-23 (the
 # smallest weight at which catches, receiving and QB passing yards were each

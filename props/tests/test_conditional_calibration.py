@@ -129,3 +129,18 @@ def test_a_qb_on_the_opening_dropbacks_started_and_a_gadget_snap_does_not_unseat
     assert "CARR" in op[("NO", 3)] and "HILL" in op[("NO", 3)], "a gadget first snap does not unseat the starter"
     assert op[("TB", 3)] == {"MAYF"}
     assert "BAKER_BACKUP" not in op[("TB", 3)]
+
+
+def test_round_29_moves_the_backs_carries_and_holds_the_qb():
+    fit = {"plays": {"intercept": 47.8, "per_spread_pt": 0.146, "per_total_pt": 0.20},
+           "pass_rate": {"intercept": 0.371, "per_spread_pt": -0.0022, "per_total_pt": 0.0038}}
+    assert M.market_rush_volume(7.0, 47.0, fit, 27.0, 0.0) == (27.0, 1.0), "weight 0: history, untouched"
+    c, f = M.market_rush_volume(7.0, 47.0, fit, 27.0, 1.0)
+    plays = 47.8 + 0.146 * 7 + 0.20 * 47
+    pr = 0.371 - 0.0022 * 7 + 0.0038 * 47
+    assert abs(c - plays * (1 - pr)) < 1e-9 and abs(f - c / 27.0) < 1e-12
+    c_dog, _ = M.market_rush_volume(-7.0, 47.0, fit, 27.0, 1.0)
+    assert c > c_dog, "a favourite runs more than an underdog"
+    rs = M.hold_qb_carries([0.5, 0.2, 0.15], 2, 1.2)
+    assert abs(rs[2] * 1.2 - 0.15) < 1e-12 and rs[0] == 0.5, "his expected carries unchanged, the backs' move"
+    assert list(M.hold_qb_carries([0.5, 0.15], None, 1.2)) == [0.5, 0.15]

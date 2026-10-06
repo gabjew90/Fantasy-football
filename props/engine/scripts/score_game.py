@@ -760,6 +760,12 @@ def main():
                     MODEL.team_spread_from_home(hs, t == HOME), tl, P["market_env_fit"],
                     env[t]["targets"], env[t]["carries"], MODEL.MARKET_PASS_WEIGHT)
                 env[t]["source"] = f"history + market pass volume ({MODEL.MARKET_PASS_WEIGHT:g})"
+            if a.env != "market" and MODEL.MARKET_RUSH_WEIGHT and P.get("market_env_fit"):
+                # round 29: the backs' carries move toward the market's fitted carries;
+                # the starting QB's are held (hold_qb_carries, below)
+                env[t]["carries"], env[t]["carry_factor"] = MODEL.market_rush_volume(
+                    MODEL.team_spread_from_home(hs, t == HOME), tl, P["market_env_fit"],
+                    env[t]["carries"], MODEL.MARKET_RUSH_WEIGHT)
             if a.env == "market":
                 hist_targets, hist_carries = env[t]["targets"], env[t]["carries"]
                 team_pr = hist_targets / max(hist_targets + hist_carries, 1e-6)
@@ -1087,6 +1093,8 @@ def main():
         else:
             qb_i = None
         rs_t = [float(v) for v in Mt.rs]
+        if env[t].get("carry_factor", 1.0) != 1.0:      # round 29: the QB's carries held
+            rs_t = [float(v) for v in MODEL.hold_qb_carries(rs_t, qb_i, env[t]["carry_factor"])]
         car_want = {names.index(r_["who"]): r_["value"] for r_ in RULES
                     if a.scenario_run and not r_["team"] and r_["key"] == "carries" and r_["team_of"] == t}
         if car_want:                 # YOUR scenario: carries per game, teammates give up the difference

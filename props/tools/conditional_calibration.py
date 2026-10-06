@@ -75,7 +75,8 @@ STAGE_KNOBS = [("stage 1: targets", "share_conc_targets"),
                ("stage 1: carries (backs)", "share_conc_carries"),
                ("stage 2: catches | targets", "catch_conc"),
                ("stage 2: receiving yards | targets", "eff_sd_rec"),
-               ("stage 2: rushing yards | carries (backs)", "eff_sd_rush")]
+               ("stage 2: rushing yards | carries (backs)", "eff_sd_rush"),
+               ("stage 1: carries (starting QB)", "share_conc_qb")]
 
 
 def grid_pick(grid, frames, reps, rng, flagged):
@@ -88,6 +89,8 @@ def grid_pick(grid, frames, reps, rng, flagged):
     for label, knob in STAGE_KNOBS:
         _, pit_col, _vol, _w, _e, pop = checks[label]
         rows = []
+        if knob not in base:              # this grid does not carry the knob
+            continue
         for cfg, R in zip(grid, frames):
             if any(cfg.get(k) != base.get(k) for k in base if k != knob):
                 continue

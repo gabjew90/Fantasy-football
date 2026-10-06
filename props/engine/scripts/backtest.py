@@ -189,6 +189,8 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
     dispersion = args.dispersion or ("prior" if live else "train")
     # round 16: the market pass-volume weight -- --env market_pass (the tuning runs:
     # --pace-weight), else --market-pass-weight, else what the scorer ships; live only
+    mrw = (M.MARKET_RUSH_WEIGHT if getattr(args, "market_rush_weight", None) is None
+           else float(args.market_rush_weight))
     mpw = ((args.pace_weight if args.pace_weight is not None else M.MARKET_PASS_WEIGHT)
            if args.env == "market_pass" else
            (M.MARKET_PASS_WEIGHT if getattr(args, "market_pass_weight", None) is None
@@ -560,7 +562,8 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
                 targets_env = league_plays * league_pass_rate
                 carries_env = league_plays * (1 - league_pass_rate)
             team_pr = targets_env / max(targets_env + carries_env, 1e-6)   # team's own history pass rate
-            if env_mode in ("history", "market_pass") and mpw and opp_team:
+            carry_factor = 1.0
+            if env_mode in ("history", "market_pass") and (mpw or mrw) and opp_team:
                 # round 16: the market moves the pass volume only (model.market_pass_volume)
                 key3 = None
                 if (r.team, opp_team, W) in game_lines.index: key3 = (r.team, opp_team, W); is_home3 = True
@@ -569,6 +572,8 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
                     sl3, tl3 = game_lines.loc[key3, ["spread_line", "total_line"]]
                     targets_env, carries_env = M.market_pass_volume(sl3 if is_home3 else -sl3, tl3, MKT_FIT,
                                                                     targets_env, carries_env, mpw)
+                    carries_env, carry_factor = M.market_rush_volume(sl3 if is_home3 else -sl3, tl3, MKT_FIT,
+                                                                    carries_env, mrw)
             if env_mode == "market_fit" and opp_team:
                 key2 = None
                 if (r.team, opp_team, W) in game_lines.index: key2 = (r.team, opp_team, W); is_home2 = True
@@ -601,7 +606,8 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
                         sl = float(game_lines.loc[key, "spread_line"])     # nflverse: + = home favoured
                         abs_spread, team_spread = abs(sl), (sl if home else -sl); break
             rows.append(dict(r, ts=ts, cr=cr, ypt=ypt, rs=rs_, ypc=ypc,
-                             team_targets_env=targets_env, team_carries_env=carries_env, abs_spread=abs_spread,
+                             team_targets_env=targets_env, team_carries_env=carries_env, carry_factor=carry_factor,
+                             abs_spread=abs_spread,
                              team_spread=team_spread))
         return pd.DataFrame(rows)
 
@@ -779,9 +785,13 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
                     qb_start = M.starter_qb_index(slots, list(shares[idx]), slots=slots)
                     p_kneel = [kg if j == qb_start else None for j in range(len(slots))]
                 qb_i = qb_start if qb_resid is not None else None
+                sh_ = shares[idx]
+                cf_ = float(g.carry_factor.iloc[0]) if "carry_factor" in g else 1.0
+                if cf_ != 1.0:                 # round 29: the QB's carries stay where history put them
+                    sh_ = M.hold_qb_carries(sh_, M.starter_qb_index(slots, list(shares[idx]), slots=slots), cf_)
                 _car, y_, _tc = M.simulate_team_rush(game_rng(team, week, arm), N,
                                                      float(g.team_carries_env.iloc[0]), r_team_carries,
-                                                     shares[idx], ypcs[idx], carry_resid, width=width,
+                                                     sh_, ypcs[idx], carry_resid, width=width,
                                                      player_resid=p_resid, player_kneel=p_kneel, qb_index=qb_i)
                 tot = float(np.clip(np.asarray(shares[idx], dtype=float), 0, None).sum())
                 for k, i in enumerate(idx):
@@ -1185,7 +1195,17 @@ TIER2_GRID = ([dict(_T2_BASE)]
               + [{**_T2_BASE, "eff_sd_rec": v} for v in (0.1, 0.2, 0.3)]
               + [{**_T2_BASE, "eff_sd_rush": v} for v in (0.15, 0.45)])
 
+# Round 28 (reports/round28_running_game.md): the running game's knobs alone
+_R28_BASE = {"share_conc_carries": 20.0, "eff_sd_rush": 0.3, "share_conc_qb": 80.0}
+RUNNING_GRID = ([dict(_R28_BASE)]
+                + [{**_R28_BASE, "share_conc_carries": v} for v in (5.0, 7.5, 10.0, 15.0)]
+                + [{**_R28_BASE, "eff_sd_rush": v} for v in (0.0, 0.075, 0.15)]
+                + [{**_R28_BASE, "share_conc_qb": v} for v in (30.0, 50.0)])
+
 SUBGRIDS = {
+    "running": (RUNNING_GRID, ("rush", "qbrush", "car"), "width",
+                "Round 28: the running game's knobs alone (reports/round28_running_game.md); the pick is "
+                "made per stage by props/tools/conditional_calibration.py --grid, not by this table."),
     "tier2": (TIER2_GRID, ("rec", "yds", "rush", "qbrush", "car"), "width",
               "Tier 2 part B: each pre-registered knob alone (reports/tier2_conditional_calibration.md). The "
               "pick is made per stage by props/tools/conditional_calibration.py --grid, not by this table."),
@@ -1714,6 +1734,9 @@ def main(argv=None):
     ap.add_argument("--test", default="2024,2025", help="harness: seasons the verdict is read from")
     ap.add_argument("--weeks", default="2-18", help="harness: weeks scored in each season")
     ap.add_argument("--report", default=None, help="harness: output path without extension (.md and .json)")
+    ap.add_argument("--market-rush-weight", type=float, default=None,
+                    help="round 29: weight on the market's fitted carries for the backs (default "
+                         "model.MARKET_RUSH_WEIGHT, 0 = runs from history; the QB's carries are held)")
     ap.add_argument("--grade-depth-chart-qb", action="store_true",
                     help="grade the starting-QB markets on the depth chart's starter even when another QB "
                          "started (the pre-#181 harness, for reproducing older records)")
@@ -1739,7 +1762,7 @@ def main(argv=None):
     ap.add_argument("--tune-width", action="store_true",
                     help="choose the width settings on the --tune seasons; writes --report (.md/.csv)")
     ap.add_argument("--width-out", default=None, help="--tune-width: write the chosen settings to this JSON file")
-    ap.add_argument("--tune-grid", choices=["main", "qb", "rushnorm", "rushlead", "tier2"], default="main",
+    ap.add_argument("--tune-grid", choices=["main", "qb", "rushnorm", "rushlead", "tier2", "running"], default="main",
                     help="--tune-width: the receiving/rushing grid, the starting QB's own settings, or the "
                          "carry-share rescaling")
     ap.add_argument("--dispersion", choices=["prior", "train"], default=None,
