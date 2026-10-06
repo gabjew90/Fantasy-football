@@ -7465,3 +7465,18 @@ by the user.
   calibration check of the combined sum on 2022-25, rule set before it runs; if it fails,
   tying a team's runs and passes to the script is a model change that goes through the
   validation loop.
+
+## 2026-10-05 (174) -- round 26: shares leaning harder on this season -- measured, not shipped
+
+- User: shares are a team decision, so this season should count more after a few weeks.
+  Pre-registered (reports/round26_share_weight.md): target share k0 80/40/20/10 and carry
+  share 40/20/10/5, selected on 2022-23 weeks 5-18 with weeks 2-4 no worse, shipped only if
+  2024-25 (read once) beats the shipped values on weeks 5-18, is no worse on weeks 2-4,
+  and no calibration verdict worsens.
+- Target share: the shipped 80 won; every step toward "this season only" was worse.
+- Carry share: 20 was the eligible winner on 2022-23 and won weeks 5-18 on 2024-25 by
+  0.010, but lost weeks 2-4 by 0.072 and cost QB rushing in both windows. Not shipped.
+- Next (round 26b, proposed): team volume's blend (4 games, never backtested) and the
+  yearly-fit carry share and yards per carry, plus a week-dependent weight (trust this
+  season's split more only from week 5) -- the shape the carry result points to.
+- Tooling: backtest.py --k0 replaces model.K0_FIXED rather than adding to it; to fix.
