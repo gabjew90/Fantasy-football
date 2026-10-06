@@ -553,10 +553,12 @@ need not be surfaced. Write the reply as a premium prop guide with this structur
    column overstates the evidence by about an order of magnitude. Quote it only with that
    description attached. The 2022-25 yardage harness (`reports/yardage_harness.md` in the
    repo) is the evidence: receptions and receiving yards are unbiased on outcomes with their
-   width within the bar. Rushing yards and rushing + receiving passed the same checks before
-   round 30 narrowed the yards-per-carry swing; the re-check at the current setting is
-   pending -- say so. None is tested against posted lines yet; say that, not that the
-   numbers are unvalidated guesses.
+   width within the bar. Rushing yards and rushing + receiving are unbiased and right at the
+   main line, but their distributions run too narrow in the tails (23-25% of games outside
+   the 80% range on the re-check, reports/current_settings_check_2026-10-06.md): a line far
+   from the projection -- an alternate line, a long shot -- reads more confident than it
+   should; say so when quoting one. None is tested against posted lines yet; say that, not
+   that the numbers are unvalidated guesses.
    QB passing yards (the starting QB only) are his receivers' yards in the same simulation
    times a starter's usual share: right on average but too WIDE on the corrected grading
    (14% of games outside the 80% range against a 17-23% bar; reports/rush_rec_calibration.md),

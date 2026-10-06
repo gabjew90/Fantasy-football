@@ -51,7 +51,8 @@ MODEL_STATUS = {
     # 2022-25 yardage harness (reports/yardage_harness.md) backtests the yardage
     # markets on OUTCOMES: unbiased, width within the bar -- except QB passing,
     # too wide on the corrected grading (reports/rush_rec_calibration.md), and
-    # rushing, whose re-check after round 30 is pending. Posted lines are a
+    # rushing / rushing + receiving, right at the main line but narrow in the
+    # tails (reports/current_settings_check_2026-10-06.md). Posted lines are a
     # separate test, which is what VALIDATED_MARKETS below waits for.
     "player_receptions": "receiving_hier_v2, MODEL_UNVALIDATED (PROTOTYPE)",
     "player_reception_yds": "receiving_hier_v2, MODEL_UNVALIDATED (PROTOTYPE)",

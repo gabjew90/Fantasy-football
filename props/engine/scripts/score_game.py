@@ -3237,8 +3237,9 @@ def main():
     # outlived a corrected FAIL on passing width); reports/rush_rec_calibration.md, yardage_harness.md
     L.append(f"\nModel states (none tested against posted lines): receptions and receiving yards `receiving_hier_v2` PROTOTYPE "
              f"(2022-25 harness: unbiased, width within the bar); rushing yards `rush_yds_v0` and rushing + receiving PROTOTYPE "
-             f"(unbiased and within the width bar before round 30 narrowed the yards-per-carry swing; the re-check at the "
-             f"current setting is pending); QB passing yards `pass_yds_v0` PROTOTYPE (right on average but too WIDE: 14% of "
+             f"(unbiased and right at the main line, but too narrow in the tails: 23-25% of games outside the 80% range, so a "
+             f"line far from the median reads too confident; reports/current_settings_check_2026-10-06.md); QB passing yards "
+             f"`pass_yds_v0` PROTOTYPE (right on average but too WIDE: 14% of "
              f"games outside the 80% range against a 17-23% bar, so its chances sit too close to 50%); "
              f"anytime TD `anytime_td_v1` PROTOTYPE (outcome-backtested, no posted-line test; no fair odds). All MODEL_UNVALIDATED. Dispersion: receptions log r = "
              f"{P['receptions_dispersion']['a']:.3f} + {P['receptions_dispersion']['b']:.3f}·log μ; carries "
