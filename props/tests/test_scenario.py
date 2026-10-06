@@ -117,3 +117,68 @@ def test_the_board_never_reads_the_assumptions():
 def test_the_fast_path_summary_carries_your_scenario():
     src = (ENGINE / "score_game.py").read_text(encoding="utf-8")
     assert "gate=GATE) + SCEN_L" in src, "a --markets run prints the scenario table chat reads"
+
+
+def test_a_range_reads_low_expected_high_and_prices_three_rule_sets():
+    """DECISIONS #175: 'carries=10/12/15' is your low / expected / high; the expected run
+    uses the middle value and the low / high runs move every range to its own end."""
+    r = SC.parse(["Alvin Kamara (NO): carries=10/12/15", "NO: pass=-4/-2/+1", "Chris Olave: targets=8"],
+                 {"NO", "ATL"})
+    assert [x["value"] for x in r] == [12.0, -2.0, 8.0]
+    assert r[0]["values"] == [10.0, 12.0, 15.0] and "values" not in r[2]
+    v = dict(SC.range_variants(SC.resolve_players(r, ["Alvin Kamara", "Chris Olave"], ["NO", "NO"])))
+    assert list(v) == ["low", "expected", "high"]
+    assert v["low"] == ["Alvin Kamara (NO): carries=10", "NO: pass=-4", "Chris Olave (NO): targets=8"]
+    assert v["high"][1] == "NO: pass=+1"
+    # every variant string reads back as the single value it names
+    for lab, i in (("low", 0), ("expected", 1), ("high", 2)):
+        back = SC.parse(v[lab], {"NO", "ATL"})
+        assert [x["value"] for x in back] == [r[0]["values"][i], r[1]["values"][i], 8.0]
+    pct = dict(SC.range_variants(SC.parse(["X: catch=60%/65%/70%", "NO: ypt=-10%/-5%/0%"], {"NO"})))
+    assert SC.parse(pct["low"], {"NO"})[0]["value"] == pytest.approx(0.60)
+    assert pct["high"][1] == "NO: ypt=+0%"
+    assert SC.range_variants(SC.parse(["X: carries=12"], {"NO"})) is None
+    for bad, why in [("X: carries=10/12", "low/expected/high"), ("X: carries=15/12/10", "smallest first"),
+                     ("X: carries=10//15", "low/expected/high"), ("NO: pass=-4/-2/1", "CHANGE, not a total")]:
+        with pytest.raises(ValueError, match=why):
+            SC.parse([bad], {"NO"})
+
+
+def test_range_verdict_reads_how_much_of_your_range_a_side_needs():
+    be = 0.55
+    assert SC.range_verdict(0.58, 0.62, 0.66, be) == "pays across your range"
+    assert SC.range_verdict(0.50, 0.57, 0.63, be) == "pays at your expected, not at your low"
+    assert SC.range_verdict(0.45, 0.52, 0.60, be) == "pays only at your high"
+    assert SC.range_verdict(0.40, 0.45, 0.50, be) == "does not pay in your range"
+    assert SC.range_verdict(0.50, 0.56, 0.50, be) == "pays only at your expected"
+    # a teammate's chances run the other way across the range: the verdict names the end
+    assert SC.range_verdict(0.63, 0.46, 0.26, be) == "pays only at your low"
+    assert SC.range_verdict(0.66, 0.62, 0.50, be) == "pays at your expected, not at your high"
+    assert SC.range_verdict(None, 0.62, None, be) == "pays at your expected; your low and high was not priced"
+    assert SC.range_verdict(0.60, 0.62, float("nan"), be) == "pays at your expected; your high was not priced"
+    assert SC.range_verdict(0.5, float("nan"), 0.6, be) is None
+    assert SC.range_verdict(0.5, 0.6, 0.7, None) is None
+
+
+def test_role_what_if_reads_player_and_slot():
+    r = SC.parse_roles(["Bhayshul Tuten=RB1", "Kendre Miller (NO)=rb2"], {"NO", "JAX"})
+    assert r == [{"who": "Bhayshul Tuten", "team_of": None, "slot": "RB1"},
+                 {"who": "Kendre Miller", "team_of": "NO", "slot": "RB2"}]
+    for bad, why in [("Bhayshul Tuten", "PLAYER=SLOT"), ("=RB1", "PLAYER=SLOT"), ("X=RB3", "slot is one of"),
+                     ("X=FB1", "slot is one of")]:
+        with pytest.raises(ValueError, match=why):
+            SC.parse_roles([bad], {"NO"})
+
+
+def test_an_out_starter_with_no_priced_replacement_is_flagged():
+    pop = pd.DataFrame([
+        {"team": "JAX", "name": "Travis Etienne", "pos": "RB", "slot": "RB1", "excluded": True},
+        {"team": "JAX", "name": "Tank Bigsby", "pos": "RB", "slot": "RB2", "excluded": False},
+        {"team": "JAX", "name": "Brian Thomas", "pos": "WR", "slot": "WR1", "excluded": False},
+        {"team": "JAX", "name": "Gabe Davis", "pos": "WR", "slot": "WR2", "excluded": True},
+        {"team": "JAX", "name": "Travis Hunter", "pos": "WR", "slot": "WR2", "excluded": False},
+        {"team": "JAX", "name": "Parker Washington", "pos": "WR", "slot": "WR3", "excluded": False},
+        {"team": "JAX", "name": "Deep Guy", "pos": "WR", "slot": "PROXY", "excluded": True},
+    ])
+    f = SC.missing_replacements(pop)
+    assert [(x["name"], x["priced_left"]) for x in f] == [("Travis Etienne", ["Tank Bigsby"])]

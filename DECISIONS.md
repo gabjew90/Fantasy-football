@@ -7480,3 +7480,23 @@ by the user.
   yearly-fit carry share and yards per carry, plus a week-dependent weight (trust this
   season's split more only from week 5) -- the shape the carry result points to.
 - Tooling: backtest.py --k0 replaces model.K0_FIXED rather than adding to it; to fix.
+
+## 2026-10-06 (175) -- the user's volume thesis as a range; a role what-if; no-replacement flag
+
+- Outside reviewer, agreed as Tier 1: the engine checks lines under the user's volume
+  thesis, so a thesis should be a range and a line should say how much of it it needs.
+- Range what-if: `--assume "PLAYER: carries=10/12/15"` (team changes too) prices the board
+  at the low, expected and high ends and gives each side a verdict that names the end it
+  needs ("pays across your range" / "at your expected, not at your low" / "only at your
+  high" / "does not pay in your range"). A teammate's line runs the other way, so the
+  verdict never says "best" or "worst". Unsigned 0 is accepted as a team change.
+- Role what-if: `--role "PLAYER=RB1"` adds a player the depth chart has not promoted at
+  that slot (role-average prior blended with his own games). Nobody else moves. A full run
+  with research, written to OUT/role (record_run reads only the top folder).
+- No priced replacement: an Out starter whose team now prices fewer players at his
+  position than it has slots is named in the report with the role what-if to try.
+- Wording: "pays at this price if you expect" (expected volume), not "if he gets"
+  (realized). The overview says the luck-free gauge is realized-volume arithmetic, biased
+  low and treating the line as an average.
+- Fix: before this week's roster is published, last week's game-day inactive (INA) reads
+  as active; the injury report decides (Baker Mayfield was priced out of week 5).

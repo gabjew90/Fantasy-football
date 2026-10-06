@@ -239,6 +239,19 @@ For a narrow question, run only what it needs:
   Reproduce that table in full, say the numbers are conditional on the user's assumptions (which are
   assumptions, not confidence intervals), and never call a line a play. Touchdowns are not adjusted.
   Never recorded (outputs in `scenarios/`).
+  **A range** -- `--assume "PLAYER: carries=10/12/15"` (low / expected / high, smallest first; team
+  changes too, `"NO: pass=-4/-2/+1"`) -- prices the board three times and adds the Over at each end and
+  a verdict per side: *pays across your range*, *pays at your expected, not at your low/high*, *pays
+  only at your low/high*, or *does not pay in your range*. Prefer a range whenever the user gives a
+  rough number: a side that pays across the range does not rest on the exact figure. Narrate the
+  verdict with its end named ("the Under needs him at your 15, not your 12"); a teammate's line runs
+  the other way across the range.
+- **Role what-if (a replacement the depth chart has not promoted):** `--role "PLAYER=RB1"` (QB1, RB1,
+  RB2, WR1, WR2, WR3, TE1; `"PLAYER (TEAM)=..."` when a name is on both teams), repeatable, with or
+  without `--assume`. A full run -- research included -- that prices him with that slot's role average
+  as his prior; nobody else moves; never recorded (outputs in `role/`). Offer it whenever the report
+  says **No priced replacement for ...**: an Out starter whose team now prices fewer players at his
+  position than it has slots, so his snaps go to someone the board does not price.
 - **Today's games / one date:** `python scripts/score_week.py --today` or `--date YYYY-MM-DD`
   (`--markets` passes through). `--kickoff 13:00` keeps one window (Eastern time: 13:00 is the
   10am PT games); `--sort total` orders the games by their total, highest first; `--overs-only`
@@ -474,7 +487,7 @@ need not be surfaced. Write the reply as a premium prop guide with this structur
    guess at whether he plays and do not recommend one: the user decides.
 5. **Research table** — reproduce the report's "Research table" (from `research_*.csv`) as ONE
    table, grouped by team: Player, Prop, Line, Price (Over / Under), Our projection, Over:
-   model / book, Line implies, Pays at this price if he gets, Last game, Flags. Do not hand-compute any of these numbers
+   model / book, Line implies, Pays at this price if you expect, Last game, Flags. Do not hand-compute any of these numbers
    and do not re-sort them by the model-book gap: ranking by gap ranked lines by how likely
    the model was missing something.
    For anytime-TD rows, the model is `anytime_td_v1` (PROTOTYPE; see

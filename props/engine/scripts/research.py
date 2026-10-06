@@ -96,7 +96,7 @@ def search_edges(share_over, prices):
 
 
 def break_even_cell(x) -> str:
-    """The research table's 'Pays at this price if he gets' cell: the Over beats
+    """The research table's 'Pays at this price if you expect' cell: the Over beats
     its own price above over_needs, the Under at or below under_needs. A side
     with no posted price (no be_over / be_under) says so rather than reading as
     a search that ran out of range."""

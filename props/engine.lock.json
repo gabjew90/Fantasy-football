@@ -1,12 +1,12 @@
 {
   "algorithm": "props-engine-sha256-lf-1",
-  "engine_sha256": "6b22a15abeea4aa709fdf070bc5d1d784e0e7bcd02acb60c8b27fd34a81d3e6c",
+  "engine_sha256": "32ff8cf960e1538c24052d119ff7bb9b84b7b9883bdcc367a4c950aa883f2eec",
   "file_count": 57,
   "files": {
-    "SKILL.md": "7c47f4db29075187747a59a6d65442f844637a99ab47536d32d3fbab574ca121",
+    "SKILL.md": "86d78d9bc64ddd4895c80f5167b0a0e9a5b05772d0fe00eb03030e3926eecebb",
     "resources/calibration_2025.csv": "47e3922c7af818307831d70a3d2be4333200f3aee1d94dc6bbf6e0e9ccee4ac8",
     "resources/data_source_matrix.md": "2088a5ebe6164a75c11331367fda734d4b10ea217704320321a3f2aec6bb9c2b",
-    "resources/engine_overview.md": "1b7dd3cdc173dad2ef46142da5e734032e0202415faab12a95650451db331b01",
+    "resources/engine_overview.md": "fb1b52249b7106770bd715dcc42d89f5976095b55f9f42a81646b6116f42ed54",
     "resources/execution_protocol.md": "5f54fb23a77d60ecc947d44b6f18ecf67c4357d6b49c70bc937726c1c14016c1",
     "resources/line_archive.md": "baf1b6b97ec439bdf26b73dc4c3ae23d0c4ee9f502db4be7baae70390cdb5c45",
     "resources/methodology.md": "73ab60b65ad076eeb6e373e06e79b37b6f8c178ab3271b8aa1d3686c001a5d30",
@@ -31,7 +31,7 @@
     "resources/priors_2025_td_slots.csv": "af7c13b60f35bc1d064f44c25b66f361f6e1d79243283c74225136b8e69b6cec",
     "resources/priors_2025_td_teamgames.csv": "f2726a5664c7f7063bf897997873f4a2d47be20d2a35979083a6a046c85f7828",
     "resources/priors_2025_teams.csv": "85c2c2e15743f74756b6a0770364e063ef80bce98e387d0cdcbe4ad332465375",
-    "resources/prop_workflow.md": "d9cf730e714c01304b7aa5179eccd4e3ec4e36f6ddb04da7096e9bd7253fae4d",
+    "resources/prop_workflow.md": "d3384a46580badce938aa8f524d994e6d7d6277289c9a12377cbc4cb4b6c9906",
     "resources/research_standard.md": "ad96e86bcbae405b9593d84420351820c4cac3026f993ac08a5af0ddc3913916",
     "resources/stadium_coords.csv": "cf9ce9133fa57249347a2ee14c90b2ddc011602aed5398b1ebf3f7fd0ea71aa1",
     "resources/td_parlay_gate.json": "9619f7de2f262d87c15fbedcc65d95de98c8fc16f87ea9b81630ca0969ddf0f4",
@@ -45,10 +45,10 @@
     "scripts/eligibility.py": "f1672cff3d7ae2d52ca94b5952451e92c794bfcd21ab2224b0e35e7f152445b5",
     "scripts/model.py": "4e967fb31e1a0c17e5d68a181c494a1c0b405eafc42ca1726063911e5cb5d77c",
     "scripts/odds_client.py": "434186273bd0412a5545247228298951c5d0504a19c8a47c4c782bf3bb75aaa1",
-    "scripts/research.py": "40f058cceee7021a0fa2abaf1bf4b8fc5b737f5e5b5f6f387ae3aece8e7e2741",
-    "scripts/scenario.py": "732ef233876bb13ae5dee3c8f04e5bf99b5634cb879bdeb744f56a47df557172",
-    "scripts/score_game.py": "592c3ef063c094d545bd56f1ec907684ae0a4e9eb04e1380dd8a068a855de98f",
-    "scripts/score_week.py": "5259ebc2f6e56571f7e0b03291e84d0e26d00f85dacf5256f40b07ac275fabeb",
+    "scripts/research.py": "2ecb9d109e9d49c5ee654673ae73aa3ca495d7bca76fe38e0fe86afbd9bee49e",
+    "scripts/scenario.py": "972c8fa6b5ee8593e4fa5dc215241d6495466bb0999290184868ceb0bdbb7ef8",
+    "scripts/score_game.py": "b773be3b7775004e04980947ee785984557587ace9c155c8dc07dd9474b41ea7",
+    "scripts/score_week.py": "5882335bd0e2274ce6705a71692fb2e878ea57e44fa146da59c04fcd37fd7f81",
     "scripts/td_alloc.py": "7c407c949cac8f0f74d7f91589fd5d749f65d9053eb1c3f5f0dc63a700b3465b",
     "scripts/td_alloc_backtest.py": "e259d9f0e301a5d5d34e5a9e84bba222810f077d9c05a1f1f799a611914595a4",
     "scripts/td_backtest.py": "0ae77781fea2de212154ff72f64b0792f15f77fabfda7cae944fce20b3c9895f",
@@ -61,5 +61,5 @@
     "scripts/td_model.py": "7c1635bbf515b4316f14771b177363a9f82a1ba7ad3393e479cd2dce26a25724",
     "scripts/td_v1.py": "4e54516734888fc588a7ad3fd9d0ad7dd16d96edcaa980adff3dbcda232ece0f"
   },
-  "tag": "props-v1.39"
+  "tag": "props-v1.40"
 }

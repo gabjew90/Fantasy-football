@@ -274,7 +274,7 @@ def test_the_slate_board_orders_games_by_total_and_can_show_overs_only():
     O = W.slate_board(RS, runs, sort="total", overs_only=True)
     r = next(ln for ln in O if ln.startswith("| B (CIN)"))
     assert "| -118 |" in r and "| 8.5 targets |" in r and "U -139" not in r
-    assert "The Over pays if he gets more than" in "\n".join(O)
+    assert "The Over pays if you expect more than" in "\n".join(O)
 
 
 def test_kickoff_reads_the_way_people_say_it_and_missing_totals_sort_last():
@@ -337,3 +337,13 @@ def test_a_player_on_reserve_is_out_like_a_ruled_out_player():
     p2 = SG.apply_designations(pd.DataFrame({"team": ["NO"] * 2, "gsis_id": list("xy"), "status": ["DEV", "PUP"],
                                              "report_status": [None, None]}))
     assert p2.excluded.tolist() == [False, True], "only the not-playing statuses are excluded"
+
+
+def test_last_weeks_game_day_inactive_does_not_rule_a_player_out_this_week():
+    ros = pd.DataFrame({"season": [2026] * 4, "week": [4] * 4, "team": ["TB"] * 4, "gsis_id": list("abcd"),
+                        "full_name": ["Baker Mayfield", "Jalon Daniels", "Mike Evans", "X"],
+                        "position": ["QB", "QB", "WR", "WR"], "status": ["INA", "ACT", "RES", "DEV"]})
+    rw, prov = SG.week_roster(ros, 2026, 5)
+    assert prov == 4 and rw.status.tolist() == ["ACT", "ACT", "RES", "DEV"], "only INA is per-game"
+    rw, prov = SG.week_roster(ros.assign(week=5), 2026, 5)
+    assert prov is None and rw.status.tolist()[0] == "INA", "this week's own inactive list stands"
