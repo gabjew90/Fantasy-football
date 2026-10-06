@@ -32,7 +32,7 @@ def _world(n=8000, seed=0):
 def test_a_truly_better_setting_wins_out_of_fold():
     truth, y = _world()
     frames = [_frame(truth, y, 0.12, 1), _frame(truth, y, 0.0, 2), _frame(truth, y, 0.25, 3)]
-    out = LS.loso(frames, [0, 1, 2], 0, "receptions", "c", reps=200)
+    out = LS.loso(frames, [0, 1, 2], 0, "receptions", "c", reps=200, min_move=0)
     assert all(f["pick"] == 1 for f in out["folds"]), "the right setting is picked in every fold"
     assert out["oof_gain"] > 0 and out["oof_ci"][0] > 0
 
@@ -42,7 +42,7 @@ def test_a_grid_of_pure_noise_shows_the_winners_curse():
     the in-sample pick looks at least as good as shipped, the out-of-fold gain does not."""
     truth, y = _world(seed=4)
     frames = [_frame(truth, y, 0.08, 10 + k) for k in range(10)]
-    out = LS.loso(frames, list(range(10)), 0, "receptions", "c", reps=200, tie=0.0)
+    out = LS.loso(frames, list(range(10)), 0, "receptions", "c", reps=200, tie=0.0, min_move=0)
     assert out["in_sample_gain"] >= 0
     assert out["oof_gain"] < out["in_sample_gain"] + 1e-12
     assert out["oof_ci"][0] < 0 < out["oof_ci"][1] or out["oof_gain"] <= 0, "no real gain out of fold"
@@ -52,3 +52,27 @@ def test_the_shipped_setting_is_kept_within_the_tie():
     truth, y = _world(seed=5)
     frames = [_frame(truth, y, 0.0, 1), _frame(truth, y, 0.0, 2)]
     assert LS.pick(frames, [0, 1], 0, "receptions", "c") == 0
+
+
+def test_each_fold_picks_without_the_held_out_season():
+    """A setting that is right ONLY in 2025 and noisy elsewhere: the fold that holds out 2025
+    must not pick it (it never sees 2025); the folds that train on 2025 may."""
+    truth, y = _world(seed=6)
+    good25 = _frame(truth, y, 0.12, 1)
+    is25 = good25.season.eq(2025).to_numpy()
+    good25.loc[is25, "pc_rec"] = truth[is25]                   # perfect in 2025 only
+    frames = [_frame(truth, y, 0.06, 2), good25]
+    out = LS.loso(frames, [0, 1], 0, "receptions", "c", reps=100, min_move=0)
+    f25 = next(f for f in out["folds"] if f["held_out"] == 2025)
+    assert f25["pick"] == 0, "the 2025-only winner is invisible when 2025 is held out"
+
+
+def test_ties_go_closer_to_shipped_and_small_moves_stay_shipped():
+    truth, y = _world(seed=7)
+    same = _frame(truth, y, 0.0, 1)
+    frames = [_frame(truth, y, 0.10, 2), same, same.copy()]
+    assert LS.pick(frames, [0, 1, 2], 0, "receptions", "c", dist={0: 0, 1: 2.0, 2: 1.0}, min_move=0) == 2
+    tiny = _frame(truth, y, 0.10, 2)
+    tiny["pc_rec"] = 0.93 * frames[0].pc_rec + 0.07 * truth         # better, but moves under a point
+    assert LS.pick([frames[0], tiny], [0, 1], 0, "receptions", "c", tie=0.0, min_move=0) == 1
+    assert LS.pick([frames[0], tiny], [0, 1], 0, "receptions", "c", tie=0.0, min_move=1.0) == 0

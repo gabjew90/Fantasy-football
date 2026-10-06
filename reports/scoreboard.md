@@ -133,3 +133,8 @@ yards of where real bets sit.
   - **"Upper bound":** real spread in role-stable stretches usually overstates the true spread
     (undetected drift), so a model spread well above it is likely too wide -- an assumption,
     not a guarantee.
+- **2026-10-06, after the leave-one-season-out check (reports/loso_rounds_30_33.md):** every
+  selection from round 34 on reports the out-of-fold gain of its rule
+  (props/tools/loso_select.py) beside the in-sample gain. Detectability is still read on the
+  registered seasons; an out-of-fold gain at or below zero is reported as a warning sign of
+  selection, not a separate veto.

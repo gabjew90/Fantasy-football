@@ -67,3 +67,24 @@ Log loss and Brier agree in sign in every cell.
 - Until then the report wording stands as written on 2026-10-06 (rushing: re-check pending)
   and is updated to this result: rushing and combined distributions run narrow in the
   tails; the main-line chance is unaffected.
+
+## Step 7: the same run with the scorer's new-team cap (harness parity, 779c2db / 68ac50f)
+
+The harness now caps a carried-over prior for a player on a new team, as the scorer does.
+Checked first that it does only that: the projected rush share moved for 2,794 of 2,819
+new-team player-games and for no one else; team totals moved only on teams with a new-team
+player; the 3,243 player-games on teams without one did not move at all. Test seasons
+2024-25, share outside the 80% range:
+
+| Market | Without the cap (step 6) | With it (step 7) |
+|---|---|---|
+| Receptions | 18.4% | 18.4% |
+| Receiving yards | 18.4% | 19.0% |
+| Rushing yards | 23.4% | 23.5% |
+| Rushing + receiving | 24.9% (FAIL) | 25.2% (FAIL) |
+| QB passing yards | 14.4% (FAIL) | 14.7% (12.5-17.1, INSUFFICIENT DATA) |
+
+Bias and baseline verdicts are unchanged. The capped run is the baseline every comparison
+uses from here (compare() refuses to mix the two harnesses). Remaining parity gaps, still
+disclosed in every harness report: weekly depth slots, the snap-share role scaling, and
+pre-game injury regimes.
