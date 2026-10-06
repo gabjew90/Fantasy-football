@@ -254,11 +254,20 @@ For a narrow question, run only what it needs:
      allowed" line: PPR per game and rank -- a small sample this early, context only, never a
      reason on its own), and the injuries (who is out, questionable, back) -- plus any line
      moves since the morning.
+  1b. **Team volume against the season** (the report's "Team volume" section, DECISIONS #172):
+     each team's games this season -- score, how much of each game it spent ahead or behind by
+     8+, pass attempts, sacks, designed carries, scrambles -- and whether our projected passes
+     and runs fit them. Then the script: how teams under a line like this one spent their plays
+     (ahead / close / behind), at this team's own pass share in each state, against our split.
+     Say plainly when our volume or the script split sits outside every game it has played,
+     and name the game whose script matches the Vegas line (a favourite's comfortable win).
   2. **Each player with a priced line**, team by team: his volume and share LAST SEASON, THIS
      SEASON so far, and last game against his earlier games (targets or carries, share and count).
   3. **Teammates out or questionable** who move his work, and which way.
   4. **Expected volume and share, ours and the book's**: our projected targets or carries; the
-     book's own volume where it posts it (catches / carries lines, the side favoured); what each
+     book's own volume where it posts it (catches / carries / completions lines, the side favoured,
+     and the book's coin-flip number -- "a coin flip at about 19.2", its no-vig price turned into a
+     volume with our simulation's game-to-game spread); what each
      yards line works out to ("line implies").
   5. **The lines themselves**: where our projection lands (zone), and the luck-free check -- his
      luck-free yards a play over his last 10 games, the volume the yards line takes at that rate,

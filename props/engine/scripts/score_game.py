@@ -1894,6 +1894,18 @@ def main():
     _pos_map = (ros.sort_values("week").drop_duplicates("gsis_id", keep="last").set_index("gsis_id").position.to_dict()
                 if {"gsis_id", "position", "week"}.issubset(ros.columns) else {})
     PA = RSCH.points_allowed(pbp, _pos_map)
+    # TEAM VOLUME (DECISIONS #172): every game this season beside our projection
+    TEAM_VOL_LINES = {}
+    TEAM_SPREAD = {t_: RSCH.team_line(None if market_env is None else market_env.get("home_spread"), t_ == HOME)
+                   for t_ in (AWAY, HOME)}
+    _league_script = RSCH.league_script_shares(pbp)
+    _state_mix = RSCH.league_state_mix(pbp)
+    for t_ in (AWAY, HOME):
+        _rows = RSCH.team_volume(pbp, t_)
+        TEAM_VOL_LINES[t_] = RSCH.team_volume_lines(
+            t_, _rows, RSCH.team_volume_check(_rows, env[t_]["targets"], env[t_]["carries"],
+                                              team_spread=TEAM_SPREAD.get(t_), league=_league_script,
+                                              mix=_state_mix))
     PA_LINE = RSCH.points_allowed_line(PA, (AWAY, HOME))
     # CATCHES, YARDS AND THE LONG ONE (DECISIONS #164): the book's three receiving lines
     # read together at the whole numbers that win them, against his yards a catch
@@ -1948,6 +1960,12 @@ def main():
                 season_yds=None if sr_ is None else float(sr_.rec_yards),
                 model_ypc=float(m_.ypt) / float(m_.cr) if float(m_.cr) > 0 else None,
                 longest_line=_xl("longest_reception", p_, t_).get("line"))
+            _cr_row = g_[(g_.market == "player_receptions") & (g_.book == book_)]
+            if CATCH_READ[(p_, t_)] is not None and len(_cr_row):
+                CATCH_READ[(p_, t_)]["book_fair"] = RSCH.fair_volume(
+                    float(_cr_row.line.iloc[0]),
+                    RSCH.fair_over(price_over=_cr_row.price_over.iloc[0], price_under=_cr_row.price_under.iloc[0]),
+                    float(np.std(sims[p_]["receptions"])) if p_ in sims else None)
         _cols = {"ypc_need": "need_ypc", "ypc_mid": "mid_ypc", "ypc_season": "season_ypc",
                  "ypc_luckfree_10g": "season_ypc_luckfree", "ypc_model": "model_ypc",
                  "long_line": "longest_line", "long_rest_ypc": "rest_ypc", "ypc_read": "read"}
@@ -1976,6 +1994,10 @@ def main():
                 season_car=None if sr_ is None else float(sr_.car), season_yds=None if sr_ is None else float(sr_.yds),
                 longest_line=_xl("longest_rush", r_.player, r_.team).get("line"),
                 carries_fav=RSCH.favoured(att_.get("mult_over"), att_.get("mult_under")))
+            if CARRY_READ[(r_.player, r_.team)] is not None and att_.get("line") is not None:
+                CARRY_READ[(r_.player, r_.team)]["book_fair"] = RSCH.fair_volume(
+                    att_["line"], RSCH.fair_over(att_.get("mult_over"), att_.get("mult_under")),
+                    float(np.std(sims[r_.player]["carries"])) if r_.player in sims else None)
         _runcols = {"car_line": "carries_line", "car_fav": "carries_fav", "run_ypc_mid": "mid_ypc",
                     "run_ypc_model": "model_ypc", "run_ypc_season": "season_ypc",
                     "long_run_line": "longest_line", "run_read": "read"}
@@ -2008,6 +2030,14 @@ def main():
                 longest_line=_xl("longest_passing_completion", r_.player, r_.team).get("line"),
                 completions_fav=RSCH.favoured(cp_.get("mult_over"), cp_.get("mult_under")),
                 attempts_line=_xl("passing_attempts", r_.player, r_.team).get("line"))
+            if QB_READ[(r_.player, r_.team)] is not None and cp_.get("line") is not None:
+                # the spread of the team's catches across the simulation, at the starter's share
+                _sum = sum(np.asarray(sims[n_]["receptions"], dtype=float) for n_ in _team) if _team else None
+                if _sum is not None and _oth is not None:
+                    _sum = _sum + np.asarray(_oth, dtype=float) * _cr       # the depth bucket's catches (mean rate)
+                QB_READ[(r_.player, r_.team)]["book_fair"] = RSCH.fair_volume(
+                    cp_["line"], RSCH.fair_over(cp_.get("mult_over"), cp_.get("mult_under")),
+                    None if _sum is None else float(np.std(_sum)) * float(np.mean(P["qb_starter_pass_share_quantiles"])))
         RESEARCH["qb_yards"] = [RSCH.qb_yards_sentence(QB_READ.get((r.player, r.team)))
                                 if r.market == "player_pass_yds" else None for r in RESEARCH.itertuples()]
     RESEARCH.to_csv(OUT / f"research_{slug}.csv", index=False)
@@ -2652,6 +2682,8 @@ def main():
               f"- **Injury designations (week {WEEK} report):** " + (", ".join(desig) if desig else "none on the eligible set") + ". Out/Doubtful removed; their share goes mostly to the replacement, a quarter to the priced teammates; Questionable priced as if playing, with a separate 'if he's out' pricing. Re-run inside 90 minutes of kickoff: a late scratch changes every share on that team.",
               f"- **Data cutoff:** 2026 weeks 1-{WEEK-1} play-by-play, week {WEEK} roster/injury/depth chart; prices snapshot {now()}; kickoff in {hrs:.1f} h.",
               "",
+              *(["## Team volume\n"] + [l_ for t_ in (AWAY, HOME) for l_ in TEAM_VOL_LINES.get(t_, [])]
+                if any(TEAM_VOL_LINES.values()) else []),
               "<details><summary>Method in six lines</summary>\n",
               f"1. Data: nflverse play-by-play/rosters/injuries/snaps through week {WEEK-1}, 2025 priors bundled, prices from {books_used_str}, NWS weather.",
               "2. Model: receiving_hier_v2 (receptions, rec yds), rush_yds_v0, pass_yds_v0 (the starting QB), anytime_td_v1 (anytime TD; v0 only as a labelled fallback); methodology v1.0 in resources/methodology.md.",

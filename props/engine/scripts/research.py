@@ -441,7 +441,7 @@ def volume_gauge(y_min, rate, proj, unit, low_volume):
             "low": float(proj) < low_volume}
 
 
-def gauge_sentence(g, rate, per, luck_clause, y_min, long_word, book_line=None, book_fav=None):
+def gauge_sentence(g, rate, per, luck_clause, y_min, long_word, book_line=None, book_fav=None, book_fair=None):
     """'At 4.4 yards a carry with the luck taken out (<how>), 90 yards takes about 20.6
     carries; we project 17.5 (our volume), about what it takes. The book's own carries line
     is 19.5, Under favoured: fewer than the yards line takes, so even the book's volume
@@ -457,7 +457,8 @@ def gauge_sentence(g, rate, per, luck_clause, y_min, long_word, book_line=None, 
     s += "."
     if book_line is not None and book_line == book_line:
         fav = f", {book_fav} favoured" if book_fav else ""
-        s += f" The book's own {g['unit']} line is {book_line:g}{fav}: "
+        fair = f" (a coin flip at about {book_fair:.1f})" if book_fair is not None and book_fair == book_fair else ""
+        s += f" The book's own {g['unit']} line is {book_line:g}{fav}{fair}: "
         # lines move in halves: within half a unit of the book's line is the book's volume
         if g["need"] > book_line + 0.5:
             s += f"fewer than the yards line takes, so even the book's volume falls short without {long_word}."
@@ -470,6 +471,291 @@ def gauge_sentence(g, rate, per, luck_clause, y_min, long_word, book_line=None, 
     if g["low"]:
         s += f" At this little volume one {SINGULAR.get(g['unit'], g['unit'])} either way decides it."
     return s
+
+
+def fair_over(mult_over=None, mult_under=None, price_over=None, price_under=None) -> float | None:
+    """The book's chance of the Over with its cut removed, from Sleeper's payout multipliers
+    (1 / multiplier) or American prices (breakeven), scaled so the two sides add to 1."""
+    ok = lambda v: v is not None and v == v
+    if ok(mult_over) and ok(mult_under) and mult_over > 1 and mult_under > 1:
+        o, u = 1.0 / float(mult_over), 1.0 / float(mult_under)
+    else:
+        o, u = breakeven(price_over), breakeven(price_under)
+        if o is None or u is None:
+            return None
+    return o / (o + u)
+
+
+def fair_volume(line, p_over, sd) -> float | None:
+    """The volume at which the book's own price is a coin flip (DECISIONS #172): the line
+    moved by sd x the normal quantile of its no-vig Over chance. sd is the game-to-game
+    spread of that player's volume in our simulation."""
+    from statistics import NormalDist
+    ok = lambda v: v is not None and v == v
+    if not (ok(line) and ok(p_over) and ok(sd)) or not 0 < p_over < 1 or sd <= 0:
+        return None
+    return float(line) + float(sd) * NormalDist().inv_cdf(float(p_over))
+
+
+# a game state: leading or trailing by this many points or more at the snap (one score = 8)
+SCRIPT_MARGIN = 8
+
+
+def team_volume(pbp, team) -> list[dict]:
+    """One row per game this season for `team` (DECISIONS #172): opponent, score, pass
+    attempts (sacks are not attempts), sacks, designed carries (kneel-downs and QB
+    scrambles out), scrambles, targets (throws aimed at a receiver -- the unit the model
+    counts) and the QB who threw most."""
+    need = {"week", "posteam", "home_team", "away_team", "home_score", "away_score", "play_type"}
+    if pbp is None or not need.issubset(pbp.columns):
+        return []
+    f0 = lambda s: s.fillna(0)
+    rows = []
+    for w, g in pbp[(pbp.home_team == team) | (pbp.away_team == team)].groupby("week"):
+        home = g.home_team.iloc[0] == team
+        us = g.home_score.max() if home else g.away_score.max()
+        them = g.away_score.max() if home else g.home_score.max()
+        o = g[g.posteam == team]
+        sack = f0(o.get("sack", 0)) == 1 if "sack" in o else o.play_type.isna()
+        scr = f0(o["qb_scramble"]) == 1 if "qb_scramble" in o else o.play_type.isna()
+        kneel = f0(o["qb_kneel"]) == 1 if "qb_kneel" in o else o.play_type.isna()
+        # a spike is play_type qb_spike: requiring a pass play keeps it out of the attempts
+        att = ((f0(o["pass_attempt"]) == 1) if "pass_attempt" in o else True) & (o.play_type == "pass") & ~sack
+        qb = (o.loc[att, "passer_player_name"].mode() if "passer_player_name" in o else pd_empty())
+        run_ = (o.play_type == "run") & ~kneel & ~scr
+        plays = att | sack | scr | run_
+        diff = o["score_differential"] if "score_differential" in o else None
+        state = {}
+        for name, m in (("lead", diff >= SCRIPT_MARGIN), ("close", diff.abs() < SCRIPT_MARGIN),
+                        ("trail", diff <= -SCRIPT_MARGIN)) if diff is not None else ():
+            m = m.fillna(False) & plays
+            state[name] = {"plays": int(m.sum()), "att": int((m & att).sum()), "runs": int((m & (run_ | scr)).sum())}
+        n_ = int(plays.sum())
+        rows.append({"week": int(w), "opp": ("vs " if home else "at ") + str(g.away_team.iloc[0] if home else g.home_team.iloc[0]),
+                     "state": state,
+                     "lead_share": (state["lead"]["plays"] / n_) if state and n_ else None,
+                     "trail_share": (state["trail"]["plays"] / n_) if state and n_ else None,
+                     "score": f"{int(us)}-{int(them)}" if us == us and them == them else "",
+                     "margin": (float(us) - float(them)) if us == us and them == them else None,
+                     "att": int(att.sum()), "sacks": int(sack.sum()),
+                     "carries": int(((o.play_type == "run") & ~kneel & ~scr).sum()), "scrambles": int(scr.sum()),
+                     "targets": int(((o.play_type == "pass") & o.get("receiver_player_id", o.play_type).notna()).sum())
+                     if "receiver_player_id" in o else None,
+                     "qb": str(qb.iat[0]) if len(qb) else ""})
+    return rows
+
+
+def pd_empty():
+    import pandas as _pd
+    return _pd.Series([], dtype=object)
+
+
+# a team's pass share in a game state is blended toward the league's with this many plays
+# of weight: a display choice (picked, not fitted) so 17 plays ahead never set the split
+SCRIPT_PRIOR_PLAYS = 60
+
+
+def league_script_shares(pbp) -> dict:
+    """The league's pass attempts / (attempts + runs) in each game state this season."""
+    need = {"posteam", "play_type", "score_differential"}
+    if pbp is None or not need.issubset(pbp.columns):
+        return {}
+    f0 = lambda c: pbp[c].fillna(0) if c in pbp else 0
+    sack = f0("sack") == 1
+    scr = f0("qb_scramble") == 1
+    kneel = f0("qb_kneel") == 1
+    att = ((f0("pass_attempt") == 1) if "pass_attempt" in pbp else True) & (pbp.play_type == "pass") & ~sack
+    runs = ((pbp.play_type == "run") & ~kneel) | scr
+    d = pbp.score_differential
+    out = {}
+    for name, m in (("lead", d >= SCRIPT_MARGIN), ("close", d.abs() < SCRIPT_MARGIN), ("trail", d <= -SCRIPT_MARGIN)):
+        m = m.fillna(False) & pbp.posteam.notna()
+        a, u = int((m & att).sum()), int((m & runs).sum())
+        if a + u:
+            out[name] = a / (a + u)
+    return out
+
+
+LINE_BUCKETS = ("big favourite", "favourite", "close", "underdog", "big underdog")
+
+
+def line_bucket(team_spread) -> str | None:
+    """The kind of pregame line a team played under; team_spread NEGATIVE = favoured."""
+    if team_spread is None or team_spread != team_spread:
+        return None
+    v = -float(team_spread)
+    return ("big favourite" if v >= 7 else "favourite" if v >= 3.5 else "big underdog" if v <= -7
+            else "underdog" if v <= -3.5 else "close")
+
+
+def league_state_mix(pbp) -> dict:
+    """How a team's plays split between ahead / close / behind by SCRIPT_MARGIN, by the
+    pregame line it played under (line_bucket), from this season's games league-wide:
+    {bucket: {state: share}}. nflverse
+    spread_line is the HOME team's margin (positive = home favoured)."""
+    need = {"posteam", "home_team", "play_type", "score_differential", "spread_line"}
+    if pbp is None or not need.issubset(pbp.columns):
+        return {}
+    f0 = lambda c: pbp[c].fillna(0) if c in pbp else 0
+    plays = (((pbp.play_type == "run") & (f0("qb_kneel") != 1)) | (pbp.play_type == "pass")) & pbp.posteam.notna()
+    d = pbp[plays]
+    own = d.spread_line.where(d.posteam == d.home_team, -d.spread_line)       # positive = this team favoured
+    bucket = own.apply(lambda v: None if v != v else line_bucket(-v))
+    state = d.score_differential.apply(lambda v: None if v != v else "lead" if v >= SCRIPT_MARGIN
+                                       else "trail" if v <= -SCRIPT_MARGIN else "close")
+    out = {}
+    for b in LINE_BUCKETS:
+        s_ = state[bucket == b].dropna()
+        if len(s_):
+            vc = s_.value_counts(normalize=True)
+            out[b] = {k: float(vc.get(k, 0.0)) for k in ("lead", "close", "trail")}
+    s_ = state.dropna()
+    if len(s_):
+        vc = s_.value_counts(normalize=True)
+        out["_all"] = {k: float(vc.get(k, 0.0)) for k in ("lead", "close", "trail")}
+    return out
+
+
+def script_rates(rows) -> dict:
+    """His season's pass attempts and runs per play in each game state (ahead / close /
+    behind by SCRIPT_MARGIN), pooled over his games: {state: (att_rate, run_rate, plays)}."""
+    out = {}
+    for st in ("lead", "close", "trail"):
+        p = sum((r.get("state") or {}).get(st, {}).get("plays", 0) for r in rows)
+        a = sum((r.get("state") or {}).get(st, {}).get("att", 0) for r in rows)
+        u = sum((r.get("state") or {}).get(st, {}).get("runs", 0) for r in rows)
+        if p:
+            out[st] = (a / p, u / p, p)
+    return out
+
+
+def team_line(book_home_spread, is_home) -> float | None:
+    """A team's own pregame line, NEGATIVE = favoured, from a book's home spread (NEGATIVE =
+    home favoured: 'DAL -9.5')."""
+    if book_home_spread is None or book_home_spread != book_home_spread:
+        return None
+    return float(book_home_spread) if is_home else -float(book_home_spread)
+
+
+def expected_state(team_spread) -> str:
+    """The game state the Vegas line points to for this team: a favourite by more than a
+    field goal is expected to lead, an underdog by more than one to trail, else close.
+    team_spread is the team's own line (negative = favoured)."""
+    if team_spread is None or team_spread != team_spread:
+        return "close"
+    return "lead" if team_spread <= -3.5 else "trail" if team_spread >= 3.5 else "close"
+
+
+def blended_share(att, runs, league_share, k=SCRIPT_PRIOR_PLAYS) -> float | None:
+    """His pass share in a state, blended toward the league's with k plays of weight."""
+    if league_share is None:
+        return (att / (att + runs)) if att + runs else None
+    return (att + k * league_share) / (att + runs + k)
+
+
+def team_volume_check(rows, our_targets, our_runs, team_spread=None, league=None, mix=None) -> dict | None:
+    """Our projection beside what the team has actually done: our targets turned into
+    attempts at the team's own targets-per-attempt rate, our runs (which count scrambles,
+    as the model does) against carries + scrambles. inside = within the range of his
+    games this season."""
+    if not rows:
+        return None
+    att = [r["att"] for r in rows]
+    runs = [r["carries"] + r["scrambles"] for r in rows]
+    tg = [r["targets"] for r in rows if r["targets"] is not None]
+    rate = (sum(tg) / sum(att)) if tg and sum(att) else None
+    our_att = (float(our_targets) / rate) if rate else None
+    out = {"games": len(rows), "att_avg": sum(att) / len(att), "att_min": min(att), "att_max": max(att),
+           "runs_avg": sum(runs) / len(runs), "runs_min": min(runs), "runs_max": max(runs),
+           "our_att": our_att, "our_runs": float(our_runs), "target_rate": rate}
+    out["att_inside"] = our_att is not None and min(att) - 0.5 <= our_att <= max(att) + 0.5
+    out["runs_inside"] = min(runs) - 0.5 <= our_runs <= max(runs) + 0.5
+    # the script Vegas expects: his own pass and run rate in that state, applied to our plays
+    sr = script_rates(rows)
+    st = expected_state(team_spread)
+    league = league or {}
+    out.update(rates=sr, state=st, script_att=None, script_runs=None, league=league, script_share=None)
+    # a game is a mix of states: how teams under this kind of line spent their plays
+    # (league_state_mix), each state at his own blended pass share
+    shares = {}
+    for s_ in ("lead", "close", "trail"):
+        a_s = sum((r.get("state") or {}).get(s_, {}).get("att", 0) for r in rows)
+        u_s = sum((r.get("state") or {}).get(s_, {}).get("runs", 0) for r in rows)
+        shares[s_] = (blended_share(a_s, u_s, league.get(s_)), a_s + u_s)
+    b_ = line_bucket(team_spread) or "close"
+    # no game yet under this kind of line: every team's mix, never all snaps in one state
+    w = (mix or {}).get(b_) or (mix or {}).get("_all")
+    out["line_bucket"] = b_ if (mix or {}).get(b_) else ("all lines" if w else None)
+    w = w or {}
+    if w and all(shares[k][0] is not None for k in w if w[k] > 0):
+        share = sum(w[k] * shares[k][0] for k in w if w[k] > 0) / sum(v for v in w.values() if v > 0)
+    else:
+        share = None
+    out["state_mix"] = w
+    out["state_shares"] = shares
+    if share is not None and our_att is not None:
+        plays = our_att + float(our_runs)
+        out.update(script_share=share, script_plays=sum(n for _, n in shares.values()),
+                   script_att=plays * share, script_runs=plays * (1 - share))
+        out["script_inside"] = (min(att) - 0.5 <= out["script_att"] <= max(att) + 0.5
+                                and min(runs) - 0.5 <= out["script_runs"] <= max(runs) + 0.5)
+    return out
+
+
+def team_volume_lines(team, rows, chk) -> list[str]:
+    """The report's team-volume block: every game this season, then our projection
+    beside the season, said plainly when it sits outside every game he has played."""
+    if not rows:
+        return []
+    L = [f"**{team}** -- this season, game by game (attempts exclude sacks; carries are designed runs, "
+         "QB scrambles counted apart):", "",
+         "| Week | Opponent | Score | Plays ahead / behind by 8+ | Pass att | Sacks | Carries | Scrambles | QB |",
+         "|---|---|---|---|---|---|---|---|---|"]
+    pc = lambda v: "—" if v is None else f"{100 * v:.0f}%"
+    for r in rows:
+        L.append(f"| {r['week']} | {r['opp']} | {r['score']} | {pc(r.get('lead_share'))} / {pc(r.get('trail_share'))} | "
+                 f"{r['att']} | {r['sacks']} | {r['carries']} | {r['scrambles']} | {r['qb']} |")
+    if chk:
+        L.append(f"| **Avg** | | | | **{chk['att_avg']:.1f}** | | **{chk['runs_avg'] - sum(r['scrambles'] for r in rows) / len(rows):.1f}** "
+                 f"| {sum(r['scrambles'] for r in rows) / len(rows):.1f} | |")
+        L.append("")
+        a = (f"about {chk['our_att']:.0f} pass attempts" if chk["our_att"] is not None else "")
+        s = (f"We project {a} ({chk['att_min']}-{chk['att_max']} in its games, {chk['att_avg']:.1f} a game) and "
+             f"{chk['our_runs']:.0f} runs counting scrambles ({chk['runs_min']}-{chk['runs_max']}, {chk['runs_avg']:.1f} a game).")
+        out_ = [w for w, ok in (("pass attempts", chk["att_inside"]), ("runs", chk["runs_inside"])) if not ok]
+        if out_:
+            s += (f" Our {' and '.join(out_)} sit outside every game this season -- the market's spread and total "
+                  "pull them there; say why, or treat the player numbers built on them with care.")
+        else:
+            s += " Both sit inside the range of its games this season."
+        L.append(s)
+        sr = chk.get("rates") or {}
+        words = {"lead": "ahead by 8+", "close": "within one score", "trail": "behind by 8+"}
+        if sr:
+            L.append("")
+            L.append("Pass share of plays by game state this season: " + "; ".join(
+                f"{words[k]} {100 * a / (a + u):.0f}% ({p} plays)" for k, (a, u, p) in sr.items()) + ".")
+            lg = chk.get("league") or {}
+            if lg:
+                L.append("League this season: " + "; ".join(f"{words[k]} {100 * v:.0f}%" for k, v in lg.items()) + ".")
+            if chk.get("script_att") is not None:
+                lean = {"big favourite": "a favourite by 7+", "favourite": "a favourite by 3.5-7",
+                        "close": "a line within 3", "underdog": "an underdog by 3.5-7",
+                        "big underdog": "an underdog by 7+", "all lines": "any line (none yet under this one)"}.get(
+                    chk.get("line_bucket"), "this line")
+                mixw = chk.get("state_mix") or {}
+                mixs = ", ".join(f"{100 * v:.0f}% {words[k]}" for k, v in mixw.items() if v > 0)
+                s2 = (f"Teams playing as {lean} spent their plays {mixs} this season. At this team's own "
+                      f"pass share in each state (blended toward the league's where its sample is small), that "
+                      f"script is about {100 * chk['script_share']:.0f}% passes: our total plays would split into "
+                      f"about {chk['script_att']:.0f} pass attempts and {chk['script_runs']:.0f} runs, against our "
+                      f"{chk['our_att']:.0f} and {chk['our_runs']:.0f}.")
+                if not chk.get("script_inside", True):
+                    s2 += (" That split sits outside every game it has played this season, so read it as the "
+                           "direction the script pushes, not a number.")
+                L.append(s2)
+    L.append("")
+    return L
 
 
 POS_GROUPS = ("RB", "WR", "TE")
@@ -677,7 +963,7 @@ def catch_yards_sentence(d) -> str | None:
     if d.get("gauge") is not None:
         lc = luck_words(d.get("luck"), "catch") if d["season_ypc_luckfree"] is not None else None
         bits.append(gauge_sentence(d["gauge"], d["gauge_rate"], "catch", lc, d["y_min"], "a long catch",
-                                   book_line=d["catches_line"]))
+                                   book_line=d["catches_line"], book_fair=d.get("book_fair")))
     if d["long_min"] is not None:
         if d["long_min"] >= d["y_min"]:
             bits.append(f"The longest-catch line ({d['longest_line']:g}) sits at or above his yards line: "
@@ -776,7 +1062,7 @@ def carry_yards_sentence(d) -> str | None:
     if d.get("gauge") is not None:
         lc = luck_words(d.get("luck"), "run") if d["season_ypc_luckfree"] is not None else None
         bits.append(gauge_sentence(d["gauge"], d["gauge_rate"], "carry", lc, d["y_min"], "a long run",
-                                   book_line=d["carries_line"], book_fav=d["carries_fav"]))
+                                   book_line=d["carries_line"], book_fav=d["carries_fav"], book_fair=d.get("book_fair")))
     if d["long_min"] is not None:
         if d["long_min"] >= d["y_min"]:
             bits.append(f"The longest-run line ({d['longest_line']:g}) sits at or above his yards line: "
@@ -863,7 +1149,8 @@ def qb_yards_sentence(d) -> str | None:
     if d.get("gauge") is not None:
         lc = luck_words(d.get("luck"), "completion") if d["luckfree_ypc"] is not None else None
         bits.append(gauge_sentence(d["gauge"], d["gauge_rate"], "completion", lc, d["y_min"], "a long completion",
-                                   book_line=d["completions_line"], book_fav=d["completions_fav"]))
+                                   book_line=d["completions_line"], book_fav=d["completions_fav"],
+                                   book_fair=d.get("book_fair")))
     if d["long_min"] is not None:
         bits.append(f"The longest-completion line ({d['longest_line']:g}) means one completion of "
                     f"{d['long_min']}, {100 * d['long_min'] / d['y_min']:.0f}% of the {d['y_min']} yards.")

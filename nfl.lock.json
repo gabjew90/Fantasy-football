@@ -132,7 +132,7 @@
   "manager/yahoo_context.py": "0aa541b5c73457d09f4aa3bbfdda14d66d8051835370073fb9f2a12f57f9ab34",
   "manager/yahoo_sync.py": "3ea0dba0ea5b03e561952cbdd2b40eba7b9a7c328691258915b7c29aadc54b90",
   "nfl.py": "78a94fe768aa2d271772852a8961e2e25fb6577d23f67f60f1a1a6d3bc4a87ac",
-  "props/engine/SKILL.md": "62907eb03e354c7cac234d1ec135a37692f6c68655348cf3af9e7626f22b43be",
+  "props/engine/SKILL.md": "f815f1b56c8414de3fa76e88b84bcf7f06ad498747debba106303635aab7d9c1",
   "props/engine/resources/calibration_2025.csv": "47e3922c7af818307831d70a3d2be4333200f3aee1d94dc6bbf6e0e9ccee4ac8",
   "props/engine/resources/data_source_matrix.md": "2088a5ebe6164a75c11331367fda734d4b10ea217704320321a3f2aec6bb9c2b",
   "props/engine/resources/execution_protocol.md": "5f54fb23a77d60ecc947d44b6f18ecf67c4357d6b49c70bc937726c1c14016c1",
@@ -173,9 +173,9 @@
   "props/engine/scripts/eligibility.py": "f1672cff3d7ae2d52ca94b5952451e92c794bfcd21ab2224b0e35e7f152445b5",
   "props/engine/scripts/model.py": "4e967fb31e1a0c17e5d68a181c494a1c0b405eafc42ca1726063911e5cb5d77c",
   "props/engine/scripts/odds_client.py": "434186273bd0412a5545247228298951c5d0504a19c8a47c4c782bf3bb75aaa1",
-  "props/engine/scripts/research.py": "67ccc0b367f79f557732fd34f6c78c6af7e0cdb045912203589377dc86135446",
+  "props/engine/scripts/research.py": "49530bc0817ee050184953a932a3ee47c98892f21e2bd29752de449a85a64153",
   "props/engine/scripts/scenario.py": "732ef233876bb13ae5dee3c8f04e5bf99b5634cb879bdeb744f56a47df557172",
-  "props/engine/scripts/score_game.py": "ea7ea0001af71ee311daf464aab5da40b4325527e7f75bc200af25364b9336cc",
+  "props/engine/scripts/score_game.py": "12f8026f0764095e96989992c41b77dd63d188afd6a40f2507dbec04325b9538",
   "props/engine/scripts/score_week.py": "5259ebc2f6e56571f7e0b03291e84d0e26d00f85dacf5256f40b07ac275fabeb",
   "props/engine/scripts/td_alloc.py": "7c407c949cac8f0f74d7f91589fd5d749f65d9053eb1c3f5f0dc63a700b3465b",
   "props/engine/scripts/td_alloc_backtest.py": "e259d9f0e301a5d5d34e5a9e84bba222810f077d9c05a1f1f799a611914595a4",
@@ -192,6 +192,6 @@
   "tiers.csv": "04a1a79d43e9f2445ba3dc4ea262b00fbd58efea1f41e8b0393cb4c7f8afee41",
   "tiers.keefamania.csv": "11e6546b56caa807a572da86d5c3d81097bafd2d2550e25653882d78b2962e94"
  },
- "sha256": "4174fd803715099470dd320e0ceeb6a894b189b8e9aaff6bc80c284bbaea0838",
- "tag": "nfl-v1.39"
+ "sha256": "553bfa61a015d1ce0ab22425eddfd4b6c3558ee9ede4b70a507135f1e09d9067",
+ "tag": "nfl-v1.40"
 }
