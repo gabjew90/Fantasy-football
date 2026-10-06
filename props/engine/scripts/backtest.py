@@ -811,7 +811,7 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
             return yds, car_mean, share_sum, cars
 
         def add_conditional(res_df, test_act, tr, rec_mask, tgtM, carsM, rush_pop, qb_pop, starter, y_rush,
-                            width, recM=None, ydsM=None, rushM=None):
+                            width, recM=None, ydsM=None, rushM=None, passTW=None, p_ix=None, y_pass=None):
             """TIER 2 (reports/tier2_conditional_calibration.md): stage 1, the simulated
             volume against the actual count; stage 2, catches and yards drawn GIVEN the
             actual targets, rushing yards GIVEN the actual carries (a QB's without
@@ -830,7 +830,7 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
                 # it (the engine's own pre-game median, at the half), the chance of the Over GIVEN
                 # the actual volume (pc_) and with the engine's own volume (pu_), and the outcome
                 "L_rec", "pc_rec", "pu_rec", "L_yds", "pc_yds", "pu_yds", "L_rush", "pc_rush", "pu_rush",
-                "L_rr", "pc_rr", "pu_rr", "sd_tgt", "sd_car")}
+                "L_rr", "pc_rr", "pu_rr", "sd_tgt", "sd_car", "L_pass", "pc_pass", "pu_pass", "pit_pass_c")}
             half = lambda x: float(np.floor(x) + 0.5)
             cond_yds, cond_rush = {}, {}
             act_t, act_r, act_y = (tr.act_targets.to_numpy(), tr.act_receptions.to_numpy(float),
@@ -889,6 +889,37 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
                     L = half(mu_t[tpos[i]] * ypt_[tpos[i]] + mu_c[i] * ypc_all[i])
                     cols["L_rr"][i], cols["pc_rr"][i] = L, float(((cond_yds[i] + cond_rush[i]) > L).mean())
                     cols["pu_rr"][i] = float((uM > L).mean())
+            # STARTING-QB PASSING given the volume: every receiver's yards drawn given his actual
+            # targets, the depth receivers given the team's remaining actual targets, times the
+            # starter's share -- the engine's own passing machinery (model.simulate_qb_passing)
+            if passTW is not None and p_ix is not None and pass_on and len(p_ix):
+                tt_act = twt.set_index(["team", "week"])["team_targets"]
+                trk = list(zip(tr.team, tr.week))
+                by_tw = {}
+                for k_, i in enumerate(np.flatnonzero(rec_mask)):
+                    by_tw.setdefault(trk[k_], []).append((k_, i))
+                share_mean = float(np.mean(pass_share)) if pass_share is not None else 1.0
+                for i in p_ix:
+                    tw_ = (test_act.team.iloc[i], int(test_act.week.iloc[i]))
+                    rows_ = by_tw.get(tw_, [])
+                    team_t = float(tt_act.get(tw_, np.nan))
+                    if not rows_ or team_t != team_t:
+                        continue
+                    other_T = max(team_t - sum(float(act_t[k_]) for k_, _ in rows_), 0.0)
+                    g = crng(i, 3)
+                    ys = [cond_yds[j] for _k, j in rows_ if j in cond_yds]
+                    pD = M.simulate_qb_passing(g, N, ys, np.full(N, other_T), other_rates, shape_ypc,
+                                               starter_share=pass_share, width=width)
+                    # stand-in line from pre-game inputs: expected throws at their yards per target
+                    sh_ = sum(float(tr.ts.iloc[k_]) for k_, _ in rows_)
+                    exp_y = (sum(mu_t[k_] * ypt_[k_] for k_, _ in rows_)
+                             + max(1.0 - sh_, 0.0) * float(tr.team_targets_env.iloc[rows_[0][0]])
+                             * float(other_rates["ypt"])) * share_mean
+                    L = half(exp_y)
+                    uM = np.asarray(passTW[tw_], dtype=float)
+                    cols["L_pass"][i], cols["pc_pass"][i] = L, float((pD > L).mean())
+                    cols["pu_pass"][i] = float((uM > L).mean())
+                    cols["pit_pass_c"][i] = pit(pD, float(y_pass[i]), g)
             return res_df.assign(**cols)
 
         def rpit_block(samples, y_arr):
@@ -1083,7 +1114,8 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
                                    act_carries=y_car)
         if cond:
             res_df = add_conditional(res_df, test_act, tr, rec_mask, tgtM, carsM, rush_pop, qb_pop, starter,
-                                     y_rush, width, recM=recM, ydsM=ydsM, rushM=rushM)
+                                     y_rush, width, recM=recM, ydsM=ydsM, rushM=rushM, passTW=passTW, p_ix=p_ix,
+                                     y_pass=y_pass)
         res = res_df.merge(gm, on=["team", "week"], how="left")
 
         # RELIABILITY AT SYNTHETIC LINES (calibration a bettor can read): lines at

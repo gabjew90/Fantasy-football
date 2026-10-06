@@ -39,6 +39,8 @@ MARKETS = {  # market: (line col, conditional col, own-volume col, actual col, p
     "receiving yards": ("L_yds", "pc_yds", "pu_yds", "act_rec_yards", "rec"),
     "rushing yards": ("L_rush", "pc_rush", "pu_rush", "act_rush_yards", "rb"),
     "rushing + receiving yards": ("L_rr", "pc_rr", "pu_rr", "act_rr", "rb"),
+    # the starting QB, given every receiver's actual targets and the team's remaining ones
+    "QB passing yards": ("L_pass", "pc_pass", "pu_pass", "act_pass_yards", "qb"),
 }
 MIN_TARGETS, MIN_CARRIES = 3.0, 8.0
 TGT_BANDS = [(3, 5), (5, 8), (8, 11), (11, 99)]
@@ -48,6 +50,8 @@ CAR_BANDS = [(8, 12), (12, 16), (16, 20), (20, 99)]
 def bettable(R: pd.DataFrame, pop: str) -> pd.Series:
     if pop == "rec":
         return R.mean_tgt.ge(MIN_TARGETS).fillna(False)
+    if pop == "qb":
+        return R.pass_pop.astype(bool)
     return R.rush_pop.astype(bool) & R.mean_car_model.ge(MIN_CARRIES).fillna(False)
 
 

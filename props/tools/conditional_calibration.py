@@ -39,6 +39,10 @@ CHECKS = [
     ("stage 2: rushing yards | carries (backs)", "pit_rush_c", "act_carries", "carries", CAR_EDGES, "rb"),
     ("stage 1: carries (starting QB)", "pit_car_qb", "mean_car_model", "projected", [], "qb"),
     ("stage 2: rushing yards | carries (starting QB)", "pit_rush_c", "act_carries", "carries", [], "qb"),
+    # the starting QB's passing yards given every receiver's actual targets
+    ("stage 2: QB passing | targets", "pit_pass_c", "act_pass_yards", "yards", [], "pass"),
+    # and with the engine's own volume, for comparison (the whole chain)
+    ("whole chain: QB passing", "pit_pass", "act_pass_yards", "yards", [], "pass"),
 ]
 
 
@@ -185,7 +189,8 @@ def main(argv=None):
         sys.exit("these results have no conditional columns: rerun backtest.py with --conditional")
     R = R.merge(team_margins(seasons), on=["season", "week", "team"], how="left")
     R = R.merge(team_context(seasons), on=["season", "week", "team"], how="left")
-    pops = {"rec": R.act_targets.notna(), "rb": R.rush_pop.astype(bool), "qb": R.qb_pop.astype(bool)}
+    pops = {"rec": R.act_targets.notna(), "rb": R.rush_pop.astype(bool), "qb": R.qb_pop.astype(bool),
+            "pass": (R.pass_pop.astype(bool) if "pass_pop" in R else pd.Series(False, index=R.index))}
     # SUBGROUPS known before kickoff, judged like volume buckets (pooled calibration can
     # hide a big favourite's backs running low or backup-QB games running high)
     SUBGROUPS = [("favoured by 7+", lambda d: d.spread >= 7), ("underdog by 7+", lambda d: d.spread <= -7),
@@ -193,6 +198,8 @@ def main(argv=None):
     rng = np.random.default_rng(20261006)
     report = []
     for label, pit_col, vol_col, word, edges, pop in CHECKS:
+        if pit_col not in R or not pops[pop].any():
+            continue                      # results older than this check, or no such population
         d0 = R[pops[pop] & R[pit_col].notna()].assign(pit=lambda x: x[pit_col])
         rows = [("all", shares(d0, a.reps, rng))]
         for lo, hi, lab in edges:
