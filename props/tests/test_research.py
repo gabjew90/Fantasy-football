@@ -543,7 +543,11 @@ def test_fantasy_points_allowed_by_position():
     assert pa["ATL"]["TE"][0] == 0.0 and pa["NO"]["TE"] == (pytest.approx(2.0), 1)
     assert pa["ATL"]["RB"][1] == 1 and pa["NO"]["RB"][1] == 2, "rank 1 = most allowed"
     line = RS.points_allowed_line(pa, ("ATL", "NO"))
-    assert line.startswith("ATL's defence allows RB 2.2 (1 of 2") and "League average: RB 1.1" in line
+    assert line.startswith("ATL's defence allows RB 2.2 (1st most of 2") and "League average: RB 1.1" in line
+    assert RS.matchup_sentence(pa, "NO", "TE").startswith("NO allows 2.0 PPR points a game to tight ends, the 1st most of 2")
+    assert "the 1st fewest of 2" in RS.matchup_sentence(pa, "NO", "RB"), "the bottom half counts from the bottom"
+    assert RS.matchup_sentence(pa, "ATL", "FB").startswith("ATL allows 2.2 PPR points a game to running backs")
+    assert RS.matchup_sentence(pa, "ATL", "QB") is None and RS.matchup_sentence(pa, "DAL", "WR") is None
     assert "context, not an adjustment" in line
     assert RS.points_allowed_line(pa, ("ATL", "DAL")) is None and RS.points_allowed(None, pos) == {}
 
@@ -742,7 +746,9 @@ def test_the_rushing_plus_receiving_read():
     assert "53 yards takes about" in s and "we project 18.9 (15.8 carries, 3.1 catches)" in s
     assert "The book's own carries and catches lines add to 16 touches." in s
     assert "if his team falls behind, that part holds up" in s
-    assert "not shown until the combined market passes its calibration check" in s
+    assert "Our model gives the Over" not in s, "no model chance passed in: none claimed"
+    priced = RS.rush_rec_sentence({**d, "p_model_over": 0.57})
+    assert "Our model gives the Over 57%" in priced and "DECISIONS #187" in priced
     assert RS.rush_rec_read(None) is None
     bare = RS.rush_rec_read(line=40.5)
     assert RS.rush_rec_sentence(bare).startswith("The book's line is 40.5.")
@@ -753,3 +759,84 @@ def test_the_rushing_plus_receiving_read_names_whose_rate():
     d = RS.rush_rec_read(line=30.5, proj_carries=6.0, proj_catches=2.0, run_rate=3.9, catch_rate=6.5,
                          rates_luck_free=False)
     assert "At our yards a touch (too few of his own plays)" in RS.rush_rec_sentence(d)
+
+
+def test_the_book_quarterback_flag_fires_only_when_the_book_skips_our_starter():
+    """DECISIONS #181: the backtest graded the wrong QB in 27% of backup starts because a
+    stale depth chart named an active primary; live, the book's own lines say who starts."""
+    extra = [{"name": "Teddy Bridgewater", "team": "TB", "kind": "passing_attempts", "line": 30.5},
+             {"name": "Teddy Bridgewater", "team": "TB", "kind": "pass_completions", "line": 19.5},
+             {"name": "Dak Prescott", "team": "DAL", "kind": "passing_attempts", "line": 34.5},
+             {"name": "Bucky Irving", "team": "TB", "kind": "rushing_attempts", "line": 14.5}]
+    got = RS.book_qb_mismatch(extra, {"TB": "Baker Mayfield", "DAL": "Dak Prescott"})
+    assert got == [{"team": "TB", "engine": "Baker Mayfield", "book": ["Teddy Bridgewater"]}]
+    assert RS.book_qb_mismatch(extra, {"TB": "Teddy Bridgewater", "DAL": "Dak Prescott"}) == []
+    assert RS.book_qb_mismatch([], {"TB": "Baker Mayfield"}) == [], "no QB lines posted: no claim"
+    la = [{"name": "Matthew Stafford", "team": "LAR", "kind": "passing_attempts", "line": 33.5}]
+    assert RS.book_qb_mismatch(la, {"LA": "Matthew Stafford"}, {"LA": "LAR"}) == [], "team codes mapped"
+    py = [{"name": "Teddy Bridgewater", "team": "TB", "kind": "passing_yards"}]
+    assert RS.book_qb_mismatch(py, {"TB": "Baker Mayfield"}) == [
+        {"team": "TB", "engine": "Baker Mayfield", "book": ["Teddy Bridgewater"]}], "the passing-yards line counts"
+
+
+def test_ordinals_read_like_english():
+    assert [RS.ordinal(n) for n in (1, 2, 3, 4, 10, 11, 12, 13, 21, 22, 23, 32)] == [
+        "1st", "2nd", "3rd", "4th", "10th", "11th", "12th", "13th", "21st", "22nd", "23rd", "32nd"]
+
+
+def test_defence_epa_and_points_per_drive_allowed():
+    """Known answers: ATL allows +0.5 and -0.1 EPA (kneel and spike out), one TD drive (7)
+    and one empty drive -> 3.5 a drive; NO allows -0.2 EPA and a field goal (3)."""
+    import pandas as pd
+    def play(g, d, dr, typ, epa, s0, s1, kneel=0, spike=0, pos="X"):
+        return dict(game_id=g, defteam=d, posteam=pos, fixed_drive=dr, play_type=typ, epa=epa,
+                    posteam_score=s0, posteam_score_post=s1, qb_kneel=kneel, qb_spike=spike)
+    pbp = pd.DataFrame([
+        play("g1", "ATL", 1, "pass", 0.5, 0, 0), play("g1", "ATL", 1, "run", 0.3, 0, 7),
+        play("g1", "ATL", 2, "run", -0.4, 7, 7), play("g1", "ATL", 2, "run", -5.0, 7, 7, kneel=1),
+        play("g1", "ATL", 2, "pass", -3.0, 7, 7, spike=1),
+        play("g2", "NO", 1, "pass", -0.2, 0, 3),
+    ])
+    dm = RS.defense_metrics(pbp)
+    assert dm["ATL"]["epa_play"][0] == pytest.approx((0.5 + 0.3 - 0.4) / 3), "kneel-downs and spikes out"
+    assert dm["ATL"]["epa_pass"][0] == pytest.approx(0.5) and dm["ATL"]["epa_rush"][0] == pytest.approx(-0.05)
+    assert dm["ATL"]["pts_drive"] == (pytest.approx(3.5), 1) and dm["NO"]["pts_drive"] == (pytest.approx(3.0), 2)
+    assert dm["ATL"]["epa_play"][1] == 1, "1st = most allowed"
+    line = RS.defense_line(dm, ("ATL", "NO"))
+    assert line.startswith("ATL allows +0.13 EPA a play (1st most)") and "3.50 points a drive (1st most)" in line
+    assert "NO allows -0.20 EPA a play (1st fewest)" in line
+    assert RS.defense_line(dm, ("ATL", "DAL")) is None
+    assert RS.defense_metrics(pbp.drop(columns=["epa"])) == {}
+    no_drives = RS.defense_metrics(pbp.drop(columns=["fixed_drive"]))
+    assert "pts_drive" not in no_drives["ATL"] and "epa_play" in no_drives["ATL"], "EPA without drive columns"
+
+
+def test_offence_epa_and_points_per_drive_gained():
+    """The same plays by the team with the ball: X gains every play above (two drives in
+    g1 -> 3.5 a drive, the kneel and spike out), Y the field goal."""
+    import pandas as pd
+    rows = [("g1", "ATL", "X", 1, "pass", 0.5, 0, 0, 0, 0), ("g1", "ATL", "X", 1, "run", 0.3, 0, 7, 0, 0),
+            ("g1", "ATL", "X", 2, "run", -0.4, 7, 7, 0, 0), ("g1", "ATL", "X", 2, "run", -5.0, 7, 7, 1, 0),
+            ("g2", "NO", "Y", 1, "pass", -0.2, 0, 3, 0, 0)]
+    pbp = pd.DataFrame(rows, columns=["game_id", "defteam", "posteam", "fixed_drive", "play_type", "epa",
+                                      "posteam_score", "posteam_score_post", "qb_kneel", "qb_spike"])
+    om = RS.offense_metrics(pbp)
+    assert om["X"]["epa_play"] == (pytest.approx(0.4 / 3), 1) and om["X"]["pts_drive"][0] == pytest.approx(3.5)
+    assert om["Y"]["pts_drive"] == (pytest.approx(3.0), 2)
+    line = RS.defense_line(om, ("X", "Y"), verb="gains")
+    assert line.startswith("X gains +0.13 EPA a play (1st most)") and "('fewest') gained" in line
+
+
+def test_rank_words_count_from_the_nearer_end():
+    assert [RS.rank_words(r, 32) for r in (1, 10, 16, 17, 31, 32)] == [
+        "1st most", "10th most", "16th most", "16th fewest", "2nd fewest", "1st fewest"]
+
+
+def test_epa_uses_the_pass_and_rush_flags_so_a_scramble_is_a_dropback():
+    import pandas as pd
+    pbp = pd.DataFrame({"game_id": "g", "defteam": "ATL", "posteam": "X", "epa": [0.6, -0.2, 1.0],
+                        "play_type": ["pass", "run", "run"], "pass": [1, 0, 1], "rush": [0, 1, 0],
+                        "qb_scramble": [0, 0, 1]})
+    dm = RS.defense_metrics(pbp)
+    assert dm["ATL"]["epa_pass"][0] == pytest.approx(0.8), "the scramble is a dropback"
+    assert dm["ATL"]["epa_rush"][0] == pytest.approx(-0.2)

@@ -287,12 +287,36 @@ def snap_react(share, snap_last, snap_base, gamma, clip=SNAP_REACT_CLIP, gamma_u
     return sh * float(np.clip((sl / sb) ** g, clip[0], clip[1]))
 
 
-def k0_rates(fitted, override=None):
+def snap_names_from_roster(snp: pd.DataFrame, ros: pd.DataFrame) -> pd.DataFrame:
+    """Snap rows carrying the ROSTER's name for each player, matched by ID (the snap file's
+    pfr_player_id = the roster's pfr_id), the snap file's own name kept where no ID matches.
+    Every snap lookup in the engine keys on a normalised name; the two files spell some
+    players differently ("Kenneth Gainwell" / "Kenny Gainwell", "Zonovan" / "Bam Knight"),
+    and a name-only join gave those players no snaps at all (outside review, 2026-10-06).
+    The snap file's spelling is kept as player_snap_file."""
+    if snp is None or not len(snp) or "pfr_player_id" not in snp or ros is None or "pfr_id" not in ros:
+        return snp
+    r = ros.dropna(subset=["pfr_id"])
+    order = [c for c in ("season", "week") if c in r]
+    if order:
+        r = r.sort_values(order)
+    names = r.drop_duplicates("pfr_id", keep="last").set_index("pfr_id")["full_name"]
+    out = snp.copy()
+    out["player_snap_file"] = out["player"]
+    hit = out["pfr_player_id"].map(names)
+    out["player"] = hit.where(hit.notna(), out["player"])
+    return out
+
+
+def k0_rates(fitted, override=None, fit_only=False):
     """The per-rate shrinkage constants a pricing run uses: the priors' fitted
-    `k0_per_rate` (else DEFAULT_K0), with K0_FIXED -- or `override`, for the
-    harness -- replacing the rates it names."""
+    `k0_per_rate` (else DEFAULT_K0), with K0_FIXED replacing the rates it names, and
+    `override` (the harness's --k0) replacing the rates IT names on top -- a partial
+    override keeps every other shipped constant (outside review 2026-10-06: overriding
+    one rate used to drop all of K0_FIXED). fit_only: the ablation, the per-season fit
+    with no fixed constants at all (as before round 17)."""
     out = dict(fitted or DEFAULT_K0)
-    fixed = K0_FIXED if override is None else override
+    fixed = {} if fit_only else {**K0_FIXED, **(override or {})}
     out.update(fixed)
     # build_priors.py derives the goal-line shares' constants from the share
     # constants rescaled to goal-line volume; a fixed share constant carries its
@@ -328,6 +352,39 @@ def market_environment_fitted(team_spread, total, mkt_fit, team_pace_blend, team
     return {"plays": (1 - w) * team_pace_blend + w * mkt_plays,
             "pass_rate": float(np.clip((1 - w) * team_pr_blend + w * mkt_pr, 0.35, 0.75)),
             "implied_points": (total + team_spread) / 2, "source": "market-fitted"}
+
+
+# Round 29 (reports/round29_market_runs.md): the weight on the market's fitted CARRIES
+# for the backs; 0 = runs from history alone (shipped). The starting QB's carries are
+# held where history put them (hold_qb_carries), since the full market environment hurt
+# QB rushing (#106).
+MARKET_RUSH_WEIGHT = 0.0
+# DECISIONS #185 (user's choice): round 29's weight priced BESIDE the board for the backs'
+# rushing yards -- shown and logged, graded by the settled record, never the board's price.
+SHADOW_MARKET_RUSH_WEIGHT = 0.5
+
+
+def market_rush_volume(team_spread, total, mkt_fit, team_carries_blend, weight):
+    """Round 29: team carries moved `weight` toward the market's fitted carries (plays x
+    (1 - pass rate) from `mkt_fit`, the fit #134 uses for throws). Returns (carries,
+    factor = new / old) -- the factor is what hold_qb_carries divides the QB's share by."""
+    w = float(np.clip(weight or 0.0, 0.0, 1.0))
+    if not mkt_fit or not w or not team_carries_blend or team_carries_blend <= 0:
+        return team_carries_blend, 1.0
+    fp, fr = mkt_fit["plays"], mkt_fit["pass_rate"]
+    plays = fp["intercept"] + fp["per_spread_pt"] * team_spread + fp["per_total_pt"] * total
+    pr = float(np.clip(fr["intercept"] + fr["per_spread_pt"] * team_spread + fr["per_total_pt"] * total, 0.35, 0.75))
+    new = (1 - w) * team_carries_blend + w * plays * (1 - pr)
+    return new, new / team_carries_blend
+
+
+def hold_qb_carries(rush_shares, qb_index, factor):
+    """The starting QB's carry share divided by the team-carries factor, so his expected
+    carries stay where history put them and only the backs' and depth pool's move."""
+    rs = np.asarray(rush_shares, dtype=float).copy()
+    if qb_index is not None and factor and factor != 1.0:
+        rs[int(qb_index)] = rs[int(qb_index)] / factor
+    return rs
 
 
 # Round 16 (2026-10-01, DECISIONS #134): the weight on the market's fitted pass
@@ -622,7 +679,17 @@ def questionable_flip_check(samples_by_regime, line):
 WIDTH_OFF = {"share_conc_targets": None, "share_conc_carries": None, "catch_conc": None,
              "eff_sd_rec": 0.0, "eff_sd_rush": 0.0, "share_conc_qb": None, "eff_sd_qb": None,
              "rush_other_share": None, "rush_norm_strength": 0.0, "rush_norm_qb": False,
-             "rush_norm_lead": None, "eff_sd_pass": 0.0}
+             "rush_norm_lead": None, "eff_sd_pass": 0.0,
+             # the per-catch yards shape times this (None = the fitted shape as is): a larger
+             # shape narrows yards given catches (reports/round30_conversion.md)
+             "catch_shape_mult": None,
+             # the team targets' negative-binomial dispersion times this (None = the fitted r):
+             # a larger r narrows the team's game-to-game throws (reports/round31_target_spread.md)
+             "team_r_mult": None,
+             # receiving yards' spread grows with catches as catches ** (2 - this) instead of
+             # linearly (None = 1, today's sum of independent catches); above 1 = slower growth
+             # (reports/round32_yards_shape.md)
+             "catch_shape_exp": None}
 
 # simulate_team_game(..., return_other=True) files the 'other' bucket's targets
 # under this key, for simulate_qb_passing.
@@ -645,6 +712,9 @@ def validate_width(w):
                 raise ValueError(f"{k} must be null (off) or > 0, got {v!r}")
         elif k == "eff_sd_qb" and v is None:
             continue                                   # None = inherit eff_sd_rush
+        elif k in ("catch_shape_mult", "team_r_mult", "catch_shape_exp"):
+            if v is not None and not (isinstance(v, (int, float)) and v > 0):
+                raise ValueError(f"{k} must be null (off) or > 0, got {v!r}")
         elif k == "rush_other_share":
             if v is not None and not (isinstance(v, (int, float)) and 0 <= v < 1):
                 raise ValueError(f"{k} must be null (off) or in [0, 1), got {v!r}")
@@ -823,19 +893,9 @@ def simulate_team_rush(rng, n_sim, team_carries_mean, carries_r, rush_shares, yp
     carries, yards = [], []
     for j in range(len(rs)):
         car = alloc[:, j]
-        rush = np.zeros(n_sim)
-        if car.max() > 0:
-            mx = int(car.max())
-            grid = carry_resid if player_resid is None or player_resid[j] is None else player_resid[j]
-            draws = rng.choice(grid, size=(n_sim, mx)) + float(ypc[j])
-            rush = (draws * (np.arange(mx)[None, :] < car[:, None])).sum(1)
-        sd = w["eff_sd_rush"]
-        if qb_index is not None and j == int(qb_index) and w["eff_sd_qb"] is not None:
-            sd = w["eff_sd_qb"]
-        if sd:
-            # the game's yards per carry = ypc x a mean-one multiplier; the
-            # carry residuals stay as drawn
-            rush = rush + car * float(ypc[j]) * (_game_multiplier(rng, n_sim, sd) - 1.0)
+        grid = carry_resid if player_resid is None or player_resid[j] is None else player_resid[j]
+        rush = rushing_given_carries(rng, n_sim, car, ypc[j], grid,
+                                     rush_eff_sd(w, qb_index is not None and j == int(qb_index)))
         carries.append(car.astype(float)); yards.append(rush)
     if player_kneel is not None and any(k is not None for k in player_kneel):
         kneel_rng = rng.spawn(1)[0]
@@ -843,6 +903,31 @@ def simulate_team_rush(rng, n_sim, team_carries_mean, carries_r, rush_shares, yp
             if grid is not None:
                 yards[j] = yards[j] + kneel_rng.choice(np.asarray(grid, dtype=float), size=n_sim)
     return carries, yards, tc_draw
+
+
+def rush_eff_sd(width, is_starting_qb):
+    """The game-wide yards-per-carry swing for a player: eff_sd_qb for the starting QB
+    when set, else eff_sd_rush."""
+    w = {**WIDTH_OFF, **(width or {})}
+    return w["eff_sd_qb"] if is_starting_qb and w["eff_sd_qb"] is not None else w["eff_sd_rush"]
+
+
+def rushing_given_carries(rng, n_sim, carries, ypc, grid, eff_sd):
+    """One player's rushing yards GIVEN his carries in each simulation (an array, or one
+    number for every simulation): the rushing sampler's second stage, also run alone by
+    the conditional calibration. Each carry gains his yards per carry plus a residual
+    from `grid`; a game multiplier (sd eff_sd) scales the yards-per-carry part."""
+    car = np.broadcast_to(np.asarray(carries), (n_sim,))
+    rush = np.zeros(n_sim)
+    if car.max() > 0:
+        mx = int(car.max())
+        draws = rng.choice(grid, size=(n_sim, mx)) + float(ypc)
+        rush = (draws * (np.arange(mx)[None, :] < car[:, None])).sum(1)
+    if eff_sd:
+        # the game's yards per carry = ypc x a mean-one multiplier; the
+        # carry residuals stay as drawn
+        rush = rush + car * float(ypc) * (_game_multiplier(rng, n_sim, eff_sd) - 1.0)
+    return rush
 
 
 def kneel_grid(params, team_spread):
@@ -890,7 +975,7 @@ def starter_qb_index(positions, rush_shares, slots=None):
 
 def simulate_team_game(rng, n_sim, team_volume_mean, team_volume_r, player_shares,
                         player_catch_rates, player_ypt, per_catch_shape, other_bucket=True, width=None,
-                        return_other=False):
+                        return_other=False, return_targets=False):
     """Draw one team's targets jointly with all eligible receivers in one pass.
 
     1. Team targets ~ NegBinomial(team_volume_mean, team_volume_r) -- one draw per
@@ -907,6 +992,8 @@ def simulate_team_game(rng, n_sim, team_volume_mean, team_volume_r, player_share
     Returns {player_index: (receptions_array, yards_array)}, plus team_targets_array.
     With `return_other` (and the other bucket on), the dict also holds
     OTHER -> the bucket's targets per simulation; that costs no random draw.
+    With `return_targets`, a third value: {player: his targets per simulation}
+    (also no random draw).
     """
     w = {**WIDTH_OFF, **(width or {})}
     names = list(player_shares.keys())
@@ -919,6 +1006,8 @@ def simulate_team_game(rng, n_sim, team_volume_mean, team_volume_r, player_share
         s = shares.sum()
         shares = shares / s if s > 0 else shares
 
+    if w["team_r_mult"]:                               # round 31 candidate: None = the fitted r
+        team_volume_r = team_volume_r * float(w["team_r_mult"])
     p = team_volume_r / (team_volume_r + max(team_volume_mean, 1e-6))
     team_targets = rng.negative_binomial(team_volume_r, p, size=n_sim)
 
@@ -928,24 +1017,49 @@ def simulate_team_game(rng, n_sim, team_volume_mean, team_volume_r, player_share
 
     out = {}
     for j, name in enumerate(names):
-        cr = max(player_catch_rates.get(name, 0.3), 0.05)
-        if w["catch_conc"]:
-            # this game's catch rate ~ Beta around the player's rate
-            c = w["catch_conc"]
-            cr_game = rng.beta(max(c * cr, 1e-3), max(c * (1.0 - cr), 1e-3), size=n_sim)
-            rec = rng.binomial(alloc[:, j], cr_game).astype(float)
-        else:
-            rec = rng.binomial(alloc[:, j], cr).astype(float)
-        ypt = max(player_ypt.get(name, 7.0), 0.5)
-        ypc = ypt / cr
-        shape_total = np.clip(rec, 0, 25) * per_catch_shape
-        yds = np.where(rec > 0, rng.gamma(np.maximum(shape_total, 1e-6), ypc / per_catch_shape), 0.0)
-        if w["eff_sd_rec"]:
-            yds = yds * _game_multiplier(rng, n_sim, w["eff_sd_rec"])
-        out[name] = (rec, yds)
+        out[name] = receiving_given_targets(rng, n_sim, alloc[:, j], player_catch_rates.get(name, 0.3),
+                                            player_ypt.get(name, 7.0), per_catch_shape, w)
     if return_other and other_bucket:
         out[OTHER] = alloc[:, -1].astype(float)
+    if return_targets:
+        return out, team_targets, {name: alloc[:, j].astype(float) for j, name in enumerate(names)}
     return out, team_targets
+
+
+def receiving_given_targets(rng, n_sim, targets, catch_rate, ypt, per_catch_shape, width=None):
+    """One player's catches and receiving yards GIVEN his targets in each simulation
+    (an array, or one number for every simulation): the joint sampler's second stage,
+    also run alone by the conditional calibration (backtest.py --conditional).
+    Catches | targets ~ Binomial(catch rate), this game's rate Beta-drawn when
+    catch_conc is set; yards | catches ~ a sum of per-catch Gamma draws, times a
+    game multiplier when eff_sd_rec is set."""
+    w = {**WIDTH_OFF, **(width or {})}
+    targets = np.broadcast_to(np.asarray(targets), (n_sim,))
+    cr = max(catch_rate, 0.05)
+    if w["catch_conc"]:
+        # this game's catch rate ~ Beta around the player's rate
+        c = w["catch_conc"]
+        cr_game = rng.beta(max(c * cr, 1e-3), max(c * (1.0 - cr), 1e-3), size=n_sim)
+        rec = rng.binomial(targets, cr_game).astype(float)
+    else:
+        rec = rng.binomial(targets, cr).astype(float)
+    ypt = max(ypt, 0.5)
+    ypc = ypt / cr
+    if w["catch_shape_mult"]:                          # round 30 candidate: None = the fitted shape
+        per_catch_shape = per_catch_shape * float(w["catch_shape_mult"])
+    if w["catch_shape_exp"]:
+        # round 32 candidate: the same mean (catches x yards a catch), a spread that grows
+        # as catches ** (2 - exp) -- the gamma's shape is catches ** exp x the per-catch shape
+        n_c = np.clip(rec, 0, 25)
+        shape_total = np.power(n_c, float(w["catch_shape_exp"])) * per_catch_shape
+        scale = np.where(n_c > 0, n_c * ypc / np.maximum(shape_total, 1e-9), 1.0)
+        yds = np.where(rec > 0, rng.gamma(np.maximum(shape_total, 1e-6), scale), 0.0)
+    else:
+        shape_total = np.clip(rec, 0, 25) * per_catch_shape
+        yds = np.where(rec > 0, rng.gamma(np.maximum(shape_total, 1e-6), ypc / per_catch_shape), 0.0)
+    if w["eff_sd_rec"]:
+        yds = yds * _game_multiplier(rng, n_sim, w["eff_sd_rec"])
+    return rec, yds
 
 
 def simulate_qb_completions(rng, n_sim, receiver_receptions, other_targets, other_rates, starter_share=None):

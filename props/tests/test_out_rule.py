@@ -51,3 +51,31 @@ def test_the_old_rule_is_x1_y1_pro_rata_to_everyone():
 def test_no_one_excluded_changes_nothing():
     M, red = SG.apply_out_rule(_m(), pd.DataFrame(), ("A", "B"))
     assert M.equals(_m())
+
+
+
+def test_round_35_carries_hand_on_this_seasons_share_and_only_what_is_left():
+    """DECISIONS #192: the absent back's carry share this season in his games, and each
+    teammate gets only the fraction of the absence not yet in his own share."""
+    import score_game as SG
+    rushes = pd.DataFrame({"posteam": "X", "week": [1] * 10 + [2] * 10 + [3] * 10,
+                           "rusher_player_id": (["K"] * 6 + ["A"] * 4) * 2 + ["A"] * 10})
+    passes = pd.DataFrame({"posteam": ["X"], "week": [1], "receiver_player_id": ["A"]})
+    act = {"A": {1, 2, 3}, "B": {3}}
+    share, frac = SG.carry_handoff_inputs(rushes, passes, act, "X", "K", ["A", "B"])
+    assert share == pytest.approx(12 / 20), "K: 12 of the team's 20 carries in his two games"
+    assert frac == {"A": pytest.approx(2 / 3), "B": 0.0}, "B joined after K went out: K's absence is all in B's share"
+    assert SG.carry_handoff_inputs(rushes, passes, act, "X", "Z", ["A"]) == (None, {})
+    catcher = pd.DataFrame({"posteam": ["X"], "week": [3], "receiver_player_id": ["K"]})
+    assert SG.carry_handoff_inputs(rushes, catcher, act, "X", "K", ["A"])[1]["A"] == pytest.approx(2 / 3), \
+        "a week with only a catch is not a played week for the carry handoff (as tested)"
+    two = pd.concat([rushes, pd.DataFrame({"posteam": ["X"] * 4, "week": [1] * 4, "rusher_player_id": ["K"] * 4,
+                                           "two_point_attempt": [1] * 4})], ignore_index=True)
+    assert SG.carry_handoff_inputs(two, passes, act, "X", "K", ["A"])[0] == pytest.approx(12 / 20), "two-point tries out"
+    M = pd.DataFrame({"team": "X", "gsis_id": ["A", "B"], "pos": "RB", "ts": 0.0, "rs": [0.3, 0.2],
+                      "i10ts": 0.0, "i10rs": 0.0})
+    E = pd.DataFrame({"team": ["X"], "gsis_id": ["K"], "pos": ["RB"], "ts": 0.0, "rs": [share], "i10ts": 0.0, "i10rs": 0.0})
+    plain, _ = SG.apply_out_rule(M, E, ["X"])
+    scaled, _ = SG.apply_out_rule(M, E, ["X"], mult={"rs": {0: frac}})
+    gain_a, gain_b = (plain.rs - M.rs).to_numpy()
+    assert (scaled.rs - M.rs).to_numpy() == pytest.approx([gain_a * 2 / 3, 0.0])

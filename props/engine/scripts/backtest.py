@@ -33,8 +33,9 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from scipy.optimize import minimize
-from scipy.special import gammaln
+# SciPy is imported where the dispersion fit needs it (nb_mle), not at module load: the
+# lean capture and CI installs (props/requirements.txt) import this module's helpers in
+# props/tests without SciPy, and a module-level import failed them (outside review, 10-06).
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import model as M
@@ -49,7 +50,7 @@ N = 1000
 # market key -> (actual column, label, synthetic-line offsets for the reliability table)
 # market -> the population column its rows are graded on (absent = every row)
 POPULATION = {"rush": "rush_pop", "qbrush": "qb_pop", "pass": "pass_pop", "car": "rush_pop",
-              "cmp": "pass_pop"}
+              "cmp": "pass_pop", "rr": "rr_pop"}
 MARKETS = {"rec": ("act_receptions", "receptions", [0.5, 1.5, 2.5, 3.5]),
            "yds": ("act_rec_yards", "receiving yards", [5, 10, 15, 20, 30]),
            "rush": ("act_rush_yards", "rushing yards", [5, 10, 15, 20, 30]),
@@ -62,7 +63,10 @@ MARKETS = {"rec": ("act_receptions", "receptions", [0.5, 1.5, 2.5, 3.5]),
            # already makes, graded on the same rushing population (backs, not QBs)
            "car": ("act_carries", "rushing attempts", [0.5, 1.5, 2.5, 3.5]),
            # the starting QB's completions (reports/qb_completions.md)
-           "cmp": ("act_completions", "QB completions", [0.5, 1.5, 2.5, 3.5])}
+           "cmp": ("act_completions", "QB completions", [0.5, 1.5, 2.5, 3.5]),
+           # a back's rushing + receiving yards (reports/rush_rec_calibration.md, #173 step 2):
+           # his receiving and rushing draws from the same simulation, summed
+           "rr": ("act_rr", "rushing + receiving yards", [5, 10, 15, 20, 30])}
 # THE LIVE SCORER'S OPPONENT SETTINGS (score_game.py section 5): team level, fixed
 # shrinkage k0=150 plays, applied to catch rate, ypt and ypc. The single-season
 # defaults below (posgrp, k0=1000) are the round-5 ones, kept for reproduction.
@@ -89,7 +93,56 @@ def parse_weeks(s):
     return [int(x) for x in s.split(",")]
 
 
+def standin_half(x):
+    """The stand-in line for an expected value x: the half-point line NEAREST x
+    (floor(x) + 0.5 -- 3.2 -> 3.5, 3.8 -> 3.5, 63.2 -> 63.5), the shape a book's line takes.
+    reports/scoreboard.md's 2026-10-06 text called it "the half nearest below"; the code has
+    always taken the nearest half (amendment, outside review 2026-10-06)."""
+    return float(np.floor(x) + 0.5)
+
+
+def receptions_over_exact(targets, catch_rate, line, catch_conc=None):
+    """P(catches > line | targets) EXACTLY, the conditional receptions score's chance
+    (outside review 2026-10-06: 1,000 draws leave a 0.5-1% chance with a standard error
+    near a third of a point). Binomial(targets, catch rate) -- the shipped sampler, rate
+    floored at 0.05 as model.receiving_given_targets floors it -- or, with catch_conc,
+    the beta-binomial that sampler draws (this game's rate ~ Beta(c*cr, c*(1-cr)))."""
+    import math
+    T = int(targets)
+    cr = max(float(catch_rate), 0.05)
+    k0 = int(math.floor(line)) + 1                       # the first count that clears the line
+    if k0 > T:
+        return 0.0
+    if k0 <= 0:
+        return 1.0
+    if catch_conc:
+        a, b = max(catch_conc * cr, 1e-3), max(catch_conc * (1.0 - cr), 1e-3)
+        lbeta = lambda x, y: math.lgamma(x) + math.lgamma(y) - math.lgamma(x + y)
+        pmf = lambda k: math.exp(math.lgamma(T + 1) - math.lgamma(k + 1) - math.lgamma(T - k + 1)
+                                 + lbeta(k + a, T - k + b) - lbeta(a, b))
+    else:
+        pmf = lambda k: math.comb(T, k) * cr ** k * (1.0 - cr) ** (T - k)
+    return float(min(max(sum(pmf(k) for k in range(k0, T + 1)), 0.0), 1.0))
+
+
+def rr_given_volume(targets, carries, yds_draw, rush_draw, n):
+    """Rushing + receiving yards GIVEN his actual targets and carries: the two conditional
+    draws summed, a side with no volume a known zero (outside review, 2026-10-06 -- 15
+    carries and no target is still a combined-yards game). None when he had neither (the
+    book voids a player who never touches the ball) or a side with volume has no draw."""
+    if targets <= 0 and carries <= 0:
+        return None
+    yd = yds_draw if targets > 0 else np.zeros(n)
+    ru = rush_draw if carries > 0 else np.zeros(n)
+    if yd is None or ru is None:
+        return None
+    return np.asarray(yd, float) + np.asarray(ru, float)
+
+
 def nb_mle(mu, y, r_clamp):
+    from scipy.optimize import minimize
+    from scipy.special import gammaln
+
     def nll(p):
         a, b = p
         r = np.clip(np.exp(a + b * np.log(np.maximum(mu, 1e-6))), *r_clamp)
@@ -166,17 +219,31 @@ def crps_block(samples, y_arr):
     return t1 - 0.5 * t2
 
 
+OPENING_DROPBACKS = 3
+
+
+def opening_passers(pbp):
+    """{(team, week): the passers of the team's first OPENING_DROPBACKS dropbacks}. A QB
+    in that set started; three plays, not one, so a gadget pass on the first snap does
+    not unseat the real starter (DECISIONS #181)."""
+    d = pbp[(pbp.play_type == "pass") & pbp.passer_player_id.notna()].sort_values("play_id")
+    first = d.groupby(["posteam", "week"]).head(OPENING_DROPBACKS)
+    return {(t, int(w)): set(g.passer_player_id) for (t, w), g in first.groupby(["posteam", "week"])}
+
+
 def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
     """One season, walk-forward. Returns (per-player-week results, meta), or,
     given `widths`, one (results, meta) per width setting -- features are built
     once and every setting is scored on the same random draws."""
-    seed = 20260917 + (S - 2025 if live else 0)
+    seed = 20260917 + (S - 2025 if live else 0) + int(getattr(args, "audit_seed_offset", 0) or 0) * 1000
     opp = (dict(LIVE_OPP, **({"metrics": args.live_opp_metrics} if getattr(args, "live_opp_metrics", None) else {}))
            if live else dict(level=args.opp_level, mode=args.opp_mode, k0=args.opp_k0,
                              metrics=args.opp_metrics))
     dispersion = args.dispersion or ("prior" if live else "train")
     # round 16: the market pass-volume weight -- --env market_pass (the tuning runs:
     # --pace-weight), else --market-pass-weight, else what the scorer ships; live only
+    mrw = (M.MARKET_RUSH_WEIGHT if getattr(args, "market_rush_weight", None) is None
+           else float(args.market_rush_weight))
     mpw = ((args.pace_weight if args.pace_weight is not None else M.MARKET_PASS_WEIGHT)
            if args.env == "market_pass" else
            (M.MARKET_PASS_WEIGHT if getattr(args, "market_pass_weight", None) is None
@@ -188,7 +255,7 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
     sr_up = (M.SNAP_REACT_UP if getattr(args, "snap_react_up", None) is None
              else (None if args.snap_react_up == "same" else float(args.snap_react_up)))
     print(f"season={S} env={args.env} opponent={args.opponent} ({opp['level']}, k0={opp['k0']:g}) "
-          f"historical_blend={args.historical_blend} dispersion={dispersion} live={live}", file=sys.stderr)
+          f"historical_blend={args.historical_blend} new_team_cap={getattr(args, 'new_team_cap', True)} dispersion={dispersion} live={live}", file=sys.stderr)
 
     # ---- self-contained data build (round 7): derive every frame from nflverse for
     # ANY season, cached so repeat runs are instant. ----
@@ -248,6 +315,15 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
             ["posteam", "week", "passer_player_id"]).y.sum().rename("pass_yards").reset_index().rename(
             columns={"posteam": "team", "passer_player_id": "gsis_id"})
         pd.to_pickle((games, gm, roles, roster, rec, rush, twt, twc, kneel, pas), frames_cache)
+    cut = getattr(args, "audit_truncate_after", None)
+    if cut is not None:
+        # HARNESS AUDIT (leakage): every frame without the weeks after `cut`. Week `cut`'s
+        # model numbers must come out identical to a full-season run; any difference
+        # means something read the future.
+        _keep = lambda d: d[d.week <= cut]
+        pbp_full, games, gm, roles, roster = map(_keep, (pbp_full, games, gm, roles, roster))
+        rec, rush, twt, twc, kneel, pas = map(_keep, (rec, rush, twt, twc, kneel, pas))
+        print(f"AUDIT: frames truncated after week {cut}", file=sys.stderr)
 
     if "spread_line" not in games.columns:
         sys.exit("games.csv has no spread_line/total_line -- cannot backtest --env market")
@@ -265,10 +341,12 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
     pri_teams = pd.read_csv(pdir / f"priors_{PRIOR}_teams.csv", index_col=0)
     print(f"priors: {PRIOR} (the season before the one under test), "
           f"{len(pri_players)} players", file=sys.stderr)
-    _k0o = None
-    if getattr(args, "k0", None):
+    _k0o, _k0fit = None, False
+    if getattr(args, "k0", None) == "fit":
+        _k0fit = True              # the ablation: the per-season fit alone, no fixed constants
+    elif getattr(args, "k0", None):
         _k0o = {kv.split("=")[0].strip(): float(kv.split("=")[1]) for kv in args.k0.split(",") if kv.strip()}
-    K0R = M.k0_rates(P0.get("k0_per_rate", M.DEFAULT_K0), override=_k0o)
+    K0R = M.k0_rates(P0.get("k0_per_rate", M.DEFAULT_K0), override=_k0o, fit_only=_k0fit)
     print(f"shrinkage constants: {K0R}", file=sys.stderr)
     K0_TEAM = float(P0.get("K0", 4.0))
     league_pass_rate = P0.get("league_pass_rate", 0.55)
@@ -491,6 +569,12 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
             # was tuned: team targets for shares, own targets for catch rate and
             # ypt, carries for ypc.
             pri = pri_players.loc[r.gsis_id] if r.gsis_id in pri_players.index else None
+            # THE NEW-TEAM CAP the scorer applies (outside review 2026-10-06, finding 4): a
+            # rate carried from another team is capped at half weight. Team identity alone,
+            # so the harness can reproduce it; the scorer's snap-based role_scale needs a
+            # pre-game snap feed the harness does not have and stays a disclosed gap.
+            new_team = bool(getattr(args, "new_team_cap", True) and pri is not None and "team_prior" in pri.index
+                            and pd.notna(pri["team_prior"]) and pri["team_prior"] != r.team)
 
             def two_stage(pri_col, n_col, slot_key, default, k0_key, k0_default,
                           cur, cur_n, scale_role=False):
@@ -505,7 +589,7 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
                 val, _chain = M.blended_rate(
                     own_pri, n_pri, gv(sp[slot_key], slot, default),
                     K0R.get(k0_key, k0_default),
-                    cur_rate=cur, cur_den=cur_n, scale_role=scale_role)
+                    cur_rate=cur, cur_den=cur_n, scale_role=scale_role, new_team=new_team)
                 return val
 
             ts = two_stage("target_share", "team_targets_n", "ts", np.nan,
@@ -539,7 +623,8 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
                 targets_env = league_plays * league_pass_rate
                 carries_env = league_plays * (1 - league_pass_rate)
             team_pr = targets_env / max(targets_env + carries_env, 1e-6)   # team's own history pass rate
-            if env_mode in ("history", "market_pass") and mpw and opp_team:
+            carry_factor = 1.0
+            if env_mode in ("history", "market_pass") and (mpw or mrw) and opp_team:
                 # round 16: the market moves the pass volume only (model.market_pass_volume)
                 key3 = None
                 if (r.team, opp_team, W) in game_lines.index: key3 = (r.team, opp_team, W); is_home3 = True
@@ -548,6 +633,8 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
                     sl3, tl3 = game_lines.loc[key3, ["spread_line", "total_line"]]
                     targets_env, carries_env = M.market_pass_volume(sl3 if is_home3 else -sl3, tl3, MKT_FIT,
                                                                     targets_env, carries_env, mpw)
+                    carries_env, carry_factor = M.market_rush_volume(sl3 if is_home3 else -sl3, tl3, MKT_FIT,
+                                                                    carries_env, mrw)
             if env_mode == "market_fit" and opp_team:
                 key2 = None
                 if (r.team, opp_team, W) in game_lines.index: key2 = (r.team, opp_team, W); is_home2 = True
@@ -580,7 +667,8 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
                         sl = float(game_lines.loc[key, "spread_line"])     # nflverse: + = home favoured
                         abs_spread, team_spread = abs(sl), (sl if home else -sl); break
             rows.append(dict(r, ts=ts, cr=cr, ypt=ypt, rs=rs_, ypc=ypc,
-                             team_targets_env=targets_env, team_carries_env=carries_env, abs_spread=abs_spread,
+                             team_targets_env=targets_env, team_carries_env=carries_env, carry_factor=carry_factor,
+                             abs_spread=abs_spread,
                              team_spread=team_spread))
         return pd.DataFrame(rows)
 
@@ -594,6 +682,8 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
         what the scorer reads from the same nflverse file before kickoff."""
         sn = pd.read_csv(dl(f"{NV}/snap_counts/snap_counts_{S}.csv", f"snap_counts_{S}.csv"), low_memory=False)
         sn = sn[sn.game_type == "REG"]
+        if getattr(args, "audit_truncate_after", None) is not None:
+            sn = sn[sn.week <= args.audit_truncate_after]
         pl = pd.read_csv(dl(f"{NV}/players/players.csv", "players.csv"), usecols=["gsis_id", "pfr_id"],
                          low_memory=False).dropna()
         sn = sn.assign(gsis_id=sn.pfr_player_id.map(dict(zip(pl.pfr_id, pl.gsis_id)))).dropna(subset=["gsis_id"])
@@ -667,6 +757,17 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
           f"carries r={r_team_carries:.2f}", file=sys.stderr)
 
     test_act = feat_te[feat_te.roster_status == "ACT"].reset_index(drop=True)
+    _bad = test_act[test_act.team_targets_env.isna() | test_act.team_carries_env.isna()]
+    if len(_bad):           # NaN volume crashes the sampler deep down; say what is missing instead
+        sys.exit(f"season {S}: no team volume for {len(set(zip(_bad.team, _bad.week)))} team-weeks "
+                 f"(e.g. {sorted(set(zip(_bad.team, _bad.week)))[:3]}). Usually a stale cache: games.csv "
+                 f"without that week's spread/total or play-by-play missing earlier weeks -- refresh "
+                 f"{CACHE} and use a fresh --out.")
+    # WHO ACTUALLY STARTED at QB: a passer on the team's first three dropbacks. The
+    # starting-QB markets are graded only when the depth-chart starter is that man; a
+    # depth chart that still lists an active primary who did not start had the harness
+    # grading a QB who barely played (27% of backup starts, 2022-25; DECISIONS #181).
+    OPENING_PASSERS = opening_passers(pbp_full)
 
     def score(width, full=True):
         rng = np.random.default_rng(seed)
@@ -693,25 +794,30 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
                 return rng
             return np.random.default_rng([seed, arm, int(week), zlib.crc32(str(team).encode("utf-8"))])
 
-        def draw_block_joint(frame, shares, crs, ypts, arm):
+        def draw_block_joint(frame, shares, crs, ypts, arm, want_targets=False):
             """THE LIVE PIPELINE'S DRAW (model.simulate_team_game): one team-volume
             draw per simulation, split across that team's players. With QB
             passing on, also each team-game's starting-QB passing yards from the
             same draws (model.simulate_qb_passing), keyed (team, week)."""
             rec_ = np.zeros((len(frame), N))
             yds = np.zeros((len(frame), N))
+            tgt_ = np.zeros((len(frame), N)) if want_targets else None
             passing = {}
             completions = {}
             pos_ = {ix: i for i, ix in enumerate(frame.index)}
             for (team, week), g in frame.groupby(["team", "week"], sort=False):
                 tvol = float(g.team_targets_env.iloc[0])
                 g_rng = game_rng(team, week, arm)
-                out, _tt = M.simulate_team_game(
+                got = M.simulate_team_game(
                     g_rng, N, tvol, r_team_targets,
                     {ix: float(shares[pos_[ix]]) for ix in g.index},
                     {ix: float(crs[pos_[ix]]) for ix in g.index},
                     {ix: float(ypts[pos_[ix]]) for ix in g.index},
-                    shape_ypc, width=width, return_other=pass_on)
+                    shape_ypc, width=width, return_other=pass_on, return_targets=want_targets)
+                out = got[0]
+                if want_targets:                  # no random draw: the joint sampler's own targets
+                    for ix, t_ in got[2].items():
+                        tgt_[pos_[ix]] = t_
                 other_t = out.pop(M.OTHER, None)
                 for ix, (r_, y_) in out.items():
                     rec_[pos_[ix]] = r_
@@ -723,6 +829,7 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
                     completions[(team, week)] = M.simulate_qb_completions(
                         g_rng, N, [r_ for r_, _y in out.values()], other_t, other_rates, starter_share=pass_share)
             draw_block_joint.completions = completions
+            draw_block_joint.targets = tgt_
             return rec_, yds, passing
 
         def draw_block_rush(frame, shares, ypcs, arm):
@@ -745,9 +852,13 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
                     qb_start = M.starter_qb_index(slots, list(shares[idx]), slots=slots)
                     p_kneel = [kg if j == qb_start else None for j in range(len(slots))]
                 qb_i = qb_start if qb_resid is not None else None
+                sh_ = shares[idx]
+                cf_ = float(g.carry_factor.iloc[0]) if "carry_factor" in g else 1.0
+                if cf_ != 1.0:                 # round 29: the QB's carries stay where history put them
+                    sh_ = M.hold_qb_carries(sh_, M.starter_qb_index(slots, list(shares[idx]), slots=slots), cf_)
                 _car, y_, _tc = M.simulate_team_rush(game_rng(team, week, arm), N,
                                                      float(g.team_carries_env.iloc[0]), r_team_carries,
-                                                     shares[idx], ypcs[idx], carry_resid, width=width,
+                                                     sh_, ypcs[idx], carry_resid, width=width,
                                                      player_resid=p_resid, player_kneel=p_kneel, qb_index=qb_i)
                 tot = float(np.clip(np.asarray(shares[idx], dtype=float), 0, None).sum())
                 for k, i in enumerate(idx):
@@ -756,6 +867,134 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
                     car_mean[i] = float(_car[k].mean())
                     share_sum[i] = tot
             return yds, car_mean, share_sum, cars
+
+        def add_conditional(res_df, test_act, tr, rec_mask, tgtM, carsM, rush_pop, qb_pop, starter, y_rush,
+                            width, recM=None, ydsM=None, rushM=None, passTW=None, p_ix=None, y_pass=None):
+            """TIER 2 (reports/tier2_conditional_calibration.md): stage 1, the simulated
+            volume against the actual count; stage 2, catches and yards drawn GIVEN the
+            actual targets, rushing yards GIVEN the actual carries (a QB's without
+            kneels), from the pre-game rates and model.py's own per-player samplers. A
+            separate random stream per row: every other column is unchanged."""
+            def crng(i, k):
+                return np.random.default_rng([seed, 77, S, int(i), k])
+
+            def pit(samples, y, r):
+                return float((samples < y).mean() + r.uniform() * (samples == y).mean())
+            n = len(test_act)
+            cols = {c: np.full(n, np.nan) for c in (
+                "act_targets", "pit_tgt", "mean_tgt", "pit_rec_c", "pit_yds_c", "mean_rec_c", "mean_yds_c",
+                "pit_car_qb", "pit_rush_c", "mean_rush_c",
+                # THE SCOREBOARD (reports/scoreboard.md): a stand-in line where a book would hang
+                # it (the engine's own pre-game median, at the half), the chance of the Over GIVEN
+                # the actual volume (pc_) and with the engine's own volume (pu_), and the outcome
+                "L_rec", "pc_rec", "pu_rec", "L_yds", "pc_yds", "pu_yds", "L_rush", "pc_rush", "pu_rush",
+                "L_rr", "pc_rr", "pu_rr", "sd_tgt", "sd_car", "L_pass", "pc_pass", "pu_pass", "pit_pass_c",
+                "pc_rec_exact")}
+            half = standin_half
+            cond_yds, cond_rush = {}, {}
+            act_t, act_r, act_y = (tr.act_targets.to_numpy(), tr.act_receptions.to_numpy(float),
+                                   tr.act_rec_yards.to_numpy(float))
+            cr_, ypt_ = tr.cr.clip(lower=0.05).to_numpy(float), tr.ypt.to_numpy(float)
+            # THE STAND-IN LINE comes from pre-game inputs no width setting moves (expected
+            # targets x catch rate / yards per target; expected carries x yards per carry), so
+            # every setting in a comparison is scored at the SAME line. A line at each setting's
+            # own median moved with the knobs under test (caught in review before any read).
+            # CENTRED (scoreboard amendment): each yards market's expectation scaled by a fixed
+            # factor so the stand-ins sit on Sleeper's 2026 lines on average (standin_check.py);
+            # the same factor for every setting, so compared versions still share a line
+            SC_Y, SC_R, SC_P = STANDIN_SCALE["rec_yds"], STANDIN_SCALE["rush_yds"], STANDIN_SCALE["pass_yds"]
+            mu_t = (tr.team_targets_env * tr.ts).to_numpy(float)
+            mu_c = (test_act.team_carries_env * test_act.rs.fillna(0.0)).to_numpy(float)
+            ypc_all = test_act.ypc.to_numpy(float)
+            tpos_all = np.cumsum(rec_mask) - 1
+            for k_, i in enumerate(np.flatnonzero(rec_mask)):
+                T = int(act_t[k_])
+                cols["act_targets"][i] = T
+                g = crng(i, 1)
+                cols["pit_tgt"][i] = pit(tgtM[k_], T, g)
+                cols["mean_tgt"][i] = tgtM[k_].mean()       # stage 1 is bucketed by this, never the actual
+                cols["sd_tgt"][i] = tgtM[k_].std()
+                if T > 0:
+                    rec, yd = M.receiving_given_targets(g, N, T, float(cr_[k_]), float(ypt_[k_]), shape_ypc, width)
+                    cols["pit_rec_c"][i] = pit(rec, act_r[k_], g)
+                    cols["pit_yds_c"][i] = pit(yd, act_y[k_], g)
+                    cols["mean_rec_c"][i], cols["mean_yds_c"][i] = rec.mean(), yd.mean()
+                    cond_yds[i] = yd
+                    if recM is not None:                     # line scores: no random draw
+                        lines_ = {"rec": half(mu_t[k_] * cr_[k_]), "yds": half(SC_Y * mu_t[k_] * ypt_[k_])}
+                        for nm_, uM, cD in (("rec", recM[k_], rec), ("yds", ydsM[k_], yd)):
+                            L = lines_[nm_]
+                            cols[f"L_{nm_}"][i], cols[f"pc_{nm_}"][i] = L, float((cD > L).mean())
+                            cols[f"pu_{nm_}"][i] = float((uM > L).mean())
+                        # receptions given targets has a closed form: score it exactly
+                        cols["pc_rec_exact"][i] = 1.0      # a stamp: compare() never mixes the two
+                        cols["pc_rec"][i] = receptions_over_exact(
+                            T, float(cr_[k_]), lines_["rec"], ({**M.WIDTH_OFF, **(width or {})})["catch_conc"])
+            act_c, ypc_ = test_act.act_carries.to_numpy(), test_act.ypc.to_numpy(float)
+            for i in np.flatnonzero(rush_pop | qb_pop):
+                C = int(act_c[i])
+                g = crng(i, 2)
+                is_qb = bool(starter[i])
+                if is_qb:                                    # backs already have pit_car
+                    cols["pit_car_qb"][i] = pit(carsM[i], C, g)
+                cols["sd_car"][i] = carsM[i].std()
+                if C > 0:
+                    grid = qb_resid if (is_qb and qb_resid is not None) else carry_resid
+                    yd = M.rushing_given_carries(g, N, C, float(ypc_[i]), grid, M.rush_eff_sd(width, is_qb))
+                    cols["pit_rush_c"][i] = pit(yd, float(y_rush[i]), g)
+                    cols["mean_rush_c"][i] = yd.mean()
+                    if rushM is not None and not is_qb:      # line scores: no random draw
+                        L = half(SC_R * mu_c[i] * ypc_all[i])
+                        cols["L_rush"][i], cols["pc_rush"][i] = L, float((yd > L).mean())
+                        cols["pu_rush"][i] = float((rushM[i] > L).mean())
+                        cond_rush[i] = yd
+            # rushing + receiving given BOTH actual volumes: his two conditional draws summed.
+            # A ZERO side is a known zero, not a missing game (outside review, 2026-10-06): a back
+            # with 15 carries and no target is scored on his rushing alone, one with 5 targets and
+            # no carry on his receiving. A game with neither is left out -- the book voids a
+            # player who never touches the ball as if he had not played.
+            if rushM is not None and ydsM is not None:
+                tpos = tpos_all
+                for i in np.flatnonzero(rush_pop & rec_mask & ~starter.astype(bool)):
+                    both = rr_given_volume(int(act_t[tpos[i]]), int(act_c[i]), cond_yds.get(i), cond_rush.get(i), N)
+                    if both is None:
+                        continue
+                    uM = ydsM[tpos[i]] + rushM[i]
+                    L = half(SC_Y * mu_t[tpos[i]] * ypt_[tpos[i]] + SC_R * mu_c[i] * ypc_all[i])
+                    cols["L_rr"][i], cols["pc_rr"][i] = L, float((both > L).mean())
+                    cols["pu_rr"][i] = float((uM > L).mean())
+            # STARTING-QB PASSING given the volume: every receiver's yards drawn given his actual
+            # targets, the depth receivers given the team's remaining actual targets, times the
+            # starter's share -- the engine's own passing machinery (model.simulate_qb_passing)
+            if passTW is not None and p_ix is not None and pass_on and len(p_ix):
+                tt_act = twt.set_index(["team", "week"])["team_targets"]
+                trk = list(zip(tr.team, tr.week))
+                by_tw = {}
+                for k_, i in enumerate(np.flatnonzero(rec_mask)):
+                    by_tw.setdefault(trk[k_], []).append((k_, i))
+                share_mean = float(np.mean(pass_share)) if pass_share is not None else 1.0
+                for i in p_ix:
+                    tw_ = (test_act.team.iloc[i], int(test_act.week.iloc[i]))
+                    rows_ = by_tw.get(tw_, [])
+                    team_t = float(tt_act.get(tw_, np.nan))
+                    if not rows_ or team_t != team_t:
+                        continue
+                    other_T = max(team_t - sum(float(act_t[k_]) for k_, _ in rows_), 0.0)
+                    g = crng(i, 3)
+                    ys = [cond_yds[j] for _k, j in rows_ if j in cond_yds]
+                    pD = M.simulate_qb_passing(g, N, ys, np.full(N, other_T), other_rates, shape_ypc,
+                                               starter_share=pass_share, width=width)
+                    # stand-in line from pre-game inputs: expected throws at their yards per target
+                    sh_ = sum(float(tr.ts.iloc[k_]) for k_, _ in rows_)
+                    exp_y = (sum(mu_t[k_] * ypt_[k_] for k_, _ in rows_)
+                             + max(1.0 - sh_, 0.0) * float(tr.team_targets_env.iloc[rows_[0][0]])
+                             * float(other_rates["ypt"])) * share_mean
+                    L = half(SC_P * exp_y)
+                    uM = np.asarray(passTW[tw_], dtype=float)
+                    cols["L_pass"][i], cols["pc_pass"][i] = L, float((pD > L).mean())
+                    cols["pu_pass"][i] = float((uM > L).mean())
+                    cols["pit_pass_c"][i] = pit(pD, float(y_pass[i]), g)
+            return res_df.assign(**cols)
 
         def rpit_block(samples, y_arr):
             return (samples < y_arr[:, None]).mean(1) + rng.uniform(size=len(y_arr)) * (samples == y_arr[:, None]).mean(1)
@@ -773,8 +1012,10 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
 
         # Both arms use the joint sampler, so the model-vs-baseline comparison
         # isolates the SHRINKAGE, which is what baseline A exists to test.
+        cond = bool(getattr(args, "conditional", False))
         recM, ydsM, passTW = draw_block_joint(tr, tr.ts.values, tr.cr.clip(lower=0.05).values, tr.ypt.values,
-                                              arm=1)
+                                              arm=1, want_targets=cond)
+        tgtM = draw_block_joint.targets
         cmpTW = dict(getattr(draw_block_joint, "completions", {}))
         if full:
             recA, ydsA, passTW_A = draw_block_joint(tr, shareA, crA, yptA, arm=2)
@@ -785,6 +1026,15 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
             cmpTW_A = cmpTW
         y_rec = tr.act_receptions.values.astype(float)
         y_yds = tr.act_rec_yards.values.astype(float)
+        synth = bool(getattr(args, "synthetic_truth", False))
+        if synth:
+            # HARNESS AUDIT (model-is-truth): every actual is replaced by an independent
+            # draw from the model itself (its own streams, arms 91 / 93), so a correct
+            # harness must find every market calibrated. Tests the scoring, never the model.
+            recT, ydsT, passT_TW = draw_block_joint(tr, tr.ts.values, tr.cr.clip(lower=0.05).values,
+                                                    tr.ypt.values, arm=91)
+            cmpT_TW = dict(getattr(draw_block_joint, "completions", {}))
+            y_rec, y_yds = recT[:, 0].copy(), ydsT[:, 0].copy()
         # The receiving PITs draw their tie-break uniforms BEFORE the rushing
         # draws, in the order the single-season protocol always used, so its
         # PIT numbers reproduce exactly.
@@ -800,6 +1050,11 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
         y_rush = test_act.act_rush_yards.values.astype(float)
         # the book's number for a QB: carries plus kneel-downs
         y_qb = y_rush + test_act.act_kneel_yards.values.astype(float)
+        if synth:
+            rushT, _cT, _sT, carsT = draw_block_rush(test_act, test_act.rs.fillna(0.0).values,
+                                                     test_act.ypc.values, arm=93)
+            y_car, y_rush = carsT[:, 0].copy(), rushT[:, 0].copy()
+            y_qb = y_rush.copy()           # the model's QB draws already carry his kneel-downs
         # The rushing population is fixed before the game and identical for every
         # model version: RB depth-chart slots, plus anyone with 20%+ of the team's
         # carries over his last four games. QBs are graded separately (qb_pop):
@@ -815,6 +1070,13 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
                 starter[g_.index[j_]] = True
         rush_pop = ((slot_s.str.startswith("RB") | (test_act.rs_last4.fillna(0.0) >= 0.20))
                     & ~slot_s.str.startswith("QB")).values
+        if not getattr(args, "grade_depth_chart_qb", False):
+            started = np.array([g_ in OPENING_PASSERS.get((t_, int(w_)), ()) for t_, w_, g_
+                                in zip(test_act.team, test_act.week, test_act.gsis_id)])
+            n_miss = int((starter & ~started).sum())
+            print(f"starting QB: the depth chart picked a QB who did not start in {n_miss} of "
+                  f"{int(starter.sum())} team-games; those are not graded", file=sys.stderr)
+            starter = starter & started
         qb_pop = (starter.copy() if qb_resid is not None else np.zeros(len(test_act), bool))
         nan_ = np.full(len(test_act), np.nan)
         # QB PASSING: the same starting QB, priced from his team-game's
@@ -831,6 +1093,11 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
         cmpA = np.array([cmpTW_A[tw_keys[i]] for i in p_ix]).reshape(len(p_ix), N)
         y_cmp = test_act.act_completions.values.astype(float)
         y_cmp_p = y_cmp[p_ix]
+        if synth:
+            y_pass_p = np.array([passT_TW[tw_keys[i]][0] for i in p_ix], dtype=float)
+            y_cmp_p = np.array([cmpT_TW[tw_keys[i]][0] for i in p_ix], dtype=float)
+            y_pass, y_cmp = np.full(len(test_act), np.nan), np.full(len(test_act), np.nan)
+            y_pass[p_ix], y_cmp[p_ix] = y_pass_p, y_cmp_p
 
         def pass_rows(vals):
             """Starting-QB passing values back onto every row; NaN elsewhere."""
@@ -897,7 +1164,35 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
             "crps_qbrush_baseA": np.where(qb_pop, crps_block(rushA, y_qb), nan_),
             "crps_rec_indep": full_rows(crps_block(recI, y_rec)), "crps_yds_indep": full_rows(crps_block(ydsI, y_yds)),
         })
+        # RUSHING + RECEIVING (#173 step 2): backs in both populations; drawn after every
+        # other PIT, so every existing column is unchanged
+        tr_pos = np.cumsum(rec_mask) - 1
+        rr_pop = rush_pop & rec_mask
+        rr_ix = np.flatnonzero(rr_pop)
+        y_rr_all = full_rows(y_yds) + y_rush
+        rrM = ydsM[tr_pos[rr_ix]] + rushM[rr_ix]
+        rrA = ydsA[tr_pos[rr_ix]] + rushA[rr_ix]
+        y_rr = y_rr_all[rr_ix]
+
+        def rr_rows(vals):
+            out = np.full(len(test_act), np.nan, dtype=float)
+            out[rr_ix] = vals
+            return out
+        res_df = res_df.assign(
+            rr_pop=rr_pop, act_rr=np.where(rr_pop, y_rr_all, np.nan),
+            crps_rr_model=rr_rows(crps_block(rrM, y_rr)), crps_rr_baseA=rr_rows(crps_block(rrA, y_rr)),
+            mean_rr_model=rr_rows(rrM.mean(1)), med_rr_model=rr_rows(np.median(rrM, axis=1)),
+            above_med_rr=rr_rows(y_rr > np.median(rrM, axis=1)), pit_rr=rr_rows(rpit_block(rrM, y_rr)))
+        if synth:                     # the actual columns the summaries read, from the same draws
+            res_df = res_df.assign(act_receptions=full_rows(y_rec), act_rec_yards=full_rows(y_yds),
+                                   act_carries=y_car)
+        if cond:
+            res_df = add_conditional(res_df, test_act, tr, rec_mask, tgtM, carsM, rush_pop, qb_pop, starter,
+                                     y_rush, width, recM=recM, ydsM=ydsM, rushM=rushM, passTW=passTW, p_ix=p_ix,
+                                     y_pass=y_pass)
         res = res_df.merge(gm, on=["team", "week"], how="left")
+        # which harness wrote these rows: compare() never mixes a capped run with an uncapped one
+        res["new_team_cap"] = bool(getattr(args, "new_team_cap", True))
 
         # RELIABILITY AT SYNTHETIC LINES (calibration a bettor can read): lines at
         # fixed offsets from the model median (not model quantiles, which would be
@@ -913,7 +1208,8 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
                 ("qbrush", rushM, y_qb, qb_pop, test_act.week.values, games_a),
                 ("pass", passM, y_pass_p, np.ones(len(p_ix), bool), test_act.week.values[p_ix], games_a[p_ix]),
                 ("car", carsM, y_car, rush_pop, test_act.week.values, games_a),
-                ("cmp", cmpM, y_cmp_p, np.ones(len(p_ix), bool), test_act.week.values[p_ix], games_a[p_ix])]:
+                ("cmp", cmpM, y_cmp_p, np.ones(len(p_ix), bool), test_act.week.values[p_ix], games_a[p_ix]),
+                ("rr", rrM, y_rr, np.ones(len(rr_ix), bool), test_act.week.values[rr_ix], games_a[rr_ix])]:
             if not keep.any():
                 continue
             smp, yy = samples[keep], y[keep]
@@ -1060,7 +1356,69 @@ def tie_flags(frames, per_row, best):
 # --tune-width --tune-grid NAME: one family of settings, every other setting
 # held at the shipped values. name -> (grid, graded market, tie-break, intro).
 # Index 0 of each grid is "off" (the shipped sampler without that family).
+# Tier 2 part B (reports/tier2_conditional_calibration.md): each pre-registered knob
+# alone, every other at the shipped value; the first row IS the shipped setting. The
+# pick is made by props/tools/conditional_calibration.py --grid on each stage's own
+# diagnostic, not by this tuner's CRPS rule (run with --conditional --save-results).
+_T2_BASE = {"share_conc_targets": 40.0, "share_conc_carries": 20.0, "catch_conc": None,
+            "eff_sd_rec": 0.0, "eff_sd_rush": 0.3}
+TIER2_GRID = ([dict(_T2_BASE)]
+              + [{**_T2_BASE, "share_conc_targets": v} for v in (20.0, 30.0, 60.0, 80.0)]
+              + [{**_T2_BASE, "share_conc_carries": v} for v in (10.0, 15.0, 30.0, 40.0)]
+              + [{**_T2_BASE, "catch_conc": v} for v in (200.0, 100.0, 50.0)]
+              + [{**_T2_BASE, "eff_sd_rec": v} for v in (0.1, 0.2, 0.3)]
+              + [{**_T2_BASE, "eff_sd_rush": v} for v in (0.15, 0.45)])
+
+# Round 28 (reports/round28_running_game.md): the running game's knobs alone
+_R28_BASE = {"share_conc_carries": 20.0, "eff_sd_rush": 0.3, "share_conc_qb": 80.0}
+RUNNING_GRID = ([dict(_R28_BASE)]
+                + [{**_R28_BASE, "share_conc_carries": v} for v in (5.0, 7.5, 10.0, 15.0)]
+                + [{**_R28_BASE, "eff_sd_rush": v} for v in (0.0, 0.075, 0.15)]
+                + [{**_R28_BASE, "share_conc_qb": v} for v in (30.0, 50.0)])
+
+# Round 30 (reports/round30_conversion.md): the conversion knobs
+_R30_BASE = {"eff_sd_rush": 0.3, "catch_conc": None, "catch_shape_mult": None}
+CONVERSION_GRID = ([dict(_R30_BASE)]
+                   + [{**_R30_BASE, "eff_sd_rush": v} for v in (0.0, 0.075, 0.15)]
+                   + [{**_R30_BASE, "catch_conc": cc, "catch_shape_mult": sm}
+                      for cc in (None, 200.0, 100.0, 50.0, 25.0) for sm in (None, 1.3, 1.6, 2.0)
+                      if not (cc is None and sm is None)])
+
+# Round 31 (reports/round31_target_spread.md): the targets' spread knobs, crossed
+TARGET_SPREAD_GRID = [{"share_conc_targets": sc, "team_r_mult": rm}
+                      for sc in (40.0, 60.0, 80.0, 120.0) for rm in (None, 1.5, 2.5)]
+
+# Round 32 (reports/round32_yards_shape.md): receiving yards' spread with catches
+YARDS_SHAPE_GRID = [{"catch_shape_exp": ex, "catch_shape_mult": mu}
+                    for ex in (None, 1.15, 1.3, 1.5) for mu in (None, 0.8)]
+
+# THE STAND-IN LINE SCALE (reports/scoreboard.md, amendment 2026-10-06): posted / expected,
+# the median over Sleeper's 2026 weeks 2-4 lines (props/tools/standin_check.py). 1.0 = the
+# expectation itself. Catches need none (median ratio 1.000).
+STANDIN_SCALE = {"rec_yds": 0.876, "rush_yds": 0.902, "pass_yds": 1.0}
+
+# Round 33 (reports/round33_passing_spread.md): the team's throws, judged on QB passing
+PASS_SPREAD_GRID = [{"team_r_mult": v} for v in (None, 1.5, 2.5, 4.0)]
+
 SUBGRIDS = {
+    "passspread": (PASS_SPREAD_GRID, ("pass", "rec", "yds"), "width",
+                   "Round 33: the team's throws judged on QB passing (reports/round33_passing_spread.md); the "
+                   "pick is made on the scoreboard, not by this table."),
+    "yardsshape": (YARDS_SHAPE_GRID, ("yds", "pass"), "width",
+                   "Round 32: receiving yards' spread with catches (reports/round32_yards_shape.md); the pick "
+                   "is made on the scoreboard's conversion log loss, not by this table."),
+    "targetspread": (TARGET_SPREAD_GRID, ("rec", "yds", "pass"), "width",
+                     "Round 31: the targets' spread (reports/round31_target_spread.md); the pick is made by "
+                     "props/tools/scoreboard.py's spread check, not by this table."),
+    "conversion": (CONVERSION_GRID, ("rec", "yds", "rush", "rr"), "width",
+                   "Round 30: the conversion knobs (reports/round30_conversion.md); the pick is made by "
+                   "props/tools/scoreboard.py on the conversion log loss, not by this table."),
+    "running": (RUNNING_GRID, ("rush", "qbrush", "car"), "width",
+                "Round 28: the running game's knobs alone (reports/round28_running_game.md); the pick is "
+                "made per stage by props/tools/conditional_calibration.py --grid, not by this table."),
+    "tier2": (TIER2_GRID, ("rec", "yds", "rush", "qbrush", "car"), "width",
+              "Tier 2 part B: each pre-registered knob alone (reports/tier2_conditional_calibration.md). The "
+              "pick is made per stage by props/tools/conditional_calibration.py --grid, not by this table."),
     "qb": (QB_GRID, ("qbrush",), "width",
            "The starting QB's own settings. *Off* = no QB-only setting: the QB is one more component of the "
            "carries Dirichlet and shares eff_sd_rush (the sampler before props-v1.21)."),
@@ -1111,6 +1469,8 @@ def tune_subgrid(args, OUT):
                                                  OUT, live=True, widths=grid)):
             frames[i].append(res)
     frames = [pd.concat(f, ignore_index=True) for f in frames]
+    if args.save_results:
+        pd.to_pickle({"kind": "width_tuning", "grid": grid, "frames": frames}, args.save_results)
     keys = list(grid_part[0])
     rows = []
     for i, cfg in enumerate(grid):
@@ -1461,8 +1821,11 @@ def harness_report(all_res, calib, metas, args, out_base, comparison=None):
                 L.append(f"| {subset} | {MARKETS[mk][1]} | {c['n']} | {c['crps_ref']:.4f} | "
                          f"{c['gain']:+.4f} ({lo:+.4f}, {hi:+.4f}){sig} |")
     L += ["", "## What this does not reproduce from the live scorer", "",
-          "- The snap-share role scaling and the new-team cap on the prior-season rate "
-          "(`blended_rate(role_scale=..., new_team=...)`): the harness has no pre-game snap feed.",
+          "- The snap-share role scaling on a new team's prior-season rate "
+          "(`blended_rate(role_scale=...)`): the harness has no pre-game snap feed. "
+          + ("The new-team cap itself IS reproduced (team identity alone, 2026-10-06)."
+             if getattr(args, "new_team_cap", True) else
+             "This run also leaves out the new-team cap (--no-new-team-cap, the ablation)."),
           "- The player's depth-chart slot is his first slot of the season (the round-4 convention), "
           "not the week's.",
           "- Questionable-player regimes, injury-report exclusions (the harness uses the game-day "
@@ -1584,6 +1947,26 @@ def main(argv=None):
     ap.add_argument("--test", default="2024,2025", help="harness: seasons the verdict is read from")
     ap.add_argument("--weeks", default="2-18", help="harness: weeks scored in each season")
     ap.add_argument("--report", default=None, help="harness: output path without extension (.md and .json)")
+    ap.add_argument("--market-rush-weight", type=float, default=None,
+                    help="round 29: weight on the market's fitted carries for the backs (default "
+                         "model.MARKET_RUSH_WEIGHT, 0 = runs from history; the QB's carries are held)")
+    ap.add_argument("--grade-depth-chart-qb", action="store_true",
+                    help="grade the starting-QB markets on the depth chart's starter even when another QB "
+                         "started (the pre-#181 harness, for reproducing older records)")
+    ap.add_argument("--audit-seed-offset", type=int, default=0,
+                    help="HARNESS AUDIT: shift every random stream; two runs of one model that differ only "
+                         "here must show no difference (their paired intervals should include zero)")
+    ap.add_argument("--audit-truncate-after", type=int, default=None,
+                    help="HARNESS AUDIT: drop every week after this one from the season's data; that week's "
+                         "model numbers must match a full-season run exactly (a leakage test)")
+    ap.add_argument("--synthetic-truth", action="store_true",
+                    help="HARNESS AUDIT: replace every actual with an independent draw from the model "
+                         "itself; a correct harness then finds every market calibrated (tests the scoring "
+                         "code, not the model; never a model result)")
+    ap.add_argument("--conditional", action="store_true",
+                    help="Tier 2: also grade each stage alone -- simulated volume vs the actual count, and "
+                         "catches / yards drawn GIVEN the actual targets or carries (adds columns only; "
+                         "reports/tier2_conditional_calibration.md)")
     ap.add_argument("--save-results", default=None,
                     help="harness: pickle (results, calibration rows, settings) of the whole run")
     ap.add_argument("--from-results", default=None, help="harness: re-render the report from a --save-results pickle")
@@ -1592,7 +1975,7 @@ def main(argv=None):
     ap.add_argument("--tune-width", action="store_true",
                     help="choose the width settings on the --tune seasons; writes --report (.md/.csv)")
     ap.add_argument("--width-out", default=None, help="--tune-width: write the chosen settings to this JSON file")
-    ap.add_argument("--tune-grid", choices=["main", "qb", "rushnorm", "rushlead"], default="main",
+    ap.add_argument("--tune-grid", choices=["main", "qb", "rushnorm", "rushlead", "tier2", "running", "conversion", "targetspread", "yardsshape", "passspread"], default="main",
                     help="--tune-width: the receiving/rushing grid, the starting QB's own settings, or the "
                          "carry-share rescaling")
     ap.add_argument("--dispersion", choices=["prior", "train"], default=None,
@@ -1633,8 +2016,13 @@ def main(argv=None):
                     help="round 23: target share x (last week's snaps / earlier weeks') ** g, or 'off' "
                          "(default model.SNAP_REACT)")
     ap.add_argument("--k0", default=None,
-                    help="round 17: fixed shrinkage constants over the priors' fit, e.g. 'ypt=40,catch_rate=20' "
-                         "(default: model.K0_FIXED)")
+                    help="round 17: shrinkage constants over model.K0_FIXED (the rates named replace those, the "
+                         "rest stay shipped), e.g. 'ypt=40,catch_rate=20'; 'fit' = the ablation, the priors' "
+                         "per-season fit with no fixed constants (default: model.K0_FIXED)")
+    ap.add_argument("--new-team-cap", action="store_true", default=True,
+                    help="the scorer's new-team cap on a carried-over prior (model.blended_rate new_team)")
+    ap.add_argument("--no-new-team-cap", dest="new_team_cap", action="store_false",
+                    help="ABLATION: the pre-2026-10-06 harness, no new-team cap")
     ap.add_argument("--historical-blend", action="store_true", default=True,
                     help="two-stage: prior-season own rate -> slot prior -> this season (what the live scorer does)")
     ap.add_argument("--no-historical-blend", dest="historical_blend", action="store_false",
@@ -1642,6 +2030,9 @@ def main(argv=None):
     ap.add_argument("--tag", default=None, help="label for output files")
     ap.add_argument("--compare-to", default=None, help="results pickle of a reference run; paired game-block bootstrap on the MODEL's own CRPS")
     args = ap.parse_args(argv)
+    if getattr(args, "synthetic_truth", False) and getattr(args, "conditional", False):
+        sys.exit("--synthetic-truth and --conditional do not combine: the audit replaces outcomes, the "
+                 "conditional check reads the real volume")
     OUT = Path(args.out); OUT.mkdir(parents=True, exist_ok=True)
 
     if not args.seasons and not args.tune_width:

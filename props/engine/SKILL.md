@@ -1,6 +1,6 @@
 ---
 name: nfl-prop-research
-description: Quantitative NFL sportsbook player-prop research for the NFL Gambling Project. Use when the user asks to evaluate, price, or find edges on NFL player props (passing/rushing/receiving yards, receptions, passing TDs, anytime TD) or game spreads/totals, wants fair odds or line-and-price thresholds, asks to test The Odds API connection, or asks to archive lines or validate a prop model. Retrieves nflverse play-by-play, snaps, weekly rosters, injuries, depth charts, The Odds API prices, and NWS/Open-Meteo weather in the container. Not for fantasy football start/sit, waiver, trade, or draft decisions.
+description: Quantitative NFL sportsbook player-prop research for the NFL Gambling Project. Use when the user asks to evaluate, price, or find edges on NFL player props (receptions, receiving yards, non-QB rushing yards, rushing + receiving yards, passing yards) or game spreads/totals, wants fair odds or line-and-price thresholds, asks to test The Odds API connection, or asks to archive lines or validate a prop model. Retrieves nflverse play-by-play, snaps, weekly rosters, injuries, depth charts, The Odds API prices, and NWS/Open-Meteo weather in the container. Not for fantasy football start/sit, waiver, trade, or draft decisions.
 ---
 
 # NFL Prop Research
@@ -9,7 +9,14 @@ description: Quantitative NFL sportsbook player-prop research for the NFL Gambli
 Evaluate NFL player props using verified evidence, reproducible calculations, and explicit uncertainty. Do not force bets. If the evidence cannot support a defensible probability or threshold, return `PASS` or `DATA_INSUFFICIENT`.
 
 ## Scope boundary
-This skill owns sportsbook decisions only: prop market evaluation, Over/Under valuation, fair odds, line-and-price thresholds, TD-prop evaluation, line archiving, and model validation.
+This skill owns sportsbook decisions only: prop market evaluation, Over/Under valuation, fair odds, line-and-price thresholds, line archiving, and model validation.
+
+**The engine's markets (user, 2026-10-06; DECISIONS #190):** receptions, receiving yards,
+non-QB rushing yards, rushing + receiving yards and QB passing yards. **Deferred: QB rushing
+yards and anytime touchdowns** -- neither is on the board or in the record, and you do not
+read, quote or narrate them (the TD notes further down describe the deferred model and apply
+only if the user explicitly asks for a TD price, which runs `--markets td`). When a report
+or the user mentions them, say they are deferred.
 
 It does not own fantasy football decisions (start/sit, waivers, trades, draft). If a request is primarily a fantasy decision, do not apply this skill's betting framing to it. If a request contains both, answer the sportsbook portion with this skill and the fantasy portion separately, and keep the outputs distinct even when they share evidence. Do not replace fantasy roster logic with betting-market logic.
 
@@ -226,9 +233,18 @@ pick. Say why in one sentence (the model has not shown it adds anything beside t
 price; weeks 2-3, STRONG calls won 45%) and offer the research leads and the journal.
 
 ## Fast path
+**The user never types a command (standing rule, 2026-10-06).** Every flag below is yours to
+run from what the user says in plain words; never ask them to type one, and never end a reply
+with a command for them to run. Turn their words into the flags yourself: "I think Kamara
+gets 12 to 15 carries" is `--assume "Alvin Kamara: carries=12/13.5/15"`; "what if Bijan gets
+more work" with no number is `carries=auto`; a report line **No priced replacement for ...**
+or **The book's quarterback is not ours** means you rerun with the role what-if yourself and
+present that run. What the engine can read for itself (injuries, who starts at QB) it now
+decides on its own and says so in the report's first lines -- quote that.
+
 For a narrow question, run only what it needs:
-- **One game, specific markets:** `python scripts/score_game.py --away NYG --home LA --markets td`
-  (markets: `receptions`, `rec_yds`, `rush_yds`, `pass_yds`, `td`, comma-separated). `--week` is optional and
+- **One game, specific markets:** `python scripts/score_game.py --away NYG --home LA --markets rec_yds,rush_rec`
+  (markets: `receptions`, `rec_yds`, `rush_yds`, `rush_rec`, `pass_yds`; `td` is deferred, comma-separated). `--week` is optional and
   resolves to the next meeting; `LAR`, `WSH`, `JAC`, `LVR` are accepted. A `--markets` run prints a
   short summary (also saved as `summary_*.md`) instead of the full report, which is still written.
 - **Your scenario (a what-if on workload):** add `--assume "PLAYER: carries=14"` (or `targets=8`,
@@ -239,6 +255,26 @@ For a narrow question, run only what it needs:
   Reproduce that table in full, say the numbers are conditional on the user's assumptions (which are
   assumptions, not confidence intervals), and never call a line a play. Touchdowns are not adjusted.
   Never recorded (outputs in `scenarios/`).
+  **A range** -- `--assume "PLAYER: carries=10/12/15"` (low / expected / high, smallest first; team
+  changes too, `"NO: pass=-4/-2/+1"`) -- prices the board three times and adds the Over at each end and
+  a verdict per side: *pays across your range*, *pays at your expected, not at your low/high*, *pays
+  only at your low/high*, or *does not pay in your range*. Prefer a range whenever the user gives a
+  rough number: a side that pays across the range does not rest on the exact figure. Narrate the
+  verdict with its end named ("the Under needs him at your 15, not your 12"); a teammate's line runs
+  the other way across the range.
+  **No numbers? `carries=auto` / `targets=auto`** (a player's targets or carries only) builds the
+  range itself: our projection plus or minus one standard error of his share over his last 10 games
+  (last season's final games top up this season's; this season only after a team change or a
+  backfield takeover; needs 3+ games). It measures how sure we are of his AVERAGE, not his
+  game-to-game swing, which the price already holds. Quote the three numbers the report prints.
+- **Role what-if (a replacement the depth chart has not promoted):** `--role "PLAYER=RB1"` (QB1, RB1,
+  RB2, WR1, WR2, WR3, TE1; `"PLAYER (TEAM)=..."` when a name is on both teams), repeatable, with or
+  without `--assume`. A full run -- research included -- that prices him with that slot's role average
+  as his prior; nobody else moves; never recorded (outputs in `role/`). Run it yourself whenever the
+  report says **No priced replacement for ...** (an Out starter whose team now prices fewer players
+  at his position than it has slots) or **The book's quarterback is not ours** -- pick the man from
+  the depth chart, the book's lines or the news, and say which. A starting QB who is out is handled
+  automatically (the next quarterback is priced; DECISIONS #183), so this is for the rest.
 - **Today's games / one date:** `python scripts/score_week.py --today` or `--date YYYY-MM-DD`
   (`--markets` passes through). `--kickoff 13:00` keeps one window (Eastern time: 13:00 is the
   10am PT games); `--sort total` orders the games by their total, highest first; `--overs-only`
@@ -248,14 +284,29 @@ For a narrow question, run only what it needs:
   (DECISIONS #156): a role story plus last game's workload already past that side's break-even.
   **How the engine works, with the numbers:** resources/engine_overview.md -- read it when the user
   asks how a projection, share, weight or price is built, and quote its formulas.
+  **Rushing + receiving yards is priced (DECISIONS #187):** a back's combined line now has the
+  model's Over chance like any yardage line (the sum of his rushing and receiving draws; it
+  passed its calibration check on 2022-25). Read it beside his separate rushing and receiving
+  lines: the combined leg survives either script, and the report's air share says how much
+  of it holds up if his team falls behind.
+  **With market carries (shadow), DECISIONS #185:** a back's rushing line also shows the
+  Over if his carries take half their volume from the market's script (favourites run more).
+  Quote both numbers when you read a back's rushing line: the board's is the price, the
+  shadow's is being graded beside it on the scorecard. Never present the shadow as the price.
   **A single-game read is a full story, in this order** (user, 2026-10-05; DECISIONS #168).
   Headed sections, short paragraphs, tables where they help; thorough but easy to read:
   1. **The game.** The matchup and what each team has been, the weather (or roof), home and
      away, the Vegas lines (spread, total, implied points and the script they point to), the
      fantasy points each defence allows to RBs, WRs and TEs (the header's "Fantasy points
      allowed" line: PPR per game and rank -- a small sample this early, context only, never a
-     reason on its own), and the injuries (who is out, questionable, back) -- plus any line
-     moves since the morning.
+     reason on its own), each offence's EPA per play and points per drive gained and each
+     defence's allowed (all plays, passes, runs), with their ranks (the header's "Offence" and
+     "Defence" lines, 1st = most; read them against each other -- a top-5 passing offence into a
+     bottom-5 pass defence; context, never a price input), and the injuries (who is out, questionable, back) -- plus any line
+     moves since the morning. Include the **offensive line** (header line, DECISIONS #178): how
+     many of each team's five regular linemen (most snaps this season) are out, and who. Context
+     for the user to judge -- e.g. two starters out on a run-first team -- never a price change;
+     say "status unknown" for an unmatched lineman, and say when no injury report is out yet.
   1b. **Team volume against the season** (the report's "Team volume" section, DECISIONS #172):
      each team's games this season -- score, how much of each game it spent ahead or behind by
      8+, pass attempts, sacks, designed carries, scrambles -- and whether our projected passes
@@ -265,6 +316,10 @@ For a narrow question, run only what it needs:
      and name the game whose script matches the Vegas line (a favourite's comfortable win).
   2. **Each player with a priced line**, team by team: his volume and share LAST SEASON, THIS
      SEASON so far, and last game against his earlier games (targets or carries, share and count).
+     Then his **matchup** (his "Matchup." line, user 2026-10-06): the PPR points a game the
+     defence he faces allows to his position and its rank -- "NYG give up the 10th most PPR
+     points to tight ends (14.2 a game, league 13.6)". Say the games behind it while the sample
+     is small; it is context, never the reason for a side on its own.
   3. **Teammates out or questionable** who move his work, and which way.
   4. **Expected volume and share, ours and the book's**: our projected targets or carries; the
      book's own volume where it posts it (catches / carries / completions lines, the side favoured,
@@ -289,7 +344,8 @@ For a narrow question, run only what it needs:
   read the game, do not recite the table. Start from the context line under its heading --
   who is favoured and the implied points (the script: a big favourite runs late, an underdog
   throws; a low total with a backup QB plays conservative), and each team's "last week was a
-  preview / differs" note. Then each side's situation: the role changes that matter (who took
+  preview / differs" note. Then each side's situation, with the matchup rank for a player you
+  name ("against the 3rd most PPR points to WRs"): the role changes that matter (who took
   over a backfield, whose target share jumped or collapsed, a returning star and who it takes
   from), where the model and the book disagree AND WHY (a stale prior on a new role, a game script
   the model does not price; when the model sits below most QB passing lines, say the gap is
@@ -474,7 +530,7 @@ need not be surfaced. Write the reply as a premium prop guide with this structur
    guess at whether he plays and do not recommend one: the user decides.
 5. **Research table** — reproduce the report's "Research table" (from `research_*.csv`) as ONE
    table, grouped by team: Player, Prop, Line, Price (Over / Under), Our projection, Over:
-   model / book, Line implies, Pays at this price if he gets, Last game, Flags. Do not hand-compute any of these numbers
+   model / book, Line implies, Pays at this price if you expect, Last game, Flags. Do not hand-compute any of these numbers
    and do not re-sort them by the model-book gap: ranking by gap ranked lines by how likely
    the model was missing something.
    For anytime-TD rows, the model is `anytime_td_v1` (PROTOTYPE; see
@@ -496,13 +552,18 @@ need not be surfaced. Write the reply as a premium prop guide with this structur
    rather than the ones worth betting, and reuses each player-week 8-10 times so its `n`
    column overstates the evidence by about an order of magnitude. Quote it only with that
    description attached. The 2022-25 yardage harness (`reports/yardage_harness.md` in the
-   repo) is the evidence now: since props-v1.20 receptions, receiving yards and rushing yards
-   are unbiased and calibrated on outcomes (a model 85% wins about 84-85%). None is tested
-   against posted lines yet; say that, not that the numbers are unvalidated guesses.
-   QB passing yards (props-v1.24, the starting QB only) are his receivers' yards in the same
-   simulation times a starter's usual share: right on average and the right width, but its
-   edge over the no-shrinkage version is early season only and one small bucket missed --
-   priced by the user's decision (DECISIONS #105). Say so when quoting one.
+   repo) is the evidence: receptions and receiving yards are unbiased on outcomes with their
+   width within the bar. Rushing yards and rushing + receiving are unbiased and right at the
+   main line, but their distributions run too narrow in the tails (23-25% of games outside
+   the 80% range on the re-check, reports/current_settings_check_2026-10-06.md): a line far
+   from the projection -- an alternate line, a long shot -- reads more confident than it
+   should; say so when quoting one. None is tested against posted lines yet; say that, not
+   that the numbers are unvalidated guesses.
+   QB passing yards (the starting QB only) are his receivers' yards in the same simulation
+   times a starter's usual share: right on average but too WIDE on the corrected grading
+   (14% of games outside the 80% range against a 17-23% bar; reports/rush_rec_calibration.md),
+   so a passing chance sits too close to 50% -- an Over the model gives 60% is likely a bit
+   better than that. Priced by the user's decision (DECISIONS #105). Say so when quoting one.
    Ladder: `ladder_*.csv` holds P(stat <= k) per player; quote it when the user asks about
    an alternate line.
 6. **Parlays — DISABLED, do not price them.** `parlays_*.csv` is no longer written.

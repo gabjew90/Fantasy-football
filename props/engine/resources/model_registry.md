@@ -201,6 +201,12 @@ next fix).
   and 2% low in 2025.
 - `eff_sd_pass` (a game-wide passing swing) exists and is off: the width
   already passes.
+- **Superseded 2026-10-06 (corrected grading, reports/rush_rec_calibration.md):**
+  graded only on the QB who actually started (the first three dropbacks), the
+  width FAILS -- 14.4% of starter-games outside p10-p90 (95% CI 12.2-16.8%,
+  bar 17-23%): too WIDE. The 18.1% above included rows for depth-chart QBs who
+  did not play. Round 33 (team throws) did not fix it; the open leads are the
+  conversion given targets (runs slightly low) and the starter-share draw.
 
 ### rush_yds_v0
 - Markets: player_rush_yds

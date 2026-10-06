@@ -96,7 +96,7 @@ def search_edges(share_over, prices):
 
 
 def break_even_cell(x) -> str:
-    """The research table's 'Pays at this price if he gets' cell: the Over beats
+    """The research table's 'Pays at this price if you expect' cell: the Over beats
     its own price above over_needs, the Under at or below under_needs. A side
     with no posted price (no be_over / be_under) says so rather than reading as
     a search that ran out of range."""
@@ -809,7 +809,7 @@ def points_allowed_line(pa, teams) -> str | None:
         return ("most" if rank <= 8 else "fewest" if rank > n - 8 else "middle")
     parts = []
     for t in teams:
-        bits = ", ".join(f"{p} {pa[t][p][0]:.1f} ({pa[t][p][1]} of {n}"
+        bits = ", ".join(f"{p} {pa[t][p][0]:.1f} ({rank_words(pa[t][p][1], n)} of {n}"
                          + ("" if word(pa[t][p][1]) == "middle" else f", among the {word(pa[t][p][1])}") + ")"
                          for p in POS_GROUPS)
         parts.append(f"{t}'s defence allows {bits}")
@@ -820,6 +820,119 @@ def points_allowed_line(pa, teams) -> str | None:
             + (f" {100 * pa['_unmapped_share']:.0f}% of skill-player points league-wide belong to players the "
                "roster file gives no position, so these totals run a little low."
                if pa.get("_unmapped_share", 0) > 0.02 else ""))
+
+
+def rank_words(rank: int, n: int, most: str = "most", fewest: str = "fewest") -> str:
+    """A rank among n read the short way round: 3 of 32 -> '3rd most', 31 of 32 -> '2nd
+    fewest' (the bottom half counted from the other end; ties share the lower rank)."""
+    rank, n = int(rank), int(n)
+    return f"{ordinal(rank)} {most}" if rank <= (n + 1) // 2 else f"{ordinal(n - rank + 1)} {fewest}"
+
+
+def ordinal(n: int) -> str:
+    """1 -> '1st', 2 -> '2nd', 11 -> '11th', 23 -> '23rd'."""
+    n = int(n)
+    suf = "th" if 10 <= n % 100 <= 20 else {1: "st", 2: "nd", 3: "rd"}.get(n % 10, "th")
+    return f"{n}{suf}"
+
+
+POS_WORD = {"RB": "running backs", "WR": "wide receivers", "TE": "tight ends"}
+
+
+def matchup_sentence(pa, opp, pos) -> str | None:
+    """One player's matchup line (user, 2026-10-06): the PPR points a game the opposing
+    defence allows to his position and its rank, 1st = most allowed. None for a QB, an
+    unknown position, or no numbers for that defence."""
+    pos = "RB" if pos == "FB" else pos
+    if not pa or opp not in pa or pos not in POS_GROUPS:
+        return None
+    ppg, rank = pa[opp][pos]
+    return (f"{opp} allows {ppg:.1f} PPR points a game to {POS_WORD[pos]}, the {rank_words(rank, pa['_n'])} of "
+            f"{pa['_n']} (league average {pa['_league'][pos]:.1f}; {pa['_games'][opp]} games). Context, "
+            "not a price input: position matchups were tested as too noisy to move the model.")
+
+
+def defense_metrics(pbp) -> dict:
+    """Each defence's EPA and points per drive ALLOWED (team_efficiency by defteam)."""
+    return team_efficiency(pbp, "defteam")
+
+
+def offense_metrics(pbp) -> dict:
+    """Each offence's EPA per play and points per drive GAINED (team_efficiency by posteam)."""
+    return team_efficiency(pbp, "posteam")
+
+
+def team_efficiency(pbp, side="defteam") -> dict:
+    """Each team's EPA per play (all, passes, runs) and points per drive this season, as the
+    defence (side "defteam": allowed) or the offence ("posteam": gained), with ranks
+    (1st = most -- the softest defence, the best offence). Plays: dropbacks and runs with
+    an EPA by nflfastR's pass / rush flags (scrambles are dropbacks; play_type when the
+    flags are absent), kneel-downs and spikes out. Drives: nflverse's fixed_drive per game,
+    points = the team with the ball's score at the drive's end minus its start (touchdowns
+    with their extra point or two-point try, field goals). A defensive score on the drive is
+    not the offence's and does not count; a kickoff or punt RETURN touchdown sits on the
+    returning team's drive and does count. Every drive counts, end-of-half kneels included.
+    Returns {defteam: {metric: (value, rank)}} plus "_league", "_games", "_n";
+    {} when the play-by-play lacks the columns."""
+    need = {"game_id", "defteam", "posteam", "play_type", "epa"}
+    if pbp is None or not len(pbp) or not need.issubset(pbp.columns):
+        return {}
+    import pandas as _pd
+    if {"pass", "rush"}.issubset(pbp.columns):
+        # nflfastR's flags, the public EPA/play convention (rbsdm): a scramble is a dropback
+        # (pass = 1), and a penalty snap that would have been a pass or run still counts
+        is_pass, is_rush = pbp["pass"].fillna(0) == 1, pbp["rush"].fillna(0) == 1
+    else:
+        is_pass, is_rush = pbp.play_type.eq("pass"), pbp.play_type.eq("run")
+    keep = (is_pass | is_rush) & pbp.epa.notna() & pbp[side].notna()
+    if "qb_kneel" in pbp:
+        keep &= pbp.qb_kneel.fillna(0) != 1
+    if "qb_spike" in pbp:
+        keep &= pbp.qb_spike.fillna(0) != 1
+    plays = pbp[keep]
+    m = _pd.DataFrame({"epa_play": plays.groupby(side).epa.mean(),
+                       "epa_pass": plays[is_pass[keep]].groupby(side).epa.mean(),
+                       "epa_rush": plays[is_rush[keep] & ~is_pass[keep]].groupby(side).epa.mean()})
+    dcols = {"fixed_drive", "posteam_score", "posteam_score_post"}
+    if dcols.issubset(pbp.columns):
+        d = pbp[pbp.fixed_drive.notna() & pbp.posteam.notna() & pbp.defteam.notna()]
+        g = d.groupby(["game_id", "fixed_drive"]).agg(team=(side, "first"),
+                                                      start=("posteam_score", "first"),
+                                                      end=("posteam_score_post", "last"))
+        g["pts"] = (g.end - g.start).clip(lower=0)
+        m["pts_drive"] = g.groupby("team").pts.mean()
+    cols = [c for c in ("epa_play", "epa_pass", "epa_rush", "pts_drive") if c in m]
+    rk = m[cols].rank(ascending=False, method="min")
+    games = pbp.groupby(side).game_id.nunique()
+    out = {t: {c: (float(m.loc[t, c]), int(rk.loc[t, c])) for c in cols if m.loc[t, c] == m.loc[t, c]}
+           for t in m.index}
+    out["_league"] = {c: float(m[c].mean()) for c in cols}
+    out["_games"] = {t: int(games.get(t, 0)) for t in m.index}
+    out["_n"] = len(m.index)
+    return out
+
+
+def defense_line(dm, teams, verb="allows") -> str | None:
+    """The game header's defence read: EPA per play and points per drive each defence in
+    this game allows, ranked 1st = most allowed. verb "gains" reads an offense_metrics dict
+    the same way (1st = most gained)."""
+    if not dm or not all(t in dm for t in teams):
+        return None
+    n, lg = dm["_n"], dm["_league"]
+    lab = {"epa_play": "EPA a play", "epa_pass": "EPA a pass", "epa_rush": "EPA a run", "pts_drive": "points a drive"}
+    fmt = lambda c, v: f"{v:+.2f}" if c.startswith("epa") else f"{v:.2f}"
+    parts = []
+    for t in teams:
+        bits = ", ".join(f"{fmt(c, dm[t][c][0])} {lab[c]} ({rank_words(dm[t][c][1], n)})"
+                         for c in lab if c in dm[t])
+        parts.append(f"{t} {verb} {bits}")
+    games = sorted(set(dm["_games"][t] for t in teams))
+    return ("; ".join(parts) + ". League average: "
+            + ", ".join(f"{fmt(c, lg[c])} {lab[c]}" for c in lab if c in lg)
+            + f". Ranks of {n}, counted from the top ('most') or the bottom ('fewest') "
+            f"{'allowed' if verb == 'allows' else 'gained'}; over "
+            f"{'/'.join(map(str, games))} games, from nflverse "
+            "play-by-play (EPA is nflfastR's expected-points model). Context only: no price reads it.")
 
 
 # Sleeper's lines that are read beside the priced ones, never priced (DECISIONS #164, #166)
@@ -1160,16 +1273,15 @@ def qb_yards_sentence(d) -> str | None:
 
 def rush_rec_read(line=None, mult_over=None, mult_under=None, proj_carries=None, proj_catches=None,
                   run_rate=None, catch_rate=None, run_luck=None, catch_luck=None, sd=None,
-                  book_carries=None, book_catches=None, rates_luck_free=True) -> dict | None:
+                  book_carries=None, book_catches=None, rates_luck_free=True, p_model_over=None) -> dict | None:
     """The book's rushing + receiving yards line read against his touches (DECISIONS #173):
     the no-vig Over chance and the coin-flip yards (sd = the game-to-game spread of his
     simulated rushing + receiving yards); his luck-free yards a touch -- carries and catches
     at their own luck-free rates (research.luck_for), weighted by our projected carries and
     catches; the touches the line takes at that rate against ours and the book's carries +
     catches lines; and the share of his yards that come through the air, the part that holds
-    up when his team falls behind. Our model's own chance of the Over is NOT shown: the
-    combined market waits on its calibration check (the simulation draws a team's runs and
-    passes independently)."""
+    up when his team falls behind; and our model's Over chance (priced since it passed its
+    calibration check, DECISIONS #187)."""
     ok = lambda v: v is not None and v == v
     if not ok(line):
         return None
@@ -1181,7 +1293,8 @@ def rush_rec_read(line=None, mult_over=None, mult_under=None, proj_carries=None,
            "proj_catches": float(proj_catches) if ok(proj_catches) else None,
            "run_rate": float(run_rate) if ok(run_rate) else None,
            "catch_rate": float(catch_rate) if ok(catch_rate) else None,
-           "run_luck": run_luck, "catch_luck": catch_luck, "rates_luck_free": bool(rates_luck_free)}
+           "run_luck": run_luck, "catch_luck": catch_luck, "rates_luck_free": bool(rates_luck_free),
+           "p_model_over": float(p_model_over) if ok(p_model_over) else None}
     out["coin"] = fair_volume(line, out["p_over"], sd)
     c, k, rr, cr = out["proj_carries"], out["proj_catches"], out["run_rate"], out["catch_rate"]
     if c is not None and k is not None and rr is not None and cr is not None and c + k > 0:
@@ -1213,8 +1326,9 @@ def rush_rec_sentence(d) -> str | None:
         if d["air_share"] is not None:
             bits.append(f"About {100 * d['air_share']:.0f}% of his projected yards come from catches: if his team falls "
                         "behind, that part holds up while the carries shrink.")
-    bits.append("Our model's own chance on this line is not shown until the combined market passes its "
-                "calibration check.")
+    if d.get("p_model_over") is not None:
+        bits.append(f"Our model gives the Over {100 * d['p_model_over']:.0f}% (the combined market is priced since "
+                    "it passed its calibration check, DECISIONS #187).")
     return " ".join(bits)
 
 
@@ -1338,3 +1452,124 @@ def backfield_jobs(weeks):
             "passdown": last[2], "passdown_base": mean(2),
             "i5": last[3], "i5_base": mean(3),
             "i5_n": int(last[4]), "i5_team": int(last[5])}
+
+
+# ---- offensive line: how many of a team's five regular linemen are out (DECISIONS #178) ----
+# Context only, never a price input: the reader judges it. Whether missing starters
+# predict the model's misses is a separate, later test (queued behind conditional
+# calibration and the implied team total).
+OL_POS = ("T", "G", "C", "OL")
+LINE_SLOTS = 5
+
+
+def line_regulars(snaps, team, week, n=LINE_SLOTS) -> list[dict]:
+    """The team's regular offensive line: the n linemen with the most offensive snaps
+    this season before this week (snap counts: player, pfr_player_id, position, team,
+    week, offense_snaps). Empty when the team has no lineman snaps yet."""
+    s = snaps[(snaps.team == team) & (snaps.week < week) & snaps.position.isin(OL_POS)]
+    if s.empty:
+        return []
+    g = s.groupby("pfr_player_id").agg(name=("player", "last"), pos=("position", "last"),
+                                       snaps=("offense_snaps", "sum"),
+                                       games=("offense_snaps", lambda v: int((v > 0).sum())))
+    g = g[g.snaps > 0].sort_values(["snaps", "name"], ascending=[False, True]).head(n)
+    return [{"pfr_id": i, "name": r["name"], "pos": r.pos, "snaps": int(r.snaps), "games": int(r.games)}
+            for i, r in g.iterrows()]
+
+
+def line_status(regulars, team, pfr_to_gsis, roster, report, not_playing, name_to_gsis=None) -> list[dict]:
+    """Each regular's status this week: 'out' (Out / Doubtful on the report, a not-playing
+    roster status, or off the team's roster), 'questionable', 'playing', or 'unmatched'
+    (no roster id found: never counted as out). Ids come from pfr_to_gsis, else from
+    name_to_gsis {(team, norm_name): gsis_id} (the roster file lacks many pfr ids).
+    roster: {gsis_id: (team, roster status)} for this week; report: {gsis_id: status}."""
+    out = []
+    for r in regulars:
+        gid = pfr_to_gsis.get(r["pfr_id"]) or (name_to_gsis or {}).get((team, MODEL.norm_name(r["name"])))
+        on = roster.get(gid) if gid else None
+        rep = report.get(gid) if gid else None
+        if gid is None:
+            why, state = "not matched to the roster", "unmatched"
+        elif on is None or on[0] != team:
+            why, state = "no longer on the roster", "out"
+        elif on[1] in not_playing:
+            why, state = {"INA": "inactive"}.get(on[1], "on reserve"), "out"
+        elif rep in ("Out", "Doubtful"):
+            why, state = rep, "out"
+        elif rep == "Questionable":
+            why, state = rep, "questionable"
+        else:
+            why, state = None, "playing"
+        out.append({**r, "state": state, "why": why})
+    return out
+
+
+def line_sentence(team, status, report_out=True, feed=False) -> str | None:
+    """The game header's line read for one team; None without five regulars.
+    report_out False: this week's injury report is not published yet; feed True: Sleeper's
+    injury feed filled in where it was silent (the players' own statuses, #183)."""
+    if len(status) < LINE_SLOTS:
+        return None
+    out = [s for s in status if s["state"] == "out"]
+    q = [s for s in status if s["state"] == "questionable"]
+    name = lambda s: f"{s['name']} ({s['pos']}, {s['why']})"
+    head = (f"{team}: all five regular linemen available" if not out else
+            f"{team}: {len(out)} of 5 regular linemen out -- " + ", ".join(map(name, out)))
+    um = [s for s in status if s["state"] == "unmatched"]
+    if not out and um:
+        head = f"{team}: no regular lineman reported out"
+    if not report_out:
+        head += (" (no injury report yet this week: roster status and Sleeper's injury feed)" if feed else
+                 " (no injury report yet this week: roster status only)")
+    return (head + (f"; questionable: " + ", ".join(map(name, q)) if q else "")
+            + (f"; not matched to the roster, status unknown: " + ", ".join(s["name"] for s in um) if um else "")
+            + ".")
+
+
+# ---- the automatic what-if range: 'carries=auto' (DECISIONS #179) ----
+# Not his game-to-game swing (the simulation already prices that): how sure we are of
+# his AVERAGE share, one standard error either side of our projection.
+AUTO_GAMES = LUCK_WINDOW        # last 10 games, the luck-free check's window
+AUTO_MIN_GAMES = 3
+
+
+def auto_range(this_season, last_season, proj, team_volume, this_season_only=False):
+    """Low / expected / high volume for an automatic range. this_season / last_season:
+    his per-game shares (oldest first) of the team's throws or runs; the last AUTO_GAMES
+    games are used, topped up from last season unless this_season_only (a role change).
+    proj: our projected volume; team_volume: the team's projected throws or runs.
+    Returns {values, n, se, from_last} or None under AUTO_MIN_GAMES games."""
+    shares = [float(v) for v in this_season if v == v][-AUTO_GAMES:]
+    from_last = 0
+    if not this_season_only and len(shares) < AUTO_GAMES:
+        tail = [float(v) for v in last_season if v == v]
+        take = tail[-(AUTO_GAMES - len(shares)):]
+        from_last = len(take)
+        shares = take + shares
+    n = len(shares)
+    if n < AUTO_MIN_GAMES or proj is None or team_volume is None:
+        return None
+    se = float(np.std(shares, ddof=1) / np.sqrt(n) * team_volume)
+    return {"values": [max(0.0, proj - se), float(proj), proj + se], "n": n, "se": se, "from_last": from_last}
+
+
+# ---- the book's quarterback against the engine's starter (DECISIONS #181) ----
+QB_KINDS = ("passing_attempts", "pass_completions", "longest_passing_completion", "passing_yards")
+
+
+def book_qb_mismatch(extra, starters, sleeper_team=None) -> list[dict]:
+    """Teams whose book posts passing lines for a QB other than the engine's starter and
+    none for the starter: the depth chart may be stale (the backtest graded the wrong
+    QB in 27% of backup starts, 2022-25). starters: {our team code: engine starter's
+    name}. Returns [{team, engine, book}]."""
+    back = {v: k for k, v in (sleeper_team or {}).items()}
+    posted = {}
+    for x in extra or []:
+        if x["kind"] in QB_KINDS:
+            posted.setdefault(back.get(x["team"], x["team"]), set()).add(x["name"])
+    out = []
+    for team, names in posted.items():
+        eng = starters.get(team)
+        if eng and MODEL.norm_name(eng) not in {MODEL.norm_name(n) for n in names}:
+            out.append({"team": team, "engine": eng, "book": sorted(names)})
+    return out

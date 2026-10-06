@@ -35,7 +35,8 @@ import pandas as pd
 MIN_CALLS = 300
 MIN_LEVEL_CALLS = 30      # a market (or book) with fewer calls, or one outcome only, shares the base intercept
 EPS = 1e-4
-YARDAGE_MARKETS = ("player_receptions", "player_reception_yds", "player_rush_yds", "player_pass_yds")
+YARDAGE_MARKETS = ("player_receptions", "player_reception_yds", "player_rush_yds", "player_pass_yds",
+                   "player_rush_reception_yds")
 
 
 def _logit(p):

@@ -7480,3 +7480,228 @@ by the user.
   yearly-fit carry share and yards per carry, plus a week-dependent weight (trust this
   season's split more only from week 5) -- the shape the carry result points to.
 - Tooling: backtest.py --k0 replaces model.K0_FIXED rather than adding to it; to fix.
+
+## 2026-10-06 (175) -- the user's volume thesis as a range; a role what-if; no-replacement flag
+
+- Outside reviewer, agreed as Tier 1: the engine checks lines under the user's volume
+  thesis, so a thesis should be a range and a line should say how much of it it needs.
+- Range what-if: `--assume "PLAYER: carries=10/12/15"` (team changes too) prices the board
+  at the low, expected and high ends and gives each side a verdict that names the end it
+  needs ("pays across your range" / "at your expected, not at your low" / "only at your
+  high" / "does not pay in your range"). A teammate's line runs the other way, so the
+  verdict never says "best" or "worst". Unsigned 0 is accepted as a team change.
+- Role what-if: `--role "PLAYER=RB1"` adds a player the depth chart has not promoted at
+  that slot (role-average prior blended with his own games). Nobody else moves. A full run
+  with research, written to OUT/role (record_run reads only the top folder).
+- No priced replacement: an Out starter whose team now prices fewer players at his
+  position than it has slots is named in the report with the role what-if to try.
+- Wording: "pays at this price if you expect" (expected volume), not "if he gets"
+  (realized). The overview says the luck-free gauge is realized-volume arithmetic, biased
+  low and treating the line as an average.
+- Fix: before this week's roster is published, last week's game-day inactive (INA) reads
+  as active; the injury report decides (Baker Mayfield was priced out of week 5).
+
+## 2026-10-06 (178) -- the offensive line flag: five regulars, how many out
+
+- User, from the outside reviewer's list (Tier 1): count how many of each team's five
+  regular linemen are out. Regulars = the five T/G/C/OL with the most offensive snaps this
+  season (nflverse snap counts); out = Out/Doubtful, a not-playing roster status, or off
+  the team's roster; questionable listed. Ids by pfr id, else a same-team name match (the
+  2026 roster file lacks about a quarter of pfr ids); an unmatched lineman is "status
+  unknown", never out. Says so when this week's injury report is not out yet.
+- Context only: no price changes, so no test is needed. Queued for Tier 3, after
+  conditional calibration and the implied team total test: do missing starters predict
+  the model's misses (expected null for one starter; two or more is rare and thin).
+
+## 2026-10-06 (179) -- the automatic what-if range: carries=auto / targets=auto
+
+- User: a range should default from recent games, his last 10. Built as opt-in per
+  player: low / high = our projection +/- one standard error of his share over his last
+  10 games (this season's, topped up with last season's final games, from the new
+  resources/priors_2025_share_games.csv) times the team's projected volume. This season
+  only after a team change or a backfield takeover; 3+ games or the report says to give
+  numbers.
+- Not his game-to-game min / max: the simulation already prices those swings, so using
+  them as the range would count them twice and every line would read "only at your high".
+
+## 2026-10-06 (181) -- the book's quarterback against ours
+
+- Found by the backup-QB implied-total diagnostic (reports/backup_qb_implied_total.md on
+  props/tier3): the backtest graded the depth chart's starter, and in 27% of backup
+  starts (2022-25) that was an active primary who did not start. The live board picks
+  its starter the same way, so a stale depth chart prices the wrong quarterback.
+- The report now flags a team whose Sleeper lines name a different quarterback (passing
+  attempts / completions / longest completion) and none for our starter, with the role
+  what-if that prices the book's man. Thursday's TB at DAL fires it: Sleeper posts Jalon
+  Daniels, the depth chart starts Baker Mayfield.
+- The backtest fix (grade only the QB who started) ships with the Tier 2 work.
+
+## 2026-10-06 (182) -- tier 2: each stage graded alone; the width retune does not ship; the harness audited
+
+- Pre-registered (reports/tier2_conditional_calibration.md, tag archive/tier2-prereg).
+  Part A (2022-24): with the actual volume plugged in, catches given targets are too
+  narrow (22.4% outside p10-p90), receiving yards too wide (18.6%), backs' rushing yards
+  far too wide (11.3%) while their carries are too narrow (27.2%), targets too wide
+  (18.0%). For backs the two stages offset, as the outside reviewer suspected.
+- Part B: each flagged stage's knob picked on its own diagnostic (targets 60, carries 10,
+  catch_conc 50, eff_sd_rush 0.15); on 2025, read once, five touched markets were worse
+  (QB passing -0.131, interval just excluding zero). Null: shipped widths stay. The
+  running-game subset is a candidate for a separate registration on unread data.
+- Harness audit first (reports/harness_audit_2026-10-06.md): model-is-truth, leakage
+  (weeks 3 and 9, four seasons), same-model-two-seeds and an inert-option check all pass;
+  #135-#136 replicate on fresh seeds. A smoke-run bug in the new tool (stage 1 bucketed
+  by the actual volume) was caught before any result.
+- backtest.py now grades the starting-QB markets only when the depth chart's starter
+  actually started (#181): it had graded a QB who did not start in 31 of 472 team-games
+  in 2024 and 7 of 468 in 2025. Past QB-market comparisons carried the same rows in both
+  arms; their absolute calibration numbers did not. `--grade-depth-chart-qb` reproduces
+  the old population.
+
+## 2026-10-06 (183) -- injuries from Sleeper's feed when the report is silent; the next QB starts
+
+- User: "how can you not tell Mayfield is injured and not playing?" -- and the user never
+  types commands. Before the official report (Monday for a Thursday game), the board read
+  last week's roster only; #175's INA fix then priced Mayfield as playing, though Sleeper's
+  player feed (already downloaded every run) said "Out, thumb".
+- Where this week's official report has no entry, Sleeper's injury_status fills in
+  (IR / PUP / suspended read as Out; Questionable as Questionable), labelled in the report.
+  The official report wins wherever it has an entry.
+- When the depth chart's QB1 is out, the next quarterback who is rostered and not out is
+  priced as the starter (Sleeper's depth order first, then the depth chart's); the report
+  says so in its first lines. Only one QB plays, so unlike the other positions his job
+  goes to one man. A --role for that team's QB still wins.
+- SKILL.md: the user never types a command; chat turns plain words into the flags and runs
+  role what-ifs itself when the report flags a missing replacement or a different QB.
+- TB at DAL: Jalon Daniels priced as TB's starter automatically, Mayfield out (Sleeper).
+
+## 2026-10-06 (184) -- rounds 28b and 29: two running-game candidates wait for 2026 weeks 2-8
+
+- Round 29 (reports/round29_market_runs.md): the backs' carries move toward the market's
+  fitted carries with the starting QB's held; selected w = 0.5 on 2022-25 (rushing yards
+  +0.093, rushing attempts +0.012, QB rushing +0.001). From the implied-total test (b =
+  +0.60 for backs' rushing in both periods; mostly carries).
+- Round 28 (running-game widths) failed its own guard on QB rushing (-0.003) and is null;
+  28b, registered after that guard and before its own (disclosed), moves only the backs'
+  knobs (carries 10, eff_sd_rush 0.075) and passes (rushing +0.028, attempts +0.013, QB
+  rushing +0.003).
+- Neither ships yet: both are read once on 2026 weeks 2-8 after week 8 is graded, each on
+  its own test, then jointly. The code ships at the shipped values (weight 0, shipped
+  widths): no price moves now.
+
+## 2026-10-06 (185) -- the market-carries rushing number beside the board; no midseason waits
+
+- User: nothing waits for midseason. The rounds 28b / 29 test was amended (before any read)
+  to 2026 weeks 2-4 and read once: null for both by the rule (rushing attempts worse on the
+  point estimate in every arm; rushing yards better in both; 188 back-games, intervals too
+  wide to confirm or refute).
+- User's choice: show round 29 beside the board. Every backs' rushing line now also prices
+  the Over with the carries 50% from the market's fitted carries (model.SHADOW_MARKET_RUSH_
+  WEIGHT, the QB's carries held, its own random stream: no board number moves); the report
+  shows both, the record logs p_over_board / p_over_mkt_carries / mkt_carries, and the
+  scorecard grades them (Brier, game-clustered interval) as weeks settle.
+
+## 2026-10-06 (186) -- guards: markets the user bets stay strict; the others block only when clearly worse
+
+- User's choice, from the next round on (never applied to a result already read): a
+  candidate is blocked by receptions, receiving yards, rushing yards or QB passing yards
+  getting worse on the point estimate (the markets the user bets); QB rushing, rushing
+  attempts and QB completions block it only when their 95% interval is wholly on the worse
+  side. They stay in every report as diagnostics: the QB's carries come out of the same
+  team pool as the backs', so a QB-rushing shift flags a misallocation.
+
+## 2026-10-06 (187) -- rushing + receiving yards priced
+
+- #173 step 2 (reports/rush_rec_calibration.md, tag archive/rushrec-prereg): the sum of a
+  back's rushing and receiving draws, graded on 2022-25 with the corrected harness, fails
+  no part of the bar -- width 0.223 (0.205-0.240), bias +1.7% (PASS), no band fails. A
+  back's rushing and receiving residuals correlate at +0.044, so independent draws hold.
+- The user bets the combined line when it is the better leg: it is now a priced market
+  (player_rush_reception_yds, from Sleeper's rushing_and_receiving_yards), QBs excluded,
+  settled on rushing + receiving yards, part of the label gate's yardage calls, and on the
+  strict guard list with receptions, receiving, rushing and passing yards.
+- Found in the same run: QB passing yards FAIL on width under the corrected grading (14.4%
+  of games outside the 80% range: too wide). Queued.
+
+## 2026-10-06 (188) -- QB rushing off the board; the scoreboard adopted
+
+- User (and the outside reviewer): QB rushing is not bet, so it leaves the board and the
+  guards. The starting QB's carries stay in the simulation for now -- they come out of the
+  same team pool as the backs' -- until the backs' pool is rebuilt as designed runs minus
+  the QB's own rate (queued, a volume change).
+- The scoreboard (reports/scoreboard.md, tag archive/scoreboard-rules): the engine is
+  judged on its two links -- conversion (the Over chance at a stand-in line with the actual
+  volume plugged in, log loss and Brier, bettable players) and spread (real vs simulated
+  game-to-game spread in stable-role stretches, by volume band) -- with a 1.0-point minimum
+  effect, guards in like units, team-season clustering for team-level changes, PIT tenths
+  and subgroups, and a comparisons ledger. The book comparison stays with the label gate.
+  Stand-in lines sit where Sleeper's 2026 lines sit (catches 97% within one; yards median
+  gap 5, ours about 3-4 lower).
+
+## 2026-10-06 (189) -- round 30: the backs' yards-per-carry swing halved (0.30 -> 0.15); rounds 31 null
+
+- First rounds judged on the scoreboard (reports/scoreboard.md). Round 30 (conversion,
+  reports/round30_conversion.md): eff_sd_rush 0.15 improves the rushing-yards conversion
+  log loss on 2022-25 at the 99% bar (+0.0074; the running-game family's multiple-look
+  level), moves Over chances 3.1 points, passes the guards, and is not negative on 2026
+  weeks 2-4 (+0.016). Ships. catch_conc 50 is not detectable; the receiving-yards shape
+  stays (narrower scored worse at the lines).
+- Round 31 (target spread, reports/round31_target_spread.md): share_conc_targets 120 brings
+  the model's target spread to the real upper bound in every band and passes its 2022-25
+  guard, but the 2026 weeks 2-4 read leans negative (receptions -0.002, receiving -0.001,
+  intervals across zero). Null. The finding stands: the target spread is too wide.
+- A review catch before any selection read: stand-in lines now come from pre-game inputs
+  no setting moves (each setting's own median moved with the knobs under test).
+
+## 2026-10-06 (190) -- the engine's markets: receptions, receiving, non-QB rushing, rushing + receiving, passing
+
+- User: the focus is receptions, receiving yards, non-QB rushing yards, rushing + receiving
+  yards and passing yards. QB rushing (#188) and anytime touchdowns are deferred: off the
+  skill and off what the user reads (the report's player tables and TD pairs; the slate
+  board already left TDs out). Anytime TDs are still priced, logged and graded -- "it's fine
+  to keep the logging" -- so the record keeps measuring them; `--markets td` shows them on
+  request. The TD model is untouched.
+
+## 2026-10-06 (191) -- the outside repo review: measurement and scenario fixes before any more tuning
+
+- An outside review (it read and ran the code at 6f7cd76) and a second opinion on it agree:
+  no tuning rounds until the scenario and grading paths are fixed. Round 34 waits.
+- Fixed, each with a known-answer test: CI imported SciPy at module load and failed the lean
+  capture install; scenario targets are set in the sampler's effective shares and asserted
+  against the request (raw 0.70 / 0.60 with 'A: targets=8' gave 4.45, two fixed players in
+  an overfull budget gave 0 -- reachable only through the function: the live scorer already
+  caps each team's shares at 100%); combined yards are scored with a zero side; comparisons
+  use one frozen cohort with equal outcomes and lines; guards are complete or blocked; the
+  calibration wording follows the corrected evidence (QB passing too wide); exact
+  receptions chances in the conditional score, stamped so a sampled run is never compared
+  with an exact one; CI counts a moved price hash or any engine script / data file as a
+  model change.
+- **--k0 changed meaning:** 'rate=value' now replaces only the named rates OVER
+  model.K0_FIXED; it used to replace K0_FIXED entirely. The old behaviour is '--k0 fit'
+  (the per-season fit alone, an ablation). Round 26's archived commands used the old
+  meaning; rerunning them today computes something else.
+- The scoreboard amendment records the 15-85% decision zone the code already used and the
+  stand-in rounding the code always did (the half-point nearest the expected value).
+- User, the same day: each player's matchup line gives the PPR points a game his opponent
+  allows to his position with its rank ("the 10th most"; the bottom half reads "Nth
+  fewest"), and the game header carries each offence's and defence's EPA per play (all,
+  dropbacks, runs) and points per drive with ranks -- nflverse play-by-play, nflfastR's
+  pass / rush flags. Context only; no price reads them.
+
+## 2026-10-06 (192) -- the second outside review: snap join by ID, active-week priors, the carry handoff (round 35)
+
+- Checked against the code first; confirmed: snap counts were joined by name (Gainwell,
+  Bam Knight had no snaps), prior-season shares divided by team volume only in touch weeks
+  (part-timers inflated), games counted playoffs and byes, a blank roof read as outdoors.
+  All fixed (model.snap_names_from_roster, build_priors.active_week_denominators,
+  score_game.resolve_roof). The yards-per-carry weight test the review could not find is
+  round 27 (#177, on PR #125).
+- The priors fix ships on its pre-registered guard (reports/priors_active_weeks.md; the
+  guard moved from line log loss to paired CRPS before any read, because stand-in lines
+  move with projections): every bet market within 0.15%, bias improves on receptions and
+  receiving yards. resources/priors_2025_players.csv rebuilt.
+- Round 35 (reports/round35_out_rule.md): the CARRY handoff now hands on the absent
+  player's share this season, and to each teammate only the part of the absence not yet in
+  his share (+10.4 x1e-4 on 2022-24, detectable; 2025 +4.3; every held-out season
+  positive). Targets keep the shipped rule (positive, not detectable).
+- Next, from the same review: the new-team cap on efficiency rates (one test) and the
+  starter-share draw on QB passing (one round; the user bets passing as often as others).

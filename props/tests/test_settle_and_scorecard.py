@@ -388,3 +388,24 @@ def test_releases_that_share_a_pricing_model_are_one_section(record):
     text = (record / "scorecard.md").read_text(encoding="utf-8")
     assert "## Engine props-v1.21, props-v1.22 (one pricing model)" in text
     assert "pricing models in the record" not in text
+
+
+def test_the_market_carries_shadow_is_graded_beside_the_board():
+    """DECISIONS #185: log loss first and Brier beside it, board vs shadow, game-clustered."""
+    import numpy as np
+    import scorecard
+    rng = np.random.default_rng(3)
+    n = 400
+    truth = rng.uniform(0.3, 0.7, n)
+    actual = np.where(rng.uniform(size=n) < truth, 80.0, 40.0)
+    df = pd.DataFrame({"market": "player_rush_yds", "event_id": rng.integers(0, 60, n).astype(str),
+                       "player": [f"p{i}" for i in range(n)], "line": 60.5, "actual": actual,
+                       "p_over_board": np.full(n, 0.5), "p_over_mkt_carries": truth})
+    out = "\n".join(scorecard.shadow_rush_section(df))
+    assert "positive = the shadow is better" in out, out
+    ll = next(l for l in out.splitlines() if l.startswith("- Log loss"))
+    br = next(l for l in out.splitlines() if l.startswith("- Brier score"))
+    assert "difference +" in ll and "difference +" in br, "the informative shadow wins on both scores"
+    assert out.index("- Log loss") < out.index("- Brier score"), "log loss is the primary score"
+    assert scorecard.shadow_rush_section(df.head(10))[-2].startswith("10 settled")
+    assert scorecard.shadow_rush_section(df.drop(columns=["p_over_mkt_carries"])) == []

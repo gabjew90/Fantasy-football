@@ -178,7 +178,7 @@ def clv_table(season: int) -> pd.DataFrame:
 
 BOOKS_MIN = 200                     # reports/sleeper_vs_books.md: the reading rule's sample
 LINE_OFF = {"player_receptions": 0.5, "player_reception_yds": 2.5, "player_rush_yds": 2.5,
-            "player_pass_yds": 5.0}
+            "player_pass_yds": 5.0, "player_rush_reception_yds": 3.0}
 PRICE_OFF = 0.03
 
 
@@ -338,6 +338,47 @@ def snap_rule_section(df: pd.DataFrame) -> list[str]:
                        f"{pd.to_numeric(g.p_model, errors='coerce').mean():.1%} | "
                        f"{pd.to_numeric(g.p_novig, errors='coerce').mean():.1%} | {miss.mean():+.2f} |")
     return out + ["", "A group needs about 50 calls before its numbers say anything.", ""]
+
+
+def shadow_rush_section(df: pd.DataFrame, reps: int = 2000, seed: int = 29) -> list[str]:
+    """DECISIONS #185: the board's rushing-yards Over probability against the market-
+    carries shadow's, on settled backs' rushing lines. Scored like every comparison on the
+    scoreboard (reports/scoreboard.md): log loss first, Brier beside it (both lower is
+    better; chances clipped to 0.5-99.5% as the scoreboard does), each with a 95% interval
+    on the difference resampling whole games. The board's number stays the price until
+    this says otherwise at a pre-set review -- with both scores agreeing in sign."""
+    need = {"p_over_board", "p_over_mkt_carries", "actual", "line"}
+    if not need <= set(df.columns):
+        return []
+    d = df[df["market"] == "player_rush_yds"].copy()
+    for c in ("p_over_board", "p_over_mkt_carries", "actual", "line"):
+        d[c] = pd.to_numeric(d[c], errors="coerce")
+    d = d.dropna(subset=list(need))
+    d = d[d.actual != d.line]                                   # pushes grade neither way
+    d = d.drop_duplicates(["event_id", "player", "line"])
+    head = ["## Rushing yards: the board vs the market-carries shadow", ""]
+    if len(d) < 30:
+        return head + [f"{len(d)} settled backs' rushing lines carry the shadow so far; the comparison "
+                       "starts at 30.", ""]
+    over = (d.actual > d.line).astype(float).to_numpy()
+    pb = np.clip(d.p_over_board.to_numpy(), 0.005, 0.995)
+    ps = np.clip(d.p_over_mkt_carries.to_numpy(), 0.005, 0.995)
+    ll = lambda p: -(over * np.log(p) + (1 - over) * np.log(1 - p))
+    games = d["event_id"].astype(str).to_numpy() if "event_id" in d.columns else np.arange(len(d)).astype(str)
+    ug, inv = np.unique(games, return_inverse=True)
+    idx = np.random.default_rng(seed).integers(0, len(ug), size=(reps, len(ug)))
+    cnt = np.bincount(inv)
+
+    def ci(diff):
+        sums = np.bincount(inv, weights=diff)
+        return np.percentile(sums[idx].sum(1) / cnt[idx].sum(1), [2.5, 97.5])
+
+    out = [f"{len(d)} settled lines, {len(ug)} games. Board minus shadow, positive = the shadow is better:"]
+    for name, fb, fs in (("Log loss", ll(pb), ll(ps)), ("Brier score", (pb - over) ** 2, (ps - over) ** 2)):
+        lo, hi = ci(fb - fs)
+        out.append(f"- {name}: board {fb.mean():.4f}, shadow {fs.mean():.4f}; difference "
+                   f"{(fb - fs).mean():+.4f} (95% CI {lo:+.4f} to {hi:+.4f})")
+    return head + out + ["", "The board's number stays the price until a pre-set review says otherwise.", ""]
 
 
 def render_sections(df: pd.DataFrame) -> tuple[list[str], list[dict]]:
@@ -567,6 +608,7 @@ def main(argv: list[str] | None = None) -> int:
         csv_rows += rows
         out += render_clv(clv, engine_hash)
         out += snap_rule_section(group)
+        out += shadow_rush_section(group)
         out += look_section(group)
         out += blend.blend_section(group)
 
