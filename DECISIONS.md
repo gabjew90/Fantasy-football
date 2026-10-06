@@ -7501,3 +7501,17 @@ by the user.
   in 2024 and 7 of 468 in 2025. Past QB-market comparisons carried the same rows in both
   arms; their absolute calibration numbers did not. `--grade-depth-chart-qb` reproduces
   the old population.
+
+## 2026-10-06 (184) -- rounds 28b and 29: two running-game candidates wait for 2026 weeks 2-8
+
+- Round 29 (reports/round29_market_runs.md): the backs' carries move toward the market's
+  fitted carries with the starting QB's held; selected w = 0.5 on 2022-25 (rushing yards
+  +0.093, rushing attempts +0.012, QB rushing +0.001). From the implied-total test (b =
+  +0.60 for backs' rushing in both periods; mostly carries).
+- Round 28 (running-game widths) failed its own guard on QB rushing (-0.003) and is null;
+  28b, registered after that guard and before its own (disclosed), moves only the backs'
+  knobs (carries 10, eff_sd_rush 0.075) and passes (rushing +0.028, attempts +0.013, QB
+  rushing +0.003).
+- Neither ships yet: both are read once on 2026 weeks 2-8 after week 8 is graded, each on
+  its own test, then jointly. The code ships at the shipped values (weight 0, shipped
+  widths): no price moves now.

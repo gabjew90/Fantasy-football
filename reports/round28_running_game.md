@@ -70,3 +70,10 @@ BACKS' knobs only (share_conc_carries 10, eff_sd_rush 0.075), share_conc_qb stay
 guard on 2022-25 (rushing yards, rushing attempts, QB rushing no worse), then the same
 2026 weeks 2-8 ship test, read once with round 29 under round 29's joint rule. The QB knob
 is the one candidate cause the data names: the backs' knobs barely touch the QB's carries.
+
+### Round 28b guard, 2022-25 (backs' knobs only: share_conc_carries 10, eff_sd_rush 0.075)
+
+Rushing yards +0.0275 (+0.0000, +0.0586); rushing attempts +0.0125 (+0.0072, +0.0180);
+QB rushing +0.0025 (-0.0142, +0.0188); receiving and passing identical. **The guard
+passes.** Round 28b waits for the one read on 2026 weeks 2-8 (after week 8 is graded),
+together with round 29 under its joint rule.
