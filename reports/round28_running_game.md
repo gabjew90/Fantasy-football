@@ -48,3 +48,25 @@ weeks 2-8 for this family before the read.
 ## Result
 
 (Filled in after the runs, below this line, without editing anything above.)
+
+### Selection, 2022-25 (props/tools/conditional_calibration.py --grid; corrected harness)
+
+| Stage | Knob | Shipped -> picked | Stage outside p10-p90, shipped -> picked |
+|---|---|---|---|
+| 1: carries, backs | share_conc_carries | 20 -> 10 | 27.3% -> 21.3% (ok) |
+| 2: rushing yards given carries, backs | eff_sd_rush | 0.30 -> 0.075 | about 11% -> 20.0% (ok) |
+| 1: carries, starting QB | share_conc_qb | 80 -> 30 | 24.2% -> 19.1% (ok) |
+
+### Guard, 2022-25 (the three picks together vs shipped, paired)
+
+Rushing yards +0.0304 (+0.0038, +0.0611); rushing attempts +0.0136 (+0.0081, +0.0192);
+**QB rushing -0.0031 (-0.0269, +0.0203)**; receiving and passing identical.
+
+**The guard fails** (QB rushing worse on the point estimate), so round 28 is null before
+any 2026 read; 2026 weeks 2-8 stay unread for this family.
+
+**Round 28b, registered now, after this guard and before its own (disclosed):** the two
+BACKS' knobs only (share_conc_carries 10, eff_sd_rush 0.075), share_conc_qb stays 80. Same
+guard on 2022-25 (rushing yards, rushing attempts, QB rushing no worse), then the same
+2026 weeks 2-8 ship test, read once with round 29 under round 29's joint rule. The QB knob
+is the one candidate cause the data names: the backs' knobs barely touch the QB's carries.

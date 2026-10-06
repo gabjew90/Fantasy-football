@@ -38,3 +38,16 @@ the one with the larger rushing-yards gain ships alone).
 ## Result
 
 (Filled in after the runs, below this line, without editing anything above.)
+
+### Selection, 2022-25 (each weight vs w = 0, paired, corrected harness)
+
+| w | Rushing yards | QB rushing | Rushing attempts |
+|---|---|---|---|
+| 0.25 | +0.0833 (+0.0509, +0.1157) | -0.0026 (-0.0195, +0.0142) | +0.0133 (+0.0070, +0.0197) |
+| **0.5** | **+0.0932 (+0.0399, +0.1480)** | +0.0010 (-0.0183, +0.0190) | +0.0124 (+0.0006, +0.0243) |
+| 0.75 | +0.0854 (+0.0079, +0.1638) | +0.0036 (-0.0173, +0.0243) | +0.0033 (-0.0146, +0.0208) |
+| 1.0 | +0.0344 (-0.0676, +0.1373) | -0.0093 (-0.0333, +0.0140) | -0.0208 (-0.0445, +0.0028) |
+
+Receiving and passing identical at every weight (as designed). **Selected: w = 0.5** (the
+largest rushing-yards gain among weights with QB rushing no worse; 0.25 and 1.0 are
+ineligible). Next: the one read on 2026 weeks 2-8 after week 8 is graded.
