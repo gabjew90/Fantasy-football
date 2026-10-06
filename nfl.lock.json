@@ -167,7 +167,7 @@
   "props/engine/resources/width_params.json": "ccd5629e29bf3e14bae8e050f256d04a107a8bb37ff6222de490564e93d93176",
   "props/engine/scripts/absence_check.py": "fa45e3fb4a1985b38771f0c58ed002956b163ee16439778ac7391ece1ba25079",
   "props/engine/scripts/absence_tune.py": "4bb4daaf1861f93ff8d57504e9fff5e0b0b828306d8210b688c87aa25ef27d1d",
-  "props/engine/scripts/backtest.py": "47a620c7859e1eea18cd5b113ce72e45507114bb645015e594b887d8f1c01d8e",
+  "props/engine/scripts/backtest.py": "84203d2d36df6a1a8eb2656760b7015d0bf6f8c9cf23f0b91c9768242e4c9b39",
   "props/engine/scripts/build_play_yards.py": "11de6c408de85098b8a304718612e06bb5412b1b8fbe7a918c86ecb212844d73",
   "props/engine/scripts/build_priors.py": "1757899778f704cf2bd074c9750f54de1edb9ff14d1429027d5096715ac707e3",
   "props/engine/scripts/build_td_priors.py": "c7330a57e68c1b7c5f8a9304bfbddbb4be0ca285d9f37ef383173d3e3049c27f",
@@ -193,6 +193,6 @@
   "tiers.csv": "04a1a79d43e9f2445ba3dc4ea262b00fbd58efea1f41e8b0393cb4c7f8afee41",
   "tiers.keefamania.csv": "11e6546b56caa807a572da86d5c3d81097bafd2d2550e25653882d78b2962e94"
  },
- "sha256": "be324ce45028c15a2a119d3864d81330e4e47a5f8ca49fe5afcec2b1390dfe15",
+ "sha256": "7e223f9b4cd42805f9007633f15e5460edaf99495699c63ee476dca77a065266",
  "tag": "nfl-v1.45"
 }
