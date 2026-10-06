@@ -51,8 +51,12 @@ Log loss and Brier agree in sign in every cell.
    whole chain (26% outside). The spread check in role-stable stretches found the carries
    spread about right when the AVERAGE is right (real / model 1.06, 1.01, 1.01), so what is
    missing is the engine's uncertainty about a back's average workload. That matters for
-   lines far from the median (alternate lines, long shots), not for the main line, and it
-   does not apply when the user supplies the workload.
+   lines far from the median (alternate lines, long shots), not for the main line. It
+   applies to the user's what-ifs too, less strongly: a workload read has error of its own,
+   so a what-if priced at the user's number is somewhat overconfident for the same reason,
+   mostly far from the middle (correction from the outside reviewer, 2026-10-06). No new
+   modelling is needed for that: compare the read with the break-even volume the report
+   already prints, and treat a small margin as thin.
 3. **No hidden script dependence.** The correlation is small in every spread bucket, and the
    combined line's narrowness is the same in all of them (23-27%), so the cause is the
    shared one above, not a missing rushing/receiving dependence model.
@@ -82,9 +86,29 @@ player; the 3,243 player-games on teams without one did not move at all. Test se
 | Receiving yards | 18.4% | 19.0% |
 | Rushing yards | 23.4% | 23.5% |
 | Rushing + receiving | 24.9% (FAIL) | 25.2% (FAIL) |
-| QB passing yards | 14.4% (FAIL) | 14.7% (12.5-17.1, INSUFFICIENT DATA) |
+| QB passing yards | 14.4% (FAIL) | 14.7% (12.5-17.1, INSUFFICIENT DATA -- a label change only: still too wide) |
 
 Bias and baseline verdicts are unchanged. The capped run is the baseline every comparison
 uses from here (compare() refuses to mix the two harnesses). Remaining parity gaps, still
 disclosed in every harness report: weekly depth slots, the snap-share role scaling, and
 pre-game injury regimes.
+
+## Receiving and passing, stage by stage (the step 7 baseline, 2022-25; share outside the 80% range)
+
+| Projected targets | Target spread real / model (role-stable) | Catches given targets | Rec yards given targets | Catches, whole chain | Rec yards, whole chain |
+|---|---|---|---|---|---|
+| 3-5 | 0.88 (0.85-0.91) | 21.9% (20.6-23.2) | 19.7% (18.4-20.9) | 19.2% | 20.2% |
+| 5-8 | 0.89 (0.86-0.92) | 22.1% (20.7-23.6) | 16.2% (14.9-17.4) | 18.1% | 15.5% |
+| 8-11 | 0.84 (0.77-0.91) | 22.5% (19.8-24.9) | 17.5% (15.1-19.9) | 16.8% | 14.0% |
+
+The target spread is too wide in every band, while catches given targets already run at the
+narrow edge (22%). Narrowing targets alone would help receiving yards (too wide at 5+
+targets, whole chain 14-16%) and push catches past the bar -- so a target-spread change needs
+the catch-rate swing widened with it (round 34's joint design), which is likely why round 31,
+moving targets alone, came back null.
+
+QB passing: 14.2% (12.6-15.8) outside on the whole chain, 17.9% (16.2-19.7) given every
+receiver's actual targets (PIT mean 0.536: slightly low). The too-wide stage is the volume or
+the starter-share draw, not the conversion; round 33 ruled out the team-throws dispersion, so
+the starter-share draw (an injury or benching risk that applies to every start) is what is
+left.
