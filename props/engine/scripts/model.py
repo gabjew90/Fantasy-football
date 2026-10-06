@@ -655,7 +655,10 @@ def questionable_flip_check(samples_by_regime, line):
 WIDTH_OFF = {"share_conc_targets": None, "share_conc_carries": None, "catch_conc": None,
              "eff_sd_rec": 0.0, "eff_sd_rush": 0.0, "share_conc_qb": None, "eff_sd_qb": None,
              "rush_other_share": None, "rush_norm_strength": 0.0, "rush_norm_qb": False,
-             "rush_norm_lead": None, "eff_sd_pass": 0.0}
+             "rush_norm_lead": None, "eff_sd_pass": 0.0,
+             # the per-catch yards shape times this (None = the fitted shape as is): a larger
+             # shape narrows yards given catches (reports/round30_conversion.md)
+             "catch_shape_mult": None}
 
 # simulate_team_game(..., return_other=True) files the 'other' bucket's targets
 # under this key, for simulate_qb_passing.
@@ -678,6 +681,9 @@ def validate_width(w):
                 raise ValueError(f"{k} must be null (off) or > 0, got {v!r}")
         elif k == "eff_sd_qb" and v is None:
             continue                                   # None = inherit eff_sd_rush
+        elif k == "catch_shape_mult":
+            if v is not None and not (isinstance(v, (int, float)) and v > 0):
+                raise ValueError(f"{k} must be null (off) or > 0, got {v!r}")
         elif k == "rush_other_share":
             if v is not None and not (isinstance(v, (int, float)) and 0 <= v < 1):
                 raise ValueError(f"{k} must be null (off) or in [0, 1), got {v!r}")
@@ -1006,6 +1012,8 @@ def receiving_given_targets(rng, n_sim, targets, catch_rate, ypt, per_catch_shap
         rec = rng.binomial(targets, cr).astype(float)
     ypt = max(ypt, 0.5)
     ypc = ypt / cr
+    if w["catch_shape_mult"]:                          # round 30 candidate: None = the fitted shape
+        per_catch_shape = per_catch_shape * float(w["catch_shape_mult"])
     shape_total = np.clip(rec, 0, 25) * per_catch_shape
     yds = np.where(rec > 0, rng.gamma(np.maximum(shape_total, 1e-6), ypc / per_catch_shape), 0.0)
     if w["eff_sd_rec"]:

@@ -1259,7 +1259,18 @@ RUNNING_GRID = ([dict(_R28_BASE)]
                 + [{**_R28_BASE, "eff_sd_rush": v} for v in (0.0, 0.075, 0.15)]
                 + [{**_R28_BASE, "share_conc_qb": v} for v in (30.0, 50.0)])
 
+# Round 30 (reports/round30_conversion.md): the conversion knobs
+_R30_BASE = {"eff_sd_rush": 0.3, "catch_conc": None, "catch_shape_mult": None}
+CONVERSION_GRID = ([dict(_R30_BASE)]
+                   + [{**_R30_BASE, "eff_sd_rush": v} for v in (0.0, 0.075, 0.15)]
+                   + [{**_R30_BASE, "catch_conc": cc, "catch_shape_mult": sm}
+                      for cc in (None, 200.0, 100.0, 50.0, 25.0) for sm in (None, 1.3, 1.6, 2.0)
+                      if not (cc is None and sm is None)])
+
 SUBGRIDS = {
+    "conversion": (CONVERSION_GRID, ("rec", "yds", "rush", "rr"), "width",
+                   "Round 30: the conversion knobs (reports/round30_conversion.md); the pick is made by "
+                   "props/tools/scoreboard.py on the conversion log loss, not by this table."),
     "running": (RUNNING_GRID, ("rush", "qbrush", "car"), "width",
                 "Round 28: the running game's knobs alone (reports/round28_running_game.md); the pick is "
                 "made per stage by props/tools/conditional_calibration.py --grid, not by this table."),
@@ -1819,7 +1830,7 @@ def main(argv=None):
     ap.add_argument("--tune-width", action="store_true",
                     help="choose the width settings on the --tune seasons; writes --report (.md/.csv)")
     ap.add_argument("--width-out", default=None, help="--tune-width: write the chosen settings to this JSON file")
-    ap.add_argument("--tune-grid", choices=["main", "qb", "rushnorm", "rushlead", "tier2", "running"], default="main",
+    ap.add_argument("--tune-grid", choices=["main", "qb", "rushnorm", "rushlead", "tier2", "running", "conversion"], default="main",
                     help="--tune-width: the receiving/rushing grid, the starting QB's own settings, or the "
                          "carry-share rescaling")
     ap.add_argument("--dispersion", choices=["prior", "train"], default=None,
