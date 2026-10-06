@@ -473,3 +473,22 @@ def test_snap_rows_take_the_rosters_name_by_id():
     out = MODEL.snap_names_from_roster(snp, ros)
     assert out.player.tolist() == ["Kenny Gainwell", "Bam Knight", "No Id Guy"], "id first, name as fallback"
     assert out.player_snap_file.tolist()[0] == "Kenneth Gainwell"
+
+
+def test_prior_shares_divide_by_every_active_week_with_one_team_per_week():
+    """build_priors.active_week_denominators: a part-timer active 4 weeks with a touch in
+    one counts all 4 weeks of team volume; a bye week adds nothing; in a trade week listed
+    on both teams, the team he touched the ball for counts once."""
+    import build_priors as BP
+    tw = pd.DataFrame({"team": ["A"] * 4 + ["B"] * 4, "week": [1, 2, 3, 5, 3, 4, 5, 6],
+                       "targets": [30, 30, 30, 30, 40, 40, 40, 40], "carries": [25] * 8,
+                       "i10_targets": [2] * 8, "i10_carries": [3] * 8})          # A's bye is week 4
+    ros = pd.DataFrame({"gsis_id": ["p"] * 4 + ["t"] * 6,
+                        "team": ["A", "A", "A", "A", "A", "A", "A", "B", "B", "B"],
+                        "week": [1, 2, 3, 4, 1, 2, 3, 3, 4, 5],
+                        "status": ["ACT"] * 10})
+    pw = pd.DataFrame({"gsis_id": ["p", "t", "t"], "team": ["A", "A", "B"], "week": [2, 1, 4]})
+    den = BP.active_week_denominators(ros, pw, tw)
+    assert den.loc["p", "targets"] == 90, "weeks 1-3 counted, the bye (4) has no team volume"
+    # t: A weeks 1-2, week 3 listed on both (no touch) -> the later roster row (B), B weeks 4-5
+    assert den.loc["t", "targets"] == 30 + 30 + 40 + 40 + 40, "one team per week in the trade week"

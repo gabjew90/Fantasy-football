@@ -27,6 +27,23 @@ import pandas as pd
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import model as M
 
+def active_week_denominators(roster_reg, pw, tw):
+    """{gsis_id: team targets, carries, inside-10 targets and carries} summed over every
+    week the player was ACTIVE for a team that played (or touched the ball for it) --
+    never only his touch weeks, which inflated part-timers' shares (outside review,
+    2026-10-06). One team per player-week: in a trade week the roster can list him on
+    both, and the team he touched the ball for wins, else the later roster row.
+    roster_reg: regular-season weekly roster (gsis_id, team, week, status); pw: his touch
+    weeks (gsis_id, team, week); tw: team volume per (team, week)."""
+    act = roster_reg[roster_reg.status == "ACT"][["gsis_id", "team", "week"]].assign(_touch=0)
+    tch = pw[["gsis_id", "team", "week"]].assign(_touch=1)
+    weeks = (pd.concat([act, tch], ignore_index=True)
+               .sort_values("_touch", kind="stable")
+               .drop_duplicates(["gsis_id", "week"], keep="last"))
+    cols = ["targets", "carries", "i10_targets", "i10_carries"]
+    return weeks.merge(tw[["team", "week"] + cols], on=["team", "week"]).groupby("gsis_id")[cols].sum()
+
+
 def norm_name(s):
     """Normalise a player name for joining across nflverse tables that disagree on
     punctuation and suffixes: 'D.J. Moore' == 'DJ Moore', 'Luther Burden III' == 'Luther Burden'."""
@@ -138,7 +155,8 @@ def main():
     # snap_counts keys on pfr id, not gsis: the roster's name by that id (the snap file's
     # spelling only where no id matches), then a per-player season mean by name + team
     # (a role prior, never usage evidence)
-    snaps = M.snap_names_from_roster(snaps, pd.read_csv(ros_f, low_memory=False))
+    roster_all = pd.read_csv(ros_f, low_memory=False)
+    snaps = M.snap_names_from_roster(snaps, roster_all)
     snaps = snaps.copy(); snaps["key"] = snaps["player"].map(norm_name)
     snap_season = snaps.groupby(["team", "key"])["offense_pct"].mean().rename("snap_pct_25")
 
@@ -149,8 +167,7 @@ def main():
         rush_yards=("rush_yards", "sum"), team_carries=("carries_team", "sum"),
         i10_targets=("i10_targets", "sum"), team_i10_targets=("i10_targets_team", "sum"),
         i10_carries=("i10_carries", "sum"), team_i10_carries=("i10_carries_team", "sum"))
-    roster = pd.read_csv(ros_f, low_memory=False)
-    roster = roster[roster.season == S]
+    roster = roster_all[roster_all.season == S]
     # regular-season weeks only: the weekly roster also lists playoff weeks (up to week 22),
     # which made "games" run to 21 (outside review, 2026-10-06)
     roster_reg = roster[roster.game_type == "REG"] if "game_type" in roster else roster[roster.week <= 18]
@@ -167,11 +184,7 @@ def main():
     # volume only in his touch weeks inflated part-timers' shares (Velus Jones Jr. 15.4% of
     # the carries on 4 carries; outside review, 2026-10-06). The scorer's current-season
     # share counts every team game the same way.
-    act_wk = roster_reg[roster_reg.status == "ACT"][["gsis_id", "team", "week"]]
-    weeks = pd.concat([act_wk, pw[["gsis_id", "team", "week"]]]).drop_duplicates()
-    den = (weeks.merge(tw[["team", "week", "targets", "carries", "i10_targets", "i10_carries"]],
-                       on=["team", "week"]).groupby("gsis_id")
-              [["targets", "carries", "i10_targets", "i10_carries"]].sum())
+    den = active_week_denominators(roster_reg, pw, tw)
     for a_, b_ in (("team_targets", "targets"), ("team_carries", "carries"),
                    ("team_i10_targets", "i10_targets"), ("team_i10_carries", "i10_carries")):
         agg[a_] = den[b_].reindex(agg.index).fillna(agg[a_])

@@ -1383,9 +1383,11 @@ def main():
         return float(1 - np.exp(-td_lambda(pr))), "anytime_td_v0"
 
     # ---------- 6c. weather (NWS, Open-Meteo fallback) ----------
-    weather = {"status": "skipped (closed roof)" if roof in ("closed", "dome") else "not attempted"}
+    # a roof NOT YET POSTED for a retractable stadium could open on the day: fetch anyway
+    _fetch_wx = roof not in ("closed", "dome") or bool(ROOF_NOTE and "retractable" in ROOF_NOTE)
+    weather = {"status": "skipped (closed roof)" if not _fetch_wx else "not attempted"}
     STADIUM_LL = {}   # filled from games.csv when available; else geocode by stadium is not attempted
-    if roof not in ("closed", "dome"):
+    if _fetch_wx:
         import urllib.request
         # games.csv has no coordinates; use the bundled home-team stadium table. City-level
         # accuracy is enough for an NWS grid cell (2.5 km). Neutral-site games are the
