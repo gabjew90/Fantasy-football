@@ -66,6 +66,12 @@ def test_round_35_carries_hand_on_this_seasons_share_and_only_what_is_left():
     assert share == pytest.approx(12 / 20), "K: 12 of the team's 20 carries in his two games"
     assert frac == {"A": pytest.approx(2 / 3), "B": 0.0}, "B joined after K went out: K's absence is all in B's share"
     assert SG.carry_handoff_inputs(rushes, passes, act, "X", "Z", ["A"]) == (None, {})
+    catcher = pd.DataFrame({"posteam": ["X"], "week": [3], "receiver_player_id": ["K"]})
+    assert SG.carry_handoff_inputs(rushes, catcher, act, "X", "K", ["A"])[1]["A"] == pytest.approx(2 / 3), \
+        "a week with only a catch is not a played week for the carry handoff (as tested)"
+    two = pd.concat([rushes, pd.DataFrame({"posteam": ["X"] * 4, "week": [1] * 4, "rusher_player_id": ["K"] * 4,
+                                           "two_point_attempt": [1] * 4})], ignore_index=True)
+    assert SG.carry_handoff_inputs(two, passes, act, "X", "K", ["A"])[0] == pytest.approx(12 / 20), "two-point tries out"
     M = pd.DataFrame({"team": "X", "gsis_id": ["A", "B"], "pos": "RB", "ts": 0.0, "rs": [0.3, 0.2],
                       "i10ts": 0.0, "i10rs": 0.0})
     E = pd.DataFrame({"team": ["X"], "gsis_id": ["K"], "pos": ["RB"], "ts": 0.0, "rs": [share], "i10ts": 0.0, "i10rs": 0.0})

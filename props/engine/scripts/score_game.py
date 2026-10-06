@@ -3111,7 +3111,7 @@ def main():
         _src = lambda r: (f", {INJ_SOURCE[(r.team, r.gsis_id)]}" if (r.team, r.gsis_id) in INJ_SOURCE else "")
         L.append(f"- **Out:** " + ", ".join(f"{r['name']} ({r.report_status or r.status}{_src(r)})"
                                             for _, r in excl.iterrows())
-                 + ". Most of their usual share goes to whoever replaces them, not to the priced teammates: a quarter of their targets and carries is handed on in our numbers, mostly to their position.")
+                 + ". Most of their usual share goes to whoever replaces them, not to the priced teammates: a quarter of their targets is handed on in our numbers, mostly to their position; for carries, a quarter of their carry share this season, and to each teammate only the part of the absence not already in his own numbers (round 35).")
         for f_ in SC.missing_replacements(pop):
             left = ("nobody" if not f_["priced_left"] else "only " + ", ".join(f_["priced_left"]))
             L.append(f"- **No priced replacement for {f_['name']} ({f_['team']} {f_['slot']}):** the depth chart "
@@ -3374,15 +3374,18 @@ def short_summary(R, away, home, season, week, books, hrs, markets, gate=None) -
 
 def carry_handoff_inputs(rushes, passes, act_weeks, team, absent, mates):
     """Round 35 (reports/round35_out_rule.md, DECISIONS #192): for the CARRY handoff,
-    the absent player's carry share THIS season in the games he played (a target or a
-    carry), and for each priced teammate the fraction of his own active games this season
-    in which the absent player played -- the part of the absence NOT already in that
-    teammate's share. rushes / passes: this season's plays before the game (posteam, week,
-    rusher_player_id / receiver_player_id); act_weeks: {gsis_id: set of weeks ACTIVE for
-    this team}. Returns (share or None when he has not played this season, {mate: fraction})."""
+    the absent player's carry share THIS season in the games he had a carry, and for each
+    priced teammate the fraction of his own active games this season in which the absent
+    player had a carry -- the part of the absence NOT already in that teammate's share.
+    Exactly the tested definition (out_rule_test.py V2, carries kind: two-point tries out).
+    rushes / passes: this season's plays before the game (posteam, week, rusher_player_id /
+    receiver_player_id); act_weeks: {gsis_id: set of weeks ACTIVE for this team}. Returns
+    (share or None when he has not carried this season, {mate: fraction})."""
     r = rushes[rushes.posteam == team]
+    if "two_point_attempt" in r:
+        r = r[r.two_point_attempt.fillna(0) != 1]
     p = passes[passes.posteam == team]
-    played = set(r.loc[r.rusher_player_id == absent, "week"]) | set(p.loc[p.receiver_player_id == absent, "week"])
+    played = set(r.loc[r.rusher_player_id == absent, "week"])
     if not played:
         return None, {}
     team_c = r.groupby("week").size()
