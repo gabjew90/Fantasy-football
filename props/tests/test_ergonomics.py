@@ -404,6 +404,28 @@ def test_sleeper_fills_the_injury_report_only_where_it_is_silent():
     assert st[("TB", "h")] == "Questionable" and ("TB", "h") not in src, "the official report wins"
 
 
+def test_once_the_report_is_out_a_stale_sleeper_out_does_not_bench_a_healthy_player():
+    """Code review 2026-10-06: a player off this week's report (or practising fully) is
+    healthy even if Sleeper still shows last week's Out; one listed DNP/limited with no
+    game status yet takes Sleeper's; a reserve list counts whatever the report says."""
+    players = {"1": {"full_name": "Back Returning", "team": "NO", "injury_status": "Out", "gsis_id": "r"},
+               "2": {"full_name": "Back Limited", "team": "NO", "injury_status": "Doubtful", "gsis_id": "l"},
+               "3": {"full_name": "Back Full", "team": "NO", "injury_status": "Out", "gsis_id": "f"},
+               "4": {"full_name": "Back Ir", "team": "NO", "injury_status": "IR", "gsis_id": "i"},
+               "5": {"full_name": "Gabriel Davis", "team": "BUF", "injury_status": "Out", "gsis_id": "gd"}}
+    m = SG.sleeper_injury_map(players)
+    roster = pd.DataFrame({"team": ["NO"] * 4 + ["BUF"], "gsis_id": ["r", "l", "f", "i", "gd"],
+                           "full_name": ["Back Returning", "Back Limited", "Back Full", "Back Ir", "Gabe Davis"]})
+    practice = {("NO", "l"): "Limited Participation in Practice", ("NO", "f"): "Full Participation in Practice"}
+    st, src = SG.injuries_with_fallback({("NO", "l"): None, ("NO", "f"): None}, roster, m,
+                                        practice=practice, reported_teams={"NO"})
+    assert ("NO", "r") not in st or not isinstance(st[("NO", "r")], str), "off the report: healthy"
+    assert st[("NO", "f")] is None, "practising fully: healthy"
+    assert st[("NO", "l")] == "Doubtful" and "practice" in src[("NO", "l")]
+    assert st[("NO", "i")] == "Out", "a reserve list is never on the weekly report"
+    assert st[("BUF", "gd")] == "Out", "joined by gsis id, not by name (Gabe / Gabriel)"
+
+
 def test_the_next_quarterback_starts_when_qb1_is_out():
     roles = pd.DataFrame([{"team": "TB", "gsis_id": "baker", "slot": "QB1", "dc_dt": None},
                           {"team": "TB", "gsis_id": "evans", "slot": "WR1", "dc_dt": None}])

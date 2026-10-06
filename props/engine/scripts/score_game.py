@@ -75,38 +75,66 @@ def cached_json(path, ttl_s, loader):
 # SLEEPER'S INJURY FEED (DECISIONS #183): the official report lands Wednesday (Monday for
 # a Thursday game) and nflverse after it; Sleeper's player feed carries each player's
 # status as soon as it is news (Baker Mayfield "Out, thumb" four days before a Thursday
-# game with no report out yet). Used ONLY where this week's official report has no entry.
+# game with no report out yet). Used ONLY where this week's official report has no entry,
+# and -- once a team's report is out -- only for a player it lists as missing or limited in
+# practice (a player off the report is healthy; Sleeper can still carry last week's "Out"),
+# or on a reserve list, which the weekly report never carries (code review, 2026-10-06).
 SLEEPER_OUT = {"Out": "Out", "Doubtful": "Doubtful", "IR": "Out", "PUP": "Out", "Sus": "Out", "NFI": "Out"}
+SLEEPER_RESERVE = {"IR", "PUP", "Sus", "NFI"}
 
 
 def sleeper_injury_map(players, sleeper_team=None) -> dict:
-    """{(our team code, norm_name): (status, body part)} from Sleeper's player feed, for
-    players it lists as Out / Doubtful / Questionable or on IR / PUP / suspended."""
+    """{("gsis", gsis_id): (status, body part)} and, for players the feed gives no gsis_id,
+    {(our team code, norm_name): (status, body part)} from Sleeper's player feed, for
+    players it lists as Out / Doubtful / Questionable or on IR / PUP / suspended. The id
+    is the join (CLAUDE.md: players are joined by ID, never by name alone); the name key
+    is the fallback."""
     back = {v: k for k, v in (sleeper_team or {}).items()}
     out = {}
     for v in (players or {}).values():
         st = v.get("injury_status")
         if st not in SLEEPER_OUT and st != "Questionable":
             continue
+        hit = (st, v.get("injury_body_part"))
+        gid = str(v.get("gsis_id") or "").strip()
+        if gid:
+            out[("gsis", gid)] = hit
         name = v.get("full_name") or f'{v.get("first_name", "")} {v.get("last_name", "")}'.strip()
         if name and v.get("team"):
-            out[(back.get(v["team"], v["team"]), norm_name(name))] = (st, v.get("injury_body_part"))
+            out.setdefault((back.get(v["team"], v["team"]), norm_name(name)), hit)
     return out
 
 
-def injuries_with_fallback(official, roster, sleeper):
+def _missed_practice(practice_status) -> bool:
+    """Whether a report's practice status says he missed practice or was limited."""
+    p = str(practice_status or "").lower()
+    return "did not" in p or "limited" in p or p in ("dnp", "lp")
+
+
+def injuries_with_fallback(official, roster, sleeper, practice=None, reported_teams=()):
     """This week's status per (team, gsis_id): the official report where it has an entry,
-    else Sleeper's (IR / PUP / suspended read as Out). Returns (status, source) dicts;
-    source names Sleeper and the body part for every status it supplied."""
+    else Sleeper's (IR / PUP / suspended read as Out). For a team whose report is out
+    (reported_teams), Sleeper fills in only a player the report lists as missing or
+    limited in practice (practice: {(team, gsis_id): practice status}), or a reserve-list
+    designation. Returns (status, source) dicts; source names Sleeper and the body part
+    for every status it supplied."""
     status, source = dict(official), {}
+    reported = set(reported_teams or ())
     for t, g, n in zip(roster.team, roster.gsis_id, roster.full_name):
         if isinstance(status.get((t, g)), str):
             continue
-        hit = sleeper.get((t, norm_name(n)))
-        if hit:
-            st, part = hit
-            status[(t, g)] = SLEEPER_OUT.get(st, st)
-            source[(t, g)] = f"Sleeper injury feed{', ' + part.lower() if part else ''}; no official report yet"
+        hit = sleeper.get(("gsis", str(g).strip())) or sleeper.get((t, norm_name(n)))
+        if not hit:
+            continue
+        st, part = hit
+        if t in reported and st not in SLEEPER_RESERVE:
+            if not _missed_practice((practice or {}).get((t, g))):
+                continue          # off the report or practising fully: the report says he is fine
+            why = "the official report has his practice but no game status yet"
+        else:
+            why = "no official report yet" if t not in reported else "a reserve list"
+        status[(t, g)] = SLEEPER_OUT.get(st, st)
+        source[(t, g)] = f"Sleeper injury feed{', ' + part.lower() if part else ''}; {why}"
     return status, source
 
 
@@ -786,7 +814,7 @@ def main():
         log(f"  Sleeper player feed unavailable ({exc}); injuries from the official report only")
     inj_status, INJ_SOURCE = injuries_with_fallback(
         iw.set_index(["team", "gsis_id"])["report_status"].to_dict(), rw,
-        sleeper_injury_map(SLP_PLAYERS, SLEEPER_TEAM))
+        sleeper_injury_map(SLP_PLAYERS, SLEEPER_TEAM), practice=inj_practice, reported_teams=set(iw.team))
     # THE NEXT QB STARTS when the depth chart's QB1 is out (#183) -- Sleeper's depth order
     # first (fresher), then the depth chart's; a --role for that team's QB wins
     _rw_st = {(t_, g_): st_ for t_, g_, st_ in zip(rw.team, rw.gsis_id, rw.status)}
@@ -804,13 +832,14 @@ def main():
         q1_before = roles[(roles.team == t) & (roles.slot == "QB1")].gsis_id.tolist() if not roles.empty else []
         roles, got = promote_qb(
             roles, t, order,
-            is_out=lambda g_, t=t: (inj_status.get((t, g_)) in ("Out", "Doubtful")
+            is_out=lambda g_, t=t: (inj_status.get((t, g_)) in ("Out", "Doubtful") or g_ in ASSUME_OUT
                                     or _rw_st.get((t, g_)) in NOT_PLAYING),
             on_roster=lambda g_, t=t: _rw_st.get((t, g_)) == "ACT")
         if got:
             nm_ = lambda g_: rw[rw.gsis_id == g_].full_name.iloc[0] if (rw.gsis_id == g_).any() else g_
             AUTO_QB.append({"team": t, "starter": nm_(got), "out": nm_(q1_before[0]) if q1_before else "QB1",
-                            "why": INJ_SOURCE.get((t, q1_before[0]), inj_status.get((t, q1_before[0])) or "")})
+                            "why": ("assumed out in this scenario" if q1_before and q1_before[0] in ASSUME_OUT else
+                                    INJ_SOURCE.get((t, q1_before[0]), inj_status.get((t, q1_before[0])) or ""))})
 
     snp_ = snp[(snp.season == SEASON) & (snp.week < WEEK)].copy()
     snp_["key"] = snp_["player"].map(norm_name)
@@ -2096,11 +2125,13 @@ def main():
     _pfr = (ros.dropna(subset=["pfr_id"]).drop_duplicates("pfr_id", keep="last")
                .set_index("pfr_id")["gsis_id"].to_dict() if "pfr_id" in ros else {})
     _ros_now = {g_: (t_, st_) for t_, g_, st_ in zip(rw.team, rw.gsis_id, rw.status)}
-    _rep_now = dict(zip(iw.gsis_id, iw.report_status))
+    # the same statuses the players are priced on: the official report, Sleeper's feed where it is silent
+    _rep_now = {g_: s_ for (t_, g_), s_ in inj_status.items() if t_ in (AWAY, HOME)}
     _by_name = {(t_, norm_name(n_)): g_ for t_, n_, g_ in zip(rw.team, rw.full_name, rw.gsis_id)}
     LINE_LINES = [l_ for t_ in (AWAY, HOME) for l_ in [RSCH.line_sentence(t_, RSCH.line_status(
         RSCH.line_regulars(snp[snp.season == SEASON], t_, WEEK), t_, _pfr, _ros_now, _rep_now, NOT_PLAYING,
-        name_to_gsis=_by_name), report_out=bool((iw.team == t_).any() or iw.team.nunique() >= 16))] if l_]
+        name_to_gsis=_by_name), report_out=bool((iw.team == t_).any() or iw.team.nunique() >= 16),
+        feed=SLP_PLAYERS is not None)] if l_]
     # CATCHES, YARDS AND THE LONG ONE (DECISIONS #164): the book's three receiving lines
     # read together at the whole numbers that win them, against his yards a catch
     CATCH_READ, CARRY_READ, QB_READ, RUSH_REC = {}, {}, {}, {}
@@ -2400,9 +2431,14 @@ def main():
             out.append(f"**Caution: {label.lower()}.** {text.replace(' Your call.', '')}")
         return out
 
+    # WHAT THE USER READS (DECISIONS #190): anytime TDs are deferred -- priced, logged and
+    # graded (R keeps them; the shadow log is written from R), but every table the user
+    # reads is built from RD, which drops them unless the run asked for them (--markets td)
+    show_td = bool(MARKETS) and "player_anytime_td" in MARKETS
+    RD = R if (show_td or R.empty) else R[R.market != "player_anytime_td"]
     top = pd.DataFrame()
-    if not R.empty:
-        top = (R.sort_values("gap", key=abs, ascending=False)
+    if not RD.empty:
+        top = (RD.sort_values("gap", key=abs, ascending=False)
                 .drop_duplicates(subset=["market", "player", "side"]).head(12))
 
     hrs = (kick - pd.Timestamp.now(tz="UTC")).total_seconds() / 3600
@@ -2522,7 +2558,6 @@ def main():
     def pct(x): return f"{100*x:.0f}%"
     def odds_str(a): a = int(a); return f"+{a}" if a > 0 else f"{a}"
     td_book = {}
-    show_td = bool(MARKETS) and "player_anytime_td" in MARKETS      # deferred unless asked for
     if not R.empty and show_td:
         for _, rr in R[R.market == "player_anytime_td"].iterrows():
             td_book.setdefault(rr.player, []).append((rr.book, rr.price, rr.p_novig))
@@ -2789,7 +2824,7 @@ def main():
         for _, c in CONF.iterrows():
             tier_of[(c.player, c.market, c.side)] = c.tier
     bet_rows = []
-    if not R.empty:
+    if not R.empty:      # all markets: the card's final tier is what the shadow log records
         Rd = R[R.season.eq(SEASON) & R.week.eq(WEEK)].copy()
         Rd["ER"] = Rd["ER"].astype(float)
         # one row per (player, market, side): the best PRICE at the book's own line
@@ -3048,7 +3083,19 @@ def main():
                      + ", ".join(f"{r_.full_name} ({r_.team})" for r_ in prov_ina)
                      + ". Priced as playing his normal role until this week's report says otherwise; if he "
                        "sits again, his lines are void and his teammates' move.")
-    for mm_ in RSCH.book_qb_mismatch((data or {}).get("sleeper_extra"), STARTER_QB, SLEEPER_TEAM):
+    # the book's quarterbacks: its extra QB lines and its passing-yards line (the commonest
+    # QB line; outcomes carry no team, so the team comes from this week's roster)
+    _qb_team = {norm_name(n_): t_ for t_, n_, p_ in zip(rw.team, rw.full_name, rw.position)
+                if p_ == "QB" and t_ in (AWAY, HOME)}
+    _book_qbs = list((data or {}).get("sleeper_extra") or [])
+    for b_ in ((data or {}).get("bookmakers") or []):
+        for mk_ in b_.get("markets", []):
+            if mk_.get("key") == "player_pass_yds":
+                for o_ in mk_.get("outcomes", []):
+                    t_ = _qb_team.get(norm_name(o_.get("description", "")))
+                    if t_:
+                        _book_qbs.append({"name": o_["description"], "team": t_, "kind": "passing_yards"})
+    for mm_ in RSCH.book_qb_mismatch(_book_qbs, STARTER_QB, SLEEPER_TEAM):
         L.append(f"- **The book's quarterback is not ours ({mm_['team']}):** Sleeper posts passing lines for "
                  f"{', '.join(mm_['book'])} and none for {mm_['engine']}, the depth chart's starter, whom this "
                  f"board prices as the starter (his kneel-downs and passing share; his receivers' numbers do not "
@@ -3121,7 +3168,7 @@ def main():
              "tells you how much role your view needs, not whether the view is right; the model's chances are not shown "
              "to be calibrated within 3 points (reports/calibration_bar_v2.md).")
     if not td_two_sided:
-        if (R.market == "player_anytime_td").any() if len(R) else False:
+        if (RD.market == "player_anytime_td").any() if len(RD) else False:
             L.append("- **Touchdown prices** have no 'won't score' side to remove the cut from, so the book's number there is a bit high.")
     L.append("- **Why there are no bet labels:** the model beats simple baselines on past seasons, but it has not shown it "
              "adds anything beside the book's price (the report's first line gives the current graded record). Every run "
@@ -3169,10 +3216,10 @@ def main():
 
     # ---- technical appendix ----
     L.append("---\n<details><summary>Technical appendix: all lines</summary>\n")
-    if not R.empty:
+    if not RD.empty:
         L.append("| Book | Market | Player | Line | Model mean | Side | p_model | p_novig | Gap | Price | ER |")
         L.append("|---|---|---|---|---|---|---|---|---|---|---|")
-        for _, r in R.iterrows():
+        for _, r in RD.iterrows():
             L.append(f"| {r.book} | {r.market.replace('player_','')} | {r.player} | {'' if pd.isna(r.line) else r.line} | "
                      f"{'' if pd.isna(r.model_mean) else round(r.model_mean,1)} | {r.side} | {r.p_model:.3f} | {r.p_novig:.3f} | "
                      f"{r.gap:+.3f} | {r.price} | {r.ER:+.3f} |")
@@ -3239,7 +3286,7 @@ def main():
     if not SCENARIO and not a.no_scenarios:
         q = pop[pop.questionable & ~pop.excluded]
         if len(q) and snap_written:
-            L += run_scenarios(q, R, slug, snap_path)
+            L += run_scenarios(q, RD, slug, snap_path)
             (OUT / f"report_{slug}.md").write_text("\n".join(L), encoding="utf-8")
         elif len(q):
             L += ["", "## If a Questionable player is out", "",

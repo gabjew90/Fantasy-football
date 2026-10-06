@@ -770,3 +770,6 @@ def test_the_book_quarterback_flag_fires_only_when_the_book_skips_our_starter():
     assert RS.book_qb_mismatch([], {"TB": "Baker Mayfield"}) == [], "no QB lines posted: no claim"
     la = [{"name": "Matthew Stafford", "team": "LAR", "kind": "passing_attempts", "line": 33.5}]
     assert RS.book_qb_mismatch(la, {"LA": "Matthew Stafford"}, {"LA": "LAR"}) == [], "team codes mapped"
+    py = [{"name": "Teddy Bridgewater", "team": "TB", "kind": "passing_yards"}]
+    assert RS.book_qb_mismatch(py, {"TB": "Baker Mayfield"}) == [
+        {"team": "TB", "engine": "Baker Mayfield", "book": ["Teddy Bridgewater"]}], "the passing-yards line counts"

@@ -1391,9 +1391,10 @@ def line_status(regulars, team, pfr_to_gsis, roster, report, not_playing, name_t
     return out
 
 
-def line_sentence(team, status, report_out=True) -> str | None:
+def line_sentence(team, status, report_out=True, feed=False) -> str | None:
     """The game header's line read for one team; None without five regulars.
-    report_out False: this week's injury report is not published yet."""
+    report_out False: this week's injury report is not published yet; feed True: Sleeper's
+    injury feed filled in where it was silent (the players' own statuses, #183)."""
     if len(status) < LINE_SLOTS:
         return None
     out = [s for s in status if s["state"] == "out"]
@@ -1405,7 +1406,8 @@ def line_sentence(team, status, report_out=True) -> str | None:
     if not out and um:
         head = f"{team}: no regular lineman reported out"
     if not report_out:
-        head += " (no injury report yet this week: roster status only)"
+        head += (" (no injury report yet this week: roster status and Sleeper's injury feed)" if feed else
+                 " (no injury report yet this week: roster status only)")
     return (head + (f"; questionable: " + ", ".join(map(name, q)) if q else "")
             + (f"; not matched to the roster, status unknown: " + ", ".join(s["name"] for s in um) if um else "")
             + ".")
@@ -1439,7 +1441,7 @@ def auto_range(this_season, last_season, proj, team_volume, this_season_only=Fal
 
 
 # ---- the book's quarterback against the engine's starter (DECISIONS #181) ----
-QB_KINDS = ("passing_attempts", "pass_completions", "longest_passing_completion")
+QB_KINDS = ("passing_attempts", "pass_completions", "longest_passing_completion", "passing_yards")
 
 
 def book_qb_mismatch(extra, starters, sleeper_team=None) -> list[dict]:

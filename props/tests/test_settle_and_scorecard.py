@@ -391,7 +391,7 @@ def test_releases_that_share_a_pricing_model_are_one_section(record):
 
 
 def test_the_market_carries_shadow_is_graded_beside_the_board():
-    """DECISIONS #185: Brier on backs' rushing Overs, board vs shadow, game-clustered."""
+    """DECISIONS #185: log loss first and Brier beside it, board vs shadow, game-clustered."""
     import numpy as np
     import scorecard
     rng = np.random.default_rng(3)
@@ -402,6 +402,10 @@ def test_the_market_carries_shadow_is_graded_beside_the_board():
                        "player": [f"p{i}" for i in range(n)], "line": 60.5, "actual": actual,
                        "p_over_board": np.full(n, 0.5), "p_over_mkt_carries": truth})
     out = "\n".join(scorecard.shadow_rush_section(df))
-    assert "positive = the shadow is better" in out and "board minus shadow +" in out, out
+    assert "positive = the shadow is better" in out, out
+    ll = next(l for l in out.splitlines() if l.startswith("- Log loss"))
+    br = next(l for l in out.splitlines() if l.startswith("- Brier score"))
+    assert "difference +" in ll and "difference +" in br, "the informative shadow wins on both scores"
+    assert out.index("- Log loss") < out.index("- Brier score"), "log loss is the primary score"
     assert scorecard.shadow_rush_section(df.head(10))[-2].startswith("10 settled")
     assert scorecard.shadow_rush_section(df.drop(columns=["p_over_mkt_carries"])) == []

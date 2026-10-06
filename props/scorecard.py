@@ -342,9 +342,11 @@ def snap_rule_section(df: pd.DataFrame) -> list[str]:
 
 def shadow_rush_section(df: pd.DataFrame, reps: int = 2000, seed: int = 29) -> list[str]:
     """DECISIONS #185: the board's rushing-yards Over probability against the market-
-    carries shadow's, on settled backs' rushing lines -- Brier score (lower is better) with
-    a 95% interval on the difference, resampling whole games. The board's number stays the
-    price until this says otherwise at a pre-set review."""
+    carries shadow's, on settled backs' rushing lines. Scored like every comparison on the
+    scoreboard (reports/scoreboard.md): log loss first, Brier beside it (both lower is
+    better; chances clipped to 0.5-99.5% as the scoreboard does), each with a 95% interval
+    on the difference resampling whole games. The board's number stays the price until
+    this says otherwise at a pre-set review -- with both scores agreeing in sign."""
     need = {"p_over_board", "p_over_mkt_carries", "actual", "line"}
     if not need <= set(df.columns):
         return []
@@ -359,18 +361,24 @@ def shadow_rush_section(df: pd.DataFrame, reps: int = 2000, seed: int = 29) -> l
         return head + [f"{len(d)} settled backs' rushing lines carry the shadow so far; the comparison "
                        "starts at 30.", ""]
     over = (d.actual > d.line).astype(float).to_numpy()
-    b_board = (d.p_over_board.to_numpy() - over) ** 2
-    b_shadow = (d.p_over_mkt_carries.to_numpy() - over) ** 2
-    diff = b_board - b_shadow                                   # positive = the shadow better
+    pb = np.clip(d.p_over_board.to_numpy(), 0.005, 0.995)
+    ps = np.clip(d.p_over_mkt_carries.to_numpy(), 0.005, 0.995)
+    ll = lambda p: -(over * np.log(p) + (1 - over) * np.log(1 - p))
     games = d["event_id"].astype(str).to_numpy() if "event_id" in d.columns else np.arange(len(d)).astype(str)
     ug, inv = np.unique(games, return_inverse=True)
-    sums, cnt = np.bincount(inv, weights=diff), np.bincount(inv)
     idx = np.random.default_rng(seed).integers(0, len(ug), size=(reps, len(ug)))
-    lo, hi = np.percentile(sums[idx].sum(1) / cnt[idx].sum(1), [2.5, 97.5])
-    return head + [f"{len(d)} settled lines, {len(ug)} games. Brier score (lower is better): board "
-                   f"{b_board.mean():.4f}, shadow {b_shadow.mean():.4f}; board minus shadow {diff.mean():+.4f} "
-                   f"(95% CI {lo:+.4f} to {hi:+.4f}; positive = the shadow is better). The board's number "
-                   "stays the price until a pre-set review says otherwise.", ""]
+    cnt = np.bincount(inv)
+
+    def ci(diff):
+        sums = np.bincount(inv, weights=diff)
+        return np.percentile(sums[idx].sum(1) / cnt[idx].sum(1), [2.5, 97.5])
+
+    out = [f"{len(d)} settled lines, {len(ug)} games. Board minus shadow, positive = the shadow is better:"]
+    for name, fb, fs in (("Log loss", ll(pb), ll(ps)), ("Brier score", (pb - over) ** 2, (ps - over) ** 2)):
+        lo, hi = ci(fb - fs)
+        out.append(f"- {name}: board {fb.mean():.4f}, shadow {fs.mean():.4f}; difference "
+                   f"{(fb - fs).mean():+.4f} (95% CI {lo:+.4f} to {hi:+.4f})")
+    return head + out + ["", "The board's number stays the price until a pre-set review says otherwise.", ""]
 
 
 def render_sections(df: pd.DataFrame) -> tuple[list[str], list[dict]]:

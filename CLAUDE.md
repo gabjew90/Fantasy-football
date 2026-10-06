@@ -26,6 +26,12 @@
   follow-up PRs is reviewed together at the latest when the run ends. The
   user's standing rule (2026-09-26): it is not skipped for being a "small"
   or "chat-only" change.
+- **Every new script, and every script it changes or depends on, goes through
+  the code-review skill before it is used** -- before any long test, backtest,
+  grid or selection run reads its output, and before it ships. A hand read or
+  an inline check is not a substitute. Any load-bearing script the engine or
+  the chat skill relies on that has NOT been through the skill is flagged to
+  the user as a risk until it has (the user's standing rule, 2026-10-06).
 - The in-season auto-manager (`manager/`) has NO schedule since 2026-09-25
   (the user's call, DECISIONS #109): `weekly.yml` and `gate.yml` run only when
   dispatched by hand. `props.yml` is the only scheduled workflow.

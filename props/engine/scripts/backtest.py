@@ -33,8 +33,9 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from scipy.optimize import minimize
-from scipy.special import gammaln
+# SciPy is imported where the dispersion fit needs it (nb_mle), not at module load: the
+# lean capture and CI installs (props/requirements.txt) import this module's helpers in
+# props/tests without SciPy, and a module-level import failed them (outside review, 10-06).
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import model as M
@@ -93,6 +94,9 @@ def parse_weeks(s):
 
 
 def nb_mle(mu, y, r_clamp):
+    from scipy.optimize import minimize
+    from scipy.special import gammaln
+
     def nll(p):
         a, b = p
         r = np.clip(np.exp(a + b * np.log(np.maximum(mu, 1e-6))), *r_clamp)
