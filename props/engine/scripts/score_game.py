@@ -138,6 +138,27 @@ def injuries_with_fallback(official, roster, sleeper, practice=None, reported_te
     return status, source
 
 
+def resolve_roof(roof, stadium_id, games):
+    """The game's roof. nflverse leaves it blank until the game is played, and a blank read
+    as outdoors fired the wind screen for a closed retractable roof (AT&T Stadium, outside
+    review 2026-10-06). Blank: the roof this stadium recorded most often in its last 16
+    games, with a note saying so. Returns (roof, note or None)."""
+    r = str(roof).strip().lower() if roof is not None else ""
+    if r and r != "nan":
+        return r, None
+    if stadium_id is None or games is None or "stadium_id" not in games or "roof" not in games:
+        return "unknown", "roof not posted yet and no stadium history"
+    h = games[(games.stadium_id == stadium_id) & games.roof.notna()]
+    h = h.sort_values("gameday").tail(16) if "gameday" in h else h.tail(16)
+    if h.empty:
+        return "unknown", "roof not posted yet and no stadium history"
+    vc = h.roof.astype(str).str.lower().value_counts()
+    top = vc.index[0]
+    return top, (f"roof not posted yet; {int(vc.iloc[0])} of this stadium's last {len(h)} games were "
+                 f"{top}" + (" (retractable: the call is made on game day)" if len(vc) > 1 or top in ("open", "closed")
+                             else ""))
+
+
 def promote_qb(roles, team, qb_order, is_out, on_roster):
     """When a team's depth-chart QB1 is out, the next quarterback who is on the roster and
     not out starts: only one QB plays, so unlike the other positions his job goes to one
@@ -588,9 +609,9 @@ def main():
                                              "They do not meet this season; check the abbreviations "
                                              f"(aliases accepted: {', '.join(f'{k}->{v}' for k, v in CLI_ALIASES.items())})."))
     G = g.iloc[0]; WEEK = int(G.week)
-    roof = str(G.roof).lower()
+    roof, ROOF_NOTE = resolve_roof(G.roof, G.get("stadium_id"), games)
     log(f"verified: {AWAY} at {HOME}, {SEASON} week {WEEK}, {G.gameday} {G.gametime} ET, "
-        f"{G.stadium}, roof={roof}")
+        f"{G.stadium}, roof={roof}" + (f" ({ROOF_NOTE})" if ROOF_NOTE else ""))
 
     PRIOR = a.prior_season or SEASON - 1
     P = json.load(open(RES / f"priors_{PRIOR}_params.json"))
@@ -691,6 +712,7 @@ def main():
     inj = pd.read_csv(fetch(*cur["injuries"]), low_memory=False)
     dcf = pd.read_csv(fetch(*cur["depth_charts"]), low_memory=False)
     snp = pd.read_csv(fetch(*cur["snaps"]))
+    snp = MODEL.snap_names_from_roster(snp, ros)      # joined by ID first, the name only as a fallback
 
     passes = pbp[(pbp.play_type == "pass") & pbp.receiver_player_id.notna()]
     rushes = pbp[(pbp.play_type == "run") & (pbp.qb_kneel != 1) & pbp.rusher_player_id.notna()]
@@ -3050,7 +3072,8 @@ def main():
 
     # ---- context ----
     L.append("## The setup\n")
-    L.append(f"- **Kickoff:** {G.gameday} {G.gametime} ET at {G.stadium} ({'indoors' if roof in ('closed','dome') else 'outdoors'}).")
+    L.append(f"- **Kickoff:** {G.gameday} {G.gametime} ET at {G.stadium} ({'indoors' if roof in ('closed','dome') else 'outdoors' if roof in ('open', 'outdoors') else 'roof unknown'}"
+             + (f"; {ROOF_NOTE}" if ROOF_NOTE else "") + ").")
     L.append(f"- **What we're working with:** {n_weeks} week{'s' if n_weeks!=1 else ''} of this season, plus each player's full {PRIOR} season as a starting point.")
     for t in (AWAY, HOME):
         e = env[t]

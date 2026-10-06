@@ -287,6 +287,27 @@ def snap_react(share, snap_last, snap_base, gamma, clip=SNAP_REACT_CLIP, gamma_u
     return sh * float(np.clip((sl / sb) ** g, clip[0], clip[1]))
 
 
+def snap_names_from_roster(snp: pd.DataFrame, ros: pd.DataFrame) -> pd.DataFrame:
+    """Snap rows carrying the ROSTER's name for each player, matched by ID (the snap file's
+    pfr_player_id = the roster's pfr_id), the snap file's own name kept where no ID matches.
+    Every snap lookup in the engine keys on a normalised name; the two files spell some
+    players differently ("Kenneth Gainwell" / "Kenny Gainwell", "Zonovan" / "Bam Knight"),
+    and a name-only join gave those players no snaps at all (outside review, 2026-10-06).
+    The snap file's spelling is kept as player_snap_file."""
+    if snp is None or not len(snp) or "pfr_player_id" not in snp or ros is None or "pfr_id" not in ros:
+        return snp
+    r = ros.dropna(subset=["pfr_id"])
+    order = [c for c in ("season", "week") if c in r]
+    if order:
+        r = r.sort_values(order)
+    names = r.drop_duplicates("pfr_id", keep="last").set_index("pfr_id")["full_name"]
+    out = snp.copy()
+    out["player_snap_file"] = out["player"]
+    hit = out["pfr_player_id"].map(names)
+    out["player"] = hit.where(hit.notna(), out["player"])
+    return out
+
+
 def k0_rates(fitted, override=None, fit_only=False):
     """The per-rate shrinkage constants a pricing run uses: the priors' fitted
     `k0_per_rate` (else DEFAULT_K0), with K0_FIXED replacing the rates it names, and

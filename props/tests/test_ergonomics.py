@@ -450,3 +450,26 @@ def test_rushing_plus_receiving_is_priced_and_settled_end_to_end():
     assert "player_rush_reception_yds" in BL.YARDAGE_MARKETS
     assert SG.MARKET_WORDS["player_rush_reception_yds"] == "rushing + receiving yards"
     assert SG.parse_markets("rush_rec") == {"player_rush_reception_yds"}
+
+
+def test_a_blank_roof_reads_the_stadiums_history_not_outdoors():
+    """Outside review 2026-10-06: nflverse leaves roof blank until kickoff; AT&T Stadium read
+    as outdoors and the wind screen could fire under a closed roof."""
+    games = pd.DataFrame({"stadium_id": ["DAL00"] * 9 + ["GB00"], "gameday": [f"2025-10-{d:02d}" for d in range(1, 11)],
+                          "roof": ["closed"] * 8 + [None, "outdoors"]})
+    r, note = SG.resolve_roof(float("nan"), "DAL00", games)
+    assert r == "closed" and "8 of this stadium's last 8" in note and "retractable" in note
+    assert SG.resolve_roof("outdoors", "GB00", games) == ("outdoors", None), "a posted roof is used as is"
+    assert SG.resolve_roof(None, "NEW00", games)[0] == "unknown"
+
+
+def test_snap_rows_take_the_rosters_name_by_id():
+    """Outside review 2026-10-06: 'Kenneth Gainwell' (snaps) vs 'Kenny Gainwell' (roster)."""
+    import model as MODEL
+    snp = pd.DataFrame({"player": ["Kenneth Gainwell", "Zonovan Knight", "No Id Guy"],
+                        "pfr_player_id": ["GainKe00", "KnigZo00", None], "team": ["TB", "ARI", "NO"]})
+    ros = pd.DataFrame({"full_name": ["Kenny Gainwell", "Bam Knight"], "pfr_id": ["GainKe00", "KnigZo00"],
+                        "season": [2026, 2026], "week": [1, 1]})
+    out = MODEL.snap_names_from_roster(snp, ros)
+    assert out.player.tolist() == ["Kenny Gainwell", "Bam Knight", "No Id Guy"], "id first, name as fallback"
+    assert out.player_snap_file.tolist()[0] == "Kenneth Gainwell"

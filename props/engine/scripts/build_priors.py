@@ -135,8 +135,10 @@ def main():
     # ---- snap share --------------------------------------------------------
     snaps = pd.read_csv(snap_f)
     snaps = snaps[(snaps.season == S) & (snaps.game_type == "REG")]
-    # snap_counts keys on pfr id, not gsis; aggregate by player name + team as a
-    # per-player season mean only (used as a role prior, never as usage evidence)
+    # snap_counts keys on pfr id, not gsis: the roster's name by that id (the snap file's
+    # spelling only where no id matches), then a per-player season mean by name + team
+    # (a role prior, never usage evidence)
+    snaps = M.snap_names_from_roster(snaps, pd.read_csv(ros_f, low_memory=False))
     snaps = snaps.copy(); snaps["key"] = snaps["player"].map(norm_name)
     snap_season = snaps.groupby(["team", "key"])["offense_pct"].mean().rename("snap_pct_25")
 
@@ -149,11 +151,30 @@ def main():
         i10_carries=("i10_carries", "sum"), team_i10_carries=("i10_carries_team", "sum"))
     roster = pd.read_csv(ros_f, low_memory=False)
     roster = roster[roster.season == S]
-    n_act = roster[roster.status == "ACT"].groupby("gsis_id").size().rename("n_games")
-    main_team = roster[roster.status == "ACT"].groupby("gsis_id")["team"].agg(
+    # regular-season weeks only: the weekly roster also lists playoff weeks (up to week 22),
+    # which made "games" run to 21 (outside review, 2026-10-06)
+    roster_reg = roster[roster.game_type == "REG"] if "game_type" in roster else roster[roster.week <= 18]
+    # games = ACTIVE weeks in which his team PLAYED (a bye week also lists him ACT)
+    _played = tw[["team", "week"]].drop_duplicates()
+    n_act = (roster_reg[roster_reg.status == "ACT"].merge(_played, on=["team", "week"])
+             .drop_duplicates(["gsis_id", "week"]).groupby("gsis_id").size().rename("n_games"))
+    main_team = roster_reg[roster_reg.status == "ACT"].groupby("gsis_id")["team"].agg(
         lambda s: s.mode().iloc[0] if len(s.mode()) else None).rename("team_prior")
     names = roster.drop_duplicates("gsis_id").set_index("gsis_id")["full_name"]
 
+    # THE DENOMINATOR: the team's volume in every week the player was ACTIVE for that team
+    # (or touched the ball), not only the weeks he had a target or carry -- counting team
+    # volume only in his touch weeks inflated part-timers' shares (Velus Jones Jr. 15.4% of
+    # the carries on 4 carries; outside review, 2026-10-06). The scorer's current-season
+    # share counts every team game the same way.
+    act_wk = roster_reg[roster_reg.status == "ACT"][["gsis_id", "team", "week"]]
+    weeks = pd.concat([act_wk, pw[["gsis_id", "team", "week"]]]).drop_duplicates()
+    den = (weeks.merge(tw[["team", "week", "targets", "carries", "i10_targets", "i10_carries"]],
+                       on=["team", "week"]).groupby("gsis_id")
+              [["targets", "carries", "i10_targets", "i10_carries"]].sum())
+    for a_, b_ in (("team_targets", "targets"), ("team_carries", "carries"),
+                   ("team_i10_targets", "i10_targets"), ("team_i10_carries", "i10_carries")):
+        agg[a_] = den[b_].reindex(agg.index).fillna(agg[a_])
     P = pd.DataFrame(index=agg.index)
     P["target_share"] = agg.targets / agg.team_targets
     P["catch_rate"] = np.where(agg.targets > 0, agg.receptions / agg.targets, np.nan)
