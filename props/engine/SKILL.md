@@ -226,6 +226,15 @@ pick. Say why in one sentence (the model has not shown it adds anything beside t
 price; weeks 2-3, STRONG calls won 45%) and offer the research leads and the journal.
 
 ## Fast path
+**The user never types a command (standing rule, 2026-10-06).** Every flag below is yours to
+run from what the user says in plain words; never ask them to type one, and never end a reply
+with a command for them to run. Turn their words into the flags yourself: "I think Kamara
+gets 12 to 15 carries" is `--assume "Alvin Kamara: carries=12/13.5/15"`; "what if Bijan gets
+more work" with no number is `carries=auto`; a report line **No priced replacement for ...**
+or **The book's quarterback is not ours** means you rerun with the role what-if yourself and
+present that run. What the engine can read for itself (injuries, who starts at QB) it now
+decides on its own and says so in the report's first lines -- quote that.
+
 For a narrow question, run only what it needs:
 - **One game, specific markets:** `python scripts/score_game.py --away NYG --home LA --markets td`
   (markets: `receptions`, `rec_yds`, `rush_yds`, `pass_yds`, `td`, comma-separated). `--week` is optional and
@@ -239,6 +248,26 @@ For a narrow question, run only what it needs:
   Reproduce that table in full, say the numbers are conditional on the user's assumptions (which are
   assumptions, not confidence intervals), and never call a line a play. Touchdowns are not adjusted.
   Never recorded (outputs in `scenarios/`).
+  **A range** -- `--assume "PLAYER: carries=10/12/15"` (low / expected / high, smallest first; team
+  changes too, `"NO: pass=-4/-2/+1"`) -- prices the board three times and adds the Over at each end and
+  a verdict per side: *pays across your range*, *pays at your expected, not at your low/high*, *pays
+  only at your low/high*, or *does not pay in your range*. Prefer a range whenever the user gives a
+  rough number: a side that pays across the range does not rest on the exact figure. Narrate the
+  verdict with its end named ("the Under needs him at your 15, not your 12"); a teammate's line runs
+  the other way across the range.
+  **No numbers? `carries=auto` / `targets=auto`** (a player's targets or carries only) builds the
+  range itself: our projection plus or minus one standard error of his share over his last 10 games
+  (last season's final games top up this season's; this season only after a team change or a
+  backfield takeover; needs 3+ games). It measures how sure we are of his AVERAGE, not his
+  game-to-game swing, which the price already holds. Quote the three numbers the report prints.
+- **Role what-if (a replacement the depth chart has not promoted):** `--role "PLAYER=RB1"` (QB1, RB1,
+  RB2, WR1, WR2, WR3, TE1; `"PLAYER (TEAM)=..."` when a name is on both teams), repeatable, with or
+  without `--assume`. A full run -- research included -- that prices him with that slot's role average
+  as his prior; nobody else moves; never recorded (outputs in `role/`). Run it yourself whenever the
+  report says **No priced replacement for ...** (an Out starter whose team now prices fewer players
+  at his position than it has slots) or **The book's quarterback is not ours** -- pick the man from
+  the depth chart, the book's lines or the news, and say which. A starting QB who is out is handled
+  automatically (the next quarterback is priced; DECISIONS #183), so this is for the rest.
 - **Today's games / one date:** `python scripts/score_week.py --today` or `--date YYYY-MM-DD`
   (`--markets` passes through). `--kickoff 13:00` keeps one window (Eastern time: 13:00 is the
   10am PT games); `--sort total` orders the games by their total, highest first; `--overs-only`
@@ -259,7 +288,10 @@ For a narrow question, run only what it needs:
      fantasy points each defence allows to RBs, WRs and TEs (the header's "Fantasy points
      allowed" line: PPR per game and rank -- a small sample this early, context only, never a
      reason on its own), and the injuries (who is out, questionable, back) -- plus any line
-     moves since the morning.
+     moves since the morning. Include the **offensive line** (header line, DECISIONS #178): how
+     many of each team's five regular linemen (most snaps this season) are out, and who. Context
+     for the user to judge -- e.g. two starters out on a run-first team -- never a price change;
+     say "status unknown" for an unmatched lineman, and say when no injury report is out yet.
   1b. **Team volume against the season** (the report's "Team volume" section, DECISIONS #172):
      each team's games this season -- score, how much of each game it spent ahead or behind by
      8+, pass attempts, sacks, designed carries, scrambles -- and whether our projected passes
@@ -478,7 +510,7 @@ need not be surfaced. Write the reply as a premium prop guide with this structur
    guess at whether he plays and do not recommend one: the user decides.
 5. **Research table** — reproduce the report's "Research table" (from `research_*.csv`) as ONE
    table, grouped by team: Player, Prop, Line, Price (Over / Under), Our projection, Over:
-   model / book, Line implies, Pays at this price if he gets, Last game, Flags. Do not hand-compute any of these numbers
+   model / book, Line implies, Pays at this price if you expect, Last game, Flags. Do not hand-compute any of these numbers
    and do not re-sort them by the model-book gap: ranking by gap ranked lines by how likely
    the model was missing something.
    For anytime-TD rows, the model is `anytime_td_v1` (PROTOTYPE; see

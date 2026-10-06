@@ -65,11 +65,65 @@ def cached_json(path, ttl_s, loader):
     import time
     p = Path(path)
     if p.exists() and (time.time() - p.stat().st_mtime) < ttl_s:
-        return json.load(open(p))
+        return json.load(open(p, encoding="utf-8"))
     obj = loader()
     p.parent.mkdir(parents=True, exist_ok=True)
-    json.dump(obj, open(p, "w"))
+    json.dump(obj, open(p, "w", encoding="utf-8"))
     return obj
+
+
+# SLEEPER'S INJURY FEED (DECISIONS #183): the official report lands Wednesday (Monday for
+# a Thursday game) and nflverse after it; Sleeper's player feed carries each player's
+# status as soon as it is news (Baker Mayfield "Out, thumb" four days before a Thursday
+# game with no report out yet). Used ONLY where this week's official report has no entry.
+SLEEPER_OUT = {"Out": "Out", "Doubtful": "Doubtful", "IR": "Out", "PUP": "Out", "Sus": "Out", "NFI": "Out"}
+
+
+def sleeper_injury_map(players, sleeper_team=None) -> dict:
+    """{(our team code, norm_name): (status, body part)} from Sleeper's player feed, for
+    players it lists as Out / Doubtful / Questionable or on IR / PUP / suspended."""
+    back = {v: k for k, v in (sleeper_team or {}).items()}
+    out = {}
+    for v in (players or {}).values():
+        st = v.get("injury_status")
+        if st not in SLEEPER_OUT and st != "Questionable":
+            continue
+        name = v.get("full_name") or f'{v.get("first_name", "")} {v.get("last_name", "")}'.strip()
+        if name and v.get("team"):
+            out[(back.get(v["team"], v["team"]), norm_name(name))] = (st, v.get("injury_body_part"))
+    return out
+
+
+def injuries_with_fallback(official, roster, sleeper):
+    """This week's status per (team, gsis_id): the official report where it has an entry,
+    else Sleeper's (IR / PUP / suspended read as Out). Returns (status, source) dicts;
+    source names Sleeper and the body part for every status it supplied."""
+    status, source = dict(official), {}
+    for t, g, n in zip(roster.team, roster.gsis_id, roster.full_name):
+        if isinstance(status.get((t, g)), str):
+            continue
+        hit = sleeper.get((t, norm_name(n)))
+        if hit:
+            st, part = hit
+            status[(t, g)] = SLEEPER_OUT.get(st, st)
+            source[(t, g)] = f"Sleeper injury feed{', ' + part.lower() if part else ''}; no official report yet"
+    return status, source
+
+
+def promote_qb(roles, team, qb_order, is_out, on_roster):
+    """When a team's depth-chart QB1 is out, the next quarterback who is on the roster and
+    not out starts: only one QB plays, so unlike the other positions his job goes to one
+    man (DECISIONS #183). qb_order: the team's QBs, best first. Returns (roles, promoted
+    gsis_id or None)."""
+    q1 = roles[(roles.team == team) & (roles.slot == "QB1")] if not roles.empty else roles
+    if q1.empty or not is_out(q1.gsis_id.iloc[0]):
+        return roles, None
+    for g in qb_order:
+        if g != q1.gsis_id.iloc[0] and on_roster(g) and not is_out(g):
+            keep = roles[~((roles.team == team) & (roles.gsis_id == g))]
+            return pd.concat([keep, pd.DataFrame([{"team": team, "gsis_id": g, "slot": "QB1",
+                                                   "dc_dt": pd.NaT}])], ignore_index=True), g
+    return roles, None
 N_SIM = 20000
 OUT = Path(os.environ.get("NFL_OUT", "/mnt/user-data/outputs"))
 
@@ -255,6 +309,22 @@ def parse_markets(spec: str | None) -> set[str]:
 NOT_PLAYING = ("INA", "RES", "PUP", "SUS", "NFI")
 
 
+def week_roster(ros: pd.DataFrame, season: int, week: int):
+    """This week's roster rows, or -- before they are published -- the latest week's as
+    provisional (returned with that week). INA is one game's inactive list: last week's
+    says nothing about this week, where the injury report decides (Baker Mayfield, INA
+    in week 4, was priced out of the week 5 board before the week 5 report existed,
+    2026-10-05), so a provisional INA reads as ACT."""
+    cols = ["team", "gsis_id", "full_name", "position", "status"]
+    rw = ros[(ros.season == season) & (ros.week == week)][cols].drop_duplicates(["team", "gsis_id"])
+    if not rw.empty:
+        return rw, None
+    last = ros[ros.season == season].week.max()
+    rw = ros[(ros.season == season) & (ros.week == last)][cols].drop_duplicates(["team", "gsis_id"])
+    rw = rw.assign(was_inactive=rw.status.eq("INA"))
+    return rw.assign(status=rw.status.replace({"INA": "ACT"})), last
+
+
 def keep_in_pool(status, played_this_season: bool) -> bool:
     """Whether a rostered, eligible player enters the pool. ACT and INA always;
     a reserve-list player only if he played this season -- his share is in his
@@ -407,6 +477,10 @@ def main():
                          "'ypc=4.5', or 'TEAM: pass=-3' / 'rush=+2' / 'ypt=-5%%'. The board is priced as usual; the "
                          "report adds 'Your scenario' with every line priced again under the assumptions "
                          "(scenario.py). Experimental, never recorded.")
+    ap.add_argument("--role", action="append", default=[],
+                    help="ROLE what-if, repeatable: 'PLAYER=SLOT' (QB1 RB1 RB2 WR1 WR2 WR3 TE1) prices a player "
+                         "the depth chart has not promoted, with that slot's role average as his prior. Nobody "
+                         "else moves. Outputs go to OUT/role, which the record never reads.")
     ap.add_argument("--scenario-run", action="store_true", help=argparse.SUPPRESS)
     ap.add_argument("--odds-snapshot", default=None,
                     help="price from the lines and spread/total a main run saved; no fetch, no credits, no archive")
@@ -435,10 +509,18 @@ def main():
     # a scenario run ('if he is out', or the user's own assumptions) writes to
     # OUT/scenarios, which record_run never reads, and skips the research search
     SCENARIO = bool(ASSUME_OUT) or a.scenario_run
+    # a ROLE what-if (DECISIONS #175) is a full run -- research included -- in its own
+    # folder; its 'if he is out' and scenario children nest under it
+    if a.role:
+        OUT = OUT / "role"
     if SCENARIO:
         OUT = OUT / "scenarios"
 
     AWAY, HOME = resolve_team(a.away), resolve_team(a.home)
+    try:
+        ROLE_OVERRIDES = SC.parse_roles(a.role, {AWAY, HOME})
+    except ValueError as exc:
+        sys.exit(f"--role: {exc}")
     try:
         RULES = SC.parse(a.assume, {AWAY, HOME})
     except ValueError as exc:
@@ -650,27 +732,76 @@ def main():
     kick = eastern_to_utc(G.gameday, G.gametime)
     dcf["dt"] = pd.to_datetime(dcf["dt"], errors="coerce", utc=True)
     roles = []
+    DC_QB = {}           # team -> its QBs in depth-chart order (the QB promotion reads it)
     for t in (AWAY, HOME):
         d = dcf[(dcf.team == t) & (dcf.dt < kick) & dcf.pos_abb.isin(["QB", "RB", "WR", "TE"])]
         if d.empty:
             continue
         d = d[d.dt == d.dt.max()]
+        DC_QB[t] = d[d.pos_abb == "QB"].sort_values("pos_rank").gsis_id.tolist()
         for pos, mx in [("QB", 1), ("RB", 2), ("WR", 3), ("TE", 1)]:
             for _, r in d[(d.pos_abb == pos) & (d.pos_rank <= mx)].iterrows():
                 roles.append({"team": t, "gsis_id": r.gsis_id, "slot": f"{pos}{int(r.pos_rank)}",
                               "dc_dt": d.dt.max()})
     roles = pd.DataFrame(roles).drop_duplicates(["team", "gsis_id"])
 
-    rw = ros[(ros.season == SEASON) & (ros.week == WEEK)][
-        ["team", "gsis_id", "full_name", "position", "status"]].drop_duplicates(["team", "gsis_id"])
-    if rw.empty:
-        rw = ros[(ros.season == SEASON) & (ros.week == ros.week.max())][
-            ["team", "gsis_id", "full_name", "position", "status"]].drop_duplicates(["team", "gsis_id"])
-        log(f"  WARNING: no week {WEEK} roster rows; using week {ros.week.max()} as provisional")
+    rw, prov_wk = week_roster(ros, SEASON, WEEK)
+    if prov_wk is not None:
+        log(f"  WARNING: no week {WEEK} roster rows; using week {prov_wk} as provisional")
+
+    for ro in ROLE_OVERRIDES:
+        cand = rw[rw.team.isin([ro["team_of"]] if ro["team_of"] else [AWAY, HOME])]
+        hit = cand[cand.full_name.map(norm_name) == norm_name(ro["who"])]
+        if hit.empty:
+            sys.exit(f"--role: {ro['who']} is not on {ro['team_of'] or 'either team'}'s roster this week")
+        if len(hit) > 1:
+            sys.exit(f"--role: {ro['who']} is on both rosters: write '{ro['who']} (TEAM)={ro['slot']}'")
+        t_, pid_ = hit.team.iloc[0], hit.gsis_id.iloc[0]
+        ro.update(name=hit.full_name.iloc[0], team=t_, gsis_id=pid_,
+                  was=(roles[(roles.team == t_) & (roles.gsis_id == pid_)].slot.iloc[0]
+                       if not roles.empty and ((roles.team == t_) & (roles.gsis_id == pid_)).any() else None))
+        keep = roles[~((roles.team == t_) & (roles.gsis_id == pid_))] if not roles.empty else roles
+        roles = pd.concat([keep, pd.DataFrame([{"team": t_, "gsis_id": pid_, "slot": ro["slot"],
+                                                "dc_dt": pd.NaT}])], ignore_index=True)
 
     iw = inj[(inj.season == SEASON) & (inj.week == WEEK)]
-    inj_status = iw.set_index(["team", "gsis_id"])["report_status"].to_dict()
     inj_practice = iw.set_index(["team", "gsis_id"])["practice_status"].to_dict()
+    # Sleeper's feed fills in where the official report has no entry yet (#183)
+    import urllib.request as _ur0
+    try:
+        SLP_PLAYERS = cached_json(wd / "sleeper_players.json", 86400, lambda: json.load(_ur0.urlopen(
+            _ur0.Request("https://api.sleeper.app/v1/players/nfl", headers={"User-Agent": "Mozilla/5.0"}),
+            timeout=120)))
+    except Exception as exc:           # no feed: the official report alone, said in the sources
+        SLP_PLAYERS = None
+        log(f"  Sleeper player feed unavailable ({exc}); injuries from the official report only")
+    inj_status, INJ_SOURCE = injuries_with_fallback(
+        iw.set_index(["team", "gsis_id"])["report_status"].to_dict(), rw,
+        sleeper_injury_map(SLP_PLAYERS, SLEEPER_TEAM))
+    # THE NEXT QB STARTS when the depth chart's QB1 is out (#183) -- Sleeper's depth order
+    # first (fresher), then the depth chart's; a --role for that team's QB wins
+    _rw_st = {(t_, g_): st_ for t_, g_, st_ in zip(rw.team, rw.gsis_id, rw.status)}
+    _slp_qb = {}
+    for v_ in (SLP_PLAYERS or {}).values():
+        if v_.get("position") == "QB" and v_.get("gsis_id") and v_.get("depth_chart_order"):
+            _slp_qb[str(v_["gsis_id"]).strip()] = int(v_["depth_chart_order"])
+    AUTO_QB = []
+    for t in (AWAY, HOME):
+        if any(ro["team"] == t and ro["slot"] == "QB1" for ro in ROLE_OVERRIDES):
+            continue
+        qbs = [g_ for (tt_, g_) in _rw_st if tt_ == t and g_ in set(rw[rw.position == "QB"].gsis_id)]
+        order = sorted(qbs, key=lambda g_: (_slp_qb.get(g_, 99),
+                                            DC_QB.get(t, []).index(g_) if g_ in DC_QB.get(t, []) else 99))
+        q1_before = roles[(roles.team == t) & (roles.slot == "QB1")].gsis_id.tolist() if not roles.empty else []
+        roles, got = promote_qb(
+            roles, t, order,
+            is_out=lambda g_, t=t: (inj_status.get((t, g_)) in ("Out", "Doubtful")
+                                    or _rw_st.get((t, g_)) in NOT_PLAYING),
+            on_roster=lambda g_, t=t: _rw_st.get((t, g_)) == "ACT")
+        if got:
+            nm_ = lambda g_: rw[rw.gsis_id == g_].full_name.iloc[0] if (rw.gsis_id == g_).any() else g_
+            AUTO_QB.append({"team": t, "starter": nm_(got), "out": nm_(q1_before[0]) if q1_before else "QB1",
+                            "why": INJ_SOURCE.get((t, q1_before[0]), inj_status.get((t, q1_before[0])) or "")})
 
     snp_ = snp[(snp.season == SEASON) & (snp.week < WEEK)].copy()
     snp_["key"] = snp_["player"].map(norm_name)
@@ -712,6 +843,14 @@ def main():
     pop["practice_status"] = pd.Series([inj_practice.get((t, p)) for t, p in zip(pop.team, pop.gsis_id)],
                                        index=pop.index, dtype=object)
     pop = apply_designations(pop, ASSUME_OUT)
+    for ro in ROLE_OVERRIDES:
+        hit = pop[(pop.team == ro["team"]) & (pop.gsis_id == ro["gsis_id"])]
+        if hit.empty:
+            sys.exit(f"--role: {ro['name']} is on the roster but not available to play "
+                     f"({rw[(rw.team == ro['team']) & (rw.gsis_id == ro['gsis_id'])].status.iloc[0]})")
+        if bool(hit.excluded.iloc[0]):
+            sys.exit(f"--role: {ro['name']} is ruled out ({hit.report_status.iloc[0] or hit.status.iloc[0]}), "
+                     "so there is nothing to price")
     n_excl = int(pop.excluded.sum())
     active = pop[~pop.excluded].copy()
 
@@ -831,6 +970,7 @@ def main():
     _ca_w = rushes.groupby(["posteam", "rusher_player_id", "week"]).size()
     _tw_i = tw.set_index(["team", "week"])
     USAGE, ROLE, BACKFIELD, CARRY_U = {}, {}, {}, {}
+    WEEK_SH = {}         # name -> this season's games he played: (week, snap, target share, carry share, ...)
     # a back's three jobs by week (research columns): early-down carries,
     # passing-down targets (3rd/4th down or the last two minutes of a half),
     # inside-5 carries. Display only: nothing here moves a price.
@@ -845,6 +985,7 @@ def main():
                 n_t, n_c = float(_tg_w.get((m_.team, m_.gsis_id, w_), 0)), float(_ca_w.get((m_.team, m_.gsis_id, w_), 0))
                 wks.append((int(w_), float(sv), n_t / tt_ if tt_ else np.nan, n_c / tc_ if tc_ else np.nan,
                             n_t, n_c))
+        WEEK_SH[m_["name"]] = sorted(wks)
         USAGE[m_["name"]] = RSCH.usage_change(sorted(wks))
         CARRY_U[m_["name"]] = RSCH.carry_change(sorted(wks))     # the takeover flag's own definition
         ROLE[m_["name"]] = RSCH.role_flag(USAGE[m_["name"]], WEEK - 1)
@@ -1939,6 +2080,15 @@ def main():
                                               team_spread=TEAM_SPREAD.get(t_), league=_league_script,
                                               mix=_state_mix))
     PA_LINE = RSCH.points_allowed_line(PA, (AWAY, HOME))
+    # the offensive line: how many of each team's five regular linemen are out (#178)
+    _pfr = (ros.dropna(subset=["pfr_id"]).drop_duplicates("pfr_id", keep="last")
+               .set_index("pfr_id")["gsis_id"].to_dict() if "pfr_id" in ros else {})
+    _ros_now = {g_: (t_, st_) for t_, g_, st_ in zip(rw.team, rw.gsis_id, rw.status)}
+    _rep_now = dict(zip(iw.gsis_id, iw.report_status))
+    _by_name = {(t_, norm_name(n_)): g_ for t_, n_, g_ in zip(rw.team, rw.full_name, rw.gsis_id)}
+    LINE_LINES = [l_ for t_ in (AWAY, HOME) for l_ in [RSCH.line_sentence(t_, RSCH.line_status(
+        RSCH.line_regulars(snp[snp.season == SEASON], t_, WEEK), t_, _pfr, _ros_now, _rep_now, NOT_PLAYING,
+        name_to_gsis=_by_name), report_out=bool((iw.team == t_).any() or iw.team.nunique() >= 16))] if l_]
     # CATCHES, YARDS AND THE LONG ONE (DECISIONS #164): the book's three receiving lines
     # read together at the whole numbers that win them, against his yards a catch
     CATCH_READ, CARRY_READ, QB_READ, RUSH_REC = {}, {}, {}, {}
@@ -2337,6 +2487,20 @@ def main():
     L = []
     L.append(f"# {AWAY} at {HOME}")
     L.append(f"### {SEASON} Week {WEEK} · {G.gameday} {G.gametime} ET · {G.stadium}\n")
+    for aq_ in AUTO_QB:
+        L.append(f"**{aq_['team']}'s starting quarterback: {aq_['starter']}.** {aq_['out']} is out"
+                 + (f" ({aq_['why']})" if aq_['why'] else "") + f", so the next quarterback on the depth chart "
+                 f"is priced as the starter (his kneel-downs, passing share and rushing).\n")
+    if ROLE_OVERRIDES:
+        L.append("**Role what-if, not the board:** " + "; ".join(
+            f"{ro['name']} ({ro['team']}) priced as {ro['slot']}"
+            + (f" (the depth chart has him at {ro['was']})" if ro["was"] else " (no depth-chart slot)")
+            + "".join(f"; {o_['name']} still holds {ro['slot']} too" for _, o_ in
+                      pop[(pop.team == ro["team"]) & (pop.slot == ro["slot"]) & ~pop.excluded
+                          & (pop.gsis_id != ro["gsis_id"])].iterrows())
+            for ro in ROLE_OVERRIDES)
+            + ". His prior is that slot's role average, blended with his own games; nobody else moves. "
+              "Never recorded.\n")
     L.append(research_statement(RESEARCH, GATE) + "\n")
 
     # ---------- player-by-player research rows, in depth-chart order ----------
@@ -2436,7 +2600,7 @@ def main():
             mine = RESEARCH[RESEARCH.player == m["name"]] if len(RESEARCH) else RESEARCH
             if len(mine) or tdq:
                 L.append("| Prop | Line | Price | Our projection | Over: model / book | Line implies | "
-                         "Pays at this price if he gets |")
+                         "Pays at this price if you expect |")
                 L.append("|---|---|---|---|---|---|---|")
                 for _, x in mine.iterrows():
                     L.append(research_cells(x, MKT))
@@ -2751,6 +2915,9 @@ def main():
                              if (V1TD.team == t).any()) + ". The two differ by design, not by error."),
               f"- **Weather:** {wx}. 15 mph sustained-wind screen {'HIT' if (weather.get('wind_mph_max') or 0) > 15 else 'not hit'}.",
               *([f"- **Fantasy points allowed:** {PA_LINE}"] if PA_LINE else []),
+              *([f"- **Offensive line (the five linemen with the most snaps this season):** " + " ".join(LINE_LINES)
+                 + " Context only: line absences do not change any price."] if LINE_LINES else
+                [f"- **Offensive line:** no lineman snap counts yet this season (DATA MISSING)."] if WEEK > 1 else []),
               f"- **Injury designations (week {WEEK} report):** " + (", ".join(desig) if desig else "none on the eligible set") + ". Out/Doubtful removed; their share goes mostly to the replacement, a quarter to the priced teammates; Questionable priced as if playing, with a separate 'if he's out' pricing. Re-run inside 90 minutes of kickoff: a late scratch changes every share on that team.",
               f"- **Data cutoff:** 2026 weeks 1-{WEEK-1} play-by-play, week {WEEK} roster/injury/depth chart; prices snapshot {now()}; kickoff in {hrs:.1f} h.",
               "",
@@ -2767,7 +2934,7 @@ def main():
         T += ["## Research table\n",
               f"*Every priced line, snapshot {now()}, grouped by team. {RESEARCH_NOTE.strip('*')}*\n",
               "| Player | Prop | Line | Price | Our projection | Over: model / book | Line implies | "
-              "Pays at this price if he gets | Last game | Flags |",
+              "Pays at this price if you expect | Last game | Flags |",
               "|---|---|---|---|---|---|---|---|---|---|"]
         if len(RESEARCH):
             for _, x in RESEARCH.sort_values(["team", "player", "market", "line"]).iterrows():
@@ -2842,8 +3009,36 @@ def main():
              "tested and are too noisy to use. Expect this to move a projection by a point or two, not more.")
     excl = pop[pop.excluded]
     if len(excl):
-        L.append(f"- **Out:** " + ", ".join(f"{r['name']} ({r.report_status or r.status})" for _, r in excl.iterrows())
+        _src = lambda r: (f", {INJ_SOURCE[(r.team, r.gsis_id)]}" if (r.team, r.gsis_id) in INJ_SOURCE else "")
+        L.append(f"- **Out:** " + ", ".join(f"{r['name']} ({r.report_status or r.status}{_src(r)})"
+                                            for _, r in excl.iterrows())
                  + ". Most of their usual share goes to whoever replaces them, not to the priced teammates: a quarter of their targets and carries is handed on in our numbers, mostly to their position.")
+        for f_ in SC.missing_replacements(pop):
+            left = ("nobody" if not f_["priced_left"] else "only " + ", ".join(f_["priced_left"]))
+            L.append(f"- **No priced replacement for {f_['name']} ({f_['team']} {f_['slot']}):** the depth chart "
+                     f"before kickoff has not promoted anyone, so {f_['team']} prices {left} at {f_['pos']}. "
+                     + (f"No {f_['team']} passing lines are priced, and the receivers' numbers carry no "
+                        f"adjustment for the backup. " if f_["pos"] == "QB" else
+                        f"The player who takes his snaps is not priced; most of the absent player's share "
+                        f"stays with the unpriced depth pool. ")
+                     + f"A role what-if prices whoever replaces him: "
+                     f"--role \"PLAYER={f_['slot']}\".")
+    if "was_inactive" in rw:
+        # provisional roster: last week's inactives with no report yet this week are priced as playing
+        reported = {k for k, v in inj_status.items() if isinstance(v, str)}
+        prov_ina = [r_ for _, r_ in rw[rw.was_inactive].iterrows()
+                    if (r_.team, r_.gsis_id) not in reported and r_.gsis_id in set(pop.gsis_id)]
+        if prov_ina:
+            L.append("- **Inactive last week, no injury report yet this week:** "
+                     + ", ".join(f"{r_.full_name} ({r_.team})" for r_ in prov_ina)
+                     + ". Priced as playing his normal role until this week's report says otherwise; if he "
+                       "sits again, his lines are void and his teammates' move.")
+    for mm_ in RSCH.book_qb_mismatch((data or {}).get("sleeper_extra"), STARTER_QB, SLEEPER_TEAM):
+        L.append(f"- **The book's quarterback is not ours ({mm_['team']}):** Sleeper posts passing lines for "
+                 f"{', '.join(mm_['book'])} and none for {mm_['engine']}, the depth chart's starter, whom this "
+                 f"board prices as the starter (his kneel-downs and passing share; his receivers' numbers do not "
+                 f"depend on who throws). The depth chart may be stale. To price the book's quarterback: "
+                 f"--role \"{mm_['book'][0]}=QB1\".")
     q = pop[pop.questionable]
     if len(q):
         L.append(f"- **Questionable:** " + ", ".join(r["name"] for _, r in q.iterrows()) + ". Priced as if they play their normal role; see 'If a Questionable player is out' for the other case.")
@@ -2906,7 +3101,7 @@ def main():
              "always add to more than 100%; we strip that out so it's a fair comparison.")
     L.append("- **Line implies** is the workload (targets or carries per game) at which the posted line is a fair 50/50, "
              "holding his catch rate and yards per touch. Compare it with what he has been getting.")
-    L.append("- **Pays at this price if he gets** is the same search at each side's own price: the Over beats its price only "
+    L.append("- **Pays at this price if you expect** is the same search at each side's own price: the Over beats its price only "
              "above the first number, the Under only at or below the second. The gap between them is the book's cut. It "
              "tells you how much role your view needs, not whether the view is right; the model's chances are not shown "
              "to be calibrated within 3 points (reports/calibration_bar_v2.md).")
@@ -2989,8 +3184,39 @@ def main():
     SCEN_L = []
     if RULES and not SCENARIO:
         snap_ = Path(a.odds_snapshot) if a.odds_snapshot else (snap_path if snap_written else None)
+        if any(r_.get("auto") for r_ in RULES):
+            # the automatic range (#179): our projection +/- one standard error of his
+            # share over his last 10 games; this season only after a team change or a takeover
+            import build_play_yards as _BPY
+            _sg_path = RES / f"priors_{PRIOR}_share_games.csv"
+            _sg = ({str(r_.gsis_id): _BPY.parse_share_games(r_.games)
+                    for r_ in pd.read_csv(_sg_path).itertuples()} if _sg_path.exists() else {})
+            _ranges = {}
+            for r_ in RULES:
+                if not r_.get("auto"):
+                    continue
+                m_ = M[M.name == r_["who"]].iloc[0]
+                j_ = 2 if r_["key"] == "targets" else 3            # target / carry share in WEEK_SH rows
+                vol_ = env[m_.team]["targets" if r_["key"] == "targets" else "carries"]
+                proj_ = (vol_ * float(m_.ts) if r_["key"] == "targets"
+                         else float(np.mean(sims[m_["name"]]["carries"])))
+                # a role change: a new team, or the validated flag for this volume (the
+                # takeover flag for carries, the role-shift flag for targets)
+                changed_ = bool(m_.new_team) or bool(RSCH.carry_flag(CARRY_U.get(m_["name"]), WEEK - 1)
+                                                     if r_["key"] == "carries" else ROLE.get(m_["name"]))
+                _ranges[(r_["who"], r_["key"])] = RSCH.auto_range(
+                    [w_[j_] for w_ in WEEK_SH.get(m_["name"], [])],
+                    [g_[j_ - 1] for g_ in _sg.get(str(m_.gsis_id), [])], proj_, vol_, this_season_only=changed_)
+            try:
+                RULES = SC.fill_auto(RULES, _ranges)
+                auto_err = None
+            except ValueError as exc:
+                auto_err = str(exc)
+        else:
+            auto_err = None
         # THIS run's lines only, never the --prior-log merge (an earlier capture's chance is not the board's)
-        SCEN_L = run_user_scenario(pd.DataFrame(rows) if rows else R.iloc[0:0], RESEARCH, slug, snap_, RULES)
+        SCEN_L = (["", "## Your scenario (experimental)", "", f"Not priced: {auto_err}."] if auto_err else
+                  run_user_scenario(pd.DataFrame(rows) if rows else R.iloc[0:0], RESEARCH, slug, snap_, RULES))
         L += SCEN_L
         (OUT / f"report_{slug}.md").write_text("\n".join(L), encoding="utf-8")
     if not SCENARIO and not a.no_scenarios:
@@ -3394,13 +3620,34 @@ def _scenario_argv(drop=("--prior-log", "--prior-archive")):
     return argv
 
 
+def _price_scenario(slug, snap, assume, label):
+    """One scenario pricing in a subprocess. assume None keeps this run's own --assume
+    flags; a list replaces them (one end of a range). Returns (lines, None) or (None, why)."""
+    drop = ("--prior-log", "--prior-archive") + (() if assume is None else ("--assume",))
+    extra = [] if assume is None else [y for a in assume for y in ("--assume", a)]
+    cmd = [sys.executable, str(Path(__file__).resolve()), *_scenario_argv(drop), *extra, "--scenario-run",
+           "--odds-snapshot", str(snap), "--no-scenarios"]
+    f = OUT / "scenarios" / f"shadow_log_{slug}.csv"
+    f.unlink(missing_ok=True)
+    r = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
+    if r.returncode != 0 or not f.exists():
+        tail = r.stderr.strip().splitlines()[-1][:300] if r.stderr.strip() else "no output"
+        return None, f"exit {r.returncode}: {tail}"
+    S = pd.read_csv(f)
+    f.replace(OUT / "scenarios" / f"shadow_log_{slug}_assume{'' if assume is None else '_' + label}.csv")
+    return S, None
+
+
 def run_user_scenario(R: pd.DataFrame, RESEARCH: pd.DataFrame, slug: str, snap: Path | None, rules) -> list[str]:
     """YOUR scenario (scenario.py, DECISIONS #153): the same lines priced again
     with the user's workload assumptions, beside the board's own numbers, the
     break-even at each side's price and what each side would return IF the
     assumptions are right. Written to OUT/scenarios, never recorded."""
     L = ["", "## Your scenario (experimental)", "",
-         f"**Your assumptions:** {SC.describe(rules)}. These are assumptions, not confidence intervals. Every "
+         f"**Your assumptions:** {SC.describe(rules)}. "
+         + ("An auto range is one standard error of his recent share around our projection: how sure we are "
+            "of his average workload, not a forecast of this game. " if any(r_.get("auto") for r_ in rules)
+            else "These are assumptions, not confidence intervals. ") + "Every "
          "line below is priced again from the same simulation with only those inputs changed: what one player "
          "gains in targets or carries his teammates give up in proportion, receptions and receiving yards move "
          "together, and the starting QB's passing yards follow his receivers. The model's chances are not shown "
@@ -3410,20 +3657,22 @@ def run_user_scenario(R: pd.DataFrame, RESEARCH: pd.DataFrame, slug: str, snap: 
         return L + ["Not priced: this run saved no lines to price against."]
     if R.empty:
         return L + ["No priced lines to compare."]
-    cmd = [sys.executable, str(Path(__file__).resolve()), *_scenario_argv(), "--scenario-run",
-           "--odds-snapshot", str(snap), "--no-scenarios"]
-    f = OUT / "scenarios" / f"shadow_log_{slug}.csv"
-    f.unlink(missing_ok=True)
-    r = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
-    if r.returncode != 0 or not f.exists():
-        tail = r.stderr.strip().splitlines()[-1][:300] if r.stderr.strip() else "no output"
-        return L + [f"Scenario failed (exit {r.returncode}): {tail}"]
-    S = pd.read_csv(f)
-    f.replace(OUT / "scenarios" / f"shadow_log_{slug}_assume.csv")
+    variants = SC.range_variants(rules)
+    runs = {}
+    for lab, assume in (variants or [("expected", None)]):
+        S, err = _price_scenario(slug, snap, assume, lab)
+        if err:
+            return L + [f"Scenario failed{'' if variants is None else f' ({lab} run)'}: {err}"]
+        runs[lab] = S
+    S = runs["expected"]
     key = ["book", "market", "player", "line"]
     base = R[R.market != "player_anytime_td"].drop_duplicates(key)
     j = base.merge(S[key + ["side", "p_model", "p_push"]].drop_duplicates(key), on=key, how="left",
                    suffixes=("", "_sc"))
+    for lab, suf in (("low", "_lo"), ("high", "_hi")):
+        if lab in runs:
+            E = runs[lab][key + ["side", "p_model", "p_push"]].drop_duplicates(key)
+            j = j.merge(E.rename(columns={c: c + suf for c in ("side", "p_model", "p_push")}), on=key, how="left")
     pays = ({(r.player, r.market, float(r.line), r.book): RSCH.break_even_cell(r)
              for _, r in RESEARCH.iterrows()} if len(RESEARCH) else {})
     named = {x["who"] for x in rules if not x["team"]}
@@ -3434,17 +3683,30 @@ def run_user_scenario(R: pd.DataFrame, RESEARCH: pd.DataFrame, slug: str, snap: 
             continue
         o0, u0, _p0 = _sides(x)
         o1, u1, p1 = _sides(pd.Series({"p_model": x.p_model_sc, "side": x.side_sc, "p_push": x.p_push_sc}))
-        if abs(o1 - o0) < 0.005 and x.player not in named and x.team not in teams_named:
+        moved = [o1] + [_sides(pd.Series({"p_model": x["p_model" + suf], "side": x["side" + suf],
+                                          "p_push": x["p_push" + suf]}))[0]
+                        for suf in ("_lo", "_hi") if variants and pd.notna(x.get("p_model" + suf))]
+        if max(abs(v - o0) for v in moved) < 0.005 and x.player not in named and x.team not in teams_named:
             continue
         po, pu = x.get("price_over"), x.get("price_under")
         ev_o = SC.net_per_100(po, o1, u1) if pd.notna(po) else None
         ev_u = SC.net_per_100(pu, u1, o1) if pd.notna(pu) else None
-        rows.append(dict(player=x.player, team=x.team, market=x.market, line=float(x.line), book=x.book,
-                         price_over=po, price_under=pu, be_over=RSCH.breakeven(po), be_under=RSCH.breakeven(pu),
-                         over_model=o0, over_scenario=o1, under_scenario=u1, push_scenario=p1,
-                         net_over=ev_o, net_under=ev_u,
-                         pays_if=pays.get((x.player, x.market, float(x.line), x.book), "—"),
-                         named=x.player in named))
+        row = dict(player=x.player, team=x.team, market=x.market, line=float(x.line), book=x.book,
+                   price_over=po, price_under=pu, be_over=RSCH.breakeven(po), be_under=RSCH.breakeven(pu),
+                   over_model=o0, over_scenario=o1, under_scenario=u1, push_scenario=p1,
+                   net_over=ev_o, net_under=ev_u,
+                   pays_if=pays.get((x.player, x.market, float(x.line), x.book), "—"),
+                   named=x.player in named)
+        if variants:
+            ends = {}
+            for suf in ("_lo", "_hi"):
+                ends[suf] = ((None, None) if pd.isna(x.get("p_model" + suf)) else
+                             _sides(pd.Series({"p_model": x["p_model" + suf], "side": x["side" + suf],
+                                               "p_push": x["p_push" + suf]}))[:2])
+            row.update(over_low=ends["_lo"][0], over_high=ends["_hi"][0],
+                       verdict_over=SC.range_verdict(ends["_lo"][0], o1, ends["_hi"][0], row["be_over"]),
+                       verdict_under=SC.range_verdict(ends["_lo"][1], u1, ends["_hi"][1], row["be_under"]))
+        rows.append(row)
     if not rows:
         return L + ["No line moves by half a point or more under these assumptions."]
     T = pd.DataFrame(rows)
@@ -3453,18 +3715,37 @@ def run_user_scenario(R: pd.DataFrame, RESEARCH: pd.DataFrame, slug: str, snap: 
     odds = lambda v: "—" if v is None or pd.isna(v) else (f"+{int(v)}" if v > 0 else f"{int(v)}")
     pc = lambda v: "—" if v is None or pd.isna(v) else f"{100 * v:.0f}%"
     money = lambda v: "—" if v is None or pd.isna(v) else f"{v:+.1f}"
-    L += ["| Player | Prop | Line | Price (O / U) | Break-even (O / U) | Over: board / your scenario | "
-          "If your scenario is right, net per $100: Over / Under | Pays at this price if he gets |",
-          "|---|---|---|---|---|---|---|---|"]
-    for _, x in T.iterrows():
-        L.append(f"| {x.player} ({x.team}) | {MARKET_WORDS.get(x.market, x.market)} | {x.line:g} | "
-                 f"O {odds(x.price_over)} / U {odds(x.price_under)} | {pc(x.be_over)} / {pc(x.be_under)} | "
-                 f"{pc(x.over_model)} / {pc(x.over_scenario)} | {money(x.net_over)} / {money(x.net_under)} | "
-                 f"{x.pays_if} |")
+    if variants:
+        def verdict(x):
+            v = [f"{side} {x[f'verdict_{side.lower()}']}" for side in ("Over", "Under")
+                 if x[f"verdict_{side.lower()}"] not in (None, "does not pay in your range")]
+            return "; ".join(v) or "neither side pays in your range"
+        L += ["| Player | Prop | Line | Price (O / U) | Break-even (O / U) | Over: board / your low / expected / high | "
+              "Your range | Net per $100 at your expected: Over / Under | Pays at this price if you expect |",
+              "|---|---|---|---|---|---|---|---|---|"]
+        for _, x in T.iterrows():
+            L.append(f"| {x.player} ({x.team}) | {MARKET_WORDS.get(x.market, x.market)} | {x.line:g} | "
+                     f"O {odds(x.price_over)} / U {odds(x.price_under)} | {pc(x.be_over)} / {pc(x.be_under)} | "
+                     f"{pc(x.over_model)} / {pc(x.over_low)} / {pc(x.over_scenario)} / {pc(x.over_high)} | "
+                     f"{verdict(x)} | {money(x.net_over)} / {money(x.net_under)} | {x.pays_if} |")
+        L += ["", "Your range is priced three times: every range at its low, then at its expected, then at its "
+              "high (fixed assumptions stay put). 'Pays across your range' means the side clears its break-even "
+              "at your low, expected and high alike; 'pays only at your high' means it needs that end of what you "
+              "assumed. A teammate's line can run the other way: his Over may pay only at your low."]
+    else:
+        L += ["| Player | Prop | Line | Price (O / U) | Break-even (O / U) | Over: board / your scenario | "
+              "If your scenario is right, net per $100: Over / Under | Pays at this price if you expect |",
+              "|---|---|---|---|---|---|---|---|"]
+        for _, x in T.iterrows():
+            L.append(f"| {x.player} ({x.team}) | {MARKET_WORDS.get(x.market, x.market)} | {x.line:g} | "
+                     f"O {odds(x.price_over)} / U {odds(x.price_under)} | {pc(x.be_over)} / {pc(x.be_under)} | "
+                     f"{pc(x.over_model)} / {pc(x.over_scenario)} | {money(x.net_over)} / {money(x.net_under)} | "
+                     f"{x.pays_if} |")
     L += ["", "Lines are listed for the players and teams you named, then any other line whose Over moves by half "
           "a point or more. 'Pays at this price' is the board's break-even workload: compare it with the "
           "workload you assumed."]
     out = {"logged_at_utc": now(), "assumptions": [x["text"] for x in rules], "rules": rules,
+           "range_runs": None if variants is None else {lab: a_ for lab, a_ in variants},
            "lines": T.drop(columns=["move"]).to_dict(orient="records")}
     (OUT / "scenarios" / f"scenario_{slug}.json").write_text(json.dumps(out, indent=1, default=str) + "\n",
                                                             encoding="utf-8")

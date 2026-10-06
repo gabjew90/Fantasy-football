@@ -12,13 +12,13 @@ Discuss only supported angles: opportunity concentration, target/rush competitio
 No recommendations (DECISIONS #142): the board is a research sheet until the settled
 record shows the model earning weight beside the book. Use these columns:
 
-| Player | Team | Prop Market | Line & Price (Over / Under) | Our projection (median, p10-p90) | Over: model / book | Line implies | Pays at this price if he gets | Last game | Flags |
+| Player | Team | Prop Market | Line & Price (Over / Under) | Our projection (median, p10-p90) | Over: model / book | Line implies | Pays at this price if you expect | Last game | Flags |
 |---|---|---|---|---|---|---|---|---|---|
 
 Rules:
 - No Over/Under/Yes/PASS call, no fair odds, no entry threshold, no EV, Kelly or stake.
 - `Line implies` is the targets or carries per game at which the line is a fair 50/50.
-- `Pays at this price if he gets` is the workload at which each side beats its own price
+- `Pays at this price if you expect` is the workload at which each side beats its own price
   (vig included), conditional on the model's numbers. It is how much role a view needs,
   not an entry threshold or a pick.
 - Keep the observed quote (bookmaker, `last_update`) beside the model's numbers.

@@ -64,6 +64,141 @@ def _number(v: str, key: str, raw: str) -> tuple[float, bool]:
     return x, pct
 
 
+def _one_value(v, k, raw, is_team):
+    """One value of a rule, checked: a team's values are signed changes, a player's are levels."""
+    x, pct = _number(v, k, raw)
+    if is_team:
+        if k == "ypt" and not pct:
+            raise ValueError(f"'{raw}': a team's ypt is a percent change, e.g. ypt=-5%")
+        if k != "ypt" and pct:
+            raise ValueError(f"'{raw}': {k} is a change in {WORDS[k]}, e.g. {k}=-3")
+        if x != 0 and not v.strip().startswith(("+", "-")):       # zero is no change either way
+            # 'NO: pass=42' was read as 42 MORE targets (2026-10-05); a team value is
+            # always a change, so it must carry its sign
+            eg = "ypt=-5%" if k == "ypt" else f"{k}=+6"
+            raise ValueError(f"'{raw}': a team's {k} is a CHANGE, not a total -- write the sign, "
+                             f"e.g. {eg}")
+        if k == "ypt" and x <= -100:
+            raise ValueError(f"'{raw}': ypt cannot fall by 100% or more")
+    else:
+        if k == "catch":
+            x = x / 100 if (pct or x > 1) else x
+            if not 0 < x <= 1:
+                raise ValueError(f"'{raw}': catch rate must be between 0 and 100%")
+        elif pct:
+            raise ValueError(f"'{raw}': {k} is {WORDS[k]}, not a percent")
+        elif x < 0 or (k in ("ypt", "ypc") and x == 0):
+            raise ValueError(f"'{raw}': {k} must be positive")
+    return x
+
+
+RANGE_LABELS = ("low", "expected", "high")
+
+
+def range_variants(rules):
+    """For a scenario with any range, three rule sets -- your low, expected and high -- as
+    --assume strings, each rule at its own end of its range (fixed rules unchanged); None
+    when no rule is a range."""
+    if not any("values" in r for r in rules):
+        return None
+    def fmt(r, x):
+        who = r["who"] if r["team"] or not r.get("team_of") else f"{r['who']} ({r['team_of']})"
+        if r["team"]:
+            val = f"{x:+g}%" if r["key"] == "ypt" else f"{x:+g}"
+        elif r["key"] == "catch":
+            val = f"{100 * x:g}%"
+        else:
+            val = f"{x:g}"
+        return f"{who}: {r['key']}={val}"
+    return [(lab, [fmt(r, r["values"][i] if "values" in r else r["value"]) for r in rules])
+            for i, lab in enumerate(RANGE_LABELS)]
+
+
+def fill_auto(rules, ranges) -> list[dict]:
+    """The automatic ranges filled in: ranges {(player, key): research.auto_range result
+    or None}. A rule with no range (too few games) raises ValueError with the reason."""
+    out = []
+    for r in rules:
+        if not r.get("auto"):
+            out.append(r)
+            continue
+        got = ranges.get((r["who"], r["key"]))
+        if got is None:
+            raise ValueError(f"{r['who']}: {r['key']}=auto needs at least 3 recent games with a share; "
+                             f"give your own range, e.g. {r['key']}=10/12/15")
+        lo, mid, hi = got["values"]
+        src = (f"his last {got['n']} games" + (f", {got['from_last']} of them from last season"
+                                               if got["from_last"] else ""))
+        out.append({**r, "value": mid, "values": [lo, mid, hi],
+                    "text": f"{r['who']}: {r['key']}=auto ({lo:.1f}/{mid:.1f}/{hi:.1f}: our projection "
+                            f"+/- one standard error of his share over {src})"})
+    return out
+
+
+def range_verdict(p_low, p_exp, p_high, breakeven):
+    """How much of your range one side needs to beat its price. p_low / p_high: that
+    side's chance when your ranges sit at their low / high ends (a named player's low
+    can be a teammate's best case, so the verdict names the end, not 'best' or 'worst')."""
+    ok = lambda v: v is not None and v == v
+    if not (ok(p_exp) and ok(breakeven)):
+        return None
+    clears = {lab: v >= breakeven for lab, v in (("low", p_low), ("high", p_high)) if ok(v)}
+    unpriced = [lab for lab in ("low", "high") if lab not in clears]
+    if p_exp >= breakeven:
+        fails = [lab for lab, c in clears.items() if not c]
+        if not fails:
+            return ("pays across your range" if not unpriced else
+                    f"pays at your expected; your {' and '.join(unpriced)} was not priced")
+        return ("pays only at your expected" if len(fails) == 2
+                else f"pays at your expected, not at your {fails[0]}")
+    wins = [lab for lab, c in clears.items() if c]
+    if wins:
+        return f"pays only at your {' or '.join(wins)}"
+    return "does not pay in your range"
+
+
+ROLE_SLOTS = {"QB1": 1, "RB1": 1, "RB2": 2, "WR1": 1, "WR2": 2, "WR3": 3, "TE1": 1}
+SLOT_COUNT = {"QB": 1, "RB": 2, "WR": 3, "TE": 1}
+
+
+def parse_roles(roles, teams) -> list[dict]:
+    """--role strings ('Player=RB1', 'Player (TEAM)=WR2') -> [{who, team_of, slot}].
+    Raises ValueError with a plain reason."""
+    teams = {t.upper() for t in teams}
+    out = []
+    for raw in roles or []:
+        who, eq, slot = str(raw).rpartition("=")
+        who, slot = " ".join(who.split()), slot.strip().upper()
+        if not eq or not who:
+            raise ValueError(f"'{raw}': write it as 'PLAYER=SLOT', e.g. 'Bhayshul Tuten=RB1'")
+        if slot not in ROLE_SLOTS:
+            raise ValueError(f"'{raw}': the slot is one of " + ", ".join(ROLE_SLOTS))
+        team_of = None
+        m_ = re.fullmatch(r"(.+?)\s*\(([A-Za-z]{2,3})\)", who)
+        if m_ and m_.group(2).upper() in teams:
+            who, team_of = m_.group(1).strip(), m_.group(2).upper()
+        out.append({"who": who, "team_of": team_of, "slot": slot})
+    return out
+
+
+def missing_replacements(pop) -> list[dict]:
+    """Out players who held a priced depth slot while their team now prices fewer
+    players at that position than it has slots: the depth chart may not have
+    promoted anyone, so the replacement's lines (if any) are unpriced. pop: the
+    engine's player pool (team, name, pos, slot, excluded)."""
+    flags = []
+    for _, r in pop[pop.excluded].iterrows():
+        pos = re.match(r"[A-Z]+", str(r.slot or ""))
+        pos = pos.group(0) if pos else None
+        if pos not in SLOT_COUNT or str(r.slot) == "PROXY":
+            continue
+        priced = pop[(pop.team == r.team) & ~pop.excluded & (pop.pos == pos)]
+        if len(priced) < SLOT_COUNT[pos]:
+            flags.append({"name": r["name"], "team": r.team, "pos": pos, "slot": r.slot,
+                          "priced_left": list(priced["name"])})
+    return flags
+
+
 def parse(rules, teams) -> list[dict]:
     """--assume strings -> rules. teams: this game's two abbreviations. Raises
     ValueError with a plain reason on anything it cannot read."""
@@ -86,32 +221,26 @@ def parse(rules, teams) -> list[dict]:
             if not eq or k not in allowed:
                 raise ValueError(f"'{raw}': '{kv.strip()}' -- {'team' if is_team else 'player'} keys are "
                                  + ", ".join(allowed))
-            x, pct = _number(v, k, raw)
-            if is_team:
-                if k == "ypt" and not pct:
-                    raise ValueError(f"'{raw}': a team's ypt is a percent change, e.g. ypt=-5%")
-                if k != "ypt" and pct:
-                    raise ValueError(f"'{raw}': {k} is a change in {WORDS[k]}, e.g. {k}=-3")
-                if not v.strip().startswith(("+", "-")):
-                    # 'NO: pass=42' was read as 42 MORE targets (2026-10-05); a team value is
-                    # always a change, so it must carry its sign
-                    eg = "ypt=-5%" if k == "ypt" else f"{k}=+6"
-                    raise ValueError(f"'{raw}': a team's {k} is a CHANGE, not a total -- write the sign, "
-                                     f"e.g. {eg}")
-                if k == "ypt" and x <= -100:
-                    raise ValueError(f"'{raw}': ypt cannot fall by 100% or more")
-            else:
-                if k == "catch":
-                    x = x / 100 if (pct or x > 1) else x
-                    if not 0 < x <= 1:
-                        raise ValueError(f"'{raw}': catch rate must be between 0 and 100%")
-                elif pct:
-                    raise ValueError(f"'{raw}': {k} is {WORDS[k]}, not a percent")
-                elif x < 0 or (k in ("ypt", "ypc") and x == 0):
-                    raise ValueError(f"'{raw}': {k} must be positive")
-            out.append({"who": who.upper() if is_team else who, "team": is_team, "key": k, "value": x,
-                        "team_of": who.upper() if is_team else team_of,
-                        "text": f"{who.upper() if is_team else who}: {k}={v.strip()}"})
+            if v.strip().lower() == "auto":
+                # the AUTOMATIC range (#179): filled in by the scorer from his last 10 games
+                if is_team or k not in ("targets", "carries"):
+                    raise ValueError(f"'{raw}': auto works for a player's targets or carries")
+                out.append({"who": who, "team": False, "key": k, "value": None, "auto": True,
+                            "team_of": team_of, "text": f"{who}: {k}=auto"})
+                continue
+            # a RANGE (DECISIONS #175): 'carries=10/12/15' is your low / expected / high
+            parts = [q for q in v.split("/")]
+            if len(parts) not in (1, 3) or any(not q.strip() for q in parts):
+                raise ValueError(f"'{raw}': a range is low/expected/high, e.g. {k}=10/12/15")
+            vals = [_one_value(q, k, raw, is_team) for q in parts]
+            if len(vals) == 3 and not vals[0] <= vals[1] <= vals[2]:
+                raise ValueError(f"'{raw}': write the range low/expected/high, smallest first")
+            rule = {"who": who.upper() if is_team else who, "team": is_team, "key": k, "value": vals[len(vals) // 2],
+                    "team_of": who.upper() if is_team else team_of,
+                    "text": f"{who.upper() if is_team else who}: {k}={v.strip()}"}
+            if len(vals) == 3:
+                rule["values"] = vals
+            out.append(rule)
     return out
 
 

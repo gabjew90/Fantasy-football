@@ -96,7 +96,7 @@ def search_edges(share_over, prices):
 
 
 def break_even_cell(x) -> str:
-    """The research table's 'Pays at this price if he gets' cell: the Over beats
+    """The research table's 'Pays at this price if you expect' cell: the Over beats
     its own price above over_needs, the Under at or below under_needs. A side
     with no posted price (no be_over / be_under) says so rather than reading as
     a search that ran out of range."""
@@ -1338,3 +1338,122 @@ def backfield_jobs(weeks):
             "passdown": last[2], "passdown_base": mean(2),
             "i5": last[3], "i5_base": mean(3),
             "i5_n": int(last[4]), "i5_team": int(last[5])}
+
+
+# ---- offensive line: how many of a team's five regular linemen are out (DECISIONS #178) ----
+# Context only, never a price input: the reader judges it. Whether missing starters
+# predict the model's misses is a separate, later test (queued behind conditional
+# calibration and the implied team total).
+OL_POS = ("T", "G", "C", "OL")
+LINE_SLOTS = 5
+
+
+def line_regulars(snaps, team, week, n=LINE_SLOTS) -> list[dict]:
+    """The team's regular offensive line: the n linemen with the most offensive snaps
+    this season before this week (snap counts: player, pfr_player_id, position, team,
+    week, offense_snaps). Empty when the team has no lineman snaps yet."""
+    s = snaps[(snaps.team == team) & (snaps.week < week) & snaps.position.isin(OL_POS)]
+    if s.empty:
+        return []
+    g = s.groupby("pfr_player_id").agg(name=("player", "last"), pos=("position", "last"),
+                                       snaps=("offense_snaps", "sum"),
+                                       games=("offense_snaps", lambda v: int((v > 0).sum())))
+    g = g[g.snaps > 0].sort_values(["snaps", "name"], ascending=[False, True]).head(n)
+    return [{"pfr_id": i, "name": r["name"], "pos": r.pos, "snaps": int(r.snaps), "games": int(r.games)}
+            for i, r in g.iterrows()]
+
+
+def line_status(regulars, team, pfr_to_gsis, roster, report, not_playing, name_to_gsis=None) -> list[dict]:
+    """Each regular's status this week: 'out' (Out / Doubtful on the report, a not-playing
+    roster status, or off the team's roster), 'questionable', 'playing', or 'unmatched'
+    (no roster id found: never counted as out). Ids come from pfr_to_gsis, else from
+    name_to_gsis {(team, norm_name): gsis_id} (the roster file lacks many pfr ids).
+    roster: {gsis_id: (team, roster status)} for this week; report: {gsis_id: status}."""
+    out = []
+    for r in regulars:
+        gid = pfr_to_gsis.get(r["pfr_id"]) or (name_to_gsis or {}).get((team, MODEL.norm_name(r["name"])))
+        on = roster.get(gid) if gid else None
+        rep = report.get(gid) if gid else None
+        if gid is None:
+            why, state = "not matched to the roster", "unmatched"
+        elif on is None or on[0] != team:
+            why, state = "no longer on the roster", "out"
+        elif on[1] in not_playing:
+            why, state = {"INA": "inactive"}.get(on[1], "on reserve"), "out"
+        elif rep in ("Out", "Doubtful"):
+            why, state = rep, "out"
+        elif rep == "Questionable":
+            why, state = rep, "questionable"
+        else:
+            why, state = None, "playing"
+        out.append({**r, "state": state, "why": why})
+    return out
+
+
+def line_sentence(team, status, report_out=True) -> str | None:
+    """The game header's line read for one team; None without five regulars.
+    report_out False: this week's injury report is not published yet."""
+    if len(status) < LINE_SLOTS:
+        return None
+    out = [s for s in status if s["state"] == "out"]
+    q = [s for s in status if s["state"] == "questionable"]
+    name = lambda s: f"{s['name']} ({s['pos']}, {s['why']})"
+    head = (f"{team}: all five regular linemen available" if not out else
+            f"{team}: {len(out)} of 5 regular linemen out -- " + ", ".join(map(name, out)))
+    um = [s for s in status if s["state"] == "unmatched"]
+    if not out and um:
+        head = f"{team}: no regular lineman reported out"
+    if not report_out:
+        head += " (no injury report yet this week: roster status only)"
+    return (head + (f"; questionable: " + ", ".join(map(name, q)) if q else "")
+            + (f"; not matched to the roster, status unknown: " + ", ".join(s["name"] for s in um) if um else "")
+            + ".")
+
+
+# ---- the automatic what-if range: 'carries=auto' (DECISIONS #179) ----
+# Not his game-to-game swing (the simulation already prices that): how sure we are of
+# his AVERAGE share, one standard error either side of our projection.
+AUTO_GAMES = LUCK_WINDOW        # last 10 games, the luck-free check's window
+AUTO_MIN_GAMES = 3
+
+
+def auto_range(this_season, last_season, proj, team_volume, this_season_only=False):
+    """Low / expected / high volume for an automatic range. this_season / last_season:
+    his per-game shares (oldest first) of the team's throws or runs; the last AUTO_GAMES
+    games are used, topped up from last season unless this_season_only (a role change).
+    proj: our projected volume; team_volume: the team's projected throws or runs.
+    Returns {values, n, se, from_last} or None under AUTO_MIN_GAMES games."""
+    shares = [float(v) for v in this_season if v == v][-AUTO_GAMES:]
+    from_last = 0
+    if not this_season_only and len(shares) < AUTO_GAMES:
+        tail = [float(v) for v in last_season if v == v]
+        take = tail[-(AUTO_GAMES - len(shares)):]
+        from_last = len(take)
+        shares = take + shares
+    n = len(shares)
+    if n < AUTO_MIN_GAMES or proj is None or team_volume is None:
+        return None
+    se = float(np.std(shares, ddof=1) / np.sqrt(n) * team_volume)
+    return {"values": [max(0.0, proj - se), float(proj), proj + se], "n": n, "se": se, "from_last": from_last}
+
+
+# ---- the book's quarterback against the engine's starter (DECISIONS #181) ----
+QB_KINDS = ("passing_attempts", "pass_completions", "longest_passing_completion")
+
+
+def book_qb_mismatch(extra, starters, sleeper_team=None) -> list[dict]:
+    """Teams whose book posts passing lines for a QB other than the engine's starter and
+    none for the starter: the depth chart may be stale (the backtest graded the wrong
+    QB in 27% of backup starts, 2022-25). starters: {our team code: engine starter's
+    name}. Returns [{team, engine, book}]."""
+    back = {v: k for k, v in (sleeper_team or {}).items()}
+    posted = {}
+    for x in extra or []:
+        if x["kind"] in QB_KINDS:
+            posted.setdefault(back.get(x["team"], x["team"]), set()).add(x["name"])
+    out = []
+    for team, names in posted.items():
+        eng = starters.get(team)
+        if eng and MODEL.norm_name(eng) not in {MODEL.norm_name(n) for n in names}:
+            out.append({"team": team, "engine": eng, "book": sorted(names)})
+    return out

@@ -753,3 +753,18 @@ def test_the_rushing_plus_receiving_read_names_whose_rate():
     d = RS.rush_rec_read(line=30.5, proj_carries=6.0, proj_catches=2.0, run_rate=3.9, catch_rate=6.5,
                          rates_luck_free=False)
     assert "At our yards a touch (too few of his own plays)" in RS.rush_rec_sentence(d)
+
+
+def test_the_book_quarterback_flag_fires_only_when_the_book_skips_our_starter():
+    """DECISIONS #181: the backtest graded the wrong QB in 27% of backup starts because a
+    stale depth chart named an active primary; live, the book's own lines say who starts."""
+    extra = [{"name": "Teddy Bridgewater", "team": "TB", "kind": "passing_attempts", "line": 30.5},
+             {"name": "Teddy Bridgewater", "team": "TB", "kind": "pass_completions", "line": 19.5},
+             {"name": "Dak Prescott", "team": "DAL", "kind": "passing_attempts", "line": 34.5},
+             {"name": "Bucky Irving", "team": "TB", "kind": "rushing_attempts", "line": 14.5}]
+    got = RS.book_qb_mismatch(extra, {"TB": "Baker Mayfield", "DAL": "Dak Prescott"})
+    assert got == [{"team": "TB", "engine": "Baker Mayfield", "book": ["Teddy Bridgewater"]}]
+    assert RS.book_qb_mismatch(extra, {"TB": "Teddy Bridgewater", "DAL": "Dak Prescott"}) == []
+    assert RS.book_qb_mismatch([], {"TB": "Baker Mayfield"}) == [], "no QB lines posted: no claim"
+    la = [{"name": "Matthew Stafford", "team": "LAR", "kind": "passing_attempts", "line": 33.5}]
+    assert RS.book_qb_mismatch(la, {"LA": "Matthew Stafford"}, {"LA": "LAR"}) == [], "team codes mapped"

@@ -7481,6 +7481,61 @@ by the user.
   season's split more only from week 5) -- the shape the carry result points to.
 - Tooling: backtest.py --k0 replaces model.K0_FIXED rather than adding to it; to fix.
 
+## 2026-10-06 (175) -- the user's volume thesis as a range; a role what-if; no-replacement flag
+
+- Outside reviewer, agreed as Tier 1: the engine checks lines under the user's volume
+  thesis, so a thesis should be a range and a line should say how much of it it needs.
+- Range what-if: `--assume "PLAYER: carries=10/12/15"` (team changes too) prices the board
+  at the low, expected and high ends and gives each side a verdict that names the end it
+  needs ("pays across your range" / "at your expected, not at your low" / "only at your
+  high" / "does not pay in your range"). A teammate's line runs the other way, so the
+  verdict never says "best" or "worst". Unsigned 0 is accepted as a team change.
+- Role what-if: `--role "PLAYER=RB1"` adds a player the depth chart has not promoted at
+  that slot (role-average prior blended with his own games). Nobody else moves. A full run
+  with research, written to OUT/role (record_run reads only the top folder).
+- No priced replacement: an Out starter whose team now prices fewer players at his
+  position than it has slots is named in the report with the role what-if to try.
+- Wording: "pays at this price if you expect" (expected volume), not "if he gets"
+  (realized). The overview says the luck-free gauge is realized-volume arithmetic, biased
+  low and treating the line as an average.
+- Fix: before this week's roster is published, last week's game-day inactive (INA) reads
+  as active; the injury report decides (Baker Mayfield was priced out of week 5).
+
+## 2026-10-06 (178) -- the offensive line flag: five regulars, how many out
+
+- User, from the outside reviewer's list (Tier 1): count how many of each team's five
+  regular linemen are out. Regulars = the five T/G/C/OL with the most offensive snaps this
+  season (nflverse snap counts); out = Out/Doubtful, a not-playing roster status, or off
+  the team's roster; questionable listed. Ids by pfr id, else a same-team name match (the
+  2026 roster file lacks about a quarter of pfr ids); an unmatched lineman is "status
+  unknown", never out. Says so when this week's injury report is not out yet.
+- Context only: no price changes, so no test is needed. Queued for Tier 3, after
+  conditional calibration and the implied team total test: do missing starters predict
+  the model's misses (expected null for one starter; two or more is rare and thin).
+
+## 2026-10-06 (179) -- the automatic what-if range: carries=auto / targets=auto
+
+- User: a range should default from recent games, his last 10. Built as opt-in per
+  player: low / high = our projection +/- one standard error of his share over his last
+  10 games (this season's, topped up with last season's final games, from the new
+  resources/priors_2025_share_games.csv) times the team's projected volume. This season
+  only after a team change or a backfield takeover; 3+ games or the report says to give
+  numbers.
+- Not his game-to-game min / max: the simulation already prices those swings, so using
+  them as the range would count them twice and every line would read "only at your high".
+
+## 2026-10-06 (181) -- the book's quarterback against ours
+
+- Found by the backup-QB implied-total diagnostic (reports/backup_qb_implied_total.md on
+  props/tier3): the backtest graded the depth chart's starter, and in 27% of backup
+  starts (2022-25) that was an active primary who did not start. The live board picks
+  its starter the same way, so a stale depth chart prices the wrong quarterback.
+- The report now flags a team whose Sleeper lines name a different quarterback (passing
+  attempts / completions / longest completion) and none for our starter, with the role
+  what-if that prices the book's man. Thursday's TB at DAL fires it: Sleeper posts Jalon
+  Daniels, the depth chart starts Baker Mayfield.
+- The backtest fix (grade only the QB who started) ships with the Tier 2 work.
+
 ## 2026-10-06 (182) -- tier 2: each stage graded alone; the width retune does not ship; the harness audited
 
 - Pre-registered (reports/tier2_conditional_calibration.md, tag archive/tier2-prereg).
@@ -7501,6 +7556,23 @@ by the user.
   in 2024 and 7 of 468 in 2025. Past QB-market comparisons carried the same rows in both
   arms; their absolute calibration numbers did not. `--grade-depth-chart-qb` reproduces
   the old population.
+
+## 2026-10-06 (183) -- injuries from Sleeper's feed when the report is silent; the next QB starts
+
+- User: "how can you not tell Mayfield is injured and not playing?" -- and the user never
+  types commands. Before the official report (Monday for a Thursday game), the board read
+  last week's roster only; #175's INA fix then priced Mayfield as playing, though Sleeper's
+  player feed (already downloaded every run) said "Out, thumb".
+- Where this week's official report has no entry, Sleeper's injury_status fills in
+  (IR / PUP / suspended read as Out; Questionable as Questionable), labelled in the report.
+  The official report wins wherever it has an entry.
+- When the depth chart's QB1 is out, the next quarterback who is rostered and not out is
+  priced as the starter (Sleeper's depth order first, then the depth chart's); the report
+  says so in its first lines. Only one QB plays, so unlike the other positions his job
+  goes to one man. A --role for that team's QB still wins.
+- SKILL.md: the user never types a command; chat turns plain words into the flags and runs
+  role what-ifs itself when the report flags a missing replacement or a different QB.
+- TB at DAL: Jalon Daniels priced as TB's starter automatically, Mayfield out (Sleeper).
 
 ## 2026-10-06 (184) -- rounds 28b and 29: two running-game candidates wait for 2026 weeks 2-8
 

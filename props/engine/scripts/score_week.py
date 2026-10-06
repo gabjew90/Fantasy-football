@@ -120,9 +120,9 @@ def slate_board(RS, runs, sort="kickoff", overs_only=False) -> list[str]:
         games = sorted(games, key=lambda r: -(_num(r.get("total")) or -1))
     pc = lambda v: "—" if _num(v) is None else f"{100 * _num(v):.0f}%"
     head = (["| Player | Prop | Line | Over price | Our projection | Over: model / book | Line implies | "
-             "The Over pays if he gets more than | Last game | Flags |"] if overs_only else
+             "The Over pays if you expect more than | Last game | Flags |"] if overs_only else
             ["| Player | Prop | Line | Price | Our projection | Over: model / book | Line implies | "
-             "Pays at this price if he gets | Last game | Flags |"])
+             "Pays at this price if you expect | Last game | Flags |"])
     out = [f"# Slate board: {len(games)} games, " + ("game total, highest first" if sort == "total"
                                                      else "by kickoff"), "",
            "*A research sheet, not a bet list: no line carries a bet label until the record earns it at a review "
@@ -407,7 +407,7 @@ def main():
               "missed the model's next-week projection in 2022-25 (reports/role_shift_check.md); whether the BOOK also "
               "reacts late is what the bet journal decides. 'Line implies' is the targets per game at which the line is a "
               "fair 50/50; 'pays at this price' is the workload each side needs to beat its own price.*", "",
-              "| Game | Player | Prop | Line | Line implies | Pays at this price if he gets | Last game | Flags |",
+              "| Game | Player | Prop | Line | Line implies | Pays at this price if you expect | Last game | Flags |",
               "|---|---|---|---|---|---|---|---|"]
         if len(flagged):
             for _, x in flagged.sort_values(["game", "player"]).iterrows():

@@ -69,7 +69,7 @@ def test_the_research_table_has_its_columns_on_every_row(run):
     i = lines.index("## Research table")
     header = next(ln for ln in lines[i:] if ln.startswith("| Player |"))
     assert header == ("| Player | Prop | Line | Price | Our projection | Over: model / book | Line implies | "
-                      "Pays at this price if he gets | Last game | Flags |")
+                      "Pays at this price if you expect | Last game | Flags |")
     j = lines.index(header)
     rows = [ln for ln in lines[j + 2:] if ln.startswith("|")]
     rows = rows[:next((k for k, ln in enumerate(rows) if not ln.startswith("| ") or "(DAL)" not in ln

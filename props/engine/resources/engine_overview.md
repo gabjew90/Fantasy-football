@@ -1,6 +1,6 @@
 # How the props engine works -- inputs to prices, with the actual numbers
 
-*As of props-v1.38 (2026-10-06). The plain-language companion to methodology.md and
+*As of props-v1.40 (2026-10-06). The plain-language companion to methodology.md and
 model_registry.md: every formula and setting the engine runs, where each came from, and
 what is proven. Worked examples are from week 4 of 2026 (ATL at NO).*
 
@@ -25,14 +25,23 @@ what is proven. Worked examples are from week 4 of 2026 (ATL at NO).*
 
 ## 2. Who plays, and absences
 
-- Priced roles come from the depth chart: QB1, RB1-2, WR1-3, TE1.
-- Out / Doubtful / reserve players are removed and the depth chart re-ranks; the player
-  moving up is blended toward the typical share of his new role.
+- Priced roles come from the latest published depth chart before kickoff (QB1, RB1-2,
+  WR1-3, TE1), plus anyone with 10%+ of his team's targets or 20%+ of its carries this
+  season.
+- Out / Doubtful / reserve players are removed (a game-day inactive counts only for its own week:
+  before this week's roster is published, last week's INA reads as active and the injury report decides). The engine does **not** re-rank the depth
+  chart itself: a replacement is priced only if the published depth chart already lists him
+  in a priced slot or his share passes the bar above. A lagging depth chart can leave the
+  replacement unpriced -- the report then flags the absence with no priced replacement, and a
+  role what-if (`--role "Player=RB1"`) prices him.
 - **The Out rule** (score_game.OUT_RULE; tuned on 2022-23 absence games, confirmed on
   2024-25, reports/absence_tune.md):
   - targets: **25%** of the absent player's share goes to the priced teammates (80% of that
     to his position, 20% across everyone); **75%** to players outside the priced set;
   - carries: **25%** to the priced backs; **75%** to backs outside the set.
+  The 75% is not given to any named player: it stays in the team's unpriced "depth" pool,
+  simulated at depth players' rates. A promoted player who is priced gets his own blended
+  share plus his part of the 25% -- counted once.
   Measured reason: when a player with ~21% of the targets sat, players outside the priced
   set went from 11% to 27% of the targets.
 - Questionable players are priced as playing, with a separate "if he's out" section;
@@ -88,7 +97,10 @@ to 4x between years, which is why the receiving k's were fixed by backtest.
   the share.
 - **Opponent (efficiency only):** a team-level multiplier on catch rate and yards per
   target / carry, k = 150 plays, about a +/-4% swing.
-- **Carry shares:** if a team's add to more than 100%, scaled down in proportion; then moved
+- **Shares over 100%:** after the Out rule and the snap rule, a team's priced target shares
+  (and carry shares, and goal-line shares) are scaled down in proportion when they add to more
+  than 100%, so the quoted projection and the simulation always agree.
+- **Carry shares:** then moved
   halfway toward leaving 12% of carries for players outside the priced set (the QB's share
   untouched; round 15, #133).
 
@@ -128,16 +140,18 @@ to 4x between years, which is why the receiving k's were fixed by backtest.
 | Reading | Formula |
 |---|---|
 | Line implies | the targets or carries at which the line is a coin flip (a search in the simulation) |
-| Pays if he gets / zone | the volume where each side reaches its break-even price; our projection falls in the Over, no-bet or Under zone |
+| Pays if you expect / zone | the AVERAGE volume (his expected share; the game-to-game swings in volume stay in the price) at which each side reaches its break-even price; our projection falls in the Over, no-bet or Under zone. "Line implies" and the what-ifs are expected-volume numbers too |
 | Whole numbers | each Over is read at the number that wins it: 3.5 means 4, 44.5 means 45 |
 | Luck-free yards a play | over his last 10 games, every play past his own 97.5th percentile is counted at that line; under 20 plays, his longest is dropped instead. Needs 8+ catches, 10+ carries or 20+ completions, else our figure |
-| Volume check | needed volume = yards needed / luck-free rate, against ours ("comfortably more" at +15% or more, "fewer" at -15% or less) and the book's volume line (within 0.5 reads as about the same) |
+| Volume check | needed volume = yards needed / luck-free rate, against ours ("comfortably more" at +15% or more, "fewer" at -15% or less) and the book's volume line (within 0.5 reads as about the same). **Caveat:** this is arithmetic on realized volume, not the simulation: it treats the line as an average to reach (a 50% line is a median, and yards are skewed) and the trimmed rate is biased low by design, so it leans against Overs. A gauge, never a price |
 | Book's coin flip | line + game-to-game spread x the normal quantile of the book's no-vig chance |
 | Team volume and script | each team's games this season; our projection against that range; teams under this kind of line split their snaps ahead / close / behind by 8+, times this team's pass share in each state, blended toward the league with 60 plays of weight |
 | Rushing + receiving | the touches the line takes at his luck-free rates; how much of his yards come from catches (our probability waits on calibration) |
 | Flags | role up/down; backfield takeover (carry share +/-20 points); teammates out, back or questionable; QB change; new team |
 | Fantasy points allowed | PPR per game by position, context only |
-| What-ifs | separate runs with user assumptions, never recorded |
+| Offensive line | each team's five linemen with the most snaps this season; how many are out (report, reserve, off the roster) or questionable; context only, never a price input |
+| What-ifs | separate runs with user assumptions, never recorded. A range (`carries=10/12/15`) prices low / expected / high and gives each side a verdict ("pays across your range" ... "does not pay in your range"); `--role "Player=RB1"` prices a replacement the depth chart has not promoted. `carries=auto` / `targets=auto`: our projection +/- one standard error of his share over his last 10 games x the team's projected volume (this season only after a team change or takeover; 3+ games) |
+| No priced replacement | an Out starter whose team now prices fewer players at his position than it has slots; the report names him and suggests the role what-if |
 
 ## 8. Narration (SKILL.md)
 
