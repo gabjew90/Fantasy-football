@@ -1,8 +1,8 @@
 # Props scorecard — 2026
 
-1568 calls (1665 priced lines graded, so 97 superseded by a later line).
+2621 calls (2718 priced lines graded, so 97 superseded by a later line).
 
-**7 pricing models in the record (props-v1.3, props-v1.26, props-v1.0, props-v1.1, props-v1.25, props-v1.7, props-v1.18); they are not pooled.** Pass `--pool` to pool them explicitly.
+**9 pricing models in the record (props-v1.3, props-v1.26, props-v1.0, props-v1.1, props-v1.31, props-v1.25, props-v1.7, props-v1.18, props-v1.28); they are not pooled.** Pass `--pool` to pool them explicitly.
 
 ## Label gate
 
@@ -11,19 +11,27 @@ The research board shows no bet labels. The gate is decided only at the reviews 
 | Pricing model | Calls | Weeks | Running weight (95% CI) | Last review | Weight at review | Top-tier net per $100 at review | Gate |
 |---|---|---|---|---|---|---|---|
 | props-v1.3 | 371 | 2-2 | +0.115 (-0.692, +0.945) | none yet (first after week 8) | — | — | closed |
-| props-v1.26 | 51 | 3-3 | not estimated below 300 calls | none yet (first after week 8) | — | — | closed |
+| props-v1.26 (current) | 430 | 3-4 | +0.321 (-0.211, +0.982) | none yet (first after week 8) | — | — | closed |
 | props-v1.0 | 24 | 2-2 | not estimated below 300 calls | none yet (first after week 8) | — | — | closed |
 | props-v1.1 | 24 | 2-2 | not estimated below 300 calls | none yet (first after week 8) | — | — | closed |
-| props-v1.25 (current) | 397 | 3-3 | +0.301 (-0.490, +0.906) | none yet (first after week 8) | — | — | closed |
+| props-v1.31 | 52 | 4-4 | not estimated below 300 calls | none yet (first after week 8) | — | — | closed |
+| props-v1.25 | 397 | 3-3 | +0.301 (-0.490, +0.906) | none yet (first after week 8) | — | — | closed |
 | props-v1.7 | 23 | 2-2 | not estimated below 300 calls | none yet (first after week 8) | — | — | closed |
 | props-v1.18 | 290 | 3-3 | not estimated below 300 calls | none yet (first after week 8) | — | — | closed |
-| all models, pooled (context only) | 1180 | 2-3 | +0.029 (-0.452, +0.564) | none yet (first after week 8) | — | — | closed |
+| props-v1.28 | 387 | 4-4 | +0.603 (-0.058, +1.209) | none yet (first after week 8) | — | — | closed |
+| all models, pooled (context only) | 1998 | 2-4 | +0.156 (-0.237, +0.555) | none yet (first after week 8) | — | — | closed |
 
 ## Sleeper against DraftKings/FanDuel
 
 Not the model: when Sleeper's line or price sits off the DraftKings/FanDuel consensus, the side the consensus favours, bet at Sleeper's price (reports/sleeper_vs_books.md).
 
-0 comparison rows logged; no settled Sleeper call has a matching discrepancy yet.
+| Discrepancy | Bets | Won | Win rate | Break-even | Net per $100 (95% CI) |
+|---|---|---|---|---|---|
+| line off | 8 | 5 | 62.5% | 60.1% | +8.3 (-21.4, +18.3) |
+| price off | 2 | 2 | 100.0% | 58.6% | +70.8 (+nan, +nan) |
+| both, pooled | 10 | 7 | 70.0% | 59.8% | +20.8 (-21.4, +31.4) |
+
+10 graded discrepancies: no verdict yet: the rule needs 200+ bets and an interval above zero.
 
 ## Engine props-v1.3
 
@@ -86,6 +94,10 @@ Those rows assume the teammate played. When he sat, they graded against a line p
 
 Beating the close consistently is the signal that survives small samples. Winning without it is variance.
 
+### Worth a look
+
+No marked line has been graded yet.
+
 ### Market blend (shadow: nothing priced from it)
 
 0 settled anytime_td_v1 calls in this pricing model; the blend weight is not estimated below 300. The record is filling.
@@ -102,18 +114,18 @@ No out-of-sample check yet: it holds out one week at a time and needs at least t
 
 ## Engine props-v1.26
 
-66 settled calls, 31 winners (47.0%), net -1026 per $100 flat-staked.
+556 settled calls, 269 winners (48.4%), net -4799 per $100 flat-staked.
 
 ### Calibration: does the model's probability mean anything?
 
 | Model prob | Calls | Hit rate | Stated | Diff | Net/$100 |
 |---|---|---|---|---|---|
-| 50%-55% | 18 | 50.0% | 52.2% | -2.2% | -197 |
-| 55%-60% | 11 | 72.7% | 57.7% | +15.0% | +358 |
-| 60%-65% | 12 | 66.7% | 62.1% | +4.6% | +197 |
-| 65%-70% | 1 | 100.0% | 68.6% | +31.4% | +77 |
-| 70%-80% | 6 | 16.7% | 73.5% | -56.8% | -426 |
-| 80%-101% | 2 | 100.0% | 86.7% | +13.3% | +130 |
+| 50%-55% | 123 | 50.4% | 52.5% | -2.1% | -1067 |
+| 55%-60% | 132 | 54.5% | 57.4% | -2.8% | -494 |
+| 60%-65% | 80 | 55.0% | 62.0% | -7.0% | -222 |
+| 65%-70% | 41 | 61.0% | 67.1% | -6.1% | +98 |
+| 70%-80% | 27 | 48.1% | 73.1% | -25.0% | -451 |
+| 80%-101% | 5 | 60.0% | 85.3% | -25.3% | +6 |
 
 A bucket needs roughly 50 calls before its hit rate says anything; below that the difference is noise.
 
@@ -121,11 +133,11 @@ A bucket needs roughly 50 calls before its hit rate says anything; below that th
 
 | Tier | Calls | Hit rate | Model said | Book said | Net/$100 |
 |---|---|---|---|---|---|
-| STRONG | 6 | 66.7% | 60.4% | 49.8% | +118 |
-| MODERATE | 6 | 50.0% | 59.0% | 50.1% | -85 |
-| LEAN | 12 | 58.3% | 54.9% | 50.4% | +68 |
-| WEAK | 17 | 58.8% | 66.4% | 48.0% | +111 |
-| UNTIERED | 25 | 28.0% | 39.8% | 42.5% | -1239 |
+| STRONG | 107 | 57.9% | 59.4% | 50.0% | +346 |
+| MODERATE | 34 | 47.1% | 60.2% | 49.9% | -592 |
+| LEAN | 80 | 58.8% | 53.9% | 49.5% | +693 |
+| WEAK | 123 | 54.5% | 63.5% | 48.6% | +42 |
+| UNTIERED | 212 | 36.3% | 39.8% | 43.0% | -5288 |
 
 WEAK exists on the assumption the book is right when it disagrees sharply. If WEAK hits nearer the model column than the book column, that assumption is costing money and the tier rule should change.
 
@@ -133,11 +145,11 @@ WEAK exists on the assumption the book is right when it disagrees sharply. If WE
 
 | Market | Calls | Hit rate | Model said | Net/$100 |
 |---|---|---|---|---|
-| player_anytime_td [anytime_td_v1] | 15 | 6.7% | 29.9% | -1276 |
-| player_pass_yds | 3 | 66.7% | 59.7% | +56 |
-| player_reception_yds | 19 | 63.2% | 59.1% | +236 |
-| player_receptions | 19 | 57.9% | 61.5% | +68 |
-| player_rush_yds | 10 | 50.0% | 58.0% | -110 |
+| player_anytime_td [anytime_td_v1] | 126 | 34.1% | 30.8% | -2305 |
+| player_pass_yds | 32 | 50.0% | 59.6% | -347 |
+| player_reception_yds | 157 | 51.0% | 57.9% | -1466 |
+| player_receptions | 157 | 52.2% | 58.1% | -845 |
+| player_rush_yds | 84 | 57.1% | 59.0% | +163 |
 
 Receptions and receiving yards are the only backtested markets; rushing and anytime TD have no backtest at all, so their rows here are the first evidence either way.
 
@@ -146,7 +158,7 @@ Receptions and receiving yards are the only backtested markets; rushing and anyt
 | Teammate Questionable at pricing | Calls | Hit rate | Model said | Net/$100 |
 |---|---|---|---|---|
 | yes | 31 | 41.9% | 51.4% | -777 |
-| no | 35 | 51.4% | 54.5% | -249 |
+| no | 525 | 48.8% | 52.1% | -4022 |
 
 Those rows assume the teammate played. When he sat, they graded against a line priced on the wrong roster; if 'yes' runs apart from 'no', that is the cost.
 
@@ -155,18 +167,31 @@ Those rows assume the teammate played. When he sat, they graded against a line p
 | Week | Calls | Hit rate | Net/$100 |
 |---|---|---|---|
 | 3 | 66 | 47.0% | -1026 |
+| 4 | 490 | 48.6% | -3773 |
 
 ### Closing line value
 
-51 calls have both snapshots. The line moved toward the call 5.9% of the time (mean move +0.10).
+393 calls have both snapshots. The line moved toward the call 19.8% of the time (mean move +0.18).
 
 Beating the close consistently is the signal that survives small samples. Winning without it is variance.
 
+### Worth a look
+
+No marked line has been graded yet.
+
 ### Market blend (shadow: nothing priced from it)
 
-15 settled anytime_td_v1 calls in this pricing model; the blend weight is not estimated below 300. The record is filling.
+126 settled anytime_td_v1 calls in this pricing model; the blend weight is not estimated below 300. The record is filling.
 
-51 settled yardage calls (receptions, receiving, rushing and QB passing yards) in this pricing model; the blend weight is not estimated below 300. The record is filling.
+430 settled yardage calls (receptions, receiving, rushing and QB passing yards); books sleeper (an intercept per book and per market; the intercept row below is sleeper's).
+
+| term | weight | 95% CI (game-clustered) |
+|---|---|---|
+| intercept | -0.128 | (-0.986, +0.759) |
+| logit(model) | +0.321 | (-0.211, +0.982) |
+| logit(market) | -0.061 | (-1.589, +1.341) |
+
+Leave-one-week-out log loss on the same calls: model 0.7032, market 0.6947, blend 0.7129 (430 calls).
 
 ## Engine props-v1.0
 
@@ -227,6 +252,10 @@ Those rows assume the teammate played. When he sat, they graded against a line p
 24 calls have both snapshots. The line moved toward the call 33.3% of the time (mean move +0.04).
 
 Beating the close consistently is the signal that survives small samples. Winning without it is variance.
+
+### Worth a look
+
+No marked line has been graded yet.
 
 ### Market blend (shadow: nothing priced from it)
 
@@ -294,11 +323,101 @@ Those rows assume the teammate played. When he sat, they graded against a line p
 
 Beating the close consistently is the signal that survives small samples. Winning without it is variance.
 
+### Worth a look
+
+No marked line has been graded yet.
+
 ### Market blend (shadow: nothing priced from it)
 
 0 settled anytime_td_v1 calls in this pricing model; the blend weight is not estimated below 300. The record is filling.
 
 24 settled yardage calls (receptions, receiving, rushing and QB passing yards) in this pricing model; the blend weight is not estimated below 300. The record is filling.
+
+## Engine props-v1.31
+
+68 settled calls, 33 winners (48.5%), net -590 per $100 flat-staked.
+
+### Calibration: does the model's probability mean anything?
+
+| Model prob | Calls | Hit rate | Stated | Diff | Net/$100 |
+|---|---|---|---|---|---|
+| 50%-55% | 14 | 57.1% | 52.3% | +4.9% | +49 |
+| 55%-60% | 17 | 47.1% | 57.5% | -10.4% | -299 |
+| 60%-65% | 13 | 53.8% | 62.2% | -8.3% | -82 |
+| 65%-70% | 7 | 42.9% | 67.9% | -25.1% | -223 |
+| 70%-80% | 1 | 100.0% | 72.7% | +27.3% | +78 |
+
+A bucket needs roughly 50 calls before its hit rate says anything; below that the difference is noise.
+
+### Tier validity: is a big gap the book knowing something?
+
+| Tier | Calls | Hit rate | Model said | Book said | Net/$100 |
+|---|---|---|---|---|---|
+| STRONG | 20 | 45.0% | 60.4% | 50.0% | -352 |
+| MODERATE | 2 | 0.0% | 62.6% | 49.7% | -200 |
+| LEAN | 8 | 50.0% | 53.4% | 49.1% | -67 |
+| WEAK | 11 | 63.6% | 63.4% | 49.7% | +119 |
+| UNTIERED | 27 | 48.1% | 41.8% | 44.6% | -90 |
+
+WEAK exists on the assumption the book is right when it disagrees sharply. If WEAK hits nearer the model column than the book column, that assumption is costing money and the tier rule should change.
+
+### By market
+
+| Market | Calls | Hit rate | Model said | Net/$100 |
+|---|---|---|---|---|
+| player_anytime_td [anytime_td_v1] | 16 | 50.0% | 34.5% | +150 |
+| player_pass_yds | 4 | 25.0% | 59.5% | -221 |
+| player_reception_yds | 19 | 42.1% | 58.8% | -475 |
+| player_receptions | 19 | 47.4% | 58.1% | -300 |
+| player_rush_yds | 10 | 70.0% | 57.5% | +257 |
+
+Receptions and receiving yards are the only backtested markets; rushing and anytime TD have no backtest at all, so their rows here are the first evidence either way.
+
+### Priced with a Questionable teammate
+
+| Teammate Questionable at pricing | Calls | Hit rate | Model said | Net/$100 |
+|---|---|---|---|---|
+| yes | 17 | 52.9% | 55.3% | -34 |
+| no | 51 | 47.1% | 51.9% | -556 |
+
+Those rows assume the teammate played. When he sat, they graded against a line priced on the wrong roster; if 'yes' runs apart from 'no', that is the cost.
+
+### By week
+
+| Week | Calls | Hit rate | Net/$100 |
+|---|---|---|---|
+| 4 | 68 | 48.5% | -590 |
+
+### Closing line value
+
+52 calls have both snapshots. The line moved toward the call 15.4% of the time (mean move +0.38).
+
+Beating the close consistently is the signal that survives small samples. Winning without it is variance.
+
+### The snap-change rule's calls
+
+Receiving calls whose target share the rule raised, lowered, or left alone. If the rule overshoots, the raised group's miss runs negative (and the lowered group's positive).
+
+| Market | Rule | Calls | Hit rate | Model said | Book said | Mean miss |
+|---|---|---|---|---|---|---|
+| catches | raised | 8 | 62.5% | 58.2% | 50.2% | +0.77 |
+| catches | lowered | 10 | 40.0% | 57.0% | 49.3% | +1.30 |
+| catches | not moved | 1 | 0.0% | 68.8% | 59.7% | +2.21 |
+| receiving yards | raised | 8 | 50.0% | 59.2% | 49.9% | +18.25 |
+| receiving yards | lowered | 10 | 40.0% | 58.8% | 49.8% | +20.08 |
+| receiving yards | not moved | 1 | 0.0% | 55.2% | 49.7% | +17.28 |
+
+A group needs about 50 calls before its numbers say anything.
+
+### Worth a look
+
+No marked line has been graded yet.
+
+### Market blend (shadow: nothing priced from it)
+
+16 settled anytime_td_v1 calls in this pricing model; the blend weight is not estimated below 300. The record is filling.
+
+52 settled yardage calls (receptions, receiving, rushing and QB passing yards) in this pricing model; the blend weight is not estimated below 300. The record is filling.
 
 ## Engine props-v1.25
 
@@ -361,6 +480,10 @@ Those rows assume the teammate played. When he sat, they graded against a line p
 48 calls have both snapshots. The line moved toward the call 18.8% of the time (mean move +0.19).
 
 Beating the close consistently is the signal that survives small samples. Winning without it is variance.
+
+### Worth a look
+
+No marked line has been graded yet.
 
 ### Market blend (shadow: nothing priced from it)
 
@@ -433,6 +556,10 @@ Those rows assume the teammate played. When he sat, they graded against a line p
 
 Beating the close consistently is the signal that survives small samples. Winning without it is variance.
 
+### Worth a look
+
+No marked line has been graded yet.
+
 ### Market blend (shadow: nothing priced from it)
 
 8 settled anytime_td_v1 calls in this pricing model; the blend weight is not estimated below 300. The record is filling.
@@ -499,12 +626,153 @@ Those rows assume the teammate played. When he sat, they graded against a line p
 
 Beating the close consistently is the signal that survives small samples. Winning without it is variance.
 
+### Worth a look
+
+No marked line has been graded yet.
+
 ### Market blend (shadow: nothing priced from it)
 
 120 settled anytime_td_v1 calls in this pricing model; the blend weight is not estimated below 300. The record is filling.
 
 290 settled yardage calls (receptions, receiving, rushing and QB passing yards) in this pricing model; the blend weight is not estimated below 300. The record is filling.
 
+## Engine props-v1.28
+
+495 settled calls, 245 winners (49.5%), net -3513 per $100 flat-staked.
+
+### Calibration: does the model's probability mean anything?
+
+| Model prob | Calls | Hit rate | Stated | Diff | Net/$100 |
+|---|---|---|---|---|---|
+| 50%-55% | 107 | 49.5% | 52.7% | -3.2% | -1203 |
+| 55%-60% | 120 | 54.2% | 57.4% | -3.2% | -551 |
+| 60%-65% | 71 | 54.9% | 62.1% | -7.2% | -377 |
+| 65%-70% | 47 | 51.1% | 67.2% | -16.1% | -650 |
+| 70%-80% | 22 | 72.7% | 73.0% | -0.3% | +551 |
+| 80%-101% | 5 | 60.0% | 82.6% | -22.6% | -4 |
+
+A bucket needs roughly 50 calls before its hit rate says anything; below that the difference is noise.
+
+### Tier validity: is a big gap the book knowing something?
+
+| Tier | Calls | Hit rate | Model said | Book said | Net/$100 |
+|---|---|---|---|---|---|
+| STRONG | 94 | 46.8% | 59.7% | 50.1% | -1543 |
+| MODERATE | 25 | 44.0% | 59.5% | 49.4% | -545 |
+| LEAN | 73 | 54.8% | 53.5% | 49.0% | -4 |
+| WEAK | 122 | 59.8% | 63.9% | 50.2% | +782 |
+| UNTIERED | 181 | 42.5% | 40.6% | 43.8% | -2202 |
+
+WEAK exists on the assumption the book is right when it disagrees sharply. If WEAK hits nearer the model column than the book column, that assumption is costing money and the tier rule should change.
+
+### By market
+
+| Market | Calls | Hit rate | Model said | Net/$100 |
+|---|---|---|---|---|
+| player_anytime_td [anytime_td_v1] | 108 | 38.0% | 31.9% | -1002 |
+| player_pass_yds | 27 | 40.7% | 58.5% | -738 |
+| player_reception_yds | 141 | 51.1% | 58.1% | -1282 |
+| player_receptions | 144 | 54.9% | 59.3% | -495 |
+| player_rush_yds | 75 | 56.0% | 58.7% | +4 |
+
+Receptions and receiving yards are the only backtested markets; rushing and anytime TD have no backtest at all, so their rows here are the first evidence either way.
+
+### Priced with a Questionable teammate
+
+| Teammate Questionable at pricing | Calls | Hit rate | Model said | Net/$100 |
+|---|---|---|---|---|
+| yes | 122 | 54.9% | 53.8% | +93 |
+| no | 373 | 47.7% | 52.5% | -3606 |
+
+Those rows assume the teammate played. When he sat, they graded against a line priced on the wrong roster; if 'yes' runs apart from 'no', that is the cost.
+
+### By week
+
+| Week | Calls | Hit rate | Net/$100 |
+|---|---|---|---|
+| 4 | 495 | 49.5% | -3513 |
+
+### Closing line value
+
+376 calls have both snapshots. The line moved toward the call 13.0% of the time (mean move +0.10).
+
+Beating the close consistently is the signal that survives small samples. Winning without it is variance.
+
+### Worth a look
+
+No marked line has been graded yet.
+
+### Market blend (shadow: nothing priced from it)
+
+108 settled anytime_td_v1 calls in this pricing model; the blend weight is not estimated below 300. The record is filling.
+
+387 settled yardage calls (receptions, receiving, rushing and QB passing yards); books sleeper (an intercept per book and per market; the intercept row below is sleeper's).
+
+| term | weight | 95% CI (game-clustered) |
+|---|---|---|
+| intercept | -0.226 | (-0.576, +0.108) |
+| logit(model) | +0.603 | (-0.058, +1.209) |
+| logit(market) | -0.392 | (-2.037, +1.286) |
+
+No out-of-sample check yet: it holds out one week at a time and needs at least two (1 settled so far).
+
 ## Bet journal
 
-No bets logged yet. Log one with `python props/journal.py add ...` (all four checklist answers required); it is graded here every Tuesday.
+23 bets logged: 22 graded, 1 void (push or did not play), 0 open. Kept apart from the model's record: these are the user's handicapped bets.
+
+**Late-line value, the first number to watch:** 16 of 23 bets got a better number than the last line Sleeper showed before kickoff (70%; 1 tied); mean move your way +10.09 points. Beating the late line shows up in about 100-200 bets; the win rate needs far more. It is the last line the capture logged (usually a few hours out), not the true close.
+
+| Bets | Won | Win rate | Break-even at these prices | Net per $100 staked |
+|---|---|---|---|---|
+| 22 | 12 | 55% | 55% | -3.7 |
+
+A few dozen bets say little; about 100 is where the win rate starts to separate from luck.
+
+**By angle** (chosen when the bet was logged):
+
+| Angle | Bets | Graded | Won | Win rate | Break-even | Net per $100 | Beat the late line |
+|---|---|---|---|---|---|---|---|
+| injury redistribution | 2 | 2 | 0 | 0% | 59% | -100.0 | 1 of 2 |
+| role change | 12 | 11 | 6 | 55% | 57% | -5.6 | 9 of 12 |
+| teammate returning | 1 | 1 | 1 | 100% | 55% | +82.0 | 1 of 1 |
+| other | 8 | 8 | 5 | 62% | 53% | +12.2 | 5 of 8 |
+
+Each angle is its own small sample: read the late-line column first.
+
+**Entries** (Sleeper Power Plays: every leg must hit):
+
+| Logged | Legs | Stake | Pays (total) | Legs won / graded | Result | Net |
+|---|---|---|---|---|---|---|
+| week 4 (after kickoff) | Dalton Schultz under, Woody Marks under, Tyler Allgeier under, D'Andre Swift over, Luther Burden III over | $5 | $100 | 3 / 5 | lost | -5.00 |
+| week 4 (after kickoff) | CeeDee Lamb yes, Ja'Marr Chase yes, Jaxon Smith-Njigba yes, Drake London yes | $5 | $103 | 1 / 4 | lost | -5.00 |
+| week 4 (after kickoff) | Jahmyr Gibbs over, Amon-Ra St. Brown over, Chuba Hubbard over, Darren Waller over | $5 | $50 | 2 / 4 | lost | -5.00 |
+| week 4 (after kickoff) | Ashton Jeanty under, Rashee Rice over, Courtland Sutton over, Mike Evans under | $5 | $47.5 | 1 / 3 | lost | -5.00 |
+| week 4 (after kickoff) | Michael Penix Jr. over, Drake London over, Juwan Johnson over, Alvin Kamara over, Brian Robinson over, Tyler Shough over | $5 | $102.5 | 5 / 6 | lost | -5.00 |
+
+Entries logged after kickoff are kept but are not clean pre-game decisions; the legs are still graded one by one on the scorecard.
+
+| Week | Player | Bet | Angle | Price | Late line | Result | Net | The change | Your scenario |
+|---|---|---|---|---|---|---|---|---|---|
+| 4 | Dalton Schultz | under 40.5 rec yds | teammate returning | -122 | 40.5 -130 (-0) | won | +82 | Role reads from the week-4 board: Houston redistributes around Collins and Montgomery, Love took Arizona's backfield, Chicago leans on Swift and Burden with Keenum | — |
+| 4 | Woody Marks | under 36.5 rush yds | role change | -122 | 35.5 -125 (+1) | won | +82 | Role reads from the week-4 board: Houston redistributes around Collins and Montgomery, Love took Arizona's backfield, Chicago leans on Swift and Burden with Keenum | — |
+| 4 | Tyler Allgeier | under 21.5 rush yds | role change | -122 | 21.5 -130 (-0) | lost | -100 | Role reads from the week-4 board: Houston redistributes around Collins and Montgomery, Love took Arizona's backfield, Chicago leans on Swift and Burden with Keenum | — |
+| 4 | D'Andre Swift | over 63.5 rush yds | role change | -122 | 63.5 -132 (+0) | lost | -100 | Role reads from the week-4 board: Houston redistributes around Collins and Montgomery, Love took Arizona's backfield, Chicago leans on Swift and Burden with Keenum | — |
+| 4 | Luther Burden III | over 46.5 rec yds | role change | -122 | 47.5 -127 (+1) | won | +82 | Role reads from the week-4 board: Houston redistributes around Collins and Montgomery, Love took Arizona's backfield, Chicago leans on Swift and Burden with Keenum | — |
+| 4 | CeeDee Lamb | yes anytime TD | other | +113 | — | won | +113 | Anytime-TD Power Play on four lead receivers (no board read behind it; the TD model is untested) | — |
+| 4 | Ja'Marr Chase | yes anytime TD | other | +113 | — | lost | -100 | Anytime-TD Power Play on four lead receivers (no board read behind it; the TD model is untested) | — |
+| 4 | Jaxon Smith-Njigba | yes anytime TD | other | +113 | — | lost | -100 | Anytime-TD Power Play on four lead receivers (no board read behind it; the TD model is untested) | — |
+| 4 | Drake London | yes anytime TD | other | +113 | — | lost | -100 | Anytime-TD Power Play on four lead receivers (no board read behind it; the TD model is untested) | — |
+| 4 | Jahmyr Gibbs | over 4.5 catches | role change | -128 | 4.5 -143 (+0) | lost | -100 | SNF read: Carolina's reshuffled offense (Hubbard's workload, Waller as the safety valve) and Detroit's receiving roles (Gibbs' bigger share, St. Brown back to himself) | — |
+| 4 | Amon-Ra St. Brown | over 7 catches | other | -128 | 6.5 -175 (-0.5) | won | +78 | SNF read: Carolina's reshuffled offense (Hubbard's workload, Waller as the safety valve) and Detroit's receiving roles (Gibbs' bigger share, St. Brown back to himself) | — |
+| 4 | Chuba Hubbard | over 65.5 rush yds | role change | -128 | 65.5 -130 (+0) | won | +78 | SNF read: Carolina's reshuffled offense (Hubbard's workload, Waller as the safety valve) and Detroit's receiving roles (Gibbs' bigger share, St. Brown back to himself) | — |
+| 4 | Darren Waller | over 3.5 catches | role change | -128 | 3.5 -125 (+0) | lost | -100 | SNF read: Carolina's reshuffled offense (Hubbard's workload, Waller as the safety valve) and Detroit's receiving roles (Gibbs' bigger share, St. Brown back to himself) | — |
+| 4 | Ashton Jeanty | under 58.5 rush yds | other | -132 | 58.5 -132 (-0) | won | +76 | 1pm PT what-ifs: Las Vegas trails and abandons the run, Rice keeps the targets, Sutton as Nix's go-to, Evans limited | — |
+| 4 | Rashee Rice | over 4.5 catches | role change | -132 | 4.5 -164 (+0) | void | +0 | 1pm PT what-ifs: Las Vegas trails and abandons the run, Rice keeps the targets, Sutton as Nix's go-to, Evans limited | — |
+| 4 | Courtland Sutton | over 3 catches | role change | -132 | 3.5 +101 (+0.5) | lost | -100 | 1pm PT what-ifs: Las Vegas trails and abandons the run, Rice keeps the targets, Sutton as Nix's go-to, Evans limited | — |
+| 4 | Mike Evans | under 3.5 catches | injury redistribution | -132 | 3.5 -118 (-0) | lost | -100 | 1pm PT what-ifs: Las Vegas trails and abandons the run, Rice keeps the targets, Sutton as Nix's go-to, Evans limited | — |
+| 4 | Michael Penix Jr. | over 0.5 pass yds | other | -153 | 226.5 -130 (+226) | won | +65 | PrizePicks 6-pick Power Play (guarantee pick on Penix, demon on Juwan Johnson): Saints throwing (Shough, Johnson), London on yards over catches by the luck-free check, Brian Robinson on ordinary volume, Kamara as Etienne's replacement -- the Kamara leg needed the opposite script to the Saints passing legs | — |
+| 4 | Drake London | over 80.5 rec yds | role change | -153 | 81.5 -130 (+1) | won | +65 | PrizePicks 6-pick Power Play (guarantee pick on Penix, demon on Juwan Johnson): Saints throwing (Shough, Johnson), London on yards over catches by the luck-free check, Brian Robinson on ordinary volume, Kamara as Etienne's replacement -- the Kamara leg needed the opposite script to the Saints passing legs | — |
+| 4 | Juwan Johnson | over 4.5 catches | role change | -153 | 4.5 +105 (+0) | won | +65 | PrizePicks 6-pick Power Play (guarantee pick on Penix, demon on Juwan Johnson): Saints throwing (Shough, Johnson), London on yards over catches by the luck-free check, Brian Robinson on ordinary volume, Kamara as Etienne's replacement -- the Kamara leg needed the opposite script to the Saints passing legs | — |
+| 4 | Alvin Kamara | over 35.5 rush yds | injury redistribution | -153 | 36.5 -130 (+1) | lost | -100 | PrizePicks 6-pick Power Play (guarantee pick on Penix, demon on Juwan Johnson): Saints throwing (Shough, Johnson), London on yards over catches by the luck-free check, Brian Robinson on ordinary volume, Kamara as Etienne's replacement -- the Kamara leg needed the opposite script to the Saints passing legs | — |
+| 4 | Brian Robinson | over 29.5 rush yds | role change | -153 | 29.5 -130 (+0) | won | +65 | PrizePicks 6-pick Power Play (guarantee pick on Penix, demon on Juwan Johnson): Saints throwing (Shough, Johnson), London on yards over catches by the luck-free check, Brian Robinson on ordinary volume, Kamara as Etienne's replacement -- the Kamara leg needed the opposite script to the Saints passing legs | — |
+| 4 | Tyler Shough | over 258.5 pass yds | other | -153 | 260.5 -128 (+2) | won | +65 | PrizePicks 6-pick Power Play (guarantee pick on Penix, demon on Juwan Johnson): Saints throwing (Shough, Johnson), London on yards over catches by the luck-free check, Brian Robinson on ordinary volume, Kamara as Etienne's replacement -- the Kamara leg needed the opposite script to the Saints passing legs | — |
