@@ -727,3 +727,22 @@ def test_spikes_are_not_pass_attempts():
     df = pd.DataFrame([dict(base, play_type="pass", pass_attempt=1, receiver_player_id="w"),
                        dict(base, play_type="qb_spike", pass_attempt=1)])
     assert RS.team_volume(df, "DAL")[0]["att"] == 1
+
+
+
+def test_the_rushing_plus_receiving_read():
+    d = RS.rush_rec_read(line=52.5, mult_over=1.70, mult_under=1.87, proj_carries=15.8, proj_catches=3.1,
+                         run_rate=4.3, catch_rate=7.0, sd=24.0, book_carries=13.5, book_catches=2.5)
+    assert d["fav"] == "Over" and d["coin"] > 52.5
+    rate = (15.8 * 4.3 + 3.1 * 7.0) / 18.9
+    assert d["touch_rate"] == pytest.approx(rate) and d["need"] == pytest.approx(53 / rate)
+    assert d["air_share"] == pytest.approx(3.1 * 7.0 / (15.8 * 4.3 + 3.1 * 7.0))
+    s = RS.rush_rec_sentence(d)
+    assert s.startswith("The book's line is 52.5, Over favoured (a coin flip at about")
+    assert "53 yards takes about" in s and "we project 18.9 (15.8 carries, 3.1 catches)" in s
+    assert "The book's own carries and catches lines add to 16 touches." in s
+    assert "if his team falls behind, that part holds up" in s
+    assert "not shown until the combined market passes its calibration check" in s
+    assert RS.rush_rec_read(None) is None
+    bare = RS.rush_rec_read(line=40.5)
+    assert RS.rush_rec_sentence(bare).startswith("The book's line is 40.5.")

@@ -7450,3 +7450,18 @@ by the user.
   Over chance (1 / multiplier, or American breakeven, scaled to sum to 1) turned into a
   volume with our simulation's game-to-game spread for that player.
 - Report text only: no price moves.
+
+## 2026-10-05 (173) -- rushing + receiving yards: read now, priced only after a calibration check
+
+- User, after a Power Play lost on Kamara's rushing yards while the Saints' passing legs
+  hit: bring in rushing + receiving yards, the leg that survives either script for a back.
+- Step 1 (this change): Sleeper's combined line is fetched with its payouts; the report
+  reads the no-vig coin flip, the touches the line takes at his luck-free yards a carry and a
+  catch (each over his last 10 games), against our touches and the book's carries + catches
+  lines, and the share of his yards from catches.
+- Not yet: our model's own chance on the combined line. The simulation draws a team's
+  runs and passes independently, so a back's carries and targets don't trade off with the
+  game script; summing his rushing and receiving draws may misstate the spread. Step 2 is a
+  calibration check of the combined sum on 2022-25, rule set before it runs; if it fails,
+  tying a team's runs and passes to the script is a model change that goes through the
+  validation loop.
