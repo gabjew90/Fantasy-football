@@ -616,3 +616,88 @@ def test_a_quarterbacks_cameo_games_stay_out_of_his_window():
 def test_the_quarterback_read_says_whether_the_yards_line_asks_more():
     d = RS.qb_yards_read(completions_line=23.5, yards_line=260.5, proj_completions=23.1, model_ypc=10.0)
     assert d["read"] == "yards line rich" and "needs extra completions or a long one" in RS.qb_yards_sentence(d)
+
+
+
+def test_the_books_coin_flip_volume():
+    # Bijan, week 4: 19.5 carries, Over 1.87x / Under 1.70x -> a fair 47.6% Over
+    p = RS.fair_over(1.87, 1.70)
+    assert p == pytest.approx((1 / 1.87) / (1 / 1.87 + 1 / 1.70))
+    assert RS.fair_volume(19.5, p, 4.5) == pytest.approx(19.23, abs=0.02)
+    assert RS.fair_volume(5.5, RS.fair_over(price_over=-182, price_under=107), 2.0) > 5.5, "a favoured Over sits above"
+    assert RS.fair_volume(19.5, None, 4.5) is None and RS.fair_over(None, None) is None
+    d = dict(RS.carry_yards_read(19.5, 89.5, model_ypc=4.9, proj_carries=17.5, carries_fav="Under"), book_fair=19.2)
+    assert "The book's own carries line is 19.5, Under favoured (a coin flip at about 19.2)" in RS.carry_yards_sentence(d)
+
+
+def test_team_volume_against_our_projection():
+    import pandas as pd
+    def play(week, pos, typ, **kw):
+        base = dict(week=week, posteam=pos, home_team="DAL", away_team="NYG", home_score=20, away_score=28,
+                    play_type=typ, sack=0, pass_attempt=0, qb_scramble=0, qb_kneel=0, receiver_player_id=None,
+                    passer_player_name=None, score_differential=0)
+        base.update(kw)
+        return base
+    rows = ([play(1, "DAL", "pass", pass_attempt=1, receiver_player_id="w", passer_player_name="D.Prescott")] * 30
+            + [play(1, "DAL", "pass", pass_attempt=1, passer_player_name="D.Prescott")] * 2          # throwaways
+            + [play(1, "DAL", "pass", pass_attempt=1, sack=1)] * 3                                  # sacks
+            + [play(1, "DAL", "run")] * 20 + [play(1, "DAL", "run", qb_scramble=1)] * 2
+            + [play(1, "DAL", "run", qb_kneel=1)] * 3 + [play(1, "NYG", "run")] * 25)
+    tv = RS.team_volume(pd.DataFrame(rows), "DAL")
+    keep = {k: v for k, v in tv[0].items() if k not in ("state", "lead_share", "trail_share")}
+    assert keep == {"week": 1, "opp": "vs NYG", "score": "20-28", "margin": -8.0, "att": 32, "sacks": 3,
+                    "carries": 20, "scrambles": 2, "targets": 30, "qb": "D.Prescott"}
+    assert tv[0]["state"]["close"] == {"plays": 57, "att": 32, "runs": 22} and tv[0]["lead_share"] == 0.0
+    chk = RS.team_volume_check(tv, our_targets=30.0, our_runs=22.0)
+    assert chk["our_att"] == pytest.approx(32.0) and chk["att_inside"] and chk["runs_inside"]
+    assert "Both sit inside the range of his games this season." in " ".join(RS.team_volume_lines("DAL", tv, chk))
+    chk = RS.team_volume_check(tv, our_targets=40.0, our_runs=30.0)
+    assert "sit outside every game this season" in " ".join(RS.team_volume_lines("DAL", tv, chk))
+    assert RS.team_volume(None, "DAL") == [] and RS.team_volume_lines("DAL", [], None) == []
+
+
+
+def test_the_script_vegas_expects_sets_the_pass_share():
+    rows = [{"att": 30, "carries": 20, "scrambles": 2, "targets": 28, "score": "", "week": 1, "opp": "", "sacks": 0,
+             "qb": "", "state": {"lead": {"plays": 40, "att": 14, "runs": 26}, "close": {"plays": 60, "att": 33, "runs": 27},
+                                 "trail": {"plays": 20, "att": 14, "runs": 6}}}]
+    sr = RS.script_rates(rows)
+    assert sr["lead"][0] == pytest.approx(14 / 40) and sr["trail"][2] == 20
+    assert RS.expected_state(-9.5) == "lead" and RS.expected_state(9.5) == "trail" and RS.expected_state(-1.5) == "close"
+    league = {"lead": 0.45, "close": 0.56, "trail": 0.63}
+    mix = {"big favourite": {"lead": 0.4, "close": 0.5, "trail": 0.1}}
+    chk = RS.team_volume_check(rows, our_targets=28.0, our_runs=22.0, team_spread=-9.5, league=league, mix=mix)
+    plays = 30.0 + 22.0
+    sh = {"lead": (14 + 60 * 0.45) / (40 + 60), "close": (33 + 60 * 0.56) / (60 + 60), "trail": (14 + 60 * 0.63) / (20 + 60)}
+    share = 0.4 * sh["lead"] + 0.5 * sh["close"] + 0.1 * sh["trail"]
+    assert chk["state"] == "lead" and chk["script_att"] == pytest.approx(plays * share)
+    text = " ".join(RS.team_volume_lines("DAL", rows, chk))
+    assert "Teams playing as a favourite by 7+ spent their plays 40% ahead by 8+, 50% within one score" in text
+    assert "ahead by 8+ 35% (40 plays)" in text
+    far = RS.team_volume_check(rows, our_targets=28.0, our_runs=22.0, team_spread=-9.5,
+                               league={"lead": 0.05, "close": 0.05, "trail": 0.05}, mix=mix)
+    assert not far["script_inside"] and "read it as the direction the script pushes" in " ".join(
+        RS.team_volume_lines("DAL", rows, far))
+    assert RS.blended_share(14, 26, None) == pytest.approx(14 / 40)
+
+
+
+def test_league_script_shares():
+    import pandas as pd
+    df = pd.DataFrame({"posteam": ["A", "A", "A", "B"], "play_type": ["pass", "run", "pass", "run"],
+                       "pass_attempt": [1, 0, 1, 0], "sack": [0, 0, 1, 0], "qb_scramble": [0, 0, 0, 0],
+                       "qb_kneel": [0, 0, 0, 0], "score_differential": [10, 10, 0, -9]})
+    lg = RS.league_script_shares(df)
+    assert lg == {"lead": 0.5, "trail": 0.0}, "the sack is not an attempt; no close plays but the sack"
+
+
+
+def test_league_state_mix_by_pregame_line():
+    import pandas as pd
+    # home team H favoured by 7 (spread_line +7): H's plays 2 ahead, 1 close; road team R's 1 behind, 1 close
+    df = pd.DataFrame({"posteam": ["H", "H", "H", "R", "R"], "home_team": "H", "play_type": "pass",
+                       "qb_kneel": 0, "spread_line": 7.0, "score_differential": [10, 9, 0, -10, 3]})
+    mix = RS.league_state_mix(df)
+    assert mix["big favourite"] == {"lead": pytest.approx(2 / 3), "close": pytest.approx(1 / 3), "trail": 0.0}
+    assert mix["big underdog"] == {"lead": 0.0, "close": 0.5, "trail": 0.5}
+    assert RS.line_bucket(-9.5) == "big favourite" and RS.line_bucket(4) == "underdog" and RS.line_bucket(1.5) == "close"

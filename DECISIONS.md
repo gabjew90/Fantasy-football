@@ -7432,3 +7432,21 @@ by the user.
 - User: replace "which groups mix" with "which groups don't mix". The close of every
   narrative lists only conflicting pairs, each with its reason, plus pairs that mix only
   under a stated script, then one line saying everything else mixes.
+
+## 2026-10-05 (172) -- team volume is checked against the season and the script; the book's coin-flip volume
+
+- The report gets a "Team volume" section: every game this season per team (score, share
+  of plays ahead / behind by 8+, pass attempts without sacks, sacks, designed carries,
+  scrambles, QB), our projected passes (targets at the team's own targets-per-attempt
+  rate) and runs (scrambles included, as the model counts) against the range of those
+  games, and a script check (user: "it should take into account if they were losing or
+  winning"): how teams under this kind of line (favourite / underdog by 3.5-7 or 7+,
+  close) spent their plays this season, times this team's own pass share in each state,
+  blended toward the league's with 60 plays of weight (picked, not fitted -- Dallas had 17
+  plays ahead by 8+). Applying the "ahead" rate to every snap gave 25 passes / 36 runs for
+  a 9.5-point favourite, outside every game it played; the measured mix (18% ahead, 78%
+  close) gives 36 / 26.
+- Carries, catches and completions reads quote the book's coin-flip volume: the no-vig
+  Over chance (1 / multiplier, or American breakeven, scaled to sum to 1) turned into a
+  volume with our simulation's game-to-game spread for that player.
+- Report text only: no price moves.
