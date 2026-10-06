@@ -1,6 +1,6 @@
 {
  "algorithm": "nfl-release-sha256-lf-1",
- "file_count": 189,
+ "file_count": 190,
  "files": {
   "CHAT.md": "c6ac5c21bb62851bed3ec7e0f3654752834ebeface768ce2dcdc3e6451bd2327",
   "config.yaml": "7e7e2de6f52d3bbf13c0d7c6850ea6925a2d279fa714546e48b26ec3354f695e",
@@ -132,9 +132,10 @@
   "manager/yahoo_context.py": "0aa541b5c73457d09f4aa3bbfdda14d66d8051835370073fb9f2a12f57f9ab34",
   "manager/yahoo_sync.py": "3ea0dba0ea5b03e561952cbdd2b40eba7b9a7c328691258915b7c29aadc54b90",
   "nfl.py": "78a94fe768aa2d271772852a8961e2e25fb6577d23f67f60f1a1a6d3bc4a87ac",
-  "props/engine/SKILL.md": "c7c9a76a22c6beb9d3fd4ca91c890e1092f2c460ae158b6876f4d41555b96ed4",
+  "props/engine/SKILL.md": "7c47f4db29075187747a59a6d65442f844637a99ab47536d32d3fbab574ca121",
   "props/engine/resources/calibration_2025.csv": "47e3922c7af818307831d70a3d2be4333200f3aee1d94dc6bbf6e0e9ccee4ac8",
   "props/engine/resources/data_source_matrix.md": "2088a5ebe6164a75c11331367fda734d4b10ea217704320321a3f2aec6bb9c2b",
+  "props/engine/resources/engine_overview.md": "1b7dd3cdc173dad2ef46142da5e734032e0202415faab12a95650451db331b01",
   "props/engine/resources/execution_protocol.md": "5f54fb23a77d60ecc947d44b6f18ecf67c4357d6b49c70bc937726c1c14016c1",
   "props/engine/resources/line_archive.md": "baf1b6b97ec439bdf26b73dc4c3ae23d0c4ee9f502db4be7baae70390cdb5c45",
   "props/engine/resources/methodology.md": "73ab60b65ad076eeb6e373e06e79b37b6f8c178ab3271b8aa1d3686c001a5d30",
@@ -192,6 +193,6 @@
   "tiers.csv": "04a1a79d43e9f2445ba3dc4ea262b00fbd58efea1f41e8b0393cb4c7f8afee41",
   "tiers.keefamania.csv": "11e6546b56caa807a572da86d5c3d81097bafd2d2550e25653882d78b2962e94"
  },
- "sha256": "6d16d10d663a868bac32bbd79d43c8c88f41ba2366568517d2677e5458efa235",
- "tag": "nfl-v1.41"
+ "sha256": "9795c36ff44dc70774bc0e228fbc2da7d3552d39b5b4da851ca0c8097b31448f",
+ "tag": "nfl-v1.42"
 }

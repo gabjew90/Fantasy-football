@@ -246,6 +246,8 @@ For a narrow question, run only what it needs:
   table in one file, in that order -- and prints it: for "the props for these games", reproduce it
   in full (never trim rows), then a short read of what stands out per game. A **bold** prop is "worth a look"
   (DECISIONS #156): a role story plus last game's workload already past that side's break-even.
+  **How the engine works, with the numbers:** resources/engine_overview.md -- read it when the user
+  asks how a projection, share, weight or price is built, and quote its formulas.
   **A single-game read is a full story, in this order** (user, 2026-10-05; DECISIONS #168).
   Headed sections, short paragraphs, tables where they help; thorough but easy to read:
   1. **The game.** The matchup and what each team has been, the weather (or roof), home and
