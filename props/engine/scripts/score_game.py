@@ -1920,11 +1920,8 @@ def main():
         import build_play_yards as _BPY
         _py = pd.read_csv(_py_path) if _py_path.exists() else pd.DataFrame(columns=["gsis_id", "kind", "games"])
         _prior_games = {(str(r.gsis_id), r.kind): _BPY.parse_games(r.games) for r in _py.itertuples()}
-        def _by_game(df, pid, y):
-            return {str(g): [list(d_[d_.week == w][y]) for w in sorted(d_.week.unique())]
-                    for g, d_ in df[df[y].notna()].groupby(pid)}
-        _cur = {"catch": _by_game(passes[passes.complete_pass == 1], "receiver_player_id", "receiving_yards"),
-                "run": _by_game(rushes, "rusher_player_id", "rushing_yards")}
+        _cur = {"catch": RSCH.games_by_player(passes[passes.complete_pass == 1], "receiver_player_id", "receiving_yards"),
+                "run": RSCH.games_by_player(rushes, "rusher_player_id", "rushing_yards")}
         _luck = lambda gid, kind: RSCH.luck_for(_prior_games, _cur[kind], str(gid), kind)
         if not _py_path.exists():
             SOURCES.append(("Last season's play yards (luck-free check)", "each player's last 10 games, play by play",

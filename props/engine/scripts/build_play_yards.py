@@ -16,8 +16,10 @@ from pathlib import Path
 
 import pandas as pd
 
+import research as RSCH
+
 RES = Path(__file__).resolve().parent.parent / "resources"
-LAST_GAMES = 10
+LAST_GAMES = RSCH.LUCK_WINDOW      # the resource must hold at least the luck-free window
 COLS = ["season_type", "week", "play_type", "qb_kneel", "complete_pass", "receiver_player_id", "rusher_player_id",
         "receiving_yards", "rushing_yards"]
 

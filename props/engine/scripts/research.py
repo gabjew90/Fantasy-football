@@ -343,13 +343,13 @@ def to_clear(line) -> int:
 YPC_BAND = 1.0
 YPC_MIN_CATCHES = 8
 # THE LUCK LINE for the achievability gauge (user's design, 2026-10-05; DECISIONS #167):
-# a play past the player's OWN 99th percentile for that prop over his last LUCK_WINDOW games
+# a play past the player's OWN 97.5th percentile for that prop over his last LUCK_WINDOW games
 # -- his catches for receiving yards, his runs for rushing yards -- counts as a lucky
-# breakaway and is counted at that line (user, 2026-10-05: the 95th cut a back's ordinary
-# 15-25-yard runs, which come most games). "Too few" = under LUCK_MIN_PLAYS of his plays of
+# breakaway and is counted at that line (user, 2026-10-05, after trying the 95th and 99th: the
+# 95th cut a back's ordinary 15-25-yard runs, which come most games). "Too few" = under LUCK_MIN_PLAYS of his plays of
 # that kind in the window; then his longest play is left out instead. A definition for a
 # descriptive gauge, not a fit (reports/robust_ypc_check.md, for reference only)
-LUCK_PCT = 99
+LUCK_PCT = 97.5
 LUCK_MIN_PLAYS = 20
 # the luck-free check (luck line AND rate) reads his last this-many games, crossing into
 # last season while this one is short (user, 2026-10-05)
@@ -390,6 +390,14 @@ def luck_for(prior_games, current_games, gid, kind, window=LUCK_WINDOW):
     return luck, (luck_free_rate(plays, luck) if len(plays) >= min_plays else None)
 
 
+def games_by_player(df, pid, y) -> dict:
+    """{gsis_id: [[yards], ...]} oldest week first, one list per week he had a play in
+    df. df needs week, pid and y columns."""
+    d = df[df[y].notna() & df[pid].notna()]
+    return {str(g): [[float(v) for v in x[x.week == w][y]] for w in sorted(x.week.unique())]
+            for g, x in d.groupby(pid)}
+
+
 def luck_words(luck, unit) -> str:
     """How the report names the luck line it used."""
     if not luck:
@@ -397,9 +405,9 @@ def luck_words(luck, unit) -> str:
     plural = f"{unit}es" if unit == "catch" else f"{unit}s"
     if luck["own"]:
         return (f"every {unit} past {luck['cap']:.0f} yards, his own {LUCK_PCT}th percentile over his last "
-                f"{luck.get('games', '?')} games and {luck['n']} {plural}, counted as {luck['cap']:.0f}")
+                f"{luck.get('games', '?')} games with a {unit} ({luck['n']} {plural}), counted as {luck['cap']:.0f}")
     return (f"his longest {unit} left out -- only {luck['n']} {plural} in his last {luck.get('games', '?')} "
-            f"games, too few for a percentile")
+            f"games with a {unit}, too few for a percentile")
 
 
 # display bands for the gauge, picked, not measured: projected volume within 15% of what
@@ -482,6 +490,8 @@ def points_allowed(pbp, positions) -> dict:
     import pandas as _pd
     a = _pd.concat([_pd.DataFrame({"defteam": d.values, "pid": p.values, "pts": x.values}) for d, p, x in rows])
     a["pos"] = a.pid.map(pos)
+    unmapped = float(a.loc[a.pos.isna(), "pts"].clip(lower=0).sum())
+    total = float(a.pts.clip(lower=0).sum())
     a = a[a.pos.isin(POS_GROUPS)]
     games = pbp.groupby("defteam").game_id.nunique()
     t = a.groupby(["defteam", "pos"]).pts.sum().unstack().reindex(columns=list(POS_GROUPS)).fillna(0.0)
@@ -491,6 +501,7 @@ def points_allowed(pbp, positions) -> dict:
     out["_league"] = {p: float(t[p].mean()) for p in POS_GROUPS}
     out["_games"] = {d: int(games[d]) for d in t.index}
     out["_n"] = len(t.index)
+    out["_unmapped_share"] = unmapped / total if total > 0 else 0.0
     return out
 
 
@@ -511,7 +522,10 @@ def points_allowed_line(pa, teams) -> str | None:
     games = sorted(set(pa["_games"][t] for t in teams))
     return ("; ".join(parts) + ". League average: " + ", ".join(f"{p} {lg[p]:.1f}" for p in POS_GROUPS)
             + f". PPR points per game over {'/'.join(map(str, games))} games: a small sample, and position "
-            "matchups were tested as too noisy to move the model, so this is context, not an adjustment.")
+            "matchups were tested as too noisy to move the model, so this is context, not an adjustment."
+            + (f" {100 * pa['_unmapped_share']:.0f}% of skill-player points league-wide belong to players the "
+               "roster file gives no position, so these totals run a little low."
+               if pa.get("_unmapped_share", 0) > 0.02 else ""))
 
 
 # Sleeper's lines that are read beside the priced ones, never priced (DECISIONS #164, #166)

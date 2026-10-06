@@ -260,9 +260,14 @@ For a narrow question, run only what it needs:
   4. **Expected volume and share, ours and the book's**: our projected targets or carries; the
      book's own volume where it posts it (catches / carries lines, the side favoured); what each
      yards line works out to ("line implies").
-  5. **The lines themselves**: catches vs yards, where our projection lands (zone), and the
-     luck-free check -- his luck-free yards a play over his last 10 games, the volume the yards
-     line takes at that rate, against our volume and the book's.
+  5. **The lines themselves**: where our projection lands (zone), and the luck-free check -- his
+     luck-free yards a play over his last 10 games, the volume the yards line takes at that rate,
+     against our volume and the book's. Then **name the better line for each read, catches OR
+     yards, and say why** -- never use the two interchangeably (user, 2026-10-05). Yards is the
+     better vehicle when the luck-free check says the yards line takes fewer catches than the
+     catches line asks (London: 82 yards takes about 5.3 catches; the catches line asks 7); catches
+     is better when the yards line takes more than his volume or rests on a long play, or when a
+     plus-money catches price makes it the cheaper side. When neither fits, say so.
   6. **If-thens**, one per line of decision, with the losing branch, and which groups of legs mix.
   A slate (several games) keeps the short per-game preview below; the full story is for one game
   or when the user asks for it.
@@ -341,7 +346,7 @@ For a narrow question, run only what it needs:
   Over that needs his raw average needs another one. Lean on our figure for runners: their
   early-season yards a carry is noise.
   **The achievability gauge** ends both reads: the volume the yards line takes at his capped
-  yards a play (the luck line: a play past the player's OWN 99th percentile for that prop --
+  yards a play (the luck line: a play past the player's OWN 97.5th percentile for that prop --
   his catches or his runs, last season and this one -- counts as a lucky breakaway and is
   counted at the line; under 20 plays of his own, his longest play this season is left out
   instead; the report prints which it used; ours when his

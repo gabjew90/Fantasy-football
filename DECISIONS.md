@@ -7410,3 +7410,6 @@ by the user.
   games, for catches and runs (supersedes the 95th in #167): at the 95th a back's
   ordinary 15-25-yard runs, which came in 6 of Bijan Robinson's last 10 games, counted
   as luck.
+- Later the same evening the user settled on the 97.5th percentile (both catches and
+  runs) after trying the 95th and 99th. Narration names the better line, catches OR
+  yards, for every read, with the reason; the two are never used interchangeably.
