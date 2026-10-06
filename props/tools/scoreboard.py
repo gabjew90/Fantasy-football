@@ -43,6 +43,7 @@ MARKETS = {  # market: (line col, conditional col, own-volume col, actual col, p
     "QB passing yards": ("L_pass", "pc_pass", "pu_pass", "act_pass_yards", "qb"),
 }
 MIN_TARGETS, MIN_CARRIES = 3.0, 8.0
+ZONE = (0.15, 0.85)
 TGT_BANDS = [(3, 5), (5, 8), (8, 11), (11, 99)]
 CAR_BANDS = [(8, 12), (12, 16), (16, 20), (20, 99)]
 
@@ -129,6 +130,17 @@ def compare(R: pd.DataFrame, Ref: pd.DataFrame, cluster: str, reps: int = 2000, 
                 base = float(f(d[f"{col}_ref"], d.y_ref).mean())
                 row[f"{nm}_{tag}"] = {"gain": float(diff.mean()), "ci": [lo, hi],
                                       "relative": float(diff.mean() / base) if base else None}
+        # THE DECISION ZONE (amendment): cases whose reference chance is 15-85% -- where a bet
+        # at a typical price is decided -- log loss and Brier, which must agree in sign to ship
+        for tag, col in (("c", "pc"), ("u", "pu")):
+            z = d[(d[f"{col}_ref"] >= ZONE[0]) & (d[f"{col}_ref"] <= ZONE[1])]
+            if len(z):
+                zi = cluster_ids(z, cluster)
+                zl = (logloss(z[f"{col}_ref"], z.y_ref) - logloss(z[col], z.y)).to_numpy()
+                zb = (brier(z[f"{col}_ref"], z.y_ref) - brier(z[col], z.y)).to_numpy()
+                row[f"zone_{tag}"] = {"n": int(len(z)), "share": float(len(z) / len(d)),
+                                      "logloss": float(zl.mean()), "ci": list(cluster_ci(zl, zi, reps, rng, level)),
+                                      "brier": float(zb.mean()), "agree": bool(np.sign(zl.mean()) == np.sign(zb.mean()))}
         row["move_points_c"] = float(100 * (d.pc - d.pc_ref).abs().mean())
         row["move_points_u"] = float(100 * (d.pu - d.pu_ref).abs().mean())
         out[mk] = row

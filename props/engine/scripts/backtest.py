@@ -840,6 +840,10 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
             # targets x catch rate / yards per target; expected carries x yards per carry), so
             # every setting in a comparison is scored at the SAME line. A line at each setting's
             # own median moved with the knobs under test (caught in review before any read).
+            # CENTRED (scoreboard amendment): each yards market's expectation scaled by a fixed
+            # factor so the stand-ins sit on Sleeper's 2026 lines on average (standin_check.py);
+            # the same factor for every setting, so compared versions still share a line
+            SC_Y, SC_R, SC_P = STANDIN_SCALE["rec_yds"], STANDIN_SCALE["rush_yds"], STANDIN_SCALE["pass_yds"]
             mu_t = (tr.team_targets_env * tr.ts).to_numpy(float)
             mu_c = (test_act.team_carries_env * test_act.rs.fillna(0.0)).to_numpy(float)
             ypc_all = test_act.ypc.to_numpy(float)
@@ -858,7 +862,7 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
                     cols["mean_rec_c"][i], cols["mean_yds_c"][i] = rec.mean(), yd.mean()
                     cond_yds[i] = yd
                     if recM is not None:                     # line scores: no random draw
-                        lines_ = {"rec": half(mu_t[k_] * cr_[k_]), "yds": half(mu_t[k_] * ypt_[k_])}
+                        lines_ = {"rec": half(mu_t[k_] * cr_[k_]), "yds": half(SC_Y * mu_t[k_] * ypt_[k_])}
                         for nm_, uM, cD in (("rec", recM[k_], rec), ("yds", ydsM[k_], yd)):
                             L = lines_[nm_]
                             cols[f"L_{nm_}"][i], cols[f"pc_{nm_}"][i] = L, float((cD > L).mean())
@@ -877,7 +881,7 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
                     cols["pit_rush_c"][i] = pit(yd, float(y_rush[i]), g)
                     cols["mean_rush_c"][i] = yd.mean()
                     if rushM is not None and not is_qb:      # line scores: no random draw
-                        L = half(mu_c[i] * ypc_all[i])
+                        L = half(SC_R * mu_c[i] * ypc_all[i])
                         cols["L_rush"][i], cols["pc_rush"][i] = L, float((yd > L).mean())
                         cols["pu_rush"][i] = float((rushM[i] > L).mean())
                         cond_rush[i] = yd
@@ -886,7 +890,7 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
                 tpos = tpos_all
                 for i in set(cond_rush) & set(cond_yds):
                     uM = ydsM[tpos[i]] + rushM[i]
-                    L = half(mu_t[tpos[i]] * ypt_[tpos[i]] + mu_c[i] * ypc_all[i])
+                    L = half(SC_Y * mu_t[tpos[i]] * ypt_[tpos[i]] + SC_R * mu_c[i] * ypc_all[i])
                     cols["L_rr"][i], cols["pc_rr"][i] = L, float(((cond_yds[i] + cond_rush[i]) > L).mean())
                     cols["pu_rr"][i] = float((uM > L).mean())
             # STARTING-QB PASSING given the volume: every receiver's yards drawn given his actual
@@ -915,7 +919,7 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
                     exp_y = (sum(mu_t[k_] * ypt_[k_] for k_, _ in rows_)
                              + max(1.0 - sh_, 0.0) * float(tr.team_targets_env.iloc[rows_[0][0]])
                              * float(other_rates["ypt"])) * share_mean
-                    L = half(exp_y)
+                    L = half(SC_P * exp_y)
                     uM = np.asarray(passTW[tw_], dtype=float)
                     cols["L_pass"][i], cols["pc_pass"][i] = L, float((pD > L).mean())
                     cols["pu_pass"][i] = float((uM > L).mean())
@@ -1315,6 +1319,11 @@ TARGET_SPREAD_GRID = [{"share_conc_targets": sc, "team_r_mult": rm}
 # Round 32 (reports/round32_yards_shape.md): receiving yards' spread with catches
 YARDS_SHAPE_GRID = [{"catch_shape_exp": ex, "catch_shape_mult": mu}
                     for ex in (None, 1.15, 1.3, 1.5) for mu in (None, 0.8)]
+
+# THE STAND-IN LINE SCALE (reports/scoreboard.md, amendment 2026-10-06): posted / expected,
+# the median over Sleeper's 2026 weeks 2-4 lines (props/tools/standin_check.py). 1.0 = the
+# expectation itself. Catches need none (median ratio 1.000).
+STANDIN_SCALE = {"rec_yds": 0.876, "rush_yds": 0.902, "pass_yds": 1.0}
 
 # Round 33 (reports/round33_passing_spread.md): the team's throws, judged on QB passing
 PASS_SPREAD_GRID = [{"team_r_mult": v} for v in (None, 1.5, 2.5, 4.0)]

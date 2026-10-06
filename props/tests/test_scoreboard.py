@@ -151,3 +151,11 @@ def test_round_31_never_narrows_past_the_real_spread():
     assert pick["cfg"] == {"share_conc_targets": 80.0, "team_r_mult": None}, \
         "1.01 is past the upper bound; 80/1.5 ties 80 alone, which moves fewer knobs"
     assert R31.choose([{"cfg": {}, "ratios": [1.1, 1.2, 1.0]}]) is None
+
+
+def test_the_decision_zone_is_scored_and_signs_must_agree():
+    truth, noisy = _world(0.0, seed=30), _world(0.15, seed=30)
+    c = SB.compare(noisy, truth, "game", reps=300)["receptions"]
+    z = c["zone_c"]
+    assert 0 < z["share"] < 1 and z["n"] < c["n"], "only cases whose reference chance is 15-85%"
+    assert z["logloss"] < 0 and z["brier"] < 0 and z["agree"], "a noisier forecast loses in the zone too"

@@ -25,9 +25,9 @@ from model import norm_name  # noqa: E402
 
 CACHE = Path(os.environ.get("NFL_BACKTEST_CACHE", Path(tempfile.gettempdir()) / "nflbt"))
 MARKET_L = {"player_receptions": "L_rec", "player_reception_yds": "L_yds", "player_rush_yds": "L_rush",
-            "player_rush_reception_yds": "L_rr"}
+            "player_rush_reception_yds": "L_rr", "player_pass_yds": "L_pass"}
 CLOSE = {"player_receptions": 1.0, "player_reception_yds": 5.0, "player_rush_yds": 5.0,
-         "player_rush_reception_yds": 7.5}
+         "player_rush_reception_yds": 7.5, "player_pass_yds": 15.0}
 
 
 def posted_lines(record_dir: Path, season: int) -> pd.DataFrame:
