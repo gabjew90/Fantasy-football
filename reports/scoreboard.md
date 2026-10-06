@@ -73,3 +73,9 @@ So the engine is graded on the two links it owns, near-equally:
 - **2026-10-06, after round 30 was registered, before any round read it:** QB rushing yards
   leave the board (DECISIONS #188) and the guards, from the next round on. Round 30's knobs
   do not touch them (the starting QB's yards-per-carry swing is eff_sd_qb, not in the grid).
+- **2026-10-06, before any selection read:** the stand-in line is the half nearest below
+  the pre-game EXPECTED value from inputs no width setting moves (expected targets x catch
+  rate or yards per target; expected carries x yards per carry), not each setting's own
+  median -- the median moved with the very knobs under test, so two settings were scored at
+  different lines (caught in code review; the round 30 / 31 grids were stopped and rerun).
+  Comparisons now refuse rows whose lines differ.

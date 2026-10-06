@@ -139,3 +139,15 @@ def test_round_30_picks_follow_the_registered_rule():
     flat = [_world(0.0, seed=20) for _ in range(3)]   # identical frames: a tie keeps shipped
     v2, i2, _t, _m = R30.pick(grid, flat, "catch_conc", "receptions", {"eff_sd_rush": 0.3, "catch_shape_mult": None})
     assert v2 is None and i2 == 0
+
+
+def test_round_31_never_narrows_past_the_real_spread():
+    import round31_select as R31
+    rows = [{"cfg": {"share_conc_targets": 40.0, "team_r_mult": None}, "ratios": [0.83, 0.88, 0.84]},
+            {"cfg": {"share_conc_targets": 80.0, "team_r_mult": None}, "ratios": [0.95, 0.97, 0.96]},
+            {"cfg": {"share_conc_targets": 120.0, "team_r_mult": 2.5}, "ratios": [1.01, 1.00, 0.99]},
+            {"cfg": {"share_conc_targets": 80.0, "team_r_mult": 1.5}, "ratios": [0.955, 0.975, 0.96]}]
+    pick = R31.choose(rows)
+    assert pick["cfg"] == {"share_conc_targets": 80.0, "team_r_mult": None}, \
+        "1.01 is past the upper bound; 80/1.5 ties 80 alone, which moves fewer knobs"
+    assert R31.choose([{"cfg": {}, "ratios": [1.1, 1.2, 1.0]}]) is None

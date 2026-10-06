@@ -102,7 +102,7 @@ def single(R: pd.DataFrame) -> dict:
 
 
 def compare(R: pd.DataFrame, Ref: pd.DataFrame, cluster: str, reps: int = 2000, seed: int = 11,
-            level: float = 0.95) -> dict:
+            level: float = 0.95, require_same_lines: bool = True) -> dict:
     rng = np.random.default_rng(seed)
     out = {}
     for mk in MARKETS:
@@ -113,8 +113,11 @@ def compare(R: pd.DataFrame, Ref: pd.DataFrame, cluster: str, reps: int = 2000, 
         if d.empty:
             continue
         ids = cluster_ids(d, cluster)
-        row = {"n": int(len(d)), "cluster": cluster,
-               "same_lines": float((d.L == d.L_ref).mean())}
+        same = float((d.L == d.L_ref).mean())
+        if same < 1.0 and require_same_lines:
+            raise ValueError(f"{mk}: only {100 * same:.1f}% of rows share a stand-in line -- two settings "
+                             "must be scored at the same lines (reports/scoreboard.md)")
+        row = {"n": int(len(d)), "cluster": cluster, "same_lines": same}
         for tag, col in (("c", "pc"), ("u", "pu")):
             for nm, f in (("brier", brier), ("logloss", logloss)):
                 diff = (f(d[f"{col}_ref"], d.y_ref) - f(d[col], d.y)).to_numpy()

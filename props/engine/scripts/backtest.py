@@ -836,6 +836,14 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
             act_t, act_r, act_y = (tr.act_targets.to_numpy(), tr.act_receptions.to_numpy(float),
                                    tr.act_rec_yards.to_numpy(float))
             cr_, ypt_ = tr.cr.clip(lower=0.05).to_numpy(float), tr.ypt.to_numpy(float)
+            # THE STAND-IN LINE comes from pre-game inputs no width setting moves (expected
+            # targets x catch rate / yards per target; expected carries x yards per carry), so
+            # every setting in a comparison is scored at the SAME line. A line at each setting's
+            # own median moved with the knobs under test (caught in review before any read).
+            mu_t = (tr.team_targets_env * tr.ts).to_numpy(float)
+            mu_c = (test_act.team_carries_env * test_act.rs.fillna(0.0)).to_numpy(float)
+            ypc_all = test_act.ypc.to_numpy(float)
+            tpos_all = np.cumsum(rec_mask) - 1
             for k_, i in enumerate(np.flatnonzero(rec_mask)):
                 T = int(act_t[k_])
                 cols["act_targets"][i] = T
@@ -850,8 +858,9 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
                     cols["mean_rec_c"][i], cols["mean_yds_c"][i] = rec.mean(), yd.mean()
                     cond_yds[i] = yd
                     if recM is not None:                     # line scores: no random draw
+                        lines_ = {"rec": half(mu_t[k_] * cr_[k_]), "yds": half(mu_t[k_] * ypt_[k_])}
                         for nm_, uM, cD in (("rec", recM[k_], rec), ("yds", ydsM[k_], yd)):
-                            L = half(np.median(uM))
+                            L = lines_[nm_]
                             cols[f"L_{nm_}"][i], cols[f"pc_{nm_}"][i] = L, float((cD > L).mean())
                             cols[f"pu_{nm_}"][i] = float((uM > L).mean())
             act_c, ypc_ = test_act.act_carries.to_numpy(), test_act.ypc.to_numpy(float)
@@ -868,16 +877,16 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
                     cols["pit_rush_c"][i] = pit(yd, float(y_rush[i]), g)
                     cols["mean_rush_c"][i] = yd.mean()
                     if rushM is not None and not is_qb:      # line scores: no random draw
-                        L = half(np.median(rushM[i]))
+                        L = half(mu_c[i] * ypc_all[i])
                         cols["L_rush"][i], cols["pc_rush"][i] = L, float((yd > L).mean())
                         cols["pu_rush"][i] = float((rushM[i] > L).mean())
                         cond_rush[i] = yd
             # rushing + receiving given BOTH actual volumes: his two conditional draws summed
             if rushM is not None and ydsM is not None:
-                tpos = np.cumsum(rec_mask) - 1
+                tpos = tpos_all
                 for i in set(cond_rush) & set(cond_yds):
                     uM = ydsM[tpos[i]] + rushM[i]
-                    L = half(np.median(uM))
+                    L = half(mu_t[tpos[i]] * ypt_[tpos[i]] + mu_c[i] * ypc_all[i])
                     cols["L_rr"][i], cols["pc_rr"][i] = L, float(((cond_yds[i] + cond_rush[i]) > L).mean())
                     cols["pu_rr"][i] = float((uM > L).mean())
             return res_df.assign(**cols)
