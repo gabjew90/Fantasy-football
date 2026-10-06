@@ -1191,6 +1191,8 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
                                      y_rush, width, recM=recM, ydsM=ydsM, rushM=rushM, passTW=passTW, p_ix=p_ix,
                                      y_pass=y_pass)
         res = res_df.merge(gm, on=["team", "week"], how="left")
+        # which harness wrote these rows: compare() never mixes a capped run with an uncapped one
+        res["new_team_cap"] = bool(getattr(args, "new_team_cap", True))
 
         # RELIABILITY AT SYNTHETIC LINES (calibration a bettor can read): lines at
         # fixed offsets from the model median (not model quantiles, which would be
@@ -1819,8 +1821,11 @@ def harness_report(all_res, calib, metas, args, out_base, comparison=None):
                 L.append(f"| {subset} | {MARKETS[mk][1]} | {c['n']} | {c['crps_ref']:.4f} | "
                          f"{c['gain']:+.4f} ({lo:+.4f}, {hi:+.4f}){sig} |")
     L += ["", "## What this does not reproduce from the live scorer", "",
-          "- The snap-share role scaling and the new-team cap on the prior-season rate "
-          "(`blended_rate(role_scale=..., new_team=...)`): the harness has no pre-game snap feed.",
+          "- The snap-share role scaling on a new team's prior-season rate "
+          "(`blended_rate(role_scale=...)`): the harness has no pre-game snap feed. "
+          + ("The new-team cap itself IS reproduced (team identity alone, 2026-10-06)."
+             if getattr(args, "new_team_cap", True) else
+             "This run also leaves out the new-team cap (--no-new-team-cap, the ablation)."),
           "- The player's depth-chart slot is his first slot of the season (the round-4 convention), "
           "not the week's.",
           "- Questionable-player regimes, injury-report exclusions (the harness uses the game-day "

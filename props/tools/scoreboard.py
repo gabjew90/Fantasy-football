@@ -124,6 +124,12 @@ def compare(R: pd.DataFrame, Ref: pd.DataFrame, cluster: str, reps: int = 2000, 
     rng = np.random.default_rng(seed)
     if level > 0.95:
         reps = max(reps, 10_000)      # an interval above 95% needs enough values in each tail
+    # two harness versions are not one comparison: rows from before the new-team cap carry
+    # no stamp (read as uncapped), rows after it carry new_team_cap (2026-10-06)
+    cap = lambda x: bool(x["new_team_cap"].iloc[0]) if ("new_team_cap" in x and len(x)) else False
+    if cap(R) != cap(Ref):
+        raise ValueError("the two runs come from different harnesses (one applies the new-team cap, "
+                         "the other does not) -- rerun the older one")
     out = {}
     for mk in MARKETS:
         a = market_frame(Ref, mk)

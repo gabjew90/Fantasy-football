@@ -59,7 +59,8 @@ def bucket_of(spread: pd.Series) -> pd.Series:
 def _boot(stat, ids, reps, rng):
     """95% interval for stat(index array) resampling whole clusters."""
     ug, inv = np.unique(ids, return_inverse=True)
-    members = [np.flatnonzero(inv == k) for k in range(len(ug))]
+    order = np.argsort(inv, kind="stable")
+    members = np.split(order, np.cumsum(np.bincount(inv, minlength=len(ug)))[:-1])
     vals = []
     for _ in range(reps):
         pick = rng.integers(0, len(ug), len(ug))
@@ -76,7 +77,11 @@ def dependence(R: pd.DataFrame, games: pd.DataFrame, reps: int = 2000, seed: int
     d["bucket"] = bucket_of(d.spread)
     d["r_rush"] = d.act_rush_yards - d.mean_rush_model
     d["r_rec"] = d.act_rec_yards - d.mean_yds_model
-    d["outside"] = ((d.pit_rr < 0.1) | (d.pit_rr > 0.9)).astype(float) if "pit_rr" in d else np.nan
+    if "pit_rr" in d:
+        # a row with no combined-line PIT is left out of the width share, never read as inside
+        d["outside"] = ((d.pit_rr < 0.1) | (d.pit_rr > 0.9)).astype(float).where(d.pit_rr.notna())
+    else:
+        d["outside"] = np.nan
     rng = np.random.default_rng(seed)
 
     def summarise(x: pd.DataFrame) -> dict:

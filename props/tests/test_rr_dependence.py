@@ -56,3 +56,11 @@ def test_independent_draws_read_zero_and_a_script_dependence_is_found_where_it_l
     assert close["corr_ci"][0] < 0 < close["corr_ci"][1], "no dependence where there is none"
     assert 0.15 < out["pooled"]["outside_80"] < 0.25, "a right-width sum reads about 20% outside"
     assert set(out["by_season"]) == {2024, 2025} and out["unmatched_spread"] == 0
+
+
+def test_a_missing_pit_is_left_out_of_the_width_share_not_counted_inside():
+    R, g = _world()
+    R["pit_rr"] = 0.95                              # every PIT outside the range
+    R.loc[R.index[: len(R) // 2], "pit_rr"] = np.nan
+    out = RD.dependence(R, g, reps=50)
+    assert out["pooled"]["outside_80"] == pytest.approx(1.0), "half missing must not read as 50% outside"

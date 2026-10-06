@@ -211,3 +211,15 @@ def test_exact_and_sampled_receptions_runs_are_never_compared():
         raise AssertionError("mixed scoring methods must be refused")
     except ValueError as e:
         assert "exactly" in str(e)
+
+
+def test_a_capped_and_an_uncapped_harness_run_are_never_compared():
+    ref, cand = _world(0.0), _world(0.0)
+    cand["new_team_cap"] = True
+    try:
+        SB.compare(cand, ref, "game", reps=100)
+        raise AssertionError("mixed harness versions must be refused")
+    except ValueError as e:
+        assert "different harnesses" in str(e)
+    ref["new_team_cap"] = True
+    assert SB.compare(cand, ref, "game", reps=100)["receptions"]["n"] == len(ref)
