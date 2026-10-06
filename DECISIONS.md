@@ -7500,3 +7500,26 @@ by the user.
   low and treating the line as an average.
 - Fix: before this week's roster is published, last week's game-day inactive (INA) reads
   as active; the injury report decides (Baker Mayfield was priced out of week 5).
+
+## 2026-10-06 (178) -- the offensive line flag: five regulars, how many out
+
+- User, from the outside reviewer's list (Tier 1): count how many of each team's five
+  regular linemen are out. Regulars = the five T/G/C/OL with the most offensive snaps this
+  season (nflverse snap counts); out = Out/Doubtful, a not-playing roster status, or off
+  the team's roster; questionable listed. Ids by pfr id, else a same-team name match (the
+  2026 roster file lacks about a quarter of pfr ids); an unmatched lineman is "status
+  unknown", never out. Says so when this week's injury report is not out yet.
+- Context only: no price changes, so no test is needed. Queued for Tier 3, after
+  conditional calibration and the implied team total test: do missing starters predict
+  the model's misses (expected null for one starter; two or more is rare and thin).
+
+## 2026-10-06 (179) -- the automatic what-if range: carries=auto / targets=auto
+
+- User: a range should default from recent games, his last 10. Built as opt-in per
+  player: low / high = our projection +/- one standard error of his share over his last
+  10 games (this season's, topped up with last season's final games, from the new
+  resources/priors_2025_share_games.csv) times the team's projected volume. This season
+  only after a team change or a backfield takeover; 3+ games or the report says to give
+  numbers.
+- Not his game-to-game min / max: the simulation already prices those swings, so using
+  them as the range would count them twice and every line would read "only at your high".

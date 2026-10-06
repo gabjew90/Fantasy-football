@@ -149,7 +149,8 @@ to 4x between years, which is why the receiving k's were fixed by backtest.
 | Rushing + receiving | the touches the line takes at his luck-free rates; how much of his yards come from catches (our probability waits on calibration) |
 | Flags | role up/down; backfield takeover (carry share +/-20 points); teammates out, back or questionable; QB change; new team |
 | Fantasy points allowed | PPR per game by position, context only |
-| What-ifs | separate runs with user assumptions, never recorded. A range (`carries=10/12/15`) prices low / expected / high and gives each side a verdict ("pays across your range" ... "does not pay in your range"); `--role "Player=RB1"` prices a replacement the depth chart has not promoted |
+| Offensive line | each team's five linemen with the most snaps this season; how many are out (report, reserve, off the roster) or questionable; context only, never a price input |
+| What-ifs | separate runs with user assumptions, never recorded. A range (`carries=10/12/15`) prices low / expected / high and gives each side a verdict ("pays across your range" ... "does not pay in your range"); `--role "Player=RB1"` prices a replacement the depth chart has not promoted. `carries=auto` / `targets=auto`: our projection +/- one standard error of his share over his last 10 games x the team's projected volume (this season only after a team change or takeover; 3+ games) |
 | No priced replacement | an Out starter whose team now prices fewer players at his position than it has slots; the report names him and suggests the role what-if |
 
 ## 8. Narration (SKILL.md)

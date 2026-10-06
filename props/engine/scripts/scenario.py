@@ -114,6 +114,27 @@ def range_variants(rules):
             for i, lab in enumerate(RANGE_LABELS)]
 
 
+def fill_auto(rules, ranges) -> list[dict]:
+    """The automatic ranges filled in: ranges {(player, key): research.auto_range result
+    or None}. A rule with no range (too few games) raises ValueError with the reason."""
+    out = []
+    for r in rules:
+        if not r.get("auto"):
+            out.append(r)
+            continue
+        got = ranges.get((r["who"], r["key"]))
+        if got is None:
+            raise ValueError(f"{r['who']}: {r['key']}=auto needs at least 3 recent games with a share; "
+                             f"give your own range, e.g. {r['key']}=10/12/15")
+        lo, mid, hi = got["values"]
+        src = (f"his last {got['n']} games" + (f", {got['from_last']} of them from last season"
+                                               if got["from_last"] else ""))
+        out.append({**r, "value": mid, "values": [lo, mid, hi],
+                    "text": f"{r['who']}: {r['key']}=auto ({lo:.1f}/{mid:.1f}/{hi:.1f}: our projection "
+                            f"+/- one standard error of his share over {src})"})
+    return out
+
+
 def range_verdict(p_low, p_exp, p_high, breakeven):
     """How much of your range one side needs to beat its price. p_low / p_high: that
     side's chance when your ranges sit at their low / high ends (a named player's low
@@ -200,6 +221,13 @@ def parse(rules, teams) -> list[dict]:
             if not eq or k not in allowed:
                 raise ValueError(f"'{raw}': '{kv.strip()}' -- {'team' if is_team else 'player'} keys are "
                                  + ", ".join(allowed))
+            if v.strip().lower() == "auto":
+                # the AUTOMATIC range (#179): filled in by the scorer from his last 10 games
+                if is_team or k not in ("targets", "carries"):
+                    raise ValueError(f"'{raw}': auto works for a player's targets or carries")
+                out.append({"who": who, "team": False, "key": k, "value": None, "auto": True,
+                            "team_of": team_of, "text": f"{who}: {k}=auto"})
+                continue
             # a RANGE (DECISIONS #175): 'carries=10/12/15' is your low / expected / high
             parts = [q for q in v.split("/")]
             if len(parts) not in (1, 3) or any(not q.strip() for q in parts):

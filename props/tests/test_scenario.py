@@ -182,3 +182,37 @@ def test_an_out_starter_with_no_priced_replacement_is_flagged():
     ])
     f = SC.missing_replacements(pop)
     assert [(x["name"], x["priced_left"]) for x in f] == [("Travis Etienne", ["Tank Bigsby"])]
+
+
+def test_auto_range_is_one_standard_error_of_his_share_around_our_projection():
+    """DECISIONS #179: 'carries=auto' -- how sure we are of his AVERAGE share, not his swing."""
+    sys.path.insert(0, str(ENGINE))
+    import research as RSCH
+    this = [0.50, 0.60, 0.55, 0.65]
+    last = [0.40] * 3 + [0.45, 0.50, 0.55, 0.60, 0.50, 0.45, 0.55]
+    r = RSCH.auto_range(this, last, proj=15.0, team_volume=28.0)
+    shares = last[-6:] + this
+    se = float(np.std(shares, ddof=1) / np.sqrt(10) * 28.0)
+    assert r["n"] == 10 and r["from_last"] == 6 and r["se"] == pytest.approx(se)
+    assert r["values"] == pytest.approx([15.0 - se, 15.0, 15.0 + se])
+    only = RSCH.auto_range(this, last, 15.0, 28.0, this_season_only=True)
+    assert only["n"] == 4 and only["from_last"] == 0 and only["se"] > r["se"] * 0.9
+    assert RSCH.auto_range([0.5, 0.6], [], 15.0, 28.0) is None, "under three games: no range"
+    assert RSCH.auto_range([0.5] * 12, [], 15.0, 28.0)["n"] == 10, "the last ten only"
+    assert RSCH.auto_range([0.01, 0.30, 0.02], [], 0.5, 28.0)["values"][0] == 0.0, "never below zero"
+
+
+def test_auto_reads_and_fills_and_refuses_what_it_cannot_do():
+    r = SC.parse(["Javonte Williams: carries=auto"], {"DAL", "TB"})
+    assert r[0]["auto"] and r[0]["value"] is None
+    for bad in ["DAL: pass=auto", "X: ypc=auto", "X: catch=auto"]:
+        with pytest.raises(ValueError, match="auto works for"):
+            SC.parse([bad], {"DAL"})
+    filled = SC.fill_auto(r, {("Javonte Williams", "carries"): {"values": [13.1, 14.6, 16.1], "n": 10,
+                                                                "se": 1.5, "from_last": 6}})
+    assert filled[0]["values"] == [13.1, 14.6, 16.1] and filled[0]["value"] == 14.6
+    assert "6 of them from last season" in filled[0]["text"]
+    v = dict(SC.range_variants(filled))
+    assert SC.parse(v["low"], {"DAL", "TB"})[0]["value"] == pytest.approx(13.1)
+    with pytest.raises(ValueError, match="at least 3 recent games"):
+        SC.fill_auto(r, {("Javonte Williams", "carries"): None})

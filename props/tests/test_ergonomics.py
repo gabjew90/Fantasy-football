@@ -347,3 +347,39 @@ def test_last_weeks_game_day_inactive_does_not_rule_a_player_out_this_week():
     assert prov == 4 and rw.status.tolist() == ["ACT", "ACT", "RES", "DEV"], "only INA is per-game"
     rw, prov = SG.week_roster(ros.assign(week=5), 2026, 5)
     assert prov is None and rw.status.tolist()[0] == "INA", "this week's own inactive list stands"
+
+
+def test_the_line_flag_counts_the_five_regulars_and_why_each_is_out():
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "engine" / "scripts"))
+    import research as RSCH
+    rows = []
+    for w in (1, 2, 3):
+        for pid, nm, pos, sn in [("a", "LT A", "T", 60), ("b", "LG B", "G", 60), ("c", "C C", "C", 60),
+                                 ("d", "RG D", "G", 60), ("e", "RT E", "T", 60 if w < 3 else 0),
+                                 ("f", "Swing F", "OL", 5 if w < 3 else 60), ("g", "TE G", "TE", 70)]:
+            rows.append({"team": "NO", "week": w, "pfr_player_id": pid, "player": nm, "position": pos,
+                         "offense_snaps": sn})
+    snaps = pd.DataFrame(rows)
+    regs = RSCH.line_regulars(snaps, "NO", 4)
+    assert [r["name"] for r in regs] == ["C C", "LG B", "LT A", "RG D", "RT E"], "top five by snaps, no TE"
+    assert RSCH.line_regulars(snaps, "NO", 1) == [] and RSCH.line_regulars(snaps, "ATL", 4) == []
+    pfr = {k: k.upper() for k in "abcdef"}
+    roster = {"A": ("NO", "ACT"), "B": ("NO", "RES"), "C": ("NO", "ACT"), "D": ("NO", "ACT")}   # E traded
+    report = {"A": "Out", "C": "Questionable"}
+    st = RSCH.line_status(regs, "NO", pfr, roster, report, ("INA", "RES"))
+    assert [(s["name"], s["state"], s["why"]) for s in st] == [
+        ("C C", "questionable", "Questionable"), ("LG B", "out", "on reserve"), ("LT A", "out", "Out"),
+        ("RG D", "playing", None), ("RT E", "out", "no longer on the roster")]
+    txt = RSCH.line_sentence("NO", st)
+    assert txt.startswith("NO: 3 of 5 regular linemen out -- ") and "questionable: C C (C, Questionable)" in txt
+    assert RSCH.line_sentence("NO", st[:4]) is None
+    ok = RSCH.line_status(regs, "NO", pfr, {k: ("NO", "ACT") for k in "ABCDE"}, {}, ("INA",))
+    assert RSCH.line_sentence("NO", ok) == "NO: all five regular linemen available."
+
+    # the roster file lacks many pfr ids: a same-team name match fills in; no match is never "out"
+    by_name = {("NO", "lt a"): "A"}
+    st2 = RSCH.line_status(regs, "NO", {}, {"A": ("NO", "ACT")}, {}, ("INA",), name_to_gsis=by_name)
+    assert [s["state"] for s in st2] == ["unmatched", "unmatched", "playing", "unmatched", "unmatched"]
+    assert RSCH.line_sentence("NO", st2).startswith("NO: no regular lineman reported out; not matched")
+    assert RSCH.line_sentence("NO", ok, report_out=False) == (
+        "NO: all five regular linemen available (no injury report yet this week: roster status only).")

@@ -873,6 +873,7 @@ def main():
     _ca_w = rushes.groupby(["posteam", "rusher_player_id", "week"]).size()
     _tw_i = tw.set_index(["team", "week"])
     USAGE, ROLE, BACKFIELD, CARRY_U = {}, {}, {}, {}
+    WEEK_SH = {}         # name -> this season's games he played: (week, snap, target share, carry share, ...)
     # a back's three jobs by week (research columns): early-down carries,
     # passing-down targets (3rd/4th down or the last two minutes of a half),
     # inside-5 carries. Display only: nothing here moves a price.
@@ -887,6 +888,7 @@ def main():
                 n_t, n_c = float(_tg_w.get((m_.team, m_.gsis_id, w_), 0)), float(_ca_w.get((m_.team, m_.gsis_id, w_), 0))
                 wks.append((int(w_), float(sv), n_t / tt_ if tt_ else np.nan, n_c / tc_ if tc_ else np.nan,
                             n_t, n_c))
+        WEEK_SH[m_["name"]] = sorted(wks)
         USAGE[m_["name"]] = RSCH.usage_change(sorted(wks))
         CARRY_U[m_["name"]] = RSCH.carry_change(sorted(wks))     # the takeover flag's own definition
         ROLE[m_["name"]] = RSCH.role_flag(USAGE[m_["name"]], WEEK - 1)
@@ -1955,6 +1957,15 @@ def main():
                                               team_spread=TEAM_SPREAD.get(t_), league=_league_script,
                                               mix=_state_mix))
     PA_LINE = RSCH.points_allowed_line(PA, (AWAY, HOME))
+    # the offensive line: how many of each team's five regular linemen are out (#178)
+    _pfr = (ros.dropna(subset=["pfr_id"]).drop_duplicates("pfr_id", keep="last")
+               .set_index("pfr_id")["gsis_id"].to_dict() if "pfr_id" in ros else {})
+    _ros_now = {g_: (t_, st_) for t_, g_, st_ in zip(rw.team, rw.gsis_id, rw.status)}
+    _rep_now = dict(zip(iw.gsis_id, iw.report_status))
+    _by_name = {(t_, norm_name(n_)): g_ for t_, n_, g_ in zip(rw.team, rw.full_name, rw.gsis_id)}
+    LINE_LINES = [l_ for t_ in (AWAY, HOME) for l_ in [RSCH.line_sentence(t_, RSCH.line_status(
+        RSCH.line_regulars(snp[snp.season == SEASON], t_, WEEK), t_, _pfr, _ros_now, _rep_now, NOT_PLAYING,
+        name_to_gsis=_by_name), report_out=bool((iw.team == t_).any() or iw.team.nunique() >= 16))] if l_]
     # CATCHES, YARDS AND THE LONG ONE (DECISIONS #164): the book's three receiving lines
     # read together at the whole numbers that win them, against his yards a catch
     CATCH_READ, CARRY_READ, QB_READ, RUSH_REC = {}, {}, {}, {}
@@ -2769,6 +2780,9 @@ def main():
                              if (V1TD.team == t).any()) + ". The two differ by design, not by error."),
               f"- **Weather:** {wx}. 15 mph sustained-wind screen {'HIT' if (weather.get('wind_mph_max') or 0) > 15 else 'not hit'}.",
               *([f"- **Fantasy points allowed:** {PA_LINE}"] if PA_LINE else []),
+              *([f"- **Offensive line (the five linemen with the most snaps this season):** " + " ".join(LINE_LINES)
+                 + " Context only: line absences do not change any price."] if LINE_LINES else
+                [f"- **Offensive line:** no lineman snap counts yet this season (DATA MISSING)."] if WEEK > 1 else []),
               f"- **Injury designations (week {WEEK} report):** " + (", ".join(desig) if desig else "none on the eligible set") + ". Out/Doubtful removed; their share goes mostly to the replacement, a quarter to the priced teammates; Questionable priced as if playing, with a separate 'if he's out' pricing. Re-run inside 90 minutes of kickoff: a late scratch changes every share on that team.",
               f"- **Data cutoff:** 2026 weeks 1-{WEEK-1} play-by-play, week {WEEK} roster/injury/depth chart; prices snapshot {now()}; kickoff in {hrs:.1f} h.",
               "",
@@ -3027,8 +3041,39 @@ def main():
     SCEN_L = []
     if RULES and not SCENARIO:
         snap_ = Path(a.odds_snapshot) if a.odds_snapshot else (snap_path if snap_written else None)
+        if any(r_.get("auto") for r_ in RULES):
+            # the automatic range (#179): our projection +/- one standard error of his
+            # share over his last 10 games; this season only after a team change or a takeover
+            import build_play_yards as _BPY
+            _sg_path = RES / f"priors_{PRIOR}_share_games.csv"
+            _sg = ({str(r_.gsis_id): _BPY.parse_share_games(r_.games)
+                    for r_ in pd.read_csv(_sg_path).itertuples()} if _sg_path.exists() else {})
+            _ranges = {}
+            for r_ in RULES:
+                if not r_.get("auto"):
+                    continue
+                m_ = M[M.name == r_["who"]].iloc[0]
+                j_ = 2 if r_["key"] == "targets" else 3            # target / carry share in WEEK_SH rows
+                vol_ = env[m_.team]["targets" if r_["key"] == "targets" else "carries"]
+                proj_ = (vol_ * float(m_.ts) if r_["key"] == "targets"
+                         else float(np.mean(sims[m_["name"]]["carries"])))
+                # a role change: a new team, or the validated flag for this volume (the
+                # takeover flag for carries, the role-shift flag for targets)
+                changed_ = bool(m_.new_team) or bool(RSCH.carry_flag(CARRY_U.get(m_["name"]), WEEK - 1)
+                                                     if r_["key"] == "carries" else ROLE.get(m_["name"]))
+                _ranges[(r_["who"], r_["key"])] = RSCH.auto_range(
+                    [w_[j_] for w_ in WEEK_SH.get(m_["name"], [])],
+                    [g_[j_ - 1] for g_ in _sg.get(str(m_.gsis_id), [])], proj_, vol_, this_season_only=changed_)
+            try:
+                RULES = SC.fill_auto(RULES, _ranges)
+                auto_err = None
+            except ValueError as exc:
+                auto_err = str(exc)
+        else:
+            auto_err = None
         # THIS run's lines only, never the --prior-log merge (an earlier capture's chance is not the board's)
-        SCEN_L = run_user_scenario(pd.DataFrame(rows) if rows else R.iloc[0:0], RESEARCH, slug, snap_, RULES)
+        SCEN_L = (["", "## Your scenario (experimental)", "", f"Not priced: {auto_err}."] if auto_err else
+                  run_user_scenario(pd.DataFrame(rows) if rows else R.iloc[0:0], RESEARCH, slug, snap_, RULES))
         L += SCEN_L
         (OUT / f"report_{slug}.md").write_text("\n".join(L), encoding="utf-8")
     if not SCENARIO and not a.no_scenarios:
@@ -3456,7 +3501,10 @@ def run_user_scenario(R: pd.DataFrame, RESEARCH: pd.DataFrame, slug: str, snap: 
     break-even at each side's price and what each side would return IF the
     assumptions are right. Written to OUT/scenarios, never recorded."""
     L = ["", "## Your scenario (experimental)", "",
-         f"**Your assumptions:** {SC.describe(rules)}. These are assumptions, not confidence intervals. Every "
+         f"**Your assumptions:** {SC.describe(rules)}. "
+         + ("An auto range is one standard error of his recent share around our projection: how sure we are "
+            "of his average workload, not a forecast of this game. " if any(r_.get("auto") for r_ in rules)
+            else "These are assumptions, not confidence intervals. ") + "Every "
          "line below is priced again from the same simulation with only those inputs changed: what one player "
          "gains in targets or carries his teammates give up in proportion, receptions and receiving yards move "
          "together, and the starting QB's passing yards follow his receivers. The model's chances are not shown "

@@ -246,6 +246,11 @@ For a narrow question, run only what it needs:
   rough number: a side that pays across the range does not rest on the exact figure. Narrate the
   verdict with its end named ("the Under needs him at your 15, not your 12"); a teammate's line runs
   the other way across the range.
+  **No numbers? `carries=auto` / `targets=auto`** (a player's targets or carries only) builds the
+  range itself: our projection plus or minus one standard error of his share over his last 10 games
+  (last season's final games top up this season's; this season only after a team change or a
+  backfield takeover; needs 3+ games). It measures how sure we are of his AVERAGE, not his
+  game-to-game swing, which the price already holds. Quote the three numbers the report prints.
 - **Role what-if (a replacement the depth chart has not promoted):** `--role "PLAYER=RB1"` (QB1, RB1,
   RB2, WR1, WR2, WR3, TE1; `"PLAYER (TEAM)=..."` when a name is on both teams), repeatable, with or
   without `--assume`. A full run -- research included -- that prices him with that slot's role average
@@ -268,7 +273,10 @@ For a narrow question, run only what it needs:
      fantasy points each defence allows to RBs, WRs and TEs (the header's "Fantasy points
      allowed" line: PPR per game and rank -- a small sample this early, context only, never a
      reason on its own), and the injuries (who is out, questionable, back) -- plus any line
-     moves since the morning.
+     moves since the morning. Include the **offensive line** (header line, DECISIONS #178): how
+     many of each team's five regular linemen (most snaps this season) are out, and who. Context
+     for the user to judge -- e.g. two starters out on a run-first team -- never a price change;
+     say "status unknown" for an unmatched lineman, and say when no injury report is out yet.
   1b. **Team volume against the season** (the report's "Team volume" section, DECISIONS #172):
      each team's games this season -- score, how much of each game it spent ahead or behind by
      8+, pass attempts, sacks, designed carries, scrambles -- and whether our projected passes
