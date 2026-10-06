@@ -122,7 +122,8 @@ to 4x between years, which is why the receiving k's were fixed by backtest.
 | Receiving yards | each catch drawn separately (gamma, shape 1.07), so any catch can go long |
 | Rushing yards | carries x yards per carry plus per-carry draws from last season's real league run distribution; a game-wide efficiency swing (sd 0.30) |
 | QB passing yards | his receivers' yards in the same game plus the depth receivers' (66% catch rate, 6.3 yards per target), x a draw of the share a starter keeps |
-| QB rushing | includes kneel-downs, as the book settles it |
+| QB rushing | not on the board since DECISIONS #188 (the user does not bet it); his carries are still drawn, because they come out of the same team pool as the backs' |
+| Rushing + receiving | a back's rushing and receiving draws summed in each simulation; priced since it passed its calibration check (#187) |
 | Touchdowns | a separate prototype model (anytime_td_v1), blended with the market's price |
 
 ## 6. Price, record and the label gate

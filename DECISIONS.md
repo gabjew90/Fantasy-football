@@ -7621,3 +7621,18 @@ by the user.
   strict guard list with receptions, receiving, rushing and passing yards.
 - Found in the same run: QB passing yards FAIL on width under the corrected grading (14.4%
   of games outside the 80% range: too wide). Queued.
+
+## 2026-10-06 (188) -- QB rushing off the board; the scoreboard adopted
+
+- User (and the outside reviewer): QB rushing is not bet, so it leaves the board and the
+  guards. The starting QB's carries stay in the simulation for now -- they come out of the
+  same team pool as the backs' -- until the backs' pool is rebuilt as designed runs minus
+  the QB's own rate (queued, a volume change).
+- The scoreboard (reports/scoreboard.md, tag archive/scoreboard-rules): the engine is
+  judged on its two links -- conversion (the Over chance at a stand-in line with the actual
+  volume plugged in, log loss and Brier, bettable players) and spread (real vs simulated
+  game-to-game spread in stable-role stretches, by volume band) -- with a 1.0-point minimum
+  effect, guards in like units, team-season clustering for team-level changes, PIT tenths
+  and subgroups, and a comparisons ledger. The book comparison stays with the label gate.
+  Stand-in lines sit where Sleeper's 2026 lines sit (catches 97% within one; yards median
+  gap 5, ours about 3-4 lower).

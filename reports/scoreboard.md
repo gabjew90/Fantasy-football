@@ -67,3 +67,9 @@ So the engine is graded on the two links it owns, near-equally:
   When k candidates in one family are read against the same confirmation weeks, their
   intervals are at 1 - 0.05 / k.
 - No rule changes after a result is read; a changed rule applies to the next round only.
+
+## Amendments
+
+- **2026-10-06, after round 30 was registered, before any round read it:** QB rushing yards
+  leave the board (DECISIONS #188) and the guards, from the next round on. Round 30's knobs
+  do not touch them (the starting QB's yards-per-carry swing is eff_sd_qb, not in the grid).

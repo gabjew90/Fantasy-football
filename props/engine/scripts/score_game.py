@@ -1723,9 +1723,9 @@ def main():
                                         f"{STARTER_QB.get(tm_) or 'none'}")
                             continue
                         pr = M[M.name == nm].iloc[0]
-                        if mk["key"] == "player_rush_yds" and pr.pos == "QB" and (
-                                not QB_RUSH_ON or STARTER_QB.get(pr.team) != nm):
-                            continue   # only the starter is graded (kneels, QB width); backups are not
+                        if mk["key"] == "player_rush_yds" and pr.pos == "QB":
+                            continue   # QB rushing is off the board (DECISIONS #188): the user does not bet
+                                       # it; his carries stay in the team's pool, which the backs share
                         if mk["key"] == "player_rush_reception_yds" and pr.pos == "QB":
                             continue   # the combined line is checked on backs and receivers, not QBs
                         s = sims[nm][col]; L = oo["Over"]["point"]
