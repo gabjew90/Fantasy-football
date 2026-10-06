@@ -49,7 +49,7 @@ N = 1000
 # market key -> (actual column, label, synthetic-line offsets for the reliability table)
 # market -> the population column its rows are graded on (absent = every row)
 POPULATION = {"rush": "rush_pop", "qbrush": "qb_pop", "pass": "pass_pop", "car": "rush_pop",
-              "cmp": "pass_pop"}
+              "cmp": "pass_pop", "rr": "rr_pop"}
 MARKETS = {"rec": ("act_receptions", "receptions", [0.5, 1.5, 2.5, 3.5]),
            "yds": ("act_rec_yards", "receiving yards", [5, 10, 15, 20, 30]),
            "rush": ("act_rush_yards", "rushing yards", [5, 10, 15, 20, 30]),
@@ -62,7 +62,10 @@ MARKETS = {"rec": ("act_receptions", "receptions", [0.5, 1.5, 2.5, 3.5]),
            # already makes, graded on the same rushing population (backs, not QBs)
            "car": ("act_carries", "rushing attempts", [0.5, 1.5, 2.5, 3.5]),
            # the starting QB's completions (reports/qb_completions.md)
-           "cmp": ("act_completions", "QB completions", [0.5, 1.5, 2.5, 3.5])}
+           "cmp": ("act_completions", "QB completions", [0.5, 1.5, 2.5, 3.5]),
+           # a back's rushing + receiving yards (reports/rush_rec_calibration.md, #173 step 2):
+           # his receiving and rushing draws from the same simulation, summed
+           "rr": ("act_rr", "rushing + receiving yards", [5, 10, 15, 20, 30])}
 # THE LIVE SCORER'S OPPONENT SETTINGS (score_game.py section 5): team level, fixed
 # shrinkage k0=150 plays, applied to catch rate, ypt and ypc. The single-season
 # defaults below (posgrp, k0=1000) are the round-5 ones, kept for reproduction.
@@ -1019,6 +1022,25 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
             "crps_qbrush_baseA": np.where(qb_pop, crps_block(rushA, y_qb), nan_),
             "crps_rec_indep": full_rows(crps_block(recI, y_rec)), "crps_yds_indep": full_rows(crps_block(ydsI, y_yds)),
         })
+        # RUSHING + RECEIVING (#173 step 2): backs in both populations; drawn after every
+        # other PIT, so every existing column is unchanged
+        tr_pos = np.cumsum(rec_mask) - 1
+        rr_pop = rush_pop & rec_mask
+        rr_ix = np.flatnonzero(rr_pop)
+        y_rr_all = full_rows(y_yds) + y_rush
+        rrM = ydsM[tr_pos[rr_ix]] + rushM[rr_ix]
+        rrA = ydsA[tr_pos[rr_ix]] + rushA[rr_ix]
+        y_rr = y_rr_all[rr_ix]
+
+        def rr_rows(vals):
+            out = np.full(len(test_act), np.nan, dtype=float)
+            out[rr_ix] = vals
+            return out
+        res_df = res_df.assign(
+            rr_pop=rr_pop, act_rr=np.where(rr_pop, y_rr_all, np.nan),
+            crps_rr_model=rr_rows(crps_block(rrM, y_rr)), crps_rr_baseA=rr_rows(crps_block(rrA, y_rr)),
+            mean_rr_model=rr_rows(rrM.mean(1)), med_rr_model=rr_rows(np.median(rrM, axis=1)),
+            above_med_rr=rr_rows(y_rr > np.median(rrM, axis=1)), pit_rr=rr_rows(rpit_block(rrM, y_rr)))
         if synth:                     # the actual columns the summaries read, from the same draws
             res_df = res_df.assign(act_receptions=full_rows(y_rec), act_rec_yards=full_rows(y_yds),
                                    act_carries=y_car)
@@ -1041,7 +1063,8 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
                 ("qbrush", rushM, y_qb, qb_pop, test_act.week.values, games_a),
                 ("pass", passM, y_pass_p, np.ones(len(p_ix), bool), test_act.week.values[p_ix], games_a[p_ix]),
                 ("car", carsM, y_car, rush_pop, test_act.week.values, games_a),
-                ("cmp", cmpM, y_cmp_p, np.ones(len(p_ix), bool), test_act.week.values[p_ix], games_a[p_ix])]:
+                ("cmp", cmpM, y_cmp_p, np.ones(len(p_ix), bool), test_act.week.values[p_ix], games_a[p_ix]),
+                ("rr", rrM, y_rr, np.ones(len(rr_ix), bool), test_act.week.values[rr_ix], games_a[rr_ix])]:
             if not keep.any():
                 continue
             smp, yy = samples[keep], y[keep]
