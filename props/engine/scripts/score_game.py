@@ -1896,9 +1896,8 @@ def main():
     PA = RSCH.points_allowed(pbp, _pos_map)
     # TEAM VOLUME (DECISIONS #172): every game this season beside our projection
     TEAM_VOL_LINES = {}
-    # the team's own line, NEGATIVE = favoured (own_spread_from_book is positive = favoured)
-    TEAM_SPREAD = {t_: (None if market_env is None or MODEL.own_spread_from_book(market_env.get("home_spread"), t_ == HOME) is None
-                        else -MODEL.own_spread_from_book(market_env.get("home_spread"), t_ == HOME)) for t_ in (AWAY, HOME)}
+    TEAM_SPREAD = {t_: RSCH.team_line(None if market_env is None else market_env.get("home_spread"), t_ == HOME)
+                   for t_ in (AWAY, HOME)}
     _league_script = RSCH.league_script_shares(pbp)
     _state_mix = RSCH.league_state_mix(pbp)
     for t_ in (AWAY, HOME):
@@ -2034,6 +2033,8 @@ def main():
             if QB_READ[(r_.player, r_.team)] is not None and cp_.get("line") is not None:
                 # the spread of the team's catches across the simulation, at the starter's share
                 _sum = sum(np.asarray(sims[n_]["receptions"], dtype=float) for n_ in _team) if _team else None
+                if _sum is not None and _oth is not None:
+                    _sum = _sum + np.asarray(_oth, dtype=float) * _cr       # the depth bucket's catches (mean rate)
                 QB_READ[(r_.player, r_.team)]["book_fair"] = RSCH.fair_volume(
                     cp_["line"], RSCH.fair_over(cp_.get("mult_over"), cp_.get("mult_under")),
                     None if _sum is None else float(np.std(_sum)) * float(np.mean(P["qb_starter_pass_share_quantiles"])))

@@ -650,7 +650,7 @@ def test_team_volume_against_our_projection():
     assert tv[0]["state"]["close"] == {"plays": 57, "att": 32, "runs": 22} and tv[0]["lead_share"] == 0.0
     chk = RS.team_volume_check(tv, our_targets=30.0, our_runs=22.0)
     assert chk["our_att"] == pytest.approx(32.0) and chk["att_inside"] and chk["runs_inside"]
-    assert "Both sit inside the range of his games this season." in " ".join(RS.team_volume_lines("DAL", tv, chk))
+    assert "Both sit inside the range of its games this season." in " ".join(RS.team_volume_lines("DAL", tv, chk))
     chk = RS.team_volume_check(tv, our_targets=40.0, our_runs=30.0)
     assert "sit outside every game this season" in " ".join(RS.team_volume_lines("DAL", tv, chk))
     assert RS.team_volume(None, "DAL") == [] and RS.team_volume_lines("DAL", [], None) == []
@@ -701,3 +701,29 @@ def test_league_state_mix_by_pregame_line():
     assert mix["big favourite"] == {"lead": pytest.approx(2 / 3), "close": pytest.approx(1 / 3), "trail": 0.0}
     assert mix["big underdog"] == {"lead": 0.0, "close": 0.5, "trail": 0.5}
     assert RS.line_bucket(-9.5) == "big favourite" and RS.line_bucket(4) == "underdog" and RS.line_bucket(1.5) == "close"
+
+
+
+def test_the_team_line_sign_and_the_mix_fallback():
+    assert RS.team_line(-9.5, True) == -9.5 and RS.team_line(-9.5, False) == 9.5, "DAL -9.5 at home: TB is +9.5"
+    assert RS.line_bucket(RS.team_line(-9.5, True)) == "big favourite"
+    assert RS.line_bucket(RS.team_line(-9.5, False)) == "big underdog"
+    assert RS.team_line(None, True) is None
+    rows = [{"att": 30, "carries": 20, "scrambles": 2, "targets": 28, "score": "", "week": 1, "opp": "", "sacks": 0,
+             "qb": "", "state": {"lead": {"plays": 40, "att": 14, "runs": 26}, "close": {"plays": 60, "att": 33, "runs": 27},
+                                 "trail": {"plays": 20, "att": 14, "runs": 6}}}]
+    league = {"lead": 0.45, "close": 0.56, "trail": 0.63}
+    chk = RS.team_volume_check(rows, 28.0, 22.0, team_spread=-9.5, league=league,
+                               mix={"_all": {"lead": 0.2, "close": 0.6, "trail": 0.2}})
+    assert chk["line_bucket"] == "all lines" and chk["state_mix"] == {"lead": 0.2, "close": 0.6, "trail": 0.2}
+    none = RS.team_volume_check(rows, 28.0, 22.0, team_spread=-9.5, league=league, mix={})
+    assert none["script_att"] is None, "no mix at all: no script, never every snap in one state"
+
+
+def test_spikes_are_not_pass_attempts():
+    import pandas as pd
+    base = dict(week=1, posteam="DAL", home_team="DAL", away_team="NYG", home_score=20, away_score=28, sack=0,
+                qb_scramble=0, qb_kneel=0, receiver_player_id=None, passer_player_name="D.Prescott", score_differential=0)
+    df = pd.DataFrame([dict(base, play_type="pass", pass_attempt=1, receiver_player_id="w"),
+                       dict(base, play_type="qb_spike", pass_attempt=1)])
+    assert RS.team_volume(df, "DAL")[0]["att"] == 1

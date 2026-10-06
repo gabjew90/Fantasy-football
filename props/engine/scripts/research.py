@@ -519,7 +519,8 @@ def team_volume(pbp, team) -> list[dict]:
         sack = f0(o.get("sack", 0)) == 1 if "sack" in o else o.play_type.isna()
         scr = f0(o["qb_scramble"]) == 1 if "qb_scramble" in o else o.play_type.isna()
         kneel = f0(o["qb_kneel"]) == 1 if "qb_kneel" in o else o.play_type.isna()
-        att = (f0(o["pass_attempt"]) == 1) & ~sack if "pass_attempt" in o else (o.play_type == "pass") & ~sack
+        # a spike is play_type qb_spike: requiring a pass play keeps it out of the attempts
+        att = ((f0(o["pass_attempt"]) == 1) if "pass_attempt" in o else True) & (o.play_type == "pass") & ~sack
         qb = (o.loc[att, "passer_player_name"].mode() if "passer_player_name" in o else pd_empty())
         run_ = (o.play_type == "run") & ~kneel & ~scr
         plays = att | sack | scr | run_
@@ -563,7 +564,7 @@ def league_script_shares(pbp) -> dict:
     sack = f0("sack") == 1
     scr = f0("qb_scramble") == 1
     kneel = f0("qb_kneel") == 1
-    att = ((f0("pass_attempt") == 1) if "pass_attempt" in pbp else (pbp.play_type == "pass")) & ~sack
+    att = ((f0("pass_attempt") == 1) if "pass_attempt" in pbp else True) & (pbp.play_type == "pass") & ~sack
     runs = ((pbp.play_type == "run") & ~kneel) | scr
     d = pbp.score_differential
     out = {}
@@ -608,6 +609,10 @@ def league_state_mix(pbp) -> dict:
         if len(s_):
             vc = s_.value_counts(normalize=True)
             out[b] = {k: float(vc.get(k, 0.0)) for k in ("lead", "close", "trail")}
+    s_ = state.dropna()
+    if len(s_):
+        vc = s_.value_counts(normalize=True)
+        out["_all"] = {k: float(vc.get(k, 0.0)) for k in ("lead", "close", "trail")}
     return out
 
 
@@ -622,6 +627,14 @@ def script_rates(rows) -> dict:
         if p:
             out[st] = (a / p, u / p, p)
     return out
+
+
+def team_line(book_home_spread, is_home) -> float | None:
+    """A team's own pregame line, NEGATIVE = favoured, from a book's home spread (NEGATIVE =
+    home favoured: 'DAL -9.5')."""
+    if book_home_spread is None or book_home_spread != book_home_spread:
+        return None
+    return float(book_home_spread) if is_home else -float(book_home_spread)
 
 
 def expected_state(team_spread) -> str:
@@ -670,9 +683,11 @@ def team_volume_check(rows, our_targets, our_runs, team_spread=None, league=None
         u_s = sum((r.get("state") or {}).get(s_, {}).get("runs", 0) for r in rows)
         shares[s_] = (blended_share(a_s, u_s, league.get(s_)), a_s + u_s)
     b_ = line_bucket(team_spread) or "close"
-    w = (mix or {}).get(b_) or {st: 1.0}
-    out["line_bucket"] = b_
-    if all(shares[k][0] is not None for k in w if w[k] > 0):
+    # no game yet under this kind of line: every team's mix, never all snaps in one state
+    w = (mix or {}).get(b_) or (mix or {}).get("_all")
+    out["line_bucket"] = b_ if (mix or {}).get(b_) else ("all lines" if w else None)
+    w = w or {}
+    if w and all(shares[k][0] is not None for k in w if w[k] > 0):
         share = sum(w[k] * shares[k][0] for k in w if w[k] > 0) / sum(v for v in w.values() if v > 0)
     else:
         share = None
@@ -705,14 +720,14 @@ def team_volume_lines(team, rows, chk) -> list[str]:
                  f"| {sum(r['scrambles'] for r in rows) / len(rows):.1f} | |")
         L.append("")
         a = (f"about {chk['our_att']:.0f} pass attempts" if chk["our_att"] is not None else "")
-        s = (f"We project {a} ({chk['att_min']}-{chk['att_max']} in his games, {chk['att_avg']:.1f} a game) and "
+        s = (f"We project {a} ({chk['att_min']}-{chk['att_max']} in its games, {chk['att_avg']:.1f} a game) and "
              f"{chk['our_runs']:.0f} runs counting scrambles ({chk['runs_min']}-{chk['runs_max']}, {chk['runs_avg']:.1f} a game).")
         out_ = [w for w, ok in (("pass attempts", chk["att_inside"]), ("runs", chk["runs_inside"])) if not ok]
         if out_:
             s += (f" Our {' and '.join(out_)} sit outside every game this season -- the market's spread and total "
                   "pull them there; say why, or treat the player numbers built on them with care.")
         else:
-            s += " Both sit inside the range of his games this season."
+            s += " Both sit inside the range of its games this season."
         L.append(s)
         sr = chk.get("rates") or {}
         words = {"lead": "ahead by 8+", "close": "within one score", "trail": "behind by 8+"}
@@ -726,16 +741,17 @@ def team_volume_lines(team, rows, chk) -> list[str]:
             if chk.get("script_att") is not None:
                 lean = {"big favourite": "a favourite by 7+", "favourite": "a favourite by 3.5-7",
                         "close": "a line within 3", "underdog": "an underdog by 3.5-7",
-                        "big underdog": "an underdog by 7+"}.get(chk.get("line_bucket"), "this line")
+                        "big underdog": "an underdog by 7+", "all lines": "any line (none yet under this one)"}.get(
+                    chk.get("line_bucket"), "this line")
                 mixw = chk.get("state_mix") or {}
                 mixs = ", ".join(f"{100 * v:.0f}% {words[k]}" for k, v in mixw.items() if v > 0)
-                s2 = (f"Teams playing as {lean} spent their plays {mixs} this season. At his own "
-                      f"pass share in each state (blended toward the league's where his sample is small), that "
+                s2 = (f"Teams playing as {lean} spent their plays {mixs} this season. At this team's own "
+                      f"pass share in each state (blended toward the league's where its sample is small), that "
                       f"script is about {100 * chk['script_share']:.0f}% passes: our total plays would split into "
                       f"about {chk['script_att']:.0f} pass attempts and {chk['script_runs']:.0f} runs, against our "
                       f"{chk['our_att']:.0f} and {chk['our_runs']:.0f}.")
                 if not chk.get("script_inside", True):
-                    s2 += (" That split sits outside every game he has played this season, so read it as the "
+                    s2 += (" That split sits outside every game it has played this season, so read it as the "
                            "direction the script pushes, not a number.")
                 L.append(s2)
     L.append("")
