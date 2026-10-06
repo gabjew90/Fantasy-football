@@ -12,6 +12,7 @@ read on the same confirmation weeks uses 1 - 0.05 / k intervals.
 | 2026-10-06 | widths (tier 2) | per-stage picks | 2025 | once | null (QB passing) |
 | 2026-10-06 | market | pooled market fit | 2022-24 selection | -- | not selected; 2025 unread |
 | 2026-10-06 | shrinkage | round 27 ypc k | 2022-24 selection | -- | 80 kept; 2025 unread |
+| 2026-10-06 | volume spread | round 31 (share_conc_targets 120) | 2026 wk 2-4 | once | null (own-volume log loss -0.002 / -0.001) |
 
 The running-game family has been read four times on 2026 weeks 2-4: any further
 running-game candidate confirmed on those weeks uses 1 - 0.05 / 5 = 99% intervals.

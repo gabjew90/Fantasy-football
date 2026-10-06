@@ -42,3 +42,30 @@ to shipped (fewer knobs moved, then smaller moves).
 ## Result
 
 (Filled in after the runs, below this line, without editing anything above.)
+
+### Selection, 2022-25 (props/tools/round31_select.py)
+
+Real / model spread ratio by band (3-5 / 5-8 / 8-11 projected targets), stable-role stretches:
+
+| share_conc_targets | team_r_mult 1 | 1.5 | 2.5 |
+|---|---|---|---|
+| 40 (shipped) | 0.83 / 0.88 / 0.84 | 0.84 / 0.89 / 0.86 | 0.85 / 0.92 / 0.88 |
+| 60 | 0.89 / 0.93 / 0.88 | 0.90 / 0.96 / 0.92 | 0.91 / 0.97 / 0.94 |
+| 80 | 0.92 / 0.96 / 0.92 | 0.94 / 0.99 / 0.95 | 0.95 / **1.01** / 0.98 |
+| 120 | **0.96 / 1.00 / 0.94** | 0.97 / **1.03** / 0.98 | 0.99 / **1.06** / **1.01** |
+
+(bold over 1.00 = narrower than the real upper bound, ineligible; the pick in bold row.)
+**Picked: share_conc_targets 120, team_r_mult off** (largest gap to 1: 0.056). Guard on
+2022-25 (team-season clustered): own-volume log loss receptions +0.00057 (-0.00034,
++0.00149), receiving yards +0.00065 (-0.00002, +0.00136); Over chances move 1.7 / 1.4
+points. The guard passes.
+
+### Confirmation, 2026 weeks 2-4 (read once)
+
+Own-volume log loss, pick vs shipped (395 receivers): receptions -0.00204 (-0.00637,
++0.00234); receiving yards -0.00057 (-0.00452, +0.00359). **Both point estimates are
+negative: round 31 is null; the shipped spread stays.** The intervals span zero both
+ways -- three weeks cannot confirm or refute -- but the rule was not met.
+
+Standing finding, not a ship: the engine's target spread is wider than real games in
+every band on four seasons (an upper-bound comparison), the London case generalised.
