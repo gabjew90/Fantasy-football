@@ -39,3 +39,22 @@ than 1.0 point stays shipped.
 ## Result
 
 (Filled in after the runs, below this line, without editing anything above.)
+
+### Selection, 2022-25 (scoreboard; team-season clustered; 10,000 resamples)
+
+| team_r_mult | QB passing own-volume log loss | Receivers' spread ratio (3-5 / 5-8 / 8-11) |
+|---|---|---|
+| 1 (shipped) | 0.69931 | 0.83 / 0.88 / 0.84 |
+| 1.5 | 0.69895 | 0.84 / 0.89 / 0.86 |
+| **2.5** | **0.69816** | 0.85 / 0.92 / 0.88 |
+| 4 | 0.69905 | 0.85 / 0.91 / 0.90 |
+
+Picked 2.5 (every setting keeps the receivers under the real upper bound). Against shipped:
+QB passing own-volume log loss **+0.00115, 97.5% interval (-0.00051, +0.00284)** -- not
+detectable; the Over chance moves 1.3 points. Guards: receptions -0.0001, receiving yards
+-0.0002, rushing + receiving +0.0013 (relative), all within -0.5%.
+
+**Round 33 is null at the detectability step; 2026 is not read for it.** The team's
+throw variance is not where most of QB passing's excess width lives, or the effect is too
+small for four seasons to pin; the conditional check (given the targets) runs slightly low,
+the other open passing lead.

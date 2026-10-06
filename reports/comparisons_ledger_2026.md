@@ -14,6 +14,8 @@ read on the same confirmation weeks uses 1 - 0.05 / k intervals.
 | 2026-10-06 | shrinkage | round 27 ypc k | 2022-24 selection | -- | 80 kept; 2025 unread |
 | 2026-10-06 | volume spread | round 31 (share_conc_targets 120) | 2026 wk 2-4 | once | null (own-volume log loss -0.002 / -0.001) |
 | 2026-10-06 | running game (conversion) | round 30 eff_sd_rush 0.15 | 2026 wk 2-4 | once | **ships** (99% bar on 2022-25; +0.016 on 2026) |
+| 2026-10-06 | receiving conversion | round 32 (yards shape) | -- | -- | shipped shape best at selection; 2026 unread |
+| 2026-10-06 | volume spread | round 33 (team_r_mult 2.5, QB passing) | -- | -- | not detectable on 2022-25 (97.5%); 2026 unread |
 
 The running-game family has been read four times on 2026 weeks 2-4: any further
 running-game candidate confirmed on those weeks uses 1 - 0.05 / 6 = 99.2% intervals.
