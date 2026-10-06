@@ -155,3 +155,14 @@ def test_pit_deciles_show_shape_one_range_cannot():
     assert narrow[0] > 0.15 and narrow[-1] > 0.15 and narrow[5] < 0.08, "too narrow piles into the ends"
     tilt = CC.pit_deciles(pd.Series(rng.beta(1.0, 1.6, 50_000)))
     assert tilt[0] > tilt[-1] * 2, "a model that runs high piles outcomes into the low tenths"
+
+
+def test_the_yards_shape_exponent_keeps_the_mean_and_slows_the_spread():
+    rng = np.random.default_rng(12)
+    for T in (3, 12):
+        a = M.receiving_given_targets(np.random.default_rng(1), 200_000, T, 0.65, 8.0, 1.065)[1]
+        b = M.receiving_given_targets(np.random.default_rng(1), 200_000, T, 0.65, 8.0, 1.065,
+                                      {"catch_shape_exp": 1.3})[1]
+        assert abs(a.mean() - b.mean()) < 0.01 * a.mean() + 0.1, "the mean stays"
+        if T == 12:
+            assert b.std() < 0.95 * a.std(), "with many catches the spread grows more slowly"

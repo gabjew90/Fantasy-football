@@ -1312,7 +1312,14 @@ CONVERSION_GRID = ([dict(_R30_BASE)]
 TARGET_SPREAD_GRID = [{"share_conc_targets": sc, "team_r_mult": rm}
                       for sc in (40.0, 60.0, 80.0, 120.0) for rm in (None, 1.5, 2.5)]
 
+# Round 32 (reports/round32_yards_shape.md): receiving yards' spread with catches
+YARDS_SHAPE_GRID = [{"catch_shape_exp": ex, "catch_shape_mult": mu}
+                    for ex in (None, 1.15, 1.3, 1.5) for mu in (None, 0.8)]
+
 SUBGRIDS = {
+    "yardsshape": (YARDS_SHAPE_GRID, ("yds", "pass"), "width",
+                   "Round 32: receiving yards' spread with catches (reports/round32_yards_shape.md); the pick "
+                   "is made on the scoreboard's conversion log loss, not by this table."),
     "targetspread": (TARGET_SPREAD_GRID, ("rec", "yds", "pass"), "width",
                      "Round 31: the targets' spread (reports/round31_target_spread.md); the pick is made by "
                      "props/tools/scoreboard.py's spread check, not by this table."),
@@ -1878,7 +1885,7 @@ def main(argv=None):
     ap.add_argument("--tune-width", action="store_true",
                     help="choose the width settings on the --tune seasons; writes --report (.md/.csv)")
     ap.add_argument("--width-out", default=None, help="--tune-width: write the chosen settings to this JSON file")
-    ap.add_argument("--tune-grid", choices=["main", "qb", "rushnorm", "rushlead", "tier2", "running", "conversion", "targetspread"], default="main",
+    ap.add_argument("--tune-grid", choices=["main", "qb", "rushnorm", "rushlead", "tier2", "running", "conversion", "targetspread", "yardsshape"], default="main",
                     help="--tune-width: the receiving/rushing grid, the starting QB's own settings, or the "
                          "carry-share rescaling")
     ap.add_argument("--dispersion", choices=["prior", "train"], default=None,

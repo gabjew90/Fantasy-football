@@ -661,7 +661,11 @@ WIDTH_OFF = {"share_conc_targets": None, "share_conc_carries": None, "catch_conc
              "catch_shape_mult": None,
              # the team targets' negative-binomial dispersion times this (None = the fitted r):
              # a larger r narrows the team's game-to-game throws (reports/round31_target_spread.md)
-             "team_r_mult": None}
+             "team_r_mult": None,
+             # receiving yards' spread grows with catches as catches ** (2 - this) instead of
+             # linearly (None = 1, today's sum of independent catches); above 1 = slower growth
+             # (reports/round32_yards_shape.md)
+             "catch_shape_exp": None}
 
 # simulate_team_game(..., return_other=True) files the 'other' bucket's targets
 # under this key, for simulate_qb_passing.
@@ -684,7 +688,7 @@ def validate_width(w):
                 raise ValueError(f"{k} must be null (off) or > 0, got {v!r}")
         elif k == "eff_sd_qb" and v is None:
             continue                                   # None = inherit eff_sd_rush
-        elif k in ("catch_shape_mult", "team_r_mult"):
+        elif k in ("catch_shape_mult", "team_r_mult", "catch_shape_exp"):
             if v is not None and not (isinstance(v, (int, float)) and v > 0):
                 raise ValueError(f"{k} must be null (off) or > 0, got {v!r}")
         elif k == "rush_other_share":
@@ -1019,8 +1023,16 @@ def receiving_given_targets(rng, n_sim, targets, catch_rate, ypt, per_catch_shap
     ypc = ypt / cr
     if w["catch_shape_mult"]:                          # round 30 candidate: None = the fitted shape
         per_catch_shape = per_catch_shape * float(w["catch_shape_mult"])
-    shape_total = np.clip(rec, 0, 25) * per_catch_shape
-    yds = np.where(rec > 0, rng.gamma(np.maximum(shape_total, 1e-6), ypc / per_catch_shape), 0.0)
+    if w["catch_shape_exp"]:
+        # round 32 candidate: the same mean (catches x yards a catch), a spread that grows
+        # as catches ** (2 - exp) -- the gamma's shape is catches ** exp x the per-catch shape
+        n_c = np.clip(rec, 0, 25)
+        shape_total = np.power(n_c, float(w["catch_shape_exp"])) * per_catch_shape
+        scale = np.where(n_c > 0, n_c * ypc / np.maximum(shape_total, 1e-9), 1.0)
+        yds = np.where(rec > 0, rng.gamma(np.maximum(shape_total, 1e-6), scale), 0.0)
+    else:
+        shape_total = np.clip(rec, 0, 25) * per_catch_shape
+        yds = np.where(rec > 0, rng.gamma(np.maximum(shape_total, 1e-6), ypc / per_catch_shape), 0.0)
     if w["eff_sd_rec"]:
         yds = yds * _game_multiplier(rng, n_sim, w["eff_sd_rec"])
     return rec, yds
