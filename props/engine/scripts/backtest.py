@@ -811,7 +811,7 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
             return yds, car_mean, share_sum, cars
 
         def add_conditional(res_df, test_act, tr, rec_mask, tgtM, carsM, rush_pop, qb_pop, starter, y_rush,
-                            width):
+                            width, recM=None, ydsM=None, rushM=None):
             """TIER 2 (reports/tier2_conditional_calibration.md): stage 1, the simulated
             volume against the actual count; stage 2, catches and yards drawn GIVEN the
             actual targets, rushing yards GIVEN the actual carries (a QB's without
@@ -825,7 +825,14 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
             n = len(test_act)
             cols = {c: np.full(n, np.nan) for c in (
                 "act_targets", "pit_tgt", "mean_tgt", "pit_rec_c", "pit_yds_c", "mean_rec_c", "mean_yds_c",
-                "pit_car_qb", "pit_rush_c", "mean_rush_c")}
+                "pit_car_qb", "pit_rush_c", "mean_rush_c",
+                # THE SCOREBOARD (reports/scoreboard.md): a stand-in line where a book would hang
+                # it (the engine's own pre-game median, at the half), the chance of the Over GIVEN
+                # the actual volume (pc_) and with the engine's own volume (pu_), and the outcome
+                "L_rec", "pc_rec", "pu_rec", "L_yds", "pc_yds", "pu_yds", "L_rush", "pc_rush", "pu_rush",
+                "L_rr", "pc_rr", "pu_rr", "sd_tgt", "sd_car")}
+            half = lambda x: float(np.floor(x) + 0.5)
+            cond_yds, cond_rush = {}, {}
             act_t, act_r, act_y = (tr.act_targets.to_numpy(), tr.act_receptions.to_numpy(float),
                                    tr.act_rec_yards.to_numpy(float))
             cr_, ypt_ = tr.cr.clip(lower=0.05).to_numpy(float), tr.ypt.to_numpy(float)
@@ -835,11 +842,18 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
                 g = crng(i, 1)
                 cols["pit_tgt"][i] = pit(tgtM[k_], T, g)
                 cols["mean_tgt"][i] = tgtM[k_].mean()       # stage 1 is bucketed by this, never the actual
+                cols["sd_tgt"][i] = tgtM[k_].std()
                 if T > 0:
                     rec, yd = M.receiving_given_targets(g, N, T, float(cr_[k_]), float(ypt_[k_]), shape_ypc, width)
                     cols["pit_rec_c"][i] = pit(rec, act_r[k_], g)
                     cols["pit_yds_c"][i] = pit(yd, act_y[k_], g)
                     cols["mean_rec_c"][i], cols["mean_yds_c"][i] = rec.mean(), yd.mean()
+                    cond_yds[i] = yd
+                    if recM is not None:                     # line scores: no random draw
+                        for nm_, uM, cD in (("rec", recM[k_], rec), ("yds", ydsM[k_], yd)):
+                            L = half(np.median(uM))
+                            cols[f"L_{nm_}"][i], cols[f"pc_{nm_}"][i] = L, float((cD > L).mean())
+                            cols[f"pu_{nm_}"][i] = float((uM > L).mean())
             act_c, ypc_ = test_act.act_carries.to_numpy(), test_act.ypc.to_numpy(float)
             for i in np.flatnonzero(rush_pop | qb_pop):
                 C = int(act_c[i])
@@ -847,11 +861,25 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
                 is_qb = bool(starter[i])
                 if is_qb:                                    # backs already have pit_car
                     cols["pit_car_qb"][i] = pit(carsM[i], C, g)
+                cols["sd_car"][i] = carsM[i].std()
                 if C > 0:
                     grid = qb_resid if (is_qb and qb_resid is not None) else carry_resid
                     yd = M.rushing_given_carries(g, N, C, float(ypc_[i]), grid, M.rush_eff_sd(width, is_qb))
                     cols["pit_rush_c"][i] = pit(yd, float(y_rush[i]), g)
                     cols["mean_rush_c"][i] = yd.mean()
+                    if rushM is not None and not is_qb:      # line scores: no random draw
+                        L = half(np.median(rushM[i]))
+                        cols["L_rush"][i], cols["pc_rush"][i] = L, float((yd > L).mean())
+                        cols["pu_rush"][i] = float((rushM[i] > L).mean())
+                        cond_rush[i] = yd
+            # rushing + receiving given BOTH actual volumes: his two conditional draws summed
+            if rushM is not None and ydsM is not None:
+                tpos = np.cumsum(rec_mask) - 1
+                for i in set(cond_rush) & set(cond_yds):
+                    uM = ydsM[tpos[i]] + rushM[i]
+                    L = half(np.median(uM))
+                    cols["L_rr"][i], cols["pc_rr"][i] = L, float(((cond_yds[i] + cond_rush[i]) > L).mean())
+                    cols["pu_rr"][i] = float((uM > L).mean())
             return res_df.assign(**cols)
 
         def rpit_block(samples, y_arr):
@@ -1046,7 +1074,7 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
                                    act_carries=y_car)
         if cond:
             res_df = add_conditional(res_df, test_act, tr, rec_mask, tgtM, carsM, rush_pop, qb_pop, starter,
-                                     y_rush, width)
+                                     y_rush, width, recM=recM, ydsM=ydsM, rushM=rushM)
         res = res_df.merge(gm, on=["team", "week"], how="left")
 
         # RELIABILITY AT SYNTHETIC LINES (calibration a bettor can read): lines at

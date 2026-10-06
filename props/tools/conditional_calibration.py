@@ -42,6 +42,39 @@ CHECKS = [
 ]
 
 
+def pit_deciles(pit: pd.Series) -> list[float]:
+    """Share of outcomes in each tenth of the model's distribution (0.10 each when
+    calibrated): a too-narrow model piles into the end deciles, a too-wide one into the
+    middle, a lopsided one tilts -- what one 80% range cannot show."""
+    return [float(x) for x in np.histogram(pit.clip(0, 0.999999), bins=np.linspace(0, 1, 11))[0] / max(len(pit), 1)]
+
+
+def team_context(seasons, cache=None):
+    """(season, team, week) -> own spread (positive = favoured) and whether a backup QB
+    started (the first dropback's passer is not the passer who started most of the team's
+    earlier games, 2+)."""
+    import os
+    import tempfile
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    import scoreboard as SB
+    cache = Path(cache or os.environ.get("NFL_BACKTEST_CACHE", Path(tempfile.gettempdir()) / "nflbt"))
+    g = pd.read_csv(cache / "games.csv")
+    g = g[g.season.isin(seasons) & (g.game_type == "REG")]
+    sp = pd.concat([g.assign(team=g.home_team, spread=g.spread_line),
+                    g.assign(team=g.away_team, spread=-g.spread_line)])[["season", "week", "team", "spread"]]
+    starts = SB.opening_starters(seasons, cache)
+    rows, by_team = [], {}
+    for (s_, t, w), pid in starts.items():
+        by_team.setdefault((s_, t), []).append((w, pid))
+    for (s_, t), lst in by_team.items():
+        lst.sort()
+        for i, (w, pid) in enumerate(lst):
+            earlier = pd.Series([q for _, q in lst[:i]]).value_counts()
+            backup = (not earlier.empty and earlier.iloc[0] >= 2 and pid != earlier.index[0])
+            rows.append({"season": s_, "team": t, "week": w, "backup_start": bool(backup)})
+    return sp.merge(pd.DataFrame(rows), on=["season", "team", "week"], how="left")
+
+
 def team_margins(seasons):
     g = pd.read_csv(CACHE / "games.csv")
     g = g[g.season.isin(seasons) & (g.game_type == "REG")]
@@ -151,7 +184,12 @@ def main(argv=None):
     if "pit_tgt" not in R:
         sys.exit("these results have no conditional columns: rerun backtest.py with --conditional")
     R = R.merge(team_margins(seasons), on=["season", "week", "team"], how="left")
+    R = R.merge(team_context(seasons), on=["season", "week", "team"], how="left")
     pops = {"rec": R.act_targets.notna(), "rb": R.rush_pop.astype(bool), "qb": R.qb_pop.astype(bool)}
+    # SUBGROUPS known before kickoff, judged like volume buckets (pooled calibration can
+    # hide a big favourite's backs running low or backup-QB games running high)
+    SUBGROUPS = [("favoured by 7+", lambda d: d.spread >= 7), ("underdog by 7+", lambda d: d.spread <= -7),
+                 ("backup QB started", lambda d: d.backup_start.fillna(False).astype(bool))]
     rng = np.random.default_rng(20261006)
     report = []
     for label, pit_col, vol_col, word, edges, pop in CHECKS:
@@ -165,15 +203,21 @@ def main(argv=None):
             d = d0[(d0.margin >= lo) & (d0.margin < hi)]
             if len(d):
                 rows.append((lab, shares(d, a.reps, rng, descriptive=True)))
+        for lab, f in SUBGROUPS:
+            d = d0[f(d0)]
+            if len(d) >= 50:
+                rows.append((lab, shares(d, a.reps, rng)))
         n_nom = int(d0.margin.isna().sum())
         if n_nom:
             print(f"  ({n_nom} rows have no final score in games.csv and sit only in 'all')")
-        report.append({"check": label, "rows": [{"bucket": b, **v} for b, v in rows]})
+        dec = pit_deciles(d0.pit)
+        report.append({"check": label, "rows": [{"bucket": b, **v} for b, v in rows], "pit_deciles": dec})
         print(f"\n{label}")
         print(f"  {'bucket':<20}{'n':>7}{'<p10':>8}{'>p90':>8}{'outside':>9}   95% CI        verdict")
         for b, v in rows:
             print(f"  {b:<20}{v['n']:>7}{100 * v['below_p10']:>7.1f}%{100 * v['above_p90']:>7.1f}%"
                   f"{100 * v['outside']:>8.1f}%   [{100 * v['ci'][0]:.1f}, {100 * v['ci'][1]:.1f}]   {v['verdict']}")
+        print("  PIT by tenth (10% each when calibrated): " + " ".join(f"{100 * x:.0f}" for x in dec))
     if a.out:
         Path(a.out).write_text(json.dumps(report, indent=1) + "\n", encoding="utf-8")
     return 0

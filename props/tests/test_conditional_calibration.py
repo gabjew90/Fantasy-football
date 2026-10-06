@@ -50,6 +50,8 @@ def _run(tmp_path, monkeypatch, R):
     f = tmp_path / "res.pkl"
     pd.to_pickle({"kind": "harness", "results": R}, f)
     monkeypatch.setattr(CC, "team_margins", lambda seasons: R[["season", "week", "team"]].assign(margin=0))
+    monkeypatch.setattr(CC, "team_context", lambda seasons: R[["season", "week", "team"]].drop_duplicates()
+                        .assign(spread=0.0, backup_start=False))
     out = tmp_path / "out.json"
     CC.main([str(f), "--seasons", "2023", "--reps", "300", "--out", str(out)])
     import json
@@ -144,3 +146,12 @@ def test_round_29_moves_the_backs_carries_and_holds_the_qb():
     rs = M.hold_qb_carries([0.5, 0.2, 0.15], 2, 1.2)
     assert abs(rs[2] * 1.2 - 0.15) < 1e-12 and rs[0] == 0.5, "his expected carries unchanged, the backs' move"
     assert list(M.hold_qb_carries([0.5, 0.15], None, 1.2)) == [0.5, 0.15]
+
+
+def test_pit_deciles_show_shape_one_range_cannot():
+    rng = np.random.default_rng(6)
+    assert all(abs(x - 0.1) < 0.01 for x in CC.pit_deciles(pd.Series(rng.uniform(size=50_000))))
+    narrow = CC.pit_deciles(pd.Series(rng.beta(0.6, 0.6, 50_000)))
+    assert narrow[0] > 0.15 and narrow[-1] > 0.15 and narrow[5] < 0.08, "too narrow piles into the ends"
+    tilt = CC.pit_deciles(pd.Series(rng.beta(1.0, 1.6, 50_000)))
+    assert tilt[0] > tilt[-1] * 2, "a model that runs high piles outcomes into the low tenths"
