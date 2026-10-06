@@ -1,6 +1,6 @@
 {
   "algorithm": "props-engine-sha256-lf-1",
-  "engine_sha256": "d277bf0276d1cea2ebfe787019fb1f4941e79d323c8c4f0f19ab61c7bee58b52",
+  "engine_sha256": "3355836771a9547bfbf1a1f41e7973bcbb15c5f7af76b56fb3e738fc10fa74a0",
   "file_count": 57,
   "files": {
     "SKILL.md": "240b0a2ef678bc7d7cc6e35ec2507fa9b0c5c42eac8f5c5a30bc80019f7ae479",
@@ -38,7 +38,7 @@
     "resources/width_params.json": "ccd5629e29bf3e14bae8e050f256d04a107a8bb37ff6222de490564e93d93176",
     "scripts/absence_check.py": "fa45e3fb4a1985b38771f0c58ed002956b163ee16439778ac7391ece1ba25079",
     "scripts/absence_tune.py": "4bb4daaf1861f93ff8d57504e9fff5e0b0b828306d8210b688c87aa25ef27d1d",
-    "scripts/backtest.py": "84203d2d36df6a1a8eb2656760b7015d0bf6f8c9cf23f0b91c9768242e4c9b39",
+    "scripts/backtest.py": "f59ea02a6bf81d9f0193f9528471ca5981fc757c8198ae50c5cadd6c0a77b070",
     "scripts/build_play_yards.py": "11de6c408de85098b8a304718612e06bb5412b1b8fbe7a918c86ecb212844d73",
     "scripts/build_priors.py": "1757899778f704cf2bd074c9750f54de1edb9ff14d1429027d5096715ac707e3",
     "scripts/build_td_priors.py": "c7330a57e68c1b7c5f8a9304bfbddbb4be0ca285d9f37ef383173d3e3049c27f",
