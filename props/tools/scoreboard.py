@@ -7,15 +7,16 @@ bets -- he supplies the volume, the engine turns it into a chance at one line.
 Reads backtest.py --conditional --save-results pickles. Per bet market, on the bettable
 population (3+ projected targets; 8+ projected carries for rushing and rushing+receiving):
 
-1. CONVERSION (main): the Over chance at a stand-in line (the engine's own pre-game median,
-   at the half -- where a book hangs it) GIVEN the player's actual targets / carries,
+1. CONVERSION (main): the Over chance at a stand-in line (the pre-game expectation from inputs
+   no setting moves, centred on Sleeper's lines by backtest.STANDIN_SCALE, at the half) GIVEN
+   the player's actual targets / carries,
    scored by Brier and log loss against the outcome. Rows with zero actual volume have no
    conditional chance and are left out.
 2. OWN VOLUME (secondary): the same lines with the engine's own volume -- the baseline the
    user's read departs from.
 3. SPREAD: the game-to-game spread of targets / carries around the projection, real
-   against the model's, in stable-role stretches (same team, same starting QB, projected
-   volume within 20% of the stretch's mean, 4+ games), by volume band. Real spread includes
+   against the model's, in stable-role stretches (same team, same starting QB, same depth
+   slot, 4+ games -- role only, never the projections), by volume band. Real spread includes
    undetected role drift, so it is an upper bound: a model spread ABOVE it is too wide.
 
 With --ref, paired differences (positive = this run better) with 95% intervals resampling
@@ -38,7 +39,7 @@ MARKETS = {  # market: (line col, conditional col, own-volume col, actual col, p
     "receptions": ("L_rec", "pc_rec", "pu_rec", "act_receptions", "rec"),
     "receiving yards": ("L_yds", "pc_yds", "pu_yds", "act_rec_yards", "rec"),
     "rushing yards": ("L_rush", "pc_rush", "pu_rush", "act_rush_yards", "rb"),
-    "rushing + receiving yards": ("L_rr", "pc_rr", "pu_rr", "act_rr", "rb"),
+    "rushing + receiving yards": ("L_rr", "pc_rr", "pu_rr", "act_rr", "rr"),
     # the starting QB, given every receiver's actual targets and the team's remaining ones
     "QB passing yards": ("L_pass", "pc_pass", "pu_pass", "act_pass_yards", "qb"),
 }
@@ -53,6 +54,9 @@ def bettable(R: pd.DataFrame, pop: str) -> pd.Series:
         return R.mean_tgt.ge(MIN_TARGETS).fillna(False)
     if pop == "qb":
         return R.pass_pop.astype(bool)
+    if pop == "rr":
+        # the combined line is posted for pass-catching backs too: 8+ projected touches
+        return R.rush_pop.astype(bool) & (R.mean_car_model.fillna(0) + R.mean_tgt.fillna(0)).ge(MIN_CARRIES)
     return R.rush_pop.astype(bool) & R.mean_car_model.ge(MIN_CARRIES).fillna(False)
 
 
@@ -109,6 +113,8 @@ def single(R: pd.DataFrame) -> dict:
 def compare(R: pd.DataFrame, Ref: pd.DataFrame, cluster: str, reps: int = 2000, seed: int = 11,
             level: float = 0.95, require_same_lines: bool = True) -> dict:
     rng = np.random.default_rng(seed)
+    if level > 0.95:
+        reps = max(reps, 10_000)      # an interval above 95% needs enough values in each tail
     out = {}
     for mk in MARKETS:
         a, b = market_frame(Ref, mk), market_frame(R, mk)
@@ -256,7 +262,7 @@ def main(argv=None):
         for nm, vol, act, sd, bands, popm in (("targets", "mean_tgt", "act_targets", "sd_tgt", TGT_BANDS, None),
                                                ("carries", "mean_car_model", "act_carries", "sd_car", CAR_BANDS, "rb")):
             d = R if popm is None else R[R.rush_pop.astype(bool)]
-            out["spread"][nm] = spread_table(stable_stretches(d, vol, act, sd, opening=opening), bands)
+            out["spread"][nm] = spread_table(stable_stretches(d, vol, act, sd, opening=opening, by="role"), bands)
             print(f"\nSPREAD of {nm} around the projection, stable-role stretches (real is an upper bound)")
             for b in out["spread"][nm]:
                 print(f"  {b['band']:6s} stretches {b['stretches']:4d}  real {b['real_sd']:.2f}  model {b['model_sd']:.2f}"

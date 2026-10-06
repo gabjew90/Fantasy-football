@@ -67,6 +67,9 @@ def team_context(seasons, cache=None):
     sp = pd.concat([g.assign(team=g.home_team, spread=g.spread_line),
                     g.assign(team=g.away_team, spread=-g.spread_line)])[["season", "week", "team", "spread"]]
     starts = SB.opening_starters(seasons, cache)
+    # the harness grades QBs who threw any of the first three dropbacks (gadget snaps);
+    # a planned starter here is the first dropback's passer -- the same man in all but ~1%
+    # of team-games, noted rather than duplicated
     rows, by_team = [], {}
     for (s_, t, w), pid in starts.items():
         by_team.setdefault((s_, t), []).append((w, pid))

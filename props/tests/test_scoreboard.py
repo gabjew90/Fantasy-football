@@ -159,3 +159,10 @@ def test_the_decision_zone_is_scored_and_signs_must_agree():
     z = c["zone_c"]
     assert 0 < z["share"] < 1 and z["n"] < c["n"], "only cases whose reference chance is 15-85%"
     assert z["logloss"] < 0 and z["brier"] < 0 and z["agree"], "a noisier forecast loses in the zone too"
+
+
+def test_the_combined_line_counts_pass_catching_backs_and_99_uses_10k():
+    R = pd.DataFrame({"rush_pop": [True, True, True], "mean_car_model": [4.3, 12.0, 3.0],
+                      "mean_tgt": [4.0, 1.0, 2.0]})
+    assert SB.bettable(R, "rr").tolist() == [True, True, False], "touches, not carries alone"
+    assert SB.bettable(R, "rb").tolist() == [False, True, False]

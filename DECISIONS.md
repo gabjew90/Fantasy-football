@@ -7651,3 +7651,12 @@ by the user.
   intervals across zero). Null. The finding stands: the target spread is too wide.
 - A review catch before any selection read: stand-in lines now come from pre-game inputs
   no setting moves (each setting's own median moved with the knobs under test).
+
+## 2026-10-06 (190) -- the engine's markets: receptions, receiving, non-QB rushing, rushing + receiving, passing
+
+- User: the focus is receptions, receiving yards, non-QB rushing yards, rushing + receiving
+  yards and passing yards. QB rushing (#188) and anytime touchdowns are deferred: off the
+  skill and off what the user reads (the report's player tables and TD pairs; the slate
+  board already left TDs out). Anytime TDs are still priced, logged and graded -- "it's fine
+  to keep the logging" -- so the record keeps measuring them; `--markets td` shows them on
+  request. The TD model is untouched.

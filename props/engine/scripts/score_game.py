@@ -149,6 +149,11 @@ YARD_MARKETS = {"player_reception_yds": "rec_yards", "player_rush_yds": "rush_ya
                 # (reports/rush_rec_calibration.md: priced since it passed, DECISIONS #187)
                 "player_rush_reception_yds": "rush_rec_yards"}
 COUNT_MARKETS = {"player_receptions": "receptions"}
+# DEFERRED (user, 2026-10-06; DECISIONS #190): the engine's focus is receptions, receiving
+# yards, non-QB rushing, rushing + receiving and passing yards. Anytime TDs are still priced,
+# LOGGED and graded (the record keeps measuring them) but left off what the user reads -- the
+# report's player tables and TD pairs -- unless he asks (--markets td).
+DEFERRED_MARKETS = {"player_anytime_td"}
 CONSENSUS_TOL = {"player_receptions": 1.0, "player_reception_yds": 4.0, "player_rush_yds": 5.0,
                  "player_pass_yds": 10.0, "player_rush_reception_yds": 6.0}
 
@@ -2517,7 +2522,8 @@ def main():
     def pct(x): return f"{100*x:.0f}%"
     def odds_str(a): a = int(a); return f"+{a}" if a > 0 else f"{a}"
     td_book = {}
-    if not R.empty:
+    show_td = bool(MARKETS) and "player_anytime_td" in MARKETS      # deferred unless asked for
+    if not R.empty and show_td:
         for _, rr in R[R.market == "player_anytime_td"].iterrows():
             td_book.setdefault(rr.player, []).append((rr.book, rr.price, rr.p_novig))
 
@@ -3115,14 +3121,16 @@ def main():
              "tells you how much role your view needs, not whether the view is right; the model's chances are not shown "
              "to be calibrated within 3 points (reports/calibration_bar_v2.md).")
     if not td_two_sided:
-        L.append("- **Touchdown prices** have no 'won't score' side to remove the cut from, so the book's number there is a bit high.")
+        if (R.market == "player_anytime_td").any() if len(R) else False:
+            L.append("- **Touchdown prices** have no 'won't score' side to remove the cut from, so the book's number there is a bit high.")
     L.append("- **Why there are no bet labels:** the model beats simple baselines on past seasons, but it has not shown it "
              "adds anything beside the book's price (the report's first line gives the current graded record). Every run "
              "still logs every line, the Tuesday scorecard keeps measuring, and bets you make are graded in the journal.")
     L.append("")
 
-    # ---- touchdown pairs: only the classes the committed gate opened ----
-    L += td_pairs_section(J_)
+    # ---- touchdown pairs: only the classes the committed gate opened (deferred, #190) ----
+    if show_td:
+        L += td_pairs_section(J_)
 
     # ---- housekeeping ----
     L.append("## Housekeeping\n")

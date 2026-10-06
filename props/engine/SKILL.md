@@ -1,6 +1,6 @@
 ---
 name: nfl-prop-research
-description: Quantitative NFL sportsbook player-prop research for the NFL Gambling Project. Use when the user asks to evaluate, price, or find edges on NFL player props (passing/rushing/receiving yards, receptions, passing TDs, anytime TD) or game spreads/totals, wants fair odds or line-and-price thresholds, asks to test The Odds API connection, or asks to archive lines or validate a prop model. Retrieves nflverse play-by-play, snaps, weekly rosters, injuries, depth charts, The Odds API prices, and NWS/Open-Meteo weather in the container. Not for fantasy football start/sit, waiver, trade, or draft decisions.
+description: Quantitative NFL sportsbook player-prop research for the NFL Gambling Project. Use when the user asks to evaluate, price, or find edges on NFL player props (receptions, receiving yards, non-QB rushing yards, rushing + receiving yards, passing yards) or game spreads/totals, wants fair odds or line-and-price thresholds, asks to test The Odds API connection, or asks to archive lines or validate a prop model. Retrieves nflverse play-by-play, snaps, weekly rosters, injuries, depth charts, The Odds API prices, and NWS/Open-Meteo weather in the container. Not for fantasy football start/sit, waiver, trade, or draft decisions.
 ---
 
 # NFL Prop Research
@@ -9,7 +9,14 @@ description: Quantitative NFL sportsbook player-prop research for the NFL Gambli
 Evaluate NFL player props using verified evidence, reproducible calculations, and explicit uncertainty. Do not force bets. If the evidence cannot support a defensible probability or threshold, return `PASS` or `DATA_INSUFFICIENT`.
 
 ## Scope boundary
-This skill owns sportsbook decisions only: prop market evaluation, Over/Under valuation, fair odds, line-and-price thresholds, TD-prop evaluation, line archiving, and model validation.
+This skill owns sportsbook decisions only: prop market evaluation, Over/Under valuation, fair odds, line-and-price thresholds, line archiving, and model validation.
+
+**The engine's markets (user, 2026-10-06; DECISIONS #190):** receptions, receiving yards,
+non-QB rushing yards, rushing + receiving yards and QB passing yards. **Deferred: QB rushing
+yards and anytime touchdowns** -- neither is on the board or in the record, and you do not
+read, quote or narrate them (the TD notes further down describe the deferred model and apply
+only if the user explicitly asks for a TD price, which runs `--markets td`). When a report
+or the user mentions them, say they are deferred.
 
 It does not own fantasy football decisions (start/sit, waivers, trades, draft). If a request is primarily a fantasy decision, do not apply this skill's betting framing to it. If a request contains both, answer the sportsbook portion with this skill and the fantasy portion separately, and keep the outputs distinct even when they share evidence. Do not replace fantasy roster logic with betting-market logic.
 
@@ -236,8 +243,8 @@ present that run. What the engine can read for itself (injuries, who starts at Q
 decides on its own and says so in the report's first lines -- quote that.
 
 For a narrow question, run only what it needs:
-- **One game, specific markets:** `python scripts/score_game.py --away NYG --home LA --markets td`
-  (markets: `receptions`, `rec_yds`, `rush_yds`, `pass_yds`, `td`, comma-separated). `--week` is optional and
+- **One game, specific markets:** `python scripts/score_game.py --away NYG --home LA --markets rec_yds,rush_rec`
+  (markets: `receptions`, `rec_yds`, `rush_yds`, `rush_rec`, `pass_yds`; `td` is deferred, comma-separated). `--week` is optional and
   resolves to the next meeting; `LAR`, `WSH`, `JAC`, `LVR` are accepted. A `--markets` run prints a
   short summary (also saved as `summary_*.md`) instead of the full report, which is still written.
 - **Your scenario (a what-if on workload):** add `--assume "PLAYER: carries=14"` (or `targets=8`,

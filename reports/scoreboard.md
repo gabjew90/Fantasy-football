@@ -19,7 +19,9 @@ So the engine is graded on the two links it owns, near-equally:
 - **Population:** bettable player-games -- 3+ projected targets (receptions, receiving
   yards); 8+ projected carries for backs (rushing yards, rushing + receiving yards). Zero
   actual volume has no conditional chance and is left out.
-- **Stand-in lines:** where a book hangs a line -- the engine's own pre-game median, at the
+- **Stand-in lines** (current definition in the amendments below: the pre-game expectation
+  from inputs no setting moves, centred on Sleeper's lines by a fixed factor per market):
+  where a book hangs a line -- first written as the engine's own pre-game median, at the
   half. props/tools/standin_check.py confirms they sit where Sleeper's 2026 lines sit (line
   positions only; no outcome read).
 - **Conversion score (main):** with the player's ACTUAL targets / carries plugged into the
