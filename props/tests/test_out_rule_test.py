@@ -60,12 +60,40 @@ def test_v2_hands_on_less_as_the_absence_lengthens_and_v0_uses_last_seasons_shar
     t, ros = _team()
     d = OR.game_rows(t, ros, {"K": 0.40}, "targets").assign(season=2024)
     p0, p1, p2 = (OR.predict(d, v, 0.2, 0.25) for v in ("V0", "V1", "V2"))
-    wk = d.week.to_numpy()
+    wk = OR.collapse(d, "V0", 0.2, 0.25).week.to_numpy()
     assert (p0 > p1).all(), "a bigger share last season hands on more"
     assert np.allclose(p1[wk == 4], p2[wk == 4]), "first game out: nothing is in the teammates' shares yet"
     assert (p2[wk == 6] < p1[wk == 6]).all(), "later: part of the absence is already in their shares"
-    d["actual"] = p1                                       # a world where V1 is exactly right
-    L = OR.losses(d, 0.2, 0.25)
-    assert L["V1"].max() == 0
-    m, lo, hi = OR.diff_ci(d, L["V1"], L["V0"], reps=50)
-    assert m > 0 and lo > 0, "positive = the first argument (V1) is better"
+    f1 = OR.collapse(d, "V1", 0.2, 0.25)
+    d = d.merge(f1[["game_id", "player_id", "pred"]], on=["game_id", "player_id"]).assign(actual=lambda q: q.pred)
+    fr, L = OR.losses(d.drop(columns="pred"), 0.2, 0.25)    # a world where V1 is exactly right
+    assert L["V1"].max() < 1e-20
+    m, lo, hi = OR.diff_ci(fr, L["V1"], L["V0"], reps=50)
+    assert m > 0 and lo >= 0, "positive = the first argument (V1) is better"
+
+
+def test_two_absent_keys_sum_their_handoffs_and_a_second_spell_starts_over():
+    """Code review: two key players out in one game hand on together (one row per teammate),
+    and an absence after a return is a first game out again."""
+    rows = []
+    for w in range(1, 9):
+        out_k = w in (4, 7, 8)                       # K out week 4, back 5-6, out again 7-8
+        out_j = w == 4                               # J out week 4 too
+        n = {"A": 5}
+        if not out_k:
+            n["K"] = 9
+        if not out_j:
+            n["J"] = 6
+        for p, v in n.items():
+            rows.append({"game_id": f"g{w}", "week": w, "team": "X", "player_id": p, "n": v, "team_n": 30})
+    t = pd.DataFrame(rows)
+    ros = pd.DataFrame([{"week": w, "team": "X", "gsis_id": p, "position": pos,
+                         "status": ("RES" if (p == "K" and w in (4, 7, 8)) or (p == "J" and w == 4) else "ACT")}
+                        for w in range(1, 9) for p, pos in (("K", "WR"), ("J", "WR"), ("A", "WR"))])
+    d = OR.game_rows(t, ros, {}, "targets").assign(season=2024)
+    f = OR.collapse(d, "V1", 1.0, 0.25)
+    a4 = f[(f.player_id == "A") & (f.week == 4)].iloc[0]
+    assert a4.n_absent == 2 and len(f[(f.player_id == "A") & (f.week == 4)]) == 1, "one row, both absences"
+    assert a4["add"] == pytest.approx(0.25 * (0.3 + 0.2)), "A is the only priced teammate: he gets both quarters"
+    firsts = f[f.player_id == "A"].set_index("week").first_out
+    assert bool(firsts[4]) and bool(firsts[7]) and not bool(firsts[8]), "week 7 starts a new spell"

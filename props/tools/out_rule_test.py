@@ -11,6 +11,12 @@ scored against his actual share. Three versions of what is handed on:
   V2  V1 times the fraction of the teammate's season-to-date games the absent player played
       (only what is not already in the teammate's share)
 
+Every absent key player's handoff in a game is summed for each teammate, as the live rule
+applies every excluded player, and each teammate-game is scored once. Key players are chosen
+on their share over the whole season, as absence_tune.py chose them (it uses games after
+the absence too; the sample leans toward players whose role held or grew). "First game out"
+means he played the team's previous game.
+
     python props/tools/out_rule_test.py --seasons 2022,2023,2024,2025 --select 2022,2023,2024 --confirm 2025
 """
 from __future__ import annotations
@@ -94,7 +100,7 @@ def game_rows(t: pd.DataFrame, ros: pd.DataFrame, prior_share: dict, kind: str) 
                     mates.append((j, cur, with_k, n.get((g, j), 0) / tn[g], pos.get(j) == pos.get(kid)))
                 if not mates:
                     continue
-                first = not any((h, kid) not in n and (wk[h], team, kid) in rostered_out for h in before)
+                first = bool(before) and (before[-1], kid) in n     # he played the team's previous game
                 for j, cur, with_k, actual, same in mates:
                     rows.append({"event": f"{team}_{kid}", "game_id": g, "week": w, "team": team, "absent": kid,
                                  "player_id": j, "cur": cur, "with_k": with_k, "same": same, "actual": actual,
@@ -102,30 +108,76 @@ def game_rows(t: pd.DataFrame, ros: pd.DataFrame, prior_share: dict, kind: str) 
     return pd.DataFrame(rows)
 
 
-def predict(d: pd.DataFrame, variant: str, x: float, y: float) -> np.ndarray:
-    """Each teammate's predicted share in the game under a variant."""
-    out = np.empty(len(d))
-    for _, idx in d.groupby(["game_id", "absent"]).indices.items():
+def collapse(d: pd.DataFrame, variant: str, x: float, y: float) -> pd.DataFrame:
+    """One row per (game, teammate): his season-to-date share, the SUM of every absent key
+    player's handoff to him under the variant, the prediction and the actual share.
+    Rows come out in a fixed order, so the variants line up row for row."""
+    d = d if "season" in d else d.assign(season=0)
+    add = np.zeros(len(d))
+    for _, idx in d.groupby(["season", "game_id", "absent"]).indices.items():
         g = d.iloc[idx]
         k = g["v0"].iloc[0] if variant == "V0" else g["v1"].iloc[0]
-        add = handoff(g["cur"].to_numpy(float), g["same"].to_numpy(bool), y * k, x)
-        if variant == "V2":
-            add = add * g["with_k"].to_numpy(float)
-        out[idx] = g["cur"].to_numpy(float) + add
+        a_ = handoff(g["cur"].to_numpy(float), g["same"].to_numpy(bool), y * k, x)
+        add[idx] = a_ * g["with_k"].to_numpy(float) if variant == "V2" else a_
+    out = (d.assign(add=add)
+             .groupby(["season", "team", "game_id", "player_id"], sort=True)
+             .agg(week=("week", "first"), cur=("cur", "first"), actual=("actual", "first"),
+                  add=("add", "sum"), first_out=("first_out", "all"), n_absent=("absent", "nunique"))
+             .reset_index())
+    out["pred"] = out["cur"] + out["add"]
+    out["cluster"] = out["season"].astype(str) + "_" + out["team"].astype(str)
     return out
 
 
-def losses(d: pd.DataFrame, x: float, y: float) -> dict:
-    return {v: (predict(d, v, x, y) - d["actual"].to_numpy()) ** 2 for v in VARIANTS}
+def predict(d: pd.DataFrame, variant: str, x: float, y: float) -> np.ndarray:
+    """Each teammate-game's predicted share under a variant (collapse order)."""
+    return collapse(d, variant, x, y)["pred"].to_numpy()
 
 
-def diff_ci(d: pd.DataFrame, a: np.ndarray, b: np.ndarray, reps=2000, seed=35) -> tuple[float, float, float]:
-    """Mean of b - a (positive = a better) with a 95% interval resampling whole events."""
-    g = pd.DataFrame({"e": d["event"].astype(str) + "_" + d["season"].astype(str), "x": b - a}).groupby("e")["x"]
-    s, c = g.sum().to_numpy(), g.size().to_numpy()
-    idx = np.random.default_rng(seed).integers(0, len(s), size=(reps, len(s)))
-    boot = s[idx].sum(1) / c[idx].sum(1)
+def losses(d: pd.DataFrame, x: float, y: float) -> tuple[pd.DataFrame, dict]:
+    """(the teammate-game frame, {variant: squared errors in that frame's order})."""
+    frames = {v: collapse(d, v, x, y) for v in VARIANTS}
+    base = frames["V0"]
+    return base, {v: (f["pred"] - f["actual"]).to_numpy() ** 2 for v, f in frames.items()}
+
+
+def diff_ci(f: pd.DataFrame, a: np.ndarray, b: np.ndarray, reps=2000, seed=35) -> tuple[float, float, float]:
+    """Mean of b - a (positive = a better) with a 95% interval resampling whole
+    team-seasons (absences on one team share teammates and games)."""
+    g = pd.DataFrame({"e": f["cluster"].to_numpy(), "x": b - a}).groupby("e")["x"]
+    sm, c = g.sum().to_numpy(), g.size().to_numpy()
+    idx = np.random.default_rng(seed).integers(0, len(sm), size=(reps, len(sm)))
+    boot = sm[idx].sum(1) / c[idx].sum(1)
     return float((b - a).mean()), *(float(v) for v in np.percentile(boot, [2.5, 97.5]))
+
+
+def pick_variant(mean_loss: dict, tie=0.005) -> str:
+    """The lowest loss; V0 (shipped) kept within tie x its own loss."""
+    best = min(mean_loss, key=mean_loss.get)
+    return "V0" if mean_loss["V0"] - mean_loss[best] <= tie * mean_loss["V0"] else best
+
+
+def verdict(sel: pd.DataFrame, conf: pd.DataFrame, x: float, y: float) -> dict:
+    """The registered rule (reports/round35_out_rule.md), computed: pick on the selection
+    seasons, detectable against V0 there, no worse than 5% of V0's loss in either the
+    first-game-out or continuing part there, and not worse on the confirmation season."""
+    fs, Ls = losses(sel, x, y)
+    ms = {v: float(Ls[v].mean()) for v in VARIANTS}
+    pick = pick_variant(ms)
+    out = {"loss_select": ms, "pick": pick}
+    if pick == "V0":
+        return {**out, "ship": False, "why": "the shipped version is within 0.5% of the best"}
+    m, lo, hi = diff_ci(fs, Ls[pick], Ls["V0"])
+    parts = {}
+    for nm, msk in (("first game out", fs.first_out.to_numpy()), ("continuing", ~fs.first_out.to_numpy())):
+        if msk.any():
+            worse = float((Ls[pick][msk] - Ls["V0"][msk]).mean())
+            parts[nm] = {"n": int(msk.sum()), "worse_by": worse, "v0_loss": float(Ls["V0"][msk].mean()),
+                         "ok": worse <= 0.05 * float(Ls["V0"][msk].mean())}
+    fc, Lc = losses(conf, x, y)
+    mc, loc, hic = diff_ci(fc, Lc[pick], Lc["V0"])
+    ship = lo > 0 and all(p_["ok"] for p_ in parts.values()) and mc >= 0
+    return {**out, "gain_select": [m, lo, hi], "parts": parts, "gain_confirm": [mc, loc, hic], "ship": bool(ship)}
 
 
 def build(seasons, kind: str) -> pd.DataFrame:
@@ -156,39 +208,33 @@ def main(argv=None):
     for kind in ("targets", "carries"):
         x, y = SG.OUT_RULE[RULE_COL[kind]]
         d = build(seasons, kind)
-        res[kind] = {"x": x, "y": y}
+        f_all, _ = losses(d, x, y)
         print(f"\n== {kind} (OUT_RULE x {x}, y {y}): {d.event.nunique()} absence events, "
-              f"{d.game_id.nunique()} games, {len(d)} teammate-games")
+              f"{f_all.game_id.nunique()} games, {len(f_all)} teammate-games "
+              f"({int((f_all.n_absent > 1).sum())} with two or more key players out)")
         for lab, part in (("select " + a.select, d[d.season.isin(sel)]), ("confirm " + a.confirm, d[d.season.isin(conf)])):
-            L = losses(part, x, y)
-            mean = {v: float(L[v].mean()) for v in VARIANTS}
-            print(f"  {lab}: loss x1e4 " + ", ".join(f"{v} {1e4 * mean[v]:.3f}" for v in VARIANTS))
-            row = {"loss": mean}
+            fr, L = losses(part, x, y)
+            print(f"  {lab}: loss x1e4 " + ", ".join(f"{v} {1e4 * L[v].mean():.3f}" for v in VARIANTS))
             for v in ("V1", "V2"):
-                m, lo, hi = diff_ci(part, L[v], L["V0"])
-                row[v] = {"gain": m, "ci": [lo, hi]}
+                m, lo, hi = diff_ci(fr, L[v], L["V0"])
                 print(f"    {v} vs V0: gain x1e4 {1e4 * m:+.3f} ({1e4 * lo:+.3f}, {1e4 * hi:+.3f})")
-                for nm, msk in (("first game out", part.first_out.to_numpy()), ("continuing", ~part.first_out.to_numpy())):
+                for nm, msk in (("first game out", fr.first_out.to_numpy()), ("continuing", ~fr.first_out.to_numpy())):
                     if msk.any():
-                        mm, l2, h2 = diff_ci(part[msk], L[v][msk], L["V0"][msk])
-                        row[f"{v}_{nm}"] = {"gain": mm, "ci": [l2, h2], "n": int(msk.sum()),
-                                            "v0_loss": float(L["V0"][msk].mean())}
+                        mm, l2, h2 = diff_ci(fr[msk], L[v][msk], L["V0"][msk])
                         print(f"      {nm:15s} n {int(msk.sum()):5d}: {1e4 * mm:+.3f} ({1e4 * l2:+.3f}, {1e4 * h2:+.3f})"
                               f"  [V0 loss {1e4 * L['V0'][msk].mean():.3f}]")
-            res[kind][lab] = row
-        # leave one season out: the variant picked on the other seasons, scored on the held-out one
+        v_ = verdict(d[d.season.isin(sel)], d[d.season.isin(conf)], x, y)
+        print(f"  VERDICT: pick {v_['pick']}, {'SHIPS' if v_['ship'] else 'does not ship'}"
+              + (f" ({v_['why']})" if "why" in v_ else ""))
         oof = []
-        for s in seasons:
-            tr, te = d[d.season != s], d[d.season == s]
-            Lt = losses(tr, x, y)
-            mt = {v: Lt[v].mean() for v in VARIANTS}
-            best = min(mt, key=mt.get)
-            pick = "V0" if mt["V0"] - mt[best] <= 0.005 * mt["V0"] else best
-            Le = losses(te, x, y)
-            oof.append({"held_out": s, "pick": pick, "gain": float((Le["V0"] - Le[pick]).mean()), "n": len(te)})
-        res[kind]["loso"] = oof
+        for s_ in seasons:
+            _, Lt = losses(d[d.season != s_], x, y)
+            pk = pick_variant({v: float(Lt[v].mean()) for v in VARIANTS})
+            _, Le = losses(d[d.season == s_], x, y)
+            oof.append({"held_out": s_, "pick": pk, "gain": float((Le["V0"] - Le[pk]).mean())})
         print("  leave-one-season-out: " + "; ".join(f"{o['held_out']} pick {o['pick']} gain x1e4 {1e4 * o['gain']:+.3f}"
                                                     for o in oof))
+        res[kind] = {"x": x, "y": y, "verdict": v_, "loso": oof}
     if a.out:
         Path(a.out).write_text(json.dumps(res, indent=1, default=float) + "\n", encoding="utf-8")
     return 0
