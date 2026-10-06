@@ -43,3 +43,26 @@ Nothing ships from this test by itself. The offensive-line test is queued after 
 ## Result
 
 (Filled in after the runs, below this line, without editing anything above.)
+
+### Run 2026-10-06 (props/tools/implied_total_test.py; the corrected harness, 2022-25, shipped engine)
+
+The corrected harness left out team-games where the depth chart's starter did not start:
+30 / 24 / 31 / 7 of about 470 a season (2022-25).
+
+| Market | 2022-23: team-games, b (95% CI) | 2024-25: team-games, b (95% CI) | Verdict |
+|---|---|---|---|
+| Backs' rushing yards | 1,017, +0.601 (+0.257, +0.971) | 1,018, +0.608 (+0.333, +0.889) | **the implied total carries information the model lacks** |
+| Receivers' receiving yards | 1,021, +0.194 (-0.010, +0.394) | 1,023, +0.416 (+0.141, +0.719) | unresolved |
+| Starting QB passing yards | 875, +0.180 (-0.047, +0.395) | 901, +0.478 (+0.142, +0.759) | unresolved |
+
+**Reading.** The backs' running game takes nothing from the market (its volume is the
+team's history; DECISIONS #106 found the full market environment hurt QB rushing, so runs
+were left out of #134's market blend). Yet a team the market expects to score 10% above its
+usual runs for about 6% more than our projection, with the same slope in both periods. The
+receiving and passing slopes point the same way (clear in 2024-25, just short in 2022-23):
+the throws already take 25% from the market, and the remainder looks smaller.
+
+Next, per the rule: the backs' rushing becomes a candidate for a pre-registered tuning round
+(an implied-total term in the backs' carries or yards per carry, leaving the QB's carries
+alone). The offensive-line test was queued behind this one because a passing implied-total
+term would already carry line injuries; for rushing it now likely does.
