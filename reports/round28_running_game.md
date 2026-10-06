@@ -77,3 +77,12 @@ Rushing yards +0.0275 (+0.0000, +0.0586); rushing attempts +0.0125 (+0.0072, +0.
 QB rushing +0.0025 (-0.0142, +0.0188); receiving and passing identical. **The guard
 passes.** Round 28b waits for the one read on 2026 weeks 2-8 (after week 8 is graded),
 together with round 29 under its joint rule.
+
+### Amendment, 2026-10-06, before any 2026 read (user: no waiting for midseason)
+
+The ship test reads **2026 weeks 2-4** (every week played so far that a backtest can
+score) instead of weeks 2-8, now, once. Same rule otherwise: rushing yards, rushing
+attempts and QB rushing CRPS no worse (point estimate), no calibration verdict worse in
+those markets, receiving and passing identical; rounds 28b and 29 each on their own test,
+then jointly. Disclosed cost: about 550 back-games instead of about 1,300, so a no-worse
+rule passes more easily by chance, and the result is reported with its intervals.
