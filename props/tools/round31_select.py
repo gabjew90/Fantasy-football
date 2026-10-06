@@ -58,8 +58,11 @@ def main(argv=None):
         c = SB.compare(frames[i], frames[b], "team-season")
         out["guard"] = {mk: {"own_volume_gain": c[mk]["logloss_u"]["gain"], "ci": c[mk]["logloss_u"]["ci"],
                              "relative": c[mk]["logloss_u"]["relative"], "move_points_u": c[mk]["move_points_u"]}
-                        for mk in ("receptions", "receiving yards") if mk in c}
-        out["guard_ok"] = all(v["relative"] >= GUARD for v in out["guard"].values())
+                        for mk in c}
+        # every bet market must be present, sized and finite (QB passing included: team
+        # throws feed it); a missing one blocks rather than passes (outside review, 10-06)
+        out["guard_status"] = SB.guard_verdict(c, None, "logloss_u", floor=GUARD)
+        out["guard_ok"] = out["guard_status"]["status"] == "pass"
     print(json.dumps(out, indent=1, default=str))
     return 0
 

@@ -809,7 +809,7 @@ def points_allowed_line(pa, teams) -> str | None:
         return ("most" if rank <= 8 else "fewest" if rank > n - 8 else "middle")
     parts = []
     for t in teams:
-        bits = ", ".join(f"{p} {pa[t][p][0]:.1f} ({pa[t][p][1]} of {n}"
+        bits = ", ".join(f"{p} {pa[t][p][0]:.1f} ({ordinal(pa[t][p][1])} most of {n}"
                          + ("" if word(pa[t][p][1]) == "middle" else f", among the {word(pa[t][p][1])}") + ")"
                          for p in POS_GROUPS)
         parts.append(f"{t}'s defence allows {bits}")
@@ -820,6 +820,102 @@ def points_allowed_line(pa, teams) -> str | None:
             + (f" {100 * pa['_unmapped_share']:.0f}% of skill-player points league-wide belong to players the "
                "roster file gives no position, so these totals run a little low."
                if pa.get("_unmapped_share", 0) > 0.02 else ""))
+
+
+def ordinal(n: int) -> str:
+    """1 -> '1st', 2 -> '2nd', 11 -> '11th', 23 -> '23rd'."""
+    n = int(n)
+    suf = "th" if 10 <= n % 100 <= 20 else {1: "st", 2: "nd", 3: "rd"}.get(n % 10, "th")
+    return f"{n}{suf}"
+
+
+POS_WORD = {"RB": "running backs", "WR": "wide receivers", "TE": "tight ends"}
+
+
+def matchup_sentence(pa, opp, pos) -> str | None:
+    """One player's matchup line (user, 2026-10-06): the PPR points a game the opposing
+    defence allows to his position and its rank, 1st = most allowed. None for a QB, an
+    unknown position, or no numbers for that defence."""
+    pos = "RB" if pos == "FB" else pos
+    if not pa or opp not in pa or pos not in POS_GROUPS:
+        return None
+    ppg, rank = pa[opp][pos]
+    return (f"{opp} allows {ppg:.1f} PPR points a game to {POS_WORD[pos]}, the {ordinal(rank)} most of "
+            f"{pa['_n']} (league average {pa['_league'][pos]:.1f}; {pa['_games'][opp]} games). Context, "
+            "not a price input: position matchups were tested as too noisy to move the model.")
+
+
+def defense_metrics(pbp) -> dict:
+    """Each defence's EPA and points per drive ALLOWED (team_efficiency by defteam)."""
+    return team_efficiency(pbp, "defteam")
+
+
+def offense_metrics(pbp) -> dict:
+    """Each offence's EPA per play and points per drive GAINED (team_efficiency by posteam)."""
+    return team_efficiency(pbp, "posteam")
+
+
+def team_efficiency(pbp, side="defteam") -> dict:
+    """Each team's EPA per play (all, passes, runs) and points per drive this season, as the
+    defence (side "defteam": allowed) or the offence ("posteam": gained), with ranks
+    (1st = most -- the softest defence, the best offence). Plays: passes and runs with
+    an EPA, kneel-downs and spikes out. Drives: nflverse's fixed_drive per game, points =
+    the offence's score at the drive's end minus its start (touchdowns with their extra
+    point or two-point try, field goals; defensive and return scores are not the offence's
+    and do not count); every drive counts, end-of-half kneels included.
+    Returns {defteam: {metric: (value, rank)}} plus "_league", "_games", "_n";
+    {} when the play-by-play lacks the columns."""
+    need = {"game_id", "defteam", "posteam", "play_type", "epa"}
+    if pbp is None or not len(pbp) or not need.issubset(pbp.columns):
+        return {}
+    import pandas as _pd
+    plays = pbp[pbp.play_type.isin(["pass", "run"]) & pbp.epa.notna() & pbp[side].notna()]
+    if "qb_kneel" in plays:
+        plays = plays[plays.qb_kneel.fillna(0) != 1]
+    if "qb_spike" in plays:
+        plays = plays[plays.qb_spike.fillna(0) != 1]
+    m = _pd.DataFrame({"epa_play": plays.groupby(side).epa.mean(),
+                       "epa_pass": plays[plays.play_type == "pass"].groupby(side).epa.mean(),
+                       "epa_rush": plays[plays.play_type == "run"].groupby(side).epa.mean()})
+    dcols = {"fixed_drive", "posteam_score", "posteam_score_post"}
+    if dcols.issubset(pbp.columns):
+        d = pbp[pbp.fixed_drive.notna() & pbp.posteam.notna() & pbp.defteam.notna()]
+        g = d.groupby(["game_id", "fixed_drive"]).agg(team=(side, "first"),
+                                                      start=("posteam_score", "first"),
+                                                      end=("posteam_score_post", "last"))
+        g["pts"] = (g.end - g.start).clip(lower=0)
+        m["pts_drive"] = g.groupby("team").pts.mean()
+    cols = [c for c in ("epa_play", "epa_pass", "epa_rush", "pts_drive") if c in m]
+    rk = m[cols].rank(ascending=False, method="min")
+    games = pbp.groupby(side).game_id.nunique()
+    out = {t: {c: (float(m.loc[t, c]), int(rk.loc[t, c])) for c in cols if m.loc[t, c] == m.loc[t, c]}
+           for t in m.index}
+    out["_league"] = {c: float(m[c].mean()) for c in cols}
+    out["_games"] = {t: int(games.get(t, 0)) for t in m.index}
+    out["_n"] = len(m.index)
+    return out
+
+
+def defense_line(dm, teams, verb="allows") -> str | None:
+    """The game header's defence read: EPA per play and points per drive each defence in
+    this game allows, ranked 1st = most allowed. verb "gains" reads an offense_metrics dict
+    the same way (1st = most gained)."""
+    if not dm or not all(t in dm for t in teams):
+        return None
+    n, lg = dm["_n"], dm["_league"]
+    lab = {"epa_play": "EPA a play", "epa_pass": "EPA a pass", "epa_rush": "EPA a run", "pts_drive": "points a drive"}
+    fmt = lambda c, v: f"{v:+.2f}" if c.startswith("epa") else f"{v:.2f}"
+    parts = []
+    for t in teams:
+        bits = ", ".join(f"{fmt(c, dm[t][c][0])} {lab[c]} ({ordinal(dm[t][c][1])} most)"
+                         for c in lab if c in dm[t])
+        parts.append(f"{t} {verb} {bits}")
+    games = sorted(set(dm["_games"][t] for t in teams))
+    return ("; ".join(parts) + ". League average: "
+            + ", ".join(f"{fmt(c, lg[c])} {lab[c]}" for c in lab if c in lg)
+            + f". Ranks of {n}, 1st = most {'allowed' if verb == 'allows' else 'gained'}; over "
+            f"{'/'.join(map(str, games))} games, from nflverse "
+            "play-by-play (EPA is nflfastR's expected-points model). Context only: no price reads it.")
 
 
 # Sleeper's lines that are read beside the priced ones, never priced (DECISIONS #164, #166)

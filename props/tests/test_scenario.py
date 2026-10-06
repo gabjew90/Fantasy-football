@@ -72,6 +72,34 @@ def test_targets_come_out_of_teammates_and_the_depth_receivers_in_proportion():
     assert M.ts.tolist() == [0.25, 0.20, 0.15, 0.30], "the board's frame is never touched"
 
 
+@pytest.mark.parametrize("shares, rules", [
+    ([0.70, 0.60, 0.0], ["A: targets=8"]),                       # the review's case: raw total 130%
+    ([0.25, 0.20, 0.15], ["A: targets=8"]),                      # under 100%: unchanged arithmetic
+    ([0.50, 0.30, 0.20], ["A: targets=8"]),                      # exactly 100%: no depth bucket
+    ([0.55, 0.45, 0.30], ["A: targets=8", "B: targets=12"]),     # two fixed players, overfull
+    ([0.60, 0.40, 0.0], ["A: targets=12", "B: targets=8"]),      # fixed players take the whole budget
+])
+def test_the_sampler_delivers_the_targets_asked_for_whatever_the_share_total(shares, rules):
+    """Outside review 2026-10-06: raw shares 0.70 / 0.60 and 'A: targets=8' gave A about
+    4.4 targets in the sampler. Checked here against model.simulate_team_game itself."""
+    import model as MODEL
+    M = pd.DataFrame({"name": ["A", "B", "C"], "team": "HOU", "ts": shares, "cr": 0.65, "ypt": 8.0,
+                      "ypc": 4.2, "rs": 0.1})
+    env = {"HOU": {"targets": 40.0, "carries": 26.0}, "DAL": {"targets": 33.0, "carries": 27.0}}
+    M2, _ = SC.apply_before_sim(M, env, _rules(M, rules))
+    _, _, tg = MODEL.simulate_team_game(np.random.default_rng(5), 200_000, 40.0, 30.0,
+                                        dict(zip(M2.name, M2.ts)), dict(zip(M2.name, M2.cr)),
+                                        dict(zip(M2.name, M2.ypt)), 1.4, return_targets=True)
+    for r in SC.parse(rules, {"HOU"}):
+        assert tg[r["who"]].mean() == pytest.approx(r["value"], abs=0.05), (r, tg[r["who"]].mean())
+    # teammates keep their order and give up the difference in proportion
+    eff = SC.sampler_shares(M.ts)
+    free = [n for n in "ABC" if n not in {r["who"] for r in SC.parse(rules, {"HOU"})}]
+    if len(free) == 2 and eff.iloc[2] > 0:
+        a_, b_ = (M2.set_index("name").ts[n] for n in free)
+        assert a_ / b_ == pytest.approx(eff.iloc["ABC".index(free[0])] / eff.iloc["ABC".index(free[1])])
+
+
 def test_team_rules_apply_before_the_player_targets():
     M, env = _team()
     M2, env2 = SC.apply_before_sim(M, env, _rules(M, ["HOU: pass=-4, ypt=-10%", "B: targets=6, ypt=9.5"]))

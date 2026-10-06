@@ -166,3 +166,16 @@ def test_the_yards_shape_exponent_keeps_the_mean_and_slows_the_spread():
         assert abs(a.mean() - b.mean()) < 0.01 * a.mean() + 0.1, "the mean stays"
         if T == 12:
             assert b.std() < 0.95 * a.std(), "with many catches the spread grows more slowly"
+
+
+def test_combined_yards_counts_a_zero_side_as_zero_not_as_a_missing_game():
+    """Outside review 2026-10-06: 0 targets / 15 carries and 5 targets / 0 carries were
+    dropped from the combined-yards score; only 'neither' is left out."""
+    import backtest as BT
+    n = 4
+    rush, yds = np.array([60.0, 70, 80, 90]), np.array([10.0, 20, 30, 40])
+    assert BT.rr_given_volume(0, 15, None, rush, n).tolist() == rush.tolist(), "no target: rushing alone"
+    assert BT.rr_given_volume(5, 0, yds, None, n).tolist() == yds.tolist(), "no carry: receiving alone"
+    assert BT.rr_given_volume(3, 15, yds, rush, n).tolist() == (yds + rush).tolist()
+    assert BT.rr_given_volume(0, 0, None, None, n) is None, "never touched the ball: void"
+    assert BT.rr_given_volume(3, 15, None, rush, n) is None, "volume without a draw is not a zero"

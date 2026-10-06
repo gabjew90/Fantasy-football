@@ -295,7 +295,11 @@ def apply_before_sim(M, env, rules):
         M.loc[me(r), col[r["key"]]] = r["value"]
     # targets: the named players are fixed at their new share; every other
     # tracked teammate AND the depth receivers ('other') give up the difference
-    # in proportion, so the team total never moves
+    # in proportion, so the team total never moves. The work is done in the
+    # sampler's EFFECTIVE shares (sampler_shares): tracked shares can add past
+    # 100%, and the sampler then divides them by their total -- fixing a raw
+    # share inside an overfull budget delivered about half the targets asked
+    # for (outside review, 2026-10-06: targets=8 gave 4.4 at raw 0.70 / 0.60).
     for t in M.team.unique():
         m = M.team == t
         want = {r["who"]: r["value"] for r in rules
@@ -304,16 +308,32 @@ def apply_before_sim(M, env, rules):
         if not len(fixed):
             continue
         new = {i: want[M.at[i, "name"]] / env[t]["targets"] for i in fixed}
-        tot_new, tot_old = sum(new.values()), float(M.loc[fixed, "ts"].clip(lower=0).sum())
+        tot_new = sum(new.values())
         if tot_new > MAX_SHARE:
             raise ValueError(f"{t}: the targets you set add up to {100 * tot_new:.0f}% of the team's "
                              f"{env[t]['targets']:.1f} per game; the most is {100 * MAX_SHARE:.0f}%")
+        eff = sampler_shares(M.loc[m, "ts"])           # what the sampler would hand each player
+        tot_old = float(eff.loc[fixed].sum())
         rest = m & ~M.index.isin(fixed)
         g = (1 - tot_new) / max(1 - tot_old, 1e-9)
-        M.loc[rest, "ts"] = M.loc[rest, "ts"].clip(lower=0) * g
+        M.loc[rest, "ts"] = eff.loc[M.index[rest]] * g
         for i, s in new.items():
             M.at[i, "ts"] = s
+        # the promise: each named player's expected targets are what was asked for
+        got = sampler_shares(M.loc[m, "ts"]) * env[t]["targets"]
+        for i in fixed:
+            if abs(got.loc[i] - want[M.at[i, "name"]]) > 1e-6:      # never silently price another number
+                raise RuntimeError(f"{t}: {M.at[i, 'name']} would get {got.loc[i]:.2f} targets, not the "
+                                   f"{want[M.at[i, 'name']]:g} asked for")
     return M, env
+
+
+def sampler_shares(ts):
+    """The share of team targets each tracked player gets in model.simulate_team_game:
+    shares clipped at zero, divided by their total when it passes 100% (the depth
+    receivers' bucket is then empty), otherwise as given."""
+    ts = ts.astype(float).clip(lower=0)
+    return ts / max(float(ts.sum()), 1.0)
 
 
 def solve_carries(rs, fixed, effective):

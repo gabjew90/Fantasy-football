@@ -299,7 +299,10 @@ For a narrow question, run only what it needs:
      away, the Vegas lines (spread, total, implied points and the script they point to), the
      fantasy points each defence allows to RBs, WRs and TEs (the header's "Fantasy points
      allowed" line: PPR per game and rank -- a small sample this early, context only, never a
-     reason on its own), and the injuries (who is out, questionable, back) -- plus any line
+     reason on its own), each offence's EPA per play and points per drive gained and each
+     defence's allowed (all plays, passes, runs), with their ranks (the header's "Offence" and
+     "Defence" lines, 1st = most; read them against each other -- a top-5 passing offence into a
+     bottom-5 pass defence; context, never a price input), and the injuries (who is out, questionable, back) -- plus any line
      moves since the morning. Include the **offensive line** (header line, DECISIONS #178): how
      many of each team's five regular linemen (most snaps this season) are out, and who. Context
      for the user to judge -- e.g. two starters out on a run-first team -- never a price change;
@@ -313,6 +316,10 @@ For a narrow question, run only what it needs:
      and name the game whose script matches the Vegas line (a favourite's comfortable win).
   2. **Each player with a priced line**, team by team: his volume and share LAST SEASON, THIS
      SEASON so far, and last game against his earlier games (targets or carries, share and count).
+     Then his **matchup** (his "Matchup." line, user 2026-10-06): the PPR points a game the
+     defence he faces allows to his position and its rank -- "NYG give up the 10th most PPR
+     points to tight ends (14.2 a game, league 13.6)". Say the games behind it while the sample
+     is small; it is context, never the reason for a side on its own.
   3. **Teammates out or questionable** who move his work, and which way.
   4. **Expected volume and share, ours and the book's**: our projected targets or carries; the
      book's own volume where it posts it (catches / carries / completions lines, the side favoured,
@@ -337,7 +344,8 @@ For a narrow question, run only what it needs:
   read the game, do not recite the table. Start from the context line under its heading --
   who is favoured and the implied points (the script: a big favourite runs late, an underdog
   throws; a low total with a backup QB plays conservative), and each team's "last week was a
-  preview / differs" note. Then each side's situation: the role changes that matter (who took
+  preview / differs" note. Then each side's situation, with the matchup rank for a player you
+  name ("against the 3rd most PPR points to WRs"): the role changes that matter (who took
   over a backfield, whose target share jumped or collapsed, a returning star and who it takes
   from), where the model and the book disagree AND WHY (a stale prior on a new role, a game script
   the model does not price; when the model sits below most QB passing lines, say the gap is
@@ -544,13 +552,16 @@ need not be surfaced. Write the reply as a premium prop guide with this structur
    rather than the ones worth betting, and reuses each player-week 8-10 times so its `n`
    column overstates the evidence by about an order of magnitude. Quote it only with that
    description attached. The 2022-25 yardage harness (`reports/yardage_harness.md` in the
-   repo) is the evidence now: since props-v1.20 receptions, receiving yards and rushing yards
-   are unbiased and calibrated on outcomes (a model 85% wins about 84-85%). None is tested
-   against posted lines yet; say that, not that the numbers are unvalidated guesses.
-   QB passing yards (props-v1.24, the starting QB only) are his receivers' yards in the same
-   simulation times a starter's usual share: right on average and the right width, but its
-   edge over the no-shrinkage version is early season only and one small bucket missed --
-   priced by the user's decision (DECISIONS #105). Say so when quoting one.
+   repo) is the evidence: receptions and receiving yards are unbiased on outcomes with their
+   width within the bar. Rushing yards and rushing + receiving passed the same checks before
+   round 30 narrowed the yards-per-carry swing; the re-check at the current setting is
+   pending -- say so. None is tested against posted lines yet; say that, not that the
+   numbers are unvalidated guesses.
+   QB passing yards (the starting QB only) are his receivers' yards in the same simulation
+   times a starter's usual share: right on average but too WIDE on the corrected grading
+   (14% of games outside the 80% range against a 17-23% bar; reports/rush_rec_calibration.md),
+   so a passing chance sits too close to 50% -- an Over the model gives 60% is likely a bit
+   better than that. Priced by the user's decision (DECISIONS #105). Say so when quoting one.
    Ladder: `ladder_*.csv` holds P(stat <= k) per player; quote it when the user asks about
    an alternate line.
 6. **Parlays — DISABLED, do not price them.** `parlays_*.csv` is no longer written.

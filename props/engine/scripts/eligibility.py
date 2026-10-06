@@ -48,10 +48,11 @@ from dataclasses import dataclass, field
 MODEL_STATUS = {
     # These strings are written to every record row as model_state, so they
     # stay fixed across releases: the evidence changes, the label does not. The
-    # 2022-25 yardage harness (reports/yardage_harness.md) backtests all three
-    # yardage markets; since props-v1.20 (the width settings) they are
-    # unbiased and calibrated on OUTCOMES. Posted lines are a separate test,
-    # which is what VALIDATED_MARKETS below waits for.
+    # 2022-25 yardage harness (reports/yardage_harness.md) backtests the yardage
+    # markets on OUTCOMES: unbiased, width within the bar -- except QB passing,
+    # too wide on the corrected grading (reports/rush_rec_calibration.md), and
+    # rushing, whose re-check after round 30 is pending. Posted lines are a
+    # separate test, which is what VALIDATED_MARKETS below waits for.
     "player_receptions": "receiving_hier_v2, MODEL_UNVALIDATED (PROTOTYPE)",
     "player_reception_yds": "receiving_hier_v2, MODEL_UNVALIDATED (PROTOTYPE)",
     "player_rush_yds": "rush_yds_v0, MODEL_UNVALIDATED (no backtest)",

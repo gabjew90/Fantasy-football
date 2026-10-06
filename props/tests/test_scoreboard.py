@@ -20,7 +20,8 @@ def _world(noise, seed=0, team_effect=0.0, n_teams=32, weeks=range(2, 19), seaso
     """Receivers whose catches beat a stand-in line with a known chance `truth`; the
     run's conditional chance is truth plus `noise` (0 = right by construction)."""
     rng = np.random.default_rng(seed)
-    rows = []
+    nrng = np.random.default_rng([seed, 1])     # the noise on its own stream: every noise level
+    rows = []                                   # sees the same games and outcomes
     for s in seasons:
         tfx = {t: rng.normal(0, team_effect) for t in range(n_teams)}
         for t in range(n_teams):
@@ -28,7 +29,7 @@ def _world(noise, seed=0, team_effect=0.0, n_teams=32, weeks=range(2, 19), seaso
                 for p in range(3):
                     truth = float(np.clip(0.5 + rng.normal(0, 0.15) + tfx[t], 0.05, 0.95))
                     y = float(rng.uniform() < truth)
-                    pc = float(np.clip(truth + rng.normal(0, noise), 0.01, 0.99)) if noise else truth
+                    pc = float(np.clip(truth + nrng.normal(0, noise), 0.01, 0.99)) if noise else truth
                     rows.append({"season": s, "team": f"T{t}", "week": w, "gsis_id": f"{t}_{p}",
                                  "game_id": f"{s}_{w}_{t // 2}", "mean_tgt": 6.0, "L_rec": 4.5,
                                  "act_receptions": 5.0 if y else 4.0, "pc_rec": pc, "pu_rec": 0.5,
@@ -44,6 +45,40 @@ def test_a_sharper_conversion_wins_and_a_noisy_one_loses():
     same = SB.compare(truth, truth, "game", reps=200)["receptions"]
     assert same["logloss_c"]["gain"] == 0 and same["move_points_c"] == 0
     assert SB.single(truth)["receptions"]["brier_c"] < SB.single(noisy)["receptions"]["brier_c"]
+
+
+def test_a_comparison_is_on_one_frozen_cohort_and_guards_block_when_evidence_is_missing():
+    """Outside review 2026-10-06: the candidate is scored on the reference's player-games
+    (not its own eligibility intersected), and a guard market that is absent, thin or
+    non-finite blocks the verdict instead of passing."""
+    ref, cand = _world(0.0), _world(0.05)
+    cand.loc[cand.index[:40], "mean_tgt"] = 2.0          # the candidate's own projections drop 40 rows
+    c = SB.compare(cand, ref, "game", reps=200)
+    assert c["receptions"]["n"] == len(ref), "scored on the reference's cohort, all of it"
+    short = cand.drop(cand.index[:5])
+    try:
+        SB.compare(short, ref, "game", reps=200)
+        raise AssertionError("a candidate missing player-games must be refused")
+    except ValueError as e:
+        assert "same cohort" in str(e)
+    flipped = cand.copy()
+    flipped.loc[flipped.index[0], "act_receptions"] = 9.0 - flipped.loc[flipped.index[0], "act_receptions"]
+    try:
+        SB.compare(flipped, ref, "game", reps=200)
+        raise AssertionError("different outcomes must be refused")
+    except ValueError as e:
+        assert "outcomes" in str(e)
+    v = SB.guard_verdict(c, "receptions")
+    assert v["status"] == "blocked" and "QB passing yards" in v["missing"], "absent markets block"
+    full = {mk: {"n": 500, "logloss_c": {"relative": 0.0}} for mk in SB.MARKETS}
+    assert SB.guard_verdict(full, "receptions")["status"] == "pass"
+    worse = {**full, "receiving yards": {"n": 500, "logloss_c": {"relative": -0.01}}}
+    assert SB.guard_verdict(worse, "receptions")["status"] == "fail"
+    thin = {**full, "QB passing yards": {"n": 50, "logloss_c": {"relative": 0.0}}}
+    assert SB.guard_verdict(thin, "receptions")["thin"] == ["QB passing yards"]
+    nan = {**full, "rushing yards": {"n": 500, "logloss_c": {"relative": float("nan")}}}
+    assert SB.guard_verdict(nan, "receptions")["status"] == "blocked"
+    assert SB.guard_verdict(full, None, "logloss_c")["status"] == "pass", "no target: every market guards"
 
 
 def test_the_bettable_filter_and_zero_volume_rows():

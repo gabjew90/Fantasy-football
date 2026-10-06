@@ -93,6 +93,20 @@ def parse_weeks(s):
     return [int(x) for x in s.split(",")]
 
 
+def rr_given_volume(targets, carries, yds_draw, rush_draw, n):
+    """Rushing + receiving yards GIVEN his actual targets and carries: the two conditional
+    draws summed, a side with no volume a known zero (outside review, 2026-10-06 -- 15
+    carries and no target is still a combined-yards game). None when he had neither (the
+    book voids a player who never touches the ball) or a side with volume has no draw."""
+    if targets <= 0 and carries <= 0:
+        return None
+    yd = yds_draw if targets > 0 else np.zeros(n)
+    ru = rush_draw if carries > 0 else np.zeros(n)
+    if yd is None or ru is None:
+        return None
+    return np.asarray(yd, float) + np.asarray(ru, float)
+
+
 def nb_mle(mu, y, r_clamp):
     from scipy.optimize import minimize
     from scipy.special import gammaln
@@ -889,13 +903,20 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
                         cols["L_rush"][i], cols["pc_rush"][i] = L, float((yd > L).mean())
                         cols["pu_rush"][i] = float((rushM[i] > L).mean())
                         cond_rush[i] = yd
-            # rushing + receiving given BOTH actual volumes: his two conditional draws summed
+            # rushing + receiving given BOTH actual volumes: his two conditional draws summed.
+            # A ZERO side is a known zero, not a missing game (outside review, 2026-10-06): a back
+            # with 15 carries and no target is scored on his rushing alone, one with 5 targets and
+            # no carry on his receiving. A game with neither is left out -- the book voids a
+            # player who never touches the ball as if he had not played.
             if rushM is not None and ydsM is not None:
                 tpos = tpos_all
-                for i in set(cond_rush) & set(cond_yds):
+                for i in np.flatnonzero(rush_pop & rec_mask & ~starter.astype(bool)):
+                    both = rr_given_volume(int(act_t[tpos[i]]), int(act_c[i]), cond_yds.get(i), cond_rush.get(i), N)
+                    if both is None:
+                        continue
                     uM = ydsM[tpos[i]] + rushM[i]
                     L = half(SC_Y * mu_t[tpos[i]] * ypt_[tpos[i]] + SC_R * mu_c[i] * ypc_all[i])
-                    cols["L_rr"][i], cols["pc_rr"][i] = L, float(((cond_yds[i] + cond_rush[i]) > L).mean())
+                    cols["L_rr"][i], cols["pc_rr"][i] = L, float((both > L).mean())
                     cols["pu_rr"][i] = float((uM > L).mean())
             # STARTING-QB PASSING given the volume: every receiver's yards drawn given his actual
             # targets, the depth receivers given the team's remaining actual targets, times the

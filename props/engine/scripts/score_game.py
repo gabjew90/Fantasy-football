@@ -2121,6 +2121,9 @@ def main():
                                               team_spread=TEAM_SPREAD.get(t_), league=_league_script,
                                               mix=_state_mix))
     PA_LINE = RSCH.points_allowed_line(PA, (AWAY, HOME))
+    # the defences' EPA per play and points per drive allowed (user, 2026-10-06): context only
+    DEF_LINE = RSCH.defense_line(RSCH.defense_metrics(pbp), (AWAY, HOME))
+    OFF_LINE = RSCH.defense_line(RSCH.offense_metrics(pbp), (AWAY, HOME), verb="gains")
     # the offensive line: how many of each team's five regular linemen are out (#178)
     _pfr = (ros.dropna(subset=["pfr_id"]).drop_duplicates("pfr_id", keep="last")
                .set_index("pfr_id")["gsis_id"].to_dict() if "pfr_id" in ros else {})
@@ -2630,6 +2633,9 @@ def main():
             ry_ = RSCH.carry_yards_sentence(CARRY_READ.get((m["name"], t)))
             if ry_:
                 L.append(f"**Carries and yards.** {ry_}\n")
+            mu_ = RSCH.matchup_sentence(PA, HOME if t == AWAY else AWAY, m.pos)
+            if mu_:
+                L.append(f"**Matchup.** {mu_}\n")
             if m["name"] in SHADOW_RUSH and len(R) and "p_over_mkt_carries" in R:
                 for _, x_ in R[(R.player == m["name"]) & (R.market == "player_rush_yds")
                                & R.p_over_mkt_carries.notna()].drop_duplicates("line").iterrows():
@@ -2965,6 +2971,10 @@ def main():
                              if (V1TD.team == t).any()) + ". The two differ by design, not by error."),
               f"- **Weather:** {wx}. 15 mph sustained-wind screen {'HIT' if (weather.get('wind_mph_max') or 0) > 15 else 'not hit'}.",
               *([f"- **Fantasy points allowed:** {PA_LINE}"] if PA_LINE else []),
+              *([f"- **Offence:** {OFF_LINE}"] if OFF_LINE else []),
+              *([f"- **Defence:** {DEF_LINE}"] if DEF_LINE else
+                [f"- **Defence:** no EPA or drive data in this season's play-by-play yet (DATA MISSING)."]
+                if WEEK > 1 else []),
               *([f"- **Offensive line (the five linemen with the most snaps this season):** " + " ".join(LINE_LINES)
                  + " Context only: line absences do not change any price."] if LINE_LINES else
                 [f"- **Offensive line:** no lineman snap counts yet this season (DATA MISSING)."] if WEEK > 1 else []),
@@ -3223,7 +3233,13 @@ def main():
             L.append(f"| {r.book} | {r.market.replace('player_','')} | {r.player} | {'' if pd.isna(r.line) else r.line} | "
                      f"{'' if pd.isna(r.model_mean) else round(r.model_mean,1)} | {r.side} | {r.p_model:.3f} | {r.p_novig:.3f} | "
                      f"{r.gap:+.3f} | {r.price} | {r.ER:+.3f} |")
-    L.append(f"\nModel states: receptions/receiving yards `receiving_hier_v2`, rushing yards `rush_yds_v0` and QB passing yards `pass_yds_v0` PROTOTYPE (2022-25 harness, with the width settings: unbiased and calibrated on outcomes; not tested against posted lines); "
+    # the evidence per market, as measured (outside review 2026-10-06: the blanket "calibrated"
+    # outlived a corrected FAIL on passing width); reports/rush_rec_calibration.md, yardage_harness.md
+    L.append(f"\nModel states (none tested against posted lines): receptions and receiving yards `receiving_hier_v2` PROTOTYPE "
+             f"(2022-25 harness: unbiased, width within the bar); rushing yards `rush_yds_v0` and rushing + receiving PROTOTYPE "
+             f"(unbiased and within the width bar before round 30 narrowed the yards-per-carry swing; the re-check at the "
+             f"current setting is pending); QB passing yards `pass_yds_v0` PROTOTYPE (right on average but too WIDE: 14% of "
+             f"games outside the 80% range against a 17-23% bar, so its chances sit too close to 50%); "
              f"anytime TD `anytime_td_v1` PROTOTYPE (outcome-backtested, no posted-line test; no fair odds). All MODEL_UNVALIDATED. Dispersion: receptions log r = "
              f"{P['receptions_dispersion']['a']:.3f} + {P['receptions_dispersion']['b']:.3f}·log μ; carries "
              f"{P['carries_dispersion']['a']:.3f} + {P['carries_dispersion']['b']:.3f}·log μ; per-catch Gamma shape {SH:.3f}; "

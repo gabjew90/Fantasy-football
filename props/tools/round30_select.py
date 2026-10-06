@@ -67,11 +67,12 @@ def main(argv=None):
             continue
         c = SB.compare(frames[i], frames[ref[knob]], "game", level=level)
         target = c[market]["logloss_c"]
-        guards = {mk: v["logloss_c"]["relative"] for mk, v in c.items() if mk != market}
+        gv = SB.guard_verdict(c, market, "logloss_c", floor=GUARD)
+        guards = gv["guards"]
         checks[knob] = {"market": market, "level": level, "gain": target["gain"], "ci": target["ci"],
                         "detectable": target["ci"][0] > 0, "move_points": c[market]["move_points_c"],
                         "guards_relative": guards,
-                        "guards_ok": all(g is None or g >= GUARD for g in guards.values())}
+                        "guards_ok": gv["status"] == "pass", "guard_status": gv}
     out["checks"] = checks
     print(json.dumps(out, indent=1, default=str))
     return 0

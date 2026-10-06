@@ -69,11 +69,18 @@ def logloss(p, y):
     return -(y * np.log(p) + (1 - y) * np.log(1 - p))
 
 
-def market_frame(R: pd.DataFrame, market: str) -> pd.DataFrame:
+def market_frame(R: pd.DataFrame, market: str, cohort: pd.DataFrame | None = None) -> pd.DataFrame:
+    """The scored rows for one market: the bettable population with a line, a chance and an
+    outcome -- or, with `cohort` (KEYS rows, the reference's population), exactly those
+    player-games whatever this run's own projections say (a frozen comparison cohort)."""
     Lc, pc, pu, act, pop = MARKETS[market]
     if pc not in R:
         return R.iloc[0:0]
-    d = R[bettable(R, pop) & R[pc].notna() & R[Lc].notna() & R[act].notna()].copy()
+    if cohort is not None:
+        keep = R.set_index(KEYS).index.isin(cohort.set_index(KEYS).index)
+        d = R[keep & R[pc].notna() & R[Lc].notna() & R[act].notna()].copy()
+    else:
+        d = R[bettable(R, pop) & R[pc].notna() & R[Lc].notna() & R[act].notna()].copy()
     d["y"] = (d[act] > d[Lc]).astype(float)
     d["pc"], d["pu"], d["L"] = d[pc].astype(float), d[pu].astype(float), d[Lc].astype(float)
     return d
@@ -117,12 +124,21 @@ def compare(R: pd.DataFrame, Ref: pd.DataFrame, cluster: str, reps: int = 2000, 
         reps = max(reps, 10_000)      # an interval above 95% needs enough values in each tail
     out = {}
     for mk in MARKETS:
-        a, b = market_frame(Ref, mk), market_frame(R, mk)
-        if a.empty or b.empty:
-            continue
+        a = market_frame(Ref, mk)
+        if a.empty:
+            continue                  # no evidence for this market: guard_verdict reports it missing
+        # THE FROZEN COHORT (outside review, 2026-10-06): the candidate is scored on exactly the
+        # reference's player-games, never on its own eligibility intersected with the reference's
+        b = market_frame(R, mk, cohort=a[KEYS])
+        for nm_, x_ in (("reference", a), ("candidate", b)):
+            if x_.duplicated(KEYS).any():
+                raise ValueError(f"{mk}: the {nm_} has duplicate player-games")
+        if len(b) != len(a):
+            raise ValueError(f"{mk}: the candidate scores {len(b)} of the reference's {len(a)} player-games "
+                             "-- two settings must be scored on the same cohort (reports/scoreboard.md)")
         d = b.merge(a[KEYS + ["pc", "pu", "L", "y"]], on=KEYS, suffixes=("", "_ref"))
-        if d.empty:
-            continue
+        if not (d.y == d.y_ref).all():
+            raise ValueError(f"{mk}: the two runs disagree on outcomes -- not the same games")
         ids = cluster_ids(d, cluster)
         same = float((d.L == d.L_ref).mean())
         if same < 1.0 and require_same_lines:
@@ -151,6 +167,40 @@ def compare(R: pd.DataFrame, Ref: pd.DataFrame, cluster: str, reps: int = 2000, 
         row["move_points_u"] = float(100 * (d.pu - d.pu_ref).abs().mean())
         out[mk] = row
     return out
+
+
+MIN_GUARD_N = 200          # player-games a guard market needs before its score counts
+
+
+def guard_verdict(c: dict, target: str | None, score: str = "logloss_c", floor: float = -0.005,
+                  required=tuple(MARKETS), min_n: int = MIN_GUARD_N) -> dict:
+    """A comparison's guards, complete or explicitly not (outside review, 2026-10-06):
+    every required market other than `target` (None: a change judged elsewhere, e.g. the
+    spread check, so every market is a guard) must be present in compare()'s output with
+    min_n+ rows and a finite relative change at least `floor`. Missing, thin or non-finite
+    evidence BLOCKS the verdict -- it never passes by being absent. score: "logloss_c"
+    (conversion) or "logloss_u" (own volume), the path the change acts through.
+    Returns {status: pass | fail | blocked, guards, missing, thin, nonfinite}."""
+    guards, missing, thin, nonfinite = {}, [], [], []
+    for mk in required:
+        if mk == target:
+            continue
+        v = c.get(mk)
+        if v is None:
+            missing.append(mk)
+            continue
+        if v.get("n", 0) < min_n:
+            thin.append(mk)
+        rel = (v.get(score) or {}).get("relative")
+        if rel is None or not np.isfinite(rel):
+            nonfinite.append(mk)
+            continue
+        guards[mk] = float(rel)
+    if target is not None and target not in c:
+        missing.insert(0, target)
+    status = ("blocked" if (missing or thin or nonfinite) else
+              "pass" if all(g >= floor for g in guards.values()) else "fail")
+    return {"status": status, "guards": guards, "missing": missing, "thin": thin, "nonfinite": nonfinite}
 
 
 def stable_stretches(R: pd.DataFrame, vol: str, act: str, sd: str, opening: dict | None = None,
