@@ -824,7 +824,8 @@ def points_allowed_line(pa, teams) -> str | None:
 
 # Sleeper's lines that are read beside the priced ones, never priced (DECISIONS #164, #166)
 EXTRA_KINDS = ("longest_reception", "longest_rush", "rushing_attempts",
-               "pass_completions", "passing_attempts", "longest_passing_completion")
+               "pass_completions", "passing_attempts", "longest_passing_completion",
+               "rushing_and_receiving_yards")
 
 
 def extra_lines(markets, players, teams, kinds=EXTRA_KINDS) -> list[dict]:
@@ -1155,6 +1156,66 @@ def qb_yards_sentence(d) -> str | None:
         bits.append(f"The longest-completion line ({d['longest_line']:g}) means one completion of "
                     f"{d['long_min']}, {100 * d['long_min'] / d['y_min']:.0f}% of the {d['y_min']} yards.")
     return " ".join(b for b in bits if b)
+
+
+def rush_rec_read(line=None, mult_over=None, mult_under=None, proj_carries=None, proj_catches=None,
+                  run_rate=None, catch_rate=None, run_luck=None, catch_luck=None, sd=None,
+                  book_carries=None, book_catches=None, rates_luck_free=True) -> dict | None:
+    """The book's rushing + receiving yards line read against his touches (DECISIONS #173):
+    the no-vig Over chance and the coin-flip yards (sd = the game-to-game spread of his
+    simulated rushing + receiving yards); his luck-free yards a touch -- carries and catches
+    at their own luck-free rates (research.luck_for), weighted by our projected carries and
+    catches; the touches the line takes at that rate against ours and the book's carries +
+    catches lines; and the share of his yards that come through the air, the part that holds
+    up when his team falls behind. Our model's own chance of the Over is NOT shown: the
+    combined market waits on its calibration check (the simulation draws a team's runs and
+    passes independently)."""
+    ok = lambda v: v is not None and v == v
+    if not ok(line):
+        return None
+    y_min = to_clear(line)
+    out = {"line": float(line), "y_min": y_min, "p_over": fair_over(mult_over, mult_under),
+           "fav": favoured(mult_over, mult_under), "coin": None, "touch_rate": None, "need": None,
+           "proj_touches": None, "book_touches": None, "air_share": None, "word": None,
+           "proj_carries": float(proj_carries) if ok(proj_carries) else None,
+           "proj_catches": float(proj_catches) if ok(proj_catches) else None,
+           "run_rate": float(run_rate) if ok(run_rate) else None,
+           "catch_rate": float(catch_rate) if ok(catch_rate) else None,
+           "run_luck": run_luck, "catch_luck": catch_luck, "rates_luck_free": bool(rates_luck_free)}
+    out["coin"] = fair_volume(line, out["p_over"], sd)
+    c, k, rr, cr = out["proj_carries"], out["proj_catches"], out["run_rate"], out["catch_rate"]
+    if c is not None and k is not None and rr is not None and cr is not None and c + k > 0:
+        yards = c * rr + k * cr
+        out.update(touch_rate=yards / (c + k), proj_touches=c + k,
+                   air_share=(k * cr / yards) if yards > 0 else None)
+        g = volume_gauge(y_min, out["touch_rate"], c + k, "touches", 8.0)
+        if g:
+            out.update(need=g["need"], word=g["word"])
+    if ok(book_carries) and ok(book_catches):
+        out["book_touches"] = float(book_carries) + float(book_catches)
+    return out
+
+
+def rush_rec_sentence(d) -> str | None:
+    if not d:
+        return None
+    fav = f", {d['fav']} favoured" if d["fav"] else ""
+    coin = f" (a coin flip at about {d['coin']:.0f} yards)" if d["coin"] is not None else ""
+    bits = [f"The book's line is {d['line']:g}{fav}{coin}."]
+    if d["need"] is not None:
+        whose = "his luck-free yards a touch" if d.get("rates_luck_free", True) else "our yards a touch (too few of his own plays)"
+        bits.append(f"At {whose} ({d['run_rate']:.1f} a carry, {d['catch_rate']:.1f} a catch, "
+                    f"{d['touch_rate']:.1f} a touch at our mix), {d['y_min']} yards takes about {d['need']:.1f} touches; "
+                    f"we project {d['proj_touches']:.1f} ({d['proj_carries']:.1f} carries, {d['proj_catches']:.1f} "
+                    f"catches), {d['word']}.")
+        if d["book_touches"] is not None:
+            bits.append(f"The book's own carries and catches lines add to {d['book_touches']:g} touches.")
+        if d["air_share"] is not None:
+            bits.append(f"About {100 * d['air_share']:.0f}% of his projected yards come from catches: if his team falls "
+                        "behind, that part holds up while the carries shrink.")
+    bits.append("Our model's own chance on this line is not shown until the combined market passes its "
+                "calibration check.")
+    return " ".join(bits)
 
 
 # a questionable player worth a flag on his teammates' rows, priced or not (DECISIONS #163)

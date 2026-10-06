@@ -1909,7 +1909,7 @@ def main():
     PA_LINE = RSCH.points_allowed_line(PA, (AWAY, HOME))
     # CATCHES, YARDS AND THE LONG ONE (DECISIONS #164): the book's three receiving lines
     # read together at the whole numbers that win them, against his yards a catch
-    CATCH_READ, CARRY_READ, QB_READ = {}, {}, {}
+    CATCH_READ, CARRY_READ, QB_READ, RUSH_REC = {}, {}, {}, {}
     if len(RESEARCH):
         _extra_rows = (data or {}).get("sleeper_extra")
         _extra = RSCH.extra_index(_extra_rows, SLEEPER_TEAM)
@@ -2006,6 +2006,35 @@ def main():
                             for r in RESEARCH.itertuples()]
         RESEARCH["carry_yards"] = [RSCH.carry_yards_sentence(CARRY_READ.get((r.player, r.team)))
                                    if r.market == "player_rush_yds" else None for r in RESEARCH.itertuples()]
+        # RUSHING + RECEIVING YARDS (DECISIONS #173): the book's combined line against his touches
+        for (k_, n_, tm_), x_ in _extra.items():
+            if k_ != "rushing_and_receiving_yards":
+                continue
+            hit = M[(M.name.map(norm_name) == n_) & (M.team == tm_)]
+            if hit.empty or hit.iloc[0]["name"] not in sims:
+                continue
+            m_ = hit.iloc[0]
+            sm_ = sims[m_["name"]]
+            lr_, rr_ = _luck(m_.gsis_id, "run")
+            lc_, cr_ = _luck(m_.gsis_id, "catch")
+            RUSH_REC[(m_["name"], tm_)] = RSCH.rush_rec_read(
+                line=x_["line"], mult_over=x_.get("mult_over"), mult_under=x_.get("mult_under"),
+                proj_carries=float(np.mean(sm_["carries"])), proj_catches=float(np.mean(sm_["receptions"])),
+                run_rate=rr_ if rr_ is not None else (float(m_.ypc) if pd.notna(m_.ypc) else None),
+                catch_rate=cr_ if cr_ is not None else (float(m_.ypt) / float(m_.cr) if float(m_.cr) > 0 else None),
+                run_luck=lr_, catch_luck=lc_, rates_luck_free=rr_ is not None and cr_ is not None,
+                sd=float(np.std(np.asarray(sm_["rush_yards"]) + np.asarray(sm_["rec_yards"]))),
+                book_carries=_xl("rushing_attempts", m_["name"], tm_).get("line"),
+                book_catches=next((float(r.line) for r in RESEARCH[(RESEARCH.player == m_["name"])
+                                                                   & (RESEARCH.market == "player_receptions")
+                                                                   & (RESEARCH.book == "sleeper")].itertuples()), None))
+        # on his rushing row, or on his receiving-yards row when he has no rushing line
+        _has_rush = set(zip(RESEARCH.loc[RESEARCH.market == "player_rush_yds", "player"],
+                            RESEARCH.loc[RESEARCH.market == "player_rush_yds", "team"]))
+        RESEARCH["rush_rec"] = [RSCH.rush_rec_sentence(RUSH_REC.get((r.player, r.team)))
+                                if (r.market == "player_rush_yds"
+                                    or (r.market == "player_reception_yds" and (r.player, r.team) not in _has_rush))
+                                else None for r in RESEARCH.itertuples()]
         # COMPLETIONS AND YARDS (DECISIONS #170): the quarterback's version
         _qbr = RESEARCH[RESEARCH.market == "player_pass_yds"]
         _qbr = _qbr.sort_values("book", key=lambda b: b != "sleeper").drop_duplicates(["player", "team"])
@@ -2356,6 +2385,9 @@ def main():
             ry_ = RSCH.carry_yards_sentence(CARRY_READ.get((m["name"], t)))
             if ry_:
                 L.append(f"**Carries and yards.** {ry_}\n")
+            rr_s = RSCH.rush_rec_sentence(RUSH_REC.get((m["name"], t)))
+            if rr_s:
+                L.append(f"**Rushing + receiving yards.** {rr_s}\n")
             qy_ = RSCH.qb_yards_sentence(QB_READ.get((m["name"], t)))
             if qy_:
                 L.append(f"**Completions and yards.** {qy_}\n")

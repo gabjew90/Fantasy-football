@@ -357,6 +357,14 @@ For a narrow question, run only what it needs:
   below); a big gap between the two means his average was built on one or two long plays, so a yards
   Over that needs his raw average needs another one. Lean on our figure for runners: their
   early-season yards a carry is noise.
+  **Rushing + receiving yards** (DECISIONS #173): for a back, the report reads the book's
+  combined line -- its no-vig coin flip, the touches the line takes at his luck-free yards a
+  carry and a catch, against our touches and the book's carries + catches lines, and how much
+  of his yards come from catches. When a back's rushing leg needs a different script from the
+  rest of an entry, name his combined line as the leg that survives both scripts (the catches
+  hold up when his team trails). Our model's own chance on it is not shown yet: the combined
+  market waits on its calibration check, because the simulation draws a team's runs and passes
+  independently.
   **The achievability gauge** ends both reads: the volume the yards line takes at his capped
   yards a play (the luck line: a play past the player's OWN 97.5th percentile for that prop --
   his catches or his runs, last season and this one -- counts as a lucky breakaway and is
