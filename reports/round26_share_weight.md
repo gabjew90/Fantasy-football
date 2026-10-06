@@ -47,6 +47,8 @@ Run: `backtest.py --seasons 2022,2023,2024,2025 --tune 2022,2023 --test 2024,202
 
 (Filled in after the runs, below this line, without editing anything above.)
 
+The text above was committed before any run as 4db45da (2026-10-05 21:1x PT, tag archive/round26-prereg).
+
 ### Result (2026-10-05): null -- the shipped values stay
 
 Selection on 2022-23 (lower CRPS is better):
