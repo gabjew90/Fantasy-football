@@ -69,3 +69,11 @@ Shipped engine, harness saved per player-game (props/tools/backup_qb_check.py):
   against 0.975 otherwise (WR2 0.939 / 0.976; WR3, TE1 unchanged) -- the shape of a backup
   spreading the ball away from the top target. A WR1-specific rule would need its own
   pre-registration and a fresh look, since this split was seen first here.
+
+### Correction (2026-10-06, after this result)
+
+The QB passing rows above are a harness grading error, not a model miss. The harness
+graded its own pre-game starter, and in 27% of backup games that was an active primary
+who did not start (reports/backup_qb_implied_total.md, PR #128). Graded on the QB who
+started, backup starts run at 0.995 of the model's passing yards. The receiver rows are
+unaffected, and the conclusion stands: no receiver adjustment.
