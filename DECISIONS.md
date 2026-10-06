@@ -7413,3 +7413,16 @@ by the user.
 - Later the same evening the user settled on the 97.5th percentile (both catches and
   runs) after trying the 95th and 99th. Narration names the better line, catches OR
   yards, for every read, with the reason; the two are never used interchangeably.
+
+## 2026-10-05 (170) -- the quarterback gets the same luck-free check, on completions
+
+- Each starting QB's passing-yards line gets a "Completions and yards" read: Sleeper's
+  completions line (with the side it favours) and attempts line beside our projected
+  completions -- his receivers' catches in this simulation plus the depth bucket's, times
+  the starter's usual share, the mean of what simulate_qb_completions draws; the lines'
+  yards per completion against ours; his luck-free yards per completion over his last 10
+  games (each completion past his own 97.5th percentile counted at it; under 20
+  completions, our figure); the completions the yards line takes at that rate, against
+  ours and the book's; and the longest-completion line's share of the yards.
+- The resource now also stores each passer's completions (kind "pass"). Report text and
+  chat answers only: no price moves.

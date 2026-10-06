@@ -395,6 +395,7 @@ def research_fields(b) -> dict:
                           if get("bf_early") is not None and not pd.isna(get("bf_early")) else None),
             "catch_yards": get("catch_yards") if isinstance(get("catch_yards"), str) else None,
             "carry_yards": get("carry_yards") if isinstance(get("carry_yards"), str) else None,
+            "qb_yards": get("qb_yards") if isinstance(get("qb_yards"), str) else None,
             "flags": get("flags") if isinstance(get("flags"), str) else ""}
 
 
@@ -446,6 +447,8 @@ def research_text(x: dict, label: str, book: str = "", line=None) -> str:
         bits.append(f"catches and yards: {x['catch_yards']}")
     if x.get("carry_yards") and label == "rush yds":
         bits.append(f"carries and yards: {x['carry_yards']}")
+    if x.get("qb_yards") and label == "pass yds":
+        bits.append(f"completions and yards: {x['qb_yards']}")
     if x.get("flags"):
         bits.append(f"flags: {x['flags']}")
     return "; ".join(bits)

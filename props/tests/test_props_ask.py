@@ -372,3 +372,8 @@ def test_the_carries_and_yards_read_rides_on_the_rushing_answer():
     f = A.research_fields(pd.Series({"price_over": -128, "carry_yards": "The book's carries line is 19.5."}))
     assert "carries and yards: The book's carries line is 19.5." in A.research_text(f, "rush yds")
     assert "carries and yards" not in A.research_text(f, "rec yds")
+
+
+def test_the_completions_read_rides_on_the_passing_answer():
+    f = A.research_fields(pd.Series({"price_over": -128, "qb_yards": "The book's completions line is 22.5."}))
+    assert "completions and yards: The book's completions line is 22.5." in A.research_text(f, "pass yds")

@@ -564,3 +564,31 @@ def test_points_allowed_notes_players_without_a_position():
     assert pa["_unmapped_share"] == pytest.approx(0.5)
     pa["NO"], pa["_games"]["NO"] = pa["ATL"], 1
     assert "belong to players the roster file gives no position" in RS.points_allowed_line(pa, ("ATL", "NO"))
+
+
+def test_the_quarterback_read_uses_completions():
+    lk = {"cap": 41.0, "own": True, "n": 210, "games": 10}
+    d = RS.qb_yards_read(completions_line=22.5, yards_line=259.5, proj_completions=20.1, model_ypc=11.9,
+                         luck=lk, luckfree_ypc=10.8, longest_line=34.5, completions_fav="Under", attempts_line=35.5)
+    assert d["gauge"]["need"] == pytest.approx(260 / 10.8)
+    s = RS.qb_yards_sentence(d)
+    assert s.startswith("The book's completions line is 22.5, Under favoured (attempts 35.5); we project 20.1.")
+    assert "The lines ask 11.5 yards a completion (259.5 over 22.5); we expect 11.9, 10.8 luck-free over his last 10 games." in s
+    assert ("every completion past 41 yards, his own 97.5th percentile over his last 10 games with a completion "
+            "(210 completions), counted as 41") in s
+    assert "260 yards takes about 24.1 completions; we project 20.1 (our volume), fewer than it takes" in s
+    assert "The book's own completions line is 22.5, Under favoured: fewer than the yards line takes" in s
+    assert "The longest-completion line (34.5) means one completion of 35, 13% of the 260 yards." in s
+    assert RS.qb_yards_read(22.5, None) is None
+    bare = RS.qb_yards_read(yards_line=225.5, proj_completions=19.0, model_ypc=11.0)
+    assert "(our figure for him)" in RS.qb_yards_sentence(bare)
+
+
+def test_the_resource_holds_a_quarterbacks_completions():
+    import pandas as pd
+    import build_play_yards as BPY
+    pbp = pd.DataFrame({"season_type": "REG", "week": [1, 1, 2], "play_type": "pass", "qb_kneel": 0,
+                        "complete_pass": [1, 0, 1], "receiver_player_id": ["wr", "wr", "te"], "rusher_player_id": None,
+                        "receiving_yards": [12.0, None, 30.0], "rushing_yards": None, "passer_player_id": "qb"})
+    out = BPY.play_yards(pbp)
+    assert out[(out.gsis_id == "qb") & (out.kind == "pass")].iloc[0].games == "1:12;2:30"

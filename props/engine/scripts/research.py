@@ -346,14 +346,16 @@ YPC_MIN_CATCHES = 8
 # a play past the player's OWN 97.5th percentile for that prop over his last LUCK_WINDOW games
 # -- his catches for receiving yards, his runs for rushing yards -- counts as a lucky
 # breakaway and is counted at that line (user, 2026-10-05, after trying the 95th and 99th: the
-# 95th cut a back's ordinary 15-25-yard runs, which come most games). "Too few" = under LUCK_MIN_PLAYS of his plays of
-# that kind in the window; then his longest play is left out instead. A definition for a
+# 95th cut a back's ordinary 15-25-yard runs, which come most games). "Too few" = under
+# LUCK_MIN_PLAYS of his plays of that kind in the window; then his longest play is left out
+# instead. At 20 plays the 97.5th sits at about his longest play. A definition for a
 # descriptive gauge, not a fit (reports/robust_ypc_check.md, for reference only)
 LUCK_PCT = 97.5
 LUCK_MIN_PLAYS = 20
 # the luck-free check (luck line AND rate) reads his last this-many games, crossing into
 # last season while this one is short (user, 2026-10-05)
 LUCK_WINDOW = 10
+QB_MIN_COMPLETIONS = 20
 
 
 def player_luck_line(plays) -> dict:
@@ -386,7 +388,7 @@ def luck_for(prior_games, current_games, gid, kind, window=LUCK_WINDOW):
     games = (list(prior_games.get((gid, kind), []) or []) + list(current_games.get(gid, []) or []))[-window:]
     plays = [y for g in games for y in g]
     luck = dict(player_luck_line(plays), games=len(games))
-    min_plays = YPC_MIN_CATCHES if kind == "catch" else RUN_MIN_CARRIES
+    min_plays = {"catch": YPC_MIN_CATCHES, "run": RUN_MIN_CARRIES, "pass": QB_MIN_COMPLETIONS}[kind]
     return luck, (luck_free_rate(plays, luck) if len(plays) >= min_plays else None)
 
 
@@ -402,7 +404,7 @@ def luck_words(luck, unit) -> str:
     """How the report names the luck line it used."""
     if not luck:
         return ""
-    plural = f"{unit}es" if unit == "catch" else f"{unit}s"
+    plural = {"catch": "catches", "run": "runs", "completion": "completions"}.get(unit, f"{unit}s")
     if luck["own"]:
         return (f"every {unit} past {luck['cap']:.0f} yards, his own {LUCK_PCT}th percentile over his last "
                 f"{luck.get('games', '?')} games with a {unit} ({luck['n']} {plural}), counted as {luck['cap']:.0f}")
@@ -413,7 +415,7 @@ def luck_words(luck, unit) -> str:
 # display bands for the gauge, picked, not measured: projected volume within 15% of what
 # the yards line takes reads "about what it takes"
 GAUGE_BAND = 0.15
-SINGULAR = {"catches": "catch", "carries": "carry"}
+SINGULAR = {"catches": "catch", "carries": "carry", "completions": "completion"}
 
 
 def volume_gauge(y_min, rate, proj, unit, low_volume):
@@ -529,7 +531,8 @@ def points_allowed_line(pa, teams) -> str | None:
 
 
 # Sleeper's lines that are read beside the priced ones, never priced (DECISIONS #164, #166)
-EXTRA_KINDS = ("longest_reception", "longest_rush", "rushing_attempts")
+EXTRA_KINDS = ("longest_reception", "longest_rush", "rushing_attempts",
+               "pass_completions", "passing_attempts", "longest_passing_completion")
 
 
 def extra_lines(markets, players, teams, kinds=EXTRA_KINDS) -> list[dict]:
@@ -781,6 +784,62 @@ def carry_yards_sentence(d) -> str | None:
                       f"; with that one, his other {n_} carries need {d['rest_ypc']:.1f} each")
             bits.append(s + ".")
     return " ".join(bits)
+
+
+def qb_yards_read(completions_line=None, yards_line=None, proj_completions=None, model_ypc=None,
+                  luck=None, luckfree_ypc=None, longest_line=None, completions_fav=None,
+                  attempts_line=None) -> dict | None:
+    """The quarterback's version of the catches/carries reads (DECISIONS #170): the book's
+    completions, passing-yards and longest-completion lines read together at the whole
+    numbers that win them; his luck-free yards per completion over his last LUCK_WINDOW
+    games (each completion past his own LUCK_PCT percentile counted at it); the
+    completions the yards line takes at that rate, against our projected completions and
+    the book's completions line. Report text only."""
+    ok = lambda v: v is not None and v == v
+    if not ok(yards_line):
+        return None
+    y_min = to_clear(yards_line)
+    out = {"yards_line": float(yards_line), "y_min": y_min, "completions_line": None, "c_min": None,
+           "mid_ypc": None, "model_ypc": float(model_ypc) if ok(model_ypc) and model_ypc > 0 else None,
+           "luckfree_ypc": float(luckfree_ypc) if ok(luckfree_ypc) else None, "luck": luck,
+           "completions_fav": completions_fav, "attempts_line": float(attempts_line) if ok(attempts_line) else None,
+           "proj": float(proj_completions) if ok(proj_completions) else None,
+           "longest_line": None, "long_min": None, "gauge": None, "gauge_rate": None}
+    if ok(completions_line) and float(completions_line) > 0:
+        out.update(completions_line=float(completions_line), c_min=to_clear(completions_line),
+                   mid_ypc=float(yards_line) / float(completions_line))
+    if ok(longest_line):
+        out.update(longest_line=float(longest_line), long_min=to_clear(longest_line))
+    rate = out["luckfree_ypc"] if out["luckfree_ypc"] is not None else out["model_ypc"]
+    if rate is not None:
+        out.update(gauge_rate=rate, gauge=volume_gauge(y_min, rate, out["proj"], "completions", 12.0))
+    return out
+
+
+def qb_yards_sentence(d) -> str | None:
+    if not d or (d["completions_line"] is None and d.get("gauge") is None):
+        return None
+    bits = []
+    if d["completions_line"] is not None:
+        fav = f", {d['completions_fav']} favoured" if d["completions_fav"] else ""
+        att = f" (attempts {d['attempts_line']:g})" if d["attempts_line"] is not None else ""
+        we = f"; we project {d['proj']:.1f}" if d["proj"] is not None else ""
+        bits.append(f"The book's completions line is {d['completions_line']:g}{fav}{att}{we}.")
+        his = []
+        if d["model_ypc"] is not None:
+            his.append(f"we expect {d['model_ypc']:.1f}")
+        if d["luckfree_ypc"] is not None:
+            his.append(f"{d['luckfree_ypc']:.1f} luck-free over his last {(d.get('luck') or {}).get('games', '?')} games")
+        bits.append(f"The lines ask {d['mid_ypc']:.1f} yards a completion ({d['yards_line']:g} over "
+                    f"{d['completions_line']:g})" + (f"; {', '.join(his)}" if his else "") + ".")
+    if d.get("gauge") is not None:
+        lc = luck_words(d.get("luck"), "completion") if d["luckfree_ypc"] is not None else None
+        bits.append(gauge_sentence(d["gauge"], d["gauge_rate"], "completion", lc, d["y_min"], "a long completion",
+                                   book_line=d["completions_line"], book_fav=d["completions_fav"]))
+    if d["long_min"] is not None:
+        bits.append(f"The longest-completion line ({d['longest_line']:g}) means one completion of "
+                    f"{d['long_min']}, {100 * d['long_min'] / d['y_min']:.0f}% of the {d['y_min']} yards.")
+    return " ".join(b for b in bits if b)
 
 
 # a questionable player worth a flag on his teammates' rows, priced or not (DECISIONS #163)

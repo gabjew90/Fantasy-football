@@ -262,10 +262,13 @@ For a narrow question, run only what it needs:
      yards line works out to ("line implies").
   5. **The lines themselves**: where our projection lands (zone), and the luck-free check -- his
      luck-free yards a play over his last 10 games, the volume the yards line takes at that rate,
-     against our volume and the book's. Then **name the better line for each read, catches OR
-     yards, and say why** -- never use the two interchangeably (user, 2026-10-05). Yards is the
-     better vehicle when the luck-free check says the yards line takes fewer catches than the
-     catches line asks (London: 82 yards takes about 5.3 catches; the catches line asks 7); catches
+     against our volume and the book's. For a QB the same check reads "Completions and yards": his
+     luck-free yards per completion, the completions his passing-yards line takes, against our
+     projected completions and the book's completions line. Then **name the better line for each
+     read, catches OR yards, and say why** -- never use the two interchangeably (user,
+     2026-10-05). Yards is the better vehicle when the luck-free check says the yards line takes
+     fewer catches than the catches line asks (London, week 4: 82 yards took about 5.4 catches; the
+     catches line asked 7); catches
      is better when the yards line takes more than his volume or rests on a long play, or when a
      plus-money catches price makes it the cheaper side. When neither fits, say so.
   6. **If-thens**, one per line of decision, with the losing branch, and which groups of legs mix.

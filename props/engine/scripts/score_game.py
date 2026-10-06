@@ -1897,7 +1897,7 @@ def main():
     PA_LINE = RSCH.points_allowed_line(PA, (AWAY, HOME))
     # CATCHES, YARDS AND THE LONG ONE (DECISIONS #164): the book's three receiving lines
     # read together at the whole numbers that win them, against his yards a catch
-    CATCH_READ, CARRY_READ = {}, {}
+    CATCH_READ, CARRY_READ, QB_READ = {}, {}, {}
     if len(RESEARCH):
         _extra_rows = (data or {}).get("sleeper_extra")
         _extra = RSCH.extra_index(_extra_rows, SLEEPER_TEAM)
@@ -1921,7 +1921,8 @@ def main():
         _py = pd.read_csv(_py_path) if _py_path.exists() else pd.DataFrame(columns=["gsis_id", "kind", "games"])
         _prior_games = {(str(r.gsis_id), r.kind): _BPY.parse_games(r.games) for r in _py.itertuples()}
         _cur = {"catch": RSCH.games_by_player(passes[passes.complete_pass == 1], "receiver_player_id", "receiving_yards"),
-                "run": RSCH.games_by_player(rushes, "rusher_player_id", "rushing_yards")}
+                "run": RSCH.games_by_player(rushes, "rusher_player_id", "rushing_yards"),
+                "pass": RSCH.games_by_player(passes[passes.complete_pass == 1], "passer_player_id", "receiving_yards")}
         _luck = lambda gid, kind: RSCH.luck_for(_prior_games, _cur[kind], str(gid), kind)
         if not _py_path.exists():
             SOURCES.append(("Last season's play yards (luck-free check)", "each player's last 10 games, play by play",
@@ -1983,6 +1984,32 @@ def main():
                             for r in RESEARCH.itertuples()]
         RESEARCH["carry_yards"] = [RSCH.carry_yards_sentence(CARRY_READ.get((r.player, r.team)))
                                    if r.market == "player_rush_yds" else None for r in RESEARCH.itertuples()]
+        # COMPLETIONS AND YARDS (DECISIONS #170): the quarterback's version
+        _qbr = RESEARCH[RESEARCH.market == "player_pass_yds"]
+        _qbr = _qbr.sort_values("book", key=lambda b: b != "sleeper").drop_duplicates(["player", "team"])
+        for r_ in _qbr.itertuples():
+            if r_.player not in sims or "pass_yards" not in sims[r_.player]:
+                continue
+            m_ = M[(M.name == r_.player) & (M.team == r_.team)].iloc[0]
+            # our completions: the receivers' catches in this simulation plus the depth bucket's,
+            # times the starter's usual share -- the mean of the draw simulate_qb_completions makes
+            _team = [n_ for n_ in M[M.team == r_.team].name if n_ != r_.player and n_ in sims]
+            _oth = pass_inputs.get(r_.team, (None, None))[1]
+            _cr = float(P["other_receiver_rates"]["catch_rate"])
+            _proj = ((sum(float(np.mean(sims[n_]["receptions"])) for n_ in _team)
+                      + (float(np.mean(_oth)) * _cr if _oth is not None else 0.0))
+                     * float(np.mean(P["qb_starter_pass_share_quantiles"])))
+            lk_, lfr_ = _luck(m_.gsis_id, "pass")
+            cp_ = _xl("pass_completions", r_.player, r_.team)
+            QB_READ[(r_.player, r_.team)] = RSCH.qb_yards_read(
+                completions_line=cp_.get("line"), yards_line=float(r_.line), proj_completions=_proj,
+                model_ypc=float(np.mean(sims[r_.player]["pass_yards"])) / _proj if _proj > 0 else None,
+                luck=lk_, luckfree_ypc=lfr_,
+                longest_line=_xl("longest_passing_completion", r_.player, r_.team).get("line"),
+                completions_fav=RSCH.favoured(cp_.get("mult_over"), cp_.get("mult_under")),
+                attempts_line=_xl("passing_attempts", r_.player, r_.team).get("line"))
+        RESEARCH["qb_yards"] = [RSCH.qb_yards_sentence(QB_READ.get((r.player, r.team)))
+                                if r.market == "player_pass_yds" else None for r in RESEARCH.itertuples()]
     RESEARCH.to_csv(OUT / f"research_{slug}.csv", index=False)
 
     # ---------- 8b/9. report, written for a casual reader ----------
@@ -2299,6 +2326,9 @@ def main():
             ry_ = RSCH.carry_yards_sentence(CARRY_READ.get((m["name"], t)))
             if ry_:
                 L.append(f"**Carries and yards.** {ry_}\n")
+            qy_ = RSCH.qb_yards_sentence(QB_READ.get((m["name"], t)))
+            if qy_:
+                L.append(f"**Completions and yards.** {qy_}\n")
 
             # research rows: line, price, projection, the two Over chances, what the line implies
             mine = RESEARCH[RESEARCH.player == m["name"]] if len(RESEARCH) else RESEARCH
