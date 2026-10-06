@@ -2022,13 +2022,19 @@ def main():
                 proj_carries=float(np.mean(sm_["carries"])), proj_catches=float(np.mean(sm_["receptions"])),
                 run_rate=rr_ if rr_ is not None else (float(m_.ypc) if pd.notna(m_.ypc) else None),
                 catch_rate=cr_ if cr_ is not None else (float(m_.ypt) / float(m_.cr) if float(m_.cr) > 0 else None),
-                run_luck=lr_, catch_luck=lc_,
+                run_luck=lr_, catch_luck=lc_, rates_luck_free=rr_ is not None and cr_ is not None,
                 sd=float(np.std(np.asarray(sm_["rush_yards"]) + np.asarray(sm_["rec_yards"]))),
                 book_carries=_xl("rushing_attempts", m_["name"], tm_).get("line"),
                 book_catches=next((float(r.line) for r in RESEARCH[(RESEARCH.player == m_["name"])
-                                                                   & (RESEARCH.market == "player_receptions")].itertuples()), None))
+                                                                   & (RESEARCH.market == "player_receptions")
+                                                                   & (RESEARCH.book == "sleeper")].itertuples()), None))
+        # on his rushing row, or on his receiving-yards row when he has no rushing line
+        _has_rush = set(zip(RESEARCH.loc[RESEARCH.market == "player_rush_yds", "player"],
+                            RESEARCH.loc[RESEARCH.market == "player_rush_yds", "team"]))
         RESEARCH["rush_rec"] = [RSCH.rush_rec_sentence(RUSH_REC.get((r.player, r.team)))
-                                if r.market == "player_rush_yds" else None for r in RESEARCH.itertuples()]
+                                if (r.market == "player_rush_yds"
+                                    or (r.market == "player_reception_yds" and (r.player, r.team) not in _has_rush))
+                                else None for r in RESEARCH.itertuples()]
         # COMPLETIONS AND YARDS (DECISIONS #170): the quarterback's version
         _qbr = RESEARCH[RESEARCH.market == "player_pass_yds"]
         _qbr = _qbr.sort_values("book", key=lambda b: b != "sleeper").drop_duplicates(["player", "team"])

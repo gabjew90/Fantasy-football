@@ -746,3 +746,10 @@ def test_the_rushing_plus_receiving_read():
     assert RS.rush_rec_read(None) is None
     bare = RS.rush_rec_read(line=40.5)
     assert RS.rush_rec_sentence(bare).startswith("The book's line is 40.5.")
+
+
+
+def test_the_rushing_plus_receiving_read_names_whose_rate():
+    d = RS.rush_rec_read(line=30.5, proj_carries=6.0, proj_catches=2.0, run_rate=3.9, catch_rate=6.5,
+                         rates_luck_free=False)
+    assert "At our yards a touch (too few of his own plays)" in RS.rush_rec_sentence(d)

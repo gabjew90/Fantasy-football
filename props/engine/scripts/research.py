@@ -1160,7 +1160,7 @@ def qb_yards_sentence(d) -> str | None:
 
 def rush_rec_read(line=None, mult_over=None, mult_under=None, proj_carries=None, proj_catches=None,
                   run_rate=None, catch_rate=None, run_luck=None, catch_luck=None, sd=None,
-                  book_carries=None, book_catches=None) -> dict | None:
+                  book_carries=None, book_catches=None, rates_luck_free=True) -> dict | None:
     """The book's rushing + receiving yards line read against his touches (DECISIONS #173):
     the no-vig Over chance and the coin-flip yards (sd = the game-to-game spread of his
     simulated rushing + receiving yards); his luck-free yards a touch -- carries and catches
@@ -1181,7 +1181,7 @@ def rush_rec_read(line=None, mult_over=None, mult_under=None, proj_carries=None,
            "proj_catches": float(proj_catches) if ok(proj_catches) else None,
            "run_rate": float(run_rate) if ok(run_rate) else None,
            "catch_rate": float(catch_rate) if ok(catch_rate) else None,
-           "run_luck": run_luck, "catch_luck": catch_luck}
+           "run_luck": run_luck, "catch_luck": catch_luck, "rates_luck_free": bool(rates_luck_free)}
     out["coin"] = fair_volume(line, out["p_over"], sd)
     c, k, rr, cr = out["proj_carries"], out["proj_catches"], out["run_rate"], out["catch_rate"]
     if c is not None and k is not None and rr is not None and cr is not None and c + k > 0:
@@ -1203,7 +1203,8 @@ def rush_rec_sentence(d) -> str | None:
     coin = f" (a coin flip at about {d['coin']:.0f} yards)" if d["coin"] is not None else ""
     bits = [f"The book's line is {d['line']:g}{fav}{coin}."]
     if d["need"] is not None:
-        bits.append(f"At his luck-free yards a touch ({d['run_rate']:.1f} a carry, {d['catch_rate']:.1f} a catch, "
+        whose = "his luck-free yards a touch" if d.get("rates_luck_free", True) else "our yards a touch (too few of his own plays)"
+        bits.append(f"At {whose} ({d['run_rate']:.1f} a carry, {d['catch_rate']:.1f} a catch, "
                     f"{d['touch_rate']:.1f} a touch at our mix), {d['y_min']} yards takes about {d['need']:.1f} touches; "
                     f"we project {d['proj_touches']:.1f} ({d['proj_carries']:.1f} carries, {d['proj_catches']:.1f} "
                     f"catches), {d['word']}.")

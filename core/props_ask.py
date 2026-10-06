@@ -448,7 +448,7 @@ def research_text(x: dict, label: str, book: str = "", line=None) -> str:
         bits.append(f"catches and yards: {x['catch_yards']}")
     if x.get("carry_yards") and label == "rush yds":
         bits.append(f"carries and yards: {x['carry_yards']}")
-    if x.get("rush_rec") and label == "rush yds":
+    if x.get("rush_rec") and label in ("rush yds", "rec yds"):
         bits.append(f"rushing + receiving yards: {x['rush_rec']}")
     if x.get("qb_yards") and label == "pass yds":
         bits.append(f"completions and yards: {x['qb_yards']}")
