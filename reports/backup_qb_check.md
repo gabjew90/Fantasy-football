@@ -44,3 +44,28 @@ Otherwise the board keeps flagging QB changes with no model change.
 ## Result
 
 (Filled in after the run, below this line, without editing anything above.)
+
+### Result (2026-10-06): no receiver adjustment earned; the QB gap needs a cleaner split
+
+Shipped engine, harness saved per player-game (props/tools/backup_qb_check.py):
+
+| Period | Market | Backup team-games | actual / model, backup | actual / model, others | Difference (95% CI) |
+|---|---|---|---|---|---|
+| 2022-23 | receiving yards | 226 | 0.947 | 0.996 | -0.048 (-0.098, +0.001) |
+| 2022-23 | catches | 226 | 0.966 | 0.996 | -0.030 (-0.074, +0.013) |
+| 2022-23 | QB passing yards | 149 | 0.628 | 1.028 | -0.400 (-0.487, -0.316) |
+| 2024-25 | receiving yards | 224 | 0.976 | 0.984 | -0.008 (-0.063, +0.049) |
+| 2024-25 | catches | 224 | 0.995 | 0.977 | +0.018 (-0.027, +0.064) |
+| 2024-25 | QB passing yards | 152 | 0.752 | 1.023 | -0.271 (-0.357, -0.184) |
+
+- **The rule:** receiving yards run lower in backup games in both periods, but the 2024-25
+  interval spans zero, so no receiver adjustment is earned.
+- **QB passing yards** sit far below the model in backup games -- but the harness prices the
+  depth chart's starter, and a "backup game" here includes games where the primary QB left
+  injured or was benched mid-game, which nothing pregame can know. The gap mixes those with
+  planned backup starts. Not acted on; the follow-up (pre-registered separately) splits
+  planned starts (the backup listed QB1 before kickoff) from in-game exits.
+- Diagnostic, not part of the rule: by slot, WR1s ran 0.889 of the model in backup games
+  against 0.975 otherwise (WR2 0.939 / 0.976; WR3, TE1 unchanged) -- the shape of a backup
+  spreading the ball away from the top target. A WR1-specific rule would need its own
+  pre-registration and a fresh look, since this split was seen first here.
