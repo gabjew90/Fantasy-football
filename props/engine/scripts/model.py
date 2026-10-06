@@ -823,19 +823,9 @@ def simulate_team_rush(rng, n_sim, team_carries_mean, carries_r, rush_shares, yp
     carries, yards = [], []
     for j in range(len(rs)):
         car = alloc[:, j]
-        rush = np.zeros(n_sim)
-        if car.max() > 0:
-            mx = int(car.max())
-            grid = carry_resid if player_resid is None or player_resid[j] is None else player_resid[j]
-            draws = rng.choice(grid, size=(n_sim, mx)) + float(ypc[j])
-            rush = (draws * (np.arange(mx)[None, :] < car[:, None])).sum(1)
-        sd = w["eff_sd_rush"]
-        if qb_index is not None and j == int(qb_index) and w["eff_sd_qb"] is not None:
-            sd = w["eff_sd_qb"]
-        if sd:
-            # the game's yards per carry = ypc x a mean-one multiplier; the
-            # carry residuals stay as drawn
-            rush = rush + car * float(ypc[j]) * (_game_multiplier(rng, n_sim, sd) - 1.0)
+        grid = carry_resid if player_resid is None or player_resid[j] is None else player_resid[j]
+        rush = rushing_given_carries(rng, n_sim, car, ypc[j], grid,
+                                     rush_eff_sd(w, qb_index is not None and j == int(qb_index)))
         carries.append(car.astype(float)); yards.append(rush)
     if player_kneel is not None and any(k is not None for k in player_kneel):
         kneel_rng = rng.spawn(1)[0]
@@ -843,6 +833,31 @@ def simulate_team_rush(rng, n_sim, team_carries_mean, carries_r, rush_shares, yp
             if grid is not None:
                 yards[j] = yards[j] + kneel_rng.choice(np.asarray(grid, dtype=float), size=n_sim)
     return carries, yards, tc_draw
+
+
+def rush_eff_sd(width, is_starting_qb):
+    """The game-wide yards-per-carry swing for a player: eff_sd_qb for the starting QB
+    when set, else eff_sd_rush."""
+    w = {**WIDTH_OFF, **(width or {})}
+    return w["eff_sd_qb"] if is_starting_qb and w["eff_sd_qb"] is not None else w["eff_sd_rush"]
+
+
+def rushing_given_carries(rng, n_sim, carries, ypc, grid, eff_sd):
+    """One player's rushing yards GIVEN his carries in each simulation (an array, or one
+    number for every simulation): the rushing sampler's second stage, also run alone by
+    the conditional calibration. Each carry gains his yards per carry plus a residual
+    from `grid`; a game multiplier (sd eff_sd) scales the yards-per-carry part."""
+    car = np.broadcast_to(np.asarray(carries), (n_sim,))
+    rush = np.zeros(n_sim)
+    if car.max() > 0:
+        mx = int(car.max())
+        draws = rng.choice(grid, size=(n_sim, mx)) + float(ypc)
+        rush = (draws * (np.arange(mx)[None, :] < car[:, None])).sum(1)
+    if eff_sd:
+        # the game's yards per carry = ypc x a mean-one multiplier; the
+        # carry residuals stay as drawn
+        rush = rush + car * float(ypc) * (_game_multiplier(rng, n_sim, eff_sd) - 1.0)
+    return rush
 
 
 def kneel_grid(params, team_spread):
@@ -890,7 +905,7 @@ def starter_qb_index(positions, rush_shares, slots=None):
 
 def simulate_team_game(rng, n_sim, team_volume_mean, team_volume_r, player_shares,
                         player_catch_rates, player_ypt, per_catch_shape, other_bucket=True, width=None,
-                        return_other=False):
+                        return_other=False, return_targets=False):
     """Draw one team's targets jointly with all eligible receivers in one pass.
 
     1. Team targets ~ NegBinomial(team_volume_mean, team_volume_r) -- one draw per
@@ -907,6 +922,8 @@ def simulate_team_game(rng, n_sim, team_volume_mean, team_volume_r, player_share
     Returns {player_index: (receptions_array, yards_array)}, plus team_targets_array.
     With `return_other` (and the other bucket on), the dict also holds
     OTHER -> the bucket's targets per simulation; that costs no random draw.
+    With `return_targets`, a third value: {player: his targets per simulation}
+    (also no random draw).
     """
     w = {**WIDTH_OFF, **(width or {})}
     names = list(player_shares.keys())
@@ -928,24 +945,39 @@ def simulate_team_game(rng, n_sim, team_volume_mean, team_volume_r, player_share
 
     out = {}
     for j, name in enumerate(names):
-        cr = max(player_catch_rates.get(name, 0.3), 0.05)
-        if w["catch_conc"]:
-            # this game's catch rate ~ Beta around the player's rate
-            c = w["catch_conc"]
-            cr_game = rng.beta(max(c * cr, 1e-3), max(c * (1.0 - cr), 1e-3), size=n_sim)
-            rec = rng.binomial(alloc[:, j], cr_game).astype(float)
-        else:
-            rec = rng.binomial(alloc[:, j], cr).astype(float)
-        ypt = max(player_ypt.get(name, 7.0), 0.5)
-        ypc = ypt / cr
-        shape_total = np.clip(rec, 0, 25) * per_catch_shape
-        yds = np.where(rec > 0, rng.gamma(np.maximum(shape_total, 1e-6), ypc / per_catch_shape), 0.0)
-        if w["eff_sd_rec"]:
-            yds = yds * _game_multiplier(rng, n_sim, w["eff_sd_rec"])
-        out[name] = (rec, yds)
+        out[name] = receiving_given_targets(rng, n_sim, alloc[:, j], player_catch_rates.get(name, 0.3),
+                                            player_ypt.get(name, 7.0), per_catch_shape, w)
     if return_other and other_bucket:
         out[OTHER] = alloc[:, -1].astype(float)
+    if return_targets:
+        return out, team_targets, {name: alloc[:, j].astype(float) for j, name in enumerate(names)}
     return out, team_targets
+
+
+def receiving_given_targets(rng, n_sim, targets, catch_rate, ypt, per_catch_shape, width=None):
+    """One player's catches and receiving yards GIVEN his targets in each simulation
+    (an array, or one number for every simulation): the joint sampler's second stage,
+    also run alone by the conditional calibration (backtest.py --conditional).
+    Catches | targets ~ Binomial(catch rate), this game's rate Beta-drawn when
+    catch_conc is set; yards | catches ~ a sum of per-catch Gamma draws, times a
+    game multiplier when eff_sd_rec is set."""
+    w = {**WIDTH_OFF, **(width or {})}
+    targets = np.broadcast_to(np.asarray(targets), (n_sim,))
+    cr = max(catch_rate, 0.05)
+    if w["catch_conc"]:
+        # this game's catch rate ~ Beta around the player's rate
+        c = w["catch_conc"]
+        cr_game = rng.beta(max(c * cr, 1e-3), max(c * (1.0 - cr), 1e-3), size=n_sim)
+        rec = rng.binomial(targets, cr_game).astype(float)
+    else:
+        rec = rng.binomial(targets, cr).astype(float)
+    ypt = max(ypt, 0.5)
+    ypc = ypt / cr
+    shape_total = np.clip(rec, 0, 25) * per_catch_shape
+    yds = np.where(rec > 0, rng.gamma(np.maximum(shape_total, 1e-6), ypc / per_catch_shape), 0.0)
+    if w["eff_sd_rec"]:
+        yds = yds * _game_multiplier(rng, n_sim, w["eff_sd_rec"])
+    return rec, yds
 
 
 def simulate_qb_completions(rng, n_sim, receiver_receptions, other_targets, other_rates, starter_share=None):

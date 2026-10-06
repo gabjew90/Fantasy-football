@@ -52,3 +52,31 @@ sampler so both run the same code, on a separate random stream.
 ## Result
 
 (Filled in after the runs, below this line, without editing anything above.)
+
+**Disclosed before any full run:** the smoke run (2023-24) showed stage 1 bucketed by
+the ACTUAL volume, which selects on the outcome (a 10-target game sits above the model's
+p90 by construction). Stage 1 is now bucketed by the PROJECTED volume (the simulation's
+mean); stage 2 keeps the actual volume, its input. Final-margin buckets also select on
+an outcome the player helped cause, so they are shown as descriptive, never judged.
+Both rules have known-answer tests (props/tests/test_conditional_calibration.py), and
+the harness itself passed an audit first (reports/harness_audit_2026-10-06.md).
+
+### Part A, 2022-24, weeks 2-18 (shipped settings)
+
+| Stage | Player-games | Outside p10-p90 (95% CI) | Verdict | Where it is worst |
+|---|---|---|---|---|
+| 1: targets | 9,978 | 18.0% (17.2-18.8) | too wide | projected 6.5+: 15% |
+| 2: catches given targets | 8,625 | 22.4% (21.5-23.2) | too narrow | 7-9 targets: 25.2% |
+| 2: receiving yards given targets | 8,625 | 18.6% (17.8-19.5) | too wide | 10+ targets: 13.9% |
+| 1: carries, backs | 3,032 | 27.2% (25.5-28.9) | too narrow | projected under 9.5: 30.5% |
+| 2: rushing yards given carries, backs | 2,795 | 11.3% (10.2-12.5) | too wide | 20+ carries: 6.9% |
+| 1: carries, starting QB | 1,402 | 26.0% (23.7-28.2) | too narrow | -- |
+| 2: QB rushing yards given carries | 1,149 | 20.0% (17.7-22.4) | ok | -- |
+
+Reading: the reviewer's concern holds. For backs the two stages offset -- volume too
+narrow, efficiency far too wide -- so the whole chain looked acceptable while each
+stage is off. Flagged for Part B: every stage but QB rushing yards. The starting QB's
+carries are flagged too, but no QB knob was pre-registered, so they cannot move in this
+round (a later, separately registered round). Receiving yards given targets are too wide
+while the only pre-registered yards knob (eff_sd_rec, now 0) can only widen them, so the
+per-catch yards shape -- not in the grid -- is the likely lever, also for a later round.
