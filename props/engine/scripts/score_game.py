@@ -65,11 +65,65 @@ def cached_json(path, ttl_s, loader):
     import time
     p = Path(path)
     if p.exists() and (time.time() - p.stat().st_mtime) < ttl_s:
-        return json.load(open(p))
+        return json.load(open(p, encoding="utf-8"))
     obj = loader()
     p.parent.mkdir(parents=True, exist_ok=True)
-    json.dump(obj, open(p, "w"))
+    json.dump(obj, open(p, "w", encoding="utf-8"))
     return obj
+
+
+# SLEEPER'S INJURY FEED (DECISIONS #183): the official report lands Wednesday (Monday for
+# a Thursday game) and nflverse after it; Sleeper's player feed carries each player's
+# status as soon as it is news (Baker Mayfield "Out, thumb" four days before a Thursday
+# game with no report out yet). Used ONLY where this week's official report has no entry.
+SLEEPER_OUT = {"Out": "Out", "Doubtful": "Doubtful", "IR": "Out", "PUP": "Out", "Sus": "Out", "NFI": "Out"}
+
+
+def sleeper_injury_map(players, sleeper_team=None) -> dict:
+    """{(our team code, norm_name): (status, body part)} from Sleeper's player feed, for
+    players it lists as Out / Doubtful / Questionable or on IR / PUP / suspended."""
+    back = {v: k for k, v in (sleeper_team or {}).items()}
+    out = {}
+    for v in (players or {}).values():
+        st = v.get("injury_status")
+        if st not in SLEEPER_OUT and st != "Questionable":
+            continue
+        name = v.get("full_name") or f'{v.get("first_name", "")} {v.get("last_name", "")}'.strip()
+        if name and v.get("team"):
+            out[(back.get(v["team"], v["team"]), norm_name(name))] = (st, v.get("injury_body_part"))
+    return out
+
+
+def injuries_with_fallback(official, roster, sleeper):
+    """This week's status per (team, gsis_id): the official report where it has an entry,
+    else Sleeper's (IR / PUP / suspended read as Out). Returns (status, source) dicts;
+    source names Sleeper and the body part for every status it supplied."""
+    status, source = dict(official), {}
+    for t, g, n in zip(roster.team, roster.gsis_id, roster.full_name):
+        if isinstance(status.get((t, g)), str):
+            continue
+        hit = sleeper.get((t, norm_name(n)))
+        if hit:
+            st, part = hit
+            status[(t, g)] = SLEEPER_OUT.get(st, st)
+            source[(t, g)] = f"Sleeper injury feed{', ' + part.lower() if part else ''}; no official report yet"
+    return status, source
+
+
+def promote_qb(roles, team, qb_order, is_out, on_roster):
+    """When a team's depth-chart QB1 is out, the next quarterback who is on the roster and
+    not out starts: only one QB plays, so unlike the other positions his job goes to one
+    man (DECISIONS #183). qb_order: the team's QBs, best first. Returns (roles, promoted
+    gsis_id or None)."""
+    q1 = roles[(roles.team == team) & (roles.slot == "QB1")] if not roles.empty else roles
+    if q1.empty or not is_out(q1.gsis_id.iloc[0]):
+        return roles, None
+    for g in qb_order:
+        if g != q1.gsis_id.iloc[0] and on_roster(g) and not is_out(g):
+            keep = roles[~((roles.team == team) & (roles.gsis_id == g))]
+            return pd.concat([keep, pd.DataFrame([{"team": team, "gsis_id": g, "slot": "QB1",
+                                                   "dc_dt": pd.NaT}])], ignore_index=True), g
+    return roles, None
 N_SIM = 20000
 OUT = Path(os.environ.get("NFL_OUT", "/mnt/user-data/outputs"))
 
@@ -678,11 +732,13 @@ def main():
     kick = eastern_to_utc(G.gameday, G.gametime)
     dcf["dt"] = pd.to_datetime(dcf["dt"], errors="coerce", utc=True)
     roles = []
+    DC_QB = {}           # team -> its QBs in depth-chart order (the QB promotion reads it)
     for t in (AWAY, HOME):
         d = dcf[(dcf.team == t) & (dcf.dt < kick) & dcf.pos_abb.isin(["QB", "RB", "WR", "TE"])]
         if d.empty:
             continue
         d = d[d.dt == d.dt.max()]
+        DC_QB[t] = d[d.pos_abb == "QB"].sort_values("pos_rank").gsis_id.tolist()
         for pos, mx in [("QB", 1), ("RB", 2), ("WR", 3), ("TE", 1)]:
             for _, r in d[(d.pos_abb == pos) & (d.pos_rank <= mx)].iterrows():
                 roles.append({"team": t, "gsis_id": r.gsis_id, "slot": f"{pos}{int(r.pos_rank)}",
@@ -709,8 +765,43 @@ def main():
                                                 "dc_dt": pd.NaT}])], ignore_index=True)
 
     iw = inj[(inj.season == SEASON) & (inj.week == WEEK)]
-    inj_status = iw.set_index(["team", "gsis_id"])["report_status"].to_dict()
     inj_practice = iw.set_index(["team", "gsis_id"])["practice_status"].to_dict()
+    # Sleeper's feed fills in where the official report has no entry yet (#183)
+    import urllib.request as _ur0
+    try:
+        SLP_PLAYERS = cached_json(wd / "sleeper_players.json", 86400, lambda: json.load(_ur0.urlopen(
+            _ur0.Request("https://api.sleeper.app/v1/players/nfl", headers={"User-Agent": "Mozilla/5.0"}),
+            timeout=120)))
+    except Exception as exc:           # no feed: the official report alone, said in the sources
+        SLP_PLAYERS = None
+        log(f"  Sleeper player feed unavailable ({exc}); injuries from the official report only")
+    inj_status, INJ_SOURCE = injuries_with_fallback(
+        iw.set_index(["team", "gsis_id"])["report_status"].to_dict(), rw,
+        sleeper_injury_map(SLP_PLAYERS, SLEEPER_TEAM))
+    # THE NEXT QB STARTS when the depth chart's QB1 is out (#183) -- Sleeper's depth order
+    # first (fresher), then the depth chart's; a --role for that team's QB wins
+    _rw_st = {(t_, g_): st_ for t_, g_, st_ in zip(rw.team, rw.gsis_id, rw.status)}
+    _slp_qb = {}
+    for v_ in (SLP_PLAYERS or {}).values():
+        if v_.get("position") == "QB" and v_.get("gsis_id") and v_.get("depth_chart_order"):
+            _slp_qb[str(v_["gsis_id"]).strip()] = int(v_["depth_chart_order"])
+    AUTO_QB = []
+    for t in (AWAY, HOME):
+        if any(ro["team"] == t and ro["slot"] == "QB1" for ro in ROLE_OVERRIDES):
+            continue
+        qbs = [g_ for (tt_, g_) in _rw_st if tt_ == t and g_ in set(rw[rw.position == "QB"].gsis_id)]
+        order = sorted(qbs, key=lambda g_: (_slp_qb.get(g_, 99),
+                                            DC_QB.get(t, []).index(g_) if g_ in DC_QB.get(t, []) else 99))
+        q1_before = roles[(roles.team == t) & (roles.slot == "QB1")].gsis_id.tolist() if not roles.empty else []
+        roles, got = promote_qb(
+            roles, t, order,
+            is_out=lambda g_, t=t: (inj_status.get((t, g_)) in ("Out", "Doubtful")
+                                    or _rw_st.get((t, g_)) in NOT_PLAYING),
+            on_roster=lambda g_, t=t: _rw_st.get((t, g_)) == "ACT")
+        if got:
+            nm_ = lambda g_: rw[rw.gsis_id == g_].full_name.iloc[0] if (rw.gsis_id == g_).any() else g_
+            AUTO_QB.append({"team": t, "starter": nm_(got), "out": nm_(q1_before[0]) if q1_before else "QB1",
+                            "why": INJ_SOURCE.get((t, q1_before[0]), inj_status.get((t, q1_before[0])) or "")})
 
     snp_ = snp[(snp.season == SEASON) & (snp.week < WEEK)].copy()
     snp_["key"] = snp_["player"].map(norm_name)
@@ -2364,6 +2455,10 @@ def main():
     L = []
     L.append(f"# {AWAY} at {HOME}")
     L.append(f"### {SEASON} Week {WEEK} · {G.gameday} {G.gametime} ET · {G.stadium}\n")
+    for aq_ in AUTO_QB:
+        L.append(f"**{aq_['team']}'s starting quarterback: {aq_['starter']}.** {aq_['out']} is out"
+                 + (f" ({aq_['why']})" if aq_['why'] else "") + f", so the next quarterback on the depth chart "
+                 f"is priced as the starter (his kneel-downs, passing share and rushing).\n")
     if ROLE_OVERRIDES:
         L.append("**Role what-if, not the board:** " + "; ".join(
             f"{ro['name']} ({ro['team']}) priced as {ro['slot']}"
@@ -2874,7 +2969,9 @@ def main():
              "tested and are too noisy to use. Expect this to move a projection by a point or two, not more.")
     excl = pop[pop.excluded]
     if len(excl):
-        L.append(f"- **Out:** " + ", ".join(f"{r['name']} ({r.report_status or r.status})" for _, r in excl.iterrows())
+        _src = lambda r: (f", {INJ_SOURCE[(r.team, r.gsis_id)]}" if (r.team, r.gsis_id) in INJ_SOURCE else "")
+        L.append(f"- **Out:** " + ", ".join(f"{r['name']} ({r.report_status or r.status}{_src(r)})"
+                                            for _, r in excl.iterrows())
                  + ". Most of their usual share goes to whoever replaces them, not to the priced teammates: a quarter of their targets and carries is handed on in our numbers, mostly to their position.")
         for f_ in SC.missing_replacements(pop):
             left = ("nobody" if not f_["priced_left"] else "only " + ", ".join(f_["priced_left"]))
@@ -2884,7 +2981,7 @@ def main():
                         f"adjustment for the backup. " if f_["pos"] == "QB" else
                         f"The player who takes his snaps is not priced; most of the absent player's share "
                         f"stays with the unpriced depth pool. ")
-                     + f"If you know who replaces him, a role what-if prices him: "
+                     + f"A role what-if prices whoever replaces him: "
                      f"--role \"PLAYER={f_['slot']}\".")
     if "was_inactive" in rw:
         # provisional roster: last week's inactives with no report yet this week are priced as playing

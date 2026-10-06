@@ -7535,3 +7535,20 @@ by the user.
   what-if that prices the book's man. Thursday's TB at DAL fires it: Sleeper posts Jalon
   Daniels, the depth chart starts Baker Mayfield.
 - The backtest fix (grade only the QB who started) ships with the Tier 2 work.
+
+## 2026-10-06 (183) -- injuries from Sleeper's feed when the report is silent; the next QB starts
+
+- User: "how can you not tell Mayfield is injured and not playing?" -- and the user never
+  types commands. Before the official report (Monday for a Thursday game), the board read
+  last week's roster only; #175's INA fix then priced Mayfield as playing, though Sleeper's
+  player feed (already downloaded every run) said "Out, thumb".
+- Where this week's official report has no entry, Sleeper's injury_status fills in
+  (IR / PUP / suspended read as Out; Questionable as Questionable), labelled in the report.
+  The official report wins wherever it has an entry.
+- When the depth chart's QB1 is out, the next quarterback who is rostered and not out is
+  priced as the starter (Sleeper's depth order first, then the depth chart's); the report
+  says so in its first lines. Only one QB plays, so unlike the other positions his job
+  goes to one man. A --role for that team's QB still wins.
+- SKILL.md: the user never types a command; chat turns plain words into the flags and runs
+  role what-ifs itself when the report flags a missing replacement or a different QB.
+- TB at DAL: Jalon Daniels priced as TB's starter automatically, Mayfield out (Sleeper).

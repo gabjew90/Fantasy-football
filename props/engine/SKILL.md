@@ -226,6 +226,15 @@ pick. Say why in one sentence (the model has not shown it adds anything beside t
 price; weeks 2-3, STRONG calls won 45%) and offer the research leads and the journal.
 
 ## Fast path
+**The user never types a command (standing rule, 2026-10-06).** Every flag below is yours to
+run from what the user says in plain words; never ask them to type one, and never end a reply
+with a command for them to run. Turn their words into the flags yourself: "I think Kamara
+gets 12 to 15 carries" is `--assume "Alvin Kamara: carries=12/13.5/15"`; "what if Bijan gets
+more work" with no number is `carries=auto`; a report line **No priced replacement for ...**
+or **The book's quarterback is not ours** means you rerun with the role what-if yourself and
+present that run. What the engine can read for itself (injuries, who starts at QB) it now
+decides on its own and says so in the report's first lines -- quote that.
+
 For a narrow question, run only what it needs:
 - **One game, specific markets:** `python scripts/score_game.py --away NYG --home LA --markets td`
   (markets: `receptions`, `rec_yds`, `rush_yds`, `pass_yds`, `td`, comma-separated). `--week` is optional and
@@ -254,9 +263,11 @@ For a narrow question, run only what it needs:
 - **Role what-if (a replacement the depth chart has not promoted):** `--role "PLAYER=RB1"` (QB1, RB1,
   RB2, WR1, WR2, WR3, TE1; `"PLAYER (TEAM)=..."` when a name is on both teams), repeatable, with or
   without `--assume`. A full run -- research included -- that prices him with that slot's role average
-  as his prior; nobody else moves; never recorded (outputs in `role/`). Offer it whenever the report
-  says **No priced replacement for ...**: an Out starter whose team now prices fewer players at his
-  position than it has slots, so his snaps go to someone the board does not price.
+  as his prior; nobody else moves; never recorded (outputs in `role/`). Run it yourself whenever the
+  report says **No priced replacement for ...** (an Out starter whose team now prices fewer players
+  at his position than it has slots) or **The book's quarterback is not ours** -- pick the man from
+  the depth chart, the book's lines or the news, and say which. A starting QB who is out is handled
+  automatically (the next quarterback is priced; DECISIONS #183), so this is for the rest.
 - **Today's games / one date:** `python scripts/score_week.py --today` or `--date YYYY-MM-DD`
   (`--markets` passes through). `--kickoff 13:00` keeps one window (Eastern time: 13:00 is the
   10am PT games); `--sort total` orders the games by their total, highest first; `--overs-only`

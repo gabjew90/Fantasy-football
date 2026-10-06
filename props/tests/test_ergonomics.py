@@ -383,3 +383,36 @@ def test_the_line_flag_counts_the_five_regulars_and_why_each_is_out():
     assert RSCH.line_sentence("NO", st2).startswith("NO: no regular lineman reported out; not matched")
     assert RSCH.line_sentence("NO", ok, report_out=False) == (
         "NO: all five regular linemen available (no injury report yet this week: roster status only).")
+
+
+def test_sleeper_fills_the_injury_report_only_where_it_is_silent():
+    """DECISIONS #183: Baker Mayfield 'Out, thumb' on Sleeper four days before a Thursday
+    game, no official report yet. The official report wins wherever it has an entry."""
+    players = {"1": {"full_name": "Baker Mayfield", "team": "TB", "injury_status": "Out", "injury_body_part": "Thumb"},
+               "2": {"full_name": "Mike Evans", "team": "TB", "injury_status": "Questionable", "injury_body_part": None},
+               "3": {"full_name": "Puka Nacua", "team": "LAR", "injury_status": "IR", "injury_body_part": "Ankle"},
+               "4": {"full_name": "Healthy Guy", "team": "TB", "injury_status": None}}
+    m = SG.sleeper_injury_map(players, {"LA": "LAR"})
+    assert m[("TB", "baker mayfield")] == ("Out", "Thumb") and ("LA", "puka nacua") in m
+    assert ("TB", "healthy guy") not in m
+    roster = pd.DataFrame({"team": ["TB", "TB", "LA", "TB"], "gsis_id": ["b", "e", "p", "h"],
+                           "full_name": ["Baker Mayfield", "Mike Evans", "Puka Nacua", "Healthy Guy"]})
+    st, src = SG.injuries_with_fallback({("TB", "e"): None, ("TB", "h"): "Questionable"}, roster, m)
+    assert st[("TB", "b")] == "Out" and "thumb" in src[("TB", "b")]
+    assert st[("LA", "p")] == "Out", "IR reads as Out"
+    assert st[("TB", "e")] == "Questionable" and ("TB", "e") in src, "an empty official entry is no entry"
+    assert st[("TB", "h")] == "Questionable" and ("TB", "h") not in src, "the official report wins"
+
+
+def test_the_next_quarterback_starts_when_qb1_is_out():
+    roles = pd.DataFrame([{"team": "TB", "gsis_id": "baker", "slot": "QB1", "dc_dt": None},
+                          {"team": "TB", "gsis_id": "evans", "slot": "WR1", "dc_dt": None}])
+    out = {"baker"}
+    r2, got = SG.promote_qb(roles, "TB", ["baker", "stick", "daniels"], lambda g: g in out,
+                            lambda g: g != "stick")
+    assert got == "daniels", "the next QB on the roster and not out"
+    assert set(r2[r2.slot == "QB1"].gsis_id) == {"baker", "daniels"}, "the out QB stays listed (and excluded)"
+    r3, got3 = SG.promote_qb(roles, "TB", ["baker", "daniels"], lambda g: False, lambda g: True)
+    assert got3 is None and r3.equals(roles), "QB1 healthy: nothing moves"
+    _r4, got4 = SG.promote_qb(roles, "TB", ["baker"], lambda g: g in out, lambda g: True)
+    assert got4 is None, "no other QB: nobody is invented"
