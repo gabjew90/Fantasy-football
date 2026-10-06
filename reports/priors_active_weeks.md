@@ -32,3 +32,12 @@ worse by more than 0.5% of its own log loss (point estimate) on the conversion s
 own-volume score (scoreboard.compare against step 7, frozen cohort). Width and bias from the
 harness report are recorded beside it. A guard failure means: do not ship, find out which
 players drive it.
+
+**Amendment, 2026-10-06, before the run finished or any result was read:** the stand-in
+lines are built from pre-game projections (expected targets x rates), and this fix moves
+projections, so the two runs are scored at different lines and scoreboard.compare refuses
+them (correctly: a log loss at a moved line is not comparable). The guard therefore uses the
+whole-distribution score the harness writes per player-game -- CRPS (lower is better, no
+line) -- paired on the reference's player-games, game-clustered 95% intervals: a bet market
+whose mean CRPS is worse by more than 0.5% blocks the ship. The harness's width, bias and
+calibration verdicts are recorded beside it, as registered.
