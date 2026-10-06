@@ -93,6 +93,38 @@ def parse_weeks(s):
     return [int(x) for x in s.split(",")]
 
 
+def standin_half(x):
+    """The stand-in line for an expected value x: the half-point line NEAREST x
+    (floor(x) + 0.5 -- 3.2 -> 3.5, 3.8 -> 3.5, 63.2 -> 63.5), the shape a book's line takes.
+    reports/scoreboard.md's 2026-10-06 text called it "the half nearest below"; the code has
+    always taken the nearest half (amendment, outside review 2026-10-06)."""
+    return float(np.floor(x) + 0.5)
+
+
+def receptions_over_exact(targets, catch_rate, line, catch_conc=None):
+    """P(catches > line | targets) EXACTLY, the conditional receptions score's chance
+    (outside review 2026-10-06: 1,000 draws leave a 0.5-1% chance with a standard error
+    near a third of a point). Binomial(targets, catch rate) -- the shipped sampler, rate
+    floored at 0.05 as model.receiving_given_targets floors it -- or, with catch_conc,
+    the beta-binomial that sampler draws (this game's rate ~ Beta(c*cr, c*(1-cr)))."""
+    import math
+    T = int(targets)
+    cr = max(float(catch_rate), 0.05)
+    k0 = int(math.floor(line)) + 1                       # the first count that clears the line
+    if k0 > T:
+        return 0.0
+    if k0 <= 0:
+        return 1.0
+    if catch_conc:
+        a, b = max(catch_conc * cr, 1e-3), max(catch_conc * (1.0 - cr), 1e-3)
+        lbeta = lambda x, y: math.lgamma(x) + math.lgamma(y) - math.lgamma(x + y)
+        pmf = lambda k: math.exp(math.lgamma(T + 1) - math.lgamma(k + 1) - math.lgamma(T - k + 1)
+                                 + lbeta(k + a, T - k + b) - lbeta(a, b))
+    else:
+        pmf = lambda k: math.comb(T, k) * cr ** k * (1.0 - cr) ** (T - k)
+    return float(min(max(sum(pmf(k) for k in range(k0, T + 1)), 0.0), 1.0))
+
+
 def rr_given_volume(targets, carries, yds_draw, rush_draw, n):
     """Rushing + receiving yards GIVEN his actual targets and carries: the two conditional
     draws summed, a side with no volume a known zero (outside review, 2026-10-06 -- 15
@@ -309,10 +341,12 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
     pri_teams = pd.read_csv(pdir / f"priors_{PRIOR}_teams.csv", index_col=0)
     print(f"priors: {PRIOR} (the season before the one under test), "
           f"{len(pri_players)} players", file=sys.stderr)
-    _k0o = None
-    if getattr(args, "k0", None):
+    _k0o, _k0fit = None, False
+    if getattr(args, "k0", None) == "fit":
+        _k0fit = True              # the ablation: the per-season fit alone, no fixed constants
+    elif getattr(args, "k0", None):
         _k0o = {kv.split("=")[0].strip(): float(kv.split("=")[1]) for kv in args.k0.split(",") if kv.strip()}
-    K0R = M.k0_rates(P0.get("k0_per_rate", M.DEFAULT_K0), override=_k0o)
+    K0R = M.k0_rates(P0.get("k0_per_rate", M.DEFAULT_K0), override=_k0o, fit_only=_k0fit)
     print(f"shrinkage constants: {K0R}", file=sys.stderr)
     K0_TEAM = float(P0.get("K0", 4.0))
     league_pass_rate = P0.get("league_pass_rate", 0.55)
@@ -849,7 +883,7 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
                 # the actual volume (pc_) and with the engine's own volume (pu_), and the outcome
                 "L_rec", "pc_rec", "pu_rec", "L_yds", "pc_yds", "pu_yds", "L_rush", "pc_rush", "pu_rush",
                 "L_rr", "pc_rr", "pu_rr", "sd_tgt", "sd_car", "L_pass", "pc_pass", "pu_pass", "pit_pass_c")}
-            half = lambda x: float(np.floor(x) + 0.5)
+            half = standin_half
             cond_yds, cond_rush = {}, {}
             act_t, act_r, act_y = (tr.act_targets.to_numpy(), tr.act_receptions.to_numpy(float),
                                    tr.act_rec_yards.to_numpy(float))
@@ -885,6 +919,9 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
                             L = lines_[nm_]
                             cols[f"L_{nm_}"][i], cols[f"pc_{nm_}"][i] = L, float((cD > L).mean())
                             cols[f"pu_{nm_}"][i] = float((uM > L).mean())
+                        # receptions given targets has a closed form: score it exactly
+                        cols["pc_rec"][i] = receptions_over_exact(
+                            T, float(cr_[k_]), lines_["rec"], ({**M.WIDTH_OFF, **(width or {})})["catch_conc"])
             act_c, ypc_ = test_act.act_carries.to_numpy(), test_act.ypc.to_numpy(float)
             for i in np.flatnonzero(rush_pop | qb_pop):
                 C = int(act_c[i])
@@ -1966,8 +2003,9 @@ def main(argv=None):
                     help="round 23: target share x (last week's snaps / earlier weeks') ** g, or 'off' "
                          "(default model.SNAP_REACT)")
     ap.add_argument("--k0", default=None,
-                    help="round 17: fixed shrinkage constants over the priors' fit, e.g. 'ypt=40,catch_rate=20' "
-                         "(default: model.K0_FIXED)")
+                    help="round 17: shrinkage constants over model.K0_FIXED (the rates named replace those, the "
+                         "rest stay shipped), e.g. 'ypt=40,catch_rate=20'; 'fit' = the ablation, the priors' "
+                         "per-season fit with no fixed constants (default: model.K0_FIXED)")
     ap.add_argument("--historical-blend", action="store_true", default=True,
                     help="two-stage: prior-season own rate -> slot prior -> this season (what the live scorer does)")
     ap.add_argument("--no-historical-blend", dest="historical_blend", action="store_false",

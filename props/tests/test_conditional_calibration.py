@@ -7,6 +7,7 @@ import sys
 from pathlib import Path
 
 import numpy as np
+import pytest
 import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -179,3 +180,14 @@ def test_combined_yards_counts_a_zero_side_as_zero_not_as_a_missing_game():
     assert BT.rr_given_volume(3, 15, yds, rush, n).tolist() == (yds + rush).tolist()
     assert BT.rr_given_volume(0, 0, None, None, n) is None, "never touched the ball: void"
     assert BT.rr_given_volume(3, 15, None, rush, n) is None, "volume without a draw is not a zero"
+
+
+def test_the_exact_receptions_chance_matches_the_sampler():
+    """The closed form against model.receiving_given_targets at 400,000 draws, binomial and
+    beta-binomial, plus the edges (line above the targets, line below zero)."""
+    import backtest as BT
+    for T, cr, L, conc in ((6, 0.65, 3.5, None), (10, 0.7, 7.5, None), (4, 0.6, 3.5, 50.0), (8, 0.02, 0.5, None)):
+        rec, _ = M.receiving_given_targets(np.random.default_rng(1), 400_000, T, cr, 8.0, 1.4,
+                                           {"catch_conc": conc} if conc else None)
+        assert BT.receptions_over_exact(T, cr, L, conc) == pytest.approx(float((rec > L).mean()), abs=0.004), (T, cr, L)
+    assert BT.receptions_over_exact(3, 0.7, 3.5) == 0.0 and BT.receptions_over_exact(3, 0.7, -0.5) == 1.0

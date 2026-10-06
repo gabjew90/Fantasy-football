@@ -17,7 +17,9 @@ population (3+ projected targets; 8+ projected carries for rushing and rushing+r
 3. SPREAD: the game-to-game spread of targets / carries around the projection, real
    against the model's, in stable-role stretches (same team, same starting QB, same depth
    slot, 4+ games -- role only, never the projections), by volume band. Real spread includes
-   undetected role drift, so it is an upper bound: a model spread ABOVE it is too wide.
+   undetected role drift, so it USUALLY overstates the true game-to-game spread and a model
+   spread well above it is likely too wide -- an assumption about drift, not a guarantee
+   (outside review, 2026-10-06).
 
 With --ref, paired differences (positive = this run better) with 95% intervals resampling
 whole games (default) or team-seasons (--cluster team-season, for changes that act on a
@@ -313,7 +315,7 @@ def main(argv=None):
                                                ("carries", "mean_car_model", "act_carries", "sd_car", CAR_BANDS, "rb")):
             d = R if popm is None else R[R.rush_pop.astype(bool)]
             out["spread"][nm] = spread_table(stable_stretches(d, vol, act, sd, opening=opening, by="role"), bands)
-            print(f"\nSPREAD of {nm} around the projection, stable-role stretches (real is an upper bound)")
+            print(f"\nSPREAD of {nm} around the projection, stable-role stretches (real usually overstates it)")
             for b in out["spread"][nm]:
                 print(f"  {b['band']:6s} stretches {b['stretches']:4d}  real {b['real_sd']:.2f}  model {b['model_sd']:.2f}"
                       f"  ratio {b['ratio']:.2f} ({b['ci'][0]:.2f}, {b['ci'][1]:.2f})  {b['reading']}")

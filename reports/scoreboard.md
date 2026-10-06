@@ -114,3 +114,22 @@ yards of where real bets sit.
     comes at lower efficiency.
   - **Stage-1 knobs** are judged on the spread check and the own-volume score only (round 33
     was registered that way).
+- **2026-10-06, second outside review (before round 34 reads anything; nothing already read is
+  re-judged):**
+  - **The decision zone is 15-85%,** not the 25-75% written above: a bet needs about 56%+ at
+    typical prices, so decisions sit at 55-85% and the mirror for Unders (the advice that
+    widened it). scoreboard.py has used 15-85% since commit c252491; this records it here, where
+    the rule lives. Round 30's 25-75% figures above stay as measured.
+  - **Stand-in rounding:** the line is the half-point NEAREST the expected value (3.2 -> 3.5),
+    not "the half nearest below" as written above -- the code has always done this
+    (backtest.standin_half). Every comparison so far was scored at the code's lines, so no
+    result changes; the question it measures is the Over at the nearest half.
+  - **The frozen cohort:** a candidate is scored on exactly the reference's player-games (its
+    own projections never re-select them), with equal outcomes and lines asserted.
+  - **Guards are complete or blocked:** every bet market must be present, with 200+ player-games
+    and a finite score; missing evidence blocks a ship (scoreboard.guard_verdict).
+  - **Combined yards with a zero side:** a back with carries and no target (or targets and no
+    carry) is scored on the combined line; only a game with neither is left out.
+  - **"Upper bound":** real spread in role-stable stretches usually overstates the true spread
+    (undetected drift), so a model spread well above it is likely too wide -- an assumption,
+    not a guarantee.

@@ -22,10 +22,16 @@ def test_the_fixed_constants_replace_only_the_rates_they_name():
     assert fitted["ypt"] == 640, "the priors' dict is not mutated"
 
 
-def test_an_explicit_override_wins_and_an_empty_one_is_the_fit():
-    fitted = {"ypt": 160, "catch_rate": 40}
-    assert M.k0_rates(fitted, override={})["ypt"] == 160, "override {} = the per-season fit, as before round 17"
+def test_an_explicit_override_wins_and_keeps_the_other_shipped_constants():
+    """Outside review 2026-10-06: overriding rush_share alone used to restore the fitted
+    receiving constants (640/320/320) instead of the shipped 80/40/80."""
+    fitted = {"ypt": 640, "catch_rate": 320, "target_share": 320, "rush_share": 40}
+    out = M.k0_rates(fitted, override={"rush_share": 20.0})
+    assert out["rush_share"] == 20.0
+    assert (out["ypt"], out["catch_rate"], out["target_share"]) == (80, 40, 80), "the rest stay shipped"
     assert M.k0_rates(fitted, override={"ypt": 20.0})["ypt"] == 20.0
+    assert M.k0_rates(fitted, override={}) == M.k0_rates(fitted), "an empty override is the shipped set"
+    assert M.k0_rates(fitted, fit_only=True)["ypt"] == 640, "the named ablation: the per-season fit alone"
     assert M.k0_rates(None)["ypt"] == M.K0_FIXED["ypt"], "no fit: DEFAULT_K0, then the fixed constants"
 
 
@@ -42,5 +48,7 @@ def test_the_goal_line_constant_follows_a_fixed_share_constant():
     assert out["target_share"] == 80 and out["i10_target_share"] == 8, "2 x 80/20, as build_priors would"
     same = M.k0_rates({"target_share": 80, "i10_target_share": 5, "ypt": 160, "catch_rate": 40})
     assert same["i10_target_share"] == 5, "this season's fit (80 -> 5) is unchanged"
-    assert M.k0_rates({"target_share": 20, "i10_target_share": 2}, override={"ypt": 40.0})["i10_target_share"] == 2
+    assert M.k0_rates({"target_share": 20, "i10_target_share": 2}, override={"ypt": 40.0})["i10_target_share"] == 8, \
+        "a partial override keeps the fixed target share, so its goal-line constant follows"
+    assert M.k0_rates({"target_share": 20, "i10_target_share": 2}, fit_only=True)["i10_target_share"] == 2
 

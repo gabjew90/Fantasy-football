@@ -100,7 +100,7 @@ jobs:
             BASE=$(git rev-parse HEAD~1)
           fi
           if git diff --name-only "$BASE...HEAD" \
-             | grep -qE '^props/engine/(scripts/(model|backtest|build_priors)\.py|resources/(priors_|calibration_))'; then
+             | grep -qE '^props/engine/(scripts/[^/]+\.py|resources/[^/]+\.(csv|json))$'; then
             echo "model=true" >> "$GITHUB_OUTPUT"
             echo "the model changed; the backtest smoke will run"
           else

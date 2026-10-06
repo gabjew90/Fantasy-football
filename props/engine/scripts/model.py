@@ -287,12 +287,15 @@ def snap_react(share, snap_last, snap_base, gamma, clip=SNAP_REACT_CLIP, gamma_u
     return sh * float(np.clip((sl / sb) ** g, clip[0], clip[1]))
 
 
-def k0_rates(fitted, override=None):
+def k0_rates(fitted, override=None, fit_only=False):
     """The per-rate shrinkage constants a pricing run uses: the priors' fitted
-    `k0_per_rate` (else DEFAULT_K0), with K0_FIXED -- or `override`, for the
-    harness -- replacing the rates it names."""
+    `k0_per_rate` (else DEFAULT_K0), with K0_FIXED replacing the rates it names, and
+    `override` (the harness's --k0) replacing the rates IT names on top -- a partial
+    override keeps every other shipped constant (outside review 2026-10-06: overriding
+    one rate used to drop all of K0_FIXED). fit_only: the ablation, the per-season fit
+    with no fixed constants at all (as before round 17)."""
     out = dict(fitted or DEFAULT_K0)
-    fixed = K0_FIXED if override is None else override
+    fixed = {} if fit_only else {**K0_FIXED, **(override or {})}
     out.update(fixed)
     # build_priors.py derives the goal-line shares' constants from the share
     # constants rescaled to goal-line volume; a fixed share constant carries its
