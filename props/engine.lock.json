@@ -1,6 +1,6 @@
 {
   "algorithm": "props-engine-sha256-lf-1",
-  "engine_sha256": "63a8873f8e400812383b846daeb5d4be7f57eb0cce5a5f15807568dee802c785",
+  "engine_sha256": "e8a339512f26ff7571171515b6d07b79d8bc205f5bc6c31e9b4fb6531a9b1585",
   "file_count": 58,
   "files": {
     "SKILL.md": "dbc94f66a0cb118d61c0668ea5dd776faed98ed420a9842b9177f024b82038c9",
@@ -39,12 +39,12 @@
     "resources/width_params.json": "88dd306b0305f66a81b99ca9a053ceddc4b3108fb5b8aa7369d3829ac98c11cb",
     "scripts/absence_check.py": "fa45e3fb4a1985b38771f0c58ed002956b163ee16439778ac7391ece1ba25079",
     "scripts/absence_tune.py": "4bb4daaf1861f93ff8d57504e9fff5e0b0b828306d8210b688c87aa25ef27d1d",
-    "scripts/backtest.py": "b76c441498a09ed1f0c9e3f66c186b7d38f29b62beb169752f099f8a159732b2",
+    "scripts/backtest.py": "23bbcbea9db9e67f3163b7b9f2bfce4ec130d40ce759b595a4c60f53178fbf45",
     "scripts/build_play_yards.py": "51af89e684bd85e9e33e6f894a0a3002e13e98e0f00b94a4f91e4dbe474c8dfa",
     "scripts/build_priors.py": "1757899778f704cf2bd074c9750f54de1edb9ff14d1429027d5096715ac707e3",
     "scripts/build_td_priors.py": "c7330a57e68c1b7c5f8a9304bfbddbb4be0ca285d9f37ef383173d3e3049c27f",
     "scripts/eligibility.py": "93b5d72850797c7bef1fd6ea9a633f9f2fabfdb25a29f6150f27cb18e9f84681",
-    "scripts/model.py": "38cb9cd479467ea53c3fd21d26ca3ecaf79d37e2c642c1f3b91b564f8bd8e851",
+    "scripts/model.py": "b789acf155cf405ed76188ee67bee52cb93a99423fc2db7b6c5b0c5b13bfe070",
     "scripts/odds_client.py": "434186273bd0412a5545247228298951c5d0504a19c8a47c4c782bf3bb75aaa1",
     "scripts/research.py": "1142f3a4f3d143242a7d12f9dcb8bf366d04adb1255f29f05cfbd68bfc88ed17",
     "scripts/scenario.py": "ce375b4f4f90ad303c4496a80cd03b2a0469c8e63460ffec3592abaaff811e49",
