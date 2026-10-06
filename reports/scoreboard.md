@@ -92,3 +92,23 @@ The expected-value stand-ins sit about 4 yards above Sleeper's yards lines; the 
 version (each setting's median) sat about 4 below. Books hang yards lines between the
 median and the mean of a skewed distribution, and both versions measure within a few
 yards of where real bets sit.
+- **2026-10-06, from an outside review (applies from the next round on; no result already
+  read is re-judged):**
+  - **Decision-zone score:** every comparison also reports the score on cases where the
+    reference chance is 25-75%, and log loss and Brier must agree in sign there for a ship.
+    Measured on round 30 (already shipped under the old rule): all back-games +0.0074 log
+    loss / +0.0018 Brier; decision zone (54% of games) +0.0025 / +0.0009, same sign, 99%
+    interval (-0.0031, +0.0080) spanning zero; 4% of the gain came from cases outside 5-95%
+    and the 49 games at the probability clip contributed +0.30 of +17.7. The gain sits in the
+    5-25% and 75-95% zones -- confident reads -- and is positive, not detectable, at 25-75%.
+  - **Resamples:** 10,000 for any interval above 95% (a 99.2% interval from 2,000 rests on
+    about 8 values per tail).
+  - **Spread check:** stability from role only -- same team, same starting QB, same depth slot
+    -- not from the projections (which react to outcomes). Rerun on 2022-25: targets real /
+    model 0.88 (0.85-0.91), 0.89 (0.86-0.93), 0.83 (0.77-0.90); carries 1.06, 1.01, 1.01, each
+    spanning 1. The conclusion stands.
+  - **Volume-ratio split (diagnostic):** in the conditional test, actual volume is an input,
+    so splitting by actual / expected volume is legitimate and tests whether extra volume
+    comes at lower efficiency.
+  - **Stage-1 knobs** are judged on the spread check and the own-volume score only (round 33
+    was registered that way).

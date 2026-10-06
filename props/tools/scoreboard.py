@@ -136,7 +136,7 @@ def compare(R: pd.DataFrame, Ref: pd.DataFrame, cluster: str, reps: int = 2000, 
 
 
 def stable_stretches(R: pd.DataFrame, vol: str, act: str, sd: str, opening: dict | None = None,
-                     tol: float = 0.20, min_games: int = 4) -> pd.DataFrame:
+                     tol: float = 0.20, min_games: int = 4, by: str = "projection") -> pd.DataFrame:
     """Stable-role stretches: a player's consecutive games with one team and one starting
     QB (when `opening` maps (season, team, week) -> starter), extended while every game's
     projected volume stays within `tol` of the stretch's mean. One row per stretch of
@@ -147,13 +147,20 @@ def stable_stretches(R: pd.DataFrame, vol: str, act: str, sd: str, opening: dict
     for (s_, g, t), x in d.groupby(["season", "gsis_id", "team"]):
         vals, y, m_sd = x[vol].to_numpy(float), x[act].to_numpy(float), x[sd].to_numpy(float)
         qbs = [(opening or {}).get((s_, t, int(w))) for w in x.week]
+        slots = x["slot"].astype(str).tolist() if (by == "role" and "slot" in x) else [None] * len(x)
         n, i = len(x), 0
         while i < n:
             j = i + 1
             while j < n and qbs[j] == qbs[i]:
-                seg = vals[i:j + 1]
-                if np.any(np.abs(seg - seg.mean()) > tol * seg.mean()):
-                    break
+                if by == "role":
+                    # stability from role alone (depth slot, team, starting QB): projections react
+                    # to past outcomes, so filtering on them can favour calm stretches
+                    if slots[j] != slots[i]:
+                        break
+                else:
+                    seg = vals[i:j + 1]
+                    if np.any(np.abs(seg - seg.mean()) > tol * seg.mean()):
+                        break
                 j += 1
             if j - i >= min_games:
                 rows.append({"season": s_, "gsis_id": g, "team": t, "n": j - i, "proj": float(vals[i:j].mean()),
