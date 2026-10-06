@@ -7426,3 +7426,9 @@ by the user.
   ours and the book's; and the longest-completion line's share of the yards.
 - The resource now also stores each passer's completions (kind "pass"). Report text and
   chat answers only: no price moves.
+
+## 2026-10-05 (171) -- narratives list the legs that don't mix, not a mix matrix
+
+- User: replace "which groups mix" with "which groups don't mix". The close of every
+  narrative lists only conflicting pairs, each with its reason, plus pairs that mix only
+  under a stated script, then one line saying everything else mixes.

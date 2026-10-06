@@ -271,7 +271,7 @@ For a narrow question, run only what it needs:
      catches line asked 7); catches
      is better when the yards line takes more than his volume or rests on a long play, or when a
      plus-money catches price makes it the cheaper side. When neither fits, say so.
-  6. **If-thens**, one per line of decision, with the losing branch, and which groups of legs mix.
+  6. **If-thens**, one per line of decision, with the losing branch, then **which legs don't mix**.
   A slate (several games) keeps the short per-game preview below; the full story is for one game
   or when the user asks for it.
   **Every game gets a short preview narrative**, in the board's order, BEFORE its bold lines:
@@ -297,12 +297,12 @@ For a narrow question, run only what it needs:
   are observable before entry (the inactives list, a confirmed starter, a line move) or plainly a
   belief ("if you think the Saints throw like they have all season"). Give the losing branch
   too, and say which conditions are the same game script so legs that need opposite scripts
-  never share an entry. When legs are grouped for building entries, say for every pair of
-  groups whether they mix, conflict, or mix only under a stated script -- a list of groups
-  alone reads as "don't mix these" (2026-10-05: Bijan's rushing Over and London's catches
-  Over were listed apart, though both came from the same Atlanta-leads game). Name the
-  conflicts with their reason (two backs splitting one team's carries; one team running out
-  the clock vs the same team throwing), and say when how strongly two legs move together is
+  never share an entry. Close with **"Don't mix"**: list only the pairs of legs that conflict,
+  each with its reason (two backs splitting one team's carries; one team running out the clock
+  vs the same team throwing; a WR1's target spike vs the WR2 it came from), plus any pair that
+  mixes only under a stated script; then one line saying everything else mixes (user,
+  2026-10-05 -- a full mix matrix was noise; earlier, separate groups with no verdict read as
+  "don't combine"). Say when how strongly two legs move together is
   judgment: the joint model is unchecked against real games and the what-if tool holds team
   totals fixed. These are conditional on the reader's view, never picks: no "take",
   "hammer", "best bet", and no ranking by expected profit.
