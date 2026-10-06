@@ -340,6 +340,39 @@ def snap_rule_section(df: pd.DataFrame) -> list[str]:
     return out + ["", "A group needs about 50 calls before its numbers say anything.", ""]
 
 
+def shadow_rush_section(df: pd.DataFrame, reps: int = 2000, seed: int = 29) -> list[str]:
+    """DECISIONS #185: the board's rushing-yards Over probability against the market-
+    carries shadow's, on settled backs' rushing lines -- Brier score (lower is better) with
+    a 95% interval on the difference, resampling whole games. The board's number stays the
+    price until this says otherwise at a pre-set review."""
+    need = {"p_over_board", "p_over_mkt_carries", "actual", "line"}
+    if not need <= set(df.columns):
+        return []
+    d = df[df["market"] == "player_rush_yds"].copy()
+    for c in ("p_over_board", "p_over_mkt_carries", "actual", "line"):
+        d[c] = pd.to_numeric(d[c], errors="coerce")
+    d = d.dropna(subset=list(need))
+    d = d[d.actual != d.line]                                   # pushes grade neither way
+    d = d.drop_duplicates(["event_id", "player", "line"])
+    head = ["## Rushing yards: the board vs the market-carries shadow", ""]
+    if len(d) < 30:
+        return head + [f"{len(d)} settled backs' rushing lines carry the shadow so far; the comparison "
+                       "starts at 30.", ""]
+    over = (d.actual > d.line).astype(float).to_numpy()
+    b_board = (d.p_over_board.to_numpy() - over) ** 2
+    b_shadow = (d.p_over_mkt_carries.to_numpy() - over) ** 2
+    diff = b_board - b_shadow                                   # positive = the shadow better
+    games = d["event_id"].astype(str).to_numpy() if "event_id" in d.columns else np.arange(len(d)).astype(str)
+    ug, inv = np.unique(games, return_inverse=True)
+    sums, cnt = np.bincount(inv, weights=diff), np.bincount(inv)
+    idx = np.random.default_rng(seed).integers(0, len(ug), size=(reps, len(ug)))
+    lo, hi = np.percentile(sums[idx].sum(1) / cnt[idx].sum(1), [2.5, 97.5])
+    return head + [f"{len(d)} settled lines, {len(ug)} games. Brier score (lower is better): board "
+                   f"{b_board.mean():.4f}, shadow {b_shadow.mean():.4f}; board minus shadow {diff.mean():+.4f} "
+                   f"(95% CI {lo:+.4f} to {hi:+.4f}; positive = the shadow is better). The board's number "
+                   "stays the price until a pre-set review says otherwise.", ""]
+
+
 def render_sections(df: pd.DataFrame) -> tuple[list[str], list[dict]]:
     """The four rollups for one engine's calls. (markdown lines, csv rows)."""
     out: list[str] = []
@@ -567,6 +600,7 @@ def main(argv: list[str] | None = None) -> int:
         csv_rows += rows
         out += render_clv(clv, engine_hash)
         out += snap_rule_section(group)
+        out += shadow_rush_section(group)
         out += look_section(group)
         out += blend.blend_section(group)
 

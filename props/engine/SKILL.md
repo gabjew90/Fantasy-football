@@ -248,6 +248,10 @@ For a narrow question, run only what it needs:
   (DECISIONS #156): a role story plus last game's workload already past that side's break-even.
   **How the engine works, with the numbers:** resources/engine_overview.md -- read it when the user
   asks how a projection, share, weight or price is built, and quote its formulas.
+  **With market carries (shadow), DECISIONS #185:** a back's rushing line also shows the
+  Over if his carries take half their volume from the market's script (favourites run more).
+  Quote both numbers when you read a back's rushing line: the board's is the price, the
+  shadow's is being graded beside it on the scorecard. Never present the shadow as the price.
   **A single-game read is a full story, in this order** (user, 2026-10-05; DECISIONS #168).
   Headed sections, short paragraphs, tables where they help; thorough but easy to read:
   1. **The game.** The matchup and what each team has been, the weather (or roof), home and

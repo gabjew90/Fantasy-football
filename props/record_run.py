@@ -74,10 +74,13 @@ PRED_FIELDS = [
     "price_over", "price_under",
     # the worth-a-look side, if the row was marked (DECISIONS #156)
     "look",
+    # the market-carries shadow on backs' rushing lines (DECISIONS #185)
+    "p_over_board", "p_over_mkt_carries", "mkt_carries",
 ]
 
 NUMERIC = {"line", "model_mean", "p_model", "p_push", "p_novig", "gap", "price", "ER", "p_market", "p_blend",
-           "blend_w", "snap_react", "price_over", "price_under"}
+           "blend_w", "snap_react", "price_over", "price_under", "p_over_board", "p_over_mkt_carries",
+           "mkt_carries"}
 INTEGER = {"season", "week"}
 BOOLEAN = {"new_team", "questionable", "clears_edge_rule_if_validated", "questionable_teammate", "two_sided"}
 

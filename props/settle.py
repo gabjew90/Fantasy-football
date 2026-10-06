@@ -82,6 +82,8 @@ SETTLED_FIELDS = [
     "price_over", "price_under",
     # the worth-a-look side (DECISIONS #156)
     "look",
+    # the market-carries shadow on backs' rushing lines (DECISIONS #185)
+    "p_over_board", "p_over_mkt_carries", "mkt_carries",
     # The engine that made the call. These must be listed here or the
     # DictWriter's extrasaction="ignore" below drops them silently, and the
     # scorecard could not separate two versions.

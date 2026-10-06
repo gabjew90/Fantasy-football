@@ -22,7 +22,7 @@ all three yardage markets pass the 2022-25 harness (reports/yardage_harness.md):
 Nothing is a fair price or an entry threshold.
 Recommendation is PASS on every line, per the model registry.
 """
-import argparse, json, os, subprocess, sys, time
+import argparse, json, os, subprocess, sys, time, zlib
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -1064,6 +1064,7 @@ def main():
     sims = {}
     sim_inputs = {}      # team -> the simulation's inputs, for the research columns (no draws)
     team_targets_draw, team_carries_draw = {}, {}
+    SHADOW_RUSH = {}     # back -> (rushing yards draws, carries draws) with market carries (#185)
     pass_inputs = {}     # team -> (every receiver's yards draws, the other bucket's targets)
     for t in (AWAY, HOME):
         Mt = M[M.team == t]
@@ -1115,6 +1116,22 @@ def main():
                                                           width=WIDTH, player_resid=p_resid, player_kneel=p_kneel,
                                                           qb_index=qb_i)
         team_carries_draw[t] = tc_draw
+        # THE SHADOW (DECISIONS #185): the backs' rushing again with the market-carries
+        # blend (round 29, SHADOW_MARKET_RUSH_WEIGHT), the QB's carries held, on its own
+        # stream so no board number moves. Shown beside the board and logged for grading.
+        if (MODEL.SHADOW_MARKET_RUSH_WEIGHT and not MODEL.MARKET_RUSH_WEIGHT and market_env is not None
+                and P.get("market_env_fit") and not SCENARIO):
+            c_m, f_m = MODEL.market_rush_volume(
+                MODEL.team_spread_from_home(market_env["home_spread"], t == HOME), market_env["total_line"],
+                P["market_env_fit"], env[t]["carries"], MODEL.SHADOW_MARKET_RUSH_WEIGHT)
+            qb_h = qb_i if qb_i is not None else MODEL.starter_qb_index(list(Mt.pos), rs_t, slots=list(Mt.slot))
+            car_m, rush_m, _tcm = MODEL.simulate_team_rush(
+                np.random.default_rng([20260917, 29, zlib.crc32(t.encode("utf-8"))]), N_SIM, c_m,
+                TVD["carries_r"], MODEL.hold_qb_carries(rs_t, qb_h, f_m), [float(v) for v in Mt.ypc], resid,
+                width=WIDTH, player_resid=p_resid, player_kneel=p_kneel, qb_index=qb_i)
+            for j, (_, m) in enumerate(Mt.iterrows()):
+                if str(m.pos) != "QB":
+                    SHADOW_RUSH[m["name"]] = (rush_m[j], car_m[j])
         for j, (_, m) in enumerate(Mt.iterrows()):
             rec, yds = out_rec[m["name"]]
             sims[m["name"]] = {"receptions": rec, "rec_yards": yds, "rush_yards": rush_t[j], "carries": car_t[j]}
@@ -1581,7 +1598,12 @@ def main():
                             price_over=oo["Over"]["price"], price_under=oo["Under"]["price"],
                             # round 23's factor on his target share, logged so the
                             # scorecard can grade the calls the rule moved (#145)
-                            snap_react=float(pr.evidence.get("target_share", {}).get("snap_react") or 1.0)))
+                            snap_react=float(pr.evidence.get("target_share", {}).get("snap_react") or 1.0),
+                            # the market-carries shadow beside the board (#185)
+                            **({"p_over_board": p_o,
+                                "p_over_mkt_carries": float(np.mean(SHADOW_RUSH[nm][0] > L)),
+                                "mkt_carries": float(np.mean(SHADOW_RUSH[nm][1]))}
+                               if mk["key"] == "player_rush_yds" and nm in SHADOW_RUSH else {})))
                 elif mk["key"] == "player_anytime_td":
                     no_price = {o["description"]: o["price"] for o in mk["outcomes"] if o["name"] == "No"}
                     for o in mk["outcomes"]:
@@ -2395,6 +2417,14 @@ def main():
             ry_ = RSCH.carry_yards_sentence(CARRY_READ.get((m["name"], t)))
             if ry_:
                 L.append(f"**Carries and yards.** {ry_}\n")
+            if m["name"] in SHADOW_RUSH and len(R) and "p_over_mkt_carries" in R:
+                for _, x_ in R[(R.player == m["name"]) & (R.market == "player_rush_yds")
+                               & R.p_over_mkt_carries.notna()].drop_duplicates("line").iterrows():
+                    L.append(f"**With market carries (shadow).** Rushing yards {x_.line:g}: Over "
+                             f"{100 * x_.p_over_board:.0f}% on the board, {100 * x_.p_over_mkt_carries:.0f}% if his "
+                             f"carries take half their volume from the market's script "
+                             f"({float(np.mean(sims[m['name']]['carries'])):.1f} -> {x_.mkt_carries:.1f} carries). "
+                             f"The board's number is the price; this one is graded beside it.\n")
             rr_s = RSCH.rush_rec_sentence(RUSH_REC.get((m["name"], t)))
             if rr_s:
                 L.append(f"**Rushing + receiving yards.** {rr_s}\n")

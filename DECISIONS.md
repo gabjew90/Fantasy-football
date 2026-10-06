@@ -7515,3 +7515,24 @@ by the user.
 - Neither ships yet: both are read once on 2026 weeks 2-8 after week 8 is graded, each on
   its own test, then jointly. The code ships at the shipped values (weight 0, shipped
   widths): no price moves now.
+
+## 2026-10-06 (185) -- the market-carries rushing number beside the board; no midseason waits
+
+- User: nothing waits for midseason. The rounds 28b / 29 test was amended (before any read)
+  to 2026 weeks 2-4 and read once: null for both by the rule (rushing attempts worse on the
+  point estimate in every arm; rushing yards better in both; 188 back-games, intervals too
+  wide to confirm or refute).
+- User's choice: show round 29 beside the board. Every backs' rushing line now also prices
+  the Over with the carries 50% from the market's fitted carries (model.SHADOW_MARKET_RUSH_
+  WEIGHT, the QB's carries held, its own random stream: no board number moves); the report
+  shows both, the record logs p_over_board / p_over_mkt_carries / mkt_carries, and the
+  scorecard grades them (Brier, game-clustered interval) as weeks settle.
+
+## 2026-10-06 (186) -- guards: markets the user bets stay strict; the others block only when clearly worse
+
+- User's choice, from the next round on (never applied to a result already read): a
+  candidate is blocked by receptions, receiving yards, rushing yards or QB passing yards
+  getting worse on the point estimate (the markets the user bets); QB rushing, rushing
+  attempts and QB completions block it only when their 95% interval is wholly on the worse
+  side. They stay in every report as diagnostics: the QB's carries come out of the same
+  team pool as the backs', so a QB-rushing shift flags a misallocation.

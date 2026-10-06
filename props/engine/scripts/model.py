@@ -335,6 +335,9 @@ def market_environment_fitted(team_spread, total, mkt_fit, team_pace_blend, team
 # held where history put them (hold_qb_carries), since the full market environment hurt
 # QB rushing (#106).
 MARKET_RUSH_WEIGHT = 0.0
+# DECISIONS #185 (user's choice): round 29's weight priced BESIDE the board for the backs'
+# rushing yards -- shown and logged, graded by the settled record, never the board's price.
+SHADOW_MARKET_RUSH_WEIGHT = 0.5
 
 
 def market_rush_volume(team_spread, total, mkt_fit, team_carries_blend, weight):
