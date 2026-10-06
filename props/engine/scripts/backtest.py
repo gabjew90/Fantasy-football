@@ -696,6 +696,12 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
           f"carries r={r_team_carries:.2f}", file=sys.stderr)
 
     test_act = feat_te[feat_te.roster_status == "ACT"].reset_index(drop=True)
+    _bad = test_act[test_act.team_targets_env.isna() | test_act.team_carries_env.isna()]
+    if len(_bad):           # NaN volume crashes the sampler deep down; say what is missing instead
+        sys.exit(f"season {S}: no team volume for {len(set(zip(_bad.team, _bad.week)))} team-weeks "
+                 f"(e.g. {sorted(set(zip(_bad.team, _bad.week)))[:3]}). Usually a stale cache: games.csv "
+                 f"without that week's spread/total or play-by-play missing earlier weeks -- refresh "
+                 f"{CACHE} and use a fresh --out.")
     # WHO ACTUALLY STARTED at QB: a passer on the team's first three dropbacks. The
     # starting-QB markets are graded only when the depth-chart starter is that man; a
     # depth chart that still lists an active primary who did not start had the harness

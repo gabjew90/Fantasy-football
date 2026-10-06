@@ -60,3 +60,24 @@ attempts and QB rushing CRPS no worse (point estimate), no calibration verdict w
 those markets, receiving and passing identical; rounds 28b and 29 each on their own test,
 then jointly. Disclosed cost: about 550 back-games instead of about 1,300, so a no-worse
 rule passes more easily by chance, and the result is reported with its intervals.
+
+### The 2026 weeks 2-4 read (once; fresh nflverse data -- the first attempt found a stale cache, see below)
+
+Against shipped, paired, 2026 weeks 2-4 (positive = better):
+
+| Market | 28b (backs' widths) | 29 (market carries, w 0.5) | 28b + 29 |
+|---|---|---|---|
+| Rushing yards (188 back-games) | +0.0920 (-0.0198, +0.2007) | +0.0636 (-0.1534, +0.2615) | +0.1371 (-0.1174, +0.3846) |
+| Rushing attempts (188) | -0.0144 (-0.0411, +0.0114) | -0.0103 (-0.0544, +0.0342) | -0.0266 (-0.0710, +0.0204) |
+| QB rushing (88 QB-games) | +0.0676 (+0.0142, +0.1228) | +0.0216 (-0.0445, +0.0888) | -0.0132 (-0.0714, +0.0430) |
+| Receiving, passing, completions | identical | identical | identical |
+
+Calibration verdicts: INSUFFICIENT DATA in every arm (unchanged). **By the rule: null for
+both** -- rushing attempts are worse on the point estimate in every arm. Rushing yards lean
+better in both, as on 2022-25, but three weeks (188 back-games, not the ~550 the amendment
+estimated) give intervals about +/-0.2 on rushing yards and +/-0.04 on attempts: this read
+neither confirms nor refutes. The shipped settings stay.
+
+Data note: the first attempt failed because the harness's nflverse cache predated week 4
+(play-by-play through week 3, no week 4 lines); the cache was refreshed, the run repeated
+from scratch, and backtest.py now stops with a plain message when a week has no team volume.
