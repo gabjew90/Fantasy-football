@@ -37,3 +37,18 @@ Over chance by less than 1.0 point on average stays shipped.
 ## Result
 
 (Filled in after the runs, below this line, without editing anything above.)
+
+### Selection, 2022-25 (receiving-yards conversion log loss at the stand-in lines, bettable receivers)
+
+| catch_shape_exp | mult 1 | mult 0.8 |
+|---|---|---|
+| 1 (shipped) | **0.51529** | 0.51679 |
+| 1.15 | 0.51533 | 0.51543 |
+| 1.3 | 0.51733 | 0.51626 |
+| 1.5 | 0.52175 | 0.51945 |
+
+**The shipped shape is the best: round 32 is null at selection**; 2026 is not read for it.
+The by-volume pattern in the PIT (narrow at 1-3 targets, wide at 10+) sits in the tails;
+at lines near the middle -- where bets are placed -- the shipped shape already scores best.
+With round 30's catch-rate result, the receiving conversion is as good as these knobs make
+it; the open receiving lever is the volume spread (round 31's finding).
