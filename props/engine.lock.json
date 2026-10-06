@@ -1,9 +1,9 @@
 {
   "algorithm": "props-engine-sha256-lf-1",
-  "engine_sha256": "f7ebca4eb191e02512fe0787e81537ba1a3ef40b2b1c7e49155f47ca035938a9",
-  "file_count": 54,
+  "engine_sha256": "2dda6e3c11469c41b221b6215d4b4e52b9de68f167e7e2747ae298cdb96c3e8b",
+  "file_count": 56,
   "files": {
-    "SKILL.md": "829984a3bd91960382e1c6eb84f0a621dce9dfb1ce7ad700ba21618fd5d64c13",
+    "SKILL.md": "d59060facbfc42238670d417fcb70c18cbf0e9dd1deb5876cc213d756b1bf369",
     "resources/calibration_2025.csv": "47e3922c7af818307831d70a3d2be4333200f3aee1d94dc6bbf6e0e9ccee4ac8",
     "resources/data_source_matrix.md": "2088a5ebe6164a75c11331367fda734d4b10ea217704320321a3f2aec6bb9c2b",
     "resources/execution_protocol.md": "5f54fb23a77d60ecc947d44b6f18ecf67c4357d6b49c70bc937726c1c14016c1",
@@ -19,6 +19,7 @@
     "resources/priors_2024_teams.csv": "851133be4a2b23edd66a8dc91a24f31285b203071576f15451ce9abac257751e",
     "resources/priors_2025_opponent.csv": "019d7c8568e450fb6aeeb07f9a147189aa649503e98eb3ec83b3dc1ffe8101b2",
     "resources/priors_2025_params.json": "2193853605507c25797135eb733acd0bb802abcc99261aa0ebc8ecaf031fde44",
+    "resources/priors_2025_play_yards.csv": "671f8746ae42f4dbed8a8f4d063f5d9a92430ea0fcfcbc278b02c12fc8444a2b",
     "resources/priors_2025_players.csv": "6893d646ef5c58d9c6edaa6a4321012410cbf91406ab681f8873fb1f633a3688",
     "resources/priors_2025_roles.csv": "a8abf4ec9c9c86c9f5577c65a6c9676411839a97fac4d9266e04d699ca4d3e97",
     "resources/priors_2025_slots.csv": "7fad2a09088ce05b50055082289cb7279ea864e509f15b6902720bd7619dade5",
@@ -37,14 +38,15 @@
     "scripts/absence_check.py": "fa45e3fb4a1985b38771f0c58ed002956b163ee16439778ac7391ece1ba25079",
     "scripts/absence_tune.py": "4bb4daaf1861f93ff8d57504e9fff5e0b0b828306d8210b688c87aa25ef27d1d",
     "scripts/backtest.py": "6b7af146f7bb373cb3eb56c9519d81de2ec622657048351da3f78853c537fd77",
+    "scripts/build_play_yards.py": "11de6c408de85098b8a304718612e06bb5412b1b8fbe7a918c86ecb212844d73",
     "scripts/build_priors.py": "1757899778f704cf2bd074c9750f54de1edb9ff14d1429027d5096715ac707e3",
     "scripts/build_td_priors.py": "c7330a57e68c1b7c5f8a9304bfbddbb4be0ca285d9f37ef383173d3e3049c27f",
     "scripts/eligibility.py": "f1672cff3d7ae2d52ca94b5952451e92c794bfcd21ab2224b0e35e7f152445b5",
     "scripts/model.py": "4e967fb31e1a0c17e5d68a181c494a1c0b405eafc42ca1726063911e5cb5d77c",
     "scripts/odds_client.py": "434186273bd0412a5545247228298951c5d0504a19c8a47c4c782bf3bb75aaa1",
-    "scripts/research.py": "5945659e770fa4cf3f5a80b3fc6b47ee0a0b578fc808802e76da071d6925be51",
+    "scripts/research.py": "67ccc0b367f79f557732fd34f6c78c6af7e0cdb045912203589377dc86135446",
     "scripts/scenario.py": "732ef233876bb13ae5dee3c8f04e5bf99b5634cb879bdeb744f56a47df557172",
-    "scripts/score_game.py": "473f6b4fbb0d9d055ce3c99f010469b9963c04126e9da6686c16d743ca191bfa",
+    "scripts/score_game.py": "ea7ea0001af71ee311daf464aab5da40b4325527e7f75bc200af25364b9336cc",
     "scripts/score_week.py": "5259ebc2f6e56571f7e0b03291e84d0e26d00f85dacf5256f40b07ac275fabeb",
     "scripts/td_alloc.py": "7c407c949cac8f0f74d7f91589fd5d749f65d9053eb1c3f5f0dc63a700b3465b",
     "scripts/td_alloc_backtest.py": "e259d9f0e301a5d5d34e5a9e84bba222810f077d9c05a1f1f799a611914595a4",
@@ -58,5 +60,5 @@
     "scripts/td_model.py": "7c1635bbf515b4316f14771b177363a9f82a1ba7ad3393e479cd2dce26a25724",
     "scripts/td_v1.py": "4e54516734888fc588a7ad3fd9d0ad7dd16d96edcaa980adff3dbcda232ece0f"
   },
-  "tag": "props-v1.34"
+  "tag": "props-v1.35"
 }

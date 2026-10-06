@@ -340,12 +340,15 @@ def test_the_read_degrades_without_its_inputs():
     assert RS.catch_yards_sentence(RS.catch_yards_read(None, 44.5)) is None
 
 
-def test_longest_lines_come_from_sleeper_for_this_game_only():
-    opt = lambda team, out, v, status="active", game="pre_game": {
-        "subject_team": team, "outcome": out, "outcome_value": v, "status": status, "game_status": game}
+def test_extra_lines_come_from_sleeper_for_this_game_only():
+    opt = lambda team, out, v, mult=None, status="active", game="pre_game": {
+        "subject_team": team, "outcome": out, "outcome_value": v, "status": status, "game_status": game,
+        **({"payout_multiplier": mult} if mult else {})}
     mk = [
         {"sport": "nfl", "wager_type": "longest_reception", "subject_id": "1",
          "options": [opt("NO", "over", 19.5), opt("NO", "under", 19.5)]},
+        {"sport": "nfl", "wager_type": "rushing_attempts", "subject_id": "5",
+         "options": [opt("ATL", "over", 19.5, "1.87"), opt("ATL", "under", 19.5, "1.70")]},
         {"sport": "nfl", "wager_type": "longest_reception", "subject_id": "2", "line_type": "goblin",
          "options": [opt("NO", "over", 9.5)]},                                  # not a normal line
         {"sport": "nfl", "wager_type": "longest_reception", "subject_id": "3",
@@ -356,5 +359,260 @@ def test_longest_lines_come_from_sleeper_for_this_game_only():
          "options": [opt("ATL", "over", 26.5, game="in_progress")]},            # kicked off
     ]
     players = {"1": {"full_name": "Devaughn Vele"}, "2": {"full_name": "Bryce Lance"},
-               "3": {"full_name": "CeeDee Lamb"}, "4": {"first_name": "Drake", "last_name": "London"}}
-    assert RS.longest_lines(mk, players, {"NO", "ATL"}) == [{"name": "Devaughn Vele", "team": "NO", "line": 19.5}]
+               "3": {"full_name": "CeeDee Lamb"}, "4": {"first_name": "Drake", "last_name": "London"},
+               "5": {"full_name": "Bijan Robinson"}}
+    got = RS.extra_lines(mk, players, {"NO", "ATL"})
+    assert got == [
+        {"name": "Devaughn Vele", "team": "NO", "kind": "longest_reception", "line": 19.5,
+         "mult_over": None, "mult_under": None},
+        {"name": "Bijan Robinson", "team": "ATL", "kind": "rushing_attempts", "line": 19.5,
+         "mult_over": 1.87, "mult_under": 1.70}]
+    assert RS.favoured(1.87, 1.70) == "Under" and RS.favoured(1.70, 1.87) == "Over"
+    assert RS.favoured(1.78, 1.78) is None and RS.favoured(1.80, None) is None
+
+
+def test_carries_and_yards_lines_read_together():
+    # Bijan Robinson, ATL week 4: 19.5 carries (Under favoured), 89.5 yards, longest run 17.5;
+    # 349 yards on 66 carries this season, 55 of them on one run
+    d = RS.carry_yards_read(19.5, 89.5, model_ypc=5.3, proj_carries=17.5, season_car=66, season_yds=349,
+                            longest_line=17.5, carries_fav="Under")
+    assert (d["c_min"], d["y_min"], d["long_min"]) == (20, 90, 18)
+    assert d["mid_ypc"] == pytest.approx(89.5 / 19.5) and d["need_ypc"] == pytest.approx(4.5)
+    assert d["read"] == "yards line lean", "4.6 asked against our 5.3 is past the half-yard band"
+    assert d["rest_ypc"] == pytest.approx((90 - 18) / 19)
+    s = RS.carry_yards_sentence(d)
+    assert s.startswith("The book's carries line is 19.5, Under favoured; we project 17.5.")
+    assert "5.3 this season on 66 carries (mostly noise this early" in s and "mostly a bet on the carries" in s
+    assert "one run of 18, 20% of the 90 yards; with that one, his other 19 carries need 3.8 each" in s
+
+
+def test_the_carries_read_degrades_without_its_inputs():
+    assert RS.carry_yards_read(11.5, None) is None
+    d = RS.carry_yards_read(11.5, 36.5, model_ypc=3.4, season_car=8, season_yds=30)
+    assert d["season_ypc"] is None, "8 carries is too few to quote a season yards a carry"
+    k = RS.carry_yards_read(11.5, 36.5, model_ypc=3.4, season_car=18, season_yds=51)
+    assert "he has 2.8 this season on 18 carries (mostly noise" in RS.carry_yards_sentence(k), \
+        "Kamara's own number shows, with its count, though it carries no verdict"
+    assert d["read"] == "about even" and d["carries_fav"] is None
+    assert "Under favoured" not in RS.carry_yards_sentence(d) and "we project" not in RS.carry_yards_sentence(d)
+    d = RS.carry_yards_read(None, 29.5, longest_line=14.5)
+    assert d["need_ypc"] is None and RS.carry_yards_sentence(d).startswith("The longest-run line (14.5)")
+    assert RS.carry_yards_sentence(RS.carry_yards_read(None, 29.5)) is None
+    assert RS.carry_yards_read(9.5, 29.5, model_ypc=2.5)["read"] == "yards line rich"
+
+
+
+def test_extra_lines_are_indexed_by_our_team_code():
+    rows = [{"name": "Puka Nacua", "team": "LAR", "kind": "longest_reception", "line": 24.5},
+            {"name": "Bijan Robinson", "team": "ATL", "kind": "rushing_attempts", "line": 19.5}]
+    ix = RS.extra_index(rows, {"LA": "LAR"})
+    assert ix[("longest_reception", M.norm_name("Puka Nacua"), "LA")]["line"] == 24.5, "Sleeper's LAR is our LA"
+    assert ix[("rushing_attempts", M.norm_name("Bijan Robinson"), "ATL")]["line"] == 19.5
+    assert RS.extra_summary(rows) == "longest catch 1, carries 1"
+    assert RS.extra_summary([]) == "none posted for this game"
+
+
+
+def test_the_season_yards_a_catch_is_shown_capped():
+    # London: 274 yards on 15 catches, 220 once each catch is capped (made-up capped total)
+    lk = {"cap": 41.0, "own": True, "n": 52, "games": 10}
+    d = RS.catch_yards_read(6.5, 81.5, season_rec=15, season_yds=274, model_ypc=13.4, luckfree_ypc=220 / 15, luck=lk)
+    assert d["season_ypc_luckfree"] == pytest.approx(220 / 15)
+    assert "he has 18.3 this season on 15 catches, 14.7 luck-free over his last 10 games" in RS.catch_yards_sentence(d)
+    assert d["read"] == "about even", "context only: the verdict still compares the lines with ours"
+    assert RS.catch_yards_read(6.5, 81.5, season_rec=5, season_yds=90, luckfree_ypc=16.0)["season_ypc_luckfree"] == 16.0, \
+        "the 10-game window decides the luck-free rate, not this season's count"
+
+
+
+def test_the_gauge_compares_the_volume_the_line_takes_with_ours():
+    # Bijan: 349 yards on 66 carries, 323 once his 55-yarder counts as 29; 90 yards takes 18.4
+    d = RS.carry_yards_read(19.5, 89.5, model_ypc=5.3, proj_carries=17.5, season_car=66, season_yds=349,
+                            luckfree_ypc=323 / 66)
+    assert d["gauge"]["need"] == pytest.approx(90 / (323 / 66))
+    s = RS.carry_yards_sentence(d)
+    assert "90 yards takes about 18.4 carries; we project 17.5 (our volume), about what it takes." in s
+    assert "The book's own carries line is 19.5: the yards line takes less than the book's own volume." in s
+    lk = {"cap": 31.0, "own": True, "n": 183, "games": 10}
+    d = RS.carry_yards_read(None, 29.5, model_ypc=4.5, proj_carries=9.1, season_car=30, season_yds=132,
+                            luckfree_ypc=132 / 30, luck=lk)
+    assert ("At 4.4 yards a carry with the luck taken out (every run past 31 yards, his own 97.5th percentile "
+            "over his last 10 games with a run (183 runs), counted as 31), 30 yards takes") in RS.carry_yards_sentence(d), \
+        "with no carries line the gauge still names the cap it used"
+    d = RS.carry_yards_read(None, 36.5, model_ypc=2.5, proj_carries=11.8)
+    assert "fewer than it takes: the Over needs more carries or a long run." in RS.carry_yards_sentence(d)
+    d = RS.carry_yards_read(None, 29.5, model_ypc=4.5, proj_carries=9.1)
+    assert "comfortably more than it takes" in RS.carry_yards_sentence(d)
+    assert "his usual game clears it" not in RS.carry_yards_sentence(d), "an average game is not a usual game"
+    # a low-volume receiver gets the warning
+    d = RS.catch_yards_read(1.5, 19.5, model_ypc=13.4, proj_catches=2.2)
+    s = RS.catch_yards_sentence(d)
+    assert "20 yards takes about 1.5 catches; we project 2.2" in s and "one catch either way decides it" in s
+    assert RS.volume_gauge(45, 11.5, None, "catches", 3.0) is None
+
+
+
+def test_the_luck_line_is_the_players_own_97_5th_percentile_play():
+    plays = list(range(1, 101))                       # 100 plays of 1..100 yards
+    lk = RS.player_luck_line(plays)
+    assert lk["own"] and lk["n"] == 100 and lk["cap"] == pytest.approx(np.percentile(plays, 97.5))
+    few = RS.player_luck_line([5, 8, 55])
+    assert few == {"cap": None, "own": False, "n": 3}, "too few plays: no percentile"
+    assert RS.luck_free_rate([5, 8, 55], few) == pytest.approx(6.5), "too few: his longest play left out"
+    assert RS.luck_free_rate([5, 8, 120], lk) == pytest.approx((5 + 8 + np.percentile(plays, 97.5)) / 3)
+    assert RS.luck_free_rate([9], few) is None and RS.luck_free_rate([], lk) is None
+    assert RS.luck_words(dict(lk, games=10), "run") == \
+        "every run past 98 yards, his own 97.5th percentile over his last 10 games with a run (100 runs), counted as 98"
+    assert RS.luck_words(dict(few, games=2), "run") == \
+        "his longest run left out -- only 3 runs in his last 2 games with a run, too few for a percentile"
+    assert RS.player_luck_line(list(range(1, 21)))["own"], "20 plays of his own is enough"
+    assert not RS.player_luck_line(list(range(1, 20)))["own"], "19 is too few"
+    assert RS.luck_words(None, "run") == ""
+
+
+
+def test_the_luck_free_check_reads_his_last_10_games():
+    # last season's final 9 games (3 runs each), then this season's 3 games
+    prior = {("00-001", "run"): [[float(g), 2.0, 3.0] for g in range(1, 10)]}
+    cur = {"00-001": [[4.0, 6.0], [60.0, 1.0], [5.0]]}
+    luck, rate = RS.luck_for(prior, cur, "00-001", "run")
+    # the window is the last 10 games: prior games 3..9 (7 games) + this season's 3
+    plays = [y for g in prior[("00-001", "run")][-7:] for y in g] + [4.0, 6.0, 60.0, 1.0, 5.0]
+    assert luck["games"] == 10 and luck["n"] == len(plays) == 26 and luck["own"]
+    assert luck["cap"] == pytest.approx(np.percentile(plays, 97.5))
+    assert rate == pytest.approx(sum(min(y, luck["cap"]) for y in plays) / len(plays)), "rate: the same 10 games"
+    # too few plays in the window: his longest left out; under 10 carries: no rate
+    luck, rate = RS.luck_for({}, {"00-002": [[3.0, 4.0, 30.0], [2.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0]]},
+                             "00-002", "run")
+    assert not luck["own"] and luck["games"] == 2
+    assert rate == pytest.approx((3 + 4 + 30 + 2 + 5 + 6 + 7 + 8 + 9 + 10 + 11 - 30) / 10)
+    assert RS.luck_for({}, {"00-003": [[3.0, 9.0]]}, "00-003", "catch")[1] is None, "2 catches: too few for a rate"
+    assert RS.luck_for({}, {}, "00-999", "run") == ({"cap": None, "own": False, "n": 0, "games": 0}, None)
+
+
+def test_last_seasons_games_round_trip_through_the_resource():
+    import pandas as pd
+    import build_play_yards as BPY
+    pbp = pd.DataFrame({"season_type": "REG", "week": [1, 1, 2, 3], "play_type": "run", "qb_kneel": 0,
+                        "complete_pass": None, "receiver_player_id": None, "rusher_player_id": "00-001",
+                        "receiving_yards": None, "rushing_yards": [3.0, 12.0, 5.0, -2.0]})
+    out = BPY.play_yards(pbp, last_games=2)
+    row = out[out.kind == "run"].iloc[0]
+    assert row.games == "2:5;3:-2" and row.n == 2, "the last 2 games, oldest first"
+    assert BPY.parse_games(row.games) == [[5.0], [-2.0]]
+
+
+
+def test_the_gauge_says_whose_volume_each_number_is():
+    d = RS.carry_yards_read(19.5, 89.5, model_ypc=4.4, proj_carries=17.5, carries_fav="Under")
+    s = RS.carry_yards_sentence(d)
+    assert "we project 17.5 (our volume)" in s
+    assert "The book's own carries line is 19.5, Under favoured: fewer than the yards line takes" in s
+    d = RS.carry_yards_read(None, 29.5, model_ypc=4.3, proj_carries=9.1)
+    assert "The book posts no carries line for him, so this is against our volume only." in RS.carry_yards_sentence(d)
+    d = RS.catch_yards_read(6.5, 81.5, model_ypc=16.4, proj_catches=5.8)
+    assert "The book's own catches line is 6.5: the yards line takes less than the book's own volume." \
+        in RS.catch_yards_sentence(d)
+
+
+
+def test_fantasy_points_allowed_by_position():
+    import pandas as pd
+    pbp = pd.DataFrame([
+        # ATL defence, game 1: a WR catch for 20 and a TD (1 + 2 + 6), an RB run for 30 (3)
+        dict(game_id="g1", defteam="ATL", play_type="pass", complete_pass=1, receiver_player_id="wr1",
+             rusher_player_id=None, receiving_yards=20, rushing_yards=None, pass_touchdown=1, rush_touchdown=0, qb_kneel=0),
+        dict(game_id="g1", defteam="ATL", play_type="run", complete_pass=None, receiver_player_id=None,
+             rusher_player_id="rb1", receiving_yards=None, rushing_yards=30, pass_touchdown=0, rush_touchdown=0, qb_kneel=0),
+        # a QB kneel and a QB run: not counted
+        dict(game_id="g1", defteam="ATL", play_type="run", complete_pass=None, receiver_player_id=None,
+             rusher_player_id="qb1", receiving_yards=None, rushing_yards=-1, pass_touchdown=0, rush_touchdown=0, qb_kneel=1),
+        # ATL game 2: an incomplete pass to the TE (0) and a FB catch for 5 (1.5, counts as RB)
+        dict(game_id="g2", defteam="ATL", play_type="pass", complete_pass=0, receiver_player_id="te1",
+             rusher_player_id=None, receiving_yards=0, rushing_yards=None, pass_touchdown=0, rush_touchdown=0, qb_kneel=0),
+        dict(game_id="g2", defteam="ATL", play_type="pass", complete_pass=1, receiver_player_id="fb1",
+             rusher_player_id=None, receiving_yards=5, rushing_yards=None, pass_touchdown=0, rush_touchdown=0, qb_kneel=0),
+        # NO defence, one game: a TE catch for 10 (2)
+        dict(game_id="g3", defteam="NO", play_type="pass", complete_pass=1, receiver_player_id="te1",
+             rusher_player_id=None, receiving_yards=10, rushing_yards=None, pass_touchdown=0, rush_touchdown=0, qb_kneel=0),
+    ])
+    pos = {"wr1": "WR", "rb1": "RB", "qb1": "QB", "te1": "TE", "fb1": "FB"}
+    pa = RS.points_allowed(pbp, pos)
+    assert pa["_games"] == {"ATL": 2, "NO": 1}
+    assert pa["ATL"]["WR"][0] == pytest.approx(9.0 / 2) and pa["ATL"]["RB"][0] == pytest.approx((3 + 1.5) / 2)
+    assert pa["ATL"]["TE"][0] == 0.0 and pa["NO"]["TE"] == (pytest.approx(2.0), 1)
+    assert pa["ATL"]["RB"][1] == 1 and pa["NO"]["RB"][1] == 2, "rank 1 = most allowed"
+    line = RS.points_allowed_line(pa, ("ATL", "NO"))
+    assert line.startswith("ATL's defence allows RB 2.2 (1 of 2") and "League average: RB 1.1" in line
+    assert "context, not an adjustment" in line
+    assert RS.points_allowed_line(pa, ("ATL", "DAL")) is None and RS.points_allowed(None, pos) == {}
+
+
+
+def test_this_seasons_games_come_oldest_week_first():
+    import pandas as pd
+    df = pd.DataFrame({"week": [3, 1, 3, 2, 1], "pid": ["a", "a", "a", None, "b"], "y": [10.0, 4.0, None, 7.0, 2.0]})
+    assert RS.games_by_player(df, "pid", "y") == {"a": [[4.0], [10.0]], "b": [[2.0]]}
+
+
+def test_points_allowed_notes_players_without_a_position():
+    import pandas as pd
+    row = lambda pid, yds: dict(game_id="g1", defteam="ATL", play_type="pass", complete_pass=1, receiver_player_id=pid,
+                                rusher_player_id=None, receiving_yards=yds, rushing_yards=None, pass_touchdown=0,
+                                rush_touchdown=0, qb_kneel=0)
+    pa = RS.points_allowed(pd.DataFrame([row("wr1", 50), row("ghost", 50)]), {"wr1": "WR"})
+    assert pa["_unmapped_share"] == pytest.approx(0.5)
+    pa["NO"], pa["_games"]["NO"] = pa["ATL"], 1
+    assert "belong to players the roster file gives no position" in RS.points_allowed_line(pa, ("ATL", "NO"))
+
+
+def test_the_quarterback_read_uses_completions():
+    lk = {"cap": 41.0, "own": True, "n": 210, "games": 10}
+    d = RS.qb_yards_read(completions_line=22.5, yards_line=259.5, proj_completions=20.1, model_ypc=11.9,
+                         luck=lk, luckfree_ypc=10.8, longest_line=34.5, completions_fav="Under", attempts_line=35.5)
+    assert d["gauge"]["need"] == pytest.approx(260 / 10.8)
+    s = RS.qb_yards_sentence(d)
+    assert s.startswith("The book's completions line is 22.5, Under favoured (attempts 35.5); we project 20.1.")
+    assert "The lines ask 11.5 yards a completion (259.5 over 22.5); we expect 11.9, 10.8 luck-free over his last 10 games." in s
+    assert ("every completion past 41 yards, his own 97.5th percentile over his last 10 games with a completion "
+            "(210 completions), counted as 41") in s
+    assert "260 yards takes about 24.1 completions; we project 20.1 (our volume), fewer than it takes" in s
+    assert "The book's own completions line is 22.5, Under favoured: fewer than the yards line takes" in s
+    assert "The longest-completion line (34.5) means one completion of 35, 13% of the 260 yards." in s
+    assert RS.qb_yards_read(22.5, None) is None
+    bare = RS.qb_yards_read(yards_line=225.5, proj_completions=19.0, model_ypc=11.0)
+    assert "(our figure for him)" in RS.qb_yards_sentence(bare)
+
+
+def test_the_resource_holds_a_quarterbacks_completions():
+    import pandas as pd
+    import build_play_yards as BPY
+    pbp = pd.DataFrame({"season_type": "REG", "week": [1, 1, 2], "play_type": "pass", "qb_kneel": 0,
+                        "complete_pass": [1, 0, 1], "receiver_player_id": ["wr", "wr", "te"], "rusher_player_id": None,
+                        "receiving_yards": [12.0, None, 30.0], "rushing_yards": None, "passer_player_id": "qb"})
+    out = BPY.play_yards(pbp)
+    assert out[(out.gsis_id == "qb") & (out.kind == "pass")].iloc[0].games == "1:12;2:30"
+
+
+
+def test_projected_completions_match_the_simulated_mean():
+    rng = np.random.default_rng(7)
+    rec = [rng.poisson(5.0, 20000).astype(float), rng.poisson(3.0, 20000).astype(float)]
+    other = rng.poisson(6.0, 20000)
+    share = [0.85, 0.95, 1.0]
+    sim = M.simulate_qb_completions(np.random.default_rng(8), 20000, rec, other, {"catch_rate": 0.6},
+                                    starter_share=share)
+    proj = RS.projected_completions([r.mean() for r in rec], other.mean(), 0.6, np.mean(share))
+    assert proj == pytest.approx(float(np.mean(sim)), rel=0.02), "the mean of the draw the model makes"
+    assert RS.projected_completions([5.0], None, None, 1.0) == 5.0
+
+
+def test_a_quarterbacks_cameo_games_stay_out_of_his_window():
+    prior = {("qb", "pass"): [[10.0] * 3, [8.0] * 20]}          # a 3-completion cameo, then a start
+    luck, rate = RS.luck_for(prior, {"qb": [[12.0] * 22]}, "qb", "pass")
+    assert luck["games"] == 2 and luck["n"] == 42, "the cameo is left out"
+
+
+def test_the_quarterback_read_says_whether_the_yards_line_asks_more():
+    d = RS.qb_yards_read(completions_line=23.5, yards_line=260.5, proj_completions=23.1, model_ypc=10.0)
+    assert d["read"] == "yards line rich" and "needs extra completions or a long one" in RS.qb_yards_sentence(d)

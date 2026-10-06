@@ -246,6 +246,34 @@ For a narrow question, run only what it needs:
   table in one file, in that order -- and prints it: for "the props for these games", reproduce it
   in full (never trim rows), then a short read of what stands out per game. A **bold** prop is "worth a look"
   (DECISIONS #156): a role story plus last game's workload already past that side's break-even.
+  **A single-game read is a full story, in this order** (user, 2026-10-05; DECISIONS #168).
+  Headed sections, short paragraphs, tables where they help; thorough but easy to read:
+  1. **The game.** The matchup and what each team has been, the weather (or roof), home and
+     away, the Vegas lines (spread, total, implied points and the script they point to), the
+     fantasy points each defence allows to RBs, WRs and TEs (the header's "Fantasy points
+     allowed" line: PPR per game and rank -- a small sample this early, context only, never a
+     reason on its own), and the injuries (who is out, questionable, back) -- plus any line
+     moves since the morning.
+  2. **Each player with a priced line**, team by team: his volume and share LAST SEASON, THIS
+     SEASON so far, and last game against his earlier games (targets or carries, share and count).
+  3. **Teammates out or questionable** who move his work, and which way.
+  4. **Expected volume and share, ours and the book's**: our projected targets or carries; the
+     book's own volume where it posts it (catches / carries lines, the side favoured); what each
+     yards line works out to ("line implies").
+  5. **The lines themselves**: where our projection lands (zone), and the luck-free check -- his
+     luck-free yards a play over his last 10 games, the volume the yards line takes at that rate,
+     against our volume and the book's. For a QB the same check reads "Completions and yards": his
+     luck-free yards per completion, the completions his passing-yards line takes, against our
+     projected completions and the book's completions line. Then **name the better line for each
+     read, catches OR yards, and say why** -- never use the two interchangeably (user,
+     2026-10-05). Yards is the better vehicle when the luck-free check says the yards line takes
+     fewer catches than the catches line asks (London, week 4: 82 yards took about 5.4 catches; the
+     catches line asked 7); catches
+     is better when the yards line takes more than his volume or rests on a long play, or when a
+     plus-money catches price makes it the cheaper side. When neither fits, say so.
+  6. **If-thens**, one per line of decision, with the losing branch, and which groups of legs mix.
+  A slate (several games) keeps the short per-game preview below; the full story is for one game
+  or when the user asks for it.
   **Every game gets a short preview narrative**, in the board's order, BEFORE its bold lines:
   read the game, do not recite the table. Start from the context line under its heading --
   who is favoured and the implied points (the script: a big favourite runs late, an underdog
@@ -308,6 +336,36 @@ For a narrow question, run only what it needs:
   says how much of the yards one play carries -- with one catch at that line, what the rest must
   average. Narrate it as the book's view of how he gets his yards, not as a model edge: the
   longest-catch line is the book's number only and is not priced here.
+  **Carries and yards** (backs and receivers, not QBs; DECISIONS #166) is the runner's version:
+  the book's carries line beside our projected carries (with the side the book favours), the
+  lines' yards a carry against ours, his season figure with its count and the warning that it is
+  mostly noise this early (three games of yards a carry predicted later games worse than the
+  league average in 2022-25; reports/robust_ypc_check.md), both Overs at the minimum, and the
+  longest-run line's share of the yards. When the lines ask about his usual yards a carry, his
+  rushing-yards Over is a bet on the carries: say so, and say where the book's carries line and
+  favoured side sit against ours (Bijan, week 4: 19.5, Under favoured, we 17.5 -- the market
+  does not expect 20). Receivers' season figures are shown beside a luck-free version (the luck line
+  below); a big gap between the two means his average was built on one or two long plays, so a yards
+  Over that needs his raw average needs another one. Lean on our figure for runners: their
+  early-season yards a carry is noise.
+  **The achievability gauge** ends both reads: the volume the yards line takes at his capped
+  yards a play (the luck line: a play past the player's OWN 97.5th percentile for that prop --
+  his catches or his runs, last season and this one -- counts as a lucky breakaway and is
+  counted at the line; under 20 plays of his own, his longest play this season is left out
+  instead; the report prints which it used; ours when his
+  sample is small), against the volume we project: "comfortably more than it takes", "about what
+  it takes" or "fewer than it takes". Use it to say whether a yards line is achievable without a
+  lucky breakaway. **Say whose volume each number is.** "We project" is OUR model's volume, never
+  the book's. The gauge also quotes the book's own catches or carries line when Sleeper posts
+  one (with the side it favours) -- narrate against both: "90 yards takes about 21 carries
+  without a breakaway; we project 17.5, and the book's own carries line is 19.5 with the Under
+  favoured -- even the book's volume falls short, so the Over needs a workhorse game or a long
+  run". When the book posts no volume line for him, say the check is against our volume only and
+  add his recent games' volume and what the yards line works out to ("line implies" in the
+  table), so the reader sees three volumes side by side. It is an average-game check, so a
+  "comfortably" on a 1-2 catch player is still
+  close to a coin flip (the gauge warns under 3 catches or 6 carries). Report text only: it never
+  changes the model's price.
   Then narrate the bold lines, analytically, in plain English -- interpret, do not recite the
   row's numbers back:
   1. **The story and its direction**: who is out or back, whose role moved, and why that points

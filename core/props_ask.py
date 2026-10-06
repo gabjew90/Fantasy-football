@@ -394,6 +394,8 @@ def research_fields(b) -> dict:
                                                         "bf_i5_base", "bf_i5_n", "bf_i5_team")}
                           if get("bf_early") is not None and not pd.isna(get("bf_early")) else None),
             "catch_yards": get("catch_yards") if isinstance(get("catch_yards"), str) else None,
+            "carry_yards": get("carry_yards") if isinstance(get("carry_yards"), str) else None,
+            "qb_yards": get("qb_yards") if isinstance(get("qb_yards"), str) else None,
             "flags": get("flags") if isinstance(get("flags"), str) else ""}
 
 
@@ -443,6 +445,10 @@ def research_text(x: dict, label: str, book: str = "", line=None) -> str:
     if x.get("catch_yards") and label == "rec yds":
         # once per player: the read is the same on his catches row (DECISIONS #164)
         bits.append(f"catches and yards: {x['catch_yards']}")
+    if x.get("carry_yards") and label == "rush yds":
+        bits.append(f"carries and yards: {x['carry_yards']}")
+    if x.get("qb_yards") and label == "pass yds":
+        bits.append(f"completions and yards: {x['qb_yards']}")
     if x.get("flags"):
         bits.append(f"flags: {x['flags']}")
     return "; ".join(bits)

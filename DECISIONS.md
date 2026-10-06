@@ -7341,3 +7341,88 @@ by the user.
 - Grouped legs say, pair by pair, whether the groups mix, conflict or mix only under
   a stated script: listing Bijan's rushing Over and London's catches Over in separate
   groups read as "don't combine" though both came from Atlanta's week-3 lead.
+
+## 2026-10-05 (166) -- the runner's version: carries, rushing yards and the longest run read together
+
+- Each back's or receiver's rushing line gets a "Carries and yards" read: Sleeper's
+  rushing-attempts line beside our projected carries, with the side the book favours
+  (from its payout multipliers, when they differ by more than 0.05); the lines' yards a
+  carry against ours, a half-yard band reading "about even" (picked, not measured --
+  a carry gains about a third of a catch); his season figure (10+ carries) with its
+  count and a warning that it is mostly noise this early; both Overs at the minimum;
+  and the longest-run line's share of the yards.
+- QBs are left out: their rushing line counts kneel-downs, which muddy a yards a carry.
+- Taking the luck out: see #167 for the luck line. reports/robust_ypc_check.md records
+  how caps and "drop the longest" compare as predictors of later yards a play, for
+  reference only (the gauge describes, it does not predict); three games of yards a
+  carry lost to the league average, so the runner's season figure carries a noise
+  warning.
+- The achievability gauge (user, 2026-10-05): the volume the yards line takes at his
+  luck-free yards a play (#167; ours when his sample is small), against the volume we project --
+  "comfortably more than it takes" / "about what it takes" (within 15%, a display band)
+  / "fewer than it takes", with a warning under 3 catches or 6 carries. Volume times
+  rate is an average game, pulled up by big games, so it is never phrased as "his usual
+  game clears it". Report text only: no price moves.
+- The unpriced Sleeper lines are now one list (research.extra_lines: longest catch,
+  longest run, rushing attempts), replacing longest_lines. Still never priced, joined,
+  logged or archived.
+- Prompted by Bijan Robinson, week 4: the book's 19.5 carries line favoured the Under
+  while the lines asked 4.6 a carry, so his rushing-yards Over was a bet on 20 carries.
+
+## 2026-10-05 (167) -- the luck line is each player's own 95th-percentile play
+
+- User's design for the achievability gauge, settled over several messages: a play
+  past the player's OWN 95th percentile for that prop -- his catches for receiving
+  yards, his runs for rushing yards -- counts as a lucky breakaway and is counted at
+  that line. His plays from last season (resources/priors_2025_play_yards.csv, built
+  by scripts/build_play_yards.py) and this season are pooled, because three games
+  are far too few for a percentile.
+- "Too few" = under 20 plays of that kind (at 20 the 95th percentile still sits
+  between his two longest; below it the line would just be his longest play). Then
+  his longest play this season is left out instead.
+- Earlier versions in the same session (league-wide caps at the 95th, then 99th
+  percentile; own 99th) were superseded: own 99th sat at a player's longest one or
+  two plays and trimmed almost nothing.
+- Every read prints the line it used ("every run past 14 yards, his own 95th
+  percentile over his last 10 games and 195 runs, counted as 14"). Report text only:
+  no price moves.
+- The window (user, later the same day): the luck line AND the luck-free rate both read
+  the player's last 10 games -- this season's, topped up with last season's final games
+  (the resource now stores each player's last 10 games of 2025, game by game). The rate
+  needs 8 catches / 10 carries in the window, else our figure. The gauge also quotes the
+  book's own catches or carries line, within half a unit reading as about the same.
+
+## 2026-10-05 (168) -- a single-game read is a full story in a fixed order
+
+- User: the game (matchup, weather, home/away, Vegas lines, injuries), then each
+  player's volume and share last season and this season, the teammates who move it, our
+  and the book's expected volume, the lines with the luck-free check, then the
+  if-thens. Headed and easy to read. A slate keeps the short per-game preview.
+
+## 2026-10-05 (169) -- the game story shows fantasy points allowed by position; the luck line moves to the 99th
+
+- The game header gets a "Fantasy points allowed" line: PPR points per game each
+  defence has allowed to RBs, WRs and TEs this season (1 a catch, 0.1 a yard, 6 a
+  touchdown; kneel-downs, fumbles and two-point plays out), its rank of 32 and the league
+  average (research.points_allowed). Context for the narrative only: position matchups
+  were tested as too noisy to move the model, and three games is a small sample.
+- The user moved the per-player luck line back to the 99th percentile of his last 10
+  games, for catches and runs (supersedes the 95th in #167): at the 95th a back's
+  ordinary 15-25-yard runs, which came in 6 of Bijan Robinson's last 10 games, counted
+  as luck.
+- Later the same evening the user settled on the 97.5th percentile (both catches and
+  runs) after trying the 95th and 99th. Narration names the better line, catches OR
+  yards, for every read, with the reason; the two are never used interchangeably.
+
+## 2026-10-05 (170) -- the quarterback gets the same luck-free check, on completions
+
+- Each starting QB's passing-yards line gets a "Completions and yards" read: Sleeper's
+  completions line (with the side it favours) and attempts line beside our projected
+  completions -- his receivers' catches in this simulation plus the depth bucket's, times
+  the starter's usual share, the mean of what simulate_qb_completions draws; the lines'
+  yards per completion against ours; his luck-free yards per completion over his last 10
+  games (each completion past his own 97.5th percentile counted at it; under 20
+  completions, our figure); the completions the yards line takes at that rate, against
+  ours and the book's; and the longest-completion line's share of the yards.
+- The resource now also stores each passer's completions (kind "pass"). Report text and
+  chat answers only: no price moves.
