@@ -57,7 +57,8 @@ for _stream in (sys.stdout, sys.stderr):
 
 CAL_MARKETS = {"player_receptions", "player_reception_yds"}
 MK_LABEL = {"player_receptions": "catches", "player_reception_yds": "rec yds",
-            "player_rush_yds": "rush yds", "player_anytime_td": "anytime TD", "player_pass_yds": "pass yds"}
+            "player_rush_yds": "rush yds", "player_anytime_td": "anytime TD", "player_pass_yds": "pass yds",
+            "player_rush_reception_yds": "rush+rec yds"}
 
 
 def eastern_kickoff(s: str) -> str:
@@ -114,7 +115,7 @@ def slate_board(RS, runs, sort="kickoff", overs_only=False) -> list[str]:
     Over chances and the workload the Over needs at its price."""
     from score_game import research_cells, usage_line
     MKT = {"player_receptions": "catches", "player_reception_yds": "rec yds", "player_rush_yds": "rush yds",
-           "player_pass_yds": "pass yds"}
+           "player_pass_yds": "pass yds", "player_rush_reception_yds": "rush+rec yds"}
     games = [r for r in runs if r["game"] in set(RS.game)]
     if sort == "total":
         games = sorted(games, key=lambda r: -(_num(r.get("total")) or -1))

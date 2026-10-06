@@ -1160,16 +1160,15 @@ def qb_yards_sentence(d) -> str | None:
 
 def rush_rec_read(line=None, mult_over=None, mult_under=None, proj_carries=None, proj_catches=None,
                   run_rate=None, catch_rate=None, run_luck=None, catch_luck=None, sd=None,
-                  book_carries=None, book_catches=None, rates_luck_free=True) -> dict | None:
+                  book_carries=None, book_catches=None, rates_luck_free=True, p_model_over=None) -> dict | None:
     """The book's rushing + receiving yards line read against his touches (DECISIONS #173):
     the no-vig Over chance and the coin-flip yards (sd = the game-to-game spread of his
     simulated rushing + receiving yards); his luck-free yards a touch -- carries and catches
     at their own luck-free rates (research.luck_for), weighted by our projected carries and
     catches; the touches the line takes at that rate against ours and the book's carries +
     catches lines; and the share of his yards that come through the air, the part that holds
-    up when his team falls behind. Our model's own chance of the Over is NOT shown: the
-    combined market waits on its calibration check (the simulation draws a team's runs and
-    passes independently)."""
+    up when his team falls behind; and our model's Over chance (priced since it passed its
+    calibration check, DECISIONS #187)."""
     ok = lambda v: v is not None and v == v
     if not ok(line):
         return None
@@ -1181,7 +1180,8 @@ def rush_rec_read(line=None, mult_over=None, mult_under=None, proj_carries=None,
            "proj_catches": float(proj_catches) if ok(proj_catches) else None,
            "run_rate": float(run_rate) if ok(run_rate) else None,
            "catch_rate": float(catch_rate) if ok(catch_rate) else None,
-           "run_luck": run_luck, "catch_luck": catch_luck, "rates_luck_free": bool(rates_luck_free)}
+           "run_luck": run_luck, "catch_luck": catch_luck, "rates_luck_free": bool(rates_luck_free),
+           "p_model_over": float(p_model_over) if ok(p_model_over) else None}
     out["coin"] = fair_volume(line, out["p_over"], sd)
     c, k, rr, cr = out["proj_carries"], out["proj_catches"], out["run_rate"], out["catch_rate"]
     if c is not None and k is not None and rr is not None and cr is not None and c + k > 0:
@@ -1213,8 +1213,9 @@ def rush_rec_sentence(d) -> str | None:
         if d["air_share"] is not None:
             bits.append(f"About {100 * d['air_share']:.0f}% of his projected yards come from catches: if his team falls "
                         "behind, that part holds up while the carries shrink.")
-    bits.append("Our model's own chance on this line is not shown until the combined market passes its "
-                "calibration check.")
+    if d.get("p_model_over") is not None:
+        bits.append(f"Our model gives the Over {100 * d['p_model_over']:.0f}% (the combined market is priced since "
+                    "it passed its calibration check, DECISIONS #187).")
     return " ".join(bits)
 
 

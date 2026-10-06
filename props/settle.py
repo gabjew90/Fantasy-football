@@ -60,6 +60,7 @@ MARKET_STAT = {
     "player_rush_yds": "rushing_yards",
     "player_pass_yds": "passing_yards",
     "player_anytime_td": "_anytime_td",
+    "player_rush_reception_yds": "_rush_rec_yards",
     "receptions": "receptions",
     "reception_yds": "receiving_yards",
     "rush_yds": "rushing_yards",
@@ -202,6 +203,7 @@ def load_stats(season: int, cache_dir: Path, max_age_s: int = STATS_MAX_AGE_S,
             df[col] = 0
         df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
     df["_anytime_td"] = (df["rushing_tds"] + df["receiving_tds"] >= 1).astype(int)
+    df["_rush_rec_yards"] = df["rushing_yards"].fillna(0) + df["receiving_yards"].fillna(0)
     # `player_display_name` carries the full name and is what the book's name
     # can match exactly; `player_name` is abbreviated and only ever usable
     # through the loose key.

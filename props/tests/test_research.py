@@ -742,7 +742,9 @@ def test_the_rushing_plus_receiving_read():
     assert "53 yards takes about" in s and "we project 18.9 (15.8 carries, 3.1 catches)" in s
     assert "The book's own carries and catches lines add to 16 touches." in s
     assert "if his team falls behind, that part holds up" in s
-    assert "not shown until the combined market passes its calibration check" in s
+    assert "Our model gives the Over" not in s, "no model chance passed in: none claimed"
+    priced = RS.rush_rec_sentence({**d, "p_model_over": 0.57})
+    assert "Our model gives the Over 57%" in priced and "DECISIONS #187" in priced
     assert RS.rush_rec_read(None) is None
     bare = RS.rush_rec_read(line=40.5)
     assert RS.rush_rec_sentence(bare).startswith("The book's line is 40.5.")

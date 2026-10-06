@@ -7608,3 +7608,16 @@ by the user.
   attempts and QB completions block it only when their 95% interval is wholly on the worse
   side. They stay in every report as diagnostics: the QB's carries come out of the same
   team pool as the backs', so a QB-rushing shift flags a misallocation.
+
+## 2026-10-06 (187) -- rushing + receiving yards priced
+
+- #173 step 2 (reports/rush_rec_calibration.md, tag archive/rushrec-prereg): the sum of a
+  back's rushing and receiving draws, graded on 2022-25 with the corrected harness, fails
+  no part of the bar -- width 0.223 (0.205-0.240), bias +1.7% (PASS), no band fails. A
+  back's rushing and receiving residuals correlate at +0.044, so independent draws hold.
+- The user bets the combined line when it is the better leg: it is now a priced market
+  (player_rush_reception_yds, from Sleeper's rushing_and_receiving_yards), QBs excluded,
+  settled on rushing + receiving yards, part of the label gate's yardage calls, and on the
+  strict guard list with receptions, receiving, rushing and passing yards.
+- Found in the same run: QB passing yards FAIL on width under the corrected grading (14.4%
+  of games outside the 80% range: too wide). Queued.

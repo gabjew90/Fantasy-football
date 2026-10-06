@@ -277,6 +277,11 @@ For a narrow question, run only what it needs:
   (DECISIONS #156): a role story plus last game's workload already past that side's break-even.
   **How the engine works, with the numbers:** resources/engine_overview.md -- read it when the user
   asks how a projection, share, weight or price is built, and quote its formulas.
+  **Rushing + receiving yards is priced (DECISIONS #187):** a back's combined line now has the
+  model's Over chance like any yardage line (the sum of his rushing and receiving draws; it
+  passed its calibration check on 2022-25). Read it beside his separate rushing and receiving
+  lines: the combined leg survives either script, and the report's air share says how much
+  of it holds up if his team falls behind.
   **With market carries (shadow), DECISIONS #185:** a back's rushing line also shows the
   Over if his carries take half their volume from the market's script (favourites run more).
   Quote both numbers when you read a back's rushing line: the board's is the price, the

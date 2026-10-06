@@ -178,7 +178,7 @@ def clv_table(season: int) -> pd.DataFrame:
 
 BOOKS_MIN = 200                     # reports/sleeper_vs_books.md: the reading rule's sample
 LINE_OFF = {"player_receptions": 0.5, "player_reception_yds": 2.5, "player_rush_yds": 2.5,
-            "player_pass_yds": 5.0}
+            "player_pass_yds": 5.0, "player_rush_reception_yds": 3.0}
 PRICE_OFF = 0.03
 
 

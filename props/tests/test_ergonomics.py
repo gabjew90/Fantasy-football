@@ -416,3 +416,15 @@ def test_the_next_quarterback_starts_when_qb1_is_out():
     assert got3 is None and r3.equals(roles), "QB1 healthy: nothing moves"
     _r4, got4 = SG.promote_qb(roles, "TB", ["baker"], lambda g: g in out, lambda g: True)
     assert got4 is None, "no other QB: nobody is invented"
+
+
+def test_rushing_plus_receiving_is_priced_and_settled_end_to_end():
+    """DECISIONS #187: the combined line is the sum of a player's two draws, settled on
+    rushing + receiving yards, and labelled wherever markets are named."""
+    import settle as ST
+    import blend as BL
+    assert SG.YARD_MARKETS["player_rush_reception_yds"] == "rush_rec_yards"
+    assert ST.MARKET_STAT["player_rush_reception_yds"] == "_rush_rec_yards"
+    assert "player_rush_reception_yds" in BL.YARDAGE_MARKETS
+    assert SG.MARKET_WORDS["player_rush_reception_yds"] == "rushing + receiving yards"
+    assert SG.parse_markets("rush_rec") == {"player_rush_reception_yds"}

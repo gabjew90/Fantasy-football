@@ -52,7 +52,8 @@ MARKETS = {
     "td": "player_anytime_td", "anytime_td": "player_anytime_td", "anytime td": "player_anytime_td",
 }
 LABEL = {"player_receptions": "catches", "player_reception_yds": "rec yds", "player_rush_yds": "rush yds",
-         "player_pass_yds": "pass yds", "player_anytime_td": "anytime TD"}
+         "player_pass_yds": "pass yds", "player_anytime_td": "anytime TD",
+         "player_rush_reception_yds": "rush+rec yds"}
 
 
 def journal_path(season: int) -> Path:

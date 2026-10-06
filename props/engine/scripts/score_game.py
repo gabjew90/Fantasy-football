@@ -144,10 +144,13 @@ TEAM_NAMES = {
     "TB": "Tampa Bay Buccaneers", "TEN": "Tennessee Titans", "WAS": "Washington Commanders",
 }
 YARD_MARKETS = {"player_reception_yds": "rec_yards", "player_rush_yds": "rush_yards",
-                "player_pass_yds": "pass_yards"}
+                "player_pass_yds": "pass_yards",
+                # a back's rushing + receiving, the sum of his two draws in each simulation
+                # (reports/rush_rec_calibration.md: priced since it passed, DECISIONS #187)
+                "player_rush_reception_yds": "rush_rec_yards"}
 COUNT_MARKETS = {"player_receptions": "receptions"}
 CONSENSUS_TOL = {"player_receptions": 1.0, "player_reception_yds": 4.0, "player_rush_yds": 5.0,
-                 "player_pass_yds": 10.0}
+                 "player_pass_yds": 10.0, "player_rush_reception_yds": 6.0}
 
 
 def now(): return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -257,7 +260,8 @@ MARKET_ALIASES = {"receptions": "player_receptions", "rec": "player_receptions",
                   "rec_yds": "player_reception_yds", "receiving_yards": "player_reception_yds",
                   "rush_yds": "player_rush_yds", "rushing_yards": "player_rush_yds",
                   "pass_yds": "player_pass_yds", "passing_yards": "player_pass_yds",
-                  "td": "player_anytime_td", "anytime_td": "player_anytime_td", "atd": "player_anytime_td"}
+                  "td": "player_anytime_td", "anytime_td": "player_anytime_td", "atd": "player_anytime_td",
+                  "rush_rec": "player_rush_reception_yds", "rush_rec_yds": "player_rush_reception_yds"}
 # A TD-only run takes DraftKings anytime prices from The Odds API when the last
 # known quota leaves at least this many credits; otherwise Sleeper. (ESPN's
 # free prop feed lists anytime-TD markets but carries no price for them.)
@@ -1275,7 +1279,8 @@ def main():
                     SHADOW_RUSH[m["name"]] = (rush_m[j], car_m[j])
         for j, (_, m) in enumerate(Mt.iterrows()):
             rec, yds = out_rec[m["name"]]
-            sims[m["name"]] = {"receptions": rec, "rec_yards": yds, "rush_yards": rush_t[j], "carries": car_t[j]}
+            sims[m["name"]] = {"receptions": rec, "rec_yards": yds, "rush_yards": rush_t[j], "carries": car_t[j],
+                               "rush_rec_yards": yds + rush_t[j]}
     # QB PASSING (plan step 4, props-v1.24; reports/yardage_harness.md, DECISIONS
     # #105): the starter's passing yards are his receivers' yards in THIS
     # simulation, plus the other bucket's targets at the depth receivers' rates,
@@ -1398,7 +1403,7 @@ def main():
                 _ur.urlopen(_ur.Request("https://api.sleeper.app/v1/players/nfl", headers=_hdr), timeout=120)))
             WT = {"receptions": "player_receptions", "receiving_yards": "player_reception_yds",
                   "rushing_yards": "player_rush_yds", "anytime_touchdowns": "player_anytime_td",
-                  "passing_yards": "player_pass_yds"}
+                  "passing_yards": "player_pass_yds", "rushing_and_receiving_yards": "player_rush_reception_yds"}
             def mult_to_amer(m):
                 m = float(m)
                 return int(round((m - 1) * 100)) if m >= 2 else int(round(-100 / (m - 1)))
@@ -1721,6 +1726,8 @@ def main():
                         if mk["key"] == "player_rush_yds" and pr.pos == "QB" and (
                                 not QB_RUSH_ON or STARTER_QB.get(pr.team) != nm):
                             continue   # only the starter is graded (kneels, QB width); backups are not
+                        if mk["key"] == "player_rush_reception_yds" and pr.pos == "QB":
+                            continue   # the combined line is checked on backs and receivers, not QBs
                         s = sims[nm][col]; L = oo["Over"]["point"]
                         p_o = float(np.mean(s > L))
                         p_push = float(np.mean(s == L)) if float(L).is_integer() else 0.0
@@ -2206,6 +2213,7 @@ def main():
                 catch_rate=cr_ if cr_ is not None else (float(m_.ypt) / float(m_.cr) if float(m_.cr) > 0 else None),
                 run_luck=lr_, catch_luck=lc_, rates_luck_free=rr_ is not None and cr_ is not None,
                 sd=float(np.std(np.asarray(sm_["rush_yards"]) + np.asarray(sm_["rec_yards"]))),
+                p_model_over=float(np.mean(np.asarray(sm_["rush_rec_yards"]) > float(x_["line"]))),
                 book_carries=_xl("rushing_attempts", m_["name"], tm_).get("line"),
                 book_catches=next((float(r.line) for r in RESEARCH[(RESEARCH.player == m_["name"])
                                                                    & (RESEARCH.market == "player_receptions")
@@ -2256,7 +2264,7 @@ def main():
     # ---------- 8b/9. report, written for a casual reader ----------
     MKT = {"player_receptions": "catches", "player_reception_yds": "receiving yards",
            "player_rush_yds": "rushing yards", "player_anytime_td": "to score a touchdown",
-           "player_pass_yds": "passing yards"}
+           "player_pass_yds": "passing yards", "player_rush_reception_yds": "rushing + receiving yards"}
 
     def pct(x): return f"{100*x:.0f}%"
     def odds_words(a):
@@ -2767,7 +2775,8 @@ def main():
         b = payout(price); q = 1 - p - push
         return max(0.0, (b * p - q) / b)
     MKT_SHORT = {"player_receptions": "catches", "player_reception_yds": "rec yds",
-                 "player_rush_yds": "rush yds", "player_anytime_td": "anytime TD", "player_pass_yds": "pass yds"}
+                 "player_rush_yds": "rush yds", "player_anytime_td": "anytime TD", "player_pass_yds": "pass yds",
+                 "player_rush_reception_yds": "rush+rec yds"}
     SIM_COL = {**COUNT_MARKETS, **YARD_MARKETS}
     tier_of = {}
     if not CONF.empty:
@@ -3546,7 +3555,8 @@ def usage_line(u, rush=False, short=False):
 
 SCEN_KEY = ["book", "market", "player", "side", "line"]
 MARKET_WORDS = {"player_receptions": "catches", "player_reception_yds": "receiving yards",
-                "player_rush_yds": "rushing yards", "player_pass_yds": "passing yards"}
+                "player_rush_yds": "rushing yards", "player_pass_yds": "passing yards",
+                "player_rush_reception_yds": "rushing + receiving yards"}
 
 
 def run_scenarios(q: pd.DataFrame, R: pd.DataFrame, slug: str, snap_path: Path) -> list[str]:

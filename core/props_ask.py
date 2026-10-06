@@ -49,7 +49,8 @@ SCRIPTS = ROOT / "props" / "engine" / "scripts"
 TTL_MIN = 20
 
 LABEL = {"player_receptions": "catches", "player_reception_yds": "rec yds", "player_rush_yds": "rush yds",
-         "player_pass_yds": "pass yds", "player_anytime_td": "anytime TD"}
+         "player_pass_yds": "pass yds", "player_anytime_td": "anytime TD",
+         "player_rush_reception_yds": "rush+rec yds"}
 STAT_ALIASES = {"catches": "catches", "receptions": "catches", "rec": "catches", "recs": "catches",
                 "rec yds": "rec yds", "receiving yards": "rec yds", "receiving": "rec yds",
                 "rush yds": "rush yds", "rushing yards": "rush yds", "rushing": "rush yds",
