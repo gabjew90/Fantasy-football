@@ -78,12 +78,13 @@ def cluster_ids(d: pd.DataFrame, how: str) -> np.ndarray:
     return (d.season.astype(str) + "_" + d.team.astype(str) + "_" + d.week.astype(str)).to_numpy()
 
 
-def cluster_ci(x: np.ndarray, ids: np.ndarray, reps: int, rng) -> tuple[float, float]:
+def cluster_ci(x: np.ndarray, ids: np.ndarray, reps: int, rng, level: float = 0.95) -> tuple[float, float]:
     ug, inv = np.unique(ids, return_inverse=True)
     sums, cnt = np.bincount(inv, weights=x, minlength=len(ug)), np.bincount(inv, minlength=len(ug))
     idx = rng.integers(0, len(ug), size=(reps, len(ug)))
     boot = sums[idx].sum(1) / cnt[idx].sum(1)
-    lo, hi = np.percentile(boot, [2.5, 97.5])
+    a = 100 * (1 - level) / 2
+    lo, hi = np.percentile(boot, [a, 100 - a])
     return float(lo), float(hi)
 
 
@@ -100,7 +101,8 @@ def single(R: pd.DataFrame) -> dict:
     return out
 
 
-def compare(R: pd.DataFrame, Ref: pd.DataFrame, cluster: str, reps: int = 2000, seed: int = 11) -> dict:
+def compare(R: pd.DataFrame, Ref: pd.DataFrame, cluster: str, reps: int = 2000, seed: int = 11,
+            level: float = 0.95) -> dict:
     rng = np.random.default_rng(seed)
     out = {}
     for mk in MARKETS:
@@ -116,7 +118,7 @@ def compare(R: pd.DataFrame, Ref: pd.DataFrame, cluster: str, reps: int = 2000, 
         for tag, col in (("c", "pc"), ("u", "pu")):
             for nm, f in (("brier", brier), ("logloss", logloss)):
                 diff = (f(d[f"{col}_ref"], d.y_ref) - f(d[col], d.y)).to_numpy()
-                lo, hi = cluster_ci(diff, ids, reps, rng)
+                lo, hi = cluster_ci(diff, ids, reps, rng, level)
                 base = float(f(d[f"{col}_ref"], d.y_ref).mean())
                 row[f"{nm}_{tag}"] = {"gain": float(diff.mean()), "ci": [lo, hi],
                                       "relative": float(diff.mean() / base) if base else None}

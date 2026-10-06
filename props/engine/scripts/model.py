@@ -658,7 +658,10 @@ WIDTH_OFF = {"share_conc_targets": None, "share_conc_carries": None, "catch_conc
              "rush_norm_lead": None, "eff_sd_pass": 0.0,
              # the per-catch yards shape times this (None = the fitted shape as is): a larger
              # shape narrows yards given catches (reports/round30_conversion.md)
-             "catch_shape_mult": None}
+             "catch_shape_mult": None,
+             # the team targets' negative-binomial dispersion times this (None = the fitted r):
+             # a larger r narrows the team's game-to-game throws (reports/round31_target_spread.md)
+             "team_r_mult": None}
 
 # simulate_team_game(..., return_other=True) files the 'other' bucket's targets
 # under this key, for simulate_qb_passing.
@@ -681,7 +684,7 @@ def validate_width(w):
                 raise ValueError(f"{k} must be null (off) or > 0, got {v!r}")
         elif k == "eff_sd_qb" and v is None:
             continue                                   # None = inherit eff_sd_rush
-        elif k == "catch_shape_mult":
+        elif k in ("catch_shape_mult", "team_r_mult"):
             if v is not None and not (isinstance(v, (int, float)) and v > 0):
                 raise ValueError(f"{k} must be null (off) or > 0, got {v!r}")
         elif k == "rush_other_share":
@@ -975,6 +978,8 @@ def simulate_team_game(rng, n_sim, team_volume_mean, team_volume_r, player_share
         s = shares.sum()
         shares = shares / s if s > 0 else shares
 
+    if w["team_r_mult"]:                               # round 31 candidate: None = the fitted r
+        team_volume_r = team_volume_r * float(w["team_r_mult"])
     p = team_volume_r / (team_volume_r + max(team_volume_mean, 1e-6))
     team_targets = rng.negative_binomial(team_volume_r, p, size=n_sim)
 

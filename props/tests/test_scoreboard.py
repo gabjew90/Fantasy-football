@@ -126,3 +126,16 @@ def test_the_standin_check_joins_on_name_team_and_week():
                    ("CeeDee Lamb", "player_reception_yds"): -15.0}
     s = SC.summary(J)
     assert s["player_reception_yds"]["within"] == 0.5 and s["player_receptions"]["within"] == 1.0
+
+
+def test_round_30_picks_follow_the_registered_rule():
+    import round30_select as R30
+    base = {"eff_sd_rush": 0.3, "catch_conc": None, "catch_shape_mult": None}
+    grid = [dict(base), {**base, "catch_conc": 100.0}, {**base, "catch_conc": 50.0}]
+    noise = {0: 0.12, 1: 0.0, 2: 0.11}                 # catch_conc 100 is right by construction
+    frames = [_world(noise[i], seed=20) for i in range(3)]
+    v, i, table, move = R30.pick(grid, frames, "catch_conc", "receptions", {"eff_sd_rush": 0.3, "catch_shape_mult": None})
+    assert v == 100.0 and i == 1 and move >= 1.0
+    flat = [_world(0.0, seed=20) for _ in range(3)]   # identical frames: a tie keeps shipped
+    v2, i2, _t, _m = R30.pick(grid, flat, "catch_conc", "receptions", {"eff_sd_rush": 0.3, "catch_shape_mult": None})
+    assert v2 is None and i2 == 0
