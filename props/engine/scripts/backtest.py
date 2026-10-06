@@ -166,6 +166,18 @@ def crps_block(samples, y_arr):
     return t1 - 0.5 * t2
 
 
+OPENING_DROPBACKS = 3
+
+
+def opening_passers(pbp):
+    """{(team, week): the passers of the team's first OPENING_DROPBACKS dropbacks}. A QB
+    in that set started; three plays, not one, so a gadget pass on the first snap does
+    not unseat the real starter (DECISIONS #181)."""
+    d = pbp[(pbp.play_type == "pass") & pbp.passer_player_id.notna()].sort_values("play_id")
+    first = d.groupby(["posteam", "week"]).head(OPENING_DROPBACKS)
+    return {(t, int(w)): set(g.passer_player_id) for (t, w), g in first.groupby(["posteam", "week"])}
+
+
 def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
     """One season, walk-forward. Returns (per-player-week results, meta), or,
     given `widths`, one (results, meta) per width setting -- features are built
@@ -678,6 +690,11 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
           f"carries r={r_team_carries:.2f}", file=sys.stderr)
 
     test_act = feat_te[feat_te.roster_status == "ACT"].reset_index(drop=True)
+    # WHO ACTUALLY STARTED at QB: a passer on the team's first three dropbacks. The
+    # starting-QB markets are graded only when the depth-chart starter is that man; a
+    # depth chart that still lists an active primary who did not start had the harness
+    # grading a QB who barely played (27% of backup starts, 2022-25; DECISIONS #181).
+    OPENING_PASSERS = opening_passers(pbp_full)
 
     def score(width, full=True):
         rng = np.random.default_rng(seed)
@@ -892,6 +909,13 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
                 starter[g_.index[j_]] = True
         rush_pop = ((slot_s.str.startswith("RB") | (test_act.rs_last4.fillna(0.0) >= 0.20))
                     & ~slot_s.str.startswith("QB")).values
+        if not getattr(args, "grade_depth_chart_qb", False):
+            started = np.array([g_ in OPENING_PASSERS.get((t_, int(w_)), ()) for t_, w_, g_
+                                in zip(test_act.team, test_act.week, test_act.gsis_id)])
+            n_miss = int((starter & ~started).sum())
+            print(f"starting QB: the depth chart picked a QB who did not start in {n_miss} of "
+                  f"{int(starter.sum())} team-games; those are not graded", file=sys.stderr)
+            starter = starter & started
         qb_pop = (starter.copy() if qb_resid is not None else np.zeros(len(test_act), bool))
         nan_ = np.full(len(test_act), np.nan)
         # QB PASSING: the same starting QB, priced from his team-game's
@@ -1690,6 +1714,9 @@ def main(argv=None):
     ap.add_argument("--test", default="2024,2025", help="harness: seasons the verdict is read from")
     ap.add_argument("--weeks", default="2-18", help="harness: weeks scored in each season")
     ap.add_argument("--report", default=None, help="harness: output path without extension (.md and .json)")
+    ap.add_argument("--grade-depth-chart-qb", action="store_true",
+                    help="grade the starting-QB markets on the depth chart's starter even when another QB "
+                         "started (the pre-#181 harness, for reproducing older records)")
     ap.add_argument("--audit-seed-offset", type=int, default=0,
                     help="HARNESS AUDIT: shift every random stream; two runs of one model that differ only "
                          "here must show no difference (their paired intervals should include zero)")

@@ -5,7 +5,7 @@ the share of outcomes below the model's p10 and above its p90 (PIT < 0.1 / > 0.9
 with 95% intervals from resampling whole games. Calibrated: 10% / 10%, 20% outside.
 
     python props/tools/conditional_calibration.py RESULTS.pkl --seasons 2022,2023,2024 [--out f.json]
-    python props/tools/conditional_calibration.py --grid GRID.pkl --flagged "stage 1: targets|..."   # part B
+    python props/tools/conditional_calibration.py --grid GRID.pkl --flagged "stage 1: targets; ..."   # part B
 """
 from __future__ import annotations
 
@@ -105,14 +105,14 @@ def grid_pick(grid, frames, reps, rng, flagged):
 def main_grid(argv):
     ap = argparse.ArgumentParser()
     ap.add_argument("results")
-    ap.add_argument("--flagged", required=True, help="Part A's flagged stages, '|'-separated labels")
+    ap.add_argument("--flagged", required=True, help="Part A flagged stages, semicolon-separated labels")
     ap.add_argument("--reps", type=int, default=2000)
     ap.add_argument("--out", default=None)
     a = ap.parse_args(argv)
     saved = pd.read_pickle(a.results)
     if saved.get("kind") != "width_tuning":
         sys.exit("--grid reads a backtest --tune-width --tune-grid tier2 --save-results pickle")
-    flagged = set(a.flagged.split("|"))
+    flagged = {x.strip() for x in a.flagged.split(";")}
     unknown = flagged - {c[0] for c in CHECKS}
     if unknown:
         sys.exit(f"unknown stage labels: {sorted(unknown)}")

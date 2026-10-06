@@ -80,3 +80,46 @@ carries are flagged too, but no QB knob was pre-registered, so they cannot move 
 round (a later, separately registered round). Receiving yards given targets are too wide
 while the only pre-registered yards knob (eff_sd_rec, now 0) can only widen them, so the
 per-catch yards shape -- not in the grid -- is the likely lever, also for a later round.
+
+### Part B, selection on 2022-24 (props/tools/conditional_calibration.py --grid)
+
+| Stage | Knob | Shipped -> picked | Stage outside p10-p90, shipped -> picked |
+|---|---|---|---|
+| 1: targets | share_conc_targets | 40 -> 60 | 18.0% -> 20.6% (ok) |
+| 1: carries, backs | share_conc_carries | 20 -> 10 (grid edge) | 27.9% -> 22.0% (still narrow) |
+| 2: catches given targets | catch_conc | off -> 50 (grid edge) | 22.4% -> 20.6% (ok) |
+| 2: receiving yards given targets | eff_sd_rec | 0 -> 0 | 18.6% (this knob can only widen) |
+| 2: rushing yards given carries, backs | eff_sd_rush | 0.30 -> 0.15 (grid edge) | 11.3% -> 17.4% (still wide) |
+
+### Part B, ship test on 2025 (read once; harness fixed to grade only the QB who started, DECISIONS #181)
+
+Picked settings against shipped, paired, 2025 weeks 2-18 (positive = picked better):
+
+| Market | Player-games | CRPS difference (95% CI) |
+|---|---|---|
+| Receptions | 3,189 | +0.0003 (-0.0014, +0.0019) |
+| Receiving yards | 3,189 | -0.0042 (-0.0259, +0.0169) |
+| Rushing yards | 997 | +0.0238 (-0.0319, +0.0804) |
+| QB rushing yards | 461 | -0.0099 (-0.0447, +0.0237) |
+| QB passing yards | 461 | -0.1309 (-0.2579, -0.0002) |
+| Rushing attempts | 997 | -0.0004 (-0.0112, +0.0096) |
+| QB completions | 461 | -0.0076 (-0.0157, +0.0002) |
+
+Calibration verdicts: none worse; rushing attempts FAIL -> INSUFFICIENT DATA; widths
+closer to 0.20 (receptions 0.181 -> 0.197, rushing attempts 0.250 -> 0.197).
+
+**Part B is null: the shipped widths stay.** Five touched markets are worse on the
+point estimate (QB passing clearly: wider catches widen passing more than they help).
+The stage diagnostics did their job -- each stage moved toward calibration -- but the
+whole chain's accuracy did not improve, and that is the ship test.
+
+**Not acted on, a candidate for its own registration:** the running-game knobs alone
+(share_conc_carries 10, eff_sd_rush 0.15) fixed the rushing-attempts FAIL and leaned
+better on rushing yards. Choosing that subset now would be picked after reading 2025,
+so it needs a fresh pre-registration judged on data not yet read (2026 as it settles),
+and three picks sat at grid edges, so its grid would extend past them.
+
+Note on the ship test's QB rows: it ran with the first-dropback starter rule; the code
+review then widened it to the first three dropbacks, so a gadget first snap cannot
+unseat the real starter (about 1% of team-games). Both arms graded the same rows, so the
+null verdict does not depend on it.

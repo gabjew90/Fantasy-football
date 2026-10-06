@@ -7480,3 +7480,24 @@ by the user.
   yearly-fit carry share and yards per carry, plus a week-dependent weight (trust this
   season's split more only from week 5) -- the shape the carry result points to.
 - Tooling: backtest.py --k0 replaces model.K0_FIXED rather than adding to it; to fix.
+
+## 2026-10-06 (182) -- tier 2: each stage graded alone; the width retune does not ship; the harness audited
+
+- Pre-registered (reports/tier2_conditional_calibration.md, tag archive/tier2-prereg).
+  Part A (2022-24): with the actual volume plugged in, catches given targets are too
+  narrow (22.4% outside p10-p90), receiving yards too wide (18.6%), backs' rushing yards
+  far too wide (11.3%) while their carries are too narrow (27.2%), targets too wide
+  (18.0%). For backs the two stages offset, as the outside reviewer suspected.
+- Part B: each flagged stage's knob picked on its own diagnostic (targets 60, carries 10,
+  catch_conc 50, eff_sd_rush 0.15); on 2025, read once, five touched markets were worse
+  (QB passing -0.131, interval just excluding zero). Null: shipped widths stay. The
+  running-game subset is a candidate for a separate registration on unread data.
+- Harness audit first (reports/harness_audit_2026-10-06.md): model-is-truth, leakage
+  (weeks 3 and 9, four seasons), same-model-two-seeds and an inert-option check all pass;
+  #135-#136 replicate on fresh seeds. A smoke-run bug in the new tool (stage 1 bucketed
+  by the actual volume) was caught before any result.
+- backtest.py now grades the starting-QB markets only when the depth chart's starter
+  actually started (#181): it had graded a QB who did not start in 31 of 472 team-games
+  in 2024 and 7 of 468 in 2025. Past QB-market comparisons carried the same rows in both
+  arms; their absolute calibration numbers did not. `--grade-depth-chart-qb` reproduces
+  the old population.

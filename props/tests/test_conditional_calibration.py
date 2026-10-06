@@ -118,3 +118,14 @@ def test_part_b_picks_the_value_closest_to_twenty_percent_per_stage():
     assert cands == [40.0, 80.0], "the eff_sd_rush row is not a target-concentration candidate"
     _, picks2 = CC.grid_pick(grid, frames, 200, rng, set())
     assert picks2 == {}, "an unflagged stage never moves"
+
+
+def test_a_qb_on_the_opening_dropbacks_started_and_a_gadget_snap_does_not_unseat_him():
+    import backtest as BT
+    pbp = pd.DataFrame({"posteam": ["NO"] * 5 + ["TB"] * 3, "week": [3] * 8, "play_type": ["pass"] * 8,
+                        "play_id": [1, 2, 3, 4, 5, 1, 2, 3],
+                        "passer_player_id": ["HILL", "CARR", "CARR", "CARR", "CARR", "MAYF", "MAYF", "MAYF"]})
+    op = BT.opening_passers(pbp)
+    assert "CARR" in op[("NO", 3)] and "HILL" in op[("NO", 3)], "a gadget first snap does not unseat the starter"
+    assert op[("TB", 3)] == {"MAYF"}
+    assert "BAKER_BACKUP" not in op[("TB", 3)]
