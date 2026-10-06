@@ -75,6 +75,48 @@ def nb_mle(mu, y, r_clamp):
     return {"a": float(res.x[0]), "b": float(res.x[1])}
 
 
+def throws_and_runs(pbp):
+    """The engine's throws (passes with a named receiver) and runs (no kneel-downs)."""
+    passes = pbp[(pbp.play_type == "pass") & pbp.receiver_player_id.notna()]
+    rushes = pbp[(pbp.play_type == "run") & (pbp.qb_kneel != 1) & pbp.rusher_player_id.notna()]
+    return passes, rushes
+
+
+def market_rows(g, tw):
+    """One row per team-game with a spread and total: (team's own spread, total, plays,
+    pass rate). nflverse spread_line is the HOME side's and POSITIVE when home is
+    favoured, so the team's own spread is positive = favoured. g: that season's REG
+    games; tw: its team-week volumes (targets, carries)."""
+    rows = []
+    for _, r in g.iterrows():
+        for team, is_home in [(r.home_team, 1), (r.away_team, 0)]:
+            sp = r.spread_line if is_home else -r.spread_line
+            t_ = tw[(tw.team == team) & (tw.week == r.week)]
+            if len(t_) and pd.notna(r.spread_line) and pd.notna(r.total_line):
+                pl = float(t_.targets.iloc[0] + t_.carries.iloc[0])
+                rows.append((sp, float(r.total_line), pl, float(t_.targets.iloc[0]) / pl))
+    return rows
+
+
+def fit_market(rows):
+    """Market->environment coefficients: team plays and pass rate regressed on the
+    team's own spread and the game total (replaces a hand-set 0.015-per-7-points
+    pass-rate shift). R^2 is reported because the market explains little of team
+    volume, and that is the honest result. {} under 51 rows."""
+    mkt_fit = {}
+    if len(rows) > 50:
+        _d = np.array(rows)
+        A = np.c_[np.ones(len(_d)), _d[:, 0], _d[:, 1]]
+        for j, nm in [(2, "plays"), (3, "pass_rate")]:
+            y = _d[:, j]
+            b, *_ = np.linalg.lstsq(A, y, rcond=None)
+            pred = A @ b
+            r2 = float(1 - ((y - pred) ** 2).sum() / ((y - y.mean()) ** 2).sum())
+            mkt_fit[nm] = {"intercept": float(b[0]), "per_spread_pt": float(b[1]),
+                           "per_total_pt": float(b[2]), "r2": r2, "n": int(len(_d))}
+    return mkt_fit
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--season", type=int, required=True)
@@ -97,8 +139,7 @@ def main():
     games = pd.read_csv(games_f)
     g = games[(games.season == S) & (games.game_type == "REG")].copy()
 
-    passes = pbp[(pbp.play_type == "pass") & pbp.receiver_player_id.notna()]
-    rushes = pbp[(pbp.play_type == "run") & (pbp.qb_kneel != 1) & pbp.rusher_player_id.notna()]
+    passes, rushes = throws_and_runs(pbp)
 
     # ---- team per-week volumes -------------------------------------------
     tw = pd.DataFrame({
@@ -347,28 +388,10 @@ def main():
     # Replaces a hand-set 0.015-per-7-points pass-rate shift. Reporting R^2 matters:
     # if the market explains almost none of the variance in team volume, a
     # market-anchored environment cannot help much, and that is the honest result.
-    _rows = []
-    for _, r in g.iterrows():
-        for team, is_home in [(r.home_team, 1), (r.away_team, 0)]:
-            # the team's own spread: nflverse spread_line is the HOME side's and
-            # POSITIVE when home is favoured, so this is positive = favoured
-            sp = r.spread_line if is_home else -r.spread_line
-            t_ = tw[(tw.team == team) & (tw.week == r.week)]
-            if len(t_) and pd.notna(r.spread_line) and pd.notna(r.total_line):
-                pl = float(t_.targets.iloc[0] + t_.carries.iloc[0])
-                _rows.append((sp, float(r.total_line), pl, float(t_.targets.iloc[0]) / pl))
-    mkt_fit = {}
-    if len(_rows) > 50:
-        _d = np.array(_rows)
-        A = np.c_[np.ones(len(_d)), _d[:, 0], _d[:, 1]]
-        for j, nm in [(2, "plays"), (3, "pass_rate")]:
-            y = _d[:, j]
-            b, *_ = np.linalg.lstsq(A, y, rcond=None)
-            pred = A @ b
-            r2 = float(1 - ((y - pred) ** 2).sum() / ((y - y.mean()) ** 2).sum())
-            mkt_fit[nm] = {"intercept": float(b[0]), "per_spread_pt": float(b[1]),
-                           "per_total_pt": float(b[2]), "r2": r2, "n": int(len(_d))}
-            print(f"market->{nm}: {b[0]:.4f} {b[1]:+.5f}*spread {b[2]:+.5f}*total  R2={r2:.4f}", file=sys.stderr)
+    mkt_fit = fit_market(market_rows(g, tw))
+    for nm, f_ in mkt_fit.items():
+        print(f"market->{nm}: {f_['intercept']:.4f} {f_['per_spread_pt']:+.5f}*spread "
+              f"{f_['per_total_pt']:+.5f}*total  R2={f_['r2']:.4f}", file=sys.stderr)
 
     # ---- opponent efficiency table ----
     opp = M.build_opponent_table(pbp, roles)
