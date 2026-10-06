@@ -79,3 +79,16 @@ So the engine is graded on the two links it owns, near-equally:
   median -- the median moved with the very knobs under test, so two settings were scored at
   different lines (caught in code review; the round 30 / 31 grids were stopped and rerun).
   Comparisons now refuse rows whose lines differ.
+
+## Stand-in check (props/tools/standin_check.py, 2026 weeks 2-4; line positions only)
+
+| Market | Lines matched | Median gap | Mean gap (stand-in minus posted) | Within |
+|---|---|---|---|---|
+| Catches | 154 | 0.0 | +0.1 | 97% within 1 |
+| Receiving yards | 154 | 5.0 | +3.9 | 56% within 5 |
+| Rushing yards | 54 | 6.0 | +3.9 | 44% within 5 |
+
+The expected-value stand-ins sit about 4 yards above Sleeper's yards lines; the first
+version (each setting's median) sat about 4 below. Books hang yards lines between the
+median and the mean of a skewed distribution, and both versions measure within a few
+yards of where real bets sit.
