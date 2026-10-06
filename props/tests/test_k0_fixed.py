@@ -52,3 +52,14 @@ def test_the_goal_line_constant_follows_a_fixed_share_constant():
         "a partial override keeps the fixed target share, so its goal-line constant follows"
     assert M.k0_rates({"target_share": 20, "i10_target_share": 2}, fit_only=True)["i10_target_share"] == 2
 
+
+
+def test_the_harness_applies_the_scorers_new_team_cap():
+    """Outside review 2026-10-06 (finding 4): the scorer caps a carried-over prior for a
+    player on a new team (blended_rate new_team); the harness now passes it too."""
+    bt = (ENGINE / "backtest.py").read_text(encoding="utf-8")
+    assert re.search(r"cur_rate=cur, cur_den=cur_n, scale_role=scale_role, new_team=new_team\)", bt)
+    assert "--no-new-team-cap" in bt, "the ablation stays reachable"
+    a = M.blended_rate(0.30, 400, 0.15, 80, cur_rate=0.20, cur_den=60)[0]
+    b = M.blended_rate(0.30, 400, 0.15, 80, cur_rate=0.20, cur_den=60, new_team=True)[0]
+    assert round(a, 5) == 0.24286 and round(b, 5) == 0.21429, "the review's worked example"

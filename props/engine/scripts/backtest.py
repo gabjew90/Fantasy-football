@@ -255,7 +255,7 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
     sr_up = (M.SNAP_REACT_UP if getattr(args, "snap_react_up", None) is None
              else (None if args.snap_react_up == "same" else float(args.snap_react_up)))
     print(f"season={S} env={args.env} opponent={args.opponent} ({opp['level']}, k0={opp['k0']:g}) "
-          f"historical_blend={args.historical_blend} dispersion={dispersion} live={live}", file=sys.stderr)
+          f"historical_blend={args.historical_blend} new_team_cap={getattr(args, 'new_team_cap', True)} dispersion={dispersion} live={live}", file=sys.stderr)
 
     # ---- self-contained data build (round 7): derive every frame from nflverse for
     # ANY season, cached so repeat runs are instant. ----
@@ -569,6 +569,12 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
             # was tuned: team targets for shares, own targets for catch rate and
             # ypt, carries for ypc.
             pri = pri_players.loc[r.gsis_id] if r.gsis_id in pri_players.index else None
+            # THE NEW-TEAM CAP the scorer applies (outside review 2026-10-06, finding 4): a
+            # rate carried from another team is capped at half weight. Team identity alone,
+            # so the harness can reproduce it; the scorer's snap-based role_scale needs a
+            # pre-game snap feed the harness does not have and stays a disclosed gap.
+            new_team = bool(getattr(args, "new_team_cap", True) and pri is not None and "team_prior" in pri.index
+                            and pd.notna(pri["team_prior"]) and pri["team_prior"] != r.team)
 
             def two_stage(pri_col, n_col, slot_key, default, k0_key, k0_default,
                           cur, cur_n, scale_role=False):
@@ -583,7 +589,7 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
                 val, _chain = M.blended_rate(
                     own_pri, n_pri, gv(sp[slot_key], slot, default),
                     K0R.get(k0_key, k0_default),
-                    cur_rate=cur, cur_den=cur_n, scale_role=scale_role)
+                    cur_rate=cur, cur_den=cur_n, scale_role=scale_role, new_team=new_team)
                 return val
 
             ts = two_stage("target_share", "team_targets_n", "ts", np.nan,
@@ -2008,6 +2014,10 @@ def main(argv=None):
                     help="round 17: shrinkage constants over model.K0_FIXED (the rates named replace those, the "
                          "rest stay shipped), e.g. 'ypt=40,catch_rate=20'; 'fit' = the ablation, the priors' "
                          "per-season fit with no fixed constants (default: model.K0_FIXED)")
+    ap.add_argument("--new-team-cap", action="store_true", default=True,
+                    help="the scorer's new-team cap on a carried-over prior (model.blended_rate new_team)")
+    ap.add_argument("--no-new-team-cap", dest="new_team_cap", action="store_false",
+                    help="ABLATION: the pre-2026-10-06 harness, no new-team cap")
     ap.add_argument("--historical-blend", action="store_true", default=True,
                     help="two-stage: prior-season own rate -> slot prior -> this season (what the live scorer does)")
     ap.add_argument("--no-historical-blend", dest="historical_blend", action="store_false",
