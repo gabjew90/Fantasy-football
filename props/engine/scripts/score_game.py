@@ -1094,7 +1094,9 @@ def main():
             qb_i = None
         rs_t = [float(v) for v in Mt.rs]
         if env[t].get("carry_factor", 1.0) != 1.0:      # round 29: the QB's carries held
-            rs_t = [float(v) for v in MODEL.hold_qb_carries(rs_t, qb_i, env[t]["carry_factor"])]
+            # the starter by the same rule the harness uses, whether or not the QB grid is loaded
+            qb_h = qb_i if qb_i is not None else MODEL.starter_qb_index(list(Mt.pos), rs_t, slots=list(Mt.slot))
+            rs_t = [float(v) for v in MODEL.hold_qb_carries(rs_t, qb_h, env[t]["carry_factor"])]
         car_want = {names.index(r_["who"]): r_["value"] for r_ in RULES
                     if a.scenario_run and not r_["team"] and r_["key"] == "carries" and r_["team_of"] == t}
         if car_want:                 # YOUR scenario: carries per game, teammates give up the difference
