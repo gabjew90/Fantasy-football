@@ -51,3 +51,29 @@ together, and the combination must also pass the guards on 2022-25.
 ## Result
 
 (Filled in after the runs, below this line, without editing anything above.)
+
+### Selection, 2022-25 (props/tools/round30_select.py; stand-in lines from pre-game inputs, identical across settings)
+
+Conversion log loss on the bettable population (lower is better):
+
+| Knob | Values (log loss) | Pick |
+|---|---|---|
+| eff_sd_rush (rushing yards) | 0.30: 0.45588, 0: 0.45067, 0.075: 0.44921, **0.15: 0.44853** | 0.15 |
+| catch_conc (receptions) | off: 0.34868, 200: 0.34867, 100: 0.34815, **50: 0.34785**, 25: 0.34858 | 50 |
+| catch_shape_mult (receiving yards, catch_conc 50) | **1: 0.51581**, 1.3: 0.51597, 1.6: 0.51692, 2.0: 0.51980 | 1 (shipped) |
+
+Ship checks against shipped (game-clustered):
+- **eff_sd_rush 0.15:** rushing-yards conversion log loss +0.00735, **99%** interval
+  (+0.00195, +0.01241) -- detectable; moves the Over chance 3.1 points; guards: rushing +
+  receiving +1.0%, the rest unchanged.
+- **catch_conc 50:** receptions +0.00083 (-0.00031, +0.00202) -- not detectable: stays off.
+- **catch_shape_mult:** the narrower shapes score worse at the lines: stays 1.
+
+### Confirmation, 2026 weeks 2-4 (read once)
+
+eff_sd_rush 0.15 vs shipped: rushing-yards conversion log loss **+0.01565** (-0.00090,
++0.02954), 115 back-games, Over chances move 3.4 points; rushing + receiving +0.00170;
+every other market identical. **Not negative: round 30 ships eff_sd_rush 0.15**
+(resources/width_params.json). The only change: the backs' game-wide yards-per-carry swing
+is halved, so a back's rushing yards for a given carry count spread less -- Tier 2 measured
+11% of games outside the 80% range given the carries (20% calibrated).

@@ -7636,3 +7636,18 @@ by the user.
   and subgroups, and a comparisons ledger. The book comparison stays with the label gate.
   Stand-in lines sit where Sleeper's 2026 lines sit (catches 97% within one; yards median
   gap 5, ours about 3-4 lower).
+
+## 2026-10-06 (189) -- round 30: the backs' yards-per-carry swing halved (0.30 -> 0.15); rounds 31 null
+
+- First rounds judged on the scoreboard (reports/scoreboard.md). Round 30 (conversion,
+  reports/round30_conversion.md): eff_sd_rush 0.15 improves the rushing-yards conversion
+  log loss on 2022-25 at the 99% bar (+0.0074; the running-game family's multiple-look
+  level), moves Over chances 3.1 points, passes the guards, and is not negative on 2026
+  weeks 2-4 (+0.016). Ships. catch_conc 50 is not detectable; the receiving-yards shape
+  stays (narrower scored worse at the lines).
+- Round 31 (target spread, reports/round31_target_spread.md): share_conc_targets 120 brings
+  the model's target spread to the real upper bound in every band and passes its 2022-25
+  guard, but the 2026 weeks 2-4 read leans negative (receptions -0.002, receiving -0.001,
+  intervals across zero). Null. The finding stands: the target spread is too wide.
+- A review catch before any selection read: stand-in lines now come from pre-game inputs
+  no setting moves (each setting's own median moved with the knobs under test).
