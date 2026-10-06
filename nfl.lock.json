@@ -168,12 +168,12 @@
   "props/engine/resources/width_params.json": "88dd306b0305f66a81b99ca9a053ceddc4b3108fb5b8aa7369d3829ac98c11cb",
   "props/engine/scripts/absence_check.py": "fa45e3fb4a1985b38771f0c58ed002956b163ee16439778ac7391ece1ba25079",
   "props/engine/scripts/absence_tune.py": "4bb4daaf1861f93ff8d57504e9fff5e0b0b828306d8210b688c87aa25ef27d1d",
-  "props/engine/scripts/backtest.py": "b76c441498a09ed1f0c9e3f66c186b7d38f29b62beb169752f099f8a159732b2",
+  "props/engine/scripts/backtest.py": "23bbcbea9db9e67f3163b7b9f2bfce4ec130d40ce759b595a4c60f53178fbf45",
   "props/engine/scripts/build_play_yards.py": "51af89e684bd85e9e33e6f894a0a3002e13e98e0f00b94a4f91e4dbe474c8dfa",
   "props/engine/scripts/build_priors.py": "1757899778f704cf2bd074c9750f54de1edb9ff14d1429027d5096715ac707e3",
   "props/engine/scripts/build_td_priors.py": "c7330a57e68c1b7c5f8a9304bfbddbb4be0ca285d9f37ef383173d3e3049c27f",
   "props/engine/scripts/eligibility.py": "93b5d72850797c7bef1fd6ea9a633f9f2fabfdb25a29f6150f27cb18e9f84681",
-  "props/engine/scripts/model.py": "38cb9cd479467ea53c3fd21d26ca3ecaf79d37e2c642c1f3b91b564f8bd8e851",
+  "props/engine/scripts/model.py": "b789acf155cf405ed76188ee67bee52cb93a99423fc2db7b6c5b0c5b13bfe070",
   "props/engine/scripts/odds_client.py": "434186273bd0412a5545247228298951c5d0504a19c8a47c4c782bf3bb75aaa1",
   "props/engine/scripts/research.py": "1142f3a4f3d143242a7d12f9dcb8bf366d04adb1255f29f05cfbd68bfc88ed17",
   "props/engine/scripts/scenario.py": "ce375b4f4f90ad303c4496a80cd03b2a0469c8e63460ffec3592abaaff811e49",
@@ -194,6 +194,6 @@
   "tiers.csv": "04a1a79d43e9f2445ba3dc4ea262b00fbd58efea1f41e8b0393cb4c7f8afee41",
   "tiers.keefamania.csv": "11e6546b56caa807a572da86d5c3d81097bafd2d2550e25653882d78b2962e94"
  },
- "sha256": "a10a62d5d416079bca57d5d9a6027147906364dd5a8028e940685bea96801933",
+ "sha256": "228dcc85346fbdd32cc30b075cb49a6cf67486af87dc6648835beb2be6821819",
  "tag": "nfl-v1.46"
 }
