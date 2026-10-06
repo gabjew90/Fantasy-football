@@ -155,5 +155,5 @@
  },
  "rule": "decided only at the week 8, 12, 18 reviews, on the calls through that week: labels return only when the whole 95% interval of the model's weight is above zero AND the top-tier calls' net per $100 at Sleeper's recorded prices has its whole 95% interval above zero",
  "season": 2026,
- "updated_utc": "2026-10-06T19:54:51Z"
+ "updated_utc": "2026-10-06T21:34:17Z"
 }
