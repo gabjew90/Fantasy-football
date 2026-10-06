@@ -592,3 +592,27 @@ def test_the_resource_holds_a_quarterbacks_completions():
                         "receiving_yards": [12.0, None, 30.0], "rushing_yards": None, "passer_player_id": "qb"})
     out = BPY.play_yards(pbp)
     assert out[(out.gsis_id == "qb") & (out.kind == "pass")].iloc[0].games == "1:12;2:30"
+
+
+
+def test_projected_completions_match_the_simulated_mean():
+    rng = np.random.default_rng(7)
+    rec = [rng.poisson(5.0, 20000).astype(float), rng.poisson(3.0, 20000).astype(float)]
+    other = rng.poisson(6.0, 20000)
+    share = [0.85, 0.95, 1.0]
+    sim = M.simulate_qb_completions(np.random.default_rng(8), 20000, rec, other, {"catch_rate": 0.6},
+                                    starter_share=share)
+    proj = RS.projected_completions([r.mean() for r in rec], other.mean(), 0.6, np.mean(share))
+    assert proj == pytest.approx(float(np.mean(sim)), rel=0.02), "the mean of the draw the model makes"
+    assert RS.projected_completions([5.0], None, None, 1.0) == 5.0
+
+
+def test_a_quarterbacks_cameo_games_stay_out_of_his_window():
+    prior = {("qb", "pass"): [[10.0] * 3, [8.0] * 20]}          # a 3-completion cameo, then a start
+    luck, rate = RS.luck_for(prior, {"qb": [[12.0] * 22]}, "qb", "pass")
+    assert luck["games"] == 2 and luck["n"] == 42, "the cameo is left out"
+
+
+def test_the_quarterback_read_says_whether_the_yards_line_asks_more():
+    d = RS.qb_yards_read(completions_line=23.5, yards_line=260.5, proj_completions=23.1, model_ypc=10.0)
+    assert d["read"] == "yards line rich" and "needs extra completions or a long one" in RS.qb_yards_sentence(d)

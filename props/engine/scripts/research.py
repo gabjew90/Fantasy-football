@@ -356,6 +356,9 @@ LUCK_MIN_PLAYS = 20
 # last season while this one is short (user, 2026-10-05)
 LUCK_WINDOW = 10
 QB_MIN_COMPLETIONS = 20
+# a QB game with fewer completions than this is a cameo (relief, garbage time) and stays out of
+# his window, so "his last 10 games" are games he played as the passer
+QB_CAMEO_COMPLETIONS = 5
 
 
 def player_luck_line(plays) -> dict:
@@ -385,7 +388,10 @@ def luck_for(prior_games, current_games, gid, kind, window=LUCK_WINDOW):
     (last season's final games, priors_*_play_yards.csv), current_games = {gsis_id:
     [[yards], ...]} this season, oldest first. Both the line and the rate read the same
     window; the returned line carries `games`, the number of games in it."""
-    games = (list(prior_games.get((gid, kind), []) or []) + list(current_games.get(gid, []) or []))[-window:]
+    games = list(prior_games.get((gid, kind), []) or []) + list(current_games.get(gid, []) or [])
+    if kind == "pass":
+        games = [g for g in games if len(g) >= QB_CAMEO_COMPLETIONS]
+    games = games[-window:]
     plays = [y for g in games for y in g]
     luck = dict(player_luck_line(plays), games=len(games))
     min_plays = {"catch": YPC_MIN_CATCHES, "run": RUN_MIN_CARRIES, "pass": QB_MIN_COMPLETIONS}[kind]
@@ -786,6 +792,15 @@ def carry_yards_sentence(d) -> str | None:
     return " ".join(bits)
 
 
+def projected_completions(receiver_catch_means, other_targets_mean, other_catch_rate, starter_share_mean):
+    """Our projected completions for the starter: his receivers' simulated catches, plus the
+    depth bucket's targets caught at the depth rate, times his usual share of the team's
+    passing -- the mean of what model.simulate_qb_completions draws."""
+    other = (float(other_targets_mean) * float(other_catch_rate)
+             if other_targets_mean is not None and other_catch_rate is not None else 0.0)
+    return (float(sum(receiver_catch_means)) + other) * float(starter_share_mean)
+
+
 def qb_yards_read(completions_line=None, yards_line=None, proj_completions=None, model_ypc=None,
                   luck=None, luckfree_ypc=None, longest_line=None, completions_fav=None,
                   attempts_line=None) -> dict | None:
@@ -813,6 +828,11 @@ def qb_yards_read(completions_line=None, yards_line=None, proj_completions=None,
     rate = out["luckfree_ypc"] if out["luckfree_ypc"] is not None else out["model_ypc"]
     if rate is not None:
         out.update(gauge_rate=rate, gauge=volume_gauge(y_min, rate, out["proj"], "completions", 12.0))
+    out["read"] = None
+    if out["mid_ypc"] is not None and out["model_ypc"] is not None:
+        gap = out["mid_ypc"] - out["model_ypc"]
+        out["read"] = ("yards line rich" if gap >= YPC_BAND
+                       else "yards line lean" if gap <= -YPC_BAND else "about even")
     return out
 
 
@@ -832,6 +852,14 @@ def qb_yards_sentence(d) -> str | None:
             his.append(f"{d['luckfree_ypc']:.1f} luck-free over his last {(d.get('luck') or {}).get('games', '?')} games")
         bits.append(f"The lines ask {d['mid_ypc']:.1f} yards a completion ({d['yards_line']:g} over "
                     f"{d['completions_line']:g})" + (f"; {', '.join(his)}" if his else "") + ".")
+        if d.get("read") == "yards line rich":
+            bits.append("That is more per completion than ours: past the completions line, his yards Over still "
+                        "needs extra completions or a long one.")
+        elif d.get("read") == "yards line lean":
+            bits.append("That is less per completion than ours: if he clears the completions line, the yards "
+                        "usually come with it.")
+        elif d.get("read") == "about even":
+            bits.append("That is about ours: his yards Over is a bet on the completions.")
     if d.get("gauge") is not None:
         lc = luck_words(d.get("luck"), "completion") if d["luckfree_ypc"] is not None else None
         bits.append(gauge_sentence(d["gauge"], d["gauge_rate"], "completion", lc, d["y_min"], "a long completion",

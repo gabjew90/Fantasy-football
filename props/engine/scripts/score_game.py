@@ -1996,9 +1996,9 @@ def main():
             _team = [n_ for n_ in M[M.team == r_.team].name if n_ != r_.player and n_ in sims]
             _oth = pass_inputs.get(r_.team, (None, None))[1]
             _cr = float(P["other_receiver_rates"]["catch_rate"])
-            _proj = ((sum(float(np.mean(sims[n_]["receptions"])) for n_ in _team)
-                      + (float(np.mean(_oth)) * _cr if _oth is not None else 0.0))
-                     * float(np.mean(P["qb_starter_pass_share_quantiles"])))
+            _proj = RSCH.projected_completions([float(np.mean(sims[n_]["receptions"])) for n_ in _team],
+                                               None if _oth is None else float(np.mean(_oth)), _cr,
+                                               float(np.mean(P["qb_starter_pass_share_quantiles"])))
             lk_, lfr_ = _luck(m_.gsis_id, "pass")
             cp_ = _xl("pass_completions", r_.player, r_.team)
             QB_READ[(r_.player, r_.team)] = RSCH.qb_yards_read(
