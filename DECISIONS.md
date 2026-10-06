@@ -7523,3 +7523,15 @@ by the user.
   numbers.
 - Not his game-to-game min / max: the simulation already prices those swings, so using
   them as the range would count them twice and every line would read "only at your high".
+
+## 2026-10-06 (181) -- the book's quarterback against ours
+
+- Found by the backup-QB implied-total diagnostic (reports/backup_qb_implied_total.md on
+  props/tier3): the backtest graded the depth chart's starter, and in 27% of backup
+  starts (2022-25) that was an active primary who did not start. The live board picks
+  its starter the same way, so a stale depth chart prices the wrong quarterback.
+- The report now flags a team whose Sleeper lines name a different quarterback (passing
+  attempts / completions / longest completion) and none for our starter, with the role
+  what-if that prices the book's man. Thursday's TB at DAL fires it: Sleeper posts Jalon
+  Daniels, the depth chart starts Baker Mayfield.
+- The backtest fix (grade only the QB who started) ships with the Tier 2 work.

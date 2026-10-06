@@ -2896,6 +2896,12 @@ def main():
                      + ", ".join(f"{r_.full_name} ({r_.team})" for r_ in prov_ina)
                      + ". Priced as playing his normal role until this week's report says otherwise; if he "
                        "sits again, his lines are void and his teammates' move.")
+    for mm_ in RSCH.book_qb_mismatch((data or {}).get("sleeper_extra"), STARTER_QB, SLEEPER_TEAM):
+        L.append(f"- **The book's quarterback is not ours ({mm_['team']}):** Sleeper posts passing lines for "
+                 f"{', '.join(mm_['book'])} and none for {mm_['engine']}, the depth chart's starter, whom this "
+                 f"board prices as the starter (his kneel-downs and passing share; his receivers' numbers do not "
+                 f"depend on who throws). The depth chart may be stale. To price the book's quarterback: "
+                 f"--role \"{mm_['book'][0]}=QB1\".")
     q = pop[pop.questionable]
     if len(q):
         L.append(f"- **Questionable:** " + ", ".join(r["name"] for _, r in q.iterrows()) + ". Priced as if they play their normal role; see 'If a Questionable player is out' for the other case.")

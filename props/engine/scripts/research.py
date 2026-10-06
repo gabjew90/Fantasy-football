@@ -1435,3 +1435,25 @@ def auto_range(this_season, last_season, proj, team_volume, this_season_only=Fal
         return None
     se = float(np.std(shares, ddof=1) / np.sqrt(n) * team_volume)
     return {"values": [max(0.0, proj - se), float(proj), proj + se], "n": n, "se": se, "from_last": from_last}
+
+
+# ---- the book's quarterback against the engine's starter (DECISIONS #181) ----
+QB_KINDS = ("passing_attempts", "pass_completions", "longest_passing_completion")
+
+
+def book_qb_mismatch(extra, starters, sleeper_team=None) -> list[dict]:
+    """Teams whose book posts passing lines for a QB other than the engine's starter and
+    none for the starter: the depth chart may be stale (the backtest graded the wrong
+    QB in 27% of backup starts, 2022-25). starters: {our team code: engine starter's
+    name}. Returns [{team, engine, book}]."""
+    back = {v: k for k, v in (sleeper_team or {}).items()}
+    posted = {}
+    for x in extra or []:
+        if x["kind"] in QB_KINDS:
+            posted.setdefault(back.get(x["team"], x["team"]), set()).add(x["name"])
+    out = []
+    for team, names in posted.items():
+        eng = starters.get(team)
+        if eng and MODEL.norm_name(eng) not in {MODEL.norm_name(n) for n in names}:
+            out.append({"team": team, "engine": eng, "book": sorted(names)})
+    return out
