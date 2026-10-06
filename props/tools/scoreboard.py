@@ -138,6 +138,9 @@ def compare(R: pd.DataFrame, Ref: pd.DataFrame, cluster: str, reps: int = 2000, 
         if len(b) != len(a):
             raise ValueError(f"{mk}: the candidate scores {len(b)} of the reference's {len(a)} player-games "
                              "-- two settings must be scored on the same cohort (reports/scoreboard.md)")
+        if mk == "receptions" and (("pc_rec_exact" in R) != ("pc_rec_exact" in Ref)):
+            raise ValueError("receptions: one run scores the chance exactly, the other by sampling "
+                             "(backtest.receptions_over_exact, 2026-10-06) -- rerun the older one")
         d = b.merge(a[KEYS + ["pc", "pu", "L", "y"]], on=KEYS, suffixes=("", "_ref"))
         if not (d.y == d.y_ref).all():
             raise ValueError(f"{mk}: the two runs disagree on outcomes -- not the same games")
@@ -171,7 +174,10 @@ def compare(R: pd.DataFrame, Ref: pd.DataFrame, cluster: str, reps: int = 2000, 
     return out
 
 
-MIN_GUARD_N = 200          # player-games a guard market needs before its score counts
+# player-games a guard market needs before its score counts, for a multi-season selection
+# read. A short slice (2026 weeks 2-4: about 96 starting-QB games) must pass its own stated
+# min_n -- with this floor every such guard would read "blocked" (code review, 2026-10-06).
+MIN_GUARD_N = 200
 
 
 def guard_verdict(c: dict, target: str | None, score: str = "logloss_c", floor: float = -0.005,

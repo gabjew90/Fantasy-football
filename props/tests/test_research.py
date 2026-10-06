@@ -545,6 +545,7 @@ def test_fantasy_points_allowed_by_position():
     line = RS.points_allowed_line(pa, ("ATL", "NO"))
     assert line.startswith("ATL's defence allows RB 2.2 (1st most of 2") and "League average: RB 1.1" in line
     assert RS.matchup_sentence(pa, "NO", "TE").startswith("NO allows 2.0 PPR points a game to tight ends, the 1st most of 2")
+    assert "the 1st fewest of 2" in RS.matchup_sentence(pa, "NO", "RB"), "the bottom half counts from the bottom"
     assert RS.matchup_sentence(pa, "ATL", "FB").startswith("ATL allows 2.2 PPR points a game to running backs")
     assert RS.matchup_sentence(pa, "ATL", "QB") is None and RS.matchup_sentence(pa, "DAL", "WR") is None
     assert "context, not an adjustment" in line
@@ -803,6 +804,7 @@ def test_defence_epa_and_points_per_drive_allowed():
     assert dm["ATL"]["epa_play"][1] == 1, "1st = most allowed"
     line = RS.defense_line(dm, ("ATL", "NO"))
     assert line.startswith("ATL allows +0.13 EPA a play (1st most)") and "3.50 points a drive (1st most)" in line
+    assert "NO allows -0.20 EPA a play (1st fewest)" in line
     assert RS.defense_line(dm, ("ATL", "DAL")) is None
     assert RS.defense_metrics(pbp.drop(columns=["epa"])) == {}
     no_drives = RS.defense_metrics(pbp.drop(columns=["fixed_drive"]))
@@ -822,4 +824,19 @@ def test_offence_epa_and_points_per_drive_gained():
     assert om["X"]["epa_play"] == (pytest.approx(0.4 / 3), 1) and om["X"]["pts_drive"][0] == pytest.approx(3.5)
     assert om["Y"]["pts_drive"] == (pytest.approx(3.0), 2)
     line = RS.defense_line(om, ("X", "Y"), verb="gains")
-    assert line.startswith("X gains +0.13 EPA a play (1st most)") and "1st = most gained" in line
+    assert line.startswith("X gains +0.13 EPA a play (1st most)") and "('fewest') gained" in line
+
+
+def test_rank_words_count_from_the_nearer_end():
+    assert [RS.rank_words(r, 32) for r in (1, 10, 16, 17, 31, 32)] == [
+        "1st most", "10th most", "16th most", "16th fewest", "2nd fewest", "1st fewest"]
+
+
+def test_epa_uses_the_pass_and_rush_flags_so_a_scramble_is_a_dropback():
+    import pandas as pd
+    pbp = pd.DataFrame({"game_id": "g", "defteam": "ATL", "posteam": "X", "epa": [0.6, -0.2, 1.0],
+                        "play_type": ["pass", "run", "run"], "pass": [1, 0, 1], "rush": [0, 1, 0],
+                        "qb_scramble": [0, 0, 1]})
+    dm = RS.defense_metrics(pbp)
+    assert dm["ATL"]["epa_pass"][0] == pytest.approx(0.8), "the scramble is a dropback"
+    assert dm["ATL"]["epa_rush"][0] == pytest.approx(-0.2)

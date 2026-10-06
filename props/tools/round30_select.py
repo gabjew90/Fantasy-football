@@ -66,8 +66,11 @@ def main(argv=None):
         if out["picks"][knob] == BASE[knob]:
             continue
         c = SB.compare(frames[i], frames[ref[knob]], "game", level=level)
-        target = c[market]["logloss_c"]
         gv = SB.guard_verdict(c, market, "logloss_c", floor=GUARD)
+        if market not in c:
+            checks[knob] = {"market": market, "guard_status": gv, "guards_ok": False, "detectable": False}
+            continue
+        target = c[market]["logloss_c"]
         guards = gv["guards"]
         checks[knob] = {"market": market, "level": level, "gain": target["gain"], "ci": target["ci"],
                         "detectable": target["ci"][0] > 0, "move_points": c[market]["move_points_c"],

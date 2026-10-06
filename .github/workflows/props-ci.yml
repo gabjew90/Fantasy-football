@@ -99,8 +99,15 @@ jobs:
           if [ -z "$BASE" ] || ! git cat-file -e "$BASE" 2>/dev/null; then
             BASE=$(git rev-parse HEAD~1)
           fi
-          if git diff --name-only "$BASE...HEAD" \
-             | grep -qE '^props/engine/(scripts/[^/]+\.py|resources/[^/]+\.(csv|json))$'; then
+          # what can change a price: the engine's price hash (every pricer script and data
+          # file, engine_version.price_files), before and after -- plus the harness scripts
+          mkdir -p "$RUNNER_TEMP/base"
+          git archive "$BASE" props/engine | tar -x -C "$RUNNER_TEMP/base" || true
+          PH_NEW=$(python props/engine_version.py print | sed -n 's/^price_hash=//p')
+          PH_OLD=$(python props/engine_version.py print --engine-dir "$RUNNER_TEMP/base/props/engine" 2>/dev/null \
+                   | sed -n 's/^price_hash=//p' || true)
+          if [ "$PH_NEW" != "$PH_OLD" ] || git diff --name-only "$BASE...HEAD" \
+             | grep -qE '^props/engine/(scripts/[^/]+\.py|resources/.+\.(csv|json))$'; then
             echo "model=true" >> "$GITHUB_OUTPUT"
             echo "the model changed; the backtest smoke will run"
           else

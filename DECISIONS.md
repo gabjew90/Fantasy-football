@@ -7660,3 +7660,29 @@ by the user.
   board already left TDs out). Anytime TDs are still priced, logged and graded -- "it's fine
   to keep the logging" -- so the record keeps measuring them; `--markets td` shows them on
   request. The TD model is untouched.
+
+## 2026-10-06 (191) -- the outside repo review: measurement and scenario fixes before any more tuning
+
+- An outside review (it read and ran the code at 6f7cd76) and a second opinion on it agree:
+  no tuning rounds until the scenario and grading paths are fixed. Round 34 waits.
+- Fixed, each with a known-answer test: CI imported SciPy at module load and failed the lean
+  capture install; scenario targets are set in the sampler's effective shares and asserted
+  against the request (raw 0.70 / 0.60 with 'A: targets=8' gave 4.45, two fixed players in
+  an overfull budget gave 0 -- reachable only through the function: the live scorer already
+  caps each team's shares at 100%); combined yards are scored with a zero side; comparisons
+  use one frozen cohort with equal outcomes and lines; guards are complete or blocked; the
+  calibration wording follows the corrected evidence (QB passing too wide); exact
+  receptions chances in the conditional score, stamped so a sampled run is never compared
+  with an exact one; CI counts a moved price hash or any engine script / data file as a
+  model change.
+- **--k0 changed meaning:** 'rate=value' now replaces only the named rates OVER
+  model.K0_FIXED; it used to replace K0_FIXED entirely. The old behaviour is '--k0 fit'
+  (the per-season fit alone, an ablation). Round 26's archived commands used the old
+  meaning; rerunning them today computes something else.
+- The scoreboard amendment records the 15-85% decision zone the code already used and the
+  stand-in rounding the code always did (the half-point nearest the expected value).
+- User, the same day: each player's matchup line gives the PPR points a game his opponent
+  allows to his position with its rank ("the 10th most"; the bottom half reads "Nth
+  fewest"), and the game header carries each offence's and defence's EPA per play (all,
+  dropbacks, runs) and points per drive with ranks -- nflverse play-by-play, nflfastR's
+  pass / rush flags. Context only; no price reads them.

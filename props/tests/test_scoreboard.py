@@ -201,3 +201,13 @@ def test_the_combined_line_counts_pass_catching_backs_and_99_uses_10k():
                       "mean_tgt": [4.0, 1.0, 2.0]})
     assert SB.bettable(R, "rr").tolist() == [True, True, False], "touches, not carries alone"
     assert SB.bettable(R, "rb").tolist() == [False, True, False]
+
+
+def test_exact_and_sampled_receptions_runs_are_never_compared():
+    ref, cand = _world(0.0), _world(0.0)
+    cand["pc_rec_exact"] = 1.0
+    try:
+        SB.compare(cand, ref, "game", reps=100)
+        raise AssertionError("mixed scoring methods must be refused")
+    except ValueError as e:
+        assert "exactly" in str(e)

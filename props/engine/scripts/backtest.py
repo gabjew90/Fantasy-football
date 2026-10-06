@@ -882,7 +882,8 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
                 # it (the engine's own pre-game median, at the half), the chance of the Over GIVEN
                 # the actual volume (pc_) and with the engine's own volume (pu_), and the outcome
                 "L_rec", "pc_rec", "pu_rec", "L_yds", "pc_yds", "pu_yds", "L_rush", "pc_rush", "pu_rush",
-                "L_rr", "pc_rr", "pu_rr", "sd_tgt", "sd_car", "L_pass", "pc_pass", "pu_pass", "pit_pass_c")}
+                "L_rr", "pc_rr", "pu_rr", "sd_tgt", "sd_car", "L_pass", "pc_pass", "pu_pass", "pit_pass_c",
+                "pc_rec_exact")}
             half = standin_half
             cond_yds, cond_rush = {}, {}
             act_t, act_r, act_y = (tr.act_targets.to_numpy(), tr.act_receptions.to_numpy(float),
@@ -920,6 +921,7 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
                             cols[f"L_{nm_}"][i], cols[f"pc_{nm_}"][i] = L, float((cD > L).mean())
                             cols[f"pu_{nm_}"][i] = float((uM > L).mean())
                         # receptions given targets has a closed form: score it exactly
+                        cols["pc_rec_exact"][i] = 1.0      # a stamp: compare() never mixes the two
                         cols["pc_rec"][i] = receptions_over_exact(
                             T, float(cr_[k_]), lines_["rec"], ({**M.WIDTH_OFF, **(width or {})})["catch_conc"])
             act_c, ypc_ = test_act.act_carries.to_numpy(), test_act.ypc.to_numpy(float)
