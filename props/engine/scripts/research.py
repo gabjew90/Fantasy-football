@@ -939,6 +939,7 @@ def defense_line(dm, teams, verb="allows") -> str | None:
 # Modelled on the user's TB at DAL brief: each section a small table the narrative then
 # interprets. Context only: nothing below is a price input.
 DEF_POS = {"DE", "DT", "NT", "DL", "LB", "ILB", "OLB", "MLB", "CB", "S", "SS", "FS", "DB"}
+SCORE_EPA_WEIGHT = 2 / 3         # the unit score: two parts EPA per play, one part success rate
 
 
 def unit_efficiency(pbp, wp_lo=0.10, wp_hi=0.90) -> dict:
@@ -975,8 +976,9 @@ def unit_efficiency(pbp, wp_lo=0.10, wp_hi=0.90) -> dict:
                 out[side].setdefault(t, {})[kind] = (float(r.epa), int(er[t]), float(r.sr), int(sr[t]), int(r.n))
     out["_n"] = len(set(out["off"]) | set(out["def"]))
     # THE UNIT SCORE (user, 2026-10-06: "blend EPA and success into a score and tier it"):
-    # each team's EPA per play and success rate standardised across the league and averaged
-    # equally, then put on a 50 +/- 10 scale (50 = league average, 10 = one standard deviation),
+    # each team's EPA per play and success rate standardised across the league and blended two
+    # parts EPA to one part success (user, 2026-10-06: weight EPA more -- big plays count), then
+    # put on a 50 +/- 10 scale (50 = league average, 10 = one standard deviation),
     # oriented so higher is better for offences AND defences (a defence allowing less scores high)
     out["score"] = {"off": {"pass": {}, "run": {}}, "def": {"pass": {}, "run": {}}}
     for side in ("off", "def"):
@@ -987,7 +989,7 @@ def unit_efficiency(pbp, wp_lo=0.10, wp_hi=0.90) -> dict:
             e = np.array([out[side][t][kind][0] for t in teams])
             r = np.array([out[side][t][kind][2] for t in teams])
             z = lambda a: (a - a.mean()) / a.std() if a.std() > 0 else a * 0.0
-            comp = (z(e) + z(r)) / 2 * (1 if side == "off" else -1)
+            comp = (SCORE_EPA_WEIGHT * z(e) + (1 - SCORE_EPA_WEIGHT) * z(r)) * (1 if side == "off" else -1)
             comp = z(comp)
             for t, c in zip(teams, comp):
                 out["score"][side][kind][t] = float(50 + 10 * c)
@@ -1007,6 +1009,13 @@ def unit_efficiency(pbp, wp_lo=0.10, wp_hi=0.90) -> dict:
 
 TIER_STEPS = (0.5, 1, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10)
 MAX_TIERS = 6
+TIER_LETTERS = "SABCDF"          # user, 2026-10-06: S, A, B, C, D, F from the best band down
+
+
+def tier_letter(k: int) -> str:
+    """Band k (1 = best) as its letter; a letter always means the same band position, so a
+    list whose spread needs only five bands has no F."""
+    return TIER_LETTERS[min(max(int(k), 1), len(TIER_LETTERS)) - 1]
 
 
 def tiers(values: dict, higher_is_better=True, max_tiers=MAX_TIERS, steps=TIER_STEPS) -> dict:
@@ -1061,18 +1070,19 @@ def unit_table(ue, away, home) -> list[str]:
     T = unit_tiers(ue)
     sc = ue["score"]
     L = ["| Matchup | Offence score | Offence tier | Defence faced: score | Defence tier |", "|---|---|---|---|---|"]
+    letters = lambda tt, team: tier_letter(tt["tier"][team])
     for o, d_ in ((away, home), (home, away)):
         for k in ("pass", "run"):
             if o in sc["off"][k] and d_ in sc["def"][k]:
                 to, td = T[("off", k)], T[("def", k)]
-                L.append(f"| {o} {k} vs. {d_} | {round(sc['off'][k][o])} | {to['tier'][o]} of {to['n']} | "
-                         f"{round(sc['def'][k][d_])} | {td['tier'][d_]} of {td['n']} |")
+                L.append(f"| {o} {k} vs. {d_} | {round(sc['off'][k][o])} | {letters(to, o)} | "
+                         f"{round(sc['def'][k][d_])} | {letters(td, d_)} |")
     L += ["", "**Score**: how well a unit does per play, blending EPA per play (points added against an average "
               "play from the same down, distance and field position) and success rate (share of plays that added "
-              "points) equally. 50 is the league average and every 10 points is one standard deviation; higher is "
+              "points), two parts EPA to one part success. 50 is the league average and every 10 points is one standard deviation; higher is "
               "better for offences and defences alike. Passes include sacks and scrambles; garbage time removed ("
-              + ue["_filter"] + "). **Tiers**: equal bands of score counted down from the league's best team; "
-              "tier 1 is best.",
+              + ue["_filter"] + "). **Tiers** S, A, B, C, D, F: equal bands of score counted down from the "
+              "league's best team (S = the top band); a list whose spread needs fewer bands stops before F.",
           "", "| Tier | Passing offence | Running offence | Pass defence | Run defence |", "|---|---|---|---|---|"]
     n = max(T[k]["n"] for k in T)
     for k in range(1, n + 1):
@@ -1080,7 +1090,7 @@ def unit_table(ue, away, home) -> list[str]:
         for key in (("off", "pass"), ("off", "run"), ("def", "pass"), ("def", "run")):
             b = next((x for x in T[key]["bands"] if x[0] == k), None)
             cells.append(band_label(b, last=(k == T[key]["n"])) if b else "")
-        L.append(f"| {k}{' (best)' if k == 1 else ''} | " + " | ".join(cells) + " |")
+        L.append(f"| {tier_letter(k)}{' (best)' if k == 1 else ''} | " + " | ".join(cells) + " |")
     pace = ue.get("pace") or {}
     if all(t in pace for t in (away, home)):
         L.append("")

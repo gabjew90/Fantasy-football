@@ -7730,9 +7730,11 @@ by the user.
   repeating the obvious, no jargon"), and "for EPA the numbers mean nothing for me ... blend
   EPA and success into a score and tier it".
 - Unit against unit now shows one **score** per unit: EPA per play and success rate, each
-  standardised across the league and averaged equally, on a 50 +/- 10 scale (50 = league
+  standardised across the league and blended two parts EPA to one part success (the user:
+  weight EPA more, so big-play units are not pulled down by a lower success rate), on a
+  50 +/- 10 scale (50 = league
   average, 10 = one standard deviation), higher better for offences and defences alike; and
-  a **tier**: equal bands counted down from the league's best team, the band width the
+  a **tier** S, A, B, C, D, F: equal bands counted down from the league's best team, the band width the
   smallest round step that keeps the league within six tiers, with a ladder table showing
   each tier's range. Garbage time removed (win probability 10-90%). Raw EPA is no longer quoted.
 - Tables carry one number per cell with the rank key in the caption; the positional table

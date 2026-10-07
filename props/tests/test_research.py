@@ -916,7 +916,8 @@ def test_the_unit_score_blends_epa_and_success_and_tiers_from_the_best_team_down
     assert all(b[2] - b[1] == pytest.approx(t["step"]) for b in t["bands"]), "equal-width bands"
     tab = RS.unit_table(ue, "A", "B")
     assert tab[0] == "| Matchup | Offence score | Offence tier | Defence faced: score | Defence tier |"
-    assert any(r.startswith("| A pass vs. B | ") for r in tab) and any(r.startswith("| 1 (best) |") for r in tab)
+    assert any(r.startswith("| A pass vs. B | ") for r in tab) and any(r.startswith("| S (best) |") for r in tab)
+    assert [RS.tier_letter(k) for k in range(1, 7)] == list("SABCDF") and RS.tier_letter(9) == "F"
     assert "50 is the league average" in " ".join(tab)
 
 
