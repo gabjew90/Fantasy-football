@@ -7861,3 +7861,14 @@ The expert re-ran the four-season backtest (baseline reproduces ours: receptions
 - Still open: tight-end yards too wide and backs' receiving yards too narrow with actual targets
   in (the shapes did not clear the bar); receiving yards' Over 2.6 points above the engine
   overall (round 40, next).
+
+## 2026-10-06 (201) -- round 40 null: the receiving-yards level stays; the queue from the audits is done
+
+- Receivers' yards a catch x1.02-1.06 (with passing's level re-picked): the conversion score
+  leans better at 1.04 but the tie rule's pick (1.02) moves the Over by under a point -- kept;
+  passing's 1.04 stays best. Receiving yards' Over still runs about 3 points above the engine
+  (24-27 implied points +6.0): volume and environment, not the yards a catch.
+- The audit queue (rounds 38-42): 38 ships (user override of the width guard), 41 ships
+  (tight ends' share x1.06), 39 stays in shadow (user), 40 and 42 null. Open: the receiving
+  environment lean, tight-end and back yards widths, the tight-end touchdown chance moving
+  with the share (untested; hidden from the reads).
