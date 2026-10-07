@@ -1750,6 +1750,78 @@ def capped_line(read, per) -> str:
               "descriptive, not the workload that makes the line a coin flip.")
 
 
+# ---- the volume chance (user, 2026-10-07): the engine supplies the volume, the reader the efficiency.
+# For each efficiency assumption, the volume a line needs and the engine's chance of reaching it, plus
+# how many of his games this season beat the efficiency the line needs at the engine's volume.
+VOLUME_UNIT = {"player_reception_yds": ("targets", "yards a target"), "player_receptions": ("targets", "catch rate"),
+               "player_rush_yds": ("carries", "yards a carry"),
+               "player_rush_reception_yds": ("touches", "yards a touch"),
+               "player_pass_yds": ("pass attempts", "yards an attempt")}
+
+
+# How the engine's volume chances have held up (backtest 2022-25, 1,000 draws, measured 2026-10-07):
+# targets calibrated (19.6% outside the 80% range); carries too narrow (24.8%), high totals 4-5 points
+# low; a back's touches 22.9%, about 5 points low at three over; team throws 15.2%, slightly wide,
+# high totals 1-2 points high (21.3% vs 19.0% at six over). No note where it is calibrated.
+VOLUME_CALIBRATION = {
+    "player_rush_yds": " The engine's chance of a high carry total has run 4-5 points low in the backtest (2022-25).",
+    "player_rush_reception_yds": " The engine's chance of a high touch total has run about 5 points low in the "
+                                 "backtest (2022-25).",
+    "player_pass_yds": " Attempts here are the team's throws at its own targets-per-attempt rate; the engine's "
+                       "chance of a high total has run 1-2 points high in the backtest (2022-25)."}
+
+
+ONE_UNIT = {"targets": "a target", "carries": "a carry", "touches": "a touch", "pass attempts": "an attempt"}
+
+
+def volume_chance(market, line, draws, rates, games=None, market_volume=None, team=None) -> list[str]:
+    """market: a VOLUME_UNIT key; line: the posted line; draws: the engine's volume draws (targets,
+    carries, touches or attempts); rates: [(label, rate)] efficiency assumptions (yards per unit,
+    or a catch rate for receptions); games: [(volume, outcome)] his games this season (outcome =
+    yards, or catches for receptions); market_volume: the market's own volume line, if posted; team: whose games those are.
+    Returns markdown lines, [] when there is nothing to show."""
+    import math
+    unit, rate_word = VOLUME_UNIT[market]
+    d = np.asarray(draws, dtype=float) if draws is not None else None
+    if d is None or not len(d) or not _ok(line):
+        return []
+    need_out = math.floor(float(line)) + 1                      # the whole number that wins the Over
+    rows = []
+    for label, r in rates:
+        if not _ok(r) or float(r) <= 0:
+            continue
+        vol = math.ceil(need_out / float(r) - 1e-9)
+        pct_ = float((d >= vol).mean())
+        rate_txt = f"{100 * float(r):.0f}%" if market == "player_receptions" else f"{float(r):.1f}"
+        rows.append(f"| {label} | {rate_txt} | {vol} {unit} | {100 * pct_:.0f}% |")
+    if not rows:
+        return []
+    proj = float(d.mean())
+    L = [f"| Efficiency assumption | {rate_word.capitalize()} | Volume the line needs | Engine's chance of that volume |",
+         "|---|---:|---:|---:|", *rows]
+    if _ok(market_volume):
+        L.append(f"| The market's own {unit} line | - | more than {float(market_volume):g} {unit} | "
+                 f"{100 * float((d > float(market_volume)).mean()):.0f}% |")
+    need_rate = need_out / proj if proj > 0 else None
+    tail = ""
+    if need_rate is not None:
+        if market == "player_receptions" and need_rate > 1:
+            # more catches than targets: no catch rate gets there, so no games can beat it
+            tail = f"At the engine's {proj:.1f} {unit}, the line needs {need_out} catches -- more than his targets."
+        else:
+            nr = f"{100 * need_rate:.0f}%" if market == "player_receptions" else f"{need_rate:.1f} {rate_word}"
+            tail = f"At the engine's {proj:.1f} {unit}, the line needs {nr}"
+            g = [(v, y) for v, y in (games or []) if _ok(v) and float(v) > 0 and _ok(y)]
+            if g:
+                beat = sum(1 for v, y in g if float(y) / float(v) >= need_rate)
+                who = f" for {team}" if team else ""
+                tail += (f"; he beat that in {beat} of his {len(g)} games{who} this season with "
+                         f"{ONE_UNIT.get(unit, unit)}")
+            tail += "."
+    note = VOLUME_CALIBRATION.get(market, "")
+    return L + ["", tail + note] if tail or note else L
+
+
 def player_card(d: dict) -> list[str]:
     """The full card for one priced player. d: name, team, slot, pos, rows (research rows as
     dicts, preferred book first), book, quoted, usage, backfield, qbs, prior, season,
@@ -1789,6 +1861,11 @@ def player_card(d: dict) -> list[str]:
     cal = calibration_line({r["market"] for r in rows}, d.get("implied"), d.get("team"), d.get("slot"))
     if cal:
         L += cal + [""]
+    for vc in d.get("volume") or []:
+        if vc.get("lines"):
+            L += [f"**Volume chance, {PROP_WORDS.get(vc['market'], (vc['market'],))[0].lower()} "
+                  f"{float(vc['line']):g}** (the engine's volume; the efficiency is your call):", "",
+                  *vc["lines"], ""]
     for s_ in d.get("fit") or []:
         L += [f"**How his lines fit together:** {s_}", ""]
     for sh in d.get("shadow") or []:

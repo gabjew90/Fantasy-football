@@ -1311,10 +1311,10 @@ def main():
         shares_t = {n: float(v) for n, v in zip(Mt.name, Mt.ts)}
         crs_t = {n: float(v) for n, v in zip(Mt.name, Mt.cr)}
         ypt_t = {n: float(v) for n, v in zip(Mt.name, Mt.ypt)}
-        out_rec, tt_draw = MODEL.simulate_team_game(team_stream(t, 101), N_SIM, env[t]["targets"], TVD["targets_r"],
-                                                    shares_t, crs_t, ypt_t, SH, other_bucket=True, width=WIDTH_SIM,
-                                                    return_other=True,
-                                                    player_roles={n: MODEL.role_group(s_) for n, s_ in zip(Mt.name, Mt.slot)})
+        out_rec, tt_draw, tg_draws = MODEL.simulate_team_game(
+            team_stream(t, 101), N_SIM, env[t]["targets"], TVD["targets_r"], shares_t, crs_t, ypt_t, SH,
+            other_bucket=True, width=WIDTH_SIM, return_other=True, return_targets=True,
+            player_roles={n: MODEL.role_group(s_) for n, s_ in zip(Mt.name, Mt.slot)})
         pass_inputs[t] = ([out_rec[n][1] for n in names], out_rec.pop(MODEL.OTHER))
         # ROUND 34'S REVERSAL SHADOW (DECISIONS #204): receiving again at target spread 40 (the
         # setting before round 34), its own stream, logged as p_over_spread40 for the week-8 check
@@ -1381,7 +1381,7 @@ def main():
         for j, (_, m) in enumerate(Mt.iterrows()):
             rec, yds = out_rec[m["name"]]
             sims[m["name"]] = {"receptions": rec, "rec_yards": yds, "rush_yards": rush_t[j], "carries": car_t[j],
-                               "rush_rec_yards": yds + rush_t[j]}
+                               "rush_rec_yards": yds + rush_t[j], "targets": tg_draws[m["name"]]}
     # QB PASSING (plan step 4, props-v1.24; reports/yardage_harness.md, DECISIONS
     # #105): the starter's passing yards are his receivers' yards in THIS
     # simulation, plus the other bucket's targets at the depth receivers' rates,
@@ -2653,6 +2653,87 @@ def main():
         for _, rr in R[R.market == "player_anytime_td"].iterrows():
             td_book.setdefault(rr.player, []).append((rr.book, rr.price, rr.p_novig))
 
+    # his games this season, per team and week, for the volume chance's "games he beat it" (attempts as
+    # research.qb_workload counts them: no sacks, no spikes)
+    _tg_g = passes.groupby(["receiver_player_id", "posteam", "week"]).agg(
+        tg=("play_type", "size"), cat=("complete_pass", "sum"), ryd=("receiving_yards", "sum"))
+    _ru_g = rushes.groupby(["rusher_player_id", "posteam", "week"]).agg(car=("play_type", "size"),
+                                                                       uyd=("rushing_yards", "sum"))
+    _pa = pbp[(pbp.play_type == "pass") & pbp.passer_player_id.notna()] if "passer_player_id" in pbp else pbp.iloc[0:0]
+    if "sack" in _pa:
+        _pa = _pa[_pa["sack"].fillna(0) != 1]
+    if "pass_attempt" in _pa:
+        _pa = _pa[_pa["pass_attempt"].fillna(0) == 1]
+    _pa_g = _pa.groupby(["passer_player_id", "posteam", "week"]).agg(att=("play_type", "size"),
+                                                                     pyd=("passing_yards", "sum"))
+
+    def games_of(gid, t, kind):
+        """[(volume, outcome)] for his games this season with team t, oldest first."""
+        def by_week(frame, cols):
+            try:
+                x = frame.xs((gid, t), level=(0, 1))[cols].fillna(0)
+            except KeyError:
+                return {}
+            return {w: tuple(float(v) for v in r) for w, r in zip(x.index, x.to_numpy())}
+        parts = {"player_reception_yds": [(_tg_g, ["tg", "ryd"])], "player_receptions": [(_tg_g, ["tg", "cat"])],
+                 "player_rush_yds": [(_ru_g, ["car", "uyd"])], "player_pass_yds": [(_pa_g, ["att", "pyd"])],
+                 "player_rush_reception_yds": [(_ru_g, ["car", "uyd"]), (_tg_g, ["cat", "ryd"])]}.get(kind, [])
+        tot = {}
+        for frame, cols in parts:               # touches: carries and catches added week by week
+            for w, (v, y) in by_week(frame, cols).items():
+                a_ = tot.get(w, (0.0, 0.0))
+                tot[w] = (a_[0] + v, a_[1] + y)
+        return [tot[w] for w in sorted(tot)]
+
+    def volume_inputs(m, t, rows, nm):
+        """The volume-chance tables for his priced markets (research.volume_chance)."""
+        s_ = sims.get(nm) or {}
+        out, seen = [], set()
+        for r in rows:
+            mk = r["market"]
+            if mk in seen or mk not in RSCH.VOLUME_UNIT:
+                continue
+            seen.add(mk)
+            games = games_of(m.gsis_id, t, mk)
+            tot = lambda i: sum(g[i] for g in games)
+            season = (tot(1) / tot(0)) if games and tot(0) > 0 else None
+            mvol, rates, draws = None, [], None
+            if mk == "player_reception_yds" and "targets" in s_:
+                cr_ = CATCH_READ.get((nm, t)) or {}
+                lf_ = cr_.get("season_ypc_luckfree")              # yards a catch, long catches capped
+                capped = float(lf_) * float(m.cr) if lf_ is not None and pd.notna(m.cr) else None
+                rates = [("His recent rate, long catches capped", capped),
+                         ("His season rate", season), ("The engine's rate", float(m.ypt))]
+                draws = s_["targets"]
+            elif mk == "player_receptions" and "targets" in s_:
+                rates = [("His season catch rate", season), ("The engine's catch rate", float(m.cr))]
+                draws = s_["targets"]
+            elif mk == "player_rush_yds" and "carries" in s_:
+                cy_ = CARRY_READ.get((nm, t)) or {}
+                rates = [("His recent rate, long runs capped", cy_.get("season_ypc_luckfree")),
+                         ("His season rate", season), ("The engine's rate", float(m.ypc) if pd.notna(m.ypc) else None)]
+                draws, mvol = s_["carries"], cy_.get("carries_line")
+            elif mk == "player_rush_reception_yds" and "carries" in s_:
+                tch = np.asarray(s_["carries"]) + np.asarray(s_["receptions"])
+                eng = float(np.mean(s_["rush_rec_yards"])) / float(tch.mean()) if tch.mean() > 0 else None
+                rr_ = RUSH_REC.get((nm, t)) or {}
+                rates = [("His recent rate, long plays capped", rr_.get("touch_rate") if rr_.get("rates_luck_free") else None),
+                         ("His season rate", season),
+                         ("The engine's rate", eng)]
+                draws = tch
+            elif mk == "player_pass_yds" and t in team_targets_draw and "pass_yards" in s_                     and RSCH._ok((TEAM_VOL_CHK.get(t) or {}).get("target_rate")):
+                # the simulated starter only; attempts are the team's throws at its own measured
+                # targets-per-attempt rate (no rate measured: no table)
+                draws = np.asarray(team_targets_draw[t], dtype=float) / float(TEAM_VOL_CHK[t]["target_rate"])
+                eng = float(np.mean(s_["pass_yards"])) / float(draws.mean()) if draws.mean() > 0 else None
+                rates = [("His season rate", season), ("The engine's rate", eng)]
+                mvol = _xl("passing_attempts", nm, t).get("line")      # the market's attempts line, if posted
+            if draws is None:
+                continue
+            out.append({"market": mk, "line": r["line"],
+                        "lines": RSCH.volume_chance(mk, r["line"], draws, rates, games, mvol, team=t)})
+        return out
+
     def card_inputs(m, t, mine, rr_read):
         """Everything one player's card shows, from what this run already built."""
         nm = m["name"]
@@ -2720,7 +2801,7 @@ def main():
                              RSCH.rush_rec_sentence(rr_read),
                              RSCH.qb_yards_sentence(nog(QB_READ.get((nm, t))))) if x_]
         return {"name": nm, "team": t, "slot": m.slot, "pos": m.pos, "rows": rows, "book": book, "quoted": quoted,
-                "fit": fit, "implied": env[t].get("implied_points"),
+                "fit": fit, "volume": volume_inputs(m, t, rows, nm), "implied": env[t].get("implied_points"),
                 "usage": u_, "backfield": BACKFIELD.get(nm), "qbs": qbs, "prior": prior, "season": season,
                 "carries_book": carries_book,
                 "reads": {"catch": CATCH_READ.get((nm, t)), "carry": CARRY_READ.get((nm, t)), "rr": rr_read},

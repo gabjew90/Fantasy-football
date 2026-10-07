@@ -129,3 +129,64 @@ def test_a_tight_end_card_shows_his_roles_measured_row():
     assert "| Receptions, every wide receiver | 45.1% | 44.3% | 4754 |" in wr
     assert "| Receptions | 48.4% | 45.2% | 49.6% | 506 |" in wr, "the live record at real lines"
     assert RS.calibration_line({"player_rush_reception_yds"}, None, None, "RB1") == [], "no live lines, no implied row"
+
+
+def test_volume_chance_known_answers():
+    # 68.5 needs 69 yards: at 8.5 a target that is ceil(69/8.5) = 9 targets; at 6.0, 12 (11.5 rounds up)
+    draws = list(range(1, 21))                       # 1..20 targets, one each: P(>= 9) = 12/20
+    L = RS.volume_chance("player_reception_yds", 68.5, draws, [("Capped", 8.5), ("Season", 6.0), ("Bad", None)],
+                         games=[(10, 90.0), (8, 40.0), (0, 0.0)])
+    txt = "\n".join(L)
+    assert "| Capped | 8.5 | 9 targets | 60% |" in txt
+    assert "| Season | 6.0 | 12 targets | 45% |" in txt
+    assert "Bad" not in txt                         # an assumption with no rate is left out
+    # the engine's mean is 10.5 targets, so the line needs 69 / 10.5 = 6.6 a target; 9.0 beat it, 5.0 did not,
+    # and the zero-target game is not a game he could beat it in
+    assert "At the engine's 10.5 targets, the line needs 6.6 yards a target; he beat that in 1 of his 2 games" in txt
+
+
+def test_volume_chance_receptions_and_carries():
+    # 4.5 catches needs 5: at a 65% catch rate ceil(5/0.65) = 8 targets
+    L = RS.volume_chance("player_receptions", 4.5, [8] * 3 + [7] * 7, [("Season", 0.65)])
+    assert "| Season | 65% | 8 targets | 30% |" in "\n".join(L)
+    # a whole-number rate lands exactly: 60 yards at 4.0 a carry is 15 carries, not 16
+    L = RS.volume_chance("player_rush_yds", 59.5, [15] * 4 + [14] * 6, [("Engine", 4.0)], market_volume=14.5)
+    txt = "\n".join(L)
+    assert "| Engine | 4.0 | 15 carries | 40% |" in txt
+    assert "| The market's own carries line | - | more than 14.5 carries | 40% |" in txt
+    assert "4-5 points low" in txt                  # the backtest's carry note rides on rushing tables
+    assert RS.volume_chance("player_rush_yds", None, [10], [("Engine", 4.0)]) == []
+    assert RS.volume_chance("player_rush_yds", 59.5, [], [("Engine", 4.0)]) == []
+
+
+def test_the_card_prints_a_volume_chance_block():
+    vol = RS.volume_chance("player_reception_yds", 68.5, list(range(1, 21)), [("Season", 8.5)])
+    d = {"name": "Test Player", "team": "DAL", "slot": "WR1", "pos": "WR",
+         "rows": [_row("player_reception_yds", 68.5)], "book": "sleeper", "quoted": None, "fit": [],
+         "volume": [{"market": "player_reception_yds", "line": 68.5, "lines": vol}]}
+    txt = "\n".join(RS.player_card(d))
+    assert "**Volume chance, receiving yards 68.5**" in txt and "| Season | 8.5 | 9 targets | 60% |" in txt
+
+
+def test_volume_chance_receptions_past_his_targets_and_team_wording():
+    # 2.5 catches needs 3; the engine projects 2.0 targets -- no catch rate gets there
+    L = RS.volume_chance("player_receptions", 2.5, [2.0] * 10, [("Season", 0.8)], games=[(3, 3.0)])
+    txt = "\n".join(L)
+    assert "the line needs 3 catches -- more than his targets." in txt and "%;" not in txt
+    L = RS.volume_chance("player_rush_yds", 59.5, [15] * 10, [("Engine", 4.0)], games=[(15, 70.0)], team="DAL")
+    assert "he beat that in 1 of his 1 games for DAL this season with a carry" in "\n".join(L)
+
+
+def test_keeping_target_draws_changes_no_simulated_number():
+    # the volume chance reads the per-player targets the sampler already draws: asking for them must not
+    # consume random numbers, or every price after it would move
+    import numpy as np
+    import model as MODEL
+    args = (60_000, 34.0, 30.0, {"a": 0.25, "b": 0.2}, {"a": 0.65, "b": 0.7}, {"a": 8.0, "b": 7.0}, 1.4)
+    out1, tt1 = MODEL.simulate_team_game(np.random.default_rng(11), *args, other_bucket=True, return_other=True)
+    out2, tt2, tg = MODEL.simulate_team_game(np.random.default_rng(11), *args, other_bucket=True, return_other=True,
+                                             return_targets=True)
+    assert np.array_equal(tt1, tt2)
+    for k in ("a", "b"):
+        assert np.array_equal(out1[k][0], out2[k][0]) and np.array_equal(out1[k][1], out2[k][1])
+    assert abs(tg["a"].mean() - 34.0 * 0.25) < 0.2

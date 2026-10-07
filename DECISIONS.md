@@ -7953,3 +7953,22 @@ The expert re-ran the four-season backtest (baseline reproduces ours: receptions
   receivers' summed lines (round 38 scales the QB alone).
 - Not changed: passes and runs, and the two teams, are drawn independently -- no effect on a
   single prop; it would matter for same-game combinations, which are not priced.
+
+## 2026-10-07 (206) -- the volume chance on every card; team throws measured
+
+- **The user's framework:** the engine predicts volume (targets, carries) from snap share and
+  game script; the user judges the efficiency. "The engine just needs to predict when volume is
+  more than X." Each card now prints, per yards and receptions line, the volume the line needs
+  at each efficiency assumption (recent capped rate, season rate, engine rate), the engine's
+  chance of that volume, the efficiency the line needs at the engine's volume and how many of
+  his games this season beat it. Informational: no probability, tier or record row changes.
+- **Volume measured first (backtest 2022-25, r40 frames plus a new run saving team throws):**
+  targets calibrated (19.6% outside the 80% range, average miss 2.26 vs naive 2.37); carries too
+  narrow (24.8%; high totals 4-5 points low); a back's targets plus carries 22.9%, about 5 points
+  low at three over (the two surprises are uncorrelated, -0.01); team throws 15.2% outside,
+  slightly wide, high totals 1-2 points high (six over: engine 21.3%, actual 19.0%), average miss
+  5.82 vs the team's own average 6.12 (1,662 team-games with three earlier games). Each table
+  carries the note for its volume. QB attempts are the team's throws at its own
+  targets-per-attempt rate.
+- **Not changed:** the carries width. A wider carries spread is a model change and goes through
+  the pre-registered round process, not this informational PR.

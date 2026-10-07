@@ -566,6 +566,18 @@ need not be surfaced. Write the reply as a premium prop guide with this structur
      table (a yards line that asks for many more targets than the catches line suits a
      short-pass view less). Passing and combined yards have NO price-based workload: never
      present their arithmetic (the capped check, the touches read) as an equivalent threshold.
+   - **The volume chance** (user, 2026-10-07: "the engine just needs to predict when volume is
+     more than X"): each yards and receptions market has one table, at the card's first book's line
+     (Sleeper's when it is quoted) -- for each efficiency assumption
+     (his recent capped rate, his season rate, the engine's), the volume the line needs and the
+     engine's chance of reaching it; then the efficiency the line needs at the engine's volume
+     and how many of his games for this team this season beat it (games with that volume only;
+     the QB's season rate is his own yards an attempt). Volume is targets (receivers), carries or
+     touches (backs), team pass attempts (QBs). Copy it whole; the engine owns the volume, the
+     user judges the efficiency -- say which row matches the efficiency you expect and why. Its
+     chances are the engine's, NOT a price: quote the market's chance as the probability of the
+     prop. Read the calibration note under the table (carries and touches run low on high
+     totals, attempts slightly high).
    - **Where the read can fail**: the specific role, script or efficiency change.
    - **The closing condition** (bold): "If you expect [player] to average [range] in this
      situation, [side, prop, line] meets / misses the quoted price's required win rate under

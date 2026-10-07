@@ -56,6 +56,16 @@ def test_the_report_opens_as_a_research_sheet(run):
     assert "A research sheet, not a bet list." in first
 
 
+def test_cards_carry_the_volume_chance_for_every_market_kind(run):
+    # the user's framework (2026-10-07): the engine's volume, the efficiency each line needs at it
+    report, _r, _e = run
+    for head in ("**Volume chance, receiving yards", "**Volume chance, receptions", "**Volume chance, rushing yards",
+                 "**Volume chance, passing yards"):
+        assert head in report, head
+    assert "pass attempts |" in report and "targets |" in report and "carries |" in report
+    assert "he beat that in" in report
+
+
 def test_no_bet_language_anywhere_the_user_reads(run):
     report, _r, log = run
     for w in FORBIDDEN:
