@@ -358,10 +358,11 @@ def market_environment_fitted(team_spread, total, mkt_fit, team_pace_blend, team
 # for the backs; 0 = runs from history alone (shipped). The starting QB's carries are
 # held where history put them (hold_qb_carries), since the full market environment hurt
 # QB rushing (#106).
-MARKET_RUSH_WEIGHT = 0.0
-# DECISIONS #185 (user's choice): round 29's weight priced BESIDE the board for the backs'
-# rushing yards -- shown and logged, graded by the settled record, never the board's price.
-SHADOW_MARKET_RUSH_WEIGHT = 0.5
+MARKET_RUSH_WEIGHT = 0.5      # round 39 ships (user, 2026-10-06; DECISIONS #204)
+# DECISIONS #185 priced round 29 BESIDE the board while it was off. Now that it ships, the
+# shadow is reversed (DECISIONS #204): the backs' rushing again WITHOUT market carries (history
+# alone), logged as p_over_hist_carries for the week-8 reversal check -- never the board's price.
+SHADOW_MARKET_RUSH_WEIGHT = None
 
 
 def market_rush_volume(team_spread, total, mkt_fit, team_carries_blend, weight):
@@ -701,7 +702,15 @@ WIDTH_OFF = {"share_conc_targets": None, "share_conc_carries": None, "catch_conc
              # round 38 amended (expert audit 2026-10-06): the passing draw times (the team's market-
              # implied points / PASS_IMPLIED_REF) ** this (0 = off). DECISIONS #137's version, which
              # tested only 0.5-1.5; the Over ran 39% at <= 18 implied points and 66% at 27+
-             "pass_implied_exp": 0.0}
+             "pass_implied_exp": 0.0,
+             # round 41 (reports/round41_receiving_roles.md, DECISIONS #198): the per-catch yards
+             # shape times this for tight ends / backs (None or 1 = the shared shape; larger =
+             # narrower), and tight ends' target share times te_share_mult (None or 1 = as blended;
+             # the 'other' bucket gives up what they gain)
+             "catch_shape_mult_te": None, "catch_shape_mult_rb": None, "te_share_mult": None,
+             # round 40 (reports/round40_receiving_level.md): every receiver's yards a catch times
+             # this (None or 1 = as blended), the depth bucket's too, so QB passing (their sum) moves with it
+             "rec_ypc_mult": None}
 PASS_IMPLIED_REF = 22.0          # about the league's mean implied team points
 
 # simulate_team_game(..., return_other=True) files the 'other' bucket's targets
@@ -734,7 +743,8 @@ def validate_width(w):
         elif k == "pass_shrink":
             if v is not None and not (isinstance(v, (int, float)) and 0 < v <= 1):
                 raise ValueError(f"{k} must be null (off) or in (0, 1], got {v!r}")
-        elif k in ("catch_shape_mult", "team_r_mult", "catch_shape_exp", "pass_scale"):
+        elif k in ("catch_shape_mult", "team_r_mult", "catch_shape_exp", "pass_scale", "catch_shape_mult_te",
+                   "catch_shape_mult_rb", "te_share_mult", "rec_ypc_mult"):
             if v is not None and not (isinstance(v, (int, float)) and v > 0):
                 raise ValueError(f"{k} must be null (off) or > 0, got {v!r}")
         elif k == "rush_other_share":
@@ -995,9 +1005,16 @@ def starter_qb_index(positions, rush_shares, slots=None):
     return min(qbs, key=lambda j: (rank(j), -carries(j)))
 
 
+def role_group(slot):
+    """'TE' / 'WR' / 'RB' from a depth slot (TE1, WR2, RB1 ...); None for anything else (a PROXY,
+    a QB): round 41's role knobs act on these three groups only."""
+    s = "".join(ch for ch in str(slot or "") if ch.isalpha()).upper()
+    return s if s in ("TE", "WR", "RB") else None
+
+
 def simulate_team_game(rng, n_sim, team_volume_mean, team_volume_r, player_shares,
                         player_catch_rates, player_ypt, per_catch_shape, other_bucket=True, width=None,
-                        return_other=False, return_targets=False):
+                        return_other=False, return_targets=False, player_roles=None):
     """Draw one team's targets jointly with all eligible receivers in one pass.
 
     1. Team targets ~ NegBinomial(team_volume_mean, team_volume_r) -- one draw per
@@ -1019,8 +1036,16 @@ def simulate_team_game(rng, n_sim, team_volume_mean, team_volume_r, player_share
     """
     w = {**WIDTH_OFF, **(width or {})}
     names = list(player_shares.keys())
+    roles = player_roles or {}
     shares = np.array([player_shares[n] for n in names], dtype=float)
     shares = np.clip(shares, 0, None)
+    if w["te_share_mult"] and float(w["te_share_mult"]) != 1.0:
+        # round 41: tight ends' shares up (or down); the 'other' bucket absorbs it below
+        te = np.array([roles.get(n) == "TE" for n in names])
+        if te.any():
+            shares = np.where(te, shares * float(w["te_share_mult"]), shares)
+            if shares.sum() > 1.0:
+                shares = shares / shares.sum()
     if other_bucket:
         rest = max(1.0 - shares.sum(), 0.0)
         shares = np.append(shares, rest)
@@ -1040,7 +1065,7 @@ def simulate_team_game(rng, n_sim, team_volume_mean, team_volume_r, player_share
     out = {}
     for j, name in enumerate(names):
         out[name] = receiving_given_targets(rng, n_sim, alloc[:, j], player_catch_rates.get(name, 0.3),
-                                            player_ypt.get(name, 7.0), per_catch_shape, w)
+                                            player_ypt.get(name, 7.0), per_catch_shape, w, role=roles.get(name))
     if return_other and other_bucket:
         out[OTHER] = alloc[:, -1].astype(float)
     if return_targets:
@@ -1048,7 +1073,7 @@ def simulate_team_game(rng, n_sim, team_volume_mean, team_volume_r, player_share
     return out, team_targets
 
 
-def receiving_given_targets(rng, n_sim, targets, catch_rate, ypt, per_catch_shape, width=None):
+def receiving_given_targets(rng, n_sim, targets, catch_rate, ypt, per_catch_shape, width=None, role=None):
     """One player's catches and receiving yards GIVEN his targets in each simulation
     (an array, or one number for every simulation): the joint sampler's second stage,
     also run alone by the conditional calibration (backtest.py --conditional).
@@ -1067,8 +1092,13 @@ def receiving_given_targets(rng, n_sim, targets, catch_rate, ypt, per_catch_shap
         rec = rng.binomial(targets, cr).astype(float)
     ypt = max(ypt, 0.5)
     ypc = ypt / cr
+    if w["rec_ypc_mult"]:                              # round 40: the level of yards a catch
+        ypc = ypc * float(w["rec_ypc_mult"])
     if w["catch_shape_mult"]:                          # round 30 candidate: None = the fitted shape
         per_catch_shape = per_catch_shape * float(w["catch_shape_mult"])
+    rk = {"TE": "catch_shape_mult_te", "RB": "catch_shape_mult_rb"}.get(role)
+    if rk and w[rk]:                                   # round 41: the role's own shape
+        per_catch_shape = per_catch_shape * float(w[rk])
     if w["catch_shape_exp"]:
         # round 32 candidate: the same mean (catches x yards a catch), a spread that grows
         # as catches ** (2 - exp) -- the gamma's shape is catches ** exp x the per-catch shape
@@ -1132,7 +1162,7 @@ def simulate_qb_passing(rng, n_sim, receiver_yards, other_targets, other_rates, 
         total = total + np.asarray(y, dtype=float)
     if other_targets is not None and other_rates:
         cr = min(max(float(other_rates["catch_rate"]), 0.05), 1.0)
-        ypc = max(float(other_rates["ypt"]), 0.5) / cr
+        ypc = max(float(other_rates["ypt"]), 0.5) / cr * (float(w["rec_ypc_mult"]) if w["rec_ypc_mult"] else 1.0)
         rec = g.binomial(np.asarray(other_targets).astype(np.int64), cr).astype(float)
         shape_total = np.clip(rec, 0, 25) * per_catch_shape
         total = total + np.where(rec > 0, g.gamma(np.maximum(shape_total, 1e-6), ypc / per_catch_shape), 0.0)

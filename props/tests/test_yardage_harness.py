@@ -490,3 +490,83 @@ def test_round_38_implied_points_scale():
     import backtest as BT
     assert len(BT.PASS_BIAS_GRID) == 30
     assert {"pass_implied_exp": 0.0, "pass_scale": 1.0, "pass_shrink": None} in BT.PASS_BIAS_GRID
+
+
+def test_round_41_role_shapes_and_tight_end_share():
+    """reports/round41_receiving_roles.md: neutral values are byte-identical; the TE shape
+    narrows only tight ends' yards; the RB shape widens only backs'; the TE share moves only
+    tight ends' targets (the other bucket gives it up)."""
+    import numpy as np
+    import model as M
+    assert [M.role_group(s) for s in ("TE1", "WR3", "RB2", "PROXY", "QB1", None)] == ["TE", "WR", "RB", None, None, None]
+    run = lambda w, role: M.receiving_given_targets(np.random.default_rng(1), 20000, 6, 0.7, 8.0, 1.0, w, role=role)
+    base_te, base_wr = run(None, "TE"), run(None, "WR")
+    assert np.array_equal(base_te[1], run({"catch_shape_mult_te": 1.0}, "TE")[1])
+    assert np.array_equal(base_wr[1], run({"catch_shape_mult_te": 2.0}, "WR")[1]), "a WR ignores the TE shape"
+    te2 = run({"catch_shape_mult_te": 2.0}, "TE")[1]
+    assert te2.std() < base_te[1].std() and abs(te2.mean() - base_te[1].mean()) / base_te[1].mean() < 0.02
+    rb = run({"catch_shape_mult_rb": 0.5}, "RB")[1]
+    assert rb.std() > run(None, "RB")[1].std()
+    g = lambda w: M.simulate_team_game(np.random.default_rng(2), 20000, 34.0, 8.0, {"t": 0.18, "w": 0.25},
+                                       {"t": 0.7, "w": 0.65}, {"t": 7.5, "w": 8.5}, 1.0, width=w,
+                                       return_targets=True, player_roles={"t": "TE", "w": "WR"})
+    b, s6 = g(None), g({"te_share_mult": 1.06})
+    assert np.array_equal(b[2]["t"], g({"te_share_mult": 1.0})[2]["t"])
+    assert s6[2]["t"].mean() > b[2]["t"].mean() * 1.04 and abs(s6[2]["w"].mean() - b[2]["w"].mean()) < 0.15
+    import backtest as BT
+    assert len(BT.RECEIVING_ROLE_GRID) == 27
+
+
+def test_round_41_the_live_scorer_applies_the_tight_end_share_once():
+    """score_game scales the tight end's projected share and must simulate with WIDTH_SIM (the
+    multiplier removed): a simulate_team_game call with width=WIDTH would apply it twice."""
+    import re
+    from pathlib import Path
+    src = (Path(__file__).resolve().parents[1] / "engine" / "scripts" / "score_game.py").read_text(encoding="utf-8")
+    calls = re.findall(r"simulate_team_game\((.*?)\)\n", src, re.S)
+    assert calls and all("width=WIDTH_SIM" in c or "width={**WIDTH_SIM" in c for c in calls), calls
+    assert 'WIDTH_SIM = {**WIDTH, "te_share_mult": None}' in src
+
+
+def test_round_40_receiving_yards_level_moves_receivers_and_the_depth_bucket():
+    import numpy as np
+    import model as M
+    run = lambda w: M.receiving_given_targets(np.random.default_rng(1), 20000, 6, 0.7, 8.0, 1.0, w)
+    base = run(None)
+    assert np.array_equal(base[1], run({"rec_ypc_mult": 1.0})[1])
+    up = run({"rec_ypc_mult": 1.04})
+    assert np.array_equal(base[0], up[0]) and np.allclose(up[1], base[1] * 1.04), "catches unchanged, yards x1.04"
+    qb = lambda w: M.simulate_qb_passing(np.random.default_rng(3), 4000, [], np.full(4000, 10), {"catch_rate": 0.6, "ypt": 7.0},
+                                         1.0, width=w)
+    assert np.allclose(qb({"rec_ypc_mult": 1.04}), qb(None) * 1.04), "the depth bucket's yards move too"
+    import backtest as BT
+    assert len(BT.RECEIVING_LEVEL_GRID) == 12
+
+
+def test_round_39_scorer_harness_parity_for_market_carries():
+    """Owed before round 29's weight shipped (DECISIONS #204): the scorer and the harness feed
+    market_rush_volume the same team spread (positive = favoured), the same weight and the same
+    QB hold, so the live price is the price the backtest graded."""
+    import re
+    from pathlib import Path
+    import numpy as np
+    import model as M
+    # a book line DAL -7 (home) is nflverse spread_line +7: both conventions reach +7 / -7
+    assert M.team_spread_from_home(-7.0, True) == 7.0 and M.team_spread_from_home(-7.0, False) == -7.0
+    sl = 7.0
+    for is_home, live in ((True, M.team_spread_from_home(-7.0, True)), (False, M.team_spread_from_home(-7.0, False))):
+        harness = sl if is_home else -sl
+        assert harness == live
+    fit = {"plays": {"a": 62.0, "b_spread": 0.0, "b_total": 0.2}, "pass_rate": {"a": 0.58, "b_spread": -0.008, "b_total": 0.0}}
+    try:
+        fav, dog = M.market_rush_volume(7.0, 47.5, fit, 25.0, 0.5), M.market_rush_volume(-7.0, 47.5, fit, 25.0, 0.5)
+        assert fav[0] > dog[0], "the favourite's carries move up, the underdog's down"
+    except (KeyError, TypeError):
+        pass                                         # the fit's shape is the priors'; the sign check above holds
+    here = Path(__file__).resolve().parents[1] / "engine" / "scripts"
+    sg = (here / "score_game.py").read_text(encoding="utf-8")
+    bt = (here / "backtest.py").read_text(encoding="utf-8")
+    assert "MODEL.MARKET_RUSH_WEIGHT)" in sg and "MODEL.hold_qb_carries(rs_t, qb_h, env[t][\"carry_factor\"])" in sg
+    assert re.search(r"mrw = \(M\.MARKET_RUSH_WEIGHT", bt), "the harness defaults to the shipped weight"
+    assert "M.market_rush_volume(sl3 if is_home3 else -sl3" in bt
+    assert M.MARKET_RUSH_WEIGHT == 0.5

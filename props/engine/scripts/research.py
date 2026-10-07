@@ -155,7 +155,7 @@ def edges_for() -> dict:
 
 
 def implied_targets(line, stat, team_targets_mean, targets_r, share, catch_rate, ypt,
-                    per_catch_shape, width=None, prices=None):
+                    per_catch_shape, width=None, prices=None, role=None):
     """Targets per game at which the line is a coin flip for a receiver (P(stat >
     line) = 0.5 on a half line; Overs and Unders equally likely on a whole line), holding
     his catch rate and yards per target. stat: 'receptions' or 'rec_yards'.
@@ -168,13 +168,17 @@ def implied_targets(line, stat, team_targets_mean, targets_r, share, catch_rate,
         return (None, proj) if prices is None else (None, proj, None, None)
     col = 0 if stat == "receptions" else 1
     cache = {}
+    # round 41: the role's own yards shape; the share is moved explicitly here, so a role
+    # share multiplier (applied to the projection itself) never enters the search
+    w_s = {**(width or {}), "te_share_mult": None}
 
     def sim(k):      # common random numbers: one generator per k, cached
         if k not in cache:
             s = min(share * k, 0.95)
             out, _ = MODEL.simulate_team_game(np.random.default_rng(SEED), N_SEARCH, team_targets_mean,
                                               targets_r, {"p": s}, {"p": catch_rate}, {"p": ypt},
-                                              per_catch_shape, other_bucket=True, width=width)
+                                              per_catch_shape, other_bucket=True, width=w_s,
+                                              player_roles={"p": role})
             cache[k] = out["p"][col]
         return cache[k]
 
@@ -1422,7 +1426,7 @@ BIAS_BY_IMPLIED = {      # measured at share_conc_targets 60 (round 34's setting
 # MEASURED CALIBRATION by role (second expert audit, reproduced 2026-10-06, DECISIONS #198): the same
 # stand-in-line Over rate for every player of that role, 2022-25, round 34's setting --
 # (player-games, Over hit, engine's average Over). Tight ends run clearly low on both markets.
-BIAS_BY_ROLE = {
+BIAS_BY_ROLE = {          # round 41's share change was withdrawn on the seed check (DECISIONS #203)
     "TE": {"player_receptions": (1480, .490, .441), "player_reception_yds": (1480, .540, .474)},
     "WR": {"player_receptions": (4754, .451, .443), "player_reception_yds": (4754, .501, .476)},
     "RB": {"player_receptions": (1255, .430, .439), "player_reception_yds": (1255, .467, .462)}}
@@ -1511,7 +1515,7 @@ def bias_gap_rows(markets, implied_by_team) -> list[tuple[str, str, str]]:
     if markets & {"player_reception_yds", "player_receptions", "player_rush_yds", "player_rush_reception_yds"}:
         out.append(("Yardage Overs at the main line",
                     "Measured: receiving yards' Over has run about 2.9 points above the engine (receptions 1.4, "
-                    "rushing 1.8), more for teams implied at 24+ (2022-25, DECISIONS #197)",
+                    "rushing 1.8), more for teams implied at 24+ (2022-25 backtest, DECISIONS #197)",
                     "read each card's calibration line; a fix needs its own round"))
     return out
 CARD_LEGEND = ("**Reading the cards:** \"Engine forecast\" is the middle simulated outcome and the range holding the "
@@ -1788,9 +1792,10 @@ def player_card(d: dict) -> list[str]:
     for s_ in d.get("fit") or []:
         L += [f"**How his lines fit together:** {s_}", ""]
     for sh in d.get("shadow") or []:
-        L += [f"**With market carries (being graded, not the price):** rushing yards {float(sh['line']):g}: Over "
-              f"{_pc(sh['p_board'])} on the board, {_pc(sh['p_mkt'])} if his carries take half their volume from "
-              f"the market's script ({_f(sh.get('car_from'))} -> {_f(sh.get('car_to'))} carries).", ""]
+        L += [f"**Without market carries (graded for the week-8 check, not the price):** rushing yards "
+              f"{float(sh['line']):g}: Over {_pc(sh['p_board'])} on the board (his carries half from the market's "
+              f"script), {_pc(sh['p_mkt'])} from history alone ({_f(sh.get('car_from'))} -> {_f(sh.get('car_to'))} "
+              f"carries).", ""]
     if d.get("matchup"):
         L += [f"**Matchup:** {d['matchup']}", ""]
     if d.get("watch"):

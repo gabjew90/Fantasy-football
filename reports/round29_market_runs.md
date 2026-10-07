@@ -81,3 +81,14 @@ neither confirms nor refutes. The shipped settings stay.
 Data note: the first attempt failed because the harness's nflverse cache predated week 4
 (play-by-play through week 3, no week 4 lines); the cache was refreshed, the run repeated
 from scratch, and backtest.py now stops with a plain message when a week has no team volume.
+
+### Shipped (2026-10-06, round 39; DECISIONS #204)
+
+The third expert review re-ran w = 0.5 under three more seeds: rushing-yards CRPS +0.51%, +0.56%,
++0.63% (+0.38% on the original seed), clear every time, and clear in both halves on three of four
+seeds. The 2026 weeks 2-4 read that stopped it was a noise-sized point estimate on 188 back-games
+in a market the guard rule (#186) no longer blocks on; the live record is silent on direction
+(favourite-minus-underdog gap -1 to -3 points, interval about +/-18). **The user shipped
+MARKET_RUSH_WEIGHT 0.5.** The scorer-harness parity test owed before shipping is in
+(test_round_39_scorer_harness_parity_for_market_carries). The shadow is reversed: the board
+carries market carries; p_over_hist_carries logs the history-only price for the reversal check.

@@ -7847,3 +7847,90 @@ The expert re-ran the four-season backtest (baseline reproduces ours: receptions
 - Round 39 (backs' carries 50% toward the market = round 29): stays in shadow by the user's
   choice; the record grades it. Round 42 (target handoff by absence age): null, the shipped
   handoff is about right in continuing absences (0.99).
+
+## 2026-10-06 (200) -- round 41: tight ends' target share x1.06 ships; the role yards shapes stay
+
+- Three registered stages on each role's own rows (reports/round41_receiving_roles.md). The
+  tight-end yards shape (1.5) leaned better but was not detectable and went negative on 2026;
+  the backs' shape kept 1. **Tight ends' share x1.06 ships**: their receptions own-volume log
+  loss +0.0063 (+0.0016, +0.0112) on 2022-24, 2026 weeks 2-4 not negative, every held-out
+  season picks 1.06; every market's guard within -0.2%; tight ends' Over-minus-engine gap
+  5.4 -> 1.9 (catches) and 7.4 -> 4.7 (yards).
+- Live: applied to the tight end's projected share (once; the simulation runs without it).
+  The cards' receiving calibration rows are re-measured.
+- Still open: tight-end yards too wide and backs' receiving yards too narrow with actual targets
+  in (the shapes did not clear the bar); receiving yards' Over 2.6 points above the engine
+  overall (round 40, next).
+
+## 2026-10-06 (201) -- round 40 null: the receiving-yards level stays; the queue from the audits is done
+
+- Receivers' yards a catch x1.02-1.06 (with passing's level re-picked): the conversion score
+  leans better at 1.04 but the tie rule's pick (1.02) moves the Over by under a point -- kept;
+  passing's 1.04 stays best. Receiving yards' Over still runs about 3 points above the engine
+  (24-27 implied points +6.0): volume and environment, not the yards a catch.
+- The audit queue (rounds 38-42): 38 ships (user override of the width guard), 41 ships
+  (tight ends' share x1.06), 39 stays in shadow (user), 40 and 42 null. Open: the receiving
+  environment lean, tight-end and back yards widths, the tight-end touchdown chance moving
+  with the share (untested; hidden from the reads).
+
+## 2026-10-06 (202) -- third expert review: seed noise outweighs small gains; the engine has not beaten the market at real lines
+
+- **Seed noise** (the expert: nine runs of the unchanged model; reproduced here on the round 38
+  and 41 settings): two runs of the same model differ by up to ~0.15% CRPS and ~0.0015-0.0018 in
+  own-volume log loss, and the Over chance for the same player-game by 1.7-1.8 points -- so the
+  "moves the Over by 1 point" bar is passed by noise alone. Round 34's log-loss gain does not
+  replicate on three other seeds (2022-24 -0.00007 / +0.00040 / +0.00077; 2025 negative on all
+  three), though receiving-yards CRPS improves on all four and the direct spread measurement
+  supports it. Market carries 50% (round 29 / 39) replicates on every seed (+0.51% to +0.63%
+  rushing CRPS, 2022-23 clear on its own).
+- **Standing rule from here:** a candidate is judged on the average of four seeds
+  (`--audit-seed-offset 0-3`), selection and confirmation alike; a gain under about 0.3% must
+  hold on every seed; the minimum Over move must clear the seed noise (3.6 points, twice 1.8)
+  rather than 1 point. The audit's own differences under ~0.15% are unconfirmed.
+- **The live record at Sleeper's real lines** (weeks 2-4, 1,536 graded lines; reproduced): the
+  engine's Over chance had no useful relationship to outcomes -- log loss 0.717 against the
+  market's 0.692 (a coin flip is 0.693); passing Overs hit 57% against an engine 42%, rushing 40%
+  against 47%, tight-end receiving 45.7% against 46.3% (the backtest's tight-end lean is not seen
+  live). The cards now print this record first and tell chat to read the market's chance as the
+  probability and the engine for workload and role. Stand-in-line calibration ("a model 85%
+  wins about 84-85%") is not evidence about real lines.
+- **Also from the review:** the passing lean by implied points holds among regular starters
+  (0.87 to 1.09, not a backup effect); the verdict labels cannot be passed at this sample size (a
+  perfect synthetic model reads INSUFFICIENT DATA on 7 of 8 markets) -- the label gate needs a
+  redesign (the user's decision); team-volume dispersion swings 25-53 between seasons and live
+  uses one season's value (unmeasured, queued). Leak test exact; synthetic-truth audit passes.
+
+## 2026-10-06 (203) -- seed check: round 38 replicates; round 41 withdrawn
+
+- Round 38 (QB passing by implied points), re-run under three more seeds: gain on 2022-24
+  +0.0094 to +0.0099 on every seed (every interval above zero), 2026 positive on every seed,
+  the Over moving 4.6 points against 1.8 points of seed noise. **It stands.**
+- Round 41 (tight ends' share x1.06): 2022-24 +0.0032 to +0.0063 (one seed not clear); 2026
+  weeks 2-4 negative on the seed average (-0.0015) and on two of four seeds; the live record
+  shows no tight-end lean. **Withdrawn: te_share_mult back to 1** (knob kept, off; the cards'
+  receiving rows back to the round-34 measurement).
+
+## 2026-10-06 (204) -- round 34 kept under the spread rule; round 39 (market carries 50%) ships; the week-8 reversal rule
+
+- **The user's calls**, after the third expert review: keep round 34's target spread 60 and ship
+  round 39's market carries. The policy on retroactive rules is applied to both alike: each is
+  judged on the evidence its own kind of change is judged on, across the seeds now available.
+- **Round 34:** a volume-spread change is judged on the spread check, the own-volume score a
+  guard at -0.5% (the scoreboard's standing rule). On that rule 60 passes on every seed (targets
+  too spread out in every band, 2022-25; the worst seed's own-volume change -0.00007). Recorded
+  as judged under the spread rule, not an override; the receptions log-loss gain it was first
+  reported on does not replicate (DECISIONS #202).
+- **Round 39 ships MARKET_RUSH_WEIGHT 0.5** (backs' carries half from the market's fitted
+  carries, the starting QB's held): rushing-yards CRPS better on four seeds of four (+0.38% to
+  +0.63%), both halves clear on three. The live rushing level (Overs 40% vs engine 47%) is a level,
+  mostly week 2 (29% on 62 lines; weeks 3-4 44% and 43% vs 48% and 45%), and silent on the
+  favourite-underdog direction this change acts on. Scorer-harness parity test added.
+- **Reversal rule (written now, before weeks 5-8 are played):** at the week-8 review, revert
+  either change if its target market is clearly worse on weeks 5-8 at Sleeper's real lines,
+  judged on four seeds. Target markets: round 34 -- receptions and receiving yards; round 39 --
+  backs' rushing yards. "Clearly worse": the change's log loss at real lines minus the
+  without-change version's, averaged over four seeds, has a 95% game-clustered interval wholly
+  above zero (worse). The without-change prices are logged from now on beside the board:
+  p_over_spread40 (receptions, receiving yards at target spread 40) and p_over_hist_carries
+  (backs' rushing from history carries); the four-seed versions come from replaying the archived
+  snapshots (--odds-snapshot) with the seed offset -- that replay tool is owed before the review.

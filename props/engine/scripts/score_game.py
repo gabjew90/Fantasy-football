@@ -968,6 +968,7 @@ def main():
             if a.env != "market" and MODEL.MARKET_RUSH_WEIGHT and P.get("market_env_fit"):
                 # round 29: the backs' carries move toward the market's fitted carries;
                 # the starting QB's are held (hold_qb_carries, below)
+                env[t]["carries_history"] = env[t]["carries"]     # the reversal-check shadow (#204)
                 env[t]["carries"], env[t]["carry_factor"] = MODEL.market_rush_volume(
                     MODEL.team_spread_from_home(hs, t == HOME), tl, P["market_env_fit"],
                     env[t]["carries"], MODEL.MARKET_RUSH_WEIGHT)
@@ -1243,6 +1244,21 @@ def main():
                 E.loc[i_, "rs"] = sh_
                 OUT_MULT["rs"][i_] = fr_
     M, redistributed = apply_out_rule(M, E, (AWAY, HOME), mult=OUT_MULT)
+    # WIDTH SETTINGS (resources/width_params.json): game-to-game variation in
+    # shares, catch rate and yards per touch, tuned on 2022-23 by backtest.py
+    # --tune-width and judged on 2024-25 (reports/width_tuning.md,
+    # reports/yardage_harness.md). No file = the pre-width sampler, draw for draw.
+    _wf = RES / "width_params.json"
+    WIDTH = MODEL.validate_width(json.loads(_wf.read_text(encoding="utf-8"))) if _wf.exists() else None
+    # ROUND 41 (DECISIONS #200): tight ends' target share x te_share_mult on the projection
+    # itself, so the projected targets, the 50/50 search and the card all carry it; the
+    # simulation then runs without the multiplier (the harness applies it inside the draw:
+    # the same shares, the depth bucket giving up what the tight end gains)
+    TE_MULT = float((WIDTH or {}).get("te_share_mult") or 1.0)
+    if TE_MULT != 1.0:
+        _te = M.slot.map(MODEL.role_group) == "TE"
+        M.loc[_te, "ts"] = M.loc[_te, "ts"] * TE_MULT
+    WIDTH_SIM = {**WIDTH, "te_share_mult": None} if WIDTH else None
     for t in (AWAY, HOME):
         m = M.team == t
         # Shares are estimated per player with no joint constraint, so the eligible set's
@@ -1270,12 +1286,6 @@ def main():
     # made same-game-parlay probabilities impossible to state.
     SH = P["shape_ypc_per_catch"]
     TVD = P.get("team_volume_dispersion", {"targets_r": 30.0, "carries_r": 30.0})
-    # WIDTH SETTINGS (resources/width_params.json): game-to-game variation in
-    # shares, catch rate and yards per touch, tuned on 2022-23 by backtest.py
-    # --tune-width and judged on 2024-25 (reports/width_tuning.md,
-    # reports/yardage_harness.md). No file = the pre-width sampler, draw for draw.
-    _wf = RES / "width_params.json"
-    WIDTH = MODEL.validate_width(json.loads(_wf.read_text(encoding="utf-8"))) if _wf.exists() else None
     QB_RESID = np.array(P["qb_carry_residual_quantiles"]) if "qb_carry_residual_quantiles" in P else None
     # QB rushing props are priced once the priors carry the QB carry grid and the
     # kneel-down grids (props-v1.21; reports/yardage_harness.md, DECISIONS #100):
@@ -1285,7 +1295,8 @@ def main():
     sims = {}
     sim_inputs = {}      # team -> the simulation's inputs, for the research columns (no draws)
     team_targets_draw, team_carries_draw = {}, {}
-    SHADOW_RUSH = {}     # back -> (rushing yards draws, carries draws) with market carries (#185)
+    SHADOW_RUSH = {}     # back -> (rushing yards draws, carries draws) WITHOUT market carries (#204)
+    SHADOW_REC = {}      # receiver -> (catches draws, yards draws) at target spread 40 (#204)
     pass_inputs = {}     # team -> (every receiver's yards draws, the other bucket's targets)
     for t in (AWAY, HOME):
         Mt = M[M.team == t]
@@ -1294,9 +1305,19 @@ def main():
         crs_t = {n: float(v) for n, v in zip(Mt.name, Mt.cr)}
         ypt_t = {n: float(v) for n, v in zip(Mt.name, Mt.ypt)}
         out_rec, tt_draw = MODEL.simulate_team_game(rng, N_SIM, env[t]["targets"], TVD["targets_r"],
-                                                    shares_t, crs_t, ypt_t, SH, other_bucket=True, width=WIDTH,
-                                                    return_other=True)
+                                                    shares_t, crs_t, ypt_t, SH, other_bucket=True, width=WIDTH_SIM,
+                                                    return_other=True,
+                                                    player_roles={n: MODEL.role_group(s_) for n, s_ in zip(Mt.name, Mt.slot)})
         pass_inputs[t] = ([out_rec[n][1] for n in names], out_rec.pop(MODEL.OTHER))
+        # ROUND 34'S REVERSAL SHADOW (DECISIONS #204): receiving again at target spread 40 (the
+        # setting before round 34), its own stream, logged as p_over_spread40 for the week-8 check
+        if WIDTH_SIM and WIDTH_SIM.get("share_conc_targets") != 40.0 and not SCENARIO:
+            _o40, _ = MODEL.simulate_team_game(np.random.default_rng([20260917, 34, zlib.crc32(t.encode("utf-8"))]),
+                                               N_SIM, env[t]["targets"], TVD["targets_r"], shares_t, crs_t, ypt_t, SH,
+                                               other_bucket=True, width={**WIDTH_SIM, "share_conc_targets": 40.0},
+                                               player_roles={n: MODEL.role_group(s_) for n, s_ in zip(Mt.name, Mt.slot)})
+            for n in names:
+                SHADOW_REC[n] = _o40[n]
         team_targets_draw[t] = tt_draw
         # carries: same joint structure, per-carry yards from the empirical league residual grid.
         # QBs (plan step 3): their own carry grid, and the starter's kneel-downs by the
@@ -1315,6 +1336,7 @@ def main():
         else:
             qb_i = None
         rs_t = [float(v) for v in Mt.rs]
+        rs_hist = list(rs_t)                            # before the QB hold: the history-only shadow
         if env[t].get("carry_factor", 1.0) != 1.0:      # round 29: the QB's carries held
             # the starter by the same rule the harness uses, whether or not the QB grid is loaded
             qb_h = qb_i if qb_i is not None else MODEL.starter_qb_index(list(Mt.pos), rs_t, slots=list(Mt.slot))
@@ -1337,18 +1359,14 @@ def main():
                                                           width=WIDTH, player_resid=p_resid, player_kneel=p_kneel,
                                                           qb_index=qb_i)
         team_carries_draw[t] = tc_draw
-        # THE SHADOW (DECISIONS #185): the backs' rushing again with the market-carries
-        # blend (round 29, SHADOW_MARKET_RUSH_WEIGHT), the QB's carries held, on its own
-        # stream so no board number moves. Shown beside the board and logged for grading.
-        if (MODEL.SHADOW_MARKET_RUSH_WEIGHT and not MODEL.MARKET_RUSH_WEIGHT and market_env is not None
-                and P.get("market_env_fit") and not SCENARIO):
-            c_m, f_m = MODEL.market_rush_volume(
-                MODEL.team_spread_from_home(market_env["home_spread"], t == HOME), market_env["total_line"],
-                P["market_env_fit"], env[t]["carries"], MODEL.SHADOW_MARKET_RUSH_WEIGHT)
-            qb_h = qb_i if qb_i is not None else MODEL.starter_qb_index(list(Mt.pos), rs_t, slots=list(Mt.slot))
+        # THE REVERSED SHADOW (DECISIONS #204): round 39 ships market carries, so the backs'
+        # rushing is priced again WITHOUT them (history carries, the QB not held), on its own
+        # stream so no board number moves; logged as p_over_hist_carries for the week-8
+        # reversal check (revert if rushing is clearly worse at real lines, weeks 5-8).
+        if ("carries_history" in env[t] and env[t].get("carry_factor", 1.0) != 1.0 and not SCENARIO):
             car_m, rush_m, _tcm = MODEL.simulate_team_rush(
-                np.random.default_rng([20260917, 29, zlib.crc32(t.encode("utf-8"))]), N_SIM, c_m,
-                TVD["carries_r"], MODEL.hold_qb_carries(rs_t, qb_h, f_m), [float(v) for v in Mt.ypc], resid,
+                np.random.default_rng([20260917, 39, zlib.crc32(t.encode("utf-8"))]), N_SIM,
+                env[t]["carries_history"], TVD["carries_r"], rs_hist, [float(v) for v in Mt.ypc], resid,
                 width=WIDTH, player_resid=p_resid, player_kneel=p_kneel, qb_index=qb_i)
             for j, (_, m) in enumerate(Mt.iterrows()):
                 if str(m.pos) != "QB":
@@ -1831,11 +1849,16 @@ def main():
                             # round 23's factor on his target share, logged so the
                             # scorecard can grade the calls the rule moved (#145)
                             snap_react=float(pr.evidence.get("target_share", {}).get("snap_react") or 1.0),
-                            # the market-carries shadow beside the board (#185)
+                            # the reversal-check shadows beside the board (#204)
                             **({"p_over_board": p_o,
-                                "p_over_mkt_carries": float(np.mean(SHADOW_RUSH[nm][0] > L)),
-                                "mkt_carries": float(np.mean(SHADOW_RUSH[nm][1]))}
-                               if mk["key"] == "player_rush_yds" and nm in SHADOW_RUSH else {})))
+                                "p_over_hist_carries": float(np.mean(SHADOW_RUSH[nm][0] > L)),
+                                "hist_carries": float(np.mean(SHADOW_RUSH[nm][1]))}
+                               if mk["key"] == "player_rush_yds" and nm in SHADOW_RUSH else {}),
+                            **({"p_over_board": p_o,
+                                "p_over_spread40": float(np.mean(
+                                    SHADOW_REC[nm][0 if mk["key"] == "player_receptions" else 1] > L))}
+                               if mk["key"] in ("player_receptions", "player_reception_yds") and nm in SHADOW_REC
+                               else {})))
                 elif mk["key"] == "player_anytime_td":
                     no_price = {o["description"]: o["price"] for o in mk["outcomes"] if o["name"] == "No"}
                     for o in mk["outcomes"]:
@@ -2087,7 +2110,7 @@ def main():
                 _implied_cache[ck] = RSCH.implied_targets(
                     float(r_.line), "receptions" if r_.market == "player_receptions" else "rec_yards",
                     env[m_.team]["targets"], TVD["targets_r"], float(m_.ts), float(m_.cr), float(m_.ypt),
-                    SH, width=WIDTH, prices=px_)
+                    SH, width=WIDTH, prices=px_, role=MODEL.role_group(m_.slot))
                 _implied_cache[ck] += ("targets",)
                 _edges_cache[ck] = RSCH.edges_for()
             elif r_.market == "player_rush_yds":
@@ -2661,11 +2684,11 @@ def main():
                   "gauge": q_.get("gauge"), "gauge_rate": q_.get("gauge_rate"),
                   "luck_games": (q_.get("luck") or {}).get("games")}
         shadow = []
-        if nm in SHADOW_RUSH and len(R) and "p_over_mkt_carries" in R:
+        if nm in SHADOW_RUSH and len(R) and "p_over_hist_carries" in R:
             for _, x_ in R[(R.player == nm) & (R.market == "player_rush_yds")
-                           & R.p_over_mkt_carries.notna()].drop_duplicates("line").iterrows():
-                shadow.append({"line": x_.line, "p_board": x_.p_over_board, "p_mkt": x_.p_over_mkt_carries,
-                               "car_from": float(np.mean(sims[nm]["carries"])), "car_to": x_.mkt_carries})
+                           & R.p_over_hist_carries.notna()].drop_duplicates("line").iterrows():
+                shadow.append({"line": x_.line, "p_board": x_.p_over_board, "p_mkt": x_.p_over_hist_carries,
+                               "car_from": float(np.mean(sims[nm]["carries"])), "car_to": x_.hist_carries})
         watch = []
         if m.new_team:
             watch.append(f"changed teams ({m.prior_team} to {t}); his role here has few games behind it")

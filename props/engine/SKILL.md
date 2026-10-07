@@ -290,10 +290,11 @@ For a narrow question, run only what it needs:
   passed its calibration check on 2022-25). Read it beside his separate rushing and receiving
   lines: the combined leg survives either script, and the report's air share says how much
   of it holds up if his team falls behind.
-  **With market carries (shadow), DECISIONS #185:** a back's rushing line also shows the
-  Over if his carries take half their volume from the market's script (favourites run more).
-  Quote both numbers when you read a back's rushing line: the board's is the price, the
-  shadow's is being graded beside it on the scorecard. Never present the shadow as the price.
+  **Market carries are live (round 39, DECISIONS #204):** a back's carries take half their
+  volume from the market's script (favourites run more, underdogs less); the starting QB's carries
+  are held. Each back's card also shows the Over **without** market carries (history alone) --
+  graded beside the board for the week-8 reversal check, never the price. Receiving lines log the
+  Over at the old target spread (40) the same way (round 34's check).
   **How a single-game read is written (user, 2026-10-06): follow `resources/team_matchup_guide.md`
   EXACTLY for the team section, then the "Player cards" rules for the players.** Read the guide
   before writing any single-game read; it is binding, not a suggestion (user: "just follow it
@@ -619,10 +620,12 @@ need not be surfaced. Write the reply as a premium prop guide with this structur
    at the backtest's stand-in line on 2022-25 the receiving-yards Over hit 2.9 points more often
    than the engine said (receptions 1.4, rushing 1.8, combined 0.6), and every market leans by
    the team's implied points (backs on teams implied 27+: Over 58.7% against 48.5%). Each card
-   prints the row its team sits in and, for receiving lines, his role's row ("Measured
+   prints the row its team sits in and, for receiving lines, his role's row ("Backtest
    calibration"; DECISIONS #198: tight ends' catches Over hit 4.9 points and yards 6.6 points more
-   often than the engine said, and with actual targets in, tight-end yards run too wide and backs'
-   receiving yards too narrow); quote it with the price -- a measured
+   often than the engine said in the backtest -- not seen at real lines so far (live: 45.7% hit
+   against 46.3%), and round 41's share change was withdrawn on the seed check (DECISIONS #203) --
+   and with actual targets in, tight-end yards run too wide and backs' receiving yards too narrow);
+   quote it with the price -- a measured
    record, never an adjustment you apply. Widths: receptions and receiving yards within the
    bar; rushing yards and rushing + receiving run too narrow in the tails (23-25% of games outside
    the 80% range on the re-check, reports/current_settings_check_2026-10-06.md): a line far

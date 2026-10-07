@@ -85,6 +85,8 @@ SETTLED_FIELDS = [
     "look",
     # the market-carries shadow on backs' rushing lines (DECISIONS #185)
     "p_over_board", "p_over_mkt_carries", "mkt_carries",
+    # the reversal-check shadows once rounds 34 and 39 ship (DECISIONS #204)
+    "p_over_hist_carries", "hist_carries", "p_over_spread40",
     # The engine that made the call. These must be listed here or the
     # DictWriter's extrasaction="ignore" below drops them silently, and the
     # scorecard could not separate two versions.

@@ -69,7 +69,7 @@ def test_back_card_combined_column_is_never_a_threshold():
            "13.5 carries, Under favoured and no receptions line |" in text
     assert "| Share of projected combined yards from catches | - | 31% |" in text
     assert "(0 of 1)" in text and "| Carries and share of team carries | 13.3 a game; 61% | 16; 52% |" in text
-    assert "Over 55% on the board, 53% if his carries" in text
+    assert "Over 55% on the board (his carries half from the market's script), 53% from history alone" in text
 
 
 def test_qb_card_states_the_measured_bias_and_no_threshold():
@@ -127,5 +127,5 @@ def test_a_tight_end_card_shows_his_roles_measured_row():
     assert "| Receiving yards, teams implied 27+ | 52.2% | 47.6% | 709 |" in text
     wr = RS.calibration_line({"player_receptions"}, None, None, "WR2")
     assert "| Receptions, every wide receiver | 45.1% | 44.3% | 4754 |" in wr
-    assert "| Receptions | 48.4% | 45.2% | 49.6% | 506 |" in wr
+    assert "| Receptions | 48.4% | 45.2% | 49.6% | 506 |" in wr, "the live record at real lines"
     assert RS.calibration_line({"player_rush_reception_yds"}, None, None, "RB1") == [], "no live lines, no implied row"
