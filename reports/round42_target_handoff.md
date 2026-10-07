@@ -38,3 +38,24 @@ x (the part spread over every teammate rather than his position) stays 0.2. 12 s
 ## Result
 
 (Filled in after the run, below this line, without editing anything above.)
+
+## Result (2026-10-06; props/tools/round42_select.py; 118 absence events on 2022-24, 12 on 2026)
+
+Loss x 1e4 on 2022-24 (lower is better): shipped 0.25 / 0.25 **64.94**; the lowest 0.25 /
+0.15 **64.94** (0.0002% lower, inside the tie); every larger first-game y and every smaller
+continuing y is worse (0.25 / 0.05: 65.49; 0.5 / 0.25: 65.84).
+
+**Null: the shipped handoff stays.** Same-position teammates, actual / predicted share under
+the shipped rule, 2022-24:
+
+| | Teammate-games | Actual / predicted (shipped rule) | Actual / his share before the game |
+|---|---|---|---|
+| First game out | 308 | 1.04 | 1.17 |
+| Continuing absence | 1,049 | 0.99 | 1.13 |
+
+The expert's estimate ("about double in a continuing absence") came from projected targets
+and a rough reading of the live rule; measured against the rule's own handoff on the
+teammate's season-to-date share, a continuing absence is about right (0.99) and the first
+game out slightly under-handed (1.04), but handing on more there scores worse -- the
+first-game gain is concentrated in fewer players than the rule spreads it over. 2026 was not
+needed (no pick). The rule's spread across teammates (x) was not tested here.
