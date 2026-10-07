@@ -1057,10 +1057,16 @@ def _band_mod(t: dict, team) -> str:
     if x is None or not t.get("step"):
         return ""
     g = x if t.get("higher_is_better", True) else -x
-    down = (t["best"] - g) - (t["tier"][team] - 1) * t["step"]      # distance below the band's top
-    if down < t["step"] / 3:
+    step = t["step"]
+    down = (t["best"] - g) - (t["tier"][team] - 1) * step      # distance below the band's top
+    if float(step).is_integer() and float(down).is_integer():
+        # whole-number scores: the band holds `step` scores; the top and bottom ceil(step/3) of
+        # them get + and -, the middle plain -- symmetric (8 -> 3 / 2 / 3)
+        edge = -(-int(step) // 3)
+        return "+" if down < edge else "-" if down >= step - edge else ""
+    if down < step / 3:
         return "+"
-    if down >= 2 * t["step"] / 3:
+    if down >= 2 * step / 3:
         return "-"
     return ""
 

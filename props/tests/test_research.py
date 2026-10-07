@@ -968,5 +968,8 @@ def test_plus_and_minus_mark_where_a_team_sits_inside_its_band():
     g = {k: RS.tier_grade(t, k) for k in "ABCDEF"}
     assert g["A"] == "S+" and g["B"] == "S+" and g["C"] == "S" and g["D"] == "S-"
     assert g["E"] == "A+", "one point below the S band's bottom: the top of A, a neighbour of S-"
+    band = RS.tiers({"top": 73, **{f"x{i}": 73 - i for i in range(1, 8)}}, steps=(8,))
+    marks = [RS.tier_grade(band, k)[1:] for k in ["top"] + [f"x{i}" for i in range(1, 8)]]
+    assert marks.count("+") == marks.count("-") == 3 and marks.count("") == 2, marks
     low = RS.tiers({"x": 10.0, "y": 2.0, "z": 9.5}, higher_is_better=False, steps=(1, 2, 3))
     assert RS.tier_grade(low, "y")[0] == "S" and RS.tier_grade(low, "x")[0] != "S"

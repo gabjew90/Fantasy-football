@@ -309,7 +309,9 @@ For a narrow question, run only what it needs:
       scrambles), never "dropbacks"; no broadcast adjectives or metaphors ("stingiest",
       "explosive", "by a distance", "air it out", "feast"). Quote a unit's **score and tier**
       (EPA and success rate blended two to one; 50 = league average, 10 = one standard deviation; tiers S,
-      A, B, C, D, F from the best band down), never raw EPA numbers; explain the score once.
+      A, B, C, D, F from the best band down, + / - for the top / bottom third of a band), never
+      raw EPA numbers; explain the score once. A C- and a D+ are neighbours: say so, and never
+      treat adjacent letters as a big gap without looking at the scores.
     - Copy the report's tables as they are: one number per cell, the rank key in the caption.
       Never cram several figures into a cell. **Every table in the Matchup brief appears, in its
       order -- none is skipped**, the fantasy points allowed by position with its ranks
