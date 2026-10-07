@@ -105,8 +105,24 @@ def test_the_break_even_workload_straddles_the_coin_flip(run):
 
 def test_a_backs_three_jobs_and_the_snap_rule_are_shown(run):
     report, _r, _e = run
-    assert "**Backfield jobs.** Week 3: early-down carries" in report
+    # the player cards (user's draft, 2026-10-06): a back's three jobs are a role-evidence row
+    assert "| Backfield jobs: early-down carries / passing-down targets / inside-5 carries |" in report
     assert "Snap-change rule (round 23)" in report
+
+
+def test_the_team_matchup_section_and_the_cards_follow_the_users_guides(run):
+    report, _r, _e = run
+    for h in ("## Team matchup", "### 1. The market's view of the game",
+              "### 2. Expected volume and how the teams have been playing",
+              "### 3. Unit performance and matchup: scores and tiers", "### 4. Who plays: injuries and replacements",
+              "### 7. Where the baseline could miss this game"):
+        assert h in report, h
+    # the fixture holds two teams' plays only: no league to score units against, said in words
+    assert ("50 = league average; higher is better for both offense and defense." in report
+            or "Unit scores: not included in this run" in report), "the user's caption, or the gap stated"
+    assert "| Tier | Passing offence |" not in report, "no tier ladder"
+    assert "| Prop | Line | Price: Over / Under | Engine forecast: middle; 80% range | Over: engine / market |" in report
+    assert "**Live record at Sleeper's lines**" in report, "the real-line record on the cards"
 
 
 @pytest.fixture(scope="module")
