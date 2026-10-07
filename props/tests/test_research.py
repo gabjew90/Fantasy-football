@@ -943,3 +943,19 @@ def test_a_printed_score_sits_inside_its_tiers_printed_band():
         assert lo <= shown[t] <= hi, (t, shown[t], k, lo, hi)
     over = RS.tiers({str(i): float(i * 20) for i in range(6)}, steps=(2, 3))   # spread 100 > 6 x 3
     assert over["bands"][-1][1] <= 0.0, "the last band reaches the worst team"
+
+
+def test_the_score_weights_epa_two_to_one_over_success():
+    """User, 2026-10-06: weight EPA more. Mirror-image units -- one big-play (high EPA, low
+    success), one steady (low EPA, high success) -- the big-play unit scores higher."""
+    import pandas as pd
+    spec = {"BIG": (0.30, 0.35), "STEADY": (-0.10, 0.55), "M1": (0.10, 0.45), "M2": (0.10, 0.45)}
+    rows, i = [], 0
+    for team, (e, srate) in spec.items():
+        for j in range(20):
+            rows.append(dict(game_id=f"g{team}", play_id=i, posteam=team, defteam="X", epa=e,
+                             success=float(j < srate * 20), **{"pass": 1, "rush": 0}, wp=0.5, qb_kneel=0, qb_spike=0))
+            i += 1
+    sc = RS.unit_efficiency(pd.DataFrame(rows))["score"]["off"]["pass"]
+    assert RS.SCORE_EPA_WEIGHT == pytest.approx(2 / 3)
+    assert sc["BIG"] > 50 > sc["STEADY"], "two parts EPA to one part success"
