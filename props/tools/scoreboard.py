@@ -127,9 +127,10 @@ def compare(R: pd.DataFrame, Ref: pd.DataFrame, cluster: str, reps: int = 2000, 
     # two harness versions are not one comparison: rows from before the new-team cap carry
     # no stamp (read as uncapped), rows after it carry new_team_cap (2026-10-06)
     cap = lambda x: bool(x["new_team_cap"].iloc[0]) if ("new_team_cap" in x and len(x)) else False
-    if cap(R) != cap(Ref):
-        raise ValueError("the two runs come from different harnesses (one applies the new-team cap, "
-                         "the other does not) -- rerun the older one")
+    rates = lambda x: str(x["new_team_cap_rates"].iloc[0]) if ("new_team_cap_rates" in x and len(x)) else "all"
+    if cap(R) != cap(Ref) or rates(R) != rates(Ref):
+        raise ValueError("the two runs come from different harnesses (the new-team cap, or the rates it "
+                         "applies to, differ) -- rerun the older one")
     out = {}
     for mk in MARKETS:
         a = market_frame(Ref, mk)

@@ -58,7 +58,8 @@ def new_team_mask(ref: pd.DataFrame, priors_dir: Path) -> pd.Series:
     for s in sorted(ref.season.unique()):
         f = Path(priors_dir) / f"priors_{int(s) - 1}_players.csv"
         if not f.exists():
-            continue
+            raise FileNotFoundError(f"{f} is missing: build the priors first (backtest.py builds them); "
+                                    "an empty new-team mask would read as 'no effect'")
         tp = pd.read_csv(f, usecols=["gsis_id", "team_prior"]).dropna()
         m = ref.season == s
         prior = ref.loc[m, "gsis_id"].map(dict(zip(tp.gsis_id, tp.team_prior)))

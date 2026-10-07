@@ -31,10 +31,16 @@ def spread_eligible(frames, seasons, opening=None, bands=SB.TGT_BANDS[:3]) -> li
     in every band, role-only stable stretches on the given seasons."""
     out = []
     for R in frames:
+        if not {"mean_tgt", "act_targets", "sd_tgt"}.issubset(R.columns):
+            raise ValueError("the spread check could not run: the frames lack mean_tgt / act_targets / sd_tgt "
+                             "(run the grid with --conditional); eligibility is not measurable")
         R = R[R.season.isin(seasons)]
         tab = SB.spread_table(SB.stable_stretches(R, "mean_tgt", "act_targets", "sd_tgt", opening=opening, by="role"),
                               bands)
-        out.append(bool(tab) and all(b["ratio"] <= 1.0 for b in tab))
+        if not tab:
+            raise ValueError("the spread check could not run on these frames (no stable stretches or no sd_tgt): "
+                             "eligibility is not measurable")
+        out.append(all(b["ratio"] <= 1.0 for b in tab))
     return out
 
 
@@ -47,6 +53,35 @@ def knob_distance(grid, shipped_i, knobs) -> dict:
     return {i: sum(abs(pos(i, k) - pos(shipped_i, k)) for k in knobs) for i in range(len(grid))}
 
 
+def _loso(sel, select, shipped_i, market, score, cands, eligibility, tie, dist, min_move, reps=2000) -> dict:
+    """Leave one selection season out: candidates (eligibility recomputed without it), the
+    pick on the rest, the gain on it; pooled with one game-clustered interval."""
+    diffs, ids, folds = [], [], []
+    for s in select:
+        rest = [x for x in select if x != s]
+        tr = [F[F.season.isin(rest)] for F in sel]
+        te = [F[F.season == s] for F in sel]
+        c_s = cands if eligibility is None else (
+            [i for i, ok in enumerate(eligibility(rest)) if ok] or [shipped_i])
+        if shipped_i not in c_s:
+            c_s = [shipped_i] + c_s
+        p = LS.pick(tr, c_s, shipped_i, market, score, tie=tie, dist=dist, min_move=min_move)
+        a = SB.market_frame(te[shipped_i], market)
+        if p == shipped_i:
+            d = np.zeros(len(a))
+        else:
+            b = SB.market_frame(te[p], market, cohort=a[SB.KEYS])
+            m = b.merge(a[SB.KEYS + [f"p{score}", "y"]], on=SB.KEYS, suffixes=("", "_ref"))
+            d = (SB.logloss(m[f"p{score}_ref"], m.y_ref) - SB.logloss(m[f"p{score}"], m.y)).to_numpy()
+            a = m
+        diffs.append(d)
+        ids.append(SB.cluster_ids(a, "game"))
+        folds.append({"held_out": int(s), "pick": int(p), "gain": float(d.mean()) if len(d) else 0.0, "n": len(d)})
+    x, g = np.concatenate(diffs), np.concatenate(ids)
+    return {"oof_gain": float(x.mean()) if len(x) else 0.0,
+            "oof_ci": list(SB.cluster_ci(x, g, reps, np.random.default_rng(7))) if len(x) else None, "folds": folds}
+
+
 def outside80(R, col) -> float | None:
     x = R[col].dropna() if col in R else pd.Series(dtype=float)
     return float(((x < 0.1) | (x > 0.9)).mean()) if len(x) else None
@@ -54,7 +89,16 @@ def outside80(R, col) -> float | None:
 
 def run(grid, frames, shipped_i, market, score, select, confirm, knobs, eligible=None, level=0.95,
         tie=0.0005, min_move=1.0, confirm_zone=True, required=tuple(SB.MARKETS), reps=10_000,
-        width_col=None) -> dict:
+        width_col=None, eligibility=None) -> dict:
+    """eligibility: optional callable(seasons) -> [bool per setting], recomputed inside each
+    leave-one-season-out fold so a held-out season never decides its own candidates."""
+    have = set(frames[shipped_i].season.unique())
+    missing = sorted((set(select) | set(confirm)) - have)
+    if missing:
+        raise ValueError(f"the grid holds no frames for season(s) {missing}: run the grid with --tune covering "
+                         f"every selection and confirmation season")
+    if eligibility is not None and eligible is None:
+        eligible = eligibility(list(select))
     sel = [F[F.season.isin(select)] for F in frames]
     con = [F[F.season.isin(confirm)] for F in frames]
     cands = [i for i in range(len(grid)) if eligible is None or eligible[i]]
@@ -62,7 +106,7 @@ def run(grid, frames, shipped_i, market, score, select, confirm, knobs, eligible
         cands = [shipped_i] + cands               # shipped is always a candidate (staying put)
     dist = knob_distance(grid, shipped_i, knobs)
     pick = LS.pick(sel, cands, shipped_i, market, score, tie=tie, dist=dist, min_move=min_move)
-    out = {"pick": pick, "pick_setting": grid[pick], "candidates": cands,
+    out = {"pick": pick, "pick_setting": grid[pick], "candidates": cands, "eligible": eligible,
            "loss_select": {i: LS.mean_score(sel[i], market, score,
                                             SB.market_frame(sel[shipped_i], market)[SB.KEYS]) for i in cands}}
     if pick == shipped_i:
@@ -79,7 +123,7 @@ def run(grid, frames, shipped_i, market, score, select, confirm, knobs, eligible
     cc = SB.compare(con[pick], con[shipped_i], "game", level=0.95, reps=reps)[market]
     czone = cc.get(f"zone_{score}", {})
     confirmed = cc[f"logloss_{score}"]["gain"] >= 0 and (not confirm_zone or bool(czone.get("agree")))
-    lo = LS.loso(sel, cands, shipped_i, market, score, reps=2000, tie=tie, dist=dist, min_move=min_move)
+    lo = _loso(sel, select, shipped_i, market, score, cands, eligibility, tie, dist, min_move)
     out.update(select_gain=m[f"logloss_{score}"], move_points=m[f"move_points_{score}"], zone=zone,
                guards=guards, confirm_gain=cc[f"logloss_{score}"], confirm_zone=czone,
                loso={"oof_gain": lo["oof_gain"], "oof_ci": lo.get("oof_ci"), "folds": lo["folds"]},
@@ -103,12 +147,12 @@ def main(argv=None, market=None, score=None, knobs=None, shipped=None, spread=Fa
     grid, frames = d["grid"], d["frames"]
     shipped_i = next(i for i, g in enumerate(grid) if all(g.get(k) == v for k, v in shipped.items()))
     sel = [int(x) for x in a.select.split(",")]
-    eligible = None
+    eligibility = None
     if spread:
-        eligible = spread_eligible(frames, sel, SB.opening_starters(sel))
+        opening = SB.opening_starters(sel)
+        eligibility = lambda seasons: spread_eligible(frames, seasons, opening)
     res = run(grid, frames, shipped_i, market, score, sel, [int(x) for x in a.confirm.split(",")], knobs,
-              eligible=eligible, width_col=width_col, confirm_zone=confirm_zone)
-    res["eligible"] = eligible
+              width_col=width_col, confirm_zone=confirm_zone, eligibility=eligibility)
     print(title)
     print(json.dumps(res, indent=1, default=lambda o: o.item() if hasattr(o, "item") else str(o)))
     if a.out:

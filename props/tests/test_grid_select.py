@@ -54,3 +54,26 @@ def test_eligibility_and_the_tie_go_to_shipped_or_the_nearest_setting():
     same = GS.run(grid, [frames[1], frames[1], frames[1]], 0, "receptions", "u", [2022, 2023, 2024], [2025],
                   ("k",), reps=200, required=("receptions",))
     assert same["pick"] == 0 and not same["ship"], "identical settings: shipped stays"
+
+
+def test_a_missing_season_and_an_unmeasurable_spread_are_errors():
+    import pytest
+    truth, y = _world(n=7998)
+    frames = [_frame(truth, y, 0.0, 1, n_seasons=3)] * 2
+    with pytest.raises(ValueError, match="no frames for season"):
+        GS.run([{"k": None}, {"k": 1}], frames, 0, "receptions", "u", [2022, 2023, 2024], [2025], ("k",))
+    with pytest.raises(ValueError, match="not measurable"):
+        GS.spread_eligible([frames[0].assign(act_targets=5.0)], [2022])
+
+
+def test_loso_recomputes_eligibility_without_the_held_out_season():
+    truth, y = _world(seed=8)
+    grid = [{"k": None}, {"k": 1.0}]
+    frames = [_frame(truth, y, 0.12, 1), _frame(truth, y, 0.0, 2)]
+    seen = []
+    def elig(seasons):
+        seen.append(tuple(seasons))
+        return [True, True]
+    GS.run(grid, frames, 0, "receptions", "u", [2022, 2023, 2024], [2025], ("k",), reps=100, min_move=0,
+           required=("receptions",), eligibility=elig)
+    assert (2022, 2023, 2024) in seen and (2023, 2024) in seen and (2022, 2023) in seen, seen

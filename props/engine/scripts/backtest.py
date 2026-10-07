@@ -832,7 +832,8 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
                         g_rng, N, [y_ for _r, y_ in out.values()], other_t, other_rates, shape_ypc,
                         starter_share=pass_share, width=width)
                     completions[(team, week)] = M.simulate_qb_completions(
-                        g_rng, N, [r_ for r_, _y in out.values()], other_t, other_rates, starter_share=pass_share)
+                        g_rng, N, [r_ for r_, _y in out.values()], other_t, other_rates, starter_share=pass_share,
+                        width=width)
             draw_block_joint.completions = completions
             draw_block_joint.targets = tgt_
             return rec_, yds, passing
