@@ -1218,6 +1218,16 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
         res["new_team_cap"] = bool(getattr(args, "new_team_cap", True))
         res["new_team_cap_rates"] = getattr(args, "new_team_cap_rates", "all")
         res["n_draws"] = N                      # compare() refuses runs with different draw counts
+        # the team's throws, projected and actual, for the volume-calibration check (user, 2026-10-07:
+        # "how about pass attempts?"); informational, read by no score
+        _tv = test_act.groupby(["team", "week"]).team_targets_env.first().rename("team_targets_env")
+        res = res.drop(columns=[c for c in ("team_targets_env", "team_targets_act") if c in res.columns])
+        res = res.merge(_tv.reset_index(), on=["team", "week"], how="left").merge(
+            twt.rename(columns={"team_targets": "team_targets_act"}), on=["team", "week"], how="left")
+        res["team_targets_r"] = float(r_team_targets)
+        if synth:                               # synthetic truth: the real team totals do not apply
+            res["team_targets_act"] = np.nan
+        # team_targets_* count throws aimed at a receiver (the engine's unit), not pass attempts
 
         # RELIABILITY AT SYNTHETIC LINES (calibration a bettor can read): lines at
         # fixed offsets from the model median (not model quantiles, which would be
