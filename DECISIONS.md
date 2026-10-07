@@ -7799,3 +7799,6 @@ The expert re-ran the four-season backtest (baseline reproduces ours: receptions
 - **Meanwhile, live:** each player card prints its team's measured row ("Measured calibration")
   beside the price -- a record, not an adjustment. 2024-25 has now had extra looks; fixes are
   confirmed on fresh 2026 weeks.
+- Re-measured at round 34's setting (share_conc_targets 60, the live setting once #133 merges):
+  receiving yards +2.9, receptions +1.4 (the expert's figures), rushing +1.8, combined +0.6;
+  passing unchanged. The cards print these round-34 rows.
