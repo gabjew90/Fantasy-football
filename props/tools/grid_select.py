@@ -49,7 +49,8 @@ def knob_distance(grid, shipped_i, knobs) -> dict:
     setting's value sits from the shipped one. None (the knob off) is its own step at the TOP
     end: for a concentration knob off means no swing at all (beyond the largest value); for
     starter_share_shrink it means no shrink (1.0, beyond 0.75). Sorting it first put catch_conc
-    off next to 25, the most swing (expert review, 2026-10-06)."""
+    off next to 25, the most swing (expert review, 2026-10-06). A knob whose off means ZERO (an
+    eff_sd) must be gridded with an explicit 0, never None."""
     levels = {k: sorted({g.get(k) for g in grid}, key=lambda v: (v is None, v if v is not None else 0))
               for k in knobs}
     pos = lambda i, k: levels[k].index(grid[i].get(k))
