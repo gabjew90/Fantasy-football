@@ -102,3 +102,35 @@ Disclosed before the run (code review): the backtest scales by nflverse's closin
 the live report scales by the line at run time, so the harness's environment is slightly
 better informed; and if an exponent ships, a live run without a spread/total must say the
 scale is off (to be added with the ship).
+
+## Result (2026-10-06; props/tools/round38_select.py on the 30-setting grid, 2022-26)
+
+**Pick (the registered rule): pass_implied_exp 0.2, pass_scale 1.04, pass_shrink off.** The
+lowest own-volume log loss on 2022-24 was 0.3 / 1.04 / off (0.68901); 0.2 / 1.04 / off
+(0.68937) sits inside the 0.0005 tie and closer to shipped.
+
+| Check (pre-registered) | Pick | Shipped | Verdict |
+|---|---|---|---|
+| Own-volume log loss gain, 2022-24 | +0.0099 (95%: +0.0040, +0.0156) | -- | detectable: pass |
+| Decision zone 15-85% (log loss and Brier) | both positive | -- | pass |
+| Average move of the Over chance | 4.6 points | -- | pass (bar 1.0) |
+| Calibration by implied points, 2022-24 (weighted mean gap) | 1.8 points | 6.3 points | falls: pass |
+| Calibration by implied points, 2026 weeks 2-4 | 6.7 points | 11.2 points | does not rise: pass |
+| Conversion (actual targets in), 2022-24 | +0.021 better | -- | pass |
+| Paired CRPS, 2022-24 (lower is better) | 42.44 | 42.66 | not worse: pass |
+| Width: games outside the 80% range, 2022-24 (bar 17-23%) | 11.9% | 13.8% | **further from the bar: FAIL** |
+| Confirmation, 2026 weeks 2-4 (88 starts) | +0.026 (+0.003, +0.048) | -- | not negative: pass |
+| Leave-one-season-out | +0.0086 (+0.0027, +0.0142); picks 0.2 / 0.3 / 0.2-scale | -- | every fold positive |
+
+The Over rate minus the engine's chance by implied points, 2022-24 (points):
+
+| Setting | 18 or less | 18-21 | 21-24 | 24-27 | 27+ |
+|---|---|---|---|---|---|
+| Shipped | -5.1 | +1.7 | +6.8 | +9.0 | +11.3 |
+| Pick | -3.4 | -0.1 | +2.2 | +1.9 | +1.8 |
+
+**Under the rule as written, round 38 does not ship: the width guard fails.** Why it fails is
+mechanical: removing the bias brings more outcomes inside the 80% range (the shipped draw was
+already too wide, and its bias hid part of that). The settings with the 0.7 narrowing overshoot
+the other way (about 25% outside) and their scores sit outside the tie. Whether to override the
+guard is the user's decision; this report does not make it.
