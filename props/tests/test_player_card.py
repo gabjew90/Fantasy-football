@@ -122,10 +122,10 @@ def test_a_tight_end_card_shows_his_roles_measured_row():
     d = {"name": "T", "team": "DAL", "slot": "TE1", "pos": "TE", "implied": 28.0,
          "rows": [_row("player_receptions", 3.5), _row("player_reception_yds", 32.5)]}
     text = "\n".join(RS.player_card(d))
-    assert "| Receptions, every tight end | 49.2% | 47.8% | 1514 |" in text
-    assert "| Receiving yards, every tight end | 54.1% | 50.2% | 1514 |" in text
-    assert "| Receiving yards, teams implied 27+ | 52.0% | 48.2% | 713 |" in text
+    assert "| Receptions, every tight end | 49.0% | 44.1% | 1480 |" in text
+    assert "| Receiving yards, every tight end | 54.0% | 47.4% | 1480 |" in text
+    assert "| Receiving yards, teams implied 27+ | 52.2% | 47.6% | 709 |" in text
     wr = RS.calibration_line({"player_receptions"}, None, None, "WR2")
-    assert "| Receptions, every wide receiver | 45.0% | 44.2% | 4752 |" in wr
+    assert "| Receptions, every wide receiver | 45.1% | 44.3% | 4754 |" in wr
     assert "| Receptions | 48.4% | 45.2% | 49.6% | 506 |" in wr, "the live record at real lines"
     assert RS.calibration_line({"player_rush_reception_yds"}, None, None, "RB1") == [], "no live lines, no implied row"

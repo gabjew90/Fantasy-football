@@ -1413,11 +1413,10 @@ BIAS_BY_IMPLIED = {      # measured at share_conc_targets 60 (round 34's setting
     # passing after round 38 (implied-points power 0.2, level x1.04; DECISIONS #199), round-38 frames
     "player_pass_yds": {"18 or less": (219, .388, .448), "18-21": (419, .496, .491), "21-24": (547, .536, .515),
                         "24-27": (419, .566, .541), "27+": (174, .655, .568)},
-    # receiving after round 41 (tight ends' share x1.06; DECISIONS #200), round-41 frames
-    "player_reception_yds": {"18 or less": (1225, .452, .472), "18-21": (2023, .508, .475),
-                             "21-24": (2366, .501, .476), "24-27": (1717, .522, .479), "27+": (713, .520, .482)},
-    "player_receptions": {"18 or less": (1225, .423, .447), "18-21": (2023, .468, .447), "21-24": (2366, .452, .447),
-                          "24-27": (1717, .461, .448), "27+": (713, .474, .450)},
+    "player_reception_yds": {"18 or less": (1221, .455, .467), "18-21": (2014, .507, .470),
+                             "21-24": (2358, .500, .471), "24-27": (1711, .522, .475), "27+": (709, .522, .476)},
+    "player_receptions": {"18 or less": (1221, .423, .440), "18-21": (2014, .468, .441), "21-24": (2358, .450, .441),
+                          "24-27": (1711, .462, .442), "27+": (709, .474, .442)},
     "player_rush_yds": {"18 or less": (376, .492, .511), "18-21": (615, .511, .503), "21-24": (682, .522, .494),
                         "24-27": (501, .507, .498), "27+": (218, .587, .485)},
     "player_rush_reception_yds": {"18 or less": (451, .488, .528), "18-21": (730, .538, .520),
@@ -1427,10 +1426,10 @@ BIAS_BY_IMPLIED = {      # measured at share_conc_targets 60 (round 34's setting
 # MEASURED CALIBRATION by role (second expert audit, reproduced 2026-10-06, DECISIONS #198): the same
 # stand-in-line Over rate for every player of that role, 2022-25, round 34's setting --
 # (player-games, Over hit, engine's average Over). Tight ends run clearly low on both markets.
-BIAS_BY_ROLE = {          # after round 41 (tight ends' share x1.06; DECISIONS #200)
-    "TE": {"player_receptions": (1514, .492, .478), "player_reception_yds": (1514, .541, .502)},
-    "WR": {"player_receptions": (4752, .450, .442), "player_reception_yds": (4752, .501, .475)},
-    "RB": {"player_receptions": (1253, .430, .439), "player_reception_yds": (1253, .466, .462)}}
+BIAS_BY_ROLE = {          # round 41's share change was withdrawn on the seed check (DECISIONS #203)
+    "TE": {"player_receptions": (1480, .490, .441), "player_reception_yds": (1480, .540, .474)},
+    "WR": {"player_receptions": (4754, .451, .443), "player_reception_yds": (4754, .501, .476)},
+    "RB": {"player_receptions": (1255, .430, .439), "player_reception_yds": (1255, .467, .462)}}
 ROLE_WORDS = {"TE": "tight ends", "WR": "wide receivers", "RB": "backs"}
 
 
@@ -1515,8 +1514,8 @@ def bias_gap_rows(markets, implied_by_team) -> list[tuple[str, str, str]]:
                     "read the market's chance as the probability; use the engine for workload and role"))
     if markets & {"player_reception_yds", "player_receptions", "player_rush_yds", "player_rush_reception_yds"}:
         out.append(("Yardage Overs at the main line",
-                    "Measured: receiving yards' Over has run about 2.6 points above the engine (receptions 0.7, "
-                    "rushing 1.8), more for teams implied at 24+ (2022-25, after round 41; DECISIONS #197, #200)",
+                    "Measured: receiving yards' Over has run about 2.9 points above the engine (receptions 1.4, "
+                    "rushing 1.8), more for teams implied at 24+ (2022-25 backtest, DECISIONS #197)",
                     "read each card's calibration line; a fix needs its own round"))
     return out
 CARD_LEGEND = ("**Reading the cards:** \"Engine forecast\" is the middle simulated outcome and the range holding the "

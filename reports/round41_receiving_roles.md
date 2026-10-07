@@ -92,3 +92,23 @@ weighted gap falls in every row; receiving yards' too (24-27 still +6.0).
 tight end's projected share (score_game, after the Out rule, before the share cap); the
 simulation then runs without it, so it is applied once. The cards' receiving calibration rows
 are re-measured at the new setting.
+
+### Withdrawn on the seed check (2026-10-06, third expert review; DECISIONS #203)
+
+The backtest's random noise is larger than some gains it approved (two runs of the same model
+differ by up to 0.0015 in log loss and 1.7-1.8 points in the Over chance). Re-run under three
+more seeds (`--tune-grid seedcheck41 --audit-seed-offset 1|2|3`), tight-end rows, receptions own
+volume, 1.06 against 1.00:
+
+| Seed | Gain 2022-24 (95%) | 2026 weeks 2-4 |
+|---|---|---|
+| 0 (the run it shipped on) | +0.0063 (+0.0013, +0.0112) | +0.0013 |
+| 1 | +0.0032 (-0.0017, +0.0081) | -0.0050 |
+| 2 | +0.0055 (+0.0009, +0.0105) | -0.0027 |
+| 3 | +0.0051 (+0.0004, +0.0099) | +0.0004 |
+| Average | +0.0050 | **-0.0015** |
+
+The confirmation (2026 not negative) fails on the seed average and on two of four seeds, and the
+live record at Sleeper's lines shows no tight-end lean (45.7% hit against an engine 46.3%, 199
+lines). **te_share_mult goes back to 1** (the knob stays in the code, off). Seed noise between
+two runs of the shipped model: Over moves of 1.7-1.8 points, log-loss differences up to 0.0018.

@@ -616,14 +616,15 @@ need not be surfaced. Write the reply as a premium prop guide with this structur
    evidence and the what-ifs. Each card prints the live record beside the backtest rows; never
    present the engine's percentage as the better probability. The backtest evidence, with
    **measured biases at the main line (expert audit, DECISIONS #197)**:
-   at the backtest's stand-in line on 2022-25 the receiving-yards Over hit 2.6 points more often
-   than the engine said after round 41 (receptions 0.7, rushing 1.8, combined 0.6), and every market leans by
+   at the backtest's stand-in line on 2022-25 the receiving-yards Over hit 2.9 points more often
+   than the engine said (receptions 1.4, rushing 1.8, combined 0.6), and every market leans by
    the team's implied points (backs on teams implied 27+: Over 58.7% against 48.5%). Each card
    prints the row its team sits in and, for receiving lines, his role's row ("Backtest
    calibration"; DECISIONS #198: tight ends' catches Over hit 4.9 points and yards 6.6 points more
-   often than the engine said -- round 41 raised tight ends' target share x1.06 (DECISIONS #200),
-   leaving 1.4 and 3.9 -- and with actual targets in, tight-end yards still run too wide and backs'
-   receiving yards too narrow); quote it with the price -- a measured
+   often than the engine said in the backtest -- not seen at real lines so far (live: 45.7% hit
+   against 46.3%), and round 41's share change was withdrawn on the seed check (DECISIONS #203) --
+   and with actual targets in, tight-end yards run too wide and backs' receiving yards too narrow);
+   quote it with the price -- a measured
    record, never an adjustment you apply. Widths: receptions and receiving yards within the
    bar; rushing yards and rushing + receiving run too narrow in the tails (23-25% of games outside
    the 80% range on the re-check, reports/current_settings_check_2026-10-06.md): a line far

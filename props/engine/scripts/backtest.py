@@ -1438,7 +1438,16 @@ RECEIVING_ROLE_GRID = [{"catch_shape_mult_te": te, "catch_shape_mult_rb": rb, "t
 PASS_BIAS_GRID = [{"pass_implied_exp": e, "pass_scale": c, "pass_shrink": s}
                   for e in (0.0, 0.1, 0.2, 0.3, 0.4) for c in (1.0, 1.02, 1.04) for s in (None, 0.7)]
 
+# Seed checks (third expert review, DECISIONS #202): the shipped and picked settings of rounds 38
+# and 41, re-run under other seeds (--audit-seed-offset) to see whether the gain replicates.
+SEEDCHECK_38 = [{"pass_implied_exp": 0.0, "pass_scale": 1.0, "pass_shrink": None, "te_share_mult": 1.0},
+                {"pass_implied_exp": 0.2, "pass_scale": 1.04, "pass_shrink": None, "te_share_mult": 1.0}]
+SEEDCHECK_41 = [{"te_share_mult": 1.0, "pass_implied_exp": 0.0, "pass_scale": 1.0},
+                {"te_share_mult": 1.06, "pass_implied_exp": 0.0, "pass_scale": 1.0}]
+
 SUBGRIDS = {
+    "seedcheck38": (SEEDCHECK_38, ("pass",), "width", "Seed check, round 38 (DECISIONS #202)."),
+    "seedcheck41": (SEEDCHECK_41, ("rec",), "width", "Seed check, round 41 (DECISIONS #202)."),
     "receivinglevel": (RECEIVING_LEVEL_GRID, ("rec", "yds", "pass"), "width",
                        "Round 40: receivers' yards a catch and passing's level (reports/round40_receiving_level.md); "
                        "the pick is made by props/tools/round40_select.py."),
@@ -2028,7 +2037,7 @@ def main(argv=None):
     ap.add_argument("--tune-width", action="store_true",
                     help="choose the width settings on the --tune seasons; writes --report (.md/.csv)")
     ap.add_argument("--width-out", default=None, help="--tune-width: write the chosen settings to this JSON file")
-    ap.add_argument("--tune-grid", choices=["main", "qb", "rushnorm", "rushlead", "tier2", "running", "conversion", "targetspread", "yardsshape", "passspread", "receivingjoint", "qbshare", "qbbias", "receivingroles", "receivinglevel"], default="main",
+    ap.add_argument("--tune-grid", choices=["main", "qb", "rushnorm", "rushlead", "tier2", "running", "conversion", "targetspread", "yardsshape", "passspread", "receivingjoint", "qbshare", "qbbias", "receivingroles", "receivinglevel", "seedcheck38", "seedcheck41"], default="main",
                     help="--tune-width: the receiving/rushing grid, the starting QB's own settings, or the "
                          "carry-share rescaling")
     ap.add_argument("--dispersion", choices=["prior", "train"], default=None,

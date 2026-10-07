@@ -7872,3 +7872,40 @@ The expert re-ran the four-season backtest (baseline reproduces ours: receptions
   (tight ends' share x1.06), 39 stays in shadow (user), 40 and 42 null. Open: the receiving
   environment lean, tight-end and back yards widths, the tight-end touchdown chance moving
   with the share (untested; hidden from the reads).
+
+## 2026-10-06 (202) -- third expert review: seed noise outweighs small gains; the engine has not beaten the market at real lines
+
+- **Seed noise** (the expert: nine runs of the unchanged model; reproduced here on the round 38
+  and 41 settings): two runs of the same model differ by up to ~0.15% CRPS and ~0.0015-0.0018 in
+  own-volume log loss, and the Over chance for the same player-game by 1.7-1.8 points -- so the
+  "moves the Over by 1 point" bar is passed by noise alone. Round 34's log-loss gain does not
+  replicate on three other seeds (2022-24 -0.00007 / +0.00040 / +0.00077; 2025 negative on all
+  three), though receiving-yards CRPS improves on all four and the direct spread measurement
+  supports it. Market carries 50% (round 29 / 39) replicates on every seed (+0.51% to +0.63%
+  rushing CRPS, 2022-23 clear on its own).
+- **Standing rule from here:** a candidate is judged on the average of four seeds
+  (`--audit-seed-offset 0-3`), selection and confirmation alike; a gain under about 0.3% must
+  hold on every seed; the minimum Over move must clear the seed noise (3.6 points, twice 1.8)
+  rather than 1 point. The audit's own differences under ~0.15% are unconfirmed.
+- **The live record at Sleeper's real lines** (weeks 2-4, 1,536 graded lines; reproduced): the
+  engine's Over chance had no useful relationship to outcomes -- log loss 0.717 against the
+  market's 0.692 (a coin flip is 0.693); passing Overs hit 57% against an engine 42%, rushing 40%
+  against 47%, tight-end receiving 45.7% against 46.3% (the backtest's tight-end lean is not seen
+  live). The cards now print this record first and tell chat to read the market's chance as the
+  probability and the engine for workload and role. Stand-in-line calibration ("a model 85%
+  wins about 84-85%") is not evidence about real lines.
+- **Also from the review:** the passing lean by implied points holds among regular starters
+  (0.87 to 1.09, not a backup effect); the verdict labels cannot be passed at this sample size (a
+  perfect synthetic model reads INSUFFICIENT DATA on 7 of 8 markets) -- the label gate needs a
+  redesign (the user's decision); team-volume dispersion swings 25-53 between seasons and live
+  uses one season's value (unmeasured, queued). Leak test exact; synthetic-truth audit passes.
+
+## 2026-10-06 (203) -- seed check: round 38 replicates; round 41 withdrawn
+
+- Round 38 (QB passing by implied points), re-run under three more seeds: gain on 2022-24
+  +0.0094 to +0.0099 on every seed (every interval above zero), 2026 positive on every seed,
+  the Over moving 4.6 points against 1.8 points of seed noise. **It stands.**
+- Round 41 (tight ends' share x1.06): 2022-24 +0.0032 to +0.0063 (one seed not clear); 2026
+  weeks 2-4 negative on the seed average (-0.0015) and on two of four seeds; the live record
+  shows no tight-end lean. **Withdrawn: te_share_mult back to 1** (knob kept, off; the cards'
+  receiving rows back to the round-34 measurement).
