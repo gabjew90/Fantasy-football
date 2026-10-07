@@ -84,8 +84,8 @@ def test_qb_card_states_the_measured_bias_and_no_threshold():
     assert "Measured calibration" not in text, "no implied total: no calibration line"
     d2 = {**d, "implied": 28.0}
     t2 = "\n".join(RS.player_card(d2))
-    assert "**Measured calibration, teams implied 27+** (TB, implied 28.0):" in t2
-    assert "| Passing yards | 65.5% | 47.2% | 174 |" in t2
+    assert "**Measured calibration** (TB, implied 28.0):" in t2
+    assert "| Passing yards, teams implied 27+ | 65.5% | 47.2% | 174 |" in t2
     assert "Role evidence" not in text
     three = RS.qb_table({**q, "games": [(1, 30, 20), (2, 34, 22), (3, 27, 19)]})
     assert "earlier games (2): 32.0 attempts, 21.0 completions a game; last game (week 3): 27 attempts, 19" in three[3]
@@ -114,3 +114,14 @@ def test_two_books_are_named_and_line_fit_reads_print():
     d = {"name": "X", "team": "TB", "slot": "WR2", "pos": "WR", "rows": [_row("player_receptions", 4.5)],
          "fit": ["The book's yards a catch is 11.0."]}
     assert "**How his lines fit together:** The book's yards a catch is 11.0." in "\n".join(RS.player_card(d))
+
+
+def test_a_tight_end_card_shows_his_roles_measured_row():
+    d = {"name": "T", "team": "DAL", "slot": "TE1", "pos": "TE", "implied": 28.0,
+         "rows": [_row("player_receptions", 3.5), _row("player_reception_yds", 32.5)]}
+    text = "\n".join(RS.player_card(d))
+    assert "| Receptions, every tight end | 49.0% | 44.1% | 1480 |" in text
+    assert "| Receiving yards, every tight end | 54.0% | 47.4% | 1480 |" in text
+    assert "| Receiving yards, teams implied 27+ | 52.2% | 47.6% | 709 |" in text
+    assert RS.calibration_line({"player_receptions"}, None, None, "WR2")[4] == "| Receptions, every wide receiver | 45.1% | 44.3% | 4754 |"
+    assert RS.calibration_line({"player_pass_yds"}, None, None, "QB1") == []

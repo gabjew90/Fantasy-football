@@ -1418,6 +1418,16 @@ BIAS_BY_IMPLIED = {      # measured at share_conc_targets 60 (round 34's setting
                                   "21-24": (794, .514, .516), "24-27": (561, .528, .519), "27+": (241, .581, .509)}}
 
 
+# MEASURED CALIBRATION by role (second expert audit, reproduced 2026-10-06, DECISIONS #198): the same
+# stand-in-line Over rate for every player of that role, 2022-25, round 34's setting --
+# (player-games, Over hit, engine's average Over). Tight ends run clearly low on both markets.
+BIAS_BY_ROLE = {
+    "TE": {"player_receptions": (1480, .490, .441), "player_reception_yds": (1480, .540, .474)},
+    "WR": {"player_receptions": (4754, .451, .443), "player_reception_yds": (4754, .501, .476)},
+    "RB": {"player_receptions": (1255, .430, .439), "player_reception_yds": (1255, .467, .462)}}
+ROLE_WORDS = {"TE": "tight ends", "WR": "wide receivers", "RB": "backs"}
+
+
 def implied_row(implied):
     try:
         v = float(implied)
@@ -1428,24 +1438,29 @@ def implied_row(implied):
     return next(lab for hi, lab in IMPLIED_ROWS if v <= hi)
 
 
-def calibration_line(markets, implied, team=None) -> list[str]:
-    """The card's measured-calibration table for the player's priced markets, at the row his
-    team's implied points sit in; [] without an implied total."""
+def calibration_line(markets, implied, team=None, slot=None) -> list[str]:
+    """The card's measured-calibration table for the player's priced markets: his team's
+    implied-points row and, for receiving markets, his role's row. [] when neither applies."""
     row = implied_row(implied)
-    if row is None:
-        return []
+    role = "".join(ch for ch in str(slot or "") if ch.isalpha()) or None
+    role = role if role in BIAS_BY_ROLE else None
     mks = [m for m in MARKET_ORDER if m in markets and m in BIAS_BY_IMPLIED]
-    if not mks:
-        return []
-    who = f"{team}, implied {float(implied):.1f}" if team else f"implied {float(implied):.1f}"
-    L = [f"**Measured calibration, teams implied {row}** ({who}):", "",
-         "| Market | Over hit | Engine said | Games |", "|---|---:|---:|---:|"]
+    rows = []
     for mk in mks:
-        n, hit, eng = BIAS_BY_IMPLIED[mk][row]
-        L.append(f"| {PROP_WORDS[mk][0]} | {100 * hit:.1f}% | {100 * eng:.1f}% | {n} |")
-    L += ["", "The backtest's 2022-25 games at lines near the middle of the forecast (DECISIONS #197): a record "
-              "of how this row has run, not an adjustment to the price above; lines far from the middle were not "
-              "measured."]
+        if row is not None:
+            rows.append((f"{PROP_WORDS[mk][0]}, teams implied {row}", *BIAS_BY_IMPLIED[mk][row]))
+        if role and mk in BIAS_BY_ROLE[role]:
+            rows.append((f"{PROP_WORDS[mk][0]}, every {ROLE_WORDS[role][:-1]}", *BIAS_BY_ROLE[role][mk]))
+    if not rows:
+        return []
+    who = f" ({team}, implied {float(implied):.1f})" if team and row is not None else ""
+    L = [f"**Measured calibration**{who}:", "", "| Market and group | Over hit | Engine said | Games |",
+         "|---|---:|---:|---:|"]
+    for lab, n, hit, eng in rows:
+        L.append(f"| {lab} | {100 * hit:.1f}% | {100 * eng:.1f}% | {n} |")
+    L += ["", "The backtest's 2022-25 games at lines near the middle of the forecast (DECISIONS #197, #198): a "
+              "record of how these groups have run, not an adjustment to the price above; lines far from the "
+              "middle were not measured."]
     return L
 
 
@@ -1735,7 +1750,7 @@ def player_card(d: dict) -> list[str]:
             cl = capped_line(reads.get(key), per)
             if cl:
                 L += [cl, ""]
-    cal = calibration_line({r["market"] for r in rows}, d.get("implied"), d.get("team"))
+    cal = calibration_line({r["market"] for r in rows}, d.get("implied"), d.get("team"), d.get("slot"))
     if cal:
         L += cal + [""]
     for s_ in d.get("fit") or []:

@@ -612,7 +612,10 @@ need not be surfaced. Write the reply as a premium prop guide with this structur
    at the backtest's stand-in line on 2022-25 the receiving-yards Over hit 2.9 points more often
    than the engine said (receptions 1.4, rushing 1.8, combined 0.6), and every market leans by
    the team's implied points (backs on teams implied 27+: Over 58.7% against 48.5%). Each card
-   prints the row its team sits in ("Measured calibration"); quote it with the price -- a measured
+   prints the row its team sits in and, for receiving lines, his role's row ("Measured
+   calibration"; DECISIONS #198: tight ends' catches Over hit 4.9 points and yards 6.6 points more
+   often than the engine said, and with actual targets in, tight-end yards run too wide and backs'
+   receiving yards too narrow); quote it with the price -- a measured
    record, never an adjustment you apply. Widths: receptions and receiving yards within the
    bar; rushing yards and rushing + receiving run too narrow in the tails (23-25% of games outside
    the 80% range on the re-check, reports/current_settings_check_2026-10-06.md): a line far
