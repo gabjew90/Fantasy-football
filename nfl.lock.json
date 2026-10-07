@@ -166,15 +166,15 @@
   "props/engine/resources/stadium_coords.csv": "cf9ce9133fa57249347a2ee14c90b2ddc011602aed5398b1ebf3f7fd0ea71aa1",
   "props/engine/resources/td_parlay_gate.json": "9619f7de2f262d87c15fbedcc65d95de98c8fc16f87ea9b81630ca0969ddf0f4",
   "props/engine/resources/team_matchup_guide.md": "b819405165d7499993b545d18e2ad4950b0b15d80774c700c3fca55348abdeeb",
-  "props/engine/resources/width_params.json": "88dd306b0305f66a81b99ca9a053ceddc4b3108fb5b8aa7369d3829ac98c11cb",
+  "props/engine/resources/width_params.json": "5aeda889b8124cbf2d3411f2abaeb52505fd27ed390b6e68fe1e0854395d8692",
   "props/engine/scripts/absence_check.py": "fa45e3fb4a1985b38771f0c58ed002956b163ee16439778ac7391ece1ba25079",
   "props/engine/scripts/absence_tune.py": "4bb4daaf1861f93ff8d57504e9fff5e0b0b828306d8210b688c87aa25ef27d1d",
-  "props/engine/scripts/backtest.py": "97d711d083b3fb04eafed17afa38eacab964553f807e0e7b78c6461207af771a",
+  "props/engine/scripts/backtest.py": "ca31c86dc6961bf4568c6c309559439948e95d767ebdc35ad3f520a50ac1d36d",
   "props/engine/scripts/build_play_yards.py": "51af89e684bd85e9e33e6f894a0a3002e13e98e0f00b94a4f91e4dbe474c8dfa",
   "props/engine/scripts/build_priors.py": "6998f1092026d16d6e11f87b91556aac22fdaa4ce9bc666f750514530e13feda",
   "props/engine/scripts/build_td_priors.py": "c7330a57e68c1b7c5f8a9304bfbddbb4be0ca285d9f37ef383173d3e3049c27f",
   "props/engine/scripts/eligibility.py": "92ea11cdd30ef91fb391b0be8920002efb0853c63f300a500d9c4f89b0eb3a19",
-  "props/engine/scripts/model.py": "e928bbc47a495bb33b2b5d46d3afc33835cefc2d700cb2e2c3e8ba0077bc905e",
+  "props/engine/scripts/model.py": "9e1501f2b5afd8c90fec9c800e6f946528b3db1bd5a7a72cbdbe24d6f831adba",
   "props/engine/scripts/odds_client.py": "434186273bd0412a5545247228298951c5d0504a19c8a47c4c782bf3bb75aaa1",
   "props/engine/scripts/research.py": "5e9a9acbfa93007dbf3b87ed535b7ad65bda4effa597e1a7488a89ecb4012d74",
   "props/engine/scripts/scenario.py": "e16722e9abebb55f05a770910c1e47dc1cc89f7d469c8d6232d6e6bd1af83774",
@@ -195,6 +195,6 @@
   "tiers.csv": "04a1a79d43e9f2445ba3dc4ea262b00fbd58efea1f41e8b0393cb4c7f8afee41",
   "tiers.keefamania.csv": "11e6546b56caa807a572da86d5c3d81097bafd2d2550e25653882d78b2962e94"
  },
- "sha256": "1398f67e40e6b2ec06954639893af63d9c8500b0c8d8dae61948e68b197dbc1b",
+ "sha256": "7d42d67a1706131fb2d27397fc99323312b5becd6e8c29704beb3a2625f52dc7",
  "tag": "nfl-v1.50"
 }
