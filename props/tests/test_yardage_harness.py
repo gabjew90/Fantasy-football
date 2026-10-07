@@ -412,3 +412,25 @@ def test_rows_without_a_pit_do_not_count_as_inside_the_band(backtest):
     res.loc[res.index % 10 >= 4, "pit_rec"] = np.nan     # only the four tail rows keep a PIT
     v = backtest.market_verdict(res, cal, [2024, 2025], "rec")
     assert v["outside_p10_p90"] == pytest.approx(1.0)
+
+
+
+def test_round_36_shrink_keeps_the_mean_and_narrows_the_share_draw():
+    """reports/round36_qb_share.md: None is the shipped draw exactly; 0 is the grid's mean;
+    in between the same draw pulled toward the mean (so the average is unchanged)."""
+    import numpy as np
+    import model as M
+    grid = np.array([0.03, 0.6, 0.95, 1.0, 1.0, 1.0, 1.0, 1.05])
+    ys = [np.full(4000, 100.0)]
+    run = lambda w: M.simulate_qb_passing(np.random.default_rng(3), 4000, ys, None, None, 1.0,
+                                          starter_share=grid, width=w)
+    base, none_, half, zero = run(None), run({"starter_share_shrink": None}), run({"starter_share_shrink": 0.5}), \
+        run({"starter_share_shrink": 0.0})
+    assert np.array_equal(base, none_), "None is byte-identical to the shipped draw"
+    assert np.allclose(zero, 100 * grid.mean()), "0 = always the mean share"
+    assert np.allclose(half, 100 * (grid.mean() + 0.5 * (base / 100 - grid.mean())))
+    assert half.std() < base.std()
+    assert abs(half.mean() - (0.5 * base.mean() + 0.5 * 100 * grid.mean())) < 1e-9, "the average is kept in expectation"
+    import pytest as _pt
+    with _pt.raises(ValueError):
+        M.validate_width({"starter_share_shrink": 1.5})

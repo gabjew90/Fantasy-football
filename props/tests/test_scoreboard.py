@@ -223,3 +223,14 @@ def test_a_capped_and_an_uncapped_harness_run_are_never_compared():
         assert "different harnesses" in str(e)
     ref["new_team_cap"] = True
     assert SB.compare(cand, ref, "game", reps=100)["receptions"]["n"] == len(ref)
+
+
+def test_runs_with_different_new_team_cap_rates_are_never_compared():
+    ref, cand = _world(0.0), _world(0.0)
+    ref["new_team_cap"], cand["new_team_cap"] = True, True
+    cand["new_team_cap_rates"] = "shares"
+    try:
+        SB.compare(cand, ref, "game", reps=100)
+        raise AssertionError("mixed new-team-cap rates must be refused")
+    except ValueError as e:
+        assert "differ" in str(e)
