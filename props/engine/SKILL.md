@@ -293,8 +293,30 @@ For a narrow question, run only what it needs:
   Over if his carries take half their volume from the market's script (favourites run more).
   Quote both numbers when you read a back's rushing line: the board's is the price, the
   shadow's is being graded beside it on the scorecard. Never present the shadow as the price.
-  **A single-game read is a full story, in this order** (user, 2026-10-05; DECISIONS #168).
-  Headed sections, short paragraphs, tables where they help; thorough but easy to read:
+  **How a single-game read is written (user, 2026-10-06; his "TB at DAL" brief is the model).**
+  Written straight into the chat, formatted with markdown headings and tables -- never a PDF
+  or a file. The report's **Matchup brief** section holds the tables; the read is built on them:
+  - **Open with the thesis**: two or three sentences on the game you expect and why (who the
+    market makes the stronger side, who plays from ahead, the one issue that matters most).
+  - **Then numbered sections, each a table and a short read.** Copy the report's table in full,
+    then one or two short paragraphs that interpret it: what it implies for each team's volume
+    and which players it helps, and what it does NOT establish. Never walk the table back in
+    words; reason from it ("the case for extra Dallas carries comes from the expected lead,
+    not from a soft run defence").
+  - **Keep facts, model estimates and judgment apart**: the data is fact, "the engine projects"
+    is an estimate, "I expect" is judgment. Missing data reads "not in this run", never a guess.
+  - **Order**: the market -> team outlook (our workload against the season) -> unit against unit
+    (EPA and success, pace) -> personnel -> fantasy points allowed by position -> weather (one
+    line unless it matters) -> **where this baseline may miss** (the report's table, then which
+    of those to examine as a separate scenario) -> **expected game flow and what would change
+    it** (a base case and two "if" branches) -> your strongest directional read and the
+    conditional ones -> then the players, below.
+  - **Tie every player conclusion to his share, the line and the price**; a team read alone is
+    never a player call. When the user gives a workload read, set it against the line's
+    break-even volume ("pays at this price if you expect") and call a margin under 10% thin --
+    the research table's flags already mark thin margins at our own projection.
+  **The full story, in this order** (user, 2026-10-05; DECISIONS #168). Headed sections, short
+  paragraphs, tables where they help; thorough but easy to read:
   1. **The game.** The matchup and what each team has been, the weather (or roof), home and
      away, the Vegas lines (spread, total, implied points and the script they point to), the
      fantasy points each defence allows to RBs, WRs and TEs (the header's "Fantasy points
