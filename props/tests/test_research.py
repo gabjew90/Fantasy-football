@@ -888,5 +888,5 @@ def test_margin_flags_mark_thin_sides_at_our_projection():
     assert RS.margin_flags(20.0, 18.5, 16.0, "carries") == ["thin: the Over needs 18.5 carries, we project 20.0"]
     assert RS.margin_flags(24.0, 18.5, 16.0, "carries") == [], "a wide margin is not flagged"
     assert RS.margin_flags(15.0, 18.5, 15.8, "carries")[0].startswith("thin: the Under needs 15.8")
-    assert RS.margin_flags(17.0, 18.5, 16.0)[0].startswith("neither side pays")
+    assert RS.margin_flags(17.0, 18.5, 16.0) == [], "inside the cut: the break-even cell says it already"
     assert RS.margin_flags(None, 18.5, 16.0) == []

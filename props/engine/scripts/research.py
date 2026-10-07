@@ -1118,8 +1118,7 @@ def known_gaps(ctx: dict) -> list[tuple[str, str]]:
 
 def margin_flags(projected, over_needs, under_needs, unit="", thin=0.10) -> list[str]:
     """The research table's margin flag at OUR projection (user, 2026-10-06): the side that
-    pays at our volume and whether it clears its break-even volume by under 10% ("thin");
-    or that neither side pays (our volume sits inside the book's cut)."""
+    pays at our volume, flagged when it clears its break-even volume by under 10% ("thin")."""
     o = thin_margin(projected, over_needs, True, thin)
     u = thin_margin(projected, under_needs, False, thin)
     unit = f" {unit}" if unit else ""
@@ -1127,9 +1126,7 @@ def margin_flags(projected, over_needs, under_needs, unit="", thin=0.10) -> list
         return [f"thin: the Over needs {float(over_needs):.1f}{unit}, we project {float(projected):.1f}"] if o[1] else []
     if u and u[0] >= 0:
         return [f"thin: the Under needs {float(under_needs):.1f}{unit} or fewer, we project {float(projected):.1f}"] if u[1] else []
-    if o is not None and u is not None:
-        return ["neither side pays at our projection (it sits inside the book's cut)"]
-    return []
+    return []          # neither side pays: the break-even cell already says so ("no-bet zone")
 
 
 def thin_margin(projected, needs, side_over=True, thin=0.10):
