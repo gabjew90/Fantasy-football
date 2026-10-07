@@ -149,6 +149,9 @@ def test_your_scenario_prices_the_lines_again_and_leaves_the_board_alone(run, ru
     rows = [ln for ln in sec.splitlines() if ln.startswith("| ") and ("(HOU)" in ln or "(DAL)" in ln)]
     assert rows[0].startswith("| Woody Marks (HOU) | rushing yards"), "the named players lead"
     assert all(ln.count("|") == 9 for ln in rows)
+    # one random stream per team (fourth expert review): what-ifs on Houston players leave every
+    # Dallas draw identical, so no Dallas line may be listed as moved
+    assert not any("(DAL)" in ln for ln in rows), [ln for ln in rows if "(DAL)" in ln]
     for w in FORBIDDEN:
         assert w not in sec
     # the board itself is the plain run's, line for line
@@ -157,3 +160,24 @@ def test_your_scenario_prices_the_lines_again_and_leaves_the_board_alone(run, ru
     cols = [c for c in plain.columns if c in mine.columns and not c.endswith("_utc")]
     assert plain[cols].equals(mine[cols])
     assert (run_assume / "scenarios" / "scenario_2026_wk04_DAL_HOU.json").exists()
+
+
+def test_an_away_team_what_if_leaves_every_home_line_alone(tmp_path):
+    """Fourth expert review, reproduced: with one shared stream, a Dallas (away) what-if listed six
+    Houston lines as moved although nothing about Houston changed. One stream per team: none."""
+    wd, out = tmp_path / "wd", tmp_path / "out"
+    wd.mkdir(); out.mkdir()
+    for f in FIXTURE.iterdir():
+        shutil.copy(f, wd / f.name)
+    env = dict(os.environ, NFL_FETCH_MAX_AGE_S="1000000000", NFL_OUT=str(out))
+    r = subprocess.run([sys.executable, str(SCRIPTS / "score_game.py"), "--away", "DAL", "--home", "HOU",
+                        "--season", "2026", "--week", "4", "--workdir", str(wd),
+                        "--odds-snapshot", str(wd / "odds_snapshot_2026_wk04_DAL_HOU.json"), "--no-scenarios",
+                        "--assume", "CeeDee Lamb: targets=11"],
+                       capture_output=True, text=True, encoding="utf-8", errors="replace", env=env, timeout=900)
+    assert r.returncode == 0, r.stderr[-2000:]
+    report = (out / "report_2026_wk04_DAL_HOU.md").read_text(encoding="utf-8")
+    sec = report[report.index("## Your scenario (experimental)"):]
+    rows = [ln for ln in sec.splitlines() if ln.startswith("| ") and "(HOU)" in ln]
+    assert rows == [], rows
+    assert any(ln.startswith("| CeeDee Lamb (DAL)") for ln in sec.splitlines()), "the named player is priced"

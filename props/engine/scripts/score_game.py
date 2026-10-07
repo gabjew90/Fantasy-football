@@ -587,7 +587,14 @@ def main():
         sys.exit("--scenario-run needs at least one --assume")
     wd = Path(a.workdir); wd.mkdir(parents=True, exist_ok=True)
     OUT.mkdir(parents=True, exist_ok=True)
-    rng = np.random.default_rng(20260917)
+    # ONE RANDOM STREAM PER TEAM AND STAGE (fourth expert review, 2026-10-07): a what-if on one
+    # team must not reshuffle the other team's draws. A single stream shared in draw order gave the
+    # unchanged team fresh random numbers (Over chances moved by up to ~1 point, a quarter of them
+    # past the scenario report's half-point listing threshold). The backtest already seeds per
+    # team-game; stages: 101 receiving, 102 rushing, 103 passing, 34 / 39 the reversal shadows.
+    # Within a team a what-if still re-splits the shared draws, so a teammate's listed move mixes
+    # his real share change with ~0.3-0.4 points of simulation noise.
+    team_stream = lambda t, stage: np.random.default_rng([20260917, stage, zlib.crc32(str(t).encode("utf-8"))])
 
     # ---------- 1. verify matchup from games.csv ----------
     games = pd.read_csv(fetch(GAMES_URL, wd / "games.csv"))
@@ -1304,7 +1311,7 @@ def main():
         shares_t = {n: float(v) for n, v in zip(Mt.name, Mt.ts)}
         crs_t = {n: float(v) for n, v in zip(Mt.name, Mt.cr)}
         ypt_t = {n: float(v) for n, v in zip(Mt.name, Mt.ypt)}
-        out_rec, tt_draw = MODEL.simulate_team_game(rng, N_SIM, env[t]["targets"], TVD["targets_r"],
+        out_rec, tt_draw = MODEL.simulate_team_game(team_stream(t, 101), N_SIM, env[t]["targets"], TVD["targets_r"],
                                                     shares_t, crs_t, ypt_t, SH, other_bucket=True, width=WIDTH_SIM,
                                                     return_other=True,
                                                     player_roles={n: MODEL.role_group(s_) for n, s_ in zip(Mt.name, Mt.slot)})
@@ -1312,7 +1319,7 @@ def main():
         # ROUND 34'S REVERSAL SHADOW (DECISIONS #204): receiving again at target spread 40 (the
         # setting before round 34), its own stream, logged as p_over_spread40 for the week-8 check
         if WIDTH_SIM and WIDTH_SIM.get("share_conc_targets") != 40.0 and not SCENARIO:
-            _o40, _ = MODEL.simulate_team_game(np.random.default_rng([20260917, 34, zlib.crc32(t.encode("utf-8"))]),
+            _o40, _ = MODEL.simulate_team_game(team_stream(t, 34),
                                                N_SIM, env[t]["targets"], TVD["targets_r"], shares_t, crs_t, ypt_t, SH,
                                                other_bucket=True, width={**WIDTH_SIM, "share_conc_targets": 40.0},
                                                player_roles={n: MODEL.role_group(s_) for n, s_ in zip(Mt.name, Mt.slot)})
@@ -1354,7 +1361,7 @@ def main():
         sim_inputs[t] = dict(names=names, shares=shares_t, crs=crs_t, ypt=ypt_t,
                              rs=rs_t, ypc=[float(v) for v in Mt.ypc],
                              p_resid=p_resid, p_kneel=p_kneel, qb_i=qb_i)
-        car_t, rush_t, tc_draw = MODEL.simulate_team_rush(rng, N_SIM, env[t]["carries"], TVD["carries_r"],
+        car_t, rush_t, tc_draw = MODEL.simulate_team_rush(team_stream(t, 102), N_SIM, env[t]["carries"], TVD["carries_r"],
                                                           rs_t, [float(v) for v in Mt.ypc], resid,
                                                           width=WIDTH, player_resid=p_resid, player_kneel=p_kneel,
                                                           qb_index=qb_i)
@@ -1365,7 +1372,7 @@ def main():
         # reversal check (revert if rushing is clearly worse at real lines, weeks 5-8).
         if ("carries_history" in env[t] and env[t].get("carry_factor", 1.0) != 1.0 and not SCENARIO):
             car_m, rush_m, _tcm = MODEL.simulate_team_rush(
-                np.random.default_rng([20260917, 39, zlib.crc32(t.encode("utf-8"))]), N_SIM,
+                team_stream(t, 39), N_SIM,
                 env[t]["carries_history"], TVD["carries_r"], rs_hist, [float(v) for v in Mt.ypc], resid,
                 width=WIDTH, player_resid=p_resid, player_kneel=p_kneel, qb_index=qb_i)
             for j, (_, m) in enumerate(Mt.iterrows()):
@@ -1389,7 +1396,8 @@ def main():
             if STARTER_QB.get(t) is not None:
                 ys_t, other_t = pass_inputs[t]
                 sims[STARTER_QB[t]]["pass_yards"] = MODEL.simulate_qb_passing(
-                    rng, N_SIM, ys_t, other_t, P["other_receiver_rates"], SH, starter_share=_share, width=WIDTH,
+                    team_stream(t, 103), N_SIM, ys_t, other_t, P["other_receiver_rates"], SH, starter_share=_share,
+                    width=WIDTH,
                     implied_points=env[t].get("implied_points"))
                 if (WIDTH or {}).get("pass_implied_exp") and env[t].get("implied_points") is None:
                     # round 38 (pre-registered): a run without the spread/total says the scale is off

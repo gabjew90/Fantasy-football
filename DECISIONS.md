@@ -7934,3 +7934,22 @@ The expert re-ran the four-season backtest (baseline reproduces ours: receptions
   p_over_spread40 (receptions, receiving yards at target spread 40) and p_over_hist_carries
   (backs' rushing from history carries); the four-seed versions come from replaying the archived
   snapshots (--odds-snapshot) with the seed offset -- that replay tool is owed before the review.
+
+## 2026-10-07 (205) -- fourth expert review (the simulation itself): samplers correct; one random stream per team
+
+- The expert checked every sampler against exact formulas at 2,000,000 draws (team and player
+  targets, catches, yards, carries, kneel-downs, QB passing): all correct. Noise in one Over
+  chance: 0.34 points on the live board (20,000 draws), 0.56 in the break-even search (8,000),
+  1.54 in the backtest (1,000) -- the source of #202's seed noise.
+- **Fixed: one random stream per team and stage in the live scorer.** The shared stream gave the
+  team simulated second fresh draws whenever the first team changed. Reproduced: a Dallas (away)
+  what-if listed 6 Houston lines as moved in the scenario report; after the fix, 0. A CI test
+  pins it (props/tests_ci). Every live number shifts once by simulation noise (~0.3 points).
+- Backtest draws are now settable (NFL_BACKTEST_DRAWS, default 1,000 so earlier runs reproduce);
+  ship decisions keep #202's four-seed rule, and 10,000 draws is the alternative.
+- Comments corrected: teammates' targets correlate about +0.06 (the shared total offsets the
+  split's competition), not negatively; the backtest CRPS is the plug-in form (~0.05% bias at
+  1,000 draws, equal across arms). SKILL.md: never compare a QB's passing line with his
+  receivers' summed lines (round 38 scales the QB alone).
+- Not changed: passes and runs, and the two teams, are drawn independently -- no effect on a
+  single prop; it would matter for same-game combinations, which are not priced.
