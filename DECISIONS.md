@@ -7705,3 +7705,21 @@ by the user.
   positive). Targets keep the shipped rule (positive, not detectable).
 - Next, from the same review: the new-team cap on efficiency rates (one test) and the
   starter-share draw on QB passing (one round; the user bets passing as often as others).
+
+## 2026-10-06 (193) -- the matchup brief: tables first, read second
+
+- User: his "TB at DAL" brief is the model -- clear tables and a reader-friendly narrative that
+  interprets the data instead of repeating it, written in chat (markdown), never a PDF.
+- Every game report now opens with a **Matchup brief**: the market; team outlook (our
+  expected passes and runs against the season, close-game pass rate); unit against unit
+  (EPA per play and success on dropbacks and runs for each offence against the defence it
+  faces, garbage time removed at win probability 10-90%, neutral pace); personnel (QB with
+  start number, O-line regulars, designated skill players, defensive injuries); fantasy points
+  allowed by position; weather and roof; and **where this baseline may miss** -- the model's
+  known blind spots that apply to this game (a QB change, an expected lead the carries do not
+  follow, new roles, questionable players, passing width, rushing tails, line absences, wind,
+  an unposted roof). Context only; nothing in it is a price input.
+- The research table flags a thin margin at our projection (under 10% past a side's
+  break-even volume) or that neither side pays; SKILL.md writes the brief's prose rules:
+  a thesis first, then table-and-read sections, facts / estimates / judgment apart, the
+  game flow and what would change it, every player call tied to share, line and price.

@@ -2995,6 +2995,13 @@ def main():
                      for _, r in R.iterrows()]
         R.to_csv(logf, index=False)
 
+    # THE MATCHUP BRIEF goes at the top whether or not the card has rows (code review)
+    BRIEF = brief_section(AWAY=AWAY, HOME=HOME, market_env=market_env, M=M, pop=pop, iw=iw, pbp=pbp,
+                          STARTER_QB=STARTER_QB, AUTO_QB=AUTO_QB, LINE_STATUS=LINE_STATUS,
+                          TEAM_VOL_CHK=TEAM_VOL_CHK, UNIT_EFF=UNIT_EFF, PA=PA, weather=weather, roof=roof,
+                          ROOF_NOTE=ROOF_NOTE, R=R)
+    if BET.empty:
+        L[3:3] = BRIEF
     # put the card at the top of the report, right after the header rule
     if not BET.empty:
         T = []
@@ -3005,7 +3012,7 @@ def main():
         wx = (f"{weather.get('temp_f','')}F, wind to {weather.get('wind_mph_max','')} mph, rain {weather.get('precip_pct_max','')}% (NWS {weather.get('updated','')})"
               if weather.get("status") == "ok" else f"weather {weather.get('status')}")
         desig = [f"{r['name']} {r.report_status}" for _, r in pop.iterrows() if isinstance(r.get("report_status"), str) and r.report_status]
-        T += brief_section(locals())
+        T += BRIEF
         T += ["## Game header\n",
               f"- **Frame:** {frame}. Team TD totals, all touchdowns incl. defence and special teams (the yardage "
               f"model's anchor): " + ", ".join(f"{t} {env[t].get('pass_td',0)+env[t].get('rush_td',0):.1f} ({'market-anchored' if env[t].get('td_anchor')=='market' else 'history'})" for t in (AWAY, HOME))
@@ -3645,22 +3652,35 @@ BOOK_NAME = {"sleeper": "Sleeper", "draftkings": "DraftKings", "fanduel": "FanDu
 break_even_cell = RSCH.break_even_cell
 
 
-def qb_starts(pbp, gsis_id) -> int:
-    """Games this season in which this QB threw his team's first pass (the start)."""
+def first_passers(pbp):
+    """{(game_id, team): the QB who threw the team's first pass} -- the starts."""
     if pbp is None or not len(pbp) or "passer_player_id" not in pbp:
-        return 0
+        return pd.Series(dtype=object)
     p_ = pbp[pbp.passer_player_id.notna() & pbp.posteam.notna()]
     if "play_id" in p_:
         p_ = p_.sort_values(["game_id", "play_id"])
-    first = p_.groupby(["game_id", "posteam"]).passer_player_id.first()
-    return int((first == gsis_id).sum())
+    return p_.groupby(["game_id", "posteam"]).passer_player_id.first()
 
 
-def brief_section(V: dict) -> list[str]:
+def qb_starts(pbp, gsis_id, first=None) -> int:
+    """Games this season in which this QB threw his team's first pass (the start)."""
+    first = first_passers(pbp) if first is None else first
+    return int((first == gsis_id).sum()) if len(first) else 0
+
+
+BRIEF_ARGS = ("AWAY", "HOME", "market_env", "M", "pop", "iw", "pbp", "STARTER_QB", "AUTO_QB", "LINE_STATUS",
+              "TEAM_VOL_CHK", "UNIT_EFF", "PA", "weather", "roof", "ROOF_NOTE", "R")
+
+
+def brief_section(**V) -> list[str]:
     """The matchup brief (user, 2026-10-06; modelled on his TB at DAL brief): market, team
     outlook, unit against unit, personnel, positional points allowed, weather and the known
-    gaps that apply to THIS game -- small tables the narrative interprets. V: the scorer's
-    locals. Context only: nothing here moves a price."""
+    gaps that apply to THIS game -- small tables the narrative interprets. Every input is a
+    named argument (BRIEF_ARGS); a missing one is an error, never a silently empty table.
+    Context only: nothing here moves a price."""
+    missing = [k for k in BRIEF_ARGS if k not in V]
+    if missing:
+        raise TypeError(f"brief_section is missing {missing}")
     AWAY, HOME, ME_ = V["AWAY"], V["HOME"], V.get("market_env") or {}
     M, pop, iw, pbp = V["M"], V["pop"], V["iw"], V["pbp"]
     L = ["## Matchup brief\n", "*Facts (data), model estimates (ours) and judgment (yours or chat's) are kept "
@@ -3674,13 +3694,15 @@ def brief_section(V: dict) -> list[str]:
     # personnel
     starters = V.get("STARTER_QB") or {}
     auto = {a_["team"]: a_ for a_ in (V.get("AUTO_QB") or [])}
+    FP = first_passers(pbp)
+    sid = {t: (lambda g_: g_.iloc[0] if len(g_) else None)(M[(M.team == t) & (M.name == starters[t])].gsis_id)
+           for t in (AWAY, HOME) if starters.get(t) is not None}
     cells = {}
     for t in (AWAY, HOME):
         c = {}
         qn = starters.get(t)
         if qn is not None:
-            g_ = M[(M.team == t) & (M.name == qn)].gsis_id
-            n_ = qb_starts(pbp, g_.iloc[0]) + 1 if len(g_) else None
+            n_ = qb_starts(pbp, sid[t], FP) + 1 if sid.get(t) else None
             st_ = pop[(pop.team == t) & (pop.name == qn)].report_status
             st_ = st_.iloc[0] if len(st_) and isinstance(st_.iloc[0], str) else None
             if t in auto:
@@ -3699,7 +3721,7 @@ def brief_section(V: dict) -> list[str]:
         sk = pop[(pop.team == t) & pop.report_status.apply(lambda v: isinstance(v, str) and v != "")]
         c["Pass catchers / backs"] = ", ".join(f"{r['name']} ({r.pos}, {r.report_status})" for _, r in sk.iterrows()
                                                if r.pos != "QB") or "none designated"
-        if len(iw) and "position" in iw:
+        if len(iw) and "position" in iw and (iw.team == t).any():
             dfn = iw[(iw.team == t) & iw.position.isin(RSCH.DEF_POS)
                      & iw.report_status.isin(["Out", "Doubtful", "Questionable"])]
             c["Defence"] = ", ".join(f"{r.full_name} ({r.position}, {r.report_status})" for r in dfn.itertuples()) \
@@ -3724,10 +3746,12 @@ def brief_section(V: dict) -> list[str]:
     for t in (AWAY, HOME):
         if t in auto:
             qb_change[t] = f"{auto[t]['starter']} starts for {auto[t]['out']}"
-        elif starters.get(t) is not None:
-            g_ = M[(M.team == t) & (M.name == starters[t])].gsis_id
-            if len(g_) and qb_starts(pbp, g_.iloc[0]) <= 1:
-                qb_change[t] = f"{starters[t]}, start {qb_starts(pbp, g_.iloc[0]) + 1} this season"
+        elif sid.get(t):
+            mine = qb_starts(pbp, sid[t], FP)
+            team_fp = FP[[k[1] == t for k in FP.index]] if len(FP) else FP
+            others = int((team_fp != sid[t]).sum()) if len(team_fp) else 0
+            if others and mine <= 1:          # another QB started for this team: a real change
+                qb_change[t] = f"{starters[t]}, start {mine + 1} this season after {others} by another QB"
     priced = set(R.player) if R is not None and len(R) else set()
     ctx = {"qb_change": qb_change,
            "fav": (HOME if spread is not None and spread < 0 else AWAY) if spread is not None else None,

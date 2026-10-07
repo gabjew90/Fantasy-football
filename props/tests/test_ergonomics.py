@@ -498,3 +498,10 @@ def test_qb_starts_count_games_he_threw_his_teams_first_pass():
     pbp = pd.DataFrame({"game_id": ["g1", "g1", "g2", "g2", "g3"], "play_id": [1, 2, 1, 2, 1],
                         "posteam": ["TB"] * 5, "passer_player_id": ["M", "D", "D", "D", "M"]})
     assert SG.qb_starts(pbp, "D") == 1 and SG.qb_starts(pbp, "M") == 2
+
+
+
+def test_the_brief_refuses_a_missing_input():
+    import pytest as _pt
+    with _pt.raises(TypeError, match="missing"):
+        SG.brief_section(AWAY="TB", HOME="DAL")
