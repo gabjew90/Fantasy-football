@@ -926,3 +926,19 @@ def test_tiers_narrow_for_a_tight_league_and_widen_for_a_spread_one():
     assert tight["step"] < wide["step"] and tight["n"] <= RS.MAX_TIERS and wide["n"] <= RS.MAX_TIERS
     low = RS.tiers({"a": 10.0, "b": 2.0}, higher_is_better=False)
     assert low["tier"] == {"a": low["n"], "b": 1}, "lower is better: the smaller value is tier 1"
+
+
+
+def test_a_printed_score_sits_inside_its_tiers_printed_band():
+    """Code review: tiers on the whole-number scores shown, bands without shared edges, the
+    last band reaching the worst team."""
+    sc = {"A": 73.4, "B": 65.2, "C": 64.6, "D": 57.0, "E": 49.9, "F": 25.1}
+    ue = {"score": {"off": {"pass": sc, "run": {}}, "def": {"pass": {}, "run": {}}}}
+    T = RS.unit_tiers(ue)[("off", "pass")]
+    shown = {t: round(v) for t, v in sc.items()}
+    for t, k in T["tier"].items():
+        b = next(x for x in T["bands"] if x[0] == k)
+        lo, hi = (int(x) for x in RS.band_label(b, last=(k == T["n"])).split("-"))
+        assert lo <= shown[t] <= hi, (t, shown[t], k, lo, hi)
+    over = RS.tiers({str(i): float(i * 20) for i in range(6)}, steps=(2, 3))   # spread 100 > 6 x 3
+    assert over["bands"][-1][1] <= 0.0, "the last band reaches the worst team"

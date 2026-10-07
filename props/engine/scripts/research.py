@@ -1009,7 +1009,7 @@ TIER_STEPS = (0.5, 1, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10)
 MAX_TIERS = 6
 
 
-def tiers(values: dict, higher_is_better=True, max_tiers=MAX_TIERS) -> dict:
+def tiers(values: dict, higher_is_better=True, max_tiers=MAX_TIERS, steps=TIER_STEPS) -> dict:
     """Equal-width tiers counted from the best team down (user, 2026-10-06). The width is the
     smallest round step that keeps the league inside max_tiers bands, so a tight league gets
     narrow bands and a spread-out one wide bands, and every band means the same number of
@@ -1020,12 +1020,14 @@ def tiers(values: dict, higher_is_better=True, max_tiers=MAX_TIERS) -> dict:
     g = {t: (v if higher_is_better else -v) for t, v in values.items()}
     best, worst = max(g.values()), min(g.values())
     span = best - worst
-    step = next((st for st in TIER_STEPS if span <= st * max_tiers), TIER_STEPS[-1])
+    step = next((st for st in steps if span <= st * max_tiers), steps[-1])
     n = max(1, min(max_tiers, int(-(-span // step)) if span > 0 else 1))
     tier = {t: min(n, 1 + int((best - x) // step)) for t, x in g.items()}
     bands = []
     for k in range(1, n + 1):
         hi_g, lo_g = best - (k - 1) * step, best - k * step
+        if k == n:
+            lo_g = min(lo_g, worst)          # the last band always reaches the worst team
         lo, hi = (lo_g, hi_g) if higher_is_better else (-hi_g, -lo_g)
         bands.append((k, lo, hi))
     return {"step": step, "n": n, "tier": tier, "bands": bands}
@@ -1034,8 +1036,20 @@ def tiers(values: dict, higher_is_better=True, max_tiers=MAX_TIERS) -> dict:
 def unit_tiers(ue) -> dict:
     """The four tier scales on the unit score (higher is better on all four)."""
     sc = (ue or {}).get("score") or {}
-    return {(side, kind): tiers(sc.get(side, {}).get(kind, {}), higher_is_better=True)
+    # tiered on the WHOLE-NUMBER scores the table shows, in whole-number bands, so a printed
+    # score always sits inside its tier's printed range (code review)
+    return {(side, kind): tiers({t: round(v) for t, v in sc.get(side, {}).get(kind, {}).items()},
+                                higher_is_better=True, steps=INT_STEPS)
             for side in ("off", "def") for kind in ("pass", "run")}
+
+
+INT_STEPS = (2, 3, 4, 5, 6, 8, 10, 12, 15, 20)
+
+
+def band_label(b, last=False) -> str:
+    """A whole-number band (k, lo, hi] as 'lo+1-hi' (the last band includes its low edge)."""
+    lo, hi = int(round(b[1])), int(round(b[2]))
+    return f"{lo if last else lo + 1}-{hi}"
 
 
 def unit_table(ue, away, home) -> list[str]:
@@ -1051,8 +1065,8 @@ def unit_table(ue, away, home) -> list[str]:
         for k in ("pass", "run"):
             if o in sc["off"][k] and d_ in sc["def"][k]:
                 to, td = T[("off", k)], T[("def", k)]
-                L.append(f"| {o} {k} vs. {d_} | {sc['off'][k][o]:.0f} | {to['tier'][o]} of {to['n']} | "
-                         f"{sc['def'][k][d_]:.0f} | {td['tier'][d_]} of {td['n']} |")
+                L.append(f"| {o} {k} vs. {d_} | {round(sc['off'][k][o])} | {to['tier'][o]} of {to['n']} | "
+                         f"{round(sc['def'][k][d_])} | {td['tier'][d_]} of {td['n']} |")
     L += ["", "**Score**: how well a unit does per play, blending EPA per play (points added against an average "
               "play from the same down, distance and field position) and success rate (share of plays that added "
               "points) equally. 50 is the league average and every 10 points is one standard deviation; higher is "
@@ -1065,7 +1079,7 @@ def unit_table(ue, away, home) -> list[str]:
         cells = []
         for key in (("off", "pass"), ("off", "run"), ("def", "pass"), ("def", "run")):
             b = next((x for x in T[key]["bands"] if x[0] == k), None)
-            cells.append(f"{b[1]:.0f}-{b[2]:.0f}" if b else "")
+            cells.append(band_label(b, last=(k == T[key]["n"])) if b else "")
         L.append(f"| {k}{' (best)' if k == 1 else ''} | " + " | ".join(cells) + " |")
     pace = ue.get("pace") or {}
     if all(t in pace for t in (away, home)):
