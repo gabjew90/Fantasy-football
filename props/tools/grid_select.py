@@ -46,8 +46,11 @@ def spread_eligible(frames, seasons, opening=None, bands=SB.TGT_BANDS[:3]) -> li
 
 def knob_distance(grid, shipped_i, knobs) -> dict:
     """Ties go to the setting closest to shipped: the sum over knobs of how many grid steps a
-    setting's value sits from the shipped one (None counts as its own step)."""
-    levels = {k: sorted({g.get(k) for g in grid}, key=lambda v: (v is not None, v if v is not None else 0))
+    setting's value sits from the shipped one. None (the knob off) is its own step at the TOP
+    end: for a concentration knob off means no swing at all (beyond the largest value); for
+    starter_share_shrink it means no shrink (1.0, beyond 0.75). Sorting it first put catch_conc
+    off next to 25, the most swing (expert review, 2026-10-06)."""
+    levels = {k: sorted({g.get(k) for g in grid}, key=lambda v: (v is None, v if v is not None else 0))
               for k in knobs}
     pos = lambda i, k: levels[k].index(grid[i].get(k))
     return {i: sum(abs(pos(i, k) - pos(shipped_i, k)) for k in knobs) for i in range(len(grid))}

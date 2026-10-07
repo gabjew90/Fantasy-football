@@ -50,7 +50,12 @@ def test_eligibility_and_the_tie_go_to_shipped_or_the_nearest_setting():
                eligible=[True, False, True], min_move=0, required=("receptions",))
     assert r["pick"] == 2 and 1 not in r["candidates"], "an ineligible setting is never picked"
     d = GS.knob_distance(grid, 0, ("k",))
-    assert d == {0: 0, 1: 1, 2: 2}
+    assert d == {0: 0, 1: 2, 2: 1}, "off sits beyond the largest value (no swing), not beside the smallest"
+    # round 34's shape: catch_conc off is one step from 100 (the least swing), three from 25
+    g34 = [{"t": t, "c": c} for t in (40.0, 60.0) for c in (None, 25.0, 50.0, 100.0)]
+    d34 = GS.knob_distance(g34, 0, ("t", "c"))
+    assert d34[g34.index({"t": 40.0, "c": 100.0})] == 1 and d34[g34.index({"t": 40.0, "c": 25.0})] == 3
+    assert d34[g34.index({"t": 60.0, "c": None})] == 1
     same = GS.run(grid, [frames[1], frames[1], frames[1]], 0, "receptions", "u", [2022, 2023, 2024], [2025],
                   ("k",), reps=200, required=("receptions",))
     assert same["pick"] == 0 and not same["ship"], "identical settings: shipped stays"

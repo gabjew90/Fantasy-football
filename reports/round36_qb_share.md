@@ -52,3 +52,30 @@ near 1.0, a few exits near zero), so pulling it to its mean also moves the middl
 distribution. As with round 32, QB passing's excess width sits in the tails, and the shipped
 setting already prices the main line best. QB passing stays labelled "too wide" for lines far
 from the projection; 2025 is not read for a ship (nothing to confirm).
+
+### Amendment after the expert review (2026-10-06; nothing above edited)
+
+**The setting was mis-specified.** 86% of starts keep 99% or more of the passing yards, so
+pulling the draw to its 0.963 mean cut every full game by about 3.7%: it moved the middle and
+the spread together. The null stands for that setting; it says nothing about a width fix that
+leaves the middle alone.
+
+**"The shipped setting already prices the main line best" was wrong to conclude.** The shipped
+score, 0.6997, is worse than a constant 50% (0.6931). The check the expert asked for -- the
+actual Over rate at the stand-in line beside the mean model chance, shipped setting, starting
+QBs, 1,778 games (scratchpad check on the round's own frames):
+
+| Season | Games | Over hit | Model's mean Over chance | Gap (95%, game-clustered) |
+|---|---|---|---|---|
+| 2022 | 434 | 52.5% | 46.8% | +5.7 (+0.9, +10.5) |
+| 2023 | 442 | 54.3% | 47.0% | +7.3 (+2.8, +12.0) |
+| 2024 | 441 | 49.2% | 47.2% | +2.1 (-2.8, +6.6) |
+| 2025 | 461 | 54.7% | 47.0% | +7.7 (+3.2, +12.2) |
+| All | 1,778 | 52.7% | 47.0% | **+5.7 (+3.3, +8.0)** |
+
+The gap is there in every fifth of the model's chance (+5 to +8 points), and it grows with each
+shrink step, matching the losses above. Shifting the model's chance up by the gap alone brings
+the score to 0.6934, about a coin flip: at the main line the engine's QB passing Over has been
+about 6 points too low. This is a measured bias, not a direction guessed from the width.
+**A fix needs its own pre-registered round (38)**; until then the report states the bias
+beside every passing-yards price.

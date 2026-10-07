@@ -83,3 +83,49 @@ closer to real; receptions 19.1% -> 21.2% outside the 80% range and receiving ya
 push catches past the bar.
 
 **Round 34 ships share_conc_targets 60** (resources/width_params.json).
+
+### Amendment after the expert review (2026-10-06; nothing above edited)
+
+**What the ship rests on.** Mainly the direct spread measurement: the engine's target spread
+was wider than real games in every band in all four seasons, and 60 moves each ratio toward
+real without passing it. The log-loss gain is small because the scores are read at the
+engine's own central line, where every spread setting says about 50%.
+
+**Three sentences above oversell, corrected here:**
+
+- *Widths "closer to real".* True for targets and receiving yards. Receptions moved from 19.1%
+  to 21.2% outside the 80% range -- further from 20%, though still inside the bar.
+- *"Every fold positive".* True of each fold's point estimate. The pooled out-of-fold gain's
+  interval includes zero, and so does 2025's.
+- *2025 as a clean confirmation.* It is not: round 31 selected on 2022-25 and read the same
+  setting family (share_conc_targets 40-120) with 2025 inside its selection data. 2025 was not
+  untouched when round 34 named it the confirmation season.
+
+**The tie-break had a bug** (props/tools/grid_select.knob_distance): it treated catch_conc off
+as one step from 25 (the most swing) instead of one step from 100 (the least). Fixed, with a
+test on round 34's grid shape. Rerun: **the pick is unchanged** (60, catch_conc off). One
+leave-one-season-out fold's pick moved (2024 held out: 60 / 25 -> 60 / 100), and the pooled
+out-of-fold gain is now +0.00071 (95%: -0.00025, +0.00164).
+
+**The catch-rate swing on the conversion score** (the scoreboard's standing rule for a
+conversion setting), at share_conc_targets 60, paired against catch_conc off:
+
+| catch_conc | Conversion gain 2022-24 (95%) | 2025 | Catches given targets outside 80% (2022-24 / 2025) |
+|---|---|---|---|
+| off (shipped) | -- | -- | 22.5% / 20.4% |
+| 100 | +0.00038 (-0.00007, +0.00083) | +0.00048 (-0.00032, +0.00139) | 21.8% / 20.1% |
+| 50 | +0.00045 (-0.00039, +0.00132) | +0.00061 (-0.00094, +0.00235) | 20.9% / 19.2% |
+| 25 | -0.00005 (-0.00155, +0.00152) | +0.00014 (-0.00263, +0.00295) | 19.4% / 17.0% |
+
+(Target spread does not touch this score: 40 / off and 60 / off are identical, as they
+should be.) No setting is detectable, so the catch-rate swing stays off under the rule. The
+lean is positive at 100 and 50 and the catches-given-targets width moves toward 20%: a
+candidate for a pre-registered round, not a ship.
+
+**Open on the betting path:**
+
+- Catches given targets are still too narrow (22.5% outside on 2022-24). The old, too-wide
+  target spread partly offset that, so a receptions what-if now leans slightly overconfident.
+- The 8-11 projected-target band is still about 14% too wide (real / model 0.86), while the
+  3-8 bands would take a setting near 80-120. One setting cannot fit both; WR1s sit in the
+  top band. A band-dependent spread is the follow-up.

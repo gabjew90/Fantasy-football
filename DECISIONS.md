@@ -7752,3 +7752,18 @@ by the user.
   worsens the chance at the line at every step -- the excess width is in the tails.
 - **Round 37 null**: capping only the shares for new-team players changes nothing detectable;
   the cap stays on every rate.
+
+## 2026-10-06 (196) -- expert review of rounds 34 and 36: tie-break fixed, QB passing Over measured 6 points low
+
+- grid_select.knob_distance put "off" next to the smallest value (catch_conc off beside 25,
+  the most swing); off now sits beyond the largest. Round 34 rerun: same pick (60, off); the
+  pooled out-of-fold gain is +0.00071 (-0.00025, +0.00164).
+- Round 34's summary corrected: receptions width moved away from 20% (19.1 -> 21.2%); the
+  pooled out-of-fold and 2025 intervals include zero; 2025 was not a clean confirmation
+  (round 31 selected on it). The ship stands on the direct spread measurement.
+- The catch-rate swing on the conversion score at 60: no setting detectable (best +0.00045,
+  -0.00039 to +0.00132); stays off. Leans positive: a candidate round.
+- Round 36: the shrink moved the middle as well as the spread (86% of starts keep 99%+ of
+  the yards). The QB passing Over at the stand-in line hit 52.7% against a model 47.0% on
+  2022-25 (+5.7, 95% +3.3 to +8.0; three of four seasons clear zero). Round 38 to fix it;
+  the report states the bias beside passing prices meanwhile.
