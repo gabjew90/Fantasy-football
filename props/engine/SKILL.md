@@ -608,7 +608,14 @@ need not be surfaced. Write the reply as a premium prop guide with this structur
    rather than the ones worth betting, and reuses each player-week 8-10 times so its `n`
    column overstates the evidence by about an order of magnitude. Quote it only with that
    description attached. The 2022-25 yardage harness (`reports/yardage_harness.md` in the
-   repo) is the evidence, with **measured biases at the main line (expert audit, DECISIONS #197)**:
+   repo) is the backtest evidence. **The live record at Sleeper's real lines comes first (DECISIONS
+   #202):** over weeks 2-4 (1,536 graded lines) the engine's Over chance had no useful relationship
+   to outcomes -- log loss 0.717 against the market's 0.692 (a coin flip is 0.693); passing Overs
+   hit 57% against an engine 42%, rushing 40% against 47%. So read the market's no-vig chance as
+   the probability and the engine for what it is built for: the workload a line needs, the role
+   evidence and the what-ifs. Each card prints the live record beside the backtest rows; never
+   present the engine's percentage as the better probability. The backtest evidence, with
+   **measured biases at the main line (expert audit, DECISIONS #197)**:
    at the backtest's stand-in line on 2022-25 the receiving-yards Over hit 2.9 points more often
    than the engine said (receptions 1.4, rushing 1.8, combined 0.6), and every market leans by
    the team's implied points (backs on teams implied 27+: Over 58.7% against 48.5%). Each card
