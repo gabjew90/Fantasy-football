@@ -1032,6 +1032,7 @@ def tiers(values: dict, higher_is_better=True, max_tiers=MAX_TIERS, steps=TIER_S
     step = next((st for st in steps if span <= st * max_tiers), steps[-1])
     n = max(1, min(max_tiers, int(-(-span // step)) if span > 0 else 1))
     tier = {t: min(n, 1 + int((best - x) // step)) for t, x in g.items()}
+    _values = dict(values)
     bands = []
     for k in range(1, n + 1):
         hi_g, lo_g = best - (k - 1) * step, best - k * step
@@ -1039,7 +1040,29 @@ def tiers(values: dict, higher_is_better=True, max_tiers=MAX_TIERS, steps=TIER_S
             lo_g = min(lo_g, worst)          # the last band always reaches the worst team
         lo, hi = (lo_g, hi_g) if higher_is_better else (-hi_g, -lo_g)
         bands.append((k, lo, hi))
-    return {"step": step, "n": n, "tier": tier, "bands": bands}
+    return {"step": step, "n": n, "tier": tier, "bands": bands, "best": best,
+            "higher_is_better": higher_is_better, "_values": _values}
+
+
+def tier_grade(t: dict, team) -> str:
+    """The team's letter with + / - for where it sits inside its band (user, 2026-10-06):
+    top third +, bottom third -, middle plain -- so a C- and a D+ read as the neighbours they
+    are instead of a full grade apart."""
+    k = t["tier"][team]
+    return tier_letter(k) + _band_mod(t, team)
+
+
+def _band_mod(t: dict, team) -> str:
+    x = t.get("_values", {}).get(team)
+    if x is None or not t.get("step"):
+        return ""
+    g = x if t.get("higher_is_better", True) else -x
+    down = (t["best"] - g) - (t["tier"][team] - 1) * t["step"]      # distance below the band's top
+    if down < t["step"] / 3:
+        return "+"
+    if down >= 2 * t["step"] / 3:
+        return "-"
+    return ""
 
 
 def unit_tiers(ue) -> dict:
@@ -1070,7 +1093,7 @@ def unit_table(ue, away, home) -> list[str]:
     T = unit_tiers(ue)
     sc = ue["score"]
     L = ["| Matchup | Offence score | Offence tier | Defence faced: score | Defence tier |", "|---|---|---|---|---|"]
-    letters = lambda tt, team: tier_letter(tt["tier"][team])
+    letters = tier_grade
     for o, d_ in ((away, home), (home, away)):
         for k in ("pass", "run"):
             if o in sc["off"][k] and d_ in sc["def"][k]:
@@ -1082,7 +1105,8 @@ def unit_table(ue, away, home) -> list[str]:
               "points), two parts EPA to one part success. 50 is the league average and every 10 points is one standard deviation; higher is "
               "better for offences and defences alike. Passes include sacks and scrambles; garbage time removed ("
               + ue["_filter"] + "). **Tiers** S, A, B, C, D, F: equal bands of score counted down from the "
-              "league's best team (S = the top band); a list whose spread needs fewer bands stops before F.",
+              "league's best team (S = the top band); a list whose spread needs fewer bands stops before F. "
+              "**+ / -** mark the top and bottom third of a band, so a C- and a D+ are neighbours.",
           "", "| Tier | Passing offence | Running offence | Pass defence | Run defence |", "|---|---|---|---|---|"]
     n = max(T[k]["n"] for k in T)
     for k in range(1, n + 1):

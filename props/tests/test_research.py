@@ -959,3 +959,14 @@ def test_the_score_weights_epa_two_to_one_over_success():
     sc = RS.unit_efficiency(pd.DataFrame(rows))["score"]["off"]["pass"]
     assert RS.SCORE_EPA_WEIGHT == pytest.approx(2 / 3)
     assert sc["BIG"] > 50 > sc["STEADY"], "two parts EPA to one part success"
+
+
+
+def test_plus_and_minus_mark_where_a_team_sits_inside_its_band():
+    # user, 2026-10-06: a 1-point gap across a band edge must not read as a full grade
+    t = RS.tiers({"A": 73, "B": 72, "C": 69, "D": 66, "E": 65, "F": 58}, steps=(8,))
+    g = {k: RS.tier_grade(t, k) for k in "ABCDEF"}
+    assert g["A"] == "S+" and g["B"] == "S+" and g["C"] == "S" and g["D"] == "S-"
+    assert g["E"] == "A+", "one point below the S band's bottom: the top of A, a neighbour of S-"
+    low = RS.tiers({"x": 10.0, "y": 2.0, "z": 9.5}, higher_is_better=False, steps=(1, 2, 3))
+    assert RS.tier_grade(low, "y")[0] == "S" and RS.tier_grade(low, "x")[0] != "S"
