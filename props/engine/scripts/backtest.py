@@ -575,6 +575,10 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
             # pre-game snap feed the harness does not have and stays a disclosed gap.
             new_team = bool(getattr(args, "new_team_cap", True) and pri is not None and "team_prior" in pri.index
                             and pd.notna(pri["team_prior"]) and pri["team_prior"] != r.team)
+            # round 37 (reports/round37_new_team_rates.md): the cap on every rate (shipped, as the
+            # scorer does) or on the two SHARES only -- catch rate and yards a target or carry
+            # travel with the player more than his role does
+            cap_rates = getattr(args, "new_team_cap_rates", "all")
 
             def two_stage(pri_col, n_col, slot_key, default, k0_key, k0_default,
                           cur, cur_n, scale_role=False):
@@ -589,7 +593,8 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
                 val, _chain = M.blended_rate(
                     own_pri, n_pri, gv(sp[slot_key], slot, default),
                     K0R.get(k0_key, k0_default),
-                    cur_rate=cur, cur_den=cur_n, scale_role=scale_role, new_team=new_team)
+                    cur_rate=cur, cur_den=cur_n, scale_role=scale_role,
+                    new_team=new_team and (cap_rates == "all" or k0_key in ("target_share", "rush_share")))
                 return val
 
             ts = two_stage("target_share", "team_targets_n", "ts", np.nan,
@@ -1193,6 +1198,7 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
         res = res_df.merge(gm, on=["team", "week"], how="left")
         # which harness wrote these rows: compare() never mixes a capped run with an uncapped one
         res["new_team_cap"] = bool(getattr(args, "new_team_cap", True))
+        res["new_team_cap_rates"] = getattr(args, "new_team_cap_rates", "all")
 
         # RELIABILITY AT SYNTHETIC LINES (calibration a bettor can read): lines at
         # fixed offsets from the model median (not model quantiles, which would be
@@ -1400,7 +1406,20 @@ STANDIN_SCALE = {"rec_yds": 0.876, "rush_yds": 0.902, "pass_yds": 1.0}
 # Round 33 (reports/round33_passing_spread.md): the team's throws, judged on QB passing
 PASS_SPREAD_GRID = [{"team_r_mult": v} for v in (None, 1.5, 2.5, 4.0)]
 
+# Round 34 (reports/round34_receiving_joint.md): target spread and catch-rate swing together
+RECEIVING_JOINT_GRID = [{"share_conc_targets": sc, "catch_conc": cc}
+                        for sc in (40.0, 60.0, 80.0, 120.0) for cc in (None, 100.0, 50.0, 25.0)]
+
+# Round 36 (reports/round36_qb_share.md): the starter-share draw on QB passing, pulled to its mean
+PASS_SHARE_GRID = [{"starter_share_shrink": v} for v in (None, 0.75, 0.5, 0.25, 0.0)]
+
 SUBGRIDS = {
+    "receivingjoint": (RECEIVING_JOINT_GRID, ("rec", "yds", "pass"), "width",
+                       "Round 34: target spread and catch-rate swing together (reports/round34_receiving_joint.md); "
+                       "the pick is made by props/tools/round34_select.py, not by this table."),
+    "qbshare": (PASS_SHARE_GRID, ("pass",), "width",
+                "Round 36: the starter-share draw on QB passing (reports/round36_qb_share.md); the pick is made "
+                "by props/tools/round36_select.py, not by this table."),
     "passspread": (PASS_SPREAD_GRID, ("pass", "rec", "yds"), "width",
                    "Round 33: the team's throws judged on QB passing (reports/round33_passing_spread.md); the "
                    "pick is made on the scoreboard, not by this table."),
@@ -1975,7 +1994,7 @@ def main(argv=None):
     ap.add_argument("--tune-width", action="store_true",
                     help="choose the width settings on the --tune seasons; writes --report (.md/.csv)")
     ap.add_argument("--width-out", default=None, help="--tune-width: write the chosen settings to this JSON file")
-    ap.add_argument("--tune-grid", choices=["main", "qb", "rushnorm", "rushlead", "tier2", "running", "conversion", "targetspread", "yardsshape", "passspread"], default="main",
+    ap.add_argument("--tune-grid", choices=["main", "qb", "rushnorm", "rushlead", "tier2", "running", "conversion", "targetspread", "yardsshape", "passspread", "receivingjoint", "qbshare"], default="main",
                     help="--tune-width: the receiving/rushing grid, the starting QB's own settings, or the "
                          "carry-share rescaling")
     ap.add_argument("--dispersion", choices=["prior", "train"], default=None,
@@ -2021,6 +2040,8 @@ def main(argv=None):
                          "per-season fit with no fixed constants (default: model.K0_FIXED)")
     ap.add_argument("--new-team-cap", action="store_true", default=True,
                     help="the scorer's new-team cap on a carried-over prior (model.blended_rate new_team)")
+    ap.add_argument("--new-team-cap-rates", choices=["all", "shares"], default="all",
+                    help="round 37: the new-team cap on every rate (shipped) or on the target / carry shares only")
     ap.add_argument("--no-new-team-cap", dest="new_team_cap", action="store_false",
                     help="ABLATION: the pre-2026-10-06 harness, no new-team cap")
     ap.add_argument("--historical-blend", action="store_true", default=True,

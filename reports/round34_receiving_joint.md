@@ -51,3 +51,11 @@ travels through). Ties within 0.0005 go to the setting closer to shipped.
 ## Result
 
 (Filled in after the runs, below this line, without editing anything above.)
+
+**Amendment, 2026-10-06, before any run:** run on the current harness (priors over active
+weeks, the new-team cap, exact receptions chances: DECISIONS #191-192), and scored by the
+scoreboard as it now stands -- one frozen cohort, guards complete or BLOCKED
+(scoreboard.guard_verdict), the 15-85% decision zone. Eligibility (target spread at or below
+the real upper bound in every band) is read on 2022-24. The leave-one-season-out gain of the
+rule (props/tools/loso_select.py, over the eligible settings) is reported beside the
+in-sample gain. Tool: props/tools/round34_select.py.

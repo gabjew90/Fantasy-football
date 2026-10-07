@@ -689,7 +689,11 @@ WIDTH_OFF = {"share_conc_targets": None, "share_conc_carries": None, "catch_conc
              # receiving yards' spread grows with catches as catches ** (2 - this) instead of
              # linearly (None = 1, today's sum of independent catches); above 1 = slower growth
              # (reports/round32_yards_shape.md)
-             "catch_shape_exp": None}
+             "catch_shape_exp": None,
+             # round 36: the starter-share draw on QB passing pulled toward its own mean by this
+             # factor (None = the drawn share as is; 0 = always the mean): keeps the passing
+             # average, narrows the exits-and-benchings spread (reports/round36_qb_share.md)
+             "starter_share_shrink": None}
 
 # simulate_team_game(..., return_other=True) files the 'other' bucket's targets
 # under this key, for simulate_qb_passing.
@@ -712,6 +716,9 @@ def validate_width(w):
                 raise ValueError(f"{k} must be null (off) or > 0, got {v!r}")
         elif k == "eff_sd_qb" and v is None:
             continue                                   # None = inherit eff_sd_rush
+        elif k == "starter_share_shrink":
+            if v is not None and not (isinstance(v, (int, float)) and 0 <= v <= 1):
+                raise ValueError(f"{k} must be null (off) or in [0, 1], got {v!r}")
         elif k in ("catch_shape_mult", "team_r_mult", "catch_shape_exp"):
             if v is not None and not (isinstance(v, (int, float)) and v > 0):
                 raise ValueError(f"{k} must be null (off) or > 0, got {v!r}")
@@ -1105,5 +1112,10 @@ def simulate_qb_passing(rng, n_sim, receiver_yards, other_targets, other_rates, 
     if w["eff_sd_pass"]:
         total = total * _game_multiplier(g, n_sim, w["eff_sd_pass"])
     if starter_share is not None:
-        total = total * g.choice(np.asarray(starter_share, dtype=float), size=n_sim)
+        grid = np.asarray(starter_share, dtype=float)
+        share = g.choice(grid, size=n_sim)
+        if w["starter_share_shrink"] is not None:          # round 36: same draw, pulled toward the mean
+            m = float(grid.mean())
+            share = m + float(w["starter_share_shrink"]) * (share - m)
+        total = total * share
     return total
