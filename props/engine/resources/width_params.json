@@ -3,13 +3,13 @@
  "eff_sd_qb": 0.15,
  "eff_sd_rec": 0.0,
  "eff_sd_rush": 0.15,
- "note": "backtest.py --tune-width (reports/width_tuning.md), --tune-grid qb (reports/width_tuning_qb.md) and --tune-grid rushlead (reports/width_tuning_rushlead.md, round 15, DECISIONS #133); eff_sd_rush 0.30 -> 0.15 by round 30 (reports/round30_conversion.md, DECISIONS #189: the conversion score with actual carries plugged in, 2022-25 + 2026 weeks 2-4)",
+ "note": "backtest.py --tune-width (reports/width_tuning.md), --tune-grid qb (reports/width_tuning_qb.md) and --tune-grid rushlead (reports/width_tuning_rushlead.md, round 15, DECISIONS #133); eff_sd_rush 0.30 -> 0.15 by round 30 (reports/round30_conversion.md, DECISIONS #189: the conversion score with actual carries plugged in, 2022-25 + 2026 weeks 2-4); share_conc_targets 40 -> 60 by round 34 (reports/round34_receiving_joint.md, DECISIONS #195: receptions own-volume log loss on 2022-24, confirmed on 2025)",
  "rush_norm_lead": 1.0,
  "rush_norm_qb": false,
  "rush_norm_strength": 0.5,
  "rush_other_share": 0.12,
  "share_conc_carries": 20.0,
  "share_conc_qb": 80.0,
- "share_conc_targets": 40.0,
+ "share_conc_targets": 60.0,
  "tuned_on": "2022,2023"
 }
