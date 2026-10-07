@@ -588,14 +588,12 @@ def line_bucket(team_spread) -> str | None:
             else "underdog" if v <= -3.5 else "close")
 
 
-def league_state_mix(pbp) -> dict:
-    """How a team's plays split between ahead / close / behind by SCRIPT_MARGIN, by the
-    pregame line it played under (line_bucket), from this season's games league-wide:
-    {bucket: {state: share}}. nflverse
-    spread_line is the HOME team's margin (positive = home favoured)."""
+def _state_frame(pbp):
+    """(plays, line bucket, game state) for every scrimmage play this season, or None: the one
+    population behind league_state_mix's shares and league_state_sample's counts."""
     need = {"posteam", "home_team", "play_type", "score_differential", "spread_line"}
     if pbp is None or not need.issubset(pbp.columns):
-        return {}
+        return None
     f0 = lambda c: pbp[c].fillna(0) if c in pbp else 0
     plays = (((pbp.play_type == "run") & (f0("qb_kneel") != 1)) | (pbp.play_type == "pass")) & pbp.posteam.notna()
     d = pbp[plays]
@@ -603,6 +601,18 @@ def league_state_mix(pbp) -> dict:
     bucket = own.apply(lambda v: None if v != v else line_bucket(-v))
     state = d.score_differential.apply(lambda v: None if v != v else "lead" if v >= SCRIPT_MARGIN
                                        else "trail" if v <= -SCRIPT_MARGIN else "close")
+    return d, bucket, state
+
+
+def league_state_mix(pbp) -> dict:
+    """How a team's plays split between ahead / close / behind by SCRIPT_MARGIN, by the
+    pregame line it played under (line_bucket), from this season's games league-wide:
+    {bucket: {state: share}}. nflverse
+    spread_line is the HOME team's margin (positive = home favoured)."""
+    f = _state_frame(pbp)
+    if f is None:
+        return {}
+    d, bucket, state = f
     out = {}
     for b in LINE_BUCKETS:
         s_ = state[bucket == b].dropna()
@@ -614,6 +624,43 @@ def league_state_mix(pbp) -> dict:
         vc = s_.value_counts(normalize=True)
         out["_all"] = {k: float(vc.get(k, 0.0)) for k in ("lead", "close", "trail")}
     return out
+
+
+def league_state_sample(pbp) -> dict:
+    """{line bucket: (plays, team-games)} behind league_state_mix's shares (the guide asks for
+    the sample beside them)."""
+    f = _state_frame(pbp)
+    if f is None or "game_id" not in pbp:
+        return {}
+    d, bucket, state = f
+    out = {}
+    for b in LINE_BUCKETS:
+        x = d[(bucket == b) & state.notna()]
+        if len(x):
+            out[b] = (int(len(x)), int(x[["game_id", "posteam"]].drop_duplicates().shape[0]))
+    return out
+
+
+# hours behind Eastern for a home stadium, (daylight time, standard time); a neutral site
+# gets Eastern only. Arizona keeps standard time all year.
+TEAM_ET_OFFSET = {**{t: (1, 1) for t in ("CHI", "DAL", "GB", "HOU", "KC", "MIN", "NO", "TEN")},
+                  "DEN": (2, 2), "ARI": (3, 2), **{t: (3, 3) for t in ("LA", "LAR", "LAC", "LV", "SEA", "SF")}}
+
+
+def kickoff_words(weekday, gameday, gametime, home, dst, neutral=False) -> str:
+    """'Thursday, Oct 8, 8:15 PM ET (7:15 PM local)' from games.csv's Eastern time."""
+    import datetime as _dt
+    try:
+        d = _dt.date.fromisoformat(str(gameday))
+        h, m = (int(x) for x in str(gametime).split(":"))
+    except (TypeError, ValueError):
+        return f"{weekday or ''} {gameday} {gametime} ET".strip()
+    fmt = lambda hh: f"{(hh - 1) % 12 + 1}:{m:02d} {'PM' if hh % 24 >= 12 else 'AM'}"
+    s = f"{weekday or d.strftime('%A')}, {d.strftime('%b')} {d.day}, {fmt(h)} ET"
+    off = TEAM_ET_OFFSET.get(home)
+    if off and not neutral:
+        s += f" ({fmt(h - off[0 if dst else 1])} local)"
+    return s
 
 
 def script_rates(rows) -> dict:
@@ -1084,149 +1131,233 @@ def unit_tiers(ue) -> dict:
 INT_STEPS = (2, 3, 4, 5, 6, 8, 10, 12, 15, 20)
 
 
-def band_label(b, last=False) -> str:
-    """A whole-number band (k, lo, hi] as 'lo+1-hi' (the last band includes its low edge)."""
-    lo, hi = int(round(b[1])), int(round(b[2]))
-    return f"{lo if last else lo + 1}-{hi}"
+# ---- the team matchup section (user's format and voice guide, 2026-10-06) ----
+# Home team first in every two-team table, as the guide lays it out. One number per cell.
+DASH = "—"
+TIER_CAPTION = ("50 = league average; higher is better for both offense and defense. S is the highest tier. "
+                "+/\u2212 indicates position within a tier; compare the scores because neighboring grades can be "
+                "very close.")      # the user's caption, verbatim (2026-10-06): no ladder table
 
 
-def unit_table(ue, away, home) -> list[str]:
-    """Each offence against the defence it faces, passes and runs, as one blended score and
-    its tier per unit; the tier ladder below shows what each tier spans (user, 2026-10-06)."""
+def roof_words(roof, roof_note) -> str:
+    """'roof closed', or for a retractable roof with no posted call 'retractable roof, decision
+    pending (closed in 16 of its last 16 games)' -- the history once, compact."""
+    if roof_note:
+        import re
+        m = re.search(r"(\d+) of this stadium's last (\d+) games were (\w+)", roof_note)
+        hist = f" ({m.group(3)} in {m.group(1)} of its last {m.group(2)} games)" if m else ""
+        return "retractable roof, decision pending" + hist
+    return {"closed": "roof closed", "dome": "dome", "open": "roof open", "outdoors": "outdoors"}.get(
+        roof, f"roof {roof}")
+
+
+BUCKET_WORDS = {"big favourite": "favored by 7+", "favourite": "favored by 3.5-6.5", "close": "within 3",
+                "underdog": "underdog by 3.5-6.5", "big underdog": "underdog by 7+"}
+
+
+def matchup_header(away, home, when, venue, roof, roof_note, rest=None, sources=None) -> list[str]:
+    """**Away at Home**, the kickoff / venue / roof / rest line, and the sources-updated line."""
+    bits = [when, venue, roof_words(roof, roof_note)]
+    if rest:
+        bits.append("rest: " + ", ".join(f"{t} {d} days" for t, d in rest.items()))
+    L = [f"**{away} at {home}**", "", " · ".join(b for b in bits if b)]
+    if sources:
+        L += ["", "Sources updated: " + " · ".join(sources)]
+    return L
+
+
+def market_table(away, home, home_spread, total, book=None, updated=None) -> list[str]:
+    """Section 1: spread, implied team points and the total, home column first."""
+    if home_spread is None or total is None:
+        return ["Spread and total: not included in this run."]
+    hp, ap = (total - home_spread) / 2, (total + home_spread) / 2
+    return [f"| Market | {home} | {away} |", "|---|---:|---:|",
+            f"| Spread | {home_spread:+g} | {-home_spread:+g} |",
+            f"| Implied team points | {hp:.1f} | {ap:.1f} |",
+            f"| Total points | {total:g} | \u2014 |",
+            "", f"Book: {book or 'not recorded'} · Updated: {updated or 'not recorded'}. Spread sign: negative = "
+                "favored by that many points. Implied team points come from this spread and total. The opening "
+                "quote is not included in this run."]
+
+
+STATE_WORDS = (("lead", "Ahead by 8+"), ("close", "Within 7"), ("trail", "Behind by 8+"))
+
+
+def game_state_table(chk: dict, away, home, sample=None) -> list[str]:
+    """How teams under each side's kind of line spent their PLAYS this season (team_volume_check's
+    state_mix), home first. sample: {bucket: (plays, team_games)}. Shares of plays, never chances."""
+    cols = [(t, (chk.get(t) or {}).get("state_mix"), (chk.get(t) or {}).get("line_bucket")) for t in (home, away)]
+    if not all(m for _, m, _ in cols):
+        return []
+    head = " | ".join(f"{t} (teams {BUCKET_WORDS.get(b, b)})" if b and b != "all lines" else f"{t} (every team)"
+                      for t, _, b in cols)
+    L = [f"| Share of plays | {head} |", "|---|---:|---:|"]
+    for k, w in STATE_WORDS:
+        L.append(f"| {w} | " + " | ".join(f"{100 * float(m.get(k, 0.0)):.0f}%" for _, m, _ in cols) + " |")
+    n = [(b, (sample or {}).get(b)) for _, _, b in cols]
+    ns = "; ".join(f"{BUCKET_WORDS.get(b, b)}: {x[1]} team-games, {x[0]} plays" for b, x in n if x)
+    L += ["", "This season's games league-wide, grouped by the pregame line each team played under" +
+          (f" ({ns})" if ns else "") + ". These are shares of plays, not chances of a blowout or of time spent "
+          "leading."]
+    return L
+
+
+def outlook_table(chk: dict, away, home, games=None) -> list[str]:
+    """Section 2: expected volume beside the season, one number per cell, home first."""
+    if not (chk.get(home) and chk.get(away)):
+        return []
+    close = lambda c: (lambda a: f"{100 * a[0] / (a[0] + a[1]):.0f}%" if a and (a[0] + a[1]) else "\u2014")(
+        (c.get("rates") or {}).get("close"))
+    f0 = lambda v: f"{v:.0f}" if v is not None else "\u2014"
+    rows = [("Expected passes", lambda c: f0(c.get("our_att"))), ("Expected runs", lambda c: f0(c.get("our_runs"))),
+            ("Season passes per game", lambda c: f"{c['att_avg']:.1f}"),
+            ("Season runs per game", lambda c: f"{c['runs_avg']:.1f}"), ("Close-game pass rate", close)]
+    L = [f"| Workload measure | {home} | {away} |", "|---|---:|---:|"]
+    for name, fn in rows:
+        L.append(f"| {name} | {fn(chk[home])} | {fn(chk[away])} |")
+    lg = (chk[home].get("league") or {}).get("close")
+    g = games or {t: chk[t].get("games") for t in (home, away)}
+    L += ["", (f"League close-game pass rate: {100 * lg:.0f}%. " if lg is not None else "")
+          + "Window: " + ", ".join(f"{t} {g[t]} games" for t in (home, away) if g.get(t)) + " this season. "
+          "Expected = the engine's projection for this game. Passes are attempts, sacks excluded; runs include "
+          "scrambles. Close game = the score within 7 points at the snap. Section 3's unit scores group plays "
+          "differently (sacks and scrambles count as passes), so its counts are not comparable with these."]
+    return L
+
+
+def recent_games_table(team, rows) -> list[str]:
+    """A compact game log for a team whose quarterback changed: the volume each start produced."""
+    if not rows:
+        return []
+    L = [f"| {team} game | Score | Passes | Runs | Quarterback |", "|---|---|---:|---:|---|"]
+    for r in rows:
+        L.append(f"| Week {r['week']} {r['opp']} | {r.get('score') or DASH} | {r['att']} | "
+                 f"{r['carries'] + r['scrambles']} | {r.get('qb') or DASH} |")
+    return L
+
+
+def unit_table(ue, away, home, window=None) -> list[str]:
+    """Section 3: each offense against the defense it faces, home first, each unit's own score
+    and grade; the user's caption in place of a tier ladder."""
     if not ue or not ue.get("score") or not all(
             t in ue["score"]["off"]["pass"] and t in ue["score"]["def"]["pass"] for t in (away, home)):
         return []
     T = unit_tiers(ue)
     sc = ue["score"]
-    L = ["| Matchup | Offence score | Offence tier | Defence faced: score | Defence tier |", "|---|---|---|---|---|"]
-    letters = tier_grade
-    for o, d_ in ((away, home), (home, away)):
+    word = {"pass": "passing", "run": "rushing"}
+    L = ["| Matchup | Offense score | Offense tier | Defense faced: score | Defense tier |", "|---|---:|---|---:|---|"]
+    for o, d_ in ((home, away), (away, home)):
         for k in ("pass", "run"):
             if o in sc["off"][k] and d_ in sc["def"][k]:
-                to, td = T[("off", k)], T[("def", k)]
-                L.append(f"| {o} {k} vs. {d_} | {round(sc['off'][k][o])} | {letters(to, o)} | "
-                         f"{round(sc['def'][k][d_])} | {letters(td, d_)} |")
-    L += ["", "**Score**: how well a unit does per play, blending EPA per play (points added against an average "
-              "play from the same down, distance and field position) and success rate (share of plays that added "
-              "points), two parts EPA to one part success. 50 is the league average and every 10 points is one standard deviation; higher is "
-              "better for offences and defences alike. Passes include sacks and scrambles; garbage time removed ("
-              + ue["_filter"] + "). **Tiers** S, A, B, C, D, F: equal bands of score counted down from the "
-              "league's best team (S = the top band); a list whose spread needs fewer bands stops before F. "
-              "**+ / -** mark the top and bottom third of a band, so a C- and a D+ are neighbours.",
-          "", "| Tier | Passing offence | Running offence | Pass defence | Run defence |", "|---|---|---|---|---|"]
-    n = max(T[k]["n"] for k in T)
-    for k in range(1, n + 1):
-        cells = []
-        for key in (("off", "pass"), ("off", "run"), ("def", "pass"), ("def", "run")):
-            b = next((x for x in T[key]["bands"] if x[0] == k), None)
-            cells.append(band_label(b, last=(k == T[key]["n"])) if b else "")
-        L.append(f"| {tier_letter(k)}{' (best)' if k == 1 else ''} | " + " | ".join(cells) + " |")
-    pace = ue.get("pace") or {}
-    if all(t in pace for t in (away, home)):
-        L.append("")
-        L.append(f"Pace in neutral situations (seconds between snaps; 1st = fastest): "
-                 + "; ".join(f"{t} {pace[t][0]:.1f} ({ordinal(pace[t][1])})" for t in (away, home)) + ".")
-    return L
-
-
-def market_table(away, home, home_spread, total) -> list[str]:
-    """The spread and implied points per team."""
-    if home_spread is None or total is None:
-        return ["Spread and total: not available in this run."]
-    hp, ap = (total - home_spread) / 2, (total + home_spread) / 2
-    return ["| Market | " + away + " | " + home + " |", "|---|---|---|",
-            f"| Spread | {-home_spread:+g} | {home_spread:+g} |",
-            f"| Implied team points | {ap:.1f} | {hp:.1f} |",
-            "", f"Game total {total:g}."]
-
-
-def outlook_table(chk: dict, away, home) -> list[str]:
-    """Our expected passes and runs against each team's season (team_volume_check)."""
-    rows = [(t, chk.get(t)) for t in (away, home) if chk.get(t)]
-    if not rows:
-        return []
-    close = lambda c: (lambda a: f"{100 * a[0] / (a[0] + a[1]):.0f}%" if a and (a[0] + a[1]) else "—")(
-        (c.get("rates") or {}).get("close"))
-    L = ["| Team | Expected passes | Expected runs | Season avg passes / runs | Close-game pass rate |",
-         "|---|---|---|---|---|"]
-    for t, c in rows:
-        att = f"{c['our_att']:.0f}" if c.get("our_att") is not None else "—"
-        L.append(f"| {t} | {att} | {c['our_runs']:.0f} | {c['att_avg']:.1f} / {c['runs_avg']:.1f} | {close(c)} |")
-    lg = (rows[0][1].get("league") or {}).get("close")
-    if lg is not None:
-        L += ["", f"League close-game pass rate: {100 * lg:.0f}%. Passes are attempts (sacks out); runs count "
-                  "scrambles, as the model does."]
+                L.append(f"| {o} {word[k]} vs. {d_} | {round(sc['off'][k][o])} | {tier_grade(T[('off', k)], o)} | "
+                         f"{round(sc['def'][k][d_])} | {tier_grade(T[('def', k)], d_)} |")
+    win = f"Window: {window or 'this season'}, league-wide. "
+    L += ["", win + f"Garbage-time filter: {ue['_filter']}. Each unit's score blends EPA per play and success "
+               "rate, with twice the weight on EPA, scaled within its unit type (10 points = one standard "
+               "deviation); offense and defense are scored separately, not as one matchup grade. Passing plays "
+               "include sacks and scrambles. A descriptive performance scale, not a win probability, expected "
+               "points or a yardage multiplier.", "", TIER_CAPTION]
     return L
 
 
 def positional_table(pa, teams) -> list[str]:
-    """PPR points a game each defence allows by position, with rank."""
+    """Section 5: PPR points a game each defense allows by position, the rank beside the value
+    written as '(13th most)'. teams: (home, away)."""
     if not pa or not all(t in pa for t in teams):
         return []
     n = pa["_n"]
-    L = ["| Defence | RBs | WRs | TEs |", "|---|---|---|---|"]
+    L = ["| Defense | To RBs | To WRs | To TEs |", "|---|---|---|---|"]
     for t in teams:
-        L.append(f"| {t} | " + " | ".join(f"{pa[t][p][0]:.1f} ({ordinal(pa[t][p][1])})" for p in POS_GROUPS) + " |")
+        L.append(f"| {t} | " + " | ".join(f"{pa[t][p][0]:.1f} ({ordinal(pa[t][p][1])} most)" for p in POS_GROUPS)
+                 + " |")
     L.append("| League average | " + " | ".join(f"{pa['_league'][p]:.1f}" for p in POS_GROUPS) + " |")
     g = sorted(set(pa["_games"][t] for t in teams))
-    L += ["", f"PPR fantasy points allowed per game over {'/'.join(map(str, g))} games. Rank among {n} teams: 1st "
-              "= most points allowed. Touchdowns included; shaped by the opponents faced."]
+    L += ["", f"PPR points allowed per game. Rank: 1 = most allowed, out of {n} teams. Window: "
+              f"{'/'.join(map(str, g))} games. These totals include touchdowns and aggregate all players at each "
+              "position."]
     return L
 
 
-def personnel_table(cells: dict, away, home) -> list[str]:
-    """cells: {team: {"Quarterback": str, "Offensive line": str, "Pass catchers / backs": str,
-    "Defence": str}}."""
-    units = ["Quarterback", "Offensive line", "Pass catchers / backs", "Defence"]
-    L = [f"| Unit | {away} | {home} |", "|---|---|---|"]
-    for u in units:
-        L.append(f"| {u} | {cells.get(away, {}).get(u, '—')} | {cells.get(home, {}).get(u, '—')} |")
+WHO_UNITS = ("Quarterback", "Offensive line", "Receivers, tight ends and backs", "Pass rush and coverage")
+
+
+def personnel_table(cells: dict, away, home, note=None) -> list[str]:
+    """Section 4: who plays, home first. cells: {team: {unit: text}} over WHO_UNITS."""
+    L = [f"| Unit | {home} | {away} |", "|---|---|---|"]
+    for u in WHO_UNITS:
+        L.append(f"| {u} | {cells.get(home, {}).get(u, DASH)} | {cells.get(away, {}).get(u, DASH)} |")
+    if note:
+        L += ["", note]
     return L
+
+
+def weather_line(wx, roof, roof_note) -> str:
+    """Section 6: forecast window, provider and update time, roof."""
+    if (wx or {}).get("status") == "ok":
+        w = (f"{wx.get('temp_f', '')}°F, sustained wind up to {wx.get('wind_mph_max', '')} mph (gusts not included "
+             f"in this run), precipitation chance up to {wx.get('precip_pct_max', '')}%")
+        try:
+            hit = float(wx.get("wind_mph_max")) > 15
+        except (TypeError, ValueError):
+            hit = None
+        w += ("; above the 15 mph sustained-wind screen" if hit else "; below the 15 mph sustained-wind screen"
+              if hit is False else "")
+        src = f"{wx.get('provider', 'NWS')}, updated {str(wx.get('updated') or '')[:16].replace('T', ' ')} UTC"
+    else:
+        w, src = f"Forecast {(wx or {}).get('status', 'not included in this run')}", (wx or {}).get("provider", "NWS")
+    return f"{w} · {src} · {roof_words(roof, roof_note)}"
 
 
 def known_gaps_table(gaps) -> list[str]:
-    """[(gap, consequence)] -> the 'where this baseline may miss' table."""
+    """Section 7: [(issue, what the baseline may miss, separate scenario)]."""
     if not gaps:
         return ["No known gap applies to this game beyond the general ones in 'Reading the numbers'."]
-    return ["| Gap in this run | Consequence for this matchup |", "|---|---|"] + [f"| {g} | {c} |" for g, c in gaps]
+    return (["| Matchup issue | What the baseline may miss | Separate scenario to examine |", "|---|---|---|"]
+            + [f"| {g} | {m} | {s} |" for g, m, s in gaps])
 
 
-def known_gaps(ctx: dict) -> list[tuple[str, str]]:
-    """The model's known blind spots that apply to THIS game, from facts the scorer has.
-    ctx keys (all optional): qb_change {team: text}, fav (team), spread (abs), new_team
-    [names], questionable [names], has_pass_lines, has_rush_lines, oline_out {team: n},
-    wind_mph, roof, roof_note."""
+def known_gaps(ctx: dict) -> list[tuple[str, str, str]]:
+    """The model's known blind spots that apply to THIS game, from facts the scorer has, each with
+    the scenario that would examine it (quantified only after running). ctx keys (all optional):
+    qb_change {team: text}, fav (team), dog (team), spread (abs), new_team [names], questionable
+    [names], has_pass_lines, has_rush_lines, oline_out {team: n}, wind_mph, roof, roof_note."""
     g = []
     for t, txt in (ctx.get("qb_change") or {}).items():
-        g.append((f"{t}'s quarterback: {txt}",
-                  "Receiver and back prices do not adjust for who throws (they run on each player's shares and "
-                  "rates); a lower-volume or lower-efficiency passing game belongs beside the baseline."))
+        g.append((f"{t} quarterback: {txt}",
+                  "Catch efficiency, yards per target, target allocation and drive volume: receiver and back prices "
+                  "run on each player's own shares and rates, not on who throws",
+                  f"{t} at lower pass volume and, separately, lower efficiency per target"))
     if ctx.get("fav") and (ctx.get("spread") or 0) >= 7:
-        g.append((f"{ctx['fav']}'s expected lead ({ctx['spread']:g} points)",
-                  "The carry forecast does not follow the score: a favourite's late carries can run above it and "
-                  "the underdog's passes too. The market-carries number beside a back's rushing line shows the "
-                  "direction; who gets the late work still decides the player."))
+        dog = ctx.get("dog") or "the underdog"
+        g.append((f"{ctx['fav']} expected lead ({ctx['spread']:g} points)",
+                  "Team run/pass workload change: the carry forecast does not follow the score",
+                  f"{ctx['fav']} higher runs / lower passes, {dog} higher passes; the affected backs' and "
+                  "receivers' shares (the market-carries number beside a back's rushing line is the graded test)"))
     if ctx.get("new_team"):
-        g.append(("New roles: " + ", ".join(ctx["new_team"]),
-                  "Thin new-team evidence: their shares are less settled than the projection's single number."))
+        g.append(("Changed roles: " + ", ".join(ctx["new_team"]),
+                  "Historical role no longer representative: few games on the new team",
+                  "a target or carry share range around the projection"))
     if ctx.get("questionable"):
         g.append(("Questionable: " + ", ".join(ctx["questionable"]),
-                  "Priced as playing his normal role; 'If a Questionable player is out' prices the other case."))
+                  "Teammate redistribution if he sits",
+                  "plays normally versus out (the report's 'If a Questionable player is out' section)"))
     if ctx.get("has_pass_lines"):
-        g.append(("QB passing width",
-                  "The passing distribution is too wide (14% of games outside the 80% range): a passing chance sits "
-                  "too close to 50%, so a 60% Over is likely a little better than 60."))
+        g.append(("QB passing yards", *QB_PASS_BIAS_GAP))
     if ctx.get("has_rush_lines"):
         g.append(("Rushing tails",
                   "Rushing and rushing + receiving run narrow in the tails: a line far from the projection reads "
-                  "more confident than it should; the main line is unaffected."))
+                  "more confident than it should; the main line is unaffected",
+                  "read alternate lines with that caution"))
     for t, k in (ctx.get("oline_out") or {}).items():
         if k >= 2:
-            g.append((f"{t} offensive line ({k} of 5 regulars out)", "Line absences are not a price input."))
+            g.append((f"{t} offensive line ({k} of 5 regulars out)", "Protection and blocking: not a price input",
+                      "lower efficiency for that offense"))
     if (ctx.get("wind_mph") or 0) > 15 and ctx.get("roof") not in ("closed", "dome"):
-        g.append((f"Wind to {ctx['wind_mph']:.0f} mph", "The model has no wind adjustment."))
+        g.append((f"Wind up to {ctx['wind_mph']:.0f} mph sustained", "The model has no wind adjustment",
+                  "lower passing efficiency"))
     if ctx.get("roof_note"):
-        g.append(("Roof", ctx["roof_note"] + "."))
+        g.append(("Roof not posted", roof_words(ctx.get("roof"), ctx["roof_note"]) + "; priced as "
+                  + str(ctx.get("roof")), "none: check the posted roof status before kickoff"))
     return g
 
 
@@ -1274,6 +1405,10 @@ QB_PASS_BIAS = ("**Known bias, near the middle only:** on lines near the middle 
                 "passing-yards Over has run about 6 points low (2022-25 starters at the backtest's stand-in line: "
                 "the Over hit 52.7% when the engine averaged 47.0%; 95% range of the gap +3.3 to +8.0; "
                 "DECISIONS #196). It was not measured for lines far from the middle.")
+# the same fact for the matchup section's section-7 row (edit both together)
+QB_PASS_BIAS_GAP = ("Measured bias: near the middle of the forecast the Over has run about 6 points low (2022-25, "
+                    "DECISIONS #196); the distribution is also too wide in the tails",
+                    "none needed to see the direction; read passing Overs near the middle as low by about that much")
 CARD_LEGEND = ("**Reading the cards:** \"Engine forecast\" is the middle simulated outcome and the range holding the "
                "middle 80% of simulated outcomes. \"Over: engine / market\" compares the engine with the market's "
                "price after removing the bookmaker's margin; the market percentage is not the win rate the offered "

@@ -26,6 +26,7 @@ Always apply:
 - `resources/data_source_matrix.md` (sources, endpoints, credential lookup)
 - `resources/execution_protocol.md` (step order for a full evaluation in this container)
 - `resources/prop_workflow.md` (required output structure)
+- `resources/team_matchup_guide.md` (the user's binding layout and voice for every single-game read's team section)
 - `resources/methodology.md` (versioned reference for how the numbers are built; keep the parameter table current when any constant changes)
 
 For any modeled probability, fair odds, or entry threshold, also apply:
@@ -293,52 +294,34 @@ For a narrow question, run only what it needs:
   Over if his carries take half their volume from the market's script (favourites run more).
   Quote both numbers when you read a back's rushing line: the board's is the price, the
   shadow's is being graded beside it on the scorecard. Never present the shadow as the price.
-  **How a single-game read is written (user, 2026-10-06; his "TB at DAL" brief is the model).**
-  Written straight into the chat, formatted with markdown headings and tables -- never a PDF
-  or a file. The report's **Matchup brief** section holds the tables; the read is built on them:
-  - **Open with the thesis**: two or three sentences on the game you expect and why (who the
-    market makes the stronger side, who plays from ahead, the one issue that matters most).
-  - **Then numbered sections, each a table and a short read.** Copy the report's table in full,
-    then one or two short paragraphs that interpret it: what it implies for each team's volume
-    and which players it helps, and what it does NOT establish. Never walk the table back in
-    words; reason from it ("the case for extra Dallas carries comes from the expected lead,
-    not from a soft run defence").
-  - **Style -- the user's TB at DAL brief is the bar** (user, 2026-10-06: "superior in every way
-    in prose, table clarity, not repeating the obvious, no jargon"):
-    - Plain words a casual fan reads without stopping: "passes" (they include sacks and
-      scrambles), never "dropbacks"; no broadcast adjectives or metaphors ("stingiest",
-      "explosive", "by a distance", "air it out", "feast"). Quote a unit's **score and tier**
-      (EPA and success rate blended two to one; 50 = league average, 10 = one standard deviation; tiers S,
-      A, B, C, D, F from the best band down, + / - for the top / bottom third of a band), never
-      raw EPA numbers; explain the score once. A C- and a D+ are neighbours: say so, and never
-      treat adjacent letters as a big gap without looking at the scores.
-    - Copy the report's tables as they are: one number per cell, the rank key in the caption.
-      Never cram several figures into a cell. **Every table in the Matchup brief appears, in its
-      order -- none is skipped**, the fantasy points allowed by position with its ranks
-      included (user, 2026-10-06: "you're completely missing the table").
-    - Each inference carries its basis and its limit: "The case for extra Dallas carries
-      comes from the expected lead, not from evidence of a weak run defence." Use "consistent
-      with", "supports the direction", "does not establish", "plausible if the lead develops".
-    - Say a caveat once, where it belongs (sample size sits in the table caption); no filler
-      ("which four games can't tell you"), and no sentence that only restates a number the
-      table shows -- a number appears in prose only to compare or explain it.
-    - Under a table, one short paragraph per team when they differ (two to four sentences).
-    - First person for judgment ("I expect", "My base case"), "the engine projects" for
-      estimates, plain statement for facts.
-  - **Keep facts, model estimates and judgment apart**: the data is fact, "the engine projects"
-    is an estimate, "I expect" is judgment. Missing data reads "not in this run", never a guess.
-  - **Order**: the market -> team outlook (our workload against the season) -> unit against unit
-    (score and tier, with the tier ladder; pace) -> personnel -> fantasy points allowed by position -> weather (one
-    line unless it matters) -> **where this baseline may miss** (the report's table, then which
-    of those to examine as a separate scenario) -> **expected game flow and what would change
-    it** (a base case and two "if" branches) -> your strongest directional read and the
-    conditional ones -> then the players, below.
+  **How a single-game read is written (user, 2026-10-06): follow `resources/team_matchup_guide.md`
+  EXACTLY for the team section, then the "Player cards" rules for the players.** Read the guide
+  before writing any single-game read; it is binding, not a suggestion (user: "just follow it
+  exactly"). Written straight into the chat as markdown -- never a PDF or a file. In short:
+  - **Order:** header and sources line -> opening thesis (two or three sentences, written after
+    the sections) -> 1 the market -> 2 expected volume -> 3 unit performance (scores and tiers) ->
+    4 who plays -> 5 production allowed by position -> 6 weather and venue -> 7 where the baseline
+    could miss -> 8 expected game flow and what would change it -> the player cards.
+  - **The report's "Team matchup" section prints sections 1-7 in that order**: copy every table
+    as printed, in order, none skipped (home team first, one number per cell, ranks written
+    "21.9 (13th most)"). Under each, one or two short paragraphs (two to four sentences each)
+    following the guide's "Required narration" for that section.
+  - **You write**: the opening thesis, every narration, and **section 8** -- its table (base
+    case, a competitive alternative, the main failure branch, each with both teams'
+    opportunities; chosen for THIS matchup, no probabilities) and the handoff to the players.
+  - **Section 3**: the unit table and the user's tier caption, no ladder table; compare the
+    scores, not just the letters (a C- and a D+ are neighbours).
+  - **Voice** (the guide's voice section): observation -> matchup implication -> opportunity
+    consequence -> condition that could change it. "The market expects", "Through four games",
+    "The engine projects", "My base case". Interpret; never narrate table cells. No jargon, no
+    broadcast adjectives ("stingiest", "explosive", "air it out", "feast"); plain "passes".
+  - Run the guide's finished-report check before sending.
   - **Tie every player conclusion to his share, the line and the price**; a team read alone is
     never a player call. When the user gives a workload read, set it against the line's
-    break-even volume ("pays at this price if you expect") and call a margin under 10% thin --
-    the research table's flags already mark thin margins at our own projection.
-  **The full story, in this order** (user, 2026-10-05; DECISIONS #168). Headed sections, short
-  paragraphs, tables where they help; thorough but easy to read:
+    break-even volume and call a margin under 10% thin.
+  **The full story** (user, 2026-10-05; DECISIONS #168) -- what each piece of data means. The
+  LAYOUT of a single-game read is the team matchup guide followed by the player cards (above);
+  this list is the reference for the content behind them:
   1. **The game.** The matchup and what each team has been, the weather (or roof), home and
      away, the Vegas lines (spread, total, implied points and the script they point to), the
      fantasy points each defence allows to RBs, WRs and TEs (the header's "Fantasy points

@@ -668,7 +668,8 @@ def main():
                     tot0 = next(m for m in dkb["markets"] if m["key"] == "totals")
                     home_spread = next(o["point"] for o in sp0["outcomes"] if o["name"] == home_name0)
                     total_line = tot0["outcomes"][0]["point"]
-                    market_env = {"home_spread": home_spread, "total_line": total_line}   # TD anchor always; plays/pass-rate only with --env market
+                    market_env = {"home_spread": home_spread, "total_line": total_line,   # TD anchor always; plays/pass-rate only with --env market
+                                  "book": "DraftKings (The Odds API)", "as_of": now()}
                     SOURCES.append(("Market spread/total (DK)", "anchors each team's touchdown total to its implied points",
                                     "ok", f"{HOME} {home_spread:+g}, total {total_line}"))
         except Exception as ex:
@@ -692,7 +693,12 @@ def main():
                 abbr = {x["homeAway"]: x["team"]["abbreviation"] for x in c_["competitors"]}
                 if abbr.get("home") == _home_e and abbr.get("away") == _away_e and c_.get("odds"):
                     o_ = c_["odds"][0]
-                    market_env = {"home_spread": float(o_["spread"]), "total_line": float(o_["overUnder"])}
+                    _sbp = wd / f"espn_scoreboard_{SEASON}_wk{WEEK:02d}.json"
+                    market_env = {"home_spread": float(o_["spread"]), "total_line": float(o_["overUnder"]),
+                                  "book": f"{o_.get('provider', {}).get('name', 'book')} (ESPN scoreboard)",
+                                  # the scoreboard may be a cached copy: its own fetch time, not now
+                                  "as_of": (datetime.fromtimestamp(_sbp.stat().st_mtime, timezone.utc)
+                                            .strftime("%Y-%m-%dT%H:%M:%SZ") if _sbp.exists() else now())}
                     SOURCES.append(("Market spread/total (ESPN scoreboard, %s)" % o_.get("provider", {}).get("name", "book"),
                                     "anchors each team's touchdown total to its implied points" + (" (fallback)" if a.source == "oddsapi" else ""),
                                     "ok", f"{HOME} {market_env['home_spread']:+g}, total {market_env['total_line']}"))
@@ -2154,6 +2160,7 @@ def main():
                    for t_ in (AWAY, HOME)}
     _league_script = RSCH.league_script_shares(pbp)
     _state_mix = RSCH.league_state_mix(pbp)
+    _state_n = RSCH.league_state_sample(pbp)
     TEAM_VOL_CHK, TEAM_VOL_ROWS = {}, {}
     for t_ in (AWAY, HOME):
         _rows = RSCH.team_volume(pbp, t_)
@@ -2998,7 +3005,7 @@ def main():
     BRIEF = brief_section(AWAY=AWAY, HOME=HOME, market_env=market_env, M=M, pop=pop, iw=iw, pbp=pbp,
                           STARTER_QB=STARTER_QB, AUTO_QB=AUTO_QB, LINE_STATUS=LINE_STATUS,
                           TEAM_VOL_CHK=TEAM_VOL_CHK, UNIT_EFF=UNIT_EFF, PA=PA, weather=weather, roof=roof,
-                          ROOF_NOTE=ROOF_NOTE, R=R)
+                          ROOF_NOTE=ROOF_NOTE, R=R, G=G, WEEK=WEEK, TEAM_VOL_ROWS=TEAM_VOL_ROWS, STATE_N=_state_n)
     if BET.empty:
         L[3:3] = BRIEF
     # put the card at the top of the report, right after the header rule
@@ -3668,35 +3675,88 @@ def qb_starts(pbp, gsis_id, first=None) -> int:
 
 
 BRIEF_ARGS = ("AWAY", "HOME", "market_env", "M", "pop", "iw", "pbp", "STARTER_QB", "AUTO_QB", "LINE_STATUS",
-              "TEAM_VOL_CHK", "UNIT_EFF", "PA", "weather", "roof", "ROOF_NOTE", "R")
+              "TEAM_VOL_CHK", "UNIT_EFF", "PA", "weather", "roof", "ROOF_NOTE", "R", "G", "WEEK", "TEAM_VOL_ROWS",
+              "STATE_N")
 
 
 def brief_section(**V) -> list[str]:
-    """The matchup brief (user, 2026-10-06; modelled on his TB at DAL brief): market, team
-    outlook, unit against unit, personnel, positional points allowed, weather and the known
-    gaps that apply to THIS game -- small tables the narrative interprets. Every input is a
-    named argument (BRIEF_ARGS); a missing one is an error, never a silently empty table.
-    Context only: nothing here moves a price."""
+    """The team matchup section, to the user's format and voice guide (2026-10-06): the header and
+    sources line, then 1 the market, 2 expected volume, 3 unit against unit, 4 who plays, 5
+    production allowed by position, 6 weather and venue, 7 where the baseline could miss -- one
+    compact table each, home team first. The opening thesis, every narration and section 8 (game
+    flow) are chat's to write (SKILL.md). Every input is a named argument (BRIEF_ARGS); a missing
+    one is an error, never a silently empty table. Context only: nothing here moves a price."""
     missing = [k for k in BRIEF_ARGS if k not in V]
     if missing:
         raise TypeError(f"brief_section is missing {missing}")
     AWAY, HOME, ME_ = V["AWAY"], V["HOME"], V.get("market_env") or {}
-    M, pop, iw, pbp = V["M"], V["pop"], V["iw"], V["pbp"]
-    L = ["## Matchup brief\n", "*Facts (data), model estimates (ours) and judgment (yours or chat's) are kept "
-         "apart: every table below is fact or estimate, labelled; none of it is a price input.*\n",
-         "### The market\n", *RSCH.market_table(AWAY, HOME, ME_.get("home_spread"), ME_.get("total_line")), ""]
-    ot = RSCH.outlook_table(V.get("TEAM_VOL_CHK") or {}, AWAY, HOME)
-    if ot:
-        L += ["### Team outlook: our expected workload against the season\n", *ot, ""]
-    ut = RSCH.unit_table(V.get("UNIT_EFF") or {}, AWAY, HOME)
-    L += ["### Unit against unit\n", *(ut or ["No EPA in this season's play-by-play yet (DATA MISSING)."]), ""]
-    # personnel
+    M, pop, iw, pbp, G, WEEK = V["M"], V["pop"], V["iw"], V["pbp"], V["G"], V["WEEK"]
+    R = V.get("R")
+    wx = V.get("weather") or {}
+    roof, note = V.get("roof"), V.get("ROOF_NOTE")
+    chk = V.get("TEAM_VOL_CHK") or {}
+    # ---- header ----
+    kick = eastern_to_utc(G.gameday, G.gametime) if pd.notna(G.get("gametime")) else None
+    dst = kick is not None and (kick - pd.Timestamp(f"{G.gameday} {G.gametime}").tz_localize("UTC")) == pd.Timedelta(hours=4)
+    when = RSCH.kickoff_words(G.get("weekday"), G.gameday, G.gametime, HOME, dst,
+                              neutral=str(G.get("location", "Home")) == "Neutral")
+    rest = ({HOME: int(G.home_rest), AWAY: int(G.away_rest)}
+            if pd.notna(G.get("home_rest")) and pd.notna(G.get("away_rest")) else None)
+    quoted = None
+    if R is not None and len(R) and "last_update" in R:
+        lu_ = R.last_update.dropna()
+        books_ = ", ".join(sorted(BOOK_NAME.get(b_, b_) for b_ in set(R.book.dropna()))) if "book" in R else ""
+        quoted = (f"player prices ({books_}) " if books_ else "player prices ") + \
+            str(lu_.max())[:16].replace("T", " ") + " UTC" if len(lu_) else None
+    reported = set(iw.team) if len(iw) and "team" in iw else set()
+    inj = (f"injury report: week {WEEK} published for " + " and ".join(sorted({AWAY, HOME} & reported))
+           if {AWAY, HOME} & reported else f"injury report: week {WEEK} not yet published")
+    srcs = [(f"spread and total ({ME_.get('book') or 'book not recorded'}) "
+             f"{str(ME_.get('as_of'))[:16].replace('T', ' ')} UTC") if ME_.get("as_of") else "spread and total: time not recorded",
+            *([quoted] if quoted else []), inj,
+            f"performance through week {WEEK - 1}",
+            (f"weather forecast {str(wx.get('updated') or '')[:16].replace('T', ' ')} UTC" if wx.get("status") == "ok"
+             else "weather forecast not included in this run")]
+    L = ["## Team matchup\n",
+         *RSCH.matchup_header(AWAY, HOME, when, G.stadium, roof, note, rest, srcs), "",
+         "### 1. The market's view of the game\n",
+         *RSCH.market_table(AWAY, HOME, ME_.get("home_spread"), ME_.get("total_line"), ME_.get("book"),
+                            (str(ME_.get("as_of"))[:16].replace("T", " ") + " UTC") if ME_.get("as_of") else None), ""]
+    gs = RSCH.game_state_table(chk, AWAY, HOME, V.get("STATE_N"))
+    if gs:
+        L += [*gs, ""]
+    # ---- 2. expected volume ----
+    ot = RSCH.outlook_table(chk, AWAY, HOME)
+    L += ["### 2. Expected volume and how the teams have been playing\n",
+          *(ot or ["Team volume: not included in this run."]), ""]
+    # a QB change makes the starts behind the season average worth seeing apart
     starters = V.get("STARTER_QB") or {}
     auto = {a_["team"]: a_ for a_ in (V.get("AUTO_QB") or [])}
     FP = first_passers(pbp)
     sid = {t: (lambda g_: g_.iloc[0] if len(g_) else None)(M[(M.team == t) & (M.name == starters[t])].gsis_id)
            for t in (AWAY, HOME) if starters.get(t) is not None}
+    qb_change = {}
+    for t in (AWAY, HOME):
+        if t in auto:
+            qb_change[t] = f"{auto[t]['starter']} starts for {auto[t]['out']}"
+        elif sid.get(t):
+            mine = qb_starts(pbp, sid[t], FP)
+            team_fp = FP[[k[1] == t for k in FP.index]] if len(FP) else FP
+            others = int((team_fp != sid[t]).sum()) if len(team_fp) else 0
+            if others and mine <= 1:          # another QB started for this team: a real change
+                qb_change[t] = f"{starters[t]}, start {mine + 1} this season after {others} by another QB"
+    for t in (HOME, AWAY):
+        if t in qb_change and (V.get("TEAM_VOL_ROWS") or {}).get(t):
+            L += [f"{t}'s games, quarterback change ({qb_change[t]}):", "",
+                  *RSCH.recent_games_table(t, V["TEAM_VOL_ROWS"][t]), ""]
+    # ---- 3. unit against unit ----
+    ut = RSCH.unit_table(V.get("UNIT_EFF") or {}, AWAY, HOME, window=f"weeks 1-{WEEK - 1}" if WEEK > 2 else "week 1")
+    L += ["### 3. Unit performance and matchup: scores and tiers\n",
+          *(ut or ["Unit scores: not included in this run (no EPA in this season's play-by-play yet)."]), ""]
+    # ---- 4. who plays ----
     cells = {}
+    prac = (iw.set_index("gsis_id")["practice_status"].to_dict()
+            if len(iw) and {"gsis_id", "practice_status"}.issubset(iw.columns) else {})
     for t in (AWAY, HOME):
         c = {}
         qn = starters.get(t)
@@ -3708,52 +3768,46 @@ def brief_section(**V) -> list[str]:
                 c["Quarterback"] = (f"{qn} starts" + (f" ({RSCH.ordinal(n_)} start this season)" if n_ else "")
                                     + f"; {auto[t]['out']} out" + (f" ({auto[t]['why']})" if auto[t]["why"] else ""))
             else:
-                c["Quarterback"] = f"{qn}: {st_.lower() if st_ else 'healthy (no designation)'}" + (
-                    f", {RSCH.ordinal(n_)} start this season" if n_ and n_ <= 3 else "")
+                c["Quarterback"] = f"{qn} starts; {st_ if st_ else 'no injury designation'}" + (
+                    f"; {RSCH.ordinal(n_)} start this season" if n_ and n_ <= 3 else "")
         ls = (V.get("LINE_STATUS") or {}).get(t) or []
         if len(ls) >= 5:
-            out_ = [x for x in ls if x["state"] == "out"]
-            q_ = [x for x in ls if x["state"] == "questionable"]
-            c["Offensive line"] = (f"{5 - len(out_)} of 5 regulars" + (
-                "; out: " + ", ".join(f"{x['name']} ({x['pos']})" for x in out_) if out_ else "")
-                + ("; questionable: " + ", ".join(f"{x['name']} ({x['pos']})" for x in q_) if q_ else ""))
+            word = {"out": "out", "questionable": "questionable", "playing": "available", "unmatched": "status unknown"}
+            avail = sum(1 for x in ls if x["state"] != "out")
+            c["Offensive line"] = (f"{avail} of 5 regulars available: "
+                                   + ", ".join(f"{x['name']} ({x['pos']}, {word.get(x['state'], x['state'])})"
+                                               for x in ls))
         sk = pop[(pop.team == t) & pop.report_status.apply(lambda v: isinstance(v, str) and v != "")]
-        c["Pass catchers / backs"] = ", ".join(f"{r['name']} ({r.pos}, {r.report_status})" for _, r in sk.iterrows()
-                                               if r.pos != "QB") or "none designated"
+        c["Receivers, tight ends and backs"] = "; ".join(
+            f"{r['name']} ({r.pos}, {r.report_status}"
+            + (f", practice: {prac[r.gsis_id]}" if isinstance(prac.get(r.gsis_id), str) and prac.get(r.gsis_id) else "")
+            + ")" for _, r in sk.iterrows() if r.pos != "QB") or "no designations"
         if len(iw) and "position" in iw and (iw.team == t).any():
             dfn = iw[(iw.team == t) & iw.position.isin(RSCH.DEF_POS)
                      & iw.report_status.isin(["Out", "Doubtful", "Questionable"])]
-            c["Defence"] = ", ".join(f"{r.full_name} ({r.position}, {r.report_status})" for r in dfn.itertuples()) \
-                or "none designated"
+            c["Pass rush and coverage"] = "; ".join(f"{r.full_name} ({r.position}, {r.report_status})"
+                                                    for r in dfn.itertuples()) or "no designations"
         else:
-            c["Defence"] = "no injury report yet this week"
+            c["Pass rush and coverage"] = "no injury report yet this week"
         cells[t] = c
-    L += ["### Personnel\n", *RSCH.personnel_table(cells, AWAY, HOME), ""]
-    pt = RSCH.positional_table(V.get("PA"), (AWAY, HOME))
+    who_note = (f"Official report: week {WEEK} " + ("published for " + " and ".join(sorted({AWAY, HOME} & reported))
+                                                   if {AWAY, HOME} & reported else "not yet published")
+                + ". Before it, a quarterback's status can come from Sleeper's injury feed, labelled where used; "
+                  "statuses not yet published stay unknown. Offensive line = the five linemen with the most snaps "
+                  "this season.")
+    L += ["### 4. Who plays: injuries and replacements\n", *RSCH.personnel_table(cells, AWAY, HOME, who_note), ""]
+    # ---- 5. production allowed ----
+    pt = RSCH.positional_table(V.get("PA"), (HOME, AWAY))
     if pt:
-        L += ["### Fantasy points allowed by position\n", *pt, ""]
-    wx = V.get("weather") or {}
-    roof, note = V.get("roof"), V.get("ROOF_NOTE")
-    L += ["### Weather\n", (f"{wx.get('temp_f', '')}F, wind to {wx.get('wind_mph_max', '')} mph, rain "
-                            f"{wx.get('precip_pct_max', '')}%" if wx.get("status") == "ok" else f"Weather {wx.get('status')}")
-          + f". Roof: {roof}" + (f" -- {note}" if note else "") + ".", ""]
-    # the gaps that apply to this game
-    R = V.get("R")
+        L += ["### 5. Production allowed by position\n", *pt, ""]
+    # ---- 6. weather and venue ----
+    L += ["### 6. Weather and venue\n", RSCH.weather_line(wx, roof, note), ""]
+    # ---- 7. where the baseline could miss ----
     mk = set(R.market) if R is not None and len(R) else set()
     spread = ME_.get("home_spread")
-    qb_change = {}
-    for t in (AWAY, HOME):
-        if t in auto:
-            qb_change[t] = f"{auto[t]['starter']} starts for {auto[t]['out']}"
-        elif sid.get(t):
-            mine = qb_starts(pbp, sid[t], FP)
-            team_fp = FP[[k[1] == t for k in FP.index]] if len(FP) else FP
-            others = int((team_fp != sid[t]).sum()) if len(team_fp) else 0
-            if others and mine <= 1:          # another QB started for this team: a real change
-                qb_change[t] = f"{starters[t]}, start {mine + 1} this season after {others} by another QB"
+    fav = (HOME if spread < 0 else AWAY) if spread is not None else None
     priced = set(R.player) if R is not None and len(R) else set()
-    ctx = {"qb_change": qb_change,
-           "fav": (HOME if spread is not None and spread < 0 else AWAY) if spread is not None else None,
+    ctx = {"qb_change": qb_change, "fav": fav, "dog": (AWAY if fav == HOME else HOME) if fav else None,
            "spread": abs(spread) if spread is not None else None,
            "new_team": sorted(n for n in M[M.new_team.astype(bool)].name if n in priced),
            "questionable": sorted(n for n in M[M.questionable.astype(bool)].name if n in priced),
@@ -3763,7 +3817,7 @@ def brief_section(**V) -> list[str]:
                          for t in (AWAY, HOME)},
            "wind_mph": wx.get("wind_mph_max") if wx.get("status") == "ok" else None,
            "roof": roof, "roof_note": note}
-    L += ["### Where this baseline may miss\n", *RSCH.known_gaps_table(RSCH.known_gaps(ctx)), ""]
+    L += ["### 7. Where the baseline could miss this game\n", *RSCH.known_gaps_table(RSCH.known_gaps(ctx)), ""]
     return L
 
 
