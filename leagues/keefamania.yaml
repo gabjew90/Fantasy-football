@@ -20,8 +20,8 @@ season: 2026
 stats_season: 2025
 
 me:
-  username: "Air Raid Gabriel"   # Yahoo team name (no Sleeper identity)
-  user_id: null
+  username: "JUUWWANNNNNNN JOHNNNNNNSONN"   # Yahoo team name (renamed from "Air Raid Gabriel")
+  user_id: "470.l.49649.t.3"     # Yahoo team key: survives renames (resolve_me matches it first)
   draft_slot: null               # unknown until Yahoo reveals draft order
 
 # 10-team · half-PPR · ONE flex (W/R/T). PURE FORMAT DERIVATION —
