@@ -1289,7 +1289,8 @@ def main():
         ypt_t = {n: float(v) for n, v in zip(Mt.name, Mt.ypt)}
         out_rec, tt_draw = MODEL.simulate_team_game(rng, N_SIM, env[t]["targets"], TVD["targets_r"],
                                                     shares_t, crs_t, ypt_t, SH, other_bucket=True, width=WIDTH,
-                                                    return_other=True)
+                                                    return_other=True,
+                                                    player_roles={n: MODEL.role_group(s_) for n, s_ in zip(Mt.name, Mt.slot)})
         pass_inputs[t] = ([out_rec[n][1] for n in names], out_rec.pop(MODEL.OTHER))
         team_targets_draw[t] = tt_draw
         # carries: same joint structure, per-carry yards from the empirical league residual grid.
@@ -2076,7 +2077,7 @@ def main():
                 _implied_cache[ck] = RSCH.implied_targets(
                     float(r_.line), "receptions" if r_.market == "player_receptions" else "rec_yards",
                     env[m_.team]["targets"], TVD["targets_r"], float(m_.ts), float(m_.cr), float(m_.ypt),
-                    SH, width=WIDTH, prices=px_)
+                    SH, width=WIDTH, prices=px_, role=MODEL.role_group(m_.slot))
                 _implied_cache[ck] += ("targets",)
                 _edges_cache[ck] = RSCH.edges_for()
             elif r_.market == "player_rush_yds":

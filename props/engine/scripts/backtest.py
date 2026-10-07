@@ -826,7 +826,8 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
                     {ix: float(shares[pos_[ix]]) for ix in g.index},
                     {ix: float(crs[pos_[ix]]) for ix in g.index},
                     {ix: float(ypts[pos_[ix]]) for ix in g.index},
-                    shape_ypc, width=width, return_other=pass_on, return_targets=want_targets)
+                    shape_ypc, width=width, return_other=pass_on, return_targets=want_targets,
+                    player_roles={ix: M.role_group(s_) for ix, s_ in zip(g.index, g.slot)} if "slot" in g else None)
                 out = got[0]
                 if want_targets:                  # no random draw: the joint sampler's own targets
                     for ix, t_ in got[2].items():
@@ -921,6 +922,7 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
             mu_c = (test_act.team_carries_env * test_act.rs.fillna(0.0)).to_numpy(float)
             ypc_all = test_act.ypc.to_numpy(float)
             tpos_all = np.cumsum(rec_mask) - 1
+            roles_tr = [M.role_group(s_) for s_ in tr.slot] if "slot" in tr else [None] * len(tr)
             for k_, i in enumerate(np.flatnonzero(rec_mask)):
                 T = int(act_t[k_])
                 cols["act_targets"][i] = T
@@ -929,7 +931,8 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
                 cols["mean_tgt"][i] = tgtM[k_].mean()       # stage 1 is bucketed by this, never the actual
                 cols["sd_tgt"][i] = tgtM[k_].std()
                 if T > 0:
-                    rec, yd = M.receiving_given_targets(g, N, T, float(cr_[k_]), float(ypt_[k_]), shape_ypc, width)
+                    rec, yd = M.receiving_given_targets(g, N, T, float(cr_[k_]), float(ypt_[k_]), shape_ypc, width,
+                                                        role=roles_tr[k_])
                     cols["pit_rec_c"][i] = pit(rec, act_r[k_], g)
                     cols["pit_yds_c"][i] = pit(yd, act_y[k_], g)
                     cols["mean_rec_c"][i], cols["mean_yds_c"][i] = rec.mean(), yd.mean()
@@ -1423,11 +1426,19 @@ RECEIVING_JOINT_GRID = [{"share_conc_targets": sc, "catch_conc": cc}
 # Round 36 (reports/round36_qb_share.md): the starter-share draw on QB passing, pulled to its mean
 PASS_SHARE_GRID = [{"starter_share_shrink": v} for v in (None, 0.75, 0.5, 0.25, 0.0)]
 
+# Round 41 (reports/round41_receiving_roles.md): tight ends' and backs' yards shape, tight ends' share
+# (explicit neutral values: the tie rule's distance treats them as ordinary steps)
+RECEIVING_ROLE_GRID = [{"catch_shape_mult_te": te, "catch_shape_mult_rb": rb, "te_share_mult": ts}
+                       for te in (1.0, 1.5, 2.0) for rb in (1.0, 0.75, 0.5) for ts in (1.0, 1.03, 1.06)]
+
 # Round 38 (reports/round38_qb_passing_bias.md): the QB passing draw's spread and level
 PASS_BIAS_GRID = [{"pass_implied_exp": e, "pass_scale": c, "pass_shrink": s}
                   for e in (0.0, 0.1, 0.2, 0.3, 0.4) for c in (1.0, 1.02, 1.04) for s in (None, 0.7)]
 
 SUBGRIDS = {
+    "receivingroles": (RECEIVING_ROLE_GRID, ("rec", "yds", "pass"), "width",
+                       "Round 41: tight ends' and backs' yards shape and tight ends' share "
+                       "(reports/round41_receiving_roles.md); the pick is made by props/tools/round41_select.py."),
     "qbbias": (PASS_BIAS_GRID, ("pass",), "width",
                "Round 38: the QB passing draw's spread and level (reports/round38_qb_passing_bias.md); the "
                "pick is made by props/tools/round38_select.py, not by this table."),
@@ -2011,7 +2022,7 @@ def main(argv=None):
     ap.add_argument("--tune-width", action="store_true",
                     help="choose the width settings on the --tune seasons; writes --report (.md/.csv)")
     ap.add_argument("--width-out", default=None, help="--tune-width: write the chosen settings to this JSON file")
-    ap.add_argument("--tune-grid", choices=["main", "qb", "rushnorm", "rushlead", "tier2", "running", "conversion", "targetspread", "yardsshape", "passspread", "receivingjoint", "qbshare", "qbbias"], default="main",
+    ap.add_argument("--tune-grid", choices=["main", "qb", "rushnorm", "rushlead", "tier2", "running", "conversion", "targetspread", "yardsshape", "passspread", "receivingjoint", "qbshare", "qbbias", "receivingroles"], default="main",
                     help="--tune-width: the receiving/rushing grid, the starting QB's own settings, or the "
                          "carry-share rescaling")
     ap.add_argument("--dispersion", choices=["prior", "train"], default=None,

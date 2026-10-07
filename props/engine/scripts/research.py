@@ -155,7 +155,7 @@ def edges_for() -> dict:
 
 
 def implied_targets(line, stat, team_targets_mean, targets_r, share, catch_rate, ypt,
-                    per_catch_shape, width=None, prices=None):
+                    per_catch_shape, width=None, prices=None, role=None):
     """Targets per game at which the line is a coin flip for a receiver (P(stat >
     line) = 0.5 on a half line; Overs and Unders equally likely on a whole line), holding
     his catch rate and yards per target. stat: 'receptions' or 'rec_yards'.
@@ -168,13 +168,17 @@ def implied_targets(line, stat, team_targets_mean, targets_r, share, catch_rate,
         return (None, proj) if prices is None else (None, proj, None, None)
     col = 0 if stat == "receptions" else 1
     cache = {}
+    # round 41: the role's own yards shape; the share is moved explicitly here, so a role
+    # share multiplier (applied to the projection itself) never enters the search
+    w_s = {**(width or {}), "te_share_mult": None}
 
     def sim(k):      # common random numbers: one generator per k, cached
         if k not in cache:
             s = min(share * k, 0.95)
             out, _ = MODEL.simulate_team_game(np.random.default_rng(SEED), N_SEARCH, team_targets_mean,
                                               targets_r, {"p": s}, {"p": catch_rate}, {"p": ypt},
-                                              per_catch_shape, other_bucket=True, width=width)
+                                              per_catch_shape, other_bucket=True, width=w_s,
+                                              player_roles={"p": role})
             cache[k] = out["p"][col]
         return cache[k]
 

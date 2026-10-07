@@ -490,3 +490,28 @@ def test_round_38_implied_points_scale():
     import backtest as BT
     assert len(BT.PASS_BIAS_GRID) == 30
     assert {"pass_implied_exp": 0.0, "pass_scale": 1.0, "pass_shrink": None} in BT.PASS_BIAS_GRID
+
+
+def test_round_41_role_shapes_and_tight_end_share():
+    """reports/round41_receiving_roles.md: neutral values are byte-identical; the TE shape
+    narrows only tight ends' yards; the RB shape widens only backs'; the TE share moves only
+    tight ends' targets (the other bucket gives it up)."""
+    import numpy as np
+    import model as M
+    assert [M.role_group(s) for s in ("TE1", "WR3", "RB2", "PROXY", "QB1", None)] == ["TE", "WR", "RB", None, None, None]
+    run = lambda w, role: M.receiving_given_targets(np.random.default_rng(1), 20000, 6, 0.7, 8.0, 1.0, w, role=role)
+    base_te, base_wr = run(None, "TE"), run(None, "WR")
+    assert np.array_equal(base_te[1], run({"catch_shape_mult_te": 1.0}, "TE")[1])
+    assert np.array_equal(base_wr[1], run({"catch_shape_mult_te": 2.0}, "WR")[1]), "a WR ignores the TE shape"
+    te2 = run({"catch_shape_mult_te": 2.0}, "TE")[1]
+    assert te2.std() < base_te[1].std() and abs(te2.mean() - base_te[1].mean()) / base_te[1].mean() < 0.02
+    rb = run({"catch_shape_mult_rb": 0.5}, "RB")[1]
+    assert rb.std() > run(None, "RB")[1].std()
+    g = lambda w: M.simulate_team_game(np.random.default_rng(2), 20000, 34.0, 8.0, {"t": 0.18, "w": 0.25},
+                                       {"t": 0.7, "w": 0.65}, {"t": 7.5, "w": 8.5}, 1.0, width=w,
+                                       return_targets=True, player_roles={"t": "TE", "w": "WR"})
+    b, s6 = g(None), g({"te_share_mult": 1.06})
+    assert np.array_equal(b[2]["t"], g({"te_share_mult": 1.0})[2]["t"])
+    assert s6[2]["t"].mean() > b[2]["t"].mean() * 1.04 and abs(s6[2]["w"].mean() - b[2]["w"].mean()) < 0.15
+    import backtest as BT
+    assert len(BT.RECEIVING_ROLE_GRID) == 27
