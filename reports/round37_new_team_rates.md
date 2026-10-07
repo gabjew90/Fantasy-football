@@ -23,3 +23,20 @@ yards, rushing yards, rushing + receiving and QB passing.
   market is worse by more than 0.5% on everyone; and 2025 (read once) is not worse on the
   new-team players.
 - Otherwise the cap stays on all rates.
+
+## Result (2026-10-06; props/tools/paired_crps.py, the shares-only run against the shipped run)
+
+Paired CRPS gain (positive = shares-only better; 95% game-clustered):
+
+| Market | New-team players 2022-24 | Everyone 2022-24 | New-team players 2025 |
+|---|---|---|---|
+| Receptions | -0.0004 (-0.0012, +0.0004) | -0.0001 | -0.0012 (-0.0023, -0.0000) |
+| Receiving yards | +0.0010 (-0.0074, +0.0089) | +0.0005 | +0.0027 |
+| Rushing yards | -0.0039 (-0.0388, +0.0315) | -0.0008 | +0.0243 |
+| Rushing + receiving | -0.0028 (-0.0374, +0.0331) | -0.0004 | +0.0165 |
+| QB passing | +0.0294 (-0.0066, +0.0790) | +0.0041 | +0.0051 |
+
+(1,951 new-team receiving player-games on 2022-24.) **Null: no detectable gain on receptions or
+receiving yards for the players it acts on, and receptions lean worse on 2025. The cap stays on
+every rate.** Every relative change is under 0.2%: whether a moved player's catch rate and yards
+per target are trusted at half or full weight barely moves a price.

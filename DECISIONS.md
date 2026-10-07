@@ -7741,3 +7741,14 @@ by the user.
   reads "21.9 (13th)"; SKILL.md holds the style rules (plain words, every brief table shown,
   basis and limit for each inference, a caveat once, no restated numbers).
 
+
+## 2026-10-06 (195) -- rounds 34, 36, 37: target spread 40 -> 60 ships; the share draw and the new-team rates stay
+
+- **Round 34 ships** share_conc_targets 60 (the target shares hold steadier game to game):
+  receptions own-volume log loss +0.00114 on 2022-24 (detectable), confirmed on 2025, every
+  leave-one-season-out fold positive, guards pass; the target spread moves toward real and
+  receptions / receiving yards widths stay inside the bar. The catch-rate swing stayed off.
+- **Round 36 null**: shrinking the starter-share draw on QB passing fixes the width check but
+  worsens the chance at the line at every step -- the excess width is in the tails.
+- **Round 37 null**: capping only the shares for new-team players changes nothing detectable;
+  the cap stays on every rate.

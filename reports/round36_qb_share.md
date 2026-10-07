@@ -34,3 +34,21 @@ by less than 1.0 point stays shipped.
 - Guards: none needed (no other market reads the draw); scoreboard.guard_verdict confirms every
   other market unchanged.
 - Leave-one-season-out gain reported (loso_select.py). Tool: props/tools/round36_select.py.
+
+## Result (2026-10-06; props/tools/round36_select.py)
+
+| starter_share_shrink | Passing own-volume log loss, 2022-24 | Whole-chain outside 80% (2022-24 / 2025) |
+|---|---|---|
+| off (shipped) | **0.69971** | 14.0% / 14.5% |
+| 0.75 | 0.70074 | 15.1% / 14.8% |
+| 0.5 | 0.70163 | 16.1% / 16.5% |
+| 0.25 | 0.70179 | 17.1% / 16.3% |
+| 0 | 0.70183 | 17.7% / 17.1% |
+
+**Null: the shipped draw is best at the line.** The shrink does what it was built to do for the
+width check -- at full shrink 17.7% of games fall outside the 80% range, inside the bar -- but
+every step makes the chance at the stand-in line worse. The share draw is lopsided (most starts
+near 1.0, a few exits near zero), so pulling it to its mean also moves the middle of the
+distribution. As with round 32, QB passing's excess width sits in the tails, and the shipped
+setting already prices the main line best. QB passing stays labelled "too wide" for lines far
+from the projection; 2025 is not read for a ship (nothing to confirm).
