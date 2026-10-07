@@ -307,7 +307,9 @@ For a narrow question, run only what it needs:
     in prose, table clarity, not repeating the obvious, no jargon"):
     - Plain words a casual fan reads without stopping: "passes" (they include sacks and
       scrambles), never "dropbacks"; no broadcast adjectives or metaphors ("stingiest",
-      "explosive", "by a distance", "air it out", "feast"). Gloss EPA and success rate once.
+      "explosive", "by a distance", "air it out", "feast"). Quote a unit's **score and tier**
+      (EPA and success rate blended; 50 = league average, 10 = one standard deviation, tier 1
+      = best), never raw EPA numbers; explain the score once.
     - Copy the report's tables as they are: one number per cell, the rank key in the caption.
       Never cram several figures into a cell. **Every table in the Matchup brief appears, in its
       order -- none is skipped**, the fantasy points allowed by position with its ranks
@@ -324,7 +326,7 @@ For a narrow question, run only what it needs:
   - **Keep facts, model estimates and judgment apart**: the data is fact, "the engine projects"
     is an estimate, "I expect" is judgment. Missing data reads "not in this run", never a guess.
   - **Order**: the market -> team outlook (our workload against the season) -> unit against unit
-    (EPA and success, pace) -> personnel -> fantasy points allowed by position -> weather (one
+    (score and tier, with the tier ladder; pace) -> personnel -> fantasy points allowed by position -> weather (one
     line unless it matters) -> **where this baseline may miss** (the report's table, then which
     of those to examine as a separate scenario) -> **expected game flow and what would change
     it** (a base case and two "if" branches) -> your strongest directional read and the
