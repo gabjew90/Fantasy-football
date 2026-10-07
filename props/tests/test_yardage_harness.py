@@ -526,3 +526,18 @@ def test_round_41_the_live_scorer_applies_the_tight_end_share_once():
     calls = re.findall(r"simulate_team_game\((.*?)\)\n", src, re.S)
     assert calls and all("width=WIDTH_SIM" in c for c in calls), calls
     assert 'WIDTH_SIM = {**WIDTH, "te_share_mult": None}' in src
+
+
+def test_round_40_receiving_yards_level_moves_receivers_and_the_depth_bucket():
+    import numpy as np
+    import model as M
+    run = lambda w: M.receiving_given_targets(np.random.default_rng(1), 20000, 6, 0.7, 8.0, 1.0, w)
+    base = run(None)
+    assert np.array_equal(base[1], run({"rec_ypc_mult": 1.0})[1])
+    up = run({"rec_ypc_mult": 1.04})
+    assert np.array_equal(base[0], up[0]) and np.allclose(up[1], base[1] * 1.04), "catches unchanged, yards x1.04"
+    qb = lambda w: M.simulate_qb_passing(np.random.default_rng(3), 4000, [], np.full(4000, 10), {"catch_rate": 0.6, "ypt": 7.0},
+                                         1.0, width=w)
+    assert np.allclose(qb({"rec_ypc_mult": 1.04}), qb(None) * 1.04), "the depth bucket's yards move too"
+    import backtest as BT
+    assert len(BT.RECEIVING_LEVEL_GRID) == 12

@@ -706,7 +706,10 @@ WIDTH_OFF = {"share_conc_targets": None, "share_conc_carries": None, "catch_conc
              # shape times this for tight ends / backs (None or 1 = the shared shape; larger =
              # narrower), and tight ends' target share times te_share_mult (None or 1 = as blended;
              # the 'other' bucket gives up what they gain)
-             "catch_shape_mult_te": None, "catch_shape_mult_rb": None, "te_share_mult": None}
+             "catch_shape_mult_te": None, "catch_shape_mult_rb": None, "te_share_mult": None,
+             # round 40 (reports/round40_receiving_level.md): every receiver's yards a catch times
+             # this (None or 1 = as blended), the depth bucket's too, so QB passing (their sum) moves with it
+             "rec_ypc_mult": None}
 PASS_IMPLIED_REF = 22.0          # about the league's mean implied team points
 
 # simulate_team_game(..., return_other=True) files the 'other' bucket's targets
@@ -740,7 +743,7 @@ def validate_width(w):
             if v is not None and not (isinstance(v, (int, float)) and 0 < v <= 1):
                 raise ValueError(f"{k} must be null (off) or in (0, 1], got {v!r}")
         elif k in ("catch_shape_mult", "team_r_mult", "catch_shape_exp", "pass_scale", "catch_shape_mult_te",
-                   "catch_shape_mult_rb", "te_share_mult"):
+                   "catch_shape_mult_rb", "te_share_mult", "rec_ypc_mult"):
             if v is not None and not (isinstance(v, (int, float)) and v > 0):
                 raise ValueError(f"{k} must be null (off) or > 0, got {v!r}")
         elif k == "rush_other_share":
@@ -1088,6 +1091,8 @@ def receiving_given_targets(rng, n_sim, targets, catch_rate, ypt, per_catch_shap
         rec = rng.binomial(targets, cr).astype(float)
     ypt = max(ypt, 0.5)
     ypc = ypt / cr
+    if w["rec_ypc_mult"]:                              # round 40: the level of yards a catch
+        ypc = ypc * float(w["rec_ypc_mult"])
     if w["catch_shape_mult"]:                          # round 30 candidate: None = the fitted shape
         per_catch_shape = per_catch_shape * float(w["catch_shape_mult"])
     rk = {"TE": "catch_shape_mult_te", "RB": "catch_shape_mult_rb"}.get(role)
@@ -1156,7 +1161,7 @@ def simulate_qb_passing(rng, n_sim, receiver_yards, other_targets, other_rates, 
         total = total + np.asarray(y, dtype=float)
     if other_targets is not None and other_rates:
         cr = min(max(float(other_rates["catch_rate"]), 0.05), 1.0)
-        ypc = max(float(other_rates["ypt"]), 0.5) / cr
+        ypc = max(float(other_rates["ypt"]), 0.5) / cr * (float(w["rec_ypc_mult"]) if w["rec_ypc_mult"] else 1.0)
         rec = g.binomial(np.asarray(other_targets).astype(np.int64), cr).astype(float)
         shape_total = np.clip(rec, 0, 25) * per_catch_shape
         total = total + np.where(rec > 0, g.gamma(np.maximum(shape_total, 1e-6), ypc / per_catch_shape), 0.0)

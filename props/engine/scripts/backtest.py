@@ -1426,6 +1426,9 @@ RECEIVING_JOINT_GRID = [{"share_conc_targets": sc, "catch_conc": cc}
 # Round 36 (reports/round36_qb_share.md): the starter-share draw on QB passing, pulled to its mean
 PASS_SHARE_GRID = [{"starter_share_shrink": v} for v in (None, 0.75, 0.5, 0.25, 0.0)]
 
+# Round 40 (reports/round40_receiving_level.md): receivers' yards a catch, with passing's level re-picked
+RECEIVING_LEVEL_GRID = [{"rec_ypc_mult": y, "pass_scale": p} for y in (1.0, 1.02, 1.04, 1.06) for p in (1.0, 1.02, 1.04)]
+
 # Round 41 (reports/round41_receiving_roles.md): tight ends' and backs' yards shape, tight ends' share
 # (explicit neutral values: the tie rule's distance treats them as ordinary steps)
 RECEIVING_ROLE_GRID = [{"catch_shape_mult_te": te, "catch_shape_mult_rb": rb, "te_share_mult": ts}
@@ -1436,6 +1439,9 @@ PASS_BIAS_GRID = [{"pass_implied_exp": e, "pass_scale": c, "pass_shrink": s}
                   for e in (0.0, 0.1, 0.2, 0.3, 0.4) for c in (1.0, 1.02, 1.04) for s in (None, 0.7)]
 
 SUBGRIDS = {
+    "receivinglevel": (RECEIVING_LEVEL_GRID, ("rec", "yds", "pass"), "width",
+                       "Round 40: receivers' yards a catch and passing's level (reports/round40_receiving_level.md); "
+                       "the pick is made by props/tools/round40_select.py."),
     "receivingroles": (RECEIVING_ROLE_GRID, ("rec", "yds", "pass"), "width",
                        "Round 41: tight ends' and backs' yards shape and tight ends' share "
                        "(reports/round41_receiving_roles.md); the pick is made by props/tools/round41_select.py."),
@@ -2022,7 +2028,7 @@ def main(argv=None):
     ap.add_argument("--tune-width", action="store_true",
                     help="choose the width settings on the --tune seasons; writes --report (.md/.csv)")
     ap.add_argument("--width-out", default=None, help="--tune-width: write the chosen settings to this JSON file")
-    ap.add_argument("--tune-grid", choices=["main", "qb", "rushnorm", "rushlead", "tier2", "running", "conversion", "targetspread", "yardsshape", "passspread", "receivingjoint", "qbshare", "qbbias", "receivingroles"], default="main",
+    ap.add_argument("--tune-grid", choices=["main", "qb", "rushnorm", "rushlead", "tier2", "running", "conversion", "targetspread", "yardsshape", "passspread", "receivingjoint", "qbshare", "qbbias", "receivingroles", "receivinglevel"], default="main",
                     help="--tune-width: the receiving/rushing grid, the starting QB's own settings, or the "
                          "carry-share rescaling")
     ap.add_argument("--dispersion", choices=["prior", "train"], default=None,
