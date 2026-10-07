@@ -94,6 +94,10 @@ Those rows assume the teammate played. When he sat, they graded against a line p
 
 Beating the close consistently is the signal that survives small samples. Winning without it is variance.
 
+## Rushing yards: the board vs the market-carries shadow
+
+0 settled backs' rushing lines carry the shadow so far; the comparison starts at 30.
+
 ### Worth a look
 
 No marked line has been graded yet.
@@ -175,6 +179,10 @@ Those rows assume the teammate played. When he sat, they graded against a line p
 
 Beating the close consistently is the signal that survives small samples. Winning without it is variance.
 
+## Rushing yards: the board vs the market-carries shadow
+
+0 settled backs' rushing lines carry the shadow so far; the comparison starts at 30.
+
 ### Worth a look
 
 No marked line has been graded yet.
@@ -253,6 +261,10 @@ Those rows assume the teammate played. When he sat, they graded against a line p
 
 Beating the close consistently is the signal that survives small samples. Winning without it is variance.
 
+## Rushing yards: the board vs the market-carries shadow
+
+0 settled backs' rushing lines carry the shadow so far; the comparison starts at 30.
+
 ### Worth a look
 
 No marked line has been graded yet.
@@ -322,6 +334,10 @@ Those rows assume the teammate played. When he sat, they graded against a line p
 24 calls have both snapshots. The line moved toward the call 29.2% of the time (mean move -0.08).
 
 Beating the close consistently is the signal that survives small samples. Winning without it is variance.
+
+## Rushing yards: the board vs the market-carries shadow
+
+0 settled backs' rushing lines carry the shadow so far; the comparison starts at 30.
 
 ### Worth a look
 
@@ -409,6 +425,10 @@ Receiving calls whose target share the rule raised, lowered, or left alone. If t
 
 A group needs about 50 calls before its numbers say anything.
 
+## Rushing yards: the board vs the market-carries shadow
+
+0 settled backs' rushing lines carry the shadow so far; the comparison starts at 30.
+
 ### Worth a look
 
 No marked line has been graded yet.
@@ -480,6 +500,10 @@ Those rows assume the teammate played. When he sat, they graded against a line p
 48 calls have both snapshots. The line moved toward the call 18.8% of the time (mean move +0.19).
 
 Beating the close consistently is the signal that survives small samples. Winning without it is variance.
+
+## Rushing yards: the board vs the market-carries shadow
+
+0 settled backs' rushing lines carry the shadow so far; the comparison starts at 30.
 
 ### Worth a look
 
@@ -556,6 +580,10 @@ Those rows assume the teammate played. When he sat, they graded against a line p
 
 Beating the close consistently is the signal that survives small samples. Winning without it is variance.
 
+## Rushing yards: the board vs the market-carries shadow
+
+0 settled backs' rushing lines carry the shadow so far; the comparison starts at 30.
+
 ### Worth a look
 
 No marked line has been graded yet.
@@ -625,6 +653,10 @@ Those rows assume the teammate played. When he sat, they graded against a line p
 19 calls have both snapshots. The line moved toward the call 42.1% of the time (mean move +0.68).
 
 Beating the close consistently is the signal that survives small samples. Winning without it is variance.
+
+## Rushing yards: the board vs the market-carries shadow
+
+0 settled backs' rushing lines carry the shadow so far; the comparison starts at 30.
 
 ### Worth a look
 
@@ -697,6 +729,10 @@ Those rows assume the teammate played. When he sat, they graded against a line p
 376 calls have both snapshots. The line moved toward the call 13.0% of the time (mean move +0.10).
 
 Beating the close consistently is the signal that survives small samples. Winning without it is variance.
+
+## Rushing yards: the board vs the market-carries shadow
+
+0 settled backs' rushing lines carry the shadow so far; the comparison starts at 30.
 
 ### Worth a look
 

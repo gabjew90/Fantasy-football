@@ -803,8 +803,8 @@ def test_defence_epa_and_points_per_drive_allowed():
     assert dm["ATL"]["pts_drive"] == (pytest.approx(3.5), 1) and dm["NO"]["pts_drive"] == (pytest.approx(3.0), 2)
     assert dm["ATL"]["epa_play"][1] == 1, "1st = most allowed"
     line = RS.defense_line(dm, ("ATL", "NO"))
-    assert line.startswith("ATL allows +0.13 EPA a play (1st most)") and "3.50 points a drive (1st most)" in line
-    assert "NO allows -0.20 EPA a play (1st fewest)" in line
+    assert line.startswith("ATL allows +0.13 EPA a play (1st)") and "3.50 points a drive (1st)" in line
+    assert "NO allows -0.20 EPA a play (2nd)" in line and "1st = most allowed" in line
     assert RS.defense_line(dm, ("ATL", "DAL")) is None
     assert RS.defense_metrics(pbp.drop(columns=["epa"])) == {}
     no_drives = RS.defense_metrics(pbp.drop(columns=["fixed_drive"]))
@@ -824,7 +824,7 @@ def test_offence_epa_and_points_per_drive_gained():
     assert om["X"]["epa_play"] == (pytest.approx(0.4 / 3), 1) and om["X"]["pts_drive"][0] == pytest.approx(3.5)
     assert om["Y"]["pts_drive"] == (pytest.approx(3.0), 2)
     line = RS.defense_line(om, ("X", "Y"), verb="gains")
-    assert line.startswith("X gains +0.13 EPA a play (1st most)") and "('fewest') gained" in line
+    assert line.startswith("X gains +0.13 EPA a play (1st)") and "1st = most gained" in line
 
 
 def test_rank_words_count_from_the_nearer_end():
@@ -861,8 +861,7 @@ def test_unit_efficiency_splits_dropbacks_and_runs_removes_garbage_time_and_rank
     assert ue["off"]["A"]["run"][4] == 1, "the kneel-down is out"
     assert ue["def"]["B"]["pass"][0] == pytest.approx(0.2) and ue["off"]["A"]["pass"][1] == 1
     assert ue["pace"]["A"][0] == pytest.approx(30.0), "30 seconds between snaps on one drive"
-    t = RS.unit_table(ue, "A", "B")
-    assert t[0].startswith("| Matchup |") and any(r.startswith("| A dropbacks vs B | +0.20") for r in t)
+    assert RS.unit_table(ue, "A", "B") == [], "two teams: no league to score against"
     assert RS.unit_efficiency(pd.DataFrame(rows).drop(columns=["epa"])) == {}
 
 
@@ -890,3 +889,87 @@ def test_margin_flags_mark_thin_sides_at_our_projection():
     assert RS.margin_flags(15.0, 18.5, 15.8, "carries")[0].startswith("thin: the Under needs 15.8")
     assert RS.margin_flags(17.0, 18.5, 16.0) == [], "inside the cut: the break-even cell says it already"
     assert RS.margin_flags(None, 18.5, 16.0) == []
+
+
+
+def test_the_unit_score_blends_epa_and_success_and_tiers_from_the_best_team_down():
+    """User, 2026-10-06: one score per unit (EPA per play and success rate standardised and
+    averaged, 50 = league average, 10 = one standard deviation, higher better for offences
+    and defences alike), tiered in equal bands counted from the best team."""
+    import pandas as pd
+    rows, i = [], 0
+    for k, team in enumerate("ABCDEFGHIJ"):
+        for j in range(20):                     # team k: EPA +0.05k-0.2, success rises with k
+            e = 0.05 * k - 0.2 + (0.3 if j % 2 else -0.3)
+            rows.append(dict(game_id=f"g{k}", play_id=i, posteam=team, defteam="ABCDEFGHIJ"[(k + 1) % 10],
+                             epa=e, success=float(j < 5 + k), **{"pass": 1, "rush": 0}, wp=0.5,
+                             qb_kneel=0, qb_spike=0))
+            i += 1
+    ue = RS.unit_efficiency(pd.DataFrame(rows))
+    off = ue["score"]["off"]["pass"]
+    assert off["J"] > off["A"] and abs(sum(off.values()) / len(off) - 50) < 1e-9, "50 is the league average"
+    d = ue["score"]["def"]["pass"]
+    assert d["B"] > d["A"], "B faces the worst offence (A): allowing less scores higher"
+    t = RS.tiers(off)
+    assert t["tier"]["J"] == 1 and max(t["tier"].values()) == t["n"] <= RS.MAX_TIERS
+    assert t["bands"][0][2] == pytest.approx(max(off.values())), "bands count down from the best team"
+    assert all(b[2] - b[1] == pytest.approx(t["step"]) for b in t["bands"]), "equal-width bands"
+    tab = RS.unit_table(ue, "A", "B")
+    assert tab[0] == "| Matchup | Offence score | Offence tier | Defence faced: score | Defence tier |"
+    assert any(r.startswith("| A pass vs. B | ") for r in tab) and any(r.startswith("| S (best) |") for r in tab)
+    assert [RS.tier_letter(k) for k in range(1, 7)] == list("SABCDF") and RS.tier_letter(9) == "F"
+    assert "50 is the league average" in " ".join(tab)
+
+
+def test_tiers_narrow_for_a_tight_league_and_widen_for_a_spread_one():
+    tight = RS.tiers({str(i): 50 + i for i in range(10)})          # spread 9
+    wide = RS.tiers({str(i): 30 + 5 * i for i in range(10)})       # spread 45
+    assert tight["step"] < wide["step"] and tight["n"] <= RS.MAX_TIERS and wide["n"] <= RS.MAX_TIERS
+    low = RS.tiers({"a": 10.0, "b": 2.0}, higher_is_better=False)
+    assert low["tier"] == {"a": low["n"], "b": 1}, "lower is better: the smaller value is tier 1"
+
+
+
+def test_a_printed_score_sits_inside_its_tiers_printed_band():
+    """Code review: tiers on the whole-number scores shown, bands without shared edges, the
+    last band reaching the worst team."""
+    sc = {"A": 73.4, "B": 65.2, "C": 64.6, "D": 57.0, "E": 49.9, "F": 25.1}
+    ue = {"score": {"off": {"pass": sc, "run": {}}, "def": {"pass": {}, "run": {}}}}
+    T = RS.unit_tiers(ue)[("off", "pass")]
+    shown = {t: round(v) for t, v in sc.items()}
+    for t, k in T["tier"].items():
+        b = next(x for x in T["bands"] if x[0] == k)
+        lo, hi = (int(x) for x in RS.band_label(b, last=(k == T["n"])).split("-"))
+        assert lo <= shown[t] <= hi, (t, shown[t], k, lo, hi)
+    over = RS.tiers({str(i): float(i * 20) for i in range(6)}, steps=(2, 3))   # spread 100 > 6 x 3
+    assert over["bands"][-1][1] <= 0.0, "the last band reaches the worst team"
+
+
+def test_the_score_weights_epa_two_to_one_over_success():
+    """User, 2026-10-06: weight EPA more. Mirror-image units -- one big-play (high EPA, low
+    success), one steady (low EPA, high success) -- the big-play unit scores higher."""
+    import pandas as pd
+    spec = {"BIG": (0.30, 0.35), "STEADY": (-0.10, 0.55), "M1": (0.10, 0.45), "M2": (0.10, 0.45)}
+    rows, i = [], 0
+    for team, (e, srate) in spec.items():
+        for j in range(20):
+            rows.append(dict(game_id=f"g{team}", play_id=i, posteam=team, defteam="X", epa=e,
+                             success=float(j < srate * 20), **{"pass": 1, "rush": 0}, wp=0.5, qb_kneel=0, qb_spike=0))
+            i += 1
+    sc = RS.unit_efficiency(pd.DataFrame(rows))["score"]["off"]["pass"]
+    assert RS.SCORE_EPA_WEIGHT == pytest.approx(2 / 3)
+    assert sc["BIG"] > 50 > sc["STEADY"], "two parts EPA to one part success"
+
+
+
+def test_plus_and_minus_mark_where_a_team_sits_inside_its_band():
+    # user, 2026-10-06: a 1-point gap across a band edge must not read as a full grade
+    t = RS.tiers({"A": 73, "B": 72, "C": 69, "D": 66, "E": 65, "F": 58}, steps=(8,))
+    g = {k: RS.tier_grade(t, k) for k in "ABCDEF"}
+    assert g["A"] == "S+" and g["B"] == "S+" and g["C"] == "S" and g["D"] == "S-"
+    assert g["E"] == "A+", "one point below the S band's bottom: the top of A, a neighbour of S-"
+    band = RS.tiers({"top": 73, **{f"x{i}": 73 - i for i in range(1, 8)}}, steps=(8,))
+    marks = [RS.tier_grade(band, k)[1:] for k in ["top"] + [f"x{i}" for i in range(1, 8)]]
+    assert marks.count("+") == marks.count("-") == 3 and marks.count("") == 2, marks
+    low = RS.tiers({"x": 10.0, "y": 2.0, "z": 9.5}, higher_is_better=False, steps=(1, 2, 3))
+    assert RS.tier_grade(low, "y")[0] == "S" and RS.tier_grade(low, "x")[0] != "S"
