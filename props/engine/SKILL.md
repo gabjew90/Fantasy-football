@@ -623,12 +623,13 @@ need not be surfaced. Write the reply as a premium prop guide with this structur
    should; say so when quoting one. None is tested against posted lines yet; say that, not
    that the numbers are unvalidated guesses.
    QB passing yards (the starting QB only) are his receivers' yards in the same simulation
-   times a starter's usual share. **Measured bias by game environment (DECISIONS #196, #197):**
-   at the harness's main line on 2022-25 the Over hit 52.7% overall while the engine averaged
-   47.0%, and the miss follows the team's implied points: 38.8% hit at 18 or fewer, 49.6% at
-   18-21, 53.6% at 21-24, 56.6% at 24-27, 65.5% at 27+, against an engine near 47% in every row.
-   The card prints the team's row beside every passing price; chat says it with any passing read
-   (a measured figure, so stating its direction is not guessing). Round 38 is testing a fix. It is also too WIDE in the tails (14% of games outside the 80% range against a
+   times a starter's usual share, **scaled since round 38 by the team's implied points**
+   ((implied / 22) ** 0.2, times 1.04; DECISIONS #199). Before it the Over at the harness's main
+   line followed the implied points (38.8% hit at 18 or fewer, 65.5% at 27+, against an engine
+   near 47% everywhere); after it the engine says 44.8% and 56.8% in those rows -- most of the
+   lean is gone, the extremes keep some. The card prints the team's row beside every passing
+   price; chat says it with any passing read. A run without a spread/total turns the scale off
+   and says so in the sources table. It is also too WIDE in the tails (14% of games outside the 80% range against a
    17-23% bar; reports/rush_rec_calibration.md). Priced by the user's decision (DECISIONS #105).
    Ladder: `ladder_*.csv` holds P(stat <= k) per player; quote it when the user asks about
    an alternate line.

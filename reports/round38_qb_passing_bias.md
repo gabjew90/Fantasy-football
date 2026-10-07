@@ -134,3 +134,22 @@ mechanical: removing the bias brings more outcomes inside the 80% range (the shi
 already too wide, and its bias hid part of that). The settings with the 0.7 narrowing overshoot
 the other way (about 25% outside) and their scores sit outside the tie. Whether to override the
 guard is the user's decision; this report does not make it.
+
+### The user's decision (2026-10-06): ship, overriding the width guard
+
+Asked after the result above, the user chose to ship the pick: the width guard read a move
+of outcomes into the range (the bias removed) as a widening, which it was not designed to
+catch. **Round 38 ships pass_implied_exp 0.2, pass_scale 1.04** (resources/width_params.json).
+Calibration after the change, 2022-25 at the stand-in line (Over hit / engine):
+
+| Team implied points | Before | After |
+|---|---|---|
+| 18 or less | 38.8% / 46.9% | 38.8% / 44.8% |
+| 18-21 | 49.6% / 47.2% | 49.6% / 49.1% |
+| 21-24 | 53.6% / 46.8% | 53.6% / 51.5% |
+| 24-27 | 56.6% / 47.0% | 56.6% / 54.1% |
+| 27+ | 65.5% / 47.1% | 65.5% / 56.8% |
+
+The extremes keep part of the lean (27+: 8.7 points; 18 or less: 6.0, on 174 and 219 starts).
+The draw stays too wide (11.9% outside the 80% range). A live run without a spread/total turns
+the scale off and says so in the sources table.

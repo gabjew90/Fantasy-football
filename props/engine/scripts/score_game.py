@@ -1373,6 +1373,11 @@ def main():
                 sims[STARTER_QB[t]]["pass_yards"] = MODEL.simulate_qb_passing(
                     rng, N_SIM, ys_t, other_t, P["other_receiver_rates"], SH, starter_share=_share, width=WIDTH,
                     implied_points=env[t].get("implied_points"))
+                if (WIDTH or {}).get("pass_implied_exp") and env[t].get("implied_points") is None:
+                    # round 38 (pre-registered): a run without the spread/total says the scale is off
+                    SOURCES.append((f"QB passing implied-points scale ({t})", "round 38's passing scale",
+                                    "DATA MISSING", "no spread/total this run: the scale is off for this team's "
+                                                    "passing price (DECISIONS #199)"))
     M["mu_rec"] = [max(env[r.team]["targets"] * r.ts * max(r.cr, 0.05), 0.02) for _, r in M.iterrows()]
     M["mu_car"] = [max(env[r.team]["carries"] * r.rs, 0.02) for _, r in M.iterrows()]
 
@@ -3294,10 +3299,10 @@ def main():
     # the evidence per market, as measured (outside review 2026-10-06: the blanket "calibrated"
     # outlived a corrected FAIL on passing width); reports/rush_rec_calibration.md, yardage_harness.md
     L.append(f"\nModel states (none tested against posted lines): receptions and receiving yards `receiving_hier_v2` PROTOTYPE "
-             f"(2022-25 harness: unbiased, width within the bar); rushing yards `rush_yds_v0` and rushing + receiving PROTOTYPE "
-             f"(unbiased and right at the main line, but too narrow in the tails: 23-25% of games outside the 80% range, so a "
+             f"(2022-25 harness: width within the bar; at the main line the Over hits more often than the engine says -- receiving yards by 2.9 points, receptions 1.4, tight ends most, DECISIONS #197-#198); rushing yards `rush_yds_v0` and rushing + receiving PROTOTYPE "
+             f"(near the main line on average, leaning by implied points -- backs on teams implied 27+ hit the Over 59% against 49%; too narrow in the tails: 23-25% of games outside the 80% range, so a "
              f"line far from the median reads too confident; reports/current_settings_check_2026-10-06.md); QB passing yards "
-             f"`pass_yds_v0` PROTOTYPE (its Over at the main line low by environment: 39% hit at 18 or fewer implied points, 66% at 27+, against an engine ~47%, DECISIONS #197; too WIDE: 14% of "
+             f"`pass_yds_v0` PROTOTYPE (scaled by implied points since round 38, DECISIONS #199: at the main line the Over hit 39% at 18 or fewer implied points against an engine 45%, 66% at 27+ against 57%; too WIDE: 12% of "
              f"games outside the 80% range against a 17-23% bar, so its chances sit too close to 50%); "
              f"anytime TD `anytime_td_v1` PROTOTYPE (outcome-backtested, no posted-line test; no fair odds). All MODEL_UNVALIDATED. Dispersion: receptions log r = "
              f"{P['receptions_dispersion']['a']:.3f} + {P['receptions_dispersion']['b']:.3f}·log μ; carries "
