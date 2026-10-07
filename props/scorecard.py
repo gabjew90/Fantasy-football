@@ -341,28 +341,51 @@ def snap_rule_section(df: pd.DataFrame) -> list[str]:
 
 
 def shadow_rush_section(df: pd.DataFrame, reps: int = 2000, seed: int = 29) -> list[str]:
+    return shadow_section(df, "p_over_mkt_carries", ("player_rush_yds",),
+                          "Rushing yards: the board vs the market-carries shadow", reps, seed,
+                          "settled backs' rushing lines carry the shadow")
+
+
+# DECISIONS #204: the reversal-check shadows once rounds 34 and 39 ship -- the board (with the
+# change) against the price without it, at Sleeper's real lines; positive = the old setting better
+REVERSAL_SHADOWS = (("p_over_hist_carries", ("player_rush_yds",),
+                     "Round 39 reversal check: rushing yards with market carries vs without"),
+                    ("p_over_spread40", ("player_receptions", "player_reception_yds"),
+                     "Round 34 reversal check: receiving at target spread 60 vs 40"))
+
+
+def reversal_sections(df: pd.DataFrame) -> list[str]:
+    out = []
+    for col, markets, title in REVERSAL_SHADOWS:
+        out += shadow_section(df, col, markets, title, 2000, 204, "settled lines carry this shadow")
+    return out
+
+
+def shadow_section(df: pd.DataFrame, col: str, markets, title: str, reps: int = 2000, seed: int = 29,
+                   few: str = "settled lines carry the shadow") -> list[str]:
     """DECISIONS #185: the board's rushing-yards Over probability against the market-
     carries shadow's, on settled backs' rushing lines. Scored like every comparison on the
     scoreboard (reports/scoreboard.md): log loss first, Brier beside it (both lower is
     better; chances clipped to 0.5-99.5% as the scoreboard does), each with a 95% interval
     on the difference resampling whole games. The board's number stays the price until
     this says otherwise at a pre-set review -- with both scores agreeing in sign."""
-    need = {"p_over_board", "p_over_mkt_carries", "actual", "line"}
+    need = {"p_over_board", col, "actual", "line"}
     if not need <= set(df.columns):
         return []
-    d = df[df["market"] == "player_rush_yds"].copy()
-    for c in ("p_over_board", "p_over_mkt_carries", "actual", "line"):
+    d = df[df["market"].isin(list(markets))].copy()
+    for c in ("p_over_board", col, "actual", "line"):
         d[c] = pd.to_numeric(d[c], errors="coerce")
     d = d.dropna(subset=list(need))
     d = d[d.actual != d.line]                                   # pushes grade neither way
-    d = d.drop_duplicates(["event_id", "player", "line"])
-    head = ["## Rushing yards: the board vs the market-carries shadow", ""]
+    d = d.drop_duplicates(["event_id", "market", "player", "line"])
+    if d.empty:
+        return []
+    head = [f"## {title}", ""]
     if len(d) < 30:
-        return head + [f"{len(d)} settled backs' rushing lines carry the shadow so far; the comparison "
-                       "starts at 30.", ""]
+        return head + [f"{len(d)} {few} so far; the comparison starts at 30.", ""]
     over = (d.actual > d.line).astype(float).to_numpy()
     pb = np.clip(d.p_over_board.to_numpy(), 0.005, 0.995)
-    ps = np.clip(d.p_over_mkt_carries.to_numpy(), 0.005, 0.995)
+    ps = np.clip(d[col].to_numpy(), 0.005, 0.995)
     ll = lambda p: -(over * np.log(p) + (1 - over) * np.log(1 - p))
     games = d["event_id"].astype(str).to_numpy() if "event_id" in d.columns else np.arange(len(d)).astype(str)
     ug, inv = np.unique(games, return_inverse=True)
@@ -609,6 +632,7 @@ def main(argv: list[str] | None = None) -> int:
         out += render_clv(clv, engine_hash)
         out += snap_rule_section(group)
         out += shadow_rush_section(group)
+        out += reversal_sections(group)
         out += look_section(group)
         out += blend.blend_section(group)
 

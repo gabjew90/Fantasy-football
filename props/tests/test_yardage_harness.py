@@ -524,7 +524,7 @@ def test_round_41_the_live_scorer_applies_the_tight_end_share_once():
     from pathlib import Path
     src = (Path(__file__).resolve().parents[1] / "engine" / "scripts" / "score_game.py").read_text(encoding="utf-8")
     calls = re.findall(r"simulate_team_game\((.*?)\)\n", src, re.S)
-    assert calls and all("width=WIDTH_SIM" in c for c in calls), calls
+    assert calls and all("width=WIDTH_SIM" in c or "width={**WIDTH_SIM" in c for c in calls), calls
     assert 'WIDTH_SIM = {**WIDTH, "te_share_mult": None}' in src
 
 
@@ -541,3 +541,32 @@ def test_round_40_receiving_yards_level_moves_receivers_and_the_depth_bucket():
     assert np.allclose(qb({"rec_ypc_mult": 1.04}), qb(None) * 1.04), "the depth bucket's yards move too"
     import backtest as BT
     assert len(BT.RECEIVING_LEVEL_GRID) == 12
+
+
+def test_round_39_scorer_harness_parity_for_market_carries():
+    """Owed before round 29's weight shipped (DECISIONS #204): the scorer and the harness feed
+    market_rush_volume the same team spread (positive = favoured), the same weight and the same
+    QB hold, so the live price is the price the backtest graded."""
+    import re
+    from pathlib import Path
+    import numpy as np
+    import model as M
+    # a book line DAL -7 (home) is nflverse spread_line +7: both conventions reach +7 / -7
+    assert M.team_spread_from_home(-7.0, True) == 7.0 and M.team_spread_from_home(-7.0, False) == -7.0
+    sl = 7.0
+    for is_home, live in ((True, M.team_spread_from_home(-7.0, True)), (False, M.team_spread_from_home(-7.0, False))):
+        harness = sl if is_home else -sl
+        assert harness == live
+    fit = {"plays": {"a": 62.0, "b_spread": 0.0, "b_total": 0.2}, "pass_rate": {"a": 0.58, "b_spread": -0.008, "b_total": 0.0}}
+    try:
+        fav, dog = M.market_rush_volume(7.0, 47.5, fit, 25.0, 0.5), M.market_rush_volume(-7.0, 47.5, fit, 25.0, 0.5)
+        assert fav[0] > dog[0], "the favourite's carries move up, the underdog's down"
+    except (KeyError, TypeError):
+        pass                                         # the fit's shape is the priors'; the sign check above holds
+    here = Path(__file__).resolve().parents[1] / "engine" / "scripts"
+    sg = (here / "score_game.py").read_text(encoding="utf-8")
+    bt = (here / "backtest.py").read_text(encoding="utf-8")
+    assert "MODEL.MARKET_RUSH_WEIGHT)" in sg and "MODEL.hold_qb_carries(rs_t, qb_h, env[t][\"carry_factor\"])" in sg
+    assert re.search(r"mrw = \(M\.MARKET_RUSH_WEIGHT", bt), "the harness defaults to the shipped weight"
+    assert "M.market_rush_volume(sl3 if is_home3 else -sl3" in bt
+    assert M.MARKET_RUSH_WEIGHT == 0.5

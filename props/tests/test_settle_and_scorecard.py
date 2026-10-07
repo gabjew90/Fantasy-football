@@ -409,3 +409,22 @@ def test_the_market_carries_shadow_is_graded_beside_the_board():
     assert out.index("- Log loss") < out.index("- Brier score"), "log loss is the primary score"
     assert scorecard.shadow_rush_section(df.head(10))[-2].startswith("10 settled")
     assert scorecard.shadow_rush_section(df.drop(columns=["p_over_mkt_carries"])) == []
+
+
+def test_reversal_shadows_are_graded_per_change():
+    """DECISIONS #204: the board (with the change) against the logged without-change price, each on
+    its own markets; a missing column grades nothing."""
+    import numpy as np
+    import scorecard
+    rng = np.random.default_rng(5)
+    n = 300
+    truth = rng.uniform(0.3, 0.7, n)
+    actual = np.where(rng.uniform(size=n) < truth, 9.0, 2.0)
+    df = pd.DataFrame({"market": "player_receptions", "event_id": rng.integers(0, 50, n).astype(str),
+                       "player": [f"p{i}" for i in range(n)], "line": 4.5, "actual": actual,
+                       "p_over_board": np.full(n, 0.5), "p_over_spread40": truth, "p_over_hist_carries": np.nan})
+    out = "\n".join(scorecard.reversal_sections(df))
+    assert "Round 34 reversal check" in out and "Round 39 reversal check" not in out, out
+    ll = next(l for l in out.splitlines() if l.startswith("- Log loss"))
+    assert "difference +" in ll, "the informative without-change price wins here"
+    assert scorecard.reversal_sections(df.drop(columns=["p_over_spread40", "p_over_hist_carries"])) == []

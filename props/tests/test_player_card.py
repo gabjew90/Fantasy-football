@@ -69,7 +69,7 @@ def test_back_card_combined_column_is_never_a_threshold():
            "13.5 carries, Under favoured and no receptions line |" in text
     assert "| Share of projected combined yards from catches | - | 31% |" in text
     assert "(0 of 1)" in text and "| Carries and share of team carries | 13.3 a game; 61% | 16; 52% |" in text
-    assert "Over 55% on the board, 53% if his carries" in text
+    assert "Over 55% on the board (his carries half from the market's script), 53% from history alone" in text
 
 
 def test_qb_card_states_the_measured_bias_and_no_threshold():

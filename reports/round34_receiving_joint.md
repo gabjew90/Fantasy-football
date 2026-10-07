@@ -129,3 +129,14 @@ candidate for a pre-registered round, not a ship.
 - The 8-11 projected-target band is still about 14% too wide (real / model 0.86), while the
   3-8 bands would take a setting near 80-120. One setting cannot fit both; WR1s sit in the
   top band. A band-dependent spread is the follow-up.
+
+### The user's decision after the seed check (2026-10-06; DECISIONS #204): keep 60, judged under the spread rule
+
+The third expert review re-ran round 34 under three more seeds: the receptions log-loss gain does
+not replicate (2022-24 -0.00007 / +0.00040 / +0.00077; 2025 negative on all three), while
+receiving-yards and receptions CRPS improve on all four seeds. The scoreboard's standing rule
+judges a volume-spread change on the spread check, with the own-volume score only as a guard at
+-0.5%; on that rule 60 passes on every seed (targets were too spread out in every band over four
+seasons; the worst seed's own-volume change, -0.00007, sits far inside the guard). **The user
+kept 60, recorded as judged under the spread rule** -- not an override, and not on the
+receptions log-loss gain this round originally reported. Reversal rule: DECISIONS #204.

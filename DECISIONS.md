@@ -7909,3 +7909,28 @@ The expert re-ran the four-season backtest (baseline reproduces ours: receptions
   weeks 2-4 negative on the seed average (-0.0015) and on two of four seeds; the live record
   shows no tight-end lean. **Withdrawn: te_share_mult back to 1** (knob kept, off; the cards'
   receiving rows back to the round-34 measurement).
+
+## 2026-10-06 (204) -- round 34 kept under the spread rule; round 39 (market carries 50%) ships; the week-8 reversal rule
+
+- **The user's calls**, after the third expert review: keep round 34's target spread 60 and ship
+  round 39's market carries. The policy on retroactive rules is applied to both alike: each is
+  judged on the evidence its own kind of change is judged on, across the seeds now available.
+- **Round 34:** a volume-spread change is judged on the spread check, the own-volume score a
+  guard at -0.5% (the scoreboard's standing rule). On that rule 60 passes on every seed (targets
+  too spread out in every band, 2022-25; the worst seed's own-volume change -0.00007). Recorded
+  as judged under the spread rule, not an override; the receptions log-loss gain it was first
+  reported on does not replicate (DECISIONS #202).
+- **Round 39 ships MARKET_RUSH_WEIGHT 0.5** (backs' carries half from the market's fitted
+  carries, the starting QB's held): rushing-yards CRPS better on four seeds of four (+0.38% to
+  +0.63%), both halves clear on three. The live rushing level (Overs 40% vs engine 47%) is a level,
+  mostly week 2 (29% on 62 lines; weeks 3-4 44% and 43% vs 48% and 45%), and silent on the
+  favourite-underdog direction this change acts on. Scorer-harness parity test added.
+- **Reversal rule (written now, before weeks 5-8 are played):** at the week-8 review, revert
+  either change if its target market is clearly worse on weeks 5-8 at Sleeper's real lines,
+  judged on four seeds. Target markets: round 34 -- receptions and receiving yards; round 39 --
+  backs' rushing yards. "Clearly worse": the change's log loss at real lines minus the
+  without-change version's, averaged over four seeds, has a 95% game-clustered interval wholly
+  above zero (worse). The without-change prices are logged from now on beside the board:
+  p_over_spread40 (receptions, receiving yards at target spread 40) and p_over_hist_carries
+  (backs' rushing from history carries); the four-seed versions come from replaying the archived
+  snapshots (--odds-snapshot) with the seed offset -- that replay tool is owed before the review.

@@ -290,10 +290,11 @@ For a narrow question, run only what it needs:
   passed its calibration check on 2022-25). Read it beside his separate rushing and receiving
   lines: the combined leg survives either script, and the report's air share says how much
   of it holds up if his team falls behind.
-  **With market carries (shadow), DECISIONS #185:** a back's rushing line also shows the
-  Over if his carries take half their volume from the market's script (favourites run more).
-  Quote both numbers when you read a back's rushing line: the board's is the price, the
-  shadow's is being graded beside it on the scorecard. Never present the shadow as the price.
+  **Market carries are live (round 39, DECISIONS #204):** a back's carries take half their
+  volume from the market's script (favourites run more, underdogs less); the starting QB's carries
+  are held. Each back's card also shows the Over **without** market carries (history alone) --
+  graded beside the board for the week-8 reversal check, never the price. Receiving lines log the
+  Over at the old target spread (40) the same way (round 34's check).
   **How a single-game read is written (user, 2026-10-06): follow `resources/team_matchup_guide.md`
   EXACTLY for the team section, then the "Player cards" rules for the players.** Read the guide
   before writing any single-game read; it is binding, not a suggestion (user: "just follow it

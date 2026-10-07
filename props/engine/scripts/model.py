@@ -358,10 +358,11 @@ def market_environment_fitted(team_spread, total, mkt_fit, team_pace_blend, team
 # for the backs; 0 = runs from history alone (shipped). The starting QB's carries are
 # held where history put them (hold_qb_carries), since the full market environment hurt
 # QB rushing (#106).
-MARKET_RUSH_WEIGHT = 0.0
-# DECISIONS #185 (user's choice): round 29's weight priced BESIDE the board for the backs'
-# rushing yards -- shown and logged, graded by the settled record, never the board's price.
-SHADOW_MARKET_RUSH_WEIGHT = 0.5
+MARKET_RUSH_WEIGHT = 0.5      # round 39 ships (user, 2026-10-06; DECISIONS #204)
+# DECISIONS #185 priced round 29 BESIDE the board while it was off. Now that it ships, the
+# shadow is reversed (DECISIONS #204): the backs' rushing again WITHOUT market carries (history
+# alone), logged as p_over_hist_carries for the week-8 reversal check -- never the board's price.
+SHADOW_MARKET_RUSH_WEIGHT = None
 
 
 def market_rush_volume(team_spread, total, mkt_fit, team_carries_blend, weight):

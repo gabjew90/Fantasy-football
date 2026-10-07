@@ -1792,9 +1792,10 @@ def player_card(d: dict) -> list[str]:
     for s_ in d.get("fit") or []:
         L += [f"**How his lines fit together:** {s_}", ""]
     for sh in d.get("shadow") or []:
-        L += [f"**With market carries (being graded, not the price):** rushing yards {float(sh['line']):g}: Over "
-              f"{_pc(sh['p_board'])} on the board, {_pc(sh['p_mkt'])} if his carries take half their volume from "
-              f"the market's script ({_f(sh.get('car_from'))} -> {_f(sh.get('car_to'))} carries).", ""]
+        L += [f"**Without market carries (graded for the week-8 check, not the price):** rushing yards "
+              f"{float(sh['line']):g}: Over {_pc(sh['p_board'])} on the board (his carries half from the market's "
+              f"script), {_pc(sh['p_mkt'])} from history alone ({_f(sh.get('car_from'))} -> {_f(sh.get('car_to'))} "
+              f"carries).", ""]
     if d.get("matchup"):
         L += [f"**Matchup:** {d['matchup']}", ""]
     if d.get("watch"):
