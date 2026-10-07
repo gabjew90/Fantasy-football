@@ -7767,3 +7767,35 @@ by the user.
   the yards). The QB passing Over at the stand-in line hit 52.7% against a model 47.0% on
   2022-25 (+5.7, 95% +3.3 to +8.0; three of four seasons clear zero). Round 38 to fix it;
   the report states the bias beside passing prices meanwhile.
+
+## 2026-10-06 (197) -- expert audit of #99-#143: the shipped changes hold; two validation claims and two nulls reopened
+
+The expert re-ran the four-season backtest (baseline reproduces ours: receptions own-volume
+0.6858 vs 0.6855) and 16 ablations. Reproduced here on the round-36 frames where noted.
+
+- **Hold up:** #133 carry-share rescale (rushing 2.0% better, both halves), #134 pass volume
+  25% toward the market (passing 0.85%), #135/#136 fixed weights (beat the yearly fit and tie or
+  beat each neighbour), #143 snap-change rule (receptions 0.37%). The opponent adjustment helps
+  rushing by 0.44% and nothing measurable for receiving or passing; the league drift correction
+  has no measurable effect. Both stay (CLAUDE.md: measure before cutting); their descriptions
+  should stop claiming more.
+- **#105 corrected** ("right on average and the right width"): the passing Over at the stand-in
+  line hit 52.7% vs the engine's 47.0% (+5.7, every season positive; +6.1 with actual targets).
+- **#137 reopened** (implied-points scale called null): reproduced -- by implied points the
+  passing Over hit 38.8% (<=18), 49.6%, 53.6%, 56.6%, 65.5% (27+) against an engine near 47%
+  in every row, in both 2022-23 and 2024-25. #137 tried exponents 0.5-1.5 only; 2022-23 fits
+  about 0.23. Now in round 38's grid (0-0.4).
+- **#106 reopened** (Vegas-line environment, judged on 2022-23 only): on 2024-25 it improves
+  rushing 0.48% (interval excludes zero); backs on teams implied 27+ ran Over 58.7% vs 48.5%.
+  Weaker than passing (mostly a 2024-25 pattern). Queued as round 39.
+- **#99 corrected** ("the yardage markets pass", pooled whole-chain): at the stand-in lines the
+  Over hit more often than the engine said -- receiving yards +3.6 (95% +2.4 to +4.7),
+  receptions +1.9 (+0.8 to +3.0), rushing +1.8 (-0.1 to +3.6); with actual volume plugged in
+  receptions and rushing are fine, receiving yards +1.3. Queued as round 40.
+- **Why they slipped:** pooled averages hid environment-dependent bias; CRPS with ties going
+  to off cannot see a calibration bias this size; a null stopped before its held-out seasons
+  were read. Going forward: every round reports the Over rate against the engine by implied
+  points beside its pooled score.
+- **Meanwhile, live:** each player card prints its team's measured row ("Measured calibration")
+  beside the price -- a record, not an adjustment. 2024-25 has now had extra looks; fixes are
+  confirmed on fresh 2026 weeks.
