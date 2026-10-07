@@ -7768,6 +7768,70 @@ by the user.
   2022-25 (+5.7, 95% +3.3 to +8.0; three of four seasons clear zero). Round 38 to fix it;
   the report states the bias beside passing prices meanwhile.
 
+## 2026-10-06 (197) -- expert audit of #99-#143: the shipped changes hold; two validation claims and two nulls reopened
+
+The expert re-ran the four-season backtest (baseline reproduces ours: receptions own-volume
+0.6858 vs 0.6855) and 16 ablations. Reproduced here on the round-36 frames where noted.
+
+- **Hold up:** #133 carry-share rescale (rushing 2.0% better, both halves), #134 pass volume
+  25% toward the market (passing 0.85%), #135/#136 fixed weights (beat the yearly fit and tie or
+  beat each neighbour), #143 snap-change rule (receptions 0.37%). The opponent adjustment helps
+  rushing by 0.44% and nothing measurable for receiving or passing; the league drift correction
+  has no measurable effect. Both stay (CLAUDE.md: measure before cutting); their descriptions
+  should stop claiming more.
+- **#105 corrected** ("right on average and the right width"): the passing Over at the stand-in
+  line hit 52.7% vs the engine's 47.0% (+5.7, every season positive; +6.1 with actual targets).
+- **#137 reopened** (implied-points scale called null): reproduced -- by implied points the
+  passing Over hit 38.8% (<=18), 49.6%, 53.6%, 56.6%, 65.5% (27+) against an engine near 47%
+  in every row, in both 2022-23 and 2024-25. #137 tried exponents 0.5-1.5 only; 2022-23 fits
+  about 0.23. Now in round 38's grid (0-0.4).
+- **#106 reopened** (Vegas-line environment, judged on 2022-23 only): on 2024-25 it improves
+  rushing 0.48% (interval excludes zero); backs on teams implied 27+ ran Over 58.7% vs 48.5%.
+  Weaker than passing (mostly a 2024-25 pattern). Queued as round 39.
+- **#99 corrected** ("the yardage markets pass", pooled whole-chain): at the stand-in lines the
+  Over hit more often than the engine said -- receiving yards +3.6 (95% +2.4 to +4.7),
+  receptions +1.9 (+0.8 to +3.0), rushing +1.8 (-0.1 to +3.6); with actual volume plugged in
+  receptions and rushing are fine, receiving yards +1.3. Queued as round 40.
+- **Why they slipped:** pooled averages hid environment-dependent bias; CRPS with ties going
+  to off cannot see a calibration bias this size; a null stopped before its held-out seasons
+  were read. Going forward: every round reports the Over rate against the engine by implied
+  points beside its pooled score.
+- **Meanwhile, live:** each player card prints its team's measured row ("Measured calibration")
+  beside the price -- a record, not an adjustment. 2024-25 has now had extra looks; fixes are
+  confirmed on fresh 2026 weeks.
+- Re-measured at round 34's setting (share_conc_targets 60, the live setting once #133 merges):
+  receiving yards +2.9, receptions +1.4 (the expert's figures), rushing +1.8, combined +0.6;
+  passing unchanged. The cards print these round-34 rows.
+
+## 2026-10-06 (198) -- second expert audit (the early rounds): five pieces hold; injury logic untested, role shapes and tight-end bias
+
+- **Hold up on 2022-25:** the two-stage blend (the largest contributor: receptions 2.1%,
+  receiving yards 2.0%, passing 0.9%, both halves); the team-volume weight of 4 games (better
+  than 2, tied with 8 and 16 -- the one piece "never backtested"); the early-season blend
+  (weeks 2-4 unbiased, 14-16% better than the naive baseline on receiving); carry-share spread
+  20 (tied with 10, better than 40); yards-per-carry weight 80 (tied with 20 and 40; 200 and
+  400 worse -- the expert withdrew the earlier 200-600 suggestion).
+- **The backtest never runs the injury logic** (it prices whoever was active; no handoff, no
+  Questionable). The expert's raw measure, same-position teammates' targets actual / projected:
+  no key teammate out 0.98; first game out 1.08 (1.03-1.12); continuing absence 1.04
+  (1.00-1.07). The live rule adds roughly 10-15% in both cases: about right the first game,
+  roughly double in a continuing absence (approximate; the live handoff was not computed game
+  by game). Queued: a handoff test by absence age.
+- **One yards-per-catch shape for every role** -- reproduced here (round 34's setting, actual
+  targets in, outside the 80% range): tight-end yards 14.4% (too wide), wide receivers 17.5%,
+  backs 24.8% (too narrow).
+- **Role bias** -- reproduced: tight ends' Over at the stand-in line hit 49.0% vs 44.1% on
+  catches (+4.9, 95% +2.4 to +7.4) and 54.0% vs 47.4% on yards (+6.6, +4.1 to +9.3); their
+  targets ran 5% above projection on the bettable rows (the expert: 3%, 0.4-5.4%). Lead backs'
+  receiving targets ran 4% and yards 6% below projection (the expert's figures).
+- **Not checkable from the backtest:** who gets priced (depth roles, share thresholds, the
+  depth bucket), the new-team snap-ratio scaling, live-vs-fitted rushing weights (low
+  sensitivity), the touchdown model.
+- **Live meanwhile:** receiving cards print the role's measured row beside the implied-points
+  row. **Queue after round 38:** role-specific catch shape and the tight-end level (largest
+  remaining bias on the betting path), then the injury handoff by absence age, then rushing by
+  game environment (#106 reopened), then the receiving-yards level (#99). Each with a written
+  rule and fresh 2026 weeks: these reruns are extra looks at 2022-25.
 ## 2026-10-06 (199) -- round 38 ships: QB passing scaled by implied points (power 0.2) and level x1.04; the width guard overridden by the user
 
 - Pick by the registered rule (30-setting grid, 2022-24): pass_implied_exp 0.2, pass_scale 1.04,
