@@ -1434,6 +1434,18 @@ BIAS_BY_ROLE = {          # after round 41 (tight ends' share x1.06; DECISIONS #
 ROLE_WORDS = {"TE": "tight ends", "WR": "wide receivers", "RB": "backs"}
 
 
+# THE LIVE RECORD AT SLEEPER'S REAL LINES (third expert review, reproduced 2026-10-06, DECISIONS
+# #202): the graded calls of weeks 2-4 -- (lines, Over hit, engine's average Over, market's
+# no-vig Over, engine log loss, market log loss). At real lines the engine's chance has not
+# beaten the market's (0.717 vs 0.692 over 1,536 lines; a coin flip is 0.693). Re-measure as weeks
+# settle (props/record/settled); combined yards had no graded lines yet.
+LIVE_WEEKS = "2-4"
+LIVE_RECORD = {"player_pass_yds": (86, .570, .417, .501, .732, .692),
+               "player_reception_yds": (652, .495, .453, .501, .719, .693),
+               "player_receptions": (506, .484, .452, .496, .714, .689),
+               "player_rush_yds": (292, .404, .466, .500, .713, .694)}
+
+
 def implied_row(implied):
     try:
         v = float(implied)
@@ -1451,22 +1463,33 @@ def calibration_line(markets, implied, team=None, slot=None) -> list[str]:
     role = "".join(ch for ch in str(slot or "") if ch.isalpha()) or None
     role = role if role in BIAS_BY_ROLE else None
     mks = [m for m in MARKET_ORDER if m in markets and m in BIAS_BY_IMPLIED]
-    rows = []
+    rows, live = [], []
     for mk in mks:
+        if mk in LIVE_RECORD:
+            n, hit, eng, mkt, lle, llm = LIVE_RECORD[mk]
+            live.append(f"| {PROP_WORDS[mk][0]} | {100 * hit:.1f}% | {100 * eng:.1f}% | {100 * mkt:.1f}% | {n} |")
         if row is not None:
             rows.append((f"{PROP_WORDS[mk][0]}, teams implied {row}", *BIAS_BY_IMPLIED[mk][row]))
         if role and mk in BIAS_BY_ROLE[role]:
             rows.append((f"{PROP_WORDS[mk][0]}, every {ROLE_WORDS[role][:-1]}", *BIAS_BY_ROLE[role][mk]))
-    if not rows:
+    if not rows and not live:
         return []
-    who = f" ({team}, implied {float(implied):.1f})" if team and row is not None else ""
-    L = [f"**Measured calibration**{who}:", "", "| Market and group | Over hit | Engine said | Games |",
-         "|---|---:|---:|---:|"]
-    for lab, n, hit, eng in rows:
-        L.append(f"| {lab} | {100 * hit:.1f}% | {100 * eng:.1f}% | {n} |")
-    L += ["", "The backtest's 2022-25 games at lines near the middle of the forecast (DECISIONS #197, #198): a "
-              "record of how these groups have run, not an adjustment to the price above; lines far from the "
-              "middle were not measured."]
+    L = []
+    if live:
+        L += [f"**Live record at Sleeper's lines** (weeks {LIVE_WEEKS}, every graded line of that market):", "",
+              "| Market | Over hit | Engine said | Market said | Lines |", "|---|---:|---:|---:|---:|", *live,
+              "", "At real lines the engine's Over chance has not beaten the market's so far (log loss 0.717 "
+                  "against 0.692 over 1,536 lines; a coin flip is 0.693, DECISIONS #202): read the market's "
+                  "chance as the probability and the engine for workload and role.", ""]
+    if rows:
+        who = f" ({team}, implied {float(implied):.1f})" if team and row is not None else ""
+        L += [f"**Backtest calibration**{who}:", "", "| Market and group | Over hit | Engine said | Games |",
+              "|---|---:|---:|---:|"]
+        for lab, n, hit, eng in rows:
+            L.append(f"| {lab} | {100 * hit:.1f}% | {100 * eng:.1f}% | {n} |")
+        L += ["", "The backtest's 2022-25 games at stand-in lines near the middle of the forecast (DECISIONS "
+                  "#197, #198), not real lines; the live record above has not matched it for rushing or tight "
+                  "ends. A record, not an adjustment to the price."]
     return L
 
 
@@ -1482,6 +1505,14 @@ def bias_gap_rows(markets, implied_by_team) -> list[tuple[str, str, str]]:
                     "but teams implied 27+ still hit the Over more often than the engine says and 18 or less less "
                     "often (2022-25)" + (f" -- {rows}" if rows else ""),
                     "read the card's calibration line beside each passing price"))
+    live = [m for m in MARKET_ORDER if m in markets and m in LIVE_RECORD]
+    if live:
+        out.append(("The engine's chance at real lines",
+                    f"Live record, weeks {LIVE_WEEKS}: the engine's Over chance has not beaten the market's at "
+                    "Sleeper's lines (log loss 0.717 vs 0.692 over 1,536 lines; " + "; ".join(
+                        f"{PROP_WORDS[m][0].lower()} Overs hit {100 * LIVE_RECORD[m][1]:.0f}% vs engine "
+                        f"{100 * LIVE_RECORD[m][2]:.0f}%" for m in live) + "; DECISIONS #202)",
+                    "read the market's chance as the probability; use the engine for workload and role"))
     if markets & {"player_reception_yds", "player_receptions", "player_rush_yds", "player_rush_reception_yds"}:
         out.append(("Yardage Overs at the main line",
                     "Measured: receiving yards' Over has run about 2.6 points above the engine (receptions 0.7, "

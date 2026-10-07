@@ -81,10 +81,12 @@ def test_qb_card_states_the_measured_bias_and_no_threshold():
     assert "| His recent workload | week 3: 3 attempts, 0 completions; week 4: 27 attempts, 19 completions |" in text
     assert "completions 17.5; attempts 28.5, Over favoured" in text
     assert "over his last 1 game (arithmetic, not a price-based break-even)" in text
-    assert "Measured calibration" not in text, "no implied total: no calibration line"
+    assert "Backtest calibration" not in text, "no implied total: no backtest row"
+    assert "Live record at Sleeper's lines" in text
     d2 = {**d, "implied": 28.0}
     t2 = "\n".join(RS.player_card(d2))
-    assert "**Measured calibration** (TB, implied 28.0):" in t2
+    assert "| Passing yards | 57.0% | 41.7% | 50.1% | 86 |" in t2, "the live record at real lines comes first"
+    assert "**Backtest calibration** (TB, implied 28.0):" in t2
     assert "| Passing yards, teams implied 27+ | 65.5% | 56.8% | 174 |" in t2
     assert "Role evidence" not in text
     three = RS.qb_table({**q, "games": [(1, 30, 20), (2, 34, 22), (3, 27, 19)]})
