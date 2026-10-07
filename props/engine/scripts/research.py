@@ -1341,8 +1341,8 @@ def known_gaps(ctx: dict) -> list[tuple[str, str, str]]:
         g.append(("Questionable: " + ", ".join(ctx["questionable"]),
                   "Teammate redistribution if he sits",
                   "plays normally versus out (the report's 'If a Questionable player is out' section)"))
-    if ctx.get("has_pass_lines"):
-        g.append(("QB passing yards", *QB_PASS_BIAS_GAP))
+    g += bias_gap_rows(ctx.get("markets") or ({"player_pass_yds"} if ctx.get("has_pass_lines") else set()),
+                       ctx.get("implied") or {})
     if ctx.get("has_rush_lines"):
         g.append(("Rushing tails",
                   "Rushing and rushing + receiving run narrow in the tails: a line far from the projection reads "
@@ -1399,16 +1399,74 @@ PROP_WORDS = {"player_receptions": ("Receptions", "catches"), "player_reception_
               "player_pass_yds": ("Passing yards", "yards")}
 MARKET_ORDER = ["player_pass_yds", "player_receptions", "player_reception_yds", "player_rush_yds",
                 "player_rush_reception_yds"]
-# the measured QB passing bias at the main line (DECISIONS #196): stated beside every passing
-# price until round 38 fixes it -- a measured figure, not a direction guessed from the width
-QB_PASS_BIAS = ("**Known bias, near the middle only:** on lines near the middle of the forecast the engine's "
-                "passing-yards Over has run about 6 points low (2022-25 starters at the backtest's stand-in line: "
-                "the Over hit 52.7% when the engine averaged 47.0%; 95% range of the gap +3.3 to +8.0; "
-                "DECISIONS #196). It was not measured for lines far from the middle.")
-# the same fact for the matchup section's section-7 row (edit both together)
-QB_PASS_BIAS_GAP = ("Measured bias: near the middle of the forecast the Over has run about 6 points low (2022-25, "
-                    "DECISIONS #196); the distribution is also too wide in the tails",
-                    "none needed to see the direction; read passing Overs near the middle as low by about that much")
+# MEASURED CALIBRATION by the team's market-implied points (expert audit, reproduced 2026-10-06,
+# DECISIONS #197): at the backtest's stand-in line (near the middle of the forecast), 2022-25,
+# the shipped engine -- (player-games, Over hit, engine's average Over). Stated on each card for
+# the row the player's team sits in: a measured fact, never a correction applied to a price.
+# Re-measure and edit when a round changes these markets (round 38 is testing QB passing).
+IMPLIED_ROWS = ((18.0, "18 or less"), (21.0, "18-21"), (24.0, "21-24"), (27.0, "24-27"), (99.0, "27+"))
+BIAS_BY_IMPLIED = {      # measured at share_conc_targets 60 (round 34's setting), round-34 frames
+    "player_pass_yds": {"18 or less": (219, .388, .467), "18-21": (419, .496, .473), "21-24": (547, .536, .469),
+                        "24-27": (419, .566, .471), "27+": (174, .655, .472)},
+    "player_reception_yds": {"18 or less": (1221, .455, .467), "18-21": (2014, .507, .470),
+                             "21-24": (2358, .500, .471), "24-27": (1711, .522, .475), "27+": (709, .522, .476)},
+    "player_receptions": {"18 or less": (1221, .423, .440), "18-21": (2014, .468, .441), "21-24": (2358, .450, .441),
+                          "24-27": (1711, .462, .442), "27+": (709, .474, .442)},
+    "player_rush_yds": {"18 or less": (376, .492, .511), "18-21": (615, .511, .503), "21-24": (682, .522, .494),
+                        "24-27": (501, .507, .498), "27+": (218, .587, .485)},
+    "player_rush_reception_yds": {"18 or less": (451, .488, .528), "18-21": (730, .538, .520),
+                                  "21-24": (794, .514, .516), "24-27": (561, .528, .519), "27+": (241, .581, .509)}}
+
+
+def implied_row(implied):
+    try:
+        v = float(implied)
+    except (TypeError, ValueError):
+        return None
+    if v != v:
+        return None
+    return next(lab for hi, lab in IMPLIED_ROWS if v <= hi)
+
+
+def calibration_line(markets, implied, team=None) -> list[str]:
+    """The card's measured-calibration table for the player's priced markets, at the row his
+    team's implied points sit in; [] without an implied total."""
+    row = implied_row(implied)
+    if row is None:
+        return []
+    mks = [m for m in MARKET_ORDER if m in markets and m in BIAS_BY_IMPLIED]
+    if not mks:
+        return []
+    who = f"{team}, implied {float(implied):.1f}" if team else f"implied {float(implied):.1f}"
+    L = [f"**Measured calibration, teams implied {row}** ({who}):", "",
+         "| Market | Over hit | Engine said | Games |", "|---|---:|---:|---:|"]
+    for mk in mks:
+        n, hit, eng = BIAS_BY_IMPLIED[mk][row]
+        L.append(f"| {PROP_WORDS[mk][0]} | {100 * hit:.1f}% | {100 * eng:.1f}% | {n} |")
+    L += ["", "The backtest's 2022-25 games at lines near the middle of the forecast (DECISIONS #197): a record "
+              "of how this row has run, not an adjustment to the price above; lines far from the middle were not "
+              "measured."]
+    return L
+
+
+# the matchup section's section-7 rows for the same facts (one source: BIAS_BY_IMPLIED)
+def bias_gap_rows(markets, implied_by_team) -> list[tuple[str, str, str]]:
+    out = []
+    if "player_pass_yds" in markets:
+        rows = "; ".join(f"{t} (implied {v:.1f}): Over hit {100 * BIAS_BY_IMPLIED['player_pass_yds'][implied_row(v)][1]:.0f}% "
+                         f"vs engine {100 * BIAS_BY_IMPLIED['player_pass_yds'][implied_row(v)][2]:.0f}%"
+                         for t, v in implied_by_team.items() if implied_row(v))
+        out.append(("QB passing yards by game environment",
+                    "Measured: the passing Over runs low for teams implied at 21+ points and high at 18 or less "
+                    "(2022-25, DECISIONS #197)" + (f" -- {rows}" if rows else ""),
+                    "the engine is not adjusted for this yet (round 38 is testing an implied-points scale); read "
+                    "the card's calibration line beside each passing price"))
+    if markets & {"player_reception_yds", "player_receptions", "player_rush_yds", "player_rush_reception_yds"}:
+        out.append(("Yardage Overs at the main line",
+                    "Measured: receiving yards' Over has run about 2.9 points above the engine (receptions 1.4, "
+                    "rushing 1.8), more for teams implied at 24+ (2022-25, DECISIONS #197)",
+                    "read each card's calibration line; a fix needs its own round"))
+    return out
 CARD_LEGEND = ("**Reading the cards:** \"Engine forecast\" is the middle simulated outcome and the range holding the "
                "middle 80% of simulated outcomes. \"Over: engine / market\" compares the engine with the market's "
                "price after removing the bookmaker's margin; the market percentage is not the win rate the offered "
@@ -1659,8 +1717,7 @@ def player_card(d: dict) -> list[str]:
     reads = d.get("reads") or {}
     if pos == "QB":
         L += qb_table(d.get("qb")) + [""]
-        if any(r["market"] == "player_pass_yds" for r in rows):
-            L += [QB_PASS_BIAS, ""]
+
     else:
         is_back = pos in ("RB", "FB", "HB")
         L += role_table(d.get("usage"), d.get("backfield"), is_back, d.get("qbs")) + [""]
@@ -1678,6 +1735,9 @@ def player_card(d: dict) -> list[str]:
             cl = capped_line(reads.get(key), per)
             if cl:
                 L += [cl, ""]
+    cal = calibration_line({r["market"] for r in rows}, d.get("implied"), d.get("team"))
+    if cal:
+        L += cal + [""]
     for s_ in d.get("fit") or []:
         L += [f"**How his lines fit together:** {s_}", ""]
     for sh in d.get("shadow") or []:

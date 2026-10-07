@@ -608,19 +608,24 @@ need not be surfaced. Write the reply as a premium prop guide with this structur
    rather than the ones worth betting, and reuses each player-week 8-10 times so its `n`
    column overstates the evidence by about an order of magnitude. Quote it only with that
    description attached. The 2022-25 yardage harness (`reports/yardage_harness.md` in the
-   repo) is the evidence: receptions and receiving yards are unbiased on outcomes with their
-   width within the bar. Rushing yards and rushing + receiving are unbiased and right at the
-   main line, but their distributions run too narrow in the tails (23-25% of games outside
+   repo) is the evidence, with **measured biases at the main line (expert audit, DECISIONS #197)**:
+   at the backtest's stand-in line on 2022-25 the receiving-yards Over hit 2.9 points more often
+   than the engine said (receptions 1.4, rushing 1.8, combined 0.6), and every market leans by
+   the team's implied points (backs on teams implied 27+: Over 58.7% against 48.5%). Each card
+   prints the row its team sits in ("Measured calibration"); quote it with the price -- a measured
+   record, never an adjustment you apply. Widths: receptions and receiving yards within the
+   bar; rushing yards and rushing + receiving run too narrow in the tails (23-25% of games outside
    the 80% range on the re-check, reports/current_settings_check_2026-10-06.md): a line far
    from the projection -- an alternate line, a long shot -- reads more confident than it
    should; say so when quoting one. None is tested against posted lines yet; say that, not
    that the numbers are unvalidated guesses.
    QB passing yards (the starting QB only) are his receivers' yards in the same simulation
-   times a starter's usual share. **Measured bias (DECISIONS #196):** at the harness's main line
-   the Over hit 52.7% on 2022-25 while the engine averaged 47.0% (+5.7 points, 95% +3.3 to
-   +8.0) -- its Over chance runs about 6 points low; the card prints this beside every passing
-   price, and chat says it with any passing read (a measured figure, so stating its direction is
-   not guessing). It is also too WIDE in the tails (14% of games outside the 80% range against a
+   times a starter's usual share. **Measured bias by game environment (DECISIONS #196, #197):**
+   at the harness's main line on 2022-25 the Over hit 52.7% overall while the engine averaged
+   47.0%, and the miss follows the team's implied points: 38.8% hit at 18 or fewer, 49.6% at
+   18-21, 53.6% at 21-24, 56.6% at 24-27, 65.5% at 27+, against an engine near 47% in every row.
+   The card prints the team's row beside every passing price; chat says it with any passing read
+   (a measured figure, so stating its direction is not guessing). Round 38 is testing a fix. It is also too WIDE in the tails (14% of games outside the 80% range against a
    17-23% bar; reports/rush_rec_calibration.md). Priced by the user's decision (DECISIONS #105).
    Ladder: `ladder_*.csv` holds P(stat <= k) per player; quote it when the user asks about
    an alternate line.

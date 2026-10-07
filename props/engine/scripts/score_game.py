@@ -2683,7 +2683,7 @@ def main():
                              RSCH.rush_rec_sentence(rr_read),
                              RSCH.qb_yards_sentence(nog(QB_READ.get((nm, t))))) if x_]
         return {"name": nm, "team": t, "slot": m.slot, "pos": m.pos, "rows": rows, "book": book, "quoted": quoted,
-                "fit": fit,
+                "fit": fit, "implied": env[t].get("implied_points"),
                 "usage": u_, "backfield": BACKFIELD.get(nm), "qbs": qbs, "prior": prior, "season": season,
                 "carries_book": carries_book,
                 "reads": {"catch": CATCH_READ.get((nm, t)), "carry": CARRY_READ.get((nm, t)), "rr": rr_read},
@@ -3296,7 +3296,7 @@ def main():
              f"(2022-25 harness: unbiased, width within the bar); rushing yards `rush_yds_v0` and rushing + receiving PROTOTYPE "
              f"(unbiased and right at the main line, but too narrow in the tails: 23-25% of games outside the 80% range, so a "
              f"line far from the median reads too confident; reports/current_settings_check_2026-10-06.md); QB passing yards "
-             f"`pass_yds_v0` PROTOTYPE (its Over at the main line about 6 points low on 2022-25, DECISIONS #196; too WIDE: 14% of "
+             f"`pass_yds_v0` PROTOTYPE (its Over at the main line low by environment: 39% hit at 18 or fewer implied points, 66% at 27+, against an engine ~47%, DECISIONS #197; too WIDE: 14% of "
              f"games outside the 80% range against a 17-23% bar, so its chances sit too close to 50%); "
              f"anytime TD `anytime_td_v1` PROTOTYPE (outcome-backtested, no posted-line test; no fair odds). All MODEL_UNVALIDATED. Dispersion: receptions log r = "
              f"{P['receptions_dispersion']['a']:.3f} + {P['receptions_dispersion']['b']:.3f}·log μ; carries "
@@ -3813,6 +3813,9 @@ def brief_section(**V) -> list[str]:
            "questionable": sorted(n for n in M[M.questionable.astype(bool)].name if n in priced),
            "has_pass_lines": "player_pass_yds" in mk,
            "has_rush_lines": bool({"player_rush_yds", "player_rush_reception_yds"} & mk),
+           "markets": mk,
+           "implied": ({HOME: (ME_["total_line"] - ME_["home_spread"]) / 2, AWAY: (ME_["total_line"] + ME_["home_spread"]) / 2}
+                       if ME_.get("home_spread") is not None and ME_.get("total_line") is not None else {}),
            "oline_out": {t: sum(1 for x in ((V.get("LINE_STATUS") or {}).get(t) or []) if x["state"] == "out")
                          for t in (AWAY, HOME)},
            "wind_mph": wx.get("wind_mph_max") if wx.get("status") == "ok" else None,
