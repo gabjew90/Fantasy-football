@@ -515,3 +515,14 @@ def test_round_41_role_shapes_and_tight_end_share():
     assert s6[2]["t"].mean() > b[2]["t"].mean() * 1.04 and abs(s6[2]["w"].mean() - b[2]["w"].mean()) < 0.15
     import backtest as BT
     assert len(BT.RECEIVING_ROLE_GRID) == 27
+
+
+def test_round_41_the_live_scorer_applies_the_tight_end_share_once():
+    """score_game scales the tight end's projected share and must simulate with WIDTH_SIM (the
+    multiplier removed): a simulate_team_game call with width=WIDTH would apply it twice."""
+    import re
+    from pathlib import Path
+    src = (Path(__file__).resolve().parents[1] / "engine" / "scripts" / "score_game.py").read_text(encoding="utf-8")
+    calls = re.findall(r"simulate_team_game\((.*?)\)\n", src, re.S)
+    assert calls and all("width=WIDTH_SIM" in c for c in calls), calls
+    assert 'WIDTH_SIM = {**WIDTH, "te_share_mult": None}' in src

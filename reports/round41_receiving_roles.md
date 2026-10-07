@@ -60,3 +60,35 @@ its knob at 1 and the next stage runs at 1.
 ## Result
 
 (Filled in after the runs, below this line, without editing anything above.)
+
+## Result (2026-10-06; props/tools/round41_select.py on the 27-setting grid, 2022-26)
+
+| Stage | Pick | Gain on 2022-24 (95%) | 2026 weeks 2-4 | Leave-one-season-out | Verdict |
+|---|---|---|---|---|---|
+| A1 tight-end yards shape (conversion) | 1.5 | +0.0031 (-0.0020, +0.0080) | -0.0049 | +0.0031, every fold 1.5 | not detectable, 2026 negative: **stays 1** |
+| A2 backs' yards shape (conversion) | 1 (shipped best) | -- | -- | -- | **stays 1** |
+| B tight-end share (own volume) | **1.06** | **+0.0063 (+0.0016, +0.0112)** | +0.0012 (-0.016, +0.020) | +0.0063 (+0.0014, +0.0111), every fold 1.06 | **ships** |
+
+Move of the Over chance 3.8 points (bar 1.0); log loss and Brier agree in the 15-85% zone.
+
+**Guards on the combined setting (1 / 1 / 1.06), 2022-24, floor -0.2%:** conversion identical in
+every market; own volume receptions +0.15%, receiving yards +0.27%, rushing + receiving -0.04%,
+QB passing -0.10%, rushing identical -- **pass**. **Width:** the share knob cannot move the
+conversion draws; on the frozen cohort tight ends' yards width is identical (14.37% both,
+draws equal), so it does not move away from the bar (the unfrozen 14.4 -> 14.5 is rows entering
+the bettable set). **Role calibration** (Over minus engine, points):
+
+| | Tight-end receptions | Tight-end yards |
+|---|---|---|
+| Shipped, 2022-24 | +5.4 | +7.4 |
+| Pick, 2022-24 | +1.9 | +4.7 |
+| Shipped, 2026 weeks 2-4 | +0.5 | +5.9 |
+| Pick, 2026 weeks 2-4 | -2.8 | +3.0 |
+
+Shrinks on both: pass. By implied points (reported, the standing rule): receptions'
+weighted gap falls in every row; receiving yards' too (24-27 still +6.0).
+
+**Round 41 ships te_share_mult 1.06** (resources/width_params.json). Live it multiplies the
+tight end's projected share (score_game, after the Out rule, before the share cap); the
+simulation then runs without it, so it is applied once. The cards' receiving calibration rows
+are re-measured at the new setting.

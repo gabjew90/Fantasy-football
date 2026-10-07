@@ -609,12 +609,13 @@ need not be surfaced. Write the reply as a premium prop guide with this structur
    column overstates the evidence by about an order of magnitude. Quote it only with that
    description attached. The 2022-25 yardage harness (`reports/yardage_harness.md` in the
    repo) is the evidence, with **measured biases at the main line (expert audit, DECISIONS #197)**:
-   at the backtest's stand-in line on 2022-25 the receiving-yards Over hit 2.9 points more often
-   than the engine said (receptions 1.4, rushing 1.8, combined 0.6), and every market leans by
+   at the backtest's stand-in line on 2022-25 the receiving-yards Over hit 2.6 points more often
+   than the engine said after round 41 (receptions 0.7, rushing 1.8, combined 0.6), and every market leans by
    the team's implied points (backs on teams implied 27+: Over 58.7% against 48.5%). Each card
    prints the row its team sits in and, for receiving lines, his role's row ("Measured
    calibration"; DECISIONS #198: tight ends' catches Over hit 4.9 points and yards 6.6 points more
-   often than the engine said, and with actual targets in, tight-end yards run too wide and backs'
+   often than the engine said -- round 41 raised tight ends' target share x1.06 (DECISIONS #200),
+   leaving 1.4 and 3.9 -- and with actual targets in, tight-end yards still run too wide and backs'
    receiving yards too narrow); quote it with the price -- a measured
    record, never an adjustment you apply. Widths: receptions and receiving yards within the
    bar; rushing yards and rushing + receiving run too narrow in the tails (23-25% of games outside

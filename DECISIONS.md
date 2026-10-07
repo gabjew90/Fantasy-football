@@ -7847,3 +7847,17 @@ The expert re-ran the four-season backtest (baseline reproduces ours: receptions
 - Round 39 (backs' carries 50% toward the market = round 29): stays in shadow by the user's
   choice; the record grades it. Round 42 (target handoff by absence age): null, the shipped
   handoff is about right in continuing absences (0.99).
+
+## 2026-10-06 (200) -- round 41: tight ends' target share x1.06 ships; the role yards shapes stay
+
+- Three registered stages on each role's own rows (reports/round41_receiving_roles.md). The
+  tight-end yards shape (1.5) leaned better but was not detectable and went negative on 2026;
+  the backs' shape kept 1. **Tight ends' share x1.06 ships**: their receptions own-volume log
+  loss +0.0063 (+0.0016, +0.0112) on 2022-24, 2026 weeks 2-4 not negative, every held-out
+  season picks 1.06; every market's guard within -0.2%; tight ends' Over-minus-engine gap
+  5.4 -> 1.9 (catches) and 7.4 -> 4.7 (yards).
+- Live: applied to the tight end's projected share (once; the simulation runs without it).
+  The cards' receiving calibration rows are re-measured.
+- Still open: tight-end yards too wide and backs' receiving yards too narrow with actual targets
+  in (the shapes did not clear the bar); receiving yards' Over 2.6 points above the engine
+  overall (round 40, next).

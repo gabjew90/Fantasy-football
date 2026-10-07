@@ -1243,6 +1243,21 @@ def main():
                 E.loc[i_, "rs"] = sh_
                 OUT_MULT["rs"][i_] = fr_
     M, redistributed = apply_out_rule(M, E, (AWAY, HOME), mult=OUT_MULT)
+    # WIDTH SETTINGS (resources/width_params.json): game-to-game variation in
+    # shares, catch rate and yards per touch, tuned on 2022-23 by backtest.py
+    # --tune-width and judged on 2024-25 (reports/width_tuning.md,
+    # reports/yardage_harness.md). No file = the pre-width sampler, draw for draw.
+    _wf = RES / "width_params.json"
+    WIDTH = MODEL.validate_width(json.loads(_wf.read_text(encoding="utf-8"))) if _wf.exists() else None
+    # ROUND 41 (DECISIONS #200): tight ends' target share x te_share_mult on the projection
+    # itself, so the projected targets, the 50/50 search and the card all carry it; the
+    # simulation then runs without the multiplier (the harness applies it inside the draw:
+    # the same shares, the depth bucket giving up what the tight end gains)
+    TE_MULT = float((WIDTH or {}).get("te_share_mult") or 1.0)
+    if TE_MULT != 1.0:
+        _te = M.slot.map(MODEL.role_group) == "TE"
+        M.loc[_te, "ts"] = M.loc[_te, "ts"] * TE_MULT
+    WIDTH_SIM = {**WIDTH, "te_share_mult": None} if WIDTH else None
     for t in (AWAY, HOME):
         m = M.team == t
         # Shares are estimated per player with no joint constraint, so the eligible set's
@@ -1270,12 +1285,6 @@ def main():
     # made same-game-parlay probabilities impossible to state.
     SH = P["shape_ypc_per_catch"]
     TVD = P.get("team_volume_dispersion", {"targets_r": 30.0, "carries_r": 30.0})
-    # WIDTH SETTINGS (resources/width_params.json): game-to-game variation in
-    # shares, catch rate and yards per touch, tuned on 2022-23 by backtest.py
-    # --tune-width and judged on 2024-25 (reports/width_tuning.md,
-    # reports/yardage_harness.md). No file = the pre-width sampler, draw for draw.
-    _wf = RES / "width_params.json"
-    WIDTH = MODEL.validate_width(json.loads(_wf.read_text(encoding="utf-8"))) if _wf.exists() else None
     QB_RESID = np.array(P["qb_carry_residual_quantiles"]) if "qb_carry_residual_quantiles" in P else None
     # QB rushing props are priced once the priors carry the QB carry grid and the
     # kneel-down grids (props-v1.21; reports/yardage_harness.md, DECISIONS #100):
@@ -1294,7 +1303,7 @@ def main():
         crs_t = {n: float(v) for n, v in zip(Mt.name, Mt.cr)}
         ypt_t = {n: float(v) for n, v in zip(Mt.name, Mt.ypt)}
         out_rec, tt_draw = MODEL.simulate_team_game(rng, N_SIM, env[t]["targets"], TVD["targets_r"],
-                                                    shares_t, crs_t, ypt_t, SH, other_bucket=True, width=WIDTH,
+                                                    shares_t, crs_t, ypt_t, SH, other_bucket=True, width=WIDTH_SIM,
                                                     return_other=True,
                                                     player_roles={n: MODEL.role_group(s_) for n, s_ in zip(Mt.name, Mt.slot)})
         pass_inputs[t] = ([out_rec[n][1] for n in names], out_rec.pop(MODEL.OTHER))
