@@ -467,4 +467,26 @@ def test_round_38_shrink_keeps_the_mean_and_the_scale_moves_it():
         with _pt.raises(ValueError):
             M.validate_width(bad)
     import backtest as BT
-    assert len(BT.PASS_BIAS_GRID) == 12 and {"pass_shrink": None, "pass_scale": 1.0} in BT.PASS_BIAS_GRID
+    assert {"pass_implied_exp": 0.0, "pass_shrink": None, "pass_scale": 1.0} in BT.PASS_BIAS_GRID
+
+
+def test_round_38_implied_points_scale():
+    """Amended round 38: the draw times (implied / 22) ** exp; 0 is byte-identical; a missing
+    or bad implied total leaves the draw alone."""
+    import numpy as np
+    import model as M
+    ys = [np.random.default_rng(5).gamma(4.0, 55.0, 4000)]
+    run = lambda w, ip: M.simulate_qb_passing(np.random.default_rng(3), 4000, ys, None, None, 1.0,
+                                              starter_share=np.ones(4), width=w, implied_points=ip)
+    base = run(None, 28.0)
+    assert np.array_equal(base, run({"pass_implied_exp": 0.0}, 28.0))
+    assert np.allclose(run({"pass_implied_exp": 0.2}, 28.0), base * (28 / 22) ** 0.2)
+    assert np.allclose(run({"pass_implied_exp": 0.2}, 16.5), base * (16.5 / 22) ** 0.2)
+    for ip in (None, float("nan"), 0.0):
+        assert np.array_equal(base, run({"pass_implied_exp": 0.2}, ip))
+    import pytest as _pt
+    with _pt.raises(ValueError):
+        M.validate_width({"pass_implied_exp": -0.1})
+    import backtest as BT
+    assert len(BT.PASS_BIAS_GRID) == 30
+    assert {"pass_implied_exp": 0.0, "pass_scale": 1.0, "pass_shrink": None} in BT.PASS_BIAS_GRID

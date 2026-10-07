@@ -1365,7 +1365,8 @@ def main():
             if STARTER_QB.get(t) is not None:
                 ys_t, other_t = pass_inputs[t]
                 sims[STARTER_QB[t]]["pass_yards"] = MODEL.simulate_qb_passing(
-                    rng, N_SIM, ys_t, other_t, P["other_receiver_rates"], SH, starter_share=_share, width=WIDTH)
+                    rng, N_SIM, ys_t, other_t, P["other_receiver_rates"], SH, starter_share=_share, width=WIDTH,
+                    implied_points=env[t].get("implied_points"))
     M["mu_rec"] = [max(env[r.team]["targets"] * r.ts * max(r.cr, 0.05), 0.02) for _, r in M.iterrows()]
     M["mu_car"] = [max(env[r.team]["carries"] * r.rs, 0.02) for _, r in M.iterrows()]
 

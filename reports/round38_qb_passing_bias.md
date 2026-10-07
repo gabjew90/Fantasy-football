@@ -61,3 +61,44 @@ to hold this round.
 ## Result
 
 (Filled in after the runs, below this line, without editing anything above.)
+
+### Amendment before any result was read (2026-10-06, after the expert's audit of #99-#143)
+
+The 12-setting run finished; **its results were not opened.** The expert's audit, reproduced
+here on the round-36 frames (2022-25 starters, the Over at the stand-in line):
+
+| Team implied points | Starts | Actual / engine yards | Over hit | Engine's Over | Engine's Over given actual targets |
+|---|---|---|---|---|---|
+| 18 or less | 219 | 0.894 | 38.8% | 46.9% | 41.8% |
+| 18-21 | 419 | 0.995 | 49.6% | 47.2% | 46.4% |
+| 21-24 | 547 | 1.041 | 53.6% | 46.8% | 47.9% |
+| 24-27 | 419 | 1.049 | 56.6% | 47.0% | 47.5% |
+| 27+ | 174 | 1.086 | 65.5% | 47.1% | 47.0% |
+
+The same slope in 2022-23 and 2024-25. A level change alone cannot fix a bias that runs from
+-8 to +18 points by game environment, so round 38 adds DECISIONS #137's implied-points scale
+(code from tag archive/props-pass-implied), with the small exponents #137 never tried:
+
+| Knob | Shipped | Grid |
+|---|---|---|
+| pass_implied_exp: the draw times (implied points / 22) ** this | 0 | 0, 0.1, 0.2, 0.3, 0.4 |
+| pass_scale | 1.0 | 1.0, 1.02, 1.04 |
+| pass_shrink (before the share draw) | off | off, 0.7 |
+
+Crossed: 30 settings, one run (the unread 12-setting run is superseded). Selection, ship test,
+width and CRPS guards and the 2026 weeks 2-4 confirmation as registered above, plus two guards:
+
+- **Calibration by implied points:** the weighted mean gap |Over hit - engine's Over| over the
+  five rows above must fall against shipped on 2022-24, and must not rise on 2026 weeks 2-4
+  (point estimate; about a hundred starts, a sign check).
+- **Conversion:** the passing log loss with actual targets plugged in must not be worse than
+  shipped on 2022-24.
+
+The exponent is gridded with an explicit 0 (off), so the tie rule's distance treats it as an
+ordinary value. 2024-25 has now been read by the expert and here: a disclosed extra look; the
+fresh evidence is 2026.
+
+Disclosed before the run (code review): the backtest scales by nflverse's closing lines while
+the live report scales by the line at run time, so the harness's environment is slightly
+better informed; and if an exponent ships, a live run without a spread/total must say the
+scale is off (to be added with the ship).
