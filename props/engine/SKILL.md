@@ -303,6 +303,24 @@ For a narrow question, run only what it needs:
     and which players it helps, and what it does NOT establish. Never walk the table back in
     words; reason from it ("the case for extra Dallas carries comes from the expected lead,
     not from a soft run defence").
+  - **Style -- the user's TB at DAL brief is the bar** (user, 2026-10-06: "superior in every way
+    in prose, table clarity, not repeating the obvious, no jargon"):
+    - Plain words a casual fan reads without stopping: "passes" (they include sacks and
+      scrambles), never "dropbacks"; no broadcast adjectives or metaphors ("stingiest",
+      "explosive", "by a distance", "air it out", "feast"). Gloss EPA and success rate once.
+    - Copy the report's tables as they are: one number per cell, the rank key in the caption.
+      Never cram several figures into a cell. **Every table in the Matchup brief appears, in its
+      order -- none is skipped**, the fantasy points allowed by position with its ranks
+      included (user, 2026-10-06: "you're completely missing the table").
+    - Each inference carries its basis and its limit: "The case for extra Dallas carries
+      comes from the expected lead, not from evidence of a weak run defence." Use "consistent
+      with", "supports the direction", "does not establish", "plausible if the lead develops".
+    - Say a caveat once, where it belongs (sample size sits in the table caption); no filler
+      ("which four games can't tell you"), and no sentence that only restates a number the
+      table shows -- a number appears in prose only to compare or explain it.
+    - Under a table, one short paragraph per team when they differ (two to four sentences).
+    - First person for judgment ("I expect", "My base case"), "the engine projects" for
+      estimates, plain statement for facts.
   - **Keep facts, model estimates and judgment apart**: the data is fact, "the engine projects"
     is an estimate, "I expect" is judgment. Missing data reads "not in this run", never a guess.
   - **Order**: the market -> team outlook (our workload against the season) -> unit against unit

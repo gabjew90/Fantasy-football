@@ -920,6 +920,7 @@ def defense_line(dm, teams, verb="allows") -> str | None:
         return None
     n, lg = dm["_n"], dm["_league"]
     lab = {"epa_play": "EPA a play", "epa_pass": "EPA a pass", "epa_rush": "EPA a run", "pts_drive": "points a drive"}
+    # (EPA explained once, in the brief's unit table; "a pass" counts sacks and scrambles)
     fmt = lambda c, v: f"{v:+.2f}" if c.startswith("epa") else f"{v:.2f}"
     parts = []
     for t in teams:
@@ -988,30 +989,30 @@ def unit_efficiency(pbp, wp_lo=0.10, wp_hi=0.90) -> dict:
     return out
 
 
-def _rk(r, n, best="best"):
-    return f"{ordinal(r)} {best}" if r <= (n + 1) // 2 else f"{ordinal(n - r + 1)} worst"
-
-
 def unit_table(ue, away, home) -> list[str]:
-    """Each offence against the defence it faces, dropbacks and runs."""
+    """Each offence against the defence it faces, passes and runs: one number per cell with
+    its rank, the rank key and the terms explained once under the table (user, 2026-10-06:
+    plain labels, no crammed cells)."""
     if not ue or not all(t in ue["off"] and t in ue["def"] for t in (away, home)):
         return []
-    n = ue["_n"]
-    cell_o = lambda t, k: (lambda v: f"{v[0]:+.2f} ({_rk(v[1], n)}) · {100 * v[2]:.0f}% ({_rk(v[3], n)})")(ue["off"][t][k])
-    cell_d = lambda t, k: (lambda v: f"{v[0]:+.2f} ({rank_words(v[1], n)}) · {100 * v[2]:.0f}% ({rank_words(v[3], n)})")(ue["def"][t][k])
-    L = ["| Matchup | Offence: EPA/play · success | Defence it faces allows: EPA/play · success |", "|---|---|---|"]
+    L = ["| Matchup | Offence: EPA per play | Offence: success rate | Defence faced: EPA allowed | "
+         "Defence faced: success allowed |", "|---|---|---|---|---|"]
     for o, d_ in ((away, home), (home, away)):
-        for k, lab in (("pass", "dropbacks"), ("run", "runs")):
+        for k, lab in (("pass", "pass"), ("run", "run")):
             if k in ue["off"][o] and k in ue["def"][d_]:
-                L.append(f"| {o} {lab} vs {d_} | {cell_o(o, k)} | {cell_d(d_, k)} |")
+                a, b = ue["off"][o][k], ue["def"][d_][k]
+                L.append(f"| {o} {lab} vs. {d_} | {a[0]:+.2f} ({ordinal(a[1])}) | {100 * a[2]:.0f}% ({ordinal(a[3])}) | "
+                         f"{b[0]:+.2f} ({ordinal(b[1])}) | {100 * b[2]:.0f}% ({ordinal(b[3])}) |")
     lg = ue["_league"]
+    L += ["", f"League average: pass {lg['pass'][0]:+.2f} EPA, {100 * lg['pass'][1]:.0f}% success; run "
+              f"{lg['run'][0]:+.2f} EPA, {100 * lg['run'][1]:.0f}% success. Rank among {ue['_n']} teams: offence "
+              f"1st = best, defence 1st = allows the most. Passes include sacks and scrambles. EPA per play: points "
+              f"added per play against an average play from the same down, distance and field position. Success "
+              f"rate: share of plays that added points. Garbage time removed ({ue['_filter']})."]
     pace = ue.get("pace") or {}
-    pace_s = "; ".join(f"{t} {pace[t][0]:.1f} s ({rank_words(pace[t][1], len(pace), 'fastest', 'slowest')})"
-                       for t in (away, home) if t in pace)
-    L += ["", f"League: dropbacks {lg['pass'][0]:+.2f} EPA, {100 * lg['pass'][1]:.0f}% success; runs "
-              f"{lg['run'][0]:+.2f} EPA, {100 * lg['run'][1]:.0f}% success. Garbage time removed ({ue['_filter']}); "
-              f"offence ranks 1st = best, defence ranks count from most allowed."
-          + (f" Pace, neutral situations, seconds between snaps: {pace_s}." if pace_s else "")]
+    if all(t in pace for t in (away, home)):
+        L.append(f"Pace in neutral situations (seconds between snaps; 1st = fastest): "
+                 + "; ".join(f"{t} {pace[t][0]:.1f} ({ordinal(pace[t][1])})" for t in (away, home)) + ".")
     return L
 
 
@@ -1052,11 +1053,11 @@ def positional_table(pa, teams) -> list[str]:
     n = pa["_n"]
     L = ["| Defence | RBs | WRs | TEs |", "|---|---|---|---|"]
     for t in teams:
-        L.append(f"| {t} | " + " | ".join(f"{pa[t][p][0]:.1f} ({rank_words(pa[t][p][1], n)})" for p in POS_GROUPS) + " |")
+        L.append(f"| {t} | " + " | ".join(f"{pa[t][p][0]:.1f} ({ordinal(pa[t][p][1])})" for p in POS_GROUPS) + " |")
     L.append("| League average | " + " | ".join(f"{pa['_league'][p]:.1f}" for p in POS_GROUPS) + " |")
     g = sorted(set(pa["_games"][t] for t in teams))
-    L += ["", f"PPR points allowed per game over {'/'.join(map(str, g))} games; touchdowns included, every player "
-              "at the position together. Shaped by the opponents faced; not a price input."]
+    L += ["", f"PPR fantasy points allowed per game over {'/'.join(map(str, g))} games. Rank among {n} teams: 1st "
+              "= most points allowed. Touchdowns included; shaped by the opponents faced."]
     return L
 
 

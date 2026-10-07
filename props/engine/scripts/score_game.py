@@ -3706,11 +3706,11 @@ def brief_section(**V) -> list[str]:
             st_ = pop[(pop.team == t) & (pop.name == qn)].report_status
             st_ = st_.iloc[0] if len(st_) and isinstance(st_.iloc[0], str) else None
             if t in auto:
-                c["Quarterback"] = (f"{auto[t]['out']} out" + (f" ({auto[t]['why']})" if auto[t]["why"] else "")
-                                    + f"; {qn} starts" + (f", start {n_} this season" if n_ else ""))
+                c["Quarterback"] = (f"{qn} starts" + (f" ({RSCH.ordinal(n_)} start this season)" if n_ else "")
+                                    + f"; {auto[t]['out']} out" + (f" ({auto[t]['why']})" if auto[t]["why"] else ""))
             else:
-                c["Quarterback"] = f"{qn}: {st_.lower() if st_ else 'no injury designation'}" + (
-                    f", start {n_} this season" if n_ and n_ <= 3 else "")
+                c["Quarterback"] = f"{qn}: {st_.lower() if st_ else 'healthy (no designation)'}" + (
+                    f", {RSCH.ordinal(n_)} start this season" if n_ and n_ <= 3 else "")
         ls = (V.get("LINE_STATUS") or {}).get(t) or []
         if len(ls) >= 5:
             out_ = [x for x in ls if x["state"] == "out"]

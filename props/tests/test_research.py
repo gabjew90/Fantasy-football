@@ -862,7 +862,8 @@ def test_unit_efficiency_splits_dropbacks_and_runs_removes_garbage_time_and_rank
     assert ue["def"]["B"]["pass"][0] == pytest.approx(0.2) and ue["off"]["A"]["pass"][1] == 1
     assert ue["pace"]["A"][0] == pytest.approx(30.0), "30 seconds between snaps on one drive"
     t = RS.unit_table(ue, "A", "B")
-    assert t[0].startswith("| Matchup |") and any(r.startswith("| A dropbacks vs B | +0.20") for r in t)
+    assert t[0].startswith("| Matchup |") and any(r.startswith("| A pass vs. B | +0.20 (1st)") for r in t)
+    assert "sacks and scrambles" in t[-1] and "EPA per play" in t[-1], "the terms explained in plain words"
     assert RS.unit_efficiency(pd.DataFrame(rows).drop(columns=["epa"])) == {}
 
 
