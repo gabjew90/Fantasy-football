@@ -464,9 +464,10 @@ For a narrow question, run only what it needs:
   carry and a catch, against our touches and the book's carries + catches lines, and how much
   of his yards come from catches. When a back's rushing leg needs a different script from the
   rest of an entry, name his combined line as the leg that survives both scripts (the catches
-  hold up when his team trails). Our model's own chance on it is not shown yet: the combined
-  market waits on its calibration check, because the simulation draws a team's runs and passes
-  independently.
+  hold up when his team trails). The combined line is priced since DECISIONS #187 (the model's
+  chance sits in the prop table); this touches read is arithmetic beside it, never a price-based
+  threshold -- the card's combined column says so, and a combined what-if runs as a separate
+  carry-and-catch scenario (carries, targets, catch rate and both yards rates kept apart).
   **The achievability gauge** ends both reads: the volume the yards line takes at his capped
   yards a play (the luck line: a play past the player's OWN 97.5th percentile for that prop --
   his catches or his runs, last season and this one -- counts as a lucky breakaway and is
@@ -553,19 +554,47 @@ need not be surfaced. Write the reply as a premium prop guide with this structur
    target, yards per carry, with sample size) and the multiplier applied to the opposing
    receivers/rushers. State plainly if the effect is small.
 4. **Per team, starters in depth-chart order** (QB1, RB1, WR1, WR2, TE1, WR3; RB2/proxy
-   only if they have a line). Each: the research rows first -- line, both prices, our
-   projection (median and 10th-90th range), the Over by the model and by the book, and
-   what the line implies (targets or carries per game at which it is a fair 50/50, next to
-   what we project), and what each side needs at its own price (the Over pays above the
-   first workload, the Under at or below the second, if the model's numbers are right;
-   it is how much role a view needs, never a pick) -- then the role: last-season share and games, this season's count,
-   last game's snaps and share against his earlier weeks, a back's three jobs (early-down
-   carries, passing-down targets, inside-5 carries; last game against earlier weeks), the
-   opponent multiplier if it
-   moved the number, and any Watch flag (new team, Questionable, snap scaling, the
+   only if they have a line). Each: the report's player card, laid out and narrated as the
+   "Player cards" rules below say. What its tables hold: the prop table (line, both prices,
+   the forecast's middle and 80% range, the Over by the engine and by the market); the role
+   evidence (last game against his earlier games: shares, snaps, a back's three jobs, the
+   quarterback); the workload check (the 50/50 workload and what each side needs at its own
+   price -- the Over pays above the first workload, the Under at or below the second, if the
+   model's numbers are right; how much role a view needs, never a pick); and any Watch flag (new team, Questionable, snap scaling, the
    receiving role-shift flag with its 2022-25 wording, a back's "carries up / down" flag when his
    carry share moved 20+ points last week (reports/rb_takeover_check.md: such backs beat or
    missed the model's carries by about two the next week), a teammate out or back).
+   **Player cards (the report's per-player section, user's draft 2026-10-06).** The report
+   prints one card per priced player: the prop table, role evidence (earlier games against last
+   game), the historical baseline, the workload check (the QB's volume-and-efficiency check),
+   the capped-play check, the market-carries number for backs, Matchup and Watch. Copy the
+   card's tables as printed -- every line, depth-chart order, never sorted by the gap. Then
+   write the read around them, in this order, in plain words:
+   - **The question** (bold, one line): what this player's prop turns on in THIS game ("Will
+     Dallas's extra running belong to this back?").
+   - **What his recent usage means**: name the change and why -- more snaps, a bigger share on
+     the same snaps, or an absent teammate. A share rise with more snaps is stronger evidence
+     than one busy game on unchanged snaps. Say whether last game had the same quarterback and
+     the same teammates as this one (the card's quarterback row).
+   - **What this matchup means**: the team-level script, then how much of it reaches this
+     player through his share.
+   - **Which prop fits the view**: receptions or yards, rushing or combined -- from the workload
+     table (a yards line that asks for many more targets than the catches line suits a
+     short-pass view less). Passing and combined yards have NO price-based workload: never
+     present their arithmetic (the capped check, the touches read) as an equivalent threshold.
+   - **Where the read can fail**: the specific role, script or efficiency change.
+   - **The closing condition** (bold): "If you expect [player] to average [range] in this
+     situation, [side, prop, line] meets / misses the quoted price's required win rate under
+     these efficiency assumptions. It stops fitting that view if [change]." Take the numbers
+     from the workload table; describe a margin under 10% as thin.
+   After the cards: **"What changes for the remaining players"** (one short paragraph per
+   group), and **"Reads that pull in different directions"** -- only conflicts the roles
+   support (two backs cannot both gain share of one fixed workload; a receiver's target gain
+   taken from a teammate pressures that teammate's Over), stated as assumptions, never as a
+   joint probability. A workload scenario table appears only after the scenarios were run
+   (`--assume`), never with estimated numbers. End with the card footnote on pick'em prices.
+   A whole-number line can push: quote the engine's Over with the push beside it, as the card
+   does.
    **Questionable players: give both cases, pick neither.** Every number in the run is
    priced as if a Questionable player PLAYS his normal role (no discount). The report's
    "If a Questionable player is out" section prices the same lines with him OUT and his
@@ -604,10 +633,12 @@ need not be surfaced. Write the reply as a premium prop guide with this structur
    should; say so when quoting one. None is tested against posted lines yet; say that, not
    that the numbers are unvalidated guesses.
    QB passing yards (the starting QB only) are his receivers' yards in the same simulation
-   times a starter's usual share: right on average but too WIDE on the corrected grading
-   (14% of games outside the 80% range against a 17-23% bar; reports/rush_rec_calibration.md),
-   so a passing chance sits too close to 50% -- an Over the model gives 60% is likely a bit
-   better than that. Priced by the user's decision (DECISIONS #105). Say so when quoting one.
+   times a starter's usual share. **Measured bias (DECISIONS #196):** at the harness's main line
+   the Over hit 52.7% on 2022-25 while the engine averaged 47.0% (+5.7 points, 95% +3.3 to
+   +8.0) -- its Over chance runs about 6 points low; the card prints this beside every passing
+   price, and chat says it with any passing read (a measured figure, so stating its direction is
+   not guessing). It is also too WIDE in the tails (14% of games outside the 80% range against a
+   17-23% bar; reports/rush_rec_calibration.md). Priced by the user's decision (DECISIONS #105).
    Ladder: `ladder_*.csv` holds P(stat <= k) per player; quote it when the user asks about
    an alternate line.
 6. **Parlays — DISABLED, do not price them.** `parlays_*.csv` is no longer written.

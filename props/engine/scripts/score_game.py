@@ -2114,6 +2114,7 @@ def main():
             price_over=r_.get("price_over"), price_under=r_.get("price_under"),
             median=float(np.median(s_)), p10=float(np.quantile(s_, 0.1)), p90=float(np.quantile(s_, 0.9)),
             p_over_model=float(p_over), p_over_book=float(nv_over),
+            p_push=float(r_.p_push) if pd.notna(r_.p_push) else None,
             implied=imp, projected=proj, unit=unit, over_needs=over_needs, under_needs=under_needs,
             be_over=RSCH.breakeven(px_[0]), be_under=RSCH.breakeven(px_[1]),
             **_edges_cache.get(ck, {}),
@@ -2153,9 +2154,10 @@ def main():
                    for t_ in (AWAY, HOME)}
     _league_script = RSCH.league_script_shares(pbp)
     _state_mix = RSCH.league_state_mix(pbp)
-    TEAM_VOL_CHK = {}
+    TEAM_VOL_CHK, TEAM_VOL_ROWS = {}, {}
     for t_ in (AWAY, HOME):
         _rows = RSCH.team_volume(pbp, t_)
+        TEAM_VOL_ROWS[t_] = _rows
         TEAM_VOL_CHK[t_] = RSCH.team_volume_check(_rows, env[t_]["targets"], env[t_]["carries"],
                                                   team_spread=TEAM_SPREAD.get(t_), league=_league_script,
                                                   mix=_state_mix)
@@ -2607,6 +2609,81 @@ def main():
         for _, rr in R[R.market == "player_anytime_td"].iterrows():
             td_book.setdefault(rr.player, []).append((rr.book, rr.price, rr.p_novig))
 
+    def card_inputs(m, t, mine, rr_read):
+        """Everything one player's card shows, from what this run already built."""
+        nm = m["name"]
+        mine = mine.sort_values("book", key=lambda b: b != "sleeper", kind="stable")
+        rows = mine.to_dict("records")
+        book = rows[0]["book"] if rows else ("sleeper" if rr_read else None)
+        quoted = None
+        if len(R) and "last_update" in R and book:
+            lu_ = R[(R.player == nm) & (R.book == book)].last_update.dropna()
+            quoted = str(lu_.max())[:16].replace("T", " ") + " UTC" if len(lu_) else None
+        ev = m.evidence
+        ts_, rs_ = ev.get("target_share", {}), ev.get("rush_share", {})
+        prior = {"ts": ts_.get("own_prior"), "rs": rs_.get("own_prior"), "games": ts_.get("n_prior") or rs_.get("n_prior"),
+                 "team": m.prior_team, "new_team": bool(m.new_team)}
+        cr_ = CATCH_READ.get((nm, t)) or {}
+        season = {"games": len(WEEK_SH.get(nm, [])),
+                  "targets": ts_.get("cur_num") if pd.notna(ts_.get("cur_num")) else None,
+                  "catches": cr_.get("season_rec"),
+                  "carries": rs_.get("cur_num") if m.pos in ("RB", "FB", "HB") and pd.notna(rs_.get("cur_num")) else None}
+        u_ = USAGE.get(nm)
+        qbs = None
+        if u_:
+            by_w = {r_["week"]: r_["qb"] for r_ in TEAM_VOL_ROWS.get(t, [])}
+            earlier = [w_[0] for w_ in WEEK_SH.get(nm, [])][:-1]
+            qbs = (list(dict.fromkeys(by_w[w_] for w_ in earlier if by_w.get(w_))), by_w.get(u_["week"]))
+        cy_ = CARRY_READ.get((nm, t)) or {}
+        carries_book = ({"line": cy_.get("carries_line"), "fav": cy_.get("carries_fav"), "fair": cy_.get("book_fair")}
+                        if cy_ else ({"line": _xl("rushing_attempts", nm, t).get("line")} if rr_read else None))
+        qb = None
+        if m.pos == "QB":
+            q_ = QB_READ.get((nm, t)) or {}
+            att_ = _xl("passing_attempts", nm, t)
+            qb = {"team_passes": (TEAM_VOL_CHK.get(t) or {}).get("our_att"),
+                  "games": RSCH.qb_workload(pbp, m.gsis_id), "proj_cmp": q_.get("proj"),
+                  "cmp_line": q_.get("completions_line"), "cmp_fav": q_.get("completions_fav"),
+                  "att_line": att_.get("line"), "att_fav": RSCH.favoured(att_.get("mult_over"), att_.get("mult_under")),
+                  "gauge": q_.get("gauge"), "gauge_rate": q_.get("gauge_rate"),
+                  "luck_games": (q_.get("luck") or {}).get("games")}
+        shadow = []
+        if nm in SHADOW_RUSH and len(R) and "p_over_mkt_carries" in R:
+            for _, x_ in R[(R.player == nm) & (R.market == "player_rush_yds")
+                           & R.p_over_mkt_carries.notna()].drop_duplicates("line").iterrows():
+                shadow.append({"line": x_.line, "p_board": x_.p_over_board, "p_mkt": x_.p_over_mkt_carries,
+                               "car_from": float(np.mean(sims[nm]["carries"])), "car_to": x_.mkt_carries})
+        watch = []
+        if m.new_team:
+            watch.append(f"changed teams ({m.prior_team} to {t}); his role here has few games behind it")
+        if m.questionable:
+            watch.append("listed Questionable; priced as if he plays his normal role; whether his own prop voids "
+                         "if he sits depends on the provider's rules")
+        if m.role_scale != 1.0:
+            watch.append(f"snap share on the new team scaled his projection by {m.role_scale:.2f}")
+        rf_ = ROLE.get(nm)
+        if rf_ and m.pos != "QB":
+            watch.append(f"receiving {rf_[0]}: {rf_[1]}")
+        for f_ in "; ".join(str(x) for x in mine.get("flags", pd.Series(dtype=object)).dropna().unique()).split("; "):
+            if f_ and f_ != "questionable" and not f_.startswith("new team") and f_ not in watch \
+                    and not (rf_ and f_ == rf_[0]):
+                watch.append(f_)
+        # the line-fit reads (#164, #166, #170, #173) without their gauge: the card's capped-play
+        # line carries that check once
+        nog = lambda d_: {**d_, "gauge": None} if d_ else None
+        fit = [x_ for x_ in (RSCH.catch_yards_sentence(nog(CATCH_READ.get((nm, t)))),
+                             RSCH.carry_yards_sentence(nog(CARRY_READ.get((nm, t)))),
+                             RSCH.rush_rec_sentence(rr_read),
+                             RSCH.qb_yards_sentence(nog(QB_READ.get((nm, t))))) if x_]
+        return {"name": nm, "team": t, "slot": m.slot, "pos": m.pos, "rows": rows, "book": book, "quoted": quoted,
+                "fit": fit,
+                "usage": u_, "backfield": BACKFIELD.get(nm), "qbs": qbs, "prior": prior, "season": season,
+                "carries_book": carries_book,
+                "reads": {"catch": CATCH_READ.get((nm, t)), "carry": CARRY_READ.get((nm, t)), "rr": rr_read},
+                "qb": qb, "shadow": shadow,
+                "matchup": RSCH.matchup_sentence(PA, HOME if t == AWAY else AWAY, m.pos), "watch": watch}
+
+    L.append(RSCH.CARD_LEGEND + "\n")
     for t, side_label in [(AWAY, "away"), (HOME, "home")]:
         L.append(f"## {t} ({side_label})\n")
         e = env[t]
@@ -2618,96 +2695,19 @@ def main():
         Mt["_ord"] = Mt.slot.map(SLOT_ORDER).fillna(9)
         Mt = Mt.sort_values(["_ord", "mu_rec"], ascending=[True, False])
         for _, m in Mt.iterrows():
-            props = CARD[(CARD.player == m["name"]) & (CARD.call != "no line posted")]
-            tdq = td_book.get(m["name"], [])
-            if props.empty and not tdq:
-                continue
-            ev = m.evidence
-            L.append(f"### {m['name']} — {m.slot}\n")
-
-            # role summary, built from the evidence chain
-            ts_ = ev.get("target_share", {}); rs_ = ev.get("rush_share", {})
-            bits = []
-            if pd.notna(ts_.get("own_prior")) and ts_["own_prior"] >= 0.04:
-                bits.append(f"{pct(ts_['own_prior'])} of his team's throws last season over {int(ts_['n_prior'])} games")
-            if pd.notna(ts_.get("cur_rate")) and ts_.get("cur_den", 0) > 0 and ts_["cur_num"] > 0:
-                bits.append(f"{int(ts_['cur_num'])} of {int(ts_['cur_den'])} ({pct(ts_['cur_rate'])}) this season")
-            if pd.notna(rs_.get("own_prior")) and rs_["own_prior"] >= 0.08:
-                bits.append(f"{pct(rs_['own_prior'])} of the carries last season")
-            if pd.notna(rs_.get("cur_rate")) and rs_.get("cur_den", 0) > 0 and rs_["cur_num"] > 0 and rs_["cur_rate"] >= 0.08:
-                bits.append(f"{int(rs_['cur_num'])} of {int(rs_['cur_den'])} carries this season")
-            if m.pos == "QB":
-                L.append("**Role.** Starting quarterback. "
-                         + ("Passing yards come from his receivers' draws in the same simulation; " if PASS_ON else
-                            "Passing props are not modeled here; ")
-                         + ("rushing yards include his kneel-downs, which the book counts.\n" if QB_RUSH_ON else
-                            "rushing yards are excluded because kneel-downs count against the prop and are "
-                            "not simulated.\n"))
-            else:
-                role = "; ".join(bits) if bits else "little usage history"
-                # medians, not means: yardage is right-skewed and the thresholds below key off
-                # the median, so quoting the mean here made a 92-yard projection sit next to an
-                # 87.5 line that read "no play"
-                rec_med = float(np.median(sims[m['name']]['receptions']))
-                yds_med = float(np.median(sims[m['name']]['rec_yards']))
-                proj = f"typical game about {e['targets']*m.ts:.1f} targets, {rec_med:.0f} catches"
-                if yds_med >= 8: proj += f", {yds_med:.0f} receiving yards"
-                if m.mu_car >= 3: proj += f", {m.mu_car:.0f} carries for {float(np.median(sims[m['name']]['rush_yards'])):.0f} yards"
-                L.append(f"**Role.** {role}. Blending that, {proj} (medians; upside games run higher).\n")
-            flags = []
-            if m.new_team: flags.append(f"changed teams ({m.prior_team} to {t}); one game of new-team data, so the book knows his role better than we do")
-            if m.questionable: flags.append("listed Questionable; priced as if he plays his normal role; if he sits the prop voids")
-            if m.role_scale != 1.0: flags.append(f"snap share on the new team scaled his projection by {m.role_scale:.2f}")
-            rf_ = ROLE.get(m["name"])
-            if rf_ and m.pos != "QB":
-                flags.append(f"receiving {rf_[0]}: {rf_[1]}")
-            if flags:
-                L.append("**Watch.** " + " ".join(f + "." for f in flags) + "\n")
-            ul_ = usage_line(USAGE.get(m["name"]), rush=m.mu_car >= 3)
-            if ul_:
-                L.append(f"**Last game.** {ul_}\n")
-            bj_ = backfield_line(BACKFIELD.get(m["name"]))
-            if bj_:
-                L.append(f"**Backfield jobs.** {bj_}\n")
-            cy_ = RSCH.catch_yards_sentence(CATCH_READ.get((m["name"], t)))
-            if cy_:
-                L.append(f"**Catches and yards.** {cy_}\n")
-            ry_ = RSCH.carry_yards_sentence(CARRY_READ.get((m["name"], t)))
-            if ry_:
-                L.append(f"**Carries and yards.** {ry_}\n")
-            mu_ = RSCH.matchup_sentence(PA, HOME if t == AWAY else AWAY, m.pos)
-            if mu_:
-                L.append(f"**Matchup.** {mu_}\n")
-            if m["name"] in SHADOW_RUSH and len(R) and "p_over_mkt_carries" in R:
-                for _, x_ in R[(R.player == m["name"]) & (R.market == "player_rush_yds")
-                               & R.p_over_mkt_carries.notna()].drop_duplicates("line").iterrows():
-                    L.append(f"**With market carries (shadow).** Rushing yards {x_.line:g}: Over "
-                             f"{100 * x_.p_over_board:.0f}% on the board, {100 * x_.p_over_mkt_carries:.0f}% if his "
-                             f"carries take half their volume from the market's script "
-                             f"({float(np.mean(sims[m['name']]['carries'])):.1f} -> {x_.mkt_carries:.1f} carries). "
-                             f"The board's number is the price; this one is graded beside it.\n")
-            rr_s = RSCH.rush_rec_sentence(RUSH_REC.get((m["name"], t)))
-            if rr_s:
-                L.append(f"**Rushing + receiving yards.** {rr_s}\n")
-            qy_ = RSCH.qb_yards_sentence(QB_READ.get((m["name"], t)))
-            if qy_:
-                L.append(f"**Completions and yards.** {qy_}\n")
-
-            # research rows: line, price, projection, the two Over chances, what the line implies
             mine = RESEARCH[RESEARCH.player == m["name"]] if len(RESEARCH) else RESEARCH
-            if len(mine) or tdq:
-                L.append("| Prop | Line | Price | Our projection | Over: model / book | Line implies | "
-                         "Pays at this price if you expect |")
-                L.append("|---|---|---|---|---|---|---|")
-                for _, x in mine.iterrows():
-                    L.append(research_cells(x, MKT))
-                if tdq:
-                    bk, price, p_imp = sorted(tdq, key=lambda x: x[0] != "draftkings")[0]
-                    p_yes, td_src = p_anytime(m)
-                    # anytime TD: the two chances only; no fair odds from a prototype
-                    L.append(f"| anytime TD ({td_src}, prototype) | — | {odds_str(price)} | — | "
-                             f"{pct(p_yes)} / {pct(p_imp)} | — | — |")
-            L.append("")
+            tdq = td_book.get(m["name"], [])
+            rr_read = RUSH_REC.get((m["name"], t))
+            if mine.empty and not tdq and not rr_read:
+                continue
+            L += RSCH.player_card(card_inputs(m, t, mine, rr_read))
+            if tdq:
+                bk, price, p_imp = sorted(tdq, key=lambda x: x[0] != "draftkings")[0]
+                p_yes, td_src = p_anytime(m)
+                # anytime TD: the two chances only; no fair odds from a prototype
+                L.append(f"Anytime touchdown ({td_src}, prototype; not part of the research): {odds_str(price)}, "
+                         f"engine {pct(p_yes)} / market {pct(p_imp)}.\n")
+    L.append(RSCH.CARD_FOOTNOTE + "\n")
 
     # ---------- 8d. confidence tiers + parlay candidates ----------
     # Confidence is NOT gap size. In early season a big gap almost always means the model
@@ -3289,7 +3289,7 @@ def main():
              f"(2022-25 harness: unbiased, width within the bar); rushing yards `rush_yds_v0` and rushing + receiving PROTOTYPE "
              f"(unbiased and right at the main line, but too narrow in the tails: 23-25% of games outside the 80% range, so a "
              f"line far from the median reads too confident; reports/current_settings_check_2026-10-06.md); QB passing yards "
-             f"`pass_yds_v0` PROTOTYPE (right on average but too WIDE: 14% of "
+             f"`pass_yds_v0` PROTOTYPE (its Over at the main line about 6 points low on 2022-25, DECISIONS #196; too WIDE: 14% of "
              f"games outside the 80% range against a 17-23% bar, so its chances sit too close to 50%); "
              f"anytime TD `anytime_td_v1` PROTOTYPE (outcome-backtested, no posted-line test; no fair odds). All MODEL_UNVALIDATED. Dispersion: receptions log r = "
              f"{P['receptions_dispersion']['a']:.3f} + {P['receptions_dispersion']['b']:.3f}·log μ; carries "
@@ -3791,17 +3791,6 @@ def research_cells(x, MKT) -> str:
     return (f"| {label} | {x.line:g} | O {odds(x.price_over)} / U {odds(x.price_under)} | "
             f"{n0(x['median'])} ({n0(x['p10'])} to {n0(x['p90'])}) | {100*x.p_over_model:.0f}% / {100*x.p_over_book:.0f}% | {imp} | "
             f"{break_even_cell(x)} |")
-
-
-def backfield_line(b):
-    """A back's three jobs, last game against his earlier weeks (research.backfield_jobs)."""
-    if not b:
-        return None
-    pc = lambda v: "—" if v is None or pd.isna(v) else f"{100*v:.0f}%"
-    return (f"Week {b['week']}: early-down carries {pc(b['early'])} (earlier {pc(b['early_base'])}), "
-            f"passing-down targets {pc(b['passdown'])} (earlier {pc(b['passdown_base'])}), "
-            f"inside-5 carries {b['i5_n']} of {b['i5_team']} (earlier share {pc(b['i5_base'])}). "
-            "Passing downs are 3rd and 4th down plus the last two minutes of a half.")
 
 
 def usage_line(u, rush=False, short=False):
