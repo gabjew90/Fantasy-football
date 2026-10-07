@@ -1414,7 +1414,14 @@ RECEIVING_JOINT_GRID = [{"share_conc_targets": sc, "catch_conc": cc}
 # Round 36 (reports/round36_qb_share.md): the starter-share draw on QB passing, pulled to its mean
 PASS_SHARE_GRID = [{"starter_share_shrink": v} for v in (None, 0.75, 0.5, 0.25, 0.0)]
 
+# Round 38 (reports/round38_qb_passing_bias.md): the QB passing draw's spread and level
+PASS_BIAS_GRID = [{"pass_shrink": s, "pass_scale": c}
+                  for s in (None, 0.85, 0.7, 0.55) for c in (1.0, 1.02, 1.04)]
+
 SUBGRIDS = {
+    "qbbias": (PASS_BIAS_GRID, ("pass",), "width",
+               "Round 38: the QB passing draw's spread and level (reports/round38_qb_passing_bias.md); the "
+               "pick is made by props/tools/round38_select.py, not by this table."),
     "receivingjoint": (RECEIVING_JOINT_GRID, ("rec", "yds", "pass"), "width",
                        "Round 34: target spread and catch-rate swing together (reports/round34_receiving_joint.md); "
                        "the pick is made by props/tools/round34_select.py, not by this table."),
@@ -1995,7 +2002,7 @@ def main(argv=None):
     ap.add_argument("--tune-width", action="store_true",
                     help="choose the width settings on the --tune seasons; writes --report (.md/.csv)")
     ap.add_argument("--width-out", default=None, help="--tune-width: write the chosen settings to this JSON file")
-    ap.add_argument("--tune-grid", choices=["main", "qb", "rushnorm", "rushlead", "tier2", "running", "conversion", "targetspread", "yardsshape", "passspread", "receivingjoint", "qbshare"], default="main",
+    ap.add_argument("--tune-grid", choices=["main", "qb", "rushnorm", "rushlead", "tier2", "running", "conversion", "targetspread", "yardsshape", "passspread", "receivingjoint", "qbshare", "qbbias"], default="main",
                     help="--tune-width: the receiving/rushing grid, the starting QB's own settings, or the "
                          "carry-share rescaling")
     ap.add_argument("--dispersion", choices=["prior", "train"], default=None,

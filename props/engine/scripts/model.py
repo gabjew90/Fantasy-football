@@ -693,7 +693,11 @@ WIDTH_OFF = {"share_conc_targets": None, "share_conc_carries": None, "catch_conc
              # round 36: the starter-share draw on QB passing pulled toward its own mean by this
              # factor (None = the drawn share as is; 0 = always the mean): keeps the passing
              # average, narrows the exits-and-benchings spread (reports/round36_qb_share.md)
-             "starter_share_shrink": None}
+             "starter_share_shrink": None,
+             # round 38 (reports/round38_qb_passing_bias.md): the full-game passing draw pulled toward
+             # its own simulated mean by this factor before the starter-share draw (None = as drawn;
+             # mean-preserving), then times pass_scale (None = 1). It ran right-skewed, wide, ~2% low
+             "pass_shrink": None, "pass_scale": None}
 
 # simulate_team_game(..., return_other=True) files the 'other' bucket's targets
 # under this key, for simulate_qb_passing.
@@ -719,7 +723,10 @@ def validate_width(w):
         elif k == "starter_share_shrink":
             if v is not None and not (isinstance(v, (int, float)) and 0 <= v <= 1):
                 raise ValueError(f"{k} must be null (off) or in [0, 1], got {v!r}")
-        elif k in ("catch_shape_mult", "team_r_mult", "catch_shape_exp"):
+        elif k == "pass_shrink":
+            if v is not None and not (isinstance(v, (int, float)) and 0 < v <= 1):
+                raise ValueError(f"{k} must be null (off) or in (0, 1], got {v!r}")
+        elif k in ("catch_shape_mult", "team_r_mult", "catch_shape_exp", "pass_scale"):
             if v is not None and not (isinstance(v, (int, float)) and v > 0):
                 raise ValueError(f"{k} must be null (off) or > 0, got {v!r}")
         elif k == "rush_other_share":
@@ -1123,6 +1130,13 @@ def simulate_qb_passing(rng, n_sim, receiver_yards, other_targets, other_rates, 
         total = total + np.where(rec > 0, g.gamma(np.maximum(shape_total, 1e-6), ypc / per_catch_shape), 0.0)
     if w["eff_sd_pass"]:
         total = total * _game_multiplier(g, n_sim, w["eff_sd_pass"])
+    if w["pass_shrink"] is not None:
+        # round 38: the full-game draw pulled toward its mean BEFORE the starter-share draw, so
+        # an exit or a benching (a real settlement outcome) keeps its full effect
+        m = float(total.mean())
+        total = m + float(w["pass_shrink"]) * (total - m)
     if starter_share is not None:
         total = total * _share_draw(g, n_sim, starter_share, w)     # round 36: shrink when set
+    if w["pass_scale"] is not None:
+        total = total * float(w["pass_scale"])
     return total
