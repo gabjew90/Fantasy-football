@@ -7802,3 +7802,33 @@ The expert re-ran the four-season backtest (baseline reproduces ours: receptions
 - Re-measured at round 34's setting (share_conc_targets 60, the live setting once #133 merges):
   receiving yards +2.9, receptions +1.4 (the expert's figures), rushing +1.8, combined +0.6;
   passing unchanged. The cards print these round-34 rows.
+
+## 2026-10-06 (198) -- second expert audit (the early rounds): five pieces hold; injury logic untested, role shapes and tight-end bias
+
+- **Hold up on 2022-25:** the two-stage blend (the largest contributor: receptions 2.1%,
+  receiving yards 2.0%, passing 0.9%, both halves); the team-volume weight of 4 games (better
+  than 2, tied with 8 and 16 -- the one piece "never backtested"); the early-season blend
+  (weeks 2-4 unbiased, 14-16% better than the naive baseline on receiving); carry-share spread
+  20 (tied with 10, better than 40); yards-per-carry weight 80 (tied with 20 and 40; 200 and
+  400 worse -- the expert withdrew the earlier 200-600 suggestion).
+- **The backtest never runs the injury logic** (it prices whoever was active; no handoff, no
+  Questionable). The expert's raw measure, same-position teammates' targets actual / projected:
+  no key teammate out 0.98; first game out 1.08 (1.03-1.12); continuing absence 1.04
+  (1.00-1.07). The live rule adds roughly 10-15% in both cases: about right the first game,
+  roughly double in a continuing absence (approximate; the live handoff was not computed game
+  by game). Queued: a handoff test by absence age.
+- **One yards-per-catch shape for every role** -- reproduced here (round 34's setting, actual
+  targets in, outside the 80% range): tight-end yards 14.4% (too wide), wide receivers 17.5%,
+  backs 24.8% (too narrow).
+- **Role bias** -- reproduced: tight ends' Over at the stand-in line hit 49.0% vs 44.1% on
+  catches (+4.9, 95% +2.4 to +7.4) and 54.0% vs 47.4% on yards (+6.6, +4.1 to +9.3); their
+  targets ran 5% above projection on the bettable rows (the expert: 3%, 0.4-5.4%). Lead backs'
+  receiving targets ran 4% and yards 6% below projection (the expert's figures).
+- **Not checkable from the backtest:** who gets priced (depth roles, share thresholds, the
+  depth bucket), the new-team snap-ratio scaling, live-vs-fitted rushing weights (low
+  sensitivity), the touchdown model.
+- **Live meanwhile:** receiving cards print the role's measured row beside the implied-points
+  row. **Queue after round 38:** role-specific catch shape and the tight-end level (largest
+  remaining bias on the betting path), then the injury handoff by absence age, then rushing by
+  game environment (#106 reopened), then the receiving-yards level (#99). Each with a written
+  rule and fresh 2026 weeks: these reruns are extra looks at 2022-25.
