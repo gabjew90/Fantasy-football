@@ -492,3 +492,16 @@ def test_prior_shares_divide_by_every_active_week_with_one_team_per_week():
     assert den.loc["p", "targets"] == 90, "weeks 1-3 counted, the bye (4) has no team volume"
     # t: A weeks 1-2, week 3 listed on both (no touch) -> the later roster row (B), B weeks 4-5
     assert den.loc["t", "targets"] == 30 + 30 + 40 + 40 + 40, "one team per week in the trade week"
+
+
+def test_qb_starts_count_games_he_threw_his_teams_first_pass():
+    pbp = pd.DataFrame({"game_id": ["g1", "g1", "g2", "g2", "g3"], "play_id": [1, 2, 1, 2, 1],
+                        "posteam": ["TB"] * 5, "passer_player_id": ["M", "D", "D", "D", "M"]})
+    assert SG.qb_starts(pbp, "D") == 1 and SG.qb_starts(pbp, "M") == 2
+
+
+
+def test_the_brief_refuses_a_missing_input():
+    import pytest as _pt
+    with _pt.raises(TypeError, match="missing"):
+        SG.brief_section(AWAY="TB", HOME="DAL")

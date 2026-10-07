@@ -33,6 +33,10 @@ slate`) are for the whole decision -- "set my lineup", "who should I add",
   trade (percentiles, WOPR, target share, aDOT, P(win), implied points) are
   welcome -- explain one the first time if it is not obvious. Structure
   follows the question, with headings when a big decision reads better so.
+- **Answers are written in the chat, as markdown** -- headings, tables, short
+  paragraphs. Never a PDF, a document or a file unless the user asks for one
+  (user, 2026-10-06). A game read follows the props engine's "matchup brief"
+  style: a thesis, then each table with a short read of what it means.
 - **The full data, every time.** The user wants all the numbers, not a
   selection (2026-09-30: he asked twice for "the full stats" after a trimmed
   answer). Any answer about a player shows his **weekly stat line** and his

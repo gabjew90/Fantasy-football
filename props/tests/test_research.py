@@ -840,3 +840,53 @@ def test_epa_uses_the_pass_and_rush_flags_so_a_scramble_is_a_dropback():
     dm = RS.defense_metrics(pbp)
     assert dm["ATL"]["epa_pass"][0] == pytest.approx(0.8), "the scramble is a dropback"
     assert dm["ATL"]["epa_rush"][0] == pytest.approx(-0.2)
+
+
+def test_unit_efficiency_splits_dropbacks_and_runs_removes_garbage_time_and_ranks_by_side():
+    """Matchup brief (user, 2026-10-06): A's two dropbacks (+0.5, -0.1) and run (+0.2); a
+    garbage-time play (wp 0.97) and a kneel are left out; B allows them; pace from snaps on
+    one drive in a neutral first quarter."""
+    import pandas as pd
+    rows = [dict(game_id="g", play_id=i, posteam="A", defteam="B", epa=e, **{"pass": ps, "rush": rs},
+                 success=float(e > 0), wp=wp, qb_kneel=k, qb_spike=0, game_seconds_remaining=3600 - 30 * i,
+                 qtr=1, score_differential=0, fixed_drive=1)
+            for i, (e, ps, rs, wp, k) in enumerate([(0.5, 1, 0, 0.5, 0), (-0.1, 1, 0, 0.5, 0), (0.2, 0, 1, 0.5, 0),
+                                                    (3.0, 1, 0, 0.97, 0), (-1.0, 0, 1, 0.5, 1)])]
+    rows.append(dict(game_id="g", play_id=9, posteam="B", defteam="A", epa=-0.3, **{"pass": 1, "rush": 0},
+                     success=0.0, wp=0.5, qb_kneel=0, qb_spike=0, game_seconds_remaining=1000, qtr=2,
+                     score_differential=0, fixed_drive=2))
+    ue = RS.unit_efficiency(pd.DataFrame(rows))
+    a = ue["off"]["A"]["pass"]
+    assert a[0] == pytest.approx(0.2) and a[2] == pytest.approx(0.5) and a[4] == 2, "garbage time out"
+    assert ue["off"]["A"]["run"][4] == 1, "the kneel-down is out"
+    assert ue["def"]["B"]["pass"][0] == pytest.approx(0.2) and ue["off"]["A"]["pass"][1] == 1
+    assert ue["pace"]["A"][0] == pytest.approx(30.0), "30 seconds between snaps on one drive"
+    t = RS.unit_table(ue, "A", "B")
+    assert t[0].startswith("| Matchup |") and any(r.startswith("| A dropbacks vs B | +0.20") for r in t)
+    assert RS.unit_efficiency(pd.DataFrame(rows).drop(columns=["epa"])) == {}
+
+
+def test_brief_tables_and_known_gaps_read_the_game_not_a_template():
+    assert RS.market_table("TB", "DAL", -9.5, 47.5)[2:4] == ["| Spread | +9.5 | -9.5 |",
+                                                             "| Implied team points | 19.0 | 28.5 |"]
+    chk = {"TB": {"our_att": 33.2, "our_runs": 26.0, "att_avg": 31.5, "runs_avg": 24.2,
+                  "rates": {"close": (57, 43, 100)}, "league": {"close": 0.56}}}
+    ot = RS.outlook_table(chk, "TB", "DAL")
+    assert ot[2] == "| TB | 33 | 26 | 31.5 / 24.2 | 57% |" and "56%" in ot[-1]
+    g = RS.known_gaps({"qb_change": {"TB": "Daniels starts for Mayfield"}, "fav": "DAL", "spread": 9.5,
+                       "new_team": ["Kenny Gainwell"], "has_pass_lines": True, "oline_out": {"TB": 1, "DAL": 2},
+                       "wind_mph": 20, "roof": "closed"})
+    names = [x[0] for x in g]
+    assert names[0].startswith("TB's quarterback") and any(n.startswith("DAL's expected lead (9.5") for n in names)
+    assert any("DAL offensive line (2 of 5" in n for n in names) and not any("TB offensive line" in n for n in names)
+    assert not any(n.startswith("Wind") for n in names), "a closed roof: no wind gap"
+    assert RS.known_gaps({"fav": "DAL", "spread": 3}) == [], "a 3-point line is not an expected lead"
+    assert RS.known_gaps_table([])[0].startswith("No known gap")
+
+
+def test_margin_flags_mark_thin_sides_at_our_projection():
+    assert RS.margin_flags(20.0, 18.5, 16.0, "carries") == ["thin: the Over needs 18.5 carries, we project 20.0"]
+    assert RS.margin_flags(24.0, 18.5, 16.0, "carries") == [], "a wide margin is not flagged"
+    assert RS.margin_flags(15.0, 18.5, 15.8, "carries")[0].startswith("thin: the Under needs 15.8")
+    assert RS.margin_flags(17.0, 18.5, 16.0) == [], "inside the cut: the break-even cell says it already"
+    assert RS.margin_flags(None, 18.5, 16.0) == []

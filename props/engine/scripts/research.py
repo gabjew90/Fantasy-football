@@ -935,6 +935,213 @@ def defense_line(dm, teams, verb="allows") -> str | None:
             "play-by-play (EPA is nflfastR's expected-points model). Context only: no price reads it.")
 
 
+# ---- the matchup brief (user, 2026-10-06): tables first, read second ----
+# Modelled on the user's TB at DAL brief: each section a small table the narrative then
+# interprets. Context only: nothing below is a price input.
+DEF_POS = {"DE", "DT", "NT", "DL", "LB", "ILB", "OLB", "MLB", "CB", "S", "SS", "FS", "DB"}
+
+
+def unit_efficiency(pbp, wp_lo=0.10, wp_hi=0.90) -> dict:
+    """Each team's EPA per play and success rate on dropbacks and runs, as the offence and
+    as the defence (allowed), with garbage time removed (win probability wp_lo-wp_hi when
+    the play-by-play carries it), plus neutral-situation pace (seconds between snaps on the
+    same drive, quarters 1-3, score within 7). Ranks: offence 1st = best, defence 1st = most
+    allowed, pace 1st = fastest. {} without EPA."""
+    need = {"game_id", "posteam", "defteam", "epa"}
+    if pbp is None or not len(pbp) or not need.issubset(pbp.columns):
+        return {}
+    import pandas as _pd
+    f0 = lambda c: pbp[c].fillna(0) if c in pbp else _pd.Series(0, index=pbp.index)
+    if {"pass", "rush"}.issubset(pbp.columns):
+        is_pass, is_rush = f0("pass") == 1, (f0("rush") == 1) & (f0("pass") != 1)
+    else:
+        is_pass, is_rush = pbp.play_type.eq("pass"), pbp.play_type.eq("run")
+    keep = (is_pass | is_rush) & pbp.epa.notna() & pbp.posteam.notna() & pbp.defteam.notna()
+    keep &= (f0("qb_kneel") != 1) & (f0("qb_spike") != 1)
+    filt = "all plays"
+    if "wp" in pbp:
+        keep &= pbp.wp.between(wp_lo, wp_hi)
+        filt = f"win probability {100 * wp_lo:.0f}-{100 * wp_hi:.0f}%"
+    d = pbp[keep].assign(_pass=is_pass[keep], _succ=(pbp.loc[keep, "success"] if "success" in pbp
+                                                    else (pbp.loc[keep, "epa"] > 0).astype(float)))
+    out = {"off": {}, "def": {}, "pace": {}, "_league": {}, "_filter": filt}
+    for kind, m in (("pass", d._pass), ("run", ~d._pass)):
+        x = d[m]
+        out["_league"][kind] = (float(x.epa.mean()), float(x._succ.mean()))
+        for side, key in (("off", "posteam"), ("def", "defteam")):
+            g = x.groupby(key).agg(epa=("epa", "mean"), sr=("_succ", "mean"), n=("epa", "size"))
+            er, sr = g.epa.rank(ascending=False, method="min"), g.sr.rank(ascending=False, method="min")
+            for t, r in g.iterrows():
+                out[side].setdefault(t, {})[kind] = (float(r.epa), int(er[t]), float(r.sr), int(sr[t]), int(r.n))
+    out["_n"] = len(set(out["off"]) | set(out["def"]))
+    pc = {"game_seconds_remaining", "qtr", "score_differential", "play_id"}
+    if pc.issubset(pbp.columns):
+        q = pbp[(is_pass | is_rush) & pbp.posteam.notna()].sort_values(["game_id", "play_id"])
+        drv = q["fixed_drive"] if "fixed_drive" in q else q["drive"] if "drive" in q else None
+        same = (q.game_id.eq(q.game_id.shift()) & q.posteam.eq(q.posteam.shift())
+                & (drv.eq(drv.shift()) if drv is not None else True))
+        dt = q.game_seconds_remaining.shift() - q.game_seconds_remaining
+        neutral = q.qtr.le(3) & q.score_differential.abs().le(7) & same & dt.between(1, 60)
+        sec = dt[neutral].groupby(q.loc[neutral, "posteam"]).mean()
+        rk = sec.rank(ascending=True, method="min")
+        out["pace"] = {t: (float(v), int(rk[t])) for t, v in sec.items()}
+    return out
+
+
+def _rk(r, n, best="best"):
+    return f"{ordinal(r)} {best}" if r <= (n + 1) // 2 else f"{ordinal(n - r + 1)} worst"
+
+
+def unit_table(ue, away, home) -> list[str]:
+    """Each offence against the defence it faces, dropbacks and runs."""
+    if not ue or not all(t in ue["off"] and t in ue["def"] for t in (away, home)):
+        return []
+    n = ue["_n"]
+    cell_o = lambda t, k: (lambda v: f"{v[0]:+.2f} ({_rk(v[1], n)}) · {100 * v[2]:.0f}% ({_rk(v[3], n)})")(ue["off"][t][k])
+    cell_d = lambda t, k: (lambda v: f"{v[0]:+.2f} ({rank_words(v[1], n)}) · {100 * v[2]:.0f}% ({rank_words(v[3], n)})")(ue["def"][t][k])
+    L = ["| Matchup | Offence: EPA/play · success | Defence it faces allows: EPA/play · success |", "|---|---|---|"]
+    for o, d_ in ((away, home), (home, away)):
+        for k, lab in (("pass", "dropbacks"), ("run", "runs")):
+            if k in ue["off"][o] and k in ue["def"][d_]:
+                L.append(f"| {o} {lab} vs {d_} | {cell_o(o, k)} | {cell_d(d_, k)} |")
+    lg = ue["_league"]
+    pace = ue.get("pace") or {}
+    pace_s = "; ".join(f"{t} {pace[t][0]:.1f} s ({rank_words(pace[t][1], len(pace), 'fastest', 'slowest')})"
+                       for t in (away, home) if t in pace)
+    L += ["", f"League: dropbacks {lg['pass'][0]:+.2f} EPA, {100 * lg['pass'][1]:.0f}% success; runs "
+              f"{lg['run'][0]:+.2f} EPA, {100 * lg['run'][1]:.0f}% success. Garbage time removed ({ue['_filter']}); "
+              f"offence ranks 1st = best, defence ranks count from most allowed."
+          + (f" Pace, neutral situations, seconds between snaps: {pace_s}." if pace_s else "")]
+    return L
+
+
+def market_table(away, home, home_spread, total) -> list[str]:
+    """The spread and implied points per team."""
+    if home_spread is None or total is None:
+        return ["Spread and total: not available in this run."]
+    hp, ap = (total - home_spread) / 2, (total + home_spread) / 2
+    return ["| Market | " + away + " | " + home + " |", "|---|---|---|",
+            f"| Spread | {-home_spread:+g} | {home_spread:+g} |",
+            f"| Implied team points | {ap:.1f} | {hp:.1f} |",
+            "", f"Game total {total:g}."]
+
+
+def outlook_table(chk: dict, away, home) -> list[str]:
+    """Our expected passes and runs against each team's season (team_volume_check)."""
+    rows = [(t, chk.get(t)) for t in (away, home) if chk.get(t)]
+    if not rows:
+        return []
+    close = lambda c: (lambda a: f"{100 * a[0] / (a[0] + a[1]):.0f}%" if a and (a[0] + a[1]) else "—")(
+        (c.get("rates") or {}).get("close"))
+    L = ["| Team | Expected passes | Expected runs | Season avg passes / runs | Close-game pass rate |",
+         "|---|---|---|---|---|"]
+    for t, c in rows:
+        att = f"{c['our_att']:.0f}" if c.get("our_att") is not None else "—"
+        L.append(f"| {t} | {att} | {c['our_runs']:.0f} | {c['att_avg']:.1f} / {c['runs_avg']:.1f} | {close(c)} |")
+    lg = (rows[0][1].get("league") or {}).get("close")
+    if lg is not None:
+        L += ["", f"League close-game pass rate: {100 * lg:.0f}%. Passes are attempts (sacks out); runs count "
+                  "scrambles, as the model does."]
+    return L
+
+
+def positional_table(pa, teams) -> list[str]:
+    """PPR points a game each defence allows by position, with rank."""
+    if not pa or not all(t in pa for t in teams):
+        return []
+    n = pa["_n"]
+    L = ["| Defence | RBs | WRs | TEs |", "|---|---|---|---|"]
+    for t in teams:
+        L.append(f"| {t} | " + " | ".join(f"{pa[t][p][0]:.1f} ({rank_words(pa[t][p][1], n)})" for p in POS_GROUPS) + " |")
+    L.append("| League average | " + " | ".join(f"{pa['_league'][p]:.1f}" for p in POS_GROUPS) + " |")
+    g = sorted(set(pa["_games"][t] for t in teams))
+    L += ["", f"PPR points allowed per game over {'/'.join(map(str, g))} games; touchdowns included, every player "
+              "at the position together. Shaped by the opponents faced; not a price input."]
+    return L
+
+
+def personnel_table(cells: dict, away, home) -> list[str]:
+    """cells: {team: {"Quarterback": str, "Offensive line": str, "Pass catchers / backs": str,
+    "Defence": str}}."""
+    units = ["Quarterback", "Offensive line", "Pass catchers / backs", "Defence"]
+    L = [f"| Unit | {away} | {home} |", "|---|---|---|"]
+    for u in units:
+        L.append(f"| {u} | {cells.get(away, {}).get(u, '—')} | {cells.get(home, {}).get(u, '—')} |")
+    return L
+
+
+def known_gaps_table(gaps) -> list[str]:
+    """[(gap, consequence)] -> the 'where this baseline may miss' table."""
+    if not gaps:
+        return ["No known gap applies to this game beyond the general ones in 'Reading the numbers'."]
+    return ["| Gap in this run | Consequence for this matchup |", "|---|---|"] + [f"| {g} | {c} |" for g, c in gaps]
+
+
+def known_gaps(ctx: dict) -> list[tuple[str, str]]:
+    """The model's known blind spots that apply to THIS game, from facts the scorer has.
+    ctx keys (all optional): qb_change {team: text}, fav (team), spread (abs), new_team
+    [names], questionable [names], has_pass_lines, has_rush_lines, oline_out {team: n},
+    wind_mph, roof, roof_note."""
+    g = []
+    for t, txt in (ctx.get("qb_change") or {}).items():
+        g.append((f"{t}'s quarterback: {txt}",
+                  "Receiver and back prices do not adjust for who throws (they run on each player's shares and "
+                  "rates); a lower-volume or lower-efficiency passing game belongs beside the baseline."))
+    if ctx.get("fav") and (ctx.get("spread") or 0) >= 7:
+        g.append((f"{ctx['fav']}'s expected lead ({ctx['spread']:g} points)",
+                  "The carry forecast does not follow the score: a favourite's late carries can run above it and "
+                  "the underdog's passes too. The market-carries number beside a back's rushing line shows the "
+                  "direction; who gets the late work still decides the player."))
+    if ctx.get("new_team"):
+        g.append(("New roles: " + ", ".join(ctx["new_team"]),
+                  "Thin new-team evidence: their shares are less settled than the projection's single number."))
+    if ctx.get("questionable"):
+        g.append(("Questionable: " + ", ".join(ctx["questionable"]),
+                  "Priced as playing his normal role; 'If a Questionable player is out' prices the other case."))
+    if ctx.get("has_pass_lines"):
+        g.append(("QB passing width",
+                  "The passing distribution is too wide (14% of games outside the 80% range): a passing chance sits "
+                  "too close to 50%, so a 60% Over is likely a little better than 60."))
+    if ctx.get("has_rush_lines"):
+        g.append(("Rushing tails",
+                  "Rushing and rushing + receiving run narrow in the tails: a line far from the projection reads "
+                  "more confident than it should; the main line is unaffected."))
+    for t, k in (ctx.get("oline_out") or {}).items():
+        if k >= 2:
+            g.append((f"{t} offensive line ({k} of 5 regulars out)", "Line absences are not a price input."))
+    if (ctx.get("wind_mph") or 0) > 15 and ctx.get("roof") not in ("closed", "dome"):
+        g.append((f"Wind to {ctx['wind_mph']:.0f} mph", "The model has no wind adjustment."))
+    if ctx.get("roof_note"):
+        g.append(("Roof", ctx["roof_note"] + "."))
+    return g
+
+
+def margin_flags(projected, over_needs, under_needs, unit="", thin=0.10) -> list[str]:
+    """The research table's margin flag at OUR projection (user, 2026-10-06): the side that
+    pays at our volume, flagged when it clears its break-even volume by under 10% ("thin")."""
+    o = thin_margin(projected, over_needs, True, thin)
+    u = thin_margin(projected, under_needs, False, thin)
+    unit = f" {unit}" if unit else ""
+    if o and o[0] >= 0:
+        return [f"thin: the Over needs {float(over_needs):.1f}{unit}, we project {float(projected):.1f}"] if o[1] else []
+    if u and u[0] >= 0:
+        return [f"thin: the Under needs {float(under_needs):.1f}{unit} or fewer, we project {float(projected):.1f}"] if u[1] else []
+    return []          # neither side pays: the break-even cell already says so ("no-bet zone")
+
+
+def thin_margin(projected, needs, side_over=True, thin=0.10):
+    """Whether a volume read clears a side's break-even volume by under `thin` (10%):
+    Over needs volume >= needs, Under volume <= needs. None when either is missing."""
+    try:
+        v, k = float(projected), float(needs)
+    except (TypeError, ValueError):
+        return None
+    if not (v == v and k == k) or k <= 0:
+        return None
+    margin = (v - k) / k if side_over else (k - v) / k
+    return margin, (0 <= margin < thin)
+
+
 # Sleeper's lines that are read beside the priced ones, never priced (DECISIONS #164, #166)
 EXTRA_KINDS = ("longest_reception", "longest_rush", "rushing_attempts",
                "pass_completions", "passing_attempts", "longest_passing_completion",
