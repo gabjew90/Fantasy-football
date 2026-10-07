@@ -125,5 +125,7 @@ def test_a_tight_end_card_shows_his_roles_measured_row():
     assert "| Receptions, every tight end | 49.2% | 47.8% | 1514 |" in text
     assert "| Receiving yards, every tight end | 54.1% | 50.2% | 1514 |" in text
     assert "| Receiving yards, teams implied 27+ | 52.0% | 48.2% | 713 |" in text
-    assert RS.calibration_line({"player_receptions"}, None, None, "WR2")[4] == "| Receptions, every wide receiver | 45.0% | 44.2% | 4752 |"
-    assert RS.calibration_line({"player_pass_yds"}, None, None, "QB1") == []
+    wr = RS.calibration_line({"player_receptions"}, None, None, "WR2")
+    assert "| Receptions, every wide receiver | 45.0% | 44.2% | 4752 |" in wr
+    assert "| Receptions | 48.4% | 45.2% | 49.6% | 506 |" in wr, "the live record at real lines"
+    assert RS.calibration_line({"player_rush_reception_yds"}, None, None, "RB1") == [], "no live lines, no implied row"
