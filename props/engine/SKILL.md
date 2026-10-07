@@ -303,10 +303,32 @@ For a narrow question, run only what it needs:
     and which players it helps, and what it does NOT establish. Never walk the table back in
     words; reason from it ("the case for extra Dallas carries comes from the expected lead,
     not from a soft run defence").
+  - **Style -- the user's TB at DAL brief is the bar** (user, 2026-10-06: "superior in every way
+    in prose, table clarity, not repeating the obvious, no jargon"):
+    - Plain words a casual fan reads without stopping: "passes" (they include sacks and
+      scrambles), never "dropbacks"; no broadcast adjectives or metaphors ("stingiest",
+      "explosive", "by a distance", "air it out", "feast"). Quote a unit's **score and tier**
+      (EPA and success rate blended two to one; 50 = league average, 10 = one standard deviation; tiers S,
+      A, B, C, D, F from the best band down, + / - for the top / bottom third of a band), never
+      raw EPA numbers; explain the score once. A C- and a D+ are neighbours: say so, and never
+      treat adjacent letters as a big gap without looking at the scores.
+    - Copy the report's tables as they are: one number per cell, the rank key in the caption.
+      Never cram several figures into a cell. **Every table in the Matchup brief appears, in its
+      order -- none is skipped**, the fantasy points allowed by position with its ranks
+      included (user, 2026-10-06: "you're completely missing the table").
+    - Each inference carries its basis and its limit: "The case for extra Dallas carries
+      comes from the expected lead, not from evidence of a weak run defence." Use "consistent
+      with", "supports the direction", "does not establish", "plausible if the lead develops".
+    - Say a caveat once, where it belongs (sample size sits in the table caption); no filler
+      ("which four games can't tell you"), and no sentence that only restates a number the
+      table shows -- a number appears in prose only to compare or explain it.
+    - Under a table, one short paragraph per team when they differ (two to four sentences).
+    - First person for judgment ("I expect", "My base case"), "the engine projects" for
+      estimates, plain statement for facts.
   - **Keep facts, model estimates and judgment apart**: the data is fact, "the engine projects"
     is an estimate, "I expect" is judgment. Missing data reads "not in this run", never a guess.
   - **Order**: the market -> team outlook (our workload against the season) -> unit against unit
-    (EPA and success, pace) -> personnel -> fantasy points allowed by position -> weather (one
+    (score and tier, with the tier ladder; pace) -> personnel -> fantasy points allowed by position -> weather (one
     line unless it matters) -> **where this baseline may miss** (the report's table, then which
     of those to examine as a separate scenario) -> **expected game flow and what would change
     it** (a base case and two "if" branches) -> your strongest directional read and the

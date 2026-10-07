@@ -2160,7 +2160,6 @@ def main():
                                                   team_spread=TEAM_SPREAD.get(t_), league=_league_script,
                                                   mix=_state_mix)
         TEAM_VOL_LINES[t_] = RSCH.team_volume_lines(t_, _rows, TEAM_VOL_CHK[t_])
-    PA_LINE = RSCH.points_allowed_line(PA, (AWAY, HOME))
     # the defences' EPA per play and points per drive allowed (user, 2026-10-06): context only
     DEF_LINE = RSCH.defense_line(RSCH.defense_metrics(pbp), (AWAY, HOME))
     OFF_LINE = RSCH.defense_line(RSCH.offense_metrics(pbp), (AWAY, HOME), verb="gains")
@@ -3706,11 +3705,11 @@ def brief_section(**V) -> list[str]:
             st_ = pop[(pop.team == t) & (pop.name == qn)].report_status
             st_ = st_.iloc[0] if len(st_) and isinstance(st_.iloc[0], str) else None
             if t in auto:
-                c["Quarterback"] = (f"{auto[t]['out']} out" + (f" ({auto[t]['why']})" if auto[t]["why"] else "")
-                                    + f"; {qn} starts" + (f", start {n_} this season" if n_ else ""))
+                c["Quarterback"] = (f"{qn} starts" + (f" ({RSCH.ordinal(n_)} start this season)" if n_ else "")
+                                    + f"; {auto[t]['out']} out" + (f" ({auto[t]['why']})" if auto[t]["why"] else ""))
             else:
-                c["Quarterback"] = f"{qn}: {st_.lower() if st_ else 'no injury designation'}" + (
-                    f", start {n_} this season" if n_ and n_ <= 3 else "")
+                c["Quarterback"] = f"{qn}: {st_.lower() if st_ else 'healthy (no designation)'}" + (
+                    f", {RSCH.ordinal(n_)} start this season" if n_ and n_ <= 3 else "")
         ls = (V.get("LINE_STATUS") or {}).get(t) or []
         if len(ls) >= 5:
             out_ = [x for x in ls if x["state"] == "out"]

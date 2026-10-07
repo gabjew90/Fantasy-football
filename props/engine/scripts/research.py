@@ -920,17 +920,17 @@ def defense_line(dm, teams, verb="allows") -> str | None:
         return None
     n, lg = dm["_n"], dm["_league"]
     lab = {"epa_play": "EPA a play", "epa_pass": "EPA a pass", "epa_rush": "EPA a run", "pts_drive": "points a drive"}
+    # (EPA explained once, in the brief's unit table; "a pass" counts sacks and scrambles)
     fmt = lambda c, v: f"{v:+.2f}" if c.startswith("epa") else f"{v:.2f}"
     parts = []
     for t in teams:
-        bits = ", ".join(f"{fmt(c, dm[t][c][0])} {lab[c]} ({rank_words(dm[t][c][1], n)})"
+        bits = ", ".join(f"{fmt(c, dm[t][c][0])} {lab[c]} ({ordinal(dm[t][c][1])})"
                          for c in lab if c in dm[t])
         parts.append(f"{t} {verb} {bits}")
     games = sorted(set(dm["_games"][t] for t in teams))
     return ("; ".join(parts) + ". League average: "
             + ", ".join(f"{fmt(c, lg[c])} {lab[c]}" for c in lab if c in lg)
-            + f". Ranks of {n}, counted from the top ('most') or the bottom ('fewest') "
-            f"{'allowed' if verb == 'allows' else 'gained'}; over "
+            + f". Rank among {n} teams: 1st = most {'allowed' if verb == 'allows' else 'gained'}; over "
             f"{'/'.join(map(str, games))} games, from nflverse "
             "play-by-play (EPA is nflfastR's expected-points model). Context only: no price reads it.")
 
@@ -939,6 +939,7 @@ def defense_line(dm, teams, verb="allows") -> str | None:
 # Modelled on the user's TB at DAL brief: each section a small table the narrative then
 # interprets. Context only: nothing below is a price input.
 DEF_POS = {"DE", "DT", "NT", "DL", "LB", "ILB", "OLB", "MLB", "CB", "S", "SS", "FS", "DB"}
+SCORE_EPA_WEIGHT = 2 / 3         # the unit score: two parts EPA per play, one part success rate
 
 
 def unit_efficiency(pbp, wp_lo=0.10, wp_hi=0.90) -> dict:
@@ -974,6 +975,24 @@ def unit_efficiency(pbp, wp_lo=0.10, wp_hi=0.90) -> dict:
             for t, r in g.iterrows():
                 out[side].setdefault(t, {})[kind] = (float(r.epa), int(er[t]), float(r.sr), int(sr[t]), int(r.n))
     out["_n"] = len(set(out["off"]) | set(out["def"]))
+    # THE UNIT SCORE (user, 2026-10-06: "blend EPA and success into a score and tier it"):
+    # each team's EPA per play and success rate standardised across the league and blended two
+    # parts EPA to one part success (user, 2026-10-06: weight EPA more -- big plays count), then
+    # put on a 50 +/- 10 scale (50 = league average, 10 = one standard deviation),
+    # oriented so higher is better for offences AND defences (a defence allowing less scores high)
+    out["score"] = {"off": {"pass": {}, "run": {}}, "def": {"pass": {}, "run": {}}}
+    for side in ("off", "def"):
+        for kind in ("pass", "run"):
+            teams = [t for t, v in out[side].items() if kind in v]
+            if len(teams) < 3:
+                continue
+            e = np.array([out[side][t][kind][0] for t in teams])
+            r = np.array([out[side][t][kind][2] for t in teams])
+            z = lambda a: (a - a.mean()) / a.std() if a.std() > 0 else a * 0.0
+            comp = (SCORE_EPA_WEIGHT * z(e) + (1 - SCORE_EPA_WEIGHT) * z(r)) * (1 if side == "off" else -1)
+            comp = z(comp)
+            for t, c in zip(teams, comp):
+                out["score"][side][kind][t] = float(50 + 10 * c)
     pc = {"game_seconds_remaining", "qtr", "score_differential", "play_id"}
     if pc.issubset(pbp.columns):
         q = pbp[(is_pass | is_rush) & pbp.posteam.notna()].sort_values(["game_id", "play_id"])
@@ -988,30 +1007,125 @@ def unit_efficiency(pbp, wp_lo=0.10, wp_hi=0.90) -> dict:
     return out
 
 
-def _rk(r, n, best="best"):
-    return f"{ordinal(r)} {best}" if r <= (n + 1) // 2 else f"{ordinal(n - r + 1)} worst"
+TIER_STEPS = (0.5, 1, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10)
+MAX_TIERS = 6
+TIER_LETTERS = "SABCDF"          # user, 2026-10-06: S, A, B, C, D, F from the best band down
+
+
+def tier_letter(k: int) -> str:
+    """Band k (1 = best) as its letter; a letter always means the same band position, so a
+    list whose spread needs only five bands has no F."""
+    return TIER_LETTERS[min(max(int(k), 1), len(TIER_LETTERS)) - 1]
+
+
+def tiers(values: dict, higher_is_better=True, max_tiers=MAX_TIERS, steps=TIER_STEPS) -> dict:
+    """Equal-width tiers counted from the best team down (user, 2026-10-06). The width is the
+    smallest round step that keeps the league inside max_tiers bands, so a tight league gets
+    narrow bands and a spread-out one wide bands, and every band means the same number of
+    points. Returns {"step", "n", "tier": {team: k}, "bands": [(k, lo, hi)]} with bands in
+    the values' own units (1 = best)."""
+    if not values:
+        return {"step": None, "n": 0, "tier": {}, "bands": []}
+    g = {t: (v if higher_is_better else -v) for t, v in values.items()}
+    best, worst = max(g.values()), min(g.values())
+    span = best - worst
+    step = next((st for st in steps if span <= st * max_tiers), steps[-1])
+    n = max(1, min(max_tiers, int(-(-span // step)) if span > 0 else 1))
+    tier = {t: min(n, 1 + int((best - x) // step)) for t, x in g.items()}
+    _values = dict(values)
+    bands = []
+    for k in range(1, n + 1):
+        hi_g, lo_g = best - (k - 1) * step, best - k * step
+        if k == n:
+            lo_g = min(lo_g, worst)          # the last band always reaches the worst team
+        lo, hi = (lo_g, hi_g) if higher_is_better else (-hi_g, -lo_g)
+        bands.append((k, lo, hi))
+    return {"step": step, "n": n, "tier": tier, "bands": bands, "best": best,
+            "higher_is_better": higher_is_better, "_values": _values}
+
+
+def tier_grade(t: dict, team) -> str:
+    """The team's letter with + / - for where it sits inside its band (user, 2026-10-06):
+    top third +, bottom third -, middle plain -- so a C- and a D+ read as the neighbours they
+    are instead of a full grade apart."""
+    k = t["tier"][team]
+    return tier_letter(k) + _band_mod(t, team)
+
+
+def _band_mod(t: dict, team) -> str:
+    x = t.get("_values", {}).get(team)
+    if x is None or not t.get("step"):
+        return ""
+    g = x if t.get("higher_is_better", True) else -x
+    step = t["step"]
+    down = (t["best"] - g) - (t["tier"][team] - 1) * step      # distance below the band's top
+    if float(step).is_integer() and float(down).is_integer():
+        # whole-number scores: the band holds `step` scores; the top and bottom ceil(step/3) of
+        # them get + and -, the middle plain -- symmetric (8 -> 3 / 2 / 3)
+        edge = -(-int(step) // 3)
+        return "+" if down < edge else "-" if down >= step - edge else ""
+    if down < step / 3:
+        return "+"
+    if down >= 2 * step / 3:
+        return "-"
+    return ""
+
+
+def unit_tiers(ue) -> dict:
+    """The four tier scales on the unit score (higher is better on all four)."""
+    sc = (ue or {}).get("score") or {}
+    # tiered on the WHOLE-NUMBER scores the table shows, in whole-number bands, so a printed
+    # score always sits inside its tier's printed range (code review)
+    return {(side, kind): tiers({t: round(v) for t, v in sc.get(side, {}).get(kind, {}).items()},
+                                higher_is_better=True, steps=INT_STEPS)
+            for side in ("off", "def") for kind in ("pass", "run")}
+
+
+INT_STEPS = (2, 3, 4, 5, 6, 8, 10, 12, 15, 20)
+
+
+def band_label(b, last=False) -> str:
+    """A whole-number band (k, lo, hi] as 'lo+1-hi' (the last band includes its low edge)."""
+    lo, hi = int(round(b[1])), int(round(b[2]))
+    return f"{lo if last else lo + 1}-{hi}"
 
 
 def unit_table(ue, away, home) -> list[str]:
-    """Each offence against the defence it faces, dropbacks and runs."""
-    if not ue or not all(t in ue["off"] and t in ue["def"] for t in (away, home)):
+    """Each offence against the defence it faces, passes and runs, as one blended score and
+    its tier per unit; the tier ladder below shows what each tier spans (user, 2026-10-06)."""
+    if not ue or not ue.get("score") or not all(
+            t in ue["score"]["off"]["pass"] and t in ue["score"]["def"]["pass"] for t in (away, home)):
         return []
-    n = ue["_n"]
-    cell_o = lambda t, k: (lambda v: f"{v[0]:+.2f} ({_rk(v[1], n)}) · {100 * v[2]:.0f}% ({_rk(v[3], n)})")(ue["off"][t][k])
-    cell_d = lambda t, k: (lambda v: f"{v[0]:+.2f} ({rank_words(v[1], n)}) · {100 * v[2]:.0f}% ({rank_words(v[3], n)})")(ue["def"][t][k])
-    L = ["| Matchup | Offence: EPA/play · success | Defence it faces allows: EPA/play · success |", "|---|---|---|"]
+    T = unit_tiers(ue)
+    sc = ue["score"]
+    L = ["| Matchup | Offence score | Offence tier | Defence faced: score | Defence tier |", "|---|---|---|---|---|"]
+    letters = tier_grade
     for o, d_ in ((away, home), (home, away)):
-        for k, lab in (("pass", "dropbacks"), ("run", "runs")):
-            if k in ue["off"][o] and k in ue["def"][d_]:
-                L.append(f"| {o} {lab} vs {d_} | {cell_o(o, k)} | {cell_d(d_, k)} |")
-    lg = ue["_league"]
+        for k in ("pass", "run"):
+            if o in sc["off"][k] and d_ in sc["def"][k]:
+                to, td = T[("off", k)], T[("def", k)]
+                L.append(f"| {o} {k} vs. {d_} | {round(sc['off'][k][o])} | {letters(to, o)} | "
+                         f"{round(sc['def'][k][d_])} | {letters(td, d_)} |")
+    L += ["", "**Score**: how well a unit does per play, blending EPA per play (points added against an average "
+              "play from the same down, distance and field position) and success rate (share of plays that added "
+              "points), two parts EPA to one part success. 50 is the league average and every 10 points is one standard deviation; higher is "
+              "better for offences and defences alike. Passes include sacks and scrambles; garbage time removed ("
+              + ue["_filter"] + "). **Tiers** S, A, B, C, D, F: equal bands of score counted down from the "
+              "league's best team (S = the top band); a list whose spread needs fewer bands stops before F. "
+              "**+ / -** mark the top and bottom third of a band, so a C- and a D+ are neighbours.",
+          "", "| Tier | Passing offence | Running offence | Pass defence | Run defence |", "|---|---|---|---|---|"]
+    n = max(T[k]["n"] for k in T)
+    for k in range(1, n + 1):
+        cells = []
+        for key in (("off", "pass"), ("off", "run"), ("def", "pass"), ("def", "run")):
+            b = next((x for x in T[key]["bands"] if x[0] == k), None)
+            cells.append(band_label(b, last=(k == T[key]["n"])) if b else "")
+        L.append(f"| {tier_letter(k)}{' (best)' if k == 1 else ''} | " + " | ".join(cells) + " |")
     pace = ue.get("pace") or {}
-    pace_s = "; ".join(f"{t} {pace[t][0]:.1f} s ({rank_words(pace[t][1], len(pace), 'fastest', 'slowest')})"
-                       for t in (away, home) if t in pace)
-    L += ["", f"League: dropbacks {lg['pass'][0]:+.2f} EPA, {100 * lg['pass'][1]:.0f}% success; runs "
-              f"{lg['run'][0]:+.2f} EPA, {100 * lg['run'][1]:.0f}% success. Garbage time removed ({ue['_filter']}); "
-              f"offence ranks 1st = best, defence ranks count from most allowed."
-          + (f" Pace, neutral situations, seconds between snaps: {pace_s}." if pace_s else "")]
+    if all(t in pace for t in (away, home)):
+        L.append("")
+        L.append(f"Pace in neutral situations (seconds between snaps; 1st = fastest): "
+                 + "; ".join(f"{t} {pace[t][0]:.1f} ({ordinal(pace[t][1])})" for t in (away, home)) + ".")
     return L
 
 
@@ -1052,11 +1166,11 @@ def positional_table(pa, teams) -> list[str]:
     n = pa["_n"]
     L = ["| Defence | RBs | WRs | TEs |", "|---|---|---|---|"]
     for t in teams:
-        L.append(f"| {t} | " + " | ".join(f"{pa[t][p][0]:.1f} ({rank_words(pa[t][p][1], n)})" for p in POS_GROUPS) + " |")
+        L.append(f"| {t} | " + " | ".join(f"{pa[t][p][0]:.1f} ({ordinal(pa[t][p][1])})" for p in POS_GROUPS) + " |")
     L.append("| League average | " + " | ".join(f"{pa['_league'][p]:.1f}" for p in POS_GROUPS) + " |")
     g = sorted(set(pa["_games"][t] for t in teams))
-    L += ["", f"PPR points allowed per game over {'/'.join(map(str, g))} games; touchdowns included, every player "
-              "at the position together. Shaped by the opponents faced; not a price input."]
+    L += ["", f"PPR fantasy points allowed per game over {'/'.join(map(str, g))} games. Rank among {n} teams: 1st "
+              "= most points allowed. Touchdowns included; shaped by the opponents faced."]
     return L
 
 
