@@ -693,7 +693,16 @@ WIDTH_OFF = {"share_conc_targets": None, "share_conc_carries": None, "catch_conc
              # round 36: the starter-share draw on QB passing pulled toward its own mean by this
              # factor (None = the drawn share as is; 0 = always the mean): keeps the passing
              # average, narrows the exits-and-benchings spread (reports/round36_qb_share.md)
-             "starter_share_shrink": None}
+             "starter_share_shrink": None,
+             # round 38 (reports/round38_qb_passing_bias.md): the full-game passing draw pulled toward
+             # its own simulated mean by this factor before the starter-share draw (None = as drawn;
+             # mean-preserving), then times pass_scale (None = 1). It ran right-skewed, wide, ~2% low
+             "pass_shrink": None, "pass_scale": None,
+             # round 38 amended (expert audit 2026-10-06): the passing draw times (the team's market-
+             # implied points / PASS_IMPLIED_REF) ** this (0 = off). DECISIONS #137's version, which
+             # tested only 0.5-1.5; the Over ran 39% at <= 18 implied points and 66% at 27+
+             "pass_implied_exp": 0.0}
+PASS_IMPLIED_REF = 22.0          # about the league's mean implied team points
 
 # simulate_team_game(..., return_other=True) files the 'other' bucket's targets
 # under this key, for simulate_qb_passing.
@@ -719,7 +728,13 @@ def validate_width(w):
         elif k == "starter_share_shrink":
             if v is not None and not (isinstance(v, (int, float)) and 0 <= v <= 1):
                 raise ValueError(f"{k} must be null (off) or in [0, 1], got {v!r}")
-        elif k in ("catch_shape_mult", "team_r_mult", "catch_shape_exp"):
+        elif k == "pass_implied_exp":
+            if not (isinstance(v, (int, float)) and 0 <= v <= 2):
+                raise ValueError(f"{k} must be in [0, 2] (0 = off), got {v!r}")
+        elif k == "pass_shrink":
+            if v is not None and not (isinstance(v, (int, float)) and 0 < v <= 1):
+                raise ValueError(f"{k} must be null (off) or in (0, 1], got {v!r}")
+        elif k in ("catch_shape_mult", "team_r_mult", "catch_shape_exp", "pass_scale"):
             if v is not None and not (isinstance(v, (int, float)) and v > 0):
                 raise ValueError(f"{k} must be null (off) or > 0, got {v!r}")
         elif k == "rush_other_share":
@@ -1100,7 +1115,7 @@ def simulate_qb_completions(rng, n_sim, receiver_receptions, other_targets, othe
 
 
 def simulate_qb_passing(rng, n_sim, receiver_yards, other_targets, other_rates, per_catch_shape,
-                        starter_share=None, width=None):
+                        starter_share=None, width=None, implied_points=None):
     """The starting QB's passing yards (plan step 4), from the SAME simulation
     as his receivers: every tracked receiver's yards, plus the 'other' bucket's
     targets at the depth receivers' catch rate and yards per target (the
@@ -1123,6 +1138,16 @@ def simulate_qb_passing(rng, n_sim, receiver_yards, other_targets, other_rates, 
         total = total + np.where(rec > 0, g.gamma(np.maximum(shape_total, 1e-6), ypc / per_catch_shape), 0.0)
     if w["eff_sd_pass"]:
         total = total * _game_multiplier(g, n_sim, w["eff_sd_pass"])
+    if w["pass_shrink"] is not None:
+        # round 38: the full-game draw pulled toward its mean BEFORE the starter-share draw, so
+        # an exit or a benching (a real settlement outcome) keeps its full effect
+        m = float(total.mean())
+        total = m + float(w["pass_shrink"]) * (total - m)
     if starter_share is not None:
         total = total * _share_draw(g, n_sim, starter_share, w)     # round 36: shrink when set
+    if w["pass_scale"] is not None:
+        total = total * float(w["pass_scale"])
+    if w["pass_implied_exp"] and implied_points is not None and np.isfinite(implied_points) and implied_points > 0:
+        # no random draw: every other number stays where it was
+        total = total * (float(implied_points) / PASS_IMPLIED_REF) ** float(w["pass_implied_exp"])
     return total

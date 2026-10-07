@@ -363,6 +363,14 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
     pass_on = live and "other_receiver_rates" in P0 and "qb_starter_pass_share_quantiles" in P0
     other_rates = P0.get("other_receiver_rates") if pass_on else None
     pass_share = np.array(P0["qb_starter_pass_share_quantiles"]) if pass_on else None
+    # round 38: each team-game's market-implied points (nflverse lines: spread_line positive =
+    # home favoured), for the QB passing scale; missing where a line is missing (no scaling)
+    implied_of = {}
+    if {"spread_line", "total_line"}.issubset(games.columns):
+        for _, g_ in games.iterrows():
+            if pd.notna(g_.spread_line) and pd.notna(g_.total_line):
+                implied_of[(g_.home_team, int(g_.week))] = (float(g_.total_line) + float(g_.spread_line)) / 2
+                implied_of[(g_.away_team, int(g_.week))] = (float(g_.total_line) - float(g_.spread_line)) / 2
 
     role_lookup = roles.drop_duplicates("gsis_id", keep="first").set_index("gsis_id")["slot"]
     # LIVE MODE: the slot as the scorer sees it -- the latest pre-game depth
@@ -830,7 +838,7 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
                 if pass_on:
                     passing[(team, week)] = M.simulate_qb_passing(
                         g_rng, N, [y_ for _r, y_ in out.values()], other_t, other_rates, shape_ypc,
-                        starter_share=pass_share, width=width)
+                        starter_share=pass_share, width=width, implied_points=implied_of.get((team, int(week))))
                     completions[(team, week)] = M.simulate_qb_completions(
                         g_rng, N, [r_ for r_, _y in out.values()], other_t, other_rates, starter_share=pass_share,
                         width=width)
@@ -989,7 +997,8 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
                     g = crng(i, 3)
                     ys = [cond_yds[j] for _k, j in rows_ if j in cond_yds]
                     pD = M.simulate_qb_passing(g, N, ys, np.full(N, other_T), other_rates, shape_ypc,
-                                               starter_share=pass_share, width=width)
+                                               starter_share=pass_share, width=width,
+                                               implied_points=implied_of.get(tw_))
                     # stand-in line from pre-game inputs: expected throws at their yards per target
                     sh_ = sum(float(tr.ts.iloc[k_]) for k_, _ in rows_)
                     exp_y = (sum(mu_t[k_] * ypt_[k_] for k_, _ in rows_)
@@ -1414,7 +1423,14 @@ RECEIVING_JOINT_GRID = [{"share_conc_targets": sc, "catch_conc": cc}
 # Round 36 (reports/round36_qb_share.md): the starter-share draw on QB passing, pulled to its mean
 PASS_SHARE_GRID = [{"starter_share_shrink": v} for v in (None, 0.75, 0.5, 0.25, 0.0)]
 
+# Round 38 (reports/round38_qb_passing_bias.md): the QB passing draw's spread and level
+PASS_BIAS_GRID = [{"pass_implied_exp": e, "pass_scale": c, "pass_shrink": s}
+                  for e in (0.0, 0.1, 0.2, 0.3, 0.4) for c in (1.0, 1.02, 1.04) for s in (None, 0.7)]
+
 SUBGRIDS = {
+    "qbbias": (PASS_BIAS_GRID, ("pass",), "width",
+               "Round 38: the QB passing draw's spread and level (reports/round38_qb_passing_bias.md); the "
+               "pick is made by props/tools/round38_select.py, not by this table."),
     "receivingjoint": (RECEIVING_JOINT_GRID, ("rec", "yds", "pass"), "width",
                        "Round 34: target spread and catch-rate swing together (reports/round34_receiving_joint.md); "
                        "the pick is made by props/tools/round34_select.py, not by this table."),
@@ -1995,7 +2011,7 @@ def main(argv=None):
     ap.add_argument("--tune-width", action="store_true",
                     help="choose the width settings on the --tune seasons; writes --report (.md/.csv)")
     ap.add_argument("--width-out", default=None, help="--tune-width: write the chosen settings to this JSON file")
-    ap.add_argument("--tune-grid", choices=["main", "qb", "rushnorm", "rushlead", "tier2", "running", "conversion", "targetspread", "yardsshape", "passspread", "receivingjoint", "qbshare"], default="main",
+    ap.add_argument("--tune-grid", choices=["main", "qb", "rushnorm", "rushlead", "tier2", "running", "conversion", "targetspread", "yardsshape", "passspread", "receivingjoint", "qbshare", "qbbias"], default="main",
                     help="--tune-width: the receiving/rushing grid, the starting QB's own settings, or the "
                          "carry-share rescaling")
     ap.add_argument("--dispersion", choices=["prior", "train"], default=None,

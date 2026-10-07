@@ -7832,3 +7832,18 @@ The expert re-ran the four-season backtest (baseline reproduces ours: receptions
   remaining bias on the betting path), then the injury handoff by absence age, then rushing by
   game environment (#106 reopened), then the receiving-yards level (#99). Each with a written
   rule and fresh 2026 weeks: these reruns are extra looks at 2022-25.
+## 2026-10-06 (199) -- round 38 ships: QB passing scaled by implied points (power 0.2) and level x1.04; the width guard overridden by the user
+
+- Pick by the registered rule (30-setting grid, 2022-24): pass_implied_exp 0.2, pass_scale 1.04,
+  no narrowing. Own-volume log loss +0.0099 (+0.0040, +0.0156); calibration by implied points
+  6.3 -> 1.8 points (2022-24), 11.2 -> 6.7 (2026 weeks 2-4); conversion better; paired CRPS
+  better; 2026 weeks 2-4 +0.026 (+0.003, +0.048); every leave-one-season-out fold positive.
+- The pre-registered width guard failed (11.9% outside the 80% range vs 13.8% shipped, further
+  from 17-23%): removing the bias brings outcomes inside the range. **The user chose to ship
+  over it.** Recorded as an override, not a pass.
+- Live: resources/width_params.json; a run without a spread/total turns the scale off and says
+  so. The cards' passing calibration rows are re-measured at the new setting (27+: Over 65.5%
+  vs engine 56.8%, from 47.1%).
+- Round 39 (backs' carries 50% toward the market = round 29): stays in shadow by the user's
+  choice; the record grades it. Round 42 (target handoff by absence age): null, the shipped
+  handoff is about right in continuing absences (0.99).

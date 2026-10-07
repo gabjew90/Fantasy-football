@@ -1406,8 +1406,9 @@ MARKET_ORDER = ["player_pass_yds", "player_receptions", "player_reception_yds", 
 # Re-measure and edit when a round changes these markets (round 38 is testing QB passing).
 IMPLIED_ROWS = ((18.0, "18 or less"), (21.0, "18-21"), (24.0, "21-24"), (27.0, "24-27"), (99.0, "27+"))
 BIAS_BY_IMPLIED = {      # measured at share_conc_targets 60 (round 34's setting), round-34 frames
-    "player_pass_yds": {"18 or less": (219, .388, .467), "18-21": (419, .496, .473), "21-24": (547, .536, .469),
-                        "24-27": (419, .566, .471), "27+": (174, .655, .472)},
+    # passing after round 38 (implied-points power 0.2, level x1.04; DECISIONS #199), round-38 frames
+    "player_pass_yds": {"18 or less": (219, .388, .448), "18-21": (419, .496, .491), "21-24": (547, .536, .515),
+                        "24-27": (419, .566, .541), "27+": (174, .655, .568)},
     "player_reception_yds": {"18 or less": (1221, .455, .467), "18-21": (2014, .507, .470),
                              "21-24": (2358, .500, .471), "24-27": (1711, .522, .475), "27+": (709, .522, .476)},
     "player_receptions": {"18 or less": (1221, .423, .440), "18-21": (2014, .468, .441), "21-24": (2358, .450, .441),
@@ -1495,10 +1496,10 @@ def bias_gap_rows(markets, implied_by_team) -> list[tuple[str, str, str]]:
                          f"vs engine {100 * BIAS_BY_IMPLIED['player_pass_yds'][implied_row(v)][2]:.0f}%"
                          for t, v in implied_by_team.items() if implied_row(v))
         out.append(("QB passing yards by game environment",
-                    "Measured: the passing Over runs low for teams implied at 21+ points and high at 18 or less "
-                    "(2022-25, DECISIONS #197)" + (f" -- {rows}" if rows else ""),
-                    "the engine is not adjusted for this yet (round 38 is testing an implied-points scale); read "
-                    "the card's calibration line beside each passing price"))
+                    "Measured after round 38's implied-points scale (DECISIONS #199): most of the old lean is gone, "
+                    "but teams implied 27+ still hit the Over more often than the engine says and 18 or less less "
+                    "often (2022-25)" + (f" -- {rows}" if rows else ""),
+                    "read the card's calibration line beside each passing price"))
     live = [m for m in MARKET_ORDER if m in markets and m in LIVE_RECORD]
     if live:
         out.append(("The engine's chance at real lines",

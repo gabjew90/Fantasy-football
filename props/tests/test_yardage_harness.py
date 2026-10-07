@@ -434,3 +434,59 @@ def test_round_36_shrink_keeps_the_mean_and_narrows_the_share_draw():
     import pytest as _pt
     with _pt.raises(ValueError):
         M.validate_width({"starter_share_shrink": 1.5})
+
+
+def test_round_38_shrink_keeps_the_mean_and_the_scale_moves_it():
+    """reports/round38_qb_passing_bias.md: None / 1.0 is the shipped draw exactly; the shrink
+    pulls each draw toward the simulated mean (mean kept, spread x the factor); the scale
+    multiplies after it."""
+    import numpy as np
+    import model as M
+    grid = np.array([0.03, 0.6, 0.95, 1.0, 1.0, 1.0, 1.0, 1.05])
+    ys = [np.random.default_rng(5).gamma(4.0, 55.0, 4000)]
+    run = lambda w: M.simulate_qb_passing(np.random.default_rng(3), 4000, ys, None, None, 1.0,
+                                          starter_share=grid, width=w)
+    base = run(None)
+    assert np.array_equal(base, run({"pass_shrink": None, "pass_scale": None}))
+    assert np.array_equal(base, run({"pass_scale": 1.0}))
+    s = run({"pass_shrink": 0.7})
+    assert abs(s.mean() - base.mean()) / base.mean() < 0.01 and s.std() < base.std()
+    # before the share draw: with every start a full game the shrink is exact
+    full = lambda w: M.simulate_qb_passing(np.random.default_rng(3), 4000, ys, None, None, 1.0,
+                                           starter_share=np.ones(4), width=w)
+    f0, f7 = full(None), full({"pass_shrink": 0.7})
+    assert abs(f7.mean() - f0.mean()) < 1e-9 and abs(f7.std() - 0.7 * f0.std()) < 1e-9
+    # an exit keeps its full effect: a share-0.03 game is not pulled toward the mean
+    ex = lambda w: M.simulate_qb_passing(np.random.default_rng(3), 4000, ys, None, None, 1.0,
+                                         starter_share=np.array([0.03]), width=w)
+    assert ex({"pass_shrink": 0.7}).max() < 0.03 * ys[0].max() + 1e-9
+    both = run({"pass_shrink": 0.7, "pass_scale": 1.02})
+    assert np.allclose(both, 1.02 * s)
+    import pytest as _pt
+    for bad in ({"pass_shrink": 0.0}, {"pass_shrink": 1.2}, {"pass_scale": 0.0}, {"pass_scale": -1}):
+        with _pt.raises(ValueError):
+            M.validate_width(bad)
+    import backtest as BT
+    assert {"pass_implied_exp": 0.0, "pass_shrink": None, "pass_scale": 1.0} in BT.PASS_BIAS_GRID
+
+
+def test_round_38_implied_points_scale():
+    """Amended round 38: the draw times (implied / 22) ** exp; 0 is byte-identical; a missing
+    or bad implied total leaves the draw alone."""
+    import numpy as np
+    import model as M
+    ys = [np.random.default_rng(5).gamma(4.0, 55.0, 4000)]
+    run = lambda w, ip: M.simulate_qb_passing(np.random.default_rng(3), 4000, ys, None, None, 1.0,
+                                              starter_share=np.ones(4), width=w, implied_points=ip)
+    base = run(None, 28.0)
+    assert np.array_equal(base, run({"pass_implied_exp": 0.0}, 28.0))
+    assert np.allclose(run({"pass_implied_exp": 0.2}, 28.0), base * (28 / 22) ** 0.2)
+    assert np.allclose(run({"pass_implied_exp": 0.2}, 16.5), base * (16.5 / 22) ** 0.2)
+    for ip in (None, float("nan"), 0.0):
+        assert np.array_equal(base, run({"pass_implied_exp": 0.2}, ip))
+    import pytest as _pt
+    with _pt.raises(ValueError):
+        M.validate_width({"pass_implied_exp": -0.1})
+    import backtest as BT
+    assert len(BT.PASS_BIAS_GRID) == 30
+    assert {"pass_implied_exp": 0.0, "pass_scale": 1.0, "pass_shrink": None} in BT.PASS_BIAS_GRID
