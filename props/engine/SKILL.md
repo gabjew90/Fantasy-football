@@ -26,6 +26,7 @@ Always apply:
 - `resources/data_source_matrix.md` (sources, endpoints, credential lookup)
 - `resources/execution_protocol.md` (step order for a full evaluation in this container)
 - `resources/prop_workflow.md` (required output structure)
+- `resources/team_matchup_guide.md` (the user's binding layout and voice for every single-game read's team section)
 - `resources/methodology.md` (versioned reference for how the numbers are built; keep the parameter table current when any constant changes)
 
 For any modeled probability, fair odds, or entry threshold, also apply:
@@ -293,52 +294,34 @@ For a narrow question, run only what it needs:
   Over if his carries take half their volume from the market's script (favourites run more).
   Quote both numbers when you read a back's rushing line: the board's is the price, the
   shadow's is being graded beside it on the scorecard. Never present the shadow as the price.
-  **How a single-game read is written (user, 2026-10-06; his "TB at DAL" brief is the model).**
-  Written straight into the chat, formatted with markdown headings and tables -- never a PDF
-  or a file. The report's **Matchup brief** section holds the tables; the read is built on them:
-  - **Open with the thesis**: two or three sentences on the game you expect and why (who the
-    market makes the stronger side, who plays from ahead, the one issue that matters most).
-  - **Then numbered sections, each a table and a short read.** Copy the report's table in full,
-    then one or two short paragraphs that interpret it: what it implies for each team's volume
-    and which players it helps, and what it does NOT establish. Never walk the table back in
-    words; reason from it ("the case for extra Dallas carries comes from the expected lead,
-    not from a soft run defence").
-  - **Style -- the user's TB at DAL brief is the bar** (user, 2026-10-06: "superior in every way
-    in prose, table clarity, not repeating the obvious, no jargon"):
-    - Plain words a casual fan reads without stopping: "passes" (they include sacks and
-      scrambles), never "dropbacks"; no broadcast adjectives or metaphors ("stingiest",
-      "explosive", "by a distance", "air it out", "feast"). Quote a unit's **score and tier**
-      (EPA and success rate blended two to one; 50 = league average, 10 = one standard deviation; tiers S,
-      A, B, C, D, F from the best band down, + / - for the top / bottom third of a band), never
-      raw EPA numbers; explain the score once. A C- and a D+ are neighbours: say so, and never
-      treat adjacent letters as a big gap without looking at the scores.
-    - Copy the report's tables as they are: one number per cell, the rank key in the caption.
-      Never cram several figures into a cell. **Every table in the Matchup brief appears, in its
-      order -- none is skipped**, the fantasy points allowed by position with its ranks
-      included (user, 2026-10-06: "you're completely missing the table").
-    - Each inference carries its basis and its limit: "The case for extra Dallas carries
-      comes from the expected lead, not from evidence of a weak run defence." Use "consistent
-      with", "supports the direction", "does not establish", "plausible if the lead develops".
-    - Say a caveat once, where it belongs (sample size sits in the table caption); no filler
-      ("which four games can't tell you"), and no sentence that only restates a number the
-      table shows -- a number appears in prose only to compare or explain it.
-    - Under a table, one short paragraph per team when they differ (two to four sentences).
-    - First person for judgment ("I expect", "My base case"), "the engine projects" for
-      estimates, plain statement for facts.
-  - **Keep facts, model estimates and judgment apart**: the data is fact, "the engine projects"
-    is an estimate, "I expect" is judgment. Missing data reads "not in this run", never a guess.
-  - **Order**: the market -> team outlook (our workload against the season) -> unit against unit
-    (score and tier, with the tier ladder; pace) -> personnel -> fantasy points allowed by position -> weather (one
-    line unless it matters) -> **where this baseline may miss** (the report's table, then which
-    of those to examine as a separate scenario) -> **expected game flow and what would change
-    it** (a base case and two "if" branches) -> your strongest directional read and the
-    conditional ones -> then the players, below.
+  **How a single-game read is written (user, 2026-10-06): follow `resources/team_matchup_guide.md`
+  EXACTLY for the team section, then the "Player cards" rules for the players.** Read the guide
+  before writing any single-game read; it is binding, not a suggestion (user: "just follow it
+  exactly"). Written straight into the chat as markdown -- never a PDF or a file. In short:
+  - **Order:** header and sources line -> opening thesis (two or three sentences, written after
+    the sections) -> 1 the market -> 2 expected volume -> 3 unit performance (scores and tiers) ->
+    4 who plays -> 5 production allowed by position -> 6 weather and venue -> 7 where the baseline
+    could miss -> 8 expected game flow and what would change it -> the player cards.
+  - **The report's "Team matchup" section prints sections 1-7 in that order**: copy every table
+    as printed, in order, none skipped (home team first, one number per cell, ranks written
+    "21.9 (13th most)"). Under each, one or two short paragraphs (two to four sentences each)
+    following the guide's "Required narration" for that section.
+  - **You write**: the opening thesis, every narration, and **section 8** -- its table (base
+    case, a competitive alternative, the main failure branch, each with both teams'
+    opportunities; chosen for THIS matchup, no probabilities) and the handoff to the players.
+  - **Section 3**: the unit table and the user's tier caption, no ladder table; compare the
+    scores, not just the letters (a C- and a D+ are neighbours).
+  - **Voice** (the guide's voice section): observation -> matchup implication -> opportunity
+    consequence -> condition that could change it. "The market expects", "Through four games",
+    "The engine projects", "My base case". Interpret; never narrate table cells. No jargon, no
+    broadcast adjectives ("stingiest", "explosive", "air it out", "feast"); plain "passes".
+  - Run the guide's finished-report check before sending.
   - **Tie every player conclusion to his share, the line and the price**; a team read alone is
     never a player call. When the user gives a workload read, set it against the line's
-    break-even volume ("pays at this price if you expect") and call a margin under 10% thin --
-    the research table's flags already mark thin margins at our own projection.
-  **The full story, in this order** (user, 2026-10-05; DECISIONS #168). Headed sections, short
-  paragraphs, tables where they help; thorough but easy to read:
+    break-even volume and call a margin under 10% thin.
+  **The full story** (user, 2026-10-05; DECISIONS #168) -- what each piece of data means. The
+  LAYOUT of a single-game read is the team matchup guide followed by the player cards (above);
+  this list is the reference for the content behind them:
   1. **The game.** The matchup and what each team has been, the weather (or roof), home and
      away, the Vegas lines (spread, total, implied points and the script they point to), the
      fantasy points each defence allows to RBs, WRs and TEs (the header's "Fantasy points
@@ -464,9 +447,10 @@ For a narrow question, run only what it needs:
   carry and a catch, against our touches and the book's carries + catches lines, and how much
   of his yards come from catches. When a back's rushing leg needs a different script from the
   rest of an entry, name his combined line as the leg that survives both scripts (the catches
-  hold up when his team trails). Our model's own chance on it is not shown yet: the combined
-  market waits on its calibration check, because the simulation draws a team's runs and passes
-  independently.
+  hold up when his team trails). The combined line is priced since DECISIONS #187 (the model's
+  chance sits in the prop table); this touches read is arithmetic beside it, never a price-based
+  threshold -- the card's combined column says so, and a combined what-if runs as a separate
+  carry-and-catch scenario (carries, targets, catch rate and both yards rates kept apart).
   **The achievability gauge** ends both reads: the volume the yards line takes at his capped
   yards a play (the luck line: a play past the player's OWN 97.5th percentile for that prop --
   his catches or his runs, last season and this one -- counts as a lucky breakaway and is
@@ -553,19 +537,47 @@ need not be surfaced. Write the reply as a premium prop guide with this structur
    target, yards per carry, with sample size) and the multiplier applied to the opposing
    receivers/rushers. State plainly if the effect is small.
 4. **Per team, starters in depth-chart order** (QB1, RB1, WR1, WR2, TE1, WR3; RB2/proxy
-   only if they have a line). Each: the research rows first -- line, both prices, our
-   projection (median and 10th-90th range), the Over by the model and by the book, and
-   what the line implies (targets or carries per game at which it is a fair 50/50, next to
-   what we project), and what each side needs at its own price (the Over pays above the
-   first workload, the Under at or below the second, if the model's numbers are right;
-   it is how much role a view needs, never a pick) -- then the role: last-season share and games, this season's count,
-   last game's snaps and share against his earlier weeks, a back's three jobs (early-down
-   carries, passing-down targets, inside-5 carries; last game against earlier weeks), the
-   opponent multiplier if it
-   moved the number, and any Watch flag (new team, Questionable, snap scaling, the
+   only if they have a line). Each: the report's player card, laid out and narrated as the
+   "Player cards" rules below say. What its tables hold: the prop table (line, both prices,
+   the forecast's middle and 80% range, the Over by the engine and by the market); the role
+   evidence (last game against his earlier games: shares, snaps, a back's three jobs, the
+   quarterback); the workload check (the 50/50 workload and what each side needs at its own
+   price -- the Over pays above the first workload, the Under at or below the second, if the
+   model's numbers are right; how much role a view needs, never a pick); and any Watch flag (new team, Questionable, snap scaling, the
    receiving role-shift flag with its 2022-25 wording, a back's "carries up / down" flag when his
    carry share moved 20+ points last week (reports/rb_takeover_check.md: such backs beat or
    missed the model's carries by about two the next week), a teammate out or back).
+   **Player cards (the report's per-player section, user's draft 2026-10-06).** The report
+   prints one card per priced player: the prop table, role evidence (earlier games against last
+   game), the historical baseline, the workload check (the QB's volume-and-efficiency check),
+   the capped-play check, the market-carries number for backs, Matchup and Watch. Copy the
+   card's tables as printed -- every line, depth-chart order, never sorted by the gap. Then
+   write the read around them, in this order, in plain words:
+   - **The question** (bold, one line): what this player's prop turns on in THIS game ("Will
+     Dallas's extra running belong to this back?").
+   - **What his recent usage means**: name the change and why -- more snaps, a bigger share on
+     the same snaps, or an absent teammate. A share rise with more snaps is stronger evidence
+     than one busy game on unchanged snaps. Say whether last game had the same quarterback and
+     the same teammates as this one (the card's quarterback row).
+   - **What this matchup means**: the team-level script, then how much of it reaches this
+     player through his share.
+   - **Which prop fits the view**: receptions or yards, rushing or combined -- from the workload
+     table (a yards line that asks for many more targets than the catches line suits a
+     short-pass view less). Passing and combined yards have NO price-based workload: never
+     present their arithmetic (the capped check, the touches read) as an equivalent threshold.
+   - **Where the read can fail**: the specific role, script or efficiency change.
+   - **The closing condition** (bold): "If you expect [player] to average [range] in this
+     situation, [side, prop, line] meets / misses the quoted price's required win rate under
+     these efficiency assumptions. It stops fitting that view if [change]." Take the numbers
+     from the workload table; describe a margin under 10% as thin.
+   After the cards: **"What changes for the remaining players"** (one short paragraph per
+   group), and **"Reads that pull in different directions"** -- only conflicts the roles
+   support (two backs cannot both gain share of one fixed workload; a receiver's target gain
+   taken from a teammate pressures that teammate's Over), stated as assumptions, never as a
+   joint probability. A workload scenario table appears only after the scenarios were run
+   (`--assume`), never with estimated numbers. End with the card footnote on pick'em prices.
+   A whole-number line can push: quote the engine's Over with the push beside it, as the card
+   does.
    **Questionable players: give both cases, pick neither.** Every number in the run is
    priced as if a Questionable player PLAYS his normal role (no discount). The report's
    "If a Questionable player is out" section prices the same lines with him OUT and his
@@ -596,18 +608,29 @@ need not be surfaced. Write the reply as a premium prop guide with this structur
    rather than the ones worth betting, and reuses each player-week 8-10 times so its `n`
    column overstates the evidence by about an order of magnitude. Quote it only with that
    description attached. The 2022-25 yardage harness (`reports/yardage_harness.md` in the
-   repo) is the evidence: receptions and receiving yards are unbiased on outcomes with their
-   width within the bar. Rushing yards and rushing + receiving are unbiased and right at the
-   main line, but their distributions run too narrow in the tails (23-25% of games outside
+   repo) is the evidence, with **measured biases at the main line (expert audit, DECISIONS #197)**:
+   at the backtest's stand-in line on 2022-25 the receiving-yards Over hit 2.9 points more often
+   than the engine said (receptions 1.4, rushing 1.8, combined 0.6), and every market leans by
+   the team's implied points (backs on teams implied 27+: Over 58.7% against 48.5%). Each card
+   prints the row its team sits in and, for receiving lines, his role's row ("Measured
+   calibration"; DECISIONS #198: tight ends' catches Over hit 4.9 points and yards 6.6 points more
+   often than the engine said, and with actual targets in, tight-end yards run too wide and backs'
+   receiving yards too narrow); quote it with the price -- a measured
+   record, never an adjustment you apply. Widths: receptions and receiving yards within the
+   bar; rushing yards and rushing + receiving run too narrow in the tails (23-25% of games outside
    the 80% range on the re-check, reports/current_settings_check_2026-10-06.md): a line far
    from the projection -- an alternate line, a long shot -- reads more confident than it
    should; say so when quoting one. None is tested against posted lines yet; say that, not
    that the numbers are unvalidated guesses.
    QB passing yards (the starting QB only) are his receivers' yards in the same simulation
-   times a starter's usual share: right on average but too WIDE on the corrected grading
-   (14% of games outside the 80% range against a 17-23% bar; reports/rush_rec_calibration.md),
-   so a passing chance sits too close to 50% -- an Over the model gives 60% is likely a bit
-   better than that. Priced by the user's decision (DECISIONS #105). Say so when quoting one.
+   times a starter's usual share, **scaled since round 38 by the team's implied points**
+   ((implied / 22) ** 0.2, times 1.04; DECISIONS #199). Before it the Over at the harness's main
+   line followed the implied points (38.8% hit at 18 or fewer, 65.5% at 27+, against an engine
+   near 47% everywhere); after it the engine says 44.8% and 56.8% in those rows -- most of the
+   lean is gone, the extremes keep some. The card prints the team's row beside every passing
+   price; chat says it with any passing read. A run without a spread/total turns the scale off
+   and says so in the sources table. It is also too WIDE in the tails (14% of games outside the 80% range against a
+   17-23% bar; reports/rush_rec_calibration.md). Priced by the user's decision (DECISIONS #105).
    Ladder: `ladder_*.csv` holds P(stat <= k) per player; quote it when the user asks about
    an alternate line.
 6. **Parlays — DISABLED, do not price them.** `parlays_*.csv` is no longer written.

@@ -19,7 +19,7 @@ what is proven. Worked examples are from week 4 of 2026 (ATL at NO).*
 | nflverse play-by-play, this season through last week | targets, catches, yards, carries, scores, game states |
 | Weekly rosters, injury report, depth charts, snap counts | who plays, roles, snap shares |
 | Last season's priors (resources/priors_*) | each player's shares and rates, role averages (WR1, RB2...), team volume, variation settings, last season's plays game by game |
-| Sleeper Picks (primary) / The Odds API (fallback) | lines and payouts; also lines read but not modelled (carries, completions, attempts, longest plays, rushing + receiving) |
+| Sleeper Picks (primary) / The Odds API (fallback) | lines and payouts; also lines read but not modelled (carries, completions, attempts, longest plays); rushing + receiving is priced since #187 |
 | Vegas spread and total | game script and the touchdown anchor |
 | NWS weather | matters only above 15 mph sustained wind |
 
@@ -147,7 +147,7 @@ to 4x between years, which is why the receiving k's were fixed by backtest.
 | Volume check | needed volume = yards needed / luck-free rate, against ours ("comfortably more" at +15% or more, "fewer" at -15% or less) and the book's volume line (within 0.5 reads as about the same). **Caveat:** this is arithmetic on realized volume, not the simulation: it treats the line as an average to reach (a 50% line is a median, and yards are skewed) and the trimmed rate is biased low by design, so it leans against Overs. A gauge, never a price |
 | Book's coin flip | line + game-to-game spread x the normal quantile of the book's no-vig chance |
 | Team volume and script | each team's games this season; our projection against that range; teams under this kind of line split their snaps ahead / close / behind by 8+, times this team's pass share in each state, blended toward the league with 60 plays of weight |
-| Rushing + receiving | the touches the line takes at his luck-free rates; how much of his yards come from catches (our probability waits on calibration) |
+| Rushing + receiving | the touches the line takes at his luck-free rates; how much of his yards come from catches (arithmetic beside the priced chance since #187, never a threshold) |
 | Flags | role up/down; backfield takeover (carry share +/-20 points); teammates out, back or questionable; QB change; new team |
 | Fantasy points allowed | PPR per game by position, context only |
 | Offensive line | each team's five linemen with the most snaps this season; how many are out (report, reserve, off the roster) or questionable; context only, never a price input |

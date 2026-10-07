@@ -35,8 +35,9 @@ slate`) are for the whole decision -- "set my lineup", "who should I add",
   follows the question, with headings when a big decision reads better so.
 - **Answers are written in the chat, as markdown** -- headings, tables, short
   paragraphs. Never a PDF, a document or a file unless the user asks for one
-  (user, 2026-10-06). A game read follows the props engine's "matchup brief"
-  style: a thesis, then each table with a short read of what it means.
+  (user, 2026-10-06). A game read follows the props engine's team matchup guide
+  (`props/engine/resources/team_matchup_guide.md`) EXACTLY -- header, thesis, sections 1-8,
+  each table with its short read -- then the player cards (user: "just follow it exactly").
 - **The full data, every time.** The user wants all the numbers, not a
   selection (2026-09-30: he asked twice for "the full stats" after a trimmed
   answer). Any answer about a player shows his **weekly stat line** and his

@@ -866,17 +866,30 @@ def test_unit_efficiency_splits_dropbacks_and_runs_removes_garbage_time_and_rank
 
 
 def test_brief_tables_and_known_gaps_read_the_game_not_a_template():
-    assert RS.market_table("TB", "DAL", -9.5, 47.5)[2:4] == ["| Spread | +9.5 | -9.5 |",
-                                                             "| Implied team points | 19.0 | 28.5 |"]
-    chk = {"TB": {"our_att": 33.2, "our_runs": 26.0, "att_avg": 31.5, "runs_avg": 24.2,
-                  "rates": {"close": (57, 43, 100)}, "league": {"close": 0.56}}}
+    mt = RS.market_table("TB", "DAL", -9.5, 47.5, "DraftKings", "2026-10-07 02:20 UTC")
+    assert mt[0] == "| Market | DAL | TB |", "the guide: home team first"
+    assert mt[2:5] == ["| Spread | -9.5 | +9.5 |", "| Implied team points | 28.5 | 19.0 |",
+                       "| Total points | 47.5 | — |"]
+    assert "Book: DraftKings · Updated: 2026-10-07 02:20 UTC" in mt[-1] and "negative = favored" in mt[-1]
+    c_ = lambda a, r, att, runs: {"our_att": a, "our_runs": r, "att_avg": att, "runs_avg": runs, "games": 4,
+                                  "rates": {"close": (57, 43, 100)}, "league": {"close": 0.56},
+                                  "state_mix": {"lead": 0.18, "close": 0.78, "trail": 0.04},
+                                  "line_bucket": "big favourite"}
+    chk = {"TB": c_(33.2, 26.0, 31.5, 24.2), "DAL": c_(37.4, 25.1, 37.8, 23.5)}
     ot = RS.outlook_table(chk, "TB", "DAL")
-    assert ot[2] == "| TB | 33 | 26 | 31.5 / 24.2 | 57% |" and "56%" in ot[-1]
+    assert ot[0] == "| Workload measure | DAL | TB |" and ot[2] == "| Expected passes | 37 | 33 |"
+    assert ot[5] == "| Season runs per game | 23.5 | 24.2 |" and "League close-game pass rate: 56%" in ot[-1]
+    gs = RS.game_state_table(chk, "TB", "DAL", {"big favourite": (938, 16)})
+    assert gs[0].startswith("| Share of plays | DAL (teams favored by 7+)") and gs[2] == "| Ahead by 8+ | 18% | 18% |"
+    assert "16 team-games, 938 plays" in gs[-1] and "not chances" in gs[-1]
+    assert RS.known_gaps_table([("a", "b", "c")])[0] == ("| Matchup issue | What the baseline may miss | "
+                                                         "Separate scenario to examine |")
     g = RS.known_gaps({"qb_change": {"TB": "Daniels starts for Mayfield"}, "fav": "DAL", "spread": 9.5,
                        "new_team": ["Kenny Gainwell"], "has_pass_lines": True, "oline_out": {"TB": 1, "DAL": 2},
                        "wind_mph": 20, "roof": "closed"})
     names = [x[0] for x in g]
-    assert names[0].startswith("TB's quarterback") and any(n.startswith("DAL's expected lead (9.5") for n in names)
+    assert all(len(x) == 3 for x in g), "issue, what it may miss, the scenario"
+    assert names[0].startswith("TB quarterback") and any(n.startswith("DAL expected lead (9.5") for n in names)
     assert any("DAL offensive line (2 of 5" in n for n in names) and not any("TB offensive line" in n for n in names)
     assert not any(n.startswith("Wind") for n in names), "a closed roof: no wind gap"
     assert RS.known_gaps({"fav": "DAL", "spread": 3}) == [], "a 3-point line is not an expected lead"
@@ -914,11 +927,14 @@ def test_the_unit_score_blends_epa_and_success_and_tiers_from_the_best_team_down
     assert t["tier"]["J"] == 1 and max(t["tier"].values()) == t["n"] <= RS.MAX_TIERS
     assert t["bands"][0][2] == pytest.approx(max(off.values())), "bands count down from the best team"
     assert all(b[2] - b[1] == pytest.approx(t["step"]) for b in t["bands"]), "equal-width bands"
-    tab = RS.unit_table(ue, "A", "B")
-    assert tab[0] == "| Matchup | Offence score | Offence tier | Defence faced: score | Defence tier |"
-    assert any(r.startswith("| A pass vs. B | ") for r in tab) and any(r.startswith("| S (best) |") for r in tab)
+    tab = RS.unit_table(ue, "A", "B", window="weeks 1-4")
+    assert tab[0] == "| Matchup | Offense score | Offense tier | Defense faced: score | Defense tier |"
+    assert tab[2].startswith("| B passing vs. A | "), "the guide: home team's units first"
+    assert any(r.startswith("| A passing vs. B | ") for r in tab)
+    assert tab[-1] == RS.TIER_CAPTION and not any(r.startswith("| S") for r in tab), "the caption, no ladder"
     assert [RS.tier_letter(k) for k in range(1, 7)] == list("SABCDF") and RS.tier_letter(9) == "F"
-    assert "50 is the league average" in " ".join(tab)
+    assert "50 = league average" in tab[-1] and "Window: weeks 1-4, league-wide" in " ".join(tab)
+    assert "not a win probability" in " ".join(tab)
 
 
 def test_tiers_narrow_for_a_tight_league_and_widen_for_a_spread_one():
@@ -939,8 +955,7 @@ def test_a_printed_score_sits_inside_its_tiers_printed_band():
     shown = {t: round(v) for t, v in sc.items()}
     for t, k in T["tier"].items():
         b = next(x for x in T["bands"] if x[0] == k)
-        lo, hi = (int(x) for x in RS.band_label(b, last=(k == T["n"])).split("-"))
-        assert lo <= shown[t] <= hi, (t, shown[t], k, lo, hi)
+        assert (b[1] < shown[t] <= b[2]) or (k == T["n"] and b[1] <= shown[t] <= b[2]), (t, shown[t], k, b)
     over = RS.tiers({str(i): float(i * 20) for i in range(6)}, steps=(2, 3))   # spread 100 > 6 x 3
     assert over["bands"][-1][1] <= 0.0, "the last band reaches the worst team"
 
@@ -973,3 +988,32 @@ def test_plus_and_minus_mark_where_a_team_sits_inside_its_band():
     assert marks.count("+") == marks.count("-") == 3 and marks.count("") == 2, marks
     low = RS.tiers({"x": 10.0, "y": 2.0, "z": 9.5}, higher_is_better=False, steps=(1, 2, 3))
     assert RS.tier_grade(low, "y")[0] == "S" and RS.tier_grade(low, "x")[0] != "S"
+
+
+def test_matchup_header_positional_and_weather_follow_the_guide():
+    h = RS.matchup_header("TB", "DAL", "Thursday, Oct 8, 8:15 PM ET (7:15 PM local)", "AT&T Stadium", "closed",
+                          "roof not posted yet; 16 of this stadium's last 16 games were closed; retractable",
+                          {"DAL": 4, "TB": 4}, ["market 02:20 UTC", "performance through week 4"])
+    assert h[0] == "**TB at DAL**"
+    assert h[2] == ("Thursday, Oct 8, 8:15 PM ET (7:15 PM local) · AT&T Stadium · retractable roof, decision "
+                    "pending (closed in 16 of its last 16 games) · rest: DAL 4 days, TB 4 days")
+    assert h[-1] == "Sources updated: market 02:20 UTC · performance through week 4"
+    assert RS.kickoff_words("Thursday", "2026-10-08", "20:15", "DAL", True) == "Thursday, Oct 8, 8:15 PM ET (7:15 PM local)"
+    assert RS.kickoff_words("Sunday", "2026-12-06", "16:05", "ARI", False).endswith("(2:05 PM local)"), "Arizona: no DST"
+    assert RS.kickoff_words("Sunday", "2026-10-11", "09:30", "JAX", True, neutral=True).endswith("9:30 AM ET")
+    pa = {"_n": 32, "_games": {"DAL": 4, "TB": 4}, "_league": {"RB": 21.9, "WR": 32.4, "TE": 13.6},
+          "DAL": {"RB": (21.9, 13), "WR": (36.9, 10), "TE": (15.3, 14)},
+          "TB": {"RB": (18.0, 23), "WR": (24.1, 29), "TE": (17.9, 9)}}
+    pt = RS.positional_table(pa, ("DAL", "TB"))
+    assert pt[0] == "| Defense | To RBs | To WRs | To TEs |" and pt[2] == "| DAL | 21.9 (13th most) | 36.9 (10th most) | 15.3 (14th most) |"
+    assert "Rank: 1 = most allowed, out of 32 teams" in pt[-1]
+    w = RS.weather_line({"status": "ok", "temp_f": "73-84", "wind_mph_max": 5, "precip_pct_max": 0,
+                         "provider": "NWS", "updated": "2026-10-06T23:06:41+00:00"}, "dome", None)
+    assert w == ("73-84°F, sustained wind up to 5 mph (gusts not included in this run), precipitation chance up "
+                 "to 0%; below the 15 mph sustained-wind screen · NWS, updated 2026-10-06 23:06 UTC · dome")
+    pr = RS.personnel_table({"DAL": {"Quarterback": "Dak Prescott starts"}}, "TB", "DAL", "Official report: x.")
+    assert pr[0] == "| Unit | DAL | TB |" and pr[2] == "| Quarterback | Dak Prescott starts | — |"
+    assert [r.split(" | ")[0] for r in pr[2:6]] == ["| Quarterback", "| Offensive line",
+                                                    "| Receivers, tight ends and backs", "| Pass rush and coverage"]
+    assert RS.recent_games_table("TB", [{"week": 4, "opp": "vs GB", "score": "14-17", "att": 27, "carries": 25,
+                                         "scrambles": 6, "qb": "J.Daniels"}])[2] == "| Week 4 vs GB | 14-17 | 27 | 31 | J.Daniels |"
