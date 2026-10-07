@@ -924,14 +924,13 @@ def defense_line(dm, teams, verb="allows") -> str | None:
     fmt = lambda c, v: f"{v:+.2f}" if c.startswith("epa") else f"{v:.2f}"
     parts = []
     for t in teams:
-        bits = ", ".join(f"{fmt(c, dm[t][c][0])} {lab[c]} ({rank_words(dm[t][c][1], n)})"
+        bits = ", ".join(f"{fmt(c, dm[t][c][0])} {lab[c]} ({ordinal(dm[t][c][1])})"
                          for c in lab if c in dm[t])
         parts.append(f"{t} {verb} {bits}")
     games = sorted(set(dm["_games"][t] for t in teams))
     return ("; ".join(parts) + ". League average: "
             + ", ".join(f"{fmt(c, lg[c])} {lab[c]}" for c in lab if c in lg)
-            + f". Ranks of {n}, counted from the top ('most') or the bottom ('fewest') "
-            f"{'allowed' if verb == 'allows' else 'gained'}; over "
+            + f". Rank among {n} teams: 1st = most {'allowed' if verb == 'allows' else 'gained'}; over "
             f"{'/'.join(map(str, games))} games, from nflverse "
             "play-by-play (EPA is nflfastR's expected-points model). Context only: no price reads it.")
 

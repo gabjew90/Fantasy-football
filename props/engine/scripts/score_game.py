@@ -2160,7 +2160,6 @@ def main():
                                                   team_spread=TEAM_SPREAD.get(t_), league=_league_script,
                                                   mix=_state_mix)
         TEAM_VOL_LINES[t_] = RSCH.team_volume_lines(t_, _rows, TEAM_VOL_CHK[t_])
-    PA_LINE = RSCH.points_allowed_line(PA, (AWAY, HOME))
     # the defences' EPA per play and points per drive allowed (user, 2026-10-06): context only
     DEF_LINE = RSCH.defense_line(RSCH.defense_metrics(pbp), (AWAY, HOME))
     OFF_LINE = RSCH.defense_line(RSCH.offense_metrics(pbp), (AWAY, HOME), verb="gains")

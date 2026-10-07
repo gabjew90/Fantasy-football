@@ -803,8 +803,8 @@ def test_defence_epa_and_points_per_drive_allowed():
     assert dm["ATL"]["pts_drive"] == (pytest.approx(3.5), 1) and dm["NO"]["pts_drive"] == (pytest.approx(3.0), 2)
     assert dm["ATL"]["epa_play"][1] == 1, "1st = most allowed"
     line = RS.defense_line(dm, ("ATL", "NO"))
-    assert line.startswith("ATL allows +0.13 EPA a play (1st most)") and "3.50 points a drive (1st most)" in line
-    assert "NO allows -0.20 EPA a play (1st fewest)" in line
+    assert line.startswith("ATL allows +0.13 EPA a play (1st)") and "3.50 points a drive (1st)" in line
+    assert "NO allows -0.20 EPA a play (2nd)" in line and "1st = most allowed" in line
     assert RS.defense_line(dm, ("ATL", "DAL")) is None
     assert RS.defense_metrics(pbp.drop(columns=["epa"])) == {}
     no_drives = RS.defense_metrics(pbp.drop(columns=["fixed_drive"]))
@@ -824,7 +824,7 @@ def test_offence_epa_and_points_per_drive_gained():
     assert om["X"]["epa_play"] == (pytest.approx(0.4 / 3), 1) and om["X"]["pts_drive"][0] == pytest.approx(3.5)
     assert om["Y"]["pts_drive"] == (pytest.approx(3.0), 2)
     line = RS.defense_line(om, ("X", "Y"), verb="gains")
-    assert line.startswith("X gains +0.13 EPA a play (1st most)") and "('fewest') gained" in line
+    assert line.startswith("X gains +0.13 EPA a play (1st)") and "1st = most gained" in line
 
 
 def test_rank_words_count_from_the_nearer_end():
@@ -863,7 +863,8 @@ def test_unit_efficiency_splits_dropbacks_and_runs_removes_garbage_time_and_rank
     assert ue["pace"]["A"][0] == pytest.approx(30.0), "30 seconds between snaps on one drive"
     t = RS.unit_table(ue, "A", "B")
     assert t[0].startswith("| Matchup |") and any(r.startswith("| A pass vs. B | +0.20 (1st)") for r in t)
-    assert "sacks and scrambles" in t[-1] and "EPA per play" in t[-1], "the terms explained in plain words"
+    cap = " ".join(t[t.index("") + 1:])
+    assert "sacks and scrambles" in cap and "EPA per play" in cap, "the terms explained in plain words"
     assert RS.unit_efficiency(pd.DataFrame(rows).drop(columns=["epa"])) == {}
 
 
