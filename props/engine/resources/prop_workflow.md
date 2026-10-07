@@ -3,6 +3,7 @@
 ## Required Output
 
 ### 1. Matchup Environment & Injury Context
+(For a single-game read the layout and voice are `resources/team_matchup_guide.md`, followed exactly; this list is the content checklist.)
 Concise summary of: verified matchup and kickoff (local time and UTC), venue/roof/timezone, timestamped spread and total with bookmaker, derived team implied totals (same bookmaker and snapshot; state the spread sign convention), game-window weather or `closed roof`, roster status changes (INA, new ACT), official offensive-line and secondary concerns, other relevant availability, missing/unresolved inputs.
 
 ### 2. Primary Analytical Angles
