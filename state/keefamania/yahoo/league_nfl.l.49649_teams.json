@@ -1,5 +1,5 @@
 {
- "fetched_at": 1789602606.0728788,
+ "fetched_at": 1791359040.6461027,
  "path": "league/nfl.l.49649/teams",
  "payload": {
   "fantasy_content": {
@@ -7,9 +7,9 @@
    "league": [
     {
      "allow_add_to_dl_extra_pos": 1,
-     "current_week": 2,
+     "current_week": 5,
      "draft_status": "postdraft",
-     "edit_key": "2",
+     "edit_key": "5",
      "end_date": "2027-01-04",
      "end_week": "17",
      "felo_tier": "silver",
@@ -23,9 +23,9 @@
      "league_id": "49649",
      "league_key": "470.l.49649",
      "league_type": "private",
-     "league_update_timestamp": "1789541009",
+     "league_update_timestamp": "1791355350",
      "logo_url": "https://s.yimg.com/ep/cx/blendr/v2/image-avatar-football-trophy-buf-png_1721783391232.png",
-     "matchup_week": 2,
+     "matchup_week": 5,
      "max_teams": "10",
      "name": "Keefamania",
      "num_teams": 10,
@@ -73,19 +73,19 @@
          [],
          [],
          {
-          "waiver_priority": 6
+          "waiver_priority": 5
          },
          [],
          {
-          "number_of_moves": 1
+          "number_of_moves": 4
          },
          {
-          "number_of_trades": 0
+          "number_of_trades": "1"
          },
          {
           "roster_adds": {
            "coverage_type": "week",
-           "coverage_value": 2,
+           "coverage_value": 5,
            "value": "0"
           }
          },
@@ -111,7 +111,7 @@
           "managers": [
            {
             "manager": {
-             "felo_score": "589",
+             "felo_score": "579",
              "felo_tier": "bronze",
              "guid": "--hidden--",
              "image_url": "https://s.yimg.com/ag/images/default_user_profile_pic_64sq.jpg",
@@ -158,7 +158,7 @@
          },
          [],
          {
-          "number_of_moves": 1
+          "number_of_moves": 8
          },
          {
           "number_of_trades": 0
@@ -166,7 +166,7 @@
          {
           "roster_adds": {
            "coverage_type": "week",
-           "coverage_value": 2,
+           "coverage_value": 5,
            "value": "0"
           }
          },
@@ -192,10 +192,10 @@
           "managers": [
            {
             "manager": {
-             "felo_score": "683",
+             "felo_score": "649",
              "felo_tier": "silver",
              "guid": "--hidden--",
-             "image_url": "https://s.yimg.com/ag/images/default_user_profile_pic_64sq.jpg",
+             "image_url": "https://s.yimg.com/ag/images/pa_1cb54222_14fa5001-33f7-5f06-a209-9db19fe388a7_64sq.jpg",
              "manager_id": "2",
              "nickname": "Edward"
             }
@@ -215,7 +215,7 @@
           "team_id": "3"
          },
          {
-          "name": "Air Raid Gabriel"
+          "name": "JUUWWANNNNNNN JOHNNNNNNSONN"
          },
          {
           "is_owned_by_current_login": 1
@@ -228,7 +228,7 @@
            {
             "team_logo": {
              "size": "large",
-             "url": "https://s.yimg.com/ep/cx/blendr/v2/image-touchdown-signal-png_1721175309366.png"
+             "url": "https://yahoofantasysports-res.cloudinary.com/image/upload/t_s192sq/fantasy-logos/01231946a75963be946fd0ffc3b013a1e1a592d243c6efcf5534f26f97efc659.jpg"
             }
            }
           ]
@@ -236,20 +236,20 @@
          [],
          [],
          {
-          "waiver_priority": 9
+          "waiver_priority": 10
          },
          [],
          {
-          "number_of_moves": 13
+          "number_of_moves": 24
          },
          {
-          "number_of_trades": 0
+          "number_of_trades": "3"
          },
          {
           "roster_adds": {
            "coverage_type": "week",
-           "coverage_value": 2,
-           "value": "4"
+           "coverage_value": 5,
+           "value": "1"
           }
          },
          [],
@@ -274,7 +274,7 @@
           "managers": [
            {
             "manager": {
-             "felo_score": "640",
+             "felo_score": "606",
              "felo_tier": "silver",
              "guid": "--hidden--",
              "image_url": "https://s.yimg.com/ag/images/default_user_profile_pic_64sq.jpg",
@@ -298,7 +298,7 @@
           "team_id": "4"
          },
          {
-          "name": "Angle Lockers"
+          "name": "Angle Lockers (10-0-0)"
          },
          [],
          {
@@ -309,7 +309,7 @@
            {
             "team_logo": {
              "size": "large",
-             "url": "https://s.yimg.com/ep/cx/blendr/v2/image-dracula-png_1721173923779.png"
+             "url": "https://s.yimg.com/ep/cx/blendr/v2/image-n-png_1721173299150.png"
             }
            }
           ]
@@ -317,19 +317,19 @@
          [],
          [],
          {
-          "waiver_priority": 2
+          "waiver_priority": 9
          },
          [],
          {
-          "number_of_moves": 1
+          "number_of_moves": 8
          },
          {
-          "number_of_trades": 0
+          "number_of_trades": "1"
          },
          {
           "roster_adds": {
            "coverage_type": "week",
-           "coverage_value": 2,
+           "coverage_value": 5,
            "value": "0"
           }
          },
@@ -355,7 +355,7 @@
           "managers": [
            {
             "manager": {
-             "felo_score": "597",
+             "felo_score": "583",
              "felo_tier": "bronze",
              "guid": "--hidden--",
              "image_url": "https://s.yimg.com/ag/images/4461/38167518674_db17e8_64sq.jpg",
@@ -401,15 +401,15 @@
          },
          [],
          {
-          "number_of_moves": 0
+          "number_of_moves": 3
          },
          {
-          "number_of_trades": 0
+          "number_of_trades": "1"
          },
          {
           "roster_adds": {
            "coverage_type": "week",
-           "coverage_value": 2,
+           "coverage_value": 5,
            "value": "0"
           }
          },
@@ -435,8 +435,8 @@
           "managers": [
            {
             "manager": {
-             "felo_score": "588",
-             "felo_tier": "bronze",
+             "felo_score": "604",
+             "felo_tier": "silver",
              "guid": "--hidden--",
              "image_url": "https://s.yimg.com/ag/images/default_user_profile_pic_64sq.jpg",
              "manager_id": "5",
@@ -477,20 +477,20 @@
          [],
          [],
          {
-          "waiver_priority": 7
+          "waiver_priority": 8
          },
          [],
          {
-          "number_of_moves": 1
+          "number_of_moves": 10
          },
          {
-          "number_of_trades": 0
+          "number_of_trades": "3"
          },
          {
           "roster_adds": {
            "coverage_type": "week",
-           "coverage_value": 2,
-           "value": "1"
+           "coverage_value": 5,
+           "value": "0"
           }
          },
          [],
@@ -515,7 +515,7 @@
           "managers": [
            {
             "manager": {
-             "felo_score": "589",
+             "felo_score": "587",
              "felo_tier": "bronze",
              "guid": "--hidden--",
              "image_url": "https://s.yimg.com/ag/images/default_user_profile_pic_64sq.jpg",
@@ -557,20 +557,20 @@
          [],
          [],
          {
-          "waiver_priority": 10
+          "waiver_priority": 4
          },
          [],
          {
-          "number_of_moves": 8
+          "number_of_moves": 18
          },
          {
-          "number_of_trades": 0
+          "number_of_trades": "5"
          },
          {
           "roster_adds": {
            "coverage_type": "week",
-           "coverage_value": 2,
-           "value": "3"
+           "coverage_value": 5,
+           "value": "0"
           }
          },
          [],
@@ -595,8 +595,8 @@
           "managers": [
            {
             "manager": {
-             "felo_score": "577",
-             "felo_tier": "bronze",
+             "felo_score": "619",
+             "felo_tier": "silver",
              "guid": "--hidden--",
              "image_url": "https://s.yimg.com/ag/images/default_user_profile_pic_64sq.jpg",
              "is_commissioner": "1",
@@ -619,7 +619,7 @@
           "team_id": "8"
          },
          {
-          "name": "Kelvin's Frontline Precision"
+          "name": "Kelvin's Frontline Penetration"
          },
          [],
          {
@@ -638,20 +638,20 @@
          [],
          [],
          {
-          "waiver_priority": 4
+          "waiver_priority": 6
          },
          [],
          {
-          "number_of_moves": 7
+          "number_of_moves": 16
          },
          {
-          "number_of_trades": 0
+          "number_of_trades": "1"
          },
          {
           "roster_adds": {
            "coverage_type": "week",
-           "coverage_value": 2,
-           "value": "2"
+           "coverage_value": 5,
+           "value": "0"
           }
          },
          [],
@@ -718,11 +718,11 @@
          [],
          [],
          {
-          "waiver_priority": 8
+          "waiver_priority": 7
          },
          [],
          {
-          "number_of_moves": 2
+          "number_of_moves": 7
          },
          {
           "number_of_trades": 0
@@ -730,8 +730,8 @@
          {
           "roster_adds": {
            "coverage_type": "week",
-           "coverage_value": 2,
-           "value": "1"
+           "coverage_value": 5,
+           "value": "0"
           }
          },
          [],
@@ -756,8 +756,8 @@
           "managers": [
            {
             "manager": {
-             "felo_score": "590",
-             "felo_tier": "bronze",
+             "felo_score": "603",
+             "felo_tier": "silver",
              "guid": "--hidden--",
              "image_url": "https://s.yimg.com/ag/images/default_user_profile_pic_64sq.jpg",
              "manager_id": "9",
@@ -798,19 +798,19 @@
          [],
          [],
          {
-          "waiver_priority": 5
+          "waiver_priority": 2
          },
          [],
          {
-          "number_of_moves": 1
+          "number_of_moves": 2
          },
          {
-          "number_of_trades": 0
+          "number_of_trades": "1"
          },
          {
           "roster_adds": {
            "coverage_type": "week",
-           "coverage_value": 2,
+           "coverage_value": 5,
            "value": "0"
           }
          },
@@ -836,7 +836,7 @@
           "managers": [
            {
             "manager": {
-             "felo_score": "589",
+             "felo_score": "595",
              "felo_tier": "bronze",
              "guid": "--hidden--",
              "image_url": "https://s.yimg.com/ag/images/default_user_profile_pic_64sq.jpg",
@@ -854,7 +854,7 @@
     }
    ],
    "refresh_rate": "30",
-   "time": "81.258058547974ms",
+   "time": "69.747924804688ms",
    "xml:lang": "en-US",
    "yahoo:uri": "/fantasy/v2/league/nfl.l.49649/teams"
   }
