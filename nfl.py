@@ -174,7 +174,8 @@ def cmd_props(a) -> int:
             print("props game needs AWAY@HOME", file=sys.stderr)
             return 2
         away, home = a.game.split("@", 1)
-        cmd = [sys.executable, str(SCRIPTS / "score_game.py"), "--away", away, "--home", home]
+        # a chat game run asks for the result-scenario prices (2 Odds API credits; DECISIONS #220)
+        cmd = [sys.executable, str(SCRIPTS / "score_game.py"), "--away", away, "--home", home, "--scenario-prices"]
     else:
         cmd = [sys.executable, str(SCRIPTS / "score_week.py")]
         if a.skip_started:

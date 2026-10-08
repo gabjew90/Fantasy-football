@@ -8382,3 +8382,88 @@ every row while the predictions rows carry open / decision / close (line_archive
   external PDF waits for a PDF library decision.
 - **Tested on TNF (TB@DAL):** a v2 read of Prescott, Lamb and Williams passes 33 of 33. The
   checker refused "leans" twice in my own drafts, and they were rephrased.
+
+## 2026-10-08 (219) -- the external PDF
+
+- **What:** `publish_pdf.py` typesets `publish_render.render_external`. That is the guide's
+  structure from the same run and reads as the QA version, without the backend, the checks, the
+  model names, the decision numbers or the release internals. The PDF holds exactly the checked
+  Markdown's words and numbers; the module only lays them out.
+- **Library:** reportlab 4.2.5 (the user approved the install), in requirements.txt. Fonts: the
+  Bitstream Vera family bundled with reportlab, embedded, so the page is the same on any machine.
+  Vera has no arrow, so `->` is written out ("10.7 targets (8.0 catches)", "...: 67%").
+- **Where it runs:** `publish` writes `<slug>.pdf` beside the QA and agent versions. Without
+  reportlab it prints `PDF skipped` and still writes the other two. The PDF tests live in tests/
+  (the root suite installs requirements.txt), because props/tests runs before every capture and
+  must not depend on reportlab.
+## 2026-10-08 (220) -- the full report: market-priced scenarios, the line against the middle, rushing vs combined, every player
+
+- **The user's asks** (TNF review), each diagnosed first:
+  - **Missing scenario likelihoods.** The cause was the failed margin model (#218): its fit
+    window held 2021, the loosest season in the decade, so it under-called close games (a weak
+    modelling rule, not code).
+  - **The market's chance always ~50%.** On Sleeper, 84% of TNF's 31 lines priced 45-55%.
+    Sleeper moves the line, not the price, so the market's view is the line itself (a property of
+    the source).
+  - **Combined yards never discussed.** The guide asked for that comparison and only receptions
+    vs yards was built (a render gap).
+  - **Only three players.** My test sample covered three; the report showed only players with a
+    written read (a coverage gap).
+- **Scenarios from market prices** (the user's pick over a model v1):
+  `research.alt_spread_scenarios` reads DraftKings' alternate spreads together with its main line.
+  The main line is absent from the alternates: on TNF, DAL -8.5 sat only under `spreads`, and the
+  first pull found no pair. The favourite is DAL -8.5 against TB +8.5, the underdog TB -8.5
+  against DAL +8.5, margin removed; within one score is the rest.
+  - TNF: DAL by 9+ 52%, within one score 39%, TB by 9+ 9%. Consistent with the moneyline's 80%
+    Dallas win.
+  - Cost: `--scenario-prices`, two credits. `nfl.py props game` asks for it; the scheduled
+    captures never do, and it is skipped under COMPARE_QUOTA_MIN.
+  - Market data, not a model: nothing to register. margin_buckets_v0 stays failed; its status is
+    the fallback note.
+- **The line against the middle:** Table A gains the engine's middle and its gap to the line. The
+  closing paragraph says where the market sets the line and how it is priced, instead of "the
+  market favors neither side".
+- **Rushing vs combined** on every back's card:
+  - both lines, the engine's middles and chances;
+  - the combined line minus the sum of its parts' lines, against the same gap in the engine's
+    middles (yards come in bursts, so a sum's middle runs higher). TNF Williams: +6.5 vs +4.3.
+  - his receiving role, last game against before;
+  - the rule: combined fits when its line is no higher than its parts justify, his receiving role
+    is showing, and the script is uncertain. The engine draws rushing and receiving
+    independently, so the script hedge is judgment, not in the numbers.
+- **Every priced player:** a written read's full card, or a data card (tables and computed
+  verdicts, marked "no written read"). The QA version counts coverage; CHAT.md asks for reads on
+  every player the user is likely to consider.
+## 2026-10-08 (221) -- the customer version's layout and editorial style
+
+- **The user's rules** (props/engine/resources/customer_style.md):
+  - the guide's layout;
+  - generous whitespace;
+  - compact tables with explanations beneath;
+  - 2-4 sentence paragraphs;
+  - bold only the decisive takeaway;
+  - purposeful, concrete football prose;
+  - technical terms explained once;
+  - conditional, direct recommendations;
+  - narration in the order requires -> engine expects -> matchup -> choose;
+  - an edit pass before delivery.
+- **Render** (customer version only; the QA version keeps its detail):
+  - one shared "How to read the player cards" note replaces the per-card footnotes;
+  - compact table labels and short verdict labels;
+  - the combined column moves from Table B into the rushing-vs-combined table, which gains the
+    verdict;
+  - the card closes in the user's order, then the branches;
+  - bold only on the requirement, the chosen market and its failure condition, with the failure
+    condition attached to the chosen leg (it had landed on the alternative);
+  - branch arithmetic that multiplies out as shown;
+  - plain market, unit and weather notes, and the guide's "Updated:" header line;
+  - wider spacing in the PDF.
+- **Checks:** no prose field over four sentences; vague matchup phrases ("favorable matchup",
+  "smash spot") refused; at most one bold phrase per paragraph.
+- **Found in the edit pass:** my own explanations repeated the generated close and the matchup
+  sentence, and the section narrations restated their tables. They were rewritten to state
+  conclusions.
+- **Also found:** odds_client's response cache sat inside the engine folder, so a run that reached
+  The Odds API changed the hash of the engine that ran. `cache` is now excluded from the hash (a
+  latent bug: it would have cost the record its release tag whenever a capture fell back to The
+  Odds API).

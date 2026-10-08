@@ -3,3 +3,5 @@
 .cache/
 __pycache__/
 *.pyc
+# odds_client's response cache (written inside the engine by runs that reach The Odds API)
+engine/scripts/cache/

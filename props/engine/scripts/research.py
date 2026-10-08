@@ -898,6 +898,47 @@ def espn_odds_extra(o) -> dict:
     return out
 
 
+def alt_spread_scenarios(bookmakers, home_name, away_name, home_spread, cut=9, book="draftkings") -> dict:
+    """The result scenarios from a book's alternate spreads (DECISIONS #220): the favourite by
+    `cut`+ points is the favourite at -(cut - 0.5) against the underdog at +(cut - 0.5), margin
+    removed; the underdog by `cut`+ is the underdog at -(cut - 0.5) against the favourite at
+    +(cut - 0.5); within one score is the rest. No model: the market's own prices. Returns
+    {status, ...}; status 'ok' or the reason it is missing (never a guessed number)."""
+    pt = cut - 0.5
+    if home_spread is None:
+        return {"status": "no spread to name the favourite"}
+    fav, dog = (home_name, away_name) if home_spread <= 0 else (away_name, home_name)
+    bk = next((b for b in bookmakers or [] if b.get("key") == book), None)
+    # the book lists its MAIN line under 'spreads' and leaves it out of 'alternate_spreads', so the
+    # two are read together (TB at DAL, 2026-10-08: DAL -8.5 was the main line, absent from the alternates)
+    mks = [m for m in (bk or {}).get("markets") or [] if m.get("key") in ("spreads", "alternate_spreads")]
+    if not any(m.get("key") == "alternate_spreads" for m in mks):
+        return {"status": f"{book} posted no alternate spreads for this game"}
+    mk = {"last_update": max((m.get("last_update") or "") for m in mks)}
+    price = {(o.get("name"), float(o.get("point"))): o.get("price") for m in mks for o in m.get("outcomes") or []
+             if o.get("point") is not None and o.get("price") is not None}
+
+    def pair(a_team, a_point, b_team, b_point):
+        a, b = price.get((a_team, a_point)), price.get((b_team, b_point))
+        if a is None or b is None:
+            return None, (a, b)
+        pa, pb = american_to_prob(a), american_to_prob(b)
+        return (pa / (pa + pb) if pa is not None and pb is not None and pa + pb > 0 else None), (a, b)
+    p_fav, pr_fav = pair(fav, -pt, dog, pt)
+    p_dog, pr_dog = pair(dog, -pt, fav, pt)
+    if p_fav is None or p_dog is None:
+        return {"status": f"{book} has no two-sided {pt:g}-point alternate line for both teams"}
+    within = 1 - p_fav - p_dog
+    if within < 0:
+        return {"status": "the alternate lines' chances add to more than 100%; not shown"}
+    return {"status": "ok", "book": book, "favourite": fav, "underdog": dog, "pickem": home_spread == 0,
+            "cut": cut, "point": pt,
+            "favourite_by_cut": p_fav, "within_one_score": within, "underdog_by_cut": p_dog,
+            "prices": {"favourite": {"minus": pr_fav[0], "plus_other": pr_fav[1]},
+                       "underdog": {"minus": pr_dog[0], "plus_other": pr_dog[1]}},
+            "last_update": mk.get("last_update")}
+
+
 def unit_export(ue, teams) -> dict:
     """Section 3 as data: each team's passing and rushing offense and defense -- score (50 = league
     average, higher better for both sides), grade, and league rank (1 = the best unit)."""

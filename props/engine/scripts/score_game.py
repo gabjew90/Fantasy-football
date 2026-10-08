@@ -291,9 +291,10 @@ def espn_scoreboard_url(season, week):
             f"?seasontype=2&week={int(week)}&dates={int(season)}")
 
 
-def run_odds(stage, args_list):
+def run_odds(stage, args_list, reuse_s=None):
     cmd = [sys.executable, str(HERE / "odds_client.py"), stage] + args_list
-    r = subprocess.run(cmd, capture_output=True, text=True, cwd=str(HERE))
+    env = dict(os.environ, ODDS_REUSE_CACHE_MAX_AGE=str(int(reuse_s))) if reuse_s else None
+    r = subprocess.run(cmd, capture_output=True, text=True, cwd=str(HERE), env=env)
     if r.returncode != 0 and not r.stdout.strip():
         raise RuntimeError(f"odds_client {stage} failed: {r.stderr[:400]}")
     try:
@@ -513,6 +514,11 @@ def main():
                     help="price source: Sleeper Picks (default; no key, no quota, pick'em multipliers converted to American) "
                          "or The Odds API (DK/FD, 8 credits a run). Whichever is not chosen is the automatic fallback. "
                          f"A TD-only run (--markets td) defaults to The Odds API when the cached quota shows {TD_QUOTA_MIN}+ credits.")
+    ap.add_argument("--scenario-prices", action="store_true",
+                    help="the report's result scenarios from DraftKings' alternate spreads via The Odds API "
+                         "(2 credits: the main line and the alternates; skipped when no key or fewer than "
+                         "COMPARE_QUOTA_MIN credits remain). "
+                         "Opt-in: the scheduled captures never spend it (DECISIONS #220)")
     ap.add_argument("--compare-books", action="store_true",
                     help="beside Sleeper, pull DraftKings and FanDuel player lines from The Odds API for this game "
                          "(~4 credits; skipped when no key or fewer than COMPARE_QUOTA_MIN credits remain)")
@@ -1646,6 +1652,49 @@ def main():
                                 f"{(od.get('quota') or {}).get('x-requests-remaining')} credits left"))
             except Exception as ex:  # noqa: BLE001 -- a comparison must never cost the run
                 SOURCES.append((*_src, "unavailable", f"{type(ex).__name__}: {str(ex)[:120]}"))
+
+    # ---------- 7a3. the result scenarios from alternate spreads (--scenario-prices, DECISIONS #220) ----------
+    # The report guide's scenario likelihoods are the market's own: DraftKings' alternate spreads at
+    # the comfortable-margin cut, margin removed. Opt-in, two credits, never the last ones; any failure
+    # is a sources note and the table says why it is empty.
+    SCEN_MKT = {"status": "not requested this run (props game asks for it; scheduled captures do not)"}
+    if SNAP is None and not a.no_odds and a.scenario_prices:
+        _src = ("Result scenarios (DraftKings alternate spreads, The Odds API)", "the report's result-scenario likelihoods")
+        _q = last_oddsapi_quota()
+        try:
+            _cut = int(json.loads((RES / "margin_settings.json").read_text(encoding="utf-8"))["comfortable_margin"])
+        except Exception:  # noqa: BLE001 -- the setting file ships with the engine
+            _cut = 9
+        if market_env is None or market_env.get("home_spread") is None:
+            SCEN_MKT = {"status": "no spread this run to name the favourite"}
+        elif _q is not None and _q < COMPARE_QUOTA_MIN:
+            SCEN_MKT = {"status": f"skipped: {_q} credits left; needs {COMPARE_QUOTA_MIN}+"}
+        else:
+            try:
+                home_name, away_name = TEAM_NAMES.get(HOME), TEAM_NAMES.get(AWAY)
+                ev = run_odds("events", ["--home", home_name, "--away", away_name,
+                                         "--key-file", str(RES / "credential.env")])
+                evs = [e for e in ev.get("events", []) if e["home_team"] == home_name and e["away_team"] == away_name]
+                if len(evs) != 1:
+                    raise RuntimeError(f"{len(evs)} matching events")
+                eid3 = evs[0]["id"]
+                od = run_odds("odds", [eid3, "--key-file", str(RES / "credential.env"),
+                                       "--markets", "spreads,alternate_spreads", "--books", "draftkings"], reuse_s=900)
+                cf = ([HERE / "cache" / od["reused_cache"]] if od.get("reused_cache") else
+                      sorted((HERE / "cache").glob(f"odds_{eid3}_*.json"), key=lambda f: f.stat().st_mtime))
+                if od.get("class") != "OK" or not cf:
+                    raise RuntimeError(f"the Odds API request failed ({od.get('class') or 'no response'})")
+                books = json.load(open(cf[-1]))["data"].get("bookmakers", [])
+                SCEN_MKT = RSCH.alt_spread_scenarios(books, home_name, away_name, market_env["home_spread"], _cut)
+                SCEN_MKT["as_of"] = od.get("retrieved_at_utc")
+                SCEN_MKT["credits_left"] = (od.get("quota") or {}).get("x-requests-remaining")
+            except Exception as ex:  # noqa: BLE001 -- a scenario price must never cost the run
+                SCEN_MKT = {"status": f"unavailable: {type(ex).__name__}: {str(ex)[:120]}"}
+        SOURCES.append((*_src, "ok" if SCEN_MKT.get("status") == "ok" else "unavailable",
+                        SCEN_MKT.get("status") if SCEN_MKT.get("status") != "ok" else
+                        f"favourite by {_cut}+ {100 * SCEN_MKT['favourite_by_cut']:.0f}%, within one score "
+                        f"{100 * SCEN_MKT['within_one_score']:.0f}%, underdog by {_cut}+ {100 * SCEN_MKT['underdog_by_cut']:.0f}%; "
+                        f"{SCEN_MKT.get('credits_left')} credits left"))
 
     if SNAP is None and not a.no_odds and not a.lines_file and (a.source == "oddsapi" or oddsapi_is_fallback):
         home_name, away_name = TEAM_NAMES.get(HOME), TEAM_NAMES.get(AWAY)
@@ -2899,7 +2948,7 @@ def main():
                 "matchup": RSCH.matchup_sentence(PA, HOME if t == AWAY else AWAY, m.pos), "watch": watch}
 
     # the run as data (run_<slug>.json): what the cards and the brief show, for publish.py
-    RUN_EXPORT = {"cards": []}
+    RUN_EXPORT = {"cards": [], "scenarios_market": SCEN_MKT}
     L.append("\n".join(RSCH.card_guide()) + "\n")
     # the live record and the backtest calibration, once (they were the same on every card)
     _cal = RSCH.calibration_block(set(RESEARCH.market) if len(RESEARCH) else set(),

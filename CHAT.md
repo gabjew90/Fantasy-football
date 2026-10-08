@@ -330,9 +330,30 @@ matchup brief, then Passing, Receiving, and Rushing and combined yards.
    - every number the prose states, cited by its field;
    - every injured player the prose names.
 
-   Each player appears once, in his main market's section. The verdict words (attainable,
-   requires a rebound, requires better gains) are computed, never chosen. The legs are
-   conditional reads, never picks.
+   Each player appears once, in his main market's section. Every priced player gets a card: a
+   player without a written read gets his data card (tables and computed verdicts, marked "no
+   written read"), and the QA version counts the coverage. Write a read for every player the user
+   is likely to consider, not only a few. The verdict words (attainable, requires a rebound,
+   requires better gains, requires more work than the engine expects) are computed, never chosen.
+   The legs are conditional reads, never picks.
+
+   The customer version (the PDF) follows `props/engine/resources/customer_style.md`, the user's
+   layout and editorial rules:
+   - 2-4 sentence paragraphs, each drawing a conclusion rather than restating a table;
+   - concrete football reasons (opponents, involvement, injuries), never "favorable matchup";
+   - at most one bold phrase per paragraph;
+   - an explanation that adds what the generated close does not already say (the close states
+     the requirement, the engine's workload and the matchup).
+
+   The checker refuses the parts a machine can see. Before delivering, read the whole report
+   once for repetition, density and jargon.
+
+   On Sleeper the market's chance sits near 50% on most lines, because Sleeper moves the line, not
+   the price. The market's view is the line itself: read it against the engine's middle (Table A
+   shows the gap). For a back, the card's rushing-vs-combined table says whether the combined line
+   is set fairly against its parts. The result scenarios are the market's own (DraftKings'
+   alternate spreads, two Odds API credits per `props game`); when they are missing, the table
+   says why.
 3. Run `nfl.py props publish AWAY@HOME --reads $NFL_OUT/reads_AWAY_HOME.json`. It checks the reads
    against the run before it renders anything. When it prints `FAIL` lines (exit 3), fix the read
    and run it again. Never bend a number to pass: a failure means the prose said something the run
@@ -340,7 +361,10 @@ matchup brief, then Passing, Receiving, and Rushing and combined yards.
 4. When every check passes, it writes `<slug>_qa.md` and `<slug>_agent.md` in `$NFL_OUT`.
    - **The QA/QC version** is for the user and internal reviewers. Give it in the reply, in full.
    - **The agent version** is for another LLM agent. Attach it when asked.
-   - **The external PDF** is not built yet: it waits for the user's format guide. Say so if asked.
+   - **The external PDF** (`<slug>.pdf`) is the same read for an outside reader, with no backend,
+     checks or internals. Attach it when the user asks for the report or the PDF. If publish prints
+     `PDF skipped` (reportlab missing), run `python -m pip install -q --break-system-packages
+     reportlab==4.2.5` once, silently, and publish again.
 5. The checks are arithmetic and sourcing only. Whether a condition is plausible is judgment, and
    the QA version leaves it to the reviewer.
 

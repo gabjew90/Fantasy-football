@@ -62,6 +62,9 @@ def test_the_credential_and_the_caches_are_not_the_engine(tmp_path):
     (base / "scripts/__pycache__/model.cpython-311.pyc").write_bytes(b"\x00\x01")
     (base / "scripts/backtest_out").mkdir(parents=True, exist_ok=True)
     (base / "scripts/backtest_out/_frames_2025.pkl").write_bytes(b"\x80\x04")
+    # odds_client's response cache, written inside scripts/ by any run that reaches The Odds API
+    (base / "scripts/cache").mkdir(parents=True, exist_ok=True)
+    (base / "scripts/cache/odds_abc_1791499890.json").write_text('{"class": "OK"}', encoding="utf-8")
     assert ev.tree_hash(base) == before
 
 

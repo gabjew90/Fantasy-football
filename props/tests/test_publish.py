@@ -295,7 +295,7 @@ def test_qa_version_follows_the_guide_and_shows_every_check():
     assert "not estimated" in qa and "log loss 0.717 against 0.692" in qa
     assert "| Verdict | attainable | attainable |" in qa
     assert "Engine chance he makes the required catches | 63% | 63%‡" in qa
-    assert "**The market favors neither side** (50% for the Over)" in qa
+    assert "**The market sets the line at 6.5, priced near even** (50% for the Over); the engine's middle is 8.0 (+1.5)." in qa
     assert "- **If you expect 9 targets at 79%, then receptions over 6.5 fits**, because 9 x 0.787 = 7.1" in qa
     assert "- **If his share falls back, skip it" in qa
     assert f"{len(checks)} of {len(checks)} pass" in qa
@@ -346,10 +346,10 @@ def test_main_renders_nothing_when_a_check_fails(tmp_path):
     leg0(bad)["fails"] = "he saw 12 targets"
     run_p, reads_p = _files(tmp_path, reads=bad)
     out = tmp_path / "out"
-    assert P.main(["--run", str(run_p), "--reads", str(reads_p), "--out", str(out), "--no-ci"]) == 3
+    assert P.main(["--run", str(run_p), "--reads", str(reads_p), "--out", str(out), "--no-ci", "--which", "qa,agent"]) == 3
     assert not out.exists() or not list(out.iterdir())
     run_p, reads_p = _files(tmp_path)
-    assert P.main(["--run", str(run_p), "--reads", str(reads_p), "--out", str(out), "--no-ci"]) == 0
+    assert P.main(["--run", str(run_p), "--reads", str(reads_p), "--out", str(out), "--no-ci", "--which", "qa,agent"]) == 0
     assert sorted(p.name for p in out.iterdir()) == ["2026_wk05_TB_DAL_agent.md", "2026_wk05_TB_DAL_qa.md"]
 
 
@@ -366,7 +366,7 @@ def test_key_shaped_strings_are_scrubbed_from_what_is_written(tmp_path):
                            "detail": "URLError: /v4/sports?apiKey=0123456789abcdef0123456789abcdef&regions=us"})
     run_p, reads_p = _files(tmp_path, run=run)
     out = tmp_path / "o"
-    assert P.main(["--run", str(run_p), "--reads", str(reads_p), "--out", str(out), "--no-ci",
+    assert P.main(["--run", str(run_p), "--reads", str(reads_p), "--out", str(out), "--no-ci", "--which", "qa,agent",
                    "--release-hash", "ab" * 32]) == 0
     for f in out.iterdir():
         txt = f.read_text(encoding="utf-8")
@@ -434,3 +434,146 @@ def test_the_unit_footnote_states_the_runs_own_filter():
     t = "\n".join(PR.unit_table({**RUN, "unit_filter": "win probability 5-95%"}))
     assert "win probability 5-95%" in t
     assert "not recorded" in "\n".join(PR.unit_table(RUN))
+
+
+def test_the_external_version_carries_no_internals():
+    reads = good()
+    ext = PR.render_external(RUN, reads)
+    for w in ("DECISIONS", "PROTOTYPE", "MODEL_", "Checks", "Backend", "QA appendix", "release", "slug", "gsis"):
+        assert w not in ext, w
+    assert "## Receiving" in ext and "## A note on reliability" in ext and "Data as of:" in ext
+    assert "| Verdict | Attainable | Attainable |" in ext
+
+
+# ---- the full report (the user, 2026-10-08): market scenarios, the line vs the middle, combined, coverage ----
+ALT = [{"key": "draftkings", "markets": [
+    {"key": "spreads", "last_update": "t1", "outcomes": [{"name": "Dallas Cowboys", "point": -8.5, "price": -120},
+                                                         {"name": "Tampa Bay Buccaneers", "point": 8.5, "price": 100}]},
+    {"key": "alternate_spreads", "last_update": "t2", "outcomes": [
+        {"name": "Tampa Bay Buccaneers", "point": -8.5, "price": 970}, {"name": "Dallas Cowboys", "point": 8.5, "price": -4200},
+        {"name": "Dallas Cowboys", "point": -9.5, "price": -110}]}]}]
+
+
+def test_alt_spread_scenarios_read_the_main_line_and_the_alternates_together():
+    import research as RS
+    sm = RS.alt_spread_scenarios(ALT, "Dallas Cowboys", "Tampa Bay Buccaneers", -8.5, 9)
+    assert sm["status"] == "ok" and sm["favourite"] == "Dallas Cowboys"
+    assert sm["favourite_by_cut"] == pytest.approx(0.5217, abs=1e-3)
+    assert sm["underdog_by_cut"] == pytest.approx(0.0873, abs=1e-3)
+    assert sm["within_one_score"] == pytest.approx(1 - 0.5217 - 0.0873, abs=1e-3)
+    # without the main line (the alternates alone omit it) the pair is missing, and it says so
+    alts_only = [{"key": "draftkings", "markets": [ALT[0]["markets"][1]]}]
+    assert "no two-sided 8.5-point" in RS.alt_spread_scenarios(alts_only, "Dallas Cowboys", "Tampa Bay Buccaneers", -8.5)["status"]
+    assert "no alternate spreads" in RS.alt_spread_scenarios([], "Dallas Cowboys", "Tampa Bay Buccaneers", -8.5)["status"]
+
+
+def test_the_scenario_table_shows_the_markets_likelihoods_or_why_not():
+    import research as RS
+    run = {**RUN, "scenarios_market": {**RS.alt_spread_scenarios(ALT, "Dallas Cowboys", "Tampa Bay Buccaneers", -8.5, 9),
+                                       "as_of": "2026-10-08T22:52:27Z", "credits_left": "437"}}
+    t = "\n".join(PR.scenario_table(run, detail=True))
+    assert "| DAL (favorite) wins by 9+ points | 52% |" in t and "| TB (underdog) wins by 9+ points | 9% |" in t
+    assert "| Final margin stays within one score | 39% |" in t and "not a model" in t and "credits left" in t
+    short = "\n".join(PR.scenario_table(run))
+    assert "the market's own estimate" in short and "credits" not in short and "-4200" not in short
+    missing = "\n".join(PR.scenario_table({**RUN, "scenarios_market": {"status": "skipped: 40 credits left; needs 100+"}}))
+    assert "not estimated" in missing and "skipped: 40 credits left" in missing
+    # the narration may quote the market's scenario numbers
+    r = edit(lambda r: r.update(market_read=r["market_read"] + " The market gives Dallas a 52% chance of winning by 9+."))
+    assert not [c for c in fails(r, run) if c["leg"] == 0]
+
+
+def test_table_a_shows_the_line_against_the_engines_middle():
+    t = "\n".join(PR.table_a(LAMB))
+    assert "| Receptions | 6.5 · -127 / -130 | 8.0 (+1.5) | 50% | 63% |" in t and "moves the line instead" in t
+
+
+def test_rushing_vs_combined_reads_the_lines_against_their_parts():
+    card = {"name": "Javonte Williams", "usage": {"tn": 5.0, "tn_base": 4.0}, "book": "sleeper", "rows": [
+        {"market": "player_rush_yds", "line": 65.5, "book": "sleeper", "median": 59.3, "p_over_model": 0.43, "p_over_book": 0.50},
+        {"market": "player_reception_yds", "line": 14.5, "book": "sleeper", "median": 13.5, "p_over_model": 0.47, "p_over_book": 0.50},
+        {"market": "player_rush_reception_yds", "line": 86.5, "book": "sleeper", "median": 76.7, "p_over_model": 0.40,
+         "p_over_book": 0.51}], "volume": []}
+    t = "\n".join(PR.rushing_vs_combined(card))
+    assert "| Combined line minus rushing + receiving lines (65.5 + 14.5) | | +6.5 |" in t
+    assert "| +3.9 |" in t and "set 2.6 yards above what its parts justify" in t
+    assert "5 targets last game against 4.0 a game before" in t and "independently" in t
+    assert PR.rushing_vs_combined(LAMB) == []
+
+
+def test_every_priced_player_gets_a_card_and_the_qa_counts_coverage():
+    other = copy.deepcopy(LAMB)
+    other["name"], other["slot"] = "George Pickens", "WR2"
+    run = {**RUN, "cards": [LAMB, other]}
+    reads = good()
+    qa = PR.render_qa(run, reads, P.check(run, reads), {})
+    ext = PR.render_external(run, reads)
+    for doc in (qa, ext):
+        assert "### George Pickens · WR2, DAL" in doc and "### CeeDee Lamb · WR1, DAL" in doc
+    assert "No written read for this player" in qa and "No written read for this player" not in ext
+    assert ext.count("## How to read the player cards") == 1 and "Cards without a closing paragraph" in ext
+    assert "**Coverage:** 1 of 2 priced players have a written read; data cards only: George Pickens." in qa
+
+
+# ---- the customer version's style (the user, 2026-10-08) ----
+def test_style_checks_refuse_long_paragraphs_vague_matchups_and_heavy_bold():
+    long = edit(lambda r: r["players"][0].update(explanation="One. Two. Three. Four. Five."))
+    assert any(c["check"] == "style" and "5 sentences" in c["stated"] for c in fails(long))
+    vague = edit(lambda r: r["players"][0].update(explanation="This is a favorable matchup for him."))
+    assert any(c["check"] == "style" and "favorable matchup" in c["stated"] for c in fails(vague))
+    bold = edit(lambda r: r["players"][0].update(explanation="**One** thing and **another**."))
+    assert any(c["check"] == "style" and "bold" in c["stated"] for c in fails(bold))
+    assert not [c for c in fails(good()) if c["check"] == "style"]
+
+
+def test_the_customer_card_follows_requires_expects_matchup_then_choose():
+    reads = good()
+    ext = PR.render_external(RUN, reads)
+    i_req = ext.index("Receptions 6.5 needs **9 targets at this season's gains**, so it is attainable.")
+    i_exp = ext.index("The engine expects 10.7 targets, based on last game's 21 targets.")
+    i_mat = ext.index("The matchup supports it: Tampa is without its starting safety.")
+    i_choose = ext.index("- If you expect 9 targets at 79%, **receptions over 6.5** fits")
+    assert i_req < i_exp < i_mat < i_choose
+    assert "fits: about 7.1 catches, past the 7 the Over needs. It stops fitting if **his share falls back toward 26%, under the market-implied 9.2 targets**." in ext
+    # compact tables, explanations shared once, not under every card
+    assert "| Prop | Line (O/U) | Engine middle | Market Over | Engine Over |" in ext
+    assert "| Trimmed gains |" in ext or "| This season |" in ext
+    assert "Each cell: the workload" not in ext and "Sleeper prices most lines near even and moves" not in ext
+    assert "%% Updated: markets 20:42 UTC" in ext
+
+
+# ---- the review of the full report (2026-10-08) ----
+def test_only_a_chat_game_run_spends_credits_on_scenario_prices():
+    root = Path(__file__).resolve().parents[2]
+    sg = (root / "props/engine/scripts/score_game.py").read_text(encoding="utf-8")
+    assert "if SNAP is None and not a.no_odds and a.scenario_prices:" in sg       # opt-in, never a what-if re-run
+    for f in ("props/engine/scripts/score_week.py", ".github/workflows/props.yml"):
+        assert "scenario-prices" not in (root / f).read_text(encoding="utf-8"), f
+    assert "--scenario-prices" in (root / "nfl.py").read_text(encoding="utf-8")
+
+
+def test_a_pickem_has_no_favorite_label():
+    import research as RS
+    alt = copy.deepcopy(ALT)
+    sm = RS.alt_spread_scenarios(alt, "Dallas Cowboys", "Tampa Bay Buccaneers", 0.0, 9)
+    t = "\n".join(PR.scenario_table({**RUN, "market_env": {**RUN["market_env"], "home_spread": 0.0},
+                                     "scenarios_market": sm}))
+    assert "favorite" not in t and "underdog" not in t and "| DAL wins by 9+ points |" in t
+
+
+def test_a_near_miss_is_never_rounded_onto_the_need():
+    lg = {"market": "pass yds", "side": "under", "line": 270.5, "if": "x", "fails": "y", "else": "z",
+          "needs": [{"volume": 24, "rate": 11.27, "reaches": False}]}
+    t = "\n".join(PR.branches(lg, {"volume": [{"market": "player_pass_yds", "cells": {"unit": "completions"}}]},
+                              compact=True))
+    assert "about 270.5 yards, short of the 271" in t
+
+
+def test_the_needs_row_says_when_it_is_the_season_rate():
+    card = {"name": "B", "usage": {}, "book": "sleeper", "rows": [
+        {"market": "player_rush_yds", "line": 40.5, "book": "sleeper", "median": 40.0},
+        {"market": "player_rush_reception_yds", "line": 50.5, "book": "sleeper", "median": 52.0}],
+        "volume": [{"market": "player_rush_yds", "line": 40.5, "cells": {"unit": "carries", "proj": 10.0, "rows": {
+            "season": {"vol": 11, "vol_txt": "11 carries", "rate": 3.8, "rate_txt": "3.8", "pct": 0.4}}}}]}
+    t = "\n".join(PR.rushing_vs_combined(card, compact=True))
+    assert "11 carries (this season's gains)" in t
