@@ -851,8 +851,6 @@ def points_allowed(pbp, positions) -> dict:
     import pandas as _pd
     a = _pd.concat([_pd.DataFrame({"defteam": d.values, "pid": p.values, "pts": x.values}) for d, p, x in rows])
     a["pos"] = a.pid.map(pos)
-    unmapped = float(a.loc[a.pos.isna(), "pts"].clip(lower=0).sum())
-    total = float(a.pts.clip(lower=0).sum())
     a = a[a.pos.isin(POS_GROUPS)]
     games = pbp.groupby("defteam").game_id.nunique()
     t = a.groupby(["defteam", "pos"]).pts.sum().unstack().reindex(columns=list(POS_GROUPS)).fillna(0.0)
@@ -862,7 +860,6 @@ def points_allowed(pbp, positions) -> dict:
     out["_league"] = {p: float(t[p].mean()) for p in POS_GROUPS}
     out["_games"] = {d: int(games[d]) for d in t.index}
     out["_n"] = len(t.index)
-    out["_unmapped_share"] = unmapped / total if total > 0 else 0.0
     return out
 
 

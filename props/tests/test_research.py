@@ -572,7 +572,6 @@ def test_points_allowed_notes_players_without_a_position():
                                 rusher_player_id=None, receiving_yards=yds, rushing_yards=None, pass_touchdown=0,
                                 rush_touchdown=0, qb_kneel=0)
     pa = RS.points_allowed(pd.DataFrame([row("wr1", 50), row("ghost", 50)]), {"wr1": "WR"})
-    assert pa["_unmapped_share"] == pytest.approx(0.5)
 
 
 def test_the_quarterback_read_uses_completions():

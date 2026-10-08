@@ -357,8 +357,10 @@ def reversal_sections(df: pd.DataFrame) -> list[str]:
 
 def shadow_section(df: pd.DataFrame, col: str, markets, title: str, reps: int = 2000, seed: int = 29,
                    few: str = "settled lines carry the shadow") -> list[str]:
-    """DECISIONS #185: the board's rushing-yards Over probability against the market-
-    carries shadow's, on settled backs' rushing lines. Scored like every comparison on the
+    """The board's Over probability against a shadow price in column `col`, on settled lines
+    of `markets` -- today the week-8 reversal shadows (DECISIONS #204; the #185 market-carries
+    shadow it was written for shipped and its columns were dropped, #211). Scored like every
+    comparison on the
     scoreboard (reports/scoreboard.md): log loss first, Brier beside it (both lower is
     better; chances clipped to 0.5-99.5% as the scoreboard does), each with a 95% interval
     on the difference resampling whole games. The board's number stays the price until
