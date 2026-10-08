@@ -347,15 +347,25 @@ def to_clear(line) -> int:
 YPC_BAND = 1.0
 YPC_MIN_CATCHES = 8
 # THE LUCK LINE for the achievability gauge (user's design, 2026-10-05; DECISIONS #167):
-# a play past the player's OWN 97.5th percentile for that prop over his last LUCK_WINDOW games
+# a play past the player's OWN percentile for that prop (LUCK_PCT by kind) over his last LUCK_WINDOW games
 # -- his catches for receiving yards, his runs for rushing yards -- counts as a lucky
 # breakaway and is counted at that line (user, 2026-10-05, after trying the 95th and 99th: the
 # 95th cut a back's ordinary 15-25-yard runs, which come most games). "Too few" = under
 # LUCK_MIN_PLAYS of his plays of that kind in the window; then his longest play is left out
-# instead. At 20 plays the 97.5th sits at about his longest play. A definition for a
-# descriptive gauge, not a fit (reports/robust_ypc_check.md, for reference only)
-LUCK_PCT = 97.5
-LUCK_MIN_PLAYS = 20
+# instead. At 20 plays the 97.5th sits at about his longest play, the 90th at about his
+# third-longest. A definition for a
+# descriptive gauge, not a fit (reports/robust_ypc_check.md, for reference only).
+# 2026-10-07 (user, DECISIONS #207): the 90th for every kind -- a strict luckless Over check, not
+# only a trim of freak plays. Typical caps (2023-24, last 10 games): a back's 9 yards (97.5th: 17),
+# a receiver's 22 (33), a QB's 22 a completion (35); it trims about 0.7 yards a carry, 1.0 a catch,
+# 1.1 a completion (2018-24). Half-to-half steadiness: runs 0.45 -> 0.50, catches 0.67 -> 0.66,
+# completions 0.39 -> 0.41. The user saw the 10-05 concern (ordinary runs trimmed) and chose it.
+LUCK_PCT = {"catch": 90.0, "run": 90.0, "pass": 90.0}
+# 10 since the 90th (DECISIONS #207): at 20 the drop-his-longest fallback (19 plays) was far milder
+# than the 90th's top-10% trim (20 plays), a jump at the boundary; from 10 plays the 90th caps
+# about his longest, so the two rules meet again. Rates need 8 catches / 10 carries / 20
+# completions anyway, so the fallback now only covers 8-9 catches.
+LUCK_MIN_PLAYS = 10
 # the luck-free check (luck line AND rate) reads his last this-many games, crossing into
 # last season while this one is short (user, 2026-10-05)
 LUCK_WINDOW = 10
@@ -365,14 +375,15 @@ QB_MIN_COMPLETIONS = 20
 QB_CAMEO_COMPLETIONS = 5
 
 
-def player_luck_line(plays) -> dict:
-    """The luck line for one player and one kind of play: {cap, own, n}. own: his
-    LUCK_PCT percentile play sets the cap. Otherwise (too few plays) cap is None and the
-    caller leaves his longest play out instead (luck_free_rate)."""
+def player_luck_line(plays, pct) -> dict:
+    """The luck line for one player and one kind of play: {cap, own, n, pct}. own: his
+    `pct` percentile play sets the cap (LUCK_PCT[kind]; required, so no kind falls back to
+    another's). Otherwise (too few plays) cap is
+    None and the caller leaves his longest play out instead (luck_free_rate)."""
     v = [float(x) for x in (plays or []) if x == x]
     if len(v) >= LUCK_MIN_PLAYS:
-        return {"cap": float(np.percentile(v, LUCK_PCT)), "own": True, "n": len(v)}
-    return {"cap": None, "own": False, "n": len(v)}
+        return {"cap": float(np.percentile(v, pct)), "own": True, "n": len(v), "pct": pct}
+    return {"cap": None, "own": False, "n": len(v), "pct": pct}
 
 
 def luck_free_rate(season_plays, luck) -> float | None:
@@ -392,12 +403,17 @@ def luck_for(prior_games, current_games, gid, kind, window=LUCK_WINDOW):
     (last season's final games, priors_*_play_yards.csv), current_games = {gsis_id:
     [[yards], ...]} this season, oldest first. Both the line and the rate read the same
     window; the returned line carries `games`, the number of games in it."""
-    games = list(prior_games.get((gid, kind), []) or []) + list(current_games.get(gid, []) or [])
+    prior = list(prior_games.get((gid, kind), []) or [])
+    cur = list(current_games.get(gid, []) or [])
     if kind == "pass":
-        games = [g for g in games if len(g) >= QB_CAMEO_COMPLETIONS]
-    games = games[-window:]
+        prior = [g for g in prior if len(g) >= QB_CAMEO_COMPLETIONS]
+        cur = [g for g in cur if len(g) >= QB_CAMEO_COMPLETIONS]
+    games = (prior + cur)[-window:]
     plays = [y for g in games for y in g]
-    luck = dict(player_luck_line(plays), games=len(games))
+    n_cur = min(len(cur), len(games))
+    # which games the window holds (the volume chance names them): last season's, this season's
+    luck = dict(player_luck_line(plays, LUCK_PCT[kind]), games=len(games), prior_games=len(games) - n_cur, cur_games=n_cur,
+                plays=len(plays))
     min_plays = {"catch": YPC_MIN_CATCHES, "run": RUN_MIN_CARRIES, "pass": QB_MIN_COMPLETIONS}[kind]
     return luck, (luck_free_rate(plays, luck) if len(plays) >= min_plays else None)
 
@@ -416,7 +432,7 @@ def luck_words(luck, unit) -> str:
         return ""
     plural = {"catch": "catches", "run": "runs", "completion": "completions"}.get(unit, f"{unit}s")
     if luck["own"]:
-        return (f"every {unit} past {luck['cap']:.0f} yards, his own {LUCK_PCT}th percentile over his last "
+        return (f"every {unit} past {luck['cap']:.0f} yards, his own {luck.get('pct', LUCK_PCT['run']):g}th percentile over his last "
                 f"{luck.get('games', '?')} games with a {unit} ({luck['n']} {plural}), counted as {luck['cap']:.0f}")
     return (f"his longest {unit} left out -- only {luck['n']} {plural} in his last {luck.get('games', '?')} "
             f"games with a {unit}, too few for a percentile")
@@ -430,7 +446,7 @@ SINGULAR = {"catches": "catch", "carries": "carry", "completions": "completion"}
 
 def volume_gauge(y_min, rate, proj, unit, low_volume):
     """The achievability gauge (DECISIONS #166): the volume the yards line takes at a
-    typical yards a play (long plays capped, so one breakaway does not set the bar),
+    typical yards a play (plays past his own 90th percentile capped, so long plays do not set the bar),
     against the volume we project. Volume times rate is an AVERAGE game and averages are
     pulled up by big games, so the gauge is phrased as volume needed vs projected and
     never as "his usual game clears it". Description, not a price."""
@@ -1455,43 +1471,6 @@ def implied_row(implied):
     return next(lab for hi, lab in IMPLIED_ROWS if v <= hi)
 
 
-def calibration_line(markets, implied, team=None, slot=None) -> list[str]:
-    """The card's measured-calibration table for the player's priced markets: his team's
-    implied-points row and, for receiving markets, his role's row. [] when neither applies."""
-    row = implied_row(implied)
-    role = "".join(ch for ch in str(slot or "") if ch.isalpha()) or None
-    role = role if role in BIAS_BY_ROLE else None
-    mks = [m for m in MARKET_ORDER if m in markets and m in BIAS_BY_IMPLIED]
-    rows, live = [], []
-    for mk in mks:
-        if mk in LIVE_RECORD:
-            n, hit, eng, mkt, lle, llm = LIVE_RECORD[mk]
-            live.append(f"| {PROP_WORDS[mk][0]} | {100 * hit:.1f}% | {100 * eng:.1f}% | {100 * mkt:.1f}% | {n} |")
-        if row is not None:
-            rows.append((f"{PROP_WORDS[mk][0]}, teams implied {row}", *BIAS_BY_IMPLIED[mk][row]))
-        if role and mk in BIAS_BY_ROLE[role]:
-            rows.append((f"{PROP_WORDS[mk][0]}, every {ROLE_WORDS[role][:-1]}", *BIAS_BY_ROLE[role][mk]))
-    if not rows and not live:
-        return []
-    L = []
-    if live:
-        L += [f"**Live record at Sleeper's lines** (weeks {LIVE_WEEKS}, every graded line of that market):", "",
-              "| Market | Over hit | Engine said | Market said | Lines |", "|---|---:|---:|---:|---:|", *live,
-              "", "At real lines the engine's Over chance has not beaten the market's so far (log loss 0.717 "
-                  "against 0.692 over 1,536 lines; a coin flip is 0.693, DECISIONS #202): read the market's "
-                  "chance as the probability and the engine for workload and role.", ""]
-    if rows:
-        who = f" ({team}, implied {float(implied):.1f})" if team and row is not None else ""
-        L += [f"**Backtest calibration**{who}:", "", "| Market and group | Over hit | Engine said | Games |",
-              "|---|---:|---:|---:|"]
-        for lab, n, hit, eng in rows:
-            L.append(f"| {lab} | {100 * hit:.1f}% | {100 * eng:.1f}% | {n} |")
-        L += ["", "The backtest's 2022-25 games at stand-in lines near the middle of the forecast (DECISIONS "
-                  "#197, #198), not real lines; the live record above has not matched it for rushing or tight "
-                  "ends. A record, not an adjustment to the price."]
-    return L
-
-
 # the matchup section's section-7 rows for the same facts (one source: BIAS_BY_IMPLIED)
 def bias_gap_rows(markets, implied_by_team) -> list[tuple[str, str, str]]:
     out = []
@@ -1503,7 +1482,7 @@ def bias_gap_rows(markets, implied_by_team) -> list[tuple[str, str, str]]:
                     "Measured after round 38's implied-points scale (DECISIONS #199): most of the old lean is gone, "
                     "but teams implied 27+ still hit the Over more often than the engine says and 18 or less less "
                     "often (2022-25)" + (f" -- {rows}" if rows else ""),
-                    "read the card's calibration line beside each passing price"))
+                    "read the calibration table above the cards"))
     live = [m for m in MARKET_ORDER if m in markets and m in LIVE_RECORD]
     if live:
         out.append(("The engine's chance at real lines",
@@ -1516,15 +1495,103 @@ def bias_gap_rows(markets, implied_by_team) -> list[tuple[str, str, str]]:
         out.append(("Yardage Overs at the main line",
                     "Measured: receiving yards' Over has run about 2.9 points above the engine (receptions 1.4, "
                     "rushing 1.8), more for teams implied at 24+ (2022-25 backtest, DECISIONS #197)",
-                    "read each card's calibration line; a fix needs its own round"))
+                    "read the calibration table above the cards; a fix needs its own round"))
     return out
-CARD_LEGEND = ("**Reading the cards:** \"Engine forecast\" is the middle simulated outcome and the range holding the "
-               "middle 80% of simulated outcomes. \"Over: engine / market\" compares the engine with the market's "
-               "price after removing the bookmaker's margin; the market percentage is not the win rate the offered "
-               "price requires. On a whole-number line a push is possible: the engine's Over counts a push as not "
-               "winning and the push chance is shown beside it, while the price checks in the workload tables count "
-               "wins among the outcomes that are not pushes.")
-CARD_FOOTNOTE = ("*Price-based checks use the quoted side prices. For a pick'em entry such as Sleeper, the entry's "
+
+
+def card_guide() -> list[str]:
+    """How every number on a player card is produced and how to read it (user, 2026-10-07: "a lot of
+    data, as long as there's sufficiently detailed explanation on how the data was produced and how
+    to interpret the data"). Printed once, before the cards."""
+    p = f"{LUCK_PCT['catch']:g}th"
+    rows = [
+        ("**Market's chance of the Over**",
+         "The book's Over and Under prices turned into chances, then scaled so the two add to 100% (the "
+         "book's built-in cut removed).",
+         "Read this as the probability. At Sleeper's real lines it has beaten the engine so far (weeks 2-4, "
+         "the live record below)."),
+        ("Engine's chance",
+         "The share of 20,000 simulated games in which he clears the line. On a whole-number line, a "
+         "push is shown beside it and counts as not clearing.",
+         "The engine's view from his role and the team's volume. A big gap to the market usually means the "
+         "market knows something (practice, news), not a mispriced line."),
+        ("Price: Over / Under",
+         "The book's quoted prices for each side.",
+         "For a Sleeper Power Play the entry pays a flat multiple, so a single leg's price is not its "
+         "break-even."),
+        ("Engine's forecast: middle; 80% range",
+         "The middle simulated outcome, and the range that holds the middle 80% of the 20,000 games.",
+         "How wide his game can go. One game in ten lands below the range, one above."),
+        ("The Over needs",
+         "The smallest whole number that beats the line (69 yards on 68.5).",
+         "The target every row below works toward."),
+        ("Engine's volume",
+         "His average simulated workload. Team plays: this season blended with last, moved part of the way "
+         "toward what the spread and total imply (throws 25%, backs' carries 50%). His share: last season "
+         "blended with this one, this season counting more each week; an injured teammate's share is "
+         "handed to the others. Catches: his targets at his catch rate, with the luck of which ones he "
+         "catches. Completions: his receivers' catches, at his share of the team's passing.",
+         "The engine's job. Targets are calibrated in the backtest; carries run too narrow (big carry "
+         "totals come more often than it says); see the note under each table."),
+        ("At his luck-capped rate",
+         f"His yards a catch, a carry or a completion over his last 10 games (crossing into last season "
+         f"while this one is short), with every play past his own {p} percentile counted at that value; "
+         f"under 10 plays, his longest is left out instead. No rate (a dash) under 8 catches, 10 carries "
+         f"or 20 completions in the window. The volume needed is the Over divided by that rate, rounded "
+         f"up; the chance is the share of simulated games in which the engine's volume reaches it.",
+         "The luckless Over test: if this row clears, the Over does not need a long play. The note under "
+         "the table names the games it covers (e.g. 7 from 2025, 3 from 2026)."),
+        ("At his rate this season",
+         "The same, with this season's games for this team, nothing capped. The note gives the games and "
+         "his longest play.",
+         "Few games, so noisy: three games of yards a carry predicted later games worse than the league "
+         "average did (2022-25). Lean on it most when his role changed (new team, new quarterback)."),
+        ("At the engine's rate",
+         "The engine's own yards a unit: its simulated yards divided by its simulated volume (his rates "
+         "blended with his history and his role's).",
+         "What the engine's chance assumes about his efficiency."),
+        ("Receptions column",
+         "Volume is targets and the efficiency is his catch rate: the targets needed at that rate, and the "
+         "engine's chance of that many.",
+         "A pure volume read: catch rate moves little week to week."),
+        ("The market's own volume line",
+         "The book's carries or completions line, and the engine's chance of more than it.",
+         "Where the book puts his volume. The side it favours: the next row for a back, the workload "
+         "table under the card for a quarterback."),
+        ("The book's other lines",
+         "The book's catches line beside the yards line (the yards a catch the two ask together), the "
+         "carries line and the side its prices favour, and the longest-play lines.",
+         "How the book sees him getting his yards: through volume, or through one long play."),
+        ("At the engine's volume, the line needs",
+         "The Over divided by the engine's volume: the efficiency the line asks for if the engine's volume "
+         "is right.",
+         "The efficiency question in one number. Compare it with the rows above."),
+        ("His games this season that beat that",
+         "His games this season for this team, with at least one of that volume, in which his yards a unit "
+         "reached that number.",
+         "How often he has actually done what the line asks."),
+    ]
+    L = ["## How to read the player cards", "",
+         "Each card is one table, with a column per prop at the book's line. The engine supplies the volume "
+         "(targets, catches, carries, completions); you judge the efficiency (yards a catch, a carry, a "
+         "completion; a catch rate for receptions). Each efficiency row answers: if he plays at this rate, "
+         "how much volume does the line need, and how often does the engine give him that much?", "",
+         "| Row | How it is produced | How to read it |", "|---|---|---|"]
+    L += [f"| {a} | {b} | {c} |" for a, b, c in rows]
+    L += ["", "**Under each table:** role evidence (his share and snaps in earlier games against last game, the "
+              "quarterback who threw most; a QB's own workload), last season's baseline, notes naming the "
+              "games behind each rate with the calibration of the engine's volume, the market-carries shadow "
+              "for backs (graded for the week-8 check, not the price), the matchup (context, not an input) "
+              "and Watch flags (injuries, new teams, role changes).",
+          "",
+          "**Using it:** pick the efficiency row you believe and say why. If that row clears with plenty of "
+          "room, the prop is a volume question, and the role evidence says whether the volume holds. If only "
+          "the engine's rate clears, the prop needs an efficiency he has not shown lately. Either way, the "
+          "market's chance is the probability; the table tells you what has to happen for the Over to land."]
+    return L
+
+
+CARD_FOOTNOTE = ("*Prices are the books' quoted side prices. For a pick'em entry such as Sleeper, the entry's "
                  "payout and settlement rules decide its required win rate; a converted leg price is not a "
                  "standalone bet.*")
 
@@ -1631,57 +1698,6 @@ def _need_cell(r, unit, conditional):
     return "; ".join(bits) + f" {unit}" + (", conditional on the model" if conditional else "")
 
 
-def workload_table(rows, kind, carries_book=None, rr=None) -> list[str]:
-    """The workload check. kind 'rec': receptions and receiving yards, by targets. kind
-    'run': rushing yards by carries, with combined yards beside it (its arithmetic is NOT an
-    equivalent threshold: the combined column points at a carry-and-catch scenario).
-    carries_book: {'line', 'fav', 'fair'} from the market's carries line; rr: rush_rec_read."""
-    by = {}
-    for r in rows:
-        by.setdefault(r["market"], r)          # the first (preferred-book) row per market
-    if kind == "rec":
-        cols = [c for c in ("player_receptions", "player_reception_yds") if c in by]
-        if not cols:
-            return []
-        L = ["| Workload check | " + " | ".join(PROP_WORDS[c][0] for c in cols) + " |",
-             "|---" * (len(cols) + 1) + "|"]
-        L.append("| Engine's expected targets | " + " | ".join(f"{_f(by[c].get('projected'))} a game" for c in cols) + " |")
-        L.append("| Expected targets making the line roughly 50/50 | "
-                 + " | ".join(f"{_f(by[c].get('implied'))} a game" if _ok(by[c].get("implied"))
-                              else "outside the searched range" for c in cols) + " |")
-        L.append("| At the quoted price | " + " | ".join(_need_cell(by[c], "targets", False) for c in cols) + " |")
-        return L
-    r = by.get("player_rush_yds")
-    comb = "player_rush_reception_yds" in by or bool(rr)
-    if r is None and not comb:
-        return []
-    head = ["Rushing yards"] if r is not None else []
-    head += ["Combined yards"] if comb else []
-    L = ["| Workload check | " + " | ".join(head) + " |", "|---" * (len(head) + 1) + "|"]
-    def row(label, rush_cell, comb_cell):
-        cells = ([rush_cell] if r is not None else []) + ([comb_cell] if comb else [])
-        L.append(f"| {label} | " + " | ".join(cells) + " |")
-    cb = carries_book or {}
-    car_line = (f"{float(cb['line']):g} carries" + (f", {cb['fav']} favoured" if cb.get("fav") else "")
-                + (f"; a coin flip near {_f(cb['fair'])}" if _ok(cb.get("fair")) else "")) if _ok(cb.get("line")) \
-        else "carries line not posted"
-    rec_line = (f"{float(rr['book_catches']):g} receptions" if rr and _ok(rr.get("book_catches"))
-                else "no receptions line")
-    row("Engine's expected role", f"{_f((r or {}).get('projected'))} carries a game",
-        (f"{_f(rr.get('proj_carries'))} carries plus {_f(rr.get('proj_catches'))} catches a game (simulation "
-         "means)" if rr else "-"))
-    row("Market's own volume lines", car_line,
-        (car_line.split(";")[0] + f" and {rec_line}") if _ok(cb.get("line")) else rec_line)
-    row("Workload making the line roughly 50/50",
-        f"{_f(r.get('implied'))} carries a game" if r is not None and _ok(r.get("implied")) else "outside the searched range",
-        "use the separate carry-and-catch scenario")
-    row("At the quoted price", _need_cell(r, "carries", True),
-        "compare the scenario's chance with the required win rate")
-    if comb:
-        row("Share of projected combined yards from catches", "-", _pc((rr or {}).get("air_share")))
-    return L
-
-
 def qb_workload(pbp, gsis_id) -> list[tuple]:
     """(week, attempts, completions) for one passer, his games this season, oldest first.
     Sacks and spikes are not attempts."""
@@ -1726,71 +1742,199 @@ def qb_table(q) -> list[str]:
             ("His recent workload", work),
             ("Projected completions", _f(q.get("proj_cmp"))),
             ("Market's completions / attempts lines", "; ".join(lines) or "not posted")]
-    gg = q.get("gauge")
-    if gg:
-        rows.append(("Passing-yards line at a rate with unusually long completions capped",
-                     f"about {gg['need']:.1f} completions at {_f(q.get('gauge_rate'))} yards a completion"
-                     + (f", over his last {q['luck_games']} game{'s' if q['luck_games'] != 1 else ''}"
-                        if q.get("luck_games") else "")
-                     + " (arithmetic, not a price-based break-even)"))
     return ["| Volume and efficiency check | What the report shows |", "|---|---|"] + [f"| {a} | {b} |" for a, b in rows]
 
 
-def capped_line(read, per) -> str:
-    """The capped-play check, one sentence: the yards line at his rate with long plays capped."""
-    if not read or not read.get("gauge") or not _ok(read.get("gauge_rate")):
-        return ""
-    g = read["gauge"]
-    games = (read.get("luck") or {}).get("games")
-    return (f"**Capped-play check:** {read['y_min']} yards takes about {g['need']:.1f} {g['unit']} at "
-            f"{float(read['gauge_rate']):.1f} yards a {per}"
-            + (f" (his last {games} game{'s' if games != 1 else ''}, unusually long plays capped)"
-               if games else "")
-            + f"; we project {g['proj']:.1f}. Capping long gains lowers the rate on purpose, so this is "
-              "descriptive, not the workload that makes the line a coin flip.")
+# ---- the volume chance (user, 2026-10-07): the engine supplies the volume, the reader the efficiency.
+# The split (measured 2026-10-07, 2018-24, first half-season vs second): yards a catch is a player's
+# steadiest efficiency (0.57; catch rate 0.48, yards a target 0.31 -- it carries both noises), so the
+# reader judges yards a catch, a completion or a carry, and the engine supplies the catches (targets x
+# his catch rate, with the catch luck), completions or carries. Receptions keep targets and a catch rate.
+VOLUME_UNIT = {"player_reception_yds": ("catches", "yards a catch"), "player_receptions": ("targets", "catch rate"),
+               "player_rush_yds": ("carries", "yards a carry"),
+               "player_rush_reception_yds": ("carries + catches", "yards a carry, a catch"),
+               "player_pass_yds": ("completions", "yards a completion")}
+
+# How the engine's volume chances have held up (backtest 2022-25, 1,000 draws, measured 2026-10-07):
+# targets calibrated (20.5% outside the 80% range); catches calibrated (20.8%), but for receivers
+# projected 5+ only 7.5% land above the engine's 90th percentile; carries too narrow (24.8-27.1%,
+# high totals 4-5 points low); QB completions 16.9%, 7.8% above the 90th. No note where calibrated.
+VOLUME_CALIBRATION = {
+    "player_reception_yds": " The engine's catch counts are calibrated; for receivers it projects 5+ catches, a "
+                            "big total has come a little less often than it says (backtest 2022-25).",
+    "player_rush_yds": " The engine's chance of a high carry total has run 4-5 points low in the backtest (2022-25).",
+    "player_rush_reception_yds": " The engine's carries run too narrow: a high carry total has come 4-5 points more "
+                                 "often than it says (backtest 2022-25).",
+    "player_pass_yds": " The engine's chance of a big completion total has run about 2 points high in the "
+                       "backtest (2022-25)."}
+
+
+def capped_label(luck, play, plays_word, prior_season, season) -> str:
+    """The luck-capped row's name, from the luck line research.luck_for returned: 'Last 10 games,
+    long catches capped (7 from 2025, 3 from 2026; 51 catches)'. The window it names is the one
+    the rate was computed on."""
+    if not luck or not luck.get("games"):
+        return f"Recent games, long {play} capped"
+    bits = [f"{n} from {s_}" for n, s_ in ((luck.get("prior_games"), prior_season), (luck.get("cur_games"), season)) if n]
+    return (f"Last {luck['games']} games, long {play} capped ({', '.join(bits)}; {luck.get('plays', 0)} {plays_word})")
+
+
+def volume_cells(market, line, draws, rates, games=None, market_volume=None):
+    """The volume chance as numbers for the card's table. market: a VOLUME_UNIT key; line: the
+    posted line; draws: the engine's volume draws (catches, targets, carries or completions), or
+    for rushing + receiving a pair (carries, catches); rates: [(key, label, rate)] with key
+    'capped' / 'season' / 'engine' -- yards per unit, a catch rate for receptions, or a pair (yards
+    a carry, yards a catch) for rushing + receiving; games: [(volume, outcome)] his games this
+    season; market_volume: the market's own volume line, if posted. Returns None when there is
+    nothing to show, else {unit, need_out, proj, rows {key: {label, rate_txt, vol, pct}},
+    market_row (line, pct) | None, need_txt, beat (n_beat, n_games) | None, note}."""
+    import math
+    unit, rate_word = VOLUME_UNIT[market]
+    pair = market == "player_rush_reception_yds"
+    if draws is None or not _ok(line):
+        return None
+    if pair:
+        car, cat = (np.asarray(x, dtype=float) for x in draws)
+        if not len(car) or len(car) != len(cat):
+            return None
+        d = car + cat
+    else:
+        d = np.asarray(draws, dtype=float)
+        if not len(d):
+            return None
+    need_out = math.floor(float(line)) + 1                      # the whole number that wins the Over
+    rows = {}
+    for key, label, r in rates:
+        if pair:
+            if not r or not all(_ok(x) and float(x) > 0 for x in r):
+                continue
+            ra, rb = float(r[0]), float(r[1])
+            blend = (car.mean() * ra + cat.mean() * rb) / d.mean() if d.mean() > 0 else None
+            if not blend:
+                continue
+            vol = math.ceil(need_out / blend - 1e-9)
+            pct_ = float((car * ra + cat * rb >= need_out).mean())
+            rate_txt = f"{ra:.1f} a carry, {rb:.1f} a catch"
+        else:
+            if not _ok(r) or float(r) <= 0:
+                continue
+            vol = math.ceil(need_out / float(r) - 1e-9)
+            pct_ = float((d >= vol).mean())
+            rate_txt = f"{100 * float(r):.0f}%" if market == "player_receptions" else f"{float(r):.1f}"
+        rows[key] = {"label": label, "rate_txt": rate_txt, "vol": vol, "pct": pct_}
+    if not rows:
+        return None
+    proj = float(d.mean())
+    market_row = ((float(market_volume), float((d > float(market_volume)).mean()))
+                  if _ok(market_volume) and not pair else None)
+    need_rate = need_out / proj if proj > 0 else None
+    need_txt, beat = None, None
+    if need_rate is not None:
+        if market == "player_receptions" and need_rate > 1:
+            need_txt = f"{need_out} catches: more than his targets"        # no catch rate gets there
+        else:
+            per = "yards a carry or catch" if pair else rate_word
+            need_txt = f"{100 * need_rate:.0f}%" if market == "player_receptions" else f"{need_rate:.1f} {per}"
+            g = [(v, y) for v, y in (games or []) if _ok(v) and float(v) > 0 and _ok(y)]
+            if g:
+                beat = (sum(1 for v, y in g if float(y) / float(v) >= need_rate), len(g))
+    return {"unit": unit, "need_out": need_out, "proj": proj, "rows": rows, "market_row": market_row,
+            "need_txt": need_txt, "beat": beat, "note": VOLUME_CALIBRATION.get(market, "").strip()}
+
+
+ROW_WORDS = {"capped": "At his luck-capped rate", "season": "At his rate this season", "engine": "At the engine's rate"}
+NEED_WORDS = {"player_receptions": "catches", "player_reception_yds": "yards", "player_rush_yds": "yards",
+              "player_rush_reception_yds": "yards", "player_pass_yds": "yards"}
+
+
+def prop_table(rows, volume) -> tuple[list[str], list[str]]:
+    """The card's one table (user, 2026-10-07): a column per priced market at the first book's
+    line, the market's chance first, then the engine, what the Over needs, the engine's volume
+    and the chance at each efficiency. Returns (table lines, footnotes)."""
+    first = {}
+    for r in rows:
+        first.setdefault(r["market"], r)
+    mks = [m for m in MARKET_ORDER if m in first] + [m for m in first if m not in MARKET_ORDER]
+    if not mks:
+        return [], []
+    vol = {v["market"]: v for v in (volume or []) if v.get("cells") or v.get("book_lines")}
+    cell = lambda f: [f(first[m], (vol.get(m) or {}).get("cells"), vol.get(m) or {}) for m in mks]
+    head = "| | " + " | ".join(f"{PROP_WORDS.get(m, (m,))[0]} {float(first[m]['line']):g}" for m in mks) + " |"
+    L = [head, "|---|" + "---:|" * len(mks)]
+
+    def add(label, vals):
+        if any(v for v in vals):
+            L.append(f"| {label} | " + " | ".join(v or "-" for v in vals) + " |")
+
+    def push(r):
+        return f" (push {_pc(r['p_push'])})" if _ok(r.get("p_push")) and float(r["p_push"]) >= 0.005 else ""
+
+    add("**Market's chance of the Over**", cell(lambda r, c, v: f"**{_pc(r.get('p_over_book'))}**"))
+    add("Engine's chance", cell(lambda r, c, v: _pc(r.get("p_over_model")) + push(r)))
+    add("Price: Over / Under", cell(lambda r, c, v: f"{_odds(r.get('price_over'))} / {_odds(r.get('price_under'))}"))
+    add("Engine's forecast: middle; 80% range",
+        cell(lambda r, c, v: f"{_f(r.get('median'), 0)}; {_f(r.get('p10'), 0)}-{_f(r.get('p90'), 0)}"))
+    add("The Over needs", cell(lambda r, c, v: f"{c['need_out'] if c else int(float(r['line'])) + 1} "
+                                               f"{NEED_WORDS.get(r['market'], '')}".strip()))
+    add("Engine's volume", cell(lambda r, c, v: v.get("volume_text")))
+    for key, word in ROW_WORDS.items():
+        add(word, cell(lambda r, c, v: (f"{c['rows'][key]['vol']} {c['unit']} at {c['rows'][key]['rate_txt']} "
+                                        f"-> **{_pc(c['rows'][key]['pct'])}**") if c and key in c["rows"] else None))
+    add("The market's own volume line", cell(lambda r, c, v: (f"more than {c['market_row'][0]:g} {c['unit']} -> "
+                                                              f"{_pc(c['market_row'][1])}")
+                                             if c and c["market_row"] else None))
+    add("The book's other lines", cell(lambda r, c, v: v.get("book_lines")))
+    add("At the engine's volume, the line needs", cell(lambda r, c, v: c["need_txt"] if c else None))
+    add("His games this season that beat that", cell(lambda r, c, v: f"{c['beat'][0]} of {c['beat'][1]}"
+                                                     if c and c["beat"] else None))
+    notes = []
+    for m in mks:
+        c = (vol.get(m) or {}).get("cells")
+        if not c:
+            continue
+        bits = [f"{word} = {c['rows'][k]['label'][0].lower() + c['rows'][k]['label'][1:]}."
+                for k, word in (("capped", "luck-capped rate"), ("season", "rate this season"))
+                if k in c["rows"] and c["rows"][k]["label"]]
+        if c["note"]:
+            bits.append(c["note"])
+        if bits:
+            notes.append(f"*{PROP_WORDS.get(m, (m,))[0]}: " + " ".join(bits) + "*")
+    return L, notes
 
 
 def player_card(d: dict) -> list[str]:
-    """The full card for one priced player. d: name, team, slot, pos, rows (research rows as
-    dicts, preferred book first), book, quoted, usage, backfield, qbs, prior, season,
-    carries_book, reads {catch, carry, rr}, qb, fit [the line-fit sentences], shadow [{line,
-    p_board, p_mkt, car_from, car_to}], matchup, watch [str]."""
+    """The card for one priced player (user, 2026-10-07: one table, not five): the prop table
+    (a column per market), the role evidence, the rate windows as notes, then any other lines,
+    the week-8 shadow, matchup and watch. d: name, team, slot, pos, rows (research rows as dicts,
+    preferred book first), book, quoted, usage, backfield, qbs, prior, season, qb, volume
+    [{market, line, cells, volume_text}], shadow, matchup, watch. The live record and backtest
+    calibration print once at the top of the report (calibration_block), not per card."""
     rows = sorted(d.get("rows") or [], key=lambda r: (MARKET_ORDER.index(r["market"])
                                                      if r["market"] in MARKET_ORDER else 99))
-    mk = list(dict.fromkeys(PROP_WORDS.get(r["market"], (r["market"],))[0] for r in rows))
-    if d.get("reads", {}).get("rr") and "Rushing + receiving yards" not in mk:
-        mk.append("Rushing + receiving yards (read, not priced)")
-    L = [f"#### {d['name']} ({d['slot']}) · {' and '.join(mk) if len(mk) <= 2 else ', '.join(mk)}", ""]
-    L += [f"Book: **{d.get('book') or '-'}** · Quote updated: **{d.get('quoted') or '-'}**", ""]
-    if rows:
-        L += prop_rows_table(rows) + [""]
     pos = d.get("pos")
-    reads = d.get("reads") or {}
+    L = [f"#### {d['name']} · {d['slot']}, {d.get('team') or ''}".rstrip(", "), ""]
+    L += [f"Book: **{d.get('book') or '-'}** · Quote updated: **{d.get('quoted') or '-'}**", ""]
+    table, notes = prop_table(rows, d.get("volume"))
+    if table:
+        L += table + [""]
+    elif d.get("unpriced_read"):
+        L += [f"**Rushing + receiving yards (read, not priced):** {d['unpriced_read']}", ""]
     if pos == "QB":
         L += qb_table(d.get("qb")) + [""]
-
     else:
         is_back = pos in ("RB", "FB", "HB")
         L += role_table(d.get("usage"), d.get("backfield"), is_back, d.get("qbs")) + [""]
         bl = baseline_line(d.get("prior"), d.get("season"), is_back)
         if bl:
             L += [bl, ""]
-        markets = {r["market"] for r in rows}
-        if markets & {"player_rush_yds", "player_rush_reception_yds"} or reads.get("rr"):
-            wt = workload_table(rows, "run", d.get("carries_book"), reads.get("rr"))
-            if wt:
-                L += wt + [""]
-        if markets & {"player_receptions", "player_reception_yds"}:
-            L += workload_table(rows, "rec") + [""]
-        for key, per in (("catch", "catch"), ("carry", "carry")):
-            cl = capped_line(reads.get(key), per)
-            if cl:
-                L += [cl, ""]
-    cal = calibration_line({r["market"] for r in rows}, d.get("implied"), d.get("team"), d.get("slot"))
-    if cal:
-        L += cal + [""]
-    for s_ in d.get("fit") or []:
-        L += [f"**How his lines fit together:** {s_}", ""]
+    if notes:
+        L += notes + [""]
+    seen = {}
+    for r in rows:
+        seen.setdefault(r["market"], r)
+    extra = [r for r in rows if seen[r["market"]] is not r]
+    if extra:
+        L += ["Other lines for him:", ""] + prop_rows_table(extra) + [""]
     for sh in d.get("shadow") or []:
         L += [f"**Without market carries (graded for the week-8 check, not the price):** rushing yards "
               f"{float(sh['line']):g}: Over {_pc(sh['p_board'])} on the board (his carries half from the market's "
@@ -1800,6 +1944,44 @@ def player_card(d: dict) -> list[str]:
         L += [f"**Matchup:** {d['matchup']}", ""]
     if d.get("watch"):
         L += ["**Watch:** " + " ".join(w.rstrip(".") + "." for w in d["watch"]), ""]
+    return L
+
+
+def calibration_block(markets, implied_by_team, slots) -> list[str]:
+    """The live record and the backtest calibration, ONCE for the report (they were the same on
+    every card): the live record per market, the backtest by each team's implied points, and by
+    role for the roles priced."""
+    mks = [m for m in MARKET_ORDER if m in markets and m in BIAS_BY_IMPLIED]
+    live = [m for m in mks if m in LIVE_RECORD]
+    L = []
+    if live:
+        L += [f"**Live record at Sleeper's lines** (weeks {LIVE_WEEKS}, every graded line of that market):", "",
+              "| Market | Over hit | Engine said | Market said | Lines |", "|---|---:|---:|---:|---:|"]
+        for m in live:
+            n, hit, eng, mkt, lle, llm = LIVE_RECORD[m]
+            L.append(f"| {PROP_WORDS[m][0]} | {100 * hit:.1f}% | {100 * eng:.1f}% | {100 * mkt:.1f}% | {n} |")
+        L += ["", "At real lines the engine's Over chance has not beaten the market's so far (log loss 0.717 "
+                  "against 0.692 over 1,536 lines; a coin flip is 0.693, DECISIONS #202): read the market's chance "
+                  "as the probability and the engine for workload and role.", ""]
+    rows = []
+    for t, imp in implied_by_team.items():
+        row = implied_row(imp)
+        for m in mks:
+            if row is not None:
+                rows.append((f"{PROP_WORDS[m][0]}, {t} (implied {float(imp):.1f}: teams implied {row})",
+                             *BIAS_BY_IMPLIED[m][row]))
+    roles = [r for r in dict.fromkeys("".join(ch for ch in str(s_) if ch.isalpha()) for s_ in slots) if r in BIAS_BY_ROLE]
+    for role in roles:
+        for m in mks:
+            if m in BIAS_BY_ROLE[role]:
+                rows.append((f"{PROP_WORDS[m][0]}, every {ROLE_WORDS[role][:-1]}", *BIAS_BY_ROLE[role][m]))
+    if rows:
+        L += ["**Backtest calibration:**", "", "| Market and group | Over hit | Engine said | Games |",
+              "|---|---:|---:|---:|"]
+        L += [f"| {lab} | {100 * hit:.1f}% | {100 * eng:.1f}% | {n} |" for lab, n, hit, eng in rows]
+        L += ["", "The backtest's 2022-25 games at stand-in lines near the middle of the forecast (DECISIONS "
+                  "#197, #198), not real lines; the live record above has not matched it for rushing or tight "
+                  "ends. A record, not an adjustment to the price.", ""]
     return L
 
 
@@ -2075,7 +2257,7 @@ def qb_yards_read(completions_line=None, yards_line=None, proj_completions=None,
     """The quarterback's version of the catches/carries reads (DECISIONS #170): the book's
     completions, passing-yards and longest-completion lines read together at the whole
     numbers that win them; his luck-free yards per completion over his last LUCK_WINDOW
-    games (each completion past his own LUCK_PCT percentile counted at it); the
+    games (each completion past his own LUCK_PCT["pass"] percentile counted at it); the
     completions the yards line takes at that rate, against our projected completions and
     the book's completions line. Report text only."""
     ok = lambda v: v is not None and v == v

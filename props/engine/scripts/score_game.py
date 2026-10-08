@@ -1311,10 +1311,10 @@ def main():
         shares_t = {n: float(v) for n, v in zip(Mt.name, Mt.ts)}
         crs_t = {n: float(v) for n, v in zip(Mt.name, Mt.cr)}
         ypt_t = {n: float(v) for n, v in zip(Mt.name, Mt.ypt)}
-        out_rec, tt_draw = MODEL.simulate_team_game(team_stream(t, 101), N_SIM, env[t]["targets"], TVD["targets_r"],
-                                                    shares_t, crs_t, ypt_t, SH, other_bucket=True, width=WIDTH_SIM,
-                                                    return_other=True,
-                                                    player_roles={n: MODEL.role_group(s_) for n, s_ in zip(Mt.name, Mt.slot)})
+        out_rec, tt_draw, tg_draws = MODEL.simulate_team_game(
+            team_stream(t, 101), N_SIM, env[t]["targets"], TVD["targets_r"], shares_t, crs_t, ypt_t, SH,
+            other_bucket=True, width=WIDTH_SIM, return_other=True, return_targets=True,
+            player_roles={n: MODEL.role_group(s_) for n, s_ in zip(Mt.name, Mt.slot)})
         pass_inputs[t] = ([out_rec[n][1] for n in names], out_rec.pop(MODEL.OTHER))
         # ROUND 34'S REVERSAL SHADOW (DECISIONS #204): receiving again at target spread 40 (the
         # setting before round 34), its own stream, logged as p_over_spread40 for the week-8 check
@@ -1381,7 +1381,7 @@ def main():
         for j, (_, m) in enumerate(Mt.iterrows()):
             rec, yds = out_rec[m["name"]]
             sims[m["name"]] = {"receptions": rec, "rec_yards": yds, "rush_yards": rush_t[j], "carries": car_t[j],
-                               "rush_rec_yards": yds + rush_t[j]}
+                               "rush_rec_yards": yds + rush_t[j], "targets": tg_draws[m["name"]]}
     # QB PASSING (plan step 4, props-v1.24; reports/yardage_harness.md, DECISIONS
     # #105): the starter's passing yards are his receivers' yards in THIS
     # simulation, plus the other bucket's targets at the depth receivers' rates,
@@ -1399,6 +1399,13 @@ def main():
                     team_stream(t, 103), N_SIM, ys_t, other_t, P["other_receiver_rates"], SH, starter_share=_share,
                     width=WIDTH,
                     implied_points=env[t].get("implied_points"))
+                # his completions for the volume chance (simulate_qb_completions: his receivers' catches
+                # in this simulation, the depth bucket's targets caught, his share), stream 104: no price
+                # reads them and no other draw moves
+                sims[STARTER_QB[t]]["completions"] = MODEL.simulate_qb_completions(
+                    team_stream(t, 104), N_SIM,
+                    [sims[n_]["receptions"] for n_ in M[M.team == t].name if n_ != STARTER_QB[t] and n_ in sims],
+                    other_t, P["other_receiver_rates"], starter_share=_share, width=WIDTH)
                 if (WIDTH or {}).get("pass_implied_exp") and env[t].get("implied_points") is None:
                     # round 38 (pre-registered): a run without the spread/total says the scale is off
                     SOURCES.append((f"QB passing implied-points scale ({t})", "round 38's passing scale",
@@ -2252,6 +2259,7 @@ def main():
                 "run": RSCH.games_by_player(rushes, "rusher_player_id", "rushing_yards"),
                 "pass": RSCH.games_by_player(passes[passes.complete_pass == 1], "passer_player_id", "receiving_yards")}
         _luck = lambda gid, kind: RSCH.luck_for(_prior_games, _cur[kind], str(gid), kind)
+
         if not _py_path.exists():
             SOURCES.append(("Last season's play yards (luck-free check)", "each player's last 10 games, play by play",
                             "DATA MISSING", f"{_py_path.name} not found; the check uses this season's games only"))
@@ -2653,6 +2661,156 @@ def main():
         for _, rr in R[R.market == "player_anytime_td"].iterrows():
             td_book.setdefault(rr.player, []).append((rr.book, rr.price, rr.p_novig))
 
+    # his games this season, per team and week, for the volume chance's "games he beat it" (attempts as
+    # research.qb_workload counts them: no sacks, no spikes)
+    _tg_g = passes.groupby(["receiver_player_id", "posteam", "week"]).agg(
+        tg=("play_type", "size"), cat=("complete_pass", "sum"), ryd=("receiving_yards", "sum"),
+        lng=("receiving_yards", "max"))
+    _ru_g = rushes.groupby(["rusher_player_id", "posteam", "week"]).agg(car=("play_type", "size"),
+                                                                       uyd=("rushing_yards", "sum"),
+                                                                       lng=("rushing_yards", "max"))
+    _pa = pbp[(pbp.play_type == "pass") & pbp.passer_player_id.notna()] if "passer_player_id" in pbp else pbp.iloc[0:0]
+    if "sack" in _pa:
+        _pa = _pa[_pa["sack"].fillna(0) != 1]
+    if "pass_attempt" in _pa:
+        _pa = _pa[_pa["pass_attempt"].fillna(0) == 1]
+    _pa_g = _pa.groupby(["passer_player_id", "posteam", "week"]).agg(att=("play_type", "size"),
+                                                                     pyd=("passing_yards", "sum"),
+                                                                     cmp=("complete_pass", "sum"),
+                                                                     lng=("passing_yards", "max"))
+
+    def games_of(gid, t, kind):
+        """[(volume, outcome)] for his games this season with team t, oldest first."""
+        def by_week(frame, cols):
+            try:
+                x = frame.xs((gid, t), level=(0, 1))[cols].fillna(0)
+            except KeyError:
+                return {}
+            return {w: tuple(float(v) for v in r) for w, r in zip(x.index, x.to_numpy())}
+        parts = {"player_reception_yds": [(_tg_g, ["cat", "ryd"])], "player_receptions": [(_tg_g, ["tg", "cat"])],
+                 "player_rush_yds": [(_ru_g, ["car", "uyd"])], "player_pass_yds": [(_pa_g, ["cmp", "pyd"])],
+                 "player_rush_reception_yds": [(_ru_g, ["car", "uyd"]), (_tg_g, ["cat", "ryd"])]}.get(kind, [])
+        tot = {}
+        for frame, cols in parts:               # combined: carries and catches added week by week
+            for w, (v, y) in by_week(frame, cols).items():
+                a_ = tot.get(w, (0.0, 0.0))
+                tot[w] = (a_[0] + v, a_[1] + y)
+        return [tot[w] for w in sorted(tot)]
+
+    def season_facts(gid, t, frame):
+        """(games, longest play) for his games this season with team t in one per-game frame."""
+        try:
+            x = frame.xs((gid, t), level=(0, 1))
+        except KeyError:
+            return 0, None
+        return len(x), (float(x.lng.max()) if x.lng.notna().any() else None)
+
+    def book_lines_of(mk, nm, t):
+        """The book's lines read beside a priced one (DECISIONS #164, #166, #170): what the catches and
+        yards lines ask together, the carries line and the side it favours, the longest-play lines."""
+        g = lambda v: f"{float(v):g}" if v is not None and v == v else None
+        bits = []
+        if mk == "player_reception_yds":
+            cr_ = CATCH_READ.get((nm, t)) or {}
+            if g(cr_.get("catches_line")) and cr_.get("mid_ypc"):
+                bits.append(f"catches {g(cr_['catches_line'])}: {float(cr_['mid_ypc']):.1f} a catch asked")
+            if g(cr_.get("longest_line")):
+                bits.append(f"longest catch {g(cr_['longest_line'])}")
+        elif mk == "player_rush_yds":
+            cy_ = CARRY_READ.get((nm, t)) or {}
+            if g(cy_.get("carries_line")):
+                bits.append(f"carries {g(cy_['carries_line'])}" + (f", {cy_['carries_fav']} favoured"
+                                                                   if cy_.get("carries_fav") else ""))
+            if g(cy_.get("longest_line")):
+                bits.append(f"longest run {g(cy_['longest_line'])}")
+        elif mk == "player_pass_yds":
+            q_ = QB_READ.get((nm, t)) or {}
+            if g(q_.get("longest_line")):
+                bits.append(f"longest completion {g(q_['longest_line'])}")
+        return "; ".join(bits) or None
+
+    def volume_inputs(m, t, rows, nm):
+        """The volume chance for his priced markets (research.volume_cells, shown in the card's table). The engine's volume
+        (catches, carries, completions; targets for receptions) against the efficiency the reader judges
+        (yards a catch, a carry, a completion). Every row names the games behind its rate: the
+        luck-capped window (last season's games and this season's), this season uncapped with its
+        longest play, the engine's own rate."""
+        s_ = sims.get(nm) or {}
+        out, seen = [], set()
+        cap = lambda luck, play, word: RSCH.capped_label(luck, play, word, PRIOR, SEASON)
+        mean_ = lambda k: float(np.mean(s_[k])) if k in s_ else 0.0
+        per = lambda num, den: num / den if den > 0 else None
+
+        def season_label(frame, play):
+            n_, lng_ = season_facts(m.gsis_id, t, frame)
+            longest = f", longest {play} {lng_:.0f}" if lng_ is not None else ""
+            return f"{SEASON} so far, uncapped ({n_} games{longest})"
+
+        def season_rate(frame, vol, yds):
+            try:
+                x = frame.xs((m.gsis_id, t), level=(0, 1))
+            except KeyError:
+                return None
+            return per(float(x[yds].fillna(0).sum()), float(x[vol].sum()))
+
+        for r in rows:
+            mk = r["market"]
+            if mk in seen or mk not in RSCH.VOLUME_UNIT:
+                continue
+            seen.add(mk)
+            games = games_of(m.gsis_id, t, mk)
+            tot = lambda i: sum(g[i] for g in games)
+            season = (tot(1) / tot(0)) if games and tot(0) > 0 else None
+            mvol, rates, draws, vtext = None, [], None, None
+            if mk == "player_reception_yds" and "receptions" in s_:
+                cr_ = CATCH_READ.get((nm, t)) or {}
+                rates = [("capped", cap(cr_.get("luck"), "catches", "catches"), cr_.get("season_ypc_luckfree")),
+                         ("season", season_label(_tg_g, "catch"), season),
+                         ("engine", None, per(mean_("rec_yards"), mean_("receptions")))]
+                draws = s_["receptions"]
+                vtext = f"{mean_('targets'):.1f} targets -> {mean_('receptions'):.1f} catches"
+            elif mk == "player_receptions" and "targets" in s_:
+                rates = [("season", f"{SEASON} so far ({season_facts(m.gsis_id, t, _tg_g)[0]} games)", season),
+                         ("engine", None, float(m.cr))]
+                draws = s_["targets"]
+                vtext = f"{mean_('targets'):.1f} targets"
+            elif mk == "player_rush_yds" and "carries" in s_:
+                cy_ = CARRY_READ.get((nm, t)) or {}
+                rates = [("capped", cap(cy_.get("luck"), "runs", "carries"), cy_.get("season_ypc_luckfree")),
+                         ("season", season_label(_ru_g, "run"), season),
+                         ("engine", None, per(mean_("rush_yards"), mean_("carries")))]
+                draws, mvol = s_["carries"], cy_.get("carries_line")
+                vtext = f"{mean_('carries'):.1f} carries"
+            elif mk == "player_rush_reception_yds" and "carries" in s_ and "receptions" in s_:
+                # two efficiencies: yards a carry and yards a catch, on the engine's carries and catches
+                rr_ = RUSH_REC.get((nm, t)) or {}
+                capped = (rr_.get("run_rate"), rr_.get("catch_rate")) if rr_.get("rates_luck_free") else None
+                rates = [("capped", cap(rr_.get("run_luck"), "runs", "carries") + "; "
+                          + cap(rr_.get("catch_luck"), "catches", "catches")[0].lower()
+                          + cap(rr_.get("catch_luck"), "catches", "catches")[1:], capped),
+                         ("season", f"{SEASON} so far, uncapped ({len(games)} games)",
+                          (season_rate(_ru_g, "car", "uyd"), season_rate(_tg_g, "cat", "ryd"))),
+                         ("engine", None, (per(mean_("rush_yards"), mean_("carries")),
+                                           per(mean_("rec_yards"), mean_("receptions"))))]
+                draws = (s_["carries"], s_["receptions"])
+                vtext = f"{mean_('carries'):.1f} carries + {mean_('receptions'):.1f} catches"
+            elif mk == "player_pass_yds" and "completions" in s_ and "pass_yards" in s_:
+                # the simulated starter only. QB luck cap (user, 2026-10-07): his capped yards a
+                # completion over his last 10 games
+                q_ = QB_READ.get((nm, t)) or {}
+                rates = [("capped", cap(q_.get("luck"), "completions", "completions"), q_.get("luckfree_ypc")),
+                         ("season", season_label(_pa_g, "completion"), season),
+                         ("engine", None, per(mean_("pass_yards"), mean_("completions")))]
+                draws = s_["completions"]
+                vtext = f"{mean_('completions'):.1f} completions"
+                mvol = _xl("pass_completions", nm, t).get("line")      # the market's completions line, if posted
+            if draws is None and not book_lines_of(mk, nm, t):
+                continue
+            out.append({"market": mk, "line": r["line"], "volume_text": vtext, "book_lines": book_lines_of(mk, nm, t),
+                        "cells": RSCH.volume_cells(mk, r["line"], draws, rates, games, mvol) if draws is not None
+                        else None})
+        return out
+
     def card_inputs(m, t, mine, rr_read):
         """Everything one player's card shows, from what this run already built."""
         nm = m["name"]
@@ -2678,9 +2836,6 @@ def main():
             by_w = {r_["week"]: r_["qb"] for r_ in TEAM_VOL_ROWS.get(t, [])}
             earlier = [w_[0] for w_ in WEEK_SH.get(nm, [])][:-1]
             qbs = (list(dict.fromkeys(by_w[w_] for w_ in earlier if by_w.get(w_))), by_w.get(u_["week"]))
-        cy_ = CARRY_READ.get((nm, t)) or {}
-        carries_book = ({"line": cy_.get("carries_line"), "fav": cy_.get("carries_fav"), "fair": cy_.get("book_fair")}
-                        if cy_ else ({"line": _xl("rushing_attempts", nm, t).get("line")} if rr_read else None))
         qb = None
         if m.pos == "QB":
             q_ = QB_READ.get((nm, t)) or {}
@@ -2709,25 +2864,24 @@ def main():
         if rf_ and m.pos != "QB":
             watch.append(f"receiving {rf_[0]}: {rf_[1]}")
         for f_ in "; ".join(str(x) for x in mine.get("flags", pd.Series(dtype=object)).dropna().unique()).split("; "):
-            if f_ and f_ != "questionable" and not f_.startswith("new team") and f_ not in watch \
+            if f_ and f_ != "questionable" and not f_.startswith(("new team", "thin:")) and f_ not in watch \
                     and not (rf_ and f_ == rf_[0]):
                 watch.append(f_)
-        # the line-fit reads (#164, #166, #170, #173) without their gauge: the card's capped-play
-        # line carries that check once
-        nog = lambda d_: {**d_, "gauge": None} if d_ else None
-        fit = [x_ for x_ in (RSCH.catch_yards_sentence(nog(CATCH_READ.get((nm, t)))),
-                             RSCH.carry_yards_sentence(nog(CARRY_READ.get((nm, t)))),
-                             RSCH.rush_rec_sentence(rr_read),
-                             RSCH.qb_yards_sentence(nog(QB_READ.get((nm, t))))) if x_]
         return {"name": nm, "team": t, "slot": m.slot, "pos": m.pos, "rows": rows, "book": book, "quoted": quoted,
-                "fit": fit, "implied": env[t].get("implied_points"),
+                "volume": volume_inputs(m, t, rows, nm),
+                "unpriced_read": RSCH.rush_rec_sentence(rr_read) if not rows and rr_read else None,
                 "usage": u_, "backfield": BACKFIELD.get(nm), "qbs": qbs, "prior": prior, "season": season,
-                "carries_book": carries_book,
-                "reads": {"catch": CATCH_READ.get((nm, t)), "carry": CARRY_READ.get((nm, t)), "rr": rr_read},
                 "qb": qb, "shadow": shadow,
                 "matchup": RSCH.matchup_sentence(PA, HOME if t == AWAY else AWAY, m.pos), "watch": watch}
 
-    L.append(RSCH.CARD_LEGEND + "\n")
+    L.append("\n".join(RSCH.card_guide()) + "\n")
+    # the live record and the backtest calibration, once (they were the same on every card)
+    _cal = RSCH.calibration_block(set(RESEARCH.market) if len(RESEARCH) else set(),
+                                  {t_: env[t_]["implied_points"] for t_ in (AWAY, HOME)
+                                   if env[t_].get("implied_points") is not None},
+                                  list(M[M.name.isin(set(RESEARCH.player))].slot) if len(RESEARCH) else [])
+    if _cal:
+        L.append("\n".join(_cal) + "\n")
     for t, side_label in [(AWAY, "away"), (HOME, "home")]:
         L.append(f"## {t} ({side_label})\n")
         e = env[t]
@@ -3105,14 +3259,18 @@ def main():
     L.append(f"**Step 2, this season.** We layer in what has actually happened so far ({n_weeks} week{'s' if n_weeks!=1 else ''}). "
              "One game counts for a little; by mid-season it counts for most of it. A player who changed teams gets his old "
              "numbers discounted, because his old role is weak evidence for his new one.\n")
-    L.append("**Step 3, the game.** We estimate how many times each team will throw and run, and how many touchdowns it should "
-             "score, from its own recent games. Players who are out are removed and their share of the ball is handed to teammates.\n")
+    L.append("**Step 3, the game.** We estimate how many times each team will throw and run from its own games this "
+             "season and last, then move that part of the way toward what the spread and total imply (throws a quarter "
+             "of the way, backs' carries half). Touchdowns are anchored to the market's implied points. Players who are "
+             "out are removed and their share of the ball is handed to teammates.\n")
     L.append("**Step 4, the simulation.** We play the game out 20,000 times on a computer with realistic randomness: some games "
              "a player gets 4 catches, some 9, some he breaks a long one. From those 20,000 outcomes we read off how often he "
              "clears each line the book has posted.\n")
     L.append("**Step 5, the comparison.** We turn the book's odds into a probability, strip out its built-in cut, and put our "
-             "number next to it. The gap is what the report is about. A big gap does not mean a good bet; it usually means "
-             "one side knows something the other doesn't, and the book is the one watching practice.\n")
+             "number next to it. At real lines the book's number has been the better probability so far, so read it as "
+             "the chance and use ours for the workload: how much volume each line needs at each efficiency, and how "
+             "often the simulation gives him that much. A big gap usually means one side knows something the other "
+             "doesn't, and the book is the one watching practice.\n")
 
     L.append("## What we pulled, and whether it worked\n")
     L.append("| Source | Used for | Status | Detail |")

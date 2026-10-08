@@ -7953,3 +7953,84 @@ The expert re-ran the four-season backtest (baseline reproduces ours: receptions
   receivers' summed lines (round 38 scales the QB alone).
 - Not changed: passes and runs, and the two teams, are drawn independently -- no effect on a
   single prop; it would matter for same-game combinations, which are not priced.
+
+## 2026-10-07 (206) -- the volume chance on every card; volume and efficiency measured
+
+- **The user's framework:** the engine predicts volume from snap share and game script; the user
+  judges the efficiency. "The engine just needs to predict when volume is more than X." Each card
+  now prints, per yards and receptions market, the volume the line needs at each efficiency
+  assumption (last 10 games with long plays capped -- naming its games by season -- this season
+  uncapped, the engine's rate), the engine's chance of that volume, the efficiency the line needs
+  at the engine's volume and how many of his games this season beat it. Informational: the
+  research CSV is byte-identical before and after.
+- **The efficiency is per catch, per completion, per carry (the user's call, measured):** first
+  half-season against second, 2018-24, 691 receiver-seasons -- yards a catch 0.57, catch rate
+  0.48, yards a target 0.31 (it carries both noises); QBs, 177 seasons -- yards an attempt 0.43,
+  a completion 0.40, completion rate 0.46. So the engine supplies catches (targets x his catch
+  rate, with the catch luck) and completions (simulate_qb_completions on its own stream, 104),
+  and the user judges yards a catch / a completion / a carry. A back's rushing + receiving uses
+  both rates on the engine's carries and catches. Receptions keep targets and a catch rate.
+  QBs get a luck-capped row (their capped yards a completion, last 10 games).
+- **Volume measured first (backtest 2022-25):** targets calibrated (19.6-20.5% outside the 80%
+  range, average miss 2.26 vs naive 2.37); catches calibrated (20.8%), but for receivers projected
+  5+ only 7.5% land above the engine's 90th percentile; carries too narrow (24.8-27.1%; high totals
+  4-5 points low); a back's targets plus carries 22.9%; QB completions 16.9% (7.8% above the 90th);
+  team throws 15.2%, slightly wide, average miss 5.82 vs the team's own average 6.12 (1,662
+  team-games). Each table carries the note for its volume.
+- **Not changed:** the carries width. A wider carries spread is a model change and goes through
+  the pre-registered round process, not this informational PR.
+
+## 2026-10-07 (207) -- the luck cap moves to the 90th percentile for every kind
+
+- **The user's call, after seeing 95/97.5 and then 90 on the fixture:** the 90th for catches, runs
+  and completions. The cap is the luckless Over check (user: "only for overs anyways"), so a strict
+  one is the point. The 10-05 reason for the 97.5th on runs (ordinary runs trimmed) was put to the
+  user with the numbers below and set aside.
+- **Measured first:** typical caps (2023-24, each player's last 10 games) -- backs 17 / 13 / 9
+  yards at 97.5 / 95 / 90 (1.3 runs trimmed a game at 90), receivers 33 / 28 / 22 (0.5 a game),
+  QBs 35 / 29 / 22 a completion (1.9 a game). Pull-down at 90 (2018-24): 0.7 yards a carry, 1.0 a
+  catch, 1.1 a completion. Half-to-half steadiness at 97.5 / 95 / 90: runs 0.45 / 0.47 / 0.50,
+  catches 0.67 / 0.67 / 0.66, completions 0.39 / 0.40 / 0.41.
+- **On the fixture:** most receivers need the same catches; deep threats and QBs move most
+  (Collins 16.1 -> 14.3 a catch, 5 -> 6 catches; Dak 11.4 -> 10.6 a completion, 24 -> 26
+  completions, 44% -> 33%; Javonte 4.1 -> 3.6 a carry, 15 -> 17 carries, 51% -> 36%).
+- **It moves no price:** only the luck-free column and the line-fit sentences change; every
+  other output is identical apart from run timestamps.
+- **The minimum plays for a percentile drops from 20 to 10** (review finding): at the 90th, the
+  under-20 fallback (drop only his longest) was far milder than the cap's top-10% trim, a jump at
+  the boundary; from 10 plays the 90th caps about his longest, so the rules meet. Rates already
+  need 8 catches / 10 carries / 20 completions, so the fallback now covers only 8-9 catches. The
+  card's wording drops "unusually long" and "lucky breakaway": it says plays past his 90th
+  percentile are capped.
+
+## 2026-10-07 (208) -- the player card is one table
+
+- **The user:** the card was "kind of confusing, lots of tables and numbers everywhere". The
+  same few numbers appeared in five places (prop table, workload check, capped-play line,
+  volume-chance tables, line-fit sentence) and the live record and backtest calibration were
+  repeated on every card. The user approved a one-table mock-up.
+- **Now:** one prop table per player with a column per market -- the market's chance first (the
+  probability), the engine's chance, the price, the forecast, what the Over needs, the engine's
+  volume, the volume chance at each efficiency (luck-capped, this season, the engine's), the
+  market's own volume line, the efficiency the line needs at the engine's volume and his games
+  that beat it. Under it: role evidence (a QB's workload table), the baseline, and notes naming
+  each rate's games. Other books' lines get a small table. The live record and backtest
+  calibration print once above the cards.
+- **Dropped from the card** (not data the user bets on): the price-based workload check (Sleeper
+  Power Plays pay flat multipliers, so a leg's price is not his break-even), the capped-play line
+  and the line-fit sentence (the table carries both). The line-fit reads stay in the research
+  CSV. workload_table, capped_line and calibration_line are deleted (replaced, not kept beside).
+- **No price moves:** every research and record output is identical on the fixture.
+
+## 2026-10-07 (209) -- every report explains how its card numbers are made and how to read them
+
+- **The user, on the one-table card:** "It's a lot of data, as long as there's sufficiently
+  detailed explanation on how the data was produced and how to interpret the data." The data
+  stays; the explanation is what was thin (a one-paragraph legend, and a plain-English section at
+  the end of the report that still described the gap as the point of the report).
+- **Now:** "How to read the player cards" prints once before the cards: a row-by-row table (how it
+  is produced, how to read it) and a short "Using it" paragraph. The plain-English steps describe
+  the market inputs (throws a quarter and backs' carries half toward the spread and total; TDs
+  anchored to implied points) and read the book's number as the probability. SKILL.md: chat copies
+  the guide before the first card and says how the matchup tables were built; no number goes out
+  without its source explained.

@@ -56,6 +56,24 @@ def test_the_report_opens_as_a_research_sheet(run):
     assert "A research sheet, not a bet list." in first
 
 
+def test_cards_are_one_table_with_the_volume_chance_for_every_market_kind(run):
+    # the user's framework and layout (2026-10-07): one table per player, a column per prop; the engine's
+    # volume against the efficiency each line needs
+    report, _r, _e = run
+    for head in ("| | Receptions ", " Receiving yards ", " Rushing yards ", "| | Passing yards "):
+        assert head in report, head
+    assert "| **Market's chance of the Over** |" in report and "| At his luck-capped rate |" in report
+    assert " completions at " in report and " catches at " in report and " carries at " in report
+    assert " targets at " in report
+    assert "luck-capped rate = last 10 games, long catches capped (" in report and "so far, uncapped (" in report
+    assert "| His games this season that beat that |" in report
+    for gone in ("| Workload check |", "**Capped-play check:**", "**How his lines fit together:**", "**Volume chance"):
+        assert gone not in report, gone
+    # the price-based margin flags belong to the research table, never to a card's Watch line
+    watch = [ln for ln in report.splitlines() if ln.startswith("**Watch:**")]
+    assert watch and not any("thin" in ln.lower() for ln in watch)
+
+
 def test_no_bet_language_anywhere_the_user_reads(run):
     report, _r, log = run
     for w in FORBIDDEN:
@@ -121,8 +139,8 @@ def test_the_team_matchup_section_and_the_cards_follow_the_users_guides(run):
     assert ("50 = league average; higher is better for both offense and defense." in report
             or "Unit scores: not included in this run" in report), "the user's caption, or the gap stated"
     assert "| Tier | Passing offence |" not in report, "no tier ladder"
-    assert "| Prop | Line | Price: Over / Under | Engine forecast: middle; 80% range | Over: engine / market |" in report
-    assert "**Live record at Sleeper's lines**" in report, "the real-line record on the cards"
+    assert "| **Market's chance of the Over** |" in report
+    assert report.count("**Live record at Sleeper's lines**") == 1, "the real-line record, once for the report"
 
 
 @pytest.fixture(scope="module")
