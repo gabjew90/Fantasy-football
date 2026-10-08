@@ -132,17 +132,19 @@ def test_a_tight_end_card_shows_his_roles_measured_row():
 
 
 def test_volume_chance_known_answers():
-    # 68.5 needs 69 yards: at 8.5 a target that is ceil(69/8.5) = 9 targets; at 6.0, 12 (11.5 rounds up)
-    draws = list(range(1, 21))                       # 1..20 targets, one each: P(>= 9) = 12/20
-    L = RS.volume_chance("player_reception_yds", 68.5, draws, [("Capped", 8.5), ("Season", 6.0), ("Bad", None)],
-                         games=[(10, 90.0), (8, 40.0), (0, 0.0)])
+    # 68.5 needs 69 yards: at 13.1 a catch that is ceil(69/13.1) = 6 catches; at 9.4, 8 (7.3 rounds up)
+    draws = list(range(1, 11))                       # 1..10 catches, one each: P(>= 6) = 5/10
+    L = RS.volume_chance("player_reception_yds", 68.5, draws, [("Capped", 13.1), ("Season", 9.4), ("Bad", None)],
+                         games=[(5, 80.0), (6, 40.0), (0, 0.0)], team="DAL")
     txt = "\n".join(L)
-    assert "| Capped | 8.5 | 9 targets | 60% |" in txt
-    assert "| Season | 6.0 | 12 targets | 45% |" in txt
+    assert "| Capped | 13.1 | 6 catches | 50% |" in txt
+    assert "| Season | 9.4 | 8 catches | 30% |" in txt
     assert "Bad" not in txt                         # an assumption with no rate is left out
-    # the engine's mean is 10.5 targets, so the line needs 69 / 10.5 = 6.6 a target; 9.0 beat it, 5.0 did not,
-    # and the zero-target game is not a game he could beat it in
-    assert "At the engine's 10.5 targets, the line needs 6.6 yards a target; he beat that in 1 of his 2 games" in txt
+    # the engine's mean is 5.5 catches, so the line needs 69 / 5.5 = 12.5 a catch; 16.0 beat it, 6.7 did not,
+    # and the zero-catch game is not a game he could beat it in
+    assert ("At the engine's 5.5 catches, the line needs 12.5 yards a catch; he beat that in 1 of his 2 games "
+            "for DAL this season.") in txt
+    assert "catch counts are calibrated" in txt     # the backtest note for catches rides on the table
 
 
 def test_volume_chance_receptions_and_carries():
@@ -154,27 +156,64 @@ def test_volume_chance_receptions_and_carries():
     txt = "\n".join(L)
     assert "| Engine | 4.0 | 15 carries | 40% |" in txt
     assert "| The market's own carries line | - | more than 14.5 carries | 40% |" in txt
-    assert "4-5 points low" in txt                  # the backtest's carry note rides on rushing tables
+    assert "4-5 points low" in txt
     assert RS.volume_chance("player_rush_yds", None, [10], [("Engine", 4.0)]) == []
     assert RS.volume_chance("player_rush_yds", 59.5, [], [("Engine", 4.0)]) == []
 
 
-def test_the_card_prints_a_volume_chance_block():
-    vol = RS.volume_chance("player_reception_yds", 68.5, list(range(1, 21)), [("Season", 8.5)])
-    d = {"name": "Test Player", "team": "DAL", "slot": "WR1", "pos": "WR",
-         "rows": [_row("player_reception_yds", 68.5)], "book": "sleeper", "quoted": None, "fit": [],
-         "volume": [{"market": "player_reception_yds", "line": 68.5, "lines": vol}]}
-    txt = "\n".join(RS.player_card(d))
-    assert "**Volume chance, receiving yards 68.5**" in txt and "| Season | 8.5 | 9 targets | 60% |" in txt
+def test_volume_chance_passing_counts_completions():
+    # 265.5 needs 266: at 11.7 a completion ceil(266/11.7) = 23 completions
+    L = RS.volume_chance("player_pass_yds", 265.5, [23] * 5 + [22] * 5, [("Capped", 11.7)], market_volume=22.5)
+    txt = "\n".join(L)
+    assert "| Capped | 11.7 | 23 completions | 50% |" in txt
+    assert "| The market's own completions line | - | more than 22.5 completions | 50% |" in txt
 
 
-def test_volume_chance_receptions_past_his_targets_and_team_wording():
+def test_volume_chance_rushing_plus_receiving_uses_two_rates():
+    # carries and catches drawn together: 10 carries + 2 catches, or 14 carries + 4 catches
+    car, cat = [10] * 5 + [14] * 5, [2] * 5 + [4] * 5
+    # at 4.0 a carry and 8.0 a catch: 56 or 88 yards; a 60.5 line needs 61 -> only the second half clears
+    L = RS.volume_chance("player_rush_reception_yds", 60.5, (car, cat), [("Engine", (4.0, 8.0)), ("Half", (4.0, None))],
+                         games=[(15, 70.0)])
+    txt = "\n".join(L)
+    # blended rate (12*4 + 3*8) / 15 = 4.8 a touch -> ceil(61/4.8) = 13 carries + catches
+    assert "| Engine | 4.0 a carry, 8.0 a catch | 13 carries + catches | 50% |" in txt
+    assert "Half" not in txt                        # a pair with a missing rate is left out
+    assert "Engine's chance at that efficiency" in txt
+    assert "the line needs 4.1 yards a carry or catch; he beat that in 1 of his 1 games" in txt
+    assert RS.volume_chance("player_rush_reception_yds", 60.5, ([1, 2], [1]), [("E", (4.0, 8.0))]) == []
+
+
+def test_volume_chance_receptions_past_his_targets():
     # 2.5 catches needs 3; the engine projects 2.0 targets -- no catch rate gets there
     L = RS.volume_chance("player_receptions", 2.5, [2.0] * 10, [("Season", 0.8)], games=[(3, 3.0)])
     txt = "\n".join(L)
     assert "the line needs 3 catches -- more than his targets." in txt and "%;" not in txt
-    L = RS.volume_chance("player_rush_yds", 59.5, [15] * 10, [("Engine", 4.0)], games=[(15, 70.0)], team="DAL")
-    assert "he beat that in 1 of his 1 games for DAL this season with a carry" in "\n".join(L)
+
+
+def test_the_card_prints_a_volume_chance_block():
+    vol = RS.volume_chance("player_reception_yds", 68.5, list(range(1, 11)), [("Season", 13.1)])
+    d = {"name": "Test Player", "team": "DAL", "slot": "WR1", "pos": "WR",
+         "rows": [_row("player_reception_yds", 68.5)], "book": "sleeper", "quoted": None, "fit": [],
+         "volume": [{"market": "player_reception_yds", "line": 68.5, "lines": vol}]}
+    txt = "\n".join(RS.player_card(d))
+    assert "**Volume chance, receiving yards 68.5**" in txt and "| Season | 13.1 | 6 catches | 50% |" in txt
+
+
+def test_the_capped_label_names_the_window_luck_for_used():
+    # 4 games last season with a catch, 3 this season: the window holds all 7 (fewer than 10 -> says 7)
+    prior = {("p1", "catch"): [[10.0, 12.0]] * 4}
+    cur = {"p1": [[8.0], [9.0, 30.0], [5.0]]}
+    luck, _rate = RS.luck_for(prior, cur, "p1", "catch")
+    assert (luck["games"], luck["prior_games"], luck["cur_games"], luck["plays"]) == (7, 4, 3, 12)
+    assert RS.capped_label(luck, "catches", "catches", 2025, 2026) ==         "Last 7 games, long catches capped (4 from 2025, 3 from 2026; 12 catches)"
+    # 12 games last season: only the latest 7 of them fit beside this season's 3
+    luck, _ = RS.luck_for({("p1", "catch"): [[10.0]] * 12}, cur, "p1", "catch")
+    assert (luck["games"], luck["prior_games"], luck["cur_games"]) == (10, 7, 3)
+    # a passer's cameo games (under 5 completions) are not in his window, last season or this
+    luck, _ = RS.luck_for({("q", "pass"): [[9.0] * 2, [9.0] * 20]}, {"q": [[9.0] * 18, [9.0]]}, "q", "pass")
+    assert (luck["prior_games"], luck["cur_games"]) == (1, 1)
+    assert RS.capped_label(None, "runs", "carries", 2025, 2026) == "Recent games, long runs capped"
 
 
 def test_keeping_target_draws_changes_no_simulated_number():

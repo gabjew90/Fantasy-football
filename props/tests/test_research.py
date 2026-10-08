@@ -487,7 +487,8 @@ def test_the_luck_free_check_reads_his_last_10_games():
     assert not luck["own"] and luck["games"] == 2
     assert rate == pytest.approx((3 + 4 + 30 + 2 + 5 + 6 + 7 + 8 + 9 + 10 + 11 - 30) / 10)
     assert RS.luck_for({}, {"00-003": [[3.0, 9.0]]}, "00-003", "catch")[1] is None, "2 catches: too few for a rate"
-    assert RS.luck_for({}, {}, "00-999", "run") == ({"cap": None, "own": False, "n": 0, "games": 0}, None)
+    assert RS.luck_for({}, {}, "00-999", "run") == ({"cap": None, "own": False, "n": 0, "games": 0, "prior_games": 0,
+                                                     "cur_games": 0, "plays": 0}, None)
 
 
 def test_last_seasons_games_round_trip_through_the_resource():

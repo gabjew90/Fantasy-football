@@ -1399,6 +1399,13 @@ def main():
                     team_stream(t, 103), N_SIM, ys_t, other_t, P["other_receiver_rates"], SH, starter_share=_share,
                     width=WIDTH,
                     implied_points=env[t].get("implied_points"))
+                # his completions for the volume chance (simulate_qb_completions: his receivers' catches
+                # in this simulation, the depth bucket's targets caught, his share), stream 104: no price
+                # reads them and no other draw moves
+                sims[STARTER_QB[t]]["completions"] = MODEL.simulate_qb_completions(
+                    team_stream(t, 104), N_SIM,
+                    [sims[n_]["receptions"] for n_ in M[M.team == t].name if n_ != STARTER_QB[t] and n_ in sims],
+                    other_t, P["other_receiver_rates"], starter_share=_share, width=WIDTH)
                 if (WIDTH or {}).get("pass_implied_exp") and env[t].get("implied_points") is None:
                     # round 38 (pre-registered): a run without the spread/total says the scale is off
                     SOURCES.append((f"QB passing implied-points scale ({t})", "round 38's passing scale",
@@ -2252,6 +2259,7 @@ def main():
                 "run": RSCH.games_by_player(rushes, "rusher_player_id", "rushing_yards"),
                 "pass": RSCH.games_by_player(passes[passes.complete_pass == 1], "passer_player_id", "receiving_yards")}
         _luck = lambda gid, kind: RSCH.luck_for(_prior_games, _cur[kind], str(gid), kind)
+
         if not _py_path.exists():
             SOURCES.append(("Last season's play yards (luck-free check)", "each player's last 10 games, play by play",
                             "DATA MISSING", f"{_py_path.name} not found; the check uses this season's games only"))
@@ -2656,16 +2664,20 @@ def main():
     # his games this season, per team and week, for the volume chance's "games he beat it" (attempts as
     # research.qb_workload counts them: no sacks, no spikes)
     _tg_g = passes.groupby(["receiver_player_id", "posteam", "week"]).agg(
-        tg=("play_type", "size"), cat=("complete_pass", "sum"), ryd=("receiving_yards", "sum"))
+        tg=("play_type", "size"), cat=("complete_pass", "sum"), ryd=("receiving_yards", "sum"),
+        lng=("receiving_yards", "max"))
     _ru_g = rushes.groupby(["rusher_player_id", "posteam", "week"]).agg(car=("play_type", "size"),
-                                                                       uyd=("rushing_yards", "sum"))
+                                                                       uyd=("rushing_yards", "sum"),
+                                                                       lng=("rushing_yards", "max"))
     _pa = pbp[(pbp.play_type == "pass") & pbp.passer_player_id.notna()] if "passer_player_id" in pbp else pbp.iloc[0:0]
     if "sack" in _pa:
         _pa = _pa[_pa["sack"].fillna(0) != 1]
     if "pass_attempt" in _pa:
         _pa = _pa[_pa["pass_attempt"].fillna(0) == 1]
     _pa_g = _pa.groupby(["passer_player_id", "posteam", "week"]).agg(att=("play_type", "size"),
-                                                                     pyd=("passing_yards", "sum"))
+                                                                     pyd=("passing_yards", "sum"),
+                                                                     cmp=("complete_pass", "sum"),
+                                                                     lng=("passing_yards", "max"))
 
     def games_of(gid, t, kind):
         """[(volume, outcome)] for his games this season with team t, oldest first."""
@@ -2675,20 +2687,48 @@ def main():
             except KeyError:
                 return {}
             return {w: tuple(float(v) for v in r) for w, r in zip(x.index, x.to_numpy())}
-        parts = {"player_reception_yds": [(_tg_g, ["tg", "ryd"])], "player_receptions": [(_tg_g, ["tg", "cat"])],
-                 "player_rush_yds": [(_ru_g, ["car", "uyd"])], "player_pass_yds": [(_pa_g, ["att", "pyd"])],
+        parts = {"player_reception_yds": [(_tg_g, ["cat", "ryd"])], "player_receptions": [(_tg_g, ["tg", "cat"])],
+                 "player_rush_yds": [(_ru_g, ["car", "uyd"])], "player_pass_yds": [(_pa_g, ["cmp", "pyd"])],
                  "player_rush_reception_yds": [(_ru_g, ["car", "uyd"]), (_tg_g, ["cat", "ryd"])]}.get(kind, [])
         tot = {}
-        for frame, cols in parts:               # touches: carries and catches added week by week
+        for frame, cols in parts:               # combined: carries and catches added week by week
             for w, (v, y) in by_week(frame, cols).items():
                 a_ = tot.get(w, (0.0, 0.0))
                 tot[w] = (a_[0] + v, a_[1] + y)
         return [tot[w] for w in sorted(tot)]
 
+    def season_facts(gid, t, frame):
+        """(games, longest play) for his games this season with team t in one per-game frame."""
+        try:
+            x = frame.xs((gid, t), level=(0, 1))
+        except KeyError:
+            return 0, None
+        return len(x), (float(x.lng.max()) if x.lng.notna().any() else None)
+
     def volume_inputs(m, t, rows, nm):
-        """The volume-chance tables for his priced markets (research.volume_chance)."""
+        """The volume-chance tables for his priced markets (research.volume_chance). The engine's volume
+        (catches, carries, completions; targets for receptions) against the efficiency the reader judges
+        (yards a catch, a carry, a completion). Every row names the games behind its rate: the
+        luck-capped window (last season's games and this season's), this season uncapped with its
+        longest play, the engine's own rate."""
         s_ = sims.get(nm) or {}
         out, seen = [], set()
+        cap = lambda luck, play, word: RSCH.capped_label(luck, play, word, PRIOR, SEASON)
+        mean_ = lambda k: float(np.mean(s_[k])) if k in s_ else 0.0
+        per = lambda num, den: num / den if den > 0 else None
+
+        def season_label(frame, play):
+            n_, lng_ = season_facts(m.gsis_id, t, frame)
+            longest = f", longest {play} {lng_:.0f}" if lng_ is not None else ""
+            return f"{SEASON} so far, uncapped ({n_} games{longest})"
+
+        def season_rate(frame, vol, yds):
+            try:
+                x = frame.xs((m.gsis_id, t), level=(0, 1))
+            except KeyError:
+                return None
+            return per(float(x[yds].fillna(0).sum()), float(x[vol].sum()))
+
         for r in rows:
             mk = r["market"]
             if mk in seen or mk not in RSCH.VOLUME_UNIT:
@@ -2698,36 +2738,43 @@ def main():
             tot = lambda i: sum(g[i] for g in games)
             season = (tot(1) / tot(0)) if games and tot(0) > 0 else None
             mvol, rates, draws = None, [], None
-            if mk == "player_reception_yds" and "targets" in s_:
+            if mk == "player_reception_yds" and "receptions" in s_:
                 cr_ = CATCH_READ.get((nm, t)) or {}
-                lf_ = cr_.get("season_ypc_luckfree")              # yards a catch, long catches capped
-                capped = float(lf_) * float(m.cr) if lf_ is not None and pd.notna(m.cr) else None
-                rates = [("His recent rate, long catches capped", capped),
-                         ("His season rate", season), ("The engine's rate", float(m.ypt))]
-                draws = s_["targets"]
+                rates = [(cap(cr_.get("luck"), "catches", "catches"), cr_.get("season_ypc_luckfree")),
+                         (season_label(_tg_g, "catch"), season),
+                         ("The engine's rate", per(mean_("rec_yards"), mean_("receptions")))]
+                draws = s_["receptions"]
             elif mk == "player_receptions" and "targets" in s_:
-                rates = [("His season catch rate", season), ("The engine's catch rate", float(m.cr))]
+                rates = [(f"{SEASON} so far ({season_facts(m.gsis_id, t, _tg_g)[0]} games)", season),
+                         ("The engine's catch rate", float(m.cr))]
                 draws = s_["targets"]
             elif mk == "player_rush_yds" and "carries" in s_:
                 cy_ = CARRY_READ.get((nm, t)) or {}
-                rates = [("His recent rate, long runs capped", cy_.get("season_ypc_luckfree")),
-                         ("His season rate", season), ("The engine's rate", float(m.ypc) if pd.notna(m.ypc) else None)]
+                rates = [(cap(cy_.get("luck"), "runs", "carries"), cy_.get("season_ypc_luckfree")),
+                         (season_label(_ru_g, "run"), season),
+                         ("The engine's rate", per(mean_("rush_yards"), mean_("carries")))]
                 draws, mvol = s_["carries"], cy_.get("carries_line")
-            elif mk == "player_rush_reception_yds" and "carries" in s_:
-                tch = np.asarray(s_["carries"]) + np.asarray(s_["receptions"])
-                eng = float(np.mean(s_["rush_rec_yards"])) / float(tch.mean()) if tch.mean() > 0 else None
+            elif mk == "player_rush_reception_yds" and "carries" in s_ and "receptions" in s_:
+                # two efficiencies: yards a carry and yards a catch, on the engine's carries and catches
                 rr_ = RUSH_REC.get((nm, t)) or {}
-                rates = [("His recent rate, long plays capped", rr_.get("touch_rate") if rr_.get("rates_luck_free") else None),
-                         ("His season rate", season),
-                         ("The engine's rate", eng)]
-                draws = tch
-            elif mk == "player_pass_yds" and t in team_targets_draw and "pass_yards" in s_                     and RSCH._ok((TEAM_VOL_CHK.get(t) or {}).get("target_rate")):
-                # the simulated starter only; attempts are the team's throws at its own measured
-                # targets-per-attempt rate (no rate measured: no table)
-                draws = np.asarray(team_targets_draw[t], dtype=float) / float(TEAM_VOL_CHK[t]["target_rate"])
-                eng = float(np.mean(s_["pass_yards"])) / float(draws.mean()) if draws.mean() > 0 else None
-                rates = [("His season rate", season), ("The engine's rate", eng)]
-                mvol = _xl("passing_attempts", nm, t).get("line")      # the market's attempts line, if posted
+                capped = (rr_.get("run_rate"), rr_.get("catch_rate")) if rr_.get("rates_luck_free") else None
+                rates = [(cap(rr_.get("run_luck"), "runs", "carries") + "; "
+                          + cap(rr_.get("catch_luck"), "catches", "catches")[0].lower()
+                          + cap(rr_.get("catch_luck"), "catches", "catches")[1:], capped),
+                         (f"{SEASON} so far, uncapped ({len(games)} games)",
+                          (season_rate(_ru_g, "car", "uyd"), season_rate(_tg_g, "cat", "ryd"))),
+                         ("The engine's rate", (per(mean_("rush_yards"), mean_("carries")),
+                                                per(mean_("rec_yards"), mean_("receptions"))))]
+                draws = (s_["carries"], s_["receptions"])
+            elif mk == "player_pass_yds" and "completions" in s_ and "pass_yards" in s_:
+                # the simulated starter only. QB luck cap (user, 2026-10-07): his capped yards a
+                # completion over his last 10 games
+                q_ = QB_READ.get((nm, t)) or {}
+                rates = [(cap(q_.get("luck"), "completions", "completions"), q_.get("luckfree_ypc")),
+                         (season_label(_pa_g, "completion"), season),
+                         ("The engine's rate", per(mean_("pass_yards"), mean_("completions")))]
+                draws = s_["completions"]
+                mvol = _xl("pass_completions", nm, t).get("line")      # the market's completions line, if posted
             if draws is None:
                 continue
             out.append({"market": mk, "line": r["line"],

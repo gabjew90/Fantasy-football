@@ -62,7 +62,8 @@ def test_cards_carry_the_volume_chance_for_every_market_kind(run):
     for head in ("**Volume chance, receiving yards", "**Volume chance, receptions", "**Volume chance, rushing yards",
                  "**Volume chance, passing yards"):
         assert head in report, head
-    assert "pass attempts |" in report and "targets |" in report and "carries |" in report
+    assert "completions |" in report and "catches |" in report and "carries |" in report and "targets |" in report
+    assert "Last 10 games, long catches capped (" in report and "so far, uncapped (" in report
     assert "he beat that in" in report
 
 
