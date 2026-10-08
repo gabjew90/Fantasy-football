@@ -7979,3 +7979,16 @@ The expert re-ran the four-season backtest (baseline reproduces ours: receptions
   team-games). Each table carries the note for its volume.
 - **Not changed:** the carries width. A wider carries spread is a model change and goes through
   the pre-registered round process, not this informational PR.
+
+## 2026-10-07 (207) -- the luck cap: 95th for catches and completions, runs stay 97.5th
+
+- **The user's call:** cap at the 95th; runs keep the 97.5th (the 10-05 reason holds: a back's
+  95th is about 13 yards, range 10-18, so ordinary 14-yard runs would be trimmed, ~0.7 a game).
+- **Measured first (2018-24, half-seasons with 20+ plays):** the 95th trims 0.50 yards a catch
+  (97.5th: 0.25), 0.58 a completion (0.30), 0.40 a carry (0.22). Half-to-half steadiness: catches
+  0.66 uncapped / 0.67 at 97.5 / 0.67 at 95 (no cost); completions 0.39 / 0.39 / 0.40; carries
+  0.42 / 0.45 / 0.47 (not taken, by the user's call). A receiver's typical cap moves from 33 to 28
+  yards. Pickens (51 catches): cap 38.8 -> 33.0, 13.1 -> 12.7 a catch.
+- **The cap is the luckless Over check** (user: "only for overs anyways"). It moves no price: on
+  the fixture only the luck-free column and the line-fit sentences change; every other output is
+  identical apart from run timestamps.

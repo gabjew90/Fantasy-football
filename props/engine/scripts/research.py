@@ -347,14 +347,19 @@ def to_clear(line) -> int:
 YPC_BAND = 1.0
 YPC_MIN_CATCHES = 8
 # THE LUCK LINE for the achievability gauge (user's design, 2026-10-05; DECISIONS #167):
-# a play past the player's OWN 97.5th percentile for that prop over his last LUCK_WINDOW games
+# a play past the player's OWN percentile for that prop (LUCK_PCT by kind) over his last LUCK_WINDOW games
 # -- his catches for receiving yards, his runs for rushing yards -- counts as a lucky
 # breakaway and is counted at that line (user, 2026-10-05, after trying the 95th and 99th: the
 # 95th cut a back's ordinary 15-25-yard runs, which come most games). "Too few" = under
 # LUCK_MIN_PLAYS of his plays of that kind in the window; then his longest play is left out
-# instead. At 20 plays the 97.5th sits at about his longest play. A definition for a
-# descriptive gauge, not a fit (reports/robust_ypc_check.md, for reference only)
-LUCK_PCT = 97.5
+# instead. At 20 plays the 97.5th sits at about his longest play, the 95th between his two
+# longest. A definition for a
+# descriptive gauge, not a fit (reports/robust_ypc_check.md, for reference only).
+# 2026-10-07 (user, DECISIONS #207): catches and completions move to the 95th -- it trims about 0.5
+# yards a catch and 0.6 a completion across 2018-24 (a receiver's typical cap ~28 yards, from 33)
+# and costs no half-to-half steadiness; runs keep the 97.5th (a back's 95th is ~13 yards, the
+# ordinary runs the 10-05 call protected).
+LUCK_PCT = {"catch": 95.0, "run": 97.5, "pass": 95.0}
 LUCK_MIN_PLAYS = 20
 # the luck-free check (luck line AND rate) reads his last this-many games, crossing into
 # last season while this one is short (user, 2026-10-05)
@@ -365,14 +370,15 @@ QB_MIN_COMPLETIONS = 20
 QB_CAMEO_COMPLETIONS = 5
 
 
-def player_luck_line(plays) -> dict:
-    """The luck line for one player and one kind of play: {cap, own, n}. own: his
-    LUCK_PCT percentile play sets the cap. Otherwise (too few plays) cap is None and the
-    caller leaves his longest play out instead (luck_free_rate)."""
+def player_luck_line(plays, pct) -> dict:
+    """The luck line for one player and one kind of play: {cap, own, n, pct}. own: his
+    `pct` percentile play sets the cap (LUCK_PCT[kind]; required, so no kind falls back to
+    another's). Otherwise (too few plays) cap is
+    None and the caller leaves his longest play out instead (luck_free_rate)."""
     v = [float(x) for x in (plays or []) if x == x]
     if len(v) >= LUCK_MIN_PLAYS:
-        return {"cap": float(np.percentile(v, LUCK_PCT)), "own": True, "n": len(v)}
-    return {"cap": None, "own": False, "n": len(v)}
+        return {"cap": float(np.percentile(v, pct)), "own": True, "n": len(v), "pct": pct}
+    return {"cap": None, "own": False, "n": len(v), "pct": pct}
 
 
 def luck_free_rate(season_plays, luck) -> float | None:
@@ -401,7 +407,7 @@ def luck_for(prior_games, current_games, gid, kind, window=LUCK_WINDOW):
     plays = [y for g in games for y in g]
     n_cur = min(len(cur), len(games))
     # which games the window holds (the volume chance names them): last season's, this season's
-    luck = dict(player_luck_line(plays), games=len(games), prior_games=len(games) - n_cur, cur_games=n_cur,
+    luck = dict(player_luck_line(plays, LUCK_PCT[kind]), games=len(games), prior_games=len(games) - n_cur, cur_games=n_cur,
                 plays=len(plays))
     min_plays = {"catch": YPC_MIN_CATCHES, "run": RUN_MIN_CARRIES, "pass": QB_MIN_COMPLETIONS}[kind]
     return luck, (luck_free_rate(plays, luck) if len(plays) >= min_plays else None)
@@ -421,7 +427,7 @@ def luck_words(luck, unit) -> str:
         return ""
     plural = {"catch": "catches", "run": "runs", "completion": "completions"}.get(unit, f"{unit}s")
     if luck["own"]:
-        return (f"every {unit} past {luck['cap']:.0f} yards, his own {LUCK_PCT}th percentile over his last "
+        return (f"every {unit} past {luck['cap']:.0f} yards, his own {luck.get('pct', LUCK_PCT['run']):g}th percentile over his last "
                 f"{luck.get('games', '?')} games with a {unit} ({luck['n']} {plural}), counted as {luck['cap']:.0f}")
     return (f"his longest {unit} left out -- only {luck['n']} {plural} in his last {luck.get('games', '?')} "
             f"games with a {unit}, too few for a percentile")
@@ -2189,7 +2195,7 @@ def qb_yards_read(completions_line=None, yards_line=None, proj_completions=None,
     """The quarterback's version of the catches/carries reads (DECISIONS #170): the book's
     completions, passing-yards and longest-completion lines read together at the whole
     numbers that win them; his luck-free yards per completion over his last LUCK_WINDOW
-    games (each completion past his own LUCK_PCT percentile counted at it); the
+    games (each completion past his own LUCK_PCT["pass"] percentile counted at it); the
     completions the yards line takes at that rate, against our projected completions and
     the book's completions line. Report text only."""
     ok = lambda v: v is not None and v == v

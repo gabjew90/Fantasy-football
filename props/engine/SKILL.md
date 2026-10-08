@@ -453,7 +453,7 @@ For a narrow question, run only what it needs:
   threshold -- the card's combined column says so, and a combined what-if runs as a separate
   carry-and-catch scenario (carries, targets, catch rate and both yards rates kept apart).
   **The achievability gauge** ends both reads: the volume the yards line takes at his capped
-  yards a play (the luck line: a play past the player's OWN 97.5th percentile for that prop --
+  yards a play (the luck line: a play past the player's OWN 95th percentile for catches and completions, 97.5th for runs --
   his catches or his runs, last season and this one -- counts as a lucky breakaway and is
   counted at the line; under 20 plays of his own, his longest play this season is left out
   instead; the report prints which it used; ours when his
