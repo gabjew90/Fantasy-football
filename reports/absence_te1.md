@@ -17,3 +17,4 @@ Lead back only (the McCaffrey case): share 0.105 with the TE1, scorer's rule 0.1
 
 A ratio near 1 means the proportional rule is right for that group; well below 1 means it overstates the boost; above 1 means it understates it.
 
+*Produced by props/engine/scripts/absence_check.py, deleted 2026-10-08 (DECISIONS #211); the code is in git history at 87f67a4.*

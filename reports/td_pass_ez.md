@@ -1,6 +1,6 @@
 # The end-zone split: red-zone targets and TDs separated into end-zone (pass_ez) and other (pass_rz)
 
-Paired comparison, player by player: the shipped model from main (five channels) vs the same model with the split, identical players, game-clustered CIs (scripts/td_compare.py). No parameter was fitted, so every era is an evaluation. 2016-17 alone is below the harness's 95% active-list coverage guard and is not reported.
+Paired comparison, player by player: the shipped model from main (five channels) vs the same model with the split, identical players, game-clustered CIs (props/engine/scripts/td_compare.py, deleted 2026-10-08 (DECISIONS #211); the code is in git history at c183f82). No parameter was fitted, so every era is an evaluation. 2016-17 alone is below the harness's 95% active-list coverage guard and is not reported.
 
 ## 2022_2023
 

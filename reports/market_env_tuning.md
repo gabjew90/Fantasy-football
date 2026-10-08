@@ -19,7 +19,7 @@ time it runs.
 **The rule, fixed before the 0.75 and 1.0 runs finished:** CRPS summed over
 the five markets, each relative to the live model's; among weights not
 measurably worse than the best, the smallest -- the live model counts as
-weight 0. Computed by `props/tools/pick_market_env.py` from the runs'
+weight 0. Computed by `props/tools/pick_market_env.py` (deleted 2026-10-08 (DECISIONS #211); the code is in git history at 5d78354) from the runs'
 `--save-results` pickles.
 
 "Not measurably worse" two ways, 95% intervals resampling whole games. The

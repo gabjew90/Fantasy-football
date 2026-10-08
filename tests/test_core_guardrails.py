@@ -38,7 +38,7 @@ FETCH_ALLOWED = {
     "draftkit/baselines.py", "draftkit/consensus.py", "draftkit/dataset.py", "draftkit/defense.py",
     "draftkit/external.py", "draftkit/seasondata.py", "draftkit/sleeper.py",
     "manager/consensus.py", "manager/usage.py", "manager/waiver_brief.py",
-    "props/engine/scripts/absence_check.py", "props/engine/scripts/absence_tune.py",
+    "props/engine/scripts/absence_tune.py",
     "props/engine/scripts/backtest.py", "props/engine/scripts/build_priors.py",
     "props/engine/scripts/score_game.py", "props/engine/scripts/td_alloc_backtest.py",
     "props/engine/scripts/td_backtest.py", "props/guard.py",
