@@ -639,7 +639,10 @@ need not be surfaced. Write the reply as a premium prop guide with this structur
    near 47% everywhere); after it the engine says 44.8% and 56.8% in those rows -- most of the
    lean is gone, the extremes keep some. The card prints the team's row beside every passing
    price; chat says it with any passing read. A run without a spread/total turns the scale off
-   and says so in the sources table. It is also too WIDE in the tails (14% of games outside the 80% range against a
+   and says so in the sources table.
+   Because the scale acts on the QB alone, his passing mean sits above his receivers' summed yards
+   (about 4% at 22 implied points, 9.5% at 28.5): never compare a QB's line with his receivers' lines
+   added up (fourth expert review). It is also too WIDE in the tails (14% of games outside the 80% range against a
    17-23% bar; reports/rush_rec_calibration.md). Priced by the user's decision (DECISIONS #105).
    Ladder: `ladder_*.csv` holds P(stat <= k) per player; quote it when the user asks about
    an alternate line.

@@ -1024,10 +1024,11 @@ def simulate_team_game(rng, n_sim, team_volume_mean, team_volume_r, player_share
     3. Each player's catches | his own targets ~ Binomial(his catch rate).
     4. Yards | catches ~ sum of per-catch Gamma draws.
 
-    This makes teammates' receptions NEGATIVELY correlated within a simulation
-    (more targets to A means fewer available for B, for a fixed team total) and
-    makes every player's outcome share the team's own play-count variance --
-    both true of real football and both absent from independent per-player draws.
+    Two forces act on teammates within a simulation: the split competes (more targets to A
+    means fewer for B, for a fixed team total) and the shared team total moves everyone
+    together. Measured, they roughly cancel: teammates' targets correlate about +0.06, not
+    negatively (fourth expert review, 2026-10-07). Every player's outcome shares the team's
+    play-count variance, which independent per-player draws would not.
     Returns {player_index: (receptions_array, yards_array)}, plus team_targets_array.
     With `return_other` (and the other bucket on), the dict also holds
     OTHER -> the bucket's targets per simulation; that costs no random draw.

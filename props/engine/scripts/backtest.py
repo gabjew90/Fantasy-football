@@ -45,7 +45,10 @@ RES = HERE.parent / "resources"
 CACHE = Path(os.environ.get("NFL_BACKTEST_CACHE", Path(tempfile.gettempdir()) / "nflbt"))
 NV = "https://github.com/nflverse/nflverse-data/releases/download"
 GAMES = "https://raw.githubusercontent.com/nflverse/nfldata/master/data/games.csv"
-N = 1000
+# Draws per player-game. 1,000 leaves ~1.5 points of noise in one Over chance and is the source of
+# the seed noise behind #202's four-seed rule; NFL_BACKTEST_DRAWS raises it (e.g. 10000) for a ship
+# decision. The default stays 1,000 so earlier runs reproduce.
+N = int(os.environ.get("NFL_BACKTEST_DRAWS", "1000"))
 
 # market key -> (actual column, label, synthetic-line offsets for the reliability table)
 # market -> the population column its rows are graded on (absent = every row)
@@ -210,7 +213,9 @@ def ensure_priors(season, priors_dir, build):
 
 
 def crps_block(samples, y_arr):
-    """Vectorized unbiased empirical CRPS across all players at once."""
+    """Vectorized empirical CRPS across all players at once, in the plug-in form (the spread
+    term divides by n*n, not n*(n-1)): biased by about 1/n -- ~0.05% at 1,000 draws, equal across
+    arms of a comparison (fourth expert review)."""
     n = samples.shape[1]
     t1 = np.abs(samples - y_arr[:, None]).mean(axis=1)
     ss_ = np.sort(samples, axis=1)
@@ -1212,6 +1217,7 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
         # which harness wrote these rows: compare() never mixes a capped run with an uncapped one
         res["new_team_cap"] = bool(getattr(args, "new_team_cap", True))
         res["new_team_cap_rates"] = getattr(args, "new_team_cap_rates", "all")
+        res["n_draws"] = N                      # compare() refuses runs with different draw counts
 
         # RELIABILITY AT SYNTHETIC LINES (calibration a bettor can read): lines at
         # fixed offsets from the model median (not model quantiles, which would be

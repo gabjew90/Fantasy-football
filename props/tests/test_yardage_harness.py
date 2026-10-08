@@ -570,3 +570,28 @@ def test_round_39_scorer_harness_parity_for_market_carries():
     assert re.search(r"mrw = \(M\.MARKET_RUSH_WEIGHT", bt), "the harness defaults to the shipped weight"
     assert "M.market_rush_volume(sl3 if is_home3 else -sl3" in bt
     assert M.MARKET_RUSH_WEIGHT == 0.5
+
+
+def test_the_live_scorer_draws_each_team_from_its_own_stream():
+    """Fourth expert review: the receiving, rushing and passing draws take a per-team stream, so a
+    what-if on one team cannot reshuffle the other team's numbers."""
+    import re
+    from pathlib import Path
+    src = (Path(__file__).resolve().parents[1] / "engine" / "scripts" / "score_game.py").read_text(encoding="utf-8")
+    for fn, stage in (("simulate_team_game", "101"), ("simulate_team_rush", "102"), ("simulate_qb_passing", "103")):
+        assert re.search(rf"MODEL\.{fn}\(\s*team_stream\(t, {stage}\)", src), fn
+    assert "rng = np.random.default_rng(20260917)" not in src, "the shared stream is gone"
+
+
+def test_compare_refuses_runs_with_different_draw_counts():
+    import sys
+    from pathlib import Path
+    import numpy as np
+    import pandas as pd
+    import pytest
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
+    import scoreboard as SB
+    a = pd.DataFrame({"season": [2024], "team": ["T"], "week": [3], "gsis_id": ["p"], "n_draws": [1000]})
+    b = a.assign(n_draws=10000)
+    with pytest.raises(ValueError, match="different draw counts"):
+        SB.compare(b, a, "game", reps=10)

@@ -131,6 +131,11 @@ def compare(R: pd.DataFrame, Ref: pd.DataFrame, cluster: str, reps: int = 2000, 
     if cap(R) != cap(Ref) or rates(R) != rates(Ref):
         raise ValueError("the two runs come from different harnesses (the new-team cap, or the rates it "
                          "applies to, differ) -- rerun the older one")
+    # draws per player-game (NFL_BACKTEST_DRAWS): rows before the stamp ran at 1,000
+    draws = lambda x: int(x["n_draws"].iloc[0]) if ("n_draws" in x and len(x)) else 1000
+    if draws(R) != draws(Ref):
+        raise ValueError(f"the two runs used different draw counts ({draws(R)} vs {draws(Ref)}) -- part of "
+                         "any difference would be simulation noise, not the setting; rerun at one count")
     out = {}
     for mk in MARKETS:
         a = market_frame(Ref, mk)
