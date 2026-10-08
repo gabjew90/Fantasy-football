@@ -8286,6 +8286,9 @@ every row while the predictions rows carry open / decision / close (line_archive
   report's positions (DEF_POS: CB, LB, DE...). The depth chart names spots by side (RCB, LILB, LDE,
   NB...), so only FS / SS / MLB / NT ever matched. **Process:** #215's test built its depth chart
   with the report's codes, never the feed's real ones, so it could not see the mismatch.
-- **Fix:** `research.def_starters` over DEPTH_DEF_SPOTS, the 15 defensive spots in the 2026 feed;
-  the test uses those exact codes (plus a rank-2, an older snapshot, a QB and a kicker).
+- **Fix:** `research.def_starters` reads a defender from the feed's own group (`pos_grp` 'Base 3-4
+  D' / 'Base 4-3 D'), so a renamed spot still counts (the 15 spot codes of the 2026 feed are the
+  fallback), and from the last chart before kickoff, as the offence does. `research.defense_out`
+  joins starters to the prices' status by gsis_id alone (the report's position is no longer a
+  second filter). Tests use the real codes, an unknown code, the cutoff, and section 7's row.
 - **No price moves:** the DAL@HOU fixture's CSVs are byte-identical; the report gains the row.

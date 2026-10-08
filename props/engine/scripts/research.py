@@ -1016,14 +1016,34 @@ DEPTH_DEF_SPOTS = {"LDE", "RDE", "LDT", "RDT", "NT", "LILB", "RILB", "MLB", "SLB
                    "LCB", "RCB", "NB", "FS", "SS"}
 
 
-def def_starters(dcf) -> set:
+def def_starters(dcf, before=None) -> set:
     """{(team, gsis_id)}: the first player at each defensive spot in each team's latest depth-chart
-    snapshot (`dt` already parsed). Section 7 names an Out or Doubtful defender only if he is one."""
+    snapshot before `before` (kickoff; `dt` already parsed). A defender is a row in a defensive
+    group ('Base 3-4 D', 'Base 4-3 D'), so a renamed or new spot still counts; DEPTH_DEF_SPOTS is
+    the fallback for a feed without pos_grp. Section 7 names an Out or Doubtful defender only if
+    he is one."""
     if dcf is None or not len(dcf) or not {"team", "gsis_id", "pos_abb", "pos_rank", "dt"}.issubset(dcf.columns):
         return set()
-    last = dcf[dcf.dt == dcf.groupby("team").dt.transform("max")]
-    st = last[last.pos_abb.astype(str).str.upper().isin(DEPTH_DEF_SPOTS) & (last.pos_rank == 1)]
+    d = dcf if before is None else dcf[dcf.dt < before]
+    if not len(d):
+        return set()
+    last = d[d.dt == d.groupby("team").dt.transform("max")]
+    defence = (last.pos_grp.astype(str).str.strip().str.endswith(" D") if "pos_grp" in last.columns
+               else last.pos_abb.astype(str).str.upper().isin(DEPTH_DEF_SPOTS))
+    st = last[defence & (last.pos_rank == 1)]
     return {(str(t), str(g)) for t, g in zip(st.team, st.gsis_id) if isinstance(g, str)}
+
+
+def defense_out(iw, status, starters, teams) -> dict:
+    """{team: sorted names}: the defensive starters (def_starters) the prices' status map has Out or
+    Doubtful. Joined by gsis_id alone -- the report's position is not a second filter, because a
+    starter the report files under another label is still a starter."""
+    if iw is None or not len(iw) or not {"team", "gsis_id", "full_name"}.issubset(iw.columns):
+        return {}
+    status, starters = status or {}, starters or set()
+    return {t: sorted({r.full_name for r in iw[iw.team == t].itertuples()
+                       if status.get((t, r.gsis_id)) in ("Out", "Doubtful") and (t, str(r.gsis_id)) in starters})
+            for t in teams}
 SCORE_EPA_WEIGHT = 2 / 3         # the unit score: two parts EPA per play, one part success rate
 
 
