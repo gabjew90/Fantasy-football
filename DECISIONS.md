@@ -7511,6 +7511,16 @@ by the user.
   2025 unread; the one-season fit stays. Older seasons bring league pass-rate drift.
 - The tool and the factored fit are archived at tag archive/market-refit-code.
 
+## 2026-10-06 (177) -- round 27: yards per carry keeps k = 80 -- null
+
+- Outside reviewer: k = 80 carries implies too wide a talent spread; published estimates
+  suggest 200-600. Pre-registered (reports/round27_ypc_k.md, tag archive/round27-prereg):
+  grid 80 / 200 / 400 / 600, selected on 2022-24 rushing-yards CRPS weeks 2-18 with QB
+  rushing no worse, 2025 read once only if a new k was selected.
+- 2022-24: 80 best (15.791), then 200 (15.866), 400 (15.934), 600 (15.972); QB rushing the
+  same order. 80 wins in every season and both windows. Selected 80; 2025 unread; nothing
+  changes. A back's yards per carry carries his line and scheme, which persist.
+
 ## 2026-10-06 (178) -- the offensive line flag: five regulars, how many out
 
 - User, from the outside reviewer's list (Tier 1): count how many of each team's five
