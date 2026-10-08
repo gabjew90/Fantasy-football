@@ -1,5 +1,5 @@
 {
- "fetched_at": 1789602604.603666,
+ "fetched_at": 1791359038.5858188,
  "path": "league/nfl.l.49649/settings",
  "payload": {
   "fantasy_content": {
@@ -7,9 +7,9 @@
    "league": [
     {
      "allow_add_to_dl_extra_pos": 1,
-     "current_week": 2,
+     "current_week": 5,
      "draft_status": "postdraft",
-     "edit_key": "2",
+     "edit_key": "5",
      "end_date": "2027-01-04",
      "end_week": "17",
      "felo_tier": "silver",
@@ -23,9 +23,9 @@
      "league_id": "49649",
      "league_key": "470.l.49649",
      "league_type": "private",
-     "league_update_timestamp": "1789541009",
+     "league_update_timestamp": "1791355350",
      "logo_url": "https://s.yimg.com/ep/cx/blendr/v2/image-avatar-football-trophy-buf-png_1721783391232.png",
-     "matchup_week": 2,
+     "matchup_week": 5,
      "max_teams": "10",
      "name": "Keefamania",
      "num_teams": 10,
@@ -1175,7 +1175,7 @@
     }
    ],
    "refresh_rate": "30",
-   "time": "54.727077484131ms",
+   "time": "38.579940795898ms",
    "xml:lang": "en-US",
    "yahoo:uri": "/fantasy/v2/league/nfl.l.49649/settings"
   }
