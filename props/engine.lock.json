@@ -1,6 +1,6 @@
 {
   "algorithm": "props-engine-sha256-lf-1",
-  "engine_sha256": "c4c738e723cd02a4b11c70d6dfbbdfdd9fd16bb637999e0190b07ba7e63897ea",
+  "engine_sha256": "b2aa974baccaa6db48419d11f011a18010bd244344979dabbb61b10996836155",
   "file_count": 56,
   "files": {
     "SKILL.md": "cd4cac21b211fedb0bae974aa64bdfab3229889c4cb80f6b006fc336cb20d8cf",
@@ -10,7 +10,7 @@
     "resources/execution_protocol.md": "514f09c8ec93f1b36609bcfbbd8589e515eaeb6615614056a589a06c05efe260",
     "resources/line_archive.md": "326f59694d55005989077aeb6bcf37ac56fb6884ad10e5cb959489040b1387b1",
     "resources/methodology.md": "bd68847517f4bd4a990ab0ac65ba3bf727ed88ff84a94b5c5e0976f7a3d0ddf5",
-    "resources/model_registry.md": "818abc4ebb109944e4c40d3c95f9dfe7beef424fc5fe4daf38b1d7d0e198d512",
+    "resources/model_registry.md": "7293eb37729954f2d861e75569f72643da9c68aad9e6c1690c1acbec637e6acb",
     "resources/modeling_framework.md": "51568adb4e4f69442a98190b3909c0e3c0c4042f5348289bb8799dab541ed2e7",
     "resources/priors_2024_opponent.csv": "aa37b5af3e6b758ce08c7d71179083e3af5df0c9bb3492fe848eb9e2a7d1f9e4",
     "resources/priors_2024_params.json": "6eb67b77139926c9e5d7e2a3fde2ff01c7175600be4d3e14260c3320598b007f",
@@ -44,9 +44,9 @@
     "scripts/build_priors.py": "015c897123ce6f0874429863d3708c9d7aed4a80d72b6faaf130c5f356fdc191",
     "scripts/build_td_priors.py": "c7330a57e68c1b7c5f8a9304bfbddbb4be0ca285d9f37ef383173d3e3049c27f",
     "scripts/eligibility.py": "91b45727f37f690a1416e9461d2ef5f00f4bd1c31985fd31d312e2251fd76bd2",
-    "scripts/model.py": "93c62fa1e9a3f1a6f735f94870fbb72f461d61f2c7e4febd9e8a7829cc9bf8a9",
+    "scripts/model.py": "8dad6adc5535f17c1020408ec8b823530fdb6303bbe04f9cb50f9140efbb8ef2",
     "scripts/odds_client.py": "434186273bd0412a5545247228298951c5d0504a19c8a47c4c782bf3bb75aaa1",
-    "scripts/research.py": "e4d51d75670c64a41b2dca501ab474790e008f4967552d2bbe1c6787d823d40a",
+    "scripts/research.py": "84de5e4f4db39fc3f2ac4dde1b195323a32e627673d7591c857bdead254edebd",
     "scripts/scenario.py": "e16722e9abebb55f05a770910c1e47dc1cc89f7d469c8d6232d6e6bd1af83774",
     "scripts/score_game.py": "cf7854bc2c94b89d9f7347f7ae63fcbf4398724de785b4fcb0324dee72d7ca9b",
     "scripts/score_week.py": "f9a04bfd46e0079c7d363a795d70d85541701116746c3252d54acba1c3266404",
