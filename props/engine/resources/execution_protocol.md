@@ -6,7 +6,7 @@ Step order for a full prop evaluation in the Claude container. Replaces the Chat
 Identify: season, week, exact matchup, prop candidates if provided, whether to discover candidates or evaluate supplied props, the user's edge thresholds if they override the defaults in `modeling_framework.md`, and whether this is API validation mode only.
 
 ## 2. Verify matchup before player research
-Load games.csv, filter to the season/week/teams, confirm away/home, gameday, gametime, stadium, roof. Call Odds API `/events` and match on team names and `commence_time`. Resolve conflicts before proceeding.
+Load games.csv, filter to the season/week/teams, confirm away/home, gameday, gametime, stadium, roof. Match the price source's event: Sleeper Picks (primary) by its `game_id` grouping and team codes; The Odds API `/events` by team names and `commence_time` only when it is used (the fallback, or `--source oddsapi`). Resolve conflicts before proceeding.
 
 ## 3. Freeze a snapshot
 Record actual retrieval time UTC, URLs retrieved (credential-free), source update timestamps, sportsbook `last_update` times, and weather forecast update/retrieval times. Do not mix later prices with earlier spreads/totals without saying so.
@@ -18,12 +18,12 @@ Download PBP and snap counts for the season. For a Week N analysis, current oppo
 A PBP failure must not block roster, injury, depth chart, odds, or weather retrieval. Load roster_weekly for the target week (status ACT/INA), injuries for the target week (practice and report status with `date_modified`), and depth charts. Note the file's latest week; if the target week is absent, say so and treat prior-week rows as provisional.
 
 ## 6. Retrieve market data
-Use `scripts/odds_client.py --key-file resources/credential.env` (or the env var / user-supplied key if present):
+`score_game.py` does this itself, in the price-source order in `SKILL.md`: **Sleeper Picks first** (no key, no quota), the spread and total from the ESPN scoreboard, and The Odds API only as a fallback when Sleeper has no lines for the event (or first under `--source oddsapi`). For a direct Odds API pull (API validation mode, or a fallback by hand), use `scripts/odds_client.py --key-file resources/credential.env` (or the env var / user-supplied key if present):
 1. `events` (no quota cost); match the exact event ID.
 2. Optionally `markets` (1 request) to learn what is open; skip if a cached inventory from this session exists.
 3. `odds` for only the needed allowlisted markets, DraftKings and FanDuel, with `--archive`.
 4. Record quota headers.
-Apply the credential rules in `SKILL.md`. If authentication is unavailable, mark odds `N/A — AUTHENTICATED ODDS ACCESS UNAVAILABLE` and continue with the non-price analysis.
+Apply the credential rules in `SKILL.md`. If no price source answers, mark odds `N/A — AUTHENTICATED ODDS ACCESS UNAVAILABLE` and continue with the non-price analysis.
 
 ## 7. Weather
 Skip for closed roofs. Otherwise verify stadium coordinates/timezone, retrieve the NWS hourly forecast; if it fails, use Open-Meteo. One provider per reported forecast. Apply the >15 mph sustained-wind screen exactly.
@@ -40,7 +40,7 @@ Before modeling any prop, confirm:
 If any fails, the prop is `PASS` or `DATA_INSUFFICIENT`. Do not manufacture probabilities to populate the table.
 
 ## 9. Output
-Follow `prop_workflow.md`. End with a source manifest containing only sources actually retrieved. Present the archive file (or confirm the push) and any registry change as files.
+Follow `prop_workflow.md`. End with a source manifest containing only sources actually retrieved. The reply is the answer: attach no file (archive, report, CSV) unless the user asks for one. Chat never writes the repository -- no archive push, no registry edit; the record is written by the scheduled props workflow, and a registry change goes through a Claude Code session.
 
 ## Order of operations for a bare API test
 Steps 1, 2, 6 only. Report per `SKILL.md` API validation mode.

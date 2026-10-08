@@ -387,8 +387,9 @@ def player_luck_line(plays, pct) -> dict:
 
 
 def luck_free_rate(season_plays, luck) -> float | None:
-    """His yards a play this season with the luck taken out: each play counted at most
-    the luck line, or -- when he has too few plays for one -- his longest play left out."""
+    """His yards a play over the plays given (luck_for passes his last LUCK_WINDOW games)
+    with the luck taken out: each play counted at most the luck line, or -- when he has too
+    few plays for one -- his longest play among them left out."""
     v = [float(x) for x in (season_plays or []) if x == x]
     if not v or not luck:
         return None

@@ -14,11 +14,14 @@ pulls a decision-time quote from Sleeper Picks (The Odds API as fallback), and w
   line_archive_nfl_{season}.jsonl decision snapshot rows (merged with --prior-archive)
   shadow_log_{season}_wk{W}_{AWAY}_{HOME}.csv  one row per posted line, all PASS
 
-EVERY probability here is EXPLORATORY. receiving_hier_v2 and anytime_td_v1 are PROTOTYPE
-(outcome-backtested, not tested against posted lines); rush_yds_v0 is PROTOTYPE too. Since
-props-v1.20 the yardage samplers carry the width settings (resources/width_params.json), and
-all three yardage markets pass the 2022-25 harness (reports/yardage_harness.md): unbiased,
-~20% of outcomes outside p10-p90, every 60-90% bucket within 3 points.
+EVERY probability here is EXPLORATORY. receiving_hier_v2, rush_yds_v0, pass_yds_v0 and
+anytime_td_v1 are PROTOTYPE (outcome-backtested on 2022-25, not tested against posted lines).
+The yardage samplers carry the width settings (resources/width_params.json). The current
+width evidence is reports/current_settings_check_2026-10-06.md (it supersedes
+reports/yardage_harness.md for width): receptions and receiving yards inside the bar; backs'
+rushing and rushing + receiving too narrow in the tails; QB passing too wide, still so after
+round 38 (11.9% outside the 80% range, reports/round38_qb_passing_bias.md). At Sleeper's real
+lines (2026 weeks 2-4) the engine's log loss is 0.717 against the market's 0.692 (DECISIONS #202).
 Nothing is a fair price or an entry threshold.
 Recommendation is PASS on every line, per the model registry.
 """
@@ -955,8 +958,9 @@ def main():
             # blend 3.8 vs market-implied 2.74), and that one number drives every player's
             # anytime-TD probability. The spread/total cannot be swung by one game. Keep the
             # history blend's pass/rush split; rescale the total to implied points x league
-            # TD-per-point. Plays and pass rate stay on the history blend unless --env market
-            # (that re-centre showed no accuracy gain in backtesting and is off by default).
+            # TD-per-point. The full re-centre of plays and pass rate (--env market) showed no
+            # accuracy gain in backtesting and is off by default; the partial pass-volume
+            # (round 16) and carries (round 39) blends below are what ships.
             total_td_mkt = implied_pts * P.get("league_td_per_point", 0.1055)
             hist_total = env[t]["td_total_history"]
             if hist_total > 0:
@@ -966,8 +970,8 @@ def main():
             env[t]["implied_points"] = implied_pts
             env[t]["td_anchor"] = "market"
             if a.env != "market" and MODEL.MARKET_PASS_WEIGHT and P.get("market_env_fit"):
-                # round 16: the market's fitted pass volume at MODEL.MARKET_PASS_WEIGHT;
-                # carries keep the team's history (DECISIONS #134)
+                # round 16: the market's fitted pass volume at MODEL.MARKET_PASS_WEIGHT
+                # (DECISIONS #134); carries are moved separately just below (round 39)
                 env[t]["targets"], env[t]["carries"] = MODEL.market_pass_volume(
                     MODEL.team_spread_from_home(hs, t == HOME), tl, P["market_env_fit"],
                     env[t]["targets"], env[t]["carries"], MODEL.MARKET_PASS_WEIGHT)
@@ -3451,16 +3455,18 @@ def main():
                  + (f"n/a ({src_})" if sleeper_used or a.lines_file or _q is None else f"{_q}") + ".")
     L.append(f"- Routes run and route participation: not available from any verified source, so not used.")
     if QB_RUSH_ON:
-        L.append("- QB rushing yards (the starter only) include kneel-downs, which the book counts, drawn by the "
-                 "team's pregame spread. The newest yardage market: its graded record, including where it runs "
-                 "high or low, is in the repo's reports/yardage_harness.md.")
+        L.append("- QB rushing yards are off the board by the user's choice (DECISIONS #188, #190): no QB rushing "
+                 "line is priced or recorded. The starter's carries (kneel-downs included, drawn by the team's "
+                 "pregame spread) stay in the simulation, because they come out of the same team pool as the backs'.")
     else:
-        L.append(f"- QB rushing yards left out on purpose: kneel-downs count against the prop and we don't model them yet.")
+        L.append(f"- QB rushing yards are off the board by the user's choice (DECISIONS #188, #190); this run's "
+                 f"priors carry no QB carry grid either.")
     if PASS_ON:
         L.append("- QB passing yards (the starter only) are his receivers' yards in the same simulation, times a "
-                 "starter's usual share of the team's passing yards. Graded 2022-25 in reports/yardage_harness.md: "
-                 "right on average and the right width; it beats the unshrunk version early in the season and ties it "
-                 "from week 5.")
+                 "starter's usual share of the team's passing yards, scaled by the team's implied points since "
+                 "round 38 (DECISIONS #199). Graded 2022-25: at the main line the Over still leans with implied "
+                 "points, less than before, and the range is too WIDE (11.9% of games outside the 80% range "
+                 "against a 17-23% bar), so its chances sit too close to 50%; reports/round38_qb_passing_bias.md.")
         if pass_skipped:
             L.append("- Passing lines posted for a QB the model does not start, not priced: "
                      + "; ".join(f"{nm} ({tm}; the model's starter is {STARTER_QB.get(tm) or 'none'})"
@@ -3469,11 +3475,12 @@ def main():
             L.append("- QB passing yards were not priced this run: Sleeper Picks carries them, and the Odds API "
                      "fallback request does not include them.")
     if hrs > 1:
-        L.append(f"- **Kickoff is in {hrs:.1f} hours.** To track how these lines moved, open a chat inside the last hour and ask for a closing capture.")
+        L.append(f"- **Kickoff is in {hrs:.1f} hours.** The scheduled capture (props.yml) records the open, "
+                 f"decision and closing snapshots; this run is a reference copy.")
     elif hrs > 0:
         L.append(f"- **Candidate closing snapshot:** kickoff in {hrs * 60:.0f} minutes, inside the closing window. The "
                  "scheduled capture records the official close; this run is a reference copy.")
-    L.append(f"- Full technical detail (every line, every book, model parameters) is in the attached CSV files.")
+    L.append(f"- Full technical detail (every line, every book, model parameters) is in the CSV files written beside this report.")
     L.append("")
 
     # ---- technical appendix ----
@@ -3489,14 +3496,16 @@ def main():
     # outlived a corrected FAIL on passing width); reports/rush_rec_calibration.md, yardage_harness.md
     L.append(f"\nModel states (none tested against posted lines): receptions and receiving yards `receiving_hier_v2` PROTOTYPE "
              f"(2022-25 harness: width within the bar; at the main line the Over hits more often than the engine says -- receiving yards by 2.9 points, receptions 1.4, tight ends most, DECISIONS #197-#198); rushing yards `rush_yds_v0` and rushing + receiving PROTOTYPE "
-             f"(near the main line on average, leaning by implied points -- backs on teams implied 27+ hit the Over 59% against 49%; too narrow in the tails: 23-25% of games outside the 80% range, so a "
+             f"(near the main line on average, leaning by implied points -- backs on teams implied 27+ hit the Over 59% against 49%, measured before round 39's market carries, which act on it (DECISIONS #204); too narrow in the tails: 23-25% of games outside the 80% range, so a "
              f"line far from the median reads too confident; reports/current_settings_check_2026-10-06.md); QB passing yards "
              f"`pass_yds_v0` PROTOTYPE (scaled by implied points since round 38, DECISIONS #199: at the main line the Over hit 39% at 18 or fewer implied points against an engine 45%, 66% at 27+ against 57%; too WIDE: 12% of "
              f"games outside the 80% range against a 17-23% bar, so its chances sit too close to 50%); "
              f"anytime TD `anytime_td_v1` PROTOTYPE (outcome-backtested, no posted-line test; no fair odds). All MODEL_UNVALIDATED. Dispersion: receptions log r = "
              f"{P['receptions_dispersion']['a']:.3f} + {P['receptions_dispersion']['b']:.3f}·log μ; carries "
              f"{P['carries_dispersion']['a']:.3f} + {P['carries_dispersion']['b']:.3f}·log μ; per-catch Gamma shape {SH:.3f}; "
-             f"K0={K0}; {N_SIM} draws, seed 20260917. Early-season prior-season blend is not the form validated in the 2025 backtest.")
+             f"K0={K0}; {N_SIM} draws, seed 20260917. The early-season two-stage blend (prior-season rate, slot "
+             f"prior, this season) is what the 2022-25 harness grades, weeks 2-4 included (DECISIONS #198); the "
+             f"snap-share role scaling and the pre-game injury handling are not in the harness.")
     L.append("</details>")
 
     L.append("\n</details>")       # closes 'Everything else', which is opened unconditionally

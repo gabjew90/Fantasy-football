@@ -66,8 +66,13 @@ Log loss and Brier agree in sign in every cell.
 
 - The fix for point 2 is a pre-registered round on the board path only: an uncertainty
   draw on a back's projected carries share (the average), judged on whole-chain width and
-  own-volume log loss, with the conversion score as a guard. It waits for the parity
+  own-volume log loss, with the conversion score as a guard. It waited for the parity
   baseline (step 7) and the leave-one-season-out check (step 8).
+  -> Update 2026-10-08 (docs truth pass): steps 7 and 8 are done (step 7 below;
+  step 8 is reports/loso_rounds_30_33.md). The carries-uncertainty round itself has not
+  been registered or run yet: it is still owed (the carries width is unchanged, DECISIONS
+  #206). Round 39 (backs' carries 50% toward the market, #204) shipped since and moves the
+  average, not this uncertainty.
 - Until then the report wording stands as written on 2026-10-06 (rushing: re-check pending)
   and is updated to this result: rushing and combined distributions run narrow in the
   tails; the main-line chance is unaffected.

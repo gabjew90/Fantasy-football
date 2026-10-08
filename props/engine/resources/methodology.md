@@ -1,11 +1,11 @@
 # nfl-prop-research: how the numbers are built
-Version 1.0, 2026-09-17; sections 4 and 5 and the validation status brought up to date 2026-10-01 (props-v1.27). Applies to model core `model.py` at registry entries receiving_hier_v2 (receptions, receiving yards), rush_yds_v0, pass_yds_v0, anytime_td_v1, with the round-11 width settings. `model_registry.md` is the authority where the two differ. Running example: Dalton Kincaid, BUF TE1, DET@BUF 2026 week 2, Under 4.5 catches.
+Version 1.0, 2026-09-17; sections 4 and 5 and the validation status brought up to date 2026-10-01 (props-v1.27); sections 1, 2, 5, 7-8 and the parameter table brought up to date 2026-10-08 (props-v1.53). Applies to model core `model.py` at registry entries receiving_hier_v2 (receptions, receiving yards), rush_yds_v0, rush_rec_sum_v0, pass_yds_v0, anytime_td_v1, with the width settings in `resources/width_params.json` (round 11, re-set by rounds 30, 34 and 38). `model_registry.md` is the authority where the two differ. Running example: Dalton Kincaid, BUF TE1, DET@BUF 2026 week 2, Under 4.5 catches.
 
 ## 1. Data
 - nflverse play-by-play, current season (weeks 1 to N-1): targets, catches, carries, yards, TDs, goal-line (inside-10) plays.
 - nflverse prior season, pre-processed offseason by `build_priors.py` into `priors_{season}_*`: per-player shares and rates, per-slot league priors, per-team volumes, opponent efficiency allowed (built, not read by the scorer -- section 4), dispersion fits, TD constants.
 - Weekly rosters (ACT/INA), injury report, depth charts, snap counts for the target week.
-- The Odds API: spreads, totals, allowlisted player props, all books returned.
+- Sleeper Picks (primary, no key): the player lines and payouts. The Odds API: fallback only, when Sleeper has no lines for the event (or first under `--source oddsapi`). Spread and total: the ESPN scoreboard (the DraftKings line).
 - NWS hourly forecast at the stadium (Open-Meteo fallback).
 
 Kincaid: 2025 = 15% target share over 14 games, catch rate 75%, 7.6 yards per target. 2026 wk 1 = 6 of 29 targets (21%). DK Under 4.5 at -167.
@@ -13,9 +13,9 @@ Kincaid: 2025 = 15% target share over 14 games, catch rate 75%, 7.6 yards per ta
 ## 2. Team environment (how many chances exist)
 Throws and runs per game: the team's prior-season mean blended with its current-season games (K0 = 4 games), times a league-wide drift ratio (recent 3 weeks / expanding, clipped 0.85 to 1.15, inactive before week 5). BUF: 29 throws, 29 runs.
 Team offensive TDs: market-anchored. Implied points from the same-book spread and total, times the league TD-per-point constant, split pass/rush by the team's history. BUF: 30.0 implied points, 3.2 TDs. If the spread/total is unavailable the history blend is used and TD calls are capped at MODERATE.
-Game script enters the PASS volume only, and only a little: since round 16 (props-v1.28) team targets blend 25% toward the market-fitted plays x pass rate, which depend on the team's spread and the total (fit R2 0.02 to 0.04; about one throw across 20 points of spread). Carries, and the full `--env market_fit` re-centring, are not conditioned on it. Within a team all players share one volume draw; across teams the draws are independent. Consequence: the whole pie shrinking together is simulated within a team, but the state that shrinks it (leading, trailing) is not, and cross-team script correlation is absent. Open registry gap.
+Game script enters the team volume through the spread and total, part way: since round 16 (props-v1.28) team targets blend 25% toward the market-fitted plays x pass rate (fit R2 0.02 to 0.04; about one throw across 20 points of spread), and since round 39 (props-v1.51, DECISIONS #204) the backs' carries blend 50% toward the market-fitted plays x (1 - pass rate), the starting QB's carries held. The full `--env market_fit` re-centring is off. Within a team all players share one volume draw; across teams the draws are independent. Consequence: the whole pie shrinking together is simulated within a team, but the state that shrinks it (leading, trailing) is not, and cross-team script correlation is absent. Open registry gap.
 
-Pass volume (round 16, props-v1.28): team targets blend 25% toward the market-fitted plays x pass rate (the team's spread and the total, fitted on the prior season); carries keep the history. `model.MARKET_PASS_WEIGHT`.
+Pass volume (round 16, props-v1.28): team targets blend 25% toward the market-fitted plays x pass rate (the team's spread and the total, fitted on the prior season), `model.MARKET_PASS_WEIGHT`. Run volume (round 39): the backs' carries blend 50% toward the same fit's carries, `model.MARKET_RUSH_WEIGHT`; the history-only carries are logged beside the board (p_over_hist_carries) for the week-8 reversal check.
 
 ## 3. Player share (how many of those chances are his)
 Per rate (target share, catch rate, yards per target, rush share, yards per carry, goal-line shares):
@@ -36,15 +36,17 @@ Team-level efficiency allowed (catch rate, yards per target, yards per carry) fr
 - Receiving yards: Gamma with league-wide per-catch shape 1.065 and player-specific scale (his yards per catch). Shape is not per player.
 - Rushing yards: per-carry draws from the empirical 2025 residual quantile grid around the player's yards per carry.
 - TDs: team pass and rush TDs allocated by goal-line share for the inside-10 fraction and by overall share for the rest; P(at least one) = 1 - exp(-lambda).
-- Width (round 11, props-v1.20; registry): four mean-preserving per-game variations the draws above used to hold fixed -- Dirichlet variation of a player's target share (concentration 40) and carry share (20), and a lognormal per-game multiplier on yards per carry (log-sd 0.3); catch rate and yards per catch stay fixed. Without them every yardage market was too narrow (26-32% of outcomes outside p10-p90, 20% expected).
+- Width (round 11, props-v1.20; registry): mean-preserving per-game variations the draws above used to hold fixed -- Dirichlet variation of a player's target share and carry share (20), and a lognormal per-game multiplier on yards per carry; catch rate and yards per catch stay fixed. Without them every yardage market was too narrow (26-32% of outcomes outside p10-p90, 20% expected). Round 11 set target concentration 40 and yards-per-carry log-sd 0.3; round 30 halved the log-sd to 0.15 (DECISIONS #189) and round 34 raised target concentration to 60 (DECISIONS #195, kept under the spread rule, #204). Current values: `resources/width_params.json`.
 - Carry shares (round 15, props-v1.28): when the priced players' carry shares miss 1 - 0.12, half the gap is closed, added in proportion to share; the starting QB keeps exactly the share the sampler gave him before. Without it the backs ran ~4% over their rushing projection (registry round 15).
-- QB markets: passing yards (round 13, `pass_yds_v0`) from his receivers' yards in the same simulation times his share of the team's passing; QB rushing (round 12) on its own carry grid, kneel-downs included as books settle.
+- QB markets: passing yards (round 13, `pass_yds_v0`) from his receivers' yards in the same simulation times his share of the team's passing, times (implied points / 22)^0.2 x 1.04 since round 38 (DECISIONS #199; off without a spread/total). QB rushing (round 12) is still simulated on its own carry grid, kneel-downs included, because his carries share the team pool with the backs', but it is off the board since DECISIONS #188/#190: no QB rushing line is priced or recorded.
+- Rushing + receiving (DECISIONS #187): a back's rushing and receiving draws summed in each simulation; QBs excluded.
 Kincaid: median 3 catches, P(<4.5) = 14,327 / 20,000 = 71.6% (computed before the round-11 width; the same call now reads a few points nearer 50%).
 
 ## 6. Book number
 Both sides' American prices converted to implied probability, normalised to remove vig. DK -167 Under implies 62.5% raw, about 59% no-vig.
 
 ## 7. Edge rule and thresholds
+No bet labels since DECISIONS #142: the edge rule and tiers below are internal (the shadow log's `tier` column, read by the scorecard), never shown. Labels can return only at the week 8 / 12 / 18 reviews (DECISIONS #151).
 Edge = model probability minus no-vig probability, in points. EV per $100 = 100 x (p x payout - (1 - p - push)). Kelly = (b p - q) / b. Thresholds ("Under if >= X") are the same draws read at each possible line, at -110.
 Floors: 6 points for count and yardage props; 25% relative edge for TD props.
 
@@ -59,7 +61,7 @@ Floors: 6 points for count and yardage props; 25% relative edge for TD props.
 The team TD total comes from the market's implied points. A TD gap therefore lives only in the allocation (goal-line share, overall share), not in the team's scoring expectation. Treat a TD gap as a share disagreement, not a game disagreement, and never as equivalent to a receptions gap.
 
 ## 10. Validation status
-**Superseded as the current evidence (2026-10-01): read the registry's rounds 10-13.** The yardage harness (round 10: four seasons 2022-25, tuned on 2022-23, tested on 2024-25, weeks 2-18) found receptions, receiving and rushing yards beat the naive baseline and are unbiased, but too NARROW -- and showed the calibration table below predates the joint sampler. Round 11's width settings fixed the width on the untouched test seasons (outside p10-p90: 19.0% / 19.2% / 19.6%, every 60-90% bucket within 3 points). Round 13 added QB passing yards. What follows is the 2026-09-18 single-season record, kept for lineage. Against sportsbook lines the status is unchanged: nothing is validated.
+**Superseded as the current evidence (2026-10-01): read the registry's rounds 10-13 -- and, for width, reports/current_settings_check_2026-10-06.md, which supersedes round 11's verdicts (backs' rushing and rushing + receiving too narrow in the tails, QB passing too wide, still so after round 38), and the live record at Sleeper's real lines (DECISIONS #202: the engine's log loss 0.717 against the market's 0.692).** The yardage harness (round 10: four seasons 2022-25, tuned on 2022-23, tested on 2024-25, weeks 2-18) found receptions, receiving and rushing yards beat the naive baseline and are unbiased, but too NARROW -- and showed the calibration table below predates the joint sampler. Round 11's width settings fixed the width on the untouched test seasons (outside p10-p90: 19.0% / 19.2% / 19.6%, every 60-90% bucket within 3 points). Round 13 added QB passing yards. What follows is the 2026-09-18 single-season record, kept for lineage. Against sportsbook lines the status is unchanged: nothing is validated.
 
 Walk-forward 2025 backtest of receptions and receiving yards (train weeks 5-8, test 9-18, N = 1,895 player-weeks).
 
@@ -86,20 +88,27 @@ Two readings matter more than the signs.
 
 **Marginal CRPS is nearly blind to the sampler.** Independent per-player draws and the live joint draw -- generative models with completely different correlation structure, one where teammates compete for a fixed team volume and one where they do not -- differ by 0.4% on receptions and 0.1% on yards. This is the empirical reason joint/parlay pricing is gated off: the metric that has been measured cannot distinguish the two samplers, so it cannot possibly validate a correlation factor.
 
-**Validated against posted sportsbook lines: nothing.** Not the pre-week-5 prior blend (this form was not in the backtest), not rushing yards, not anytime TD, not the edge rule against closing lines, not the prior-season team-volume blend in the live scorer, and not joint/parlay outcomes, which have never been compared against realised joint results at all. Every market is therefore ineligible under `scripts/eligibility.py`, and the record in `props/record` is being accumulated prospectively to answer the question. Second-season (2024) confirmation pending a residual 2.6% bias.
+**Validated against posted sportsbook lines: nothing.** Not the pre-week-5 prior blend (the 2022-25 harness has run it since 2026-09-18, against outcomes, not lines), not rushing yards, not anytime TD, not the edge rule against closing lines, not the prior-season team-volume blend in the live scorer, and not joint/parlay outcomes, which have never been compared against realised joint results at all. Every market is therefore ineligible under `scripts/eligibility.py`, and the record in `props/record` is being accumulated prospectively to answer the question. Second-season (2024) confirmation pending a residual 2.6% bias.
 
-## 11. Parameter table (v1.0)
+## 11. Parameter table (v1.0; current values 2026-10-08, props-v1.53)
 | Parameter | Value | Where |
 |---|---|---|
 | Team volume blend K0 | 4 games | priors_2025_params.json |
-| K0 target share | 80 targets | k0_per_rate |
-| K0 catch rate | 40 targets | k0_per_rate |
-| K0 yards per target | 160 targets | k0_per_rate |
+| K0 target share | 80 targets | model.K0_FIXED (round 18) |
+| K0 catch rate | 40 targets | model.K0_FIXED (round 17) |
+| K0 yards per target | 80 targets (fixed; the per-season fit says 160) | model.K0_FIXED (rounds 17-18) |
 | K0 rush share | 40 carries | k0_per_rate |
 | K0 yards per carry | 80 carries | k0_per_rate |
 | K0 inside-10 target / carry share | 5 / 4 | k0_per_rate |
 | Opponent shrinkage k0 | 150 plays | model.opponent_multiplier |
 | Drift ratio window / clip | 3 weeks / [0.85, 1.15], off before week 5 | model.league_drift_ratio |
+| Market weight on throws | 0.25 | model.MARKET_PASS_WEIGHT (round 16, DECISIONS #134) |
+| Market weight on the backs' carries | 0.5 | model.MARKET_RUSH_WEIGHT (round 39, DECISIONS #204) |
+| Target-share concentration | 60 | width_params.json share_conc_targets (round 34, DECISIONS #195) |
+| Carry-share concentration / QB | 20 / 80 | width_params.json share_conc_carries / share_conc_qb |
+| Yards-per-carry log-sd (backs / QB) | 0.15 / 0.15 | width_params.json eff_sd_rush (round 30, DECISIONS #189) / eff_sd_qb |
+| QB passing implied-points power / level | 0.2 / 1.04 | width_params.json pass_implied_exp / pass_scale (round 38, DECISIONS #199) |
+| Carry-share room for unpriced players | 0.12, half the gap closed | width_params.json rush_other_share / rush_norm_strength (round 15) |
 | Team targets / carries dispersion r | 33.7 / 28.5 | team_volume_dispersion |
 | Receptions dispersion log r = a + b log mu | 2.007, 0.830 | receptions_dispersion |
 | Carries dispersion | -0.652, 1.416 | carries_dispersion |
