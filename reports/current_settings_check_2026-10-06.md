@@ -6,7 +6,7 @@ for the whole chain (the engine's own volume) at the new setting, for all five m
 for the combined line checked directly inside game scripts. Code: backtest.py at 68ac50f
 (the reviewed harness: frozen cohorts, zero-side combined yards, exact receptions chances;
 no new-team cap -- that is step 7), `--seasons 2022,2023,2024,2025 --tune 2022,2023 --test
-2024,2025 --conditional`, and props/tools/rr_dependence.py. No setting was changed by
+2024,2025 --conditional`, and props/tools/rr_dependence.py (deleted 2026-10-08 (DECISIONS #211); the code is in git history at 68ac50f). No setting was changed by
 anything below.
 
 ## Whole-chain width on the test seasons 2024-25 (share outside the model's 80% range; 20% is right, the bar 17-23%)

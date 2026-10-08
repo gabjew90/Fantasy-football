@@ -190,3 +190,4 @@ Top-q player, WITHIN channels: realised channel TDs / (his channel share x the t
 | 2024 | 107 | 1320 | 0.0811 |
 | 2025 | 107 | 1321 | 0.0810 |
 
+*Produced by props/engine/scripts/td_diagnostics.py, deleted 2026-10-08 (DECISIONS #211); the code is in git history at 18c36f4.*

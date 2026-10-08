@@ -10,8 +10,6 @@ for the whole slate (about 4 s per game after the first). Then it reads every ga
 shadow log and bet card back and writes:
 
   slate_summary_{season}_wk{W}.md   runs, research leads and notes by game (the slate overview)
-  slate_survival_{season}_wk{W}.csv RETIRED as a pick (DECISIONS #142): still written for the
-                                    record by the rule below, never shown; no must-win pick is given
   slate_research_{season}_wk{W}.csv every priced line's research row (line implies, usage, flags)
   slate_board_{season}_wk{W}.md     THE chat reply for "the props for these games": every
                                     game's full research table in ONE file, ordered by
@@ -20,19 +18,9 @@ shadow log and bet card back and writes:
   slate_card_{season}_wk{W}.csv     the old card rows, written for the record only, never shown
   slate_runs_{season}_wk{W}.csv     per-game run status (lines, spread/total, exit code)
 
-Survival rule, RETIRED (DECISIONS #142: no picks; the file is written for the record and never
-shown, and `nfl.py props best --survival` says so). As it was ("if you could have only one bet
-in this game and had to win it"):
-  1. receptions and receiving yards only (the two markets with a 2025 backtest when written);
-  2. the book must agree: no-vig probability >= 0.55 on the same side;
-  3. highest model probability among what remains.
-  Fallbacks, in order, if nothing qualifies: no-vig >= 0.50 on calibrated markets;
-  any market with no-vig >= 0.50; then the highest calibrated model probability with the
-  book disagreeing, flagged. The slate-wide single pick applies the same rule across every
-  game, excluding only new-team and Questionable players; depth-role players are eligible
-  and their slot is printed so a thin role is visible. This maximises P(win), not EV --
-  every survival pick is a heavily juiced favourite side and a bad bet in isolation. It is
-  the answer to a different question than the card.
+The must-win ("survival") pick and its slate_survival_*.csv are no longer computed: no
+picks are shown (DECISIONS #142) and nothing read the file (DECISIONS #211; the rule is in
+git history before that entry).
 
 Per-game failures do not stop the slate; they are reported in the runs table.
 """
@@ -170,50 +158,6 @@ def base_tier(t):
     return str(t).split(" (")[0].strip() if isinstance(t, str) else ""
 
 
-def _survival_rank(d):
-    """Ordered (frame, floor, rule) attempts for the survival rule on one frame."""
-    cal = d[d.market.isin(CAL_MARKETS)]
-    return [(cal, 0.55, "calibrated market, book agrees (no-vig >= 55%)"),
-            (cal, 0.50, "calibrated market, book agrees (no-vig >= 50%)"),
-            (d, 0.50, "any market, book agrees (no-vig >= 50%)")], cal
-
-
-def survival_pick(d):
-    """Apply the survival rule to one game's shadow-log frame. Returns (row, rule) or (None, reason).
-
-    Role-flagged players (new team, Questionable) are excluded on the first pass, the same
-    exclusion the slate-wide single pick applies, so the two scopes cannot disagree about
-    who is eligible. Only if no unflagged line qualifies at any tier does the rule re-run on
-    the full frame; the rule string then says so and the row is flagged in the summary.
-    """
-    if d.empty:
-        return None, "no priced lines"
-    clean = d[(~d.new_team.astype(bool)) & (~d.questionable.astype(bool))]
-    for frame, suffix in ((clean, ""), (d, " [role-flagged fallback: no unflagged line qualified]")):
-        if frame.empty:
-            continue
-        tries, cal = _survival_rank(frame)
-        for f, floor, rule in tries:
-            c = f[f.p_novig >= floor]
-            if not c.empty:
-                return c.sort_values("p_model", ascending=False).iloc[0], rule + suffix
-        if not cal.empty:
-            return (cal.sort_values("p_model", ascending=False).iloc[0],
-                    "calibrated market, BOOK DISAGREES (weakest class)" + suffix)
-    return None, "no calibrated-market lines"
-
-
-def slate_pick_order(ok):
-    """Candidates for the slate-wide single pick, best first: no role flag, book not disagreeing,
-    then the rule's own order (backtested market at >= 55%, then >= 50%, then any-market
-    fallbacks) before model probability."""
-    top = ok[(~ok.new_team.astype(bool)) & (~ok.questionable.astype(bool))
-             & (~ok.rule.str.contains("DISAGREES"))].copy()
-    top["rule_rank"] = [0 if (m in CAL_MARKETS and "55%" in r) else 1 if m in CAL_MARKETS else 2
-                        for m, r in zip(top.market, top.rule)]
-    return top.sort_values(["rule_rank", "p_model"], ascending=[True, False])
-
-
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--season", type=int, default=None)
@@ -331,26 +275,11 @@ def main():
     R.to_csv(OUT / f"slate_runs_{a.season}_wk{a.week:02d}.csv", index=False)
 
     # ---------- aggregate ----------
-    surv, cards, unders = [], [], 0
+    cards = []
     research = []
     for r in runs:
         A, H = r["game"].split("@")
-        sl = OUT / f"shadow_log_{a.season}_wk{a.week:02d}_{A}_{H}.csv"
         bc = OUT / f"bet_card_{a.season}_wk{a.week:02d}_{A}_{H}.csv"
-        d = pd.read_csv(sl) if sl.exists() and r["status"] != "FAILED" else pd.DataFrame()
-        pick, rule = survival_pick(d)
-        if pick is None:
-            surv.append(dict(game=r["game"], pick="none", rule=rule))
-        else:
-            tier = str(pick.tier).split(" (")[0] if isinstance(pick.tier, str) else ""
-            surv.append(dict(game=r["game"], player=pick.player, team=pick.team, slot=str(pick.slot),
-                             prop=f"{pick.side} {pick.line:g} {MK_LABEL.get(pick.market, pick.market)}"
-                                  if pd.notna(pick.line) else f"{pick.side} {MK_LABEL.get(pick.market, pick.market)}",
-                             price=int(pick.price), p_model=round(float(pick.p_model), 3),
-                             p_novig=round(float(pick.p_novig), 3),
-                             model_mean=round(float(pick.model_mean), 2) if pd.notna(pick.model_mean) else None,
-                             line=pick.line, tier=tier, market=pick.market, new_team=bool(pick.new_team),
-                             questionable=bool(pick.questionable), rule=rule, book=pick.book))
         if bc.exists() and r["status"] == "ok":
             c = pd.read_csv(bc); c["game"] = r["game"]; cards.append(c)
         rf = OUT / f"research_{a.season}_wk{a.week:02d}_{A}_{H}.csv"
@@ -358,8 +287,6 @@ def main():
             x = pd.read_csv(rf)
             if len(x):
                 research.append(x.assign(game=r["game"]))
-    S = pd.DataFrame(surv)
-    S.to_csv(OUT / f"slate_survival_{a.season}_wk{a.week:02d}.csv", index=False)
     C = pd.concat(cards, ignore_index=True) if cards else pd.DataFrame()
     if not C.empty:
         # Sort key: tier first, then BACKTESTED markets (receptions / receiving yards) ahead of
@@ -382,7 +309,6 @@ def main():
             if {"p_blend", "p_market"} <= set(b.columns):
                 boards.append(b.assign(game=r["game"]))
     TBOARD = pd.concat(boards, ignore_index=True) if boards else pd.DataFrame()
-    TLEGS = TB.candidate_legs(TBOARD) if len(TBOARD) else pd.DataFrame()
     TPAR = TB.build(TBOARD) if len(TBOARD) else pd.DataFrame()
     if len(TPAR):
         TPAR.to_csv(OUT / f"parlay_builder_{a.season}_wk{a.week:02d}.csv", index=False)
@@ -397,10 +323,10 @@ def main():
          "## Runs", "", "| Game | Kickoff (UTC) | Roof | Spread | Total | Lines | Status |", "|---|---|---|---|---|---|---|"]
     for r in runs:
         L.append(f"| {r['game']} | {r['kickoff_utc']} | {r['roof']} | {r['spread'] or '—'} | {r['total'] or '—'} | {r['n_lines']} | {r['status']}{(' — ' + r['error']) if r['error'] else ''} |")
-    # The must-win picks and the cross-game TD parlays are still computed and
-    # written (slate_survival_*.csv, parlay_builder_*.csv) but not shown: no
-    # picks until the record shows the model adds weight beside the book's
-    # price (DECISIONS #142, the user's call 2026-10-03).
+    # No picks are shown until the record shows the model adds weight beside the
+    # book's price (DECISIONS #142, the user's call 2026-10-03): the cross-game TD
+    # parlays are still written (parlay_builder_*.csv) but not shown; the must-win
+    # pick (slate_survival_*.csv) is no longer computed (DECISIONS #211).
     RS = pd.concat(research, ignore_index=True) if research else pd.DataFrame()
     if len(RS):
         RS.to_csv(OUT / f"slate_research_{a.season}_wk{a.week:02d}.csv", index=False)

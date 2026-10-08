@@ -259,12 +259,14 @@ def _apply_availability(df: pl.DataFrame, av: pl.DataFrame) -> pl.DataFrame:
 def default_projection(cfg, usage: pl.DataFrame, market: pl.DataFrame) -> pl.DataFrame:
     """Dispatch on projections.source (DECISIONS 2026-09-02 #21).
 
-    external  (config default) -- stat lines from outside, scored in league
-              settings: draftkit/external.py. The projection is an INPUT.
-    model     the retired 2025-usage + log(ECR) blend below. Off by default;
-              it has never beaten the external source out of sample and the
-              burden of proof is on it (scripts/projection_backtest.py).
-    Test fixtures that carry no `source` get the legacy path, so they test
+    model     (config.yaml default; Omnibeta's live source) -- the 2025-usage
+              + log(ECR) blend below. It stayed the default because the
+              external stand-in failed the replay gate (DECISIONS #23,
+              reports/source_gate.md).
+    external  stat lines from outside, scored in league settings:
+              draftkit/external.py. Keefamania's league yaml selects it
+              (it drafts on the sheet).
+    Test fixtures that carry no `source` get the model path, so they test
     what they were written to test."""
     source = str((cfg.get("projections") or {}).get("source", "model"))
     if source == "external":
@@ -279,7 +281,7 @@ def external_projection(cfg, usage: pl.DataFrame, market: pl.DataFrame) -> pl.Da
     import sys
 
     from . import external as X
-    from .ids import SleeperIndex
+    from core.ids import SleeperIndex
     from .sleeper import SleeperClient
 
     p = cfg["projections"]
@@ -460,9 +462,10 @@ def _ensure_dispersion(df: pl.DataFrame) -> pl.DataFrame:
 
 
 def model_projection(cfg, usage: pl.DataFrame, market: pl.DataFrame) -> pl.DataFrame:
-    """RETIRED 2026-09-02 (DECISIONS #21): the 2025-usage + log(ECR) blend.
-    Kept behind projections.source: model for the backtest and for the day
-    it earns its way back. Returns market frame + proj_pts, proj_source."""
+    """The 2025-usage + log(ECR) blend, selected by projections.source: model --
+    the config.yaml default and Omnibeta's live source. DECISIONS #21 planned
+    to retire it; the external stand-in failed the gate (#23), so it stays
+    live. Returns market frame + proj_pts, proj_source."""
     p = cfg["projections"]
     shrink_k = float(p["shrink_k"])
     alpha = float(p["model_alpha"])

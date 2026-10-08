@@ -355,14 +355,14 @@ def market_environment_fitted(team_spread, total, mkt_fit, team_pace_blend, team
 
 
 # Round 29 (reports/round29_market_runs.md): the weight on the market's fitted CARRIES
-# for the backs; 0 = runs from history alone (shipped until round 39). The starting QB's carries are
-# held where history put them (hold_qb_carries), since the full market environment hurt
-# QB rushing (#106).
+# for the backs; 0 = runs from history alone (the default before round 39). The starting
+# QB's carries are held where history put them (hold_qb_carries), since the full market
+# environment hurt QB rushing (#106).
 MARKET_RUSH_WEIGHT = 0.5      # round 39 ships (user, 2026-10-06; DECISIONS #204)
 # DECISIONS #185 priced round 29 BESIDE the board while it was off. Now that it ships, the
-# shadow is reversed (DECISIONS #204): the backs' rushing again WITHOUT market carries (history
-# alone), logged as p_over_hist_carries for the week-8 reversal check -- never the board's price.
-SHADOW_MARKET_RUSH_WEIGHT = None
+# shadow is reversed (DECISIONS #204): score_game prices the backs' rushing again WITHOUT
+# market carries (history alone), logged as p_over_hist_carries for the week-8 reversal
+# check -- never the board's price.
 
 
 def market_rush_volume(team_spread, total, mkt_fit, team_carries_blend, weight):
@@ -456,44 +456,6 @@ def market_implied_environment(spread_home, total, home_pass_rate, away_pass_rat
         "away": {"implied_points": implied_away, "plays": plays_a,
                  "pass_rate": np.clip(away_pass_rate - shift_home, 0.35, 0.75)},
     }
-
-
-def team_environment(team, cur_team_row, cur_n, pri_team_row, k0_volume,
-                      market=None, league_pass_rate=0.58, league_plays=64.0):
-    """Blend prior-season and current-season team volume, optionally re-centring
-    on a market-implied total when one is supplied.
-
-    market, if given: {'implied_points':..., 'plays':..., 'pass_rate':...} for
-    THIS team, from market_implied_environment(). When supplied, targets/carries
-    are built from plays x pass_rate instead of the pure history blend, and the
-    history blend is used only for the pass/rush split's stability check.
-    Disclosure required wherever this is used: the environment then comes from
-    the same book's own price, so it cannot itself be cited as an edge on the
-    total or spread -- only player-level allocation within that total can be.
-    """
-    out = {}
-    for c in ["targets", "carries", "i10_targets", "i10_carries", "pass_td", "rush_td"]:
-        own = cur_team_row.get(c, np.nan) if cur_team_row is not None else np.nan
-        pri = pri_team_row.get(c, np.nan) if pri_team_row is not None else np.nan
-        out[c] = blend(own, cur_n, pri, k0_volume)
-    out["source"] = "history"
-    if market is not None:
-        plays = market["plays"]
-        pass_rate = market["pass_rate"]
-        out["targets"] = plays * pass_rate
-        out["carries"] = plays * (1 - pass_rate)
-        # touchdowns scale with implied points at the league rate; goal-line shares
-        # of targets/carries carry over unchanged from the history blend since the
-        # market doesn't speak to WHERE on the field a team's plays happen
-        td_per_pt = out.get("_league_td_per_point", 0.1055)
-        total_td = market["implied_points"] * td_per_pt
-        # keep the history blend's pass/rush TD split ratio, apply to the new total
-        hist_total_td = out["pass_td"] + out["rush_td"]
-        if hist_total_td > 0:
-            out["pass_td"] = total_td * out["pass_td"] / hist_total_td
-            out["rush_td"] = total_td * out["rush_td"] / hist_total_td
-        out["source"] = "market"
-    return out
 
 
 # ---------------------------------------------------------------- opponent adjustment
@@ -614,41 +576,14 @@ def td_lambda(env_team, i10_target_share, i10_carry_share, target_share, rush_sh
             + env_team["rush_td"] * (f_rush_in10 * i10_carry_share + (1 - f_rush_in10) * rush_share))
 
 
-# ---------------------------------------------------------------- questionable regime
-QUESTIONABLE_WEIGHTS = {"normal": 0.55, "limited": 0.30, "out": 0.15}
-QUESTIONABLE_SCALE = {"normal": 1.0, "limited": 0.6, "out": 0.0}
-# Base rates: of players tagged Questionable in 2025, what fraction played a normal
-# snap share, a limited one, or sat out. Stored here as the documented default;
-# build_priors.py can refresh QUESTIONABLE_WEIGHTS from data if desired.
-
-
-def questionable_regimes(mu_base):
-    """Return {regime: (probability, adjusted_mu)} for a Questionable player.
-    Per modeling_framework.md: run normal/limited/out regimes with stated weights;
-    if the regimes disagree enough to change the betting decision, the market_read
-    layer should mark the line for the PASS-because-flip rule rather than pricing
-    an average of the three."""
-    return {reg: (w, mu_base * QUESTIONABLE_SCALE[reg]) for reg, w in QUESTIONABLE_WEIGHTS.items()}
-
-
-def questionable_flip_check(samples_by_regime, line):
-    """True if the Over/Under recommendation would flip depending which
-    Questionable regime is realised -- the case where PASS is mandatory regardless
-    of the blended number."""
-    sides = set()
-    for regime, s in samples_by_regime.items():
-        p_over = float(np.mean(s > line))
-        sides.add(p_over >= 0.5)
-    return len(sides) > 1
-
-
 # ---------------------------------------------------------------- joint simulation
 # WIDTH SETTINGS (docs/plans/2026-09-24-yardage-harness.md, step 2). The 2022-25
 # harness found every yardage market right on average and too NARROW: shares,
 # catch rates and yards per touch were fixed within a game. Each setting below
 # lets one of them vary game to game, mean-preserving. None / 0.0 is the old
 # sampler EXACTLY (no extra random draws, so output is byte-identical); the
-# values the scorer uses are tuned on 2022-23 by backtest.py --tune-width.
+# values the scorer uses were first tuned on 2022-23 by backtest.py --tune-width;
+# later rounds re-selected some of them on other seasons (width_params.json tuned_on).
 #   share_conc  Dirichlet concentration of the split of team targets / carries
 #               (a player's share varies around its mean; smaller = wider)
 #   catch_conc  Beta concentration of each player's catch rate

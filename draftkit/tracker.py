@@ -54,8 +54,6 @@ def calibrate_survival(s: float, knots: list[tuple[float, float]]) -> float:
 BENCH_TIE = 2.0   # bench rows this close on the RAW insurance value are a coin flip: the higher
                   # CEILING breaks it (proj_hi, else proj_pts + band/2; never the width, DECISIONS #55)
 
-FALLBACK_FLOORS = ("board_min", "replacement")
-
 
 def fallback_value(survivor_vals: list[float], pool_vals: list[float],
                    repl: float | None, mode: str = "board_min") -> float | None:

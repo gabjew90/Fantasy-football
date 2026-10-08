@@ -213,7 +213,7 @@ def test_from_sheet_headline_is_reproduced_from_the_workbooks_inputs(tmp_path, g
     tab lines, the ECR slot, the RISK haircut and the workbook's own
     formulas, in LEAGUE scoring; the row carries the workbook's games basis;
     a tab player off the page is estimated at the position's median ratio."""
-    from draftkit.seasondata import score_projection
+    from core.scoring import score as score_projection
     p = _headline_workbook(tmp_path, games, three_way)
     idx = FakeIndex({("Jahmyr Gibbs", "RB"): "4866", ("Bijan Robinson", "RB"): "9509"})
     rep = {}
@@ -264,7 +264,7 @@ def test_the_workbooks_own_scoring_is_reported_not_used(tmp_path):
     df, _ = X.from_sheet(p, HALF, idx, as_of="cfg", line="tab", report=rep)
     assert rep["sheet_scoring_diffs"] == {"rec": (1.0, HALF["rec"])}
     g = df.filter(pl.col("name") == "Jahmyr Gibbs").row(0, named=True)
-    from draftkit.seasondata import score_projection
+    from core.scoring import score as score_projection
     assert abs(g["pts17"] - score_projection({"rush_att": 275.2, "rush_yd": 1383.7, "rush_td": 13.8, "rec": 71.3, "rec_yd": 581.1, "rec_td": 4.1, "fum_lost": 1.1}, HALF)) < 1e-9
 
 
@@ -296,7 +296,7 @@ def test_the_headline_block_holds_tab_players_the_index_cannot_match(tmp_path):
     or everyone ranked below him shifts. Bijan is RB1 in ECR but unknown to
     the index; Gibbs at RB2 must see Bijan's AVG as the largest in the block."""
     import openpyxl
-    from draftkit.seasondata import score_projection
+    from core.scoring import score as score_projection
     p = _headline_workbook(tmp_path, 17, True)
     wb = openpyxl.load_workbook(p)
     ecr = wb["ECR"]

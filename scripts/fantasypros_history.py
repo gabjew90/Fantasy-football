@@ -14,7 +14,7 @@ so the FPTS column and its unknown scoring never enter.
     venv\\Scripts\\python.exe scripts\\fantasypros_history.py --attach keefamania
     venv\\Scripts\\python.exe scripts\\source_gate.py --rows reports/projection_backtest.keefamania.fpros.rows.csv,reports/projection_backtest.omnibeta.fpros.rows.csv --candidate fpros --rivals blend,lines --out reports/fpros_gate.md
 
-Files: data/external/fantasypros_history/fpros_<season>_<pos>.csv, one row
+Files: data/raw_history/fantasypros_history/fpros_<season>_<pos>.csv, one row
 per player with the stat line, the capture timestamp and the archived URL.
 """
 
@@ -36,9 +36,12 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from draftkit.external import SHEET_COLS  # noqa: E402
-from draftkit.seasondata import score_projection  # noqa: E402
+from core.scoring import score as score_projection  # noqa: E402
 
-OUT = ROOT / "data" / "external" / "fantasypros_history"
+# NOT under data/external/: skill/release.py ships data/external/*.csv to chat, and
+# fnmatch's * crosses "/", so a subfolder there ships too. This history is offline
+# only (the source gate), so it lives outside every release rule (DECISIONS #211).
+OUT = ROOT / "data" / "raw_history" / "fantasypros_history"
 UA = {"User-Agent": "Mozilla/5.0 draftkit-history/1.0"}
 # regular-season kickoff (Thursday opener) per season: a capture on or before
 # it is a genuine preseason table; after it the draft page is static

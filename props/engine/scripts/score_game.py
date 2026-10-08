@@ -201,11 +201,6 @@ YARD_MARKETS = {"player_reception_yds": "rec_yards", "player_rush_yds": "rush_ya
                 # (reports/rush_rec_calibration.md: priced since it passed, DECISIONS #187)
                 "player_rush_reception_yds": "rush_rec_yards"}
 COUNT_MARKETS = {"player_receptions": "receptions"}
-# DEFERRED (user, 2026-10-06; DECISIONS #190): the engine's focus is receptions, receiving
-# yards, non-QB rushing, rushing + receiving and passing yards. Anytime TDs are still priced,
-# LOGGED and graded (the record keeps measuring them) but left off what the user reads -- the
-# report's player tables and TD pairs -- unless he asks (--markets td).
-DEFERRED_MARKETS = {"player_anytime_td"}
 CONSENSUS_TOL = {"player_receptions": 1.0, "player_reception_yds": 4.0, "player_rush_yds": 5.0,
                  "player_pass_yds": 10.0, "player_rush_reception_yds": 6.0}
 
@@ -1256,15 +1251,18 @@ def main():
                 OUT_MULT["rs"][i_] = fr_
     M, redistributed = apply_out_rule(M, E, (AWAY, HOME), mult=OUT_MULT)
     # WIDTH SETTINGS (resources/width_params.json): game-to-game variation in
-    # shares, catch rate and yards per touch, tuned on 2022-23 by backtest.py
+    # shares, catch rate and yards per touch, first tuned on 2022-23 by backtest.py
     # --tune-width and judged on 2024-25 (reports/width_tuning.md,
-    # reports/yardage_harness.md). No file = the pre-width sampler, draw for draw.
+    # reports/yardage_harness.md); later rounds re-selected some settings (the file's
+    # tuned_on and note). No file = the pre-width sampler, draw for draw.
     _wf = RES / "width_params.json"
     WIDTH = MODEL.validate_width(json.loads(_wf.read_text(encoding="utf-8"))) if _wf.exists() else None
-    # ROUND 41 (DECISIONS #200): tight ends' target share x te_share_mult on the projection
-    # itself, so the projected targets, the 50/50 search and the card all carry it; the
-    # simulation then runs without the multiplier (the harness applies it inside the draw:
-    # the same shares, the depth bucket giving up what the tight end gains)
+    # ROUND 41 (DECISIONS #200), WITHDRAWN by #203: te_share_mult is back to 1 (absent from
+    # width_params.json), so this block is inert -- the knob is kept, off. When set, tight
+    # ends' target share x te_share_mult on the projection itself, so the projected targets,
+    # the 50/50 search and the card all carry it; the simulation then runs without the
+    # multiplier (the harness applies it inside the draw: the same shares, the depth bucket
+    # giving up what the tight end gains)
     TE_MULT = float((WIDTH or {}).get("te_share_mult") or 1.0)
     if TE_MULT != 1.0:
         _te = M.slot.map(MODEL.role_group) == "TE"
@@ -1291,10 +1289,11 @@ def main():
     # ---------- 6. simulate: JOINT per-team draws (round 5, review item 6) ----------
     # One team-targets draw and one team-carries draw per simulation, shared by every
     # player on that team, then a multinomial split across the eligible set plus an
-    # "other" bucket. Teammates are negatively correlated within a simulation (a fixed
-    # total means more for A is less for B) and every player shares the team's own
-    # play-count variance. Independent per-player draws had neither property, which
-    # made same-game-parlay probabilities impossible to state.
+    # "other" bucket. Within a simulation teammates compete for a split (more for A is
+    # less for B) but share the team's own play-count variance; the shared total
+    # outweighs the split, so teammates' targets correlate about +0.06 (DECISIONS #205).
+    # Independent per-player draws had neither property, which made same-game-parlay
+    # probabilities impossible to state.
     SH = P["shape_ypc_per_catch"]
     TVD = P.get("team_volume_dispersion", {"targets_r": 30.0, "carries_r": 30.0})
     QB_RESID = np.array(P["qb_carry_residual_quantiles"]) if "qb_carry_residual_quantiles" in P else None

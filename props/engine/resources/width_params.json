@@ -13,5 +13,5 @@
  "share_conc_carries": 20.0,
  "share_conc_qb": 80.0,
  "share_conc_targets": 60.0,
- "tuned_on": "2022,2023"
+ "tuned_on": "2022-23 (--tune-width, qb and rushlead grids); eff_sd_rush selected on 2022-25 (round 30); share_conc_targets, pass_implied_exp and pass_scale selected on 2022-24 (rounds 34 and 38)"
 }

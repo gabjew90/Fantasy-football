@@ -1,4 +1,4 @@
-from draftkit.ids import SleeperIndex, normalize_name
+from core.ids import SleeperIndex, normalize_name
 
 
 def test_normalize_strips_suffixes_and_punctuation():
