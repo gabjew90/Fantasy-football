@@ -1,3 +1,5 @@
+> Historical (superseded). Both drafts are done (Omnibeta 2026-08-23, Keefamania 2026-09-05). The draft engine is frozen until 2027 draft prep under docs/plans/2026-09-24-consolidation-plan.md; the draft-day procedure that followed this was docs/draft-day-runbook.md and docs/plans/2026-09-02-final-form-and-survival-sim-plan.md.
+
 # Draft rig: foolproof and versatile — design
 
 Date: 2026-09-01. Status: approved in conversation; implementation proceeds

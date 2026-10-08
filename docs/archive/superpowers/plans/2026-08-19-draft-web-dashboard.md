@@ -1,4 +1,4 @@
-> Historical (superseded); see docs/draft-day-runbook.md and docs/plans/2026-09-02-final-form-and-survival-sim-plan.md
+> Historical (superseded). Both drafts are done (Omnibeta 2026-08-23, Keefamania 2026-09-05). The draft engine is frozen until 2027 draft prep under docs/plans/2026-09-24-consolidation-plan.md; the draft-day procedure that followed this was docs/draft-day-runbook.md and docs/plans/2026-09-02-final-form-and-survival-sim-plan.md.
 
 # Draft-Day Web Dashboard Implementation Plan
 
@@ -10,7 +10,7 @@
 
 **Tech Stack:** Python 3.10 stdlib (`http.server`, `json`), existing `Tracker`/`snake` modules, vanilla HTML/CSS/JS. No new pip dependencies.
 
-**Spec:** `docs/superpowers/specs/2026-08-19-draft-web-dashboard-design.md`. One deliberate deviation: no `refresh_status.json` — the page instead shows the `tiers.csv` build time (file mtime) and turns the banner amber when it is >12h old. Simpler, and truthful even if someone rebuilds tiers outside the launcher.
+**Spec:** `docs/archive/superpowers/specs/2026-08-19-draft-web-dashboard-design.md`. One deliberate deviation: no `refresh_status.json` — the page instead shows the `tiers.csv` build time (file mtime) and turns the banner amber when it is >12h old. Simpler, and truthful even if someone rebuilds tiers outside the launcher.
 
 **File map:**
 - Create: `draftkit/web.py` — state JSON builder + `DraftWebApp` + HTTP handler + `run_server`
