@@ -2554,10 +2554,10 @@ def role_flag(u, last_week_expected):
     d_snap = u["snap"] - u["snap_base"]
     d_ts = u["ts"] - u["ts_base"]
     if d_snap >= SNAP_JUMP and d_ts < SHARE_LAG:
-        return ("role up", "snaps jumped while his targets lagged; the projection already raises his "
+        return ("role up", "snaps jumped while his target share lagged; the projection already raises his "
                            "target share for it (snap-change rule)")
     if d_snap <= -SNAP_JUMP and d_ts > -SHARE_LAG:
-        return ("role down", "snaps fell while his targets held; the projection already lowers his "
+        return ("role down", "snaps fell while his target share held; the projection already lowers his "
                              "target share for it (snap-change rule)")
     return None
 

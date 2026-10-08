@@ -256,7 +256,7 @@ K0_FIXED = {"ypt": 80, "catch_rate": 40, "target_share": 80}
 
 # Round 23 (2026-10-03): the share blend reacts to a role change late. On
 # props-v1.28's 2022-25 harness results a receiver whose snaps jumped 15+
-# points last week while his targets lagged caught +0.28 to +0.51 more than
+# points last week while his target share lagged caught +0.28 to +0.51 more than
 # projected the next week, and one whose snaps fell missed by about 0.55
 # (reports/role_shift_check.md). The fix: scale the blended target share by
 # (last week's snap share / his earlier weeks') ** SNAP_REACT, clipped to

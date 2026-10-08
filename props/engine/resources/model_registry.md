@@ -134,7 +134,7 @@ next fix).
 ### Round 23 (2026-10-03): target share reacts to last week's snap change, props-v1.29
 
 - Found by the research board's role-shift check (reports/role_shift_check.md): a receiver
-  whose snaps moved 15+ points last week while his targets lagged beat or missed the next
+  whose snaps moved 15+ points last week while his target share lagged beat or missed the next
   week's catches by about half a catch, in 2022-23 and 2024-25. Fix: blended target share x
   (last week's snaps / his earlier weeks') ** 0.5, clipped [0.6, 1.6], when last week is the
   week before this one and he has two earlier weeks with the team (`model.SNAP_REACT`).
