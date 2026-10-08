@@ -1,16 +1,12 @@
-"""`python -m manager` -- the local Yahoo sync and the trade radar.
+"""`python -m manager` -- the local Yahoo sync, the one entrypoint left.
 
   python -m manager --league keefamania yahoo-sync   # pull Yahoo into state/<league>/yahoo/
-  python -m manager --league <name> trade-radar      # the trade search, printed (read-only)
 
 The in-season cron stack this module used to drive (gate, cron, the --module
 runs, vegas-refresh) was retired on 2026-10-08 (DECISIONS #212); the fantasy
 commands (`nfl fantasy ...`) answer lineups, waivers and trades. yahoo-sync
 stays because the fantasy commands read the synced copy on a host without
-Yahoo credentials (manager.yahoo_api.read_cached). trade-radar is the old
-`--module trade` run: the radar is kept pending the user's call on trade
-search (repo sweep 2026-10-08), and it opens the store read-only, so a run
-prints every opportunity and writes no state.
+Yahoo credentials (manager.yahoo_api.read_cached).
 """
 
 from __future__ import annotations
@@ -43,22 +39,15 @@ def main() -> int:
     load_dotenv()
     _setup_logging()
     ap = argparse.ArgumentParser(prog="manager")
-    ap.add_argument("command", choices=("yahoo-sync", "trade-radar"))
+    ap.add_argument("command", choices=("yahoo-sync",))
     ap.add_argument("--league", default=None,
                     help="league name; overrides DRAFTKIT_LEAGUE / default_league")
     ap.add_argument("--week", type=int, default=None,
-                    help="sync / search this NFL week instead of the live one")
+                    help="sync this NFL week instead of the live one")
     args = ap.parse_args()
 
     from .context import configure
     configure(league=args.league, week=args.week)
-
-    if args.command == "trade-radar":
-        from .context import league_context, state_dir
-        from .store import Store
-        from .trade_radar import build
-        print(build(league_context(write_state=False), Store(state_dir(), read_only=True)))
-        return 0
 
     # The Yahoo credentials are LOCAL: this pulls every resource the fantasy
     # commands read into state/<league>/yahoo/ and the .bat commits it, so a

@@ -162,10 +162,9 @@ def test_every_production_call_site_passes_flex_slots_by_name():
     import inspect
 
     from draftkit import briefs, lineup, playoffs
-    from manager import trade_radar, waiver_brief
-
-    # (lineup_opt and scout were retired with the cron stack, DECISIONS #212)
-    for mod in (briefs, playoffs, lineup, trade_radar, waiver_brief):
+    # (the manager call sites -- lineup_opt, scout, trade_radar, waiver_brief --
+    # were retired with the cron stack and the radar, DECISIONS #212)
+    for mod in (briefs, playoffs, lineup):
         src = inspect.getsource(mod)
         assert 'ctx["slots"], ctx["flex_slots"]' not in src, (
             f"{mod.__name__}: flex_slots is sitting in the `flex` positional")

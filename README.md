@@ -12,9 +12,8 @@ evidence live in `DECISIONS.md`; this README is the map, not the record.
 > duplicated the fantasy commands: use `nfl fantasy ...` (lineup, waiver,
 > trade, scenario), through chat or `python nfl.py fantasy --help`. Props
 > capture and grading (`props.yml`) still run on their schedule. `manager/`
-> keeps the Yahoo and consensus layer the fantasy commands import, the trade
-> radar (pending the user's call on trade search), and two manual entrypoints:
-> `yahoo-sync` (`scripts/YAHOO SYNC.bat`) and `trade-radar`.
+> keeps only the Yahoo and consensus layer the fantasy commands import, and
+> `python -m manager --league keefamania yahoo-sync` (`scripts/YAHOO SYNC.bat`).
 >
 > 5. Weekly projections auto-detect Sleeper publish state; until live they fall back to
 >    season proj ÷ 16 with a visible banner. The matchup adjustment activates from
@@ -139,7 +138,7 @@ python -m draftkit simulate --slot 6   # full-draft dry run through the real tra
 - `scripts/SEASON BRIEFS.bat` and `scripts/ADP DIFF.bat` are run by Windows scheduled tasks on the laptop, not by the repo. SEASON BRIEFS (`python -m draftkit` briefs) overlaps the `nfl fantasy` commands and is a candidate for retirement — that decision is owed to the user; neither task has been touched. `scripts/YAHOO SYNC.bat` (also a scheduled task) keeps the committed Yahoo copy the fantasy commands read on a host without Yahoo credentials; `scripts/VEGAS REFRESH.bat` was deleted with the cron stack (DECISIONS #212), so its scheduled task, if still registered, has nothing to run.
 
 Repo layout: `draftkit/` (pipeline + tracker modules), `manager/` (the Yahoo
-and consensus layer under `fantasy/`, the trade radar, state in `state/`), `scripts/` (the Yahoo
+and consensus layer under `fantasy/`, state in `state/`), `scripts/` (the Yahoo
 draft rig — bridge server, in-page driver, pre-rank driver — and the
 validation harness: replays, backtest, gates), `leagues/*.yaml` (league
 facts), `config.yaml` (globals only), `tests/`, `data/raw` (API caches,
@@ -162,14 +161,11 @@ What stays in `manager/` is what the fantasy commands import: the Yahoo API
 client, sync and league source (`yahoo_api`, `yahoo_sync`, `yahoo_context`,
 `yahoo`), the league context (`context`), the rest-of-season consensus and
 FantasyPros feeds (`consensus`, `fantasypros`), the state store and the
-decision ledger (`store`, `ledger`, `provenance`).
-
-The trade radar (`trade_radar`, with `marginal`, `market`, `ecr`,
-`waiver_brief`, `faab`, `usage`, `age_decay`) is kept pending the user's call
-on trade search (repo sweep 2026-10-08): it searches the league for trades,
-where `nfl fantasy trade` scores one named trade. Two manual entrypoints:
+decision ledger (`store`, `ledger`, `provenance`). The trade radar and its
+pricing (`trade_radar`, `marginal`, `market`, `ecr`, `waiver_brief`, `faab`,
+`usage`, `age_decay`) went with it: no trade search is needed (the user's
+call); `nfl fantasy trade` scores a named trade. One entrypoint is left:
 
 ```
 python -m manager --league keefamania yahoo-sync   # pull Yahoo into state/keefamania/yahoo/
-python -m manager --league omnibeta trade-radar    # the trade search, printed; writes no state
 ```

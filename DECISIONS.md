@@ -8046,31 +8046,35 @@ The expert re-ran the four-season backtest (baseline reproduces ours: receptions
   only by the cron's lineup and scout); the `python -m manager gate / cron / --module /
   vegas-refresh` entrypoints; and the manager modules only that path used: `jobs`, `gate`,
   `triggers`, `clock`, `deliver`, `phone`, `injuries`, `scout`, `lineup_opt`, `vegas`, `games`,
-  `trade_watch` (grep-verified: nothing in `fantasy/`, `core/`, `nfl.py`, `CHAT.md`, `skill/`,
-  `props/` or the kept modules imports them). With them: the Store's delivery and bid-history
-  methods and their tests (8 test files whole, the cron tests inside 4 more). `notify.yml` now
-  watches `props` only. `scripts/keefamania_trades.py` goes in the same sweep (the dead-code PR).
+  `trade_watch`. `notify.yml` now watches `props` only.
+- **The trade radar is retired too (the user's call: no trade search is needed;
+  `nfl fantasy trade` scores a named trade):** `trade_radar` and what only it needed --
+  `marginal` (price / accepts / verdict, the injury discount), `market` (FantasyCalc), `ecr` (the
+  rank panel) with `fantasypros.overall`, `waiver_brief` (the free-agent pool), `faab`, `usage`,
+  `age_decay` -- plus `fantasypros.crosswalk`, `yahoo.load` / `injury_overlay` and the
+  browser-scrape snapshot fallback (only the radar, `scripts/keefamania_trades.py` and tests used
+  them), `Store.first_time` (the radar's dedup; the Store's delivery and bid-history methods went
+  with the cron), the unread `inseason.age_decay` knob, and the fetch allowlist entries for
+  `manager/usage.py` and `manager/waiver_brief.py`. `scripts/keefamania_trades.py` goes in the
+  same sweep (the dead-code PR).
+- **Grep-verified:** nothing in `fantasy/`, `core/`, `draftkit/`, `nfl.py`, `CHAT.md`, `skill/`,
+  `props/` or `scripts/` imports any deleted module (`draftkit.market` is a different module, and
+  `briefs.playoff_odds` keeps its caller inside briefs). 23 test files went whole; the cron and
+  radar tests inside 8 more were cut, keeping their draftkit, consensus and Sleeper tests.
 - **Kept, because the fantasy commands import them:** `yahoo_api`, `yahoo_sync`, `yahoo_context`,
-  `yahoo` (the Yahoo client, the local sync and the league source; `fantasy/league.py` reads the
-  synced copy through `read_cached` on a host without credentials, so `python -m manager
-  yahoo-sync` and `scripts/YAHOO SYNC.bat` stay), `context`, `consensus` and `fantasypros`
-  (registered: provisional / live), `store`, `ledger` and `provenance` (`fantasy lineup --record`
-  emits ledger rows). The ledger's grading functions stay as harness code although the Tuesday
-  job that called them is gone; the consensus registry note now says grading is by hand.
-- **Kept pending the user's call on trade search (repo sweep 2026-10-08):** `trade_radar` and
-  what it needs -- `marginal` (price / accepts / verdict, the injury discount), `market`
-  (FantasyCalc), `ecr` (the rank panel) with `fantasypros.overall`, `waiver_brief` (the free-agent
-  pool), `faab`, `usage`, `age_decay` -- with their tests and the `inseason.age_decay` knob. It is
-  one of the repo's two trade SEARCH tools (the other, `scripts/keefamania_trades.py`, is gone)
-  and `nfl fantasy trade` only scores one named trade. Its old `--module trade` run is now
-  `python -m manager --league L trade-radar`, which opens the store read-only (it prints and
-  writes no state). `Store.first_time` stays because the radar dedups through it.
+  `yahoo` (now only `api_entries`, `yahoo_id_map`, `_flat`, `YAHOO_STATUS`; `fantasy/league.py`
+  reads the synced copy through `read_cached` on a host without credentials, so `python -m
+  manager yahoo-sync` -- the one entrypoint left -- and `scripts/YAHOO SYNC.bat` stay), `context`,
+  `consensus` and `fantasypros` (registered: provisional / live), `store` (kv only), `ledger` and
+  `provenance` (`fantasy lineup --record` emits ledger rows). The ledger's grading functions stay
+  as harness code although the Tuesday job that called them is gone; the consensus registry note
+  now says grading is by hand.
 - **Shims:** the kept modules import `core.ids` and `core.scoring` directly instead of the
   `draftkit.ids` / `seasondata.score_projection` shims (pure re-exports, so identical behaviour).
-- **State:** `state/week_plan.json`, `state/gate_hours.json`, `state/messages.json` (and their
-  `state/keefamania/` copies) and `state/vegas/` were written only by the cron; they are removed
-  in a state-only commit on its own branch, sweep/retire-manager-state (hygiene.yml fails a PR
-  that mixes state with code). `kv.json`, `seen.json` (the radar's dedup), the ledgers and the
-  Yahoo sync stay.
-- **Undo:** git history. The last commit with the cron stack is b2341d3; restoring the files
-  listed above from it (and re-enabling the workflows) brings it back as it ran.
+- **State:** `state/week_plan.json`, `state/gate_hours.json`, `state/messages.json`,
+  `state/seen.json` (and their `state/keefamania/` copies) and `state/vegas/` were written only by
+  the cron and the radar; they are removed in a state-only commit on its own branch,
+  sweep/retire-manager-state (hygiene.yml fails a PR that mixes state with code). `kv.json`, the
+  ledgers and the Yahoo sync stay.
+- **Undo:** git history. The last commit with the cron stack and the radar is b2341d3; restoring
+  the files listed above from it (and re-enabling the workflows) brings them back as they ran.

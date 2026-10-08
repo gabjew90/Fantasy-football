@@ -384,16 +384,3 @@ def test_an_int_keyed_index_matches_and_returns_string_ids(monkeypatch):
     assert out["1"]["pts"] == 378.0 and "DATA MISSING" not in (note or "")
 
 
-def test_the_crosswalk_reports_yahoo_ids_and_a_second_name_index(monkeypatch):
-    _feed(monkeypatch, {"RB": [{"player_name": "Bijan Robinson", "player_id": 17240,
-                                "player_yahoo_id": "40059", "r2p_pts": "378.0"}]})
-    cw, note = fp.crosswalk({}, 2026, INDEX)
-    assert cw["by_yahoo"] == {"40059": "1"}
-    assert cw["by_name"]["bijan robinson"] == [("1", "RB", "ATL")]
-    assert "crosswalk 1 yahoo ids" in note
-
-
-def test_the_crosswalk_degrades_to_empty_tables_not_none(monkeypatch):
-    monkeypatch.setattr(fp, "_rows", lambda *a, **k: ([], {}))
-    cw, note = fp.crosswalk({}, 2026, INDEX)
-    assert cw == {"by_yahoo": {}, "by_name": {}} and "DATA MISSING" in note
