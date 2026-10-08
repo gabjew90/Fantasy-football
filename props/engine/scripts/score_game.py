@@ -4011,11 +4011,10 @@ def brief_section(**V) -> list[str]:
             c["Offensive line"] = (f"{avail} of 5 regulars available: "
                                    + ", ".join(f"{x['name']} ({x['pos']}, {word.get(x['state'], x['state'])})"
                                                for x in ls))
-        sk = pop[(pop.team == t) & pop.report_status.apply(lambda v: isinstance(v, str) and v != "")]
-        c["Receivers, tight ends and backs"] = "; ".join(
-            f"{r['name']} ({r.pos}, {r.report_status}"
-            + (f", practice: {prac[r.gsis_id]}" if isinstance(prac.get(r.gsis_id), str) and prac.get(r.gsis_id) else "")
-            + ")" for _, r in sk.iterrows() if r.pos != "QB") or "no designations"
+        # every receiver, tight end and back the report lists, priced or not (the same builder as the
+        # defense cell, with the prices' own status and its source)
+        c["Receivers, tight ends and backs"] = RSCH.defense_cell(t, iw, V.get("INJ_STATUS"), V.get("INJ_SOURCE"),
+                                                                 positions=RSCH.SKILL_POS)
         c["Pass rush and coverage"] = RSCH.defense_cell(t, iw, V.get("INJ_STATUS"), V.get("INJ_SOURCE"))
         cells[t] = c
     who_note = (RSCH.injury_note(rstate, WEEK)

@@ -1327,7 +1327,10 @@ def _missed(p) -> bool:
     return "did not" in p or "limited" in p
 
 
-def defense_cell(team, iw, status=None, source=None) -> str:
+SKILL_POS = {"WR", "TE", "RB", "FB", "HB"}
+
+
+def defense_cell(team, iw, status=None, source=None, positions=DEF_POS) -> str:
     """Section 4's pass rush and coverage cell: every defender the report lists Out, Doubtful or
     Questionable, or (before game statuses post) missing or limited in practice. status/source:
     the engine's per-(team, gsis_id) status and where it came from (the official report, or
@@ -1336,7 +1339,7 @@ def defense_cell(team, iw, status=None, source=None) -> str:
         return "no injury report yet this week"
     status, source = status or {}, source or {}
     out = []
-    for r in iw[(iw.team == team) & iw.position.isin(DEF_POS)].itertuples():
+    for r in iw[(iw.team == team) & iw.position.isin(positions)].itertuples():
         st = status.get((team, r.gsis_id)) or (r.report_status if isinstance(r.report_status, str) else None)
         prac = getattr(r, "practice_status", None)
         if st not in GAME_STATUSES and not _missed(prac):
@@ -1680,7 +1683,8 @@ def card_guide() -> list[str]:
           "**Using it:** pick the efficiency row you believe and say why. If that row clears with plenty of "
           "room, the prop is a volume question, and the role evidence says whether the volume holds. If only "
           "the engine's rate clears, the prop needs an efficiency he has not shown lately. Either way, the "
-          "market's chance is the probability; the table tells you what has to happen for the Over to land."]
+          "market's chance is the best available estimate of the prop's chance; the table tells you what has to "
+          "happen for the Over to land."]
     return L
 
 

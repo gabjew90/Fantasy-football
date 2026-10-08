@@ -309,8 +309,17 @@ def test_the_small_sample_label_says_his_longest_play_was_left_out():
 
 def test_the_card_guide_says_what_its_numbers_are_not():
     g = "\n".join(RS.card_guide())
-    assert "best available estimate" in g and "Read this as the probability" not in g
+    assert "best available estimate" in g and "is the probability" not in g and "as the probability" not in g
     assert "AVERAGE-production threshold" in g and "is not the chance the prop wins" in g
     assert "One game in ten" not in g and "too narrow" in g and "too wide" in g
     assert "luckless" not in g and "sensitivity check" in g
     assert "model error" in g
+
+
+def test_the_skill_cell_lists_every_listed_receiver_not_only_the_priced_ones():
+    import pandas as pd
+    iw = pd.DataFrame({"team": ["DAL", "DAL"], "gsis_id": ["w5", "s1"], "full_name": ["A Fifth Receiver", "A Safety"],
+                       "position": ["WR", "S"], "report_status": ["Questionable", None],
+                       "practice_status": ["Did Not Participate In Practice", "Full Participation in Practice"]})
+    cell = RS.defense_cell("DAL", iw, positions=RS.SKILL_POS)
+    assert cell == "A Fifth Receiver (WR, Questionable; practice: did not participate in practice)"
