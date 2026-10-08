@@ -16,9 +16,9 @@ otherwise it is a CONDITIONAL comparison and says which check failed.
 
 Writes a report (markdown) and a decision record (JSON) to the outputs folder.
 With `record=True` it also appends a ledger row, graded against actuals like
-every other. Chat never records (it is read-only). NOTHING PASSES IT YET: the
-scheduled runs are rewired to call this command with --record in step 6
-(the Actions rework), so until then no start/sit recommendation is graded.
+every other. Chat never records (it is read-only). No workflow passes it: the
+fantasy schedules are off (DECISIONS #109), so a start/sit recommendation is
+graded only when this command is run by hand with --record.
 """
 
 from __future__ import annotations

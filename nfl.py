@@ -22,7 +22,10 @@ session cache ($NFL_CACHE, else <temp>/nfl_cache -- never the outputs folder),
 reused for 20 minutes (--fresh re-reads).
 Reports and decision records go to $NFL_OUT (default /mnt/user-data/outputs).
 `--record` appends to the graded ledger. A chat session never passes it (chat
-is read-only, as for the props record); the scheduled runs will, from step 6.
+is read-only, as for the props record), and no workflow schedules a run that
+does (the fantasy schedules are off, DECISIONS #109): the ledger fills only
+from a run by hand with --record. `props best --survival` is retired: it stops
+with a message that there is no must-win pick and points at `props best --slate`.
 
 TROUBLESHOOTING LOG (temporary, `session_log` in config.yaml; inside a chat
 release only, or with NFL_SESSION_LOG=1): every command

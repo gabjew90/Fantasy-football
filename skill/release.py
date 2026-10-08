@@ -40,7 +40,8 @@ INCLUDE_FILES = ("CHAT.md", "nfl.py", "config.yaml", "requirements.txt", "tiers.
 # CHANGING THE RULES ABOVE DOES NOT REACH AN INSTALLED HARNESS. The installed
 # skill unpacks a release with its own copy of this file, as of its build, and
 # skips everything that copy does not include -- then the lock check fails and
-# chat runs the vendored fallback (props/ask.py, nfl-v1.16/17, DECISIONS #121).
+# chat runs the vendored fallback (it happened to props/ask.py in nfl-v1.16/17,
+# DECISIONS #121; the module moved to core/props_ask.py, inside the old rules).
 # A file must fit the rules of the OLDEST harness in use (HARNESS_RULES in
 # tests/test_skill_release.py) or wait for a rebuilt skill.
 INCLUDE_GLOBS = ("data/external/*.csv",)

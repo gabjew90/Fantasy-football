@@ -1,3 +1,5 @@
+> Historical. The "daily cron" this plan builds on is off since 2026-09-25 (DECISIONS #109): `weekly.yml` and `gate.yml` run only when dispatched by hand. In-season decisions moved to the `fantasy/` commands and `nfl.py` under docs/plans/2026-09-24-consolidation-plan.md.
+
 # Plan: season manager v2 — multi-source decisions for trades, waivers and lineups
 
 Verified against HEAD `3464921` (2026-09-07). Absorbs the prediction-ledger v3
