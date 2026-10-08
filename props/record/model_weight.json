@@ -4,6 +4,7 @@
   "estimated": true,
   "gate_open": false,
   "hi": 0.982,
+  "level": 0.95,
   "lo": -0.211,
   "model_id": "1df22e40b3d974065ebf02ae2051c5b73add5d4d16c07e17789fbc3cdbeb227d",
   "n_calls": 430,
@@ -21,6 +22,7 @@
    "estimated": true,
    "gate_open": false,
    "hi": 0.945,
+   "level": 0.95,
    "lo": -0.692,
    "model_id": "17455e4ad023bbe189db8ff7ed87f1e1de96d6c05c0e72218af476ed41dfbb77",
    "n_calls": 371,
@@ -36,6 +38,7 @@
    "estimated": true,
    "gate_open": false,
    "hi": 0.982,
+   "level": 0.95,
    "lo": -0.211,
    "model_id": "1df22e40b3d974065ebf02ae2051c5b73add5d4d16c07e17789fbc3cdbeb227d",
    "n_calls": 430,
@@ -88,6 +91,7 @@
    "estimated": true,
    "gate_open": false,
    "hi": 0.906,
+   "level": 0.95,
    "lo": -0.49,
    "model_id": "8b04ff332eab6762535a3cb8e10a7e7c42a96db1e96530deb61e45c684d614b9",
    "n_calls": 397,
@@ -127,6 +131,7 @@
    "estimated": true,
    "gate_open": false,
    "hi": 1.209,
+   "level": 0.95,
    "lo": -0.058,
    "model_id": "c0db10ff197c151b3bf547c08ab08a0f0515d44dd31b61452431780d1df2a794",
    "n_calls": 387,
@@ -142,6 +147,7 @@
   "estimated": true,
   "gate_open": false,
   "hi": 0.555,
+  "level": 0.95,
   "lo": -0.237,
   "n_calls": 1998,
   "next_review": 8,
@@ -153,7 +159,7 @@
    4
   ]
  },
- "rule": "decided only at the week 8, 12, 18 reviews, on the calls through that week: labels return only when the whole 95% interval of the model's weight is above zero AND the top-tier calls' net per $100 at Sleeper's recorded prices has its whole 95% interval above zero",
+ "rule": "decided only at the week 8, 12, 18 reviews, on the calls through that week: labels return only when the whole 98.3% interval of the model's weight is above zero AND the top-tier calls' net per $100 at Sleeper's recorded prices has its whole 98.3% interval above zero (3 looks share one 5%)",
  "season": 2026,
- "updated_utc": "2026-10-08T00:15:08Z"
+ "updated_utc": "2026-10-08T06:18:22Z"
 }

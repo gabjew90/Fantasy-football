@@ -6,9 +6,9 @@
 
 ## Label gate
 
-The research board shows no bet labels. The gate is decided only at the reviews after weeks 8, 12, 18, on the calls through that week, and opens only when both hold: the model's number earns weight beside the book's price (the whole 95% interval above zero), and the top-tier calls made money at Sleeper's recorded prices (the whole 95% interval of net per $100 above zero). Between reviews it holds; the running weight is context only.
+The research board shows no bet labels. The gate is decided only at the reviews after weeks 8, 12, 18, on the calls through that week, and opens only when both hold: the model's number earns weight beside the book's price (the whole 98.3% interval above zero), and the top-tier calls made money at Sleeper's recorded prices (the whole 98.3% interval of net per $100 above zero). Each review uses 98.3% rather than 95% because the gate looks 3 times: the looks share one 5% chance of opening on luck. Between reviews it holds; the running weight (95%) is context only.
 
-| Pricing model | Calls | Weeks | Running weight (95% CI) | Last review | Weight at review | Top-tier net per $100 at review | Gate |
+| Pricing model | Calls | Weeks | Running weight (95% CI) | Last review | Weight at review (98.3% CI) | Top-tier net per $100 at review (98.3% CI) | Gate |
 |---|---|---|---|---|---|---|---|
 | props-v1.3 | 371 | 2-2 | +0.115 (-0.692, +0.945) | none yet (first after week 8) | — | — | closed |
 | props-v1.26 (current) | 430 | 3-4 | +0.321 (-0.211, +0.982) | none yet (first after week 8) | — | — | closed |
