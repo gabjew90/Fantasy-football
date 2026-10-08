@@ -146,7 +146,7 @@
   "props/engine/scripts/eligibility.py": "91b45727f37f690a1416e9461d2ef5f00f4bd1c31985fd31d312e2251fd76bd2",
   "props/engine/scripts/model.py": "93c62fa1e9a3f1a6f735f94870fbb72f461d61f2c7e4febd9e8a7829cc9bf8a9",
   "props/engine/scripts/odds_client.py": "434186273bd0412a5545247228298951c5d0504a19c8a47c4c782bf3bb75aaa1",
-  "props/engine/scripts/research.py": "4b43c28c05dbd373860b5983e13af5486f1eb0526cba05317837736619f89fd5",
+  "props/engine/scripts/research.py": "e4d51d75670c64a41b2dca501ab474790e008f4967552d2bbe1c6787d823d40a",
   "props/engine/scripts/scenario.py": "e16722e9abebb55f05a770910c1e47dc1cc89f7d469c8d6232d6e6bd1af83774",
   "props/engine/scripts/score_game.py": "cf7854bc2c94b89d9f7347f7ae63fcbf4398724de785b4fcb0324dee72d7ca9b",
   "props/engine/scripts/score_week.py": "f9a04bfd46e0079c7d363a795d70d85541701116746c3252d54acba1c3266404",
@@ -163,6 +163,6 @@
   "tiers.csv": "04a1a79d43e9f2445ba3dc4ea262b00fbd58efea1f41e8b0393cb4c7f8afee41",
   "tiers.keefamania.csv": "11e6546b56caa807a572da86d5c3d81097bafd2d2550e25653882d78b2962e94"
  },
- "sha256": "8e8151e18db4c68d23c8b088db5bdc9d9c58df64a078160e9b523d975638ce3e",
+ "sha256": "b4e1f0f342c659a76407bc14a882dd5f84fdea17dbe7dd0ea3f09364cd8e7e2d",
  "tag": "nfl-v1.58"
 }
