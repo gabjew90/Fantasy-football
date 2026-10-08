@@ -225,3 +225,36 @@ def test_a_practice_only_injury_report_is_said_and_shown(tmp_path):
     row = next(ln for ln in sec.splitlines() if ln.startswith("| Pass rush and coverage"))
     assert "did not participate" in row and "no designations |" not in row.split("|")[3]
     assert "practice statuses only" in report.split("## Team matchup")[1].split("### 1.")[0]
+
+
+def test_the_run_export_matches_the_report_and_a_read_built_from_it_publishes(run, tmp_path):
+    # run_<slug>.json is the report's cards as data (DECISIONS #217): one card per report card,
+    # and a read that states only the run's numbers passes publish's checks and renders
+    import json
+    out = PLAIN_OUT["dir"]
+    report, _r, _e = run
+    data = json.loads((out / "run_2026_wk04_DAL_HOU.json").read_text(encoding="utf-8"))
+    assert data["export_version"] == 1 and data["away"] == "DAL" and data["home"] == "HOU"
+    assert len(data["cards"]) == len(re.findall(r"(?m)^#### ", report))
+    assert data["sources"] and data["gaps"] and data["who_plays"]
+    card = next(c for c in data["cards"] for v in c["volume"]
+                if v.get("cells") and "season" in v["cells"]["rows"] and v["market"] == "player_receptions")
+    v = next(v for v in card["volume"] if v["market"] == "player_receptions")
+    row = next(r for r in card["rows"] if r["market"] == "player_receptions" and r["line"] == v["line"])
+    rate, need = v["cells"]["rows"]["season"]["rate"], v["cells"]["need_out"]
+    vol = v["cells"]["rows"]["season"]["vol"]
+    pct = f"{100 * row['p_over_book']:.0f}%"
+    reads = {"reads_version": 1, "game": "DAL@HOU", "thesis": "A read built from the run.",
+             "legs": [{"player": card["name"], "market": "receptions", "side": "over", "line": v["line"],
+                       "condition": "his share holds.", "case": f"The market has the Over at {pct}.",
+                       "fails": "His share falls.",
+                       "needs": [{"volume": vol, "rate": rate, "reaches": vol * rate >= need - 1e-9}],
+                       "cite": [{"field": "market_p", "value": pct}]}]}
+    rp = tmp_path / "reads.json"
+    rp.write_text(json.dumps(reads), encoding="utf-8")
+    r = subprocess.run([sys.executable, str(SCRIPTS / "publish.py"), "--run", str(out / "run_2026_wk04_DAL_HOU.json"),
+                        "--reads", str(rp), "--out", str(tmp_path / "pub"), "--no-ci"],
+                       capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120)
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert (tmp_path / "pub" / "2026_wk04_DAL_HOU_qa.md").exists()
+    assert (tmp_path / "pub" / "2026_wk04_DAL_HOU_agent.md").exists()

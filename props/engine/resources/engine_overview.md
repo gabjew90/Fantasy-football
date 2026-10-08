@@ -1,6 +1,6 @@
 # How the props engine works -- inputs to prices, with the actual numbers
 
-*Settings as of props-v1.53 (2026-10-07). The plain-language companion to methodology.md and
+*Settings as of props-v1.57 (2026-10-08; the prices unchanged since props-v1.53). The plain-language companion to methodology.md and
 model_registry.md: every formula and setting the engine runs, where each came from, and
 what is proven. Worked examples are from week 4 of 2026 (ATL at NO), computed at props-v1.40:
 they predate round 34 (target spread 60), round 38 (QB passing scale) and round 39 (backs'
@@ -172,6 +172,13 @@ one card per player (one table; "How to read the player cards" copied before the
 each player's volume and share, last season vs this season -> teammates out -> the engine's
 volume vs the book's -> the card's efficiency rows, with catches or yards named per read ->
 if-thens with the losing branch -> "Don't mix". Never picks.
+
+**Publishing (DECISIONS #217).** Each run also writes `run_<slug>.json`, the cards and the brief as
+data. A read written for others goes to scripts/publish.py as a reads file. publish.py first checks
+it against the run: the leg is on the board, every volume x efficiency is recomputed, every cited
+number matches, every number in the prose traces back, injuries match section 4, and no pick
+language appears. Only then does it render the QA/QC version and the agent version
+(resources/agent_guide.md). A failed check renders nothing.
 
 ## 9. Proven, unproven, next
 

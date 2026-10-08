@@ -2894,6 +2894,8 @@ def main():
                 "qb": qb, "shadow": shadow,
                 "matchup": RSCH.matchup_sentence(PA, HOME if t == AWAY else AWAY, m.pos), "watch": watch}
 
+    # the run as data (run_<slug>.json): what the cards and the brief show, for publish.py
+    RUN_EXPORT = {"cards": []}
     L.append("\n".join(RSCH.card_guide()) + "\n")
     # the live record and the backtest calibration, once (they were the same on every card)
     _cal = RSCH.calibration_block(set(RESEARCH.market) if len(RESEARCH) else set(),
@@ -2918,7 +2920,9 @@ def main():
             rr_read = RUSH_REC.get((m["name"], t))
             if mine.empty and not tdq and not rr_read:
                 continue
-            L += RSCH.player_card(card_inputs(m, t, mine, rr_read))
+            _ci = card_inputs(m, t, mine, rr_read)
+            RUN_EXPORT["cards"].append(_ci)
+            L += RSCH.player_card(_ci)
             if tdq:
                 bk, price, p_imp = sorted(tdq, key=lambda x: x[0] != "draftkings")[0]
                 p_yes, td_src = p_anytime(m)
@@ -3217,7 +3221,8 @@ def main():
                           STARTER_QB=STARTER_QB, AUTO_QB=AUTO_QB, LINE_STATUS=LINE_STATUS,
                           TEAM_VOL_CHK=TEAM_VOL_CHK, UNIT_EFF=UNIT_EFF, PA=PA, weather=weather, roof=roof,
                           ROOF_NOTE=ROOF_NOTE, R=R, G=G, WEEK=WEEK, TEAM_VOL_ROWS=TEAM_VOL_ROWS, STATE_N=_state_n,
-                          INJ_STATUS=inj_status, INJ_SOURCE=INJ_SOURCE, DEF_STARTERS=DEF_STARTERS)
+                          INJ_STATUS=inj_status, INJ_SOURCE=INJ_SOURCE, DEF_STARTERS=DEF_STARTERS,
+                          EXPORT=RUN_EXPORT)
     if BET.empty:
         L[3:3] = BRIEF
     # put the card at the top of the report, right after the header rule
@@ -3531,6 +3536,13 @@ def main():
     # cp1252, which cannot encode it. The Linux runner never saw this because
     # it defaults to UTF-8, so the bug was invisible in CI and fatal locally.
     (OUT / f"report_{slug}.md").write_text("\n".join(L), encoding="utf-8")
+    try:
+        write_run_export(OUT / f"run_{slug}.json", RUN_EXPORT, L, SOURCES, env, market_env, AWAY, HOME, SEASON,
+                         WEEK, kick, hrs, slug)
+    except Exception as exc:  # noqa: BLE001 -- the export must never cost the prop run
+        # no older run file may stand in for this run (publish would check reads against it)
+        (OUT / f"run_{slug}.json").unlink(missing_ok=True)
+        log(f"  run export skipped ({type(exc).__name__}: {exc})")
     M.drop(columns=["evidence"]).to_csv(OUT / f"player_params_{slug}.csv", index=False)
     try:
         FP = fantasy_table(M, sims, V1TD, td_lambda, parse_scoring(a.fantasy_scoring),
@@ -3896,6 +3908,61 @@ def qb_starts(pbp, gsis_id, first=None) -> int:
     return int((first == gsis_id).sum()) if len(first) else 0
 
 
+RUN_EXPORT_VERSION = 1
+
+
+def _jsonable(o):
+    """A run's objects as plain JSON: numpy and pandas scalars to Python, NaN and NaT to None,
+    timestamps to ISO strings, tuples and sets to lists, tuple keys joined with '|'."""
+    if isinstance(o, dict):
+        return {("|".join(map(str, k)) if isinstance(k, tuple) else str(k)): _jsonable(v) for k, v in o.items()}
+    if isinstance(o, (list, tuple)):
+        return [_jsonable(v) for v in o]
+    if isinstance(o, (set, frozenset)):
+        return sorted((_jsonable(v) for v in o), key=str)
+    if isinstance(o, pd.DataFrame):
+        return _jsonable(o.to_dict("records"))
+    if isinstance(o, pd.Series):
+        return _jsonable(o.tolist())
+    if isinstance(o, np.ndarray):
+        return _jsonable(o.tolist())
+    if isinstance(o, (pd.Timestamp, datetime)):
+        return None if pd.isna(o) else o.isoformat()
+    if isinstance(o, np.generic):
+        o = o.item()
+    if isinstance(o, float) and (o != o or o in (float("inf"), float("-inf"))):
+        return None
+    if o is pd.NaT or (o is not None and not isinstance(o, (str, int, float, bool)) and pd.api.types.is_scalar(o)
+                       and pd.isna(o)):
+        return None
+    if o is None or isinstance(o, (str, int, float, bool)):
+        return o
+    return str(o)
+
+
+def write_run_export(path, export, report_lines, sources, env, market_env, away, home, season, week, kick, hrs,
+                     slug) -> None:
+    """run_<slug>.json: the run as data, for publish.py (the QA/QC and agent reports, and the
+    check that every number a written read states is the run's). The same objects the report
+    renders -- the cards' inputs, section 4's players, section 7's gaps, the sources table -- so
+    the two can never disagree. Informational: no price reads it."""
+    def line_starting(prefix):
+        return next((x.strip() for x in report_lines if x.strip().startswith(prefix)), None)
+    out = {"export_version": RUN_EXPORT_VERSION, "slug": slug, "season": season, "week": week,
+           "away": away, "home": home, "kickoff_utc": kick, "hours_to_kickoff": hrs,
+           "data_cutoff": line_starting("- **Data cutoff:**"),
+           "model_states": line_starting("Model states"),
+           "market_env": market_env or {},
+           "teams": {t: {k: env[t].get(k) for k in ("implied_points", "targets", "carries", "pass_td", "rush_td",
+                                                   "td_anchor", "td_total_history")} for t in (away, home) if t in env},
+           "sources": [dict(zip(("name", "purpose", "status", "detail"), s)) for s in sources],
+           "card_guide": RSCH.card_guide(),
+           **{k: v for k, v in export.items()}}
+    tmp = Path(path).with_suffix(".json.tmp")
+    tmp.write_text(json.dumps(_jsonable(out), indent=1, ensure_ascii=False), encoding="utf-8")
+    tmp.replace(path)
+
+
 BRIEF_ARGS = ("AWAY", "HOME", "market_env", "M", "pop", "iw", "pbp", "STARTER_QB", "AUTO_QB", "LINE_STATUS",
               "TEAM_VOL_CHK", "UNIT_EFF", "PA", "weather", "roof", "ROOF_NOTE", "R", "G", "WEEK", "TEAM_VOL_ROWS",
               "STATE_N", "INJ_STATUS", "INJ_SOURCE", "DEF_STARTERS")
@@ -4042,7 +4109,14 @@ def brief_section(**V) -> list[str]:
            "roof": roof, "roof_note": note,
            # starters only: a backup defender out is not a gap in the opposing offense's price
            "defense_out": RSCH.defense_out(iw, V.get("INJ_STATUS"), V.get("DEF_STARTERS"), (AWAY, HOME))}
-    L += ["### 7. Where the baseline could miss this game\n", *RSCH.known_gaps_table(RSCH.known_gaps(ctx)), ""]
+    gaps = RSCH.known_gaps(ctx)
+    L += ["### 7. Where the baseline could miss this game\n", *RSCH.known_gaps_table(gaps), ""]
+    ex = V.get("EXPORT")
+    if isinstance(ex, dict):
+        # the same facts, as data, for run_<slug>.json (publish.py checks reads against them)
+        ex.update({"sources_line": srcs, "who_plays": cells, "who_note": who_note, "report_state": rstate,
+                   "gaps": [list(g_) for g_ in gaps], "qb_change": qb_change,
+                   "injuries": RSCH.injury_rows(iw, pop, V.get("INJ_STATUS"), V.get("INJ_SOURCE"), (AWAY, HOME))})
     return L
 
 
