@@ -337,6 +337,17 @@ matchup brief, then Passing, Receiving, and Rushing and combined yards.
    requires better gains, requires more work than the engine expects) are computed, never chosen.
    The legs are conditional reads, never picks.
 
+   The customer version (the PDF) follows `props/engine/resources/customer_style.md`, the user's
+   layout and editorial rules:
+   - 2-4 sentence paragraphs, each drawing a conclusion rather than restating a table;
+   - concrete football reasons (opponents, involvement, injuries), never "favorable matchup";
+   - at most one bold phrase per paragraph;
+   - an explanation that adds what the generated close does not already say (the close states
+     the requirement, the engine's workload and the matchup).
+
+   The checker refuses the parts a machine can see. Before delivering, read the whole report
+   once for repetition, density and jargon.
+
    On Sleeper the market's chance sits near 50% on most lines, because Sleeper moves the line, not
    the price. The market's view is the line itself: read it against the engine's middle (Table A
    shows the gap). For a back, the card's rushing-vs-combined table says whether the combined line

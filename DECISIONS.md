@@ -8434,3 +8434,36 @@ every row while the predictions rows carry open / decision / close (line_archive
 - **Every priced player:** a written read's full card, or a data card (tables and computed
   verdicts, marked "no written read"). The QA version counts coverage; CHAT.md asks for reads on
   every player the user is likely to consider.
+## 2026-10-08 (221) -- the customer version's layout and editorial style
+
+- **The user's rules** (props/engine/resources/customer_style.md):
+  - the guide's layout;
+  - generous whitespace;
+  - compact tables with explanations beneath;
+  - 2-4 sentence paragraphs;
+  - bold only the decisive takeaway;
+  - purposeful, concrete football prose;
+  - technical terms explained once;
+  - conditional, direct recommendations;
+  - narration in the order requires -> engine expects -> matchup -> choose;
+  - an edit pass before delivery.
+- **Render** (customer version only; the QA version keeps its detail):
+  - one shared "How to read the player cards" note replaces the per-card footnotes;
+  - compact table labels and short verdict labels;
+  - the combined column moves from Table B into the rushing-vs-combined table, which gains the
+    verdict;
+  - the card closes in the user's order, then the branches;
+  - bold only on the requirement, the chosen market and its failure condition, with the failure
+    condition attached to the chosen leg (it had landed on the alternative);
+  - branch arithmetic that multiplies out as shown;
+  - plain market, unit and weather notes, and the guide's "Updated:" header line;
+  - wider spacing in the PDF.
+- **Checks:** no prose field over four sentences; vague matchup phrases ("favorable matchup",
+  "smash spot") refused; at most one bold phrase per paragraph.
+- **Found in the edit pass:** my own explanations repeated the generated close and the matchup
+  sentence, and the section narrations restated their tables. They were rewritten to state
+  conclusions.
+- **Also found:** odds_client's response cache sat inside the engine folder, so a run that reached
+  The Odds API changed the hash of the engine that ran. `cache` is now excluded from the hash (a
+  latent bug: it would have cost the record its release tag whenever a capture fell back to The
+  Odds API).

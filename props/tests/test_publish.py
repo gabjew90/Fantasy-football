@@ -442,7 +442,7 @@ def test_the_external_version_carries_no_internals():
     for w in ("DECISIONS", "PROTOTYPE", "MODEL_", "Checks", "Backend", "QA appendix", "release", "slug", "gsis"):
         assert w not in ext, w
     assert "## Receiving" in ext and "## A note on reliability" in ext and "Data as of:" in ext
-    assert "| Verdict | attainable | attainable |" in ext
+    assert "| Verdict | Attainable | Attainable |" in ext
 
 
 # ---- the full report (the user, 2026-10-08): market scenarios, the line vs the middle, combined, coverage ----
@@ -471,9 +471,11 @@ def test_the_scenario_table_shows_the_markets_likelihoods_or_why_not():
     import research as RS
     run = {**RUN, "scenarios_market": {**RS.alt_spread_scenarios(ALT, "Dallas Cowboys", "Tampa Bay Buccaneers", -8.5, 9),
                                        "as_of": "2026-10-08T22:52:27Z", "credits_left": "437"}}
-    t = "\n".join(PR.scenario_table(run))
+    t = "\n".join(PR.scenario_table(run, detail=True))
     assert "| DAL (favorite) wins by 9+ points | 52% |" in t and "| TB (underdog) wins by 9+ points | 9% |" in t
-    assert "| Final margin stays within one score | 39% |" in t and "not a model" in t
+    assert "| Final margin stays within one score | 39% |" in t and "not a model" in t and "credits left" in t
+    short = "\n".join(PR.scenario_table(run))
+    assert "the market's own estimate" in short and "credits" not in short and "-4200" not in short
     missing = "\n".join(PR.scenario_table({**RUN, "scenarios_market": {"status": "skipped: 40 credits left; needs 100+"}}))
     assert "not estimated" in missing and "skipped: 40 credits left" in missing
     # the narration may quote the market's scenario numbers
@@ -507,6 +509,34 @@ def test_every_priced_player_gets_a_card_and_the_qa_counts_coverage():
     qa = PR.render_qa(run, reads, P.check(run, reads), {})
     ext = PR.render_external(run, reads)
     for doc in (qa, ext):
-        assert "### George Pickens · WR2, DAL" in doc and "No written read for this player" in doc
-        assert "### CeeDee Lamb · WR1, DAL" in doc
+        assert "### George Pickens · WR2, DAL" in doc and "### CeeDee Lamb · WR1, DAL" in doc
+    assert "No written read for this player" in qa and "No written read for this player" not in ext
+    assert ext.count("## How to read the player cards") == 1 and "Cards without a closing paragraph" in ext
     assert "**Coverage:** 1 of 2 priced players have a written read; data cards only: George Pickens." in qa
+
+
+# ---- the customer version's style (the user, 2026-10-08) ----
+def test_style_checks_refuse_long_paragraphs_vague_matchups_and_heavy_bold():
+    long = edit(lambda r: r["players"][0].update(explanation="One. Two. Three. Four. Five."))
+    assert any(c["check"] == "style" and "5 sentences" in c["stated"] for c in fails(long))
+    vague = edit(lambda r: r["players"][0].update(explanation="This is a favorable matchup for him."))
+    assert any(c["check"] == "style" and "favorable matchup" in c["stated"] for c in fails(vague))
+    bold = edit(lambda r: r["players"][0].update(explanation="**One** thing and **another**."))
+    assert any(c["check"] == "style" and "bold" in c["stated"] for c in fails(bold))
+    assert not [c for c in fails(good()) if c["check"] == "style"]
+
+
+def test_the_customer_card_follows_requires_expects_matchup_then_choose():
+    reads = good()
+    ext = PR.render_external(RUN, reads)
+    i_req = ext.index("Receptions 6.5 needs **9 targets at this season's gains**, so it is attainable.")
+    i_exp = ext.index("The engine expects 10.7 targets, based on last game's 21 targets.")
+    i_mat = ext.index("The matchup supports it: Tampa is without its starting safety.")
+    i_choose = ext.index("- If you expect 9 targets at 79%, **receptions over 6.5** fits")
+    assert i_req < i_exp < i_mat < i_choose
+    assert "fits: about 7.1 catches, past the 7 the Over needs. It stops fitting if **his share falls back toward 26%, under the market-implied 9.2 targets**." in ext
+    # compact tables, explanations shared once, not under every card
+    assert "| Prop | Line (O/U) | Engine middle | Market Over | Engine Over |" in ext
+    assert "| Trimmed gains |" in ext or "| This season |" in ext
+    assert "Each cell: the workload" not in ext and "Sleeper prices most lines near even and moves" not in ext
+    assert "%% Updated: markets 20:42 UTC" in ext

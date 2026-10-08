@@ -67,15 +67,15 @@ def _styles():
     from reportlab.lib.colors import HexColor
     from reportlab.lib.styles import ParagraphStyle
     c = HexColor
-    base = ParagraphStyle("body", fontName="Vera", fontSize=9.2, leading=13, textColor=c(INK), spaceAfter=5)
+    base = ParagraphStyle("body", fontName="Vera", fontSize=9.2, leading=14, textColor=c(INK), spaceAfter=9)
     return {
         "body": base,
         "title": ParagraphStyle("title", parent=base, fontName="Vera-Bold", fontSize=20, leading=24, textColor=c(INK),
                                 spaceAfter=4),
         "h2": ParagraphStyle("h2", parent=base, fontName="Vera-Bold", fontSize=12.5, leading=16, textColor=c(ACCENT),
-                             spaceBefore=12, spaceAfter=5, keepWithNext=1),
+                             spaceBefore=20, spaceAfter=8, keepWithNext=1),
         "h3": ParagraphStyle("h3", parent=base, fontName="Vera-Bold", fontSize=10.5, leading=14, textColor=c(INK),
-                             spaceBefore=9, spaceAfter=4, keepWithNext=1),
+                             spaceBefore=16, spaceAfter=6, keepWithNext=1),
         "note": ParagraphStyle("note", parent=base, fontSize=7.6, leading=10, textColor=c(MUTED), spaceAfter=4),
         "meta": ParagraphStyle("meta", parent=base, fontSize=8, leading=11, textColor=c(MUTED), spaceAfter=2),
         "cell": ParagraphStyle("cell", parent=base, fontSize=7.8, leading=10, spaceAfter=0),
@@ -85,7 +85,7 @@ def _styles():
                                 alignment=2),
         "quote": ParagraphStyle("quote", parent=base, leftIndent=8, borderPadding=(5, 6, 5, 6), backColor=c(BAND),
                                 spaceBefore=3, spaceAfter=7),
-        "bullet": ParagraphStyle("bullet", parent=base, leftIndent=12, bulletIndent=2, spaceAfter=3, bulletFontName="Vera"),
+        "bullet": ParagraphStyle("bullet", parent=base, leftIndent=12, bulletIndent=2, spaceAfter=5, bulletFontName="Vera"),
     }
 
 
@@ -155,7 +155,7 @@ def flowables(md: str, width: float) -> list:
             while i < len(lines) and lines[i].strip().startswith("|"):
                 rows.append(_cells(lines[i]))
                 i += 1
-            out += [_table(rows, aligns, S, width), Spacer(1, 5)]
+            out += [Spacer(1, 3), _table(rows, aligns, S, width), Spacer(1, 10)]
             continue
         if s.startswith("# "):
             flush()

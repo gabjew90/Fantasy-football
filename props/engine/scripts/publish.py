@@ -546,9 +546,29 @@ def _rates_match(bs, r) -> bool:
     return len(bs) == len(rs) and all(_close(b, x, 0.005 if float(x) <= 1 else 0.05) for b, x in zip(bs, rs))
 
 
+# the customer version's style (props/engine/resources/customer_style.md, the user 2026-10-08)
+MAX_SENTENCES = 4
+VAGUE = re.compile(r"\b(favou?rable|good|great|tough|bad|plus|soft|nice|brutal) (match-?ups?|spots?)\b|\bsmash spot\b", re.I)
+
+
+def _style_checks(add, leg, kind, text):
+    n = count_sentences(text)
+    if kind != "opening" and n > MAX_SENTENCES:
+        add(leg, "style", f"{kind}: {n} sentences", f"at most {MAX_SENTENCES}", False,
+            "keep each paragraph to 2-4 sentences, one insight each")
+    m = VAGUE.search(text)
+    if m:
+        add(leg, "style", f"{kind}: '{m.group(0)}'", "-", False,
+            "say why: name the opponent, the player's involvement or the injury behind it")
+    if text.count("**") > 2:
+        add(leg, "style", f"{kind}: {text.count('**') // 2} bold phrases", "at most one", False,
+            "bold only the decisive takeaway")
+
+
 def _text_checks(add, leg, kind, text, allowed, inj, cited_inj, verdicts=None):
     if not text:
         return
+    _style_checks(add, leg, kind, text)
     for rx, what in BANNED:
         m = rx.search(text)
         if m:
