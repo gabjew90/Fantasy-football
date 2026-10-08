@@ -436,7 +436,7 @@ def test_the_gauge_compares_the_volume_the_line_takes_with_ours():
     lk = {"cap": 31.0, "own": True, "n": 183, "games": 10}
     d = RS.carry_yards_read(None, 29.5, model_ypc=4.5, proj_carries=9.1, season_car=30, season_yds=132,
                             luckfree_ypc=132 / 30, luck=lk)
-    assert ("At 4.4 yards a carry with the luck taken out (every run past 31 yards, his own 97.5th percentile "
+    assert ("At 4.4 yards a carry with the luck taken out (every run past 31 yards, his own 90th percentile "
             "over his last 10 games with a run (183 runs), counted as 31), 30 yards takes") in RS.carry_yards_sentence(d), \
         "with no carries line the gauge still names the cap it used"
     d = RS.carry_yards_read(None, 36.5, model_ypc=2.5, proj_carries=11.8)
@@ -452,18 +452,19 @@ def test_the_gauge_compares_the_volume_the_line_takes_with_ours():
 
 
 
-def test_the_luck_line_is_the_players_own_97_5th_percentile_play():
+def test_the_luck_line_is_the_players_own_percentile_play():
     plays = list(range(1, 101))                       # 100 plays of 1..100 yards
     lk = RS.player_luck_line(plays, 97.5)
     assert lk["own"] and lk["n"] == 100 and lk["cap"] == pytest.approx(np.percentile(plays, 97.5))
     few = RS.player_luck_line([5, 8, 55], 97.5)
     assert few == {"cap": None, "own": False, "n": 3, "pct": 97.5}, "too few plays: no percentile"
-    # by kind (DECISIONS #207): catches and completions at the 95th, runs at the 97.5th
-    assert RS.LUCK_PCT == {"catch": 95.0, "run": 97.5, "pass": 95.0}
-    assert RS.player_luck_line(plays, 95.0)["cap"] == pytest.approx(np.percentile(plays, 95))
-    luck_c, _ = RS.luck_for({}, {"c": [plays]}, "c", "catch")
-    assert luck_c["pct"] == 95.0 and luck_c["cap"] == pytest.approx(np.percentile(plays, 95))
-    assert "his own 95th percentile" in RS.luck_words(luck_c, "catch")
+    # by kind (DECISIONS #207): the 90th for catches, runs and completions
+    assert RS.LUCK_PCT == {"catch": 90.0, "run": 90.0, "pass": 90.0}
+    assert RS.player_luck_line(plays, 90.0)["cap"] == pytest.approx(np.percentile(plays, 90))
+    for kind in ("catch", "run", "pass"):
+        luck_k, _ = RS.luck_for({}, {"c": [plays]}, "c", kind)
+        assert luck_k["pct"] == 90.0 and luck_k["cap"] == pytest.approx(np.percentile(plays, 90))
+    assert "his own 90th percentile" in RS.luck_words(luck_k, "catch")
     assert RS.luck_free_rate([5, 8, 55], few) == pytest.approx(6.5), "too few: his longest play left out"
     assert RS.luck_free_rate([5, 8, 120], lk) == pytest.approx((5 + 8 + np.percentile(plays, 97.5)) / 3)
     assert RS.luck_free_rate([9], few) is None and RS.luck_free_rate([], lk) is None
@@ -471,8 +472,8 @@ def test_the_luck_line_is_the_players_own_97_5th_percentile_play():
         "every run past 98 yards, his own 97.5th percentile over his last 10 games with a run (100 runs), counted as 98"
     assert RS.luck_words(dict(few, games=2), "run") == \
         "his longest run left out -- only 3 runs in his last 2 games with a run, too few for a percentile"
-    assert RS.player_luck_line(list(range(1, 21)), 97.5)["own"], "20 plays of his own is enough"
-    assert not RS.player_luck_line(list(range(1, 20)), 97.5)["own"], "19 is too few"
+    assert RS.player_luck_line(list(range(1, 11)), 97.5)["own"], "10 plays of his own is enough"
+    assert not RS.player_luck_line(list(range(1, 10)), 97.5)["own"], "9 is too few"
     assert RS.luck_words(None, "run") == ""
 
 
@@ -485,15 +486,16 @@ def test_the_luck_free_check_reads_his_last_10_games():
     # the window is the last 10 games: prior games 3..9 (7 games) + this season's 3
     plays = [y for g in prior[("00-001", "run")][-7:] for y in g] + [4.0, 6.0, 60.0, 1.0, 5.0]
     assert luck["games"] == 10 and luck["n"] == len(plays) == 26 and luck["own"]
-    assert luck["cap"] == pytest.approx(np.percentile(plays, 97.5))
+    assert luck["cap"] == pytest.approx(np.percentile(plays, RS.LUCK_PCT["run"]))
     assert rate == pytest.approx(sum(min(y, luck["cap"]) for y in plays) / len(plays)), "rate: the same 10 games"
     # too few plays in the window: his longest left out; under 10 carries: no rate
-    luck, rate = RS.luck_for({}, {"00-002": [[3.0, 4.0, 30.0], [2.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0]]},
-                             "00-002", "run")
+    # (9 catches: under LUCK_MIN_PLAYS, so his longest is left out; 8+ catches is enough for a rate)
+    luck, rate = RS.luck_for({}, {"00-002": [[3.0, 4.0, 30.0], [2.0, 5.0, 6.0, 7.0, 8.0, 9.0]]},
+                             "00-002", "catch")
     assert not luck["own"] and luck["games"] == 2
-    assert rate == pytest.approx((3 + 4 + 30 + 2 + 5 + 6 + 7 + 8 + 9 + 10 + 11 - 30) / 10)
+    assert rate == pytest.approx((3 + 4 + 30 + 2 + 5 + 6 + 7 + 8 + 9 - 30) / 8)
     assert RS.luck_for({}, {"00-003": [[3.0, 9.0]]}, "00-003", "catch")[1] is None, "2 catches: too few for a rate"
-    assert RS.luck_for({}, {}, "00-999", "run") == ({"cap": None, "own": False, "n": 0, "pct": 97.5, "games": 0,
+    assert RS.luck_for({}, {}, "00-999", "run") == ({"cap": None, "own": False, "n": 0, "pct": 90.0, "games": 0,
                                                      "prior_games": 0, "cur_games": 0, "plays": 0}, None)
 
 
@@ -578,14 +580,14 @@ def test_points_allowed_notes_players_without_a_position():
 
 
 def test_the_quarterback_read_uses_completions():
-    lk = {"cap": 41.0, "own": True, "n": 210, "games": 10, "pct": 95.0}
+    lk = {"cap": 41.0, "own": True, "n": 210, "games": 10, "pct": 90.0}
     d = RS.qb_yards_read(completions_line=22.5, yards_line=259.5, proj_completions=20.1, model_ypc=11.9,
                          luck=lk, luckfree_ypc=10.8, longest_line=34.5, completions_fav="Under", attempts_line=35.5)
     assert d["gauge"]["need"] == pytest.approx(260 / 10.8)
     s = RS.qb_yards_sentence(d)
     assert s.startswith("The book's completions line is 22.5, Under favoured (attempts 35.5); we project 20.1.")
     assert "The lines ask 11.5 yards a completion (259.5 over 22.5); we expect 11.9, 10.8 luck-free over his last 10 games." in s
-    assert ("every completion past 41 yards, his own 95th percentile over his last 10 games with a completion "
+    assert ("every completion past 41 yards, his own 90th percentile over his last 10 games with a completion "
             "(210 completions), counted as 41") in s
     assert "260 yards takes about 24.1 completions; we project 20.1 (our volume), fewer than it takes" in s
     assert "The book's own completions line is 22.5, Under favoured: fewer than the yards line takes" in s

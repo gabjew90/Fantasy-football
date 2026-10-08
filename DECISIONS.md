@@ -7980,15 +7980,25 @@ The expert re-ran the four-season backtest (baseline reproduces ours: receptions
 - **Not changed:** the carries width. A wider carries spread is a model change and goes through
   the pre-registered round process, not this informational PR.
 
-## 2026-10-07 (207) -- the luck cap: 95th for catches and completions, runs stay 97.5th
+## 2026-10-07 (207) -- the luck cap moves to the 90th percentile for every kind
 
-- **The user's call:** cap at the 95th; runs keep the 97.5th (the 10-05 reason holds: a back's
-  95th is about 13 yards, range 10-18, so ordinary 14-yard runs would be trimmed, ~0.7 a game).
-- **Measured first (2018-24, half-seasons with 20+ plays):** the 95th trims 0.50 yards a catch
-  (97.5th: 0.25), 0.58 a completion (0.30), 0.40 a carry (0.22). Half-to-half steadiness: catches
-  0.66 uncapped / 0.67 at 97.5 / 0.67 at 95 (no cost); completions 0.39 / 0.39 / 0.40; carries
-  0.42 / 0.45 / 0.47 (not taken, by the user's call). A receiver's typical cap moves from 33 to 28
-  yards. Pickens (51 catches): cap 38.8 -> 33.0, 13.1 -> 12.7 a catch.
-- **The cap is the luckless Over check** (user: "only for overs anyways"). It moves no price: on
-  the fixture only the luck-free column and the line-fit sentences change; every other output is
-  identical apart from run timestamps.
+- **The user's call, after seeing 95/97.5 and then 90 on the fixture:** the 90th for catches, runs
+  and completions. The cap is the luckless Over check (user: "only for overs anyways"), so a strict
+  one is the point. The 10-05 reason for the 97.5th on runs (ordinary runs trimmed) was put to the
+  user with the numbers below and set aside.
+- **Measured first:** typical caps (2023-24, each player's last 10 games) -- backs 17 / 13 / 9
+  yards at 97.5 / 95 / 90 (1.3 runs trimmed a game at 90), receivers 33 / 28 / 22 (0.5 a game),
+  QBs 35 / 29 / 22 a completion (1.9 a game). Pull-down at 90 (2018-24): 0.7 yards a carry, 1.0 a
+  catch, 1.1 a completion. Half-to-half steadiness at 97.5 / 95 / 90: runs 0.45 / 0.47 / 0.50,
+  catches 0.67 / 0.67 / 0.66, completions 0.39 / 0.40 / 0.41.
+- **On the fixture:** most receivers need the same catches; deep threats and QBs move most
+  (Collins 16.1 -> 14.3 a catch, 5 -> 6 catches; Dak 11.4 -> 10.6 a completion, 24 -> 26
+  completions, 44% -> 33%; Javonte 4.1 -> 3.6 a carry, 15 -> 17 carries, 51% -> 36%).
+- **It moves no price:** only the luck-free column and the line-fit sentences change; every
+  other output is identical apart from run timestamps.
+- **The minimum plays for a percentile drops from 20 to 10** (review finding): at the 90th, the
+  under-20 fallback (drop only his longest) was far milder than the cap's top-10% trim, a jump at
+  the boundary; from 10 plays the 90th caps about his longest, so the rules meet. Rates already
+  need 8 catches / 10 carries / 20 completions, so the fallback now covers only 8-9 catches. The
+  card's wording drops "unusually long" and "lucky breakaway": it says plays past his 90th
+  percentile are capped.

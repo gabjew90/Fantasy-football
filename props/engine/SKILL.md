@@ -453,13 +453,14 @@ For a narrow question, run only what it needs:
   threshold -- the card's combined column says so, and a combined what-if runs as a separate
   carry-and-catch scenario (carries, targets, catch rate and both yards rates kept apart).
   **The achievability gauge** ends both reads: the volume the yards line takes at his capped
-  yards a play (the luck line: a play past the player's OWN 95th percentile for catches and completions, 97.5th for runs --
-  his catches or his runs, last season and this one -- counts as a lucky breakaway and is
-  counted at the line; under 20 plays of his own, his longest play this season is left out
+  yards a play (the luck line: a play past the player's OWN 90th percentile for that prop --
+  his catches or his runs, last season and this one -- is counted at that line: a strict,
+  luckless Over check that trims every long play, not only freak ones (a back's cap is about 9
+  yards); under 10 plays of his own, his longest play this season is left out
   instead; the report prints which it used; ours when his
   sample is small), against the volume we project: "comfortably more than it takes", "about what
-  it takes" or "fewer than it takes". Use it to say whether a yards line is achievable without a
-  lucky breakaway. **Say whose volume each number is.** "We project" is OUR model's volume, never
+  it takes" or "fewer than it takes". Use it to say whether a yards line is achievable without
+  long plays. **Say whose volume each number is.** "We project" is OUR model's volume, never
   the book's. The gauge also quotes the book's own catches or carries line when Sleeper posts
   one (with the side it favours) -- narrate against both: "90 yards takes about 21 carries
   without a breakaway; we project 17.5, and the book's own carries line is 19.5 with the Under

@@ -352,15 +352,20 @@ YPC_MIN_CATCHES = 8
 # breakaway and is counted at that line (user, 2026-10-05, after trying the 95th and 99th: the
 # 95th cut a back's ordinary 15-25-yard runs, which come most games). "Too few" = under
 # LUCK_MIN_PLAYS of his plays of that kind in the window; then his longest play is left out
-# instead. At 20 plays the 97.5th sits at about his longest play, the 95th between his two
-# longest. A definition for a
+# instead. At 20 plays the 97.5th sits at about his longest play, the 90th at about his
+# third-longest. A definition for a
 # descriptive gauge, not a fit (reports/robust_ypc_check.md, for reference only).
-# 2026-10-07 (user, DECISIONS #207): catches and completions move to the 95th -- it trims about 0.5
-# yards a catch and 0.6 a completion across 2018-24 (a receiver's typical cap ~28 yards, from 33)
-# and costs no half-to-half steadiness; runs keep the 97.5th (a back's 95th is ~13 yards, the
-# ordinary runs the 10-05 call protected).
-LUCK_PCT = {"catch": 95.0, "run": 97.5, "pass": 95.0}
-LUCK_MIN_PLAYS = 20
+# 2026-10-07 (user, DECISIONS #207): the 90th for every kind -- a strict luckless Over check, not
+# only a trim of freak plays. Typical caps (2023-24, last 10 games): a back's 9 yards (97.5th: 17),
+# a receiver's 22 (33), a QB's 22 a completion (35); it trims about 0.7 yards a carry, 1.0 a catch,
+# 1.1 a completion (2018-24). Half-to-half steadiness: runs 0.45 -> 0.50, catches 0.67 -> 0.66,
+# completions 0.39 -> 0.41. The user saw the 10-05 concern (ordinary runs trimmed) and chose it.
+LUCK_PCT = {"catch": 90.0, "run": 90.0, "pass": 90.0}
+# 10 since the 90th (DECISIONS #207): at 20 the drop-his-longest fallback (19 plays) was far milder
+# than the 90th's top-10% trim (20 plays), a jump at the boundary; from 10 plays the 90th caps
+# about his longest, so the two rules meet again. Rates need 8 catches / 10 carries / 20
+# completions anyway, so the fallback now only covers 8-9 catches.
+LUCK_MIN_PLAYS = 10
 # the luck-free check (luck line AND rate) reads his last this-many games, crossing into
 # last season while this one is short (user, 2026-10-05)
 LUCK_WINDOW = 10
@@ -441,7 +446,7 @@ SINGULAR = {"catches": "catch", "carries": "carry", "completions": "completion"}
 
 def volume_gauge(y_min, rate, proj, unit, low_volume):
     """The achievability gauge (DECISIONS #166): the volume the yards line takes at a
-    typical yards a play (long plays capped, so one breakaway does not set the bar),
+    typical yards a play (plays past his own 90th percentile capped, so long plays do not set the bar),
     against the volume we project. Volume times rate is an AVERAGE game and averages are
     pulled up by big games, so the gauge is phrased as volume needed vs projected and
     never as "his usual game clears it". Description, not a price."""
@@ -1739,7 +1744,7 @@ def qb_table(q) -> list[str]:
             ("Market's completions / attempts lines", "; ".join(lines) or "not posted")]
     gg = q.get("gauge")
     if gg:
-        rows.append(("Passing-yards line at a rate with unusually long completions capped",
+        rows.append(("Passing-yards line at a rate with long completions capped (his 90th percentile)",
                      f"about {gg['need']:.1f} completions at {_f(q.get('gauge_rate'))} yards a completion"
                      + (f", over his last {q['luck_games']} game{'s' if q['luck_games'] != 1 else ''}"
                         if q.get("luck_games") else "")
@@ -1755,7 +1760,7 @@ def capped_line(read, per) -> str:
     games = (read.get("luck") or {}).get("games")
     return (f"**Capped-play check:** {read['y_min']} yards takes about {g['need']:.1f} {g['unit']} at "
             f"{float(read['gauge_rate']):.1f} yards a {per}"
-            + (f" (his last {games} game{'s' if games != 1 else ''}, unusually long plays capped)"
+            + (f" (his last {games} game{'s' if games != 1 else ''}, plays past his 90th percentile capped)"
                if games else "")
             + f"; we project {g['proj']:.1f}. Capping long gains lowers the rate on purpose, so this is "
               "descriptive, not the workload that makes the line a coin flip.")
