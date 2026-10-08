@@ -17,4 +17,4 @@ venv\Scripts\python.exe scripts\yahoo_auth.py refresh-token | gh secret set YAHO
 echo.
 gh secret list
 echo.
-echo done -- Actions now reads Yahoo and Vegas live; the local sync jobs can be disabled.
+echo done -- props.yml reads ODDS_API_KEY from these. Keep the local YAHOO SYNC task: the fantasy commands read its copy.

@@ -56,7 +56,7 @@ from .consensus import ConsensusUnavailable, fetch_position
 from .role import GATED, STARTERS, depth_orders
 from core.scoring import league_scoring
 
-from .seasondata import score_projection
+from core.scoring import score as score_projection
 
 log = logging.getLogger("draftkit")
 
@@ -799,7 +799,7 @@ def load_external(cfg, index, getter=None) -> tuple[pl.DataFrame, dict]:
                 continue
         elif name == "espn":
             from .espn import EspnUnavailable
-            from .ids import load_id_map
+            from core.ids import load_id_map
             try:
                 f, unmatched = from_espn(int(cfg["season"]), scoring, cfg.path("raw"),
                                          load_id_map(cfg.path("raw")), index)

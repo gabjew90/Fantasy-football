@@ -94,7 +94,7 @@ def test_back_card_two_rate_column_and_the_markets_carries_line():
     assert "Over 55% on the board (his carries half from the market's script), 53% from history alone" in text
 
 
-def test_qb_card_keeps_his_workload_table():
+def test_qb_card_keeps_his_recent_workload_row():
     q = {"team_passes": 33.0, "games": [(3, 3, 0), (4, 27, 19)], "proj_cmp": 21.6, "cmp_line": 17.5,
          "att_line": 28.5, "att_fav": "Over", "gauge": {"need": 17.3}, "gauge_rate": 10.4, "luck_games": 1}
     d = {"name": "A Passer", "team": "TB", "slot": "QB1", "pos": "QB",

@@ -22,9 +22,12 @@ session cache ($NFL_CACHE, else <temp>/nfl_cache -- never the outputs folder),
 reused for 20 minutes (--fresh re-reads).
 Reports and decision records go to $NFL_OUT (default /mnt/user-data/outputs).
 `--record` appends to the graded ledger. A chat session never passes it (chat
-is read-only, as for the props record); the scheduled runs will, from step 6.
+is read-only, as for the props record), and no workflow schedules a run that
+does (the fantasy schedules are off, DECISIONS #109): the ledger fills only
+from a run by hand with --record. `props best --survival` is retired: it stops
+with a message that there is no must-win pick and points at `props best --slate`.
 
-TROUBLESHOOTING LOG (temporary, `session_log` in config.yaml; inside a chat
+TROUBLESHOOTING LOG (permanent, `session_log` in config.yaml; inside a chat
 release only, or with NFL_SESSION_LOG=1): every command
 appends one JSON line to $NFL_OUT/nfl_session_log.jsonl -- the release, the
 command and its arguments, exit code, duration, the error if one was raised,
@@ -319,7 +322,7 @@ def main(argv=None) -> int:
     f.add_argument("--json", action="store_true", help="question tools: the numbers as JSON")
     f.add_argument("--league", required=True)
     f.add_argument("--week", type=int)
-    f.add_argument("--record", action="store_true", help="append to the graded ledger (scheduled runs only)")
+    f.add_argument("--record", action="store_true", help="append to the graded ledger (a deliberate run by hand; chat never records)")
     f.add_argument("--player")
     f.add_argument("--out")
     f.add_argument("--pos", help="waiver: positions, e.g. RB,WR (default RB,WR,TE)")

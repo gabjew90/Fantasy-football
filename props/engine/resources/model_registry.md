@@ -1,6 +1,6 @@
 # Model Registry
 
-This file is the only source of model state. At runtime, look the model up here by ID before pricing anything. If the ID is absent or its status is below `VALIDATED_DISTRIBUTION`, the prop is `MODEL_UNVALIDATED`. Do not upgrade a status inside a chat; a status changes only by editing this file with the evidence recorded below, and the edit is presented to the user as a file for them to save into the Project.
+This file is the only source of model state. At runtime, look the model up here by ID before pricing anything. If the ID is absent or its status is below `VALIDATED_DISTRIBUTION`, the prop is `MODEL_UNVALIDATED`. Do not upgrade a status inside a chat; a status changes only by a reviewed change to this file in the repository (a Claude Code session, never chat: chat is read-only), with the evidence recorded below.
 
 ## Status levels
 - `REJECTED`: evaluated and failed; not to be reused as a model or as a prior-strength rule.
@@ -15,6 +15,35 @@ To `VALIDATED_DISTRIBUTION`: frozen spec (code hash or version), training and te
 To `VALIDATED_BETTING`: everything above plus archive coverage (rows, bookmakers, snapshot types, date range), decision-time definition, selection rule as frozen before replay, N candidate bets and N placed under the rule, hit rate, ROI with interval, closing-line value where closing rows exist, and comparison to flat and no-vig-consensus benchmarks.
 
 ## Entries
+
+### Current settings (props-v1.53, 2026-10-07) -- read this first
+The rounds below are kept in the order they were written, so older entries state settings that
+later rounds replaced. What runs now (`resources/width_params.json`, `scripts/model.py`):
+- **Target-share concentration 60** -- round 34 (DECISIONS #195; kept under the spread rule,
+  #204; reports/round34_receiving_joint.md). Replaces round 11's 40.
+- **Backs' yards-per-carry log-sd 0.15** -- round 30 (DECISIONS #189;
+  reports/round30_conversion.md). Replaces round 11's 0.3. Carry-share concentration 20 and
+  the QB's own settings (80, 0.15) are round 11/12's.
+- **QB passing x (implied points / 22)^0.2 x 1.04** -- round 38 (DECISIONS #199, the width
+  guard overridden by the user; replicated on four seeds, #203;
+  reports/round38_qb_passing_bias.md). Replaces round 19's null. Still too wide: 11.9% of
+  games outside the 80% range.
+- **Backs' carries 50% toward the market** (`model.MARKET_RUSH_WEIGHT` 0.5) -- round 39, which is
+  round 29 re-run (DECISIONS #204; reports/round29_market_runs.md). Throws stay 25% toward the
+  market (`model.MARKET_PASS_WEIGHT`, round 16, #134).
+- **Fixed shrinkage** (`model.K0_FIXED`): yards per target 80, catch rate 40, target share 80
+  (rounds 17-18).
+- **Round 41** (tight ends' target share x1.06) shipped and was withdrawn on the seed check the
+  same day (DECISIONS #200, #203): `te_share_mult` is off.
+- Rounds 34 and 39 are under the week-8 reversal rule (DECISIONS #204).
+- **Current width evidence:** reports/current_settings_check_2026-10-06.md (it supersedes round
+  11's verdicts in reports/yardage_harness.md): receptions and receiving yards inside the bar;
+  backs' rushing and rushing + receiving too narrow in the tails; QB passing too wide.
+- **Markets:** receptions, receiving yards, non-QB rushing, rushing + receiving, QB passing
+  (DECISIONS #190). QB rushing is off the board (#188): simulated, not priced or recorded.
+  Anytime TD is deferred: priced, logged and graded, not shown unless asked.
+- **The live record at Sleeper's real lines** (weeks 2-4, DECISIONS #202): the engine's log
+  loss 0.717 against the market's 0.692. No market is tested against posted lines beyond that.
 
 ### box_score_mean_shift_v0
 - Markets: player_anytime_td (probe)
@@ -53,6 +82,10 @@ protocol too, so this is the model, not the harness. Width is now part of
 the bar; widening is the next change.
 
 ### Round 11 (2026-09-24): the width settings, props-v1.20
+-> Settings since replaced: target concentration 40 -> 60 (round 34, DECISIONS #195) and
+yards-per-carry log-sd 0.3 -> 0.15 (round 30, #189); the width verdicts below are superseded by
+reports/current_settings_check_2026-10-06.md (see "Current settings" above).
+
 The round-10 finding (right on average, too narrow) traced to four things the
 joint sampler held fixed within a game. Each is now a mean-preserving setting
 in model.py (`WIDTH_OFF` = the old sampler draw for draw): Dirichlet variation
@@ -110,6 +143,9 @@ next fix).
   week 4 of a season. DECISIONS #143; reports/snap_react.md.
 
 ### Round 19 (2026-10-01): QB passing scaled by implied points -- measured, not shipped
+-> Reopened and shipped as round 38 (2026-10-06, DECISIONS #197, #199): exponent 0.2 with level
+x1.04, outside this round's 0.5-1.5 grid.
+
 
 - The shipped model's QB passing runs 19% high for teams implied <= 18 points and 6-7% low at
   25+ (2022-23; 2024-25 shows the same, and was seen while diagnosing). Tested: the QB's yards
@@ -207,6 +243,9 @@ next fix).
   bar 17-23%): too WIDE. The 18.1% above included rows for depth-chart QBs who
   did not play. Round 33 (team throws) did not fix it; the open leads are the
   conversion given targets (runs slightly low) and the starter-share draw.
+  -> Since: round 36 (shrinking the starter-share draw) null (DECISIONS #195); round 38 ships
+  the implied-points scale and x1.04 level (DECISIONS #199), which removed most of the bias
+  at the main line and left the width at 11.9% outside the 80% range (still too wide).
 
 ### rush_yds_v0
 - Markets: player_rush_yds
@@ -220,8 +259,12 @@ next fix).
   test seasons, unbiased on average, too narrow until round 11 widened it. Not tested
   against sportsbook lines (no market is).
 - Known limits:
-  - QB rushing: priced since round 12 (props-v1.21) on its own carry grid; kneel-downs,
-    which the book settles, are part of it.
+  - QB rushing: priced from round 12 (props-v1.21) on its own carry grid, kneel-downs
+    included; OFF THE BOARD since 2026-10-06 (DECISIONS #188, #190): still simulated, because
+    the QB's carries share the team pool with the backs', but not priced or recorded.
+  - Backs' carries move 50% toward the market's fitted carries since round 39 (DECISIONS #204);
+    yards-per-carry log-sd 0.15 since round 30 (#189). Width: too narrow in the tails
+    (reports/current_settings_check_2026-10-06.md).
   - Run defense: the opposing defense's yards per carry IS applied (team level, current
     season, k0=150; round 12 kept it -- dropping it worsened rushing CRPS).
   - (Corrected 2026-10-01: this entry still said "Test: NONE", "QB rushing excluded" and
@@ -472,19 +515,24 @@ next fix).
   scoring population.
 
 ### (no other models)
-Passing yards, passing TDs, and spreads/totals have no model. All props in those markets are
+Passing TDs and spreads/totals have no model (passing yards: `pass_yds_v0`, round 13).
+Rushing + receiving yards: `rush_rec_sum_v0` (DECISIONS #187), the sum of a back's rushing and
+receiving draws, outcome-graded on 2022-25 (reports/rush_rec_calibration.md). All props in those markets are
 `MODEL_UNVALIDATED`.
 
 ### receiving_hier_v2 (shared model core, rounds 5-6)
 - Markets: player_receptions, player_reception_yds (rushing yards runs through the same
-  code path but has NO backtest; see rush_yds_v0)
+  code path; it had no backtest when this entry was written and has been in the yardage
+  harness since round 10 -- see rush_yds_v0)
 - Status: `PROTOTYPE`
 - Spec: same hierarchical structure as v1, now in `scripts/model.py` (shared by
   `score_game.py` and `backtest.py`), with: per-rate shrinkage constants in OPPORTUNITY
   units (team targets / own targets / carries), tuned on a held-out 2025 fold; team-level
   opponent efficiency adjustment with empirical-Bayes shrinkage; joint per-team simulation
   (one team-volume draw per sim, multinomial split, "other" bucket) for correlated
-  teammate outcomes; optional market-anchored team environment (OFF by default).
+  teammate outcomes; optional market-anchored team environment (the full re-centre, `--env
+  market`, OFF by default; the partial blends ARE live: throws 25% toward the market since
+  round 16, backs' carries 50% since round 39).
 - Backtest (2025; train weeks 5-8, test 9-18; ACT-only, INA voided, byes excluded;
   per-arm MLE dispersion; PAIRED game-block bootstrap on the MODEL'S OWN CRPS against a
   reference run of the v1-equivalent, positive = better than reference):
@@ -626,121 +674,11 @@ variance, clipped to [0.85, 1.15] and inactive before week 5.
   projections run an environment the backtest does not test. Either add the blend to
   `backtest.py` and test it, or drop it from `score_game.py`. Left as-is and documented
   rather than silently picked.
+  -> Closed: the harness now blends the prior-season team volume at K0 4 (backtest.py
+  `K0_TEAM`), and the second expert audit tested the weight (better than 2, tied with 8 and
+  16; DECISIONS #198).
 
-**Round-10: team touchdown totals anchored to the market by default.** Caught by Gabriel
-on the MIN@CHI card: Swift TD Yes (-130, us 67%) and Monangai TD Yes (+180, us 43%) were
-graded STRONG. Chicago's team TD projection was 3.8 = 0.8 x 2.76 (2025 avg) + 0.2 x 8
-(week 1 blowout). The market implied 26 points = 2.74 TDs. Rescaling to market removes
-both calls (Swift 56% vs book 57%). Change: TD totals use implied points x league
-TD-per-point by default, keeping the history pass/rush split; plays and pass rate stay on
-the history blend (the plays re-centre is separately unvalidated). Confidence tier caps TD
-calls at MODERATE when the anchor is unavailable and annotates STRONG TD calls when the
-history blend disagreed with the market by >20%. Note this anchor consumes the same book's
-total and therefore cannot be cited as evidence of edge against that book's game total.
-
-- CORRECTION of the first round-5 registry text:**Round-7, market environment rebuilt properly.** The earlier "market anchoring is a
-no-op" finding was also partly an artifact of the implementation: `plays` was pinned to a
-league constant for every team and the pass-rate shift was hand-set at 0.015 per 7 points,
-so the only thing the market actually fed was touchdowns. Rebuilt: team plays and pass
-rate now come from coefficients FIT on 2025 (`market_env_fit` in the priors), blended with
-the team's own pace history by `pace_weight`.
-
-  Fitted coefficients (2025, n=544 team-games):
-  plays = 47.80 + 0.146*spread + 0.201*total, R2 = 0.022
-  pass rate = 0.371 - 0.0022*spread + 0.0038*total, R2 = 0.041
-  The hand-set 0.015-per-7-points shift (= 0.0021/pt) was nearly identical to the fitted
-  0.0022/pt, so the pass-rate shift was never the problem; pinned plays was.
-
-  Paired game-block bootstrap vs the history reference:
-
-  | pace_weight | Scope | Receptions | Reception yards |
-  |---|---|---|---|
-  | 0.25 | all games | **+0.003 (+0.000,+0.007)** | +0.030 (-0.008,+0.069) |
-  | 0.25 | \|spread\|>=7 | +0.004 (-0.001,+0.009) | **+0.067 (+0.006,+0.135)** |
-  | 0.50 | all games | +0.004 (-0.001,+0.009) | +0.049 (-0.009,+0.103) |
-  | 0.50 | \|spread\|>=7 | +0.002 (-0.005,+0.011) | +0.099 (-0.003,+0.200) |
-  | 1.00 | \|spread\|>=7 | +0.000 (-0.014,+0.015) | +0.142 (-0.019,+0.312) |
-
-  Read this cautiously. Twelve comparisons were run; two exclude zero, where chance alone
-  would give about 0.6. The point estimates are consistently positive and grow on lopsided
-  games, which is the direction theory predicts, but this is suggestive rather than
-  established. `--env market_fit --pace-weight 0.25` is available and NOT the default;
-  promote it only if it holds up on a second season.
-
-**Round-8 (code review), two findings on cross-season validation.**
-
-1. *Legacy depth-chart schema was mixing return specialists into "WR1".* nflverse's
-   pre-2025 format lists the same position across offense AND special teams; a WR row
-   with depth_team=1 may be the starting split end or the punt returner (921 PR rows under
-   position WR in 2024). Fixed in `model.normalize_depth_charts`: keep only
-   formation=="Offense" and depth_position==position, then stable-sort. Now exactly one
-   player per slot per team-week on 2024. This halved the 2024 receptions bias but did
-   not clear it.
-
-2. *The team-volume environment lags within-season league drift, in BOTH seasons.*
-   Team targets/game rose +3.4% from weeks 1-8 to 9-18 in 2024 and fell -4.2% in 2025. An
-   expanding mean lags both. Bias diagnostic (actual/model mean, receptions):
-
-   | Env | 2024 | 2025 |
-   |---|---|---|
-   | expanding mean (default) | 1.045 | 0.976 |
-   | trailing 4 games | 1.025 | 0.989 |
-   | trailing 6 games | 1.028 | 0.985 |
-
-   So "2025 is calibrated" was wrong; it had the same defect in the other direction. A
-   trailing window converges toward 1.0 from both sides, confirming the mechanism, but
-   costs CRPS (2024 1.033->1.036, 2025 1.009->1.014) because per-team 4-game means are
-   noisy. Default stays expanding mean for now; `--env-window N` is available. The
-   principled fix is an expanding team mean multiplied by a league-wide recent/expanding
-   volume ratio (bias correction without per-team noise); not yet implemented or tested.
-   A ~2.5% residual bias remains on 2024 with the window, source not yet identified.
-
-   Consequence: cross-season validation of the market-fit and opponent findings is still
-   pending. 2024 now has a sane population but a known small bias; both seasons' bias
-   should be corrected before their comparison numbers are treated as a second-season
-   confirmation.
-
-**Round-9: within-season league drift correction. ADOPTED (the first change in several
-rounds that improves accuracy and reduces bias at the same time).**
-
-The per-team expanding mean is the low-variance estimate of team volume but lags
-league-wide drift: total targets/game rose 3.4% inside 2024 and fell 4.2% inside 2025.
-`model.league_drift_ratio` scales the expanding mean by a single league-wide
-recent(3 weeks)/expanding ratio, estimated across all 32 teams so it adds almost no
-variance, clipped to [0.85, 1.15] and inactive before week 5.
-
-  | | 2024 bias (rec) | 2025 bias (rec) | 2024 CRPS | 2025 CRPS |
-  |---|---|---|---|---|
-  | expanding mean | 1.045 | 0.976 | 1.0329 | 1.0091 |
-  | + drift correction | **1.026** | **0.995** | **1.0291** | 1.0087 |
-  | per-team trailing 4 (rejected) | 1.025 | 0.989 | 1.0362 (worse) | 1.0141 (worse) |
-
-  Paired game-block bootstrap, receptions: 2024 +0.0037 (+0.0008, +0.0067), excludes
-  zero; 2025 +0.0003 (-0.0031, +0.0037). So it materially helps the season that was
-  badly biased and costs nothing on the season that was mildly biased the other way.
-  Insensitive to the recent-window length (2, 3, 4 and 5 give the same bias), so this is
-  a mechanism, not a tuned parameter. The per-team trailing window fixed the same bias
-  but cost CRPS in both seasons, which is why it was rejected in favour of separating
-  LEVEL (per-team, expanding) from DRIFT (league-wide, recent).
-
-  Live behaviour: inactive before week 5 and reported as such in the source table, so
-  early-season runs are unchanged rather than corrected on a thin sample.
-
-  Round-9 review corrections: (a) the first wiring applied the ratio to the current-
-  season mean BEFORE it was blended with the prior-season team mean, which diluted the
-  deployed correction to the blend weight (50% strength at week 5); now applied to the
-  blended environment, and to goal-line volume and TD rates as well as targets/carries.
-  (b) "Insensitive to window length" is accurate for 2024 (1.025-1.026 across 2-5) and
-  slightly overstated for 2025 (0.988-0.996).
-
-  KNOWN GAP, not fixed: the live scorer blends the current-season team environment with
-  the prior-season team mean (K0=4 games). The backtest environment is current-season
-  only. The prior-season blend has therefore never been validated; early-season live
-  projections run an environment the backtest does not test. Either add the blend to
-  `backtest.py` and test it, or drop it from `score_game.py`. Left as-is and documented
-  rather than silently picked.
-
-**Round-10: team touchdown totals anchored to the market by default.** Caught by Gabriel
+**Round-10 of the first series (receiving_hier_v2 rounds 5-10; not the 2026-09-24 yardage-harness Round 10 above): team touchdown totals anchored to the market by default.** Caught by Gabriel
 on the MIN@CHI card: Swift TD Yes (-130, us 67%) and Monangai TD Yes (+180, us 43%) were
 graded STRONG. Chicago's team TD projection was 3.8 = 0.8 x 2.76 (2025 avg) + 0.2 x 8
 (week 1 blowout). The market implied 26 points = 2.74 TDs. Rescaling to market removes
@@ -764,9 +702,10 @@ total and therefore cannot be cited as evidence of edge against that book's game
   helpful. Do not switch to fixed shrinkage.
 - K0 (opportunity units): target_share 80, catch_rate 40, ypt 160, rush_share 20, ypc 80
   (ypc hit the grid floor and was set to a documented default rather than the edge value).
+  (As of this round; ypt is fixed at 80 since round 17, see `model.K0_FIXED`.)
 - Joint simulation: marginals verified equal to closed-form means at every run (drift
   check logs a warning above 10%). CRPS backtest above is on marginals; the joint draw
   changes nothing there and exists for same-game-parlay probabilities, which have NO
   validation yet.
-- Still unvalidated: anytime TD (no backtest), rushing yards (no backtest), any per-slot
+- Still unvalidated (as written; since then rushing yards are outcome-graded in the yardage harness from round 10, and anytime TD in anytime_td_v1's backtest): anytime TD (no backtest), rushing yards (no backtest), any per-slot
   claim (round 4: nothing survives multiplicity), betting edge (needs 2026 archive).

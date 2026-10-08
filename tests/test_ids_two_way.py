@@ -2,7 +2,7 @@
 match a WR source line: the sheet carried Travis Hunter and the board called
 him UNPROJECTED (2026-09-04)."""
 
-from draftkit.ids import SleeperIndex
+from core.ids import SleeperIndex
 
 
 def _universe():

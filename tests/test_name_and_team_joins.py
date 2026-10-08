@@ -8,18 +8,16 @@ namesakes also made live players "ambiguous" and dropped them.
 TEAMS. The schedule carries draftkit codes (SFO, NOS, GBP...) and rosters
 carry Sleeper codes (SF, NO, GB...). Nothing converted, so for eight
 franchises every schedule-to-roster match was empty: no inactives check was
-scheduled for them and they never appeared in a lock time.
+scheduled for them and they never appeared in a lock time. (The week_games,
+planner and Vegas-alias tests went with the retired cron stack, DECISIONS
+#212; the code maps and the schedule-strength join are pinned here still.)
 """
-
-from datetime import datetime, timezone
 
 import polars as pl
 import pytest
 
 from draftkit import defense, seasondata
-from draftkit.ids import NameIndex
-from manager import triggers
-from manager.games import week_games
+from core.ids import NameIndex
 
 PLAYERS = {
     "12530": {"full_name": "Travis Hunter", "position": "DB",
@@ -107,40 +105,6 @@ def test_an_index_missing_both_position_fields_is_skipped_not_crashed():
 
 # -------------------------------------------------------------------- teams
 
-def _schedule():
-    rows = [("SFO", "SEA", "2026-09-20", "16:25"), ("SEA", "SFO", "2026-09-20", "16:25"),
-            ("NOS", "ATL", "2026-09-20", "13:00"), ("ATL", "NOS", "2026-09-20", "13:00"),
-            ("GBP", "CHI", "2026-09-18", "20:15"), ("CHI", "GBP", "2026-09-18", "20:15")]
-    return pl.DataFrame(
-        {"week": [2] * 6,
-         "team": [r[0] for r in rows], "opp": [r[1] for r in rows],
-         "gameday": [r[2] for r in rows], "gametime": [r[3] for r in rows]})
-
-
-def test_week_games_emits_the_codes_rosters_use():
-    games = week_games(_schedule(), 2)
-    teams = {t for g in games for t in g["teams"]}
-    assert teams == {"SF", "SEA", "NO", "ATL", "GB", "CHI"}
-    assert not {"SFO", "NOS", "GBP"} & teams
-    assert len(games) == 3, "one game per pairing, not one per team-row"
-
-
-def test_a_roster_team_now_intersects_the_schedule():
-    """The actual defect: frozenset({'SFO'}) & {'SF'} was empty, so three
-    San Francisco players had no inactives check all season."""
-    games = week_games(_schedule(), 2)
-    mine = {"SF", "NO"}
-    hits = [sorted(g["teams"] & mine) for g in games if g["teams"] & mine]
-    assert hits == [["NO"], ["SF"]], "New Orleans kicks off before San Francisco"
-
-
-def test_the_planner_schedules_a_slate_for_those_teams():
-    games = week_games(_schedule(), 2)
-    slates = triggers.relevant_slates(games, {"SF"}, {"NO"})
-    covered = {t for s in slates for t in s["teams"]}
-    assert covered == {"SF", "NO"}
-
-
 def test_the_code_maps_are_inverses_and_leave_normalised_spellings_alone():
     for dk, sl in seasondata.SLEEPER_CODE.items():
         assert seasondata.to_sleeper(dk) == sl
@@ -152,11 +116,6 @@ def test_the_code_maps_are_inverses_and_leave_normalised_spellings_alone():
     assert seasondata.to_draftkit("LAR") == "LAR"
     assert seasondata.to_sleeper("") == "" and seasondata.to_draftkit("") == ""
     assert seasondata.to_sleeper("sfo") == "SF", "case is not the caller's problem"
-
-
-def test_vegas_aliases_are_the_shared_map():
-    from manager import vegas
-    assert vegas.ALIASES is seasondata.SLEEPER_CODE
 
 
 def test_playoff_schedule_strength_finds_a_sleeper_coded_team():

@@ -5542,6 +5542,8 @@ about model states changed.
 
 ## 2026-09-24 (99) -- the width settings: the yardage markets pass (props-v1.20)
 
+-> superseded by #187 (2026-10-06: under starter-only grading QB passing fails width) and #197 (2026-10-06: at the stand-in lines the Overs hit more often than the engine said).
+
 Step 2 of docs/plans/2026-09-24-yardage-harness.md. The samplers held a
 player's share, catch rate and yards per touch fixed within a game; each can
 now vary game to game, mean-preserving, with "off" the old sampler draw for
@@ -5587,6 +5589,8 @@ could be mistaken for a path on Windows; the knob-design caveat above; and
 tuning ran 108 pointless bootstraps.
 
 ## 2026-09-24 (100) -- QB rushing priced; the backs' calibration miss judged noise (props-v1.21)
+
+-> superseded by #188 (2026-10-06) and #190 (2026-10-06): QB rushing is off the board -- simulated, not priced or recorded.
 
 Step 3 of docs/plans/2026-09-24-yardage-harness.md.
 
@@ -5746,6 +5750,8 @@ given to chat to push anywhere.
 
 ## 2026-09-25 (105) -- QB passing yards priced from the team simulation (props-v1.24)
 
+-> superseded by #187 (2026-10-06: graded on the QB who started, the width FAILS, too wide), #197 (2026-10-06: "right on average and the right width" corrected) and #199 (2026-10-06: round 38 scales passing by implied points).
+
 Plan step 4. The starting QB's passing yards are his receivers' yards in the
 same simulation that prices their props (`model.simulate_qb_passing`), plus
 two facts the sampler lacked, both measured on 2021-25 play-by-play first:
@@ -5798,6 +5804,8 @@ check: Mahomes 235 vs Sleeper 236.5; Malik Willis 162 vs 177.5, flagged WEAK
 (new team).
 
 ## 2026-09-25 (106) -- the Vegas-line environment: tuned, not better; the yardage market blend in shadow
+
+-> superseded by #134 (2026-10-01: throws 25% toward the market), #197 (2026-10-06: reopened) and #204 (2026-10-06: the backs' carries 50% toward the market).
 
 Plan step 5, two parts.
 
@@ -6862,6 +6870,8 @@ Also found by the sweep, not acted on: QB passing over-projected in weeks
 
 ## 2026-10-01 (137) -- QB passing scaled by implied points: measured, not shipped
 
+-> superseded by #197 (2026-10-06: reopened) and #199 (2026-10-06: round 38 ships the implied-points scale, exponent 0.2).
+
 The sweep's biggest miss: QB passing 19% high for teams implied <= 18 points,
 6-7% low at 25+ (receivers barely). DISCLOSED: 2024-25 was printed while
 reading the shape. Tested (implied / 22) ** beta on the QB's yards: on
@@ -7042,6 +7052,8 @@ worst calibration band (14 rows) moved 0.055 -> 0.162 -- noise-sized, watched
 on the settled record from week 4, the first week the rule acts in 2026.
 
 ## 2026-10-03 (144) -- the label gate: the record decides, in code
+
+-> superseded by #151 (2026-10-03): the gate is decided only at the week 8 / 12 / 18 reviews, on weight AND top-tier profit.
 
 The research board's "no bet labels until the record shows otherwise" was a
 sentence with no code behind it, and its "through week 3" figures were
@@ -7371,6 +7383,8 @@ by the user.
 
 ## 2026-10-05 (167) -- the luck line is each player's own 95th-percentile play
 
+-> superseded by #169 (2026-10-05: the 99th) and #207 (2026-10-07: the 90th for every kind).
+
 - User's design for the achievability gauge, settled over several messages: a play
   past the player's OWN 95th percentile for that prop -- his catches for receiving
   yards, his runs for rushing yards -- counts as a lucky breakaway and is counted at
@@ -7400,6 +7414,8 @@ by the user.
   if-thens. Headed and easy to read. A slate keeps the short per-game preview.
 
 ## 2026-10-05 (169) -- the game story shows fantasy points allowed by position; the luck line moves to the 99th
+
+-> superseded by #207 (2026-10-07) for the luck line (now the 90th); the fantasy-points-allowed part stands.
 
 - The game header gets a "Fantasy points allowed" line: PPR points per game each
   defence has allowed to RBs, WRs and TEs this season (1 a catch, 0.1 a yard, 6 a
@@ -7452,6 +7468,8 @@ by the user.
 - Report text only: no price moves.
 
 ## 2026-10-05 (173) -- rushing + receiving yards: read now, priced only after a calibration check
+
+-> superseded by #187 (2026-10-06): rushing + receiving yards are priced.
 
 - User, after a Power Play lost on Kamara's rushing yards while the Saints' passing legs
   hit: bring in rushing + receiving yards, the leg that survives either script for a back.
@@ -7606,6 +7624,8 @@ by the user.
 - TB at DAL: Jalon Daniels priced as TB's starter automatically, Mayfield out (Sleeper).
 
 ## 2026-10-06 (184) -- rounds 28b and 29: two running-game candidates wait for 2026 weeks 2-8
+
+-> superseded by #185 (2026-10-06: read once on 2026 weeks 2-4, no midseason wait) and #204 (2026-10-06: round 39, market carries 50%, ships).
 
 - Round 29 (reports/round29_market_runs.md): the backs' carries move toward the market's
   fitted carries with the starting QB's held; selected w = 0.5 on 2022-25 (rushing yards
@@ -7881,6 +7901,8 @@ The expert re-ran the four-season backtest (baseline reproduces ours: receptions
 
 ## 2026-10-06 (200) -- round 41: tight ends' target share x1.06 ships; the role yards shapes stay
 
+-> superseded by #203 (2026-10-06): round 41 withdrawn on the seed check; te_share_mult back to 1.
+
 - Three registered stages on each role's own rows (reports/round41_receiving_roles.md). The
   tight-end yards shape (1.5) leaned better but was not detectable and went negative on 2026;
   the backs' shape kept 1. **Tight ends' share x1.06 ships**: their receptions own-volume log
@@ -8065,3 +8087,144 @@ The expert re-ran the four-season backtest (baseline reproduces ours: receptions
   anchored to implied points) and read the book's number as the probability. SKILL.md: chat copies
   the guide before the first card and says how the matchup tables were built; no number goes out
   without its source explained.
+
+## 2026-10-08 (210) -- docs truth pass: every doc, docstring, rule text and report sentence says what is true now
+
+No behaviour changed: text only (docs, comments, docstrings, report and rule strings), one test
+renamed, one registry entry added as data. What was corrected, each checked against the code,
+config or a report first:
+
+- **QB passing** (score_game.py's report lines, core/props_ask.py's PASS_YDS_RULE, SKILL.md,
+  model_registry.md, core/registry.py): "right on average and the right width" (#105) replaced by
+  round 38's scale and its measured width (11.9% outside the 80% range, still too wide; #199).
+- **The no-labels rule** (props_ask UNVALIDATED): labels return only at the week 8 / 12 / 18
+  reviews on weight AND top-tier profit (#151); the live record (#202) leads; "ARE calibrated"
+  replaced by the corrected backtest evidence.
+- **QB rushing** off the board (#188/#190) where docs still called it priced or "not modelled yet";
+  **anytime TDs** priced, logged and graded but hidden (#190), reconciled in SKILL.md.
+- **Closing capture and persistence**: the scheduled capture records open / decision / close; chat
+  is read-only and writes no archive (SKILL.md, line_archive.md, data_source_matrix.md,
+  execution_protocol.md, the scorer's kickoff line). Sleeper is the primary price source.
+- **Team volume**: throws 25% and the backs' carries 50% toward the market (#134, #204), not
+  "history by default" (SKILL.md, engine_overview.md, methodology.md, model_registry.md).
+- **Width settings**: target concentration 60 (#195), eff_sd_rush 0.15 (#189), the passing scale
+  (#199), K0 yards per target 80 in methodology's table; a "Current settings" block heads the
+  model registry, with forward pointers on rounds 11, 13, 19 and the round-5-10 notes; its
+  duplicated Round-7/8/9/10 copy (113 lines, byte-identical) removed and the colliding Round-10
+  heading renamed. reports/yardage_harness.md carries a banner pointing at
+  reports/current_settings_check_2026-10-06.md for width.
+- **The card** (#206-#208): SKILL.md's per-player line-fit reads and gauge now say they live in
+  research_*.csv; the card's efficiency rows replace them; the second "premium prop guide" layout
+  points at team_matchup_guide.md and the cards. The luck fallback drops the longest play in the
+  10-game window, not "this season".
+- **Retired or stale**: the must-win pick (#142) in CHAT.md's routing and score_week.py's
+  docstring; "weeks 2-3 STRONG 45%" replaced by the live record; the fantasy ledger fills only
+  from explicit --record runs, which nothing schedules (#109); CLAUDE.md scopes the draft
+  validation loop to the draft engine and adds props/tests_ci to the test command (README too);
+  props-ci.yml's comments; props/README.md's layout, settle window and backtest scope;
+  README.md's title, layout and the Keefamania draft date; data/external/README.md's real
+  overrides.csv header; model_projection retires at 2027 draft prep.
+- **Archive**: the Yahoo API access request, the two expert prompts, docs/superpowers/ and the
+  2026-08-25 auto-manager plan moved to docs/archive/ (README there); banners name the
+  consolidation plan as the successor; docs/draft-day-runbook.md is marked historical.
+- **Forward pointers** under #99, #100, #105, #106, #137, #144, #167, #169, #173, #184 and #200.
+
+Found and NOT fixed (behaviour, out of scope): the scorer stamps every line-archive row
+`decision` and record_run only fills a missing type, so props/record/lines/ reads `decision` on
+every row while the predictions rows carry open / decision / close (line_archive.md now says so).
+
+## 2026-10-08 (211) -- dead code removed: unused engine helpers, finished one-off scripts, the market-carries record fields
+
+- **Why:** the sweep found code nothing calls, constants nothing reads, files nothing reads and
+  comments that say the opposite of what ships. Each item was grepped across the whole repo
+  (tests, workflows, .bat, nfl.py, CHAT.md, skill/) before it went; anything still used stayed.
+- **Engine (props/engine/scripts):** model.SHADOW_MARKET_RUSH_WEIGHT, model.team_environment, the
+  Questionable-regime helpers and weights (unused since bce0771), score_game.DEFERRED_MARKETS,
+  td_v1.game_probabilities, td_joint.STRUCTURES, research.points_allowed_line (tests only) and
+  research._need_cell. score_week: slate_pick_order (test only), TLEGS, and the must-win pick with
+  its slate_survival_*.csv (no picks are shown, #142, and nothing read the file; the nfl.py
+  --survival flag still answers that the pick is retired). build_priors uses model.norm_name
+  (its copy was identical). Comments: market carries 0.5 ships (#204), round 41 withdrawn with
+  the knob kept off (#203), teammates' targets correlate about +0.06 (#205).
+  width_params.json tuned_on names each setting's selection seasons (a documentation key: it
+  moves the resource hash, not a price).
+- **One-off scripts deleted** (reports that cite them name the last commit): absence_check.py
+  87f67a4, td_compare.py c183f82, td_diagnostics.py 18c36f4, props/tools backfill_engine_stamp.py
+  72e05e9, pick_market_env.py 5d78354, rb_takeover_check.py 97a3173, rr_dependence.py 68ac50f;
+  scripts/keefamania_trades.py 574c69b (the scrape path; the Yahoo API replaced it).
+  absence_check.py left FETCH_ALLOWED.
+- **Record:** p_over_mkt_carries and mkt_carries leave record_run and settle (score_game stopped
+  writing them at #204; 0 of 2,800 settled and 0 of 5,041 prediction rows held a value) and
+  scorecard's market-carries section goes with them. The reversal shadows (p_over_hist_carries,
+  p_over_spread40) and p_over_board stay.
+- **Draft/fantasy:** two unused names (staged._steps_2_to_4, tracker.FALLBACK_FLOORS); config.yaml
+  says pool_lookback and bench_row_wins_dedupe are inert and session_log is permanent; the
+  projections docstrings say model is the default (Omnibeta live) and Keefamania selects
+  external. draftkit/, scripts/ and tests/ import core.ids / core.scoring directly; the
+  draftkit.ids and seasondata.score_projection shims stayed until manager/ moved off them -- it did
+  in #212, and both shims were deleted in the same sweep (draftkit/ids.py gone; tests import core.*).
+- **Release:** data/external/fantasypros_history/ shipped to chat because fnmatch's * crosses "/"
+  in the data/external/*.csv glob; it moved to data/raw_history/fantasypros_history/, which no
+  release or harness rule matches.
+- **Evidence, no price moved:** the DAL@HOU fixture (props/tests/fixtures/report_dal_hou, week 4,
+  --no-scenarios) run before and after: all ten CSVs (bet_card, betting_card, confidence,
+  fantasy_points, joint_td, ladder, player_params, research, shadow_log, td_board) identical
+  column by column except snapshot_utc (bet card) and logged_at_utc (joint TD, shadow log); the
+  report identical line by line except the two lines that carry the price snapshot time and the
+  kickoff clock. The same two-run comparison on the unchanged code shows the same columns
+  differing. Tests: 2038 passed, 8 skipped.
+
+## 2026-10-08 (212) -- the in-season auto-manager's cron stack is retired (the user's call)
+
+- **Why:** it had no schedule since 2026-09-25 (#109), ran only when dispatched by hand, and
+  duplicated the fantasy commands (`nfl fantasy lineup / waiver / trade / scenario`) for lineups,
+  waivers and trades. Two engines answering the same question is what the consolidation plan
+  forbids ("no parallel engines").
+- **Deleted (the cron wiring):** `.github/workflows/weekly.yml` and `gate.yml`;
+  `scripts/gate_guard.py`; `scripts/VEGAS REFRESH.bat` (its snapshot in `state/vegas/` was read
+  only by the cron's lineup and scout); the `python -m manager gate / cron / --module /
+  vegas-refresh` entrypoints; and the manager modules only that path used: `jobs`, `gate`,
+  `triggers`, `clock`, `deliver`, `phone`, `injuries`, `scout`, `lineup_opt`, `vegas`, `games`,
+  `trade_watch`. `notify.yml` now watches `props` only.
+- **The trade radar is retired too (the user's call: no trade search is needed;
+  `nfl fantasy trade` scores a named trade):** `trade_radar` and what only it needed --
+  `marginal` (price / accepts / verdict, the injury discount), `market` (FantasyCalc), `ecr` (the
+  rank panel) with `fantasypros.overall`, `waiver_brief` (the free-agent pool), `faab`, `usage`,
+  `age_decay` -- plus `fantasypros.crosswalk`, `yahoo.load` / `injury_overlay` and the
+  browser-scrape snapshot fallback (only the radar, `scripts/keefamania_trades.py` and tests used
+  them), `Store.first_time` (the radar's dedup; the Store's delivery and bid-history methods went
+  with the cron), the unread `inseason.age_decay` knob, and the fetch allowlist entries for
+  `manager/usage.py` and `manager/waiver_brief.py`. `scripts/keefamania_trades.py` goes in the
+  same sweep (the dead-code PR).
+- **Grep-verified:** nothing in `fantasy/`, `core/`, `draftkit/`, `nfl.py`, `CHAT.md`, `skill/`,
+  `props/` or `scripts/` imports any deleted module (`draftkit.market` is a different module, and
+  `briefs.playoff_odds` keeps its caller inside briefs). 23 test files went whole; the cron and
+  radar tests inside 8 more were cut, keeping their draftkit, consensus and Sleeper tests.
+- **Kept, because the fantasy commands import them:** `yahoo_api`, `yahoo_sync`, `yahoo_context`,
+  `yahoo` (now only `api_entries`, `yahoo_id_map`, `_flat`, `YAHOO_STATUS`; `fantasy/league.py`
+  reads the synced copy through `read_cached` on a host without credentials, so `python -m
+  manager yahoo-sync` -- the one entrypoint left -- and `scripts/YAHOO SYNC.bat` stay), `context`,
+  `consensus` and `fantasypros` (registered: provisional / live), `store` (kv only), `ledger` and
+  `provenance` (`fantasy lineup --record` emits ledger rows). The ledger's grading functions stay
+  as harness code although the Tuesday job that called them is gone; the consensus registry note
+  now says grading is by hand.
+- **Shims:** the kept modules import `core.ids` and `core.scoring` directly instead of the
+  `draftkit.ids` / `seasondata.score_projection` shims (pure re-exports, so identical behaviour).
+- **State:** `state/week_plan.json`, `state/gate_hours.json`, `state/messages.json`,
+  `state/seen.json` (and their `state/keefamania/` copies) and `state/vegas/` were written only by
+  the cron and the radar; they are removed in a state-only commit on its own branch,
+  sweep/retire-manager-state (hygiene.yml fails a PR that mixes state with code). `kv.json`, the
+  ledgers and the Yahoo sync stay.
+- **Undo:** git history. The last commit with the cron stack and the radar is b2341d3; restoring
+  the files listed above from it (and re-enabling the workflows) brings them back as they ran.
+
+## 2026-10-08 (213) -- repo hygiene: per-run outputs stop being tracked
+
+- **The repo sweep (the user's approval, 2026-10-08):** files that every run rewrites showed as
+  modified in every checkout and read as current to an agent. Now ignored and untracked (kept
+  locally): data/processed/season/ (transactions.jsonl, rewritten by draftkit/seasondata.py),
+  reports/adp_movers.md, survival_calibration.md, survival_fit.md / .json (scripts/fit_survival.py
+  outputs), and the week-1 briefs waiver_brief.md, lineup_brief.md, early_check.md (draftkit
+  briefs, last written 2026-09-11). exports/ (files made for the user) and scratch_* are ignored.
+- reports/survival_fit_study_2026-09-05.md / .json are now tracked: draftkit/tracker.py cites them.
+- Nothing reads any untracked file as an input (grep of draftkit/, scripts/, props/, tests/).

@@ -17,8 +17,8 @@
 ## Engineering
 - Windows host: file I/O is always `encoding="utf-8"`; console output goes
   through the UTF-8 reconfigure in cli.main.
-- Tests run with `venv/Scripts/python.exe -m pytest tests props/tests -q` and
-  must pass before any merge to main. Reports in `reports/` are generated
+- Tests run with `venv/Scripts/python.exe -m pytest tests props/tests props/tests_ci -q`
+  and must pass before any merge to main. Reports in `reports/` are generated
   artifacts.
 - **A code review after every major piece of work, before its PR merges.**
   Run the code-review skill (high) on the branch diff, report the findings,
@@ -32,12 +32,14 @@
   an inline check is not a substitute. Any load-bearing script the engine or
   the chat skill relies on that has NOT been through the skill is flagged to
   the user as a risk until it has (the user's standing rule, 2026-10-06).
-- The in-season auto-manager (`manager/`) has NO schedule since 2026-09-25
-  (the user's call, DECISIONS #109): `weekly.yml` and `gate.yml` run only when
-  dispatched by hand. `props.yml` is the only scheduled workflow.
-- Engine changes ship behind the validation loop in
+- The in-season auto-manager's cron stack is retired (2026-10-08, DECISIONS
+  #212): fantasy decisions go through `fantasy/` (`nfl fantasy ...`), and
+  `props.yml` is the only scheduled workflow.
+- Draft-engine changes ship behind the validation loop in
   docs/plans/2026-08-29-draft-engine-v2-plan.md — CLV, historical sim,
-  input accuracy. Self-graded boards validate nothing.
+  input accuracy. Props-engine changes ship through pre-registered rounds
+  judged on reports/scoreboard.md (DECISIONS #188), with the four-seed rule
+  (#202). Self-graded boards validate nothing.
 
 ## Architecture (consolidation since 2026-09-24)
 The plan is docs/plans/2026-09-24-consolidation-plan.md. tests/test_core_guardrails.py

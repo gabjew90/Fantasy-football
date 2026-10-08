@@ -37,9 +37,7 @@ def test_score_counts_only_scored_keys_and_skips_unprojected():
 
 def test_the_legacy_names_are_the_one_function():
     from draftkit import consensus as dc
-    from draftkit import seasondata
     from manager import consensus as mc
-    assert seasondata.score_projection is scoring.score
     assert mc._score is scoring.score
     assert dc.score is scoring.score
 
@@ -166,11 +164,6 @@ def test_sleeper_gsis_prefers_the_map_fills_gaps_and_drops_shared_ids():
                                                   ("00-0000010", ["10", "11"]),   # the map claims it twice
                                                   ("00-0000077", ["8", "9"])]
     assert ids.invert(out)["00-0000005"] == "5"
-
-
-def test_draftkit_ids_is_the_same_module_surface():
-    import draftkit.ids as old
-    assert old.load_id_map is ids.load_id_map and old.NameIndex is ids.NameIndex
 
 
 def test_an_empty_download_is_a_failed_refresh_not_a_new_copy(tmp_path):

@@ -49,3 +49,19 @@ experiments/out/
 
 # the yardage harness cache and outputs (generated, large)
 props/engine/scripts/backtest_out/
+
+# per-run outputs that are rewritten on every run (repo sweep 2026-10-08, DECISIONS #213):
+# kept locally, never tracked, so a clean checkout never shows them as modified
+data/processed/season/
+data/processed/*.jsonl
+!data/processed/rival_pools.jsonl
+reports/adp_movers.md
+reports/survival_calibration.md
+reports/survival_fit.md
+reports/survival_fit.json
+reports/waiver_brief.md
+reports/lineup_brief.md
+reports/early_check.md
+# exports and scratch files made for the user, outside the repo's history
+exports/
+scratch_*

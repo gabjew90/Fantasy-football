@@ -13,7 +13,9 @@ compute. Rows are JSON lines under `state/<league>/ledger/<season>-wkNN.jsonl`
 state, each carrying the provenance stamp so a bad row can be attributed to
 its inputs or its logic. A dry run emits nothing.
 
-Grading runs after the week's games (the Tuesday ledger job): actuals are
+Grading runs after the week's games (the Tuesday ledger job until the cron
+stack was retired on 2026-10-08, DECISIONS #212; grade_week is not called
+on a schedule any more): actuals are
 Sleeper's weekly stat lines scored in the league's own settings, and each
 kind has one honest ruler:
 
@@ -62,8 +64,8 @@ def emit(store, ctx, kind: str, rows: list[dict], sources: dict | None = None) -
     dry run, which must leave state untouched)."""
     if kind not in KINDS:
         raise ValueError(f"ledger kind {kind!r} is not one of {KINDS}")
-    # The structured result also feeds the delivered (phone) rendering, dry
-    # run or not: manager.phone reads ctx["_summary"][kind].
+    # The structured result rides on the context, dry run or not (the
+    # retired manager.phone rendering read ctx["_summary"][kind]).
     ctx.setdefault("_summary", {})[kind] = list(rows)
     if not rows:
         return 0
@@ -117,11 +119,12 @@ def latest_per_subject(rows: list[dict], kind: str) -> dict[str, dict]:
 
 def actual_points(ctx, week: int, getter=None) -> dict[str, float]:
     """sleeper_id -> points scored in `week`, in this league's scoring."""
+    from core.scoring import score
     from draftkit import seasondata
     season = (ctx.get("state") or {}).get("season")
     scoring = (ctx.get("league") or {}).get("scoring_settings") or {}
     raw = seasondata.weekly_stats(season, week, getter) if getter else seasondata.weekly_stats(season, week)
-    return {str(pid): round(seasondata.score_projection(stats, scoring), 2)
+    return {str(pid): round(score(stats, scoring), 2)
             for pid, stats in (raw or {}).items() if isinstance(stats, dict)}
 
 

@@ -15,10 +15,10 @@ The verdict is personal only when the decision gate passes (fantasy.gate);
 otherwise it is a CONDITIONAL comparison and says which check failed.
 
 Writes a report (markdown) and a decision record (JSON) to the outputs folder.
-With `record=True` it also appends a ledger row, graded against actuals like
-every other. Chat never records (it is read-only). NOTHING PASSES IT YET: the
-scheduled runs are rewired to call this command with --record in step 6
-(the Actions rework), so until then no start/sit recommendation is graded.
+With `record=True` it also appends a ledger row. Chat never records (it is
+read-only), no workflow passes it (the fantasy schedules are off, DECISIONS #109)
+and nothing grades the ledger since the cron stack retired (DECISIONS #212:
+manager.ledger.grade_week has no caller), so a recorded row waits ungraded.
 """
 
 from __future__ import annotations

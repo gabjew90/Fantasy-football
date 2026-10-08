@@ -54,8 +54,13 @@ MODEL_STATUS = {
     # rushing / rushing + receiving, right at the main line but narrow in the
     # tails (reports/current_settings_check_2026-10-06.md). Posted lines are a
     # separate test, which is what VALIDATED_MARKETS below waits for.
+    # QB passing too wide is still true after round 38 (11.9% outside the 80% range,
+    # reports/round38_qb_passing_bias.md, DECISIONS #199).
     "player_receptions": "receiving_hier_v2, MODEL_UNVALIDATED (PROTOTYPE)",
     "player_reception_yds": "receiving_hier_v2, MODEL_UNVALIDATED (PROTOTYPE)",
+    # "(no backtest)" is the frozen label from props-v1.0; rushing yards have been
+    # outcome-graded in the harness since round 10 (model_registry.md). The label stays
+    # so record rows group across releases.
     "player_rush_yds": "rush_yds_v0, MODEL_UNVALIDATED (no backtest)",
     # the starting QB's passing yards (plan step 4, props-v1.24): outcome-graded
     # in the same harness, not tested against posted lines

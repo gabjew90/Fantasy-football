@@ -277,11 +277,6 @@ def game_detail(shares, team, ids, pos, ctx, implied, c=V1["c"], qb=None) -> pd.
     return out
 
 
-def game_probabilities(shares, team, ids, pos, ctx, implied, c=V1["c"], qb=None) -> pd.Series:
-    """P(at least one touchdown) for each active player on `team`."""
-    return game_detail(shares, team, ids, pos, ctx, implied, c, qb)["p"]
-
-
 # ------------------------------------------------------------ live inputs
 
 def load_bundled(res: Path, season: int) -> dict:

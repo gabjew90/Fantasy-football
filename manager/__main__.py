@@ -1,10 +1,12 @@
-"""`python -m manager` — entrypoints.
+"""`python -m manager` -- the local Yahoo sync, the one entrypoint left.
 
-  python -m manager gate                      # one 15-min gate tick (Actions)
-  python -m manager cron                      # weekly.yml dispatcher (PT-guarded)
-  python -m manager cron --job waivers        # force one weekly job (dispatch)
-  python -m manager --dry-run --module all    # full pipeline vs live data, stdout
-  python -m manager vegas-refresh --week 1    # pull lines locally, commit them
+  python -m manager --league keefamania yahoo-sync   # pull Yahoo into state/<league>/yahoo/
+
+The in-season cron stack this module used to drive (gate, cron, the --module
+runs, vegas-refresh) was retired on 2026-10-08 (DECISIONS #212); the fantasy
+commands (`nfl fantasy ...`) answer lineups, waivers and trades. yahoo-sync
+stays because the fantasy commands read the synced copy on a host without
+Yahoo credentials (manager.yahoo_api.read_cached).
 """
 
 from __future__ import annotations
@@ -13,14 +15,14 @@ import argparse
 import logging
 import sys
 from datetime import datetime
+from zoneinfo import ZoneInfo
 
 from dotenv import load_dotenv
 
-MODULES = ("plan", "waivers", "injuries", "lineup", "scout", "trade", "health", "ledger", "all")
+PT = ZoneInfo("America/Los_Angeles")
 
 
 def _setup_logging() -> None:
-    from .clock import PT
     fmt = logging.Formatter("%(asctime)s %(levelname)s %(message)s")
     fmt.converter = lambda ts: datetime.fromtimestamp(ts, tz=PT).timetuple()
     h = logging.StreamHandler()
@@ -31,135 +33,38 @@ def _setup_logging() -> None:
 
 
 def main() -> int:
-    if sys.platform == "win32":  # emoji in briefs vs cp1252 consoles
+    if sys.platform == "win32":  # non-ASCII names vs cp1252 consoles
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
         sys.stderr.reconfigure(encoding="utf-8", errors="replace")
     load_dotenv()
     _setup_logging()
     ap = argparse.ArgumentParser(prog="manager")
-    ap.add_argument("command", nargs="?", default="module",
-                    choices=("gate", "cron", "module", "vegas-refresh", "yahoo-sync"))
-    ap.add_argument("--module", choices=MODULES, default=None)
-    ap.add_argument("--job", choices=tuple(k for k in MODULES if k != "all"),
-                    default=None, help="cron: force one job regardless of window")
-    ap.add_argument("--dry-run", action="store_true",
-                    help="full pipeline against live data; print instead of email")
+    ap.add_argument("command", choices=("yahoo-sync",))
     ap.add_argument("--league", default=None,
                     help="league name; overrides DRAFTKIT_LEAGUE / default_league")
     ap.add_argument("--week", type=int, default=None,
-                    help="render as if it were this NFL week (module runs only)")
+                    help="sync this NFL week instead of the live one")
     args = ap.parse_args()
 
-    # vegas-refresh writes a WEEK-KEYED file, so an explicit week is meaningful
-    # there; pinning gate/cron to a stale week is what the guard is for.
-    if args.week is not None and args.command not in ("module", "vegas-refresh", "yahoo-sync"):
-        ap.error("--week is for 'module' and 'vegas-refresh' runs only: pinning "
-                 "gate/cron to a stale week would make the live manager act on "
-                 "the wrong week")
-
-    from . import jobs
     from .context import configure
     configure(league=args.league, week=args.week)
-    # state/ is committed and shipped to the live manager, so a rehearsal must
-    # not leave anything behind for the real run to read.
-    jobs.configure(dry_run=args.dry_run)
 
-    if args.command == "vegas-refresh":
-        # The Odds API key is a LOCAL secret and stays local: rather than
-        # handing it to CI, the week's lines are pulled here and committed,
-        # and the scheduled job reads a file it could never fetch itself.
-        from .context import league_context
-        from . import vegas
-        ctx = league_context()
-        season = (ctx.get("state") or {}).get("season")
-        week = int(ctx["week"])
-        totals, note = vegas.implied_totals(
-            jobs.get_store(), window=vegas.week_window(ctx))
-        if not totals:
-            print(f"[vegas] nothing written: {note}")
-            return 1
-        path = vegas.write_snapshot(season, week, totals)
-        top = sorted(totals.items(), key=lambda kv: -kv[1])[:5]
-        print(f"[vegas] {len(totals)} teams -> {path}")
-        print("        " + " · ".join(f"{t} {v:.1f}" for t, v in top))
-        print("        commit state/vegas/ so the scheduled job can read it")
-        return 0
-
-    if args.command == "yahoo-sync":
-        # The Yahoo credentials are LOCAL, like the Odds key: this pulls every
-        # resource the manager reads into state/<league>/yahoo/ and the .bat
-        # commits it, so Actions reads Yahoo without holding a secret.
-        from draftkit.config import Config
-        from draftkit.seasondata import nfl_state
-        from . import yahoo_sync
-        cfg = Config.load(league=args.league)
-        if str(cfg.get("platform") or "sleeper").lower() != "yahoo":
-            print(f"[yahoo-sync] {cfg.league_name} is not a Yahoo league")
-            return 1
-        st = nfl_state()
-        week = args.week or (int(st["week"]) if st.get("season_type") == "regular" else 1)
-        result = yahoo_sync.sync(cfg, week)
-        for path, status in result.items():
-            print(f"[yahoo-sync] {status:<8} {path}")
-        return 0 if all(v == "ok" for v in result.values()) else 1
-
-    if args.command == "gate":
-        from .gate import run_gate
-        # The live week lets the gate notice a plan the planner never wrote
-        # for this week and replan; unreachable Sleeper means no heal, not
-        # a crash -- the checks still tick.
-        live_week = None
-        try:
-            from draftkit.seasondata import nfl_state
-            st = nfl_state()
-            live_week = int(st["week"]) if st.get("season_type") == "regular" else 1
-        except Exception as e:  # noqa: BLE001
-            logging.getLogger("manager").warning("gate: live week unknown (%s)", e.__class__.__name__)
-        result = run_gate(dry_run=args.dry_run, live_week=live_week)
-        print(f"[gate] ran {result.get('ran', 0)}, pending {result.get('pending', 0)}"
-              + (", replanned" if result.get("healed") else ""))
-        return 0
-
-    if args.command == "cron":
-        force = {"plan": "plan", "waivers": "waivers", "scout": "scout",
-                 "lineup": "lineup", "health": "health", "ledger": "ledger"}.get(args.job or "", None)
-        ran = jobs.cron_tick(dry_run=args.dry_run, force=force)
-        print(f"[cron] ran: {ran or 'nothing (outside all windows)'}")
-        return 0
-
-    if not args.module:
-        ap.error("--module is required unless command is 'gate' or 'cron'")
-
-    def do(name: str) -> None:
-        if name == "plan":
-            plan = jobs.plan_week(dry_run=args.dry_run)
-            print(f"\n[plan] {len(plan['jobs'])} checks computed for week {plan['week']}")
-        elif name == "waivers":
-            jobs.waiver_job(dry_run=args.dry_run)
-        elif name == "injuries":
-            jobs.sweep_job(dry_run=args.dry_run)
-        elif name == "lineup":
-            jobs.lineup_job(dry_run=args.dry_run)
-        elif name == "scout":
-            jobs.scout_job(dry_run=args.dry_run)
-        elif name == "trade":
-            from .context import league_context
-            from .trade_radar import build
-            print(build(league_context(), jobs.get_store()))
-        elif name == "health":
-            jobs.healthcheck(dry_run=args.dry_run)
-        elif name == "ledger":
-            jobs.ledger_job(dry_run=args.dry_run, week=args.week)
-
-    if args.module == "all":
-        # scout before lineup so ceiling/floor mode is fresh; plan first (spec order)
-        for m in ("plan", "waivers", "injuries", "scout", "lineup"):
-            do(m)
-        print("\n[all] trade radar is appended inside the waiver brief; healthcheck "
-              "runs daily via weekly.yml")
-    else:
-        do(args.module)
-    return 0
+    # The Yahoo credentials are LOCAL: this pulls every resource the fantasy
+    # commands read into state/<league>/yahoo/ and the .bat commits it, so a
+    # host without the credentials reads the synced copy.
+    from draftkit.config import Config
+    from draftkit.seasondata import nfl_state
+    from . import yahoo_sync
+    cfg = Config.load(league=args.league)
+    if str(cfg.get("platform") or "sleeper").lower() != "yahoo":
+        print(f"[yahoo-sync] {cfg.league_name} is not a Yahoo league")
+        return 1
+    st = nfl_state()
+    week = args.week or (int(st["week"]) if st.get("season_type") == "regular" else 1)
+    result = yahoo_sync.sync(cfg, week)
+    for path, status in result.items():
+        print(f"[yahoo-sync] {status:<8} {path}")
+    return 0 if all(v == "ok" for v in result.values()) else 1
 
 
 if __name__ == "__main__":

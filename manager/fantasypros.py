@@ -111,9 +111,9 @@ def _num(v):
 
 
 def _index_by_name(index):
-    """The shared resolver (draftkit.ids.NameIndex): fantasy eligibility, not
+    """The shared resolver (core.ids.NameIndex): fantasy eligibility, not
     the depth-chart slot, and live players preferred over retired namesakes."""
-    from draftkit.ids import NameIndex
+    from core.ids import NameIndex
     return NameIndex(index)
 
 
@@ -122,14 +122,14 @@ def fetch(scoring: dict, season, index, kind: str = ROS, week: int | None = None
     """sleeper_id -> {pts, ecr, best, worst, sd, tier, pos, owned}. Plus a note.
 
     `best`/`worst` are RANKS, so lower is better -- the same convention
-    manager.ecr uses, and the opposite of every points field in the repo.
+    the retired manager.ecr used, and the opposite of every points field in the repo.
 
     Degrades to ({}, "DATA MISSING: ...") rather than raising. A projection
     source that cannot be reached must not take the brief down with it, and a
     silent empty dict would let the consensus quietly drop to two sources
     without saying so.
     """
-    from draftkit.ids import normalize_name
+    from core.ids import normalize_name
 
     slug = scoring_slug(scoring)
     ckey = f"fantasypros:{kind}:{slug}:{season}:{week or 0}"
@@ -184,8 +184,8 @@ def fetch(scoring: dict, season, index, kind: str = ROS, week: int | None = None
                 # that one is not: the crosswalk is free, the bulk pull is not.
                 "fp_id": row.get("player_id"),
                 "yahoo_id": row.get("player_yahoo_id"),
-                # The FEED's spelling, not the index's -- crosswalk() keys on
-                # it, and a name identical to ours is of no use there.
+                # The FEED's spelling, not the index's (the retired crosswalk()
+                # keyed a second name index on it).
                 "name": row.get("player_name"),
                 "pts": _num(row.get("r2p_pts")),
                 "ecr": _num(row.get("rank_ecr")),
@@ -469,132 +469,5 @@ def injuries(rows: dict, season, week, store=None
     # reports no injuries, long after the API has recovered; a run cut short
     # at batch 2 of 5 freezes three fifths of the roster as healthy.
     if store is not None and not partial:
-        store.set(ckey, {"ts": _time.time(), "data": out, "note": note})
-    return out, note
-
-
-# --------------------------------------------------------------- crosswalk
-
-def crosswalk(scoring: dict, season, index, store=None
-              ) -> tuple[dict, str | None]:
-    """Identity for a league whose rosters arrive as bare names.
-
-    Returns {"by_yahoo": {yahoo_id: sleeper_id},
-             "by_name":  {normalised name: [(sleeper_id, pos, team)]}}
-
-    BE HONEST ABOUT WHAT THIS IS WORTH. fetch() resolves a FantasyPros row to
-    a sleeper_id BY NAME, so `by_yahoo` is a name-mediated link, not an
-    independent one. It does not make the Sleeper side exact.
-
-    What it does buy, which is real:
-
-      * A SECOND NAME SPELLING, WHICH MEASURED ZERO AND IS KEPT ANYWAY.
-        draftkit.ids.normalize_name already strips punctuation and
-        generational suffixes, so "Harold Fannin Jr." against "Harold Fannin"
-        ALREADY matches -- suffixes were the obvious guess and they are not
-        the gap. What is left is genuinely different renderings of one person
-        ("Marquise Brown" against "Hollywood Brown"). On the Keefamania
-        scrape of 2026-09-09 that population is EMPTY: 131 players resolved
-        with the crosswalk and 131 without it. So this buys nothing today. It
-        is kept because it costs one dict on a fetch the consensus already
-        makes, and it is the path a renaming would otherwise take down
-        silently -- but do not cite it as a benefit until it rescues someone.
-      * TEAM, SO AMBIGUITY IS RESOLVABLE. yahoo.load currently takes cand[0]
-        on a duplicate name, which silently prices the wrong Mike Williams.
-        A team code turns that guess into a decision.
-      * A PLACE FOR THE EXACT JOIN TO LAND. The scrape is `POS|Name|Owner`
-        today. If it is ever widened to carry Yahoo's own player id, this
-        table is already the other half and the name matching drops out
-        entirely. That is the upgrade worth making; this is not a substitute
-        for it.
-    """
-    rows, note = fetch(scoring, season, index, kind=ROS, store=store)
-    if not rows:
-        return {"by_yahoo": {}, "by_name": {}}, note
-
-    from draftkit.ids import normalize_name
-    by_yahoo: dict[str, str] = {}
-    by_name: dict[str, list[tuple[str, str, str]]] = {}
-    for pid, r in rows.items():
-        yid = r.get("yahoo_id")
-        if yid:
-            by_yahoo.setdefault(str(yid), pid)
-        # KEYED ON THE FANTASYPROS SPELLING, WHICH IS THE WHOLE POINT.
-        # Keying it on the Sleeper index's own full_name made the table a
-        # strict subset of the by_norm that yahoo.load already builds from
-        # those same fields -- so it could never hold a rendering the index
-        # lacked, and the "second spelling" fallback could not fire at all.
-        d = (index.get(pid) or {}) if hasattr(index, "get") else {}
-        nm = r.get("name") or d.get("full_name") or d.get("last_name")
-        if nm:
-            by_name.setdefault(normalize_name(nm), []).append(
-                (pid, r.get("pos") or d.get("position") or "",
-                 (d.get("team") or "").upper()))
-    return ({"by_yahoo": by_yahoo, "by_name": by_name},
-            f"{note}; crosswalk {len(by_yahoo)} yahoo ids")
-
-
-# ----------------------------------------------------------------- overall
-
-# The two overall lists FantasyPros publishes. They are NOT interchangeable.
-# "ALL" is the standard one-QB board: Bijan 4, Caleb Williams 63. "OP" --
-# offensive player -- is the SUPERFLEX board, with quarterbacks stacked on
-# top: Allen 1, Hurts 5, Caleb 8, and every non-QB pushed down 8-17 ranks
-# to make room. Measured live 2026-09-10 against the DynastyProcess mirror
-# of the same panel; the first cut of this function used OP for a one-QB
-# league and would have inflated every QB in the acceptance test.
-OVERALL_ONE_QB, OVERALL_SUPERFLEX = "ALL", "OP"
-
-
-def overall(scoring: dict, season, index, kind: str = DRAFT, store=None,
-            position: str = OVERALL_ONE_QB) -> tuple[dict[str, dict], str | None]:
-    """sleeper_id -> {overall, pos, panel, list}. The OVERALL consensus rank.
-
-    The per-position fetch() carries positional rank (RB13). This carries
-    the one list that puts a WR4 and an RB13 on the same scale, which is
-    what a cross-position trade needs. `position` picks WHICH overall list:
-    OVERALL_ONE_QB for a one-QB league, OVERALL_SUPERFLEX when two QBs can
-    start -- rank_panel() decides from the league shape. `panel` is the
-    expert count on that list, carried so a three-expert rank can never be
-    read as agreement, and `list` says which board the number came from.
-    """
-    from draftkit.ids import normalize_name
-
-    slug = scoring_slug(scoring)
-    ckey = f"fantasypros:overall:{position}:{kind}:{slug}:{season}"
-    if store is not None:
-        cached = store.get(ckey)
-        if cached and _time.time() - cached.get("ts", 0) < TTL:
-            return cached["data"], cached.get("note")
-    if not index:
-        return {}, "DATA MISSING: fantasypros overall (no player index)"
-
-    names = _index_by_name(index)
-    try:
-        rows, body = _rows(position, slug, season, kind)
-    except Exception as e:  # noqa: BLE001
-        return {}, f"DATA MISSING: fantasypros overall {position} ({e.__class__.__name__})"
-
-    out: dict[str, dict] = {}
-    for row in rows:
-        our_pos = POSITIONS.get(row.get("player_position_id"))
-        if not our_pos:
-            continue
-        if our_pos == "DEF":
-            pid = names.defense(row.get("player_team_id") or "", TEAM_ALIAS)
-        else:                                            # ambiguous: dropped
-            pid = names.resolve(row.get("player_name") or "", our_pos,
-                                (row.get("player_team_id") or "").upper())
-        rank = _num(row.get("rank_ecr"))
-        if not pid or rank is None:
-            continue
-        out[pid] = {"overall": rank, "pos": our_pos,
-                    "panel": body.get("total_experts"), "list": position}
-
-    if not out:
-        return out, f"DATA MISSING: fantasypros overall {position} matched no players"
-    note = (f"fantasypros overall {position} {kind} {slug}: {len(out)} players, "
-            f"panel {body.get('total_experts')}, updated {body.get('last_updated')}")
-    if store is not None:
         store.set(ckey, {"ts": _time.time(), "data": out, "note": note})
     return out, note

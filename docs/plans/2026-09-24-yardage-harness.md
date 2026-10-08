@@ -76,7 +76,8 @@ worst on the low side (players bust more often than the model allows).
    existed and measures as helping; QB rushing is simulated (own carry grid,
    kneel-downs by spread, own width settings) and priced, and passes. Running
    backs miss the calibration limit by 0.4 points; the user judged it noise
-   (DECISIONS #100). Next fix found on the way: backs run ~4% low because shares
+   (DECISIONS #100). -> Since 2026-10-06 QB rushing is off the board (simulated,
+   not priced or recorded; DECISIONS #188, #190). Next fix found on the way: backs run ~4% low because shares
    summing past 1 are scaled down. A rescaling fix was tuned and tested and did
    not beat the live model on 2024-25 (DECISIONS #103); the bias stays below the
    5% limit and the diagnosis is recorded for the next attempt.
@@ -84,15 +85,22 @@ worst on the low side (players bust more often than the model allows).
    the QB's passing yards before sacks), plus who is under center. It inherits
    step 2. **Done (props-v1.24, DECISIONS #105):** calibrated and the right
    width; misses the bar on 2024's interval and one 18-bet bucket, priced by
-   the user's decision.
+   the user's decision. -> Corrected 2026-10-06: graded on the QB who actually
+   started, the width FAILS (too wide, 14.4% outside p10-p90; DECISIONS #187) and
+   the Over at the main line ran ~6 points above the engine (#196-#197); round 38
+   (#199) scaled it by implied points, and it is still too wide (11.9%).
 5. The Vegas-line environment (`market_fit`) and a market blend layer, tested
    on two seasons instead of one. **Done 2026-09-25 (DECISIONS #106):** the
    market environment was tuned on 2022-23 and is not better than the live
    one (reports/market_env_tuning.md); the live environment stays. The market
    blend for yardage runs in shadow on the Tuesday scorecard, as the TD one
-   does, until the settled record can fit its weight.
+   does, until the settled record can fit its weight. -> Since: partial market
+   volume ships -- throws 25% toward the market (round 16, DECISIONS #134) and
+   the backs' carries 50% (round 39, #204); #106's Vegas-line rushing lead was
+   reopened by the expert audit (#197).
 
-Follow-up outside these steps: the slate's must-win pick (`score_week.py`,
+Follow-up outside these steps (moot since DECISIONS #142: the must-win pick is
+retired, its file written for the record and never shown): the slate's must-win pick (`score_week.py`,
 `CAL_MARKETS`) prefers receptions and receiving yards as the calibrated
 markets. Since step 2 rushing yards passes the same bar; whether it joins
 `CAL_MARKETS` is a separate decision about the pick rule.

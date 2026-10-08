@@ -22,12 +22,19 @@ jobs:
           base="${{ github.event.pull_request.base.sha || github.event.before }}"
           # NOT HEAD. On a pull_request event the checkout is a MERGE commit of
           # this branch into main's CURRENT head, so anything main gained while
-          # the PR was open is inside HEAD. The manager commits state/ hourly on
-          # a schedule, so `base...HEAD` reported main's own state commit as
-          # riding along with this branch's code -- a false positive that would
-          # hit essentially every PR left open for an hour.
+          # the PR was open is inside HEAD. Machine-written state lands on main
+          # on its own (props.yml commits props/record/ every 15 minutes near a
+          # game, and the in-season manager committed state/ hourly until its
+          # cron stack was retired, DECISIONS #212), so `base...HEAD` reported
+          # main's own state commit as riding along with this branch's code --
+          # a false positive that would hit essentially every open PR.
           head="${{ github.event.pull_request.head.sha || github.sha }}"
           if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ]; then
             base="$(git rev-parse "$head~1" 2>/dev/null || echo "$head")"
+          fi
+          # a force-push (a rebased branch) leaves github.event.before pointing at a commit that is
+          # gone: check the branch against where it leaves main instead of crashing (2026-10-08)
+          if ! git cat-file -e "$base^{commit}" 2>/dev/null; then
+            base="$(git merge-base origin/main "$head")"
           fi
           python scripts/check_commit_hygiene.py --range "$base...$head"

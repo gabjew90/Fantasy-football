@@ -10,9 +10,9 @@ projections:
   # source: external  -> stat lines from outside, scored in each league's
   #                      own settings (draftkit/external.py). The engine's
   #                      edge is roster-aware timing, not projection modeling.
-  #         model     -> the 2025-usage + log(ECR) blend (knobs below), to be
-  #                      retired: it comes back only if scripts/projection_backtest.py
-  #                      shows it beating the external source out of sample.
+  #         model     -> the 2025-usage + log(ECR) blend (knobs below); the
+  #                      default and Omnibeta's live source (STATUS below);
+  #                      Keefamania's league yaml overrides to external.
   # STATUS 2026-09-02: external is built and verified end to end. The gate
   # was redefined around quality (DECISIONS #23, thresholds pre-registered)
   # and the external stand-in (Sleeper week-1 lines, the only outside lines
@@ -112,7 +112,7 @@ engine:
   # everyone with ADP inside 180) and inflated survival right where the
   # round-8 upside switch decides. pool_min is the floor so it never starves.
   pool_min: 40        # never sample from fewer than this many candidates
-  pool_lookback: 20   # include players whose ADP is up to N picks BEHIND now
+  pool_lookback: 20   # INERT since 2026-09-02: no lower bound, fallers stay in the pool (tracker.py); kept for config compatibility
   pool_lookahead: 60  # ...and up to N picks ahead
   sigma_early: 6.0     # 2026-09-05 study (11 rooms, shown objective): floored draw at 6/27 (was 10.0 under order, #46)
   sigma_late: 27.0    # 27/6 scaled with sigma_early (was 45.0)
@@ -213,7 +213,7 @@ engine:
   # values: board_min (today) | replacement (season baselines; churned 28% on the
   # headline board because those baselines are drafted players by round 5) |
   # wire (the draft_k-th predicted-undrafted player, bench.waiver_ppw; DECISIONS #50)
-  bench_row_wins_dedupe: false   # who wins the market/bench seam
+  bench_row_wins_dedupe: false   # INERT since the staged bench (2026-09-05): switches nothing (tracker.py); kept for config compatibility
   per_position_deadline: false   # STAYS OFF: no measurement can decide it
   # Draft-time order statistic for the bench wire. Hedges PREDICTION ERROR --
   # which undrafted player is really the best one -- and NOT claim friction,
@@ -255,20 +255,6 @@ inseason:
   # the old numbers exactly, so rollback is this one line.
   ros_prorate:
     enabled: true
-  # In-season age decay on ROS DISPLAYS and trade logic only â€” never touches
-  # tiers.csv, projections, or any draft-layer number (post-v2 item 4).
-  # Conventional-wisdom-shaped and UNVALIDATED; revisit with 2026 actuals.
-  age_decay:
-    # OFF everywhere until 2026 actuals can validate it (2026-09-01).
-    # Displays and trade logic only; never touches draft numbers.
-    enabled: false
-    cap: 0.10           # max fraction lost across a full season
-    per_year: 0.02      # per year above the position threshold, at season end
-    thresholds:
-      RB: 27
-      WR: 30
-      TE: 31
-      QB: 33
   faab:
     league_winner: [0.40, 0.65]
     breakout: [0.15, 0.35]
@@ -289,7 +275,7 @@ fantasy:
     week1: 0.6
     zero_by_week: 9
 
-# TEMPORARY troubleshooting log (DECISIONS #104): every `nfl.py` command appends
-# one line to $NFL_OUT/nfl_session_log.jsonl. On for the chat shakedown; turn
-# off with a normal release once the skill runs clean.
+# Session log (DECISIONS #104): every `nfl.py` command appends one line to
+# $NFL_OUT/nfl_session_log.jsonl. Permanent, not a shakedown switch: `nfl.py log`
+# (the chat transcript review) and CHAT.md's gate/inputs line read it.
 session_log: true

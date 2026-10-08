@@ -189,7 +189,7 @@ def build_usage(cfg) -> tuple[pl.DataFrame, pl.DataFrame]:
         )
     )
 
-    from .ids import load_id_map
+    from core.ids import load_id_map
 
     id_map = load_id_map(cfg.path("raw"))
     gsis_pfr = id_map.filter(pl.col("gsis_id").is_not_null()).select(

@@ -17,7 +17,7 @@ from pathlib import Path
 import polars as pl
 import requests
 
-from .ids import SleeperIndex, load_id_map, normalize_name
+from core.ids import SleeperIndex, load_id_map, normalize_name
 
 FPECR_URL = "https://raw.githubusercontent.com/dynastyprocess/data/master/files/db_fpecr_latest.csv"
 FFC_URL = "https://fantasyfootballcalculator.com/api/v1/adp/{fmt}?teams={teams}&year={year}"

@@ -57,13 +57,16 @@ STAT_ALIASES = {"catches": "catches", "receptions": "catches", "rec": "catches",
                 "pass yds": "pass yds", "passing yards": "pass yds", "passing": "pass yds"}
 SLEEPER_TO_NFLVERSE = {"LAR": "LA"}
 UNVALIDATED = ("No bet labels: the model has not shown it adds anything beside the book's price (the report's first "
-               "line quotes the current graded record; labels return only when the model's weight is clearly above "
-               "zero), so a gap between them is information, "
-               "not an edge -- and a big gap was usually the model missing something. (Catches and receiving "
-               "yards ARE calibrated on 2022-25 outcomes -- a model 85% has won about 84-85%; rushing yards nearly so, one "
-               "probability band 3.2 points off against a 3-point limit -- so they are not guesses; they are "
-               "untested against the book. QB passing yards beat the naive baseline in both test seasons but two "
-               "probability bands miss by under a point, so they do not fully pass that test yet.)")
+               "line quotes the current graded record; labels can return only at the fixed reviews after weeks 8, 12 "
+               "and 18, and only if the current engine's weight beside the book is clearly above zero AND its top-tier "
+               "yardage calls made money at Sleeper's recorded prices, DECISIONS #151), so a gap between them is "
+               "information, not an edge -- and a big gap was usually the model missing something. At Sleeper's real "
+               "lines (2026 weeks 2-4) the engine's chance scored worse than the market's (log loss 0.717 against "
+               "0.692, DECISIONS #202): read the market's chance as the probability and the engine for the workload "
+               "a line needs. (Backtest on 2022-25 outcomes, at stand-in lines: receptions and receiving yards inside "
+               "the width bar, though their Over hits more often than the engine says -- receiving yards by about 3 "
+               "points; rushing and rushing + receiving too narrow in the tails; QB passing too wide, still so after "
+               "round 38. None is tested against the book's lines.)")
 TD_V0_RULE = ("This TD row is anytime_td_v0, the fallback (v1 could not run: no market implied total); it runs "
               "about 1.3 points low on average, so a gap in the book's favour is partly the model's.")
 NEW_TEAM_RULE = ("He changed teams: one or two games of new-team evidence, so the book knows his role better "
@@ -71,8 +74,10 @@ NEW_TEAM_RULE = ("He changed teams: one or two games of new-team evidence, so th
 TD_RULE = ("Anytime TD (anytime_td_v1, prototype): quote the model, the market and their blend -- no fair "
            "odds and no 'take it at' price; the gap that matters is the blend against the market.")
 PASS_YDS_RULE = ("QB passing yards (pass_yds_v0): his receivers' yards in the same simulation times a "
-                 "starter's usual share -- right on average and the right width on 2022-25, its edge over "
-                 "the no-shrinkage version early-season only (DECISIONS #105).")
+                 "starter's usual share, scaled by the team's implied points since round 38 (DECISIONS #199). On "
+                 "2022-25 the Over at the main line still leans with implied points at the extremes, and the range "
+                 "is too wide (11.9% of games outside the 80% range against a 17-23% bar), so its chances sit too "
+                 "close to 50%. Never compare his line with his receivers' lines added up (the scale acts on him alone).")
 
 
 class AskError(ValueError):

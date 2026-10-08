@@ -5,8 +5,9 @@ the users, my identity, the platform's injury designations, the week's
 matchups and the week's transactions. Everything else it does is NFL-wide.
 This class answers those seven from the Yahoo Fantasy API (access
 provisioned for Keefamania 2026-09-16) in the dict shapes Sleeper returns,
-so waivers, lineup, injuries, scout and trade watch run for a Yahoo league
-without a branch anywhere downstream.
+so the fantasy commands (and, until its retirement on 2026-10-08, DECISIONS
+#212, the cron stack's waivers, lineup, injuries, scout and trade watch) run
+for a Yahoo league without a branch anywhere downstream.
 
 The shapes, and where each field comes from:
 
@@ -35,7 +36,7 @@ import logging
 import time
 from datetime import datetime
 
-from draftkit.ids import NameIndex
+from core.ids import NameIndex
 from draftkit.sleeper import IdentityError, SleeperClient
 
 from . import yahoo as yahoo_mod

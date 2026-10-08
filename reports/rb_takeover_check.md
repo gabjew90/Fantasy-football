@@ -63,3 +63,5 @@ What this does not say: whether the BOOK also lags (the journal decides), or how
 the carry gap turns into yards. A model fix (moving carry share by the change, as round
 23 does for receivers' target share) is a separate, pre-registered tuning round,
 because it would move prices.
+
+*Computed by props/tools/rb_takeover_check.py, deleted 2026-10-08 (DECISIONS #211); the code is in git history at 97a3173.*

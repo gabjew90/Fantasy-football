@@ -1,27 +1,20 @@
-# draftkit — draft prep, live draft engine, in-season auto-manager
+# fantasy-football — the draft kit, the fantasy and props engines, and the chat skill
 
 Multi-league since 2026-08-29: `config.yaml` holds globals, every league fact
 lives in `leagues/<name>.yaml` (`--league <name>` / `DRAFTKIT_LEAGUE`).
 Leagues on file: **Omnibeta Degens** (Sleeper, 12-team full PPR, 2 FLEX,
 drafted 2026-08-23) and **Keefamania** (Yahoo, 10-team half PPR, 1 FLEX,
-draft Sat 2026-09-05 — see `docs/draft-day-runbook.md`). Decisions and their
+drafted 2026-09-05 — the procedure, now historical, is `docs/draft-day-runbook.md`). Decisions and their
 evidence live in `DECISIONS.md`; this README is the map, not the record.
 
-> **Scheduled fantasy notifications are OFF since 2026-09-25** (the user's call,
-> DECISIONS #109): `weekly.yml` and `gate.yml` run only when dispatched by hand;
-> fantasy questions go through chat (`nfl fantasy ...`). Props capture and
-> grading (`props.yml`) still run on their schedule. What follows describes
-> the schedule as it ran, and is what restoring it would bring back.
+> **The in-season auto-manager's cron stack is retired (2026-10-08, DECISIONS
+> #212).** It had no schedule since 2026-09-25 (DECISIONS #109) and
+> duplicated the fantasy commands: use `nfl fantasy ...` (lineup, waiver,
+> trade, scenario), through chat or `python nfl.py fantasy --help`. Props
+> capture and grading (`props.yml`) still run on their schedule. `manager/`
+> keeps only the Yahoo and consensus layer the fantasy commands import, and
+> `python -m manager --league keefamania yahoo-sync` (`scripts/YAHOO SYNC.bat`).
 >
-> **In-season cadence (draft complete 2026-08-23 — finished #1 of 12 on the board):**
-> The auto-manager runs on GitHub Actions (`.github/workflows/weekly.yml`, hourly
-> since 2026-09-16 — GitHub's cron lag made fixed windows miss, DECISIONS #70) and
-> delivers as GitHub Issues. Pacific time, first tick after: **Monday 5:30 AM**
-> planner, **Tuesday 3:30 PM** waiver brief (deadline 6:45), **Friday 11:30 AM**
-> scout, **Sunday 6 AM** lineup backstop (deadline 9:45), daily 7:30 AM healthcheck.
-> Both leagues: Sleeper directly, Yahoo through its API since 2026-09-16
-> (`manager/yahoo_context.py`; `python -m manager --league keefamania --dry-run --module all`).
-> Deep research passes stay ad hoc: briefs flag names; ping Claude to verify facts.
 > 5. Weekly projections auto-detect Sleeper publish state; until live they fall back to
 >    season proj ÷ 16 with a visible banner. The matchup adjustment activates from
 >    week 3 data (cap in config.yaml `inseason:`).
@@ -134,7 +127,7 @@ Where I deviated, and why:
 ## Testing
 
 ```bash
-python -m pytest tests/          # snake math, needs, tiering, scoring, ID matching
+venv/Scripts/python.exe -m pytest tests props/tests props/tests_ci -q   # the full suite (must pass before a merge; ~4 min)
 python -m draftkit simulate --slot 6   # full-draft dry run through the real tracker code
 ```
 
@@ -142,50 +135,46 @@ python -m draftkit simulate --slot 6   # full-draft dry run through the real tra
 
 - Sleeper leagues launch draft day with `scripts/DRAFT DAY.bat`; Yahoo leagues follow `docs/draft-day-runbook.md` (bridge server + in-page driver).
 - `git config core.hooksPath .githooks` is required once per clone: the pre-commit hook is the guard that keeps `state/*.json` commits and code commits apart.
-- `scripts/SEASON BRIEFS.bat` and `scripts/ADP DIFF.bat` are run by Windows scheduled tasks on the laptop, not by the repo. SEASON BRIEFS duplicates what the GitHub Actions manager already delivers and is a candidate for retirement — that decision is owed to the user; neither task has been touched.
+- `scripts/SEASON BRIEFS.bat` and `scripts/ADP DIFF.bat` are run by Windows scheduled tasks on the laptop, not by the repo. SEASON BRIEFS (`python -m draftkit` briefs) overlaps the `nfl fantasy` commands and is a candidate for retirement — that decision is owed to the user; neither task has been touched. `scripts/YAHOO SYNC.bat` (also a scheduled task) keeps the committed Yahoo copy the fantasy commands read on a host without Yahoo credentials; `scripts/VEGAS REFRESH.bat` was deleted with the cron stack (DECISIONS #212), so its scheduled task, if still registered, has nothing to run.
 
-Repo layout: `draftkit/` (pipeline + tracker modules), `manager/` (in-season
-auto-manager, GitHub Actions, state in `state/*.json`), `scripts/` (the Yahoo
+Repo layout: `nfl.py` (the one CLI chat runs: `nfl.py fantasy ...` and
+`nfl.py props ...`), `CHAT.md` (the chat contract), `core/` (the one data
+layer -- fetch, IDs, scoring, the model registry -- and the props question
+tools), `fantasy/` (the in-season fantasy commands: player, swap, roster,
+lineup, waiver, trade, scenario), `props/` (the props engine in
+`props/engine/`, its historical record and the bet journal; see
+`props/README.md`), `skill/` (the chat skill's release files, lock and
+build), `draftkit/` (pipeline + tracker modules), `manager/` (the Yahoo
+and consensus layer under `fantasy/`, state in `state/`), `scripts/` (the Yahoo
 draft rig — bridge server, in-page driver, pre-rank driver — and the
-validation harness: replays, backtest, gates), `leagues/*.yaml` (league
-facts), `config.yaml` (globals only), `tests/`, `data/raw` (API caches,
-gitignored), `data/processed` (intermediates, gitignored), `tiers*.csv` +
-`board*.md` (deliverables, committed), `reports/` (generated artifacts),
-`DECISIONS.md` (the record).
+validation harness: replays, backtest, gates), `experiments/` (one-off
+studies, outputs gitignored, promoted or deleted within 30 days),
+`leagues/*.yaml` (league facts), `config.yaml` (globals only), `tests/`,
+`data/raw` (API caches, gitignored), `data/processed` (intermediates,
+gitignored), `tiers*.csv` + `board*.md` (deliverables, committed),
+`reports/` (generated artifacts), `docs/` (plans and runbooks;
+`docs/archive/` is history), `DECISIONS.md` (the record).
 
-## Auto-manager (in-season, notification-only)
+## Auto-manager (retired 2026-10-08)
 
-Watches the league so you don't watch football. Never writes to Sleeper.
-Runtime is GitHub Actions — no servers, no resident process.
+The in-season auto-manager's cron stack -- `weekly.yml` (planner, waiver
+brief, scout, lineup backstop, healthcheck), `gate.yml` (the 15-minute check
+gate) and the `python -m manager gate / cron / --module` entrypoints, with the
+GitHub-Issue delivery behind them -- was retired on 2026-10-08 (DECISIONS
+#212, the user's call). It had run only when dispatched by hand since
+2026-09-25 (DECISIONS #109), and the fantasy commands answer the same
+questions: use `nfl fantasy ...` (`lineup`, `waiver`, `trade`, `scenario`).
+The last commit with the cron stack is b2341d3; git history is the undo.
+
+What stays in `manager/` is what the fantasy commands import: the Yahoo API
+client, sync and league source (`yahoo_api`, `yahoo_sync`, `yahoo_context`,
+`yahoo`), the league context (`context`), the rest-of-season consensus and
+FantasyPros feeds (`consensus`, `fantasypros`), the state store and the
+decision ledger (`store`, `ledger`, `provenance`). The trade radar and its
+pricing (`trade_radar`, `marginal`, `market`, `ecr`, `waiver_brief`, `faab`,
+`usage`, `age_decay`) went with it: no trade search is needed (the user's
+call); `nfl fantasy trade` scores a named trade. One entrypoint is left:
 
 ```
-python -m manager --dry-run --module all   # full pipeline vs live data, stdout
-python -m manager cron --job waivers       # force one weekly job
-python -m manager gate                     # one gate tick (reads state/week_plan.json)
+python -m manager --league keefamania yahoo-sync   # pull Yahoo into state/keefamania/yahoo/
 ```
-
-**Setup: zero secrets.** Delivery is GitHub Issues: github-actions[bot]
-opens an issue titled with the alert and @mentions you — GitHub notifies via
-email and app push. Optional secrets: `ODDS_API_KEY` (Vegas tilts) and
-`SMTP_USER`/`SMTP_APP_PASSWORD`/`ALERT_EMAIL_TO` (only used when no
-GITHUB_TOKEN, e.g. running locally). Dispatch `weekly` with job `plan` from
-the Actions tab: it opens the week-plan issue and commits
-`state/week_plan.json`; the `gate` workflow executes the plan's checks every
-15 minutes inside decision windows. For lock-screen alerts install the
-GitHub mobile app and allow notifications.
-
-- **weekly.yml** — Mon 6 AM PT planner, Tue 4 PM PT waiver brief (bids due
-  7 PM PT), Fri noon scout, Sun 7 AM lineup backstop, daily 8 AM healthcheck.
-  Each PT event has both possible UTC crons (DST) with a Pacific guard inside.
-- **gate.yml** — every 15 min; a stdlib window guard against
-  `state/gate_hours.json` makes off-window ticks exit in seconds. Checks are
-  due at target − 10 min and eligible ~45 min, so late/skipped crons are
-  absorbed; done flags + content-hash email idempotency prevent double sends.
-- **notify.yml** — opens an `[ACT NOW]` issue when any workflow goes red.
-  Silence past 9 AM PT with no red-run issue = schedules died; debug from the
-  Actions tab.
-- Issue titles are decision-sufficient from the lock screen: `[ACT NOW]
-  Warren OUT — start Harvey — locks in 74 min`. Updates are comments on the
-  same issue (one thread, one notification stream per event).
-- **Manual run:** Actions tab → weekly → Run workflow → pick a job. Every
-  workflow has `workflow_dispatch`. State commits are the durable run log.

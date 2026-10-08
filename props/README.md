@@ -9,10 +9,14 @@ imports `draftkit` or `manager`.
 
 ## Why it exists
 
-The model behind these calls has been backtested against 2025 outcomes for
-receptions and receiving yards. It has **never** been tested against real
-sportsbook prices. Nothing here is a validated betting edge, and a positive
-estimated edge is not evidence of one. The only thing that can settle the
+The model behind these calls is backtested against 2022-25 outcomes on its
+five markets -- receptions, receiving yards, non-QB rushing yards, rushing +
+receiving yards and QB passing yards (the yardage harness and the current-
+settings check, reports/current_settings_check_2026-10-06.md). Against real
+sportsbook prices it has only the live record: over 2026 weeks 2-4 at Sleeper's
+lines its log loss was 0.717 against the market's 0.692 (DECISIONS #202).
+Nothing here is a validated betting edge, and a positive estimated edge is not
+evidence of one. The only thing that can settle the
 question is a record: every call, the price it was made at, where the line
 closed, and what actually happened.
 
@@ -30,13 +34,24 @@ props/
   record_run.py      files a scorer run's artifacts into the record
   settle.py          grades recorded calls against nflverse outcomes
   scorecard.py       calibration, tier validity and CLV rollups
+  calls.py           what counts as one call (settle and scorecard import it)
+  blend.py           the model's weight beside the book from settled calls (the label gate, DECISIONS #144/#151; the TD blend, shadow)
+  compare.py         Sleeper against DraftKings/FanDuel, one snapshot per game (DECISIONS #147)
+  journal.py         the bet journal: the user's own bets, graded by the Tuesday settle
+  engine_version.py  engine_hash / price_hash, the lock, the price map
   persist.py         append-and-dedupe record writer, three declared modes
+  journal/           the bet journal (committed): <season>.jsonl
   record/            the historical record (committed)
     predictions/<season>/wk<NN>.jsonl
     lines/<season>/line_archive_<season>.jsonl
     settled/<season>/settled_<season>.csv
-    scorecard.md
-  tests/             boundary and hygiene tests
+    joint/<season>/wk<NN>.jsonl        layer-3 joint TD prices (shadow)
+    compare/<season>/wk<NN>.jsonl      the DraftKings/FanDuel snapshots
+    model_weight.json                  the label gate's fitted weight and next review
+    scorecard.md, scorecard.csv
+  tools/             one-off harness tools (round selectors, scoreboard, paired CRPS, LOSO)
+  tests/             boundary, hygiene and record tests (run before every capture)
+  tests_ci/          the offline end-to-end report render (pull requests only)
 ```
 
 `engine/resources/credential.env` is **not** vendored. This repo is public. The
@@ -78,7 +93,8 @@ to LF, paths sorted bytewise, with `resources/credential.env` and build caches
 excluded. That definition is what lets three copies of the same engine agree —
 this repo's CRLF checkout, the LF tree on an Actions runner, and the installed
 Claude skill, which carries the credential file the public repo must not.
-Verified on all three: `911a3de4…`.
+Verified on all three at props-v1.0 (an example: that release's hash was
+`911a3de4…`; every release has its own, in `engine.lock.json`).
 
 `engine_tag` is the release name from `engine.lock.json`, attached **only**
 when the computed hash matches the lock. An edited engine still records rows;
@@ -148,7 +164,7 @@ context columns and nothing else.
 ## Running it
 
 ```bash
-# score a game and file the result (chat container or laptop)
+# score a game and file the result (a laptop or the workflow; chat never files)
 python props/engine/scripts/score_game.py --away MIA --home SF --season 2026 --week 2
 python props/record_run.py --dir /mnt/user-data/outputs --snapshot-type decision
 
@@ -220,8 +236,9 @@ here.
 ## The workflow
 
 `.github/workflows/props.yml` runs on its own concurrency group
-(`props-record`) and touches only `props/`, so it cannot collide with the
-fantasy workflows on `manager-state`. A 15-minute tick hits `guard.py` first,
+(`props-record`) and touches only `props/`; it is the repo's only scheduled
+workflow since the fantasy cron stack was retired (2026-10-08, DECISIONS
+#212). A 15-minute tick hits `guard.py` first,
 which installs nothing and exits in under a second unless there is work.
 
 | Window | When | Snapshot |
@@ -229,7 +246,7 @@ which installs nothing and exits in under a second unless there is work.
 | open | Thursday 22:00–24:00 UTC, once per ISO week | `open` |
 | capture | a kickoff within six hours | `decision` |
 | capture | a kickoff within 60 minutes | `close` |
-| settle | Tuesday 14:00–16:00 UTC, once per ISO week | grades the week |
+| settle | from Tuesday 14:00 UTC until it has run, through Thursday 12:00 UTC, once per ISO week (a due capture takes the tick first) | grades the week |
 
 The windows are hours wide because GitHub fires these crons a median 128
 minutes late (DECISIONS #70); a marker in the Actions cache is what stops the

@@ -49,7 +49,7 @@ def leakage_rows(df: pl.DataFrame, kickoff: str = KICKOFF) -> pl.DataFrame:
 def build(league: str) -> pl.DataFrame:
     from draftkit import external as X
     from draftkit.config import Config
-    from draftkit.ids import SleeperIndex, load_id_map
+    from core.ids import SleeperIndex, load_id_map
     from draftkit.sleeper import SleeperClient
     cfg = Config.load(league=league)
     scoring = {k: float(v) for k, v in (cfg.get("scoring") or cfg["expected"]["scoring"]).items()}
@@ -92,7 +92,7 @@ def score(league: str, path: Path) -> int:
     import nflreadpy as nfl
     from draftkit.config import Config
     from draftkit.dataset import scoring_from_cfg
-    from draftkit.ids import load_id_map
+    from core.ids import load_id_map
     from projection_backtest import season_actuals
     cfg = Config.load(league=league)
     df = pl.read_csv(path, infer_schema_length=10000)

@@ -55,7 +55,7 @@ sys.path.insert(0, str(ROOT))
 from draftkit.config import Config, _deep_merge  # noqa: E402
 from draftkit.consensus import adp_key  # noqa: E402
 from draftkit.dataset import build_usage, fantasy_points_expr, scoring_from_cfg  # noqa: E402
-from draftkit.ids import SleeperIndex, load_id_map  # noqa: E402
+from core.ids import SleeperIndex, load_id_map  # noqa: E402
 from core.scoring import score  # noqa: E402
 from draftkit.market import _attach_sleeper_ids, load_ffc_adp  # noqa: E402
 from draftkit.projections import default_projection  # noqa: E402

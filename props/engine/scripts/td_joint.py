@@ -53,8 +53,6 @@ R_PROVISIONAL = 0.43
 DIRICHLET_C = 100.0
 # The committed gate output: which parlay classes are open and each one's model.
 GATE_FILE = "td_parlay_gate.json"
-STRUCTURES = {"joint": ("plain", False), "joint + mix shift": ("shift", False),
-              "joint + mix shift + copula": ("shift", True), "joint + copula": ("plain", True)}
 CH = list(T.OFFENSIVE)
 _GH_Z, _GH_W = np.polynomial.hermite_e.hermegauss(40)     # nodes/weights for a standard normal
 _GH_W = _GH_W / _GH_W.sum()

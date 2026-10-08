@@ -129,7 +129,7 @@ names a week.
 | set my lineup / who to start this week, the whole matchup | `nfl.py fantasy lineup --league L` |
 | is X's prop any good / what does the model think of X | `nfl.py props player "X"` (finds and prices his game) |
 | X over / under N (any line, alternate lines) | `nfl.py props line "X" "rec yds" N` (catches, rec yds, rush yds, pass yds) |
-| best bets in a game / this week / a must-win pick | `nfl.py props best AWAY@HOME`, `--slate`, `--slate --survival` |
+| best bets in a game / this week / a must-win pick | `nfl.py props best AWAY@HOME`, `--slate` (no pick either way: say why, then give the research rows) |
 | how does the game project | `nfl.py props matchup AWAY@HOME` |
 | a full breakdown of a game / the slate | `nfl.py status`, then **Props** below (the engine's full guide) |
 | waiver targets at RB / WR / TE | `nfl.py fantasy waiver --league L --pos RB,WR --horizon H` |
@@ -231,16 +231,19 @@ print.
 The props engine's own contract governs the SUBSTANCE of a props answer --
 markets, the research table, the credential order, and its honesty rules.
 The board is a RESEARCH SHEET, not a bet list (DECISIONS #142): the model
-has not shown it adds anything beside the book's price (weeks 2-3: its STRONG
-calls won 45%), and the report's first line quotes the current graded record
+has not shown it adds anything beside the book's price (at Sleeper's real lines
+over weeks 2-4 its log loss was 0.717 against the market's 0.692, DECISIONS #202), and the report's first line quotes the current graded record
 and the label gate (DECISIONS #144, #151: decided at the week 8/12/18 reviews, on weight beside the book and profit at Sleeper's prices). So no answer calls a line a play, a lean, an edge or a value,
 and none quotes EV, Kelly or a stake. What a props answer gives instead: the
 line and both prices, our projection, the Over by the model and by the book,
 what the line implies (the targets or carries at which it is a fair 50/50,
-next to what he has been getting), the workload each side needs to beat its
-own price ("if the model's numbers are right, the Over pays above 7.5
-targets" -- conditional, never a pick: it says how much role a view needs, not
-that the view is right), last game's usage, and the flags. The
+next to what he has been getting), in the research table only the workload
+each side needs to beat its own price ("if the model's numbers are right, the
+Over pays above 7.5 targets" -- conditional, never a pick: it says how much
+role a view needs, not that the view is right; the player cards dropped this
+price-based check, because a Power Play leg's price is not its break-even,
+DECISIONS #208), the card's volume chance at each efficiency, last game's
+usage, and the flags. The
 VOICE is this file's.
 
 A narrower question ("is the Kelce over any good?", "chance he gets 60
@@ -386,7 +389,7 @@ reach the call. The reply mentions the parts that decide it, not all of them.
   gate, input freshness, setup facts -- never credentials). Do not mention it
   unless a command failed or the user asks about what ran; then summarize from
   it, and attach it only if asked.
-- **Chat transcript (temporary, while `session_log: true` in config.yaml).**
+- **Chat transcript (while `session_log: true` in config.yaml, which is permanent).**
   Before sending each reply, append one entry to `$NFL_OUT/chat_transcript.md`
   -- the user reviews it with Claude Code to check the data, the logic and the
   answers:
@@ -432,9 +435,12 @@ reach the call. The reply mentions the parts that decide it, not all of them.
 ## Chat is read-only
 
 Chat never passes `--record`, never commits, pushes or opens issues, and never
-writes into the repository. The graded ledger and the betting record are
-written only by the scheduled workflows. Report files in the outputs folder
-are reference copies for the conversation.
+writes into the repository. The fantasy graded ledger fills only from an
+explicit `--record` run, and no workflow schedules one (the fantasy schedules
+are off since DECISIONS #109). The props record and the bet journal's grading
+are written by the scheduled props workflow (`.github/workflows/props.yml`);
+journal entries are added in a Claude Code session. Report files in the
+outputs folder are reference copies for the conversation.
 
 ## Credentials
 
