@@ -86,8 +86,10 @@ LOCK_PATH = HERE / "engine.lock.json"
 PRICE_MAP_PATH = HERE / "engine_prices.json"
 
 # `credential.env` lives only in the installed skill -- this repo is public.
-# The caches are build output. Neither is the engine.
-EXCLUDE_DIRS = {"__pycache__", "backtest_out"}
+# The caches are build output. Neither is the engine. `cache` is odds_client's response cache,
+# written inside scripts/ by any run that reaches The Odds API: without it here a run changed the
+# hash of the engine that ran (found 2026-10-08, DECISIONS #220).
+EXCLUDE_DIRS = {"__pycache__", "backtest_out", "cache"}
 EXCLUDE_SUFFIXES = {".pyc", ".pyo", ".env", ".pkl", ".tmp"}
 
 
