@@ -8276,3 +8276,16 @@ every row while the predictions rows carry open / decision / close (line_archive
   separate agent before delivery; SKILL.md / CHAT.md: every volume x efficiency is shown worked
   and checked, usage claims come from the player's own rows, injuries follow section 4.
 - **No price moves.**
+
+## 2026-10-08 (216) -- section 7's defensive starters read the depth chart's own spots
+
+- **Found** testing the skill on TNF (nfl-v1.58): section 7 named only Winfield of the five
+  Out defenders. Morrison (TB RCB, rank 1) and Overshown (DAL LILB, rank 1) are starters and were
+  dropped; Dennis, Nelson and Durant are rank 2 and rightly left out.
+- **Root cause (code):** the starters filter matched the depth chart's `pos_abb` against the injury
+  report's positions (DEF_POS: CB, LB, DE...). The depth chart names spots by side (RCB, LILB, LDE,
+  NB...), so only FS / SS / MLB / NT ever matched. **Process:** #215's test built its depth chart
+  with the report's codes, never the feed's real ones, so it could not see the mismatch.
+- **Fix:** `research.def_starters` over DEPTH_DEF_SPOTS, the 15 defensive spots in the 2026 feed;
+  the test uses those exact codes (plus a rank-2, an older snapshot, a QB and a kicker).
+- **No price moves:** the DAL@HOU fixture's CSVs are byte-identical; the report gains the row.

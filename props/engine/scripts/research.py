@@ -1009,6 +1009,21 @@ def defense_line(dm, teams, verb="allows") -> str | None:
 # Modelled on the user's TB at DAL brief: each section a small table the narrative then
 # interprets. Context only: nothing below is a price input.
 DEF_POS = {"DE", "DT", "NT", "DL", "LB", "ILB", "OLB", "MLB", "CB", "S", "SS", "FS", "DB"}
+# the depth chart names defensive SPOTS by side, not the report's positions: matching it against
+# DEF_POS kept only FS / SS / MLB / NT and dropped every corner, end, tackle and outside backer
+# (TNF week 5: Morrison RCB and Overshown LILB, both rank 1, missing from section 7)
+DEPTH_DEF_SPOTS = {"LDE", "RDE", "LDT", "RDT", "NT", "LILB", "RILB", "MLB", "SLB", "WLB",
+                   "LCB", "RCB", "NB", "FS", "SS"}
+
+
+def def_starters(dcf) -> set:
+    """{(team, gsis_id)}: the first player at each defensive spot in each team's latest depth-chart
+    snapshot (`dt` already parsed). Section 7 names an Out or Doubtful defender only if he is one."""
+    if dcf is None or not len(dcf) or not {"team", "gsis_id", "pos_abb", "pos_rank", "dt"}.issubset(dcf.columns):
+        return set()
+    last = dcf[dcf.dt == dcf.groupby("team").dt.transform("max")]
+    st = last[last.pos_abb.astype(str).str.upper().isin(DEPTH_DEF_SPOTS) & (last.pos_rank == 1)]
+    return {(str(t), str(g)) for t, g in zip(st.team, st.gsis_id) if isinstance(g, str)}
 SCORE_EPA_WEIGHT = 2 / 3         # the unit score: two parts EPA per play, one part success rate
 
 
