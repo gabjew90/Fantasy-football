@@ -1,29 +1,25 @@
-"""Publish a game read in three versions from ONE run and ONE set of written reads (DECISIONS #217).
+"""Publish a game read from ONE run and ONE written reads file (DECISIONS #217, #218).
 
     python publish.py --run OUT/run_2026_wk05_TB_DAL.json --reads reads.json --out OUT
                       [--which qa,agent] [--release-tag T --release-hash H --release-source S]
                       [--check-only] [--no-ci]
 
 The run file is what score_game.py writes beside its report (write_run_export): every card's
-numbers, section 4's players, section 7's gaps, the sources table. The reads file is what chat
-writes: a game thesis and, per leg, the condition, the case, how it fails, the volume x efficiency
-it needs and every number it cites (schema: resources/agent_guide.md, "The reads file").
+numbers, the team brief's tables as data, section 4's players, section 7's gaps, the sources. The
+reads file is what chat writes, in the structure of the user's report guide
+(docs/plans/2026-10-08-report-format-design.md; schema in resources/agent_guide.md): the opening
+read, a narration per team section, the personnel rows, the assumptions and the handoff; and per
+player the workload basis, the explanation, the role evidence, the matchup verdict, and per leg
+the condition, the failure, the alternative, the volume x efficiency it needs and its cites.
 
-THE CHECK RUNS FIRST. Every leg must be on the board at its side and line; every volume x
-efficiency is recomputed against the whole number the Over needs; every cited number must be the
-run's at the precision written; every number in the prose must trace to a cite, a need or the line;
-injuries must match section 4; betting words and "the probability" are refused. A failed check
-renders nothing: the failures print (exit 3) for chat to fix. Judgment -- whether a condition is
-plausible -- is not machine-checked; the QA version lists it for the human reviewer.
-
-Outputs (in --out): <slug>_qa.md (the QA/QC version, for chat and internal reviewers) and
-<slug>_agent.md (the whole pipeline for another LLM agent). The external PDF comes with the
-user's format guide. Informational only: nothing here reads or moves a price.
+THE CHECK RUNS FIRST (publish.check). A failed check renders nothing: the failures print (exit 3)
+for chat to fix. Judgment -- whether a condition is plausible -- is not machine-checked; the QA
+version leaves it to the reviewer. The renders are in publish_render.py. Informational only:
+nothing here reads or moves a price.
 """
 from __future__ import annotations
 
 import argparse
-import datetime as dt
 import json
 import math
 import re
@@ -33,7 +29,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 ENGINE = HERE.parent
 REPO_URL = "https://github.com/gabjew90/Fantasy-football"
-READS_VERSION = 1
+READS_VERSION = 2
 
 MARKET_ALIASES = {
     "receptions": "player_receptions", "catches": "player_receptions",
@@ -45,6 +41,12 @@ MARKET_ALIASES = {
 MARKET_WORDS = {"player_receptions": "receptions", "player_reception_yds": "receiving yards",
                 "player_rush_yds": "rushing yards", "player_rush_reception_yds": "rushing + receiving yards",
                 "player_pass_yds": "passing yards"}
+MARKET_ORDER = ("player_pass_yds", "player_receptions", "player_reception_yds", "player_rush_yds",
+                "player_rush_reception_yds")
+# the guide's player sections: each player once, in his main market's section (user, 2026-10-08)
+SECTIONS = ("Passing", "Receiving", "Rushing and combined yards")
+SECTION_OF_POS = {"QB": "Passing", "WR": "Receiving", "TE": "Receiving", "RB": "Rushing and combined yards",
+                  "FB": "Rushing and combined yards", "HB": "Rushing and combined yards"}
 # row aliases: a cite's field -> (where, key); "row" is the leg's research row, "cells" its volume cells
 ROW_ALIASES = {"market_p": ("row", "p_over_book"), "engine_p": ("row", "p_over_model"), "push": ("row", "p_push"),
                "price_over": ("row", "price_over"), "price_under": ("row", "price_under"),
@@ -73,12 +75,16 @@ BANNED = [
      "telling the reader which side to take"),
     (re.compile(r"\b(i|we)('d| would| really)? (like|love)\b", re.I), "a preference stated as a pick"),
 ]
+# the card's verdict words, by definition (the user, 2026-10-08): never chosen by the writer
+VERDICTS = ("attainable", "requires a rebound", "requires better gains", "requires more work than the engine expects")
 # spans whose numbers are labels, not claims
 EXEMPT = [re.compile(p, re.I) for p in (
     r"\bweeks? \d+(?:\s*(?:-|–|to|and)\s*\d+)?", r"\b20\d\d\b", r"\b\d+(?:st|nd|rd|th)\b",
     r"\b80% range\b", r"\b\d+-leg\b", r"\b(?:WR|RB|TE|QB)\d\b", r"\b\d+x\b")]
 NUM = re.compile(r"(?<![\w.])(\d+(?:\.\d+)?)(%?)(?![\w])")
-TEXT_FIELDS = ("condition", "case", "fails")
+LEG_TEXT = ("if", "fails", "else")
+PLAYER_TEXT = ("basis", "explanation", "role_evidence", "matchup_reason")
+GAME_TEXT = ("opening", "market_read", "workload_read", "personnel_read", "allowed_read", "handoff")
 
 
 class ReadsError(ValueError):
@@ -94,26 +100,57 @@ def load_run(path) -> dict:
 
 
 def load_reads(path) -> dict:
-    reads = json.loads(Path(path).read_text(encoding="utf-8-sig"))
+    """The reads file, validated, with its legs flattened (each leg carries its player's name)."""
+    return validate(json.loads(Path(path).read_text(encoding="utf-8-sig")))
+
+
+def validate(reads: dict) -> dict:
+    """A reads dict as the schema says, or ReadsError; returns a copy whose legs are flattened."""
+    reads = json.loads(json.dumps(reads))
     if reads.get("reads_version") != READS_VERSION:
-        raise ReadsError(f"reads_version must be {READS_VERSION}")
-    if not isinstance(reads.get("legs"), list) or not reads["legs"]:
-        raise ReadsError("reads need at least one leg")
-    for i, lg in enumerate(reads["legs"], 1):
-        miss = [k for k in ("player", "market", "side", "line", *TEXT_FIELDS) if lg.get(k) in (None, "")]
+        raise ReadsError(f"reads_version must be {READS_VERSION} (the report guide's structure)")
+    players = reads.get("players")
+    if not isinstance(players, list) or not players:
+        raise ReadsError("reads need at least one player")
+    for k in ("opening", "handoff"):
+        if not reads.get(k):
+            raise ReadsError(f"the reads need {k!r}")
+    if not isinstance(reads.get("assumptions"), list) or not 2 <= len(reads["assumptions"]) <= 3:
+        raise ReadsError("the reads need two or three assumptions worth testing")
+    legs = []
+    for pi, p in enumerate(players, 1):
+        if not p.get("player"):
+            raise ReadsError(f"player {pi}: missing player")
+        miss = [k for k in PLAYER_TEXT if not p.get(k)]
         if miss:
-            raise ReadsError(f"leg {i}: missing {', '.join(miss)}")
-        if str(lg["side"]).lower() not in ("over", "under"):
-            raise ReadsError(f"leg {i}: side must be over or under")
-        if market_key(lg["market"]) is None:
-            raise ReadsError(f"leg {i}: unknown market {lg['market']!r} (use one of {', '.join(sorted(MARKET_ALIASES))})")
-        for c in lg.get("cite") or []:
-            _valid_cite(c, f"leg {i}")
-        for n in lg.get("needs") or []:
-            if not isinstance(n.get("reaches"), bool):
-                raise ReadsError(f"leg {i}: every need says reaches true or false")
+            raise ReadsError(f"{p['player']}: missing {', '.join(miss)}")
+        if p.get("matchup") not in ("supports", "challenges"):
+            raise ReadsError(f"{p['player']}: matchup must be 'supports' or 'challenges'")
+        if not isinstance(p.get("legs"), list) or not p["legs"]:
+            raise ReadsError(f"{p['player']}: at least one leg")
+        for c in p.get("cite") or []:
+            _valid_cite(c, p["player"])
+        for lg in p["legs"]:
+            where = f"{p['player']} {lg.get('market')} {lg.get('line')}"
+            miss = [k for k in ("market", "side", "line", *LEG_TEXT) if lg.get(k) in (None, "")]
+            if miss:
+                raise ReadsError(f"{where}: missing {', '.join(miss)}")
+            if str(lg["side"]).lower() not in ("over", "under"):
+                raise ReadsError(f"{where}: side must be over or under")
+            if market_key(lg["market"]) is None:
+                raise ReadsError(f"{where}: unknown market {lg['market']!r} (use one of {', '.join(sorted(MARKET_ALIASES))})")
+            for c in lg.get("cite") or []:
+                _valid_cite(c, where)
+            for n in lg.get("needs") or []:
+                if not isinstance(n.get("reaches"), bool):
+                    raise ReadsError(f"{where}: every need says reaches true or false")
+            legs.append({**lg, "player": p["player"]})
     for c in reads.get("cite") or []:
         _valid_cite(c, "game")
+    for r in reads.get("personnel") or []:
+        if not r.get("player") or not r.get("status") or not r.get("changes") or not r.get("affects"):
+            raise ReadsError("each personnel row needs player, status, changes and affects")
+    reads["legs"] = legs
     return reads
 
 
@@ -146,9 +183,26 @@ def row_for(card, market, line):
     return (pref or rows)[0]
 
 
+def main_rows(card) -> list[dict]:
+    """The card's props: the first book's row per market, in the board's order."""
+    seen = {}
+    for r in sorted(card.get("rows") or [], key=lambda r: r.get("book") != card.get("book")):
+        seen.setdefault(r.get("market"), r)
+    return [seen[m] for m in MARKET_ORDER if m in seen]
+
+
 def cells_for(card, market):
     v = next((v for v in card.get("volume") or [] if v.get("market") == market), None)
     return (v or {}).get("cells")
+
+
+def volume_text(card, market):
+    v = next((v for v in card.get("volume") or [] if v.get("market") == market), None)
+    return (v or {}).get("volume_text")
+
+
+def section_of(card) -> str:
+    return SECTION_OF_POS.get(str(card.get("pos") or "").upper(), "Receiving")
 
 
 def resolve(path: str, run, card, row, cells):
@@ -179,6 +233,40 @@ def resolve(path: str, run, card, row, cells):
         else:
             return None
     return obj
+
+
+# ---------------------------------------------------------------- what the run computes for the card
+def last_volume(card, market):
+    """His last game's workload in the unit the market's volume counts: targets for receptions,
+    carries for rushing; None where the run does not carry it (catches, completions, touches)."""
+    u = card.get("usage") or {}
+    return {"player_receptions": u.get("tn"), "player_rush_yds": u.get("cn")}.get(market)
+
+
+def verdict(card, market) -> dict | None:
+    """The card's verdict word by its definition (the user, 2026-10-08), checked in this order:
+    - requires better gains: at the trimmed (or, for receptions, this season's) rate the line needs
+      more than the engine's projected workload, and only the engine's own rate clears at it;
+    - requires more work than the engine expects: no rate clears at the engine's workload;
+    - requires a rebound: the engine's workload clears, but the need is above his last game's;
+    - attainable: the need is at or below the engine's workload (and his last game's, if known)."""
+    c = cells_for(card, market)
+    if not c or not c.get("rows"):
+        return None
+    ref = "capped" if "capped" in c["rows"] else ("season" if "season" in c["rows"] else None)
+    if ref is None:
+        return None
+    need, proj = float(c["rows"][ref]["vol"]), float(c["proj"])
+    eng = c["rows"].get("engine")
+    last = last_volume(card, market)
+    if need > proj + 1e-9:
+        word = "requires better gains" if eng and float(eng["vol"]) <= proj + 1e-9 else VERDICTS[3]
+    elif last is not None and need > float(last) + 1e-9:
+        word = "requires a rebound"
+    else:
+        word = "attainable"
+    return {"word": word, "ref": ref, "need": need, "proj": proj, "last": last, "unit": c.get("unit"),
+            "vol_txt": c["rows"][ref]["vol_txt"], "rate_txt": c["rows"][ref]["rate_txt"], "pct": c["rows"][ref]["pct"]}
 
 
 # ---------------------------------------------------------------- number matching
@@ -222,151 +310,6 @@ def _fmt(x, pct=False):
     return f"{100 * x:.1f}%" if pct else (f"{x:g}" if float(x).is_integer() else f"{x:.3f}".rstrip("0"))
 
 
-# ---------------------------------------------------------------- the check
-def check(run, reads) -> list[dict]:
-    """Every mechanical check, one dict each: {leg, check, stated, run, ok, detail}. leg 0 is the
-    game (the thesis and its cites)."""
-    out = []
-
-    def add(leg, kind, stated, value, ok, detail=""):
-        out.append({"leg": leg, "check": kind, "stated": stated, "run": value, "ok": bool(ok), "detail": detail})
-
-    inj = {str(i.get("name", "")).lower(): i for i in run.get("injuries") or []}
-    game_ok_numbers = _game_numbers(run)
-    # ---- the game ----
-    for c in reads.get("cite") or []:
-        v = resolve(str(c.get("field")), run, {}, None, None)
-        ok = matches(c.get("value"), v)
-        add(0, "cite", f"{c.get('field')} = {c.get('value')}", _fmt(v), ok, "" if ok else "not the run's number")
-        if ok:
-            game_ok_numbers.append(float(v))
-    for kind, text in (("thesis", reads.get("thesis")), *(("note", n) for n in reads.get("notes") or [])):
-        _text_checks(add, 0, kind, text, game_ok_numbers, inj, [])
-    # ---- the legs ----
-    for i, lg in enumerate(reads["legs"], 1):
-        mk, line = market_key(lg["market"]), float(lg["line"])
-        card = card_for(run, lg["player"])
-        if card is None:
-            add(i, "on the board", lg["player"], "-", False, "no card for this player in the run (check the name)")
-            continue
-        row = row_for(card, mk, line)
-        if row is None:
-            have = sorted({f"{MARKET_WORDS.get(r['market'], r['market'])} {r['line']:g}" for r in card.get("rows") or []
-                           if r.get("market") and isinstance(r.get("line"), (int, float))})
-            add(i, "on the board", f"{MARKET_WORDS[mk]} {line:g}", "; ".join(have) or "no lines", False,
-                "not on the board at this line")
-            continue
-        add(i, "on the board", f"{lg['player']} {MARKET_WORDS[mk]} {lg['side']} {line:g}",
-            f"{row.get('book')} {row.get('line'):g}", True)
-        cells = cells_for(card, mk)
-        need_out = math.floor(line) + 1
-        allowed = [line, need_out]
-        rates = {k: r.get("rate") for k, r in ((cells or {}).get("rows") or {}).items()}
-        for n in lg.get("needs") or []:
-            parts = n.get("parts") or [[n.get("volume"), n.get("rate")]]
-            try:
-                parts = [(float(a), float(b)) for a, b in parts]
-            except (TypeError, ValueError):
-                add(i, "volume x efficiency", json.dumps(n), "-", False, "needs volume and rate numbers")
-                continue
-            total = sum(a * b for a, b in parts)
-            reaches = total >= need_out - 1e-9
-            stated = n.get("reaches")
-            txt = " + ".join(f"{a:g} x {b:g}" for a, b in parts) + f" = {total:.2f}"
-            add(i, "volume x efficiency", f"{txt}: {'reaches' if stated else 'short of'} {need_out}",
-                f"{'reaches' if reaches else 'short of'} {need_out}", stated is reaches,
-                "" if stated is reaches else "the read says the opposite of the arithmetic")
-            for a, b in parts:
-                allowed += [a, b, round(a * b, 1)]
-            if n.get("hypothetical"):
-                add(i, "rate source", " + ".join(f"{b:g}" for _a, b in parts), "hypothetical (labelled)", True)
-            else:
-                hit = [k for k, r in rates.items() if _rates_match([b for _a, b in parts], r)]
-                add(i, "rate source", " + ".join(f"{b:g}" for _a, b in parts), ", ".join(hit) or "not a card rate",
-                    bool(hit), "" if hit else ("the rate is not one of the card's rows (a carries + catches need lists "
-                                               "carries first); mark the need hypothetical or use a card rate"))
-                for k in hit:
-                    # the card's exact rate decides: a rounded rate must not flip the verdict
-                    exact = rates[k] if isinstance(rates[k], list) else [rates[k]]
-                    t_card = sum(a * float(r) for (a, _b), r in zip(parts, exact))
-                    if (t_card >= need_out - 1e-9) is not reaches:
-                        add(i, "rate rounding", txt, f"at the card's {k} rate: {t_card:.2f}, "
-                            f"{'reaches' if t_card >= need_out - 1e-9 else 'short of'} {need_out}", False,
-                            "the rounded rate flips the verdict; use the card's rate to more decimals")
-            allowed += [total, round(total, 1)]
-        for c in lg.get("cite") or []:
-            f = str(c.get("field"))
-            v = resolve(f, run, card, row, cells)
-            ok = matches(c.get("value"), v)
-            add(i, "cite", f"{f} = {c.get('value')}", _fmt(v), ok, "" if ok else "not the run's number")
-            if ok:
-                allowed.append(float(v))
-        for j in lg.get("injuries") or []:
-            nm = str(j.get("player", "")).lower()
-            have = inj.get(nm)
-            run_st = (have or {}).get("status") or ("practice only" if have and have.get("practice") else "not listed")
-            stated = str(j.get("status", "")).strip()
-            ok = stated.lower() == run_st.lower()
-            add(i, "injury", f"{j.get('player')}: {stated}", run_st, ok, "" if ok else "section 4 says otherwise")
-        cited_inj = {str(j.get("player", "")).lower() for j in lg.get("injuries") or []}
-        for k in TEXT_FIELDS:
-            _text_checks(add, i, k, lg.get(k), allowed + game_ok_numbers, inj, cited_inj)
-    return out
-
-
-def _rates_match(bs, r) -> bool:
-    """The need's rates against one card row's rate: one rate, or a carries + catches pair in that
-    order (yards a carry, then yards a catch). Catch rates within 0.005, yards within 0.05."""
-    if r is None:
-        return False
-    rs = r if isinstance(r, list) else [r]
-    return len(bs) == len(rs) and all(_close(b, x, 0.005 if float(x) <= 1 else 0.05) for b, x in zip(bs, rs))
-
-
-def _game_numbers(run):
-    me = run.get("market_env") or {}
-    nums = [me.get("total_line")]
-    if me.get("home_spread") is not None:
-        nums += [me["home_spread"], abs(me["home_spread"])]
-    for t in (run.get("teams") or {}).values():
-        nums += [t.get("implied_points"), t.get("targets"), t.get("carries")]
-    return [n for n in nums if n is not None]
-
-
-def _text_checks(add, leg, kind, text, allowed, inj, cited_inj):
-    if not text:
-        return
-    for rx, what in BANNED:
-        m = rx.search(text)
-        if m:
-            add(leg, "language", f"{kind}: '{m.group(0)}'", "-", False, f"{what} is not allowed: the board is a research sheet")
-    clean = text
-    for rx in EXEMPT:
-        clean = rx.sub(" ", clean)
-    for m in NUM.finditer(clean):
-        tok = m.group(1) + m.group(2)
-        ok = any(_num_ok(tok, a) for a in allowed)
-        if not ok:
-            add(leg, "number traced", f"{kind}: {tok}", "-", False,
-                "a number in the prose that no cite, need or line accounts for")
-    low = text.lower()
-    for nm, row in inj.items():
-        if not nm or nm in cited_inj:
-            continue
-        last = _last_name(nm)
-        named = nm in low or (last and re.search(rf"\b{re.escape(last)}\b", low))
-        if named:
-            add(leg, "injury named", f"{kind}: {row.get('name')}", row.get("status") or "practice only", False,
-                "the prose names a player on section 4 without an injuries entry to check it")
-
-
-def _last_name(nm: str) -> str | None:
-    """'jonathan mingo' -> 'mingo'; suffixes dropped; None when too short to search alone."""
-    parts = [p for p in re.split(r"\s+", nm.strip()) if p.strip(".") not in ("jr", "sr", "ii", "iii", "iv", "v")]
-    last = parts[-1].strip(".") if len(parts) > 1 else None
-    return last if last and len(last) >= 4 else None
-
-
 def _num_ok(tok, allowed):
     """A prose number against one allowed run value, units kept apart: '79%' traces only to a
     fraction (0.787), '9.2' only to a count or a yardage, never across. Within a unit the prose may
@@ -381,268 +324,266 @@ def _num_ok(tok, allowed):
     return not is_fraction and matches(tok, a)
 
 
-# ---------------------------------------------------------------- shared pieces
-def legs_resolved(run, reads):
-    for i, lg in enumerate(reads["legs"], 1):
-        mk = market_key(lg["market"])
-        card = card_for(run, lg["player"]) or {}
-        row = row_for(card, mk, float(lg["line"])) if card else None
-        yield i, lg, mk, card, row, cells_for(card, mk) if card else None
-
-
-def support_table(row, cells, side) -> list[str]:
-    """The leg's numbers, the card's rows in the card's words (research.prop_table's vocabulary)."""
-    if not row:
-        return ["*Not on the board in this run.*"]
-    pct = lambda v: "-" if v is None else f"{100 * float(v):.0f}%"
-    odds = lambda v: "-" if v is None else (f"+{int(v)}" if float(v) > 0 else f"{int(v)}")
-    L = ["| | |", "|---|---:|",
-         f"| Market's chance of the Over (the best available estimate) | **{pct(row.get('p_over_book'))}** |",
-         f"| Engine's chance of the Over | {pct(row.get('p_over_model'))} |",
-         f"| Price: Over / Under | {odds(row.get('price_over'))} / {odds(row.get('price_under'))} |",
-         f"| Engine's forecast: middle; 80% range | {_r0(row.get('median'))}; {_r0(row.get('p10'))}-{_r0(row.get('p90'))} |"]
-    if cells:
-        L.append(f"| The Over needs | {cells['need_out']} |")
-        L.append(f"| Engine's volume | {cells['proj']:.1f} {cells['unit']} |")
-    if row.get("market_volume") is not None:
-        L.append(f"| Market-implied volume (at the engine's efficiency) | {float(row['market_volume']):.1f} {row.get('unit') or ''} |")
-    for k, word in (("capped", "At his luck-capped rate"), ("season", "At his rate this season"),
-                    ("engine", "At the engine's rate")):
-        r = ((cells or {}).get("rows") or {}).get(k)
-        if r:
-            L.append(f"| {word} | {r['vol_txt']} at {r['rate_txt']} -> {pct(r['pct'])} |")
-    if cells and cells.get("market_row"):
-        L.append(f"| The market's own volume line | more than {cells['market_row'][0]:g} {cells['unit']} -> {pct(cells['market_row'][1])} |")
-    if cells and cells.get("need_txt"):
-        L.append(f"| At the engine's volume, the line needs | {cells['need_txt']} |")
-    if cells and cells.get("beat"):
-        L.append(f"| His games this season that beat that | {cells['beat'][0]} of {cells['beat'][1]} |")
-    if side == "under":
-        L.append("| The Under wins | below the line; on a whole-number line a result AT the line is a push |")
-    return L
-
-
-def _r0(v):
-    return "-" if v is None else f"{float(v):.0f}"
-
-
-def role_table(card) -> list[str]:
-    u = card.get("usage") or {}
-    if not u:
-        return []
-    pct = lambda v: "-" if v is None else f"{100 * float(v):.0f}%"
-    num = lambda v: "-" if v is None else f"{float(v):.1f}".rstrip("0").rstrip(".")
-    L = [f"| Role (week {u.get('week')} vs his {u.get('n_base')} games before) | Last game | Before |", "|---|---:|---:|"]
-    for k, word, f in (("snap", "Snap share", pct), ("ts", "Target share", pct), ("cs", "Carry share", pct),
-                       ("tn", "Targets", num), ("cn", "Carries", num)):
-        if u.get(k) is not None:
-            L.append(f"| {word} | {f(u.get(k))} | {f(u.get(k + '_base'))} |")
-    return L
-
-
-def checks_table(checks) -> list[str]:
-    L = ["| Check | The read says | The run says | Result |", "|---|---|---|---|"]
-    for c in checks:
-        res = "pass" if c["ok"] else f"**FAIL**: {c['detail']}"
-        L.append(f"| {c['check']} | {_esc(c['stated'])} | {_esc(c['run'])} | {res} |")
-    return L
-
-
-def cutoff(run) -> str:
-    """The report's data-cutoff line without its list-item label."""
-    return re.sub(r"^-?\s*\*\*Data cutoff:\*\*\s*", "", run.get("data_cutoff") or "") or "-"
-
-
-def _esc(s):
-    return str(s).replace("|", "/").replace("\n", " ")
-
-
-SECRET_PATTERNS = [re.compile(r"(?i)\b(api[_-]?key|apikey|access[_-]?token|token|secret|password|key)=[^&\s|)]+"),
-                   re.compile(r"(?<![0-9a-fA-F])[0-9a-f]{32}(?![0-9a-fA-F])")]
-
-
-def scrub(text: str) -> str:
-    """Key-shaped strings out of anything this writes: a query-string credential (apiKey=...) and a
-    bare 32-hex key (the Odds API's shape). The 64-hex release hash is left alone."""
-    text = SECRET_PATTERNS[0].sub(lambda m: m.group(1) + "=<redacted>", text)
-    return SECRET_PATTERNS[1].sub("<redacted>", text)
-
-
-# ---------------------------------------------------------------- the QA/QC version
-def render_qa(run, reads, checks, release, report_md: str | None = None) -> str:
-    """For chat and internal reviewers: the read as the external reader gets it, plus the backend
-    under each leg -- every number with its source field, every check, the inputs and their age."""
-    away, home, wk = run["away"], run["home"], run["week"]
-    n_fail = sum(not c["ok"] for c in checks)
+def game_numbers(run) -> list[float]:
+    """Every number the team brief's tables show (the frame a game narration may quote): the
+    spread, total, implied points, win chances and their openers; the workload columns; the unit
+    scores and ranks; the points allowed, their ranks, parts and the league averages."""
     me = run.get("market_env") or {}
-    L = [f"# {away} at {home}, week {wk}: QA/QC read", "",
-         f"Release **{release.get('tag') or 'unknown'}** ({str(release.get('hash') or '')[:12] or 'hash unknown'}, "
-         f"{release.get('source') or 'source unknown'}) · run `{run['slug']}` · kickoff {str(run.get('kickoff_utc'))[:16]} UTC "
-         f"({run.get('hours_to_kickoff') or 0:.1f} h after the run)", "",
-         f"**Checks: {len(checks) - n_fail} of {len(checks)} pass.**"
-         + ("" if not n_fail else f" {n_fail} FAIL: this read is not publishable until they are fixed."), "",
-         "Judgment is not machine-checked: whether each condition is plausible, and whether the case "
-         "follows from the evidence, is the reviewer's to judge (below, per leg).", "",
-         "## The game", "", reads.get("thesis") or "*No thesis written.*", "",
-         "| Frame | |", "|---|---|",
-         f"| Spread / total | {home} {me.get('home_spread'):+g} / {me.get('total_line'):g} ({me.get('book')}, {str(me.get('as_of'))[:16]} UTC) |"
-         if me.get("home_spread") is not None and me.get("total_line") is not None else "| Spread / total | not posted |"]
+    nums = []
+    for k in ("total_line", "open_total", "home_win_prob", "home_win_prob_open"):
+        if me.get(k) is not None:
+            nums.append(me[k])
+    for k in ("home_win_prob", "home_win_prob_open"):
+        if me.get(k) is not None:
+            nums.append(1 - me[k])
+    for k in ("home_spread", "open_home_spread"):
+        if me.get(k) is not None:
+            nums += [me[k], abs(me[k])]
+    if me.get("home_spread") is not None and me.get("open_home_spread") is not None:
+        nums.append(abs(me["home_spread"] - me["open_home_spread"]))
+    if me.get("total_line") is not None and me.get("open_total") is not None:
+        nums.append(abs(me["total_line"] - me["open_total"]))
+    tv = run.get("team_volume") or {}
     for t, e in (run.get("teams") or {}).items():
-        L.append(f"| {t} | implied {_fmt(e.get('implied_points'))} points; about {float(e.get('targets') or 0):.0f} throws, "
-                 f"{float(e.get('carries') or 0):.0f} runs, {float((e.get('pass_td') or 0) + (e.get('rush_td') or 0)):.1f} "
-                 f"offensive touchdowns (touchdowns {e.get('td_anchor')}-anchored) |")
-    game_checks = [c for c in checks if c["leg"] == 0]
-    L += ["", *(checks_table(game_checks) if game_checks else []), ""]
-    for i, lg, mk, card, row, cells in legs_resolved(run, reads):
-        L += [f"## Leg {i}: {lg['player']} {MARKET_WORDS.get(mk, mk)} {lg['side']} {float(lg['line']):g}", "",
-              f"**If** {lg['condition']}", "", f"**The case.** {lg['case']}", "", f"**How it fails.** {lg['fails']}", "",
-              *support_table(row, cells, str(lg["side"]).lower()), ""]
-        rt = role_table(card)
-        if rt:
-            L += [*rt, ""]
-        L += ["**Backend.**", ""]
-        if card:
-            L.append(f"- Card: {card.get('slot')}, {card.get('team')}; book {card.get('book')}, quote {card.get('quoted')}.")
-            for k in ("capped", "season", "engine"):
-                r = ((cells or {}).get("rows") or {}).get(k)
-                if r and r.get("label"):
-                    L.append(f"- The {k} rate's window: {r['label']} (rate {_fmt(r.get('rate'))}).")
-            if cells and cells.get("note"):
-                L.append(f"- Measured calibration for this market: {cells['note']}")
-            if card.get("watch"):
-                L.append("- The engine's flags: " + "; ".join(card["watch"]) + ".")
-            if card.get("matchup"):
-                L.append(f"- Matchup context: {card['matchup']}")
-        if row:
-            if row.get("implied") is not None:
-                L.append(f"- Line implies (the {row.get('unit') or 'volume'} at which this line is a coin flip): "
-                         f"{float(row['implied']):.1f}.")
-            if row.get("market_edge") in ("min", "max"):
-                L.append(f"- The market-implied search hit its {row['market_edge']} bound: the market's volume is outside it.")
-            if row.get("flags"):
-                L.append(f"- Research flags: {row['flags']}.")
-        L += ["", "**Checks for this leg.**", "", *checks_table([c for c in checks if c["leg"] == i]), "",
-              "**For the reviewer (not machine-checked):** is the condition something the evidence above makes "
-              "possible, and does the case argue from this player's own rows?", ""]
-    L += ["## Who plays (section 4)", ""]
-    for t, cells_ in (run.get("who_plays") or {}).items():
-        for unit, txt in cells_.items():
-            L.append(f"- **{t} {unit}:** {txt}")
-    L += ["", run.get("who_note") or "", "", "## Where the baseline could miss (section 7)", "",
-          "| Matchup issue | What the baseline may miss | Separate scenario |", "|---|---|---|",
-          *(f"| {_esc(a)} | {_esc(b)} | {_esc(c)} |" for a, b, c in run.get("gaps") or []), "",
-          "## Inputs and their state", "", "| Source | Used for | Status | Detail |", "|---|---|---|---|",
-          *(f"| {_esc(s['name'])} | {_esc(s['purpose'])} | {_esc(s['status'])} | {_esc(s['detail'])} |"
-            for s in run.get("sources") or []), "",
-          f"**Data cutoff:** {cutoff(run)}", "", "## Model states", "", run.get("model_states") or "-", ""]
-    if report_md:
-        L += ["## The engine's full report", "",
-              "The game read above is a selection. The engine's report for this run is the reference copy: "
-              f"`report_{run['slug']}.md`, in the same folder.", ""]
-    return "\n".join(L) + "\n"
+        nums += [e.get("implied_points"), e.get("targets"), e.get("carries"), e.get("market_runs")]
+        rate = (tv.get(t) or {}).get("target_rate")
+        if e.get("market_throws") is not None and rate:
+            nums.append(e["market_throws"] / rate)
+    for v in tv.values():
+        for k in ("our_att", "our_runs", "att_avg", "runs_avg", "games"):
+            nums.append((v or {}).get(k))
+    for t, units in (run.get("units") or {}).items():
+        for u in units.values():
+            nums += [u.get("score"), u.get("rank"), u.get("of")]
+    pa = run.get("points_allowed") or {}
+    for t, pos in pa.items():
+        if t.startswith("_"):
+            continue
+        for d in pos.values():
+            nums += [d.get(k) for k in ("ppr", "rank_most", "catches", "rec_yds", "rush_yds", "tds")]
+    nums += list((pa.get("_league") or {}).values()) + [pa.get("_n")]
+    lr = run.get("live_record") or {}
+    nums += [lr.get("engine_log_loss"), lr.get("market_log_loss"), lr.get("lines"), lr.get("coin_flip")]
+    return [float(n) for n in nums if isinstance(n, (int, float)) and not isinstance(n, bool)]
 
 
-# ---------------------------------------------------------------- the agent version
-def render_agent(run, reads, checks, release, ci) -> str:
-    """For another LLM agent: how the engine works end to end, from the repository to this run's
-    inputs, models, tests and checks, and how the read reaches the external reader. The static
-    parts are the release's own documents (agent_guide.md, engine_overview.md,
-    data_source_matrix.md), embedded verbatim, so this file never restates them."""
-    tag = release.get("tag")
-    ref = tag or "main"
-    res = lambda p: (ENGINE / "resources" / p).read_text(encoding="utf-8") if (ENGINE / "resources" / p).exists() else f"*{p}: DATA MISSING*"
-    L = [f"# Props engine, end to end: {run['away']} at {run['home']}, week {run['week']}", "",
-         "*For an LLM agent. Everything below is either this run's own data or a document shipped in "
-         "the release that produced it; nothing is summarised from memory.*", "",
-         "## 0. Identity", "", "| | |", "|---|---|",
-         f"| Repository | {REPO_URL} |",
-         f"| Release | {tag or 'unknown'} -- the code at {REPO_URL}/tree/{ref} |",
-         f"| Release hash | {release.get('hash') or 'unknown'} (skill/release.py: sha256 over the release's files, LF-normalised) |",
-         f"| How it was fetched | {release.get('source') or 'unknown'} |",
-         f"| This run | `{run['slug']}`: kickoff {str(run.get('kickoff_utc'))[:16]} UTC, priced "
-         f"{run.get('hours_to_kickoff') or 0:.1f} h before it |",
-         f"| Data cutoff | {cutoff(run)} |", ""]
-    L += [res("agent_guide.md").replace("{REF}", ref).replace("{REPO}", REPO_URL), ""]
-    L += ["## 3. This run's inputs (the run's sources table, verbatim)", "",
-          "| Source | Used for | Status | Detail |", "|---|---|---|---|",
-          *(f"| {_esc(s['name'])} | {_esc(s['purpose'])} | {_esc(s['status'])} | {_esc(s['detail'])} |"
-            for s in run.get("sources") or []), "",
-          "### Where each source lives (resources/data_source_matrix.md, verbatim)", "",
-          _demote(res("data_source_matrix.md")), ""]
-    L += ["## 4. How the engine turns inputs into prices (resources/engine_overview.md, verbatim)", "",
-          _demote(res("engine_overview.md")), ""]
-    L += ["## 5. Validation", "", "### Model states at this run", "", run.get("model_states") or "-", "",
-          "### Tests and CI for this release", ""]
-    if ci is None:
-        L += ["DATA MISSING: the CI results for this release could not be read from GitHub (no network, "
-              "or the API refused). The suites are listed in section 2; nothing here says they passed.", ""]
-    else:
-        L += [f"Read from the GitHub API for {ci.get('ref')} (commit {str(ci.get('sha'))[:12]}"
-              + (f"; merged by pull request #{ci['pr']}, whose head commit ran the suites" if ci.get("pr") else
-                 "; no pull request found for it, so only the commit's own runs") + "):", "",
-              "| Check | Ran on | Result | Run |", "|---|---|---|---|",
-              *(f"| {_esc(c['name'])} | {c.get('where')} | {c.get('conclusion') or c.get('status')} | {c.get('url') or '-'} |"
-                for c in ci.get("checks") or []), "",
-              "The check names map to the suites in section 2 (tests: props/tests and props/tests_ci; "
-              "root-suite: tests/ and the release lock; backtest-smoke: the backtest on model changes; "
-              "commit-hygiene: no per-run outputs committed; tick: the scheduled props capture, not a test). "
-              "The test COUNT is not in the API's answer.", ""]
-        if not any(c.get("name") in ("tests", "root-suite") for c in ci.get("checks") or []):
-            L += ["DATA MISSING: no test-suite run was found for this release; nothing here says the suites passed.", ""]
-    L += ["## 6. From this run to the external reader", "",
-          "1. score_game.py priced the game and wrote the report and `run_<slug>.json` (section 2).",
-          "2. The analyst (chat) wrote the reads file: a thesis and, per leg, a condition, the case, how it "
-          "fails, the volume x efficiency it needs and every number it cites.",
-          "3. publish.py checked the reads against the run (below). A failed check renders nothing.",
-          "4. publish.py rendered the QA/QC version and this file from the same run and reads; the external "
-          "PDF renders from them too.", "",
-          "### Field map: what each reader-facing number is", "",
-          "| On the page | Run field | Meaning |", "|---|---|---|",
-          "| Market's chance of the Over | cards[].rows[].p_over_book | the book's Over and Under prices with the cut removed, scaled to 100% |",
-          "| Engine's chance | cards[].rows[].p_over_model | share of 20,000 simulated games over the line (a push counts as not over) |",
-          "| The Over needs | cards[].volume[].cells.need_out | floor(line) + 1 |",
-          "| Engine's volume | cards[].volume[].cells.proj | mean of the simulated targets / catches / carries / completions |",
-          "| Market-implied volume | cards[].rows[].market_volume | the volume at which the engine's chance equals the market's, at the engine's efficiency |",
-          "| At his luck-capped / season / engine rate | cards[].volume[].cells.rows.{capped,season,engine} | vol = ceil(need_out / rate); pct = share of simulations reaching vol |",
-          "| Role table | cards[].usage | last game vs the games before: snap, target and carry shares, counts |",
-          "| Injuries | injuries[], who_plays | section 4: the prices' own status (Sleeper fills a missed practice) |", "",
-          "### The reads and their checks", "", "```json", json.dumps(reads, indent=1, ensure_ascii=False), "```", "",
-          *checks_table(checks), "",
-          f"**{sum(c['ok'] for c in checks)} of {len(checks)} checks pass.** Judgment (whether a condition "
-          "is plausible) is not machine-checked.", ""]
-    L += ["## 7. Reproduce", "", "```bash",
-          f"git clone {REPO_URL} && cd Fantasy-football && git checkout {ref}",
-          "pip install -r requirements.txt",
-          f"python props/engine/scripts/score_game.py --away {run['away']} --home {run['home']} --season {run['season']} --week {run['week']}",
-          f"python props/engine/scripts/publish.py --run $NFL_OUT/run_{run['slug']}.json --reads reads.json --out $NFL_OUT",
-          "```", "",
-          "Prices move with the lines and the inputs' publication times: a re-run reproduces the method and "
-          "the checks, not necessarily these exact numbers.", ""]
-    return "\n".join(L) + "\n"
+# ---------------------------------------------------------------- the check
+def check(run, reads) -> list[dict]:
+    """Every mechanical check, one dict each: {leg, check, stated, run, ok, detail}. leg 0 is the
+    game; legs are numbered in the reads' order."""
+    out = []
+
+    def add(leg, kind, stated, value, ok, detail=""):
+        out.append({"leg": leg, "check": kind, "stated": stated, "run": value, "ok": bool(ok), "detail": detail})
+
+    inj = {str(i.get("name", "")).lower(): i for i in run.get("injuries") or []}
+    game_ok = game_numbers(run)
+    # ---- the game ----
+    for c in reads.get("cite") or []:
+        v = resolve(str(c.get("field")), run, {}, None, None)
+        ok = matches(c.get("value"), v)
+        add(0, "cite", f"{c.get('field')} = {c.get('value')}", _fmt(v), ok, "" if ok else "not the run's number")
+        if ok:
+            game_ok.append(float(v))
+    n_sent = len([s for s in re.split(r"(?<=[.!?])\s+", str(reads.get("opening") or "").strip()) if s])
+    add(0, "opening read", f"{n_sent} sentences", "three", n_sent == 3, "" if n_sent == 3 else "the guide asks for three")
+    qb_out = {str(v).split(" starts for ")[-1].lower() for v in (run.get("qb_change") or {}).values()}
+    named_inj = set()
+    for r in reads.get("personnel") or []:
+        nm = str(r["player"]).lower()
+        have = inj.get(nm)
+        run_st = (have or {}).get("status") or ("practice only" if have and have.get("practice") else
+                                                ("Out" if nm in qb_out else "not listed"))
+        ok = str(r["status"]).strip().lower() == run_st.lower()
+        add(0, "personnel", f"{r['player']}: {r['status']}", run_st, ok, "" if ok else "section 4 says otherwise")
+        named_inj.add(nm)
+    texts = [(k, reads.get(k)) for k in GAME_TEXT] + [(f"unit read {t}", v) for t, v in (reads.get("unit_reads") or {}).items()]
+    texts += [(f"assumption {i}", a) for i, a in enumerate(reads.get("assumptions") or [], 1)]
+    texts += [(f"personnel {r['player']}", f"{r['changes']} {r['affects']}") for r in reads.get("personnel") or []]
+    for kind, text in texts:
+        _text_checks(add, 0, kind, text, game_ok, inj, named_inj)
+    # ---- the players and their legs ----
+    by_player = {}
+    for i, lg in enumerate(reads["legs"], 1):
+        by_player.setdefault(lg["player"], []).append(i)
+    for p in reads.get("players") or []:
+        card = card_for(run, p["player"])
+        idx = by_player.get(p["player"], [])
+        if card is None:
+            for i in idx:
+                add(i, "on the board", p["player"], "-", False, "no card for this player in the run (check the name)")
+            continue
+        p_allowed = list(game_ok)
+        for c in p.get("cite") or []:
+            f = str(c.get("field"))
+            v = resolve(f, run, card, None, None)
+            ok = matches(c.get("value"), v)
+            add(idx[0], "cite", f"{f} = {c.get('value')}", _fmt(v), ok, "" if ok else "not the run's number")
+            if ok:
+                p_allowed.append(float(v))
+        cited_inj = set(named_inj) | {str(j.get("player", "")).lower() for j in p.get("injuries") or []}
+        for j in p.get("injuries") or []:
+            _injury_check(add, idx[0], j, inj)
+        verdicts = set()
+        for i in idx:
+            lg = reads["legs"][i - 1]
+            allowed, v = _check_leg(add, i, run, card, lg, inj)
+            p_allowed += allowed
+            if v:
+                verdicts.add(v["word"])
+            cited_inj |= {str(j.get("player", "")).lower() for j in lg.get("injuries") or []}
+        for i in idx:
+            lg = reads["legs"][i - 1]
+            for k in LEG_TEXT:
+                _text_checks(add, i, k, lg.get(k), p_allowed, inj, cited_inj, verdicts)
+        for k in PLAYER_TEXT:
+            _text_checks(add, idx[0], k, p.get(k), p_allowed, inj, cited_inj, verdicts)
+    return out
 
 
-def _demote(md: str) -> str:
-    """Embedded documents' headings go two levels down, so they nest under this file's sections."""
-    return re.sub(r"(?m)^(#{1,4}) ", lambda m: "#" * min(6, len(m.group(1)) + 2) + " ", md)
+def _injury_check(add, i, j, inj):
+    nm = str(j.get("player", "")).lower()
+    have = inj.get(nm)
+    run_st = (have or {}).get("status") or ("practice only" if have and have.get("practice") else "not listed")
+    stated = str(j.get("status", "")).strip()
+    ok = stated.lower() == run_st.lower()
+    add(i, "injury", f"{j.get('player')}: {stated}", run_st, ok, "" if ok else "section 4 says otherwise")
 
 
+def _check_leg(add, i, run, card, lg, inj):
+    """One leg's checks; returns (the numbers its prose may quote, its verdict)."""
+    mk, line = market_key(lg["market"]), float(lg["line"])
+    row = row_for(card, mk, line)
+    if row is None:
+        have = sorted({f"{MARKET_WORDS.get(r['market'], r['market'])} {r['line']:g}" for r in card.get("rows") or []
+                       if r.get("market") and isinstance(r.get("line"), (int, float))})
+        add(i, "on the board", f"{MARKET_WORDS[mk]} {line:g}", "; ".join(have) or "no lines", False,
+            "not on the board at this line")
+        return [], None
+    add(i, "on the board", f"{lg['player']} {MARKET_WORDS[mk]} {lg['side']} {line:g}",
+        f"{row.get('book')} {row.get('line'):g}", True)
+    cells = cells_for(card, mk)
+    need_out = math.floor(line) + 1
+    allowed = [line, need_out]
+    v = verdict(card, mk) if _close(row.get("line"), (next((x for x in card.get("volume") or []
+                                                            if x.get("market") == mk), {}) or {}).get("line"), 1e-9) else None
+    if v:
+        allowed += [v["need"], v["proj"], v["pct"]] + ([v["last"]] if v["last"] is not None else [])
+    rates = {k: r.get("rate") for k, r in ((cells or {}).get("rows") or {}).items()}
+    for k, r in ((cells or {}).get("rows") or {}).items():
+        allowed += [r.get("vol"), r.get("pct")] + (r.get("rate") if isinstance(r.get("rate"), list) else [r.get("rate")])
+    if cells:
+        allowed += [cells.get("proj"), cells.get("need_rate")] + list(cells.get("market_row") or [])
+    for k in ("p_over_book", "p_over_model", "median", "p10", "p90", "market_volume", "market_catches"):
+        allowed.append(row.get(k))
+    for n in lg.get("needs") or []:
+        parts = n.get("parts") or [[n.get("volume"), n.get("rate")]]
+        try:
+            parts = [(float(a), float(b)) for a, b in parts]
+        except (TypeError, ValueError):
+            add(i, "volume x efficiency", json.dumps(n), "-", False, "needs volume and rate numbers")
+            continue
+        total = sum(a * b for a, b in parts)
+        reaches = total >= need_out - 1e-9
+        stated = n.get("reaches")
+        txt = " + ".join(f"{a:g} x {b:g}" for a, b in parts) + f" = {total:.2f}"
+        add(i, "volume x efficiency", f"{txt}: {'reaches' if stated else 'short of'} {need_out}",
+            f"{'reaches' if reaches else 'short of'} {need_out}", stated is reaches,
+            "" if stated is reaches else "the read says the opposite of the arithmetic")
+        for a, b in parts:
+            allowed += [a, b, round(a * b, 1)]
+        if n.get("hypothetical"):
+            add(i, "rate source", " + ".join(f"{b:g}" for _a, b in parts), "hypothetical (labelled)", True)
+        else:
+            hit = [k for k, r in rates.items() if _rates_match([b for _a, b in parts], r)]
+            add(i, "rate source", " + ".join(f"{b:g}" for _a, b in parts), ", ".join(hit) or "not a card rate",
+                bool(hit), "" if hit else ("the rate is not one of the card's rows (a carries + catches need lists "
+                                           "carries first); mark the need hypothetical or use a card rate"))
+            for k in hit:
+                # the card's exact rate decides: a rounded rate must not flip the verdict
+                exact = rates[k] if isinstance(rates[k], list) else [rates[k]]
+                t_card = sum(a * float(r) for (a, _b), r in zip(parts, exact))
+                if (t_card >= need_out - 1e-9) is not reaches:
+                    add(i, "rate rounding", txt, f"at the card's {k} rate: {t_card:.2f}, "
+                        f"{'reaches' if t_card >= need_out - 1e-9 else 'short of'} {need_out}", False,
+                        "the rounded rate flips the verdict; use the card's rate to more decimals")
+        allowed += [total, round(total, 1)]
+    for c in lg.get("cite") or []:
+        f = str(c.get("field"))
+        val = resolve(f, run, card, row, cells)
+        ok = matches(c.get("value"), val)
+        add(i, "cite", f"{f} = {c.get('value')}", _fmt(val), ok, "" if ok else "not the run's number")
+        if ok:
+            allowed.append(float(val))
+    for j in lg.get("injuries") or []:
+        _injury_check(add, i, j, inj)
+    return [a for a in allowed if isinstance(a, (int, float)) and not isinstance(a, bool)], v
+
+
+def _rates_match(bs, r) -> bool:
+    """The need's rates against one card row's rate: one rate, or a carries + catches pair in that
+    order (yards a carry, then yards a catch). Catch rates within 0.005, yards within 0.05."""
+    if r is None:
+        return False
+    rs = r if isinstance(r, list) else [r]
+    return len(bs) == len(rs) and all(_close(b, x, 0.005 if float(x) <= 1 else 0.05) for b, x in zip(bs, rs))
+
+
+def _text_checks(add, leg, kind, text, allowed, inj, cited_inj, verdicts=None):
+    if not text:
+        return
+    for rx, what in BANNED:
+        m = rx.search(text)
+        if m:
+            add(leg, "language", f"{kind}: '{m.group(0)}'", "-", False, f"{what} is not allowed: the board is a research sheet")
+    low = text.lower()
+    if verdicts is not None:
+        for w in VERDICTS:
+            if w in low and w not in verdicts:
+                add(leg, "verdict word", f"{kind}: '{w}'", ", ".join(sorted(verdicts)) or "none computed", False,
+                    "the verdict words are computed from the card, not chosen")
+    clean = text
+    for rx in EXEMPT:
+        clean = rx.sub(" ", clean)
+    for m in NUM.finditer(clean):
+        tok = m.group(1) + m.group(2)
+        if not any(_num_ok(tok, a) for a in allowed):
+            add(leg, "number traced", f"{kind}: {tok}", "-", False,
+                "a number in the prose that no cite, need, line or table accounts for")
+    for nm, row in inj.items():
+        if not nm or nm in cited_inj:
+            continue
+        last = _last_name(nm)
+        named = nm in low or (last and re.search(rf"\b{re.escape(last)}\b", low))
+        if named:
+            add(leg, "injury named", f"{kind}: {row.get('name')}", row.get("status") or "practice only", False,
+                "the prose names a player on section 4 without an injuries or personnel entry to check it")
+
+
+def _last_name(nm: str) -> str | None:
+    """'jonathan mingo' -> 'mingo'; suffixes dropped; None when too short to search alone."""
+    parts = [p for p in re.split(r"\s+", nm.strip()) if p.strip(".") not in ("jr", "sr", "ii", "iii", "iv", "v")]
+    last = parts[-1].strip(".") if len(parts) > 1 else None
+    return last if last and len(last) >= 4 else None
+
+
+# ---------------------------------------------------------------- the CI read (agent version)
 def ci_results(repo_url, ref, get=None):
-    """The GitHub check runs for a release: on the tag's commit, or -- the props CI runs on pull
-    requests, not on main -- on the head of the pull request that merged it. None when GitHub
-    cannot be read (DATA MISSING, never a guessed pass)."""
+    """The GitHub check runs for a release: the suites ran on the head of the pull request that
+    merged it; the tag's commit carries what ran on main. Both are reported, each labelled. None
+    when GitHub cannot be read (DATA MISSING, never a guessed pass)."""
     import urllib.request
     api = "https://api.github.com/repos/" + repo_url.split("github.com/", 1)[1]
     get = get or (lambda u: json.loads(urllib.request.urlopen(
         urllib.request.Request(u, headers={"Accept": "application/vnd.github+json", "User-Agent": "nfl-publish"}),
         timeout=20).read().decode("utf-8")))
+
     def runs_at(sha, where):
         rs = get(f"{api}/commits/{sha}/check-runs?per_page=100").get("check_runs") or []
         return [{"name": r.get("name"), "status": r.get("status"), "conclusion": r.get("conclusion"),
                  "url": r.get("html_url"), "where": where} for r in rs]
     try:
         sha = get(f"{api}/commits/{ref}")["sha"]
-        # the suites run on the pull request's head; the merge commit carries what ran on main
-        # (the scheduled capture, the push checks) -- both are reported, each labelled
         prs = get(f"{api}/commits/{sha}/pulls") or []
         pr = next((p for p in prs if p.get("merged_at")), prs[0] if prs else None)
         checks = (runs_at(pr["head"]["sha"], f"pull request #{pr['number']} head") if pr else []) \
@@ -654,6 +595,7 @@ def ci_results(repo_url, ref, get=None):
 
 # ---------------------------------------------------------------- command line
 def main(argv=None) -> int:
+    import publish_render as PR
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--run", required=True, help="run_<slug>.json from score_game.py")
     ap.add_argument("--reads", required=True, help="the reads file (resources/agent_guide.md, 'The reads file')")
@@ -690,15 +632,13 @@ def main(argv=None) -> int:
     out.mkdir(parents=True, exist_ok=True)
     which = {w.strip() for w in a.which.split(",") if w.strip()}
     if "qa" in which:
-        rep = Path(a.run).with_name(f"report_{run['slug']}.md")
         p = out / f"{run['slug']}_qa.md"
-        p.write_text(scrub(render_qa(run, reads, checks, release, rep.read_text(encoding="utf-8") if rep.exists() else None)),
-                     encoding="utf-8")
+        p.write_text(PR.scrub(PR.render_qa(run, reads, checks, release)), encoding="utf-8")
         print(f"wrote {p}")
     if "agent" in which:
         ci = None if a.no_ci or not a.release_tag else ci_results(REPO_URL, a.release_tag)
         p = out / f"{run['slug']}_agent.md"
-        p.write_text(scrub(render_agent(run, reads, checks, release, ci)), encoding="utf-8")
+        p.write_text(PR.scrub(PR.render_agent(run, reads, checks, release, ci)), encoding="utf-8")
         print(f"wrote {p}")
     return 0
 

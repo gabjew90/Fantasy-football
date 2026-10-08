@@ -74,37 +74,81 @@ volume_text, book_lines, cells {unit, need_out, proj, rows {capped|season|engine
 rate_txt, vol, vol_txt, pct}, market_row, need_txt, need_rate, beat, note}}], usage, backfield,
 prior, season, qb, watch, matchup}], who_plays {TEAM: {unit: text}}, who_note, report_state,
 injuries [{team, name, pos, gsis_id, status, source, practice}], gaps [[issue, may miss,
-scenario]], qb_change`.
+scenario]], qb_change`; and for the report guide (DECISIONS #218): `header [lines],
+kickoff_words, weather_line, market_env {home_ml, away_ml, home_ml_open, away_ml_open,
+open_home_spread, open_total, home_win_prob, home_win_prob_open}, teams {TEAM: market_throws,
+market_runs, carries_history}, team_volume {TEAM: our_att, our_runs, att_avg, runs_avg,
+target_rate, ...}, units {TEAM: {off_pass|off_run|def_pass|def_run: score, grade, rank, of}},
+points_allowed {TEAM: {RB|WR|TE: ppr, rank_most, catches, rec_yds, rush_yds, tds}, _league,
+_n, _games}, live_record {weeks, lines, engine_log_loss, market_log_loss, coin_flip, markets},
+if_out [{player, team, pos, ran, moves [{player, market, side, line, p_plays, p_out, move}]}]`.
 
-**The reads file** (reads_version 1), written by the analyst:
+**The reads file** (reads_version 2, the structure of the user's report guide), written by the
+analyst:
 
 ```json
-{"reads_version": 1, "game": "TB@DAL",
- "thesis": "the game in a paragraph; every number traced",
+{"reads_version": 2, "game": "TB@DAL",
+ "opening": "three sentences: the expected winner and scoring balance, each offense's likely route, the uncertainty that most affects opportunities",
+ "market_read": "section 1's narration", "workload_read": "section 2's",
+ "unit_reads": {"DAL": "the home offense's matchup read", "TB": "the away offense's"},
+ "personnel": [{"player": "Baker Mayfield", "status": "Out", "changes": "the football pathway", "affects": "which props"}],
+ "personnel_read": "section 4's narration", "allowed_read": "section 5's",
+ "assumptions": ["two or three assumptions worth testing"],
+ "handoff": "the bridge to the player sections",
  "cite": [{"field": "game.teams.DAL.implied_points", "value": 29.0}],
- "notes": ["optional game-level paragraphs"],
- "legs": [{"player": "CeeDee Lamb", "market": "receptions", "side": "over", "line": 6.5,
-           "condition": "his target share stays near the 49% of last game",
-           "case": "why the condition could hold, from his own rows",
-           "fails": "how the leg loses",
-           "needs": [{"volume": 9, "rate": 0.79, "reaches": true}],
-           "cite": [{"field": "market_p", "value": "50%"}, {"field": "card.usage.tn", "value": 21}],
-           "injuries": [{"player": "Jonathan Mingo", "status": "Questionable"}]}]}
+ "players": [{"player": "CeeDee Lamb",
+              "basis": "the engine workload's basis: role, allocation, playing time, absences",
+              "explanation": "the short explanation under his tables",
+              "role_evidence": "completes 'The engine expects [workload], based on ...'",
+              "matchup": "supports", "matchup_reason": "completes 'This matchup supports that requirement because ...'",
+              "cite": [{"field": "card.usage.tn", "value": 21}],
+              "legs": [{"market": "receptions", "side": "over", "line": 6.5,
+                        "if": "the checkable belief: 'If you expect ...'",
+                        "fails": "completes '... it stops fitting if ...'",
+                        "else": "the second branch, a full sentence: 'If ..., [alternative or skip] fits better'",
+                        "needs": [{"volume": 9, "rate": 0.787, "reaches": true}],
+                        "cite": [{"field": "market_p", "value": "50%"}],
+                        "injuries": [{"player": "Jonathan Mingo", "status": "Questionable"}]}]}]}
 ```
 
-- `market`: receptions, rec yds, rush yds, rush+rec yds, pass yds (or the player_* key).
-- `needs`: `volume` x `rate` (or `parts: [[volume, rate], ...]` for carries + catches), and
-  whether that `reaches` floor(line) + 1. A rate must be one of the card's rows unless the need
-  says `"hypothetical": true`.
-- `cite.field`: market_p, engine_p, push, price_over, price_under, median, p10, p90,
-  market_volume, market_catches, proj_volume, need_rate, need_out, market_line, market_line_pct,
-  row.<capped|season|engine>.<pct|vol|rate>, card.<path> (into the card), game.<path> (into the
-  run). A value written "50%" is compared as a percent; a plain number at the decimals written.
-- `injuries.status`: the run's status (Out, Doubtful, Questionable), or "practice only".
+- `market`: receptions, rec yds, rush yds, rush+rec yds, pass yds (or the player_* key). Each
+  player appears once, in the section of his main market (QB: Passing; WR/TE: Receiving; backs:
+  Rushing and combined yards), with all his props on his card.
+- `needs`: `volume` x `rate` (or `parts: [[volume, rate], ...]` for carries + catches, carries
+  first), and whether that `reaches` floor(line) + 1. A rate must be one of the card's rows unless
+  the need says `"hypothetical": true`; at a card rate, the card's exact rate decides.
+- `cite.field`: market_p, engine_p, market_p_under, engine_p_under, push, price_over,
+  price_under, median, p10, p90, market_volume, market_catches, proj_volume, need_rate, need_out,
+  market_line, market_line_pct, row.<capped|season|engine>.<pct|vol|rate>, card.<path> (into the
+  card), game.<path> (into the run). A value written "50%" is compared as a percent; a plain
+  number at the decimals written; a chance written as a bare 0.5 is too coarse.
+- `injuries.status` and `personnel.status`: the run's status (Out, Doubtful, Questionable), or
+  "practice only".
 
-**The checks** (publish.check): on the board at the side and line; volume x efficiency against
-the whole number the Over needs; the rate's source; every cite equal to the run's number at the
-precision written; every number in the prose traced to a cite, a need, the line or the game frame
-(week numbers, years, ordinals and "80% range" are labels); injuries equal to section 4, and any
-injured player the prose names carries an injuries entry; no pick language (a play, a lean, an
-edge, value, a lock, EV, Kelly, a stake) and never "the probability". One failure renders nothing.
+**Generated, never written** (publish_render): the verdict word, the closing paragraph's computed
+half (which side the market favors, the engine's workload, the workload the line needs and how
+often the engine reaches it), the receptions-vs-yards comparison, the production paths and the
+scenario table's status. The verdict words, by definition (the user, 2026-10-08), at the trimmed
+rate (this season's for receptions):
+- *requires better gains:* the need is above the engine's workload and only the engine's own rate
+  clears at it;
+- *requires more work than the engine expects:* no rate clears at the engine's workload;
+- *requires a rebound:* the engine's workload clears, but the need is above his last game's
+  (targets for receptions, carries for rushing; unknown elsewhere);
+- *attainable:* the need is at or below the engine's workload, and his last game's when known.
+
+**The checks** (publish.check):
+- The leg is on the board at its side and line.
+- Volume x efficiency is checked against the whole number the Over needs, at the card's exact
+  rate, and the rate's source is checked.
+- Every cite equals the run's number at the precision written.
+- Every number in the prose traces to a cite, a need, the line or a team-brief table, with units
+  kept apart. Week numbers, years, ordinals and "80% range" are labels.
+- Injuries and personnel equal section 4; any injured player the prose names, last name included,
+  carries an entry.
+- The opening is three sentences, and two or three assumptions are given.
+- A verdict word in the prose is the one the card computes.
+- No pick language appears (a play, a lean, an edge, value, a lock, EV, Kelly, a stake, "take the
+  Over"), and never "the probability".
+
+One failure renders nothing.

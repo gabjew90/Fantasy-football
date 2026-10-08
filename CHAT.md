@@ -310,21 +310,29 @@ Read `$ENGINE_DIR/SKILL.md` and follow it. Its paths are relative to
 Run `nfl.py status` first. When it says a game's lines are thin or the run is
 early, say so before any price.
 
-### Publishing a read (DECISIONS #217)
+### Publishing a read (DECISIONS #217, #218)
 
 One game run and one set of written reads make every version, so the versions cannot disagree.
+The versions follow the user's report guide (docs/plans/2026-10-08-report-format-design.md): a
+matchup brief, then Passing, Receiving, and Rushing and combined yards.
 1. Run `nfl.py props game AWAY@HOME` and do the read as above.
-2. Write the reads file as JSON, `$NFL_OUT/reads_AWAY_HOME.json`. The schema is in
-   `props/engine/resources/agent_guide.md`, under "The reads file". It holds the thesis and,
-   for each leg:
-   - the condition (the "if");
-   - the case;
-   - how it fails;
-   - the volume x efficiency the leg needs, and whether that reaches the whole number the Over needs;
+2. Write the reads file as JSON, `$NFL_OUT/reads_AWAY_HOME.json` (reads_version 2). The schema is
+   in `props/engine/resources/agent_guide.md`, under "The reads file". The team brief needs:
+   - the three-sentence opening read;
+   - a narration for each section: the market, the workload, each offense's unit read, the
+     personnel rows with their football pathway, points allowed;
+   - two or three assumptions worth testing, and the handoff.
+
+   Each player needs the workload basis, the explanation, the role evidence and the matchup
+   (supports or challenges, and why). Each leg needs:
+   - the "if", how it fails, and the second branch;
+   - the volume x efficiency it needs;
    - every number the prose states, cited by its field;
    - every injured player the prose names.
 
-   The legs are conditional reads, never picks.
+   Each player appears once, in his main market's section. The verdict words (attainable,
+   requires a rebound, requires better gains) are computed, never chosen. The legs are
+   conditional reads, never picks.
 3. Run `nfl.py props publish AWAY@HOME --reads $NFL_OUT/reads_AWAY_HOME.json`. It checks the reads
    against the run before it renders anything. When it prints `FAIL` lines (exit 3), fix the read
    and run it again. Never bend a number to pass: a failure means the prose said something the run

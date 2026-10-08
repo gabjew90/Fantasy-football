@@ -1722,6 +1722,17 @@ LIVE_RECORD = {"player_pass_yds": (86, .570, .417, .501, .732, .692),
                "player_rush_yds": (292, .404, .466, .500, .713, .694)}
 
 
+def live_record_summary() -> dict:
+    """LIVE_RECORD pooled the way the reports quote it (0.717 vs 0.692 over 1,536 lines), computed
+    from the table so the two can never disagree; plus each market's row."""
+    n = sum(v[0] for v in LIVE_RECORD.values())
+    eng = sum(v[0] * v[4] for v in LIVE_RECORD.values()) / n
+    mkt = sum(v[0] * v[5] for v in LIVE_RECORD.values()) / n
+    return {"weeks": LIVE_WEEKS, "lines": n, "engine_log_loss": eng, "market_log_loss": mkt, "coin_flip": 0.693,
+            "markets": {m: dict(zip(("lines", "over_hit", "engine_over", "market_over", "engine_log_loss",
+                                     "market_log_loss"), v)) for m, v in LIVE_RECORD.items()}}
+
+
 def implied_row(implied):
     try:
         v = float(implied)

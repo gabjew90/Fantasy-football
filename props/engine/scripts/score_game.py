@@ -3969,6 +3969,7 @@ def write_run_export(path, export, report_lines, sources, env, market_env, away,
                                                    "carries_history")} for t in (away, home) if t in env},
            "sources": [dict(zip(("name", "purpose", "status", "detail"), s)) for s in sources],
            "card_guide": RSCH.card_guide(),
+           "live_record": RSCH.live_record_summary(),
            **{k: v for k, v in export.items()}}
     tmp = Path(path).with_suffix(".json.tmp")
     tmp.write_text(json.dumps(_jsonable(out), indent=1, ensure_ascii=False), encoding="utf-8")
@@ -4026,7 +4027,7 @@ def brief_section(**V) -> list[str]:
             (f"weather forecast {str(wx.get('updated') or '')[:16].replace('T', ' ')} UTC" if wx.get("status") == "ok"
              else "weather forecast not included in this run")]
     L = ["## Team matchup\n",
-         *RSCH.matchup_header(AWAY, HOME, when, G.stadium, roof, note, rest, srcs), "",
+         *(_hdr := RSCH.matchup_header(AWAY, HOME, when, G.stadium, roof, note, rest, srcs)), "",
          "### 1. The market's view of the game\n",
          *RSCH.market_table(AWAY, HOME, ME_.get("home_spread"), ME_.get("total_line"), ME_.get("book"),
                             (str(ME_.get("as_of"))[:16].replace("T", " ") + " UTC") if ME_.get("as_of") else None), ""]
@@ -4100,7 +4101,8 @@ def brief_section(**V) -> list[str]:
     if pt:
         L += ["### 5. Production allowed by position\n", *pt, ""]
     # ---- 6. weather and venue ----
-    L += ["### 6. Weather and venue\n", RSCH.weather_line(wx, roof, note), ""]
+    _wx_line = RSCH.weather_line(wx, roof, note)
+    L += ["### 6. Weather and venue\n", _wx_line, ""]
     # ---- 7. where the baseline could miss ----
     mk = set(R.market) if R is not None and len(R) else set()
     spread = ME_.get("home_spread")
@@ -4126,7 +4128,8 @@ def brief_section(**V) -> list[str]:
     ex = V.get("EXPORT")
     if isinstance(ex, dict):
         # the same facts, as data, for run_<slug>.json (publish.py checks reads against them)
-        ex.update({"team_volume": {t_: chk.get(t_) for t_ in (AWAY, HOME)},
+        ex.update({"header": list(_hdr), "kickoff_words": when, "weather_line": _wx_line,
+                   "team_volume": {t_: chk.get(t_) for t_ in (AWAY, HOME)},
                    "units": RSCH.unit_export(V.get("UNIT_EFF") or {}, (AWAY, HOME)),
                    "points_allowed": RSCH.pa_export(V.get("PA"), V.get("PA_PARTS"), (AWAY, HOME)),
                    "sources_line": srcs, "who_plays": cells, "who_note": who_note, "report_state": rstate,

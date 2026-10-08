@@ -237,6 +237,11 @@ def test_the_run_export_matches_the_report_and_a_read_built_from_it_publishes(ru
     assert data["export_version"] == 1 and data["away"] == "DAL" and data["home"] == "HOU"
     assert len(data["cards"]) == len(re.findall(r"(?m)^#### ", report))
     assert data["sources"] and data["gaps"] and data["who_plays"]
+    # the report guide's data (DECISIONS #218): the brief's tables travel as data too
+    # (no unit scores: the fixture holds two teams' plays, no league to rank against)
+    for k in ("header", "weather_line", "team_volume", "points_allowed", "live_record"):
+        assert data.get(k), k
+    assert data["live_record"]["lines"] == 1536
     card = next(c for c in data["cards"] for v in c["volume"]
                 if v.get("cells") and "season" in v["cells"]["rows"] and v["market"] == "player_receptions")
     v = next(v for v in card["volume"] if v["market"] == "player_receptions")
@@ -244,12 +249,15 @@ def test_the_run_export_matches_the_report_and_a_read_built_from_it_publishes(ru
     rate, need = v["cells"]["rows"]["season"]["rate"], v["cells"]["need_out"]
     vol = v["cells"]["rows"]["season"]["vol"]
     pct = f"{100 * row['p_over_book']:.0f}%"
-    reads = {"reads_version": 1, "game": "DAL@HOU", "thesis": "A read built from the run.",
-             "legs": [{"player": card["name"], "market": "receptions", "side": "over", "line": v["line"],
-                       "condition": "his share holds.", "case": f"The market has the Over at {pct}.",
-                       "fails": "His share falls.",
-                       "needs": [{"volume": vol, "rate": rate, "reaches": vol * rate >= need - 1e-9}],
-                       "cite": [{"field": "market_p", "value": pct}]}]}
+    reads = {"reads_version": 2, "game": "DAL@HOU",
+             "opening": "A read built from the run. It states only the run's numbers. It is a test.",
+             "assumptions": ["The share holds.", "The volume holds."], "handoff": "The player sections follow.",
+             "players": [{"player": card["name"], "basis": "His share.", "explanation": f"The market has the Over at {pct}.",
+                          "role_evidence": "his share", "matchup": "supports", "matchup_reason": "the test says so",
+                          "legs": [{"market": "receptions", "side": "over", "line": v["line"],
+                                    "if": "his share holds", "fails": "his share falls", "else": "skip it",
+                                    "needs": [{"volume": vol, "rate": rate, "reaches": vol * rate >= need - 1e-9}],
+                                    "cite": [{"field": "market_p", "value": pct}]}]}]}
     rp = tmp_path / "reads.json"
     rp.write_text(json.dumps(reads), encoding="utf-8")
     r = subprocess.run([sys.executable, str(SCRIPTS / "publish.py"), "--run", str(out / "run_2026_wk04_DAL_HOU.json"),
