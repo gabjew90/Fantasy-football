@@ -8034,3 +8034,43 @@ The expert re-ran the four-season backtest (baseline reproduces ours: receptions
   anchored to implied points) and read the book's number as the probability. SKILL.md: chat copies
   the guide before the first card and says how the matchup tables were built; no number goes out
   without its source explained.
+
+## 2026-10-08 (211) -- dead code removed: unused engine helpers, finished one-off scripts, the market-carries record fields
+
+- **Why:** the sweep found code nothing calls, constants nothing reads, files nothing reads and
+  comments that say the opposite of what ships. Each item was grepped across the whole repo
+  (tests, workflows, .bat, nfl.py, CHAT.md, skill/) before it went; anything still used stayed.
+- **Engine (props/engine/scripts):** model.SHADOW_MARKET_RUSH_WEIGHT, model.team_environment, the
+  Questionable-regime helpers and weights (unused since bce0771), score_game.DEFERRED_MARKETS,
+  td_v1.game_probabilities, td_joint.STRUCTURES, research.points_allowed_line (tests only) and
+  research._need_cell. score_week: slate_pick_order (test only), TLEGS, and the must-win pick with
+  its slate_survival_*.csv (no picks are shown, #142, and nothing read the file; the nfl.py
+  --survival flag still answers that the pick is retired). build_priors uses model.norm_name
+  (its copy was identical). Comments: market carries 0.5 ships (#204), round 41 withdrawn with
+  the knob kept off (#203), teammates' targets correlate about +0.06 (#205).
+  width_params.json tuned_on names each setting's selection seasons (a documentation key: it
+  moves the resource hash, not a price).
+- **One-off scripts deleted** (reports that cite them name the last commit): absence_check.py
+  87f67a4, td_compare.py c183f82, td_diagnostics.py 18c36f4, props/tools backfill_engine_stamp.py
+  72e05e9, pick_market_env.py 5d78354, rb_takeover_check.py 97a3173, rr_dependence.py 68ac50f;
+  scripts/keefamania_trades.py 574c69b (the scrape path; the Yahoo API replaced it).
+  absence_check.py left FETCH_ALLOWED.
+- **Record:** p_over_mkt_carries and mkt_carries leave record_run and settle (score_game stopped
+  writing them at #204; 0 of 2,800 settled and 0 of 5,041 prediction rows held a value) and
+  scorecard's market-carries section goes with them. The reversal shadows (p_over_hist_carries,
+  p_over_spread40) and p_over_board stay.
+- **Draft/fantasy:** two unused names (staged._steps_2_to_4, tracker.FALLBACK_FLOORS); config.yaml
+  says pool_lookback and bench_row_wins_dedupe are inert and session_log is permanent; the
+  projections docstrings say model is the default (Omnibeta live) and Keefamania selects
+  external. draftkit/, scripts/ and tests/ import core.ids / core.scoring directly; the
+  draftkit.ids and seasondata.score_projection shims stay until manager/ moves off them.
+- **Release:** data/external/fantasypros_history/ shipped to chat because fnmatch's * crosses "/"
+  in the data/external/*.csv glob; it moved to data/raw_history/fantasypros_history/, which no
+  release or harness rule matches.
+- **Evidence, no price moved:** the DAL@HOU fixture (props/tests/fixtures/report_dal_hou, week 4,
+  --no-scenarios) run before and after: all ten CSVs (bet_card, betting_card, confidence,
+  fantasy_points, joint_td, ladder, player_params, research, shadow_log, td_board) identical
+  column by column except snapshot_utc (bet card) and logged_at_utc (joint TD, shadow log); the
+  report identical line by line except the two lines that carry the price snapshot time and the
+  kickoff clock. The same two-run comparison on the unchanged code shows the same columns
+  differing. Tests: 2038 passed, 8 skipped.
