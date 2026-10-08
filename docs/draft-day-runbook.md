@@ -1,6 +1,8 @@
+> Historical: the 2026-09-05 draft is done; reused at 2027 draft prep.
+
 # Keefamania draft-day runbook (Yahoo, Sat Sep 5 2026, 10:00 PM EDT / 7:00 PM PT)
 
-Three layers, each a fallback for the one above (design: docs/superpowers/specs/2026-09-01-draft-rig-foolproof-design.md).
+Three layers, each a fallback for the one above (design: docs/archive/superpowers/specs/2026-09-01-draft-rig-foolproof-design.md).
 Everything below is executed, not built. If a step is red, the layer below still drafts.
 
 ## Projection source (DECIDED — nothing to do on draft day)

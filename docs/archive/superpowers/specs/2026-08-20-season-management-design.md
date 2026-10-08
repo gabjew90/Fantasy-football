@@ -1,4 +1,4 @@
-> Historical (superseded); see docs/draft-day-runbook.md and docs/plans/2026-09-02-final-form-and-survival-sim-plan.md
+> Historical (superseded). The in-season tooling this describes was replaced by the `fantasy/` commands and `nfl.py` under docs/plans/2026-09-24-consolidation-plan.md; the fantasy schedules are off since 2026-09-25 (DECISIONS #109).
 
 # In-Season Management — waiver wire + weekly lineup (v1 design)
 

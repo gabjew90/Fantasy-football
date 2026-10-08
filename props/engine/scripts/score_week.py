@@ -10,7 +10,8 @@ for the whole slate (about 4 s per game after the first). Then it reads every ga
 shadow log and bet card back and writes:
 
   slate_summary_{season}_wk{W}.md   runs, research leads and notes by game (the slate overview)
-  slate_survival_{season}_wk{W}.csv one "must-win" pick per game (rule below)
+  slate_survival_{season}_wk{W}.csv RETIRED as a pick (DECISIONS #142): still written for the
+                                    record by the rule below, never shown; no must-win pick is given
   slate_research_{season}_wk{W}.csv every priced line's research row (line implies, usage, flags)
   slate_board_{season}_wk{W}.md     THE chat reply for "the props for these games": every
                                     game's full research table in ONE file, ordered by
@@ -19,8 +20,10 @@ shadow log and bet card back and writes:
   slate_card_{season}_wk{W}.csv     the old card rows, written for the record only, never shown
   slate_runs_{season}_wk{W}.csv     per-game run status (lines, spread/total, exit code)
 
-Survival rule ("if you could have only one bet in this game and had to win it"):
-  1. receptions and receiving yards only (the two markets with a 2025 backtest);
+Survival rule, RETIRED (DECISIONS #142: no picks; the file is written for the record and never
+shown, and `nfl.py props best --survival` says so). As it was ("if you could have only one bet
+in this game and had to win it"):
+  1. receptions and receiving yards only (the two markets with a 2025 backtest when written);
   2. the book must agree: no-vig probability >= 0.55 on the same side;
   3. highest model probability among what remains.
   Fallbacks, in order, if nothing qualifies: no-vig >= 0.50 on calibrated markets;

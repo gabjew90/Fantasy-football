@@ -1,4 +1,6 @@
-# The gate on props/ changes. Four checks, and deliberately no more.
+# The gate on props/ changes: the props tests, the offline end-to-end report
+# (props/tests_ci), the engine-against-its-lock check (with the price-map
+# check), and the backtest smoke, which runs only when the model changed.
 #
 # WHY THIS EXISTS SEPARATELY FROM props.yml. props.yml runs
 # `pytest props/tests` before every capture, so anything asserted there can
@@ -7,11 +9,12 @@
 # on pull requests, where a human is waiting and the cost of a red run is a
 # few minutes.
 #
-# The backtest smoke PRINTS CRPS rather than gating on it. A tolerance is
-# only meaningful against a second engine version to compare with, and there
-# is exactly one (props-v1.0). Typing a threshold now would be a number
-# invented rather than measured, which is what CLAUDE.md forbids; the gate
-# arrives with v1.2, when v1.1 exists as a baseline. See DECISIONS #75.
+# The backtest smoke PRINTS CRPS rather than gating on it (DECISIONS #75).
+# A one-season 2025 smoke is not the evidence a change ships on: model
+# changes are judged by pre-registered rounds on the 2022-25 harness and
+# reports/scoreboard.md (DECISIONS #188, the four-seed rule #202). No CRPS
+# threshold has been set here; one would be a number invented rather than
+# measured, which is what CLAUDE.md forbids.
 name: props-ci
 
 on:
@@ -173,8 +176,8 @@ jobs:
               echo "No summary written; see the log artifact."
             fi
             echo
-            echo "_No pass/fail threshold yet: there is one released engine, so"
-            echo "there is nothing to compare against. Read the numbers._"
+            echo "_No pass/fail threshold: a one-season smoke is not the ship test"
+            echo "(pre-registered rounds on 2022-25 are). Read the numbers._"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - uses: actions/upload-artifact@v4

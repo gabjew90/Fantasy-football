@@ -9,8 +9,8 @@ Statuses:
   live         in use, and `evidence` names the validation artifact(s) that
                earned it the place
   provisional  in use WITHOUT validation; `note` must say why and what would
-               validate it. This is the honest label for rush_yds_v0 and the
-               market blend weight -- not a way around the rule
+               validate it. This is the honest label for, e.g., the TD market
+               blend weight -- not a way around the rule
   shadow       computed and logged beside a live component, never shown as the
                answer; `evidence` names the harness comparing them
   deprecated   still in the tree, scheduled for deletion; `retire_in` names the
@@ -47,33 +47,58 @@ COMPONENTS: tuple[Component, ...] = (
     # ------------------------------------------------------------- props
     Component("receiving_hier_v2", "prop_model", "props/engine/scripts/model.py", "live",
               evidence=("reports/yardage_harness.md", "reports/width_tuning.md",
-                        "props/engine/resources/model_registry.md"),
+                        "props/engine/resources/model_registry.md",
+                        "reports/current_settings_check_2026-10-06.md", "reports/round34_receiving_joint.md"),
               note="with the width settings (props-v1.20, resources/width_params.json, tuned on 2022-23): "
-                   "passes all four harness checks on 2024-25 -- beats baseline A each season, unbiased, "
+                   "passed all four harness checks on 2024-25 -- beats baseline A each season, unbiased, "
                    "19.0% / 19.2% outside p10-p90, every 60-90% bucket within 3 points (yards exactly at "
-                   "the limit). Not yet tested "
-                   "against posted lines (eligibility.VALIDATED_MARKETS)",
+                   "the limit). Since: target-share concentration 40 -> 60 (round 34, DECISIONS #195, kept "
+                   "under the spread rule #204); re-checked at the current settings "
+                   "(reports/current_settings_check_2026-10-06.md) both stay inside the width bar, but at the "
+                   "main line the Over hits ~3 points more often than the engine on receiving yards and 1.4 on "
+                   "receptions (#197). At Sleeper's real lines (weeks 2-4) the engine trails the market (#202). "
+                   "Not yet tested against posted lines (eligibility.VALIDATED_MARKETS)",
               markets=("player_receptions", "player_reception_yds")),
     Component("rush_yds_v0", "prop_model", "props/engine/scripts/model.py", "live",
-              evidence=("reports/yardage_harness.md", "reports/width_tuning.md", "reports/width_tuning_qb.md"),
+              evidence=("reports/yardage_harness.md", "reports/width_tuning.md", "reports/width_tuning_qb.md",
+                        "reports/round30_conversion.md", "reports/round29_market_runs.md",
+                        "reports/current_settings_check_2026-10-06.md"),
               note="props-v1.21 (DECISIONS #100): starting QBs (carry grid + kneel-downs, own width "
                    "settings) pass all four checks -- 22.0% outside p10-p90, worst bucket 2.9 points; running "
                    "backs 20.3% and 3.4 points, 0.4 over the calibration limit -- USER DECISION: noise, kept "
                    "live. Known: backs run ~4% low (shares summing past 1 are scaled down); QBs ran ~12% "
-                   "high in 2025. The run-defense adjustment is measured to help. Not tested against posted "
+                   "high in 2025. The run-defense adjustment is measured to help. Since: the carry-share "
+                   "rescale (round 15, #133); yards-per-carry log-sd 0.30 -> 0.15 (round 30, #189); the backs' "
+                   "carries 50% toward the market (round 39, #204). QB rushing is OFF THE BOARD (#188, #190): "
+                   "simulated, never priced or recorded. Current width (current_settings_check): backs' "
+                   "rushing too narrow in the tails (23.4% outside the 80% range). Not tested against posted "
                    "lines",
               markets=("player_rush_yds",)),
     Component("pass_yds_v0", "prop_model", "props/engine/scripts/model.py", "live",
-              evidence=("reports/yardage_harness.md",),
+              evidence=("reports/yardage_harness.md", "reports/rush_rec_calibration.md",
+                        "reports/round38_qb_passing_bias.md"),
               note="props-v1.24 (DECISIONS #105): the starting QB's passing yards from his receivers' draws "
                    "in the same simulation, plus the depth receivers, times a starter's share. 2024-25: "
                    "actual/model 0.986, 18.1% outside p10-p90, beats baseline A pooled (+1.08, interval "
                    "excludes 0) and in 2025; 2024's interval includes 0 (+0.86); a 16-bet 80-90% bucket "
                    "misses by 18 points and Over 60-70% by 3.2 (all others within 3) -- USER DECISION: "
                    "priced, bar unchanged. The gain is early season (weeks 2-4 +4.9); from week 5 it ties "
-                   "baseline A. The starter is the depth-chart QB first (DECISIONS #105). Not tested "
-                   "against posted lines",
+                   "baseline A. The starter is the depth-chart QB first (DECISIONS #105). CORRECTED "
+                   "2026-10-06: graded on the QB who actually started, the width FAILS (14.4% outside, too "
+                   "wide; #187) and the Over at the main line ran ~6 points above the engine (#196-#197). "
+                   "Round 38 ships (implied points ^0.2, x1.04; #199, the width guard overridden by the user; "
+                   "replicated on four seeds, #203): most of the bias gone, still too wide (11.9%). Not "
+                   "tested against posted lines",
               markets=("player_pass_yds",)),
+    Component("rush_rec_sum_v0", "prop_model", "props/engine/scripts/score_game.py", "live",
+              evidence=("reports/rush_rec_calibration.md", "reports/current_settings_check_2026-10-06.md"),
+              note="a back's (or receiver's) rushing + receiving yards: the sum of his rushing and "
+                   "receiving draws in each simulation, QBs excluded; priced since it passed its 2022-25 "
+                   "calibration check (width 0.223, bias +1.7%, no band fails; residual correlation +0.044, "
+                   "so independent draws hold; DECISIONS #187). After round 30 the whole-chain width FAILS "
+                   "(24.9% outside the 80% range, too narrow in the tails; current_settings_check). Not "
+                   "tested against posted lines",
+              markets=("player_rush_reception_yds",)),
     Component("anytime_td_v1", "prop_model", "props/engine/scripts/td_v1.py", "live",
               evidence=("reports/td_v1.md", "reports/td_layer1.md", "reports/td_layer2.md"),
               note="layers 1-2: team TD count and per-channel scorer shares",
@@ -135,7 +160,7 @@ COMPONENTS: tuple[Component, ...] = (
                    "scoring; the draft board's projection"),
     Component("model_projection", "projection_source", "draftkit/projections.py", "deprecated",
               evidence=("reports/projection_backtest.omnibeta.md",),
-              retire_in="August draft prep",
+              retire_in="2027 draft prep",
               note="the in-house season model; lost its own backtest. Draft-only, frozen: still "
                    "Omnibeta's draft source and the board-identity path (DECISIONS #108)"),
 )

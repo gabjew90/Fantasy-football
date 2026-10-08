@@ -1,10 +1,10 @@
-# draftkit — draft prep, live draft engine, in-season auto-manager
+# fantasy-football — the draft kit, the fantasy and props engines, and the chat skill
 
 Multi-league since 2026-08-29: `config.yaml` holds globals, every league fact
 lives in `leagues/<name>.yaml` (`--league <name>` / `DRAFTKIT_LEAGUE`).
 Leagues on file: **Omnibeta Degens** (Sleeper, 12-team full PPR, 2 FLEX,
 drafted 2026-08-23) and **Keefamania** (Yahoo, 10-team half PPR, 1 FLEX,
-draft Sat 2026-09-05 — see `docs/draft-day-runbook.md`). Decisions and their
+drafted 2026-09-05 — the procedure, now historical, is `docs/draft-day-runbook.md`). Decisions and their
 evidence live in `DECISIONS.md`; this README is the map, not the record.
 
 > **Scheduled fantasy notifications are OFF since 2026-09-25** (the user's call,
@@ -134,7 +134,7 @@ Where I deviated, and why:
 ## Testing
 
 ```bash
-python -m pytest tests/          # snake math, needs, tiering, scoring, ID matching
+venv/Scripts/python.exe -m pytest tests props/tests props/tests_ci -q   # the full suite (must pass before a merge; ~4 min)
 python -m draftkit simulate --slot 6   # full-draft dry run through the real tracker code
 ```
 
@@ -144,14 +144,23 @@ python -m draftkit simulate --slot 6   # full-draft dry run through the real tra
 - `git config core.hooksPath .githooks` is required once per clone: the pre-commit hook is the guard that keeps `state/*.json` commits and code commits apart.
 - `scripts/SEASON BRIEFS.bat` and `scripts/ADP DIFF.bat` are run by Windows scheduled tasks on the laptop, not by the repo. SEASON BRIEFS duplicates what the GitHub Actions manager already delivers and is a candidate for retirement — that decision is owed to the user; neither task has been touched.
 
-Repo layout: `draftkit/` (pipeline + tracker modules), `manager/` (in-season
+Repo layout: `nfl.py` (the one CLI chat runs: `nfl.py fantasy ...` and
+`nfl.py props ...`), `CHAT.md` (the chat contract), `core/` (the one data
+layer -- fetch, IDs, scoring, the model registry -- and the props question
+tools), `fantasy/` (the in-season fantasy commands: player, swap, roster,
+lineup, waiver, trade, scenario), `props/` (the props engine in
+`props/engine/`, its historical record and the bet journal; see
+`props/README.md`), `skill/` (the chat skill's release files, lock and
+build), `draftkit/` (pipeline + tracker modules), `manager/` (in-season
 auto-manager, GitHub Actions, state in `state/*.json`), `scripts/` (the Yahoo
 draft rig — bridge server, in-page driver, pre-rank driver — and the
-validation harness: replays, backtest, gates), `leagues/*.yaml` (league
-facts), `config.yaml` (globals only), `tests/`, `data/raw` (API caches,
-gitignored), `data/processed` (intermediates, gitignored), `tiers*.csv` +
-`board*.md` (deliverables, committed), `reports/` (generated artifacts),
-`DECISIONS.md` (the record).
+validation harness: replays, backtest, gates), `experiments/` (one-off
+studies, outputs gitignored, promoted or deleted within 30 days),
+`leagues/*.yaml` (league facts), `config.yaml` (globals only), `tests/`,
+`data/raw` (API caches, gitignored), `data/processed` (intermediates,
+gitignored), `tiers*.csv` + `board*.md` (deliverables, committed),
+`reports/` (generated artifacts), `docs/` (plans and runbooks;
+`docs/archive/` is history), `DECISIONS.md` (the record).
 
 ## Auto-manager (in-season, notification-only)
 

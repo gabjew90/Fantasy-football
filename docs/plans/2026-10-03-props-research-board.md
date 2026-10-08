@@ -19,7 +19,10 @@ graded journal decides whether the process works.
    "Bottom line" verdicts leave the report, the per-game summary, the slate
    card, `props ask` and chat. They come back only when the scorecard shows the
    model adding weight beside the book (blend weight interval above zero) for
-   the current engine version.
+   the current engine version. -> Tightened by DECISIONS #151 (2026-10-03): the
+   gate is decided only at the reviews after weeks 8, 12 and 18, and also needs
+   the top-tier yardage calls' profit at Sleeper's recorded prices wholly above
+   zero on 100+ bets.
 2. **Research table per line:** line and price, projection (median and
    p10-p90), model % vs book %, **line implies** (the targets or carries the
    line needs to be 50/50 vs what he is getting), and **flags**.

@@ -5542,6 +5542,8 @@ about model states changed.
 
 ## 2026-09-24 (99) -- the width settings: the yardage markets pass (props-v1.20)
 
+-> superseded by #187 (2026-10-06: under starter-only grading QB passing fails width) and #197 (2026-10-06: at the stand-in lines the Overs hit more often than the engine said).
+
 Step 2 of docs/plans/2026-09-24-yardage-harness.md. The samplers held a
 player's share, catch rate and yards per touch fixed within a game; each can
 now vary game to game, mean-preserving, with "off" the old sampler draw for
@@ -5587,6 +5589,8 @@ could be mistaken for a path on Windows; the knob-design caveat above; and
 tuning ran 108 pointless bootstraps.
 
 ## 2026-09-24 (100) -- QB rushing priced; the backs' calibration miss judged noise (props-v1.21)
+
+-> superseded by #188 (2026-10-06) and #190 (2026-10-06): QB rushing is off the board -- simulated, not priced or recorded.
 
 Step 3 of docs/plans/2026-09-24-yardage-harness.md.
 
@@ -5746,6 +5750,8 @@ given to chat to push anywhere.
 
 ## 2026-09-25 (105) -- QB passing yards priced from the team simulation (props-v1.24)
 
+-> superseded by #187 (2026-10-06: graded on the QB who started, the width FAILS, too wide), #197 (2026-10-06: "right on average and the right width" corrected) and #199 (2026-10-06: round 38 scales passing by implied points).
+
 Plan step 4. The starting QB's passing yards are his receivers' yards in the
 same simulation that prices their props (`model.simulate_qb_passing`), plus
 two facts the sampler lacked, both measured on 2021-25 play-by-play first:
@@ -5798,6 +5804,8 @@ check: Mahomes 235 vs Sleeper 236.5; Malik Willis 162 vs 177.5, flagged WEAK
 (new team).
 
 ## 2026-09-25 (106) -- the Vegas-line environment: tuned, not better; the yardage market blend in shadow
+
+-> superseded by #134 (2026-10-01: throws 25% toward the market), #197 (2026-10-06: reopened) and #204 (2026-10-06: the backs' carries 50% toward the market).
 
 Plan step 5, two parts.
 
@@ -6862,6 +6870,8 @@ Also found by the sweep, not acted on: QB passing over-projected in weeks
 
 ## 2026-10-01 (137) -- QB passing scaled by implied points: measured, not shipped
 
+-> superseded by #197 (2026-10-06: reopened) and #199 (2026-10-06: round 38 ships the implied-points scale, exponent 0.2).
+
 The sweep's biggest miss: QB passing 19% high for teams implied <= 18 points,
 6-7% low at 25+ (receivers barely). DISCLOSED: 2024-25 was printed while
 reading the shape. Tested (implied / 22) ** beta on the QB's yards: on
@@ -7042,6 +7052,8 @@ worst calibration band (14 rows) moved 0.055 -> 0.162 -- noise-sized, watched
 on the settled record from week 4, the first week the rule acts in 2026.
 
 ## 2026-10-03 (144) -- the label gate: the record decides, in code
+
+-> superseded by #151 (2026-10-03): the gate is decided only at the week 8 / 12 / 18 reviews, on weight AND top-tier profit.
 
 The research board's "no bet labels until the record shows otherwise" was a
 sentence with no code behind it, and its "through week 3" figures were
@@ -7371,6 +7383,8 @@ by the user.
 
 ## 2026-10-05 (167) -- the luck line is each player's own 95th-percentile play
 
+-> superseded by #169 (2026-10-05: the 99th) and #207 (2026-10-07: the 90th for every kind).
+
 - User's design for the achievability gauge, settled over several messages: a play
   past the player's OWN 95th percentile for that prop -- his catches for receiving
   yards, his runs for rushing yards -- counts as a lucky breakaway and is counted at
@@ -7400,6 +7414,8 @@ by the user.
   if-thens. Headed and easy to read. A slate keeps the short per-game preview.
 
 ## 2026-10-05 (169) -- the game story shows fantasy points allowed by position; the luck line moves to the 99th
+
+-> superseded by #207 (2026-10-07) for the luck line (now the 90th); the fantasy-points-allowed part stands.
 
 - The game header gets a "Fantasy points allowed" line: PPR points per game each
   defence has allowed to RBs, WRs and TEs this season (1 a catch, 0.1 a yard, 6 a
@@ -7452,6 +7468,8 @@ by the user.
 - Report text only: no price moves.
 
 ## 2026-10-05 (173) -- rushing + receiving yards: read now, priced only after a calibration check
+
+-> superseded by #187 (2026-10-06): rushing + receiving yards are priced.
 
 - User, after a Power Play lost on Kamara's rushing yards while the Saints' passing legs
   hit: bring in rushing + receiving yards, the leg that survives either script for a back.
@@ -7606,6 +7624,8 @@ by the user.
 - TB at DAL: Jalon Daniels priced as TB's starter automatically, Mayfield out (Sleeper).
 
 ## 2026-10-06 (184) -- rounds 28b and 29: two running-game candidates wait for 2026 weeks 2-8
+
+-> superseded by #185 (2026-10-06: read once on 2026 weeks 2-4, no midseason wait) and #204 (2026-10-06: round 39, market carries 50%, ships).
 
 - Round 29 (reports/round29_market_runs.md): the backs' carries move toward the market's
   fitted carries with the starting QB's held; selected w = 0.5 on 2022-25 (rushing yards
@@ -7881,6 +7901,8 @@ The expert re-ran the four-season backtest (baseline reproduces ours: receptions
 
 ## 2026-10-06 (200) -- round 41: tight ends' target share x1.06 ships; the role yards shapes stay
 
+-> superseded by #203 (2026-10-06): round 41 withdrawn on the seed check; te_share_mult back to 1.
+
 - Three registered stages on each role's own rows (reports/round41_receiving_roles.md). The
   tight-end yards shape (1.5) leaned better but was not detectable and went negative on 2026;
   the backs' shape kept 1. **Tight ends' share x1.06 ships**: their receptions own-volume log
@@ -8065,3 +8087,48 @@ The expert re-ran the four-season backtest (baseline reproduces ours: receptions
   anchored to implied points) and read the book's number as the probability. SKILL.md: chat copies
   the guide before the first card and says how the matchup tables were built; no number goes out
   without its source explained.
+
+## 2026-10-08 (210) -- docs truth pass: every doc, docstring, rule text and report sentence says what is true now
+
+No behaviour changed: text only (docs, comments, docstrings, report and rule strings), one test
+renamed, one registry entry added as data. What was corrected, each checked against the code,
+config or a report first:
+
+- **QB passing** (score_game.py's report lines, core/props_ask.py's PASS_YDS_RULE, SKILL.md,
+  model_registry.md, core/registry.py): "right on average and the right width" (#105) replaced by
+  round 38's scale and its measured width (11.9% outside the 80% range, still too wide; #199).
+- **The no-labels rule** (props_ask UNVALIDATED): labels return only at the week 8 / 12 / 18
+  reviews on weight AND top-tier profit (#151); the live record (#202) leads; "ARE calibrated"
+  replaced by the corrected backtest evidence.
+- **QB rushing** off the board (#188/#190) where docs still called it priced or "not modelled yet";
+  **anytime TDs** priced, logged and graded but hidden (#190), reconciled in SKILL.md.
+- **Closing capture and persistence**: the scheduled capture records open / decision / close; chat
+  is read-only and writes no archive (SKILL.md, line_archive.md, data_source_matrix.md,
+  execution_protocol.md, the scorer's kickoff line). Sleeper is the primary price source.
+- **Team volume**: throws 25% and the backs' carries 50% toward the market (#134, #204), not
+  "history by default" (SKILL.md, engine_overview.md, methodology.md, model_registry.md).
+- **Width settings**: target concentration 60 (#195), eff_sd_rush 0.15 (#189), the passing scale
+  (#199), K0 yards per target 80 in methodology's table; a "Current settings" block heads the
+  model registry, with forward pointers on rounds 11, 13, 19 and the round-5-10 notes; its
+  duplicated Round-7/8/9/10 copy (113 lines, byte-identical) removed and the colliding Round-10
+  heading renamed. reports/yardage_harness.md carries a banner pointing at
+  reports/current_settings_check_2026-10-06.md for width.
+- **The card** (#206-#208): SKILL.md's per-player line-fit reads and gauge now say they live in
+  research_*.csv; the card's efficiency rows replace them; the second "premium prop guide" layout
+  points at team_matchup_guide.md and the cards. The luck fallback drops the longest play in the
+  10-game window, not "this season".
+- **Retired or stale**: the must-win pick (#142) in CHAT.md's routing and score_week.py's
+  docstring; "weeks 2-3 STRONG 45%" replaced by the live record; the fantasy ledger fills only
+  from explicit --record runs, which nothing schedules (#109); CLAUDE.md scopes the draft
+  validation loop to the draft engine and adds props/tests_ci to the test command (README too);
+  props-ci.yml's comments; props/README.md's layout, settle window and backtest scope;
+  README.md's title, layout and the Keefamania draft date; data/external/README.md's real
+  overrides.csv header; model_projection retires at 2027 draft prep.
+- **Archive**: the Yahoo API access request, the two expert prompts, docs/superpowers/ and the
+  2026-08-25 auto-manager plan moved to docs/archive/ (README there); banners name the
+  consolidation plan as the successor; docs/draft-day-runbook.md is marked historical.
+- **Forward pointers** under #99, #100, #105, #106, #137, #144, #167, #169, #173, #184 and #200.
+
+Found and NOT fixed (behaviour, out of scope): the scorer stamps every line-archive row
+`decision` and record_run only fills a missing type, so props/record/lines/ reads `decision` on
+every row while the predictions rows carry open / decision / close (line_archive.md now says so).

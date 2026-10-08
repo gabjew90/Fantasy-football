@@ -1,4 +1,4 @@
-> Historical (superseded); see docs/draft-day-runbook.md and docs/plans/2026-09-02-final-form-and-survival-sim-plan.md
+> Historical (superseded). The in-season tooling this describes was replaced by the `fantasy/` commands and `nfl.py` under docs/plans/2026-09-24-consolidation-plan.md; the fantasy schedules are off since 2026-09-25 (DECISIONS #109).
 
 # Season Management Implementation Plan
 
@@ -10,7 +10,7 @@
 
 **Tech Stack:** Python 3.10, polars, numpy, nflreadpy, stdlib http. No new deps.
 
-**Spec:** `docs/superpowers/specs/2026-08-20-season-management-design.md` (revised after external review). Verified 2026-08-23: Sleeper weekly projections endpoint responds (placeholder-only until stat projections publish — detection required); nflverse 2026 schedules carry weekday/gametime/byes; **week 1 contains a Wednesday game**, so the spec's "Thursday check" generalizes to an early-games check driven by the schedule.
+**Spec:** `docs/archive/superpowers/specs/2026-08-20-season-management-design.md` (revised after external review). Verified 2026-08-23: Sleeper weekly projections endpoint responds (placeholder-only until stat projections publish — detection required); nflverse 2026 schedules carry weekday/gametime/byes; **week 1 contains a Wednesday game**, so the spec's "Thursday check" generalizes to an early-games check driven by the schedule.
 
 **Plan-format note:** tests are complete in every task; implementation steps carry complete code for all decision logic (composer, bands, regime, protections, renderers) and exact endpoint/field contracts for fetch plumbing. Executed inline immediately after writing, so plan and implementation share one source of truth.
 

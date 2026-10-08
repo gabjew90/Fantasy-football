@@ -13,10 +13,12 @@ This skill owns sportsbook decisions only: prop market evaluation, Over/Under va
 
 **The engine's markets (user, 2026-10-06; DECISIONS #190):** receptions, receiving yards,
 non-QB rushing yards, rushing + receiving yards and QB passing yards. **Deferred: QB rushing
-yards and anytime touchdowns** -- neither is on the board or in the record, and you do not
-read, quote or narrate them (the TD notes further down describe the deferred model and apply
-only if the user explicitly asks for a TD price, which runs `--markets td`). When a report
-or the user mentions them, say they are deferred.
+yards and anytime touchdowns** -- neither is on the board, and you do not read, quote or
+narrate them (the TD notes further down describe the deferred model and apply only if the
+user explicitly asks for a TD price, which runs `--markets td`). QB rushing lines are not
+priced or recorded at all; anytime TDs are still priced, logged and graded, so the record
+keeps measuring them, but they are left off what the user reads. When a report or the user
+mentions them, say they are deferred.
 
 It does not own fantasy football decisions (start/sit, waivers, trades, draft). If a request is primarily a fantasy decision, do not apply this skill's betting framing to it. If a request contains both, answer the sportsbook portion with this skill and the fantasy portion separately, and keep the outputs distinct even when they share evidence. Do not replace fantasy roster logic with betting-market logic.
 
@@ -56,7 +58,9 @@ Helpers in `scripts/`:
   the file and nothing is assembled by hand), `slate_research_*.csv` (every priced line's
   research row) and `slate_runs_*.csv`. `slate_survival_*.csv`, `slate_card_*.csv` and
   `parlay_builder_*.csv` are still written for the record but are never shown: no picks
-  (DECISIONS #142). A 15-game week took about 3 minutes on the Windows host (props-v1.26, 2026-09-27; 9 before it): about 5 s a game plus a full re-run per Questionable player for the 'if he's out' pricing.
+  (DECISIONS #142). Timing, measured once at props-v1.26 (2026-09-27) and not re-timed since:
+  a 15-game week took about 3 minutes on the Windows host (9 before it), about 5 s a game plus a
+  full re-run per Questionable player for the 'if he's out' pricing.
 - `odds_client.py` — Odds API stages, header capture, caching, archive rows. Never prints
   the key. Prefer it over ad hoc curl.
 - `build_priors.py` — OFFSEASON ONLY. Rebuilds `resources/priors_{season}_*` from a
@@ -78,17 +82,22 @@ dispersion fits, the per-catch Gamma shape, the empirical carry-yardage residual
 the league TD-per-point constant. A live run reads these instead of reprocessing a ~100 MB
 play-by-play file. They change once per offseason.
 
-## Team environment and opponent adjustment (rounds 5-6, TD anchor round 10)
-Team volume (throws, runs) comes from the team's own history blend by default. Team
+## Team environment and opponent adjustment (rounds 5-6, TD anchor round 10; market volume rounds 16 and 39)
+Team volume (throws, runs) starts from the team's own history blend, then moves part way
+toward the market's fitted volume from the same-book spread and total: throws 25% of the way
+(model.MARKET_PASS_WEIGHT, round 16, DECISIONS #134) and the backs' carries 50% of the way
+(model.MARKET_RUSH_WEIGHT, round 39, DECISIONS #204; the starting QB's carries are held where
+history put them). With no spread/total posted, volume stays on history alone. Team
 TOUCHDOWN totals are anchored to the market by default: implied points from the same-book
 spread/total times the league TD-per-point rate, keeping the history blend's pass/rush
 split. Reason: at 20% week weight one blowout swings a history-blended TD total by a full
 touchdown (CHI week 2: 2.76 avg, 8 TDs in week 1, blend 3.8 vs market-implied 2.74), and
 that single number drives every player's anytime-TD probability. When the spread/total
-cannot be fetched, TD totals fall back to history and TD calls are capped at MODERATE. A market-anchored
-environment (`--env market`) exists but is OFF: a paired backtest on 2025 found no CRPS
-difference versus history (the first version of this note claimed otherwise; that was a
-misreading and is withdrawn). Opponent efficiency runs at the team level with fixed
+cannot be fetched, TD totals fall back to history and TD calls are capped at MODERATE. The full
+market-anchored environment (`--env market`, plays and pass rate re-centred together) exists but
+is OFF: a paired backtest on 2025 found no CRPS difference versus history (the first version of
+this note claimed otherwise; that was a misreading and is withdrawn). The partial pass and carry
+blends above are what ships. Opponent efficiency runs at the team level with fixed
 shrinkage (k0=150 plays) and measurably improves reception-yards accuracy. An earlier
 claim that it was harmful came from a yards-per-completion vs yards-per-target bug in the
 league reference, now fixed; see `model_registry.md` round-7 correction. Position-group
@@ -105,35 +114,48 @@ shrunk toward the slot prior by games played, then blends that toward current-se
 observation with `K0`. Two guards apply: a player who changed teams has the weight of his
 individual prior capped (his old role is weak evidence for his new one), and his projected
 share is rescaled by the ratio of current to prior snap share when both are available.
-**This blended form is not what the 2025 backtest validated.** It is an extension, and
-output produced under it is exploratory even for `receiving_hier_v1`.
+The two-stage blend and the new-team cap are what the 2022-25 harness runs (backtest.py
+`--historical-blend` and `--new-team-cap`, both on by default), weeks 2-4 included: the second
+expert audit found the early-season blend unbiased in weeks 2-4 and 14-16% better than the
+naive baseline on receiving (DECISIONS #198). The snap-share rescaling, weekly depth slots and
+pre-game injury handling are not in the harness (reports/current_settings_check_2026-10-06.md).
+The live receiving model is `receiving_hier_v2`; its output is exploratory like every price here.
 
 ## Persistence between invocations
-The container resets, so the archive and the decision log must leave each run and come back
-to the next one. Either pass the previous files back in with `--prior-archive` and
-`--prior-log` (the scorer de-duplicates and appends), or set `GITHUB_TOKEN` and
-`LINE_ARCHIVE_REPO` so `odds_client.py` pushes archive rows to a repo. If neither is done,
-each run's archive stands alone and closing-line value cannot be computed later.
+The record is kept by the scheduled props workflow (`.github/workflows/props.yml`), not by
+chat: it scores every game near kickoff, writes the lines and calls to `props/record/` through
+`props/record_run.py`, and commits them. Chat is read-only (CHAT.md, "Chat is read-only"): it
+never passes `--record`, never commits or pushes, and writes nothing into the repository. A
+chat run's archive JSONL and shadow log stay in the outputs folder as reference copies.
+`--prior-archive` / `--prior-log` still merge a previous run's files into a new one (the
+scorer de-duplicates and appends), and `odds_client.py` still carries a `GITHUB_TOKEN` /
+`LINE_ARCHIVE_REPO` push; chat uses neither.
 
 If the returned archive is older than the current week, report `ARCHIVE_STALE` with the last
 capture time rather than implying closing rows exist.
 
 ## Closing capture
-The container cannot schedule itself. `score_game.py` prints how long until kickoff and, when
-more than an hour remains, tells the user to open a chat inside the final 60 minutes and ask
-for a closing capture. Without that row, closing-line value for the game is `unavailable` and
-must not be estimated.
+The scheduled capture takes it (`props/guard.py`, ticking every 15 minutes): a Thursday-evening
+`open` sweep, `decision` snapshots inside 6 hours of a kickoff, and `close` inside the final 60
+minutes. Each recorded call carries its snapshot type (`props/record/predictions/`). Actions
+cron can fire late, so a game may have no `close` row; then closing-line value for it is
+`unavailable` and must not be estimated. A chat run is never the close: `score_game.py` says how
+long until kickoff and, inside 60 minutes, calls its own quote a reference copy.
 
 ## Execution environment
 This skill runs in the Claude container with `bash_tool` and Python. All retrieval and calculation happens there. Web search is a discovery aid only; it never substitutes for a direct retrieval, and it is never used to fetch prices.
 
 Network allowlist known to work (verified 2026-09-17): github.com and raw.githubusercontent.com (nflverse, DynastyProcess), api.the-odds-api.com, api.weather.gov, api.open-meteo.com, www.nfl.com, site.api.espn.com, api.sleeper.app, api.sleeper.com, api.github.com. A `host_not_allowed` deny reason means the allowlist needs updating; report it as `NETWORK_ENVIRONMENT_BLOCKED` and tell the user, do not conclude the source is gone.
 
-The container resets between chats. Anything that must persist (line archive, model registry updates, cached snapshots) must be written to `/mnt/user-data/outputs/` and presented, or pushed to the user's designated persistent store. See `resources/line_archive.md`.
+The container resets between chats, and chat persists nothing: the record lives in the repo and only the scheduled workflow writes it (see "Persistence between invocations"). Files in `/mnt/user-data/outputs/` are reference copies; attach none unless the user asks. See `resources/line_archive.md`.
 
 ## Default sportsbook market allowlist
-Unless the user explicitly requests additional markets, restrict standard prop research to:
-`spreads`, `totals`, `player_pass_yds`, `player_pass_tds`, `player_rush_yds`, `player_reception_yds`, `player_receptions`, `player_anytime_td`.
+Unless the user explicitly requests additional markets, restrict standard prop research to the
+engine's markets (DECISIONS #190): `spreads`, `totals`, `player_receptions`,
+`player_reception_yds`, `player_rush_yds` (non-QB), `player_rush_reception_yds` (backs and
+receivers) and `player_pass_yds` (the starting QB). `player_anytime_td` is deferred: priced,
+logged and graded, shown only when the user asks (`--markets td`). `player_pass_tds` is not
+priced (`odds_client.py`'s Odds API allowlist still lists it for a direct API pull).
 
 Do not silently expand into longest-play, first-TD, last-TD, alternate, or multi-TD markets.
 
@@ -179,7 +201,7 @@ is recorded on every call and printed in the source table. When the quota is gon
   which carries the DraftKings line; used for the TD anchor only, never for props.
 - `--source sleeper` prices the card from Sleeper Picks (api.sleeper.app/lines/available,
   no key, no quota, allowlisted; verified 2026-09-17). Two-sided lines for receptions,
-  receiving yards, rushing yards, QB passing yards and anytime TD on most starters, with dynamic payout
+  receiving yards, rushing yards, rushing + receiving yards, QB passing yards and anytime TD on most starters, with dynamic payout
   multipliers converted to American odds (1.78 -> -128). Sleeper is a pick'em product
   (2+ leg entries, ~12% overround per leg vs ~4.5% at DK/FD), so EV at Sleeper prices is
   lower for the same line; model % and no-vig % are comparable to a sportsbook's. Rows are
@@ -231,7 +253,8 @@ re-run. Do not reproduce a full per-game guide unless the user asks about one ga
 
 "Best play", "one pick per game", "must-win", "if you could only have one bet": there is no
 pick. Say why in one sentence (the model has not shown it adds anything beside the book's
-price; weeks 2-3, STRONG calls won 45%) and offer the research leads and the journal.
+price: over weeks 2-4 at Sleeper's real lines its log loss was 0.717 against the market's 0.692,
+DECISIONS #202) and offer the research leads and the journal.
 
 ## Fast path
 **The user never types a command (standing rule, 2026-10-06).** Every flag below is yours to
@@ -354,13 +377,13 @@ For a narrow question, run only what it needs:
      and the book's coin-flip number -- "a coin flip at about 19.2", its no-vig price turned into a
      volume with our simulation's game-to-game spread); what each
      yards line works out to ("line implies").
-  5. **The lines themselves**: where our projection lands (zone), and the luck-free check -- his
-     luck-free yards a play over his last 10 games, the volume the yards line takes at that rate,
-     against our volume and the book's. For a QB the same check reads "Completions and yards": his
-     luck-free yards per completion, the completions his passing-yards line takes, against our
-     projected completions and the book's completions line. Then **name the better line for each
+  5. **The lines themselves**: where our projection lands (zone), and the luckless check -- the
+     card's "At his luck-capped rate" row (DECISIONS #206-#208): the volume the Over needs at his
+     yards a play over his last 10 games with every play past his own 90th percentile capped, and
+     the engine's chance of that volume, beside the book's own volume line where posted. For a QB
+     the same row is in yards a completion and completions. Then **name the better line for each
      read, catches OR yards, and say why** -- never use the two interchangeably (user,
-     2026-10-05). Yards is the better vehicle when the luck-free check says the yards line takes
+     2026-10-05). Yards is the better vehicle when the luck-capped row says the yards line takes
      fewer catches than the catches line asks (London, week 4: 82 yards took about 5.4 catches; the
      catches line asked 7); catches
      is better when the yards line takes more than his volume or rests on a long play, or when a
@@ -377,8 +400,10 @@ For a narrow question, run only what it needs:
   over a backfield, whose target share jumped or collapsed, a returning star and who it takes
   from), where the model and the book disagree AND WHY (a stale prior on a new role, a game script
   the model does not price; when the model sits below most QB passing lines, say the gap is
-  unexplained -- the harness found QB passing unbiased on 2024-25 outcomes, so neither side
-  is known to be right), and
+  more likely the model's than the book's -- the backtest measured the engine's passing Over
+  about 6 points too low at the main line (DECISIONS #196), round 38 removed most of that but
+  not all at the extremes of implied points (DECISIONS #199), and at Sleeper's real lines over
+  weeks 2-4, priced before round 38, passing Overs hit 57% against an engine 42% (DECISIONS #202)), and
   what to watch. A game with nothing to find says so in a sentence. Never call a line a bet.
   **Write for a reader without the table** (user, 2026-10-05). The narrative is read on its own,
   often on a phone after the table has scrolled away: every line it discusses names the player,
@@ -421,56 +446,38 @@ For a narrow question, run only what it needs:
   and spread, so it guides how much role a view needs; it is not a guarantee. In a Power Play
   the listed price does not apply: every leg needs about 56% (4 picks, 10x) or 55% (5 picks,
   20x), whichever side, so a plus-money Under is no cheaper there than any other leg.
-  **Catches and yards together.** Each receiver's "Catches and yards" line reads the book's
-  catches, receiving-yards and longest-catch lines against each other (DECISIONS #164). Lines
-  move in half points, so each Over means the next whole number (3.5 catches = 4, 44.5 yards =
-  45; a whole-number line pushes on itself). Use it whenever the user weighs "yards or catches":
-  the lines' own yards a catch against ours for him says whether his yards Over asks more than
-  his catches Over (his raw season figure is shown but is too noisy to carry the read);
-  "both Overs at the minimum" is what stacking his two legs needs; and the longest-catch line
-  says how much of the yards one play carries -- with one catch at that line, what the rest must
-  average. Narrate it as the book's view of how he gets his yards, not as a model edge: the
-  longest-catch line is the book's number only and is not priced here.
-  **Carries and yards** (backs and receivers, not QBs; DECISIONS #166) is the runner's version:
-  the book's carries line beside our projected carries (with the side the book favours), the
-  lines' yards a carry against ours, his season figure with its count and the warning that it is
-  mostly noise this early (three games of yards a carry predicted later games worse than the
-  league average in 2022-25; reports/robust_ypc_check.md), both Overs at the minimum, and the
-  longest-run line's share of the yards. When the lines ask about his usual yards a carry, his
-  rushing-yards Over is a bet on the carries: say so, and say where the book's carries line and
-  favoured side sit against ours (Bijan, week 4: 19.5, Under favoured, we 17.5 -- the market
-  does not expect 20). Receivers' season figures are shown beside a luck-free version (the luck line
-  below); a big gap between the two means his average was built on one or two long plays, so a yards
-  Over that needs his raw average needs another one. Lean on our figure for runners: their
-  early-season yards a carry is noise.
-  **Rushing + receiving yards** (DECISIONS #173): for a back, the report reads the book's
-  combined line -- its no-vig coin flip, the touches the line takes at his luck-free yards a
-  carry and a catch, against our touches and the book's carries + catches lines, and how much
-  of his yards come from catches. When a back's rushing leg needs a different script from the
-  rest of an entry, name his combined line as the leg that survives both scripts (the catches
-  hold up when his team trails). The combined line is priced since DECISIONS #187 (the model's
-  chance sits in the prop table); this touches read is arithmetic beside it, never a price-based
-  threshold, and a combined what-if runs as a separate
-  carry-and-catch scenario (carries, targets, catch rate and both yards rates kept apart).
-  **The achievability gauge** ends both reads: the volume the yards line takes at his capped
-  yards a play (the luck line: a play past the player's OWN 90th percentile for that prop --
-  his catches or his runs, last season and this one -- is counted at that line: a strict,
-  luckless Over check that trims every long play, not only freak ones (a back's cap is about 9
-  yards); under 10 plays of his own, his longest play this season is left out
-  instead; the report prints which it used; ours when his
-  sample is small), against the volume we project: "comfortably more than it takes", "about what
-  it takes" or "fewer than it takes". Use it to say whether a yards line is achievable without
-  long plays. **Say whose volume each number is.** "We project" is OUR model's volume, never
-  the book's. The gauge also quotes the book's own catches or carries line when Sleeper posts
-  one (with the side it favours) -- narrate against both: "90 yards takes about 21 carries
-  without a breakaway; we project 17.5, and the book's own carries line is 19.5 with the Under
-  favoured -- even the book's volume falls short, so the Over needs a workhorse game or a long
-  run". When the book posts no volume line for him, say the check is against our volume only and
-  add his recent games' volume and what the yards line works out to ("line implies" in the
-  table), so the reader sees three volumes side by side. It is an average-game check, so a
-  "comfortably" on a 1-2 catch player is still
-  close to a coin flip (the gauge warns under 3 catches or 6 carries). Report text only: it never
-  changes the model's price.
+  **The line-fit reads moved off the card (DECISIONS #208).** The old per-player reads --
+  "Catches and yards" (DECISIONS #164), "Carries and yards" (#166), the QB's "Completions and
+  yards" (#170), the rushing + receiving touches read (#173) and the achievability gauge that
+  ended them -- are now columns in `research_*.csv` (`catch_yards`, `carry_yards`, `qb_yards`,
+  `rush_rec`), not report text. On the card, the efficiency rows replace them: the volume the
+  Over needs at his luck-capped rate, at his rate this season and at the engine's rate, each with
+  the engine's chance of that volume; the efficiency the line needs at the engine's volume and
+  his games this season that beat it; and "The book's other lines" (the catches line beside the
+  yards line, the carries line and the side its prices favour, the longest-play lines). The
+  rules those reads carried still apply when you narrate the card:
+  - Lines move in half points, so each Over means the next whole number (3.5 catches = 4, 44.5
+    yards = 45; a whole-number line pushes on itself).
+  - The book's longest-play line says how much of the yards one play carries; it is the book's
+    number only and is not priced here. Narrate the book's lines as its view of how he gets his
+    yards, not as a model edge.
+  - A back's season yards a carry is mostly noise this early (three games of yards a carry
+    predicted later games worse than the league average in 2022-25; reports/robust_ypc_check.md):
+    lean on the luck-capped and engine rows for runners. When the line asks about his usual yards
+    a carry, his rushing-yards Over is a bet on the carries: say where the book's carries line and
+    favoured side sit against the engine's volume (Bijan, week 4: 19.5, Under favoured, engine 17.5).
+  - The luck-capped rate reads his last 10 games (crossing into last season while this one is
+    short) with every play past his own 90th percentile counted at that value (a strict, luckless
+    Over check: a back's cap is about 9 yards); under 10 plays in that window, his longest play
+    in the window is left out instead. The card's notes name the games.
+  - **Say whose volume each number is.** "The engine projects" is OUR volume, never the book's;
+    the market's own volume line sits in its own row. A clear row on a 1-2 catch player is still
+    close to a coin flip.
+  - A back's combined line survives either script (the catches hold up when his team trails):
+    name it when his rushing leg needs a different script from the rest of an entry. A combined
+    what-if runs as a separate carry-and-catch scenario (carries, targets, catch rate and both
+    yards rates kept apart).
+  None of this changes a price.
   Then narrate the bold lines, analytically, in plain English -- interpret, do not recite the
   row's numbers back:
   1. **The story and its direction**: who is out or back, whose role moved, and why that points
@@ -524,21 +531,16 @@ Two rules for every reply:
   present `joint_td_*.csv` (all four candidates, shadow) or a three-teammate combination.
 
 When `score_game.py` has been run, the CHAT REPLY is the deliverable, not the report file.
-The archive JSONL and shadow-log CSV are still written (they feed closing-line value) but
-need not be surfaced. Write the reply as a premium prop guide with this structure:
+The archive JSONL and shadow-log CSV are still written (reference copies; the record is the
+scheduled workflow's) but need not be surfaced. A single-game read has ONE layout: the team
+section follows `resources/team_matchup_guide.md` exactly (header and sources line, thesis,
+sections 1-8 -- the market, expected volume, unit performance, who plays, production allowed,
+weather and venue, where the baseline could miss, game flow; see "How a single-game read is
+written" in the fast path), then the player cards. The parts below are the content rules for
+the player cards and what follows them, not a second layout. State once, in the header, that
+these are model opinions not tested against sportsbook lines.
 
-1. **Header** — matchup, kickoff, venue/roof. Then the game frame in one block: same-book
-   spread and total with implied team totals, weather (temp, wind, rain, and whether the
-   15 mph wind screen was hit), injury/inactive summary, and how much current-season data
-   the model has. One sentence stating these are model opinions not yet validated
-   against sportsbooks.
-2. **How the game projects** — each team's projected throws, runs, and offensive TDs,
-   and where those came from (history blend, market re-centre if used, league drift
-   correction if active).
-3. **The matchup** — each defense's efficiency allowed vs league (catch rate, yards per
-   target, yards per carry, with sample size) and the multiplier applied to the opposing
-   receivers/rushers. State plainly if the effect is small.
-4. **Per team, starters in depth-chart order** (QB1, RB1, WR1, WR2, TE1, WR3; RB2/proxy
+1. **Per team, starters in depth-chart order** (QB1, RB1, WR1, WR2, TE1, WR3; RB2/proxy
    only if they have a line). Each: the report's player card, laid out and narrated as the
    "Player cards" rules below say. What its tables hold: the prop table (below); the role
    evidence (last game against his earlier games: shares, snaps, a back's three jobs, the
@@ -606,12 +608,13 @@ need not be surfaced. Write the reply as a premium prop guide with this structur
    share handed to his teammates. Show both numbers side by side for every line that
    moves, and state that his own props void if he sits. Do not weight the two cases by a
    guess at whether he plays and do not recommend one: the user decides.
-5. **Research table** — reproduce the report's "Research table" (from `research_*.csv`) as ONE
+2. **Research table** — reproduce the report's "Research table" (from `research_*.csv`) as ONE
    table, grouped by team: Player, Prop, Line, Price (Over / Under), Our projection, Over:
    model / book, Line implies, Pays at this price if you expect, Last game, Flags. Do not hand-compute any of these numbers
    and do not re-sort them by the model-book gap: ranking by gap ranked lines by how likely
    the model was missing something.
-   For anytime-TD rows, the model is `anytime_td_v1` (PROTOTYPE; see
+   For anytime-TD rows (deferred: only when the user asks for TDs, `--markets td`; DECISIONS
+   #190), the model is `anytime_td_v1` (PROTOTYPE; see
    `resources/model_registry.md`). State each team's expected offensive touchdowns and
    the player's share of each, and say which model priced the row: the `td_model` column
    reads `anytime_td_v1`, or `anytime_td_v0` when v1 could not run (no market implied
@@ -629,8 +632,11 @@ need not be surfaced. Write the reply as a premium prop guide with this structur
    it places lines at fixed offsets from the model's own median, over every player-week
    rather than the ones worth betting, and reuses each player-week 8-10 times so its `n`
    column overstates the evidence by about an order of magnitude. Quote it only with that
-   description attached. The 2022-25 yardage harness (`reports/yardage_harness.md` in the
-   repo) is the backtest evidence. **The live record at Sleeper's real lines comes first (DECISIONS
+   description attached. The backtest evidence is the 2022-25 harness at the current settings:
+   `reports/current_settings_check_2026-10-06.md` in the repo (it supersedes
+   `reports/yardage_harness.md` for width), with rounds 30-39 since (`reports/round30_conversion.md`,
+   `reports/round34_receiving_joint.md`, `reports/round38_qb_passing_bias.md`,
+   `reports/round29_market_runs.md` for round 39). **The live record at Sleeper's real lines comes first (DECISIONS
    #202):** over weeks 2-4 (1,536 graded lines) the engine's Over chance had no useful relationship
    to outcomes -- log loss 0.717 against the market's 0.692 (a coin flip is 0.693); passing Overs
    hit 57% against an engine 42%, rushing 40% against 47%. So read the market's no-vig chance as
@@ -640,7 +646,8 @@ need not be surfaced. Write the reply as a premium prop guide with this structur
    **measured biases at the main line (expert audit, DECISIONS #197)**:
    at the backtest's stand-in line on 2022-25 the receiving-yards Over hit 2.9 points more often
    than the engine said (receptions 1.4, rushing 1.8, combined 0.6), and every market leans by
-   the team's implied points (backs on teams implied 27+: Over 58.7% against 48.5%). The report
+   the team's implied points (backs on teams implied 27+: Over 58.7% against 48.5%, measured
+   before round 39's market carries, which act on that lean; DECISIONS #204). The report
    prints, once above the cards, each team's row and the priced roles' rows ("Backtest
    calibration"; DECISIONS #198: tight ends' catches Over hit 4.9 points and yards 6.6 points more
    often than the engine said in the backtest -- not seen at real lines so far (live: 45.7% hit
@@ -663,11 +670,13 @@ need not be surfaced. Write the reply as a premium prop guide with this structur
    and says so in the sources table.
    Because the scale acts on the QB alone, his passing mean sits above his receivers' summed yards
    (about 4% at 22 implied points, 9.5% at 28.5): never compare a QB's line with his receivers' lines
-   added up (fourth expert review). It is also too WIDE in the tails (14% of games outside the 80% range against a
-   17-23% bar; reports/rush_rec_calibration.md). Priced by the user's decision (DECISIONS #105).
+   added up (fourth expert review). It is also too WIDE in the tails, still so after round 38 (11.9%
+   of games outside the 80% range against a 17-23% bar, 2022-24; reports/round38_qb_passing_bias.md):
+   its chances sit too close to 50%. Priced by the user's decision (DECISIONS #105), and round 38
+   shipped over its width guard by the user's override (DECISIONS #199).
    Ladder: `ladder_*.csv` holds P(stat <= k) per player; quote it when the user asks about
    an alternate line.
-6. **Parlays — DISABLED, do not price them.** `parlays_*.csv` is no longer written.
+3. **Parlays — DISABLED, do not price them.** `parlays_*.csv` is no longer written.
    The simulation does induce real within-team correlation, which is exactly why a
    parlay number built from it reads as authoritative, but the joint distribution has
    never been checked against realised joint outcomes: the backtest scores each market
@@ -675,7 +684,7 @@ need not be surfaced. Write the reply as a premium prop guide with this structur
    turns a +450 fair price into a losing bet, and marginal CRPS cannot detect that. If
    asked for a parlay, say it is gated pending a joint-outcome holdout and give the
    single legs instead.
-7. **Close** — the receiving role-shift flags on the board, if any, and one line on the
+4. **Close** — the receiving role-shift flags on the board, if any, and one line on the
    journal: a bet the user makes is logged with its four checklist answers (the verified
    change, the workload the line implies, how it fails, the price) and its angle (injury,
    role, return or other, chosen when logged), and graded on Tuesday.
@@ -707,6 +716,6 @@ Before finalizing:
 - model state taken from the registry, not self-assigned
 - no pick, lean, edge, EV, Kelly or stake language in the reply
 - any actionable quote refreshed immediately before valuation with source update time and quota headers
-- archive rows written for every retrieved market and presented or pushed
+- archive rows written for every retrieved market (reference copies in the outputs folder; the record is the scheduled workflow's)
 - no API key present in output, cache, archive, or logs
 - unresolved gaps explicitly disclosed

@@ -355,7 +355,7 @@ def market_environment_fitted(team_spread, total, mkt_fit, team_pace_blend, team
 
 
 # Round 29 (reports/round29_market_runs.md): the weight on the market's fitted CARRIES
-# for the backs; 0 = runs from history alone (shipped). The starting QB's carries are
+# for the backs; 0 = runs from history alone (shipped until round 39). The starting QB's carries are
 # held where history put them (hold_qb_carries), since the full market environment hurt
 # QB rushing (#106).
 MARKET_RUSH_WEIGHT = 0.5      # round 39 ships (user, 2026-10-06; DECISIONS #204)
