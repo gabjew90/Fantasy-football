@@ -98,7 +98,7 @@ def test_a_rate_not_on_the_card_fails_unless_labelled_hypothetical():
     assert not any(c["check"] == "rate source" for c in fails(ok))
 
 
-@pytest.mark.parametrize("value, ok", [("50%", True), ("51%", False), ("49.7%", True), ("49.8%", False), (0.5, True)])
+@pytest.mark.parametrize("value, ok", [("50%", True), ("51%", False), ("49.7%", True), ("49.8%", False), (0.5, False), (0.50, False), ("0.497", True)])
 def test_a_cite_matches_at_the_precision_it_is_written(value, ok):
     r = edit(lambda r: r["legs"][0]["cite"].__setitem__(3, {"field": "market_p", "value": value}))
     bad = [c for c in fails(r) if c["check"] == "cite"]
@@ -204,3 +204,101 @@ def test_main_renders_nothing_when_a_check_fails(tmp_path):
     reads_p.write_text(json.dumps(GOOD), encoding="utf-8")
     assert P.main(["--run", str(run_p), "--reads", str(reads_p), "--out", str(out), "--no-ci"]) == 0
     assert sorted(p.name for p in out.iterdir()) == ["2026_wk05_TB_DAL_agent.md", "2026_wk05_TB_DAL_qa.md"]
+
+
+# ---- the code review's ten (2026-10-08): each a false pass the first checker allowed ----
+def test_prose_is_traced_to_the_runs_number_not_the_stated_cite():
+    run = copy.deepcopy(RUN)
+    run["cards"][0]["rows"][0]["p_over_book"] = 0.451
+    r = edit(lambda r: r["legs"][0]["cite"].__setitem__(3, {"field": "market_p", "value": "45%"}))
+    # the prose still says 50%: it no longer traces to anything the run says
+    assert any(c["check"] == "number traced" and "50%" in c["stated"] for c in fails(r, run))
+    # and a chance written as a bare 0.5 is too coarse to pass as a cite at all
+    coarse = edit(lambda r: r["legs"][0]["cite"].__setitem__(3, {"field": "market_p", "value": 0.5}))
+    assert any(c["check"] == "cite" for c in fails(coarse, run))
+
+
+def test_a_rounded_rate_cannot_flip_the_verdict():
+    run = copy.deepcopy(RUN)
+    run["cards"][0]["volume"][0]["cells"]["rows"]["season"]["rate"] = 0.778      # 9 x 0.778 = 7.002, reaches 7
+    r = edit(lambda r: r["legs"][0].update(needs=[{"volume": 9, "rate": 0.775, "reaches": False}],
+                                           case="Nine targets fall short."))
+    assert any(c["check"] == "rate rounding" for c in fails(r, run))
+
+
+def test_an_injured_player_named_by_last_name_or_practice_only_must_be_checked():
+    r = edit(lambda r: r["legs"][0].update(injuries=[], case="With Mingo out, the share grows."))
+    assert any(c["check"] == "injury named" for c in fails(r))
+    r = edit(lambda r: r["legs"][0].update(fails="Nelson is out."))
+    assert any(c["check"] == "injury named" and "Nelson" in c["stated"] for c in fails(r))
+
+
+def test_number_tracing_keeps_units_apart():
+    # 9 is a need volume: "9%" must not trace to it; 0.787 is a rate: "1" must not trace to it
+    r = edit(lambda r: r["legs"][0].update(fails="Nine percent, 9%, and 1 more."))
+    bad = {c["stated"] for c in fails(r) if c["check"] == "number traced"}
+    assert "fails: 9%" in bad and "fails: 1" in bad
+
+
+def test_carries_and_catches_rates_match_in_order():
+    run = copy.deepcopy(RUN)
+    run["cards"][0]["rows"].append({"market": "player_rush_reception_yds", "line": 87.5, "book": "sleeper",
+                                    "p_over_book": 0.5, "p_over_model": 0.39})
+    run["cards"][0]["volume"].append({"market": "player_rush_reception_yds", "line": 87.5, "cells": {
+        "unit": "touches", "need_out": 88, "proj": 19.4, "rows": {"season": {"rate": [3.726, 5.133], "vol": 23,
+                                                                             "vol_txt": "x", "rate_txt": "x", "pct": 0.29}}}})
+    leg = {"player": "CeeDee Lamb", "market": "rush+rec yds", "side": "over", "line": 87.5,
+           "condition": "x.", "case": "x.", "fails": "x."}
+    right = {**GOOD, "legs": [{**leg, "needs": [{"parts": [[16, 3.726], [3, 5.133]], "reaches": False}]}]}
+    swapped = {**GOOD, "legs": [{**leg, "needs": [{"parts": [[16, 5.133], [3, 3.726]], "reaches": False}]}]}
+    assert not any(c["check"] == "rate source" for c in fails(right, run))
+    assert any(c["check"] == "rate source" for c in fails(swapped, run))
+
+
+@pytest.mark.parametrize("phrase", ["Take the Over.", "I like the Under.", "Hit the over.", "We'd love it."])
+def test_common_pick_phrasings_are_refused(phrase):
+    r = edit(lambda r: r["legs"][0].update(fails=r["legs"][0]["fails"] + " " + phrase))
+    assert any(c["check"] == "language" for c in fails(r))
+
+
+def test_an_under_leg_cites_its_own_sides_chance_and_the_table_says_a_push_is_a_push():
+    r = edit(lambda r: r["legs"][0].update(side="under", case="The market has the Under at 50%.",
+                                           cite=[{"field": "market_p_under", "value": "50%"}],
+                                           needs=[], fails="He gets 7 catches.", condition="his share falls.",
+                                           injuries=[]))
+    assert not fails(r), fails(r)
+    assert P.resolve("engine_p_under", RUN, RUN["cards"][0], RUN["cards"][0]["rows"][0], None) == pytest.approx(0.373)
+    tbl = "\n".join(P.support_table(RUN["cards"][0]["rows"][0], None, "under"))
+    assert "a result AT the line is a push" in tbl
+
+
+def test_a_malformed_reads_file_is_a_message_not_a_traceback(tmp_path):
+    run_p, reads_p = tmp_path / "run.json", tmp_path / "reads.json"
+    run_p.write_text(json.dumps(RUN), encoding="utf-8")
+    for bad in (edit(lambda r: r["legs"][0]["cite"].append({"field": "market_p", "value": "about 50%"})),
+                edit(lambda r: r["legs"][0]["needs"].append({"volume": 9, "rate": 0.787}))):
+        reads_p.write_text(json.dumps(bad), encoding="utf-8")
+        assert P.main(["--run", str(run_p), "--reads", str(reads_p), "--out", str(tmp_path / "o"), "--no-ci"]) == 2
+
+
+def test_key_shaped_strings_are_scrubbed_from_what_is_written(tmp_path):
+    run = copy.deepcopy(RUN)
+    run["sources"].append({"name": "Sportsbook prices (The Odds API)", "purpose": "fallback", "status": "unavailable",
+                           "detail": "URLError: /v4/sports?apiKey=0123456789abcdef0123456789abcdef&regions=us"})
+    run_p, reads_p, out = tmp_path / "run.json", tmp_path / "reads.json", tmp_path / "o"
+    run_p.write_text(json.dumps(run), encoding="utf-8")
+    reads_p.write_text(json.dumps(GOOD), encoding="utf-8")
+    assert P.main(["--run", str(run_p), "--reads", str(reads_p), "--out", str(out), "--no-ci",
+                   "--release-hash", "ab" * 32]) == 0
+    for f in out.iterdir():
+        txt = f.read_text(encoding="utf-8")
+        assert "0123456789abcdef0123456789abcdef" not in txt and "apiKey=<redacted>" in txt
+    assert "ab" * 32 in (out / "2026_wk05_TB_DAL_agent.md").read_text(encoding="utf-8")
+
+
+def test_a_run_file_that_is_not_the_reports_run_is_refused(tmp_path):
+    run_p, reads_p = tmp_path / "run_2026_wk05_TB_DAL.json", tmp_path / "reads.json"
+    run_p.write_text(json.dumps({**RUN, "data_cutoff": "- **Data cutoff:** an older run"}), encoding="utf-8")
+    (tmp_path / "report_2026_wk05_TB_DAL.md").write_text("- **Data cutoff:** the newer run\n", encoding="utf-8")
+    reads_p.write_text(json.dumps(GOOD), encoding="utf-8")
+    assert P.main(["--run", str(run_p), "--reads", str(reads_p), "--out", str(tmp_path / "o"), "--no-ci"]) == 2

@@ -52,6 +52,10 @@ ROW_ALIASES = {"market_p": ("row", "p_over_book"), "engine_p": ("row", "p_over_m
                "market_volume": ("row", "market_volume"), "market_catches": ("row", "market_catches"),
                "proj_volume": ("cells", "proj"), "need_rate": ("cells", "need_rate"),
                "need_out": ("cells", "need_out")}
+# the Under's own side: the market's no-vig Under is 1 - its Over; the engine's Under excludes a push
+UNDER_ALIASES = {"market_p_under": lambda row: None if row.get("p_over_book") is None else 1 - float(row["p_over_book"]),
+                 "engine_p_under": lambda row: None if row.get("p_over_model") is None
+                 else 1 - float(row["p_over_model"]) - float(row.get("p_push") or 0)}
 # refused anywhere in a read: the board is a research sheet (DECISIONS #142); the market's chance is
 # the best available estimate, never "the probability" (#215)
 BANNED = [
@@ -65,6 +69,9 @@ BANNED = [
     (re.compile(r"\b(value|smash|hammer|fade)\b", re.I), "pick language"),
     (re.compile(r"\bthe probability\b", re.I), "'the probability' (say the best available estimate)"),
     (re.compile(r"\bguarantee", re.I), "a guarantee"),
+    (re.compile(r"\b(take|hit|pound|slam|love|like|bet|back|play|grab|ride) (the )?(over|under)s?\b", re.I),
+     "telling the reader which side to take"),
+    (re.compile(r"\b(i|we)('d| would| really)? (like|love)\b", re.I), "a preference stated as a pick"),
 ]
 # spans whose numbers are labels, not claims
 EXEMPT = [re.compile(p, re.I) for p in (
@@ -100,7 +107,23 @@ def load_reads(path) -> dict:
             raise ReadsError(f"leg {i}: side must be over or under")
         if market_key(lg["market"]) is None:
             raise ReadsError(f"leg {i}: unknown market {lg['market']!r} (use one of {', '.join(sorted(MARKET_ALIASES))})")
+        for c in lg.get("cite") or []:
+            _valid_cite(c, f"leg {i}")
+        for n in lg.get("needs") or []:
+            if not isinstance(n.get("reaches"), bool):
+                raise ReadsError(f"leg {i}: every need says reaches true or false")
+    for c in reads.get("cite") or []:
+        _valid_cite(c, "game")
     return reads
+
+
+def _valid_cite(c, where):
+    if not isinstance(c, dict) or not c.get("field"):
+        raise ReadsError(f"{where}: a cite needs a field and a value")
+    try:
+        parse_stated(c.get("value"))
+    except ReadsError as ex:
+        raise ReadsError(f"{where}: cite {c.get('field')}: {ex}") from None
 
 
 def market_key(m) -> str | None:
@@ -131,6 +154,8 @@ def cells_for(card, market):
 def resolve(path: str, run, card, row, cells):
     """The run's value at a cite's field: an alias (market_p ...), row.<key>.pct|vol|rate for a
     volume-chance row, card.<path> into the player's card, game.<path> into the run."""
+    if path in UNDER_ALIASES:
+        return UNDER_ALIASES[path](row or {})
     if path in ROW_ALIASES:
         where, key = ROW_ALIASES[path]
         src = row if where == "row" else cells
@@ -181,6 +206,8 @@ def matches(stated, computed) -> bool:
     if computed is None or isinstance(computed, (dict, list, str, bool)):
         return False
     n, pct, dec = parse_stated(stated)
+    if not pct and 0 < abs(float(computed)) < 1 and dec < 2:
+        return False          # a chance or a share written 0.5 spans 45-55%: write it as a percent
     c = float(computed) * (100 if pct else 1)
     return abs(c - n) <= 0.5 * 10 ** -dec + 1e-9
 
@@ -212,7 +239,7 @@ def check(run, reads) -> list[dict]:
         ok = matches(c.get("value"), v)
         add(0, "cite", f"{c.get('field')} = {c.get('value')}", _fmt(v), ok, "" if ok else "not the run's number")
         if ok:
-            game_ok_numbers.append(c.get("value"))
+            game_ok_numbers.append(float(v))
     for kind, text in (("thesis", reads.get("thesis")), *(("note", n) for n in reads.get("notes") or [])):
         _text_checks(add, 0, kind, text, game_ok_numbers, inj, [])
     # ---- the legs ----
@@ -250,13 +277,22 @@ def check(run, reads) -> list[dict]:
                 f"{'reaches' if reaches else 'short of'} {need_out}", stated is reaches,
                 "" if stated is reaches else "the read says the opposite of the arithmetic")
             for a, b in parts:
-                allowed += [a, b, round(a * b, 1), b * 100]
-                hit = [k for k, r in rates.items() if _rate_match(b, r, len(parts) > 1)]
-                if n.get("hypothetical"):
-                    add(i, "rate source", f"{b:g}", "hypothetical (labelled)", True)
-                else:
-                    add(i, "rate source", f"{b:g}", ", ".join(hit) or "not a card rate", bool(hit),
-                        "" if hit else "the rate is not one of the card's rows; mark the need hypothetical or use a card rate")
+                allowed += [a, b, round(a * b, 1)]
+            if n.get("hypothetical"):
+                add(i, "rate source", " + ".join(f"{b:g}" for _a, b in parts), "hypothetical (labelled)", True)
+            else:
+                hit = [k for k, r in rates.items() if _rates_match([b for _a, b in parts], r)]
+                add(i, "rate source", " + ".join(f"{b:g}" for _a, b in parts), ", ".join(hit) or "not a card rate",
+                    bool(hit), "" if hit else ("the rate is not one of the card's rows (a carries + catches need lists "
+                                               "carries first); mark the need hypothetical or use a card rate"))
+                for k in hit:
+                    # the card's exact rate decides: a rounded rate must not flip the verdict
+                    exact = rates[k] if isinstance(rates[k], list) else [rates[k]]
+                    t_card = sum(a * float(r) for (a, _b), r in zip(parts, exact))
+                    if (t_card >= need_out - 1e-9) is not reaches:
+                        add(i, "rate rounding", txt, f"at the card's {k} rate: {t_card:.2f}, "
+                            f"{'reaches' if t_card >= need_out - 1e-9 else 'short of'} {need_out}", False,
+                            "the rounded rate flips the verdict; use the card's rate to more decimals")
             allowed += [total, round(total, 1)]
         for c in lg.get("cite") or []:
             f = str(c.get("field"))
@@ -264,7 +300,7 @@ def check(run, reads) -> list[dict]:
             ok = matches(c.get("value"), v)
             add(i, "cite", f"{f} = {c.get('value')}", _fmt(v), ok, "" if ok else "not the run's number")
             if ok:
-                allowed.append(c.get("value"))
+                allowed.append(float(v))
         for j in lg.get("injuries") or []:
             nm = str(j.get("player", "")).lower()
             have = inj.get(nm)
@@ -278,12 +314,13 @@ def check(run, reads) -> list[dict]:
     return out
 
 
-def _rate_match(b, r, pair):
+def _rates_match(bs, r) -> bool:
+    """The need's rates against one card row's rate: one rate, or a carries + catches pair in that
+    order (yards a carry, then yards a catch). Catch rates within 0.005, yards within 0.05."""
     if r is None:
         return False
-    if isinstance(r, list):
-        return any(_close(b, x, 0.05) for x in r)
-    return _close(b, r, 0.005 if r <= 1 else 0.05)
+    rs = r if isinstance(r, list) else [r]
+    return len(bs) == len(rs) and all(_close(b, x, 0.005 if float(x) <= 1 else 0.05) for b, x in zip(bs, rs))
 
 
 def _game_numbers(run):
@@ -314,21 +351,34 @@ def _text_checks(add, leg, kind, text, allowed, inj, cited_inj):
                 "a number in the prose that no cite, need or line accounts for")
     low = text.lower()
     for nm, row in inj.items():
-        if nm and nm in low and nm not in cited_inj and row.get("status"):
-            add(leg, "injury named", f"{kind}: {row.get('name')}", row.get("status"), False,
-                "the prose names an injured player without an injuries entry to check it")
+        if not nm or nm in cited_inj:
+            continue
+        last = _last_name(nm)
+        named = nm in low or (last and re.search(rf"\b{re.escape(last)}\b", low))
+        if named:
+            add(leg, "injury named", f"{kind}: {row.get('name')}", row.get("status") or "practice only", False,
+                "the prose names a player on section 4 without an injuries entry to check it")
+
+
+def _last_name(nm: str) -> str | None:
+    """'jonathan mingo' -> 'mingo'; suffixes dropped; None when too short to search alone."""
+    parts = [p for p in re.split(r"\s+", nm.strip()) if p.strip(".") not in ("jr", "sr", "ii", "iii", "iv", "v")]
+    last = parts[-1].strip(".") if len(parts) > 1 else None
+    return last if last and len(last) >= 4 else None
 
 
 def _num_ok(tok, allowed):
+    """A prose number against one allowed run value, units kept apart: '79%' traces only to a
+    fraction (0.787), '9.2' only to a count or a yardage, never across. Within a unit the prose may
+    round (10 for 10.4); WHICH quantity it names is the reviewer's to judge."""
     try:
-        if isinstance(allowed, str):
-            a_n, a_pct, _ = parse_stated(allowed)
-            if tok.endswith("%") != a_pct:
-                return False
-            return matches(tok, a_n / 100 if a_pct else a_n)
-        return matches(tok, allowed / 100 if tok.endswith("%") and allowed > 1 else allowed)
-    except (ReadsError, TypeError, ValueError):
+        a = float(allowed)
+    except (TypeError, ValueError):
         return False
+    is_fraction = 0 < abs(a) < 1
+    if tok.endswith("%"):
+        return is_fraction and matches(tok, a)
+    return not is_fraction and matches(tok, a)
 
 
 # ---------------------------------------------------------------- shared pieces
@@ -368,7 +418,7 @@ def support_table(row, cells, side) -> list[str]:
     if cells and cells.get("beat"):
         L.append(f"| His games this season that beat that | {cells['beat'][0]} of {cells['beat'][1]} |")
     if side == "under":
-        L.append("| The Under wins | at or below the line (a push on a whole-number line does not win) |")
+        L.append("| The Under wins | below the line; on a whole-number line a result AT the line is a push |")
     return L
 
 
@@ -405,6 +455,17 @@ def cutoff(run) -> str:
 
 def _esc(s):
     return str(s).replace("|", "/").replace("\n", " ")
+
+
+SECRET_PATTERNS = [re.compile(r"(?i)\b(api[_-]?key|apikey|access[_-]?token|token|secret|password|key)=[^&\s|)]+"),
+                   re.compile(r"(?<![0-9a-fA-F])[0-9a-f]{32}(?![0-9a-fA-F])")]
+
+
+def scrub(text: str) -> str:
+    """Key-shaped strings out of anything this writes: a query-string credential (apiKey=...) and a
+    bare 32-hex key (the Odds API's shape). The 64-hex release hash is left alone."""
+    text = SECRET_PATTERNS[0].sub(lambda m: m.group(1) + "=<redacted>", text)
+    return SECRET_PATTERNS[1].sub("<redacted>", text)
 
 
 # ---------------------------------------------------------------- the QA/QC version
@@ -609,6 +670,14 @@ def main(argv=None) -> int:
     except (ReadsError, OSError, json.JSONDecodeError) as ex:
         print(f"PUBLISH: {ex}", file=sys.stderr)
         return 2
+    rep_path = Path(a.run).with_name(f"report_{run['slug']}.md")
+    if rep_path.exists():
+        cut = next((x.strip() for x in rep_path.read_text(encoding="utf-8").splitlines()
+                    if x.strip().startswith("- **Data cutoff:**")), None)
+        if cut and run.get("data_cutoff") and cut != run["data_cutoff"]:
+            print(f"PUBLISH: {Path(a.run).name} is not the run behind {rep_path.name} (their data cutoffs differ: "
+                  f"the run export failed or is older); run `props game` again", file=sys.stderr)
+            return 2
     checks = check(run, reads)
     fails = [c for c in checks if not c["ok"]]
     print(f"checks: {len(checks) - len(fails)} of {len(checks)} pass")
@@ -623,13 +692,13 @@ def main(argv=None) -> int:
     if "qa" in which:
         rep = Path(a.run).with_name(f"report_{run['slug']}.md")
         p = out / f"{run['slug']}_qa.md"
-        p.write_text(render_qa(run, reads, checks, release, rep.read_text(encoding="utf-8") if rep.exists() else None),
+        p.write_text(scrub(render_qa(run, reads, checks, release, rep.read_text(encoding="utf-8") if rep.exists() else None)),
                      encoding="utf-8")
         print(f"wrote {p}")
     if "agent" in which:
         ci = None if a.no_ci or not a.release_tag else ci_results(REPO_URL, a.release_tag)
         p = out / f"{run['slug']}_agent.md"
-        p.write_text(render_agent(run, reads, checks, release, ci), encoding="utf-8")
+        p.write_text(scrub(render_agent(run, reads, checks, release, ci)), encoding="utf-8")
         print(f"wrote {p}")
     return 0
 

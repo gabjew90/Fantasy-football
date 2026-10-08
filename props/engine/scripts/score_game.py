@@ -3540,6 +3540,8 @@ def main():
         write_run_export(OUT / f"run_{slug}.json", RUN_EXPORT, L, SOURCES, env, market_env, AWAY, HOME, SEASON,
                          WEEK, kick, hrs, slug)
     except Exception as exc:  # noqa: BLE001 -- the export must never cost the prop run
+        # no older run file may stand in for this run (publish would check reads against it)
+        (OUT / f"run_{slug}.json").unlink(missing_ok=True)
         log(f"  run export skipped ({type(exc).__name__}: {exc})")
     M.drop(columns=["evidence"]).to_csv(OUT / f"player_params_{slug}.csv", index=False)
     try:
@@ -3956,7 +3958,9 @@ def write_run_export(path, export, report_lines, sources, env, market_env, away,
            "sources": [dict(zip(("name", "purpose", "status", "detail"), s)) for s in sources],
            "card_guide": RSCH.card_guide(),
            **{k: v for k, v in export.items()}}
-    Path(path).write_text(json.dumps(_jsonable(out), indent=1, ensure_ascii=False), encoding="utf-8")
+    tmp = Path(path).with_suffix(".json.tmp")
+    tmp.write_text(json.dumps(_jsonable(out), indent=1, ensure_ascii=False), encoding="utf-8")
+    tmp.replace(path)
 
 
 BRIEF_ARGS = ("AWAY", "HOME", "market_env", "M", "pop", "iw", "pbp", "STARTER_QB", "AUTO_QB", "LINE_STATUS",
