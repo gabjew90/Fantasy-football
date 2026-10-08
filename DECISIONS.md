@@ -8330,3 +8330,55 @@ every row while the predictions rows carry open / decision / close (line_archive
   errors fails on all five: 18 x 3.7 = 66.6 claimed to reach 67, "best play", an untraced
   "12 targets", Mingo called Out, and a rate not on the card. The checker also refused my own
   "the script both legs lean on" ("lean" is on the betting list; kept strict, rephrased).
+## 2026-10-08 (218) -- the user's report format guide for the QA/QC version and the external PDF
+
+- **The guide (user):** a matchup brief in five sections, then Passing, Receiving, and Rushing and
+  combined yards. Every card answers what the line requires, how that compares with the
+  market's and the engine's workload, and whether the matchup supports it. Reviewed against the
+  run's data before adoption.
+- **The user's four decisions:**
+  - It applies to the PDF and the QA version, and chat's in-conversation read stays on the team
+    guide.
+  - Each player appears once, in his main market's section.
+  - The scenario table is backed by a margin model, built and tested first.
+  - The verdict words are defined mechanically, and "stronger language" is dropped.
+- **Review changes adopted:**
+  - The yards column's catch chance is labelled as only the catches, with the engine's Over
+    beside it.
+  - The reliability note keeps the live record (computed from research.LIVE_RECORD: 0.717 vs
+    0.692 over 1,536 lines).
+  - The assumptions are drawn from section 7, and its full table stays in the QA version.
+  - The comparative claims become citable data.
+- **The margin model (margin_buckets_v0):** pre-registered in
+  docs/plans/2026-10-08-report-format-design.md, fit 2018-21 and tested on 2022-25 closing
+  spreads (scripts/fit_margin_model.py, reports/margin_buckets_v0.md).
+  - The empirical model beat the baseline's log loss (0.911 vs 0.939) but missed calibration:
+    2022-25 games finished closer than 2018-21, so within one score was under-called by 4-7
+    points.
+  - The normal model failed both tests.
+  - Nothing ships; the table prints "not estimated". It was not re-tuned against the test
+    seasons. A v1 needs its own pre-registration, for example a fit on recent seasons only.
+- **Data added to run_<slug>.json (informational; the fixture's CSVs are byte-identical):**
+  - ESPN's DraftKings moneylines and opening lines, and the margin-free win chance;
+  - the market fit's workload alone;
+  - unit ranks;
+  - points allowed with their parts;
+  - the team-volume check;
+  - the Questionable if-out moves;
+  - the header, the weather line and the live record.
+- **Reads v2 and the checker:**
+  - The team brief's narrations may quote any number its tables show.
+  - Personnel statuses are checked against section 4 and the QB change.
+  - The opening must be three sentences, with two or three assumptions.
+  - A verdict word in the prose must be the one the card computes.
+  - Every v1 check stays.
+- **The verdict words, by definition,** at the trimmed rate (this season's for receptions):
+  - *requires better gains:* only the engine's rate clears at its workload;
+  - *requires more work than the engine expects:* no rate clears;
+  - *requires a rebound:* the need is above last game's targets or carries;
+  - *attainable:* none of the above.
+- **Renders:** publish_render.py. The QA version follows the guide with the backend and checks
+  under each section. The agent version adds the margin record and the live record. The
+  external PDF waits for a PDF library decision.
+- **Tested on TNF (TB@DAL):** a v2 read of Prescott, Lamb and Williams passes 33 of 33. The
+  checker refused "leans" twice in my own drafts, and they were rephrased.

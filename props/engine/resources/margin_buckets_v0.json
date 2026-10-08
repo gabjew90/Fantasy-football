@@ -1,0 +1,173 @@
+{
+ "model": "margin_buckets_v0",
+ "scenarios": [
+  "favourite_9plus",
+  "within_one_score",
+  "underdog_9plus"
+ ],
+ "comfortable_margin": 9,
+ "fit_seasons": "2018-2021",
+ "test_seasons": "2022-2025",
+ "fit_games": 1040,
+ "test_games": 1087,
+ "shipped": null,
+ "residual_sd": 13.171775807973459,
+ "spread_source": "nflverse games.csv spread_line, the closing spread; a run applies it to the spread posted at the time of the run, which can differ from the close",
+ "residuals": null,
+ "log_loss": {
+  "A_empirical": 0.91141472020907,
+  "B_normal": 0.9299242487428618,
+  "baseline": 0.9394194408864264
+ },
+ "baseline_frequencies": [
+  0.34807692307692306,
+  0.5125,
+  0.13942307692307693
+ ],
+ "pass_rule": {
+  "log_loss_margin": 0.02,
+  "calibration_tolerance": 0.04
+ },
+ "verdict": {
+  "A_empirical": {
+   "log_loss": true,
+   "calibration": false
+  },
+  "B_normal": {
+   "log_loss": false,
+   "calibration": false
+  }
+ },
+ "calibration": {
+  "A_empirical": [
+   {
+    "band": "|s| <= 3",
+    "scenario": "favourite_9plus",
+    "games": 436,
+    "predicted": 0.26998610621030344,
+    "observed": 0.24311926605504589
+   },
+   {
+    "band": "|s| <= 3",
+    "scenario": "within_one_score",
+    "games": 436,
+    "predicted": 0.5400207304163727,
+    "observed": 0.5986238532110092
+   },
+   {
+    "band": "|s| <= 3",
+    "scenario": "underdog_9plus",
+    "games": 436,
+    "predicted": 0.1899931633733239,
+    "observed": 0.15825688073394495
+   },
+   {
+    "band": "3.5-7",
+    "scenario": "favourite_9plus",
+    "games": 425,
+    "predicted": 0.3449343891402715,
+    "observed": 0.3623529411764706
+   },
+   {
+    "band": "3.5-7",
+    "scenario": "within_one_score",
+    "games": 425,
+    "predicted": 0.5147567873303167,
+    "observed": 0.5505882352941176
+   },
+   {
+    "band": "3.5-7",
+    "scenario": "underdog_9plus",
+    "games": 425,
+    "predicted": 0.14030882352941176,
+    "observed": 0.08705882352941176
+   },
+   {
+    "band": "7.5+",
+    "scenario": "favourite_9plus",
+    "games": 226,
+    "predicted": 0.5225387168141593,
+    "observed": 0.4911504424778761
+   },
+   {
+    "band": "7.5+",
+    "scenario": "within_one_score",
+    "games": 226,
+    "predicted": 0.3965601599727706,
+    "observed": 0.4646017699115044
+   },
+   {
+    "band": "7.5+",
+    "scenario": "underdog_9plus",
+    "games": 226,
+    "predicted": 0.08090112321307012,
+    "observed": 0.04424778761061947
+   }
+  ],
+  "B_normal": [
+   {
+    "band": "|s| <= 3",
+    "scenario": "favourite_9plus",
+    "games": 436,
+    "predicted": 0.3197490616457608,
+    "observed": 0.24311926605504589
+   },
+   {
+    "band": "|s| <= 3",
+    "scenario": "within_one_score",
+    "games": 436,
+    "predicted": 0.4742404082369799,
+    "observed": 0.5986238532110092
+   },
+   {
+    "band": "|s| <= 3",
+    "scenario": "underdog_9plus",
+    "games": 436,
+    "predicted": 0.20601053011725937,
+    "observed": 0.15825688073394495
+   },
+   {
+    "band": "3.5-7",
+    "scenario": "favourite_9plus",
+    "games": 425,
+    "predicted": 0.3975539213673873,
+    "observed": 0.3623529411764706
+   },
+   {
+    "band": "3.5-7",
+    "scenario": "within_one_score",
+    "games": 425,
+    "predicted": 0.44974346694007006,
+    "observed": 0.5505882352941176
+   },
+   {
+    "band": "3.5-7",
+    "scenario": "underdog_9plus",
+    "games": 425,
+    "predicted": 0.1527026116925426,
+    "observed": 0.08705882352941176
+   },
+   {
+    "band": "7.5+",
+    "scenario": "favourite_9plus",
+    "games": 226,
+    "predicted": 0.5549715186263838,
+    "observed": 0.4911504424778761
+   },
+   {
+    "band": "7.5+",
+    "scenario": "within_one_score",
+    "games": 226,
+    "predicted": 0.36510618003815093,
+    "observed": 0.4646017699115044
+   },
+   {
+    "band": "7.5+",
+    "scenario": "underdog_9plus",
+    "games": 226,
+    "predicted": 0.07992230133546521,
+    "observed": 0.04424778761061947
+   }
+  ]
+ }
+}

@@ -1,15 +1,17 @@
 {
   "algorithm": "props-engine-sha256-lf-1",
-  "engine_sha256": "1c087f9c749f0f5cc41833c70d2fe5f0738f525d8fba14c7b2f529d8121f3e38",
-  "file_count": 58,
+  "engine_sha256": "3baf5d733c11a7ebda1c5e6cccb49b11ed0619d97652d6095c956b26a3a7c3e7",
+  "file_count": 61,
   "files": {
     "SKILL.md": "cd4cac21b211fedb0bae974aa64bdfab3229889c4cb80f6b006fc336cb20d8cf",
-    "resources/agent_guide.md": "ed9e7cfdb7aa1289fc9cc015d00497e2506e0298e73a773767fc769c76309731",
+    "resources/agent_guide.md": "dad00490cf14e3a9c5c7129175181cf4134fb3bb937ce722d5a62be83bfb17ae",
     "resources/calibration_2025.csv": "47e3922c7af818307831d70a3d2be4333200f3aee1d94dc6bbf6e0e9ccee4ac8",
     "resources/data_source_matrix.md": "3d5fa287473fde6b9c09d5755778425840be4c8e49bf3ac2aa43ac2bd3640820",
     "resources/engine_overview.md": "489b90a8cfe65b225b41f6ea46af0ed519a8642aadd7af601a8d0c55f7523be3",
     "resources/execution_protocol.md": "514f09c8ec93f1b36609bcfbbd8589e515eaeb6615614056a589a06c05efe260",
     "resources/line_archive.md": "326f59694d55005989077aeb6bcf37ac56fb6884ad10e5cb959489040b1387b1",
+    "resources/margin_buckets_v0.json": "2ce2929f635fd127b7abf6d265284d47e1aa3c779a4e0dc5f17d3af445bdd4ca",
+    "resources/margin_settings.json": "4efc8e6c05052ed556992573fe40c7e1a0c728105abccc1db85dc50a5c8cf7ac",
     "resources/methodology.md": "bd68847517f4bd4a990ab0ac65ba3bf727ed88ff84a94b5c5e0976f7a3d0ddf5",
     "resources/model_registry.md": "7293eb37729954f2d861e75569f72643da9c68aad9e6c1690c1acbec637e6acb",
     "resources/modeling_framework.md": "51568adb4e4f69442a98190b3909c0e3c0c4042f5348289bb8799dab541ed2e7",
@@ -45,12 +47,13 @@
     "scripts/build_priors.py": "015c897123ce6f0874429863d3708c9d7aed4a80d72b6faaf130c5f356fdc191",
     "scripts/build_td_priors.py": "c7330a57e68c1b7c5f8a9304bfbddbb4be0ca285d9f37ef383173d3e3049c27f",
     "scripts/eligibility.py": "91b45727f37f690a1416e9461d2ef5f00f4bd1c31985fd31d312e2251fd76bd2",
-    "scripts/model.py": "8dad6adc5535f17c1020408ec8b823530fdb6303bbe04f9cb50f9140efbb8ef2",
+    "scripts/model.py": "c692e34e63219841bcb3cfd5da2427f4129acb3a27f2e9bf7dfc120f304e226b",
     "scripts/odds_client.py": "434186273bd0412a5545247228298951c5d0504a19c8a47c4c782bf3bb75aaa1",
-    "scripts/publish.py": "dcd15b8427e06d039d0b0a50a600ee6a062e901addefa74ff8da3811dd72c315",
-    "scripts/research.py": "d064c3b37eb43d84f9d4feb1b088c9c0655bd89a7b5d11332380dfeea60899ec",
+    "scripts/publish.py": "676d3682ae4ab9c2288b0e08529912542457cbbcc40de804ed0de5ccf8e0a865",
+    "scripts/publish_render.py": "163a9f0a65e679b05147a272731b84b8c5c57007aa88bb895e862bb578131890",
+    "scripts/research.py": "68864642098a73843bd66c8f03c8f7ad5b8c0c3d8b1cad156c1964c0b447d687",
     "scripts/scenario.py": "e16722e9abebb55f05a770910c1e47dc1cc89f7d469c8d6232d6e6bd1af83774",
-    "scripts/score_game.py": "2c0afbb23bf35061413f97d6f622cfe4b09b1fdbfcf200c0a3af3c4848857c0b",
+    "scripts/score_game.py": "74237c67848f2add3eec613da73d46486e3bf4d5ad70a0c8ff28cb95b6afcf66",
     "scripts/score_week.py": "f9a04bfd46e0079c7d363a795d70d85541701116746c3252d54acba1c3266404",
     "scripts/td_alloc.py": "7c407c949cac8f0f74d7f91589fd5d749f65d9053eb1c3f5f0dc63a700b3465b",
     "scripts/td_alloc_backtest.py": "e259d9f0e301a5d5d34e5a9e84bba222810f077d9c05a1f1f799a611914595a4",
@@ -62,5 +65,5 @@
     "scripts/td_model.py": "7c1635bbf515b4316f14771b177363a9f82a1ba7ad3393e479cd2dce26a25724",
     "scripts/td_v1.py": "bb4ef62e525c948889ef4e45f6c41564dcc7bed2a97b3d4def0792848f12c485"
   },
-  "tag": "props-v1.57"
+  "tag": "props-v1.58"
 }

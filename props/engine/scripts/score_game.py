@@ -699,7 +699,8 @@ def main():
                 if abbr.get("home") == _home_e and abbr.get("away") == _away_e and c_.get("odds"):
                     o_ = c_["odds"][0]
                     _sbp = wd / f"espn_scoreboard_{SEASON}_wk{WEEK:02d}.json"
-                    market_env = {"home_spread": float(o_["spread"]), "total_line": float(o_["overUnder"]),
+                    market_env = {**RSCH.espn_odds_extra(o_),
+                                  "home_spread": float(o_["spread"]), "total_line": float(o_["overUnder"]),
                                   "book": f"{o_.get('provider', {}).get('name', 'book')} (ESPN scoreboard)",
                                   # the scoreboard may be a cached copy: its own fetch time, not now
                                   "as_of": (datetime.fromtimestamp(_sbp.stat().st_mtime, timezone.utc)
@@ -966,6 +967,8 @@ def main():
             env[t]["td_total_market"] = total_td_mkt
             env[t]["implied_points"] = implied_pts
             env[t]["td_anchor"] = "market"
+            env[t]["market_throws"], env[t]["market_runs"] = MODEL.market_fit_volume(
+                MODEL.team_spread_from_home(hs, t == HOME), tl, P.get("market_env_fit"))
             if a.env != "market" and MODEL.MARKET_PASS_WEIGHT and P.get("market_env_fit"):
                 # round 16: the market's fitted pass volume at MODEL.MARKET_PASS_WEIGHT
                 # (DECISIONS #134); carries are moved separately just below (round 39)
@@ -2212,6 +2215,7 @@ def main():
     _pos_map = (ros.sort_values("week").drop_duplicates("gsis_id", keep="last").set_index("gsis_id").position.to_dict()
                 if {"gsis_id", "position", "week"}.issubset(ros.columns) else {})
     PA = RSCH.points_allowed(pbp, _pos_map)
+    PA_PARTS = RSCH.points_allowed_parts(pbp, _pos_map)      # what produced it (the report guide)
     # TEAM VOLUME (DECISIONS #172): every game this season beside our projection
     TEAM_VOL_LINES = {}
     TEAM_SPREAD = {t_: RSCH.team_line(None if market_env is None else market_env.get("home_spread"), t_ == HOME)
@@ -3222,7 +3226,7 @@ def main():
                           TEAM_VOL_CHK=TEAM_VOL_CHK, UNIT_EFF=UNIT_EFF, PA=PA, weather=weather, roof=roof,
                           ROOF_NOTE=ROOF_NOTE, R=R, G=G, WEEK=WEEK, TEAM_VOL_ROWS=TEAM_VOL_ROWS, STATE_N=_state_n,
                           INJ_STATUS=inj_status, INJ_SOURCE=INJ_SOURCE, DEF_STARTERS=DEF_STARTERS,
-                          EXPORT=RUN_EXPORT)
+                          EXPORT=RUN_EXPORT, PA_PARTS=PA_PARTS)
     if BET.empty:
         L[3:3] = BRIEF
     # put the card at the top of the report, right after the header rule
@@ -3594,8 +3598,15 @@ def main():
     if not SCENARIO and not a.no_scenarios:
         q = pop[pop.questionable & ~pop.excluded]
         if len(q) and snap_written:
-            L += run_scenarios(q, RD, slug, snap_path)
+            RUN_EXPORT["if_out"] = []
+            L += run_scenarios(q, RD, slug, snap_path, export=RUN_EXPORT["if_out"])
             (OUT / f"report_{slug}.md").write_text("\n".join(L), encoding="utf-8")
+            try:
+                write_run_export(OUT / f"run_{slug}.json", RUN_EXPORT, L, SOURCES, env, market_env, AWAY, HOME,
+                                 SEASON, WEEK, kick, hrs, slug)
+            except Exception as exc:  # noqa: BLE001 -- the export must never cost the prop run
+                (OUT / f"run_{slug}.json").unlink(missing_ok=True)
+                log(f"  run export skipped ({type(exc).__name__}: {exc})")
         elif len(q):
             L += ["", "## If a Questionable player is out", "",
                   "Not priced: this run had no lines to price against."]
@@ -3954,9 +3965,11 @@ def write_run_export(path, export, report_lines, sources, env, market_env, away,
            "model_states": line_starting("Model states"),
            "market_env": market_env or {},
            "teams": {t: {k: env[t].get(k) for k in ("implied_points", "targets", "carries", "pass_td", "rush_td",
-                                                   "td_anchor", "td_total_history")} for t in (away, home) if t in env},
+                                                   "td_anchor", "td_total_history", "market_throws", "market_runs",
+                                                   "carries_history")} for t in (away, home) if t in env},
            "sources": [dict(zip(("name", "purpose", "status", "detail"), s)) for s in sources],
            "card_guide": RSCH.card_guide(),
+           "live_record": RSCH.live_record_summary(),
            **{k: v for k, v in export.items()}}
     tmp = Path(path).with_suffix(".json.tmp")
     tmp.write_text(json.dumps(_jsonable(out), indent=1, ensure_ascii=False), encoding="utf-8")
@@ -4014,7 +4027,7 @@ def brief_section(**V) -> list[str]:
             (f"weather forecast {str(wx.get('updated') or '')[:16].replace('T', ' ')} UTC" if wx.get("status") == "ok"
              else "weather forecast not included in this run")]
     L = ["## Team matchup\n",
-         *RSCH.matchup_header(AWAY, HOME, when, G.stadium, roof, note, rest, srcs), "",
+         *(_hdr := RSCH.matchup_header(AWAY, HOME, when, G.stadium, roof, note, rest, srcs)), "",
          "### 1. The market's view of the game\n",
          *RSCH.market_table(AWAY, HOME, ME_.get("home_spread"), ME_.get("total_line"), ME_.get("book"),
                             (str(ME_.get("as_of"))[:16].replace("T", " ") + " UTC") if ME_.get("as_of") else None), ""]
@@ -4088,7 +4101,8 @@ def brief_section(**V) -> list[str]:
     if pt:
         L += ["### 5. Production allowed by position\n", *pt, ""]
     # ---- 6. weather and venue ----
-    L += ["### 6. Weather and venue\n", RSCH.weather_line(wx, roof, note), ""]
+    _wx_line = RSCH.weather_line(wx, roof, note)
+    L += ["### 6. Weather and venue\n", _wx_line, ""]
     # ---- 7. where the baseline could miss ----
     mk = set(R.market) if R is not None and len(R) else set()
     spread = ME_.get("home_spread")
@@ -4114,7 +4128,12 @@ def brief_section(**V) -> list[str]:
     ex = V.get("EXPORT")
     if isinstance(ex, dict):
         # the same facts, as data, for run_<slug>.json (publish.py checks reads against them)
-        ex.update({"sources_line": srcs, "who_plays": cells, "who_note": who_note, "report_state": rstate,
+        ex.update({"header": list(_hdr), "kickoff_words": when, "weather_line": _wx_line,
+                   "team_volume": {t_: chk.get(t_) for t_ in (AWAY, HOME)},
+                   "units": RSCH.unit_export(V.get("UNIT_EFF") or {}, (AWAY, HOME)),
+                   "unit_filter": (V.get("UNIT_EFF") or {}).get("_filter"),
+                   "points_allowed": RSCH.pa_export(V.get("PA"), V.get("PA_PARTS"), (AWAY, HOME)),
+                   "sources_line": srcs, "who_plays": cells, "who_note": who_note, "report_state": rstate,
                    "gaps": [list(g_) for g_ in gaps], "qb_change": qb_change,
                    "injuries": RSCH.injury_rows(iw, pop, V.get("INJ_STATUS"), V.get("INJ_SOURCE"), (AWAY, HOME))})
     return L
@@ -4171,7 +4190,7 @@ MARKET_WORDS = {"player_receptions": "catches", "player_reception_yds": "receivi
                 "player_rush_reception_yds": "rushing + receiving yards"}
 
 
-def run_scenarios(q: pd.DataFrame, R: pd.DataFrame, slug: str, snap_path: Path) -> list[str]:
+def run_scenarios(q: pd.DataFrame, R: pd.DataFrame, slug: str, snap_path: Path, export=None) -> list[str]:
     """For each Questionable player, price the game again with him OUT: a full
     run of this script with --assume-out, on the lines this run saved. The
     main run already priced the 'he plays' case at his normal share. Nothing
@@ -4192,9 +4211,13 @@ def run_scenarios(q: pd.DataFrame, R: pd.DataFrame, slug: str, snap_path: Path) 
         f.unlink(missing_ok=True)   # never read a leftover from an earlier scenario
         r = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
         L += ["", f"### If {pl['name']} ({pl.team} {pl.pos}) is out", ""]
+        rec = {"player": pl["name"], "team": pl.team, "pos": pl.pos, "gsis_id": pl.gsis_id, "ran": False, "moves": []}
+        if export is not None:
+            export.append(rec)
         if r.returncode != 0 or not f.exists():
             L.append(f"Scenario failed (exit {r.returncode}): {r.stderr.strip().splitlines()[-1][:200] if r.stderr.strip() else 'no output'}.")
             continue
+        rec["ran"] = True
         S = pd.read_csv(f)
         dest = OUT / "scenarios" / f"shadow_log_{slug}_out_{pl.gsis_id}.csv"
         f.replace(dest)
@@ -4211,6 +4234,9 @@ def run_scenarios(q: pd.DataFrame, R: pd.DataFrame, slug: str, snap_path: Path) 
         L += ["| player | line | book | market says | if he plays | if he's out | change |",
               "|---|---|---|---|---|---|---|"]
         for _, x in j.iterrows():
+            rec["moves"].append({"player": x.player, "team": x.team, "market": x.market, "side": x.side,
+                                 "line": x.line, "book": x.book, "p_novig": x.p_novig, "p_plays": x.p_model,
+                                 "p_out": x.p_model_out, "move": x.move})
             what = ("scores a TD" if x.market == "player_anytime_td" else
                     f"{x.side} {x.line:g} {MARKET_WORDS.get(x.market, x.market)}")
             L.append(f"| {x.player} ({x.team}) | {what} | {x.book} | {x.p_novig:.0%} | {x.p_model:.0%} | "
