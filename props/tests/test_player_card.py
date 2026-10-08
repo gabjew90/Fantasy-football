@@ -275,10 +275,10 @@ def test_a_practice_only_report_is_not_a_published_game_report():
     assert RS.report_state(iw, "TB") == "practice" and RS.report_state(iw, "NYG") == "none"
     assert RS.report_state(iw.assign(report_status=["Out", None, None]), "TB") == "game"
     # the defender who missed practice is shown, with the status the prices use and its source
-    cell = RS.defense_cell("TB", iw, {("TB", "s1"): "Out"}, {("TB", "s1"): "Sleeper injury feed, knee"})
+    cell = RS.injury_cell("TB", iw, {("TB", "s1"): "Out"}, {("TB", "s1"): "Sleeper injury feed, knee"})
     assert cell == "A Safety (S, Out; Sleeper injury feed, knee; practice: did not participate in practice)"
-    assert RS.defense_cell("TB", iw) == "A Safety (S, no game status yet; practice: did not participate in practice)"
-    assert RS.defense_cell("DAL", iw) == "no designations", "full practice is not a designation"
+    assert RS.injury_cell("TB", iw) == "A Safety (S, no game status yet; practice: did not participate in practice)"
+    assert RS.injury_cell("DAL", iw) == "no designations", "full practice is not a designation"
     # once game statuses post, a limited practice with no status reads as no designation, not "not yet"
     fin = iw.assign(report_status=["Out", None, None]).assign(practice_status=["Did Not Participate In Practice",
                                                                                   "Limited Participation in Practice",
@@ -286,7 +286,7 @@ def test_a_practice_only_report_is_not_a_published_game_report():
     fin = pd.concat([fin, pd.DataFrame({"team": ["TB"], "gsis_id": ["l1"], "full_name": ["A Backer"],
                                         "position": ["LB"], "report_status": [None],
                                         "practice_status": ["Limited Participation in Practice"]})])
-    assert "A Backer (LB, no game designation; practice: limited participation in practice)" in RS.defense_cell("TB", fin)
+    assert "A Backer (LB, no game designation; practice: limited participation in practice)" in RS.injury_cell("TB", fin)
     note = RS.injury_note({"TB": "practice", "DAL": "game"}, 5)
     assert "game statuses published for DAL" in note and "TB: PRACTICE STATUSES ONLY" in note
     assert "published" not in RS.injury_note({"TB": "practice"}, 5).split("PRACTICE")[0]
@@ -321,5 +321,18 @@ def test_the_skill_cell_lists_every_listed_receiver_not_only_the_priced_ones():
     iw = pd.DataFrame({"team": ["DAL", "DAL"], "gsis_id": ["w5", "s1"], "full_name": ["A Fifth Receiver", "A Safety"],
                        "position": ["WR", "S"], "report_status": ["Questionable", None],
                        "practice_status": ["Did Not Participate In Practice", "Full Participation in Practice"]})
-    cell = RS.defense_cell("DAL", iw, positions=RS.SKILL_POS)
+    cell = RS.injury_cell("DAL", iw, positions=RS.SKILL_POS)
     assert cell == "A Fifth Receiver (WR, Questionable; practice: did not participate in practice)"
+
+
+def test_a_status_the_prices_use_but_the_report_lacks_still_reaches_section_4():
+    import pandas as pd
+    iw = pd.DataFrame({"team": ["DAL"], "gsis_id": ["s1"], "full_name": ["A Safety"], "position": ["S"],
+                       "report_status": [None], "practice_status": ["Full Participation in Practice"]})
+    cell = RS.injury_cell("DAL", iw, {}, {("DAL", "w9"): "Sleeper injury feed; a reserve list"},
+                          positions=RS.SKILL_POS, extra=[("A Receiver", "WR", "w9", "Out"),
+                                                         ("A Back", "RB", "b1", "Out (scenario)")])
+    assert cell == "A Receiver (WR, Out; Sleeper injury feed; a reserve list); A Back (RB, Out (scenario))"
+    # no report rows at all: the extras still show
+    assert RS.injury_cell("NYG", iw.iloc[0:0], positions=RS.SKILL_POS,
+                          extra=[("A Back", "RB", "b1", "Out (scenario)")]) == "A Back (RB, Out (scenario))"

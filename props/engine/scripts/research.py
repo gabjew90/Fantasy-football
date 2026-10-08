@@ -1330,29 +1330,39 @@ def _missed(p) -> bool:
 SKILL_POS = {"WR", "TE", "RB", "FB", "HB"}
 
 
-def defense_cell(team, iw, status=None, source=None, positions=DEF_POS) -> str:
-    """Section 4's pass rush and coverage cell: every defender the report lists Out, Doubtful or
-    Questionable, or (before game statuses post) missing or limited in practice. status/source:
-    the engine's per-(team, gsis_id) status and where it came from (the official report, or
-    Sleeper's feed filling a practice-only report) -- the same map the prices use."""
-    if iw is None or not len(iw) or "position" not in iw or not (iw.team == team).any():
-        return "no injury report yet this week"
+def injury_cell(team, iw, status=None, source=None, positions=DEF_POS, extra=None) -> str:
+    """One section-4 cell (pass rush and coverage, or receivers / tight ends / backs): every
+    player at `positions` the report lists Out, Doubtful or Questionable, or missing or limited in
+    practice; plus `extra` -- [(name, position, gsis_id, status)] for priced players whose status
+    the prices use but the weekly report does not carry (a Sleeper reserve-list Out, a what-if's
+    'Out (scenario)'). status/source: the engine's per-(team, gsis_id) status and where it came
+    from -- the same map the prices use, so the cell never disagrees with them."""
     status, source = status or {}, source or {}
-    out = []
-    for r in iw[(iw.team == team) & iw.position.isin(positions)].itertuples():
+    rows = (iw[(iw.team == team) & iw.position.isin(positions)]
+            if iw is not None and len(iw) and {"team", "position"}.issubset(iw.columns) else None)
+    if (rows is None or rows.empty) and not extra and (iw is None or not len(iw) or not (iw.team == team).any()):
+        return "no injury report yet this week"
+    # once the team's game statuses are out, a missing one means no designation (he is cleared);
+    # before that it is not known yet
+    cleared = "no game designation" if report_state(iw, team) == "game" else "no game status yet"
+    out, seen = [], set()
+    for r in (rows.itertuples() if rows is not None else []):
         st = status.get((team, r.gsis_id)) or (r.report_status if isinstance(r.report_status, str) else None)
         prac = getattr(r, "practice_status", None)
         if st not in GAME_STATUSES and not _missed(prac):
             continue
-        # once the team's game statuses are out, a missing one means no designation (he is cleared);
-        # before that it is not known yet
-        bits = [st if st in GAME_STATUSES else
-                ("no game designation" if report_state(iw, team) == "game" else "no game status yet")]
+        bits = [st if st in GAME_STATUSES else cleared]
         if (team, r.gsis_id) in source:
             bits.append(source[(team, r.gsis_id)])
         if isinstance(prac, str) and prac:
             bits.append("practice: " + prac.lower())
         out.append(f"{r.full_name} ({r.position}, {'; '.join(bits)})")
+        seen.add(str(r.gsis_id))
+    for name, pos, gid, st in extra or []:
+        if str(gid) in seen or not isinstance(st, str) or not st:
+            continue
+        bits = [st] + ([source[(team, gid)]] if (team, gid) in source else [])
+        out.append(f"{name} ({pos}, {'; '.join(bits)})")
     return "; ".join(out) or "no designations"
 
 

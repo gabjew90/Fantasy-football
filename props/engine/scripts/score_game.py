@@ -3989,8 +3989,6 @@ def brief_section(**V) -> list[str]:
           *(ut or ["Unit scores: not included in this run (no EPA in this season's play-by-play yet)."]), ""]
     # ---- 4. who plays ----
     cells = {}
-    prac = (iw.set_index("gsis_id")["practice_status"].to_dict()
-            if len(iw) and {"gsis_id", "practice_status"}.issubset(iw.columns) else {})
     for t in (AWAY, HOME):
         c = {}
         qn = starters.get(t)
@@ -4013,9 +4011,11 @@ def brief_section(**V) -> list[str]:
                                                for x in ls))
         # every receiver, tight end and back the report lists, priced or not (the same builder as the
         # defense cell, with the prices' own status and its source)
-        c["Receivers, tight ends and backs"] = RSCH.defense_cell(t, iw, V.get("INJ_STATUS"), V.get("INJ_SOURCE"),
-                                                                 positions=RSCH.SKILL_POS)
-        c["Pass rush and coverage"] = RSCH.defense_cell(t, iw, V.get("INJ_STATUS"), V.get("INJ_SOURCE"))
+        _ex = [(r_["name"], r_.pos, r_.gsis_id, r_.report_status) for _, r_ in pop[pop.team == t].iterrows()
+               if r_.pos in RSCH.SKILL_POS and isinstance(r_.report_status, str) and r_.report_status]
+        c["Receivers, tight ends and backs"] = RSCH.injury_cell(t, iw, V.get("INJ_STATUS"), V.get("INJ_SOURCE"),
+                                                                positions=RSCH.SKILL_POS, extra=_ex)
+        c["Pass rush and coverage"] = RSCH.injury_cell(t, iw, V.get("INJ_STATUS"), V.get("INJ_SOURCE"))
         cells[t] = c
     who_note = (RSCH.injury_note(rstate, WEEK)
                 + " Offensive line = the five linemen with the most snaps this season (not a confirmed starting "
