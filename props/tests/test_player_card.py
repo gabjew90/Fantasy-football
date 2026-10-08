@@ -336,3 +336,40 @@ def test_a_status_the_prices_use_but_the_report_lacks_still_reaches_section_4():
     # no report rows at all: the extras still show
     assert RS.injury_cell("NYG", iw.iloc[0:0], positions=RS.SKILL_POS,
                           extra=[("A Back", "RB", "b1", "Out (scenario)")]) == "A Back (RB, Out (scenario))"
+
+
+def test_def_starters_reads_the_depth_charts_side_specific_spots():
+    # nflverse/ESPN depth charts name spots by side (RCB, LILB, LDE, NB...), not the report's CB / LB / DE;
+    # week 5's TNF dropped Morrison (RCB 1) and Overshown (LILB 1) from section 7 (DECISIONS #216)
+    import pandas as pd
+    t0, t1 = pd.Timestamp("2026-10-01", tz="UTC"), pd.Timestamp("2026-10-08", tz="UTC")
+    spots = ["LDE", "RDE", "LDT", "RDT", "NT", "LILB", "RILB", "MLB", "SLB", "WLB", "LCB", "RCB", "NB", "FS", "SS"]
+    rows = [("TB", f"g_{s}", s, 1, t1) for s in spots] + [
+        ("TB", "g_backup", "RCB", 2, t1),       # a backup is not a starter
+        ("TB", "g_old", "LCB", 1, t0),          # an older snapshot does not count
+        ("TB", "g_qb", "QB", 1, t1),            # offence and specialists are not defenders
+        ("TB", "g_k", "PK", 1, t1)]
+    dcf = pd.DataFrame(rows, columns=["team", "gsis_id", "pos_abb", "pos_rank", "dt"])
+    assert RS.def_starters(dcf) == {("TB", f"g_{s}") for s in spots}     # no pos_grp: the spot list
+    assert RS.def_starters(dcf.iloc[0:0]) == set()
+    # with pos_grp (the real feed): a defender is any rank-1 row in a defensive group, so a spot
+    # code the list does not know still counts, and offence / special teams never do
+    grp = dcf.assign(pos_grp=["Base 3-4 D"] * len(spots) + ["Base 3-4 D", "Base 3-4 D", "3WR 1TE", "Special Teams"])
+    grp = pd.concat([grp, pd.DataFrame([("TB", "g_edge", "EDGE", 1, t1, "Base 4-3 D")], columns=grp.columns)])
+    assert RS.def_starters(grp) == {("TB", f"g_{s}") for s in spots} | {("TB", "g_edge")}
+    # a snapshot after kickoff is not read: the pre-game chart decides
+    assert RS.def_starters(grp, before=pd.Timestamp("2026-10-05", tz="UTC")) == {("TB", "g_old")}
+
+
+def test_section_7_names_out_starters_by_id_not_by_report_position():
+    import pandas as pd
+    iw = pd.DataFrame({"team": ["TB", "TB", "TB", "DAL"], "gsis_id": ["s1", "s2", "b1", "s3"],
+                       "full_name": ["A Corner", "An Edge", "A Backup", "A Backer"],
+                       "position": ["CB", None, "LB", "LB"]})
+    status = {("TB", "s1"): "Out", ("TB", "s2"): "Doubtful", ("TB", "b1"): "Out", ("DAL", "s3"): "Questionable"}
+    starters = {("TB", "s1"), ("TB", "s2"), ("DAL", "s3")}
+    # the backup is out but not a starter; the Questionable starter is not out; the starter with no
+    # report position still counts
+    assert RS.defense_out(iw, status, starters, ("TB", "DAL")) == {"TB": ["A Corner", "An Edge"], "DAL": []}
+    gaps = RS.known_gaps({"defense_out": {"TB": ["A Corner"]}})
+    assert any("TB defense: A Corner out" in str(g) for g in gaps)

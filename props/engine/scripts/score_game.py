@@ -801,13 +801,8 @@ def main():
                  f"the pre-game depth chart cutoff. Re-run once the time is published.")
     kick = eastern_to_utc(G.gameday, G.gametime)
     dcf["dt"] = pd.to_datetime(dcf["dt"], errors="coerce", utc=True)
-    # the defensive starters, for section 7 (DECISIONS #215): the depth chart's first player at each
-    # defensive spot in its latest snapshot per team, joined by gsis_id
-    DEF_STARTERS = set()
-    if len(dcf) and {"team", "gsis_id", "pos_abb", "pos_rank", "dt"}.issubset(dcf.columns):
-        _last = dcf[dcf.dt == dcf.groupby("team").dt.transform("max")]
-        _st = _last[_last.pos_abb.astype(str).str.upper().isin(RSCH.DEF_POS) & (_last.pos_rank == 1)]
-        DEF_STARTERS = {(str(t_), str(g_)) for t_, g_ in zip(_st.team, _st.gsis_id) if isinstance(g_, str)}
+    # the defensive starters for section 7 (DECISIONS #215, #216; research.def_starters)
+    DEF_STARTERS = RSCH.def_starters(dcf, before=kick)
     roles = []
     DC_QB = {}           # team -> its QBs in depth-chart order (the QB promotion reads it)
     for t in (AWAY, HOME):
@@ -4046,10 +4041,7 @@ def brief_section(**V) -> list[str]:
            "wind_mph": wx.get("wind_mph_max") if wx.get("status") == "ok" else None,
            "roof": roof, "roof_note": note,
            # starters only: a backup defender out is not a gap in the opposing offense's price
-           "defense_out": {t_: sorted(r_.full_name for r_ in iw[(iw.team == t_) & iw.position.isin(RSCH.DEF_POS)].itertuples()
-                                      if (V.get("INJ_STATUS") or {}).get((t_, r_.gsis_id)) in ("Out", "Doubtful")
-                                      and (t_, str(r_.gsis_id)) in (V.get("DEF_STARTERS") or set()))
-                           for t_ in (AWAY, HOME)} if len(iw) and "position" in iw else {}}
+           "defense_out": RSCH.defense_out(iw, V.get("INJ_STATUS"), V.get("DEF_STARTERS"), (AWAY, HOME))}
     L += ["### 7. Where the baseline could miss this game\n", *RSCH.known_gaps_table(RSCH.known_gaps(ctx)), ""]
     return L
 
