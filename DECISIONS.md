@@ -8034,3 +8034,14 @@ The expert re-ran the four-season backtest (baseline reproduces ours: receptions
   anchored to implied points) and read the book's number as the probability. SKILL.md: chat copies
   the guide before the first card and says how the matchup tables were built; no number goes out
   without its source explained.
+
+## 2026-10-08 (213) -- repo hygiene: per-run outputs stop being tracked
+
+- **The repo sweep (the user's approval, 2026-10-08):** files that every run rewrites showed as
+  modified in every checkout and read as current to an agent. Now ignored and untracked (kept
+  locally): data/processed/season/ (transactions.jsonl, rewritten by draftkit/seasondata.py),
+  reports/adp_movers.md, survival_calibration.md, survival_fit.md / .json (scripts/fit_survival.py
+  outputs), and the week-1 briefs waiver_brief.md, lineup_brief.md, early_check.md (draftkit
+  briefs, last written 2026-09-11). exports/ (files made for the user) and scratch_* are ignored.
+- reports/survival_fit_study_2026-09-05.md / .json are now tracked: draftkit/tracker.py cites them.
+- Nothing reads any untracked file as an input (grep of draftkit/, scripts/, props/, tests/).
