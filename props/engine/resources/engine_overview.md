@@ -142,7 +142,7 @@ to 4x between years, which is why the receiving k's were fixed by backtest.
   before kickoff and the close), settled Tuesday, graded on the scorecard. Chat never records.
 - **The live record so far** (weeks 2-4, 1,536 lines at Sleeper's real lines, DECISIONS #202):
   the engine's log loss 0.717 against the market's 0.692 (a coin flip is 0.693). Read the
-  market's chance as the probability and the engine for volume and role.
+  market's chance as the best available estimate and the engine for volume and role.
 - **Label gate:** labels return only at the week 8, 12 or 18 reviews, and only if both the
   model's weight beside the book and the profit of its strongest calls are wholly above zero.
 

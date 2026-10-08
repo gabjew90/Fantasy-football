@@ -8246,3 +8246,33 @@ every row while the predictions rows carry open / decision / close (line_archive
   cannot separate more volume from better efficiency; the card guide says so.
 - **No price moves:** the research CSV gains market_volume, market_edge and market_catches; every
   other output is identical on the fixture.
+
+## 2026-10-08 (215) -- the expert review of the TNF read: root causes, then fixes
+
+- **The review:** 33 points on the TB at DAL read (v3). Each was verified against the data the
+  engine read and classified by root cause before any fix (the user's rule: diagnose first).
+- **Code (9):** section 4 called a practice-only injury report "published" and read only game
+  statuses, so defenders who missed practice (Winfield, Morrison, Dennis, Overshown, Durant)
+  showed as "no designations" -- the PRICES were right (injuries_with_fallback fills Sleeper's
+  status for practice misses), only the display was wrong; the small-sample capped label; two
+  completion projections; labels without sources (ESPN depth chart, most-used linemen); the
+  combined row's lumped count; an unmeasured "main line unaffected" claim.
+- **Weak rules (10):** "read the market's chance as THE probability"; "a big gap usually means the
+  market knows"; "one game in ten lands below the range" (measured coverage differs by market);
+  volume rows read as needs; "luckless"; pooled biases nudging single players; no rule to compare
+  legs on market chance or to tie validation to a version; closing conditions that ask the writer
+  to compute combinations the table does not show.
+- **Process (14):** the read's 14 player narratives were hand-written and shipped with no step
+  re-deriving each claim (arithmetic: 20 x 8.5 = 170 for a 181 line; 3 x 9 = 27 for 29.5;
+  teammate usage generalised; snaps "unchanged" at 82 -> 86%), and nothing reviewed an analysis
+  the user bets on -- the user's approval stood in for the check.
+- **Fixes, by cause:** code -- report_state / defense_cell / injury_note (practice-only stated,
+  every defender who missed practice listed with the prices' own status and its source), Out
+  defenders in section 7, the small-sample label, one completions number, the combined split,
+  the rushing-width row rewritten; rules -- "best available estimate", the measured range
+  coverage, average-production thresholds, capping as a sensitivity check, the causes of a gap,
+  legs compared on market chance, biases never applied to one player, validation names its
+  version; process -- CLAUDE.md: an analysis the user bets on gets a verification pass by a
+  separate agent before delivery; SKILL.md / CHAT.md: every volume x efficiency is shown worked
+  and checked, usage claims come from the player's own rows, injuries follow section 4.
+- **No price moves.**

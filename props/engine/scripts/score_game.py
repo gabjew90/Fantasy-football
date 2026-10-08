@@ -801,6 +801,13 @@ def main():
                  f"the pre-game depth chart cutoff. Re-run once the time is published.")
     kick = eastern_to_utc(G.gameday, G.gametime)
     dcf["dt"] = pd.to_datetime(dcf["dt"], errors="coerce", utc=True)
+    # the defensive starters, for section 7 (DECISIONS #215): the depth chart's first player at each
+    # defensive spot in its latest snapshot per team, joined by gsis_id
+    DEF_STARTERS = set()
+    if len(dcf) and {"team", "gsis_id", "pos_abb", "pos_rank", "dt"}.issubset(dcf.columns):
+        _last = dcf[dcf.dt == dcf.groupby("team").dt.transform("max")]
+        _st = _last[_last.pos_abb.astype(str).str.upper().isin(RSCH.DEF_POS) & (_last.pos_rank == 1)]
+        DEF_STARTERS = {(str(t_), str(g_)) for t_, g_ in zip(_st.team, _st.gsis_id) if isinstance(g_, str)}
     roles = []
     DC_QB = {}           # team -> its QBs in depth-chart order (the QB promotion reads it)
     for t in (AWAY, HOME):
@@ -2387,6 +2394,9 @@ def main():
             _proj = RSCH.projected_completions([float(np.mean(sims[n_]["receptions"])) for n_ in _team],
                                                None if _oth is None else float(np.mean(_oth)), _cr,
                                                float(np.mean(P["qb_starter_pass_share_quantiles"])))
+            # the simulated completions the card shows, where the starter has them (one number, #215)
+            if "completions" in sims[r_.player]:
+                _proj = float(np.mean(sims[r_.player]["completions"]))
             lk_, lfr_ = _luck(m_.gsis_id, "pass")
             cp_ = _xl("pass_completions", r_.player, r_.team)
             QB_READ[(r_.player, r_.team)] = RSCH.qb_yards_read(
@@ -2853,7 +2863,10 @@ def main():
             q_ = QB_READ.get((nm, t)) or {}
             att_ = _xl("passing_attempts", nm, t)
             qb = {"team_passes": (TEAM_VOL_CHK.get(t) or {}).get("our_att"),
-                  "games": RSCH.qb_workload(pbp, m.gsis_id), "proj_cmp": q_.get("proj"),
+                  "games": RSCH.qb_workload(pbp, m.gsis_id),
+                  # the same completions the card's volume row shows (simulated), not the closed form
+                  "proj_cmp": (float(np.mean(sims[nm]["completions"])) if "completions" in (sims.get(nm) or {})
+                               else q_.get("proj")),
                   "cmp_line": q_.get("completions_line"), "cmp_fav": q_.get("completions_fav"),
                   "att_line": att_.get("line"), "att_fav": RSCH.favoured(att_.get("mult_over"), att_.get("mult_under")),
                   "gauge": q_.get("gauge"), "gauge_rate": q_.get("gauge_rate"),
@@ -3208,7 +3221,8 @@ def main():
     BRIEF = brief_section(AWAY=AWAY, HOME=HOME, market_env=market_env, M=M, pop=pop, iw=iw, pbp=pbp,
                           STARTER_QB=STARTER_QB, AUTO_QB=AUTO_QB, LINE_STATUS=LINE_STATUS,
                           TEAM_VOL_CHK=TEAM_VOL_CHK, UNIT_EFF=UNIT_EFF, PA=PA, weather=weather, roof=roof,
-                          ROOF_NOTE=ROOF_NOTE, R=R, G=G, WEEK=WEEK, TEAM_VOL_ROWS=TEAM_VOL_ROWS, STATE_N=_state_n)
+                          ROOF_NOTE=ROOF_NOTE, R=R, G=G, WEEK=WEEK, TEAM_VOL_ROWS=TEAM_VOL_ROWS, STATE_N=_state_n,
+                          INJ_STATUS=inj_status, INJ_SOURCE=INJ_SOURCE, DEF_STARTERS=DEF_STARTERS)
     if BET.empty:
         L[3:3] = BRIEF
     # put the card at the top of the report, right after the header rule
@@ -3889,7 +3903,7 @@ def qb_starts(pbp, gsis_id, first=None) -> int:
 
 BRIEF_ARGS = ("AWAY", "HOME", "market_env", "M", "pop", "iw", "pbp", "STARTER_QB", "AUTO_QB", "LINE_STATUS",
               "TEAM_VOL_CHK", "UNIT_EFF", "PA", "weather", "roof", "ROOF_NOTE", "R", "G", "WEEK", "TEAM_VOL_ROWS",
-              "STATE_N")
+              "STATE_N", "INJ_STATUS", "INJ_SOURCE", "DEF_STARTERS")
 
 
 def brief_section(**V) -> list[str]:
@@ -3921,9 +3935,16 @@ def brief_section(**V) -> list[str]:
         books_ = ", ".join(sorted(BOOK_NAME.get(b_, b_) for b_ in set(R.book.dropna()))) if "book" in R else ""
         quoted = (f"player prices ({books_}) " if books_ else "player prices ") + \
             str(lu_.max())[:16].replace("T", " ") + " UTC" if len(lu_) else None
-    reported = set(iw.team) if len(iw) and "team" in iw else set()
-    inj = (f"injury report: week {WEEK} published for " + " and ".join(sorted({AWAY, HOME} & reported))
-           if {AWAY, HOME} & reported else f"injury report: week {WEEK} not yet published")
+    # a practice-only report is not a published game report (DECISIONS #215)
+    rstate = {t_: RSCH.report_state(iw, t_) for t_ in (AWAY, HOME)}
+    _g = sorted(t_ for t_, s_ in rstate.items() if s_ == "game")
+    _p = sorted(t_ for t_, s_ in rstate.items() if s_ == "practice")
+    _inj = []
+    if _g:
+        _inj.append(f"injury report: week {WEEK} game statuses for " + " and ".join(_g))
+    if _p:
+        _inj.append(f"injury report: week {WEEK} practice statuses only for " + " and ".join(_p))
+    inj = "; ".join(_inj) or f"injury report: week {WEEK} not yet published"
     srcs = [(f"spread and total ({ME_.get('book') or 'book not recorded'}) "
              f"{str(ME_.get('as_of'))[:16].replace('T', ' ')} UTC") if ME_.get("as_of") else "spread and total: time not recorded",
             *([quoted] if quoted else []), inj,
@@ -3995,19 +4016,11 @@ def brief_section(**V) -> list[str]:
             f"{r['name']} ({r.pos}, {r.report_status}"
             + (f", practice: {prac[r.gsis_id]}" if isinstance(prac.get(r.gsis_id), str) and prac.get(r.gsis_id) else "")
             + ")" for _, r in sk.iterrows() if r.pos != "QB") or "no designations"
-        if len(iw) and "position" in iw and (iw.team == t).any():
-            dfn = iw[(iw.team == t) & iw.position.isin(RSCH.DEF_POS)
-                     & iw.report_status.isin(["Out", "Doubtful", "Questionable"])]
-            c["Pass rush and coverage"] = "; ".join(f"{r.full_name} ({r.position}, {r.report_status})"
-                                                    for r in dfn.itertuples()) or "no designations"
-        else:
-            c["Pass rush and coverage"] = "no injury report yet this week"
+        c["Pass rush and coverage"] = RSCH.defense_cell(t, iw, V.get("INJ_STATUS"), V.get("INJ_SOURCE"))
         cells[t] = c
-    who_note = (f"Official report: week {WEEK} " + ("published for " + " and ".join(sorted({AWAY, HOME} & reported))
-                                                   if {AWAY, HOME} & reported else "not yet published")
-                + ". Before it, a quarterback's status can come from Sleeper's injury feed, labelled where used; "
-                  "statuses not yet published stay unknown. Offensive line = the five linemen with the most snaps "
-                  "this season.")
+    who_note = (RSCH.injury_note(rstate, WEEK)
+                + " Offensive line = the five linemen with the most snaps this season (not a confirmed starting "
+                  "five).")
     L += ["### 4. Who plays: injuries and replacements\n", *RSCH.personnel_table(cells, AWAY, HOME, who_note), ""]
     # ---- 5. production allowed ----
     pt = RSCH.positional_table(V.get("PA"), (HOME, AWAY))
@@ -4032,7 +4045,12 @@ def brief_section(**V) -> list[str]:
            "oline_out": {t: sum(1 for x in ((V.get("LINE_STATUS") or {}).get(t) or []) if x["state"] == "out")
                          for t in (AWAY, HOME)},
            "wind_mph": wx.get("wind_mph_max") if wx.get("status") == "ok" else None,
-           "roof": roof, "roof_note": note}
+           "roof": roof, "roof_note": note,
+           # starters only: a backup defender out is not a gap in the opposing offense's price
+           "defense_out": {t_: sorted(r_.full_name for r_ in iw[(iw.team == t_) & iw.position.isin(RSCH.DEF_POS)].itertuples()
+                                      if (V.get("INJ_STATUS") or {}).get((t_, r_.gsis_id)) in ("Out", "Doubtful")
+                                      and (t_, str(r_.gsis_id)) in (V.get("DEF_STARTERS") or set()))
+                           for t_ in (AWAY, HOME)} if len(iw) and "position" in iw else {}}
     L += ["### 7. Where the baseline could miss this game\n", *RSCH.known_gaps_table(RSCH.known_gaps(ctx)), ""]
     return L
 
