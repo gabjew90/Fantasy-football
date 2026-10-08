@@ -8382,3 +8382,17 @@ every row while the predictions rows carry open / decision / close (line_archive
   external PDF waits for a PDF library decision.
 - **Tested on TNF (TB@DAL):** a v2 read of Prescott, Lamb and Williams passes 33 of 33. The
   checker refused "leans" twice in my own drafts, and they were rephrased.
+
+## 2026-10-08 (219) -- the external PDF
+
+- **What:** `publish_pdf.py` typesets `publish_render.render_external`. That is the guide's
+  structure from the same run and reads as the QA version, without the backend, the checks, the
+  model names, the decision numbers or the release internals. The PDF holds exactly the checked
+  Markdown's words and numbers; the module only lays them out.
+- **Library:** reportlab 4.2.5 (the user approved the install), in requirements.txt. Fonts: the
+  Bitstream Vera family bundled with reportlab, embedded, so the page is the same on any machine.
+  Vera has no arrow, so `->` is written out ("10.7 targets (8.0 catches)", "...: 67%").
+- **Where it runs:** `publish` writes `<slug>.pdf` beside the QA and agent versions. Without
+  reportlab it prints `PDF skipped` and still writes the other two. The PDF tests live in tests/
+  (the root suite installs requirements.txt), because props/tests runs before every capture and
+  must not depend on reportlab.

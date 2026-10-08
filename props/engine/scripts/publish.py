@@ -613,7 +613,7 @@ def main(argv=None) -> int:
     ap.add_argument("--run", required=True, help="run_<slug>.json from score_game.py")
     ap.add_argument("--reads", required=True, help="the reads file (resources/agent_guide.md, 'The reads file')")
     ap.add_argument("--out", required=True)
-    ap.add_argument("--which", default="qa,agent", help="comma list: qa, agent")
+    ap.add_argument("--which", default="qa,agent,pdf", help="comma list: qa, agent, pdf")
     ap.add_argument("--release-tag")
     ap.add_argument("--release-hash")
     ap.add_argument("--release-source")
@@ -653,6 +653,15 @@ def main(argv=None) -> int:
         p = out / f"{run['slug']}_agent.md"
         p.write_text(PR.scrub(PR.render_agent(run, reads, checks, release, ci)), encoding="utf-8")
         print(f"wrote {p}")
+    if "pdf" in which:
+        import publish_pdf as PDF
+        if not PDF.available():
+            print("PDF skipped: the reportlab package is not installed (pip install reportlab); "
+                  "the QA and agent versions are written", file=sys.stderr)
+        else:
+            p = PDF.build(PR.scrub(PR.render_external(run, reads)), out / f"{run['slug']}.pdf",
+                          title=f"{run['away']} at {run['home']}, week {run['week']}")
+            print(f"wrote {p}")
     return 0
 
 

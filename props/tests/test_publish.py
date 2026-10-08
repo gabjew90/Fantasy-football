@@ -346,10 +346,10 @@ def test_main_renders_nothing_when_a_check_fails(tmp_path):
     leg0(bad)["fails"] = "he saw 12 targets"
     run_p, reads_p = _files(tmp_path, reads=bad)
     out = tmp_path / "out"
-    assert P.main(["--run", str(run_p), "--reads", str(reads_p), "--out", str(out), "--no-ci"]) == 3
+    assert P.main(["--run", str(run_p), "--reads", str(reads_p), "--out", str(out), "--no-ci", "--which", "qa,agent"]) == 3
     assert not out.exists() or not list(out.iterdir())
     run_p, reads_p = _files(tmp_path)
-    assert P.main(["--run", str(run_p), "--reads", str(reads_p), "--out", str(out), "--no-ci"]) == 0
+    assert P.main(["--run", str(run_p), "--reads", str(reads_p), "--out", str(out), "--no-ci", "--which", "qa,agent"]) == 0
     assert sorted(p.name for p in out.iterdir()) == ["2026_wk05_TB_DAL_agent.md", "2026_wk05_TB_DAL_qa.md"]
 
 
@@ -366,7 +366,7 @@ def test_key_shaped_strings_are_scrubbed_from_what_is_written(tmp_path):
                            "detail": "URLError: /v4/sports?apiKey=0123456789abcdef0123456789abcdef&regions=us"})
     run_p, reads_p = _files(tmp_path, run=run)
     out = tmp_path / "o"
-    assert P.main(["--run", str(run_p), "--reads", str(reads_p), "--out", str(out), "--no-ci",
+    assert P.main(["--run", str(run_p), "--reads", str(reads_p), "--out", str(out), "--no-ci", "--which", "qa,agent",
                    "--release-hash", "ab" * 32]) == 0
     for f in out.iterdir():
         txt = f.read_text(encoding="utf-8")
@@ -434,3 +434,12 @@ def test_the_unit_footnote_states_the_runs_own_filter():
     t = "\n".join(PR.unit_table({**RUN, "unit_filter": "win probability 5-95%"}))
     assert "win probability 5-95%" in t
     assert "not recorded" in "\n".join(PR.unit_table(RUN))
+
+
+def test_the_external_version_carries_no_internals():
+    reads = good()
+    ext = PR.render_external(RUN, reads)
+    for w in ("DECISIONS", "PROTOTYPE", "MODEL_", "Checks", "Backend", "QA appendix", "release", "slug", "gsis"):
+        assert w not in ext, w
+    assert "## Receiving" in ext and "## A note on reliability" in ext and "Data as of:" in ext
+    assert "| Verdict | attainable | attainable |" in ext

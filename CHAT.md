@@ -340,7 +340,10 @@ matchup brief, then Passing, Receiving, and Rushing and combined yards.
 4. When every check passes, it writes `<slug>_qa.md` and `<slug>_agent.md` in `$NFL_OUT`.
    - **The QA/QC version** is for the user and internal reviewers. Give it in the reply, in full.
    - **The agent version** is for another LLM agent. Attach it when asked.
-   - **The external PDF** is not built yet: it waits for the user's format guide. Say so if asked.
+   - **The external PDF** (`<slug>.pdf`) is the same read for an outside reader, with no backend,
+     checks or internals. Attach it when the user asks for the report or the PDF. If publish prints
+     `PDF skipped` (reportlab missing), run `python -m pip install -q --break-system-packages
+     reportlab==4.2.5` once, silently, and publish again.
 5. The checks are arithmetic and sourcing only. Whether a condition is plausible is judgment, and
    the QA version leaves it to the reviewer.
 

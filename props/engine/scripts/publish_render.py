@@ -473,6 +473,43 @@ def render_qa(run, reads, checks, release) -> str:
     return "\n".join(L) + "\n"
 
 
+# ---------------------------------------------------------------- the external version
+def render_external(run, reads) -> str:
+    """For an outside reader (the PDF): the guide's structure and the supporting data, without the
+    backend -- no checks, no model names, no decision numbers, no release internals. The same run
+    and reads as the QA version, so the two cannot disagree."""
+    home, away = teams(run)
+    L = [f"# {away.upper()} AT {home.upper()}", "", *header_lines(run), "",
+         "**Opening game read.** " + reads["opening"], "",
+         "## 1. What game does the market expect?", "", *market_table(run), "", reads.get("market_read") or "", "",
+         *scenario_table(run, detail=False), "",
+         "## 2. How much passing and rushing should we expect?", "", *workload_table(run), "",
+         reads.get("workload_read") or "", "",
+         "## 3. What is each team good and bad at?", "", *unit_table(run), ""]
+    for t in (home, away):
+        if (reads.get("unit_reads") or {}).get(t):
+            L += [f"> **{t} offense:** {reads['unit_reads'][t]}", ""]
+    L += ["## 4. Which personnel changes affect that picture?", "", *personnel_table(reads), "",
+          reads.get("personnel_read") or "", "", *if_out_tables(run), "",
+          "## 5. Where have opposing positions produced?", "", *allowed_tables(run), "", reads.get("allowed_read") or "", "",
+          f"**Weather and venue.** {run.get('weather_line') or '-'}", "",
+          "**Assumptions worth testing.**", "", *(f"- {a}" for a in reads["assumptions"]), "",
+          reads["handoff"], ""]
+    by_player = {}
+    for i, lg in enumerate(reads["legs"], 1):
+        by_player.setdefault(lg["player"], []).append(i)
+    for sec in PB.SECTIONS:
+        ps = [p for p in reads["players"] if PB.section_of(PB.card_for(run, p["player"]) or {}) == sec]
+        if not ps:
+            continue
+        L += [f"## {sec}", ""]
+        for p in ps:
+            L += player_card(run, reads, p, [], by_player.get(p["player"], []), qa=False)
+    L += reliability_note(run)
+    L += [f"*Data as of: {cutoff(run)}*", ""]
+    return "\n".join(L) + "\n"
+
+
 # ---------------------------------------------------------------- the agent version
 def render_agent(run, reads, checks, release, ci) -> str:
     """For another LLM agent: how the engine works end to end, from the repository to this run's
