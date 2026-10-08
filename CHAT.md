@@ -372,6 +372,12 @@ reach the call. The reply mentions the parts that decide it, not all of them.
 
 ## Every reply
 
+- **Check a props read before sending it (expert review 2026-10-08, DECISIONS #215).** Re-derive
+  every number you state from the report: each volume x efficiency you write is computed in the
+  reply and clears (or misses) the line as you say; every usage claim is that player's own row,
+  not a teammate's or a team story; injuries match section 4 (a practice-only report is not a
+  game status). Call the market's chance the best available estimate, never "the probability".
+
 - **The release is recorded, not recited.** Which release ran goes in the
   transcript and the log (both name it), not at the top of every reply. This
   supersedes the older harness instruction ("the first line of every reply

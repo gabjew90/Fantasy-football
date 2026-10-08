@@ -89,7 +89,8 @@ def test_back_card_two_rate_column_and_the_markets_carries_line():
     assert "14 carries at 4.0 -> **40%**" in text
     assert "| The market's own volume line | more than 13.5 carries -> 40% | - |" in text
     # 69 yards: 14*4 + 4*8 = 88 clears, 12*4 + 2*8 = 64 does not -> 50%
-    assert "carries + catches at 4.0 a carry, 8.0 a catch -> **50%**" in text
+    # blended 4.75 a touch at the engine's 13 carries / 3 catches -> 15 touches, split 12 + 3
+    assert "12 carries + 3 catches at 4.0 a carry, 8.0 a catch -> **50%**" in text
     assert "| Carries and share of team carries | 13.3 a game; 61% | 16; 52% |" in text
     assert "Over 55% on the board (his carries half from the market's script), 53% from history alone" in text
 
@@ -234,3 +235,104 @@ def test_the_card_guide_explains_every_row_the_table_prints():
         assert f"| {r} |" in guide, r
     assert "| Row | How it is produced | How to read it |" in guide
     assert f"{RS.LUCK_PCT['catch']:g}th percentile" in guide
+
+
+def test_the_market_implied_volume_is_the_search_aimed_at_the_markets_chance():
+    # a share_over rising linearly in k: P = 0.5 at k = 1, +0.1 per 0.2 of k; work = 8 targets x k
+    share_over = lambda k: 0.5 + 0.5 * (k - 1.0)
+    work = lambda k: 8.0 * k
+    RS._market_cache(share_over, 0.55, work)
+    assert abs(RS.LAST_EDGES["market_volume"] - 8.8) < 0.05      # P = 0.55 at k = 1.1
+    # the anchor: the main run says 0.52 where the search says 0.50 at k = 1, so a market 0.55
+    # is 3 points above the engine and the volume follows that gap (k = 1.06), not the raw 0.55
+    RS._market_cache(share_over, 0.55, work, engine_p=0.52)
+    assert abs(RS.LAST_EDGES["market_volume"] - 8.48) < 0.05
+    # outside the search range: an edge, not a number
+    RS._market_cache(lambda k: 0.2, 0.9, work)
+    assert RS.LAST_EDGES["market_volume"] is None and RS.LAST_EDGES["market_edge"] == "max"
+    RS._market_cache(share_over, None, work)
+    assert RS.LAST_EDGES["market_volume"] is None and RS.LAST_EDGES["market_edge"] is None
+
+
+def test_the_card_shows_the_market_implied_volume():
+    d = {"name": "X", "team": "TB", "slot": "WR1", "pos": "WR",
+         "rows": [_row("player_receptions", 4.5, unit="targets", market_volume=8.1),
+                  _row("player_reception_yds", 68.5, unit="targets", market_volume=8.6, market_catches=5.6),
+                  _row("player_rush_yds", 52.5, unit="carries", market_volume=None, market_edge="max")]}
+    text = "\n".join(RS.player_card(d))
+    assert ("| Market-implied volume (at the engine's efficiency) | 8.1 targets | 8.6 targets -> 5.6 catches | "
+            "more carries than the search covers |") in text
+    assert "| Market-implied volume (at the engine's efficiency) |" in "\n".join(RS.card_guide())
+
+
+def test_a_practice_only_report_is_not_a_published_game_report():
+    import pandas as pd
+    iw = pd.DataFrame({"team": ["TB", "TB", "DAL"], "gsis_id": ["s1", "q1", "c1"],
+                       "full_name": ["A Safety", "A Passer", "A Corner"], "position": ["S", "QB", "CB"],
+                       "report_status": [None, None, None],
+                       "practice_status": ["Did Not Participate In Practice", "Did Not Participate In Practice",
+                                           "Full Participation in Practice"]})
+    assert RS.report_state(iw, "TB") == "practice" and RS.report_state(iw, "NYG") == "none"
+    assert RS.report_state(iw.assign(report_status=["Out", None, None]), "TB") == "game"
+    # the defender who missed practice is shown, with the status the prices use and its source
+    cell = RS.injury_cell("TB", iw, {("TB", "s1"): "Out"}, {("TB", "s1"): "Sleeper injury feed, knee"})
+    assert cell == "A Safety (S, Out; Sleeper injury feed, knee; practice: did not participate in practice)"
+    assert RS.injury_cell("TB", iw) == "A Safety (S, no game status yet; practice: did not participate in practice)"
+    assert RS.injury_cell("DAL", iw) == "no designations", "full practice is not a designation"
+    # once game statuses post, a limited practice with no status reads as no designation, not "not yet"
+    fin = iw.assign(report_status=["Out", None, None]).assign(practice_status=["Did Not Participate In Practice",
+                                                                                  "Limited Participation in Practice",
+                                                                                  "Full Participation in Practice"])
+    fin = pd.concat([fin, pd.DataFrame({"team": ["TB"], "gsis_id": ["l1"], "full_name": ["A Backer"],
+                                        "position": ["LB"], "report_status": [None],
+                                        "practice_status": ["Limited Participation in Practice"]})])
+    assert "A Backer (LB, no game designation; practice: limited participation in practice)" in RS.injury_cell("TB", fin)
+    note = RS.injury_note({"TB": "practice", "DAL": "game"}, 5)
+    assert "game statuses published for DAL" in note and "TB: PRACTICE STATUSES ONLY" in note
+    assert "published" not in RS.injury_note({"TB": "practice"}, 5).split("PRACTICE")[0]
+
+
+def test_out_defenders_and_the_rushing_width_reach_section_7():
+    g = RS.known_gaps({"defense_out": {"TB": ["A Safety"]}, "has_rush_lines": True})
+    rows = {r[0]: r for r in g}
+    assert "TB defense: A Safety out" in rows
+    assert "main line is unaffected" not in " ".join(" ".join(r) for r in g)
+    assert "not measured" in rows["Rushing width"][1]
+
+
+def test_the_small_sample_label_says_his_longest_play_was_left_out():
+    luck, _ = RS.luck_for({}, {"p": [[3.0, 9.0, 40.0], [5.0, 6.0]]}, "p", "catch")
+    assert not luck["own"]
+    assert RS.capped_label(luck, "catches", "catches", 2025, 2026) == (
+        "Last 2 games, his longest catch left out (2 from 2026; only 5 catches, too few for a percentile cap)")
+
+
+def test_the_card_guide_says_what_its_numbers_are_not():
+    g = "\n".join(RS.card_guide())
+    assert "best available estimate" in g and "is the probability" not in g and "as the probability" not in g
+    assert "AVERAGE-production threshold" in g and "is not the chance the prop wins" in g
+    assert "One game in ten" not in g and "too narrow" in g and "too wide" in g
+    assert "luckless" not in g and "sensitivity check" in g
+    assert "model error" in g
+
+
+def test_the_skill_cell_lists_every_listed_receiver_not_only_the_priced_ones():
+    import pandas as pd
+    iw = pd.DataFrame({"team": ["DAL", "DAL"], "gsis_id": ["w5", "s1"], "full_name": ["A Fifth Receiver", "A Safety"],
+                       "position": ["WR", "S"], "report_status": ["Questionable", None],
+                       "practice_status": ["Did Not Participate In Practice", "Full Participation in Practice"]})
+    cell = RS.injury_cell("DAL", iw, positions=RS.SKILL_POS)
+    assert cell == "A Fifth Receiver (WR, Questionable; practice: did not participate in practice)"
+
+
+def test_a_status_the_prices_use_but_the_report_lacks_still_reaches_section_4():
+    import pandas as pd
+    iw = pd.DataFrame({"team": ["DAL"], "gsis_id": ["s1"], "full_name": ["A Safety"], "position": ["S"],
+                       "report_status": [None], "practice_status": ["Full Participation in Practice"]})
+    cell = RS.injury_cell("DAL", iw, {}, {("DAL", "w9"): "Sleeper injury feed; a reserve list"},
+                          positions=RS.SKILL_POS, extra=[("A Receiver", "WR", "w9", "Out"),
+                                                         ("A Back", "RB", "b1", "Out (scenario)")])
+    assert cell == "A Receiver (WR, Out; Sleeper injury feed; a reserve list); A Back (RB, Out (scenario))"
+    # no report rows at all: the extras still show
+    assert RS.injury_cell("NYG", iw.iloc[0:0], positions=RS.SKILL_POS,
+                          extra=[("A Back", "RB", "b1", "Out (scenario)")]) == "A Back (RB, Out (scenario))"

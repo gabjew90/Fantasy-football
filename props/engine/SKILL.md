@@ -554,8 +554,11 @@ these are model opinions not tested against sportsbook lines.
    workload table), the historical baseline, the rate notes, the market-carries shadow for backs,
    Matchup and Watch. The live record and the backtest calibration print ONCE above the cards,
    not per player. The prop table, top to bottom: **the market's chance of the Over** (the price
-   with its margin removed -- the probability), the engine's chance, the price, the engine's
-   forecast (middle and 80% range), what the Over needs, the engine's volume, then **the volume
+   with its margin removed -- the best available estimate of the chance), the engine's chance, the price, the engine's
+   forecast (middle and 80% range), what the Over needs, the engine's volume, the **market-implied
+   volume** (the workload the market's no-vig price implies at the engine's efficiency: above the
+   engine's volume, the market expects more work -- or better efficiency, which one price cannot
+   separate; below it, less), then **the volume
    chance** -- one row per efficiency (his luck-capped rate, his rate this season, the engine's),
    each "N [catches / carries / completions / targets] at [rate] -> [engine's chance of that
    volume]"; the market's own carries or completions line where posted; the efficiency the line
@@ -588,12 +591,27 @@ these are model opinions not tested against sportsbook lines.
      table's columns. A line that needs only volume (receptions, or a yards line his capped and
      season rates both clear) suits a volume view; a line that needs an efficiency he has not
      shown this season needs a reason to expect it back. Say which efficiency row you believe and
-     why. The volume chances are the engine's, NOT a price: the market's chance is the
-     probability of the prop.
+     why. The volume chances are the engine's average-production thresholds, NOT the chance the
+     prop wins: the market's chance is the best available estimate of that (an estimate, not a
+     known probability). When two lines suit the same view (catches or yards), compare them on
+     their market chances, not on the engine's -- a Power Play pays a flat multiple, so the leg
+     with the better estimated chance is the better leg for that view.
    - **Where the read can fail**: the specific role, script or efficiency change.
    - **The closing condition** (bold): "If you expect [player] to [volume] at [efficiency] in
      this situation, [side, prop, line] fits that view. It stops fitting if [change]." Take the
-     numbers from the table; call a margin under 10% thin.
+     numbers from the table; call a margin under 10% thin. **Show the arithmetic of every
+     volume x efficiency you state, and check it clears the line** ("22 completions x 8.5 = 187,
+     clears 181"; "3 catches x 10.0 = 30, clears 29.5") -- expert review 2026-10-08 found
+     "20+ completions at 8.5" for a 181 line (= 170) and "3-4 catches at about 9" for 29.5
+     (= 27). Prefer the volume a table row already printed.
+   - **Every usage claim comes from THAT player's own rows** -- never generalised from a
+     teammate or a team story ("the backup QB doesn't throw to backs" was true of one back and
+     false of the other). Say snaps rose or held from the numbers ("82% to 86%"), not by
+     impression. Low team volume does not sink every line, and two receivers can both clear
+     from the same throws: state such links only with the numbers that show them.
+   - **Injuries:** when section 4 says the report is practice-only, say so and name the
+     players who missed practice; never call a player's status known until game statuses
+     post.
    After the cards: **"What changes for the remaining players"** (one short paragraph per
    group), and **"Reads that pull in different directions"** -- only conflicts the roles
    support (two backs cannot both gain share of one fixed workload; a receiver's target gain
@@ -640,8 +658,11 @@ these are model opinions not tested against sportsbook lines.
    #202):** over weeks 2-4 (1,536 graded lines) the engine's Over chance had no useful relationship
    to outcomes -- log loss 0.717 against the market's 0.692 (a coin flip is 0.693); passing Overs
    hit 57% against an engine 42%, rushing 40% against 47%. So read the market's no-vig chance as
-   the probability and the engine for what it is built for: the workload a line needs, the role
-   evidence and the what-ifs. The live record prints once above the cards, beside the backtest rows; never
+   the best available estimate of the chance (not a known probability) and the engine for what it
+   is built for: the workload a line needs, the role evidence and the what-ifs. A big engine-market
+   gap can be news the market has, model error, stale inputs or different assumptions; never say
+   which without evidence. Pooled backtest biases describe the engine on average; never apply one
+   to a single player's chance. Any validation number names the engine version it graded. The live record prints once above the cards, beside the backtest rows; never
    present the engine's percentage as the better probability. The backtest evidence, with
    **measured biases at the main line (expert audit, DECISIONS #197)**:
    at the backtest's stand-in line on 2022-25 the receiving-yards Over hit 2.9 points more often

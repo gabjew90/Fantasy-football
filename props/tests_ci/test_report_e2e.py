@@ -63,6 +63,7 @@ def test_cards_are_one_table_with_the_volume_chance_for_every_market_kind(run):
     for head in ("| | Receptions ", " Receiving yards ", " Rushing yards ", "| | Passing yards "):
         assert head in report, head
     assert "| **Market's chance of the Over** |" in report and "| At his luck-capped rate |" in report
+    assert "| Market-implied volume (at the engine's efficiency) |" in report
     assert " completions at " in report and " catches at " in report and " carries at " in report
     assert " targets at " in report
     assert "luck-capped rate = last 10 games, long catches capped (" in report and "so far, uncapped (" in report
@@ -199,3 +200,28 @@ def test_an_away_team_what_if_leaves_every_home_line_alone(tmp_path):
     rows = [ln for ln in sec.splitlines() if ln.startswith("| ") and "(HOU)" in ln]
     assert rows == [], rows
     assert any(ln.startswith("| CeeDee Lamb (DAL)") for ln in sec.splitlines()), "the named player is priced"
+
+
+def test_a_practice_only_injury_report_is_said_and_shown(tmp_path):
+    # expert review 2026-10-08 (DECISIONS #215): before game statuses post, the report must say the
+    # report is practice-only and still list the defenders who missed practice -- not "no designations"
+    wd, out = tmp_path / "wd", tmp_path / "out"
+    wd.mkdir()
+    out.mkdir()
+    for f in FIXTURE.iterdir():
+        shutil.copy(f, wd / f.name)
+    inj = pd.read_csv(wd / "inj_2026.csv", low_memory=False)
+    inj.loc[inj.week == 4, "report_status"] = None
+    inj.to_csv(wd / "inj_2026.csv", index=False)
+    env = dict(os.environ, NFL_FETCH_MAX_AGE_S="1000000000", NFL_OUT=str(out))
+    r = subprocess.run([sys.executable, str(SCRIPTS / "score_game.py"), "--away", "DAL", "--home", "HOU",
+                        "--season", "2026", "--week", "4", "--workdir", str(wd),
+                        "--odds-snapshot", str(wd / "odds_snapshot_2026_wk04_DAL_HOU.json"), "--no-scenarios"],
+                       capture_output=True, text=True, encoding="utf-8", errors="replace", env=env, timeout=600)
+    assert r.returncode == 0, r.stderr[-2000:]
+    report = (out / "report_2026_wk04_DAL_HOU.md").read_text(encoding="utf-8")
+    sec = report[report.index("### 4. Who plays"):report.index("### 5.")]
+    assert "PRACTICE STATUSES ONLY" in sec and "game statuses published" not in sec
+    row = next(ln for ln in sec.splitlines() if ln.startswith("| Pass rush and coverage"))
+    assert "did not participate" in row and "no designations |" not in row.split("|")[3]
+    assert "practice statuses only" in report.split("## Team matchup")[1].split("### 1.")[0]

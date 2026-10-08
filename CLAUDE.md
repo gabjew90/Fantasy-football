@@ -32,6 +32,14 @@
   an inline check is not a substitute. Any load-bearing script the engine or
   the chat skill relies on that has NOT been through the skill is flagged to
   the user as a risk until it has (the user's standing rule, 2026-10-06).
+- **An analysis the user bets on is verified before it is delivered** (the user's rule after
+  the 2026-10-08 expert review, DECISIONS #215): a props read or any written analysis built on
+  engine output goes through a verification pass -- a separate agent re-derives every number
+  and claim from the engine report and the official sources (arithmetic, each player's own
+  rows, injuries against the official report) and lists mismatches, which are fixed before the
+  user sees it. The user's approval is not the check.
+- **Diagnose before solutioning**: for any bug, error or review finding, verify it, classify its
+  root cause (code / process / weak rule) and group by cause before proposing fixes.
 - The in-season auto-manager's cron stack is retired (2026-10-08, DECISIONS
   #212): fantasy decisions go through `fantasy/` (`nfl fantasy ...`), and
   `props.yml` is the only scheduled workflow.

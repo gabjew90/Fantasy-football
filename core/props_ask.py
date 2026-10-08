@@ -62,7 +62,7 @@ UNVALIDATED = ("No bet labels: the model has not shown it adds anything beside t
                "yardage calls made money at Sleeper's recorded prices, DECISIONS #151), so a gap between them is "
                "information, not an edge -- and a big gap was usually the model missing something. At Sleeper's real "
                "lines (2026 weeks 2-4) the engine's chance scored worse than the market's (log loss 0.717 against "
-               "0.692, DECISIONS #202): read the market's chance as the probability and the engine for the workload "
+               "0.692, DECISIONS #202): read the market's chance as the best available estimate and the engine for the workload "
                "a line needs. (Backtest on 2022-25 outcomes, at stand-in lines: receptions and receiving yards inside "
                "the width bar, though their Over hits more often than the engine says -- receiving yards by about 3 "
                "points; rushing and rushing + receiving too narrow in the tails; QB passing too wide, still so after "
