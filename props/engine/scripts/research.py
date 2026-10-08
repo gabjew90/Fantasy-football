@@ -857,6 +857,112 @@ def team_volume_lines(team, rows, chk) -> list[str]:
 POS_GROUPS = ("RB", "WR", "TE")
 
 
+def american_to_prob(odds):
+    """An American price ('-500', '+340', 'EVEN', -110) as its implied chance, cut included."""
+    s = str(odds).strip().upper()
+    if s in ("EVEN", "EV", "PK"):
+        return 0.5
+    try:
+        o = float(s.replace("+", ""))
+    except ValueError:
+        return None
+    if o == 0:
+        return None
+    return (-o) / (-o + 100) if o < 0 else 100 / (o + 100)
+
+
+def espn_odds_extra(o) -> dict:
+    """The parts of an ESPN scoreboard odds object beyond spread and total: DraftKings' closing
+    (current) and opening moneylines, the opening spread and total, and the home team's win
+    chance with the cut removed. Missing pieces are None, never guessed."""
+    def path(*ks):
+        x = o
+        for k in ks:
+            x = x.get(k) if isinstance(x, dict) else None
+        return x
+
+    def num(v):
+        try:
+            return float(str(v).lstrip("ou").replace("+", "")) if v not in (None, "") else None
+        except ValueError:
+            return None
+    ml = {f"{side}_{when}": path("moneyline", side, when, "odds") for side in ("home", "away") for when in ("close", "open")}
+    out = {"home_ml": ml["home_close"], "away_ml": ml["away_close"], "home_ml_open": ml["home_open"],
+           "away_ml_open": ml["away_open"],
+           "open_home_spread": num(path("pointSpread", "home", "open", "line")),
+           "open_total": num(path("total", "over", "open", "line")), "home_win_prob": None, "home_win_prob_open": None}
+    for k, a, b in (("home_win_prob", "home_close", "away_close"), ("home_win_prob_open", "home_open", "away_open")):
+        ph, pa = american_to_prob(ml[a]), american_to_prob(ml[b])
+        if ph is not None and pa is not None and ph + pa > 0:
+            out[k] = ph / (ph + pa)
+    return out
+
+
+def unit_export(ue, teams) -> dict:
+    """Section 3 as data: each team's passing and rushing offense and defense -- score (50 = league
+    average, higher better for both sides), grade, and league rank (1 = the best unit)."""
+    if not ue or not ue.get("score"):
+        return {}
+    T = unit_tiers(ue)
+    out = {}
+    for t in teams:
+        d = {}
+        for side in ("off", "def"):
+            for k in ("pass", "run"):
+                sc = ue["score"][side][k]
+                if t not in sc:
+                    continue
+                order = sorted(sc, key=lambda x: -sc[x])
+                d[f"{side}_{k}"] = {"score": float(sc[t]), "grade": tier_grade(T[(side, k)], t),
+                                    "rank": order.index(t) + 1, "of": len(order)}
+        out[t] = d
+    return out
+
+
+def pa_export(pa, parts, teams) -> dict:
+    """Section 5 as data: PPR a game allowed by position with its rank (1 = most allowed), the
+    league average, and what produced it (catches, receiving and rushing yards, touchdowns a game)."""
+    if not pa:
+        return {}
+    out = {t: {p: {"ppr": pa[t][p][0], "rank_most": pa[t][p][1], **((parts or {}).get(t, {}).get(p) or {})}
+               for p in POS_GROUPS} for t in teams if t in pa}
+    out["_league"] = pa.get("_league")
+    out["_n"] = pa.get("_n")
+    out["_games"] = {t: (pa.get("_games") or {}).get(t) for t in teams}
+    return out
+
+
+def points_allowed_parts(pbp, positions) -> dict:
+    """What points_allowed counts, split: catches, receiving yards, rushing yards and receiving +
+    rushing touchdowns allowed a game, by position ({defteam: {pos: {...}}}), on the same plays."""
+    need = {"game_id", "defteam", "play_type", "complete_pass", "receiver_player_id", "rusher_player_id",
+            "receiving_yards", "rushing_yards", "pass_touchdown", "rush_touchdown"}
+    if pbp is None or not need.issubset(pbp.columns) or not len(pbp):
+        return {}
+    import pandas as _pd
+    pos = {k: ("RB" if v == "FB" else v) for k, v in positions.items()}
+    f0 = lambda s: s.fillna(0).astype(float)
+    rec = pbp[(pbp.play_type == "pass") & pbp.receiver_player_id.notna()]
+    kneel = pbp["qb_kneel"] == 1 if "qb_kneel" in pbp else False
+    run = pbp[(pbp.play_type == "run") & ~kneel & pbp.rusher_player_id.notna()]
+    a = _pd.concat([
+        _pd.DataFrame({"defteam": rec.defteam.values, "pid": rec.receiver_player_id.values,
+                       "catches": f0(rec.complete_pass).values, "rec_yds": f0(rec.receiving_yards).values,
+                       "rush_yds": 0.0, "tds": f0(rec.pass_touchdown).values}),
+        _pd.DataFrame({"defteam": run.defteam.values, "pid": run.rusher_player_id.values, "catches": 0.0,
+                       "rec_yds": 0.0, "rush_yds": f0(run.rushing_yards).values, "tds": f0(run.rush_touchdown).values})])
+    a["pos"] = a.pid.map(pos)
+    a = a[a.pos.isin(POS_GROUPS)]
+    games = pbp.groupby("defteam").game_id.nunique()
+    g = a.groupby(["defteam", "pos"])[["catches", "rec_yds", "rush_yds", "tds"]].sum()
+    out = {}
+    for (d, p), row in g.iterrows():
+        n = games.get(d)
+        if n:
+            out.setdefault(d, {})[p] = {k: float(v) / n for k, v in row.items()}
+    return out
+
+
 def points_allowed(pbp, positions) -> dict:
     """PPR fantasy points each defence has allowed per game to RBs, WRs and TEs this
     season (DECISIONS #169): 1 a catch, 0.1 a receiving or rushing yard, 6 a receiving or

@@ -365,6 +365,18 @@ MARKET_RUSH_WEIGHT = 0.5      # round 39 ships (user, 2026-10-06; DECISIONS #204
 # check -- never the board's price.
 
 
+def market_fit_volume(team_spread, total, mkt_fit):
+    """The market's fitted throws and runs ALONE (plays x pass rate, plays x (1 - pass rate), the
+    fit market_pass_volume and market_rush_volume blend toward): the report's 'market-derived'
+    workload column. (None, None) without a fit. Informational: no price reads it."""
+    if not mkt_fit:
+        return None, None
+    fp, fr = mkt_fit["plays"], mkt_fit["pass_rate"]
+    plays = fp["intercept"] + fp["per_spread_pt"] * team_spread + fp["per_total_pt"] * total
+    pr = float(np.clip(fr["intercept"] + fr["per_spread_pt"] * team_spread + fr["per_total_pt"] * total, 0.35, 0.75))
+    return float(plays * pr), float(plays * (1 - pr))
+
+
 def market_rush_volume(team_spread, total, mkt_fit, team_carries_blend, weight):
     """Round 29: team carries moved `weight` toward the market's fitted carries (plays x
     (1 - pass rate) from `mkt_fit`, the fit #134 uses for throws). Returns (carries,
