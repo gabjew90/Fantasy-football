@@ -2705,8 +2705,32 @@ def main():
             return 0, None
         return len(x), (float(x.lng.max()) if x.lng.notna().any() else None)
 
+    def book_lines_of(mk, nm, t):
+        """The book's lines read beside a priced one (DECISIONS #164, #166, #170): what the catches and
+        yards lines ask together, the carries line and the side it favours, the longest-play lines."""
+        g = lambda v: f"{float(v):g}" if v is not None and v == v else None
+        bits = []
+        if mk == "player_reception_yds":
+            cr_ = CATCH_READ.get((nm, t)) or {}
+            if g(cr_.get("catches_line")) and cr_.get("mid_ypc"):
+                bits.append(f"catches {g(cr_['catches_line'])}: {float(cr_['mid_ypc']):.1f} a catch asked")
+            if g(cr_.get("longest_line")):
+                bits.append(f"longest catch {g(cr_['longest_line'])}")
+        elif mk == "player_rush_yds":
+            cy_ = CARRY_READ.get((nm, t)) or {}
+            if g(cy_.get("carries_line")):
+                bits.append(f"carries {g(cy_['carries_line'])}" + (f", {cy_['carries_fav']} favoured"
+                                                                   if cy_.get("carries_fav") else ""))
+            if g(cy_.get("longest_line")):
+                bits.append(f"longest run {g(cy_['longest_line'])}")
+        elif mk == "player_pass_yds":
+            q_ = QB_READ.get((nm, t)) or {}
+            if g(q_.get("longest_line")):
+                bits.append(f"longest completion {g(q_['longest_line'])}")
+        return "; ".join(bits) or None
+
     def volume_inputs(m, t, rows, nm):
-        """The volume-chance tables for his priced markets (research.volume_chance). The engine's volume
+        """The volume chance for his priced markets (research.volume_cells, shown in the card's table). The engine's volume
         (catches, carries, completions; targets for receptions) against the efficiency the reader judges
         (yards a catch, a carry, a completion). Every row names the games behind its rate: the
         luck-capped window (last season's games and this season's), this season uncapped with its
@@ -2737,48 +2761,54 @@ def main():
             games = games_of(m.gsis_id, t, mk)
             tot = lambda i: sum(g[i] for g in games)
             season = (tot(1) / tot(0)) if games and tot(0) > 0 else None
-            mvol, rates, draws = None, [], None
+            mvol, rates, draws, vtext = None, [], None, None
             if mk == "player_reception_yds" and "receptions" in s_:
                 cr_ = CATCH_READ.get((nm, t)) or {}
-                rates = [(cap(cr_.get("luck"), "catches", "catches"), cr_.get("season_ypc_luckfree")),
-                         (season_label(_tg_g, "catch"), season),
-                         ("The engine's rate", per(mean_("rec_yards"), mean_("receptions")))]
+                rates = [("capped", cap(cr_.get("luck"), "catches", "catches"), cr_.get("season_ypc_luckfree")),
+                         ("season", season_label(_tg_g, "catch"), season),
+                         ("engine", None, per(mean_("rec_yards"), mean_("receptions")))]
                 draws = s_["receptions"]
+                vtext = f"{mean_('targets'):.1f} targets -> {mean_('receptions'):.1f} catches"
             elif mk == "player_receptions" and "targets" in s_:
-                rates = [(f"{SEASON} so far ({season_facts(m.gsis_id, t, _tg_g)[0]} games)", season),
-                         ("The engine's catch rate", float(m.cr))]
+                rates = [("season", f"{SEASON} so far ({season_facts(m.gsis_id, t, _tg_g)[0]} games)", season),
+                         ("engine", None, float(m.cr))]
                 draws = s_["targets"]
+                vtext = f"{mean_('targets'):.1f} targets"
             elif mk == "player_rush_yds" and "carries" in s_:
                 cy_ = CARRY_READ.get((nm, t)) or {}
-                rates = [(cap(cy_.get("luck"), "runs", "carries"), cy_.get("season_ypc_luckfree")),
-                         (season_label(_ru_g, "run"), season),
-                         ("The engine's rate", per(mean_("rush_yards"), mean_("carries")))]
+                rates = [("capped", cap(cy_.get("luck"), "runs", "carries"), cy_.get("season_ypc_luckfree")),
+                         ("season", season_label(_ru_g, "run"), season),
+                         ("engine", None, per(mean_("rush_yards"), mean_("carries")))]
                 draws, mvol = s_["carries"], cy_.get("carries_line")
+                vtext = f"{mean_('carries'):.1f} carries"
             elif mk == "player_rush_reception_yds" and "carries" in s_ and "receptions" in s_:
                 # two efficiencies: yards a carry and yards a catch, on the engine's carries and catches
                 rr_ = RUSH_REC.get((nm, t)) or {}
                 capped = (rr_.get("run_rate"), rr_.get("catch_rate")) if rr_.get("rates_luck_free") else None
-                rates = [(cap(rr_.get("run_luck"), "runs", "carries") + "; "
+                rates = [("capped", cap(rr_.get("run_luck"), "runs", "carries") + "; "
                           + cap(rr_.get("catch_luck"), "catches", "catches")[0].lower()
                           + cap(rr_.get("catch_luck"), "catches", "catches")[1:], capped),
-                         (f"{SEASON} so far, uncapped ({len(games)} games)",
+                         ("season", f"{SEASON} so far, uncapped ({len(games)} games)",
                           (season_rate(_ru_g, "car", "uyd"), season_rate(_tg_g, "cat", "ryd"))),
-                         ("The engine's rate", (per(mean_("rush_yards"), mean_("carries")),
-                                                per(mean_("rec_yards"), mean_("receptions"))))]
+                         ("engine", None, (per(mean_("rush_yards"), mean_("carries")),
+                                           per(mean_("rec_yards"), mean_("receptions"))))]
                 draws = (s_["carries"], s_["receptions"])
+                vtext = f"{mean_('carries'):.1f} carries + {mean_('receptions'):.1f} catches"
             elif mk == "player_pass_yds" and "completions" in s_ and "pass_yards" in s_:
                 # the simulated starter only. QB luck cap (user, 2026-10-07): his capped yards a
                 # completion over his last 10 games
                 q_ = QB_READ.get((nm, t)) or {}
-                rates = [(cap(q_.get("luck"), "completions", "completions"), q_.get("luckfree_ypc")),
-                         (season_label(_pa_g, "completion"), season),
-                         ("The engine's rate", per(mean_("pass_yards"), mean_("completions")))]
+                rates = [("capped", cap(q_.get("luck"), "completions", "completions"), q_.get("luckfree_ypc")),
+                         ("season", season_label(_pa_g, "completion"), season),
+                         ("engine", None, per(mean_("pass_yards"), mean_("completions")))]
                 draws = s_["completions"]
+                vtext = f"{mean_('completions'):.1f} completions"
                 mvol = _xl("pass_completions", nm, t).get("line")      # the market's completions line, if posted
-            if draws is None:
+            if draws is None and not book_lines_of(mk, nm, t):
                 continue
-            out.append({"market": mk, "line": r["line"],
-                        "lines": RSCH.volume_chance(mk, r["line"], draws, rates, games, mvol, team=t)})
+            out.append({"market": mk, "line": r["line"], "volume_text": vtext, "book_lines": book_lines_of(mk, nm, t),
+                        "cells": RSCH.volume_cells(mk, r["line"], draws, rates, games, mvol) if draws is not None
+                        else None})
         return out
 
     def card_inputs(m, t, mine, rr_read):
@@ -2806,9 +2836,6 @@ def main():
             by_w = {r_["week"]: r_["qb"] for r_ in TEAM_VOL_ROWS.get(t, [])}
             earlier = [w_[0] for w_ in WEEK_SH.get(nm, [])][:-1]
             qbs = (list(dict.fromkeys(by_w[w_] for w_ in earlier if by_w.get(w_))), by_w.get(u_["week"]))
-        cy_ = CARRY_READ.get((nm, t)) or {}
-        carries_book = ({"line": cy_.get("carries_line"), "fav": cy_.get("carries_fav"), "fair": cy_.get("book_fair")}
-                        if cy_ else ({"line": _xl("rushing_attempts", nm, t).get("line")} if rr_read else None))
         qb = None
         if m.pos == "QB":
             q_ = QB_READ.get((nm, t)) or {}
@@ -2840,22 +2867,21 @@ def main():
             if f_ and f_ != "questionable" and not f_.startswith("new team") and f_ not in watch \
                     and not (rf_ and f_ == rf_[0]):
                 watch.append(f_)
-        # the line-fit reads (#164, #166, #170, #173) without their gauge: the card's capped-play
-        # line carries that check once
-        nog = lambda d_: {**d_, "gauge": None} if d_ else None
-        fit = [x_ for x_ in (RSCH.catch_yards_sentence(nog(CATCH_READ.get((nm, t)))),
-                             RSCH.carry_yards_sentence(nog(CARRY_READ.get((nm, t)))),
-                             RSCH.rush_rec_sentence(rr_read),
-                             RSCH.qb_yards_sentence(nog(QB_READ.get((nm, t))))) if x_]
         return {"name": nm, "team": t, "slot": m.slot, "pos": m.pos, "rows": rows, "book": book, "quoted": quoted,
-                "fit": fit, "volume": volume_inputs(m, t, rows, nm), "implied": env[t].get("implied_points"),
+                "volume": volume_inputs(m, t, rows, nm),
+                "unpriced_read": RSCH.rush_rec_sentence(rr_read) if not rows and rr_read else None,
                 "usage": u_, "backfield": BACKFIELD.get(nm), "qbs": qbs, "prior": prior, "season": season,
-                "carries_book": carries_book,
-                "reads": {"catch": CATCH_READ.get((nm, t)), "carry": CARRY_READ.get((nm, t)), "rr": rr_read},
                 "qb": qb, "shadow": shadow,
                 "matchup": RSCH.matchup_sentence(PA, HOME if t == AWAY else AWAY, m.pos), "watch": watch}
 
     L.append(RSCH.CARD_LEGEND + "\n")
+    # the live record and the backtest calibration, once (they were the same on every card)
+    _cal = RSCH.calibration_block(set(RESEARCH.market) if len(RESEARCH) else set(),
+                                  {t_: env[t_]["implied_points"] for t_ in (AWAY, HOME)
+                                   if env[t_].get("implied_points") is not None},
+                                  list(M[M.name.isin(set(RESEARCH.player))].slot) if len(RESEARCH) else [])
+    if _cal:
+        L.append("\n".join(_cal) + "\n")
     for t, side_label in [(AWAY, "away"), (HOME, "home")]:
         L.append(f"## {t} ({side_label})\n")
         e = env[t]

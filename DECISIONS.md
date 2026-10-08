@@ -8002,3 +8002,22 @@ The expert re-ran the four-season backtest (baseline reproduces ours: receptions
   need 8 catches / 10 carries / 20 completions, so the fallback now covers only 8-9 catches. The
   card's wording drops "unusually long" and "lucky breakaway": it says plays past his 90th
   percentile are capped.
+
+## 2026-10-07 (208) -- the player card is one table
+
+- **The user:** the card was "kind of confusing, lots of tables and numbers everywhere". The
+  same few numbers appeared in five places (prop table, workload check, capped-play line,
+  volume-chance tables, line-fit sentence) and the live record and backtest calibration were
+  repeated on every card. The user approved a one-table mock-up.
+- **Now:** one prop table per player with a column per market -- the market's chance first (the
+  probability), the engine's chance, the price, the forecast, what the Over needs, the engine's
+  volume, the volume chance at each efficiency (luck-capped, this season, the engine's), the
+  market's own volume line, the efficiency the line needs at the engine's volume and his games
+  that beat it. Under it: role evidence (a QB's workload table), the baseline, and notes naming
+  each rate's games. Other books' lines get a small table. The live record and backtest
+  calibration print once above the cards.
+- **Dropped from the card** (not data the user bets on): the price-based workload check (Sleeper
+  Power Plays pay flat multipliers, so a leg's price is not his break-even), the capped-play line
+  and the line-fit sentence (the table carries both). The line-fit reads stay in the research
+  CSV. workload_table, capped_line and calibration_line are deleted (replaced, not kept beside).
+- **No price moves:** every research and record output is identical on the fixture.

@@ -450,7 +450,7 @@ For a narrow question, run only what it needs:
   rest of an entry, name his combined line as the leg that survives both scripts (the catches
   hold up when his team trails). The combined line is priced since DECISIONS #187 (the model's
   chance sits in the prop table); this touches read is arithmetic beside it, never a price-based
-  threshold -- the card's combined column says so, and a combined what-if runs as a separate
+  threshold, and a combined what-if runs as a separate
   carry-and-catch scenario (carries, targets, catch rate and both yards rates kept apart).
   **The achievability gauge** ends both reads: the volume the yards line takes at his capped
   yards a play (the luck line: a play past the player's OWN 90th percentile for that prop --
@@ -540,21 +540,34 @@ need not be surfaced. Write the reply as a premium prop guide with this structur
    receivers/rushers. State plainly if the effect is small.
 4. **Per team, starters in depth-chart order** (QB1, RB1, WR1, WR2, TE1, WR3; RB2/proxy
    only if they have a line). Each: the report's player card, laid out and narrated as the
-   "Player cards" rules below say. What its tables hold: the prop table (line, both prices,
-   the forecast's middle and 80% range, the Over by the engine and by the market); the role
+   "Player cards" rules below say. What its tables hold: the prop table (below); the role
    evidence (last game against his earlier games: shares, snaps, a back's three jobs, the
-   quarterback); the workload check (the 50/50 workload and what each side needs at its own
-   price -- the Over pays above the first workload, the Under at or below the second, if the
-   model's numbers are right; how much role a view needs, never a pick); and any Watch flag (new team, Questionable, snap scaling, the
+   quarterback); and any Watch flag (new team, Questionable, snap scaling, the
    receiving role-shift flag with its 2022-25 wording, a back's "carries up / down" flag when his
    carry share moved 20+ points last week (reports/rb_takeover_check.md: such backs beat or
    missed the model's carries by about two the next week), a teammate out or back).
-   **Player cards (the report's per-player section, user's draft 2026-10-06).** The report
-   prints one card per priced player: the prop table, role evidence (earlier games against last
-   game), the historical baseline, the workload check (the QB's volume-and-efficiency check),
-   the capped-play check, the market-carries number for backs, Matchup and Watch. Copy the
-   card's tables as printed -- every line, depth-chart order, never sorted by the gap. Then
-   write the read around them, in this order, in plain words:
+   **Player cards (the report's per-player section; one table, user 2026-10-07).** The report
+   prints one card per priced player: ONE prop table with a column per priced market (the first
+   book's line; other books' lines in a small table under it), then his role evidence (a QB: his
+   workload table), the historical baseline, the rate notes, the market-carries shadow for backs,
+   Matchup and Watch. The live record and the backtest calibration print ONCE above the cards,
+   not per player. The prop table, top to bottom: **the market's chance of the Over** (the price
+   with its margin removed -- the probability), the engine's chance, the price, the engine's
+   forecast (middle and 80% range), what the Over needs, the engine's volume, then **the volume
+   chance** -- one row per efficiency (his luck-capped rate, his rate this season, the engine's),
+   each "N [catches / carries / completions / targets] at [rate] -> [engine's chance of that
+   volume]"; the market's own carries or completions line where posted; the efficiency the line
+   needs at the engine's volume; and how many of his games this season beat that. The engine owns
+   the volume, the user judges the efficiency (user: "the engine just needs to predict when volume
+   is more than X"): yards a catch for receivers (the engine's catches already hold his catch rate
+   and its luck), yards a carry for backs, yards a completion for the starting QB; rushing +
+   receiving uses both rates on the engine's carries and catches; receptions use targets and a
+   catch rate. The notes under the table name each rate's games (luck-capped: his last 10 games,
+   e.g. 7 from 2025 and 3 from 2026, plays past his own 90th percentile capped; this season:
+   games and longest play) and the volume's calibration note (carries run narrow; big catch totals
+   for top receivers and big completion totals run a little high). Copy the card's tables as
+   printed -- every column and row, depth-chart order, never sorted by the gap. Then write the
+   read around them, in plain words:
    - **The question** (bold, one line): what this player's prop turns on in THIS game ("Will
      Dallas's extra running belong to this back?").
    - **What his recent usage means**: name the change and why -- more snaps, a bigger share on
@@ -563,29 +576,16 @@ need not be surfaced. Write the reply as a premium prop guide with this structur
      the same teammates as this one (the card's quarterback row).
    - **What this matchup means**: the team-level script, then how much of it reaches this
      player through his share.
-   - **Which prop fits the view**: receptions or yards, rushing or combined -- from the workload
-     table (a yards line that asks for many more targets than the catches line suits a
-     short-pass view less). Passing and combined yards have NO price-based workload: never
-     present their arithmetic (the capped check, the touches read) as an equivalent threshold.
-   - **The volume chance** (user, 2026-10-07: "the engine just needs to predict when volume is
-     more than X"): each yards and receptions market has one table, at the card's first book's line
-     (Sleeper's when it is quoted). The engine owns the volume, the user judges the efficiency:
-     yards a catch (receivers -- the engine's catches already hold his catch rate and its luck),
-     yards a carry (backs), yards a completion (the starting QB); a back's rushing + receiving
-     uses both rates on the engine's carries and catches; receptions use targets and a catch
-     rate. Rows: last 10 games with long plays capped (it names the games -- e.g. 7 from 2025,
-     3 from 2026 -- so a gap to this season explains itself), this season uncapped (games and
-     longest play), the engine's rate. Each row gives the volume the line needs and the engine's
-     chance of it; then the efficiency the line needs at the engine's volume and how many of his
-     games for this team this season beat it. Copy it whole; say which row matches the efficiency
-     you expect and why. Its chances are the engine's, NOT a price: quote the market's chance as
-     the probability of the prop. Read the calibration note under the table (carries run narrow;
-     big catch totals for top receivers and big completion totals run a little high).
+   - **Which prop fits the view**: receptions or yards, rushing or combined -- read across the
+     table's columns. A line that needs only volume (receptions, or a yards line his capped and
+     season rates both clear) suits a volume view; a line that needs an efficiency he has not
+     shown this season needs a reason to expect it back. Say which efficiency row you believe and
+     why. The volume chances are the engine's, NOT a price: the market's chance is the
+     probability of the prop.
    - **Where the read can fail**: the specific role, script or efficiency change.
-   - **The closing condition** (bold): "If you expect [player] to average [range] in this
-     situation, [side, prop, line] meets / misses the quoted price's required win rate under
-     these efficiency assumptions. It stops fitting that view if [change]." Take the numbers
-     from the workload table; describe a margin under 10% as thin.
+   - **The closing condition** (bold): "If you expect [player] to [volume] at [efficiency] in
+     this situation, [side, prop, line] fits that view. It stops fitting if [change]." Take the
+     numbers from the table; call a margin under 10% thin.
    After the cards: **"What changes for the remaining players"** (one short paragraph per
    group), and **"Reads that pull in different directions"** -- only conflicts the roles
    support (two backs cannot both gain share of one fixed workload; a receiver's target gain
@@ -629,13 +629,13 @@ need not be surfaced. Write the reply as a premium prop guide with this structur
    to outcomes -- log loss 0.717 against the market's 0.692 (a coin flip is 0.693); passing Overs
    hit 57% against an engine 42%, rushing 40% against 47%. So read the market's no-vig chance as
    the probability and the engine for what it is built for: the workload a line needs, the role
-   evidence and the what-ifs. Each card prints the live record beside the backtest rows; never
+   evidence and the what-ifs. The live record prints once above the cards, beside the backtest rows; never
    present the engine's percentage as the better probability. The backtest evidence, with
    **measured biases at the main line (expert audit, DECISIONS #197)**:
    at the backtest's stand-in line on 2022-25 the receiving-yards Over hit 2.9 points more often
    than the engine said (receptions 1.4, rushing 1.8, combined 0.6), and every market leans by
-   the team's implied points (backs on teams implied 27+: Over 58.7% against 48.5%). Each card
-   prints the row its team sits in and, for receiving lines, his role's row ("Backtest
+   the team's implied points (backs on teams implied 27+: Over 58.7% against 48.5%). The report
+   prints, once above the cards, each team's row and the priced roles' rows ("Backtest
    calibration"; DECISIONS #198: tight ends' catches Over hit 4.9 points and yards 6.6 points more
    often than the engine said in the backtest -- not seen at real lines so far (live: 45.7% hit
    against 46.3%), and round 41's share change was withdrawn on the seed check (DECISIONS #203) --
