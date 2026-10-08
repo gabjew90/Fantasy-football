@@ -69,6 +69,9 @@ def test_cards_are_one_table_with_the_volume_chance_for_every_market_kind(run):
     assert "| His games this season that beat that |" in report
     for gone in ("| Workload check |", "**Capped-play check:**", "**How his lines fit together:**", "**Volume chance"):
         assert gone not in report, gone
+    # the price-based margin flags belong to the research table, never to a card's Watch line
+    watch = [ln for ln in report.splitlines() if ln.startswith("**Watch:**")]
+    assert watch and not any("thin" in ln.lower() for ln in watch)
 
 
 def test_no_bet_language_anywhere_the_user_reads(run):

@@ -2864,7 +2864,7 @@ def main():
         if rf_ and m.pos != "QB":
             watch.append(f"receiving {rf_[0]}: {rf_[1]}")
         for f_ in "; ".join(str(x) for x in mine.get("flags", pd.Series(dtype=object)).dropna().unique()).split("; "):
-            if f_ and f_ != "questionable" and not f_.startswith("new team") and f_ not in watch \
+            if f_ and f_ != "questionable" and not f_.startswith(("new team", "thin:")) and f_ not in watch \
                     and not (rf_ and f_ == rf_[0]):
                 watch.append(f_)
         return {"name": nm, "team": t, "slot": m.slot, "pos": m.pos, "rows": rows, "book": book, "quoted": quoted,

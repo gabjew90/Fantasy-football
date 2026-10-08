@@ -1482,7 +1482,7 @@ def bias_gap_rows(markets, implied_by_team) -> list[tuple[str, str, str]]:
                     "Measured after round 38's implied-points scale (DECISIONS #199): most of the old lean is gone, "
                     "but teams implied 27+ still hit the Over more often than the engine says and 18 or less less "
                     "often (2022-25)" + (f" -- {rows}" if rows else ""),
-                    "read the card's calibration line beside each passing price"))
+                    "read the calibration table above the cards"))
     live = [m for m in MARKET_ORDER if m in markets and m in LIVE_RECORD]
     if live:
         out.append(("The engine's chance at real lines",
@@ -1495,8 +1495,10 @@ def bias_gap_rows(markets, implied_by_team) -> list[tuple[str, str, str]]:
         out.append(("Yardage Overs at the main line",
                     "Measured: receiving yards' Over has run about 2.9 points above the engine (receptions 1.4, "
                     "rushing 1.8), more for teams implied at 24+ (2022-25 backtest, DECISIONS #197)",
-                    "read each card's calibration line; a fix needs its own round"))
+                    "read the calibration table above the cards; a fix needs its own round"))
     return out
+
+
 CARD_LEGEND = ("**Reading the cards:** one column per prop. The market's chance is the book's price with its margin "
                "removed -- read it as the probability. The engine supplies the volume (catches, carries, completions; "
                "targets for receptions); you judge the efficiency: each \"At ... rate\" row is the volume the line "
