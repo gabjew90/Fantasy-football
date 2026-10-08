@@ -7501,6 +7501,16 @@ by the user.
 - Fix: before this week's roster is published, last week's game-day inactive (INA) reads
   as active; the injury report decides (Baker Mayfield was priced out of week 5).
 
+## 2026-10-06 (176) -- market volume fit: three seasons pooled does not beat one -- null
+
+- Outside reviewer: the market->volume fit is one season (544 team-games). Pre-registered
+  (reports/market_fit_pool.md, tag archive/market-refit-prereg): pooled S-3..S-1 vs
+  S-1 alone, mean squared error of each team-game's market throws, selected on 2022-24,
+  2025 read once only if pooled was selected.
+- 2022-24: one 60.75, pooled 60.94 (+0.19, 95% CI -0.29 to +0.67). Not selected;
+  2025 unread; the one-season fit stays. Older seasons bring league pass-rate drift.
+- The tool and the factored fit are archived at tag archive/market-refit-code.
+
 ## 2026-10-06 (178) -- the offensive line flag: five regulars, how many out
 
 - User, from the outside reviewer's list (Tier 1): count how many of each team's five
