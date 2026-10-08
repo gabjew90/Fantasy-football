@@ -279,6 +279,14 @@ def test_a_practice_only_report_is_not_a_published_game_report():
     assert cell == "A Safety (S, Out; Sleeper injury feed, knee; practice: did not participate in practice)"
     assert RS.defense_cell("TB", iw) == "A Safety (S, no game status yet; practice: did not participate in practice)"
     assert RS.defense_cell("DAL", iw) == "no designations", "full practice is not a designation"
+    # once game statuses post, a limited practice with no status reads as no designation, not "not yet"
+    fin = iw.assign(report_status=["Out", None, None]).assign(practice_status=["Did Not Participate In Practice",
+                                                                                  "Limited Participation in Practice",
+                                                                                  "Full Participation in Practice"])
+    fin = pd.concat([fin, pd.DataFrame({"team": ["TB"], "gsis_id": ["l1"], "full_name": ["A Backer"],
+                                        "position": ["LB"], "report_status": [None],
+                                        "practice_status": ["Limited Participation in Practice"]})])
+    assert "A Backer (LB, no game designation; practice: limited participation in practice)" in RS.defense_cell("TB", fin)
     note = RS.injury_note({"TB": "practice", "DAL": "game"}, 5)
     assert "game statuses published for DAL" in note and "TB: PRACTICE STATUSES ONLY" in note
     assert "published" not in RS.injury_note({"TB": "practice"}, 5).split("PRACTICE")[0]

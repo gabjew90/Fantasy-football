@@ -1341,7 +1341,10 @@ def defense_cell(team, iw, status=None, source=None) -> str:
         prac = getattr(r, "practice_status", None)
         if st not in GAME_STATUSES and not _missed(prac):
             continue
-        bits = [st if st in GAME_STATUSES else "no game status yet"]
+        # once the team's game statuses are out, a missing one means no designation (he is cleared);
+        # before that it is not known yet
+        bits = [st if st in GAME_STATUSES else
+                ("no game designation" if report_state(iw, team) == "game" else "no game status yet")]
         if (team, r.gsis_id) in source:
             bits.append(source[(team, r.gsis_id)])
         if isinstance(prac, str) and prac:
