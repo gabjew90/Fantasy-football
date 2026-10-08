@@ -56,9 +56,9 @@ Helpers in `scripts/`:
   across the slate -- every receiving role-shift flag with what its line implies -- a
   computed per-game notes table and the calibration note, so the chat reply is a copy of
   the file and nothing is assembled by hand), `slate_research_*.csv` (every priced line's
-  research row) and `slate_runs_*.csv`. `slate_survival_*.csv`, `slate_card_*.csv` and
-  `parlay_builder_*.csv` are still written for the record but are never shown: no picks
-  (DECISIONS #142). Timing, measured once at props-v1.26 (2026-09-27) and not re-timed since:
+  research row) and `slate_runs_*.csv`. `slate_card_*.csv` and `parlay_builder_*.csv` are
+  still written for the record but are never shown: no picks (DECISIONS #142); the must-win
+  pick's `slate_survival_*.csv` is no longer computed (DECISIONS #211). Timing, measured once at props-v1.26 (2026-09-27) and not re-timed since:
   a 15-game week took about 3 minutes on the Windows host (9 before it), about 5 s a game plus a
   full re-run per Questionable player for the 'if he's out' pricing.
 - `odds_client.py` — Odds API stages, header capture, caching, archive rows. Never prints

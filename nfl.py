@@ -27,7 +27,7 @@ does (the fantasy schedules are off, DECISIONS #109): the ledger fills only
 from a run by hand with --record. `props best --survival` is retired: it stops
 with a message that there is no must-win pick and points at `props best --slate`.
 
-TROUBLESHOOTING LOG (temporary, `session_log` in config.yaml; inside a chat
+TROUBLESHOOTING LOG (permanent, `session_log` in config.yaml; inside a chat
 release only, or with NFL_SESSION_LOG=1): every command
 appends one JSON line to $NFL_OUT/nfl_session_log.jsonl -- the release, the
 command and its arguments, exit code, duration, the error if one was raised,

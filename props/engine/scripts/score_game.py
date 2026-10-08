@@ -3475,10 +3475,11 @@ def main():
                      "fallback request does not include them.")
     if hrs > 1:
         L.append(f"- **Kickoff is in {hrs:.1f} hours.** The scheduled capture (props.yml) records the open, "
-                 f"decision and closing snapshots; this run is a reference copy.")
+                 f"decision and closing snapshots; a run outside it (a chat or a by-hand run) is a reference "
+                 f"copy, never recorded.")
     elif hrs > 0:
         L.append(f"- **Candidate closing snapshot:** kickoff in {hrs * 60:.0f} minutes, inside the closing window. The "
-                 "scheduled capture records the official close; this run is a reference copy.")
+                 "scheduled capture records the official close; a run outside it is a reference copy.")
     L.append(f"- Full technical detail (every line, every book, model parameters) is in the CSV files written beside this report.")
     L.append("")
 

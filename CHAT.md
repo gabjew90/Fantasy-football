@@ -389,7 +389,7 @@ reach the call. The reply mentions the parts that decide it, not all of them.
   gate, input freshness, setup facts -- never credentials). Do not mention it
   unless a command failed or the user asks about what ran; then summarize from
   it, and attach it only if asked.
-- **Chat transcript (temporary, while `session_log: true` in config.yaml).**
+- **Chat transcript (while `session_log: true` in config.yaml, which is permanent).**
   Before sending each reply, append one entry to `$NFL_OUT/chat_transcript.md`
   -- the user reviews it with Claude Code to check the data, the logic and the
   answers:
