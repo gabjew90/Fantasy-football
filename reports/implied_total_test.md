@@ -1,5 +1,8 @@
 # Does the model under-use the market's implied team total? (pre-registered 2026-10-06, before any run)
 
+> Caveat (code review, repo sweep 2026-10-08): the interval resamples team-games, not games, so a game's two teams count as independent and the interval is somewhat narrower than a game-clustered one; and team-games with zero actual or model yards in a market are dropped before the log ratio. Re-run with game-clustered resampling and zero handling before any round is registered on this result.
+
+
 ## Why
 
 The engine takes the market's spread and total for its touchdown level and for 25% of

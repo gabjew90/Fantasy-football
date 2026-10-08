@@ -4,6 +4,12 @@ log(implied total / the team's mean implied total over its earlier games that se
 with a 95% interval resampling team-games, in 2022-23 and 2024-25.
 
     python props/tools/implied_total_test.py <corrected harness --save-results pickle, 2022-25> [--out f.json]
+
+Caveat (code review, repo sweep 2026-10-08): the interval resamples team-games, not games,
+so a game's two teams count as independent and the interval is somewhat narrower than a
+game-clustered one; and team-games with zero actual or model yards in a market are dropped
+before the log ratio. Re-run with game-clustered resampling and zero handling before any
+round is registered on this result.
 """
 from __future__ import annotations
 
