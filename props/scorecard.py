@@ -517,9 +517,10 @@ def write_label_gate(season: int, df: pd.DataFrame, engines) -> dict:
     import datetime as dt
     gate = {"season": season, "updated_utc": dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
             "rule": ("decided only at the week " + ", ".join(map(str, blend.REVIEW_WEEKS)) + " reviews, on the "
-                     "calls through that week: labels return only when the whole 95% interval of the model's "
-                     "weight is above zero AND the top-tier calls' net per $100 at Sleeper's recorded prices "
-                     "has its whole 95% interval above zero"),
+                     f"calls through that week: labels return only when the whole {100 * blend.GATE_LEVEL:.1f}% "
+                     "interval of the model's weight is above zero AND the top-tier calls' net per $100 at "
+                     f"Sleeper's recorded prices has its whole {100 * blend.GATE_LEVEL:.1f}% interval above zero "
+                     f"({len(blend.REVIEW_WEEKS)} looks share one 5%)"),
             "engines": [], "pooled": blend.yardage_gate(df)}
     for engine_hash, group in engines:
         g = blend.yardage_gate(group)
@@ -540,11 +541,16 @@ def label_gate_md(gate: dict) -> list[str]:
     out = ["## Label gate", "",
            "The research board shows no bet labels. The gate is decided only at the reviews after weeks "
            + ", ".join(map(str, blend.REVIEW_WEEKS)) + ", on the calls through that week, and opens only when "
-           "both hold: the model's number earns weight beside the book's price (the whole 95% interval above "
-           "zero), and the top-tier calls made money at Sleeper's recorded prices (the whole 95% interval of "
-           "net per $100 above zero). Between reviews it holds; the running weight is context only.", "",
-           "| Pricing model | Calls | Weeks | Running weight (95% CI) | Last review | Weight at review | "
-           "Top-tier net per $100 at review | Gate |", "|---|---|---|---|---|---|---|---|"]
+           f"both hold: the model's number earns weight beside the book's price (the whole "
+           f"{100 * blend.GATE_LEVEL:.1f}% interval above zero), and the top-tier calls made money at Sleeper's "
+           f"recorded prices (the whole {100 * blend.GATE_LEVEL:.1f}% interval of net per $100 above zero). "
+           f"Each review uses {100 * blend.GATE_LEVEL:.1f}% rather than 95% because the gate looks "
+           f"{len(blend.REVIEW_WEEKS)} times: the looks share one 5% chance of opening on luck. Between reviews "
+           "it holds; the running weight (95%) is context only.", "",
+           "| Pricing model | Calls | Weeks | Running weight (95% CI) | Last review | "
+           f"Weight at review ({100 * blend.GATE_LEVEL:.1f}% CI) | "
+           f"Top-tier net per $100 at review ({100 * blend.GATE_LEVEL:.1f}% CI) | Gate |",
+           "|---|---|---|---|---|---|---|---|"]
     rows = ([(g["engine"] + (" (current)" if g is gate.get("current") else ""), g) for g in gate["engines"]]
             + [("all models, pooled (context only)", gate["pooled"])])
     for name, g in rows:

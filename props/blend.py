@@ -121,8 +121,9 @@ def _design(d: pd.DataFrame, levels: tuple):
     return X, y, ub
 
 
-def _boot(d: pd.DataFrame, X: np.ndarray, y: np.ndarray, reps: int, seed: int):
-    """Game-clustered bootstrap: the 95% interval of every weight."""
+def _boot(d: pd.DataFrame, X: np.ndarray, y: np.ndarray, reps: int, seed: int, level: float = 0.95):
+    """Game-clustered bootstrap: the `level` interval of every weight (95% unless the
+    gate asks for its multiple-look level)."""
     games = d["event_id"].astype(str).to_numpy() if "event_id" in d else np.arange(len(d)).astype(str)
     ug = np.unique(games)
     rng = np.random.default_rng(seed)
@@ -131,13 +132,19 @@ def _boot(d: pd.DataFrame, X: np.ndarray, y: np.ndarray, reps: int, seed: int):
     for _ in range(reps):
         take = np.concatenate([idx_by[g] for g in rng.choice(ug, size=len(ug))])
         bs.append(fit(X[take], y[take]))
-    return np.percentile(np.array(bs), [2.5, 97.5], axis=0)
+    a = 100 * (1 - level) / 2
+    return np.percentile(np.array(bs), [a, 100 - a], axis=0)
 
 
 # THE GATE IS DECIDED AT FIXED REVIEWS ONLY (DECISIONS #151): after these
 # weeks are graded, on the calls through that week. Between reviews it holds,
 # so watching the running number week by week cannot open it on a lucky run.
 REVIEW_WEEKS = (8, 12, 18)
+# THREE LOOKS SHARE ONE 5% (outside reviewer, DECISIONS #180): each review's two
+# intervals are at 1 - 0.05 / 3 = 98.3%, so three chances to open do not triple the
+# chance of opening on luck. The running number stays at 95%: context, never a decision.
+GATE_LEVEL = 1 - 0.05 / len(REVIEW_WEEKS)
+REVIEW_REPS = 4000          # bootstrap draws behind a review's decision (about 33 in each 0.83% tail)
 # the bet-selection rule the profit condition grades: the board's internal top
 # tier (the label a bet would carry), at the price Sleeper showed when logged
 SELECTION_TIERS = ("STRONG",)
@@ -146,23 +153,24 @@ MIN_BETS = 100
 MIN_GAMES = 10      # an interval from resampling fewer games is not trusted
 
 
-def _weight(d: pd.DataFrame, reps: int, seed: int) -> dict:
+def _weight(d: pd.DataFrame, reps: int, seed: int, level: float = 0.95) -> dict:
     """The model's weight beside the book, with its game-clustered interval."""
     if len(d) < MIN_CALLS:
         return {"estimated": False}
     try:
         X, y, _ub = _design(d, ("market",))
         w = fit(X, y)
-        lo, hi = _boot(d, X, y, reps, seed)
+        lo, hi = _boot(d, X, y, reps, seed, level)
     except (np.linalg.LinAlgError, FloatingPointError, ValueError):
         return {"estimated": False}
     return {"estimated": True, "w_model": round(float(w[1]), 3), "lo": round(float(lo[1]), 3),
-            "hi": round(float(hi[1]), 3)}
+            "hi": round(float(hi[1]), 3), "level": level}
 
 
-def selection_profit(df: pd.DataFrame, reps: int = 2000, seed: int = 23) -> dict:
+def selection_profit(df: pd.DataFrame, reps: int = 2000, seed: int = 23, level: float = 0.95) -> dict:
     """What the selection rule actually made: net per $100 on settled top-tier
-    yardage calls at Sleeper's recorded prices, with a 95% interval from
+    yardage calls at Sleeper's recorded prices, with a `level` interval (95%, or GATE_LEVEL
+    at a review) from
     resampling whole games. A positive weight beside the book is not a
     betting edge after the hold; this is."""
     d = df[df["market"].isin(YARDAGE_MARKETS)] if "market" in df.columns else df.iloc[0:0]
@@ -183,9 +191,10 @@ def selection_profit(df: pd.DataFrame, reps: int = 2000, seed: int = 23) -> dict
     if len(sums) < MIN_GAMES:
         return {**out, "n_games": int(len(sums))}
     idx = np.random.default_rng(seed).integers(0, len(sums), size=(reps, len(sums)))
-    lo, hi = np.percentile(sums[idx].sum(1) / cnt[idx].sum(1), [2.5, 97.5])
+    a = 100 * (1 - level) / 2
+    lo, hi = np.percentile(sums[idx].sum(1) / cnt[idx].sum(1), [a, 100 - a])
     return {**out, "estimated": True, "net_per_100": round(float(d["_pnl"].mean()), 2),
-            "lo": round(float(lo), 2), "hi": round(float(hi), 2), "n_games": int(len(sums))}
+            "lo": round(float(lo), 2), "hi": round(float(hi), 2), "n_games": int(len(sums)), "level": level}
 
 
 def yardage_gate(df: pd.DataFrame, reps: int = 1000, seed: int = 17) -> dict:
@@ -193,9 +202,9 @@ def yardage_gate(df: pd.DataFrame, reps: int = 1000, seed: int = 17) -> dict:
     labels. At each review (after weeks 8, 12 and 18 are graded), on the calls
     through that week, the gate opens only when BOTH hold:
     1. the model's number earns weight beside the book's price on settled
-       yardage calls (the whole 95% interval above zero), and
+       yardage calls (the whole 98.3% interval above zero -- GATE_LEVEL), and
     2. the selection rule made money at Sleeper's recorded prices (the whole
-       95% interval of net per $100 above zero).
+       98.3% interval of net per $100 above zero).
     Between reviews the decision holds. The running weight on every graded
     call is reported as context and never opens the gate."""
     if df is None or df.empty or "market" not in df.columns:
@@ -215,8 +224,12 @@ def yardage_gate(df: pd.DataFrame, reps: int = 1000, seed: int = 17) -> dict:
     if review is None:
         return out
     dr = d[wk <= review]
-    w = running if len(dr) == len(d) else _weight(dr, reps, seed)
-    pr = selection_profit(df[pd.to_numeric(df["week"], errors="coerce") <= review])
+    # the decision's intervals are at the multiple-look level, never the running 95%; at 98.3% each
+    # tail holds 0.83% of the draws, so a review resamples at least REVIEW_REPS times (1,000 draws
+    # would put the cutoff on about 8 of them)
+    w = _weight(dr, max(reps, REVIEW_REPS), seed, GATE_LEVEL)
+    pr = selection_profit(df[pd.to_numeric(df["week"], errors="coerce") <= review],
+                          reps=REVIEW_REPS, level=GATE_LEVEL)
     weight_ok = bool(w.get("estimated") and w["lo"] > 0)
     profit_ok = bool(pr.get("estimated") and pr["lo"] > 0)
     out["at_review"] = {"week": review, "n_calls": int(len(dr)), "weight": w, "weight_ok": weight_ok,

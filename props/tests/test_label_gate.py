@@ -152,3 +152,17 @@ def test_the_scorecard_grades_each_mark_on_its_own_side():
     # row 1: model side Over won, so the marked Under LOST; row 2: marked Under won at -125
     assert "| rush_yds | 2 | 1 | 50% | 56% | -10.0 |" in md
     assert scorecard.look_section(df.drop(columns="look")) == []
+
+
+def test_each_review_uses_the_three_look_level_and_its_interval_is_wider():
+    """DECISIONS #180: three reviews share one 5% -- each review's intervals are at
+    1 - 0.05/3 = 98.3%, so they nest around the running 95% interval on the same calls."""
+    assert abs(blend.GATE_LEVEL - (1 - 0.05 / 3)) < 1e-12 and len(blend.REVIEW_WEEKS) == 3
+    d = _calls(3000, True, weeks=(2, 9))                 # every call is through the week 8 review
+    g = blend.yardage_gate(d, reps=400)
+    w = g["at_review"]["weight"]
+    assert w["level"] == blend.GATE_LEVEL and g["level"] == 0.95
+    assert w["lo"] <= g["lo"] and w["hi"] >= g["hi"], "same calls, same draws: the 98.3% interval holds the 95%"
+    assert g["at_review"]["profit"]["level"] == blend.GATE_LEVEL
+    lines = scorecard.label_gate_md({"engines": [], "pooled": g})
+    assert "98.3%" in lines[2] and "share one 5%" in lines[2]

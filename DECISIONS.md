@@ -7534,6 +7534,17 @@ by the user.
 - Not his game-to-game min / max: the simulation already prices those swings, so using
   them as the range would count them twice and every line would read "only at your high".
 
+## 2026-10-06 (180) -- the label gate's three reviews share one 5%
+
+- Outside reviewer (Tier 3): the gate looks at the record three times (after weeks 8,
+  12 and 18); at 95% each, the chance of opening on luck is close to three times 5%.
+  Each review's two intervals (the model's weight beside the book, and the top-tier
+  calls' net per $100) are now at 1 - 0.05 / 3 = 98.3% (blend.GATE_LEVEL); the running
+  weight stays at 95% and remains context only.
+- Stricter only: no review has happened yet in 2026 (first after week 8), so no past
+  gate decision changes. Test: the review intervals nest around the 95% one on the same
+  calls (props/tests/test_label_gate.py).
+
 ## 2026-10-06 (181) -- the book's quarterback against ours
 
 - Found by the backup-QB implied-total diagnostic (reports/backup_qb_implied_total.md on
