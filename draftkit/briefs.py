@@ -257,7 +257,8 @@ def build_context(cfg, week: int | None = None, source=None, write_state: bool =
     # WARNINGS ARE NOT NOTES. `stale` is the report's banner, which the
     # delivered text deliberately drops; a warning is a fact that can make
     # the ADVICE wrong (a roster copy old enough to be missing a move), so
-    # it travels separately and manager.phone puts it in the message.
+    # it travels separately so a renderer can put it in the message (the
+    # retired manager.phone did).
     warnings = list(getattr(source, "warnings", []) or [])
 
     return {

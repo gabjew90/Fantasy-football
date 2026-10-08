@@ -1,6 +1,7 @@
-# Props historical record. Independent of the fantasy workflows: its own
-# concurrency group (they use `manager-state`) and its own paths, so a props
-# tick and a manager tick can never fight over the same commit.
+# Props historical record. Its own concurrency group (`props-record`) and its
+# own paths (props/ only). The fantasy workflows that shared the repo on the
+# `manager-state` group were retired on 2026-10-08 (DECISIONS #212); this is
+# the only scheduled workflow.
 #
 # Three jobs, all driven off one cheap stdlib-only guard so ticks outside a
 # kickoff window exit in seconds and cost almost no free-tier minutes:

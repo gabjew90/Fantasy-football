@@ -74,10 +74,10 @@ def _load(path: Path = TOKEN_PATH) -> dict | None:
             return json.loads(path.read_text(encoding="utf-8"))
         except json.JSONDecodeError:
             return None
-    # No file: a fresh checkout (GitHub Actions). The refresh token is the
-    # durable credential -- Yahoo's OAuth needs the sign-in once, on the
-    # machine that ran it -- so the scheduled jobs carry it as a secret and
-    # bootstrap the file from it. An expired access token is what makes
+    # No file: a fresh checkout (a CI runner, the chat sandbox). The refresh
+    # token is the durable credential -- Yahoo's OAuth needs the sign-in once,
+    # on the machine that ran it -- so a host without the file can carry it as
+    # a secret and bootstrap the file from it. An expired access token is what makes
     # access_token() refresh on the first use.
     seed = os.environ.get("YAHOO_REFRESH_TOKEN")
     if seed:
@@ -171,12 +171,12 @@ def get(path: str, params: dict | None = None, token_path: Path = TOKEN_PATH) ->
     """GET a fantasy resource as JSON.
 
     With credentials (client id + secret + a token file or YAHOO_REFRESH_TOKEN)
-    this is the live API. Without them -- GitHub Actions, where no Yahoo
-    secret is stored -- it reads the payload the LOCAL SYNC committed
-    (`python -m manager --league <name> yahoo-sync`, scheduled hourly on the
-    machine that holds the credentials, into state/<league>/yahoo/). The
-    scheduled jobs never need a Yahoo secret; they read what the sync wrote,
-    the same way they read the committed Vegas snapshot.
+    this is the live API. Without them it reads the payload the LOCAL SYNC
+    committed (`python -m manager --league <name> yahoo-sync`, run by
+    scripts/YAHOO SYNC.bat on the machine that holds the credentials, into
+    state/<league>/yahoo/), so a host with no Yahoo secret -- the fantasy
+    commands anywhere else -- reads what the sync wrote. (The scheduled jobs
+    this was built for were retired on 2026-10-08, DECISIONS #212.)
 
     Raises YahooScopeError when the app is not approved for Fantasy Sports,
     YahooAuthError on any other 4xx or when neither path can answer.

@@ -322,7 +322,7 @@ def main(argv=None) -> int:
     f.add_argument("--json", action="store_true", help="question tools: the numbers as JSON")
     f.add_argument("--league", required=True)
     f.add_argument("--week", type=int)
-    f.add_argument("--record", action="store_true", help="append to the graded ledger (scheduled runs only)")
+    f.add_argument("--record", action="store_true", help="append to the graded ledger (a deliberate run by hand; chat never records)")
     f.add_argument("--player")
     f.add_argument("--out")
     f.add_argument("--pos", help="waiver: positions, e.g. RB,WR (default RB,WR,TE)")

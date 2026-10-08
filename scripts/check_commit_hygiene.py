@@ -1,12 +1,14 @@
 """Refuse commits that mix generated gate-pattern state with code changes.
 
-`state/*.json` is written by the scheduled in-season workflows. When it rides
-along in a feature commit -- which `git add -A` does silently and often; six
-commits in this repo's history did it -- two things break. The state history
-stops being a readable record of what the manager actually did and when, and a
-revert of the code change also reverts live state.
+`state/` is machine-written: the local Yahoo sync (scripts/YAHOO SYNC.bat),
+the ledger rows `nfl fantasy lineup --record` appends, and, until its cron
+stack was retired on 2026-10-08 (DECISIONS #212), the scheduled in-season
+manager. When it rides along in a feature commit -- which `git add -A` does
+silently and often; six commits in this repo's history did it -- two things
+break. The state history stops being a readable record of what was written
+and when, and a revert of the code change also reverts live state.
 
-State commits belong to the workflows that produce them, on their own.
+State commits belong to the jobs that produce them, on their own.
 
     python scripts/check_commit_hygiene.py            # staged changes
     python scripts/check_commit_hygiene.py --range main...HEAD

@@ -236,8 +236,9 @@ here.
 ## The workflow
 
 `.github/workflows/props.yml` runs on its own concurrency group
-(`props-record`) and touches only `props/`, so it cannot collide with the
-fantasy workflows on `manager-state`. A 15-minute tick hits `guard.py` first,
+(`props-record`) and touches only `props/`; it is the repo's only scheduled
+workflow since the fantasy cron stack was retired (2026-10-08, DECISIONS
+#212). A 15-minute tick hits `guard.py` first,
 which installs nothing and exits in under a second unless there is work.
 
 | Window | When | Snapshot |

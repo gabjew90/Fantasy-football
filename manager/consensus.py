@@ -125,7 +125,7 @@ def _sleeper(scoring: dict, season) -> tuple[dict[str, float], str | None]:
 def _espn(scoring: dict, season, raw_dir, index) -> tuple[dict[str, float], str | None]:
     try:
         from draftkit import espn as espn_mod
-        from draftkit import ids as ids_mod
+        from core import ids as ids_mod
         from draftkit import seasondata
         raw = espn_mod.fetch_projections(season, Path(raw_dir))
         rows = espn_mod.parse_players(raw, season)

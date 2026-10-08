@@ -8173,6 +8173,50 @@ every row while the predictions rows carry open / decision / close (line_archive
   kickoff clock. The same two-run comparison on the unchanged code shows the same columns
   differing. Tests: 2038 passed, 8 skipped.
 
+## 2026-10-08 (212) -- the in-season auto-manager's cron stack is retired (the user's call)
+
+- **Why:** it had no schedule since 2026-09-25 (#109), ran only when dispatched by hand, and
+  duplicated the fantasy commands (`nfl fantasy lineup / waiver / trade / scenario`) for lineups,
+  waivers and trades. Two engines answering the same question is what the consolidation plan
+  forbids ("no parallel engines").
+- **Deleted (the cron wiring):** `.github/workflows/weekly.yml` and `gate.yml`;
+  `scripts/gate_guard.py`; `scripts/VEGAS REFRESH.bat` (its snapshot in `state/vegas/` was read
+  only by the cron's lineup and scout); the `python -m manager gate / cron / --module /
+  vegas-refresh` entrypoints; and the manager modules only that path used: `jobs`, `gate`,
+  `triggers`, `clock`, `deliver`, `phone`, `injuries`, `scout`, `lineup_opt`, `vegas`, `games`,
+  `trade_watch`. `notify.yml` now watches `props` only.
+- **The trade radar is retired too (the user's call: no trade search is needed;
+  `nfl fantasy trade` scores a named trade):** `trade_radar` and what only it needed --
+  `marginal` (price / accepts / verdict, the injury discount), `market` (FantasyCalc), `ecr` (the
+  rank panel) with `fantasypros.overall`, `waiver_brief` (the free-agent pool), `faab`, `usage`,
+  `age_decay` -- plus `fantasypros.crosswalk`, `yahoo.load` / `injury_overlay` and the
+  browser-scrape snapshot fallback (only the radar, `scripts/keefamania_trades.py` and tests used
+  them), `Store.first_time` (the radar's dedup; the Store's delivery and bid-history methods went
+  with the cron), the unread `inseason.age_decay` knob, and the fetch allowlist entries for
+  `manager/usage.py` and `manager/waiver_brief.py`. `scripts/keefamania_trades.py` goes in the
+  same sweep (the dead-code PR).
+- **Grep-verified:** nothing in `fantasy/`, `core/`, `draftkit/`, `nfl.py`, `CHAT.md`, `skill/`,
+  `props/` or `scripts/` imports any deleted module (`draftkit.market` is a different module, and
+  `briefs.playoff_odds` keeps its caller inside briefs). 23 test files went whole; the cron and
+  radar tests inside 8 more were cut, keeping their draftkit, consensus and Sleeper tests.
+- **Kept, because the fantasy commands import them:** `yahoo_api`, `yahoo_sync`, `yahoo_context`,
+  `yahoo` (now only `api_entries`, `yahoo_id_map`, `_flat`, `YAHOO_STATUS`; `fantasy/league.py`
+  reads the synced copy through `read_cached` on a host without credentials, so `python -m
+  manager yahoo-sync` -- the one entrypoint left -- and `scripts/YAHOO SYNC.bat` stay), `context`,
+  `consensus` and `fantasypros` (registered: provisional / live), `store` (kv only), `ledger` and
+  `provenance` (`fantasy lineup --record` emits ledger rows). The ledger's grading functions stay
+  as harness code although the Tuesday job that called them is gone; the consensus registry note
+  now says grading is by hand.
+- **Shims:** the kept modules import `core.ids` and `core.scoring` directly instead of the
+  `draftkit.ids` / `seasondata.score_projection` shims (pure re-exports, so identical behaviour).
+- **State:** `state/week_plan.json`, `state/gate_hours.json`, `state/messages.json`,
+  `state/seen.json` (and their `state/keefamania/` copies) and `state/vegas/` were written only by
+  the cron and the radar; they are removed in a state-only commit on its own branch,
+  sweep/retire-manager-state (hygiene.yml fails a PR that mixes state with code). `kv.json`, the
+  ledgers and the Yahoo sync stay.
+- **Undo:** git history. The last commit with the cron stack and the radar is b2341d3; restoring
+  the files listed above from it (and re-enabling the workflows) brings them back as they ran.
+
 ## 2026-10-08 (213) -- repo hygiene: per-run outputs stop being tracked
 
 - **The repo sweep (the user's approval, 2026-10-08):** files that every run rewrites showed as

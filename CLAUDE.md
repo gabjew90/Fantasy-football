@@ -32,9 +32,9 @@
   an inline check is not a substitute. Any load-bearing script the engine or
   the chat skill relies on that has NOT been through the skill is flagged to
   the user as a risk until it has (the user's standing rule, 2026-10-06).
-- The in-season auto-manager (`manager/`) has NO schedule since 2026-09-25
-  (the user's call, DECISIONS #109): `weekly.yml` and `gate.yml` run only when
-  dispatched by hand. `props.yml` is the only scheduled workflow.
+- The in-season auto-manager's cron stack is retired (2026-10-08, DECISIONS
+  #212): fantasy decisions go through `fantasy/` (`nfl fantasy ...`), and
+  `props.yml` is the only scheduled workflow.
 - Draft-engine changes ship behind the validation loop in
   docs/plans/2026-08-29-draft-engine-v2-plan.md — CLV, historical sim,
   input accuracy. Props-engine changes ship through pre-registered rounds

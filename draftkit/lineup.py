@@ -3,8 +3,8 @@
 Start/sit against the actual weekly opponent: optimal lineup diffs only,
 inactive-risk flags ordered by kickoff (week 1 of 2026 has a Wednesday
 game — lock order comes from the schedule, not the calendar), and red
-structural warnings first. The variance lean that breaks close calls lives
-in manager/lineup_opt.py (its own inline rule).
+structural warnings first. (The variance lean that broke close calls lived
+in manager/lineup_opt.py, retired with the cron stack, DECISIONS #212.)
 """
 
 from __future__ import annotations
@@ -76,8 +76,8 @@ def optimal_lineup(roster: list[dict], slots: dict[str, int], flex: int = 0,
         # sleeper_id twice started him twice and the total was silently
         # inflated -- RB 300 + RB 100 with two RB slots and a duplicate of
         # the 300 returned 600 instead of 400. Reachable whenever a caller
-        # builds a post-trade roster by concatenation (marginal.slot_moves)
-        # and the arriving player is already rostered.
+        # builds a post-trade roster by concatenation (the retired
+        # marginal.slot_moves did) and the arriving player is already rostered.
         # .get, not [] — the old loop read sleeper_id only off CHOSEN rows, so
         # a roster carrying an unidentified row that never starts used to be
         # fine at flex=0. Subscripting here would have turned that into a
