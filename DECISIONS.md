@@ -8161,7 +8161,8 @@ every row while the predictions rows carry open / decision / close (line_archive
   says pool_lookback and bench_row_wins_dedupe are inert and session_log is permanent; the
   projections docstrings say model is the default (Omnibeta live) and Keefamania selects
   external. draftkit/, scripts/ and tests/ import core.ids / core.scoring directly; the
-  draftkit.ids and seasondata.score_projection shims stay until manager/ moves off them.
+  draftkit.ids and seasondata.score_projection shims stayed until manager/ moved off them -- it did
+  in #212, and both shims were deleted in the same sweep (draftkit/ids.py gone; tests import core.*).
 - **Release:** data/external/fantasypros_history/ shipped to chat because fnmatch's * crosses "/"
   in the data/external/*.csv glob; it moved to data/raw_history/fantasypros_history/, which no
   release or harness rule matches.

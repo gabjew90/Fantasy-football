@@ -122,11 +122,6 @@ def nfl_state(getter=get_json) -> dict:
             "season_type": s.get("season_type", "regular")}
 
 
-# The one scoring function lives in core.scoring; this name is kept for the
-# callers that import it from here.
-score_projection = score
-
-
 def weekly_projections(scoring: dict, season: str, week: int,
                        getter=get_json) -> dict[str, float] | None:
     """sleeper_id -> projected points in league scoring, or None when Sleeper

@@ -11,7 +11,7 @@ consumer that needs usage or play-by-play for a fantasy player goes through
 it: matching nflverse names to Sleeper names breaks silently on duplicates
 and suffixes.
 
-Moved from draftkit/ids.py on 2026-09-24; that module re-exports these names.
+Moved from draftkit/ids.py on 2026-09-24; the re-export there was deleted on 2026-10-08 once nothing imported it.
 """
 
 from __future__ import annotations

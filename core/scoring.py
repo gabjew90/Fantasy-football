@@ -12,7 +12,7 @@ both are served:
                                stat columns, for vectorised play-by-play and
                                player-stats frames (fantasy_points_expr)
 
-It replaced the copies in draftkit.seasondata.score_projection (now an alias),
+It replaced the copies in draftkit.seasondata.score_projection (an alias until 2026-10-08),
 the inline sums in draftkit.consensus.score_rows and
 scripts/projection_backtest.py, manager.consensus._score, and draftkit.dataset's
 column map. One remains on an allowlist that may only shrink: the props

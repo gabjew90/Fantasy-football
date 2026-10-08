@@ -38,7 +38,8 @@ def test_early_games_include_wednesday():
 
 # ---- Task 2: fetchers (getter injected, no network) ----
 
-from draftkit.seasondata import injury_map, rival_budgets, score_projection, weekly_projections
+from core.scoring import score as score_projection
+from draftkit.seasondata import injury_map, rival_budgets, weekly_projections
 
 SCORING = {"pass_td": 4.0, "pass_yd": 0.04, "rec": 1.0, "rush_yd": 0.1}
 

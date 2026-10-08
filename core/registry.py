@@ -151,9 +151,10 @@ COMPONENTS: tuple[Component, ...] = (
     Component("rest_of_season_consensus", "projection_source", "manager/consensus.py",
               "provisional",
               note="Sleeper + ESPN + FantasyPros rescaled to a common basis; the ledger "
-                   "has no graded weeks yet, which is what would validate it (the Tuesday job "
-                   "that graded it retired with the cron stack, DECISIONS #212: grading is "
-                   "manager.ledger.grade_week, run by hand)"),
+                   "has no graded weeks yet, which is what would validate it. The Tuesday job "
+                   "that graded it retired with the cron stack (DECISIONS #212); "
+                   "manager.ledger.grade_week stays as harness code but NOTHING CALLS IT today, "
+                   "so no grading is happening"),
     Component("fantasypros", "projection_source", "manager/fantasypros.py", "live",
               evidence=("reports/fpros_gate.md",)),
     Component("external_season_lines", "projection_source", "draftkit/external.py", "live",
