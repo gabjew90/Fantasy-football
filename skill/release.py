@@ -45,7 +45,7 @@ INCLUDE_FILES = ("CHAT.md", "nfl.py", "config.yaml", "requirements.txt", "tiers.
 # A file must fit the rules of the OLDEST harness in use (HARNESS_RULES in
 # tests/test_skill_release.py) or wait for a rebuilt skill.
 INCLUDE_GLOBS = ("data/external/*.csv",)
-EXCLUDE_PARTS = ("__pycache__", "backtest_out")
+EXCLUDE_PARTS = ("__pycache__", "backtest_out", "cache")
 EXCLUDE_SUFFIXES = (".pyc", ".pyo", ".env", ".pkl", ".tmp", ".part")
 EXCLUDE_NAMES = ("credential.env", ".env")
 

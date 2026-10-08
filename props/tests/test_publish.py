@@ -540,3 +540,40 @@ def test_the_customer_card_follows_requires_expects_matchup_then_choose():
     assert "| Trimmed gains |" in ext or "| This season |" in ext
     assert "Each cell: the workload" not in ext and "Sleeper prices most lines near even and moves" not in ext
     assert "%% Updated: markets 20:42 UTC" in ext
+
+
+# ---- the review of the full report (2026-10-08) ----
+def test_only_a_chat_game_run_spends_credits_on_scenario_prices():
+    root = Path(__file__).resolve().parents[2]
+    sg = (root / "props/engine/scripts/score_game.py").read_text(encoding="utf-8")
+    assert "if SNAP is None and not a.no_odds and a.scenario_prices:" in sg       # opt-in, never a what-if re-run
+    for f in ("props/engine/scripts/score_week.py", ".github/workflows/props.yml"):
+        assert "scenario-prices" not in (root / f).read_text(encoding="utf-8"), f
+    assert "--scenario-prices" in (root / "nfl.py").read_text(encoding="utf-8")
+
+
+def test_a_pickem_has_no_favorite_label():
+    import research as RS
+    alt = copy.deepcopy(ALT)
+    sm = RS.alt_spread_scenarios(alt, "Dallas Cowboys", "Tampa Bay Buccaneers", 0.0, 9)
+    t = "\n".join(PR.scenario_table({**RUN, "market_env": {**RUN["market_env"], "home_spread": 0.0},
+                                     "scenarios_market": sm}))
+    assert "favorite" not in t and "underdog" not in t and "| DAL wins by 9+ points |" in t
+
+
+def test_a_near_miss_is_never_rounded_onto_the_need():
+    lg = {"market": "pass yds", "side": "under", "line": 270.5, "if": "x", "fails": "y", "else": "z",
+          "needs": [{"volume": 24, "rate": 11.27, "reaches": False}]}
+    t = "\n".join(PR.branches(lg, {"volume": [{"market": "player_pass_yds", "cells": {"unit": "completions"}}]},
+                              compact=True))
+    assert "about 270.5 yards, short of the 271" in t
+
+
+def test_the_needs_row_says_when_it_is_the_season_rate():
+    card = {"name": "B", "usage": {}, "book": "sleeper", "rows": [
+        {"market": "player_rush_yds", "line": 40.5, "book": "sleeper", "median": 40.0},
+        {"market": "player_rush_reception_yds", "line": 50.5, "book": "sleeper", "median": 52.0}],
+        "volume": [{"market": "player_rush_yds", "line": 40.5, "cells": {"unit": "carries", "proj": 10.0, "rows": {
+            "season": {"vol": 11, "vol_txt": "11 carries", "rate": 3.8, "rate_txt": "3.8", "pct": 0.4}}}}]}
+    t = "\n".join(PR.rushing_vs_combined(card, compact=True))
+    assert "11 carries (this season's gains)" in t

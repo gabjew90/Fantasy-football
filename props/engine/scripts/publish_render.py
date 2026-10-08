@@ -156,9 +156,10 @@ def market_scenario_table(run, sm, detail=False) -> list[str]:
     hs = (run.get("market_env") or {}).get("home_spread")
     fav, dog = (home, away) if hs is not None and hs <= 0 else (away, home)
     n, pt = sm["cut"], sm["point"]
-    rows = ((f"{fav} (favorite) wins by {n}+ points", sm["favourite_by_cut"], SCENARIO_ROWS[0][1]),
+    pk = bool(sm.get("pickem"))
+    rows = ((f"{fav}{'' if pk else ' (favorite)'} wins by {n}+ points", sm["favourite_by_cut"], SCENARIO_ROWS[0][1]),
             ("Final margin stays within one score", sm["within_one_score"], SCENARIO_ROWS[1][1]),
-            (f"{dog} (underdog) wins by {n}+ points", sm["underdog_by_cut"], SCENARIO_ROWS[2][1]))
+            (f"{dog}{'' if pk else ' (underdog)'} wins by {n}+ points", sm["underdog_by_cut"], SCENARIO_ROWS[2][1]))
     L = ["| Result scenario | Estimated likelihood | Opportunity implication |", "|---|---:|---|"]
     L += [f"| {a} | {pct(b)} | {c} |" for a, b, c in rows]
     pr = sm.get("prices") or {}
@@ -457,7 +458,8 @@ def rushing_vs_combined(card, compact=False) -> list[str]:
          f"| {'Market Over' if compact else 'Market Over estimate'} | {pct(ru.get('p_over_book'))} | {pct(rr.get('p_over_book'))} |"]
     if compact:
         vr, vc = PB.verdict(card, "player_rush_yds"), PB.verdict(card, "player_rush_reception_yds")
-        L.append(f"| Needs at trimmed gains | {(vr or {}).get('vol_txt', '-')} | {(vc or {}).get('vol_txt', '-')} |")
+        need = lambda v: "-" if not v else v["vol_txt"] + ("" if v["ref"] == "capped" else " (this season's gains)")
+        L.append(f"| Needs at trimmed gains | {need(vr)} | {need(vc)} |")
         L.append(f"| Verdict | {VERDICT_SHORT.get((vr or {}).get('word'), '-')} | {VERDICT_SHORT.get((vc or {}).get('word'), '-')} |")
     notes = []
     if have_parts:
@@ -514,7 +516,8 @@ def branches(lg, card=None, compact=False) -> list[str]:
                                f"{f'{100 * float(b):.0f}%' if float(b) <= 1 else f'{float(b):.2f}'}".replace("  ", " ")
                                for k, (a, b) in enumerate(parts))
             what = "catches" if mk == "player_receptions" else "yards"
-            amount = f"{total:.1f}" if mk == "player_receptions" else f"{total:.0f}"
+            amount = (f"{total:.1f}" if mk == "player_receptions" or abs(total - need_out) < 1
+                      else f"{total:.0f}")
             L.append(f"- If you expect {shown}, **{PB.MARKET_WORDS[mk]} {side} {float(lg['line']):g}** fits: about "
                      f"{amount} {what}, {'past' if want else 'short of'} the {need_out} the Over needs"
                      f"{' (a hypothetical rate)' if n.get('hypothetical') else ''}. It stops fitting if "

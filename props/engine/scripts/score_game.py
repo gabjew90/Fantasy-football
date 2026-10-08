@@ -291,9 +291,10 @@ def espn_scoreboard_url(season, week):
             f"?seasontype=2&week={int(week)}&dates={int(season)}")
 
 
-def run_odds(stage, args_list):
+def run_odds(stage, args_list, reuse_s=None):
     cmd = [sys.executable, str(HERE / "odds_client.py"), stage] + args_list
-    r = subprocess.run(cmd, capture_output=True, text=True, cwd=str(HERE))
+    env = dict(os.environ, ODDS_REUSE_CACHE_MAX_AGE=str(int(reuse_s))) if reuse_s else None
+    r = subprocess.run(cmd, capture_output=True, text=True, cwd=str(HERE), env=env)
     if r.returncode != 0 and not r.stdout.strip():
         raise RuntimeError(f"odds_client {stage} failed: {r.stderr[:400]}")
     try:
@@ -1678,10 +1679,12 @@ def main():
                     raise RuntimeError(f"{len(evs)} matching events")
                 eid3 = evs[0]["id"]
                 od = run_odds("odds", [eid3, "--key-file", str(RES / "credential.env"),
-                                       "--markets", "spreads,alternate_spreads", "--books", "draftkings"])
+                                       "--markets", "spreads,alternate_spreads", "--books", "draftkings"], reuse_s=900)
                 cf = ([HERE / "cache" / od["reused_cache"]] if od.get("reused_cache") else
                       sorted((HERE / "cache").glob(f"odds_{eid3}_*.json"), key=lambda f: f.stat().st_mtime))
-                books = json.load(open(cf[-1]))["data"].get("bookmakers", []) if od.get("class") == "OK" and cf else []
+                if od.get("class") != "OK" or not cf:
+                    raise RuntimeError(f"the Odds API request failed ({od.get('class') or 'no response'})")
+                books = json.load(open(cf[-1]))["data"].get("bookmakers", [])
                 SCEN_MKT = RSCH.alt_spread_scenarios(books, home_name, away_name, market_env["home_spread"], _cut)
                 SCEN_MKT["as_of"] = od.get("retrieved_at_utc")
                 SCEN_MKT["credits_left"] = (od.get("quota") or {}).get("x-requests-remaining")

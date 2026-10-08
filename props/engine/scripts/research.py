@@ -931,7 +931,8 @@ def alt_spread_scenarios(bookmakers, home_name, away_name, home_spread, cut=9, b
     within = 1 - p_fav - p_dog
     if within < 0:
         return {"status": "the alternate lines' chances add to more than 100%; not shown"}
-    return {"status": "ok", "book": book, "favourite": fav, "underdog": dog, "cut": cut, "point": pt,
+    return {"status": "ok", "book": book, "favourite": fav, "underdog": dog, "pickem": home_spread == 0,
+            "cut": cut, "point": pt,
             "favourite_by_cut": p_fav, "within_one_score": within, "underdog_by_cut": p_dog,
             "prices": {"favourite": {"minus": pr_fav[0], "plus_other": pr_fav[1]},
                        "underdog": {"minus": pr_dog[0], "plus_other": pr_dog[1]}},
