@@ -150,8 +150,8 @@
   "props/engine/scripts/model.py": "c692e34e63219841bcb3cfd5da2427f4129acb3a27f2e9bf7dfc120f304e226b",
   "props/engine/scripts/odds_client.py": "434186273bd0412a5545247228298951c5d0504a19c8a47c4c782bf3bb75aaa1",
   "props/engine/scripts/publish.py": "4dac5ae42fb7aa7523b289ed1c4c1c3f621d73b6dc3dd03145876d8bd8b82edc",
-  "props/engine/scripts/publish_pdf.py": "a25facf9e7e38319353c6e969f3df3c4052c5482db6e1bedca949d41392b0a4f",
-  "props/engine/scripts/publish_render.py": "2ac491ef03fe68329a7333fe5798fcf8b80b8a9adf23317228f15547cd154b68",
+  "props/engine/scripts/publish_pdf.py": "4622ee91596b52d7640a0f0ec0f9ad88666b320cd3f2aa318e52d162d4627c3d",
+  "props/engine/scripts/publish_render.py": "11ebe9c655c3662b6497d5fe156c9edc1e9476fbfc09b00b064adf6bd2f2b1f4",
   "props/engine/scripts/research.py": "68864642098a73843bd66c8f03c8f7ad5b8c0c3d8b1cad156c1964c0b447d687",
   "props/engine/scripts/scenario.py": "e16722e9abebb55f05a770910c1e47dc1cc89f7d469c8d6232d6e6bd1af83774",
   "props/engine/scripts/score_game.py": "74237c67848f2add3eec613da73d46486e3bf4d5ad70a0c8ff28cb95b6afcf66",
@@ -169,6 +169,6 @@
   "tiers.csv": "04a1a79d43e9f2445ba3dc4ea262b00fbd58efea1f41e8b0393cb4c7f8afee41",
   "tiers.keefamania.csv": "11e6546b56caa807a572da86d5c3d81097bafd2d2550e25653882d78b2962e94"
  },
- "sha256": "ae46a09d8be254949cb685bc638f27a2d26e71637cd2d7a112868a9b73cd3cb5",
+ "sha256": "8d22dae29ffb8d66c59da57520368f297d51c911ecb587a42a55291ac73c6b47",
  "tag": "nfl-v1.62"
 }

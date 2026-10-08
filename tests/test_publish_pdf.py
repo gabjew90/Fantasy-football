@@ -25,7 +25,7 @@ def _pdf_text(path) -> str:
 def test_inline_marks_escape_and_the_arrow_is_written_out():
     assert PDF.inline("**a** & *b* < c") == "<b>a</b> &amp; <i>b</i> &lt; c"
     assert PDF.plain("10.7 targets -> 8.0 catches") == "10.7 targets (8.0 catches)"
-    assert PDF.plain("9 targets at 79% -> 67%") == "9 targets at 79%: 67%"
+    assert PDF.plain("9 targets at 79% -> 67%", cell=True) == "9 targets at 79%: 67%"
     assert PDF.inline("Win probability*") == "Win probability*"          # a lone star is not italic
 
 
@@ -61,3 +61,28 @@ def test_publish_writes_the_pdf_and_says_so_when_reportlab_is_missing(tmp_path, 
     assert P.main(["--run", str(run_p), "--reads", str(reads_p), "--out", str(out2), "--no-ci"]) == 0
     assert not (out2 / "2026_wk05_TB_DAL.pdf").exists()
     assert "PDF skipped" in capsys.readouterr().err
+
+
+# ---- the code review (2026-10-08) ----
+def test_every_markdown_table_and_header_line_reaches_the_pdf_as_itself():
+    from reportlab.platypus import Paragraph, Table
+    md = PR.render_external(T.RUN, T.good())
+    lines = md.splitlines()
+    n_md = sum(1 for a, b in zip(lines, lines[1:]) if a.startswith("|") and re.match(r"^\|?\s*:?-{3,}", b.strip()))
+    fl = PDF.flowables(md, 500)
+    assert sum(isinstance(f, Table) for f in fl) == n_md > 5
+    paras = [f for f in fl if isinstance(f, Paragraph)]
+    assert not any(p.text.lstrip().startswith("|") for p in paras)          # no table set as a paragraph
+    meta = [p for p in paras if p.style.name == "meta"]
+    assert meta and all(not p.text.startswith("%%") for p in paras)
+
+
+def test_only_the_renderers_arrows_are_written_out():
+    assert PDF.plain("his share went 26% -> 49%") == "his share went 26% -> 49%"
+    assert PDF.plain("9 targets at 79% -> 67%", cell=True) == "9 targets at 79%: 67%"
+    assert PDF.plain("10.7 targets -> 8.0 catches") == "10.7 targets (8.0 catches)"
+
+
+def test_headings_keep_with_what_follows():
+    S = PDF._styles()
+    assert S["h2"].keepWithNext and S["h3"].keepWithNext

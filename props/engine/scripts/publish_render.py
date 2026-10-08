@@ -419,82 +419,56 @@ def reliability_note(run) -> list[str]:
               "there -- not as a better chance than the market's. Nothing here is a recommendation to bet.", ""]
 
 
-# ---------------------------------------------------------------- the QA/QC version
+# ---------------------------------------------------------------- the QA/QC and external versions
+META = "%% "      # marks a header line for the PDF's meta style (render_external only)
+
+
 def render_qa(run, reads, checks, release) -> str:
     """For chat and internal reviewers: the guide's structure, with the backend under each section
     and every check; the full 'where the baseline could miss' table and the inputs at the end."""
-    home, away = teams(run)
-    n_fail = sum(not c["ok"] for c in checks)
-    game_checks = [c for c in checks if c["leg"] == 0]
-    L = [f"# {away.upper()} AT {home.upper()} · QA/QC", "", *header_lines(run), "",
-         f"Release **{release.get('tag') or 'unknown'}** ({str(release.get('hash') or '')[:12] or 'hash unknown'}, "
-         f"{release.get('source') or 'source unknown'}) · run `{run['slug']}` · data cutoff: {cutoff(run)}", "",
-         f"**Checks: {len(checks) - n_fail} of {len(checks)} pass.**"
-         + ("" if not n_fail else f" {n_fail} FAIL: not publishable until they are fixed."), "",
-         "**Opening game read.** " + reads["opening"], "",
-         "## 1. What game does the market expect?", "", *market_table(run), "", reads.get("market_read") or "", "",
-         *scenario_table(run, detail=True), "",
-         "## 2. How much passing and rushing should we expect?", "", *workload_table(run), "",
-         reads.get("workload_read") or "", "",
-         "## 3. What is each team good and bad at?", "", *unit_table(run), ""]
-    for t in (home, away):
-        if (reads.get("unit_reads") or {}).get(t):
-            L += [f"> **{t} offense:** {reads['unit_reads'][t]}", ""]
-    L += ["## 4. Which personnel changes affect that picture?", "", *personnel_table(reads), "",
-          reads.get("personnel_read") or "", "", *if_out_tables(run), "",
-          "Section 4 as the engine reads it (the prices' own statuses):", ""]
-    for t, cells_ in (run.get("who_plays") or {}).items():
-        for unit, txt in cells_.items():
-            L.append(f"- **{t} {unit}:** {txt}")
-    L += ["", run.get("who_note") or "", "",
-          "## 5. Where have opposing positions produced?", "", *allowed_tables(run), "", reads.get("allowed_read") or "", "",
-          f"**Weather and venue.** {run.get('weather_line') or '-'}", "",
-          "**Assumptions worth testing.**", "", *(f"- {a}" for a in reads["assumptions"]), "",
-          reads["handoff"], "", "**Checks for the team brief.**", "", *checks_table(game_checks), ""]
-    by_player = {}
-    for i, lg in enumerate(reads["legs"], 1):
-        by_player.setdefault(lg["player"], []).append(i)
-    for sec in PB.SECTIONS:
-        ps = [p for p in reads["players"] if PB.section_of(PB.card_for(run, p["player"]) or {}) == sec]
-        if not ps:
-            continue
-        L += [f"## {sec}", ""]
-        for p in ps:
-            L += player_card(run, reads, p, checks, by_player.get(p["player"], []), qa=True)
-    L += reliability_note(run)
-    L += ["## QA appendix", "", "### Where the baseline could miss (section 7, in full)", "",
-          "| Matchup issue | What the baseline may miss | Separate scenario |", "|---|---|---|",
-          *(f"| {_esc(a)} | {_esc(b)} | {_esc(c)} |" for a, b, c in run.get("gaps") or []), "",
-          "### Inputs and their state", "", "| Source | Used for | Status | Detail |", "|---|---|---|---|",
-          *(f"| {_esc(s['name'])} | {_esc(s['purpose'])} | {_esc(s['status'])} | {_esc(s['detail'])} |"
-            for s in run.get("sources") or []), "",
-          "### Model states", "", run.get("model_states") or "-", "",
-          f"The engine's full report for this run is the reference copy: `report_{run['slug']}.md`, in the same folder.", ""]
-    return "\n".join(L) + "\n"
+    return _document(run, reads, checks, release, qa=True)
 
 
-# ---------------------------------------------------------------- the external version
 def render_external(run, reads) -> str:
-    """For an outside reader (the PDF): the guide's structure and the supporting data, without the
-    backend -- no checks, no model names, no decision numbers, no release internals. The same run
-    and reads as the QA version, so the two cannot disagree."""
+    """For an outside reader (the PDF): the same document without the backend -- no checks, no
+    model names, no decision numbers, no release internals. One builder for both, so the two
+    versions cannot drift apart. Header lines carry the META mark for the PDF's meta style."""
+    return _document(run, reads, [], {}, qa=False)
+
+
+def _document(run, reads, checks, release, qa: bool) -> str:
     home, away = teams(run)
-    L = [f"# {away.upper()} AT {home.upper()}", "", *header_lines(run), "",
-         "**Opening game read.** " + reads["opening"], "",
-         "## 1. What game does the market expect?", "", *market_table(run), "", reads.get("market_read") or "", "",
-         *scenario_table(run, detail=False), "",
-         "## 2. How much passing and rushing should we expect?", "", *workload_table(run), "",
-         reads.get("workload_read") or "", "",
-         "## 3. What is each team good and bad at?", "", *unit_table(run), ""]
+    hdr = header_lines(run) if qa else [META + h if h.strip() else h for h in header_lines(run)]
+    L = [f"# {away.upper()} AT {home.upper()}" + (" · QA/QC" if qa else ""), "", *hdr, ""]
+    if qa:
+        n_fail = sum(not c["ok"] for c in checks)
+        L += [f"Release **{release.get('tag') or 'unknown'}** ({str(release.get('hash') or '')[:12] or 'hash unknown'}, "
+              f"{release.get('source') or 'source unknown'}) · run `{run['slug']}` · data cutoff: {cutoff(run)}", "",
+              f"**Checks: {len(checks) - n_fail} of {len(checks)} pass.**"
+              + ("" if not n_fail else f" {n_fail} FAIL: not publishable until they are fixed."), ""]
+    L += ["**Opening game read.** " + reads["opening"], "",
+          "## 1. What game does the market expect?", "", *market_table(run), "", reads.get("market_read") or "", "",
+          *scenario_table(run, detail=qa), "",
+          "## 2. How much passing and rushing should we expect?", "", *workload_table(run), "",
+          reads.get("workload_read") or "", "",
+          "## 3. What is each team good and bad at?", "", *unit_table(run), ""]
     for t in (home, away):
         if (reads.get("unit_reads") or {}).get(t):
             L += [f"> **{t} offense:** {reads['unit_reads'][t]}", ""]
     L += ["## 4. Which personnel changes affect that picture?", "", *personnel_table(reads), "",
-          reads.get("personnel_read") or "", "", *if_out_tables(run), "",
-          "## 5. Where have opposing positions produced?", "", *allowed_tables(run), "", reads.get("allowed_read") or "", "",
+          reads.get("personnel_read") or "", "", *if_out_tables(run), ""]
+    if qa:
+        L += ["Section 4 as the engine reads it (the prices' own statuses):", ""]
+        for t, cells_ in (run.get("who_plays") or {}).items():
+            for unit, txt in cells_.items():
+                L.append(f"- **{t} {unit}:** {txt}")
+        L += ["", run.get("who_note") or "", ""]
+    L += ["## 5. Where have opposing positions produced?", "", *allowed_tables(run), "", reads.get("allowed_read") or "", "",
           f"**Weather and venue.** {run.get('weather_line') or '-'}", "",
           "**Assumptions worth testing.**", "", *(f"- {a}" for a in reads["assumptions"]), "",
           reads["handoff"], ""]
+    if qa:
+        L += ["**Checks for the team brief.**", "", *checks_table([c for c in checks if c["leg"] == 0]), ""]
     by_player = {}
     for i, lg in enumerate(reads["legs"], 1):
         by_player.setdefault(lg["player"], []).append(i)
@@ -504,9 +478,19 @@ def render_external(run, reads) -> str:
             continue
         L += [f"## {sec}", ""]
         for p in ps:
-            L += player_card(run, reads, p, [], by_player.get(p["player"], []), qa=False)
+            L += player_card(run, reads, p, checks, by_player.get(p["player"], []), qa=qa)
     L += reliability_note(run)
-    L += [f"*Data as of: {cutoff(run)}*", ""]
+    if qa:
+        L += ["## QA appendix", "", "### Where the baseline could miss (section 7, in full)", "",
+              "| Matchup issue | What the baseline may miss | Separate scenario |", "|---|---|---|",
+              *(f"| {_esc(a)} | {_esc(b)} | {_esc(c)} |" for a, b, c in run.get("gaps") or []), "",
+              "### Inputs and their state", "", "| Source | Used for | Status | Detail |", "|---|---|---|---|",
+              *(f"| {_esc(s_['name'])} | {_esc(s_['purpose'])} | {_esc(s_['status'])} | {_esc(s_['detail'])} |"
+                for s_ in run.get("sources") or []), "",
+              "### Model states", "", run.get("model_states") or "-", "",
+              f"The engine's full report for this run is the reference copy: `report_{run['slug']}.md`, in the same folder.", ""]
+    else:
+        L += [f"*Data as of: {cutoff(run)}*", ""]
     return "\n".join(L) + "\n"
 
 

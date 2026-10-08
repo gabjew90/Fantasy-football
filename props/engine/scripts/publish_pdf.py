@@ -14,6 +14,7 @@ import re
 from pathlib import Path
 
 INK, ACCENT, MUTED, RULE, FILL, BAND = "#1F2933", "#2F5D8A", "#5F6B78", "#C9D3DD", "#EAF0F6", "#F6F8FA"
+META = "%% "      # publish_render.META: a header line, set in the meta style
 
 
 def available() -> bool:
@@ -45,15 +46,17 @@ def _fonts():
         addMapping(fam, 1, 1, bi)
 
 
-def plain(text: str) -> str:
-    """'10.7 targets -> 8.0 catches' -> '10.7 targets (8.0 catches)'; any other ' -> ' -> ': '."""
+def plain(text: str, cell: bool = False) -> str:
+    """The renderer's arrows written out (Vera has none): '10.7 targets -> 8.0 catches' ->
+    '10.7 targets (8.0 catches)' anywhere; in a table cell (all renderer-written) any other
+    ' -> ' -> ': '. An arrow in the analyst's prose is left as written."""
     text = re.sub(r"(\d[\d.]* targets) -> (\d[\d.]* catches)", r"\1 (\2)", text)
-    return text.replace(" -> ", ": ")
+    return text.replace(" -> ", ": ") if cell else text
 
 
-def inline(text: str) -> str:
+def inline(text: str, cell: bool = False) -> str:
     """Markdown inline marks to reportlab's mini-markup, the text escaped first."""
-    t = plain(text).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+    t = plain(text, cell).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
     t = re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", t)
     t = re.sub(r"(?<![\w*])\*(?!\s)(.+?)(?<!\s)\*(?![\w*])", r"<i>\1</i>", t)
     t = re.sub(r"`([^`]+)`", r"\1", t)
@@ -70,9 +73,9 @@ def _styles():
         "title": ParagraphStyle("title", parent=base, fontName="Vera-Bold", fontSize=20, leading=24, textColor=c(INK),
                                 spaceAfter=4),
         "h2": ParagraphStyle("h2", parent=base, fontName="Vera-Bold", fontSize=12.5, leading=16, textColor=c(ACCENT),
-                             spaceBefore=12, spaceAfter=5),
+                             spaceBefore=12, spaceAfter=5, keepWithNext=1),
         "h3": ParagraphStyle("h3", parent=base, fontName="Vera-Bold", fontSize=10.5, leading=14, textColor=c(INK),
-                             spaceBefore=9, spaceAfter=4),
+                             spaceBefore=9, spaceAfter=4, keepWithNext=1),
         "note": ParagraphStyle("note", parent=base, fontSize=7.6, leading=10, textColor=c(MUTED), spaceAfter=4),
         "meta": ParagraphStyle("meta", parent=base, fontSize=8, leading=11, textColor=c(MUTED), spaceAfter=2),
         "cell": ParagraphStyle("cell", parent=base, fontSize=7.8, leading=10, spaceAfter=0),
@@ -97,7 +100,7 @@ def _table(rows, aligns, S, width):
         for j, cell in enumerate(r):
             right = j < len(aligns) and aligns[j] == "right"
             style = (S["headr"] if right else S["head"]) if i == 0 else (S["cellr"] if right else S["cell"])
-            out.append(Paragraph(inline(cell), style))
+            out.append(Paragraph(inline(cell, cell=True), style))
         data.append(out)
     first = 0.34 if ncol > 2 else 0.5
     widths = [width * first] + [width * (1 - first) / (ncol - 1)] * (ncol - 1) if ncol > 1 else [width]
@@ -124,7 +127,7 @@ def _cells(line):
 def flowables(md: str, width: float) -> list:
     """The Markdown subset as reportlab flowables."""
     from reportlab.lib.colors import HexColor
-    from reportlab.platypus import HRFlowable, KeepTogether, Paragraph, Spacer
+    from reportlab.platypus import Paragraph, Spacer
     _fonts()
     S = _styles()
     out, lines, i = [], md.splitlines(), 0
@@ -159,11 +162,10 @@ def flowables(md: str, width: float) -> list:
             out.append(Paragraph(inline(s[2:]), S["title"]))
         elif s.startswith("## "):
             flush()
-            out += [Paragraph(inline(s[3:]), S["h2"]), HRFlowable(width="100%", thickness=0.6, color=HexColor(RULE),
-                                                                   spaceBefore=0, spaceAfter=5)]
+            out.append(Paragraph(inline(s[3:]), S["h2"]))
         elif s.startswith("### "):
             flush()
-            out.append(KeepTogether([Paragraph(inline(s[4:]), S["h3"])]))
+            out.append(Paragraph(inline(s[4:]), S["h3"]))
         elif s.startswith("> "):
             flush()
             q = [s[2:].rstrip()]
@@ -174,9 +176,9 @@ def flowables(md: str, width: float) -> list:
         elif s.startswith("- "):
             flush()
             out.append(Paragraph(inline(s[2:]), S["bullet"], bulletText="•"))
-        elif s.startswith("Thursday") or s.startswith("Sources updated") or re.match(r"^[A-Z][a-z]+day, ", s):
+        elif s.startswith(META):
             flush()
-            out.append(Paragraph(inline(s), S["meta"]))
+            out.append(Paragraph(inline(s[len(META):]), S["meta"]))
         else:
             para.append(s)
         i += 1
