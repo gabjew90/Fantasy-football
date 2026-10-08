@@ -379,3 +379,58 @@ def test_a_run_file_that_is_not_the_reports_run_is_refused(tmp_path):
     run_p, reads_p = _files(tmp_path, run={**RUN, "data_cutoff": "- **Data cutoff:** an older run"})
     (tmp_path / "report_2026_wk05_TB_DAL.md").write_text("- **Data cutoff:** the newer run\n", encoding="utf-8")
     assert P.main(["--run", str(run_p), "--reads", str(reads_p), "--out", str(tmp_path / "o"), "--no-ci"]) == 2
+
+
+# ---- the second code review (2026-10-08) ----
+def test_player_prose_cannot_quote_a_brief_table_number_without_citing_it():
+    # 29.0 is Dallas's implied points: fine in the market narration, not in a player's prose uncited
+    r = edit(lambda r: r["players"][0].update(basis="He has 29 catches."))
+    assert any(c["check"] == "number traced" and "29" in c["stated"] for c in fails(r))
+    cited = edit(lambda r: (r["players"][0].update(basis="Dallas is implied for 29.0 points."),
+                            r["players"][0]["cite"].append({"field": "game.teams.DAL.implied_points", "value": 29.0})))
+    assert not any(c["check"] == "number traced" and "29" in c["stated"] for c in fails(cited))
+
+
+def test_a_legs_prose_traces_to_its_own_leg_not_a_sibling_legs():
+    raw = copy.deepcopy(GOOD_RAW)
+    yds = {"market": "rec yds", "side": "over", "line": 85.5, "if": "he catches 7 at 13.0", "fails": "he catches fewer",
+           "else": "skip it", "needs": [{"volume": 7, "rate": 12.956, "reaches": True}]}
+    raw["players"][0]["legs"].append(yds)
+    leg0(raw)["fails"] = "he catches fewer than 86 yards' worth"         # 86 belongs to the yards leg
+    assert any(c["check"] == "number traced" and "86" in c["stated"] for c in fails(P.validate(raw)))
+
+
+def test_the_opening_counts_sentences_past_abbreviations():
+    assert P.count_sentences("Antoine Winfield Jr. is out. Dallas vs. Tampa is lopsided. That is the game.") == 3
+
+
+def test_an_alternate_line_leg_does_not_borrow_the_main_lines_requirement():
+    card = copy.deepcopy(LAMB)
+    card["rows"].append({**card["rows"][0], "line": 5.5, "book": "sleeper"})
+    lg = {**LEG, "line": 5.5, "player": "CeeDee Lamb"}
+    p = GOOD_RAW["players"][0]
+    txt = PR.closing_paragraph(card, p, lg)
+    assert "needs 9 targets" not in txt and "built at the 6.5 line" in txt
+
+
+def test_an_under_legs_closing_says_the_requirement_is_the_overs():
+    lg = {**LEG, "side": "under", "player": "CeeDee Lamb"}
+    txt = PR.closing_paragraph(LAMB, GOOD_RAW["players"][0], lg)
+    assert "the Over at receptions 6.5 needs" in txt and "(for the Over; this leg is the Under)" in txt
+    assert "supports the Over's requirement" in txt and "receptions under 6.5 fits" in txt
+
+
+def test_if_out_tables_render_the_moves_or_say_why_not():
+    run = {**RUN, "if_out": [{"player": "Jonathan Mingo", "team": "DAL", "pos": "WR", "ran": True,
+                              "moves": [{"player": "CeeDee Lamb", "team": "DAL", "market": "player_receptions", "side": "Over",
+                                         "line": 6.5, "p_plays": 0.62, "p_out": 0.66, "move": 0.04}]},
+                             {"player": "X", "team": "TB", "pos": "WR", "ran": False, "moves": []}]}
+    t = "\n".join(PR.if_out_tables(run))
+    assert "| CeeDee Lamb (DAL) | Over 6.5 receptions | 62% | 66% | +4 |" in t and "re-pricing failed" in t
+    assert PR.if_out_tables(RUN) == []
+
+
+def test_the_unit_footnote_states_the_runs_own_filter():
+    t = "\n".join(PR.unit_table({**RUN, "unit_filter": "win probability 5-95%"}))
+    assert "win probability 5-95%" in t
+    assert "not recorded" in "\n".join(PR.unit_table(RUN))

@@ -4131,6 +4131,7 @@ def brief_section(**V) -> list[str]:
         ex.update({"header": list(_hdr), "kickoff_words": when, "weather_line": _wx_line,
                    "team_volume": {t_: chk.get(t_) for t_ in (AWAY, HOME)},
                    "units": RSCH.unit_export(V.get("UNIT_EFF") or {}, (AWAY, HOME)),
+                   "unit_filter": (V.get("UNIT_EFF") or {}).get("_filter"),
                    "points_allowed": RSCH.pa_export(V.get("PA"), V.get("PA_PARTS"), (AWAY, HOME)),
                    "sources_line": srcs, "who_plays": cells, "who_note": who_note, "report_state": rstate,
                    "gaps": [list(g_) for g_ in gaps], "qb_change": qb_change,

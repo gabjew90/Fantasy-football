@@ -18,7 +18,6 @@ import re
 import publish as PB
 
 ENGINE = PB.ENGINE
-WINDOW_FILTER = "win probability between 10% and 90% (garbage time excluded)"
 SCENARIO_ROWS = (("Favorite wins comfortably ({n}+ points)", "More potential late rushing; fewer necessary late passes"),
                  ("Final margin stays within one score", "More sustained passing and less pressure to abandon rushing"),
                  ("Underdog wins comfortably ({n}+ points)", "Reverses the expected workload pressure"))
@@ -172,8 +171,9 @@ def unit_table(run) -> list[str]:
             cells.append(f"{u['rank']} · {u['grade']} · {u['score']:.0f}" if u else "-")
         L.append(f"| {w} | {cells[0]} | {cells[1]} |")
     n = next((u.get("of") for t in U.values() for u in t.values()), 32)
+    filt = run.get("unit_filter") or "garbage-time filter not recorded in this run"
     return L + ["", f"*Rank 1 = strongest unit of {n}. Scores blend EPA and success rate; 50 is average. Weeks 1-"
-                    f"{run['week'] - 1}, {WINDOW_FILTER}. Each unit is graded separately.*"]
+                    f"{run['week'] - 1}; {filt}. Each unit is graded separately.*"]
 
 
 def allowed_tables(run) -> list[str]:
@@ -322,14 +322,20 @@ def closing_paragraph(card, p, lg) -> str:
     pb = row.get("p_over_book")
     favours = ("neither side" if pb is None or round(100 * float(pb)) == 50 else
                ("the Over" if float(pb) > 0.5 else "the Under"))
-    v = PB.verdict(card, mk)
+    vol_line = (next((x for x in card.get("volume") or [] if x.get("market") == mk), {}) or {}).get("line")
+    on_main = PB._close(vol_line, lg["line"], 1e-9)
+    v = PB.verdict(card, mk) if on_main else None
     vt = PB.volume_text(card, mk) or "-"
+    under = lg["side"].lower() == "under"
     s = [f"**The market favors {favours}** ({pct(pb)} for the Over). The engine expects {vt}, based on {p['role_evidence'].rstrip('.')}."]
     if v:
         lead = "With big gains trimmed" if v["ref"] == "capped" else "At his rate this season"
-        s.append(f"{lead}, {PB.MARKET_WORDS[mk]} {float(lg['line']):g} needs {v['vol_txt']}, which the engine reaches "
-                 f"{pct(v['pct'])} of the time: **{v['word']}**.")
-    s.append(f"This matchup {p['matchup']} that requirement because {p['matchup_reason'].rstrip('.')}.")
+        s.append(f"{lead}, the Over at {PB.MARKET_WORDS[mk]} {float(lg['line']):g} needs {v['vol_txt']}, which the engine "
+                 f"reaches {pct(v['pct'])} of the time: **{v['word']}**" + (" (for the Over; this leg is the Under)." if under else "."))
+    elif vol_line is not None:
+        s.append(f"(The card's gain-rate table is built at the {float(vol_line):g} line; this leg's "
+                 f"{float(lg['line']):g} has no workload table in the run.)")
+    s.append(f"This matchup {p['matchup']} the Over's requirement because {p['matchup_reason'].rstrip('.')}.")
     s.append(f"If you expect {lg['if'].rstrip('.')}, {lg['player']} {PB.MARKET_WORDS[mk]} {lg['side'].lower()} "
              f"{float(lg['line']):g} fits; it stops fitting if {lg['fails'].rstrip('.')}.")
     return " ".join(s)
@@ -390,7 +396,8 @@ def player_card(run, reads, p, checks, idx, qa: bool) -> list[str]:
             if v:
                 L.append(f"- {PB.MARKET_WORDS[r['market']]} verdict **{v['word']}**: needs {v['need']:g} {v['unit']} at the "
                          f"{v['ref']} rate against the engine's {v['proj']:.1f}"
-                         + (f" and {v['last']:g} last game" if v["last"] is not None else " (last game's count not in the run)") + ".")
+                         + (f" and {v['last']:g} in his last game played (week {(card.get('usage') or {}).get('week')})"
+                            if v["last"] is not None else " (last game's count not in the run)") + ".")
         if card.get("watch"):
             L.append("- The engine's flags: " + "; ".join(card["watch"]) + ".")
         if card.get("matchup"):

@@ -377,7 +377,7 @@ def check(run, reads) -> list[dict]:
         out.append({"leg": leg, "check": kind, "stated": stated, "run": value, "ok": bool(ok), "detail": detail})
 
     inj = {str(i.get("name", "")).lower(): i for i in run.get("injuries") or []}
-    game_ok = game_numbers(run)
+    game_ok, game_cites = game_numbers(run), []
     # ---- the game ----
     for c in reads.get("cite") or []:
         v = resolve(str(c.get("field")), run, {}, None, None)
@@ -385,7 +385,8 @@ def check(run, reads) -> list[dict]:
         add(0, "cite", f"{c.get('field')} = {c.get('value')}", _fmt(v), ok, "" if ok else "not the run's number")
         if ok:
             game_ok.append(float(v))
-    n_sent = len([s for s in re.split(r"(?<=[.!?])\s+", str(reads.get("opening") or "").strip()) if s])
+            game_cites.append(float(v))
+    n_sent = count_sentences(reads.get("opening"))
     add(0, "opening read", f"{n_sent} sentences", "three", n_sent == 3, "" if n_sent == 3 else "the guide asks for three")
     qb_out = {str(v).split(" starts for ")[-1].lower() for v in (run.get("qb_change") or {}).values()}
     named_inj = set()
@@ -413,14 +414,16 @@ def check(run, reads) -> list[dict]:
             for i in idx:
                 add(i, "on the board", p["player"], "-", False, "no card for this player in the run (check the name)")
             continue
-        p_allowed = list(game_ok)
+        p_cites = list(game_cites)                # the game CITES, not the brief's tables
         for c in p.get("cite") or []:
             f = str(c.get("field"))
             v = resolve(f, run, card, None, None)
             ok = matches(c.get("value"), v)
             add(idx[0], "cite", f"{f} = {c.get('value')}", _fmt(v), ok, "" if ok else "not the run's number")
             if ok:
-                p_allowed.append(float(v))
+                p_cites.append(float(v))
+        p_allowed = list(p_cites)
+        leg_allowed = {}
         cited_inj = set(named_inj) | {str(j.get("player", "")).lower() for j in p.get("injuries") or []}
         for j in p.get("injuries") or []:
             _injury_check(add, idx[0], j, inj)
@@ -428,6 +431,7 @@ def check(run, reads) -> list[dict]:
         for i in idx:
             lg = reads["legs"][i - 1]
             allowed, v = _check_leg(add, i, run, card, lg, inj)
+            leg_allowed[i] = allowed
             p_allowed += allowed
             if v:
                 verdicts.add(v["word"])
@@ -435,10 +439,19 @@ def check(run, reads) -> list[dict]:
         for i in idx:
             lg = reads["legs"][i - 1]
             for k in LEG_TEXT:
-                _text_checks(add, i, k, lg.get(k), p_allowed, inj, cited_inj, verdicts)
+                _text_checks(add, i, k, lg.get(k), leg_allowed.get(i, []) + p_cites, inj, cited_inj, verdicts)
         for k in PLAYER_TEXT:
             _text_checks(add, idx[0], k, p.get(k), p_allowed, inj, cited_inj, verdicts)
     return out
+
+
+ABBREV = re.compile(r"\b(Jr|Sr|St|Mr|Dr|vs|No)\.", re.I)
+
+
+def count_sentences(text) -> int:
+    """Sentences in a paragraph; 'Jr.', 'St.', 'vs.' and the like do not end one."""
+    t = ABBREV.sub(lambda m: m.group(1), str(text or "").strip())
+    return len([s for s in re.split(r"(?<=[.!?])\s+", t) if s])
 
 
 def _injury_check(add, i, j, inj):
