@@ -33,10 +33,10 @@ def state_dir() -> Path:
     """Where this league's committed state lives.
 
     One directory served every league until 2026-09-16, which was fine while
-    only Omnibeta ran. The store keys (`ran:plan:2026-W38`, `waivers:2`, the
-    consensus cache), the week plan and the gate hours are all per league,
-    so a second league would have consumed the first league's runs and
-    overwritten its plan. The default league keeps `state/` unchanged (no
+    only Omnibeta ran. The store keys (the consensus cache; the retired cron
+    stack's run markers, week plan and gate hours, DECISIONS #212), the
+    ledger and the Yahoo sync are all per league, so a second league would
+    have consumed the first league's runs and overwritten its plan. The default league keeps `state/` unchanged (no
     migration, the Actions history stays readable); every other league gets
     `state/<league>/`. Same convention as Config.scoped for tiers.csv.
     """

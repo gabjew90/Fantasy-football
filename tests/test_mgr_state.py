@@ -1,193 +1,21 @@
-"""FAAB from transaction history, diff-based alerting, delivery idempotency."""
+"""The committed-state store: kv survives a reopen.
 
-from manager.deliver import deliver
-from manager.faab import crosscheck, spent_from_transactions
+The FAAB, alert-dedup and delivery tests went with the cron stack they
+covered (DECISIONS #212); the kv store stays because the fantasy commands
+read the consensus cache and write the ledger through it.
+"""
+
 from manager.store import Store
-
-
-def _store(tmp_path):
-    return Store(tmp_path / "state")
-
-
-def test_faab_spent_from_transactions():
-    txns = [
-        [  # week 1
-            {"type": "waiver", "status": "complete",
-             "settings": {"waiver_bid": 40}, "adds": {"p1": 4}, "roster_ids": [4]},
-            {"type": "waiver", "status": "failed",
-             "settings": {"waiver_bid": 55}, "adds": {"p1": 7}, "roster_ids": [7]},
-            {"type": "free_agent", "status": "complete", "adds": {"p2": 4},
-             "roster_ids": [4]},
-        ],
-        [  # week 2
-            {"type": "waiver", "status": "complete",
-             "settings": {"waiver_bid": 12}, "adds": {"p3": 4}, "roster_ids": [4]},
-            {"type": "waiver", "status": "complete",
-             "settings": {"waiver_bid": 1}, "adds": {"p4": 9}, "roster_ids": [9]},
-        ],
-    ]
-    spent = spent_from_transactions(txns)
-    assert spent == {4: 52, 9: 1}  # failed claims and free agents cost nothing
-
-
-def test_faab_crosscheck_reports_mismatch():
-    rosters = [{"roster_id": 4, "settings": {"waiver_budget_used": 52}},
-               {"roster_id": 9, "settings": {"waiver_budget_used": 6}}]
-    notes = crosscheck({4: 52, 9: 1}, rosters)
-    assert len(notes) == 1 and "roster 9" in notes[0] and "using the field" in notes[0]
-
-
-def test_alert_fires_exactly_once(tmp_path):
-    s = _store(tmp_path)
-    assert s.first_time("inj:123:Out") is True
-    assert s.first_time("inj:123:Out") is False       # same fact -> silent
-    assert s.first_time("inj:123:Questionable") is True  # changed fact -> alert
 
 
 def test_store_state_survives_reopen(tmp_path):
     Store(tmp_path / "state").set("k", {"a": 1})
-    s2 = Store(tmp_path / "state")   # fresh instance = fresh Actions run
+    s2 = Store(tmp_path / "state")   # fresh instance = fresh process
     assert s2.get("k") == {"a": 1}
-    assert s2.first_time("x") and not Store(tmp_path / "state").first_time("x")
 
 
-def test_delivery_is_idempotent_without_smtp(tmp_path, monkeypatch):
-    for var in ("SMTP_USER", "SMTP_APP_PASSWORD", "ALERT_EMAIL_TO",
-                "GITHUB_TOKEN", "GITHUB_REPOSITORY"):
-        monkeypatch.delenv(var, raising=False)
-    s = _store(tmp_path)
-    assert deliver(s, "waivers:3", "subj", "body A") == "disabled"
-    assert deliver(s, "waivers:3", "subj", "body A") == "unchanged"  # no double-send
-    assert deliver(s, "waivers:3", "subj", "body B") == "disabled"   # changed -> again
-
-
-def test_subject_prefixes(tmp_path, capsys):
-    s = _store(tmp_path)
-    deliver(s, "a", "Warren OUT — start Harvey — locks in 74 min", "x",
-            dry_run=True, act_now=True)
-    deliver(s, "b", "Waivers wk 3", "y", dry_run=True)
-    out = capsys.readouterr().out
-    assert "[ACT NOW] Warren OUT — start Harvey — locks in 74 min" in out
-    assert "[BRIEF] Waivers wk 3" in out
-
-
-def test_dry_run_never_records(tmp_path):
-    s = _store(tmp_path)
-    assert deliver(s, "k", "T", "Body", dry_run=True) == "printed"
-    assert s.message("k") == (None, None)  # dry-run leaves no delivery state
-
-
-def test_github_issue_delivery_and_threading(tmp_path, monkeypatch):
-    """First send opens an issue with an @mention; the update comments on it."""
-    import manager.deliver as dl
-
-    calls = []
-
-    class FakeResp:
-        status_code = 201
-        def raise_for_status(self): pass
-        def json(self): return {"number": 7}
-
-    def fake_post(url, headers=None, timeout=None, json=None):
-        calls.append((url, json))
-        return FakeResp()
-
-    monkeypatch.setenv("GITHUB_TOKEN", "t")
-    monkeypatch.setenv("GITHUB_REPOSITORY", "gabjew90/Fantasy-football")
-    monkeypatch.setattr(dl.requests, "post", fake_post)
-    s = Store(tmp_path / "state")
-
-    assert dl.deliver(s, "lineup:1", "Lineup wk 1 — 2 change(s)", "body",
-                      act_now=True) == "sent"
-    url, payload = calls[0]
-    assert url.endswith("/repos/gabjew90/Fantasy-football/issues")
-    assert payload["title"] == "[ACT NOW] Lineup wk 1 — 2 change(s)"
-    assert payload["body"].startswith("@gabjew90")  # mention -> notification
-
-    assert dl.deliver(s, "lineup:1", "Lineup wk 1 — 2 change(s)", "body",
-                      act_now=True) == "unchanged"
-    assert dl.deliver(s, "lineup:1", "Lineup wk 1 — 1 change", "new body") == "updated"
-    url2, payload2 = calls[1]
-    assert url2.endswith("/issues/7/comments")  # same event -> same thread
-
-
-def test_trade_watch_alerts_once_per_status(tmp_path, monkeypatch):
-    from manager import trade_watch
-
-    txns = [{"type": "trade", "status": "pending", "transaction_id": "t1",
-             "adds": {"p1": 4, "p2": 9}, "roster_ids": [4, 9]}]
-    monkeypatch.setattr("draftkit.briefs.get_transactions", lambda c, l, w: txns)
-    monkeypatch.setattr(trade_watch, "values", lambda store: ({"p1": 5000, "p2": 2000}, None))
-    ctx = {"week": 1, "client": None,
-           "cfg": type("C", (), {"league_id": "x"})(),
-           "users_by_rid": {4: "bankerkyle", 9: "DihtrickCohones"},
-           "player_row": lambda pid: {"name": f"Player {pid}"}}
-    s = Store(tmp_path / "state")
-    alerts = trade_watch.scan(ctx, s)
-    assert len(alerts) == 1
-    subject, body, urgent = alerts[0]
-    assert urgent and "pending review" in subject
-    assert "LOPSIDED" in body          # 2000/5000 = 0.4 < 0.7
-    assert trade_watch.scan(ctx, s) == []   # same status -> silent
-    txns[0]["status"] = "complete"          # processed -> one more, non-urgent
-    alerts2 = trade_watch.scan(ctx, s)
-    assert len(alerts2) == 1 and not alerts2[0][2]
-
-
-def test_live_fa_replacement_levels():
-    from manager.waiver_brief import fa_replacement_levels, value_over_fa
-    pool = [
-        {"sleeper_id": "a", "pos": "RB", "ros": 120.0},
-        {"sleeper_id": "b", "pos": "RB", "ros": 60.0},
-        {"sleeper_id": "c", "pos": "WR", "ros": 110.0},
-        {"sleeper_id": "d", "pos": "WR", "ros": 105.0},
-    ]
-    lv = fa_replacement_levels(pool)
-    # the leader is carried BY ID: an exact tie at the top must not let two
-    # players both price themselves against second-best
-    assert lv["RB"] == (120.0, 60.0, "a") and lv["WR"] == (110.0, 105.0, "c")
-    # scarce RB: best RB is worth his gap to the next one (+60); deep WR: +5
-    assert value_over_fa(pool[0], lv) == 60.0
-    assert value_over_fa(pool[2], lv) == 5.0
-    # a non-best player is measured against the best still available
-    assert value_over_fa(pool[1], lv) == -60.0
-
-
-def test_overreaction_damper_discriminates():
-    from manager.usage import overreaction
-    usage = {"spike guy": {2: {"targets": 4, "target_share": 0.12, "rec_yards": 30},
-                           3: {"targets": 5, "target_share": 0.13, "rec_yards": 140}},
-             "role guy": {2: {"targets": 3, "target_share": 0.10, "rec_yards": 25},
-                          3: {"targets": 9, "target_share": 0.24, "rec_yards": 110}}}
-    snaps = {"spike guy": {2: 0.55, 3: 0.57}, "role guy": {2: 0.40, 3: 0.78}}
-    note = overreaction("Spike Guy", usage, snaps, 3)
-    assert note and "flat usage" in note      # 30->140 yds on the same role
-    assert overreaction("Role Guy", usage, snaps, 3) is None  # genuine role change
-    assert overreaction("Spike Guy", usage, snaps, 1) is None  # needs two weeks
-
-
-def test_ir_aware_stash_budget():
-    from manager.waiver_brief import bench_stash_count, stash_note
-    ctx = {
-        "my_rid": 2, "current_starters": ["s1"],
-        "my_roster": {"reserve": []},
-        "reserve_allow": ("Out", "Doubtful"),
-        "roster_players": {2: [
-            {"sleeper_id": "s1", "name": "Starter", "pos": "RB", "weekly": 15.0},
-            {"sleeper_id": "b1", "name": "Stash One", "pos": "RB", "weekly": 0.5},
-            {"sleeper_id": "b2", "name": "Hurt Guy", "pos": "WR", "weekly": 0.0,
-             "status": "Out"},
-        ]},
-    }
-    # Hurt Guy counts as a bench stash now (IR empty), so bench holds 2 -> but
-    # he is IR-eligible, so a new stash is OK via the IR exemption
-    assert bench_stash_count(ctx) == 2
-    note = stash_note(ctx, {"weekly": 0.0}, contingent=True)
-    assert note and "can move to IR" in note
-    # once he's ON IR: exempt from the count, and the budget is spent
-    ctx["my_roster"]["reserve"] = ["b2"]
-    assert bench_stash_count(ctx) == 1
-    note2 = stash_note(ctx, {"weekly": 0.0}, contingent=False)
-    assert note2 and "over budget" in note2
-    # a claim WITH a role is never a stash question
-    assert stash_note(ctx, {"weekly": 9.0}, contingent=False) is None
+def test_a_read_only_store_writes_nothing(tmp_path):
+    s = Store(tmp_path / "state", read_only=True)
+    s.set("k", 1)
+    assert s.get("k") is None and s.suppressed == ["kv"]
+    assert not (tmp_path / "state").exists()

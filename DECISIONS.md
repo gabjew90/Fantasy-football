@@ -8034,3 +8034,40 @@ The expert re-ran the four-season backtest (baseline reproduces ours: receptions
   anchored to implied points) and read the book's number as the probability. SKILL.md: chat copies
   the guide before the first card and says how the matchup tables were built; no number goes out
   without its source explained.
+
+## 2026-10-08 (212) -- the in-season auto-manager's cron stack is retired (the user's call)
+
+- **Why:** it had no schedule since 2026-09-25 (#109), ran only when dispatched by hand, and
+  duplicated the fantasy commands (`nfl fantasy lineup / waiver / trade / scenario`) for lineups,
+  waivers and trades. Two engines answering the same question is what the consolidation plan
+  forbids ("no parallel engines").
+- **Deleted:** `.github/workflows/weekly.yml` and `gate.yml`; `scripts/gate_guard.py`;
+  `scripts/VEGAS REFRESH.bat` (its snapshot in `state/vegas/` was read only by the cron's lineup
+  and scout); the `python -m manager gate / cron / --module / vegas-refresh` entrypoints; and the
+  manager modules only that path used: `jobs`, `gate`, `triggers`, `clock`, `deliver`, `phone`,
+  `injuries`, `scout`, `lineup_opt`, `vegas`, `games`, `waiver_brief`, `faab`, `usage`,
+  `age_decay`, `trade_radar`, `trade_watch`, `marginal`, `market`, `ecr` (grep-verified: nothing
+  in `fantasy/`, `core/`, `nfl.py`, `CHAT.md`, `skill/` or `props/` imports them; `marginal`,
+  `market` and `trade_radar` were otherwise reached only by `scripts/keefamania_trades.py`, which
+  goes in the same sweep). With them: `fantasypros.overall()` (only `ecr` read it), the Store's
+  alert-dedup / delivery / bid-history methods, the `inseason.age_decay` knob (read by nothing
+  now), and their tests (22 test files whole, the cron tests inside 7 more). `notify.yml` now
+  watches `props` only. The guardrail fetch allowlist shrank by `manager/usage.py` and
+  `manager/waiver_brief.py`.
+- **Kept, because the fantasy commands import them:** `yahoo_api`, `yahoo_sync`, `yahoo_context`,
+  `yahoo` (the Yahoo client, the local sync and the league source; `fantasy/league.py` reads the
+  synced copy through `read_cached` on a host without credentials, so `python -m manager
+  yahoo-sync` and `scripts/YAHOO SYNC.bat` stay), `context` (the league context and per-league
+  state dir), `consensus` and `fantasypros` (registered: provisional / live), `store` (the kv
+  consensus cache and the ledger directory), `ledger` and `provenance` (`fantasy lineup
+  --record` emits ledger rows). The ledger's grading functions stay as harness code although the
+  Tuesday job that called them is gone; the consensus registry note now says grading is by
+  hand. The kept modules now import `core.ids` and `core.scoring` directly instead of the
+  `draftkit.ids` / `seasondata.score_projection` shims (pure re-exports, so identical behaviour).
+- **State:** `state/week_plan.json`, `state/gate_hours.json`, `state/messages.json`,
+  `state/seen.json` (and their `state/keefamania/` copies) and `state/vegas/` were written only by
+  the cron; they are removed in a state-only commit on its own branch,
+  sweep/retire-manager-state (hygiene.yml fails a PR that mixes state with code). `kv.json`,
+  the ledgers and the Yahoo sync stay.
+- **Undo:** git history. The last commit with the cron stack is b2341d3; restoring the files
+  listed above from it (and re-enabling the workflows) brings it back as it ran.

@@ -71,8 +71,10 @@ def test_the_sweep_actually_covers_the_manager_package():
     """A guard on the guard: if PACKAGES or the skip list ever silences the
     package this was written for, the sweep passes while covering nothing."""
     names = _modules()
-    assert "manager.jobs" in names
-    assert sum(1 for n in names if n.startswith("manager.")) >= 15
+    # manager/ shrank to the Yahoo + consensus layer the fantasy commands
+    # import when its cron stack was retired (DECISIONS #212): 10 modules.
+    assert "manager.yahoo_api" in names
+    assert sum(1 for n in names if n.startswith("manager.")) >= 10
     assert sum(1 for n in names if n.startswith("draftkit.")) >= 15
 
 
