@@ -364,6 +364,10 @@ def game_numbers(run) -> list[float]:
     nums += list((pa.get("_league") or {}).values()) + [pa.get("_n")]
     lr = run.get("live_record") or {}
     nums += [lr.get("engine_log_loss"), lr.get("market_log_loss"), lr.get("lines"), lr.get("coin_flip")]
+    sm = run.get("scenarios_market") or {}
+    if sm.get("status") == "ok":
+        nums += [sm.get("favourite_by_cut"), sm.get("within_one_score"), sm.get("underdog_by_cut"), sm.get("cut"),
+                 sm.get("point")]
     return [float(n) for n in nums if isinstance(n, (int, float)) and not isinstance(n, bool)]
 
 

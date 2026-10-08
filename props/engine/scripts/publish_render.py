@@ -121,12 +121,17 @@ def market_table(run) -> list[str]:
 
 
 def scenario_table(run, detail=False) -> list[str]:
+    sm = run.get("scenarios_market") or {}
+    if sm.get("status") == "ok":
+        return market_scenario_table(run, sm, detail)
     mm = margin_model()
     n = mm.get("comfortable_margin", 9)
     shipped = mm.get("shipped")
     L = ["| Result scenario | Estimated likelihood | Opportunity implication |", "|---|---:|---|"]
     for label, impl in SCENARIO_ROWS:
         L.append(f"| {label.format(n=n)} | {'see note' if shipped else 'not estimated'} | {impl} |")
+    if sm.get("status"):
+        L += ["", f"*No market prices for these scenarios this run ({sm['status']}).*"]
     if shipped:
         note = "Likelihoods from the margin model (provisional)."
     else:
@@ -137,6 +142,29 @@ def scenario_table(run, detail=False) -> list[str]:
             note += (f" (margin_buckets_v0, fit {mm.get('fit_seasons')}, test {mm.get('test_seasons')}: the empirical "
                      f"model's log loss {ll.get('A_empirical', 0):.3f} beat the baseline's {ll.get('baseline', 0):.3f} but "
                      "missed calibration -- 2022-25 games finished closer than 2018-21; reports/margin_buckets_v0.md.)")
+    return L + ["", f"*{note}*"]
+
+
+def market_scenario_table(run, sm, detail=False) -> list[str]:
+    """The result scenarios as the market prices them (research.alt_spread_scenarios): the book's
+    alternate spreads at the comfortable-margin cut, margin removed."""
+    home, away = teams(run)
+    hs = (run.get("market_env") or {}).get("home_spread")
+    fav, dog = (home, away) if hs is not None and hs <= 0 else (away, home)
+    n, pt = sm["cut"], sm["point"]
+    rows = ((f"{fav} (favorite) wins by {n}+ points", sm["favourite_by_cut"], SCENARIO_ROWS[0][1]),
+            ("Final margin stays within one score", sm["within_one_score"], SCENARIO_ROWS[1][1]),
+            (f"{dog} (underdog) wins by {n}+ points", sm["underdog_by_cut"], SCENARIO_ROWS[2][1]))
+    L = ["| Result scenario | Estimated likelihood | Opportunity implication |", "|---|---:|---|"]
+    L += [f"| {a} | {pct(b)} | {c} |" for a, b, c in rows]
+    pr = sm.get("prices") or {}
+    note = (f"From DraftKings' spreads at {pt:g} points (via The Odds API), margin removed: the market's own estimate, "
+            f"not a model. {fav} -{pt:g} at {odds(pr.get('favourite', {}).get('minus'))} against {dog} +{pt:g} at "
+            f"{odds(pr.get('favourite', {}).get('plus_other'))}; {dog} -{pt:g} at {odds(pr.get('underdog', {}).get('minus'))} "
+            f"against {fav} +{pt:g} at {odds(pr.get('underdog', {}).get('plus_other'))}. Within one score includes a "
+            f"one-score win by either team.")
+    if detail:
+        note += f" As of {str(sm.get('as_of'))[:16].replace('T', ' ')} UTC; {sm.get('credits_left')} Odds API credits left."
     return L + ["", f"*{note}*"]
 
 
@@ -239,12 +267,16 @@ def if_out_tables(run) -> list[str]:
 
 # ---------------------------------------------------------------- the player cards
 def table_a(card) -> list[str]:
-    L = ["| Prop | Line · Over / Under prices | Market Over estimate | Engine Over estimate |", "|---|---|---:|---:|"]
+    L = ["| Prop | Line · Over / Under prices | Engine's middle (vs the line) | Market Over estimate | Engine Over estimate |",
+         "|---|---|---:|---:|---:|"]
     for r in PB.main_rows(card):
+        med = r.get("median")
+        mid = "-" if med is None else f"{float(med):.1f} ({float(med) - float(r['line']):+.1f})"
         L.append(f"| {PB.MARKET_WORDS.get(r['market'], r['market']).capitalize()} | {float(r['line']):g} · "
-                 f"{odds(r.get('price_over'))} / {odds(r.get('price_under'))} | {pct(r.get('p_over_book'))} | "
+                 f"{odds(r.get('price_over'))} / {odds(r.get('price_under'))} | {mid} | {pct(r.get('p_over_book'))} | "
                  f"{pct(r.get('p_over_model'))} |")
-    return L
+    return L + ["", "*Sleeper prices most lines near even and moves the line instead, so the market's view is mostly "
+                    "the line itself: the gap between it and the engine's middle is where the two disagree.*"]
 
 
 def table_b(card) -> list[str]:
@@ -320,14 +352,13 @@ def closing_paragraph(card, p, lg) -> str:
     mk = PB.market_key(lg["market"])
     row = PB.row_for(card, mk, float(lg["line"])) or {}
     pb = row.get("p_over_book")
-    favours = ("neither side" if pb is None or round(100 * float(pb)) == 50 else
-               ("the Over" if float(pb) > 0.5 else "the Under"))
+    med = row.get("median")
     vol_line = (next((x for x in card.get("volume") or [] if x.get("market") == mk), {}) or {}).get("line")
     on_main = PB._close(vol_line, lg["line"], 1e-9)
     v = PB.verdict(card, mk) if on_main else None
     vt = PB.volume_text(card, mk) or "-"
     under = lg["side"].lower() == "under"
-    s = [f"**The market favors {favours}** ({pct(pb)} for the Over). The engine expects {vt}, based on {p['role_evidence'].rstrip('.')}."]
+    s = [market_sentence(lg["line"], pb, med) + f" The engine expects {vt}, based on {p['role_evidence'].rstrip('.')}."]
     if v:
         lead = "With big gains trimmed" if v["ref"] == "capped" else "At his rate this season"
         s.append(f"{lead}, the Over at {PB.MARKET_WORDS[mk]} {float(lg['line']):g} needs {v['vol_txt']}, which the engine "
@@ -339,6 +370,57 @@ def closing_paragraph(card, p, lg) -> str:
     s.append(f"If you expect {lg['if'].rstrip('.')}, {lg['player']} {PB.MARKET_WORDS[mk]} {lg['side'].lower()} "
              f"{float(lg['line']):g} fits; it stops fitting if {lg['fails'].rstrip('.')}.")
     return " ".join(s)
+
+
+def market_sentence(line, pb, med) -> str:
+    """Where the market stands: near an even price, its view is the line itself, read against the
+    engine's middle; off even, which side the price favors."""
+    line = float(line)
+    gap = "" if med is None else f"; the engine's middle is {float(med):.1f} ({float(med) - line:+.1f})"
+    if pb is None:
+        return f"**The market's line is {line:g}**{gap}."
+    if abs(float(pb) - 0.5) < 0.03:
+        return f"**The market sets the line at {line:g}, priced near even** ({pct(pb)} for the Over){gap}."
+    return f"**The market favors the {'Over' if float(pb) > 0.5 else 'Under'}** at {line:g} ({pct(pb)} for the Over){gap}."
+
+
+def rushing_vs_combined(card) -> list[str]:
+    """Rushing alone against rushing + receiving (the user, 2026-10-08): whether the combined line is
+    set fairly against its parts, whether the receiving role is showing, and the engine's chances.
+    The engine draws rushing and receiving independently, so it holds no game-script trade-off."""
+    rows = {r["market"]: r for r in PB.main_rows(card)}
+    ru, rec, rr = rows.get("player_rush_yds"), rows.get("player_reception_yds"), rows.get("player_rush_reception_yds")
+    if not ru or not rr:
+        return []
+    have_parts = rec is not None and all(x.get("median") is not None for x in (ru, rec, rr))
+    L = ["| Check | Rushing yards | Rushing + receiving yards |", "|---|---:|---:|",
+         f"| Line | {float(ru['line']):g} | {float(rr['line']):g} |",
+         f"| Engine's middle (vs the line) | {_mid(ru)} | {_mid(rr)} |",
+         f"| Engine Over estimate | {pct(ru.get('p_over_model'))} | {pct(rr.get('p_over_model'))} |",
+         f"| Market Over estimate | {pct(ru.get('p_over_book'))} | {pct(rr.get('p_over_book'))} |"]
+    notes = []
+    if have_parts:
+        book_gap = float(rr["line"]) - float(ru["line"]) - float(rec["line"])
+        eng_gap = float(rr["median"]) - float(ru["median"]) - float(rec["median"])
+        L += [f"| Combined line minus rushing + receiving lines ({float(ru['line']):g} + {float(rec['line']):g}) | | "
+              f"{book_gap:+.1f} |",
+              f"| The same gap in the engine's middles (yards come in bursts, so a sum's middle runs higher) | | "
+              f"{eng_gap:+.1f} |"]
+        d = book_gap - eng_gap
+        notes.append(f"The combined line is set {abs(d):.1f} yards {'above' if d > 0 else 'below'} what its parts justify"
+                     if abs(d) >= 0.5 else "The combined line is set about where its parts justify")
+    u = card.get("usage") or {}
+    if u.get("tn") is not None:
+        notes.append(f"his receiving role: {u['tn']:g} targets last game against {float(u.get('tn_base') or 0):.1f} a game before")
+    L += ["", "*" + ("; ".join(notes) + ". " if notes else "") +
+          "Combined fits better when its line is set no higher than its parts justify, his receiving role is showing up, "
+          "and the script is uncertain (handoffs if his team leads, checkdowns if it trails). The engine draws rushing and "
+          "receiving independently, so that script hedge is a judgment the numbers do not hold.*"]
+    return L
+
+
+def _mid(r):
+    return "-" if r.get("median") is None else f"{float(r['median']):.1f} ({float(r['median']) - float(r['line']):+.1f})"
 
 
 def branches(lg, card=None) -> list[str]:
@@ -374,7 +456,7 @@ def player_card(run, reads, p, checks, idx, qa: bool) -> list[str]:
            if PB.volume_text(card, r["market"])]
     L += [f"> **Engine workload:** {'; '.join(vts) or '-'}.  ", f"> **Basis:** {p['basis']}", "",
           *table_a(card), "", *table_b(card), ""]
-    for extra in (receiving_comparison(card), production_paths(card)):
+    for extra in (receiving_comparison(card), rushing_vs_combined(card), production_paths(card)):
         if extra:
             L += [*extra, ""]
     legs = [reads["legs"][i - 1] for i in idx]
@@ -406,6 +488,27 @@ def player_card(run, reads, p, checks, idx, qa: bool) -> list[str]:
               "**For the reviewer (not machine-checked):** is each condition something the evidence makes possible, "
               "and does the case argue from this player's own rows?", ""]
     return L
+
+
+def data_card(run, card, qa: bool) -> list[str]:
+    """A priced player with no written read: his tables and computed verdicts, said plainly."""
+    L = [f"### {card['name']} · {card.get('slot')}, {card.get('team')}", ""]
+    vts = [f"{PB.MARKET_WORDS[r['market']]}: {PB.volume_text(card, r['market'])}" for r in PB.main_rows(card)
+           if PB.volume_text(card, r["market"])]
+    L += [f"> **Engine workload:** {'; '.join(vts) or '-'}.", "", *table_a(card), "", *table_b(card), ""]
+    for extra in (receiving_comparison(card), rushing_vs_combined(card), production_paths(card)):
+        if extra:
+            L += [*extra, ""]
+    L += ["*No written read for this player: the tables are the market's and the engine's, and the verdicts are "
+          "computed from them.*", ""]
+    if qa and card.get("watch"):
+        L += ["- The engine's flags: " + "; ".join(card["watch"]) + ".", ""]
+    return L
+
+
+def priced_cards(run) -> list[dict]:
+    """Every card with at least one priced line, in the run's order (away team first, by slot)."""
+    return [c for c in run.get("cards") or [] if PB.main_rows(c)]
 
 
 def reliability_note(run) -> list[str]:
@@ -472,13 +575,21 @@ def _document(run, reads, checks, release, qa: bool) -> str:
     by_player = {}
     for i, lg in enumerate(reads["legs"], 1):
         by_player.setdefault(lg["player"], []).append(i)
+    written = {p["player"].lower(): p for p in reads["players"]}
+    cards = priced_cards(run)
     for sec in PB.SECTIONS:
-        ps = [p for p in reads["players"] if PB.section_of(PB.card_for(run, p["player"]) or {}) == sec]
-        if not ps:
+        cs = [c for c in cards if PB.section_of(c) == sec]
+        if not cs:
             continue
         L += [f"## {sec}", ""]
-        for p in ps:
-            L += player_card(run, reads, p, checks, by_player.get(p["player"], []), qa=qa)
+        for c in cs:
+            p = written.get(c["name"].lower())
+            L += (player_card(run, reads, p, checks, by_player.get(p["player"], []), qa=qa) if p
+                  else data_card(run, c, qa))
+    if qa:
+        unread = [c["name"] for c in cards if c["name"].lower() not in written]
+        L += [f"**Coverage:** {len(cards) - len(unread)} of {len(cards)} priced players have a written read"
+              + (f"; data cards only: {', '.join(unread)}." if unread else "."), ""]
     L += reliability_note(run)
     if qa:
         L += ["## QA appendix", "", "### Where the baseline could miss (section 7, in full)", "",

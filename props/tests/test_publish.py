@@ -295,7 +295,7 @@ def test_qa_version_follows_the_guide_and_shows_every_check():
     assert "not estimated" in qa and "log loss 0.717 against 0.692" in qa
     assert "| Verdict | attainable | attainable |" in qa
     assert "Engine chance he makes the required catches | 63% | 63%‡" in qa
-    assert "**The market favors neither side** (50% for the Over)" in qa
+    assert "**The market sets the line at 6.5, priced near even** (50% for the Over); the engine's middle is 8.0 (+1.5)." in qa
     assert "- **If you expect 9 targets at 79%, then receptions over 6.5 fits**, because 9 x 0.787 = 7.1" in qa
     assert "- **If his share falls back, skip it" in qa
     assert f"{len(checks)} of {len(checks)} pass" in qa
@@ -443,3 +443,70 @@ def test_the_external_version_carries_no_internals():
         assert w not in ext, w
     assert "## Receiving" in ext and "## A note on reliability" in ext and "Data as of:" in ext
     assert "| Verdict | attainable | attainable |" in ext
+
+
+# ---- the full report (the user, 2026-10-08): market scenarios, the line vs the middle, combined, coverage ----
+ALT = [{"key": "draftkings", "markets": [
+    {"key": "spreads", "last_update": "t1", "outcomes": [{"name": "Dallas Cowboys", "point": -8.5, "price": -120},
+                                                         {"name": "Tampa Bay Buccaneers", "point": 8.5, "price": 100}]},
+    {"key": "alternate_spreads", "last_update": "t2", "outcomes": [
+        {"name": "Tampa Bay Buccaneers", "point": -8.5, "price": 970}, {"name": "Dallas Cowboys", "point": 8.5, "price": -4200},
+        {"name": "Dallas Cowboys", "point": -9.5, "price": -110}]}]}]
+
+
+def test_alt_spread_scenarios_read_the_main_line_and_the_alternates_together():
+    import research as RS
+    sm = RS.alt_spread_scenarios(ALT, "Dallas Cowboys", "Tampa Bay Buccaneers", -8.5, 9)
+    assert sm["status"] == "ok" and sm["favourite"] == "Dallas Cowboys"
+    assert sm["favourite_by_cut"] == pytest.approx(0.5217, abs=1e-3)
+    assert sm["underdog_by_cut"] == pytest.approx(0.0873, abs=1e-3)
+    assert sm["within_one_score"] == pytest.approx(1 - 0.5217 - 0.0873, abs=1e-3)
+    # without the main line (the alternates alone omit it) the pair is missing, and it says so
+    alts_only = [{"key": "draftkings", "markets": [ALT[0]["markets"][1]]}]
+    assert "no two-sided 8.5-point" in RS.alt_spread_scenarios(alts_only, "Dallas Cowboys", "Tampa Bay Buccaneers", -8.5)["status"]
+    assert "no alternate spreads" in RS.alt_spread_scenarios([], "Dallas Cowboys", "Tampa Bay Buccaneers", -8.5)["status"]
+
+
+def test_the_scenario_table_shows_the_markets_likelihoods_or_why_not():
+    import research as RS
+    run = {**RUN, "scenarios_market": {**RS.alt_spread_scenarios(ALT, "Dallas Cowboys", "Tampa Bay Buccaneers", -8.5, 9),
+                                       "as_of": "2026-10-08T22:52:27Z", "credits_left": "437"}}
+    t = "\n".join(PR.scenario_table(run))
+    assert "| DAL (favorite) wins by 9+ points | 52% |" in t and "| TB (underdog) wins by 9+ points | 9% |" in t
+    assert "| Final margin stays within one score | 39% |" in t and "not a model" in t
+    missing = "\n".join(PR.scenario_table({**RUN, "scenarios_market": {"status": "skipped: 40 credits left; needs 100+"}}))
+    assert "not estimated" in missing and "skipped: 40 credits left" in missing
+    # the narration may quote the market's scenario numbers
+    r = edit(lambda r: r.update(market_read=r["market_read"] + " The market gives Dallas a 52% chance of winning by 9+."))
+    assert not [c for c in fails(r, run) if c["leg"] == 0]
+
+
+def test_table_a_shows_the_line_against_the_engines_middle():
+    t = "\n".join(PR.table_a(LAMB))
+    assert "| Receptions | 6.5 · -127 / -130 | 8.0 (+1.5) | 50% | 63% |" in t and "moves the line instead" in t
+
+
+def test_rushing_vs_combined_reads_the_lines_against_their_parts():
+    card = {"name": "Javonte Williams", "usage": {"tn": 5.0, "tn_base": 4.0}, "book": "sleeper", "rows": [
+        {"market": "player_rush_yds", "line": 65.5, "book": "sleeper", "median": 59.3, "p_over_model": 0.43, "p_over_book": 0.50},
+        {"market": "player_reception_yds", "line": 14.5, "book": "sleeper", "median": 13.5, "p_over_model": 0.47, "p_over_book": 0.50},
+        {"market": "player_rush_reception_yds", "line": 86.5, "book": "sleeper", "median": 76.7, "p_over_model": 0.40,
+         "p_over_book": 0.51}], "volume": []}
+    t = "\n".join(PR.rushing_vs_combined(card))
+    assert "| Combined line minus rushing + receiving lines (65.5 + 14.5) | | +6.5 |" in t
+    assert "| +3.9 |" in t and "set 2.6 yards above what its parts justify" in t
+    assert "5 targets last game against 4.0 a game before" in t and "independently" in t
+    assert PR.rushing_vs_combined(LAMB) == []
+
+
+def test_every_priced_player_gets_a_card_and_the_qa_counts_coverage():
+    other = copy.deepcopy(LAMB)
+    other["name"], other["slot"] = "George Pickens", "WR2"
+    run = {**RUN, "cards": [LAMB, other]}
+    reads = good()
+    qa = PR.render_qa(run, reads, P.check(run, reads), {})
+    ext = PR.render_external(run, reads)
+    for doc in (qa, ext):
+        assert "### George Pickens · WR2, DAL" in doc and "No written read for this player" in doc
+        assert "### CeeDee Lamb · WR1, DAL" in doc
+    assert "**Coverage:** 1 of 2 priced players have a written read; data cards only: George Pickens." in qa

@@ -81,7 +81,10 @@ market_runs, carries_history}, team_volume {TEAM: our_att, our_runs, att_avg, ru
 target_rate, ...}, units {TEAM: {off_pass|off_run|def_pass|def_run: score, grade, rank, of}},
 points_allowed {TEAM: {RB|WR|TE: ppr, rank_most, catches, rec_yds, rush_yds, tds}, _league,
 _n, _games}, live_record {weeks, lines, engine_log_loss, market_log_loss, coin_flip, markets},
-if_out [{player, team, pos, ran, moves [{player, market, side, line, p_plays, p_out, move}]}]`.
+if_out [{player, team, pos, ran, moves [{player, market, side, line, p_plays, p_out, move}]}],
+scenarios_market {status, book, favourite, underdog, cut, point, favourite_by_cut, within_one_score,
+underdog_by_cut, prices, as_of, credits_left}` (DECISIONS #220: DraftKings' main and alternate spreads at
+the cut, margin removed; status names the reason when they are missing).
 
 **The reads file** (reads_version 2, the structure of the user's report guide), written by the
 analyst:

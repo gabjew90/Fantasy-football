@@ -8396,3 +8396,41 @@ every row while the predictions rows carry open / decision / close (line_archive
   reportlab it prints `PDF skipped` and still writes the other two. The PDF tests live in tests/
   (the root suite installs requirements.txt), because props/tests runs before every capture and
   must not depend on reportlab.
+## 2026-10-08 (220) -- the full report: market-priced scenarios, the line against the middle, rushing vs combined, every player
+
+- **The user's asks** (TNF review), each diagnosed first:
+  - **Missing scenario likelihoods.** The cause was the failed margin model (#218): its fit
+    window held 2021, the loosest season in the decade, so it under-called close games (a weak
+    modelling rule, not code).
+  - **The market's chance always ~50%.** On Sleeper, 84% of TNF's 31 lines priced 45-55%.
+    Sleeper moves the line, not the price, so the market's view is the line itself (a property of
+    the source).
+  - **Combined yards never discussed.** The guide asked for that comparison and only receptions
+    vs yards was built (a render gap).
+  - **Only three players.** My test sample covered three; the report showed only players with a
+    written read (a coverage gap).
+- **Scenarios from market prices** (the user's pick over a model v1):
+  `research.alt_spread_scenarios` reads DraftKings' alternate spreads together with its main line.
+  The main line is absent from the alternates: on TNF, DAL -8.5 sat only under `spreads`, and the
+  first pull found no pair. The favourite is DAL -8.5 against TB +8.5, the underdog TB -8.5
+  against DAL +8.5, margin removed; within one score is the rest.
+  - TNF: DAL by 9+ 52%, within one score 39%, TB by 9+ 9%. Consistent with the moneyline's 80%
+    Dallas win.
+  - Cost: `--scenario-prices`, two credits. `nfl.py props game` asks for it; the scheduled
+    captures never do, and it is skipped under COMPARE_QUOTA_MIN.
+  - Market data, not a model: nothing to register. margin_buckets_v0 stays failed; its status is
+    the fallback note.
+- **The line against the middle:** Table A gains the engine's middle and its gap to the line. The
+  closing paragraph says where the market sets the line and how it is priced, instead of "the
+  market favors neither side".
+- **Rushing vs combined** on every back's card:
+  - both lines, the engine's middles and chances;
+  - the combined line minus the sum of its parts' lines, against the same gap in the engine's
+    middles (yards come in bursts, so a sum's middle runs higher). TNF Williams: +6.5 vs +4.3.
+  - his receiving role, last game against before;
+  - the rule: combined fits when its line is no higher than its parts justify, his receiving role
+    is showing, and the script is uncertain. The engine draws rushing and receiving
+    independently, so the script hedge is judgment, not in the numbers.
+- **Every priced player:** a written read's full card, or a data card (tables and computed
+  verdicts, marked "no written read"). The QA version counts coverage; CHAT.md asks for reads on
+  every player the user is likely to consider.
