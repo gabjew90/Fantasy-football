@@ -120,8 +120,8 @@ def test_load_external_reports_espn_unavailable_and_continues(tmp_path, monkeypa
     def boom(*a, **k):
         raise E.EspnUnavailable("down")
 
-    import draftkit.ids
-    monkeypatch.setattr(draftkit.ids, "load_id_map", lambda p: pl.DataFrame())
+    import core.ids
+    monkeypatch.setattr(core.ids, "load_id_map", lambda p: pl.DataFrame())
     monkeypatch.setattr(X, "from_espn", boom)
     monkeypatch.setattr(X, "from_sleeper", lambda *a, **k: pl.DataFrame(
         {"sleeper_id": ["1"], "name": ["A"], "pos": ["RB"], "team": ["X"], "pts17": [100.0],

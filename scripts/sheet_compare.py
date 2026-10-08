@@ -36,8 +36,8 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from draftkit.config import Config  # noqa: E402
-from draftkit.ids import normalize_name  # noqa: E402
-from draftkit.seasondata import score_projection  # noqa: E402
+from core.ids import normalize_name  # noqa: E402
+from core.scoring import score as score_projection  # noqa: E402
 
 SHEET = ROOT / "data" / "external" / "DraftSheets_2026_Keefamania_10tm_halfPPR_1flex_v2.xlsx"
 SHEET_GAMES = 17.0

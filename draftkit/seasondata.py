@@ -143,7 +143,7 @@ def weekly_projections(scoring: dict, season: str, week: int,
     )
     if not has_real:
         return None
-    return {str(pid): round(score_projection(stats, scoring), 2)
+    return {str(pid): round(score(stats, scoring), 2)
             for pid, stats in raw.items() if isinstance(stats, dict)}
 
 

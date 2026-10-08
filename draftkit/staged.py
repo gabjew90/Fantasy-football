@@ -216,10 +216,6 @@ def _steps_2_to_5(rows: list[Row], report: dict, needs: dict, rnd: int,
     return [ranked[0]] + others + rest, note
 
 
-# kept for callers and tests that import the old name
-_steps_2_to_4 = _steps_2_to_5
-
-
 def staged_rank(cands: list[Row], report: dict | None, needs: dict, rnd: int,
                 urgency_of: dict[str, float], market_of: dict[str, str],
                 second_best_now: dict[str, float], eligible_after: Callable[[str], set[str]],

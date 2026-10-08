@@ -17,7 +17,7 @@ import polars as pl
 import pytest
 
 from draftkit import defense, seasondata
-from draftkit.ids import NameIndex
+from core.ids import NameIndex
 from manager import triggers
 from manager.games import week_games
 
