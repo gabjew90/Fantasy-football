@@ -390,8 +390,10 @@ def test_releases_that_share_a_pricing_model_are_one_section(record):
     assert "pricing models in the record" not in text
 
 
-def test_the_market_carries_shadow_is_graded_beside_the_board():
-    """DECISIONS #185: log loss first and Brier beside it, board vs shadow, game-clustered."""
+def test_a_shadow_is_graded_beside_the_board():
+    """DECISIONS #185: log loss first and Brier beside it, board vs shadow, game-clustered.
+    (Was the market-carries shadow's section; that shadow is gone since #204, the shared
+    grader now serves the reversal shadows.)"""
     import numpy as np
     import scorecard
     rng = np.random.default_rng(3)
@@ -400,15 +402,16 @@ def test_the_market_carries_shadow_is_graded_beside_the_board():
     actual = np.where(rng.uniform(size=n) < truth, 80.0, 40.0)
     df = pd.DataFrame({"market": "player_rush_yds", "event_id": rng.integers(0, 60, n).astype(str),
                        "player": [f"p{i}" for i in range(n)], "line": 60.5, "actual": actual,
-                       "p_over_board": np.full(n, 0.5), "p_over_mkt_carries": truth})
-    out = "\n".join(scorecard.shadow_rush_section(df))
+                       "p_over_board": np.full(n, 0.5), "p_over_hist_carries": truth})
+    section = lambda d: scorecard.shadow_section(d, "p_over_hist_carries", ("player_rush_yds",), "Rushing yards")
+    out = "\n".join(section(df))
     assert "positive = the shadow is better" in out, out
     ll = next(l for l in out.splitlines() if l.startswith("- Log loss"))
     br = next(l for l in out.splitlines() if l.startswith("- Brier score"))
     assert "difference +" in ll and "difference +" in br, "the informative shadow wins on both scores"
     assert out.index("- Log loss") < out.index("- Brier score"), "log loss is the primary score"
-    assert scorecard.shadow_rush_section(df.head(10))[-2].startswith("10 settled")
-    assert scorecard.shadow_rush_section(df.drop(columns=["p_over_mkt_carries"])) == []
+    assert section(df.head(10))[-2].startswith("10 settled")
+    assert section(df.drop(columns=["p_over_hist_carries"])) == []
 
 
 def test_reversal_shadows_are_graded_per_change():

@@ -340,12 +340,6 @@ def snap_rule_section(df: pd.DataFrame) -> list[str]:
     return out + ["", "A group needs about 50 calls before its numbers say anything.", ""]
 
 
-def shadow_rush_section(df: pd.DataFrame, reps: int = 2000, seed: int = 29) -> list[str]:
-    return shadow_section(df, "p_over_mkt_carries", ("player_rush_yds",),
-                          "Rushing yards: the board vs the market-carries shadow", reps, seed,
-                          "settled backs' rushing lines carry the shadow")
-
-
 # DECISIONS #204: the reversal-check shadows once rounds 34 and 39 ship -- the board (with the
 # change) against the price without it, at Sleeper's real lines; positive = the old setting better
 REVERSAL_SHADOWS = (("p_over_hist_carries", ("player_rush_yds",),
@@ -631,7 +625,6 @@ def main(argv: list[str] | None = None) -> int:
         csv_rows += rows
         out += render_clv(clv, engine_hash)
         out += snap_rule_section(group)
-        out += shadow_rush_section(group)
         out += reversal_sections(group)
         out += look_section(group)
         out += blend.blend_section(group)
