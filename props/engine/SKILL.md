@@ -565,7 +565,13 @@ need not be surfaced. Write the reply as a premium prop guide with this structur
    catch rate. The notes under the table name each rate's games (luck-capped: his last 10 games,
    e.g. 7 from 2025 and 3 from 2026, plays past his own 90th percentile capped; this season:
    games and longest play) and the volume's calibration note (carries run narrow; big catch totals
-   for top receivers and big completion totals run a little high). Copy the card's tables as
+   for top receivers and big completion totals run a little high). **Explain the data every time
+   (user, 2026-10-07: "a lot of data, as long as there's sufficiently detailed explanation on how
+   the data was produced and how to interpret the data").** Before the first card, copy the
+   report's "How to read the player cards" table (each row: how it is produced, how to read it)
+   and its "Using it" paragraph. Above the team matchup, say in a sentence or two how its tables
+   were built (each section prints its window and method under its table). Never present a
+   number without its source being explained somewhere in the answer. Copy the card's tables as
    printed -- every column and row, depth-chart order, never sorted by the gap. Then write the
    read around them, in plain words:
    - **The question** (bold, one line): what this player's prop turns on in THIS game ("Will

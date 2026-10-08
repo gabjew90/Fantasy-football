@@ -222,3 +222,15 @@ def test_the_qb_table_no_longer_repeats_the_capped_rate():
     q = {"team_passes": 33.0, "games": [(4, 27, 19)], "gauge": {"need": 17.3}, "gauge_rate": 10.4, "luck_games": 1}
     assert "long completions capped" not in "\n".join(RS.qb_table(q))
     assert "Prices are the books' quoted side prices." in RS.CARD_FOOTNOTE
+
+
+def test_the_card_guide_explains_every_row_the_table_prints():
+    guide = "\n".join(RS.card_guide())
+    rows = ["**Market's chance of the Over**", "Engine's chance", "Price: Over / Under",
+            "Engine's forecast: middle; 80% range", "The Over needs", "Engine's volume", *RS.ROW_WORDS.values(),
+            "The market's own volume line", "The book's other lines", "At the engine's volume, the line needs",
+            "His games this season that beat that"]
+    for r in rows:
+        assert f"| {r} |" in guide, r
+    assert "| Row | How it is produced | How to read it |" in guide
+    assert f"{RS.LUCK_PCT['catch']:g}th percentile" in guide

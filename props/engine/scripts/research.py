@@ -1499,12 +1499,98 @@ def bias_gap_rows(markets, implied_by_team) -> list[tuple[str, str, str]]:
     return out
 
 
-CARD_LEGEND = ("**Reading the cards:** one column per prop. The market's chance is the book's price with its margin "
-               "removed -- read it as the probability. The engine supplies the volume (catches, carries, completions; "
-               "targets for receptions); you judge the efficiency: each \"At ... rate\" row is the volume the line "
-               "needs at that efficiency and the engine's chance of reaching it. \"Engine's forecast\" is the middle "
-               "simulated outcome and the range holding the middle 80%. On a whole-number line a push is possible: "
-               "the engine's chance counts a push as not winning and shows the push beside it.")
+def card_guide() -> list[str]:
+    """How every number on a player card is produced and how to read it (user, 2026-10-07: "a lot of
+    data, as long as there's sufficiently detailed explanation on how the data was produced and how
+    to interpret the data"). Printed once, before the cards."""
+    p = f"{LUCK_PCT['catch']:g}th"
+    rows = [
+        ("**Market's chance of the Over**",
+         "The book's Over and Under prices turned into chances, then scaled so the two add to 100% (the "
+         "book's built-in cut removed).",
+         "Read this as the probability. At Sleeper's real lines it has beaten the engine so far (weeks 2-4, "
+         "the live record below)."),
+        ("Engine's chance",
+         "The share of 20,000 simulated games in which he clears the line. On a whole-number line, a "
+         "push is shown beside it and counts as not clearing.",
+         "The engine's view from his role and the team's volume. A big gap to the market usually means the "
+         "market knows something (practice, news), not a mispriced line."),
+        ("Price: Over / Under",
+         "The book's quoted prices for each side.",
+         "For a Sleeper Power Play the entry pays a flat multiple, so a single leg's price is not its "
+         "break-even."),
+        ("Engine's forecast: middle; 80% range",
+         "The middle simulated outcome, and the range that holds the middle 80% of the 20,000 games.",
+         "How wide his game can go. One game in ten lands below the range, one above."),
+        ("The Over needs",
+         "The smallest whole number that beats the line (69 yards on 68.5).",
+         "The target every row below works toward."),
+        ("Engine's volume",
+         "His average simulated workload. Team plays: this season blended with last, moved part of the way "
+         "toward what the spread and total imply (throws 25%, backs' carries 50%). His share: last season "
+         "blended with this one, this season counting more each week; an injured teammate's share is "
+         "handed to the others. Catches: his targets at his catch rate, with the luck of which ones he "
+         "catches. Completions: his receivers' catches, at his share of the team's passing.",
+         "The engine's job. Targets are calibrated in the backtest; carries run too narrow (big carry "
+         "totals come more often than it says); see the note under each table."),
+        ("At his luck-capped rate",
+         f"His yards a catch, a carry or a completion over his last 10 games (crossing into last season "
+         f"while this one is short), with every play past his own {p} percentile counted at that value; "
+         f"under 10 plays, his longest is left out instead. No rate (a dash) under 8 catches, 10 carries "
+         f"or 20 completions in the window. The volume needed is the Over divided by that rate, rounded "
+         f"up; the chance is the share of simulated games in which the engine's volume reaches it.",
+         "The luckless Over test: if this row clears, the Over does not need a long play. The note under "
+         "the table names the games it covers (e.g. 7 from 2025, 3 from 2026)."),
+        ("At his rate this season",
+         "The same, with this season's games for this team, nothing capped. The note gives the games and "
+         "his longest play.",
+         "Few games, so noisy: three games of yards a carry predicted later games worse than the league "
+         "average did (2022-25). Lean on it most when his role changed (new team, new quarterback)."),
+        ("At the engine's rate",
+         "The engine's own yards a unit: its simulated yards divided by its simulated volume (his rates "
+         "blended with his history and his role's).",
+         "What the engine's chance assumes about his efficiency."),
+        ("Receptions column",
+         "Volume is targets and the efficiency is his catch rate: the targets needed at that rate, and the "
+         "engine's chance of that many.",
+         "A pure volume read: catch rate moves little week to week."),
+        ("The market's own volume line",
+         "The book's carries or completions line, and the engine's chance of more than it.",
+         "Where the book puts his volume. The side it favours: the next row for a back, the workload "
+         "table under the card for a quarterback."),
+        ("The book's other lines",
+         "The book's catches line beside the yards line (the yards a catch the two ask together), the "
+         "carries line and the side its prices favour, and the longest-play lines.",
+         "How the book sees him getting his yards: through volume, or through one long play."),
+        ("At the engine's volume, the line needs",
+         "The Over divided by the engine's volume: the efficiency the line asks for if the engine's volume "
+         "is right.",
+         "The efficiency question in one number. Compare it with the rows above."),
+        ("His games this season that beat that",
+         "His games this season for this team, with at least one of that volume, in which his yards a unit "
+         "reached that number.",
+         "How often he has actually done what the line asks."),
+    ]
+    L = ["## How to read the player cards", "",
+         "Each card is one table, with a column per prop at the book's line. The engine supplies the volume "
+         "(targets, catches, carries, completions); you judge the efficiency (yards a catch, a carry, a "
+         "completion; a catch rate for receptions). Each efficiency row answers: if he plays at this rate, "
+         "how much volume does the line need, and how often does the engine give him that much?", "",
+         "| Row | How it is produced | How to read it |", "|---|---|---|"]
+    L += [f"| {a} | {b} | {c} |" for a, b, c in rows]
+    L += ["", "**Under each table:** role evidence (his share and snaps in earlier games against last game, the "
+              "quarterback who threw most; a QB's own workload), last season's baseline, notes naming the "
+              "games behind each rate with the calibration of the engine's volume, the market-carries shadow "
+              "for backs (graded for the week-8 check, not the price), the matchup (context, not an input) "
+              "and Watch flags (injuries, new teams, role changes).",
+          "",
+          "**Using it:** pick the efficiency row you believe and say why. If that row clears with plenty of "
+          "room, the prop is a volume question, and the role evidence says whether the volume holds. If only "
+          "the engine's rate clears, the prop needs an efficiency he has not shown lately. Either way, the "
+          "market's chance is the probability; the table tells you what has to happen for the Over to land."]
+    return L
+
+
 CARD_FOOTNOTE = ("*Prices are the books' quoted side prices. For a pick'em entry such as Sleeper, the entry's "
                  "payout and settlement rules decide its required win rate; a converted leg price is not a "
                  "standalone bet.*")

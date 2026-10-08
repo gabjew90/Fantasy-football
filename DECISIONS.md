@@ -8021,3 +8021,16 @@ The expert re-ran the four-season backtest (baseline reproduces ours: receptions
   and the line-fit sentence (the table carries both). The line-fit reads stay in the research
   CSV. workload_table, capped_line and calibration_line are deleted (replaced, not kept beside).
 - **No price moves:** every research and record output is identical on the fixture.
+
+## 2026-10-07 (209) -- every report explains how its card numbers are made and how to read them
+
+- **The user, on the one-table card:** "It's a lot of data, as long as there's sufficiently
+  detailed explanation on how the data was produced and how to interpret the data." The data
+  stays; the explanation is what was thin (a one-paragraph legend, and a plain-English section at
+  the end of the report that still described the gap as the point of the report).
+- **Now:** "How to read the player cards" prints once before the cards: a row-by-row table (how it
+  is produced, how to read it) and a short "Using it" paragraph. The plain-English steps describe
+  the market inputs (throws a quarter and backs' carries half toward the spread and total; TDs
+  anchored to implied points) and read the book's number as the probability. SKILL.md: chat copies
+  the guide before the first card and says how the matchup tables were built; no number goes out
+  without its source explained.

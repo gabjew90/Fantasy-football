@@ -2874,7 +2874,7 @@ def main():
                 "qb": qb, "shadow": shadow,
                 "matchup": RSCH.matchup_sentence(PA, HOME if t == AWAY else AWAY, m.pos), "watch": watch}
 
-    L.append(RSCH.CARD_LEGEND + "\n")
+    L.append("\n".join(RSCH.card_guide()) + "\n")
     # the live record and the backtest calibration, once (they were the same on every card)
     _cal = RSCH.calibration_block(set(RESEARCH.market) if len(RESEARCH) else set(),
                                   {t_: env[t_]["implied_points"] for t_ in (AWAY, HOME)
@@ -3259,14 +3259,18 @@ def main():
     L.append(f"**Step 2, this season.** We layer in what has actually happened so far ({n_weeks} week{'s' if n_weeks!=1 else ''}). "
              "One game counts for a little; by mid-season it counts for most of it. A player who changed teams gets his old "
              "numbers discounted, because his old role is weak evidence for his new one.\n")
-    L.append("**Step 3, the game.** We estimate how many times each team will throw and run, and how many touchdowns it should "
-             "score, from its own recent games. Players who are out are removed and their share of the ball is handed to teammates.\n")
+    L.append("**Step 3, the game.** We estimate how many times each team will throw and run from its own games this "
+             "season and last, then move that part of the way toward what the spread and total imply (throws a quarter "
+             "of the way, backs' carries half). Touchdowns are anchored to the market's implied points. Players who are "
+             "out are removed and their share of the ball is handed to teammates.\n")
     L.append("**Step 4, the simulation.** We play the game out 20,000 times on a computer with realistic randomness: some games "
              "a player gets 4 catches, some 9, some he breaks a long one. From those 20,000 outcomes we read off how often he "
              "clears each line the book has posted.\n")
     L.append("**Step 5, the comparison.** We turn the book's odds into a probability, strip out its built-in cut, and put our "
-             "number next to it. The gap is what the report is about. A big gap does not mean a good bet; it usually means "
-             "one side knows something the other doesn't, and the book is the one watching practice.\n")
+             "number next to it. At real lines the book's number has been the better probability so far, so read it as "
+             "the chance and use ours for the workload: how much volume each line needs at each efficiency, and how "
+             "often the simulation gives him that much. A big gap usually means one side knows something the other "
+             "doesn't, and the book is the one watching practice.\n")
 
     L.append("## What we pulled, and whether it worked\n")
     L.append("| Source | Used for | Status | Detail |")
