@@ -234,3 +234,31 @@ def test_the_card_guide_explains_every_row_the_table_prints():
         assert f"| {r} |" in guide, r
     assert "| Row | How it is produced | How to read it |" in guide
     assert f"{RS.LUCK_PCT['catch']:g}th percentile" in guide
+
+
+def test_the_market_implied_volume_is_the_search_aimed_at_the_markets_chance():
+    # a share_over rising linearly in k: P = 0.5 at k = 1, +0.1 per 0.2 of k; work = 8 targets x k
+    share_over = lambda k: 0.5 + 0.5 * (k - 1.0)
+    work = lambda k: 8.0 * k
+    RS._market_cache(share_over, 0.55, work)
+    assert abs(RS.LAST_EDGES["market_volume"] - 8.8) < 0.05      # P = 0.55 at k = 1.1
+    # the anchor: the main run says 0.52 where the search says 0.50 at k = 1, so a market 0.55
+    # is 3 points above the engine and the volume follows that gap (k = 1.06), not the raw 0.55
+    RS._market_cache(share_over, 0.55, work, engine_p=0.52)
+    assert abs(RS.LAST_EDGES["market_volume"] - 8.48) < 0.05
+    # outside the search range: an edge, not a number
+    RS._market_cache(lambda k: 0.2, 0.9, work)
+    assert RS.LAST_EDGES["market_volume"] is None and RS.LAST_EDGES["market_edge"] == "max"
+    RS._market_cache(share_over, None, work)
+    assert RS.LAST_EDGES["market_volume"] is None and RS.LAST_EDGES["market_edge"] is None
+
+
+def test_the_card_shows_the_market_implied_volume():
+    d = {"name": "X", "team": "TB", "slot": "WR1", "pos": "WR",
+         "rows": [_row("player_receptions", 4.5, unit="targets", market_volume=8.1),
+                  _row("player_reception_yds", 68.5, unit="targets", market_volume=8.6, market_catches=5.6),
+                  _row("player_rush_yds", 52.5, unit="carries", market_volume=None, market_edge="max")]}
+    text = "\n".join(RS.player_card(d))
+    assert ("| Market-implied volume (at the engine's efficiency) | 8.1 targets | 8.6 targets -> 5.6 catches | "
+            "more carries than the search covers |") in text
+    assert "| Market-implied volume (at the engine's efficiency) |" in "\n".join(RS.card_guide())

@@ -149,20 +149,45 @@ def _edge_cache(share_over, prices, k_o, k_u, work):
     LAST_EDGES.update(over_limit=lim(LAST_EDGES["over_edge"]), under_limit=lim(LAST_EDGES["under_edge"]))
 
 
+def _market_cache(share_over, market_p, work, engine_p=None):
+    """The MARKET-IMPLIED VOLUME (user, 2026-10-07): the workload at which the engine's own
+    distribution gives the Over the market's no-vig chance -- his share moved, his efficiency
+    held at the engine's. Recorded beside the edges (LAST_EDGES): market_volume, or None with
+    market_edge 'min' / 'max' when the market's chance sits outside the search range.
+    engine_p: the main simulation's Over share (of the outcomes that do not push). The search
+    runs on fewer draws, so its chance at the engine's own volume (k = 1) can differ from the
+    main run's by a point; the target is moved by that difference so the market-implied volume
+    sits above the engine's exactly when the market's chance does."""
+    LAST_EDGES.update(market_volume=None, market_edge=None)
+    if market_p is None or not (market_p == market_p) or not 0 < float(market_p) < 1:
+        return
+    target = float(market_p)
+    if engine_p is not None and engine_p == engine_p:
+        target = min(max(target + share_over(1.0) - float(engine_p), 0.001), 0.999)
+    market_p = target
+    k = _bisect(share_over, target)
+    if k is not None:
+        LAST_EDGES["market_volume"] = work(k)
+    else:
+        LAST_EDGES["market_edge"] = "max" if share_over(K_HI) < float(market_p) else "min"
+
+
 def edges_for() -> dict:
     """The edges of the last implied_* call made with prices (see _edge_cache)."""
     return dict(LAST_EDGES)
 
 
 def implied_targets(line, stat, team_targets_mean, targets_r, share, catch_rate, ypt,
-                    per_catch_shape, width=None, prices=None, role=None):
+                    per_catch_shape, width=None, prices=None, role=None, market_p=None, engine_p=None):
     """Targets per game at which the line is a coin flip for a receiver (P(stat >
     line) = 0.5 on a half line; Overs and Unders equally likely on a whole line), holding
     his catch rate and yards per target. stat: 'receptions' or 'rec_yards'.
     Returns (implied targets, projected targets) or (None, projected). With
     prices=(over, under) it also returns the targets at which the Over and the
     Under break even at those prices: (implied, projected, over_needs,
-    under_needs) -- the Over pays above over_needs, the Under below under_needs."""
+    under_needs) -- the Over pays above over_needs, the Under below under_needs. With
+    market_p (the market's no-vig Over chance) the search also records the market-implied
+    targets (_market_cache, read through edges_for)."""
     proj = team_targets_mean * share
     if share <= 0 or line is None:
         return (None, proj) if prices is None else (None, proj, None, None)
@@ -189,11 +214,13 @@ def implied_targets(line, stat, team_targets_mean, targets_r, share, catch_rate,
         return work(k), proj
     k_o, k_u = _break_even_ks(share_over, prices)
     _edge_cache(share_over, prices, k_o, k_u, work)
+    _market_cache(share_over, market_p, work, engine_p)
     return work(k), proj, work(k_o), work(k_u)
 
 
 def implied_carries(line, j, team_carries_mean, carries_r, rush_shares, ypc, resid,
-                    width=None, player_resid=None, player_kneel=None, qb_index=None, prices=None):
+                    width=None, player_resid=None, player_kneel=None, qb_index=None, prices=None,
+                    market_p=None, engine_p=None):
     """Carries per game at which the line is a coin flip for player j (as above),
     scaling only his share inside the FULL team call (the share rescale
     depends on every teammate). Returns (implied mean carries, projected mean
@@ -224,6 +251,7 @@ def implied_carries(line, j, team_carries_mean, carries_r, rush_shares, ypc, res
         return work(k), proj
     k_o, k_u = _break_even_ks(share_over, prices)
     _edge_cache(share_over, prices, k_o, k_u, work)
+    _market_cache(share_over, market_p, work, engine_p)
     return work(k), proj, work(k_o), work(k_u)
 
 
@@ -1508,6 +1536,14 @@ def card_guide() -> list[str]:
          "catches. Completions: his receivers' catches, at his share of the team's passing.",
          "The engine's job. Targets are calibrated in the backtest; carries run too narrow (big carry "
          "totals come more often than it says); see the note under each table."),
+        ("Market-implied volume (at the engine's efficiency)",
+         "The same search that finds the break-even workload, aimed at the market's no-vig chance: his "
+         "share is moved, holding his catch rate and yards a target (or a carry) at the engine's, until "
+         "the engine's chance of the Over equals the market's. Receivers: targets (and catches at his "
+         "catch rate); backs' rushing: carries. Not computed for passing or rushing + receiving.",
+         "The volume the price implies if his efficiency is what the engine expects. Above the engine's "
+         "volume, the market expects more work than the engine (or better efficiency: the two are not "
+         "separable from one price); below it, less."),
         ("At his luck-capped rate",
          f"His yards a catch, a carry or a completion over his last 10 games (crossing into last season "
          f"while this one is short), with every play past his own {p} percentile counted at that value; "
@@ -1814,6 +1850,22 @@ NEED_WORDS = {"player_receptions": "catches", "player_reception_yds": "yards", "
               "player_rush_reception_yds": "yards", "player_pass_yds": "yards"}
 
 
+def market_volume_cell(r) -> str | None:
+    """The workload the market's no-vig price implies, from the same search as the break-even
+    workload (research._market_cache): his targets (and catches, at the engine's catch rate) or
+    carries. None where no search ran (passing, rushing + receiving, a missing price)."""
+    mv, unit = r.get("market_volume"), r.get("unit")
+    if mv is None or not _ok(mv):
+        edge = r.get("market_edge")
+        if edge in ("min", "max") and unit:
+            return f"{'more' if edge == 'max' else 'fewer'} {unit} than the search covers"
+        return None
+    txt = f"{float(mv):.1f} {unit}"
+    if r.get("market") == "player_reception_yds" and _ok(r.get("market_catches")):
+        txt += f" -> {float(r['market_catches']):.1f} catches"
+    return txt
+
+
 def prop_table(rows, volume) -> tuple[list[str], list[str]]:
     """The card's one table (user, 2026-10-07): a column per priced market at the first book's
     line, the market's chance first, then the engine, what the Over needs, the engine's volume
@@ -1844,6 +1896,7 @@ def prop_table(rows, volume) -> tuple[list[str], list[str]]:
     add("The Over needs", cell(lambda r, c, v: f"{c['need_out'] if c else int(float(r['line'])) + 1} "
                                                f"{NEED_WORDS.get(r['market'], '')}".strip()))
     add("Engine's volume", cell(lambda r, c, v: v.get("volume_text")))
+    add("Market-implied volume (at the engine's efficiency)", cell(lambda r, c, v: market_volume_cell(r)))
     for key, word in ROW_WORDS.items():
         add(word, cell(lambda r, c, v: (f"{c['rows'][key]['vol']} {c['unit']} at {c['rows'][key]['rate_txt']} "
                                         f"-> **{_pc(c['rows'][key]['pct'])}**") if c and key in c["rows"] else None))

@@ -555,7 +555,10 @@ these are model opinions not tested against sportsbook lines.
    Matchup and Watch. The live record and the backtest calibration print ONCE above the cards,
    not per player. The prop table, top to bottom: **the market's chance of the Over** (the price
    with its margin removed -- the probability), the engine's chance, the price, the engine's
-   forecast (middle and 80% range), what the Over needs, the engine's volume, then **the volume
+   forecast (middle and 80% range), what the Over needs, the engine's volume, the **market-implied
+   volume** (the workload the market's no-vig price implies at the engine's efficiency: above the
+   engine's volume, the market expects more work -- or better efficiency, which one price cannot
+   separate; below it, less), then **the volume
    chance** -- one row per efficiency (his luck-capped rate, his rate this season, the engine's),
    each "N [catches / carries / completions / targets] at [rate] -> [engine's chance of that
    volume]"; the market's own carries or completions line where posted; the efficiency the line

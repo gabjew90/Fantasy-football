@@ -2120,7 +2120,13 @@ def main():
         si = sim_inputs[m_.team]
         # the posted prices: the break-even workload is read at the price this book shows
         px_ = (r_.get("price_over"), r_.get("price_under"))
-        ck = (r_.player, r_.market, float(r_.line), str(px_))
+        # the market's no-vig Over chance, for the market-implied volume (DECISIONS #214)
+        mp_ = float(r_.p_novig if r_.side == "Over" else 1 - r_.p_novig) if pd.notna(r_.p_novig) else None
+        # the main simulation's Over share of the non-push outcomes, the search's anchor
+        _push = 0.0 if pd.isna(r_.p_push) else float(r_.p_push)
+        _po = float(r_.p_model if r_.side == "Over" else 1 - r_.p_model - _push)
+        ep_ = _po / (1 - _push) if _push < 1 else None
+        ck = (r_.player, r_.market, float(r_.line), str(px_), None if mp_ is None else round(mp_, 4))
         if ck not in _implied_cache and SCENARIO:
             _implied_cache[ck] = (None, None, None, None, None)     # scenario run: nobody reads its research
         if ck not in _implied_cache:
@@ -2128,7 +2134,7 @@ def main():
                 _implied_cache[ck] = RSCH.implied_targets(
                     float(r_.line), "receptions" if r_.market == "player_receptions" else "rec_yards",
                     env[m_.team]["targets"], TVD["targets_r"], float(m_.ts), float(m_.cr), float(m_.ypt),
-                    SH, width=WIDTH, prices=px_, role=MODEL.role_group(m_.slot))
+                    SH, width=WIDTH, prices=px_, role=MODEL.role_group(m_.slot), market_p=mp_, engine_p=ep_)
                 _implied_cache[ck] += ("targets",)
                 _edges_cache[ck] = RSCH.edges_for()
             elif r_.market == "player_rush_yds":
@@ -2136,7 +2142,7 @@ def main():
                 _implied_cache[ck] = RSCH.implied_carries(
                     float(r_.line), j_, env[m_.team]["carries"], TVD["carries_r"], si["rs"], si["ypc"], resid,
                     width=WIDTH, player_resid=si["p_resid"], player_kneel=si["p_kneel"], qb_index=si["qb_i"],
-                    prices=px_)
+                    prices=px_, market_p=mp_, engine_p=ep_)
                 _implied_cache[ck] += ("carries",)
                 _edges_cache[ck] = RSCH.edges_for()
             else:
@@ -2171,6 +2177,9 @@ def main():
             implied=imp, projected=proj, unit=unit, over_needs=over_needs, under_needs=under_needs,
             be_over=RSCH.breakeven(px_[0]), be_under=RSCH.breakeven(px_[1]),
             **_edges_cache.get(ck, {}),
+            market_catches=(float(_edges_cache[ck]["market_volume"]) * float(m_.cr)
+                            if unit == "targets" and (_edges_cache.get(ck) or {}).get("market_volume") is not None
+                            else None),
             usage_week=(u_ or {}).get("week"), preview=PREVIEW.get(m_.team),
             snap=(u_ or {}).get("snap"), snap_base=(u_ or {}).get("snap_base"),
             ts=(u_ or {}).get("ts"), ts_base=(u_ or {}).get("ts_base"),

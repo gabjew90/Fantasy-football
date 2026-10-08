@@ -8228,3 +8228,21 @@ every row while the predictions rows carry open / decision / close (line_archive
   briefs, last written 2026-09-11). exports/ (files made for the user) and scratch_* are ignored.
 - reports/survival_fit_study_2026-09-05.md / .json are now tracked: draftkit/tracker.py cites them.
 - Nothing reads any untracked file as an input (grep of draftkit/, scripts/, props/, tests/).
+
+## 2026-10-08 (214) -- the market-implied volume on every card
+
+- **The user (2026-10-07), on finding the market's expectation from its price:** yes to a row that
+  shows it. Not by Poisson (it assumes the spread equals the mean; targets are overdispersed and
+  yards are not counts): the engine's own break-even search is aimed at the market's no-vig Over
+  chance instead -- his share moved, his catch rate and yards a target (or a carry) held at the
+  engine's -- and the workload where the engine's chance equals the market's is the
+  market-implied volume. Receivers: targets (and catches at his catch rate); backs' rushing:
+  carries. Not computed for passing or rushing + receiving (no share search there).
+- **Anchored to the main run:** the search uses fewer draws, so at the engine's own volume its
+  chance can differ from the main run's by about a point; the target moves by that difference,
+  so the row sits above the engine's volume exactly when the market's chance does (25 of 25 rows
+  on the DAL@HOU fixture; before the anchor, 24 of 25).
+- **Read it as:** the volume the price implies IF his efficiency is the engine's. One price
+  cannot separate more volume from better efficiency; the card guide says so.
+- **No price moves:** the research CSV gains market_volume, market_edge and market_catches; every
+  other output is identical on the fixture.

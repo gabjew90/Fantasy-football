@@ -63,6 +63,7 @@ def test_cards_are_one_table_with_the_volume_chance_for_every_market_kind(run):
     for head in ("| | Receptions ", " Receiving yards ", " Rushing yards ", "| | Passing yards "):
         assert head in report, head
     assert "| **Market's chance of the Over** |" in report and "| At his luck-capped rate |" in report
+    assert "| Market-implied volume (at the engine's efficiency) |" in report
     assert " completions at " in report and " catches at " in report and " carries at " in report
     assert " targets at " in report
     assert "luck-capped rate = last 10 games, long catches capped (" in report and "so far, uncapped (" in report
