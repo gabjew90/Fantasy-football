@@ -866,29 +866,6 @@ def points_allowed(pbp, positions) -> dict:
     return out
 
 
-def points_allowed_line(pa, teams) -> str | None:
-    """The game header's sentence: what each defence in this game allows by position."""
-    if not pa or not all(t in pa for t in teams):
-        return None
-    n = pa["_n"]
-    lg = pa["_league"]
-    def word(rank):
-        return ("most" if rank <= 8 else "fewest" if rank > n - 8 else "middle")
-    parts = []
-    for t in teams:
-        bits = ", ".join(f"{p} {pa[t][p][0]:.1f} ({rank_words(pa[t][p][1], n)} of {n}"
-                         + ("" if word(pa[t][p][1]) == "middle" else f", among the {word(pa[t][p][1])}") + ")"
-                         for p in POS_GROUPS)
-        parts.append(f"{t}'s defence allows {bits}")
-    games = sorted(set(pa["_games"][t] for t in teams))
-    return ("; ".join(parts) + ". League average: " + ", ".join(f"{p} {lg[p]:.1f}" for p in POS_GROUPS)
-            + f". PPR points per game over {'/'.join(map(str, games))} games: a small sample, and position "
-            "matchups were tested as too noisy to move the model, so this is context, not an adjustment."
-            + (f" {100 * pa['_unmapped_share']:.0f}% of skill-player points league-wide belong to players the "
-               "roster file gives no position, so these totals run a little low."
-               if pa.get("_unmapped_share", 0) > 0.02 else ""))
-
-
 def rank_words(rank: int, n: int, most: str = "most", fewest: str = "fewest") -> str:
     """A rank among n read the short way round: 3 of 32 -> '3rd most', 31 of 32 -> '2nd
     fewest' (the bottom half counted from the other end; ties share the lower rank)."""
@@ -1688,14 +1665,6 @@ def baseline_line(prior, season, is_back=False) -> str:
         if parts:
             out.append(f"This season: {', '.join(parts)} in {int(season['games'])} games.")
     return " ".join(out)
-
-
-def _need_cell(r, unit, conditional):
-    o, u = (r or {}).get("over_needs"), (r or {}).get("under_needs")
-    if not (_ok(o) or _ok(u)):
-        return "-"
-    bits = ([f"Over above {_f(o)}"] if _ok(o) else []) + ([f"Under at or below {_f(u)}"] if _ok(u) else [])
-    return "; ".join(bits) + f" {unit}" + (", conditional on the model" if conditional else "")
 
 
 def qb_workload(pbp, gsis_id) -> list[tuple]:

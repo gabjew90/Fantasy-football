@@ -186,19 +186,6 @@ def test_espn_scoreboard_asks_for_the_game_week():
     assert "seasontype=2" in u and "week=3" in u and "dates=2026" in u
 
 
-def test_slate_pick_prefers_backtested_market_over_higher_td_probability():
-    import score_week as SW
-    ok = pd.DataFrame([
-        dict(player="TD back", market="player_anytime_td", rule="any market, book agrees (no-vig >= 50%)",
-             p_model=0.76, new_team=False, questionable=False),
-        dict(player="Catcher", market="player_receptions", rule="calibrated market, book agrees (no-vig >= 55%)",
-             p_model=0.66, new_team=False, questionable=False),
-        dict(player="Disagree", market="player_receptions", rule="calibrated market, BOOK DISAGREES (weakest class)",
-             p_model=0.90, new_team=False, questionable=False),
-    ])
-    assert SW.slate_pick_order(ok).player.tolist() == ["Catcher", "TD back"]
-
-
 def _age(path, seconds):
     import os
     import time

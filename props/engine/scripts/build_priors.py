@@ -20,7 +20,6 @@ Outputs:
 import argparse, json, sys
 from pathlib import Path
 
-import re
 import numpy as np
 import pandas as pd
 
@@ -43,15 +42,6 @@ def active_week_denominators(roster_reg, pw, tw):
     cols = ["targets", "carries", "i10_targets", "i10_carries"]
     return weeks.merge(tw[["team", "week"] + cols], on=["team", "week"]).groupby("gsis_id")[cols].sum()
 
-
-def norm_name(s):
-    """Normalise a player name for joining across nflverse tables that disagree on
-    punctuation and suffixes: 'D.J. Moore' == 'DJ Moore', 'Luther Burden III' == 'Luther Burden'."""
-    if not isinstance(s, str):
-        return s
-    s = s.lower().replace(".", "").replace("'", "").replace("-", " ")
-    s = re.sub(r"\b(jr|sr|ii|iii|iv|v)\b", "", s)
-    return " ".join(s.split())
 
 NFLVERSE = "https://github.com/nflverse/nflverse-data/releases/download"
 GAMES_URL = "https://raw.githubusercontent.com/nflverse/nfldata/master/data/games.csv"
@@ -157,7 +147,7 @@ def main():
     # (a role prior, never usage evidence)
     roster_all = pd.read_csv(ros_f, low_memory=False)
     snaps = M.snap_names_from_roster(snaps, roster_all)
-    snaps = snaps.copy(); snaps["key"] = snaps["player"].map(norm_name)
+    snaps = snaps.copy(); snaps["key"] = snaps["player"].map(M.norm_name)
     snap_season = snaps.groupby(["team", "key"])["offense_pct"].mean().rename("snap_pct_25")
 
     # ---- per-player season rates ------------------------------------------
@@ -204,7 +194,7 @@ def main():
     P = P.join(n_act).join(main_team).join(names)
     P["n_games"] = P["n_games"].fillna(0).astype(int)
     P = P.reset_index()
-    P["key"] = P["full_name"].map(norm_name)
+    P["key"] = P["full_name"].map(M.norm_name)
     P = P.merge(snap_season.reset_index().rename(columns={"team": "team_prior"}),
                 on=["team_prior", "key"], how="left").drop(columns="key")
     P.round(5).to_csv(out / f"priors_{S}_players.csv", index=False)

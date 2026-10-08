@@ -551,14 +551,12 @@ def test_fantasy_points_allowed_by_position():
     assert pa["ATL"]["WR"][0] == pytest.approx(9.0 / 2) and pa["ATL"]["RB"][0] == pytest.approx((3 + 1.5) / 2)
     assert pa["ATL"]["TE"][0] == 0.0 and pa["NO"]["TE"] == (pytest.approx(2.0), 1)
     assert pa["ATL"]["RB"][1] == 1 and pa["NO"]["RB"][1] == 2, "rank 1 = most allowed"
-    line = RS.points_allowed_line(pa, ("ATL", "NO"))
-    assert line.startswith("ATL's defence allows RB 2.2 (1st most of 2") and "League average: RB 1.1" in line
+    assert pa["_league"]["RB"] == pytest.approx((2.25 + 0.0) / 2) and pa["_n"] == 2
     assert RS.matchup_sentence(pa, "NO", "TE").startswith("NO allows 2.0 PPR points a game to tight ends, the 1st most of 2")
     assert "the 1st fewest of 2" in RS.matchup_sentence(pa, "NO", "RB"), "the bottom half counts from the bottom"
     assert RS.matchup_sentence(pa, "ATL", "FB").startswith("ATL allows 2.2 PPR points a game to running backs")
     assert RS.matchup_sentence(pa, "ATL", "QB") is None and RS.matchup_sentence(pa, "DAL", "WR") is None
-    assert "context, not an adjustment" in line
-    assert RS.points_allowed_line(pa, ("ATL", "DAL")) is None and RS.points_allowed(None, pos) == {}
+    assert RS.points_allowed(None, pos) == {}
 
 
 
@@ -575,8 +573,6 @@ def test_points_allowed_notes_players_without_a_position():
                                 rush_touchdown=0, qb_kneel=0)
     pa = RS.points_allowed(pd.DataFrame([row("wr1", 50), row("ghost", 50)]), {"wr1": "WR"})
     assert pa["_unmapped_share"] == pytest.approx(0.5)
-    pa["NO"], pa["_games"]["NO"] = pa["ATL"], 1
-    assert "belong to players the roster file gives no position" in RS.points_allowed_line(pa, ("ATL", "NO"))
 
 
 def test_the_quarterback_read_uses_completions():
