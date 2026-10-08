@@ -96,7 +96,47 @@ def cmd_status(a) -> int:
     return 0
 
 
+def _release() -> dict:
+    """{tag, hash, source}: inside chat from the bootstrap's stamp beside the release; in a checkout
+    from nfl.lock.json (which describes a release and is not part of one)."""
+    stamp = ROOT.with_name(ROOT.name + ".stamp.json")
+    if stamp.exists():
+        s = json.loads(stamp.read_text(encoding="utf-8"))
+        return {"tag": s.get("release_tag") or s.get("lock_tag"), "hash": s.get("release_hash"),
+                "source": s.get("release_source")}
+    lock = ROOT / "nfl.lock.json"
+    if lock.exists():
+        k = json.loads(lock.read_text(encoding="utf-8"))
+        return {"tag": k.get("tag"), "hash": k.get("sha256"), "source": "checkout (nfl.lock.json)"}
+    return {"tag": None, "hash": None, "source": None}
+
+
+def cmd_publish(a) -> int:
+    """props publish AWAY@HOME --reads FILE: check the reads against this game's latest run in
+    $NFL_OUT, then write the QA/QC and agent versions beside it (publish.py)."""
+    game = a.game or (a.args[0] if a.args else None)
+    if not game or "@" not in game or not a.reads:
+        print("props publish needs AWAY@HOME and --reads FILE", file=sys.stderr)
+        return 2
+    away, home = (x.strip().upper() for x in game.split("@", 1))
+    out = Path(os.environ.get("NFL_OUT", "/mnt/user-data/outputs"))
+    runs = sorted(out.glob(f"run_*_{away}_{home}.json"), key=lambda p: p.stat().st_mtime)
+    if not runs:
+        print(f"props publish: no run for {away}@{home} in {out}; run `props game {away}@{home}` first", file=sys.stderr)
+        return 2
+    rel = _release()
+    cmd = [sys.executable, str(SCRIPTS / "publish.py"), "--run", str(runs[-1]), "--reads", a.reads, "--out", str(out)]
+    for k in ("tag", "hash", "source"):
+        if rel.get(k):
+            cmd += [f"--release-{k}", str(rel[k])]
+    if a.check_only:
+        cmd.append("--check-only")
+    return subprocess.run(cmd).returncode
+
+
 def cmd_props(a) -> int:
+    if a.what == "publish":
+        return cmd_publish(a)
     if a.what in ("player", "line", "best", "matchup"):
         from core import props_ask as PA
         try:
@@ -297,8 +337,10 @@ def main(argv=None) -> int:
     s.set_defaults(fn=cmd_status)
 
     p = sub.add_parser("props", help="price a game or the slate (the props engine)")
-    p.add_argument("what", choices=("game", "slate", "player", "line", "best", "matchup"))
-    p.add_argument("args", nargs="*", help="game: AWAY@HOME; player: NAME; line: NAME STAT LINE; best/matchup: AWAY@HOME")
+    p.add_argument("what", choices=("game", "slate", "player", "line", "best", "matchup", "publish"))
+    p.add_argument("args", nargs="*", help="game: AWAY@HOME; player: NAME; line: NAME STAT LINE; best/matchup/publish: AWAY@HOME")
+    p.add_argument("--reads", help="publish: the reads file (props/engine/resources/agent_guide.md, 'The reads file')")
+    p.add_argument("--check-only", action="store_true", help="publish: print the checks, render nothing")
     p.add_argument("--game", help="question tools: the game, AWAY@HOME (found from the player's team when omitted)")
     p.add_argument("--slate", action="store_true", help="best: the whole week's card")
     p.add_argument("--survival", action="store_true", help="retired: the must-win pick is off until the record earns it (DECISIONS #142)")

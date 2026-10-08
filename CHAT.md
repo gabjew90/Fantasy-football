@@ -76,7 +76,8 @@ The hard lines, which no voice overrides:
 
 1. **Answer in the reply, not in a file.** The commands write reports; those
    are working material. Never answer with a file, and never offer or attach
-   one (`present_files`) unless the user asks for a file.
+   one (`present_files`) unless the user asks for a file. A published read's
+   agent version is a file by design: attach it when the user asks for it.
 2. **Never ask the user for anything a command can read.** Record, standings,
    roster, starters, the opponent, this week's projections and scores, injury
    designations, waiver options -- run the command. `fantasy roster` prints
@@ -132,6 +133,7 @@ names a week.
 | best bets in a game / this week / a must-win pick | `nfl.py props best AWAY@HOME`, `--slate` (no pick either way: say why, then give the research rows) |
 | how does the game project | `nfl.py props matchup AWAY@HOME` |
 | a full breakdown of a game / the slate | `nfl.py status`, then **Props** below (the engine's full guide) |
+| a read to share / for review / the QA version / the agent version of a game | `props game AWAY@HOME`, then **Publishing a read** below |
 | waiver targets at RB / WR / TE | `nfl.py fantasy waiver --league L --pos RB,WR --horizon H` |
 | stream a defense or kicker | `nfl.py fantasy waiver --league L --pos DEF --horizon stream` (or `--pos K`) |
 | should I pick up X over someone on my bench | the same waiver run at X's position; find X in the candidate table and the cut it pairs with |
@@ -307,6 +309,32 @@ Read `$ENGINE_DIR/SKILL.md` and follow it. Its paths are relative to
 
 Run `nfl.py status` first. When it says a game's lines are thin or the run is
 early, say so before any price.
+
+### Publishing a read (DECISIONS #217)
+
+One game run and one set of written reads make every version, so the versions cannot disagree.
+1. Run `nfl.py props game AWAY@HOME` and do the read as above.
+2. Write the reads file as JSON, `$NFL_OUT/reads_AWAY_HOME.json`. The schema is in
+   `props/engine/resources/agent_guide.md`, under "The reads file". It holds the thesis and,
+   for each leg:
+   - the condition (the "if");
+   - the case;
+   - how it fails;
+   - the volume x efficiency the leg needs, and whether that reaches the whole number the Over needs;
+   - every number the prose states, cited by its field;
+   - every injured player the prose names.
+
+   The legs are conditional reads, never picks.
+3. Run `nfl.py props publish AWAY@HOME --reads $NFL_OUT/reads_AWAY_HOME.json`. It checks the reads
+   against the run before it renders anything. When it prints `FAIL` lines (exit 3), fix the read
+   and run it again. Never bend a number to pass: a failure means the prose said something the run
+   does not.
+4. When every check passes, it writes `<slug>_qa.md` and `<slug>_agent.md` in `$NFL_OUT`.
+   - **The QA/QC version** is for the user and internal reviewers. Give it in the reply, in full.
+   - **The agent version** is for another LLM agent. Attach it when asked.
+   - **The external PDF** is not built yet: it waits for the user's format guide. Say so if asked.
+5. The checks are arithmetic and sourcing only. Whether a condition is plausible is judgment, and
+   the QA version leaves it to the reviewer.
 
 ## Fantasy answers
 

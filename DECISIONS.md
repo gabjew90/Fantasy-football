@@ -8292,3 +8292,41 @@ every row while the predictions rows carry open / decision / close (line_archive
   joins starters to the prices' status by gsis_id alone (the report's position is no longer a
   second filter). Tests use the real codes, an unknown code, the cutoff, and section 7's row.
 - **No price moves:** the DAL@HOU fixture's CSVs are byte-identical; the report gains the row.
+
+## 2026-10-08 (217) -- one run, one set of reads, three versions: the QA/QC and agent versions
+
+- **The request (user):** a game read in three versions. An external PDF for readers who want the
+  rationale and the supporting data. A QA/QC version for chat, the same story with the backend
+  detail for troubleshooting. An MD for another LLM agent that explains the engine end to end:
+  repository, data connections, tests, results, and how the read reaches the external reader.
+  User's calls: external reads are CONDITIONAL ("if X, this leg fits and needs Y"), keeping #142;
+  all versions render from one run plus one structured reads file, behind a mechanical check. The
+  PDF waits for the user's format guide.
+- **The run as data:** score_game writes `run_<slug>.json` (write_run_export): every card's inputs
+  (volume_cells now carries the numeric `rate` behind each row and `need_rate`), section 4's
+  players (research.injury_rows, by injury_cell's rule), section 7's gaps, the sources table, the
+  model states. Informational: the fixture's CSVs and report are byte-identical.
+- **The check (publish.check), from the expert review's process causes (#215):**
+  - the leg is on the board at its side and line;
+  - every volume x efficiency is recomputed against floor(line) + 1;
+  - every rate is a card row, or the read labels it hypothetical;
+  - every cite matches the run's number at the precision written;
+  - every number in the prose traces to a cite, a need, the line or the game frame;
+  - injuries match section 4, and an injured player the prose names must carry an entry;
+  - pick language and "the probability" are refused.
+
+  One failure renders nothing. Judgment (whether a condition is plausible) is not checked; the QA
+  version leaves it to the reviewer.
+- **The versions:** `<slug>_qa.md` holds the read, each leg's support and role tables, the
+  backend (rate windows, calibration notes, flags), every check, section 4 and section 7, the
+  sources and the model states. `<slug>_agent.md` holds the system map and schemas
+  (resources/agent_guide.md), this run's sources, data_source_matrix.md and engine_overview.md
+  embedded verbatim, the model states, and the release's CI read from GitHub. The suites ran on
+  the merging pull request's head, so the API is read there as well as on the tag's commit; if
+  it cannot be read, the file says DATA MISSING. The file ends with the field map, the reads,
+  their checks and how to reproduce the run.
+- **Chat:** `nfl.py props publish AWAY@HOME --reads FILE` (CHAT.md, "Publishing a read").
+- **Tested** on TNF (TB@DAL): a correct read passes 21 of 21 checks. A copy with five planted
+  errors fails on all five: 18 x 3.7 = 66.6 claimed to reach 67, "best play", an untraced
+  "12 targets", Mingo called Out, and a rate not on the card. The checker also refused my own
+  "the script both legs lean on" ("lean" is on the betting list; kept strict, rephrased).

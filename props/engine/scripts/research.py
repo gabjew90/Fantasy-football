@@ -1401,6 +1401,35 @@ def injury_cell(team, iw, status=None, source=None, positions=DEF_POS, extra=Non
     return "; ".join(out) or "no designations"
 
 
+def injury_rows(iw, pop, status, source, teams) -> list[dict]:
+    """Section 4's players as data, by the same rule as injury_cell (a game status, the prices' own
+    first, or a missed or limited practice) at every position, plus priced players whose status
+    the prices use but the report lacks. [{team, name, pos, gsis_id, status, source, practice}];
+    status None means no game status (yet)."""
+    status, source, out, seen = status or {}, source or {}, [], set()
+    have = iw is not None and len(iw) and {"team", "gsis_id", "full_name", "position"}.issubset(iw.columns)
+    for t in teams:
+        for r in (iw[iw.team == t].itertuples() if have else []):
+            rs = getattr(r, "report_status", None)
+            st = status.get((t, r.gsis_id)) or (rs if isinstance(rs, str) and rs else None)
+            prac = getattr(r, "practice_status", None)
+            prac = prac if isinstance(prac, str) and prac else None
+            if st not in GAME_STATUSES and not _missed(prac):
+                continue
+            out.append({"team": t, "name": r.full_name, "pos": r.position, "gsis_id": str(r.gsis_id),
+                        "status": st if st in GAME_STATUSES else None, "source": source.get((t, r.gsis_id)),
+                        "practice": prac})
+            seen.add((t, str(r.gsis_id)))
+        if pop is not None and len(pop) and {"team", "name", "pos", "gsis_id", "report_status"}.issubset(pop.columns):
+            for r in pop[pop.team == t].itertuples():
+                if (t, str(r.gsis_id)) in seen or not isinstance(r.report_status, str) or not r.report_status:
+                    continue
+                out.append({"team": t, "name": r.name, "pos": r.pos, "gsis_id": str(r.gsis_id),
+                            "status": r.report_status, "source": source.get((t, r.gsis_id)), "practice": None})
+                seen.add((t, str(r.gsis_id)))
+    return out
+
+
 def injury_note(states: dict, week) -> str:
     """Section 4's note: which teams' game statuses are published, and what a practice-only
     report means for the table."""
@@ -1963,7 +1992,9 @@ def volume_cells(market, line, draws, rates, games=None, market_volume=None):
             vol = math.ceil(need_out / float(r) - 1e-9)
             pct_ = float((d >= vol).mean())
             rate_txt = f"{100 * float(r):.0f}%" if market == "player_receptions" else f"{float(r):.1f}"
-        rows[key] = {"label": label, "rate_txt": rate_txt, "vol": vol, "pct": pct_,
+        # "rate" is the number behind rate_txt (a pair for rushing + receiving): the publish check
+        # recomputes vol x rate from it
+        rows[key] = {"label": label, "rate_txt": rate_txt, "rate": [ra, rb] if pair else float(r), "vol": vol, "pct": pct_,
                      "vol_txt": f"{split[0]} carries + {split[1]} catches" if pair else f"{vol} {unit}"}
     if not rows:
         return None
@@ -1982,7 +2013,8 @@ def volume_cells(market, line, draws, rates, games=None, market_volume=None):
             if g:
                 beat = (sum(1 for v, y in g if float(y) / float(v) >= need_rate), len(g))
     return {"unit": unit, "need_out": need_out, "proj": proj, "rows": rows, "market_row": market_row,
-            "need_txt": need_txt, "beat": beat, "note": VOLUME_CALIBRATION.get(market, "").strip()}
+            "need_txt": need_txt, "need_rate": need_rate, "beat": beat,
+            "note": VOLUME_CALIBRATION.get(market, "").strip()}
 
 
 ROW_WORDS = {"capped": "At his luck-capped rate", "season": "At his rate this season", "engine": "At the engine's rate"}
