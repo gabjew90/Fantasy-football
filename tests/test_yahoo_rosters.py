@@ -4,15 +4,14 @@ Yahoo's API is approval-gated, so manager.context refuses the platform and
 Keefamania had no way to use manager.marginal at all -- every trade priced
 for it was priced in a throwaway script. This adapter resolves a scraped
 `POS|Name|Owner` file to sleeper_ids so price/slot_moves/explain work on it
-unchanged. (manager.marginal and the trade radar were retired with the cron
-stack on 2026-10-08, DECISIONS #212; the roster resolution is what these pin.)
+unchanged.
 """
 
 from __future__ import annotations
 
 import time
 
-from manager import yahoo
+from manager import marginal, yahoo
 
 
 class Cfg(dict):
@@ -61,13 +60,15 @@ def test_the_roster_shape_comes_from_the_league_file():
     assert shape == {"slots": {"QB": 1, "WR": 2, "RB": 2, "TE": 1}, "flex": 1}
 
 
-def test_rows_come_back_in_the_roster_row_shape(tmp_path, monkeypatch):
+def test_rows_come_back_in_the_shape_marginal_expects(tmp_path, monkeypatch):
     _write(tmp_path, monkeypatch, BODY)
     rosters, shape, _ = yahoo.load(CFG, PLAYERS, CON)
     assert set(rosters) == {"Me", "Them"}
     row = next(r for r in rosters["Me"] if r["name"] == "Jahmyr Gibbs")
     assert row["sleeper_id"] == "1" and row["pos"] == "RB"
     assert row["weekly"] == 310.8, "the consensus value must reach the optimiser"
+    # and the framework works on it untouched
+    assert marginal.lineup_points(rosters["Me"], shape) > 0
 
 
 def test_a_kicker_is_kept_out_of_the_rows_but_his_team_survives(tmp_path, monkeypatch):

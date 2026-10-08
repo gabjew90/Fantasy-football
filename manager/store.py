@@ -3,14 +3,15 @@ directory beside it).
 
 JSON over SQLite: readable diffs, painless `git pull --rebase`. The fantasy
 commands read the consensus cache through `get` and write the ledger under
-`dir`. The alert-dedup, delivery and bid-history methods went with the
-retired cron stack (DECISIONS #212).
+`dir`; the trade radar dedups through `first_time` (seen.json). The delivery
+and bid-history methods went with the retired cron stack (DECISIONS #212).
 """
 
 from __future__ import annotations
 
 import json
 import logging
+import time
 from pathlib import Path
 
 log = logging.getLogger("manager")
@@ -59,3 +60,13 @@ class Store:
         data = self._load("kv")
         data[key] = value
         self._save("kv", data)
+
+    # -- alert dedup ----------------------------------------------------
+    def first_time(self, alert_id: str) -> bool:
+        """True exactly once per alert id — the diff-based alerting gate."""
+        seen = self._load("seen")
+        if alert_id in seen:
+            return False
+        seen[alert_id] = time.time()
+        self._save("seen", seen)
+        return True

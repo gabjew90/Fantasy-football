@@ -7,22 +7,23 @@ data/raw/yahoo/<league>.txt, and that file is still the fallback: every
 successful API read rewrites it, so an API outage degrades to a roster that
 is at most as old as the last good read rather than to nothing.
 
-Either way the rows are resolved to sleeper_ids, in the roster-row shape the
-trade framework read. The API adds three things the scrape
+Either way the rows are resolved to sleeper_ids so marginal.price, slot_moves
+and explain work on them UNCHANGED. The API adds three things the scrape
 could not carry:
   * Yahoo's player id, joined exactly through the DynastyProcess id map
     (`id_map`), with the name match kept as the fallback;
   * each player's lineup slot (`slot`: QB, BN, IR, ...);
   * Yahoo's own injury designation (`yahoo_status`: IR, IR-R, PUP-R, O, Q,
     ...), which is what decides IR-slot eligibility in this league.
-    `injury_overlay()` maps it onto the Sleeper vocabulary.
+    `injury_overlay()` maps it onto the Sleeper vocabulary the trade path reads.
 
 Today the live consumer is manager.yahoo_context (through which the fantasy
 commands read a Yahoo league): it uses api_entries, yahoo_id_map, _flat and
-YAHOO_STATUS. load() and injury_overlay() served the trade radar (retired
-with the cron stack, DECISIONS #212) and scripts/keefamania_trades.py (also
-removed in the 2026-10-08 sweep); they stay, with their tests, as the
-roster-resolution path and the snapshot fallback.
+YAHOO_STATUS. load() and injury_overlay() served scripts/keefamania_trades.py
+(removed in the 2026-10-08 repo sweep); they stay, with their tests, as the
+roster-resolution path and the snapshot fallback the trade framework
+(manager.marginal, kept with the trade radar pending the user's call on trade
+search) reads.
 """
 
 from __future__ import annotations
@@ -37,10 +38,9 @@ ROSTER_DIR = Path("data/raw/yahoo")
 SKILL = ("QB", "RB", "WR", "TE")
 STALE_DAYS = 2.0
 
-# Yahoo status code -> the Sleeper injury_status vocabulary that
-# yahoo_context's injury overlay and the briefs read. Codes measured on the
-# live league 2026-09-16: IR, IR-R, PUP-R, CEL, Q; the rest are Yahoo's
-# documented set.
+# Yahoo status code -> the Sleeper injury_status vocabulary manager.marginal
+# reads (INJURED, DEFAULT_WEEKS_OUT). Codes measured on the live league
+# 2026-09-16: IR, IR-R, PUP-R, CEL, Q; the rest are Yahoo's documented set.
 YAHOO_STATUS = {
     "IR": "IR", "IR-R": "IR", "IR-NFI": "NFI",
     "PUP-R": "PUP", "PUP-P": "PUP", "NFI-R": "NFI", "NFI-A": "NFI",
@@ -173,7 +173,7 @@ def load(cfg, players: dict, con: dict | None = None,
          ) -> tuple[dict[str, list[dict]], dict, list[str]]:
     """(owner -> rows, shape, notes).
 
-    Rows are the trade-framework roster shape: sleeper_id, pos, name, and
+    Rows are the shape manager.marginal expects: sleeper_id, pos, name, and
     `weekly` carrying the consensus value so the optimiser sorts on it. An
     API row also carries yahoo_id, slot and yahoo_status. Unmatched names are
     REPORTED, never dropped silently -- a roster missing two players prices
