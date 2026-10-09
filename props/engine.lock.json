@@ -1,6 +1,6 @@
 {
   "algorithm": "props-engine-sha256-lf-1",
-  "engine_sha256": "a7995182d3d50221f3ba432e497e00c2e4742654d48e5a177fd9c9546e07ccc9",
+  "engine_sha256": "2507864b4bbb1cba5d962eeaf438606e8330f67381ee325de9fd7d2c29b55ebe",
   "file_count": 63,
   "files": {
     "SKILL.md": "cd4cac21b211fedb0bae974aa64bdfab3229889c4cb80f6b006fc336cb20d8cf",
@@ -55,7 +55,7 @@
     "scripts/publish_render.py": "bfb93297d28c632e09a22801a9d806101ffa6182a43e62be051ca0f6cfe1a5f9",
     "scripts/research.py": "36b669cfa43ad20bc0ecdd93fa4240dd76815cb0cce55f8a0ad1e42b59173d0d",
     "scripts/scenario.py": "e16722e9abebb55f05a770910c1e47dc1cc89f7d469c8d6232d6e6bd1af83774",
-    "scripts/score_game.py": "cbc4e5c38fea3d4ac3683b51edb9d5727300dba8d093bab7a726b65aa403651b",
+    "scripts/score_game.py": "834e92427094c93b55163da4c8fd8ae77870733ee53d8b4eda3053d5d2e528ab",
     "scripts/score_week.py": "f9a04bfd46e0079c7d363a795d70d85541701116746c3252d54acba1c3266404",
     "scripts/td_alloc.py": "7c407c949cac8f0f74d7f91589fd5d749f65d9053eb1c3f5f0dc63a700b3465b",
     "scripts/td_alloc_backtest.py": "e259d9f0e301a5d5d34e5a9e84bba222810f077d9c05a1f1f799a611914595a4",
@@ -67,5 +67,5 @@
     "scripts/td_model.py": "7c1635bbf515b4316f14771b177363a9f82a1ba7ad3393e479cd2dce26a25724",
     "scripts/td_v1.py": "bb4ef62e525c948889ef4e45f6c41564dcc7bed2a97b3d4def0792848f12c485"
   },
-  "tag": "props-v1.61"
+  "tag": "props-v1.62"
 }

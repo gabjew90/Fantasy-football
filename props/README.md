@@ -78,6 +78,7 @@ can be re-derived later, not just scored:
 | `snapshot_type` | `decision`, `open` or `close` |
 | `logged_at_utc`, `last_update` | when the call was made and when the book last moved |
 | `commence_time`, `minutes_to_kickoff` | when the game starts, and how far out the call was made |
+| `gsis_id`, `sleeper_id`, `join_how` | who the call is about, by ID (nflverse and Sleeper), and how the engine matched the book's line to its player (`gsis` or `name`); since 2026-10-09, empty before. Line-archive quotes carry `gsis_id` and `sleeper_id` too |
 
 Rows are keyed on `(season, week, event_id, book, market, player, side, line,
 snapshot_type, engine_hash)` and de-duplicated on write, so re-running a game
@@ -142,10 +143,13 @@ that rule lives; `settle.py` and `scorecard.py` both import it.
 makes the settled CSV self-explaining. `scorecard.py` counts only calls.
 
 Settled rows add `actual`, `result`, `status`, `won`, `pnl_per_100`,
-`is_call` and `join_method`. A player who did not play settles as `dnp`, not a loss, because
-a book would have voided the prop; folding voids in as losses would bias every
-hit rate downward. Rows whose name could not be joined are kept with status
-`unjoined` and reported, never silently dropped.
+`is_call` and `join_method`. Settle joins the stats by `gsis_id` (a row from before the ids
+takes its id from that week's roster by team and full name). A call with no stat row is
+graded at 0 when the player took an offensive snap -- the book grades him at 0 -- and settles
+as `dnp` (a void, not a loss) when he took none; folding voids in as losses would bias every
+hit rate downward, and voiding a played zero flatters the Overs. `pending` means no stat row
+and no snap counts yet to tell; it never overwrites an earlier grade. A row with no id at all
+is kept as `unjoined` and reported, never silently dropped.
 
 They also add the fields that say WHY a call missed, which is the only reason
 a record is worth keeping past the hit rate:

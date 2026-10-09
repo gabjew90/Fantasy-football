@@ -67,12 +67,20 @@ def current_season(today: dt.date | None = None) -> int:
 
 def _download(url: str, dest: Path, timeout: int, headers: dict | None = None) -> None:
     req = urllib.request.Request(url, headers=headers or HEADERS)
+    got = 0
     with urllib.request.urlopen(req, timeout=timeout) as resp, open(dest, "wb") as fh:
+        expect = resp.headers.get("Content-Length")
         while True:
             chunk = resp.read(1 << 20)
             if not chunk:
                 break
             fh.write(chunk)
+            got += len(chunk)
+    # A connection closed mid-body ends the read loop as if the file were done: the cut copy
+    # then replaced the last good one (2026-10-09: a 751 KB weekly-roster file for 3.4 MB).
+    # A short body is a failed refresh, like an empty one.
+    if expect is not None and expect.isdigit() and got != int(expect):
+        raise OSError(f"truncated response from {url}: {got} of {expect} bytes")
 
 
 def _mtime(p: Path) -> dt.datetime:

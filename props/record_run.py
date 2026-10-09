@@ -80,6 +80,9 @@ PRED_FIELDS = [
     "p_over_board",
     # the reversal-check shadows once rounds 34 and 39 ship (DECISIONS #204)
     "p_over_hist_carries", "hist_carries", "p_over_spread40",
+    # WHO the call is about, by ID (DECISIONS #224): the nflverse gsis id settle joins the stats
+    # on, Sleeper's own player id, and how the engine matched the book's line to its player
+    "gsis_id", "sleeper_id", "join_how",
 ]
 
 NUMERIC = {"line", "model_mean", "p_model", "p_push", "p_novig", "gap", "price", "ER", "p_market", "p_blend",
