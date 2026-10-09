@@ -1,10 +1,10 @@
 {
   "algorithm": "props-engine-sha256-lf-1",
-  "engine_sha256": "eb81428c3ad0a014a2cea13bcbfcae543e29dd7f7cf10ddfbe51b1c8a9fe86ea",
+  "engine_sha256": "078e0d4f0fbf0c8c5a900c2c962b4bdbd46a6d07f3c9f12c66062eb89663f785",
   "file_count": 63,
   "files": {
     "SKILL.md": "cd4cac21b211fedb0bae974aa64bdfab3229889c4cb80f6b006fc336cb20d8cf",
-    "resources/agent_guide.md": "cd771a9213c091f53ff79e32ae286051747d5a37b031ea264f9eb383960205b8",
+    "resources/agent_guide.md": "23952f25741868e8ddc9dc0e35278866ebc0275e122969ce4c8e9859fb301ec6",
     "resources/calibration_2025.csv": "47e3922c7af818307831d70a3d2be4333200f3aee1d94dc6bbf6e0e9ccee4ac8",
     "resources/customer_style.md": "399244087acf975d3803da95911b65c6ff2dac22bdcf73808d3cc83a6109340b",
     "resources/data_source_matrix.md": "3d5fa287473fde6b9c09d5755778425840be4c8e49bf3ac2aa43ac2bd3640820",
@@ -50,9 +50,9 @@
     "scripts/eligibility.py": "91b45727f37f690a1416e9461d2ef5f00f4bd1c31985fd31d312e2251fd76bd2",
     "scripts/model.py": "c692e34e63219841bcb3cfd5da2427f4129acb3a27f2e9bf7dfc120f304e226b",
     "scripts/odds_client.py": "434186273bd0412a5545247228298951c5d0504a19c8a47c4c782bf3bb75aaa1",
-    "scripts/publish.py": "53b7d2ac60bb456b0d6714b4114af3479ba6d741b3c32c6e5f61418b4c160572",
-    "scripts/publish_pdf.py": "7d791e53a6c314fc8236b4b621a60674dc2c7a0ff794fb1590137f68c3013b0b",
-    "scripts/publish_render.py": "257038df712dc4eb0c20f87f0cefaf6a3f835db59839f351975a01a5a7223989",
+    "scripts/publish.py": "eb1196c919a281facb24446f626968ae1229b9f158fb7b6d8ca3f99c644d3e9b",
+    "scripts/publish_pdf.py": "a4514ccbcc0254373c32e35bf3cd05ed97461347608ec43dff965697ea56bdb4",
+    "scripts/publish_render.py": "41c426bdd2e225ff7f678887a8cafc06afcaf6cce62e33984cbafa82fbadfe04",
     "scripts/research.py": "36b669cfa43ad20bc0ecdd93fa4240dd76815cb0cce55f8a0ad1e42b59173d0d",
     "scripts/scenario.py": "e16722e9abebb55f05a770910c1e47dc1cc89f7d469c8d6232d6e6bd1af83774",
     "scripts/score_game.py": "cbc4e5c38fea3d4ac3683b51edb9d5727300dba8d093bab7a726b65aa403651b",
@@ -67,5 +67,5 @@
     "scripts/td_model.py": "7c1635bbf515b4316f14771b177363a9f82a1ba7ad3393e479cd2dce26a25724",
     "scripts/td_v1.py": "bb4ef62e525c948889ef4e45f6c41564dcc7bed2a97b3d4def0792848f12c485"
   },
-  "tag": "props-v1.59"
+  "tag": "props-v1.60"
 }

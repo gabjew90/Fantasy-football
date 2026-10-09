@@ -654,6 +654,263 @@ def reliability_note(run) -> list[str]:
               "there -- not as a better chance than the market's. Nothing here is a recommendation to bet.", ""]
 
 
+
+# ---------------------------------------------------------------- the customer card (the guide, 2026-10-08)
+# The user's guide fixes the card: heading, workload and basis, Table A (four columns), Table B
+# (three columns, one market), the read, two if-then bullets. No extra columns or summary tables:
+# a comparison the guide asks for (catches vs yards, rushing vs combined) is a sentence in the read.
+GAIN_WORDS = (("season", "This season"), ("capped", "Big gains trimmed"), ("engine", "Engine's gain assumption"))
+MAIN_MARKETS = {"Passing": ("player_pass_yds",),
+                "Receiving": ("player_reception_yds", "player_receptions"),
+                "Rushing and combined yards": ("player_rush_yds", "player_rush_reception_yds", "player_reception_yds",
+                                               "player_receptions")}
+
+
+def card_market(card, legs=None) -> str | None:
+    """The market Table B is built on: the read's first leg, else the section's main market."""
+    if legs:
+        return PB.market_key(legs[0]["market"])
+    have = [r["market"] for r in PB.main_rows(card)]
+    return next((m for m in MAIN_MARKETS.get(PB.section_of(card), ()) if m in have), have[0] if have else None)
+
+
+def workload_line(card) -> str:
+    """'10.7 targets, 8.0 catches; 16.4 carries': the card's volume texts, a text that another
+    contains dropped."""
+    vts = [PB.volume_text(card, r["market"]) for r in PB.main_rows(card)]
+    vts = [v for v in dict.fromkeys(v for v in vts if v)]
+    keep = [v for v in vts if not any(o != v and o.startswith(v) for o in vts)]
+    keep = [k for k in keep if not any(o != k and k in o for o in keep) and " + " not in k]
+    return "; ".join(v.replace(" -> ", ", ") for v in keep) or "Unavailable"
+
+
+def basis_line(card) -> str:
+    """The role evidence behind the workload, from the card's own usage rows."""
+    u = card.get("usage") or {}
+    pos = str(card.get("pos") or "").upper()
+    if pos == "QB":
+        tp = (card.get("qb") or {}).get("team_passes")
+        return f"his team's {tp:.0f} projected pass attempts and his completion rate." if tp else "Unavailable."
+    pct_ = lambda v: f"{100 * float(v):.0f}%"
+    if not u:
+        return "Unavailable: no recent usage row in the run."
+    if pos in ("RB", "FB", "HB") and u.get("cs") is not None:
+        return (f"{pct_(u['cs'])} of the carries in week {u.get('week')} against {pct_(u.get('cs_base') or 0)} in the "
+                f"games before; {pct_(u.get('snap') or 0)} of the snaps.")
+    if u.get("ts") is not None:
+        return (f"{pct_(u['ts'])} of the targets in week {u.get('week')} against {pct_(u.get('ts_base') or 0)} in the "
+                f"games before; {pct_(u.get('snap') or 0)} of the snaps.")
+    return "Unavailable."
+
+
+def table_a_guide(card) -> list[str]:
+    L = ["| Prop | Line · Over / Under prices | Market Over estimate | Engine Over estimate |", "|---|---|---:|---:|"]
+    for r in PB.main_rows(card):
+        L.append(f"| {PB.MARKET_WORDS[r['market']].capitalize()} | {float(r['line']):g} · {odds(r.get('price_over'))} / "
+                 f"{odds(r.get('price_under'))} | {pct(r.get('p_over_book'))} | {pct(r.get('p_over_model'))} |")
+    return L
+
+
+def table_b_guide(card, mk) -> list[str]:
+    c = PB.cells_for(card, mk) or {}
+    rows = c.get("rows") or {}
+    L = ["| Gain reference | Workload needed to clear | Engine chance of reaching that workload |", "|---|---:|---:|"]
+    for k, w in GAIN_WORDS:
+        x = rows.get(k)
+        L.append(f"| {w} | {x['vol_txt']} at {x['rate_txt']} | {pct(x['pct'])} |" if x else f"| {w} | Unavailable | Unavailable |")
+    samples = []
+    m = re.search(r"\((\d+) games", (rows.get("season") or {}).get("label") or "")
+    if m:
+        samples.append(f"this season, {m.group(1)} games")
+    m = re.search(r"Last (\d+) games", (rows.get("capped") or {}).get("label") or "")
+    if m:
+        samples.append(f"trimmed, his last {m.group(1)} games")
+    note = ("*Chance of reaching the workload, not of clearing the line." + (f" Samples: {'; '.join(samples)}." if samples else "")
+            + (" Trimming big gains does not apply to a catch count." if mk == "player_receptions" and "capped" not in rows
+               else "") + "*")
+    L += ["", note]
+    extra = []
+    mr = c.get("market_row")
+    if mr:
+        extra.append(f"Book's {c.get('unit')} line: {mr[0]:g} (the engine's chance of more: {pct(mr[1])}).")
+    row = next((r for r in PB.main_rows(card) if r["market"] == mk), {})
+    if row.get("market_volume") is not None:
+        extra.append(f"Workload consistent with the market price, assuming the engine's gains: "
+                     f"{float(row['market_volume']):.1f} {row.get('unit') or ''}.".replace(" .", "."))
+    return L + (["", " ".join(extra)] if extra else [])
+
+
+def compare_sentence(card) -> str | None:
+    """The guide's market comparison, as one sentence: catches vs yards for a receiver, rushing vs
+    combined for a back."""
+    rows = {r["market"]: r for r in PB.main_rows(card)}
+    rec, yds = rows.get("player_receptions"), rows.get("player_reception_yds")
+    ru, rr = rows.get("player_rush_yds"), rows.get("player_rush_reception_yds")
+    if PB.section_of(card) == "Rushing and combined yards" and ru and rr and yds and all(
+            x.get("median") is not None for x in (ru, rr, yds)):
+        d = (float(rr["line"]) - float(ru["line"]) - float(yds["line"])) - (
+            float(rr["median"]) - float(ru["median"]) - float(yds["median"]))
+        where = (f"{abs(d):.1f} yards above what its rushing and receiving parts justify" if d >= 0.5 else
+                 f"{abs(d):.1f} yards below what its parts justify" if d <= -0.5 else "about where its parts justify")
+        return f"Rushing vs combined: the combined line of {float(rr['line']):g} is set {where}."
+    cy = PB.cells_for(card, "player_reception_yds") if yds else None
+    if rec and cy:
+        ref = "capped" if "capped" in cy["rows"] else "season"
+        x = cy["rows"].get(ref)
+        if x:
+            return (f"Catches vs yards: receptions {float(rec['line']):g} needs {int(float(rec['line'])) + 1} catches; "
+                    f"receiving yards {float(yds['line']):g} needs {x['vol']} at {x['rate_txt']} yards, which the engine "
+                    f"reaches {pct(x['pct'])} of the time.")
+    return None
+
+
+def read_guide(card, p, lg) -> str:
+    """The guide's closing read: the market -> the engine's workload -> the trimmed requirement ->
+    the matchup, plus the market comparison the guide asks for."""
+    mk = PB.market_key(lg["market"])
+    row = PB.row_for(card, mk, float(lg["line"])) or {}
+    pb, med, line = row.get("p_over_book"), row.get("median"), float(lg["line"])
+    word = PB.MARKET_WORDS[mk]
+    if pb is None:
+        s = [f"The market's line is {word} {line:g}."]
+    elif abs(float(pb) - 0.5) < 0.03:
+        s = [f"The market prices {word} {line:g} near even ({pct(pb)} Over)"
+             + (f"; the engine's middle forecast is {float(med):.0f}." if med is not None else ".")]
+    else:
+        s = [f"The market favors the {'Over' if float(pb) > 0.5 else 'Under'} at {line:g} ({pct(pb)} Over)."]
+    s.append(f"The engine expects {PB.volume_text(card, mk).replace(' -> ', ', ') if PB.volume_text(card, mk) else 'Unavailable'}, "
+             f"based on {p['role_evidence'].rstrip('.')}.")
+    vol_line = (next((x for x in card.get("volume") or [] if x.get("market") == mk), {}) or {}).get("line")
+    v = PB.verdict(card, mk) if PB._close(vol_line, lg["line"], 1e-9) else None
+    if v:
+        ref = "the trimmed" if v["ref"] == "capped" else "this season's"
+        s.append(f"At {ref} gain reference, the line requires **{v['vol_txt']}**, which the engine reaches "
+                 f"{pct(v['pct'])} of the time: {v['word']}"
+                 + (" (for the Over; this leg is the Under)." if lg["side"].lower() == "under" else "."))
+    s.append(f"This matchup {p['matchup']} that requirement because {p['matchup_reason'].rstrip('.')}.")
+    cmp_ = compare_sentence(card)
+    return " ".join(s + ([cmp_] if cmp_ else []))
+
+
+def choices_guide(lg, card) -> list[str]:
+    """The guide's two if-then bullets, with the line and the price; the shown arithmetic multiplies out."""
+    mk = PB.market_key(lg["market"])
+    row = PB.row_for(card, mk, float(lg["line"])) or {}
+    side = lg["side"].lower()
+    price = odds(row.get("price_over" if side == "over" else "price_under"))
+    need_out = int(float(lg["line"])) + 1
+    want = side == "over"
+    n = next((x for x in lg.get("needs") or [] if x.get("reaches") is want), None)
+    unit = (PB.cells_for(card, mk) or {}).get("unit") or ""
+    units = [u.strip() for u in unit.split("+")] if "+" in unit else [unit]
+    leg = f"{PB.MARKET_WORDS[mk]} {side} {float(lg['line']):g} ({price})"
+    if n:
+        parts = [(float(a), float(b)) for a, b in (n.get("parts") or [[n.get("volume"), n.get("rate")]])]
+        total = sum(a * b for a, b in parts)
+        shown = " + ".join(f"{a:g} {units[k] if k < len(units) else ''} at "
+                           f"{f'{100 * b:.0f}%' if b <= 1 else f'{b:.2f}'}".replace("  ", " ") for k, (a, b) in enumerate(parts))
+        what = "catches" if mk == "player_receptions" else "yards"
+        amount = f"{total:.1f}" if mk == "player_receptions" or abs(total - need_out) < 1 else f"{total:.0f}"
+        first = (f"- **If you expect {shown}, {leg} fits**: about {amount} {what}, "
+                 f"{'past' if want else 'short of'} the {need_out} the Over needs"
+                 f"{' (a hypothetical rate)' if n.get('hypothetical') else ''}. It stops fitting if {lg['fails'].rstrip('.')}.")
+    else:
+        first = f"- **If {lg['if'].rstrip('.')}, {leg} fits.** It stops fitting if {lg['fails'].rstrip('.')}."
+    alt = lg["else"].strip().rstrip(".")
+    return [first, f"- {alt[:1].upper() + alt[1:]}."]
+
+
+def data_read(card, mk) -> str | None:
+    """A card without a written read still states its requirement in one sentence."""
+    v = PB.verdict(card, mk) if mk else None
+    if not v:
+        return None
+    row = next((r for r in PB.main_rows(card) if r["market"] == mk), {})
+    ref = "the trimmed" if v["ref"] == "capped" else "this season's"
+    return (f"At {ref} gain reference, {PB.MARKET_WORDS[mk]} {float(row.get('line', 0)):g} requires "
+            f"**{v['vol_txt']}**, which the engine reaches {pct(v['pct'])} of the time: {v['word']}.")
+
+
+def card_customer(run, card, p, legs) -> list[str]:
+    mk = card_market(card, legs)
+    L = [f"### {card['name']} · {card.get('team')} · {card.get('pos')}", "",
+         f"**Engine workload:** {workload_line(card)}.  ",
+         f"**Basis:** {(p['basis'] if p else basis_line(card)).rstrip('.')}.", "",
+         "**Table A: the line and competing expectations**", "", *table_a_guide(card), ""]
+    if mk:
+        row = next((r for r in PB.main_rows(card) if r["market"] == mk), {})
+        L += [f"**Table B: what ordinary production requires** ({PB.MARKET_WORDS[mk]} {float(row.get('line', 0)):g})", "",
+              *table_b_guide(card, mk), ""]
+    if mk == "player_rush_reception_yds" and legs:
+        L += [*production_paths(card), ""]
+    if p:
+        L += [read_guide(card, p, legs[0]), "", p["explanation"], ""]
+        for lg in legs:
+            L += [*choices_guide(lg, card), ""]
+    else:
+        dr = data_read(card, mk)
+        if dr:
+            L += [dr, ""]
+    return L
+
+
+REL_WORDS = {"direct conflict": "Direct conflict", "script tension": "Script tension",
+             "opportunity competition": "Opportunity competition", "shared exposure": "Shared exposure",
+             "conditional fit": "Conditional fit", "production tension": "Production tension"}
+
+
+def parlay_section(reads) -> list[str]:
+    pf = reads.get("parlay") or {}
+    L = ["## Parlay Fit — which picks should you avoid combining?", "", pf.get("opening") or "", ""]
+    if pf.get("ticket"):
+        L += ["**Proposed ticket:** " + "; ".join(_leg_words(x) for x in pf["ticket"]) + ".", ""]
+    if pf.get("pairs"):
+        L += ["| Combination | Relationship | Guidance |", "|---|---|---|"]
+        for pr in pf["pairs"]:
+            L.append(f"| {_leg_words(pr['a'])} + {_leg_words(pr['b'])} | **{REL_WORDS[pr['relationship']]}:** "
+                     f"{_esc(pr['reason'])} | {_esc(pr['guidance'])} |")
+        L.append("")
+    L += ["*Relationships are analytical judgment, not a measured joint probability. Parlay value not assessed: no "
+          "joint quote or modeled joint probability.*", "", f"**{pf.get('closing') or ''}**", ""]
+    return L
+
+
+def _leg_words(x) -> str:
+    pl, mk, side, line = PB.parse_leg(x)
+    return f"{pl} {PB.MARKET_WORDS.get(mk, mk)} {side} {line:g}"
+
+
+def notes_section(run) -> list[str]:
+    lr = run.get("live_record") or {}
+    missing = []
+    sm = run.get("scenarios_market") or {}
+    if sm.get("status") != "ok":
+        missing.append(f"Result-scenario likelihoods ({sm.get('status') or 'not in this run'}).")
+    if not (run.get("market_env") or {}).get("home_ml"):
+        missing.append("Win probability (no moneyline in this run).")
+    if not run.get("units"):
+        missing.append("Unit ranks, grades and scores (no league-wide play-by-play in this run).")
+    if not run.get("points_allowed"):
+        missing.append("Production allowed by position.")
+    L = ["## Notes", "",
+         "- **Gain references.** This season: his gains per catch, carry or completion so far. Big gains trimmed: his "
+         "last 10 games with each play past his own 90th-percentile gain counted at that level; it reduces dependence on "
+         "big plays but does not remove luck. Engine's gain assumption: the rate the engine simulates.",
+         "- **Workload chances** (Table B) are the chance of reaching that workload, not of clearing the yardage line.",
+         "- **Market Over estimate:** the book's two prices with the margin removed. Sleeper prices most lines near even "
+         "and moves the line instead, so the line itself carries the market's view.",
+         "- **Verdicts:** attainable (the engine's workload covers the need), requires a rebound (more than his last "
+         "game), requires better gains (only the engine's gains clear it), requires more work than the engine expects.",
+         "- **Reliability:** the market's chance is the best available estimate. "
+         + (f"At Sleeper's real lines (weeks {lr.get('weeks')}, {lr.get('lines'):,} lines) the engine's chances scored "
+            f"worse than the market's (log loss {lr.get('engine_log_loss', 0):.3f} against {lr.get('market_log_loss', 0):.3f}). "
+            if lr else "")
+         + "Read the engine for workload and role. Nothing here is a recommendation to bet.", ""]
+    if missing:
+        L += ["**Missing inputs:**", "", *(f"- {m}" for m in missing), ""]
+    return L + [f"*Data as of: {cutoff(run)}*", ""]
+
+
 # ---------------------------------------------------------------- the QA/QC and external versions
 META = "%% "      # marks a header line for the PDF's meta style (render_external only)
 
@@ -681,17 +938,18 @@ def _document(run, reads, checks, release, qa: bool) -> str:
               f"{release.get('source') or 'source unknown'}) · run `{run['slug']}` · data cutoff: {cutoff(run)}", "",
               f"**Checks: {len(checks) - n_fail} of {len(checks)} pass.**"
               + ("" if not n_fail else f" {n_fail} FAIL: not publishable until they are fixed."), ""]
-    L += ["**Opening game read.** " + reads["opening"], "",
+    hr = [] if qa else ["---", ""]
+    L += ["**Opening game read.** " + reads["opening"], "", *hr,
           "## 1. What game does the market expect?", "", *market_table(run, compact=not qa), "",
          reads.get("market_read") or "", "",
-          *scenario_table(run, detail=qa), "",
+          *scenario_table(run, detail=qa), "", *hr,
           "## 2. How much passing and rushing should we expect?", "", *workload_table(run, compact=not qa), "",
-          reads.get("workload_read") or "", "",
+          reads.get("workload_read") or "", "", *hr,
           "## 3. What is each team good and bad at?", "", *unit_table(run, compact=not qa), ""]
     for t in (home, away):
         if (reads.get("unit_reads") or {}).get(t):
             L += [f"> **{t} offense:** {reads['unit_reads'][t]}", ""]
-    L += ["## 4. Which personnel changes affect that picture?", "", *personnel_table(reads), "",
+    L += [*hr, "## 4. Which personnel changes affect that picture?", "", *personnel_table(reads), "",
           reads.get("personnel_read") or "", "", *if_out_tables(run), ""]
     if qa:
         L += ["Section 4 as the engine reads it (the prices' own statuses):", ""]
@@ -699,7 +957,7 @@ def _document(run, reads, checks, release, qa: bool) -> str:
             for unit, txt in cells_.items():
                 L.append(f"- **{t} {unit}:** {txt}")
         L += ["", run.get("who_note") or "", ""]
-    L += ["## 5. Where have opposing positions produced?", "", *allowed_tables(run), "", reads.get("allowed_read") or "", "",
+    L += [*hr, "## 5. Where have opposing positions produced?", "", *allowed_tables(run), "", reads.get("allowed_read") or "", "",
           f"**Weather and venue.** {(run.get('weather_line') or '-') if qa else plain_weather(run.get('weather_line'))}", "",
           "**Assumptions worth testing.**", "", *(f"- {a}" for a in reads["assumptions"]), "",
           reads["handoff"], ""]
@@ -710,21 +968,28 @@ def _document(run, reads, checks, release, qa: bool) -> str:
         by_player.setdefault(lg["player"], []).append(i)
     written = {p["player"].lower(): p for p in reads["players"]}
     cards = priced_cards(run)
-    if not qa:
-        L += SHARED_NOTE
     for sec in PB.SECTIONS:
         cs = [c for c in cards if PB.section_of(c) == sec]
         if not cs:
             continue
-        L += [f"## {sec}", ""]
-        for c in cs:
+        L += [*hr, f"## {sec}", ""]
+        for k, c in enumerate(cs):
             p = written.get(c["name"].lower())
-            L += (player_card(run, reads, p, checks, by_player.get(p["player"], []), qa=qa) if p
-                  else data_card(run, c, qa))
+            if qa:
+                L += (player_card(run, reads, p, checks, by_player.get(p["player"], []), qa=True) if p
+                      else data_card(run, c, True))
+            else:
+                legs = [reads["legs"][i - 1] for i in by_player.get(p["player"], [])] if p else []
+                L += (["---", ""] if k else []) + card_customer(run, c, p, legs)
+    if not qa:
+        L += ["---", "", *parlay_section(reads), "---", "", *notes_section(run)]
+        return "\n".join(L) + "\n"
     if qa:
         unread = [c["name"] for c in cards if c["name"].lower() not in written]
         L += [f"**Coverage:** {len(cards) - len(unread)} of {len(cards)} priced players have a written read"
               + (f"; data cards only: {', '.join(unread)}." if unread else "."), ""]
+        L += [*parlay_section(reads), "**Checks for Parlay Fit.**", "",
+              *checks_table([c for c in checks if c["check"] == "parlay pair"]), ""]
     L += reliability_note(run)
     if qa:
         L += ["## QA appendix", "", "### Where the baseline could miss (section 7, in full)", "",

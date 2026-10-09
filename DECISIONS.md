@@ -8467,3 +8467,48 @@ every row while the predictions rows carry open / decision / close (line_archive
   The Odds API changed the hash of the engine that ran. `cache` is now excluded from the hash (a
   latent bug: it would have cost the record its release tag whenever a capture fell back to The
   Odds API).
+## 2026-10-08 (222) -- the customer card exactly as the guide lays it out, and Parlay Fit
+
+- **The user:** "your player props section is still not exactly like the guide; it has way too much
+  data". The guide was also updated (Parlay Fit, horizontal rules, Table A/B captions, missing
+  inputs).
+- **Diagnosis:**
+  - **Code: I had added what the guide forbids** ("keep the supplied column structure; do not add
+    extra columns or summary tables"):
+    - an engine-middle column in Table A;
+    - a Table B with a column per market and three extra rows (book line, market-implied workload,
+      verdict);
+    - a receptions-vs-yards table;
+    - a rushing-vs-combined table on every back.
+  - **Process:** I built from an earlier guide revision and did not re-check against the updated
+    one.
+- **The card now:**
+  - "Name · team · position";
+  - engine workload and basis (generated from usage when no read was written);
+  - Table A in four columns;
+  - Table B in three columns for the read's market;
+  - the short Table B footnote with the samples;
+  - the book's volume line and market-implied workload in one sentence;
+  - the guide's closing read: market -> engine -> trimmed requirement -> matchup, with the
+    catches-vs-yards or rushing-vs-combined comparison as a sentence;
+  - two if-then bullets with the price.
+
+  The production-path table appears only on a combined-yards leg; "Unavailable" marks a missing
+  gain reference.
+- **Document:**
+  - horizontal rules between team sections, before the player sections and between cards;
+  - definitions, reliability and missing inputs in one Notes section at the end;
+  - a Parlay Fit section after the cards.
+- **Parlay Fit (reads.parlay, required):**
+  - the opening;
+  - the proposed ticket;
+  - up to five pairs, each with a relationship, a reason and guidance;
+  - one practical closing sentence;
+  - "Parlay value not assessed" (no joint probability is claimed).
+
+  The checker refuses a relationship the legs contradict:
+  - a direct conflict needs the same player and stat with no result where both win;
+  - shared exposure is one player;
+  - opportunity competition is teammates;
+  - production tension is a quarterback and a teammate's receiving.
+- The QA version keeps its detail and adds Parlay Fit with its checks.

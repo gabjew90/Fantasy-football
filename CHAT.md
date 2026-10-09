@@ -337,6 +337,13 @@ matchup brief, then Passing, Receiving, and Rushing and combined yards.
    requires better gains, requires more work than the engine expects) are computed, never chosen.
    The legs are conditional reads, never picks.
 
+   The reads also need a **parlay** section (the guide's Parlay Fit): a 2-3 sentence opening on the main
+   conflict, up to five pairs from the actual recommendations or the user's ticket (relationship: direct
+   conflict, script tension, opportunity competition, shared exposure, conditional fit or production
+   tension, each with a short reason and guidance), and one practical closing sentence. The checker
+   refuses a relationship the legs contradict (a "direct conflict" both legs could win). Never give a
+   joint probability or a parlay value: the report says it is not assessed.
+
    The customer version (the PDF) follows `props/engine/resources/customer_style.md`, the user's
    layout and editorial rules:
    - 2-4 sentence paragraphs, each drawing a conclusion rather than restating a table;
