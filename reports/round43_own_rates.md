@@ -50,10 +50,12 @@ One change, three rates, each tested alone, plus all three together. `backtest.p
   his longest catch left out), divided by his targets in the window.
 - **Yards per carry:** the same, on his runs (kneel-downs excluded, as the harness counts runs).
 - **The long-play add-back (amended 2026-10-09, before any registered run):** the capped yards
-  (catches and runs) are multiplied by his position's long-play factor -- over every player with
-  10+ such plays LAST season (S-1), plain yards over yards capped at each one's own 90th
-  percentile, pooled by position (RB / WR / TE / QB, positions from last season's weekly
-  rosters; `backtest.own_uplift`). Why: a smoke run on 2021 weeks 2-4 (outside this round's
+  (catches and runs) are multiplied by his position's long-play factor -- over each player's
+  final 10 games of LAST season (S-1) with such a play, for every player with 10+ plays there,
+  plain yards over yards capped at each one's own 90th percentile of that window (the window's
+  own definition), pooled by position (RB with fullbacks / WR / TE / QB, positions from last
+  season's weekly rosters; `backtest.own_uplift`). A window with fewer than 10 catches (possible
+  at 20+ targets) uses his plain yards a catch, with no trim and no add-back. Why: a smoke run on 2021 weeks 2-4 (outside this round's
   data; rates only, no outcome read) showed the capped average runs low for everyone --
   receivers 7.66 vs the blend's 8.80 yards a target, backs 3.68 vs 4.30 a carry -- because
   every player has real long plays. Priced raw, it would lower every Over for a reason unrelated
@@ -70,8 +72,11 @@ One change, three rates, each tested alone, plus all three together. `backtest.p
 **The stand-in lines stay where the shipped engine puts them.** The conversion score's lines
 come from the same rates this round replaces (backtest.add_conditional), and the scorer refuses
 two runs at different lines. The lines now read the shipped rates (`cr_ship`, `ypt_ship`,
-`ypc_ship`, computed in every arm); with `--own-rates off` they equal today's lines exactly (a
-test asserts it), so every arm is scored at the same lines on the same player-games.
+`ypc_ship`, computed in every arm); with `--own-rates off` the whole output equals today's
+harness (checked by running main and this branch on 2026 weeks 2-4: all 107 columns identical on
+669 player-games; a source test pins which rates the lines and the draws read), and scoreboard
+.compare refuses any two arms whose lines differ, so every arm is scored at the same lines on
+the same player-games.
 
 ## Which score judges each arm (reports/scoreboard.md)
 
@@ -97,8 +102,11 @@ in), bettable population:
   - **detectable** on 2022-24: its market's conversion log-loss gain has a 95% game-clustered
     interval wholly above zero (10,000 resamples), with log loss and Brier agreeing in sign in
     the 15-85% decision zone;
-  - **big enough:** it moves the Over chance at the stand-in lines by at least **3.6 points** on
-    average (the seed-noise minimum, #202);
+  - **big enough:** it moves the Over chance at the stand-in lines on average by at least **1.8
+    points** (receiving and rushing yards) or **1.0 point** (receptions). Amended before any read
+    (code review): #202's 3.6 is twice the noise of ONE seed; the chances here are four-seed
+    averages, which halve it (1/sqrt(4)), and receptions are scored exactly with no seed noise, so
+    the scoreboard's original 1-point minimum applies there;
   - **guards pass:** every bet market (receptions, receiving yards, rushing yards, rushing +
     receiving, QB passing) no worse than -0.5% of its own log loss, on the conversion and the
     own-volume score, complete or blocked (scoreboard.guard_verdict);
@@ -127,6 +135,9 @@ in), bettable population:
   resource of each player's last-season games built by build_play_yards.py (targets, catches,
   catch yards, runs per game), with this season's games from the current play-by-play; known-
   answer tests pin the live number to the harness's for the same player-week.
+- The window length and the thin-window thresholds (10 games, 20 targets, 40 carries) move from
+  backtest.py constants into the engine's resources config, read by the harness and the scorer
+  alike (CLAUDE.md: knobs live in config).
 - The blend code those rates no longer use for a full window stays only as the thin-window
   fallback; anything left unused is deleted in the promoting PR.
 - The research reads' "we expect" yards a catch and the luck-free column then show the same

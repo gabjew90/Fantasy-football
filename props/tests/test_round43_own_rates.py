@@ -112,6 +112,21 @@ def test_the_long_play_add_back_is_plain_over_capped_by_position(bt):
     assert f["run"] == {}
 
 
+def test_the_add_back_reads_each_players_final_ten_games_only(bt):
+    # weeks 1-5: one 90-yard catch a game; weeks 6-15: 6 yards a catch -- only the last 10 count
+    rows = [(2025, w, "W", 1, 90.0) for w in range(1, 6)] + [(2025, w, "W", 1, 6.0) for w in range(6, 16)]
+    f = bt.own_uplift(_rec(rows), None, {"W": "WR"})
+    assert f["catch"]["WR"] == pytest.approx(1.0), "the early long catches are outside the window"
+
+
+def test_under_ten_catches_is_his_plain_average_with_no_add_back(bt):
+    rows = [(2026, w, "P", 1, y) for w, y in ((1, 5.0), (2, 40.0), (3, 7.0))]
+    rows += [(2026, w, "P", 0, np.nan) for w in (1, 2, 3)] * 6          # 21 targets, 3 catches
+    rec_ix, _ = bt.own_play_index(_rec(rows), None)
+    o = bt.own_window_rates(rec_ix, {}, "P", (2026, 4), uplift_catch=1.2)
+    assert o["n_tg"] == 21 and o["ypt"] == pytest.approx((5.0 + 40.0 + 7.0) / 21)
+
+
 def test_the_add_back_multiplies_the_capped_yards_only(bt):
     rows = [(2025, w, "P", 1, 6.0) for w in range(1, 11)] * 2 + [(2025, w, "P", 0, np.nan) for w in range(1, 11)]
     rec_ix, _ = bt.own_play_index(_rec(rows), None)

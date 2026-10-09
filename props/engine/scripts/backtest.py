@@ -184,18 +184,22 @@ def own_play_index(rec_plays, run_plays):
     return rec_ix, run_ix
 
 
-def own_uplift(rec_prev, run_prev, pos_of):
-    """The long-play add-back by position, from LAST season only: over every player with enough
-    plays for a percentile (research.LUCK_MIN_PLAYS), his plain yards over his yards with each
-    play capped at his own 90th percentile, pooled by position group. A capped average drops the
-    long plays every player really has, so it runs low (2021 smoke: receivers -13%); times this
-    factor, a player's rate is his own ordinary plays plus the long-play share typical of his
-    position. Returns {"catch": {grp: f}, "run": {grp: f}}, grp RB / WR / TE / QB / ALL."""
+def own_uplift(rec_prev, run_prev, pos_of, window=OWN_WINDOW):
+    """The long-play add-back by position, from LAST season only, on the window's own definition:
+    each player's final `window` games of last season with such a play; over every player with
+    enough plays there for a percentile (research.LUCK_MIN_PLAYS), his plain yards over his yards
+    with each play capped at his own 90th percentile of that window, pooled by position group. A
+    capped average drops the long plays every player really has, so it runs low (2021 smoke:
+    receivers -13%); times this factor, a player's rate is his own ordinary plays plus the
+    long-play share typical of his position. Returns {"catch": {grp: f}, "run": {grp: f}}, grp
+    RB (fullbacks too) / WR / TE / QB / ALL."""
     import research as RSCH
 
     def factors(df, kind):
         tot = {}
         for pid, g in df.groupby("gsis_id", sort=False):
+            last = set(sorted(set(zip(g.season, g.week)))[-window:])
+            g = g[[k in last for k in zip(g.season, g.week)]]
             v = [float(y) for y in g.yards]
             luck = RSCH.player_luck_line(v, RSCH.LUCK_PCT[kind])
             if not luck["own"]:
@@ -229,11 +233,13 @@ def own_window_rates(rec_ix, run_ix, pid, before, window=OWN_WINDOW,
         if n_tg >= min_targets:
             out["catch_rate"] = n_ca / n_tg
             catches = [y for g in cy[lo:j] for y in g]
-            per_catch = RSCH.luck_free_rate(catches, RSCH.player_luck_line(catches, RSCH.LUCK_PCT["catch"]))
-            if per_catch is None:        # no catch (0 yards a target) or one (nothing left once it is dropped)
+            luck = RSCH.player_luck_line(catches, RSCH.LUCK_PCT["catch"])
+            if luck["own"]:              # capped at his 90th, the long plays added back at his position's rate
+                per_catch = RSCH.luck_free_rate(catches, luck) * float(uplift_catch)
+            else:                        # too few catches for a percentile: his plain average, no trim, no add-back
                 per_catch = (sum(catches) / len(catches)) if catches else 0.0
-            # luck_free_rate is yards a CATCH; a target's share of it is the catches over the targets
-            out["ypt"] = per_catch * float(uplift_catch) * n_ca / n_tg
+            # yards a CATCH; a target's share of it is the catches over the targets
+            out["ypt"] = per_catch * n_ca / n_tg
     uu = run_ix.get(str(pid))
     if uu is not None:
         keys, ry = uu
@@ -759,6 +765,7 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
             own_n_tg = own_n_ca = np.nan
             if own_arm:
                 grp = re_first_letters(slot)
+                grp = "RB" if grp == "FB" else grp            # as own_uplift files fullbacks
                 upc, upr = own_uplift_f["catch"], own_uplift_f["run"]
                 ow = own_window_rates(own_rec_ix, own_run_ix, r.gsis_id, (S, int(W)),
                                       uplift_catch=upc.get(grp, upc.get("ALL", 1.0)),

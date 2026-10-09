@@ -31,7 +31,10 @@ SINGLE = {"catch_rate": "receptions", "ypt": "receiving yards", "ypc": "rushing 
 ARMS = ("off", "catch_rate", "ypt", "ypc", "all")
 SEEDS = (0, 1, 2, 3)
 SELECT, CONFIRM = [2022, 2023, 2024], [2026]
-MIN_MOVE = 3.6           # the seed-noise minimum (#202)
+# the minimum Over move (#202: twice the seed noise, 3.6 points for ONE seed). On four-seed averages
+# the noise halves (1/sqrt(4)): 1.8 for the yards markets; receptions are scored exactly (no seed
+# noise), so the scoreboard's original 1.0-point "big enough to matter" applies (amended before any read)
+MIN_MOVE = {"receptions": 1.0, "receiving yards": 1.8, "rushing yards": 1.8}
 SMALL = 0.003            # a gain under 0.3% of the shipped log loss must hold on every seed
 # family "efficiency source": 4 candidates read once on 2026 weeks 2-4; the ypc arm is also in the
 # running-game family, already read four times there (reports/comparisons_ledger_2026.md)
@@ -79,10 +82,11 @@ def seed_average(frames: list[pd.DataFrame]) -> pd.DataFrame:
     return out
 
 
-def per_seed(runs: Path, arm: str, market: str, seasons) -> list[dict]:
+def per_seed(raw: dict, arm: str, market: str, seasons) -> list[dict]:
+    """raw: {(arm, seed): frame}, loaded once in main."""
     rows = []
     for s in SEEDS:
-        a, r = load(runs, arm, s), load(runs, "off", s)
+        a, r = raw[(arm, s)], raw[("off", s)]
         c = SB.compare(a[a.season.isin(seasons)], r[r.season.isin(seasons)], "game", reps=2000)[market]
         rows.append({"seed": s, "gain": c["logloss_c"]["gain"], "relative": c["logloss_c"]["relative"]})
     return rows
@@ -131,12 +135,13 @@ def main(argv=None):
     ap.add_argument("--out", default=None)
     a = ap.parse_args(argv)
     runs = Path(a.runs)
-    avg = {arm: seed_average([load(runs, arm, s) for s in SEEDS]) for arm in ARMS}
+    raw = {(arm, s): load(runs, arm, s) for arm in ARMS for s in SEEDS}
+    avg = {arm: seed_average([raw[(arm, s)] for s in SEEDS]) for arm in ARMS}
     out = {"rule": "reports/round43_own_rates.md", "arms": {}}
     for arm, market in SINGLE.items():
         res = GS.run([{"own": "off"}, {"own": arm}], [avg["off"], avg[arm]], 0, market, "c", SELECT, CONFIRM,
-                     ("own",), min_move=MIN_MOVE, reps=10_000)
-        seeds = per_seed(runs, arm, market, SELECT)
+                     ("own",), min_move=MIN_MOVE[market], reps=10_000)
+        seeds = per_seed(raw, arm, market, SELECT)
         rel = (res.get("select_gain") or {}).get("relative")
         every_seed = (rel is None or abs(rel) >= SMALL or all(s["gain"] > 0 for s in seeds))
         con = SB.compare(avg[arm][avg[arm].season.isin(CONFIRM)], avg["off"][avg["off"].season.isin(CONFIRM)],
