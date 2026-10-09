@@ -142,6 +142,109 @@ def rr_given_volume(targets, carries, yds_draw, rush_draw, n):
     return np.asarray(yd, float) + np.asarray(ru, float)
 
 
+# ROUND 43 (reports/round43_own_rates.md): a player's catch rate, yards per target and yards per
+# carry from his OWN last OWN_WINDOW games, long plays capped at his own 90th percentile (the luck
+# cap, research.player_luck_line / luck_free_rate), instead of the league-anchored blend. Off by
+# default: --own-rates off is the shipped harness, byte for byte.
+OWN_ARMS = {"off": (), "catch_rate": ("catch_rate",), "ypt": ("ypt",), "ypc": ("ypc",),
+            "all": ("catch_rate", "ypt", "ypc")}
+OWN_WINDOW = 10          # games with a target (receiving) or a carry (rushing), the luck cap's window
+OWN_MIN_TARGETS = 20     # under this many targets in the window: the shipped blend (picked, not measured)
+OWN_MIN_CARRIES = 40     # under this many carries in the window: the shipped blend (picked, not measured)
+
+
+def own_play_index(rec_plays, run_plays):
+    """Per player, his games oldest first, from play-level frames of one or more seasons.
+
+    rec_plays: season, week, gsis_id, complete (0/1), yards (catch yards; ignored when not
+    complete) -- one row per target. run_plays: season, week, gsis_id, yards -- one row per carry
+    (kneel-downs already out). Returns ({gsis_id: (keys, targets, catches, [catch yards])},
+    {gsis_id: (keys, [run yards])}), keys = sorted (season, week) of the games he had such a play."""
+    rec_ix, run_ix = {}, {}
+    if rec_plays is not None and len(rec_plays):
+        r = rec_plays.assign(complete=rec_plays.complete.fillna(0).astype(int),
+                             yards=rec_plays.yards.fillna(0.0).astype(float))
+        for pid, g in r.groupby("gsis_id", sort=False):
+            keys, tg, ca, cy = [], [], [], []
+            for (s, w), gg in g.groupby(["season", "week"], sort=True):
+                keys.append((int(s), int(w)))
+                tg.append(int(len(gg)))
+                c = gg[gg.complete == 1]
+                ca.append(int(len(c)))
+                cy.append([float(y) for y in c.yards])
+            rec_ix[str(pid)] = (keys, tg, ca, cy)
+    if run_plays is not None and len(run_plays):
+        u = run_plays.assign(yards=run_plays.yards.fillna(0.0).astype(float))
+        for pid, g in u.groupby("gsis_id", sort=False):
+            keys, ry = [], []
+            for (s, w), gg in g.groupby(["season", "week"], sort=True):
+                keys.append((int(s), int(w)))
+                ry.append([float(y) for y in gg.yards])
+            run_ix[str(pid)] = (keys, ry)
+    return rec_ix, run_ix
+
+
+def own_uplift(rec_prev, run_prev, pos_of):
+    """The long-play add-back by position, from LAST season only: over every player with enough
+    plays for a percentile (research.LUCK_MIN_PLAYS), his plain yards over his yards with each
+    play capped at his own 90th percentile, pooled by position group. A capped average drops the
+    long plays every player really has, so it runs low (2021 smoke: receivers -13%); times this
+    factor, a player's rate is his own ordinary plays plus the long-play share typical of his
+    position. Returns {"catch": {grp: f}, "run": {grp: f}}, grp RB / WR / TE / QB / ALL."""
+    import research as RSCH
+
+    def factors(df, kind):
+        tot = {}
+        for pid, g in df.groupby("gsis_id", sort=False):
+            v = [float(y) for y in g.yards]
+            luck = RSCH.player_luck_line(v, RSCH.LUCK_PCT[kind])
+            if not luck["own"]:
+                continue
+            grp = pos_of.get(str(pid), "ALL")
+            for k in {grp, "ALL"}:
+                p, c = tot.get(k, (0.0, 0.0))
+                tot[k] = (p + sum(v), c + sum(min(y, luck["cap"]) for y in v))
+        return {k: (p / c if c > 0 else 1.0) for k, (p, c) in tot.items()}
+
+    catches = rec_prev[rec_prev.complete.fillna(0).astype(int) == 1] if rec_prev is not None else None
+    return {"catch": factors(catches.assign(yards=catches.yards.fillna(0.0)), "catch") if catches is not None else {},
+            "run": factors(run_prev.assign(yards=run_prev.yards.fillna(0.0)), "run") if run_prev is not None else {}}
+
+
+def own_window_rates(rec_ix, run_ix, pid, before, window=OWN_WINDOW,
+                     min_targets=OWN_MIN_TARGETS, min_carries=OWN_MIN_CARRIES, uplift_catch=1.0, uplift_run=1.0):
+    """{catch_rate, ypt, ypc, n_tg, n_ca} from his last `window` games strictly before `before`
+    ((season, week)). A rate is None when the window is thin (the caller keeps the blend). The
+    capped yards are multiplied by the position's long-play add-back (own_uplift)."""
+    import bisect
+    import research as RSCH
+    out = {"catch_rate": None, "ypt": None, "ypc": None, "n_tg": 0, "n_ca": 0}
+    rr = rec_ix.get(str(pid))
+    if rr is not None:
+        keys, tg, ca, cy = rr
+        j = bisect.bisect_left(keys, tuple(before))
+        lo = max(0, j - window)
+        n_tg, n_ca = sum(tg[lo:j]), sum(ca[lo:j])
+        out["n_tg"] = n_tg
+        if n_tg >= min_targets:
+            out["catch_rate"] = n_ca / n_tg
+            catches = [y for g in cy[lo:j] for y in g]
+            per_catch = RSCH.luck_free_rate(catches, RSCH.player_luck_line(catches, RSCH.LUCK_PCT["catch"]))
+            if per_catch is None:        # no catch (0 yards a target) or one (nothing left once it is dropped)
+                per_catch = (sum(catches) / len(catches)) if catches else 0.0
+            # luck_free_rate is yards a CATCH; a target's share of it is the catches over the targets
+            out["ypt"] = per_catch * float(uplift_catch) * n_ca / n_tg
+    uu = run_ix.get(str(pid))
+    if uu is not None:
+        keys, ry = uu
+        j = bisect.bisect_left(keys, tuple(before))
+        runs = [y for g in ry[max(0, j - window):j] for y in g]
+        out["n_ca"] = len(runs)
+        if len(runs) >= min_carries:
+            out["ypc"] = RSCH.luck_free_rate(runs, RSCH.player_luck_line(runs, RSCH.LUCK_PCT["run"])) * float(uplift_run)
+    return out
+
+
 def nb_mle(mu, y, r_clamp):
     from scipy.optimize import minimize
     from scipy.special import gammaln
@@ -332,6 +435,34 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
 
     if "spread_line" not in games.columns:
         sys.exit("games.csv has no spread_line/total_line -- cannot backtest --env market")
+
+    # ROUND 43: the own-window rates read his plays from last season and this season's weeks before
+    # the game (after any audit truncation above, so the leak test still covers them)
+    own_arm = OWN_ARMS[getattr(args, "own_rates", None) or "off"]
+    own_rec_ix, own_run_ix, own_uplift_f = {}, {}, {"catch": {}, "run": {}}
+    if own_arm:
+        _cols = ["season_type", "week", "play_type", "receiver_player_id", "rusher_player_id", "complete_pass",
+                 "receiving_yards", "rushing_yards", "qb_kneel"]
+        _prev = pd.read_csv(dl(f"{NV}/pbp/play_by_play_{S - 1}.csv.gz", f"pbp_{S - 1}.csv.gz"), usecols=_cols,
+                            low_memory=False)
+        _both = pd.concat([_prev[_prev.season_type == "REG"].assign(season=S - 1),
+                           pbp_full[_cols].assign(season=S)], ignore_index=True)
+        _recp = _both[(_both.play_type == "pass") & _both.receiver_player_id.notna()].rename(columns={
+            "receiver_player_id": "gsis_id", "complete_pass": "complete",
+            "receiving_yards": "yards"})[["season", "week", "gsis_id", "complete", "yards"]]
+        _runp = _both[(_both.play_type == "run") & (_both.qb_kneel != 1) & _both.rusher_player_id.notna()].rename(
+            columns={"rusher_player_id": "gsis_id", "rushing_yards": "yards"})[["season", "week", "gsis_id", "yards"]]
+        own_rec_ix, own_run_ix = own_play_index(_recp, _runp)
+        # the long-play add-back by position, from last season's plays alone (no test week enters it)
+        _ros = pd.read_csv(dl(f"{NV}/weekly_rosters/roster_weekly_{S - 1}.csv", f"roster_weekly_{S - 1}.csv"),
+                           usecols=["gsis_id", "position"], low_memory=False).dropna()
+        _ros["grp"] = _ros.position.map(lambda p: "RB" if p in ("RB", "FB") else p if p in ("WR", "TE", "QB")
+                                        else "ALL")
+        _pos_prev = _ros.groupby("gsis_id").grp.agg(lambda s: s.mode().iloc[0]).to_dict()
+        own_uplift_f = own_uplift(_recp[_recp.season == S - 1], _runp[_runp.season == S - 1], _pos_prev)
+        print(f"own-window rates ({getattr(args, 'own_rates', 'off')}): {len(own_rec_ix)} receivers, "
+              f"{len(own_run_ix)} runners from {S - 1}-{S}; long-play add-back "
+              f"{ {k: {g: round(f, 3) for g, f in v.items()} for k, v in own_uplift_f.items()} }", file=sys.stderr)
 
     # THE PRIOR SEASON, NOT THIS ONE.
     #
@@ -622,6 +753,20 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
                             "rush_share", 20, r.own_rs, r.n_cc)
             ypc = two_stage("ypc", "carries_n", "ypc", ypc_default,
                             "ypc", 80, r.own_ypc, r.n_ca)
+            # ROUND 43: the shipped rates are kept beside any own-window replacement -- the stand-in
+            # lines read them, so every arm is scored at the shipped engine's lines
+            cr_ship, ypt_ship, ypc_ship = cr, ypt, ypc
+            own_n_tg = own_n_ca = np.nan
+            if own_arm:
+                grp = re_first_letters(slot)
+                upc, upr = own_uplift_f["catch"], own_uplift_f["run"]
+                ow = own_window_rates(own_rec_ix, own_run_ix, r.gsis_id, (S, int(W)),
+                                      uplift_catch=upc.get(grp, upc.get("ALL", 1.0)),
+                                      uplift_run=upr.get(grp, upr.get("ALL", 1.0)))
+                own_n_tg, own_n_ca = ow["n_tg"], ow["n_ca"]
+                if "catch_rate" in own_arm and ow["catch_rate"] is not None: cr = ow["catch_rate"]
+                if "ypt" in own_arm and ow["ypt"] is not None: ypt = ow["ypt"]
+                if "ypc" in own_arm and ow["ypc"] is not None: ypc = ow["ypc"]
 
             opp_team = opp_team_of.get((r.team, W))
             if args.opponent and opp_team:
@@ -629,9 +774,13 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
                 otab = opp_tabs[W]
                 if len(otab):
                     om = lambda met: M.opponent_multiplier(otab, opp_team, posgrp, met, k0_opp=opp["k0"], mode=opp["mode"])
-                    if "catch_rate" in mets: cr = float(np.clip(cr * om("catch_rate"), 0.05, 1.0))
-                    if "ypt" in mets: ypt = float(ypt * om("ypt"))
-                    if "ypc" in mets: ypc = float(ypc * om("ypc"))
+                    if "catch_rate" in mets:
+                        m_ = om("catch_rate")
+                        cr = float(np.clip(cr * m_, 0.05, 1.0)); cr_ship = float(np.clip(cr_ship * m_, 0.05, 1.0))
+                    if "ypt" in mets:
+                        m_ = om("ypt"); ypt = float(ypt * m_); ypt_ship = float(ypt_ship * m_)
+                    if "ypc" in mets:
+                        m_ = om("ypc"); ypc = float(ypc * m_); ypc_ship = float(ypc_ship * m_)
 
             he = hist_env[W]
             targets_env = float(he.loc[r.team, "team_targets"]) if r.team in he.index else league_plays * league_pass_rate
@@ -685,6 +834,8 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
                         sl = float(game_lines.loc[key, "spread_line"])     # nflverse: + = home favoured
                         abs_spread, team_spread = abs(sl), (sl if home else -sl); break
             rows.append(dict(r, ts=ts, cr=cr, ypt=ypt, rs=rs_, ypc=ypc,
+                             cr_ship=cr_ship, ypt_ship=ypt_ship, ypc_ship=ypc_ship,
+                             own_n_tg=own_n_tg, own_n_ca=own_n_ca,
                              team_targets_env=targets_env, team_carries_env=carries_env, carry_factor=carry_factor,
                              abs_spread=abs_spread,
                              team_spread=team_spread))
@@ -915,6 +1066,9 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
             act_t, act_r, act_y = (tr.act_targets.to_numpy(), tr.act_receptions.to_numpy(float),
                                    tr.act_rec_yards.to_numpy(float))
             cr_, ypt_ = tr.cr.clip(lower=0.05).to_numpy(float), tr.ypt.to_numpy(float)
+            # ROUND 43: the LINES read the shipped rates (equal to cr / ypt / ypc unless --own-rates
+            # replaced them); the draws read the arm's own. Every arm is then scored at one line.
+            crL_, yptL_ = tr.cr_ship.clip(lower=0.05).to_numpy(float), tr.ypt_ship.to_numpy(float)
             # THE STAND-IN LINE comes from pre-game inputs no width setting moves (expected
             # targets x catch rate / yards per target; expected carries x yards per carry), so
             # every setting in a comparison is scored at the SAME line. A line at each setting's
@@ -925,7 +1079,7 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
             SC_Y, SC_R, SC_P = STANDIN_SCALE["rec_yds"], STANDIN_SCALE["rush_yds"], STANDIN_SCALE["pass_yds"]
             mu_t = (tr.team_targets_env * tr.ts).to_numpy(float)
             mu_c = (test_act.team_carries_env * test_act.rs.fillna(0.0)).to_numpy(float)
-            ypc_all = test_act.ypc.to_numpy(float)
+            ypc_all = test_act.ypc_ship.to_numpy(float)          # lines only (round 43)
             tpos_all = np.cumsum(rec_mask) - 1
             roles_tr = [M.role_group(s_) for s_ in tr.slot] if "slot" in tr else [None] * len(tr)
             for k_, i in enumerate(np.flatnonzero(rec_mask)):
@@ -943,7 +1097,7 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
                     cols["mean_rec_c"][i], cols["mean_yds_c"][i] = rec.mean(), yd.mean()
                     cond_yds[i] = yd
                     if recM is not None:                     # line scores: no random draw
-                        lines_ = {"rec": half(mu_t[k_] * cr_[k_]), "yds": half(SC_Y * mu_t[k_] * ypt_[k_])}
+                        lines_ = {"rec": half(mu_t[k_] * crL_[k_]), "yds": half(SC_Y * mu_t[k_] * yptL_[k_])}
                         for nm_, uM, cD in (("rec", recM[k_], rec), ("yds", ydsM[k_], yd)):
                             L = lines_[nm_]
                             cols[f"L_{nm_}"][i], cols[f"pc_{nm_}"][i] = L, float((cD > L).mean())
@@ -982,7 +1136,7 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
                     if both is None:
                         continue
                     uM = ydsM[tpos[i]] + rushM[i]
-                    L = half(SC_Y * mu_t[tpos[i]] * ypt_[tpos[i]] + SC_R * mu_c[i] * ypc_all[i])
+                    L = half(SC_Y * mu_t[tpos[i]] * yptL_[tpos[i]] + SC_R * mu_c[i] * ypc_all[i])
                     cols["L_rr"][i], cols["pc_rr"][i] = L, float((both > L).mean())
                     cols["pu_rr"][i] = float((uM > L).mean())
             # STARTING-QB PASSING given the volume: every receiver's yards drawn given his actual
@@ -1009,7 +1163,7 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
                                                implied_points=implied_of.get(tw_))
                     # stand-in line from pre-game inputs: expected throws at their yards per target
                     sh_ = sum(float(tr.ts.iloc[k_]) for k_, _ in rows_)
-                    exp_y = (sum(mu_t[k_] * ypt_[k_] for k_, _ in rows_)
+                    exp_y = (sum(mu_t[k_] * yptL_[k_] for k_, _ in rows_)
                              + max(1.0 - sh_, 0.0) * float(tr.team_targets_env.iloc[rows_[0][0]])
                              * float(other_rates["ypt"])) * share_mean
                     L = half(SC_P * exp_y)
@@ -1213,10 +1367,14 @@ def run_season(args, S, TRAIN, TEST, OUT, live, widths=None):
             res_df = add_conditional(res_df, test_act, tr, rec_mask, tgtM, carsM, rush_pop, qb_pop, starter,
                                      y_rush, width, recM=recM, ydsM=ydsM, rushM=rushM, passTW=passTW, p_ix=p_ix,
                                      y_pass=y_pass)
+        if own_arm:     # round 43 diagnostics: the rates this arm priced with, the shipped ones, the window
+            res_df = res_df.assign(**{c: test_act[c].to_numpy(float) for c in (
+                "cr", "ypt", "ypc", "cr_ship", "ypt_ship", "ypc_ship", "own_n_tg", "own_n_ca")})
         res = res_df.merge(gm, on=["team", "week"], how="left")
         # which harness wrote these rows: compare() never mixes a capped run with an uncapped one
         res["new_team_cap"] = bool(getattr(args, "new_team_cap", True))
         res["new_team_cap_rates"] = getattr(args, "new_team_cap_rates", "all")
+        res["own_rates"] = getattr(args, "own_rates", None) or "off"     # round 43's arm
         res["n_draws"] = N                      # compare() refuses runs with different draw counts
         # the team's throws, projected and actual, for the volume-calibration check (user, 2026-10-07:
         # "how about pass attempts?"); informational, read by no score
@@ -2101,6 +2259,10 @@ def main(argv=None):
                     help="the scorer's new-team cap on a carried-over prior (model.blended_rate new_team)")
     ap.add_argument("--new-team-cap-rates", choices=["all", "shares"], default="all",
                     help="round 37: the new-team cap on every rate (shipped) or on the target / carry shares only")
+    ap.add_argument("--own-rates", choices=list(OWN_ARMS), default="off",
+                    help="round 43 (reports/round43_own_rates.md): catch rate / yards per target / yards per "
+                         "carry from the player's own last 10 games, long plays capped at his 90th percentile, "
+                         "instead of the blend (off = shipped); the stand-in lines stay on the shipped rates")
     ap.add_argument("--no-new-team-cap", dest="new_team_cap", action="store_false",
                     help="ABLATION: the pre-2026-10-06 harness, no new-team cap")
     ap.add_argument("--historical-blend", action="store_true", default=True,
