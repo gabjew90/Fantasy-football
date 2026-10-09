@@ -1,6 +1,6 @@
 {
   "algorithm": "props-engine-sha256-lf-1",
-  "engine_sha256": "8770d51fffbfd872a8837342a709a67420d87cbf410ed3ced6cd36b7ae1631fe",
+  "engine_sha256": "a7995182d3d50221f3ba432e497e00c2e4742654d48e5a177fd9c9546e07ccc9",
   "file_count": 63,
   "files": {
     "SKILL.md": "cd4cac21b211fedb0bae974aa64bdfab3229889c4cb80f6b006fc336cb20d8cf",
@@ -43,7 +43,7 @@
     "resources/team_matchup_guide.md": "b819405165d7499993b545d18e2ad4950b0b15d80774c700c3fca55348abdeeb",
     "resources/width_params.json": "8157cb9f0c31ecd2927ef75cd129e97b5639fbd60817c6ab93f805ebeeeca8c9",
     "scripts/absence_tune.py": "4bb4daaf1861f93ff8d57504e9fff5e0b0b828306d8210b688c87aa25ef27d1d",
-    "scripts/backtest.py": "a4c6caa038dcc65c5dc34211ca61ae86dd6d5b03fd70ea2eab467e26e149096f",
+    "scripts/backtest.py": "86a4f66cd0eabc6977e51b42d80d9cb85a018953b224717da74f588f4329b90f",
     "scripts/build_play_yards.py": "51af89e684bd85e9e33e6f894a0a3002e13e98e0f00b94a4f91e4dbe474c8dfa",
     "scripts/build_priors.py": "015c897123ce6f0874429863d3708c9d7aed4a80d72b6faaf130c5f356fdc191",
     "scripts/build_td_priors.py": "c7330a57e68c1b7c5f8a9304bfbddbb4be0ca285d9f37ef383173d3e3049c27f",
@@ -67,5 +67,5 @@
     "scripts/td_model.py": "7c1635bbf515b4316f14771b177363a9f82a1ba7ad3393e479cd2dce26a25724",
     "scripts/td_v1.py": "bb4ef62e525c948889ef4e45f6c41564dcc7bed2a97b3d4def0792848f12c485"
   },
-  "tag": "props-v1.60"
+  "tag": "props-v1.61"
 }

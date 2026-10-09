@@ -8512,3 +8512,27 @@ every row while the predictions rows carry open / decision / close (line_archive
   - opportunity competition is teammates;
   - production tension is a quarterback and a teammate's receiving.
 - The QA version keeps its detail and adds Parlay Fit with its checks.
+
+## 2026-10-09 (223) -- round 43 null: the league-anchored blend beats the player's own last 10 games
+
+- **The question (user, 2026-10-08, after Irving's receiving-yards Over lost six times):** why
+  does the engine pull a player's efficiency toward the league average? Replace it with his own
+  last 10 games, long plays capped at his own 90th percentile (the luck cap).
+- **Round 43 (reports/round43_own_rates.md, pre-registered):** catch rate, yards per target and
+  yards per carry each tested alone against shipped, conversion log loss, four seeds, 2022-24,
+  confirmed on 2026 weeks 2-4. The stand-in lines read the shipped rates in every arm;
+  `--own-rates off` reproduces main column for column.
+- **Amended before any registered read:** a 2021 smoke run (rates only) showed the capped
+  average runs low for everyone (receivers -13%), so the capped yards take a long-play add-back
+  by position from last season; the minimum Over move is 1.8 points on four-seed averages and
+  1.0 on exactly scored receptions (#202's 3.6 is single-seed noise). Both came out of the
+  smoke run and the code review (7 findings: 5 fixed; core.fetch skipped because the engine is a
+  standalone release, config placement deferred to a ship).
+- **Result:** catch rate -3.7% and yards per target -3.2% on their markets, worse on every seed,
+  every position and on 2026; yards per carry +1.0% on every seed but not detectable and
+  negative held out and on 2026. Nothing ships. The own rates match the blend's level; they are
+  noisier.
+- **Irving:** the own rates would have priced his receiving Over higher (his 2025 was strong);
+  the slot average pulled him down. The miss is last season outweighing this one -- a recency
+  weight is the next candidate round, beside showing each player's record on the exact call.
+- `backtest.py --own-rates` stays as the reproduction switch (off by default, as round 37's).
