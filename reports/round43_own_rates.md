@@ -147,3 +147,35 @@ in), bettable population:
 ## Result
 
 (Filled in after the runs, below this line, without editing anything above.)
+
+## Result (2026-10-09; props/tools/round43_select.py on 40 runs: 5 arms x seeds 0-3 x 2022-24 / 2026 weeks 2-4)
+
+**Null on all three rates: the shipped blend stays.** Conversion log loss, positive = the own rate
+better, four-seed averages, 6,028 receiving and 1,797 rushing player-games on 2022-24:
+
+| Arm | Market | 2022-24 gain (95%, game-clustered) | Relative | Per seed | 2026 weeks 2-4 (family interval) | Verdict |
+|---|---|---|---|---|---|---|
+| catch_rate | receptions | -0.0130 (-0.0167, -0.0093) | -3.7% | all four worse (-3.5% to -3.7%) | -0.0162 (98.75%: -0.031, -0.001) | stays |
+| ypt | receiving yards | -0.0167 | -3.2% | all four worse (-3.2% to -3.3%) | -0.0169 (98.75%: -0.041, +0.007) | stays |
+| ypc | rushing yards | +0.0043 (-0.0041, +0.0127) | +1.0% | all four better (+0.8% to +1.1%) | -0.0024 (99.2%: -0.042, +0.033) | stays: not detectable, not confirmed, leave-one-season-out -0.0024 |
+
+- **By role, 2022-24:** catch rate worse for backs (-5.5%), receivers (-3.2%) and tight ends
+  (-3.3%), each interval below zero; yards per target worse for all three (backs -4.3%,
+  receivers -3.1%, tight ends -2.3%). Only 230 of 6,028 receiving and 44 of 1,797 rushing
+  player-games kept the blend for a thin window.
+- **The `all` arm** fails the guards on both scores (conversion: receptions -3.7%, receiving
+  yards -3.3%, rushing + receiving -1.3%, QB passing -2.0%; own volume: receiving yards -1.5%,
+  QB passing -0.8%).
+- **Why:** the own rates sit at the blend's level on average (smoke and these runs; catch rate
+  0.66 vs 0.66), so this is not a level error -- they are noisier. Ten games is 50-80 targets;
+  the blend's pull toward the slot average removes noise those samples carry, as round 17's
+  fitted constants said. Yards per carry leans the other way (+1% on every seed), consistent with
+  round 27 (the least shrinkage tried scored best), but not detectably.
+- **Irving, 2026:** the own rates would have priced him HIGHER, not lower -- yards per target 7.81
+  vs the blend's 6.84 in week 2 (7.34 vs 6.13 in week 3), the Over at the stand-in line 52% vs
+  43% (week 2) and 58% vs 47% (week 3); actual 1 and 12 yards. His window is mostly 2025 (7.9 a
+  target); the slot average was pulling him DOWN. What kept him high is his 2025 season
+  outweighing 2026 (16% weight on his yards a target), a recency question, not league vs own.
+- **Next (not this round):** a recency weight -- this season's games counting more than last
+  season's in the blend -- registered as its own round; and the card's per-player record on the
+  exact call (no model change).
