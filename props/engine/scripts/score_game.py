@@ -63,8 +63,8 @@ SLEEPER_TEAM = {"LA": "LAR"}
 
 
 def clean_gsis(v):
-    """An nflverse gsis id ("00-0039361") or None. Sleeper stores a few with stray whitespace
-    (core.ids._clean_gsis, which this standalone engine cannot import)."""
+    """An nflverse gsis id ("00-0039361") or None. Sleeper stores a few with stray whitespace.
+    Twins: core.ids._clean_gsis (this standalone engine cannot import core) and settle.clean_gsis."""
     import re as _re
     v = str(v or "").strip()
     return v if _re.fullmatch(r"00-\d{7}", v) else None
@@ -95,14 +95,17 @@ def match_line_player(desc, gsis, name_by_gsis, name_by_norm, loose_by_key):
 
     By ID first: the line's gsis id (Sleeper carries it) against our players'. A name only
     where the line has no ID or the ID is not one of ours (a player outside the priced
-    population -- the name join fails for him too). When the ID and the name point at two
-    different players of ours, neither is trusted: (None, "id/name conflict")."""
-    by_name = name_by_norm.get(norm_name(desc)) or loose_by_key.get(name_key_loose(desc))
+    population -- the name join fails for him too). Only when the line's EXACT name is another
+    of our players (a different normalised name from the ID's player) is neither trusted:
+    (None, "id/name conflict"). A loose-key hit or two players sharing one name never overrules
+    the ID (code review: teammates sharing an initial and surname dropped a correct line)."""
     by_id = name_by_gsis.get(gsis) if gsis else None
     if by_id is not None:
-        if by_name is not None and by_name != by_id:
+        exact = name_by_norm.get(norm_name(desc))
+        if exact is not None and norm_name(exact) != norm_name(by_id):
             return None, "id/name conflict"
         return by_id, "gsis"
+    by_name = name_by_norm.get(norm_name(desc)) or loose_by_key.get(name_key_loose(desc))
     return by_name, ("name" if by_name is not None else None)
 
 
@@ -2107,7 +2110,7 @@ def main():
     slug = f"{SEASON}_wk{WEEK:02d}_{AWAY}_{HOME}"
     logf = OUT / f"shadow_log_{slug}.csv"
     if a.prior_log and Path(a.prior_log).exists() and not R.empty:
-        prev = pd.read_csv(a.prior_log)
+        prev = pd.read_csv(a.prior_log, dtype={"gsis_id": str, "sleeper_id": str})   # ids stay text, not 12504.0
         R = pd.concat([prev, R], ignore_index=True).drop_duplicates(
             subset=["season", "week", "event_id", "book", "market", "player", "line", "side"],
             keep="last")

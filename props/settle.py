@@ -225,6 +225,8 @@ def load_stats(season: int, cache_dir: Path, max_age_s: int = STATS_MAX_AGE_S,
 
 
 def clean_gsis(v) -> str | None:
+    """An nflverse gsis id or None. Twins: core.ids._clean_gsis (not importable here: core.ids
+    needs polars, absent on the props runner) and score_game.clean_gsis (the standalone engine)."""
     v = str(v or "").strip()
     return v if re.fullmatch(r"00-\d{7}", v) else None
 
@@ -244,7 +246,8 @@ def load_who_played(season: int, cache_dir: Path, max_age_s: int = STATS_MAX_AGE
         sp = core_fetch.nflverse("snaps", season, cache_dir=cache_dir, manifest=m,
                                  max_age_s=max_age_s, downloader=downloader)
         ros = pd.read_csv(rp, low_memory=False, usecols=["week", "team", "full_name", "gsis_id", "pfr_id"])
-        sn = pd.read_csv(sp, low_memory=False, usecols=["week", "game_type", "pfr_player_id", "offense_snaps"])
+        sn = pd.read_csv(sp, low_memory=False,
+                         usecols=["week", "game_type", "team", "player", "pfr_player_id", "offense_snaps"])
     except Exception as exc:  # noqa: BLE001 -- the stats still grade; only the no-stat-row rows wait
         print(f"rosters / snap counts unavailable ({exc.__class__.__name__}: {exc}); rows without a stat "
               f"row stay pending", file=sys.stderr)
@@ -259,8 +262,12 @@ def load_who_played(season: int, cache_dir: Path, max_age_s: int = STATS_MAX_AGE
         if isinstance(p, str) and p:
             pfr.setdefault(g, p)
     sn = sn[sn.game_type == "REG"]
-    off = {(int(w), str(p)): float(s or 0) for w, p, s in zip(sn.week, sn.pfr_player_id, sn.offense_snaps)}
-    return {"by_name": by_name, "pfr": pfr}, {"weeks": {int(w) for w in sn.week.unique()}, "off": off}
+    snaps_n = pd.to_numeric(sn.offense_snaps, errors="coerce").fillna(0.0)
+    off = {(int(w), str(p)): float(s) for w, p, s in zip(sn.week, sn.pfr_player_id, snaps_n) if isinstance(p, str)}
+    # the same snaps by team and name, for a player whose roster row carries no pfr id (rookies)
+    off_name = {(int(w), str(t), norm_name(n)): float(s) for w, t, n, s in zip(sn.week, sn.team, sn.player, snaps_n)}
+    return ({"by_name": by_name, "pfr": pfr},
+            {"weeks": {int(w) for w in sn.week.unique()}, "off": off, "off_name": off_name})
 
 
 # the stat row of a player who took offensive snaps and recorded nothing: the book grades him at 0
@@ -287,10 +294,16 @@ def resolve(row: dict, week: int, by_id: dict, exact: dict, roster, snaps):
     elif (team, nm) in exact:
         return exact[(team, nm)], "team+name", "stat"
     if gid is None:
-        return None, "", "unjoined"
+        # without the roster an older row cannot get its id: that is not knowing, not a failed join
+        return None, "", ("pending" if roster is None else "unjoined")
     if snaps is None or roster is None or int(week) not in snaps["weeks"]:
         return None, how, "pending"
-    n = snaps["off"].get((int(week), roster["pfr"].get(gid, "")), 0.0)
+    # PLAYED = an offensive snap: the props are on offensive stats. A special-teams-only game is
+    # voided here; whether Sleeper voids it too is not verified (DECISIONS #224). A player absent
+    # from the snap file under both his pfr id and his team + name took no snap at all.
+    pfr = roster["pfr"].get(gid)
+    n = (snaps["off"].get((int(week), pfr), 0.0) if pfr else
+         snaps.get("off_name", {}).get((int(week), str(team), nm), 0.0))
     if n > 0:
         return ZERO_STATS, f"{how}; played, no stat row ({n:g} offense snaps)", "played"
     return None, how, "dnp"
@@ -478,7 +491,13 @@ def main(argv: list[str] | None = None) -> int:
             for r in csv.DictReader(fh):
                 existing[settled_key(r)] = r
     for r in out_rows:
-        existing[settled_key(r)] = r
+        k = settled_key(r)
+        # a run that could not tell (pending: snap counts or rosters unavailable) never undoes a
+        # grade an earlier run made with them in hand
+        if r.get("status") == "pending" and existing.get(k, {}).get("status") in ("settled", "push", "dnp"):
+            counts["kept_earlier_grade"] = counts.get("kept_earlier_grade", 0) + 1
+            continue
+        existing[k] = r
     # Atomic for the same reason persist.append_jsonl is: this rewrites the
     # whole settled record, and a process killed mid-write would otherwise be
     # committed truncated.

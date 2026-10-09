@@ -5,7 +5,7 @@
   "CHAT.md": "4ac9499c590cafa9aecd5aca81b74c9bf04876f300b4363fccd2ab5510f47f92",
   "config.yaml": "1a2af1bd5d6c7a464e908b50e94d910d2adba1675dede83876369aca7329c0c6",
   "core/__init__.py": "8ac9ed217e439f5828616ab66ec9ff17336c2cbbbeae391d0f9bfa001eaed571",
-  "core/fetch.py": "ec51eabfede0b0809ad36c30395d649a78ec3780a0453f4b28975d250f2deabe",
+  "core/fetch.py": "664b4f3eced6e5d586d8f6395f9ce39faf0b4218f1943eb1c3acafd1098bc4da",
   "core/ids.py": "754948692592ca92170266367c700b715d69f73c9d8fd3361eed408268ffff3d",
   "core/manifest.py": "dcdb9e164a30fbe102f7559661157c33f08c9dd6455aee6f185761260f921195",
   "core/probe.py": "b3ef1cd2f783157b4dcd75f93cacf4f00613fa4c787b921ee9e0fe452c74bdee",
@@ -155,7 +155,7 @@
   "props/engine/scripts/publish_render.py": "bfb93297d28c632e09a22801a9d806101ffa6182a43e62be051ca0f6cfe1a5f9",
   "props/engine/scripts/research.py": "36b669cfa43ad20bc0ecdd93fa4240dd76815cb0cce55f8a0ad1e42b59173d0d",
   "props/engine/scripts/scenario.py": "e16722e9abebb55f05a770910c1e47dc1cc89f7d469c8d6232d6e6bd1af83774",
-  "props/engine/scripts/score_game.py": "cbc4e5c38fea3d4ac3683b51edb9d5727300dba8d093bab7a726b65aa403651b",
+  "props/engine/scripts/score_game.py": "834e92427094c93b55163da4c8fd8ae77870733ee53d8b4eda3053d5d2e528ab",
   "props/engine/scripts/score_week.py": "f9a04bfd46e0079c7d363a795d70d85541701116746c3252d54acba1c3266404",
   "props/engine/scripts/td_alloc.py": "7c407c949cac8f0f74d7f91589fd5d749f65d9053eb1c3f5f0dc63a700b3465b",
   "props/engine/scripts/td_alloc_backtest.py": "e259d9f0e301a5d5d34e5a9e84bba222810f077d9c05a1f1f799a611914595a4",
@@ -170,6 +170,6 @@
   "tiers.csv": "04a1a79d43e9f2445ba3dc4ea262b00fbd58efea1f41e8b0393cb4c7f8afee41",
   "tiers.keefamania.csv": "11e6546b56caa807a572da86d5c3d81097bafd2d2550e25653882d78b2962e94"
  },
- "sha256": "a70b90123b4faad71c968b365f7da15ac61fc4865f4801f3c039f86a285c6e2c",
- "tag": "nfl-v1.64"
+ "sha256": "cd8ad8aa502f5a451edc8346a03e012af0e412f0ace28714e3a7e3e1ef026458",
+ "tag": "nfl-v1.65"
 }

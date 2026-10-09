@@ -57,6 +57,12 @@ def test_an_id_and_a_name_that_point_at_two_players_trust_neither(sg):
     assert sg.match_line_player("Bucky Irving", "00-0039999", *t) == (None, "id/name conflict")
 
 
+def test_a_loose_key_clash_or_a_shared_name_never_overrules_the_id(sg):
+    t = _tables(sg, {"Javonte Williams": "00-0036997", "Jaylen Williams": "00-0041234"})
+    # the book's spelling misses exactly; the loose key would say Javonte; the id says Jaylen
+    assert sg.match_line_player("Jay'len Williams", "00-0041234", *t) == ("Jaylen Williams", "gsis")
+
+
 def test_the_weekly_roster_maps_sleeper_ids_to_gsis_and_drops_a_contested_one(sg):
     import pandas as pd
     ros = pd.DataFrame({"sleeper_id": [12504.0, 12504.0, 9484.0, None, 777.0, 777.0],

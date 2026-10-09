@@ -191,6 +191,47 @@ def test_played_with_no_stat_row_grades_at_zero_and_no_snaps_is_a_void():
     assert _resolve(_pred(player="Rookie Receiver"), roster, snaps)[2] == "dnp"
 
 
+def test_a_rookie_without_a_pfr_id_is_found_in_the_snaps_by_team_and_name():
+    roster, snaps = _who_played(off={})
+    del roster["pfr"][ROOKIE]
+    snaps["off_name"] = {(2, "SF", "rookie receiver"): 24.0}
+    assert _resolve(_pred(player="Rookie Receiver"), roster, snaps)[2] == "played"
+    snaps["off_name"] = {}
+    assert _resolve(_pred(player="Rookie Receiver"), roster, snaps)[2] == "dnp", "in no snap row at all"
+
+
+def test_a_pending_run_never_undoes_an_earlier_grade(record, monkeypatch):
+    monkeypatch.setattr(settle, "load_stats", lambda season, cache: _id_stats())
+    monkeypatch.setattr(settle, "load_who_played", lambda season, cache: _who_played(off={(2, "RookRe00"): 31.0}))
+    _write(record, [_pred(player="Rookie Receiver", market="player_receptions", line=2.5, side="Over")])
+    settle.main(["--season", "2026"])
+    assert _settled(record)[0]["status"] == "settled"
+    monkeypatch.setattr(settle, "load_who_played", lambda season, cache: (None, None))   # the snaps fetch failed
+    settle.main(["--season", "2026"])
+    (row,) = _settled(record)
+    assert row["status"] == "settled" and float(row["actual"]) == 0.0
+
+
+def test_load_who_played_reads_the_published_columns(tmp_path):
+    files = {
+        "roster_weekly_2026.csv": "season,team,week,full_name,gsis_id,pfr_id,sleeper_id\n"
+                                  "2026,SF,2,Rookie Receiver,00-0041111,,12345\n"
+                                  "2026,SF,2,Christian McCaffrey,00-0033280,McCaCh01,4034\n"
+                                  "2026,SF,2,No Id,,,\n",
+        "snap_counts_2026.csv": "game_id,season,game_type,week,player,pfr_player_id,team,offense_snaps\n"
+                                "g,2026,REG,2,Christian McCaffrey,McCaCh01,SF,51\n"
+                                "g,2026,REG,2,Rookie Receiver,,SF,31.0\n"
+                                "g,2026,POST,2,Someone,SomeXx00,SF,60\n"}
+
+    def down(url, dest, timeout):
+        Path(dest).write_text(files[url.rsplit("/", 1)[-1]], encoding="utf-8")
+    roster, snaps = settle.load_who_played(2026, tmp_path, max_age_s=0, downloader=down)
+    assert roster["by_name"][(2, "SF", "rookie receiver")] == "00-0041111"
+    assert roster["pfr"] == {"00-0033280": "McCaCh01"}
+    assert snaps["off"] == {(2, "McCaCh01"): 51.0} and snaps["weeks"] == {2}
+    assert snaps["off_name"][(2, "SF", "rookie receiver")] == 31.0
+
+
 def test_no_snap_counts_yet_is_pending_not_a_void():
     roster, snaps = _who_played(snaps_weeks=())
     assert _resolve(_pred(player="Rookie Receiver"), roster, snaps)[2] == "pending"
@@ -200,8 +241,9 @@ def test_no_snap_counts_yet_is_pending_not_a_void():
 def test_no_id_anywhere_is_unjoined_and_the_loose_keys_are_gone():
     """No initial + surname within a team, no name across teams: either can attach a call to
     another player (two B. Robinsons in Atlanta, two Byron Murphys league-wide)."""
-    assert _resolve(_pred(player="C. McCaffrey", team="SF"))[2] == "unjoined"
-    assert _resolve(_pred(player="Christian McCaffrey", team="LV"))[2] == "unjoined"
+    assert _resolve(_pred(player="C. McCaffrey", team="SF"), *_who_played())[2] == "unjoined"
+    assert _resolve(_pred(player="Christian McCaffrey", team="LV"), *_who_played())[2] == "unjoined"
+    assert _resolve(_pred(player="C. McCaffrey", team="SF"))[2] == "pending", "no roster: cannot tell"
     stat, how, found = _resolve(_pred())                       # no id, no roster: exact team + name
     assert found == "stat" and how == "team+name"
 

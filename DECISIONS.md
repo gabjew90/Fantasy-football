@@ -8536,3 +8536,32 @@ every row while the predictions rows carry open / decision / close (line_archive
   the slot average pulled him down. The miss is last season outweighing this one -- a recency
   weight is the next candidate round, beside showing each player's record on the exact call.
 - `backtest.py --own-rates` stays as the reproduction switch (off by default, as round 37's).
+
+## 2026-10-09 (224) -- the record joins players by ID; a played zero is graded; truncated downloads refused
+
+- **The weak spot (user):** prediction rows and line-archive quotes carried names only, so settle
+  graded every call by team + name, with two looser fallbacks (initial + surname within a team, a
+  name across all teams). The engine also matched each book line to its player by name, though
+  Sleeper names the player by its own id.
+- **Measured before fixing:** all 2,718 graded rows had joined on team + full name; none used a
+  loose key, so no call had been graded on the wrong player. The stats file holds 20 keys shared
+  by two players on the loose keys (two B. Robinsons in Atlanta, two Byron Murphys league-wide).
+- **Found on the way, and it did move the record:** 11 player-weeks (34 calls) were players who
+  took offensive snaps and recorded nothing (Jeudy 36 snaps, Bourne 42). With no stat row they were
+  voided; the book grades them at 0. Graded, the Overs go 48.7% -> 47.4% and the Unders 51.9% ->
+  52.5%: the record flattered the engine's Overs by about 1.2 points. Settle's `dnp` status was
+  unreachable (every miss read `unjoined`).
+- **And:** core.fetch accepted a body shorter than its Content-Length (a 751 KB weekly-roster file
+  for 3.4 MB replaced the good copy). The engine's own downloader (urlretrieve) already refused
+  short bodies.
+- **The fix:** Sleeper lines carry `sleeper_id` and `gsis_id` (Sleeper's player file leaves gsis
+  empty for most players, so nflverse's weekly rosters map one to the other); a line joins to our
+  player by gsis first, by name without one, and an exact name naming a different player of ours
+  is a failed match. Prediction rows keep `gsis_id`, `sleeper_id`, `join_how`. Settle joins by
+  gsis (older rows via that week's roster); the loose keys are gone; no stat row + an offensive
+  snap = graded at 0, no snap = `dnp`, no snap counts yet = `pending` (never overwriting a grade),
+  no id = `unjoined`. **Assumption, unverified:** "played" is an offensive snap; a special-teams-
+  only game is voided, which may differ from Sleeper's rule.
+- **Checked end to end** on CHI @ GB (week 5, Sleeper): every line matched by gsis, every quote and
+  row carries both ids, all 13 ids agree with the stats file. Code review: 7 findings, all fixed.
+- The settled record is regraded by the next scheduled settle (weeks 2-5), not by hand.
