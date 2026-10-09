@@ -110,6 +110,8 @@ GOOD_RAW = {
                  "cite": [{"field": "card.usage.ts", "value": "49%"}, {"field": "card.usage.ts_base", "value": "26%"},
                           {"field": "card.usage.tn", "value": 21}],
                  "legs": [LEG]}],
+    "parlay": {"opening": "One leg, no ticket proposed. The read stands alone.",
+               "closing": "For this game read, keep the Lamb leg on its own."},
 }
 
 
@@ -441,8 +443,7 @@ def test_the_external_version_carries_no_internals():
     ext = PR.render_external(RUN, reads)
     for w in ("DECISIONS", "PROTOTYPE", "MODEL_", "Checks", "Backend", "QA appendix", "release", "slug", "gsis"):
         assert w not in ext, w
-    assert "## Receiving" in ext and "## A note on reliability" in ext and "Data as of:" in ext
-    assert "| Verdict | Attainable | Attainable |" in ext
+    assert "## Receiving" in ext and "## Parlay Fit" in ext and "## Notes" in ext and "Data as of:" in ext
 
 
 # ---- the full report (the user, 2026-10-08): market scenarios, the line vs the middle, combined, coverage ----
@@ -452,7 +453,6 @@ ALT = [{"key": "draftkings", "markets": [
     {"key": "alternate_spreads", "last_update": "t2", "outcomes": [
         {"name": "Tampa Bay Buccaneers", "point": -8.5, "price": 970}, {"name": "Dallas Cowboys", "point": 8.5, "price": -4200},
         {"name": "Dallas Cowboys", "point": -9.5, "price": -110}]}]}]
-
 
 def test_alt_spread_scenarios_read_the_main_line_and_the_alternates_together():
     import research as RS
@@ -508,14 +508,12 @@ def test_every_priced_player_gets_a_card_and_the_qa_counts_coverage():
     reads = good()
     qa = PR.render_qa(run, reads, P.check(run, reads), {})
     ext = PR.render_external(run, reads)
-    for doc in (qa, ext):
-        assert "### George Pickens · WR2, DAL" in doc and "### CeeDee Lamb · WR1, DAL" in doc
+    assert "### George Pickens · WR2, DAL" in qa and "### CeeDee Lamb · WR1, DAL" in qa
+    assert "### George Pickens · DAL · WR" in ext and "### CeeDee Lamb · DAL · WR" in ext
     assert "No written read for this player" in qa and "No written read for this player" not in ext
-    assert ext.count("## How to read the player cards") == 1 and "Cards without a closing paragraph" in ext
     assert "**Coverage:** 1 of 2 priced players have a written read; data cards only: George Pickens." in qa
 
 
-# ---- the customer version's style (the user, 2026-10-08) ----
 def test_style_checks_refuse_long_paragraphs_vague_matchups_and_heavy_bold():
     long = edit(lambda r: r["players"][0].update(explanation="One. Two. Three. Four. Five."))
     assert any(c["check"] == "style" and "5 sentences" in c["stated"] for c in fails(long))
@@ -526,23 +524,51 @@ def test_style_checks_refuse_long_paragraphs_vague_matchups_and_heavy_bold():
     assert not [c for c in fails(good()) if c["check"] == "style"]
 
 
-def test_the_customer_card_follows_requires_expects_matchup_then_choose():
+def test_the_customer_card_follows_the_guide_exactly():
     reads = good()
     ext = PR.render_external(RUN, reads)
-    i_req = ext.index("Receptions 6.5 needs **9 targets at this season's gains**, so it is attainable.")
-    i_exp = ext.index("The engine expects 10.7 targets, based on last game's 21 targets.")
-    i_mat = ext.index("The matchup supports it: Tampa is without its starting safety.")
-    i_choose = ext.index("- If you expect 9 targets at 79%, **receptions over 6.5** fits")
-    assert i_req < i_exp < i_mat < i_choose
-    assert "fits: about 7.1 catches, past the 7 the Over needs. It stops fitting if **his share falls back toward 26%, under the market-implied 9.2 targets**." in ext
-    # compact tables, explanations shared once, not under every card
-    assert "| Prop | Line (O/U) | Engine middle | Market Over | Engine Over |" in ext
-    assert "| Trimmed gains |" in ext or "| This season |" in ext
-    assert "Each cell: the workload" not in ext and "Sleeper prices most lines near even and moves" not in ext
-    assert "%% Updated: markets 20:42 UTC" in ext
+    # the guide's tables, and only those
+    assert "| Prop | Line · Over / Under prices | Market Over estimate | Engine Over estimate |" in ext
+    assert "| Gain reference | Workload needed to clear | Engine chance of reaching that workload |" in ext
+    assert "| This season | 9 targets at 79% | 67% |" in ext and "| Big gains trimmed | Unavailable | Unavailable |" in ext
+    assert "Engine middle" not in ext and "| Verdict |" not in ext and "Chance of those catches" not in ext
+    assert "*Chance of reaching the workload, not of clearing the line." in ext
+    assert "Workload consistent with the market price, assuming the engine's gains: 9.2 targets." in ext
+    # the closing read in the guide's order, then the two if-then bullets with the price
+    order = ["The market prices receptions 6.5 near even (50% Over); the engine's middle forecast is 8.",
+             "The engine expects 10.7 targets, based on last game's 21 targets.",
+             "At this season's gain reference, the line requires **9 targets**, which the engine reaches 67% of the time: attainable.",
+             "This matchup supports that requirement because Tampa is without its starting safety.",
+             "Catches vs yards: receptions 6.5 needs 7 catches; receiving yards 85.5 needs 7 at 13.0 yards",
+             "- **If you expect 9 targets at 79%, receptions over 6.5 (-127) fits**: about 7.1 catches, past the 7 the Over needs."]
+    idx = [ext.index(x) for x in order]
+    assert idx == sorted(idx)
+    assert "It stops fitting if his share falls back toward 26%, under the market-implied 9.2 targets." in ext
+    # horizontal rules, Parlay Fit, the shared notes at the end
+    assert ext.count("\n---\n") >= 6 and "Parlay value not assessed" in ext and "**Missing inputs:**" in ext
 
 
-# ---- the review of the full report (2026-10-08) ----
+def test_parlay_relationships_must_fit_the_legs():
+    def with_pairs(pairs):
+        return edit(lambda r: r["parlay"].update(pairs=pairs))
+    a, b = "CeeDee Lamb|receptions|over|6.5", "CeeDee Lamb|receptions|under|6.5"
+    ok = [c for c in P.check(RUN, with_pairs([{"a": a, "b": b, "relationship": "direct conflict", "reason": "x",
+                                               "guidance": "Do not combine"}])) if c["check"] == "parlay pair"]
+    assert ok and ok[0]["ok"]
+    # over 6.5 and under 7.5 both win at 7: not a direct conflict
+    bad = with_pairs([{"a": a, "b": "CeeDee Lamb|receptions|under|7.5", "relationship": "direct conflict",
+                       "reason": "x", "guidance": "y"}])
+    assert any(c["check"] == "parlay pair" and not c["ok"] for c in P.check(RUN, bad))
+    # shared exposure is one player's role
+    other = with_pairs([{"a": a, "b": "George Pickens|rec yds|over|65.5", "relationship": "shared exposure",
+                         "reason": "x", "guidance": "y"}])
+    assert any(c["check"] == "parlay pair" and not c["ok"] for c in P.check(RUN, other))
+    assert P.both_can_win(P.parse_leg("X|receptions|over|6.5"), P.parse_leg("X|receptions|under|8.5"))
+    assert not P.both_can_win(P.parse_leg("X|receptions|over|6.5"), P.parse_leg("X|receptions|under|7"))
+    with pytest.raises(P.ReadsError):
+        P.validate({**GOOD_RAW, "parlay": {"opening": "x"}})
+
+
 def test_only_a_chat_game_run_spends_credits_on_scenario_prices():
     root = Path(__file__).resolve().parents[2]
     sg = (root / "props/engine/scripts/score_game.py").read_text(encoding="utf-8")
@@ -577,3 +603,53 @@ def test_the_needs_row_says_when_it_is_the_season_rate():
             "season": {"vol": 11, "vol_txt": "11 carries", "rate": 3.8, "rate_txt": "3.8", "pct": 0.4}}}}]}
     t = "\n".join(PR.rushing_vs_combined(card, compact=True))
     assert "11 carries (this season's gains)" in t
+
+
+# ---- the review of the guide-exact card (2026-10-08) ----
+def test_an_alternate_line_leg_says_table_b_is_at_the_main_line():
+    card = copy.deepcopy(LAMB)
+    card["rows"].append({**card["rows"][0], "line": 5.5})
+    leg = {**LEG, "line": 5.5, "player": "CeeDee Lamb"}
+    lines = "\n".join(PR.card_customer(RUN, card, GOOD_RAW["players"][0], [leg]))
+    assert "Table B is built at the 6.5 line; this leg's 5.5 has no workload table in the run." in lines
+    assert "requires **9 targets**" not in lines
+    assert "This line has no workload table in the run (Table B is at the 6.5 line)." in lines
+
+
+def test_an_unavailable_gain_row_says_why():
+    card = copy.deepcopy(LAMB)
+    card["volume"][1]["cells"]["rows"].pop("capped")
+    t = "\n".join(PR.table_b_guide(card, "player_reception_yds"))
+    assert "| Big gains trimmed | Unavailable | Unavailable |" in t and "too few plays in his recent games" in t
+
+
+def test_a_combined_only_player_keeps_his_workload_line():
+    card = {"rows": [{"market": "player_rush_reception_yds", "line": 50.5, "book": "s"}], "book": "s",
+            "volume": [{"market": "player_rush_reception_yds", "volume_text": "14.4 carries + 3.2 catches"}]}
+    assert PR.workload_line(card) == "14.4 carries + 3.2 catches"
+    both = {"rows": [{"market": "player_rush_yds", "line": 40.5, "book": "s"},
+                     {"market": "player_rush_reception_yds", "line": 50.5, "book": "s"}], "book": "s",
+            "volume": [{"market": "player_rush_yds", "volume_text": "14.4 carries"},
+                       {"market": "player_rush_reception_yds", "volume_text": "14.4 carries + 3.2 catches"}]}
+    assert PR.workload_line(both) == "14.4 carries"
+
+
+def test_pair_rules_check_the_stat_for_tension_and_competition():
+    run = copy.deepcopy(RUN)
+    qb = {"name": "Dak Prescott", "team": "DAL", "pos": "QB", "slot": "QB1", "book": "s", "rows": [], "volume": []}
+    back = {"name": "Javonte Williams", "team": "DAL", "pos": "RB", "slot": "RB1", "book": "s", "rows": [], "volume": []}
+    run["cards"] = [LAMB, qb, back]
+    bad = {"a": "Dak Prescott|pass yds|under|270.5", "b": "Javonte Williams|rush yds|over|65.5",
+           "relationship": "production tension", "reason": "x", "guidance": "y"}
+    assert P.check_pair(run, bad)
+    good_ = {**bad, "b": "CeeDee Lamb|rec yds|over|85.5"}
+    assert P.check_pair(run, good_) is None
+    comp = {"a": "CeeDee Lamb|rec yds|over|85.5", "b": "Javonte Williams|rush yds|over|65.5",
+            "relationship": "opportunity competition", "reason": "x", "guidance": "y"}
+    assert "same pool" in P.check_pair(run, comp)
+
+
+def test_the_parlay_closing_is_bolded_once():
+    r = P.validate({**GOOD_RAW, "parlay": {"opening": "x.", "closing": "keep **Lamb** alone"}})
+    sec = "\n".join(PR.parlay_section(r))
+    assert "**keep Lamb alone**" in sec and "****" not in sec

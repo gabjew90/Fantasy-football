@@ -150,8 +150,81 @@ def validate(reads: dict) -> dict:
     for r in reads.get("personnel") or []:
         if not r.get("player") or not r.get("status") or not r.get("changes") or not r.get("affects"):
             raise ReadsError("each personnel row needs player, status, changes and affects")
+    pf = reads.get("parlay")
+    if not isinstance(pf, dict) or not pf.get("opening") or not pf.get("closing"):
+        raise ReadsError("the reads need a parlay section with an opening and a closing (the guide's Parlay Fit)")
+    if len(pf.get("pairs") or []) > 5:
+        raise ReadsError("Parlay Fit covers the 3-5 most consequential pairs, not more")
+    for x in pf.get("ticket") or []:
+        parse_leg(x)
+    for pr in pf.get("pairs") or []:
+        if pr.get("relationship") not in RELATIONSHIPS or not pr.get("reason") or not pr.get("guidance"):
+            raise ReadsError(f"each pair needs a relationship ({', '.join(sorted(RELATIONSHIPS))}), a reason and guidance")
+        parse_leg(pr.get("a"))
+        parse_leg(pr.get("b"))
     reads["legs"] = legs
     return reads
+
+
+RELATIONSHIPS = {"direct conflict", "script tension", "opportunity competition", "shared exposure", "conditional fit",
+                 "production tension"}
+
+
+def parse_leg(x) -> tuple[str, str, str, float]:
+    """'Player|market|side|line' -> (player, market key, side, line)."""
+    parts = [s.strip() for s in str(x or "").split("|")]
+    if len(parts) != 4 or not parts[0]:
+        raise ReadsError(f"a parlay leg is 'Player|market|side|line', not {x!r}")
+    mk = market_key(parts[1])
+    if mk is None:
+        raise ReadsError(f"{x!r}: unknown market")
+    if parts[2].lower() not in ("over", "under"):
+        raise ReadsError(f"{x!r}: side must be over or under")
+    try:
+        line = float(parts[3])
+    except ValueError:
+        raise ReadsError(f"{x!r}: the line is not a number") from None
+    return parts[0], mk, parts[2].lower(), line
+
+
+def both_can_win(a, b) -> bool:
+    """Two legs on the same player and stat: is there a result where both win? (Over L wins above L,
+    Under L below it; whole-number results.)"""
+    (_, _, sa, la), (_, _, sb, lb) = a, b
+    if sa == sb:
+        return True
+    lo_over = (la if sa == "over" else lb)
+    hi_under = (lb if sa == "over" else la)
+    return math.floor(lo_over) + 1 <= math.ceil(hi_under) - 1
+
+
+def check_pair(run, pr) -> str | None:
+    """The relationship a pair is given, against what can be decided from the legs. None when it
+    holds (or is a judgment no rule decides), else why not."""
+    a, b = parse_leg(pr["a"]), parse_leg(pr["b"])
+    rel = pr["relationship"]
+    same_player = a[0].lower() == b[0].lower()
+    team = lambda leg: (card_for(run, leg[0]) or {}).get("team")
+    if rel == "direct conflict":
+        if not (same_player and a[1] == b[1]):
+            return "a direct conflict needs the same player and stat"
+        if both_can_win(a, b):
+            return "both can win at some result: not a direct conflict"
+    if rel == "shared exposure" and not same_player:
+        return "shared exposure is one player's role in two markets"
+    receiving = {"player_receptions", "player_reception_yds"}
+    rushing = {"player_rush_yds", "player_rush_reception_yds"}
+    if rel == "opportunity competition":
+        if same_player or team(a) is None or team(a) != team(b):
+            return "opportunity competition is two teammates sharing a pool of work"
+        if not ({a[1], b[1]} <= receiving or {a[1], b[1]} <= rushing):
+            return "opportunity competition needs the same pool: both targets or both carries"
+    if rel == "production tension":
+        qb = [x for x in (a, b) if x[1] == "player_pass_yds"]
+        other = [x for x in (a, b) if x[1] != "player_pass_yds"]
+        if len(qb) != 1 or not other or other[0][1] not in receiving or team(a) is None or team(a) != team(b):
+            return "production tension is a quarterback's passing and a teammate's receiving"
+    return None
 
 
 def _valid_cite(c, where):
@@ -446,6 +519,19 @@ def check(run, reads) -> list[dict]:
                 _text_checks(add, i, k, lg.get(k), leg_allowed.get(i, []) + p_cites, inj, cited_inj, verdicts)
         for k in PLAYER_TEXT:
             _text_checks(add, idx[0], k, p.get(k), p_allowed, inj, cited_inj, verdicts)
+    # ---- Parlay Fit ----
+    pf = reads.get("parlay") or {}
+    p_lines = list(game_ok)
+    for x in list(pf.get("ticket") or []) + [y for pr in pf.get("pairs") or [] for y in (pr["a"], pr["b"])]:
+        _, mk_, _, ln = parse_leg(x)
+        p_lines += [ln, math.floor(ln) + 1]
+    for pr in pf.get("pairs") or []:
+        why = check_pair(run, pr)
+        add(0, "parlay pair", f"{pr['a']} + {pr['b']}: {pr['relationship']}", why or "consistent", why is None,
+            why or "")
+    for kind, text in [("parlay opening", pf.get("opening")), ("parlay closing", pf.get("closing"))] + [
+            (f"parlay pair {i}", f"{pr['reason']} {pr['guidance']}") for i, pr in enumerate(pf.get("pairs") or [], 1)]:
+        _text_checks(add, 0, kind, text, p_lines, inj, named_inj | {str(p_["player"]).lower() for p_ in reads.get("players") or []})
     return out
 
 

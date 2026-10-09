@@ -125,6 +125,9 @@ analyst:
   market_line, market_line_pct, row.<capped|season|engine>.<pct|vol|rate>, card.<path> (into the
   card), game.<path> (into the run). A value written "50%" is compared as a percent; a plain
   number at the decimals written; a chance written as a bare 0.5 is too coarse.
+- `parlay` (required): `{opening, closing, ticket: ["Player|market|side|line", ...], pairs: [{a, b,
+  relationship, reason, guidance}]}`, at most five pairs; the relationship is one of direct conflict,
+  script tension, opportunity competition, shared exposure, conditional fit, production tension.
 - `injuries.status` and `personnel.status`: the run's status (Out, Doubtful, Questionable), or
   "practice only".
 

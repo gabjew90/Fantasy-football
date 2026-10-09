@@ -252,6 +252,7 @@ def test_the_run_export_matches_the_report_and_a_read_built_from_it_publishes(ru
     reads = {"reads_version": 2, "game": "DAL@HOU",
              "opening": "A read built from the run. It states only the run's numbers. It is a test.",
              "assumptions": ["The share holds.", "The volume holds."], "handoff": "The player sections follow.",
+             "parlay": {"opening": "One leg, no ticket proposed.", "closing": "For this game read, keep the leg on its own."},
              "players": [{"player": card["name"], "basis": "His share.", "explanation": f"The market has the Over at {pct}.",
                           "role_evidence": "his share", "matchup": "supports", "matchup_reason": "the test says so",
                           "legs": [{"market": "receptions", "side": "over", "line": v["line"],

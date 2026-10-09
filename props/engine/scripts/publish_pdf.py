@@ -127,7 +127,7 @@ def _cells(line):
 def flowables(md: str, width: float) -> list:
     """The Markdown subset as reportlab flowables."""
     from reportlab.lib.colors import HexColor
-    from reportlab.platypus import Paragraph, Spacer
+    from reportlab.platypus import HRFlowable, Paragraph, Spacer
     _fonts()
     S = _styles()
     out, lines, i = [], md.splitlines(), 0
@@ -157,7 +157,11 @@ def flowables(md: str, width: float) -> list:
                 i += 1
             out += [Spacer(1, 3), _table(rows, aligns, S, width), Spacer(1, 10)]
             continue
-        if s.startswith("# "):
+        if s == "---":
+            # the guide's horizontal rules: between team sections, before the player sections, between cards
+            flush()
+            out.append(HRFlowable(width="100%", thickness=0.6, color=HexColor(RULE), spaceBefore=6, spaceAfter=10))
+        elif s.startswith("# "):
             flush()
             out.append(Paragraph(inline(s[2:]), S["title"]))
         elif s.startswith("## "):
