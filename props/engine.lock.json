@@ -1,6 +1,6 @@
 {
   "algorithm": "props-engine-sha256-lf-1",
-  "engine_sha256": "078e0d4f0fbf0c8c5a900c2c962b4bdbd46a6d07f3c9f12c66062eb89663f785",
+  "engine_sha256": "8770d51fffbfd872a8837342a709a67420d87cbf410ed3ced6cd36b7ae1631fe",
   "file_count": 63,
   "files": {
     "SKILL.md": "cd4cac21b211fedb0bae974aa64bdfab3229889c4cb80f6b006fc336cb20d8cf",
@@ -50,9 +50,9 @@
     "scripts/eligibility.py": "91b45727f37f690a1416e9461d2ef5f00f4bd1c31985fd31d312e2251fd76bd2",
     "scripts/model.py": "c692e34e63219841bcb3cfd5da2427f4129acb3a27f2e9bf7dfc120f304e226b",
     "scripts/odds_client.py": "434186273bd0412a5545247228298951c5d0504a19c8a47c4c782bf3bb75aaa1",
-    "scripts/publish.py": "eb1196c919a281facb24446f626968ae1229b9f158fb7b6d8ca3f99c644d3e9b",
+    "scripts/publish.py": "5c72244ab30dcbe662e7216d282b93a650ee9b4fc625542ae471e9b0e12affd7",
     "scripts/publish_pdf.py": "a4514ccbcc0254373c32e35bf3cd05ed97461347608ec43dff965697ea56bdb4",
-    "scripts/publish_render.py": "41c426bdd2e225ff7f678887a8cafc06afcaf6cce62e33984cbafa82fbadfe04",
+    "scripts/publish_render.py": "bfb93297d28c632e09a22801a9d806101ffa6182a43e62be051ca0f6cfe1a5f9",
     "scripts/research.py": "36b669cfa43ad20bc0ecdd93fa4240dd76815cb0cce55f8a0ad1e42b59173d0d",
     "scripts/scenario.py": "e16722e9abebb55f05a770910c1e47dc1cc89f7d469c8d6232d6e6bd1af83774",
     "scripts/score_game.py": "cbc4e5c38fea3d4ac3683b51edb9d5727300dba8d093bab7a726b65aa403651b",

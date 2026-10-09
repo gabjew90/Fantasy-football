@@ -212,11 +212,17 @@ def check_pair(run, pr) -> str | None:
             return "both can win at some result: not a direct conflict"
     if rel == "shared exposure" and not same_player:
         return "shared exposure is one player's role in two markets"
-    if rel == "opportunity competition" and (same_player or team(a) is None or team(a) != team(b)):
-        return "opportunity competition is two teammates sharing a pool of work"
+    receiving = {"player_receptions", "player_reception_yds"}
+    rushing = {"player_rush_yds", "player_rush_reception_yds"}
+    if rel == "opportunity competition":
+        if same_player or team(a) is None or team(a) != team(b):
+            return "opportunity competition is two teammates sharing a pool of work"
+        if not ({a[1], b[1]} <= receiving or {a[1], b[1]} <= rushing):
+            return "opportunity competition needs the same pool: both targets or both carries"
     if rel == "production tension":
         qb = [x for x in (a, b) if x[1] == "player_pass_yds"]
-        if len(qb) != 1 or team(a) is None or team(a) != team(b):
+        other = [x for x in (a, b) if x[1] != "player_pass_yds"]
+        if len(qb) != 1 or not other or other[0][1] not in receiving or team(a) is None or team(a) != team(b):
             return "production tension is a quarterback's passing and a teammate's receiving"
     return None
 

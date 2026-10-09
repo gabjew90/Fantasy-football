@@ -603,3 +603,53 @@ def test_the_needs_row_says_when_it_is_the_season_rate():
             "season": {"vol": 11, "vol_txt": "11 carries", "rate": 3.8, "rate_txt": "3.8", "pct": 0.4}}}}]}
     t = "\n".join(PR.rushing_vs_combined(card, compact=True))
     assert "11 carries (this season's gains)" in t
+
+
+# ---- the review of the guide-exact card (2026-10-08) ----
+def test_an_alternate_line_leg_says_table_b_is_at_the_main_line():
+    card = copy.deepcopy(LAMB)
+    card["rows"].append({**card["rows"][0], "line": 5.5})
+    leg = {**LEG, "line": 5.5, "player": "CeeDee Lamb"}
+    lines = "\n".join(PR.card_customer(RUN, card, GOOD_RAW["players"][0], [leg]))
+    assert "Table B is built at the 6.5 line; this leg's 5.5 has no workload table in the run." in lines
+    assert "requires **9 targets**" not in lines
+    assert "This line has no workload table in the run (Table B is at the 6.5 line)." in lines
+
+
+def test_an_unavailable_gain_row_says_why():
+    card = copy.deepcopy(LAMB)
+    card["volume"][1]["cells"]["rows"].pop("capped")
+    t = "\n".join(PR.table_b_guide(card, "player_reception_yds"))
+    assert "| Big gains trimmed | Unavailable | Unavailable |" in t and "too few plays in his recent games" in t
+
+
+def test_a_combined_only_player_keeps_his_workload_line():
+    card = {"rows": [{"market": "player_rush_reception_yds", "line": 50.5, "book": "s"}], "book": "s",
+            "volume": [{"market": "player_rush_reception_yds", "volume_text": "14.4 carries + 3.2 catches"}]}
+    assert PR.workload_line(card) == "14.4 carries + 3.2 catches"
+    both = {"rows": [{"market": "player_rush_yds", "line": 40.5, "book": "s"},
+                     {"market": "player_rush_reception_yds", "line": 50.5, "book": "s"}], "book": "s",
+            "volume": [{"market": "player_rush_yds", "volume_text": "14.4 carries"},
+                       {"market": "player_rush_reception_yds", "volume_text": "14.4 carries + 3.2 catches"}]}
+    assert PR.workload_line(both) == "14.4 carries"
+
+
+def test_pair_rules_check_the_stat_for_tension_and_competition():
+    run = copy.deepcopy(RUN)
+    qb = {"name": "Dak Prescott", "team": "DAL", "pos": "QB", "slot": "QB1", "book": "s", "rows": [], "volume": []}
+    back = {"name": "Javonte Williams", "team": "DAL", "pos": "RB", "slot": "RB1", "book": "s", "rows": [], "volume": []}
+    run["cards"] = [LAMB, qb, back]
+    bad = {"a": "Dak Prescott|pass yds|under|270.5", "b": "Javonte Williams|rush yds|over|65.5",
+           "relationship": "production tension", "reason": "x", "guidance": "y"}
+    assert P.check_pair(run, bad)
+    good_ = {**bad, "b": "CeeDee Lamb|rec yds|over|85.5"}
+    assert P.check_pair(run, good_) is None
+    comp = {"a": "CeeDee Lamb|rec yds|over|85.5", "b": "Javonte Williams|rush yds|over|65.5",
+            "relationship": "opportunity competition", "reason": "x", "guidance": "y"}
+    assert "same pool" in P.check_pair(run, comp)
+
+
+def test_the_parlay_closing_is_bolded_once():
+    r = P.validate({**GOOD_RAW, "parlay": {"opening": "x.", "closing": "keep **Lamb** alone"}})
+    sec = "\n".join(PR.parlay_section(r))
+    assert "**keep Lamb alone**" in sec and "****" not in sec

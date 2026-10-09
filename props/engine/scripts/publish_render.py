@@ -679,8 +679,11 @@ def workload_line(card) -> str:
     contains dropped."""
     vts = [PB.volume_text(card, r["market"]) for r in PB.main_rows(card)]
     vts = [v for v in dict.fromkeys(v for v in vts if v)]
+    # the combined "carries + catches" text goes first, when its parts are there to show
+    if any(" + " not in v for v in vts):
+        vts = [v for v in vts if " + " not in v]
     keep = [v for v in vts if not any(o != v and o.startswith(v) for o in vts)]
-    keep = [k for k in keep if not any(o != k and k in o for o in keep) and " + " not in k]
+    keep = [k for k in keep if not any(o != k and k in o for o in keep)]
     return "; ".join(v.replace(" -> ", ", ") for v in keep) or "Unavailable"
 
 
@@ -727,7 +730,9 @@ def table_b_guide(card, mk) -> list[str]:
         samples.append(f"trimmed, his last {m.group(1)} games")
     note = ("*Chance of reaching the workload, not of clearing the line." + (f" Samples: {'; '.join(samples)}." if samples else "")
             + (" Trimming big gains does not apply to a catch count." if mk == "player_receptions" and "capped" not in rows
-               else "") + "*")
+               else " Big gains trimmed: unavailable, too few plays in his recent games." if "capped" not in rows
+               else "")
+            + (" This season: unavailable, no plays yet." if "season" not in rows else "") + "*")
     L += ["", note]
     extra = []
     mr = c.get("market_row")
@@ -782,6 +787,8 @@ def read_guide(card, p, lg) -> str:
              f"based on {p['role_evidence'].rstrip('.')}.")
     vol_line = (next((x for x in card.get("volume") or [] if x.get("market") == mk), {}) or {}).get("line")
     v = PB.verdict(card, mk) if PB._close(vol_line, lg["line"], 1e-9) else None
+    if not v and vol_line is not None and not PB._close(vol_line, lg["line"], 1e-9):
+        s.append(f"This line has no workload table in the run (Table B is at the {float(vol_line):g} line).")
     if v:
         ref = "the trimmed" if v["ref"] == "capped" else "this season's"
         s.append(f"At {ref} gain reference, the line requires **{v['vol_txt']}**, which the engine reaches "
@@ -841,6 +848,10 @@ def card_customer(run, card, p, legs) -> list[str]:
         row = next((r for r in PB.main_rows(card) if r["market"] == mk), {})
         L += [f"**Table B: what ordinary production requires** ({PB.MARKET_WORDS[mk]} {float(row.get('line', 0)):g})", "",
               *table_b_guide(card, mk), ""]
+    vol_line = (next((x for x in card.get("volume") or [] if x.get("market") == mk), {}) or {}).get("line")
+    if legs and vol_line is not None and not PB._close(vol_line, legs[0]["line"], 1e-9):
+        L += [f"*Table B is built at the {float(vol_line):g} line; this leg's {float(legs[0]['line']):g} has no workload "
+              f"table in the run.*", ""]
     if mk == "player_rush_reception_yds" and legs:
         L += [*production_paths(card), ""]
     if p:
@@ -871,7 +882,7 @@ def parlay_section(reads) -> list[str]:
                      f"{_esc(pr['reason'])} | {_esc(pr['guidance'])} |")
         L.append("")
     L += ["*Relationships are analytical judgment, not a measured joint probability. Parlay value not assessed: no "
-          "joint quote or modeled joint probability.*", "", f"**{pf.get('closing') or ''}**", ""]
+          "joint quote or modeled joint probability.*", "", f"**{(pf.get('closing') or '').replace('**', '')}**", ""]
     return L
 
 
