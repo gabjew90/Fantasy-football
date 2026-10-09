@@ -67,6 +67,8 @@ def record(tmp_path, monkeypatch):
     monkeypatch.setattr(settle.persist, "RECORD_ROOT", root)
     monkeypatch.setattr(scorecard.persist, "RECORD_ROOT", root)
     monkeypatch.setattr(settle, "load_stats", lambda season, cache: _stats_frame())
+    # rosters and snap counts (who played without a stat row): none unless a test gives them
+    monkeypatch.setattr(settle, "load_who_played", lambda season, cache: (None, None))
     # The schedule is a network read behind a day-old cache. Tests that are
     # not about game context get a fixed one rather than a machine-dependent
     # one; the two tests below drive the real reader with a stub schedule.
@@ -135,6 +137,91 @@ def test_two_engines_grade_into_separate_rows(record):
     assert len(rows) == 2
     assert {r["engine_hash"] for r in rows} == {"aaa", "bbb"}
     assert {r["is_call"] for r in rows} == {"1"}, "one call per engine"
+
+
+# ------------------------------------------------- joining by ID (DECISIONS #224)
+
+CMC, OTHER, ROOKIE = "00-0033280", "00-0099999", "00-0041111"
+
+
+def _id_stats():
+    df = _stats_frame()
+    df["player_id"] = [CMC, OTHER]
+    return df
+
+
+def _who_played(snaps_weeks=(2,), off=None):
+    roster = {"by_name": {(2, "SF", "christian mccaffrey"): CMC, (2, "SF", "other player"): OTHER,
+                          (2, "SF", "rookie receiver"): ROOKIE},
+              "pfr": {CMC: "McCaCh01", OTHER: "OthePl00", ROOKIE: "RookRe00"}}
+    return roster, {"weeks": set(snaps_weeks), "off": off or {}}
+
+
+def _resolve(row, roster=None, snaps=None):
+    s = _id_stats()
+    by_id = {r["player_id"]: r for _, r in s.iterrows()}
+    exact = {(r["team"], r["_name"]): r for _, r in s.iterrows()}
+    return settle.resolve(row, 2, by_id, exact, roster, snaps)
+
+
+def test_a_row_with_a_gsis_id_joins_by_it_whatever_its_name_says():
+    stat, how, found = _resolve(_pred(gsis_id=CMC, player="C. McCaffrey-Typo"))
+    assert found == "stat" and how == "gsis" and stat["player_display_name"] == "Christian McCaffrey"
+
+
+def test_an_id_with_no_stat_row_never_falls_back_to_a_name():
+    """The id says who he is; another player's stat row under a matching name is not him."""
+    stat, how, found = _resolve(_pred(gsis_id=ROOKIE, player="Christian McCaffrey"), *_who_played())
+    assert stat is None and found == "dnp"
+
+
+def test_an_older_row_takes_its_id_from_that_weeks_roster():
+    stat, how, found = _resolve(_pred(player="Other Player"), *_who_played())
+    assert found == "stat" and how == "roster name -> gsis" and stat["player_display_name"] == "Other Player"
+
+
+def test_played_with_no_stat_row_grades_at_zero_and_no_snaps_is_a_void():
+    """2026 weeks 2-4: 11 player-weeks (Jeudy 36 offensive snaps, Bourne 42) had no stat row and were
+    left out as voids; the book grades them at 0."""
+    roster, snaps = _who_played(off={(2, "RookRe00"): 31.0})
+    stat, how, found = _resolve(_pred(player="Rookie Receiver", market="player_receptions", line=2.5,
+                                      side="Over"), roster, snaps)
+    assert found == "played" and stat["receptions"] == 0.0 and "31 offense snaps" in how
+    roster, snaps = _who_played(off={})
+    assert _resolve(_pred(player="Rookie Receiver"), roster, snaps)[2] == "dnp"
+
+
+def test_no_snap_counts_yet_is_pending_not_a_void():
+    roster, snaps = _who_played(snaps_weeks=())
+    assert _resolve(_pred(player="Rookie Receiver"), roster, snaps)[2] == "pending"
+    assert _resolve(_pred(gsis_id=ROOKIE), None, None)[2] == "pending"
+
+
+def test_no_id_anywhere_is_unjoined_and_the_loose_keys_are_gone():
+    """No initial + surname within a team, no name across teams: either can attach a call to
+    another player (two B. Robinsons in Atlanta, two Byron Murphys league-wide)."""
+    assert _resolve(_pred(player="C. McCaffrey", team="SF"))[2] == "unjoined"
+    assert _resolve(_pred(player="Christian McCaffrey", team="LV"))[2] == "unjoined"
+    stat, how, found = _resolve(_pred())                       # no id, no roster: exact team + name
+    assert found == "stat" and how == "team+name"
+
+
+def test_settle_grades_a_played_zero_and_counts_the_statuses(record, monkeypatch, capsys):
+    monkeypatch.setattr(settle, "load_stats", lambda season, cache: _id_stats())
+    monkeypatch.setattr(settle, "load_who_played", lambda season, cache: _who_played(off={(2, "RookRe00"): 31.0}))
+    _write(record, [_pred(player="Rookie Receiver", market="player_receptions", line=2.5, side="Over",
+                          event_id="e2"),
+                    _pred(player="Rookie Receiver", market="player_reception_yds", line=20.5, side="Under",
+                          event_id="e2"),
+                    _pred(gsis_id=CMC, sleeper_id="4034")])
+    assert settle.main(["--season", "2026"]) == 0
+    rows = {(r["player"], r["market"]): r for r in _settled(record)}
+    over = rows[("Rookie Receiver", "player_receptions")]
+    under = rows[("Rookie Receiver", "player_reception_yds")]
+    assert over["status"] == "settled" and float(over["actual"]) == 0.0 and str(over["won"]) in ("0", "False")
+    assert under["status"] == "settled" and str(under["won"]) in ("1", "True")
+    assert rows[("Christian McCaffrey", "player_rush_yds")]["join_method"] == "gsis"
+    assert "played_no_stat=2" in capsys.readouterr().out
 
 
 # ---------------------------------------------------------------- scorecard

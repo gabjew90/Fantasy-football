@@ -176,6 +176,43 @@ def test_an_empty_download_is_a_failed_refresh_not_a_new_copy(tmp_path):
     assert m.get("lines")["status"] == "stale"
 
 
+class _Resp:
+    """A urlopen response whose body is `body` and whose Content-Length says `length`."""
+    def __init__(self, body: bytes, length):
+        self._b, self.headers = body, ({} if length is None else {"Content-Length": str(length)})
+
+    def read(self, n=-1):
+        out, self._b = self._b[:n], self._b[n:]
+        return out
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        return False
+
+
+def test_a_truncated_download_is_a_failed_refresh_not_a_new_copy(tmp_path, monkeypatch):
+    """2026-10-09: a connection closed mid-body left a 751 KB roster file for 3.4 MB, and it
+    replaced the good copy. A body shorter than its Content-Length now fails the refresh."""
+    m = Manifest("t")
+    f = tmp_path / "roster.csv"
+    f.write_text("a,b\n1,2\n3,4\n", encoding="utf-8")
+    _age(f, 99999)
+    monkeypatch.setattr(F.urllib.request, "urlopen", lambda req, timeout: _Resp(b"a,b\n1,", 12))
+    F.fetch("https://x/roster.csv", f, 600, name="roster", manifest=m)
+    assert f.read_text(encoding="utf-8") == "a,b\n1,2\n3,4\n"
+    assert m.get("roster")["status"] == "stale" and "OSError" in m.get("roster")["detail"]
+    # a full body, or one with no length header, is a new copy as before
+    monkeypatch.setattr(F.urllib.request, "urlopen", lambda req, timeout: _Resp(b"a,b\n9,9\n", 8))
+    F.fetch("https://x/roster.csv", f, 600, name="roster", manifest=m)
+    assert f.read_text(encoding="utf-8") == "a,b\n9,9\n"
+    _age(f, 99999)
+    monkeypatch.setattr(F.urllib.request, "urlopen", lambda req, timeout: _Resp(b"a,b\n7,7\n", None))
+    F.fetch("https://x/roster.csv", f, 600, name="roster", manifest=m)
+    assert f.read_text(encoding="utf-8") == "a,b\n7,7\n"
+
+
 def test_a_naive_start_time_is_taken_as_utc():
     m = Manifest("t", started_at=dt.datetime(2026, 9, 24, 12, 0))
     m.record("roster", source="s", status="fresh", fetched_at=dt.datetime(2026, 9, 24, 12, 5))

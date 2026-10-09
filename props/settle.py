@@ -18,11 +18,15 @@ player who did not play settles as `dnp` rather than as a loss, because a
 book would have voided the prop; folding a void into the record as a loss
 would bias every hit rate downward.
 
-Name joining: nflverse `player_id` is not present on Sleeper rows, so the join
-is on a normalized name within (season, week, team), with a first-initial +
-surname fallback. Unjoined rows are written with status `unjoined` and counted
-in the run summary rather than dropped, since a silent drop is the failure mode
-that would quietly shrink the record.
+Joining by ID (DECISIONS #224): a prediction row carries the player's nflverse
+gsis id (from Sleeper's line, matched to the engine's player), which is the
+stats file's `player_id`. A row from before the ids takes its gsis id from that
+week's roster by team and full name; only a row with no id at all falls back to
+the stats' team + full name. A call with no stat row is graded at 0 when the
+player took offensive snaps (the book grades him at 0), is `dnp` (a void) when
+he took none, `pending` while that week's snap counts are unpublished, and
+`unjoined` when no id could be found. None of dnp / pending / unjoined is
+graded, and each is counted in the run summary rather than dropped.
 
 Usage:
     python props/settle.py --season 2026 [--week 2] [--through-week 5]
@@ -111,6 +115,8 @@ SETTLED_FIELDS = [
     "miss", "targets", "carries", "target_share", "air_yards_share", "wopr",
     "opponent", "team_points", "opp_points", "game_total",
     "join_method",
+    # who the call is about, by ID (DECISIONS #224); empty on rows captured before the ids
+    "gsis_id", "sleeper_id",
 ]
 
 # nflverse weekly columns worth keeping beside a graded call, and the name
@@ -218,6 +224,78 @@ def load_stats(season: int, cache_dir: Path, max_age_s: int = STATS_MAX_AGE_S,
     return df
 
 
+def clean_gsis(v) -> str | None:
+    v = str(v or "").strip()
+    return v if re.fullmatch(r"00-\d{7}", v) else None
+
+
+def load_who_played(season: int, cache_dir: Path, max_age_s: int = STATS_MAX_AGE_S, downloader=None):
+    """(roster index, snaps index) for telling a player who played without a stat row from one
+    who did not play (DECISIONS #224), or (None, None) when either file is unavailable -- settle
+    then grades what the stats hold and leaves the rest pending rather than guessing.
+
+    roster: {"by_name": {(week, team, norm name): gsis}, "pfr": {gsis: pfr id}} from the weekly
+    rosters (which carry gsis, pfr and Sleeper ids together). snaps: {"weeks": set of weeks with
+    snap counts, "off": {(week, pfr id): offense snaps}}."""
+    try:
+        m = core_fetch.Manifest("settle")
+        rp = core_fetch.nflverse("rosters_weekly", season, cache_dir=cache_dir, manifest=m,
+                                 max_age_s=max_age_s, downloader=downloader)
+        sp = core_fetch.nflverse("snaps", season, cache_dir=cache_dir, manifest=m,
+                                 max_age_s=max_age_s, downloader=downloader)
+        ros = pd.read_csv(rp, low_memory=False, usecols=["week", "team", "full_name", "gsis_id", "pfr_id"])
+        sn = pd.read_csv(sp, low_memory=False, usecols=["week", "game_type", "pfr_player_id", "offense_snaps"])
+    except Exception as exc:  # noqa: BLE001 -- the stats still grade; only the no-stat-row rows wait
+        print(f"rosters / snap counts unavailable ({exc.__class__.__name__}: {exc}); rows without a stat "
+              f"row stay pending", file=sys.stderr)
+        return None, None
+    ros = ros.dropna(subset=["gsis_id"])
+    by_name, pfr = {}, {}
+    for w, t, n, g, p in zip(ros.week, ros.team, ros.full_name, ros.gsis_id, ros.pfr_id):
+        g = clean_gsis(g)
+        if g is None:
+            continue
+        by_name.setdefault((int(w), str(t), norm_name(n)), g)
+        if isinstance(p, str) and p:
+            pfr.setdefault(g, p)
+    sn = sn[sn.game_type == "REG"]
+    off = {(int(w), str(p)): float(s or 0) for w, p, s in zip(sn.week, sn.pfr_player_id, sn.offense_snaps)}
+    return {"by_name": by_name, "pfr": pfr}, {"weeks": {int(w) for w in sn.week.unique()}, "off": off}
+
+
+# the stat row of a player who took offensive snaps and recorded nothing: the book grades him at 0
+ZERO_STATS = {col: 0.0 for col in set(MARKET_STAT.values())}
+
+
+def resolve(row: dict, week: int, by_id: dict, exact: dict, roster, snaps):
+    """(stat row or None, how, status) for one call (DECISIONS #224).
+
+    status: "stat" (a stat row), "played" (offensive snaps, no stat row: graded at 0),
+    "dnp" (no snaps: a void), "pending" (no stat row and that week's snaps not published, or
+    no snap file), "unjoined" (no ID could be found for him). By gsis id when the row carries
+    one; an older row (no id) takes his id from that week's roster by team and full name, and
+    only a row with no id at all falls back to the stats' team + full name. The looser keys
+    (initial + surname within a team, a name across teams) are gone: each can attach a call to
+    another player silently (two B. Robinsons in Atlanta, two Byron Murphys league-wide)."""
+    team, nm = row.get("team"), norm_name(row.get("player", ""))
+    gid, how = clean_gsis(row.get("gsis_id")), "gsis"
+    if gid is None and roster is not None:
+        gid, how = roster["by_name"].get((int(week), str(team), nm)), "roster name -> gsis"
+    if gid is not None:
+        if gid in by_id:
+            return by_id[gid], how, "stat"
+    elif (team, nm) in exact:
+        return exact[(team, nm)], "team+name", "stat"
+    if gid is None:
+        return None, "", "unjoined"
+    if snaps is None or roster is None or int(week) not in snaps["weeks"]:
+        return None, how, "pending"
+    n = snaps["off"].get((int(week), roster["pfr"].get(gid, "")), 0.0)
+    if n > 0:
+        return ZERO_STATS, f"{how}; played, no stat row ({n:g} offense snaps)", "played"
+    return None, how, "dnp"
+
+
 def game_context(season: int) -> dict[tuple[int, str], dict]:
     """(week, team) -> {team_points, opp_points, game_total} for played games.
 
@@ -304,8 +382,9 @@ def main(argv: list[str] | None = None) -> int:
     stats = load_stats(args.season, persist.RECORD_ROOT.parent / ".cache")
 
     context = game_context(args.season)
+    roster, snaps = load_who_played(args.season, persist.RECORD_ROOT.parent / ".cache")
 
-    out_rows, counts = [], {"settled": 0, "push": 0, "dnp": 0,
+    out_rows, counts = [], {"settled": 0, "push": 0, "dnp": 0, "pending": 0, "played_no_stat": 0,
                             "unjoined": 0, "unplayed_week": 0,
                             "calls": 0, "superseded": 0, "ties": 0}
 
@@ -317,8 +396,7 @@ def main(argv: list[str] | None = None) -> int:
             print(f"week {week}: no results published yet, skipped")
             continue
         exact = {(r["team"], r["_name"]): r for _, r in wk_stats.iterrows()}
-        loose = {(r["team"], r["_loose"]): r for _, r in wk_stats.iterrows()}
-        name_only = {r["_name"]: r for _, r in wk_stats.iterrows()}
+        by_id = {clean_gsis(r["player_id"]): r for _, r in wk_stats.iterrows() if clean_gsis(r.get("player_id"))}
 
         # EVERY ROW IS GRADED; ONE PER MARKET IS A CALL. The whole week has
         # to be in hand before `is_call` can be decided, because the call is
@@ -337,16 +415,7 @@ def main(argv: list[str] | None = None) -> int:
                 continue
             if not row.get("is_call"):
                 counts["superseded"] += 1
-            team = row.get("team")
-            nm = norm_name(row.get("player", ""))
-            stat_row, how = None, None
-            for key, table, method in (((team, nm), exact, "team+name"),
-                                       ((team, loose_key(row.get("player", ""))),
-                                        loose, "team+initial"),
-                                       (nm, name_only, "name-only")):
-                if key in table:
-                    stat_row, how = table[key], method
-                    break
+            stat_row, how, found = resolve(row, week, by_id, exact, roster, snaps)
 
             out = {f: row.get(f) for f in SETTLED_FIELDS if f in row}
             out["season"], out["week"] = args.season, week
@@ -355,15 +424,15 @@ def main(argv: list[str] | None = None) -> int:
             out["model_id"] = calls_mod.engine_version.model_id(row)
 
             if stat_row is None:
-                out.update(actual="", result="", status="dnp", won="",
-                           pnl_per_100="")
-                # A player on the week's roster who recorded no stat line is
-                # a DNP/void; one absent from the file entirely is an
-                # unresolved join and is flagged separately.
-                out["status"] = "dnp" if nm in name_only else "unjoined"
-                counts[out["status"]] += 1
+                # dnp: no offensive snap, a void as the book voids it; pending: no stat row and no
+                # snap counts yet to say whether he played; unjoined: no id found for him. None of
+                # them is graded -- a void folded in as a loss would bias every hit rate down.
+                out.update(actual="", result="", status=found, won="", pnl_per_100="")
+                counts[found] += 1
                 out_rows.append(out)
                 continue
+            if found == "played":
+                counts["played_no_stat"] += 1
 
             for src_col, dest in DIAGNOSTIC_STATS.items():
                 if src_col in stat_row:

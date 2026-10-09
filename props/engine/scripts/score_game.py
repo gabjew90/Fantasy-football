@@ -62,6 +62,50 @@ ESPN_TEAM = {"WAS": "WSH", "LA": "LAR"}
 SLEEPER_TEAM = {"LA": "LAR"}
 
 
+def clean_gsis(v):
+    """An nflverse gsis id ("00-0039361") or None. Sleeper stores a few with stray whitespace
+    (core.ids._clean_gsis, which this standalone engine cannot import)."""
+    import re as _re
+    v = str(v or "").strip()
+    return v if _re.fullmatch(r"00-\d{7}", v) else None
+
+
+def sleeper_gsis_map(ros):
+    """{Sleeper player id: gsis id} from nflverse's weekly rosters, which carry both. A Sleeper id
+    claimed by two gsis ids is left out (a wrong join is worse than a name fallback)."""
+    if ros is None or "sleeper_id" not in ros or "gsis_id" not in ros:
+        return {}
+    out, bad = {}, set()
+    for s_, g_ in zip(ros.sleeper_id, ros.gsis_id):
+        try:
+            s_ = str(int(float(s_)))
+        except (TypeError, ValueError):
+            continue
+        g_ = clean_gsis(g_)
+        if g_ is None:
+            continue
+        if out.get(s_, g_) != g_:
+            bad.add(s_)
+        out[s_] = g_
+    return {k: v for k, v in out.items() if k not in bad}
+
+
+def match_line_player(desc, gsis, name_by_gsis, name_by_norm, loose_by_key):
+    """(our player's name or None, how) for one book line (DECISIONS #224).
+
+    By ID first: the line's gsis id (Sleeper carries it) against our players'. A name only
+    where the line has no ID or the ID is not one of ours (a player outside the priced
+    population -- the name join fails for him too). When the ID and the name point at two
+    different players of ours, neither is trusted: (None, "id/name conflict")."""
+    by_name = name_by_norm.get(norm_name(desc)) or loose_by_key.get(name_key_loose(desc))
+    by_id = name_by_gsis.get(gsis) if gsis else None
+    if by_id is not None:
+        if by_name is not None and by_name != by_id:
+            return None, "id/name conflict"
+        return by_id, "gsis"
+    return by_name, ("name" if by_name is not None else None)
+
+
 def cached_json(path, ttl_s, loader):
     """Read `path` if it is younger than ttl_s seconds, else call loader(), write, return.
     Slate runs (score_week.py) share one workdir, so one Sleeper/ESPN pull serves all games."""
@@ -727,6 +771,9 @@ def main():
     pbp = pd.read_csv(fetch(*cur["pbp"]), low_memory=False)
     pbp = pbp[(pbp.season_type == "REG") & (pbp.week < WEEK)]
     ros = pd.read_csv(fetch(*cur["rosters"]), low_memory=False)
+    # Sleeper's player file leaves gsis_id empty for most players (CHI@GB, 2026-10-09: 8 of 84
+    # quotes); nflverse's weekly rosters carry both ids, so a Sleeper line gets its gsis id here
+    SLEEPER_TO_GSIS = sleeper_gsis_map(ros)
     inj = pd.read_csv(fetch(*cur["injuries"]), low_memory=False)
     dcf = pd.read_csv(fetch(*cur["depth_charts"]), low_memory=False)
     snp = pd.read_csv(fetch(*cur["snaps"]))
@@ -1550,6 +1597,11 @@ def main():
                 nm_ = pinfo.get("full_name") or f'{pinfo.get("first_name","")} {pinfo.get("last_name","")}'.strip()
                 if not nm_:
                     continue
+                # WHO THE LINE IS ABOUT, by ID (DECISIONS #224): Sleeper's own player id and the
+                # nflverse gsis id Sleeper carries for him, on every outcome and archived quote, so
+                # the line joins to our player and the record joins to the stats without names
+                ids_ = {"sleeper_id": str(m_["subject_id"]),
+                        "gsis_id": SLEEPER_TO_GSIS.get(str(m_["subject_id"])) or clean_gsis(pinfo.get("gsis_id"))}
                 gid = m_.get("game_id"); latest = max(latest, int(m_.get("updated_at", 0)))
                 if opts[0].get("subject_pos_rank"):
                     pos_rank[nm_] = opts[0]["subject_pos_rank"]
@@ -1560,17 +1612,17 @@ def main():
                 key = WT[m_["wager_type"]]
                 outs = mkts.setdefault(key, [])
                 if key == "player_anytime_td":
-                    outs.append({"name": "Yes", "description": nm_, "price": mult_to_amer(over["payout_multiplier"])})
+                    outs.append({"name": "Yes", "description": nm_, "price": mult_to_amer(over["payout_multiplier"]), **ids_})
                     if under is not None:
                         # Sleeper prices the "no TD" side too, so anytime-TD can be de-vigged
                         # properly instead of treating the Yes price as the market number.
-                        outs.append({"name": "No", "description": nm_, "price": mult_to_amer(under["payout_multiplier"])})
+                        outs.append({"name": "No", "description": nm_, "price": mult_to_amer(under["payout_multiplier"]), **ids_})
                         td_two_sided = True
                 else:
                     if under is None:
                         continue
-                    outs.append({"name": "Over", "description": nm_, "point": float(over["outcome_value"]), "price": mult_to_amer(over["payout_multiplier"])})
-                    outs.append({"name": "Under", "description": nm_, "point": float(under["outcome_value"]), "price": mult_to_amer(under["payout_multiplier"])})
+                    outs.append({"name": "Over", "description": nm_, "point": float(over["outcome_value"]), "price": mult_to_amer(over["payout_multiplier"]), **ids_})
+                    outs.append({"name": "Under", "description": nm_, "point": float(under["outcome_value"]), "price": mult_to_amer(under["payout_multiplier"]), **ids_})
                 n_lines += 1
             if n_lines == 0:
                 SOURCES.append(("Sportsbook prices (Sleeper Picks)", "the lines and odds being compared",
@@ -1590,6 +1642,7 @@ def main():
                           "event_id": eid_, "commence_time": kick.isoformat(), "home_team": TEAM_NAMES.get(HOME), "away_team": TEAM_NAMES.get(AWAY),
                           "bookmaker": "sleeper", "market": mk_["key"], "player": o.get("description"), "outcome": o.get("name"),
                           "point": o.get("point"), "price_american": o.get("price"), "last_update": lu,
+                          "sleeper_id": o.get("sleeper_id"), "gsis_id": o.get("gsis_id"),
                           "requests_remaining": None, "requests_used": None, "requests_last": None, "source": "sleeper_lines_available"}
                          for mk_ in data_["bookmakers"][0]["markets"] for o in mk_["outcomes"]]
             with open(OUT / f"line_archive_nfl_{SEASON}.jsonl", "a") as fh:
@@ -1869,6 +1922,9 @@ def main():
         loose_by_key = {}
         for n in M.name:
             loose_by_key.setdefault(name_key_loose(n), n)
+        # our players by gsis id: a Sleeper line names its player by ID (match_line_player)
+        name_by_gsis = {g_: n_ for g_, n_ in zip(M.gsis_id, M.name) if clean_gsis(g_)}
+        gsis_by_name = {n_: clean_gsis(g_) for g_, n_ in zip(M.gsis_id, M.name)}
         unmatched_odds_names = set()
         for b in (data["bookmakers"] if data else []):
             if b["key"] not in ("draftkings", "fanduel") and not a.lines_file and not sleeper_used:
@@ -1880,10 +1936,13 @@ def main():
                     for o in mk["outcomes"]:
                         by.setdefault(o["description"], {})[o["name"]] = o
                     for nm_raw, oo in by.items():
-                        nm = name_by_norm.get(norm_name(nm_raw)) or loose_by_key.get(name_key_loose(nm_raw))
+                        o_ids = next(iter(oo.values()), {})
+                        nm, how_ = match_line_player(nm_raw, o_ids.get("gsis_id"), name_by_gsis, name_by_norm,
+                                                     loose_by_key)
                         if nm is None:
                             if not is_team_entry(nm_raw):
-                                unmatched_odds_names.add((mk["key"], nm_raw))
+                                unmatched_odds_names.add((mk["key"], nm_raw + (" (ID and name disagree)"
+                                                                             if how_ else "")))
                             continue
                         if nm not in sims or "Over" not in oo or "Under" not in oo:
                             continue
@@ -1913,6 +1972,7 @@ def main():
                             side, pw, px, pn = "Under", 1 - p_o - p_push, oo["Under"]["price"], 1 - nv
                         er = pw * payout(px) - (1 - pw - p_push)
                         rows.append(dict(book=b["key"], market=mk["key"], player=nm,
+                            gsis_id=gsis_by_name.get(nm), sleeper_id=o_ids.get("sleeper_id"), join_how=how_,
                             team=pr.team, slot=pr.slot, line=L, model_mean=float(s.mean()),
                             side=side, p_model=pw, p_push=p_push, p_novig=pn, gap=pw - pn,
                             price=px, ER=er, last_update=mk["last_update"],
@@ -1936,10 +1996,12 @@ def main():
                     for o in mk["outcomes"]:
                         if o["name"] != "Yes":
                             continue
-                        nm = name_by_norm.get(norm_name(o["description"])) or loose_by_key.get(name_key_loose(o["description"]))
+                        nm, how_ = match_line_player(o["description"], o.get("gsis_id"), name_by_gsis, name_by_norm,
+                                                     loose_by_key)
                         if nm is None:
                             if not is_team_entry(o["description"]):
-                                unmatched_odds_names.add((mk["key"], o["description"]))
+                                unmatched_odds_names.add((mk["key"], o["description"] + (" (ID and name disagree)"
+                                                                                       if how_ else "")))
                             continue
                         if nm not in sims:
                             continue
@@ -1957,7 +2019,8 @@ def main():
                         p_mkt = TDM.market_prob(p_imp, two_sided)
                         p_bl = float(TDM.blend(p_yes, p_mkt))
                         rows.append(dict(book=b["key"], market="player_anytime_td",
-                            player=nm, team=pr.team, slot=pr.slot, line=np.nan,
+                            player=nm, gsis_id=gsis_by_name.get(nm), sleeper_id=o.get("sleeper_id"), join_how=how_,
+                            team=pr.team, slot=pr.slot, line=np.nan,
                             model_mean=np.nan, side="Yes", p_model=p_yes, p_push=0.0,
                             p_novig=p_imp, gap=p_yes - p_imp, price=o["price"],
                             ER=p_yes * payout(o["price"]) - (1 - p_yes),
