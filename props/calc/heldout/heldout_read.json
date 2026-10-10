@@ -1,0 +1,19 @@
+{
+ "started_at_utc": "2026-10-10T20:00:48+00:00",
+ "status": "started",
+ "seasons": [
+  2024,
+  2025
+ ],
+ "settings": {
+  "carry_r": 8,
+  "day_sd": 0.05,
+  "target_r": 10,
+  "completion_r": 25,
+  "k_ypc": 200,
+  "k_catch": 10,
+  "k_ypr": 50,
+  "k_ypcomp": 800
+ },
+ "results": {}
+}
