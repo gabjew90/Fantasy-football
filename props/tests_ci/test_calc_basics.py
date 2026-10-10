@@ -865,11 +865,15 @@ def test_the_lookup_reads_calc_and_record_files_and_finds_the_line_bet(tmp_path)
 
 
 def test_the_saved_week5_captures_are_reachable():
-    """The 362 captures of 2026-10-10 14:59 UTC (moved to calc's file) are found by the lookup."""
+    """calc's own capture file (it grows with each capture) is read by the lookup: a player's
+    newest saved quote is the one found."""
     path = lines.calc_path(2026)
     rows = [json.loads(x) for x in path.read_text(encoding="utf-8").splitlines() if x.strip()]
-    assert len(rows) == 724 and {r["snapshot_type"] for r in rows} == {"calc"}
-    r = next(x for x in rows if x["market"] == "player_rush_yds")
+    assert len(rows) >= 724 and {r["snapshot_type"] for r in rows} == {"calc"}
+    first = next(x for x in rows if x["market"] == "player_rush_yds")
+    r = max((x for x in rows if x["gsis_id"] == first["gsis_id"] and x["market"] == "player_rush_yds"
+             and x["outcome"] == "Over" and x["retrieved_at_utc"] < x["commence_time"].replace("+00:00", "Z")),
+            key=lambda x: x["retrieved_at_utc"])
     leg = {"season": 2026, "week": r["week"], "game_id": r["game_id"], "kickoff_utc": r["commence_time"],
            "gsis_id": r["gsis_id"], "player": r["player"], "team": r["team"], "market": "rush_yds"}
     got = lines.LineLookup(ROSTER, archive_root=Path("/nonexistent"), calc_root=lines.CALC_LINES).find(leg)
