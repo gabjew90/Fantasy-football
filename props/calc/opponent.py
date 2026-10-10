@@ -4,6 +4,7 @@ this season before the priced week, in the same unit as the needed rate
 
 - rushing yards: yards a carry allowed to running backs
 - receptions: catches per 10 targets allowed to his position (WR, TE or RB)
+- receiving yards: yards a target allowed to his position (incompletions 0)
 
 Garbage time is left out as the grades leave it out: plays where the
 offense's win probability is outside garbage_wp_low-high. Positions are each
@@ -60,5 +61,8 @@ def allows(b, market: str, opp: str, position: str | None, season: int, week: in
     out = {"value": None, "games": games, "who": who, "thin": False, "left_out": no_wp + unlisted}
     if d.empty:
         return out
-    value = float(d["yards"].sum() / len(d)) if market == "rush_yds" else float(10 * d["caught"].mean())
+    if market == "receptions":
+        value = float(10 * d["caught"].mean())
+    else:                                      # yards a carry, or yards a target (data.targets: incompletions are 0)
+        value = float(d["yards"].sum() / len(d))
     return {**out, "value": value, "plays": int(len(d))}

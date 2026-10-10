@@ -130,13 +130,14 @@ def test_card_renders_the_spec_layout():
     flat = " ".join(lines_)
     assert lines_[:3] == ["Check first: workload bar untested.", "TEST BACK", "Over 64.5 rushing yards (-125)"]
     bar = card.value(c, "needed_over")
-    for needle in (f"Bar for this price  ~{card._round(bar)} carries", "Last 4: 12, 12, 19, 19  (avg ~16)",
-                   f"{card._round(bar)}+ this season: ", "Line implies ~", "(our math).", "AT ~16 CARRIES",
-                   "Needed at this price: ", "His last 5 games, blended: 4.2", "This season: ",
+    for needle in (f"Bar for this price  ~{card._round(bar)} carries", "Last 4: 12, 12, 19, 19  (avg 15.5)",
+                   f"{card._round(bar)}+ this season: ", "AT 15.5 CARRIES",
+                   "Needed at this price: ", "His recent rate (5 games): 4.2", "This season: ",
                    "Tampa Bay allows: 4.4 to RBs (4 games)", "MATCHUP", "DAL run offense B vs TB run defense C",
                    "Dallas favored by 9.5. Total 49.5.", "Line as of Oct 8, 4:59 PM PT."):
         assert needle in flat, needle
-    for gone in ("Under", "Gap", "Book expects", "%", "wins often enough", "Bar assumes"):
+    for gone in ("Under", "Gap", "Book expects", "%", "wins often enough", "Bar assumes", "Line implies",
+                 "our math"):
         assert gone not in text, gone                       # one side, no gap line, no percentages
     import re
     for banned in ("bet", "value", "edge", "lean", "pick", "recommend", "play this", "lock"):
@@ -425,22 +426,23 @@ def test_a_usual_from_too_few_games_is_not_shown():
 
 def test_the_closing_question_follows_the_four_cases_and_turns_round_for_unders():
     q = card.question
-    assert q("rush_yds", "over", 1, 0.5) == "1 more carry, or 0.5 more yards a carry?"      # Williams, amended
-    assert q("rush_yds", "over", 0, 0.9) == "Workload is there. 0.9 more yards a carry?"
-    assert q("rush_yds", "over", 3, -0.2) == "At his recent rate it clears. 3 more carries?"
-    assert q("receptions", "over", -2, -1.5) == "Room for 2 fewer targets?"
-    assert q("receptions", "over", 1, 0.5) == "1 more target, or 0.5 more catches per 10?"
-    assert q("rush_yds", "over", 0, 0) == "Recent workload and rate both meet the bar."
+    # asks come in unrounded: the workload ask is shown to the nearest half, the rate ask to one decimal
+    assert q("rush_yds", "over", 17.07 - 15.5, 4.857 - 4.422) == "About 1.5 more carries, or 0.4 more yards a carry?"
+    assert q("rush_yds", "over", 0.2, 0.9) == "Workload is there. 0.9 more yards a carry?"          # 0.2 -> 0
+    assert q("rush_yds", "over", 2.8, -0.2) == "At his recent rate it clears. About 3 more carries?"
+    assert q("receptions", "over", -2.1, -1.5) == "Room for about 2 fewer targets?"
+    assert q("receptions", "over", 1.1, 0.5) == "About 1 more target, or 0.5 more catches per 10?"
+    assert q("rush_yds", "over", 0.1, 0.04) == "Recent workload and rate both meet the bar."
     # an Under needs less: a bar below his average and a needed rate below the assumed rate
-    assert q("rush_yds", "under", -3, -0.9) == "3 fewer carries, or 0.9 less yards a carry?"
-    assert q("rush_yds", "under", 2, 0.4) == "Room for 2 more carries?"
+    assert q("rush_yds", "under", -3, -0.9) == "About 3 fewer carries, or 0.9 less yards a carry?"
+    assert q("rush_yds", "under", 2, 0.4) == "Room for about 2 more carries?"
     assert q("rush_yds", "under", 2.5, -0.4) == "Workload is there. 0.4 less yards a carry?"
-    assert q("receptions", "over", 1.5, None) == "1.5 more targets?"
+    assert q("receptions", "over", 1.5, None) == "About 1.5 more targets?"
     # the outlier guard: the average meets the bar but fewer than 2 of the last 4 games did
     assert q("receptions", "over", -1, -1.4, reached=1) == "Average clears it, but only 1 of 4 games did."
-    assert q("receptions", "over", -1, -1.4, reached=2) == "Room for 1 fewer target?"
+    assert q("receptions", "over", -1, -1.4, reached=2) == "Room for about 1 fewer target?"
     assert q("rush_yds", "under", 1, 0.3, reached=0) == "Average clears it, but only 0 of 4 games did."
-    assert q("rush_yds", "over", 1, 0.5, reached=0) == "1 more carry, or 0.5 more yards a carry?"   # average short
+    assert q("rush_yds", "over", 1, 0.5, reached=0) == "About 1 more carry, or 0.5 more yards a carry?"   # short
 
 def test_leg_refuses_qb_rushing(stub_leg, monkeypatch):
     cli, _, _ = stub_leg
@@ -529,7 +531,7 @@ def test_review_fixes_on_the_card_wording(monkeypatch):
     flat = " ".join(card.render(pl, c, "over", opp="TB").splitlines())
     assert "Check first: Failed: ranges too narrow on 2018-23." in flat
     far = card.compute(pl, rush_model(ypc=1.0), "rush_yds", 300.5, 1.8, 1.76, fixed)
-    assert "Line implies more than 45 carries (our math)." in " ".join(card.render(pl, far, "over", opp="TB").splitlines())
+    assert "Line implies" not in card.render(pl, far, "over", opp="TB")         # moved to the follow-up
     marked = window.assign(fewer_snaps=[True, False, False, False, False])
     pl2 = _player(season.iloc[:3], marked.iloc[:4])
     assert "* 2025 week 17: played far fewer snaps than usual." in " ".join(card.render(
@@ -558,3 +560,39 @@ def test_a_skipped_quote_note_and_a_schedule_line_are_shown():
     err = card.render(pl, c, "over", opp="TB", opp_row={"error": "MergeError: x", "note": "not available"},
                       grades={"error": "x", "note": "not available (x)."})
     assert "Tampa Bay allows: not available (MergeError: x)" in " ".join(err.splitlines())
+
+
+def test_receiving_yards_known_answers():
+    d = calc.make_draws("targets", 8, SIMS, SEED, yards=True)
+    plain = calc.make_draws("targets", 8, SIMS, SEED)
+    assert (d.u_play == plain.u_play).all() and (d.gamma == plain.gamma).all()   # receptions draws unchanged
+    # every target caught, every catch 10 yards, 10 yards a target: exactly 10 a target
+    m = calc.Model("rec_yds", "targets", d, 10.0, catch=1.0, depth_mix=(1.0, 0.0, 0.0),
+                   catch_pools=(np.array([10.0]), np.zeros(1), np.zeros(1)))
+    assert (m.outcomes_fixed(5) == 50).all() and (m.outcomes_fixed(5, rate=6.0) == 30).all()
+    # a real-looking mix: the average yards a target over many games is the rate (scaled to it)
+    rng = np.random.default_rng(3)
+    pools = (rng.normal(4, 3, 400), rng.normal(11, 4, 400), rng.normal(28, 9, 400))
+    m2 = calc.Model("rec_yds", "targets", d, 7.5, catch=0.62, depth_mix=(0.5, 0.35, 0.15), catch_pools=pools)
+    assert m2.outcomes_fixed(20).mean() / 20 == pytest.approx(7.5, rel=0.02)
+    # more yards a target or more targets: a higher chance over a line
+    assert calc.over_share(m2, 40.5, 6.0, rate=8.5) > calc.over_share(m2, 40.5, 6.0, rate=7.5)
+    assert calc.over_share(m2, 40.5, 7.0) > calc.over_share(m2, 40.5, 6.0)
+    s = calc.solve_rate(m2, 40.5, 0.55, 6.0)
+    assert s.status == "ok" and calc.over_share(m2, 40.5, 6.0, rate=s.value) == pytest.approx(0.55, abs=0.01)
+    bad = calc.Model("rec_yds", "targets", plain, 7.5, catch=0.6, depth_mix=(1.0, 0.0, 0.0), catch_pools=pools)
+    from props.calc.checks import DataError
+    with pytest.raises(DataError, match="draws are missing"):
+        bad.outcomes_fixed(5)
+
+
+def test_backup_qb_marks_a_game_the_usual_starter_did_not_start():
+    from props.calc import player
+    sched = pd.DataFrame([dict(game_id=f"2026_0{w}_TB_X", home_team="X", away_team="TB", home_qb_id="x",
+                               away_qb_id=q) for w, q in ((1, "baker"), (2, "baker"), (3, "baker"), (4, "teddy"))]
+                         + [dict(game_id=f"2025_0{w}_TB_X", home_team="X", away_team="TB", home_qb_id="x",
+                                 away_qb_id=q) for w, q in ((1, "a"), (2, "b"))])
+    mine = pd.DataFrame([dict(game_id=g, team="TB", season=int(g[:4])) for g in sched["game_id"]])
+    out = player.backup_qb(mine, sched)
+    # 2026: baker started 3 of 4, so week 4 (teddy) is marked; 2025: a 1-1 split, no usual starter
+    assert out["backup_qb"].tolist() == [False, False, False, True, False, False]

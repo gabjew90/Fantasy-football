@@ -47,7 +47,7 @@ def main(argv: list[str] | None = None) -> int:
     sub = ap.add_subparsers(dest="cmd", required=True)
     lg = sub.add_parser("leg")
     lg.add_argument("name")
-    lg.add_argument("market", choices=["rush_yds", "receptions"])
+    lg.add_argument("market", choices=["rush_yds", "receptions", "rec_yds"])
     lg.add_argument("side", choices=["over", "under"])
     lg.add_argument("--team")
     lg.add_argument("--season", type=int)
@@ -280,8 +280,8 @@ def _parse_leg(spec: str) -> tuple:
     parts = [x.strip() for x in spec.split("|")]
     if len(parts) not in (4, 5) or not parts[0] or parts[2].lower() not in ("over", "under"):
         raise SystemExit(f"leg {spec!r}: write it as 'Name|market|over or under|line played[|TEAM]'")
-    if parts[1] not in ("rush_yds", "receptions"):
-        raise SystemExit(f"leg {spec!r}: market is rush_yds or receptions for now")
+    if parts[1] not in ("rush_yds", "receptions", "rec_yds"):
+        raise SystemExit(f"leg {spec!r}: market is rush_yds, receptions or rec_yds for now")
     try:
         line = number(float(parts[3]), "the leg's line")
     except (ValueError, DataError):

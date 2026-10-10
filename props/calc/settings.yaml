@@ -58,5 +58,5 @@ fixed_not_tuned:
   league_yards_per_target_range: [6.5, 8.5]  # Plausible league-average yards per target (2016-2023: 7.14-7.58).
   max_count: {carries: 80, targets: 40, completions: 60}  # The most plays one simulated game can hold (far above any real game).
   search_max: {carries: 45, targets: 25, completions: 45}  # The highest average workload the search tries; above it the card says "at any workload up to" this.
-  rate_range: {rush_yds: [0.0, 25.0], receptions: [0.0, 1.0]}  # The rates the "rate needed" search tries; outside them the card says "at any rate".
+  rate_range: {rush_yds: [0.0, 25.0], receptions: [0.0, 1.0], rec_yds: [0.0, 30.0]}  # The rates the "rate needed" search tries; outside them the card says "at any rate".
   bisect_steps: 40              # Halving steps in each search (40 steps pin a number far finer than the card shows).

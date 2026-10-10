@@ -13,6 +13,11 @@ Rushing yards: carries ~ negative binomial (mean W, spread carry_r); each
   factor (lognormal, mean 1, sd day_sd).
 Receptions: targets ~ negative binomial (mean W, spread target_r); each target
   is caught at his catch rate.
+Receiving yards: targets and catches as receptions; each catch gets a depth
+  (short / medium / deep) from his own mix of catches by depth, and yards drawn
+  from real catches by his position at that depth, all scaled so a catch
+  averages his yards per target / catch rate. The rate searched is yards a
+  target (an incompletion counts as 0). No good-day factor (design note #7).
 """
 
 from __future__ import annotations
@@ -63,14 +68,22 @@ class Draws:
     u_play: np.ndarray     # (sims, max) uniform: per-play draws (catch or not, which residual)
     z_day: np.ndarray      # (sims,) standard normal: the good-day/bad-day factor
     limits: "Limits"       # the bounds these draws were made for (the model reads them from here)
+    u_depth: np.ndarray | None = None   # (sims, max) uniform: each catch's depth (receiving yards only)
+    u_yard: np.ndarray | None = None    # (sims, max) uniform: which real catch it draws its yards from
 
 
-def make_draws(kind: str, r: float, sims: int, seed: int, limits: Limits | None = None) -> Draws:
+def make_draws(kind: str, r: float, sims: int, seed: int, limits: Limits | None = None,
+               yards: bool = False) -> Draws:
+    """yards: also draw each catch's depth and yards, from a separate stream, so
+    the receptions draws are the same with or without them."""
     limits = limits or default_limits()
     rng = np.random.default_rng([seed, STREAM[kind]])
-    return Draws(gamma=rng.gamma(r, 1.0 / r, sims), u_count=rng.random(sims),
-                 u_play=rng.random((sims, limits.max_count[kind])), z_day=rng.standard_normal(sims),
-                 limits=limits)
+    base = dict(gamma=rng.gamma(r, 1.0 / r, sims), u_count=rng.random(sims),
+                u_play=rng.random((sims, limits.max_count[kind])), z_day=rng.standard_normal(sims), limits=limits)
+    if yards:
+        y = np.random.default_rng([seed, STREAM[kind], 1])
+        base.update(u_depth=y.random((sims, limits.max_count[kind])), u_yard=y.random((sims, limits.max_count[kind])))
+    return Draws(**base)
 
 
 def poisson_inverse(u: np.ndarray, lam: np.ndarray, kmax: int) -> np.ndarray:
@@ -108,12 +121,16 @@ def day_factor(draws: Draws, sd: float) -> np.ndarray:
 @dataclass
 class Model:
     """One player-market with his rates and the pools it draws from."""
-    market: str                      # rush_yds | receptions
+    market: str                      # rush_yds | receptions | rec_yds
     kind: str                        # carries | targets
     draws: Draws
-    rate: float                      # ypc (rushing) or catch rate (receptions)
+    rate: float                      # ypc (rushing), catch rate (receptions), yards a target (rec_yds)
     residuals: np.ndarray | None = None
     day_sd: float = 0.0
+    catch: float | None = None       # rec_yds: his catch rate, held fixed
+    depth_mix: tuple | None = None   # rec_yds: his share of catches short / medium / deep
+    catch_pools: tuple | None = None  # rec_yds: real catch yards at his position, per depth, as arrays
+    _yards: np.ndarray | None = field(default=None, init=False, repr=False)   # running base yards
     _resid_run: tuple | None = field(default=None, init=False, repr=False)    # (residuals id, sums)
     _day: tuple | None = field(default=None, init=False, repr=False)          # (day_sd, factors)
     _caught: tuple | None = field(default=None, init=False, repr=False)       # (catch rate, running catches)
@@ -156,7 +173,39 @@ class Model:
                 self._caught = (r, np.concatenate([np.zeros((len(n), 1)),
                                                    np.cumsum(self.draws.u_play < r, axis=1)], axis=1))
             return self._caught[1][np.arange(len(n)), n]
+        if self.market == "rec_yds":
+            base, mean_mix = self._receiving_base()
+            scale = (r / self.catch) / mean_mix          # a catch then averages r / catch rate yards
+            # whole yards, as the box score counts them
+            return np.floor(scale * base[np.arange(len(n)), n] + 0.5)
         raise ValueError(f"market {self.market} is not built yet")
+
+    def _receiving_base(self) -> tuple:
+        """Running unscaled receiving yards per simulated game (built once):
+        play j is caught at his catch rate, its depth drawn from his mix and its
+        yards from the real catches at that depth. Returns (running sums,
+        the mix's average catch)."""
+        if self._yards is None:
+            d = self.draws
+            if d.u_depth is None or d.u_yard is None:
+                raise DataError("receiving-yards draws are missing (make_draws(..., yards=True))")
+            mix = np.asarray(self.depth_mix, dtype=float)
+            if not (np.isfinite(mix).all() and mix.min() >= 0 and abs(mix.sum() - 1) < 1e-9):
+                raise DataError(f"his depth mix {self.depth_mix} is not a set of shares summing to 1")
+            pools = [np.sort(np.asarray(p, dtype=float)) for p in self.catch_pools]
+            mean_mix = float(sum(m * p.mean() for m, p in zip(mix, pools) if m > 0))
+            if not mean_mix > 0:
+                raise DataError(f"the average catch at his depth mix is {mean_mix:.2f} yards; cannot scale to it")
+            bucket = np.searchsorted(np.cumsum(mix)[:-1], d.u_depth, side="right")
+            y0 = np.zeros(d.u_yard.shape)
+            for b, p in enumerate(pools):
+                m = bucket == b
+                if m.any():
+                    y0[m] = p[np.minimum((d.u_yard[m] * len(p)).astype(int), len(p) - 1)]
+            caught = d.u_play < self.catch
+            run = np.cumsum(np.where(caught, y0, 0.0), axis=1)
+            self._yards = (np.concatenate([np.zeros((len(run), 1)), run], axis=1), mean_mix)
+        return self._yards
 
     def outcomes_fixed(self, n: int, rate: float | None = None) -> np.ndarray:
         return self.outcome(fixed_counts(self.draws, n), rate)

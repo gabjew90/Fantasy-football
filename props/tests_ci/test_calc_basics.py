@@ -36,7 +36,7 @@ FIXED = {
     "league_yards_per_target_range": [6.5, 8.5],
     "max_count": {"carries": 80, "targets": 40, "completions": 60},
     "search_max": {"carries": 45, "targets": 25, "completions": 45},
-    "rate_range": {"rush_yds": [0.0, 25.0], "receptions": [0.0, 1.0]}, "bisect_steps": 40,
+    "rate_range": {"rush_yds": [0.0, 25.0], "receptions": [0.0, 1.0], "rec_yds": [0.0, 30.0]}, "bisect_steps": 40,
 }
 
 
