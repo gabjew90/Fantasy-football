@@ -71,8 +71,8 @@ so the PR review must.
   and the metric. Knobs live in yaml, so a re-tune is a config diff plus a report.
 - **No parallel engines.** One-off studies go in `experiments/` (outputs
   gitignored) and are promoted or deleted within 30 days.
-- **The calculator is the primary NFL prop tool; the engine is dormant** (DECISIONS #233,
-  replacing #231's recorded exception). `props/calc/`, the parlay-leg calculator
+- **The calculator is the primary NFL prop tool; the engine is dormant** (DECISIONS #234,
+  replacing #232's recorded exception). `props/calc/`, the parlay-leg calculator
   (docs/plans/2026-10-10-parlay-leg-calculator.md), answers prop legs and Power Play
   entries in rushing yards, receptions, receiving yards and passing yards, in chat and here.
   `props/engine/` stays in the repo, unedited: it is used only when the user asks for it by

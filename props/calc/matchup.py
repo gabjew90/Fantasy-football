@@ -6,7 +6,7 @@ props/engine/scripts/research.py at commit ec379e45ef0f31db4343998ac4536259c6bfb
 constants they use; tier_grade and _band_mod added 2026-10-10 at the user's request, same commit).
 tests/test_calc_grades_parity.py checks both the output and that each copied
 function's source text is identical to the engine's.
-props/calc may not import the engine (DECISIONS #231), so this is a copy, and
+props/calc may not import the engine (DECISIONS #232), so this is a copy, and
 tests/test_calc_grades_parity.py (outside props/calc) checks that both give
 the same letters on the same play-by-play. Their constants are also listed in
 settings.yaml under fixed_not_tuned, and check_constants() refuses to run if

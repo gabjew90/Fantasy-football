@@ -10,7 +10,11 @@ HOW IT DECIDES WHAT TO RUN, in order:
      every file in the release (skill/release.py defines the file set).
   2. If a previous run of that tag is unpacked and still verifies, reuse it.
   3. Otherwise fetch the tag as one tarball from codeload.github.com, extract
-     only release files, and verify each against the lock.
+     only release files, and verify each against the lock. If the tarball host
+     refuses (chat's sandbox got HTTP 403 from codeload on 2026-10-10 and ran a
+     two-week-old release), fetch the lock's files one by one from
+     raw.githubusercontent.com -- the host the lock itself came from -- and
+     verify them the same way.
   4. Put the install's credentials beside it -- never from the public repo,
      never printed:
        resources/credential.env              -> props/engine/resources/credential.env
@@ -33,6 +37,7 @@ YAHOO, ODDS_KEY (and FALLBACK_REASON on the fallback path).
 from __future__ import annotations
 
 import argparse
+import http.client
 import importlib.util
 import json
 import os
@@ -41,12 +46,15 @@ import subprocess
 import sys
 import tarfile
 import tempfile
+import time
 import urllib.error
 import urllib.request
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-SKILL_ROOT = HERE.parent
+# where the installed skill's vendor/ and resources/ are: this file's parent, unless an older loader
+# handed over to this copy from elsewhere (harness_update) and said where it came from
+SKILL_ROOT = Path(os.environ.get("NFL_SKILL_ROOT") or HERE.parent)
 sys.path.insert(0, str(SKILL_ROOT))      # the repo layout: skill/release.py
 sys.path.insert(0, str(HERE))           # the built skill: scripts/release.py, found first
 import release  # noqa: E402
@@ -54,6 +62,8 @@ import release  # noqa: E402
 REPO = os.environ.get("NFL_REPO", "gabjew90/Fantasy-football")
 LOCK_URL = f"https://raw.githubusercontent.com/{REPO}/main/{release.LOCK_NAME}"
 TARBALL = "https://codeload.github.com/{repo}/tar.gz/refs/tags/{tag}"
+RAW_FILE = "https://raw.githubusercontent.com/{repo}/{tag}/{path}"
+RAW_MAIN = "https://raw.githubusercontent.com/{repo}/main/{path}"
 TIMEOUT = 20
 
 VENDOR_ARCHIVE = SKILL_ROOT / "vendor" / "release.tar.gz"
@@ -133,6 +143,45 @@ def extract_release(blob: bytes, dest: Path, wanted: set | None = None) -> int:
     return written
 
 
+def fetch_files(tag: str, lock: dict, dest: Path, workers: int = 8) -> int:
+    """The release file by file from raw.githubusercontent.com at the tag, every file the lock
+    names -- the route when the tarball host refuses. Paths are checked as tarball members are
+    (nothing absolute, no '..'); verify() then holds each file to the lock's digest."""
+    from concurrent.futures import ThreadPoolExecutor
+    from urllib.parse import quote
+    files = sorted(lock.get("files") or {})
+    if not files:
+        raise RuntimeError("the lock lists no files")
+    dest.mkdir(parents=True, exist_ok=True)
+
+    from pathlib import PurePosixPath
+
+    def one(rel: str) -> None:
+        parts = PurePosixPath(rel).parts
+        # nothing absolute, no '..', no backslash, no drive ('C:/x' would discard dest on Windows)
+        if (not parts or PurePosixPath(rel).is_absolute() or "\\" in rel or ".." in parts
+                or any(":" in q for q in parts)):
+            raise RuntimeError(f"refusing a lock path outside the release: {rel}")
+        last: Exception | None = None
+        for attempt in (1, 2, 3):
+            try:
+                data = _get(RAW_FILE.format(repo=REPO, tag=quote(tag), path=quote(rel)))
+                break
+            except (urllib.error.URLError, OSError, http.client.HTTPException) as exc:
+                last = exc               # a truncated body (IncompleteRead) is retried too
+                if attempt < 3:
+                    time.sleep(attempt)
+        else:
+            raise RuntimeError(f"{rel}: {last}")
+        target = dest / rel
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(data)
+
+    with ThreadPoolExecutor(max_workers=workers) as ex:
+        list(ex.map(one, files))
+    return len(files)
+
+
 def verify(repo_dir: Path, lock: dict) -> None:
     ok, notes = release.compare(repo_dir, lock)
     if not ok:
@@ -199,6 +248,39 @@ def ensure_dependencies(install: bool = True) -> str:
     return "installed: " + ", ".join(missing)
 
 
+def harness_update(lock: dict, dest: Path, argv: list[str]) -> int | None:
+    """THE LOADER UPDATES ITSELF (DECISIONS #231). The lock on main pins the harness files
+    (release.HARNESS). When this copy differs, fetch the pinned files from main -- the same source
+    and trust as the lock -- hold each to its digest, and run that copy with the same arguments,
+    returning its exit code. None: this copy is current (or there is no pin, or it already handed
+    over). Raises on any failure; the caller then keeps running this copy."""
+    import hashlib
+    want = (lock or {}).get("harness") or {}
+    if not want or os.environ.get("NFL_HARNESS_UPDATED"):
+        return None
+    unknown = set(want) - set(release.HARNESS)
+    if unknown:
+        raise RuntimeError(f"the lock pins harness files this loader does not know: {sorted(unknown)}")
+    mine = {"scripts/bootstrap.py": Path(__file__), "scripts/release.py": Path(release.__file__)}
+    if all(name in want and release.file_digest(p) == want[name] for name, p in mine.items()):
+        return None
+    tag = hashlib.sha256("".join(want[k] for k in sorted(want)).encode("utf-8")).hexdigest()[:12]
+    run = dest / f"harness-{tag}"
+    for name, digest in want.items():
+        target = run / name
+        if target.is_file() and release.file_digest(target) == digest:
+            continue                    # a reused container already holds the verified copy
+        data = _get(RAW_MAIN.format(repo=REPO, path=release.HARNESS[name]))
+        if hashlib.sha256(data.replace(b"\r\n", b"\n")).hexdigest() != digest:
+            raise RuntimeError(f"{release.HARNESS[name]} on main does not match the lock's pin")
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(data)
+    env = {**os.environ, "NFL_HARNESS_UPDATED": tag, "NFL_SKILL_ROOT": str(SKILL_ROOT)}
+    print(f"HARNESS: this loader is out of date; running the pinned one ({tag}, verified against the lock)",
+          file=sys.stderr)
+    return subprocess.call([sys.executable, str(run / "scripts" / "bootstrap.py"), *argv], env=env)
+
+
 def write_stamp(repo_dir: Path, info: dict) -> None:
     """Beside the release, not inside it: inside it would change the hash."""
     repo_dir.with_name(repo_dir.name + ".stamp.json").write_text(
@@ -249,12 +331,20 @@ def resolve(dest: Path, tag: str | None = None, offline: bool = False) -> dict:
         if partial.exists():
             shutil.rmtree(partial, ignore_errors=True)
         url = TARBALL.format(repo=REPO, tag=lock_tag)
+        route = "tarball"
         try:
             blob = _get(url, timeout=90)
         except (urllib.error.URLError, OSError) as exc:
-            raise RuntimeError(f"tarball {url}: {exc}") from exc
-        if not extract_release(blob, partial, set((lock or {}).get("files") or {}) or None):
-            raise RuntimeError(f"tarball {url} held no release files")
+            if lock is None:            # no file list to fetch by: an unverified --tag needs the tarball
+                raise RuntimeError(f"tarball {url}: {exc}") from exc
+            try:
+                fetch_files(str(lock_tag), lock, partial)
+            except Exception as exc2:   # noqa: BLE001 -- both routes failed: the vendored copy runs
+                raise RuntimeError(f"tarball {url}: {exc}; file by file: {exc2}") from exc2
+            route = f"file by file (the tarball host refused: {exc})"
+        else:
+            if not extract_release(blob, partial, set((lock or {}).get("files") or {}) or None):
+                raise RuntimeError(f"tarball {url} held no release files")
         if lock is not None:
             verify(partial, lock)
         if run.exists():
@@ -263,7 +353,7 @@ def resolve(dest: Path, tag: str | None = None, offline: bool = False) -> dict:
         return {"repo_dir": str(run), "release_hash": release.tree_hash(run),
                 "release_tag": lock_tag if lock is not None else None,
                 "release_source": "fetched" if lock is not None else "fetched-unverified",
-                "fallback_reason": None, "lock_tag": lock.get("tag") if lock else None}
+                "fallback_reason": None, "lock_tag": lock.get("tag") if lock else None, "fetch_route": route}
     except Exception as exc:  # noqa: BLE001 -- every failure falls back
         return use_vendored(dest, str(exc), lock_tag)
 
@@ -275,6 +365,13 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--offline", action="store_true")
     ap.add_argument("--no-deps", action="store_true", help="report missing libraries, do not install them")
     a = ap.parse_args(argv)
+    if not a.offline:
+        try:
+            code = harness_update(fetch_lock(), a.dest, list(sys.argv[1:] if argv is None else argv))
+            if code is not None:
+                return code
+        except Exception as exc:  # noqa: BLE001 -- an update failure never costs the session
+            print(f"HARNESS: kept this loader (the update failed: {exc})", file=sys.stderr)
     try:
         info = resolve(a.dest, a.tag, a.offline)
     except RuntimeError as exc:
@@ -297,6 +394,9 @@ def main(argv: list[str] | None = None) -> int:
     print(f"DEPS={deps}")
     print(f"YAHOO={'live' if creds['yahoo'] else 'absent (no Yahoo bundle in this skill: Keefamania cannot be read)'}")
     print(f"ODDS_KEY={'present' if creds['odds_key'] else 'absent (Sleeper prices only)'}")
+    print(f"HARNESS={'updated ' + os.environ['NFL_HARNESS_UPDATED'] if os.environ.get('NFL_HARNESS_UPDATED') else 'current'}")
+    if info.get("fetch_route") and info["fetch_route"] != "tarball":
+        print(f"FETCH_ROUTE={info['fetch_route']}")
     if info["fallback_reason"]:
         print(f"FALLBACK_REASON={info['fallback_reason']}")
     return 0

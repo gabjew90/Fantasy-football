@@ -37,7 +37,7 @@ LOCK_NAME = "nfl.lock.json"
 INCLUDE_DIRS = ("core/", "fantasy/", "draftkit/", "manager/", "props/engine/", "props/calc/", "leagues/")
 INCLUDE_FILES = ("CHAT.md", "nfl.py", "config.yaml", "requirements.txt", "tiers.csv", "tiers.keefamania.csv",
                  "data/processed/absence_bands.json",
-                 # the calculator imports these two when it loads (props/calc/shared.py, DECISIONS #233)
+                 # the calculator imports these two when it loads (props/calc/shared.py, DECISIONS #234)
                  "props/journal.py", "props/persist.py")
 # CHANGING THE RULES ABOVE DOES NOT REACH AN INSTALLED HARNESS. The installed
 # skill unpacks a release with its own copy of this file, as of its build, and
@@ -49,7 +49,7 @@ INCLUDE_FILES = ("CHAT.md", "nfl.py", "config.yaml", "requirements.txt", "tiers.
 INCLUDE_GLOBS = ("data/external/*.csv",)
 # "lines" and "log": the calculator's own captures and name-miss log (props/calc/lines/,
 # props/calc/log/) are state a chat capture writes INTO the release tree; outside the
-# hashed set, a capture never fails the next bootstrap's verify (DECISIONS #233).
+# hashed set, a capture never fails the next bootstrap's verify (DECISIONS #234).
 EXCLUDE_PARTS = ("__pycache__", "backtest_out", "cache", "lines", "log")
 # ".gz" and ".npz": the calculator's held-out test data (props/calc/heldout/); the
 # held-out record itself (heldout_read.json) ships, for chat's "Calculation" follow-up.
@@ -105,10 +105,28 @@ def tree_hash(root: Path, rels: list[str] | None = None) -> str:
     return h.hexdigest()
 
 
+# THE HARNESS (DECISIONS #231): the loader's own files, as the installed skill names them -> where they
+# live in the repo. Pinned in the lock beside the release, so a session whose loader differs fetches the
+# pinned copy and runs it: a change to the loader reaches chat through the repo, like everything else.
+HARNESS = {"scripts/bootstrap.py": "skill/scripts/bootstrap.py", "scripts/release.py": "skill/release.py"}
+
+
+def harness_digests(root: Path) -> dict[str, str]:
+    """{installed name: digest} for the harness files present under `root` (all or none)."""
+    paths = {name: Path(root) / src for name, src in HARNESS.items()}
+    if not all(p.is_file() for p in paths.values()):
+        return {}
+    return {name: file_digest(p) for name, p in paths.items()}
+
+
 def build_lock(root: Path, tag: str) -> dict:
     rels = files(root)
-    return {"algorithm": ALGORITHM, "tag": tag, "sha256": tree_hash(root, rels), "file_count": len(rels),
+    lock = {"algorithm": ALGORITHM, "tag": tag, "sha256": tree_hash(root, rels), "file_count": len(rels),
             "files": {r: file_digest(Path(root) / r) for r in rels}}
+    harness = harness_digests(root)
+    if harness:
+        lock["harness"] = harness
+    return lock
 
 
 def compare(root: Path, lock: dict) -> tuple[bool, list[str]]:
@@ -176,7 +194,13 @@ def check_lock(lock: dict, root: Path = REPO_ROOT) -> tuple[bool, str]:
         bad = [f"tree hash {h.hexdigest()[:12]} != lock {str(lock.get('sha256'))[:12]}"]
     if bad:
         return False, f"{where} does not match {LOCK_NAME}: " + "; ".join(bad[:6])
-    return True, f"{where} matches {LOCK_NAME} ({lock['sha256'][:12]}, {len(have)} files)"
+    # the harness pin follows the working tree: an edited loader without a re-run write-lock would
+    # leave chat on the old loader, or send it a file the pin no longer describes
+    tree = harness_digests(root)
+    if (lock.get("harness") or {}) != tree:
+        return False, (f"the harness in {LOCK_NAME} does not match skill/ in this tree -- re-run "
+                       f"`python skill/release.py write-lock --tag {tag}`")
+    return True, f"{where} matches {LOCK_NAME} ({lock['sha256'][:12]}, {len(have)} files; harness pinned)"
 
 
 def cut_tag(lock: dict, root: Path = REPO_ROOT) -> tuple[bool, str]:

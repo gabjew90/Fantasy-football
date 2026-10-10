@@ -1,6 +1,6 @@
 """props/calc/matchup.py copies the props engine's unit grades (research.py:
 unit_efficiency, tiers, tier_letter, tier_grade, _band_mod, unit_tiers). This test sits outside
-props/calc, which may not import the engine (DECISIONS #231), and asserts both
+props/calc, which may not import the engine (DECISIONS #232), and asserts both
 versions give identical scores, bands and letters on the same play-by-play.
 A change to either side fails it until the copy is brought back in line."""
 

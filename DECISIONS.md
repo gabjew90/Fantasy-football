@@ -8689,7 +8689,31 @@ every row while the predictions rows carry open / decision / close (line_archive
   settled before IDs were recorded (#224) join through the season's roster by name and team, never
   name alone. Captures skip it; an unreadable record shows no row. No price changes.
 
-## 2026-10-10 (231) -- a parlay-leg calculator in props/calc/, a user-approved exception to "no parallel engines"
+## 2026-10-10 (231) -- chat fetches the release file by file when the tarball host refuses
+
+- **The failure (user, 2026-10-10):** Keefamania "failed to load" in chat. The bootstrap read the
+  lock (nfl-v1.69) from raw.githubusercontent.com, but codeload.github.com answered HTTP 403 for
+  the tarball, so chat ran the release bundled in the installed skill: nfl-v1.20 (built 09-28),
+  which predates the team-key fix (2026-10-07) and found the user's team by its old name, "Air
+  Raid Gabriel". The repo's config was already right; the failure was which copy ran.
+- **Causes:** process -- the installed skill's fallback was two weeks old (it is rebuilt only when
+  the user runs skill/build.py); code -- the bootstrap had one fetch route, through a host that
+  the 2026-09-17 plan already named as outside chat's documented allowlist.
+- **The fix:** when the tarball host refuses, the bootstrap fetches every file the lock names from
+  raw.githubusercontent.com (the host the lock already comes from), retries truncated reads,
+  refuses any path outside the release (drive paths included), and verifies the tree against the
+  lock as before; FETCH_ROUTE says so. Only both routes failing runs the bundled copy. Live-tested:
+  nfl-v1.69 fetched file by file, hash matching the lock. Takes effect when the user rebuilds and
+  reinstalls the skill, which also refreshes the bundled fallback to the current release.
+- **The last reinstall (user: "I thought we never had to update the skill, only the repo"):** that
+  is the design, and it held for everything but the loader itself, which runs before any download.
+  So the loader now updates itself: nfl.lock.json pins its two files (harness, written by
+  write-lock, checked by check-lock); a session whose loader differs fetches the pinned files from
+  main, holds each to its digest, and runs that copy (no loop; any failure keeps the current one).
+  build.py refuses to build a loader the lock does not pin. After this one reinstall, loader changes
+  reach chat through the repo like everything else; only the bundled fallback still ages.
+
+## 2026-10-10 (232) -- a parlay-leg calculator in props/calc/, a user-approved exception to "no parallel engines"
 
 - **What (user):** a small calculator for Sleeper parlay legs. From a posted line and its two
   prices it gives the workload (carries, passes thrown to him, completions) a player needs for the
@@ -8713,7 +8737,7 @@ every row while the predictions rows carry open / decision / close (line_archive
   "book expects" row. Data through `core.fetch`; 2016-17 play-by-play feeds the 2018 pools only.
 - **Status:** design settled; code starts on the user's go.
 
-## 2026-10-10 (232) -- props/calc tuned on 2018-23; 2024-25 read once: no bet type passes all its tests
+## 2026-10-10 (233) -- props/calc tuned on 2018-23; 2024-25 read once: no bet type passes all its tests
 
 - **Tuned (pre-registered grids, props/calc/harness.py, 2018-23 only):** carry_r 16->8, day_sd
   0.15->0.05, target_r 8->10, completion_r 10->25, k_ypc 150->200, k_catch 60->10 (grid edge),
@@ -8729,11 +8753,11 @@ every row while the predictions rows carry open / decision / close (line_archive
   keep "Check first: workload bar untested." until the user chooses the failure wording.
   Details: docs/plans/2026-10-10-parlay-leg-calculator.md, "Tuning" and "Held-out read".
 
-## 2026-10-10 (233) -- the calculator is the primary NFL prop tool; the engine goes dormant
+## 2026-10-10 (234) -- the calculator is the primary NFL prop tool; the engine goes dormant
 
 - **What (user):** `props/calc/` answers prop legs and Power Play entries in rushing yards,
   receptions, receiving yards and passing yards, in chat and in Claude Code sessions. This
-  replaces #231's "recorded exception to no parallel engines": the calculator is now the
+  replaces #232's "recorded exception to no parallel engines": the calculator is now the
   primary tool, not an exception beside the engine.
 - **The engine is dormant, not retired.** `props/engine/` stays in the repo, unedited, and is not
   the default answer to any prop question. It is used only when the user asks for it by name,
@@ -8751,14 +8775,19 @@ every row while the predictions rows carry open / decision / close (line_archive
   for a Claude Code session. The release adds `props/calc/`, `props/journal.py` and
   `props/persist.py` (nfl-v1.70); the calculator's own captures, name-miss log and held-out
   data files stay out of the release, so a chat capture never fails the next bootstrap's
-  verify. The user rebuilds and re-uploads the skill: the oldest installed harness (built at
-  nfl-v1.0) unpacks by its own rules and would skip the new files. **Order, so chat never
-  falls back:** (1) build the skill from this branch (build.py vendors the branch's release,
-  since the tag does not exist yet) and upload it -- it still runs nfl-v1.69, because the
-  bootstrap reads the lock from main; (2) merge; (3) at once, on main, `python skill/release.py
-  cut-tag` and push the tag. Between (2) and (3) chat runs the vendored copy, which is
-  nfl-v1.70 itself. If main moved before the merge, merge main into the branch and re-run
-  `write-lock` first.
-- **Evidence and limits:** the calculator's held-out read (#232) passed spread, round trip and the
+  verify. The user rebuilds and re-uploads the skill: an installed harness older than #231 (the
+  oldest was built at nfl-v1.0) unpacks by its own rules and would skip the new files; a harness
+  from #231 on updates itself from main's pin and unpacks the lock's files, so for it the rebuild
+  only refreshes the bundled fallback to nfl-v1.70.
+- **Order, so the fallback window is one step and runs the new release:** (0) main was merged into
+  this branch and `write-lock --tag nfl-v1.70` re-run (it pins the harness, #231); if main moves
+  again before the merge, repeat (0) and rebuild. (1) Build the skill from this branch (build.py
+  vendors the branch's release, since the tag does not exist yet) and upload it. Until the merge
+  it still runs nfl-v1.69: the bootstrap reads main's lock, and because the branch's
+  `skill/release.py` differs from main's pin, it fetches and runs main's pinned loader. (2) Merge.
+  (3) At once, on main, `python skill/release.py cut-tag` and push the tag. Between (2) and (3)
+  the tag does not exist, so both fetch routes fail and chat runs the bundled copy
+  (RELEASE_SOURCE=VENDORED_FALLBACK), which is nfl-v1.70 itself; after (3) it fetches nfl-v1.70.
+- **Evidence and limits:** the calculator's held-out read (#233) passed spread, round trip and the
   80% range for every bet type but passing's spread, and failed the conversion band test
   everywhere; each card says so in the user's words. No real-game record yet.

@@ -1,6 +1,6 @@
 # Parlay-leg calculator (props/calc/): design note
 
-*2026-10-10. DECISIONS #231. Status: approved by the user on 2026-10-10; building. Order agreed
+*2026-10-10. DECISIONS #232. Status: approved by the user on 2026-10-10; building. Order agreed
 then: a working rushing and receptions card end to end at the prototype settings first, tuning
 after; no scope additions until that card exists.*
 

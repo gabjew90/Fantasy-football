@@ -1,4 +1,4 @@
-"""props/calc/ (the parlay-leg calculator, DECISIONS #231) must not import the
+"""props/calc/ (the parlay-leg calculator, DECISIONS #232) must not import the
 props engine. It is a user-approved exception to "no parallel engines" only
 because it shares nothing with it; an import would make it a second front end
 on the engine's numbers. Same AST pattern as test_boundary.py, plus a text

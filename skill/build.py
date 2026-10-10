@@ -97,6 +97,13 @@ def main(argv: list[str] | None = None) -> int:
         print(f"no {release.LOCK_NAME}; run skill/release.py write-lock first", file=sys.stderr)
         return 2
     lock = json.loads(lock_path.read_text(encoding="utf-8"))
+    # THE LOADER SHIPPED IS THE ONE THE LOCK PINS (DECISIONS #231): a skill built from a tree whose
+    # skill/ differs would hand over to the pinned loader on every session instead of running itself
+    pinned, here = lock.get("harness") or {}, release.harness_digests(REPO)
+    if pinned and pinned != here:
+        print("skill/ in this checkout is not the loader nfl.lock.json pins: build from main after "
+              "pulling (or re-run `python skill/release.py write-lock --tag <tag>` on a branch)", file=sys.stderr)
+        return 2
 
     with tempfile.TemporaryDirectory() as tmp:
         stage = Path(tmp) / SKILL_NAME

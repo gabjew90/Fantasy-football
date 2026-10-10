@@ -2,7 +2,7 @@
  "algorithm": "nfl-release-sha256-lf-1",
  "file_count": 194,
  "files": {
-  "CHAT.md": "d78aa9be2cfecae08950b1aff61f4a78790aeb5b15fbf63b9d3383106e7797d2",
+  "CHAT.md": "fac48ee0fec738f91d9051d516f906b56b260dbb95bf8b826a0e4e500b5146d1",
   "config.yaml": "1a2af1bd5d6c7a464e908b50e94d910d2adba1675dede83876369aca7329c0c6",
   "core/__init__.py": "8ac9ed217e439f5828616ab66ec9ff17336c2cbbbeae391d0f9bfa001eaed571",
   "core/fetch.py": "664b4f3eced6e5d586d8f6395f9ce39faf0b4218f1943eb1c3acafd1098bc4da",
@@ -10,7 +10,7 @@
   "core/manifest.py": "dcdb9e164a30fbe102f7559661157c33f08c9dd6455aee6f185761260f921195",
   "core/probe.py": "b3ef1cd2f783157b4dcd75f93cacf4f00613fa4c787b921ee9e0fe452c74bdee",
   "core/props_ask.py": "a9a12487e73e59c5e917c49ab98a434a0fc9a5565f0b3d773c274389f8ff00f1",
-  "core/registry.py": "77bc6aa608294dbaebfd00d53e21a8e1ca9dbd7ebca5f9faa57665cc4a54e32b",
+  "core/registry.py": "436eb838e385881eb4b06c38d417525bcd9f9e62c7c23deba2c5187b781870cd",
   "core/scoring.py": "99cfb2cdb23b7441b85b92084688fdddc5b70d307f75942f82a50630685e71d3",
   "core/status.py": "5f09b233b568849dc5f8cdd7a76e2936245823e5d837d9b49e502f2bb837b16f",
   "data/external/availability.csv": "3e56bc4760ab853a816e3d6a3ab93560a4236addf1f99233699be2fd866623ba",
@@ -117,7 +117,7 @@
   "props/calc/heldout/heldout_read.json": "7835047006d12037529c7155b188a5c82bf5908fc4b17f30e56602779dd809ac",
   "props/calc/lines.py": "a4114701829dc636fbe402162e2a28d9713d4bc3d87a298ad1d5b1dec4d1d455",
   "props/calc/markets.py": "4fab14da3ce288711437a43c4a18facb98e748213403b26a8b50b968335ffbbf",
-  "props/calc/matchup.py": "3b0084357ebaf6e7609e2abe85608a44ca911a6902a3fc06824fed3b82c59285",
+  "props/calc/matchup.py": "1224d830ed674a1214774fdb3725b885185c8502e9b785c29422df67935eccf7",
   "props/calc/names.py": "9eaa5617dd8d5ad2758ab529976928fb34b05d938b7eddbb7ab97fb5d555339c",
   "props/calc/odds.py": "e0096cc1f7b98e885268b8f01ac475260be75af3a5cc18485224b3e10a562c8f",
   "props/calc/opponent.py": "1a657b51f9b0463c8e6c9598a490ddd81e1270911a164777828b3c524a4b65f0",
@@ -197,6 +197,10 @@
   "tiers.csv": "04a1a79d43e9f2445ba3dc4ea262b00fbd58efea1f41e8b0393cb4c7f8afee41",
   "tiers.keefamania.csv": "11e6546b56caa807a572da86d5c3d81097bafd2d2550e25653882d78b2962e94"
  },
- "sha256": "c1b022e79dbc1944c2635f96efe4297432eb13e171f8890f29b1bacbbabfb48e",
+ "harness": {
+  "scripts/bootstrap.py": "d5e5c9a718adf11bd2e0adff4560c7cc757be3085a0a206ae32c487c1612a003",
+  "scripts/release.py": "a75353d7b4e83d21e7e22600c5bb2856b05389966b8e7b1b2d25e62a4ed84bf7"
+ },
+ "sha256": "82489f3c797093f5ae2e7b164e908089e3e11e5af176c6fed40351503aa9da41",
  "tag": "nfl-v1.70"
 }
