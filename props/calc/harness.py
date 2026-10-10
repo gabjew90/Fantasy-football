@@ -77,6 +77,7 @@ GRIDS = {
     "k_ypr": [10, 25, 50, 100, 150, 250, 400],
     "k_ypcomp": [25, 50, 100, 150, 250, 400, 800],
 }
+UNTESTED: dict = {}      # roles left untested for a reason other than games played, by reason (reported)
 KIND = {"rush_yds": "carries", "receptions": "targets", "rec_yds": "targets", "pass_yds": "completions"}
 R_KEY = {"carries": "carry_r", "targets": "target_r", "completions": "completion_r"}
 STAT = {"rush_yds": "rush_yds", "receptions": "receptions", "rec_yds": "rec_yds", "pass_yds": "pass_yds"}
@@ -106,10 +107,17 @@ def tested(b, season: int, week: int, min_games: int, top_n: int = 3) -> list[tu
         now_t = set(now.loc[now["team"] == team, "gsis_id"])
         ok = lambda gid: played.get(gid, 0) >= min_games and gid in now_t      # noqa: E731
         sums = tg.groupby("gsis_id")[["carries", "targets", "completions"]].sum().sort_index()
-        is_rb = np.array([b.position_at(gid, season, week) == "RB" for gid in sums.index], dtype=bool)
-        backs = sums[(sums["carries"].to_numpy() > 0) & is_rb]
-        if len(backs) and ok(backs["carries"].idxmax()):
-            out.append((backs["carries"].idxmax(), team, "rush_yds"))
+        carriers = sums[sums["carries"] > 0]
+        pos = {gid: b.position_at(gid, season, week) for gid in carriers.index}   # only players with carries
+        backs = carriers[[pos[g] == "RB" for g in carriers.index]]
+        unknown = carriers[[pos[g] is None for g in carriers.index]]
+        if len(backs):
+            lead = backs["carries"].idxmax()
+            if len(unknown) and unknown["carries"].max() >= backs["carries"].max():
+                # the carry leader may be a back with no roster listing: the role is not tested, and counted
+                UNTESTED["lead back with no roster position"] = UNTESTED.get("lead back with no roster position", 0) + 1
+            elif ok(lead):
+                out.append((lead, team, "rush_yds"))
         top = sums[sums["targets"] > 0].sort_values("targets", ascending=False, kind="stable").index[:top_n]
         out += [(gid, team, m) for gid in top if ok(gid) for m in ("receptions", "rec_yds")]
         if sums["completions"].max() > 0 and ok(sums["completions"].idxmax()):
@@ -162,7 +170,7 @@ def extract(seasons: tuple, fixed: dict, tuned: dict) -> pd.DataFrame:
         df["pools"] = [v if not isinstance(v, tuple)
                        else tuple(done.setdefault(id(a), np.sort(np.asarray(a, dtype=float))) for a in v)
                        for v in df["pools"]]
-    df.attrs.update(skipped=skipped, resid=resid)
+    df.attrs.update(skipped=skipped, resid=resid, untested=dict(UNTESTED))
     return df
 
 
@@ -200,7 +208,10 @@ class Pricer:
         self.fixed, self.k = fixed, k
         sims, seed = int(fixed["sims"]), int(fixed["seed"])
         lim = calc.Limits.from_fixed(fixed)
-        key = tuple(k[R_KEY[kind]] for kind in R_KEY) + (id(df),)
+        lim_key = (tuple(sorted(lim.max_count.items())), tuple(sorted(lim.search_max.items())),
+                   tuple(sorted(lim.rate_range.items())), lim.bisect_steps)
+        key = (tuple(k[R_KEY[kind]] for kind in R_KEY), sims, seed, lim_key,
+               tuple((s_, id(v)) for s_, v in sorted(df.attrs["resid"].items())))
         if key not in _DRAWS:                  # built once per set of r values (and case table), not per call
             draws = {kind: calc.make_draws(kind, k[R_KEY[kind]], sims, seed, lim, yards=kind != "carries")
                      for kind in R_KEY}
@@ -265,11 +276,16 @@ def _share(out: np.ndarray, line: float) -> float | None:
     return None if po + pu == 0 else po / (po + pu)
 
 
-def coverage(sim: np.ndarray, actual: float, fixed: dict) -> tuple:
+def coverage(sim: np.ndarray, actual: float, fixed: dict, is_sorted: bool = False) -> tuple:
     """(fractional, inclusive) inside-the-80%-range scores for one actual
     result against simulated results (see the module docstring)."""
     lo_p, hi_p = fixed["range_low_pct"] / 100, fixed["range_high_pct"] / 100
-    below, at_or_below = float(np.mean(sim < actual)), float(np.mean(sim <= actual))
+    if is_sorted:
+        n = len(sim)
+        below = float(np.searchsorted(sim, actual, side="left")) / n
+        at_or_below = float(np.searchsorted(sim, actual, side="right")) / n
+    else:
+        below, at_or_below = float(np.mean(sim < actual)), float(np.mean(sim <= actual))
     width = at_or_below - below
     if width > 0:
         frac = max(0.0, min(at_or_below, hi_p) - max(below, lo_p)) / width
@@ -357,9 +373,9 @@ def spread(df: pd.DataFrame, market: str, fixed: dict, r_value: float) -> dict:
     cache: dict = {}
     frac, incl = [], []
     for w, a in zip(d["usual"], d["actual_work"]):
-        if w not in cache:
-            cache[w] = calc.counts(draws, float(w), lim.max_count[kind])
-        f, inc = coverage(cache[w], a, fixed)
+        if w not in cache:                     # sorted once per distinct average
+            cache[w] = np.sort(calc.counts(draws, float(w), lim.max_count[kind]))
+        f, inc = coverage(cache[w], a, fixed, is_sorted=True)
         frac.append(f)
         incl.append(inc)
     cov = float(np.mean(frac)) if frac else None
@@ -375,11 +391,12 @@ def round_trip(df: pd.DataFrame, market: str, fixed: dict, k: dict, every: int =
     searches may find no workload."""
     pr = Pricer(df, fixed, k)
     d = df[(df["market"] == market) & df["usual"].notna()].iloc[::every]
-    errs, unsolved = [], 0
+    errs, unsolved, zero_line = [], 0, 0
     for _, r in d.iterrows():
         m = pr.model(r, market)
         line = half_up(r["usual"] * m.rate, "0.5")
         if line <= 0:
+            zero_line += 1
             continue
         for p in (0.45, 0.50, 0.55):
             s = calc.solve_workload(m, line, p)
@@ -392,8 +409,8 @@ def round_trip(df: pd.DataFrame, market: str, fixed: dict, k: dict, every: int =
     searched = len(e) + unsolved
     ok = (worst is not None and worst * 100 <= fixed["round_trip_points"]
           and unsolved <= 0.01 * searched)
-    return {"checked": int(len(e)), "unsolved": unsolved, "worst_points": None if worst is None else worst * 100,
-            "pass": ok}
+    return {"sampled_cases": int(len(d)), "line_of_0_cases": zero_line, "checked": int(len(e)),
+            "unsolved": unsolved, "worst_points": None if worst is None else worst * 100, "pass": ok}
 
 
 def game_story(seasons_a: tuple, seasons_b: tuple, fixed: dict) -> dict:
@@ -411,8 +428,11 @@ def game_story(seasons_a: tuple, seasons_b: tuple, fixed: dict) -> dict:
             att = p[data._flag(p["pass_attempt"]) & ~data._flag(p["sack"]) & ~data._flag(p["two_point_attempt"])]
             a = att.groupby(["game_id", "posteam"]).size().rename("attempts")
             rows.append(pd.concat([c, a], axis=1).fillna(0).reset_index())
-        t = pd.concat(rows, ignore_index=True).merge(
-            sched[["game_id", "home_team", "home_score", "away_score"]], on="game_id", how="inner")
+        t = pd.concat(rows, ignore_index=True)
+        t = t.merge(sched[["game_id", "home_team", "home_score", "away_score"]], on="game_id", how="left")
+        require(t["home_team"].notna().all(), f"{int(t['home_team'].isna().sum())} team-games have no schedule row")
+        require(t[["home_score", "away_score"]].notna().all().all(),
+                f"{int(t['home_score'].isna().sum())} team-games have no final score")
         m = np.where(t["posteam"] == t["home_team"], 1, -1) * (t["home_score"] - t["away_score"])
         t["group"] = np.where(m >= margin, f"won by {margin}+",
                               np.where(m <= -margin, f"lost by {margin}+", f"within {margin - 1}"))
@@ -460,6 +480,25 @@ def run_tests(df: pd.DataFrame, fixed: dict, k: dict) -> dict:
 
 
 # ------------------------------------------------------------------ CLI
+
+def save_cases(df: pd.DataFrame, where: Path) -> None:
+    """Cases as CSV plus every pool array (npz, by id) and each case's depth
+    mix, so a separate agent can re-derive every stated chance without reading
+    the seasons again."""
+    out = df.drop(columns=[c for c in ("pools",) if c in df]).copy()
+    pools, ids = {}, []
+    for v in (df["pools"] if "pools" in df else [None] * len(df)):
+        if isinstance(v, tuple):
+            ids.append("|".join(pools.setdefault(id(a), (f"pool{len(pools)}", a))[0] for a in v))
+        else:
+            ids.append("")
+    out["pool_ids"] = ids
+    if "mix" in df:
+        out["mix"] = [json.dumps(list(m)) if isinstance(m, tuple) else "" for m in df["mix"]]
+    out.to_csv(where / "cases_2024_2025.csv.gz", index_label="case")
+    np.savez_compressed(where / "pools_2024_2025.npz", **{name: arr for name, arr in pools.values()},
+                        **{f"resid_{s_}": v for s_, v in df.attrs["resid"].items()})
+
 
 def _load_cases(seasons: tuple) -> pd.DataFrame:
     path = OUT / f"cases_{min(seasons)}_{max(seasons)}.pkl"
@@ -514,29 +553,33 @@ def main(argv=None) -> int:
         if HELDOUT_MARK.exists():
             raise SystemExit(f"the held-out seasons were already read ({HELDOUT_MARK}); they are read once")
         HELDOUT_DIR.mkdir(parents=True, exist_ok=True)
-        started = dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds")
-        # the mark goes down BEFORE anything is read: a crash still counts as the read
-        HELDOUT_MARK.write_text(json.dumps({"started_at_utc": started, "status": "started",
-                                            "seasons": list(HELDOUT_SEASONS), "settings": tuned}, indent=1),
-                                encoding="utf-8")
+        OUT.mkdir(parents=True, exist_ok=True)
+        rec = {"started_at_utc": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
+               "status": "started", "seasons": list(HELDOUT_SEASONS), "settings": tuned, "results": {}}
+
+        def save():                            # the record after every step: a crash keeps what was done
+            HELDOUT_MARK.write_text(json.dumps(rec, indent=1, default=str), encoding="utf-8")
+        save()                                 # BEFORE anything is read: a crash still counts as the read
         df = extract(HELDOUT_SEASONS, fixed, tuned)
         with open(OUT / "cases_heldout.pkl", "wb") as fh:
             pickle.dump(df, fh)
-        res, lines_ = {}, []
+        save_cases(df, HELDOUT_DIR)
+        rec.update(cases=int(len(df)), not_enough=df.attrs["skipped"], untested=df.attrs["untested"],
+                   status="extracted")
+        save()
+        lines_ = []
         for market in ("rush_yds", "receptions", "rec_yds", "pass_yds"):
             conv = conversion(df, market, fixed, tuned, keep_rows=True)
             lines_ += [{**row, "market": market} for row in conv.pop("rows")]
-            res[market] = {"conversion": conv, "spread": spread(df, market, fixed, tuned[R_KEY[KIND[market]]]),
-                           "round_trip": round_trip(df, market, fixed, tuned)}
-            res[market]["pass"] = all(v["pass"] for v in res[market].values())
-        res["game_story"] = game_story(TUNE_SEASONS, HELDOUT_SEASONS, fixed)
-        cols = [c for c in df.columns if c not in ("pools", "mix")]
-        df[cols].to_csv(HELDOUT_DIR / "cases_2024_2025.csv.gz", index_label="case")
-        pd.DataFrame(lines_).to_csv(HELDOUT_DIR / "lines_2024_2025.csv.gz", index=False)
-        rec = {"started_at_utc": started, "finished_at_utc": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
-               "status": "read", "seasons": list(HELDOUT_SEASONS), "settings": tuned, "cases": int(len(df)),
-               "not_enough": df.attrs["skipped"], "results": res}
-        HELDOUT_MARK.write_text(json.dumps(rec, indent=1, default=str), encoding="utf-8")
+            pd.DataFrame(lines_).to_csv(HELDOUT_DIR / "lines_2024_2025.csv.gz", index=False)
+            res = {"conversion": conv, "spread": spread(df, market, fixed, tuned[R_KEY[KIND[market]]]),
+                   "round_trip": round_trip(df, market, fixed, tuned)}
+            res["pass"] = all(v["pass"] for v in res.values())
+            rec["results"][market] = res
+            save()
+        rec["results"]["game_story"] = game_story(TUNE_SEASONS, HELDOUT_SEASONS, fixed)
+        rec.update(status="read", finished_at_utc=dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"))
+        save()
         print(json.dumps(rec, indent=1, default=str))
         return 0
     return 1

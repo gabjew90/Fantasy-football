@@ -96,3 +96,42 @@ def test_the_band_table_and_pass_marks():
     assert (lo, hi) == (1.0, 9.0)
     assert harness._share(np.array([1.0, 2.0, 3.0, 3.0]), 2.0) == pytest.approx(2 / 3)    # a push is void
     assert harness._share(np.array([2.0, 2.0]), 2.0) is None
+
+
+def test_game_story_by_hand(monkeypatch):
+    from props.calc import data
+    # one game a season: home A wins 30-10 (won by 8+), away B lost by 8+; A runs 3 times and throws 2,
+    # B runs once and throws 4 (a sack and a two-point try do not count as attempts)
+    def pbp(season, season_type="REG"):
+        rows = [dict(posteam="A", rush_attempt=1, pass_attempt=0)] * 3 + [dict(posteam="A", rush_attempt=0,
+                                                                              pass_attempt=1)] * 2
+        rows += [dict(posteam="B", rush_attempt=1, pass_attempt=0)] + [dict(posteam="B", rush_attempt=0,
+                                                                            pass_attempt=1)] * 4
+        rows += [dict(posteam="B", rush_attempt=0, pass_attempt=1, sack=1),
+                 dict(posteam="B", rush_attempt=0, pass_attempt=1, two_point_attempt=1)]
+        df = pd.DataFrame(rows)
+        for c in ("sack", "two_point_attempt", "qb_kneel"):
+            df[c] = df.get(c, 0)
+        return df.fillna(0).assign(game_id=f"{season}_01_B_A", season=season, week=1, defteam="X",
+                                   rusher_player_id="r", rushing_yards=1.0, wp=0.5)
+    sched = pd.DataFrame([dict(game_id=f"{s}_01_B_A", home_team="A", away_team="B", home_score=30, away_score=10)
+                          for s in (2020, 2024)])
+    monkeypatch.setattr(data, "pbp", pbp)
+    monkeypatch.setattr(data, "schedule", lambda **k: sched)
+    res = harness.game_story((2020,), (2024,), {"season_type": "REG", "result_margin": 8, "game_story_points": 1.5})
+    assert res["a"]["carries"] == {"lost by 8+": 1.0, "won by 8+": 3.0}
+    assert res["a"]["attempts"] == {"lost by 8+": 4.0, "won by 8+": 2.0}
+    assert res["pass"] and res["worst_difference"] == 0.0
+
+
+def test_saved_cases_carry_what_a_verifier_needs(tmp_path):
+    pool = np.sort(np.array([3.0, 9.0, 20.0]))
+    df = pd.DataFrame({"market": ["rec_yds", "rush_yds"], "gsis_id": ["a", "b"], "mix": [(1.0, 0.0, 0.0), None],
+                       "pools": [(pool, pool, pool), None]})
+    df.attrs["resid"] = {2024: np.array([-1.0, 1.0])}
+    harness.save_cases(df, tmp_path)
+    back = pd.read_csv(tmp_path / "cases_2024_2025.csv.gz")
+    npz = np.load(tmp_path / "pools_2024_2025.npz")
+    ids = back.loc[0, "pool_ids"].split("|")
+    assert ids == ["pool0"] * 3 and (npz["pool0"] == pool).all() and (npz["resid_2024"] == [-1.0, 1.0]).all()
+    assert back.loc[0, "mix"] == "[1.0, 0.0, 0.0]"
