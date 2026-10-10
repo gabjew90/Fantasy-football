@@ -8700,5 +8700,10 @@ every row while the predictions rows carry open / decision / close (line_archive
   `props/calc/`, imports nothing from `props/engine/` (a test enforces it), and leaves the engine,
   its workflow and its record untouched. It is judged by its own pre-registered tests (conversion,
   spread, round trip, game-story rows), tuned on 2018-23, with 2024-25 read once at the end.
-- **Status:** design note (docs/plans/2026-10-10-parlay-leg-calculator.md) written with eleven open
+- **Matchup block (user, same day):** each card gets a display-only MATCHUP block (spread, total and
+  implied points; key injuries with with/without splits; the opposing defense's rate and volume
+  allowed to his position, with rank; EPA and success-rate tiers, garbage time out), computed in
+  `props/calc/` from play-by-play, rosters, injuries and schedules. It changes no calculated number
+  and adds no setting; a test builds every card with and without it and requires identical numbers.
+- **Status:** design note (docs/plans/2026-10-10-parlay-leg-calculator.md) written with sixteen open
   questions; no code until the user approves it.

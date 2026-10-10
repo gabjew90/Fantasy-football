@@ -148,6 +148,57 @@ brackets. The gap is the needed workload minus his trailing 4-game average (Q9),
 reading only restates that ("needs 4 more carries than his recent average"); it never says
 whether to play the leg.
 
+**1a. MATCHUP block** (added 2026-10-10, user). Display only: nothing in it changes any number
+on the card or becomes a setting. It sits under the card's numbers. Every line carries its
+sample size, and a figure built on fewer than 4 games says "only N games". Each line is worded
+against the card's question (the workload or the yards per carry needed), never as a verdict.
+Illustrative numbers:
+
+```
+MATCHUP (DEN at KC, week 6)
+Game: KC -3.5, total 44.5; DEN 20.5, KC 24.0 implied points
+  He needs 20 carries; in his games as an underdog: 15.0 a game (3 games)
+Injuries: Sutton out. With him: 16.2 carries (5 games); without: 19.0 (only 2 games)
+  QB: Nix starting, no change
+KC defense: 4.6 a carry allowed to RBs (rank 27 of 32, 5 games)
+  He needs 3.2 a carry at his usual 16 carries; KC allows 4.6
+KC allows RBs 24.1 carries, 102 yards a game (5 games)
+Tiers (EPA per play and success rate, garbage time out, 5 games):
+  DEN offense: run 2 of 4, overall 3 of 4 | KC defense: run 4 of 4, overall 2 of 4
+```
+
+How each line is computed, in `props/calc/matchup.py`, from play-by-play, rosters, injuries and
+schedules read through the same data layer as the rest of the tool (nothing from the engine):
+
+- **Game.** Spread and total from the schedule (latest before the card is made). Implied points:
+  favourite = total/2 + spread/2, underdog = total/2 - spread/2. The relating line uses his own
+  workload history split by whether his team was favoured.
+- **Injuries.** The week's report (nflverse injuries file; Sleeper's player status when it is
+  newer, with the source and date shown; see Q13). Listed: a QB change (this week's expected
+  starter differs from last game's), and any teammate who is a lead back or top-3 by targets
+  (same pre-game definition as the tests) ruled out or doubtful. For each, his workload in games
+  with and without that player this season and last, "without" meaning the teammate played zero
+  snaps (snap counts). Where no "without" games exist, the line says so.
+- **Opposing defense.** Rushing cards: yards per carry allowed to RBs. Receiving cards: yards
+  per target and catch rate allowed to his position (WR, TE or RB). Passing cards: yards per
+  completion and completions allowed. Rank 1 = fewest allowed, out of 32, season to date before
+  the priced week.
+- **Volume allowed.** Carries and yards (or targets and yards, or completions and yards) allowed
+  per game to his position.
+- **Tiers.** Each team's EPA per play and success rate for and against, garbage time excluded,
+  season to date. Teams are ranked on each, the two ranks averaged, and the average cut into
+  four tiers of 8 (1 = best). The card shows the unit that matters (run for rushing cards, pass
+  for receiving and passing) and overall.
+
+Fixed display constants, not settings and not tuned: garbage time = plays with the offense's win
+probability under 10% or over 90% (nflverse `wp`); the "only N games" threshold of 4; tiers of
+8 teams. They change no calculated number, so they do not count toward the cap (Q12).
+
+The rushing card gains one row the matchup lines refer to: the yards per carry he needs at his
+trailing 4-game workload (receiving yards: yards per catch at his usual catches; passing already
+has its yards-per-completion row). This is the same search turned around, on the same settings
+(Q14).
+
 **2. Entry check.** For each leg, the game story it needs: rushing Overs want his team ahead,
 passing and receiving Overs want it behind or a shootout, Unders the reverse. Conflicts are
 listed when two legs in the same game need stories that cannot both happen (team A ahead and
@@ -203,7 +254,10 @@ by 8+), taken from 2018-23, are within about 1.5 carries of the 2024-25 averages
 **Unit tests.** Odds conversion (multiplier, American, break-even, no-vig), name matching
 (including Joshua/Josh, "C.McCaffrey", a team mismatch), the leakage cut, and the boundary rule
 (no `props.engine` import anywhere under `props/calc/`, same AST pattern as
-`props/tests/test_boundary.py`).
+`props/tests/test_boundary.py`). Matchup: implied points, the garbage-time cut, rank direction, the
+"without" split from snap counts, and a display-only test that builds every card with the
+matchup data present and with it absent and asserts every calculated number is identical; a
+structural test that the calculator module never imports `matchup.py`.
 
 **Sanity targets** (the throwaway prototype, `carry_r` 16, `day_sd` 0.15, `target_r` 8; within
 about 1 before tuning, not required after):
@@ -249,3 +303,14 @@ about 1 before tuning, not required after):
 11. **Registry and verification.** Register as provisional (above)? And does the rule that a
     separate agent verifies any analysis you bet on (#215) apply to each leg card, or only to
     the test write-ups (cards are deterministic arithmetic covered by tests)?
+12. **Matchup constants.** Garbage time as win probability outside 10-90%, the "only N games"
+    threshold of 4, tiers of 8: acceptable as fixed display constants outside the cap of 8?
+13. **Injury source.** nflverse's injuries file can lag a day in season. Show Sleeper's player
+    status when newer (with the source named), or nflverse only?
+14. **Needed rate row.** Add "yards per carry needed at his usual carries" (and yards per catch
+    for receiving yards) to the card so the matchup lines have something to point at?
+15. **Early season.** Weeks 1-3 have too few games for ranks and tiers. Show "only N games" and
+    nothing else (my default), or show last season's figures labelled as last season?
+16. **No matchup-adjusted workload.** I will not re-run the search at the defense's allowed rate
+    ("at KC's 4.6 he'd need 15"), because that is a matchup adjustment to a calculated number.
+    Confirm.
