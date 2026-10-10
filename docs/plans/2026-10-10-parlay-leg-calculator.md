@@ -1,7 +1,8 @@
 # Parlay-leg calculator (props/calc/): design note
 
-*2026-10-10. DECISIONS #231. Status: the user answered all open questions on 2026-10-10 (see
-"Decisions" at the end); code starts on the user's go.*
+*2026-10-10. DECISIONS #231. Status: approved by the user on 2026-10-10; building. Order agreed
+then: a working rushing and receptions card end to end at the prototype settings first, tuning
+after; no scope additions until that card exists.*
 
 ## What it is, and why it is an exception
 
@@ -107,6 +108,19 @@ per catch (at his blended catch rate). Passing yards: yards per completion. Same
 new ones. (There is no "good day" row; the user dropped it.)
 
 ## Settings (8, the hard cap)
+
+**Tuned settings, by name, with the running count (kept current):**
+
+1. `carry_r`
+2. `day_sd`
+3. `target_r`
+4. `completion_r`
+5. `k_ypc`
+6. `k_catch`
+7. `k_ypr`
+8. `k_ypcomp`
+
+Count: **8 of 8.** A new one requires removing one, and that is the user's call.
 
 One file, `props/calc/settings.yaml`, each line with a plain-English comment.
 
@@ -217,8 +231,9 @@ card's "rate needed at his usual workload" row.
 
 **2. Entry check.** For each leg, the game story it needs: rushing Overs want his team ahead,
 passing and receiving Overs want it behind or a shootout, Unders the reverse. Rushing legs show
-team carries by result group under a heading that reads "League-wide (all teams, 2018 to last
-season), not this team's tendency". Conflicts are
+team carries by result group, passing and receiving legs team pass attempts by result group, each
+under a heading that reads "League-wide (all teams, 2018 to last season), not this team's
+tendency". Conflicts are
 listed when two legs in the same game need stories that cannot both happen (team A ahead and
 team A behind; team A ahead and team B ahead). Cost: total payout P, the hit rate each of n legs
 needs, (1/P)^(1/n), and the average loss per unit staked if every leg is a coin flip,
@@ -241,6 +256,12 @@ Commands, all under `python -m props.calc`: `leg`, `entry`, `capture`, `log`, `s
 **Tuning and held-out split.** Settings are tuned on 2018-2023 only. 2024-25 is held out and
 read once, at the end; the date and result of that read are recorded in this note and in
 DECISIONS. Pass marks below are fixed now and are not changed after a result is seen.
+
+**When a test fails (the user's rule, 2026-10-10).** No setting, adjustment or new constant is
+added to fix it. The failure is reported, and the card states it in plain words (for example
+"ranges for receiving yards tested too narrow"); then the user decides. One retune of the
+existing settings on 2018-23 is allowed before asking. The held-out years are never used to
+retune.
 
 **Pre-registered tuning.**
 - `carry_r`, `target_r`, `completion_r`: grid, chosen on the spread test (2018-23) as the value
@@ -267,8 +288,8 @@ actual workloads.
 **Round trip.** The "book expects" workload fed back returns the no-vig chance within 1 point.
 
 **Game-story rows.** League-average team carries in each result group (won by 8+, within 7, lost
-by 8+), taken from 2018-23, are within about 1.5 carries of the 2024-25 averages. On the card
-this block is labelled league-wide.
+by 8+), taken from 2018-23, are within about 1.5 carries of the 2024-25 averages; the same test,
+same 1.5 mark, for team pass attempts. On the card both blocks are labelled league-wide.
 
 **Unit tests.** Odds conversion (multiplier, American, break-even, no-vig), name matching
 (including Joshua/Josh, "C.McCaffrey", a team mismatch), the leakage cut, and the boundary rule
