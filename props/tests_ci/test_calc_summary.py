@@ -34,8 +34,9 @@ def test_the_summary_by_hand():
     # Williams' Over needs Dallas ahead; Lamb and Prescott need Dallas behind; Irving needs Tampa behind
     fit = flat[flat.index("FIT CHECK"):flat.index("PRICE CHECK")]
     assert fit.count("These lean on opposite game stories.") == 4         # W-L, W-P, L-I, I-P; L-P and W-I agree
-    assert fit.startswith("FIT CHECK Javonte Williams: more runs while ahead. CeeDee Lamb: more throws from behind. "
-                          "These lean on opposite game stories.")
+    assert fit.startswith("FIT CHECK Javonte Williams: more runs while DAL is ahead. CeeDee Lamb: more throws while "
+                          "DAL is behind. These lean on opposite game stories.")
+    assert "Bucky Irving: more throws while TB is behind." in fit
     assert fit.rstrip().endswith("Both can win. Check your case for each.")
     assert "Javonte Williams: more than 55.6 wins in 100." in flat        # -125: 1 / 1.80
     # each of 4 legs must win (5/50)^(1/4) = 56.2% for the entry to break even
@@ -65,7 +66,8 @@ def test_out_of_range_legs_money_and_a_player_with_two_legs():
     assert block.index("Javonte Williams: no workload up to 45 carries clears it.") < block.index("CeeDee Lamb")
     assert "Average loss: $1.63 per $5 entry." in flat                 # 54/16 - 5 = -1.625 -> half up
     two = [LEGS[0], {**LEGS[0], "market": "rec_yds", "ask": 1.0}]
-    assert "Javonte Williams (rushing): more runs while ahead." in " ".join(summary.render(two, 5, 20, False).splitlines())
+    assert "Javonte Williams (rushing): more runs while DAL is ahead." in " ".join(
+        summary.render(two, 5, 20, False).splitlines())
     with pytest.raises(ValueError):
         summary.render(LEGS, 0.0, 0.0, True)
 

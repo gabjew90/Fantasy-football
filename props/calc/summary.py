@@ -30,15 +30,19 @@ def leg_view(name: str, market: str, side: str, c: dict, team: str, opp: str, ga
 def story(leg: dict) -> tuple:
     """(team that leads in the game story the leg leans on, words). Overs on
     rushing lean on his team ahead; Overs on catches, receiving and passing
-    yards on his team behind (throwing); Unders the reverse."""
+    yards on his team behind (throwing); Unders the reverse. The words name
+    his team, so two "from behind" legs on opposite teams do not read as the
+    same story (a fix under the frozen spec's rule (b): without the team the
+    pair read as a contradiction)."""
     rush = leg["market"] == "rush_yds"
     over = leg["side"] == "over"
     ahead = rush == over                       # rush Over or pass-catch Under: his team ahead
     leader = leg["team"] if ahead else leg["opp"]
+    t = leg["team"]
     if rush:
-        words = "more runs while ahead." if over else "fewer runs while behind."
+        words = f"more runs while {t} is ahead." if over else f"fewer runs while {t} is behind."
     else:
-        words = "more throws from behind." if over else "fewer throws while ahead."
+        words = f"more throws while {t} is behind." if over else f"fewer throws while {t} is ahead."
     return leader, words
 
 

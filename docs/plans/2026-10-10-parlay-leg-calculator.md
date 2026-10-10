@@ -291,8 +291,8 @@ WHAT EACH NEEDS (biggest ask first)
 [Player]: ~[bar] [unit], [gap] more than recent.
 
 FIT CHECK
-[Player]: more runs while ahead.
-[Player]: more throws from behind.
+[Player]: more runs while [TEAM] is ahead.
+[Player]: more throws while [TEAM] is behind.
 These lean on opposite game stories.
 Both can win. Check your case for each.
 
@@ -310,8 +310,10 @@ Average loss: $[L] per $[stake] entry.
 
 - The payout is the total Sleeper shows, stake included; if computed from leg prices, say so.
 - Legs sorted from the largest workload ask down (a sort, not a verdict; no "weakest" labels).
-- FIT CHECK covers every pair on the same team or in the same game; if none: "No opposing pairs
-  found." Never "cannot both win".
+- FIT CHECK covers every pair on the same team or in the same game, one block per opposing pair;
+  if none: "No opposing pairs found." Never "cannot both win". Each story names the player's team
+  (fixed under rule (b), 2026-10-10: "Lamb: more throws from behind" beside "Irving: more throws
+  from behind" read as the same story although one needs Dallas behind and the other Tampa Bay).
 - Each leg's price check from its own price. The coin-flip figure is a stated hypothetical.
 - After a batch: the grade legend "Grades: S best, F worst." once, then the follow-up names:
   Workload, Calculation, Matchup, Fit, Entry cost.
