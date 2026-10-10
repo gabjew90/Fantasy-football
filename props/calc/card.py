@@ -168,7 +168,7 @@ def question(market: str, side: str, work_ask: float | None, rate_ask: float | N
     if rate_ask > 0:
         return f"Workload is there. {r(rate_ask)}?"
     if work_ask > 0:
-        return f"At his season rate it clears. {w(work_ask)}?"
+        return f"At his recent rate it clears. {w(work_ask)}?"     # rate ask is against the bar's (recent) rate
     if work_ask == 0:                          # even on workload, rate there too (the user, 2026-10-10)
         return "Recent workload and rate both meet the bar."
     return f"Room for {_num(-work_ask)} {room} {_unit(market, -work_ask)}?"
@@ -191,7 +191,7 @@ def matchup_lines(pl: Player, market: str, opp: str, lines_: dict | None, why_no
         return out
     total = f" Total {lines_['total']:g}." if lines_.get("total") is not None else " No total shown."
     if lines_.get("closing"):
-        total = total.rstrip(".") + " (closing line)."
+        total = total.rstrip(".") + (" (closing line)." if lines_["closing"] is True else f" ({lines_['closing']}).")
     if lines_.get("spread_unread"):
         out += _wrap(f"ESPN's spread reads {lines_['spread_text']!r} (not understood).{total}")
     elif lines_.get("favorite"):
@@ -237,7 +237,7 @@ def _last_line(pl: Player, c: dict) -> tuple[list[str], list[tuple]]:
 
 
 def render(pl: Player, c: dict, side: str, *, opp: str, game_lines: dict | None = None, why_no_lines: str = "",
-           footer: str = "", opp_row: dict | None = None, grades: dict | None = None) -> str:
+           footer: str = "", opp_row: dict | None = None, grades: dict | None = None, line_note: str = "") -> str:
     """One side's card, in the spec's layout (card rules 1-15, as amended).
     opp_row: {"value", "games", "who"} from opponent.allows (display only);
     grades: matchup.grade_pair's result (display only); footer: one line."""
@@ -254,6 +254,8 @@ def render(pl: Player, c: dict, side: str, *, opp: str, game_lines: dict | None 
         out.append("Check first: workload bar untested.")
     elif not status.startswith("Passed"):      # a failed or partial test shows on every card
         out += _wrap(f"Check first: {status}")
+    if line_note:                              # the lookup skipped newer saved quotes: say so above the numbers
+        out += _wrap(f"Check first: {line_note}.")
     out += _title(pl, c, side) + [""]
     s = sol[f"needed_{side}"]
     res = calc.side_result(side, s.status)
@@ -325,11 +327,14 @@ def render(pl: Player, c: dict, side: str, *, opp: str, game_lines: dict | None 
 
 def _opp_line(opp: str, row: dict | None) -> str:
     """The opponent row: same unit as the needed rate (display only)."""
-    if row is None:
-        return f"{city(opp)} allows: not available"
-    if row.get("value") is None:
+    if row is None or row.get("error"):
+        return f"{city(opp)} allows: not available" + (f" ({row['error']})" if row else "")
+    if row.get("value") is None and row.get("thin"):
         return f"{city(opp)}: only {row['games']} games."
-    return f"{city(opp)} allows: {row['value']:.1f}{row.get('who', '')} ({row['games']} games)"
+    if row.get("value") is None:
+        return f"{city(opp)} allows: no plays{row.get('who', '')} yet ({row['games']} games)"
+    gaps = f"; {row['left_out']} plays left out (no win chance or roster listing)" if row.get("left_out") else ""
+    return f"{city(opp)} allows: {row['value']:.1f}{row.get('who', '')} ({row['games']} games{gaps})"
 
 
 def require_side(side: str) -> None:

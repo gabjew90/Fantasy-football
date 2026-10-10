@@ -153,14 +153,29 @@ def _bundle(season: int, fixed: dict) -> tuple:
 _SPREADS: dict = {}
 
 
+def _display(fn) -> dict:
+    """A display-only block: an error is shown on the card, never stops it."""
+    try:
+        return fn()
+    except Exception as ex:  # noqa: BLE001 -- shown on the card as "not available (...)"
+        msg = f"{type(ex).__name__}: {str(ex)[:60]}"
+        return {"error": msg, "note": f"not available ({msg})."}
+
+
 def line_footer(at_utc: str | None) -> str:
     """One line: when the quote was saved, in Pacific time ("Line as of Oct 8,
     4:59 PM PT."); a typed line says so."""
     if at_utc is None:
         return "Line typed in."
-    from zoneinfo import ZoneInfo
-    t = pd.Timestamp(at_utc).tz_convert(ZoneInfo("America/Los_Angeles"))
-    return f"Line as of {t.strftime('%b')} {t.day}, {t.hour % 12 or 12}:{t.minute:02d} {t.strftime('%p')} PT."
+    try:
+        from zoneinfo import ZoneInfo
+        pacific = ZoneInfo("America/Los_Angeles")
+    except Exception as ex:  # noqa: BLE001 -- ZoneInfoNotFoundError on Windows without tzdata
+        raise DataError(f"no time-zone database for America/Los_Angeles ({ex}); install tzdata "
+                        f"(pip install -r requirements.txt)") from ex
+    t = pd.Timestamp(at_utc).tz_convert(pacific)
+    month = "Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec".split()[t.month - 1]     # not locale-dependent
+    return f"Line as of {month} {t.day}, {t.hour % 12 or 12}:{t.minute:02d} {'AM' if t.hour < 12 else 'PM'} PT."
 
 
 def _week_lines(season: int, week: int) -> tuple:
@@ -197,6 +212,7 @@ def build_card(b, name_in: str, market: str, side: str = "over", *, team=None, s
     pl = player.build(b, gsis, name, team, season, wk, tuned, fixed, market)
     mo = mu = None
     at_utc = None                              # None: a line typed in
+    line_note = ""
     if line is not None:
         mo, mu = typed["over"], typed["under"]
         source = "line typed in"
@@ -207,6 +223,7 @@ def build_card(b, name_in: str, market: str, side: str = "over", *, team=None, s
                 source = f"Sleeper quote from {q['source']}, {q['at_utc'][:16].replace('T', ' ')} UTC"
                 if q.get("note"):
                     source += f"; {q['note']}"
+                    line_note = q["note"]
                 line, mo, mu, at_utc = q["line"], q["mult_over"], q["mult_under"], q["at_utc"]
             else:
                 at = "" if at_line is None else f" at {at_line:g}"
@@ -232,13 +249,18 @@ def build_card(b, name_in: str, market: str, side: str = "over", *, team=None, s
     if week_lines is not None:
         gl = week_lines.get((game["away_team"], game["home_team"]))
         why = "" if gl else f"ESPN lists no {game['away_team']} at {game['home_team']} game in week {wk}"
-    if not game_lines.has_odds(gl):            # ESPN has none (a final game): the schedule's closing line
-        gl = game_lines.closing(game) or gl
+    if not game_lines.has_odds(gl):            # ESPN has none: the nflverse schedule's line
+        sched = game_lines.closing(game)
+        if sched is not None:
+            # after kickoff it is the closing line; before, the schedule's current line (and ESPN's reason)
+            sched["closing"] = True if kicked_off else ("schedule line; " + why if why else "schedule line")
+            gl = sched
         why = why or "ESPN and the schedule show none"
     text = card.render(pl, c, side, opp=opp, game_lines=gl, why_no_lines=why, footer=footer,
-                       opp_row=opponent.allows(b, market, opp, pl.position, season, wk, fixed),
-                       grades=matchup.grade_pair(b, team, opp, "run" if market == "rush_yds" else "pass",
-                                                 season, wk, fixed))
+                       opp_row=_display(lambda: opponent.allows(b, market, opp, pl.position, season, wk, fixed)),
+                       grades=_display(lambda: matchup.grade_pair(b, team, opp, "run" if market == "rush_yds"
+                                                                   else "pass", season, wk, fixed)),
+                       line_note=line_note)
     return {**out, "c": c, "ready": True, "settings": tuned, "text": warn + text}
 
 

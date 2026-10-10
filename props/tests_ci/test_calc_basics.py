@@ -923,12 +923,22 @@ def test_opponent_allows_by_position_without_garbage_time():
     b = _B(carries, targets, pbp, roster)
     # rushing: RB carries in weeks 1-4, win chance 10-90%: (4 + 6 + 2 + 8) / 4 = 5.0 (the week-5 one is cut)
     assert opponent.allows(b, "rush_yds", "TB", "RB", 2026, 5, fixed) == {
-        "value": 5.0, "games": 4, "who": " to RBs", "plays": 4}
+        "value": 5.0, "games": 4, "who": " to RBs", "plays": 4, "thin": False, "left_out": 0}
     # receptions to WRs: 3 of 4 caught = 7.5 per 10
     got = opponent.allows(b, "receptions", "TB", "WR", 2026, 5, fixed)
     assert got["value"] == pytest.approx(7.5) and got["who"] == " to WRs"
     thin = opponent.allows(b, "rush_yds", "TB", "RB", 2026, 4, fixed)          # three games before week 4
-    assert thin["value"] is None and thin["games"] == 3
+    assert thin["value"] is None and thin["games"] == 3 and thin["thin"]
+    # a carrier with no listing this season falls back to last season's; one with none at all, and a play with
+    # no win chance, are counted, not silently dropped
+    b.position = {(2025, "rb9"): "RB"}
+    extra = pd.DataFrame([dict(season=2026, week=2, defteam="TB", posteam="X", gsis_id=g, yards=y, wp=p)
+                          for g, y, p in (("rb9", 10, 0.5), ("nobody", 3, 0.5), ("rb1", 3, np.nan))])
+    b.carries = pd.concat([carries, extra], ignore_index=True)
+    got = opponent.allows(b, "rush_yds", "TB", "RB", 2026, 5, fixed)
+    assert got["value"] == pytest.approx(30 / 5) and got["left_out"] == 2
+    none = opponent.allows(b, "receptions", "TB", "FB", 2026, 5, fixed)
+    assert none["value"] is None and not none["thin"] and none["who"] == " to FBs"
 
 
 def test_grades_need_four_games_each():
@@ -952,3 +962,30 @@ def test_the_closing_line_and_the_pacific_footer():
     assert cli.line_footer("2026-10-08T23:59:00+00:00") == "Line as of Oct 8, 4:59 PM PT."
     assert cli.line_footer("2026-11-02T16:05:00+00:00") == "Line as of Nov 2, 8:05 AM PT."     # PST from Nov 1
     assert cli.line_footer(None) == "Line typed in."
+
+
+def test_season_grades_counts_games_and_letters_the_best_unit_s():
+    from props.calc import matchup
+    rng = np.random.default_rng(5)
+    teams = [f"T{i}" for i in range(8)]
+    rows = []
+    for g in range(16):                                   # 16 games: each team plays 4
+        a, h = teams[(2 * g) % 8], teams[(2 * g + 1 + g // 4) % 8]
+        if a == h:
+            h = teams[(2 * g + 2) % 8]
+        for k in range(60):
+            off, dfn = (a, h) if k % 2 else (h, a)
+            boost = 0.6 if off == "T0" else 0.0           # T0's offense is far the best
+            epa = rng.normal(boost, 1.0)
+            rows.append(dict(game_id=f"g{g}", posteam=off, defteam=dfn, epa=epa, success=float(epa > 0),
+                             wp=0.5, play_type="pass" if k % 3 else "run", qb_kneel=0.0, qb_spike=0.0))
+    pbp = pd.DataFrame(rows).assign(**{"pass": lambda d: (d.play_type == "pass").astype(float),
+                                       "rush": lambda d: (d.play_type == "run").astype(float)})
+    fixed = settings.load()["fixed"]
+    g = matchup.season_grades(pbp, fixed)
+    want = {t: len({x for x in pbp.loc[(pbp.posteam == t) | (pbp.defteam == t), "game_id"]}) for t in teams}
+    assert g["_games"] == want
+    assert g[("off", "pass")]["T0"] == "S" and set(g[("off", "pass")].values()) <= set("SABCDF")
+    bad = dict(fixed, grade_max_tiers=5)
+    with pytest.raises(Exception, match="grade_max_tiers"):
+        matchup.season_grades(pbp, bad)

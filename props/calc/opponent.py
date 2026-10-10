@@ -32,24 +32,33 @@ def _with_position(plays: pd.DataFrame, listed: pd.DataFrame) -> pd.DataFrame:
                          left_on="week", right_on="roster_week", by="gsis_id", direction="backward")
 
 
-def allows(b, market: str, opp: str, position: str, season: int, week: int, fixed: dict) -> dict:
-    """{"value", "games", "who"}: value None under the minimum games."""
+def allows(b, market: str, opp: str, position: str | None, season: int, week: int, fixed: dict) -> dict:
+    """{"value", "games", "who", "thin", "left_out"[, "plays"]}: value None
+    under the minimum games (thin) or with no plays to his position. A play
+    with no win probability, or whose ball carrier has no roster listing up to
+    that week (nor last season), is left out and counted in left_out, which
+    the card shows: never dropped without a word."""
     lo, hi = fixed["garbage_wp_low"], fixed["garbage_wp_high"]
     src = b.carries if market == "rush_yds" else b.targets
     d = b.cut(src[(src["season"] == season) & (src["defteam"] == opp)], season, week, "opponent plays")
     plays = b.cut(b.pbp[(b.pbp["season"] == season)
                         & ((b.pbp["posteam"] == opp) | (b.pbp["defteam"] == opp))], season, week, "opponent games")
     games = int(plays["game_id"].nunique())
-    who = " to RBs" if market == "rush_yds" else WHO.get(position, f" to {position}s")
+    want = "RB" if market == "rush_yds" else position
+    who = WHO.get(want, f" to {want}s" if want else " to his position")
     if games < int(fixed["thin_games"]):
-        return {"value": None, "games": games, "who": who}
+        return {"value": None, "games": games, "who": who, "thin": True, "left_out": 0}
+    no_wp = int(d["wp"].isna().sum())
     d = d[d["wp"].between(lo, hi)]
     d = _with_position(d, _listed(b, season))
-    d = d[d["position"] == ("RB" if market == "rush_yds" else position)]
+    miss = d["position"].isna()
+    if miss.any():                             # no listing yet this season: his last listing of last season
+        prior = getattr(b, "position", {}) or {}
+        d.loc[miss, "position"] = [prior.get((season - 1, g)) for g in d.loc[miss, "gsis_id"]]
+    unlisted = int(d["position"].isna().sum())
+    d = d[d["position"] == want] if want else d.iloc[0:0]
+    out = {"value": None, "games": games, "who": who, "thin": False, "left_out": no_wp + unlisted}
     if d.empty:
-        return {"value": None, "games": games, "who": who}
-    if market == "rush_yds":
-        value = float(d["yards"].sum() / len(d))
-    else:
-        value = float(10 * d["caught"].mean())
-    return {"value": value, "games": games, "who": who, "plays": int(len(d))}
+        return out
+    value = float(d["yards"].sum() / len(d)) if market == "rush_yds" else float(10 * d["caught"].mean())
+    return {**out, "value": value, "plays": int(len(d))}

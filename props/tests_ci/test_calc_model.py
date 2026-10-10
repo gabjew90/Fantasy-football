@@ -427,7 +427,7 @@ def test_the_closing_question_follows_the_four_cases_and_turns_round_for_unders(
     q = card.question
     assert q("rush_yds", "over", 1, 0.5) == "1 more carry, or 0.5 more yards a carry?"      # Williams, amended
     assert q("rush_yds", "over", 0, 0.9) == "Workload is there. 0.9 more yards a carry?"
-    assert q("rush_yds", "over", 3, -0.2) == "At his season rate it clears. 3 more carries?"
+    assert q("rush_yds", "over", 3, -0.2) == "At his recent rate it clears. 3 more carries?"
     assert q("receptions", "over", -2, -1.5) == "Room for 2 fewer targets?"
     assert q("receptions", "over", 1, 0.5) == "1 more target, or 0.5 more catches per 10?"
     assert q("rush_yds", "over", 0, 0) == "Recent workload and rate both meet the bar."
@@ -541,3 +541,20 @@ def test_payout_is_the_total_returned_including_the_stake():
     # the user's week 5 entry: $5 staked, Sleeper showed $97.50 for 5 legs -> 19.5x, 1.811x a leg, -123
     assert journal.leg_price(5.0, 97.5, 5) == -123
     assert journal.leg_price(5.0, 102.5, 5) == -121           # what $97.50 of profit alone would have given
+
+
+def test_a_skipped_quote_note_and_a_schedule_line_are_shown():
+    season, window = _games()
+    pl = _player(season, window)
+    c = card.compute(pl, rush_model(ypc=4.2), "rush_yds", 64.5, 1.8, 1.76, settings.load()["fixed"])
+    sched = {"favorite": "DAL", "points": 3.0, "spread_text": "DAL -3", "spread_unread": False, "total": 47.0,
+             "closing": "schedule line; ESPN not read: URLError"}
+    text = card.render(pl, c, "over", opp="TB", game_lines=sched,
+                       line_note="passed over 2 newer archive snapshots that were one-sided or split")
+    flat = " ".join(text.splitlines())
+    assert text.splitlines()[0] == "Check first: workload bar untested."
+    assert "Check first: passed over 2 newer archive snapshots" in flat
+    assert "Total 47 (schedule line; ESPN not read: URLError)." in flat and "closing line" not in flat
+    err = card.render(pl, c, "over", opp="TB", opp_row={"error": "MergeError: x", "note": "not available"},
+                      grades={"error": "x", "note": "not available (x)."})
+    assert "Tampa Bay allows: not available (MergeError: x)" in " ".join(err.splitlines())
