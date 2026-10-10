@@ -8705,5 +8705,10 @@ every row while the predictions rows carry open / decision / close (line_archive
   allowed to his position, with rank; EPA and success-rate tiers, garbage time out), computed in
   `props/calc/` from play-by-play, rosters, injuries and schedules. It changes no calculated number
   and adds no setting; a test builds every card with and without it and requires identical numbers.
-- **Status:** design note (docs/plans/2026-10-10-parlay-leg-calculator.md) written with sixteen open
-  questions; no code until the user approves it.
+- **The user's answers (same day):** all sixteen open questions settled, as recommended except: the
+  "good day" row is dropped (its example had no rule) for the rate needed at his usual workload;
+  every fixed constant is listed in the yaml under "fixed (not tuned)" and none may change after a
+  test result is read (a test pins them); the league-average game-story rows are labelled
+  league-wide on the card; the gap is needed minus trailing 4-game average, beside a separate
+  "book expects" row. Data through `core.fetch`; 2016-17 play-by-play feeds the 2018 pools only.
+- **Status:** design settled; code starts on the user's go.

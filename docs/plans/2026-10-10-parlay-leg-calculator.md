@@ -1,6 +1,7 @@
 # Parlay-leg calculator (props/calc/): design note
 
-*2026-10-10. DECISIONS #231. Status: awaiting the user's approval; no code until then.*
+*2026-10-10. DECISIONS #231. Status: the user answered all open questions on 2026-10-10 (see
+"Decisions" at the end); code starts on the user's go.*
 
 ## What it is, and why it is an exception
 
@@ -30,7 +31,7 @@ with pass marks fixed here before any data is read.
 
 | Source | Use |
 |---|---|
-| nflverse play-by-play, 2018 to now (see Q1 on 2016-17) | carries, targets, catches, completions, per-play yards, depth of target, starting QB |
+| nflverse play-by-play, 2016 to now (2016-17 only feed the pools for 2018) | carries, targets, catches, completions, per-play yards, depth of target, starting QB |
 | nflverse schedules (`games.csv`) | spread, total, final score, game dates (the leakage cut) |
 | nflverse weekly rosters | position, team by week, gsis/pfr/sleeper IDs |
 | nflverse snap counts | marks games a player left early, in his history rows |
@@ -38,12 +39,11 @@ with pass marks fixed here before any data is read.
 | Sleeper `v1/players/nfl` | Sleeper player id to gsis id |
 | `props/record/lines/` (read only) | saved line history, for the "line near kickoff" and back-dated tests |
 
-**How it is fetched (Q2, needs your call).** The brief says fetch raw files directly. The CI
-guardrail fails any new module whose source fetches nflverse or Sleeper data outside
-`core.fetch`, and its allowlist may only shrink. `core.fetch` does fetch the raw files directly
-(urllib, no nflreadpy), caches them with an age check, and is one of the three core modules
-`props/` is allowed to use. My recommendation is to read through `core.fetch`. It shares no
-code with `props/engine/`.
+**How it is fetched (decided: `core.fetch`).** The CI guardrail fails any new module whose
+source fetches nflverse or Sleeper data outside `core.fetch`, and its allowlist may only shrink.
+`core.fetch` fetches the raw files directly (urllib, no nflreadpy), caches them with an age
+check, is one of the three core modules `props/` may use, and shares no code with
+`props/engine/`.
 
 **Play definitions (the known traps).**
 - Carry: `rush_attempt == 1`, not a two-point try. Kneels are QB plays and do not touch RB rows.
@@ -81,9 +81,9 @@ catches by depth, and its yards are drawn from real catches by his position in t
 scaled so the average equals his blended yards per catch. Bucket cut points are fixed
 constants: short (air yards under 5), medium (5-14), deep (15+).
 
-**Passing yards (proposal; open questions Q6-Q8).** Completions ~ negative binomial (mean W,
-setting `completion_r`). Each completion's yards are drawn from real completions in the two
-prior seasons, by the QB's own mix of completions by depth (same buckets), scaled so the
+**Passing yards.** Completions ~ negative binomial (mean W,
+setting `completion_r`). Each completion's yards are drawn from real completions by starting QBs
+(the team's QB with the most dropbacks in that game) in the two prior seasons, by the QB's own mix of completions by depth (same buckets), scaled so the
 average equals his blended yards per completion. The card gives yards per completion as much
 space as volume: his blended and season figures, the yards per completion the line needs at his
 usual completions, and how often he has reached it.
@@ -100,9 +100,11 @@ also shows his plain season rate beside the blended one.
 (c) the Under's break-even, 1/m_under (as the W where the Over's chance is 1 minus that).
 A user target win rate replaces (b) or (c) when given; the default is break-even.
 
-**Good day.** The card's good-day figure re-runs (b) with the day factor fixed at its 80th
-percentile (rushing). For receiving and passing yards, the yards per catch/completion at the
-80th percentile of his own last-16 games. (Q5: confirm or replace.)
+**Rate needed at his usual workload.** The search turned around: hold W at his trailing
+4-game average and find the rate at which the Over's chance equals its break-even (or the
+user's target). Rushing yards: yards per carry. Receptions: catch rate. Receiving yards: yards
+per catch (at his blended catch rate). Passing yards: yards per completion. Same settings, no
+new ones. (There is no "good day" row; the user dropped it.)
 
 ## Settings (8, the hard cap)
 
@@ -119,13 +121,26 @@ One file, `props/calc/settings.yaml`, each line with a plain-English comment.
 | 7 | `k_ypr` | tuned | Same, for yards per catch, in catches |
 | 8 | `k_ypcomp` | tuned | Same, for yards per completion, in completions |
 
-Fixed constants, written in code with a comment and not tuned (Q4: confirm these do not count
-against the eight): the 16-game window, the two-season pool window, the depth cut points, the
-simulation count (20,000) and seed, the 80th percentile used for "good day" and for the
-range tests, the 8-point margin that defines "won by 8+".
+**Fixed, not tuned.** Every fixed constant is listed in the same yaml file under a
+`fixed (not tuned)` heading, each with a plain-English comment. They do not count toward the cap
+of 8. None may change after any test result has been read: a test pins their values, so a change
+fails CI until the test is edited, which a review sees. The list:
 
-Passing yards has no completion-rate setting because its workload is completions, not attempts
-(Q6). Receiving and passing yards have no day factor (Q7).
+- rate window: his last 16 games played before the priced week, across seasons
+- pool window: the two seasons before the priced week
+- depth buckets: short under 5 air yards, medium 5-14, deep 15+
+- simulations: 20,000, fixed seed
+- range: 10th to 90th percentile (the "80% range" in the tests)
+- result groups: won by 8+, within 7, lost by 8+
+- usual workload and gap: trailing 4 games played
+- tested players: at least 3 prior games; lead back = team carry leader, top 3 by targets
+- matchup: garbage time = offense win probability under 10% or over 90%; "only N games" below 4
+  games; tiers of 8 teams
+- league-wide game-story figures: all completed seasons from 2018 before the current one
+
+Passing yards has no completion-rate setting because its workload is completions, not attempts.
+Receiving and passing yards have no day factor; if their ranges fail the conversion test, the
+failure is reported as it is.
 
 ## Outputs
 
@@ -133,9 +148,9 @@ Passing yards has no completion-rate setting because its workload is completions
 
 ```
 JAVONTE WILLIAMS - rushing yards - Over 64.5 at -125
-To win often enough (56%): about 20 carries at his usual 3.7 a carry;
-  about 17 on a good day (4.5)
-Book expects: about 18
+To win often enough (56%): about 20 carries at his usual 3.7 a carry
+At his usual 16 carries he needs 4.6 a carry (his season: 3.9)
+Book expects: about 18 carries
 How often he gets 20+: this season 2 of 5
   Won by 8+: 1 of 2 | Within 7: 1 of 2 | Lost by 8+: 0 of 1
   With Nix starting: 2 of 4 | With Stidham: 0 of 1
@@ -144,7 +159,8 @@ Gap: 4 carries more than his last-4 average (16)
 ```
 
 Prices are shown as American odds converted from Sleeper's multiplier, with the multiplier in
-brackets. The gap is the needed workload minus his trailing 4-game average (Q9), and its
+brackets. The gap is the needed workload minus his trailing 4-game average; "book expects" stays
+its own row. The gap's
 reading only restates that ("needs 4 more carries than his recent average"); it never says
 whether to play the leg.
 
@@ -174,7 +190,7 @@ schedules read through the same data layer as the rest of the tool (nothing from
   favourite = total/2 + spread/2, underdog = total/2 - spread/2. The relating line uses his own
   workload history split by whether his team was favoured.
 - **Injuries.** The week's report (nflverse injuries file; Sleeper's player status when it is
-  newer, with the source and date shown; see Q13). Listed: a QB change (this week's expected
+  newer, with the source and date shown). Listed: a QB change (this week's expected
   starter differs from last game's), and any teammate who is a lead back or top-3 by targets
   (same pre-game definition as the tests) ruled out or doubtful. For each, his workload in games
   with and without that player this season and last, "without" meaning the teammate played zero
@@ -192,15 +208,17 @@ schedules read through the same data layer as the rest of the tool (nothing from
 
 Fixed display constants, not settings and not tuned: garbage time = plays with the offense's win
 probability under 10% or over 90% (nflverse `wp`); the "only N games" threshold of 4; tiers of
-8 teams. They change no calculated number, so they do not count toward the cap (Q12).
+8 teams. They change no calculated number and are listed under `fixed (not tuned)`.
 
-The rushing card gains one row the matchup lines refer to: the yards per carry he needs at his
-trailing 4-game workload (receiving yards: yards per catch at his usual catches; passing already
-has its yards-per-completion row). This is the same search turned around, on the same settings
-(Q14).
+Weeks with fewer than 4 games show "only N games" for ranks and tiers and nothing more; last
+season's figures are not substituted. The block never re-runs the search at the defense's
+allowed rate: a matchup never changes a calculated number. The matchup lines point at the
+card's "rate needed at his usual workload" row.
 
 **2. Entry check.** For each leg, the game story it needs: rushing Overs want his team ahead,
-passing and receiving Overs want it behind or a shootout, Unders the reverse. Conflicts are
+passing and receiving Overs want it behind or a shootout, Unders the reverse. Rushing legs show
+team carries by result group under a heading that reads "League-wide (all teams, 2018 to last
+season), not this team's tendency". Conflicts are
 listed when two legs in the same game need stories that cannot both happen (team A ahead and
 team A behind; team A ahead and team B ahead). Cost: total payout P, the hit rate each of n legs
 needs, (1/P)^(1/n), and the average loss per unit staked if every leg is a coin flip,
@@ -249,7 +267,8 @@ actual workloads.
 **Round trip.** The "book expects" workload fed back returns the no-vig chance within 1 point.
 
 **Game-story rows.** League-average team carries in each result group (won by 8+, within 7, lost
-by 8+), taken from 2018-23, are within about 1.5 carries of the 2024-25 averages (Q10).
+by 8+), taken from 2018-23, are within about 1.5 carries of the 2024-25 averages. On the card
+this block is labelled league-wide.
 
 **Unit tests.** Odds conversion (multiplier, American, break-even, no-vig), name matching
 (including Joshua/Josh, "C.McCaffrey", a team mismatch), the leakage cut, and the boundary rule
@@ -274,43 +293,39 @@ about 1 before tuning, not required after):
   branch diff after each major step.
 - Tests run in `props/tests/` so the existing props CI job runs them; dependencies stay within
   `props/requirements.txt` (pandas, numpy, requests).
-- Registry (Q11): register as `prop_model`, status `provisional` ("untested until the conversion
+- Registry: register as `prop_model`, status `provisional` ("untested until the conversion
   and spread tests pass on 2024-25"), promoted to `live` with the held-out write-up as evidence.
+- Verification (#215): a separate agent re-derives the test write-ups and the first few real
+  cards. Routine cards are deterministic arithmetic covered by the tests.
 - Not in the chat skill. Reaching chat would need a release tag and lock bump; out of scope
   unless you ask.
 
-## Open questions (your call before code)
+## Decisions (the user, 2026-10-10)
 
-1. **History before 2018.** The residual and catch pools use the two seasons before the priced
-   week, so 2018 needs 2016-17 play-by-play. Fetch 2016-17 for the pools only (recommended), or
-   tune on 2020-23 only?
-2. **Fetching.** Read through `core.fetch` (recommended; CI fails a module that fetches on its
-   own), or fetch directly and add `props/calc/` files to the guardrail allowlist (which the repo
-   rule says may only shrink)?
-3. **Rate window.** His last 16 games played before the week, across seasons, as n in
-   w = n / (n + k). Acceptable?
-4. **Fixed constants.** Do the constants listed under Settings count toward the cap of 8?
-5. **Good day.** Is "the day factor at its 80th percentile" what you mean by the 4.5 in your
-   example (3.7 x 1.13 is 4.2, so your 4.5 implies a different rule)? If not, what defines it?
-6. **Passing workload.** Completions (as the brief says, and keeps the cap at 8) or attempts x
-   completion rate (more natural, but needs a ninth setting, `k_comp_pct`, so one must go)?
-7. **Day factor outside rushing.** Receiving and passing yards have none, so their ranges may
-   come out too narrow in the conversion test. Keep as specified and let the test decide?
-8. **Passing pool.** Completions by depth bucket from all QBs, or only starters?
-9. **Gap.** Needed workload minus his trailing 4-game average, as above?
-10. **Game-story test.** I read it as league-average team carries by result group, 2018-23
-    against 2024-25. Or did you mean per team?
-11. **Registry and verification.** Register as provisional (above)? And does the rule that a
-    separate agent verifies any analysis you bet on (#215) apply to each leg card, or only to
-    the test write-ups (cards are deterministic arithmetic covered by tests)?
-12. **Matchup constants.** Garbage time as win probability outside 10-90%, the "only N games"
-    threshold of 4, tiers of 8: acceptable as fixed display constants outside the cap of 8?
-13. **Injury source.** nflverse's injuries file can lag a day in season. Show Sleeper's player
-    status when newer (with the source named), or nflverse only?
-14. **Needed rate row.** Add "yards per carry needed at his usual carries" (and yards per catch
-    for receiving yards) to the card so the matchup lines have something to point at?
-15. **Early season.** Weeks 1-3 have too few games for ranks and tiers. Show "only N games" and
-    nothing else (my default), or show last season's figures labelled as last season?
-16. **No matchup-adjusted workload.** I will not re-run the search at the defense's allowed rate
-    ("at KC's 4.6 he'd need 15"), because that is a matchup adjustment to a calculated number.
-    Confirm.
+All sixteen open questions were answered: as recommended, except where noted.
+
+1. 2016-17 play-by-play is fetched for the pools only; tuning stays 2018-23.
+2. Data is read through `core.fetch`.
+3. Rate window: last 16 games played, across seasons.
+4. Fixed constants do not count toward the cap, but every one is listed in the yaml under
+   `fixed (not tuned)`, and none may change after a test result has been read (user's change).
+5. The "good day" row is dropped; its example had no rule. Replaced by the rate needed at his
+   usual workload (user's change).
+6. Passing workload is completions.
+7. No day factor for receiving or passing yards; the conversion test decides, and a failure is
+   reported plainly.
+8. Passing pool: starters' completions only.
+9. Gap = needed workload minus his trailing 4-game average; "book expects" stays a separate row
+   (user's confirmation).
+10. Game-story rows are league averages, labelled league-wide on the card so they are not read
+    as the team's tendency (user's change).
+11. Registered `provisional`; verification covers the write-ups and the first few real cards.
+12. Matchup constants as proposed, under `fixed (not tuned)`.
+13. Sleeper's player status is shown when newer than nflverse's injury file, with the source.
+14. The rate-needed row is added (it also replaces the good-day row, item 5).
+15. Early weeks show "only N games" and nothing else.
+16. The search is never re-run at a defense's allowed rate.
+
+## Held-out read
+
+Not yet done. The date and the result of the one read of 2024-25 go here.
