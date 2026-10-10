@@ -16,6 +16,7 @@ import json
 import re
 
 import publish as PB
+import research as RSCH     # the Power Play hurdle and its cell, as the report card prints them (DECISIONS #225)
 
 ENGINE = PB.ENGINE
 SCENARIO_ROWS = (("Favorite wins comfortably ({n}+ points)", "More potential late rushing; fewer necessary late passes"),
@@ -326,6 +327,12 @@ def table_b(card, compact=False) -> list[str]:
     if any(v != "-" for v in vals):
         L.append(("| Market-implied workload | " if compact else
                   "| Workload consistent with the market price, assuming the engine's gains | ") + " | ".join(vals) + " |")
+    # what a Power Play leg needs on each side, beside the line's workload (DECISIONS #225)
+    vals = [RSCH.pp_cell(r) or "-" for r in rows]
+    if any(v != "-" for v in vals):
+        L.append((f"| A Power Play leg ({100 * RSCH.pp_hurdle():.0f}%) needs | " if compact else
+                  f"| Workload a {RSCH.POWER_PLAY['default_legs']}-pick Power Play leg ({100 * RSCH.pp_hurdle():.0f}%) "
+                  f"needs, assuming the engine's gains | ") + " | ".join(vals) + " |")
     vals = [((PB.verdict(card, r["market"]) or {}).get("word") or "-") for r in rows]
     if compact:
         vals = [VERDICT_SHORT.get(v, v) for v in vals]
@@ -1094,6 +1101,8 @@ def render_agent(run, reads, checks, release, ci) -> str:
           "| Market / Engine Over estimate | cards[].rows[].p_over_book / p_over_model | no-vig market chance; share of 20,000 simulations |",
           "| Workload needed at a gain rate | cards[].volume[].cells.rows.{season,capped,engine} | vol = ceil(need_out / rate); pct = share of simulations reaching vol |",
           "| Workload consistent with the market price | cards[].rows[].market_volume | the volume at which the engine's chance equals the market's, at the engine's gains |",
+          "| Workload a Power Play leg needs | cards[].rows[].pp_over_needs / pp_under_needs (pp_hurdle, pp_legs) | the volume at which each side reaches a leg's win rate, payout ** (-1 / picks), at the engine's gains |",
+          "| The same at each gain rate | cards[].volume[].pp_grid | the search with his efficiency held at his capped, season and engine rate |",
           "| Verdict | publish.verdict | attainable / requires a rebound / requires better gains / requires more work than the engine expects, by definition |",
           "| If he's out | if_out[] | the board priced again without a Questionable player |", "",
           "### The reads and their checks", "", "```json",

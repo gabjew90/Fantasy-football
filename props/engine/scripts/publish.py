@@ -52,6 +52,8 @@ ROW_ALIASES = {"market_p": ("row", "p_over_book"), "engine_p": ("row", "p_over_m
                "price_over": ("row", "price_over"), "price_under": ("row", "price_under"),
                "median": ("row", "median"), "p10": ("row", "p10"), "p90": ("row", "p90"),
                "market_volume": ("row", "market_volume"), "market_catches": ("row", "market_catches"),
+               # what a Power Play leg needs on each side (DECISIONS #225)
+               "pp_over_needs": ("row", "pp_over_needs"), "pp_under_needs": ("row", "pp_under_needs"),
                "proj_volume": ("cells", "proj"), "need_rate": ("cells", "need_rate"),
                "need_out": ("cells", "need_out")}
 # the Under's own side: the market's no-vig Under is 1 - its Over; the engine's Under excludes a push
@@ -577,7 +579,8 @@ def _check_leg(add, i, run, card, lg, inj):
         allowed += [r.get("vol"), r.get("pct")] + (r.get("rate") if isinstance(r.get("rate"), list) else [r.get("rate")])
     if cells:
         allowed += [cells.get("proj"), cells.get("need_rate")] + list(cells.get("market_row") or [])
-    for k in ("p_over_book", "p_over_model", "median", "p10", "p90", "market_volume", "market_catches"):
+    for k in ("p_over_book", "p_over_model", "median", "p10", "p90", "market_volume", "market_catches",
+              "pp_over_needs", "pp_under_needs"):
         allowed.append(row.get(k))
     for n in lg.get("needs") or []:
         parts = n.get("parts") or [[n.get("volume"), n.get("rate")]]

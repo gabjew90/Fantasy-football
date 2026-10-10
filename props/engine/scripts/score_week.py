@@ -103,7 +103,7 @@ def slate_board(RS, runs, sort="kickoff", overs_only=False) -> list[str]:
     """Every game's full research table in one place (the chat reply for "the
     props for these games"), games ordered by kickoff or by game total, highest
     first. --overs-only keeps the Over side of each line: its price, the two
-    Over chances and the workload the Over needs at its price."""
+    Over chances and the workload the Over needs for a Power Play leg (DECISIONS #225)."""
     from score_game import research_cells, usage_line
     MKT = {"player_receptions": "catches", "player_reception_yds": "rec yds", "player_rush_yds": "rush yds",
            "player_pass_yds": "pass yds", "player_rush_reception_yds": "rush+rec yds"}
@@ -111,15 +111,16 @@ def slate_board(RS, runs, sort="kickoff", overs_only=False) -> list[str]:
     if sort == "total":
         games = sorted(games, key=lambda r: -(_num(r.get("total")) or -1))
     pc = lambda v: "—" if _num(v) is None else f"{100 * _num(v):.0f}%"
-    head = (["| Player | Prop | Line | Over price | Our projection | Over: model / book | Line implies | "
-             "The Over pays if you expect more than | Last game | Flags |"] if overs_only else
-            ["| Player | Prop | Line | Price | Our projection | Over: model / book | Line implies | "
-             "Pays at this price if you expect | Last game | Flags |"])
+    head = (["| Player | Prop | Line | Over price | Our projection | Over: market / engine | Line implies | "
+             "The Over is worth a Power Play leg above | Last game | Flags |"] if overs_only else
+            ["| Player | Prop | Line | Price | Our projection | Over: market / engine | Line implies | "
+             "A Power Play leg needs | Last game | Flags |"])
     out = [f"# Slate board: {len(games)} games, " + ("game total, highest first" if sort == "total"
                                                      else "by kickoff"), "",
            "*A research sheet, not a bet list: no line carries a bet label until the record earns it at a review "
-           "(weeks 8, 12, 18). 'Line implies' is the workload that makes the line a coin flip; 'pays' is the "
-           "workload a side needs to beat its own price. Last game: snap share and target (or carry) share / "
+           "(weeks 8, 12, 18). 'Line implies' is the workload that makes the line a coin flip; 'a Power Play "
+           "leg needs' is the workload a side needs to clear a leg's win rate in a flat-payout entry (a single "
+           "pick's price is not its break-even there). Last game: snap share and target (or carry) share / "
            "count, earlier weeks in brackets. A **bold** prop is worth a look, not a bet: a role story plus last "
            "game's workload already past that side's break-even; the scorecard grades every one.*"]
     for r in games:
@@ -146,9 +147,8 @@ def slate_board(RS, runs, sort="kickoff", overs_only=False) -> list[str]:
             if overs_only:
                 po = _num(x.get("price_over"))
                 cells[2] = " — " if po is None else f" {'+' if po > 0 else ''}{int(po)} "
-                o, u = _num(x.get("over_needs")), x.get("unit") if isinstance(x.get("unit"), str) else ""
-                cells[6] = (" — " if not u else " no Over price posted " if _num(x.get("be_over")) is None
-                            else " beyond the search range " if o is None else f" {o:.1f} {u} ")
+                o, u = _num(x.get("pp_over_needs")), x.get("unit") if isinstance(x.get("unit"), str) else ""
+                cells[6] = (" — " if not u else " beyond the search range " if o is None else f" {o:.1f} {u} ")
             out.append(f"| {x.player} ({x.team}) |{'|'.join(cells)}| {last} | {fl} |")
     return out + [""]
 
@@ -336,8 +336,9 @@ def main():
               "already moves his target share for it since props-v1.29; before that it beat or "
               "missed the model's next-week projection in 2022-25 (reports/role_shift_check.md); whether the BOOK also "
               "reacts late is what the bet journal decides. 'Line implies' is the targets per game at which the line is a "
-              "fair 50/50; 'pays at this price' is the workload each side needs to beat its own price.*", "",
-              "| Game | Player | Prop | Line | Line implies | Pays at this price if you expect | Last game | Flags |",
+              "fair 50/50; 'a Power Play leg needs' is the workload each side needs to clear a leg's win rate in a "
+              "flat-payout entry (DECISIONS #225).*", "",
+              "| Game | Player | Prop | Line | Line implies | A Power Play leg needs | Last game | Flags |",
               "|---|---|---|---|---|---|---|---|"]
         if len(flagged):
             for _, x in flagged.sort_values(["game", "player"]).iterrows():
@@ -346,7 +347,7 @@ def main():
                 last = (f"snaps {100*x.snap:.0f}% (earlier {100*x.snap_base:.0f}%), targets {100*x.ts:.0f}% "
                         f"(earlier {100*x.ts_base:.0f}%)" if pd.notna(x.snap) else "—")
                 L.append(f"| {x.game} | {x.player} ({x.team}) | {MK_LABEL.get(x.market, x.market)} | {x.line:g} | "
-                         f"{imp} | {RSCH.break_even_cell(x)} | {last} | {x['flags']} |")
+                         f"{imp} | {RSCH.pp_cell(x) or '—'} | {last} | {x['flags']} |")
         else:
             L.append("| — | no receiving role-shift flags this slate | | | | | | |")
 

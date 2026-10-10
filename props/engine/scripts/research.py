@@ -47,6 +47,31 @@ def _bisect(p_over_at, target=0.5, lo=K_LO, hi=K_HI, iters=14):
     return 0.5 * (lo + hi)
 
 
+def _power_play() -> dict:
+    """resources/power_play.json (DECISIONS #225): the payout per entry size, the entry size the
+    cards show. Read once; a missing file leaves the 4-pick 10x defaults."""
+    import json
+    from pathlib import Path
+    f = Path(__file__).resolve().parent.parent / "resources" / "power_play.json"
+    try:
+        d = json.loads(f.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        d = {}
+    return {"payouts": {int(k): float(v) for k, v in (d.get("payouts") or {"4": 10}).items()},
+            "default_legs": int(d.get("default_legs", 4))}
+
+
+POWER_PLAY = _power_play()
+
+
+def pp_hurdle(legs: int | None = None) -> float:
+    """The win rate each leg of an all-or-nothing Power Play needs for the entry to break even:
+    payout ** (-1 / legs) (4 picks at 10x: 0.562; 5 at 20x: 0.549). Legs win or lose together
+    more than this assumes when they share a game script (CHAT.md: legs sharing one script)."""
+    n = int(legs or POWER_PLAY["default_legs"])
+    return float(POWER_PLAY["payouts"][n]) ** (-1.0 / n)
+
+
 def breakeven(price) -> float | None:
     """The win rate an American price needs (its own vig included), or None.
     The same rule as props/journal.py breakeven(); the engine ships without
@@ -172,13 +197,42 @@ def _market_cache(share_over, market_p, work, engine_p=None):
         LAST_EDGES["market_edge"] = "max" if share_over(K_HI) < float(market_p) else "min"
 
 
+def _hurdle_cache(share_over, work, engine_p=None, legs=None):
+    """THE POWER PLAY BREAK-EVENS (DECISIONS #225): the workload above which the Over wins often
+    enough for a leg of the user's entry (pp_hurdle), and at or below which the Under does --
+    the price of a Sleeper pick is not its break-even in a flat-payout entry (#208). The same
+    target shift as the market-implied volume (_market_cache), so all three workloads come from
+    one search and sit consistently with the engine's own volume. Recorded beside the edges:
+    pp_over_needs / pp_under_needs, or None with pp_over_edge / pp_under_edge 'min' / 'max'
+    when the search ran out; pp_hurdle, pp_legs."""
+    h = pp_hurdle(legs)
+    shift = (share_over(1.0) - float(engine_p)) if (engine_p is not None and engine_p == engine_p) else 0.0
+    LAST_EDGES.update(pp_hurdle=h, pp_legs=int(legs or POWER_PLAY["default_legs"]))
+    for side, target in (("over", h), ("under", 1.0 - h)):
+        t = min(max(target + shift, 0.001), 0.999)
+        k = _bisect(share_over, t)
+        LAST_EDGES[f"pp_{side}_needs"] = work(k) if k is not None else None
+        edge = None if k is not None else ("max" if share_over(K_HI) < t else "min")
+        LAST_EDGES[f"pp_{side}_edge"] = edge
+        # where a failed search ran out, in his units: the most (or least) work the simulation gives him
+        LAST_EDGES[f"pp_{side}_limit"] = None if edge is None else work(K_HI if edge == "max" else K_LO)
+
+
 def edges_for() -> dict:
     """The edges of the last implied_* call made with prices (see _edge_cache)."""
     return dict(LAST_EDGES)
 
 
+def pp_result() -> dict:
+    """The last search's Power Play break-evens alone: pp_over_needs, pp_under_needs and their
+    edges (the efficiency grid's cell)."""
+    return {k: LAST_EDGES.get(k) for k in ("pp_over_needs", "pp_under_needs", "pp_over_edge", "pp_under_edge",
+                                           "pp_over_limit", "pp_under_limit")}
+
+
 def implied_targets(line, stat, team_targets_mean, targets_r, share, catch_rate, ypt,
-                    per_catch_shape, width=None, prices=None, role=None, market_p=None, engine_p=None):
+                    per_catch_shape, width=None, prices=None, role=None, market_p=None, engine_p=None,
+                    pp_only=False):
     """Targets per game at which the line is a coin flip for a receiver (P(stat >
     line) = 0.5 on a half line; Overs and Unders equally likely on a whole line), holding
     his catch rate and yards per target. stat: 'receptions' or 'rec_yards'.
@@ -187,9 +241,12 @@ def implied_targets(line, stat, team_targets_mean, targets_r, share, catch_rate,
     Under break even at those prices: (implied, projected, over_needs,
     under_needs) -- the Over pays above over_needs, the Under below under_needs. With
     market_p (the market's no-vig Over chance) the search also records the market-implied
-    targets (_market_cache, read through edges_for)."""
+    targets (_market_cache, read through edges_for). pp_only: only the Power Play break-evens
+    (the efficiency grid, DECISIONS #225) -> pp_result()."""
     proj = team_targets_mean * share
     if share <= 0 or line is None:
+        if pp_only:
+            return {}
         return (None, proj) if prices is None else (None, proj, None, None)
     col = 0 if stat == "receptions" else 1
     cache = {}
@@ -209,18 +266,23 @@ def implied_targets(line, stat, team_targets_mean, targets_r, share, catch_rate,
 
     work = lambda k: None if k is None else team_targets_mean * min(share * k, 0.95)
     share_over = _share_over(sim, line)
+    if pp_only:
+        LAST_EDGES.clear()
+        _hurdle_cache(share_over, work)
+        return pp_result()
     k = _bisect(share_over)
     if prices is None:
         return work(k), proj
     k_o, k_u = _break_even_ks(share_over, prices)
     _edge_cache(share_over, prices, k_o, k_u, work)
     _market_cache(share_over, market_p, work, engine_p)
+    _hurdle_cache(share_over, work, engine_p)
     return work(k), proj, work(k_o), work(k_u)
 
 
 def implied_carries(line, j, team_carries_mean, carries_r, rush_shares, ypc, resid,
                     width=None, player_resid=None, player_kneel=None, qb_index=None, prices=None,
-                    market_p=None, engine_p=None):
+                    market_p=None, engine_p=None, pp_only=False):
     """Carries per game at which the line is a coin flip for player j (as above),
     scaling only his share inside the FULL team call (the share rescale
     depends on every teammate). Returns (implied mean carries, projected mean
@@ -241,17 +303,24 @@ def implied_carries(line, j, team_carries_mean, carries_r, rush_shares, ypc, res
             cache[k] = (car[j], yds[j])
         return cache[k]
 
+    if pp_only and (shares[j] <= 0 or line is None):
+        return {}
     proj = float(run(1.0)[0].mean())
     if shares[j] <= 0 or line is None:
         return (None, proj) if prices is None else (None, proj, None, None)
     work = lambda k: None if k is None else float(run(k)[0].mean())
     share_over = _share_over(lambda k: run(k)[1], line)
+    if pp_only:
+        LAST_EDGES.clear()
+        _hurdle_cache(share_over, work)
+        return pp_result()
     k = _bisect(share_over)
     if prices is None:
         return work(k), proj
     k_o, k_u = _break_even_ks(share_over, prices)
     _edge_cache(share_over, prices, k_o, k_u, work)
     _market_cache(share_over, market_p, work, engine_p)
+    _hurdle_cache(share_over, work, engine_p)
     return work(k), proj, work(k_o), work(k_u)
 
 
@@ -1818,17 +1887,29 @@ def card_guide() -> list[str]:
     to interpret the data"). Printed once, before the cards."""
     p = f"{LUCK_PCT['catch']:g}th"
     rows = [
-        ("**Market's chance of the Over**",
+        ("**The line assumes** (workload, at the engine's efficiency)",
+         "His share is moved, holding his catch rate and yards a target (or a carry) at the engine's, until "
+         "the engine's chance of the Over equals the market's no-vig chance. Receivers: targets (and "
+         "catches at his catch rate); backs' rushing: carries. Not computed for passing or rushing + "
+         "receiving.",
+         "The book's line restated as workload: the volume it assumes if his efficiency is what the engine "
+         "expects. The question the card asks you is whether he gets more or less work than this, and why "
+         "(role, injuries, the quarterback, the game plan). Above the engine's volume, the market expects "
+         "more work than the engine (or better efficiency: one price cannot separate the two)."),
+        ("**A Power Play leg needs**",
+         "The same search, aimed at the win rate a leg of a flat-payout entry needs (4 picks at 10x: about "
+         "56%; 5 at 20x: about 55% -- payout to the power of minus one over the picks): the workload above "
+         "which the Over clears it, and at or below which the Under does.",
+         "Your decision in one line: bet the Over only if you expect more than the first number, the Under "
+         "only at or below the second. Between them neither side is worth a leg. When either number sits "
+         "within about one unit of what the line assumes, the card says the line is too close to call on "
+         "volume: nobody can forecast one pass or one carry (RB receiving lines often land here). The "
+         "hurdle assumes legs win or lose independently; legs sharing a game script do not."),
+        ("Market's chance of the Over",
          "The book's Over and Under prices turned into chances, then scaled so the two add to 100% (the "
          "book's built-in cut removed).",
          "The best available estimate of the chance, not a known one: at Sleeper's real lines it has scored "
          "better than the engine so far (weeks 2-4, the live record below)."),
-        ("Engine's chance",
-         "The share of 20,000 simulated games in which he clears the line. On a whole-number line, a "
-         "push is shown beside it and counts as not clearing.",
-         "The engine's view from his role and the team's volume. A big gap to the market has several possible "
-         "causes -- news the market has (practice, injuries), model error, stale inputs or different "
-         "assumptions -- and is not by itself a mispriced line."),
         ("Price: Over / Under",
          "The book's quoted prices for each side.",
          "For a Sleeper Power Play the entry pays a flat multiple, so a single leg's price is not its "
@@ -1851,14 +1932,6 @@ def card_guide() -> list[str]:
          "catches. Completions: his receivers' catches, at his share of the team's passing.",
          "The engine's job. Targets are calibrated in the backtest; carries run too narrow (big carry "
          "totals come more often than it says); see the note under each table."),
-        ("Market-implied volume (at the engine's efficiency)",
-         "The same search that finds the break-even workload, aimed at the market's no-vig chance: his "
-         "share is moved, holding his catch rate and yards a target (or a carry) at the engine's, until "
-         "the engine's chance of the Over equals the market's. Receivers: targets (and catches at his "
-         "catch rate); backs' rushing: carries. Not computed for passing or rushing + receiving.",
-         "The volume the price implies if his efficiency is what the engine expects. Above the engine's "
-         "volume, the market expects more work than the engine (or better efficiency: the two are not "
-         "separable from one price); below it, less."),
         ("At his luck-capped rate",
          f"His yards a catch, a carry or a completion over his last 10 games (crossing into last season "
          f"while this one is short), with every play past his own {p} percentile counted at that value; "
@@ -1898,12 +1971,22 @@ def card_guide() -> list[str]:
          "His games this season for this team, with at least one of that volume, in which his yards a unit "
          "reached that number.",
          "How often he has actually done what the line asks."),
+        ("Engine's own chance of the Over (reference only)",
+         "The share of 20,000 simulated games in which he clears the line at the engine's own volume. On a "
+         "whole-number line, a push is shown beside it and counts as not clearing.",
+         "The engine's view from its own volume guess, which the card no longer leads with: at Sleeper's "
+         "real lines it has run high and scored worse than the market (DECISIONS #202). A gap to the market "
+         "has several possible causes -- news the market has (practice, injuries), model error, stale inputs "
+         "or different assumptions -- and is not a mispriced line; the workload rows above are what to "
+         "reason about."),
     ]
     L = ["## How to read the player cards", "",
-         "Each card is one table, with a column per prop at the book's line. The engine supplies the volume "
-         "(targets, catches, carries, completions); you judge the efficiency (yards a catch, a carry, a "
-         "completion; a catch rate for receptions). Each efficiency row answers: if he plays at this rate, "
-         "how much volume does the line need, and how often does the engine give him that much?", "",
+         "Each card is one table, with a column per prop at the book's line. It starts from the market: "
+         "the workload the line assumes, and the workload a Power Play leg needs on each side. Your call is "
+         "the volume -- do you expect more or less work than the line assumes, by enough, and why. The "
+         "efficiency rows below answer: if he plays at this rate, how much volume does the line need, and "
+         "how often does the engine give him that much? The engine's own chance comes last, as a "
+         "reference.", "",
          "| Row | How it is produced | How to read it |", "|---|---|---|"]
     L += [f"| {a} | {b} | {c} |" for a, b, c in rows]
     L += ["", "**Under each table:** role evidence (his share and snaps in earlier games against last game, the "
@@ -1912,11 +1995,11 @@ def card_guide() -> list[str]:
               "for backs (graded for the week-8 check, not the price), the matchup (context, not an input) "
               "and Watch flags (injuries, new teams, role changes).",
           "",
-          "**Using it:** pick the efficiency row you believe and say why. If that row clears with plenty of "
-          "room, the prop is a volume question, and the role evidence says whether the volume holds. If only "
-          "the engine's rate clears, the prop needs an efficiency he has not shown lately. Either way, the "
-          "market's chance is the best available estimate of the prop's chance; the table tells you what has to "
-          "happen for the Over to land."]
+          "**Using it:** read the workload the line assumes, then decide whether he gets more or less, and "
+          "why -- from the role evidence below (check which quarterback threw in each game). Bet a side "
+          "only when your view clears its Power Play number; skip the lines marked too close to call. Then "
+          "check the efficiency rows: if only the engine's rate clears, the prop also needs an efficiency he "
+          "has not shown lately. The market's chance is the best available estimate of the prop's chance."]
     return L
 
 
@@ -2196,10 +2279,48 @@ def market_volume_cell(r) -> str | None:
     return txt
 
 
+def pp_cell(r) -> str | None:
+    """'Over above X · Under at Y or fewer (Z apart)' at the Power Play hurdle (DECISIONS #225).
+    The span says how fine a volume view must be: Irving's receiving line was about one pass from
+    either side (the user, 2026-10-09). A fixed close-call cut was tried and dropped: it flagged
+    nearly every line, because the engine's ranges are too narrow (the width round) and so pull
+    both break-evens within about one unit of the line. None where no search ran."""
+    unit = r.get("unit") if isinstance(r.get("unit"), str) else ""
+    o, u = r.get("pp_over_needs"), r.get("pp_under_needs")
+    if not unit or (not _ok(o) and not _ok(u) and not r.get("pp_over_edge") and not r.get("pp_under_edge")):
+        return None
+
+    def side(v, edge, lim, word):
+        if _ok(v):
+            return (f"Over above {float(v):.1f} {unit}" if word == "Over" else f"Under at {float(v):.1f} or fewer")
+        if edge in ("max", "min") and not _ok(lim):      # ran out, place unrecorded: say so without a number
+            return {("Over", "max"): f"Over: more {unit} than the search covers",
+                    ("Under", "min"): f"Under: fewer {unit} than the search covers",
+                    ("Over", "min"): "Over: clears it across the search",
+                    ("Under", "max"): "Under: clears it across the search"}[(word, edge)]
+        at = f" {float(lim):.1f} {unit}" if _ok(lim) else ""
+        if edge == "max":
+            return (f"Over: needs more than{at} (about all the work the simulation gives him)" if word == "Over"
+                    else f"Under: clears it even at{at}")
+        if edge == "min":
+            return (f"Over: clears it even at{at}" if word == "Over"
+                    else f"Under: needs fewer than{at} (about the least work the simulation gives him)")
+        return f"{word}: -"
+    txt = (f"{side(o, r.get('pp_over_edge'), r.get('pp_over_limit'), 'Over')} · "
+           f"{side(u, r.get('pp_under_edge'), r.get('pp_under_limit'), 'Under')}")
+    if _ok(o) and _ok(u):
+        # how far apart the two sides sit, in his units: a line whose sides are about one pass or one
+        # carry apart needs a view finer than anyone can forecast (the user, 2026-10-09)
+        txt += f" ({float(o) - float(u):.1f} {unit} apart)"
+    return txt
+
+
 def prop_table(rows, volume) -> tuple[list[str], list[str]]:
     """The card's one table (user, 2026-10-07): a column per priced market at the first book's
-    line, the market's chance first, then the engine, what the Over needs, the engine's volume
-    and the chance at each efficiency. Returns (table lines, footnotes)."""
+    line. Market first (DECISIONS #225): the workload the line assumes, the workload a Power
+    Play leg needs on each side, the market's chance; then what the Over needs, the engine's
+    volume and forecast, the chance at each efficiency; the engine's own chance last, as a
+    reference. Returns (table lines, footnotes)."""
     first = {}
     for r in rows:
         first.setdefault(r["market"], r)
@@ -2218,15 +2339,20 @@ def prop_table(rows, volume) -> tuple[list[str], list[str]]:
     def push(r):
         return f" (push {_pc(r['p_push'])})" if _ok(r.get("p_push")) and float(r["p_push"]) >= 0.005 else ""
 
-    add("**Market's chance of the Over**", cell(lambda r, c, v: f"**{_pc(r.get('p_over_book'))}**"))
-    add("Engine's chance", cell(lambda r, c, v: _pc(r.get("p_over_model")) + push(r)))
+    # MARKET FIRST (DECISIONS #225): the line restated as workload, then the workload a Power
+    # Play leg needs on each side -- the question becomes "do I expect more or less work than
+    # the line assumes, by enough?" -- and the engine's own chance last, as a reference
+    hurdle = f"{100 * pp_hurdle():.0f}%"
+    add("**The line assumes** (workload, at the engine's efficiency)",
+        cell(lambda r, c, v: (f"**{market_volume_cell(r)}**" if market_volume_cell(r) else None)))
+    add(f"**A {POWER_PLAY['default_legs']}-pick Power Play leg ({hurdle}) needs**", cell(lambda r, c, v: pp_cell(r)))
+    add("Market's chance of the Over", cell(lambda r, c, v: _pc(r.get("p_over_book"))))
     add("Price: Over / Under", cell(lambda r, c, v: f"{_odds(r.get('price_over'))} / {_odds(r.get('price_under'))}"))
-    add("Engine's forecast: middle; 80% range",
-        cell(lambda r, c, v: f"{_f(r.get('median'), 0)}; {_f(r.get('p10'), 0)}-{_f(r.get('p90'), 0)}"))
     add("The Over needs", cell(lambda r, c, v: f"{c['need_out'] if c else int(float(r['line'])) + 1} "
                                                f"{NEED_WORDS.get(r['market'], '')}".strip()))
     add("Engine's volume", cell(lambda r, c, v: v.get("volume_text")))
-    add("Market-implied volume (at the engine's efficiency)", cell(lambda r, c, v: market_volume_cell(r)))
+    add("Engine's forecast: middle; 80% range",
+        cell(lambda r, c, v: f"{_f(r.get('median'), 0)}; {_f(r.get('p10'), 0)}-{_f(r.get('p90'), 0)}"))
     for key, word in ROW_WORDS.items():
         add(word, cell(lambda r, c, v: (f"{c['rows'][key]['vol_txt']} at {c['rows'][key]['rate_txt']} "
                                         f"-> **{_pc(c['rows'][key]['pct'])}**") if c and key in c["rows"] else None))
@@ -2237,6 +2363,8 @@ def prop_table(rows, volume) -> tuple[list[str], list[str]]:
     add("At the engine's volume, the line needs", cell(lambda r, c, v: c["need_txt"] if c else None))
     add("His games this season that beat that", cell(lambda r, c, v: f"{c['beat'][0]} of {c['beat'][1]}"
                                                      if c and c["beat"] else None))
+    add("Engine's own chance of the Over (reference only: it has run high, DECISIONS #202)",
+        cell(lambda r, c, v: _pc(r.get("p_over_model")) + push(r)))
     notes = []
     for m in mks:
         c = (vol.get(m) or {}).get("cells")
@@ -2250,6 +2378,43 @@ def prop_table(rows, volume) -> tuple[list[str], list[str]]:
         if bits:
             notes.append(f"*{PROP_WORDS.get(m, (m,))[0]}: " + " ".join(bits) + "*")
     return L, notes
+
+
+GRID_RATE_WORDS = {"capped": "his luck-capped rate", "season": "his rate this season", "engine": "the engine's rate"}
+GRID_RATE_UNIT = {"player_receptions": "of targets caught", "player_reception_yds": "a catch", "player_rush_yds": "a carry"}
+
+
+def pp_grid_table(rows, volume) -> list[str]:
+    """THE EFFICIENCY GRID (DECISIONS #225; the user, 2026-10-09): what a Power Play leg needs on each
+    side when his efficiency is each of the card's rates -- the volume a view needs depends on the
+    yards a carry (or a catch) assumed with it. A column per market that has a grid, a row per rate.
+    Empty when no market has one (a capture, a scenario run, passing, rushing + receiving)."""
+    vol = {v["market"]: v for v in (volume or []) if v.get("pp_grid")}
+    first = {}
+    for r in rows or []:
+        first.setdefault(r["market"], r)
+    mks = [m for m in MARKET_ORDER if m in vol and m in first]
+    if not mks:
+        return []
+    unit = {m: first[m].get("unit") or "" for m in mks}
+    L = ["**What a Power Play leg needs at each efficiency** (a view on volume is a view at some rate: carries "
+         "and targets are the opinion to form -- efficiency swings from game to game -- so move the rate only for "
+         "a reason, such as a weak run defence or a new quarterback):", "",
+         "| | " + " | ".join(f"{PROP_WORDS.get(m, (m,))[0]} {float(first[m]['line']):g}" for m in mks) + " |",
+         "|---|" + "---:|" * len(mks)]
+    for key, word in GRID_RATE_WORDS.items():
+        cells = []
+        for m in mks:
+            g = next((x for x in vol[m]["pp_grid"] if x.get("key") == key), None)
+            if g is None:
+                cells.append("-")
+                continue
+            rate = (f"{100 * g['rate']:.0f}% {GRID_RATE_UNIT[m]}" if m == "player_receptions"
+                    else f"{g['rate']:.1f} {GRID_RATE_UNIT.get(m, '')}")
+            cells.append(f"at {rate}: " + (pp_cell({**g, "unit": unit[m]}) or "-"))
+        if any(c != "-" for c in cells):
+            L.append(f"| At {word} | " + " | ".join(cells) + " |")
+    return L + [""]
 
 
 def player_card(d: dict) -> list[str]:
@@ -2267,6 +2432,7 @@ def player_card(d: dict) -> list[str]:
     table, notes = prop_table(rows, d.get("volume"))
     if table:
         L += table + [""]
+        L += pp_grid_table(rows, d.get("volume"))
     elif d.get("unpriced_read"):
         L += [f"**Rushing + receiving yards (read, not priced):** {d['unpriced_read']}", ""]
     if pos == "QB":

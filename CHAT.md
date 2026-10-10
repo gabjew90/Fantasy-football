@@ -236,17 +236,28 @@ The board is a RESEARCH SHEET, not a bet list (DECISIONS #142): the model
 has not shown it adds anything beside the book's price (at Sleeper's real lines
 over weeks 2-4 its log loss was 0.717 against the market's 0.692, DECISIONS #202), and the report's first line quotes the current graded record
 and the label gate (DECISIONS #144, #151: decided at the week 8/12/18 reviews, on weight beside the book and profit at Sleeper's prices). So no answer calls a line a play, a lean, an edge or a value,
-and none quotes EV, Kelly or a stake. What a props answer gives instead: the
-line and both prices, our projection, the Over by the model and by the book,
-what the line implies (the targets or carries at which it is a fair 50/50,
-next to what he has been getting), in the research table only the workload
-each side needs to beat its own price ("if the model's numbers are right, the
-Over pays above 7.5 targets" -- conditional, never a pick: it says how much
-role a view needs, not that the view is right; the player cards dropped this
-price-based check, because a Power Play leg's price is not its break-even,
-DECISIONS #208), the card's volume chance at each efficiency, last game's
-usage, and the flags. The
-VOICE is this file's.
+and none quotes EV, Kelly or a stake. What a props answer gives instead,
+MARKET FIRST (DECISIONS #225) -- the engine translates the line, it does not
+compete with it:
+1. **The workload the line assumes** (the card's first row: "this line assumes
+   14.4 carries" -- the market's price restated as volume, at the engine's
+   efficiency).
+2. **The workload a Power Play leg needs** on each side (the card's second row:
+   the Over is worth a leg only above the first number, the Under only at or
+   below the second; 4 picks at 10x need about 56% a leg, 5 at 20x about 55%).
+   When the card marks a line **too close to call on volume** (a break-even
+   within about one pass or carry of what the line assumes -- RB receiving
+   lines often land here), say so and do not build a leg on it.
+3. The question for the user: does he get more or less work than the line
+   assumes, by enough, and why -- the role evidence (which quarterback threw in
+   each game, injuries, the game plan) is what answers it. Conditional, never a
+   pick: the numbers say how much role a view needs, not that the view is right.
+4. Then the market's chance (the best available estimate), the line and both
+   prices, the engine's volume, the card's volume chance at each efficiency,
+   last game's usage and the flags. The engine's own Over chance comes LAST and
+   is called a reference: at real lines it has run high (#202), so a gap to the
+   market is never presented as information.
+The VOICE is this file's.
 
 A narrower question ("is the Kelce over any good?", "chance he gets 60
 yards?", "best bet in this game?") goes to the question tools, and gets a
@@ -269,7 +280,14 @@ read holds up. A what-if on workload ("what if Marks gets 14 carries?", "what
 if Houston throws less?") is a scenario run, not arithmetic: run the game
 with `--assume` (props/engine/SKILL.md, fast path) and give its "Your
 scenario" table in full; its returns hold only if the user's assumptions
-do, and say so.
+do, and say so. Prefer the user's view RELATIVE TO THE LINE and as a range
+(DECISIONS #225): "he gets 2 to 6 more carries than the line assumes, most
+likely 4" is `--assume "<Player>: carries=+2/+4/+6"` (targets the same way);
+the table then gives one chance averaged over the range (weights 1 : 4 : 1)
+and whether it clears a Power Play leg. A relative view keeps the engine's
+efficiency error out of the comparison; an absolute number ("18 carries")
+does not, so turn the user's words into the relative form when they compare
+with the line.
 
 **Bets go in the journal.** When the user says they bet a prop, chat cannot
 write it (chat is read-only); give them one line to paste into a Claude Code
@@ -282,9 +300,10 @@ python props/journal.py add "<player>" <market> <over|under> <line> <price> --te
 ```
 
 A bet that came from a "Your scenario" table also carries the assumption, the
-two Over chances that table shows for its line and the break-even cell, copied
-as shown (never recomputed): `--assumption "<the --assume rule>" --over-board
-<board %> --over-scenario <scenario %> --pays-if "<the cell>"`.
+engine's own Over and your scenario's Over that table shows for its line and
+its "A leg needs" cell, copied as shown (never recomputed): `--assumption
+"<the --assume rule>" --over-board <engine %> --over-scenario <scenario %>
+--pays-if "<the cell>"`.
 
 A Sleeper Power Play (every leg must hit) is ONE entry with its total payout:
 `python props/journal.py entry --stake <$> --payout <total it pays> --angle <...> --why "<the entry's reason>" --leg "<Player>|<market>|<side>|<line>|<TEAM>[|<angle>]" --leg ...`

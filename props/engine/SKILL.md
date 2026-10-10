@@ -275,13 +275,18 @@ For a narrow question, run only what it needs:
   `catch=70%`, `ypt=9`, `ypc=4.5`; a team: `"HOU: pass=-3"`, `rush=+2`, `ypt=-5%`), repeatable. The
   board is priced as usual; the report adds **Your scenario (experimental)**: every line priced again
   with only those inputs changed (teammates give up what one player gains; the team total holds),
-  beside the board's chance, each side's break-even and its net per $100 IF the assumptions are right.
+  judged against the win rate a Power Play leg needs (DECISIONS #225; a Sleeper pick's own price is
+  not its break-even in a flat-payout entry, #208), with the engine's own chance as a reference.
+  **Relative to the line** -- `--assume "PLAYER: carries=+2/+4/+6"` (or `targets=+1`) -- reads the
+  user's view as more or fewer than the workload his line assumes: prefer it whenever the user
+  compares with the line, because it keeps the engine's efficiency error out of the comparison.
   Reproduce that table in full, say the numbers are conditional on the user's assumptions (which are
   assumptions, not confidence intervals), and never call a line a play. Touchdowns are not adjusted.
   Never recorded (outputs in `scenarios/`).
   **A range** -- `--assume "PLAYER: carries=10/12/15"` (low / expected / high, smallest first; team
-  changes too, `"NO: pass=-4/-2/+1"`) -- prices the board three times and adds the Over at each end and
-  a verdict per side: *pays across your range*, *pays at your expected, not at your low/high*, *pays
+  changes too, `"NO: pass=-4/-2/+1"`) -- prices the board three times and adds the Over at each end,
+  one chance per side averaged over the range (weights 1 : 4 : 1), and a verdict per side against
+  the Power Play leg: *pays across your range*, *pays at your expected, not at your low/high*, *pays
   only at your low/high*, or *does not pay in your range*. Prefer a range whenever the user gives a
   rough number: a side that pays across the range does not rest on the exact figure. Narrate the
   verdict with its end named ("the Under needs him at your 15, not your 12"); a teammate's line runs
@@ -435,17 +440,15 @@ For a narrow question, run only what it needs:
   (`--assume "<TE1>: targets=<his usual + about half the absent player's>"`) or, for a priced
   player, the report's "If a Questionable player is out" section. A leg that depends on the
   status is a leg to place only once the status is known.
-  The "pays" cell ends with where OUR projection lands: Over zone (the projection already clears
-  the Over's break-even workload), Under zone, or no-bet zone (between the two, where the book's
-  cut eats either side). Explain it that way: the projection is what the model expects; the
-  thresholds are what each side needs at its price. How the zone is found, when asked: each price
-  sets the win rate its side needs (−164 needs 62%, +100 needs 50%); the simulation finds the
-  workload where each side reaches it (the Over pays above one number, the Under at or below the
-  other); between them neither side reaches its price, because the two prices add to more than
-  100% -- the book's cut, measured in targets or carries. It rests on the model's own catch rate
-  and spread, so it guides how much role a view needs; it is not a guarantee. In a Power Play
-  the listed price does not apply: every leg needs about 56% (4 picks, 10x) or 55% (5 picks,
-  20x), whichever side, so a plus-money Under is no cheaper there than any other leg.
+  The research table's "A Power Play leg needs" cell (DECISIONS #225; it replaced the single-pick
+  "pays at this price" cell, since in a Power Play the listed price does not apply) gives the
+  workload above which the Over clears a leg's win rate -- about 56% for 4 picks at 10x, 55% for
+  5 at 20x, whichever side, so a plus-money Under is no cheaper there than any other leg -- and at
+  or below which the Under does; between them neither side is worth a leg. "Too close to call on
+  volume" marks a break-even within about one pass or carry of the workload the line assumes:
+  nobody can forecast that closely, so build no leg on it. How it is found, when asked: the
+  simulation moves his share until each side reaches the hurdle. It rests on the model's own
+  catch rate and spread, so it guides how much role a view needs; it is not a guarantee.
   **The line-fit reads moved off the card (DECISIONS #208).** The old per-player reads --
   "Catches and yards" (DECISIONS #164), "Carries and yards" (#166), the QB's "Completions and
   yards" (#170), the rushing + receiving touches read (#173) and the achievability gauge that
@@ -553,16 +556,23 @@ these are model opinions not tested against sportsbook lines.
    book's line; other books' lines in a small table under it), then his role evidence (a QB: his
    workload table), the historical baseline, the rate notes, the market-carries shadow for backs,
    Matchup and Watch. The live record and the backtest calibration print ONCE above the cards,
-   not per player. The prop table, top to bottom: **the market's chance of the Over** (the price
-   with its margin removed -- the best available estimate of the chance), the engine's chance, the price, the engine's
-   forecast (middle and 80% range), what the Over needs, the engine's volume, the **market-implied
-   volume** (the workload the market's no-vig price implies at the engine's efficiency: above the
-   engine's volume, the market expects more work -- or better efficiency, which one price cannot
-   separate; below it, less), then **the volume
+   not per player. The prop table is MARKET FIRST (DECISIONS #225), top to bottom: **the line
+   assumes** (the workload the market's no-vig price implies at the engine's efficiency -- the
+   line restated as volume: above the engine's volume, the market expects more work, or better
+   efficiency, which one price cannot separate), **a Power Play leg needs** (the workload above
+   which the Over clears a 4-pick leg's ~56%, and at or below which the Under does; "too close to
+   call on volume" when either sits within about one unit of what the line assumes -- say so and
+   build no leg on it), the market's chance of the Over (the best available estimate of the
+   chance), the price, what the Over needs, the engine's volume, its forecast (middle and 80%
+   range), then **the volume
    chance** -- one row per efficiency (his luck-capped rate, his rate this season, the engine's),
    each "N [catches / carries / completions / targets] at [rate] -> [engine's chance of that
    volume]"; the market's own carries or completions line where posted; the efficiency the line
-   needs at the engine's volume; and how many of his games this season beat that. The engine owns
+   needs at the engine's volume; how many of his games this season beat that; and last, the
+   engine's own chance of the Over, a REFERENCE only (it has run high at real lines, #202: never
+   present its gap to the market as information). Lead the read with the first two rows: "the
+   line assumes N; the Over needs more than A for a leg, the Under B or fewer -- does he get more
+   or less work than the line assumes, by enough, and why?" The engine owns
    the volume, the user judges the efficiency (user: "the engine just needs to predict when volume
    is more than X"): yards a catch for receivers (the engine's catches already hold his catch rate
    and its luck), yards a carry for backs, yards a completion for the starting QB; rushing +

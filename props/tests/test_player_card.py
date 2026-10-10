@@ -51,8 +51,11 @@ def test_receiver_card_is_one_table_with_a_column_per_prop():
     assert L[0] == "#### A Receiver · WR1, TB"
     # one column per prop, receptions before receiving yards whatever order the rows came in
     assert "| | Receptions 4.5 | Receiving yards 68.5 |" in text
-    assert "| **Market's chance of the Over** | **55%** | **50%** |" in text
-    assert "| Engine's chance | 58% | 48% |" in text
+    # market first (DECISIONS #225): the market's chance plain, the engine's own chance last, a reference
+    assert "| Market's chance of the Over | 55% | 50% |" in text
+    assert ("| Engine's own chance of the Over (reference only: it has run high, DECISIONS #202) | 58% | 48% |"
+            in text)
+    assert text.index("| Market's chance of the Over |") < text.index("| Engine's own chance of the Over")
     assert "| The Over needs | 5 catches | 69 yards |" in text
     assert "| Engine's volume | 8.3 targets | 8.3 targets -> 5.5 catches |" in text
     # 69 yards at 12.0 a catch = 6 catches; P(>= 6) over 1..10 = 50%; receptions has no capped row
@@ -208,7 +211,7 @@ def test_the_books_other_lines_row_and_a_missing_price():
                      "cells": RS.volume_cells("player_rush_yds", 52.5, [15] * 4 + [13] * 6, [("engine", None, 4.0)])}]}
     text = "\n".join(RS.player_card(d))
     assert "| The book's other lines | carries 13.5, Under favoured; longest run 19.5 |" in text
-    assert "| **Market's chance of the Over** | **-** |" in text, "no no-vig price: a dash, not a number"
+    assert "| Market's chance of the Over | - |" in text, "no no-vig price: a dash, not a number"
 
 
 def test_a_card_with_no_priced_line_keeps_its_combined_read():
@@ -227,7 +230,8 @@ def test_the_qb_table_no_longer_repeats_the_capped_rate():
 
 def test_the_card_guide_explains_every_row_the_table_prints():
     guide = "\n".join(RS.card_guide())
-    rows = ["**Market's chance of the Over**", "Engine's chance", "Price: Over / Under",
+    rows = ["**The line assumes** (workload, at the engine's efficiency)", "**A Power Play leg needs**",
+            "Market's chance of the Over", "Engine's own chance of the Over (reference only)", "Price: Over / Under",
             "Engine's forecast: middle; 80% range", "The Over needs", "Engine's volume", *RS.ROW_WORDS.values(),
             "The market's own volume line", "The book's other lines", "At the engine's volume, the line needs",
             "His games this season that beat that"]
@@ -260,9 +264,9 @@ def test_the_card_shows_the_market_implied_volume():
                   _row("player_reception_yds", 68.5, unit="targets", market_volume=8.6, market_catches=5.6),
                   _row("player_rush_yds", 52.5, unit="carries", market_volume=None, market_edge="max")]}
     text = "\n".join(RS.player_card(d))
-    assert ("| Market-implied volume (at the engine's efficiency) | 8.1 targets | 8.6 targets -> 5.6 catches | "
-            "more carries than the search covers |") in text
-    assert "| Market-implied volume (at the engine's efficiency) |" in "\n".join(RS.card_guide())
+    assert ("| **The line assumes** (workload, at the engine's efficiency) | **8.1 targets** | "
+            "**8.6 targets -> 5.6 catches** | **more carries than the search covers** |") in text
+    assert "| **The line assumes** (workload, at the engine's efficiency) |" in "\n".join(RS.card_guide())
 
 
 def test_a_practice_only_report_is_not_a_published_game_report():

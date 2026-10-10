@@ -1,0 +1,5 @@
+{
+ "note": "Sleeper Power Play payouts the user plays (DECISIONS #159, #225): an entry of N picks pays this multiple of the stake when every pick wins. A leg's hurdle is the win rate that makes the entry break even with every leg alike: payout ** (-1 / N) -- 4 picks at 10x need about 56.2% a leg, 5 at 20x about 54.9%. default_legs is the hurdle the cards show.",
+ "payouts": {"4": 10, "5": 20},
+ "default_legs": 4
+}
