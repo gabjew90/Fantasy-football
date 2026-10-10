@@ -582,6 +582,9 @@ def _check_leg(add, i, run, card, lg, inj):
     for k in ("p_over_book", "p_over_model", "median", "p10", "p90", "market_volume", "market_catches",
               "pp_over_needs", "pp_under_needs"):
         allowed.append(row.get(k))
+    # the engine's graded calls on him in this market (DECISIONS #230): a read may quote them
+    rec = (next((x for x in card.get("volume") or [] if x.get("market") == mk), {}) or {}).get("record") or {}
+    allowed += [rec.get(k) for k in ("n", "overs", "engine", "market")]
     for n in lg.get("needs") or []:
         parts = n.get("parts") or [[n.get("volume"), n.get("rate")]]
         try:

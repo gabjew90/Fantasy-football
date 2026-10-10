@@ -234,7 +234,7 @@ def test_the_card_guide_explains_every_row_the_table_prints():
             "Market's chance of the Over", "Engine's own chance of the Over (reference only)", "Price: Over / Under",
             "Engine's forecast: middle game; 80% range", "The Over needs", "Engine's volume (average)", *RS.ROW_WORDS.values(),
             "The market's own volume line", "The book's other lines", "At the engine's average volume, an average game needs",
-            "His games this season that beat that"]
+            "His games this season that beat that", "The engine's graded calls on him here this season"]
     for r in rows:
         assert f"| {r} |" in guide, r
     assert "| Row | How it is produced | How to read it |" in guide
@@ -377,3 +377,58 @@ def test_section_7_names_out_starters_by_id_not_by_report_position():
     assert RS.defense_out(iw, status, starters, ("TB", "DAL")) == {"TB": ["A Corner", "An Edge"], "DAL": []}
     gaps = RS.known_gaps({"defense_out": {"TB": ["A Corner"]}})
     assert any("TB defense: A Corner out" in str(g) for g in gaps)
+
+
+# ---------------------------------------------------------------- the record on the card (DECISIONS #230)
+
+def test_the_record_row_counts_his_graded_overs_and_the_chances_given():
+    calls = [dict(week=2, market="player_reception_yds", side="Over", result="under", p_model=0.66, p_novig=0.52,
+                  p_over_board=0.66),
+             dict(week=3, market="player_reception_yds", side="Under", result="under", p_model=0.30, p_novig=0.47),
+             dict(week=4, market="player_reception_yds", side="Over", result="push", p_model=0.6, p_novig=0.5),
+             dict(week=4, market="player_receptions", side="Over", result="over", p_model=0.55, p_novig=0.5)]
+    rec = RS.player_record(calls, "player_reception_yds")
+    assert rec["n"] == 2 and rec["overs"] == 0 and rec["weeks"] == [2, 3], "the push is left out"
+    assert abs(rec["engine"] - (0.66 + 0.70) / 2) < 1e-9, "an Under row's chance is turned into the Over's"
+    assert abs(rec["market"] - (0.52 + 0.53) / 2) < 1e-9
+    assert RS.record_cell(rec) == "Over 0 of 2 (weeks 2-3); engine said 68%, market 52%"
+    assert RS.player_record(calls, "player_rush_yds") is None and RS.record_cell(None) is None
+
+
+def test_the_card_shows_the_record_row_last_only_when_there_is_one():
+    rows = [_row("player_reception_yds", 13.5)]
+    with_rec = "\n".join(RS.prop_table(rows, [{"market": "player_reception_yds", "line": 13.5, "cells": None,
+                                                "record_text": "Over 0 of 6 (weeks 2-5); engine said 67%, market 52%"}])[0])
+    assert "| The engine's graded calls on him here this season | Over 0 of 6" in with_rec
+    assert with_rec.index("Engine's own chance of the Over") < with_rec.index("graded calls on him")
+    without = "\n".join(RS.prop_table(rows, [{"market": "player_reception_yds", "line": 13.5, "cells": None}])[0])
+    assert "graded calls on him" not in without
+
+
+def test_the_record_joins_by_id_counts_one_call_a_game_and_drops_an_ambiguous_name():
+    import pandas as pd
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "engine" / "scripts"))
+    import score_game as SG
+    base = dict(season=2026, book="sleeper", market="player_reception_yds", side="Over", result="under", is_call=1)
+    d = pd.DataFrame([
+        {**base, "week": 2, "player": "A Back", "team": "TB", "gsis_id": "00-0000001", "logged_at_utc": "2026-09-14T17:00:00Z"},
+        # week 3 called twice (two engine versions): the later one counts
+        {**base, "week": 3, "player": "A Back", "team": "TB", "gsis_id": None, "logged_at_utc": "2026-09-21T15:00:00Z",
+         "result": "over"},
+        {**base, "week": 3, "player": "A Back", "team": "TB", "gsis_id": None, "logged_at_utc": "2026-09-21T16:00:00Z"},
+        # this week's call is not yet in the record's past
+        {**base, "week": 4, "player": "A Back", "team": "TB", "gsis_id": "00-0000001", "logged_at_utc": "2026-09-28T16:00:00Z"},
+        # two players share the name on one team: no join
+        {**base, "week": 2, "player": "Twin Name", "team": "DAL", "gsis_id": None, "logged_at_utc": "2026-09-14T17:00:00Z"},
+        # the same name on another team is someone else
+        {**base, "week": 2, "player": "A Back", "team": "NO", "gsis_id": None, "logged_at_utc": "2026-09-14T17:00:00Z"},
+    ])
+    ros = pd.DataFrame([dict(full_name="A Back", team="TB", gsis_id="00-0000001"),
+                        dict(full_name="Twin Name", team="DAL", gsis_id="00-0000002"),
+                        dict(full_name="Twin Name", team="DAL", gsis_id="00-0000003")])
+    rec = SG.record_by_id(d, 2026, 4, ros)
+    assert set(rec) == {"00-0000001"}, "no name-only join; an ambiguous key is dropped"
+    rows = rec["00-0000001"]
+    assert sorted(r["week"] for r in rows) == [2, 3] and all(r["team"] == "TB" for r in rows)
+    assert next(r for r in rows if r["week"] == 3)["result"] == "under", "the later call of the week counts"
+

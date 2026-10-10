@@ -1,9 +1,9 @@
 {
   "algorithm": "props-engine-sha256-lf-1",
-  "engine_sha256": "dc89f72888d5b4b1b39a992d94ff513c00164413070a117a2b623e6a86d977a8",
+  "engine_sha256": "71be1730e455f9ed9ddac142b08f0be35ca9947d962eb391ac2b5961ae72b560",
   "file_count": 64,
   "files": {
-    "SKILL.md": "8b69e0c72108a33ddfafb105a0fdd07ed46a10d5bf40d14f7cc46d8d73e9fbdd",
+    "SKILL.md": "3dcc20c9d6b851c0e15fd7bc1daef802c6c9e762b8685133c19deeb53d5d2c58",
     "resources/agent_guide.md": "23952f25741868e8ddc9dc0e35278866ebc0275e122969ce4c8e9859fb301ec6",
     "resources/calibration_2025.csv": "47e3922c7af818307831d70a3d2be4333200f3aee1d94dc6bbf6e0e9ccee4ac8",
     "resources/customer_style.md": "399244087acf975d3803da95911b65c6ff2dac22bdcf73808d3cc83a6109340b",
@@ -51,12 +51,12 @@
     "scripts/eligibility.py": "91b45727f37f690a1416e9461d2ef5f00f4bd1c31985fd31d312e2251fd76bd2",
     "scripts/model.py": "b894f141723975cb9195bbf8acb1c979a523811dceb47c8d2f28494f23d9c768",
     "scripts/odds_client.py": "434186273bd0412a5545247228298951c5d0504a19c8a47c4c782bf3bb75aaa1",
-    "scripts/publish.py": "68bd8321c5876cf84eaf006a3603777c8ad6377166fc525759ac6e1fbbc9b7a7",
+    "scripts/publish.py": "ef66f886042077be8ea9e01657beed5da24ca50c50fc4faf9da03a38195a07c9",
     "scripts/publish_pdf.py": "a4514ccbcc0254373c32e35bf3cd05ed97461347608ec43dff965697ea56bdb4",
     "scripts/publish_render.py": "613c10403a13207d64e279401e781b6b12abde3e58d2b80db87b5303e26127c0",
-    "scripts/research.py": "ff73b810f933024ab03fffc0a12d5e4a1d49589c34f50274534ab29614d27eae",
+    "scripts/research.py": "2d429fc6065409aa7fe0e90d8c7387922e5d4d894b843e0dfa13bad37b78f38a",
     "scripts/scenario.py": "a62be45470715d9abdb1473d5ffa2653e6ac6f9d0b1e9c4fb5884de22270c81b",
-    "scripts/score_game.py": "e5936cd2d69cb2baa73570472d8daf0b853cfeae7f9b8266d40c01839e163581",
+    "scripts/score_game.py": "97c3e9d287c66a4f800bffb381a297bc06fd7befbdc886ed1aa062c33a630d8b",
     "scripts/score_week.py": "e8d3d892a42d19461681dbda095ac8ad0540aee9fe38de51aef4acaed9003389",
     "scripts/td_alloc.py": "7c407c949cac8f0f74d7f91589fd5d749f65d9053eb1c3f5f0dc63a700b3465b",
     "scripts/td_alloc_backtest.py": "e259d9f0e301a5d5d34e5a9e84bba222810f077d9c05a1f1f799a611914595a4",
@@ -68,5 +68,5 @@
     "scripts/td_model.py": "7c1635bbf515b4316f14771b177363a9f82a1ba7ad3393e479cd2dce26a25724",
     "scripts/td_v1.py": "bb4ef62e525c948889ef4e45f6c41564dcc7bed2a97b3d4def0792848f12c485"
   },
-  "tag": "props-v1.65"
+  "tag": "props-v1.66"
 }

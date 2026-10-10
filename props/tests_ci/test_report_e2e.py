@@ -161,6 +161,8 @@ def test_the_market_first_card_and_its_efficiency_grid(run_full):
     rush_eng = eng.split(" | ")[-1].rstrip(" |").split(": ", 1)[1]
     assert rush_main == rush_eng, (rush_main, rush_eng)
     assert "| At his rate this season |" in card and "carries and targets are the opinion to form" in card
+    # the engine's graded calls on him (DECISIONS #230): the repo's settled record, weeks before 4, joined by ID
+    assert "| The engine's graded calls on him here this season | " in report
 
 
 def test_the_power_play_workloads_straddle_what_the_line_assumes(run_full):

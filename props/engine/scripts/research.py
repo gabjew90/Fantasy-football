@@ -1987,6 +1987,14 @@ def card_guide() -> list[str]:
          "has several possible causes -- news the market has (practice, injuries), model error, stale inputs "
          "or different assumptions -- and is not a mispriced line; the workload rows above are what to "
          "reason about."),
+        ("The engine's graded calls on him here this season",
+         "His settled calls in this market this season (one a week, the call the record keeps), joined by "
+         "his player ID: how often the Over hit, and the Over chance the engine and the market gave on "
+         "average. Pushes and voids are left out. The engine's figure spans the pricing versions that made "
+         "those calls, not only today's.",
+         "A check on the engine for this player: an engine that kept saying 65% on a 1-for-6 Over has been "
+         "wrong about him, whatever its chance says today. A handful of games is noise; read it beside the "
+         "role evidence, never as a trend on its own (DECISIONS #230)."),
     ]
     L = ["## How to read the player cards", "",
          "Each card is one table, with a column per prop at the book's line. It starts from the market: "
@@ -2037,6 +2045,41 @@ def _f(v, nd=1):
 
 def _pc(v):
     return f"{100 * float(v):.0f}%" if _ok(v) else "-"
+
+
+def player_record(calls, market) -> dict | None:
+    """The engine's graded calls on one player in one market this season (DECISIONS #230): how
+    often the Over hit, and the Over chance the engine and the market gave on average. calls: the
+    settled record's call rows for this player (one per week and market, joined by ID upstream);
+    pushes and voids are left out. None without a graded call."""
+    rs = [c for c in calls if c.get("market") == market and c.get("result") in ("over", "under")]
+    if not rs:
+        return None
+
+    def over_p(c, col):
+        v = c.get(col)
+        if not _ok(v):
+            return None
+        return float(v) if str(c.get("side", "")).lower() == "over" else 1.0 - float(v)
+
+    eng = [float(c["p_over_board"]) if _ok(c.get("p_over_board")) else over_p(c, "p_model") for c in rs]
+    mkt = [over_p(c, "p_novig") for c in rs]
+    eng, mkt = [x for x in eng if x is not None], [x for x in mkt if x is not None]
+    weeks = sorted({int(c["week"]) for c in rs if _ok(c.get("week"))})
+    return {"n": len(rs), "overs": sum(1 for c in rs if c["result"] == "over"),
+            "engine": sum(eng) / len(eng) if eng else None, "market": sum(mkt) / len(mkt) if mkt else None,
+            "weeks": weeks}
+
+
+def record_cell(rec) -> str | None:
+    """'Over 0 of 6 (weeks 2-5); engine said 67%, market 52%'."""
+    if not rec:
+        return None
+    w = rec["weeks"]
+    span = (f" (week {w[0]})" if len(w) == 1 else f" (weeks {w[0]}-{w[-1]})") if w else ""
+    said = [f"{who} {100 * v:.0f}%" for who, v in (("engine said", rec["engine"]), ("market", rec["market"]))
+            if v is not None]
+    return f"Over {rec['overs']} of {rec['n']}{span}" + ("; " + ", ".join(said) if said else "")
 
 
 def prop_rows_table(rows) -> list[str]:
@@ -2336,7 +2379,7 @@ def prop_table(rows, volume) -> tuple[list[str], list[str]]:
     mks = [m for m in MARKET_ORDER if m in first] + [m for m in first if m not in MARKET_ORDER]
     if not mks:
         return [], []
-    vol = {v["market"]: v for v in (volume or []) if v.get("cells") or v.get("book_lines")}
+    vol = {v["market"]: v for v in (volume or []) if v.get("cells") or v.get("book_lines") or v.get("record_text")}
     cell = lambda f: [f(first[m], (vol.get(m) or {}).get("cells"), vol.get(m) or {}) for m in mks]
     head = "| | " + " | ".join(f"{PROP_WORDS.get(m, (m,))[0]} {float(first[m]['line']):g}" for m in mks) + " |"
     L = [head, "|---|" + "---:|" * len(mks)]
@@ -2375,6 +2418,7 @@ def prop_table(rows, volume) -> tuple[list[str], list[str]]:
                                                      if c and c["beat"] else None))
     add("Engine's own chance of the Over (reference only: it has run high, DECISIONS #202)",
         cell(lambda r, c, v: _pc(r.get("p_over_model")) + push(r)))
+    add("The engine's graded calls on him here this season", cell(lambda r, c, v: v.get("record_text")))
     notes = []
     for m in mks:
         c = (vol.get(m) or {}).get("cells")

@@ -2,7 +2,7 @@
  "algorithm": "nfl-release-sha256-lf-1",
  "file_count": 168,
  "files": {
-  "CHAT.md": "08c0e0772fc49769f0b7fda1814ee73d63e9824e0a148b7895983f09d4cdbd54",
+  "CHAT.md": "9ce76147743f256a5666898e9db28a7600b9b01e756a916cfc0a714b0a067091",
   "config.yaml": "1a2af1bd5d6c7a464e908b50e94d910d2adba1675dede83876369aca7329c0c6",
   "core/__init__.py": "8ac9ed217e439f5828616ab66ec9ff17336c2cbbbeae391d0f9bfa001eaed571",
   "core/fetch.py": "664b4f3eced6e5d586d8f6395f9ce39faf0b4218f1943eb1c3acafd1098bc4da",
@@ -103,7 +103,7 @@
   "manager/yahoo_context.py": "fe92d74e22549756eccfd24148d6e37aa7ad57e67609fd86ad383cfbb1ee6013",
   "manager/yahoo_sync.py": "3ea0dba0ea5b03e561952cbdd2b40eba7b9a7c328691258915b7c29aadc54b90",
   "nfl.py": "00f824d1d09f9b5f8879192b2009f00c4d3e95b161d6051ddbc04cac15f6e8d6",
-  "props/engine/SKILL.md": "8b69e0c72108a33ddfafb105a0fdd07ed46a10d5bf40d14f7cc46d8d73e9fbdd",
+  "props/engine/SKILL.md": "3dcc20c9d6b851c0e15fd7bc1daef802c6c9e762b8685133c19deeb53d5d2c58",
   "props/engine/resources/agent_guide.md": "23952f25741868e8ddc9dc0e35278866ebc0275e122969ce4c8e9859fb301ec6",
   "props/engine/resources/calibration_2025.csv": "47e3922c7af818307831d70a3d2be4333200f3aee1d94dc6bbf6e0e9ccee4ac8",
   "props/engine/resources/customer_style.md": "399244087acf975d3803da95911b65c6ff2dac22bdcf73808d3cc83a6109340b",
@@ -151,12 +151,12 @@
   "props/engine/scripts/eligibility.py": "91b45727f37f690a1416e9461d2ef5f00f4bd1c31985fd31d312e2251fd76bd2",
   "props/engine/scripts/model.py": "b894f141723975cb9195bbf8acb1c979a523811dceb47c8d2f28494f23d9c768",
   "props/engine/scripts/odds_client.py": "434186273bd0412a5545247228298951c5d0504a19c8a47c4c782bf3bb75aaa1",
-  "props/engine/scripts/publish.py": "68bd8321c5876cf84eaf006a3603777c8ad6377166fc525759ac6e1fbbc9b7a7",
+  "props/engine/scripts/publish.py": "ef66f886042077be8ea9e01657beed5da24ca50c50fc4faf9da03a38195a07c9",
   "props/engine/scripts/publish_pdf.py": "a4514ccbcc0254373c32e35bf3cd05ed97461347608ec43dff965697ea56bdb4",
   "props/engine/scripts/publish_render.py": "613c10403a13207d64e279401e781b6b12abde3e58d2b80db87b5303e26127c0",
-  "props/engine/scripts/research.py": "ff73b810f933024ab03fffc0a12d5e4a1d49589c34f50274534ab29614d27eae",
+  "props/engine/scripts/research.py": "2d429fc6065409aa7fe0e90d8c7387922e5d4d894b843e0dfa13bad37b78f38a",
   "props/engine/scripts/scenario.py": "a62be45470715d9abdb1473d5ffa2653e6ac6f9d0b1e9c4fb5884de22270c81b",
-  "props/engine/scripts/score_game.py": "e5936cd2d69cb2baa73570472d8daf0b853cfeae7f9b8266d40c01839e163581",
+  "props/engine/scripts/score_game.py": "97c3e9d287c66a4f800bffb381a297bc06fd7befbdc886ed1aa062c33a630d8b",
   "props/engine/scripts/score_week.py": "e8d3d892a42d19461681dbda095ac8ad0540aee9fe38de51aef4acaed9003389",
   "props/engine/scripts/td_alloc.py": "7c407c949cac8f0f74d7f91589fd5d749f65d9053eb1c3f5f0dc63a700b3465b",
   "props/engine/scripts/td_alloc_backtest.py": "e259d9f0e301a5d5d34e5a9e84bba222810f077d9c05a1f1f799a611914595a4",
@@ -171,6 +171,6 @@
   "tiers.csv": "04a1a79d43e9f2445ba3dc4ea262b00fbd58efea1f41e8b0393cb4c7f8afee41",
   "tiers.keefamania.csv": "11e6546b56caa807a572da86d5c3d81097bafd2d2550e25653882d78b2962e94"
  },
- "sha256": "220fc7380227e7e81eb315a1400326c40114b08d8d36fbf2844a8ad25b44f610",
- "tag": "nfl-v1.68"
+ "sha256": "39bdbe9fc638db0cbedc762ff2fb92b445e1f9aa31393d60e21fdcba79caf3f9",
+ "tag": "nfl-v1.69"
 }

@@ -498,7 +498,11 @@ For a narrow question, run only what it needs:
      the read itself (backup-QB volume suits catches over yards; one long play beats a yards Under).
   5. **How it fails**: game script, a teammate's health, efficiency vs volume.
   Close with a ranking of the bold lines by how well the read holds up (strongest / one real
-  question / demanding or shaky), then the reminders: Sleeper entries need 2+ picks that each
+  question / demanding or shaky) -- judged on the evidence against the line (how far the role
+  evidence puts the workload past the Power Play workload, whether the earlier role clears it,
+  how far apart the two sides sit), never on the engine's own Over chance or its gap to the
+  market (DECISIONS #229); a line whose sides are about one pass or carry apart is never the
+  strongest -- then the reminders: Sleeper entries need 2+ picks that each
   stand alone; log any bet in the journal with its angle.
 - **Anytime TD:** every priced TD row is also in `td_board_*.csv` (the research table leaves TD rows out).
   A TD-only run takes DraftKings prices from The Odds API when the cached quota shows 100+ credits,
