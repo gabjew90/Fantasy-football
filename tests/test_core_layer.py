@@ -196,13 +196,14 @@ def test_a_truncated_download_is_a_failed_refresh_not_a_new_copy(tmp_path, monke
     """2026-10-09: a connection closed mid-body left a 751 KB roster file for 3.4 MB, and it
     replaced the good copy. A body shorter than its Content-Length now fails the refresh."""
     m = Manifest("t")
+    monkeypatch.setattr(F, "RETRY_WAITS", (0, 0))
     f = tmp_path / "roster.csv"
     f.write_text("a,b\n1,2\n3,4\n", encoding="utf-8")
     _age(f, 99999)
     monkeypatch.setattr(F.urllib.request, "urlopen", lambda req, timeout: _Resp(b"a,b\n1,", 12))
     F.fetch("https://x/roster.csv", f, 600, name="roster", manifest=m)
     assert f.read_text(encoding="utf-8") == "a,b\n1,2\n3,4\n"
-    assert m.get("roster")["status"] == "stale" and "OSError" in m.get("roster")["detail"]
+    assert m.get("roster")["status"] == "stale" and "TruncatedDownload" in m.get("roster")["detail"]
     # a full body, or one with no length header, is a new copy as before
     monkeypatch.setattr(F.urllib.request, "urlopen", lambda req, timeout: _Resp(b"a,b\n9,9\n", 8))
     F.fetch("https://x/roster.csv", f, 600, name="roster", manifest=m)
@@ -217,3 +218,73 @@ def test_a_naive_start_time_is_taken_as_utc():
     m = Manifest("t", started_at=dt.datetime(2026, 9, 24, 12, 0))
     m.record("roster", source="s", status="fresh", fetched_at=dt.datetime(2026, 9, 24, 12, 5))
     assert m.read_after_start("roster")
+
+
+# ---------------------------------------------------------------- retries (DECISIONS #235)
+
+def _http(code):
+    import urllib.error
+    return urllib.error.HTTPError("https://x/pbp.csv.gz", code, "err", {}, None)
+
+
+def test_a_transient_failure_is_tried_again_and_then_succeeds(tmp_path, monkeypatch):
+    """2026-10-10: one HTTP 502 from nflverse stopped a calculator card; a rerun worked."""
+    monkeypatch.setattr(F, "RETRY_WAITS", (0, 0))
+    calls = []
+
+    def urlopen(req, timeout):
+        calls.append(1)
+        if len(calls) < 3:
+            raise _http(502)
+        return _Resp(b"a,b\n1,2\n", 8)
+    monkeypatch.setattr(F.urllib.request, "urlopen", urlopen)
+    m = Manifest("t")
+    F.fetch("https://x/pbp.csv.gz", tmp_path / "pbp.csv.gz", 600, name="pbp", manifest=m)
+    assert len(calls) == 3 and m.get("pbp")["status"] == "fresh"
+    assert (tmp_path / "pbp.csv.gz").read_bytes() == b"a,b\n1,2\n"
+
+
+def test_a_client_error_is_not_retried_and_no_copy_raises_fetch_error(tmp_path, monkeypatch):
+    monkeypatch.setattr(F, "RETRY_WAITS", (0, 0))
+    calls = []
+
+    def urlopen(req, timeout):
+        calls.append(1)
+        raise _http(404)
+    monkeypatch.setattr(F.urllib.request, "urlopen", urlopen)
+    m = Manifest("t")
+    with pytest.raises(F.FetchError) as ei:
+        F.fetch("https://x/pbp.csv.gz", tmp_path / "pbp.csv.gz", 600, name="nflverse pbp 2026", manifest=m)
+    assert len(calls) == 1, "a 404 is not tried again"
+    assert isinstance(ei.value, OSError) and ei.value.cause.code == 404
+    assert str(ei.value).startswith("nflverse pbp 2026: download failed (HTTPError")
+    assert m.get("nflverse pbp 2026")["status"] == "failed"
+
+
+def test_retries_run_out_then_an_old_copy_is_used_or_the_error_is_named(tmp_path, monkeypatch):
+    monkeypatch.setattr(F, "RETRY_WAITS", (0, 0))
+    calls = []
+
+    def urlopen(req, timeout):
+        calls.append(1)
+        raise ConnectionResetError("reset by peer")
+    monkeypatch.setattr(F.urllib.request, "urlopen", urlopen)
+    with pytest.raises(F.FetchError, match="ConnectionResetError"):
+        F.fetch("https://x/a.csv", tmp_path / "a.csv", 600, name="a")
+    assert len(calls) == len(F.RETRY_WAITS) + 1
+    old = tmp_path / "b.csv"
+    old.write_text("old", encoding="utf-8")
+    _age(old, 99999)
+    m = Manifest("t")
+    F.fetch("https://x/b.csv", old, 600, name="b", manifest=m)
+    assert old.read_text(encoding="utf-8") == "old" and m.get("b")["status"] == "stale"
+
+
+def test_which_failures_count_as_transient():
+    import http.client
+    assert F._transient(_http(502)) and F._transient(_http(503)) and F._transient(_http(429))
+    assert not F._transient(_http(404)) and not F._transient(_http(403))
+    assert F._transient(ConnectionResetError()) and F._transient(TimeoutError())
+    assert F._transient(http.client.IncompleteRead(b"x", 10)) and F._transient(F.TruncatedDownload("cut"))
+    assert not F._transient(ValueError("a bug, not the network"))
+

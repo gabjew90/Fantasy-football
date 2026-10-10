@@ -25,9 +25,11 @@ and the case for the call.
 session cache (the league and each priced game are read once and
 reused for 20 minutes), so you can ask as many as the conversation needs:
 look a player up, compare two, try a swap, check a line, follow up. The
-full reports (`fantasy lineup / waiver / trade / scenario`, `props game /
-slate`) are for the whole decision -- "set my lineup", "who should I add",
-"break down this game". Neither is the reply; both are what you think with.
+full reports (`fantasy lineup / waiver / trade / scenario`) are for the
+whole decision -- "set my lineup", "who should I add". A game breakdown is
+the calculator's (the routing table); the engine's `props game / slate` run
+only when the engine is asked for by name. Neither is the reply; both are
+what you think with.
 For a prop leg or a Power Play entry the tool is the calculator (**Prop legs and entries**,
 below); the `props` question tools are the dormant engine's, used as the routing table says.
 
@@ -37,9 +39,11 @@ below); the `props` question tools are the dormant engine's, used as the routing
   follows the question, with headings when a big decision reads better so.
 - **Answers are written in the chat, as markdown** -- headings, tables, short
   paragraphs. Never a PDF, a document or a file unless the user asks for one
-  (user, 2026-10-06). A game read follows the props engine's team matchup guide
-  (`props/engine/resources/team_matchup_guide.md`) EXACTLY -- header, thesis, sections 1-8,
-  each table with its short read -- then the player cards (user: "just follow it exactly").
+  (user, 2026-10-06). **A game read is the calculator's** (user, 2026-10-10, DECISIONS #235):
+  `nfl.py status --game AWAY@HOME` for the spread, the total and both teams' injury report, then
+  the calculator's cards for the game's posted lines (**Prop legs and entries**). The engine's
+  team matchup guide (sections 1-8) runs only when the user asks for the engine by name; follow it
+  exactly then, labelled engine output, untested against real lines.
 - **The full data, every time.** The user wants all the numbers, not a
   selection (2026-09-30: he asked twice for "the full stats" after a trimmed
   answer). Any answer about a player shows his **weekly stat line** and his
@@ -130,6 +134,7 @@ names a week.
 | what if I start X (instead of Y) | `nfl.py fantasy swap --league L --start "X" [--bench "Y"]` (no `--bench`: every legal seat, best first) |
 | my roster / my opponent's / team Z's | `nfl.py fantasy roster --league L [--team opp\|MANAGER]` |
 | set my lineup / who to start this week, the whole matchup | `nfl.py fantasy lineup --league L` |
+| break down this game / how does AWAY at HOME look / a game read | `nfl.py status --game AWAY@HOME` (spread, total, both teams' injury report), then **the calculator**: `python -m props.calc capture` and `python -m props.calc leg` for the game's posted lines -- **Prop legs and entries** below; the engine's matchup guide only when the engine is named |
 | a prop leg: X over / under N in rushing yards, catches, receiving yards or passing yards; is this leg any good; what workload does X need | **the calculator**: `python -m props.calc capture`, then `python -m props.calc leg "X" <rush_yds\|receptions\|rec_yds\|pass_yds> <over\|under>` -- **Prop legs and entries** below |
 | a Power Play / an entry of several legs (those four bet types) | **the calculator**: `python -m props.calc capture`, then `python -m props.calc entry --dry-run --stake <$> --payout <total Sleeper shows> --angle <...> --why "..." --leg "<Player>\|<market>\|<side>\|<line>" ...` -- **Prop legs and entries** below |
 | the props engine, asked for BY NAME ("what does the engine say", "run the engine on X", an engine game guide or slate) | `nfl.py props player / line / best / matchup / game / slate` -- **Props (the engine, dormant)** below; engine output, untested against real lines |

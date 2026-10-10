@@ -79,6 +79,10 @@ def main(argv: list[str] | None = None) -> int:
     except (player.NotFound, DataError) as ex:
         print(f"Stopped: {ex}")
         return 2
+    except F.FetchError as ex:
+        # one line, never a traceback (DECISIONS #235): core.fetch has already retried
+        print(f"Download failed: {ex}. Nothing was priced; try again in a minute.")
+        return 1
 
 
 def run(a) -> int:
@@ -87,8 +91,7 @@ def run(a) -> int:
         return 0
     if a.cmd == "capture":
         r = capture.run()
-        print(f"Saved {r['lines']} lines ({r['added']} new, {r['replaced']} updated) captured at "
-              f"{r['captured_at_utc']} to {', '.join(r['paths']) or 'nowhere (none matched)'}.")
+        print(capture.summary_line(r))
         if r["stale"]:
             print(f"Warning: built on older copies of {', '.join(r['stale'])}; player and game matches may be "
                   f"out of date.")

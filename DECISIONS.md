@@ -8791,3 +8791,42 @@ every row while the predictions rows carry open / decision / close (line_archive
 - **Evidence and limits:** the calculator's held-out read (#233) passed spread, round trip and the
   80% range for every bet type but passing's spread, and failed the conversion band test
   everywhere; each card says so in the user's words. No real-game record yet.
+
+## 2026-10-11 (235) -- the LV@NE chat test: downloads retried, capture's counts agree, a game read is the calculator's (status --game)
+
+The chat test of nfl-research on LV at NE (2026-10-10, session review nfl_session_2026-10-10_2308)
+listed eight findings. Each was checked against main (5bc6c1d) before any change; by cause:
+
+- **A1, installed skill out of date (process, the user's):** the installed loader (tarball only,
+  no self-update) got HTTP 403 from codeload and ran the bundled nfl-v1.20; its SKILL.md and
+  scripts came from different builds. The new loader (#156) worked in the same session when chat
+  ran it by hand (file by file, nfl-v1.70 verified). Fix: the user rebuilds and reinstalls. No code.
+- **A2, a 502 crashed the calculator (code):** core.fetch._download had no retry, and with no
+  older copy a failed download surfaced as a raw traceback. Reproduced during this check (a
+  truncated weekly-roster download). Now: up to two retries (1 s, 3 s) on 5xx, 429, dropped or
+  refused connections, timeouts and cut-off bodies, never on a 404; the truncated-body check
+  stays; a failure with no usable copy raises core.fetch.FetchError (an OSError), and the
+  calculator prints one line, "Download failed: ...", and exits 1.
+- **A5, two rules on a game read (code, #157):** CHAT.md required the engine's matchup guide for
+  every game read while the routing table runs the engine only when named. The user's choice: a
+  game read is the calculator's -- `nfl.py status --game AWAY@HOME` (new: the game's spread,
+  total and both teams' injury report from nflverse's copy of the official report) then
+  calculator cards; the guide only when the engine is named. Pinned by tests/test_chat_game_read.py.
+- **A8, capture counts (code):** "lines" were sides / 2 while "new" and "updated" counted sides
+  ("Saved 368 lines (736 new, 0 updated)"). Now "Saved 368 lines (736 sides: 736 new, 0 updated)".
+- **A4, no injury line on cards:** not a defect; the frozen spec lists it as not built (later
+  ideas). Left there (calculator features stay stopped). A game read now carries the injuries
+  through status --game instead.
+- **Engine (dormant; verified and listed, nothing changed):** A3 two-point tries counted as
+  targets and carries -- score_game.py:785-786 (and model.py / build_priors.py) build passes and
+  rushes with no two_point_attempt filter; only the teammate-out rule drops them. A6 the header's
+  defense line (research.defense_line -> team_efficiency) averages EPA over every play while
+  section 3's tiers filter to 10-90% win probability, and the header does not say so. A7 Thornton
+  "Out, full practice" and Canada "Out, limited" are how nflverse's report publishes them (not a
+  join error); Glaze "status unknown" is a name-only fallback ("Delmar Glaze" in the snap counts,
+  "DJ Glaze" on the roster, no PFR id) -- he is active; Bowers' empty last-game cell is
+  usage_change needing three games with the team (he has two): by design.
+- **Left as is (user):** "Last games: 1, 2, 3, 4 (targets)" (correct data); calculator runs absent
+  from the chat session log; chat runs pandas 3.0.5 / numpy 2.5.3 / polars 2.0.0 while CI pins
+  pandas 1.5.3 / numpy 1.26.4 / polars 1.43.2 (requirements.txt, props/requirements.txt) -- chat
+  runs majors CI never tests.

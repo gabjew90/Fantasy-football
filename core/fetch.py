@@ -21,8 +21,10 @@ ten minutes.
 from __future__ import annotations
 
 import datetime as dt
+import http.client
 import os
 import time
+import urllib.error
 import urllib.request
 from pathlib import Path
 
@@ -58,6 +60,33 @@ SLEEPER_LINES_URL = "https://api.sleeper.app/lines/available?dynamic=true"
 HEADERS = {"User-Agent": "Mozilla/5.0 (fantasy-football core.fetch)"}
 CURL_HEADERS = {"User-Agent": "curl/8.5.0"}
 
+# A TRANSIENT FAILURE IS TRIED AGAIN before a download counts as failed (DECISIONS #235: one
+# HTTP 502 from the nflverse play-by-play release stopped a calculator card in chat on
+# 2026-10-10; the same command worked seconds later). Seconds to wait before each retry.
+RETRY_WAITS = (1.0, 3.0)
+
+
+class TruncatedDownload(OSError):
+    """A body shorter than its Content-Length: the connection closed mid-file."""
+
+
+class FetchError(OSError):
+    """No usable copy: the download failed (after its retries) and there is no older copy to
+    fall back on. An OSError, so every existing handler still catches it."""
+
+    def __init__(self, name: str, url: str, cause: BaseException):
+        super().__init__(f"{name}: download failed ({type(cause).__name__}: {cause})")
+        self.name, self.url, self.cause = name, url, cause
+
+
+def _transient(ex: BaseException) -> bool:
+    """Worth another try: a server error (5xx), rate limiting (429), a dropped or refused
+    connection, a timeout or a cut-off body. Never a 404 or another client error."""
+    if isinstance(ex, urllib.error.HTTPError):
+        return ex.code >= 500 or ex.code == 429
+    return isinstance(ex, (urllib.error.URLError, ConnectionError, TimeoutError, http.client.HTTPException,
+                           TruncatedDownload))
+
 
 def current_season(today: dt.date | None = None) -> int:
     """The NFL season in progress: the calendar year from March, else the last."""
@@ -66,6 +95,18 @@ def current_season(today: dt.date | None = None) -> int:
 
 
 def _download(url: str, dest: Path, timeout: int, headers: dict | None = None) -> None:
+    """One download, tried again after RETRY_WAITS on a transient failure; anything else, or the
+    last try, raises."""
+    for attempt in range(len(RETRY_WAITS) + 1):
+        try:
+            return _download_once(url, dest, timeout, headers)
+        except Exception as ex:  # noqa: BLE001 -- re-raised unless it is transient and tries remain
+            if attempt == len(RETRY_WAITS) or not _transient(ex):
+                raise
+            time.sleep(RETRY_WAITS[attempt])
+
+
+def _download_once(url: str, dest: Path, timeout: int, headers: dict | None = None) -> None:
     req = urllib.request.Request(url, headers=headers or HEADERS)
     got = 0
     with urllib.request.urlopen(req, timeout=timeout) as resp, open(dest, "wb") as fh:
@@ -80,7 +121,7 @@ def _download(url: str, dest: Path, timeout: int, headers: dict | None = None) -
     # then replaced the last good one (2026-10-09: a 751 KB weekly-roster file for 3.4 MB).
     # A short body is a failed refresh, like an empty one.
     if expect is not None and expect.isdigit() and got != int(expect):
-        raise OSError(f"truncated response from {url}: {got} of {expect} bytes")
+        raise TruncatedDownload(f"truncated response from {url}: {got} of {expect} bytes")
 
 
 def _mtime(p: Path) -> dt.datetime:
@@ -115,7 +156,7 @@ def fetch(url: str, dest: str | Path, max_age_s: float, *, name: str | None = No
         if not dest.exists():
             if manifest is not None:
                 manifest.record(name, source=url, status="failed", detail=f"{type(ex).__name__}: {ex}"[:200])
-            raise
+            raise FetchError(name, url, ex) from ex
         if manifest is not None:
             manifest.record(name, source=url, status="stale", path=dest, fetched_at=_mtime(dest),
                             detail=f"refresh failed: {type(ex).__name__}")
