@@ -652,3 +652,17 @@ def test_qb_today_reads_the_official_report_and_never_names_a_guess(monkeypatch)
     # the latest game was started by someone else (an injury, IR, a benching): not settled, whatever the report says
     assert cli.qb_today(bundle(["baker", "baker", "baker", "daniels", "daniels"]), "TB", 2026, 5) == \
         "Starting QB not confirmed."
+
+
+def test_half_up_everywhere_and_the_workload_ask_from_displayed_numbers():
+    assert card.d1(26.25) == "26.3" and card.d1(0.35) == "0.4" and card.d1(4.45) == "4.5"
+    assert card._round(16.5) == 17 and card.half_up(0.75, "0.5") == 1.0 and card.half_up(0.7, "0.5") == 0.5
+    season, window = _games()
+    pl = _player(season, window)
+    c = card.compute(pl, rush_model(ypc=4.2), "rush_yds", 64.5, 1.8, 1.76, settings.load()["fixed"])
+    c["usual"] = 26.25                                   # shows "avg 26.3"
+    c["solutions"]["needed_over"] = calc.Solution(26.76, "ok")      # shows "~27"
+    text = card.render(pl, c, "over", opp="TB")
+    flat = " ".join(text.splitlines())
+    assert "(avg 26.3)" in flat and "AT 26.3 CARRIES" in flat
+    assert "About 0.5 more carries" in flat               # 27 - 26.3 = 0.7, to the nearest half 0.5

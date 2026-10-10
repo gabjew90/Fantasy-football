@@ -257,9 +257,11 @@ Line as of [Mon D, H:MM AM/PM] PT.
 - Rates: one decimal.
 - Season count: from the bar as displayed. Over: games at or above it ("~17" -> "17+"; a shown
   3.2 counts games of 4 or more). Under: games at or below it ("~20 or fewer" -> "20 or fewer").
-- Closing asks: the workload ask from the unrounded bar and average, shown to the nearest half
-  (judged as shown, so one that rounds to 0 is even); the rate ask from the two rates as displayed
-  (needed rate shown minus recent rate shown), so the reader's subtraction matches.
+- Every displayed number rounds half up (26.25 shows as 26.3).
+- Closing asks, both from the numbers as displayed, so the reader's subtraction matches: the
+  workload ask is the bar as shown minus the last-4 average as shown, then to the nearest half
+  (judged as shown, so one that rounds to 0 is even); the rate ask is the needed rate as shown
+  minus the recent rate as shown.
 
 ### Closing question
 
@@ -324,13 +326,11 @@ Average loss: $[L] per $[stake] entry.
 2. No separate minimum for yards per catch; the blend handles a small sample.
 3. The quarterback marker names who started (opening-day-starter rule for which games).
 
-### Open (asked 2026-10-10)
-
-- Passing yards' minimum samples, set before any test was read: 40 of his own completions in his
-  last 16 games (about two starts), and 100 starting quarterbacks' completions per depth in the
-  pool. To confirm.
-- A plausible range for the league's yards per completion (starting quarterbacks), 8.0-14.0, a
-  wide run-time guard like the other three ranges, set before any passing result. To confirm.
+4. Passing yards' minimum samples: 40 of his own completions in his last 16 games, and 100
+   starting quarterbacks' completions per depth in the pool (confirmed).
+5. League yards per completion guard range 8.0-14.0 (confirmed).
+6. The workload ask is taken from the bar and average as displayed; every displayed number rounds
+   half up.
 
 ## Later ideas
 
@@ -340,6 +340,9 @@ Not built; each needs the user's go-ahead (the frozen-spec rule).
   one [target/carry] either way can decide this." (the user, 2026-10-10; not to be built now).
 - The injury line in MATCHUP (spec rule 9) has no data source wired yet.
 - Caching the opponent row and grades per run (a 5-card batch takes 7.5 s; not needed now).
+- The closing question does not consider his this-season rate (the user, 2026-10-10).
+- For live cards, an attributed line in MATCHUP: "Sleeper lists [Name] at QB." (the user,
+  2026-10-10).
 
 ## Outputs
 

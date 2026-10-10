@@ -80,14 +80,30 @@ def value(c: dict, key: str) -> float | None:
     return s.value if s is not None and s.status == "ok" else None
 
 
+def half_up(x: float, step: str) -> float:
+    """x rounded half up to `step` ("1", "0.1", "0.5"), through its decimal
+    text so a stored 0.35 (0.3499...) shows as 0.4 and 26.25 as 26.3 (the user,
+    2026-10-10: half up everywhere a number is displayed)."""
+    from decimal import ROUND_HALF_UP, Decimal
+    d = Decimal(repr(float(x)))
+    if step == "0.5":
+        return float((d * 2).quantize(Decimal("1"), rounding=ROUND_HALF_UP) / 2)
+    return float(d.quantize(Decimal(step), rounding=ROUND_HALF_UP))
+
+
+def d1(x: float) -> str:
+    """One decimal, half up."""
+    return f"{half_up(x, '0.1'):.1f}"
+
+
 def _round(x: float) -> int:
     """Half up, so "~N" is the same N everywhere (Python rounds half to even)."""
-    return int(math.floor(x + 0.5))
+    return int(half_up(x, "1"))
 
 
 def shown_work(x: float) -> float:
     """A workload as the card shows it: whole from 6 up, one decimal below."""
-    return float(_round(x)) if x >= 6 else math.floor(x * 10 + 0.5) / 10
+    return float(_round(x)) if x >= 6 else half_up(x, "0.1")
 
 
 def _work(x: float) -> str:
@@ -96,7 +112,7 @@ def _work(x: float) -> str:
 
 
 def shown_rate(x: float) -> float:
-    return math.floor(x * 10 + 0.5) / 10
+    return half_up(x, "0.1")
 
 
 def _num(x: float) -> str:
@@ -163,9 +179,9 @@ def _question(market: str, side: str, work_ask: float | None, rate_ask: float | 
     average meets the bar but fewer than 2 games did, the average is carried by
     one game and the question says so."""
     if work_ask is not None:
-        work_ask = math.floor(work_ask * 2 + 0.5) / 2          # the nearest half, half up
+        work_ask = half_up(work_ask, "0.5")                    # the nearest half, half up
     if rate_ask is not None:
-        rate_ask = math.floor(rate_ask * 10 + 0.5) / 10
+        rate_ask = half_up(rate_ask, "0.1")
     if work_ask is not None and reached is not None:
         meets = work_ask <= 0 if side == "over" else work_ask >= 0
         if meets and reached < 2:
@@ -256,7 +272,7 @@ def _last_line(pl: Player, c: dict) -> tuple[list[str], list[tuple]]:
         out.append(f"Last {len(rows)}: {vals}")
         out.append(f"Short history: {len(rows)} games.")
     else:
-        out.append(f"Last {n}: {vals}  (avg {c['usual']:.1f})")
+        out.append(f"Last {n}: {vals}  (avg {d1(c['usual'])})")
     if c.get("usual_spans_seasons"):
         out.append(f"(Last {len(rows)} reach back into last season.)")
     return out, rows
@@ -315,7 +331,7 @@ def render(pl: Player, c: dict, side: str, *, opp: str, game_lines: dict | None 
     # AT ~U: the rate needed at his recent workload, the rate the bar assumes, his season rate, the opponent's
     need = None
     if c["usual"] is not None:
-        out += ["", f"AT {c['usual']:.1f} {many.upper()}"]
+        out += ["", f"AT {d1(c['usual'])} {many.upper()}"]
         r = sol[f"rate_needed_{side}"]
         rr = calc.side_result(side, r.status) if r is not None else None
         if rr == "ok":
@@ -336,7 +352,9 @@ def render(pl: Player, c: dict, side: str, *, opp: str, game_lines: dict | None 
     else:
         out += ["", f"Only {c['usual_games']} games: no recent average yet."]
     out += [""] + matchup_lines(pl, m, opp, game_lines, why_no_lines, grades, qb_today)
-    work_ask = (bar - c["usual"]) if bar is not None and c["usual"] is not None else None
+    # both asks from the numbers as displayed (the user, 2026-10-10): the bar as shown minus the
+    # last-4 average as shown, then to the nearest half; the needed rate shown minus the recent rate shown
+    work_ask = (shown_work(bar) - half_up(c["usual"], "0.1")) if bar is not None and c["usual"] is not None else None
     rate_ask = (shown_rate(need) - shown_rate(assumed)) if need is not None else None    # as displayed
     reached = None
     if bar is not None and len(rows) >= int(c["usual_min"]):
@@ -359,7 +377,7 @@ def _opp_line(opp: str, row: dict | None) -> str:
     if row.get("value") is None:
         return f"{city(opp)} allows: no plays{row.get('who', '')} yet ({row['games']} games)"
     gaps = f"; {row['left_out']} plays left out (no win chance or roster listing)" if row.get("left_out") else ""
-    return f"{city(opp)} allows: {row['value']:.1f}{row.get('who', '')} ({row['games']} games{gaps})"
+    return f"{city(opp)} allows: {d1(row['value'])}{row.get('who', '')} ({row['games']} games{gaps})"
 
 
 def require_side(side: str) -> None:
