@@ -111,6 +111,13 @@ def _work(x: float) -> str:
     return f"~{v:.0f}" if x >= 6 else f"~{v:.1f}"
 
 
+def work_ask(bar: float, usual: float) -> float:
+    """The workload ask as the card shows it (card rule 10 as amended): the
+    bar as displayed minus the last-4 average as displayed, to the nearest
+    half. One place, for the card's question and the entry summary."""
+    return half_up(shown_work(bar) - half_up(usual, "0.1"), "0.5")
+
+
 def shown_rate(x: float) -> float:
     return half_up(x, "0.1")
 
@@ -352,6 +359,7 @@ def render(pl: Player, c: dict, side: str, *, opp: str, game_lines: dict | None 
     # both asks from the numbers as displayed (the user, 2026-10-10): the bar as shown minus the
     # last-4 average as shown, then to the nearest half; the needed rate shown minus the recent rate shown
     work_ask = (shown_work(bar) - half_up(c["usual"], "0.1")) if bar is not None and c["usual"] is not None else None
+    # (question() takes it to the nearest half: the same number as work_ask(bar, usual))
     rate_ask = (shown_rate(need) - shown_rate(assumed)) if need is not None else None    # as displayed
     reached = None
     if bar is not None and len(rows) >= int(c["usual_min"]):

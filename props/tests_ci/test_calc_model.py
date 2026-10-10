@@ -676,3 +676,19 @@ def test_each_bet_type_carries_its_test_line_first():
             "pass_yds": "Tested on 2018-25: the least reliable of the four. Treat the bar as rough."}
     assert card.TEST_STATUS == want
     assert "untested" not in " ".join(want.values())
+
+
+def test_entry_dry_run_without_a_payout_and_a_bad_stake(stub_leg, monkeypatch):
+    cli, lookup, pl = stub_leg
+    from props.calc import player
+    from props.calc.shared import journal
+    monkeypatch.setattr(player, "model", lambda *a, **k: rush_model(ypc=4.2))
+    lookup.quote = dict(QUOTE)
+    text = cli.entry(_entry_args(payout=None, dry_run=True))
+    flat = " ".join(text.splitlines())
+    assert "YOUR $5 ENTRY · 2 LEGS" in flat and "worked out from the legs' own prices" in flat
+    assert "No journal preview" in flat and '"entry_id"' not in text and journal.read(2026) == []
+    with pytest.raises(SystemExit, match="--payout"):
+        cli.entry(_entry_args(payout=None))                          # logging needs Sleeper's payout
+    with pytest.raises(SystemExit, match="--stake must be above 0"):
+        cli.entry(_entry_args(stake=0.0, payout=None, dry_run=True))

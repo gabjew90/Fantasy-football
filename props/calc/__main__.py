@@ -361,7 +361,9 @@ def _check_entry(a, legs: list) -> None:
             raise SystemExit(str(ex)) from None
     if len(legs) < 2:
         raise SystemExit("a Power Play has at least two legs")
-    if a.payout is not None and not 0 < a.stake < a.payout:
+    if not a.stake > 0:
+        raise SystemExit(f"--stake must be above 0; got {a.stake}")
+    if a.payout is not None and not a.stake < a.payout:
         raise SystemExit(f"--payout is the total returned if every leg wins, stake included (the number Sleeper "
                          f"shows), so it is above --stake; got ${a.stake:g} staked, ${a.payout:g} payout")
     if not str(a.why or "").strip():
@@ -419,11 +421,14 @@ def entry(a) -> str:
     if getattr(a, "dry_run", False):
         # the same serialisation journal.write uses, line for line
         added = "\n".join(json.dumps(r, sort_keys=True) for r in rows)
+        if a.payout is None:                   # the payout was worked out, not Sleeper's: no journal preview
+            return (warn + text + "\n\nDRY RUN: nothing written. No journal preview: the payout above was worked "
+                    "out from the legs' prices; logging needs --payout, the total Sleeper shows for your entry.")
         return (warn + text + f"\n\nDRY RUN: nothing written. These {len(rows)} lines would be added to "
                 f"{journal.journal_path(season)}:\n{added}")
     journal.write(season, journal.read(season) + rows)
-    return (warn + text + f"\n\nLogged entry {rows[0]['entry_id']}: {len(rows)} legs, ${a.stake:g} to "
-            f"${payout:g}, in {journal.journal_path(season)}.")
+    return (warn + text + f"\n\nLogged entry {rows[0]['entry_id']}: {len(rows)} legs, {summary.money(a.stake)} to "
+            f"{summary.money(payout)}, in {journal.journal_path(season)}.")
 
 
 def journal_fields(side: str, g: dict) -> dict:
