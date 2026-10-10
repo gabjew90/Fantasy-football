@@ -431,15 +431,18 @@ def test_every_module_nfl_py_imports_ships_in_the_release():
 # unpacks that the lock lacks is "extra"; either sends chat to the vendored
 # release. nfl-v1.70 adds props/calc/ (DECISIONS #233) and the user rebuilds and
 # re-uploads the skill from this skill/release.py with it (2026-10-10), so these
-# are the rebuilt harness's rules. Update only when every installed skill has
-# been rebuilt from a newer skill/release.py -- never to make a test pass.
+# are the rebuilt harness's rules. THE REBUILT SKILL MUST BE UPLOADED BEFORE THIS
+# MERGES: the old v1.0 harness would read nfl-v1.70's lock and miss every
+# props/calc file (the order is in DECISIONS #233). Update only when every
+# installed skill has been rebuilt from a newer skill/release.py -- never to make
+# a test pass.
 HARNESS_RULES = {
     "dirs": ("core/", "fantasy/", "draftkit/", "manager/", "props/engine/", "props/calc/", "leagues/"),
     "files": ("CHAT.md", "nfl.py", "config.yaml", "requirements.txt", "tiers.csv", "tiers.keefamania.csv",
               "data/processed/absence_bands.json", "props/journal.py", "props/persist.py"),
     "globs": ("data/external/*.csv",),
-    "exclude_parts": ("__pycache__", "backtest_out", "cache"),
-    "exclude_suffixes": (".pyc", ".pyo", ".env", ".pkl", ".tmp", ".part"),
+    "exclude_parts": ("__pycache__", "backtest_out", "cache", "lines", "log"),
+    "exclude_suffixes": (".pyc", ".pyo", ".env", ".pkl", ".tmp", ".part", ".gz", ".npz"),
     "exclude_names": ("credential.env", ".env"),
 }
 
@@ -525,9 +528,21 @@ def test_every_module_the_calculator_loads_ships_in_the_release():
         if not R.included(rel):
             missing.append(rel)
         for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
-            if isinstance(node, ast.Import):
-                for a in node.names:
-                    cand = f"props/{a.name.split('.')[0]}.py"
-                    if (root / cand).exists() and not R.included(cand):
-                        missing.append(f"{rel} imports {cand}")
+            names = ([a.name for a in node.names] if isinstance(node, ast.Import)
+                     else [node.module] if isinstance(node, ast.ImportFrom) and node.level == 0 and node.module
+                     else [])
+            for name in names:
+                cand = f"props/{name.split('.')[0]}.py"
+                if (root / cand).exists() and not R.included(cand):
+                    missing.append(f"{rel} imports {cand}")
     assert not missing, f"the calculator needs files the release does not ship: {missing}"
+
+
+def test_a_chat_capture_does_not_change_the_release():
+    """A chat capture writes props/calc/lines/ and props/calc/log/ inside the
+    release tree; neither may be a release file, or the next bootstrap's verify
+    fails and throws the captures away (code review, 2026-10-10)."""
+    for rel in ("props/calc/lines/2026/line_archive_2026.jsonl", "props/calc/log/name_misses.jsonl",
+                "props/calc/heldout/lines_2024_2025.csv.gz", "props/calc/heldout/pools_2024_2025.npz"):
+        assert not R.included(rel), rel
+    assert R.included("props/calc/lines.py") and R.included("props/calc/heldout/heldout_read.json")

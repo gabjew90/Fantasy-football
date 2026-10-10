@@ -1,8 +1,8 @@
 {
  "algorithm": "nfl-release-sha256-lf-1",
- "file_count": 199,
+ "file_count": 194,
  "files": {
-  "CHAT.md": "8c274d709758c3f65d8a662e738fccd4021d57a5c49f51e2661f0ec7b25c91a8",
+  "CHAT.md": "d78aa9be2cfecae08950b1aff61f4a78790aeb5b15fbf63b9d3383106e7797d2",
   "config.yaml": "1a2af1bd5d6c7a464e908b50e94d910d2adba1675dede83876369aca7329c0c6",
   "core/__init__.py": "8ac9ed217e439f5828616ab66ec9ff17336c2cbbbeae391d0f9bfa001eaed571",
   "core/fetch.py": "664b4f3eced6e5d586d8f6395f9ce39faf0b4218f1943eb1c3acafd1098bc4da",
@@ -114,13 +114,8 @@
   "props/calc/fixture.py": "479381430e5be3cf7de01f89bc8cfa8eb14794ab2df8e0849f41fe13b46c3886",
   "props/calc/game_lines.py": "510c130534306957467127613a25c9b6ae5bd94c19e1087a921336c61e05642d",
   "props/calc/harness.py": "25d6bdd310344037a7233e013c7ef358bd4ade0e9c4baafea09337e8b82e4073",
-  "props/calc/heldout/cases_2024_2025.csv.gz": "5973b56a4ee6a5087d3a06ac2fd47f72fac41823948d374080ae01ca155c5505",
   "props/calc/heldout/heldout_read.json": "7835047006d12037529c7155b188a5c82bf5908fc4b17f30e56602779dd809ac",
-  "props/calc/heldout/lines_2024_2025.csv.gz": "8b4e88b6e0de3180c4c7019dafb119450e1f2e6bd3b009a7525553f9a1017fb8",
-  "props/calc/heldout/pools_2024_2025.npz": "62deec51da2027770d4294dbf173de27397b5cdf6260049afdd0269a3f9ec3b1",
   "props/calc/lines.py": "a4114701829dc636fbe402162e2a28d9713d4bc3d87a298ad1d5b1dec4d1d455",
-  "props/calc/lines/2026/line_archive_2026.jsonl": "8fa04341e2562134ac2efaeb9d2344dfb3b4ee891239f2fe837f6921b97e93a7",
-  "props/calc/log/.gitkeep": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
   "props/calc/markets.py": "4fab14da3ce288711437a43c4a18facb98e748213403b26a8b50b968335ffbbf",
   "props/calc/matchup.py": "3b0084357ebaf6e7609e2abe85608a44ca911a6902a3fc06824fed3b82c59285",
   "props/calc/names.py": "9eaa5617dd8d5ad2758ab529976928fb34b05d938b7eddbb7ab97fb5d555339c",
@@ -202,6 +197,6 @@
   "tiers.csv": "04a1a79d43e9f2445ba3dc4ea262b00fbd58efea1f41e8b0393cb4c7f8afee41",
   "tiers.keefamania.csv": "11e6546b56caa807a572da86d5c3d81097bafd2d2550e25653882d78b2962e94"
  },
- "sha256": "f0022b237369f97175d0dc6b9b4843975e3485dde4fbd6d07d5c7ed40fb3e5a7",
+ "sha256": "c1b022e79dbc1944c2635f96efe4297432eb13e171f8890f29b1bacbbabfb48e",
  "tag": "nfl-v1.70"
 }

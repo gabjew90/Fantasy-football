@@ -133,7 +133,8 @@ names a week.
 | a prop leg: X over / under N in rushing yards, catches, receiving yards or passing yards; is this leg any good; what workload does X need | **the calculator**: `python -m props.calc capture`, then `python -m props.calc leg "X" <rush_yds\|receptions\|rec_yds\|pass_yds> <over\|under>` -- **Prop legs and entries** below |
 | a Power Play / an entry of several legs (those four bet types) | **the calculator**: `python -m props.calc capture`, then `python -m props.calc entry --dry-run --stake <$> --payout <total Sleeper shows> --angle <...> --why "..." --leg "<Player>\|<market>\|<side>\|<line>" ...` -- **Prop legs and entries** below |
 | the props engine, asked for BY NAME ("what does the engine say", "run the engine on X", an engine game guide or slate) | `nfl.py props player / line / best / matchup / game / slate` -- **Props (the engine, dormant)** below; engine output, untested against real lines |
-| an anytime touchdown, or rushing + receiving yards | the engine: `nfl.py props player "X"` / `props line` -- the calculator does not cover them; engine output, untested against real lines |
+| an anytime touchdown, or rushing + receiving yards | the engine: `nfl.py props player "X"` (it lists those lines; `props line` takes only catches, rec yds, rush yds, pass yds) -- the calculator does not cover them; engine output, untested against real lines |
+| best bets in a game / this week / a must-win pick | no pick from either tool: say why in a sentence, then offer the calculator on the legs the user is weighing; the engine's `props best` only when asked for by name (engine output, untested against real lines) |
 | a read to share / for review / the QA version / the agent version of a game (asked for by name) | `props game AWAY@HOME` (the engine), then **Publishing a read** below |
 | waiver targets at RB / WR / TE | `nfl.py fantasy waiver --league L --pos RB,WR --horizon H` |
 | stream a defense or kicker | `nfl.py fantasy waiver --league L --pos DEF --horizon stream` (or `--pos K`) |
@@ -251,13 +252,22 @@ closing question. It gives NO chance of its own and never says whether a line is
    the game plan), conditional on the user's view -- never a pick, a lean, an edge or a chance.
 4. **Follow-ups** (named at the end of a batch): Workload (game values, season count, rounding,
    role-changing injuries), Calculation (how the price becomes a bar, the recent rate's blend
-   toward the position average, the test numbers in docs/plans/2026-10-10-parlay-leg-calculator.md,
-   "Tuning" and "Held-out read"), Matchup (grades, spread and total, the opponent's rates),
+   toward the position average; the tuned settings and where each came from are the comments in
+   `props/calc/settings.yaml`, the held-out test results are `props/calc/heldout/heldout_read.json`
+   -- quote them, never recompute), Matchup (grades, spread and total, the opponent's rates),
    Fit (which legs lean on shared or opposing game stories), Entry cost (payout, required wins,
    the coin-flip assumptions). Answer from the cards and that note; never invent a number.
-5. **Logging.** Chat is read-only and never logs. When the user plays an entry, give them the
+5. **A what-if on workload** ("what if he gets 20 carries, does the Over clear?") is answered from
+   the card: his number against the bar, and the needed rate against his rates -- never a
+   chance, and not an engine scenario run unless the user asks for the engine by name.
+6. **Logging.** Chat is read-only and never logs. When the user plays an entry, give them the
    same `entry` command WITHOUT `--dry-run`, with `--payout` set to the total Sleeper shows
-   (stake included), to paste into a Claude Code session.
+   (stake included), to paste into a Claude Code session, which runs `python -m props.calc
+   capture` first. The entry logs only at a line Sleeper has a saved quote for before kickoff:
+   if the line has moved since, it refuses and says so -- tell the user that, never invent a
+   quote. For these four bet types this calculator command, not `props/journal.py entry`, is the
+   one that logs (it carries the card's numbers the journal grades); the journal commands in
+   **Props (the engine, dormant)** are for engine bets only (touchdowns, rushing + receiving).
 
 Only when the user asks for the engine by name, or for a bet type the calculator does not cover
 (anytime touchdowns, rushing + receiving yards, a teammate-out scenario), use the engine below,
@@ -268,6 +278,11 @@ and say in the reply that its numbers are engine output, untested against real l
 The props engine is dormant (DECISIONS #233): kept in the repository and still run on schedule
 to write the line record, but not the default answer to any prop question. Use it only as the
 routing table says, and label its numbers as engine output, untested against real lines.
+EVERYTHING BELOW THIS LINE applies only to an answer the routing table sends to the engine
+(asked for by name; anytime touchdowns; rushing + receiving; the teammate-out scenario). For a
+leg or an entry in rushing yards, catches, receiving yards or passing yards -- including "is the
+Kelce over any good?", "chance he gets 60 yards?" and workload what-ifs -- **Prop legs and
+entries** above governs, and its rules win where the two differ.
 
 The props engine's own contract governs the SUBSTANCE of an engine props answer --
 markets, the research table, the credential order, and its honesty rules.

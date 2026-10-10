@@ -47,8 +47,13 @@ INCLUDE_FILES = ("CHAT.md", "nfl.py", "config.yaml", "requirements.txt", "tiers.
 # A file must fit the rules of the OLDEST harness in use (HARNESS_RULES in
 # tests/test_skill_release.py) or wait for a rebuilt skill.
 INCLUDE_GLOBS = ("data/external/*.csv",)
-EXCLUDE_PARTS = ("__pycache__", "backtest_out", "cache")
-EXCLUDE_SUFFIXES = (".pyc", ".pyo", ".env", ".pkl", ".tmp", ".part")
+# "lines" and "log": the calculator's own captures and name-miss log (props/calc/lines/,
+# props/calc/log/) are state a chat capture writes INTO the release tree; outside the
+# hashed set, a capture never fails the next bootstrap's verify (DECISIONS #233).
+EXCLUDE_PARTS = ("__pycache__", "backtest_out", "cache", "lines", "log")
+# ".gz" and ".npz": the calculator's held-out test data (props/calc/heldout/); the
+# held-out record itself (heldout_read.json) ships, for chat's "Calculation" follow-up.
+EXCLUDE_SUFFIXES = (".pyc", ".pyo", ".env", ".pkl", ".tmp", ".part", ".gz", ".npz")
 EXCLUDE_NAMES = ("credential.env", ".env")
 
 

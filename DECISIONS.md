@@ -8749,8 +8749,16 @@ every row while the predictions rows carry open / decision / close (line_archive
 - **Chat:** CHAT.md routes those four bet types to the calculator (`python -m props.calc capture`,
   then `leg` or `entry --dry-run`); chat stays read-only and gives the user the logging command
   for a Claude Code session. The release adds `props/calc/`, `props/journal.py` and
-  `props/persist.py` (nfl-v1.70); the user rebuilds and re-uploads the skill, whose oldest
-  harness (built at nfl-v1.0) would otherwise skip the new files.
+  `props/persist.py` (nfl-v1.70); the calculator's own captures, name-miss log and held-out
+  data files stay out of the release, so a chat capture never fails the next bootstrap's
+  verify. The user rebuilds and re-uploads the skill: the oldest installed harness (built at
+  nfl-v1.0) unpacks by its own rules and would skip the new files. **Order, so chat never
+  falls back:** (1) build the skill from this branch (build.py vendors the branch's release,
+  since the tag does not exist yet) and upload it -- it still runs nfl-v1.69, because the
+  bootstrap reads the lock from main; (2) merge; (3) at once, on main, `python skill/release.py
+  cut-tag` and push the tag. Between (2) and (3) chat runs the vendored copy, which is
+  nfl-v1.70 itself. If main moved before the merge, merge main into the branch and re-run
+  `write-lock` first.
 - **Evidence and limits:** the calculator's held-out read (#232) passed spread, round trip and the
   80% range for every bet type but passing's spread, and failed the conversion band test
   everywhere; each card says so in the user's words. No real-game record yet.
