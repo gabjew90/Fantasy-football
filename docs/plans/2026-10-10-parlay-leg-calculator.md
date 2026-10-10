@@ -156,11 +156,175 @@ Passing yards has no completion-rate setting because its workload is completions
 Receiving and passing yards have no day factor; if their ranges fail the conversion test, the
 failure is reported as it is.
 
+## Card spec v1 (frozen)
+
+Frozen 2026-10-10 (the user). From now on it changes only for (a) the user's answers to questions
+Claude asks, or (b) a card that states something false or contradicts itself. Anything else,
+the user's or Claude's, goes on "Later ideas" below. Built in `props/calc/card.py`
+(`card.render`, `card.question`, `card.render_not_enough`).
+
+### Leg card template
+
+One card per leg, one side (the side asked about), plain text, about 40 characters wide (a
+line may wrap). The same layout for all four bet types.
+
+```
+[Check first: ...]                      <- only when something affects the bar (below)
+[PLAYER]
+[Side] [line] [bet type] ([price])
+
+Bar for this price  ~[N] [unit]         <- Unders: "~[N] [unit] or fewer"
+Last 4: a, b, c, d  (avg [U])           <- oldest to newest; * on a marked game
+[N]+ this season: [H] of [G]            <- Unders: "[N] or fewer this season: [H] of [G]"
+[Short history: [G] season games.]      <- only with fewer than 4 season games
+[Sleeper's [unit] line: [W]]            <- only when Sleeper posts one (step G)
+[* Week N: ...]                         <- one line per marked game
+
+AT [U] [UNIT]
+Needed at this price: [E] [rate unit]   <- Unders: "... or less"
+His recent rate ([n] games): [R]        <- the rate the bar assumes
+This season: [S]                        <- "only [n] [unit]" below the minimum sample
+[Opponent] allows: [x][ to POS] ([G] games)
+
+MATCHUP
+[TEAM] [run|pass] offense [grade] vs [OPP] [run|pass] defense [grade]
+[Favorite] favored by [spread]. Total [total].
+
+[Closing question]
+
+Line as of [Mon D, H:MM AM/PM] PT.
+```
+
+- Bet type words: "rushing yards", "catches", "receiving yards", "passing yards".
+- Price: Sleeper's multiplier for that side as American odds.
+- "Bar for this price": the average workload at which this side wins often enough at its price
+  (break-even, a push void). Never "needs N to win". Out of range: "Bar for this price: any
+  workload up to [max] [unit] clears it." / "... no workload up to [max] [unit] clears it."
+- "Needed at this price": the rate that clears the price at his last-4 average workload, from
+  the same calculator (not line divided by workload). Out of range: "any rate clears it" / "no
+  rate clears it".
+- "His recent rate ([n] games)": his blended rate over his last [n] games played (n = 16 when he
+  has them), the rate the bar assumes. The blend toward the position average is explained in the
+  "Calculation" follow-up, not on the card.
+- "This season": his plain rate this season before the week, shown only from the market's
+  minimum own sample.
+- Opponent row (display only): the opponent's defense this season before the week, in the
+  needed rate's unit, win probability 10-90% only. Under 4 games: "[Opponent]: only [G] games."
+  No plays to his position: "[Opponent] allows: no plays to [POS]s yet ([G] games)". Plays left
+  out for a missing win chance or roster listing are counted on the row.
+- MATCHUP (display only): grades from the engine's tier system (copied, `matchup.py`); rushing
+  cards run vs run, the other three pass vs pass; letters S best to F worst; under 4 games
+  "Only [G] games. No grades yet." Spread and total from ESPN; when ESPN has none, the nflverse
+  schedule's line, labelled "(closing line)" after kickoff and "(schedule line)" before. An even
+  spread: "No favorite (even spread)."; a missing spread: "No spread shown." An injury line
+  appears only when it changes this player's role (not built yet).
+- "Check first:" lines, above the numbers: "workload bar untested." while the bet type's tests
+  have not passed (a failed test's own wording replaces it); a lookup note when newer saved
+  quotes were skipped.
+- Markers (rule 3): a game where his offensive snap share was under 0.5 times his average in his
+  other games that season ("* Week N: played far fewer snaps than usual."), and a game his team's
+  starting quarterback was not the team's opening-day starter ("* Week N: backup quarterback
+  started."). A game from last season says "[year] week N".
+- Footer: one line, the saved quote's time in Pacific time; a typed line says "Line typed in."
+- Not enough data (a rate or pool below its minimum sample): "Check first: not enough data, so no
+  bar:", the reasons, "Last games: ..." and the markers; no bar, no rates.
+- Not on the card: "Line implies ~N (our math)" (in the "Calculation" follow-up), any gap line,
+  percentages, the other side, verdicts.
+
+### Units (the same in the bar, the last 4, the season count, the three rate rows and the entry summary)
+
+| Bet type | Workload | Rate | Opponent row |
+|---|---|---|---|
+| Rushing yards | carries | yards a carry | yards a carry allowed to RBs |
+| Receptions | targets | catches per 10 targets | catches per 10 targets allowed to his position |
+| Receiving yards | targets | yards a target (an incompletion is 0) | yards a target allowed to his position |
+| Passing yards | completions | yards a completion | yards a completion allowed |
+
+### Rounding
+
+- Bar: whole number with "~" from 6 up; one decimal below 6 ("~3.2").
+- Last-4 average and the AT header: one decimal ("avg 15.5", "AT 15.5 CARRIES").
+- Rates: one decimal.
+- Season count: from the bar as displayed. Over: games at or above it ("~17" -> "17+"; a shown
+  3.2 counts games of 4 or more). Under: games at or below it ("~20 or fewer" -> "20 or fewer").
+- Closing asks: from unrounded values; the workload ask to the nearest half, the rate ask to one
+  decimal; each judged as shown (a workload ask that rounds to 0 is even).
+
+### Closing question
+
+Workload ask = bar minus last-4 average. Rate ask = needed rate at his average minus his recent
+rate (the bar's). An Under turns both round, so a positive ask is what the bet needs ("fewer",
+"less", "room for N more").
+
+| Case | Over wording |
+|---|---|
+| Average meets the bar, fewer than 2 of the last 4 games reached it | "Average clears it, but only N of 4 games did." |
+| Both asks positive | "About 1.5 more carries, or 0.5 more yards a carry?" |
+| Workload ask 0 or less, rate ask positive | "Workload is there. 0.9 more yards a carry?" |
+| Workload ask positive, rate ask 0 or less | "At his recent rate it clears. About 3 more carries?" |
+| Workload ask 0, rate ask 0 or less | "Recent workload and rate both meet the bar." |
+| Workload ask negative, rate ask 0 or less | "Room for about 2 fewer targets?" |
+| No rate ask (no needed rate) | "About 1.5 more targets?" / "Workload is there." / "Room for about N fewer ..." |
+
+### Entry summary (step F, not built yet)
+
+```
+YOUR $[stake] ENTRY · [n] LEGS
+Return if all win: $[R]
+Includes your $[stake] stake.
+
+WHAT EACH NEEDS (biggest ask first)
+[Player]: ~[bar] [unit], [gap] more than recent.
+
+FIT CHECK
+[Player]: more runs while ahead.
+[Player]: more throws from behind.
+These lean on opposite game stories.
+Both can win. Check your case for each.
+
+PRICE CHECK: EACH BET ON ITS OWN
+[Player]: more than [H] wins in [G].
+
+TO COVER THE ENTRY COST
+All must win more than [H] in [G].
+
+IF EACH LEG HITS 1 TIME IN 2
+Also assume no shared game effects.
+All [n] win: 1 entry in [2^n].
+Average loss: $[L] per $[stake] entry.
+```
+
+- The payout is the total Sleeper shows, stake included; if computed from leg prices, say so.
+- Legs sorted from the largest workload ask down (a sort, not a verdict; no "weakest" labels).
+- FIT CHECK covers every pair on the same team or in the same game; if none: "No opposing pairs
+  found." Never "cannot both win".
+- Each leg's price check from its own price. The coin-flip figure is a stated hypothetical.
+- After a batch: the grade legend "Grades: S best, F worst." once, then the follow-up names:
+  Workload, Calculation, Matchup, Fit, Entry cost.
+- Season log (after step F): legs won out of legs played first; entries won second, with a note
+  that entry results are too rare to judge alone. Built as a read-only calc command over the
+  journal rows.
+
+### Open questions (asked 2026-10-10, unanswered; the card does not change until answered)
+
+1. A thin pool at one depth (RB deep catches: 69 in 2024-25, minimum 100) blocks receiving-yards
+   cards such as Bucky Irving's. Options: all positions' catches at that depth; a lower catch-pool
+   minimum; or keep "not enough data".
+2. A minimum number of his own catches for yards per catch.
+3. Backup-QB wording when a team changes starters for good mid-season.
+
+## Later ideas
+
+Not built; each needs the user's go-ahead (the frozen-spec rule).
+
+- "Small workload" line (item 5 of a user message on 2026-10-10; the item's text did not reach
+  Claude, so its content is to be restated before it is considered).
+- The injury line in MATCHUP (spec rule 9) has no data source wired yet.
+- Caching the opponent row and grades per run (a 5-card batch takes 7.5 s; not needed now).
+
 ## Outputs
 
-**The leg card layout below is superseded by the user's final card spec (2026-10-10): one
-side per card, "Bar for this price", last 4, season count, the rate the bar assumes, "Line implies
-(our math)", the AT block, MATCHUP and a closing question. Built in step B (`card.render`).**
+**Everything in this section below "Card spec v1 (frozen)" is superseded by it.**
 
 **1. Leg card** (illustrative numbers, not real data; fits a phone screen; receiving cards say "passes thrown to him"):
 
