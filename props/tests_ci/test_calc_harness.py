@@ -28,13 +28,57 @@ def _games():
     return pd.DataFrame(rows)
 
 
+POS = {"rb1": "RB", "rb2": "RB", "qb1": "QB", "wr1": "WR", "wr2": "WR", "wr3": "WR", "te1": "TE", "late": "RB"}
+
+
+def _b(games):
+    return type("B", (), {"games": games, "position_at": lambda self, g, s, w: POS.get(g)})()
+
+
 def test_who_is_tested_is_chosen_from_games_before_the_week():
-    b = type("B", (), {"games": _games()})()
+    b = _b(_games())
     got = set(harness.tested(b, 2026, 4, 3))
-    # lead back rb1 (45 carries), top 3 by targets wr1, wr2, te1, completion leader qb1; all played week 4
+    # lead back rb1 (45 carries; the QB's 9 carries do not make him a back), top 3 by targets wr1, wr2,
+    # te1, completion leader qb1; all played week 4
     assert got == {("rb1", "A", "rush_yds"), ("qb1", "A", "pass_yds")} | {
         (g, "A", m) for g in ("wr1", "wr2", "te1") for m in ("receptions", "rec_yds")}
     assert harness.tested(b, 2026, 3, 3) == []            # two games before week 3: nobody has 3
+    # the lead back missed a game (2 of 3): his role is not tested, and rb2 is not promoted into it
+    g = _games()
+    g = g[~((g["gsis_id"] == "rb1") & (g["week"] == 1))]
+    assert not any(m == "rush_yds" for _, _, m in harness.tested(_b(g), 2026, 4, 3))
+    # a rushing QB with the most carries is not the lead back
+    g2 = _games().assign(carries=lambda d: np.where(d["gsis_id"] == "qb1", 30, d["carries"]))
+    assert ("rb1", "A", "rush_yds") in harness.tested(_b(g2), 2026, 4, 3)
+
+
+def test_coverage_scores_a_calibrated_whole_number_model_at_80():
+    rng = np.random.default_rng(1)
+    fixed = {"range_low_pct": 10, "range_high_pct": 90}
+    sim = rng.poisson(5.0, 20000).astype(float)
+    actual = rng.poisson(5.0, 4000)
+    frac, incl = zip(*(harness.coverage(sim, a, fixed) for a in actual))
+    assert np.mean(frac) == pytest.approx(0.80, abs=0.015)        # the fractional score
+    assert np.mean(incl) > 0.85                                   # the inclusive count runs high
+
+
+def test_conversion_passes_a_calibrated_synthetic_market():
+    from props.calc import settings
+    fixed = settings.load()["fixed"]
+    rng = np.random.default_rng(2)
+    n = 2500
+    df = pd.DataFrame({"market": "receptions", "gsis_id": [f"p{i}" for i in range(n)], "usual": 6.0,
+                       "actual_work": 6, "own": 0.65, "n": 100, "base": 0.65})
+    df["actual_stat"] = rng.binomial(6, 0.65, n).astype(float)    # the truth: exactly the model's catch rate
+    df.attrs["resid"] = {}
+    k = {"carry_r": 16, "target_r": 8, "completion_r": 10, "k_ypc": 150, "day_sd": 0.15, "k_catch": 60,
+         "k_ypr": 50, "k_ypcomp": 150}
+    res = harness.conversion(df, "receptions", fixed, k)
+    assert 0.77 <= res["range_coverage"] <= 0.83 and res["pass_range"]
+    for band in res["bands"]:
+        if band["games"] >= 300:
+            assert abs(band["stated"] - band["actual"]) <= 0.03, band
+    assert res["left_out"]["no workload"] == 0 and res["priced_lines"] + sum(res["left_out"].values()) == 3 * n
 
 
 def test_the_re_blend_matches_rates_blend():

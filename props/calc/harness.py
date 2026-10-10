@@ -20,6 +20,26 @@ three r settings on the spread test (coverage nearest 80%), then k_ypc with
 day_sd, k_catch, k_ypr (k_catch fixed) and k_ypcomp, each on the log loss of
 the conversion test's Overs.
 
+How an "80% range holds X%" is counted: the design note's range runs from the
+10th to the 90th percentile. Workloads and catches are whole numbers, so a
+simulated distribution puts a lump of games exactly on each bound; counting
+the bounds as inside would score a well-calibrated model near 90%. Each actual
+result is therefore scored by its fractional percentile rank (where it falls
+between P(below it) and P(at or below it) in the simulation, the share of that
+span lying between the 10th and 90th percentile), which scores a calibrated
+model at 80% for whole and continuous results alike. The literal inclusive
+count is reported beside it. (Chosen 2026-10-10, before any result was read,
+after the review found the inclusive count biased.)
+
+Round trip passes when every solvable case returns the chance within
+round_trip_points and no more than 1% of the searches find no workload.
+
+The held-out command writes its mark before it reads anything, keeps every
+case and priced line (props/calc/heldout/, committed) so a separate agent can
+re-derive the write-up without a second read, and also runs the game-story
+test (league-wide team carries and pass attempts by result group, 2018-23
+against 2024-25, within game_story_points), which could not run later.
+
 Outputs go to props/calc/.cache/harness/ (gitignored); results are written
 up in the design note by hand.
 """
@@ -36,12 +56,13 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from . import calc, player, settings
+from . import calc, data, player, settings
 from .card import half_up
 from .checks import DataError, require
 
 OUT = Path(__file__).resolve().parent / ".cache" / "harness"
-HELDOUT_MARK = Path(__file__).resolve().parent / "heldout_read.json"     # committed: the read happens once
+HELDOUT_DIR = Path(__file__).resolve().parent / "heldout"
+HELDOUT_MARK = HELDOUT_DIR / "heldout_read.json"     # committed: the read happens once
 TUNE_SEASONS = tuple(range(2018, 2024))
 HELDOUT_SEASONS = (2024, 2025)
 
@@ -70,26 +91,29 @@ def _seasons(text: str) -> tuple:
 
 # ------------------------------------------------------------------ who is tested
 
-def tested(b: player.Bundle, season: int, week: int, min_games: int) -> list[tuple]:
-    """(gsis_id, team, market) for every tested player in one week."""
+def tested(b, season: int, week: int, min_games: int, top_n: int = 3) -> list[tuple]:
+    """(gsis_id, team, market) for every tested player in one week. Each role
+    is picked first (the lead back: the team's carry leader among its running
+    backs, by roster position as of the week; the top `top_n` by targets; the
+    completion leader), from the team's games that season before the week;
+    then the chosen player must have `min_games` of those games and play this
+    week, or the role is not tested (never filled by the next player)."""
     g = b.games[(b.games["season"] == season)]
     before, now = g[g["week"] < week], g[g["week"] == week]
     out = []
     for team, tg in before.groupby("team"):
         played = tg.groupby("gsis_id")["game_id"].nunique()
-        ok = set(played[played >= min_games].index)
         now_t = set(now.loc[now["team"] == team, "gsis_id"])
-        sums = tg.groupby("gsis_id")[["carries", "targets", "completions"]].sum()
-        sums = sums[sums.index.isin(ok)].sort_index()          # a tie goes to the smaller id
-        if sums.empty:
-            continue
-        lead = sums["carries"].idxmax() if sums["carries"].max() > 0 else None
-        top3 = list(sums[sums["targets"] > 0].sort_values("targets", ascending=False, kind="stable").index[:3])
-        qb = sums["completions"].idxmax() if sums["completions"].max() > 0 else None
-        for gid, markets in ((lead, ("rush_yds",)), (qb, ("pass_yds",))):
-            if gid is not None and gid in now_t:
-                out += [(gid, team, m) for m in markets]
-        out += [(gid, team, m) for gid in top3 if gid in now_t for m in ("receptions", "rec_yds")]
+        ok = lambda gid: played.get(gid, 0) >= min_games and gid in now_t      # noqa: E731
+        sums = tg.groupby("gsis_id")[["carries", "targets", "completions"]].sum().sort_index()
+        is_rb = np.array([b.position_at(gid, season, week) == "RB" for gid in sums.index], dtype=bool)
+        backs = sums[(sums["carries"].to_numpy() > 0) & is_rb]
+        if len(backs) and ok(backs["carries"].idxmax()):
+            out.append((backs["carries"].idxmax(), team, "rush_yds"))
+        top = sums[sums["targets"] > 0].sort_values("targets", ascending=False, kind="stable").index[:top_n]
+        out += [(gid, team, m) for gid in top if ok(gid) for m in ("receptions", "rec_yds")]
+        if sums["completions"].max() > 0 and ok(sums["completions"].idxmax()):
+            out.append((sums["completions"].idxmax(), team, "pass_yds"))
     return out
 
 
@@ -102,7 +126,8 @@ def extract(seasons: tuple, fixed: dict, tuned: dict) -> pd.DataFrame:
     for season in seasons:
         weeks = sorted(b.games.loc[b.games["season"] == season, "week"].unique())
         for week in weeks:
-            for gsis, team, market in tested(b, season, int(week), int(fixed["tested_min_prior_games"])):
+            for gsis, team, market in tested(b, season, int(week), int(fixed["tested_min_prior_games"]),
+                                             int(fixed["top_targets"])):
                 pl = player.build(b, gsis, gsis, team, season, int(week), tuned, fixed, market)
                 if market in pl.not_enough:
                     skipped[market] = skipped.get(market, 0) + 1
@@ -132,6 +157,11 @@ def extract(seasons: tuple, fixed: dict, tuned: dict) -> pd.DataFrame:
             print(f"  {season} week {week}: {len(rows)} cases so far", file=sys.stderr, flush=True)
     resid = {s: b.pools(s, int(fixed["pool_seasons"]))["rb_residuals"] for s in seasons}
     df = pd.DataFrame(rows)
+    if "pools" in df:                          # each pool array sorted once (the pricer reads them sorted)
+        done: dict = {}
+        df["pools"] = [v if not isinstance(v, tuple)
+                       else tuple(done.setdefault(id(a), np.sort(np.asarray(a, dtype=float))) for a in v)
+                       for v in df["pools"]]
     df.attrs.update(skipped=skipped, resid=resid)
     return df
 
@@ -157,6 +187,9 @@ def catch_rate(r, k: dict) -> float:
     return (own_sum + k["k_catch"] * r["base"]) / (r["n"] + k["k_catch"])
 
 
+_DRAWS: dict = {}
+
+
 class Pricer:
     """Simulated results at a FIXED workload n (the conversion test), with the
     calculator's own draws. Rushing uses calc.Model directly; the per-play
@@ -167,10 +200,15 @@ class Pricer:
         self.fixed, self.k = fixed, k
         sims, seed = int(fixed["sims"]), int(fixed["seed"])
         lim = calc.Limits.from_fixed(fixed)
-        self.draws = {kind: calc.make_draws(kind, k[R_KEY[kind]], sims, seed, lim, yards=kind != "carries")
-                      for kind in R_KEY}
-        self.rush = {s: calc.Model("rush_yds", "carries", self.draws["carries"], 4.0, res, k["day_sd"])
-                     for s, res in df.attrs["resid"].items()}
+        key = tuple(k[R_KEY[kind]] for kind in R_KEY) + (id(df),)
+        if key not in _DRAWS:                  # built once per set of r values (and case table), not per call
+            draws = {kind: calc.make_draws(kind, k[R_KEY[kind]], sims, seed, lim, yards=kind != "carries")
+                     for kind in R_KEY}
+            rush = {s: calc.Model("rush_yds", "carries", draws["carries"], 4.0, res, k["day_sd"])
+                    for s, res in df.attrs["resid"].items()}
+            _DRAWS.clear()
+            _DRAWS[key] = (draws, rush)
+        self.draws, self.rush = _DRAWS[key]
 
     def outcomes(self, r, market: str, rate: float) -> np.ndarray:
         n = int(r["actual_work"])
@@ -183,8 +221,12 @@ class Pricer:
             return (d.u_play[:, :n] < rate).sum(axis=1).astype(float)
         catch = catch_rate(r, self.k) if market == "rec_yds" else 1.0
         mix = np.asarray(r["mix"], dtype=float)
-        pools = [np.sort(np.asarray(p, dtype=float)) for p in r["pools"]]
+        pools = r["pools"]                     # sorted once at extract
         mean_mix = float(sum(w * p.mean() for w, p in zip(mix, pools) if w > 0))
+        require(0 < catch <= 1 and abs(mix.sum() - 1) < 1e-9 and mix.min() >= 0 and mean_mix > 0,
+                f"bad pricing inputs for {market} {r['gsis_id']}: catch {catch}, mix {tuple(mix)}, "
+                f"average catch {mean_mix}")
+        require(rate > 0, f"a rate of {rate} for {market} {r['gsis_id']}")
         bucket = np.searchsorted(np.cumsum(mix)[:-1], d.u_depth[:, :n], side="right")
         y0 = np.zeros((len(bucket), n))
         for j, p in enumerate(pools):
@@ -223,6 +265,20 @@ def _share(out: np.ndarray, line: float) -> float | None:
     return None if po + pu == 0 else po / (po + pu)
 
 
+def coverage(sim: np.ndarray, actual: float, fixed: dict) -> tuple:
+    """(fractional, inclusive) inside-the-80%-range scores for one actual
+    result against simulated results (see the module docstring)."""
+    lo_p, hi_p = fixed["range_low_pct"] / 100, fixed["range_high_pct"] / 100
+    below, at_or_below = float(np.mean(sim < actual)), float(np.mean(sim <= actual))
+    width = at_or_below - below
+    if width > 0:
+        frac = max(0.0, min(at_or_below, hi_p) - max(below, lo_p)) / width
+    else:
+        frac = float(lo_p <= below <= hi_p)
+    lo, hi = _quantiles(sim, fixed)
+    return frac, float(lo <= actual <= hi)
+
+
 def _quantiles(x: np.ndarray, fixed: dict) -> tuple:
     lo = np.quantile(x, fixed["range_low_pct"] / 100, method="inverted_cdf")
     hi = np.quantile(x, fixed["range_high_pct"] / 100, method="inverted_cdf")
@@ -231,29 +287,42 @@ def _quantiles(x: np.ndarray, fixed: dict) -> tuple:
 
 # ------------------------------------------------------------------ the tests
 
-def conversion(df: pd.DataFrame, market: str, fixed: dict, k: dict, verify_every: int = 50) -> dict:
+def conversion(df: pd.DataFrame, market: str, fixed: dict, k: dict, verify_every: int = 50,
+               keep_rows: bool = False) -> dict:
     """Actual workload plugged in; Overs at 0.8x/1.0x/1.2x of workload x
-    blended rate (to the nearest half). Returns the per-line stated chances and
-    outcomes, the band table, the 80% range coverage and the log loss."""
+    blended rate (to the nearest half). Returns the band table, the 80% range
+    coverage (fractional, and the literal inclusive count), the log loss, and
+    every line it left out, by reason."""
     pr = Pricer(df, fixed, k)
-    d = df[(df["market"] == market) & (df["actual_work"] > 0)]
-    p_all, y_all, inside = [], [], []
-    for i, (_, r) in enumerate(d.iterrows()):
+    d = df[df["market"] == market]
+    left = {"no workload": int((d["actual_work"] <= 0).sum()), "line of 0": 0, "push": 0, "no decided game": 0}
+    d = d[d["actual_work"] > 0]
+    p_all, y_all, frac, incl, rows = [], [], [], [], []
+    for i, (idx, r) in enumerate(d.iterrows()):
         rate = blended(r, market, k)
         if i % verify_every == 0:
             pr.verify(r, market)
         out = pr.outcomes(r, market, rate)
-        lo, hi = _quantiles(out, fixed)
-        inside.append(lo <= r["actual_stat"] <= hi)
+        f, inc = coverage(out, r["actual_stat"], fixed)
+        frac.append(f)
+        incl.append(inc)
         for sc in fixed["conversion_line_scales"]:
             line = half_up(sc * r["actual_work"] * rate, "0.5")
-            if line <= 0 or r["actual_stat"] == line:
-                continue                       # a line of 0, or a push (void)
+            if line <= 0:
+                left["line of 0"] += 1
+                continue
+            if r["actual_stat"] == line:
+                left["push"] += 1              # void, as Sleeper treats it
+                continue
             p = _share(out, line)
             if p is None:
+                left["no decided game"] += 1
                 continue
             p_all.append(p)
             y_all.append(float(r["actual_stat"] > line))
+            if keep_rows:
+                rows.append({"case": int(idx), "scale": sc, "line": line, "rate": rate, "stated": p,
+                             "over": y_all[-1], "in_range": f})
     p, y = np.asarray(p_all), np.asarray(y_all)
     bands = []
     for lo_, hi_ in BANDS:
@@ -263,39 +332,47 @@ def conversion(df: pd.DataFrame, market: str, fixed: dict, k: dict, verify_every
                       "stated": float(p[m].mean()) if n else None, "actual": float(y[m].mean()) if n else None})
     pc = np.clip(p, CLIP, 1 - CLIP)
     ll = float(-np.mean(y * np.log(pc) + (1 - y) * np.log(1 - pc))) if len(p) else None
-    cov = float(np.mean(inside)) if inside else None
+    cov = float(np.mean(frac)) if frac else None
     band_ok = all(b["games"] >= fixed["pass_band_min_games"]
                   and abs(b["stated"] - b["actual"]) * 100 <= fixed["pass_band_points"] for b in bands)
     range_ok = cov is not None and fixed["pass_range_low"] <= cov * 100 <= fixed["pass_range_high"]
-    untested = [b["band"] for b in bands if b["games"] < fixed["pass_band_min_games"]]
-    return {"cases": int(len(d)), "priced_lines": int(len(p)), "bands": bands, "range_coverage": cov,
-            "log_loss": ll, "pass_bands": band_ok, "pass_range": range_ok, "untested_bands": untested,
-            "pass": band_ok and range_ok}
+    out = {"cases": int(len(d)), "priced_lines": int(len(p)), "left_out": left, "bands": bands,
+           "range_coverage": cov, "range_coverage_inclusive": float(np.mean(incl)) if incl else None,
+           "log_loss": ll, "pass_bands": band_ok, "pass_range": range_ok,
+           "untested_bands": [b["band"] for b in bands if b["games"] < fixed["pass_band_min_games"]],
+           "pass": band_ok and range_ok}
+    if keep_rows:
+        out["rows"] = rows
+    return out
 
 
 def spread(df: pd.DataFrame, market: str, fixed: dict, r_value: float) -> dict:
     """W = his trailing 4-game average: does the 80% workload range hold
-    77-83% of actual workloads? Counts are the calculator's own (calc.counts)."""
+    77-83% of actual workloads? Counts are the calculator's own (calc.counts);
+    scored like the conversion range (fractional; inclusive beside it)."""
     kind = KIND[market]
     lim = calc.Limits.from_fixed(fixed)
     draws = calc.make_draws(kind, r_value, int(fixed["sims"]), int(fixed["seed"]), lim)
     d = df[(df["market"] == market) & df["usual"].notna()]
     cache: dict = {}
-    inside = []
+    frac, incl = [], []
     for w, a in zip(d["usual"], d["actual_work"]):
         if w not in cache:
-            cache[w] = _quantiles(calc.counts(draws, float(w), lim.max_count[kind]), fixed)
-        lo, hi = cache[w]
-        inside.append(lo <= a <= hi)
-    cov = float(np.mean(inside)) if inside else None
+            cache[w] = calc.counts(draws, float(w), lim.max_count[kind])
+        f, inc = coverage(cache[w], a, fixed)
+        frac.append(f)
+        incl.append(inc)
+    cov = float(np.mean(frac)) if frac else None
     ok = cov is not None and fixed["pass_range_low"] <= cov * 100 <= fixed["pass_range_high"]
-    return {"cases": int(len(d)), "coverage": cov, "pass": ok}
+    return {"cases": int(len(d)), "no_average": int(((df["market"] == market) & df["usual"].isna()).sum()),
+            "coverage": cov, "coverage_inclusive": float(np.mean(incl)) if incl else None, "pass": ok}
 
 
 def round_trip(df: pd.DataFrame, market: str, fixed: dict, k: dict, every: int = 10) -> dict:
     """Every `every`-th case: the workload solved for a no-vig chance p (0.45,
     0.50, 0.55; line = his trailing-4 average x blended rate, to the half), fed
-    back, must return p within round_trip_points."""
+    back, must return p within round_trip_points; no more than 1% of the
+    searches may find no workload."""
     pr = Pricer(df, fixed, k)
     d = df[(df["market"] == market) & df["usual"].notna()].iloc[::every]
     errs, unsolved = [], 0
@@ -312,9 +389,40 @@ def round_trip(df: pd.DataFrame, market: str, fixed: dict, k: dict, every: int =
             errs.append(abs(calc.over_share(m, line, s.value) - p))
     e = np.asarray(errs)
     worst = float(e.max()) if len(e) else None
-    ok = worst is not None and worst * 100 <= fixed["round_trip_points"]
+    searched = len(e) + unsolved
+    ok = (worst is not None and worst * 100 <= fixed["round_trip_points"]
+          and unsolved <= 0.01 * searched)
     return {"checked": int(len(e)), "unsolved": unsolved, "worst_points": None if worst is None else worst * 100,
             "pass": ok}
+
+
+def game_story(seasons_a: tuple, seasons_b: tuple, fixed: dict) -> dict:
+    """League-wide team carries and team pass attempts per game in each result
+    group (won by M+, within M-1, lost by M+; M = result_margin): seasons_a
+    against seasons_b, each within game_story_points."""
+    sched = data.schedule(game_type=fixed["season_type"])
+    margin = int(fixed["result_margin"])
+
+    def averages(seasons):
+        rows = []
+        for season in seasons:
+            p = data.pbp(season, season_type=fixed["season_type"])
+            c = data.carries(p).groupby(["game_id", "posteam"]).size().rename("carries")
+            att = p[data._flag(p["pass_attempt"]) & ~data._flag(p["sack"]) & ~data._flag(p["two_point_attempt"])]
+            a = att.groupby(["game_id", "posteam"]).size().rename("attempts")
+            rows.append(pd.concat([c, a], axis=1).fillna(0).reset_index())
+        t = pd.concat(rows, ignore_index=True).merge(
+            sched[["game_id", "home_team", "home_score", "away_score"]], on="game_id", how="inner")
+        m = np.where(t["posteam"] == t["home_team"], 1, -1) * (t["home_score"] - t["away_score"])
+        t["group"] = np.where(m >= margin, f"won by {margin}+",
+                              np.where(m <= -margin, f"lost by {margin}+", f"within {margin - 1}"))
+        return t.groupby("group")[["carries", "attempts"]].mean()
+
+    a, b_ = averages(seasons_a), averages(seasons_b)
+    diff = (a - b_).abs()
+    ok = bool((diff <= fixed["game_story_points"]).all().all())
+    return {"seasons_a": list(seasons_a), "seasons_b": list(seasons_b), "a": a.round(2).to_dict(),
+            "b": b_.round(2).to_dict(), "worst_difference": float(diff.max().max()), "pass": ok}
 
 
 # ------------------------------------------------------------------ tuning
@@ -405,10 +513,28 @@ def main(argv=None) -> int:
     if a.cmd == "heldout":
         if HELDOUT_MARK.exists():
             raise SystemExit(f"the held-out seasons were already read ({HELDOUT_MARK}); they are read once")
+        HELDOUT_DIR.mkdir(parents=True, exist_ok=True)
+        started = dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds")
+        # the mark goes down BEFORE anything is read: a crash still counts as the read
+        HELDOUT_MARK.write_text(json.dumps({"started_at_utc": started, "status": "started",
+                                            "seasons": list(HELDOUT_SEASONS), "settings": tuned}, indent=1),
+                                encoding="utf-8")
         df = extract(HELDOUT_SEASONS, fixed, tuned)
-        res = run_tests(df, fixed, tuned)
-        rec = {"read_at_utc": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
-               "seasons": list(HELDOUT_SEASONS), "settings": tuned, "cases": int(len(df)),
+        with open(OUT / "cases_heldout.pkl", "wb") as fh:
+            pickle.dump(df, fh)
+        res, lines_ = {}, []
+        for market in ("rush_yds", "receptions", "rec_yds", "pass_yds"):
+            conv = conversion(df, market, fixed, tuned, keep_rows=True)
+            lines_ += [{**row, "market": market} for row in conv.pop("rows")]
+            res[market] = {"conversion": conv, "spread": spread(df, market, fixed, tuned[R_KEY[KIND[market]]]),
+                           "round_trip": round_trip(df, market, fixed, tuned)}
+            res[market]["pass"] = all(v["pass"] for v in res[market].values())
+        res["game_story"] = game_story(TUNE_SEASONS, HELDOUT_SEASONS, fixed)
+        cols = [c for c in df.columns if c not in ("pools", "mix")]
+        df[cols].to_csv(HELDOUT_DIR / "cases_2024_2025.csv.gz", index_label="case")
+        pd.DataFrame(lines_).to_csv(HELDOUT_DIR / "lines_2024_2025.csv.gz", index=False)
+        rec = {"started_at_utc": started, "finished_at_utc": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
+               "status": "read", "seasons": list(HELDOUT_SEASONS), "settings": tuned, "cases": int(len(df)),
                "not_enough": df.attrs["skipped"], "results": res}
         HELDOUT_MARK.write_text(json.dumps(rec, indent=1, default=str), encoding="utf-8")
         print(json.dumps(rec, indent=1, default=str))
