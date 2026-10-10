@@ -1,6 +1,6 @@
 {
   "algorithm": "props-engine-sha256-lf-1",
-  "engine_sha256": "6a586cdb83ee8b8b9b070d0a41d571aeb5488b6e2333c072922a786d5d0e467e",
+  "engine_sha256": "f2f91801e5ba275fa728fa94370abb94aadf40e2292a28e7165f8f9815afe1a1",
   "file_count": 64,
   "files": {
     "SKILL.md": "8b69e0c72108a33ddfafb105a0fdd07ed46a10d5bf40d14f7cc46d8d73e9fbdd",
@@ -13,7 +13,7 @@
     "resources/line_archive.md": "326f59694d55005989077aeb6bcf37ac56fb6884ad10e5cb959489040b1387b1",
     "resources/margin_buckets_v0.json": "2ce2929f635fd127b7abf6d265284d47e1aa3c779a4e0dc5f17d3af445bdd4ca",
     "resources/margin_settings.json": "4efc8e6c05052ed556992573fe40c7e1a0c728105abccc1db85dc50a5c8cf7ac",
-    "resources/methodology.md": "bd68847517f4bd4a990ab0ac65ba3bf727ed88ff84a94b5c5e0976f7a3d0ddf5",
+    "resources/methodology.md": "d93241b2b3c4ae7def16d3089cc979a95e75f3e0f30a52b9d8879c3874b2d16e",
     "resources/model_registry.md": "7293eb37729954f2d861e75569f72643da9c68aad9e6c1690c1acbec637e6acb",
     "resources/modeling_framework.md": "51568adb4e4f69442a98190b3909c0e3c0c4042f5348289bb8799dab541ed2e7",
     "resources/power_play.json": "5b0bfe7ba11c4937aa6eaa3903e20d5909999b0e4facde68ead52bac85851af1",
@@ -54,9 +54,9 @@
     "scripts/publish.py": "68bd8321c5876cf84eaf006a3603777c8ad6377166fc525759ac6e1fbbc9b7a7",
     "scripts/publish_pdf.py": "a4514ccbcc0254373c32e35bf3cd05ed97461347608ec43dff965697ea56bdb4",
     "scripts/publish_render.py": "613c10403a13207d64e279401e781b6b12abde3e58d2b80db87b5303e26127c0",
-    "scripts/research.py": "2cfe1ac1c578bf437debb16438801de1e2b798fd46a2e82fabfdbf59bacfabd2",
+    "scripts/research.py": "ff73b810f933024ab03fffc0a12d5e4a1d49589c34f50274534ab29614d27eae",
     "scripts/scenario.py": "a62be45470715d9abdb1473d5ffa2653e6ac6f9d0b1e9c4fb5884de22270c81b",
-    "scripts/score_game.py": "cdf731a1c303efde08c55ed9ed47f12e56d405fd6d149b35e69a8466a874e427",
+    "scripts/score_game.py": "e5936cd2d69cb2baa73570472d8daf0b853cfeae7f9b8266d40c01839e163581",
     "scripts/score_week.py": "e8d3d892a42d19461681dbda095ac8ad0540aee9fe38de51aef4acaed9003389",
     "scripts/td_alloc.py": "7c407c949cac8f0f74d7f91589fd5d749f65d9053eb1c3f5f0dc63a700b3465b",
     "scripts/td_alloc_backtest.py": "e259d9f0e301a5d5d34e5a9e84bba222810f077d9c05a1f1f799a611914595a4",
@@ -68,5 +68,5 @@
     "scripts/td_model.py": "7c1635bbf515b4316f14771b177363a9f82a1ba7ad3393e479cd2dce26a25724",
     "scripts/td_v1.py": "bb4ef62e525c948889ef4e45f6c41564dcc7bed2a97b3d4def0792848f12c485"
   },
-  "tag": "props-v1.63"
+  "tag": "props-v1.64"
 }

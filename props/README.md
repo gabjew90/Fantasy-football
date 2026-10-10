@@ -40,7 +40,9 @@ props/
   journal.py         the bet journal: the user's own bets, graded by the Tuesday settle
   engine_version.py  engine_hash / price_hash, the lock, the price map
   persist.py         append-and-dedupe record writer, three declared modes
-  journal/           the bet journal (committed): <season>.jsonl
+  journal/           the bet journal (committed): <season>.jsonl; a bet on catches, receiving or rushing yards
+                     may carry the user's volume view (view_low/likely/high) beside the workload the line
+                     assumes (line_volume) and, once graded, the actual (actual_volume), DECISIONS #226
   record/            the historical record (committed)
     predictions/<season>/wk<NN>.jsonl
     lines/<season>/line_archive_<season>.jsonl
@@ -75,7 +77,7 @@ can be re-derived later, not just scored:
 | `engine_hash`, `engine_tag` | the build of `engine/` that made the call |
 | `price_hash` | the part of that build that can change a price (since 2026-09-25) |
 | `model_state` | the engine's own per-market label (`receiving_hier_v1`, …); it is hand-written and has been wrong, so it is not a version |
-| `snapshot_type` | `decision`, `open` or `close` |
+| `snapshot_type` | `decision`, `open` or `close`. A line-archive quote carries the capture's real type, judged per quote against the close window, since 2026-10-09 (DECISIONS #226; before it every quote said `decision`, and an opening quote at the same line was replaced by the later one) |
 | `logged_at_utc`, `last_update` | when the call was made and when the book last moved |
 | `commence_time`, `minutes_to_kickoff` | when the game starts, and how far out the call was made |
 | `gsis_id`, `sleeper_id`, `join_how` | who the call is about, by ID (nflverse and Sleeper), and how the engine matched the book's line to its player (`gsis` or `name`); since 2026-10-09, empty before. Line-archive quotes carry `gsis_id` and `sleeper_id` too |

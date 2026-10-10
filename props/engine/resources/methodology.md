@@ -110,8 +110,8 @@ Two readings matter more than the signs.
 | QB passing implied-points power / level | 0.2 / 1.04 | width_params.json pass_implied_exp / pass_scale (round 38, DECISIONS #199) |
 | Carry-share room for unpriced players | 0.12, half the gap closed | width_params.json rush_other_share / rush_norm_strength (round 15) |
 | Team targets / carries dispersion r | 33.7 / 28.5 | team_volume_dispersion |
-| Receptions dispersion log r = a + b log mu | 2.007, 0.830 | receptions_dispersion |
-| Carries dispersion | -0.652, 1.416 | carries_dispersion |
+| Receptions dispersion log r = a + b log mu | 2.007, 0.830 | receptions_dispersion (backtest's legacy draw only; the live sampler does not read it) |
+| Carries dispersion | -0.652, 1.416 | carries_dispersion (fitted, read by nothing; the width comes from the team draw and share concentration) |
 | Per-catch Gamma shape (league) | 1.065 | shape_ypc_per_catch |
 | League pass rate / plays per game | 0.540 / 56.8 | params |
 | League TD per point | 0.1055 | league_td_per_point |

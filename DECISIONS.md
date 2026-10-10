@@ -8596,3 +8596,37 @@ every row while the predictions rows carry open / decision / close (line_archive
   simulation tops a lead back out near 19 carries (the share rescale), a width-round item.
 - **Prices do not change.** The Power Play searches and the grid run only where someone reads the cards: a scheduled capture (--no-scenarios) skips both and keeps its old cost. Code review: 7 findings, all fixed (four documents still promised the dropped close-call mark; a relative view could read another book's line; a grid failure could cost the report; the scenario's Under counted pushes).
   The customer PDF keeps the user's guide layout (#222) until the user decides whether it changes.
+
+## 2026-10-09 (226) -- step 1 of the measurement list: your volume reads graded against the line's; archived quotes keep their real snapshot type; averages say so
+
+- **Your volume view in the journal (expert list item 7):** the market-first method (#225) pays only
+  if the user's read of a player's workload beats the line's. A bet on catches, receiving yards or
+  rushing yards can now carry the view (`--view "+2/+4/+6" --line-assumes 15.3`, or a leg's
+  `view=` / `assumes=`), resolved to low / likely / high in targets or carries; the Tuesday grade
+  records the actual volume, and the scorecard adds "Your volume reads against the line": whose
+  number landed nearer, the average miss of each, whether the view pointed the right way (the actual
+  landing ON the line is not the right way), and how often the actual fell inside the range. A few
+  dozen reads say little; it is the measure that matters, not a verdict yet.
+- **Archived quotes keep the capture's real type (item 8; code bug, found while building it):** the
+  scorer stamped `decision` on every archived quote, the record reader only filled a missing type,
+  and the archive key carries the type and the line but not the time -- so a Thursday open quote at
+  the same line as Sunday's was REPLACED by it, and opens and closes could not be told apart. The
+  record reader now owns the type: the capture's own, judged per quote -- the guard calls a whole
+  run 'close' when only its soonest kickoff is inside the hour, so a quote whose own kickoff is
+  further out than the guard's close window is a 'decision' (from the quote's kickoff and retrieval
+  time). It works with any pinned engine; the scorer is unchanged. Code review moved it here from a
+  first version that also stamped the type in the scorer: two owners, and the run-level 'close'
+  landing on later games. Prediction rows keep the run-level label (calls.last_per already handles
+  it); moving them to per-row is the listed follow-up. Quotes archived before
+  this stay as they are: the replaced opens are not recoverable.
+- **Averages say "average" (item 2's labelling half):** the engine's volume is a mean shown beside a
+  median forecast, and line / mean volume is the rate at which the AVERAGE game reaches the line --
+  less than a 50% Over for yards, which big games pull up. The rows now read "Engine's volume
+  (average)", "Engine's forecast: middle game", "At the engine's average volume, an average game
+  needs", and the gauge sentences "an average game of 90 yards takes about ... carries;
+  we project ... on average". The chances beside them were already right; only the words change.
+- **The methods line printed dispersion fits nothing reads (item 14):** the per-player receptions and
+  carries dispersion formulas in the report's model notes are not used by the live sampler (team
+  draws split by share concentration replaced them; the receptions fit survives only in the
+  backtest's legacy draw). The line now prints the team volume r and the share concentrations the
+  sampler does read; methodology.md marks both fits.

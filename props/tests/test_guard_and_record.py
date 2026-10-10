@@ -546,3 +546,48 @@ def test_joint_prices_go_to_their_own_record_stream(tmp_path, monkeypatch):
     assert out["after"] == 1 and (tmp_path / "record" / "joint" / "2026" / "wk02.jsonl").exists()
     assert not (tmp_path / "record" / "predictions").exists()
     assert persist.write_joint(2026, 2, rows)["after"] == 1          # a re-run replaces, not duplicates
+
+
+def _record(tmp_path, monkeypatch, snapshot, outdir):
+    import record_run
+    engine = tmp_path / "engine"
+    if not engine.exists():
+        (engine / "scripts").mkdir(parents=True)
+        (engine / "SKILL.md").write_bytes(b"---\nname: x\n---\n")
+        (engine / "scripts/model.py").write_bytes(b"x = 1\n")
+    monkeypatch.setattr(persist, "RECORD_ROOT", tmp_path / "record")
+    monkeypatch.setattr(sys, "argv", ["record_run.py", "--dir", str(outdir), "--snapshot-type", snapshot,
+                                      "--engine-dir", str(engine)])
+    assert record_run.main() == 0
+    return [json.loads(x) for x in (tmp_path / "record" / "lines/2026/line_archive_2026.jsonl")
+            .open(encoding="utf-8") if x.strip()]
+
+
+def test_an_archived_quote_carries_the_capture_type_and_an_open_survives_the_decision(tmp_path, monkeypatch):
+    """DECISIONS #226: the scorer stamps every archived quote 'decision', and the archive key carries the
+    type but not the time, so Sunday's quote at the same line replaced Thursday's open. The run's type
+    wins."""
+    first = _scorer_dir(tmp_path)
+    rows = _record(tmp_path, monkeypatch, "open", first)
+    assert [r["snapshot_type"] for r in rows] == ["open"]
+    second = tmp_path / "out2"
+    second.mkdir()
+    (second / "line_archive_nfl_2026.jsonl").write_text(
+        (first / "line_archive_nfl_2026.jsonl").read_text(encoding="utf-8"), encoding="utf-8")
+    rows = _record(tmp_path, monkeypatch, "decision", second)
+    assert sorted(r["snapshot_type"] for r in rows) == ["decision", "open"], "the open quote survives"
+
+
+def test_a_close_run_labels_only_the_games_inside_the_close_window():
+    """The guard calls a whole run 'close' when its soonest kickoff is inside the window; a 12:15 ET run
+    must not call the 16:25 game's quotes 'close' (DECISIONS #226)."""
+    import record_run
+    at = "2026-09-20T16:15:00Z"
+    soon = {"commence_time": "2026-09-20T17:00:00+00:00", "retrieved_at_utc": at}
+    late = {"commence_time": "2026-09-20T20:25:00+00:00", "retrieved_at_utc": at}
+    assert record_run.quote_snapshot_type("close", soon) == "close"
+    assert record_run.quote_snapshot_type("close", late) == "decision"
+    assert record_run.quote_snapshot_type("close", {"commence_time": soon["commence_time"]}) == "close", \
+        "without a retrieval time the run's type stands"
+    assert record_run.quote_snapshot_type("open", late) == "open"
+    assert record_run.quote_snapshot_type("decision", soon) == "decision"

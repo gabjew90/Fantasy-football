@@ -33,6 +33,7 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import json
+import math
 import os
 import sys
 import uuid
@@ -137,11 +138,59 @@ def _check_rules(rules) -> None:
         raise ValueError(f"--assumption is not an --assume rule: {exc}") from None
 
 
+# the volume a market's line turns on: what a volume view is a view of (DECISIONS #226)
+VOLUME_UNIT = {"player_receptions": "targets", "player_reception_yds": "targets", "player_rush_yds": "carries"}
+
+
+def parse_view(view, line_assumes, unit: str | None) -> dict:
+    """The volume view behind a bet (DECISIONS #226): 'low/likely/high' or one number, in the market's
+    unit, either absolute ('16/19/22') or relative to the workload the line assumes ('+2/+4/+6', every
+    value signed). Returns {} without a view, else volume_unit, line_volume, view (as given) and
+    view_low / view_likely / view_high resolved. Raises ValueError with a plain reason."""
+    if view is None or not str(view).strip():
+        if line_assumes not in (None, ""):
+            raise ValueError("--line-assumes goes with --view: the workload the line assumes beside yours")
+        return {}
+    if unit is None:
+        raise ValueError("a volume view needs a volume market (catches, rec_yds, rush_yds)")
+    parts = [q.strip() for q in str(view).split("/")]
+    if len(parts) not in (1, 3) or any(not q for q in parts):
+        raise ValueError("--view is low/likely/high or one number, e.g. +2/+4/+6 or 19")
+    signed = [q.startswith(("+", "-")) for q in parts]
+    if any(signed) and not all(signed):
+        raise ValueError("a view relative to the line signs every value, e.g. +2/+4/+6")
+    try:
+        vals = [float(q) for q in parts]
+    except ValueError:
+        raise ValueError(f"--view '{view}' is not numbers") from None
+    # the read is graded against the line's workload, so a view without it could never be scored
+    if line_assumes in (None, ""):
+        raise ValueError("a volume view needs --line-assumes (the card's 'The line assumes'): the read is "
+                         "graded against it")
+    try:
+        base = float(line_assumes)
+    except (TypeError, ValueError):
+        raise ValueError(f"--line-assumes '{line_assumes}' is not a number") from None
+    if not all(math.isfinite(v) for v in vals + [base]):
+        raise ValueError("--view and --line-assumes are ordinary numbers")
+    if base <= 0:
+        raise ValueError("--line-assumes is a workload, above zero")
+    if all(signed):
+        vals = [base + v for v in vals]
+    if min(vals) < 0 or (len(vals) == 3 and not vals[0] <= vals[1] <= vals[2]):
+        raise ValueError("--view is low/likely/high, smallest first, none below zero")
+    lo, mid, hi = (vals * 3)[:3] if len(vals) == 1 else vals
+    return {"volume_unit": unit, "line_volume": base, "view": str(view).strip(),
+            "view_low": round(lo, 2), "view_likely": round(mid, 2), "view_high": round(hi, 2)}
+
+
 def make_entry(player: str, market: str, side: str, line, price: int, *, change: str, implies: str,
                fails: str, angle: str, team: str | None = None, book: str = "sleeper", stake: float = 1.0,
                season: int, week: int, now: dt.datetime | None = None, assumption=None,
-               over_board=None, over_scenario=None, pays_if: str | None = None) -> dict:
-    """One journal row, validated. Raises ValueError with a plain reason."""
+               over_board=None, over_scenario=None, pays_if: str | None = None,
+               view=None, line_assumes=None) -> dict:
+    """One journal row, validated. Raises ValueError with a plain reason. view / line_assumes: the volume
+    view behind the bet and the workload the line assumes (parse_view, DECISIONS #226)."""
     mk = MARKETS.get(" ".join(str(market).lower().replace("-", " ").split()), MARKETS.get(str(market).lower()))
     if mk is None:
         raise ValueError(f"unknown market '{market}' (catches, rec_yds, rush_yds, pass_yds, td)")
@@ -185,12 +234,13 @@ def make_entry(player: str, market: str, side: str, line, price: int, *, change:
     if assumption:
         scen = {"assumption": "; ".join(assumption), "p_board": side_p(ob), "p_scenario": side_p(osc),
                 "pays_if": (pays_if or "").strip() or None}
+    vol = parse_view(view, line_assumes, VOLUME_UNIT.get(mk))
     now = now or dt.datetime.now(dt.timezone.utc)
     return {"id": uuid.uuid4().hex[:10], "logged_at_utc": now.strftime("%Y-%m-%dT%H:%M:%SZ"),
             "season": int(season), "week": int(week), "player": player.strip(),
             "team": (team or "").upper() or None, "market": mk, "side": side_, "line": line, "price": price,
             "book": book, "stake": float(stake), "change": change.strip(), "implies": implies.strip(),
-            "fails": fails.strip(), "angle": angle_, "status": "open", **scen}
+            "fails": fails.strip(), "angle": angle_, "status": "open", **scen, **vol}
 
 
 def grade(season: int, stats=None, now: dt.datetime | None = None) -> dict:
@@ -235,6 +285,8 @@ def grade(season: int, stats=None, now: dt.datetime | None = None) -> dict:
                 counts["unjoined"] += 1
             continue
         actual = float(hit[settle.MARKET_STAT[r["market"]]])
+        if r.get("volume_unit") and r["volume_unit"] in hit and hit[r["volume_unit"]] == hit[r["volume_unit"]]:
+            r["actual_volume"] = float(hit[r["volume_unit"]])      # his real targets / carries, for the read's grade
         result, won = settle.settle_row({"market": r["market"], "side": r["side"], "line": r["line"]}, actual)
         pnl = settle.american_pnl(r["price"], won) * float(r.get("stake", 1.0))
         r.update(status="graded" if won is not None else "void", result=result, actual=actual, won=won,
@@ -361,9 +413,9 @@ def leg_price(stake: float, payout: float, n: int) -> int:
 def make_power_play(legs, *, stake: float, payout: float, angle: str, why: str, season: int, week: int,
                     after_kickoff: bool = False, now: dt.datetime | None = None) -> list[dict]:
     """One row per leg of a Power Play, sharing an entry id. legs: list of
-    (player, market, side, line, team[, angle]). Each leg is priced at the
-    entry's per-leg price so the scorecard can grade legs; the entry itself
-    wins only if every leg does."""
+    (player, market, side, line, team[, angle[, extras]]); extras {view, line_assumes} is the leg's
+    volume view (DECISIONS #226). Each leg is priced at the entry's per-leg price so the scorecard can
+    grade legs; the entry itself wins only if every leg does."""
     if not str(why or "").strip():
         raise ValueError("--why is required: the entry's reason in a sentence")
     if len(legs) < 2:
@@ -374,9 +426,11 @@ def make_power_play(legs, *, stake: float, payout: float, angle: str, why: str, 
     for leg in legs:
         player, market, side, line, team = (list(leg) + [None] * 5)[:5]
         leg_angle = (leg[5] if len(leg) > 5 and leg[5] else angle)
+        extra = (leg[6] if len(leg) > 6 and leg[6] else {})
         r = make_entry(player, market, side, line, price, change=why, implies="(entry leg)",
                        fails="any leg misses: the whole entry loses", angle=leg_angle, team=team,
-                       stake=1.0, season=season, week=week, now=now)     # a leg is one unit; the dollars are the entry's
+                       stake=1.0, season=season, week=week, now=now,     # a leg is one unit; the dollars are the entry's
+                       view=extra.get("view"), line_assumes=extra.get("line_assumes"))
         r.update(entry_id=eid, entry_legs=len(legs), entry_stake=float(stake), entry_payout=float(payout),
                  after_kickoff=bool(after_kickoff))
         rows.append(r)
@@ -477,6 +531,32 @@ def scenario_table(rows: list[dict]) -> list[str]:
     return out
 
 
+def volume_read_table(rows: list[dict]) -> list[str]:
+    """YOUR VOLUME READS AGAINST THE LINE (DECISIONS #225, #226): the method rests on the user's view of
+    the workload being better informed than the market's, and this is where that gets measured. Per
+    graded bet with a view, the line's assumed workload and the actual: whose number landed nearer,
+    and whether the view pointed the right way from the line."""
+    rs = [r for r in rows if r.get("view_likely") is not None and r.get("line_volume") is not None
+          and r.get("actual_volume") is not None]
+    if not rs:
+        return []
+    mine = [abs(r["actual_volume"] - r["view_likely"]) for r in rs]
+    line = [abs(r["actual_volume"] - r["line_volume"]) for r in rs]
+    closer = sum(1 for a, b in zip(mine, line) if a < b)
+    pointed = [r for r in rs if r["view_likely"] != r["line_volume"]]
+    # right way = the actual moved off the line in the view's direction; landing on the line is not right
+    right = sum(1 for r in pointed if (r["actual_volume"] - r["line_volume"]) * (r["view_likely"] - r["line_volume"]) > 0)
+    inside = sum(1 for r in rs if r["view_low"] <= r["actual_volume"] <= r["view_high"])
+    out = ["**Your volume reads against the line** (graded bets that logged a view; targets or carries):", "",
+           "| Reads | Yours nearer the actual | Your miss / the line's (average) | Pointed the right way from the line | "
+           "Actual inside your low-high |", "|---|---|---|---|---|",
+           f"| {len(rs)} | {closer} of {len(rs)} | {sum(mine) / len(rs):.1f} / {sum(line) / len(rs):.1f} | "
+           + (f"{right} of {len(pointed)}" if pointed else "—") + f" | {inside} of {len(rs)} |", "",
+           "The method pays only if your reads beat the line's: nearer the actual more often than not, and "
+           "pointing the right way. A few dozen reads say little; read it with the late-line column.", ""]
+    return out
+
+
 def angle_table(rows: list[dict]) -> list[str]:
     """The record split by the angle chosen at log time: which kind of story
     gets the better number, and which wins. Small samples per angle say even
@@ -539,6 +619,7 @@ def summary_md(season: int) -> list[str]:
         out.append("A few dozen bets say little; about 100 is where the win rate starts to separate from luck.")
         out.append("")
     out += angle_table(rows)
+    out += volume_read_table(rows)
     out += scenario_table(rows)
     out += entries_table(rows)
     out += ["| Week | Player | Bet | Angle | Price | Late line | Result | Net | The change | Your scenario |",
@@ -582,11 +663,17 @@ def main(argv: list[str] | None = None) -> int:
     a.add_argument("--over-board", default=None, help="the board's Over chance from the scenario table (e.g. 37%%)")
     a.add_argument("--over-scenario", default=None, help="your scenario's Over chance (e.g. 70%%)")
     a.add_argument("--pays-if", default=None, help="the break-even workload cell, as the board shows it")
+    a.add_argument("--view", default=None,
+                   help="your volume view: low/likely/high or one number, in targets or carries; signed values "
+                        "('+2/+4/+6') are relative to --line-assumes")
+    a.add_argument("--line-assumes", default=None, type=float,
+                   help="the card's 'The line assumes' workload for this line")
     pp = sub.add_parser("entry", help="log a Sleeper Power Play: all-or-nothing legs at the real payout")
     pp.add_argument("--stake", type=float, required=True, help="dollars staked on the entry")
     pp.add_argument("--payout", type=float, required=True, help="the TOTAL the entry pays if every leg hits")
     pp.add_argument("--leg", action="append", required=True,
-                    help="'Player|market|side|line|TEAM[|angle]' (line empty for an anytime TD), repeatable")
+                    help="'Player|market|side|line|TEAM[|angle][|view=+2/+4/+6][|assumes=15.3]' (line empty for an "
+                         "anytime TD), repeatable")
     pp.add_argument("--angle", required=True, choices=list(ANGLES), help="the entry's story (a leg can override)")
     pp.add_argument("--why", required=True, help="the entry's reason in a sentence")
     pp.add_argument("--after-kickoff", action="store_true", help="logged after a leg's game started")
@@ -615,6 +702,7 @@ def main(argv: list[str] | None = None) -> int:
             e = make_entry(args.player, args.market, args.side, line, args.price, change=args.change,
                            implies=args.implies, fails=args.fails, angle=args.angle, assumption=args.assumption,
                            over_board=args.over_board, over_scenario=args.over_scenario, pays_if=args.pays_if,
+                           view=args.view, line_assumes=args.line_assumes,
                            team=args.team, book=args.book,
                            stake=args.stake, season=season,
                            week=args.week or current_week(season))
@@ -631,12 +719,25 @@ def main(argv: list[str] | None = None) -> int:
         legs = []
         for spec in args.leg:
             parts = [x.strip() for x in spec.split("|")]
+            # the leg's volume view rides as key=value fields after the positional ones (DECISIONS #226)
+            extra = {}
+            while parts and "=" in parts[-1]:
+                k, _, v = parts.pop().partition("=")
+                k = {"view": "view", "assumes": "line_assumes"}.get(k.strip().lower())
+                if k is None or k in extra:
+                    print(f"not logged: leg '{spec}' -- the extra fields are view=... and assumes=..., once each",
+                          file=sys.stderr)
+                    return 2
+                extra[k] = v.strip()
+            if any("=" in x for x in parts):
+                print(f"not logged: leg '{spec}' -- view=... and assumes=... go last", file=sys.stderr)
+                return 2
             if len(parts) < 4 or parts[5:] and parts[5] not in ANGLES:
-                print(f"not logged: leg '{spec}' -- write it as 'Player|market|side|line[|TEAM[|angle]]'",
-                      file=sys.stderr)
+                print(f"not logged: leg '{spec}' -- write it as "
+                      "'Player|market|side|line[|TEAM[|angle]][|view=...][|assumes=...]'", file=sys.stderr)
                 return 2
             parts += [""] * (6 - len(parts))
-            legs.append((parts[0], parts[1], parts[2], parts[3] or None, parts[4] or None, parts[5] or None))
+            legs.append((parts[0], parts[1], parts[2], parts[3] or None, parts[4] or None, parts[5] or None, extra))
         try:
             rows_ = make_power_play(legs, stake=args.stake, payout=args.payout, angle=args.angle, why=args.why,
                                     season=season, week=args.week or current_week(season),
