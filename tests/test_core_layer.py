@@ -284,7 +284,19 @@ def test_which_failures_count_as_transient():
     import http.client
     assert F._transient(_http(502)) and F._transient(_http(503)) and F._transient(_http(429))
     assert not F._transient(_http(404)) and not F._transient(_http(403))
-    assert F._transient(ConnectionResetError()) and F._transient(TimeoutError())
+    import ssl
+    import urllib.error
+    assert F._transient(ConnectionResetError()) and F._transient(urllib.error.URLError(ConnectionRefusedError()))
     assert F._transient(http.client.IncompleteRead(b"x", 10)) and F._transient(F.TruncatedDownload("cut"))
     assert not F._transient(ValueError("a bug, not the network"))
+    # a hung server (timeout) or a failed TLS check fails at once: retrying costs time, never helps
+    assert not F._transient(TimeoutError()) and not F._transient(urllib.error.URLError(TimeoutError()))
+    assert not F._transient(urllib.error.URLError(ssl.SSLCertVerificationError("bad cert")))
+
+
+def test_a_bug_in_a_downloader_is_not_called_a_failed_download(tmp_path):
+    def broken(url, path, timeout):
+        raise TypeError("a bug")
+    with pytest.raises(TypeError, match="a bug"):
+        F.fetch("u", tmp_path / "x.csv", 600, downloader=broken)
 

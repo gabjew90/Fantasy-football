@@ -23,6 +23,7 @@ from __future__ import annotations
 import datetime as dt
 import http.client
 import os
+import ssl
 import time
 import urllib.error
 import urllib.request
@@ -81,11 +82,16 @@ class FetchError(OSError):
 
 def _transient(ex: BaseException) -> bool:
     """Worth another try: a server error (5xx), rate limiting (429), a dropped or refused
-    connection, a timeout or a cut-off body. Never a 404 or another client error."""
+    connection or a cut-off body. Never a 404 or another client error, a failed TLS check, or a
+    timeout -- a hung server would cost the whole timeout again on every try, and the scheduled
+    jobs (settle's 120 s downloads) must not triple their worst case."""
     if isinstance(ex, urllib.error.HTTPError):
         return ex.code >= 500 or ex.code == 429
-    return isinstance(ex, (urllib.error.URLError, ConnectionError, TimeoutError, http.client.HTTPException,
-                           TruncatedDownload))
+    if isinstance(ex, urllib.error.URLError):
+        ex = ex.reason if isinstance(ex.reason, BaseException) else ex
+    if isinstance(ex, (TimeoutError, ssl.SSLError)):
+        return False
+    return isinstance(ex, (urllib.error.URLError, ConnectionError, http.client.HTTPException, TruncatedDownload))
 
 
 def current_season(today: dt.date | None = None) -> int:
@@ -156,7 +162,10 @@ def fetch(url: str, dest: str | Path, max_age_s: float, *, name: str | None = No
         if not dest.exists():
             if manifest is not None:
                 manifest.record(name, source=url, status="failed", detail=f"{type(ex).__name__}: {ex}"[:200])
-            raise FetchError(name, url, ex) from ex
+            # a network failure is named as one; anything else (a bug) propagates as itself
+            if isinstance(ex, (OSError, http.client.HTTPException)):
+                raise FetchError(name, url, ex) from ex
+            raise
         if manifest is not None:
             manifest.record(name, source=url, status="stale", path=dest, fetched_at=_mtime(dest),
                             detail=f"refresh failed: {type(ex).__name__}")

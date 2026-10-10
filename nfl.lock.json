@@ -5,14 +5,14 @@
   "CHAT.md": "b69be5761c2aae76883329c7f33b592e6eb33be8b62abf5f54d8c0c9a2691e01",
   "config.yaml": "1a2af1bd5d6c7a464e908b50e94d910d2adba1675dede83876369aca7329c0c6",
   "core/__init__.py": "8ac9ed217e439f5828616ab66ec9ff17336c2cbbbeae391d0f9bfa001eaed571",
-  "core/fetch.py": "4d6e7ff66585229845dc1443ccacccd8ea53ebb6d6acb63753f65ccdad6c2bc1",
+  "core/fetch.py": "f7645d380c6a997b539eb28bda37400887c616d23360f71b013922541e2284fa",
   "core/ids.py": "754948692592ca92170266367c700b715d69f73c9d8fd3361eed408268ffff3d",
   "core/manifest.py": "dcdb9e164a30fbe102f7559661157c33f08c9dd6455aee6f185761260f921195",
   "core/probe.py": "b3ef1cd2f783157b4dcd75f93cacf4f00613fa4c787b921ee9e0fe452c74bdee",
   "core/props_ask.py": "a9a12487e73e59c5e917c49ab98a434a0fc9a5565f0b3d773c274389f8ff00f1",
   "core/registry.py": "436eb838e385881eb4b06c38d417525bcd9f9e62c7c23deba2c5187b781870cd",
   "core/scoring.py": "99cfb2cdb23b7441b85b92084688fdddc5b70d307f75942f82a50630685e71d3",
-  "core/status.py": "272a806dccbc19c3ef28e9347b995e4f011fee311ab79375abe7ea2836d3accd",
+  "core/status.py": "d82be354c9cf1e9e76eb40b78855ec28da5f092f848a6aec363d1bff6cb0d108",
   "data/external/availability.csv": "3e56bc4760ab853a816e3d6a3ab93560a4236addf1f99233699be2fd866623ba",
   "data/external/overrides.csv": "bb34af50b7a43d977d049235b564e848c39fa5012b6812cb7cab762dfbd8a2fe",
   "data/external/overrides.keefamania.csv": "05f532d02ea628de4a690d131a6d579e6126a44b4269d596dbc58f58a05fe4ee",
@@ -102,7 +102,7 @@
   "manager/yahoo_api.py": "1a0889f7bb74589829edad6c4c3ef082dd815475ad76982f0adf21eb1ccc44ed",
   "manager/yahoo_context.py": "fe92d74e22549756eccfd24148d6e37aa7ad57e67609fd86ad383cfbb1ee6013",
   "manager/yahoo_sync.py": "3ea0dba0ea5b03e561952cbdd2b40eba7b9a7c328691258915b7c29aadc54b90",
-  "nfl.py": "0a216072a49e59013d53f62c774c4062a832aabd044545159dd685be510991db",
+  "nfl.py": "9075f00b68165c3c5a4f3346f7613af175c5104f21dcee2416696b65097eb1e6",
   "props/calc/CLAUDE.md": "c88a7571d7b84011e9783294f930e95b4aa13d69b8de1daf3816aada962c65c4",
   "props/calc/__init__.py": "0c1b2c80861038afe4a50ff8cfeab2e6112899707de9e83e92e42e49fee31fa7",
   "props/calc/__main__.py": "9ad87d225a66ad575a3260833a01b194dbe24846f4f9d278030dfd7da00bec4c",
@@ -201,6 +201,6 @@
   "scripts/bootstrap.py": "d5e5c9a718adf11bd2e0adff4560c7cc757be3085a0a206ae32c487c1612a003",
   "scripts/release.py": "a75353d7b4e83d21e7e22600c5bb2856b05389966b8e7b1b2d25e62a4ed84bf7"
  },
- "sha256": "eea91e3eb7ae96734dd64c35606fb43f93bdf6c84f553a0d7ea1d56d1aa329a2",
+ "sha256": "5c0a956c0e6bee0f2b19a4a6a84d452241b2641bdb76f970986fa80dfc391739",
  "tag": "nfl-v1.71"
 }

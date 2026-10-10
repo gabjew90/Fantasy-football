@@ -143,7 +143,8 @@ def verdicts(st: dict) -> list[str]:
     lines = [g["lines"] for g in games if g["lines"] is not None]
     thin = sum(1 for n in lines if n < 24)
     soonest = min((g["hours_to_kickoff"] for g in games), default=None)
-    out.append(f"PROPS: {len(games)} games to play; spread and total posted for {n_spread}; "
+    plural = lambda n, w: f"{n} {w}" + ("" if n == 1 else "s")
+    out.append(f"PROPS: {plural(len(games), 'game')} to play; spread and total posted for {n_spread}; "
                + (f"Sleeper board thin (<24 lines) for {thin} of {len(lines)}; " if lines else "Sleeper board unavailable; ")
                + (f"next kickoff in {soonest:.0f} h. " if soonest is not None else "")
                + ("" if soonest is None else
@@ -152,7 +153,9 @@ def verdicts(st: dict) -> list[str]:
                   "Lines settle through the day; the closing read is inside 90 minutes of kickoff."
                   if soonest > 1.5 else "Inside the closing window."))
     inj, proj = st["injuries"], st["projections"]
-    out.append("FANTASY: " + ("weekly projections published for "
+    # with --game the table is one game, but these counts are the whole week's: say so
+    week_note = " (the whole week; this game's report is below)" if st.get("game") else ""
+    out.append("FANTASY" + week_note + ": " + ("weekly projections published for "
                               f"{proj['players']} players; " if proj.get("published") else
                               "Sleeper is still serving placeholders (no weekly projections yet); ")
                + ("no injury report for this week yet (the first practice report comes Wednesday)."
