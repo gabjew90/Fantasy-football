@@ -8688,3 +8688,17 @@ every row while the predictions rows carry open / decision / close (line_archive
   the same week -- caught by a hand check: Lamb's week 3 counted twice). Joined by player ID; rows
   settled before IDs were recorded (#224) join through the season's roster by name and team, never
   name alone. Captures skip it; an unreadable record shows no row. No price changes.
+
+## 2026-10-10 (231) -- a parlay-leg calculator in props/calc/, a user-approved exception to "no parallel engines"
+
+- **What (user):** a small calculator for Sleeper parlay legs. From a posted line and its two
+  prices it gives the workload (carries, passes thrown to him, completions) a player needs for the
+  leg to win often enough, the workload the book's no-vig price implies, and how often he has had
+  that much work. It makes no forecast, gives no chance of its own and labels no bet.
+- **Why an exception:** the engine's card already shows a Power Play workload (#225); the user wants
+  a model small enough to read end to end (eight settings at most, in one yaml file). It lives in
+  `props/calc/`, imports nothing from `props/engine/` (a test enforces it), and leaves the engine,
+  its workflow and its record untouched. It is judged by its own pre-registered tests (conversion,
+  spread, round trip, game-story rows), tuned on 2018-23, with 2024-25 read once at the end.
+- **Status:** design note (docs/plans/2026-10-10-parlay-leg-calculator.md) written with eleven open
+  questions; no code until the user approves it.
