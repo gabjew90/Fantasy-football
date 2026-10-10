@@ -127,3 +127,28 @@ running-game candidate.
 ## Result
 
 (Filled in after the runs, below this line, without editing anything above.)
+
+### Selection, 2022-25, four seeds averaged (props/tools/round44_select.py, one read, 2026-10-09)
+
+| carry_exit_rate | share_conc_carries | Rushing-yards own-volume log loss | Below p10 (carries, bettable backs) |
+|---:|---:|---:|---:|
+| **0 (shipped)** | **20** | **0.68427** | **12.1%** |
+| 0.02 | 20 | 0.68427 | 11.2% |
+| 0.03 | 20 | 0.68409 | 10.8% |
+| 0.05 | 20 | 0.68418 | 9.5% |
+| 0 | 15 | 0.68484 | 11.1% |
+| 0.02 | 15 | 0.68453 | 10.4% |
+| 0.03 | 15 | 0.68455 | 9.8% |
+| 0.05 | 15 | 0.68425 | 8.8% |
+
+**Null at selection: the shipped setting is kept.** The best setting (exit rate 0.03, split 20)
+beat shipped by 0.00019 log loss (0.03%), inside the registered tie of 0.0005, so the tie goes to
+the setting closest to shipped -- shipped. Measured after the read, on the same selection data: it moves the Over chance by 0.77 points on average (under the 1.8-point minimum), and its gain's 95% interval is (-0.0007, +0.0010), spanning zero; the 5% settings move it 0.85-0.94 points. Detectability, the guards and the confirmation were
+never reached; **2026 weeks 2-5 were not read** for this family.
+
+**What it shows.** The option did what it was built to do to the shape: the share of carries
+outcomes below the model's 10th percentile fell from 12.1% to 10.8% at a 3% exit rate (and past
+10% at 5%). But that shape barely touches the Over chance at the stand-in lines, which sit near
+the middle of the distribution: an early exit is a rare, deep cut, and with the means held the
+rest of the games shift up by a hair. The 3x collapse tail is real (DECISIONS #227) and barely
+changes the rushing-yards price where bets sit. A wider split alone (15) scored worse than shipped.

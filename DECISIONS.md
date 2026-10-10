@@ -8651,3 +8651,17 @@ every row while the predictions rows carry open / decision / close (line_archive
   reads 1.01-1.06 for carries, and would reject any added spread by construction; it stays the
   judge for plain concentration changes. Part of the split's miss is the projected share being
   wrong in that game (role drift), which this round does not touch.
+
+## 2026-10-09 (228) -- round 44 null: an early-exit chance fixes the carries tail but not the price at the line
+
+- **Result (reports/round44_carry_exits.md, four seeds, 2022-25):** the best setting (a 3% exit
+  chance, split 20) beat shipped by 0.03% on the rushing-yards own-volume log loss, inside the
+  registered tie, so shipped is kept. The shape moved as designed (carries below p10: 12.1% ->
+  10.8%), but the Over chance at lines near the middle barely depends on a rare deep cut. A wider
+  split (15) alone scored worse. 2026 weeks 2-5 stay unread for the running-game family.
+- **For the user's bets:** the engine allows RB1 collapses (40% or less of the expected work) a
+  third as often as they happen, which matters most for Overs that need the full workload; at
+  the stand-in lines the best setting moves the chance by 0.8 points on average, a gain indistinguishable from zero. The rest of the split's miss is the projected share
+  being wrong in a given game (role drift), which this round did not touch and has not been measured.
+- **The option stays in the sampler, off** (carry_exit_rate 0, call for call the shipped draw),
+  like the round-41 knob, unless the user prefers it removed.
