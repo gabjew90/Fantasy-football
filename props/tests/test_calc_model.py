@@ -121,7 +121,7 @@ def test_card_renders_the_rows_the_brief_asks_for():
     text = card.render(pl, c, source="line typed in")
     assert text.startswith("TEST BACK (DAL RB) - rushing yards - week 5")
     for needle in ("Over -125", "Under -132", "Over wins often enough (56%)", "Book expects: about",
-                   "At his usual 15.5 carries", "won by 8+: ", "A.Starter starting", "B.Backup starting",
+                   "At his last-4 average of 15.5 carries", "won by 8+: ", "A.Starter starting", "B.Backup starting",
                    "His last games (carries-yards): wk4 19-62", "Gap: the Over needs", "Tested:"):
         assert needle in text, needle
     assert c["needed_under"] < c["book_expects"] < c["needed_over"]

@@ -124,7 +124,7 @@ def render(pl: Player, c: dict, *, source: str = "") -> str:
         f"Book expects: {_w(c['book_expects'], kind)} {words}",
     ]
     if c["usual"] is not None:
-        lines.append(f"At his usual {c['usual']:.1f} {words}: the Over needs {_rate(m, c['rate_needed_over'])}, "
+        lines.append(f"At his last-{c['usual_games']} average of {c['usual']:.1f} {words}: the Over needs {_rate(m, c['rate_needed_over'])}, "
                      f"the Under {_rate(m, c['rate_needed_under'])} or less")
     season = _rate(m, rate.season) + f" on {rate.season_n}" if rate.season is not None else "none yet"
     lines.append(f"  His rate: blended {usual_rate} ({rate.own_n} of his own plays); this season {season}")
