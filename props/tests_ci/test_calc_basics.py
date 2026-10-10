@@ -821,7 +821,7 @@ def test_espn_spread_and_total_are_read_as_core_status_reads_them():
     g = game_lines.parse(sb)
     assert len(g) == 16
     assert g[("IND", "WAS")] == {"kickoff_utc": "2026-10-04T13:30Z", "favorite": "IND", "points": 4.5,
-                                 "spread_text": "IND -4.5", "total": 46.5}                 # ESPN's WSH -> WAS
+                                 "spread_text": "IND -4.5", "spread_unread": False, "total": 46.5}
     assert g[("PIT", "CLE")]["favorite"] is None and g[("PIT", "CLE")]["total"] is None    # final: odds removed
 
     def one(details):
@@ -829,14 +829,27 @@ def test_espn_spread_and_total_are_read_as_core_status_reads_them():
             {"homeAway": "home", "team": {"abbreviation": "LAR"}}, {"homeAway": "away", "team": {"abbreviation": "SF"}}],
             "odds": [{"details": details, "overUnder": 47.5}]}]}]}
     assert game_lines.parse(one("LAR -3"))[("SF", "LA")]["favorite"] == "LA"
-    assert game_lines.parse(one("EVEN"))[("SF", "LA")]["points"] is None
-    with pytest.raises(DataError, match="names neither team"):
-        game_lines.parse(one("KC -3"))
-    with pytest.raises(DataError, match="not in the form"):
-        game_lines.parse(one("SF +3"))
+    for pickem in ("EVEN", "PK"):
+        g1 = game_lines.parse(one(pickem))[("SF", "LA")]
+        assert g1["points"] is None and not g1["spread_unread"]
+    for odd in ("KC -3", "SF +3", "OFF"):                 # kept as written and flagged, never a crash
+        g1 = game_lines.parse(one(odd))[("SF", "LA")]
+        assert g1["spread_unread"] and g1["spread_text"] == odd and g1["favorite"] is None
+    with pytest.raises(DataError, match="home and an away team"):
+        game_lines.parse({"events": [{"id": "1", "competitions": [{"competitors": []}]}]})
 
 
 def test_kickoffs_follow_the_tz_database_across_both_dst_changes():
     assert data.kickoff_utc("2026-03-08", "13:00") == "2026-03-08T17:00:00+00:00"     # EDT from 2am that day
     assert data.kickoff_utc("2026-11-01", "13:00") == "2026-11-01T18:00:00+00:00"     # EST from 2am that day
     assert data.kickoff_utc("2026-10-31", "20:15") == "2026-11-01T00:15:00+00:00"
+
+
+def test_calc_rows_survive_a_flexed_kickoff(tmp_path):
+    rows = capture.archive_rows(_calc_rows([(66.5, "2026-10-11T15:00:00+00:00")]))
+    flexed = [dict(r, commence_time="2026-10-11T17:00:00+00:00") for r in rows]     # saved before the flex
+    _write_archive(tmp_path / "calc", flexed)
+    assert lines.line_near_kickoff(LEG, ROSTER, archive_root=tmp_path / "calc")["line"] == 66.5
+    late = capture.archive_rows(_calc_rows([(70.5, "2026-10-12T00:30:00+00:00")]))  # after the kickoff now
+    _write_archive(tmp_path / "calc", late)
+    assert lines.line_near_kickoff(LEG, ROSTER, archive_root=tmp_path / "calc")["line"] == 66.5

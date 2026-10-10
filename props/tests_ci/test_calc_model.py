@@ -284,7 +284,7 @@ QUOTE = {"source": "your capture", "at_utc": "2099-10-11T18:00:00+00:00", "line"
 
 def _entry_args(**kw):
     base = dict(stake=5.0, payout=15.0, angle="role", why="more carries with the starter out",
-                leg=["Test Back|rush_yds|over", "Test Back|rush_yds|under|DAL"], season=2026, week=None)
+                leg=["Test Back|rush_yds|over|64.5", "Other Back|rush_yds|under|64.5|DAL"], season=2026, week=None)
     return argparse.Namespace(**{**base, **kw})
 
 
@@ -347,7 +347,24 @@ def test_entry_logs_nothing_when_one_leg_falls_short(stub_leg, monkeypatch):
     pl.not_enough["rush_yds"] = ["12 of his own carries in his last 16 games (needs 30)"]
     assert "no full card" in cli.entry(_entry_args()) and journal.read(2026) == []
     with pytest.raises(SystemExit, match="Name\\|market"):
-        cli.entry(_entry_args(leg=["Test Back|rush_yds"]))
+        cli.entry(_entry_args(leg=["Test Back|rush_yds|over"]))
+
+
+def test_entry_logs_only_the_line_played_and_checks_cheap_inputs_first(stub_leg, monkeypatch):
+    cli, lookup, pl = stub_leg
+    from props.calc import player
+    from props.calc.shared import journal
+    monkeypatch.setattr(player, "model", lambda *a, **k: rush_model(ypc=4.2))
+    lookup.quote = dict(QUOTE)                                            # saved quote: 64.5
+    text = cli.entry(_entry_args(leg=["Test Back|rush_yds|over|67.5", "Other Back|rush_yds|under|64.5"]))
+    assert "you played 67.5 but the saved quote is 64.5" in text and journal.read(2026) == []
+    monkeypatch.setattr(player, "Bundle", None)                           # loading data would fail
+    for kw, msg in ((dict(leg=["Test Back|rush_yds|over|64.5"]), "at least two legs"),
+                    (dict(payout=4.0), "above --stake"),
+                    (dict(leg=["Test Back|rush_yds|over|64.5", "test back|rush_yds|under|64.5"]), "twice"),
+                    (dict(leg=["Test Back|rush_yds|over|x", "B|rush_yds|over|1"]), "is a number")):
+        with pytest.raises(SystemExit, match=msg):
+            cli.entry(_entry_args(**kw))
 
 
 def test_draw_streams_do_not_depend_on_the_order_of_the_yaml():

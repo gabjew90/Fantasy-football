@@ -142,7 +142,10 @@ class LineLookup:
             what = f"a saved week-{leg['week']} archive row for {leg['player']}"
             ct = _utc(r.get("commence_time"), f"{what}: kickoff")
             rt = _utc(r.get("retrieved_at_utc"), f"{what}: time")
-            if ct == ko_t and rt < ko_t:
+            # a row naming its nflverse game (calc's) is found after a flexed kickoff; any other
+            # row has only the kickoff to say which game it is for. Either way it was saved before kickoff now.
+            same_game = r.get("game_id") == leg["game_id"] if r.get("gsis_id") and r.get("game_id") else ct == ko_t
+            if same_game and rt < ko_t:
                 side = r.get("outcome")
                 require(side in ("Over", "Under"), f"{what}: outcome {side!r} is not Over or Under")
                 best.setdefault(rt, {})[side] = r             # keyed by the parsed time, not its text

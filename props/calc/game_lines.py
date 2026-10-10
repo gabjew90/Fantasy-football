@@ -22,8 +22,11 @@ SPREAD = re.compile(r"^([A-Z]{2,3})\s+(-\d+(?:\.\d+)?)$")
 
 def parse(sb: dict) -> dict:
     """{(away, home): {"kickoff_utc", "favorite", "points", "spread_text",
-    "total"}} with nflverse team codes. favorite/points are None for a pick'em
-    ("EVEN"), and with total for a game ESPN shows no odds for."""
+    "spread_unread", "total"}} with nflverse team codes. favorite/points are
+    None for a pick'em ("EVEN", "PK") and, with total, for a game ESPN shows no
+    odds for. A spread text in any other form, or naming neither team, is kept
+    as ESPN wrote it with spread_unread True, for the card to show as such:
+    one odd game must not stop every card of the week (display only)."""
     out = {}
     for ev in sb.get("events", []):
         comp = (ev.get("competitions") or [{}])[0]
@@ -34,16 +37,19 @@ def parse(sb: dict) -> dict:
         odds = (comp.get("odds") or [{}])[0]
         text = odds.get("details")
         fav = pts = None
+        unread = False
         m = SPREAD.match(str(text or "").strip())
-        if m:
+        if m and names.team_code(m.group(1)) in (t["away"], t["home"]):
             fav, pts = names.team_code(m.group(1)), abs(float(m.group(2)))
-            if fav not in (t["away"], t["home"]):
-                raise DataError(f"ESPN's spread {text!r} names neither team of {t['away']} at {t['home']}")
-        elif text not in (None, "", "EVEN"):
-            raise DataError(f"ESPN's spread {text!r} for {t['away']} at {t['home']} is not in the form 'TEAM -3.5'")
+        elif str(text or "").strip().upper() not in ("", "EVEN", "PK", "PICK"):
+            unread = True
         total = odds.get("overUnder")
+        try:
+            total = None if total is None else float(total)
+        except (TypeError, ValueError):
+            total, unread = None, True
         out[(t["away"], t["home"])] = {"kickoff_utc": ev.get("date"), "favorite": fav, "points": pts,
-                                       "spread_text": text, "total": None if total is None else float(total)}
+                                       "spread_text": text, "spread_unread": unread, "total": total}
     return out
 
 

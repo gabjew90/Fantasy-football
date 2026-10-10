@@ -6,9 +6,10 @@
       Without --line, the latest saved Sleeper quote before kickoff is used, from
       the props record's line history (your captures and the engine's).
   capture                 save the current Sleeper lines (four markets) into that history
-  entry --stake 5 --payout 50 --angle role --why "..." --leg "Name|rush_yds|over[|TEAM]" ...
-      log a Power Play in the props journal (props/journal.py), each leg's line
-      and card numbers filled in from its card. The journal grades it
+  entry --stake 5 --payout 50 --angle role --why "..." --leg "Name|rush_yds|over|64.5[|TEAM]" ...
+      log a Power Play in the props journal (props/journal.py). The line is the
+      one you played; it must match the saved quote the card is built on (run
+      capture first if Sleeper has moved it). The card numbers are filled in. The journal grades it
       (`python props/journal.py grade --season 2026`).
 """
 
@@ -59,7 +60,8 @@ def main(argv: list[str] | None = None) -> int:
     en.add_argument("--payout", type=float, required=True, help="the TOTAL the entry pays if every leg wins")
     en.add_argument("--angle", required=True, choices=list(journal.ANGLES), help="the entry's story")
     en.add_argument("--why", required=True, help="the entry's reason in one line")
-    en.add_argument("--leg", action="append", required=True, help="'Name|market|over or under[|TEAM]', repeatable")
+    en.add_argument("--leg", action="append", required=True,
+                    help="'Name|market|over or under|line played[|TEAM]', repeatable")
     en.add_argument("--season", type=int)
     en.add_argument("--week", type=int)
     a = ap.parse_args(argv)
@@ -206,26 +208,51 @@ def leg(a) -> str:
 
 def _parse_leg(spec: str) -> tuple:
     parts = [x.strip() for x in spec.split("|")]
-    if len(parts) not in (3, 4) or not parts[0] or parts[2].lower() not in ("over", "under"):
-        raise SystemExit(f"leg {spec!r}: write it as 'Name|market|over or under[|TEAM]'")
+    if len(parts) not in (4, 5) or not parts[0] or parts[2].lower() not in ("over", "under"):
+        raise SystemExit(f"leg {spec!r}: write it as 'Name|market|over or under|line played[|TEAM]'")
     if parts[1] not in ("rush_yds", "receptions"):
         raise SystemExit(f"leg {spec!r}: market is rush_yds or receptions for now")
-    return parts[0], parts[1], parts[2].lower(), (parts[3] if len(parts) == 4 and parts[3] else None)
+    try:
+        line = number(float(parts[3]), "the leg's line")
+    except (ValueError, DataError):
+        raise SystemExit(f"leg {spec!r}: the line played is a number, e.g. 64.5") from None
+    if line <= 0:
+        raise SystemExit(f"leg {spec!r}: the line played must be above 0")
+    return parts[0], parts[1], parts[2].lower(), line, (parts[4] if len(parts) == 5 and parts[4] else None)
+
+
+def _check_entry(a, legs: list) -> None:
+    """The checks that need no data, made before the bundle is loaded."""
+    for name_, v in (("--stake", a.stake), ("--payout", a.payout)):
+        try:
+            number(v, name_)
+        except DataError as ex:
+            raise SystemExit(str(ex)) from None
+    if len(legs) < 2:
+        raise SystemExit("a Power Play has at least two legs")
+    if not 0 < a.stake < a.payout:
+        raise SystemExit(f"--payout is the total paid if every leg wins, above --stake; got ${a.stake:g} to "
+                         f"${a.payout:g}")
+    seen = [(n.lower(), m) for n, m, *_ in legs]
+    dup = sorted({x for x in seen if seen.count(x) > 1})
+    if dup:
+        raise SystemExit(f"the same player and market twice in one entry: {dup}")
 
 
 def entry(a) -> str:
     """Logs a Power Play through journal.make_power_play. Every leg needs a full
-    card from a saved quote before its kickoff and an exact name match; one leg
-    that falls short and nothing is logged. Each journal row then carries the
+    card from a saved quote before its kickoff, at the line played, and an
+    exact name match; one leg that falls short and nothing is logged. Each journal row then carries the
     card's numbers (calc_*) and volume_unit, which journal.grade reads to save
     his actual workload."""
     legs = [_parse_leg(x) for x in a.leg]
+    _check_entry(a, legs)
     fixed = settings.load()["fixed"]
     season = a.season or F.current_season()
     b, warn = _bundle(season, fixed)
     lookup = lines.LineLookup(b.rosters)
     cards, problems = [], []
-    for name_in, market, side, team in legs:
+    for name_in, market, side, played, team in legs:
         got = build_card(b, name_in, market, team=team, season=season, week=a.week, lookup=lookup)
         who = f"{name_in} ({market})"
         if got["by_initial"]:
@@ -234,6 +261,10 @@ def entry(a) -> str:
             problems.append(f"{who}: no full card ({got['text'].splitlines()[-1]})")
         elif got["kicked_off"]:
             problems.append(f"{who}: the game has kicked off")
+        elif got["line"] != played:
+            # the journal must hold the line played, and the card must be built on it
+            problems.append(f"{who}: you played {played:g} but the saved quote is {got['line']:g} "
+                            f"({got['source']}); run `python -m props.calc capture`, then log again")
         cards.append((side, got))
     weeks = {g["stub"]["week"] for _, g in cards}
     if len(weeks) > 1:
