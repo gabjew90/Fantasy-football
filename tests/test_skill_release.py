@@ -554,3 +554,88 @@ def test_chat_may_show_tables_and_terms_but_never_pastes_the_output():
     assert "no report vocabulary for its own sake" not in chat, "the old ban on report language is gone"
     assert "slate the user asks for is reproduced" in chat, "the full prop guide and slate summary are reproduced as the engine contract requires"
 
+
+# ------------------------------------------------------------ the self-updating harness (DECISIONS #231)
+
+def _pin(files: dict[str, bytes]) -> dict[str, str]:
+    import hashlib
+    return {k: hashlib.sha256(v.replace(b"\r\n", b"\n")).hexdigest() for k, v in files.items()}
+
+
+def test_a_current_loader_runs_itself(tmp_path, monkeypatch):
+    mine = {"scripts/bootstrap.py": Path(B.__file__).read_bytes(), "scripts/release.py": Path(R.__file__).read_bytes()}
+    monkeypatch.setattr(B, "_get", lambda url, timeout=0: pytest.fail("a current loader fetches nothing"))
+    assert B.harness_update({"harness": _pin(mine)}, tmp_path, []) is None
+    assert B.harness_update({}, tmp_path, []) is None, "no pin: nothing to do"
+
+
+def test_an_old_loader_fetches_the_pinned_copy_verifies_it_and_hands_over(tmp_path, monkeypatch):
+    new = {"scripts/bootstrap.py": b"print('new loader')\n", "scripts/release.py": b"X = 1\n"}
+    asked, ran = [], {}
+
+    def get(url, timeout=0):
+        asked.append(url)
+        return new["scripts/bootstrap.py"] if url.endswith("skill/scripts/bootstrap.py") else new["scripts/release.py"]
+
+    def call(cmd, env=None):
+        ran.update(cmd=cmd, env=env)
+        return 0
+    monkeypatch.setattr(B, "_get", get)
+    monkeypatch.setattr(B.subprocess, "call", call)
+    monkeypatch.delenv("NFL_HARNESS_UPDATED", raising=False)
+    assert B.harness_update({"harness": _pin(new)}, tmp_path, ["--no-deps"]) == 0
+    assert all("/main/skill/" in u for u in asked)
+    script = Path(ran["cmd"][1])
+    assert script.read_bytes() == new["scripts/bootstrap.py"] and (script.parent / "release.py").exists()
+    assert ran["cmd"][2:] == ["--no-deps"] and ran["env"]["NFL_SKILL_ROOT"] == str(B.SKILL_ROOT)
+    assert ran["env"]["NFL_HARNESS_UPDATED"], "the new copy never updates again (no loop)"
+
+
+def test_a_harness_that_does_not_match_its_pin_is_never_run(tmp_path, monkeypatch):
+    new = {"scripts/bootstrap.py": b"print('new')\n", "scripts/release.py": b"X = 1\n"}
+    monkeypatch.setattr(B, "_get", lambda url, timeout=0: b"print('tampered')\n")
+    monkeypatch.setattr(B.subprocess, "call", lambda *a, **k: pytest.fail("a tampered loader must not run"))
+    monkeypatch.delenv("NFL_HARNESS_UPDATED", raising=False)
+    with pytest.raises(RuntimeError, match="does not match the lock's pin"):
+        B.harness_update({"harness": _pin(new)}, tmp_path, [])
+    with pytest.raises(RuntimeError, match="does not know"):
+        B.harness_update({"harness": {"scripts/evil.py": "0"}}, tmp_path, [])
+
+
+def test_the_lock_pins_the_harness_and_check_lock_catches_an_unpinned_edit():
+    lock = R.build_lock(ROOT, "nfl-test")
+    assert set(lock["harness"]) == set(R.HARNESS)
+    assert lock["harness"] == R.harness_digests(ROOT)
+    stale = {**lock, "harness": {**lock["harness"], "scripts/bootstrap.py": "0" * 64}}
+    ok, msg = R.check_lock(stale)
+    assert not ok, msg
+
+
+def test_main_hands_over_or_keeps_this_loader_but_never_stops_the_session(tmp_path, monkeypatch, capsys):
+    monkeypatch.setattr(B, "fetch_lock", lambda url=None: {"harness": {"x": "y"}})
+    monkeypatch.setattr(B, "harness_update", lambda lock, dest, argv: 7)
+    assert B.main(["--dest", str(tmp_path), "--no-deps"]) == 7, "the newer loader's exit code is the session's"
+    ran = []
+
+    def boom(lock, dest, argv):
+        raise RuntimeError("raw.githubusercontent.com: 403")
+    monkeypatch.setattr(B, "harness_update", boom)
+    monkeypatch.setattr(B, "resolve", lambda dest, tag, offline: ran.append(offline) or (_ for _ in ()).throw(
+        RuntimeError("stop here")))
+    assert B.main(["--dest", str(tmp_path), "--no-deps"]) == 3
+    assert ran == [False] and "kept this loader" in capsys.readouterr().err, "a failed update falls through"
+    monkeypatch.setattr(B, "harness_update", lambda *a: pytest.fail("--offline never updates"))
+    B.main(["--dest", str(tmp_path), "--no-deps", "--offline"])
+
+
+def test_a_verified_local_copy_is_not_fetched_again(tmp_path, monkeypatch):
+    new = {"scripts/bootstrap.py": b"print('new')\n", "scripts/release.py": b"X = 1\n"}
+    calls = []
+    monkeypatch.setattr(B, "_get", lambda url, timeout=0: calls.append(url) or (
+        new["scripts/bootstrap.py"] if url.endswith("bootstrap.py") else new["scripts/release.py"]))
+    monkeypatch.setattr(B.subprocess, "call", lambda *a, **k: 0)
+    monkeypatch.delenv("NFL_HARNESS_UPDATED", raising=False)
+    B.harness_update({"harness": _pin(new)}, tmp_path, [])
+    B.harness_update({"harness": _pin(new)}, tmp_path, [])
+    assert len(calls) == 2, "the second session reuses the verified copy"
+

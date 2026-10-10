@@ -8705,3 +8705,10 @@ every row while the predictions rows carry open / decision / close (line_archive
   lock as before; FETCH_ROUTE says so. Only both routes failing runs the bundled copy. Live-tested:
   nfl-v1.69 fetched file by file, hash matching the lock. Takes effect when the user rebuilds and
   reinstalls the skill, which also refreshes the bundled fallback to the current release.
+- **The last reinstall (user: "I thought we never had to update the skill, only the repo"):** that
+  is the design, and it held for everything but the loader itself, which runs before any download.
+  So the loader now updates itself: nfl.lock.json pins its two files (harness, written by
+  write-lock, checked by check-lock); a session whose loader differs fetches the pinned files from
+  main, holds each to its digest, and runs that copy (no loop; any failure keeps the current one).
+  build.py refuses to build a loader the lock does not pin. After this one reinstall, loader changes
+  reach chat through the repo like everything else; only the bundled fallback still ages.

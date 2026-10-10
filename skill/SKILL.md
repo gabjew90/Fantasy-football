@@ -25,6 +25,9 @@ RELEASE_SOURCE=fetched | cached | fetched-unverified | VENDORED_FALLBACK
 DEPS=ok | installed: ... | missing: ...
 YAHOO=live | absent ...
 ODDS_KEY=present | absent ...
+HARNESS=current | updated <id>    this loader updates itself: when the lock
+                                  pins a newer harness, the pinned copy is
+                                  fetched, verified and run (no reinstall)
 FETCH_ROUTE=file by file (...)    only when the tarball host refused and the
                                   release came from raw.githubusercontent.com,
                                   still verified against the lock -- the

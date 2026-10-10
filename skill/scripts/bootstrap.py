@@ -52,7 +52,9 @@ import urllib.request
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-SKILL_ROOT = HERE.parent
+# where the installed skill's vendor/ and resources/ are: this file's parent, unless an older loader
+# handed over to this copy from elsewhere (harness_update) and said where it came from
+SKILL_ROOT = Path(os.environ.get("NFL_SKILL_ROOT") or HERE.parent)
 sys.path.insert(0, str(SKILL_ROOT))      # the repo layout: skill/release.py
 sys.path.insert(0, str(HERE))           # the built skill: scripts/release.py, found first
 import release  # noqa: E402
@@ -61,6 +63,7 @@ REPO = os.environ.get("NFL_REPO", "gabjew90/Fantasy-football")
 LOCK_URL = f"https://raw.githubusercontent.com/{REPO}/main/{release.LOCK_NAME}"
 TARBALL = "https://codeload.github.com/{repo}/tar.gz/refs/tags/{tag}"
 RAW_FILE = "https://raw.githubusercontent.com/{repo}/{tag}/{path}"
+RAW_MAIN = "https://raw.githubusercontent.com/{repo}/main/{path}"
 TIMEOUT = 20
 
 VENDOR_ARCHIVE = SKILL_ROOT / "vendor" / "release.tar.gz"
@@ -245,6 +248,39 @@ def ensure_dependencies(install: bool = True) -> str:
     return "installed: " + ", ".join(missing)
 
 
+def harness_update(lock: dict, dest: Path, argv: list[str]) -> int | None:
+    """THE LOADER UPDATES ITSELF (DECISIONS #231). The lock on main pins the harness files
+    (release.HARNESS). When this copy differs, fetch the pinned files from main -- the same source
+    and trust as the lock -- hold each to its digest, and run that copy with the same arguments,
+    returning its exit code. None: this copy is current (or there is no pin, or it already handed
+    over). Raises on any failure; the caller then keeps running this copy."""
+    import hashlib
+    want = (lock or {}).get("harness") or {}
+    if not want or os.environ.get("NFL_HARNESS_UPDATED"):
+        return None
+    unknown = set(want) - set(release.HARNESS)
+    if unknown:
+        raise RuntimeError(f"the lock pins harness files this loader does not know: {sorted(unknown)}")
+    mine = {"scripts/bootstrap.py": Path(__file__), "scripts/release.py": Path(release.__file__)}
+    if all(name in want and release.file_digest(p) == want[name] for name, p in mine.items()):
+        return None
+    tag = hashlib.sha256("".join(want[k] for k in sorted(want)).encode("utf-8")).hexdigest()[:12]
+    run = dest / f"harness-{tag}"
+    for name, digest in want.items():
+        target = run / name
+        if target.is_file() and release.file_digest(target) == digest:
+            continue                    # a reused container already holds the verified copy
+        data = _get(RAW_MAIN.format(repo=REPO, path=release.HARNESS[name]))
+        if hashlib.sha256(data.replace(b"\r\n", b"\n")).hexdigest() != digest:
+            raise RuntimeError(f"{release.HARNESS[name]} on main does not match the lock's pin")
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(data)
+    env = {**os.environ, "NFL_HARNESS_UPDATED": tag, "NFL_SKILL_ROOT": str(SKILL_ROOT)}
+    print(f"HARNESS: this loader is out of date; running the pinned one ({tag}, verified against the lock)",
+          file=sys.stderr)
+    return subprocess.call([sys.executable, str(run / "scripts" / "bootstrap.py"), *argv], env=env)
+
+
 def write_stamp(repo_dir: Path, info: dict) -> None:
     """Beside the release, not inside it: inside it would change the hash."""
     repo_dir.with_name(repo_dir.name + ".stamp.json").write_text(
@@ -329,6 +365,13 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--offline", action="store_true")
     ap.add_argument("--no-deps", action="store_true", help="report missing libraries, do not install them")
     a = ap.parse_args(argv)
+    if not a.offline:
+        try:
+            code = harness_update(fetch_lock(), a.dest, list(sys.argv[1:] if argv is None else argv))
+            if code is not None:
+                return code
+        except Exception as exc:  # noqa: BLE001 -- an update failure never costs the session
+            print(f"HARNESS: kept this loader (the update failed: {exc})", file=sys.stderr)
     try:
         info = resolve(a.dest, a.tag, a.offline)
     except RuntimeError as exc:
@@ -351,6 +394,7 @@ def main(argv: list[str] | None = None) -> int:
     print(f"DEPS={deps}")
     print(f"YAHOO={'live' if creds['yahoo'] else 'absent (no Yahoo bundle in this skill: Keefamania cannot be read)'}")
     print(f"ODDS_KEY={'present' if creds['odds_key'] else 'absent (Sleeper prices only)'}")
+    print(f"HARNESS={'updated ' + os.environ['NFL_HARNESS_UPDATED'] if os.environ.get('NFL_HARNESS_UPDATED') else 'current'}")
     if info.get("fetch_route") and info["fetch_route"] != "tarball":
         print(f"FETCH_ROUTE={info['fetch_route']}")
     if info["fallback_reason"]:
