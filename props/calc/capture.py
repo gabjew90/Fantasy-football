@@ -1,7 +1,9 @@
 """Sleeper line capture, run by hand (`python -m props.calc capture`; no
-workflow runs it). Saves the current two-sided lines for the four markets into
-the props record's line history (props/record/lines, through
-props/persist.py), in the engine's row format with snapshot_type "calc".
+workflow runs it). Saves the current two-sided lines for the four markets to
+props/calc/lines/<season>/line_archive_<season>.jsonl with props/persist.py's
+writer, in the engine's row format with snapshot_type "calc". Not into
+props/record: only the props workflow commits there (scripts/
+check_commit_hygiene.py refuses a PR that mixes it with code).
 
 parse() works out, per player-market: the line, both payout multipliers, who
 he is (Sleeper id -> gsis id by ID, a name+team fallback only when the ID join
@@ -244,11 +246,12 @@ def run(*, misses_path: Path | None = None) -> dict:
     by_season: dict = {}
     for r in saved:
         by_season.setdefault(r["season"], []).append(r)
-    written = {s: persist.write_lines(s, rs) for s, rs in by_season.items()}
+    from .lines import calc_path         # here, not at the top: lines imports this module
+    written = {s: persist.append_jsonl(calc_path(s), rs, persist.LINE_KEY) for s, rs in by_season.items()}
     append_jsonl(misses_path or MISSES_PATH, misses)
     skipped = sum(m["reason"].startswith("skipped") for m in misses)
     stale = [f"{e['name']} ({e['status']})" for e in man.stale() if e["name"] != "sleeper lines"]
-    return {"paths": [str(persist.lines_path(s)) for s in written], "rows": len(saved),
+    return {"paths": [str(calc_path(s)) for s in written], "rows": len(saved),
             "lines": len(saved) // 2, "added": sum(w["added"] for w in written.values()),
             "replaced": sum(w["replaced"] for w in written.values()), "misses": len(misses) - skipped,
             "skipped": skipped, "captured_at_utc": entry["fetched_at_utc"], "stale": stale}

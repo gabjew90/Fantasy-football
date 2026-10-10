@@ -10,6 +10,7 @@ Display only: nothing here feeds a number on the card."""
 from __future__ import annotations
 
 import json
+import math
 import re
 
 from core import fetch as F
@@ -45,9 +46,11 @@ def parse(sb: dict) -> dict:
             unread = True
         total = odds.get("overUnder")
         try:
-            total = None if total is None else float(total)
+            total = None if total is None or isinstance(total, bool) else float(total)
         except (TypeError, ValueError):
-            total, unread = None, True
+            total = None                   # shown as no total; the spread is judged on its own
+        if total is not None and not math.isfinite(total):
+            total = None
         out[(t["away"], t["home"])] = {"kickoff_utc": ev.get("date"), "favorite": fav, "points": pts,
                                        "spread_text": text, "spread_unread": unread, "total": total}
     return out

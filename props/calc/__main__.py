@@ -8,8 +8,8 @@
   capture                 save the current Sleeper lines (four markets) into that history
   entry --stake 5 --payout 50 --angle role --why "..." --leg "Name|rush_yds|over|64.5[|TEAM]" ...
       log a Power Play in the props journal (props/journal.py). The line is the
-      one you played; it must match the saved quote the card is built on (run
-      capture first if Sleeper has moved it). The card numbers are filled in. The journal grades it
+      one you played; the card is built on the newest saved quote at that line
+      before kickoff (none saved at it: not logged). The card numbers are filled in. The journal grades it
       (`python props/journal.py grade --season 2026`).
 """
 
@@ -25,7 +25,7 @@ import pandas as pd
 from core import fetch as F
 from core.manifest import Manifest
 
-from . import capture, card, lines, odds, player, settings
+from . import capture, card, lines, names, odds, player, settings
 from .checks import DataError, number
 from .markets import workload_col
 from .shared import journal
@@ -145,10 +145,11 @@ def _bundle(season: int, fixed: dict) -> tuple:
 
 
 def build_card(b, name_in: str, market: str, *, team=None, season: int, week=None, line=None, typed=None,
-               target=None, lookup=None) -> dict:
+               target=None, lookup=None, at_line=None) -> dict:
     """One leg's card and the numbers behind it. Keys: text, ready (a full
     card with a line), by_initial, kicked_off, stub, line, mult_over,
-    mult_under, source, not_enough, c (card.compute's dict, or None)."""
+    mult_under, source, not_enough, c (card.compute's dict, or None).
+    at_line: use the newest saved quote at this line (the line a bet was made at)."""
     s = settings.load()
     tuned, fixed = s["tuned"], s["fixed"]
     warn = ""
@@ -170,14 +171,15 @@ def build_card(b, name_in: str, market: str, *, team=None, season: int, week=Non
         source = "line typed in"
     else:
         try:
-            q = (lookup or lines.LineLookup(b.rosters)).find(stub)
+            q = (lookup or lines.LineLookup(b.rosters)).find(stub, line=at_line)
             if q:                                    # validated by the lookup: multipliers above 1
                 source = f"Sleeper quote from {q['source']}, {q['at_utc'][:16].replace('T', ' ')} UTC"
                 if q.get("note"):
                     source += f"; {q['note']}"
                 line, mo, mu = q["line"], q["mult_over"], q["mult_under"]
             else:
-                source = (f"Unmatched: no saved Sleeper quote belongs to {name} ({team}) in {game['game_id']} "
+                at = "" if at_line is None else f" at {at_line:g}"
+                source = (f"Unmatched: no saved Sleeper quote{at} belongs to {name} ({team}) in {game['game_id']} "
                           f"for {market}; give --line --over --under")
         except DataError as ex:                      # a bad saved row is reported; code errors are not caught
             source = f"Unmatched: {ex}; give --line --over --under"
@@ -233,7 +235,9 @@ def _check_entry(a, legs: list) -> None:
     if not 0 < a.stake < a.payout:
         raise SystemExit(f"--payout is the total paid if every leg wins, above --stake; got ${a.stake:g} to "
                          f"${a.payout:g}")
-    seen = [(n.lower(), m) for n, m, *_ in legs]
+    if not str(a.why or "").strip():
+        raise SystemExit("--why is required: the entry's reason in one line")
+    seen = [(names.norm(n), m) for n, m, *_ in legs]
     dup = sorted({x for x in seen if seen.count(x) > 1})
     if dup:
         raise SystemExit(f"the same player and market twice in one entry: {dup}")
@@ -241,7 +245,7 @@ def _check_entry(a, legs: list) -> None:
 
 def entry(a) -> str:
     """Logs a Power Play through journal.make_power_play. Every leg needs a full
-    card from a saved quote before its kickoff, at the line played, and an
+    card from a saved quote at the line played, before its kickoff, and an
     exact name match; one leg that falls short and nothing is logged. Each journal row then carries the
     card's numbers (calc_*) and volume_unit, which journal.grade reads to save
     his actual workload."""
@@ -253,7 +257,7 @@ def entry(a) -> str:
     lookup = lines.LineLookup(b.rosters)
     cards, problems = [], []
     for name_in, market, side, played, team in legs:
-        got = build_card(b, name_in, market, team=team, season=season, week=a.week, lookup=lookup)
+        got = build_card(b, name_in, market, team=team, season=season, week=a.week, lookup=lookup, at_line=played)
         who = f"{name_in} ({market})"
         if got["by_initial"]:
             problems.append(f"{who}: matched by initial; use the name as the card shows it")
@@ -261,10 +265,8 @@ def entry(a) -> str:
             problems.append(f"{who}: no full card ({got['text'].splitlines()[-1]})")
         elif got["kicked_off"]:
             problems.append(f"{who}: the game has kicked off")
-        elif got["line"] != played:
-            # the journal must hold the line played, and the card must be built on it
-            problems.append(f"{who}: you played {played:g} but the saved quote is {got['line']:g} "
-                            f"({got['source']}); run `python -m props.calc capture`, then log again")
+        elif got["line"] != played:            # the lookup was asked for this line: never expected
+            raise DataError(f"{who}: the card was built at {got['line']:g}, not the line played {played:g}")
         cards.append((side, got))
     weeks = {g["stub"]["week"] for _, g in cards}
     if len(weeks) > 1:

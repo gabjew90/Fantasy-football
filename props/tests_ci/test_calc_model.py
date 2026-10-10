@@ -270,7 +270,9 @@ def stub_leg(monkeypatch, tmp_path):
     real = journal.journal_path(2026)
     before = (real.stat().st_size, real.stat().st_mtime_ns) if real.exists() else None
     monkeypatch.setattr(journal, "JOURNAL_ROOT", tmp_path / "journal")
-    lookup = type("L", (), {"quote": None, "find": lambda self, leg: self.quote})()
+    lookup = type("L", (), {"quote": None, "asked": [],
+                            "find": lambda self, leg, line=None: self.asked.append(line) or (
+                                self.quote if self.quote and line in (None, self.quote["line"]) else None)})()
     monkeypatch.setattr(lines, "LineLookup", lambda *a, **k: lookup)
     yield cli, lookup, pl
     monkeypatch.setattr(journal, "JOURNAL_ROOT", None)
@@ -299,7 +301,7 @@ def test_leg_reports_a_bad_saved_row_as_unmatched(stub_leg, monkeypatch):
     cli, lookup, pl = stub_leg
     from props.calc.checks import DataError
 
-    def bad(leg):
+    def bad(leg, line=None):
         raise DataError("a saved week-5 archive row for Test Back: time 'x' is not a readable time")
     monkeypatch.setattr(lookup, "find", bad)
     with pytest.raises(SystemExit, match="Unmatched: a saved week-5 archive row"):
@@ -357,11 +359,12 @@ def test_entry_logs_only_the_line_played_and_checks_cheap_inputs_first(stub_leg,
     monkeypatch.setattr(player, "model", lambda *a, **k: rush_model(ypc=4.2))
     lookup.quote = dict(QUOTE)                                            # saved quote: 64.5
     text = cli.entry(_entry_args(leg=["Test Back|rush_yds|over|67.5", "Other Back|rush_yds|under|64.5"]))
-    assert "you played 67.5 but the saved quote is 64.5" in text and journal.read(2026) == []
+    assert "no saved Sleeper quote at 67.5" in text and journal.read(2026) == [] and 67.5 in lookup.asked
     monkeypatch.setattr(player, "Bundle", None)                           # loading data would fail
     for kw, msg in ((dict(leg=["Test Back|rush_yds|over|64.5"]), "at least two legs"),
                     (dict(payout=4.0), "above --stake"),
-                    (dict(leg=["Test Back|rush_yds|over|64.5", "test back|rush_yds|under|64.5"]), "twice"),
+                    (dict(leg=["A.J. Brown|rush_yds|over|64.5", "AJ Brown|rush_yds|under|64.5"]), "twice"),
+                    (dict(why="  "), "--why is required"),
                     (dict(leg=["Test Back|rush_yds|over|x", "B|rush_yds|over|1"]), "is a number")):
         with pytest.raises(SystemExit, match=msg):
             cli.entry(_entry_args(**kw))

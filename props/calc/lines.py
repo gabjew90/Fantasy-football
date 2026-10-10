@@ -1,6 +1,8 @@
-"""The last saved Sleeper quote before kickoff for a leg, read from the one
-line history the props record keeps (props/record/lines, written through
-props/persist.py by the engine workflow and by `python -m props.calc capture`).
+"""The last saved Sleeper quote before kickoff for a leg, read from two files
+in one row format: the props record's line history (props/record/lines, the
+engine workflow's captures) and calc's own (props/calc/lines, written by
+`python -m props.calc capture` with persist's writer; kept out of
+props/record, which only the workflow commits).
 
 Rows that carry a gsis id (calc's captures, DECISIONS #224) join by it; rows
 without one (the engine's) join by name, kickoff time and team, and are refused
@@ -26,11 +28,19 @@ KNOWN_TEAMS = set(names.TEAM_NAMES.values())
 CALC_SNAPSHOT = "calc"          # snapshot_type of calc's own captures (the engine writes "decision")
 
 
+CALC_LINES = Path(__file__).resolve().parent / "lines"
+
+
 def archive_path(season: int, root: Path | None = None) -> Path:
     """persist's line history, or the same layout under `root` (tests)."""
     if root is None:
         return persist.lines_path(season)
     return root / str(season) / f"line_archive_{season}.jsonl"
+
+
+def calc_path(season: int, root: Path | None = None) -> Path:
+    """calc's own captures, in the line history's row format."""
+    return (root or CALC_LINES) / str(season) / f"line_archive_{season}.jsonl"
 
 
 def _rows(path: Path) -> tuple:
@@ -68,8 +78,11 @@ class LineLookup:
     and game. One per run: it reads the line history once and owns its caches,
     so nothing is shared between runs or between rosters."""
 
-    def __init__(self, roster: pd.DataFrame, *, archive_root: Path | None = None):
+    def __init__(self, roster: pd.DataFrame, *, archive_root: Path | None = None, calc_root: Path | None = None):
+        """archive_root / calc_root move the two files (tests); with only
+        archive_root given, calc's file is looked for under archive_root/calc."""
         self.roster, self.archive_root = roster, archive_root
+        self.calc_root = calc_root or (archive_root / "calc" if archive_root is not None else None)
         self._files: dict = {}
         self._rosters: dict = {}
         self._indexes: dict = {}          # path -> index, built once per file
@@ -87,10 +100,12 @@ class LineLookup:
             raise DataError(got)
         return got
 
-    def find(self, leg: dict) -> dict | None:
-        """{"source", "at_utc", "line", "mult_over", "mult_under"[, "note"]} or None."""
+    def find(self, leg: dict, line: float | None = None) -> dict | None:
+        """{"source", "at_utc", "line", "mult_over", "mult_under"[, "note"]} or
+        None: the newest usable quote before kickoff, or with `line`, the newest
+        at that line (the line a bet was made at)."""
         ko_t = _utc(leg.get("kickoff_utc"), "the leg's kickoff time")     # missing: fails loudly
-        return self._archive(leg, ko_t)
+        return self._archive(leg, ko_t, line)
 
     def _index(self, path: Path) -> dict:
         """Sleeper rows of the four markets, grouped once per file by (market,
@@ -108,20 +123,22 @@ class LineLookup:
             self._indexes[path] = idx
         return self._indexes[path]
 
-    def _archive(self, leg: dict, ko_t) -> dict | None:
-        arch = archive_path(int(leg["season"]), self.archive_root)
-        if not arch.exists():
+    def _archive(self, leg: dict, ko_t, line: float | None = None) -> dict | None:
+        season = int(leg["season"])
+        files = [p for p in (archive_path(season, self.archive_root), calc_path(season, self.calc_root))
+                 if p.exists()]
+        if not files:
             return None
         team = names.team_code(leg["team"])
         key = names.norm(leg["player"])
         full = names.TEAM_NAMES.get(team)
         require(full is not None, f"team code {team!r} has no full name for the line archive")
-        idx = self._index(arch)
+        idxs = [self._index(p) for p in files]
         # rows with an id join by it (DECISIONS #224); rows without one, by name
         # an id row also names its nflverse game; another game's row is not this leg's
-        by_id = [r for r in idx.get((leg["market"], "id", leg["gsis_id"]), [])
+        by_id = [r for idx in idxs for r in idx.get((leg["market"], "id", leg["gsis_id"]), [])
                  if r.get("game_id") in (None, leg["game_id"])]
-        by_name = [r for r in idx.get((leg["market"], key), []) if not r.get("gsis_id")]
+        by_name = [r for idx in idxs for r in idx.get((leg["market"], key), []) if not r.get("gsis_id")]
         best: dict = {}
         for r in by_id + by_name:
             wk, teams_ok = r.get("week"), bool(r.get("home_team") and r.get("away_team"))
@@ -165,6 +182,8 @@ class LineLookup:
             if po != pu:
                 passed += 1                # the two sides at different lines
                 continue
+            if line is not None and po != line:
+                continue                   # another line than the one asked for: not a problem, not his bet
             # the archive has names, not ids: a name-joined quote is refused when a
             # namesake is in the game (checked only once a usable quote exists)
             if not (pair["Over"].get("gsis_id") and pair["Under"].get("gsis_id")) and self.name_clash(leg):

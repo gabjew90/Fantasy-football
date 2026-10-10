@@ -247,11 +247,13 @@ with settle's stats and rules, saves his actual workload from `volume_unit`, and
 line from the line history. Calc has no settle of its own. Open: the journal has no "needed vs
 actual, legs won vs break-even, by gap" table; the user decides whether to add one.
 
-**Line capture.** `python -m props.calc capture` saves the current Sleeper lines into the props
-record's line history (`props/record/lines/<season>/line_archive_<season>.jsonl`) through
-`props/persist.py`, in the engine's row format with `snapshot_type: "calc"` plus the gsis id, the
-nflverse game id and the exact multiplier. It is run by hand; no workflow is added or changed.
-Unmatched lines are logged in `props/calc/log/name_misses.jsonl` and not saved.
+**Line capture.** `python -m props.calc capture` saves the current Sleeper lines to
+`props/calc/lines/<season>/line_archive_<season>.jsonl` with `props/persist.py`'s writer, in the
+engine's row format (`snapshot_type: "calc"`, plus the gsis id, the nflverse game id and the exact
+multiplier). Not into `props/record/`: only the props workflow commits there, and
+`scripts/check_commit_hygiene.py` refuses a PR that mixes it with code. The card reads both files.
+It is run by hand; no workflow is added or changed. Unmatched lines are logged in
+`props/calc/log/name_misses.jsonl` and not saved.
 
 Commands, all under `python -m props.calc`: `leg`, `entry`, `capture`.
 
@@ -367,8 +369,9 @@ All sixteen open questions were answered: as recommended, except where noted.
   code). The first two real cards (Javonte Williams week 5, Puka Nacua week 4) were re-derived by
   a separate agent from the raw files: no mismatches.
 - **2026-10-10, step A (reuse):** leg log switched to the journal; calc's own log, settle and
-  summary deleted; capture writes through persist into the line history (calc's 362 earlier
-  captures moved there); kickoff times from zoneinfo; ESPN spread and total read through
+  summary deleted; capture writes with persist's writer in the line history's format (calc's 362 earlier
+  captures moved there, then out again after review: calc's captures live in props/calc/lines in
+  the same row format, because a PR may not touch props/record); kickoff times from zoneinfo; ESPN spread and total read through
   `core.fetch` with core/status.py's parsing copied (props may not import core.status).
 
 ## Held-out read

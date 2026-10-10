@@ -853,3 +853,24 @@ def test_calc_rows_survive_a_flexed_kickoff(tmp_path):
     late = capture.archive_rows(_calc_rows([(70.5, "2026-10-12T00:30:00+00:00")]))  # after the kickoff now
     _write_archive(tmp_path / "calc", late)
     assert lines.line_near_kickoff(LEG, ROSTER, archive_root=tmp_path / "calc")["line"] == 66.5
+
+
+def test_the_lookup_reads_calc_and_record_files_and_finds_the_line_bet(tmp_path):
+    _write_archive(tmp_path / "rec", capture.archive_rows(_calc_rows([(66.5, "2026-10-11T23:00:00+00:00")])))
+    _write_archive(tmp_path / "mine", capture.archive_rows(_calc_rows([(64.5, "2026-10-11T20:00:00+00:00")])))
+    look = lines.LineLookup(ROSTER, archive_root=tmp_path / "rec", calc_root=tmp_path / "mine")
+    assert look.find(LEG)["line"] == 66.5                          # the newest across both files
+    assert look.find(LEG, line=64.5)["line"] == 64.5               # the line the bet was made at
+    assert look.find(LEG, line=65.5) is None                       # never saved at that line
+
+
+def test_the_saved_week5_captures_are_reachable():
+    """The 362 captures of 2026-10-10 14:59 UTC (moved to calc's file) are found by the lookup."""
+    path = lines.calc_path(2026)
+    rows = [json.loads(x) for x in path.read_text(encoding="utf-8").splitlines() if x.strip()]
+    assert len(rows) == 724 and {r["snapshot_type"] for r in rows} == {"calc"}
+    r = next(x for x in rows if x["market"] == "player_rush_yds")
+    leg = {"season": 2026, "week": r["week"], "game_id": r["game_id"], "kickoff_utc": r["commence_time"],
+           "gsis_id": r["gsis_id"], "player": r["player"], "team": r["team"], "market": "rush_yds"}
+    got = lines.LineLookup(ROSTER, archive_root=Path("/nonexistent"), calc_root=lines.CALC_LINES).find(leg)
+    assert got["line"] == r["point"] and got["source"] == "your capture"
