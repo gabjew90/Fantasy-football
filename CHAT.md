@@ -307,9 +307,18 @@ its "A leg needs" cell, copied as shown (never recomputed): `--assumption
 "<the --assume rule>" --over-board <engine %> --over-scenario <scenario %>
 --pays-if "<the cell>"`.
 
+A bet on catches, receiving yards or rushing yards also carries the user's
+volume view, when they gave one, beside the workload the card says the line
+assumes, so the scorecard can grade their reads against the line's: `--view
+"+2/+4/+6" --line-assumes <the card's "The line assumes" number>` (targets for
+catches and receiving yards, carries for rushing yards; signed values are
+relative to the line, plain ones absolute, one number or low/likely/high).
+Leave both off when the user gave no view; never invent one.
+
 A Sleeper Power Play (every leg must hit) is ONE entry with its total payout:
 `python props/journal.py entry --stake <$> --payout <total it pays> --angle <...> --why "<the entry's reason>" --leg "<Player>|<market>|<side>|<line>|<TEAM>[|<angle>]" --leg ...`
-(line empty for an anytime TD; add `--after-kickoff` if any leg's game had started).
+(line empty for an anytime TD; add `--after-kickoff` if any leg's game had started;
+a leg's volume view rides at its end as `|view=+2/+4/+6|assumes=<the line's workload>`).
 Each leg is priced at the entry's per-leg rate (a 5-leg 20x entry is about −122 a
 leg, 54.9% to break even), and the entry counts only if every leg hits. If Sleeper drops a leg ("Reboot": the player
 sat or left), the entry pays a smaller multiple only the app shows: void the leg with

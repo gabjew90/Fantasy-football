@@ -562,16 +562,16 @@ def volume_gauge(y_min, rate, proj, unit, low_volume):
 
 
 def gauge_sentence(g, rate, per, luck_clause, y_min, long_word, book_line=None, book_fav=None, book_fair=None):
-    """'At 4.4 yards a carry with the luck taken out (<how>), 90 yards takes about 20.6
-    carries; we project 17.5 (our volume), about what it takes. The book's own carries line
+    """'At 4.4 yards a carry with the luck taken out (<how>), an average game of 90 yards takes
+    about 20.6 carries; we project 17.5 on average (our volume), about what it takes. The book's own carries line
     is 19.5, Under favoured: fewer than the yards line takes, so even the book's volume
     falls short without a long run.' The book's volume line is quoted whenever it exists
     (DECISIONS #167), so the reader sees whose volume each number is."""
     if not g:
         return None
     how = f"with the luck taken out ({luck_clause})" if luck_clause else "(our figure for him)"
-    s = (f"At {rate:.1f} yards a {per} {how}, {y_min} yards takes about {g['need']:.1f} {g['unit']}; "
-         f"we project {g['proj']:.1f} (our volume), {g['word']}")
+    s = (f"At {rate:.1f} yards a {per} {how}, an average game of {y_min} yards takes about "
+         f"{g['need']:.1f} {g['unit']}; we project {g['proj']:.1f} on average (our volume), {g['word']}")
     if g["word"] == "fewer than it takes":
         s += f": the Over needs more {g['unit']} or {long_word}"
     s += "."
@@ -1918,8 +1918,10 @@ def card_guide() -> list[str]:
          "The book's quoted prices for each side.",
          "For a Sleeper Power Play the entry pays a flat multiple, so a single leg's price is not its "
          "break-even."),
-        ("Engine's forecast: middle; 80% range",
-         "The middle simulated outcome, and the range that holds the middle 80% of the 20,000 games.",
+        ("Engine's forecast: middle game; 80% range",
+         "The middle simulated outcome (the median, not the average: big games pull an average of yards "
+         "up, so the volume rows below, which are averages, sit above it), and the range that holds the "
+         "middle 80% of the 20,000 games.",
          "How wide the engine thinks his game can go -- a simulated range, not a guarantee. Measured on "
          "2022-25: receiving outcomes land outside it about as often as they should (20%); rushing more "
          "often (23-25%: too narrow); QB passing less often (12%: too wide)."),
@@ -1928,7 +1930,7 @@ def card_guide() -> list[str]:
          "The target every row below works toward. Every volume below is an AVERAGE-production threshold "
          "(the line divided by a rate): he can clear with less volume or miss with more, and the engine's "
          "chance of a volume is not the chance the prop wins."),
-        ("Engine's volume",
+        ("Engine's volume (average)",
          "His average simulated workload. Team plays: this season blended with last, moved part of the way "
          "toward what the spread and total imply (throws 25%, backs' carries 50%). His share: last season "
          "blended with this one, this season counting more each week; an injured teammate's share is "
@@ -1967,10 +1969,12 @@ def card_guide() -> list[str]:
          "The book's catches line beside the yards line (the yards a catch the two ask together), the "
          "carries line and the side its prices favour, and the longest-play lines.",
          "How the book sees him getting his yards: through volume, or through one long play."),
-        ("At the engine's volume, the line needs",
-         "The Over divided by the engine's volume: the efficiency the line asks for if the engine's volume "
-         "is right.",
-         "The efficiency question in one number. Compare it with the rows above."),
+        ("At the engine's average volume, an average game needs",
+         "The Over divided by the engine's average volume: the efficiency at which his AVERAGE game "
+         "reaches the line, if the engine's volume is right.",
+         "The efficiency question in one number, compare it with the rows above. An average, not a "
+         "coin flip: yards are pulled up by big games, so a rate that only just gets there gives less "
+         "than a 50% Over; the rows above give the chance."),
         ("His games this season that beat that",
          "His games this season for this team, with at least one of that volume, in which his yards a unit "
          "reached that number.",
@@ -2355,8 +2359,8 @@ def prop_table(rows, volume) -> tuple[list[str], list[str]]:
     add("Price: Over / Under", cell(lambda r, c, v: f"{_odds(r.get('price_over'))} / {_odds(r.get('price_under'))}"))
     add("The Over needs", cell(lambda r, c, v: f"{c['need_out'] if c else int(float(r['line'])) + 1} "
                                                f"{NEED_WORDS.get(r['market'], '')}".strip()))
-    add("Engine's volume", cell(lambda r, c, v: v.get("volume_text")))
-    add("Engine's forecast: middle; 80% range",
+    add("Engine's volume (average)", cell(lambda r, c, v: v.get("volume_text")))
+    add("Engine's forecast: middle game; 80% range",
         cell(lambda r, c, v: f"{_f(r.get('median'), 0)}; {_f(r.get('p10'), 0)}-{_f(r.get('p90'), 0)}"))
     for key, word in ROW_WORDS.items():
         add(word, cell(lambda r, c, v: (f"{c['rows'][key]['vol_txt']} at {c['rows'][key]['rate_txt']} "
@@ -2365,7 +2369,8 @@ def prop_table(rows, volume) -> tuple[list[str], list[str]]:
                                                               f"{_pc(c['market_row'][1])}")
                                              if c and c["market_row"] else None))
     add("The book's other lines", cell(lambda r, c, v: v.get("book_lines")))
-    add("At the engine's volume, the line needs", cell(lambda r, c, v: c["need_txt"] if c else None))
+    add("At the engine's average volume, an average game needs",
+        cell(lambda r, c, v: c["need_txt"] if c else None))
     add("His games this season that beat that", cell(lambda r, c, v: f"{c['beat'][0]} of {c['beat'][1]}"
                                                      if c and c["beat"] else None))
     add("Engine's own chance of the Over (reference only: it has run high, DECISIONS #202)",
@@ -2889,8 +2894,9 @@ def rush_rec_sentence(d) -> str | None:
     if d["need"] is not None:
         whose = "his luck-free yards a touch" if d.get("rates_luck_free", True) else "our yards a touch (too few of his own plays)"
         bits.append(f"At {whose} ({d['run_rate']:.1f} a carry, {d['catch_rate']:.1f} a catch, "
-                    f"{d['touch_rate']:.1f} a touch at our mix), {d['y_min']} yards takes about {d['need']:.1f} touches; "
-                    f"we project {d['proj_touches']:.1f} ({d['proj_carries']:.1f} carries, {d['proj_catches']:.1f} "
+                    f"{d['touch_rate']:.1f} a touch at our mix), an average game of {d['y_min']} yards takes about "
+                    f"{d['need']:.1f} touches; we project {d['proj_touches']:.1f} on average ({d['proj_carries']:.1f} "
+                    f"carries, {d['proj_catches']:.1f} "
                     f"catches), {d['word']}.")
         if d["book_touches"] is not None:
             bits.append(f"The book's own carries and catches lines add to {d['book_touches']:g} touches.")

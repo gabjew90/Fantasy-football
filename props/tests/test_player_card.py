@@ -57,7 +57,7 @@ def test_receiver_card_is_one_table_with_a_column_per_prop():
             in text)
     assert text.index("| Market's chance of the Over |") < text.index("| Engine's own chance of the Over")
     assert "| The Over needs | 5 catches | 69 yards |" in text
-    assert "| Engine's volume | 8.3 targets | 8.3 targets -> 5.5 catches |" in text
+    assert "| Engine's volume (average) | 8.3 targets | 8.3 targets -> 5.5 catches |" in text
     # 69 yards at 12.0 a catch = 6 catches; P(>= 6) over 1..10 = 50%; receptions has no capped row
     assert "| At his luck-capped rate | - | 6 catches at 12.0 -> **50%** |" in text
     assert "| At his rate this season | 8 targets at 64% -> **60%** | 8 catches at 9.4 -> **30%** |" in text
@@ -232,8 +232,8 @@ def test_the_card_guide_explains_every_row_the_table_prints():
     guide = "\n".join(RS.card_guide())
     rows = ["**The line assumes** (workload, at the engine's efficiency)", "**A Power Play leg needs**",
             "Market's chance of the Over", "Engine's own chance of the Over (reference only)", "Price: Over / Under",
-            "Engine's forecast: middle; 80% range", "The Over needs", "Engine's volume", *RS.ROW_WORDS.values(),
-            "The market's own volume line", "The book's other lines", "At the engine's volume, the line needs",
+            "Engine's forecast: middle game; 80% range", "The Over needs", "Engine's volume (average)", *RS.ROW_WORDS.values(),
+            "The market's own volume line", "The book's other lines", "At the engine's average volume, an average game needs",
             "His games this season that beat that"]
     for r in rows:
         assert f"| {r} |" in guide, r

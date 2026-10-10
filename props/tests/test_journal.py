@@ -294,3 +294,72 @@ def test_entry_paid_labels_a_refund_honestly(root):
     assert "| lost (as paid) | -5.00 |" in "\n".join(J.summary_md(2026))
     with pytest.raises(ValueError, match="0 or more"):
         J.entry_paid(2026, rows[0]["entry_id"], -1)
+
+
+# ------------------------------------------------ the volume view behind a bet (DECISIONS #226)
+
+def test_a_view_relative_to_the_line_is_resolved_and_kept_beside_it():
+    e = J.make_entry("Javonte Williams", "rush_yds", "over", 65.5, -125, team="DAL", season=2026, week=5,
+                     view="+2/+4/+6", line_assumes=15.3, **WHY)
+    assert e["volume_unit"] == "carries" and e["line_volume"] == 15.3 and e["view"] == "+2/+4/+6"
+    assert (e["view_low"], e["view_likely"], e["view_high"]) == (17.3, 19.3, 21.3)
+    one = J.make_entry("Bucky Irving", "rec_yds", "over", 13.5, -125, season=2026, week=5, view="4",
+                       line_assumes=3.0, **WHY)
+    assert one["line_volume"] == 3.0
+    assert one["volume_unit"] == "targets" and (one["view_low"], one["view_likely"], one["view_high"]) == (4, 4, 4)
+    plain = J.make_entry("X", "catches", "over", 3.5, -110, season=2026, week=4, **WHY)
+    assert "view" not in plain and "line_volume" not in plain, "no view: nothing added"
+
+
+def test_a_view_is_refused_without_its_line_or_on_a_market_without_volume():
+    with pytest.raises(ValueError, match="needs --line-assumes"):
+        J.make_entry("X", "rush_yds", "over", 60.5, -110, season=2026, week=4, view="+3", **WHY)
+    with pytest.raises(ValueError, match="needs --line-assumes"):
+        J.make_entry("X", "rush_yds", "over", 60.5, -110, season=2026, week=4, view="+3", line_assumes="", **WHY)
+    with pytest.raises(ValueError, match="signs every value"):
+        J.make_entry("X", "rush_yds", "over", 60.5, -110, season=2026, week=4, view="+2/4/+6", line_assumes=15, **WHY)
+    with pytest.raises(ValueError, match="volume market"):
+        J.make_entry("X", "pass_yds", "over", 240.5, -110, season=2026, week=4, view="+3", line_assumes=30, **WHY)
+    with pytest.raises(ValueError, match="smallest first"):
+        J.make_entry("X", "rush_yds", "over", 60.5, -110, season=2026, week=4, view="20/18/22", line_assumes=15,
+                     **WHY)
+    with pytest.raises(ValueError, match="graded against it"):       # an absolute view is graded against it too
+        J.make_entry("X", "rush_yds", "over", 60.5, -110, season=2026, week=4, view="19", **WHY)
+    with pytest.raises(ValueError, match="ordinary numbers"):
+        J.make_entry("X", "rush_yds", "over", 60.5, -110, season=2026, week=4, view="nan", line_assumes=15, **WHY)
+    with pytest.raises(ValueError, match="goes with --view"):
+        J.make_entry("X", "rush_yds", "over", 60.5, -110, season=2026, week=4, line_assumes=15, **WHY)
+
+
+def test_a_power_play_leg_carries_its_view_and_grading_records_the_actual_volume(root):
+    rc = J.main(["entry", "--stake", "5", "--payout", "50", "--angle", "role", "--why", "Dallas runs it",
+                 "--season", "2026", "--week", "5",
+                 "--leg", "Javonte Williams|rush_yds|over|65.5|DAL|role|view=+2/+4/+6|assumes=15.3",
+                 "--leg", "CeeDee Lamb|catches|over|6.5|DAL"])
+    assert rc == 0
+    rows = {r["player"]: r for r in J.read(2026)}
+    assert rows["Javonte Williams"]["view_likely"] == 19.3 and "view" not in rows["CeeDee Lamb"]
+    assert J.main(["entry", "--stake", "5", "--payout", "50", "--angle", "role", "--why", "x", "--season", "2026",
+                   "--week", "5", "--leg", "A|catches|over|3.5|DAL|role|guess=4", "--leg", "B|catches|over|3.5|DAL"]) == 2
+    for bad in ("A|rush_yds|over|60.5|DAL|view=+2|view=19|assumes=15", "A|rush_yds|over|60.5|DAL|view=+2|role"):
+        assert J.main(["entry", "--stake", "5", "--payout", "50", "--angle", "role", "--why", "x", "--season",
+                       "2026", "--week", "5", "--leg", bad, "--leg", "B|catches|over|3.5|DAL"]) == 2, bad
+    stats = _stats([dict(week=5, team="DAL", player_display_name="Javonte Williams", player_name="J.Williams",
+                         rushing_yards=45, carries=12),
+                    dict(week=5, team="DAL", player_display_name="CeeDee Lamb", player_name="C.Lamb", receptions=2,
+                         targets=5)])
+    J.grade(2026, stats=stats, now=NOW)
+    rows = {r["player"]: r for r in J.read(2026)}
+    assert rows["Javonte Williams"]["actual_volume"] == 12.0
+    assert "actual_volume" not in rows["CeeDee Lamb"], "no view logged: no volume to grade"
+
+
+def test_the_scorecard_grades_your_reads_against_the_lines():
+    rows = [dict(view_low=17.3, view_likely=19.3, view_high=21.3, line_volume=15.3, actual_volume=12.0),
+            dict(view_low=4.0, view_likely=5.0, view_high=6.0, line_volume=3.0, actual_volume=6.0),
+            dict(view_low=2.0, view_likely=2.0, view_high=2.0, line_volume=3.0, actual_volume=3.0)]
+    text = "\n".join(J.volume_read_table(rows))
+    # nearer: only the second (1 vs 3); pointed right: the second (up, went up); the third pointed down, went level
+    assert "| 3 | 1 of 3 |" in text and "| 1 of 3 | 1 of 3 |" in text
+    assert "3.1 / 2.1" in text           # mine (7.3 + 1 + 1) / 3, the line's (3.3 + 3 + 0) / 3
+    assert J.volume_read_table([dict(view_likely=3, line_volume=3)]) == []

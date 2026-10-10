@@ -32,6 +32,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import engine_version  # noqa: E402
+import guard  # noqa: E402
 import persist  # noqa: E402
 
 SHADOW_RE = re.compile(r"shadow_log_(\d{4})_wk(\d{2})_([A-Z]{2,3})_([A-Z]{2,3})\.csv$")
@@ -175,6 +176,28 @@ def minutes_to_kickoff(logged_at: str | None, commence: str | None) -> float | N
         return None
 
 
+def _utc(v):
+    try:
+        t = datetime.fromisoformat(str(v).replace("Z", "+00:00"))
+    except (TypeError, ValueError):
+        return None
+    return t if t.tzinfo else None
+
+
+def quote_snapshot_type(run_type: str, q: dict) -> str:
+    """The snapshot type of ONE archived quote (DECISIONS #226). A capture's output directory is fresh
+    per run, so every quote in it was taken by this capture -- but the guard labels the whole run
+    'close' when only its SOONEST kickoff is inside the close window, so a 12:15 ET run calls the 16:25
+    games' quotes 'close' too. Judged per quote against the guard's own window, from the quote's
+    kickoff and retrieval time; without both, the run's type stands."""
+    if run_type != "close":
+        return run_type
+    k, t = _utc(q.get("commence_time")), _utc(q.get("retrieved_at_utc"))
+    if k is None or t is None:
+        return run_type
+    return "close" if (k - t).total_seconds() / 60.0 <= guard.CLOSE_WINDOW_MIN else "decision"
+
+
 def read_archive(path: Path, season: int, week: int | None, snapshot_type: str,
                  stamp: dict | None = None) -> list[dict]:
     rows = []
@@ -200,7 +223,11 @@ def read_archive(path: Path, season: int, week: int | None, snapshot_type: str,
                           f"covers none or several; left unstamped", file=sys.stderr)
                 else:
                     r["week"] = week
-            r.setdefault("snapshot_type", snapshot_type)
+            # THE CAPTURE'S TYPE, NOT THE SCORER'S. The scorer stamps "decision" on every quote, and the
+            # archive key carries snapshot_type but not the time, so a Thursday open quote at the same
+            # line was REPLACED by Sunday's, and opens and closes could not be told apart (DECISIONS
+            # #226). This reader is the one owner of the type: the run's, judged per quote.
+            r["snapshot_type"] = quote_snapshot_type(snapshot_type, r)
             # A quote is a market fact, so the stamp says which build
             # captured it, not who produced it.
             r.update(stamp or {})

@@ -431,13 +431,13 @@ def test_the_gauge_compares_the_volume_the_line_takes_with_ours():
                             luckfree_ypc=323 / 66)
     assert d["gauge"]["need"] == pytest.approx(90 / (323 / 66))
     s = RS.carry_yards_sentence(d)
-    assert "90 yards takes about 18.4 carries; we project 17.5 (our volume), about what it takes." in s
+    assert "an average game of 90 yards takes about 18.4 carries; we project 17.5 on average (our volume), about what it takes." in s
     assert "The book's own carries line is 19.5: the yards line takes less than the book's own volume." in s
     lk = {"cap": 31.0, "own": True, "n": 183, "games": 10}
     d = RS.carry_yards_read(None, 29.5, model_ypc=4.5, proj_carries=9.1, season_car=30, season_yds=132,
                             luckfree_ypc=132 / 30, luck=lk)
     assert ("At 4.4 yards a carry with the luck taken out (every run past 31 yards, his own 90th percentile "
-            "over his last 10 games with a run (183 runs), counted as 31), 30 yards takes") in RS.carry_yards_sentence(d), \
+            "over his last 10 games with a run (183 runs), counted as 31), an average game of 30 yards takes") in RS.carry_yards_sentence(d), \
         "with no carries line the gauge still names the cap it used"
     d = RS.carry_yards_read(None, 36.5, model_ypc=2.5, proj_carries=11.8)
     assert "fewer than it takes: the Over needs more carries or a long run." in RS.carry_yards_sentence(d)
@@ -447,7 +447,7 @@ def test_the_gauge_compares_the_volume_the_line_takes_with_ours():
     # a low-volume receiver gets the warning
     d = RS.catch_yards_read(1.5, 19.5, model_ypc=13.4, proj_catches=2.2)
     s = RS.catch_yards_sentence(d)
-    assert "20 yards takes about 1.5 catches; we project 2.2" in s and "one catch either way decides it" in s
+    assert "an average game of 20 yards takes about 1.5 catches; we project 2.2 on average" in s and "one catch either way decides it" in s
     assert RS.volume_gauge(45, 11.5, None, "catches", 3.0) is None
 
 
@@ -515,7 +515,7 @@ def test_last_seasons_games_round_trip_through_the_resource():
 def test_the_gauge_says_whose_volume_each_number_is():
     d = RS.carry_yards_read(19.5, 89.5, model_ypc=4.4, proj_carries=17.5, carries_fav="Under")
     s = RS.carry_yards_sentence(d)
-    assert "we project 17.5 (our volume)" in s
+    assert "we project 17.5 on average (our volume)" in s
     assert "The book's own carries line is 19.5, Under favoured: fewer than the yards line takes" in s
     d = RS.carry_yards_read(None, 29.5, model_ypc=4.3, proj_carries=9.1)
     assert "The book posts no carries line for him, so this is against our volume only." in RS.carry_yards_sentence(d)
@@ -584,7 +584,7 @@ def test_the_quarterback_read_uses_completions():
     assert "The lines ask 11.5 yards a completion (259.5 over 22.5); we expect 11.9, 10.8 luck-free over his last 10 games." in s
     assert ("every completion past 41 yards, his own 90th percentile over his last 10 games with a completion "
             "(210 completions), counted as 41") in s
-    assert "260 yards takes about 24.1 completions; we project 20.1 (our volume), fewer than it takes" in s
+    assert "an average game of 260 yards takes about 24.1 completions; we project 20.1 on average (our volume), fewer than it takes" in s
     assert "The book's own completions line is 22.5, Under favoured: fewer than the yards line takes" in s
     assert "The longest-completion line (34.5) means one completion of 35, 13% of the 260 yards." in s
     assert RS.qb_yards_read(22.5, None) is None
@@ -747,7 +747,7 @@ def test_the_rushing_plus_receiving_read():
     assert d["air_share"] == pytest.approx(3.1 * 7.0 / (15.8 * 4.3 + 3.1 * 7.0))
     s = RS.rush_rec_sentence(d)
     assert s.startswith("The book's line is 52.5, Over favoured (a coin flip at about")
-    assert "53 yards takes about" in s and "we project 18.9 (15.8 carries, 3.1 catches)" in s
+    assert "an average game of 53 yards takes about" in s and "we project 18.9 on average (15.8 carries, 3.1 catches)" in s
     assert "The book's own carries and catches lines add to 16 touches." in s
     assert "if his team falls behind, that part holds up" in s
     assert "Our model gives the Over" not in s, "no model chance passed in: none claimed"
