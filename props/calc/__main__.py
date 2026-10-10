@@ -26,7 +26,7 @@ import pandas as pd
 from core import fetch as F
 from core.manifest import Manifest
 
-from . import capture, card, data, game_lines, lines, matchup, names, odds, opponent, player, settings
+from . import capture, card, data, game_lines, lines, matchup, names, odds, opponent, player, settings, summary
 from .checks import DataError, number
 from .markets import workload_col
 from .shared import journal
@@ -59,9 +59,11 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("capture")
     en = sub.add_parser("entry", help="log a Power Play in the props journal, legs filled in from their cards")
     en.add_argument("--stake", type=float, required=True, help="dollars staked on the entry")
-    en.add_argument("--payout", type=float, required=True,
+    en.add_argument("--payout", type=float,
                     help="the total returned if every leg wins, your stake included: the number Sleeper shows "
-                         "(e.g. $5 entry, Sleeper shows $97.50 -> --payout 97.5); must be above --stake")
+                         "(e.g. $5 entry, Sleeper shows $97.50 -> --payout 97.5); must be above --stake. "
+                         "Needed to log; a --dry-run without it works the payout out from the legs' prices "
+                         "and says so")
     en.add_argument("--angle", required=True, choices=list(journal.ANGLES), help="the entry's story")
     en.add_argument("--why", required=True, help="the entry's reason in one line")
     en.add_argument("--leg", action="append", required=True,
@@ -287,7 +289,7 @@ def build_card(b, name_in: str, market: str, side: str = "over", *, team=None, s
     kicked_off = pd.Timestamp(game["kickoff_utc"]) <= pd.Timestamp(dt.datetime.now(dt.timezone.utc))
     out = {"by_initial": by_initial[0], "kicked_off": kicked_off, "stub": stub, "line": line, "mult_over": mo,
            "mult_under": mu, "source": source, "c": None, "ready": False,
-           "not_enough": market in pl.not_enough,
+           "not_enough": market in pl.not_enough, "opp": opp,
            "reason": "; ".join(pl.not_enough.get(market, [])) or (source if line is None else "")}
     if market in pl.not_enough:                 # the data gap is the first thing to say, line or not
         return {**out, "text": warn + card.render_not_enough(pl, market, side, line, mo, mu, footer=footer)}
@@ -347,14 +349,19 @@ def _parse_leg(spec: str) -> tuple:
 
 def _check_entry(a, legs: list) -> None:
     """The checks that need no data, made before the bundle is loaded."""
+    if a.payout is None and not getattr(a, "dry_run", False):
+        raise SystemExit("--payout (the total Sleeper shows for your entry) is needed to log it; a --dry-run "
+                         "can work it out from the legs' prices")
     for name_, v in (("--stake", a.stake), ("--payout", a.payout)):
+        if v is None:
+            continue
         try:
             number(v, name_)
         except DataError as ex:
             raise SystemExit(str(ex)) from None
     if len(legs) < 2:
         raise SystemExit("a Power Play has at least two legs")
-    if not 0 < a.stake < a.payout:
+    if a.payout is not None and not 0 < a.stake < a.payout:
         raise SystemExit(f"--payout is the total returned if every leg wins, stake included (the number Sleeper "
                          f"shows), so it is above --stake; got ${a.stake:g} staked, ${a.payout:g} payout")
     if not str(a.why or "").strip():
@@ -396,15 +403,19 @@ def entry(a) -> str:
     if problems:
         return warn + "Not logged:\n" + "\n".join(f"  {p}" for p in problems)
     week = weeks.pop()
+    views = [summary.leg_view(g["stub"]["player"], g["stub"]["market"], side, g["c"], g["stub"]["team"], g["opp"],
+                              g["stub"]["game_id"]) for side, g in cards]
+    payout = a.payout if a.payout is not None else summary.payout_from_legs(a.stake, views)
+    entry_text = summary.render(views, a.stake, payout, payout_from_legs=a.payout is None)
     jlegs = [(g["stub"]["player"], g["stub"]["market"], side, g["line"], g["stub"]["team"]) for side, g in cards]
     try:
-        rows = journal.make_power_play(jlegs, stake=a.stake, payout=a.payout, angle=a.angle, why=a.why,
+        rows = journal.make_power_play(jlegs, stake=a.stake, payout=payout, angle=a.angle, why=a.why,
                                        season=season, week=week)
     except ValueError as ex:
         return warn + f"Not logged: {ex}"
     for r, (side, g) in zip(rows, cards):
         r.update(journal_fields(side, g))
-    text = "\n\n".join(g["text"] for _, g in cards)
+    text = "\n\n".join(g["text"] for _, g in cards) + "\n\n" + entry_text
     if getattr(a, "dry_run", False):
         # the same serialisation journal.write uses, line for line
         added = "\n".join(json.dumps(r, sort_keys=True) for r in rows)
@@ -412,7 +423,7 @@ def entry(a) -> str:
                 f"{journal.journal_path(season)}:\n{added}")
     journal.write(season, journal.read(season) + rows)
     return (warn + text + f"\n\nLogged entry {rows[0]['entry_id']}: {len(rows)} legs, ${a.stake:g} to "
-            f"${a.payout:g}, in {journal.journal_path(season)}.")
+            f"${payout:g}, in {journal.journal_path(season)}.")
 
 
 def journal_fields(side: str, g: dict) -> dict:

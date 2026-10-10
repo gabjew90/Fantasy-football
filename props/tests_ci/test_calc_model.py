@@ -128,7 +128,8 @@ def test_card_renders_the_spec_layout():
                        opp_row={"value": 4.43, "games": 4, "who": " to RBs"}, grades={"off": "B", "def": "C"})
     lines_ = text.splitlines()
     flat = " ".join(lines_)
-    assert lines_[:3] == ["Check first: workload bar untested.", "TEST BACK", "Over 64.5 rushing yards (-125)"]
+    assert " ".join(lines_[:2]) == "Tested on 2018-25: held up where it could be checked."
+    assert lines_[2:4] == ["TEST BACK", "Over 64.5 rushing yards (-125)"]
     bar = card.value(c, "needed_over")
     for needle in (f"Bar for this price  ~{card._round(bar)} carries", "Last 4: 12, 12, 19, 19  (avg 15.5)",
                    f"{card._round(bar)}+ this season: ", "AT 15.5 CARRIES",
@@ -530,7 +531,7 @@ def test_review_fixes_on_the_card_wording(monkeypatch):
     assert "No spread shown. Total 44.5." in flat and "even spread" not in flat
     monkeypatch.setitem(card.TEST_STATUS, "rush_yds", "Failed: ranges too narrow on 2018-23.")
     flat = " ".join(card.render(pl, c, "over", opp="TB").splitlines())
-    assert "Check first: Failed: ranges too narrow on 2018-23." in flat
+    assert "Failed: ranges too narrow on 2018-23." in flat
     far = card.compute(pl, rush_model(ypc=1.0), "rush_yds", 300.5, 1.8, 1.76, fixed)
     assert "Line implies" not in card.render(pl, far, "over", opp="TB")         # moved to the follow-up
     marked = window.assign(fewer_snaps=[True, False, False, False, False])
@@ -555,7 +556,7 @@ def test_a_skipped_quote_note_and_a_schedule_line_are_shown():
     text = card.render(pl, c, "over", opp="TB", game_lines=sched,
                        line_note="passed over 2 newer archive snapshots that were one-sided or split")
     flat = " ".join(text.splitlines())
-    assert text.splitlines()[0] == "Check first: workload bar untested."
+    assert " ".join(text.splitlines()[:2]) == "Tested on 2018-25: held up where it could be checked."
     assert "Check first: passed over 2 newer archive snapshots" in flat
     assert "Total 47 (schedule line; ESPN not read: URLError)." in flat and "closing line" not in flat
     err = card.render(pl, c, "over", opp="TB", opp_row={"error": "MergeError: x", "note": "not available"},
@@ -666,3 +667,12 @@ def test_half_up_everywhere_and_the_workload_ask_from_displayed_numbers():
     flat = " ".join(text.splitlines())
     assert "(avg 26.3)" in flat and "AT 26.3 CARRIES" in flat
     assert "About 0.5 more carries" in flat               # 27 - 26.3 = 0.7, to the nearest half 0.5
+
+
+def test_each_bet_type_carries_its_test_line_first():
+    want = {"rush_yds": "Tested on 2018-25: held up where it could be checked.",
+            "receptions": "Tested on 2018-25: Overs hit a bit more often than this bar implies.",
+            "rec_yds": "Tested on 2018-25: roughly right, slightly strict on Overs.",
+            "pass_yds": "Tested on 2018-25: the least reliable of the four. Treat the bar as rough."}
+    assert card.TEST_STATUS == want
+    assert "untested" not in " ".join(want.values())

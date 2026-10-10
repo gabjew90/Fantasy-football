@@ -169,6 +169,7 @@ One card per leg, one side (the side asked about), plain text, about 40 characte
 line may wrap). The same layout for all four bet types.
 
 ```
+[Tested on 2018-25: ...]                <- the bet type's test line (see "Held-out read")
 [Check first: ...]                      <- only when something affects the bar (below)
 [PLAYER]
 [Side] [line] [bet type] ([price])
@@ -228,9 +229,9 @@ Line as of [Mon D, H:MM AM/PM] PT.
   (ESPN's depth chart, in nflverse depth_charts, still listed Baker Mayfield as TB's QB1 before
   week 5 of 2026, two starts after he went out; Sleeper's depth chart is live-only and hand-kept),
   so the "[Name] starts at QB today." form is never shown: no guessed names.
-- "Check first:" lines, above the numbers: "workload bar untested." while the bet type's tests
-  have not passed (a failed test's own wording replaces it); a lookup note when newer saved
-  quotes were skipped.
+- The test line, first on every card, one per bet type (the user's wording after the held-out
+  read; see "Held-out read"); "Check first:" lines below it: a lookup note when newer saved quotes
+  were skipped.
 - Markers (rule 3): a game where his offensive snap share was under 0.5 times his average in his
   other games that season ("* Week N: played far fewer snaps than usual."), and a game his team's
   starting quarterback was not the team's opening-day starter, naming who started ("* Week 4:
@@ -343,6 +344,8 @@ Not built; each needs the user's go-ahead (the frozen-spec rule).
 - The closing question does not consider his this-season rate (the user, 2026-10-10).
 - For live cards, an attributed line in MATCHUP: "Sleeper lists [Name] at QB." (the user,
   2026-10-10).
+- day_sd, k_catch and k_ypr barely change the tuning scores (2018-23), so they may be removable
+  (the user, 2026-10-10; not acted on).
 
 ## Outputs
 
@@ -647,5 +650,15 @@ mark is changed after a result):
 - Passing's workload range was slightly too narrow in 2024-25 (76.9%).
 - Pass attempts per game fell league-wide in 2024-25; the game-story rows are not on the card.
 
-No bet type passed all of its tests, so "Check first: workload bar untested." stays on every
-card until the user chooses the wording for the failures.
+**The band test leaves bands empty by design (the user, 2026-10-10).** Its lines sit at three
+heights (0.8x, 1.0x and 1.2x of workload x rate) and each 10-point band needs 200 games, so the
+stated chances bunch near three values per bet type and some bands cannot fill. This was the
+user's specification, not a calculator fault. Accepted as reported: no retune, no grid changes,
+no change to the band test.
+
+**The card's test line (the user's wording, same day), first on every card, replacing "Check
+first: workload bar untested."; the numbers above go in the "Calculation" follow-up:**
+- Rushing yards: "Tested on 2018-25: held up where it could be checked."
+- Receptions: "Tested on 2018-25: Overs hit a bit more often than this bar implies."
+- Receiving yards: "Tested on 2018-25: roughly right, slightly strict on Overs."
+- Passing yards: "Tested on 2018-25: the least reliable of the four. Treat the bar as rough."

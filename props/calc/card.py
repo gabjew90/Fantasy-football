@@ -16,11 +16,11 @@ from .player import Player
 
 # What the tests have said about each market, in plain words. Updated by hand
 # when a test is read; a failed test is stated here and shows on every card.
-TEST_STATUS = {
-    "rush_yds": "Not yet tested: settings are the prototype's starting values.",
-    "receptions": "Not yet tested: settings are the prototype's starting values.",
-    "rec_yds": "Not yet tested: settings are the prototype's starting values.",
-    "pass_yds": "Not yet tested: settings are the prototype's starting values.",
+TEST_STATUS = {      # the user's wording after the 2024-25 held-out read (2026-10-10; numbers in "Calculation")
+    "rush_yds": "Tested on 2018-25: held up where it could be checked.",
+    "receptions": "Tested on 2018-25: Overs hit a bit more often than this bar implies.",
+    "rec_yds": "Tested on 2018-25: roughly right, slightly strict on Overs.",
+    "pass_yds": "Tested on 2018-25: the least reliable of the four. Treat the bar as rough.",
 }
 
 
@@ -292,11 +292,8 @@ def render(pl: Player, c: dict, side: str, *, opp: str, game_lines: dict | None 
     rate = pl.rates[RATE_KEY[m]]
     sol = c["solutions"]
     out = []
-    status = TEST_STATUS.get(m, "not tested")
-    if status.startswith("Not yet tested") or status == "not tested":
-        out.append("Check first: workload bar untested.")
-    elif not status.startswith("Passed"):      # a failed or partial test shows on every card
-        out += _wrap(f"Check first: {status}")
+    # the test result for this bet type, first on every card (a bet type with no result says so)
+    out += _wrap(TEST_STATUS.get(m, "Check first: workload bar untested."))
     if line_note:                              # the lookup skipped newer saved quotes: say so above the numbers
         out += _wrap(f"Check first: {line_note}.")
     out += _title(pl, c, side) + [""]
