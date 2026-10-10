@@ -254,6 +254,8 @@ multiplier). Not into `props/record/`: only the props workflow commits there, an
 `scripts/check_commit_hygiene.py` refuses a PR that mixes it with code. The card reads both files.
 It is run by hand; no workflow is added or changed. Unmatched lines are logged in
 `props/calc/log/name_misses.jsonl` and not saved.
+When the engine workflow retires, the two stores merge: calc's file becomes the one line history
+(the user, 2026-10-10).
 
 Commands, all under `python -m props.calc`: `leg`, `entry`, `capture`.
 
@@ -352,6 +354,24 @@ All sixteen open questions were answered: as recommended, except where noted.
 14. The rate-needed row is added (it also replaces the good-day row, item 5).
 15. Early weeks show "only N games" and nothing else.
 16. The search is never re-run at a defense's allowed rate.
+
+## Known issues
+
+- **The journal grades and stamps late lines by name, not by id** (the user, 2026-10-10: record
+  it, do not change journal.py now). `journal.grade` finds the player in settle's weekly stats by
+  normalised name and team, else by name alone when exactly one player has it; `journal.late_line`
+  matches the line history by normalised name, market, side and week only. The gsis id calc puts
+  on each leg row is not used. Triggers: (a) two players with the same normalised name have
+  Sleeper lines in the same week and market, so the late line (and its CLV) can be the other
+  player's; (b) a leg row whose team does not match the stats file (a midweek trade) and a
+  namesake elsewhere in the league, so the leg stays open, or goes to "check"; (c) a name the book
+  spells differently from nflverse (suffixes, nicknames), so the leg stays open as unjoined.
+- **Repeat captures replace earlier ones at the same line.** persist's row key has no capture
+  time, so a later calc capture of the same player, market, side and line replaces the earlier
+  row's prices. The journal row keeps the prices its card used.
+- **Engine rows after a flex.** The engine's name-joined rows must match the current kickoff
+  exactly, so after a flexed game they are skipped and an older calc quote can be the newest
+  found.
 
 ## Progress log
 

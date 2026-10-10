@@ -472,3 +472,19 @@ def test_entry_never_logs_a_name_matched_by_initial(stub_leg, monkeypatch):
                                                                          over=-125, under=-132))
     text = cli.entry(_entry_args())
     assert "matched by initial" in text and journal.read(2026) == []
+
+
+def test_entry_dry_run_prints_the_journal_lines_and_writes_nothing(stub_leg, monkeypatch):
+    import json
+    cli, lookup, pl = stub_leg
+    from props.calc import player
+    from props.calc.shared import journal
+    monkeypatch.setattr(player, "model", lambda *a, **k: rush_model(ypc=4.2))
+    lookup.quote = dict(QUOTE)
+    text = cli.entry(_entry_args(dry_run=True))
+    assert "DRY RUN: nothing written" in text and journal.read(2026) == []
+    assert not journal.journal_path(2026).exists()
+    lines_ = text.split("would be added to ")[1].splitlines()[1:]
+    rows = [json.loads(x) for x in lines_]
+    assert len(rows) == 2 and rows[0]["calc_bar_status"] == "ok" and rows[0]["line"] == 64.5
+    assert lines_[0] == json.dumps(rows[0], sort_keys=True)       # journal.write's own format

@@ -16,6 +16,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 
 import datetime as dt
@@ -64,6 +65,8 @@ def main(argv: list[str] | None = None) -> int:
                     help="'Name|market|over or under|line played[|TEAM]', repeatable")
     en.add_argument("--season", type=int)
     en.add_argument("--week", type=int)
+    en.add_argument("--dry-run", action="store_true",
+                    help="print exactly the journal lines it would add, and write nothing")
     a = ap.parse_args(argv)
 
     try:
@@ -282,8 +285,13 @@ def entry(a) -> str:
         return warn + f"Not logged: {ex}"
     for r, (side, g) in zip(rows, cards):
         r.update(journal_fields(side, g))
-    journal.write(season, journal.read(season) + rows)
     text = "\n\n".join(g["text"] for _, g in cards)
+    if getattr(a, "dry_run", False):
+        # the same serialisation journal.write uses, line for line
+        added = "\n".join(json.dumps(r, sort_keys=True) for r in rows)
+        return (warn + text + f"\n\nDRY RUN: nothing written. These {len(rows)} lines would be added to "
+                f"{journal.journal_path(season)}:\n{added}")
+    journal.write(season, journal.read(season) + rows)
     return (warn + text + f"\n\nLogged entry {rows[0]['entry_id']}: {len(rows)} legs, ${a.stake:g} to "
             f"${a.payout:g}, in {journal.journal_path(season)}.")
 

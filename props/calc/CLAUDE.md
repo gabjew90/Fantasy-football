@@ -5,11 +5,12 @@ repo-root CLAUDE.md and docs/plans/2026-10-10-parlay-leg-calculator.md.
 
 1. **"Code review" means the built-in `/code-review` skill**, not a plugin
    skill. Say which one ran.
-2. **Review at the commit, not after each edit.** Before every commit that
-   changes props/calc, run `/code-review` on the finished diff; fix what it
-   finds or tell the user why not. Use a higher effort level (xhigh) for
-   anything touching data loading, name matching, odds conversion or the
-   simulation.
+2. **Review per stage, after the commit** (the user, 2026-10-10; replaces the
+   earlier review-before-commit rule). Commit first, so work is never unsaved.
+   Then run one `/code-review` at high effort on that stage's diff. Fix crashes,
+   wrong numbers, silent failures and anything that could corrupt saved data;
+   list everything else for the user. At most one re-review after the fixes,
+   then move on.
 3. **Tests carry the load, not review.** Every numeric function has a
    known-answer test before it is used anywhere. Pinned now:
    - odds: multiplier 1.78 -> break-even 56.2%; -125 -> 55.6%
