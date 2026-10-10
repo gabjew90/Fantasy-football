@@ -93,6 +93,28 @@ with the spread check as a guard.
 only, no candidate). The confirmation weeks include those three; week 5 is unread by any
 running-game candidate.
 
+## Amendments, 2026-10-09, before any run (from the code review of the built option)
+
+- **The handout:** an exiter's lost share goes to his non-QB teammates in proportion to their
+  EXPECTED shares, not their shares in that simulation. With per-simulation shares the means could
+  not be held: a tiny receiver (a receiver's 0.8 carries) ran 4.5% high. With expected shares the
+  mean correction is exact (every combination of exiters enumerated) and the 1% test holds for
+  every player, including a 0.01-share receiver.
+- **The keep fraction is a knob:** `carry_exit_keep` (0.4) in width_params.json beside the other
+  two, not a code constant; not gridded.
+- **A named starting QB is required:** without one the option stays off for that team-game (a
+  running QB is not a back).
+- **The tail rule, written as meant:** "toward 10% and not past it" -- the pick's share below p10
+  on the same side of 10% as shipped's and nearer; the formula alone allowed an overshoot.
+- **The soft guards, made concrete:** rushing attempts (bettable backs) and completions (starting
+  QBs) block when the paired CRPS difference, seed-averaged per player-game on 2022-25, has a 95%
+  game-clustered interval wholly on the worse side. The scoreboard's log-loss guards cover only
+  its five markets.
+- **Run integrity:** the confirmation frames must hold 2026 weeks 2-5; the spread guard refuses to
+  run without the starting QBs (it would treat a starter change as a stable stretch).
+- **For the ship PR, if it ships:** exit eligibility (share >= 0.15) is decided after the workload
+  search scales a share, so research.implied_carries would need the unscaled share.
+
 ## Result
 
 (Filled in after the runs, below this line, without editing anything above.)

@@ -1626,7 +1626,16 @@ SEEDCHECK_38 = [{"pass_implied_exp": 0.0, "pass_scale": 1.0, "pass_shrink": None
 SEEDCHECK_41 = [{"te_share_mult": 1.0, "pass_implied_exp": 0.0, "pass_scale": 1.0},
                 {"te_share_mult": 1.06, "pass_implied_exp": 0.0, "pass_scale": 1.0}]
 
+# Round 44 (reports/round44_carry_exits.md): an early-exit chance in the carries split, with a
+# slightly wider split; (0, 20) is shipped. The pick is made by props/tools/round44_select.py.
+CARRY_EXIT_GRID = [{"carry_exit_rate": e, "share_conc_carries": c}
+                   for c in (20.0, 15.0) for e in (0.0, 0.02, 0.03, 0.05)]
+
 SUBGRIDS = {
+    "carryexit": (CARRY_EXIT_GRID, ("rush", "rr", "car"), "width",
+                  "Round 44: an early-exit chance in the backs' carries split, with a slightly wider split "
+                  "(reports/round44_carry_exits.md); the pick is made by props/tools/round44_select.py, not by "
+                  "this table."),
     "seedcheck38": (SEEDCHECK_38, ("pass",), "width", "Seed check, round 38 (DECISIONS #202)."),
     "seedcheck41": (SEEDCHECK_41, ("rec",), "width", "Seed check, round 41 (DECISIONS #202)."),
     "receivinglevel": (RECEIVING_LEVEL_GRID, ("rec", "yds", "pass"), "width",
@@ -2218,7 +2227,7 @@ def main(argv=None):
     ap.add_argument("--tune-width", action="store_true",
                     help="choose the width settings on the --tune seasons; writes --report (.md/.csv)")
     ap.add_argument("--width-out", default=None, help="--tune-width: write the chosen settings to this JSON file")
-    ap.add_argument("--tune-grid", choices=["main", "qb", "rushnorm", "rushlead", "tier2", "running", "conversion", "targetspread", "yardsshape", "passspread", "receivingjoint", "qbshare", "qbbias", "receivingroles", "receivinglevel", "seedcheck38", "seedcheck41"], default="main",
+    ap.add_argument("--tune-grid", choices=["main", "qb", "rushnorm", "rushlead", "tier2", "running", "conversion", "targetspread", "yardsshape", "passspread", "receivingjoint", "qbshare", "qbbias", "receivingroles", "receivinglevel", "seedcheck38", "seedcheck41", "carryexit"], default="main",
                     help="--tune-width: the receiving/rushing grid, the starting QB's own settings, or the "
                          "carry-share rescaling")
     ap.add_argument("--dispersion", choices=["prior", "train"], default=None,
