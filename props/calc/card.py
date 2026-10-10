@@ -5,9 +5,10 @@ no chance of its own, no verdict."""
 from __future__ import annotations
 
 import math
+import textwrap
 
 from . import calc, odds
-from .markets import label, workload_col, workload_words
+from .markets import label, min_own, workload_col, workload_words
 from .player import Player
 
 # What the tests have said about each market, in plain words. Updated by hand
@@ -24,25 +25,43 @@ def compute(pl: Player, model: calc.Model, market: str, line: float, mult_over: 
     p_book = odds.no_vig(mult_over, mult_under)
     t_o = target if target is not None else be_o
     t_u = target if target is not None else be_u
-    usual = pl.usual(market, int(fixed["usual_games"]))
-    need_o = calc.workload_for(model, line, t_o)
-    need_u = calc.workload_for(model, line, 1 - t_u)
+    usual = pl.usual(market, int(fixed["usual_games"]))      # None below its minimum number of games
+    # every row counts a push as void (Sleeper drops a pushed leg): each side's
+    # share of the decided games; on a half-point line, its plain chance
+    s_o = calc.solve_workload(model, line, t_o)
+    s_u = calc.solve_workload(model, line, 1 - t_u)
+    s_b = calc.solve_workload(model, line, p_book)
+    r_o = calc.solve_rate(model, line, t_o, usual) if usual is not None else None
+    r_u = calc.solve_rate(model, line, 1 - t_u, usual) if usual is not None else None
     out = {
         "market": market, "line": line, "mult_over": mult_over, "mult_under": mult_under,
         "break_even_over": be_o, "break_even_under": be_u, "no_vig_over": p_book,
         "target_over": t_o, "target_under": t_u,
-        "needed_over": need_o, "needed_under": need_u,
-        "book_expects": calc.workload_for(model, line, p_book),
-        "usual": usual, "rate": model.rate,
-        "rate_needed_over": calc.rate_for(model, line, t_o, usual) if usual else None,
-        "rate_needed_under": calc.rate_for(model, line, 1 - t_u, usual) if usual else None,
+        "solutions": {"needed_over": s_o, "needed_under": s_u, "book_expects": s_b,
+                      "rate_needed_over": r_o, "rate_needed_under": r_u},
+        "usual": usual, "rate": model.rate, "search_max": model.limits.search_max[model.kind],
     }
+    need_o, need_u = value(out, "needed_over"), value(out, "needed_under")
     recent = pl.window.tail(int(fixed["usual_games"]))
-    out["usual_games"] = int(fixed["usual_games"])
+    out["usual_games"] = len(recent)
+    out["usual_min"] = int(fixed["usual_games"])
+    # his plain season rate is shown only from the same minimum sample as his own rate
+    out["season_min"] = min_own(market, fixed)
     out["usual_spans_seasons"] = bool(len(recent) and (recent["season"] < pl.season).any())
     out["gap_over"] = need_o - usual if need_o is not None and usual is not None else None
     out["gap_under"] = usual - need_u if need_u is not None and usual is not None else None
     return out
+
+
+def _last_n(n: int) -> str:
+    return "last-game" if n == 1 else f"last-{n}"
+
+
+def value(c: dict, key: str) -> float | None:
+    """A search's value when it found one ("ok"), else None. The Solutions in
+    c["solutions"] are the only stored copy of each result."""
+    s = c["solutions"].get(key)
+    return s.value if s is not None and s.status == "ok" else None
 
 
 def _round(x: float) -> int:
@@ -50,15 +69,32 @@ def _round(x: float) -> int:
     return int(math.floor(x + 0.5))
 
 
-def _w(x: float | None, kind: str) -> str:
-    if x is None:
-        return f"more than {calc.SEARCH_MAX[kind]:.0f}"
+def _w(x: float) -> str:
     return f"about {_round(x)} ({x:.1f})"
 
 
-def _rate(market: str, r: float | None) -> str:
-    if r is None:
-        return "out of reach"
+def _need_line(side: str, pct: float, s, top_w: float, words: str) -> str:
+    """The "wins often enough" row for one side, worded for each search result."""
+    top = f"{top_w:.0f}"
+    head = f"{side} wins often enough ({pct:.0%})"
+    r = calc.side_result(side.lower(), s.status)
+    if r == "ok":
+        return f"{head} at {_w(s.value)} {words}" + (" or fewer" if side == "Under" else "")
+    if r == "always":
+        return f"{head} at any workload up to {top} {words}"
+    return f"{side} cannot win often enough ({pct:.0%}) at any workload up to {top} {words}"
+
+
+def _rate_phrase(side: str, s, market: str) -> str:
+    any_rate = "at any catch rate" if market == "receptions" else "at any yards per carry"
+    r = calc.side_result(side.lower(), s.status)
+    if r == "ok":
+        return (f"the Over needs {_rate(market, s.value)}" if side == "Over"
+                else f"the Under {_rate(market, s.value)} or less")
+    return f"the {side} {'wins' if r == 'always' else 'cannot win'} often enough {any_rate}"
+
+
+def _rate(market: str, r: float) -> str:
     return f"{r:.1f} a carry" if market == "rush_yds" else f"{r:.0%} caught"
 
 
@@ -103,42 +139,85 @@ def _last_games(pl: Player, market: str, n: int = 5) -> str:
     return ", ".join(parts) if parts else "none"
 
 
+def _header(pl: Player, m: str, line: float | None, mult_over: float | None, mult_under: float | None,
+            source: str) -> list[str]:
+    out = [f"{pl.name.upper()} ({pl.team} {pl.position}) - {label(m)} - week {pl.week}"]
+    if line is not None:
+        ao, au = odds.american_from_multiplier(mult_over), odds.american_from_multiplier(mult_under)
+        out.append(f"Line {line:g}: Over {odds.fmt_american(ao)} ({mult_over:.2f}x) | "
+                   f"Under {odds.fmt_american(au)} ({mult_under:.2f}x)")
+    if source:
+        out += ["  " + x for x in textwrap.wrap(f"({source})", 96)]
+    return out
+
+
+def render_not_enough(pl: Player, m: str, line: float | None, mult_over: float | None,
+                      mult_under: float | None, *, source: str = "") -> str:
+    """The card when a rate or pool is below its minimum sample: no workload
+    numbers, only the reason and his plain history."""
+    kind = workload_col(m)
+    lines = _header(pl, m, line, mult_over, mult_under, source)
+    lines.append("Not enough data, so no workload numbers for this leg:")
+    lines += [f"  - {why}" for why in pl.not_enough[m]]
+    lines.append(f"His last games ({kind}-{'yards' if m == 'rush_yds' else 'catches'}): {_last_games(pl, m)}")
+    lines.append(f"Tested: {TEST_STATUS.get(m, 'not tested')}")
+    return "\n".join(lines)
+
+
 def render(pl: Player, c: dict, *, source: str = "") -> str:
     m = c["market"]
+    if m in pl.not_enough:
+        raise ValueError(f"not enough data for {m}: use render_not_enough")
     kind = workload_col(m)
     words = workload_words(m)
-    ao, au = odds.american_from_multiplier(c["mult_over"]), odds.american_from_multiplier(c["mult_under"])
     rate = pl.rates["ypc" if m == "rush_yds" else "catch"]
-    lines = [
-        f"{pl.name.upper()} ({pl.team} {pl.position}) - {label(m)} - week {pl.week}",
-        f"Line {c['line']:g}: Over {odds.fmt_american(ao)} ({c['mult_over']:.2f}x) | "
-        f"Under {odds.fmt_american(au)} ({c['mult_under']:.2f}x)",
-    ]
-    if source:
-        lines.append(f"  ({source})")
+    lines = _header(pl, m, c["line"], c["mult_over"], c["mult_under"], source)
     usual_rate = _rate(m, c["rate"])
+    sol = c["solutions"]
+    sb = sol["book_expects"]
+    book = (_w(sb.value) if sb.status == "ok"
+            else f"more than {c['search_max']:.0f}" if sb.status == "high" else "about 0")
     lines += [
-        f"Over wins often enough ({c['target_over']:.0%}) at {_w(c['needed_over'], kind)} {words}",
+        _need_line("Over", c["target_over"], sol["needed_over"], c["search_max"], words),
         f"  at his usual {usual_rate}",
-        f"Under wins often enough ({c['target_under']:.0%}) at {_w(c['needed_under'], kind)} {words} or fewer",
-        f"Book expects: {_w(c['book_expects'], kind)} {words}",
+        _need_line("Under", c["target_under"], sol["needed_under"], c["search_max"], words),
+        f"Book expects: {book} {words}",
     ]
     if c["usual"] is not None:
-        lines.append(f"At his last-{c['usual_games']} average of {c['usual']:.1f} {words}: the Over needs {_rate(m, c['rate_needed_over'])}, "
-                     f"the Under {_rate(m, c['rate_needed_under'])} or less")
-    season = _rate(m, rate.season) + f" on {rate.season_n}" if rate.season is not None else "none yet"
-    lines.append(f"  His rate: blended {usual_rate} ({rate.own_n} of his own plays); this season {season}")
+        lines.append(f"At his {_last_n(c['usual_games'])} average of {c['usual']:.1f} {words}:")
+        lines.append(f"  {_rate_phrase('Over', sol['rate_needed_over'], m)};")
+        lines.append(f"  {_rate_phrase('Under', sol['rate_needed_under'], m)}")
+    plays = kind
+    if rate.season is not None and rate.season_n >= c["season_min"]:
+        season = _rate(m, rate.season) + f" on {rate.season_n} {plays}"
+    else:
+        season = f"only {rate.season_n} {plays}, not enough data for a rate (needs {c['season_min']})"
+    lines.append(f"His rate: blended {usual_rate} ({rate.own_n} of his own plays in his last {len(pl.window)} games)")
+    lines.append(f"  this season: {season}")
+    if m == "receptions" and pl.no_depth:
+        lines.append(f"  ({pl.no_depth} of his targets had no recorded depth and were left out of his depth mix)")
+    if m == "receptions" and pl.pools.get("targets_without_depth"):
+        lines.append(f"  (the pool's {pl.pools['targets_without_depth']} targets with no recorded depth count in "
+                     f"league averages, not in the depth groups)")
     # the same whole numbers the "about N" text shows
-    at_least = _round(c["needed_over"]) if c["needed_over"] is not None else None
-    at_most = _round(c["needed_under"]) if c["needed_under"] is not None else None
+    need_o, need_u = value(c, "needed_over"), value(c, "needed_under")
+    at_least = _round(need_o) if need_o is not None else None
+    at_most = _round(need_u) if need_u is not None else None
     lines += _history(pl, m, at_least, at_most)
     lines.append(f"His last games ({kind}-{'yards' if m == 'rush_yds' else 'catches'}): {_last_games(pl, m)}")
+    if c["usual"] is None:
+        lines.append(f"His usual: only {c['usual_games']} games played, not enough data for an average "
+                     f"(needs {c['usual_min']})")
     if c["gap_over"] is not None:
         g = c["gap_over"]
         n = c["usual_games"]
-        lines.append(f"Gap: the Over needs {g:.1f} {words} more than his last-{n} average ({c['usual']:.1f})"
-                     if g > 0 else
-                     f"Gap: his last-{n} average ({c['usual']:.1f}) is already {-g:.1f} above what the Over needs")
+        if abs(g) < 0.05:
+            lines.append(f"Gap: his {_last_n(n)} average ({c['usual']:.1f}) is right at what the Over needs")
+        elif g > 0:
+            lines.append(f"Gap: the Over needs {g:.1f} {words} more than his {_last_n(n)} average ({c['usual']:.1f})")
+        else:
+            lines.append(f"Gap: his {_last_n(n)} average ({c['usual']:.1f}) is already {-g:.1f} above what the "
+                         f"Over needs")
         if c.get("usual_spans_seasons"):
             lines.append(f"  (his last {n} games played reach back into last season)")
     lines.append(f"Tested: {TEST_STATUS.get(m, 'not tested')}")

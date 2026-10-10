@@ -2,5 +2,5 @@
 
 Takes a posted line and its two prices and says what workload a player needs
 for the leg to win often enough. Never claims a line is wrong, never labels a
-bet. Imports nothing from props/engine/ (props/tests/test_calc_boundary.py).
+bet. Imports nothing from props/engine/ (props/tests_ci/test_calc_boundary.py).
 """

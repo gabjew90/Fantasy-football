@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import datetime as dt
 import json
+import re
 from pathlib import Path
 
 import pandas as pd
@@ -18,12 +19,29 @@ import pandas as pd
 from core import fetch as F
 from core.manifest import Manifest
 
-from . import data, names
+from . import checks, data, names
 from .markets import SLEEPER_WAGER
 
 CALC = Path(__file__).resolve().parent
 LINES_ROOT = CALC / "lines"
 MISSES_PATH = CALC / "log" / "name_misses.jsonl"
+
+
+def _sleeper_number(x):
+    """Sleeper sends some numbers as text (payout_multiplier "1.80"; checked
+    on the live board 2026-10-10). Numeric text becomes a number here, where
+    that format is known; anything else is left for checks to refuse."""
+    if isinstance(x, str):
+        try:
+            return float(x)
+        except ValueError:
+            return x
+    return x
+
+
+def _miss(stamp: str, r: dict, reason: str) -> dict:
+    return {"logged_at_utc": stamp, "source": "sleeper_capture", "sleeper_id": r["sleeper_id"],
+            "name": r["name"], "team": r["team"], "market": r["market"], "reason": reason}
 
 
 def _now() -> dt.datetime:
@@ -35,11 +53,17 @@ def _player_name(info: dict) -> str:
 
 
 def parse(raw: list, players: dict, sleeper_gsis: dict, candidates: list[dict],
-          games: pd.DataFrame, captured_at: dt.datetime) -> tuple[list[dict], list[dict]]:
+          games: pd.DataFrame, captured_at: dt.datetime,
+          aside: pd.DataFrame | None = None) -> tuple[list[dict], list[dict]]:
     """(rows, misses) from Sleeper's lines payload. Kept: NFL, normal lines,
     pre-game, both sides active, one of the four markets, not a QB's rushing.
     `games`: schedule rows (game_id, season, week, home_team, away_team,
-    kickoff_utc) used to attach his team's next game."""
+    kickoff_utc) used to attach his team's next game.
+
+    A row is matched only when the player resolves to a gsis id, that player's
+    roster team (from `candidates`) is the team Sleeper names, and the team has
+    a game still to play. Otherwise gsis_id is None and the miss is logged."""
+    roster_team = {c["gsis_id"]: names.team_code(c["team"]) for c in candidates if isinstance(c.get("team"), str)}
     rows, misses = [], []
     stamp = captured_at.astimezone(dt.timezone.utc).isoformat(timespec="seconds")
     for m in raw or []:
@@ -51,33 +75,97 @@ def parse(raw: list, players: dict, sleeper_gsis: dict, candidates: list[dict],
             continue
         over = next((o for o in opts if o.get("outcome") == "over" and o.get("status") == "active"), None)
         under = next((o for o in opts if o.get("outcome") == "under" and o.get("status") == "active"), None)
-        if over is None or under is None or float(over["outcome_value"]) != float(under["outcome_value"]):
-            continue                      # one-sided, or the two sides quoted at different lines
         sid = str(m.get("subject_id") or "")
         info = players.get(sid) or {}
+        if market == "rush_yds" and info.get("position") == "QB":
+            continue                      # QB rushing is not a market here (design note)
         pos = info.get("position")
-        if market == "rush_yds" and pos == "QB":
-            continue
         name = _player_name(info)
         team = names.team_code(opts[0].get("subject_team") or info.get("team"))
+        skip = None
+        if over is None or under is None:
+            skip = "skipped: one side not offered"
+        else:
+            try:                          # the same rules the read side applies (checks.py)
+                lo = checks.line_value(_sleeper_number(over.get("outcome_value")), "the Over line")
+                lu = checks.line_value(_sleeper_number(under.get("outcome_value")), "the Under line")
+                mo = checks.multiplier(_sleeper_number(over.get("payout_multiplier")), "the Over multiplier")
+                mu = checks.multiplier(_sleeper_number(under.get("payout_multiplier")), "the Under multiplier")
+                if lo != lu:
+                    skip = "skipped: the two sides are quoted at different lines"
+            except checks.DataError as ex:
+                skip = f"skipped: {ex}"
+        if skip:                          # recorded, so an unmatched card can be traced to Sleeper's side
+            misses.append(_miss(stamp, {"sleeper_id": sid, "name": name, "team": team, "market": market}, skip))
+            continue
         gsis, how = sleeper_gsis.get(sid), "sleeper_id"
         if not gsis and str(info.get("gsis_id") or "").strip():
             gsis, how = str(info["gsis_id"]).strip(), "sleeper_table_gsis"
-        if not gsis:
+        if not gsis and aside is not None and data.set_aside_namesake(aside, name, teams=[team]):
+            how = f"miss: {name} is listed on two teams in the same week; the roster cannot say which"
+        elif not gsis:
             gsis, how = names.match(name, team, candidates)
-        if not gsis:
-            misses.append({"logged_at_utc": stamp, "source": "sleeper_capture", "sleeper_id": sid,
-                           "name": name, "team": team, "market": market, "reason": how})
         game = next_game(games, team, captured_at)
+        if gsis and roster_team.get(gsis) != team:
+            gsis, how = None, f"miss: Sleeper says {team}, the roster says {roster_team.get(gsis) or 'not rostered'}"
+        if gsis and game is None:
+            gsis, how = None, f"miss: no game still to play for {team}"
+        if gsis and not sleeper_game_agrees(m.get("game_id"), game):
+            gsis, how = None, f"miss: Sleeper game {m.get('game_id')} is not week {game['week']} of {game['season']}"
+        if not gsis:
+            misses.append(_miss(stamp, {"sleeper_id": sid, "name": name, "team": team, "market": market}, how))
         rows.append({
             "captured_at_utc": stamp, "sleeper_id": sid, "gsis_id": gsis, "matched_by": how if gsis else None,
             "name": name, "team": team, "position": pos, "market": market,
-            "line": float(over["outcome_value"]),
-            "mult_over": float(over["payout_multiplier"]), "mult_under": float(under["payout_multiplier"]),
+            "line": lo, "mult_over": mo, "mult_under": mu,
             "sleeper_game_id": m.get("game_id"), "updated_at_ms": int(m.get("updated_at") or 0),
             **(game or {"game_id": None, "season": None, "week": None, "kickoff_utc": None}),
         })
+    # every row Sleeper puts in one game must land in one nflverse game: rows
+    # that disagree with a strict majority are unmatched (all of them, if no
+    # nflverse game holds a strict majority)
+    best = game_majority(rows)        # decided once, before any row changes
+    for r in rows:
+        if r["gsis_id"] and r["game_id"] != best.get(r["sleeper_game_id"]):
+            misses.append(_miss(stamp, r, f"miss: Sleeper game {r['sleeper_game_id']} spans several nflverse games"))
+            r["gsis_id"], r["matched_by"] = None, None
     return rows, misses
+
+
+def game_teams(game_id: str) -> set:
+    """nflverse game ids read <season>_<week>_<away>_<home>."""
+    return set(str(game_id).split("_")[2:])
+
+
+def game_majority(rows: list[dict]) -> dict:
+    """Sleeper game id -> the nflverse game its matched rows belong to: the game
+    covering the most of the distinct teams Sleeper put in it, then the most
+    distinct players (never rows, so one player's several markets cannot
+    outvote the others). Absent when two games tie on both."""
+    teams: dict = {}
+    players: dict = {}
+    for r in rows:
+        if r.get("gsis_id") and r.get("game_id"):
+            teams.setdefault(r["sleeper_game_id"], set()).add(r["team"])
+            players.setdefault((r["sleeper_game_id"], r["game_id"]), set()).add(r["gsis_id"])
+    out = {}
+    for sg in teams:
+        gs = [g for (s, g) in players if s == sg]
+        score = sorted(((len(teams[sg] & game_teams(g)), len(players[(sg, g)]), g) for g in gs), reverse=True)
+        if len(score) == 1 or score[0][:2] > score[1][:2]:
+            out[sg] = score[0][2]
+    return out
+
+
+SLEEPER_GAME_ID = re.compile(r"^(\d{4})1(\d{2})\d{2}$")     # season, 1 = regular season, week, game
+
+
+def sleeper_game_agrees(sleeper_game_id, game: dict | None) -> bool:
+    """Sleeper's regular-season game ids read <season>1<week><game> (checked on
+    the 2026 week-5 board: 14 ids, each one nflverse game of that week). The
+    row's game must have that season and week; an id in another form fails."""
+    m = SLEEPER_GAME_ID.match(str(sleeper_game_id or ""))
+    return bool(m and game and int(m.group(1)) == game["season"] and int(m.group(2)) == game["week"])
 
 
 def next_game(games: pd.DataFrame, team: str, at: dt.datetime) -> dict | None:
@@ -102,30 +190,31 @@ def append_jsonl(path: Path, rows: list[dict]) -> None:
             fh.write(json.dumps(r, sort_keys=True) + "\n")
 
 
-def run(*, lines_root: Path = LINES_ROOT, misses_path: Path = MISSES_PATH) -> dict:
+def run(*, lines_root: Path | None = None, misses_path: Path | None = None) -> dict:
     """Fetch, parse and append. Refuses to write when Sleeper could not be
     refreshed: an old copy must never be saved as a new capture."""
     man = Manifest("props.calc capture")
     path = F.sleeper_lines(manifest=man, max_age_s=60)
     entry = man.get("sleeper lines")
     if entry["status"] not in ("fresh", "cached"):
-        raise RuntimeError(f"Sleeper lines not refreshed ({entry['status']}: {entry['detail']}); nothing captured")
+        raise checks.DataError(f"Sleeper lines not refreshed ({entry['status']}: {entry['detail']}); nothing captured")
     captured_at = dt.datetime.fromisoformat(entry["fetched_at_utc"])
     raw = json.loads(Path(path).read_text(encoding="utf-8"))
     players = json.loads(F.sleeper_players(manifest=man).read_text(encoding="utf-8"))
     season = F.current_season()
     roster = data.rosters(season, manifest=man)
     games = data.schedule(manifest=man)
-    rows, misses = parse(raw, players, data.sleeper_to_gsis(roster), data.roster_candidates(roster, season),
-                         games, captured_at)
-    out = lines_root / str(season) / f"lines_{season}.jsonl"
+    listed, aside = data.roster_split(roster, season, skill_only=True)
+    rows, misses = parse(raw, players, data.sleeper_to_gsis(roster), data.candidates(listed),
+                         games, captured_at, aside=aside)
+    out = capture_path(season, lines_root)
     append_jsonl(out, rows)
-    append_jsonl(misses_path, misses)
-    return {"path": str(out), "rows": len(rows), "misses": len(misses), "captured_at_utc": entry["fetched_at_utc"]}
+    append_jsonl(misses_path or MISSES_PATH, misses)
+    skipped = sum(m["reason"].startswith("skipped") for m in misses)
+    stale = [f"{e['name']} ({e['status']})" for e in man.stale() if e["name"] != "sleeper lines"]
+    return {"path": str(out), "rows": len(rows), "misses": len(misses) - skipped, "skipped": skipped,
+            "captured_at_utc": entry["fetched_at_utc"], "stale": stale}
 
 
-def read_captures(season: int, *, lines_root: Path = LINES_ROOT) -> list[dict]:
-    p = lines_root / str(season) / f"lines_{season}.jsonl"
-    if not p.exists():
-        return []
-    return [json.loads(x) for x in p.read_text(encoding="utf-8").splitlines() if x.strip()]
+def capture_path(season: int, lines_root: Path | None = None) -> Path:
+    return (lines_root or LINES_ROOT) / str(season) / f"lines_{season}.jsonl"

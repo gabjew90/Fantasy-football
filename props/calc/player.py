@@ -12,14 +12,20 @@ from dataclasses import dataclass, field
 import numpy as np
 import pandas as pd
 
-from . import calc, data, names
-from .markets import workload_col
+from . import calc, data, names, rates
+from .checks import finite, in_range, kicked_off_before, no_missing, require
+from .markets import min_own, workload_col
+
+
+class NotFound(Exception):
+    """A typed name or a game could not be found (a message for the user, not a bug)."""
 
 
 class Bundle:
     """The seasons a card or a test needs, loaded once and cut per week."""
 
     def __init__(self, seasons, fixed: dict, *, manifest=None):
+        self.manifest = manifest
         self.seasons = sorted(set(seasons))
         self.fixed = fixed
         stype = fixed["season_type"]
@@ -32,17 +38,48 @@ class Bundle:
         # every game he played: with work (play-by-play) or without it (an offensive snap)
         self.games = data.games_played(data.player_games(self.pbp), data.played(snaps, self.rosters))
         self.schedule = data.schedule(manifest=manifest, game_type=stype)
-        pos = (self.rosters.dropna(subset=["gsis_id", "position"])
-               .sort_values(["season", "week"]).drop_duplicates(["season", "gsis_id"], keep="last"))
+        self._kickoffs: dict | None = None
+        self._week_starts: dict = {}
+        r = self.rosters.dropna(subset=["gsis_id", "position"]).sort_values(["season", "week"])
+        self._roster_pos = r[["season", "week", "gsis_id", "position"]]
+        # a whole past season's label: used for the pools, which only read earlier seasons
+        pos = r.drop_duplicates(["season", "gsis_id"], keep="last")
         self.position = {(s, g): p for s, g, p in zip(pos["season"], pos["gsis_id"], pos["position"])}
         self._pools: dict = {}
 
-    def position_of(self, gsis: str, season: int) -> str | None:
-        for s in (season, season - 1):
-            p = self.position.get((s, gsis))
-            if p:
-                return p
-        return None
+    def kickoffs(self) -> dict:
+        """game_id -> kickoff time, from the schedule."""
+        if self._kickoffs is None:
+            k = self.schedule.dropna(subset=["kickoff_utc"])
+            self._kickoffs = dict(zip(k["game_id"], pd.to_datetime(k["kickoff_utc"], utc=True)))
+        return self._kickoffs
+
+    def cut(self, df: pd.DataFrame, season: int, week: int, name: str) -> pd.DataFrame:
+        """data.before (the leakage cut on season and week) plus the check
+        against an independent source: every remaining game kicked off before
+        the priced week's first kickoff. Every input to a card goes through here."""
+        out = data.before(df, season, week)
+        kicked_off_before(name, out["game_id"], self.kickoffs(), self.week_starts(season, week))
+        return out
+
+    def week_starts(self, season: int, week: int):
+        """The priced week's first kickoff."""
+        if (season, week) not in self._week_starts:
+            ko = self.kickoffs()
+            s = self.schedule[(self.schedule["season"] == season) & (self.schedule["week"] == week)]
+            times = [ko[g] for g in s["game_id"] if g in ko]
+            require(bool(times), f"no {season} week {week} games with a kickoff time on the schedule")
+            self._week_starts[(season, week)] = min(times)
+        return self._week_starts[(season, week)]
+
+    def position_at(self, gsis: str, season: int, week: int) -> str | None:
+        """His roster position as it stood in `week` (the latest roster week up
+        to it), else his last listing of the season before. Never later weeks."""
+        r = self._roster_pos
+        mine = r[(r["gsis_id"] == gsis) & (r["season"] == season) & (r["week"] <= week)]
+        if len(mine):
+            return mine["position"].iloc[-1]
+        return self.position.get((season - 1, gsis))
 
     def with_position(self, df: pd.DataFrame) -> pd.DataFrame:
         pos = [self.position.get((s, g)) for s, g in zip(df["season"], df["gsis_id"])]
@@ -52,21 +89,52 @@ class Bundle:
         """Per-play pools from the `pool_seasons` seasons before `season`."""
         key = (season, pool_seasons)
         if key not in self._pools:
-            yrs = range(season - pool_seasons, season)
+            yrs = list(range(season - pool_seasons, season))
+            missing = [y for y in yrs if y not in self.seasons]
+            require(not missing, f"pool seasons {missing} are not loaded")
             c = self.with_position(self.carries[self.carries["season"].isin(yrs)])
             t = self.with_position(self.targets[self.targets["season"].isin(yrs)])
-            if c.empty or t.empty:
-                raise ValueError(f"no plays from {list(yrs)} loaded for the pools")
-            rb = c.loc[c["position"] == "RB", "yards"].to_numpy(float)
-            self._pools[key] = {
-                "rb_residuals": rb - rb.mean(),
-                "ypc_by_pos": c.groupby("position")["yards"].mean().to_dict(),
-                "catch_by_pos": t.groupby("position")["caught"].mean().to_dict(),
-                "catch_by_pos_bucket": t.assign(bucket=depth_buckets(t["air_yards"], self.fixed["depth_short_below"],
-                                                                     self.fixed["depth_deep_from"]))
-                                        .groupby(["position", "bucket"])["caught"].mean().to_dict(),
-            }
+            empty = [y for y in yrs if not ((c["season"] == y).any() and (t["season"] == y).any())]
+            require(not empty, f"pool seasons {empty} loaded no carries or no targets")
+            cutoff = self.week_starts(season, 1)
+            kicked_off_before("pool carries", c["game_id"], self.kickoffs(), cutoff)
+            kicked_off_before("pool targets", t["game_id"], self.kickoffs(), cutoff)
+            self._pools[key] = make_pools(c, t, self.fixed)
         return self._pools[key]
+
+
+def make_pools(c: pd.DataFrame, t: pd.DataFrame, fixed: dict) -> dict:
+    """Pools from carries (season, yards, position) and targets (yards,
+    caught, air_yards, position). Fails loudly on missing values or a league
+    average outside its plausible range; records groups below their minimum
+    sample (the card then says "not enough data")."""
+    require(len(c) and len(t), "no plays loaded for the pools")
+    finite("pool carry yards", c["yards"])
+    finite("pool target yards", t["yards"])
+    no_missing("roster position of pool carries", c["position"])
+    no_missing("roster position of pool targets", t["position"])
+    league_ypc = rates.yards_per_carry(c["yards"])
+    league_catch = rates.catch_rate(t["caught"])
+    league_ypt = rates.yards_per_target(t["yards"], t["caught"])      # incompletions already 0 (data.targets)
+    in_range("league yards per carry", league_ypc, fixed["league_ypc_range"])
+    in_range("league catch rate", league_catch, fixed["league_catch_rate_range"])
+    in_range("league yards per target", league_ypt, fixed["league_yards_per_target_range"])
+    rb = c.loc[c["position"] == "RB", "yards"].to_numpy(float)
+    t = t.assign(bucket=depth_buckets(t["air_yards"], fixed["depth_short_below"], fixed["depth_deep_from"]))
+    # a target without a recorded depth (1 a season in some years) cannot join
+    # a depth group; it still counts in the league averages above, and the
+    # count is shown on receptions cards
+    g = t.dropna(subset=["bucket"]).groupby(["position", "bucket"])["caught"]
+    return {
+        "targets_without_depth": int(t["bucket"].isna().sum()),
+        "rb_residuals": rb - rb.mean() if len(rb) else rb,
+        "rb_n": len(rb),
+        "ypc_by_pos": c.groupby("position")["yards"].mean().to_dict(),
+        "carries_by_pos": c.groupby("position").size().to_dict(),
+        "catch_by_pos_bucket": g.mean().to_dict(),
+        "targets_by_pos_bucket": g.size().to_dict(),
+        "league_ypc": league_ypc, "league_catch": league_catch, "league_ypt": league_ypt,
+    }
 
 
 def depth_buckets(air: pd.Series, short_below: float = 5, deep_from: float = 15) -> pd.Series:
@@ -85,11 +153,6 @@ class Rate:
     baseline: float
 
 
-def blend(own_sum: float, n: int, baseline: float, k: float) -> float:
-    """w * own + (1 - w) * baseline with w = n / (n + k)."""
-    return (own_sum + k * baseline) / (n + k)
-
-
 @dataclass
 class Player:
     gsis_id: str
@@ -102,37 +165,54 @@ class Player:
     season_games: pd.DataFrame         # this season's games before the week, with result and starter
     rates: dict = field(default_factory=dict)
     pools: dict = field(default_factory=dict)
+    not_enough: dict = field(default_factory=dict)    # market -> [reasons the card shows no numbers]
+    no_depth: int = 0                                 # his targets without a recorded depth
 
     def usual(self, market: str, games: int) -> float | None:
-        w = self.window.tail(games)
-        return float(w[workload_col(market)].mean()) if len(w) else None
+        """His average workload over his last `games` games played; None with
+        fewer games than that (the minimum sample is the number averaged)."""
+        if len(self.window) < games:
+            return None
+        return float(self.window.tail(games)[workload_col(market)].mean())
 
 
 def find_player(b: Bundle, name: str, season: int, team: str | None = None,
-                week: int | None = None) -> tuple[str, str, str]:
+                week: int | None = None, initial_match: list | None = None) -> tuple[str, str, str]:
     """(gsis_id, full name, team) for a typed name. The name must point at one
     player on the season's rosters (with the team when given), as the rosters
     stood in `week` (the latest roster week up to it; the latest on file when
-    no week is given), so a player traded later is found on his team then."""
-    r = b.rosters[(b.rosters["season"] == season) & b.rosters["gsis_id"].notna()]
-    if week is not None and (r["week"] <= week).any():
-        r = r[r["week"] <= week]
-    r = r.sort_values("week").drop_duplicates("gsis_id", keep="last")
+    no week is given), so a player traded later is found on his team then.
+    `initial_match` (a one-item list) is set True when a full typed name was
+    resolved by first initial + surname (Scotty Miller -> Scott Miller): the
+    caller must say so and must not log on it."""
+    initial_match = initial_match if initial_match is not None else [False]
+    r, amb = data.roster_split(b.rosters, season, week, skill_only=True)   # Sleeper prices skill players only
+    r = r[r["gsis_id"].notna()]
+    if r.empty:
+        raise NotFound(f"no {season} roster on file" + (f" up to week {week}" if week is not None else ""))
     key = names.norm(name)
+    # a namesake listed on two teams that week is set aside, never guessed: if
+    # one could be the player meant, refuse rather than pick the other
+    if data.set_aside_namesake(amb, name, teams=[names.team_code(team)] if team else None):
+        raise NotFound(f"{name!r} matches a player listed on two teams in the same week of the {season} "
+                       f"rosters; the roster data cannot say which")
     hit = r[r["full_name"].map(names.norm) == key]
     if team:
         hit = hit[hit["team"] == names.team_code(team)]
     if hit.empty:
-        cands = [{"gsis_id": g, "name": n, "team": t} for g, n, t in zip(r["gsis_id"], r["full_name"], r["team"])]
         if team:
-            gid, how = names.match(name, team, cands)
+            gid, how = names.match(name, team, data.candidates(r), allow_initial=True)
             if gid:
                 hit = r[r["gsis_id"] == gid]
+                if how == "initial" and not names.abbreviated(name):
+                    initial_match[0] = True       # the card says so, and --log refuses this run
         if hit.empty:
-            raise LookupError(f"no {season} player matches {name!r}" + (f" on {team}" if team else ""))
+            raise NotFound(f"no {season} player matches {name!r}" + (f" on {team}" if team else "")
+                           + " on a team's latest roster (a traded or released player drops off until his "
+                             "new team's next roster)")
     if hit["gsis_id"].nunique() > 1:
         teams = ", ".join(sorted(hit["team"].astype(str)))
-        raise LookupError(f"{name!r} matches players on {teams}; give the team")
+        raise NotFound(f"{name!r} matches players on {teams}; give the team")
     row = hit.iloc[0]
     return row["gsis_id"], row["full_name"], row["team"]
 
@@ -156,47 +236,89 @@ def _results(b: Bundle, games: pd.DataFrame, margin: int) -> pd.DataFrame:
     return pd.concat([games, extra], axis=1)
 
 
+def _rate(own_win: pd.DataFrame, own_season: pd.DataFrame, fn, col: str, base: float, k: float) -> Rate:
+    """His blended rate (from `col`, summed) plus his plain window and season rates."""
+    def plain(d):
+        return fn(d[col]) if len(d) else None
+    blended = rates.blend(float(own_win[col].sum()), len(own_win), base, k)
+    finite("blended rate", [blended])
+    return Rate(blended, plain(own_win), len(own_win), plain(own_season), len(own_season), base)
+
+
 def build(b: Bundle, gsis: str, name: str, team: str, season: int, week: int,
-          tuned: dict, fixed: dict) -> Player:
-    """His rates and pools for `week` of `season`, from games before it only."""
-    pos = b.position_of(gsis, season) or "?"
-    mine = data.before(b.games[b.games["gsis_id"] == gsis], season, week).sort_values(["season", "week"])
+          tuned: dict, fixed: dict, market: str) -> Player:
+    """His rate for `market` and the pools it draws from, for `week` of
+    `season`, from games before it only. Only the asked market's rate is built,
+    so a short sample in another market cannot block this one; the league-wide
+    checks on the loaded plays and the pools (missing values, plausible ranges)
+    apply to every card on purpose: a bad league-wide input stops everything.
+    A rate or pool below its
+    minimum sample puts the market in not_enough (the card then shows no
+    numbers, and model() refuses it)."""
+    require(fixed == b.fixed, "build() was given other fixed settings than the ones its pools were built with")
+    pos = b.position_at(gsis, season, week) or "?"
+    mine = b.cut(b.games[b.games["gsis_id"] == gsis], season, week, "his games").sort_values(["season", "week"])
     window = mine.tail(int(fixed["rate_window_games"]))
     this = _results(b, mine[mine["season"] == season], int(fixed["result_margin"]))
     pools = b.pools(season, int(fixed["pool_seasons"]))
     pl = Player(gsis, name, team, pos, season, week, window, this, pools=pools)
-    keys = set(zip(window["season"], window["week"]))
+    keys = pd.MultiIndex.from_frame(window[["season", "week"]]) if len(window) else None
 
     def own(df):
-        d = data.before(df[df["gsis_id"] == gsis], season, week)
-        return d[[k in keys for k in zip(d["season"], d["week"])]], d[d["season"] == season]
+        d = b.cut(df[df["gsis_id"] == gsis], season, week, "his plays")      # window and season alike
+        in_win = (pd.MultiIndex.from_frame(d[["season", "week"]]).isin(keys)
+                  if keys is not None and len(d) else np.zeros(len(d), dtype=bool))
+        win = d[np.asarray(in_win, dtype=bool)]
+        return win, d[d["season"] == season]
 
-    # yards per carry
-    c_win, c_season = own(b.carries)
-    base = pools["ypc_by_pos"].get(pos, pools["ypc_by_pos"].get("RB"))
-    pl.rates["ypc"] = Rate(blend(c_win["yards"].sum(), len(c_win), base, tuned["k_ypc"]),
-                           c_win["yards"].mean() if len(c_win) else None, len(c_win),
-                           c_season["yards"].mean() if len(c_season) else None, len(c_season), base)
-    # catch rate, against a baseline of his position at his own depth mix
-    t_win, t_season = own(b.targets)
-    bk = depth_buckets(t_win["air_yards"], fixed["depth_short_below"], fixed["depth_deep_from"]).dropna()
-    by = pools["catch_by_pos_bucket"]
-    if len(bk) and all((pos, x) in by for x in bk.unique()):
-        base = float(np.mean([by[(pos, x)] for x in bk]))
+    n_win = fixed["rate_window_games"]
+    why = []
+    if market == "rush_yds":
+        c_win, c_season = own(b.carries)
+        if len(c_win) < min_own(market, fixed):
+            why.append(f"{len(c_win)} of his own carries in his last {n_win} games (needs {min_own(market, fixed)})")
+        if pools["rb_n"] < fixed["min_pool_rb_carries"]:
+            why.append(f"{pools['rb_n']} running-back carries in the residual pool "
+                       f"(needs {fixed['min_pool_rb_carries']})")
+        n_pos = pools["carries_by_pos"].get(pos, 0)
+        if pos != "RB" and n_pos < fixed["min_pool_position_carries"]:   # for a back: the residual pool above
+            why.append(f"{n_pos} {pos} carries in the pool for his position's average "
+                       f"(needs {fixed['min_pool_position_carries']})")
+        base = pools["ypc_by_pos"].get(pos, pools["league_ypc"])   # league value only when no numbers are shown
+        pl.rates["ypc"] = _rate(c_win, c_season, rates.yards_per_carry, "yards", base, tuned["k_ypc"])
+    elif market == "receptions":
+        t_win, t_season = own(b.targets)
+        if len(t_win) < min_own(market, fixed):
+            why.append(f"{len(t_win)} passes thrown to him in his last {n_win} games "
+                       f"(needs {min_own(market, fixed)})")
+        bk = depth_buckets(t_win["air_yards"], fixed["depth_short_below"], fixed["depth_deep_from"])
+        pl.no_depth = int(bk.isna().sum())          # shown on the card; left out of his depth mix only
+        bk = bk.dropna()
+        by, n_by = pools["catch_by_pos_bucket"], pools["targets_by_pos_bucket"]
+        thin = [x for x in sorted(set(bk)) if n_by.get((pos, x), 0) < fixed["min_pool_targets_per_bucket"]]
+        if thin:
+            why.append(f"too few {pos} targets in the pool for depth {', '.join(thin)} "
+                       f"(needs {fixed['min_pool_targets_per_bucket']} each)")
+        if len(t_win) and not len(bk):
+            why.append("none of his targets has a recorded depth")
+        base = float(np.mean([by[(pos, x)] for x in bk])) if len(bk) and not thin else pools["league_catch"]
+        pl.rates["catch"] = _rate(t_win, t_season, rates.catch_rate, "caught", base, tuned["k_catch"])
     else:
-        base = pools["catch_by_pos"].get(pos, pools["catch_by_pos"].get("WR"))
-    pl.rates["catch"] = Rate(blend(t_win["caught"].sum(), len(t_win), base, tuned["k_catch"]),
-                             t_win["caught"].mean() if len(t_win) else None, len(t_win),
-                             t_season["caught"].mean() if len(t_season) else None, len(t_season), base)
+        raise ValueError(f"{market} is not built yet (rushing yards and receptions only)")
+    if why:
+        pl.not_enough[market] = why
     return pl
 
 
 def model(pl: Player, market: str, tuned: dict, fixed: dict) -> calc.Model:
-    sims, seed = int(fixed["sims"]), int(fixed["seed"])
+    """The calculator for this player-market. Refuses a market that is short of
+    data, so no caller can get workload numbers for it."""
+    require(market not in pl.not_enough, f"not enough data for {market}: {pl.not_enough.get(market)}")
+    sims, seed, lim = int(fixed["sims"]), int(fixed["seed"]), calc.Limits.from_fixed(fixed)
     if market == "rush_yds":
-        d = calc.make_draws("carries", tuned["carry_r"], sims, seed)
+        d = calc.make_draws("carries", tuned["carry_r"], sims, seed, lim)
         return calc.Model(market, "carries", d, pl.rates["ypc"].blended, pl.pools["rb_residuals"], tuned["day_sd"])
     if market == "receptions":
-        d = calc.make_draws("targets", tuned["target_r"], sims, seed)
+        d = calc.make_draws("targets", tuned["target_r"], sims, seed, lim)
         return calc.Model(market, "targets", d, pl.rates["catch"].blended)
     raise ValueError(f"{market} is not built yet (rushing yards and receptions only)")

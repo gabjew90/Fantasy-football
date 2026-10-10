@@ -22,6 +22,17 @@ NICKNAMES = {
 }
 # Sleeper / book team codes that differ from nflverse's.
 TEAM_ALIASES = {"LAR": "LA", "JAC": "JAX", "WSH": "WAS"}
+# nflverse code -> the full name the engine workflow's line archive uses.
+TEAM_NAMES = {
+    "ARI": "Arizona Cardinals", "ATL": "Atlanta Falcons", "BAL": "Baltimore Ravens", "BUF": "Buffalo Bills",
+    "CAR": "Carolina Panthers", "CHI": "Chicago Bears", "CIN": "Cincinnati Bengals", "CLE": "Cleveland Browns",
+    "DAL": "Dallas Cowboys", "DEN": "Denver Broncos", "DET": "Detroit Lions", "GB": "Green Bay Packers",
+    "HOU": "Houston Texans", "IND": "Indianapolis Colts", "JAX": "Jacksonville Jaguars", "KC": "Kansas City Chiefs",
+    "LV": "Las Vegas Raiders", "LAC": "Los Angeles Chargers", "LA": "Los Angeles Rams", "MIA": "Miami Dolphins",
+    "MIN": "Minnesota Vikings", "NE": "New England Patriots", "NO": "New Orleans Saints", "NYG": "New York Giants",
+    "NYJ": "New York Jets", "PHI": "Philadelphia Eagles", "PIT": "Pittsburgh Steelers", "SF": "San Francisco 49ers",
+    "SEA": "Seattle Seahawks", "TB": "Tampa Bay Buccaneers", "TEN": "Tennessee Titans", "WAS": "Washington Commanders",
+}
 
 
 def team_code(team: str | None) -> str:
@@ -36,6 +47,13 @@ def _tokens(name: str) -> list[str]:
     toks = [t for t in s.split() if t]
     while len(toks) > 1 and toks[-1] in SUFFIXES:
         toks.pop()
+    # "A.J. Brown" -> ["aj", "brown"]: leading single letters followed by more
+    # single letters are one first name (AJ, CJ, TJ), not an abbreviation
+    lead = 0
+    while lead < len(toks) - 1 and len(toks[lead]) == 1:
+        lead += 1
+    if lead >= 2:
+        toks = ["".join(toks[:lead])] + toks[lead:]
     return toks
 
 
@@ -55,14 +73,36 @@ def initial_key(name: str) -> str:
     return f"{toks[0][0]} {''.join(toks[1:])}"
 
 
-def match(name: str, team: str | None, candidates: list[dict]) -> tuple[str | None, str]:
+def abbreviated(name: str) -> bool:
+    """'C.McCaffrey' or 'C. McCaffrey': the first name given as one letter."""
+    toks = _tokens(name)
+    return len(toks) >= 2 and len(toks[0]) == 1
+
+
+def could_be(listed: str, given: str) -> bool:
+    """Whether `given` could name the `listed` player: the same normalised name,
+    or, for an abbreviated `given` ('C. Smith'), the same initial and surname."""
+    if norm(listed) == norm(given):
+        return True
+    return abbreviated(given) and initial_key(listed) == initial_key(given)
+
+
+def match(name: str, team: str | None, candidates: list[dict], *,
+          allow_initial: bool = False) -> tuple[str | None, str]:
     """(gsis_id, how) for `name` on `team` among candidates [{gsis_id, name, team}].
-    how is "name" or "initial" on a match, else "miss: <reason>"."""
+    how is "name" or "initial" on a match, else "miss: <reason>". The first
+    initial + surname key is tried only when `name` is itself abbreviated, or
+    when the caller allows it (a name the user typed with its team, whose card
+    then shows the full name it resolved to). For automatic matching a full
+    name that matches no one is a miss, never a teammate who happens to share
+    the initial and surname (Carl Smith is not Chris Smith)."""
     t = team_code(team)
     if not t:
         return None, "miss: no team to check the name against"
     pool = [c for c in candidates if team_code(c.get("team")) == t]
-    for how, key in (("name", norm), ("initial", initial_key)):
+    keys = ((("name", norm), ("initial", initial_key)) if abbreviated(name) or allow_initial
+            else (("name", norm),))
+    for how, key in keys:
         k = key(name)
         if not k:
             continue

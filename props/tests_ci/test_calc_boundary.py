@@ -65,3 +65,23 @@ def test_the_check_catches_each_route(tmp_path):
     ok = tmp_path / "ok.py"
     ok.write_text("from core import fetch\nfrom . import odds\n", encoding="utf-8")
     assert not _engine_imports(ok)
+
+
+def test_no_module_defines_a_function_twice():
+    """A second definition silently replaces the first (it hid a stale
+    calc.solve_rate on 2026-10-10)."""
+    dupes = []
+
+    def scan(body, where):
+        seen: set[str] = set()
+        for node in body:
+            if isinstance(node, (ast.FunctionDef, ast.ClassDef)):
+                if node.name in seen:
+                    dupes.append(f"{where}: {node.name}")
+                seen.add(node.name)
+                if isinstance(node, ast.ClassDef):          # methods too
+                    scan(node.body, f"{where}.{node.name}")
+
+    for p in sorted(CALC.rglob("*.py")):
+        scan(ast.parse(p.read_text(encoding="utf-8")).body, p.relative_to(CALC).as_posix())
+    assert not dupes, dupes

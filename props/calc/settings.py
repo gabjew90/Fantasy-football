@@ -26,7 +26,7 @@ def problems(text: str) -> list[str]:
     if set(tuned) != set(TUNED_NAMES):
         out.append(f"tuned settings {sorted(tuned)} differ from the named list {sorted(TUNED_NAMES)}")
     for key in list(tuned) + list(fixed):
-        if not re.search(rf"^\s+{re.escape(key)}:[^#\n]*#\s*\S", text, re.M):
+        if not re.search(rf"^  {re.escape(key)}:[^#\n]*#[ \t]*\S", text, re.M):
             out.append(f"{key} has no plain-English comment")
     return out
 

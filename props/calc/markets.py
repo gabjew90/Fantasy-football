@@ -15,6 +15,14 @@ ARCHIVE_MARKET = {"player_rush_yds": "rush_yds", "player_receptions": "reception
                   "player_reception_yds": "rec_yds", "player_pass_yds": "pass_yds"}
 
 
+# the minimum-sample setting for his own rate in each market (settings.yaml)
+MIN_OWN = {"rush_yds": "min_own_carries", "receptions": "min_own_targets", "rec_yds": "min_own_targets"}
+
+
+def min_own(market: str, fixed: dict) -> int:
+    return int(fixed[MIN_OWN[market]])
+
+
 def label(market: str) -> str:
     return MARKETS[market][0]
 

@@ -1,0 +1,235 @@
+{
+ "note": "A slice of Sleeper's live lines/available payload (2026-10-10) and the matching player-table rows, kept as returned (multipliers are text).",
+ "lines": [
+  {
+   "status": "active",
+   "options": [
+    {
+     "status": "active",
+     "metadata": {},
+     "subject_id": "10232",
+     "outcome": "over",
+     "season": "2026",
+     "season_type": "regular",
+     "sport": "nfl",
+     "game_id": "202610501",
+     "market_type": "receiving_yards_over_under_player_10232",
+     "subject_type": "player",
+     "wager_type": "receiving_yards",
+     "outcome_type": "over_under",
+     "line_type": "normal",
+     "game_status": "pre_game",
+     "line_id": "1414641772297981958",
+     "outcome_value": 75.5,
+     "payout_multiplier": "1.77",
+     "subject_pos_rank": "WR3",
+     "subject_position": "WR",
+     "subject_team": "ARI"
+    },
+    {
+     "status": "active",
+     "metadata": {},
+     "subject_id": "10232",
+     "outcome": "under",
+     "season": "2026",
+     "season_type": "regular",
+     "sport": "nfl",
+     "game_id": "202610501",
+     "market_type": "receiving_yards_over_under_player_10232",
+     "subject_type": "player",
+     "wager_type": "receiving_yards",
+     "outcome_type": "over_under",
+     "line_type": "normal",
+     "game_status": "pre_game",
+     "line_id": "1414641772297981959",
+     "outcome_value": 75.5,
+     "payout_multiplier": "1.79",
+     "subject_pos_rank": "WR3",
+     "subject_position": "WR",
+     "subject_team": "ARI"
+    }
+   ],
+   "subject_id": "10232",
+   "season": "2026",
+   "season_type": "regular",
+   "sport": "nfl",
+   "game_id": "202610501",
+   "market_type": "receiving_yards_over_under_player_10232",
+   "updated_at": 1791639392319,
+   "subject_type": "player",
+   "wager_type": "receiving_yards",
+   "outcome_type": "over_under",
+   "line_type": "normal",
+   "game_status": "pre_game",
+   "pick_stats": {
+    "counts": {
+     "over": 1304,
+     "total": 1334,
+     "under": 30
+    },
+    "popularity": 0.9702809380078942,
+    "subject_id": "10232",
+    "subject_type": "player"
+   }
+  },
+  {
+   "status": "active",
+   "options": [
+    {
+     "status": "active",
+     "metadata": {},
+     "subject_id": "10232",
+     "outcome": "over",
+     "season": "2026",
+     "season_type": "regular",
+     "sport": "nfl",
+     "game_id": "202610501",
+     "market_type": "receptions_over_under_player_10232",
+     "subject_type": "player",
+     "wager_type": "receptions",
+     "outcome_type": "over_under",
+     "line_type": "normal",
+     "game_status": "pre_game",
+     "line_id": "1414582132516433964",
+     "outcome_value": 6.5,
+     "payout_multiplier": "2.03",
+     "subject_pos_rank": "WR3",
+     "subject_position": "WR",
+     "subject_team": "ARI"
+    },
+    {
+     "status": "active",
+     "metadata": {},
+     "subject_id": "10232",
+     "outcome": "under",
+     "season": "2026",
+     "season_type": "regular",
+     "sport": "nfl",
+     "game_id": "202610501",
+     "market_type": "receptions_over_under_player_10232",
+     "subject_type": "player",
+     "wager_type": "receptions",
+     "outcome_type": "over_under",
+     "line_type": "normal",
+     "game_status": "pre_game",
+     "line_id": "1414582132516433965",
+     "outcome_value": 6.5,
+     "payout_multiplier": "1.59",
+     "subject_pos_rank": "WR3",
+     "subject_position": "WR",
+     "subject_team": "ARI"
+    }
+   ],
+   "subject_id": "10232",
+   "season": "2026",
+   "season_type": "regular",
+   "sport": "nfl",
+   "game_id": "202610501",
+   "market_type": "receptions_over_under_player_10232",
+   "updated_at": 1791625172686,
+   "subject_type": "player",
+   "wager_type": "receptions",
+   "outcome_type": "over_under",
+   "line_type": "normal",
+   "game_status": "pre_game",
+   "pick_stats": {
+    "counts": {
+     "over": 631,
+     "total": 638,
+     "under": 7
+    },
+    "popularity": 0.9384722544694684,
+    "subject_id": "10232",
+    "subject_type": "player"
+   }
+  },
+  {
+   "status": "active",
+   "options": [
+    {
+     "status": "active",
+     "metadata": {},
+     "subject_id": "11729",
+     "outcome": "over",
+     "season": "2026",
+     "season_type": "regular",
+     "sport": "nfl",
+     "game_id": "202610501",
+     "market_type": "rushing_yards_over_under_player_11729",
+     "subject_type": "player",
+     "wager_type": "rushing_yards",
+     "outcome_type": "over_under",
+     "line_type": "normal",
+     "game_status": "pre_game",
+     "line_id": "1414558098672160770",
+     "outcome_value": 8.5,
+     "payout_multiplier": "1.83",
+     "subject_pos_rank": "RB2",
+     "subject_position": "RB",
+     "subject_team": "DET"
+    },
+    {
+     "status": "active",
+     "metadata": {},
+     "subject_id": "11729",
+     "outcome": "under",
+     "season": "2026",
+     "season_type": "regular",
+     "sport": "nfl",
+     "game_id": "202610501",
+     "market_type": "rushing_yards_over_under_player_11729",
+     "subject_type": "player",
+     "wager_type": "rushing_yards",
+     "outcome_type": "over_under",
+     "line_type": "normal",
+     "game_status": "pre_game",
+     "line_id": "1414558098672160771",
+     "outcome_value": 8.5,
+     "payout_multiplier": "1.73",
+     "subject_pos_rank": "RB2",
+     "subject_position": "RB",
+     "subject_team": "DET"
+    }
+   ],
+   "subject_id": "11729",
+   "season": "2026",
+   "season_type": "regular",
+   "sport": "nfl",
+   "game_id": "202610501",
+   "market_type": "rushing_yards_over_under_player_11729",
+   "updated_at": 1791619442333,
+   "subject_type": "player",
+   "wager_type": "rushing_yards",
+   "outcome_type": "over_under",
+   "line_type": "normal",
+   "game_status": "pre_game",
+   "pick_stats": {
+    "counts": {
+     "over": 2,
+     "total": 2
+    },
+    "popularity": 0.06292082656141165,
+    "subject_id": "11729",
+    "subject_type": "player"
+   }
+  }
+ ],
+ "players": {
+  "10232": {
+   "full_name": "Michael Wilson",
+   "first_name": "Michael",
+   "last_name": "Wilson",
+   "position": "WR",
+   "team": "ARI",
+   "gsis_id": null
+  },
+  "11729": {
+   "full_name": "Sione Vaki",
+   "first_name": "Sione",
+   "last_name": "Vaki",
+   "position": "RB",
+   "team": "DET",
+   "gsis_id": null
+  }
+ }
+}

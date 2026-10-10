@@ -20,6 +20,9 @@ import pandas as pd
 
 from core import fetch as F
 
+from . import names
+from .checks import no_missing, require
+
 PBP_COLS = [
     "game_id", "season", "week", "season_type", "posteam", "defteam", "home_team", "away_team",
     "rush_attempt", "pass_attempt", "complete_pass", "sack", "two_point_attempt", "qb_kneel",
@@ -27,6 +30,7 @@ PBP_COLS = [
     "rushing_yards", "receiving_yards", "passing_yards", "air_yards", "wp", "epa", "success",
     "play_type", "qb_dropback", "qb_scramble",
     "lateral_receiver_player_id", "lateral_receiving_yards", "lateral_rusher_player_id", "lateral_rushing_yards",
+    "total_home_score", "total_away_score",
 ]
 
 
@@ -45,7 +49,10 @@ def before(df: pd.DataFrame, season: int, week: int) -> pd.DataFrame:
 def pbp(season: int, *, manifest=None, season_type: str = "REG") -> pd.DataFrame:
     path = F.nflverse("pbp", season, manifest=manifest)
     df = pd.read_csv(path, usecols=lambda c: c in PBP_COLS, low_memory=False)
-    return df[df["season_type"] == season_type].reset_index(drop=True)
+    df = df[df["season_type"] == season_type].reset_index(drop=True)
+    no_missing(f"{season} play-by-play season", df["season"])
+    no_missing(f"{season} play-by-play week", df["week"])      # data.before would drop such a play silently
+    return df
 
 
 def schedule(*, manifest=None, game_type: str = "REG") -> pd.DataFrame:
@@ -64,7 +71,7 @@ def rosters(season: int, *, manifest=None) -> pd.DataFrame:
 
 
 def snaps(season: int, *, manifest=None) -> pd.DataFrame:
-    cols = ["game_id", "season", "game_type", "week", "pfr_player_id", "team", "offense_snaps"]
+    cols = ["game_id", "season", "game_type", "week", "player", "pfr_player_id", "position", "team", "offense_snaps"]
     df = pd.read_csv(F.nflverse("snaps", season, manifest=manifest),
                      usecols=lambda c: c in cols, low_memory=False)
     return df[df["game_type"] == "REG"].reset_index(drop=True)
@@ -114,7 +121,7 @@ def carries(p: pd.DataFrame) -> pd.DataFrame:
          & p["rusher_player_id"].notna())
     out = p.loc[m, ["game_id", "season", "week", "posteam", "defteam", "rusher_player_id", "rushing_yards"]]
     out = out.rename(columns={"rusher_player_id": "gsis_id", "rushing_yards": "yards"})
-    out["yards"] = out["yards"].fillna(0.0)
+    no_missing("rushing yards on carries", out["yards"])
     return out.reset_index(drop=True)
 
 
@@ -126,8 +133,10 @@ def targets(p: pd.DataFrame) -> pd.DataFrame:
     out = p.loc[m, ["game_id", "season", "week", "posteam", "defteam", "receiver_player_id",
                     "passer_player_id", "complete_pass", "receiving_yards", "air_yards"]]
     out = out.rename(columns={"receiver_player_id": "gsis_id", "receiving_yards": "yards"})
+    no_missing("completion flag on targets", out["complete_pass"])
     out["caught"] = _flag(out["complete_pass"])
-    out["yards"] = out["yards"].fillna(0.0).where(out["caught"], 0.0)
+    no_missing("receiving yards on catches", out.loc[out["caught"], "yards"])
+    out["yards"] = out["yards"].where(out["caught"], 0.0)       # an incompletion is 0 yards (nflverse: NaN)
     return out.drop(columns="complete_pass").reset_index(drop=True)
 
 
@@ -138,7 +147,7 @@ def completions(p: pd.DataFrame) -> pd.DataFrame:
     out = p.loc[m, ["game_id", "season", "week", "posteam", "defteam", "passer_player_id",
                     "passing_yards", "air_yards"]]
     out = out.rename(columns={"passer_player_id": "gsis_id", "passing_yards": "yards"})
-    out["yards"] = out["yards"].fillna(0.0)
+    no_missing("passing yards on completions", out["yards"])
     return out.reset_index(drop=True)
 
 
@@ -174,42 +183,119 @@ def player_games(p: pd.DataFrame) -> pd.DataFrame:
 
 def played(snap: pd.DataFrame, roster: pd.DataFrame) -> pd.DataFrame:
     """(game_id, season, week, team, gsis_id) for every player with at least one
-    offensive snap: a game he played even if he got no carries or targets."""
+    offensive snap: a game he played even if he got no carries or targets.
+    Snap rows whose pfr id has no gsis id on the rosters cannot be tied to a
+    player; the skill players among them are listed in out.attrs["unmapped"]
+    (player, team) so the caller can say so, not dropped silently."""
     ids = roster.dropna(subset=["pfr_id", "gsis_id"]).drop_duplicates("pfr_id")
     pfr = dict(zip(ids["pfr_id"], ids["gsis_id"]))
     s = snap[snap["offense_snaps"].fillna(0) > 0]
-    out = s.assign(gsis_id=s["pfr_player_id"].map(pfr)).dropna(subset=["gsis_id"])
-    return out[["game_id", "season", "week", "team", "gsis_id"]].drop_duplicates(["game_id", "gsis_id"])
+    s = s.assign(gsis_id=s["pfr_player_id"].map(pfr))
+    lost = s[s["gsis_id"].isna()]
+    if "position" in lost.columns:     # only skill players can be a leg; a lineman's missing id does not matter here
+        lost = lost[lost["position"].isin(SKILL)]
+    out = s.dropna(subset=["gsis_id"])
+    out = out[["game_id", "season", "week", "team", "gsis_id"]].drop_duplicates(["game_id", "gsis_id"])
+    out.attrs["unmapped"] = sorted({(str(p), str(t)) for p, t in
+                                    zip(lost.get("player", lost["pfr_player_id"]), lost["team"])})
+    return out
 
 
 def games_played(player_games: pd.DataFrame, played_rows: pd.DataFrame) -> pd.DataFrame:
     """player_games plus a zero row for each game he played (snaps) without a
-    carry, target or completion."""
+    carry, target or completion -- only for games whose plays are loaded: a
+    game seen in snap counts before its play-by-play is not a game of zeros."""
     keys = ["game_id", "gsis_id"]
     have = set(zip(player_games["game_id"], player_games["gsis_id"]))
-    extra = played_rows[[k not in have for k in zip(played_rows["game_id"], played_rows["gsis_id"])]]
+    loaded = set(player_games["game_id"])
+    extra = played_rows[[k not in have and k[0] in loaded
+                         for k in zip(played_rows["game_id"], played_rows["gsis_id"])]]
     if extra.empty:
         return player_games
     zeros = extra.assign(carries=0, rush_yds=0.0, targets=0, receptions=0, rec_yds=0.0, completions=0, pass_yds=0.0)
     return pd.concat([player_games, zeros[player_games.columns]], ignore_index=True).drop_duplicates(keys)
 
 
+def complete_games(p: pd.DataFrame, schedule: pd.DataFrame) -> set:
+    """Games whose play-by-play is complete: its last running score equals the
+    schedule's final score. A cached copy taken mid-game, or before every
+    play was published, does not count."""
+    last = p.groupby("game_id")[["total_home_score", "total_away_score"]].max()
+    sch = schedule.dropna(subset=["home_score", "away_score"]).set_index("game_id")
+    both = last.join(sch[["home_score", "away_score"]], how="inner")
+    ok = (both["total_home_score"] == both["home_score"]) & (both["total_away_score"] == both["away_score"])
+    return set(both.index[ok])
+
+
 # ------------------------------------------------------------------ ids
 
 def sleeper_to_gsis(roster: pd.DataFrame) -> dict[str, str]:
-    """Sleeper id -> gsis id from nflverse's weekly rosters (an ID join)."""
+    """Sleeper id -> gsis id from nflverse's weekly rosters (an ID join). A
+    Sleeper id that nflverse gives to more than one player (2026: one id on
+    two different players) is left out, so it goes to the checked fallback
+    rather than to a guess."""
     r = roster.dropna(subset=["sleeper_id", "gsis_id"])
+    shared = r.groupby("sleeper_id")["gsis_id"].nunique()
+    r = r[~r["sleeper_id"].isin(shared[shared > 1].index)]
     return dict(zip(r["sleeper_id"], r["gsis_id"]))
 
 
-def roster_candidates(roster: pd.DataFrame, season: int, week: int | None = None) -> list[dict]:
-    """[{gsis_id, name, team}] for the name fallback: the given week's rosters,
-    or the latest week on file when `week` is None."""
+# cut, retired, traded, released, unsigned (UFA/RFA) or not with the team: not on that team's roster
+GONE = ("CUT", "RET", "TRD", "TRC", "TRT", "UFA", "RFA", "NWT")
+SKILL = ("QB", "RB", "WR", "TE", "FB")
+
+
+def _listings(roster: pd.DataFrame, season: int, week: int | None) -> pd.DataFrame:
+    """Each team's latest published roster of `season` up to `week`, without
+    cut, retired or traded rows (all players, identified or not)."""
+    require("status" in roster.columns, "weekly rosters have no status column; cannot drop departed players")
     r = roster[roster["season"] == season]
-    if week is not None and (r["week"] == week).any():
-        r = r[r["week"] == week]
-    elif len(r):
-        r = r[r["week"] == r["week"].max()]
-    r = r.dropna(subset=["gsis_id"])
+    if week is not None:
+        r = r[r["week"] <= week]
+    r = r[r["team"].map(lambda t: isinstance(t, str)).astype(bool)]   # a bool mask even on an empty frame
+    if r.empty:
+        return r
+    r = r[r["week"] == r.groupby("team")["week"].transform("max")]
+    return r[~r["status"].isin(GONE)]
+
+
+def roster_split(roster: pd.DataFrame, season: int, week: int | None = None, *,
+                 skill_only: bool = False) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """(players, set aside), the one way the rosters are read as of a week.
+
+    players: everyone on each team's latest published roster of `season` up
+    to `week` (all weeks when None), identified or not. Per team, not one week
+    for all: nflverse's weekly rosters leave out teams on bye, so a single
+    latest week would drop whole teams; and per team, not each player's own
+    latest row, so a player who dropped off his team's roster without a CUT
+    row is not kept on it.
+    set aside: ids listed on two teams in the same latest week (an nflverse
+    glitch, e.g. one 2019 id shared by two linemen); never guessed.
+    skill_only: QB, RB, WR, TE, FB only (the players Sleeper prices)."""
+    r = _listings(roster, season, week)
+    if skill_only and len(r):
+        require("position" in r.columns, "weekly rosters have no position column; cannot limit to skill players")
+        r = r[r["position"].isin(SKILL)]
+    ided = r[r["gsis_id"].notna()]
+    if ided.empty:
+        return r, ided
+    latest = ided[ided["week"] == ided.groupby("gsis_id")["week"].transform("max")]
+    two = latest.groupby("gsis_id")["team"].transform("nunique") > 1
+    return pd.concat([latest[~two].drop_duplicates("gsis_id"), r[r["gsis_id"].isna()]]), latest[two]
+
+
+def set_aside_namesake(aside: pd.DataFrame, name: str, *, teams=None, other_than: str | None = None) -> bool:
+    """The one rule for "a player listed on two teams that week could be the
+    one meant": a set-aside skill player (roster_split) whom `name` could name
+    (names.could_be), on one of `teams` if given, other than `other_than`."""
+    a = aside[aside["position"].isin(SKILL)] if "position" in aside.columns else aside
+    if teams is not None:
+        a = a[a["team"].isin(set(teams))]
+    return any(names.could_be(str(n), name) and g != other_than for g, n in zip(a["gsis_id"], a["full_name"]))
+
+
+def candidates(players: pd.DataFrame) -> list[dict]:
+    """[{gsis_id, name, team}] for the identified rows of a roster_split frame."""
+    r = players[players["gsis_id"].notna()]
     return [{"gsis_id": g, "name": n, "team": t} for g, n, t in zip(r["gsis_id"], r["full_name"], r["team"])]
 
