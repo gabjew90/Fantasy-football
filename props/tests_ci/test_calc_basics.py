@@ -24,7 +24,7 @@ from props.calc import capture, data, lines, names, odds, settings  # noqa: E402
 FIXED = {
     "season_type": "REG", "rate_window_games": 16, "pool_seasons": 2, "depth_short_below": 5,
     "depth_deep_from": 15, "sims": 20000, "seed": 20261010, "range_low_pct": 10, "range_high_pct": 90,
-    "result_margin": 8, "usual_games": 4, "tested_min_prior_games": 3, "top_targets": 3,
+    "result_margin": 8, "usual_games": 4, "fewer_snaps_share": 0.5, "tested_min_prior_games": 3, "top_targets": 3,
     "garbage_wp_low": 0.10, "garbage_wp_high": 0.90, "thin_games": 4, "tier_size": 8,
     "league_wide_first_season": 2018, "gap_edges": [0, 2, 4], "conversion_line_scales": [0.8, 1.0, 1.2],
     "pass_band_points": 3, "pass_band_min_games": 200, "pass_range_low": 77, "pass_range_high": 83,
@@ -878,3 +878,18 @@ def test_the_saved_week5_captures_are_reachable():
            "gsis_id": r["gsis_id"], "player": r["player"], "team": r["team"], "market": "rush_yds"}
     got = lines.LineLookup(ROSTER, archive_root=Path("/nonexistent"), calc_root=lines.CALC_LINES).find(leg)
     assert got["line"] == r["point"] and got["source"] == "your capture"
+
+
+def test_fewer_snaps_marks_a_game_under_half_his_average_in_his_other_games():
+    from props.calc import player
+    mine = pd.DataFrame([{"game_id": f"2026_0{w}_A_B", "gsis_id": "p", "season": 2026, "week": w}
+                         for w in (1, 2, 3, 4)] + [{"game_id": "2025_18_A_B", "gsis_id": "p", "season": 2025,
+                                                    "week": 18}])
+    share = pd.DataFrame([{"game_id": g, "gsis_id": "p", "offense_pct": v} for g, v in (
+        ("2026_01_A_B", 0.80), ("2026_02_A_B", 0.70), ("2026_03_A_B", 0.37), ("2026_04_A_B", None),
+        ("2025_18_A_B", 0.10), ("2025_18_X_Y", 0.9))])
+    out = player.fewer_snaps(mine, share, 0.5)
+    # week 3: 0.37 < 0.5 x mean(0.80, 0.70) = 0.375 -> marked; week 4 has no share; 2025 has no other game
+    assert out["fewer_snaps"].tolist() == [False, False, True, False, False]
+    assert player.fewer_snaps(mine, share, 0.49)["fewer_snaps"].tolist() == [False] * 5    # 0.37 > 0.3675
+    assert list(out.index) == list(mine.index)

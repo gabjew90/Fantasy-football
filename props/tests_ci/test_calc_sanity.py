@@ -154,6 +154,7 @@ def _bundle(carries, targets, games, pools, season=2026):
     b = object.__new__(player.Bundle)
     b.seasons, b.fixed = [season - 2, season - 1, season], FIXED
     b.carries, b.targets, b.games = carries, targets, games
+    b.snap_share = pd.DataFrame(columns=["game_id", "gsis_id", "offense_pct"])
     b.schedule = pd.DataFrame([dict(game_id=f"{season}_{w:02d}_A_B", season=season, week=w, home_team="B",
                                     away_team="A", home_score=np.nan, away_score=np.nan, home_qb_id=None,
                                     away_qb_id=None, home_qb_name=None, away_qb_name=None,

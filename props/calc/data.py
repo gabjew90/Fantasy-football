@@ -71,7 +71,8 @@ def rosters(season: int, *, manifest=None) -> pd.DataFrame:
 
 
 def snaps(season: int, *, manifest=None) -> pd.DataFrame:
-    cols = ["game_id", "season", "game_type", "week", "player", "pfr_player_id", "position", "team", "offense_snaps"]
+    cols = ["game_id", "season", "game_type", "week", "player", "pfr_player_id", "position", "team", "offense_snaps",
+            "offense_pct"]
     df = pd.read_csv(F.nflverse("snaps", season, manifest=manifest),
                      usecols=lambda c: c in cols, low_memory=False)
     return df[df["game_type"] == "REG"].reset_index(drop=True)
@@ -181,8 +182,8 @@ def player_games(p: pd.DataFrame) -> pd.DataFrame:
 
 
 def played(snap: pd.DataFrame, roster: pd.DataFrame) -> pd.DataFrame:
-    """(game_id, season, week, team, gsis_id) for every player with at least one
-    offensive snap: a game he played even if he got no carries or targets.
+    """(game_id, season, week, team, gsis_id, offense_pct) for every player with
+    at least one offensive snap: a game he played even if he got no carries or targets.
     Snap rows whose pfr id has no gsis id on the rosters cannot be tied to a
     player; the skill players among them are listed in out.attrs["unmapped"]
     (player, team) so the caller can say so, not dropped silently."""
@@ -194,7 +195,8 @@ def played(snap: pd.DataFrame, roster: pd.DataFrame) -> pd.DataFrame:
     if "position" in lost.columns:     # only skill players can be a leg; a lineman's missing id does not matter here
         lost = lost[lost["position"].isin(SKILL)]
     out = s.dropna(subset=["gsis_id"])
-    out = out[["game_id", "season", "week", "team", "gsis_id"]].drop_duplicates(["game_id", "gsis_id"])
+    keep = ["game_id", "season", "week", "team", "gsis_id"] + (["offense_pct"] if "offense_pct" in out.columns else [])
+    out = out[keep].drop_duplicates(["game_id", "gsis_id"])
     out.attrs["unmapped"] = sorted({(str(p), str(t)) for p, t in
                                     zip(lost.get("player", lost["pfr_player_id"]), lost["team"])})
     return out

@@ -1,6 +1,6 @@
 """python -m props.calc <command>
 
-  leg "Name" rush_yds     the leg card (rush_yds or receptions for now)
+  leg "Name" rush_yds over   one side's leg card (rush_yds or receptions for now)
       [--team DEN] [--season 2026 --week 6] [--line 64.5 --over -125 --under -132]
       [--target 58]
       Without --line, the latest saved Sleeper quote before kickoff is used, from
@@ -26,7 +26,7 @@ import pandas as pd
 from core import fetch as F
 from core.manifest import Manifest
 
-from . import capture, card, lines, names, odds, player, settings
+from . import capture, card, game_lines, lines, names, odds, player, settings
 from .checks import DataError, number
 from .markets import workload_col
 from .shared import journal
@@ -48,6 +48,7 @@ def main(argv: list[str] | None = None) -> int:
     lg = sub.add_parser("leg")
     lg.add_argument("name")
     lg.add_argument("market", choices=["rush_yds", "receptions"])
+    lg.add_argument("side", choices=["over", "under"])
     lg.add_argument("--team")
     lg.add_argument("--season", type=int)
     lg.add_argument("--week", type=int)
@@ -147,8 +148,22 @@ def _bundle(season: int, fixed: dict) -> tuple:
     return b, warn
 
 
-def build_card(b, name_in: str, market: str, *, team=None, season: int, week=None, line=None, typed=None,
-               target=None, lookup=None, at_line=None) -> dict:
+_SPREADS: dict = {}
+
+
+def _week_lines(season: int, week: int) -> tuple:
+    """(ESPN's week, or None, and why not), fetched once per run. Display
+    only: a failed fetch is said on the card, never raised."""
+    if (season, week) not in _SPREADS:
+        try:
+            _SPREADS[(season, week)] = (game_lines.week_lines(season, week), "")
+        except Exception as ex:  # noqa: BLE001 -- shown on the card's MATCHUP block
+            _SPREADS[(season, week)] = (None, f"ESPN not read: {type(ex).__name__}: {str(ex)[:80]}")
+    return _SPREADS[(season, week)]
+
+
+def build_card(b, name_in: str, market: str, side: str = "over", *, team=None, season: int, week=None, line=None,
+               typed=None, target=None, lookup=None, at_line=None) -> dict:
     """One leg's card and the numbers behind it. Keys: text, ready (a full
     card with a line), by_initial, kicked_off, stub, line, mult_over,
     mult_under, source, not_enough, c (card.compute's dict, or None).
@@ -186,17 +201,24 @@ def build_card(b, name_in: str, market: str, *, team=None, season: int, week=Non
                           f"for {market}; give --line --over --under")
         except DataError as ex:                      # a bad saved row is reported; code errors are not caught
             source = f"Unmatched: {ex}; give --line --over --under"
+    opp = game["away_team"] if game["home_team"] == team else game["home_team"]
     kicked_off = pd.Timestamp(game["kickoff_utc"]) <= pd.Timestamp(dt.datetime.now(dt.timezone.utc))
     out = {"by_initial": by_initial[0], "kicked_off": kicked_off, "stub": stub, "line": line, "mult_over": mo,
            "mult_under": mu, "source": source, "c": None, "ready": False,
            "not_enough": market in pl.not_enough}
     if market in pl.not_enough:                 # the data gap is the first thing to say, line or not
-        return {**out, "text": warn + card.render_not_enough(pl, market, line, mo, mu, source=source)}
+        return {**out, "text": warn + card.render_not_enough(pl, market, side, line, mo, mu, source=source)}
     if line is None:
         return {**out, "text": warn + source}
     model = player.model(pl, market, tuned, fixed)
     c = card.compute(pl, model, market, line, mo, mu, fixed, target)
-    return {**out, "c": c, "ready": True, "settings": tuned, "text": warn + card.render(pl, c, source=source)}
+    week_lines, why = _week_lines(season, wk)
+    gl = None
+    if week_lines is not None:
+        gl = week_lines.get((game["away_team"], game["home_team"]))
+        why = "" if gl else f"ESPN lists no {game['away_team']} at {game['home_team']} game in week {wk}"
+    text = card.render(pl, c, side, opp=opp, game_lines=gl, why_no_lines=why, source=source)
+    return {**out, "c": c, "ready": True, "settings": tuned, "text": warn + text}
 
 
 def leg(a) -> str:
@@ -204,7 +226,7 @@ def leg(a) -> str:
     fixed = settings.load()["fixed"]
     season = a.season or F.current_season()
     b, warn = _bundle(season, fixed)
-    got = build_card(b, a.name, a.market, team=a.team, season=season, week=a.week, line=a.line, typed=typed,
+    got = build_card(b, a.name, a.market, a.side, team=a.team, season=season, week=a.week, line=a.line, typed=typed,
                      target=a.target / 100 if a.target is not None else None)
     if got["line"] is None and not got["not_enough"]:
         raise SystemExit(got["text"])          # no quote found and none typed: say why, no card
@@ -260,7 +282,7 @@ def entry(a) -> str:
     lookup = lines.LineLookup(b.rosters)
     cards, problems = [], []
     for name_in, market, side, played, team in legs:
-        got = build_card(b, name_in, market, team=team, season=season, week=a.week, lookup=lookup, at_line=played)
+        got = build_card(b, name_in, market, side, team=team, season=season, week=a.week, lookup=lookup, at_line=played)
         who = f"{name_in} ({market})"
         if got["by_initial"]:
             problems.append(f"{who}: matched by initial; use the name as the card shows it")

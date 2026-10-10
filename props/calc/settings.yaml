@@ -28,6 +28,7 @@ fixed_not_tuned:
   range_high_pct: 90            # ... to the 90th percentile.
   result_margin: 8              # "Won by 8+", "within 7" and "lost by 8+" split on this margin.
   usual_games: 4                # "His usual" workload and the gap use his last 4 games played.
+  fewer_snaps_share: 0.5        # Mark a game when his offensive snap share was under half his average in his other games that season.
   tested_min_prior_games: 3     # A player enters the tests only after 3 games played that season.
   top_targets: 3                # "Top-3 target": the team's top 3 by targets in earlier games.
   garbage_wp_low: 0.10          # Matchup tiers leave out plays where the offense's win chance is under 10% ...

@@ -35,8 +35,11 @@ class Bundle:
         self.targets = data.targets(self.pbp)
         self.rosters = pd.concat([data.rosters(s, manifest=manifest) for s in self.seasons], ignore_index=True)
         snaps = pd.concat([data.snaps(s, manifest=manifest) for s in self.seasons], ignore_index=True)
+        played = data.played(snaps, self.rosters)
         # every game he played: with work (play-by-play) or without it (an offensive snap)
-        self.games = data.games_played(data.player_games(self.pbp), data.played(snaps, self.rosters))
+        self.games = data.games_played(data.player_games(self.pbp), played)
+        # his share of his team's offensive snaps per game, for the fewer-snaps marker (display only)
+        self.snap_share = played[["game_id", "gsis_id", "offense_pct"]]
         self.schedule = data.schedule(manifest=manifest, game_type=stype)
         self._kickoffs: dict | None = None
         self._week_starts: dict = {}
@@ -217,6 +220,25 @@ def find_player(b: Bundle, name: str, season: int, team: str | None = None,
     return row["gsis_id"], row["full_name"], row["team"]
 
 
+def fewer_snaps(mine: pd.DataFrame, share: pd.DataFrame, k: float) -> pd.DataFrame:
+    """Adds snap_pct and fewer_snaps: a game where his share of the offensive
+    snaps was under k times his average share in his other games of that
+    season (games before the priced week only; `mine` is already cut). A game
+    with no snap share, or no other game to compare with, is not marked.
+    Display only: the marker changes no number."""
+    s = share[share["gsis_id"].isin(set(mine["gsis_id"]))].drop_duplicates(["game_id", "gsis_id"])
+    if s.empty or mine.empty:                  # no snap shares for him: nothing to mark
+        return mine.assign(snap_pct=np.nan, fewer_snaps=False)
+    out = mine.merge(s, on=["game_id", "gsis_id"], how="left")
+    out.index = mine.index
+    pct = pd.to_numeric(out["offense_pct"], errors="coerce")
+    marks = []
+    for i, (yr, p) in enumerate(zip(out["season"], pct)):
+        others = pct[(out["season"] == yr).to_numpy() & (np.arange(len(out)) != i)].dropna()
+        marks.append(bool(pd.notna(p) and len(others) and p < k * others.mean()))
+    return out.drop(columns=["offense_pct"]).assign(snap_pct=pct.to_numpy(), fewer_snaps=marks)
+
+
 def _results(b: Bundle, games: pd.DataFrame, margin: int) -> pd.DataFrame:
     """Add his team's margin, result group and starting QB to player_games rows."""
     sch = b.schedule.set_index("game_id")
@@ -258,6 +280,7 @@ def build(b: Bundle, gsis: str, name: str, team: str, season: int, week: int,
     require(fixed == b.fixed, "build() was given other fixed settings than the ones its pools were built with")
     pos = b.position_at(gsis, season, week) or "?"
     mine = b.cut(b.games[b.games["gsis_id"] == gsis], season, week, "his games").sort_values(["season", "week"])
+    mine = fewer_snaps(mine, b.snap_share, float(fixed["fewer_snaps_share"]))
     window = mine.tail(int(fixed["rate_window_games"]))
     this = _results(b, mine[mine["season"] == season], int(fixed["result_margin"]))
     pools = b.pools(season, int(fixed["pool_seasons"]))

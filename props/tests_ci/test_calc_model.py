@@ -4,6 +4,7 @@ and a card rendered from a synthetic player (no network)."""
 from __future__ import annotations
 
 import argparse
+import math
 import sys
 from pathlib import Path
 
@@ -116,25 +117,31 @@ def _games():
     return season, window
 
 
-def test_card_renders_the_rows_the_brief_asks_for():
+def test_card_renders_the_spec_layout():
     fixed = settings.load()["fixed"]
     season, window = _games()
     pl = _player(season, window)
     c = card.compute(pl, rush_model(ypc=4.2), "rush_yds", 64.5, odds.multiplier_from_american(-125),
                      odds.multiplier_from_american(-132), fixed)
-    text = card.render(pl, c, source="line typed in")
-    assert text.startswith("TEST BACK (DAL RB) - rushing yards - week 5")
-    for needle in ("Over -125", "Under -132", "Over wins often enough (56%)", "Book expects: about",
-                   "At his last-4 average of 15.5 carries", "won by 8+: ", "A.Starter starting", "B.Backup starting",
-                   "His last games (carries-yards): wk4 19-62", "Gap: the Over needs", "Tested:"):
-        assert needle in text, needle
-    assert card.value(c, "needed_under") < card.value(c, "book_expects") < card.value(c, "needed_over")
-    assert c["gap_over"] == pytest.approx(card.value(c, "needed_over") - 15.5)
+    gl = {"favorite": "DAL", "points": 9.5, "spread_text": "DAL -9.5", "spread_unread": False, "total": 49.5}
+    text = card.render(pl, c, "over", opp="TB", game_lines=gl, source="line typed in")
+    lines_ = text.splitlines()
+    flat = " ".join(lines_)
+    assert lines_[:3] == ["Check first: workload bar untested.", "TEST BACK", "Over 64.5 rushing yards (-125)"]
+    bar = card.value(c, "needed_over")
+    for needle in (f"Bar for this price  ~{card._round(bar)} carries", "Last 4: 12, 12, 19, 19  (avg ~16)",
+                   f"{math.ceil(bar)}+ this season: ", "Bar assumes 4.2 yards a carry.",
+                   "Line implies ~", "(our math).", "AT ~16 CARRIES", "Needed at this price: ",
+                   "His season:           ", "Tampa Bay allows:", "MATCHUP",
+                   "DAL run offense [grade] vs TB run defense [grade]", "Dallas favored by 9.5. Total 49.5.",
+                   "Line: line typed in."):
+        assert needle in flat, needle
+    for gone in ("Under", "Gap", "Book expects", "%", "wins often enough"):
+        assert gone not in text, gone                       # one side, no gap line, no percentages
     import re
     for banned in ("bet", "value", "edge", "lean", "pick", "recommend", "play this", "lock"):
         assert not re.search(rf"\b{banned}\b", text.lower()), banned
-    # every line fits a phone (one wrap at most on a narrow screen)
-    assert max(len(x) for x in text.splitlines()) <= 100
+    assert max(len(x) for x in lines_) <= card.WIDTH + 4
 
 
 def test_card_says_when_the_usual_reaches_into_last_season():
@@ -142,7 +149,7 @@ def test_card_says_when_the_usual_reaches_into_last_season():
     season, window = _games()
     pl = _player(season.iloc[:3], window.iloc[:4])          # '25 wk17 and 2026 weeks 1-3
     c = card.compute(pl, rush_model(), "rush_yds", 64.5, 1.8, 1.8, fixed)
-    assert "reach back into last season" in card.render(pl, c)
+    assert "reach back into last season" in card.render(pl, c, "over", opp="TB")
 
 
 def test_a_user_target_replaces_break_even():
@@ -159,34 +166,32 @@ def test_a_market_below_its_minimum_sample_shows_no_numbers():
     season, window = _games()
     pl = _player(season, window)
     pl.not_enough["rush_yds"] = ["12 of his own carries in his last 16 games (needs 30)"]
-    text = card.render_not_enough(pl, "rush_yds", 64.5, 1.8, 1.76)
-    assert "Not enough data, so no workload numbers" in text and "  - 12 of his own carries" in text
-    assert "wins often enough" not in text and "Book expects" not in text
+    text = card.render_not_enough(pl, "rush_yds", "over", 64.5, 1.8, 1.76)
+    assert "Check first: not enough data, so no bar:" in text and "- 12 of his own carries" in text
+    assert "Bar for this price" not in text and "Line implies" not in text and "Needed at" not in text
     c = card.compute(pl, rush_model(), "rush_yds", 64.5, 1.8, 1.76, settings.load()["fixed"])
     with pytest.raises(ValueError):
-        card.render(pl, c)
+        card.render(pl, c, "over", opp="TB")
 
 
 def test_an_unreachable_rate_is_said_in_words():
     season, window = _games()
     pl = _player(season, window)                      # last-4 average: 2 targets a game
     c = card.compute(pl, rec_model(0.75), "receptions", 4.5, 1.69, 1.89, settings.load()["fixed"])
-    text = card.render(pl, c)
-    assert card.value(c, "rate_needed_over") is None and "the Over cannot win often enough at any catch rate" in text
+    assert card.value(c, "rate_needed_over") is None
+    assert "Needed at this price: no rate clears it" in card.render(pl, c, "over", opp="TB")
     # the Under wins at every rate here (the Over tops out near 8%): it must say so, not the reverse
-    assert "the Under wins often enough at any catch rate" in text
-    assert "Under cannot" not in text
+    assert "Needed at this price: any rate clears it" in card.render(pl, c, "under", opp="TB")
 
 
 def test_an_under_that_wins_at_any_workload_is_said_in_words():
     season, window = _games()
     pl = _player(season, window)
     c = card.compute(pl, rush_model(ypc=1.0), "rush_yds", 300.5, 1.8, 1.76, settings.load()["fixed"])
-    text = card.render(pl, c)
-    assert "Over cannot win often enough (56%) at any workload up to 45 carries" in text
-    assert "Under wins often enough (57%) at any workload up to 45 carries" in text
-    assert "more than 45 carries or fewer" not in text and "Book expects: more than 45" in text
-    assert "45 or fewer" not in text                      # no always-true history row
+    over, under = card.render(pl, c, "over", opp="TB"), card.render(pl, c, "under", opp="TB")
+    assert "Bar for this price: no workload up to 45 carries clears it." in " ".join(over.splitlines())
+    assert "Bar for this price: any workload up to 45 carries clears it." in " ".join(under.splitlines())
+    assert "this season:" not in under                    # no always-true count row
 
 
 def test_position_is_read_as_of_the_priced_week():
@@ -204,17 +209,19 @@ def test_every_card_variant_fits_a_phone():
     fixed = settings.load()["fixed"]
     season, window = _games()
     pl = _player(season, window)
-    texts = [card.render(pl, card.compute(pl, rush_model(ypc=1.0), "rush_yds", 300.5, 1.8, 1.76, fixed)),
-             card.render(pl, card.compute(pl, rec_model(0.75), "receptions", 4.5, 1.69, 1.89, fixed)),
-             card.render(pl, card.compute(pl, rush_model(), "rush_yds", 64.5, 1.8, 1.76, fixed))]
+    texts = [card.render(pl, card.compute(pl, rush_model(ypc=1.0), "rush_yds", 300.5, 1.8, 1.76, fixed), s, opp="TB")
+             for s in ("over", "under")]
+    texts += [card.render(pl, card.compute(pl, rec_model(0.75), "receptions", 4.5, 1.69, 1.89, fixed), s, opp="NYJ",
+                          game_lines={"spread_text": "OFF the board", "spread_unread": True, "total": None},
+                          source="Sleeper quote from your capture, 2026-10-10 15:55 UTC") for s in ("over", "under")]
     pl.not_enough["rush_yds"] = ["12 of his own carries in his last 16 games (needs 30)",
                                  "140 TE carries in the pool for his position's average (needs 500)"]
-    texts.append(card.render_not_enough(pl, "rush_yds", 64.5, 1.8, 1.76, source="line typed in"))
-    texts.append(card.render_not_enough(pl, "rush_yds", None, None, None, source=(
+    texts.append(card.render_not_enough(pl, "rush_yds", "over", 64.5, 1.8, 1.76, source="line typed in"))
+    texts.append(card.render_not_enough(pl, "rush_yds", "under", None, None, None, source=(
         "Unmatched: no saved Sleeper quote belongs to Sam LaPorta (DET) in 2026_05_DET_ARI for rush_yds; "
         "give --line --over --under")))
     worst = max((len(x), x) for t in texts for x in t.splitlines())
-    assert worst[0] <= 100, worst
+    assert worst[0] <= card.WIDTH + 4, worst
 
 
 def test_a_push_on_a_whole_number_line_is_void_for_both_sides():
@@ -248,8 +255,8 @@ def test_every_row_uses_the_same_push_rule():
 
 def _leg_args(**kw):
     import argparse
-    base = dict(name="Test Back", market="rush_yds", team=None, season=2026, week=5, line=None, over=None,
-                under=None, target=None)
+    base = dict(name="Test Back", market="rush_yds", side="over", team=None, season=2026, week=5, line=None,
+                over=None, under=None, target=None)
     return argparse.Namespace(**{**base, **kw})
 
 
@@ -260,7 +267,11 @@ def stub_leg(monkeypatch, tmp_path):
     season, window = _games()
     pl = _player(season, window)
     pl.pools = {"rb_residuals": RESID}
-    game = pd.Series({"week": 5, "game_id": "2026_05_DAL_ARI", "kickoff_utc": "2099-10-11T20:05:00+00:00"})
+    game = pd.Series({"week": 5, "game_id": "2026_05_DAL_ARI", "kickoff_utc": "2099-10-11T20:05:00+00:00",
+                      "home_team": "ARI", "away_team": "DAL"})
+    monkeypatch.setattr(cli, "_week_lines", lambda *a: ({("DAL", "ARI"): {
+        "kickoff_utc": "x", "favorite": "DAL", "points": 3.5, "spread_text": "DAL -3.5", "spread_unread": False,
+        "total": 47.5}}, ""))
     monkeypatch.setattr(player, "Bundle", lambda *a, **k: type("B", (), {
         "rosters": None, "schedule": None, "position_at": lambda self, *a: "RB"})())
     monkeypatch.setattr(player, "find_player", lambda *a, **k: ("00-1", "Test Back", "DAL"))
@@ -294,7 +305,7 @@ def test_leg_not_enough_and_no_quote_shows_the_gap(stub_leg):
     cli, lookup, pl = stub_leg
     pl.not_enough["rush_yds"] = ["12 of his own carries in his last 16 games (needs 30)"]
     text = cli.leg(_leg_args())
-    assert "Not enough data" in text and "Unmatched: no saved Sleeper quote" in text
+    assert "not enough data" in text and "Unmatched: no saved Sleeper quote" in text
 
 
 def test_leg_reports_a_bad_saved_row_as_unmatched(stub_leg, monkeypatch):
@@ -405,19 +416,24 @@ def test_a_usual_from_too_few_games_is_not_shown():
     season, window = _games()
     pl = _player(season.iloc[:2], window.iloc[1:3])          # two games played so far
     c = card.compute(pl, rush_model(), "rush_yds", 34.5, 1.8, 1.8, fixed)
-    text = card.render(pl, c)
+    text = card.render(pl, c, "over", opp="TB")
     assert c["usual"] is None and c["gap_over"] is None
-    assert "only 2 games played, not enough data for an average (needs 4)" in text and "Gap:" not in text
+    assert "Last 2: 12, 12" in text and "Short history: 2 games." in text
+    assert "Only 2 games: no recent average yet." in text and "AT ~" not in text
 
 
-def test_a_gap_near_zero_is_said_plainly():
-    fixed = settings.load()["fixed"]
-    season, window = _games()
-    pl = _player(season, window)
-    m = rush_model(ypc=4.2)
-    c = card.compute(pl, m, "rush_yds", 64.5, 1.8, 1.76, fixed)
-    c["gap_over"] = 0.03
-    assert "is right at what the Over needs" in card.render(pl, c)
+def test_the_closing_question_follows_the_four_cases_and_turns_round_for_unders():
+    q = card.question
+    assert q("rush_yds", "over", 3, 0.9) == "3 more carries, or 0.9 more yards a carry?"
+    assert q("rush_yds", "over", 0, 0.9) == "Workload is there. 0.9 more yards a carry?"
+    assert q("rush_yds", "over", 3, -0.2) == "At his season rate it clears. 3 more carries?"
+    assert q("receptions", "over", -2, -1.5) == "Room for 2 fewer targets?"
+    assert q("receptions", "over", 1, 0.5) == "1 more target, or 0.5 more catches per 10?"
+    # an Under needs less: a bar below his average and a needed rate below his season rate
+    assert q("rush_yds", "under", -3, -0.9) == "3 fewer carries, or 0.9 less yards a carry?"
+    assert q("rush_yds", "under", 2, 0.4) == "Room for 2 more carries?"
+    assert q("rush_yds", "under", 2.5, -0.4) == "Workload is there. 0.4 less yards a carry?"
+    assert q("receptions", "over", 1.5, None) == "1.5 more targets?"
 
 
 def test_leg_refuses_qb_rushing(stub_leg, monkeypatch):
@@ -452,7 +468,8 @@ def test_entry_never_logs_a_game_that_has_kicked_off(stub_leg, monkeypatch):
     monkeypatch.setattr(player, "model", lambda *a, **k: rush_model(ypc=4.2))
     lookup.quote = dict(QUOTE)
     monkeypatch.setattr(cli, "_next_game", lambda *a, **k: pd.Series(
-        {"week": 5, "game_id": "2026_05_DAL_ARI", "kickoff_utc": "2026-10-04T17:00:00+00:00"}))
+        {"week": 5, "game_id": "2026_05_DAL_ARI", "kickoff_utc": "2026-10-04T17:00:00+00:00",
+         "home_team": "ARI", "away_team": "DAL"}))
     text = cli.entry(_entry_args())
     assert "the game has kicked off" in text and journal.read(2026) == []
 
