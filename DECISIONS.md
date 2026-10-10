@@ -8630,3 +8630,24 @@ every row while the predictions rows carry open / decision / close (line_archive
   draws split by share concentration replaced them; the receptions fit survives only in the
   backtest's legacy draw). The line now prints the team volume r and the share concentrations the
   sampler does read; methodology.md marks both fits.
+
+## 2026-10-09 (227) -- the carries miss is in the split, not game script; round 44 registered (an early-exit chance); a shape rule for the scoreboard
+
+- **The question (user):** before another width round, find which stage of the backs' carries draw
+  is too narrow and whether the score drives it. experiments/game_script_carries.py (code-reviewed
+  twice before its output was read) grades the two stages alone on the shipped engine's saved
+  harness runs (2022-24, 2026 weeks 2-4): team carries are calibrated (17.5% outside the 80%
+  range) and swing with the score, which the team width already holds; a back's carries given the
+  team's actual total are too narrow (26.7% outside, scratches excluded), on both sides about
+  equally, not driven by the score (correlation 0.04), and the extreme low end is 3x too thin for
+  RB1s (games with 40% or less of the expected carries: 5.0% happened, 1.7% allowed). The two
+  stages recombined reproduce the harness's carries PIT (26.8% vs 26.9%).
+- **Round 44, registered before any run (reports/round44_carry_exits.md):** a mean-preserving
+  early-exit chance per back per game (share x Uniform(0, 0.4), the lost share to his teammates),
+  gridded with a slightly wider split; selection 2022-25, confirmation 2026 weeks 2-5, four seeds.
+- **Scoreboard amendment, made before the read (user's choice of three):** a change to the shape
+  of a volume draw is judged on the own-volume score at the stand-in lines and the PIT tail it
+  targets, with the spread check as a guard. The spread check measures variance in stable roles,
+  reads 1.01-1.06 for carries, and would reject any added spread by construction; it stays the
+  judge for plain concentration changes. Part of the split's miss is the projected share being
+  wrong in that game (role drift), which this round does not touch.
