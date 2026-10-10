@@ -8665,3 +8665,26 @@ every row while the predictions rows carry open / decision / close (line_archive
   being wrong in a given game (role drift), which this round did not touch and has not been measured.
 - **The option stays in the sampler, off** (carry_exit_rate 0, call for call the shipped draw),
   like the round-41 knob, unless the user prefers it removed.
+
+## 2026-10-09 (229) -- legs are ranked by the evidence against the line, never by the engine's own chance
+
+- **The miss (user, after the Bucks TNF loss):** "the supposedly strongest leg was the only one that
+  fails." Irving's receiving Over was ranked strongest on the engine's own chance, which has run high
+  at real lines (#202) and which the market-first card (#225) already puts last as a reference.
+- **The rule (CHAT.md, props/engine/SKILL.md fast path):** how well a read holds up is how far the
+  role evidence puts his workload past the Power Play workload, whether his earlier role clears it
+  too, and how far apart the card's two sides sit. A line whose sides are about one pass or carry
+  apart cannot top a ranking; the engine's own Over chance and its gap to the market never order legs.
+- No price changes.
+
+## 2026-10-09 (230) -- each card shows the engine's graded calls on the player in that market
+
+- **Why (the user's earlier ask; the Irving case):** the engine priced Irving's receiving Over at
+  64-70% six times and lost all six, and nothing on the card said so. The card's last row now shows
+  his settled calls in that market this season: how often the Over hit, and the Over chance the
+  engine and the market gave on average ("Over 0 of 6 (weeks 2-5); engine said 67%, market 52%").
+- **How:** the settled record (the repo copy inside the repo, the published copy in chat, cached six
+  hours), Sleeper's calls before this week, one a game (the latest when two engine versions called
+  the same week -- caught by a hand check: Lamb's week 3 counted twice). Joined by player ID; rows
+  settled before IDs were recorded (#224) join through the season's roster by name and team, never
+  name alone. Captures skip it; an unreadable record shows no row. No price changes.

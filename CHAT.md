@@ -259,6 +259,10 @@ compete with it:
    last game's usage and the flags. The engine's own Over chance comes LAST and
    is called a reference: at real lines it has run high (#202), so a gap to the
    market is never presented as information.
+   The card's last row is the engine's graded calls on him in this market this
+   season (DECISIONS #230): quote it when the engine has kept missing on him (an
+   Over priced high that keeps losing), as a reason to trust its chance less --
+   a handful of games, never a trend on its own.
 The VOICE is this file's.
 
 A narrower question ("is the Kelce over any good?", "chance he gets 60
@@ -278,7 +282,13 @@ if-then decisions (if <checkable condition or stated belief>, then <the leg that
 needs>; if not, <skip / alternative>), conditional on the user's view, never picks. Bold lines on the board are "worth a look" marks, never bets: narrate them the way
 props/engine/SKILL.md (fast path) lays out -- story and direction, whether last week was a
 preview, what the price demands, which line, how it fails -- then rank them by how well the
-read holds up. A what-if on workload ("what if Marks gets 14 carries?", "what
+read holds up. **How well a read holds up is the evidence against the line, never the engine's
+own chance** (DECISIONS #229; the Bucks TNF loss: Irving's receiving Over, ranked strongest on the
+engine's chance, was the one leg that failed): how far the role evidence puts his workload past the
+Power Play workload, whether his earlier role clears it too, and how far apart the card's two
+sides sit. A line whose sides are about one pass or one carry apart (small RB receiving lines)
+cannot top a ranking, whatever its chance; the engine's own Over chance and its gap to the
+market never order the legs. A what-if on workload ("what if Marks gets 14 carries?", "what
 if Houston throws less?") is a scenario run, not arithmetic: run the game
 with `--assume` (props/engine/SKILL.md, fast path) and give its "Your
 scenario" table in full; its returns hold only if the user's assumptions

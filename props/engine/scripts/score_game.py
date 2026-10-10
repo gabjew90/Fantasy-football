@@ -2155,6 +2155,9 @@ def main():
 
 
     GATE = load_label_gate(wd)
+    # the engine's graded calls this season, by player ID, for the card's record row (DECISIONS #230)
+    # (a capture never shows a card, so it skips the read)
+    RECORD_CALLS = {} if a.no_scenarios else load_player_record(wd, SEASON, WEEK, ros)
 
     # ---------- 8a. research columns (props-v1.29, DECISIONS #142) ----------
     # What the line implies (the workload that makes it a fair 50/50), usage
@@ -2983,7 +2986,9 @@ def main():
                             log(f"  efficiency grid skipped for {nm} {mk} at {rate_:.2f} ({type(exc).__name__}: {exc})")
                             continue
                     grid.append({"key": key_, "rate": float(rate_), **pp_})
+            rec_ = RSCH.player_record(RECORD_CALLS.get(clean_gsis(m.gsis_id), []), mk)
             out.append({"market": mk, "line": r["line"], "volume_text": vtext, "book_lines": book_lines_of(mk, nm, t),
+                        "record_text": RSCH.record_cell(rec_), "record": rec_,
                         "cells": RSCH.volume_cells(mk, r["line"], draws, rates, games, mvol) if draws is not None
                         else None, "pp_grid": grid})
         return out
@@ -4032,6 +4037,67 @@ def load_label_gate(wd=None):
         return cached_json(Path(wd) / "model_weight.json", 6 * 3600, loader) if wd else loader()
     except Exception:  # noqa: BLE001 -- the gate is context, never a reason to fail a run
         return None
+
+
+RECORD_URL = "https://raw.githubusercontent.com/gabjew90/Fantasy-football/main/props/record/settled/{s}/settled_{s}.csv"
+
+
+def load_player_record(wd, season, week, ros) -> dict:
+    """The engine's graded calls this season before this week, grouped by player ID (DECISIONS #230):
+    the repo's settled record when the engine runs inside the repo, else the published copy (chat),
+    cached six hours. Sleeper's calls only (the user's book), one per player, week and market (the
+    record's is_call; the latest when two engine versions both called a week). Rows the settle wrote before IDs were recorded (DECISIONS #224) are joined
+    through the season's roster by name AND team, never by name alone; a row that matches no one,
+    or two players, is left out. {} when the record cannot be read -- the card then shows no row."""
+    import io
+    import time
+    local = Path(__file__).resolve().parents[2] / "record" / "settled" / str(season) / f"settled_{season}.csv"
+    try:
+        if local.exists():
+            d = pd.read_csv(local, low_memory=False)
+        else:
+            cache = Path(wd) / f"settled_{season}.csv" if wd else None
+            if cache and cache.exists() and time.time() - cache.stat().st_mtime < 6 * 3600:
+                text = cache.read_text(encoding="utf-8")
+            else:
+                import urllib.request as _ur
+                req = _ur.Request(RECORD_URL.format(s=season), headers={"User-Agent": "Mozilla/5.0"})
+                text = _ur.urlopen(req, timeout=20).read().decode("utf-8")
+                d = pd.read_csv(io.StringIO(text), low_memory=False)     # parsed before it is cached
+                if cache and {"season", "is_call"}.issubset(d.columns):
+                    cache.write_text(text, encoding="utf-8")
+            if "d" not in locals():
+                d = pd.read_csv(io.StringIO(text), low_memory=False)
+    except Exception as exc:  # noqa: BLE001 -- the record is context, never a reason to fail a run
+        log(f"  settled record unavailable ({type(exc).__name__}): no record row on the cards")
+        return {}
+    need = {"season", "week", "book", "market", "player", "team", "side", "result", "is_call"}
+    if not need.issubset(d.columns):
+        log("  settled record lacks expected columns: no record row on the cards")
+        return {}
+    return record_by_id(d, season, week, ros)
+
+
+def record_by_id(d, season, week, ros) -> dict:
+    """The settled record's Sleeper calls before `week`, grouped by player ID (load_player_record).
+    The ID is the row's gsis_id; a row settled before IDs were recorded joins through the roster by
+    name AND team (a key two players share is dropped). One call a game: the record keeps a call per
+    engine version, so two engines in one week are two calls there -- the latest is kept."""
+    d = d[(d.season == season) & (d.week < week) & (d.book == "sleeper")
+          & (pd.to_numeric(d.is_call, errors="coerce") == 1)].copy()
+    ids = d["gsis_id"].map(clean_gsis) if "gsis_id" in d else pd.Series([None] * len(d), index=d.index)
+    if ids.isna().any() and ros is not None and len(ros):
+        r_ = ros[["full_name", "team", "gsis_id"]].dropna().copy()
+        r_["k"] = r_.full_name.map(MODEL.norm_name) + "|" + r_.team.astype(str)
+        uniq = r_.drop_duplicates(["k", "gsis_id"]).groupby("k").gsis_id.agg(lambda x: x.iloc[0] if len(x) == 1 else None)
+        keys = d.player.map(MODEL.norm_name) + "|" + d.team.astype(str)
+        ids = ids.where(ids.notna(), keys.map(uniq))
+    d["gsis_key"] = ids.map(clean_gsis)
+    d = d[d.gsis_key.notna()]
+    if "logged_at_utc" in d:
+        d = d.sort_values("logged_at_utc", kind="stable")
+    d = d.drop_duplicates(["gsis_key", "week", "market"], keep="last")
+    return {k: g.to_dict("records") for k, g in d.groupby("gsis_key")}
 
 
 def gate_sentence(gate) -> str:
