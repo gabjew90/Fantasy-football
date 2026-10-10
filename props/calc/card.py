@@ -221,11 +221,14 @@ def matchup_lines(pl: Player, market: str, opp: str, lines_: dict | None, why_no
                   grades: dict | None = None, qb_today: str = "") -> list[str]:
     """MATCHUP: the grade line (run for rushing cards, pass for the others)
     and the spread and total -- ESPN's, else the nflverse schedule's closing
-    line, labelled. Display only. grades: {"off", "def"} letters, or {"note"}."""
+    line, labelled. Display only. grades: {"off", "def"} grades such as "A-", or {"note"}."""
     kind = "run" if market == "rush_yds" else "pass"
     out = ["MATCHUP"]
     if grades and grades.get("off") and grades.get("def"):
-        out += _wrap(f"{pl.team} {kind} offense {grades['off']} vs {opp} {kind} defense {grades['def']}")
+        line = f"{pl.team} {kind} offense {grades['off']} vs {opp} {kind} defense {grades['def']}"
+        # too wide: break at "vs", so each grade stays beside its unit
+        out += [line] if len(line) <= WIDTH else [f"{pl.team} {kind} offense {grades['off']} vs",
+                                                   f"{opp} {kind} defense {grades['def']}"]
     else:
         out += _wrap(f"{pl.team} {kind} offense vs {opp} {kind} defense: "
                      + ((grades or {}).get("note") or "grades not available."))

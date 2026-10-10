@@ -215,8 +215,9 @@ Line as of [Mon D, H:MM AM/PM] PT.
   No plays to his position: "[Opponent] allows: no plays to [POS]s yet ([G] games)". Plays left
   out for a missing win chance or roster listing are counted on the row.
 - MATCHUP (display only): grades from the engine's tier system (copied, `matchup.py`), as the
-  engine shows them (tier_grade): a letter, S best to F worst, with + for the top third of its
-  band and - for the bottom third (the user, 2026-10-10); rushing cards run vs run, the other
+  engine grades them (tier_grade): a letter, S best to F worst, with + near the top of its band
+  and - near the bottom (thirds; in a band of 4 whole points or fewer, halves) (the user,
+  2026-10-10); a grade line too wide for the card breaks at "vs"; rushing cards run vs run, the other
   three pass vs pass; under 4 games
   "Only [G] games. No grades yet." Spread and total from ESPN; when ESPN has none, the nflverse
   schedule's line, labelled "(closing line)" after kickoff and "(schedule line)" before. An even
@@ -352,6 +353,8 @@ Not built; each needs the user's go-ahead (the frozen-spec rule).
   2026-10-10).
 - day_sd, k_catch and k_ypr barely change the tuning scores (2018-23), so they may be removable
   (the user, 2026-10-10; not acted on).
+- Show each unit's score beside its grade, as the engine's tables do (neighbouring grades can be
+  a point apart); raised by the code review, 2026-10-10.
 
 ## Outputs
 

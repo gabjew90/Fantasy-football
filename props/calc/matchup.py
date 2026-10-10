@@ -4,6 +4,8 @@ The functions between the COPY markers are copied UNCHANGED from
 props/engine/scripts/research.py at commit ec379e45ef0f31db4343998ac4536259c6bfbbf5
 (unit_efficiency, tier_letter, tiers, tier_grade, _band_mod, unit_tiers and the
 constants they use; tier_grade and _band_mod added 2026-10-10 at the user's request, same commit).
+tests/test_calc_grades_parity.py checks both the output and that each copied
+function's source text is identical to the engine's.
 props/calc may not import the engine (DECISIONS #231), so this is a copy, and
 tests/test_calc_grades_parity.py (outside props/calc) checks that both give
 the same letters on the same play-by-play. Their constants are also listed in
@@ -14,8 +16,9 @@ The scale: per team, EPA per play and success rate on dropbacks and runs, as
 the offense and as the defense (allowed), win probability 10-90% only; two
 parts EPA to one part success, standardised, 50 = league average and 10 points
 = one standard deviation, higher is better for offense AND defense; equal-width
-bands counted from the best team down, lettered S, A, B, C, D, F, with + for the
-top third of a band and - for the bottom third (tier_grade).
+bands counted from the best team down, lettered S, A, B, C, D, F, with + near the
+top of a band and - near the bottom (tier_grade: thirds of the band; in a band
+of 4 whole points or fewer, the top half gets + and the bottom half -).
 
 The engine's system has no rule for too few games (only "fewer than 3 teams":
 no scale). The user's rule applies (2026-10-10): under 4 games, "Only [G]
@@ -136,18 +139,6 @@ def tiers(values: dict, higher_is_better=True, max_tiers=MAX_TIERS, steps=TIER_S
 
 
 
-INT_STEPS = (2, 3, 4, 5, 6, 8, 10, 12, 15, 20)
-
-
-def unit_tiers(ue) -> dict:
-    """The four tier scales on the unit score (higher is better on all four)."""
-    sc = (ue or {}).get("score") or {}
-    # tiered on the WHOLE-NUMBER scores the table shows, in whole-number bands, so a printed
-    # score always sits inside its tier's printed range (code review)
-    return {(side, kind): tiers({t: round(v) for t, v in sc.get(side, {}).get(kind, {}).items()},
-                                higher_is_better=True, steps=INT_STEPS)
-            for side in ("off", "def") for kind in ("pass", "run")}
-
 def tier_grade(t: dict, team) -> str:
     """The team's letter with + / - for where it sits inside its band (user, 2026-10-06):
     top third +, bottom third -, middle plain -- so a C- and a D+ read as the neighbours they
@@ -173,6 +164,19 @@ def _band_mod(t: dict, team) -> str:
     if down >= 2 * step / 3:
         return "-"
     return ""
+
+
+INT_STEPS = (2, 3, 4, 5, 6, 8, 10, 12, 15, 20)
+
+
+def unit_tiers(ue) -> dict:
+    """The four tier scales on the unit score (higher is better on all four)."""
+    sc = (ue or {}).get("score") or {}
+    # tiered on the WHOLE-NUMBER scores the table shows, in whole-number bands, so a printed
+    # score always sits inside its tier's printed range (code review)
+    return {(side, kind): tiers({t: round(v) for t, v in sc.get(side, {}).get(kind, {}).items()},
+                                higher_is_better=True, steps=INT_STEPS)
+            for side in ("off", "def") for kind in ("pass", "run")}
 # ---- end of COPY ----
 
 
@@ -190,7 +194,7 @@ def check_constants(fixed: dict) -> None:
 
 
 def season_grades(pbp, fixed: dict) -> dict:
-    """{(side, kind): {team: letter}} plus {"_games": {team: games}} from the
+    """{(side, kind): {team: grade}} (e.g. "A-") plus {"_games": {team: games}} from the
     plays given (already cut to this season before the priced week)."""
     check_constants(fixed)
     ue = unit_efficiency(pbp, fixed["garbage_wp_low"], fixed["garbage_wp_high"])
@@ -205,7 +209,7 @@ def season_grades(pbp, fixed: dict) -> dict:
 
 def grade_pair(b, team: str, opp: str, kind: str, season: int, week: int, fixed: dict) -> dict:
     """His team's offense and the opponent's defense on `kind` (run or pass):
-    {"off", "def"} letters, or {"note"} under the minimum games."""
+    {"off", "def"} grades (e.g. "A-"), or {"note"} under the minimum games."""
     key = (season, week)
     cache = b.__dict__.setdefault("_grades", {})
     if key not in cache:

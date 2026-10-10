@@ -692,3 +692,13 @@ def test_entry_dry_run_without_a_payout_and_a_bad_stake(stub_leg, monkeypatch):
         cli.entry(_entry_args(payout=None))                          # logging needs Sleeper's payout
     with pytest.raises(SystemExit, match="--stake must be above 0"):
         cli.entry(_entry_args(stake=0.0, payout=None, dry_run=True))
+
+
+def test_two_character_grades_stay_beside_their_units():
+    season, window = _games()
+    pl = _player(season, window)
+    c = card.compute(pl, rec_model(0.7), "receptions", 4.5, 1.8, 1.8, settings.load()["fixed"])
+    text = card.render(pl, c, "over", opp="NYJ", grades={"off": "S+", "def": "D-"})
+    lines_ = text.splitlines()
+    assert "DAL pass offense S+ vs" in lines_ and "NYJ pass defense D-" in lines_
+    assert max(len(x) for x in lines_) <= card.WIDTH

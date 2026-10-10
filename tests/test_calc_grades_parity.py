@@ -1,5 +1,5 @@
 """props/calc/matchup.py copies the props engine's unit grades (research.py:
-unit_efficiency, tiers, tier_letter, unit_tiers). This test sits outside
+unit_efficiency, tiers, tier_letter, tier_grade, _band_mod, unit_tiers). This test sits outside
 props/calc, which may not import the engine (DECISIONS #231), and asserts both
 versions give identical scores, bands and letters on the same play-by-play.
 A change to either side fails it until the copy is brought back in line."""
@@ -69,3 +69,17 @@ def test_the_copied_constants_match_the_engine(both):
     research, matchup = both
     for name in ("SCORE_EPA_WEIGHT", "TIER_STEPS", "MAX_TIERS", "TIER_LETTERS", "INT_STEPS"):
         assert getattr(research, name) == getattr(matchup, name), name
+
+
+def test_the_copied_functions_are_the_engines_source_text(both):
+    import inspect
+    research, matchup = both
+    for name in ("unit_efficiency", "tiers", "tier_letter", "tier_grade", "_band_mod", "unit_tiers"):
+        assert inspect.getsource(getattr(research, name)) == inspect.getsource(getattr(matchup, name)), name
+
+
+def test_band_mod_on_fractional_scores_matches(both):
+    research, matchup = both
+    vals = {f"T{i}": 50 + i * 0.37 for i in range(30)}             # not whole: the fractional branch
+    ta, tb = research.tiers(vals), matchup.tiers(vals)
+    assert {t: research.tier_grade(ta, t) for t in vals} == {t: matchup.tier_grade(tb, t) for t in vals}
