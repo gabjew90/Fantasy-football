@@ -1,6 +1,6 @@
 {
  "started_at_utc": "2026-10-10T20:00:48+00:00",
- "status": "started",
+ "status": "read",
  "seasons": [
   2024,
   2025
@@ -15,5 +15,357 @@
   "k_ypr": 50,
   "k_ypcomp": 800
  },
- "results": {}
+ "results": {
+  "rush_yds": {
+   "conversion": {
+    "cases": 783,
+    "priced_lines": 2328,
+    "left_out": {
+     "no workload": 1,
+     "line of 0": 0,
+     "push": 21,
+     "no decided game": 0
+    },
+    "bands": [
+     {
+      "band": "20-30%",
+      "games": 738,
+      "stated": 0.23976176055317378,
+      "actual": 0.26287262872628725
+     },
+     {
+      "band": "30-40%",
+      "games": 40,
+      "stated": 0.38281202480103066,
+      "actual": 0.4
+     },
+     {
+      "band": "40-50%",
+      "games": 741,
+      "stated": 0.4284972663390982,
+      "actual": 0.446693657219973
+     },
+     {
+      "band": "50-60%",
+      "games": 78,
+      "stated": 0.5614252618959485,
+      "actual": 0.47435897435897434
+     },
+     {
+      "band": "60-70%",
+      "games": 400,
+      "stated": 0.6578849021220927,
+      "actual": 0.6575
+     },
+     {
+      "band": "70-80%",
+      "games": 284,
+      "stated": 0.7334774081971451,
+      "actual": 0.7429577464788732
+     }
+    ],
+    "range_coverage": 0.7735825847037928,
+    "range_coverage_inclusive": 0.7828863346104725,
+    "log_loss": 0.6287118367941888,
+    "pass_bands": false,
+    "pass_range": true,
+    "untested_bands": [
+     "30-40%",
+     "50-60%"
+    ],
+    "pass": false
+   },
+   "spread": {
+    "cases": 781,
+    "no_average": 3,
+    "coverage": 0.8233846211235472,
+    "coverage_inclusive": 0.8476312419974392,
+    "pass": true
+   },
+   "round_trip": {
+    "sampled_cases": 79,
+    "line_of_0_cases": 0,
+    "checked": 237,
+    "unsolved": 0,
+    "worst_points": 0.005102040816323816,
+    "pass": true
+   },
+   "pass": false
+  },
+  "receptions": {
+   "conversion": {
+    "cases": 2267,
+    "priced_lines": 5812,
+    "left_out": {
+     "no workload": 34,
+     "line of 0": 0,
+     "push": 989,
+     "no decided game": 0
+    },
+    "bands": [
+     {
+      "band": "20-30%",
+      "games": 631,
+      "stated": 0.24740950775759088,
+      "actual": 0.2694136291600634
+     },
+     {
+      "band": "30-40%",
+      "games": 319,
+      "stated": 0.3413830204518199,
+      "actual": 0.3730407523510972
+     },
+     {
+      "band": "40-50%",
+      "games": 802,
+      "stated": 0.4583060231722362,
+      "actual": 0.5012468827930174
+     },
+     {
+      "band": "50-60%",
+      "games": 1027,
+      "stated": 0.549569379076784,
+      "actual": 0.5443037974683544
+     },
+     {
+      "band": "60-70%",
+      "games": 479,
+      "stated": 0.6476676269685778,
+      "actual": 0.697286012526096
+     },
+     {
+      "band": "70-80%",
+      "games": 787,
+      "stated": 0.7551326377706108,
+      "actual": 0.735705209656925
+     }
+    ],
+    "range_coverage": 0.7859565033129385,
+    "range_coverage_inclusive": 0.9157476841640935,
+    "log_loss": 0.567617302626689,
+    "pass_bands": false,
+    "pass_range": true,
+    "untested_bands": [],
+    "pass": false
+   },
+   "spread": {
+    "cases": 2294,
+    "no_average": 7,
+    "coverage": 0.803685273502362,
+    "coverage_inclusive": 0.8600697471665214,
+    "pass": true
+   },
+   "round_trip": {
+    "sampled_cases": 230,
+    "line_of_0_cases": 0,
+    "checked": 690,
+    "unsolved": 0,
+    "worst_points": 0.004999999999999449,
+    "pass": true
+   },
+   "pass": false
+  },
+  "rec_yds": {
+   "conversion": {
+    "cases": 2267,
+    "priced_lines": 6730,
+    "left_out": {
+     "no workload": 34,
+     "line of 0": 0,
+     "push": 71,
+     "no decided game": 0
+    },
+    "bands": [
+     {
+      "band": "20-30%",
+      "games": 1158,
+      "stated": 0.2794119949887976,
+      "actual": 0.28324697754749567
+     },
+     {
+      "band": "30-40%",
+      "games": 1259,
+      "stated": 0.3237880891683112,
+      "actual": 0.3613979348689436
+     },
+     {
+      "band": "40-50%",
+      "games": 2243,
+      "stated": 0.4419144529841613,
+      "actual": 0.44716897012929113
+     },
+     {
+      "band": "50-60%",
+      "games": 897,
+      "stated": 0.5579485306131348,
+      "actual": 0.5841694537346711
+     },
+     {
+      "band": "60-70%",
+      "games": 1035,
+      "stated": 0.6433808397488944,
+      "actual": 0.6357487922705314
+     },
+     {
+      "band": "70-80%",
+      "games": 138,
+      "stated": 0.7198516736260264,
+      "actual": 0.6304347826086957
+     }
+    ],
+    "range_coverage": 0.7703468955286475,
+    "range_coverage_inclusive": 0.7869430966034406,
+    "log_loss": 0.6598569194325032,
+    "pass_bands": false,
+    "pass_range": true,
+    "untested_bands": [
+     "70-80%"
+    ],
+    "pass": false
+   },
+   "spread": {
+    "cases": 2294,
+    "no_average": 7,
+    "coverage": 0.803685273502362,
+    "coverage_inclusive": 0.8600697471665214,
+    "pass": true
+   },
+   "round_trip": {
+    "sampled_cases": 230,
+    "line_of_0_cases": 0,
+    "checked": 690,
+    "unsolved": 0,
+    "worst_points": 0.005111951743175247,
+    "pass": true
+   },
+   "pass": false
+  },
+  "pass_yds": {
+   "conversion": {
+    "cases": 698,
+    "priced_lines": 2084,
+    "left_out": {
+     "no workload": 14,
+     "line of 0": 0,
+     "push": 10,
+     "no decided game": 0
+    },
+    "bands": [
+     {
+      "band": "20-30%",
+      "games": 61,
+      "stated": 0.23161171947740763,
+      "actual": 0.26229508196721313
+     },
+     {
+      "band": "30-40%",
+      "games": 4,
+      "stated": 0.3787949933858563,
+      "actual": 0.0
+     },
+     {
+      "band": "40-50%",
+      "games": 692,
+      "stated": 0.4557801574022774,
+      "actual": 0.5014450867052023
+     },
+     {
+      "band": "50-60%",
+      "games": 4,
+      "stated": 0.5712446485260555,
+      "actual": 0.5
+     },
+     {
+      "band": "60-70%",
+      "games": 14,
+      "stated": 0.6692202278043895,
+      "actual": 0.6428571428571429
+     },
+     {
+      "band": "70-80%",
+      "games": 127,
+      "stated": 0.7751521352423238,
+      "actual": 0.8188976377952756
+     }
+    ],
+    "range_coverage": 0.8052455484121965,
+    "range_coverage_inclusive": 0.8108882521489972,
+    "log_loss": 0.51363981072522,
+    "pass_bands": false,
+    "pass_range": true,
+    "untested_bands": [
+     "20-30%",
+     "30-40%",
+     "50-60%",
+     "60-70%",
+     "70-80%"
+    ],
+    "pass": false
+   },
+   "spread": {
+    "cases": 708,
+    "no_average": 4,
+    "coverage": 0.7689961668699279,
+    "coverage_inclusive": 0.7966101694915254,
+    "pass": false
+   },
+   "round_trip": {
+    "sampled_cases": 71,
+    "line_of_0_cases": 0,
+    "checked": 213,
+    "unsolved": 0,
+    "worst_points": 0.005030181086507213,
+    "pass": true
+   },
+   "pass": false
+  },
+  "game_story": {
+   "seasons_a": [
+    2018,
+    2019,
+    2020,
+    2021,
+    2022,
+    2023
+   ],
+   "seasons_b": [
+    2024,
+    2025
+   ],
+   "a": {
+    "carries": {
+     "lost by 8+": 20.89,
+     "within 7": 25.95,
+     "won by 8+": 30.6
+    },
+    "attempts": {
+     "lost by 8+": 36.65,
+     "within 7": 35.24,
+     "won by 8+": 30.29
+    }
+   },
+   "b": {
+    "carries": {
+     "lost by 8+": 21.26,
+     "within 7": 26.21,
+     "won by 8+": 30.91
+    },
+    "attempts": {
+     "lost by 8+": 34.53,
+     "within 7": 33.2,
+     "won by 8+": 28.62
+    }
+   },
+   "worst_difference": 2.1287153583368337,
+   "pass": false
+  }
+ },
+ "cases": 6098,
+ "not_enough": {
+  "receptions": 13,
+  "rec_yds": 13,
+  "rush_yds": 3
+ },
+ "untested": {},
+ "finished_at_utc": "2026-10-10T20:12:58+00:00"
 }
