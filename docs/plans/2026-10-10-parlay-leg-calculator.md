@@ -347,6 +347,22 @@ All sixteen open questions were answered: as recommended, except where noted.
 15. Early weeks show "only N games" and nothing else.
 16. The search is never re-run at a defense's allowed rate.
 
+## Progress log
+
+- **2026-10-10, step 2 done:** settings, odds, names, data layer (through `core.fetch`), Sleeper
+  capture, leg log. Per-game totals match nflverse's weekly stats on every non-QB row of 2019,
+  2023 and 2025 except 3 lateral plays (QB carries differ only by the kneels this tool leaves
+  out). The live Sleeper endpoint is blocked from the build container, so the capture is tested on
+  fixtures shaped like the payload the repo already parses; it has not yet run against the live
+  endpoint.
+- **2026-10-10, first rushing and receptions cards** at the prototype settings. Sanity targets
+  reproduced: 19.1 / 16.3 / 17.7, 15.5 / 13.2 / 14.3, 10.2 / 8.6 / 9.4 (all within 0.1).
+  Code review (high) on the branch: 10 findings, 9 fixed (settlement timing, zero-work games,
+  trades, relative-import guard, registry entry, two-sided line check, caching, constants read
+  from the yaml); 1 left (re-reading the line archive per leg: a few legs a week, not worth the
+  code). The first two real cards (Javonte Williams week 5, Puka Nacua week 4) were re-derived by
+  a separate agent from the raw files: no mismatches.
+
 ## Held-out read
 
 Not yet done. The date and the result of the one read of 2024-25 go here.
