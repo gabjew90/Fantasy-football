@@ -18,6 +18,10 @@ Receiving yards: targets and catches as receptions; each catch gets a depth
   from real catches by his position at that depth, all scaled so a catch
   averages his yards per target / catch rate. The rate searched is yards a
   target (an incompletion counts as 0). No good-day factor (design note #7).
+Passing yards: completions ~ negative binomial (mean W, spread completion_r);
+  each completion's depth from his own mix and its yards from real starting
+  quarterbacks' completions at that depth, scaled so a completion averages his
+  yards per completion (the receiving machinery with every play caught).
 """
 
 from __future__ import annotations
@@ -173,7 +177,7 @@ class Model:
                 self._caught = (r, np.concatenate([np.zeros((len(n), 1)),
                                                    np.cumsum(self.draws.u_play < r, axis=1)], axis=1))
             return self._caught[1][np.arange(len(n)), n]
-        if self.market == "rec_yds":
+        if self.market in ("rec_yds", "pass_yds"):     # passing: every completion is "caught" (catch = 1)
             base, mean_mix = self._receiving_base()
             scale = (r / self.catch) / mean_mix          # a catch then averages r / catch rate yards
             # whole yards, as the box score counts them

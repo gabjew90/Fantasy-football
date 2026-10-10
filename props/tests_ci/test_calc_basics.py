@@ -32,11 +32,11 @@ FIXED = {
     "pass_band_points": 3, "pass_band_min_games": 200, "pass_range_low": 77, "pass_range_high": 83,
     "round_trip_points": 1, "game_story_points": 1.5,
     "min_pool_rb_carries": 5000, "min_pool_position_carries": 500, "min_pool_targets_per_bucket": 100, "min_own_carries": 30,
-    "min_own_targets": 20, "league_ypc_range": [4.0, 5.0], "league_catch_rate_range": [0.60, 0.72],
+    "min_own_targets": 20, "min_own_completions": 40, "min_pool_completions_per_bucket": 100, "league_ypc_range": [4.0, 5.0], "league_catch_rate_range": [0.60, 0.72],
     "league_yards_per_target_range": [6.5, 8.5],
     "max_count": {"carries": 80, "targets": 40, "completions": 60},
     "search_max": {"carries": 45, "targets": 25, "completions": 45},
-    "rate_range": {"rush_yds": [0.0, 25.0], "receptions": [0.0, 1.0], "rec_yds": [0.0, 30.0]}, "bisect_steps": 40,
+    "rate_range": {"rush_yds": [0.0, 25.0], "receptions": [0.0, 1.0], "rec_yds": [0.0, 30.0], "pass_yds": [0.0, 30.0]}, "bisect_steps": 40,
 }
 
 
@@ -989,3 +989,16 @@ def test_season_grades_counts_games_and_letters_the_best_unit_s():
     bad = dict(fixed, grade_max_tiers=5)
     with pytest.raises(Exception, match="grade_max_tiers"):
         matchup.season_grades(pbp, bad)
+
+
+def test_opponent_allows_yards_a_completion_from_every_passer():
+    from props.calc import opponent
+    fixed = {"garbage_wp_low": 0.10, "garbage_wp_high": 0.90, "thin_games": 4}
+    comp = pd.DataFrame([dict(season=2026, week=w, defteam="TB", posteam="X", gsis_id=q, yards=y, wp=p)
+                         for w, q, y, p in ((1, "q1", 10, 0.5), (2, "q2", 14, 0.5), (3, "q1", 6, 0.5),
+                                            (4, "q3", 30, 0.95), (4, "q1", 10, np.nan))])
+    pbp = pd.DataFrame([dict(season=2026, week=w, game_id=f"g{w}", posteam="TB", defteam="X") for w in (1, 2, 3, 4)])
+    b = _B(None, None, pbp, pd.DataFrame(columns=["season", "week", "gsis_id", "position"]))
+    b.completions = comp
+    got = opponent.allows(b, "pass_yds", "TB", "QB", 2026, 5, fixed)
+    assert got == {"value": 10.0, "games": 4, "who": "", "thin": False, "left_out": 1, "plays": 3}

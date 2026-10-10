@@ -1,6 +1,6 @@
 """python -m props.calc <command>
 
-  leg "Name" rush_yds over   one side's leg card (rush_yds, receptions or rec_yds for now)
+  leg "Name" rush_yds over   one side's leg card (rush_yds, receptions, rec_yds or pass_yds)
       [--team DEN] [--season 2026 --week 6] [--line 64.5 --over -125 --under -132]
       [--target 58]
       Without --line, the latest saved Sleeper quote before kickoff is used, from
@@ -26,7 +26,7 @@ import pandas as pd
 from core import fetch as F
 from core.manifest import Manifest
 
-from . import capture, card, game_lines, lines, matchup, names, odds, opponent, player, settings
+from . import capture, card, data, game_lines, lines, matchup, names, odds, opponent, player, settings
 from .checks import DataError, number
 from .markets import workload_col
 from .shared import journal
@@ -47,7 +47,7 @@ def main(argv: list[str] | None = None) -> int:
     sub = ap.add_subparsers(dest="cmd", required=True)
     lg = sub.add_parser("leg")
     lg.add_argument("name")
-    lg.add_argument("market", choices=["rush_yds", "receptions", "rec_yds"])
+    lg.add_argument("market", choices=["rush_yds", "receptions", "rec_yds", "pass_yds"])
     lg.add_argument("side", choices=["over", "under"])
     lg.add_argument("--team")
     lg.add_argument("--season", type=int)
@@ -151,6 +151,43 @@ def _bundle(season: int, fixed: dict) -> tuple:
 
 
 _SPREADS: dict = {}
+
+
+NOT_CONFIRMED = {"Out", "Doubtful", "Questionable"}
+
+
+def qb_today(b, team: str, season: int, week: int, kickoff_utc: str) -> str:
+    """The MATCHUP quarterback line (the user, 2026-10-10). Source: the
+    official injury report for this week (nflverse injuries). When the team's
+    opening-day starter is listed Out, Doubtful or Questionable, the starter
+    for this game is not settled, and no dependable source names who starts
+    before kickoff (ESPN's depth chart lagged a week in 2026; Sleeper's is
+    live-only and hand-kept), so the line is "Starting QB not confirmed." --
+    never a guessed name. Otherwise no line. Display only."""
+    sch = b.schedule[(b.schedule["season"] == season)
+                     & ((b.schedule["home_team"] == team) | (b.schedule["away_team"] == team))].sort_values("week")
+    if sch.empty or int(sch["week"].iloc[0]) >= week:
+        return ""                              # his team's opener is this game or later: no opening-day starter yet
+    opener = sch.iloc[0]
+    qb = opener["home_qb_id"] if opener["home_team"] == team else opener["away_qb_id"]
+    if not isinstance(qb, str) or not qb:
+        return ""
+    key = ("_injuries", season)
+    if key not in b.__dict__:
+        b.__dict__[key] = data.injuries(season, manifest=b.manifest)
+    inj = b.__dict__[key]
+    row = inj[(inj["week"] == week) & (inj["team"] == team) & (inj["gsis_id"] == qb)]
+    if len(row) and str(row["report_status"].iloc[-1]) in NOT_CONFIRMED:
+        return "Starting QB not confirmed."
+    return ""
+
+
+def _display_text(fn) -> str:
+    """A display-only line: an error is shown on the card, never stops it."""
+    try:
+        return fn()
+    except Exception as ex:  # noqa: BLE001 -- shown on the card
+        return f"Starting QB: not checked ({type(ex).__name__}: {str(ex)[:50]})."
 
 
 def _display(fn) -> dict:
@@ -260,7 +297,8 @@ def build_card(b, name_in: str, market: str, side: str = "over", *, team=None, s
                        opp_row=_display(lambda: opponent.allows(b, market, opp, pl.position, season, wk, fixed)),
                        grades=_display(lambda: matchup.grade_pair(b, team, opp, "run" if market == "rush_yds"
                                                                    else "pass", season, wk, fixed)),
-                       line_note=line_note)
+                       line_note=line_note,
+                       qb_today=_display_text(lambda: qb_today(b, team, season, wk, game["kickoff_utc"])))
     return {**out, "c": c, "ready": True, "settings": tuned, "text": warn + text}
 
 
@@ -280,8 +318,8 @@ def _parse_leg(spec: str) -> tuple:
     parts = [x.strip() for x in spec.split("|")]
     if len(parts) not in (4, 5) or not parts[0] or parts[2].lower() not in ("over", "under"):
         raise SystemExit(f"leg {spec!r}: write it as 'Name|market|over or under|line played[|TEAM]'")
-    if parts[1] not in ("rush_yds", "receptions", "rec_yds"):
-        raise SystemExit(f"leg {spec!r}: market is rush_yds, receptions or rec_yds for now")
+    if parts[1] not in ("rush_yds", "receptions", "rec_yds", "pass_yds"):
+        raise SystemExit(f"leg {spec!r}: market is rush_yds, receptions, rec_yds or pass_yds")
     try:
         line = number(float(parts[3]), "the leg's line")
     except (ValueError, DataError):

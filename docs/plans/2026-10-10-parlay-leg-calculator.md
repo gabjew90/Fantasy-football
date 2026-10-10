@@ -183,12 +183,13 @@ Last 4: a, b, c, d  (avg [U])           <- oldest to newest; * on a marked game
 AT [U] [UNIT]
 Needed at this price: [E] [rate unit]   <- Unders: "... or less"
 His recent rate ([n] games): [R]        <- the rate the bar assumes
-This season: [S]                        <- "only [n] [unit]" below the minimum sample
+This season: [S]                        <- below the minimum sample: "[S] ([n] [unit])"
 [Opponent] allows: [x][ to POS] ([G] games)
 
 MATCHUP
 [TEAM] [run|pass] offense [grade] vs [OPP] [run|pass] defense [grade]
 [Favorite] favored by [spread]. Total [total].
+[Starting QB not confirmed.]            <- only when the opening-day starter is listed Out/Doubtful/Questionable
 
 [Closing question]
 
@@ -206,8 +207,8 @@ Line as of [Mon D, H:MM AM/PM] PT.
 - "His recent rate ([n] games)": his blended rate over his last [n] games played (n = 16 when he
   has them), the rate the bar assumes. The blend toward the position average is explained in the
   "Calculation" follow-up, not on the card.
-- "This season": his plain rate this season before the week, shown only from the market's
-  minimum own sample.
+- "This season": his plain rate this season before the week; below the market's minimum own
+  sample it is still shown, with its sample ("This season: 4.1 (15 targets)"), never replaced.
 - Opponent row (display only): the opponent's defense this season before the week, in the
   needed rate's unit, win probability 10-90% only. Under 4 games: "[Opponent]: only [G] games."
   No plays to his position: "[Opponent] allows: no plays to [POS]s yet ([G] games)". Plays left
@@ -218,13 +219,19 @@ Line as of [Mon D, H:MM AM/PM] PT.
   schedule's line, labelled "(closing line)" after kickoff and "(schedule line)" before. An even
   spread: "No favorite (even spread)."; a missing spread: "No spread shown." An injury line
   appears only when it changes this player's role (not built yet).
+- Today's quarterback (MATCHUP): source, the official injury report for the week (nflverse
+  injuries). When his team's opening-day starter is listed Out, Doubtful or Questionable, the line
+  is "Starting QB not confirmed." No dependable source names the replacement before kickoff
+  (ESPN's depth chart, in nflverse depth_charts, still listed Baker Mayfield as TB's QB1 before
+  week 5 of 2026, two starts after he went out; Sleeper's depth chart is live-only and hand-kept),
+  so the "[Name] starts at QB today." form is never shown: no guessed names.
 - "Check first:" lines, above the numbers: "workload bar untested." while the bet type's tests
   have not passed (a failed test's own wording replaces it); a lookup note when newer saved
   quotes were skipped.
 - Markers (rule 3): a game where his offensive snap share was under 0.5 times his average in his
   other games that season ("* Week N: played far fewer snaps than usual."), and a game his team's
-  starting quarterback was not the team's opening-day starter ("* Week N: backup quarterback
-  started."). A game from last season says "[year] week N".
+  starting quarterback was not the team's opening-day starter, naming who started ("* Week 4:
+  Jalon Daniels started at QB."). A game from last season says "[year] week N".
 - Footer: one line, the saved quote's time in Pacific time; a typed line says "Line typed in."
 - Not enough data (a rate or pool below its minimum sample): "Check first: not enough data, so no
   bar:", the reasons, "Last games: ..." and the markers; no bar, no rates.
@@ -247,8 +254,9 @@ Line as of [Mon D, H:MM AM/PM] PT.
 - Rates: one decimal.
 - Season count: from the bar as displayed. Over: games at or above it ("~17" -> "17+"; a shown
   3.2 counts games of 4 or more). Under: games at or below it ("~20 or fewer" -> "20 or fewer").
-- Closing asks: from unrounded values; the workload ask to the nearest half, the rate ask to one
-  decimal; each judged as shown (a workload ask that rounds to 0 is even).
+- Closing asks: the workload ask from the unrounded bar and average, shown to the nearest half
+  (judged as shown, so one that rounds to 0 is even); the rate ask from the two rates as displayed
+  (needed rate shown minus recent rate shown), so the reader's subtraction matches.
 
 ### Closing question
 
@@ -305,20 +313,26 @@ Average loss: $[L] per $[stake] entry.
   that entry results are too rare to judge alone. Built as a read-only calc command over the
   journal rows.
 
-### Open questions (asked 2026-10-10, unanswered; the card does not change until answered)
+### Answered (2026-10-10)
 
-1. A thin pool at one depth (RB deep catches: 69 in 2024-25, minimum 100) blocks receiving-yards
-   cards such as Bucky Irving's. Options: all positions' catches at that depth; a lower catch-pool
-   minimum; or keep "not enough data".
-2. A minimum number of his own catches for yards per catch.
-3. Backup-QB wording when a team changes starters for good mid-season.
+1. Thin pool at a depth: when his position has fewer than 100 catches at a depth (RB deep: 69 in
+   2024-25), every position's catches at that depth are used; said in the "Calculation"
+   follow-up, not on the card. Only if those are thin too: not enough data.
+2. No separate minimum for yards per catch; the blend handles a small sample.
+3. The quarterback marker names who started (opening-day-starter rule for which games).
+
+### Open (asked 2026-10-10)
+
+- Passing yards' minimum samples, set before any test was read: 40 of his own completions in his
+  last 16 games (about two starts), and 100 starting quarterbacks' completions per depth in the
+  pool. To confirm.
 
 ## Later ideas
 
 Not built; each needs the user's go-ahead (the frozen-spec rule).
 
-- "Small workload" line (item 5 of a user message on 2026-10-10; the item's text did not reach
-  Claude, so its content is to be restated before it is considered).
+- "Small workload" line: when the bar is under 6, one line under the bar block, "Small workload:
+  one [target/carry] either way can decide this." (the user, 2026-10-10; not to be built now).
 - The injury line in MATCHUP (spec rule 9) has no data source wired yet.
 - Caching the opponent row and grades per run (a 5-card batch takes 7.5 s; not needed now).
 
@@ -524,6 +538,11 @@ All sixteen open questions were answered: as recommended, except where noted.
 16. The search is never re-run at a defense's allowed rate.
 
 ## Known issues
+
+- **Duplicated code (left as is, the user, 2026-10-10).** The catch-rate block (depth buckets, the
+  thin-pool check, the baseline, the blend) is written twice in player.build, for receptions and
+  receiving yards; the starting-QB lookup from the schedule is written twice (player._results and
+  player.backup_qb). A fix to one copy must be made to the other.
 
 - **The journal grades and stamps late lines by name, not by id** (the user, 2026-10-10: record
   it, do not change journal.py now). `journal.grade` finds the player in settle's weekly stats by

@@ -33,6 +33,8 @@ class Bundle:
         self.pbp = pd.concat(plays, ignore_index=True)
         self.carries = data.carries(self.pbp)
         self.targets = data.targets(self.pbp)
+        self.completions = data.completions(self.pbp)
+        self.starters = data.starters(self.pbp)
         self.rosters = pd.concat([data.rosters(s, manifest=manifest) for s in self.seasons], ignore_index=True)
         snaps = pd.concat([data.snaps(s, manifest=manifest) for s in self.seasons], ignore_index=True)
         played = data.played(snaps, self.rosters)
@@ -102,7 +104,12 @@ class Bundle:
             cutoff = self.week_starts(season, 1)
             kicked_off_before("pool carries", c["game_id"], self.kickoffs(), cutoff)
             kicked_off_before("pool targets", t["game_id"], self.kickoffs(), cutoff)
-            self._pools[key] = make_pools(c, t, self.fixed)
+            pools = make_pools(c, t, self.fixed)
+            q = self.completions[self.completions["season"].isin(yrs)]
+            q = q.merge(self.starters, on=["game_id", "posteam", "gsis_id"], how="inner")   # starters' completions only
+            kicked_off_before("pool completions", q["game_id"], self.kickoffs(), cutoff)
+            pools.update(completion_pools(q, self.fixed))
+            self._pools[key] = pools
         return self._pools[key]
 
 
@@ -130,8 +137,10 @@ def make_pools(c: pd.DataFrame, t: pd.DataFrame, fixed: dict) -> dict:
     g = t.dropna(subset=["bucket"]).groupby(["position", "bucket"])["caught"]
     caught = t[t["caught"] & t["bucket"].notna()]
     return {
-        # real catch yards by position and depth, for receiving yards
+        # real catch yards by position and depth, for receiving yards; and by depth over every position,
+        # used at a depth where his position has too few (the user, 2026-10-10)
         "catch_yards_by_pos_bucket": {k: v.to_numpy(float) for k, v in caught.groupby(["position", "bucket"])["yards"]},
+        "catch_yards_by_bucket": {k: v.to_numpy(float) for k, v in caught.groupby("bucket")["yards"]},
         "targets_without_depth": int(t["bucket"].isna().sum()),
         "rb_residuals": rb - rb.mean() if len(rb) else rb,
         "rb_n": len(rb),
@@ -144,6 +153,16 @@ def make_pools(c: pd.DataFrame, t: pd.DataFrame, fixed: dict) -> dict:
 
 
 BUCKETS = ("short", "medium", "deep")
+
+
+def completion_pools(q: pd.DataFrame, fixed: dict) -> dict:
+    """Starting quarterbacks' completion yards by depth (design note #8), for
+    passing yards. A completion without a recorded depth joins no group."""
+    finite("pool completion yards", q["yards"])
+    bk = depth_buckets(q["air_yards"], fixed["depth_short_below"], fixed["depth_deep_from"])
+    q = q.assign(bucket=bk).dropna(subset=["bucket"])
+    return {"comp_yards_by_bucket": {b: g.to_numpy(float) for b, g in q.groupby("bucket")["yards"]},
+            "completions_without_depth": int(bk.isna().sum())}
 
 
 def depth_buckets(air: pd.Series, short_below: float = 5, deep_from: float = 15) -> pd.Series:
@@ -177,6 +196,7 @@ class Player:
     not_enough: dict = field(default_factory=dict)    # market -> [reasons the card shows no numbers]
     no_depth: int = 0                                 # his targets without a recorded depth
     receiving: dict = field(default_factory=dict)     # rec_yds: catch rate, yards per catch, depth mix, pools
+    passing: dict = field(default_factory=dict)       # pass_yds: depth mix and the starters' completion pools
 
     def usual(self, market: str, games: int) -> float | None:
         """His average workload over his last `games` games played; None with
@@ -246,20 +266,21 @@ def fewer_snaps(mine: pd.DataFrame, share: pd.DataFrame, k: float) -> pd.DataFra
     return out.drop(columns=["offense_pct"]).assign(snap_pct=pct.to_numpy(), fewer_snaps=marks)
 
 
-def _starter(g, team: str):
-    """The team's starting QB id in one schedule row, or None."""
-    q = g["home_qb_id"] if g["home_team"] == team else (g["away_qb_id"] if g["away_team"] == team else None)
+def _starter(g, team: str, what: str = "id"):
+    """The team's starting QB id (or name) in one schedule row, or None."""
+    q = g[f"home_qb_{what}"] if g["home_team"] == team else (g[f"away_qb_{what}"] if g["away_team"] == team else None)
     return q if isinstance(q, str) and q else None
 
 
 def backup_qb(mine: pd.DataFrame, schedule: pd.DataFrame) -> pd.DataFrame:
-    """Adds backup_qb: a game his team's starting quarterback was not the one
-    who started the team's first game of that season (the opening-day
-    starter). After an injury every game the backup starts is marked; a
-    season whose opener lists no starter marks nothing. Display only."""
+    """Adds backup_qb (and qb_started, the starter's name): a game his team's
+    starting quarterback was not the one who started the team's first game of
+    that season (the opening-day starter). After an injury every game the
+    other quarterback starts is marked; a season whose opener lists no starter
+    marks nothing. Display only."""
     sch = schedule.set_index("game_id")
     first: dict = {}
-    marks = []
+    marks, names_ = [], []
     for gid, team, yr in zip(mine["game_id"], mine["team"], mine["season"]):
         if (yr, team) not in first:
             t = schedule[(schedule["season"] == yr)
@@ -268,7 +289,8 @@ def backup_qb(mine: pd.DataFrame, schedule: pd.DataFrame) -> pd.DataFrame:
         usual = first[(yr, team)]
         q = _starter(sch.loc[gid], team) if gid in sch.index else None
         marks.append(bool(usual and q and q != usual))
-    return mine.assign(backup_qb=marks)
+        names_.append(_starter(sch.loc[gid], team, "name") if gid in sch.index and "home_qb_name" in sch else None)
+    return mine.assign(backup_qb=marks, qb_started=names_)
 
 
 def _results(b: Bundle, games: pd.DataFrame, margin: int) -> pd.DataFrame:
@@ -374,10 +396,16 @@ def build(b: Bundle, gsis: str, name: str, team: str, season: int, week: int,
         # the depths he catches at (yards) and is targeted at (catch rate) need real pool samples
         need = sorted(set(bk_c) | set(bk_t), key=BUCKETS.index)
         lo = fixed["min_pool_targets_per_bucket"]
-        thin_c = [x for x in need if len(cy.get((pos, x), ())) < lo]
+        # a depth where his position has fewer than the minimum catches uses every position's catches there
+        # (the user, 2026-10-10; said in the "Calculation" follow-up); only if those are thin too, not enough data
+        every = pools.get("catch_yards_by_bucket", {})
+        pooled_all = [x for x in need if len(cy.get((pos, x), ())) < lo]
+        yards_pool = {x: (every.get(x, np.zeros(0)) if x in pooled_all else cy[(pos, x)]) for x in need}
+        thin_c = [x for x in need if len(yards_pool[x]) < lo]
         thin_t = [x for x in need if n_by.get((pos, x), 0) < lo]
         if thin_c:
-            why.append(f"too few {pos} catches in the pool for depth {', '.join(thin_c)} (needs {lo} each)")
+            why.append(f"too few catches in the pool for depth {', '.join(thin_c)}, even counting every "
+                       f"position (needs {lo} each)")
         if thin_t:
             why.append(f"too few {pos} targets in the pool for depth {', '.join(thin_t)} (needs {lo} each)")
         if len(caught_win) and not len(bk_c):
@@ -388,18 +416,39 @@ def build(b: Bundle, gsis: str, name: str, team: str, season: int, week: int,
             cr = _rate(t_win, t_season, rates.catch_rate, "caught", base_c, tuned["k_catch"])
             # his catches' depth mix, and the position's average catch at that mix (yards per catch baseline)
             mix = tuple(float((bk_c == x).mean()) for x in BUCKETS)
-            base_ypr = float(sum(m * cy[(pos, x)].mean() for m, x in zip(mix, BUCKETS) if m > 0))
+            base_ypr = float(sum(m * yards_pool[x].mean() for m, x in zip(mix, BUCKETS) if m > 0))
             ypr = rates.blend(float(caught_win["yards"].sum()), len(caught_win), base_ypr, tuned["k_ypr"])
             finite("blended yards per catch", [ypr])
             own_ypt = rates.yards_per_target(t_win["yards"], t_win["caught"]) if len(t_win) else None
             season_ypt = rates.yards_per_target(t_season["yards"], t_season["caught"]) if len(t_season) else None
             pl.rates["ypt"] = Rate(cr.blended * ypr, own_ypt, len(t_win), season_ypt, len(t_season), base_c * base_ypr)
             pl.rates["catch"] = cr
-            pl.receiving = {"catch": cr.blended, "ypr": ypr, "mix": mix,
-                            "pools": tuple(cy.get((pos, x), np.zeros(1)) for x in BUCKETS)}   # a depth he never
+            pl.receiving = {"catch": cr.blended, "ypr": ypr, "mix": mix, "pooled_all_positions": pooled_all,
+                            "pools": tuple(yards_pool.get(x, np.zeros(1)) for x in BUCKETS)}   # a depth he never
             # catches at has share 0, so its pool (a placeholder when the position has none) is never drawn
+    elif market == "pass_yds":
+        q_win, q_season = own(b.completions)
+        if len(q_win) < min_own(market, fixed):
+            why.append(f"{len(q_win)} of his own completions in his last {n_win} games "
+                       f"(needs {min_own(market, fixed)})")
+        bk = depth_buckets(q_win["air_yards"], fixed["depth_short_below"], fixed["depth_deep_from"])
+        pl.no_depth = int(bk.isna().sum())
+        bk = bk.dropna()
+        cp = pools.get("comp_yards_by_bucket", {})
+        lo = fixed["min_pool_completions_per_bucket"]
+        thin = [x for x in sorted(set(bk), key=BUCKETS.index) if len(cp.get(x, ())) < lo]
+        if thin:
+            why.append(f"too few starting quarterbacks' completions in the pool for depth {', '.join(thin)} "
+                       f"(needs {lo} each)")
+        if len(q_win) and not len(bk):
+            why.append("none of his completions has a recorded depth")
+        if not why:
+            mix = tuple(float((bk == x).mean()) for x in BUCKETS)
+            base = float(sum(m * cp[x].mean() for m, x in zip(mix, BUCKETS) if m > 0))
+            pl.rates["ypcomp"] = _rate(q_win, q_season, rates.yards_per_completion, "yards", base, tuned["k_ypcomp"])
+            pl.passing = {"mix": mix, "pools": tuple(cp.get(x, np.zeros(1)) for x in BUCKETS)}
     else:
-        raise ValueError(f"{market} is not built yet (rushing yards, receptions and receiving yards only)")
+        raise ValueError(f"{market} is not built yet")
     if why:
         pl.not_enough[market] = why
     return pl
@@ -421,4 +470,9 @@ def model(pl: Player, market: str, tuned: dict, fixed: dict) -> calc.Model:
         r = pl.receiving
         return calc.Model(market, "targets", d, pl.rates["ypt"].blended, catch=r["catch"], depth_mix=r["mix"],
                           catch_pools=r["pools"])
-    raise ValueError(f"{market} is not built yet (rushing yards, receptions and receiving yards only)")
+    if market == "pass_yds":
+        d = calc.make_draws("completions", tuned["completion_r"], sims, seed, lim, yards=True)
+        p = pl.passing
+        return calc.Model(market, "completions", d, pl.rates["ypcomp"].blended, catch=1.0, depth_mix=p["mix"],
+                          catch_pools=p["pools"])
+    raise ValueError(f"{market} is not built yet")

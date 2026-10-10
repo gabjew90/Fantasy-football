@@ -271,6 +271,7 @@ def stub_leg(monkeypatch, tmp_path):
     from props.calc import matchup, opponent
     monkeypatch.setattr(opponent, "allows", lambda *a, **k: {"value": 4.4, "games": 4, "who": " to RBs"})
     monkeypatch.setattr(matchup, "grade_pair", lambda *a, **k: {"off": "B", "def": "C"})
+    monkeypatch.setattr(cli, "qb_today", lambda *a, **k: "")
     monkeypatch.setattr(cli, "_week_lines", lambda *a: ({("DAL", "ARI"): {
         "kickoff_utc": "x", "favorite": "DAL", "points": 3.5, "spread_text": "DAL -3.5", "spread_unread": False,
         "total": 47.5}}, ""))
@@ -602,3 +603,42 @@ def test_backup_qb_marks_a_game_the_usual_starter_did_not_start():
                              home_qb_id="x", away_qb_id="a" if w <= 2 else "b") for w in range(1, 7)])
     m2 = pd.DataFrame([dict(game_id=g, team="TB", season=2026) for g in inj["game_id"]])
     assert player.backup_qb(m2, inj)["backup_qb"].tolist() == [False, False, True, True, True, True]
+
+
+def test_step_d_decisions_on_the_card():
+    season, window = _games()
+    fixed = settings.load()["fixed"]
+    # the QB marker names who started; the season rate shows with its sample below the minimum
+    marked = window.assign(backup_qb=[False, False, False, False, True], qb_started=[None] * 4 + ["Jalon Daniels"])
+    pl = _player(season, marked)
+    pl.rates["ypc"] = player_rate(4.2, season=3.73, season_n=12)
+    c = card.compute(pl, rush_model(ypc=4.2), "rush_yds", 64.5, 1.8, 1.76, fixed)
+    flat = " ".join(card.render(pl, c, "over", opp="TB", qb_today="Starting QB not confirmed.").splitlines())
+    assert "* Week 4: Jalon Daniels started at QB." in flat and "backup" not in flat
+    assert "This season: 3.7 (12 carries)" in flat and "only" not in flat
+    assert flat.rstrip().endswith("Starting QB not confirmed.") or "Starting QB not confirmed." in flat
+    # the rate ask is the difference of the two rates as shown: 4.9 shown minus 4.2 shown
+    need = c["solutions"]["rate_needed_over"].value
+    want = round(card.shown_rate(need) - card.shown_rate(4.2), 1)
+    assert f"{want:.1f} more yards a carry?" in flat
+
+
+def player_rate(blended, season, season_n):
+    from props.calc.player import Rate
+    return Rate(blended, blended, 200, season, season_n, 4.3)
+
+
+def test_qb_today_reads_the_official_report_and_never_names_a_guess(monkeypatch):
+    from props.calc import __main__ as cli, data
+    b = type("B", (), {})()
+    b.manifest = None
+    b.schedule = pd.DataFrame([dict(season=2026, week=w, home_team="TB" if w % 2 else "X", away_team="X" if w % 2 else "TB",
+                                    home_qb_id="baker" if w % 2 else "x", away_qb_id="x" if w % 2 else "baker")
+                               for w in (1, 2, 3, 4, 5)])
+    inj = pd.DataFrame([dict(season=2026, team="TB", week=w, gsis_id="baker", full_name="Baker Mayfield",
+                             position="QB", report_status=s) for w, s in ((3, None), (4, "Out"), (5, "Questionable"))])
+    monkeypatch.setattr(data, "injuries", lambda *a, **k: inj)
+    assert cli.qb_today(b, "TB", 2026, 3, "") == ""                     # not on the report as out: no line
+    assert cli.qb_today(b, "TB", 2026, 4, "") == "Starting QB not confirmed."
+    assert cli.qb_today(b, "TB", 2026, 5, "") == "Starting QB not confirmed."
+    assert cli.qb_today(b, "TB", 2026, 1, "") == ""                     # the opener itself: no opening-day starter yet

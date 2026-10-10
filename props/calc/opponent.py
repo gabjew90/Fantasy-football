@@ -5,6 +5,7 @@ this season before the priced week, in the same unit as the needed rate
 - rushing yards: yards a carry allowed to running backs
 - receptions: catches per 10 targets allowed to his position (WR, TE or RB)
 - receiving yards: yards a target allowed to his position (incompletions 0)
+- passing yards: yards a completion allowed (every passer)
 
 Garbage time is left out as the grades leave it out: plays where the
 offense's win probability is outside garbage_wp_low-high. Positions are each
@@ -40,17 +41,20 @@ def allows(b, market: str, opp: str, position: str | None, season: int, week: in
     that week (nor last season), is left out and counted in left_out, which
     the card shows: never dropped without a word."""
     lo, hi = fixed["garbage_wp_low"], fixed["garbage_wp_high"]
-    src = b.carries if market == "rush_yds" else b.targets
+    src = b.carries if market == "rush_yds" else (b.completions if market == "pass_yds" else b.targets)
     d = b.cut(src[(src["season"] == season) & (src["defteam"] == opp)], season, week, "opponent plays")
     plays = b.cut(b.pbp[(b.pbp["season"] == season)
                         & ((b.pbp["posteam"] == opp) | (b.pbp["defteam"] == opp))], season, week, "opponent games")
     games = int(plays["game_id"].nunique())
-    want = "RB" if market == "rush_yds" else position
-    who = WHO.get(want, f" to {want}s" if want else " to his position")
+    want = "RB" if market == "rush_yds" else (None if market == "pass_yds" else position)
+    who = "" if market == "pass_yds" else WHO.get(want, f" to {want}s" if want else " to his position")
     if games < int(fixed["thin_games"]):
         return {"value": None, "games": games, "who": who, "thin": True, "left_out": 0}
     no_wp = int(d["wp"].isna().sum())
     d = d[d["wp"].between(lo, hi)]
+    if market == "pass_yds":                   # every passer counts: no position to look up
+        out = {"value": None, "games": games, "who": who, "thin": False, "left_out": no_wp}
+        return out if d.empty else {**out, "value": float(d["yards"].mean()), "plays": int(len(d))}
     d = _with_position(d, _listed(b, season))
     miss = d["position"].isna()
     if miss.any():                             # no listing yet this season: his last listing of last season

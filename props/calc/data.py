@@ -78,6 +78,14 @@ def snaps(season: int, *, manifest=None) -> pd.DataFrame:
     return df[df["game_type"] == "REG"].reset_index(drop=True)
 
 
+def injuries(season: int, *, manifest=None) -> pd.DataFrame:
+    """The official weekly injury report (nflverse): team, week, gsis_id,
+    full_name, position, report_status."""
+    cols = ["season", "team", "week", "gsis_id", "full_name", "position", "report_status"]
+    return pd.read_csv(F.nflverse("injuries", season, manifest=manifest), usecols=lambda c: c in cols,
+                       low_memory=False)
+
+
 def _id_str(x) -> str | None:
     """Sleeper ids arrive as text or as floats ("4034.0"); one string form."""
     if x is None or (isinstance(x, float) and np.isnan(x)):
@@ -144,11 +152,21 @@ def completions(p: pd.DataFrame) -> pd.DataFrame:
     """One row per completion credited to a passer (box-score passing yards)."""
     m = (_flag(p["complete_pass"]) & ~_flag(p["sack"]) & ~_flag(p["two_point_attempt"])
          & p["passer_player_id"].notna())
-    out = p.loc[m, ["game_id", "season", "week", "posteam", "defteam", "passer_player_id",
+    out = p.loc[m, ["game_id", "season", "week", "posteam", "defteam", "wp", "passer_player_id",
                     "passing_yards", "air_yards"]]
     out = out.rename(columns={"passer_player_id": "gsis_id", "passing_yards": "yards"})
     no_missing("passing yards on completions", out["yards"])
     return out.reset_index(drop=True)
+
+
+def starters(p: pd.DataFrame) -> pd.DataFrame:
+    """(game_id, posteam, gsis_id): each team's starting quarterback in each
+    game, taken as its passer with the most dropbacks (the design note's
+    definition; ties go to the passer listed first in the data)."""
+    d = p[_flag(p["qb_dropback"]) & p["passer_player_id"].notna()]
+    n = d.groupby(["game_id", "posteam", "passer_player_id"]).size().rename("n").reset_index()
+    top = n.sort_values("n", ascending=False, kind="stable").drop_duplicates(["game_id", "posteam"])
+    return top.rename(columns={"passer_player_id": "gsis_id"})[["game_id", "posteam", "gsis_id"]]
 
 
 def player_games(p: pd.DataFrame) -> pd.DataFrame:

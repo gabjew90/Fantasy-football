@@ -33,6 +33,14 @@ def yards_per_target(yards, caught) -> float:
     return float(np.where(c, np.nan_to_num(y, nan=0.0), 0.0).mean())
 
 
+def yards_per_completion(yards) -> float:
+    """Passing yards per completion (box-score yards credited to the passer)."""
+    finite("completion yards", yards)
+    a = np.asarray(yards, dtype=float)
+    require(len(a) > 0, "no completions")
+    return float(a.mean())
+
+
 def blend(own_sum: float, n: int, baseline: float, k: float) -> float:
     """w * own + (1 - w) * baseline with w = n / (n + k), written as
     (own_sum + k * baseline) / (n + k)."""

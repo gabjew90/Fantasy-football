@@ -19,6 +19,8 @@ from .player import Player
 TEST_STATUS = {
     "rush_yds": "Not yet tested: settings are the prototype's starting values.",
     "receptions": "Not yet tested: settings are the prototype's starting values.",
+    "rec_yds": "Not yet tested: settings are the prototype's starting values.",
+    "pass_yds": "Not yet tested: settings are the prototype's starting values.",
 }
 
 
@@ -63,8 +65,9 @@ SHOW = {
     "rush_yds": ("rushing yards", ("carry", "carries"), "yards a carry", "yards a carry", 1.0),
     "receptions": ("catches", ("target", "targets"), "catches per 10 targets", "catches per 10", 10.0),
     "rec_yds": ("receiving yards", ("target", "targets"), "yards a target", "yards a target", 1.0),
+    "pass_yds": ("passing yards", ("completion", "completions"), "yards a completion", "yards each", 1.0),
 }
-RATE_KEY = {"rush_yds": "ypc", "receptions": "catch", "rec_yds": "ypt"}
+RATE_KEY = {"rush_yds": "ypc", "receptions": "catch", "rec_yds": "ypt", "pass_yds": "ypcomp"}
 WIDTH = 40
 # cities shared by two teams keep the full name
 SHARED_CITY = {"NYG", "NYJ", "LA", "LAC"}
@@ -192,7 +195,7 @@ def _question(market: str, side: str, work_ask: float | None, rate_ask: float | 
 
 
 def matchup_lines(pl: Player, market: str, opp: str, lines_: dict | None, why_none: str = "",
-                  grades: dict | None = None) -> list[str]:
+                  grades: dict | None = None, qb_today: str = "") -> list[str]:
     """MATCHUP: the grade line (run for rushing cards, pass for the others)
     and the spread and total -- ESPN's, else the nflverse schedule's closing
     line, labelled. Display only. grades: {"off", "def"} letters, or {"note"}."""
@@ -205,7 +208,7 @@ def matchup_lines(pl: Player, market: str, opp: str, lines_: dict | None, why_no
                      + ((grades or {}).get("note") or "grades not available."))
     if lines_ is None:
         out += _wrap(f"Spread and total: not available ({why_none or 'no game found'}).")
-        return out
+        return out + (_wrap(qb_today) if qb_today else [])
     total = f" Total {lines_['total']:g}." if lines_.get("total") is not None else " No total shown."
     if lines_.get("closing"):
         total = total.rstrip(".") + (" (closing line)." if lines_["closing"] is True else f" ({lines_['closing']}).")
@@ -219,7 +222,7 @@ def matchup_lines(pl: Player, market: str, opp: str, lines_: dict | None, why_no
         out += _wrap(f"No spread shown.{total}")
     else:
         out += _wrap("Spread and total: none on ESPN (removed once a game is final).")
-    return out
+    return out + (_wrap(qb_today) if qb_today else [])
 
 
 def _title(pl: Player, c: dict, side: str) -> list[str]:
@@ -234,7 +237,9 @@ def _notes(rows: list[tuple], season: int) -> list[str]:
             continue
         when = f"Week {int(r['week'])}" if int(r["season"]) == season else f"{int(r['season'])} week {int(r['week'])}"
         if r.get("backup_qb", False):
-            out += _wrap(f"* {when}: backup quarterback started.")
+            who = r.get("qb_started")
+            out += _wrap(f"* {when}: {who} started at QB." if isinstance(who, str) and who
+                         else f"* {when}: another quarterback started.")
         if r.get("fewer_snaps", False):
             out += _wrap(f"* {when}: played far fewer snaps than usual.")
     return out
@@ -258,7 +263,8 @@ def _last_line(pl: Player, c: dict) -> tuple[list[str], list[tuple]]:
 
 
 def render(pl: Player, c: dict, side: str, *, opp: str, game_lines: dict | None = None, why_no_lines: str = "",
-           footer: str = "", opp_row: dict | None = None, grades: dict | None = None, line_note: str = "") -> str:
+           footer: str = "", opp_row: dict | None = None, grades: dict | None = None, line_note: str = "",
+           qb_today: str = "") -> str:
     """One side's card, in the spec's layout (card rules 1-15, as amended).
     opp_row: {"value", "games", "who"} from opponent.allows (display only);
     grades: matchup.grade_pair's result (display only); footer: one line."""
@@ -302,8 +308,9 @@ def render(pl: Player, c: dict, side: str, *, opp: str, game_lines: dict | None 
         out += _wrap(f"Bar assumes {assumed:.1f} {rate_long} ({window[0].lower() + window[1:]}).")
     # "Line implies (our math)" is not on the default card (the user, 2026-10-10): it is in the
     # "Calculation" follow-up; the row returns only as Sleeper's own workload line (step G)
-    if m in ("receptions", "rec_yds") and pl.no_depth:
-        out += _wrap(f"({pl.no_depth} of his targets had no recorded depth; left out of his depth mix.)")
+    if m in ("receptions", "rec_yds", "pass_yds") and pl.no_depth:
+        plays = "completions" if m == "pass_yds" else "targets"
+        out += _wrap(f"({pl.no_depth} of his {plays} had no recorded depth; left out of his depth mix.)")
     out += _notes(rows, pl.season)
     # AT ~U: the rate needed at his recent workload, the rate the bar assumes, his season rate, the opponent's
     need = None
@@ -319,16 +326,18 @@ def render(pl: Player, c: dict, side: str, *, opp: str, game_lines: dict | None 
         else:
             out.append("Needed at this price: no rate clears it")
         out.append(f"{window}: {assumed:.1f}")
-        if rate.season is not None and rate.season_n >= c["season_min"]:
+        if rate.season is None:
+            out.append(f"This season: no {many} yet")
+        elif rate.season_n >= c["season_min"]:
             out.append(f"This season: {shown_rate(rate.season * k):.1f}")
-        else:
-            out.append(f"This season: only {rate.season_n} {many}")
+        else:                                  # below the minimum: the number with its sample, never hidden
+            out.append(f"This season: {shown_rate(rate.season * k):.1f} ({rate.season_n} {_unit(m, rate.season_n)})")
         out += _wrap(_opp_line(opp, opp_row))
     else:
         out += ["", f"Only {c['usual_games']} games: no recent average yet."]
-    out += [""] + matchup_lines(pl, m, opp, game_lines, why_no_lines, grades)
+    out += [""] + matchup_lines(pl, m, opp, game_lines, why_no_lines, grades, qb_today)
     work_ask = (bar - c["usual"]) if bar is not None and c["usual"] is not None else None
-    rate_ask = (need - assumed) if need is not None else None
+    rate_ask = (shown_rate(need) - shown_rate(assumed)) if need is not None else None    # as displayed
     reached = None
     if bar is not None and len(rows) >= int(c["usual_min"]):
         sb = shown_work(bar)

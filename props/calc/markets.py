@@ -16,7 +16,8 @@ ARCHIVE_MARKET = {"player_rush_yds": "rush_yds", "player_receptions": "reception
 
 
 # the minimum-sample setting for his own rate in each market (settings.yaml)
-MIN_OWN = {"rush_yds": "min_own_carries", "receptions": "min_own_targets", "rec_yds": "min_own_targets"}
+MIN_OWN = {"rush_yds": "min_own_carries", "receptions": "min_own_targets", "rec_yds": "min_own_targets",
+           "pass_yds": "min_own_completions"}
 
 
 def min_own(market: str, fixed: dict) -> int:

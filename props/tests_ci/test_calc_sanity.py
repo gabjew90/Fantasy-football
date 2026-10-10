@@ -18,7 +18,7 @@ import pytest
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
-from props.calc import calc, checks, fixture, odds, rates, settings  # noqa: E402
+from props.calc import calc, checks, data, fixture, odds, rates, settings  # noqa: E402
 from props.calc.player import make_pools  # noqa: E402
 
 FIXED = settings.load()["fixed"]
@@ -305,4 +305,71 @@ def test_build_receiving_yards_by_hand():
     thin = {**pools, "catch_yards_by_pos_bucket": {("RB", "short"): np.full(50, 7.0)}}
     b2 = _bundle(pd.DataFrame(columns=["game_id", "season", "week", "gsis_id", "yards"]), tg, games, thin)
     pl2 = player.build(b2, "rb1", "Rb One", "A", 2026, 5, {"k_catch": 60, "k_ypr": 50}, FIXED, "rec_yds")
-    assert pl2.not_enough["rec_yds"] == ["too few RB catches in the pool for depth short (needs 100 each)"]
+    assert pl2.not_enough["rec_yds"] == ["too few catches in the pool for depth short, even counting every position "
+                                         "(needs 100 each)"]
+
+
+def test_yards_per_completion_by_hand():
+    assert rates.yards_per_completion([10, 5, 21]) == pytest.approx(12.0)
+    with pytest.raises(checks.DataError):
+        rates.yards_per_completion([10, float("nan")])
+
+
+def test_starters_are_the_passers_with_the_most_dropbacks():
+    p = pd.DataFrame([dict(game_id="g1", posteam="A", passer_player_id=q, qb_dropback=1.0)
+                      for q in ["qa"] * 30 + ["qb"] * 4]
+                     + [dict(game_id="g1", posteam="B", passer_player_id="qc", qb_dropback=d) for d in (1.0, 0.0)]
+                     + [dict(game_id="g1", posteam="B", passer_player_id="qd", qb_dropback=0.0)] * 5)
+    s = data.starters(p).sort_values("posteam")
+    assert s["gsis_id"].tolist() == ["qa", "qc"]           # B: qd has no dropbacks (handoffs do not count)
+
+
+def test_build_passing_yards_by_hand():
+    from props.calc import player
+    games = _games_rows(5)
+    comp = pd.DataFrame([dict(game_id=g, season=2026, week=w, gsis_id="rb1", yards=12.0 if i % 2 else 8.0,
+                              air_yards=1.0 if i % 2 else 20.0)
+                         for g, w in zip(games["game_id"], games["week"]) for i in range(20)])
+    pools = {**_hand_pools(), "comp_yards_by_bucket": {"short": np.full(300, 6.0), "deep": np.full(300, 20.0)}}
+    b = _bundle(pd.DataFrame(columns=["game_id", "season", "week", "gsis_id", "yards"]),
+                pd.DataFrame(columns=["game_id", "season", "week", "gsis_id", "yards", "caught", "air_yards"]),
+                games, pools)
+    b.completions = comp
+    pl = player.build(b, "rb1", "Rb One", "A", 2026, 5, {"k_ypcomp": 150}, FIXED, "pass_yds")
+    assert "pass_yds" not in pl.not_enough
+    # 80 completions (weeks 1-4) averaging 10.0; mix half short, half deep -> baseline (6 + 20) / 2 = 13;
+    # blended (800 + 150 x 13) / 230
+    r = pl.rates["ypcomp"]
+    assert pl.passing["mix"] == (0.5, 0.0, 0.5) and r.own_n == 80 and r.season == pytest.approx(10.0)
+    assert r.blended == pytest.approx((800 + 150 * 13) / 230)
+    m = player.model(pl, "pass_yds", {"completion_r": 10}, FIXED)
+    assert m.outcomes_fixed(25).mean() / 25 == pytest.approx(r.blended, rel=0.02)
+    few = comp[comp["week"] <= 2].head(30)                    # 30 completions: below the 40 minimum
+    b.completions = few
+    pl2 = player.build(b, "rb1", "Rb One", "A", 2026, 5, {"k_ypcomp": 150}, FIXED, "pass_yds")
+    assert pl2.not_enough["pass_yds"] == ["30 of his own completions in his last 16 games (needs 40)"]
+
+
+def test_a_thin_position_depth_uses_every_positions_catches():
+    from props.calc import player
+    games = _games_rows(5)
+    tg = pd.DataFrame([dict(game_id=g, season=2026, week=w, gsis_id="rb1", yards=5.0 if i < 4 else 30.0,
+                            caught=True, air_yards=1.0 if i < 4 else 20.0)
+                       for g, w in zip(games["game_id"], games["week"]) for i in range(6)])
+    hp = _hand_pools()
+    pools = {**hp, "targets_by_pos_bucket": {("RB", "short"): 5000, ("RB", "deep"): 150},
+             "catch_yards_by_pos_bucket": {("RB", "short"): np.full(200, 7.0), ("RB", "deep"): np.full(60, 25.0)},
+             "catch_yards_by_bucket": {"short": np.full(900, 7.0), "deep": np.full(900, 28.0)}}
+    b = _bundle(pd.DataFrame(columns=["game_id", "season", "week", "gsis_id", "yards"]), tg, games, pools)
+    pl = player.build(b, "rb1", "Rb One", "A", 2026, 5, {"k_catch": 60, "k_ypr": 50}, FIXED, "rec_yds")
+    assert "rec_yds" not in pl.not_enough and pl.receiving["pooled_all_positions"] == ["deep"]
+    # baseline yards per catch: 2/3 short at 7.0 (RB pool) + 1/3 deep at 28.0 (every position's pool)
+    mix = pl.receiving["mix"]
+    assert mix[0] == pytest.approx(2 / 3) and mix[2] == pytest.approx(1 / 3)
+    ypr = (4 * 4 * 5.0 + 4 * 2 * 30.0 + 50 * (2 / 3 * 7.0 + 1 / 3 * 28.0)) / (24 + 50)
+    assert pl.receiving["ypr"] == pytest.approx(ypr)
+    thin_all = {**pools, "catch_yards_by_bucket": {"short": np.full(900, 7.0), "deep": np.full(80, 28.0)}}
+    b2 = _bundle(pd.DataFrame(columns=["game_id", "season", "week", "gsis_id", "yards"]), tg, games, thin_all)
+    pl2 = player.build(b2, "rb1", "Rb One", "A", 2026, 5, {"k_catch": 60, "k_ypr": 50}, FIXED, "rec_yds")
+    assert pl2.not_enough["rec_yds"] == ["too few catches in the pool for depth deep, even counting every position "
+                                         "(needs 100 each)"]
