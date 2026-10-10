@@ -205,7 +205,8 @@ def build_card(b, name_in: str, market: str, side: str = "over", *, team=None, s
     kicked_off = pd.Timestamp(game["kickoff_utc"]) <= pd.Timestamp(dt.datetime.now(dt.timezone.utc))
     out = {"by_initial": by_initial[0], "kicked_off": kicked_off, "stub": stub, "line": line, "mult_over": mo,
            "mult_under": mu, "source": source, "c": None, "ready": False,
-           "not_enough": market in pl.not_enough}
+           "not_enough": market in pl.not_enough,
+           "reason": "; ".join(pl.not_enough.get(market, [])) or (source if line is None else "")}
     if market in pl.not_enough:                 # the data gap is the first thing to say, line or not
         return {**out, "text": warn + card.render_not_enough(pl, market, side, line, mo, mu, source=source)}
     if line is None:
@@ -287,7 +288,7 @@ def entry(a) -> str:
         if got["by_initial"]:
             problems.append(f"{who}: matched by initial; use the name as the card shows it")
         elif not got["ready"]:
-            problems.append(f"{who}: no full card ({got['text'].splitlines()[-1]})")
+            problems.append(f"{who}: no full card ({got['reason']})")
         elif got["kicked_off"]:
             problems.append(f"{who}: the game has kicked off")
         elif got["line"] != played:            # the lookup was asked for this line: never expected

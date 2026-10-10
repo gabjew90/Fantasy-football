@@ -39,7 +39,7 @@ class Bundle:
         # every game he played: with work (play-by-play) or without it (an offensive snap)
         self.games = data.games_played(data.player_games(self.pbp), played)
         # his share of his team's offensive snaps per game, for the fewer-snaps marker (display only)
-        self.snap_share = played[["game_id", "gsis_id", "offense_pct"]]
+        self.snap_share = played.reindex(columns=["game_id", "gsis_id", "offense_pct"])   # no share column: no marks
         self.schedule = data.schedule(manifest=manifest, game_type=stype)
         self._kickoffs: dict | None = None
         self._week_starts: dict = {}

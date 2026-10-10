@@ -505,3 +505,26 @@ def test_entry_dry_run_prints_the_journal_lines_and_writes_nothing(stub_leg, mon
     rows = [json.loads(x) for x in lines_]
     assert len(rows) == 2 and rows[0]["calc_bar_status"] == "ok" and rows[0]["line"] == 64.5
     assert lines_[0] == json.dumps(rows[0], sort_keys=True)       # journal.write's own format
+
+
+def test_review_fixes_on_the_card_wording(monkeypatch):
+    q = card.question
+    assert q("rush_yds", "over", 0, -0.3) == "Workload is there at his season rate."      # never "room for 0"
+    assert q("rush_yds", "over", 0, None) == "Workload is there."
+    assert q("rush_yds", "under", 0, 0.0) == "Workload is there at his season rate."
+    season, window = _games()
+    pl = _player(season, window)
+    fixed = settings.load()["fixed"]
+    c = card.compute(pl, rush_model(ypc=4.2), "rush_yds", 64.5, 1.8, 1.76, fixed)
+    no_spread = {"favorite": None, "points": None, "spread_text": None, "spread_unread": False, "total": 44.5}
+    flat = " ".join(card.render(pl, c, "over", opp="TB", game_lines=no_spread).splitlines())
+    assert "No spread shown. Total 44.5." in flat and "even spread" not in flat
+    monkeypatch.setitem(card.TEST_STATUS, "rush_yds", "Failed: ranges too narrow on 2018-23.")
+    flat = " ".join(card.render(pl, c, "over", opp="TB").splitlines())
+    assert "Check first: Failed: ranges too narrow on 2018-23." in flat
+    far = card.compute(pl, rush_model(ypc=1.0), "rush_yds", 300.5, 1.8, 1.76, fixed)
+    assert "Line implies more than 45 carries (our math)." in " ".join(card.render(pl, far, "over", opp="TB").splitlines())
+    marked = window.assign(fewer_snaps=[True, False, False, False, False])
+    pl2 = _player(season.iloc[:3], marked.iloc[:4])
+    assert "* 2025 week 17: played far fewer snaps than usual." in " ".join(card.render(
+        pl2, card.compute(pl2, rush_model(), "rush_yds", 64.5, 1.8, 1.8, fixed), "over", opp="TB").splitlines())

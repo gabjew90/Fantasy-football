@@ -149,13 +149,17 @@ def question(market: str, side: str, work_ask: float | None, rate_ask: float | N
     if work_ask is None:
         return f"{r(rate_ask)}?" if rate_ask is not None and rate_ask > 0 else ""
     if rate_ask is None:
-        return f"{w(work_ask)}?" if work_ask > 0 else f"Room for {_num(-work_ask)} {room} {_unit(market, -work_ask)}?"
+        if work_ask > 0:
+            return f"{w(work_ask)}?"
+        return "Workload is there." if work_ask == 0 else f"Room for {_num(-work_ask)} {room} {_unit(market, -work_ask)}?"
     if work_ask > 0 and rate_ask > 0:
         return f"{w(work_ask)}, or {r(rate_ask)}?"
     if rate_ask > 0:
         return f"Workload is there. {r(rate_ask)}?"
     if work_ask > 0:
         return f"At his season rate it clears. {w(work_ask)}?"
+    if work_ask == 0:                          # an even ask: no "room for 0" (not in the spec's four cases)
+        return "Workload is there at his season rate."
     return f"Room for {_num(-work_ask)} {room} {_unit(market, -work_ask)}?"
 
 
@@ -173,8 +177,10 @@ def matchup_lines(pl: Player, market: str, opp: str, lines_: dict | None, why_no
         out += _wrap(f"ESPN's spread reads {lines_['spread_text']!r} (not understood).{total}")
     elif lines_.get("favorite"):
         out += _wrap(f"{city(lines_['favorite'])} favored by {lines_['points']:g}.{total}")
-    elif lines_.get("spread_text") or lines_.get("total") is not None:
+    elif lines_.get("spread_text"):
         out += _wrap(f"No favorite (even spread).{total}")
+    elif lines_.get("total") is not None:
+        out += _wrap(f"No spread shown.{total}")
     else:
         out += _wrap("Spread and total: none on ESPN (removed once a game is final).")
     return out
@@ -185,11 +191,12 @@ def _title(pl: Player, c: dict, side: str) -> list[str]:
     return [pl.name.upper(), f"{side.title()} {c['line']:g} {bet} ({odds.fmt_american(price(c, side))})"]
 
 
-def _notes(rows: list[tuple]) -> list[str]:
+def _notes(rows: list[tuple], season: int) -> list[str]:
     out = []
     for _, marked, r in rows:
         if marked:
-            out += _wrap(f"* Week {int(r['week'])}: played far fewer snaps than usual.")
+            when = f"Week {int(r['week'])}" if int(r["season"]) == season else f"{int(r['season'])} week {int(r['week'])}"
+            out += _wrap(f"* {when}: played far fewer snaps than usual.")
     return out
 
 
@@ -221,8 +228,11 @@ def render(pl: Player, c: dict, side: str, *, opp: str, game_lines: dict | None 
     rate = pl.rates["ypc" if m == "rush_yds" else "catch"]
     sol = c["solutions"]
     out = []
-    if TEST_STATUS.get(m, "").startswith("Not yet tested"):
+    status = TEST_STATUS.get(m, "not tested")
+    if status.startswith("Not yet tested") or status == "not tested":
         out.append("Check first: workload bar untested.")
+    elif not status.startswith("Passed"):      # a failed or partial test shows on every card
+        out += _wrap(f"Check first: {status}")
     out += _title(pl, c, side) + [""]
     s = sol[f"needed_{side}"]
     res = calc.side_result(side, s.status)
@@ -246,7 +256,13 @@ def render(pl: Player, c: dict, side: str, *, opp: str, game_lines: dict | None 
     b = sol["book_expects"]
     if b.status == "ok":
         out.append(f"Line implies {_work(b.value)} {many} (our math).")
-    out += _notes(rows)
+    elif b.status == "high":
+        out += _wrap(f"Line implies more than {top} {many} (our math).")
+    else:
+        out += _wrap(f"Line implies about 0 {many} (our math).")
+    if m == "receptions" and pl.no_depth:
+        out += _wrap(f"({pl.no_depth} of his targets had no recorded depth; left out of his depth mix.)")
+    out += _notes(rows, pl.season)
     # AT ~U: the rate needed at his recent workload, his season rate, the opponent's
     need = season = None
     if c["usual"] is not None:
@@ -300,7 +316,7 @@ def render_not_enough(pl: Player, m: str, side: str, line: float | None, mult_ov
     rows = last_games(pl, m, 4)
     out.append("Last games: " + (", ".join(f"{w}{'*' if mk else ''}" for w, mk, _ in rows) or "none")
                + f" ({many})")
-    out += _notes(rows)
+    out += _notes(rows, pl.season)
     if source:
         out += [""] + _wrap(f"Line: {source}.")
     return "\n".join(out)

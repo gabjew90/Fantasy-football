@@ -158,6 +158,10 @@ failure is reported as it is.
 
 ## Outputs
 
+**The leg card layout below is superseded by the user's final card spec (2026-10-10): one
+side per card, "Bar for this price", last 4, season count, the rate the bar assumes, "Line implies
+(our math)", the AT block, MATCHUP and a closing question. Built in step B (`card.render`).**
+
 **1. Leg card** (illustrative numbers, not real data; fits a phone screen; receiving cards say "passes thrown to him"):
 
 ```
