@@ -2230,6 +2230,11 @@ def main():
             PREVIEW_DIFF[t_].insert(0, qc_)
         PREVIEW[t_] = RSCH.preview_note(PREVIEW_DIFF[t_])
     research_rows, _implied_cache, _edges_cache = [], {}, {}
+    # THE EFFICIENCY GRID (DECISIONS #225; the user, 2026-10-09: "yards per carry is in the equation"):
+    # per line, a search that holds the player's efficiency at a given rate and finds the workload a
+    # Power Play leg needs on each side. Built only where someone reads the cards -- a scheduled
+    # capture (--no-scenarios) and a scenario run skip it.
+    GRID_FN = {}
     # THIS run's lines only: R has been merged with --prior-log above, and an
     # earlier capture's line (58.5 before it moved to 59.5) is not a line now
     _now = pd.DataFrame(rows)
@@ -2254,17 +2259,35 @@ def main():
                 _implied_cache[ck] = RSCH.implied_targets(
                     float(r_.line), "receptions" if r_.market == "player_receptions" else "rec_yards",
                     env[m_.team]["targets"], TVD["targets_r"], float(m_.ts), float(m_.cr), float(m_.ypt),
-                    SH, width=WIDTH, prices=px_, role=MODEL.role_group(m_.slot), market_p=mp_, engine_p=ep_)
+                    SH, width=WIDTH, prices=px_, role=MODEL.role_group(m_.slot), market_p=mp_, engine_p=ep_,
+                    hurdle=not a.no_scenarios)
                 _implied_cache[ck] += ("targets",)
                 _edges_cache[ck] = RSCH.edges_for()
+                if not a.no_scenarios:
+                    # receptions: the rate is a catch rate; receiving yards: yards a catch, his catch rate held
+                    GRID_FN.setdefault((r_.player, r_.market, float(r_.line)), (
+                        lambda rate, L_=float(r_.line), mk_=r_.market, tt_=env[m_.team]["targets"], sh_=float(m_.ts),
+                        cr_=float(m_.cr), ypt_=float(m_.ypt), role_=MODEL.role_group(m_.slot):
+                        RSCH.implied_targets(L_, "receptions" if mk_ == "player_receptions" else "rec_yards", tt_,
+                                             TVD["targets_r"], sh_, rate if mk_ == "player_receptions" else cr_,
+                                             ypt_ if mk_ == "player_receptions" else rate * cr_, SH, width=WIDTH,
+                                             role=role_, pp_only=True)))
             elif r_.market == "player_rush_yds":
                 j_ = si["names"].index(r_.player)
                 _implied_cache[ck] = RSCH.implied_carries(
                     float(r_.line), j_, env[m_.team]["carries"], TVD["carries_r"], si["rs"], si["ypc"], resid,
                     width=WIDTH, player_resid=si["p_resid"], player_kneel=si["p_kneel"], qb_index=si["qb_i"],
-                    prices=px_, market_p=mp_, engine_p=ep_)
+                    prices=px_, market_p=mp_, engine_p=ep_, hurdle=not a.no_scenarios)
                 _implied_cache[ck] += ("carries",)
                 _edges_cache[ck] = RSCH.edges_for()
+                if not a.no_scenarios:
+                    def _carry_grid(rate, L_=float(r_.line), j_=j_, tc_=env[m_.team]["carries"], si_=si):
+                        ypc_ = [float(v) for v in si_["ypc"]]
+                        ypc_[j_] = float(rate)
+                        return RSCH.implied_carries(L_, j_, tc_, TVD["carries_r"], si_["rs"], ypc_, resid, width=WIDTH,
+                                                    player_resid=si_["p_resid"], player_kneel=si_["p_kneel"],
+                                                    qb_index=si_["qb_i"], pp_only=True)
+                    GRID_FN.setdefault((r_.player, r_.market, float(r_.line)), _carry_grid)
             else:
                 _implied_cache[ck] = (None, None, None, None, None)
         imp, proj, over_needs, under_needs, unit = _implied_cache[ck]
@@ -2942,9 +2965,27 @@ def main():
                 mvol = _xl("pass_completions", nm, t).get("line")      # the market's completions line, if posted
             if draws is None and not book_lines_of(mk, nm, t):
                 continue
+            # the efficiency grid: a Power Play leg's workload at each of the card's rates (DECISIONS #225)
+            grid, fn_ = [], GRID_FN.get((nm, mk, float(r["line"])))
+            if fn_ is not None:
+                for key_, _lab, rate_ in rates:
+                    if not (isinstance(rate_, (int, float)) and np.isfinite(rate_) and rate_ > 0):
+                        continue
+                    if key_ == "engine":
+                        # the engine's own rate is the main search's: the same numbers as the card's row above,
+                        # never a second, slightly different answer to one question
+                        pp_ = {k_: r.get(k_) for k_ in ("pp_over_needs", "pp_under_needs", "pp_over_edge",
+                                                         "pp_under_edge", "pp_over_limit", "pp_under_limit")}
+                    else:
+                        try:
+                            pp_ = fn_(float(rate_))
+                        except Exception as exc:  # noqa: BLE001 -- the grid informs; it never costs the report
+                            log(f"  efficiency grid skipped for {nm} {mk} at {rate_:.2f} ({type(exc).__name__}: {exc})")
+                            continue
+                    grid.append({"key": key_, "rate": float(rate_), **pp_})
             out.append({"market": mk, "line": r["line"], "volume_text": vtext, "book_lines": book_lines_of(mk, nm, t),
                         "cells": RSCH.volume_cells(mk, r["line"], draws, rates, games, mvol) if draws is not None
-                        else None})
+                        else None, "pp_grid": grid})
         return out
 
     def card_inputs(m, t, mine, rr_read):
@@ -3385,8 +3426,9 @@ def main():
               "\n</details>\n"]
         T += ["## Research table\n",
               f"*Every priced line, snapshot {now()}, grouped by team. {RESEARCH_NOTE.strip('*')}*\n",
-              "| Player | Prop | Line | Price | Our projection | Over: model / book | Line implies | "
-              "Pays at this price if you expect | Last game | Flags |",
+              "| Player | Prop | Line | Price | Our projection | Over: market / engine | Line implies | "
+              f"A {RSCH.POWER_PLAY['default_legs']}-pick Power Play leg ({100 * RSCH.pp_hurdle():.0f}%) needs | "
+              "Last game | Flags |",
               "|---|---|---|---|---|---|---|---|---|---|"]
         if len(RESEARCH):
             for _, x in RESEARCH.sort_values(["team", "player", "market", "line"]).iterrows():
@@ -3570,10 +3612,12 @@ def main():
              "always add to more than 100%; we strip that out so it's a fair comparison.")
     L.append("- **Line implies** is the workload (targets or carries per game) at which the posted line is a fair 50/50, "
              "holding his catch rate and yards per touch. Compare it with what he has been getting.")
-    L.append("- **Pays at this price if you expect** is the same search at each side's own price: the Over beats its price only "
-             "above the first number, the Under only at or below the second. The gap between them is the book's cut. It "
-             "tells you how much role your view needs, not whether the view is right; the model's chances are not shown "
-             "to be calibrated within 3 points (reports/calibration_bar_v2.md).")
+    L.append(f"- **A Power Play leg needs** is the same search at the win rate a leg of a "
+             f"{RSCH.POWER_PLAY['default_legs']}-pick, flat-payout entry needs ({100 * RSCH.pp_hurdle():.0f}%; a single "
+             "pick's Sleeper price is not its break-even in a Power Play, DECISIONS #208, #225): the Over is worth a leg "
+             "only above the first number, the Under only at or below the second. It tells you how much role your view "
+             "needs, not whether the view is right; when the two sides sit about one pass or carry apart, no "
+             "one can forecast that finely.")
     if not td_two_sided:
         if (RD.market == "player_anytime_td").any() if len(RD) else False:
             L.append("- **Touchdown prices** have no 'won't score' side to remove the cut from, so the book's number there is a bit high.")
@@ -3675,6 +3719,31 @@ def main():
     SCEN_L = []
     if RULES and not SCENARIO:
         snap_ = Path(a.odds_snapshot) if a.odds_snapshot else (snap_path if snap_written else None)
+        rel_err = None
+        if any("relative" in r_ for r_ in RULES):
+            # RELATIVE TO THE LINE (DECISIONS #225): each player's workload as his line assumes it -- the
+            # market-implied volume of his rushing line (carries) or his receptions line, else his
+            # receiving-yards line (targets), the preferred book's row first
+            _imp = {}
+            for r_ in RULES:
+                if "relative" not in r_:
+                    continue
+                mks_ = (["player_rush_yds"] if r_["key"] == "carries"
+                        else ["player_receptions", "player_reception_yds"])
+                got_ = None
+                if len(RESEARCH):
+                    for mk_ in mks_:
+                        rr_ = RESEARCH[(RESEARCH.player == r_["who"]) & (RESEARCH.market == mk_)]
+                        rr_ = rr_[rr_.market_volume.notna()] if "market_volume" in rr_ else rr_.iloc[0:0]
+                        rr_ = rr_.sort_values("book", key=lambda b: b != "sleeper", kind="stable")
+                        if len(rr_):
+                            got_ = float(rr_.iloc[0].market_volume)
+                            break
+                _imp[(r_["who"], r_["key"])] = got_
+            try:
+                RULES = SC.fill_relative(RULES, _imp)
+            except ValueError as exc:
+                rel_err = str(exc)
         if any(r_.get("auto") for r_ in RULES):
             # the automatic range (#179): our projection +/- one standard error of his
             # share over his last 10 games; this season only after a team change or a takeover
@@ -3705,6 +3774,7 @@ def main():
                 auto_err = str(exc)
         else:
             auto_err = None
+        auto_err = rel_err or auto_err
         # THIS run's lines only, never the --prior-log merge (an earlier capture's chance is not the board's)
         SCEN_L = (["", "## Your scenario (experimental)", "", f"Not priced: {auto_err}."] if auto_err else
                   run_user_scenario(pd.DataFrame(rows) if rows else R.iloc[0:0], RESEARCH, slug, snap_, RULES))
@@ -4255,8 +4325,8 @@ def brief_section(**V) -> list[str]:
 
 
 def research_cells(x, MKT) -> str:
-    """One research row's cells: | prop | line | price | projection | Over model / book | line implies |
-    break-even workload |."""
+    """One research row's cells: | prop | line | price | projection | Over market / engine | line implies |
+    Power Play leg's workload (DECISIONS #225) |."""
     def odds(a):
         try:
             a = int(a)
@@ -4276,8 +4346,8 @@ def research_cells(x, MKT) -> str:
     if isinstance(x.get("look"), str):       # worth a look (research.worth_a_look): bold, never a bet label
         label = f"**{label}**"
     return (f"| {label} | {x.line:g} | O {odds(x.price_over)} / U {odds(x.price_under)} | "
-            f"{n0(x['median'])} ({n0(x['p10'])} to {n0(x['p90'])}) | {100*x.p_over_model:.0f}% / {100*x.p_over_book:.0f}% | {imp} | "
-            f"{break_even_cell(x)} |")
+            f"{n0(x['median'])} ({n0(x['p10'])} to {n0(x['p90'])}) | {100*x.p_over_book:.0f}% / {100*x.p_over_model:.0f}% | {imp} | "
+            f"{RSCH.pp_cell(x) or '—'} |")
 
 
 def usage_line(u, rush=False, short=False):
@@ -4422,7 +4492,9 @@ def run_user_scenario(R: pd.DataFrame, RESEARCH: pd.DataFrame, slug: str, snap: 
         return L + ["No priced lines to compare."]
     variants = SC.range_variants(rules)
     runs = {}
-    for lab, assume in (variants or [("expected", None)]):
+    # a rule resolved here (relative to the line) reaches the scenario run as its number
+    single = SC.as_assume(rules) if any("relative_to" in r_ for r_ in rules) else None
+    for lab, assume in (variants or [("expected", single)]):
         S, err = _price_scenario(slug, snap, assume, lab)
         if err:
             return L + [f"Scenario failed{'' if variants is None else f' ({lab} run)'}: {err}"]
@@ -4436,8 +4508,18 @@ def run_user_scenario(R: pd.DataFrame, RESEARCH: pd.DataFrame, slug: str, snap: 
         if lab in runs:
             E = runs[lab][key + ["side", "p_model", "p_push"]].drop_duplicates(key)
             j = j.merge(E.rename(columns={c: c + suf for c in ("side", "p_model", "p_push")}), on=key, how="left")
-    pays = ({(r.player, r.market, float(r.line), r.book): RSCH.break_even_cell(r)
+    pays = ({(r.player, r.market, float(r.line), r.book): (RSCH.pp_cell(r) or "—")
              for _, r in RESEARCH.iterrows()} if len(RESEARCH) else {})
+    # the hurdle a leg of the user's Power Play must clear (DECISIONS #225): a Sleeper pick's own price is
+    # not its break-even in a flat-payout entry (#208), so the scenario is judged against this
+    hurdle = RSCH.pp_hurdle()
+
+    def decided(o, u):
+        """(Over, Under) as shares of the outcomes that do not push -- a pushed Sleeper leg is removed
+        from the entry, not lost, and the card's Power Play workloads are solved the same way."""
+        if o is None or u is None or pd.isna(o) or pd.isna(u) or o + u <= 0:
+            return o, u
+        return o / (o + u), u / (o + u)
     named = {x["who"] for x in rules if not x["team"]}
     teams_named = {x["who"] for x in rules if x["team"]}
     rows = []
@@ -4456,19 +4538,23 @@ def run_user_scenario(R: pd.DataFrame, RESEARCH: pd.DataFrame, slug: str, snap: 
         ev_u = SC.net_per_100(pu, u1, o1) if pd.notna(pu) else None
         row = dict(player=x.player, team=x.team, market=x.market, line=float(x.line), book=x.book,
                    price_over=po, price_under=pu, be_over=RSCH.breakeven(po), be_under=RSCH.breakeven(pu),
-                   over_model=o0, over_scenario=o1, under_scenario=u1, push_scenario=p1,
-                   net_over=ev_o, net_under=ev_u,
+                   hurdle=hurdle, over_model=o0, over_scenario=o1, under_scenario=u1, push_scenario=p1,
+                   over_avg=decided(o1, u1)[0], under_avg=decided(o1, u1)[1], net_over=ev_o, net_under=ev_u,
                    pays_if=pays.get((x.player, x.market, float(x.line), x.book), "—"),
                    named=x.player in named)
         if variants:
-            ends = {}
+            ends, dends = {}, {}
             for suf in ("_lo", "_hi"):
                 ends[suf] = ((None, None) if pd.isna(x.get("p_model" + suf)) else
                              _sides(pd.Series({"p_model": x["p_model" + suf], "side": x["side" + suf],
                                                "p_push": x["p_push" + suf]}))[:2])
+                dends[suf] = decided(*ends[suf])
+            do1, du1 = decided(o1, u1)
             row.update(over_low=ends["_lo"][0], over_high=ends["_hi"][0],
-                       verdict_over=SC.range_verdict(ends["_lo"][0], o1, ends["_hi"][0], row["be_over"]),
-                       verdict_under=SC.range_verdict(ends["_lo"][1], u1, ends["_hi"][1], row["be_under"]))
+                       over_avg=SC.range_average(dends["_lo"][0], do1, dends["_hi"][0]),
+                       under_avg=SC.range_average(dends["_lo"][1], du1, dends["_hi"][1]),
+                       verdict_over=SC.range_verdict(dends["_lo"][0], do1, dends["_hi"][0], hurdle),
+                       verdict_under=SC.range_verdict(dends["_lo"][1], du1, dends["_hi"][1], hurdle))
         rows.append(row)
     if not rows:
         return L + ["No line moves by half a point or more under these assumptions."]
@@ -4483,30 +4569,35 @@ def run_user_scenario(R: pd.DataFrame, RESEARCH: pd.DataFrame, slug: str, snap: 
             v = [f"{side} {x[f'verdict_{side.lower()}']}" for side in ("Over", "Under")
                  if x[f"verdict_{side.lower()}"] not in (None, "does not pay in your range")]
             return "; ".join(v) or "neither side pays in your range"
-        L += ["| Player | Prop | Line | Price (O / U) | Break-even (O / U) | Over: board / your low / expected / high | "
-              "Your range | Net per $100 at your expected: Over / Under | Pays at this price if you expect |",
-              "|---|---|---|---|---|---|---|---|---|"]
-        for _, x in T.iterrows():
-            L.append(f"| {x.player} ({x.team}) | {MARKET_WORDS.get(x.market, x.market)} | {x.line:g} | "
-                     f"O {odds(x.price_over)} / U {odds(x.price_under)} | {pc(x.be_over)} / {pc(x.be_under)} | "
-                     f"{pc(x.over_model)} / {pc(x.over_low)} / {pc(x.over_scenario)} / {pc(x.over_high)} | "
-                     f"{verdict(x)} | {money(x.net_over)} / {money(x.net_under)} | {x.pays_if} |")
-        L += ["", "Your range is priced three times: every range at its low, then at its expected, then at its "
-              "high (fixed assumptions stay put). 'Pays across your range' means the side clears its break-even "
-              "at your low, expected and high alike; 'pays only at your high' means it needs that end of what you "
-              "assumed. A teammate's line can run the other way: his Over may pay only at your low."]
-    else:
-        L += ["| Player | Prop | Line | Price (O / U) | Break-even (O / U) | Over: board / your scenario | "
-              "If your scenario is right, net per $100: Over / Under | Pays at this price if you expect |",
+        L += [f"| Player | Prop | Line | Over: your low / expected / high | Your range, averaged: Over / Under | "
+              f"Against a {RSCH.POWER_PLAY['default_legs']}-pick Power Play leg ({pc(hurdle)}) | A leg needs | "
+              f"Engine's own Over (reference) |",
               "|---|---|---|---|---|---|---|---|"]
         for _, x in T.iterrows():
             L.append(f"| {x.player} ({x.team}) | {MARKET_WORDS.get(x.market, x.market)} | {x.line:g} | "
-                     f"O {odds(x.price_over)} / U {odds(x.price_under)} | {pc(x.be_over)} / {pc(x.be_under)} | "
-                     f"{pc(x.over_model)} / {pc(x.over_scenario)} | {money(x.net_over)} / {money(x.net_under)} | "
-                     f"{x.pays_if} |")
+                     f"{pc(x.over_low)} / {pc(x.over_scenario)} / {pc(x.over_high)} | "
+                     f"**{pc(x.over_avg)} / {pc(x.under_avg)}** | {verdict(x)} | {x.pays_if} | {pc(x.over_model)} |")
+        L += ["", "Your range is priced three times: every range at its low, then at its expected, then at its "
+              "high (fixed assumptions stay put); the average weights them 1 : 4 : 1, so your expected counts most. "
+              f"'Pays across your range' means the side clears the {pc(hurdle)} a Power Play leg needs at your low, "
+              "expected and high alike; 'pays only at your high' means it needs that end of what you assumed. A "
+              "teammate's line can run the other way: his Over may pay only at your low."]
+    else:
+        def leg(x):
+            for side, v in (("Over", x.over_avg), ("Under", x.under_avg)):
+                if v is not None and not pd.isna(v) and v >= hurdle:
+                    return f"{side} clears it"
+            return "neither side clears it"
+        L += [f"| Player | Prop | Line | Your scenario: Over / Under | Against a {RSCH.POWER_PLAY['default_legs']}-pick "
+              f"Power Play leg ({pc(hurdle)}) | A leg needs | Engine's own Over (reference) |",
+              "|---|---|---|---|---|---|---|"]
+        for _, x in T.iterrows():
+            L.append(f"| {x.player} ({x.team}) | {MARKET_WORDS.get(x.market, x.market)} | {x.line:g} | "
+                     f"**{pc(x.over_scenario)} / {pc(x.under_scenario)}** | {leg(x)} | {x.pays_if} | "
+                     f"{pc(x.over_model)} |")
     L += ["", "Lines are listed for the players and teams you named, then any other line whose Over moves by half "
-          "a point or more. 'Pays at this price' is the board's break-even workload: compare it with the "
-          "workload you assumed."]
+          "a point or more. 'A leg needs' is the workload each side needs to clear a Power Play leg: compare it "
+          "with the workload you assumed."]
     out = {"logged_at_utc": now(), "assumptions": [x["text"] for x in rules], "rules": rules,
            "range_runs": None if variants is None else {lab: a_ for lab, a_ in variants},
            "lines": T.drop(columns=["move"]).to_dict(orient="records")}

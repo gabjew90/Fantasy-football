@@ -21,6 +21,9 @@ Grammar, one rule per --assume, keys comma-separated:
     PLAYER: carries=N    carries per game, the effective number the
                          simulation gives him (teammates give up the
                          difference in proportion)
+    PLAYER: carries=+N   N more (or -N fewer) than the workload his line
+    PLAYER: targets=+N   assumes (DECISIONS #225); a range signs every value,
+                         'carries=+2/+4/+6'
     PLAYER: catch=P      catch rate (68% or 0.68)
     PLAYER: ypt=N        yards per target
     PLAYER: ypc=N        yards per carry
@@ -101,17 +104,26 @@ def range_variants(rules):
     when no rule is a range."""
     if not any("values" in r for r in rules):
         return None
-    def fmt(r, x):
-        who = r["who"] if r["team"] or not r.get("team_of") else f"{r['who']} ({r['team_of']})"
-        if r["team"]:
-            val = f"{x:+g}%" if r["key"] == "ypt" else f"{x:+g}"
-        elif r["key"] == "catch":
-            val = f"{100 * x:g}%"
-        else:
-            val = f"{x:g}"
-        return f"{who}: {r['key']}={val}"
-    return [(lab, [fmt(r, r["values"][i] if "values" in r else r["value"]) for r in rules])
+    return [(lab, [_fmt_rule(r, r["values"][i] if "values" in r else r["value"]) for r in rules])
             for i, lab in enumerate(RANGE_LABELS)]
+
+
+def _fmt_rule(r, x) -> str:
+    """One resolved rule at value x as an --assume string the scenario run can read back."""
+    who = r["who"] if r["team"] or not r.get("team_of") else f"{r['who']} ({r['team_of']})"
+    if r["team"]:
+        val = f"{x:+g}%" if r["key"] == "ypt" else f"{x:+g}"
+    elif r["key"] == "catch":
+        val = f"{100 * x:g}%"
+    else:
+        val = f"{x:g}"
+    return f"{who}: {r['key']}={val}"
+
+
+def as_assume(rules) -> list[str]:
+    """The rules at their single (expected) values as --assume strings: a rule filled in here
+    (relative to the line) must reach the scenario run as the number it resolved to."""
+    return [_fmt_rule(r, r["value"]) for r in rules]
 
 
 def fill_auto(rules, ranges) -> list[dict]:
@@ -133,6 +145,51 @@ def fill_auto(rules, ranges) -> list[dict]:
                     "text": f"{r['who']}: {r['key']}=auto ({lo:.1f}/{mid:.1f}/{hi:.1f}: our projection "
                             f"+/- one standard error of his share over {src})"})
     return out
+
+
+def fill_relative(rules, implied) -> list[dict]:
+    """Ranges relative to the line resolved into workloads: implied {(player, key): the workload
+    his line assumes (the market-implied volume), or None}. 'carries=+2/+4/+6' against a line that
+    assumes 14.4 becomes 16.4 / 18.4 / 20.4. Raises ValueError when there is no such workload or a
+    value would fall to zero or below."""
+    out = []
+    for r in rules:
+        if "relative" not in r:
+            out.append(r)
+            continue
+        base = implied.get((r["who"], r["key"]))
+        if base is None or not base == base:
+            raise ValueError(f"{r['who']}: {r['key']} relative to the line needs his line's assumed workload, and "
+                             f"this board has none for him (no priced {'rushing' if r['key'] == 'carries' else 'receiving'} "
+                             f"line, or the search ran out); give a number instead, e.g. {r['key']}=14")
+        vals = [round(float(base) + o, 2) for o in r["relative"]]
+        if min(vals) <= 0:
+            raise ValueError(f"{r['who']}: {r['key']} {r['relative'][0]:+g} from the line's {float(base):.1f} is "
+                             f"{min(vals):.1f}: no workload")
+        rule = {k_: v_ for k_, v_ in r.items() if k_ != "relative"}
+        rule.update(value=vals[len(vals) // 2], relative_to=float(base),
+                    text=r["text"] + f" (the line assumes {float(base):.1f}: "
+                                     + "/".join(f"{x:.1f}" for x in vals) + ")")
+        if len(vals) == 3:
+            rule["values"] = vals
+        out.append(rule)
+    return out
+
+
+# A three-point range averaged as low / expected / high weighted 1 : 4 : 1 (the standard three-point
+# estimate; picked, not measured): your expected counts most, the ends still move the answer.
+RANGE_WEIGHTS = (1 / 6, 4 / 6, 1 / 6)
+
+
+def range_average(p_low, p_exp, p_high):
+    """One side's chance averaged over your range (RANGE_WEIGHTS); the expected alone when an end
+    is missing."""
+    ok = lambda v: v is not None and v == v
+    if not ok(p_exp):
+        return None
+    if not (ok(p_low) and ok(p_high)):
+        return p_exp
+    return RANGE_WEIGHTS[0] * p_low + RANGE_WEIGHTS[1] * p_exp + RANGE_WEIGHTS[2] * p_high
 
 
 def range_verdict(p_low, p_exp, p_high, breakeven):
@@ -232,6 +289,19 @@ def parse(rules, teams) -> list[dict]:
             parts = [q for q in v.split("/")]
             if len(parts) not in (1, 3) or any(not q.strip() for q in parts):
                 raise ValueError(f"'{raw}': a range is low/expected/high, e.g. {k}=10/12/15")
+            signed = [q.strip().startswith(("+", "-")) for q in parts]
+            if not is_team and k in ("targets", "carries") and any(signed):
+                # RELATIVE TO THE LINE (DECISIONS #225): 'carries=+2/+4/+6' is 2 / 4 / 6 more than the
+                # workload his line assumes; filled in by fill_relative once the board has that number
+                if not all(signed):
+                    raise ValueError(f"'{raw}': a range relative to the line signs every value, e.g. {k}=+2/+4/+6")
+                offs = [_number(q, k, raw)[0] for q in parts]
+                if len(offs) == 3 and not offs[0] <= offs[1] <= offs[2]:
+                    raise ValueError(f"'{raw}': write the range low/expected/high, smallest first")
+                rule = {"who": who, "team": False, "key": k, "value": None, "relative": offs,
+                        "team_of": team_of, "text": f"{who}: {k}={v.strip()} vs the line"}
+                out.append(rule)
+                continue
             vals = [_one_value(q, k, raw, is_team) for q in parts]
             if len(vals) == 3 and not vals[0] <= vals[1] <= vals[2]:
                 raise ValueError(f"'{raw}': write the range low/expected/high, smallest first")

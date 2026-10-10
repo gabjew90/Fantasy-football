@@ -8565,3 +8565,34 @@ every row while the predictions rows carry open / decision / close (line_archive
 - **Checked end to end** on CHI @ GB (week 5, Sleeper): every line matched by gsis, every quote and
   row carries both ids, all 13 ids agree with the stats file. Code review: 7 findings, all fixed.
 - The settled record is regraded by the next scheduled settle (weeks 2-5), not by hand.
+
+## 2026-10-09 (225) -- market first: the card restates the line as workload; a Power Play leg's break-evens; your view relative to the line
+
+- **The change (user, 2026-10-09):** the engine stops competing with the book and translates the
+  line. Its own Over chance had been the headline, and at real lines it loses to the market (#202),
+  so the gap it reported was not information. The question for the user becomes: does he get more
+  or less work than the line assumes, by enough, and why.
+- **The card, top to bottom:** the workload the line assumes (the market-implied volume, at the
+  engine's efficiency, #214); the workload a Power Play leg needs on each side, at the hurdle
+  payout ** (-1 / picks) from resources/power_play.json (4 picks at 10x: 56.2%; 5 at 20x: 54.9%),
+  with how far apart the two sides sit; the market's chance; then the engine's volume, forecast and
+  efficiency rows; the engine's own chance LAST, labelled a reference. The research table, the
+  slate preview and the scenario table judge sides against the hurdle, not a single pick's price
+  (a Power Play leg's price is not its break-even, #208).
+- **The efficiency grid (user, the same day: "yards per carry is in the equation"):** under each
+  card's table, what a leg needs at his luck-capped rate, his rate this season and the engine's.
+  Carries and targets are the opinion to form; efficiency moves only for a reason. The default is
+  not switched to his recent rate: round 43 measured the engine's blended rate as the better
+  predictor for receiving and the recent rate no better for carries. The engine-rate row reuses the
+  main search's numbers. Built only where someone reads the cards (scheduled captures skip it).
+- **Your view relative to the line:** `--assume "<Player>: carries=+2/+4/+6"` (targets the same)
+  is that many more or fewer than his line assumes; a range is averaged 1 : 4 : 1 and judged against
+  the hurdle. A relative view keeps the engine's efficiency error out of the comparison.
+- **Tried and dropped the same day:** a fixed "too close to call" cut (break-evens within 1.25
+  units of the line). On the DAL-HOU fixture it flagged nearly every line -- the 56% Over sits
+  about one unit above the line's workload for almost everyone (Lamb +1.0 targets, Javonte
+  Williams +1.3 carries), because the engine's ranges are too narrow and so make one unit look
+  decisive. The card shows the span instead; the width round comes next. The grid also shows the
+  simulation tops a lead back out near 19 carries (the share rescale), a width-round item.
+- **Prices do not change.** The Power Play searches and the grid run only where someone reads the cards: a scheduled capture (--no-scenarios) skips both and keeps its old cost. Code review: 7 findings, all fixed (four documents still promised the dropped close-call mark; a relative view could read another book's line; a grid failure could cost the report; the scenario's Under counted pushes).
+  The customer PDF keeps the user's guide layout (#222) until the user decides whether it changes.

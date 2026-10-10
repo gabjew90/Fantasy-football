@@ -48,12 +48,13 @@ def test_research_cells_show_both_prices_and_the_implied_workload():
                    "median": 5.0, "p10": 2.0, "p90": 10.0, "p_over_model": 0.587, "p_over_book": 0.479,
                    "implied": 6.298, "projected": 7.07, "unit": "targets"})
     row = SG.research_cells(x, {"player_receptions": "catches"})
-    assert row == "| catches | 4.5 | O -116 / U -141 | 5 (2 to 10) | 59% / 48% | 6.3 targets (we project 7.1) | — |",         "no break-even search yet: the cell says so"
+    # market first (DECISIONS #225): the market's Over before the engine's
+    assert row == "| catches | 4.5 | O -116 / U -141 | 5 (2 to 10) | 48% / 59% | 6.3 targets (we project 7.1) | — |",         "no Power Play search yet: the cell says so"
     x2 = x.copy()
-    x2["over_needs"], x2["under_needs"], x2["be_over"], x2["be_under"] = 6.512, None, 0.537, 0.585
-    assert SG.research_cells(x2, {}).endswith("| Over above 6.5 targets; Under: beyond the search range |")
-    x2["be_under"] = None                       # no Under posted: never "beyond the search range"
-    assert SG.research_cells(x2, {}).endswith("| Over above 6.5 targets; Under: no price posted |")
+    x2["pp_over_needs"], x2["pp_under_needs"], x2["market_volume"] = 8.04, 4.61, 6.3
+    assert SG.research_cells(x2, {}).endswith("| Over above 8.0 targets · Under at 4.6 or fewer (3.4 targets apart) |")
+    x2["pp_under_needs"], x2["pp_under_edge"] = None, "min"      # the search ran out at the bottom
+    assert SG.research_cells(x2, {}).endswith("| Over above 8.0 targets · Under: fewer targets than the search covers |")
     assert "-0" not in SG.research_cells(x.assign(p10=-0.3) if hasattr(x, "assign") else x, {})
 
 
@@ -248,6 +249,7 @@ def test_the_slate_board_orders_games_by_total_and_can_show_overs_only():
     row = dict(player="A", team="CIN", market="player_receptions", line=4.5, book="sleeper", price_over=-118,
                price_under=-139, median=5.0, p10=2.0, p90=9.0, p_over_model=0.55, p_over_book=0.48, implied=8.0,
                projected=8.5, unit="targets", over_needs=8.5, under_needs=7.1, be_over=0.54, be_under=0.58,
+               pp_over_needs=9.5, pp_under_needs=6.4, market_volume=8.0,
                snap=0.93, snap_base=0.72, ts=0.19, ts_base=0.25, cs=0.0, cs_base=0.0, flags="role up")
     RS = pd.DataFrame([dict(row, game="GB@TB"), dict(row, game="JAX@CIN", player="B")])
     runs = [dict(game="GB@TB", total="38.5", kickoff_utc="Sun 17:00Z"),
@@ -255,13 +257,13 @@ def test_the_slate_board_orders_games_by_total_and_can_show_overs_only():
     B = W.slate_board(RS, runs, sort="total")
     heads = [ln for ln in B if ln.startswith("## ")]
     assert heads[0].startswith("## JAX @ CIN — total 51.5") and heads[1].startswith("## GB @ TB — total 38.5")
-    assert any("| Over above 8.5 targets; Under at 7.1 or fewer · we project 8.5: no-bet zone |" in ln for ln in B)
+    assert any("| Over above 9.5 targets · Under at 6.4 or fewer (3.1 targets apart) |" in ln for ln in B)
     assert [ln for ln in W.slate_board(RS, runs) if ln.startswith("## ")][0].startswith("## GB @ TB"), \
         "kickoff order keeps the run order"
     O = W.slate_board(RS, runs, sort="total", overs_only=True)
     r = next(ln for ln in O if ln.startswith("| B (CIN)"))
-    assert "| -118 |" in r and "| 8.5 targets |" in r and "U -139" not in r
-    assert "The Over pays if you expect more than" in "\n".join(O)
+    assert "| -118 |" in r and "| 9.5 targets |" in r and "U -139" not in r     # the Power Play Over, #225
+    assert "The Over is worth a Power Play leg above" in "\n".join(O)
 
 
 def test_kickoff_reads_the_way_people_say_it_and_missing_totals_sort_last():
