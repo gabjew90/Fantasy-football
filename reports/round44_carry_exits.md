@@ -96,7 +96,7 @@ running-game candidate.
 ## Amendments, 2026-10-09, before any run (from the code review of the built option)
 
 - **The handout:** an exiter's lost share goes to his non-QB teammates in proportion to their
-  EXPECTED shares, not their shares in that simulation. With per-simulation shares the means could
+  PROJECTED shares (before the exit adjustment), not their shares in that simulation. With per-simulation shares the means could
   not be held: a tiny receiver (a receiver's 0.8 carries) ran 4.5% high. With expected shares the
   mean correction is exact (every combination of exiters enumerated) and the 1% test holds for
   every player, including a 0.01-share receiver.
@@ -112,6 +112,15 @@ running-game candidate.
   its five markets.
 - **Run integrity:** the confirmation frames must hold 2026 weeks 2-5; the spread guard refuses to
   run without the starting QBs (it would treat a starter change as a stable stretch).
+- **A barely-used backup (found when the first selection run stopped on the convergence check,
+  before any score was computed):** a receiver whose expected gain in the lead back's exits exceeds
+  his whole projected share (a 2% backup behind a 60% lead back) cannot give it back. His mean
+  rises -- he does get the work when the starter leaves -- and the unpriced 'other' bucket gives up
+  the difference, so the shares sum to one and nobody else is renormalised. Where 'other' has no
+  room (a board whose shares already fill the team, as overshoot teams do after the share trim),
+  the rest comes off every other receiver's target in proportion: a small even trim, disclosed,
+  in place of renormalising everyone. Otherwise the exiters and every receiver with room keep
+  their means exactly (checked in code).
 - **For the ship PR, if it ships:** exit eligibility (share >= 0.15) is decided after the workload
   search scales a share, so research.implied_carries would need the unscaled share.
 

@@ -87,10 +87,38 @@ def test_the_width_file_refuses_a_bad_rate():
         M.validate_width({"carry_exit_keep": 1.0})
 
 
+def test_a_barely_used_backup_gains_and_the_lead_back_keeps_his_mean():
+    """A 2% backup behind a 60% lead back gains more in the lead back's exits than his whole share:
+    his mean rises (he gets the work), 'other' gives up the difference, and the lead back is exact."""
+    p = np.array([0.10, 0.60, 0.02, 0.28])
+    can = np.array([False, True, False, False])
+    rec = np.array([False, True, True, False])
+    base = M.exit_adjusted_shares(p, can, rec, 0.05)
+    assert abs(base.sum() - 1) < 1e-9 and base[2] == 0.0 and base[3] < p[3]
+    out = M._apply_exits(np.random.default_rng(4), np.tile(base, (400_000, 1)), 0.05, can, rec, p)
+    m = out.mean(axis=0)
+    assert abs(m[1] / p[1] - 1) < 0.005, "the lead back's mean holds"
+    assert m[2] > p[2], "the backup's rises"
+
+
+def test_a_board_that_fills_the_team_trims_evenly_and_never_raises():
+    """Overshoot teams reach the sampler with 'other' at zero: the backup's gain then comes off the
+    other receivers' targets in proportion, and the shares still sum to one."""
+    p = np.array([0.12, 0.66, 0.20, 0.02, 0.0])
+    can = np.array([False, True, True, False, False])
+    rec = np.array([False, True, True, True, False])
+    base = M.exit_adjusted_shares(p, can, rec, 0.05)
+    assert abs(base.sum() - 1) < 1e-9 and base.min() >= 0 and base[-1] < 1e-12
+    out = M._apply_exits(np.random.default_rng(6), np.tile(base, (400_000, 1)), 0.05, can, rec, p)
+    m = out.mean(axis=0)
+    assert abs(m[0] - 0.12) < 1e-9, "the QB is untouched"
+    assert abs(m[1] / p[1] - 1) < 0.02 and abs(m[2] / p[2] - 1) < 0.05, "a small even trim, not a collapse"
+
+
 def test_the_fixed_point_is_exact_with_several_exiters_and_a_tiny_receiver():
     p = np.array([0.10, 0.40, 0.25, 0.16, 0.01, 0.08])
     can = np.array([False, True, True, True, False, False])
     rec = np.array([False, True, True, True, True, False])
     base = M.exit_adjusted_shares(p, can, rec, 0.05)
-    out = M._apply_exits(np.random.default_rng(2), np.tile(base, (400_000, 1)), 0.05, can, rec, base)
+    out = M._apply_exits(np.random.default_rng(2), np.tile(base, (400_000, 1)), 0.05, can, rec, p)
     assert np.allclose(out.mean(axis=0)[1:5], p[1:5], rtol=0.02, atol=2e-4)

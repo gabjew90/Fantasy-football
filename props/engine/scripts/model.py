@@ -728,12 +728,16 @@ def validate_width(w):
 def exit_adjusted_shares(p_norm, can_exit, receive, rate, keep=EXIT_KEEP, iters=500):
     """The expected shares to draw from so that, after early exits (_apply_exits), every player's
     average share is p_norm again (round 44). Exact in expectation: every combination of exiters is
-    enumerated (a team has a handful who can exit), each exiter keeps EXIT_KEEP / 2 of his share on
+    enumerated (a team has a handful who can exit), each exiter keeps keep / 2 of his share on
     average, and what the exiters lose goes to the receivers left that game in proportion to their
-    expected shares (to 'other', the last entry, when none is left). The fixed point solves
-    E[final share_j](base) = p_j. Known and small: when every receiver exits at once (probability
-    about rate ** receivers), 'other' gains a share the fixed point does not take back, so the
-    adjusted shares can sum above one by that much and the draw renormalises it away."""
+    PROJECTED shares (to 'other', the last entry, when none is left).
+
+    Two limits, both real: a receiver whose expected gain exceeds his whole projected share (a 2%
+    backup behind a 60% lead back) cannot give it back -- his share to draw stops at zero and his
+    mean rises, as it does when he gets the starter's work. The unpriced 'other' bucket gives up
+    the difference; where it has no room (the board's shares already fill the team, so 'other' is
+    zero), the rest comes off every other receiver's target in proportion, a small even trim
+    instead of a renormalisation of everyone. The total stays one."""
     from itertools import combinations
     p = np.asarray(p_norm, dtype=float)
     can_exit, receive = np.asarray(can_exit, dtype=bool), np.asarray(receive, dtype=bool)
@@ -745,6 +749,7 @@ def exit_adjusted_shares(p_norm, can_exit, receive, rate, keep=EXIT_KEEP, iters=
     loss = 1.0 - keep / 2.0                          # the average share an exiter gives up
     subsets = [(S, rate ** len(S) * (1 - rate) ** (len(ex) - len(S)))
                for m in range(1, len(ex) + 1) for S in combinations(ex, m)]
+    other = len(p) - 1
 
     def expected(base):
         out = base.copy()
@@ -754,31 +759,53 @@ def exit_adjusted_shares(p_norm, can_exit, receive, rate, keep=EXIT_KEEP, iters=
             out[S] -= pr * loss * base[S]
             left = receive.copy()
             left[S] = False
-            denom = base[left].sum()
+            denom = p[left].sum()                    # the handout follows the PROJECTED shares
             if denom > 0:
-                out[left] += pr * freed * base[left] / denom
+                out[left] += pr * freed * p[left] / denom
             else:
-                out[-1] += pr * freed
+                out[other] += pr * freed
         return out
 
-    base = p.copy()
-    for _ in range(iters):
-        e = expected(base)
-        new = np.clip(base + (p - e), 0.0, None)
-        new[~receive] = p[~receive]                  # the QB and 'other' are drawn as they are
-        if np.max(np.abs(new - base)) < 1e-13:
-            return new
-        base = new
-    if np.max(np.abs(expected(base)[receive] - p[receive])) > 1e-9:
-        raise ValueError("exit_adjusted_shares did not converge: the means would drift from the shipped ones")
-    return base
+    def solve(target):
+        fixed = ~receive
+        fixed[other] = False                         # the QB is drawn as he is; 'other' balances
+        base = target.copy()
+        for _ in range(iters):
+            e = expected(base)
+            new = np.clip(base + (target - e), 0.0, None)
+            new[fixed] = target[fixed]
+            new[other] = target.sum() - new[:other].sum()
+            if np.max(np.abs(new - base)) < 1e-13:
+                return new
+            base = new
+        raise ValueError("exit_adjusted_shares did not converge")
+
+    target = p.copy()
+    for _ in range(50):
+        base = solve(target)
+        short = -base[other]
+        if short <= 1e-12:
+            break
+        room = receive & (base > 1e-12)              # the receivers who can still give share back
+        if target[room].sum() <= short:
+            raise ValueError("exit_adjusted_shares: the backups' gains exceed the whole team's room")
+        target = target.copy()
+        target[room] *= 1.0 - short / target[room].sum()
+        target[other] = p[other] + short             # what 'other' would have had to go below zero
+    else:
+        raise ValueError("exit_adjusted_shares: the trim did not settle")
+    e = expected(base)
+    exact = receive & (base > 1e-12)
+    if np.max(np.abs(e[exact] - target[exact]), initial=0.0) > 1e-9:
+        raise ValueError("exit_adjusted_shares: the means would drift from their targets")
+    return np.clip(base, 0.0, None)
 
 
 def _apply_exits(rng, P, rate, can_exit, receive, weights, keep=EXIT_KEEP):
     """Per simulation (row of P), each can_exit player exits with probability `rate`: his share x
     Uniform(0, EXIT_KEEP); the share he loses goes to the receive players who did not exit that
-    simulation, in proportion to their EXPECTED shares (`weights`, the adjusted p_norm) -- the
-    proportion exit_adjusted_shares assumes, so the means hold exactly but for two teammates
+    simulation, in proportion to their PROJECTED shares (`weights`, p_norm before the exit
+    adjustment) -- the proportion exit_adjusted_shares assumes, so the means hold exactly but for two teammates
     exiting in one game -- or to the last column, 'other', if none is left. Round 44."""
     n, k = P.shape
     hit = (rng.random((n, k)) < rate) & np.asarray(can_exit, dtype=bool)[None, :]
@@ -968,8 +995,9 @@ def simulate_team_rush(rng, n_sim, team_carries_mean, carries_r, rush_shares, yp
         # Without a named starting QB the option stays off: a running QB is not a back.
         receive = np.array([j != int(qb_index) for j in range(len(rs))] + [False])
         can_exit = receive & (p_norm >= w["carry_exit_min_share"])
-        p_norm = exit_adjusted_shares(p_norm, can_exit, receive, w["carry_exit_rate"], w["carry_exit_keep"])
-        exits = (w["carry_exit_rate"], can_exit, receive, p_norm, w["carry_exit_keep"])
+        projected = p_norm
+        p_norm = exit_adjusted_shares(projected, can_exit, receive, w["carry_exit_rate"], w["carry_exit_keep"])
+        exits = (w["carry_exit_rate"], can_exit, receive, projected, w["carry_exit_keep"])
     mu_c = max(team_carries_mean, 1e-6)
     tc_draw = rng.negative_binomial(carries_r, carries_r / (carries_r + mu_c), size=n_sim)
     if qb_index is not None and w["share_conc_qb"]:
