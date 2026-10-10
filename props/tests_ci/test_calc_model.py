@@ -124,19 +124,19 @@ def test_card_renders_the_spec_layout():
     c = card.compute(pl, rush_model(ypc=4.2), "rush_yds", 64.5, odds.multiplier_from_american(-125),
                      odds.multiplier_from_american(-132), fixed)
     gl = {"favorite": "DAL", "points": 9.5, "spread_text": "DAL -9.5", "spread_unread": False, "total": 49.5}
-    text = card.render(pl, c, "over", opp="TB", game_lines=gl, source="line typed in")
+    text = card.render(pl, c, "over", opp="TB", game_lines=gl, footer="Line as of Oct 8, 4:59 PM PT.",
+                       opp_row={"value": 4.43, "games": 4, "who": " to RBs"}, grades={"off": "B", "def": "C"})
     lines_ = text.splitlines()
     flat = " ".join(lines_)
     assert lines_[:3] == ["Check first: workload bar untested.", "TEST BACK", "Over 64.5 rushing yards (-125)"]
     bar = card.value(c, "needed_over")
     for needle in (f"Bar for this price  ~{card._round(bar)} carries", "Last 4: 12, 12, 19, 19  (avg ~16)",
-                   f"{math.ceil(bar)}+ this season: ", "Bar assumes 4.2 yards a carry.",
-                   "Line implies ~", "(our math).", "AT ~16 CARRIES", "Needed at this price: ",
-                   "His season:           ", "Tampa Bay allows:", "MATCHUP",
-                   "DAL run offense [grade] vs TB run defense [grade]", "Dallas favored by 9.5. Total 49.5.",
-                   "Line: line typed in."):
+                   f"{card._round(bar)}+ this season: ", "Line implies ~", "(our math).", "AT ~16 CARRIES",
+                   "Needed at this price: ", "His last 5 games, blended: 4.2", "This season: ",
+                   "Tampa Bay allows: 4.4 to RBs (4 games)", "MATCHUP", "DAL run offense B vs TB run defense C",
+                   "Dallas favored by 9.5. Total 49.5.", "Line as of Oct 8, 4:59 PM PT."):
         assert needle in flat, needle
-    for gone in ("Under", "Gap", "Book expects", "%", "wins often enough"):
+    for gone in ("Under", "Gap", "Book expects", "%", "wins often enough", "Bar assumes"):
         assert gone not in text, gone                       # one side, no gap line, no percentages
     import re
     for banned in ("bet", "value", "edge", "lean", "pick", "recommend", "play this", "lock"):
@@ -213,13 +213,11 @@ def test_every_card_variant_fits_a_phone():
              for s in ("over", "under")]
     texts += [card.render(pl, card.compute(pl, rec_model(0.75), "receptions", 4.5, 1.69, 1.89, fixed), s, opp="NYJ",
                           game_lines={"spread_text": "OFF the board", "spread_unread": True, "total": None},
-                          source="Sleeper quote from your capture, 2026-10-10 15:55 UTC") for s in ("over", "under")]
+                          footer="Line as of Oct 10, 8:55 AM PT.") for s in ("over", "under")]
     pl.not_enough["rush_yds"] = ["12 of his own carries in his last 16 games (needs 30)",
                                  "140 TE carries in the pool for his position's average (needs 500)"]
-    texts.append(card.render_not_enough(pl, "rush_yds", "over", 64.5, 1.8, 1.76, source="line typed in"))
-    texts.append(card.render_not_enough(pl, "rush_yds", "under", None, None, None, source=(
-        "Unmatched: no saved Sleeper quote belongs to Sam LaPorta (DET) in 2026_05_DET_ARI for rush_yds; "
-        "give --line --over --under")))
+    texts.append(card.render_not_enough(pl, "rush_yds", "over", 64.5, 1.8, 1.76, footer="Line typed in."))
+    texts.append(card.render_not_enough(pl, "rush_yds", "under", None, None, None, footer=""))
     worst = max((len(x), x) for t in texts for x in t.splitlines())
     assert worst[0] <= card.WIDTH + 4, worst
 
@@ -269,6 +267,9 @@ def stub_leg(monkeypatch, tmp_path):
     pl.pools = {"rb_residuals": RESID}
     game = pd.Series({"week": 5, "game_id": "2026_05_DAL_ARI", "kickoff_utc": "2099-10-11T20:05:00+00:00",
                       "home_team": "ARI", "away_team": "DAL"})
+    from props.calc import matchup, opponent
+    monkeypatch.setattr(opponent, "allows", lambda *a, **k: {"value": 4.4, "games": 4, "who": " to RBs"})
+    monkeypatch.setattr(matchup, "grade_pair", lambda *a, **k: {"off": "B", "def": "C"})
     monkeypatch.setattr(cli, "_week_lines", lambda *a: ({("DAL", "ARI"): {
         "kickoff_utc": "x", "favorite": "DAL", "points": 3.5, "spread_text": "DAL -3.5", "spread_unread": False,
         "total": 47.5}}, ""))
@@ -424,17 +425,22 @@ def test_a_usual_from_too_few_games_is_not_shown():
 
 def test_the_closing_question_follows_the_four_cases_and_turns_round_for_unders():
     q = card.question
-    assert q("rush_yds", "over", 3, 0.9) == "3 more carries, or 0.9 more yards a carry?"
+    assert q("rush_yds", "over", 1, 0.5) == "1 more carry, or 0.5 more yards a carry?"      # Williams, amended
     assert q("rush_yds", "over", 0, 0.9) == "Workload is there. 0.9 more yards a carry?"
     assert q("rush_yds", "over", 3, -0.2) == "At his season rate it clears. 3 more carries?"
     assert q("receptions", "over", -2, -1.5) == "Room for 2 fewer targets?"
     assert q("receptions", "over", 1, 0.5) == "1 more target, or 0.5 more catches per 10?"
-    # an Under needs less: a bar below his average and a needed rate below his season rate
+    assert q("rush_yds", "over", 0, 0) == "Recent workload and rate both meet the bar."
+    # an Under needs less: a bar below his average and a needed rate below the assumed rate
     assert q("rush_yds", "under", -3, -0.9) == "3 fewer carries, or 0.9 less yards a carry?"
     assert q("rush_yds", "under", 2, 0.4) == "Room for 2 more carries?"
     assert q("rush_yds", "under", 2.5, -0.4) == "Workload is there. 0.4 less yards a carry?"
     assert q("receptions", "over", 1.5, None) == "1.5 more targets?"
-
+    # the outlier guard: the average meets the bar but fewer than 2 of the last 4 games did
+    assert q("receptions", "over", -1, -1.4, reached=1) == "Average clears it, but only 1 of 4 games did."
+    assert q("receptions", "over", -1, -1.4, reached=2) == "Room for 1 fewer target?"
+    assert q("rush_yds", "under", 1, 0.3, reached=0) == "Average clears it, but only 0 of 4 games did."
+    assert q("rush_yds", "over", 1, 0.5, reached=0) == "1 more carry, or 0.5 more yards a carry?"   # average short
 
 def test_leg_refuses_qb_rushing(stub_leg, monkeypatch):
     cli, _, _ = stub_leg
@@ -509,9 +515,9 @@ def test_entry_dry_run_prints_the_journal_lines_and_writes_nothing(stub_leg, mon
 
 def test_review_fixes_on_the_card_wording(monkeypatch):
     q = card.question
-    assert q("rush_yds", "over", 0, -0.3) == "Workload is there at his season rate."      # never "room for 0"
+    assert q("rush_yds", "over", 0, -0.3) == "Recent workload and rate both meet the bar."   # never "room for 0"
     assert q("rush_yds", "over", 0, None) == "Workload is there."
-    assert q("rush_yds", "under", 0, 0.0) == "Workload is there at his season rate."
+    assert q("rush_yds", "under", 0, 0.0) == "Recent workload and rate both meet the bar."
     season, window = _games()
     pl = _player(season, window)
     fixed = settings.load()["fixed"]
@@ -528,3 +534,10 @@ def test_review_fixes_on_the_card_wording(monkeypatch):
     pl2 = _player(season.iloc[:3], marked.iloc[:4])
     assert "* 2025 week 17: played far fewer snaps than usual." in " ".join(card.render(
         pl2, card.compute(pl2, rush_model(), "rush_yds", 64.5, 1.8, 1.8, fixed), "over", opp="TB").splitlines())
+
+
+def test_payout_is_the_total_returned_including_the_stake():
+    from props.calc.shared import journal
+    # the user's week 5 entry: $5 staked, Sleeper showed $97.50 for 5 legs -> 19.5x, 1.811x a leg, -123
+    assert journal.leg_price(5.0, 97.5, 5) == -123
+    assert journal.leg_price(5.0, 102.5, 5) == -121           # what $97.50 of profit alone would have given

@@ -28,7 +28,7 @@ PBP_COLS = [
     "rush_attempt", "pass_attempt", "complete_pass", "sack", "two_point_attempt", "qb_kneel",
     "rusher_player_id", "receiver_player_id", "passer_player_id",
     "rushing_yards", "receiving_yards", "passing_yards", "air_yards", "wp", "epa", "success",
-    "play_type", "qb_dropback", "qb_scramble",
+    "play_type", "qb_dropback", "qb_scramble", "pass", "rush", "qb_spike",
     "lateral_receiver_player_id", "lateral_receiving_yards", "lateral_rusher_player_id", "lateral_rushing_yards",
     "total_home_score", "total_away_score",
 ]
@@ -119,7 +119,7 @@ def carries(p: pd.DataFrame) -> pd.DataFrame:
     """One row per carry: a rush attempt that is not a two-point try or a kneel."""
     m = (_flag(p["rush_attempt"]) & ~_flag(p["two_point_attempt"]) & ~_flag(p["qb_kneel"])
          & p["rusher_player_id"].notna())
-    out = p.loc[m, ["game_id", "season", "week", "posteam", "defteam", "rusher_player_id", "rushing_yards"]]
+    out = p.loc[m, ["game_id", "season", "week", "posteam", "defteam", "wp", "rusher_player_id", "rushing_yards"]]
     out = out.rename(columns={"rusher_player_id": "gsis_id", "rushing_yards": "yards"})
     no_missing("rushing yards on carries", out["yards"])
     return out.reset_index(drop=True)
@@ -130,7 +130,7 @@ def targets(p: pd.DataFrame) -> pd.DataFrame:
     not a two-point try. Yards are 0 on an incompletion (nflverse leaves NaN)."""
     m = (_flag(p["pass_attempt"]) & ~_flag(p["sack"]) & ~_flag(p["two_point_attempt"])
          & p["receiver_player_id"].notna())
-    out = p.loc[m, ["game_id", "season", "week", "posteam", "defteam", "receiver_player_id",
+    out = p.loc[m, ["game_id", "season", "week", "posteam", "defteam", "wp", "receiver_player_id",
                     "passer_player_id", "complete_pass", "receiving_yards", "air_yards"]]
     out = out.rename(columns={"receiver_player_id": "gsis_id", "receiving_yards": "yards"})
     no_missing("completion flag on targets", out["complete_pass"])

@@ -56,6 +56,26 @@ def parse(sb: dict) -> dict:
     return out
 
 
+def closing(game) -> dict | None:
+    """The nflverse schedule's closing spread and total for one game row
+    (spread_line: points the home team is favoured by; negative = the away
+    team), for when ESPN shows none (the user, 2026-10-10). None when the
+    schedule has neither."""
+    sp, tot = game.get("spread_line"), game.get("total_line")
+    sp = None if sp is None or sp != sp else float(sp)
+    tot = None if tot is None or tot != tot else float(tot)
+    if sp is None and tot is None:
+        return None
+    fav = None if not sp else (game["home_team"] if sp > 0 else game["away_team"])
+    return {"kickoff_utc": None, "favorite": fav, "points": None if sp is None else abs(sp),
+            "spread_text": None if sp is None else ("EVEN" if sp == 0 else f"{fav} -{abs(sp):g}"),
+            "spread_unread": False, "total": tot, "closing": True}
+
+
+def has_odds(g: dict | None) -> bool:
+    return bool(g) and (g.get("favorite") or g.get("spread_text") or g.get("total") is not None)
+
+
 def week_lines(season: int, week: int, *, manifest=None) -> dict:
     """parse() of the week's scoreboard, fetched through core.fetch."""
     return parse(json.loads(F.espn_scoreboard(season, week, manifest=manifest).read_text(encoding="utf-8")))

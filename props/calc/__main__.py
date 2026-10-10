@@ -26,7 +26,7 @@ import pandas as pd
 from core import fetch as F
 from core.manifest import Manifest
 
-from . import capture, card, game_lines, lines, names, odds, player, settings
+from . import capture, card, game_lines, lines, matchup, names, odds, opponent, player, settings
 from .checks import DataError, number
 from .markets import workload_col
 from .shared import journal
@@ -59,7 +59,9 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("capture")
     en = sub.add_parser("entry", help="log a Power Play in the props journal, legs filled in from their cards")
     en.add_argument("--stake", type=float, required=True, help="dollars staked on the entry")
-    en.add_argument("--payout", type=float, required=True, help="the TOTAL the entry pays if every leg wins")
+    en.add_argument("--payout", type=float, required=True,
+                    help="the total returned if every leg wins, your stake included: the number Sleeper shows "
+                         "(e.g. $5 entry, Sleeper shows $97.50 -> --payout 97.5); must be above --stake")
     en.add_argument("--angle", required=True, choices=list(journal.ANGLES), help="the entry's story")
     en.add_argument("--why", required=True, help="the entry's reason in one line")
     en.add_argument("--leg", action="append", required=True,
@@ -151,6 +153,16 @@ def _bundle(season: int, fixed: dict) -> tuple:
 _SPREADS: dict = {}
 
 
+def line_footer(at_utc: str | None) -> str:
+    """One line: when the quote was saved, in Pacific time ("Line as of Oct 8,
+    4:59 PM PT."); a typed line says so."""
+    if at_utc is None:
+        return "Line typed in."
+    from zoneinfo import ZoneInfo
+    t = pd.Timestamp(at_utc).tz_convert(ZoneInfo("America/Los_Angeles"))
+    return f"Line as of {t.strftime('%b')} {t.day}, {t.hour % 12 or 12}:{t.minute:02d} {t.strftime('%p')} PT."
+
+
 def _week_lines(season: int, week: int) -> tuple:
     """(ESPN's week, or None, and why not), fetched once per run. Display
     only: a failed fetch is said on the card, never raised."""
@@ -184,6 +196,7 @@ def build_card(b, name_in: str, market: str, side: str = "over", *, team=None, s
         raise SystemExit("QB rushing is not a market in this tool (design note)")
     pl = player.build(b, gsis, name, team, season, wk, tuned, fixed, market)
     mo = mu = None
+    at_utc = None                              # None: a line typed in
     if line is not None:
         mo, mu = typed["over"], typed["under"]
         source = "line typed in"
@@ -194,7 +207,7 @@ def build_card(b, name_in: str, market: str, side: str = "over", *, team=None, s
                 source = f"Sleeper quote from {q['source']}, {q['at_utc'][:16].replace('T', ' ')} UTC"
                 if q.get("note"):
                     source += f"; {q['note']}"
-                line, mo, mu = q["line"], q["mult_over"], q["mult_under"]
+                line, mo, mu, at_utc = q["line"], q["mult_over"], q["mult_under"], q["at_utc"]
             else:
                 at = "" if at_line is None else f" at {at_line:g}"
                 source = (f"Unmatched: no saved Sleeper quote{at} belongs to {name} ({team}) in {game['game_id']} "
@@ -202,13 +215,14 @@ def build_card(b, name_in: str, market: str, side: str = "over", *, team=None, s
         except DataError as ex:                      # a bad saved row is reported; code errors are not caught
             source = f"Unmatched: {ex}; give --line --over --under"
     opp = game["away_team"] if game["home_team"] == team else game["home_team"]
+    footer = line_footer(at_utc) if line is not None else source      # no line: why not
     kicked_off = pd.Timestamp(game["kickoff_utc"]) <= pd.Timestamp(dt.datetime.now(dt.timezone.utc))
     out = {"by_initial": by_initial[0], "kicked_off": kicked_off, "stub": stub, "line": line, "mult_over": mo,
            "mult_under": mu, "source": source, "c": None, "ready": False,
            "not_enough": market in pl.not_enough,
            "reason": "; ".join(pl.not_enough.get(market, [])) or (source if line is None else "")}
     if market in pl.not_enough:                 # the data gap is the first thing to say, line or not
-        return {**out, "text": warn + card.render_not_enough(pl, market, side, line, mo, mu, source=source)}
+        return {**out, "text": warn + card.render_not_enough(pl, market, side, line, mo, mu, footer=footer)}
     if line is None:
         return {**out, "text": warn + source}
     model = player.model(pl, market, tuned, fixed)
@@ -218,7 +232,13 @@ def build_card(b, name_in: str, market: str, side: str = "over", *, team=None, s
     if week_lines is not None:
         gl = week_lines.get((game["away_team"], game["home_team"]))
         why = "" if gl else f"ESPN lists no {game['away_team']} at {game['home_team']} game in week {wk}"
-    text = card.render(pl, c, side, opp=opp, game_lines=gl, why_no_lines=why, source=source)
+    if not game_lines.has_odds(gl):            # ESPN has none (a final game): the schedule's closing line
+        gl = game_lines.closing(game) or gl
+        why = why or "ESPN and the schedule show none"
+    text = card.render(pl, c, side, opp=opp, game_lines=gl, why_no_lines=why, footer=footer,
+                       opp_row=opponent.allows(b, market, opp, pl.position, season, wk, fixed),
+                       grades=matchup.grade_pair(b, team, opp, "run" if market == "rush_yds" else "pass",
+                                                 season, wk, fixed))
     return {**out, "c": c, "ready": True, "settings": tuned, "text": warn + text}
 
 
@@ -259,8 +279,8 @@ def _check_entry(a, legs: list) -> None:
     if len(legs) < 2:
         raise SystemExit("a Power Play has at least two legs")
     if not 0 < a.stake < a.payout:
-        raise SystemExit(f"--payout is the total paid if every leg wins, above --stake; got ${a.stake:g} to "
-                         f"${a.payout:g}")
+        raise SystemExit(f"--payout is the total returned if every leg wins, stake included (the number Sleeper "
+                         f"shows), so it is above --stake; got ${a.stake:g} staked, ${a.payout:g} payout")
     if not str(a.why or "").strip():
         raise SystemExit("--why is required: the entry's reason in one line")
     seen = [(names.norm(n), m) for n, m, *_ in legs]

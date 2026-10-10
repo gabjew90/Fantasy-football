@@ -25,7 +25,9 @@ FIXED = {
     "season_type": "REG", "rate_window_games": 16, "pool_seasons": 2, "depth_short_below": 5,
     "depth_deep_from": 15, "sims": 20000, "seed": 20261010, "range_low_pct": 10, "range_high_pct": 90,
     "result_margin": 8, "usual_games": 4, "fewer_snaps_share": 0.5, "tested_min_prior_games": 3, "top_targets": 3,
-    "garbage_wp_low": 0.10, "garbage_wp_high": 0.90, "thin_games": 4, "tier_size": 8,
+    "garbage_wp_low": 0.10, "garbage_wp_high": 0.90, "thin_games": 4,
+    "grade_score_epa_weight": 2 / 3, "grade_max_tiers": 6, "grade_tier_letters": "SABCDF",
+    "grade_int_steps": [2, 3, 4, 5, 6, 8, 10, 12, 15, 20], "grade_tier_steps": [0.5, 1, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10],
     "league_wide_first_season": 2018, "gap_edges": [0, 2, 4], "conversion_line_scales": [0.8, 1.0, 1.2],
     "pass_band_points": 3, "pass_band_min_games": 200, "pass_range_low": 77, "pass_range_high": 83,
     "round_trip_points": 1, "game_story_points": 1.5,
@@ -893,3 +895,60 @@ def test_fewer_snaps_marks_a_game_under_half_his_average_in_his_other_games():
     assert out["fewer_snaps"].tolist() == [False, False, True, False, False]
     assert player.fewer_snaps(mine, share, 0.49)["fewer_snaps"].tolist() == [False] * 5    # 0.37 > 0.3675
     assert list(out.index) == list(mine.index)
+
+
+class _B:
+    """A stand-in bundle: plays before the priced week only."""
+    def __init__(self, carries, targets, pbp, roster):
+        self.carries, self.targets, self.pbp, self._roster_pos = carries, targets, pbp, roster
+
+    def cut(self, df, season, week, name):
+        return df[(df["season"] == season) & (df["week"] < week)]
+
+
+def test_opponent_allows_by_position_without_garbage_time():
+    from props.calc import opponent
+    fixed = {"garbage_wp_low": 0.10, "garbage_wp_high": 0.90, "thin_games": 4}
+    carries = pd.DataFrame([
+        # week, rusher, yards, win probability: TB's defense; one garbage-time carry and one by a WR
+        dict(season=2026, week=w, defteam="TB", posteam="X", gsis_id=g, yards=y, wp=p)
+        for w, g, y, p in ((1, "rb1", 4, 0.5), (2, "rb1", 6, 0.5), (3, "rb2", 2, 0.4), (4, "rb2", 8, 0.6),
+                           (4, "rb2", 40, 0.95), (3, "wr1", 20, 0.5), (5, "rb1", 30, 0.5))])
+    targets = pd.DataFrame([dict(season=2026, week=w, defteam="TB", posteam="X", gsis_id=g, caught=c, wp=0.5,
+                                 yards=0.0) for w, g, c in ((1, "wr1", True), (2, "wr1", False), (3, "te1", True),
+                                                            (4, "wr1", True), (4, "wr1", True))])
+    pbp = pd.DataFrame([dict(season=2026, week=w, game_id=f"g{w}", posteam="TB", defteam="X") for w in (1, 2, 3, 4, 5)])
+    roster = pd.DataFrame([dict(season=2026, week=1, gsis_id=g, position=p)
+                           for g, p in (("rb1", "RB"), ("rb2", "RB"), ("wr1", "WR"), ("te1", "TE"))])
+    b = _B(carries, targets, pbp, roster)
+    # rushing: RB carries in weeks 1-4, win chance 10-90%: (4 + 6 + 2 + 8) / 4 = 5.0 (the week-5 one is cut)
+    assert opponent.allows(b, "rush_yds", "TB", "RB", 2026, 5, fixed) == {
+        "value": 5.0, "games": 4, "who": " to RBs", "plays": 4}
+    # receptions to WRs: 3 of 4 caught = 7.5 per 10
+    got = opponent.allows(b, "receptions", "TB", "WR", 2026, 5, fixed)
+    assert got["value"] == pytest.approx(7.5) and got["who"] == " to WRs"
+    thin = opponent.allows(b, "rush_yds", "TB", "RB", 2026, 4, fixed)          # three games before week 4
+    assert thin["value"] is None and thin["games"] == 3
+
+
+def test_grades_need_four_games_each():
+    from props.calc import matchup
+    b = _B(None, None, pd.DataFrame(), None)
+    b._grades = {(2026, 4): {"_games": {"DAL": 3, "TB": 3}, ("off", "run"): {"DAL": "B"}, ("def", "run"): {"TB": "C"}},
+                 (2026, 5): {"_games": {"DAL": 4, "TB": 4}, ("off", "run"): {"DAL": "B"}, ("def", "run"): {"TB": "C"}}}
+    fixed = {"thin_games": 4}
+    assert matchup.grade_pair(b, "DAL", "TB", "run", 2026, 4, fixed) == {"note": "Only 3 games. No grades yet."}
+    assert matchup.grade_pair(b, "DAL", "TB", "run", 2026, 5, fixed) == {"off": "B", "def": "C"}
+
+
+def test_the_closing_line_and_the_pacific_footer():
+    from props.calc import __main__ as cli, game_lines
+    g = pd.Series({"home_team": "DAL", "away_team": "TB", "spread_line": 9.5, "total_line": 49.5})
+    c = game_lines.closing(g)
+    assert (c["favorite"], c["points"], c["total"], c["closing"]) == ("DAL", 9.5, 49.5, True)
+    assert game_lines.closing(g.copy().replace({9.5: -3.0}))["favorite"] == "TB"
+    assert game_lines.closing(pd.Series({"home_team": "A", "away_team": "B", "spread_line": np.nan,
+                                         "total_line": np.nan})) is None
+    assert cli.line_footer("2026-10-08T23:59:00+00:00") == "Line as of Oct 8, 4:59 PM PT."
+    assert cli.line_footer("2026-11-02T16:05:00+00:00") == "Line as of Nov 2, 8:05 AM PT."     # PST from Nov 1
+    assert cli.line_footer(None) == "Line typed in."

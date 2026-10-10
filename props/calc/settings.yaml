@@ -34,7 +34,11 @@ fixed_not_tuned:
   garbage_wp_low: 0.10          # Matchup tiers leave out plays where the offense's win chance is under 10% ...
   garbage_wp_high: 0.90         # ... or over 90%.
   thin_games: 4                 # A matchup figure from fewer than 4 games says "only N games".
-  tier_size: 8                  # Tiers group teams 8 at a time (tier 1 = the best 8).
+  grade_score_epa_weight: 0.6666666666666666   # Unit grade score: two parts EPA per play to one part success rate (copied from the engine).
+  grade_max_tiers: 6            # Unit grades use at most 6 equal-width bands (copied from the engine).
+  grade_tier_letters: SABCDF    # Band letters from the best down: S, A, B, C, D, F (copied from the engine).
+  grade_int_steps: [2, 3, 4, 5, 6, 8, 10, 12, 15, 20]   # Band widths tried, in whole score points, smallest that fits (copied from the engine).
+  grade_tier_steps: [0.5, 1, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10]   # The engine's default band widths, kept for the copied tiers() function.
   league_wide_first_season: 2018  # League-wide game-story rows start in 2018.
   gap_edges: [0, 2, 4]          # The season summary groups legs by gap: 0 or less, up to 2, up to 4, more than 4.
   conversion_line_scales: [0.8, 1.0, 1.2]  # Conversion test lines: these multiples of workload x rate, rounded to the half.

@@ -126,19 +126,30 @@ def last_games(pl: Player, market: str, n: int) -> list[tuple]:
 def _season_count(pl: Player, market: str, side: str, bar: float) -> str:
     col = workload_col(market)
     g = pl.season_games
+    shown = shown_work(bar)                    # the bar as displayed (the user, 2026-10-10)
     if side == "over":
-        n = math.ceil(bar - 1e-9)                  # the first whole number at or above the bar
+        n = math.ceil(shown - 1e-9)                # a shown 3.2 counts games of 4 or more
         hit = int((g[col] >= n).sum())
         return f"{n}+ this season: {hit} of {len(g)}"
-    n = math.floor(bar + 1e-9)
+    n = math.floor(shown + 1e-9)
     hit = int((g[col] <= n).sum())
     return f"{n} or fewer this season: {hit} of {len(g)}"
 
 
-def question(market: str, side: str, work_ask: float | None, rate_ask: float | None) -> str:
-    """Card rule 10. work_ask = bar minus last-4 average and rate_ask = needed
-    rate minus season rate (both from the numbers the card shows), turned
-    round for an Under so a positive ask is always what the bet needs."""
+def question(market: str, side: str, work_ask: float | None, rate_ask: float | None,
+             reached: int | None = None, of: int = 4) -> str:
+    """Card rule 10 as amended (the user, 2026-10-10). Both asks start from his
+    last-4 average workload and the rate the bar assumes, from the numbers the
+    card shows: work_ask = bar minus last-4 average; rate_ask = the rate needed
+    at his average workload minus the bar's assumed rate. Turned round for an
+    Under so a positive ask is always what the bet needs. reached: how many of
+    his last `of` games reached the bar (at or above it; at or below for an
+    Under) -- when his average meets the bar but fewer than 2 games did, the
+    average is carried by one game and the question says so."""
+    if work_ask is not None and reached is not None:
+        meets = work_ask <= 0 if side == "over" else work_ask >= 0
+        if meets and reached < 2:
+            return f"Average clears it, but only {reached} of {of} games did."
     if side == "under":
         work_ask = None if work_ask is None else -work_ask
         rate_ask = None if rate_ask is None else -rate_ask
@@ -158,21 +169,29 @@ def question(market: str, side: str, work_ask: float | None, rate_ask: float | N
         return f"Workload is there. {r(rate_ask)}?"
     if work_ask > 0:
         return f"At his season rate it clears. {w(work_ask)}?"
-    if work_ask == 0:                          # an even ask: no "room for 0" (not in the spec's four cases)
-        return "Workload is there at his season rate."
+    if work_ask == 0:                          # even on workload, rate there too (the user, 2026-10-10)
+        return "Recent workload and rate both meet the bar."
     return f"Room for {_num(-work_ask)} {room} {_unit(market, -work_ask)}?"
 
 
-def matchup_lines(pl: Player, market: str, opp: str, lines_: dict | None, why_none: str = "") -> list[str]:
-    """MATCHUP: the grade line (grades come in step C) and ESPN's spread and
-    total. Display only."""
+def matchup_lines(pl: Player, market: str, opp: str, lines_: dict | None, why_none: str = "",
+                  grades: dict | None = None) -> list[str]:
+    """MATCHUP: the grade line (run for rushing cards, pass for the others)
+    and the spread and total -- ESPN's, else the nflverse schedule's closing
+    line, labelled. Display only. grades: {"off", "def"} letters, or {"note"}."""
     kind = "run" if market == "rush_yds" else "pass"
     out = ["MATCHUP"]
-    out += _wrap(f"{pl.team} {kind} offense [grade] vs {opp} {kind} defense [grade] (grades: step C)")
+    if grades and grades.get("off") and grades.get("def"):
+        out += _wrap(f"{pl.team} {kind} offense {grades['off']} vs {opp} {kind} defense {grades['def']}")
+    else:
+        out += _wrap(f"{pl.team} {kind} offense vs {opp} {kind} defense: "
+                     + ((grades or {}).get("note") or "grades not available."))
     if lines_ is None:
-        out += _wrap(f"Spread and total: not available ({why_none or 'no ESPN game found'}).")
+        out += _wrap(f"Spread and total: not available ({why_none or 'no game found'}).")
         return out
     total = f" Total {lines_['total']:g}." if lines_.get("total") is not None else " No total shown."
+    if lines_.get("closing"):
+        total = total.rstrip(".") + " (closing line)."
     if lines_.get("spread_unread"):
         out += _wrap(f"ESPN's spread reads {lines_['spread_text']!r} (not understood).{total}")
     elif lines_.get("favorite"):
@@ -218,8 +237,10 @@ def _last_line(pl: Player, c: dict) -> tuple[list[str], list[tuple]]:
 
 
 def render(pl: Player, c: dict, side: str, *, opp: str, game_lines: dict | None = None, why_no_lines: str = "",
-           source: str = "") -> str:
-    """One side's card, in the spec's layout (card rules 1-15)."""
+           footer: str = "", opp_row: dict | None = None, grades: dict | None = None) -> str:
+    """One side's card, in the spec's layout (card rules 1-15, as amended).
+    opp_row: {"value", "games", "who"} from opponent.allows (display only);
+    grades: matchup.grade_pair's result (display only); footer: one line."""
     m = c["market"]
     if m in pl.not_enough:
         raise ValueError(f"not enough data for {m}: use render_not_enough")
@@ -252,7 +273,10 @@ def render(pl: Player, c: dict, side: str, *, opp: str, game_lines: dict | None 
         out.append(_season_count(pl, m, side, bar) if len(g) else f"No games this season before week {pl.week}.")
         if 0 < len(g) < int(c["usual_min"]):
             out.append(f"Short history: {len(g)} season games.")
-    out += _wrap(f"Bar assumes {c['rate'] * k:.1f} {rate_long}.")
+    assumed = shown_rate(c["rate"] * k)
+    window = f"His last {len(pl.window)} games, blended"     # the rate the bar assumes, labelled as what it is
+    if c["usual"] is None:                    # no AT block below: the assumed rate is stated here instead
+        out += _wrap(f"Bar assumes {assumed:.1f} {rate_long} ({window.lower()}).")
     b = sol["book_expects"]
     if b.status == "ok":
         out.append(f"Line implies {_work(b.value)} {many} (our math).")
@@ -263,8 +287,8 @@ def render(pl: Player, c: dict, side: str, *, opp: str, game_lines: dict | None 
     if m == "receptions" and pl.no_depth:
         out += _wrap(f"({pl.no_depth} of his targets had no recorded depth; left out of his depth mix.)")
     out += _notes(rows, pl.season)
-    # AT ~U: the rate needed at his recent workload, his season rate, the opponent's
-    need = season = None
+    # AT ~U: the rate needed at his recent workload, the rate the bar assumes, his season rate, the opponent's
+    need = None
     if c["usual"] is not None:
         out += ["", f"AT {_work(c['usual'])} {many.upper()}"]
         r = sol[f"rate_needed_{side}"]
@@ -276,23 +300,36 @@ def render(pl: Player, c: dict, side: str, *, opp: str, game_lines: dict | None 
             out.append("Needed at this price: any rate clears it")
         else:
             out.append("Needed at this price: no rate clears it")
+        out.append(f"{window}: {assumed:.1f}")
         if rate.season is not None and rate.season_n >= c["season_min"]:
-            season = shown_rate(rate.season * k)
-            out.append(f"His season:           {season:.1f}")
+            out.append(f"This season: {shown_rate(rate.season * k):.1f}")
         else:
-            out.append(f"His season:           only {rate.season_n} {many}")
-        out.append(f"{city(opp)} allows:  (step C)")
+            out.append(f"This season: only {rate.season_n} {many}")
+        out += _wrap(_opp_line(opp, opp_row))
     else:
         out += ["", f"Only {c['usual_games']} games: no recent average yet."]
-    out += [""] + matchup_lines(pl, m, opp, game_lines, why_no_lines)
+    out += [""] + matchup_lines(pl, m, opp, game_lines, why_no_lines, grades)
     work_ask = (shown_work(bar) - shown_work(c["usual"])) if bar is not None and c["usual"] is not None else None
-    rate_ask = (need - season) if need is not None and season is not None else None
-    q = question(m, side, work_ask, rate_ask)
+    rate_ask = (need - assumed) if need is not None else None
+    reached = None
+    if bar is not None and len(rows) >= int(c["usual_min"]):
+        sb = shown_work(bar)
+        reached = sum((w >= sb) if side == "over" else (w <= sb) for w, _, _ in rows)
+    q = question(m, side, work_ask, rate_ask, reached, len(rows))
     if q:
         out += [""] + _wrap(q)
-    if source:
-        out += [""] + _wrap(f"Line: {source}.")
+    if footer:
+        out += [""] + _wrap(footer)
     return "\n".join(out)
+
+
+def _opp_line(opp: str, row: dict | None) -> str:
+    """The opponent row: same unit as the needed rate (display only)."""
+    if row is None:
+        return f"{city(opp)} allows: not available"
+    if row.get("value") is None:
+        return f"{city(opp)}: only {row['games']} games."
+    return f"{city(opp)} allows: {row['value']:.1f}{row.get('who', '')} ({row['games']} games)"
 
 
 def require_side(side: str) -> None:
@@ -301,7 +338,7 @@ def require_side(side: str) -> None:
 
 
 def render_not_enough(pl: Player, m: str, side: str, line: float | None, mult_over: float | None,
-                      mult_under: float | None, *, source: str = "") -> str:
+                      mult_under: float | None, *, footer: str = "") -> str:
     """The card when a rate or pool is below its minimum sample: no bar and no
     rates, only the reason and his last games."""
     require_side(side)
@@ -317,6 +354,6 @@ def render_not_enough(pl: Player, m: str, side: str, line: float | None, mult_ov
     out.append("Last games: " + (", ".join(f"{w}{'*' if mk else ''}" for w, mk, _ in rows) or "none")
                + f" ({many})")
     out += _notes(rows, pl.season)
-    if source:
-        out += [""] + _wrap(f"Line: {source}.")
+    if footer:
+        out += [""] + _wrap(footer)
     return "\n".join(out)
