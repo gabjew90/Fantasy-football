@@ -60,6 +60,9 @@ def test_the_copied_grades_match_the_engine(both, seed):
         letters_a = {t: research.tier_letter(k) for t, k in ta[key]["tier"].items()}
         letters_b = {t: matchup.tier_letter(k) for t, k in tb[key]["tier"].items()}
         assert letters_a == letters_b and set(letters_a.values()) <= set("SABCDF")
+        grades_a = {t: research.tier_grade(ta[key], t) for t in ta[key]["tier"]}
+        grades_b = {t: matchup.tier_grade(tb[key], t) for t in tb[key]["tier"]}
+        assert grades_a == grades_b and {g[1:] for g in grades_a.values()} <= {"", "+", "-"}
 
 
 def test_the_copied_constants_match_the_engine(both):

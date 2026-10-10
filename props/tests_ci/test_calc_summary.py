@@ -43,7 +43,7 @@ def test_the_summary_by_hand():
     assert "All must win more than 56.2 in 100." in lines
     assert "All 4 win: 1 entry in 16." in lines
     assert "Average loss: $1.88 per $5 entry." in lines                   # 5 - 50/16
-    assert flat.endswith(summary.LEGEND + " " + summary.FOLLOW_UPS)
+    assert flat.endswith(summary.LEGEND + " " + summary.FOLLOW_UPS)       # wrapped at 40, joined here
     assert max(len(x) for x in lines) <= 40
     assert "%" not in text
 

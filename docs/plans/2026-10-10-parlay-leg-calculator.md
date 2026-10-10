@@ -214,8 +214,10 @@ Line as of [Mon D, H:MM AM/PM] PT.
   needed rate's unit, win probability 10-90% only. Under 4 games: "[Opponent]: only [G] games."
   No plays to his position: "[Opponent] allows: no plays to [POS]s yet ([G] games)". Plays left
   out for a missing win chance or roster listing are counted on the row.
-- MATCHUP (display only): grades from the engine's tier system (copied, `matchup.py`); rushing
-  cards run vs run, the other three pass vs pass; letters S best to F worst; under 4 games
+- MATCHUP (display only): grades from the engine's tier system (copied, `matchup.py`), as the
+  engine shows them (tier_grade): a letter, S best to F worst, with + for the top third of its
+  band and - for the bottom third (the user, 2026-10-10); rushing cards run vs run, the other
+  three pass vs pass; under 4 games
   "Only [G] games. No grades yet." Spread and total from ESPN; when ESPN has none, the nflverse
   schedule's line, labelled "(closing line)" after kickoff and "(schedule line)" before. An even
   spread: "No favorite (even spread)."; a missing spread: "No spread shown." An injury line
@@ -315,7 +317,8 @@ Average loss: $[L] per $[stake] entry.
   (fixed under rule (b), 2026-10-10: "Lamb: more throws from behind" beside "Irving: more throws
   from behind" read as the same story although one needs Dallas behind and the other Tampa Bay).
 - Each leg's price check from its own price. The coin-flip figure is a stated hypothetical.
-- After a batch: the grade legend "Grades: S best, F worst." once, then the follow-up names:
+- After a batch: the grade legend "Grades: S best, F worst; + and - show where a team sits in its
+  band." once, then the follow-up names:
   Workload, Calculation, Matchup, Fit, Entry cost.
 - Season log (after step F): legs won out of legs played first; entries won second, with a note
   that entry results are too rare to judge alone. Built as a read-only calc command over the
@@ -334,6 +337,7 @@ Average loss: $[L] per $[stake] entry.
 5. League yards per completion guard range 8.0-14.0 (confirmed).
 6. The workload ask is taken from the bar and average as displayed; every displayed number rounds
    half up.
+7. Grades carry the engine's + and - (tier_grade, copied unchanged with _band_mod).
 
 ## Later ideas
 

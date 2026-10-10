@@ -10,7 +10,7 @@ import math
 
 from . import calc, card, odds
 
-LEGEND = "Grades: S best, F worst."
+LEGEND = "Grades: S best, F worst; + and - show where a team sits in its band."
 FOLLOW_UPS = "Follow-ups: Workload, Calculation, Matchup, Fit, Entry cost."
 BET_WORDS = {"rush_yds": "rushing", "receptions": "catches", "rec_yds": "receiving", "pass_yds": "passing"}
 
@@ -132,7 +132,7 @@ def render(legs: list[dict], stake: float, payout: float, payout_from_legs: bool
             f"All {n} win: 1 entry in {ways}.",
             (f"Average loss: {money(-net)} per {st} entry." if net < 0
              else f"Average gain: {money(net)} per {st} entry.")]
-    out += ["", LEGEND] + card._wrap(FOLLOW_UPS)
+    out += [""] + card._wrap(LEGEND) + card._wrap(FOLLOW_UPS)
     return "\n".join(out)
 
 

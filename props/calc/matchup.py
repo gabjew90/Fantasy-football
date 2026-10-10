@@ -2,7 +2,8 @@
 
 The functions between the COPY markers are copied UNCHANGED from
 props/engine/scripts/research.py at commit ec379e45ef0f31db4343998ac4536259c6bfbbf5
-(unit_efficiency, tier_letter, tiers, unit_tiers and the constants they use).
+(unit_efficiency, tier_letter, tiers, tier_grade, _band_mod, unit_tiers and the
+constants they use; tier_grade and _band_mod added 2026-10-10 at the user's request, same commit).
 props/calc may not import the engine (DECISIONS #231), so this is a copy, and
 tests/test_calc_grades_parity.py (outside props/calc) checks that both give
 the same letters on the same play-by-play. Their constants are also listed in
@@ -13,7 +14,8 @@ The scale: per team, EPA per play and success rate on dropbacks and runs, as
 the offense and as the defense (allowed), win probability 10-90% only; two
 parts EPA to one part success, standardised, 50 = league average and 10 points
 = one standard deviation, higher is better for offense AND defense; equal-width
-bands counted from the best team down, lettered S, A, B, C, D, F.
+bands counted from the best team down, lettered S, A, B, C, D, F, with + for the
+top third of a band and - for the bottom third (tier_grade).
 
 The engine's system has no rule for too few games (only "fewer than 3 teams":
 no scale). The user's rule applies (2026-10-10): under 4 games, "Only [G]
@@ -146,6 +148,31 @@ def unit_tiers(ue) -> dict:
                                 higher_is_better=True, steps=INT_STEPS)
             for side in ("off", "def") for kind in ("pass", "run")}
 
+def tier_grade(t: dict, team) -> str:
+    """The team's letter with + / - for where it sits inside its band (user, 2026-10-06):
+    top third +, bottom third -, middle plain -- so a C- and a D+ read as the neighbours they
+    are instead of a full grade apart."""
+    k = t["tier"][team]
+    return tier_letter(k) + _band_mod(t, team)
+
+
+def _band_mod(t: dict, team) -> str:
+    x = t.get("_values", {}).get(team)
+    if x is None or not t.get("step"):
+        return ""
+    g = x if t.get("higher_is_better", True) else -x
+    step = t["step"]
+    down = (t["best"] - g) - (t["tier"][team] - 1) * step      # distance below the band's top
+    if float(step).is_integer() and float(down).is_integer():
+        # whole-number scores: the band holds `step` scores; the top and bottom ceil(step/3) of
+        # them get + and -, the middle plain -- symmetric (8 -> 3 / 2 / 3)
+        edge = -(-int(step) // 3)
+        return "+" if down < edge else "-" if down >= step - edge else ""
+    if down < step / 3:
+        return "+"
+    if down >= 2 * step / 3:
+        return "-"
+    return ""
 # ---- end of COPY ----
 
 
@@ -167,7 +194,7 @@ def season_grades(pbp, fixed: dict) -> dict:
     plays given (already cut to this season before the priced week)."""
     check_constants(fixed)
     ue = unit_efficiency(pbp, fixed["garbage_wp_low"], fixed["garbage_wp_high"])
-    out = {key: {t: tier_letter(k) for t, k in t_["tier"].items()} for key, t_ in unit_tiers(ue).items()}
+    out = {key: {t: tier_grade(t_, t) for t in t_["tier"]} for key, t_ in unit_tiers(ue).items()}
     games = {}
     for team_col in ("posteam", "defteam"):
         for t, n in pbp.groupby(team_col)["game_id"].nunique().items():

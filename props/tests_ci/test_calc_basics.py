@@ -985,7 +985,8 @@ def test_season_grades_counts_games_and_letters_the_best_unit_s():
     g = matchup.season_grades(pbp, fixed)
     want = {t: len({x for x in pbp.loc[(pbp.posteam == t) | (pbp.defteam == t), "game_id"]}) for t in teams}
     assert g["_games"] == want
-    assert g[("off", "pass")]["T0"] == "S" and set(g[("off", "pass")].values()) <= set("SABCDF")
+    assert g[("off", "pass")]["T0"][0] == "S"
+    assert all(v[0] in "SABCDF" and v[1:] in ("", "+", "-") for v in g[("off", "pass")].values())
     bad = dict(fixed, grade_max_tiers=5)
     with pytest.raises(Exception, match="grade_max_tiers"):
         matchup.season_grades(pbp, bad)
@@ -1002,3 +1003,12 @@ def test_opponent_allows_yards_a_completion_from_every_passer():
     b.completions = comp
     got = opponent.allows(b, "pass_yds", "TB", "QB", 2026, 5, fixed)
     assert got == {"value": 10.0, "games": 4, "who": "", "thin": False, "left_out": 1, "plays": 3}
+
+
+def test_grade_modifiers_by_hand():
+    from props.calc import matchup
+    # whole-number scores 50..71 tiered in bands of 4 from the best (71): 71-68 = S, 67-64 = A, ...
+    t = matchup.tiers({f"T{v}": v for v in range(50, 72)}, steps=matchup.INT_STEPS)
+    assert t["step"] == 4
+    # in a band of 4 whole scores, the top ceil(4/3) = 2 get +, the bottom 2 get -: 71, 70 -> S+; 69, 68 -> S-
+    assert [matchup.tier_grade(t, f"T{v}") for v in (71, 70, 69, 68, 67)] == ["S+", "S+", "S-", "S-", "A+"]
