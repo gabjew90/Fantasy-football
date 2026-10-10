@@ -71,6 +71,8 @@ so the PR review must.
   and the metric. Knobs live in yaml, so a re-tune is a config diff plus a report.
 - **No parallel engines.** One-off studies go in `experiments/` (outputs
   gitignored) and are promoted or deleted within 30 days.
+  Exception (user-approved, DECISIONS #226): the parlay-leg calculator in
+  `props/calc/`, scoped by docs/plans/2026-10-10-parlay-leg-calculator.md.
 - **One chat skill, harness only.** `nfl-research` fetches the release that
   `nfl.lock.json` names (files defined in `skill/release.py`), places the
   credentials and reads `CHAT.md`, which holds the routing and output rules.

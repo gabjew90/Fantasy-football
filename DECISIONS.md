@@ -8596,3 +8596,20 @@ every row while the predictions rows carry open / decision / close (line_archive
   simulation tops a lead back out near 19 carries (the share rescale), a width-round item.
 - **Prices do not change.** The Power Play searches and the grid run only where someone reads the cards: a scheduled capture (--no-scenarios) skips both and keeps its old cost. Code review: 7 findings, all fixed (four documents still promised the dropped close-call mark; a relative view could read another book's line; a grid failure could cost the report; the scenario's Under counted pushes).
   The customer PDF keeps the user's guide layout (#222) until the user decides whether it changes.
+
+## 2026-10-10 (226) -- a parlay-leg calculator in props/calc/, a user-approved exception to "no parallel engines"
+
+- **The request (user, 2026-10-10):** a small calculator for Sleeper parlay legs. Given a posted
+  line and price, it states the workload (carries, passes thrown to him, completions) the player
+  needs for the leg to win often enough. It never claims a line is wrong, never compares its own
+  chance with the book's, and never labels a bet.
+- **The exception:** CLAUDE.md says "no parallel engines". The user approved this tool as a
+  deliberate exception. Its scope is fixed by docs/plans/2026-10-10-parlay-leg-calculator.md:
+  four markets (rushing yards, receptions, receiving yards, passing yards), at most 8 tunable
+  settings in one yaml, no import from props/engine/ (a test enforces it), no workflow added or
+  changed, props/record/lines/ read only.
+- **Validation, fixed before any result is read:** conversion and spread tests tuned on
+  2018-2023; 2024-25 held out and read once at the end, the read recorded in the note.
+- **Status:** design note awaiting the user's approval; no code yet. Ten open questions are in
+  the note (data access through core.fetch, matching by id, the blend window, test location,
+  registry status, passing-yards design).
