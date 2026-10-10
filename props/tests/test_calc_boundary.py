@@ -14,13 +14,21 @@ CALC = Path(__file__).resolve().parents[1] / "calc"
 
 
 def _imports(path: Path) -> set[str]:
+    """Imported module names, with relative imports resolved as if the file
+    sat in props/calc/ (level 1 = props.calc, level 2 = props)."""
     tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
     out: set[str] = set()
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
             out.update(a.name for a in node.names)
-        elif isinstance(node, ast.ImportFrom) and node.module and node.level == 0:
-            out.add(node.module)
+        elif isinstance(node, ast.ImportFrom):
+            if node.level == 0:
+                out.add(node.module or "")
+                continue
+            pkg = ["props", "calc"][: max(0, 3 - node.level)]
+            base = ".".join(pkg + ([node.module] if node.module else []))
+            out.add(base)
+            out.update(f"{base}.{a.name}" if base else a.name for a in node.names)
     return out
 
 
@@ -47,7 +55,9 @@ def test_the_check_catches_each_route(tmp_path):
     cases = {"a.py": "import props.engine.scripts.model\n",
              "b.py": "from props.engine import x\n",
              "c.py": "import sys\nsys.path.insert(0, 'props/engine/scripts')\nimport model\n",
-             "d.py": "from scripts import score_game\n"}
+             "d.py": "from scripts import score_game\n",
+             "e.py": "from ..engine.scripts import model\n",
+             "f.py": "from .. import engine\n"}
     for name, src in cases.items():
         f = tmp_path / name
         f.write_text(src, encoding="utf-8")

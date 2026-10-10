@@ -15,7 +15,7 @@ Receptions: targets ~ negative binomial (mean W, spread target_r); each target
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import numpy as np
 
@@ -72,14 +72,6 @@ def day_factor(draws: Draws, sd: float) -> np.ndarray:
 
 # ------------------------------------------------------------------ outcomes
 
-def rushing_yards(draws: Draws, n: np.ndarray, ypc: float, residuals: np.ndarray, day_sd: float) -> np.ndarray:
-    """Simulated game rushing yards for carry counts n."""
-    idx = np.minimum((draws.u_play * len(residuals)).astype(int), len(residuals) - 1)
-    run = np.concatenate([np.zeros((len(n), 1)), np.cumsum(residuals[idx], axis=1)], axis=1)
-    resid_sum = run[np.arange(len(n)), n]
-    return day_factor(draws, day_sd) * (n * ypc + resid_sum)
-
-
 def receptions(draws: Draws, n: np.ndarray, catch_rate: float) -> np.ndarray:
     caught = np.concatenate([np.zeros((len(n), 1)), np.cumsum(draws.u_play < catch_rate, axis=1)], axis=1)
     return caught[np.arange(len(n)), n]
@@ -96,18 +88,34 @@ class Model:
     rate: float                      # ypc (rushing) or catch rate (receptions)
     residuals: np.ndarray | None = None
     day_sd: float = 0.0
+    _resid_run: np.ndarray | None = field(default=None, init=False, repr=False)
+    _counts: dict = field(default_factory=dict, init=False, repr=False)
+
+    def _counts_at(self, w: float) -> np.ndarray:
+        """Counts for average workload w, computed once per w (the rate search
+        evaluates the same w many times)."""
+        if w not in self._counts:
+            self._counts[w] = counts(self.draws, w, MAX_COUNT[self.kind])
+        return self._counts[w]
+
+    def _rushing(self, n: np.ndarray, ypc: float) -> np.ndarray:
+        if self._resid_run is None:       # independent of W and of the rate: built once
+            res = self.residuals
+            idx = np.minimum((self.draws.u_play * len(res)).astype(int), len(res) - 1)
+            self._resid_run = np.concatenate([np.zeros((len(idx), 1)), np.cumsum(res[idx], axis=1)], axis=1)
+        resid_sum = self._resid_run[np.arange(len(n)), n]
+        return day_factor(self.draws, self.day_sd) * (n * ypc + resid_sum)
 
     def outcome(self, n: np.ndarray, rate: float | None = None) -> np.ndarray:
         r = self.rate if rate is None else rate
         if self.market == "rush_yds":
-            return rushing_yards(self.draws, n, r, self.residuals, self.day_sd)
+            return self._rushing(n, r)
         if self.market == "receptions":
             return receptions(self.draws, n, r)
         raise ValueError(f"market {self.market} is not built yet")
 
     def chance_over(self, line: float, w: float, rate: float | None = None) -> float:
-        n = counts(self.draws, w, MAX_COUNT[self.kind])
-        return float(np.mean(self.outcome(n, rate) > line))
+        return float(np.mean(self.outcome(self._counts_at(w), rate) > line))
 
     def chance_over_fixed(self, line: float, n: int, rate: float | None = None) -> float:
         return float(np.mean(self.outcome(fixed_counts(self.draws, n), rate) > line))

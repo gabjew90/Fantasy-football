@@ -63,7 +63,9 @@ def main(argv: list[str] | None = None) -> int:
             print(f"{r['misses']} players could not be matched; see {capture.MISSES_PATH}.")
         return 0
     if a.cmd == "settle":
-        games = data.player_games(data.pbp(a.season))
+        roster = data.rosters(a.season)
+        games = data.games_played(data.player_games(data.pbp(a.season)),
+                                  data.played(data.snaps(a.season), roster))
         n = log.settle(a.season, games)
         print(f"Settled {n} legs.")
         return 0
@@ -73,8 +75,10 @@ def main(argv: list[str] | None = None) -> int:
         if not rows:
             print("No settled legs yet.")
         for r in rows:
+            need = "n/a" if r["needed"] is None else f"{r['needed']:.1f}"
+            got = "n/a" if r["actual"] is None else f"{r['actual']:.1f}"
             print(f"{r['market']}, gap {r['gap']}: {r['won']} of {r['legs']} won "
-                  f"(break-even {r['break_even']:.0%}); needed {r['needed']:.1f}, got {r['actual']:.1f} on average")
+                  f"(break-even {r['break_even']:.0%}); needed {need}, got {got} on average")
         return 0
     return 1
 
@@ -94,8 +98,8 @@ def leg(a) -> str:
     s = settings.load()
     tuned, fixed = s["tuned"], s["fixed"]
     season = a.season or F.current_season()
-    b = player.Bundle(range(season - int(fixed["pool_seasons"]), season + 1))
-    gsis, name, team = player.find_player(b, a.name, season, a.team)
+    b = player.Bundle(range(season - int(fixed["pool_seasons"]), season + 1), fixed)
+    gsis, name, team = player.find_player(b, a.name, season, a.team, a.week)
     game = _next_game(b.schedule, team, season, a.week)
     week = int(game["week"])
     stub = {"season": season, "week": week, "game_id": game["game_id"], "kickoff_utc": game["kickoff_utc"],

@@ -69,15 +69,16 @@ def result(side: str, line: float, actual: float | None) -> str:
 
 
 def settle_row(leg: dict, games: pd.DataFrame, kickoff_line: dict | None, now: str | None = None) -> dict:
-    """The settle row for one leg from that week's player-game table."""
-    g = games[(games["season"] == leg["season"]) & (games["week"] == leg["week"])
-              & (games["gsis_id"] == leg["gsis_id"])]
-    actual_w = int(g[workload_col(leg["market"])].sum()) if len(g) else None
-    actual = float(g[stat_col(leg["market"])].sum()) if len(g) else None
-    return {"kind": "settle", "id": leg["id"], "settled_at_utc": now or _now(),
-            "actual_workload": actual_w, "actual": actual,
-            "result": result(leg["side"], float(leg["line"]), actual),
-            "kickoff_line": kickoff_line}
+    """The settle row for one leg of a game that has been played. `games` is
+    games_played rows: a player who played with no work has a zero row; one
+    with no row did not play (Sleeper drops such a leg)."""
+    g = games[(games["game_id"] == leg["game_id"]) & (games["gsis_id"] == leg["gsis_id"])]
+    row = {"kind": "settle", "id": leg["id"], "settled_at_utc": now or _now(), "kickoff_line": kickoff_line}
+    if g.empty:
+        return {**row, "actual_workload": None, "actual": None, "result": "did not play"}
+    actual = float(g[stat_col(leg["market"])].sum())
+    return {**row, "actual_workload": int(g[workload_col(leg["market"])].sum()), "actual": actual,
+            "result": result(leg["side"], float(leg["line"]), actual)}
 
 
 def line_near_kickoff(leg: dict, *, lines_root: Path | None = None, archive_root: Path = ARCHIVE_ROOT) -> dict | None:
@@ -122,15 +123,16 @@ def line_near_kickoff(leg: dict, *, lines_root: Path | None = None, archive_root
     return None
 
 
-def settle(season: int, player_games: pd.DataFrame, *, path: Path = LOG_PATH, **kw) -> int:
-    """Append a settle row for every unsettled leg of `season` whose week is in
-    `player_games`. Returns how many were settled."""
-    done_weeks = set(zip(player_games["season"], player_games["week"]))
+def settle(season: int, games: pd.DataFrame, *, path: Path = LOG_PATH, **kw) -> int:
+    """Append a settle row for every unsettled leg of `season` whose own game
+    is in `games` (games_played rows: the game has been played and loaded).
+    Returns how many were settled."""
+    played_games = set(games["game_id"])
     rows = []
     for leg in read(path):
-        if leg.get("result") or leg["season"] != season or (leg["season"], leg["week"]) not in done_weeks:
+        if leg.get("result") or leg["season"] != season or leg["game_id"] not in played_games:
             continue
-        rows.append(settle_row(leg, player_games, line_near_kickoff(leg, **kw)))
+        rows.append(settle_row(leg, games, line_near_kickoff(leg, **kw)))
     append_jsonl(path, rows)
     return len(rows)
 
@@ -144,19 +146,27 @@ def gap_group(gap: float, edges: list[float]) -> str:
     return f"more than {edges[-1]}"
 
 
+def _mean(xs: list) -> float | None:
+    xs = [float(x) for x in xs if x is not None]
+    return sum(xs) / len(xs) if xs else None
+
+
 def summary(season: int, edges: list[float], *, path: Path = LOG_PATH) -> list[dict]:
     """Settled legs (won or lost) grouped by market and gap: how many, how many
-    won, the average break-even of the side played, needed vs actual workload."""
+    won, the average break-even of the side played, needed vs actual workload.
+    A leg whose needed workload was out of the search's reach has no gap and
+    is grouped as "out of reach"."""
     legs = [x for x in read(path) if x["season"] == season and x.get("result") in ("won", "lost")]
     groups: dict[tuple, list] = {}
     for x in legs:
-        groups.setdefault((x["market"], gap_group(float(x["gap"]), edges)), []).append(x)
+        grp = gap_group(float(x["gap"]), edges) if x.get("gap") is not None else "out of reach"
+        groups.setdefault((x["market"], grp), []).append(x)
     out = []
     for (market, grp), xs in sorted(groups.items()):
         be = [1 / (x["mult_over"] if x["side"] == "over" else x["mult_under"]) for x in xs]
         out.append({"market": market, "gap": grp, "legs": len(xs),
                     "won": sum(x["result"] == "won" for x in xs),
                     "break_even": sum(be) / len(be),
-                    "needed": sum(float(x["needed"]) for x in xs) / len(xs),
-                    "actual": sum(float(x["actual_workload"]) for x in xs) / len(xs)})
+                    "needed": _mean([x.get("needed") for x in xs]),
+                    "actual": _mean([x.get("actual_workload") for x in xs])})
     return out

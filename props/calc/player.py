@@ -19,22 +19,26 @@ from .markets import workload_col
 class Bundle:
     """The seasons a card or a test needs, loaded once and cut per week."""
 
-    def __init__(self, seasons, *, manifest=None):
+    def __init__(self, seasons, fixed: dict, *, manifest=None):
         self.seasons = sorted(set(seasons))
-        plays = [data.pbp(s, manifest=manifest) for s in self.seasons]
+        self.fixed = fixed
+        stype = fixed["season_type"]
+        plays = [data.pbp(s, manifest=manifest, season_type=stype) for s in self.seasons]
         self.pbp = pd.concat(plays, ignore_index=True)
         self.carries = data.carries(self.pbp)
         self.targets = data.targets(self.pbp)
-        self.games = data.player_games(self.pbp)
         self.rosters = pd.concat([data.rosters(s, manifest=manifest) for s in self.seasons], ignore_index=True)
-        self.schedule = data.schedule(manifest=manifest)
+        snaps = pd.concat([data.snaps(s, manifest=manifest) for s in self.seasons], ignore_index=True)
+        # every game he played: with work (play-by-play) or without it (an offensive snap)
+        self.games = data.games_played(data.player_games(self.pbp), data.played(snaps, self.rosters))
+        self.schedule = data.schedule(manifest=manifest, game_type=stype)
         pos = (self.rosters.dropna(subset=["gsis_id", "position"])
                .sort_values(["season", "week"]).drop_duplicates(["season", "gsis_id"], keep="last"))
         self.position = {(s, g): p for s, g, p in zip(pos["season"], pos["gsis_id"], pos["position"])}
         self._pools: dict = {}
 
     def position_of(self, gsis: str, season: int) -> str | None:
-        for s in (season, season - 1, season + 1):
+        for s in (season, season - 1):
             p = self.position.get((s, gsis))
             if p:
                 return p
@@ -58,7 +62,8 @@ class Bundle:
                 "rb_residuals": rb - rb.mean(),
                 "ypc_by_pos": c.groupby("position")["yards"].mean().to_dict(),
                 "catch_by_pos": t.groupby("position")["caught"].mean().to_dict(),
-                "catch_by_pos_bucket": t.assign(bucket=depth_buckets(t["air_yards"]))
+                "catch_by_pos_bucket": t.assign(bucket=depth_buckets(t["air_yards"], self.fixed["depth_short_below"],
+                                                                     self.fixed["depth_deep_from"]))
                                         .groupby(["position", "bucket"])["caught"].mean().to_dict(),
             }
         return self._pools[key]
@@ -103,10 +108,15 @@ class Player:
         return float(w[workload_col(market)].mean()) if len(w) else None
 
 
-def find_player(b: Bundle, name: str, season: int, team: str | None = None) -> tuple[str, str, str]:
+def find_player(b: Bundle, name: str, season: int, team: str | None = None,
+                week: int | None = None) -> tuple[str, str, str]:
     """(gsis_id, full name, team) for a typed name. The name must point at one
-    player on the season's rosters (with the team when given)."""
+    player on the season's rosters (with the team when given), as the rosters
+    stood in `week` (the latest roster week up to it; the latest on file when
+    no week is given), so a player traded later is found on his team then."""
     r = b.rosters[(b.rosters["season"] == season) & b.rosters["gsis_id"].notna()]
+    if week is not None and (r["week"] <= week).any():
+        r = r[r["week"] <= week]
     r = r.sort_values("week").drop_duplicates("gsis_id", keep="last")
     key = names.norm(name)
     hit = r[r["full_name"].map(names.norm) == key]
@@ -150,9 +160,7 @@ def build(b: Bundle, gsis: str, name: str, team: str, season: int, week: int,
           tuned: dict, fixed: dict) -> Player:
     """His rates and pools for `week` of `season`, from games before it only."""
     pos = b.position_of(gsis, season) or "?"
-    mine = data.before(b.games[b.games["gsis_id"] == gsis], season, week)
-    mine = mine[(mine["carries"] + mine["targets"] + mine["completions"]) > 0]
-    mine = mine.sort_values(["season", "week"])
+    mine = data.before(b.games[b.games["gsis_id"] == gsis], season, week).sort_values(["season", "week"])
     window = mine.tail(int(fixed["rate_window_games"]))
     this = _results(b, mine[mine["season"] == season], int(fixed["result_margin"]))
     pools = b.pools(season, int(fixed["pool_seasons"]))

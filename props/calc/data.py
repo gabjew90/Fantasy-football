@@ -172,6 +172,28 @@ def player_games(p: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
+def played(snap: pd.DataFrame, roster: pd.DataFrame) -> pd.DataFrame:
+    """(game_id, season, week, team, gsis_id) for every player with at least one
+    offensive snap: a game he played even if he got no carries or targets."""
+    ids = roster.dropna(subset=["pfr_id", "gsis_id"]).drop_duplicates("pfr_id")
+    pfr = dict(zip(ids["pfr_id"], ids["gsis_id"]))
+    s = snap[snap["offense_snaps"].fillna(0) > 0]
+    out = s.assign(gsis_id=s["pfr_player_id"].map(pfr)).dropna(subset=["gsis_id"])
+    return out[["game_id", "season", "week", "team", "gsis_id"]].drop_duplicates(["game_id", "gsis_id"])
+
+
+def games_played(player_games: pd.DataFrame, played_rows: pd.DataFrame) -> pd.DataFrame:
+    """player_games plus a zero row for each game he played (snaps) without a
+    carry, target or completion."""
+    keys = ["game_id", "gsis_id"]
+    have = set(zip(player_games["game_id"], player_games["gsis_id"]))
+    extra = played_rows[[k not in have for k in zip(played_rows["game_id"], played_rows["gsis_id"])]]
+    if extra.empty:
+        return player_games
+    zeros = extra.assign(carries=0, rush_yds=0.0, targets=0, receptions=0, rec_yds=0.0, completions=0, pass_yds=0.0)
+    return pd.concat([player_games, zeros[player_games.columns]], ignore_index=True).drop_duplicates(keys)
+
+
 # ------------------------------------------------------------------ ids
 
 def sleeper_to_gsis(roster: pd.DataFrame) -> dict[str, str]:

@@ -181,6 +181,9 @@ def test_capture_parse_keeps_what_it_should_and_logs_misses():
            _market("2", "receiving_yards", 50.5, 1.8, 1.8, status="in_progress"),
            dict(_market("1", "receptions", 2.5, 1.8, 1.8), line_type="discount"),
            {**_market("2", "rushing_yards", 5.5, 1.8, 1.8), "sport": "nba"}]
+    split = _market("2", "receiving_yards", 60.5, 1.8, 1.8)
+    split["options"][1]["outcome_value"] = 61.5                              # sides at different lines
+    raw.append(split)
     players = {"1": {"full_name": "Christian McCaffrey", "position": "RB", "team": "SF"},
                "2": {"full_name": "Puka Nacua", "position": "WR", "team": "LAR", "gsis_id": "00-4"},
                "3": {"full_name": "Brock Purdy", "position": "QB", "team": "SF"},
@@ -254,3 +257,44 @@ def test_line_near_kickoff_prefers_own_capture_then_archive(tmp_path):
     arch.write_text("\n".join(json.dumps(x) for x in lines), encoding="utf-8")
     got = log.line_near_kickoff(LEG, lines_root=tmp_path / "empty", archive_root=tmp_path / "arch")
     assert got["source"] == "engine archive" and got["line"] == 65.5 and got["american_over"] == -125
+
+
+def test_settle_waits_for_the_game_and_handles_no_work_and_no_play(tmp_path):
+    path = tmp_path / "legs.jsonl"
+    log.log_leg({**LEG, "market": "receptions", "side": "under", "line": 2.5}, path=path)
+    log.log_leg({**LEG, "gsis_id": "00-9", "player": "Sat Out"}, path=path)
+    none = dict(lines_root=tmp_path / "none", archive_root=tmp_path / "none")
+    # Thursday's game is in, his Sunday game is not: nothing settles yet
+    thu = pd.DataFrame([{"game_id": "2026_06_X_Y", "season": 2026, "week": 6, "team": "X", "gsis_id": "00-7",
+                         "carries": 10, "rush_yds": 40.0, "targets": 0, "receptions": 0, "rec_yds": 0.0,
+                         "completions": 0, "pass_yds": 0.0}])
+    assert log.settle(2026, thu, path=path, **none) == 0
+    # his game is in: he played with no targets (a zero row from snaps); the other back did not play
+    snaps = pd.DataFrame([{"game_id": "2026_06_LA_SF", "season": 2026, "week": 6, "team": "SF", "gsis_id": "00-2"}])
+    games = data.games_played(thu.iloc[0:0], snaps)
+    games = pd.concat([thu, games], ignore_index=True)
+    assert log.settle(2026, games, path=path, **none) == 2
+    legs = {x["gsis_id"]: x for x in log.read(path)}
+    assert legs["00-2"]["result"] == "won" and legs["00-2"]["actual_workload"] == 0
+    assert legs["00-9"]["result"] == "did not play"
+
+
+def test_summary_survives_an_out_of_reach_leg(tmp_path):
+    path = tmp_path / "legs.jsonl"
+    log.log_leg({**LEG, "needed": None, "gap": None}, path=path)
+    pg = pd.DataFrame([{"game_id": "2026_06_LA_SF", "season": 2026, "week": 6, "team": "SF", "gsis_id": "00-2",
+                        "carries": 30, "rush_yds": 150.0, "targets": 0, "receptions": 0, "rec_yds": 0.0,
+                        "completions": 0, "pass_yds": 0.0}])
+    log.settle(2026, pg, path=path, lines_root=tmp_path / "n", archive_root=tmp_path / "n")
+    rows = log.summary(2026, [0, 2, 4], path=path)
+    assert rows[0]["gap"] == "out of reach" and rows[0]["needed"] is None and rows[0]["actual"] == 30
+
+
+def test_played_maps_snaps_to_gsis_and_skips_zero_snaps():
+    snap = pd.DataFrame([{"game_id": "g1", "season": 2026, "week": 1, "team": "SF", "pfr_player_id": "p1",
+                          "offense_snaps": 30},
+                         {"game_id": "g1", "season": 2026, "week": 1, "team": "SF", "pfr_player_id": "p2",
+                          "offense_snaps": 0}])
+    roster = pd.DataFrame([{"pfr_id": "p1", "gsis_id": "00-1"}, {"pfr_id": "p2", "gsis_id": "00-2"}])
+    out = data.played(snap, roster)
+    assert list(out["gsis_id"]) == ["00-1"]

@@ -51,8 +51,8 @@ def parse(raw: list, players: dict, sleeper_gsis: dict, candidates: list[dict],
             continue
         over = next((o for o in opts if o.get("outcome") == "over" and o.get("status") == "active"), None)
         under = next((o for o in opts if o.get("outcome") == "under" and o.get("status") == "active"), None)
-        if over is None or under is None:
-            continue
+        if over is None or under is None or float(over["outcome_value"]) != float(under["outcome_value"]):
+            continue                      # one-sided, or the two sides quoted at different lines
         sid = str(m.get("subject_id") or "")
         info = players.get(sid) or {}
         pos = info.get("position")
