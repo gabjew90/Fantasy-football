@@ -246,28 +246,29 @@ def fewer_snaps(mine: pd.DataFrame, share: pd.DataFrame, k: float) -> pd.DataFra
     return out.drop(columns=["offense_pct"]).assign(snap_pct=pct.to_numpy(), fewer_snaps=marks)
 
 
+def _starter(g, team: str):
+    """The team's starting QB id in one schedule row, or None."""
+    q = g["home_qb_id"] if g["home_team"] == team else (g["away_qb_id"] if g["away_team"] == team else None)
+    return q if isinstance(q, str) and q else None
+
+
 def backup_qb(mine: pd.DataFrame, schedule: pd.DataFrame) -> pd.DataFrame:
-    """Adds backup_qb: a game his team's starting quarterback was not the
-    team's usual starter in his games of that season -- the one who started a
-    strict majority of them (games before the priced week only; `mine` is
-    cut). No strict majority (a 2-2 split), or no starter listed: not marked.
-    Display only."""
+    """Adds backup_qb: a game his team's starting quarterback was not the one
+    who started the team's first game of that season (the opening-day
+    starter). After an injury every game the backup starts is marked; a
+    season whose opener lists no starter marks nothing. Display only."""
     sch = schedule.set_index("game_id")
-    qb = []
-    for gid, team in zip(mine["game_id"], mine["team"]):
-        g = sch.loc[gid] if gid in sch.index else None
-        q = None if g is None else (g["home_qb_id"] if g["home_team"] == team else g["away_qb_id"])
-        qb.append(q if isinstance(q, str) and q else None)
-    qb = pd.Series(qb, index=mine.index, dtype=object)
-    marks = pd.Series(False, index=mine.index)
-    for (yr, team), idx in mine.groupby(["season", "team"]).groups.items():
-        q = qb.loc[idx].dropna()
-        if q.empty:
-            continue
-        top, n = q.value_counts().index[0], int(q.value_counts().iloc[0])
-        if n * 2 > len(q):
-            marks.loc[q.index] = q != top
-    return mine.assign(backup_qb=marks.to_numpy())
+    first: dict = {}
+    marks = []
+    for gid, team, yr in zip(mine["game_id"], mine["team"], mine["season"]):
+        if (yr, team) not in first:
+            t = schedule[(schedule["season"] == yr)
+                         & ((schedule["home_team"] == team) | (schedule["away_team"] == team))]
+            first[(yr, team)] = _starter(t.sort_values("week").iloc[0], team) if len(t) else None
+        usual = first[(yr, team)]
+        q = _starter(sch.loc[gid], team) if gid in sch.index else None
+        marks.append(bool(usual and q and q != usual))
+    return mine.assign(backup_qb=marks)
 
 
 def _results(b: Bundle, games: pd.DataFrame, margin: int) -> pd.DataFrame:
@@ -372,12 +373,14 @@ def build(b: Bundle, gsis: str, name: str, team: str, season: int, week: int,
         bk_c = depth_buckets(caught_win["air_yards"], fixed["depth_short_below"], fixed["depth_deep_from"]).dropna()
         # the depths he catches at (yards) and is targeted at (catch rate) need real pool samples
         need = sorted(set(bk_c) | set(bk_t), key=BUCKETS.index)
-        thin = [x for x in need if len(cy.get((pos, x), ())) < fixed["min_pool_targets_per_bucket"]
-                or n_by.get((pos, x), 0) < fixed["min_pool_targets_per_bucket"]]
-        if thin:
-            why.append(f"too few {pos} catches in the pool for depth {', '.join(thin)} "
-                       f"(needs {fixed['min_pool_targets_per_bucket']} each)")
-        if not len(bk_c):
+        lo = fixed["min_pool_targets_per_bucket"]
+        thin_c = [x for x in need if len(cy.get((pos, x), ())) < lo]
+        thin_t = [x for x in need if n_by.get((pos, x), 0) < lo]
+        if thin_c:
+            why.append(f"too few {pos} catches in the pool for depth {', '.join(thin_c)} (needs {lo} each)")
+        if thin_t:
+            why.append(f"too few {pos} targets in the pool for depth {', '.join(thin_t)} (needs {lo} each)")
+        if len(caught_win) and not len(bk_c):
             why.append("none of his catches has a recorded depth")
         if not why:
             # catch rate: as for receptions (his targets' depth mix sets the baseline)

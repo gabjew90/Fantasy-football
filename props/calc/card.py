@@ -302,7 +302,7 @@ def render(pl: Player, c: dict, side: str, *, opp: str, game_lines: dict | None 
         out += _wrap(f"Bar assumes {assumed:.1f} {rate_long} ({window[0].lower() + window[1:]}).")
     # "Line implies (our math)" is not on the default card (the user, 2026-10-10): it is in the
     # "Calculation" follow-up; the row returns only as Sleeper's own workload line (step G)
-    if m == "receptions" and pl.no_depth:
+    if m in ("receptions", "rec_yds") and pl.no_depth:
         out += _wrap(f"({pl.no_depth} of his targets had no recorded depth; left out of his depth mix.)")
     out += _notes(rows, pl.season)
     # AT ~U: the rate needed at his recent workload, the rate the bar assumes, his season rate, the opponent's

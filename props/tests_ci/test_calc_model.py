@@ -588,11 +588,17 @@ def test_receiving_yards_known_answers():
 
 def test_backup_qb_marks_a_game_the_usual_starter_did_not_start():
     from props.calc import player
-    sched = pd.DataFrame([dict(game_id=f"2026_0{w}_TB_X", home_team="X", away_team="TB", home_qb_id="x",
-                               away_qb_id=q) for w, q in ((1, "baker"), (2, "baker"), (3, "baker"), (4, "teddy"))]
-                         + [dict(game_id=f"2025_0{w}_TB_X", home_team="X", away_team="TB", home_qb_id="x",
-                                 away_qb_id=q) for w, q in ((1, "a"), (2, "b"))])
+    sched = pd.DataFrame([dict(game_id=f"2026_0{w}_TB_X", season=2026, week=w, home_team="X", away_team="TB",
+                               home_qb_id="x", away_qb_id=q)
+                          for w, q in ((1, "baker"), (2, "baker"), (3, "baker"), (4, "teddy"))]
+                         + [dict(game_id=f"2025_0{w}_TB_X", season=2025, week=w, home_team="X", away_team="TB",
+                                 home_qb_id="x", away_qb_id=q) for w, q in ((1, "a"), (2, "b"))])
     mine = pd.DataFrame([dict(game_id=g, team="TB", season=int(g[:4])) for g in sched["game_id"]])
     out = player.backup_qb(mine, sched)
-    # 2026: baker started 3 of 4, so week 4 (teddy) is marked; 2025: a 1-1 split, no usual starter
-    assert out["backup_qb"].tolist() == [False, False, False, True, False, False]
+    # 2026: baker started the opener, so week 4 (teddy) is marked; 2025: "a" started the opener, week 2 is marked
+    assert out["backup_qb"].tolist() == [False, False, False, True, False, True]
+    # an injury: the starter plays weeks 1-2, the backup weeks 3-6 -- the backup's games are the marked ones
+    inj = pd.DataFrame([dict(game_id=f"2026_0{w}_TB_X", season=2026, week=w, home_team="X", away_team="TB",
+                             home_qb_id="x", away_qb_id="a" if w <= 2 else "b") for w in range(1, 7)])
+    m2 = pd.DataFrame([dict(game_id=g, team="TB", season=2026) for g in inj["game_id"]])
+    assert player.backup_qb(m2, inj)["backup_qb"].tolist() == [False, False, True, True, True, True]

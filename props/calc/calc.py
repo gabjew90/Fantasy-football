@@ -185,7 +185,10 @@ class Model:
         play j is caught at his catch rate, its depth drawn from his mix and its
         yards from the real catches at that depth. Returns (running sums,
         the mix's average catch)."""
-        if self._yards is None:
+        key = (self.catch, self.depth_mix, id(self.catch_pools))
+        if self.catch is None or not 0 < self.catch <= 1:
+            raise DataError(f"a receiving-yards model needs a catch rate in (0, 1]; got {self.catch!r}")
+        if self._yards is None or self._yards[2] != key:          # rebuilt if catch rate, mix or pools change
             d = self.draws
             if d.u_depth is None or d.u_yard is None:
                 raise DataError("receiving-yards draws are missing (make_draws(..., yards=True))")
@@ -204,8 +207,8 @@ class Model:
                     y0[m] = p[np.minimum((d.u_yard[m] * len(p)).astype(int), len(p) - 1)]
             caught = d.u_play < self.catch
             run = np.cumsum(np.where(caught, y0, 0.0), axis=1)
-            self._yards = (np.concatenate([np.zeros((len(run), 1)), run], axis=1), mean_mix)
-        return self._yards
+            self._yards = (np.concatenate([np.zeros((len(run), 1)), run], axis=1), mean_mix, key)
+        return self._yards[0], self._yards[1]
 
     def outcomes_fixed(self, n: int, rate: float | None = None) -> np.ndarray:
         return self.outcome(fixed_counts(self.draws, n), rate)

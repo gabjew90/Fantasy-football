@@ -280,3 +280,29 @@ def test_build_refuses_other_fixed_settings_than_its_pools():
     with pytest.raises(checks.DataError, match="other fixed settings"):
         player.build(b, "rb1", "Rb One", "A", 2026, 2, {"k_ypc": 150, "k_catch": 60},
                      {**FIXED, "depth_short_below": 6}, "receptions")
+
+
+def test_build_receiving_yards_by_hand():
+    from props.calc import player
+    games = _games_rows(5)                                    # weeks 1-5; week 5 is the priced week
+    # each game: 6 targets, 4 caught for 5 yards, 2 incomplete (0 yards), all short (air 1); week 5 is cut
+    tg = pd.DataFrame([dict(game_id=g, season=2026, week=w, gsis_id="rb1", yards=5.0 if i < 4 else 0.0,
+                            caught=i < 4, air_yards=1.0)
+                       for g, w in zip(games["game_id"], games["week"]) for i in range(6)])
+    pools = {**_hand_pools(), "catch_yards_by_pos_bucket": {("RB", "short"): np.full(200, 7.0)}}
+    b = _bundle(pd.DataFrame(columns=["game_id", "season", "week", "gsis_id", "yards"]), tg, games, pools)
+    pl = player.build(b, "rb1", "Rb One", "A", 2026, 5, {"k_catch": 60, "k_ypr": 50}, FIXED, "rec_yds")
+    assert "rec_yds" not in pl.not_enough
+    # catch rate: 16 of 24 toward 0.8 with k 60 -> 64 / 84; yards per catch: 80 on 16 toward 7.0 with k 50
+    # -> 430 / 66; yards a target = their product
+    r = pl.rates["ypt"]
+    assert r.blended == pytest.approx((64 / 84) * (430 / 66))
+    assert r.own == pytest.approx(80 / 24) and r.season == pytest.approx(80 / 24) and r.season_n == 24
+    assert pl.receiving["mix"] == (1.0, 0.0, 0.0) and pl.receiving["catch"] == pytest.approx(64 / 84)
+    m = player.model(pl, "rec_yds", {"target_r": 8}, FIXED)
+    assert m.outcomes_fixed(20).mean() / 20 == pytest.approx(r.blended, rel=0.02)
+    # thin target and catch pools are each named as what they are
+    thin = {**pools, "catch_yards_by_pos_bucket": {("RB", "short"): np.full(50, 7.0)}}
+    b2 = _bundle(pd.DataFrame(columns=["game_id", "season", "week", "gsis_id", "yards"]), tg, games, thin)
+    pl2 = player.build(b2, "rb1", "Rb One", "A", 2026, 5, {"k_catch": 60, "k_ypr": 50}, FIXED, "rec_yds")
+    assert pl2.not_enough["rec_yds"] == ["too few RB catches in the pool for depth short (needs 100 each)"]

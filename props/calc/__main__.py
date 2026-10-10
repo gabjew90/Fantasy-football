@@ -1,6 +1,6 @@
 """python -m props.calc <command>
 
-  leg "Name" rush_yds over   one side's leg card (rush_yds or receptions for now)
+  leg "Name" rush_yds over   one side's leg card (rush_yds, receptions or rec_yds for now)
       [--team DEN] [--season 2026 --week 6] [--line 64.5 --over -125 --under -132]
       [--target 58]
       Without --line, the latest saved Sleeper quote before kickoff is used, from
