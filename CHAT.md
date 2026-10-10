@@ -28,6 +28,8 @@ look a player up, compare two, try a swap, check a line, follow up. The
 full reports (`fantasy lineup / waiver / trade / scenario`, `props game /
 slate`) are for the whole decision -- "set my lineup", "who should I add",
 "break down this game". Neither is the reply; both are what you think with.
+For a prop leg or a Power Play entry the tool is the calculator (**Prop legs and entries**,
+below); the `props` question tools are the dormant engine's, used as the routing table says.
 
 - **Lead with the call, then make the case.** Tables and the terms of the
   trade (percentiles, WOPR, target share, aDOT, P(win), implied points) are
@@ -128,18 +130,17 @@ names a week.
 | what if I start X (instead of Y) | `nfl.py fantasy swap --league L --start "X" [--bench "Y"]` (no `--bench`: every legal seat, best first) |
 | my roster / my opponent's / team Z's | `nfl.py fantasy roster --league L [--team opp\|MANAGER]` |
 | set my lineup / who to start this week, the whole matchup | `nfl.py fantasy lineup --league L` |
-| is X's prop any good / what does the model think of X | `nfl.py props player "X"` (finds and prices his game) |
-| X over / under N (any line, alternate lines) | `nfl.py props line "X" "rec yds" N` (catches, rec yds, rush yds, pass yds) |
-| best bets in a game / this week / a must-win pick | `nfl.py props best AWAY@HOME`, `--slate` (no pick either way: say why, then give the research rows) |
-| how does the game project | `nfl.py props matchup AWAY@HOME` |
-| a full breakdown of a game / the slate | `nfl.py status`, then **Props** below (the engine's full guide) |
-| a read to share / for review / the QA version / the agent version of a game | `props game AWAY@HOME`, then **Publishing a read** below |
+| a prop leg: X over / under N in rushing yards, catches, receiving yards or passing yards; is this leg any good; what workload does X need | **the calculator**: `python -m props.calc capture`, then `python -m props.calc leg "X" <rush_yds\|receptions\|rec_yds\|pass_yds> <over\|under>` -- **Prop legs and entries** below |
+| a Power Play / an entry of several legs (those four bet types) | **the calculator**: `python -m props.calc capture`, then `python -m props.calc entry --dry-run --stake <$> --payout <total Sleeper shows> --angle <...> --why "..." --leg "<Player>\|<market>\|<side>\|<line>" ...` -- **Prop legs and entries** below |
+| the props engine, asked for BY NAME ("what does the engine say", "run the engine on X", an engine game guide or slate) | `nfl.py props player / line / best / matchup / game / slate` -- **Props (the engine, dormant)** below; engine output, untested against real lines |
+| an anytime touchdown, or rushing + receiving yards | the engine: `nfl.py props player "X"` / `props line` -- the calculator does not cover them; engine output, untested against real lines |
+| a read to share / for review / the QA version / the agent version of a game (asked for by name) | `props game AWAY@HOME` (the engine), then **Publishing a read** below |
 | waiver targets at RB / WR / TE | `nfl.py fantasy waiver --league L --pos RB,WR --horizon H` |
 | stream a defense or kicker | `nfl.py fantasy waiver --league L --pos DEF --horizon stream` (or `--pos K`) |
 | should I pick up X over someone on my bench | the same waiver run at X's position; find X in the candidate table and the cut it pairs with |
 | should I trade X for Y / is this offer fair | `nfl.py fantasy trade --league L --give "X" --get "Y"` (comma lists for 2-for-1s) |
 | hold or sell an injured player | the trade command on the offer or a realistic one, with `--back "X:WEEK"` from the latest reporting |
-| how does X do if teammate Y is out | `nfl.py fantasy scenario --league L --player "X" --out "Y"` |
+| how does X do if teammate Y is out | `nfl.py fantasy scenario --league L --player "X" --out "Y"` (runs the props engine: say its numbers are engine output, untested against real lines) |
 | is it too early / what is posted yet | `nfl.py status [--league L]` |
 | can chat reach FantasyPros / check the data sources | `nfl.py status --probe-sources` -- show its table and what each row means |
 | a fantasy and a betting question together | both commands, two labelled sections, never mixed |
@@ -228,9 +229,47 @@ or several players, or the players you get sit on more than one roster -- ask.
 labelled as outside the engine, and it cites no engine number it did not
 print.
 
-## Props
+## Prop legs and entries: the calculator (primary)
 
-The props engine's own contract governs the SUBSTANCE of a props answer --
+The parlay-leg calculator (`props/calc/`, DECISIONS #231-#233) is THE tool for prop legs and
+Power Play entries in rushing yards, catches (receptions), receiving yards and passing yards.
+For one side of a leg it states the workload that price needs (the bar), his last 4 games, how
+often he reached the bar this season, the rate needed at his recent workload beside his own
+rates, the opponent's rate allowed, the matchup (the engine's tier grades, copied), and a
+closing question. It gives NO chance of its own and never says whether a line is good.
+
+1. **Capture first, every session.** The container is fresh: `python -m props.calc capture` saves
+   Sleeper's current lines (takes seconds); the cards read the newest quote before kickoff. A
+   line from another book: `leg ... --line N --over <American> --under <American>` (cards only;
+   an entry needs Sleeper's quote at the line played).
+2. **Markets:** `rush_yds`, `receptions`, `rec_yds`, `pass_yds`; side `over` or `under`. A name
+   matched by initial prints a NOTE: say it, and confirm the player.
+3. **Show what it prints, in full and as printed** -- every card, then the entry summary, the
+   grade legend and the follow-up names. Never recompute, round or re-sort a number; the card's
+   first line is that bet type's test result and stays with the card. Then your analysis around
+   it: the role evidence that answers its closing question (who threw in each game, injuries,
+   the game plan), conditional on the user's view -- never a pick, a lean, an edge or a chance.
+4. **Follow-ups** (named at the end of a batch): Workload (game values, season count, rounding,
+   role-changing injuries), Calculation (how the price becomes a bar, the recent rate's blend
+   toward the position average, the test numbers in docs/plans/2026-10-10-parlay-leg-calculator.md,
+   "Tuning" and "Held-out read"), Matchup (grades, spread and total, the opponent's rates),
+   Fit (which legs lean on shared or opposing game stories), Entry cost (payout, required wins,
+   the coin-flip assumptions). Answer from the cards and that note; never invent a number.
+5. **Logging.** Chat is read-only and never logs. When the user plays an entry, give them the
+   same `entry` command WITHOUT `--dry-run`, with `--payout` set to the total Sleeper shows
+   (stake included), to paste into a Claude Code session.
+
+Only when the user asks for the engine by name, or for a bet type the calculator does not cover
+(anytime touchdowns, rushing + receiving yards, a teammate-out scenario), use the engine below,
+and say in the reply that its numbers are engine output, untested against real lines.
+
+## Props (the engine, dormant)
+
+The props engine is dormant (DECISIONS #233): kept in the repository and still run on schedule
+to write the line record, but not the default answer to any prop question. Use it only as the
+routing table says, and label its numbers as engine output, untested against real lines.
+
+The props engine's own contract governs the SUBSTANCE of an engine props answer --
 markets, the research table, the credential order, and its honesty rules.
 The board is a RESEARCH SHEET, not a bet list (DECISIONS #142): the model
 has not shown it adds anything beside the book's price (at Sleeper's real lines

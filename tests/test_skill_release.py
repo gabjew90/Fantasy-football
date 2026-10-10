@@ -424,19 +424,21 @@ def test_every_module_nfl_py_imports_ships_in_the_release():
     assert not missing, f"nfl.py imports modules the release does not ship: {missing}"
 
 
-# The file rules of the OLDEST harness still installed: the skill the user
-# built at nfl-v1.0 (vendored release 04ccdab). Its bootstrap unpacks what
-# these rules include, and its compare() then demands the tree hold EXACTLY
-# the lock's files -- so a file it skips is "missing" and a file it unpacks
-# that the lock lacks is "extra"; either sends chat to the vendored release.
-# Update only when every installed skill has been rebuilt from a newer
-# skill/release.py -- never to make a test pass.
+# The file rules of the OLDEST harness still installed. Until nfl-v1.70 that was
+# the skill built at nfl-v1.0 (vendored release 04ccdab), whose bootstrap
+# unpacks what its own rules include; its compare() then demands the tree hold
+# EXACTLY the lock's files -- so a file it skips is "missing" and a file it
+# unpacks that the lock lacks is "extra"; either sends chat to the vendored
+# release. nfl-v1.70 adds props/calc/ (DECISIONS #233) and the user rebuilds and
+# re-uploads the skill from this skill/release.py with it (2026-10-10), so these
+# are the rebuilt harness's rules. Update only when every installed skill has
+# been rebuilt from a newer skill/release.py -- never to make a test pass.
 HARNESS_RULES = {
-    "dirs": ("core/", "fantasy/", "draftkit/", "manager/", "props/engine/", "leagues/"),
+    "dirs": ("core/", "fantasy/", "draftkit/", "manager/", "props/engine/", "props/calc/", "leagues/"),
     "files": ("CHAT.md", "nfl.py", "config.yaml", "requirements.txt", "tiers.csv", "tiers.keefamania.csv",
-              "data/processed/absence_bands.json"),
+              "data/processed/absence_bands.json", "props/journal.py", "props/persist.py"),
     "globs": ("data/external/*.csv",),
-    "exclude_parts": ("__pycache__", "backtest_out"),
+    "exclude_parts": ("__pycache__", "backtest_out", "cache"),
     "exclude_suffixes": (".pyc", ".pyo", ".env", ".pkl", ".tmp", ".part"),
     "exclude_names": ("credential.env", ".env"),
 }
@@ -508,3 +510,24 @@ def test_chat_may_show_tables_and_terms_but_never_pastes_the_output():
     assert "no report vocabulary for its own sake" not in chat, "the old ban on report language is gone"
     assert "slate the user asks for is reproduced" in chat, "the full prop guide and slate summary are reproduced as the engine contract requires"
 
+
+
+def test_every_module_the_calculator_loads_ships_in_the_release():
+    """Chat runs `python -m props.calc` inside the release (DECISIONS #233): every
+    props/calc module and every props/ module it imports at load (journal and
+    persist, through props/calc/shared.py) must ship, or the calculator fails
+    only in chat."""
+    import ast
+    root = Path(R.__file__).resolve().parents[1]
+    missing = []
+    for path in sorted((root / "props" / "calc").glob("*.py")):
+        rel = path.relative_to(root).as_posix()
+        if not R.included(rel):
+            missing.append(rel)
+        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+            if isinstance(node, ast.Import):
+                for a in node.names:
+                    cand = f"props/{a.name.split('.')[0]}.py"
+                    if (root / cand).exists() and not R.included(cand):
+                        missing.append(f"{rel} imports {cand}")
+    assert not missing, f"the calculator needs files the release does not ship: {missing}"

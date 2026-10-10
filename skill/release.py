@@ -34,9 +34,11 @@ LOCK_NAME = "nfl.lock.json"
 
 # What a release contains: the code the `nfl` commands run and the tracked data
 # they read. Not reports, state, tests, docs or the draft spreadsheets.
-INCLUDE_DIRS = ("core/", "fantasy/", "draftkit/", "manager/", "props/engine/", "leagues/")
+INCLUDE_DIRS = ("core/", "fantasy/", "draftkit/", "manager/", "props/engine/", "props/calc/", "leagues/")
 INCLUDE_FILES = ("CHAT.md", "nfl.py", "config.yaml", "requirements.txt", "tiers.csv", "tiers.keefamania.csv",
-                 "data/processed/absence_bands.json")
+                 "data/processed/absence_bands.json",
+                 # the calculator imports these two when it loads (props/calc/shared.py, DECISIONS #233)
+                 "props/journal.py", "props/persist.py")
 # CHANGING THE RULES ABOVE DOES NOT REACH AN INSTALLED HARNESS. The installed
 # skill unpacks a release with its own copy of this file, as of its build, and
 # skips everything that copy does not include -- then the lock check fails and

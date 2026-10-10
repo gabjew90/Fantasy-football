@@ -8728,3 +8728,29 @@ every row while the predictions rows carry open / decision / close (line_archive
 - **Per the user's rule:** no setting, adjustment or pass mark changed after a result; the cards
   keep "Check first: workload bar untested." until the user chooses the failure wording.
   Details: docs/plans/2026-10-10-parlay-leg-calculator.md, "Tuning" and "Held-out read".
+
+## 2026-10-10 (233) -- the calculator is the primary NFL prop tool; the engine goes dormant
+
+- **What (user):** `props/calc/` answers prop legs and Power Play entries in rushing yards,
+  receptions, receiving yards and passing yards, in chat and in Claude Code sessions. This
+  replaces #231's "recorded exception to no parallel engines": the calculator is now the
+  primary tool, not an exception beside the engine.
+- **The engine is dormant, not retired.** `props/engine/` stays in the repo, unedited, and is not
+  the default answer to any prop question. It is used only when the user asks for it by name,
+  or for what the calculator does not cover: anytime touchdowns, rushing + receiving yards, and
+  the fantasy teammate-out scenario (`fantasy scenario` runs the engine). Each of those routes
+  labels its numbers as engine output, untested against real lines.
+- **The scheduled capture keeps running, unchanged** (the user's option (iii)): `props.yml`'s
+  capture step IS an engine run -- the engine writes the Sleeper quotes it priced into
+  `props/record/lines` -- and that record is what the journal's late lines and the calculator's
+  saved-quote lookup read. So the engine keeps running on schedule ONLY to write the record's
+  lines; no workflow change, no `journal.py` change. The calculator's own capture replaces it
+  at the engine's retirement, not now.
+- **Chat:** CHAT.md routes those four bet types to the calculator (`python -m props.calc capture`,
+  then `leg` or `entry --dry-run`); chat stays read-only and gives the user the logging command
+  for a Claude Code session. The release adds `props/calc/`, `props/journal.py` and
+  `props/persist.py` (nfl-v1.70); the user rebuilds and re-uploads the skill, whose oldest
+  harness (built at nfl-v1.0) would otherwise skip the new files.
+- **Evidence and limits:** the calculator's held-out read (#232) passed spread, round trip and the
+  80% range for every bet type but passing's spread, and failed the conversion band test
+  everywhere; each card says so in the user's words. No real-game record yet.
