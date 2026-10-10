@@ -8712,3 +8712,82 @@ every row while the predictions rows carry open / decision / close (line_archive
   main, holds each to its digest, and runs that copy (no loop; any failure keeps the current one).
   build.py refuses to build a loader the lock does not pin. After this one reinstall, loader changes
   reach chat through the repo like everything else; only the bundled fallback still ages.
+
+## 2026-10-10 (232) -- a parlay-leg calculator in props/calc/, a user-approved exception to "no parallel engines"
+
+- **What (user):** a small calculator for Sleeper parlay legs. From a posted line and its two
+  prices it gives the workload (carries, passes thrown to him, completions) a player needs for the
+  leg to win often enough, the workload the book's no-vig price implies, and how often he has had
+  that much work. It makes no forecast, gives no chance of its own and labels no bet.
+- **Why an exception:** the engine's card already shows a Power Play workload (#225); the user wants
+  a model small enough to read end to end (eight settings at most, in one yaml file). It lives in
+  `props/calc/`, imports nothing from `props/engine/` (a test enforces it), and leaves the engine,
+  its workflow and its record untouched. It is judged by its own pre-registered tests (conversion,
+  spread, round trip, game-story rows), tuned on 2018-23, with 2024-25 read once at the end.
+- **Matchup block (user, same day):** each card gets a display-only MATCHUP block (spread, total and
+  implied points; key injuries with with/without splits; the opposing defense's rate and volume
+  allowed to his position, with rank; EPA and success-rate tiers, garbage time out), computed in
+  `props/calc/` from play-by-play, rosters, injuries and schedules. It changes no calculated number
+  and adds no setting; a test builds every card with and without it and requires identical numbers.
+- **The user's answers (same day):** all sixteen open questions settled, as recommended except: the
+  "good day" row is dropped (its example had no rule) for the rate needed at his usual workload;
+  every fixed constant is listed in the yaml under "fixed (not tuned)" and none may change after a
+  test result is read (a test pins them); the league-average game-story rows are labelled
+  league-wide on the card; the gap is needed minus trailing 4-game average, beside a separate
+  "book expects" row. Data through `core.fetch`; 2016-17 play-by-play feeds the 2018 pools only.
+- **Status:** design settled; code starts on the user's go.
+
+## 2026-10-10 (233) -- props/calc tuned on 2018-23; 2024-25 read once: no bet type passes all its tests
+
+- **Tuned (pre-registered grids, props/calc/harness.py, 2018-23 only):** carry_r 16->8, day_sd
+  0.15->0.05, target_r 8->10, completion_r 10->25, k_ypc 150->200, k_catch 60->10 (grid edge),
+  k_ypr 50 (flat), k_ypcomp 150->800 (grid edge).
+- **Held-out read, once, 2026-10-10 20:00-20:12 UTC** (record and every case and line in
+  props/calc/heldout/; re-derived by a separate agent from those files, no mismatches): spread,
+  round trip and the conversion 80% range pass for every bet type except passing's spread (76.9%).
+  The conversion bands fail everywhere: rushing on two bands under 200 games (the rest within
+  2.3), receptions 3.2-4.9 points off in three bands, receiving yards 3.7 off in one band and one
+  band under 200, passing 4.5 off and five bands under 200. Game story: carries pass, pass
+  attempts fail (league-wide decline of about 2 a game).
+- **Per the user's rule:** no setting, adjustment or pass mark changed after a result; the cards
+  keep "Check first: workload bar untested." until the user chooses the failure wording.
+  Details: docs/plans/2026-10-10-parlay-leg-calculator.md, "Tuning" and "Held-out read".
+
+## 2026-10-10 (234) -- the calculator is the primary NFL prop tool; the engine goes dormant
+
+- **What (user):** `props/calc/` answers prop legs and Power Play entries in rushing yards,
+  receptions, receiving yards and passing yards, in chat and in Claude Code sessions. This
+  replaces #232's "recorded exception to no parallel engines": the calculator is now the
+  primary tool, not an exception beside the engine.
+- **The engine is dormant, not retired.** `props/engine/` stays in the repo, unedited, and is not
+  the default answer to any prop question. It is used only when the user asks for it by name,
+  or for what the calculator does not cover: anytime touchdowns, rushing + receiving yards, and
+  the fantasy teammate-out scenario (`fantasy scenario` runs the engine). Each of those routes
+  labels its numbers as engine output, untested against real lines.
+- **The scheduled capture keeps running, unchanged** (the user's option (iii)): `props.yml`'s
+  capture step IS an engine run -- the engine writes the Sleeper quotes it priced into
+  `props/record/lines` -- and that record is what the journal's late lines and the calculator's
+  saved-quote lookup read. So the engine keeps running on schedule ONLY to write the record's
+  lines; no workflow change, no `journal.py` change. The calculator's own capture replaces it
+  at the engine's retirement, not now.
+- **Chat:** CHAT.md routes those four bet types to the calculator (`python -m props.calc capture`,
+  then `leg` or `entry --dry-run`); chat stays read-only and gives the user the logging command
+  for a Claude Code session. The release adds `props/calc/`, `props/journal.py` and
+  `props/persist.py` (nfl-v1.70); the calculator's own captures, name-miss log and held-out
+  data files stay out of the release, so a chat capture never fails the next bootstrap's
+  verify. The user rebuilds and re-uploads the skill: an installed harness older than #231 (the
+  oldest was built at nfl-v1.0) unpacks by its own rules and would skip the new files; a harness
+  from #231 on updates itself from main's pin and unpacks the lock's files, so for it the rebuild
+  only refreshes the bundled fallback to nfl-v1.70.
+- **Order, so the fallback window is one step and runs the new release:** (0) main was merged into
+  this branch and `write-lock --tag nfl-v1.70` re-run (it pins the harness, #231); if main moves
+  again before the merge, repeat (0) and rebuild. (1) Build the skill from this branch (build.py
+  vendors the branch's release, since the tag does not exist yet) and upload it. Until the merge
+  it still runs nfl-v1.69: the bootstrap reads main's lock, and because the branch's
+  `skill/release.py` differs from main's pin, it fetches and runs main's pinned loader. (2) Merge.
+  (3) At once, on main, `python skill/release.py cut-tag` and push the tag. Between (2) and (3)
+  the tag does not exist, so both fetch routes fail and chat runs the bundled copy
+  (RELEASE_SOURCE=VENDORED_FALLBACK), which is nfl-v1.70 itself; after (3) it fetches nfl-v1.70.
+- **Evidence and limits:** the calculator's held-out read (#233) passed spread, round trip and the
+  80% range for every bet type but passing's spread, and failed the conversion band test
+  everywhere; each card says so in the user's words. No real-game record yet.

@@ -1,0 +1,65 @@
+# Parlay-leg calculator settings (docs/plans/2026-10-10-parlay-leg-calculator.md).
+#
+# Two blocks. "tuned" holds the only numbers that are ever tuned, at most 8 of
+# them; adding a ninth means removing one, and that is the user's call. They are
+# tuned on 2018-2023 only. "fixed_not_tuned" holds every other constant the tool
+# uses. None of them may change after a test result has been read: a test pins
+# their values, so changing one fails CI until that test is edited too.
+
+tuned:
+  carry_r: 8  # How much his carries swing from game to game around his average. Higher = steadier. (tuned on 2018-2023, 2026-10-10; was 16)
+  day_sd: 0.05 # How much a whole rushing day runs hot or cold: 0.15 means a typical day is within about 15% of his usual yards per carry. (tuned on 2018-2023, 2026-10-10; was 0.15)
+  target_r: 10 # How much the passes thrown to him swing from game to game. Higher = steadier. (tuned on 2018-2023, 2026-10-10; was 8)
+  completion_r: 25 # How much a quarterback's completions swing from game to game. Higher = steadier. (tuned on 2018-2023, 2026-10-10; was 10)
+  k_ypc: 200 # How many of his own carries count as much as the running-back average when blending his yards per carry. (tuned on 2018-2023, 2026-10-10; was 150)
+  k_catch: 10 # The same, for catch rate, counted in passes thrown to him. (tuned on 2018-2023, 2026-10-10; was 60)
+  k_ypr: 50 # The same, for yards per catch, counted in catches. (tuned on 2018-2023, 2026-10-10; was 50)
+  k_ypcomp: 800 # The same, for yards per completion, counted in completions. (tuned on 2018-2023, 2026-10-10; was 150)
+
+fixed_not_tuned:
+  season_type: REG              # Only regular-season games are read.
+  rate_window_games: 16         # His rates use his last 16 games played before the priced week, across seasons.
+  pool_seasons: 2               # Real per-play outcomes are drawn from the two seasons before the priced week.
+  depth_short_below: 5          # A catch or completion with fewer than 5 air yards is "short".
+  depth_deep_from: 15           # 15 or more air yards is "deep"; between the two is "medium".
+  sims: 20000                   # Simulated games per chance.
+  seed: 20261010                # The fixed random seed, so the same inputs always give the same card.
+  range_low_pct: 10             # The "80% range" runs from the 10th ...
+  range_high_pct: 90            # ... to the 90th percentile.
+  result_margin: 8              # "Won by 8+", "within 7" and "lost by 8+" split on this margin.
+  usual_games: 4                # "His usual" workload and the gap use his last 4 games played.
+  fewer_snaps_share: 0.5        # Mark a game when his offensive snap share was under half his average in his other games that season.
+  tested_min_prior_games: 3     # A player enters the tests only after 3 games played that season.
+  top_targets: 3                # "Top-3 target": the team's top 3 by targets in earlier games.
+  garbage_wp_low: 0.10          # Matchup tiers leave out plays where the offense's win chance is under 10% ...
+  garbage_wp_high: 0.90         # ... or over 90%.
+  thin_games: 4                 # A matchup figure from fewer than 4 games says "only N games".
+  grade_score_epa_weight: 0.6666666666666666   # Unit grade score: two parts EPA per play to one part success rate (copied from the engine).
+  grade_max_tiers: 6            # Unit grades use at most 6 equal-width bands (copied from the engine).
+  grade_tier_letters: SABCDF    # Band letters from the best down: S, A, B, C, D, F (copied from the engine).
+  grade_int_steps: [2, 3, 4, 5, 6, 8, 10, 12, 15, 20]   # Band widths tried, in whole score points, smallest that fits (copied from the engine).
+  grade_tier_steps: [0.5, 1, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10]   # The engine's default band widths, kept for the copied tiers() function.
+  league_wide_first_season: 2018  # League-wide game-story rows start in 2018.
+  gap_edges: [0, 2, 4]          # The season summary groups legs by gap: 0 or less, up to 2, up to 4, more than 4.
+  conversion_line_scales: [0.8, 1.0, 1.2]  # Conversion test lines: these multiples of workload x rate, rounded to the half.
+  pass_band_points: 3           # Conversion test pass mark: stated vs actual within 3 points in each 10-point band ...
+  pass_band_min_games: 200      # ... each band holding at least 200 games ...
+  pass_range_low: 77            # ... and the 80% range holding between 77% ...
+  pass_range_high: 83           # ... and 83% of results (the spread test uses the same 77-83).
+  round_trip_points: 1          # Round trip: "book expects" fed back gives the no-vig chance within 1 point.
+  game_story_points: 1.5        # Game-story test: league-wide team carries / pass attempts within 1.5.
+  min_pool_rb_carries: 5000     # The running-back carry pool (residuals, and a back's average) must hold 5,000 carries, or the card says "not enough data".
+  min_pool_position_carries: 500  # A non-back's position average needs 500 carries in the pool (2018-2023 pools: WR 616-914, TE 27-161).
+  min_pool_targets_per_bucket: 100  # Each position-and-depth group of targets in the pool needs 100 or more (smallest group used, RB deep, ran 172-245 in the 2018-2023 pools).
+  min_own_carries: 30           # His own yards per carry needs 30 carries in his last 16 games, or the card says "not enough data".
+  min_own_targets: 20           # His own catch rate needs 20 passes thrown to him in his last 16 games.
+  min_own_completions: 40       # His own yards per completion needs 40 completions in his last 16 games (about two starts).
+  min_pool_completions_per_bucket: 100  # Each depth group of starting quarterbacks' completions in the pool needs 100 or more.
+  league_ypc_range: [4.0, 5.0]  # Plausible league-average yards per carry (2016-2023 ran 4.23-4.63); outside it, stop.
+  league_catch_rate_range: [0.60, 0.72]  # Plausible league-average catch rate (2016-2023: 63.2%-67.9%).
+  league_yards_per_completion_range: [8.0, 14.0]  # Plausible league-average yards per completion by starting quarterbacks (a wide guard, set before any passing result).
+  league_yards_per_target_range: [6.5, 8.5]  # Plausible league-average yards per target (2016-2023: 7.14-7.58).
+  max_count: {carries: 80, targets: 40, completions: 60}  # The most plays one simulated game can hold (far above any real game).
+  search_max: {carries: 45, targets: 25, completions: 45}  # The highest average workload the search tries; above it the card says "at any workload up to" this.
+  rate_range: {rush_yds: [0.0, 25.0], receptions: [0.0, 1.0], rec_yds: [0.0, 30.0], pass_yds: [0.0, 30.0]}  # The rates the "rate needed" search tries; outside them the card says "at any rate".
+  bisect_steps: 40              # Halving steps in each search (40 steps pin a number far finer than the card shows).

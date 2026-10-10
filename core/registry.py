@@ -117,6 +117,13 @@ COMPONENTS: tuple[Component, ...] = (
                    "step 3 the MODEL answer of `nfl fantasy scenario`, keyed by gsis_id. Never backtested as "
                    "fantasy points: a walk-forward against weekly actuals would validate it. Passing is not "
                    "modelled, so a QB row is rushing only"),
+    Component("parlay_leg_calc", "prop_model", "props/calc/calc.py", "provisional",
+              note="the parlay-leg calculator, the primary NFL prop tool (DECISIONS #232-#234, "
+                   "docs/plans/2026-10-10-parlay-leg-calculator.md): the workload a posted line needs, never "
+                   "its own chance of a result. Tuned on 2018-23; 2024-25 read once (#233): spread, round trip "
+                   "and the 80% range pass except passing's spread, the conversion band test fails everywhere. "
+                   "A real-game record is what would validate it",
+              markets=("player_rush_yds", "player_receptions", "player_reception_yds", "player_pass_yds")),
 
     # ---------------------------------------------------------- fantasy
     Component("sleeper_weekly", "projection_source", "fantasy/sources/sleeper_weekly.py", "provisional",

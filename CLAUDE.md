@@ -71,6 +71,16 @@ so the PR review must.
   and the metric. Knobs live in yaml, so a re-tune is a config diff plus a report.
 - **No parallel engines.** One-off studies go in `experiments/` (outputs
   gitignored) and are promoted or deleted within 30 days.
+- **The calculator is the primary NFL prop tool; the engine is dormant** (DECISIONS #234,
+  replacing #232's recorded exception). `props/calc/`, the parlay-leg calculator
+  (docs/plans/2026-10-10-parlay-leg-calculator.md), answers prop legs and Power Play
+  entries in rushing yards, receptions, receiving yards and passing yards, in chat and here.
+  `props/engine/` stays in the repo, unedited: it is used only when the user asks for it by
+  name, or for what the calculator does not cover (anytime touchdowns, rushing + receiving
+  yards, the fantasy teammate-out scenario), always labelled engine output, untested against
+  real lines. It still runs on schedule (props.yml), unchanged, ONLY to write the record's
+  Sleeper lines (props/record/lines); the calculator's own capture replaces that at the
+  engine's retirement, not before. The calculator never imports the engine (a test enforces it).
 - **One chat skill, harness only.** `nfl-research` fetches the release that
   `nfl.lock.json` names (files defined in `skill/release.py`), places the
   credentials and reads `CHAT.md`, which holds the routing and output rules.

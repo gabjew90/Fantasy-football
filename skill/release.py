@@ -34,9 +34,11 @@ LOCK_NAME = "nfl.lock.json"
 
 # What a release contains: the code the `nfl` commands run and the tracked data
 # they read. Not reports, state, tests, docs or the draft spreadsheets.
-INCLUDE_DIRS = ("core/", "fantasy/", "draftkit/", "manager/", "props/engine/", "leagues/")
+INCLUDE_DIRS = ("core/", "fantasy/", "draftkit/", "manager/", "props/engine/", "props/calc/", "leagues/")
 INCLUDE_FILES = ("CHAT.md", "nfl.py", "config.yaml", "requirements.txt", "tiers.csv", "tiers.keefamania.csv",
-                 "data/processed/absence_bands.json")
+                 "data/processed/absence_bands.json",
+                 # the calculator imports these two when it loads (props/calc/shared.py, DECISIONS #234)
+                 "props/journal.py", "props/persist.py")
 # CHANGING THE RULES ABOVE DOES NOT REACH AN INSTALLED HARNESS. The installed
 # skill unpacks a release with its own copy of this file, as of its build, and
 # skips everything that copy does not include -- then the lock check fails and
@@ -45,8 +47,13 @@ INCLUDE_FILES = ("CHAT.md", "nfl.py", "config.yaml", "requirements.txt", "tiers.
 # A file must fit the rules of the OLDEST harness in use (HARNESS_RULES in
 # tests/test_skill_release.py) or wait for a rebuilt skill.
 INCLUDE_GLOBS = ("data/external/*.csv",)
-EXCLUDE_PARTS = ("__pycache__", "backtest_out", "cache")
-EXCLUDE_SUFFIXES = (".pyc", ".pyo", ".env", ".pkl", ".tmp", ".part")
+# "lines" and "log": the calculator's own captures and name-miss log (props/calc/lines/,
+# props/calc/log/) are state a chat capture writes INTO the release tree; outside the
+# hashed set, a capture never fails the next bootstrap's verify (DECISIONS #234).
+EXCLUDE_PARTS = ("__pycache__", "backtest_out", "cache", "lines", "log")
+# ".gz" and ".npz": the calculator's held-out test data (props/calc/heldout/); the
+# held-out record itself (heldout_read.json) ships, for chat's "Calculation" follow-up.
+EXCLUDE_SUFFIXES = (".pyc", ".pyo", ".env", ".pkl", ".tmp", ".part", ".gz", ".npz")
 EXCLUDE_NAMES = ("credential.env", ".env")
 
 
