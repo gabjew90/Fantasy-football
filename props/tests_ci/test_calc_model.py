@@ -3,6 +3,7 @@ and a card rendered from a synthetic player (no network)."""
 
 from __future__ import annotations
 
+import argparse
 import sys
 from pathlib import Path
 
@@ -248,13 +249,14 @@ def test_every_row_uses_the_same_push_rule():
 def _leg_args(**kw):
     import argparse
     base = dict(name="Test Back", market="rush_yds", team=None, season=2026, week=5, line=None, over=None,
-                under=None, target=None, log=None)
+                under=None, target=None)
     return argparse.Namespace(**{**base, **kw})
 
 
 @pytest.fixture
 def stub_leg(monkeypatch, tmp_path):
-    from props.calc import __main__ as cli, log, player
+    from props.calc import __main__ as cli, lines, player
+    from props.calc.shared import journal
     season, window = _games()
     pl = _player(season, window)
     pl.pools = {"rb_residuals": RESID}
@@ -265,31 +267,42 @@ def stub_leg(monkeypatch, tmp_path):
     monkeypatch.setattr(cli, "Manifest", lambda *a, **k: type("M", (), {"stale": lambda self: []})())
     monkeypatch.setattr(cli, "_next_game", lambda *a, **k: game)
     monkeypatch.setattr(player, "build", lambda *a, **k: pl)
-    real = log.LOG_PATH
+    real = journal.journal_path(2026)
     before = (real.stat().st_size, real.stat().st_mtime_ns) if real.exists() else None
-    monkeypatch.setattr(log, "LOG_PATH", tmp_path / "legs.jsonl")
-    yield cli, log, pl
+    monkeypatch.setattr(journal, "JOURNAL_ROOT", tmp_path / "journal")
+    lookup = type("L", (), {"quote": None, "find": lambda self, leg: self.quote})()
+    monkeypatch.setattr(lines, "LineLookup", lambda *a, **k: lookup)
+    yield cli, lookup, pl
+    monkeypatch.setattr(journal, "JOURNAL_ROOT", None)
     after = (real.stat().st_size, real.stat().st_mtime_ns) if real.exists() else None
-    assert after == before, f"a test changed the real leg log {real}"
+    assert after == before, f"a test changed the real journal {real}"
 
 
-def test_leg_not_enough_and_no_quote_shows_the_gap_and_does_not_log(stub_leg, monkeypatch):
-    cli, log, pl = stub_leg
+QUOTE = {"source": "your capture", "at_utc": "2099-10-11T18:00:00+00:00", "line": 64.5, "mult_over": 1.78,
+         "mult_under": 1.95}
+
+
+def _entry_args(**kw):
+    base = dict(stake=5.0, payout=15.0, angle="role", why="more carries with the starter out",
+                leg=["Test Back|rush_yds|over", "Test Back|rush_yds|under|DAL"], season=2026, week=None)
+    return argparse.Namespace(**{**base, **kw})
+
+
+def test_leg_not_enough_and_no_quote_shows_the_gap(stub_leg):
+    cli, lookup, pl = stub_leg
     pl.not_enough["rush_yds"] = ["12 of his own carries in his last 16 games (needs 30)"]
-    monkeypatch.setattr(log, "line_near_kickoff", lambda *a, **k: None)
-    text = cli.leg(_leg_args(log="over"))
+    text = cli.leg(_leg_args())
     assert "Not enough data" in text and "Unmatched: no saved Sleeper quote" in text
-    assert text.endswith("Not logged: not enough data for this leg.") and not log.LOG_PATH.exists()
 
 
 def test_leg_reports_a_bad_saved_row_as_unmatched(stub_leg, monkeypatch):
-    cli, log, pl = stub_leg
+    cli, lookup, pl = stub_leg
     from props.calc.checks import DataError
 
-    def bad(*a, **k):
-        raise DataError("a capture time 'x' is not a readable time")
-    monkeypatch.setattr(log, "line_near_kickoff", bad)
-    with pytest.raises(SystemExit, match="Unmatched: a capture time"):
+    def bad(leg):
+        raise DataError("a saved week-5 archive row for Test Back: time 'x' is not a readable time")
+    monkeypatch.setattr(lookup, "find", bad)
+    with pytest.raises(SystemExit, match="Unmatched: a saved week-5 archive row"):
         cli.leg(_leg_args())
 
 
@@ -301,14 +314,40 @@ def test_leg_refuses_a_multiplier_typed_as_odds(stub_leg):
         cli.leg(_leg_args(over=-120, under=-110))
 
 
-def test_leg_logs_the_side_with_its_search_result(stub_leg, monkeypatch):
-    cli, log, pl = stub_leg
+def test_entry_logs_each_leg_in_the_journal_with_its_card_numbers(stub_leg, monkeypatch):
+    cli, lookup, pl = stub_leg
     from props.calc import player
+    from props.calc.shared import journal
     monkeypatch.setattr(player, "model", lambda *a, **k: rush_model(ypc=4.2))
-    text = cli.leg(_leg_args(line=64.5, over=-125, under=-132, log="under"))
-    row = log.read(log.LOG_PATH)[0]
-    assert "Logged as leg" in text and row["side"] == "under" and row["needed_status"] == "ok"
-    assert row["needed"] == pytest.approx(row["usual"] - row["gap"])
+    lookup.quote = dict(QUOTE)
+    text = cli.entry(_entry_args())
+    rows = journal.read(2026)
+    assert "Logged entry" in text and len(rows) == 2 and rows[0]["entry_id"] == rows[1]["entry_id"]
+    over, under = rows
+    assert (over["side"], under["side"]) == ("over", "under") and over["market"] == "player_rush_yds"
+    assert over["line"] == 64.5 and over["team"] == "DAL" and over["gsis_id"] == "00-1"
+    assert over["volume_unit"] == "carries"              # journal.grade saves his actual carries from it
+    assert over["entry_stake"] == 5.0 and over["entry_payout"] == 15.0 and over["status"] == "open"
+    assert over["price"] == journal.leg_price(5.0, 15.0, 2)
+    assert (over["calc_mult_over"], over["calc_mult_under"]) == (1.78, 1.95)
+    assert over["calc_bar_status"] == "ok" and over["calc_bar"] > under["calc_bar"]
+    assert over["calc_bar"] == pytest.approx(over["calc_usual"] + over["calc_gap"])     # Over: bar minus usual
+    assert under["calc_bar"] == pytest.approx(under["calc_usual"] - under["calc_gap"])  # Under: usual minus bar
+    assert over["calc_settings"] == settings.load()["tuned"]
+
+
+def test_entry_logs_nothing_when_one_leg_falls_short(stub_leg, monkeypatch):
+    cli, lookup, pl = stub_leg
+    from props.calc import player
+    from props.calc.shared import journal
+    monkeypatch.setattr(player, "model", lambda *a, **k: rush_model(ypc=4.2))
+    text = cli.entry(_entry_args())                       # no saved quote for either leg
+    assert text.startswith("Not logged") and "no full card" in text and journal.read(2026) == []
+    lookup.quote = dict(QUOTE)
+    pl.not_enough["rush_yds"] = ["12 of his own carries in his last 16 games (needs 30)"]
+    assert "no full card" in cli.entry(_entry_args()) and journal.read(2026) == []
+    with pytest.raises(SystemExit, match="Name\\|market"):
+        cli.entry(_entry_args(leg=["Test Back|rush_yds"]))
 
 
 def test_draw_streams_do_not_depend_on_the_order_of_the_yaml():
@@ -386,25 +425,30 @@ def test_the_model_caches_follow_day_sd_and_residuals():
     assert a != b and b != c
 
 
-def test_leg_never_logs_a_game_that_has_kicked_off(stub_leg, monkeypatch):
-    cli, log, pl = stub_leg
+def test_entry_never_logs_a_game_that_has_kicked_off(stub_leg, monkeypatch):
+    cli, lookup, pl = stub_leg
     from props.calc import player
+    from props.calc.shared import journal
     monkeypatch.setattr(player, "model", lambda *a, **k: rush_model(ypc=4.2))
+    lookup.quote = dict(QUOTE)
     monkeypatch.setattr(cli, "_next_game", lambda *a, **k: pd.Series(
         {"week": 5, "game_id": "2026_05_DAL_ARI", "kickoff_utc": "2026-10-04T17:00:00+00:00"}))
-    text = cli.leg(_leg_args(line=64.5, over=-125, under=-132, log="over"))
-    assert "Not logged: this game has already kicked off" in text and not log.LOG_PATH.exists()
+    text = cli.entry(_entry_args())
+    assert "the game has kicked off" in text and journal.read(2026) == []
 
 
-def test_leg_never_logs_a_name_matched_by_initial(stub_leg, monkeypatch):
-    cli, log, pl = stub_leg
+def test_entry_never_logs_a_name_matched_by_initial(stub_leg, monkeypatch):
+    cli, lookup, pl = stub_leg
     from props.calc import player
+    from props.calc.shared import journal
 
     def by_initial(b, name, season, team, week, flag):
         flag[0] = True
         return "00-1", "Test Back", "DAL"
     monkeypatch.setattr(player, "find_player", by_initial)
     monkeypatch.setattr(player, "model", lambda *a, **k: rush_model(ypc=4.2))
-    text = cli.leg(_leg_args(name="Testy Back", team="DAL", line=64.5, over=-125, under=-132, log="over"))
-    assert "matched to Test Back by first initial" in text and "Not logged" in text
-    assert not log.LOG_PATH.exists()
+    lookup.quote = dict(QUOTE)
+    assert "matched to Test Back by first initial" in cli.leg(_leg_args(name="Testy Back", team="DAL", line=64.5,
+                                                                         over=-125, under=-132))
+    text = cli.entry(_entry_args())
+    assert "matched by initial" in text and journal.read(2026) == []

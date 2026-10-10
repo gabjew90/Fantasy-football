@@ -1,11 +1,13 @@
-"""Standalone Sleeper line capture: saves the current two-sided lines for the
-four markets to props/calc/lines/<season>/lines_<season>.jsonl. Run by hand
-(`python -m props.calc capture`); no workflow runs it.
+"""Sleeper line capture, run by hand (`python -m props.calc capture`; no
+workflow runs it). Saves the current two-sided lines for the four markets into
+the props record's line history (props/record/lines, through
+props/persist.py), in the engine's row format with snapshot_type "calc".
 
-Each row is one player-market at one moment: the line, both payout
-multipliers, who he is (Sleeper id -> gsis id by ID, a name+team fallback
-only when the ID join fails, every miss logged) and which nflverse game it
-is for (his team's next game on the schedule)."""
+parse() works out, per player-market: the line, both payout multipliers, who
+he is (Sleeper id -> gsis id by ID, a name+team fallback only when the ID join
+fails, every miss logged) and which nflverse game it is for (his team's next
+game on the schedule). archive_rows() turns each matched one into an Over row
+and an Under row; unmatched ones are logged as misses and not saved."""
 
 from __future__ import annotations
 
@@ -19,11 +21,13 @@ import pandas as pd
 from core import fetch as F
 from core.manifest import Manifest
 
-from . import checks, data, names
-from .markets import SLEEPER_WAGER
+from . import checks, data, names, odds
+from .shared import persist
+from .markets import ARCHIVE_MARKET, SLEEPER_WAGER
 
 CALC = Path(__file__).resolve().parent
-LINES_ROOT = CALC / "lines"
+SNAPSHOT = "calc"            # the engine's rows are "decision"; persist's key keeps the two apart
+TO_ARCHIVE = {v: k for k, v in ARCHIVE_MARKET.items()}
 MISSES_PATH = CALC / "log" / "name_misses.jsonl"
 
 
@@ -190,8 +194,37 @@ def append_jsonl(path: Path, rows: list[dict]) -> None:
             fh.write(json.dumps(r, sort_keys=True) + "\n")
 
 
-def run(*, lines_root: Path | None = None, misses_path: Path | None = None) -> dict:
-    """Fetch, parse and append. Refuses to write when Sleeper could not be
+def archive_rows(rows: list[dict]) -> list[dict]:
+    """parse()'s matched rows in the line history's format: one row per side,
+    with the engine's fields (persist.LINE_KEY plus commence_time, the full team
+    names and retrieved_at_utc, which journal.late_line reads) and calc's own
+    (gsis_id, the nflverse game_id, team, the exact multiplier)."""
+    out = []
+    for r in rows:
+        if not r["gsis_id"]:
+            continue                       # unmatched: a logged miss, never a saved line
+        teams = str(r["game_id"]).split("_")[2:]
+        checks.require(len(teams) == 2, f"game id {r['game_id']!r} does not name two teams")
+        away, home = (names.TEAM_NAMES.get(t) for t in teams)
+        checks.require(away and home, f"game id {r['game_id']!r} names a team with no full name")
+        at = checks.utc(r["captured_at_utc"], "the capture time")
+        ko = checks.utc(r["kickoff_utc"], "the kickoff time")
+        base = {"season": r["season"], "week": r["week"], "event_id": f"sleeper_{r['sleeper_game_id']}",
+                "bookmaker": "sleeper", "market": TO_ARCHIVE[r["market"]], "player": r["name"],
+                "point": r["line"], "snapshot_type": SNAPSHOT, "source": "props.calc capture",
+                "commence_time": ko.isoformat(), "home_team": home, "away_team": away,
+                "retrieved_at_utc": at.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                "gsis_id": r["gsis_id"], "sleeper_id": r["sleeper_id"], "matched_by": r["matched_by"],
+                "team": r["team"], "position": r["position"], "game_id": r["game_id"],
+                "updated_at_ms": r["updated_at_ms"]}
+        for side, mult in (("Over", r["mult_over"]), ("Under", r["mult_under"])):
+            out.append({**base, "outcome": side, "multiplier": mult,
+                        "price_american": odds.american_from_multiplier(mult)})
+    return out
+
+
+def run(*, misses_path: Path | None = None) -> dict:
+    """Fetch, parse and save. Refuses to write when Sleeper could not be
     refreshed: an old copy must never be saved as a new capture."""
     man = Manifest("props.calc capture")
     path = F.sleeper_lines(manifest=man, max_age_s=60)
@@ -207,14 +240,15 @@ def run(*, lines_root: Path | None = None, misses_path: Path | None = None) -> d
     listed, aside = data.roster_split(roster, season, skill_only=True)
     rows, misses = parse(raw, players, data.sleeper_to_gsis(roster), data.candidates(listed),
                          games, captured_at, aside=aside)
-    out = capture_path(season, lines_root)
-    append_jsonl(out, rows)
+    saved = archive_rows(rows)
+    by_season: dict = {}
+    for r in saved:
+        by_season.setdefault(r["season"], []).append(r)
+    written = {s: persist.write_lines(s, rs) for s, rs in by_season.items()}
     append_jsonl(misses_path or MISSES_PATH, misses)
     skipped = sum(m["reason"].startswith("skipped") for m in misses)
     stale = [f"{e['name']} ({e['status']})" for e in man.stale() if e["name"] != "sleeper lines"]
-    return {"path": str(out), "rows": len(rows), "misses": len(misses) - skipped, "skipped": skipped,
-            "captured_at_utc": entry["fetched_at_utc"], "stale": stale}
-
-
-def capture_path(season: int, lines_root: Path | None = None) -> Path:
-    return (lines_root or LINES_ROOT) / str(season) / f"lines_{season}.jsonl"
+    return {"paths": [str(persist.lines_path(s)) for s in written], "rows": len(saved),
+            "lines": len(saved) // 2, "added": sum(w["added"] for w in written.values()),
+            "replaced": sum(w["replaced"] for w in written.values()), "misses": len(misses) - skipped,
+            "skipped": skipped, "captured_at_utc": entry["fetched_at_utc"], "stale": stale}

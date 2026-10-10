@@ -239,17 +239,21 @@ team A behind; team A ahead and team B ahead). Cost: total payout P, the hit rat
 needs, (1/P)^(1/n), and the average loss per unit staked if every leg is a coin flip,
 1 - P x 0.5^n.
 
-**3. Log** (`props/calc/log/legs.jsonl`, append only, committed like `props/record/`). At
-logging: leg, line, both prices, book expects, needed workload, timestamp. At settlement: actual
-workload, result, and the line near kickoff (the user's own capture if one exists, else the last
-snapshot before kickoff in `props/record/lines/`). A season summary groups legs by gap size and
-shows needed versus actual workload and legs won versus break-even.
+**3. Log** (the user, 2026-10-10: reuse, not a second log). `python -m props.calc entry` builds
+each leg's card and logs the entry through `props/journal.py` (`make_power_play`); each journal
+leg row also carries the card's numbers (`calc_bar`, `calc_line_implies`, `calc_usual`,
+`calc_gap`, both multipliers, the settings) and `volume_unit`. `journal.grade` grades the legs
+with settle's stats and rules, saves his actual workload from `volume_unit`, and stamps the late
+line from the line history. Calc has no settle of its own. Open: the journal has no "needed vs
+actual, legs won vs break-even, by gap" table; the user decides whether to add one.
 
-**Line capture.** `python -m props.calc capture` saves the current Sleeper lines to
-`props/calc/lines/<season>/`. It is run by hand; no workflow is added or changed.
+**Line capture.** `python -m props.calc capture` saves the current Sleeper lines into the props
+record's line history (`props/record/lines/<season>/line_archive_<season>.jsonl`) through
+`props/persist.py`, in the engine's row format with `snapshot_type: "calc"` plus the gsis id, the
+nflverse game id and the exact multiplier. It is run by hand; no workflow is added or changed.
+Unmatched lines are logged in `props/calc/log/name_misses.jsonl` and not saved.
 
-Commands, all under `python -m props.calc`: `leg`, `entry`, `capture`, `log`, `settle`,
-`summary`.
+Commands, all under `python -m props.calc`: `leg`, `entry`, `capture`.
 
 ## Testing
 
@@ -362,6 +366,10 @@ All sixteen open questions were answered: as recommended, except where noted.
   from the yaml); 1 left (re-reading the line archive per leg: a few legs a week, not worth the
   code). The first two real cards (Javonte Williams week 5, Puka Nacua week 4) were re-derived by
   a separate agent from the raw files: no mismatches.
+- **2026-10-10, step A (reuse):** leg log switched to the journal; calc's own log, settle and
+  summary deleted; capture writes through persist into the line history (calc's 362 earlier
+  captures moved there); kickoff times from zoneinfo; ESPN spread and total read through
+  `core.fetch` with core/status.py's parsing copied (props may not import core.status).
 
 ## Held-out read
 

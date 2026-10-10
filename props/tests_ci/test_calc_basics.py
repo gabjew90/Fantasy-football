@@ -1,5 +1,5 @@
 """props/calc unit tests: settings cap and freeze, odds, names, play rules,
-the leakage cut, the Sleeper capture and the leg log."""
+the leakage cut, the Sleeper capture and the saved-line lookup."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ import pytest
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
-from props.calc import capture, data, log, names, odds, settings  # noqa: E402
+from props.calc import capture, data, lines, names, odds, settings  # noqa: E402
 
 # ------------------------------------------------------------------ settings
 
@@ -234,13 +234,13 @@ def test_name_clash_in_the_same_game():
                             "position": "WR"}
                            for t, n, g in (("SF", "Mike Thomas", "a"), ("LA", "Michael Thomas", "b"),
                                            ("KC", "Christian McCaffrey", "c"))])
-    assert log.name_clash({**LEG, "player": "Mike Thomas"}, roster)
-    assert not log.name_clash(LEG, roster)
-    assert not log.name_clash(LEG, ROSTER)                      # week 6 missing: week 5 is used
+    assert lines.name_clash({**LEG, "player": "Mike Thomas"}, roster)
+    assert not lines.name_clash(LEG, roster)
+    assert not lines.name_clash(LEG, ROSTER)                      # week 6 missing: week 5 is used
     with pytest.raises(Exception, match="no 2026 roster on file"):
-        log.name_clash({**LEG, "game_id": "2026_06_NYJ_NE"}, ROSTER)
+        lines.name_clash({**LEG, "game_id": "2026_06_NYJ_NE"}, ROSTER)
     with pytest.raises(Exception, match=r"\['KC'\]"):        # one team on file is not enough
-        log.name_clash({**LEG, "game_id": "2026_06_KC_SF"}, ROSTER)
+        lines.name_clash({**LEG, "game_id": "2026_06_KC_SF"}, ROSTER)
 
 
 def test_rosters_as_of_a_week_keep_teams_on_bye():
@@ -263,17 +263,7 @@ def test_capture_unmatches_a_sleeper_game_that_spans_two_nflverse_games():
     assert all(r["gsis_id"] is None for r in rows) and all("spans several" in m["reason"] for m in misses)
 
 
-def test_a_saved_capture_is_rechecked_when_read(tmp_path):
-    caps = tmp_path / "lines"
-    capture.append_jsonl(caps / "2026" / "lines_2026.jsonl", [dict(
-        captured_at_utc="2026-10-11T20:00:00+00:00", gsis_id="00-2", team="SF", market="rush_yds",
-        game_id="2026_06_LA_SF", sleeper_game_id="202610501", line=64.5, mult_over=1.8, mult_under=1.8)])
-    # saved by an older parser with a week-5 Sleeper game id for a week-6 leg: refused, and said so
-    with pytest.raises(Exception, match="refused 1 own captures"):
-        log.line_near_kickoff(LEG, ROSTER, lines_root=caps, archive_root=tmp_path / "none")
-
-
-# ------------------------------------------------------------------ log
+# ------------------------------------------------------------------ saved lines
 
 def _cands(roster, season, week=None):
     """The production path: roster_split, then candidates."""
@@ -291,106 +281,67 @@ LEG = dict(season=2026, week=6, game_id="2026_06_LA_SF", kickoff_utc="2026-10-12
            needed=19.1, usual=16.0, gap=3.1)
 
 
-def test_log_settle_and_summary(tmp_path):
-    path = tmp_path / "legs.jsonl"
-    leg = log.log_leg(LEG, path=path, now="2026-10-10T12:00:00+00:00")
-    log.log_leg({**LEG, "side": "under", "gap": -1.0}, path=path)
-    with pytest.raises(ValueError):
-        log.log_leg({k: v for k, v in LEG.items() if k != "needed"}, path=path)
-    pg = pd.DataFrame([{"game_id": "2026_06_LA_SF", "season": 2026, "week": 6, "team": "SF", "gsis_id": "00-2",
-                        "carries": 21, "rush_yds": 88.0, "targets": 3, "receptions": 2, "rec_yds": 10.0,
-                        "completions": 0, "pass_yds": 0.0}])
-    r = log.settle(2026, pg, ROSTER, ready=set(pg["game_id"]), path=path, lines_root=tmp_path / "none", archive_root=tmp_path / "none")
-    assert r["settled"] == 2 and len(r["unmatched"]) == 2          # no saved lines: reported, not hidden
-    assert log.settle(2026, pg, ROSTER, ready=set(pg["game_id"]), path=path, lines_root=tmp_path / "none",
-                      archive_root=tmp_path / "none")["settled"] == 0
-    legs = {x["side"]: x for x in log.read(path)}
-    assert legs["over"]["id"] == leg["id"] and legs["over"]["result"] == "won"
-    assert legs["over"]["actual_workload"] == 21 and legs["under"]["result"] == "lost"
-    rows = log.summary(2026, [0, 2, 4], path=path)
-    assert {(r["gap"], r["legs"], r["won"]) for r in rows} == {("2 to 4", 1, 1), ("0 or less", 1, 0)}
-    assert len(path.read_text(encoding="utf-8").splitlines()) == 4          # append only
+def _calc_rows(points_times, *, gsis="00-2", game="2026_06_LA_SF", mult=(1.8, 1.8)):
+    """parse()-shaped rows for capture.archive_rows."""
+    return [dict(captured_at_utc=t, gsis_id=gsis, matched_by="sleeper_id", sleeper_id="4034", name="C. McCaffrey",
+                 team="SF", position="RB", market="rush_yds", game_id=game, season=2026, week=6,
+                 kickoff_utc="2026-10-12T00:20:00+00:00", sleeper_game_id="202610601", updated_at_ms=7,
+                 line=l, mult_over=mult[0], mult_under=mult[1]) for l, t in points_times]
 
 
-def test_result_rules():
-    assert log.result("over", 64.5, 65) == "won" and log.result("under", 64.5, 65) == "lost"
-    assert log.result("over", 5, 5) == "push" and log.result("over", 5.5, None) == "no stats"
-    assert log.gap_group(0, [0, 2, 4]) == "0 or less" and log.gap_group(4.5, [0, 2, 4]) == "more than 4"
+def _write_archive(root, rows):
+    arch = root / "2026" / "line_archive_2026.jsonl"
+    arch.parent.mkdir(parents=True, exist_ok=True)
+    with arch.open("a", encoding="utf-8") as fh:
+        fh.write("".join(json.dumps(x) + "\n" for x in rows))
+    return arch
 
 
-def test_line_near_kickoff_prefers_own_capture_then_archive(tmp_path):
-    caps = tmp_path / "lines"
-    rows = [dict(captured_at_utc=t, gsis_id="00-2", team="SF", market="rush_yds", game_id="2026_06_LA_SF",
-                 sleeper_game_id="202610601",
-                 line=l, mult_over=1.8, mult_under=1.8) for t, l in
-            (("2026-10-11T20:00:00+00:00", 64.5), ("2026-10-11T23:50:00+00:00", 66.5),
-             ("2026-10-12T01:00:00+00:00", 70.5))]                              # last one is after kickoff
-    capture.append_jsonl(caps / "2026" / "lines_2026.jsonl", rows)
-    got = log.line_near_kickoff(LEG, ROSTER, lines_root=caps, archive_root=tmp_path / "none")
-    assert got["source"] == "own capture" and got["line"] == 66.5
+def test_line_near_kickoff_reads_calc_rows_by_id_and_engine_rows_by_name(tmp_path):
+    # calc's captures: joined by gsis id (the name on them differs), newest before kickoff wins
+    rows = _calc_rows([(64.5, "2026-10-11T20:00:00+00:00"), (66.5, "2026-10-11T23:50:00+00:00"),
+                       (70.5, "2026-10-12T01:00:00+00:00")], mult=(1.77, 1.95))     # last is after kickoff
+    _write_archive(tmp_path / "calc", capture.archive_rows(rows))
+    got = lines.line_near_kickoff(LEG, ROSTER, archive_root=tmp_path / "calc")
+    assert got["source"] == "your capture" and got["line"] == 66.5
+    assert (got["mult_over"], got["mult_under"]) == (1.77, 1.95)          # exact, not via rounded American odds
+    # an id row from another nflverse game is not his line for this one
+    other = capture.archive_rows(_calc_rows([(50.5, "2026-10-11T23:55:00+00:00")], game="2026_06_SF_LA"))
+    _write_archive(tmp_path / "calc", [dict(r, home_team="San Francisco 49ers", away_team="Los Angeles Rams")
+                                       for r in other])
+    assert lines.line_near_kickoff(LEG, ROSTER, archive_root=tmp_path / "calc")["line"] == 66.5
+    # an id row with the right id but another team's game is not his line either
+    assert lines.line_near_kickoff({**LEG, "team": "KC", "game_id": "2026_06_KC_SF"},
+                                   pd.concat([ROSTER, pd.DataFrame([{"season": 2026, "week": 5, "team": "KC",
+                                                                     "full_name": "X", "gsis_id": "x",
+                                                                     "status": "ACT", "position": "RB"}])]),
+                                   archive_root=tmp_path / "calc") is None
 
-    arch = tmp_path / "arch" / "2026" / "line_archive_2026.jsonl"
-    arch.parent.mkdir(parents=True)
     base = dict(bookmaker="sleeper", market="player_rush_yds", player="Christian McCaffrey", week=6,
                 commence_time="2026-10-12T00:20:00+00:00", home_team="San Francisco 49ers",
-                away_team="Los Angeles Rams")
-    lines = [dict(base, outcome=o, point=65.5, price_american=p, retrieved_at_utc="2026-10-11T22:00:00Z")
-             for o, p in (("Over", -125), ("Under", -105))]
-    lines += [dict(base, outcome="Over", point=66.5, price_american=-120, retrieved_at_utc="2026-10-11T23:00:00Z",
-                   player="Someone Else")]
-    arch.write_text("\n".join(json.dumps(x) for x in lines), encoding="utf-8")
-    got = log.line_near_kickoff(LEG, ROSTER, lines_root=tmp_path / "empty", archive_root=tmp_path / "arch")
-    assert got["source"] == "engine archive" and got["line"] == 65.5 and got["mult_over"] == pytest.approx(1.8)
+                away_team="Los Angeles Rams", snapshot_type="decision")
+    eng = [dict(base, outcome=o, point=65.5, price_american=p, retrieved_at_utc="2026-10-11T22:00:00Z")
+           for o, p in (("Over", -125), ("Under", -105))]
+    eng += [dict(base, outcome="Over", point=66.5, price_american=-120, retrieved_at_utc="2026-10-11T23:00:00Z",
+                 player="Someone Else")]
+    _write_archive(tmp_path / "arch", eng)
+    got = lines.line_near_kickoff(LEG, ROSTER, archive_root=tmp_path / "arch")
+    assert got["source"] == "the engine's capture" and got["line"] == 65.5
+    assert got["mult_over"] == pytest.approx(1.8)
     # same name and kickoff, but his team is not in that game: unmatched
-    assert log.line_near_kickoff({**LEG, "team": "KC", "game_id": "2026_06_KC_SF"},
-                                 pd.concat([ROSTER, pd.DataFrame([{"season": 2026, "week": 5, "team": "KC",
-                                                                   "full_name": "X", "gsis_id": "x",
-                                                                   "status": "ACT", "position": "RB"}])]),
-                                 lines_root=tmp_path / "empty", archive_root=tmp_path / "arch") is None
-    # a namesake in the same game: the archive cannot tell them apart, so unmatched
+    assert lines.line_near_kickoff({**LEG, "team": "KC", "game_id": "2026_06_KC_SF"},
+                                   pd.concat([ROSTER, pd.DataFrame([{"season": 2026, "week": 5, "team": "KC",
+                                                                     "full_name": "X", "gsis_id": "x",
+                                                                     "status": "ACT", "position": "RB"}])]),
+                                   archive_root=tmp_path / "arch") is None
+    # a namesake in the same game: name rows cannot tell them apart, so unmatched
     clash = pd.concat([ROSTER, pd.DataFrame([{"season": 2026, "week": 5, "team": "LA", "status": "ACT",
                                               "position": "RB", "full_name": "Christian McCaffrey",
                                               "gsis_id": "00-99"}])])
     with pytest.raises(Exception, match="found but refused"):    # the reason is reported, not "no line"
-        log.line_near_kickoff(LEG, clash, lines_root=tmp_path / "empty", archive_root=tmp_path / "arch")
-    # an own capture with the right id but another team is not his line either
-    assert log.line_near_kickoff({**LEG, "team": "KC"}, ROSTER, lines_root=caps, archive_root=tmp_path / "none") is None
-
-
-def test_settle_waits_for_the_game_and_handles_no_work_and_no_play(tmp_path):
-    path = tmp_path / "legs.jsonl"
-    log.log_leg({**LEG, "market": "receptions", "side": "under", "line": 2.5}, path=path)
-    log.log_leg({**LEG, "gsis_id": "00-9", "player": "Sat Out"}, path=path)
-    none = dict(lines_root=tmp_path / "none", archive_root=tmp_path / "none")
-    # Thursday's game is in, his Sunday game is not: nothing settles yet
-    thu = pd.DataFrame([{"game_id": "2026_06_X_Y", "season": 2026, "week": 6, "team": "X", "gsis_id": "00-7",
-                         "carries": 10, "rush_yds": 40.0, "targets": 0, "receptions": 0, "rec_yds": 0.0,
-                         "completions": 0, "pass_yds": 0.0}])
-    assert log.settle(2026, thu, ROSTER, ready=set(thu["game_id"]), path=path, **none)["settled"] == 0
-    # his game is in: he played with no targets (a zero row from snaps); the other back did not play
-    snaps = pd.DataFrame([{"game_id": "2026_06_LA_SF", "season": 2026, "week": 6, "team": "SF", "gsis_id": "00-2"}])
-    sf = thu.assign(game_id="2026_06_LA_SF", gsis_id="00-8", team="LA")     # the game's plays are loaded
-    games = pd.concat([thu, data.games_played(sf, snaps)], ignore_index=True)
-    assert log.settle(2026, games, ROSTER, ready=set(games["game_id"]), path=path, **none)["settled"] == 2
-    legs = {x["gsis_id"]: x for x in log.read(path)}
-    assert legs["00-2"]["result"] == "won" and legs["00-2"]["actual_workload"] == 0
-    assert legs["00-9"]["result"] == "did not play"
-
-
-def test_summary_survives_an_out_of_reach_leg(tmp_path):
-    path = tmp_path / "legs.jsonl"
-    log.log_leg({**LEG, "needed": None, "gap": None}, path=path)
-    pg = pd.DataFrame([{"game_id": "2026_06_LA_SF", "season": 2026, "week": 6, "team": "SF", "gsis_id": "00-2",
-                        "carries": 30, "rush_yds": 150.0, "targets": 0, "receptions": 0, "rec_yds": 0.0,
-                        "completions": 0, "pass_yds": 0.0}])
-    log.settle(2026, pg, ROSTER, ready=set(pg["game_id"]), path=path, lines_root=tmp_path / "n", archive_root=tmp_path / "n")
-    rows = log.summary(2026, [0, 2, 4], path=path)
-    assert rows[0]["gap"] == "no gap (logged without a status)" and rows[0]["needed"] is None and rows[0]["actual"] == 30
-    log.log_leg({**LEG, "side": "under", "needed": None, "gap": None, "needed_status": "high"}, path=path)
-    log.log_leg({**LEG, "needed": None, "gap": None, "needed_status": "high"}, path=path)
-    log.settle(2026, pg, ROSTER, ready=set(pg["game_id"]), path=path, lines_root=tmp_path / "n", archive_root=tmp_path / "n")
-    groups = {r["gap"] for r in log.summary(2026, [0, 2, 4], path=path)}
-    assert {"Under wins at any workload", "out of reach"} <= groups
+        lines.line_near_kickoff(LEG, clash, archive_root=tmp_path / "arch")
+    # ... while calc's id rows are not refused for a namesake
+    assert lines.line_near_kickoff(LEG, clash, archive_root=tmp_path / "calc")["line"] == 66.5
 
 
 def test_played_maps_snaps_to_gsis_and_skips_zero_snaps():
@@ -411,7 +362,7 @@ def test_namesakes_are_skill_players_still_on_the_team():
          "position": "DB", "status": "DEV"},                                  # a practice-squad DB: no namesake
         {"season": 2026, "week": 1, "team": "LA", "full_name": "Christian McCaffrey", "gsis_id": "cut",
          "position": "RB", "status": "CUT"}])                                 # cut in week 1: not on the team
-    assert not log.name_clash(LEG, roster)
+    assert not lines.name_clash(LEG, roster)
     assert {c["gsis_id"] for c in _cands(roster, 2026, 5)} == {"00-2", "db"}
 
 
@@ -423,26 +374,6 @@ def test_a_player_off_his_teams_latest_roster_is_not_on_it():
     assert got == {"s": "NYG", "k": "KC"}          # g left NYG's roster without a CUT row; KC kept through its bye
 
 
-def test_settle_reports_a_leg_it_cannot_check_and_settles_the_rest(tmp_path):
-    path = tmp_path / "legs.jsonl"
-    log.log_leg(LEG, path=path)
-    log.log_leg({**LEG, "game_id": "2026_06_NYJ_NE", "team": "NE", "gsis_id": "00-7", "player": "Other"}, path=path)
-    arch = tmp_path / "arch" / "2026" / "line_archive_2026.jsonl"
-    arch.parent.mkdir(parents=True)
-    arch.write_text("\n".join(json.dumps({"bookmaker": "sleeper", "market": "player_rush_yds", "player": "Other",
-                                           "week": 6, "commence_time": "2026-10-12T00:20:00+00:00", "outcome": o,
-                                           "point": 50.5, "price_american": -120,
-                                           "retrieved_at_utc": "2026-10-11T20:00:00Z",
-                                           "home_team": "New England Patriots", "away_team": "New York Jets"})
-                              for o in ("Over", "Under")), encoding="utf-8")
-    pg = pd.DataFrame([dict(game_id=g, season=2026, week=6, team=t, gsis_id=i, carries=10, rush_yds=70.0,
-                            targets=0, receptions=0, rec_yds=0.0, completions=0, pass_yds=0.0)
-                       for g, t, i in (("2026_06_LA_SF", "SF", "00-2"), ("2026_06_NYJ_NE", "NE", "00-7"))])
-    r = log.settle(2026, pg, ROSTER, ready=set(pg["game_id"]), path=path, lines_root=tmp_path / "none", archive_root=tmp_path / "arch")
-    assert r["settled"] == 2                                   # NYJ/NE have no roster: reported, not fatal
-    assert any("Other" in u and "no 2026 roster" in u for u in r["unmatched"])
-
-
 def test_malformed_archive_rows_fail_loudly(tmp_path):
     arch = tmp_path / "arch" / "2026" / "line_archive_2026.jsonl"
     arch.parent.mkdir(parents=True)
@@ -450,31 +381,12 @@ def test_malformed_archive_rows_fail_loudly(tmp_path):
              "home_team": "San Francisco 49ers", "away_team": "Los Angeles Rams", "commence_time": "not a time", "retrieved_at_utc": "x"} for w in (6, 3)]
     arch.write_text(json.dumps(rows[0]), encoding="utf-8")
     with pytest.raises(Exception, match="not a readable time"):
-        log.line_near_kickoff(LEG, ROSTER, lines_root=tmp_path / "none", archive_root=tmp_path / "arch")
+        lines.line_near_kickoff(LEG, ROSTER, archive_root=tmp_path / "arch")
     arch.write_text(json.dumps(rows[1]), encoding="utf-8")                   # another week's bad row
-    assert log.line_near_kickoff(LEG, ROSTER, lines_root=tmp_path / "none", archive_root=tmp_path / "arch") is None
+    assert lines.line_near_kickoff(LEG, ROSTER, archive_root=tmp_path / "arch") is None
     arch.write_text(json.dumps({**rows[0], "commence_time": None, "retrieved_at_utc": None}), encoding="utf-8")
     with pytest.raises(Exception, match="not a readable time|is empty"):
-        log.line_near_kickoff(LEG, ROSTER, lines_root=tmp_path / "none", archive_root=tmp_path / "arch")
-
-
-def test_a_missing_line_near_kickoff_is_filled_in_on_a_later_settle(tmp_path):
-    path = tmp_path / "legs.jsonl"
-    log.log_leg(LEG, path=path)
-    pg = pd.DataFrame([{"game_id": "2026_06_LA_SF", "season": 2026, "week": 6, "team": "SF", "gsis_id": "00-2",
-                        "carries": 21, "rush_yds": 88.0, "targets": 0, "receptions": 0, "rec_yds": 0.0,
-                        "completions": 0, "pass_yds": 0.0}])
-    caps = tmp_path / "lines"
-    r = log.settle(2026, pg, ROSTER, ready=set(pg["game_id"]), path=path, lines_root=caps, archive_root=tmp_path / "none")
-    assert r["settled"] == 1 and log.read(path)[0]["kickoff_line"] is None
-    r = log.settle(2026, pg, ROSTER, ready=set(pg["game_id"]), path=path, lines_root=caps, archive_root=tmp_path / "none")
-    assert r["settled"] == 0 and r["unmatched"] == [] and len(r["still_missing"]) == 1   # not re-reported as new
-    capture.append_jsonl(caps / "2026" / "lines_2026.jsonl", [dict(
-        captured_at_utc="2026-10-11T20:00:00+00:00", gsis_id="00-2", team="SF", market="rush_yds",
-        game_id="2026_06_LA_SF", sleeper_game_id="202610601", line=64.5, mult_over=1.8, mult_under=1.8)])
-    r = log.settle(2026, pg, ROSTER, ready=set(pg["game_id"]), path=path, lines_root=caps, archive_root=tmp_path / "none")
-    leg = log.read(path)[0]
-    assert r["settled"] == 0 and r["filled"] == 1 and leg["kickoff_line"]["line"] == 64.5 and leg["result"] == "won"
+        lines.line_near_kickoff(LEG, ROSTER, archive_root=tmp_path / "arch")
 
 
 def test_one_stale_row_does_not_unmatch_its_whole_game():
@@ -509,7 +421,7 @@ def test_traded_players_and_unlisted_namesakes():
         {"season": 2026, "week": 5, "team": "LA", "full_name": "Christian McCaffrey", "gsis_id": None,
          "position": "RB", "status": "DEV"}])
     assert "t" not in {c["gsis_id"] for c in _cands(roster, 2026, 5)}
-    assert log.name_clash(LEG, roster)          # the same name with no gsis id is still someone else
+    assert lines.name_clash(LEG, roster)          # the same name with no gsis id is still someone else
 
 
 def test_saved_rows_without_a_time_zone_or_not_objects_fail_loudly(tmp_path):
@@ -519,27 +431,10 @@ def test_saved_rows_without_a_time_zone_or_not_objects_fail_loudly(tmp_path):
            "home_team": "San Francisco 49ers", "away_team": "Los Angeles Rams", "commence_time": "2026-10-12T00:20:00+00:00", "retrieved_at_utc": "2026-10-11T22:00:00"}
     arch.write_text(json.dumps(row), encoding="utf-8")
     with pytest.raises(Exception, match="no time zone"):
-        log.line_near_kickoff(LEG, ROSTER, lines_root=tmp_path / "none", archive_root=tmp_path / "arch")
+        lines.line_near_kickoff(LEG, ROSTER, archive_root=tmp_path / "arch")
     arch.write_text("[1, 2]\n", encoding="utf-8")
     with pytest.raises(Exception, match="not a JSON object"):
-        log.line_near_kickoff(LEG, ROSTER, lines_root=tmp_path / "none", archive_root=tmp_path / "arch")
-
-
-def test_a_redo_keeps_the_first_result(tmp_path):
-    path = tmp_path / "legs.jsonl"
-    log.log_leg(LEG, path=path)
-    pg = pd.DataFrame([{"game_id": "2026_06_LA_SF", "season": 2026, "week": 6, "team": "SF", "gsis_id": "00-2",
-                        "carries": 21, "rush_yds": 88.0, "targets": 0, "receptions": 0, "rec_yds": 0.0,
-                        "completions": 0, "pass_yds": 0.0}])
-    caps = tmp_path / "lines"
-    log.settle(2026, pg, ROSTER, ready=set(pg["game_id"]), path=path, lines_root=caps, archive_root=tmp_path / "none")
-    capture.append_jsonl(caps / "2026" / "lines_2026.jsonl", [dict(
-        captured_at_utc="2026-10-11T20:00:00+00:00", gsis_id="00-2", team="SF", market="rush_yds",
-        game_id="2026_06_LA_SF", sleeper_game_id="202610601", line=64.5, mult_over=1.8, mult_under=1.8)])
-    corrected = pg.assign(rush_yds=40.0)                    # the stats changed after the first settle
-    log.settle(2026, corrected, ROSTER, ready=set(corrected["game_id"]), path=path, lines_root=caps, archive_root=tmp_path / "none")
-    leg = log.read(path)[0]
-    assert leg["result"] == "won" and leg["actual"] == 88.0 and leg["kickoff_line"]["line"] == 64.5
+        lines.line_near_kickoff(LEG, ROSTER, archive_root=tmp_path / "arch")
 
 
 def test_a_departed_listing_never_hides_an_active_one():  # noqa: D103
@@ -558,40 +453,24 @@ def test_rosters_without_a_status_column_fail_loudly():
                                               "gsis_id": "p"}]), 2026, 5)
 
 
-def test_unreadable_own_captures_fall_back_to_the_archive_with_a_note(tmp_path):
-    caps = tmp_path / "lines" / "2026" / "lines_2026.jsonl"
-    caps.parent.mkdir(parents=True)
-    caps.write_text('{"captured_at_utc": "2026-10-11T20:00:00+00:00", "gsis_id": "00-2"', encoding="utf-8")  # cut off
-    arch = tmp_path / "arch" / "2026" / "line_archive_2026.jsonl"
-    arch.parent.mkdir(parents=True)
-    base = dict(bookmaker="sleeper", market="player_rush_yds", player="Christian McCaffrey", week=6, point=65.5,
-                commence_time="2026-10-12T00:20:00+00:00", retrieved_at_utc="2026-10-11T22:00:00Z",
-                home_team="San Francisco 49ers", away_team="Los Angeles Rams")
-    arch.write_text("\n".join(json.dumps(dict(base, outcome=o, price_american=p))
-                              for o, p in (("Over", -125), ("Under", -105))), encoding="utf-8")
-    got = log.line_near_kickoff(LEG, ROSTER, lines_root=tmp_path / "lines", archive_root=tmp_path / "arch")
-    assert got["source"] == "engine archive" and "own captures not used" in got["note"]
-
-
 def test_bad_saved_prices_and_weeks_fail_as_data_errors(tmp_path):
     from props.calc.checks import DataError
-    caps = tmp_path / "lines"
-    capture.append_jsonl(caps / "2026" / "lines_2026.jsonl", [dict(
-        captured_at_utc="2026-10-11T20:00:00+00:00", gsis_id="00-2", team="SF", market="rush_yds",
-        game_id="2026_06_LA_SF", sleeper_game_id="202610601", line=64.5, mult_over=1.0, mult_under=1.8)])
+    bad = [dict(r, multiplier=1.0) if r["outcome"] == "Over" else r
+           for r in capture.archive_rows(_calc_rows([(64.5, "2026-10-11T20:00:00+00:00")]))]
+    _write_archive(tmp_path / "calc", bad)
     with pytest.raises(DataError, match="payout multiplier"):
-        log.line_near_kickoff(LEG, ROSTER, lines_root=caps, archive_root=tmp_path / "none")
+        lines.line_near_kickoff(LEG, ROSTER, archive_root=tmp_path / "calc")
     arch = tmp_path / "arch" / "2026" / "line_archive_2026.jsonl"
     arch.parent.mkdir(parents=True)
     arch.write_text(json.dumps({"bookmaker": "sleeper", "market": "player_rush_yds", "player": "Christian McCaffrey",
                                 "home_team": "San Francisco 49ers", "away_team": "Los Angeles Rams",
                                 "week": "6"}), encoding="utf-8")
     with pytest.raises(DataError, match="no usable week"):
-        log.line_near_kickoff(LEG, ROSTER, lines_root=tmp_path / "none", archive_root=tmp_path / "arch")
+        lines.line_near_kickoff(LEG, ROSTER, archive_root=tmp_path / "arch")
     arch.write_text(json.dumps({"bookmaker": "sleeper", "market": "player_rush_yds", "player": "Christian McCaffrey",
                                 "week": 6}), encoding="utf-8")
     with pytest.raises(DataError, match="names no teams"):
-        log.line_near_kickoff(LEG, ROSTER, lines_root=tmp_path / "none", archive_root=tmp_path / "arch")
+        lines.line_near_kickoff(LEG, ROSTER, archive_root=tmp_path / "arch")
 
 
 def test_a_player_on_two_teams_in_the_same_week_is_set_aside_not_guessed():
@@ -605,29 +484,19 @@ def test_a_player_on_two_teams_in_the_same_week_is_set_aside_not_guessed():
     # a namesake who is set aside still blocks a name-only archive line
     amb = pd.concat([roster, pd.DataFrame([{"season": 2026, "week": 5, "team": t, "full_name": "Christian McCaffrey",
                                             "gsis_id": "x", "status": "ACT", "position": "RB"} for t in ("LA", "KC")])])
-    assert log.name_clash(LEG, amb)
+    assert lines.name_clash(LEG, amb)
     # ...but not one on two other teams, or one who is not a skill player
     far = pd.concat([roster, pd.DataFrame([{"season": 2026, "week": 5, "team": t, "full_name": "Christian McCaffrey",
                                             "gsis_id": "x", "status": "ACT", "position": "RB"} for t in ("NYJ", "KC")])])
-    assert not log.name_clash(LEG, far)
+    assert not lines.name_clash(LEG, far)
     db = pd.concat([roster, pd.DataFrame([{"season": 2026, "week": 5, "team": t, "full_name": "Christian McCaffrey",
                                            "gsis_id": "x", "status": "ACT", "position": "DB"} for t in ("LA", "KC")])])
-    assert not log.name_clash(LEG, db)
+    assert not lines.name_clash(LEG, db)
 
 
 def test_a_game_id_without_two_teams_fails_loudly():
     with pytest.raises(Exception, match="does not name two teams"):
-        log.name_clash({**LEG, "game_id": "LA-SF"}, ROSTER)
-
-
-def test_one_bad_capture_row_does_not_hide_an_older_good_one(tmp_path):
-    caps = tmp_path / "lines"
-    good = dict(captured_at_utc="2026-10-11T20:00:00+00:00", gsis_id="00-2", team="SF", market="rush_yds",
-                game_id="2026_06_LA_SF", sleeper_game_id="202610601", line=64.5, mult_over=1.8, mult_under=1.8)
-    capture.append_jsonl(caps / "2026" / "lines_2026.jsonl",
-                         [good, {**good, "captured_at_utc": "2026-10-11T23:00:00+00:00", "mult_over": 1.0}])
-    got = log.line_near_kickoff(LEG, ROSTER, lines_root=caps, archive_root=tmp_path / "none")
-    assert got["at_utc"].startswith("2026-10-11T20") and "skipped 1 unreadable" in got["note"]
+        lines.name_clash({**LEG, "game_id": "LA-SF"}, ROSTER)
 
 
 def test_another_teams_namesake_with_a_bad_row_does_not_block_him(tmp_path):
@@ -639,7 +508,7 @@ def test_another_teams_namesake_with_a_bad_row_does_not_block_him(tmp_path):
     rows = [dict(base, outcome=o, price_american=p) for o, p in (("Over", -125), ("Under", -105))]
     rows.append(dict(base, home_team="New York Jets", away_team="New England Patriots", week="6", outcome="Over"))
     arch.write_text("\n".join(json.dumps(r) for r in rows), encoding="utf-8")
-    got = log.line_near_kickoff(LEG, ROSTER, lines_root=tmp_path / "none", archive_root=tmp_path / "arch")
+    got = lines.line_near_kickoff(LEG, ROSTER, archive_root=tmp_path / "arch")
     assert got["line"] == 65.5
 
 
@@ -653,7 +522,7 @@ def test_the_newest_archive_quote_is_chosen_by_time_not_text(tmp_path):
     for at, pt in (("2026-10-11T23:00:00+00:00", 66.5), ("2026-10-11T22:30:00Z", 65.5)):  # "+00:00" sorts after "Z"? no
         rows += [dict(base, retrieved_at_utc=at, point=pt, outcome=o, price_american=-115) for o in ("Over", "Under")]
     arch.write_text("\n".join(json.dumps(r) for r in rows), encoding="utf-8")
-    got = log.line_near_kickoff(LEG, ROSTER, lines_root=tmp_path / "none", archive_root=tmp_path / "arch")
+    got = lines.line_near_kickoff(LEG, ROSTER, archive_root=tmp_path / "arch")
     assert got["line"] == 66.5                        # 23:00 is later than 22:30, whatever the suffix
 
 
@@ -689,23 +558,11 @@ def test_archive_rows_with_an_id_join_by_it(tmp_path):
                                               "gsis_id": "00-99"}])])
     # his id on the rows: used even with a namesake in the game
     arch.write_text("\n".join(json.dumps(r) for r in _arch_rows(gsis_id="00-2")), encoding="utf-8")
-    got = log.line_near_kickoff(LEG, clash, lines_root=tmp_path / "none", archive_root=tmp_path / "arch")
+    got = lines.line_near_kickoff(LEG, clash, archive_root=tmp_path / "arch")
     assert got["line"] == 65.5
     # the same name but another player's id: never his line
     arch.write_text("\n".join(json.dumps(r) for r in _arch_rows(gsis_id="00-99")), encoding="utf-8")
-    assert log.line_near_kickoff(LEG, ROSTER, lines_root=tmp_path / "none", archive_root=tmp_path / "arch") is None
-
-
-def test_a_refused_own_capture_is_noted_when_the_archive_is_used(tmp_path):
-    caps = tmp_path / "lines"
-    capture.append_jsonl(caps / "2026" / "lines_2026.jsonl", [dict(
-        captured_at_utc="2026-10-11T23:00:00+00:00", gsis_id="00-2", team="SF", market="rush_yds",
-        game_id="2026_06_LA_SF", sleeper_game_id="202610501", line=66.5, mult_over=1.8, mult_under=1.8)])
-    arch = tmp_path / "arch" / "2026" / "line_archive_2026.jsonl"
-    arch.parent.mkdir(parents=True)
-    arch.write_text("\n".join(json.dumps(r) for r in _arch_rows()), encoding="utf-8")
-    got = log.line_near_kickoff(LEG, ROSTER, lines_root=caps, archive_root=tmp_path / "arch")
-    assert got["source"] == "engine archive" and "refused 1 own captures" in got["note"]
+    assert lines.line_near_kickoff(LEG, ROSTER, archive_root=tmp_path / "arch") is None
 
 
 def test_another_weeks_or_teams_broken_row_does_not_block_him(tmp_path):
@@ -714,7 +571,7 @@ def test_another_weeks_or_teams_broken_row_does_not_block_him(tmp_path):
     broken = [dict(_arch_rows()[0], week=3, home_team=None),                       # week 3, no teams
               dict(_arch_rows()[0], week=None, home_team="New York Jets", away_team="New England Patriots")]
     arch.write_text("\n".join(json.dumps(r) for r in _arch_rows() + broken), encoding="utf-8")
-    got = log.line_near_kickoff(LEG, ROSTER, lines_root=tmp_path / "none", archive_root=tmp_path / "arch")
+    got = lines.line_near_kickoff(LEG, ROSTER, archive_root=tmp_path / "arch")
     assert got["line"] == 65.5
 
 
@@ -723,14 +580,14 @@ def test_a_newer_one_sided_snapshot_is_passed_over_and_noted(tmp_path):
     arch.parent.mkdir(parents=True)
     rows = _arch_rows() + [dict(_arch_rows()[0], retrieved_at_utc="2026-10-11T23:30:00Z", point=67.5)]
     arch.write_text("\n".join(json.dumps(r) for r in rows), encoding="utf-8")
-    got = log.line_near_kickoff(LEG, ROSTER, lines_root=tmp_path / "none", archive_root=tmp_path / "arch")
+    got = lines.line_near_kickoff(LEG, ROSTER, archive_root=tmp_path / "arch")
     assert got["line"] == 65.5 and "passed over 1 newer" in got["note"]
 
 
 def test_a_saved_line_of_zero_fails_as_data():
     from props.calc.checks import DataError
     with pytest.raises(DataError, match="not above 0"):
-        log._line(0, "a captured line")
+        lines._line(0, "a captured line")
 
 
 def test_an_empty_roster_slice_is_handled_not_a_crash():
@@ -742,7 +599,7 @@ def test_an_empty_roster_slice_is_handled_not_a_crash():
 
 def test_a_leg_with_no_kickoff_time_fails_loudly(tmp_path):
     with pytest.raises(Exception, match="kickoff time"):
-        log.line_near_kickoff({**LEG, "kickoff_utc": None}, ROSTER, lines_root=tmp_path, archive_root=tmp_path)
+        lines.line_near_kickoff({**LEG, "kickoff_utc": None}, ROSTER, archive_root=tmp_path)
 
 
 def test_capture_skips_a_malformed_option_and_keeps_the_rest():
@@ -768,7 +625,7 @@ def test_a_bad_newest_archive_snapshot_does_not_hide_an_older_good_one(tmp_path)
     arch.parent.mkdir(parents=True)
     newer = [dict(r, retrieved_at_utc="2026-10-11T23:00:00Z", price_american=None) for r in _arch_rows()]
     arch.write_text("\n".join(json.dumps(r) for r in _arch_rows() + newer), encoding="utf-8")
-    got = log.line_near_kickoff(LEG, ROSTER, lines_root=tmp_path / "none", archive_root=tmp_path / "arch")
+    got = lines.line_near_kickoff(LEG, ROSTER, archive_root=tmp_path / "arch")
     assert got["line"] == 65.5 and "skipped 1 unreadable archive" in got["note"]
 
 
@@ -777,21 +634,7 @@ def test_only_one_sided_archive_quotes_are_reported_not_hidden(tmp_path):
     arch.parent.mkdir(parents=True)
     arch.write_text(json.dumps(_arch_rows()[0]), encoding="utf-8")
     with pytest.raises(Exception, match="one-sided or split"):
-        log.line_near_kickoff(LEG, ROSTER, lines_root=tmp_path / "none", archive_root=tmp_path / "arch")
-
-
-def test_settle_uses_the_games_kickoff_now(tmp_path):
-    path = tmp_path / "legs.jsonl"
-    log.log_leg({**LEG, "kickoff_utc": "2026-10-11T17:00:00+00:00"}, path=path)     # logged before a flex
-    arch = tmp_path / "arch" / "2026" / "line_archive_2026.jsonl"
-    arch.parent.mkdir(parents=True)
-    arch.write_text("\n".join(json.dumps(r) for r in _arch_rows()), encoding="utf-8")   # kickoff 00:20Z
-    pg = pd.DataFrame([{"game_id": "2026_06_LA_SF", "season": 2026, "week": 6, "team": "SF", "gsis_id": "00-2",
-                        "carries": 21, "rush_yds": 88.0, "targets": 0, "receptions": 0, "rec_yds": 0.0,
-                        "completions": 0, "pass_yds": 0.0}])
-    log.settle(2026, pg, ROSTER, ready=set(pg["game_id"]), path=path, lines_root=tmp_path / "none", archive_root=tmp_path / "arch",
-               kickoffs={"2026_06_LA_SF": "2026-10-12T00:20:00+00:00"})
-    assert log.read(path)[0]["kickoff_line"]["line"] == 65.5
+        lines.line_near_kickoff(LEG, ROSTER, archive_root=tmp_path / "arch")
 
 
 def test_a_full_name_never_falls_back_to_a_teammates_initial():
@@ -810,54 +653,18 @@ def test_capture_misses_a_set_aside_player_instead_of_guessing():
     assert rows[0]["gsis_id"] is None and "two teams" in misses[0]["reason"]
 
 
-def test_settle_skips_the_lookup_for_void_legs_and_fills_merge(tmp_path):
-    path = tmp_path / "legs.jsonl"
-    log.log_leg({**LEG, "gsis_id": "00-9", "player": "Sat Out"}, path=path)          # did not play: void
-    log.log_leg(LEG, path=path)
-    pg = pd.DataFrame([{"game_id": "2026_06_LA_SF", "season": 2026, "week": 6, "team": "SF", "gsis_id": "00-2",
-                        "carries": 21, "rush_yds": 88.0, "targets": 0, "receptions": 0, "rec_yds": 0.0,
-                        "completions": 0, "pass_yds": 0.0}])
-    caps = tmp_path / "lines"
-    r = log.settle(2026, pg, ROSTER, ready=set(pg["game_id"]), path=path, lines_root=caps, archive_root=tmp_path / "none",
-                   kickoffs={"2026_06_LA_SF": None})                 # a blank schedule kickoff is ignored
-    assert r["settled"] == 2 and [u.split(" ")[1] for u in r["unmatched"]] == ["(Christian"]   # void leg not listed
-    first = {x["gsis_id"]: x for x in log.read(path)}["00-2"]["settled_at_utc"]
-    capture.append_jsonl(caps / "2026" / "lines_2026.jsonl", [dict(
-        captured_at_utc="2026-10-11T20:00:00+00:00", gsis_id="00-2", team="SF", market="rush_yds",
-        game_id="2026_06_LA_SF", sleeper_game_id="202610601", line=64.5, mult_over=1.8, mult_under=1.8)])
-    log.settle(2026, pg, ROSTER, ready=set(pg["game_id"]), path=path, lines_root=caps, archive_root=tmp_path / "none")
-    leg = {x["gsis_id"]: x for x in log.read(path)}["00-2"]
-    assert leg["settled_at_utc"] == first and leg["kickoff_line"]["line"] == 64.5 and "filled_at_utc" in leg
-
-
 def test_an_unreadable_file_is_read_once_per_run(tmp_path, monkeypatch):
-    caps = tmp_path / "lines" / "2026" / "lines_2026.jsonl"
+    caps = tmp_path / "arch" / "2026" / "line_archive_2026.jsonl"
     caps.parent.mkdir(parents=True)
     caps.write_text("{not json", encoding="utf-8")
     calls = []
-    real = log._rows
-    monkeypatch.setattr(log, "_rows", lambda p: calls.append(p) or real(p))
-    lookup = log.LineLookup(ROSTER, lines_root=tmp_path / "lines", archive_root=tmp_path / "none")
+    real = lines._rows
+    monkeypatch.setattr(lines, "_rows", lambda p: calls.append(p) or real(p))
+    lookup = lines.LineLookup(ROSTER, archive_root=tmp_path / "arch")
     for _ in range(3):
         with pytest.raises(Exception, match="not valid JSON"):
             lookup.find(LEG)
     assert calls.count(caps) == 1
-
-
-def test_did_not_play_is_rechecked_when_his_snaps_arrive(tmp_path):
-    path = tmp_path / "legs.jsonl"
-    log.log_leg({**LEG, "market": "receptions", "side": "under", "line": 2.5}, path=path)
-    thu = pd.DataFrame([{"game_id": "2026_06_LA_SF", "season": 2026, "week": 6, "team": "LA", "gsis_id": "00-4",
-                         "carries": 0, "rush_yds": 0.0, "targets": 9, "receptions": 7, "rec_yds": 80.0,
-                         "completions": 0, "pass_yds": 0.0}])
-    none = dict(lines_root=tmp_path / "none", archive_root=tmp_path / "none")
-    log.settle(2026, thu, ROSTER, ready=set(thu["game_id"]), path=path, **none)                       # his snaps not loaded yet
-    assert log.read(path)[0]["result"] == "did not play"
-    snaps = pd.DataFrame([{"game_id": "2026_06_LA_SF", "season": 2026, "week": 6, "team": "SF", "gsis_id": "00-2"}])
-    later = data.games_played(thu, snaps)                                  # now: he played, no targets
-    r = log.settle(2026, later, ROSTER, ready=set(later["game_id"]), path=path, **none)
-    leg = log.read(path)[0]
-    assert r["settled"] == 1 and leg["result"] == "won" and leg["actual_workload"] == 0
 
 
 def test_capture_checks_an_abbreviated_name_against_set_aside_players():
@@ -878,23 +685,11 @@ def test_an_unknown_team_name_in_the_archive_fails_loudly(tmp_path):
     # his own team misspelled: it could be his game, so it fails loudly
     arch.write_text("\n".join(json.dumps(dict(r, home_team="SF 49ers")) for r in _arch_rows()), encoding="utf-8")
     with pytest.raises(Exception, match="does not know"):
-        log.line_near_kickoff(LEG, ROSTER, lines_root=tmp_path / "none", archive_root=tmp_path / "arch")
+        lines.line_near_kickoff(LEG, ROSTER, archive_root=tmp_path / "arch")
     # his team spelled right and only the opponent odd: still his game
     arch.write_text("\n".join(json.dumps(dict(r, away_team="LA Rams")) for r in _arch_rows()), encoding="utf-8")
-    got = log.line_near_kickoff(LEG, ROSTER, lines_root=tmp_path / "none", archive_root=tmp_path / "arch")
+    got = lines.line_near_kickoff(LEG, ROSTER, archive_root=tmp_path / "arch")
     assert got["line"] == 65.5
-
-
-def test_settle_waits_for_the_plays_and_a_final_score(tmp_path):
-    path = tmp_path / "legs.jsonl"
-    log.log_leg(LEG, path=path)
-    snaps_only = data.games_played(pd.DataFrame(columns=["game_id", "season", "week", "team", "gsis_id", "carries",
-                                                         "rush_yds", "targets", "receptions", "rec_yds",
-                                                         "completions", "pass_yds"]),
-                                   pd.DataFrame([{"game_id": "2026_06_LA_SF", "season": 2026, "week": 6,
-                                                  "team": "SF", "gsis_id": "00-2"}]))
-    r = log.settle(2026, snaps_only, ROSTER, ready=set(), path=path, lines_root=tmp_path, archive_root=tmp_path)
-    assert r["settled"] == 0 and "result" not in log.read(path)[0]          # no play-by-play yet: not settled
 
 
 def test_numbers_in_saved_rows_must_be_numbers():
@@ -970,3 +765,78 @@ def test_unmapped_snap_rows_are_counted_not_dropped_silently():
                          for n, i, p in (("Cody White", "WhitCo05", "WR"), ("Big Guard", "GuarBi00", "G"))])
     out = data.played(snap, pd.DataFrame(columns=["pfr_id", "gsis_id"]))
     assert out.empty and out.attrs["unmapped"] == [("Cody White", "LV")]
+
+
+# ------------------------------------------------------------------ reuse: archive, journal, ESPN
+
+def test_archive_rows_use_the_engine_format_and_never_replace_its_rows(tmp_path, monkeypatch):
+    from props.calc.shared import persist
+    monkeypatch.setattr(persist, "RECORD_ROOT", tmp_path / "record")
+    rows = _calc_rows([(64.5, "2026-10-11T20:00:00+00:00")], mult=(1.78, 1.95))
+    rows.append(dict(rows[0], gsis_id=None))                     # unmatched: logged as a miss, never saved
+    out = capture.archive_rows(rows)
+    assert [r["outcome"] for r in out] == ["Over", "Under"]
+    o = out[0]
+    assert {k: o[k] for k in persist.LINE_KEY} == {
+        "season": 2026, "week": 6, "event_id": "sleeper_202610601", "bookmaker": "sleeper",
+        "market": "player_rush_yds", "player": "C. McCaffrey", "outcome": "Over", "point": 64.5,
+        "snapshot_type": "calc"}
+    assert o["commence_time"] == "2026-10-12T00:20:00+00:00" and o["retrieved_at_utc"] == "2026-10-11T20:00:00Z"
+    assert (o["home_team"], o["away_team"]) == ("San Francisco 49ers", "Los Angeles Rams")
+    assert o["multiplier"] == 1.78 and o["price_american"] == -128 and o["gsis_id"] == "00-2"
+    engine = dict(o, snapshot_type="decision", price_american=-140)
+    del engine["multiplier"], engine["gsis_id"]
+    persist.write_lines(2026, [engine])
+    w = persist.write_lines(2026, out)
+    assert w["added"] == 2 and w["replaced"] == 0                 # the engine's row at the same line is kept
+    assert persist.write_lines(2026, out)["replaced"] == 2         # a re-capture updates calc's own rows only
+
+
+def test_the_journal_grades_a_calc_leg_and_saves_his_workload(tmp_path, monkeypatch):
+    from props.calc.shared import journal, persist
+    monkeypatch.setattr(journal, "JOURNAL_ROOT", tmp_path / "journal")
+    monkeypatch.setattr(persist, "RECORD_ROOT", tmp_path / "record")
+    legs = [("Christian McCaffrey", "rush_yds", "over", 64.5, "SF"), ("Brock Purdy", "pass_yds", "under", 250.5, "SF")]
+    rows = journal.make_power_play(legs, stake=5, payout=15, angle="role", why="test", season=2026, week=6)
+    rows[0].update(volume_unit="carries", calc_bar=16.0)
+    rows[1].update(volume_unit="completions", calc_bar=22.0)
+    journal.write(2026, rows)
+    stats = pd.DataFrame([
+        {"week": 6, "team": "SF", "_name": "christian mccaffrey", "_loose": "c mccaffrey", "rushing_yards": 71.0,
+         "passing_yards": 0.0, "carries": 18},
+        {"week": 6, "team": "SF", "_name": "brock purdy", "_loose": "b purdy", "rushing_yards": 4.0,
+         "passing_yards": 231.0, "completions": 20}])
+    journal.grade(2026, stats=stats)
+    got = {r["player"]: r for r in journal.read(2026)}
+    cmc, purdy = got["Christian McCaffrey"], got["Brock Purdy"]
+    assert cmc["status"] == "graded" and cmc["won"] and cmc["actual"] == 71.0 and cmc["actual_volume"] == 18.0
+    assert purdy["won"] and purdy["actual_volume"] == 20.0 and cmc["calc_bar"] == 16.0     # card fields kept
+
+
+def test_espn_spread_and_total_are_read_as_core_status_reads_them():
+    from props.calc import game_lines
+    from props.calc.checks import DataError
+    sb = json.loads((Path(__file__).resolve().parents[1] / "tests" / "fixtures" / "report_dal_hou"
+                     / "espn_scoreboard_2026_wk04.json").read_text(encoding="utf-8"))
+    g = game_lines.parse(sb)
+    assert len(g) == 16
+    assert g[("IND", "WAS")] == {"kickoff_utc": "2026-10-04T13:30Z", "favorite": "IND", "points": 4.5,
+                                 "spread_text": "IND -4.5", "total": 46.5}                 # ESPN's WSH -> WAS
+    assert g[("PIT", "CLE")]["favorite"] is None and g[("PIT", "CLE")]["total"] is None    # final: odds removed
+
+    def one(details):
+        return {"events": [{"date": "x", "competitions": [{"competitors": [
+            {"homeAway": "home", "team": {"abbreviation": "LAR"}}, {"homeAway": "away", "team": {"abbreviation": "SF"}}],
+            "odds": [{"details": details, "overUnder": 47.5}]}]}]}
+    assert game_lines.parse(one("LAR -3"))[("SF", "LA")]["favorite"] == "LA"
+    assert game_lines.parse(one("EVEN"))[("SF", "LA")]["points"] is None
+    with pytest.raises(DataError, match="names neither team"):
+        game_lines.parse(one("KC -3"))
+    with pytest.raises(DataError, match="not in the form"):
+        game_lines.parse(one("SF +3"))
+
+
+def test_kickoffs_follow_the_tz_database_across_both_dst_changes():
+    assert data.kickoff_utc("2026-03-08", "13:00") == "2026-03-08T17:00:00+00:00"     # EDT from 2am that day
+    assert data.kickoff_utc("2026-11-01", "13:00") == "2026-11-01T18:00:00+00:00"     # EST from 2am that day
+    assert data.kickoff_utc("2026-10-31", "20:15") == "2026-11-01T00:15:00+00:00"

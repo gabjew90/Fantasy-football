@@ -2,12 +2,14 @@
 
   leg "Name" rush_yds     the leg card (rush_yds or receptions for now)
       [--team DEN] [--season 2026 --week 6] [--line 64.5 --over -125 --under -132]
-      [--target 58] [--log over|under]
-      Without --line, the latest saved quote before kickoff is used: your own
-      captures first, then the engine workflow's saved Sleeper lines.
-  capture                 save the current Sleeper lines (four markets)
-  settle --season 2026    add actual workloads and results to logged legs
-  summary --season 2026   needed vs actual workload, legs won vs break-even, by gap
+      [--target 58]
+      Without --line, the latest saved Sleeper quote before kickoff is used, from
+      the props record's line history (your captures and the engine's).
+  capture                 save the current Sleeper lines (four markets) into that history
+  entry --stake 5 --payout 50 --angle role --why "..." --leg "Name|rush_yds|over[|TEAM]" ...
+      log a Power Play in the props journal (props/journal.py), each leg's line
+      and card numbers filled in from its card. The journal grades it
+      (`python props/journal.py grade --season 2026`).
 """
 
 from __future__ import annotations
@@ -22,8 +24,10 @@ import pandas as pd
 from core import fetch as F
 from core.manifest import Manifest
 
-from . import capture, card, data, log, odds, player, settings
+from . import capture, card, lines, odds, player, settings
 from .checks import DataError, number
+from .markets import workload_col
+from .shared import journal
 
 
 def _utf8() -> None:
@@ -49,14 +53,15 @@ def main(argv: list[str] | None = None) -> int:
     lg.add_argument("--over", type=float, help="American odds for the Over")
     lg.add_argument("--under", type=float, help="American odds for the Under")
     lg.add_argument("--target", type=float, help="your target win rate in percent (default: break-even)")
-    lg.add_argument("--log", choices=["over", "under"], help="log this leg, on this side")
     sub.add_parser("capture")
-    for name in ("settle", "summary"):
-        sp = sub.add_parser(name)
-        sp.add_argument("--season", type=int, required=True)
-        if name == "settle":
-            sp.add_argument("--list-missing", action="store_true",
-                            help="list every leg settled earlier that still has no line near kickoff")
+    en = sub.add_parser("entry", help="log a Power Play in the props journal, legs filled in from their cards")
+    en.add_argument("--stake", type=float, required=True, help="dollars staked on the entry")
+    en.add_argument("--payout", type=float, required=True, help="the TOTAL the entry pays if every leg wins")
+    en.add_argument("--angle", required=True, choices=list(journal.ANGLES), help="the entry's story")
+    en.add_argument("--why", required=True, help="the entry's reason in one line")
+    en.add_argument("--leg", action="append", required=True, help="'Name|market|over or under[|TEAM]', repeatable")
+    en.add_argument("--season", type=int)
+    en.add_argument("--week", type=int)
     a = ap.parse_args(argv)
 
     try:
@@ -72,60 +77,20 @@ def run(a) -> int:
         return 0
     if a.cmd == "capture":
         r = capture.run()
-        print(f"Saved {r['rows']} lines captured at {r['captured_at_utc']} to {r['path']}.")
+        print(f"Saved {r['lines']} lines ({r['added']} new, {r['replaced']} updated) captured at "
+              f"{r['captured_at_utc']} to {', '.join(r['paths']) or 'nowhere (none matched)'}.")
         if r["stale"]:
             print(f"Warning: built on older copies of {', '.join(r['stale'])}; player and game matches may be "
                   f"out of date.")
         if r["misses"]:
-            print(f"{r['misses']} lines could not be matched to a player and game; see {capture.MISSES_PATH}.")
+            print(f"{r['misses']} lines could not be matched to a player and game and were not saved; see "
+                  f"{capture.MISSES_PATH}.")
         if r["skipped"]:
             print(f"{r['skipped']} lines were skipped on Sleeper's side (one side missing, split lines or bad "
                   f"prices); also listed there.")
         return 0
-    if a.cmd == "settle":
-        man = Manifest("props.calc settle")
-        roster = data.rosters(a.season, manifest=man)
-        plays = data.pbp(a.season, manifest=man)
-        pg = data.player_games(plays)
-        played = data.played(data.snaps(a.season, manifest=man), roster)
-        games = data.games_played(pg, played)
-        sched = data.schedule(manifest=man)
-        stale = [f"{e['name']} ({e['status']})" for e in man.stale()]
-        if stale:                          # results are written for good: never from a stale copy
-            raise DataError(f"inputs not refreshed: {', '.join(stale)}; nothing settled")
-        kickoffs = dict(zip(sched["game_id"], sched["kickoff_utc"]))
-        # a game is settled only when its play-by-play is complete: its last
-        # running score equals the schedule's final score
-        ready = data.complete_games(plays, sched)
-        unmapped = played.attrs["unmapped"]
-        r = log.settle(a.season, games, roster, ready=ready, kickoffs=kickoffs)
-        print(f"Settled {r['settled']} legs.")
-        if unmapped:
-            print(f"Note: {len(unmapped)} players' snaps could not be tied to a gsis id (e.g. {unmapped[0][0]}, "
-                  f"{unmapped[0][1]}); a leg on one of them settles as 'did not play' until the ids are fixed.")
-        if r["unmatched"]:
-            print(f"{len(r['unmatched'])} of them have no line near kickoff matched to the player, team and game "
-                  f"(left empty):")
-            for u in r["unmatched"]:
-                print(f"  {u}")
-        if r["filled"]:
-            print(f"Filled the missing line near kickoff for {r['filled']} legs settled earlier.")
-        if r["still_missing"]:
-            print(f"{len(r['still_missing'])} legs settled earlier still have no line near kickoff"
-                  + (":" if a.list_missing else " (--list-missing lists them)."))
-            for u in (r["still_missing"] if a.list_missing else []):
-                print(f"  {u}")
-        return 0
-    if a.cmd == "summary":
-        edges = settings.load()["fixed"]["gap_edges"]
-        rows = log.summary(a.season, edges)
-        if not rows:
-            print("No settled legs yet.")
-        for r in rows:
-            need = "n/a" if r["needed"] is None else f"{r['needed']:.1f}"
-            got = "n/a" if r["actual"] is None else f"{r['actual']:.1f}"
-            print(f"{r['market']}, gap {r['gap']}: {r['won']} of {r['legs']} won "
-                  f"(break-even {r['break_even']:.0%}); needed {need}, got {got} on average")
+    if a.cmd == "entry":
+        print(entry(a))
         return 0
     return 1
 
@@ -141,7 +106,8 @@ def _next_game(sched: pd.DataFrame, team: str, season: int, week: int | None) ->
     return g.sort_values("kickoff_utc").iloc[0]
 
 
-def leg(a) -> str:
+def _check_inputs(a) -> dict:
+    """Typed numbers validated once; returns the typed multipliers by side."""
     if a.target is not None and not 1 <= a.target <= 99:
         raise SystemExit(f"--target is a percent between 1 and 99 (e.g. 58); got {a.target}")
     if a.line is not None and (a.over is None or a.under is None):
@@ -164,33 +130,45 @@ def leg(a) -> str:
                                  f"multiplier (1.80x is -125); got {v}") from None
     if a.line is None and (a.over is not None or a.under is not None):
         raise SystemExit("--over and --under need --line (otherwise the saved quote's prices are used)")
-    s = settings.load()
-    tuned, fixed = s["tuned"], s["fixed"]
-    season = a.season or F.current_season()
-    man = Manifest("props.calc leg")
+    return typed
+
+
+def _bundle(season: int, fixed: dict) -> tuple:
+    man = Manifest("props.calc")
     b = player.Bundle(range(season - int(fixed["pool_seasons"]), season + 1), fixed, manifest=man)
     stale = [f"{e['name']} ({e['status']})" for e in man.stale()]
     warn = (f"WARNING: built on older copies of {', '.join(stale)} (a refresh failed); recent games may be "
             f"missing.\n" if stale else "")
+    return b, warn
+
+
+def build_card(b, name_in: str, market: str, *, team=None, season: int, week=None, line=None, typed=None,
+               target=None, lookup=None) -> dict:
+    """One leg's card and the numbers behind it. Keys: text, ready (a full
+    card with a line), by_initial, kicked_off, stub, line, mult_over,
+    mult_under, source, not_enough, c (card.compute's dict, or None)."""
+    s = settings.load()
+    tuned, fixed = s["tuned"], s["fixed"]
+    warn = ""
     by_initial = [False]
-    gsis, name, team = player.find_player(b, a.name, season, a.team, a.week, by_initial)
+    gsis, name, team = player.find_player(b, name_in, season, team, week, by_initial)
     if by_initial[0]:
-        warn += (f"NOTE: {a.name!r} was matched to {name} by first initial and surname; check this is the "
+        warn += (f"NOTE: {name_in!r} was matched to {name} by first initial and surname; check this is the "
                  f"player you meant.\n")
-    game = _next_game(b.schedule, team, season, a.week)
-    week = int(game["week"])
-    stub = {"season": season, "week": week, "game_id": game["game_id"], "kickoff_utc": game["kickoff_utc"],
-            "gsis_id": gsis, "player": name, "team": team, "market": a.market}
-    if a.market == "rush_yds" and b.position_at(gsis, season, week) == "QB":
+    game = _next_game(b.schedule, team, season, week)
+    wk = int(game["week"])
+    stub = {"season": season, "week": wk, "game_id": game["game_id"], "kickoff_utc": game["kickoff_utc"],
+            "gsis_id": gsis, "player": name, "team": team, "market": market}
+    if market == "rush_yds" and b.position_at(gsis, season, wk) == "QB":
         raise SystemExit("QB rushing is not a market in this tool (design note)")
-    pl = player.build(b, gsis, name, team, season, week, tuned, fixed, a.market)
-    line = mo = mu = None
-    if a.line is not None:
-        line, mo, mu = a.line, typed["over"], typed["under"]
+    pl = player.build(b, gsis, name, team, season, wk, tuned, fixed, market)
+    mo = mu = None
+    if line is not None:
+        mo, mu = typed["over"], typed["under"]
         source = "line typed in"
     else:
         try:
-            q = log.line_near_kickoff(stub, b.rosters)
+            q = (lookup or lines.LineLookup(b.rosters)).find(stub)
             if q:                                    # validated by the lookup: multipliers above 1
                 source = f"Sleeper quote from {q['source']}, {q['at_utc'][:16].replace('T', ' ')} UTC"
                 if q.get("note"):
@@ -198,31 +176,96 @@ def leg(a) -> str:
                 line, mo, mu = q["line"], q["mult_over"], q["mult_under"]
             else:
                 source = (f"Unmatched: no saved Sleeper quote belongs to {name} ({team}) in {game['game_id']} "
-                          f"for {a.market}; give --line --over --under")
+                          f"for {market}; give --line --over --under")
         except DataError as ex:                      # a bad saved row is reported; code errors are not caught
             source = f"Unmatched: {ex}; give --line --over --under"
-    if a.market in pl.not_enough:               # the data gap is the first thing to say, line or not
-        text = warn + card.render_not_enough(pl, a.market, line, mo, mu, source=source)
-        return text + ("\nNot logged: not enough data for this leg." if a.log else "")
+    kicked_off = pd.Timestamp(game["kickoff_utc"]) <= pd.Timestamp(dt.datetime.now(dt.timezone.utc))
+    out = {"by_initial": by_initial[0], "kicked_off": kicked_off, "stub": stub, "line": line, "mult_over": mo,
+           "mult_under": mu, "source": source, "c": None, "ready": False,
+           "not_enough": market in pl.not_enough}
+    if market in pl.not_enough:                 # the data gap is the first thing to say, line or not
+        return {**out, "text": warn + card.render_not_enough(pl, market, line, mo, mu, source=source)}
     if line is None:
-        raise SystemExit(source)
-    model = player.model(pl, a.market, tuned, fixed)
-    target = a.target / 100 if a.target is not None else None
-    c = card.compute(pl, model, a.market, line, mo, mu, fixed, target)
-    text = warn + card.render(pl, c, source=source)
-    if a.log and by_initial[0]:
-        return text + "\nNot logged: the name was matched by initial; run again with the name as shown."
-    if a.log and pd.Timestamp(game["kickoff_utc"]) <= pd.Timestamp(dt.datetime.now(dt.timezone.utc)):
-        return text + "\nNot logged: this game has already kicked off (a leg is logged before its game only)."
-    if a.log:
-        row = log.log_leg({**stub, "side": a.log, "line": line, "mult_over": mo, "mult_under": mu,
-                           "target_rate": c["target_over"] if a.log == "over" else c["target_under"],
-                           "book_expects": card.value(c, "book_expects"),
-                           "needed": card.value(c, f"needed_{a.log}"), "usual": c["usual"],
-                           "gap": c["gap_over"] if a.log == "over" else c["gap_under"],
-                           "needed_status": c["solutions"][f"needed_{a.log}"].status, "settings": tuned})
-        text += f"\nLogged as leg {row['id']} ({a.log})."
-    return text
+        return {**out, "text": warn + source}
+    model = player.model(pl, market, tuned, fixed)
+    c = card.compute(pl, model, market, line, mo, mu, fixed, target)
+    return {**out, "c": c, "ready": True, "settings": tuned, "text": warn + card.render(pl, c, source=source)}
+
+
+def leg(a) -> str:
+    typed = _check_inputs(a)
+    fixed = settings.load()["fixed"]
+    season = a.season or F.current_season()
+    b, warn = _bundle(season, fixed)
+    got = build_card(b, a.name, a.market, team=a.team, season=season, week=a.week, line=a.line, typed=typed,
+                     target=a.target / 100 if a.target is not None else None)
+    if got["line"] is None and not got["not_enough"]:
+        raise SystemExit(got["text"])          # no quote found and none typed: say why, no card
+    return warn + got["text"]
+
+
+def _parse_leg(spec: str) -> tuple:
+    parts = [x.strip() for x in spec.split("|")]
+    if len(parts) not in (3, 4) or not parts[0] or parts[2].lower() not in ("over", "under"):
+        raise SystemExit(f"leg {spec!r}: write it as 'Name|market|over or under[|TEAM]'")
+    if parts[1] not in ("rush_yds", "receptions"):
+        raise SystemExit(f"leg {spec!r}: market is rush_yds or receptions for now")
+    return parts[0], parts[1], parts[2].lower(), (parts[3] if len(parts) == 4 and parts[3] else None)
+
+
+def entry(a) -> str:
+    """Logs a Power Play through journal.make_power_play. Every leg needs a full
+    card from a saved quote before its kickoff and an exact name match; one leg
+    that falls short and nothing is logged. Each journal row then carries the
+    card's numbers (calc_*) and volume_unit, which journal.grade reads to save
+    his actual workload."""
+    legs = [_parse_leg(x) for x in a.leg]
+    fixed = settings.load()["fixed"]
+    season = a.season or F.current_season()
+    b, warn = _bundle(season, fixed)
+    lookup = lines.LineLookup(b.rosters)
+    cards, problems = [], []
+    for name_in, market, side, team in legs:
+        got = build_card(b, name_in, market, team=team, season=season, week=a.week, lookup=lookup)
+        who = f"{name_in} ({market})"
+        if got["by_initial"]:
+            problems.append(f"{who}: matched by initial; use the name as the card shows it")
+        elif not got["ready"]:
+            problems.append(f"{who}: no full card ({got['text'].splitlines()[-1]})")
+        elif got["kicked_off"]:
+            problems.append(f"{who}: the game has kicked off")
+        cards.append((side, got))
+    weeks = {g["stub"]["week"] for _, g in cards}
+    if len(weeks) > 1:
+        problems.append(f"the legs are in different weeks ({sorted(weeks)}); the journal logs one week per entry")
+    if problems:
+        return warn + "Not logged:\n" + "\n".join(f"  {p}" for p in problems)
+    week = weeks.pop()
+    jlegs = [(g["stub"]["player"], g["stub"]["market"], side, g["line"], g["stub"]["team"]) for side, g in cards]
+    try:
+        rows = journal.make_power_play(jlegs, stake=a.stake, payout=a.payout, angle=a.angle, why=a.why,
+                                       season=season, week=week)
+    except ValueError as ex:
+        return warn + f"Not logged: {ex}"
+    for r, (side, g) in zip(rows, cards):
+        r.update(journal_fields(side, g))
+    journal.write(season, journal.read(season) + rows)
+    text = "\n\n".join(g["text"] for _, g in cards)
+    return (warn + text + f"\n\nLogged entry {rows[0]['entry_id']}: {len(rows)} legs, ${a.stake:g} to "
+            f"${a.payout:g}, in {journal.journal_path(season)}.")
+
+
+def journal_fields(side: str, g: dict) -> dict:
+    """What a journal leg row carries from its card. volume_unit names the
+    stats column journal.grade copies into actual_volume."""
+    c, st = g["c"], g["stub"]
+    return {"volume_unit": workload_col(st["market"]), "gsis_id": st["gsis_id"], "game_id": st["game_id"],
+            "kickoff_utc": st["kickoff_utc"], "calc_line_source": g["source"],
+            "calc_mult_over": g["mult_over"], "calc_mult_under": g["mult_under"],
+            "calc_bar": card.value(c, f"needed_{side}"),
+            "calc_bar_status": c["solutions"][f"needed_{side}"].status,
+            "calc_target_rate": c[f"target_{side}"], "calc_line_implies": card.value(c, "book_expects"),
+            "calc_usual": c["usual"], "calc_gap": c[f"gap_{side}"], "calc_settings": g["settings"]}
 
 
 if __name__ == "__main__":

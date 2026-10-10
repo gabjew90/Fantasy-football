@@ -21,7 +21,7 @@ import pandas as pd
 from core import fetch as F
 
 from . import names
-from .checks import no_missing, require
+from .checks import DataError, no_missing, require
 
 PBP_COLS = [
     "game_id", "season", "week", "season_type", "posteam", "defteam", "home_team", "away_team",
@@ -89,17 +89,16 @@ def _id_str(x) -> str | None:
 
 # ------------------------------------------------------------------ time
 
-def _first_sunday(year: int, month: int) -> dt.date:
-    d = dt.date(year, month, 1)
-    return d + dt.timedelta(days=(6 - d.weekday()) % 7)
-
-
-def eastern_offset_hours(day: dt.date) -> int:
-    """US Eastern's UTC offset: -4 from the second Sunday of March to the first
-    Sunday of November, else -5. (No tz database needed on Windows.)"""
-    start = _first_sunday(day.year, 3) + dt.timedelta(days=7)
-    end = _first_sunday(day.year, 11)
-    return -4 if start <= day < end else -5
+def _eastern():
+    """US Eastern from the tz database (zoneinfo, as props/guard.py uses). No
+    hand-written fallback: without the database (Windows needs the tzdata
+    package from requirements.txt) every kickoff time would be wrong."""
+    try:
+        from zoneinfo import ZoneInfo
+        return ZoneInfo("America/New_York")
+    except Exception as ex:  # noqa: BLE001 -- ZoneInfoNotFoundError or a missing module
+        raise DataError(f"no time-zone database for America/New_York ({ex}); install tzdata "
+                        f"(pip install -r requirements.txt)") from ex
 
 
 def kickoff_utc(gameday: str, gametime: str) -> str | None:
@@ -109,8 +108,8 @@ def kickoff_utc(gameday: str, gametime: str) -> str | None:
         hh, mm = (int(x) for x in str(gametime).split(":")[:2])
     except (TypeError, ValueError):
         return None
-    local = dt.datetime(d.year, d.month, d.day, hh, mm)
-    return (local - dt.timedelta(hours=eastern_offset_hours(d))).replace(tzinfo=dt.timezone.utc).isoformat()
+    local = dt.datetime(d.year, d.month, d.day, hh, mm, tzinfo=_eastern())
+    return local.astimezone(dt.timezone.utc).isoformat()
 
 
 # ------------------------------------------------------------------ plays
