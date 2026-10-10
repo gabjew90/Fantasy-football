@@ -429,6 +429,9 @@ def build(b: Bundle, gsis: str, name: str, team: str, season: int, week: int,
             pl.rates["ypt"] = Rate(cr.blended * ypr, own_ypt, len(t_win), season_ypt, len(t_season), base_c * base_ypr)
             pl.rates["catch"] = cr
             pl.receiving = {"catch": cr.blended, "ypr": ypr, "mix": mix, "pooled_all_positions": pooled_all,
+                            # the blend's inputs, so the test harness can re-blend at another k_ypr
+                            "own_yards": float(caught_win["yards"].sum()), "own_catches": len(caught_win),
+                            "base_ypr": base_ypr,
                             "pools": tuple(yards_pool.get(x, np.zeros(1)) for x in BUCKETS)}   # a depth he never
             # catches at has share 0, so its pool (a placeholder when the position has none) is never drawn
     elif market == "pass_yds":

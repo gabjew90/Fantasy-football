@@ -65,3 +65,4 @@ reports/early_check.md
 # exports and scratch files made for the user, outside the repo's history
 exports/
 scratch_*
+props/calc/.cache/
