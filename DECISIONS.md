@@ -8688,3 +8688,20 @@ every row while the predictions rows carry open / decision / close (line_archive
   the same week -- caught by a hand check: Lamb's week 3 counted twice). Joined by player ID; rows
   settled before IDs were recorded (#224) join through the season's roster by name and team, never
   name alone. Captures skip it; an unreadable record shows no row. No price changes.
+
+## 2026-10-10 (231) -- chat fetches the release file by file when the tarball host refuses
+
+- **The failure (user, 2026-10-10):** Keefamania "failed to load" in chat. The bootstrap read the
+  lock (nfl-v1.69) from raw.githubusercontent.com, but codeload.github.com answered HTTP 403 for
+  the tarball, so chat ran the release bundled in the installed skill: nfl-v1.20 (built 09-28),
+  which predates the team-key fix (2026-10-07) and found the user's team by its old name, "Air
+  Raid Gabriel". The repo's config was already right; the failure was which copy ran.
+- **Causes:** process -- the installed skill's fallback was two weeks old (it is rebuilt only when
+  the user runs skill/build.py); code -- the bootstrap had one fetch route, through a host that
+  the 2026-09-17 plan already named as outside chat's documented allowlist.
+- **The fix:** when the tarball host refuses, the bootstrap fetches every file the lock names from
+  raw.githubusercontent.com (the host the lock already comes from), retries truncated reads,
+  refuses any path outside the release (drive paths included), and verifies the tree against the
+  lock as before; FETCH_ROUTE says so. Only both routes failing runs the bundled copy. Live-tested:
+  nfl-v1.69 fetched file by file, hash matching the lock. Takes effect when the user rebuilds and
+  reinstalls the skill, which also refreshes the bundled fallback to the current release.

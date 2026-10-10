@@ -155,6 +155,52 @@ def test_a_tampered_tarball_falls_back_loudly(tmp_path, online):
     assert info["release_tag"] is None and "does not match its stamp" in info["fallback_reason"]
 
 
+def test_a_refused_tarball_is_fetched_file_by_file_and_verified(tmp_path, online, monkeypatch):
+    """Chat's sandbox got HTTP 403 from codeload (2026-10-10) and ran a two-week-old release:
+    the lock's files now come one by one from raw.githubusercontent.com, held to the lock."""
+    import urllib.error
+    lock, _served = online
+    asked = []
+
+    def get(url, timeout=0):
+        asked.append(url)
+        if "codeload.github.com" in url:
+            raise urllib.error.HTTPError(url, 403, "Forbidden", None, None)
+        rel = url.split("/nfl-v9/", 1)[1]
+        return RELEASE[rel]
+    monkeypatch.setattr(B, "_get", get)
+    info = B.resolve(tmp_path / "dest")
+    assert info["release_source"] == "fetched" and info["release_hash"] == lock["sha256"]
+    assert info["fetch_route"].startswith("file by file") and "403" in info["fetch_route"]
+    assert sum("raw.githubusercontent.com" in u for u in asked) == len(RELEASE)
+
+
+def test_a_bad_file_on_the_raw_route_still_falls_back_loudly(tmp_path, online, monkeypatch):
+    import urllib.error
+    lock, _served = online
+
+    def get(url, timeout=0):
+        if "codeload.github.com" in url:
+            raise urllib.error.HTTPError(url, 403, "Forbidden", None, None)
+        rel = url.split("/nfl-v9/", 1)[1]
+        return b"x = 666\n" if rel == "core/fetch.py" else RELEASE[rel]
+    monkeypatch.setattr(B, "_get", get)
+    v = tmp_path / "vendor"
+    v.mkdir()
+    (v / "release.tar.gz").write_bytes(_tarball(RELEASE, prefix="release/"))
+    (v / "RELEASE_STAMP.json").write_text(json.dumps({"tag": "nfl-v8", "sha256": lock["sha256"]}), encoding="utf-8")
+    info = B.resolve(tmp_path / "dest")
+    assert info["release_source"] == "VENDORED_FALLBACK" and "changed: core/fetch.py" in info["fallback_reason"]
+
+
+def test_a_lock_path_outside_the_release_is_refused(tmp_path, monkeypatch):
+    monkeypatch.setattr(B, "_get", lambda url, timeout=0: b"x")
+    for bad in ("../evil.py", "/etc/passwd", "C:/Users/evil.py", "core\\evil.py", "c:evil.py"):
+        with pytest.raises(RuntimeError, match="outside the release"):
+            B.fetch_files("nfl-v9", {"files": {bad: "0"}}, tmp_path / "out")
+    assert not any(p.is_file() for p in tmp_path.rglob("*")), "nothing was written"
+
+
 def test_no_release_at_all_is_the_only_hard_failure(tmp_path, online):
     with pytest.raises(RuntimeError, match="no release at all"):
         B.resolve(tmp_path / "dest", offline=True)
