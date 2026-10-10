@@ -32,7 +32,7 @@ FIXED = {
     "pass_band_points": 3, "pass_band_min_games": 200, "pass_range_low": 77, "pass_range_high": 83,
     "round_trip_points": 1, "game_story_points": 1.5,
     "min_pool_rb_carries": 5000, "min_pool_position_carries": 500, "min_pool_targets_per_bucket": 100, "min_own_carries": 30,
-    "min_own_targets": 20, "min_own_completions": 40, "min_pool_completions_per_bucket": 100, "league_ypc_range": [4.0, 5.0], "league_catch_rate_range": [0.60, 0.72],
+    "min_own_targets": 20, "min_own_completions": 40, "min_pool_completions_per_bucket": 100, "league_ypc_range": [4.0, 5.0], "league_yards_per_completion_range": [8.0, 14.0], "league_catch_rate_range": [0.60, 0.72],
     "league_yards_per_target_range": [6.5, 8.5],
     "max_count": {"carries": 80, "targets": 40, "completions": 60},
     "search_max": {"carries": 45, "targets": 25, "completions": 45},

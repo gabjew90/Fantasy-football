@@ -107,6 +107,8 @@ class Bundle:
             pools = make_pools(c, t, self.fixed)
             q = self.completions[self.completions["season"].isin(yrs)]
             q = q.merge(self.starters, on=["game_id", "posteam", "gsis_id"], how="inner")   # starters' completions only
+            no_q = [y for y in yrs if not (q["season"] == y).any()]
+            require(not no_q, f"pool seasons {no_q} gave no starting quarterbacks' completions")
             kicked_off_before("pool completions", q["game_id"], self.kickoffs(), cutoff)
             pools.update(completion_pools(q, self.fixed))
             self._pools[key] = pools
@@ -159,6 +161,9 @@ def completion_pools(q: pd.DataFrame, fixed: dict) -> dict:
     """Starting quarterbacks' completion yards by depth (design note #8), for
     passing yards. A completion without a recorded depth joins no group."""
     finite("pool completion yards", q["yards"])
+    require(len(q), "no starting quarterbacks' completions in the pool")
+    in_range("league yards per completion", rates.yards_per_completion(q["yards"]),
+             fixed["league_yards_per_completion_range"])
     bk = depth_buckets(q["air_yards"], fixed["depth_short_below"], fixed["depth_deep_from"])
     q = q.assign(bucket=bk).dropna(subset=["bucket"])
     return {"comp_yards_by_bucket": {b: g.to_numpy(float) for b, g in q.groupby("bucket")["yards"]},

@@ -156,29 +156,43 @@ _SPREADS: dict = {}
 NOT_CONFIRMED = {"Out", "Doubtful", "Questionable"}
 
 
-def qb_today(b, team: str, season: int, week: int, kickoff_utc: str) -> str:
-    """The MATCHUP quarterback line (the user, 2026-10-10). Source: the
-    official injury report for this week (nflverse injuries). When the team's
-    opening-day starter is listed Out, Doubtful or Questionable, the starter
-    for this game is not settled, and no dependable source names who starts
-    before kickoff (ESPN's depth chart lagged a week in 2026; Sleeper's is
-    live-only and hand-kept), so the line is "Starting QB not confirmed." --
-    never a guessed name. Otherwise no line. Display only."""
+def qb_today(b, team: str, season: int, week: int) -> str:
+    """The MATCHUP quarterback line (the user, 2026-10-10): "Starting QB not
+    confirmed." when this game's starter is not settled, else no line. Never
+    a guessed name: no dependable source names a replacement before kickoff
+    (ESPN's depth chart lagged a week in 2026; Sleeper's is live-only and
+    hand-kept). Not settled when any of:
+    - the week's official injury report (nflverse injuries) has no rows for
+      his team yet (the report is not out);
+    - the opening-day starter is listed Out, Doubtful or Questionable, or did
+      not practise with no game status yet;
+    - his team's most recent game was started by someone else (an injury,
+      including IR, which the weekly report leaves out, or a benching).
+    Display only."""
     sch = b.schedule[(b.schedule["season"] == season)
                      & ((b.schedule["home_team"] == team) | (b.schedule["away_team"] == team))].sort_values("week")
-    if sch.empty or int(sch["week"].iloc[0]) >= week:
+    played = sch[sch["week"] < week]
+    if played.empty:
         return ""                              # his team's opener is this game or later: no opening-day starter yet
-    opener = sch.iloc[0]
-    qb = opener["home_qb_id"] if opener["home_team"] == team else opener["away_qb_id"]
-    if not isinstance(qb, str) or not qb:
+    opener = player._starter(played.iloc[0], team)
+    if opener is None:
         return ""
-    key = ("_injuries", season)
-    if key not in b.__dict__:
-        b.__dict__[key] = data.injuries(season, manifest=b.manifest)
-    inj = b.__dict__[key]
-    row = inj[(inj["week"] == week) & (inj["team"] == team) & (inj["gsis_id"] == qb)]
-    if len(row) and str(row["report_status"].iloc[-1]) in NOT_CONFIRMED:
+    latest = player._starter(played.iloc[-1], team)
+    if latest is not None and latest != opener:
         return "Starting QB not confirmed."
+    if b.__dict__.get("_injuries_season") != season:
+        b._injuries = data.injuries(season, manifest=b.manifest)
+        b._injuries_season = season
+    inj = b._injuries
+    rows = inj[(inj["week"] == week) & (inj["team"] == team)]
+    if rows.empty:
+        return "Starting QB not confirmed."   # the report for this week is not out yet
+    me = rows[rows["gsis_id"] == opener]
+    if len(me):
+        status = me["report_status"].iloc[-1]
+        practice = str(me.get("practice_status", pd.Series([""])).iloc[-1])
+        if str(status) in NOT_CONFIRMED or (pd.isna(status) and practice.startswith("Did Not Participate")):
+            return "Starting QB not confirmed."
     return ""
 
 
@@ -298,8 +312,10 @@ def build_card(b, name_in: str, market: str, side: str = "over", *, team=None, s
                        grades=_display(lambda: matchup.grade_pair(b, team, opp, "run" if market == "rush_yds"
                                                                    else "pass", season, wk, fixed)),
                        line_note=line_note,
-                       qb_today=_display_text(lambda: qb_today(b, team, season, wk, game["kickoff_utc"])))
-    return {**out, "c": c, "ready": True, "settings": tuned, "text": warn + text}
+                       qb_today=_display_text(lambda: qb_today(b, team, season, wk)))
+    return {**out, "c": c, "ready": True, "settings": tuned, "text": warn + text,
+            # depths whose yards came from every position's catches (the "Calculation" follow-up; journal row)
+            "pooled_depths": list(pl.receiving.get("pooled_all_positions", []))}
 
 
 def leg(a) -> str:
@@ -409,7 +425,8 @@ def journal_fields(side: str, g: dict) -> dict:
             "calc_bar": card.value(c, f"needed_{side}"),
             "calc_bar_status": c["solutions"][f"needed_{side}"].status,
             "calc_target_rate": c[f"target_{side}"], "calc_line_implies": card.value(c, "book_expects"),
-            "calc_usual": c["usual"], "calc_gap": c[f"gap_{side}"], "calc_settings": g["settings"]}
+            "calc_usual": c["usual"], "calc_gap": c[f"gap_{side}"], "calc_settings": g["settings"],
+            "calc_pooled_depths": g.get("pooled_depths", [])}
 
 
 if __name__ == "__main__":

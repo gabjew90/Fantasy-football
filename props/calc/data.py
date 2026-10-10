@@ -81,7 +81,7 @@ def snaps(season: int, *, manifest=None) -> pd.DataFrame:
 def injuries(season: int, *, manifest=None) -> pd.DataFrame:
     """The official weekly injury report (nflverse): team, week, gsis_id,
     full_name, position, report_status."""
-    cols = ["season", "team", "week", "gsis_id", "full_name", "position", "report_status"]
+    cols = ["season", "team", "week", "gsis_id", "full_name", "position", "report_status", "practice_status"]
     return pd.read_csv(F.nflverse("injuries", season, manifest=manifest), usecols=lambda c: c in cols,
                        low_memory=False)
 
@@ -162,7 +162,7 @@ def completions(p: pd.DataFrame) -> pd.DataFrame:
 def starters(p: pd.DataFrame) -> pd.DataFrame:
     """(game_id, posteam, gsis_id): each team's starting quarterback in each
     game, taken as its passer with the most dropbacks (the design note's
-    definition; ties go to the passer listed first in the data)."""
+    definition; a tie goes to the smaller gsis id, so the choice is stable)."""
     d = p[_flag(p["qb_dropback"]) & p["passer_player_id"].notna()]
     n = d.groupby(["game_id", "posteam", "passer_player_id"]).size().rename("n").reset_index()
     top = n.sort_values("n", ascending=False, kind="stable").drop_duplicates(["game_id", "posteam"])

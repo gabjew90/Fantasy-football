@@ -630,15 +630,25 @@ def player_rate(blended, season, season_n):
 
 def test_qb_today_reads_the_official_report_and_never_names_a_guess(monkeypatch):
     from props.calc import __main__ as cli, data
-    b = type("B", (), {})()
-    b.manifest = None
-    b.schedule = pd.DataFrame([dict(season=2026, week=w, home_team="TB" if w % 2 else "X", away_team="X" if w % 2 else "TB",
-                                    home_qb_id="baker" if w % 2 else "x", away_qb_id="x" if w % 2 else "baker")
-                               for w in (1, 2, 3, 4, 5)])
-    inj = pd.DataFrame([dict(season=2026, team="TB", week=w, gsis_id="baker", full_name="Baker Mayfield",
-                             position="QB", report_status=s) for w, s in ((3, None), (4, "Out"), (5, "Questionable"))])
+
+    def bundle(starters):
+        b = type("B", (), {})()
+        b.manifest = None
+        b.schedule = pd.DataFrame([dict(season=2026, week=w, home_team="TB", away_team="X", home_qb_id=q,
+                                        away_qb_id="x") for w, q in enumerate(starters, 1)])
+        return b
+    inj = pd.DataFrame([dict(season=2026, team="TB", week=w, gsis_id=g, full_name="", position="QB",
+                             report_status=st, practice_status=pr) for w, g, st, pr in (
+        (2, "baker", None, "Full Participation in Practice"), (3, "baker", "Questionable", ""),
+        (4, "baker", None, "Did Not Participate In Practice"), (5, "other", None, ""))])
     monkeypatch.setattr(data, "injuries", lambda *a, **k: inj)
-    assert cli.qb_today(b, "TB", 2026, 3, "") == ""                     # not on the report as out: no line
-    assert cli.qb_today(b, "TB", 2026, 4, "") == "Starting QB not confirmed."
-    assert cli.qb_today(b, "TB", 2026, 5, "") == "Starting QB not confirmed."
-    assert cli.qb_today(b, "TB", 2026, 1, "") == ""                     # the opener itself: no opening-day starter yet
+    b = bundle(["baker"] * 6)
+    assert cli.qb_today(b, "TB", 2026, 1) == ""                       # the opener itself: no opening-day starter yet
+    assert cli.qb_today(b, "TB", 2026, 2) == ""                       # on the report, practising fully
+    assert cli.qb_today(b, "TB", 2026, 3) == "Starting QB not confirmed."     # Questionable
+    assert cli.qb_today(b, "TB", 2026, 4) == "Starting QB not confirmed."     # did not practise, no status yet
+    assert cli.qb_today(b, "TB", 2026, 5) == ""                       # report out, he is not on it
+    assert cli.qb_today(b, "TB", 2026, 6) == "Starting QB not confirmed."     # no week-6 report yet
+    # the latest game was started by someone else (an injury, IR, a benching): not settled, whatever the report says
+    assert cli.qb_today(bundle(["baker", "baker", "baker", "daniels", "daniels"]), "TB", 2026, 5) == \
+        "Starting QB not confirmed."

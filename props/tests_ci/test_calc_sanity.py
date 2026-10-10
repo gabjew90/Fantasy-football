@@ -373,3 +373,14 @@ def test_a_thin_position_depth_uses_every_positions_catches():
     pl2 = player.build(b2, "rb1", "Rb One", "A", 2026, 5, {"k_catch": 60, "k_ypr": 50}, FIXED, "rec_yds")
     assert pl2.not_enough["rec_yds"] == ["too few catches in the pool for depth deep, even counting every position "
                                          "(needs 100 each)"]
+
+
+def test_completion_pools_by_hand():
+    from props.calc import player
+    q = pd.DataFrame({"yards": [5.0, 7.0, 12.0, 20.0, 9.0], "air_yards": [-2.0, 4.9, 5.0, 15.0, np.nan]})
+    got = player.completion_pools(q, FIXED)
+    assert got["completions_without_depth"] == 1
+    assert {k: v.tolist() for k, v in got["comp_yards_by_bucket"].items()} == {
+        "short": [5.0, 7.0], "medium": [12.0], "deep": [20.0]}
+    with pytest.raises(checks.DataError, match="yards per completion"):
+        player.completion_pools(q.assign(yards=[1.0, 1.0, 1.0, 1.0, 1.0]), FIXED)      # league average 1.0: implausible

@@ -305,7 +305,7 @@ def render(pl: Player, c: dict, side: str, *, opp: str, game_lines: dict | None 
     assumed = c["rate"] * k                  # unrounded: the rate ask is taken from it
     window = f"His recent rate ({len(pl.window)} games)"     # the rate the bar assumes (blend explained in "Calculation")
     if c["usual"] is None:                    # no AT block below: the assumed rate is stated here instead
-        out += _wrap(f"Bar assumes {assumed:.1f} {rate_long} ({window[0].lower() + window[1:]}).")
+        out += _wrap(f"Bar assumes {shown_rate(assumed):.1f} {rate_long} ({window[0].lower() + window[1:]}).")
     # "Line implies (our math)" is not on the default card (the user, 2026-10-10): it is in the
     # "Calculation" follow-up; the row returns only as Sleeper's own workload line (step G)
     if m in ("receptions", "rec_yds", "pass_yds") and pl.no_depth:
@@ -319,13 +319,13 @@ def render(pl: Player, c: dict, side: str, *, opp: str, game_lines: dict | None 
         r = sol[f"rate_needed_{side}"]
         rr = calc.side_result(side, r.status) if r is not None else None
         if rr == "ok":
-            need = r.value * k                 # unrounded: the rate ask is taken from it
-            out += _wrap(f"Needed at this price: {need:.1f} {rate_short}" + (" or less" if side == "under" else ""))
+            need = r.value * k
+            out += _wrap(f"Needed at this price: {shown_rate(need):.1f} {rate_short}" + (" or less" if side == "under" else ""))
         elif rr == "always":
             out.append("Needed at this price: any rate clears it")
         else:
             out.append("Needed at this price: no rate clears it")
-        out.append(f"{window}: {assumed:.1f}")
+        out.append(f"{window}: {shown_rate(assumed):.1f}")      # printed as the rate ask reads it
         if rate.season is None:
             out.append(f"This season: no {many} yet")
         elif rate.season_n >= c["season_min"]:

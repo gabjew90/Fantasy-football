@@ -189,7 +189,7 @@ This season: [S]                        <- below the minimum sample: "[S] ([n] [
 MATCHUP
 [TEAM] [run|pass] offense [grade] vs [OPP] [run|pass] defense [grade]
 [Favorite] favored by [spread]. Total [total].
-[Starting QB not confirmed.]            <- only when the opening-day starter is listed Out/Doubtful/Questionable
+[Starting QB not confirmed.]            <- only when this game's starter is not settled (below)
 
 [Closing question]
 
@@ -219,9 +219,12 @@ Line as of [Mon D, H:MM AM/PM] PT.
   schedule's line, labelled "(closing line)" after kickoff and "(schedule line)" before. An even
   spread: "No favorite (even spread)."; a missing spread: "No spread shown." An injury line
   appears only when it changes this player's role (not built yet).
-- Today's quarterback (MATCHUP): source, the official injury report for the week (nflverse
-  injuries). When his team's opening-day starter is listed Out, Doubtful or Questionable, the line
-  is "Starting QB not confirmed." No dependable source names the replacement before kickoff
+- Today's quarterback (MATCHUP): "Starting QB not confirmed." when this game's starter is not
+  settled: the week's official injury report (nflverse injuries) has no rows for his team yet; or
+  his team's opening-day starter is listed Out, Doubtful or Questionable, or did not practise with
+  no game status yet; or his team's most recent game was started by someone else (covers IR, which
+  the weekly report leaves out, and a benching). Otherwise no line. No dependable source names the
+  replacement before kickoff
   (ESPN's depth chart, in nflverse depth_charts, still listed Baker Mayfield as TB's QB1 before
   week 5 of 2026, two starts after he went out; Sleeper's depth chart is live-only and hand-kept),
   so the "[Name] starts at QB today." form is never shown: no guessed names.
@@ -326,6 +329,8 @@ Average loss: $[L] per $[stake] entry.
 - Passing yards' minimum samples, set before any test was read: 40 of his own completions in his
   last 16 games (about two starts), and 100 starting quarterbacks' completions per depth in the
   pool. To confirm.
+- A plausible range for the league's yards per completion (starting quarterbacks), 8.0-14.0, a
+  wide run-time guard like the other three ranges, set before any passing result. To confirm.
 
 ## Later ideas
 

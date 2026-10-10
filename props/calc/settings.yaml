@@ -57,6 +57,7 @@ fixed_not_tuned:
   min_pool_completions_per_bucket: 100  # Each depth group of starting quarterbacks' completions in the pool needs 100 or more.
   league_ypc_range: [4.0, 5.0]  # Plausible league-average yards per carry (2016-2023 ran 4.23-4.63); outside it, stop.
   league_catch_rate_range: [0.60, 0.72]  # Plausible league-average catch rate (2016-2023: 63.2%-67.9%).
+  league_yards_per_completion_range: [8.0, 14.0]  # Plausible league-average yards per completion by starting quarterbacks (a wide guard, set before any passing result).
   league_yards_per_target_range: [6.5, 8.5]  # Plausible league-average yards per target (2016-2023: 7.14-7.58).
   max_count: {carries: 80, targets: 40, completions: 60}  # The most plays one simulated game can hold (far above any real game).
   search_max: {carries: 45, targets: 25, completions: 45}  # The highest average workload the search tries; above it the card says "at any workload up to" this.
