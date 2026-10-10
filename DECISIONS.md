@@ -8712,3 +8712,19 @@ every row while the predictions rows carry open / decision / close (line_archive
   league-wide on the card; the gap is needed minus trailing 4-game average, beside a separate
   "book expects" row. Data through `core.fetch`; 2016-17 play-by-play feeds the 2018 pools only.
 - **Status:** design settled; code starts on the user's go.
+
+## 2026-10-10 (232) -- props/calc tuned on 2018-23; 2024-25 read once: no bet type passes all its tests
+
+- **Tuned (pre-registered grids, props/calc/harness.py, 2018-23 only):** carry_r 16->8, day_sd
+  0.15->0.05, target_r 8->10, completion_r 10->25, k_ypc 150->200, k_catch 60->10 (grid edge),
+  k_ypr 50 (flat), k_ypcomp 150->800 (grid edge).
+- **Held-out read, once, 2026-10-10 20:00-20:12 UTC** (record and every case and line in
+  props/calc/heldout/; re-derived by a separate agent from those files, no mismatches): spread,
+  round trip and the conversion 80% range pass for every bet type except passing's spread (76.9%).
+  The conversion bands fail everywhere: rushing on two bands under 200 games (the rest within
+  2.3), receptions 3.2-4.9 points off in three bands, receiving yards 3.7 off in one band and one
+  band under 200, passing 4.5 off and five bands under 200. Game story: carries pass, pass
+  attempts fail (league-wide decline of about 2 a game).
+- **Per the user's rule:** no setting, adjustment or pass mark changed after a result; the cards
+  keep "Check first: workload bar untested." until the user chooses the failure wording.
+  Details: docs/plans/2026-10-10-parlay-leg-calculator.md, "Tuning" and "Held-out read".

@@ -589,6 +589,63 @@ All sixteen open questions were answered: as recommended, except where noted.
   the same row format, because a PR may not touch props/record); kickoff times from zoneinfo; ESPN spread and total read through
   `core.fetch` with core/status.py's parsing copied (props may not import core.status).
 
+## Tuning (2018-2023, 2026-10-10)
+
+`python -m props.calc.harness` (props/calc/harness.py, reviewed before its output was read):
+17,767 cases from 2018-23 (rushing 2,198, receptions and receiving yards 6,727 each, passing
+2,115; 82 left out for not enough data). Pre-registered grids and order (module docstring).
+
+| Setting | Was | Now | Chosen on (2018-23) |
+|---|---|---|---|
+| `carry_r` | 16 | 8 | spread coverage 80.0% |
+| `target_r` | 8 | 10 | spread coverage 79.9% |
+| `completion_r` | 10 | 25 | spread coverage 79.3% |
+| `k_ypc` | 150 | 200 | rushing conversion log loss 0.6134 (with `day_sd`) |
+| `day_sd` | 0.15 | 0.05 | same search; 0.00 and 0.10 within 0.0001 |
+| `k_catch` | 60 | 10 | receptions log loss 0.5696; the grid's smallest value; the whole grid within 0.008 |
+| `k_ypr` | 50 | 50 | receiving-yards log loss 0.6581; the whole grid within 0.0007 |
+| `k_ypcomp` | 150 | 800 | passing log loss 0.5268; the grid's largest value |
+
+**Tests on 2018-2023 at the tuned settings** (in sample):
+
+| Bet type | Conversion bands | Conversion 80% range | Spread | Round trip |
+|---|---|---|---|---|
+| Rushing yards | fail: 50-60% off 9.6 (278 games); 30-40% 150 games (untested) | 79.1% pass | 80.0% pass | worst 0.005 pt pass |
+| Receptions | fail: 30-40% off 5.7 | 78.1% pass | 79.9% pass | 0.005 pt pass |
+| Receiving yards | fail: 70-80% off 5.8 (60-70% at the mark, 3.0) | 77.1% pass | 79.9% pass | 0.005 pt pass |
+| Passing yards | fail: 30-40%, 50-60%, 60-70% under 200 games; 70-80% off 6.5 | 77.8% pass | 79.3% pass | 0.005 pt pass |
+
+No retune: the conversion test plugs in the actual workload, so the three r settings do not
+enter it, and the k settings and day_sd were already chosen on it.
+
 ## Held-out read
 
-Not yet done. The date and the result of the one read of 2024-25 go here.
+**Read once, 2026-10-10, 20:00:48-20:12:58 UTC**, at the tuned settings above. Record:
+props/calc/heldout/heldout_read.json, with every case and priced line (cases_2024_2025.csv.gz,
+lines_2024_2025.csv.gz, pools_2024_2025.npz). 6,098 cases (rushing 783, receptions and receiving
+yards 2,267 each with a workload, passing 698).
+
+| Bet type | Conversion bands (each 200+ games, within 3 points) | Conversion 80% range (77-83%) | Spread (77-83%) | Round trip (1 pt) | Result |
+|---|---|---|---|---|---|
+| Rushing yards | fail: 30-40% (40 games) and 50-60% (78) untested; the four bands with 200+ games within 2.3 | 77.4% pass | 82.3% pass | 0.005 pass | fail |
+| Receptions | fail: 30-40% off 3.2, 40-50% off 4.3, 60-70% off 4.9 | 78.6% pass | 80.4% pass | 0.005 pass | fail |
+| Receiving yards | fail: 30-40% off 3.7; 70-80% (138 games) untested | 77.0% pass | 80.4% pass | 0.005 pass | fail |
+| Passing yards | fail: 40-50% off 4.5; 20-30%, 30-40%, 50-60%, 60-70%, 70-80% under 200 games | 80.5% pass | 76.9% fail | 0.005 pass | fail |
+
+Game story (league-wide team carries and pass attempts by result group, 2018-23 against
+2024-25, within 1.5): carries pass (largest gap 0.4); pass attempts fail (2024-25 teams threw
+2.1, 2.0 and 1.7 fewer per game when behind 8+, within 7 and ahead 8+). Overall fail.
+
+What the failures say (diagnosed, not fixed; the user's rule: no setting, adjustment or pass
+mark is changed after a result):
+- The conversion test's lines (0.8x, 1.0x, 1.2x of the actual workload x rate) put most stated
+  chances near three values per bet type, so some 10-point bands rarely fill to 200 games. That
+  is a property of the test as registered, and it is why rushing and passing fail on
+  "untested" bands.
+- Receptions' middle bands ran 3-5 points under the actual Over rate in 2024-25 (and the 30-40%
+  band in 2018-23): the stated chances there are too low.
+- Passing's workload range was slightly too narrow in 2024-25 (76.9%).
+- Pass attempts per game fell league-wide in 2024-25; the game-story rows are not on the card.
+
+No bet type passed all of its tests, so "Check first: workload bar untested." stays on every
+card until the user chooses the wording for the failures.
