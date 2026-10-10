@@ -245,9 +245,11 @@ compete with it:
 2. **The workload a Power Play leg needs** on each side (the card's second row:
    the Over is worth a leg only above the first number, the Under only at or
    below the second; 4 picks at 10x need about 56% a leg, 5 at 20x about 55%).
-   When the card marks a line **too close to call on volume** (a break-even
-   within about one pass or carry of what the line assumes -- RB receiving
-   lines often land here), say so and do not build a leg on it.
+   The cell says how far apart the two sides sit: when that is about one pass
+   or one carry (RB receiving lines often are), the line needs a view finer
+   than anyone can forecast -- say so and do not build a leg on it. The
+   engine's ranges run too narrow for now, so both numbers sit closer to the
+   line than they should; say that too when it decides the read.
 3. The question for the user: does he get more or less work than the line
    assumes, by enough, and why -- the role evidence (which quarterback threw in
    each game, injuries, the game plan) is what answers it. Conditional, never a

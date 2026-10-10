@@ -232,7 +232,7 @@ def pp_result() -> dict:
 
 def implied_targets(line, stat, team_targets_mean, targets_r, share, catch_rate, ypt,
                     per_catch_shape, width=None, prices=None, role=None, market_p=None, engine_p=None,
-                    pp_only=False):
+                    pp_only=False, hurdle=True):
     """Targets per game at which the line is a coin flip for a receiver (P(stat >
     line) = 0.5 on a half line; Overs and Unders equally likely on a whole line), holding
     his catch rate and yards per target. stat: 'receptions' or 'rec_yards'.
@@ -276,13 +276,14 @@ def implied_targets(line, stat, team_targets_mean, targets_r, share, catch_rate,
     k_o, k_u = _break_even_ks(share_over, prices)
     _edge_cache(share_over, prices, k_o, k_u, work)
     _market_cache(share_over, market_p, work, engine_p)
-    _hurdle_cache(share_over, work, engine_p)
+    if hurdle:
+        _hurdle_cache(share_over, work, engine_p)
     return work(k), proj, work(k_o), work(k_u)
 
 
 def implied_carries(line, j, team_carries_mean, carries_r, rush_shares, ypc, resid,
                     width=None, player_resid=None, player_kneel=None, qb_index=None, prices=None,
-                    market_p=None, engine_p=None, pp_only=False):
+                    market_p=None, engine_p=None, pp_only=False, hurdle=True):
     """Carries per game at which the line is a coin flip for player j (as above),
     scaling only his share inside the FULL team call (the share rescale
     depends on every teammate). Returns (implied mean carries, projected mean
@@ -320,7 +321,8 @@ def implied_carries(line, j, team_carries_mean, carries_r, rush_shares, ypc, res
     k_o, k_u = _break_even_ks(share_over, prices)
     _edge_cache(share_over, prices, k_o, k_u, work)
     _market_cache(share_over, market_p, work, engine_p)
-    _hurdle_cache(share_over, work, engine_p)
+    if hurdle:
+        _hurdle_cache(share_over, work, engine_p)
     return work(k), proj, work(k_o), work(k_u)
 
 
@@ -1897,14 +1899,16 @@ def card_guide() -> list[str]:
          "(role, injuries, the quarterback, the game plan). Above the engine's volume, the market expects "
          "more work than the engine (or better efficiency: one price cannot separate the two)."),
         ("**A Power Play leg needs**",
-         "The same search, aimed at the win rate a leg of a flat-payout entry needs (4 picks at 10x: about "
-         "56%; 5 at 20x: about 55% -- payout to the power of minus one over the picks): the workload above "
-         "which the Over clears it, and at or below which the Under does.",
+         "The same search, aimed at the win rate a leg of a flat-payout entry needs ("
+         + "; ".join(f"{n} picks at {POWER_PLAY['payouts'][n]:g}x: about {100 * pp_hurdle(n):.0f}%"
+                     for n in sorted(POWER_PLAY["payouts"]))
+         + " -- the payout to the power of minus one over the picks): the workload above which the Over "
+         "clears it, and at or below which the Under does, and how far apart the two sit.",
          "Your decision in one line: bet the Over only if you expect more than the first number, the Under "
-         "only at or below the second. Between them neither side is worth a leg. When either number sits "
-         "within about one unit of what the line assumes, the card says the line is too close to call on "
-         "volume: nobody can forecast one pass or one carry (RB receiving lines often land here). The "
-         "hurdle assumes legs win or lose independently; legs sharing a game script do not."),
+         "only at or below the second. Between them neither side is worth a leg. When the two sit about one "
+         "pass or one carry apart, the line needs a view finer than anyone can forecast (RB receiving lines "
+         "often do). The engine's ranges run too narrow, so for now both numbers sit closer to the line than "
+         "they should. The hurdle assumes legs win or lose independently; legs sharing a game script do not."),
         ("Market's chance of the Over",
          "The book's Over and Under prices turned into chances, then scaled so the two add to 100% (the "
          "book's built-in cut removed).",
@@ -1997,7 +2001,8 @@ def card_guide() -> list[str]:
           "",
           "**Using it:** read the workload the line assumes, then decide whether he gets more or less, and "
           "why -- from the role evidence below (check which quarterback threw in each game). Bet a side "
-          "only when your view clears its Power Play number; skip the lines marked too close to call. Then "
+          "only when your view clears its Power Play number; skip a line whose two sides sit about one pass "
+          "or carry apart. Then "
           "check the efficiency rows: if only the engine's rate clears, the prop also needs an efficiency he "
           "has not shown lately. The market's chance is the best available estimate of the prop's chance."]
     return L

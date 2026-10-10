@@ -2259,7 +2259,8 @@ def main():
                 _implied_cache[ck] = RSCH.implied_targets(
                     float(r_.line), "receptions" if r_.market == "player_receptions" else "rec_yards",
                     env[m_.team]["targets"], TVD["targets_r"], float(m_.ts), float(m_.cr), float(m_.ypt),
-                    SH, width=WIDTH, prices=px_, role=MODEL.role_group(m_.slot), market_p=mp_, engine_p=ep_)
+                    SH, width=WIDTH, prices=px_, role=MODEL.role_group(m_.slot), market_p=mp_, engine_p=ep_,
+                    hurdle=not a.no_scenarios)
                 _implied_cache[ck] += ("targets",)
                 _edges_cache[ck] = RSCH.edges_for()
                 if not a.no_scenarios:
@@ -2276,7 +2277,7 @@ def main():
                 _implied_cache[ck] = RSCH.implied_carries(
                     float(r_.line), j_, env[m_.team]["carries"], TVD["carries_r"], si["rs"], si["ypc"], resid,
                     width=WIDTH, player_resid=si["p_resid"], player_kneel=si["p_kneel"], qb_index=si["qb_i"],
-                    prices=px_, market_p=mp_, engine_p=ep_)
+                    prices=px_, market_p=mp_, engine_p=ep_, hurdle=not a.no_scenarios)
                 _implied_cache[ck] += ("carries",)
                 _edges_cache[ck] = RSCH.edges_for()
                 if not a.no_scenarios:
@@ -2976,7 +2977,11 @@ def main():
                         pp_ = {k_: r.get(k_) for k_ in ("pp_over_needs", "pp_under_needs", "pp_over_edge",
                                                          "pp_under_edge", "pp_over_limit", "pp_under_limit")}
                     else:
-                        pp_ = fn_(float(rate_))
+                        try:
+                            pp_ = fn_(float(rate_))
+                        except Exception as exc:  # noqa: BLE001 -- the grid informs; it never costs the report
+                            log(f"  efficiency grid skipped for {nm} {mk} at {rate_:.2f} ({type(exc).__name__}: {exc})")
+                            continue
                     grid.append({"key": key_, "rate": float(rate_), **pp_})
             out.append({"market": mk, "line": r["line"], "volume_text": vtext, "book_lines": book_lines_of(mk, nm, t),
                         "cells": RSCH.volume_cells(mk, r["line"], draws, rates, games, mvol) if draws is not None
@@ -3611,8 +3616,8 @@ def main():
              f"{RSCH.POWER_PLAY['default_legs']}-pick, flat-payout entry needs ({100 * RSCH.pp_hurdle():.0f}%; a single "
              "pick's Sleeper price is not its break-even in a Power Play, DECISIONS #208, #225): the Over is worth a leg "
              "only above the first number, the Under only at or below the second. It tells you how much role your view "
-             "needs, not whether the view is right; a line marked too close to call is about one pass or carry from "
-             "either side, which no one can forecast.")
+             "needs, not whether the view is right; when the two sides sit about one pass or carry apart, no "
+             "one can forecast that finely.")
     if not td_two_sided:
         if (RD.market == "player_anytime_td").any() if len(RD) else False:
             L.append("- **Touchdown prices** have no 'won't score' side to remove the cut from, so the book's number there is a bit high.")
@@ -3730,6 +3735,7 @@ def main():
                     for mk_ in mks_:
                         rr_ = RESEARCH[(RESEARCH.player == r_["who"]) & (RESEARCH.market == mk_)]
                         rr_ = rr_[rr_.market_volume.notna()] if "market_volume" in rr_ else rr_.iloc[0:0]
+                        rr_ = rr_.sort_values("book", key=lambda b: b != "sleeper", kind="stable")
                         if len(rr_):
                             got_ = float(rr_.iloc[0].market_volume)
                             break
@@ -4507,6 +4513,13 @@ def run_user_scenario(R: pd.DataFrame, RESEARCH: pd.DataFrame, slug: str, snap: 
     # the hurdle a leg of the user's Power Play must clear (DECISIONS #225): a Sleeper pick's own price is
     # not its break-even in a flat-payout entry (#208), so the scenario is judged against this
     hurdle = RSCH.pp_hurdle()
+
+    def decided(o, u):
+        """(Over, Under) as shares of the outcomes that do not push -- a pushed Sleeper leg is removed
+        from the entry, not lost, and the card's Power Play workloads are solved the same way."""
+        if o is None or u is None or pd.isna(o) or pd.isna(u) or o + u <= 0:
+            return o, u
+        return o / (o + u), u / (o + u)
     named = {x["who"] for x in rules if not x["team"]}
     teams_named = {x["who"] for x in rules if x["team"]}
     rows = []
@@ -4526,20 +4539,22 @@ def run_user_scenario(R: pd.DataFrame, RESEARCH: pd.DataFrame, slug: str, snap: 
         row = dict(player=x.player, team=x.team, market=x.market, line=float(x.line), book=x.book,
                    price_over=po, price_under=pu, be_over=RSCH.breakeven(po), be_under=RSCH.breakeven(pu),
                    hurdle=hurdle, over_model=o0, over_scenario=o1, under_scenario=u1, push_scenario=p1,
-                   over_avg=o1, under_avg=u1, net_over=ev_o, net_under=ev_u,
+                   over_avg=decided(o1, u1)[0], under_avg=decided(o1, u1)[1], net_over=ev_o, net_under=ev_u,
                    pays_if=pays.get((x.player, x.market, float(x.line), x.book), "—"),
                    named=x.player in named)
         if variants:
-            ends = {}
+            ends, dends = {}, {}
             for suf in ("_lo", "_hi"):
                 ends[suf] = ((None, None) if pd.isna(x.get("p_model" + suf)) else
                              _sides(pd.Series({"p_model": x["p_model" + suf], "side": x["side" + suf],
                                                "p_push": x["p_push" + suf]}))[:2])
+                dends[suf] = decided(*ends[suf])
+            do1, du1 = decided(o1, u1)
             row.update(over_low=ends["_lo"][0], over_high=ends["_hi"][0],
-                       over_avg=SC.range_average(ends["_lo"][0], o1, ends["_hi"][0]),
-                       under_avg=SC.range_average(ends["_lo"][1], u1, ends["_hi"][1]),
-                       verdict_over=SC.range_verdict(ends["_lo"][0], o1, ends["_hi"][0], hurdle),
-                       verdict_under=SC.range_verdict(ends["_lo"][1], u1, ends["_hi"][1], hurdle))
+                       over_avg=SC.range_average(dends["_lo"][0], do1, dends["_hi"][0]),
+                       under_avg=SC.range_average(dends["_lo"][1], du1, dends["_hi"][1]),
+                       verdict_over=SC.range_verdict(dends["_lo"][0], do1, dends["_hi"][0], hurdle),
+                       verdict_under=SC.range_verdict(dends["_lo"][1], du1, dends["_hi"][1], hurdle))
         rows.append(row)
     if not rows:
         return L + ["No line moves by half a point or more under these assumptions."]
@@ -4569,7 +4584,7 @@ def run_user_scenario(R: pd.DataFrame, RESEARCH: pd.DataFrame, slug: str, snap: 
               "teammate's line can run the other way: his Over may pay only at your low."]
     else:
         def leg(x):
-            for side, v in (("Over", x.over_scenario), ("Under", x.under_scenario)):
+            for side, v in (("Over", x.over_avg), ("Under", x.under_avg)):
                 if v is not None and not pd.isna(v) and v >= hurdle:
                     return f"{side} clears it"
             return "neither side clears it"

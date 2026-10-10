@@ -444,9 +444,9 @@ For a narrow question, run only what it needs:
   "pays at this price" cell, since in a Power Play the listed price does not apply) gives the
   workload above which the Over clears a leg's win rate -- about 56% for 4 picks at 10x, 55% for
   5 at 20x, whichever side, so a plus-money Under is no cheaper there than any other leg -- and at
-  or below which the Under does; between them neither side is worth a leg. "Too close to call on
-  volume" marks a break-even within about one pass or carry of the workload the line assumes:
-  nobody can forecast that closely, so build no leg on it. How it is found, when asked: the
+  or below which the Under does; between them neither side is worth a leg. The cell says how far
+  apart the two sit: about one pass or carry apart is finer than anyone can forecast, so build no
+  leg on it (the engine's narrow ranges pull both toward the line for now). How it is found, when asked: the
   simulation moves his share until each side reaches the hurdle. It rests on the model's own
   catch rate and spread, so it guides how much role a view needs; it is not a guarantee.
   **The line-fit reads moved off the card (DECISIONS #208).** The old per-player reads --
@@ -560,9 +560,9 @@ these are model opinions not tested against sportsbook lines.
    assumes** (the workload the market's no-vig price implies at the engine's efficiency -- the
    line restated as volume: above the engine's volume, the market expects more work, or better
    efficiency, which one price cannot separate), **a Power Play leg needs** (the workload above
-   which the Over clears a 4-pick leg's ~56%, and at or below which the Under does; "too close to
-   call on volume" when either sits within about one unit of what the line assumes -- say so and
-   build no leg on it), the market's chance of the Over (the best available estimate of the
+   which the Over clears a 4-pick leg's ~56%, and at or below which the Under does, and how far
+   apart the two sit -- about one pass or carry apart is finer than anyone can forecast: say so
+   and build no leg on it), the market's chance of the Over (the best available estimate of the
    chance), the price, what the Over needs, the engine's volume, its forecast (middle and 80%
    range), then **the volume
    chance** -- one row per efficiency (his luck-capped rate, his rate this season, the engine's),

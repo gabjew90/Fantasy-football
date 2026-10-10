@@ -8594,5 +8594,5 @@ every row while the predictions rows carry open / decision / close (line_archive
   Williams +1.3 carries), because the engine's ranges are too narrow and so make one unit look
   decisive. The card shows the span instead; the width round comes next. The grid also shows the
   simulation tops a lead back out near 19 carries (the share rescale), a width-round item.
-- **Prices do not change.** Captures take about 20% longer (two more searches per line).
+- **Prices do not change.** The Power Play searches and the grid run only where someone reads the cards: a scheduled capture (--no-scenarios) skips both and keeps its old cost. Code review: 7 findings, all fixed (four documents still promised the dropped close-call mark; a relative view could read another book's line; a grid failure could cost the report; the scenario's Under counted pushes).
   The customer PDF keeps the user's guide layout (#222) until the user decides whether it changes.

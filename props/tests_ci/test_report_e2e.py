@@ -50,6 +50,24 @@ def run(tmp_path_factory):
     return report, research, r.stderr
 
 
+@pytest.fixture(scope="module")
+def run_full(tmp_path_factory):
+    """The report as chat runs it -- no --no-scenarios -- so the Power Play workloads and the efficiency
+    grid are built (a capture skips both, DECISIONS #225)."""
+    wd = tmp_path_factory.mktemp("wd_full")
+    out = tmp_path_factory.mktemp("out_full")
+    for f in FIXTURE.iterdir():
+        shutil.copy(f, wd / f.name)
+    env = dict(os.environ, NFL_FETCH_MAX_AGE_S="1000000000", NFL_OUT=str(out))
+    r = subprocess.run([sys.executable, str(SCRIPTS / "score_game.py"), "--away", "DAL", "--home", "HOU",
+                        "--season", "2026", "--week", "4", "--workdir", str(wd),
+                        "--odds-snapshot", str(wd / "odds_snapshot_2026_wk04_DAL_HOU.json")],
+                       capture_output=True, text=True, encoding="utf-8", errors="replace", env=env, timeout=900)
+    assert r.returncode == 0, r.stderr[-2000:]
+    return ((out / "report_2026_wk04_DAL_HOU.md").read_text(encoding="utf-8"),
+            pd.read_csv(out / "research_2026_wk04_DAL_HOU.csv"), r.stderr)
+
+
 def test_the_report_opens_as_a_research_sheet(run):
     report, _r, _e = run
     first = next(ln for ln in report.splitlines() if ln.startswith("**"))
@@ -63,13 +81,10 @@ def test_cards_are_one_table_with_the_volume_chance_for_every_market_kind(run):
     for head in ("| | Receptions ", " Receiving yards ", " Rushing yards ", "| | Passing yards "):
         assert head in report, head
     assert "| Market's chance of the Over |" in report and "| At his luck-capped rate |" in report
-    # market first (DECISIONS #225): the line's workload, then a Power Play leg's, before the market's chance
-    pp = report.index("| **A 4-pick Power Play leg (56%) needs** |")       # within one card's table
-    tbl = report[report.rfind("\n\n", 0, pp):report.index("\n\n", pp)]
-    assert tbl.index("| **The line assumes** (workload, at the engine's efficiency) |") < tbl.index(
-        "| **A 4-pick Power Play leg (56%) needs** |") < tbl.index("| Market's chance of the Over |") < tbl.index(
-        "| Engine's own chance of the Over")
     assert "| **The line assumes** (workload, at the engine's efficiency) |" in report
+    # a capture-style run (--no-scenarios) skips the Power Play searches and the grid: nobody reads them there
+    assert "Power Play leg (56%) needs** |" not in report
+    assert "**What a Power Play leg needs at each efficiency**" not in report
     assert " completions at " in report and " catches at " in report and " carries at " in report
     assert " targets at " in report
     assert "luck-capped rate = last 10 games, long catches capped (" in report and "so far, uncapped (" in report
@@ -128,10 +143,30 @@ def test_the_break_even_workload_straddles_the_coin_flip(run):
     assert both.be_over.between(0.3, 0.8).all() and both.be_under.between(0.3, 0.8).all()
 
 
-def test_the_power_play_workloads_straddle_what_the_line_assumes(run):
+def test_the_market_first_card_and_its_efficiency_grid(run_full):
+    """DECISIONS #225: the line's workload, then a Power Play leg's, before the market's chance and the
+    engine's own chance last; under the table, the grid's engine row is the main row's own numbers."""
+    report, research, _e = run_full
+    pp = report.index("| **A 4-pick Power Play leg (56%) needs** |")       # within one card's table
+    tbl = report[report.rfind("\n\n", 0, pp):report.index("\n\n", pp)]
+    assert tbl.index("| **The line assumes** (workload, at the engine's efficiency) |") < tbl.index(
+        "| **A 4-pick Power Play leg (56%) needs** |") < tbl.index("| Market's chance of the Over |") < tbl.index(
+        "| Engine's own chance of the Over")
+    assert "**What a Power Play leg needs at each efficiency**" in report
+    card = report[report.index("#### Javonte Williams"):]
+    card = card[:card.index("| Role evidence |")]
+    main = next(ln for ln in card.splitlines() if ln.startswith("| **A 4-pick Power Play leg (56%) needs** |"))
+    eng = next(ln for ln in card.splitlines() if ln.startswith("| At the engine's rate |") and "a carry:" in ln)
+    rush_main = main.split(" | ")[-1].rstrip(" |")
+    rush_eng = eng.split(" | ")[-1].rstrip(" |").split(": ", 1)[1]
+    assert rush_main == rush_eng, (rush_main, rush_eng)
+    assert "| At his rate this season |" in card and "carries and targets are the opinion to form" in card
+
+
+def test_the_power_play_workloads_straddle_what_the_line_assumes(run_full):
     """DECISIONS #225: a leg needs ~56% whichever side, so the Over needs more work than the line assumes
     (the market's ~50%) and the Under less; both resolve for most lines."""
-    _rep, research, _e = run
+    _rep, research, _e = run_full
     d = research[research.market.isin(["player_receptions", "player_reception_yds", "player_rush_yds"])]
     both = d.dropna(subset=["pp_over_needs", "pp_under_needs", "market_volume"])
     assert len(both) >= 0.7 * len(d), "the Power Play search resolves for most lines"
