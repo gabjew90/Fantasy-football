@@ -7,14 +7,14 @@
 # their values, so changing one fails CI until that test is edited too.
 
 tuned:
-  carry_r: 16        # How much his carries swing from game to game around his average. Higher = steadier. (prototype value)
-  day_sd: 0.15       # How much a whole rushing day runs hot or cold: 0.15 means a typical day is within about 15% of his usual yards per carry. (prototype value)
-  target_r: 8        # How much the passes thrown to him swing from game to game. Higher = steadier. (prototype value)
-  completion_r: 10   # How much a quarterback's completions swing from game to game. Higher = steadier. (starting value)
-  k_ypc: 150         # How many of his own carries count as much as the running-back average when blending his yards per carry. (starting value)
-  k_catch: 60        # The same, for catch rate, counted in passes thrown to him. (starting value)
-  k_ypr: 50          # The same, for yards per catch, counted in catches. (starting value)
-  k_ypcomp: 150      # The same, for yards per completion, counted in completions. (starting value)
+  carry_r: 8  # How much his carries swing from game to game around his average. Higher = steadier. (tuned on 2018-2023, 2026-10-10; was 16)
+  day_sd: 0.05 # How much a whole rushing day runs hot or cold: 0.15 means a typical day is within about 15% of his usual yards per carry. (tuned on 2018-2023, 2026-10-10; was 0.15)
+  target_r: 10 # How much the passes thrown to him swing from game to game. Higher = steadier. (tuned on 2018-2023, 2026-10-10; was 8)
+  completion_r: 25 # How much a quarterback's completions swing from game to game. Higher = steadier. (tuned on 2018-2023, 2026-10-10; was 10)
+  k_ypc: 200 # How many of his own carries count as much as the running-back average when blending his yards per carry. (tuned on 2018-2023, 2026-10-10; was 150)
+  k_catch: 10 # The same, for catch rate, counted in passes thrown to him. (tuned on 2018-2023, 2026-10-10; was 60)
+  k_ypr: 50 # The same, for yards per catch, counted in catches. (tuned on 2018-2023, 2026-10-10; was 50)
+  k_ypcomp: 800 # The same, for yards per completion, counted in completions. (tuned on 2018-2023, 2026-10-10; was 150)
 
 fixed_not_tuned:
   season_type: REG              # Only regular-season games are read.
