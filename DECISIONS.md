@@ -8610,6 +8610,9 @@ every row while the predictions rows carry open / decision / close (line_archive
   changed, props/record/lines/ read only.
 - **Validation, fixed before any result is read:** conversion and spread tests tuned on
   2018-2023; 2024-25 held out and read once at the end, the read recorded in the note.
+- **Addition (user, same day):** a MATCHUP block on each card (game lines and implied points,
+  key injuries with with/without splits, the opposing defense against his position, tiers from EPA
+  and success rate). Display only: it may not change a calculated number or become a setting.
 - **Status:** design note awaiting the user's approval; no code yet. Ten open questions are in
   the note (data access through core.fetch, matching by id, the blend window, test location,
   registry status, passing-yards design).

@@ -37,6 +37,7 @@ props/calc/
   sim.py             the per-market chance-of-clearing functions
   search.py          finds the workload for a target chance
   card.py            leg card text
+  matchup.py         the MATCHUP block (display only)
   entry.py           entry check (game story, conflicts, cost)
   log.py             jsonl log and season summary
   validate.py        conversion, spread, round-trip and game-story tests (writes reports)
@@ -164,6 +165,53 @@ Gap: 2 carries above what the book expects.
   (for example under 1: "about what the book expects"; 1 to 3: "a bit more"; over 3: "a lot more").
   The words are fixed text, not a judgement of the line.
 
+**1b. MATCHUP block** (added by the user, 2026-10-10). Display only: nothing in it changes any
+calculated number, feeds the search, or becomes a setting. A test checks that the card's numbers
+are identical with the block on and off. Computed in `props/calc/matchup.py` from play-by-play,
+weekly rosters, the nflverse injury file and schedules; nothing is imported from the engine.
+Every line carries its sample size, and says "only N games" when there are fewer than 4 (M1).
+Each line is worded against the card's question, as a fact beside the needed workload or rate,
+never as a verdict.
+
+- **Game:** spread, total and each team's implied points (implied = total / 2 +/- spread / 2,
+  using the schedule's closing `spread_line` and `total_line`; nflverse's sign convention is
+  checked against a known game before use). Example: "DEN favored by 3.5, total 41.5: DEN about
+  22.5, MIA about 19. A rushing Over needs DEN ahead."
+- **Key injuries:** a QB change, and any top-3 target or lead back of his team listed Out or
+  Doubtful for the priced week (M2, M3). For each, his own workload in games with and without
+  that player, this season and last. Example: "Sutton out. Williams with Sutton: 15.2 carries
+  (9 games); without: 18.0 (only 2 games). He needs 20."
+- **Opposing defense, his market:**
+  - rushing: yards per carry allowed to RBs, with rank of 32. "MIA allows 4.6 a carry to RBs
+    (27th, 5 games). He needs 3.2 a carry at 20 carries."
+  - receiving: yards per target and catch rate allowed to his position (WR / TE / RB), with
+    ranks.
+  - passing: yards per completion and completion rate allowed (M4).
+- **Volume allowed:** carries and yards (rushing) or targets and yards (receiving) allowed per
+  game to his position, with rank. "MIA faces 24.1 RB carries a game (8th most, 5 games)."
+- **Tiers:** each team's offense and defense placed in one of four tiers (ranks 1-8, 9-16, 17-24,
+  25-32) by the average of its EPA-per-play rank and success-rate rank, garbage time excluded
+  (M5). Shown as words ("top-8 run defense", "bottom-8 offense") with the games counted.
+
+Scope: this season, games before the priced week (the same leakage cut-off as everything else).
+Early in a season, when a team has fewer than 4 games, last season's figure is shown beside it,
+labelled as last season (M6).
+
+Open questions for the MATCHUP block:
+- M1. "Thin" threshold: fewer than 4 games? (A display rule, fixed in code, not a setting.)
+- M2. Whose injuries: his team only, or his team plus the opposing QB (which moves game story)?
+  Proposal: both.
+- M3. Source for the priced week's status. The nflverse injury file is the official report but
+  can lag a day; Sleeper's player file has a live `injury_status`. Proposal: the official report
+  when the week is present, else Sleeper's status labelled "Sleeper status, not the official
+  report". "Out" = Out or Doubtful; Questionable is listed but not split.
+- M4. Passing cards: the brief names rushing and receiving only. Proposal: yards per completion
+  and completion rate allowed, plus sacks per dropback, so yards per completion gets its context.
+- M5. Garbage time: proposal, plays with win probability outside 10-90% are excluded, for the
+  tiers only. Should the per-carry and per-target allowed figures also exclude garbage time?
+  Proposal: no, so they match how lines settle (all plays count).
+- M6. Fall back to last season when under 4 games: yes, shown separately, never blended.
+
 **2. Entry check.** For each leg, the game story it needs: rushing Overs want the team ahead;
 passing and receiving Overs want it behind or a shootout; Unders the reverse. Conflicts are listed
 (for example a rushing Over and the same team's passing Over; a rushing Over and the opponent's
@@ -222,7 +270,7 @@ Pass marks, fixed now:
 - **Game-story rows.** Team carries by result bucket (won by 8+, within 7, lost by 8+), from prior
   games, predict the actual bucket averages within about 1.5 carries on 2024-25 (read at the
   held-out step).
-- **Unit tests:** odds conversion; name matching (Joshua/Josh, "C.McCaffrey", suffixes); the
+- **Unit tests:** the MATCHUP block leaves every card number unchanged; odds conversion; name matching (Joshua/Josh, "C.McCaffrey", suffixes); the
   leakage cut-off; the boundary rule (no import from `props.engine` or `props/engine/`, by AST,
   same pattern as `props/tests/test_boundary.py`).
 - **Sanity targets** (from the user's prototype; within about 1 before tuning is expected):
@@ -270,12 +318,12 @@ Each has a proposal; none is acted on until answered.
   This is a calculator, not a projection, but it has tuned settings. Proposal: register it as
   `provisional` with the note "calculator; validated by the conversion and spread tests" and move
   it to `live` with the held-out report as evidence if it passes.
-- **P1-P4** under Passing yards.
+- **P1-P4** under Passing yards; **M1-M6** under the MATCHUP block.
 
 ## Order
 
 1. This note and DECISIONS #226 (stop for approval). 2. Log and standalone Sleeper capture.
-3. Rushing and receptions + conversion test. 4. Leg card. 5. Receiving yards, then passing yards.
+3. Rushing and receptions + conversion test. 4. Leg card, with the MATCHUP block. 5. Receiving yards, then passing yards.
 6. Entry check. 7. Held-out read and write-up.
 
 ## Held-out read
