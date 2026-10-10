@@ -657,8 +657,16 @@ WIDTH_OFF = {"share_conc_targets": None, "share_conc_carries": None, "catch_conc
              "catch_shape_mult_te": None, "catch_shape_mult_rb": None, "te_share_mult": None,
              # round 40 (reports/round40_receiving_level.md): every receiver's yards a catch times
              # this (None or 1 = as blended), the depth bucket's too, so QB passing (their sum) moves with it
-             "rec_ypc_mult": None}
+             "rec_ypc_mult": None,
+             # round 44 (reports/round44_carry_exits.md): per simulation, each non-QB rusher with an
+             # expected carry share of at least carry_exit_min_share exits early with probability
+             # carry_exit_rate (0 = off): his share that game x Uniform(0, EXIT_KEEP), the rest to his
+             # non-QB teammates; mean-preserving (exit_adjusted_shares)
+             "carry_exit_rate": 0.0, "carry_exit_min_share": 0.15, "carry_exit_keep": 0.4}
 PASS_IMPLIED_REF = 22.0          # about the league's mean implied team points
+# an early exit keeps Uniform(0, carry_exit_keep) of his share that game; the default is the
+# diagnostic's collapse line (experiments/game_script_carries.py), fixed at round 44's registration
+EXIT_KEEP = WIDTH_OFF["carry_exit_keep"]
 
 # simulate_team_game(..., return_other=True) files the 'other' bucket's targets
 # under this key, for simulate_qb_passing.
@@ -703,6 +711,12 @@ def validate_width(w):
         elif k == "rush_norm_strength":
             if not (isinstance(v, (int, float)) and 0 <= v <= 1):
                 raise ValueError(f"{k} must be in [0, 1], got {v!r}")
+        elif k == "carry_exit_rate":
+            if not (isinstance(v, (int, float)) and 0 <= v < 0.5):
+                raise ValueError(f"{k} must be in [0, 0.5) (0 = off), got {v!r}")
+        elif k in ("carry_exit_min_share", "carry_exit_keep"):
+            if not (isinstance(v, (int, float)) and 0 < v < 1):
+                raise ValueError(f"{k} must be in (0, 1), got {v!r}")
         elif k == "rush_norm_lead":
             if v is not None and not (isinstance(v, (int, float)) and 0 <= v <= 1):
                 raise ValueError(f"{k} must be null (proportional, #103) or in [0, 1], got {v!r}")
@@ -711,17 +725,126 @@ def validate_width(w):
     return out
 
 
-def _allocate(rng, totals, p_norm, conc, fill_last):
+def exit_adjusted_shares(p_norm, can_exit, receive, rate, keep=EXIT_KEEP, iters=500):
+    """The expected shares to draw from so that, after early exits (_apply_exits), every player's
+    average share is p_norm again (round 44). Exact in expectation: every combination of exiters is
+    enumerated (a team has a handful who can exit), each exiter keeps keep / 2 of his share on
+    average, and what the exiters lose goes to the receivers left that game in proportion to their
+    PROJECTED shares (to 'other', the last entry, when none is left).
+
+    Two limits, both real: a receiver whose expected gain exceeds his whole projected share (a 2%
+    backup behind a 60% lead back) cannot give it back -- his share to draw stops at zero and his
+    mean rises, as it does when he gets the starter's work. The unpriced 'other' bucket gives up
+    the difference; where it has no room (the board's shares already fill the team, so 'other' is
+    zero), the rest comes off every other receiver's target in proportion, a small even trim
+    instead of a renormalisation of everyone. The total stays one."""
+    from itertools import combinations
+    p = np.asarray(p_norm, dtype=float)
+    can_exit, receive = np.asarray(can_exit, dtype=bool), np.asarray(receive, dtype=bool)
+    ex = np.flatnonzero(can_exit)
+    if rate <= 0 or not len(ex):
+        return p.copy()
+    if len(ex) > 8:
+        raise ValueError(f"{len(ex)} players can exit: the exact enumeration is meant for a handful")
+    loss = 1.0 - keep / 2.0                          # the average share an exiter gives up
+    subsets = [(S, rate ** len(S) * (1 - rate) ** (len(ex) - len(S)))
+               for m in range(1, len(ex) + 1) for S in combinations(ex, m)]
+    other = len(p) - 1
+
+    def expected(base):
+        out = base.copy()
+        for S, pr in subsets:
+            S = list(S)
+            freed = loss * base[S].sum()
+            out[S] -= pr * loss * base[S]
+            left = receive.copy()
+            left[S] = False
+            denom = p[left].sum()                    # the handout follows the PROJECTED shares
+            if denom > 0:
+                out[left] += pr * freed * p[left] / denom
+            else:
+                out[other] += pr * freed
+        return out
+
+    def solve(target):
+        fixed = ~receive
+        fixed[other] = False                         # the QB is drawn as he is; 'other' balances
+        base = target.copy()
+        for _ in range(iters):
+            e = expected(base)
+            new = np.clip(base + (target - e), 0.0, None)
+            new[fixed] = target[fixed]
+            new[other] = target.sum() - new[:other].sum()
+            if np.max(np.abs(new - base)) < 1e-13:
+                return new
+            base = new
+        raise ValueError("exit_adjusted_shares did not converge")
+
+    target = p.copy()
+    for _ in range(50):
+        base = solve(target)
+        short = -base[other]
+        if short <= 1e-12:
+            break
+        room = receive & (base > 1e-12)              # the receivers who can still give share back
+        if target[room].sum() <= short:
+            raise ValueError("exit_adjusted_shares: the backups' gains exceed the whole team's room")
+        target = target.copy()
+        target[room] *= 1.0 - short / target[room].sum()
+        target[other] = p[other] + short             # what 'other' would have had to go below zero
+    else:
+        raise ValueError("exit_adjusted_shares: the trim did not settle")
+    e = expected(base)
+    exact = receive & (base > 1e-12)
+    if np.max(np.abs(e[exact] - target[exact]), initial=0.0) > 1e-9:
+        raise ValueError("exit_adjusted_shares: the means would drift from their targets")
+    return np.clip(base, 0.0, None)
+
+
+def _apply_exits(rng, P, rate, can_exit, receive, weights, keep=EXIT_KEEP):
+    """Per simulation (row of P), each can_exit player exits with probability `rate`: his share x
+    Uniform(0, EXIT_KEEP); the share he loses goes to the receive players who did not exit that
+    simulation, in proportion to their PROJECTED shares (`weights`, p_norm before the exit
+    adjustment) -- the proportion exit_adjusted_shares assumes, so the means hold exactly but for two teammates
+    exiting in one game -- or to the last column, 'other', if none is left. Round 44."""
+    n, k = P.shape
+    hit = (rng.random((n, k)) < rate) & np.asarray(can_exit, dtype=bool)[None, :]
+    kept = rng.uniform(0.0, keep, size=(n, k))
+    newP = np.where(hit, P * kept, P)
+    freed = (P - newP).sum(axis=1)
+    rec = np.asarray(receive, dtype=bool)[None, :] & ~hit
+    w = np.where(rec, np.asarray(weights, dtype=float)[None, :], 0.0)
+    ws = w.sum(axis=1)
+    newP = newP + np.divide(w, ws[:, None], out=np.zeros_like(w), where=ws[:, None] > 0) * freed[:, None]
+    nobody = ws <= 0
+    newP[nobody, -1] += freed[nobody]
+    return newP
+
+
+def _allocate(rng, totals, p_norm, conc, fill_last, exits=None):
     """Split each simulation's team total across the players (+ 'other').
 
     conc None: fixed shares, sequential conditional binomials (the original
     sampler, call for call). conc > 0: each simulation first draws its own
     shares from Dirichlet(conc * p_norm), so a player's share swings from game
-    to game around the same mean."""
+    to game around the same mean. exits: (rate, can_exit, receive) -- round 44's
+    early exits applied to each simulation's shares, (rate, can_exit, receive, weights, keep) (None
+    or rate 0 = off, call for call)."""
     k = len(p_norm)
     alloc = np.zeros((len(totals), k), dtype=int)
     remaining = totals.copy()
-    if conc is None:
+    if exits is not None and exits[0] > 0:
+        if conc is None:
+            P = np.tile(np.asarray(p_norm, dtype=float), (len(totals), 1))
+        else:
+            g = rng.gamma(np.maximum(conc * p_norm, 1e-9), size=(len(totals), k))
+            P = g / g.sum(axis=1, keepdims=True)
+        P = _apply_exits(rng, P, *exits)
+        rem_p = np.ones(len(totals))
+        for j in range(k - 1):
+            pj = np.clip(np.divide(P[:, j], rem_p, out=np.zeros(len(totals)), where=rem_p > 0), 0.0, 1.0)
+            alloc[:, j] = rng.binomial(remaining, pj); remaining = remaining - alloc[:, j]; rem_p = rem_p - P[:, j]
+    elif conc is None:
         rem_p = 1.0
         for j in range(k - 1):
             pj = np.clip(p_norm[j] / rem_p, 0.0, 1.0) if rem_p > 0 else 0.0
@@ -738,7 +861,7 @@ def _allocate(rng, totals, p_norm, conc, fill_last):
     return alloc
 
 
-def _allocate_qb_first(rng, totals, p_norm, qb, conc_qb, conc_rest):
+def _allocate_qb_first(rng, totals, p_norm, qb, conc_qb, conc_rest, exits=None):
     """Split carries with the starting QB's share varying on its own.
 
     His share each simulation ~ Beta(conc_qb * q, conc_qb * (1 - q)); everyone
@@ -759,6 +882,8 @@ def _allocate_qb_first(rng, totals, p_norm, qb, conc_qb, conc_rest):
     else:
         D = np.broadcast_to(base, (n, len(rest)))
     P[:, rest] = (1.0 - P[:, [qb]]) * D
+    if exits is not None and exits[0] > 0:
+        P = _apply_exits(rng, P, *exits)        # round 44; the QB neither exits nor receives
     alloc = np.zeros((n, k), dtype=int)
     remaining = totals.copy()
     rem_p = np.ones(n)
@@ -863,12 +988,23 @@ def simulate_team_rush(rng, n_sim, team_carries_mean, carries_r, rush_shares, yp
     rs = rescale_rush_shares(rush_shares, w, qb_index)
     rest = max(1.0 - rs.sum(), 0.0)
     p_norm = np.append(rs, rest); p_norm = p_norm / p_norm.sum()
+    exits = None
+    if w["carry_exit_rate"] and qb_index is not None:
+        # round 44: the non-QB rushers on the board receive an exiter's share; those with a real
+        # role (expected share >= carry_exit_min_share) can exit; the QB and 'other' do neither.
+        # Without a named starting QB the option stays off: a running QB is not a back.
+        receive = np.array([j != int(qb_index) for j in range(len(rs))] + [False])
+        can_exit = receive & (p_norm >= w["carry_exit_min_share"])
+        projected = p_norm
+        p_norm = exit_adjusted_shares(projected, can_exit, receive, w["carry_exit_rate"], w["carry_exit_keep"])
+        exits = (w["carry_exit_rate"], can_exit, receive, projected, w["carry_exit_keep"])
     mu_c = max(team_carries_mean, 1e-6)
     tc_draw = rng.negative_binomial(carries_r, carries_r / (carries_r + mu_c), size=n_sim)
     if qb_index is not None and w["share_conc_qb"]:
-        alloc = _allocate_qb_first(rng, tc_draw, p_norm, int(qb_index), w["share_conc_qb"], w["share_conc_carries"])
+        alloc = _allocate_qb_first(rng, tc_draw, p_norm, int(qb_index), w["share_conc_qb"], w["share_conc_carries"],
+                                   exits=exits)
     else:
-        alloc = _allocate(rng, tc_draw, p_norm, w["share_conc_carries"], fill_last=False)
+        alloc = _allocate(rng, tc_draw, p_norm, w["share_conc_carries"], fill_last=False, exits=exits)
     carries, yards = [], []
     for j in range(len(rs)):
         car = alloc[:, j]

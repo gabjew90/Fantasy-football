@@ -20,6 +20,7 @@ read on the same confirmation weeks uses 1 - 0.05 / k intervals.
 | 2026-10-09 | efficiency source | round 43 own yards per target (capped + add-back) | 2026 wk 2-4 | once | null (receiving yards -3.2% / -3.3%) |
 | 2026-10-09 | efficiency source / running game | round 43 own yards per carry (capped + add-back) | 2026 wk 2-4 | once | null (+1.0% on 2022-24, not detectable; -0.5% on 2026) |
 | 2026-10-09 | efficiency source | round 43 all three own rates | 2026 wk 2-4 | once | reported only; fails the guards |
+| 2026-10-09 | running game (shape) | round 44 early exits x split (8 settings) | 2022-25 selection | -- | shipped best within the tie (best 0.03 exits, +0.03%); 2026 wk 2-5 unread |
 
 The running-game family has been read four times on 2026 weeks 2-4: any further
 running-game candidate confirmed on those weeks uses 1 - 0.05 / 6 = 99.2% intervals.

@@ -1,9 +1,12 @@
 {
+ "carry_exit_keep": 0.4,
+ "carry_exit_min_share": 0.15,
+ "carry_exit_rate": 0.0,
  "catch_conc": null,
  "eff_sd_qb": 0.15,
  "eff_sd_rec": 0.0,
  "eff_sd_rush": 0.15,
- "note": "backtest.py --tune-width (reports/width_tuning.md), --tune-grid qb (reports/width_tuning_qb.md) and --tune-grid rushlead (reports/width_tuning_rushlead.md, round 15, DECISIONS #133); eff_sd_rush 0.30 -> 0.15 by round 30 (reports/round30_conversion.md, DECISIONS #189: the conversion score with actual carries plugged in, 2022-25 + 2026 weeks 2-4); share_conc_targets 40 -> 60 by round 34 (reports/round34_receiving_joint.md, DECISIONS #195: receptions own-volume log loss on 2022-24, confirmed on 2025); pass_implied_exp 0.2 and pass_scale 1.04 by round 38 (reports/round38_qb_passing_bias.md, DECISIONS #199: QB passing own-volume log loss, calibration by implied points, confirmed on 2026 weeks 2-4; the width guard overridden by the user)",
+ "note": "backtest.py --tune-width (reports/width_tuning.md), --tune-grid qb (reports/width_tuning_qb.md) and --tune-grid rushlead (reports/width_tuning_rushlead.md, round 15, DECISIONS #133); eff_sd_rush 0.30 -> 0.15 by round 30 (reports/round30_conversion.md, DECISIONS #189: the conversion score with actual carries plugged in, 2022-25 + 2026 weeks 2-4); share_conc_targets 40 -> 60 by round 34 (reports/round34_receiving_joint.md, DECISIONS #195: receptions own-volume log loss on 2022-24, confirmed on 2025); pass_implied_exp 0.2 and pass_scale 1.04 by round 38 (reports/round38_qb_passing_bias.md, DECISIONS #199: QB passing own-volume log loss, calibration by implied points, confirmed on 2026 weeks 2-4; the width guard overridden by the user); carry_exit_rate 0 (off), carry_exit_min_share 0.15 and carry_exit_keep 0.4 added for round 44 (reports/round44_carry_exits.md), off until a measured delta",
  "pass_implied_exp": 0.2,
  "pass_scale": 1.04,
  "rush_norm_lead": 1.0,

@@ -138,3 +138,11 @@ yards of where real bets sit.
   (props/tools/loso_select.py) beside the in-sample gain. Detectability is still read on the
   registered seasons; an out-of-fold gain at or below zero is reported as a warning sign of
   selection, not a separate veto.
+- **2026-10-09, before round 44 reads anything (DECISIONS #227):** a change to the SHAPE of a
+  volume draw (round 44: an early-exit chance in the carries split) is judged on the own-volume
+  score at the stand-in lines for its market and on the PIT tail it targets (moving toward 10%,
+  not past), with the spread check as a guard (no band may become too wide for sure). The spread
+  check measures variance in stable-role stretches and cannot see shape: for carries it already
+  reads 1.01-1.06, so it would reject any added spread by construction, while the carries PIT's
+  lower tail runs 3x thin (experiments/game_script_carries.py). Plain concentration changes stay
+  judged on the spread check as before.

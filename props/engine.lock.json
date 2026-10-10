@@ -1,6 +1,6 @@
 {
   "algorithm": "props-engine-sha256-lf-1",
-  "engine_sha256": "f2f91801e5ba275fa728fa94370abb94aadf40e2292a28e7165f8f9815afe1a1",
+  "engine_sha256": "dc89f72888d5b4b1b39a992d94ff513c00164413070a117a2b623e6a86d977a8",
   "file_count": 64,
   "files": {
     "SKILL.md": "8b69e0c72108a33ddfafb105a0fdd07ed46a10d5bf40d14f7cc46d8d73e9fbdd",
@@ -42,14 +42,14 @@
     "resources/stadium_coords.csv": "cf9ce9133fa57249347a2ee14c90b2ddc011602aed5398b1ebf3f7fd0ea71aa1",
     "resources/td_parlay_gate.json": "9619f7de2f262d87c15fbedcc65d95de98c8fc16f87ea9b81630ca0969ddf0f4",
     "resources/team_matchup_guide.md": "b819405165d7499993b545d18e2ad4950b0b15d80774c700c3fca55348abdeeb",
-    "resources/width_params.json": "8157cb9f0c31ecd2927ef75cd129e97b5639fbd60817c6ab93f805ebeeeca8c9",
+    "resources/width_params.json": "d831695b292d1c6ca9510089ca26009c41da685f95b78fb71960f38eb781c6fd",
     "scripts/absence_tune.py": "4bb4daaf1861f93ff8d57504e9fff5e0b0b828306d8210b688c87aa25ef27d1d",
-    "scripts/backtest.py": "86a4f66cd0eabc6977e51b42d80d9cb85a018953b224717da74f588f4329b90f",
+    "scripts/backtest.py": "fd2e23748d466b94c02f4629051a3250ac12d4912490be63025c52585d00b023",
     "scripts/build_play_yards.py": "51af89e684bd85e9e33e6f894a0a3002e13e98e0f00b94a4f91e4dbe474c8dfa",
     "scripts/build_priors.py": "015c897123ce6f0874429863d3708c9d7aed4a80d72b6faaf130c5f356fdc191",
     "scripts/build_td_priors.py": "c7330a57e68c1b7c5f8a9304bfbddbb4be0ca285d9f37ef383173d3e3049c27f",
     "scripts/eligibility.py": "91b45727f37f690a1416e9461d2ef5f00f4bd1c31985fd31d312e2251fd76bd2",
-    "scripts/model.py": "c692e34e63219841bcb3cfd5da2427f4129acb3a27f2e9bf7dfc120f304e226b",
+    "scripts/model.py": "b894f141723975cb9195bbf8acb1c979a523811dceb47c8d2f28494f23d9c768",
     "scripts/odds_client.py": "434186273bd0412a5545247228298951c5d0504a19c8a47c4c782bf3bb75aaa1",
     "scripts/publish.py": "68bd8321c5876cf84eaf006a3603777c8ad6377166fc525759ac6e1fbbc9b7a7",
     "scripts/publish_pdf.py": "a4514ccbcc0254373c32e35bf3cd05ed97461347608ec43dff965697ea56bdb4",
@@ -68,5 +68,5 @@
     "scripts/td_model.py": "7c1635bbf515b4316f14771b177363a9f82a1ba7ad3393e479cd2dce26a25724",
     "scripts/td_v1.py": "bb4ef62e525c948889ef4e45f6c41564dcc7bed2a97b3d4def0792848f12c485"
   },
-  "tag": "props-v1.64"
+  "tag": "props-v1.65"
 }
