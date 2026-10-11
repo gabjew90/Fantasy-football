@@ -133,8 +133,8 @@ def test_card_renders_the_spec_layout():
     bar = card.value(c, "needed_over")
     for needle in (f"Bar for this price  ~{card._round(bar)} carries", "Last 4: 12, 12, 19, 19  (avg 15.5)",
                    f"{card._round(bar)}+ this season: ", "AT 15.5 CARRIES",
-                   "Needed at this price: ", "His recent rate (5 games): 4.2", "This season: ",
-                   "Tampa Bay allows: 4.4 to RBs (4 games)", "MATCHUP", "DAL run offense B vs TB run defense C",
+                   "Needed at this price: ", "His recent rate (5 games): 4.2 yards a carry",
+                   "This season: ", "Tampa Bay allows: 4.4 yards a carry to RBs (4 games)", "MATCHUP", "DAL run offense B vs TB run defense C",
                    "Dallas favored by 9.5. Total 49.5.", "Line as of Oct 8, 4:59 PM PT."):
         assert needle in flat, needle
     for gone in ("Under", "Gap", "Book expects", "%", "wins often enough", "Bar assumes", "Line implies",
@@ -433,7 +433,7 @@ def test_the_closing_question_follows_the_four_cases_and_turns_round_for_unders(
     assert q("rush_yds", "over", 0.2, 0.9) == "Workload is there. 0.9 more yards a carry?"          # 0.2 -> 0
     assert q("rush_yds", "over", 2.8, -0.2) == "At his recent rate it clears. About 3 more carries?"
     assert q("receptions", "over", -2.1, -1.5) == "Room for about 2 fewer targets?"
-    assert q("receptions", "over", 1.1, 0.5) == "About 1 more target, or 0.5 more catches per 10?"
+    assert q("receptions", "over", 1.1, 0.5) == "About 1 more target, or 0.5 more catches per 10 targets?"
     assert q("rush_yds", "over", 0.1, 0.04) == "Recent workload and rate both meet the bar."
     # an Under needs less: a bar below his average and a needed rate below the assumed rate
     assert q("rush_yds", "under", -3, -0.9) == "About 3 fewer carries, or 0.9 less yards a carry?"
@@ -616,7 +616,7 @@ def test_step_d_decisions_on_the_card():
     c = card.compute(pl, rush_model(ypc=4.2), "rush_yds", 64.5, 1.8, 1.76, fixed)
     flat = " ".join(card.render(pl, c, "over", opp="TB", qb_today="Starting QB not confirmed.").splitlines())
     assert "* Week 4: Jalon Daniels started at QB." in flat and "backup" not in flat
-    assert "This season: 3.7 (12 carries)" in flat and "only" not in flat
+    assert "This season: 3.7 yards a carry (12 carries)" in flat and "only" not in flat
     assert flat.rstrip().endswith("Starting QB not confirmed.") or "Starting QB not confirmed." in flat
     # the rate ask is the difference of the two rates as shown: 4.9 shown minus 4.2 shown
     need = c["solutions"]["rate_needed_over"].value

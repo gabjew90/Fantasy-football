@@ -7,6 +7,7 @@ percentages. About 40 characters wide."""
 from __future__ import annotations
 
 import math
+import re
 import textwrap
 
 from . import calc, odds
@@ -59,14 +60,17 @@ def compute(pl: Player, model: calc.Model, market: str, line: float, mult_over: 
 
 
 
-# per market: the bet's words, the workload unit (singular, plural), the rate's
-# long and short units, and the factor from the model's rate to the shown one
+# per market: the bet's words, the workload unit (singular, plural), the rate's unit (one, named on
+# every rate line: the user, 2026-10-11), and the factor from the model's rate to the shown one
 SHOW = {
-    "rush_yds": ("rushing yards", ("carry", "carries"), "yards a carry", "yards a carry", 1.0),
-    "receptions": ("catches", ("target", "targets"), "catches per 10 targets", "catches per 10", 10.0),
-    "rec_yds": ("receiving yards", ("target", "targets"), "yards a target", "yards a target", 1.0),
-    "pass_yds": ("passing yards", ("completion", "completions"), "yards a completion", "yards each", 1.0),
+    "rush_yds": ("rushing yards", ("carry", "carries"), "yards a carry", 1.0),
+    "receptions": ("catches", ("target", "targets"), "catches per 10 targets", 10.0),
+    "rec_yds": ("receiving yards", ("target", "targets"), "yards a target", 1.0),
+    "pass_yds": ("passing yards", ("completion", "completions"), "yards a completion", 1.0),
 }
+# the chat card's rate-table heading, per market
+RATE_TITLE = {"rush_yds": "Yards per carry", "receptions": "Catches per 10 targets", "rec_yds": "Yards per target",
+              "pass_yds": "Yards per completion"}
 RATE_KEY = {"rush_yds": "ypc", "receptions": "catch", "rec_yds": "ypt", "pass_yds": "ypcomp"}
 WIDTH = 40
 # cities shared by two teams keep the full name
@@ -153,17 +157,21 @@ def last_games(pl: Player, market: str, n: int) -> list[tuple]:
             for _, r in pl.window.tail(n).iterrows()]
 
 
-def _season_count(pl: Player, market: str, side: str, bar: float) -> str:
+def season_hits(pl: Player, market: str, side: str, bar: float) -> tuple[int, int, int]:
+    """(the bar as a whole number of games' workload, games this season that reached it, games)."""
     col = workload_col(market)
     g = pl.season_games
     shown = shown_work(bar)                    # the bar as displayed (the user, 2026-10-10)
     if side == "over":
         n = math.ceil(shown - 1e-9)                # a shown 3.2 counts games of 4 or more
-        hit = int((g[col] >= n).sum())
-        return f"{n}+ this season: {hit} of {len(g)}"
+        return n, int((g[col] >= n).sum()), len(g)
     n = math.floor(shown + 1e-9)
-    hit = int((g[col] <= n).sum())
-    return f"{n} or fewer this season: {hit} of {len(g)}"
+    return n, int((g[col] <= n).sum()), len(g)
+
+
+def _season_count(pl: Player, market: str, side: str, bar: float) -> str:
+    n, hit, of = season_hits(pl, market, side, bar)
+    return f"{n}+ this season: {hit} of {of}" if side == "over" else f"{n} or fewer this season: {hit} of {of}"
 
 
 def question(market: str, side: str, work_ask: float | None, rate_ask: float | None,
@@ -197,7 +205,7 @@ def _question(market: str, side: str, work_ask: float | None, rate_ask: float | 
         work_ask = None if work_ask is None else -work_ask
         rate_ask = None if rate_ask is None else -rate_ask
     more, less, room = ("more", "more", "fewer") if side == "over" else ("fewer", "less", "more")
-    rate_words = SHOW[market][3]
+    rate_words = SHOW[market][2]
     w = lambda n: f"about {_num(n)} {more} {_unit(market, n)}"     # noqa: E731
     r = lambda n: f"{_num(n)} {less} {rate_words}"                 # noqa: E731
     if work_ask is None:
@@ -217,6 +225,51 @@ def _question(market: str, side: str, work_ask: float | None, rate_ask: float | 
     return f"Room for about {_num(-work_ask)} {room} {_unit(market, -work_ask)}?"
 
 
+def condition(market: str, side: str, work_ask: float | None, rate_ask: float | None,
+              reached: int | None = None, of: int = 4) -> str:
+    """The chat card's "What needs to be true" (the user, 2026-10-11: a condition, not a question): the
+    same asks as question(), taken the same way (the nearest half, one decimal, turned round for an
+    Under), stated as what this side needs. "" when the question would be empty."""
+    if work_ask is not None:
+        work_ask = half_up(work_ask, "0.5")
+    if rate_ask is not None:
+        rate_ask = half_up(rate_ask, "0.1")
+    if work_ask is not None and reached is not None:
+        meets = work_ask <= 0 if side == "over" else work_ask >= 0
+        if meets and reached < 2:
+            return f"His recent average meets the bar, but only {reached} of his last {of} games did."
+    if side == "under":
+        work_ask = None if work_ask is None else -work_ask
+        rate_ask = None if rate_ask is None else -rate_ask
+    more, less, room = ("more", "more", "fewer") if side == "over" else ("fewer", "less", "more")
+    rate_words = SHOW[market][2]
+    w = lambda n: f"about {_num(n)} {more} {_unit(market, n)} than his recent average"    # noqa: E731
+    r = lambda n: (f"{_num(n)} more {rate_words} than the assumed rate" if side == "over"     # noqa: E731
+                   else f"{_num(n)} {rate_words} less than the assumed rate")
+    roomy = lambda n: f"room for about {_num(n)} {room} {_unit(market, n)}"              # noqa: E731
+    if work_ask is None:
+        return f"He needs {r(rate_ask)}." if rate_ask is not None and rate_ask > 0 else ""
+    if rate_ask is None:
+        if work_ask > 0:
+            return f"He needs {w(work_ask)}."
+        return ("His recent workload meets the bar." if work_ask == 0
+                else f"His recent workload clears the bar, with {roomy(-work_ask)}.")
+    if work_ask > 0 and rate_ask > 0:
+        return f"He needs {w(work_ask)}, or {r(rate_ask)} at his recent workload."
+    if rate_ask > 0:
+        return f"His recent workload is there; he needs {r(rate_ask)}."
+    if work_ask > 0:
+        return f"At his recent rate, he needs {w(work_ask)}."
+    if work_ask == 0:
+        return "His recent workload and rate both meet the bar."
+    return f"His recent workload and rate meet the bar, with {roomy(-work_ask)}."
+
+
+def grade_line(pl: Player, market: str, opp: str, grades: dict) -> str:
+    kind = "run" if market == "rush_yds" else "pass"
+    return f"{pl.team} {kind} offense {grades['off']} vs {opp} {kind} defense {grades['def']}"
+
+
 def matchup_lines(pl: Player, market: str, opp: str, lines_: dict | None, why_none: str = "",
                   grades: dict | None = None, qb_today: str = "") -> list[str]:
     """MATCHUP: the grade line (run for rushing cards, pass for the others)
@@ -225,7 +278,7 @@ def matchup_lines(pl: Player, market: str, opp: str, lines_: dict | None, why_no
     kind = "run" if market == "rush_yds" else "pass"
     out = ["MATCHUP"]
     if grades and grades.get("off") and grades.get("def"):
-        line = f"{pl.team} {kind} offense {grades['off']} vs {opp} {kind} defense {grades['def']}"
+        line = grade_line(pl, market, opp, grades)
         # too wide: break at "vs", so each grade stays beside its unit
         out += [line] if len(line) <= WIDTH else [f"{pl.team} {kind} offense {grades['off']} vs",
                                                    f"{opp} {kind} defense {grades['def']}"]
@@ -288,87 +341,101 @@ def _last_line(pl: Player, c: dict) -> tuple[list[str], list[tuple]]:
     return out, rows
 
 
+def _parts(pl: Player, c: dict, side: str) -> dict:
+    """Every number a card shows, computed once: the text card (render) and the chat card
+    (render_md) print these and nothing else, so the two cannot disagree (DECISIONS #238)."""
+    m = c["market"]
+    if m in pl.not_enough:
+        raise ValueError(f"not enough data for {m}: use render_not_enough")
+    require_side(side)
+    bet, (one, many), rate_long, k = SHOW[m]
+    rate = pl.rates[RATE_KEY[m]]
+    sol = c["solutions"]
+    s = sol[f"needed_{side}"]
+    res = calc.side_result(side, s.status)
+    top = f"{c['search_max']:.0f}"
+    bar = s.value if res == "ok" else None
+    if bar is not None:
+        bar_text = f"{_work(bar)} {many}" + (" or fewer" if side == "under" else "")
+    else:
+        bar_text = f"{'any' if res == 'always' else 'no'} workload up to {top} {many} clears it"
+    n = int(c["usual_min"])
+    rows = last_games(pl, m, n)
+    g = pl.season_games
+    season = season_hits(pl, m, side, bar) if bar is not None and len(g) else None
+    assumed = c["rate"] * k                  # unrounded: the rate ask is taken from it
+    need, need_text, season_rate = None, None, None
+    if c["usual"] is not None:
+        r = sol[f"rate_needed_{side}"]
+        rr = calc.side_result(side, r.status) if r is not None else None
+        if rr == "ok":
+            need = r.value * k
+            need_text = f"{shown_rate(need):.1f} {rate_long}" + (" or less" if side == "under" else "")
+        else:
+            need_text = f"{'any' if rr == 'always' else 'no'} rate clears it"
+        if rate.season is None:
+            season_rate = f"no {many} yet"
+        else:                                  # below the minimum: the number with its sample, never hidden
+            season_rate = f"{shown_rate(rate.season * k):.1f} {rate_long}" + (
+                "" if rate.season_n >= c["season_min"] else f" ({rate.season_n} {_unit(m, rate.season_n)})")
+    # both asks from the numbers as displayed (the user, 2026-10-10): the bar as shown minus the
+    # last-4 average as shown, then to the nearest half; the needed rate shown minus the recent rate shown
+    work_ask = (shown_work(bar) - half_up(c["usual"], "0.1")) if bar is not None and c["usual"] is not None else None
+    rate_ask = (shown_rate(need) - shown_rate(assumed)) if need is not None else None    # as displayed
+    reached = None
+    if bar is not None and len(rows) >= n:
+        sb = shown_work(bar)
+        reached = sum((w >= sb) if side == "over" else (w <= sb) for w, _, _ in rows)
+    return {"m": m, "bet": bet, "one": one, "many": many, "rate_long": rate_long, "k": k, "res": res, "top": top,
+            "bar": bar, "bar_text": bar_text, "n": n, "rows": rows, "season_games": len(g), "season": season,
+            "assumed": assumed, "assumed_text": f"{shown_rate(assumed):.1f} {rate_long}",
+            "window": f"His recent rate ({len(pl.window)} games)", "need": need, "need_text": need_text,
+            "season_rate": season_rate, "work_ask": work_ask, "rate_ask": rate_ask, "reached": reached}
+
+
 def render(pl: Player, c: dict, side: str, *, opp: str, game_lines: dict | None = None, why_no_lines: str = "",
            footer: str = "", opp_row: dict | None = None, grades: dict | None = None, line_note: str = "",
            qb_today: str = "") -> str:
     """One side's card, in the spec's layout (card rules 1-15, as amended).
     opp_row: {"value", "games", "who"} from opponent.allows (display only);
     grades: matchup.grade_pair's result (display only); footer: one line."""
-    m = c["market"]
-    if m in pl.not_enough:
-        raise ValueError(f"not enough data for {m}: use render_not_enough")
-    require_side(side)
-    bet, (one, many), rate_long, rate_short, k = SHOW[m]
-    rate = pl.rates[RATE_KEY[m]]
-    sol = c["solutions"]
+    P = _parts(pl, c, side)
+    m, many = P["m"], P["many"]
     out = []
     # the test result for this bet type, first on every card (a bet type with no result says so)
     out += _wrap(TEST_STATUS.get(m, "Check first: workload bar untested."))
     if line_note:                              # the lookup skipped newer saved quotes: say so above the numbers
         out += _wrap(f"Check first: {line_note}.")
     out += _title(pl, c, side) + [""]
-    s = sol[f"needed_{side}"]
-    res = calc.side_result(side, s.status)
-    top = f"{c['search_max']:.0f}"
-    bar = None
-    if res == "ok":
-        bar = s.value
-        out.append(f"Bar for this price  {_work(bar)} {many}" + (" or fewer" if side == "under" else ""))
-    elif res == "always":
-        out += _wrap(f"Bar for this price: any workload up to {top} {many} clears it.")
+    if P["bar"] is not None:
+        out.append(f"Bar for this price  {P['bar_text']}")
     else:
-        out += _wrap(f"Bar for this price: no workload up to {top} {many} clears it.")
+        out += _wrap(f"Bar for this price: {P['bar_text']}.")
     last, rows = _last_line(pl, c)
     out += last
-    if bar is not None:
-        g = pl.season_games
-        out.append(_season_count(pl, m, side, bar) if len(g) else f"No games this season before week {pl.week}.")
-        if 0 < len(g) < int(c["usual_min"]):
-            out.append(f"Short history: {len(g)} season games.")
-    assumed = c["rate"] * k                  # unrounded: the rate ask is taken from it
-    window = f"His recent rate ({len(pl.window)} games)"     # the rate the bar assumes (blend explained in "Calculation")
+    if P["bar"] is not None:
+        out.append(_season_count(pl, m, side, P["bar"]) if P["season_games"]
+                   else f"No games this season before week {pl.week}.")
+        if 0 < P["season_games"] < P["n"]:
+            out.append(f"Short history: {P['season_games']} season games.")
+    window = P["window"]                       # the rate the bar assumes (blend explained in "Calculation")
     if c["usual"] is None:                    # no AT block below: the assumed rate is stated here instead
-        out += _wrap(f"Bar assumes {shown_rate(assumed):.1f} {rate_long} ({window[0].lower() + window[1:]}).")
+        out += _wrap(f"Bar assumes {P['assumed_text']} ({window[0].lower() + window[1:]}).")
     # "Line implies (our math)" is not on the default card (the user, 2026-10-10): it is in the
     # "Calculation" follow-up; the row returns only as Sleeper's own workload line (step G)
-    if m in ("receptions", "rec_yds", "pass_yds") and pl.no_depth:
-        plays = "completions" if m == "pass_yds" else "targets"
-        out += _wrap(f"({pl.no_depth} of his {plays} had no recorded depth; left out of his depth mix.)")
+    out += _no_depth(pl, m)
     out += _notes(rows, pl.season)
     # AT ~U: the rate needed at his recent workload, the rate the bar assumes, his season rate, the opponent's
-    need = None
     if c["usual"] is not None:
         out += ["", f"AT {d1(c['usual'])} {many.upper()}"]
-        r = sol[f"rate_needed_{side}"]
-        rr = calc.side_result(side, r.status) if r is not None else None
-        if rr == "ok":
-            need = r.value * k
-            out += _wrap(f"Needed at this price: {shown_rate(need):.1f} {rate_short}" + (" or less" if side == "under" else ""))
-        elif rr == "always":
-            out.append("Needed at this price: any rate clears it")
-        else:
-            out.append("Needed at this price: no rate clears it")
-        out.append(f"{window}: {shown_rate(assumed):.1f}")      # printed as the rate ask reads it
-        if rate.season is None:
-            out.append(f"This season: no {many} yet")
-        elif rate.season_n >= c["season_min"]:
-            out.append(f"This season: {shown_rate(rate.season * k):.1f}")
-        else:                                  # below the minimum: the number with its sample, never hidden
-            out.append(f"This season: {shown_rate(rate.season * k):.1f} ({rate.season_n} {_unit(m, rate.season_n)})")
-        out += _wrap(_opp_line(opp, opp_row))
+        out += _wrap(f"Needed at this price: {P['need_text']}")
+        out += _wrap(f"{window}: {P['assumed_text']}")      # printed as the rate ask reads it
+        out += _wrap(f"This season: {P['season_rate']}")
+        out += _wrap(_opp_line(opp, opp_row, P["rate_long"]))
     else:
         out += ["", f"Only {c['usual_games']} games: no recent average yet."]
     out += [""] + matchup_lines(pl, m, opp, game_lines, why_no_lines, grades, qb_today)
-    # both asks from the numbers as displayed (the user, 2026-10-10): the bar as shown minus the
-    # last-4 average as shown, then to the nearest half; the needed rate shown minus the recent rate shown
-    work_ask = (shown_work(bar) - half_up(c["usual"], "0.1")) if bar is not None and c["usual"] is not None else None
-    # (question() takes it to the nearest half: the same number as work_ask(bar, usual))
-    rate_ask = (shown_rate(need) - shown_rate(assumed)) if need is not None else None    # as displayed
-    reached = None
-    if bar is not None and len(rows) >= int(c["usual_min"]):
-        sb = shown_work(bar)
-        reached = sum((w >= sb) if side == "over" else (w <= sb) for w, _, _ in rows)
-    q = question(m, side, work_ask, rate_ask, reached, len(rows))
+    q = question(m, side, P["work_ask"], P["rate_ask"], P["reached"], len(rows))
     if q:
         out += [""] + _wrap(q)
     if footer:
@@ -376,8 +443,138 @@ def render(pl: Player, c: dict, side: str, *, opp: str, game_lines: dict | None 
     return "\n".join(out)
 
 
-def _opp_line(opp: str, row: dict | None) -> str:
-    """The opponent row: same unit as the needed rate (display only)."""
+def _no_depth(pl: Player, m: str) -> list[str]:
+    if m in ("receptions", "rec_yds", "pass_yds") and pl.no_depth:
+        plays = "completions" if m == "pass_yds" else "targets"
+        return _wrap(f"({pl.no_depth} of his {plays} had no recorded depth; left out of his depth mix.)")
+    return []
+
+
+def _cell(x) -> str:
+    """Text safe inside one markdown table cell."""
+    return " ".join(str(x).replace("|", "/").split())
+
+
+def _md_title(pl: Player, bet: str, side: str, line: float | None, mult: float | None) -> list[str]:
+    head = [f"**{pl.name} · {bet[0].upper() + bet[1:]}**"]
+    if line is not None:
+        head += ["", f"{side.title()} {line:g} {bet} · {odds.fmt_american(odds.american_from_multiplier(mult))}"]
+    return head
+
+
+def _md_last(rows: list[tuple]) -> str:
+    return " · ".join(f"{w}{'*' if mk else ''}" for w, mk, _ in rows)
+
+
+def _md_notes(rows: list[tuple], season: int) -> list[str]:
+    """The text card's marked-game notes, unwrapped, one per bullet."""
+    text = " ".join(_notes(rows, season))
+    return [x.strip() for x in re.split(r"(?:^| )\* ", text) if x.strip()]
+
+
+def render_md(pl: Player, c: dict, side: str, *, opp: str, game_lines: dict | None = None, why_no_lines: str = "",
+              footer: str = "", opp_row: dict | None = None, grades: dict | None = None, line_note: str = "",
+              qb_today: str = "") -> str:
+    """The same card laid out for chat (the user's layout, 2026-10-11; DECISIONS #238): normal markdown,
+    two-column tables, bold only on what the bet needs, and a condition instead of a question. Every
+    number comes from _parts, as on the text card; nothing is added but layout and the condition."""
+    P = _parts(pl, c, side)
+    m, many = P["m"], P["many"]
+    rows = P["rows"]
+    out = _md_title(pl, P["bet"], side, c["line"], c[f"mult_{side}"]) + [""]
+    out += [f"Reliability: {TEST_STATUS.get(m, 'Check first: workload bar untested.')}", ""]
+    if line_note:
+        out += [f"Check first: {line_note}.", ""]
+    out += [f"**Average workload needed: {P['bar_text']}**", ""]
+    if c["usual"] is not None and P["bar"] is not None:
+        out += [f"| Workload | {many[0].upper() + many[1:]} |", "|---|---|",
+                f"| Needed at this price | **{P['bar_text']}** |",
+                f"| Recent {len(rows)}-game average | {d1(c['usual'])} |",
+                f"| Difference from recent | {difference(m, side, work_ask(P['bar'], c['usual']))} |", ""]
+    hist = []
+    if rows:
+        tabled = c["usual"] is not None and P["bar"] is not None
+        avg = f" (average {d1(c['usual'])})" if c["usual"] is not None and not tabled else ""
+        hist.append(f"Last {len(rows)}: {_md_last(rows)}{avg}"
+                    + (" (back into last season)" if c.get("usual_spans_seasons") else ""))
+    else:
+        hist.append(f"No games before week {pl.week}.")
+    if 0 < len(rows) < P["n"]:
+        hist.append(f"Short history: {len(rows)} games.")
+    if P["bar"] is not None:
+        if P["season"] is not None:
+            n, hit, of = P["season"]
+            hist.append(f"{n}+ {many} this season: {hit} of {of} games" if side == "over"
+                        else f"{n} or fewer {many} this season: {hit} of {of} games")
+        else:
+            hist.append(f"No games this season before week {pl.week}.")
+        if 0 < P["season_games"] < P["n"]:
+            hist.append(f"Short history: {P['season_games']} season games.")
+    for x in hist:                             # a paragraph each: a copied reply keeps them apart
+        out += [x, ""]
+    out.pop()
+    notes = _md_notes(rows, pl.season) + [x for x in " ".join(_no_depth(pl, m)).split("\n") if x]
+    if notes:
+        out += [""] + [f"* {x}" for x in notes]
+    out.append("")
+    if c["usual"] is not None:
+        out += [f"**At his recent workload ({d1(c['usual'])} {many})**", "",
+                f"| {RATE_TITLE[m]} | Rate |", "|---|---|",
+                f"| Needed at this price | **{_cell(P['need_text'])}** |",
+                f"| Calculator's assumed rate | {P['assumed_text']} |",
+                f"| This season | {_cell(P['season_rate'])} |",
+                f"| Opponent has allowed | {_cell(_opp_cell(opp_row, P['rate_long']))} |", ""]
+        out += [f"Assumed rate: {P['window'][0].lower() + P['window'][1:]}, blended toward the league average "
+                f"for his position. {_opp_note(opp, opp_row)}", ""]
+    else:
+        out += [f"Only {c['usual_games']} games: no recent average yet. The bar assumes {P['assumed_text']} "
+                f"({P['window'][0].lower() + P['window'][1:]}).", ""]
+    mt = " ".join(matchup_lines(pl, m, opp, game_lines, why_no_lines, grades, qb_today)[1:])
+    if grades and grades.get("off") and grades.get("def"):     # the grade line ends a sentence in prose
+        g = grade_line(pl, m, opp, grades)
+        mt = mt.replace(g, g + ".", 1)
+    out += [f"Matchup: {mt}", ""]
+    cond = condition(m, side, P["work_ask"], P["rate_ask"], P["reached"], len(rows))
+    if cond:
+        out += [f"What needs to be true: {cond}", ""]
+    if footer:
+        out.append(f"_{footer}_")
+    return "\n".join(out).rstrip("\n")
+
+
+def difference(market: str, side: str, ask: float) -> str:
+    """The workload ask in words, as the entry summary says it: positive = what the bet needs."""
+    a = ask if side == "over" else -ask
+    more, fewer = ("more", "fewer") if side == "over" else ("fewer", "more")
+    if a > 0:
+        return f"about {_num(a)} {more}"
+    if a < 0:
+        return f"about {_num(-a)} {fewer}"
+    return "the same"
+
+
+def _opp_cell(row: dict | None, unit: str) -> str:
+    if row is None or row.get("error"):
+        return "not available"
+    if row.get("value") is None and row.get("thin"):
+        return f"only {row['games']} games"
+    if row.get("value") is None:
+        return f"no plays{row.get('who', '')} yet"
+    return f"{d1(row['value'])} {unit}{row.get('who', '')}"
+
+
+def _opp_note(opp: str, row: dict | None) -> str:
+    """The opponent figure's sample, in one sentence (the text card's parenthesis)."""
+    if row is None:
+        return f"{city(opp)}: not available."
+    if row.get("error"):
+        return f"{city(opp)}: not available ({row['error']})."
+    gaps = f"; {row['left_out']} plays left out (no win chance or roster listing)" if row.get("left_out") else ""
+    return f"Opponent figure: {row['games']} games, garbage time left out{gaps}."
+
+
+def _opp_line(opp: str, row: dict | None, unit: str = "") -> str:
+    """The opponent row: same unit as the needed rate, named (display only)."""
     if row is None or row.get("error"):
         return f"{city(opp)} allows: not available" + (f" ({row['error']})" if row else "")
     if row.get("value") is None and row.get("thin"):
@@ -385,7 +582,8 @@ def _opp_line(opp: str, row: dict | None) -> str:
     if row.get("value") is None:
         return f"{city(opp)} allows: no plays{row.get('who', '')} yet ({row['games']} games)"
     gaps = f"; {row['left_out']} plays left out (no win chance or roster listing)" if row.get("left_out") else ""
-    return f"{city(opp)} allows: {d1(row['value'])}{row.get('who', '')} ({row['games']} games{gaps})"
+    unit = f" {unit}" if unit else ""
+    return f"{city(opp)} allows: {d1(row['value'])}{unit}{row.get('who', '')} ({row['games']} games{gaps})"
 
 
 def require_side(side: str) -> None:
@@ -412,4 +610,21 @@ def render_not_enough(pl: Player, m: str, side: str, line: float | None, mult_ov
     out += _notes(rows, pl.season)
     if footer:
         out += [""] + _wrap(footer)
+    return "\n".join(out)
+
+
+def render_not_enough_md(pl: Player, m: str, side: str, line: float | None, mult_over: float | None,
+                         mult_under: float | None, *, footer: str = "") -> str:
+    """render_not_enough laid out for chat: the reason and his last games, no bar."""
+    require_side(side)
+    bet, many = SHOW[m][0], SHOW[m][1][1]
+    out = _md_title(pl, bet, side, line, (mult_over if side == "over" else mult_under) if line is not None else None)
+    out += ["", "Check first: not enough data, so no bar:"] + [f"- {why}" for why in pl.not_enough[m]]
+    rows = last_games(pl, m, 4)
+    out += ["", f"Last games ({many}): {_md_last(rows) or 'none'}"]
+    notes = _md_notes(rows, pl.season)
+    if notes:
+        out += [""] + [f"* {x}" for x in notes]
+    if footer:
+        out += ["", f"_{footer}_"]
     return "\n".join(out)

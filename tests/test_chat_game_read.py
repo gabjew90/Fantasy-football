@@ -18,7 +18,7 @@ def test_a_game_read_is_status_then_the_calculator():
 
 def test_the_routing_table_sends_a_game_read_to_status_and_the_calculator():
     row = next(ln for ln in CHAT.splitlines() if ln.startswith("| break down this game"))
-    assert "`nfl.py status --game AWAY@HOME`" in row and "`python nfl.py calc game AWAY@HOME`" in row
+    assert "`nfl.py status --game AWAY@HOME`" in row and "`python nfl.py calc game AWAY@HOME --format md`" in row
     assert "only when the engine is named" in row
 
 

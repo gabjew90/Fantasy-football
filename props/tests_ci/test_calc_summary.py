@@ -48,9 +48,19 @@ def test_the_summary_by_hand():
     assert "%" not in text
 
 
+def test_an_entry_all_on_one_team_says_sleeper_needs_a_second():
+    assert "SECOND TEAM NEEDED" not in summary.render(LEGS, 5.0, 50.0, False), "Irving is on TB"
+    one_team = [LEGS[0], LEGS[1], LEGS[3]]        # all DAL
+    flat = " ".join(summary.render(one_team, 5.0, 30.0, False).splitlines())
+    assert ("SECOND TEAM NEEDED: every leg is on DAL. Sleeper takes an entry only with at least one leg from "
+            "another team.") in flat
+    assert flat.index("SECOND TEAM NEEDED") < flat.index("WHAT EACH NEEDS"), "said before the numbers"
+
+
 def test_no_opposing_pairs_and_a_payout_from_the_legs():
     legs = [LEGS[1], LEGS[3]]                     # both need Dallas behind
     text = summary.render(legs, 5.0, summary.payout_from_legs(5.0, legs), payout_from_legs=True)
+    assert "SECOND TEAM NEEDED: every leg is on DAL." in " ".join(text.splitlines())
     assert "No opposing pairs found." in text
     assert "worked out from the legs' own prices" in " ".join(text.splitlines())
     assert summary.payout_from_legs(5.0, legs) == pytest.approx(5.0 * legs[0]["mult"] * legs[1]["mult"])
