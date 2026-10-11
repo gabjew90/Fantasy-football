@@ -16,6 +16,8 @@ from __future__ import annotations
 import datetime as dt
 
 import numpy as np
+from pathlib import Path
+
 import pandas as pd
 
 from core import fetch as F
@@ -46,9 +48,42 @@ def before(df: pd.DataFrame, season: int, week: int) -> pd.DataFrame:
 
 # ------------------------------------------------------------------ loading
 
+def parsed_csv(path, cols, what: str) -> pd.DataFrame:
+    """read_csv(path) on `cols`, kept beside the source as a pickle for the rest of the session
+    (DECISIONS #236: three seasons of play-by-play took about 17 of a card's 27 seconds, paid again by
+    every command). The cache is keyed on the source's size and modification time, the columns and
+    the pandas version, so a refreshed source (core.fetch replaces the file) or a new pandas is
+    always re-read; an unreadable cache is re-read too, and a cache that cannot be written only
+    costs the saving. The frame returned is the parse itself, never a fallback."""
+    import hashlib
+    import json as _json
+    import os
+    path = Path(path)
+    st = path.stat()
+    key = hashlib.sha256(_json.dumps([path.name, st.st_size, st.st_mtime_ns, sorted(cols), pd.__version__])
+                         .encode("utf-8")).hexdigest()[:16]
+    cache = path.with_name(f"{path.name}.{what}.{key}.pkl")
+    if cache.exists():
+        try:
+            return pd.read_pickle(cache)
+        except Exception:  # noqa: BLE001 -- a cut or foreign cache file: re-read the source below
+            cache.unlink(missing_ok=True)
+    df = pd.read_csv(path, usecols=lambda c: c in cols, low_memory=False)
+    tmp = cache.with_name(cache.name + f".{os.getpid()}.tmp")
+    try:
+        df.to_pickle(tmp)
+        os.replace(tmp, cache)
+        for old in path.parent.glob(f"{path.name}.{what}.*.pkl"):
+            if old != cache:
+                old.unlink(missing_ok=True)       # an earlier copy of the source
+    except OSError:
+        tmp.unlink(missing_ok=True)
+    return df
+
+
 def pbp(season: int, *, manifest=None, season_type: str = "REG") -> pd.DataFrame:
     path = F.nflverse("pbp", season, manifest=manifest)
-    df = pd.read_csv(path, usecols=lambda c: c in PBP_COLS, low_memory=False)
+    df = parsed_csv(path, PBP_COLS, "calc-pbp")
     df = df[df["season_type"] == season_type].reset_index(drop=True)
     no_missing(f"{season} play-by-play season", df["season"])
     no_missing(f"{season} play-by-play week", df["week"])      # data.before would drop such a play silently
@@ -64,8 +99,7 @@ def schedule(*, manifest=None, game_type: str = "REG") -> pd.DataFrame:
 
 def rosters(season: int, *, manifest=None) -> pd.DataFrame:
     cols = ["season", "week", "team", "position", "full_name", "gsis_id", "sleeper_id", "pfr_id", "status"]
-    df = pd.read_csv(F.nflverse("rosters_weekly", season, manifest=manifest),
-                     usecols=lambda c: c in cols, low_memory=False)
+    df = parsed_csv(F.nflverse("rosters_weekly", season, manifest=manifest), cols, "calc-rosters").copy()
     df["sleeper_id"] = df["sleeper_id"].map(_id_str)
     return df
 
@@ -73,8 +107,7 @@ def rosters(season: int, *, manifest=None) -> pd.DataFrame:
 def snaps(season: int, *, manifest=None) -> pd.DataFrame:
     cols = ["game_id", "season", "game_type", "week", "player", "pfr_player_id", "position", "team", "offense_snaps",
             "offense_pct"]
-    df = pd.read_csv(F.nflverse("snaps", season, manifest=manifest),
-                     usecols=lambda c: c in cols, low_memory=False)
+    df = parsed_csv(F.nflverse("snaps", season, manifest=manifest), cols, "calc-snaps")
     return df[df["game_type"] == "REG"].reset_index(drop=True)
 
 

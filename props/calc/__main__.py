@@ -5,6 +5,9 @@
       [--target 58]
       Without --line, the latest saved Sleeper quote before kickoff is used, from
       the props record's line history (your captures and the engine's).
+  game PHI@JAX             every posted line of one game in one run: a summary table (each side's
+      [--player "Name" ...]  workload bar against his recent average), then the cards for the
+      [--all] [--side over]  players named (or --all), both sides unless --side; the data loads once
   capture                 save the current Sleeper lines (four markets) into that history
   entry --stake 5 --payout 50 --angle role --why "..." --leg "Name|rush_yds|over|64.5[|TEAM]" ...
       log a Power Play in the props journal (props/journal.py). The line is the
@@ -56,6 +59,13 @@ def main(argv: list[str] | None = None) -> int:
     lg.add_argument("--over", type=float, help="American odds for the Over")
     lg.add_argument("--under", type=float, help="American odds for the Under")
     lg.add_argument("--target", type=float, help="your target win rate in percent (default: break-even)")
+    gm = sub.add_parser("game", help="every posted line of one game: a summary table, then the cards asked for")
+    gm.add_argument("matchup", help="AWAY@HOME, e.g. PHI@JAX")
+    gm.add_argument("--player", action="append", default=[], help="a player whose cards to print (repeatable)")
+    gm.add_argument("--all", action="store_true", help="print every posted line's cards")
+    gm.add_argument("--side", choices=["over", "under", "both"], default="both")
+    gm.add_argument("--season", type=int)
+    gm.add_argument("--week", type=int)
     sub.add_parser("capture")
     en = sub.add_parser("entry", help="log a Power Play in the props journal, legs filled in from their cards")
     en.add_argument("--stake", type=float, required=True, help="dollars staked on the entry")
@@ -88,6 +98,9 @@ def main(argv: list[str] | None = None) -> int:
 def run(a) -> int:
     if a.cmd == "leg":
         print(leg(a))
+        return 0
+    if a.cmd == "game":
+        print(game(a))
         return 0
     if a.cmd == "capture":
         r = capture.run()
@@ -333,6 +346,106 @@ def leg(a) -> str:
     if got["line"] is None and not got["not_enough"]:
         raise SystemExit(got["text"])          # no quote found and none typed: say why, no card
     return warn + got["text"]
+
+
+MARKET_ORDER = ("pass_yds", "rush_yds", "receptions", "rec_yds")
+
+
+def _game_between(sched: pd.DataFrame, away: str, home: str, season: int, week: int | None) -> pd.Series:
+    g = sched[(sched["season"] == season) & (sched["away_team"] == away) & (sched["home_team"] == home)]
+    if week is not None:
+        g = g[g["week"] == week]
+    else:
+        g = g[pd.to_datetime(g["kickoff_utc"], utc=True) > pd.Timestamp(dt.datetime.now(dt.timezone.utc))]
+    if g.empty:
+        raise player.NotFound(f"no {season} {away}@{home} game" + (f" in week {week}" if week else " still to play"))
+    return g.sort_values("kickoff_utc").iloc[0]
+
+
+def _bar_cell(c: dict, key: str, side: str, market: str) -> str:
+    """One side's workload bar as the card prints it."""
+    s = c["solutions"][key]
+    many = card.SHOW[market][1][1]
+    if s.status == "ok":
+        return f"{card._work(s.value)} {many}" + (" or fewer" if side == "under" else "")
+    return f"any workload clears it" if s.status == "always" else "no workload clears it"
+
+
+def game(a) -> str:
+    """Every posted line of one game in one run (DECISIONS #236): the data loads once, then a
+    summary row per line (each side's bar, as its card prints it, beside his last-4 average) and
+    the full cards for the players asked for. A card is built exactly as `leg` builds it."""
+    fixed = settings.load()["fixed"]
+    season = a.season or F.current_season()
+    away, sep, home = str(a.matchup).upper().partition("@")
+    if not sep or not away or not home:
+        raise SystemExit(f"write the game as AWAY@HOME, e.g. PHI@JAX; got {a.matchup!r}")
+    away, home = names.team_code(away), names.team_code(home)
+    b, warn = _bundle(season, fixed)
+    g = _game_between(b.schedule, away, home, season, a.week)
+    wk = int(g["week"])
+    lookup = lines.LineLookup(b.rosters)
+    posted, unread = lookup.posted({"season": season, "week": wk, "kickoff_utc": g["kickoff_utc"],
+                                    "game_id": g["game_id"], "home_team": home, "away_team": away})
+    head = f"{away} at {home}, week {wk}: "
+    if not posted:
+        return warn + head + "no saved Sleeper line before kickoff. Run `capture` first."
+    built, rows = [], []
+    for p in posted:
+        try:
+            got = build_card(b, p["player"], p["market"], "over", team=p["team"], season=season, week=wk, lookup=lookup)
+        except (player.NotFound, DataError) as ex:
+            rows.append((p, None, f"not built: {ex}"))
+            continue
+        except SystemExit as ex:                 # e.g. a QB's rushing: not a market here
+            rows.append((p, None, f"not built: {ex}"))
+            continue
+        if got["stub"]["game_id"] != g["game_id"]:
+            rows.append((p, None, f"not built: the name matched {got['stub']['player']} of {got['stub']['team']}"))
+            continue
+        built.append((p, got))
+        rows.append((p, got, None))
+    order = {away: 0, home: 1}
+    rows.sort(key=lambda x: (order.get((x[1]["stub"]["team"] if x[1] else x[0]["team"]) or "", 2),
+                             str(x[1]["stub"]["player"] if x[1] else x[0]["player"]), MARKET_ORDER.index(x[0]["market"])))
+    L = [head + f"{len(rows)} posted lines (Sleeper quotes saved before kickoff)."
+         + (f" {unread} saved rows could not be read and were left out." if unread else ""), "",
+         "| Player | Bet | Line | Over needs | Under needs | Last-4 average |", "|---|---|---|---|---|---|"]
+    for p, got, why in rows:
+        bet = card.SHOW[p["market"]][0]
+        if got is None:
+            L.append(f"| {p['player']} | {bet} | -- | {why} | | |")
+            continue
+        name_ = f"{got['stub']['player']} ({got['stub']['team']})"
+        if got["not_enough"]:
+            L.append(f"| {name_} | {bet} | {got['line'] if got['line'] is not None else '--'} | "
+                     f"not enough data: {got['reason']} | | |")
+        elif not got["ready"]:
+            L.append(f"| {name_} | {bet} | -- | {got['reason'] or 'no usable quote'} | | |")
+        else:
+            c = got["c"]
+            avg = card.d1(c["usual"]) if c["usual"] is not None else "--"
+            L.append(f"| {name_} | {bet} | {got['line']:g} | {_bar_cell(c, 'needed_over', 'over', p['market'])} | "
+                     f"{_bar_cell(c, 'needed_under', 'under', p['market'])} | {avg} |")
+    wanted = {names.norm(x) for x in a.player}
+    sides = ["over", "under"] if a.side == "both" else [a.side]
+    pick = [(p, got) for p, got in built
+            if a.all or names.norm(got["stub"]["player"]) in wanted or names.norm(p["player"]) in wanted]
+    pick.sort(key=lambda x: (order.get(x[1]["stub"]["team"], 2), x[1]["stub"]["player"],
+                             MARKET_ORDER.index(x[0]["market"])))
+    missing = sorted(x for x in a.player if names.norm(x) not in
+                     {names.norm(got["stub"]["player"]) for _, got in built} | {names.norm(p["player"]) for p, _ in built})
+    if missing:
+        L += ["", f"No posted line in this game for: {', '.join(missing)}."]
+    for p, got in pick:
+        for side in sides:
+            text = got["text"] if side == "over" else build_card(
+                b, got["stub"]["player"], p["market"], side, team=got["stub"]["team"], season=season, week=wk,
+                lookup=lookup)["text"]
+            L += ["", text]
+    if not pick and not a.player:
+        L += ["", "Cards: name players with --player, or print every line's cards with --all."]
+    return warn + "\n".join(L)
 
 
 def _parse_leg(spec: str) -> tuple:
