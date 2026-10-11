@@ -251,7 +251,15 @@ def run(*, misses_path: Path | None = None) -> dict:
     append_jsonl(misses_path or MISSES_PATH, misses)
     skipped = sum(m["reason"].startswith("skipped") for m in misses)
     stale = [f"{e['name']} ({e['status']})" for e in man.stale() if e["name"] != "sleeper lines"]
-    return {"paths": [str(calc_path(s)) for s in written], "rows": len(saved),
+    return {"paths": [str(calc_path(s)) for s in written], "rows": len(saved), "sides": len(saved),
             "lines": len(saved) // 2, "added": sum(w["added"] for w in written.values()),
             "replaced": sum(w["replaced"] for w in written.values()), "misses": len(misses) - skipped,
             "skipped": skipped, "captured_at_utc": entry["fetched_at_utc"], "stale": stale}
+
+
+def summary_line(r: dict) -> str:
+    """The capture's one-line report. A line is saved as two sides (Over and Under), and the
+    archive counts each side as new or updated, so the counts are given in sides: they add up
+    (DECISIONS #235; the chat test printed "Saved 368 lines (736 new, 0 updated)")."""
+    return (f"Saved {r['lines']} lines ({r['sides']} sides: {r['added']} new, {r['replaced']} updated) captured at "
+            f"{r['captured_at_utc']} to {', '.join(r['paths']) or 'nowhere (none matched)'}.")

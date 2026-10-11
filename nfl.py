@@ -92,7 +92,16 @@ def cmd_status(a) -> int:
         from fantasy.league import roster_freshness
         league = roster_freshness(Config.load(league=a.league))
     season, week = _season_week(a.season, a.week)
-    print(ST.markdown(ST.week_status(season, week, league=league)))
+    from core import fetch as F
+    try:
+        st = ST.week_status(season, week, league=league, game=a.game)
+    except ValueError as ex:         # a game that is not on this week's slate
+        print(f"Stopped: {ex}")
+        return 2
+    except F.FetchError as ex:       # one line, never a traceback (DECISIONS #235)
+        print(f"Download failed: {ex}. Try again in a minute.")
+        return 1
+    print(ST.markdown(st))
     return 0
 
 
@@ -333,6 +342,7 @@ def main(argv=None) -> int:
     s.add_argument("--season", type=int)
     s.add_argument("--week", type=int)
     s.add_argument("--league")
+    s.add_argument("--game", help="AWAY@HOME: that game only, with both teams' injury report")
     s.add_argument("--probe-sources", action="store_true",
                    help="can this environment reach FantasyPros, and would an API key help?")
     s.set_defaults(fn=cmd_status)

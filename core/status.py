@@ -22,6 +22,47 @@ from .manifest import Manifest
 
 ESPN_TO_SLEEPER = {"WSH": "WAS"}
 SLEEPER_TO_NFLVERSE = {"LAR": "LA"}
+NFLVERSE_TO_SLEEPER = {v: k for k, v in SLEEPER_TO_NFLVERSE.items()}
+# the injury table's order: game designations first, worst first; then practice-only rows
+STATUS_ORDER = {"Out": 0, "Doubtful": 1, "Questionable": 2}
+PRACTICE_SHOWN = ("Did Not Participate", "Limited")
+
+
+def team_code(t: str) -> str:
+    """A team as status prints it (ESPN's WSH and nflverse's LA read as WAS and LAR)."""
+    t = str(t).strip().upper()
+    return ESPN_TO_SLEEPER.get(t, NFLVERSE_TO_SLEEPER.get(t, t))
+
+
+def pick_game(games: list[dict], game: str) -> dict:
+    """The one game `game` (AWAY@HOME) names. Raises ValueError listing the week's games."""
+    away, _, home = str(game).partition("@")
+    want = (team_code(away), team_code(home))
+    hit = [g for g in games if (g["away"], g["home"]) == want]
+    if not hit:
+        raise ValueError(f"no game {want[0]}@{want[1]} this week; the games are: "
+                         + ", ".join(g["game"] for g in games))
+    return hit[0]
+
+
+def game_injuries(df: pd.DataFrame, week: int, teams: tuple[str, str]) -> list[dict]:
+    """Both teams' injury-report rows for the week, from nflverse's official report as published:
+    every player with a game designation (Out / Doubtful / Questionable), and every player who
+    missed or was limited in practice without one yet. Names as the report prints them."""
+    nv = {SLEEPER_TO_NFLVERSE.get(t, t): t for t in teams}
+    wk = df[(df["week"] == week) & df["team"].isin(list(nv))]
+    out = []
+    for _, r in wk.iterrows():
+        status = r.get("report_status") if isinstance(r.get("report_status"), str) else None
+        practice = r.get("practice_status") if isinstance(r.get("practice_status"), str) else None
+        if not status and not (practice and practice.startswith(PRACTICE_SHOWN)):
+            continue
+        injury = next((r.get(c) for c in ("report_primary_injury", "practice_primary_injury")
+                       if isinstance(r.get(c), str)), None)
+        out.append({"team": nv[r["team"]], "player": r.get("full_name"), "position": r.get("position"),
+                    "status": status, "practice": practice, "injury": injury})
+    out.sort(key=lambda x: (teams.index(x["team"]), STATUS_ORDER.get(x["status"], 3), str(x["player"])))
+    return out
 
 
 def _lines_by_team(lines: list, players: dict) -> dict:
@@ -37,9 +78,10 @@ def _lines_by_team(lines: list, players: dict) -> dict:
 
 
 def week_status(season: int, week: int, *, manifest: Manifest | None = None, league: dict | None = None,
-                now: dt.datetime | None = None) -> dict:
+                now: dt.datetime | None = None, game: str | None = None) -> dict:
     """`league` is fantasy.league.roster_freshness(cfg): core never imports the
-    league code, which sits above it."""
+    league code, which sits above it. `game` (AWAY@HOME): that game only, with its injury
+    report (the chat's game read, DECISIONS #235); raises ValueError for a game not this week."""
     m = manifest or Manifest(f"status {season} wk{week}")
     now = now or dt.datetime.now(dt.timezone.utc)
     sb = json.loads(F.espn_scoreboard(season, week, manifest=m).read_text(encoding="utf-8"))
@@ -62,8 +104,12 @@ def week_status(season: int, week: int, *, manifest: Manifest | None = None, lea
         by_team = None
     for g in games:
         g["lines"] = None if by_team is None else by_team.get(g["away"], 0) + by_team.get(g["home"], 0)
+    one = pick_game(games, game) if game else None
+    if one is not None:
+        games = [one]
 
     inj = {"rows": 0, "designations": 0}
+    game_inj = None
     try:
         # the file has no report date; what matters is whether the final game
         # designations (Out / Doubtful / Questionable, released Friday) are in
@@ -71,6 +117,8 @@ def week_status(season: int, week: int, *, manifest: Manifest | None = None, lea
         wk = df[df["week"] == week]
         inj = {"rows": int(len(wk)),
                "designations": int(wk["report_status"].notna().sum()) if "report_status" in wk else 0}
+        if one is not None:
+            game_inj = game_injuries(df, week, (one["away"], one["home"]))
     except Exception as ex:  # noqa: BLE001
         inj["error"] = type(ex).__name__
 
@@ -84,7 +132,8 @@ def week_status(season: int, week: int, *, manifest: Manifest | None = None, lea
         proj["error"] = type(ex).__name__
 
     return {"season": season, "week": week, "checked_at_utc": now.isoformat(), "games": games,
-            "injuries": inj, "projections": proj, "league": league, "manifest": m.to_dict()}
+            "injuries": inj, "projections": proj, "league": league, "manifest": m.to_dict(),
+            "game": one["game"] if one is not None else None, "game_injuries": game_inj}
 
 
 def verdicts(st: dict) -> list[str]:
@@ -94,7 +143,8 @@ def verdicts(st: dict) -> list[str]:
     lines = [g["lines"] for g in games if g["lines"] is not None]
     thin = sum(1 for n in lines if n < 24)
     soonest = min((g["hours_to_kickoff"] for g in games), default=None)
-    out.append(f"PROPS: {len(games)} games to play; spread and total posted for {n_spread}; "
+    plural = lambda n, w: f"{n} {w}" + ("" if n == 1 else "s")
+    out.append(f"PROPS: {plural(len(games), 'game')} to play; spread and total posted for {n_spread}; "
                + (f"Sleeper board thin (<24 lines) for {thin} of {len(lines)}; " if lines else "Sleeper board unavailable; ")
                + (f"next kickoff in {soonest:.0f} h. " if soonest is not None else "")
                + ("" if soonest is None else
@@ -103,7 +153,9 @@ def verdicts(st: dict) -> list[str]:
                   "Lines settle through the day; the closing read is inside 90 minutes of kickoff."
                   if soonest > 1.5 else "Inside the closing window."))
     inj, proj = st["injuries"], st["projections"]
-    out.append("FANTASY: " + ("weekly projections published for "
+    # with --game the table is one game, but these counts are the whole week's: say so
+    week_note = " (the whole week; this game's report is below)" if st.get("game") else ""
+    out.append("FANTASY" + week_note + ": " + ("weekly projections published for "
                               f"{proj['players']} players; " if proj.get("published") else
                               "Sleeper is still serving placeholders (no weekly projections yet); ")
                + ("no injury report for this week yet (the first practice report comes Wednesday)."
@@ -127,4 +179,17 @@ def markdown(st: dict) -> str:
     for g in st["games"]:
         L.append(f"| {g['game']} | {g['kickoff_utc'][:16]} | {'started' if g['started'] else g['hours_to_kickoff']} | "
                  f"{g['spread'] or '—'} | {g['total'] or '—'} | {'—' if g['lines'] is None else g['lines']} |")
+    if st.get("game"):
+        rows = st.get("game_injuries")
+        L += ["", f"## Injury report -- {st['game']}", ""]
+        if rows is None:
+            L.append(f"The injury report could not be read ({st['injuries'].get('error', 'unknown error')}).")
+        elif not rows:
+            L.append("No player on either team has a game designation or a missed or limited practice yet.")
+        else:
+            L += ["| Team | Player | Pos | Game status | Practice | Injury |", "|---|---|---|---|---|---|"]
+            L += [f"| {r['team']} | {r['player']} | {r['position'] or '—'} | {r['status'] or 'no designation yet'} | "
+                  f"{r['practice'] or '—'} | {r['injury'] or '—'} |" for r in rows]
+            L += ["", "nflverse's copy of the official report, as published (a status and a practice entry can "
+                      "disagree there, e.g. Out with full participation)."]
     return "\n".join(L) + "\n"
