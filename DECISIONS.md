@@ -8917,4 +8917,6 @@ for a Power Play with no legs got a refusal preamble.
   breaks, merged note bullets, the Under rate wording, the average on out-of-range cards, a dead
   branch, two identical unit columns, a duplicated grade line); the plumbing stage, 5 findings,
   all fixed (warnings, Not logged reasons and the dry-run preview kept apart in markdown, an
-  exact number test, a repeated call).
+  exact number test, a repeated call); the CHAT.md stage, 5 findings, all fixed (the --all run is read, not pasted;
+  a dry run that prints Not logged swaps the leg; names exactly as the card prints them; full cards only;
+  --format md in the routing rows).
