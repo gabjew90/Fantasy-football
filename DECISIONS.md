@@ -9006,3 +9006,23 @@ marked every game of a settled new starter "another quarterback started".
 - Known gap, as before: a starter hurt during the last game and placed on IR (IR is not on the
   weekly report) is not caught until someone else has started a game.
 - Week 5 after the change: CHI not confirmed; BAL "Lamar Jackson ruled Out."; SEA, ATL, DET, SF no line.
+## 2026-10-11 (242) -- the matchup gets its own table in chat, and each screen card carries its checks
+
+The user (2026-10-11, after the BAL at ATL screen in chat): "Where's the matchup information like the
+spread and the offense defense tiers?" and "under each player's card it should also have the X and
+check marks". Checked: the calculator printed the matchup on every card, as one run-on line
+("Matchup: BAL pass offense S+ vs ATL pass defense A-. Atlanta favored by 3. Total 43.5."); the
+session transcript held only a summary of the reply, so whether chat dropped it cannot be told
+(process miss: CHAT.md requires the verbatim reply). Either way one line was easy to lose.
+
+- **Chat card:** a **Matchup** table -- his team's offense grade, the opponent's defense grade, the
+  spread and total, the quarterback line -- from the same facts as the text card's MATCHUP block
+  (`card.spread_sentence` is the one source for the spread wording; the text card is unchanged).
+- **Screen:** the header lists each game with its spread and total; each top card is followed by its
+  **Screen checks** table (workload, longer-run rate, the four marks with samples, cushion, flags).
+- **CHAT.md:** keep each card's Matchup table and Screen checks table exactly as printed; the Matchup
+  read goes under the table and never replaces it.
+- **Release unknown** (chat's screen header): the release is read from the bootstrap's stamp first,
+  as nfl.py does; a release does not carry nfl.lock.json.
+- Left as is, listed: the grades come from the season's games, so a team whose starting QB is out
+  (Baltimore without Lamar Jackson) keeps the grade his games earned; the screen flags the QB.

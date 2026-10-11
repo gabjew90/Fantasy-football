@@ -439,11 +439,19 @@ def _injuries(b, season: int) -> pd.DataFrame:
 
 
 def _release() -> str:
-    lock = Path(__file__).resolve().parents[2] / "nfl.lock.json"
-    try:
-        return json.loads(lock.read_text(encoding="utf-8")).get("tag") or "unknown"
-    except (OSError, ValueError):
-        return "unknown"
+    """The release that is running: in chat the bootstrap's stamp beside the release (a release does
+    not carry nfl.lock.json), in a checkout nfl.lock.json -- as nfl.py's _release reads it."""
+    root = Path(__file__).resolve().parents[2]
+    for path, keys in ((root.with_name(root.name + ".stamp.json"), ("release_tag", "lock_tag")),
+                       (root / "nfl.lock.json", ("tag",))):
+        try:
+            d = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        for k in keys:
+            if d.get(k):
+                return d[k]
+    return "unknown"
 
 
 def screen(a) -> str:
@@ -471,7 +479,7 @@ def screen(a) -> str:
     lookup = lines.LineLookup(b.rosters)
     inj = _display(lambda: _injuries(b, season))
     inj_ok = not isinstance(inj, dict)
-    rows, problems = [], []
+    rows, problems, spreads = [], [], {}
     lines_out, sides_out = {}, {}                  # whole lines never built; sides built but not listed
     skip = lambda why: lines_out.__setitem__(why, lines_out.get(why, 0) + 1)      # noqa: E731
     unlisted = lambda why: sides_out.__setitem__(why, sides_out.get(why, 0) + 1)  # noqa: E731
@@ -499,6 +507,8 @@ def screen(a) -> str:
                 skip("no usable quote")
                 continue
             c = got["c"]
+            sh = got["shown"]
+            spreads.setdefault(g["game_id"], card.spread_sentence(sh.get("game_lines"), sh.get("why_no_lines", "")))
             bars = {sd: card.value(c, f"needed_{sd}") for sd in ("over", "under")}
             status = None
             if inj_ok:
@@ -519,8 +529,9 @@ def screen(a) -> str:
                 rows.append(r)
     weeks = sorted({int(w) for w in games["week"]})
     L = [f"**Smallest ask at the price · {label} · week {', '.join(map(str, weeks))}**", "", S.HEADER, "", S.ORDER, "",
-         "Games: " + ", ".join(f"{g['away_team']} at {g['home_team']} ({S.clock(g['kickoff_utc'])})"
-                               for _, g in games.iterrows()), ""]
+         "Games:", ""] + [f"- {g['away_team']} at {g['home_team']}, {S.clock(g['kickoff_utc'])}: "
+                          + spreads.get(g["game_id"], "no card built, so no spread read.")
+                          for _, g in games.iterrows()] + [""]
     L += [f"Quotes: the newest saved Sleeper quote before each kickoff (each card shows its time). Release {_release()}."]
     if replay:
         L += ["", S.REPLAY]
@@ -561,6 +572,7 @@ def screen(a) -> str:
                 L += gap + [build_card(b, name, r["market"], sd, team=team, season=season, week=wk, lookup=lookup)[key]]
             except (player.NotFound, DataError, SystemExit) as ex:
                 L += gap + [f"{name} {card.SHOW[r['market']][0]} {sd}: card not built: {ex}"]
+            L += ["", S.checks(r, key == "md")]      # the row's ✓ and ✗ under its card
     return (_md_lead(warn) if key == "md" else warn) + "\n".join(L)
 
 

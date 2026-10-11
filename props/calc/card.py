@@ -324,23 +324,44 @@ def matchup_lines(pl: Player, market: str, opp: str, lines_: dict | None, why_no
     else:
         out += _wrap(f"{pl.team} {kind} offense vs {opp} {kind} defense: "
                      + ((grades or {}).get("note") or "grades not available."))
+    out += _wrap(spread_sentence(lines_, why_none))
+    return out + (_wrap(qb_today) if qb_today else [])
+
+
+def spread_sentence(lines_: dict | None, why_none: str = "") -> str:
+    """The spread and total in one sentence -- ESPN's, else the nflverse schedule's line, labelled. One
+    source for the text card, the chat card's matchup table and the screen's game line."""
     if lines_ is None:
-        out += _wrap(f"Spread and total: not available ({why_none or 'no game found'}).")
-        return out + (_wrap(qb_today) if qb_today else [])
+        return f"Spread and total: not available ({why_none or 'no game found'})."
     total = f" Total {lines_['total']:g}." if lines_.get("total") is not None else " No total shown."
     if lines_.get("closing"):
         total = total.rstrip(".") + (" (closing line)." if lines_["closing"] is True else f" ({lines_['closing']}).")
     if lines_.get("spread_unread"):
-        out += _wrap(f"ESPN's spread reads {lines_['spread_text']!r} (not understood).{total}")
-    elif lines_.get("favorite"):
-        out += _wrap(f"{city(lines_['favorite'])} favored by {lines_['points']:g}.{total}")
-    elif lines_.get("spread_text"):
-        out += _wrap(f"No favorite (even spread).{total}")
-    elif lines_.get("total") is not None:
-        out += _wrap(f"No spread shown.{total}")
+        return f"ESPN's spread reads {lines_['spread_text']!r} (not understood).{total}"
+    if lines_.get("favorite"):
+        return f"{city(lines_['favorite'])} favored by {lines_['points']:g}.{total}"
+    if lines_.get("spread_text"):
+        return f"No favorite (even spread).{total}"
+    if lines_.get("total") is not None:
+        return f"No spread shown.{total}"
+    return "Spread and total: none on ESPN (removed once a game is final)."
+
+
+def matchup_md(pl: Player, market: str, opp: str, lines_: dict | None, why_none: str = "",
+               grades: dict | None = None, qb_today: str = "") -> list[str]:
+    """The chat card's matchup (the user, 2026-10-11: the grades and the spread must be easy to find): a
+    two-column table of the same facts the text card's MATCHUP block prints."""
+    kind = "run" if market == "rush_yds" else "pass"
+    out = ["**Matchup**", "", "| Matchup | This game |", "|---|---|"]
+    if grades and grades.get("off") and grades.get("def"):
+        out += [f"| {pl.team} {kind} offense | {_cell(grades['off'])} |", f"| {opp} {kind} defense | {_cell(grades['def'])} |"]
     else:
-        out += _wrap("Spread and total: none on ESPN (removed once a game is final).")
-    return out + (_wrap(qb_today) if qb_today else [])
+        out.append(f"| {pl.team} {kind} offense vs {opp} {kind} defense | "
+                   f"{_cell((grades or {}).get('note') or 'grades not available.')} |")
+    out.append(f"| Spread and total | {_cell(spread_sentence(lines_, why_none))} |")
+    if qb_today:
+        out.append(f"| Quarterback | {_cell(qb_today)} |")
+    return out
 
 
 def _title(pl: Player, c: dict, side: str) -> list[str]:
@@ -580,11 +601,7 @@ def render_md(pl: Player, c: dict, side: str, *, opp: str, game_lines: dict | No
     else:
         out += [f"Only {c['usual_games']} games: no recent average yet. The bar assumes {P['assumed_text']}: "
                 f"{P['window'][0].lower() + P['window'][1:]}.", ""]
-    mt = " ".join(matchup_lines(pl, m, opp, game_lines, why_no_lines, grades, qb_today)[1:])
-    if grades and grades.get("off") and grades.get("def"):     # the grade line ends a sentence in prose
-        g = grade_line(pl, m, opp, grades)
-        mt = mt.replace(g, g + ".", 1)
-    out += [f"Matchup: {mt}", ""]
+    out += matchup_md(pl, m, opp, game_lines, why_no_lines, grades, qb_today) + [""]
     cond = condition(m, side, P["work_ask"], P["rate_ask"], P["reached"], len(rows), P["split"])
     if cond:
         out += [f"What needs to be true: {cond}", ""]

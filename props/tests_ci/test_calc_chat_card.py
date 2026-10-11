@@ -46,13 +46,15 @@ def test_the_chat_card_follows_the_users_layout():
     assert "| His longer-run rate (5 games) | 4.2 yards a carry |" in L
     assert "| Opponent has allowed | 4.4 yards a carry to RBs |" in L
     assert "Opponent figure: 4 games, garbage time left out." in md
-    assert "Matchup: DAL run offense B vs TB run defense C. Dallas favored by 9.5. Total 49.5." in L
+    i = L.index("**Matchup**")
+    assert L[i + 2:i + 7] == ["| Matchup | This game |", "|---|---|", "| DAL run offense | B |",
+                              "| TB run defense | C |", "| Spread and total | Dallas favored by 9.5. Total 49.5. |"]
     assert any(x.startswith("What needs to be true: ") for x in L) and "?" not in md
     assert L[-1] == "_Line as of Oct 8, 4:59 PM PT._"
     assert "```" not in md and "~" not in md.replace(f"~{bar}", "")
     # bold only on what the bet needs: the bar (heading and cell) and the needed rate
     bolds = re.findall(r"\*\*(.+?)\*\*", md)
-    assert bolds[0] == "Test Back · Rushing yards" and len(bolds) == 5, bolds
+    assert bolds[0] == "Test Back · Rushing yards" and len(bolds) == 6 and "Matchup" in bolds, bolds
 
 
 def test_every_number_on_the_chat_card_is_on_the_text_card():
@@ -284,3 +286,12 @@ def test_a_card_with_no_recent_average_names_the_rate_without_nested_brackets():
     c = card.compute(pl, rush_model(ypc=4.2), "rush_yds", 64.5, 1.8, 1.76, fixed)
     text = " ".join(card.render(pl, c, "over", opp="TB").splitlines())
     assert "Bar assumes 4.2 yards a carry: his longer-run rate (2 games)." in text
+
+
+
+def test_the_chat_matchup_table_carries_the_qb_line_and_the_no_grades_note():
+    pl, c, text, md = _rush(qb_today="Lamar Jackson ruled Out.", grades={"note": "Only 2 games. No grades yet."})
+    assert "| DAL run offense vs TB run defense | Only 2 games. No grades yet. |" in md
+    assert "| Quarterback | Lamar Jackson ruled Out. |" in md
+    assert "Lamar Jackson ruled Out." in text, "the text card keeps its MATCHUP block"
+    assert card.spread_sentence(None, "ESPN not read") == "Spread and total: not available (ESPN not read)."

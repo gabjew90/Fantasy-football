@@ -19,7 +19,8 @@ from test_calc_model import _games, _player, rush_model  # noqa: E402
 STUB = {"player": "Test Back", "team": "DAL", "gsis_id": "00-1", "game_id": "2026_05_DAL_ARI", "week": 5,
         "season": 2026}
 SHOWN = {"opp_row": {"value": 4.4, "games": 4, "plays": 60, "who": " to RBs"}, "grades": {"off": "B", "def": "C"},
-         "qb_today": ""}
+         "qb_today": "", "game_lines": {"favorite": "ARI", "points": 3.0, "spread_text": "ARI -3", "total": 44.5},
+         "why_no_lines": ""}
 
 
 def _card(line, pl=None):
@@ -196,6 +197,10 @@ def test_the_screen_prints_its_caveats_tables_and_top_cards(one_window):
     assert "Sides not listed (an Over and an Under count separately): 1 recent workload short of the bar." in out
     assert "Lines not ranked" not in out and "Already kicked off" not in out
     assert "MD CARD over" in out and "MD CARD under" not in out
+    after = out[out.index("MD CARD over"):]
+    assert "**Screen checks**" in after and "| Consistency | ✓ 4 of 4 at 11+ |" in after, "the marks under the card"
+    assert "| Flags | Questionable · tight line |" in after
+    assert "Arizona favored by 3. Total 44.5." in out and "no card built" not in out
     assert "Past week" not in out
     assert one_window == ["over", "over"], "one build per line, then the top cards"
 
@@ -240,7 +245,7 @@ def test_a_live_window_names_and_leaves_out_its_games_already_started(one_window
         "now": classmethod(lambda cls, tz=None: dt.datetime(2026, 10, 11, 20, 15, tzinfo=dt.timezone.utc))}))
     out = CLI.screen(_screen_args())
     assert "Already kicked off, left out: DEN at LAC (Sun 1:05 PM PT)." in out
-    assert "Games: DAL at ARI (Sun 1:25 PM PT)" in out and S.REPLAY not in out
+    assert "- DAL at ARI, Sun 1:25 PM PT: Arizona favored by 3. Total 44.5." in out and "DEN at LAC, Sun" not in out and S.REPLAY not in out
 
 
 def test_the_opponent_rate_is_worked_out_once_per_team_and_position(monkeypatch):
@@ -252,3 +257,16 @@ def test_the_opponent_rate_is_worked_out_once_per_team_and_position(monkeypatch)
         M._opp_allows(b, "rush_yds", "ARI", "RB", 2026, 5, {})
     M._opp_allows(b, "rec_yds", "ARI", "WR", 2026, 5, {})
     assert calls == [("rush_yds", "ARI", "RB", 2026), ("rec_yds", "ARI", "WR", 2026)]
+
+
+def test_the_release_comes_from_the_chat_stamp_first(tmp_path, monkeypatch):
+    import props.calc.__main__ as M
+    root = tmp_path / "nfl-v9.9"
+    (root / "props" / "calc").mkdir(parents=True)
+    (tmp_path / "nfl-v9.9.stamp.json").write_text('{"release_tag": "nfl-v9.9"}', encoding="utf-8")
+    monkeypatch.setattr(M, "__file__", str(root / "props" / "calc" / "__main__.py"))
+    assert M._release() == "nfl-v9.9"
+    (tmp_path / "nfl-v9.9.stamp.json").unlink()
+    assert M._release() == "unknown"
+    (root / "nfl.lock.json").write_text('{"tag": "nfl-v1.0"}', encoding="utf-8")
+    assert M._release() == "nfl-v1.0"

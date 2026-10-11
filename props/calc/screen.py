@@ -209,6 +209,20 @@ def table(rows: list[dict], title: str) -> list[str]:
     return out
 
 
+def checks(r: dict, md: bool) -> str:
+    """The row's checks, printed under its card (the user, 2026-10-11): the workload with his longer-run
+    rate, each mark with its sample, the cushion and the flags -- the same cells as its table row."""
+    marks = [(n, t) for n, _, t in r["marks"]]
+    cush = f"{round(r['cushion']) + 0:+d}% of the bar" if r["cushion"] is not None else "--"
+    rows = ([("Workload", r["workload"]), ("Longer-run rate", r["longer"])]
+            + [(n[0].upper() + n[1:], t) for n, t in marks]
+            + [("Cushion", cush), ("Flags", " · ".join(r["flags"]) or "--")])
+    if md:
+        return "\n".join(["**Screen checks**", "", "| Check | Result |", "|---|---|"]
+                         + [f"| {a} | {card._cell(b)} |" for a, b in rows])
+    return "\n".join(["SCREEN CHECKS"] + [x for a, b in rows for x in card._wrap(f"{a}: {b}")])
+
+
 def journal_rows(rows: list[dict], window_text: str) -> list[dict]:
     """The ranked rows as journal bet rows, so journal.grade marks them with its own stats join and push
     rule (graded in a throwaway journal, never the betting record)."""
