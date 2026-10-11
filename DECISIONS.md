@@ -8883,3 +8883,38 @@ payout and before the numbers: "SECOND TEAM NEEDED: every leg is on DAL. Sleeper
 only with at least one leg from another team." A warning, not a refusal: a dry run still prints
 every card, and logging an entry the user has already placed is never blocked. A change to the
 frozen card spec made on the user's answer, as the spec allows.
+## 2026-10-11 (238) -- the chat card, units on every rate, and entries assembled by view
+
+The user (2026-10-11): the 40-column card made the numbers that decide a bet look as important as
+the caveats; the rate lines had lost their units ("4.2" beside "catches per 10"); and a request
+for a Power Play with no legs got a refusal preamble.
+
+- **One set of numbers, two layouts.** props/calc/card.py computes a card's numbers once
+  (`_parts`); the text card (`render`) and a new chat card (`render_md`) print only those, so
+  they cannot disagree (a test checks every number on the chat card is on the text card). The
+  chat card is the user's layout: bold player and bet, the price, "Reliability:" with the bet
+  type's test wording exactly, "Average workload needed" (bold), a two-column workload table
+  (needed / recent average / difference), the last games and the season count, a two-column
+  rate table (needed / assumed / this season / opponent allowed), the matchup, "What needs to
+  be true" and the Sleeper quote's time. Normal markdown, each line its own paragraph (no
+  trailing-space breaks), one divider between cards.
+- **What needs to be true** (`card.condition`) states the same asks as the text card's closing
+  question, as a condition: "He needs about 1.5 more carries than his recent average, or 0.5
+  more yards a carry than the assumed rate at his recent workload."
+- **Units.** Every rate line names its unit on both cards ("His recent rate (5 games): 4.2 yards
+  a carry", "This season: 3.9 yards a carry", "Tampa Bay allows: 4.4 yards a carry to RBs");
+  catches read "catches per 10 targets" and passing "yards a completion". One unit per market.
+- **`--format md`** on `leg`, `game` and `entry`. An entry in chat prints a comparison table
+  first (what each leg needs, biggest ask first), then the chat cards, then the fit check, the
+  price check and the cost; the same numbers as the text summary (a test compares them).
+- **CHAT.md.** Chat shows the chat card as printed and adds only a two-sentence "Matchup read".
+  The best-bets row no longer refuses: "build me a Power Play" assembles up to three 4-leg
+  entries, one per view (from the injury report, a missing teammate, the spread), each with a
+  leg from both teams, no opposing pair in its fit check, never both sides of one line; each is
+  a `--dry-run --format md --stake 10` entry shown as printed, labelled by its view, never
+  "best" or with a chance, and every number is checked against its card before sending.
+- **Reviews (/code-review, high):** the card stage, 7 findings, all fixed (trailing-space line
+  breaks, merged note bullets, the Under rate wording, the average on out-of-range cards, a dead
+  branch, two identical unit columns, a duplicated grade line); the plumbing stage, 5 findings,
+  all fixed (warnings, Not logged reasons and the dry-run preview kept apart in markdown, an
+  exact number test, a repeated call).

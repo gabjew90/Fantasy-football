@@ -561,6 +561,33 @@ def test_chat_may_show_tables_and_terms_but_never_pastes_the_output():
 
 
 
+def test_chat_assembles_an_entry_by_view_instead_of_refusing():
+    """The user, 2026-10-11: "build me a Power Play" gets entries assembled from the cards, one per
+    view, never a refusal preamble (DECISIONS #238)."""
+    chat = (ROOT / "CHAT.md").read_text(encoding="utf-8")
+    assert "no pick from either tool" not in chat, "the old refusal row is gone"
+    rule = chat[chat.index("7. **Assembling an entry**"):chat.index("Only when the user asks for the engine by name")]
+    assert "Never refuse" in rule and "If you think <view>:" in rule
+    assert "4-leg Power Play per view (at most 3 entries)" in rule
+    assert "at least one leg from each team" in rule
+    assert "never both sides of the same line" in rule
+    flat = " ".join(rule.split())
+    assert 'the fit check must print "No opposing pairs found."' in flat
+    assert ("python nfl.py calc entry --dry-run --format md --stake 10 --angle other --why \"<the view>\" --leg"
+            in flat)
+    assert "never \"best\", \"recommended\", a chance or an edge" in flat
+    row = next(ln for ln in chat.splitlines() if ln.startswith("| build me a Power Play"))
+    assert "**Assembling an entry**" in row and "never a refusal" in row
+
+
+def test_chat_shows_the_chat_card_as_printed():
+    chat = (ROOT / "CHAT.md").read_text(encoding="utf-8")
+    rule = " ".join(chat[chat.index("3. **Show the chat card"):chat.index("4. **Follow-ups**")].split())
+    assert "`--format md`" in rule and "never inside a code block" in rule and "**Matchup read:**" in rule
+    assert "Never recompute, round, re-sort or reword a number, a unit or the Reliability line" in rule
+    assert "3. **Show what it prints, in full and as printed**" not in chat, "the old as-printed rule is replaced"
+
+
 def test_every_module_the_calculator_loads_ships_in_the_release():
     """Chat runs `python -m props.calc` inside the release (DECISIONS #234): every
     props/calc module and every props/ module it imports at load (journal and

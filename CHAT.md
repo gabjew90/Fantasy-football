@@ -140,7 +140,7 @@ names a week.
 | a Power Play / an entry of several legs (those four bet types) | **the calculator**: `python nfl.py calc capture`, then `python nfl.py calc entry --dry-run --stake <$> --payout <total Sleeper shows> --angle <...> --why "..." --leg "<Player>\|<market>\|<side>\|<line>" ...` -- **Prop legs and entries** below |
 | the props engine, asked for BY NAME ("what does the engine say", "run the engine on X", an engine game guide or slate) | `nfl.py props player / line / best / matchup / game / slate` -- **Props (the engine, dormant)** below; engine output, untested against real lines |
 | an anytime touchdown, or rushing + receiving yards | the engine: `nfl.py props player "X"` (it lists those lines; `props line` takes only catches, rec yds, rush yds, pass yds) -- the calculator does not cover them; engine output, untested against real lines |
-| best bets in a game / this week / a must-win pick | no pick from either tool: say why in a sentence, then offer the calculator on the legs the user is weighing; the engine's `props best` only when asked for by name (engine output, untested against real lines) |
+| build me a Power Play / a parlay / an entry, with no legs given; best bets in a game | **the calculator**: assemble entries by view -- **Assembling an entry** (rule 7 of **Prop legs and entries** below), never a refusal; the engine's `props best` only when asked for by name (engine output, untested against real lines) |
 | a read to share / for review / the QA version / the agent version of a game (asked for by name) | `props game AWAY@HOME` (the engine), then **Publishing a read** below |
 | waiver targets at RB / WR / TE | `nfl.py fantasy waiver --league L --pos RB,WR --horizon H` |
 | stream a defense or kicker | `nfl.py fantasy waiver --league L --pos DEF --horizon stream` (or `--pos K`) |
@@ -243,7 +243,8 @@ Power Play entries in rushing yards, catches (receptions), receiving yards and p
 For one side of a leg it states the workload that price needs (the bar), his last 4 games, how
 often he reached the bar this season, the rate needed at his recent workload beside his own
 rates, the opponent's rate allowed, the matchup (the engine's tier grades, copied), and a
-closing question. It gives NO chance of its own and never says whether a line is good.
+closing condition ("What needs to be true"; the text card asks it as a question). It gives NO
+chance of its own and never says whether a line is good.
 
 Run it through `python nfl.py calc <command>` -- the same commands and arguments as
 `python -m props.calc`, but the session log records each run and its time (DECISIONS #236).
@@ -264,11 +265,20 @@ Run it through `python nfl.py calc <command>` -- the same commands and arguments
    in seconds). An entry the user has settled on is one `entry --dry-run` (it prints every leg's
    card, but stops with "Not logged" and no cards if any leg falls short). A single `leg` run is
    for a single leg.
-3. **Show what it prints, in full and as printed** -- every card, then the entry summary, the
-   grade legend and the follow-up names. Never recompute, round or re-sort a number; the card's
-   first line is that bet type's test result and stays with the card. Then your analysis around
-   it: the role evidence that answers its closing question (who threw in each game, injuries,
-   the game plan), conditional on the user's view -- never a pick, a lean, an edge or a chance.
+3. **Show the chat card, in full and as printed** (the user's layout, 2026-10-11, DECISIONS #238).
+   Run `leg`, `game` and `entry` with `--format md`: the calculator prints each card as markdown
+   for chat -- the bet, its Reliability line (the bet type's test result, word for word), the
+   average workload needed, a workload table and a rate table, the last games and the season
+   count, the matchup, "What needs to be true", and where the quote came from. Paste it as
+   printed, as normal markdown, never inside a code block, with its own dividers; an entry
+   prints its comparison table first, then the cards, then the fit check and the cost. Never
+   recompute, round, re-sort or reword a number, a unit or the Reliability line. The one thing
+   you add to a card is a **Matchup read:** paragraph right after its Matchup line -- two
+   concrete sentences: whether his opportunities should rise, hold or fall (an injury from
+   `status --game`, a teammate out, the spread), and whether the defense or an injury supports or
+   challenges the assumed rate. Then your analysis around it, conditional on the user's view --
+   never a pick, a lean, an edge or a chance (an entry assembled under rule 7 is labelled by
+   its view, never as a pick). The text card (no `--format`) is for Claude Code.
 4. **Follow-ups** (named at the end of a batch): Workload (game values, season count, rounding,
    role-changing injuries), Calculation (how the price becomes a bar, the recent rate's blend
    toward the position average; the tuned settings and where each came from are the comments in
@@ -294,6 +304,34 @@ Run it through `python nfl.py calc <command>` -- the same commands and arguments
    calculator logs Power Plays only: a single bet, or a bet at another book, in these four bet
    types is logged with `props/journal.py add` (it does not carry the card's numbers; say so).
    The other journal commands are for engine bets (touchdowns, rushing + receiving).
+7. **Assembling an entry** (the user, 2026-10-11): "build me a Power Play", "give me a parlay",
+   "an entry for this game" with no legs given. Never refuse and never open with why you cannot
+   pick -- assemble entries from the cards, one per view:
+   1. `python nfl.py calc capture`, then `python nfl.py calc game AWAY@HOME --all --format md`
+      for the game the user named (both sides of every posted line, one run). No game named: the
+      soonest game this week still to kick off, and say which.
+   2. Open with the view bullets: "If you think <view>: <legs that express it>, each with its bar
+      and how often he has met it this season, from the card." The views come from the game's
+      open questions -- injury statuses from `nfl.py status --game AWAY@HOME`, a missing
+      teammate, the game script the spread implies.
+   3. Then one 4-leg Power Play per view (at most 3 entries):
+      - at least one leg from each team;
+      - each leg is a card that expresses that view, or whose "What needs to be true" says his
+        recent workload and rate meet the bar;
+      - no two legs whose game stories are opposite: the entry's fit check must print "No
+        opposing pairs found." A pair on the same story is allowed, but name it as one bet, not two;
+      - never both sides of the same line, never two legs on the same player and bet type.
+   4. For each entry run `python nfl.py calc entry --dry-run --format md --stake 10 --angle other
+      --why "<the view>" --leg "<Player>|<market>|<side>|<line>" ...` (four `--leg`) and show its
+      output as printed; with no `--payout` the payout is worked out from the legs' prices and
+      the summary says so. Add one line asking for the real stake and the payout Sleeper shows,
+      to rerun it.
+   5. Label each entry by its view ("Entry if you think Jeanty is limited") -- never "best",
+      "recommended", a chance or an edge.
+   6. Every number in the bullets and the entries is copied from a card or the entry output. The
+      self-check compares each one with its source before sending (the reply that prompted this
+      rule had Bowers' line as 73.5 instead of 74.5, and swapped the needed rates between Bowers
+      and Tucker).
 
 Only when the user asks for the engine by name, or for a bet type the calculator does not cover
 (anytime touchdowns, rushing + receiving yards, a teammate-out scenario), use the engine below,
@@ -596,7 +634,8 @@ reach the call. The reply mentions the parts that decide it, not all of them.
   **Self-check:** the call in the first lines? every number called the
   model's from a command's output? my own judgment marked as mine? a close call kept
   close? injuries checked before answering? asked the user for anything a
-  command can read? would a friend who knows football find this natural?
+  command can read? every line, bar and rate in an assembled entry the one on its card?
+  would a friend who knows football find this natural?
   **Reply:**
   <the reply, VERBATIM: the full text exactly as sent, every line -- not a
   summary, not a paraphrase, however long. The transcript exists to judge
