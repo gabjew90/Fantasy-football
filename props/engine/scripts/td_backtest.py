@@ -20,10 +20,7 @@ from __future__ import annotations
 
 import argparse
 import itertools
-import os
 import sys
-import tempfile
-import urllib.request
 from pathlib import Path
 
 import numpy as np
@@ -34,7 +31,6 @@ import td_model as T  # noqa: E402
 
 NV = "https://github.com/nflverse/nflverse-data/releases/download"
 GAMES = "https://raw.githubusercontent.com/nflverse/nfldata/master/data/games.csv"
-CACHE = Path(os.environ.get("NFL_BACKTEST_CACHE", Path(tempfile.gettempdir()) / "nflbt"))
 K_GRID = [None, 100.0, 300.0, 1000.0, 3000.0]
 GAMMA_GRID = [0.0, 0.25, 0.5, 0.75, 1.0]
 ALPHA_GRID = [None, 5.0, 20.0, 50.0, 100.0, 200.0, 500.0, 1000.0]
@@ -42,12 +38,10 @@ ENGINE_CONSTANT = 0.1055   # score_game's league_td_per_point: OFFENSIVE TDs per
 
 
 def fetch(url: str, name: str) -> Path:
-    CACHE.mkdir(parents=True, exist_ok=True)
-    dest = CACHE / name
-    if not dest.exists() or dest.stat().st_size == 0:
-        print(f"  fetching {name}", file=sys.stderr)
-        urllib.request.urlretrieve(url, dest)
-    return dest
+    """backtest.dl: the same NFL_BACKTEST_CACHE, and a file lands there only when it arrived
+    whole -- a partial written here would be read as cached by every script sharing it."""
+    from backtest import dl
+    return dl(url, name)
 
 
 def load(seasons: list[int]) -> pd.DataFrame:

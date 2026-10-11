@@ -1,6 +1,6 @@
 {
   "algorithm": "props-engine-sha256-lf-1",
-  "engine_sha256": "71be1730e455f9ed9ddac142b08f0be35ca9947d962eb391ac2b5961ae72b560",
+  "engine_sha256": "ea34b72af38da7b9645380ea01a238bc2064ee30dd92474d566a9fb086cd5a3c",
   "file_count": 64,
   "files": {
     "SKILL.md": "3dcc20c9d6b851c0e15fd7bc1daef802c6c9e762b8685133c19deeb53d5d2c58",
@@ -44,7 +44,7 @@
     "resources/team_matchup_guide.md": "b819405165d7499993b545d18e2ad4950b0b15d80774c700c3fca55348abdeeb",
     "resources/width_params.json": "d831695b292d1c6ca9510089ca26009c41da685f95b78fb71960f38eb781c6fd",
     "scripts/absence_tune.py": "4bb4daaf1861f93ff8d57504e9fff5e0b0b828306d8210b688c87aa25ef27d1d",
-    "scripts/backtest.py": "fd2e23748d466b94c02f4629051a3250ac12d4912490be63025c52585d00b023",
+    "scripts/backtest.py": "b85aee7435367bc9ec0d8f33c25f8e5358ac8d4bdac17a639ee2a4a337948d62",
     "scripts/build_play_yards.py": "51af89e684bd85e9e33e6f894a0a3002e13e98e0f00b94a4f91e4dbe474c8dfa",
     "scripts/build_priors.py": "015c897123ce6f0874429863d3708c9d7aed4a80d72b6faaf130c5f356fdc191",
     "scripts/build_td_priors.py": "c7330a57e68c1b7c5f8a9304bfbddbb4be0ca285d9f37ef383173d3e3049c27f",
@@ -60,7 +60,7 @@
     "scripts/score_week.py": "e8d3d892a42d19461681dbda095ac8ad0540aee9fe38de51aef4acaed9003389",
     "scripts/td_alloc.py": "7c407c949cac8f0f74d7f91589fd5d749f65d9053eb1c3f5f0dc63a700b3465b",
     "scripts/td_alloc_backtest.py": "e259d9f0e301a5d5d34e5a9e84bba222810f077d9c05a1f1f799a611914595a4",
-    "scripts/td_backtest.py": "0ae77781fea2de212154ff72f64b0792f15f77fabfda7cae944fce20b3c9895f",
+    "scripts/td_backtest.py": "4dd7528dc2bd9cf920737edc64319967c2520182543b00bb5894bbac448a6396",
     "scripts/td_builder.py": "9798da2c8efbb44af303b4e77daf5ca41e594d7a84dc6175da85f32237bc8f3f",
     "scripts/td_joint.py": "e8e94f4ed0b23f728fe2f42acef66cd72aaf2b4905acc52836692f4bd7b5c7a9",
     "scripts/td_joint_backtest.py": "cefa68ad90b7016faedaa8d0d3b91cb670a5f9391149d4128724d4440b2277b7",
@@ -68,5 +68,5 @@
     "scripts/td_model.py": "7c1635bbf515b4316f14771b177363a9f82a1ba7ad3393e479cd2dce26a25724",
     "scripts/td_v1.py": "bb4ef62e525c948889ef4e45f6c41564dcc7bed2a97b3d4def0792848f12c485"
   },
-  "tag": "props-v1.66"
+  "tag": "props-v1.67"
 }
