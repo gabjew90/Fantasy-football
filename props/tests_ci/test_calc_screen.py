@@ -40,6 +40,7 @@ def test_a_window_is_a_weekday_and_a_clock_hour_in_pacific_time():
     assert S.parse_window("sunday 1:25 PM") == (6, 13, 25)
     assert S.parse_window("Mon 17:15") == (0, 17, 15)
     assert S.parse_window("Thu 5:15pm pt") == (3, 17, 15)
+    assert S.parse_window("Sun 12am PT")[1] == 0 and S.parse_window("Sun 12pm PT")[1] == 12
     for bad in ("1pm", "Sun", "Funday 1pm", "Sun 13pm", "Sun 25:00"):
         with pytest.raises(DataError):
             S.parse_window(bad)
@@ -68,6 +69,9 @@ def test_the_window_picks_its_games_and_the_soonest_slot_still_to_play():
 def test_grades_order_from_s_plus_down_to_f_minus():
     order = ["S+", "S", "S-", "A+", "A", "A-", "B", "C-", "D+", "F-"]
     assert [S.grade_rank(g) for g in order] == sorted(S.grade_rank(g) for g in order)
+    assert S.grade_rank("Only 2 games.") is None and S.grade_rank("") is None
+    odd = dict(SHOWN, grades={"off": "?", "def": "B"})
+    assert {n: m for n, m, _ in _row(40.5, "over", odd)["marks"]}["grades"] == "–", "not a grade: no data, no crash"
 
 
 def test_an_over_with_his_workload_at_the_bar_and_every_mark_agreeing():
@@ -184,7 +188,8 @@ def test_the_screen_prints_its_caveats_tables_and_top_cards(one_window):
     assert "| 1 | Test Back (DAL) · rushing yards Over 40.5 (-125) |" in out
     assert "Questionable · tight line" in out, "his own status flags his row"
     assert "None: no leg on this side has his recent workload at the bar." in out    # the Under at 40.5
-    assert "Not ranked: 1 recent workload short of the bar." in out
+    assert "Sides not listed (an Over and an Under count separately): 1 recent workload short of the bar." in out
+    assert "Lines not ranked" not in out and "Already kicked off" not in out
     assert "MD CARD over" in out and "MD CARD under" not in out
     assert "Past week" not in out
     assert one_window == ["over", "over"], "one build per line, then the top cards"
@@ -215,3 +220,30 @@ def test_the_screen_needs_one_of_window_or_game(one_window):
         CLI.screen(_screen_args(window=None))
     with pytest.raises(SystemExit, match="--window"):
         CLI.screen(_screen_args(game="DAL@ARI"))
+
+
+def test_a_live_window_names_and_leaves_out_its_games_already_started(one_window, monkeypatch):
+    import props.calc.__main__ as M
+    sched = pd.DataFrame([
+        {"season": 2026, "week": 5, "game_id": "early", "away_team": "DEN", "home_team": "LAC",
+         "kickoff_utc": "2026-10-11T20:05:00+00:00"},
+        {"season": 2026, "week": 5, "game_id": STUB["game_id"], "away_team": "DAL", "home_team": "ARI",
+         "kickoff_utc": "2026-10-11T20:25:00+00:00"}])
+    bundle = type("B", (), {"schedule": sched, "rosters": None, "manifest": None})()
+    monkeypatch.setattr(M, "_bundle", lambda season, fixed: (bundle, ""))
+    monkeypatch.setattr(M.dt, "datetime", type("D", (dt.datetime,), {      # 1:15 PM PT: the 1:05 game is on
+        "now": classmethod(lambda cls, tz=None: dt.datetime(2026, 10, 11, 20, 15, tzinfo=dt.timezone.utc))}))
+    out = CLI.screen(_screen_args())
+    assert "Already kicked off, left out: DEN at LAC (Sun 1:05 PM PT)." in out
+    assert "Games: DAL at ARI (Sun 1:25 PM PT)" in out and S.REPLAY not in out
+
+
+def test_the_opponent_rate_is_worked_out_once_per_team_and_position(monkeypatch):
+    import props.calc.__main__ as M
+    calls = []
+    monkeypatch.setattr(M.opponent, "allows", lambda *a: calls.append(a[1:5]) or {"value": 4.0, "games": 4})
+    b = type("B", (), {})()
+    for _ in range(3):
+        M._opp_allows(b, "rush_yds", "ARI", "RB", 2026, 5, {})
+    M._opp_allows(b, "rec_yds", "ARI", "WR", 2026, 5, {})
+    assert calls == [("rush_yds", "ARI", "RB", 2026), ("rec_yds", "ARI", "WR", 2026)]

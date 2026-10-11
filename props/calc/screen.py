@@ -43,7 +43,7 @@ REPLAY = ("Past week: rebuilt from the saved line history -- the newest saved Sl
 def parse_window(text: str) -> tuple[int, int, int | None]:
     """'Sun 1pm PT' / 'sunday 1:25 PM' / 'sun 13:00' -> (weekday, hour, minute or None). The window is
     that clock hour in Pacific time; a minute narrows it to one kickoff time."""
-    t = str(text).strip().lower().replace("pt", " ").replace(".", "")
+    t = re.sub(r"\bpt\b", " ", str(text).strip().lower().replace(".", ""))
     m = re.fullmatch(r"\s*([a-z]+)\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\s*", t)
     if not m or m.group(1)[:3] not in DAYS:
         raise DataError(f"write the window as '<day> <time> PT', e.g. 'Sun 1pm PT'; got {text!r}")
@@ -70,8 +70,9 @@ def clock(utc: str) -> str:
 
 
 def window_games(sched, season: int, week: int | None, window: tuple, now: dt.datetime):
-    """The window's games: that weekday and clock hour (Pacific). With no week, the soonest such slot
-    still to kick off."""
+    """The window's games: that weekday and clock hour (Pacific). With no week, every window game of the
+    soonest week that still has one to kick off -- including any already started, which the caller
+    leaves out and names."""
     day, hour, minute = window
     g = sched[sched["season"] == season].copy()
     if week is not None:
@@ -86,15 +87,17 @@ def window_games(sched, season: int, week: int | None, window: tuple, now: dt.da
         ahead = g[pd.to_datetime(g["kickoff_utc"], utc=True) > pd.Timestamp(now)]
         if ahead.empty:
             raise DataError("no game in that window is still to kick off this season; give --week for a past week")
-        g = ahead[ahead["week"] == ahead.sort_values("kickoff_utc")["week"].iloc[0]]
+        g = g[g["week"] == ahead.sort_values("kickoff_utc")["week"].iloc[0]]
     if g.empty:
         raise DataError(f"no {season} game kicks off in that window" + (f" in week {week}" if week else ""))
     return g.sort_values(["kickoff_utc", "away_team"])
 
 
-def grade_rank(g: str) -> int:
-    """'A-' -> a number, lower is better: S+ S S- A+ ... F-."""
+def grade_rank(g: str) -> int | None:
+    """'A-' -> a number, lower is better: S+ S S- A+ ... F-. None for text that is not a grade."""
     g = str(g).strip()
+    if not re.fullmatch(f"[{TIER_LETTERS}][+-]?", g):
+        return None
     return TIER_LETTERS.index(g[0]) * 3 + {"+": 0, "-": 2}.get(g[1:2], 1)
 
 
@@ -157,8 +160,8 @@ def side_row(pl, c: dict, side: str, shown: dict, stub: dict, other_bar: float |
                       f"{'✓' if ok else '✗'} {ov:.1f} ({o['games']} g, {o.get('plays', 0)} plays)"))
     # the grade matchup: offense against defense (an Under wants the defense graded higher)
     gr = shown.get("grades") or {}
-    if gr.get("off") and gr.get("def"):
-        off, dfn = grade_rank(gr["off"]), grade_rank(gr["def"])
+    off, dfn = (grade_rank(gr["off"]), grade_rank(gr["def"])) if gr.get("off") and gr.get("def") else (None, None)
+    if off is not None and dfn is not None:
         ok = off < dfn if side == "over" else dfn < off
         marks.append(("grades", "✓" if ok else "✗", f"{'✓' if ok else '✗'} {gr['off']} vs {gr['def']}"))
     else:

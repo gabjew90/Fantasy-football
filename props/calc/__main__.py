@@ -350,7 +350,7 @@ def build_card(b, name_in: str, market: str, side: str = "over", *, team=None, s
             gl = sched
         why = why or "ESPN and the schedule show none"
     shown = dict(opp=opp, game_lines=gl, why_no_lines=why, line_note=line_note,
-                 opp_row=_display(lambda: opponent.allows(b, market, opp, pl.position, season, wk, fixed)),
+                 opp_row=_display(lambda: _opp_allows(b, market, opp, pl.position, season, wk, fixed)),
                  grades=_display(lambda: matchup.grade_pair(b, team, opp, "run" if market == "rush_yds"
                                                              else "pass", season, wk, fixed)),
                  qb_today=_display_text(lambda: qb_today(b, team, season, wk)))
@@ -415,6 +415,16 @@ def _named(typed: str, name: str) -> bool:
         names.abbreviated(typed) and names.initial_key(typed) == names.initial_key(name))
 
 
+def _opp_allows(b, market: str, opp: str, position, season: int, week: int, fixed: dict) -> dict:
+    """opponent.allows, once per (market, opponent, position, week) in a run: a screen asks it for every
+    player on a team and the answer depends on none of them."""
+    cache = b.__dict__.setdefault("_opp_allows", {})
+    key = (market, opp, position, season, week)
+    if key not in cache:
+        cache[key] = opponent.allows(b, market, opp, position, season, week, fixed)
+    return cache[key]
+
+
 def _matchup(text: str) -> tuple[str, str]:
     away, sep, home = str(text).upper().partition("@")
     if not sep or not away or not home:
@@ -455,11 +465,17 @@ def screen(a) -> str:
         away, home = _matchup(a.game)
         games = _game_between(b.schedule, away, home, season, a.week).to_frame().T
         label = f"{away} at {home}"
+    started = games[[pd.Timestamp(k) <= pd.Timestamp(now) for k in games["kickoff_utc"]]]
+    replay = len(started) == len(games)
+    if not replay:
+        games = games.drop(started.index)
     lookup = lines.LineLookup(b.rosters)
     inj = _display(lambda: _injuries(b, season))
     inj_ok = not isinstance(inj, dict)
-    rows, skipped, problems = [], {}, []
-    skip = lambda why: skipped.__setitem__(why, skipped.get(why, 0) + 1)       # noqa: E731
+    rows, problems = [], []
+    lines_out, sides_out = {}, {}                  # whole lines never built; sides built but not listed
+    skip = lambda why: lines_out.__setitem__(why, lines_out.get(why, 0) + 1)      # noqa: E731
+    unlisted = lambda why: sides_out.__setitem__(why, sides_out.get(why, 0) + 1)  # noqa: E731
     for _, g in games.iterrows():
         wk = int(g["week"])
         posted, unread, bad = lookup.posted({"season": season, "week": wk, "kickoff_utc": g["kickoff_utc"],
@@ -495,11 +511,11 @@ def screen(a) -> str:
                 if status:
                     r["flags"].insert(0, status)
                 if r["bar"] is None:
-                    skip("bar out of range")
+                    unlisted("bar out of range")
                 elif c["usual"] is None:
-                    skip("no recent average")
+                    unlisted("no recent average")
                 elif not r["passes"]:
-                    skip("recent workload short of the bar")
+                    unlisted("recent workload short of the bar")
                 r["_lookup"] = (got["stub"]["player"], got["stub"]["team"], wk)
                 rows.append(r)
     weeks = sorted({int(w) for w in games["week"]})
@@ -507,8 +523,11 @@ def screen(a) -> str:
          "Games: " + ", ".join(f"{g['away_team']} at {g['home_team']} ({S.clock(g['kickoff_utc'])})"
                                for _, g in games.iterrows()), ""]
     L += [f"Quotes: the newest saved Sleeper quote before each kickoff (each card shows its time). Release {_release()}."]
-    if all(pd.Timestamp(k) <= pd.Timestamp(now) for k in games["kickoff_utc"]):
+    if replay:
         L += ["", S.REPLAY]
+    elif len(started):
+        L += ["", "Already kicked off, left out: " + ", ".join(
+            f"{g['away_team']} at {g['home_team']} ({S.clock(g['kickoff_utc'])})" for _, g in started.iterrows()) + "."]
     if inj_ok:
         outs = []
         for _, g in games.iterrows():
@@ -527,8 +546,11 @@ def screen(a) -> str:
     ranked = {sd: S.rank([r for r in rows if r["side"] == sd])[:S.TOP] for sd in ("over", "under")}
     for sd, title in (("over", "Overs"), ("under", "Unders")):
         L += [""] + S.table(ranked[sd], f"{title} (top {S.TOP})")
-    if skipped:
-        L += ["", "Not ranked: " + ", ".join(f"{n} {why}" for why, n in sorted(skipped.items())) + "."]
+    if lines_out:
+        L += ["", "Lines not ranked: " + ", ".join(f"{n} {why}" for why, n in sorted(lines_out.items())) + "."]
+    if sides_out:
+        L += ["", "Sides not listed (an Over and an Under count separately): "
+              + ", ".join(f"{n} {why}" for why, n in sorted(sides_out.items())) + "."]
     if a.grade:
         L += [""] + _grade_screen(S, season, ranked, label)
     key = "md" if a.format == "md" else "text"
