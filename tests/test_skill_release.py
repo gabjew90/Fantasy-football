@@ -586,6 +586,16 @@ def test_chat_assembles_an_entry_by_view_instead_of_refusing():
     assert "**Assembling an entry**" in row and "never a refusal" in row
 
 
+def test_chat_routes_the_strongest_overs_and_unders_to_the_screen():
+    chat = (ROOT / "CHAT.md").read_text(encoding="utf-8")
+    row = next(ln for ln in chat.splitlines() if ln.startswith("| the strongest / best overs and unders"))
+    assert 'calc screen --window "<day> <time> PT" --format md' in row and "smallest ask at the price, untested" in row
+    assert "never a pick, a lean or a chance" in row
+    rule = " ".join(chat[chat.index("8. **The screen**"):chat.index("Only when the user asks for the engine by name")].split())
+    assert "lists only legs whose recent workload already meets the bar" in rule and "untested against results" in rule
+    assert "`--grade`" in rule and "never as proof" in rule
+
+
 def test_chat_shows_the_chat_card_as_printed():
     chat = (ROOT / "CHAT.md").read_text(encoding="utf-8")
     rule = " ".join(chat[chat.index("3. **Show the chat card"):chat.index("4. **Follow-ups**")].split())

@@ -8943,3 +8943,43 @@ the 16-game rate, and "recent" read as recent form.
   (`_split_work`) worded per layout ("Workload is there." on the text card, "His recent workload
   is there." in chat), from the same ask.
 - No change to the calculation, the bar or the settings.
+
+## 2026-10-11 (240) -- the screen: the smallest ask at the price for a kickoff window, ranked from the card's facts
+
+The user's most common question ("the strongest overs and unders for the 1pm PT games, factoring
+in the cards, tiers and matchup") had no calculator answer. `calc screen --window "Sun 1pm PT"`
+(or `--game AWAY@HOME`) builds both sides of every saved Sleeper line in the window from one data
+load (one build per line: card.compute already solves both sides).
+
+- **Listed:** only legs whose recent workload already meets the bar (the card's own test: the bar
+  as shown minus the last-4 average as shown, to the nearest half). His longer-run rate against
+  the needed rate is the same fact -- the bar is the workload at that rate -- so it shares the
+  workload column and is not counted (the first design counted it twice).
+- **Marks**, each ✓ / ✗ / – with its sample: consistency (at or past the bar in more than half his
+  season games, mirrored for Unders; – under 4 games), season rate against the needed rate (– below
+  the card's minimum sample), the opponent's allowed rate against it (– when the card shows none),
+  grades (offense against defense; an Under wants the defense higher; equal disagrees).
+- **Order:** fewest ✗, then most ✓, then cushion as a percent of the bar -- a sort, no weights, no
+  new settings (the user added "most ✓" so a row with no evidence cannot tie four agreeing marks).
+- **Flags:** his official injury status (Questionable, Doubtful, Out), short history, starting QB
+  not confirmed, tight line (the two bars within one workload unit); one line per team listing
+  players ruled Out. The official report (nflverse) is the only source; it is not live and does not
+  hold inactives named 90 minutes before kickoff.
+- **Output:** the caveats every run (only legs at the bar, role changes not on it, untested), the
+  Overs and Unders tables (top 8), then the cards for the top 3 a side. Card spec unchanged.
+- **Record, the user's question 5: is a past week reproducible?** Not exactly, but close enough
+  that no recording step is needed. Every model input (his games, rates, the opponent's rate,
+  grades, rosters) is cut at the priced week and checked against kickoff times. What differs from
+  a live run: the quote -- the line history keeps the newest saved quote before kickoff and a
+  later capture at the same line replaces the earlier one (persist's LINE_KEY has no time), so a
+  replay sees the last quote before kickoff (the workflow saves one at least every 15 minutes
+  inside six hours), not necessarily the one a live screen saw; display-only lines (the final
+  injury report, the closing spread); nflverse revisions (stat corrections, not snapshotted); and
+  the code and settings in the tree (the screen prints the release so a replay can be pinned to
+  its tag). A past week's header says how it was rebuilt; `--grade` grades the listed legs with
+  the journal's own grader in a throwaway journal and prints the hit rate by rank against the
+  legs' average break-even. Making replays exact would mean keeping every capture (a time-stamped
+  line history), a change to the line store the engine shares -- not the smallest change.
+- **Live:** Sun 1pm PT (3 games, 2026-10-11) in 82 s here; week 4 Sun 10am PT (8 games) graded in
+  224 s. A 4-game window from a cold chat container: about 3-5 minutes (the session log's
+  Timings table will measure it).

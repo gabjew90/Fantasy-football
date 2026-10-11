@@ -1,8 +1,8 @@
 {
  "algorithm": "nfl-release-sha256-lf-1",
- "file_count": 194,
+ "file_count": 195,
  "files": {
-  "CHAT.md": "8fa8100c7cf55723eb98c7cb5c7e8066efebda7747ae512bbe9463ec7bbf7f1e",
+  "CHAT.md": "2bea4a88e0e1aa08615b419065c97808a6b5e6c58c22a7de72fcd16f8558fee7",
   "config.yaml": "1a2af1bd5d6c7a464e908b50e94d910d2adba1675dede83876369aca7329c0c6",
   "core/__init__.py": "8ac9ed217e439f5828616ab66ec9ff17336c2cbbbeae391d0f9bfa001eaed571",
   "core/fetch.py": "f7645d380c6a997b539eb28bda37400887c616d23360f71b013922541e2284fa",
@@ -105,7 +105,7 @@
   "nfl.py": "7f0f40a2991befe8247049559e49d8e5ba721bf44d87fb28fde209f5101aa3e3",
   "props/calc/CLAUDE.md": "c88a7571d7b84011e9783294f930e95b4aa13d69b8de1daf3816aada962c65c4",
   "props/calc/__init__.py": "0c1b2c80861038afe4a50ff8cfeab2e6112899707de9e83e92e42e49fee31fa7",
-  "props/calc/__main__.py": "e8468cecb72554926721ce17f625a37800894e2479b13612ea82428e63756260",
+  "props/calc/__main__.py": "f6a32588478a5653455fb43689af8de379429e65c101309beea85708031d4c87",
   "props/calc/calc.py": "9b9472bcf630bbfc6cb3b8a59dad2b5075e9183edc17bd9107feff697f315a9c",
   "props/calc/capture.py": "87cfd05f4a312cfdfa34e95e448e227856d192430313ffd84acb38a5d5f50f78",
   "props/calc/card.py": "efab928116918ab011dc4d87e2cf03389c368091a8965be68296234a51fca74b",
@@ -123,6 +123,7 @@
   "props/calc/opponent.py": "1a657b51f9b0463c8e6c9598a490ddd81e1270911a164777828b3c524a4b65f0",
   "props/calc/player.py": "cdb103ba62ed3ee7a8d2008e5e95278f85a31a48a79564a304a5ccc27d991d25",
   "props/calc/rates.py": "0f29f11067e197df4375ffde997b0059757efd407a2e4bbdbcb8a0ea9793ed0f",
+  "props/calc/screen.py": "2cfa97887646ac2e2d87a93386ceb55346740478882f8485751ece0c7c4cb1ae",
   "props/calc/settings.py": "0e4dae8cd1a3be3ac6fc416d6a9048fa362d8427abb445f957c974da98a8ba3d",
   "props/calc/settings.yaml": "f5c596332e12cf83279ae92c896d12381db2bf8e43987c4fc574ebf55c4d1196",
   "props/calc/shared.py": "bb20cc5a866ead132cbac6f90b991bd6ce0e26ef38bef2464e5102c7f8914932",
@@ -201,6 +202,6 @@
   "scripts/bootstrap.py": "8c6c428d7b66fde19ea8894d5124a0c182ba3f9719db6031f4904459e3b8cdd7",
   "scripts/release.py": "a75353d7b4e83d21e7e22600c5bb2856b05389966b8e7b1b2d25e62a4ed84bf7"
  },
- "sha256": "c169061e555aa0b9f76dcc8aae69921edc583cc69574e2a977b343100a8d42d5",
- "tag": "nfl-v1.75"
+ "sha256": "cb3986226c29cf55661531436dd06bb81a01553754fa20c9ca847bfe13a387a1",
+ "tag": "nfl-v1.76"
 }
