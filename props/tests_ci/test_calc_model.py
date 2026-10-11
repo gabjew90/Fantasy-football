@@ -662,8 +662,12 @@ def test_qb_today_reads_the_official_report_and_never_names_a_guess(monkeypatch)
     assert cli.qb_today(b, "TB", 2026, 7) == "Baker Mayfield ruled Out.", "a fact from the official report"
     # a new starter who has the job is settled (Seattle, Atlanta): the old starter is not on the report
     assert cli.qb_today(bundle(["baker", "daniels", "daniels", "daniels", "daniels"]), "TB", 2026, 5) == ""
-    # ...unless the earlier starter is on the report and not ruled Out (Chicago: he may take the job back)
-    assert cli.qb_today(bundle(["baker", "baker", "daniels", "daniels"]), "TB", 2026, 3) == "Starting QB not confirmed."
+    # ...unless the earlier starter is on the report and not ruled Out (Chicago: he may take the job back).
+    # Week 3: daniels started week 2 (the current starter, not on the report); baker, week 1's starter, is
+    # Questionable on week 3's report
+    assert cli.qb_today(bundle(["baker", "daniels", "daniels"]), "TB", 2026, 3) == "Starting QB not confirmed."
+    assert cli.qb_today(bundle(["baker", "daniels", "daniels", "daniels", "daniels", "daniels"]), "TB", 2026, 6) == "", \
+        "no report for week 6: nothing"
     assert cli.qb_today(bundle(["baker", "baker", "baker", "daniels", "daniels", "daniels", "daniels"]),
                         "TB", 2026, 7) == "", "the earlier starter ruled Out: the new one is settled"
 
@@ -715,3 +719,20 @@ def test_two_character_grades_stay_beside_their_units():
     lines_ = text.splitlines()
     assert "DAL pass offense S+ vs" in lines_ and "NYJ pass defense D-" in lines_
     assert max(len(x) for x in lines_) <= card.WIDTH
+
+
+def test_a_starter_ruled_out_is_named_from_the_schedule_when_the_report_has_no_name(monkeypatch):
+    from props.calc import __main__ as cli, data
+    b = type("B", (), {})()
+    b.manifest = None
+    b.schedule = pd.DataFrame([dict(season=2026, week=1, home_team="BAL", away_team="X", home_qb_id="lamar",
+                                    away_qb_id="x", home_qb_name="Lamar Jackson", away_qb_name="X")])
+    inj = pd.DataFrame([dict(season=2026, team="BAL", week=2, gsis_id="lamar", full_name=None, position="QB",
+                             report_status="Out", practice_status="Did Not Participate In Practice")])
+    monkeypatch.setattr(data, "injuries", lambda *a, **k: inj)
+    assert cli.qb_today(b, "BAL", 2026, 2) == "Lamar Jackson ruled Out."
+    b.schedule = b.schedule.drop(columns=["home_qb_name", "away_qb_name"])
+    b._injuries_season = None
+    with pytest.raises(KeyError):          # the schedule has no name column: the card shows "not checked (...)"
+        cli.qb_today(b, "BAL", 2026, 2)
+    assert cli._display_text(lambda: cli.qb_today(b, "BAL", 2026, 2)).startswith("Starting QB: not checked")
