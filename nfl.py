@@ -300,6 +300,8 @@ def session_report(out: Path) -> Path:
         L += [f"**Transcript: {len(stub)} of {len(replies)} entries do not hold the reply verbatim** "
               "(a placeholder such as \"(as sent below)\" instead of the text) -- those answers cannot be "
               "reviewed from this file.", ""]
+    tl = timings(rows)
+    L += ["## Timings", "", *(tl or ["*No timed steps (nothing logged).*"]), ""]
     L += ["## Review of the session", "",
           read("session_review.md", nest=True) or "*Chat wrote no review (session_review.md is missing).*", ""]
     L += ["## Transcript (verbatim)", "",
@@ -320,6 +322,56 @@ def session_report(out: Path) -> Path:
     path = out / f"nfl_session_{dt.datetime.now(dt.timezone.utc):%Y-%m-%d_%H%M}.md"
     path.write_text("\n".join(L) + "\n", encoding="utf-8")
     return path
+
+
+def cmd_calc(a) -> int:
+    """The parlay-leg calculator (`python -m props.calc ...`) run inside nfl.py, so the session
+    log records it with its timing like every other command (DECISIONS #236)."""
+    from props.calc.__main__ import main as calc_main
+    return calc_main(list(a.calc_args))
+
+
+def _utc(s):
+    try:
+        t = dt.datetime.fromisoformat(str(s).replace("Z", "+00:00"))
+    except (TypeError, ValueError):
+        return None
+    return t if t.tzinfo else t.replace(tzinfo=dt.timezone.utc)
+
+
+def timings(rows: list[dict]) -> list[str]:
+    """The session as a timeline (DECISIONS #236): setup, then every logged command with its start,
+    its length and the wait before it -- the wait is chat reading, deciding and writing between
+    steps. The reply is written after the last step and is not timed."""
+    steps = []
+    setup = (rows[0].get("setup") if rows else None) or {}
+    st = _utc(setup.get("setup_started_utc"))
+    if st is not None and setup.get("setup_seconds") is not None:
+        steps.append(("setup (fetch and check the release)", st, float(setup["setup_seconds"])))
+    for r in rows:
+        secs = float(r.get("seconds") or 0)
+        start = _utc(r.get("started_utc"))
+        if start is None:
+            end = _utc(r.get("at_utc"))
+            if end is None:
+                continue
+            start = end - dt.timedelta(seconds=secs)
+        steps.append(("`" + " ".join(r.get("argv") or []) + "`", start, secs))
+    if not steps:
+        return []
+    L = ["| Step | Started (UTC) | Seconds | Wait before it |", "|---|---|---|---|"]
+    prev_end, waited = None, 0.0
+    for what, start, secs in steps:
+        wait = None if prev_end is None else max((start - prev_end).total_seconds(), 0.0)
+        waited += wait or 0.0
+        L.append(f"| {what} | {start:%H:%M:%S} | {secs:.1f} | {'--' if wait is None else f'{wait:.1f}'} |")
+        prev_end = start + dt.timedelta(seconds=secs)
+    ran = sum(s for _, _, s in steps)
+    span = (prev_end - steps[0][1]).total_seconds()
+    L += ["", f"{len(steps)} steps in {span:.0f} s from the first start to the last end: {ran:.1f} s running, "
+              f"{waited:.1f} s between steps (chat reading, deciding and writing). The reply is written after the "
+              "last step and is not timed."]
+    return L
 
 
 def cmd_log(a) -> int:
@@ -387,6 +439,10 @@ def main(argv=None) -> int:
                    help="waiver: stream (this week) or season (a league-winner candidate)")
     f.set_defaults(fn=cmd_fantasy)
 
+    c = sub.add_parser("calc", help="the parlay-leg calculator (python -m props.calc ...), logged with its timing")
+    c.add_argument("calc_args", nargs=argparse.REMAINDER, help="what `python -m props.calc` takes")
+    c.set_defaults(fn=cmd_calc)
+
     lg = sub.add_parser("log", help="the chat session in one file: review, transcript, commands")
     lg.set_defaults(fn=cmd_log)
 
@@ -440,7 +496,8 @@ def _session_log(argv, rc, err, seconds, result) -> None:
         lock = ROOT / "nfl.lock.json"
         release = (s.get("release_tag") or s.get("lock_tag")
                    or (json.loads(lock.read_text(encoding="utf-8")).get("tag") if lock.exists() else None))
-        setup = {k: s.get(k) for k in ("release_source", "yahoo", "odds_key", "fallback_reason")} if s else {}
+        setup = {k: s.get(k) for k in ("release_source", "yahoo", "odds_key", "fallback_reason",
+                                       "setup_seconds", "setup_started_utc")} if s else {}
         # packages as they are NOW, not as the bootstrap found them: chat may
         # install one after setup, and a stale "missing" misleads the audit
         import importlib.util
@@ -459,7 +516,9 @@ def _session_log(argv, rc, err, seconds, result) -> None:
             except _md.PackageNotFoundError:
                 setup["versions"][dist] = None
         rec = getattr(result, "record", None) or {}
-        line = {"at_utc": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"), "release": release,
+        now = dt.datetime.now(dt.timezone.utc)
+        line = {"at_utc": now.isoformat(timespec="seconds"), "release": release,
+                "started_utc": (now - dt.timedelta(seconds=seconds)).isoformat(timespec="milliseconds"),
                 "argv": list(argv), "exit": rc, "seconds": round(seconds, 1), "error": err, "setup": setup,
                 "gate": _gate_summary(rec.get("gate")),
                 "inputs": [{k: i.get(k) for k in ("name", "source", "status", "age_h", "detail")}
