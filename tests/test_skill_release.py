@@ -572,10 +572,16 @@ def test_chat_assembles_an_entry_by_view_instead_of_refusing():
     assert "at least one leg from each team" in rule
     assert "never both sides of the same line" in rule
     flat = " ".join(rule.split())
-    assert 'the fit check must print "No opposing pairs found."' in flat
+    assert 'fit check must print "No opposing pairs found."' in flat
     assert ("python nfl.py calc entry --dry-run --format md --stake 10 --angle other --why \"<the view>\" --leg"
             in flat)
     assert "never \"best\", \"recommended\", a chance or an edge" in flat
+    assert "the reply shows the view bullets and the entries" in flat, "the --all run is read, not pasted"
+    assert "If it prints \"Not logged\"" in flat and "never show an entry the calculator did not print" in flat
+    assert "each name exactly as its card prints it" in flat
+    for ln in chat.splitlines():
+        if ln.startswith("|") and ("calc leg" in ln or "calc game" in ln or "calc entry" in ln):
+            assert "--format md" in ln, ln
     row = next(ln for ln in chat.splitlines() if ln.startswith("| build me a Power Play"))
     assert "**Assembling an entry**" in row and "never a refusal" in row
 
