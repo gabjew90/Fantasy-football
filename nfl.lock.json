@@ -2,7 +2,7 @@
  "algorithm": "nfl-release-sha256-lf-1",
  "file_count": 195,
  "files": {
-  "CHAT.md": "676c7e49ab33379fe8c64a7f7398f780f7a225f0350275af28adea7f384ac187",
+  "CHAT.md": "7520739d9766166a83ed586a19a9331b3d2b9fb541e0568a45f7e22a320bd48b",
   "config.yaml": "1a2af1bd5d6c7a464e908b50e94d910d2adba1675dede83876369aca7329c0c6",
   "core/__init__.py": "8ac9ed217e439f5828616ab66ec9ff17336c2cbbbeae391d0f9bfa001eaed571",
   "core/fetch.py": "f7645d380c6a997b539eb28bda37400887c616d23360f71b013922541e2284fa",
@@ -105,10 +105,10 @@
   "nfl.py": "7f0f40a2991befe8247049559e49d8e5ba721bf44d87fb28fde209f5101aa3e3",
   "props/calc/CLAUDE.md": "c88a7571d7b84011e9783294f930e95b4aa13d69b8de1daf3816aada962c65c4",
   "props/calc/__init__.py": "0c1b2c80861038afe4a50ff8cfeab2e6112899707de9e83e92e42e49fee31fa7",
-  "props/calc/__main__.py": "250761cd36b3a848c09868ba2953b98e921619ca9da40636fb68f150d535ceba",
+  "props/calc/__main__.py": "493b875d5d75c6aa03ef6e116b60c5b39fabd24e79d34c073950459d0e01fd79",
   "props/calc/calc.py": "9b9472bcf630bbfc6cb3b8a59dad2b5075e9183edc17bd9107feff697f315a9c",
   "props/calc/capture.py": "87cfd05f4a312cfdfa34e95e448e227856d192430313ffd84acb38a5d5f50f78",
-  "props/calc/card.py": "efab928116918ab011dc4d87e2cf03389c368091a8965be68296234a51fca74b",
+  "props/calc/card.py": "f73e77f52d5ff0cb7d348b26ffab1b78284972f1e7188d46971e8226f46d478c",
   "props/calc/checks.py": "cc3738475c67747bb756216e50dc745fbed07fe0ffc532e9dba7d615202e3ed0",
   "props/calc/data.py": "6074f3fe3753bf05d42123f4c7472a4881ea873b4c6b9754a044e6779b9637a8",
   "props/calc/fixture.py": "479381430e5be3cf7de01f89bc8cfa8eb14794ab2df8e0849f41fe13b46c3886",
@@ -123,7 +123,7 @@
   "props/calc/opponent.py": "1a657b51f9b0463c8e6c9598a490ddd81e1270911a164777828b3c524a4b65f0",
   "props/calc/player.py": "54252987a72164c77158000d59c08329ac74ac71cc081f0460e75c1ceb1a80b5",
   "props/calc/rates.py": "0f29f11067e197df4375ffde997b0059757efd407a2e4bbdbcb8a0ea9793ed0f",
-  "props/calc/screen.py": "f1465d4f71df73980b91dfe231af684353e97a68bd050abf38bf1cca7966ceaf",
+  "props/calc/screen.py": "509633d17496bf6717c4ecb0d6fe955361305c5ead36d8f08f7526217d188e3c",
   "props/calc/settings.py": "0e4dae8cd1a3be3ac6fc416d6a9048fa362d8427abb445f957c974da98a8ba3d",
   "props/calc/settings.yaml": "f5c596332e12cf83279ae92c896d12381db2bf8e43987c4fc574ebf55c4d1196",
   "props/calc/shared.py": "bb20cc5a866ead132cbac6f90b991bd6ce0e26ef38bef2464e5102c7f8914932",
@@ -202,6 +202,6 @@
   "scripts/bootstrap.py": "8c6c428d7b66fde19ea8894d5124a0c182ba3f9719db6031f4904459e3b8cdd7",
   "scripts/release.py": "a75353d7b4e83d21e7e22600c5bb2856b05389966b8e7b1b2d25e62a4ed84bf7"
  },
- "sha256": "cb35eb244fe6ca5737db50f0f803fa801f108ab15c9b50a7a81338ef019f682f",
- "tag": "nfl-v1.77"
+ "sha256": "7de9329c5fea9cc830afc91f3383529c55fb7a5f1543fa32d89f1cc85149f13c",
+ "tag": "nfl-v1.78"
 }

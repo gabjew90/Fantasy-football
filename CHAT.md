@@ -273,8 +273,10 @@ Run it through `python nfl.py calc <command>` -- the same commands and arguments
    count, the matchup, "What needs to be true", and where the quote came from. Paste it as
    printed, as normal markdown, never inside a code block, with its own dividers; an entry
    prints its comparison table first, then the cards, then the fit check and the cost. Never
-   recompute, round, re-sort or reword a number, a unit or the Reliability line. The one thing
-   you add to a card is a **Matchup read:** paragraph right after its Matchup line -- two
+   recompute, round, re-sort or reword a number, a unit or the Reliability line. Keep each card's
+   **Matchup** table (the offense and defense grades, the spread and total, the quarterback line)
+   exactly as printed -- the user reads the matchup there; never drop it or fold it into prose. The
+   one thing you add to a card is a **Matchup read:** paragraph right after that table -- two
    concrete sentences: whether his opportunities should rise, hold or fall (an injury from
    `status --game`, a teammate out, the spread), and whether the defense or an injury supports or
    challenges the assumed rate. Then your analysis around it, conditional on the user's view --
@@ -348,8 +350,10 @@ Run it through `python nfl.py calc <command>` -- the same commands and arguments
    change, and is untested against results), the players each team has ruled Out, an Overs table
    and an Unders table (top 8 each: the workload against the bar with his longer-run rate, then
    four marks -- consistency, season rate, opponent's allowed rate, grades -- each ✓, ✗ or – with
-   its sample, the cushion and the flags), then the full chat cards for the top 3 a side. Show it
-   as printed, with a Matchup read under each card (rule 3). Call the order "the smallest ask at
+   its sample, the cushion and the flags), then the full chat cards for the top 3 a side, each
+   followed by its **Screen checks** table (the same ✓ and ✗). The header lists each game with its
+   spread and total. Show it as printed, with a Matchup read under each card's Matchup table
+   (rule 3), and keep every card's Screen checks table. Call the order "the smallest ask at
    the price", never the best, a pick, a lean or a chance; a ✗ is a fact against the leg, say it.
    **"Strongest" means this order** (the user, 2026-10-11): answer with the legs in the screen's
    rank order, #1 first, rank numbers kept -- never regrouped by game, team or bet type and never
