@@ -8830,3 +8830,43 @@ listed eight findings. Each was checked against main (5bc6c1d) before any change
   from the chat session log; chat runs pandas 3.0.5 / numpy 2.5.3 / polars 2.0.0 while CI pins
   pandas 1.5.3 / numpy 1.26.4 / polars 1.43.2 (requirements.txt, props/requirements.txt) -- chat
   runs majors CI never tests.
+
+## 2026-10-11 (236) -- every chat step timed; a game is one calculator run
+
+The PHI@JAX chat session (nfl_session_2026-10-11_0046) took 5-10 minutes for one game, and its
+log could not say where: it held 2 of about 60 commands. Measured here: every `python -m
+props.calc leg` process re-read three seasons of play-by-play, rosters and snaps (about 27 s
+cold, of which about 17 s was parsing the CSVs), and chat ran 56 of them. The user chose all
+four speed-ups and timings for every step.
+
+- **Timings.** The bootstrap stamps when setup started and how long it took (`SETUP_SECONDS=`;
+  an older loader that hands over to the pinned one passes its start along, so the figure
+  covers both). The calculator runs inside nfl.py (`nfl.py calc <same arguments>`), so the
+  session log records each run with its start (milliseconds) and length. `nfl.py log` adds a
+  Timings table: setup, every step, its seconds and the wait before it (chat reading, deciding
+  and writing); the reply after the last step is not timed.
+- **One load per game.** `calc game AWAY@HOME` lists the game's posted lines from the saved
+  Sleeper quotes before kickoff (calc's captures by id; the engine's name-only rows take an id
+  from the two teams' roster when exactly one player has that name, so "C. McCaffrey" and
+  "Christian McCaffrey" are one entry), builds every card from one data load, and prints a
+  summary table -- each side's workload bar as its card prints it, beside the recent average
+  (settings `usual_games`) -- then the cards only for `--player` names (Sleeper's short form
+  matches) or `--all`, both sides unless `--side`. A card is built exactly as `leg` builds it.
+  PHI@JAX live: 30 lines, the summary in 33 s cold; all 58 cards in 47 s warm. Card text is
+  unchanged.
+- **Parsed files kept for the session.** props/calc/data.py keeps each parsed CSV as a pickle
+  beside the download, keyed on its size, modification time, the columns and the pandas
+  version; a refreshed download or a new pandas is re-read, an unreadable cache is re-read, and
+  a cache that cannot be written costs only the saving. Warm cards: about 1.4 s of loading.
+- **Parallel runs became one run.** Legs from several games go into ONE `entry --dry-run`
+  (one load for every leg) instead of parallel processes that would each load the data.
+- **CHAT.md.** Calculator runs go through `python nfl.py calc`; a game read is one `status
+  --game` (no plain `status` as well) then one `calc game`; and, from the user (2026-10-10), an
+  entry needs at least one leg from a second team -- Sleeper refuses an all-one-team entry, so
+  chat never suggests one.
+- **Review (/code-review, high), ten findings, all fixed:** a named player whose card failed was
+  called "no posted line"; an under-side failure lost the whole output; a blank roster team
+  crashed the game list; Sleeper's short names did not match --player; error text broke the
+  summary table; a Windows cache unlink could raise; the "Last-4" header ignored `usual_games`;
+  one unreadable quote file stopped the whole game; `nfl.py calc --help` showed nfl's help; and
+  duplicate except branches were merged.

@@ -40,8 +40,9 @@ below); the `props` question tools are the dormant engine's, used as the routing
 - **Answers are written in the chat, as markdown** -- headings, tables, short
   paragraphs. Never a PDF, a document or a file unless the user asks for one
   (user, 2026-10-06). **A game read is the calculator's** (user, 2026-10-10, DECISIONS #235):
-  `nfl.py status --game AWAY@HOME` for the spread, the total and both teams' injury report, then
-  the calculator's cards for the game's posted lines (**Prop legs and entries**). The engine's
+  `nfl.py status --game AWAY@HOME` for the spread, the total and both teams' injury report (one
+  call: not a plain `status` as well), then the calculator's cards for the game's posted lines:
+  `nfl.py calc game AWAY@HOME` (**Prop legs and entries**). The engine's
   team matchup guide (sections 1-8) runs only when the user asks for the engine by name; follow it
   exactly then, labelled engine output, untested against real lines.
 - **The full data, every time.** The user wants all the numbers, not a
@@ -134,9 +135,9 @@ names a week.
 | what if I start X (instead of Y) | `nfl.py fantasy swap --league L --start "X" [--bench "Y"]` (no `--bench`: every legal seat, best first) |
 | my roster / my opponent's / team Z's | `nfl.py fantasy roster --league L [--team opp\|MANAGER]` |
 | set my lineup / who to start this week, the whole matchup | `nfl.py fantasy lineup --league L` |
-| break down this game / how does AWAY at HOME look / a game read | `nfl.py status --game AWAY@HOME` (spread, total, both teams' injury report), then **the calculator**: `python -m props.calc capture` and `python -m props.calc leg` for the game's posted lines -- **Prop legs and entries** below; the engine's matchup guide only when the engine is named |
-| a prop leg: X over / under N in rushing yards, catches, receiving yards or passing yards; is this leg any good; what workload does X need | **the calculator**: `python -m props.calc capture`, then `python -m props.calc leg "X" <rush_yds\|receptions\|rec_yds\|pass_yds> <over\|under>` -- **Prop legs and entries** below |
-| a Power Play / an entry of several legs (those four bet types) | **the calculator**: `python -m props.calc capture`, then `python -m props.calc entry --dry-run --stake <$> --payout <total Sleeper shows> --angle <...> --why "..." --leg "<Player>\|<market>\|<side>\|<line>" ...` -- **Prop legs and entries** below |
+| break down this game / how does AWAY at HOME look / a game read | `nfl.py status --game AWAY@HOME` (spread, total, both teams' injury report), then **the calculator** (props.calc, run through nfl.py): `python nfl.py calc capture`, then `python nfl.py calc game AWAY@HOME` (every posted line in one run) -- **Prop legs and entries** below; the engine's matchup guide only when the engine is named |
+| a prop leg: X over / under N in rushing yards, catches, receiving yards or passing yards; is this leg any good; what workload does X need | **the calculator**: `python nfl.py calc capture`, then `python nfl.py calc leg "X" <rush_yds\|receptions\|rec_yds\|pass_yds> <over\|under>` -- **Prop legs and entries** below |
+| a Power Play / an entry of several legs (those four bet types) | **the calculator**: `python nfl.py calc capture`, then `python nfl.py calc entry --dry-run --stake <$> --payout <total Sleeper shows> --angle <...> --why "..." --leg "<Player>\|<market>\|<side>\|<line>" ...` -- **Prop legs and entries** below |
 | the props engine, asked for BY NAME ("what does the engine say", "run the engine on X", an engine game guide or slate) | `nfl.py props player / line / best / matchup / game / slate` -- **Props (the engine, dormant)** below; engine output, untested against real lines |
 | an anytime touchdown, or rushing + receiving yards | the engine: `nfl.py props player "X"` (it lists those lines; `props line` takes only catches, rec yds, rush yds, pass yds) -- the calculator does not cover them; engine output, untested against real lines |
 | best bets in a game / this week / a must-win pick | no pick from either tool: say why in a sentence, then offer the calculator on the legs the user is weighing; the engine's `props best` only when asked for by name (engine output, untested against real lines) |
@@ -244,12 +245,22 @@ often he reached the bar this season, the rate needed at his recent workload bes
 rates, the opponent's rate allowed, the matchup (the engine's tier grades, copied), and a
 closing question. It gives NO chance of its own and never says whether a line is good.
 
-1. **Capture first, every session.** The container is fresh: `python -m props.calc capture` saves
+Run it through `python nfl.py calc <command>` -- the same commands and arguments as
+`python -m props.calc`, but the session log records each run and its time (DECISIONS #236).
+
+1. **Capture first, every session.** The container is fresh: `python nfl.py calc capture` saves
    Sleeper's current lines (takes seconds); the cards read the newest quote before kickoff. A
    line from another book: `leg ... --line N --over <American> --under <American>` (cards only;
    an entry needs Sleeper's quote at the line played).
 2. **Markets:** `rush_yds`, `receptions`, `rec_yds`, `pass_yds`; side `over` or `under`. A name
    matched by initial prints a NOTE: say it, and confirm the player.
+   **One run, not one per line** (DECISIONS #236): each run loads three seasons of play-by-play,
+   so a game is ONE `python nfl.py calc game AWAY@HOME` -- a summary table of every posted line
+   (each side's workload bar beside his recent average) -- then the cards only for the lines that
+   matter or that the user names, in the same command: `--player "Name"` (repeatable; both sides
+   unless `--side over|under`). `--all` prints every line's cards (a full game takes about a
+   minute). Several legs from different games are ONE `entry --dry-run` with every leg, not one
+   `leg` run each. A single `leg` run is for a single leg.
 3. **Show what it prints, in full and as printed** -- every card, then the entry summary, the
    grade legend and the follow-up names. Never recompute, round or re-sort a number; the card's
    first line is that bet type's test result and stays with the card. Then your analysis around
@@ -262,6 +273,9 @@ closing question. It gives NO chance of its own and never says whether a line is
    -- quote them, never recompute), Matchup (grades, spread and total, the opponent's rates),
    Fit (which legs lean on shared or opposing game stories), Entry cost (payout, required wins,
    the coin-flip assumptions). Answer from the cards and those two files; never invent a number.
+   **An entry needs at least one leg from a second team** (Sleeper will not take an entry whose
+   legs are all one team; the user, 2026-10-10). Never suggest one: a one-script entry is a stack
+   across both teams of a game (a QB's yards with the other side's back, say).
 5. **A what-if on workload** ("what if he gets 20 carries, does the Over clear?") is answered from
    the card: his number against the bar, and the needed rate against his rates -- never a
    chance, and not an engine scenario run unless the user asks for the engine by name.
