@@ -8920,3 +8920,26 @@ for a Power Play with no legs got a refusal preamble.
   exact number test, a repeated call); the CHAT.md stage, 5 findings, all fixed (the --all run is read, not pasted;
   a dry run that prints Not logged swaps the leg; names exactly as the card prints them; full cards only;
   --format md in the routing rows).
+## 2026-10-11 (239) -- the card names its longer-run rate and never says a rate meets the bar that another printed rate misses
+
+Two fixes under the frozen spec's rule (b), a card that contradicts itself (the user, 2026-10-11).
+LaPorta Over 52.5 receiving yards closed "Recent workload and rate both meet the bar" with needed
+7.9 beside "His recent rate (16 games): 8.4" and "This season: 7.1": the rate met the bar only at
+the 16-game rate, and "recent" read as recent form.
+
+- **Label.** The rate the bar assumes is "His longer-run rate (N games)" on both cards, with ", K
+  from last season" (or "from earlier seasons" when some are older) when more than half of those
+  games are from before this season. The closing's "At his recent rate" and the chat condition's
+  "than the assumed rate" now name the longer-run rate.
+- **Split closing** (`card.rate_split`). When the longer-run rate and this season's rate, as
+  printed, fall on opposite sides of the needed rate, and the season sample is at or above the
+  existing minimum, the closing names the split instead of claiming the rate is there: "Workload
+  is there. Rate clears at his longer-run 8.4 yards a target, not at this season's 7.1." (Tucker:
+  "About 1 more target. Rate clears at this season's 10.1 yards a target, not at his longer-run
+  7.4."; mirrored for Unders, which clear at or below the needed rate.) Meeting the needed rate
+  counts as clearing it. The opponent's rate stays out of the closing.
+- **One source.** `card._parts` computes the label and the split once; the text card and the chat
+  card print the same strings. The workload half of a split closing comes from one function
+  (`_split_work`) worded per layout ("Workload is there." on the text card, "His recent workload
+  is there." in chat), from the same ask.
+- No change to the calculation, the bar or the settings.
