@@ -140,7 +140,8 @@ names a week.
 | a Power Play / an entry of several legs (those four bet types) | **the calculator**: `python nfl.py calc capture`, then `python nfl.py calc entry --dry-run --format md --stake <$> --payout <total Sleeper shows> --angle <...> --why "..." --leg "<Player>\|<market>\|<side>\|<line>" ...` -- **Prop legs and entries** below |
 | the props engine, asked for BY NAME ("what does the engine say", "run the engine on X", an engine game guide or slate) | `nfl.py props player / line / best / matchup / game / slate` -- **Props (the engine, dormant)** below; engine output, untested against real lines |
 | an anytime touchdown, or rushing + receiving yards | the engine: `nfl.py props player "X"` (it lists those lines; `props line` takes only catches, rec yds, rush yds, pass yds) -- the calculator does not cover them; engine output, untested against real lines |
-| build me a Power Play / a parlay / an entry, with no legs given; best bets in a game | **the calculator**: assemble entries by view -- **Assembling an entry** (rule 7 of **Prop legs and entries** below), never a refusal; the engine's `props best` only when asked for by name (engine output, untested against real lines) |
+| the strongest / best overs and unders (or best props, best bets) for a kickoff window or a game | **the calculator's screen**: `python nfl.py calc capture`, then `python nfl.py calc screen --window "<day> <time> PT" --format md` (or `--game AWAY@HOME`) -- rule 8 of **Prop legs and entries** below; show it as printed and call it the smallest ask at the price, untested; never a pick, a lean or a chance |
+| build me a Power Play / a parlay / an entry, with no legs given | **the calculator**: assemble entries by view -- **Assembling an entry** (rule 7 of **Prop legs and entries** below), never a refusal; the engine's `props best` only when asked for by name (engine output, untested against real lines) |
 | a read to share / for review / the QA version / the agent version of a game (asked for by name) | `props game AWAY@HOME` (the engine), then **Publishing a read** below |
 | waiver targets at RB / WR / TE | `nfl.py fantasy waiver --league L --pos RB,WR --horizon H` |
 | stream a defense or kicker | `nfl.py fantasy waiver --league L --pos DEF --horizon stream` (or `--pos K`) |
@@ -338,6 +339,21 @@ Run it through `python nfl.py calc <command>` -- the same commands and arguments
       self-check compares each one with its source before sending (the reply that prompted this
       rule had Bowers' line as 73.5 instead of 74.5, and swapped the needed rates between Bowers
       and Tucker).
+
+8. **The screen** (the user, 2026-10-11, DECISIONS #240): "strongest overs and unders for the 1pm PT
+   games" is one `python nfl.py calc screen --window "Sun 1pm PT" --format md` (a window is a
+   weekday and a clock hour, Pacific; `--game AWAY@HOME` for one game). It builds both sides of
+   every saved line from one data load and prints, in order: its caveats (which you keep -- it
+   lists only legs whose recent workload already meets the bar, leaves out legs that need a role
+   change, and is untested against results), the players each team has ruled Out, an Overs table
+   and an Unders table (top 8 each: the workload against the bar with his longer-run rate, then
+   four marks -- consistency, season rate, opponent's allowed rate, grades -- each ✓, ✗ or – with
+   its sample, the cushion and the flags), then the full chat cards for the top 3 a side. Show it
+   as printed, with a Matchup read under each card (rule 3). Call the order "the smallest ask at
+   the price", never the best, a pick, a lean or a chance; a ✗ is a fact against the leg, say it.
+   A past week (`--week N`) is rebuilt from the saved line history and says so in its header;
+   `--grade` marks a played week's listed legs with the journal's own grader and prints the hit
+   rate by rank against the legs' average break-even -- quote it with its count, never as proof.
 
 Only when the user asks for the engine by name, or for a bet type the calculator does not cover
 (anytime touchdowns, rushing + receiving yards, a teammate-out scenario), use the engine below,

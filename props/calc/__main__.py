@@ -8,6 +8,10 @@
   game PHI@JAX             every posted line of one game in one run: a summary table (each side's
       [--player "Name" ...]  workload bar against his recent average), then the cards for the
       [--all] [--side over]  players named (or --all), both sides unless --side; the data loads once
+  screen --window "Sun 1pm PT"   (or --game AWAY@HOME) every saved line in the window, both sides,
+      [--week N] [--grade]   listed only where his recent workload meets the bar and ranked by how
+                             little the leg asks (untested); then the top 3 cards a side. --grade marks a
+                             past week's list with the journal's grader
   capture                 save the current Sleeper lines (four markets) into that history
   entry --stake 5 --payout 50 --angle role --why "..." --leg "Name|rush_yds|over|64.5[|TEAM]" ...
       log a Power Play in the props journal (props/journal.py). The line is the
@@ -19,6 +23,7 @@
 from __future__ import annotations
 
 import argparse
+from pathlib import Path
 import json
 import sys
 
@@ -69,6 +74,13 @@ def main(argv: list[str] | None = None) -> int:
     gm.add_argument("--season", type=int)
     gm.add_argument("--week", type=int)
     gm.add_argument("--format", choices=["text", "md"], default="text", help="the cards as text or as chat cards")
+    sc = sub.add_parser("screen", help="every saved line in a kickoff window or game, both sides, smallest ask first")
+    sc.add_argument("--window", help="'<day> <time> PT', e.g. 'Sun 1pm PT' (that clock hour, Pacific)")
+    sc.add_argument("--game", help="AWAY@HOME instead of a window")
+    sc.add_argument("--season", type=int)
+    sc.add_argument("--week", type=int, help="a past week (default: the soonest window still to kick off)")
+    sc.add_argument("--format", choices=["text", "md"], default="text", help="the top cards as text or chat cards")
+    sc.add_argument("--grade", action="store_true", help="grade the listed legs (a played week) with the journal's grader")
     sub.add_parser("capture")
     en = sub.add_parser("entry", help="log a Power Play in the props journal, legs filled in from their cards")
     en.add_argument("--stake", type=float, required=True, help="dollars staked on the entry")
@@ -106,6 +118,9 @@ def run(a) -> int:
         return 0
     if a.cmd == "game":
         print(game(a))
+        return 0
+    if a.cmd == "screen":
+        print(screen(a))
         return 0
     if a.cmd == "capture":
         r = capture.run()
@@ -335,13 +350,14 @@ def build_card(b, name_in: str, market: str, side: str = "over", *, team=None, s
             gl = sched
         why = why or "ESPN and the schedule show none"
     shown = dict(opp=opp, game_lines=gl, why_no_lines=why, line_note=line_note,
-                 opp_row=_display(lambda: opponent.allows(b, market, opp, pl.position, season, wk, fixed)),
+                 opp_row=_display(lambda: _opp_allows(b, market, opp, pl.position, season, wk, fixed)),
                  grades=_display(lambda: matchup.grade_pair(b, team, opp, "run" if market == "rush_yds"
                                                              else "pass", season, wk, fixed)),
                  qb_today=_display_text(lambda: qb_today(b, team, season, wk)))
     text = card.render(pl, c, side, footer=footer, **shown)
     md = card.render_md(pl, c, side, footer=md_footer, **shown)
     return {**out, "c": c, "ready": True, "settings": tuned, "text": warn + text, "md": md_warn + md,
+            "pl": pl, "shown": shown,                # the screen reads both sides from these (DECISIONS #240)
             # depths whose yards came from every position's catches (the "Calculation" follow-up; journal row)
             "pooled_depths": list(pl.receiving.get("pooled_all_positions", []))}
 
@@ -399,16 +415,182 @@ def _named(typed: str, name: str) -> bool:
         names.abbreviated(typed) and names.initial_key(typed) == names.initial_key(name))
 
 
+def _opp_allows(b, market: str, opp: str, position, season: int, week: int, fixed: dict) -> dict:
+    """opponent.allows, once per (market, opponent, position, week) in a run: a screen asks it for every
+    player on a team and the answer depends on none of them."""
+    cache = b.__dict__.setdefault("_opp_allows", {})
+    key = (market, opp, position, season, week)
+    if key not in cache:
+        cache[key] = opponent.allows(b, market, opp, position, season, week, fixed)
+    return cache[key]
+
+
+def _matchup(text: str) -> tuple[str, str]:
+    away, sep, home = str(text).upper().partition("@")
+    if not sep or not away or not home:
+        raise SystemExit(f"write the game as AWAY@HOME, e.g. PHI@JAX; got {text!r}")
+    return names.team_code(away), names.team_code(home)
+
+
+def _injuries(b, season: int) -> pd.DataFrame:
+    if b.__dict__.get("_injuries_season") != season:
+        b._injuries = data.injuries(season, manifest=b.manifest)
+        b._injuries_season = season
+    return b._injuries
+
+
+def _release() -> str:
+    lock = Path(__file__).resolve().parents[2] / "nfl.lock.json"
+    try:
+        return json.loads(lock.read_text(encoding="utf-8")).get("tag") or "unknown"
+    except (OSError, ValueError):
+        return "unknown"
+
+
+def screen(a) -> str:
+    """Every saved Sleeper line in a kickoff window (or one game), both sides, from one data load
+    (DECISIONS #240): listed only where his recent workload already meets the bar, ranked by how
+    little the leg asks (screen.py), then the top 3 cards a side. Untested; the header says so."""
+    from . import screen as S
+    fixed = settings.load()["fixed"]
+    season = a.season or F.current_season()
+    if bool(a.window) == bool(a.game):
+        raise SystemExit("give --window '<day> <time> PT' (e.g. 'Sun 1pm PT') or --game AWAY@HOME")
+    b, warn = _bundle(season, fixed)
+    now = dt.datetime.now(dt.timezone.utc)
+    if a.window:
+        games = S.window_games(b.schedule, season, a.week, S.parse_window(a.window), now)
+        label = a.window.strip()
+    else:
+        away, home = _matchup(a.game)
+        games = _game_between(b.schedule, away, home, season, a.week).to_frame().T
+        label = f"{away} at {home}"
+    started = games[[pd.Timestamp(k) <= pd.Timestamp(now) for k in games["kickoff_utc"]]]
+    replay = len(started) == len(games)
+    if not replay:
+        games = games.drop(started.index)
+    lookup = lines.LineLookup(b.rosters)
+    inj = _display(lambda: _injuries(b, season))
+    inj_ok = not isinstance(inj, dict)
+    rows, problems = [], []
+    lines_out, sides_out = {}, {}                  # whole lines never built; sides built but not listed
+    skip = lambda why: lines_out.__setitem__(why, lines_out.get(why, 0) + 1)      # noqa: E731
+    unlisted = lambda why: sides_out.__setitem__(why, sides_out.get(why, 0) + 1)  # noqa: E731
+    for _, g in games.iterrows():
+        wk = int(g["week"])
+        posted, unread, bad = lookup.posted({"season": season, "week": wk, "kickoff_utc": g["kickoff_utc"],
+                                             "game_id": g["game_id"], "home_team": g["home_team"],
+                                             "away_team": g["away_team"]})
+        problems += bad + ([f"{unread} saved rows for {g['away_team']} at {g['home_team']} could not be read"]
+                           if unread else [])
+        for p_ in posted:
+            try:
+                got = build_card(b, p_["player"], p_["market"], "over", team=p_["team"], season=season, week=wk,
+                                 lookup=lookup)
+            except (player.NotFound, DataError, SystemExit):
+                skip("not built")
+                continue
+            if got["stub"]["game_id"] != g["game_id"]:
+                skip("not built")
+                continue
+            if got["not_enough"]:
+                skip("not enough data")
+                continue
+            if not got["ready"]:
+                skip("no usable quote")
+                continue
+            c = got["c"]
+            bars = {sd: card.value(c, f"needed_{sd}") for sd in ("over", "under")}
+            status = None
+            if inj_ok:
+                me = inj[(inj["week"] == wk) & (inj["gsis_id"] == got["stub"]["gsis_id"])]
+                st = str(me["report_status"].iloc[-1]) if len(me) else ""
+                status = st if st in ("Questionable", "Doubtful", "Out") else None
+            for sd in ("over", "under"):
+                r = S.side_row(got["pl"], c, sd, got["shown"], got["stub"], bars["under" if sd == "over" else "over"])
+                if status:
+                    r["flags"].insert(0, status)
+                if r["bar"] is None:
+                    unlisted("bar out of range")
+                elif c["usual"] is None:
+                    unlisted("no recent average")
+                elif not r["passes"]:
+                    unlisted("recent workload short of the bar")
+                r["_lookup"] = (got["stub"]["player"], got["stub"]["team"], wk)
+                rows.append(r)
+    weeks = sorted({int(w) for w in games["week"]})
+    L = [f"**Smallest ask at the price · {label} · week {', '.join(map(str, weeks))}**", "", S.HEADER, "", S.ORDER, "",
+         "Games: " + ", ".join(f"{g['away_team']} at {g['home_team']} ({S.clock(g['kickoff_utc'])})"
+                               for _, g in games.iterrows()), ""]
+    L += [f"Quotes: the newest saved Sleeper quote before each kickoff (each card shows its time). Release {_release()}."]
+    if replay:
+        L += ["", S.REPLAY]
+    elif len(started):
+        L += ["", "Already kicked off, left out: " + ", ".join(
+            f"{g['away_team']} at {g['home_team']} ({S.clock(g['kickoff_utc'])})" for _, g in started.iterrows()) + "."]
+    if inj_ok:
+        outs = []
+        for _, g in games.iterrows():
+            for t in (g["away_team"], g["home_team"]):
+                tr = inj[(inj["week"] == int(g["week"])) & (inj["team"] == t)]
+                if tr.empty:
+                    outs.append(f"{t}: the report is not out yet")
+                else:
+                    o = sorted(tr[tr["report_status"] == "Out"]["full_name"].dropna().unique())
+                    outs.append(f"{t}: {', '.join(o) if o else 'none'}")
+        L += ["", "Ruled out (official injury report):", ""] + [f"- {x}" for x in outs]
+    else:
+        L += ["", f"Injury report not read: {inj.get('note', 'not available')}"]
+    for x in problems:
+        L += ["", f"Check first: {x}."]
+    ranked = {sd: S.rank([r for r in rows if r["side"] == sd])[:S.TOP] for sd in ("over", "under")}
+    for sd, title in (("over", "Overs"), ("under", "Unders")):
+        L += [""] + S.table(ranked[sd], f"{title} (top {S.TOP})")
+    if lines_out:
+        L += ["", "Lines not ranked: " + ", ".join(f"{n} {why}" for why, n in sorted(lines_out.items())) + "."]
+    if sides_out:
+        L += ["", "Sides not listed (an Over and an Under count separately): "
+              + ", ".join(f"{n} {why}" for why, n in sorted(sides_out.items())) + "."]
+    if a.grade:
+        L += [""] + _grade_screen(S, season, ranked, label)
+    key = "md" if a.format == "md" else "text"
+    gap = ["", "---", ""] if key == "md" else [""]
+    for sd in ("over", "under"):
+        for r in ranked[sd][:3]:
+            name, team, wk = r["_lookup"]
+            try:
+                L += gap + [build_card(b, name, r["market"], sd, team=team, season=season, week=wk, lookup=lookup)[key]]
+            except (player.NotFound, DataError, SystemExit) as ex:
+                L += gap + [f"{name} {card.SHOW[r['market']][0]} {sd}: card not built: {ex}"]
+    return (_md_lead(warn) if key == "md" else warn) + "\n".join(L)
+
+
+def _grade_screen(S, season: int, ranked: dict, label: str) -> list[str]:
+    """Grade the listed legs with the journal's own grader, in a throwaway journal (never the betting
+    record): the same stats file, name join and push rule as every logged bet."""
+    import tempfile
+    rows = S.journal_rows(ranked["over"], label) + S.journal_rows(ranked["under"], label)
+    if not rows:
+        return ["**Results**", "", "No leg was listed, so nothing to grade."]
+    keep = journal.JOURNAL_ROOT
+    with tempfile.TemporaryDirectory() as tmp:
+        try:
+            journal.JOURNAL_ROOT = Path(tmp)
+            journal.write(season, rows)
+            journal.grade(season)
+            graded = journal.read(season)
+        finally:
+            journal.JOURNAL_ROOT = keep
+    return S.results(graded, ranked["over"] + ranked["under"])
+
+
 def game(a) -> str:
     """Every posted line of one game in one run (DECISIONS #236): the data loads once, then a
     summary row per line (each side's bar, as its card prints it, beside his last-4 average) and
     the full cards for the players asked for. A card is built exactly as `leg` builds it."""
     fixed = settings.load()["fixed"]
     season = a.season or F.current_season()
-    away, sep, home = str(a.matchup).upper().partition("@")
-    if not sep or not away or not home:
-        raise SystemExit(f"write the game as AWAY@HOME, e.g. PHI@JAX; got {a.matchup!r}")
-    away, home = names.team_code(away), names.team_code(home)
+    away, home = _matchup(a.matchup)
     b, warn = _bundle(season, fixed)
     g = _game_between(b.schedule, away, home, season, a.week)
     wk = int(g["week"])
