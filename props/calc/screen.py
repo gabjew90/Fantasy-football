@@ -220,7 +220,7 @@ def checks(r: dict, md: bool) -> str:
     if md:
         return "\n".join(["**Screen checks**", "", "| Check | Result |", "|---|---|"]
                          + [f"| {a} | {card._cell(b)} |" for a, b in rows])
-    return "\n".join(["SCREEN CHECKS"] + [f"{a}: {b}" for a, b in rows])
+    return "\n".join(["SCREEN CHECKS"] + [x for a, b in rows for x in card._wrap(f"{a}: {b}")])
 
 
 def journal_rows(rows: list[dict], window_text: str) -> list[dict]:
