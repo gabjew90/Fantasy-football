@@ -2,7 +2,7 @@
  "algorithm": "nfl-release-sha256-lf-1",
  "file_count": 194,
  "files": {
-  "CHAT.md": "a6812713b3f4335a56a9d22b93106ae5f38bc0eef06024a937de9d4a3d6d73c0",
+  "CHAT.md": "aa0c891551820f00e511317ebcae513b62a937ef35cc2f71c5ab4b5ae5579ac8",
   "config.yaml": "1a2af1bd5d6c7a464e908b50e94d910d2adba1675dede83876369aca7329c0c6",
   "core/__init__.py": "8ac9ed217e439f5828616ab66ec9ff17336c2cbbbeae391d0f9bfa001eaed571",
   "core/fetch.py": "f7645d380c6a997b539eb28bda37400887c616d23360f71b013922541e2284fa",
@@ -201,6 +201,6 @@
   "scripts/bootstrap.py": "8c6c428d7b66fde19ea8894d5124a0c182ba3f9719db6031f4904459e3b8cdd7",
   "scripts/release.py": "a75353d7b4e83d21e7e22600c5bb2856b05389966b8e7b1b2d25e62a4ed84bf7"
  },
- "sha256": "7db9da72e12286c40bbc2b65a12e256bee73cc458aaccc785e565a8943f60ce8",
+ "sha256": "c293ca8bbdf2fef1da842a1ac6a64cbdca0734d5c698fe8c6e5b85c76ada2587",
  "tag": "nfl-v1.73"
 }

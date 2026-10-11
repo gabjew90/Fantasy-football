@@ -258,9 +258,12 @@ Run it through `python nfl.py calc <command>` -- the same commands and arguments
    so a game is ONE `python nfl.py calc game AWAY@HOME` -- a summary table of every posted line
    (each side's workload bar beside his recent average) -- then the cards only for the lines that
    matter or that the user names, in the same command: `--player "Name"` (repeatable; both sides
-   unless `--side over|under`). `--all` prints every line's cards (a full game takes about a
-   minute). Several legs from different games are ONE `entry --dry-run` with every leg, not one
-   `leg` run each. A single `leg` run is for a single leg.
+   unless `--side over|under`). `--all` prints every line's cards (a full game: about a minute
+   once the data is loaded, a minute and a half on a fresh container). Legs from several games:
+   one `calc game ... --player` per game (the first run keeps the parsed data, so the rest load
+   in seconds). An entry the user has settled on is one `entry --dry-run` (it prints every leg's
+   card, but stops with "Not logged" and no cards if any leg falls short). A single `leg` run is
+   for a single leg.
 3. **Show what it prints, in full and as printed** -- every card, then the entry summary, the
    grade legend and the follow-up names. Never recompute, round or re-sort a number; the card's
    first line is that bet type's test result and stays with the card. Then your analysis around
@@ -281,7 +284,7 @@ Run it through `python nfl.py calc <command>` -- the same commands and arguments
    chance, and not an engine scenario run unless the user asks for the engine by name.
 6. **Logging.** Chat is read-only and never logs. When the user plays an entry, give them the
    same `entry` command WITHOUT `--dry-run`, with `--payout` set to the total Sleeper shows
-   (stake included), to paste into a Claude Code session, which runs `python -m props.calc
+   (stake included), to paste into a Claude Code session, which runs `python nfl.py calc
    capture` first. The entry logs only at a line Sleeper has a saved quote for before kickoff:
    if the line has moved since, it refuses and says so -- tell the user that, never invent a
    quote. For a Power Play in these four bet types this calculator command, not

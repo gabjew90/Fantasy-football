@@ -8839,9 +8839,10 @@ props.calc leg` process re-read three seasons of play-by-play, rosters and snaps
 cold, of which about 17 s was parsing the CSVs), and chat ran 56 of them. The user chose all
 four speed-ups and timings for every step.
 
-- **Timings.** The bootstrap stamps when setup started and how long it took (`SETUP_SECONDS=`;
-  an older loader that hands over to the pinned one passes its start along, so the figure
-  covers both). The calculator runs inside nfl.py (`nfl.py calc <same arguments>`), so the
+- **Timings.** The bootstrap stamps when setup started and how long it took (`SETUP_SECONDS=`).
+  A loader from nfl-v1.73 on that hands over to a newer pinned one passes its start along, so
+  the figure covers both; the installed nfl-v1.71 loader predates this, so until the skill is
+  next rebuilt the figure covers only the handed-over copy. The calculator runs inside nfl.py (`nfl.py calc <same arguments>`), so the
   session log records each run with its start (milliseconds) and length. `nfl.py log` adds a
   Timings table: setup, every step, its seconds and the wait before it (chat reading, deciding
   and writing); the reply after the last step is not timed.
@@ -8858,8 +8859,10 @@ four speed-ups and timings for every step.
   beside the download, keyed on its size, modification time, the columns and the pandas
   version; a refreshed download or a new pandas is re-read, an unreadable cache is re-read, and
   a cache that cannot be written costs only the saving. Warm cards: about 1.4 s of loading.
-- **Parallel runs became one run.** Legs from several games go into ONE `entry --dry-run`
-  (one load for every leg) instead of parallel processes that would each load the data.
+- **Parallel runs were not needed.** With the parsed data kept, a second process loads in
+  about 1.4 s, so legs from several games are one `calc game ... --player` per game, run one
+  after another. `entry --dry-run` builds every leg from one load too, but it is all or nothing
+  (one leg short and it prints no cards), so it is for an entry already settled on.
 - **CHAT.md.** Calculator runs go through `python nfl.py calc`; a game read is one `status
   --game` (no plain `status` as well) then one `calc game`; and, from the user (2026-10-10), an
   entry needs at least one leg from a second team -- Sleeper refuses an all-one-team entry, so
