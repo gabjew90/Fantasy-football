@@ -162,8 +162,9 @@ def render_md(legs: list[dict], stake: float, payout: float, payout_from_legs: b
     out = [f"**Your {st} entry · {n} legs**", "", f"Return if all win: **{money(payout)}**. Includes your {st} stake."]
     if payout_from_legs:
         out += ["", "(No payout given: worked out from the legs' own prices multiplied together, not from your entry.)"]
-    if _second_team(legs):
-        out += ["", _second_team(legs)]
+    second = _second_team(legs)
+    if second:
+        out += ["", second]
     out += ["", "| Leg | What each needs (biggest ask first) |", "|---|---|"]
     for x in sorted(legs, key=_sort_key, reverse=True):
         leg = f"{x['name']} · {card.SHOW[x['market']][0]} {x['side'].title()}" + (f" {x['line']:g}" if x.get("line") is not None else "")

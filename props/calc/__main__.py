@@ -346,6 +346,11 @@ def build_card(b, name_in: str, market: str, side: str = "over", *, team=None, s
             "pooled_depths": list(pl.receiving.get("pooled_all_positions", []))}
 
 
+def _md_lead(warn: str) -> str:
+    """A warning above chat output: its own paragraph, so markdown does not run it into the title."""
+    return warn.strip() + "\n\n" if warn else ""
+
+
 def leg(a) -> str:
     typed = _check_inputs(a)
     fixed = settings.load()["fixed"]
@@ -355,7 +360,9 @@ def leg(a) -> str:
                      target=a.target / 100 if a.target is not None else None)
     if got["line"] is None and not got["not_enough"]:
         raise SystemExit(got["text"])          # no quote found and none typed: say why, no card
-    return warn + got["md" if getattr(a, "format", "text") == "md" else "text"]
+    if getattr(a, "format", "text") == "md":
+        return _md_lead(warn) + got["md"]
+    return warn + got["text"]
 
 
 MARKET_ORDER = ("pass_yds", "rush_yds", "receptions", "rec_yds")
@@ -475,7 +482,7 @@ def game(a) -> str:
                 L += gap + [f"{got['stub']['player']} {card.SHOW[p['market']][0]} {side}: card not built: {ex}"]
     if not pick and not a.player:
         L += ["", "Cards: name players with --player, or print every line's cards with --all."]
-    return warn + "\n".join(L)
+    return (_md_lead(warn) if key == "md" else warn) + "\n".join(L)
 
 
 def _parse_leg(spec: str) -> tuple:
@@ -548,13 +555,17 @@ def entry(a) -> str:
     weeks = {g["stub"]["week"] for _, g in cards}
     if len(weeks) > 1:
         problems.append(f"the legs are in different weeks ({sorted(weeks)}); the journal logs one week per entry")
+    md = getattr(a, "format", "text") == "md"
+    if md:
+        warn = _md_lead(warn)
     if problems:
+        if md:                                  # a list, so markdown keeps one reason per line
+            return warn + "Not logged:\n\n" + "\n".join(f"- {p}" for p in problems)
         return warn + "Not logged:\n" + "\n".join(f"  {p}" for p in problems)
     week = weeks.pop()
     views = [summary.leg_view(g["stub"]["player"], g["stub"]["market"], side, g["c"], g["stub"]["team"], g["opp"],
                               g["stub"]["game_id"]) for side, g in cards]
     payout = a.payout if a.payout is not None else summary.payout_from_legs(a.stake, views)
-    md = getattr(a, "format", "text") == "md"
     entry_text = (summary.render_md(views, a.stake, payout, a.payout is None, [g["md"] for _, g in cards]) if md
                   else summary.render(views, a.stake, payout, payout_from_legs=a.payout is None))
     jlegs = [(g["stub"]["player"], g["stub"]["market"], side, g["line"], g["stub"]["team"]) for side, g in cards]
@@ -573,6 +584,8 @@ def entry(a) -> str:
         if a.payout is None:                   # the payout was worked out, not Sleeper's: no journal preview
             return (warn + text + "\n\nDRY RUN: nothing written. No journal preview: the payout above was worked "
                     "out from the legs' prices; logging needs --payout, the total Sleeper shows for your entry.")
+        if md:                                 # machine lines: fenced, so markdown keeps one row per line
+            added = f"```json\n{added}\n```"
         return (warn + text + f"\n\nDRY RUN: nothing written. These {len(rows)} lines would be added to "
                 f"{journal.journal_path(season)}:\n{added}")
     journal.write(season, journal.read(season) + rows)

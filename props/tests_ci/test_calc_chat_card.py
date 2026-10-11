@@ -158,8 +158,9 @@ def test_the_chat_entry_puts_the_comparison_first_then_cards_then_the_fit_check(
     for a, b in summary.opposing_pairs(LEGS):
         assert f"{a} {b} These lean on opposite game stories." in md and a in flat
     import re
-    nums = lambda s: set(re.findall(r"\d+(?:\.\d+)?", s))      # noqa: E731
-    assert nums(md.replace("CARD ONE", "").replace("CARD TWO", "")) - {"10"} <= nums(text) | {"1", "2"}
+    nums = lambda s: sorted(re.findall(r"\d+(?:\.\d+)?", s))      # noqa: E731
+    # every number, as often as the text summary has it: none added, none dropped
+    assert nums(md.replace("CARD ONE", "").replace("CARD TWO", "")) == nums(text)
 
 
 def test_the_chat_entry_says_when_every_leg_is_on_one_team():
@@ -181,3 +182,17 @@ def test_leg_and_entry_print_the_chat_layout_with_format_md(stub_leg, monkeypatc
     assert out.startswith("**Your $5 entry · 2 legs**")
     assert out.index("| Leg |") < out.index("**Test Back · Rushing yards**") < out.index("**Fit check**")
     assert "DRY RUN: nothing written" in out
+
+
+def test_chat_output_keeps_warnings_reasons_and_preview_rows_apart(stub_leg, monkeypatch):
+    cli, lookup, pl = stub_leg
+    from props.calc import player
+    monkeypatch.setattr(player, "model", lambda *a, **k: rush_model(ypc=4.2))
+    monkeypatch.setattr(cli, "_bundle", lambda season, fixed: (player.Bundle(), "WARNING: built on older copies.\n"))
+    lookup.quote = dict(QUOTE)
+    assert cli.leg(_leg_args(format="md")).startswith("WARNING: built on older copies.\n\n**Test Back")
+    out = cli.entry(_entry_args(dry_run=True, format="md"))
+    assert "would be added to " in out and "```json\n{" in out and out.rstrip().endswith("```")
+    lookup.quote = None
+    short = cli.entry(_entry_args(format="md"))
+    assert "Not logged:\n\n- Test Back (rush_yds): no full card" in short
