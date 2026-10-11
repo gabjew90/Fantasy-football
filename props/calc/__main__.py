@@ -191,46 +191,45 @@ def _bundle(season: int, fixed: dict) -> tuple:
 _SPREADS: dict = {}
 
 
-NOT_CONFIRMED = {"Out", "Doubtful", "Questionable"}
+NOT_CONFIRMED = {"Doubtful", "Questionable"}
 
 
 def qb_today(b, team: str, season: int, week: int) -> str:
-    """The MATCHUP quarterback line (the user, 2026-10-10): "Starting QB not
-    confirmed." when this game's starter is not settled, else no line. Never
-    a guessed name: no dependable source names a replacement before kickoff
-    (ESPN's depth chart lagged a week in 2026; Sleeper's is live-only and
-    hand-kept). Not settled when any of:
-    - the week's official injury report (nflverse injuries) has no rows for
-      his team yet (the report is not out);
-    - the opening-day starter is listed Out, Doubtful or Questionable, or did
-      not practise with no game status yet;
-    - his team's most recent game was started by someone else (an injury,
-      including IR, which the weekly report leaves out, or a benching).
+    """The MATCHUP quarterback line (the user, 2026-10-11, DECISIONS #241; was the opening-day starter,
+    2026-10-10). The current starter is whoever started his team's most recent game. Never a guessed
+    name: only the official report (nflverse injuries) and played games are read.
+    - "<Name> ruled Out." when the official report lists the current starter Out (a fact, not a
+      guess at who replaces him);
+    - "Starting QB not confirmed." when it lists him Doubtful or Questionable, or he did not practise
+      with no game status yet; or when a quarterback who started for the team earlier this season
+      is on this week's report and not ruled Out (he may take the job back);
+    - otherwise no line -- including before the week's report is out: he started the last game.
     Display only."""
-    sch = b.schedule[(b.schedule["season"] == season)
-                     & ((b.schedule["home_team"] == team) | (b.schedule["away_team"] == team))].sort_values("week")
-    played = sch[sch["week"] < week]
+    played = player.played_before(b.schedule, team, season, week)
     if played.empty:
-        return ""                              # his team's opener is this game or later: no opening-day starter yet
-    opener = player._starter(played.iloc[0], team)
-    if opener is None:
+        return ""                              # his team has not played yet: no starter yet
+    now = player._starter(played.iloc[-1], team)
+    if now is None:
         return ""
-    latest = player._starter(played.iloc[-1], team)
-    if latest is not None and latest != opener:
-        return "Starting QB not confirmed."
     if b.__dict__.get("_injuries_season") != season:
         b._injuries = data.injuries(season, manifest=b.manifest)
         b._injuries_season = season
     inj = b._injuries
     rows = inj[(inj["week"] == week) & (inj["team"] == team)]
-    if rows.empty:
-        return "Starting QB not confirmed."   # the report for this week is not out yet
-    me = rows[rows["gsis_id"] == opener]
+    me = rows[rows["gsis_id"] == now]
     if len(me):
         status = me["report_status"].iloc[-1]
         practice = str(me.get("practice_status", pd.Series([""])).iloc[-1])
+        if str(status) == "Out":
+            name = str(me["full_name"].iloc[-1]) if "full_name" in me and pd.notna(me["full_name"].iloc[-1]) \
+                and str(me["full_name"].iloc[-1]).strip() else player._starter(played.iloc[-1], team, "name")
+            return f"{name or 'His starting QB'} ruled Out."
         if str(status) in NOT_CONFIRMED or (pd.isna(status) and practice.startswith("Did Not Participate")):
             return "Starting QB not confirmed."
+    earlier = {player._starter(g, team) for _, g in played.iterrows()} - {now, None}
+    back = rows[rows["gsis_id"].isin(earlier)]
+    if len(back) and (back["report_status"].astype(str) != "Out").any():
+        return "Starting QB not confirmed."   # an earlier starter is on the report, not ruled Out
     return ""
 
 

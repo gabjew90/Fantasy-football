@@ -172,8 +172,11 @@ def side_row(pl, c: dict, side: str, shown: dict, stub: dict, other_bar: float |
     # flags
     if len(P["rows"]) < P["n"] or 0 < P["season_games"] < 4:
         row["flags"].append("short history")
-    if str(shown.get("qb_today", "")).startswith("Starting QB not confirmed"):
+    qb = str(shown.get("qb_today", ""))
+    if qb.startswith("Starting QB not confirmed"):
         row["flags"].append("QB not confirmed")
+    elif qb.endswith("ruled Out."):
+        row["flags"].append(qb.removesuffix(".").replace(" ruled Out", " (QB) ruled Out"))
     if sb is not None and other_bar is not None and abs(sb - card.shown_work(other_bar)) <= 1:
         row["flags"].append("tight line")
     row["many"] = many
