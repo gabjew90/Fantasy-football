@@ -174,8 +174,44 @@ def _season_count(pl: Player, market: str, side: str, bar: float) -> str:
     return f"{n}+ this season: {hit} of {of}" if side == "over" else f"{n} or fewer this season: {hit} of {of}"
 
 
+def rate_split(market: str, side: str, longer: float | None, season: float | None, need: float | None) -> str:
+    """The closing's rate sentence when his longer-run rate (the one the bar assumes) and this season's
+    rate, both as printed, fall on opposite sides of the needed rate (DECISIONS #239): the card may not
+    say the rate meets the bar while another rate on it says otherwise. "" when they agree, or when a
+    number is missing (no needed rate, no season rate at its minimum sample). Meeting the needed rate
+    counts as clearing it; an Under clears at or below it."""
+    if longer is None or season is None or need is None:
+        return ""
+    ok = (lambda x: x >= need) if side == "over" else (lambda x: x <= need)       # noqa: E731
+    if ok(longer) == ok(season):
+        return ""
+    unit = SHOW[market][2]
+    if ok(longer):
+        return f"Rate clears at his longer-run {longer:.1f} {unit}, not at this season's {season:.1f}."
+    return f"Rate clears at this season's {season:.1f} {unit}, not at his longer-run {longer:.1f}."
+
+
+def _split_work(market: str, side: str, work_ask: float | None, reached: int | None, of: int, chat: bool) -> str:
+    """The workload half of a split closing, from the same ask the question takes (nearest half, as shown)."""
+    if work_ask is None:
+        return ""
+    work_ask = half_up(work_ask, "0.5")
+    meets = work_ask <= 0 if side == "over" else work_ask >= 0
+    if meets and reached is not None and reached < 2:
+        return (f"His recent average meets the bar, but only {reached} of his last {of} games did." if chat
+                else f"Average clears it, but only {reached} of {of} games did.")
+    a = work_ask if side == "over" else -work_ask
+    if a <= 0:
+        return "His recent workload is there." if chat else "Workload is there."
+    more = "more" if side == "over" else "fewer"
+    return (f"He needs about {_num(a)} {more} {_unit(market, a)} than his recent average." if chat
+            else f"About {_num(a)} {more} {_unit(market, a)}.")
+
+
 def question(market: str, side: str, work_ask: float | None, rate_ask: float | None,
-             reached: int | None = None, of: int = 4) -> str:
+             reached: int | None = None, of: int = 4, split: str = "") -> str:
+    if split:                                  # the two printed rates disagree: say so, never "rate meets"
+        return " ".join(x for x in (_split_work(market, side, work_ask, reached, of, False), split) if x)
     q = _question(market, side, work_ask, rate_ask, reached, of)
     q = q.replace(". about ", ". About ")      # each sentence starts with a capital
     return q[:1].upper() + q[1:]
@@ -219,17 +255,20 @@ def _question(market: str, side: str, work_ask: float | None, rate_ask: float | 
     if rate_ask > 0:
         return f"Workload is there. {r(rate_ask)}?"
     if work_ask > 0:
-        return f"At his recent rate it clears. {w(work_ask)}?"     # rate ask is against the bar's (recent) rate
+        return f"At his longer-run rate it clears. {w(work_ask)}?"     # rate ask is against the bar's rate
     if work_ask == 0:                          # even on workload, rate there too (the user, 2026-10-10)
         return "Recent workload and rate both meet the bar."
     return f"Room for about {_num(-work_ask)} {room} {_unit(market, -work_ask)}?"
 
 
 def condition(market: str, side: str, work_ask: float | None, rate_ask: float | None,
-              reached: int | None = None, of: int = 4) -> str:
+              reached: int | None = None, of: int = 4, split: str = "") -> str:
     """The chat card's "What needs to be true" (the user, 2026-10-11: a condition, not a question): the
     same asks as question(), taken the same way (the nearest half, one decimal, turned round for an
-    Under), stated as what this side needs. "" when the question would be empty."""
+    Under), stated as what this side needs. "" when the question would be empty. split: rate_split()'s
+    sentence, which replaces the rate half when the card's two rates disagree."""
+    if split:
+        return " ".join(x for x in (_split_work(market, side, work_ask, reached, of, True), split) if x)
     if work_ask is not None:
         work_ask = half_up(work_ask, "0.5")
     if rate_ask is not None:
@@ -244,8 +283,8 @@ def condition(market: str, side: str, work_ask: float | None, rate_ask: float | 
     more, less, room = ("more", "more", "fewer") if side == "over" else ("fewer", "less", "more")
     rate_words = SHOW[market][2]
     w = lambda n: f"about {_num(n)} {more} {_unit(market, n)} than his recent average"    # noqa: E731
-    r = lambda n: (f"{_num(n)} more {rate_words} than the assumed rate" if side == "over"     # noqa: E731
-                   else f"{_num(n)} {rate_words} less than the assumed rate")
+    r = lambda n: (f"{_num(n)} more {rate_words} than his longer-run rate" if side == "over"     # noqa: E731
+                   else f"{_num(n)} {rate_words} less than his longer-run rate")
     roomy = lambda n: f"room for about {_num(n)} {room} {_unit(market, n)}"              # noqa: E731
     if work_ask is None:
         return f"He needs {r(rate_ask)}." if rate_ask is not None and rate_ask > 0 else ""
@@ -259,7 +298,7 @@ def condition(market: str, side: str, work_ask: float | None, rate_ask: float | 
     if rate_ask > 0:
         return f"His recent workload is there; he needs {r(rate_ask)}."
     if work_ask > 0:
-        return f"At his recent rate, he needs {w(work_ask)}."
+        return f"At his longer-run rate, he needs {w(work_ask)}."
     if work_ask == 0:
         return "His recent workload and rate both meet the bar."
     return f"His recent workload and rate meet the bar, with {roomy(-work_ask)}."
@@ -386,11 +425,23 @@ def _parts(pl: Player, c: dict, side: str) -> dict:
     if bar is not None and len(rows) >= n:
         sb = shown_work(bar)
         reached = sum((w >= sb) if side == "over" else (w <= sb) for w, _, _ in rows)
+    # the rate the bar assumes, labelled as what it is: his longer run, not his recent form; when more
+    # than half of those games are from before this season, the label says so (as the Last 4 line does)
+    win = pl.window
+    earlier = int((win["season"] < pl.season).sum()) if len(win) and "season" in win else 0
+    when = ""
+    if earlier * 2 > len(win):
+        when = f", {earlier} from last season" if (win["season"] >= pl.season - 1).all() else \
+            f", {earlier} from earlier seasons"
+    season_shown = (shown_rate(rate.season * k) if c["usual"] is not None and rate.season is not None
+                    and rate.season_n >= c["season_min"] else None)
+    split = rate_split(m, side, shown_rate(assumed), season_shown, shown_rate(need) if need is not None else None)
     return {"m": m, "bet": bet, "one": one, "many": many, "rate_long": rate_long, "k": k, "res": res, "top": top,
             "bar": bar, "bar_text": bar_text, "n": n, "rows": rows, "season_games": len(g), "season": season,
             "assumed": assumed, "assumed_text": f"{shown_rate(assumed):.1f} {rate_long}",
-            "window": f"His recent rate ({len(pl.window)} games)", "need": need, "need_text": need_text,
-            "season_rate": season_rate, "work_ask": work_ask, "rate_ask": rate_ask, "reached": reached}
+            "window": f"His longer-run rate ({len(win)} games{when})", "need": need, "need_text": need_text,
+            "season_rate": season_rate, "work_ask": work_ask, "rate_ask": rate_ask, "reached": reached,
+            "split": split}
 
 
 def render(pl: Player, c: dict, side: str, *, opp: str, game_lines: dict | None = None, why_no_lines: str = "",
@@ -435,7 +486,7 @@ def render(pl: Player, c: dict, side: str, *, opp: str, game_lines: dict | None 
     else:
         out += ["", f"Only {c['usual_games']} games: no recent average yet."]
     out += [""] + matchup_lines(pl, m, opp, game_lines, why_no_lines, grades, qb_today)
-    q = question(m, side, P["work_ask"], P["rate_ask"], P["reached"], len(rows))
+    q = question(m, side, P["work_ask"], P["rate_ask"], P["reached"], len(rows), P["split"])
     if q:
         out += [""] + _wrap(q)
     if footer:
@@ -521,11 +572,11 @@ def render_md(pl: Player, c: dict, side: str, *, opp: str, game_lines: dict | No
         out += [f"**At his recent workload ({d1(c['usual'])} {many})**", "",
                 f"| {RATE_TITLE[m]} | Rate |", "|---|---|",
                 f"| Needed at this price | **{_cell(P['need_text'])}** |",
-                f"| Calculator's assumed rate | {P['assumed_text']} |",
+                f"| {P['window']} | {P['assumed_text']} |",
                 f"| This season | {_cell(P['season_rate'])} |",
                 f"| Opponent has allowed | {_cell(_opp_cell(opp_row, P['rate_long']))} |", ""]
-        out += [f"Assumed rate: {P['window'][0].lower() + P['window'][1:]}, blended toward the league average "
-                f"for his position. {_opp_note(opp, opp_row)}", ""]
+        out += [f"The bar assumes {P['window'][0].lower() + P['window'][1:]}, blended toward the league "
+                f"average for his position. {_opp_note(opp, opp_row)}", ""]
     else:
         out += [f"Only {c['usual_games']} games: no recent average yet. The bar assumes {P['assumed_text']} "
                 f"({P['window'][0].lower() + P['window'][1:]}).", ""]
@@ -534,7 +585,7 @@ def render_md(pl: Player, c: dict, side: str, *, opp: str, game_lines: dict | No
         g = grade_line(pl, m, opp, grades)
         mt = mt.replace(g, g + ".", 1)
     out += [f"Matchup: {mt}", ""]
-    cond = condition(m, side, P["work_ask"], P["rate_ask"], P["reached"], len(rows))
+    cond = condition(m, side, P["work_ask"], P["rate_ask"], P["reached"], len(rows), P["split"])
     if cond:
         out += [f"What needs to be true: {cond}", ""]
     if footer:

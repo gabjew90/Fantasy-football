@@ -108,7 +108,7 @@
   "props/calc/__main__.py": "e8468cecb72554926721ce17f625a37800894e2479b13612ea82428e63756260",
   "props/calc/calc.py": "9b9472bcf630bbfc6cb3b8a59dad2b5075e9183edc17bd9107feff697f315a9c",
   "props/calc/capture.py": "87cfd05f4a312cfdfa34e95e448e227856d192430313ffd84acb38a5d5f50f78",
-  "props/calc/card.py": "6b84f2971b36a20af1fc539dc6997758b0ce959e619a5528ee738359ca2e8813",
+  "props/calc/card.py": "d296d43e58f95275d42b122aa172d7dde8175fe23db370d2db6d22d61edebf2f",
   "props/calc/checks.py": "cc3738475c67747bb756216e50dc745fbed07fe0ffc532e9dba7d615202e3ed0",
   "props/calc/data.py": "6074f3fe3753bf05d42123f4c7472a4881ea873b4c6b9754a044e6779b9637a8",
   "props/calc/fixture.py": "479381430e5be3cf7de01f89bc8cfa8eb14794ab2df8e0849f41fe13b46c3886",
@@ -201,6 +201,6 @@
   "scripts/bootstrap.py": "8c6c428d7b66fde19ea8894d5124a0c182ba3f9719db6031f4904459e3b8cdd7",
   "scripts/release.py": "a75353d7b4e83d21e7e22600c5bb2856b05389966b8e7b1b2d25e62a4ed84bf7"
  },
- "sha256": "4f01be84779af7f11d1495e6bea8a62b04f1b2b653d0c20939975f183bdaf0fe",
- "tag": "nfl-v1.74"
+ "sha256": "b2dfd6044ae7686c2c4119d3be9863469062fa9ede0c4f2af056da9d89fb6456",
+ "tag": "nfl-v1.75"
 }

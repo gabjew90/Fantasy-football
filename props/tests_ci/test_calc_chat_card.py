@@ -43,7 +43,7 @@ def test_the_chat_card_follows_the_users_layout():
     assert "Last 4: 12 · 12 · 19 · 19" in L and any(x.startswith(f"{bar}+ carries this season: ") for x in L)
     assert not any(x.endswith(" ") for x in L), "no trailing-space line breaks: each line is its own paragraph"
     assert "**At his recent workload (15.5 carries)**" in L and "| Yards per carry | Rate |" in L
-    assert "| Calculator's assumed rate | 4.2 yards a carry |" in L
+    assert "| His longer-run rate (5 games) | 4.2 yards a carry |" in L
     assert "| Opponent has allowed | 4.4 yards a carry to RBs |" in L
     assert "Opponent figure: 4 games, garbage time left out." in md
     assert "Matchup: DAL run offense B vs TB run defense C. Dallas favored by 9.5. Total 49.5." in L
@@ -68,14 +68,14 @@ def test_the_condition_states_the_same_asks_as_the_question():
     q, cnd = card.question, card.condition
     assert q("rush_yds", "over", 1.6, 0.46) == "About 1.5 more carries, or 0.5 more yards a carry?"
     assert cnd("rush_yds", "over", 1.6, 0.46) == ("He needs about 1.5 more carries than his recent average, or 0.5 "
-                                                  "more yards a carry than the assumed rate at his recent workload.")
-    assert cnd("rush_yds", "over", 2.8, -0.2) == "At his recent rate, he needs about 3 more carries than his recent average."
-    assert cnd("rush_yds", "over", -0.2, 0.3) == "His recent workload is there; he needs 0.3 more yards a carry than the assumed rate."
+                                                  "more yards a carry than his longer-run rate at his recent workload.")
+    assert cnd("rush_yds", "over", 2.8, -0.2) == "At his longer-run rate, he needs about 3 more carries than his recent average."
+    assert cnd("rush_yds", "over", -0.2, 0.3) == "His recent workload is there; he needs 0.3 more yards a carry than his longer-run rate."
     assert cnd("rush_yds", "over", 0.1, -0.1) == "His recent workload and rate both meet the bar."
     assert cnd("rush_yds", "over", -2.0, -0.1) == "His recent workload and rate meet the bar, with room for about 2 fewer carries."
     assert cnd("rush_yds", "under", -1.1, None) == "He needs about 1 fewer carry than his recent average."
-    assert cnd("receptions", "over", None, 0.5) == "He needs 0.5 more catches per 10 targets than the assumed rate."
-    assert cnd("rush_yds", "under", None, -0.3) == "He needs 0.3 yards a carry less than the assumed rate."
+    assert cnd("receptions", "over", None, 0.5) == "He needs 0.5 more catches per 10 targets than his longer-run rate."
+    assert cnd("rush_yds", "under", None, -0.3) == "He needs 0.3 yards a carry less than his longer-run rate."
     assert cnd("rush_yds", "over", -1.0, None, reached=1) == "His recent average meets the bar, but only 1 of his last 4 games did."
     assert cnd("rush_yds", "over", None, None) == "" == q("rush_yds", "over", None, None)
 
@@ -88,7 +88,7 @@ def test_every_rate_names_its_unit_on_both_cards():
     row = {"value": 6.71, "games": 5, "who": " to RBs"}
     text = " ".join(card.render(pl, c, "over", opp="TB", opp_row=row).splitlines())
     md = card.render_md(pl, c, "over", opp="TB", opp_row=row)
-    assert re.search(r"His recent rate \(5 games\): \d\.\d catches per 10 targets", text)
+    assert re.search(r"His longer-run rate \(5 games\): \d\.\d catches per 10 targets", text)
     assert re.search(r"This season: \d\.\d catches per 10 targets", text)
     assert "Tampa Bay allows: 6.7 catches per 10 targets to RBs (5 games)" in text
     assert "| Catches per 10 targets | Rate |" in md and "| Opponent has allowed | 6.7 catches per 10 targets to RBs |" in md
@@ -196,3 +196,72 @@ def test_chat_output_keeps_warnings_reasons_and_preview_rows_apart(stub_leg, mon
     lookup.quote = None
     short = cli.entry(_entry_args(format="md"))
     assert "Not logged:\n\n- Test Back (rush_yds): no full card" in short
+
+
+# ---------------------------------------------------------------- the rate split (DECISIONS #239)
+
+def test_the_rate_split_names_which_printed_rate_clears_in_both_directions():
+    s = card.rate_split
+    # LaPorta, Over 52.5 receiving yards: needed 7.9, longer-run 8.4, this season 7.1
+    assert s("rec_yds", "over", 8.4, 7.1, 7.9) == ("Rate clears at his longer-run 8.4 yards a target, not at this "
+                                                   "season's 7.1.")
+    # Tucker: longer-run 7.4, this season 10.1, needed 9.6
+    assert s("rec_yds", "over", 7.4, 10.1, 9.6) == ("Rate clears at this season's 10.1 yards a target, not at his "
+                                                    "longer-run 7.4.")
+    # Unders clear at or below the needed rate: both directions
+    assert s("pass_yds", "under", 10.4, 7.9, 10.2) == ("Rate clears at this season's 7.9 yards a completion, not at "
+                                                       "his longer-run 10.4.")
+    assert s("rush_yds", "under", 4.3, 5.2, 4.6) == "Rate clears at his longer-run 4.3 yards a carry, not at this season's 5.2."
+    # agreeing rates, a rate exactly at the need, or a missing number: no split
+    assert s("rec_yds", "over", 8.4, 8.0, 7.9) == "" == s("rec_yds", "over", 7.0, 7.5, 7.9)
+    assert s("rec_yds", "over", 7.9, 8.4, 7.9) == "", "meeting the needed rate counts as clearing it"
+    assert s("rec_yds", "over", 8.4, None, 7.9) == "" == s("rec_yds", "over", 8.4, 7.1, None)
+
+
+def test_a_split_replaces_the_rate_half_of_both_closings():
+    q, cnd, s = card.question, card.condition, card.rate_split
+    sp = s("rec_yds", "over", 8.4, 7.1, 7.9)
+    assert q("rec_yds", "over", -0.5, -0.5, 3, 4, sp) == ("Workload is there. Rate clears at his longer-run 8.4 yards a "
+                                                         "target, not at this season's 7.1.")
+    assert cnd("rec_yds", "over", -0.5, -0.5, 3, 4, sp) == ("His recent workload is there. Rate clears at his longer-run "
+                                                           "8.4 yards a target, not at this season's 7.1.")
+    sp = s("rec_yds", "over", 7.4, 10.1, 9.7)
+    assert q("rec_yds", "over", 0.8, 2.3, 2, 4, sp).startswith("About 1 more target. Rate clears at this season's 10.1")
+    sp = s("pass_yds", "under", 10.4, 7.9, 10.2)
+    assert cnd("pass_yds", "under", -0.8, 0.2, 2, 4, sp) == ("He needs about 1 fewer completion than his recent average. "
+                                                           "Rate clears at this season's 7.9 yards a completion, not at "
+                                                           "his longer-run 10.4.")
+    # the one-game average rule still leads, and the rate half follows it
+    assert q("rec_yds", "over", -0.5, -0.5, 1, 4, s("rec_yds", "over", 8.4, 7.1, 7.9)).startswith(
+        "Average clears it, but only 1 of 4 games did. Rate clears")
+    assert "both meet the bar" not in q("rec_yds", "over", 0.1, -0.1, 3, 4, s("rec_yds", "over", 8.4, 7.1, 7.9))
+
+
+def test_both_cards_take_the_label_and_the_split_from_the_same_parts():
+    fixed = settings.load()["fixed"]
+    season, window = _games()
+    pl = _player(season, window)
+    pl.rates["ypc"] = type(pl.rates["ypc"])(4.2, 4.4, 200, 5.5, 60, 4.3)     # this season 5.5, above the need
+    c = card.compute(pl, rush_model(ypc=4.2), "rush_yds", 64.5, 1.8, 1.76, fixed)
+    P = card._parts(pl, c, "over")
+    assert P["split"] == "Rate clears at this season's 5.5 yards a carry, not at his longer-run 4.2."
+    text = " ".join(card.render(pl, c, "over", opp="TB").splitlines())
+    md = card.render_md(pl, c, "over", opp="TB")
+    assert P["split"] in text and P["split"] in md, "one sentence, both cards"
+    assert "His longer-run rate (5 games): 4.2" in text
+    assert "| His longer-run rate (5 games) | 4.2 yards a carry |" in md
+    assert "meet the bar" not in text and "meet the bar" not in md
+
+
+def test_the_label_says_when_most_of_the_games_are_from_before_this_season():
+    fixed = settings.load()["fixed"]
+    season, window = _games()
+    old = window.copy()
+    old.loc[old.index[:4], "season"] = [2024, 2025, 2025, 2025]           # 4 of 5 earlier, one two seasons back
+    pl = _player(season, old)
+    c = card.compute(pl, rush_model(ypc=4.2), "rush_yds", 64.5, 1.8, 1.76, fixed)
+    assert card._parts(pl, c, "over")["window"] == "His longer-run rate (5 games, 4 from earlier seasons)"
+    old.loc[old.index[0], "season"] = 2025
+    assert card._parts(pl, c, "over")["window"] == "His longer-run rate (5 games, 4 from last season)"
+    assert card._parts(_player(season, window), c, "over")["window"] == "His longer-run rate (5 games)", \
+        "1 of 5 is not more than half"
