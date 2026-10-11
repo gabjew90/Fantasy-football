@@ -113,6 +113,11 @@ def test_an_under_mirrors_every_check():
     assert not _row(64.5, "under")["passes"], "bar ~15 or fewer against an average of 15.5"
 
 
+def test_a_starter_ruled_out_is_flagged_by_name():
+    r = _row(40.5, "over", dict(SHOWN, qb_today="Lamar Jackson ruled Out."))
+    assert "Lamar Jackson (QB) ruled Out" in r["flags"]
+
+
 def test_short_history_and_an_unconfirmed_qb_are_flagged():
     season, window = _games()
     pl = _player(season.iloc[:2], window.iloc[:3])

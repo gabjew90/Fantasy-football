@@ -588,7 +588,7 @@ def test_receiving_yards_known_answers():
         bad.outcomes_fixed(5)
 
 
-def test_backup_qb_marks_a_game_the_usual_starter_did_not_start():
+def test_backup_qb_marks_games_the_current_starter_did_not_start():
     from props.calc import player
     sched = pd.DataFrame([dict(game_id=f"2026_0{w}_TB_X", season=2026, week=w, home_team="X", away_team="TB",
                                home_qb_id="x", away_qb_id=q)
@@ -596,14 +596,21 @@ def test_backup_qb_marks_a_game_the_usual_starter_did_not_start():
                          + [dict(game_id=f"2025_0{w}_TB_X", season=2025, week=w, home_team="X", away_team="TB",
                                  home_qb_id="x", away_qb_id=q) for w, q in ((1, "a"), (2, "b"))])
     mine = pd.DataFrame([dict(game_id=g, team="TB", season=int(g[:4])) for g in sched["game_id"]])
-    out = player.backup_qb(mine, sched)
-    # 2026: baker started the opener, so week 4 (teddy) is marked; 2025: "a" started the opener, week 2 is marked
-    assert out["backup_qb"].tolist() == [False, False, False, True, False, True]
-    # an injury: the starter plays weeks 1-2, the backup weeks 3-6 -- the backup's games are the marked ones
-    inj = pd.DataFrame([dict(game_id=f"2026_0{w}_TB_X", season=2026, week=w, home_team="X", away_team="TB",
-                             home_qb_id="x", away_qb_id="a" if w <= 2 else "b") for w in range(1, 7)])
-    m2 = pd.DataFrame([dict(game_id=g, team="TB", season=2026) for g in inj["game_id"]])
-    assert player.backup_qb(m2, inj)["backup_qb"].tolist() == [False, False, True, True, True, True]
+    # priced week 4: baker (week 3's starter) is the current starter: teddy's game and last season's two are marked
+    out = player.backup_qb(mine, sched, "TB", 2026, 4)
+    assert out["backup_qb"].tolist() == [False, False, False, True, True, True]
+    # priced week 5: teddy has the job (he started week 4): baker's games are now the marked ones
+    assert player.backup_qb(mine, sched, "TB", 2026, 5)["backup_qb"].tolist() == [True, True, True, False, True, True]
+    # Seattle's case: Darnold week 1, Lock weeks 2-4 -- pricing week 5, only Darnold's game is marked
+    sea = pd.DataFrame([dict(game_id=f"2026_0{w}_SEA_X", season=2026, week=w, home_team="X", away_team="SEA",
+                             home_qb_id="x", away_qb_id="darnold" if w == 1 else "lock") for w in range(1, 5)])
+    m2 = pd.DataFrame([dict(game_id=g, team="SEA", season=2026) for g in sea["game_id"]])
+    assert player.backup_qb(m2, sea, "SEA", 2026, 5)["backup_qb"].tolist() == [True, False, False, False]
+    assert not player.backup_qb(m2, sea, "SEA", 2026, 1)["backup_qb"].any(), "before the first game: no starter yet"
+    # a game not yet played lists a quarterback in nflverse's schedule: never read as the starter
+    sea2 = sea.assign(home_score=[20.0, 17.0, 24.0, None])                      # week 4 not played yet
+    assert player.current_starter(sea2, "SEA", 2026, 5) == "lock" and player.current_starter(
+        sea2.assign(away_qb_id=["darnold", "darnold", "darnold", "lock"]), "SEA", 2026, 5) == "darnold"
 
 
 def test_step_d_decisions_on_the_card():
@@ -638,21 +645,31 @@ def test_qb_today_reads_the_official_report_and_never_names_a_guess(monkeypatch)
         b.schedule = pd.DataFrame([dict(season=2026, week=w, home_team="TB", away_team="X", home_qb_id=q,
                                         away_qb_id="x") for w, q in enumerate(starters, 1)])
         return b
-    inj = pd.DataFrame([dict(season=2026, team="TB", week=w, gsis_id=g, full_name="", position="QB",
-                             report_status=st, practice_status=pr) for w, g, st, pr in (
-        (2, "baker", None, "Full Participation in Practice"), (3, "baker", "Questionable", ""),
-        (4, "baker", None, "Did Not Participate In Practice"), (5, "other", None, ""))])
+    inj = pd.DataFrame([dict(season=2026, team="TB", week=w, gsis_id=g, full_name=nm, position="QB",
+                             report_status=st, practice_status=pr) for w, g, nm, st, pr in (
+        (2, "baker", "Baker Mayfield", None, "Full Participation in Practice"),
+        (3, "baker", "Baker Mayfield", "Questionable", ""),
+        (4, "baker", "Baker Mayfield", None, "Did Not Participate In Practice"), (5, "other", "", None, ""),
+        (7, "baker", "Baker Mayfield", "Out", "Did Not Participate In Practice"))])
     monkeypatch.setattr(data, "injuries", lambda *a, **k: inj)
-    b = bundle(["baker"] * 6)
-    assert cli.qb_today(b, "TB", 2026, 1) == ""                       # the opener itself: no opening-day starter yet
+    b = bundle(["baker"] * 8)
+    assert cli.qb_today(b, "TB", 2026, 1) == ""                       # his team's first game: no starter yet
     assert cli.qb_today(b, "TB", 2026, 2) == ""                       # on the report, practising fully
     assert cli.qb_today(b, "TB", 2026, 3) == "Starting QB not confirmed."     # Questionable
     assert cli.qb_today(b, "TB", 2026, 4) == "Starting QB not confirmed."     # did not practise, no status yet
     assert cli.qb_today(b, "TB", 2026, 5) == ""                       # report out, he is not on it
-    assert cli.qb_today(b, "TB", 2026, 6) == "Starting QB not confirmed."     # no week-6 report yet
-    # the latest game was started by someone else (an injury, IR, a benching): not settled, whatever the report says
-    assert cli.qb_today(bundle(["baker", "baker", "baker", "daniels", "daniels"]), "TB", 2026, 5) == \
-        "Starting QB not confirmed."
+    assert cli.qb_today(b, "TB", 2026, 6) == "", "no report yet: he started the last game, so nothing to flag"
+    assert cli.qb_today(b, "TB", 2026, 7) == "Baker Mayfield ruled Out.", "a fact from the official report"
+    # a new starter who has the job is settled (Seattle, Atlanta): the old starter is not on the report
+    assert cli.qb_today(bundle(["baker", "daniels", "daniels", "daniels", "daniels"]), "TB", 2026, 5) == ""
+    # ...unless the earlier starter is on the report and not ruled Out (Chicago: he may take the job back).
+    # Week 3: daniels started week 2 (the current starter, not on the report); baker, week 1's starter, is
+    # Questionable on week 3's report
+    assert cli.qb_today(bundle(["baker", "daniels", "daniels"]), "TB", 2026, 3) == "Starting QB not confirmed."
+    assert cli.qb_today(bundle(["baker", "daniels", "daniels", "daniels", "daniels", "daniels"]), "TB", 2026, 6) == "", \
+        "no report for week 6: nothing"
+    assert cli.qb_today(bundle(["baker", "baker", "baker", "daniels", "daniels", "daniels", "daniels"]),
+                        "TB", 2026, 7) == "", "the earlier starter ruled Out: the new one is settled"
 
 
 def test_half_up_everywhere_and_the_workload_ask_from_displayed_numbers():
@@ -702,3 +719,20 @@ def test_two_character_grades_stay_beside_their_units():
     lines_ = text.splitlines()
     assert "DAL pass offense S+ vs" in lines_ and "NYJ pass defense D-" in lines_
     assert max(len(x) for x in lines_) <= card.WIDTH
+
+
+def test_a_starter_ruled_out_is_named_from_the_schedule_when_the_report_has_no_name(monkeypatch):
+    from props.calc import __main__ as cli, data
+    b = type("B", (), {})()
+    b.manifest = None
+    b.schedule = pd.DataFrame([dict(season=2026, week=1, home_team="BAL", away_team="X", home_qb_id="lamar",
+                                    away_qb_id="x", home_qb_name="Lamar Jackson", away_qb_name="X")])
+    inj = pd.DataFrame([dict(season=2026, team="BAL", week=2, gsis_id="lamar", full_name=None, position="QB",
+                             report_status="Out", practice_status="Did Not Participate In Practice")])
+    monkeypatch.setattr(data, "injuries", lambda *a, **k: inj)
+    assert cli.qb_today(b, "BAL", 2026, 2) == "Lamar Jackson ruled Out."
+    b.schedule = b.schedule.drop(columns=["home_qb_name", "away_qb_name"])
+    b._injuries_season = None
+    with pytest.raises(KeyError):          # the schedule has no name column: the card shows "not checked (...)"
+        cli.qb_today(b, "BAL", 2026, 2)
+    assert cli._display_text(lambda: cli.qb_today(b, "BAL", 2026, 2)).startswith("Starting QB: not checked")

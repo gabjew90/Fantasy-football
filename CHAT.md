@@ -351,6 +351,9 @@ Run it through `python nfl.py calc <command>` -- the same commands and arguments
    its sample, the cushion and the flags), then the full chat cards for the top 3 a side. Show it
    as printed, with a Matchup read under each card (rule 3). Call the order "the smallest ask at
    the price", never the best, a pick, a lean or a chance; a ✗ is a fact against the leg, say it.
+   **"Strongest" means this order** (the user, 2026-10-11): answer with the legs in the screen's
+   rank order, #1 first, rank numbers kept -- never regrouped by game, team or bet type and never
+   re-sorted by your own view; "the strongest by this ranking" is fine, with the untested caveat.
    A past week (`--week N`) is rebuilt from the saved line history and says so in its header;
    `--grade` marks a played week's listed legs with the journal's own grader and prints the hit
    rate by rank against the legs' average break-even -- quote it with its count, never as proof.

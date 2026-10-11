@@ -226,22 +226,25 @@ Line as of [Mon D, H:MM AM/PM] PT.
   schedule's line, labelled "(closing line)" after kickoff and "(schedule line)" before. An even
   spread: "No favorite (even spread)."; a missing spread: "No spread shown." An injury line
   appears only when it changes this player's role (not built yet).
-- Today's quarterback (MATCHUP): "Starting QB not confirmed." when this game's starter is not
-  settled: the week's official injury report (nflverse injuries) has no rows for his team yet; or
-  his team's opening-day starter is listed Out, Doubtful or Questionable, or did not practise with
-  no game status yet; or his team's most recent game was started by someone else (covers IR, which
-  the weekly report leaves out, and a benching). Otherwise no line. No dependable source names the
+- Today's quarterback (MATCHUP; DECISIONS #241, the user, 2026-10-11): the current starter is whoever
+  started his team's most recent game (it was the opening-day starter, which flagged every team
+  that had changed quarterbacks for the rest of the season). "[Name] ruled Out." when the week's
+  official injury report (nflverse injuries) lists him Out; "Starting QB not confirmed." when it
+  lists him Doubtful or Questionable, or he did not practise with no game status yet, or a
+  quarterback who started for the team earlier this season is on the report and not ruled Out.
+  Otherwise no line, including before the report is out. No dependable source names the
   replacement before kickoff
   (ESPN's depth chart, in nflverse depth_charts, still listed Baker Mayfield as TB's QB1 before
   week 5 of 2026, two starts after he went out; Sleeper's depth chart is live-only and hand-kept),
-  so the "[Name] starts at QB today." form is never shown: no guessed names.
+  so the "[Name] starts at QB today." form is never shown: no guessed names (nflverse's schedule
+  lists a quarterback for unplayed games; the user declined it, 2026-10-11, source unknown).
 - The test line, first on every card, one per bet type (the user's wording after the held-out
   read; see "Held-out read"); "Check first:" lines below it: a lookup note when newer saved quotes
   were skipped.
 - Markers (rule 3): a game where his offensive snap share was under 0.5 times his average in his
-  other games that season ("* Week N: played far fewer snaps than usual."), and a game his team's
-  starting quarterback was not the team's opening-day starter, naming who started ("* Week 4:
-  Jalon Daniels started at QB."). A game from last season says "[year] week N".
+  other games that season ("* Week N: played far fewer snaps than usual."), and a game started by a
+  quarterback other than his team's current starter, naming who started ("* Week 4: Jalon Daniels
+  started at QB."; DECISIONS #241). A game from last season says "[year] week N".
 - Footer: one line, the saved quote's time in Pacific time; a typed line says "Line typed in."
 - Not enough data (a rate or pool below its minimum sample): "Check first: not enough data, so no
   bar:", the reasons, "Last games: ..." and the markers; no bar, no rates.

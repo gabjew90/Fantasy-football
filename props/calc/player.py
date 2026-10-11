@@ -277,24 +277,37 @@ def _starter(g, team: str, what: str = "id"):
     return q if isinstance(q, str) and q else None
 
 
-def backup_qb(mine: pd.DataFrame, schedule: pd.DataFrame) -> pd.DataFrame:
-    """Adds backup_qb (and qb_started, the starter's name): a game his team's
-    starting quarterback was not the one who started the team's first game of
-    that season (the opening-day starter). After an injury every game the
-    other quarterback starts is marked; a season whose opener lists no starter
-    marks nothing. Display only."""
+def played_before(schedule: pd.DataFrame, team: str, season: int, week: int) -> pd.DataFrame:
+    """His team's games before `week` that have been played (a final score). nflverse's schedule also
+    lists a quarterback for games not yet played; that name is never read as a starter (the user
+    declined it as a source, 2026-10-11)."""
+    t = schedule[(schedule["season"] == season) & (schedule["week"] < week)
+                 & ((schedule["home_team"] == team) | (schedule["away_team"] == team))]
+    if "home_score" in t:
+        t = t[t["home_score"].notna()]
+    return t.sort_values("week")
+
+
+def current_starter(schedule: pd.DataFrame, team: str, season: int, week: int):
+    """The quarterback who started his team's most recent played game before `week` (DECISIONS #241:
+    the current starter, not the opening-day one), or None before the team's first game."""
+    t = played_before(schedule, team, season, week)
+    return _starter(t.iloc[-1], team) if len(t) else None
+
+
+def backup_qb(mine: pd.DataFrame, schedule: pd.DataFrame, team: str, season: int, week: int) -> pd.DataFrame:
+    """Adds backup_qb (and qb_started, the starter's name): a game started by a quarterback other
+    than his team's current starter (who started its most recent game before the priced week). The
+    new starter's own games are not marked once he has the job (DECISIONS #241; it was the
+    opening-day starter, which marked every game after any change for the rest of the season).
+    Before the team's first game there is no current starter and nothing is marked. Display only."""
     sch = schedule.set_index("game_id")
-    first: dict = {}
+    now = current_starter(schedule, team, season, week)
     marks, names_ = [], []
-    for gid, team, yr in zip(mine["game_id"], mine["team"], mine["season"]):
-        if (yr, team) not in first:
-            t = schedule[(schedule["season"] == yr)
-                         & ((schedule["home_team"] == team) | (schedule["away_team"] == team))]
-            first[(yr, team)] = _starter(t.sort_values("week").iloc[0], team) if len(t) else None
-        usual = first[(yr, team)]
-        q = _starter(sch.loc[gid], team) if gid in sch.index else None
-        marks.append(bool(usual and q and q != usual))
-        names_.append(_starter(sch.loc[gid], team, "name") if gid in sch.index and "home_qb_name" in sch else None)
+    for gid, tm in zip(mine["game_id"], mine["team"]):
+        q = _starter(sch.loc[gid], tm) if gid in sch.index else None
+        marks.append(bool(now and q and q != now))
+        names_.append(_starter(sch.loc[gid], tm, "name") if gid in sch.index and "home_qb_name" in sch else None)
     return mine.assign(backup_qb=marks, qb_started=names_)
 
 
@@ -340,7 +353,7 @@ def build(b: Bundle, gsis: str, name: str, team: str, season: int, week: int,
     pos = b.position_at(gsis, season, week) or "?"
     mine = b.cut(b.games[b.games["gsis_id"] == gsis], season, week, "his games").sort_values(["season", "week"])
     mine = fewer_snaps(mine, b.snap_share, float(fixed["fewer_snaps_share"]))
-    mine = backup_qb(mine, b.schedule)
+    mine = backup_qb(mine, b.schedule, team, season, week)
     window = mine.tail(int(fixed["rate_window_games"]))
     this = _results(b, mine[mine["season"] == season], int(fixed["result_margin"]))
     pools = b.pools(season, int(fixed["pool_seasons"]))

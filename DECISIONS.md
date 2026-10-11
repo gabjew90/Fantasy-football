@@ -8983,3 +8983,26 @@ load (one build per line: card.compute already solves both sides).
 - **Live:** Sun 1pm PT (3 games, 2026-10-11) in 82 s here; week 4 Sun 10am PT (8 games) graded in
   224 s. A 4-game window from a cold chat container: about 3-5 minutes (the session log's
   Timings table will measure it).
+
+## 2026-10-11 (241) -- the QB line and the game markers follow the current starter
+
+The user (2026-10-11): starting QBs for CHI, SEA, BAL and ATL were flagged "not confirmed". Checked
+on week 5: SEA (Lock, 3 straight starts) and ATL (Penix, 2) were flagged only because the rule
+compared with the opening-day starter, which flags a team for the rest of the season after any
+change (weak rule); BAL's flag hid a fact -- Lamar Jackson is Out on the official report (weak
+rule); CHI was right (opener Caleb Williams Questionable, Keenum the last starter). The same anchor
+marked every game of a settled new starter "another quarterback started".
+
+- **Current starter** = whoever started his team's most recent PLAYED game (a final score; nflverse
+  lists a quarterback for unplayed games, which is never read -- the user declined it as a source).
+- **QB line:** "<Name> ruled Out." when the official report lists him Out; "Starting QB not
+  confirmed." when it lists him Doubtful or Questionable, or he did not practise with no status,
+  or an earlier starter this season is on the report and not ruled Out (he may take the job back:
+  Chicago); otherwise nothing, including before the week's report is out.
+- **Markers:** a game is marked when someone other than the current starter started it.
+- **Screen:** the flag reads "QB not confirmed" or "<Name> (QB) ruled Out".
+- **CHAT.md:** "strongest" means the screen's rank order -- #1 first, ranks kept, never regrouped or
+  re-sorted (the user, 2026-10-11).
+- Known gap, as before: a starter hurt during the last game and placed on IR (IR is not on the
+  weekly report) is not caught until someone else has started a game.
+- Week 5 after the change: CHI not confirmed; BAL "Lamar Jackson ruled Out."; SEA, ATL, DET, SF no line.
