@@ -131,3 +131,53 @@ def test_a_marked_game_and_the_short_history_reach_the_chat_card():
     smd = card.render_md(short, cs, "over", opp="TB")
     assert "Last 2: 19* · 19" in smd and "Short history: 2 games." in smd
     assert "| Workload |" not in smd and "no recent average yet" in smd
+
+
+# ---------------------------------------------------------------- the entry and the commands in chat layout
+
+from props.calc import summary  # noqa: E402
+from test_calc_model import QUOTE, _entry_args, _leg_args, stub_leg  # noqa: E402,F401
+from test_calc_summary import LEGS  # noqa: E402
+
+
+def test_the_chat_entry_puts_the_comparison_first_then_cards_then_the_fit_check():
+    md = summary.render_md(LEGS, 5.0, 50.0, False, ["CARD ONE", "CARD TWO"])
+    text = summary.render(LEGS, 5.0, 50.0, payout_from_legs=False)
+    L = md.splitlines()
+    assert L[0] == "**Your $5 entry · 4 legs**" and "Return if all win: **$50.00**. Includes your $5 stake." in L
+    i_tab, i_one, i_two, i_fit = (L.index("| Leg | What each needs (biggest ask first) |"), L.index("CARD ONE"),
+                                  L.index("CARD TWO"), L.index("**Fit check**"))
+    assert i_tab < i_one < i_two < i_fit
+    assert L[i_tab + 2] == "| Javonte Williams · rushing yards Over | ~17 carries, about 1.5 more than recent |"
+    assert L.count("---") == 3, "one divider before each card and before the fit check"
+    assert "- Javonte Williams: more than 55.6 wins in 100." in L
+    assert "**To cover the entry cost:** all must win more than 56.2 in 100." in L
+    assert "Average loss: $1.88 per $5 entry." in md and md.endswith(summary.FOLLOW_UPS)
+    # the same numbers as the text summary, nothing added
+    flat = " ".join(text.splitlines())
+    for a, b in summary.opposing_pairs(LEGS):
+        assert f"{a} {b} These lean on opposite game stories." in md and a in flat
+    import re
+    nums = lambda s: set(re.findall(r"\d+(?:\.\d+)?", s))      # noqa: E731
+    assert nums(md.replace("CARD ONE", "").replace("CARD TWO", "")) - {"10"} <= nums(text) | {"1", "2"}
+
+
+def test_the_chat_entry_says_when_every_leg_is_on_one_team():
+    md = summary.render_md([LEGS[0], LEGS[1]], 5.0, 20.0, True, [])
+    assert "SECOND TEAM NEEDED: every leg is on DAL." in md and "worked out from the legs' own prices" in md
+    assert md.index("SECOND TEAM NEEDED") < md.index("| Leg |"), "said before the numbers"
+
+
+def test_leg_and_entry_print_the_chat_layout_with_format_md(stub_leg, monkeypatch):
+    cli, lookup, pl = stub_leg
+    from props.calc import player
+    monkeypatch.setattr(player, "model", lambda *a, **k: rush_model(ypc=4.2))
+    lookup.quote = dict(QUOTE)
+    text, md = cli.leg(_leg_args()), cli.leg(_leg_args(format="md"))
+    assert text.splitlines()[2] == "TEST BACK" and md.startswith("**Test Back · Rushing yards**")
+    assert md.rstrip().endswith("_Sleeper line as of Oct 11, 11:00 AM PT._"), "the chat card names the source"
+    assert text.rstrip().endswith("Line as of Oct 11, 11:00 AM PT.")
+    out = cli.entry(_entry_args(dry_run=True, format="md"))
+    assert out.startswith("**Your $5 entry · 2 legs**")
+    assert out.index("| Leg |") < out.index("**Test Back · Rushing yards**") < out.index("**Fit check**")
+    assert "DRY RUN: nothing written" in out

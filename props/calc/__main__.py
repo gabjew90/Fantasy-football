@@ -59,6 +59,8 @@ def main(argv: list[str] | None = None) -> int:
     lg.add_argument("--over", type=float, help="American odds for the Over")
     lg.add_argument("--under", type=float, help="American odds for the Under")
     lg.add_argument("--target", type=float, help="your target win rate in percent (default: break-even)")
+    lg.add_argument("--format", choices=["text", "md"], default="text",
+                    help="text: the 40-column card; md: the chat card (markdown, the user's layout)")
     gm = sub.add_parser("game", help="every posted line of one game: a summary table, then the cards asked for")
     gm.add_argument("matchup", help="AWAY@HOME, e.g. PHI@JAX")
     gm.add_argument("--player", action="append", default=[], help="a player whose cards to print (repeatable)")
@@ -66,6 +68,7 @@ def main(argv: list[str] | None = None) -> int:
     gm.add_argument("--side", choices=["over", "under", "both"], default="both")
     gm.add_argument("--season", type=int)
     gm.add_argument("--week", type=int)
+    gm.add_argument("--format", choices=["text", "md"], default="text", help="the cards as text or as chat cards")
     sub.add_parser("capture")
     en = sub.add_parser("entry", help="log a Power Play in the props journal, legs filled in from their cards")
     en.add_argument("--stake", type=float, required=True, help="dollars staked on the entry")
@@ -80,6 +83,8 @@ def main(argv: list[str] | None = None) -> int:
                     help="'Name|market|over or under|line played[|TEAM]', repeatable")
     en.add_argument("--season", type=int)
     en.add_argument("--week", type=int)
+    en.add_argument("--format", choices=["text", "md"], default="text",
+                    help="md: the chat layout -- a comparison table, the chat cards, then the fit check")
     en.add_argument("--dry-run", action="store_true",
                     help="print exactly the journal lines it would add, and write nothing")
     a = ap.parse_args(argv)
@@ -307,10 +312,14 @@ def build_card(b, name_in: str, market: str, side: str = "over", *, team=None, s
            "mult_under": mu, "source": source, "c": None, "ready": False,
            "not_enough": market in pl.not_enough, "opp": opp,
            "reason": "; ".join(pl.not_enough.get(market, [])) or (source if line is None else "")}
+    # the chat card names where the quote came from (the user's layout: "quote source and capture time")
+    md_footer = footer.replace("Line as of", "Sleeper line as of", 1) if at_utc is not None else footer
+    md_warn = warn.strip() + "\n\n" if warn else ""
     if market in pl.not_enough:                 # the data gap is the first thing to say, line or not
-        return {**out, "text": warn + card.render_not_enough(pl, market, side, line, mo, mu, footer=footer)}
+        return {**out, "text": warn + card.render_not_enough(pl, market, side, line, mo, mu, footer=footer),
+                "md": md_warn + card.render_not_enough_md(pl, market, side, line, mo, mu, footer=md_footer)}
     if line is None:
-        return {**out, "text": warn + source}
+        return {**out, "text": warn + source, "md": md_warn + source}
     model = player.model(pl, market, tuned, fixed)
     c = card.compute(pl, model, market, line, mo, mu, fixed, target)
     week_lines, why = _week_lines(season, wk)
@@ -325,13 +334,14 @@ def build_card(b, name_in: str, market: str, side: str = "over", *, team=None, s
             sched["closing"] = True if kicked_off else ("schedule line; " + why if why else "schedule line")
             gl = sched
         why = why or "ESPN and the schedule show none"
-    text = card.render(pl, c, side, opp=opp, game_lines=gl, why_no_lines=why, footer=footer,
-                       opp_row=_display(lambda: opponent.allows(b, market, opp, pl.position, season, wk, fixed)),
-                       grades=_display(lambda: matchup.grade_pair(b, team, opp, "run" if market == "rush_yds"
-                                                                   else "pass", season, wk, fixed)),
-                       line_note=line_note,
-                       qb_today=_display_text(lambda: qb_today(b, team, season, wk)))
-    return {**out, "c": c, "ready": True, "settings": tuned, "text": warn + text,
+    shown = dict(opp=opp, game_lines=gl, why_no_lines=why, line_note=line_note,
+                 opp_row=_display(lambda: opponent.allows(b, market, opp, pl.position, season, wk, fixed)),
+                 grades=_display(lambda: matchup.grade_pair(b, team, opp, "run" if market == "rush_yds"
+                                                             else "pass", season, wk, fixed)),
+                 qb_today=_display_text(lambda: qb_today(b, team, season, wk)))
+    text = card.render(pl, c, side, footer=footer, **shown)
+    md = card.render_md(pl, c, side, footer=md_footer, **shown)
+    return {**out, "c": c, "ready": True, "settings": tuned, "text": warn + text, "md": md_warn + md,
             # depths whose yards came from every position's catches (the "Calculation" follow-up; journal row)
             "pooled_depths": list(pl.receiving.get("pooled_all_positions", []))}
 
@@ -345,7 +355,7 @@ def leg(a) -> str:
                      target=a.target / 100 if a.target is not None else None)
     if got["line"] is None and not got["not_enough"]:
         raise SystemExit(got["text"])          # no quote found and none typed: say why, no card
-    return warn + got["text"]
+    return warn + got["md" if getattr(a, "format", "text") == "md" else "text"]
 
 
 MARKET_ORDER = ("pass_yds", "rush_yds", "receptions", "rec_yds")
@@ -451,16 +461,18 @@ def game(a) -> str:
             L += ["", f"No card for {x}: the summary row says why."]
         else:
             L += ["", f"No posted line in this game for: {x}."]
+    key = "md" if getattr(a, "format", "text") == "md" else "text"
+    gap = ["", "---", ""] if key == "md" else [""]          # one divider between chat cards
     for p, got in pick:
         for side in sides:
             if side == "over":
-                L += ["", got["text"]]
+                L += gap + [got[key]]
                 continue
             try:
-                L += ["", build_card(b, got["stub"]["player"], p["market"], side, team=got["stub"]["team"],
-                                     season=season, week=wk, lookup=lookup)["text"]]
+                L += gap + [build_card(b, got["stub"]["player"], p["market"], side, team=got["stub"]["team"],
+                                       season=season, week=wk, lookup=lookup)[key]]
             except (player.NotFound, DataError, SystemExit) as ex:
-                L += ["", f"{got['stub']['player']} {card.SHOW[p['market']][0]} {side}: card not built: {ex}"]
+                L += gap + [f"{got['stub']['player']} {card.SHOW[p['market']][0]} {side}: card not built: {ex}"]
     if not pick and not a.player:
         L += ["", "Cards: name players with --player, or print every line's cards with --all."]
     return warn + "\n".join(L)
@@ -542,7 +554,9 @@ def entry(a) -> str:
     views = [summary.leg_view(g["stub"]["player"], g["stub"]["market"], side, g["c"], g["stub"]["team"], g["opp"],
                               g["stub"]["game_id"]) for side, g in cards]
     payout = a.payout if a.payout is not None else summary.payout_from_legs(a.stake, views)
-    entry_text = summary.render(views, a.stake, payout, payout_from_legs=a.payout is None)
+    md = getattr(a, "format", "text") == "md"
+    entry_text = (summary.render_md(views, a.stake, payout, a.payout is None, [g["md"] for _, g in cards]) if md
+                  else summary.render(views, a.stake, payout, payout_from_legs=a.payout is None))
     jlegs = [(g["stub"]["player"], g["stub"]["market"], side, g["line"], g["stub"]["team"]) for side, g in cards]
     try:
         rows = journal.make_power_play(jlegs, stake=a.stake, payout=payout, angle=a.angle, why=a.why,
@@ -551,7 +565,8 @@ def entry(a) -> str:
         return warn + f"Not logged: {ex}"
     for r, (side, g) in zip(rows, cards):
         r.update(journal_fields(side, g))
-    text = "\n\n".join(g["text"] for _, g in cards) + "\n\n" + entry_text
+    # the text layout prints the cards, then the summary; the chat layout puts its table first (render_md)
+    text = entry_text if md else "\n\n".join(g["text"] for _, g in cards) + "\n\n" + entry_text
     if getattr(a, "dry_run", False):
         # the same serialisation journal.write uses, line for line
         added = "\n".join(json.dumps(r, sort_keys=True) for r in rows)
