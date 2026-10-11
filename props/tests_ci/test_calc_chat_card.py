@@ -40,7 +40,8 @@ def test_the_chat_card_follows_the_users_layout():
     assert f"**Average workload needed: ~{bar} carries**" in L
     assert "| Workload | Carries |" in L and f"| Needed at this price | **~{bar} carries** |" in L
     assert "| Recent 4-game average | 15.5 |" in L
-    assert "Last 4: 12 · 12 · 19 · 19" in md and f"{bar}+ carries this season: " in md
+    assert "Last 4: 12 · 12 · 19 · 19" in L and any(x.startswith(f"{bar}+ carries this season: ") for x in L)
+    assert not any(x.endswith(" ") for x in L), "no trailing-space line breaks: each line is its own paragraph"
     assert "**At his recent workload (15.5 carries)**" in L and "| Yards per carry | Rate |" in L
     assert "| Calculator's assumed rate | 4.2 yards a carry |" in L
     assert "| Opponent has allowed | 4.4 yards a carry to RBs |" in L
@@ -74,6 +75,7 @@ def test_the_condition_states_the_same_asks_as_the_question():
     assert cnd("rush_yds", "over", -2.0, -0.1) == "His recent workload and rate meet the bar, with room for about 2 fewer carries."
     assert cnd("rush_yds", "under", -1.1, None) == "He needs about 1 fewer carry than his recent average."
     assert cnd("receptions", "over", None, 0.5) == "He needs 0.5 more catches per 10 targets than the assumed rate."
+    assert cnd("rush_yds", "under", None, -0.3) == "He needs 0.3 yards a carry less than the assumed rate."
     assert cnd("rush_yds", "over", -1.0, None, reached=1) == "His recent average meets the bar, but only 1 of his last 4 games did."
     assert cnd("rush_yds", "over", None, None) == "" == q("rush_yds", "over", None, None)
 
@@ -101,6 +103,7 @@ def test_out_of_range_bars_and_the_not_enough_card_in_chat():
     over = card.render_md(pl, c, "over", opp="TB")
     assert "**Average workload needed: no workload up to 45 carries clears it**" in over
     assert "| Workload |" not in over, "no bar: no workload table"
+    assert "Last 4: 12 · 12 · 19 · 19 (average 15.5)" in over, "the average still shows, beside the games"
     pl.not_enough["rush_yds"] = ["12 of his own carries in his last 16 games (needs 30)"]
     ne = card.render_not_enough_md(pl, "rush_yds", "over", 64.5, 1.8, 1.76, footer="Line typed in.")
     assert ne.splitlines()[:3] == ["**Test Back · Rushing yards**", "", "Over 64.5 rushing yards · -125"]
@@ -115,11 +118,14 @@ def test_a_marked_game_and_the_short_history_reach_the_chat_card():
     fixed = settings.load()["fixed"]
     season, window = _games()
     window["fewer_snaps"] = [False, False, False, True, False]      # 2026 week 3
+    window["backup_qb"] = [False, False, False, True, False]
+    window["qb_started"] = [None, None, None, "B.Backup", None]
     pl = _player(season, window)
     c = card.compute(pl, rush_model(ypc=4.2), "rush_yds", 64.5, 1.8, 1.76, fixed)
     md, text = card.render_md(pl, c, "over", opp="TB"), card.render(pl, c, "over", opp="TB")
     assert "Last 4: 12 · 12 · 19* · 19" in md and "Last 4: 12, 12, 19*, 19" in text
     assert "* Week 3: played far fewer snaps than usual." in md.splitlines()
+    assert "* Week 3: B.Backup started at QB." in md.splitlines(), "two notes for one game: two bullets"
     short = _player(season.iloc[:2], window.iloc[3:])                  # two games: weeks 3-4
     cs = card.compute(short, rush_model(ypc=4.2), "rush_yds", 64.5, 1.8, 1.76, fixed)
     smd = card.render_md(short, cs, "over", opp="TB")
