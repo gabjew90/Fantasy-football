@@ -274,9 +274,25 @@ def dl(url, name):
     CACHE.mkdir(parents=True, exist_ok=True)
     dest = CACHE / name
     if not dest.exists() or dest.stat().st_size == 0:
-        import urllib.request
+        import urllib.error, urllib.request
         print(f"  fetching {name}", file=sys.stderr)
-        urllib.request.urlretrieve(url, dest)
+        # Into a .tmp, moved into place only when whole: a partial file at dest would be read as
+        # cached on the next run (pbp_2026.csv.gz, ContentTooShortError, 2026-10-09). The name is
+        # unique per call so concurrent runs on a cold cache never write the same temp file.
+        fd, tmp = tempfile.mkstemp(dir=CACHE, prefix=name + ".", suffix=".tmp")
+        os.close(fd)
+        tmp = Path(tmp)
+        try:
+            _, headers = urllib.request.urlretrieve(url, tmp)
+            want = headers.get("Content-Length")
+            got = tmp.stat().st_size
+            if want is not None and got != int(want):
+                raise urllib.error.ContentTooShortError(
+                    f"{name}: got {got} bytes, Content-Length {want}", None)
+            os.replace(tmp, dest)
+        except BaseException:
+            tmp.unlink(missing_ok=True)
+            raise
     return dest
 
 
