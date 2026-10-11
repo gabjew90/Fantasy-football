@@ -280,7 +280,7 @@ Run it through `python nfl.py calc <command>` -- the same commands and arguments
    never a pick, a lean, an edge or a chance (an entry assembled under rule 7 is labelled by
    its view, never as a pick). The text card (no `--format`) is for Claude Code.
 4. **Follow-ups** (named at the end of a batch): Workload (game values, season count, rounding,
-   role-changing injuries), Calculation (how the price becomes a bar, the recent rate's blend
+   role-changing injuries), Calculation (how the price becomes a bar, the longer-run rate's blend
    toward the position average; the tuned settings and where each came from are the comments in
    `props/calc/settings.yaml`, the held-out test results are `props/calc/heldout/heldout_read.json`
    -- quote them, never recompute), Matchup (grades, spread and total, the opponent's rates),

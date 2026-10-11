@@ -183,9 +183,9 @@ Last 4: a, b, c, d  (avg [U])           <- oldest to newest; * on a marked game
 
 AT [U] [UNIT]
 Needed at this price: [E] [rate unit]   <- Unders: "... or less"
-His recent rate ([n] games): [R]        <- the rate the bar assumes
-This season: [S]                        <- below the minimum sample: "[S] ([n] [unit])"
-[Opponent] allows: [x][ to POS] ([G] games)
+His longer-run rate ([n] games[, K from last season]): [R] [rate unit]   <- the rate the bar assumes
+This season: [S] [rate unit]            <- below the minimum sample: "[S] [rate unit] ([n] [unit])"
+[Opponent] allows: [x] [rate unit][ to POS] ([G] games)
 
 MATCHUP
 [TEAM] [run|pass] offense [grade] vs [OPP] [run|pass] defense [grade]
@@ -205,9 +205,12 @@ Line as of [Mon D, H:MM AM/PM] PT.
 - "Needed at this price": the rate that clears the price at his last-4 average workload, from
   the same calculator (not line divided by workload). Out of range: "any rate clears it" / "no
   rate clears it".
-- "His recent rate ([n] games)": his blended rate over his last [n] games played (n = 16 when he
-  has them), the rate the bar assumes. The blend toward the position average is explained in the
-  "Calculation" follow-up, not on the card.
+- "His longer-run rate ([n] games)": his blended rate over his last [n] games played (n = 16 when he
+  has them), the rate the bar assumes; ", K from last season" ("from earlier seasons" when some are
+  older) when more than half of those games are from before this season (DECISIONS #239; it was
+  "His recent rate", which read as recent form). The blend toward the position average is
+  explained in the "Calculation" follow-up, not on the card. Every rate row names its unit
+  (DECISIONS #238).
 - "This season": his plain rate this season before the week; below the market's minimum own
   sample it is still shown, with its sample ("This season: 4.1 (15 targets)"), never replaced.
 - Opponent row (display only): the opponent's defense this season before the week, in the
@@ -265,12 +268,12 @@ Line as of [Mon D, H:MM AM/PM] PT.
 - Closing asks, both from the numbers as displayed, so the reader's subtraction matches: the
   workload ask is the bar as shown minus the last-4 average as shown, then to the nearest half
   (judged as shown, so one that rounds to 0 is even); the rate ask is the needed rate as shown
-  minus the recent rate as shown.
+  minus the longer-run rate as shown.
 
 ### Closing question
 
-Workload ask = bar minus last-4 average. Rate ask = needed rate at his average minus his recent
-rate (the bar's). An Under turns both round, so a positive ask is what the bet needs ("fewer",
+Workload ask = bar minus last-4 average. Rate ask = needed rate at his average minus his
+longer-run rate (the bar's). An Under turns both round, so a positive ask is what the bet needs ("fewer",
 "less", "room for N more").
 
 | Case | Over wording |
@@ -278,10 +281,11 @@ rate (the bar's). An Under turns both round, so a positive ask is what the bet n
 | Average meets the bar, fewer than 2 of the last 4 games reached it | "Average clears it, but only N of 4 games did." |
 | Both asks positive | "About 1.5 more carries, or 0.5 more yards a carry?" |
 | Workload ask 0 or less, rate ask positive | "Workload is there. 0.9 more yards a carry?" |
-| Workload ask positive, rate ask 0 or less | "At his recent rate it clears. About 3 more carries?" |
+| Workload ask positive, rate ask 0 or less | "At his longer-run rate it clears. About 3 more carries?" |
 | Workload ask 0, rate ask 0 or less | "Recent workload and rate both meet the bar." |
 | Workload ask negative, rate ask 0 or less | "Room for about 2 fewer targets?" |
 | No rate ask (no needed rate) | "About 1.5 more targets?" / "Workload is there." / "Room for about N fewer ..." |
+| His longer-run and this season's rates (as printed, season sample at its minimum or more) on opposite sides of the needed rate -- replaces the rows above (DECISIONS #239) | the workload half ("Workload is there." / "About 1 more target." / the one-game average sentence), then "Rate clears at his longer-run 8.4 yards a target, not at this season's 7.1." or "Rate clears at this season's 10.1 yards a target, not at his longer-run 7.4." An Under clears at or below the needed rate. The opponent's rate is never in the closing. |
 
 ### Entry summary (step F, not built yet)
 

@@ -265,3 +265,22 @@ def test_the_label_says_when_most_of_the_games_are_from_before_this_season():
     assert card._parts(pl, c, "over")["window"] == "His longer-run rate (5 games, 4 from last season)"
     assert card._parts(_player(season, window), c, "over")["window"] == "His longer-run rate (5 games)", \
         "1 of 5 is not more than half"
+
+
+def test_no_split_from_a_season_rate_below_its_minimum_sample():
+    fixed = settings.load()["fixed"]
+    season, window = _games()
+    pl = _player(season, window)
+    pl.rates["ypc"] = type(pl.rates["ypc"])(4.2, 4.4, 200, 5.5, 3, 4.3)      # 3 carries this season: below the minimum
+    c = card.compute(pl, rush_model(ypc=4.2), "rush_yds", 64.5, 1.8, 1.76, fixed)
+    assert 3 < c["season_min"] and card._parts(pl, c, "over")["split"] == ""
+    assert "This season: 5.5 yards a carry (3 carries)" in " ".join(card.render(pl, c, "over", opp="TB").splitlines())
+
+
+def test_a_card_with_no_recent_average_names_the_rate_without_nested_brackets():
+    fixed = settings.load()["fixed"]
+    season, window = _games()
+    pl = _player(season.iloc[:2], window.iloc[3:])
+    c = card.compute(pl, rush_model(ypc=4.2), "rush_yds", 64.5, 1.8, 1.76, fixed)
+    text = " ".join(card.render(pl, c, "over", opp="TB").splitlines())
+    assert "Bar assumes 4.2 yards a carry: his longer-run rate (2 games)." in text

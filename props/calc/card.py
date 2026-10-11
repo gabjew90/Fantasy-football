@@ -471,7 +471,7 @@ def render(pl: Player, c: dict, side: str, *, opp: str, game_lines: dict | None 
             out.append(f"Short history: {P['season_games']} season games.")
     window = P["window"]                       # the rate the bar assumes (blend explained in "Calculation")
     if c["usual"] is None:                    # no AT block below: the assumed rate is stated here instead
-        out += _wrap(f"Bar assumes {P['assumed_text']} ({window[0].lower() + window[1:]}).")
+        out += _wrap(f"Bar assumes {P['assumed_text']}: {window[0].lower() + window[1:]}.")
     # "Line implies (our math)" is not on the default card (the user, 2026-10-10): it is in the
     # "Calculation" follow-up; the row returns only as Sleeper's own workload line (step G)
     out += _no_depth(pl, m)
@@ -578,8 +578,8 @@ def render_md(pl: Player, c: dict, side: str, *, opp: str, game_lines: dict | No
         out += [f"The bar assumes {P['window'][0].lower() + P['window'][1:]}, blended toward the league "
                 f"average for his position. {_opp_note(opp, opp_row)}", ""]
     else:
-        out += [f"Only {c['usual_games']} games: no recent average yet. The bar assumes {P['assumed_text']} "
-                f"({P['window'][0].lower() + P['window'][1:]}).", ""]
+        out += [f"Only {c['usual_games']} games: no recent average yet. The bar assumes {P['assumed_text']}: "
+                f"{P['window'][0].lower() + P['window'][1:]}.", ""]
     mt = " ".join(matchup_lines(pl, m, opp, game_lines, why_no_lines, grades, qb_today)[1:])
     if grades and grades.get("off") and grades.get("def"):     # the grade line ends a sentence in prose
         g = grade_line(pl, m, opp, grades)
