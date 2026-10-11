@@ -67,7 +67,10 @@ def parsed_csv(path, cols, what: str) -> pd.DataFrame:
         try:
             return pd.read_pickle(cache)
         except Exception:  # noqa: BLE001 -- a cut or foreign cache file: re-read the source below
-            cache.unlink(missing_ok=True)
+            try:
+                cache.unlink(missing_ok=True)
+            except OSError:                       # another run has it open (Windows): leave it
+                pass
     df = pd.read_csv(path, usecols=lambda c: c in cols, low_memory=False)
     tmp = cache.with_name(cache.name + f".{os.getpid()}.tmp")
     try:

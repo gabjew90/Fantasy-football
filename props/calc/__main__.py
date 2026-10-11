@@ -371,6 +371,17 @@ def _bar_cell(c: dict, key: str, side: str, market: str) -> str:
     return f"any workload clears it" if s.status == "always" else "no workload clears it"
 
 
+def _cell(x) -> str:
+    """Text safe inside one markdown table cell."""
+    return " ".join(str(x).replace("|", "/").split())
+
+
+def _named(typed: str, name: str) -> bool:
+    """A typed name points at this player: the same name, or Sleeper's short form ("C. McCaffrey")."""
+    return names.norm(typed) == names.norm(name) or (
+        names.abbreviated(typed) and names.initial_key(typed) == names.initial_key(name))
+
+
 def game(a) -> str:
     """Every posted line of one game in one run (DECISIONS #236): the data loads once, then a
     summary row per line (each side's bar, as its card prints it, beside his last-4 average) and
@@ -385,19 +396,17 @@ def game(a) -> str:
     g = _game_between(b.schedule, away, home, season, a.week)
     wk = int(g["week"])
     lookup = lines.LineLookup(b.rosters)
-    posted, unread = lookup.posted({"season": season, "week": wk, "kickoff_utc": g["kickoff_utc"],
+    posted, unread, bad = lookup.posted({"season": season, "week": wk, "kickoff_utc": g["kickoff_utc"],
                                     "game_id": g["game_id"], "home_team": home, "away_team": away})
     head = f"{away} at {home}, week {wk}: "
+    warn += "".join(f"A saved-quote file could not be read and was left out: {x}\n" for x in bad)
     if not posted:
         return warn + head + "no saved Sleeper line before kickoff. Run `capture` first."
     built, rows = [], []
     for p in posted:
         try:
             got = build_card(b, p["player"], p["market"], "over", team=p["team"], season=season, week=wk, lookup=lookup)
-        except (player.NotFound, DataError) as ex:
-            rows.append((p, None, f"not built: {ex}"))
-            continue
-        except SystemExit as ex:                 # e.g. a QB's rushing: not a market here
+        except (player.NotFound, DataError, SystemExit) as ex:   # SystemExit: build_card's "not a market here"
             rows.append((p, None, f"not built: {ex}"))
             continue
         if got["stub"]["game_id"] != g["game_id"]:
@@ -410,39 +419,48 @@ def game(a) -> str:
                              str(x[1]["stub"]["player"] if x[1] else x[0]["player"]), MARKET_ORDER.index(x[0]["market"])))
     L = [head + f"{len(rows)} posted lines (Sleeper quotes saved before kickoff)."
          + (f" {unread} saved rows could not be read and were left out." if unread else ""), "",
-         "| Player | Bet | Line | Over needs | Under needs | Last-4 average |", "|---|---|---|---|---|---|"]
+         f"| Player | Bet | Line | Over needs | Under needs | Last-{int(fixed['usual_games'])} average |",
+         "|---|---|---|---|---|---|"]
     for p, got, why in rows:
         bet = card.SHOW[p["market"]][0]
         if got is None:
-            L.append(f"| {p['player']} | {bet} | -- | {why} | | |")
+            L.append(f"| {_cell(p['player'])} | {bet} | -- | {_cell(why)} | | |")
             continue
         name_ = f"{got['stub']['player']} ({got['stub']['team']})"
         if got["not_enough"]:
             L.append(f"| {name_} | {bet} | {got['line'] if got['line'] is not None else '--'} | "
-                     f"not enough data: {got['reason']} | | |")
+                     f"not enough data: {_cell(got['reason'])} | | |")
         elif not got["ready"]:
-            L.append(f"| {name_} | {bet} | -- | {got['reason'] or 'no usable quote'} | | |")
+            L.append(f"| {name_} | {bet} | -- | {_cell(got['reason'] or 'no usable quote')} | | |")
         else:
             c = got["c"]
             avg = card.d1(c["usual"]) if c["usual"] is not None else "--"
             L.append(f"| {name_} | {bet} | {got['line']:g} | {_bar_cell(c, 'needed_over', 'over', p['market'])} | "
                      f"{_bar_cell(c, 'needed_under', 'under', p['market'])} | {avg} |")
-    wanted = {names.norm(x) for x in a.player}
+    def asked(p, got):
+        return any(_named(x, got["stub"]["player"]) or _named(x, p["player"]) for x in a.player)
     sides = ["over", "under"] if a.side == "both" else [a.side]
-    pick = [(p, got) for p, got in built
-            if a.all or names.norm(got["stub"]["player"]) in wanted or names.norm(p["player"]) in wanted]
+    pick = [(p, got) for p, got in built if a.all or asked(p, got)]
     pick.sort(key=lambda x: (order.get(x[1]["stub"]["team"], 2), x[1]["stub"]["player"],
                              MARKET_ORDER.index(x[0]["market"])))
-    missing = sorted(x for x in a.player if names.norm(x) not in
-                     {names.norm(got["stub"]["player"]) for _, got in built} | {names.norm(p["player"]) for p, _ in built})
-    if missing:
-        L += ["", f"No posted line in this game for: {', '.join(missing)}."]
+    unbuilt = [p for p, got, _ in rows if got is None]
+    for x in sorted(a.player):
+        if any(_named(x, got["stub"]["player"]) or _named(x, p["player"]) for p, got in built):
+            continue
+        if any(_named(x, p["player"]) for p in unbuilt):
+            L += ["", f"No card for {x}: the summary row says why."]
+        else:
+            L += ["", f"No posted line in this game for: {x}."]
     for p, got in pick:
         for side in sides:
-            text = got["text"] if side == "over" else build_card(
-                b, got["stub"]["player"], p["market"], side, team=got["stub"]["team"], season=season, week=wk,
-                lookup=lookup)["text"]
-            L += ["", text]
+            if side == "over":
+                L += ["", got["text"]]
+                continue
+            try:
+                L += ["", build_card(b, got["stub"]["player"], p["market"], side, team=got["stub"]["team"],
+                                     season=season, week=wk, lookup=lookup)["text"]]
+            except (player.NotFound, DataError, SystemExit) as ex:
+                L += ["", f"{got['stub']['player']} {card.SHOW[p['market']][0]} {side}: card not built: {ex}"]
     if not pick and not a.player:
         L += ["", "Cards: name players with --player, or print every line's cards with --all."]
     return warn + "\n".join(L)

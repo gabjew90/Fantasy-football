@@ -439,7 +439,9 @@ def main(argv=None) -> int:
                    help="waiver: stream (this week) or season (a league-winner candidate)")
     f.set_defaults(fn=cmd_fantasy)
 
-    c = sub.add_parser("calc", help="the parlay-leg calculator (python -m props.calc ...), logged with its timing")
+    # no help of its own: `nfl.py calc --help` is the calculator's help
+    c = sub.add_parser("calc", add_help=False,
+                       help="the parlay-leg calculator (python -m props.calc ...), logged with its timing")
     c.add_argument("calc_args", nargs=argparse.REMAINDER, help="what `python -m props.calc` takes")
     c.set_defaults(fn=cmd_calc)
 
@@ -450,6 +452,8 @@ def main(argv=None) -> int:
     # argparse fills a subcommand's nargs="*" positional before it sees them,
     # so the leftovers are appended to it -- anything else left over is an error
     a, extra = ap.parse_known_args(argv)
+    if hasattr(a, "calc_args"):                  # a leading flag (`calc --help`) belongs to the calculator
+        a.calc_args, extra = extra + list(a.calc_args), []
     spill = "names" if hasattr(a, "names") else ("args" if hasattr(a, "args") else None)
     if extra and (spill is None or any(x.startswith("-") for x in extra)):
         ap.error(f"unrecognized arguments: {' '.join(extra)}")

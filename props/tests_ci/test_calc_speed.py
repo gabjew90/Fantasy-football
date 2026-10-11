@@ -15,6 +15,7 @@ import pytest
 
 from props.calc import __main__ as CLI
 from props.calc import capture, data, lines
+from props.calc.checks import DataError
 
 import sys
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -72,7 +73,8 @@ def test_the_game_lists_each_market_and_player_once_from_quotes_before_kickoff(t
                  snapshot_type="decision")]
     eng += [dict(rows[0], retrieved_at_utc="garbled", player="Someone Else", gsis_id=None, game_id=None, team=None)]
     _write_archive(tmp_path / "rec", eng)
-    got, unread = lines.LineLookup(ROSTER, archive_root=tmp_path / "rec", calc_root=tmp_path / "mine").posted(GAME)
+    got, unread, bad = lines.LineLookup(ROSTER, archive_root=tmp_path / "rec", calc_root=tmp_path / "mine").posted(GAME)
+    assert bad == []
     by = {(g["market"], g["player"]): g for g in got}
     # Sleeper's "C. McCaffrey" (id) and the engine's "Christian McCaffrey" (name) are one player: one entry,
     # under the roster's full name so the card finds him exactly
@@ -87,8 +89,18 @@ def test_a_name_the_roster_cannot_settle_stays_a_name(tmp_path):
     rows = capture.archive_rows(_calc_rows([(64.5, "2026-10-11T20:00:00+00:00")]))
     eng = [dict(rows[0], gsis_id=None, game_id=None, team=None, player="Practice Squad Guy", snapshot_type="decision")]
     _write_archive(tmp_path / "rec", eng)
-    got, _ = lines.LineLookup(ROSTER, archive_root=tmp_path / "rec", calc_root=tmp_path / "none").posted(GAME)
+    got, _, _ = lines.LineLookup(ROSTER, archive_root=tmp_path / "rec", calc_root=tmp_path / "none").posted(GAME)
     assert got == [{"player": "Practice Squad Guy", "gsis_id": None, "team": None, "market": "rush_yds"}]
+
+
+def test_a_blank_roster_team_and_an_unreadable_file_do_not_stop_the_game(tmp_path):
+    blank = pd.concat([ROSTER, ROSTER.iloc[[0]].assign(gsis_id="00-99", full_name="No Team", team=None)])
+    _write_archive(tmp_path / "mine", capture.archive_rows(_calc_rows([(64.5, "2026-10-11T20:00:00+00:00")])))
+    (tmp_path / "rec" / "2026").mkdir(parents=True)
+    lines.archive_path(2026, tmp_path / "rec").write_text("{not json\n", encoding="utf-8")
+    got, _, bad = lines.LineLookup(blank, archive_root=tmp_path / "rec", calc_root=tmp_path / "mine").posted(GAME)
+    assert [g["player"] for g in got] == ["Christian McCaffrey"], "calc's own captures still count"
+    assert len(bad) == 1, "the unreadable file is named, not a crash"
 
 
 # ---------------------------------------------------------------- the game command
@@ -110,10 +122,15 @@ def one_load(monkeypatch):
     monkeypatch.setattr(lines.LineLookup, "posted", lambda self, g: (
         [{"player": "Puka Nacua", "gsis_id": "00-4", "team": "LA", "market": "rec_yds"},
          {"player": "Christian McCaffrey", "gsis_id": "00-2", "team": "SF", "market": "rush_yds"},
-         {"player": "Backup Back", "gsis_id": "00-7", "team": "SF", "market": "rush_yds"}], 0))
+         {"player": "Backup Back", "gsis_id": "00-7", "team": "SF", "market": "rush_yds"},
+         {"player": "Broken Guy", "gsis_id": "00-6", "team": "SF", "market": "rec_yds"}], 0, []))
 
     def card(b, name, market, side, **kw):
         built.append((name, market, side))
+        if name == "Broken Guy":
+            raise DataError("two quotes | one line\nsecond line")
+        if name == "Puka Nacua" and side == "under":
+            raise DataError("no under quote")
         return _fake_card(name, kw["team"], market, side, not_enough=(name == "Backup Back"))
     monkeypatch.setattr(CLI, "build_card", card)
     return loads, built
@@ -127,7 +144,9 @@ def test_one_load_a_summary_row_per_line_and_no_cards_unless_asked(one_load):
     loads, built = one_load
     out = CLI.game(_args())
     assert loads == [2026], "the data loads once for the whole game"
-    assert out.startswith("LA at SF, week 6: 3 posted lines")
+    assert out.startswith("LA at SF, week 6: 4 posted lines")
+    assert "| Broken Guy | receiving yards | -- | not built: two quotes / one line second line | | |" in out, \
+        "an error's text cannot break the table"
     assert "| Puka Nacua (LA) | receiving yards | 64.5 | ~19 targets | ~16 targets or fewer | 16.0 |" in out
     assert "| Christian McCaffrey (SF) | rushing yards | 64.5 | ~19 carries | ~16 carries or fewer | 16.0 |" in out
     assert "| Backup Back (SF) | rushing yards | 64.5 | not enough data: 12 carries" in out
@@ -144,7 +163,17 @@ def test_cards_for_the_players_named_both_sides_and_a_missing_name_is_said(one_l
     assert "CARD Puka Nacua" not in out
     assert "No posted line in this game for: Nobody." in out
     one = CLI.game(Namespace(matchup="LA@SF", player=[], all=True, side="under", season=2026, week=6))
-    assert one.count("CARD") == 3 and "over" not in " ".join(x for x in one.splitlines() if x.startswith("CARD"))
+    assert one.count("CARD") == 2 and "over" not in " ".join(x for x in one.splitlines() if x.startswith("CARD"))
+    assert "Puka Nacua receiving yards under: card not built: no under quote" in one, \
+        "one side failing keeps the rest of the output"
+
+
+def test_a_short_name_finds_the_player_and_a_failed_card_is_not_called_missing(one_load):
+    out = CLI.game(Namespace(matchup="LA@SF", player=["C. McCaffrey", "Broken Guy"], all=False, side="over",
+                             season=2026, week=6))
+    assert "CARD Christian McCaffrey rush_yds over" in out, "Sleeper's short form names him"
+    assert "No card for Broken Guy: the summary row says why." in out
+    assert "No posted line" not in out
 
 
 def test_a_bad_matchup_or_a_missing_game_stops_plainly(one_load):

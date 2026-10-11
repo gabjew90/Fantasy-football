@@ -44,6 +44,14 @@ def test_nfl_calc_passes_every_argument_through_and_returns_its_exit(monkeypatch
     assert seen == [["leg", "Jalen Hurts", "pass_yds", "over", "--line", "186.5", "--over", "-127", "--under", "-130"]]
 
 
+def test_calc_help_and_leading_flags_reach_the_calculator(monkeypatch):
+    seen = []
+    import props.calc.__main__ as CALC
+    monkeypatch.setattr(CALC, "main", lambda argv: seen.append(argv) or 0)
+    assert nfl.main(["calc", "--help"]) == 0 and nfl.main(["calc", "game", "LA@SF", "--all"]) == 0
+    assert seen == [["--help"], ["game", "LA@SF", "--all"]]
+
+
 def test_a_calc_run_is_logged_with_its_start_and_length(monkeypatch, tmp_path):
     import props.calc.__main__ as CALC
     monkeypatch.setattr(CALC, "main", lambda argv: 0)
