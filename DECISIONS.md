@@ -8873,3 +8873,13 @@ four speed-ups and timings for every step.
   summary table; a Windows cache unlink could raise; the "Last-4" header ignored `usual_games`;
   one unreadable quote file stopped the whole game; `nfl.py calc --help` showed nfl's help; and
   duplicate except branches were merged.
+
+## 2026-10-11 (237) -- the entry summary says when every leg is on one team
+
+The user (2026-10-10): a Sleeper entry needs at least one leg from a second team. CHAT.md
+already tells chat never to suggest an all-one-team entry (#236); at the user's OK the
+calculator's entry summary (props/calc/summary.py render) now says so too, right after the
+payout and before the numbers: "SECOND TEAM NEEDED: every leg is on DAL. Sleeper takes an entry
+only with at least one leg from another team." A warning, not a refusal: a dry run still prints
+every card, and logging an entry the user has already placed is never blocked. A change to the
+frozen card spec made on the user's answer, as the spec allows.

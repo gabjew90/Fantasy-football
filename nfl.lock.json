@@ -126,7 +126,7 @@
   "props/calc/settings.py": "0e4dae8cd1a3be3ac6fc416d6a9048fa362d8427abb445f957c974da98a8ba3d",
   "props/calc/settings.yaml": "f5c596332e12cf83279ae92c896d12381db2bf8e43987c4fc574ebf55c4d1196",
   "props/calc/shared.py": "bb20cc5a866ead132cbac6f90b991bd6ce0e26ef38bef2464e5102c7f8914932",
-  "props/calc/summary.py": "d08f8f8c049fe49016ed53e8a1599fafb3cf533ef26f3f7a77abd409ab95d9c0",
+  "props/calc/summary.py": "485e786d14ccf1813281dbfdb8c7cd141cb2d7ab2fc4084463ba4f40192905c2",
   "props/engine/SKILL.md": "3dcc20c9d6b851c0e15fd7bc1daef802c6c9e762b8685133c19deeb53d5d2c58",
   "props/engine/resources/agent_guide.md": "23952f25741868e8ddc9dc0e35278866ebc0275e122969ce4c8e9859fb301ec6",
   "props/engine/resources/calibration_2025.csv": "47e3922c7af818307831d70a3d2be4333200f3aee1d94dc6bbf6e0e9ccee4ac8",
@@ -201,6 +201,6 @@
   "scripts/bootstrap.py": "8c6c428d7b66fde19ea8894d5124a0c182ba3f9719db6031f4904459e3b8cdd7",
   "scripts/release.py": "a75353d7b4e83d21e7e22600c5bb2856b05389966b8e7b1b2d25e62a4ed84bf7"
  },
- "sha256": "c293ca8bbdf2fef1da842a1ac6a64cbdca0734d5c698fe8c6e5b85c76ada2587",
- "tag": "nfl-v1.73"
+ "sha256": "653433089461c9a298a71561833f5af8718e4dc6fed64c76beed5058d1208add",
+ "tag": "nfl-v1.74"
 }

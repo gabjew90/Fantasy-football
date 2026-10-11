@@ -117,6 +117,10 @@ def render(legs: list[dict], stake: float, payout: float, payout_from_legs: bool
     if payout_from_legs:
         out += card._wrap("(No payout given: worked out from the legs' own prices multiplied together, "
                           "not from your entry.)")
+    teams = {x["team"] for x in legs}
+    if len(teams) == 1:                        # Sleeper's rule (the user, 2026-10-10)
+        out += [""] + card._wrap(f"SECOND TEAM NEEDED: every leg is on {teams.pop()}. Sleeper takes an entry "
+                                 "only with at least one leg from another team.")
     out += ["", "WHAT EACH NEEDS (biggest ask first)"]
     for x in sorted(legs, key=_sort_key, reverse=True):
         out += card._wrap(_need_line(x, legs))
