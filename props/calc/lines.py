@@ -202,6 +202,67 @@ class LineLookup:
             raise DataError("; ".join(why))
         return None
 
+    def posted(self, game: dict) -> tuple[list[dict], int, list[str]]:
+        """(every player and market with a saved Sleeper quote for this game before kickoff, the
+        number of rows that could not be read and were left out, the files that could not be read at
+        all -- the other file's quotes still count). One entry per market and player:
+        {"player", "gsis_id", "team", "market"}, from the line history and calc's own captures.
+        Players are told apart by id: calc's rows carry one (and Sleeper's short name, "C.
+        McCaffrey"); a name-only row (the engine's) gets one from this season's roster of the two
+        teams when exactly one player there has that name. The name given is the roster's full
+        name, so the card finds him exactly. Which quote a card uses is still find()'s choice; this
+        only says which cards the game has (DECISIONS #236)."""
+        season, week = int(game["season"]), int(game["week"])
+        ko = _utc(game["kickoff_utc"], "the game's kickoff time")
+        codes = {names.team_code(game["home_team"]), names.team_code(game["away_team"])}
+        full = {names.TEAM_NAMES.get(t) for t in codes}
+        require(None not in full, f"game {game['game_id']} names a team with no full name for the line archive")
+        r_ = self.roster
+        r_ = r_[(r_["season"] == season) & (r_["week"] <= week)].dropna(subset=["gsis_id", "full_name", "team"])
+        r_ = r_.sort_values("week").drop_duplicates("gsis_id", keep="last")
+        r_ = r_[r_["team"].map(names.team_code).isin(codes)]
+        by_id = {g: (n, names.team_code(t)) for g, n, t in zip(r_["gsis_id"], r_["full_name"], r_["team"])}
+        by_name: dict = {}
+        for g, n in zip(r_["gsis_id"], r_["full_name"]):
+            by_name.setdefault(names.norm(n), set()).add(g)
+        out: dict = {}
+        unread, bad = 0, []
+        for path in (archive_path(season, self.archive_root), calc_path(season, self.calc_root)):
+            if not path.exists():
+                continue
+            try:
+                rows = self._file(path)
+            except DataError as ex:
+                bad.append(str(ex))
+                continue
+            for r in rows:
+                mk = ARCHIVE_MARKET.get(r.get("market"))
+                if r.get("bookmaker") != "sleeper" or mk is None or r.get("season") != season:
+                    continue
+                if r.get("week") != week or {r.get("home_team"), r.get("away_team")} != full:
+                    continue
+                if r.get("gsis_id") and r.get("game_id") and r["game_id"] != game["game_id"]:
+                    continue
+                try:
+                    if _utc(r.get("retrieved_at_utc"), "a saved quote's time") >= ko:
+                        continue
+                except DataError:
+                    unread += 1
+                    continue
+                gsis = r.get("gsis_id")
+                if not gsis:
+                    ids = by_name.get(names.norm(str(r.get("player", ""))), set())
+                    gsis = next(iter(ids)) if len(ids) == 1 else None
+                if gsis and gsis in by_id:
+                    name, team = by_id[gsis]
+                    key = (mk, "id", gsis)
+                else:                              # not on either roster by that name: the card resolves it
+                    name, team = r.get("player"), (names.team_code(r["team"]) if r.get("team") else None)
+                    key = (mk, "name", names.norm(str(r.get("player", ""))))
+                out.setdefault(key, {"player": name, "gsis_id": gsis if key[1] == "id" else None,
+                                     "team": team, "market": mk})
+        return list(out.values()), unread, bad
+
     def name_clash(self, leg: dict) -> bool:
         key = (int(leg["season"]), int(leg["week"]))
         if key not in self._rosters:

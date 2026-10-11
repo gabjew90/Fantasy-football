@@ -37,6 +37,7 @@ YAHOO, ODDS_KEY (and FALLBACK_REASON on the fallback path).
 from __future__ import annotations
 
 import argparse
+import datetime as dt
 import http.client
 import importlib.util
 import json
@@ -71,6 +72,9 @@ VENDOR_STAMP = SKILL_ROOT / "vendor" / "RELEASE_STAMP.json"
 ODDS_CREDENTIAL = SKILL_ROOT / "resources" / "credential.env"
 YAHOO_BUNDLE = SKILL_ROOT / "resources" / "Yahoo_Fantasy_Connection.json"
 DEFAULT_DEST = Path(os.environ.get("NFL_RELEASE_ROOT", tempfile.gettempdir())) / "nfl-release"
+# when setup started: an older loader that handed over to this copy passes its own start, so the
+# timing covers the whole setup (DECISIONS #236)
+T0 = float(os.environ.get("NFL_SETUP_T0") or time.time())
 
 # import name -> pip name, for the libraries the commands need beyond stdlib
 DEPENDENCIES = {"pandas": "pandas", "numpy": "numpy", "polars": "polars", "rapidfuzz": "rapidfuzz",
@@ -275,7 +279,7 @@ def harness_update(lock: dict, dest: Path, argv: list[str]) -> int | None:
             raise RuntimeError(f"{release.HARNESS[name]} on main does not match the lock's pin")
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes(data)
-    env = {**os.environ, "NFL_HARNESS_UPDATED": tag, "NFL_SKILL_ROOT": str(SKILL_ROOT)}
+    env = {**os.environ, "NFL_HARNESS_UPDATED": tag, "NFL_SKILL_ROOT": str(SKILL_ROOT), "NFL_SETUP_T0": repr(T0)}
     print(f"HARNESS: this loader is out of date; running the pinned one ({tag}, verified against the lock)",
           file=sys.stderr)
     return subprocess.call([sys.executable, str(run / "scripts" / "bootstrap.py"), *argv], env=env)
@@ -381,6 +385,9 @@ def main(argv: list[str] | None = None) -> int:
     creds = place_credentials(repo_dir)
     deps = ensure_dependencies(install=not a.no_deps)
     info.update(deps=deps, **creds)
+    # the session log's first step (nfl.py reads it from the stamp)
+    info["setup_seconds"] = round(time.time() - T0, 1)
+    info["setup_started_utc"] = dt.datetime.fromtimestamp(T0, dt.timezone.utc).isoformat(timespec="milliseconds")
     write_stamp(repo_dir, info)
     if info["release_source"] == "VENDORED_FALLBACK":
         banner = (f"VENDORED FALLBACK: {info['fallback_reason']}. Running the release bundled with this "
@@ -395,6 +402,7 @@ def main(argv: list[str] | None = None) -> int:
     print(f"YAHOO={'live' if creds['yahoo'] else 'absent (no Yahoo bundle in this skill: Keefamania cannot be read)'}")
     print(f"ODDS_KEY={'present' if creds['odds_key'] else 'absent (Sleeper prices only)'}")
     print(f"HARNESS={'updated ' + os.environ['NFL_HARNESS_UPDATED'] if os.environ.get('NFL_HARNESS_UPDATED') else 'current'}")
+    print(f"SETUP_SECONDS={info['setup_seconds']}")
     if info.get("fetch_route") and info["fetch_route"] != "tarball":
         print(f"FETCH_ROUTE={info['fetch_route']}")
     if info["fallback_reason"]:

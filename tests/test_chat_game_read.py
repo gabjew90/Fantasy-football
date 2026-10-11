@@ -18,8 +18,16 @@ def test_a_game_read_is_status_then_the_calculator():
 
 def test_the_routing_table_sends_a_game_read_to_status_and_the_calculator():
     row = next(ln for ln in CHAT.splitlines() if ln.startswith("| break down this game"))
-    assert "`nfl.py status --game AWAY@HOME`" in row and "props.calc" in row
+    assert "`nfl.py status --game AWAY@HOME`" in row and "`python nfl.py calc game AWAY@HOME`" in row
     assert "only when the engine is named" in row
+
+
+def test_calculator_runs_go_through_nfl_py_once_per_game():
+    # DECISIONS #236: the 2026-10-11 PHI@JAX read ran 56 untimed processes, each reloading the data
+    sec = CHAT[CHAT.index("## Prop legs and entries"):CHAT.index("## Props (the engine, dormant)")]
+    assert "python -m props.calc capture" not in CHAT, "chat's runs go through nfl.py"
+    assert "**One run, not one per line**" in sec and "one `calc game ... --player` per game" in sec
+    assert "**An entry needs at least one leg from a second team**" in sec
 
 
 def test_no_rule_still_sends_every_game_read_to_the_engine_guide():
