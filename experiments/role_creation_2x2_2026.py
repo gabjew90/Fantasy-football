@@ -8,14 +8,16 @@ creation predicts a later change of role is a separate backtest, not run here.
   carries 50%, carries inside the opponent's 10 25%, targets 25% (a stated choice; targets stand in for
   route participation, which no public feed carries). Inside-10 work is lumpy -- a few plays flip it -- so
   it is blended, never used alone.
-- y, creation: missed tackles forced (PFR's broken tackles, on carries and catches) per touch (carries plus
-  catches). Yards after contact per carry is shown beside it as the secondary check.
+- y, creation: broken tackles (Pro Football Reference's count, on carries and catches; close to but not the
+  same as PFF's 'missed tackles forced') per touch (carries plus catches). Yards after contact per carry is shown beside it as the secondary check.
 - colour, the blocking: the team's Next Gen Stats expected yards per carry (run_game_2x2_2026.py, weeks 1-5,
   frozen at the handoff, so the back's own vision is not in it), against the league.
 Weeks: only those PFR has posted for every game in the play-by-play (PFR runs behind it), for both axes, so
 role and creation cover the same games. A back is a running back by his latest weekly roster listing, with
 fullbacks (depth chart FB) left out; PFR and snap ids map to gsis ids through the rosters. A back needs 30+
-touches. Quadrants split at the median role score of the backs shown (a stated choice: half the listed
+touches. Carries leave out quarterback scrambles and kneels (a scramble is a broken pass play, not a carry
+a back could have had). A back whose PFR carries differ from his play-by-play carries by more than 2 (a PFR
+id that does not map, or a gap in PFR) is left out of the league line and the chart, and named. Quadrants split at the median role score of the backs shown (a stated choice: half the listed
 backs are 'high role') and at the league's missed tackles per touch over every running back's touches."""
 
 from __future__ import annotations
@@ -37,7 +39,7 @@ SEASON = 2026
 WEIGHTS = {"carry_share": 0.50, "i10_share": 0.25, "target_share": 0.25}
 MIN_TOUCHES = 30
 COLS = ["game_id", "season", "week", "season_type", "posteam", "yardline_100", "rush_attempt", "pass_attempt", "sack",
-        "two_point_attempt", "qb_kneel", "rusher_player_id", "receiver_player_id", "complete_pass"]
+        "two_point_attempt", "qb_kneel", "qb_scramble", "rusher_player_id", "receiver_player_id", "complete_pass"]
 ACTIONS = {(True, True): "Hold: lead role, creates", (True, False): "Candidate sell: role carrying him",
            (False, True): "Candidate buy: creates, small role", (False, False): "Drop: small role, little created"}
 
@@ -46,11 +48,14 @@ def flag(s: pd.Series) -> pd.Series:
     return s.fillna(0).astype(float) > 0
 
 
-def full_pfr_weeks(p: pd.DataFrame, pfr: pd.DataFrame) -> list[int]:
-    """Weeks in which PFR lists every team the play-by-play has."""
-    have = pfr.groupby("week")["team"].apply(set)
+def full_pfr_weeks(p: pd.DataFrame, *pfr: pd.DataFrame) -> list[int]:
+    """Weeks in which every PFR file given lists every team the play-by-play has."""
     need = p.groupby("week")["posteam"].apply(lambda s: set(s.dropna()))
-    return sorted(w for w in need.index if w in have.index and need[w] <= have[w])
+    ok = set(need.index)
+    for f in pfr:
+        have = f.groupby("week")["team"].apply(set)
+        ok &= {w for w in need.index if w in have.index and need[w] <= have[w]}
+    return sorted(ok)
 
 
 def build(season: int) -> tuple[pd.DataFrame, dict]:
@@ -59,7 +64,7 @@ def build(season: int) -> tuple[pd.DataFrame, dict]:
     p = p[p["season_type"] == "REG"]
     rush = pd.read_csv(F.nflverse("pfr_adv_rush", season, **age))
     rec = pd.read_csv(F.nflverse("pfr_adv_rec", season, **age))
-    weeks = full_pfr_weeks(p, rush)
+    weeks = full_pfr_weeks(p, rush, rec)
     p, rush, rec = (x[x["week"].isin(weeks)] for x in (p, rush, rec))
 
     ros = data.rosters(season)
@@ -68,10 +73,12 @@ def build(season: int) -> tuple[pd.DataFrame, dict]:
     depth = depth.dropna(subset=["gsis_id"]).sort_values("week").drop_duplicates("gsis_id", keep="last")
     fb = set(depth.loc[depth["depth_chart_position"] == "FB", "gsis_id"])
     rbs = set(latest.loc[latest["position"] == "RB", "gsis_id"]) - fb
-    pfr_gsis = dict(zip(*ros.dropna(subset=["pfr_id", "gsis_id"]).drop_duplicates("pfr_id")[["pfr_id", "gsis_id"]].T.values))
+    ids = ros.dropna(subset=["pfr_id", "gsis_id"]).drop_duplicates("pfr_id")
+    pfr_gsis = dict(zip(ids["pfr_id"], ids["gsis_id"]))
 
     # plays: carries and targets as props.calc.data counts them, plus inside the 10
-    car = p[flag(p["rush_attempt"]) & ~flag(p["two_point_attempt"]) & ~flag(p["qb_kneel"]) & p["rusher_player_id"].notna()]
+    car = p[flag(p["rush_attempt"]) & ~flag(p["two_point_attempt"]) & ~flag(p["qb_kneel"]) & ~flag(p["qb_scramble"])
+            & p["rusher_player_id"].notna()]
     car = car.assign(i10=car["yardline_100"] <= 10)
     tgt = p[flag(p["pass_attempt"]) & ~flag(p["sack"]) & ~flag(p["two_point_attempt"]) & p["receiver_player_id"].notna()]
     team_g = pd.DataFrame({"t_car": car.groupby(["game_id", "posteam"]).size(),
@@ -102,15 +109,20 @@ def build(season: int) -> tuple[pd.DataFrame, dict]:
     rush = rush.assign(gsis_id=rush["pfr_player_id"].map(pfr_gsis))
     rec = rec.assign(gsis_id=rec["pfr_player_id"].map(pfr_gsis))
     unmapped = sorted(set(rush.loc[rush["gsis_id"].isna(), "pfr_player_name"]) | set(rec.loc[rec["gsis_id"].isna(), "pfr_player_name"]))
+    for f, cols in ((rush, ["rushing_broken_tackles", "rushing_yards_after_contact", "carries"]), (rec, ["receiving_broken_tackles"])):
+        bad = f[f["gsis_id"].isin(rbs)][cols].isna().any(axis=1)
+        if bad.any():
+            raise ValueError(f"{int(bad.sum())} running-back PFR rows with a blank in {cols}")
     b["bt_rush"] = rush.groupby("gsis_id")["rushing_broken_tackles"].sum().reindex(b.index).fillna(0)
     b["bt_rec"] = rec.groupby("gsis_id")["receiving_broken_tackles"].sum().reindex(b.index).fillna(0)
     b["yac_sum"] = rush.groupby("gsis_id")["rushing_yards_after_contact"].sum().reindex(b.index)
     b["pfr_carries"] = rush.groupby("gsis_id")["carries"].sum().reindex(b.index).fillna(0)
     b["touches"] = b["carries"] + b["receptions"]
+    gap = (b["pfr_carries"] - b["carries"]).abs() > 2
     notes = {"weeks": weeks, "PFR rows with no gsis id": unmapped,
-             "backs whose PFR carries differ from the play-by-play by more than 2":
-                 sorted(b.loc[(b["pfr_carries"] - b["carries"]).abs() > 2, "name"].fillna("?"))}
-    return b, notes
+             "backs left out, PFR carries differ from the play-by-play by more than 2":
+                 sorted(f"{n} ({int(c)} vs {int(q)})" for n, c, q in zip(b.loc[gap, "name"].fillna("?"), b.loc[gap, "pfr_carries"], b.loc[gap, "carries"]))}
+    return b[~gap], notes
 
 
 def rates(b: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
@@ -155,11 +167,11 @@ def main(argv=None) -> int:
     L = [f"# Role vs creation, {SEASON} (weeks {notes['weeks'][0]}-{notes['weeks'][-1]}: the weeks PFR has in full)", "",
          f"{len(r)} running backs with {MIN_TOUCHES}+ touches. Role = carries {WEIGHTS['carry_share']:.0%}, inside-10 carries "
          f"{WEIGHTS['i10_share']:.0%}, targets {WEIGHTS['target_share']:.0%} of the team's, in his games; split at the median "
-         f"{lines['role_median']:.1f}. Creation = missed tackles forced per touch; league {lines['league_mtf_per_touch']:.3f} "
+         f"{lines['role_median']:.1f}. Creation = broken tackles (PFR) per touch; league {lines['league_mtf_per_touch']:.3f} "
          f"(yards after contact {lines['league_yac_per_carry']:.2f} a carry). Colour = team NGS expected yards per carry vs "
          f"{lines['league_exp_ypc']:.2f}. The actions are candidates until a backtest tests them.", ""]
     for act in ACTIONS.values():
-        names = [f"{x['name']} ({x['team']}, role {x['role']:.0f}, {x['mtf_per_touch']:.3f} MTF/touch, {int(x['touches'])} touches)"
+        names = [f"{x['name']} ({x['team']}, role {x['role']:.0f}, {x['mtf_per_touch']:.3f} broken tackles/touch, {int(x['touches'])} touches)"
                  for x in r.to_dict("records") if x["action"] == act]
         L += [f"**{act}** ({len(names)}): " + ", ".join(names), ""]
     L += [f"Notes: " + "; ".join(f"{k}: {v}" for k, v in notes.items())]
