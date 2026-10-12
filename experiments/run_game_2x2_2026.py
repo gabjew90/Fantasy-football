@@ -75,9 +75,12 @@ def main(argv=None) -> int:
                "teams": t.reset_index().round(3).to_dict("records")}
     a.out.with_suffix(".json").write_text(json.dumps(payload, indent=1), encoding="utf-8")
     L = [f"# Run game 2x2, {a.season} (Next Gen Stats, season to date)", "",
-         f"{len(b)} backs with 25+ carries, {int(b['carries'].sum())} carries; league expected {mid:.2f} yards a carry.", ""]
+         f"{len(b)} backs with 25+ carries, {int(b['carries'].sum())} carries; league expected {mid:.2f} yards a carry.",
+         "", "Each team's point sums only its backs NGS lists (25+ carries); a back under 25 carries is not in it. "
+         "Yards over expected settles slowly: a back on 25-50 carries can move a full yard a carry on one long run, "
+         "so the carry count is shown with every back.", ""]
     for q in QUADRANTS.values():
-        names = [f"{r.name} ({r.team})" for r in b.itertuples() if r.quadrant == q]
+        names = [f"{r.name} ({r.team}, {int(r.carries)})" for r in b.itertuples() if r.quadrant == q]
         L += [f"**{q}** ({len(names)}): " + ", ".join(names), ""]
     L += ["| Team | Backs | Carries | Expected YPC | Over expected per carry | 8+ box % | Quadrant |", "|---|---|---|---|---|---|---|"]
     for team, r in t.iterrows():
