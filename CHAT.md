@@ -358,7 +358,7 @@ Run it through `python nfl.py calc <command>` -- the same commands and arguments
    followed by its **Screen checks** table (the same ✓ and ✗). Each game has its header (rule 3).
    A player ruled Out is not ranked; the screen names him under "Not listed, ruled Out".
    The order is the cushion as a percent of the bar, biggest first (kept after the 2026 test: no
-   other order did better); the marks are shown, not counted. Show it as printed, with a Matchup
+   other order beat it by the margin set in advance); the marks are shown, not counted. Show it as printed, with a Matchup
    read on each card (rule 3), and keep every card's Screen checks table. **A request for the
    strongest or best overs and unders runs the screen, and the reply LEADS with its test line**
    (the header's "Tested on 2026 weeks 2-5 ..." sentence, word for word): legs on the list hit

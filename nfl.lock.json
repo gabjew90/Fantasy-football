@@ -2,7 +2,7 @@
  "algorithm": "nfl-release-sha256-lf-1",
  "file_count": 195,
  "files": {
-  "CHAT.md": "0be8ef16f0474e2d734e36e0a05a78ed241f3ec9739508a0e317f95a157e0f2f",
+  "CHAT.md": "dd63827621d2a79efce0ce94c70a981dea4061a9d1b0eff0cec0f1bc0dfb575c",
   "config.yaml": "1a2af1bd5d6c7a464e908b50e94d910d2adba1675dede83876369aca7329c0c6",
   "core/__init__.py": "8ac9ed217e439f5828616ab66ec9ff17336c2cbbbeae391d0f9bfa001eaed571",
   "core/fetch.py": "f7645d380c6a997b539eb28bda37400887c616d23360f71b013922541e2284fa",
@@ -123,7 +123,7 @@
   "props/calc/opponent.py": "1a657b51f9b0463c8e6c9598a490ddd81e1270911a164777828b3c524a4b65f0",
   "props/calc/player.py": "54252987a72164c77158000d59c08329ac74ac71cc081f0460e75c1ceb1a80b5",
   "props/calc/rates.py": "0f29f11067e197df4375ffde997b0059757efd407a2e4bbdbcb8a0ea9793ed0f",
-  "props/calc/screen.py": "49ee372aa56a444a517b7626aad0a0d138ab5f7c9eb78c3adbb1cedf9e105247",
+  "props/calc/screen.py": "ef2c37c0adf2042007148d3c5ac65145b7830aaaff8a2b940db3312e3bad9463",
   "props/calc/settings.py": "0e4dae8cd1a3be3ac6fc416d6a9048fa362d8427abb445f957c974da98a8ba3d",
   "props/calc/settings.yaml": "f5c596332e12cf83279ae92c896d12381db2bf8e43987c4fc574ebf55c4d1196",
   "props/calc/shared.py": "bb20cc5a866ead132cbac6f90b991bd6ce0e26ef38bef2464e5102c7f8914932",
@@ -202,6 +202,6 @@
   "scripts/bootstrap.py": "8c6c428d7b66fde19ea8894d5124a0c182ba3f9719db6031f4904459e3b8cdd7",
   "scripts/release.py": "a75353d7b4e83d21e7e22600c5bb2856b05389966b8e7b1b2d25e62a4ed84bf7"
  },
- "sha256": "ff9783773886be63ee35630e85fe395928323c9f59b87dc281b386e1e2d6edd1",
+ "sha256": "4a0edfc8435639307f2d1dc955f00d5c551f7a582ec755a5f52b70a489736714",
  "tag": "nfl-v1.80"
 }

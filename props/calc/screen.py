@@ -33,7 +33,7 @@ TESTED = ("Tested on 2026 weeks 2-5: legs on this list hit about 50% on Overs an
 HEADER = ("This lists only legs where his recent workload already meets the bar at the price. Legs that "
           "depend on a role change -- more work than his recent games -- are not on it. " + TESTED)
 ORDER = ("Order: the workload cushion as a percent of the bar, biggest first (kept after the 2026 test: no other "
-         "order did better; a low line gets a big percent from one extra target or carry). The ✓ and ✗ marks are "
+         "order beat it by the margin set in advance; a low line gets a big percent from one extra target or carry). The ✓ and ✗ marks are "
          "shown, not counted: ✓ agrees, ✗ disagrees, – not enough data.")
 TOP = 8
 REPLAY = ("Past week: rebuilt from the saved line history -- the newest saved Sleeper quote before each "

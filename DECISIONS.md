@@ -9126,4 +9126,6 @@ The user accepted #244 and set what follows from it:
 - **Freeze, 2026-10-12 to 2026-11-02 (three weeks).** Changes to props/calc and to the calculator
   sections of CHAT.md are limited to a crash, a wrong number, or a card stating something false.
   Anything else goes to "Later ideas" in docs/plans/2026-10-10-parlay-leg-calculator.md. The screen-
-  order test reruns at week 8 or later (#244) -- running the existing script is not a change.
+  order test reruns at week 8 or later (#244) -- running the existing script is not a change. Week 8's
+  stats land around 2026-10-28; the script expires 2026-11-10 (the experiments guardrail), so the
+  rerun falls between those dates, or the PR that reruns it later moves the date.
