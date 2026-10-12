@@ -14,7 +14,8 @@ Two sources, because neither alone is complete:
   yards by avoiding contact), but complete.
 
 For each source: a back's early point and late point, his early quadrant (split at that window's
-carry-weighted league line and, for the back's axis, at the league line too), and per early quadrant the
+carry-weighted league lines on both axes -- for NGS the listed backs' own average over expected, not 0, so
+the listing's drift between windows is taken out), the games behind each window, and per early quadrant the
 carry-weighted change in the back's axis. "Catching up" would show as the 'blocking beating the back'
 group improving MORE than the other groups -- every group drifts toward average from one window to the
 next (an extreme early number is part luck), so the groups are compared with each other, not with zero.
@@ -78,20 +79,21 @@ def pfr_rows(season: int) -> tuple[pd.DataFrame, dict]:
 
 
 def window(r: pd.DataFrame, weeks) -> pd.DataFrame:
-    w = r[r["week"].isin(weeks)]
+    w = r[r["week"].isin(weeks)].sort_values("week", kind="stable")
     g = w.groupby("id")
-    return pd.DataFrame({"name": g["name"].last(), "team": g["team"].last(), "carries": g["carries"].sum(),
-                         "x": g["x_sum"].sum() / g["carries"].sum(), "y_sum": g["y_sum"].sum()})
+    return pd.DataFrame({"name": g["name"].last(), "team": g["team"].last(), "games": g["week"].nunique(),
+                         "carries": g["carries"].sum(), "x": g["x_sum"].sum() / g["carries"].sum(),
+                         "y": g["y_sum"].sum() / g["carries"].sum()})
 
 
-def compare(r: pd.DataFrame, late_weeks, y_centered: bool) -> dict:
-    """y_centered: the back's axis is already 'over expected' (split at 0); otherwise split at its league line."""
+def league_line(w: pd.DataFrame) -> dict:
+    return {"x": float((w["x"] * w["carries"]).sum() / w["carries"].sum()),
+            "y": float((w["y"] * w["carries"]).sum() / w["carries"].sum())}
+
+
+def compare(r: pd.DataFrame, late_weeks) -> dict:
     e, l = window(r, EARLY), window(r, late_weeks)
-    lines = {}
-    for nm, w in (("early", e), ("late", l)):
-        lines[nm] = {"x": float((w["x"] * w["carries"]).sum() / w["carries"].sum()),
-                     "y": 0.0 if y_centered else float(w["y_sum"].sum() / w["carries"].sum())}
-        w["y"] = w["y_sum"] / w["carries"]
+    lines = {"early": league_line(e), "late": league_line(l)}
     both = e.join(l, lsuffix="_e", rsuffix="_l", how="inner")
     both = both[(both["carries_e"] >= MIN_EARLY) & (both["carries_l"] >= MIN_LATE)].copy()
     # each window measured against its own league line, so the drift of the whole league is taken out
@@ -110,7 +112,7 @@ def compare(r: pd.DataFrame, late_weeks, y_centered: bool) -> dict:
     persist = {"back axis, early vs late (r)": float(both["y_e"].corr(both["y_l"])),
                "blocking axis, early vs late (r)": float(both["x_e"].corr(both["x_l"]))}
     rows = both.rename(columns={"name_e": "name", "team_e": "team"})[
-        ["name", "team", "carries_e", "x_e", "y_e", "carries_l", "x_l", "y_l", "dx", "dy", "group"]]
+        ["name", "team", "games_e", "carries_e", "x_e", "y_e", "games_l", "carries_l", "x_l", "y_l", "dx", "dy", "group"]]
     return {"lines": lines, "summary": summary, "persistence": persist, "n_backs": len(both),
             "rows": rows.sort_values("dy", ascending=False).round(3).to_dict("records")}
 
@@ -121,8 +123,8 @@ def main(argv=None) -> int:
     a = ap.parse_args(argv)
     ngs, cov_n = ngs_rows(SEASON)
     pfr, cov_p = pfr_rows(SEASON)
-    res = {"ngs": {**compare(ngs, LATE["ngs"], True), "coverage": cov_n},
-           "pfr": {**compare(pfr, LATE["pfr"], False), "coverage": cov_p}}
+    res = {"ngs": {**compare(ngs, LATE["ngs"]), "coverage": cov_n},
+           "pfr": {**compare(pfr, LATE["pfr"]), "coverage": cov_p}}
     a.out.parent.mkdir(parents=True, exist_ok=True)
     a.out.with_suffix(".json").write_text(json.dumps(res, indent=1, default=str), encoding="utf-8")
     L = [f"# Run game 2x2 over time, {SEASON}: weeks 1-3 vs later", ""]
@@ -130,19 +132,27 @@ def main(argv=None) -> int:
                                    ("pfr", "PFR (before contact vs after contact)", "4", "after contact per carry")):
         r = res[key]
         L += [f"## {label}: weeks 1-3 vs week(s) {late}", "",
-              f"{r['n_backs']} backs with {MIN_EARLY}+ carries early and {MIN_LATE}+ late. Coverage: {r['coverage']}.",
-              f"Lines: early {r['lines']['early']}, late {r['lines']['late']}.",
-              f"Persistence: {r['persistence']}.", "",
+              f"{r['n_backs']} backs with {MIN_EARLY}+ carries early and {MIN_LATE}+ late. Coverage: "
+              + "; ".join(f"{k}: {v}" for k, v in r["coverage"].items()) + ".",
+              "League lines (blocking axis / back axis): early "
+              f"{r['lines']['early']['x']:.2f} / {r['lines']['early']['y']:+.2f}, late "
+              f"{r['lines']['late']['x']:.2f} / {r['lines']['late']['y']:+.2f}.",
+              "Same back, early vs late (correlation over these backs): back axis "
+              f"r = {r['persistence']['back axis, early vs late (r)']:.2f}, blocking axis "
+              f"r = {r['persistence']['blocking axis, early vs late (r)']:.2f}.", "",
               f"| Early group | Backs | Change in yards {unit}, vs league | Change in blocking axis, vs league | Now above the line |",
               "|---|---|---|---|---|"]
         for grp, s in r["summary"].items():
             f = (lambda v: "" if v is None else f"{v:+.2f}")
             L.append(f"| {grp} | {s['backs']} | {f(s['back axis change (late-weighted)'])} | "
                      f"{f(s['blocking axis change'])} | {s['now above the back line']} of {s['backs']} |")
-        L += ["", "| Back | Team | Group (weeks 1-3) | Carries early / late | Back axis early -> late | Blocking early -> late |",
-              "|---|---|---|---|---|---|"]
+        L += ["", "Groups of 2-10 backs: a group's change moves by tenths of a yard with one back, so read the "
+              "direction across groups, not the decimals.",
+              "", "| Back | Team | Group (weeks 1-3) | Games early / late | Carries early / late | Back axis early -> late | Blocking early -> late |",
+              "|---|---|---|---|---|---|---|"]
         for x in r["rows"]:
-            L.append(f"| {x['name']} | {x['team']} | {x['group']} | {int(x['carries_e'])} / {int(x['carries_l'])} | "
+            L.append(f"| {x['name']} | {x['team']} | {x['group']} | {int(x['games_e'])} / {int(x['games_l'])} | "
+                     f"{int(x['carries_e'])} / {int(x['carries_l'])} | "
                      f"{x['y_e']:+.2f} -> {x['y_l']:+.2f} | {x['x_e']:.2f} -> {x['x_l']:.2f} |")
         L.append("")
     a.out.with_suffix(".md").write_text("\n".join(L) + "\n", encoding="utf-8")
