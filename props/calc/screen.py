@@ -31,9 +31,9 @@ HEADER = ("This lists only legs where his recent workload already meets the bar 
           "depend on a role change -- more work than his recent games -- are not on it. The ranking is "
           "untested against results: it orders legs by how little they ask at the price, not by any chance "
           "of winning, and it is not a pick.")
-ORDER = ("Order: fewest ✗, then most ✓, then the workload cushion as a percent of the bar. ✓ agrees, ✗ "
-         "disagrees, – not enough data. Workload and his longer-run rate are one fact (the bar is the "
-         "workload at that rate), shown together and not counted.")
+ORDER = ("Order: the workload cushion as a percent of the bar, biggest first (the user's choice, 2026-10-11; "
+         "untested, and a low line gets a big percent from one extra target or carry). The ✓ and ✗ marks are "
+         "shown, not counted: ✓ agrees, ✗ disagrees, – not enough data.")
 TOP = 8
 REPLAY = ("Past week: rebuilt from the saved line history -- the newest saved Sleeper quote before each "
           "kickoff, which may differ from the quote a live screen saw (a later capture at the same line "
@@ -161,7 +161,11 @@ def side_row(pl, c: dict, side: str, shown: dict, stub: dict, other_bar: float |
     # the grade matchup: offense against defense (an Under wants the defense graded higher)
     gr = shown.get("grades") or {}
     off, dfn = (grade_rank(gr["off"]), grade_rank(gr["def"])) if gr.get("off") and gr.get("def") else (None, None)
-    if off is not None and dfn is not None:
+    qb_out = str(shown.get("qb_today", ""))
+    if qb_out.endswith(" ruled Out.") and off is not None:
+        # his offense's grade was earned with a quarterback who is out: no data, not a ✓ or ✗ (DECISIONS #243)
+        marks.append(("grades", "–", f"– graded with {qb_out.removesuffix(' ruled Out.')}, who is Out"))
+    elif off is not None and dfn is not None:
         ok = off < dfn if side == "over" else dfn < off
         marks.append(("grades", "✓" if ok else "✗", f"{'✓' if ok else '✗'} {gr['off']} vs {gr['def']}"))
     else:
@@ -184,9 +188,11 @@ def side_row(pl, c: dict, side: str, shown: dict, stub: dict, other_bar: float |
 
 
 def rank(rows: list[dict]) -> list[dict]:
-    """Workload passes only; then fewest ✗, most ✓, biggest cushion."""
+    """Workload passes only, biggest cushion first (the user, 2026-10-11, DECISIONS #243: it was fewest ✗,
+    then most ✓, then cushion; the marks are now shown, not counted, until the orders are measured);
+    ties: fewest ✗, then most ✓."""
     return sorted((r for r in rows if r["passes"]),
-                  key=lambda r: (r["x"], -r["ok"], -(r["cushion"] if r["cushion"] is not None else -1e9)))
+                  key=lambda r: (-(r["cushion"] if r["cushion"] is not None else -1e9), r["x"], -r["ok"]))
 
 
 def _leg(r: dict) -> str:

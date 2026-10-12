@@ -546,7 +546,7 @@ def _md_notes(rows: list[tuple], season: int) -> list[str]:
 
 def render_md(pl: Player, c: dict, side: str, *, opp: str, game_lines: dict | None = None, why_no_lines: str = "",
               footer: str = "", opp_row: dict | None = None, grades: dict | None = None, line_note: str = "",
-              qb_today: str = "") -> str:
+              qb_today: str = "", matchup: bool = True) -> str:
     """The same card laid out for chat (the user's layout, 2026-10-11; DECISIONS #238): normal markdown,
     two-column tables, bold only on what the bet needs, and a condition instead of a question. Every
     number comes from _parts, as on the text card; nothing is added but layout and the condition."""
@@ -601,7 +601,8 @@ def render_md(pl: Player, c: dict, side: str, *, opp: str, game_lines: dict | No
     else:
         out += [f"Only {c['usual_games']} games: no recent average yet. The bar assumes {P['assumed_text']}: "
                 f"{P['window'][0].lower() + P['window'][1:]}.", ""]
-    out += matchup_md(pl, m, opp, game_lines, why_no_lines, grades, qb_today) + [""]
+    if matchup:              # off in a screen or game read: the game header prints it once (DECISIONS #243)
+        out += matchup_md(pl, m, opp, game_lines, why_no_lines, grades, qb_today) + [""]
     cond = condition(m, side, P["work_ask"], P["rate_ask"], P["reached"], len(rows), P["split"])
     if cond:
         out += [f"What needs to be true: {cond}", ""]

@@ -9026,3 +9026,27 @@ session transcript held only a summary of the reply, so whether chat dropped it 
   as nfl.py does; a release does not carry nfl.lock.json.
 - Left as is, listed: the grades come from the season's games, so a team whose starting QB is out
   (Baltimore without Lamar Jackson) keeps the grade his games earned; the screen flags the QB.
+## 2026-10-11 (243) -- one game header, grades with a QB out, the screen ordered by cushion
+
+From the user's 2026-10-11 evening session (nfl_session_2026-10-12_0037):
+
+- **One matchup header per game** ("you don't have to repeat the same match up info every card";
+  "where's the BAL run offense on the matchup table?"). A screen and a game read print, once per
+  game: the spread and total, all four unit pairings (both teams' run and pass offense against the
+  other's defense, whatever legs are listed), each team's quarterback line, and the players Out,
+  Doubtful or Questionable. Their chat cards drop the per-card Matchup table (`render_md(matchup=
+  False)`, build_card's `md_game`); a single leg's card keeps it. Reverses #242's per-card table for
+  screens and game reads.
+- **Grades with the starter out** ("is Ravens really S+"): Lamar Jackson threw 103 of Baltimore's
+  112 passes in weeks 1-4. When a team's current starter is ruled Out, its legs' Grades mark is "–
+  graded with <name>, who is Out" (pass and run, a QB's runs count in the run grade), and the game
+  header says the same beside those grades.
+- **Order: cushion first** (the user's choice, untested): the screen lists legs at the bar, biggest
+  cushion (percent of the bar) first; ✓ and ✗ are shown, not counted, and only break ties. The
+  caveat that a low line gets a big percent from one extra target is printed with the order. The
+  orders are to be measured on replayed weeks before this is kept (method to agree with the user).
+- **Ruled Out, not ranked** (the user, 2026-10-11): a player the official report lists Out is left off
+  the tables (Sleeper voids his leg) and named under "Not listed, ruled Out"; Doubtful and
+  Questionable stay as flagged rows.
+- **Transcript summaries flagged:** `nfl.py log` counts a reply in brackets, or one under 600
+  characters after a screen, game or entry run, as not verbatim (and reads "###" entry headings).

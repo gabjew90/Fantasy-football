@@ -295,3 +295,11 @@ def test_the_chat_matchup_table_carries_the_qb_line_and_the_no_grades_note():
     assert "| Quarterback | Lamar Jackson ruled Out. |" in md
     assert "Lamar Jackson ruled Out." in text, "the text card keeps its MATCHUP block"
     assert card.spread_sentence(None, "ESPN not read") == "Spread and total: not available (ESPN not read)."
+
+
+
+def test_a_screen_or_game_card_leaves_the_matchup_to_the_game_header():
+    pl, c, text, md = _rush()
+    short = card.render_md(pl, c, "over", matchup=False, **KW)
+    assert "**Matchup**" in md and "**Matchup**" not in short and "Dallas favored" not in short
+    assert short.replace("\n\n", "\n").count("What needs to be true") == 1

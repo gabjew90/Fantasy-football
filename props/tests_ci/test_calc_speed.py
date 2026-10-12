@@ -110,7 +110,8 @@ def _fake_card(name, team, market, side, line=64.5, ready=True, not_enough=False
     c = {"solutions": {"needed_over": sol(19.1), "needed_under": sol(15.6)}, "usual": 16.0}
     return {"stub": {"player": name, "team": team, "game_id": GAME["game_id"]}, "ready": ready, "c": c,
             "line": line, "not_enough": not_enough, "reason": "12 carries in his last 16 games (needs 30)",
-            "text": f"CARD {name} {market} {side}", "md": f"**MD {name} {market} {side}**"}
+            "text": f"CARD {name} {market} {side}", "md": f"**MD+MATCHUP {name} {market} {side}**",
+            "md_game": f"**MD {name} {market} {side}**"}
 
 
 @pytest.fixture
@@ -133,6 +134,7 @@ def one_load(monkeypatch):
             raise DataError("no under quote")
         return _fake_card(name, kw["team"], market, side, not_enough=(name == "Backup Back"))
     monkeypatch.setattr(CLI, "build_card", card)
+    monkeypatch.setattr(CLI, "game_header", lambda *a: ["GAME HEADER"])
     return loads, built
 
 
@@ -180,7 +182,7 @@ def test_game_cards_in_chat_layout_have_one_divider_between_them(one_load):
     out = CLI.game(Namespace(matchup="LA@SF", player=["Christian McCaffrey"], all=False, side="both", season=2026,
                              week=6, format="md"))
     assert "**MD Christian McCaffrey rush_yds over**" in out and "**MD Christian McCaffrey rush_yds under**" in out
-    assert "CARD " not in out and out.count("\n---\n") == 2
+    assert "CARD " not in out and out.count("\n---\n") == 2 and "MATCHUP" not in out and "GAME HEADER" in out
 
 
 def test_a_bad_matchup_or_a_missing_game_stops_plainly(one_load):

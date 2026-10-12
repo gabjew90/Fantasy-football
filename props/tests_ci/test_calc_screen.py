@@ -114,9 +114,10 @@ def test_an_under_mirrors_every_check():
     assert not _row(64.5, "under")["passes"], "bar ~15 or fewer against an average of 15.5"
 
 
-def test_a_starter_ruled_out_is_flagged_by_name():
+def test_a_starter_ruled_out_is_flagged_by_name_and_his_offense_grade_is_no_data():
     r = _row(40.5, "over", dict(SHOWN, qb_today="Lamar Jackson ruled Out."))
     assert "Lamar Jackson (QB) ruled Out" in r["flags"]
+    assert {n: (m, t) for n, m, t in r["marks"]}["grades"] == ("–", "– graded with Lamar Jackson, who is Out")
 
 
 def test_short_history_and_an_unconfirmed_qb_are_flagged():
@@ -127,16 +128,16 @@ def test_short_history_and_an_unconfirmed_qb_are_flagged():
     assert {n: t for n, _, t in r["marks"]}["consistency"] == "– 2 games"
 
 
-def test_the_order_is_fewest_disagreements_then_most_agreements_then_cushion():
+def test_the_order_is_the_cushion_and_the_marks_only_break_ties():
     base = {"passes": True, "marks": []}
     rows = [dict(base, name="no evidence", x=0, ok=0, cushion=50.0),
             dict(base, name="four agree", x=0, ok=4, cushion=1.0),
             dict(base, name="one disagrees", x=1, ok=3, cushion=90.0),
-            dict(base, name="two agree, big cushion", x=0, ok=2, cushion=40.0),
-            dict(base, name="two agree, small cushion", x=0, ok=2, cushion=5.0),
+            dict(base, name="tie, two agree", x=0, ok=2, cushion=40.0),
+            dict(base, name="tie, one disagrees", x=1, ok=2, cushion=40.0),
             dict(base, name="short of the bar", x=0, ok=4, cushion=-5.0, passes=False)]
-    assert [r["name"] for r in S.rank(rows)] == ["four agree", "two agree, big cushion", "two agree, small cushion",
-                                                 "no evidence", "one disagrees"]
+    assert [r["name"] for r in S.rank(rows)] == ["one disagrees", "no evidence", "tie, two agree",
+                                                 "tie, one disagrees", "four agree"]
 
 
 # ---------------------------------------------------------------- the record
@@ -174,8 +175,9 @@ def one_window(monkeypatch):
         built.append(side)
         pl, c = _card(40.5)
         return {"stub": STUB, "ready": True, "not_enough": False, "c": c, "pl": pl, "shown": SHOWN,
-                "text": f"TEXT CARD {side}", "md": f"MD CARD {side}"}
+                "text": f"TEXT CARD {side}", "md": f"MD CARD WITH MATCHUP {side}", "md_game": f"MD CARD {side}"}
     monkeypatch.setattr(CLI, "build_card", fake_card)
+    monkeypatch.setattr(CLI, "_week_lines", lambda season, week: ({("DAL", "ARI"): SHOWN["game_lines"]}, ""))
     return built
 
 
@@ -188,9 +190,12 @@ def test_the_screen_prints_its_caveats_tables_and_top_cards(one_window):
     assert out.startswith("**Smallest ask at the price · Sun 1pm PT · week 5**")
     for must in ("This lists only legs where his recent workload already meets the bar at the price.",
                  "Legs that depend on a role change", "The ranking is untested against results",
-                 "Order: fewest ✗, then most ✓, then the workload cushion as a percent of the bar."):
+                 "Order: the workload cushion as a percent of the bar, biggest first"):
         assert must in out
-    assert "- ARI: Hurt Guy" in out and "- DAL: none" in out, "one line per team, players ruled Out"
+    assert "ARI Out: Hurt Guy. Doubtful or Questionable: none." in out
+    assert "DAL Out: none. Doubtful or Questionable: Test Back (Questionable)." in out
+    assert "| DAL run offense vs ARI run defense |" in out and "| ARI pass offense vs DAL pass defense |" in out, \
+        "all four unit pairings, whatever legs are listed"
     assert "| 1 | Test Back (DAL) · rushing yards Over 40.5 (-125) |" in out
     assert "Questionable · tight line" in out, "his own status flags his row"
     assert "None: no leg on this side has his recent workload at the bar." in out    # the Under at 40.5
@@ -200,7 +205,7 @@ def test_the_screen_prints_its_caveats_tables_and_top_cards(one_window):
     after = out[out.index("MD CARD over"):]
     assert "**Screen checks**" in after and "| Consistency | ✓ 4 of 4 at 11+ |" in after, "the marks under the card"
     assert "| Flags | Questionable · tight line |" in after
-    assert "Arizona favored by 3. Total 44.5." in out and "no card built" not in out
+    assert "**DAL at ARI** · " in out
     assert "Past week" not in out
     assert one_window == ["over", "over"], "one build per line, then the top cards"
 
@@ -245,7 +250,7 @@ def test_a_live_window_names_and_leaves_out_its_games_already_started(one_window
         "now": classmethod(lambda cls, tz=None: dt.datetime(2026, 10, 11, 20, 15, tzinfo=dt.timezone.utc))}))
     out = CLI.screen(_screen_args())
     assert "Already kicked off, left out: DEN at LAC (Sun 1:05 PM PT)." in out
-    assert "- DAL at ARI, Sun 1:25 PM PT: Arizona favored by 3. Total 44.5." in out and "DEN at LAC, Sun" not in out and S.REPLAY not in out
+    assert "**DAL at ARI** · Sun 1:25 PM PT" in out and "**DEN at LAC**" not in out and S.REPLAY not in out
 
 
 def test_the_opponent_rate_is_worked_out_once_per_team_and_position(monkeypatch):
@@ -270,3 +275,31 @@ def test_the_release_comes_from_the_chat_stamp_first(tmp_path, monkeypatch):
     assert M._release() == "unknown"
     (root / "nfl.lock.json").write_text('{"tag": "nfl-v1.0"}', encoding="utf-8")
     assert M._release() == "nfl-v1.0"
+
+
+def test_the_game_header_names_a_grade_earned_with_a_quarterback_who_is_out(monkeypatch):
+    import props.calc.__main__ as M
+    g = pd.Series({"season": 2026, "week": 5, "game_id": "g", "away_team": "BAL", "home_team": "ATL",
+                   "kickoff_utc": "2099-10-12T00:20:00+00:00"})
+    monkeypatch.setattr(M, "_game_line", lambda *a: ({"favorite": "ATL", "points": 3.5, "spread_text": "ATL -3.5",
+                                                     "total": 43.5}, ""))
+    monkeypatch.setattr(M, "qb_today", lambda b, t, s, w: "Lamar Jackson ruled Out." if t == "BAL" else "")
+    grades = {("BAL", "run"): ("A-", "S+"), ("BAL", "pass"): ("S+", "A-"), ("ATL", "run"): ("S-", "C"),
+              ("ATL", "pass"): ("D+", "B-")}
+    monkeypatch.setattr(M.matchup, "grade_pair", lambda b, off, dfn, kind, *a: dict(zip(("off", "def"), grades[(off, kind)])))
+    monkeypatch.setattr(M, "_injuries", lambda b, s: pd.DataFrame(columns=["week", "team", "report_status", "full_name"]))
+    L = M.game_header(type("B", (), {})(), g, 2026, {}, dt.datetime(2026, 10, 11, tzinfo=dt.timezone.utc))
+    assert L[0] == "**BAL at ATL** · Sun 5:20 PM PT · Atlanta favored by 3.5. Total 43.5."
+    assert "| BAL run offense vs ATL run defense | A- vs S+ (graded with Lamar Jackson, who is Out) |" in L
+    assert "| BAL pass offense vs ATL pass defense | S+ vs A- (graded with Lamar Jackson, who is Out) |" in L
+    assert "| ATL run offense vs BAL run defense | S- vs C |" in L and "BAL quarterback: Lamar Jackson ruled Out." in L
+    assert "BAL: the week's injury report is not out yet." in L
+
+
+def test_a_player_ruled_out_is_named_and_never_ranked(one_window, monkeypatch):
+    out_inj = pd.DataFrame([{"season": 2026, "week": 5, "team": "DAL", "gsis_id": "00-1", "full_name": "Test Back",
+                             "position": "RB", "report_status": "Out", "practice_status": ""}])
+    monkeypatch.setattr(CLI.data, "injuries", lambda season, manifest=None: out_inj)
+    out = CLI.screen(_screen_args())
+    assert "Not listed, ruled Out: Test Back (rushing yards)." in out
+    assert "| 1 | Test Back" not in out and "MD CARD" not in out, "no row and no card for a player who is out"
