@@ -82,7 +82,7 @@ def filtered_lines(tmp: Path) -> tuple[Path, Path, dict]:
     return out["engine"], out["calc"], kept
 
 
-def legs(b, fixed: dict, eng: Path, calc: Path, log) -> list[dict]:
+def legs(b, eng: Path, calc: Path, log) -> tuple[list[dict], dict]:
     """Every side the screen would list, with the keys each order sorts on."""
     lookup = lines.LineLookup(b.rosters, archive_root=eng, calc_root=calc)
     inj = M._injuries(b, SEASON)
@@ -229,7 +229,8 @@ def report(rows, sel, counts, kept) -> list[str]:
     L += [f"Quotes kept (saved at least 60 minutes before kickoff): engine {kept['engine'][1]} of {kept['engine'][0]} rows, "
           f"calc {kept['calc'][1]} of {kept['calc'][0]}. Lines: {counts}.", ""]
     dropped = sum(r["won"] is None for r in rows)
-    L += [f"Sides at the bar: {len(rows)}; dropped from grading (void, push, did not play, not joined): {dropped}.", ""]
+    L += [f"Sides at the bar: {len(rows)}; dropped from grading (void, push, did not play, not joined): {dropped}. "
+          "Each order's top 3 was chosen before any result; a chosen leg that is dropped is not replaced.", ""]
     for period, weeks in PERIODS:
         for side in ("over", "under"):
             keep = lambda r, w=weeks, s=side: r["week"] in w and r["side"] == s       # noqa: E731
@@ -275,13 +276,14 @@ def main(argv=None) -> int:
         print(warn)
     with tempfile.TemporaryDirectory() as tmp:
         eng, calc, kept = filtered_lines(Path(tmp))
-        rows, counts = legs(b, fixed, eng, calc, print)
+        rows, counts = legs(b, eng, calc, print)
     grade(rows)
     sel = selections(rows)
     text = "\n".join(report(rows, sel, counts, kept)) + "\n"
     a.out.parent.mkdir(parents=True, exist_ok=True)
     a.out.write_text(text, encoding="utf-8")
-    (a.out.with_suffix(".json")).write_text(json.dumps(rows, default=str), encoding="utf-8")
+    safe = [{k: (str(v) if isinstance(v, float) and math.isinf(v) else v) for k, v in r.items()} for r in rows]
+    (a.out.with_suffix(".json")).write_text(json.dumps(safe, default=str), encoding="utf-8")
     print(text)
     return 0
 
