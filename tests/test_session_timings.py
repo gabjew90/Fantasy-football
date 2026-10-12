@@ -116,3 +116,10 @@ def test_a_summarised_transcript_reply_is_flagged(tmp_path):
         "**Reply:** Start Deebo.\n", encoding="utf-8")
     text = nfl.session_report(tmp_path).read_text(encoding="utf-8")
     assert "**Transcript: 2 of 3 entries do not hold the reply verbatim**" in text
+    # an entry with no Ran line still counts, and never borrows the next entry's commands
+    (tmp_path / "chat_transcript.md").write_text(
+        "### 2026-10-11T22:30Z -- release nfl-v1.78\n**User:** hi\n**Reply:** Hello there, here is the answer.\n\n"
+        "### 2026-10-11T22:40Z -- release nfl-v1.78\n**User:** props\n**Ran:** calc screen --game BAL@ATL (0)\n"
+        "**Reply:** (the screen, summarised)\n", encoding="utf-8")
+    text = nfl.session_report(tmp_path).read_text(encoding="utf-8")
+    assert "**Transcript: 1 of 2 entries do not hold the reply verbatim**" in text

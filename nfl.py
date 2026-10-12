@@ -292,8 +292,15 @@ def session_report(out: Path) -> Path:
     tr = read("chat_transcript.md") or ""
     import re as _re
     # an entry starts "## <UTC time> -- release ..."; a reply may carry its own headings
-    entries = _re.findall(r"\*\*Ran:\*\*(.*?)\*\*Reply:\*\*(.*?)(?=\n#{2,3} [^\n]*(?:UTC|release)|\Z)", tr,
-                          flags=_re.S)
+    # one entry per heading ("## <UTC time> -- release ..." or "###"); each read on its own, so a missing
+    # Ran or Reply line never borrows the next entry's
+    entries = []
+    for chunk in _re.split(r"\n(?=#{2,3} [^\n]*(?:UTC|release))", "\n" + tr):
+        if "**Reply:**" not in chunk:
+            continue
+        head, reply = chunk.split("**Reply:**", 1)
+        ran = _re.search(r"\*\*Ran:\*\*(.*)", head)
+        entries.append((ran.group(1) if ran else "", reply))
     replies = [r for _, r in entries]
     # a SHORT reply is fine ("Start Deebo."); a placeholder, an empty one or a summary is not: a reply in
     # brackets ("(explanation of the ranking)"), or a short one after a screen, game or entry run, whose
