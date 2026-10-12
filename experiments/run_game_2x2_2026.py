@@ -13,7 +13,7 @@ same file: share of carries against 8+ defenders in the box, and time to the lin
 
 NGS prices only the carries it tracked (a few per back go untracked), so every per-carry expectation and
 over-expected figure divides by tracked carries: rush_yards_over_expected / its own per-carry field, which
-is a whole number for every back. A back whose ratio is not a whole number between 85% and 100% of his carries
+is a whole number for every back. A back whose ratio is not a whole number between 75% and 100% of his carries
 falls back to all carries, and the output counts how many did. Carries shown and actual yards a carry use all
 carries; the team 8+ box share is weighted by tracked carries, the carries NGS saw the box on."""
 
@@ -44,7 +44,8 @@ def load(season: int) -> pd.DataFrame:
     return d
 
 
-TRACKED_MIN_SHARE = 0.85      # a ratio below this share of carries is noise from a near-zero per-carry figure
+TRACKED_MIN_SHARE = 0.75      # below this share of carries the ratio is noise from a near-zero per-carry figure
+                              # (0.85 refused real weekly counts: Henry week 3 is 21 of 26 tracked)
 
 
 def tracked_carries(d: pd.DataFrame) -> tuple[pd.Series, int]:
