@@ -292,14 +292,20 @@ def session_report(out: Path) -> Path:
     tr = read("chat_transcript.md") or ""
     import re as _re
     # an entry starts "## <UTC time> -- release ..."; a reply may carry its own headings
-    replies = _re.findall(r"\*\*Reply:\*\*(.*?)(?=\n## [^\n]*(?:UTC|release)|\Z)", tr, flags=_re.S)
-    # a SHORT reply is fine ("Start Deebo."); a placeholder or an empty one is not
-    stub = [x for x in replies if not x.strip()
-            or _re.search(r"\(\s*as sent|as sent (?:above|below)|see (?:above|below)|\(same as", x, _re.I)]
+    entries = _re.findall(r"\*\*Ran:\*\*(.*?)\*\*Reply:\*\*(.*?)(?=\n#{2,3} [^\n]*(?:UTC|release)|\Z)", tr,
+                          flags=_re.S)
+    replies = [r for _, r in entries]
+    # a SHORT reply is fine ("Start Deebo."); a placeholder, an empty one or a summary is not: a reply in
+    # brackets ("(explanation of the ranking)"), or a short one after a screen, game or entry run, whose
+    # printed tables alone are longer (DECISIONS #243)
+    stub = [r for ran, r in entries if not r.strip()
+            or _re.search(r"\(\s*as sent|as sent (?:above|below)|see (?:above|below)|\(same as", r, _re.I)
+            or (r.strip().startswith("(") and r.strip().endswith(")"))
+            or (_re.search(r"calc (?:screen|game|entry)", ran) and len(r.strip()) < 600)]
     if stub:
         L += [f"**Transcript: {len(stub)} of {len(replies)} entries do not hold the reply verbatim** "
-              "(a placeholder such as \"(as sent below)\" instead of the text) -- those answers cannot be "
-              "reviewed from this file.", ""]
+              "(a placeholder such as \"(as sent below)\" or a summary instead of the text) -- those answers "
+              "cannot be reviewed from this file.", ""]
     tl = timings(rows)
     L += ["## Timings", "", *(tl or ["*No timed steps (nothing logged).*"]), ""]
     L += ["## Review of the session", "",

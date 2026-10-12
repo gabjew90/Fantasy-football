@@ -101,3 +101,18 @@ def test_the_bootstrap_times_the_whole_setup_even_after_a_hand_over(tmp_path, mo
     pin = hashlib.sha256(b"x = 1\n").hexdigest()
     B.harness_update({"harness": {"scripts/bootstrap.py": pin, "scripts/release.py": pin}}, tmp_path, [])
     assert float(seen["NFL_SETUP_T0"]) == B.T0
+
+
+
+def test_a_summarised_transcript_reply_is_flagged(tmp_path):
+    (tmp_path / "nfl_session_log.jsonl").write_text(json.dumps(_row(["status"], "2026-10-11T00:35:10.000+00:00", 0.6, at_utc="2026-10-11T00:35:11+00:00"))
+                                                    + "\n", encoding="utf-8")
+    (tmp_path / "chat_transcript.md").write_text(
+        "### 2026-10-11T22:30Z -- release nfl-v1.78\n**User:** props\n**Ran:** calc screen --game BAL@ATL (0)\n"
+        "**Self-check:** ok\n**Reply:** BAL@ATL screen reproduced as printed (Overs #1 Robinson).\n\n"
+        "### 2026-10-11T23:59Z -- release nfl-v1.78\n**User:** how\n**Ran:** none\n**Self-check:** ok\n"
+        "**Reply:** (explanation of screen ranking)\n\n"
+        "### 2026-10-12T00:10Z -- release nfl-v1.78\n**User:** who starts\n**Ran:** none\n**Self-check:** ok\n"
+        "**Reply:** Start Deebo.\n", encoding="utf-8")
+    text = nfl.session_report(tmp_path).read_text(encoding="utf-8")
+    assert "**Transcript: 2 of 3 entries do not hold the reply verbatim**" in text
