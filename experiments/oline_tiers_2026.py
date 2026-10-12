@@ -60,8 +60,9 @@ def team_games(rush, pas, pbp, ros) -> tuple[pd.DataFrame, pd.DataFrame, dict]:
              .rename("sacks").reset_index().rename(columns={"posteam": "team"}))
     pas_rows = press.merge(drop, on=["game_id", "team"], how="inner").merge(sacks, on=["game_id", "team"], how="left")
     pas_rows["sacks"] = pas_rows["sacks"].fillna(0)
+    per_week = pbp.loc[pbp["game_id"].isin(games)].groupby("week")["game_id"].nunique()
     notes = {"games": len(games), "rush rows without a roster position": unmatched,
-             "weeks": sorted(pbp.loc[pbp["game_id"].isin(games), "week"].unique().tolist())}
+             "weeks": {int(w): int(n) for w, n in per_week.items()}}
     return run[run["den"] > 0], pas_rows[pas_rows["den"] > 0], notes
 
 
@@ -100,12 +101,16 @@ def build(season: int) -> tuple[pd.DataFrame, dict]:
 
 
 def report(t: pd.DataFrame, notes: dict, season: int) -> str:
-    L = [f"# Offensive line tiers, {season} (weeks {', '.join(map(str, notes['weeks']))})", "",
+    wk = notes["weeks"]
+    full = max(wk.values()) if wk else 0
+    cover = ", ".join(f"week {w}" + ("" if n == full else f" ({n} game{'s' if n != 1 else ''} so far)") for w, n in wk.items())
+    L = [f"# Offensive line tiers, {season}", "", f"Games: {cover}.", "",
          "Run blocking: yards before contact per running-back carry. Pass protection: pressures allowed per "
          "dropback (it includes the quarterback's time to throw). Each adjusted once for the defenses faced; "
          "scores: 50 = league average, 10 = one standard deviation, higher = better line; overall = the two "
-         "averaged. Tiers S (best) to F, the unit grades' own method. Five weeks of games: read these as tiers, "
-         "not an exact order.", "",
+         "averaged. Tiers S (best) to F, the unit grades' own method. A few weeks of games, and each defense's "
+         "adjustment rests on its other three or four games: read these as tiers, not an exact order, and the "
+         "raw rate beside the adjusted one as just as real.", "",
          "| # | Team | Overall | Run block | YBC per RB carry (adjusted) | Pass pro | Pressure rate (adjusted) | Sacks | Games |",
          "|---|---|---|---|---|---|---|---|---|"]
     for i, (team, r) in enumerate(t.iterrows(), 1):
