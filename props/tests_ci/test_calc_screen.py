@@ -294,3 +294,12 @@ def test_the_game_header_names_a_grade_earned_with_a_quarterback_who_is_out(monk
     assert "| BAL pass offense vs ATL pass defense | S+ vs A- (graded with Lamar Jackson, who is Out) |" in L
     assert "| ATL run offense vs BAL run defense | S- vs C |" in L and "BAL quarterback: Lamar Jackson ruled Out." in L
     assert "BAL: the week's injury report is not out yet." in L
+
+
+def test_a_player_ruled_out_is_named_and_never_ranked(one_window, monkeypatch):
+    out_inj = pd.DataFrame([{"season": 2026, "week": 5, "team": "DAL", "gsis_id": "00-1", "full_name": "Test Back",
+                             "position": "RB", "report_status": "Out", "practice_status": ""}])
+    monkeypatch.setattr(CLI.data, "injuries", lambda season, manifest=None: out_inj)
+    out = CLI.screen(_screen_args())
+    assert "Not listed, ruled Out: Test Back (rushing yards)." in out
+    assert "| 1 | Test Back" not in out and "MD CARD" not in out, "no row and no card for a player who is out"

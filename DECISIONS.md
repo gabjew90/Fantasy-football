@@ -9045,5 +9045,8 @@ From the user's 2026-10-11 evening session (nfl_session_2026-10-12_0037):
   cushion (percent of the bar) first; ✓ and ✗ are shown, not counted, and only break ties. The
   caveat that a low line gets a big percent from one extra target is printed with the order. The
   orders are to be measured on replayed weeks before this is kept (method to agree with the user).
+- **Ruled Out, not ranked** (the user, 2026-10-11): a player the official report lists Out is left off
+  the tables (Sleeper voids his leg) and named under "Not listed, ruled Out"; Doubtful and
+  Questionable stay as flagged rows.
 - **Transcript summaries flagged:** `nfl.py log` counts a reply in brackets, or one under 600
   characters after a screen, game or entry run, as not verbatim (and reads "###" entry headings).

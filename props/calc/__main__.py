@@ -488,7 +488,7 @@ def screen(a) -> str:
     lookup = lines.LineLookup(b.rosters)
     inj = _display(lambda: _injuries(b, season))
     inj_ok = not isinstance(inj, dict)
-    rows, problems = [], []
+    rows, problems, ruled_out = [], [], {}
     lines_out, sides_out = {}, {}                  # whole lines never built; sides built but not listed
     skip = lambda why: lines_out.__setitem__(why, lines_out.get(why, 0) + 1)      # noqa: E731
     unlisted = lambda why: sides_out.__setitem__(why, sides_out.get(why, 0) + 1)  # noqa: E731
@@ -522,6 +522,9 @@ def screen(a) -> str:
                 me = inj[(inj["week"] == wk) & (inj["gsis_id"] == got["stub"]["gsis_id"])]
                 st = str(me["report_status"].iloc[-1]) if len(me) else ""
                 status = st if st in ("Questionable", "Doubtful", "Out") else None
+            if status == "Out":             # Sleeper voids his leg: named below the tables, never ranked (DECISIONS #243)
+                ruled_out.setdefault(got["stub"]["player"], []).append(card.SHOW[p_["market"]][0])
+                continue
             for sd in ("over", "under"):
                 r = S.side_row(got["pl"], c, sd, got["shown"], got["stub"], bars["under" if sd == "over" else "over"])
                 if status:
@@ -551,6 +554,9 @@ def screen(a) -> str:
         L += [""] + S.table(ranked[sd], f"{title} (top {S.TOP})")
     if lines_out:
         L += ["", "Lines not ranked: " + ", ".join(f"{n} {why}" for why, n in sorted(lines_out.items())) + "."]
+    if ruled_out:
+        L += ["", "Not listed, ruled Out: " + "; ".join(f"{n} ({', '.join(m)})" for n, m in sorted(ruled_out.items()))
+              + "."]
     if sides_out:
         L += ["", "Sides not listed (an Over and an Under count separately): "
               + ", ".join(f"{n} {why}" for why, n in sorted(sides_out.items())) + "."]

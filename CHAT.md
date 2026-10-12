@@ -354,6 +354,7 @@ Run it through `python nfl.py calc <command>` -- the same commands and arguments
    four marks -- consistency, season rate, opponent's allowed rate, grades -- each ✓, ✗ or – with
    its sample, the cushion and the flags), then the full chat cards for the top 3 a side, each
    followed by its **Screen checks** table (the same ✓ and ✗). Each game has its header (rule 3).
+   A player ruled Out is not ranked; the screen names him under "Not listed, ruled Out".
    The order is the cushion as a percent of the bar, biggest first (the user's choice, untested);
    the marks are shown, not counted. Show it as printed, with a Matchup read on each card (rule 3),
    and keep every card's Screen checks table. Call the order "the smallest ask at
