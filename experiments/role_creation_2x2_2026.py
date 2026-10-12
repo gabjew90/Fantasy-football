@@ -10,13 +10,16 @@ creation predicts a later change of role is a separate backtest, not run here.
   such carries in a month -- so a back's inside-10 share is pulled toward his carry share by K_I10 team
   inside-10 carries: (his inside-10 carries + K_I10 x carry share) / (team's + K_I10). Team carries include
   quarterback designed runs (a goal-line quarterback takes real work from the back) and leave out scrambles
-  and kneels. A game in which he played under half his own median snap share (left hurt, or barely used)
-  is left out of his role, and named: it is not his role.
+  and kneels. For a regular back (median snap share 40%+), a game in which he played under half his own
+  median snap share (he left hurt) is left out of his role, and named; a backup's quiet games are his role
+  and stay in.
 - y, creation (a trait, so measured over 2025 and this season together): broken tackles (Pro Football
   Reference's count on carries and catches; close to, not the same as, PFF's 'missed tackles forced') per
   touch. Four weeks of broken tackles carry no repeatable signal (split-half r near zero at the first
-  check), so a single season's rate is too noisy to act on; the year-to-year correlation of the rate is
-  printed. Yards after contact per carry is shown beside it as the secondary check.
+  check), so a single season's rate is too noisy to act on. Two stability checks are printed: 2025's
+  first half against its second half (a full season's trait), and 2025 against this season's weeks (the
+  second limited by the short 2026 sample). A back with under 50 touches in 2025 (a rookie, mostly) has a
+  creation number resting on this season alone; it is flagged. Yards after contact per carry is shown beside it as the secondary check.
 - colour, the blocking: the team's Next Gen Stats expected yards per carry (run_game_2x2_2026.py, frozen at
   the handoff, so the back's own vision is not in it), against the league.
 Weeks: this season, only those PFR has posted for every game in the play-by-play (PFR runs behind it); 2025,
@@ -46,7 +49,9 @@ SEASON = 2026
 PRIOR = 2025
 WEIGHTS = {"carry_share": 0.50, "i10_share": 0.25, "target_share": 0.25}
 K_I10 = 5                 # team inside-10 carries' worth of pull toward the carry share
-PARTIAL_GAME = 0.5        # a game under this share of his own median snap share is not his role
+PARTIAL_GAME = 0.5        # a game under this share of his own median snap share is not his role ...
+REGULAR_BACK = 0.40       # ... for a back whose median snap share is at least this (a backup's quiet game is his role)
+THIN_PRIOR = 50           # fewer 2025 touches than this: creation rests on this season alone
 MIN_TOUCHES = 30
 COLS = ["game_id", "season", "week", "season_type", "posteam", "yardline_100", "rush_attempt", "pass_attempt", "sack",
         "two_point_attempt", "qb_kneel", "qb_scramble", "rusher_player_id", "receiver_player_id", "complete_pass"]
@@ -132,7 +137,7 @@ def role(s: dict) -> tuple[pd.DataFrame, list]:
     played = data.played(data.snaps(s["season"]), s["ros"])
     played = played[played["game_id"].isin(set(s["p"]["game_id"])) & played["gsis_id"].isin(s["rbs"])].copy()
     med = played.groupby("gsis_id")["offense_pct"].transform("median")
-    partial = played[played["offense_pct"] < PARTIAL_GAME * med]
+    partial = played[(med >= REGULAR_BACK) & (played["offense_pct"] < PARTIAL_GAME * med)]
     names = s["latest"].set_index("gsis_id")["full_name"]
     weeks = dict(zip(s["p"]["game_id"], s["p"]["week"]))
     dropped = sorted(f"{names.get(i, i)} week {weeks.get(gm, '?')} ({100 * pct:.0f}% of snaps)"
@@ -151,6 +156,22 @@ def role(s: dict) -> tuple[pd.DataFrame, list]:
     return b, dropped
 
 
+def subset(s: dict, weeks) -> dict:
+    """The same season's inputs cut to some weeks (for the half-season stability check)."""
+    t = dict(s)
+    for k in ("car", "tgt", "rush", "rec"):
+        t[k] = s[k][s[k]["week"].isin(weeks)]
+    return t
+
+
+def rate_r(a: pd.DataFrame, b: pd.DataFrame, min_t: int) -> tuple[float, int]:
+    j = a.join(b, lsuffix="_a", rsuffix="_b", how="inner")
+    j = j[(j["touches_a"] >= min_t) & (j["touches_b"] >= min_t)]
+    ra = (j["bt_rush_a"] + j["bt_rec_a"]) / j["touches_a"]
+    rb = (j["bt_rush_b"] + j["bt_rec_b"]) / j["touches_b"]
+    return round(float(ra.corr(rb)), 2), len(j)
+
+
 def build() -> tuple[pd.DataFrame, dict]:
     cur, prior = season_inputs(SEASON), season_inputs(PRIOR)
     b, dropped = role(cur)
@@ -158,18 +179,20 @@ def build() -> tuple[pd.DataFrame, dict]:
     c_pri, left_pri = creation(prior)
     cols = ["touches", "bt_rush", "bt_rec", "yac_sum", "pfr_carries"]
     pooled = c_cur[cols].add(c_pri[cols], fill_value=0)
-    # year to year: the same back's rate in 2025 and this season (40+ touches in each)
-    both = c_cur.join(c_pri, lsuffix="_c", rsuffix="_p", how="inner")
-    both = both[(both["touches_c"] >= 40) & (both["touches_p"] >= 40)]
-    yy = float(((both["bt_rush_c"] + both["bt_rec_c"]) / both["touches_c"]).corr((both["bt_rush_p"] + both["bt_rec_p"]) / both["touches_p"]))
+    # stability: 2025 first half vs second half (60+ touches each), and 2025 vs this season (40+ each)
+    half = len(prior["weeks"]) // 2
+    h1, _ = creation(subset(prior, prior["weeks"][:half]))
+    h2, _ = creation(subset(prior, prior["weeks"][half:]))
+    r_half, n_half = rate_r(h1, h2, 60)
+    r_yy, n_yy = rate_r(c_pri, c_cur, 40)
     b = b.join(pooled.add_prefix("pool_"), how="left").join(c_cur[["bt_rush", "bt_rec"]].add_prefix("cur_"), how="left")
     b["touches"] = b["carries"] + b["receptions"]
     b["prior_touches"] = c_pri["touches"].reindex(b.index).fillna(0)
     notes = {"weeks this season": cur["weeks"], f"{PRIOR} weeks": f"{prior['weeks'][0]}-{prior['weeks'][-1]}",
              "games left out of role (under half his median snap share)": dropped,
              "seasons left out of creation (PFR carries miss the plays)": left_cur + left_pri,
-             f"broken tackles per touch, {PRIOR} vs {SEASON}, same back (r, 40+ touches each)": round(yy, 2),
-             "backs in that correlation": len(both),
+             f"broken tackles per touch, {PRIOR} first half vs second half (r, 60+ touches each)": f"{r_half} on {n_half} backs",
+             f"broken tackles per touch, {PRIOR} vs {SEASON} weeks so far (r, 40+ touches each)": f"{r_yy} on {n_yy} backs",
              "PFR rows with no gsis id": cur["unmapped"] + prior["unmapped"]}
     league = {"bt": float((pooled["bt_rush"] + pooled["bt_rec"]).sum() / pooled["touches"].sum()),
               "yac": float(pooled["yac_sum"].sum() / pooled["pfr_carries"].sum())}
@@ -185,10 +208,11 @@ def rates(b: pd.DataFrame, league: dict) -> tuple[pd.DataFrame, dict]:
     r["role"] = 100 * sum(w * r[k] for k, w in WEIGHTS.items())
     r["bt"] = r["pool_bt_rush"] + r["pool_bt_rec"]
     r["mtf_per_touch"] = r["bt"] / r["pool_touches"]
-    r["cur_bt"] = r["cur_bt_rush"].fillna(0) + r["cur_bt_rec"].fillna(0)
+    r["cur_bt"] = r["cur_bt_rush"] + r["cur_bt_rec"]          # NaN when this season's creation was left out
     r["cur_per_touch"] = r["cur_bt"] / r["touches"]
     r["yac_per_carry"] = r["pool_yac_sum"] / r["pool_pfr_carries"]
     r["touches_pg"] = r["touches"] / r["games"]
+    r["thin_creation"] = r["prior_touches"] < THIN_PRIOR
     role_mid = float(r["role"].median())
     r["action"] = [ACTIONS[(x >= role_mid, y >= league["bt"])] for x, y in zip(r["role"], r["mtf_per_touch"])]
     tb, mid, _ = rg.backs(rg.load(SEASON))
@@ -201,7 +225,7 @@ def rates(b: pd.DataFrame, league: dict) -> tuple[pd.DataFrame, dict]:
              "league_exp_ypc": float(mid)}
     keep = ["name", "team", "games", "carries", "i10", "targets", "receptions", "touches", "touches_pg", "carry_share",
             "i10_share", "i10_raw", "target_share", "role", "bt", "pool_touches", "prior_touches", "mtf_per_touch", "cur_bt",
-            "cur_per_touch", "yac_per_carry", "team_exp_ypc", "block_vs_league", "action"]
+            "cur_per_touch", "yac_per_carry", "team_exp_ypc", "block_vs_league", "thin_creation", "action"]
     return r[keep].sort_values("role", ascending=False).reset_index(names="gsis_id"), lines
 
 
@@ -222,11 +246,13 @@ def main(argv=None) -> int:
          f"{WEIGHTS['i10_share']:.0%} (pulled toward the carry share by {K_I10} team inside-10 carries), targets "
          f"{WEIGHTS['target_share']:.0%} of the team's, in his games; split at the median {lines['role_median']:.1f}. Creation = "
          f"broken tackles (PFR) per touch over {PRIOR} and {SEASON}; league {lines['league_mtf_per_touch']:.3f} (yards after "
-         f"contact {lines['league_yac_per_carry']:.2f} a carry). Year to year the same back's rate correlates r = "
-         f"{notes[f'broken tackles per touch, {PRIOR} vs {SEASON}, same back (r, 40+ touches each)']}. Colour = team NGS "
+         f"contact {lines['league_yac_per_carry']:.2f} a carry). Stability of the rate: "
+         f"{PRIOR} first half vs second half r = {notes[f'broken tackles per touch, {PRIOR} first half vs second half (r, 60+ touches each)']}; "
+         f"{PRIOR} vs {SEASON} so far r = {notes[f'broken tackles per touch, {PRIOR} vs {SEASON} weeks so far (r, 40+ touches each)']}. "
+         f"Backs marked * have under {THIN_PRIOR} touches in {PRIOR}: their creation rests on {SEASON} alone. Colour = team NGS "
          f"expected yards per carry vs {lines['league_exp_ypc']:.2f}. The actions are candidates until a backtest tests them.", ""]
     for act in ACTIONS.values():
-        names = [f"{x['name']} ({x['team']}, role {x['role']:.0f}, {x['mtf_per_touch']:.3f} broken tackles/touch on "
+        names = [f"{x['name']}{'*' if x['thin_creation'] else ''} ({x['team']}, role {x['role']:.0f}, {x['mtf_per_touch']:.3f} broken tackles/touch on "
                  f"{int(x['pool_touches'])} touches)" for x in r.to_dict("records") if x["action"] == act]
         L += [f"**{act}** ({len(names)}): " + ", ".join(names), ""]
     L += ["Notes: " + "; ".join(f"{k}: {v}" for k, v in notes.items())]
