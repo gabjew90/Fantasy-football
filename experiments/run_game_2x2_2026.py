@@ -9,7 +9,11 @@ From Next Gen Stats (player tracking, through nflverse), season to date, every b
 - y, what the back added: rush yards over expected per carry (actual minus expected).
 Quadrants split at the league's expected yards per carry (carry-weighted over the backs shown) and at
 zero over expected. A team view sums each team's listed backs the same way. Context columns, from the
-same file: share of carries against 8+ defenders in the box, and time to the line of scrimmage."""
+same file: share of carries against 8+ defenders in the box, and time to the line of scrimmage.
+
+NGS prices only the carries it tracked (a few per back go untracked), so every per-carry expectation and
+over-expected figure divides by tracked carries: rush_yards_over_expected / its own per-carry field, which
+is a whole number for every back. Carries shown, actual yards a carry and the 8+ box weights use all carries."""
 
 from __future__ import annotations
 
@@ -38,15 +42,23 @@ def load(season: int) -> pd.DataFrame:
     return d
 
 
+def tracked_carries(d: pd.DataFrame) -> pd.Series:
+    """Carries NGS priced: its over-expected total over its own per-carry figure (all carries when that is 0)."""
+    per = d["rush_yards_over_expected_per_att"]
+    ratio = (d["rush_yards_over_expected"] / per.where(per != 0)).round()
+    return ratio.fillna(d["rush_attempts"]).clip(upper=d["rush_attempts"])
+
+
 def backs(d: pd.DataFrame) -> tuple[pd.DataFrame, float]:
+    tracked = tracked_carries(d)
     b = pd.DataFrame({"name": d["player_display_name"], "team": d["team"], "carries": d["rush_attempts"],
-                      "exp_ypc": d["expected_rush_yards"] / d["rush_attempts"],
+                      "tracked": tracked, "exp_ypc": d["expected_rush_yards"] / tracked,
                       "ryoe_pc": d["rush_yards_over_expected_per_att"],
                       "ypc": d["rush_yards"] / d["rush_attempts"],
                       "box8_pct": d["percent_attempts_gte_eight_defenders"],
                       "time_to_los": d["avg_time_to_los"], "expected_yards": d["expected_rush_yards"],
                       "ryoe": d["rush_yards_over_expected"]})
-    mid = b["expected_yards"].sum() / b["carries"].sum()
+    mid = b["expected_yards"].sum() / b["tracked"].sum()
     b["quadrant"] = [QUADRANTS[(x >= mid, y >= 0)] for x, y in zip(b["exp_ypc"], b["ryoe_pc"])]
     return b.sort_values("ryoe_pc", ascending=False).reset_index(drop=True), mid
 
@@ -54,8 +66,8 @@ def backs(d: pd.DataFrame) -> tuple[pd.DataFrame, float]:
 def teams(b: pd.DataFrame, mid: float) -> pd.DataFrame:
     g = b.groupby("team")
     t = pd.DataFrame({"carries": g["carries"].sum(), "backs": g["name"].apply(lambda s: ", ".join(s)),
-                      "exp_ypc": g["expected_yards"].sum() / g["carries"].sum(),
-                      "ryoe_pc": g["ryoe"].sum() / g["carries"].sum(),
+                      "exp_ypc": g["expected_yards"].sum() / g["tracked"].sum(),
+                      "ryoe_pc": g["ryoe"].sum() / g["tracked"].sum(),
                       "box8_pct": (b["box8_pct"] * b["carries"]).groupby(b["team"]).sum() / g["carries"].sum()})
     t["quadrant"] = [QUADRANTS[(x >= mid, y >= 0)] for x, y in zip(t["exp_ypc"], t["ryoe_pc"])]
     return t.sort_values("ryoe_pc", ascending=False)
@@ -71,11 +83,13 @@ def main(argv=None) -> int:
     t = teams(b, mid)
     a.out.parent.mkdir(parents=True, exist_ok=True)
     payload = {"season": a.season, "league_exp_ypc": mid, "n_backs": len(b), "carries": int(b["carries"].sum()),
+               "tracked": int(b["tracked"].sum()),
                "backs": b.drop(columns=["expected_yards", "ryoe"]).round(3).to_dict("records"),
                "teams": t.reset_index().round(3).to_dict("records")}
     a.out.with_suffix(".json").write_text(json.dumps(payload, indent=1), encoding="utf-8")
     L = [f"# Run game 2x2, {a.season} (Next Gen Stats, season to date)", "",
-         f"{len(b)} backs with 25+ carries, {int(b['carries'].sum())} carries; league expected {mid:.2f} yards a carry.",
+         f"{len(b)} backs with 25+ carries, {int(b['carries'].sum())} carries ({int(b['tracked'].sum())} tracked by NGS); "
+         f"league expected {mid:.2f} yards a tracked carry.",
          "", "Each team's point sums only its backs NGS lists (25+ carries); a back under 25 carries is not in it. "
          "Yards over expected settles slowly: a back on 25-50 carries can move a full yard a carry on one long run, "
          "so the carry count is shown with every back.", ""]
