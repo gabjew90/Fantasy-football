@@ -12,8 +12,8 @@ nothing in the calculator (frozen to 2026-11-02, DECISIONS #245).
 - Both go on one score (50 = league average, 10 = one standard deviation; higher = better line) and are
   cut into the repo's S-F tiers (props.calc.matchup.tiers / tier_grade, the unit grades' own method).
 - Overall = the average of the two scores, an equal weight, stated as a choice.
-Games: those in both the play-by-play and PFR's files (a game the play-by-play does not have yet is left
-out, and the report says how many games each team has)."""
+Games: those in both the play-by-play and PFR's files, in weeks PFR has posted in full (PFR runs behind the
+play-by-play; a partly posted week is left out and named, so no team gets an extra game)."""
 
 from __future__ import annotations
 
@@ -42,6 +42,11 @@ def load(season: int):
 def team_games(rush, pas, pbp, ros) -> tuple[pd.DataFrame, pd.DataFrame, dict]:
     """(run rows, pass rows, notes): one row per team-game with its numerator and denominator."""
     games = set(pbp["game_id"].unique()) & set(rush["game_id"].unique()) & set(pas["game_id"].unique())
+    # PFR posts a week after the play-by-play: keep only weeks PFR has in full, so no team gets an extra game
+    pbp_n = pbp.groupby("week")["game_id"].nunique()
+    in_both = pbp[pbp["game_id"].isin(games)].groupby("week")["game_id"].nunique()
+    partial = sorted(int(w) for w, n in pbp_n.items() if in_both.get(w, 0) < n)
+    games = {g for g in games if int(pbp.loc[pbp["game_id"] == g, "week"].iloc[0]) not in partial}
     rush = rush[rush["game_id"].isin(games) & (rush["game_type"] == "REG")]
     pas = pas[pas["game_id"].isin(games) & (pas["game_type"] == "REG")]
     pbp = pbp[pbp["game_id"].isin(games)]
@@ -62,7 +67,7 @@ def team_games(rush, pas, pbp, ros) -> tuple[pd.DataFrame, pd.DataFrame, dict]:
     pas_rows["sacks"] = pas_rows["sacks"].fillna(0)
     per_week = pbp.loc[pbp["game_id"].isin(games)].groupby("week")["game_id"].nunique()
     notes = {"games": len(games), "rush rows without a roster position": unmatched,
-             "weeks": {int(w): int(n) for w, n in per_week.items()}}
+             "weeks": {int(w): int(n) for w, n in per_week.items()}, "left out": partial}
     return run[run["den"] > 0], pas_rows[pas_rows["den"] > 0], notes
 
 
@@ -94,21 +99,22 @@ def build(season: int) -> tuple[pd.DataFrame, dict]:
     t = pd.DataFrame({"run_score": score(run["adj"], True), "pass_score": score(pas["adj"], False)})
     t["overall"] = (t["run_score"] + t["pass_score"]) / 2
     for col in ("run_score", "pass_score", "overall"):
-        tr = matchup.tiers(t[col].round(1).to_dict(), True)
+        tr = matchup.tiers({k: round(v) for k, v in t[col].items()}, True, steps=matchup.INT_STEPS)
         t[col.replace("score", "tier") if col != "overall" else "overall_tier"] = [matchup.tier_grade(tr, x) for x in t.index]
     t = t.join(run.add_prefix("run_")).join(pas.add_prefix("pass_"))
     return t.sort_values("overall", ascending=False), notes
 
 
 def report(t: pd.DataFrame, notes: dict, season: int) -> str:
-    wk = notes["weeks"]
-    full = max(wk.values()) if wk else 0
-    cover = ", ".join(f"week {w}" + ("" if n == full else f" ({n} game{'s' if n != 1 else ''} so far)") for w, n in wk.items())
-    L = [f"# Offensive line tiers, {season}", "", f"Games: {cover}.", "",
+    wk = sorted(notes["weeks"])
+    left = notes["left out"]
+    cover = (f"weeks {wk[0]}-{wk[-1]}" if wk else "no weeks") + (
+        f" (week {', '.join(map(str, left))} left out: Pro Football Reference has not posted all of it yet)" if left else "")
+    L = [f"# Offensive line tiers, {season}", "", f"Games: {cover}. Every column, sacks included, covers the same games.", "",
          "Run blocking: yards before contact per running-back carry. Pass protection: pressures allowed per "
          "dropback (it includes the quarterback's time to throw). Each adjusted once for the defenses faced; "
          "scores: 50 = league average, 10 = one standard deviation, higher = better line; overall = the two "
-         "averaged. Tiers S (best) to F, the unit grades' own method. A few weeks of games, and each defense's "
+         "averaged. Tiers S (best) to F, cut on the whole-number scores shown, as the unit grades are. A few weeks of games, and each defense's "
          "adjustment rests on its other three or four games: read these as tiers, not an exact order, and the "
          "raw rate beside the adjusted one as just as real.", "",
          "| # | Team | Overall | Run block | YBC per RB carry (adjusted) | Pass pro | Pressure rate (adjusted) | Sacks | Games |",
