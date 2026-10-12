@@ -8,9 +8,12 @@ The chart
   alongside his team's current backfield, the team's last three games weighted double. No public feed has
   route participation, so offensive snap share stands in for it (on the same 0-100% scale, which the 50%
   lead-back cutoff needs; target share would not reach it). Inside-10 share is lumpy -- a team may have two
-  such carries in a month -- so it is pulled toward his carry share by K_I10 team inside-10 carries.
+  such carries in a month -- so it is pulled toward his carry share by K_I10 team inside-10 carries (which
+  brings his carry share in where his team has few such carries).
   'Current backfield' = the team's backs with a median snap share of 25%+ who played in one of its last two
-  games; a game in which one of them did not play is left out (his role there was a teammate's absence).
+  games. A game in which one of them did not play is left out when that teammate's median snap share is at
+  least half the back's own (his role there was inflated by the absence); a minor teammate's absence does not
+  change a starter's role, so those games stay.
 - y, creation: missed tackles forced per touch -- Pro Football Reference's broken tackles on carries and
   catches (close to, not the same as, PFF's count) -- this season, 50+ touches. A season's first weeks of
   this rate barely repeat (split-half r near zero at an earlier check), so the checks matter.
@@ -123,7 +126,9 @@ def role(d: dict) -> tuple[pd.DataFrame, dict]:
     in_game = pl.groupby("game_id")["gsis_id"].apply(set)
     keep, left_out = [], {}
     for row in pl.itertuples():
-        missing = [m for m in current.get(row.team, []) if m != row.gsis_id and m not in in_game.get(row.game_id, set())]
+        own = med.get((row.team, row.gsis_id), 0)
+        missing = [m for m in current.get(row.team, []) if m != row.gsis_id and m not in in_game.get(row.game_id, set())
+                   and med.get((row.team, m), 0) >= 0.5 * own]
         keep.append(not missing)
         if missing:
             left_out.setdefault(names.get(row.gsis_id, row.gsis_id), []).append(
@@ -191,7 +196,8 @@ def build() -> tuple[pd.DataFrame, dict]:
     q["action"] = [ACTIONS[(x >= ROLE_CUT, y >= mtf_mid)] for x, y in zip(q["role"], q["mtf"])]
 
     # check 1: NGS percent of rushes over expected where listed, else yards after contact per carry
-    ngs = rg.load(SEASON).set_index("player_gsis_id")
+    ngs_rows = rg.load(SEASON)
+    ngs = ngs_rows.set_index("player_gsis_id")
     q["pct_over_exp"] = ngs["rush_pct_over_expected"].reindex(q.index)
     q["check_src"] = q["pct_over_exp"].notna().map({True: "% rushes over expected", False: "yards after contact"})
     poe_mid, yac_mid = float(q["pct_over_exp"].median()), float(q["yac"].median())
@@ -199,7 +205,7 @@ def build() -> tuple[pd.DataFrame, dict]:
     q["check1_agrees"] = [bool(s == (m >= mtf_mid)) for s, m in zip(side, q["mtf"])]
 
     # check 2: the line (NGS team expected yards per carry vs league; run block win rate is not in any feed)
-    tb, lg_mid, _ = rg.backs(rg.load(SEASON))
+    tb, lg_mid, _ = rg.backs(ngs_rows)
     tt = rg.teams(tb, lg_mid)
     q["team_exp_ypc"] = q["team"].map(tt["exp_ypc"])
     if q["team_exp_ypc"].isna().any():
@@ -216,8 +222,9 @@ def build() -> tuple[pd.DataFrame, dict]:
             res.append("")
             txt.append("")
             continue
-        better = bool((row["ybc"] > mates["ybc"]).all() and (row["mtf"] > mates["mtf"]).all())
-        worse = bool((row["ybc"] < mates["ybc"]).all() and (row["mtf"] < mates["mtf"]).all())
+        my = mates["ybc"].dropna()                     # a teammate with catches but no carries has no before-contact rate
+        better = bool((row["ybc"] > my).all() and (row["mtf"] > mates["mtf"]).all())
+        worse = bool((row["ybc"] < my).all() and (row["mtf"] < mates["mtf"]).all())
         res.append("wins both" if better else "loses both" if worse else "split")
         txt.append(", ".join(f"{m} ({y:.2f} before contact, {100 * t:.1f} BT/100)" for m, y, t in
                              zip(mates["name"], mates["ybc"], mates["mtf"])))
@@ -225,7 +232,7 @@ def build() -> tuple[pd.DataFrame, dict]:
 
     # check 4: is the role propped up by a current-backfield teammate's absence?
     status = latest_status(d)
-    team_last = d["p"].groupby("posteam")["week"].max()
+    team_last = d["played"].groupby("team")["week"].max()          # the latest week with snap counts posted
     seen = set(zip(d["played"]["gsis_id"], d["played"]["week"]))
     flags = []
     for gid, row in q.iterrows():
