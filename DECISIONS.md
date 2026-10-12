@@ -9050,3 +9050,41 @@ From the user's 2026-10-11 evening session (nfl_session_2026-10-12_0037):
   Questionable stay as flagged rows.
 - **Transcript summaries flagged:** `nfl.py log` counts a reply in brackets, or one under 600
   characters after a screen, game or entry run, as not verbatim (and reads "###" entry headings).
+
+## 2026-10-12 (244) -- pre-registered: which order should the screen use (written before anything ran)
+
+The user approved a measurement of the screen's sort order (2026-10-11) on these terms, recorded here
+before the script exists in the repo. The script is experiments/screen_order_2026.py; it is reviewed
+(code-review, high) before it runs, run once, reported, and nothing changes until the user decides.
+
+- **Legs.** Every 2026 game with a saved Sleeper quote. One fixed quote per leg: the latest saved quote
+  at least 60 minutes before kickoff (both line files copied with only those rows; the calculator's
+  own lookup picks the newest). Each line is built as the screen builds it (every input cut at the
+  week); a side counts when the screen would list it (recent workload meets the bar, the player not
+  ruled Out on the official report).
+- **Coverage, checked before writing this** (player-markets with any Sleeper quote before kickoff /
+  with one at least 60 minutes before): week 1 none saved (the line record starts in week 2); week 2
+  449 / 240 (53%); week 3 504 / 450 (89%); week 4 529 / 302 (57%); week 5 454 / 433 (95%). The rule is
+  not supported for week 1 at all and only about half of weeks 2 and 4 -- a later capture at the same
+  line replaces the earlier row's time (persist's LINE_KEY has no time), and some weeks were captured
+  late. Legs without a qualifying quote are left out and the coverage is reported with the result.
+  Week 5's stats hold 26 of 32 teams so far (the night games are not in); ungraded legs are dropped.
+- **Results.** The journal's own grader (same stats, name join, push rule) in a throwaway journal. A
+  void, a push or a player not in the week's stats (did not play) is dropped, not counted.
+- **Orders, top 3 per side per game:** A cushion % (live); B fewest ✗, then most ✓, then cushion (the
+  order before #243); C cushion in his own game-to-game spread (workload cushion / standard deviation
+  of his workload in the games the longer-run rate uses); D consistency first (share of season games
+  at or past the bar), then cushion. Baseline: every leg at the bar, unordered.
+- **Measure.** Edge = hit rate minus the average break-even of the same legs (1 / Sleeper multiplier).
+  Ranges: 95% percentile intervals from 2000 bootstrap resamples of games (legs of one game move
+  together), seed 20261011. Every order is reported against the baseline and against break-even first.
+- **Decision rule.** Cushion stays unless another order's edge on the total (weeks 2-5, Overs and Unders
+  pooled) beats cushion's by at least 5 percentage points AND the bootstrap range of that paired
+  difference is entirely above zero; if more than one does, the largest. The margin: about 450
+  graded legs per order put each order's edge within roughly 4-5 points, so a smaller gap could not be
+  told from chance. The result may change the sort order only: no new setting, weight or combined
+  score. If no order clears the margin, cushion stays and the test reruns only when at least three
+  more weeks of legs exist.
+- **Slices, and no others:** weeks 1-2 (week 2 only), weeks 3-5, total; Overs and Unders separately.
+- **Headline:** one line -- did cushion's top 3 per side beat their average break-even: "yes" when the
+  whole range is above zero, "no" when it is entirely below, otherwise "not shown", with the range.
