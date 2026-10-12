@@ -7,13 +7,15 @@ From Next Gen Stats (player tracking, through nflverse), season to date, every b
   carry's expectation from where every blocker and defender is at the handoff -- so it is the line and
   the scheme (and the box), before the back does anything.
 - y, what the back added: rush yards over expected per carry (actual minus expected).
-Quadrants split at the league's expected yards per carry (carry-weighted over the backs shown) and at
+Quadrants split at the league's expected yards per carry (weighted by tracked carries over the backs shown) and at
 zero over expected. A team view sums each team's listed backs the same way. Context columns, from the
 same file: share of carries against 8+ defenders in the box, and time to the line of scrimmage.
 
 NGS prices only the carries it tracked (a few per back go untracked), so every per-carry expectation and
 over-expected figure divides by tracked carries: rush_yards_over_expected / its own per-carry field, which
-is a whole number for every back. Carries shown, actual yards a carry and the 8+ box weights use all carries."""
+is a whole number for every back. A back whose ratio is not a whole number between 85% and 100% of his carries
+falls back to all carries, and the output counts how many did. Carries shown and actual yards a carry use all
+carries; the team 8+ box share is weighted by tracked carries, the carries NGS saw the box on."""
 
 from __future__ import annotations
 
@@ -42,15 +44,22 @@ def load(season: int) -> pd.DataFrame:
     return d
 
 
-def tracked_carries(d: pd.DataFrame) -> pd.Series:
-    """Carries NGS priced: its over-expected total over its own per-carry figure (all carries when that is 0)."""
+TRACKED_MIN_SHARE = 0.85      # a ratio below this share of carries is noise from a near-zero per-carry figure
+
+
+def tracked_carries(d: pd.DataFrame) -> tuple[pd.Series, int]:
+    """Carries NGS priced: its over-expected total over its own per-carry figure. Kept only when that is a
+    whole number between TRACKED_MIN_SHARE and 100% of carries; otherwise all carries. Returns the count
+    and how many backs fell back."""
+    att = d["rush_attempts"]
     per = d["rush_yards_over_expected_per_att"]
-    ratio = (d["rush_yards_over_expected"] / per.where(per != 0)).round()
-    return ratio.fillna(d["rush_attempts"]).clip(upper=d["rush_attempts"])
+    raw = d["rush_yards_over_expected"] / per.where(per != 0)
+    ok = ((raw - raw.round()).abs() < 0.05) & (raw.round() <= att) & (raw.round() >= TRACKED_MIN_SHARE * att)
+    return raw.round().where(ok, att).astype(int), int((~ok).sum())
 
 
-def backs(d: pd.DataFrame) -> tuple[pd.DataFrame, float]:
-    tracked = tracked_carries(d)
+def backs(d: pd.DataFrame) -> tuple[pd.DataFrame, float, int]:
+    tracked, fallbacks = tracked_carries(d)
     b = pd.DataFrame({"name": d["player_display_name"], "team": d["team"], "carries": d["rush_attempts"],
                       "tracked": tracked, "exp_ypc": d["expected_rush_yards"] / tracked,
                       "ryoe_pc": d["rush_yards_over_expected_per_att"],
@@ -59,8 +68,10 @@ def backs(d: pd.DataFrame) -> tuple[pd.DataFrame, float]:
                       "time_to_los": d["avg_time_to_los"], "expected_yards": d["expected_rush_yards"],
                       "ryoe": d["rush_yards_over_expected"]})
     mid = b["expected_yards"].sum() / b["tracked"].sum()
+    # a fallback back's NGS per-carry figure is on tracked carries; recompute his on the same base as his x
+    b["ryoe_pc"] = b["ryoe"] / b["tracked"]
     b["quadrant"] = [QUADRANTS[(x >= mid, y >= 0)] for x, y in zip(b["exp_ypc"], b["ryoe_pc"])]
-    return b.sort_values("ryoe_pc", ascending=False).reset_index(drop=True), mid
+    return b.sort_values("ryoe_pc", ascending=False).reset_index(drop=True), mid, fallbacks
 
 
 def teams(b: pd.DataFrame, mid: float) -> pd.DataFrame:
@@ -68,7 +79,7 @@ def teams(b: pd.DataFrame, mid: float) -> pd.DataFrame:
     t = pd.DataFrame({"carries": g["carries"].sum(), "backs": g["name"].apply(lambda s: ", ".join(s)),
                       "exp_ypc": g["expected_yards"].sum() / g["tracked"].sum(),
                       "ryoe_pc": g["ryoe"].sum() / g["tracked"].sum(),
-                      "box8_pct": (b["box8_pct"] * b["carries"]).groupby(b["team"]).sum() / g["carries"].sum()})
+                      "box8_pct": (b["box8_pct"] * b["tracked"]).groupby(b["team"]).sum() / g["tracked"].sum()})
     t["quadrant"] = [QUADRANTS[(x >= mid, y >= 0)] for x, y in zip(t["exp_ypc"], t["ryoe_pc"])]
     return t.sort_values("ryoe_pc", ascending=False)
 
@@ -79,17 +90,18 @@ def main(argv=None) -> int:
     ap.add_argument("--out", type=Path, default=ROOT / "experiments" / "out" / "run_game_2x2_2026")
     a = ap.parse_args(argv)
     d = load(a.season)
-    b, mid = backs(d)
+    b, mid, fallbacks = backs(d)
     t = teams(b, mid)
     a.out.parent.mkdir(parents=True, exist_ok=True)
     payload = {"season": a.season, "league_exp_ypc": mid, "n_backs": len(b), "carries": int(b["carries"].sum()),
-               "tracked": int(b["tracked"].sum()),
+               "tracked": int(b["tracked"].sum()), "tracked_fallbacks": fallbacks,
                "backs": b.drop(columns=["expected_yards", "ryoe"]).round(3).to_dict("records"),
                "teams": t.reset_index().round(3).to_dict("records")}
     a.out.with_suffix(".json").write_text(json.dumps(payload, indent=1), encoding="utf-8")
     L = [f"# Run game 2x2, {a.season} (Next Gen Stats, season to date)", "",
          f"{len(b)} backs with 25+ carries, {int(b['carries'].sum())} carries ({int(b['tracked'].sum())} tracked by NGS); "
-         f"league expected {mid:.2f} yards a tracked carry.",
+         f"league expected {mid:.2f} yards a tracked carry."
+         + (f" {fallbacks} back(s) fell back to all carries (NGS's tracked count unreadable)." if fallbacks else ""),
          "", "Each team's point sums only its backs NGS lists (25+ carries); a back under 25 carries is not in it. "
          "Yards over expected settles slowly: a back on 25-50 carries can move a full yard a carry on one long run, "
          "so the carry count is shown with every back.", ""]
