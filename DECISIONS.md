@@ -9088,3 +9088,42 @@ before the script exists in the repo. The script is experiments/screen_order_202
 - **Slices, and no others:** weeks 1-2 (week 2 only), weeks 3-5, total; Overs and Unders separately.
 - **Headline:** one line -- did cushion's top 3 per side beat their average break-even: "yes" when the
   whole range is above zero, "no" when it is entirely below, otherwise "not shown", with the range.
+- **Result (run 2026-10-12, commit 07e49a3; accepted by the user).** Did the top 3 per side (cushion
+  order) beat their average break-even? **No: -8.7 points (range -15.4 to -2.2), 311 graded legs.**
+
+  | Weeks 2-5 total | Overs edge (range) | Unders edge (range) |
+  |---|---|---|
+  | baseline (every leg at the bar) | -6.1 (-13.0 to +1.1); hit 50.0% vs 56.1% | -3.5 (-8.9 to +1.6); hit 52.9% vs 56.4% |
+  | A cushion % | -11.4 (-21.2 to -1.7) | -6.4 (-15.3 to +2.3) |
+  | B fewest ✗, most ✓, cushion | -9.5 (-19.0 to -0.2) | -9.5 (-18.4 to -1.1) |
+  | C cushion in his spread | -10.6 (-20.1 to -1.4) | -4.8 (-13.3 to +3.5) |
+  | D consistency first | -11.3 (-19.8 to -2.8) | -8.5 (-17.5 to +0.6) |
+
+  Decision: no order beat cushion by 5 points with its range above zero; pooled, the best was C at
+  about +1.2. **Cushion stays.** Rerun at week 8 or later, same script, same rule, no new orders.
+  Caveats: no week-1 quotes (the "weeks 1-2" slice is week 2, where A and B picked the same legs --
+  every mark was "–" after one game); marks were mostly blank in weeks 3-4 too (283 of 312 and 133 of
+  203 sides), so B against A rests mostly on week 5; weeks 2 and 4 cover about half their lines
+  (53% / 57%); week 5's stats held 26 of 32 teams; 88 of 964 sides dropped (void, push, did not play,
+  ungraded). The unordered baseline was ahead of cushion on the total (+5.3 Overs, +2.9 Unders; both
+  ranges cross zero). Full tables: experiments/out/screen_order_2026.md (rebuilt by the script).
+
+## 2026-10-12 (245) -- the screen states its test result; chat calls no row strong; a three-week freeze
+
+The user accepted #244 and set what follows from it:
+
+- **Screen header** (props/calc/screen.py `TESTED`): "Tested on 2026 weeks 2-5: legs on this list hit about 50% on Overs and 53% on Unders (876 graded legs), against about 56% needed. The top-ranked rows (311 graded legs) did no better. This is a way to read the slate, not a list of likely winners." -- the
+  user's wording with the leg counts made true: the hit rates are from the 876 graded legs at the bar,
+  the 311 are cushion's top-ranked rows. The order line says cushion was kept after the test.
+- **CHAT.md rule 8:** "Strongest means this order" and "the strongest by this ranking is fine" are
+  gone. A request for the strongest or best overs and unders runs the screen and leads with the test
+  line; rows keep their order and ranks, but no row is called strong, likely or good.
+- **CHAT.md rule 7:** a leg may still be chosen because it expresses the stated view; "his recent
+  workload and rate meet the bar" is not a reason on its own, and a leg used only as filler says
+  legs like it hit about 50% in the test. Every assembled entry carries the test line.
+- **Journal summary:** the late-line move is the median, not the mean -- the PrizePicks guaranteed pick
+  (0.5 against a 226.5 line) had swung the mean.
+- **Freeze, 2026-10-12 to 2026-11-02 (three weeks).** Changes to props/calc and to the calculator
+  sections of CHAT.md are limited to a crash, a wrong number, or a card stating something false.
+  Anything else goes to "Later ideas" in docs/plans/2026-10-10-parlay-leg-calculator.md. The screen-
+  order test reruns at week 8 or later (#244) -- running the existing script is not a change.

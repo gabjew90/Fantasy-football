@@ -159,6 +159,18 @@ def test_the_summary_leads_with_late_line_value(root):
     md = "\n".join(J.summary_md(2026))
     assert "**Late-line value, the first number to watch:** 1 of 2 bets got a better number" in md
     assert "1 tied" in md and "| 4 -125 (+0.5) |" in md
+    assert "median move your way +0.25 points" in md
+
+
+def test_the_late_line_move_is_a_median_so_a_guaranteed_pick_cannot_swing_it(root):
+    rows = []
+    for name, pts in (("A", 0.5), ("B", 0.0), ("C", 226.0)):         # C: a 0.5 guaranteed pick against 226.5
+        r = J.make_entry(name, "catches", "over", 2.5, -125, season=2026, week=4, **WHY)
+        r.update(late_line=2.5, late_price=-125, clv_points=pts)
+        rows.append(r)
+    J.write(2026, rows)
+    md = "\n".join(J.summary_md(2026))
+    assert "median move your way +0.50 points" in md and "+75" not in md
 
 
 def test_a_td_bet_finds_its_late_yes_quote():

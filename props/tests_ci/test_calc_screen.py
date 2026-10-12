@@ -189,7 +189,8 @@ def test_the_screen_prints_its_caveats_tables_and_top_cards(one_window):
     out = CLI.screen(_screen_args())
     assert out.startswith("**Smallest ask at the price · Sun 1pm PT · week 5**")
     for must in ("This lists only legs where his recent workload already meets the bar at the price.",
-                 "Legs that depend on a role change", "The ranking is untested against results",
+                 "Legs that depend on a role change", "Tested on 2026 weeks 2-5: legs on this list hit about 50%",
+                 "This is a way to read the slate, not a list of likely winners.",
                  "Order: the workload cushion as a percent of the bar, biggest first"):
         assert must in out
     assert "ARI Out: Hurt Guy. Doubtful or Questionable: none." in out

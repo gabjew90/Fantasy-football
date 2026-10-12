@@ -140,7 +140,7 @@ names a week.
 | a Power Play / an entry of several legs (those four bet types) | **the calculator**: `python nfl.py calc capture`, then `python nfl.py calc entry --dry-run --format md --stake <$> --payout <total Sleeper shows> --angle <...> --why "..." --leg "<Player>\|<market>\|<side>\|<line>" ...` -- **Prop legs and entries** below |
 | the props engine, asked for BY NAME ("what does the engine say", "run the engine on X", an engine game guide or slate) | `nfl.py props player / line / best / matchup / game / slate` -- **Props (the engine, dormant)** below; engine output, untested against real lines |
 | an anytime touchdown, or rushing + receiving yards | the engine: `nfl.py props player "X"` (it lists those lines; `props line` takes only catches, rec yds, rush yds, pass yds) -- the calculator does not cover them; engine output, untested against real lines |
-| the strongest / best overs and unders (or best props, best bets) for a kickoff window or a game | **the calculator's screen**: `python nfl.py calc capture`, then `python nfl.py calc screen --window "<day> <time> PT" --format md` (or `--game AWAY@HOME`) -- rule 8 of **Prop legs and entries** below; show it as printed and call it the smallest ask at the price, untested; never a pick, a lean or a chance |
+| the strongest / best overs and unders (or best props, best bets) for a kickoff window or a game | **the calculator's screen**: `python nfl.py calc capture`, then `python nfl.py calc screen --window "<day> <time> PT" --format md` (or `--game AWAY@HOME`) -- rule 8 of **Prop legs and entries** below; show it as printed and lead with its test line; never call a row strong, likely or good; never a pick, a lean or a chance |
 | build me a Power Play / a parlay / an entry, with no legs given | **the calculator**: assemble entries by view -- **Assembling an entry** (rule 7 of **Prop legs and entries** below), never a refusal; the engine's `props best` only when asked for by name (engine output, untested against real lines) |
 | a read to share / for review / the QA version / the agent version of a game (asked for by name) | `props game AWAY@HOME` (the engine), then **Publishing a read** below |
 | waiver targets at RB / WR / TE | `nfl.py fantasy waiver --league L --pos RB,WR --horizon H` |
@@ -323,8 +323,9 @@ Run it through `python nfl.py calc <command>` -- the same commands and arguments
       teammate, the game script the spread implies.
    3. Then one 4-leg Power Play per view (at most 3 entries):
       - at least one leg from each team;
-      - each leg is a card that expresses that view, or whose "What needs to be true" says his
-        recent workload and rate meet the bar;
+      - each leg is a card that expresses that view. "His recent workload and rate meet the bar" is
+        not a reason on its own (legs like that hit about 50% in the 2026 test, DECISIONS #244); a leg
+        used only to fill an entry says so in the entry, with that number;
       - no two legs whose game stories are opposite: the entry's fit check must print "No
         opposing pairs found." A pair on the same story is allowed, but name it as one bet, not two;
       - never both sides of the same line, never two legs on the same player and bet type;
@@ -338,7 +339,8 @@ Run it through `python nfl.py calc <command>` -- the same commands and arguments
       that leg for another card that fits the view and run it again; never show an entry the
       calculator did not print.
    5. Label each entry by its view ("Entry if you think Jeanty is limited") -- never "best",
-      "recommended", a chance or an edge.
+      "recommended", a chance or an edge. Every assembled entry carries the test line, as the
+      screen prints it: "Tested on 2026 weeks 2-5: legs on this list hit about 50% on Overs and 53% on Unders (876 graded legs), against about 56% needed. The top-ranked rows (311 graded legs) did no better. This is a way to read the slate, not a list of likely winners."
    6. Every number in the bullets and the entries is copied from a card or the entry output. The
       self-check compares each one with its source before sending (the reply that prompted this
       rule had Bowers' line as 73.5 instead of 74.5, and swapped the needed rates between Bowers
@@ -349,19 +351,21 @@ Run it through `python nfl.py calc <command>` -- the same commands and arguments
    weekday and a clock hour, Pacific; `--game AWAY@HOME` for one game). It builds both sides of
    every saved line from one data load and prints, in order: its caveats (which you keep -- it
    lists only legs whose recent workload already meets the bar, leaves out legs that need a role
-   change, and is untested against results), the players each team has ruled Out, an Overs table
+   change, and states its test result, DECISIONS #244), the game headers, an Overs table
    and an Unders table (top 8 each: the workload against the bar with his longer-run rate, then
    four marks -- consistency, season rate, opponent's allowed rate, grades -- each ✓, ✗ or – with
    its sample, the cushion and the flags), then the full chat cards for the top 3 a side, each
    followed by its **Screen checks** table (the same ✓ and ✗). Each game has its header (rule 3).
    A player ruled Out is not ranked; the screen names him under "Not listed, ruled Out".
-   The order is the cushion as a percent of the bar, biggest first (the user's choice, untested);
-   the marks are shown, not counted. Show it as printed, with a Matchup read on each card (rule 3),
-   and keep every card's Screen checks table. Call the order "the smallest ask at
-   the price", never the best, a pick, a lean or a chance; a ✗ is a fact against the leg, say it.
-   **"Strongest" means this order** (the user, 2026-10-11): answer with the legs in the screen's
-   rank order, #1 first, rank numbers kept -- never regrouped by game, team or bet type and never
-   re-sorted by your own view; "the strongest by this ranking" is fine, with the untested caveat.
+   The order is the cushion as a percent of the bar, biggest first (kept after the 2026 test: no
+   other order did better); the marks are shown, not counted. Show it as printed, with a Matchup
+   read on each card (rule 3), and keep every card's Screen checks table. **A request for the
+   strongest or best overs and unders runs the screen, and the reply LEADS with its test line**
+   (the header's "Tested on 2026 weeks 2-5 ..." sentence, word for word): legs on the list hit
+   about 50% on Overs and 53% on Unders against about 56% needed, and the top-ranked rows did no
+   better. Keep the rows in the screen's order with their ranks, but never call a row strong,
+   strongest, likely, good or the best, and never a pick, a lean or a chance; a ✗ is a fact
+   against the leg, say it (the user, 2026-10-12).
    A past week (`--week N`) is rebuilt from the saved line history and says so in its header;
    `--grade` marks a played week's listed legs with the journal's own grader and prints the hit
    rate by rank against the legs' average break-even -- quote it with its count, never as proof.
