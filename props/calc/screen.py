@@ -11,9 +11,12 @@ weights, no settings, no chance. The user's design (2026-10-11):
   rate against the needed rate (– below the card's minimum sample), the opponent's allowed rate
   against the needed rate (– when the card shows none), and the grade matchup (offense against
   defense; equal grades disagree).
-- Order: fewest ✗, then most ✓, then the workload cushion as a percent of the bar.
+- Order: the workload cushion as a percent of the bar, biggest first; the marks are shown, not counted,
+  and only break ties (DECISIONS #243; kept after the #244 test).
 
-Untested against results; the header says so on every run."""
+Tested on 2026 weeks 2-5 (DECISIONS #244): legs on the list hit about 50% on Overs and 53% on Unders
+against about 56% needed, and the top-ranked rows did no better; the header says so on every run
+(TESTED)."""
 
 from __future__ import annotations
 
