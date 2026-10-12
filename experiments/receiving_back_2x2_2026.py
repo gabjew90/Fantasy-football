@@ -18,8 +18,11 @@ two-point try. A back is a running back by his latest weekly roster listing of t
 roster listing is left out and counted). Snaps map from PFR ids to gsis ids through the weekly rosters, as
 props.calc.data.played does; a back whose snaps cannot be mapped is left out and named.
 Views: each season alone (15+ targets) and 2025-26 pooled (25+ targets, team = his 2026 team, or his 2025
-team if he has no 2026 targets). Quadrants split at the running backs' own rate (all shown backs' targets
-over their snaps) and at zero over expected."""
+team if he has no 2026 targets). Quadrants split at the league rate for running backs -- every running
+back's targets over every running back's offensive snaps, shown or not, so the target minimum does not push
+the line toward the receiving backs -- and at zero over expected. A back with no priced catch has no y and
+is left out and named. The target mask mirrors props.calc.data.targets, which cannot be called here because
+it drops the expected-YAC and catch-probability columns."""
 
 from __future__ import annotations
 
@@ -56,7 +59,10 @@ def season_rows(season: int) -> tuple[pd.DataFrame, dict]:
     t = p[flag(p["pass_attempt"]) & ~flag(p["sack"]) & ~flag(p["two_point_attempt"])
           & p["receiver_player_id"].notna()].copy()
     t["caught"] = flag(t["complete_pass"])
-    t["yards"] = t["receiving_yards"].where(t["caught"], 0.0).fillna(0.0)
+    missing = int((t["caught"] & t["receiving_yards"].isna()).sum())
+    if missing:                                   # props.calc.data.targets refuses the same case
+        raise ValueError(f"{season}: {missing} catches with no receiving yards")
+    t["yards"] = t["receiving_yards"].where(t["caught"], 0.0)
     priced = t["caught"] & t["yards_after_catch"].notna() & t["xyac_mean_yardage"].notna()
     t["yac_oe"] = (t["yards_after_catch"] - t["xyac_mean_yardage"]).where(priced)
     t["cp_oe"] = (t["caught"].astype(float) - t["cp"]).where(t["cp"].notna())
@@ -72,36 +78,48 @@ def season_rows(season: int) -> tuple[pd.DataFrame, dict]:
     out = pd.DataFrame({"targets": g.size(), "receptions": g["caught"].sum(), "rec_yards": g["yards"].sum(),
                         "yac_oe_sum": g["yac_oe"].sum(), "priced_catches": g["yac_oe"].count(),
                         "cp_oe_sum": g["cp_oe"].sum(), "cp_targets": g["cp_oe"].count(),
-                        "team": g["posteam"].agg(lambda s: s.iloc[-1])})   # plays are in game order: his latest team
+                        "team": rb.sort_values("week", kind="stable").groupby("receiver_player_id")["posteam"].last()})
 
-    # snaps: PFR id -> gsis id through the rosters (props.calc.data.played's mapping), games with plays loaded
+    # snaps for EVERY running back (the league line needs the backs with no target too): PFR id -> gsis id
+    # through the rosters (props.calc.data.played's mapping), only games whose plays are loaded
     snap = data.snaps(season)
     snap = snap[snap["game_id"].isin(set(p["game_id"])) & (snap["offense_snaps"].fillna(0) > 0)]
     ids = ros.dropna(subset=["pfr_id", "gsis_id"]).drop_duplicates("pfr_id")
     snap = snap.assign(gsis_id=snap["pfr_player_id"].map(dict(zip(ids["pfr_id"], ids["gsis_id"]))))
-    out["snaps"] = snap.dropna(subset=["gsis_id"]).groupby("gsis_id")["offense_snaps"].sum().reindex(out.index)
-    no_snaps = out[out["snaps"].isna()]
+    snap = snap.dropna(subset=["gsis_id"])
+    snap = snap[snap["gsis_id"].map(pos) == "RB"]
+    snaps = snap.groupby("gsis_id")["offense_snaps"].sum()
+    no_snaps = out.index.difference(snaps.index)
+    out = out.reindex(out.index.union(snaps.index))
+    for c in ("targets", "receptions", "rec_yards", "yac_oe_sum", "priced_catches", "cp_oe_sum", "cp_targets"):
+        out[c] = out[c].fillna(0)
+    out["team"] = out["team"].fillna(snap.sort_values("week").groupby("gsis_id")["team"].last())
+    out["snaps"] = snaps.reindex(out.index)
     names = latest.set_index("gsis_id")["full_name"]
     out["name"] = names.reindex(out.index)
     out["season"] = season
     notes = {"targets without a roster listing": no_listing,
-             "backs with targets but no mapped snaps (left out)": sorted(names.reindex(no_snaps.index).fillna("?")),
+             "backs with targets but no mapped snaps (left out)": sorted(names.reindex(no_snaps).fillna("?")),
              "completions without expected yards after the catch": int((t["caught"] & ~priced).sum())}
     return out.dropna(subset=["snaps"]), notes
 
 
-def rates(r: pd.DataFrame, min_targets: int) -> tuple[pd.DataFrame, float]:
+def rates(r: pd.DataFrame, min_targets: int) -> tuple[pd.DataFrame, float, list]:
+    mid = 100 * r["targets"].sum() / r["snaps"].sum()     # every running back, before the target minimum
     r = r[r["targets"] >= min_targets].copy()
+    unpriced = sorted(r.loc[r["priced_catches"] == 0, "name"].fillna("?"))
+    r = r[r["priced_catches"] > 0]
+    for c in ("snaps", "targets", "receptions", "priced_catches"):
+        r[c] = r[c].astype(int)
     r["tgt_per100"] = 100 * r["targets"] / r["snaps"]
     r["yac_oe_pc"] = r["yac_oe_sum"] / r["priced_catches"]
     r["cr_oe"] = 100 * r["cp_oe_sum"] / r["cp_targets"]                 # percentage points
     r["yds_per_tgt"] = r["rec_yards"] / r["targets"]
     r["yds_per_rec"] = r["rec_yards"] / r["receptions"]
-    mid = 100 * r["targets"].sum() / r["snaps"].sum()
     r["quadrant"] = [QUADRANTS[(x >= mid, y >= 0)] for x, y in zip(r["tgt_per100"], r["yac_oe_pc"])]
     keep = ["name", "team", "snaps", "targets", "receptions", "rec_yards", "priced_catches", "tgt_per100",
             "yac_oe_pc", "cr_oe", "yds_per_tgt", "yds_per_rec", "quadrant"]
-    return r[keep].sort_values("yac_oe_pc", ascending=False).reset_index(names="gsis_id"), mid
+    return r[keep].sort_values("yac_oe_pc", ascending=False).reset_index(names="gsis_id"), mid, unpriced
 
 
 def main(argv=None) -> int:
@@ -120,16 +138,17 @@ def main(argv=None) -> int:
     for key, frame, m in ((str(SEASONS[1]), per[SEASONS[1]], MIN_TARGETS["season"]),
                           (str(SEASONS[0]), per[SEASONS[0]], MIN_TARGETS["season"]),
                           (f"{SEASONS[0]}-{str(SEASONS[1])[2:]}", pooled, MIN_TARGETS["pooled"])):
-        r, mid = rates(frame, m)
-        views[key] = {"min_targets": m, "mid": mid, "rows": r.round(3).to_dict("records")}
+        r, mid, unpriced = rates(frame, m)
+        views[key] = {"min_targets": m, "mid": mid, "unpriced": unpriced, "rows": r.round(3).to_dict("records")}
     a.out.parent.mkdir(parents=True, exist_ok=True)
     a.out.with_suffix(".json").write_text(json.dumps({"views": views, "notes": {str(k): v for k, v in notes.items()}},
                                                      indent=1), encoding="utf-8")
     L = ["# Receiving backs 2x2 (nflverse play-by-play and snap counts, regular season)", ""]
     for key, v in views.items():
         rows = v["rows"]
-        L += [f"## {key}: {len(rows)} backs with {v['min_targets']}+ targets; running backs' rate "
-              f"{v['mid']:.1f} targets per 100 snaps", ""]
+        L += [f"## {key}: {len(rows)} backs with {v['min_targets']}+ targets; league rate for running backs "
+              f"{v['mid']:.1f} targets per 100 snaps"
+              + (f"; left out, no priced catch: {', '.join(v['unpriced'])}" if v["unpriced"] else ""), ""]
         for q in QUADRANTS.values():
             names = [f"{r['name']} ({r['team']}, {r['targets']} tgt, {r['priced_catches']} priced catches)"
                      for r in rows if r["quadrant"] == q]
