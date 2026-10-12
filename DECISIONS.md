@@ -9050,3 +9050,82 @@ From the user's 2026-10-11 evening session (nfl_session_2026-10-12_0037):
   Questionable stay as flagged rows.
 - **Transcript summaries flagged:** `nfl.py log` counts a reply in brackets, or one under 600
   characters after a screen, game or entry run, as not verbatim (and reads "###" entry headings).
+
+## 2026-10-12 (244) -- pre-registered: which order should the screen use (written before anything ran)
+
+The user approved a measurement of the screen's sort order (2026-10-11) on these terms, recorded here
+before the script exists in the repo. The script is experiments/screen_order_2026.py; it is reviewed
+(code-review, high) before it runs, run once, reported, and nothing changes until the user decides.
+
+- **Legs.** Every 2026 game with a saved Sleeper quote. One fixed quote per leg: the latest saved quote
+  at least 60 minutes before kickoff (both line files copied with only those rows; the calculator's
+  own lookup picks the newest). Each line is built as the screen builds it (every input cut at the
+  week); a side counts when the screen would list it (recent workload meets the bar, the player not
+  ruled Out on the official report).
+- **Coverage, checked before writing this** (player-markets with any Sleeper quote before kickoff /
+  with one at least 60 minutes before): week 1 none saved (the line record starts in week 2); week 2
+  449 / 240 (53%); week 3 504 / 450 (89%); week 4 529 / 302 (57%); week 5 454 / 433 (95%). The rule is
+  not supported for week 1 at all and only about half of weeks 2 and 4 -- a later capture at the same
+  line replaces the earlier row's time (persist's LINE_KEY has no time), and some weeks were captured
+  late. Legs without a qualifying quote are left out and the coverage is reported with the result.
+  Week 5's stats hold 26 of 32 teams so far (the night games are not in); ungraded legs are dropped.
+- **Results.** The journal's own grader (same stats, name join, push rule) in a throwaway journal. A
+  void, a push or a player not in the week's stats (did not play) is dropped, not counted.
+- **Orders, top 3 per side per game:** A cushion % (live); B fewest ✗, then most ✓, then cushion (the
+  order before #243); C cushion in his own game-to-game spread (workload cushion / standard deviation
+  of his workload in the games the longer-run rate uses); D consistency first (share of season games
+  at or past the bar), then cushion. Baseline: every leg at the bar, unordered.
+- **Measure.** Edge = hit rate minus the average break-even of the same legs (1 / Sleeper multiplier).
+  Ranges: 95% percentile intervals from 2000 bootstrap resamples of games (legs of one game move
+  together), seed 20261011. Every order is reported against the baseline and against break-even first.
+- **Decision rule.** Cushion stays unless another order's edge on the total (weeks 2-5, Overs and Unders
+  pooled) beats cushion's by at least 5 percentage points AND the bootstrap range of that paired
+  difference is entirely above zero; if more than one does, the largest. The margin: about 450
+  graded legs per order put each order's edge within roughly 4-5 points, so a smaller gap could not be
+  told from chance. The result may change the sort order only: no new setting, weight or combined
+  score. If no order clears the margin, cushion stays and the test reruns only when at least three
+  more weeks of legs exist.
+- **Slices, and no others:** weeks 1-2 (week 2 only), weeks 3-5, total; Overs and Unders separately.
+- **Headline:** one line -- did cushion's top 3 per side beat their average break-even: "yes" when the
+  whole range is above zero, "no" when it is entirely below, otherwise "not shown", with the range.
+- **Result (run 2026-10-12, commit 07e49a3; accepted by the user).** Did the top 3 per side (cushion
+  order) beat their average break-even? **No: -8.7 points (range -15.4 to -2.2), 311 graded legs.**
+
+  | Weeks 2-5 total | Overs edge (range) | Unders edge (range) |
+  |---|---|---|
+  | baseline (every leg at the bar) | -6.1 (-13.0 to +1.1); hit 50.0% vs 56.1% | -3.5 (-8.9 to +1.6); hit 52.9% vs 56.4% |
+  | A cushion % | -11.4 (-21.2 to -1.7) | -6.4 (-15.3 to +2.3) |
+  | B fewest ✗, most ✓, cushion | -9.5 (-19.0 to -0.2) | -9.5 (-18.4 to -1.1) |
+  | C cushion in his spread | -10.6 (-20.1 to -1.4) | -4.8 (-13.3 to +3.5) |
+  | D consistency first | -11.3 (-19.8 to -2.8) | -8.5 (-17.5 to +0.6) |
+
+  Decision: no order beat cushion by 5 points with its range above zero; pooled, the best was C at
+  about +1.2. **Cushion stays.** Rerun at week 8 or later, same script, same rule, no new orders.
+  Caveats: no week-1 quotes (the "weeks 1-2" slice is week 2, where A and B picked the same legs --
+  every mark was "–" after one game); marks were mostly blank in weeks 3-4 too (283 of 312 and 133 of
+  203 sides), so B against A rests mostly on week 5; weeks 2 and 4 cover about half their lines
+  (53% / 57%); week 5's stats held 26 of 32 teams; 88 of 964 sides dropped (void, push, did not play,
+  ungraded). The unordered baseline was ahead of cushion on the total (+5.3 Overs, +2.9 Unders; both
+  ranges cross zero). Full tables: experiments/out/screen_order_2026.md (rebuilt by the script).
+
+## 2026-10-12 (245) -- the screen states its test result; chat calls no row strong; a three-week freeze
+
+The user accepted #244 and set what follows from it:
+
+- **Screen header** (props/calc/screen.py `TESTED`): "Tested on 2026 weeks 2-5: legs on this list hit about 50% on Overs and 53% on Unders (876 graded legs), against about 56% needed. The top-ranked rows (311 graded legs) did no better. This is a way to read the slate, not a list of likely winners." -- the
+  user's wording with the leg counts made true: the hit rates are from the 876 graded legs at the bar,
+  the 311 are cushion's top-ranked rows. The order line says cushion was kept after the test.
+- **CHAT.md rule 8:** "Strongest means this order" and "the strongest by this ranking is fine" are
+  gone. A request for the strongest or best overs and unders runs the screen and leads with the test
+  line; rows keep their order and ranks, but no row is called strong, likely or good.
+- **CHAT.md rule 7:** a leg may still be chosen because it expresses the stated view; "his recent
+  workload and rate meet the bar" is not a reason on its own, and a leg used only as filler says
+  legs like it hit about 50% in the test. Every assembled entry carries the test line.
+- **Journal summary:** the late-line move is the median, not the mean -- the PrizePicks guaranteed pick
+  (0.5 against a 226.5 line) had swung the mean.
+- **Freeze, 2026-10-12 to 2026-11-02 (three weeks).** Changes to props/calc and to the calculator
+  sections of CHAT.md are limited to a crash, a wrong number, or a card stating something false.
+  Anything else goes to "Later ideas" in docs/plans/2026-10-10-parlay-leg-calculator.md. The screen-
+  order test reruns at week 8 or later (#244) -- running the existing script is not a change. Week 8's
+  stats land around 2026-10-28; the script expires 2026-11-10 (the experiments guardrail), so the
+  rerun falls between those dates, or the PR that reruns it later moves the date.

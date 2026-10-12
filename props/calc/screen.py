@@ -11,9 +11,12 @@ weights, no settings, no chance. The user's design (2026-10-11):
   rate against the needed rate (– below the card's minimum sample), the opponent's allowed rate
   against the needed rate (– when the card shows none), and the grade matchup (offense against
   defense; equal grades disagree).
-- Order: fewest ✗, then most ✓, then the workload cushion as a percent of the bar.
+- Order: the workload cushion as a percent of the bar, biggest first; the marks are shown, not counted,
+  and only break ties (DECISIONS #243; kept after the #244 test).
 
-Untested against results; the header says so on every run."""
+Tested on 2026 weeks 2-5 (DECISIONS #244): legs on the list hit about 50% on Overs and 53% on Unders
+against about 56% needed, and the top-ranked rows did no better; the header says so on every run
+(TESTED)."""
 
 from __future__ import annotations
 
@@ -27,12 +30,13 @@ from .matchup import TIER_LETTERS
 
 DAYS = {"mon": 0, "tue": 1, "wed": 2, "thu": 3, "fri": 4, "sat": 5, "sun": 6}
 JOURNAL_MARKET = {v: k for k, v in ARCHIVE_MARKET.items()}      # calc's name -> the journal's (settle's)
+# the measured result (DECISIONS #244, the report's own numbers): every leg at the bar, Overs 50.0% and Unders
+# 52.9% against 56.1% / 56.4% needed (354 + 522 graded legs); cushion's top 3 per side, 311 graded legs, did no better
+TESTED = ("Tested on 2026 weeks 2-5: legs on this list hit about 50% on Overs and 53% on Unders (876 graded legs), against about 56% needed. The top-ranked rows (311 graded legs) did no better. This is a way to read the slate, not a list of likely winners.")
 HEADER = ("This lists only legs where his recent workload already meets the bar at the price. Legs that "
-          "depend on a role change -- more work than his recent games -- are not on it. The ranking is "
-          "untested against results: it orders legs by how little they ask at the price, not by any chance "
-          "of winning, and it is not a pick.")
-ORDER = ("Order: the workload cushion as a percent of the bar, biggest first (the user's choice, 2026-10-11; "
-         "untested, and a low line gets a big percent from one extra target or carry). The ✓ and ✗ marks are "
+          "depend on a role change -- more work than his recent games -- are not on it. " + TESTED)
+ORDER = ("Order: the workload cushion as a percent of the bar, biggest first (kept after the 2026 test: no other "
+         "order beat it by the margin set in advance; a low line gets a big percent from one extra target or carry). The ✓ and ✗ marks are "
          "shown, not counted: ✓ agrees, ✗ disagrees, – not enough data.")
 TOP = 8
 REPLAY = ("Past week: rebuilt from the saved line history -- the newest saved Sleeper quote before each "

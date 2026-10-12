@@ -35,6 +35,7 @@ import datetime as dt
 import json
 import math
 import os
+import statistics
 import sys
 import uuid
 from pathlib import Path
@@ -606,8 +607,10 @@ def summary_md(season: int) -> list[str]:
         tied = sum(1 for r in lv if r["clv_points"] == 0 and not r.get("clv_price"))
         out += ["**Late-line value, the first number to watch:** "
                 f"{beat} of {len(lv)} bets got a better number than the last line Sleeper showed before kickoff "
-                f"({beat / len(lv):.0%}; {tied} tied); mean move your way {sum(r['clv_points'] for r in lv) / len(lv):+.2f} "
-                "points. Beating the late line shows up in about 100-200 bets; the win rate needs far more. It is the "
+                f"({beat / len(lv):.0%}; {tied} tied); median move your way "
+                f"{statistics.median(r['clv_points'] for r in lv):+.2f} points (the median: one leg logged against "
+                "a different product, such as a guaranteed 0.5 pick against a 226.5 line, cannot swing it). "
+                "Beating the late line shows up in about 100-200 bets; the win rate needs far more. It is the "
                 "last line the capture logged (usually a few hours out), not the true close.", ""]
     if done:
         wins = sum(1 for r in done if r.get("won"))

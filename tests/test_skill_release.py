@@ -589,10 +589,16 @@ def test_chat_assembles_an_entry_by_view_instead_of_refusing():
 def test_chat_routes_the_strongest_overs_and_unders_to_the_screen():
     chat = (ROOT / "CHAT.md").read_text(encoding="utf-8")
     row = next(ln for ln in chat.splitlines() if ln.startswith("| the strongest / best overs and unders"))
-    assert 'calc screen --window "<day> <time> PT" --format md' in row and "smallest ask at the price, untested" in row
-    assert "never a pick, a lean or a chance" in row
+    assert 'calc screen --window "<day> <time> PT" --format md' in row and "lead with its test line" in row
+    assert "never call a row strong, likely or good" in row and "never a pick, a lean or a chance" in row
     rule = " ".join(chat[chat.index("8. **The screen**"):chat.index("Only when the user asks for the engine by name")].split())
-    assert "lists only legs whose recent workload already meets the bar" in rule and "untested against results" in rule
+    assert "lists only legs whose recent workload already meets the bar" in rule and "states its test result" in rule
+    assert "the reply LEADS with its test line" in rule and "never call a row strong" in rule
+    assert '"Strongest" means this order' not in chat and "the strongest by this ranking" not in chat
+    from props.calc import screen as S
+    assert S.TESTED in " ".join(chat.split()), "chat quotes the screen's test line word for word"
+    entry = " ".join(chat[chat.index("7. **Assembling an entry**"):chat.index("8. **The screen**")].split())
+    assert "is not a reason on its own" in entry and "Every assembled entry carries the test line" in entry
     assert "`--grade`" in rule and "never as proof" in rule
 
 
