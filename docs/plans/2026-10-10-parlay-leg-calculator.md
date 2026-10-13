@@ -362,6 +362,28 @@ Not built; each needs the user's go-ahead (the frozen-spec rule).
   (the user, 2026-10-10; not acted on).
 - Show each unit's score beside its grade, as the engine's tables do (neighbouring grades can be
   a point apart); raised by the code review, 2026-10-10.
+- **Pre-registered for the week-8 rerun of #244 (the user, 2026-10-12; DECISIONS #246). Not built; the
+  definition is fixed now, before the data exists.** Question: does a leg hit less often when the
+  games behind its recent workload were played in different circumstances from today's?
+  - Legs: exactly the #244 rerun's legs (screen-listed sides, the fixed quote rule, graded by the
+    journal grader, voids and pushes dropped), weeks 2 to the rerun's last graded week.
+  - "Last 4": the games the card's "Last" line shows -- his last `usual_games` (4) games played
+    before the priced week (`card.last_games`).
+  - Exposed (QB): at least one of the last 4 was started by a quarterback other than his team's
+    current starter -- the starter of his team's most recent game before the priced week
+    (`player.current_starter`) -- where starter = the first dropback of the game (#246).
+  - Exposed (teammate): a same-position teammate -- position from the latest weekly roster before
+    the priced week, on his team that week, with a median offensive snap share of 25%+ over his
+    games before the priced week -- who took an offensive snap in the priced game but took none in
+    at least one of the last 4 (or the reverse: took a snap in at least one of the last 4 and none
+    in the priced game). Snaps from nflverse snap counts.
+  - A leg is exposed if either holds; the QB and teammate parts are also reported on their own.
+  - Measure: edge = hit rate minus the average break-even of the same legs, exposed against not
+    exposed, Overs and Unders separately and pooled; 95% ranges from 2000 bootstrap resamples of
+    games, seed 20261011, as #244.
+  - Rule: report only. A difference of 5 points or more with its range entirely on one side may
+    become a flag on the card -- after the user's go-ahead and outside the freeze; anything less
+    changes nothing.
 
 ## Outputs
 

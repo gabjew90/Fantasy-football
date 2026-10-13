@@ -205,6 +205,38 @@ def starters(p: pd.DataFrame) -> pd.DataFrame:
     return top.rename(columns={"passer_player_id": "gsis_id"})[["game_id", "posteam", "gsis_id"]]
 
 
+def first_passers(p: pd.DataFrame, qbs: set | None = None) -> pd.DataFrame:
+    """(game_id, posteam, gsis_id): the quarterback on each team's first dropback of each game, in
+    play-by-play order -- who STARTED. Not `starters` (the most dropbacks, the passing pools'
+    definition): a starter hurt early (Burrow, 2025 week 2) would read as his backup having started.
+    `qbs`: gsis ids listed at QB; a receiver's trick-play pass on that first dropback is not a start."""
+    d = p[_flag(p["qb_dropback"]) & p["passer_player_id"].notna()]
+    if qbs is not None:
+        d = d[d["passer_player_id"].isin(qbs)]
+    first = d.drop_duplicates(["game_id", "posteam"], keep="first")
+    return first.rename(columns={"passer_player_id": "gsis_id"})[["game_id", "posteam", "gsis_id"]]
+
+
+def starters_on_schedule(schedule: pd.DataFrame, p: pd.DataFrame, rosters: pd.DataFrame) -> pd.DataFrame:
+    """The schedule with its quarterback columns replaced by who actually started (DECISIONS #246).
+    nflverse's schedule fills home_qb_* / away_qb_* before a game and does not always correct them
+    after it: 2026 week 2 lists Tua Tagovailoa (Doubtful, did not play) for Atlanta, whose passes
+    were thrown by Cooper Rush and Jack Strand (and 8 more 2025 games, 5 more 2026 games, at the
+    first check). So the starter is the play-by-play's first dropback (`first_passers`), named from
+    the weekly rosters; a game not in the play-by-play (not played, or not posted yet) has no
+    starter -- never the schedule's guess."""
+    sch = schedule.copy()
+    qbs = set(rosters.loc[rosters["position"] == "QB", "gsis_id"].dropna()) if "position" in rosters else None
+    st = first_passers(p, qbs).set_index(["game_id", "posteam"])["gsis_id"].to_dict()
+    r = rosters.dropna(subset=["gsis_id", "full_name"]).sort_values(["season", "week"])
+    full = dict(zip(r["gsis_id"], r["full_name"]))           # latest listing wins
+    for side in ("home", "away"):
+        ids = [st.get((g, t)) for g, t in zip(sch["game_id"], sch[f"{side}_team"])]
+        sch[f"{side}_qb_id"] = ids
+        sch[f"{side}_qb_name"] = [full.get(i) if i else None for i in ids]
+    return sch
+
+
 def player_games(p: pd.DataFrame) -> pd.DataFrame:
     """Per player per game: carries, rush_yds, targets, receptions, rec_yds,
     completions, pass_yds, with his team that game. Yards gained after taking

@@ -1012,3 +1012,61 @@ def test_grade_modifiers_by_hand():
     assert t["step"] == 4
     # in a band of 4 whole scores, the top ceil(4/3) = 2 get +, the bottom 2 get -: 71, 70 -> S+; 69, 68 -> S-
     assert [matchup.tier_grade(t, f"T{v}") for v in (71, 70, 69, 68, 67)] == ["S+", "S+", "S-", "S-", "A+"]
+
+
+# ---------------------------------------------------------------- DECISIONS #246
+
+def test_the_starter_is_the_play_by_plays_first_dropback_never_the_schedules_guess():
+    """nflverse's schedule listed Tua Tagovailoa as Atlanta's 2026 week-2 starter; Cooper Rush and Jack
+    Strand threw every pass. The starter is the first dropback (not the most dropbacks: a starter hurt
+    early would read as his backup), named from the rosters; an unplayed game has none."""
+    pbp = pd.DataFrame([
+        {"game_id": "G2", "posteam": "ATL", "qb_dropback": 1, "passer_player_id": "00-0000010"},   # Rush first
+        {"game_id": "G2", "posteam": "CAR", "qb_dropback": 1, "passer_player_id": "00-0000020"},
+        {"game_id": "G2", "posteam": "ATL", "qb_dropback": 0, "passer_player_id": None},           # a run
+        {"game_id": "G2", "posteam": "ATL", "qb_dropback": 1, "passer_player_id": "00-0000011"},   # Strand, then more
+        {"game_id": "G2", "posteam": "ATL", "qb_dropback": 1, "passer_player_id": "00-0000011"}])
+    sched = pd.DataFrame([{"game_id": "G2", "home_team": "ATL", "away_team": "CAR", "home_qb_id": "00-0000099",
+                           "home_qb_name": "Tua Tagovailoa", "away_qb_id": "00-0000020", "away_qb_name": "Bryce Young"},
+                          {"game_id": "G9", "home_team": "ATL", "away_team": "CHI", "home_qb_id": "00-0000099",
+                           "home_qb_name": "Tua Tagovailoa", "away_qb_id": "00-0000030", "away_qb_name": "X"}])
+    ros = pd.DataFrame([{"season": 2026, "week": 2, "gsis_id": "00-0000010", "full_name": "Cooper Rush"},
+                        {"season": 2026, "week": 2, "gsis_id": "00-0000020", "full_name": "Bryce Young"}])
+    out = data.starters_on_schedule(sched, pbp, ros).set_index("game_id")
+    assert (out.loc["G2", "home_qb_id"], out.loc["G2", "home_qb_name"]) == ("00-0000010", "Cooper Rush")
+    assert out.loc["G2", "away_qb_name"] == "Bryce Young"
+    assert out.loc["G9", "home_qb_id"] is None and out.loc["G9", "home_qb_name"] is None, "not played: no starter"
+    assert data.starters(pbp.assign(season=2026, week=2)).set_index("posteam").loc["ATL", "gsis_id"] == "00-0000011", \
+        "the passing pools' definition (most dropbacks) is unchanged"
+
+
+def test_chat_captures_live_outside_the_release_folder(tmp_path, monkeypatch):
+    """A capture made under one release must be read after the session moves to the next: in an
+    extracted release (its stamp beside it) they live in <root>/calc-lines, not inside <root>/<tag>."""
+    monkeypatch.delenv("NFL_CALC_LINES", raising=False)
+    rel = tmp_path / "nfl-release" / "nfl-v1.81"
+    rel.mkdir(parents=True)
+    assert lines._calc_lines_dir(rel) == rel / "props" / "calc" / "lines", "no stamp: a checkout"
+    (tmp_path / "nfl-release" / "nfl-v1.81.stamp.json").write_text("{}", encoding="utf-8")
+    assert lines._calc_lines_dir(rel) == tmp_path / "nfl-release" / "calc-lines"
+    monkeypatch.setenv("NFL_CALC_LINES", str(tmp_path / "x"))
+    assert lines._calc_lines_dir(rel) == tmp_path / "x"
+
+
+def test_a_trick_play_pass_is_not_a_start_and_a_game_without_plays_has_no_starter():
+    pbp = pd.DataFrame([
+        {"game_id": "G4", "posteam": "ATL", "qb_dropback": 1, "passer_player_id": "00-0000050"},   # a WR's pass
+        {"game_id": "G4", "posteam": "ATL", "qb_dropback": 1, "passer_player_id": "00-0000010"}])
+    sched = pd.DataFrame([{"game_id": "G4", "home_team": "ATL", "away_team": "NO", "home_qb_id": None,
+                           "home_qb_name": None, "away_qb_id": None, "away_qb_name": None, "season": 2026,
+                           "week": 4, "home_score": 20, "away_score": 17},
+                          {"game_id": "G5", "home_team": "ATL", "away_team": "BAL", "home_qb_id": "00-0000099",
+                           "home_qb_name": "Schedule Guess", "away_qb_id": None, "away_qb_name": None, "season": 2026,
+                           "week": 5, "home_score": 24, "away_score": 21}])           # final score, plays not posted
+    ros = pd.DataFrame([{"season": 2026, "week": 4, "gsis_id": "00-0000050", "full_name": "Drake London", "position": "WR"},
+                        {"season": 2026, "week": 4, "gsis_id": "00-0000010", "full_name": "Kirk Cousins", "position": "QB"}])
+    out = data.starters_on_schedule(sched, pbp, ros)
+    assert out.set_index("game_id").loc["G4", "home_qb_name"] == "Kirk Cousins"
+    from props.calc import player
+    assert player.current_starter(out, "ATL", 2026, 6) == "00-0000010", \
+        "week 5's plays are not posted: the current starter is the latest game that has one, not None"

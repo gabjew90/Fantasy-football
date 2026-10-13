@@ -12,6 +12,7 @@ DataError; code errors are not caught."""
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from types import MappingProxyType
 
@@ -28,7 +29,35 @@ KNOWN_TEAMS = set(names.TEAM_NAMES.values())
 CALC_SNAPSHOT = "calc"          # snapshot_type of calc's own captures (the engine writes "decision")
 
 
-CALC_LINES = Path(__file__).resolve().parent / "lines"
+def _calc_lines_dir(repo: Path | None = None) -> Path:
+    """Where calc's own captures live (DECISIONS #246). In a checkout: props/calc/lines. In a chat
+    release -- extracted to <root>/<tag>/ with its stamp beside it (<tag>.stamp.json) -- OUTSIDE the
+    release folder, <root>/calc-lines, so a capture made under one release is still read after the
+    session moves to the next (inside it, a v1.76 capture was invisible to v1.80). NFL_CALC_LINES
+    overrides both."""
+    if os.environ.get("NFL_CALC_LINES"):
+        return Path(os.environ["NFL_CALC_LINES"])
+    repo = repo or Path(__file__).resolve().parents[2]
+    if repo.with_name(repo.name + ".stamp.json").exists():
+        return repo.parent / "calc-lines"
+    return repo / "props" / "calc" / "lines"
+
+
+CALC_LINES = _calc_lines_dir()
+
+
+def _earlier_release_lines(repo: Path | None = None) -> list[Path]:
+    """In a chat release, the props/calc/lines folders left inside the OTHER release folders beside it
+    (captures made before DECISIONS #246 moved them out): read, never written, so a week captured
+    under v1.80 still grades on v1.81. Empty in a checkout or under NFL_CALC_LINES."""
+    repo = repo or Path(__file__).resolve().parents[2]
+    if os.environ.get("NFL_CALC_LINES") or not repo.with_name(repo.name + ".stamp.json").exists():
+        return []
+    return sorted(d / "props" / "calc" / "lines" for d in repo.parent.iterdir()
+                  if d.is_dir() and d != repo and (d / "props" / "calc" / "lines").is_dir())
+
+
+EARLIER_CALC_LINES = _earlier_release_lines()
 
 
 def archive_path(season: int, root: Path | None = None) -> Path:
@@ -39,8 +68,15 @@ def archive_path(season: int, root: Path | None = None) -> Path:
 
 
 def calc_path(season: int, root: Path | None = None) -> Path:
-    """calc's own captures, in the line history's row format."""
+    """calc's own captures, in the line history's row format (where a capture writes)."""
     return (root or CALC_LINES) / str(season) / f"line_archive_{season}.jsonl"
+
+
+def calc_paths(season: int, root: Path | None = None) -> list[Path]:
+    """Every file calc's captures are read from: calc_path, plus (in a chat release, with no root
+    given) those left inside earlier release folders."""
+    extra = [] if root is not None else [d / str(season) / f"line_archive_{season}.jsonl" for d in EARLIER_CALC_LINES]
+    return [calc_path(season, root)] + extra
 
 
 def _rows(path: Path) -> tuple:
@@ -125,7 +161,7 @@ class LineLookup:
 
     def _archive(self, leg: dict, ko_t, line: float | None = None) -> dict | None:
         season = int(leg["season"])
-        files = [p for p in (archive_path(season, self.archive_root), calc_path(season, self.calc_root))
+        files = [p for p in (archive_path(season, self.archive_root), *calc_paths(season, self.calc_root))
                  if p.exists()]
         if not files:
             return None
@@ -227,7 +263,7 @@ class LineLookup:
             by_name.setdefault(names.norm(n), set()).add(g)
         out: dict = {}
         unread, bad = 0, []
-        for path in (archive_path(season, self.archive_root), calc_path(season, self.calc_root)):
+        for path in (archive_path(season, self.archive_root), *calc_paths(season, self.calc_root)):
             if not path.exists():
                 continue
             try:

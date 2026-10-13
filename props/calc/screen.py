@@ -257,6 +257,8 @@ def results(graded: list[dict], rows: list[dict]) -> list[str]:
         for i, r in enumerate([x for x in rows if x["side"] == side], 1):
             g = by_id.get(f"screen-{r['season']}-{r['week']}-{side}-{i}", {})
             res = word.get(g.get("won"), g.get("result") or g.get("status", "open"))   # push, void, check, open
+            if res == "open":
+                res = "not posted yet"         # his game's stats or snap counts are not out (DECISIONS #246)
             act = g.get("actual")
             out.append(f"| {side.title()} | {i} | {card._cell(_leg(r))} | {act if act is not None else '--'} | {res} |")
             if g.get("won") is not None:
@@ -271,5 +273,6 @@ def results(graded: list[dict], rows: list[dict]) -> list[str]:
         out.append(f"- {side.title()}s, {b}: {w} of {n} won ({w / n * 100:.0f}%); the average break-even of those "
                    f"legs is {be / n * 100:.1f}%. Pushes and voids are left out.")
     if not tally:
-        out.append("No listed leg is graded yet (the week's stats are not out, or no leg was listed).")
+        out.append("No listed leg is graded yet: the results are not posted yet (nflverse posts a game's stats and "
+                   "snap counts some hours after it ends), or no leg was listed. Rerun the grade later.")
     return out

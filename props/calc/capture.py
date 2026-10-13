@@ -1,6 +1,7 @@
 """Sleeper line capture, run by hand (`python -m props.calc capture`; no
 workflow runs it). Saves the current two-sided lines for the four markets to
-props/calc/lines/<season>/line_archive_<season>.jsonl with props/persist.py's
+props/calc/lines/<season>/line_archive_<season>.jsonl (in a chat release, <root>/calc-lines/...,
+outside the release folder: lines.CALC_LINES, DECISIONS #246) with props/persist.py's
 writer, in the engine's row format with snapshot_type "calc". Not into
 props/record: only the props workflow commits there (scripts/
 check_commit_hygiene.py refuses a PR that mixes it with code).
