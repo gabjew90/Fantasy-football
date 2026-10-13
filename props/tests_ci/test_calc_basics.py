@@ -1051,3 +1051,22 @@ def test_chat_captures_live_outside_the_release_folder(tmp_path, monkeypatch):
     assert lines._calc_lines_dir(rel) == tmp_path / "nfl-release" / "calc-lines"
     monkeypatch.setenv("NFL_CALC_LINES", str(tmp_path / "x"))
     assert lines._calc_lines_dir(rel) == tmp_path / "x"
+
+
+def test_a_trick_play_pass_is_not_a_start_and_a_game_without_plays_has_no_starter():
+    pbp = pd.DataFrame([
+        {"game_id": "G4", "posteam": "ATL", "qb_dropback": 1, "passer_player_id": "00-0000050"},   # a WR's pass
+        {"game_id": "G4", "posteam": "ATL", "qb_dropback": 1, "passer_player_id": "00-0000010"}])
+    sched = pd.DataFrame([{"game_id": "G4", "home_team": "ATL", "away_team": "NO", "home_qb_id": None,
+                           "home_qb_name": None, "away_qb_id": None, "away_qb_name": None, "season": 2026,
+                           "week": 4, "home_score": 20, "away_score": 17},
+                          {"game_id": "G5", "home_team": "ATL", "away_team": "BAL", "home_qb_id": "00-0000099",
+                           "home_qb_name": "Schedule Guess", "away_qb_id": None, "away_qb_name": None, "season": 2026,
+                           "week": 5, "home_score": 24, "away_score": 21}])           # final score, plays not posted
+    ros = pd.DataFrame([{"season": 2026, "week": 4, "gsis_id": "00-0000050", "full_name": "Drake London", "position": "WR"},
+                        {"season": 2026, "week": 4, "gsis_id": "00-0000010", "full_name": "Kirk Cousins", "position": "QB"}])
+    out = data.starters_on_schedule(sched, pbp, ros)
+    assert out.set_index("game_id").loc["G4", "home_qb_name"] == "Kirk Cousins"
+    from props.calc import player
+    assert player.current_starter(out, "ATL", 2026, 6) == "00-0000010", \
+        "week 5's plays are not posted: the current starter is the latest game that has one, not None"

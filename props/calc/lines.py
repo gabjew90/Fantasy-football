@@ -46,6 +46,20 @@ def _calc_lines_dir(repo: Path | None = None) -> Path:
 CALC_LINES = _calc_lines_dir()
 
 
+def _earlier_release_lines(repo: Path | None = None) -> list[Path]:
+    """In a chat release, the props/calc/lines folders left inside the OTHER release folders beside it
+    (captures made before DECISIONS #246 moved them out): read, never written, so a week captured
+    under v1.80 still grades on v1.81. Empty in a checkout or under NFL_CALC_LINES."""
+    repo = repo or Path(__file__).resolve().parents[2]
+    if os.environ.get("NFL_CALC_LINES") or not repo.with_name(repo.name + ".stamp.json").exists():
+        return []
+    return sorted(d / "props" / "calc" / "lines" for d in repo.parent.iterdir()
+                  if d.is_dir() and d != repo and (d / "props" / "calc" / "lines").is_dir())
+
+
+EARLIER_CALC_LINES = _earlier_release_lines()
+
+
 def archive_path(season: int, root: Path | None = None) -> Path:
     """persist's line history, or the same layout under `root` (tests)."""
     if root is None:
@@ -54,8 +68,15 @@ def archive_path(season: int, root: Path | None = None) -> Path:
 
 
 def calc_path(season: int, root: Path | None = None) -> Path:
-    """calc's own captures, in the line history's row format."""
+    """calc's own captures, in the line history's row format (where a capture writes)."""
     return (root or CALC_LINES) / str(season) / f"line_archive_{season}.jsonl"
+
+
+def calc_paths(season: int, root: Path | None = None) -> list[Path]:
+    """Every file calc's captures are read from: calc_path, plus (in a chat release, with no root
+    given) those left inside earlier release folders."""
+    extra = [] if root is not None else [d / str(season) / f"line_archive_{season}.jsonl" for d in EARLIER_CALC_LINES]
+    return [calc_path(season, root)] + extra
 
 
 def _rows(path: Path) -> tuple:
@@ -140,7 +161,7 @@ class LineLookup:
 
     def _archive(self, leg: dict, ko_t, line: float | None = None) -> dict | None:
         season = int(leg["season"])
-        files = [p for p in (archive_path(season, self.archive_root), calc_path(season, self.calc_root))
+        files = [p for p in (archive_path(season, self.archive_root), *calc_paths(season, self.calc_root))
                  if p.exists()]
         if not files:
             return None
@@ -242,7 +263,7 @@ class LineLookup:
             by_name.setdefault(names.norm(n), set()).add(g)
         out: dict = {}
         unread, bad = 0, []
-        for path in (archive_path(season, self.archive_root), calc_path(season, self.calc_root)):
+        for path in (archive_path(season, self.archive_root), *calc_paths(season, self.calc_root)):
             if not path.exists():
                 continue
             try:

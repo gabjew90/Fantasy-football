@@ -113,7 +113,8 @@ def test_snaps_without_a_stat_row_lose_no_snap_voids_and_an_unposted_game_waits(
             J.make_entry("Late Snaps", "catches", "over", 2.5, -120, team="DAL", season=2026, week=5, **WHY)]
     J.write(2026, rows)
     stats = _stats([dict(week=5, team="ATL", player_display_name="Drake London", player_name="D.London", receptions=6),
-                    dict(week=5, team="DAL", player_display_name="Jake Ferguson", player_name="J.Ferguson", receptions=4)])
+                    dict(week=5, team="DAL", player_display_name="Jake Ferguson", player_name="J.Ferguson", receptions=4),
+                    dict(week=4, team="BUF", player_display_name="James Cook", player_name="J.Cook")])  # BUF: a known code
     roster = {"by_name": {(5, "ATL", n("Austin Hooper")): "00-0000001", (5, "ATL", n("Benched Guy")): "00-0000002",
                           (5, "DAL", n("Late Snaps")): "00-0000003"},
               "pfr": {"00-0000001": "HoopAu00", "00-0000002": "BencGu00"}}
@@ -129,6 +130,14 @@ def test_snaps_without_a_stat_row_lose_no_snap_voids_and_an_unposted_game_waits(
     assert got[3][1] == "open", "BUF has no stat row this week: its game is not posted, never 'did not play'"
     assert got[4][1] == "open", "DAL's stats are in but its snap counts are not: wait"
     assert (c["graded"], c["void"], c["unplayed"], c["open_left"]) == (2, 1, 2, 2)
+
+
+def test_a_team_code_the_stats_never_use_goes_to_check_not_open_forever(root):
+    J.write(2026, [J.make_entry("Puka Nacua", "catches", "over", 5.5, -120, team="LAR", season=2026, week=5, **WHY)])
+    stats = _stats([dict(week=5, team="LA", player_display_name="Kyren Williams", player_name="K.Williams"),
+                    dict(week=4, team="LA", player_display_name="Puka Nacua", player_name="P.Nacua", receptions=9)])
+    J.grade(2026, stats=stats, now=NOW, who_played=({"by_name": {}, "pfr": {}}, {"weeks": {5}, "off": {}, "off_name": {}}))
+    assert J.read(2026)[0]["status"] == "check", "LAR is not an nflverse code: a human resolves it"
 
 
 def test_nothing_open_means_no_download_and_no_file(root):

@@ -262,6 +262,7 @@ def grade(season: int, stats=None, now: dt.datetime | None = None, who_played=No
     if stats is None:
         stats = settle.load_stats(season, HERE / ".cache")
     now = now or dt.datetime.now(dt.timezone.utc)
+    team_codes = snap_teams = None
     for r in rows:
         if r.get("status") != "open":
             continue
@@ -280,10 +281,12 @@ def grade(season: int, stats=None, now: dt.datetime | None = None, who_played=No
         if hit is None:
             m = wk[wk["_name"] == nm]
             hit = m.iloc[0] if len(m) == 1 else None
-        if hit is None and team and wk[wk["team"] == team].empty:
+        if team_codes is None:
+            team_codes = set(stats["team"].dropna())
+        if hit is None and team and team in team_codes and wk[wk["team"] == team].empty:
             counts["unplayed"] += 1          # his game's stats are not posted yet (a later game that week)
             continue
-        if hit is None and team:
+        if hit is None and team and team in team_codes:
             # Absent from his posted game's stats: nflverse's weekly file has no row for a player
             # who did not play AND none for one who played and recorded nothing. His snaps decide.
             if who_played is None:
@@ -291,7 +294,9 @@ def grade(season: int, stats=None, now: dt.datetime | None = None, who_played=No
             roster, snaps = who_played
             if snaps is not None and roster is not None:
                 wkn = int(r["week"])
-                if not any(k[0] == wkn and k[1] == team for k in snaps.get("off_name", {})):
+                if snap_teams is None:
+                    snap_teams = {(k[0], k[1]) for k in snaps.get("off_name", {})}
+                if (wkn, team) not in snap_teams:
                     counts["unplayed"] += 1  # his team's snap counts are not posted yet
                     continue
                 gid = settle.clean_gsis(r.get("gsis_id")) or roster["by_name"].get((wkn, str(team), nm))

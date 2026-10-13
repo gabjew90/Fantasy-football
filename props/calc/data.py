@@ -205,11 +205,14 @@ def starters(p: pd.DataFrame) -> pd.DataFrame:
     return top.rename(columns={"passer_player_id": "gsis_id"})[["game_id", "posteam", "gsis_id"]]
 
 
-def first_passers(p: pd.DataFrame) -> pd.DataFrame:
+def first_passers(p: pd.DataFrame, qbs: set | None = None) -> pd.DataFrame:
     """(game_id, posteam, gsis_id): the quarterback on each team's first dropback of each game, in
     play-by-play order -- who STARTED. Not `starters` (the most dropbacks, the passing pools'
-    definition): a starter hurt early (Burrow, 2025 week 2) would read as his backup having started."""
+    definition): a starter hurt early (Burrow, 2025 week 2) would read as his backup having started.
+    `qbs`: gsis ids listed at QB; a receiver's trick-play pass on that first dropback is not a start."""
     d = p[_flag(p["qb_dropback"]) & p["passer_player_id"].notna()]
+    if qbs is not None:
+        d = d[d["passer_player_id"].isin(qbs)]
     first = d.drop_duplicates(["game_id", "posteam"], keep="first")
     return first.rename(columns={"passer_player_id": "gsis_id"})[["game_id", "posteam", "gsis_id"]]
 
@@ -223,7 +226,8 @@ def starters_on_schedule(schedule: pd.DataFrame, p: pd.DataFrame, rosters: pd.Da
     the weekly rosters; a game not in the play-by-play (not played, or not posted yet) has no
     starter -- never the schedule's guess."""
     sch = schedule.copy()
-    st = first_passers(p).set_index(["game_id", "posteam"])["gsis_id"].to_dict()
+    qbs = set(rosters.loc[rosters["position"] == "QB", "gsis_id"].dropna()) if "position" in rosters else None
+    st = first_passers(p, qbs).set_index(["game_id", "posteam"])["gsis_id"].to_dict()
     r = rosters.dropna(subset=["gsis_id", "full_name"]).sort_values(["season", "week"])
     full = dict(zip(r["gsis_id"], r["full_name"]))           # latest listing wins
     for side in ("home", "away"):

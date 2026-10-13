@@ -294,7 +294,8 @@ def current_starter(schedule: pd.DataFrame, team: str, season: int, week: int):
     """The quarterback who started his team's most recent played game before `week` (DECISIONS #241:
     the current starter, not the opening-day one), or None before the team's first game."""
     t = played_before(schedule, team, season, week)
-    return _starter(t.iloc[-1], team) if len(t) else None
+    known = [q for q in (_starter(g, team) for _, g in t.iterrows()) if q]
+    return known[-1] if known else None     # a final score posted before its plays has no starter yet
 
 
 def backup_qb(mine: pd.DataFrame, schedule: pd.DataFrame, team: str, season: int, week: int) -> pd.DataFrame:

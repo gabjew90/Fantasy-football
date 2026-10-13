@@ -321,3 +321,14 @@ def test_a_leg_whose_game_is_not_posted_reads_not_posted_yet():
     r = _row(40.5, "over", pl=pl)
     text = "\n".join(S.results([dict(S.journal_rows([r], "w")[0], status="open")], [r]))
     assert "| not posted yet |" in text and "the results are not posted yet" in text
+
+
+def test_captures_left_inside_an_earlier_release_folder_are_read(tmp_path, monkeypatch):
+    monkeypatch.delenv("NFL_CALC_LINES", raising=False)
+    root = tmp_path / "nfl-release"
+    new, old = root / "nfl-v1.81", root / "nfl-v1.80"
+    (old / "props" / "calc" / "lines").mkdir(parents=True)
+    new.mkdir()
+    (root / "nfl-v1.81.stamp.json").write_text("{}", encoding="utf-8")
+    assert lines._earlier_release_lines(new) == [old / "props" / "calc" / "lines"]
+    assert lines._earlier_release_lines(old) == [], "no stamp beside it: not a chat release"

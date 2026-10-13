@@ -208,9 +208,11 @@ def qb_today(b, team: str, season: int, week: int) -> str:
     played = player.played_before(b.schedule, team, season, week)
     if played.empty:
         return ""                              # his team has not played yet: no starter yet
-    now = player._starter(played.iloc[-1], team)
-    if now is None:
-        return ""
+    started = played[[player._starter(g, team) is not None for _, g in played.iterrows()]]
+    if started.empty:
+        return ""                              # no played game with its plays posted yet
+    last = started.iloc[-1]                    # a final score posted before its plays has no starter yet
+    now = player._starter(last, team)
     if b.__dict__.get("_injuries_season") != season:
         b._injuries = data.injuries(season, manifest=b.manifest)
         b._injuries_season = season
@@ -222,7 +224,7 @@ def qb_today(b, team: str, season: int, week: int) -> str:
         practice = str(me.get("practice_status", pd.Series([""])).iloc[-1])
         if str(status) == "Out":
             name = str(me["full_name"].iloc[-1]) if "full_name" in me and pd.notna(me["full_name"].iloc[-1]) \
-                and str(me["full_name"].iloc[-1]).strip() else player._starter(played.iloc[-1], team, "name")
+                and str(me["full_name"].iloc[-1]).strip() else player._starter(last, team, "name")
             return f"{name or 'His starting QB'} ruled Out."
         if str(status) in NOT_CONFIRMED or (pd.isna(status) and practice.startswith("Did Not Participate")):
             return "Starting QB not confirmed."

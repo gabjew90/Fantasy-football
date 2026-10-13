@@ -9140,13 +9140,16 @@ the #245 freeze. One PR, no design change.
   props/guard.py, which the journal reads the week with). All four are in skill/release.py's
   INCLUDE_FILES and the harness rules test. tests/test_skill_release.py now checks that every local
   module a released file imports -- at any depth, function-level imports included -- is itself
-  released.
+  released. These files reach a harness built from #231 on (it unpacks what the lock names); an
+  installed skill older than that unpacks by its own rules and still skips them until rebuilt.
 - **Captures survive a release change.** calc's own line captures lived inside the release folder,
   so a capture made under nfl-v1.76 was invisible after the session moved to nfl-v1.80, and
   `screen --week N --grade` printed "no leg has his recent workload at the bar" and "nothing to
   grade". In a chat release (the bootstrap writes `<tag>.stamp.json` beside `<root>/<tag>/`), they
   now live outside it, in `<root>/calc-lines` (props/calc/lines.py `CALC_LINES`; NFL_CALC_LINES
-  overrides; a checkout keeps props/calc/lines). When no line is saved for the requested games,
+  overrides; a checkout keeps props/calc/lines). Captures already left inside earlier release
+  folders beside it are read too (never written), so a week captured under v1.80 still grades on
+  v1.81. When no line is saved for the requested games,
   the screen says so and exits non-zero.
 - **Grading a game whose results are not out.** The journal grader now requires the player's TEAM to
   have rows in the week's stats, not just the week: a Monday game's players are no longer "absent"
@@ -9157,7 +9160,8 @@ the #245 freeze. One PR, no design change.
 - **Snaps and no stats grade as a loss.** A player missing from his posted game's stats was marked
   "check: did he play?". Now his team's snap counts decide, as the book does: offensive snaps -- graded
   at 0 (an Over loses; Hooper, 10 snaps and no target) -- no snap, a void; his team's snaps not posted,
-  open. Only when the snap file cannot be read does a known name still go to "check". The #244 rerun
+  open. Only when the snap file cannot be read, or the row's team code is one the stats never use
+  (a hand-typed LAR), does a known name still go to "check". The #244 rerun
   (week 8) grades with this rule, so such legs now count as losses where #244's week-5 run dropped
   them as "did not play"; the rerun's report states the count.
 - **Who started at quarterback.** nflverse's schedule fills home_qb_* / away_qb_* before a game and
@@ -9166,7 +9170,9 @@ the #245 freeze. One PR, no design change.
   play-by-play. The calculator now replaces those columns when it loads (props/calc/data.py
   `starters_on_schedule`): the starter is the quarterback on each team's first dropback of the game
   (`first_passers`; not the most dropbacks, which would name a backup as the starter when the starter
-  was hurt early), named from the weekly rosters; an unplayed game has none. This also closes the
+  was hurt early; only passers listed at QB, so a receiver's trick-play pass is not a start), named
+  from the weekly rosters; an unplayed game has none, and the current starter is the latest game
+  whose plays are posted (a final score posted before its plays leaves that game without one). This also closes the
   route by which "Starting QB not confirmed" was printed for Penix: the wrong week-2 starter made Tua
   an "earlier starter", and Tua was on Atlanta's report in weeks 1-3; v1.80 code with today's files
   does not print it for Atlanta in weeks 3-6, and with the fix Tua is no longer an earlier starter.
