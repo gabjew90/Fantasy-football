@@ -9129,3 +9129,53 @@ The user accepted #244 and set what follows from it:
   order test reruns at week 8 or later (#244) -- running the existing script is not a change. Week 8's
   stats land around 2026-10-28; the script expires 2026-11-10 (the experiments guardrail), so the
   rerun falls between those dates, or the PR that reruns it later moves the date.
+
+## 2026-10-12 (246) -- post-game fixes inside the freeze: the grader ships, captures survive a release change, starters from the play-by-play
+
+Four chat sessions' post-game reviews found crashes, wrong facts and false statements -- all inside
+the #245 freeze. One PR, no design change.
+
+- **The grader in chat.** `screen --grade` crashed: props/journal.py imports props/settle.py, which
+  was not in the release (nor settle's own imports, props/calls.py and props/engine_version.py, nor
+  props/guard.py, which the journal reads the week with). All four are in skill/release.py's
+  INCLUDE_FILES and the harness rules test. tests/test_skill_release.py now checks that every local
+  module a released file imports -- at any depth, function-level imports included -- is itself
+  released.
+- **Captures survive a release change.** calc's own line captures lived inside the release folder,
+  so a capture made under nfl-v1.76 was invisible after the session moved to nfl-v1.80, and
+  `screen --week N --grade` printed "no leg has his recent workload at the bar" and "nothing to
+  grade". In a chat release (the bootstrap writes `<tag>.stamp.json` beside `<root>/<tag>/`), they
+  now live outside it, in `<root>/calc-lines` (props/calc/lines.py `CALC_LINES`; NFL_CALC_LINES
+  overrides; a checkout keeps props/calc/lines). When no line is saved for the requested games,
+  the screen says so and exits non-zero.
+- **Grading a game whose results are not out.** The journal grader now requires the player's TEAM to
+  have rows in the week's stats, not just the week: a Monday game's players are no longer "absent"
+  because Sunday's games are posted. Their legs stay open, and the screen's results say "not posted
+  yet". A traceback reported right after a game could not be reproduced with the week's stats
+  missing (every leg prints open); the crash above (settle missing from the release) is the likely
+  cause and is fixed.
+- **Snaps and no stats grade as a loss.** A player missing from his posted game's stats was marked
+  "check: did he play?". Now his team's snap counts decide, as the book does: offensive snaps -- graded
+  at 0 (an Over loses; Hooper, 10 snaps and no target) -- no snap, a void; his team's snaps not posted,
+  open. Only when the snap file cannot be read does a known name still go to "check". The #244 rerun
+  (week 8) grades with this rule, so such legs now count as losses where #244's week-5 run dropped
+  them as "did not play"; the rerun's report states the count.
+- **Who started at quarterback.** nflverse's schedule fills home_qb_* / away_qb_* before a game and
+  does not always correct them: 2026 week 2 lists Tua Tagovailoa for Atlanta (Doubtful; Cooper Rush
+  and Jack Strand threw every pass), and 8 more 2025 games and 5 more 2026 games disagree with the
+  play-by-play. The calculator now replaces those columns when it loads (props/calc/data.py
+  `starters_on_schedule`): the starter is the quarterback on each team's first dropback of the game
+  (`first_passers`; not the most dropbacks, which would name a backup as the starter when the starter
+  was hurt early), named from the weekly rosters; an unplayed game has none. This also closes the
+  route by which "Starting QB not confirmed" was printed for Penix: the wrong week-2 starter made Tua
+  an "earlier starter", and Tua was on Atlanta's report in weeks 1-3; v1.80 code with today's files
+  does not print it for Atlanta in weeks 3-6, and with the fix Tua is no longer an earlier starter.
+- **Injury feed: not a join error, reported only.** `status --game` reads nflverse's official
+  injury report: DJ Moore's last week-5 entry there is Questionable (limited practice), and Sleeper's
+  players file also says Questionable; a game-day ruling (inactive) is not in the official report.
+  Aaron Donald is on Los Angeles's 2026 weekly rosters (active) and on Sleeper's Rams roster, so the
+  report row is the source's, not a mis-join. Showing game-day rulings would mean a second source
+  (Sleeper's injury status), which is a design change: described, not built.
+- **Later ideas:** one pre-registered question for the week-8 rerun (QB or teammate changes inside a
+  leg's last 4 games), its definition fixed before the data exists.
+

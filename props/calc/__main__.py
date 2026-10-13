@@ -488,7 +488,7 @@ def screen(a) -> str:
     lookup = lines.LineLookup(b.rosters)
     inj = _display(lambda: _injuries(b, season))
     inj_ok = not isinstance(inj, dict)
-    rows, problems, ruled_out = [], [], {}
+    rows, problems, ruled_out, n_posted = [], [], {}, 0
     lines_out, sides_out = {}, {}                  # whole lines never built; sides built but not listed
     skip = lambda why: lines_out.__setitem__(why, lines_out.get(why, 0) + 1)      # noqa: E731
     unlisted = lambda why: sides_out.__setitem__(why, sides_out.get(why, 0) + 1)  # noqa: E731
@@ -499,6 +499,7 @@ def screen(a) -> str:
                                              "away_team": g["away_team"]})
         problems += bad + ([f"{unread} saved rows for {g['away_team']} at {g['home_team']} could not be read"]
                            if unread else [])
+        n_posted += len(posted)
         for p_ in posted:
             try:
                 got = build_card(b, p_["player"], p_["market"], "over", team=p_["team"], season=season, week=wk,
@@ -538,6 +539,12 @@ def screen(a) -> str:
                 r["_lookup"] = (got["stub"]["player"], got["stub"]["team"], wk)
                 rows.append(r)
     weeks = sorted({int(w) for w in games["week"]})
+    if not n_posted and not problems:
+        # nothing saved for the week: say so and fail, never a list that reads as "no leg at the bar" and a
+        # grade that reads as "nothing to grade" (DECISIONS #246)
+        raise SystemExit(f"No Sleeper lines are saved for {label}, week {', '.join(map(str, weeks))}: nothing to "
+                         f"screen{' or grade' if a.grade else ''}. Lines are saved by `python nfl.py calc capture` "
+                         f"before kickoff; calc's captures are read from {lines.CALC_LINES}.")
     L = [f"**Smallest ask at the price · {label} · week {', '.join(map(str, weeks))}**", "", S.HEADER, "", S.ORDER, ""]
     for _, g in games.iterrows():
         L += game_header(b, g, season, fixed, now) + [""]

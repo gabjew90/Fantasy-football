@@ -12,6 +12,7 @@ DataError; code errors are not caught."""
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from types import MappingProxyType
 
@@ -28,7 +29,21 @@ KNOWN_TEAMS = set(names.TEAM_NAMES.values())
 CALC_SNAPSHOT = "calc"          # snapshot_type of calc's own captures (the engine writes "decision")
 
 
-CALC_LINES = Path(__file__).resolve().parent / "lines"
+def _calc_lines_dir(repo: Path | None = None) -> Path:
+    """Where calc's own captures live (DECISIONS #246). In a checkout: props/calc/lines. In a chat
+    release -- extracted to <root>/<tag>/ with its stamp beside it (<tag>.stamp.json) -- OUTSIDE the
+    release folder, <root>/calc-lines, so a capture made under one release is still read after the
+    session moves to the next (inside it, a v1.76 capture was invisible to v1.80). NFL_CALC_LINES
+    overrides both."""
+    if os.environ.get("NFL_CALC_LINES"):
+        return Path(os.environ["NFL_CALC_LINES"])
+    repo = repo or Path(__file__).resolve().parents[2]
+    if repo.with_name(repo.name + ".stamp.json").exists():
+        return repo.parent / "calc-lines"
+    return repo / "props" / "calc" / "lines"
+
+
+CALC_LINES = _calc_lines_dir()
 
 
 def archive_path(season: int, root: Path | None = None) -> Path:

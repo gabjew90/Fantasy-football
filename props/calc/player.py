@@ -42,7 +42,9 @@ class Bundle:
         self.games = data.games_played(data.player_games(self.pbp), played)
         # his share of his team's offensive snaps per game, for the fewer-snaps marker (display only)
         self.snap_share = played.reindex(columns=["game_id", "gsis_id", "offense_pct"])   # no share column: no marks
-        self.schedule = data.schedule(manifest=manifest, game_type=stype)
+        # who started each game is the play-by-play's, not the schedule's pre-game guess (DECISIONS #246)
+        self.schedule = data.starters_on_schedule(data.schedule(manifest=manifest, game_type=stype),
+                                                  self.pbp, self.rosters)
         self._kickoffs: dict | None = None
         self._week_starts: dict = {}
         r = self.rosters.dropna(subset=["gsis_id", "position"]).sort_values(["season", "week"])

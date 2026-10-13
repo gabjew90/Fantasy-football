@@ -304,3 +304,20 @@ def test_a_player_ruled_out_is_named_and_never_ranked(one_window, monkeypatch):
     out = CLI.screen(_screen_args())
     assert "Not listed, ruled Out: Test Back (rushing yards)." in out
     assert "| 1 | Test Back" not in out and "MD CARD" not in out, "no row and no card for a player who is out"
+
+
+def test_no_saved_line_for_the_week_says_so_and_fails(one_window, monkeypatch):
+    """DECISIONS #246: with nothing saved (a capture made under another release used to be invisible),
+    the screen said "no leg at the bar" and "nothing to grade"; it now says no line is saved and exits non-zero."""
+    monkeypatch.setattr(lines.LineLookup, "posted", lambda self, g: ([], 0, []))
+    with pytest.raises(SystemExit) as ex:
+        CLI.screen(_screen_args(grade=True))
+    assert "No Sleeper lines are saved" in str(ex.value) and "nothing to screen or grade" in str(ex.value)
+    assert ex.value.code not in (0, None)
+
+
+def test_a_leg_whose_game_is_not_posted_reads_not_posted_yet():
+    pl, c = _card(40.5)
+    r = _row(40.5, "over", pl=pl)
+    text = "\n".join(S.results([dict(S.journal_rows([r], "w")[0], status="open")], [r]))
+    assert "| not posted yet |" in text and "the results are not posted yet" in text

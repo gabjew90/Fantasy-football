@@ -244,9 +244,16 @@ def make_entry(player: str, market: str, side: str, line, price: int, *, change:
             "fails": fails.strip(), "angle": angle_, "status": "open", **scen, **vol}
 
 
-def grade(season: int, stats=None, now: dt.datetime | None = None) -> dict:
-    """Grade every open bet whose week has published stats, with settle's own
-    stat file, name join and win/push rules. Returns counts."""
+def grade(season: int, stats=None, now: dt.datetime | None = None, who_played=None) -> dict:
+    """Grade every open bet whose game has published stats, with settle's own
+    stat file, name join and win/push rules. Returns counts.
+
+    A player with no row in a posted game's stats (DECISIONS #246; the book pays a player who took
+    snaps and recorded nothing at 0, and voids one who did not play): his team's snap counts for
+    the week decide -- offensive snaps, graded at 0 (an Over loses); no snap, a void; his team's
+    snaps not posted yet, left open. His TEAM must have rows that week, not just the week: a Monday
+    game's players are not absent because Sunday's games are posted. `who_played` is settle's
+    (roster, snaps) pair; None loads it, and when it cannot load a known name goes to 'check' as before."""
     import settle
     rows = read(season)
     counts = {"graded": 0, "void": 0, "check": 0, "unjoined": 0, "unplayed": 0, "open_left": 0}
@@ -273,12 +280,44 @@ def grade(season: int, stats=None, now: dt.datetime | None = None) -> dict:
         if hit is None:
             m = wk[wk["_name"] == nm]
             hit = m.iloc[0] if len(m) == 1 else None
+        if hit is None and team and wk[wk["team"] == team].empty:
+            counts["unplayed"] += 1          # his game's stats are not posted yet (a later game that week)
+            continue
+        if hit is None and team:
+            # Absent from his posted game's stats: nflverse's weekly file has no row for a player
+            # who did not play AND none for one who played and recorded nothing. His snaps decide.
+            if who_played is None:
+                who_played = settle.load_who_played(season, HERE / ".cache")
+            roster, snaps = who_played
+            if snaps is not None and roster is not None:
+                wkn = int(r["week"])
+                if not any(k[0] == wkn and k[1] == team for k in snaps.get("off_name", {})):
+                    counts["unplayed"] += 1  # his team's snap counts are not posted yet
+                    continue
+                gid = settle.clean_gsis(r.get("gsis_id")) or roster["by_name"].get((wkn, str(team), nm))
+                pfr = roster["pfr"].get(gid) if gid else None
+                n = snaps["off"].get((wkn, pfr), 0.0) if pfr else snaps.get("off_name", {}).get((wkn, str(team), nm), 0.0)
+                if gid is None and not n:
+                    counts["unjoined"] += 1   # no id and no snap row by name: not knowing, not a void
+                    continue
+                if n > 0:
+                    result, won = settle.settle_row({"market": r["market"], "side": r["side"], "line": r["line"]}, 0.0)
+                    pnl = settle.american_pnl(r["price"], won) * float(r.get("stake", 1.0))
+                    r.update(status="graded" if won is not None else "void",
+                             result=f"{result} (played, no stat row: {n:g} offense snaps)", actual=0.0, won=won,
+                             pnl_per_100=round(pnl, 2), graded_at_utc=now.strftime("%Y-%m-%dT%H:%M:%SZ"))
+                    if r.get("volume_unit"):
+                        r["actual_volume"] = 0.0
+                    counts["graded" if won is not None else "void"] += 1
+                else:
+                    r.update(status="void", result="void (did not take an offensive snap)", actual=None, won=None,
+                             pnl_per_100=0.0, graded_at_utc=now.strftime("%Y-%m-%dT%H:%M:%SZ"))
+                    counts["void"] += 1
+                continue
         if hit is None:
-            # Absent from the week's stats. nflverse's weekly file has no row for a
-            # player who did not play AND none for one who played and recorded
-            # nothing -- the book voids the first and pays the second at 0. Never
-            # guess: a known name goes to 'check' for `journal resolve`; an
-            # unknown one stays open.
+            # Absent and his snaps cannot be read (or no team on an older row). Never
+            # guess: a known name goes to 'check' for `journal resolve`; an unknown one
+            # stays open.
             if (stats["_name"] == nm).any():
                 r.update(status="check", result="not in the week's stats: did he play?")
                 counts["check"] += 1
