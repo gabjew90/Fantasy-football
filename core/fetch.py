@@ -48,6 +48,12 @@ NFLVERSE_FILES = {
     "depth_charts": "depth_charts/depth_charts_{season}.csv",
     "snaps": "snap_counts/snap_counts_{season}.csv",
     "player_stats_week": "stats_player/stats_player_week_{season}.csv",
+    # Pro Football Reference advanced stats, weekly: rushing yards before contact; passers' pressures
+    "pfr_adv_rush": "pfr_advstats/advstats_week_rush_{season}.csv",
+    "pfr_adv_pass": "pfr_advstats/advstats_week_pass_{season}.csv",
+    "pfr_adv_rec": "pfr_advstats/advstats_week_rec_{season}.csv",     # receivers' broken tackles
+    # Next Gen Stats rushing (all seasons in one file): expected rush yards and yards over expected
+    "ngs_rushing": "nextgen_stats/ngs_rushing.csv.gz",
     "players": "players/players.csv",
 }
 GAMES_URL = "https://raw.githubusercontent.com/nflverse/nfldata/master/data/games.csv"

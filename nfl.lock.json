@@ -5,7 +5,7 @@
   "CHAT.md": "dd63827621d2a79efce0ce94c70a981dea4061a9d1b0eff0cec0f1bc0dfb575c",
   "config.yaml": "1a2af1bd5d6c7a464e908b50e94d910d2adba1675dede83876369aca7329c0c6",
   "core/__init__.py": "8ac9ed217e439f5828616ab66ec9ff17336c2cbbbeae391d0f9bfa001eaed571",
-  "core/fetch.py": "f7645d380c6a997b539eb28bda37400887c616d23360f71b013922541e2284fa",
+  "core/fetch.py": "f120dd366d4fa13e2bfbfca51234778f6c8be37d58b9fd0e12808690bce56dea",
   "core/ids.py": "754948692592ca92170266367c700b715d69f73c9d8fd3361eed408268ffff3d",
   "core/manifest.py": "dcdb9e164a30fbe102f7559661157c33f08c9dd6455aee6f185761260f921195",
   "core/probe.py": "b3ef1cd2f783157b4dcd75f93cacf4f00613fa4c787b921ee9e0fe452c74bdee",
@@ -206,6 +206,6 @@
   "scripts/bootstrap.py": "8c6c428d7b66fde19ea8894d5124a0c182ba3f9719db6031f4904459e3b8cdd7",
   "scripts/release.py": "0bdf24c73b040deb17c649e9d7badb9a71edaac6a6044f237be6e0e246ee804e"
  },
- "sha256": "0f34d10821fbca7d35982a9a77437503f61e05fa6cef42785ffc297c645bff5c",
- "tag": "nfl-v1.81"
+ "sha256": "5d886000295deaabe55116537594ad5e31ca86828be81f1283b0a6c35207670b",
+ "tag": "nfl-v1.82"
 }
